@@ -12,18 +12,28 @@ REUSE=0
 VERBOSE=0
 WORKLOAD=0 # skip the populate phase.
 PERF_BASE="M"
+OPTFILE=''
+DEBUG=
+GDB=${GDB:-gdb}
 
-USAGE="Usage: `basename $0` [-hRWsv] [-b binary dir] [-r root dir]"
+USAGE="Usage: `basename $0` [-hdRWsv] [-b binary dir] [-r root dir] [-O optfile]"
 
 # Parse command line options.
-while getopts b:hRWr:sv OPT; do
+while getopts b:dhO:RWr:sv OPT; do
     case "$OPT" in
         b)
             BIN_DIR=$OPTARG
             ;;
+        d)
+            export TERM=dtterm
+            DEBUG="$GDB --args"
+            ;;
         h)
             echo $USAGE
             exit 0
+            ;;
+        O)
+            OPTFILE=-O$OPTARG
             ;;
         R)
             REUSE=1
@@ -59,7 +69,7 @@ fi
 
 DB_HOME="$ROOT_DIR/WT_TEST"
 OUT_DIR="$ROOT_DIR/results"
-SHARED_OPTS="-${PERF_BASE} -R 1 -U 1 -t 1 -v 1 -h ${DB_HOME} -u table:test"
+SHARED_OPTS="${OPTFILE} -${PERF_BASE} -R 1 -U 1 -t 1 -v 1 -h ${DB_HOME} -u table:test"
 CREATE_OPTS="$SHARED_OPTS -r 0"
 RUN_OPTS="$SHARED_OPTS -r $RUNTIME"
 if [ $WORKLOAD -eq 0 ]; then
@@ -73,7 +83,7 @@ if [ $REUSE -eq 0 ]; then
 		echo "Creating database and archiving it for reuse."
 	fi
 	rm -rf $DB_HOME && mkdir $DB_HOME
-	$WTPERF $CREATE_OPTS
+	$DEBUG $WTPERF $CREATE_OPTS || exit 1
 
 	# Save the database so that it can be re-used by all runs.
 	# I'd rather not hard code WT_TEST, but need to get the path right.
@@ -99,15 +109,19 @@ for ckpt in "-c 120"; do
 		else
 			rm -rf $DB_HOME && mkdir $DB_HOME
 		fi
-		$WTPERF $RUN_OPTS $ckpt $opts &
-		pid=$!
-		t=0
-		while kill -0 $pid 2> /dev/null; do
-			echo "Time $t"
-			pmp $pid
-			sleep 1
-			(( t++ ))
-		done > $OUT_DIR/${res_name}.trace
+		if [ "$DEBUG" = '' ]; then
+			$WTPERF $RUN_OPTS $ckpt $opts &
+			pid=$!
+			t=0
+			while kill -0 $pid 2> /dev/null; do
+				echo "Time $t"
+				pmp $pid
+				sleep 1
+				(( t++ ))
+			done > $OUT_DIR/${res_name}.trace
+		else
+			$DEBUG $WTPERF $RUN_OPTS $ckpt $opts
+		fi
 		cp $DB_HOME/test.stat "$OUT_DIR/${res_name}.res"
 	done
 done

@@ -37,6 +37,8 @@
 #include <pthread.h>
 #include <inttypes.h>
 #include <unistd.h>
+#include <stddef.h>
+#include <ctype.h>
 
 #include <wiredtiger.h>
 
@@ -86,6 +88,47 @@ typedef struct {
 	uint32_t rand_range; /* The range to use if doing random inserts. */
 } CONFIG;
 
+typedef enum {
+	UINT32_TYPE, STRING_TYPE, BOOL_TYPE, FLAG_TYPE
+} CONFIG_OPT_TYPE;
+
+typedef struct {
+	const char *name;
+	CONFIG_OPT_TYPE type;
+	size_t offset;
+	uint32_t flagmask;
+} CONFIG_OPT;
+
+/* Parallels CONFIG, exposing what can be changed using -o or -O. */
+CONFIG_OPT config_opts[] = {
+	{ "home", STRING_TYPE, offsetof(CONFIG, home), 0 },
+	{ "uri", STRING_TYPE, offsetof(CONFIG, uri), 0 },
+	{ "conn_config", STRING_TYPE, offsetof(CONFIG, conn_config), 0 },
+	{ "table_config", STRING_TYPE, offsetof(CONFIG, table_config), 0 },
+	{ "create", BOOL_TYPE, offsetof(CONFIG, create), 0 },
+	{ "rand_seed", UINT32_TYPE, offsetof(CONFIG, rand_seed), 0 },
+	{ "icount", UINT32_TYPE, offsetof(CONFIG, icount), 0 },
+	{ "data_sz", UINT32_TYPE, offsetof(CONFIG, data_sz), 0 },
+	{ "key_sz", UINT32_TYPE, offsetof(CONFIG, key_sz), 0 },
+	{ "report_interval", UINT32_TYPE,
+	  offsetof(CONFIG, report_interval), 0 },
+	{ "checkpoint_interval", UINT32_TYPE,
+	  offsetof(CONFIG, checkpoint_interval), 0 },
+	{ "stat_interval", UINT32_TYPE, offsetof(CONFIG, stat_interval), 0 },
+	{ "run_time", UINT32_TYPE, offsetof(CONFIG, run_time), 0 },
+	{ "elapsed_time", UINT32_TYPE, offsetof(CONFIG, elapsed_time), 0 },
+	{ "populate_threads", UINT32_TYPE,
+	  offsetof(CONFIG, populate_threads), 0 },
+	{ "read_threads", UINT32_TYPE, offsetof(CONFIG, read_threads), 0 },
+	{ "insert_threads", UINT32_TYPE, offsetof(CONFIG, insert_threads), 0 },
+	{ "update_threads", UINT32_TYPE, offsetof(CONFIG, update_threads), 0 },
+	{ "verbose", UINT32_TYPE, offsetof(CONFIG, verbose), 0 },
+	{ "insert_rmw", FLAG_TYPE, offsetof(CONFIG, flags), PERF_INSERT_RMW },
+	{ "pareto", FLAG_TYPE, offsetof(CONFIG, flags), PERF_RAND_PARETO },
+	{ "random", FLAG_TYPE, offsetof(CONFIG, flags), PERF_RAND_WORKLOAD },
+	{ "random_range", UINT32_TYPE, offsetof(CONFIG, rand_range), 0 }
+};
+
 /* Forward function definitions. */
 int execute_populate(CONFIG *);
 int execute_workload(CONFIG *);
@@ -98,6 +141,11 @@ int lprintf(CONFIG *cfg, int err, uint32_t level, const char *fmt, ...)
 void *checkpoint_worker(void *);
 int find_table_count(CONFIG *);
 void *insert_thread(void *);
+void config_assign(CONFIG *, const CONFIG *);
+void config_free(CONFIG *);
+int config_option(CONFIG *, const char *, const char *);
+int config_option_file(CONFIG *, const char *);
+int config_option_line(CONFIG *, char *);
 void *populate_thread(void *);
 void print_config(CONFIG *);
 void *read_thread(void *);
@@ -813,14 +861,15 @@ int main(int argc, char **argv)
 	CONFIG cfg;
 	WT_CONNECTION *conn;
 	const char *user_cconfig, *user_tconfig;
-	const char *opts = "C:I:P:R:U:T:c:d:eh:i:jk:l:m:r:ps:t:u:v:SML";
+	const char *opts = "C:I:O:P:R:U:T:c:d:eh:i:jk:l:m:o:r:ps:t:u:v:SML";
 	char *cc_buf, *tc_buf;
 	int ch, checkpoint_created, ret, stat_created;
 	pthread_t checkpoint, stat;
 	uint64_t req_len;
 
 	/* Setup the default configuration values. */
-	memcpy(&cfg, &default_cfg, sizeof(cfg));
+	memset(&cfg, 0, sizeof(cfg));
+	config_assign(&cfg, &default_cfg);
 	cc_buf = tc_buf = NULL;
 	user_cconfig = user_tconfig = NULL;
 	conn = NULL;
@@ -833,13 +882,17 @@ int main(int argc, char **argv)
 	while ((ch = getopt(argc, argv, opts)) != EOF)
 		switch (ch) {
 		case 'S':
-			memcpy(&cfg, &small_cfg, sizeof(cfg));
+			config_assign(&cfg, &small_cfg);
 			break;
 		case 'M':
-			memcpy(&cfg, &med_cfg, sizeof(cfg));
+			config_assign(&cfg, &med_cfg);
 			break;
 		case 'L':
-			memcpy(&cfg, &large_cfg, sizeof(cfg));
+			config_assign(&cfg, &large_cfg);
+			break;
+		case 'O':
+			if (config_option_file(&cfg, optarg) != 0)
+				return (EINVAL);
 			break;
 		default:
 			/* Validation is provided on the next parse. */
@@ -860,7 +913,7 @@ int main(int argc, char **argv)
 			cfg.create = 0;
 			break;
 		case 'h':
-			cfg.home = optarg;
+			config_option(&cfg, "home", optarg);
 			break;
 		case 'i':
 			cfg.icount = (uint32_t)atoi(optarg);
@@ -884,6 +937,10 @@ int main(int argc, char **argv)
 			}
 				
 			break;
+		case 'o':
+			if (config_option_line(&cfg, optarg) != 0)
+				return (EINVAL);
+			break;
 		case 'p':
 			F_SET(&cfg, PERF_RAND_PARETO);
 			break;
@@ -897,7 +954,7 @@ int main(int argc, char **argv)
 			cfg.report_interval = (uint32_t)atoi(optarg);
 			break;
 		case 'u':
-			cfg.uri = optarg;
+			config_option(&cfg, "uri", optarg);
 			break;
 		case 'v':
 			cfg.verbose = (uint32_t)atoi(optarg);
@@ -920,6 +977,7 @@ int main(int argc, char **argv)
 		case 'T':
 			user_tconfig = optarg;
 			break;
+		case 'O':
 		case 'L':
 		case 'M':
 		case 'S':
@@ -930,6 +988,12 @@ int main(int argc, char **argv)
 			usage();
 			return (EINVAL);
 		}
+
+	if (cfg.rand_range > 0 && !F_ISSET(&cfg, PERF_RAND_WORKLOAD)) {
+		fprintf(stderr, "rand_range cannot be set without "
+		    "random workload\n");
+		return (EINVAL);
+	}
 
 	if ((ret = setup_log_file(&cfg)) != 0)
 		goto err;
@@ -952,7 +1016,7 @@ int main(int argc, char **argv)
 		    cfg.verbose > 1 ? "," : "",
 		    cfg.verbose > 1 ? debug_cconfig : "",
 		    user_cconfig ? "," : "", user_cconfig ? user_cconfig : "");
-		cfg.conn_config = cc_buf;
+		config_option(&cfg, "conn_config", cc_buf);
 	}
 	if (cfg.verbose > 1 || user_tconfig != NULL) {
 		req_len = strlen(cfg.table_config) + strlen(debug_tconfig) + 3;
@@ -968,7 +1032,7 @@ int main(int argc, char **argv)
 		    cfg.verbose > 1 ? "," : "",
 		    cfg.verbose > 1 ? debug_tconfig : "",
 		    user_tconfig ? "," : "", user_tconfig ? user_tconfig : "");
-		cfg.table_config = tc_buf;
+		config_option(&cfg, "table_config", tc_buf);
 	}
 
 	wtperf_srand(&cfg);
@@ -1049,6 +1113,7 @@ err:	g_util_running = 0;
 		fflush(cfg.logf);
 		fclose(cfg.logf);
 	}
+	config_free(&cfg);
 
 	return (ret);
 }
@@ -1056,6 +1121,212 @@ err:	g_util_running = 0;
 /*
  * Following are utility functions.
  */
+void config_assign(CONFIG *dest, const CONFIG *src)
+{
+	int i;
+	char **pstr;
+	char *newstr;
+	size_t len;
+
+	config_free(dest);
+	memcpy(dest, src, sizeof(CONFIG));
+
+	for (i = 0; i < sizeof(config_opts)/sizeof(config_opts[0]); i++) {
+		if (config_opts[i].type == STRING_TYPE) {
+			pstr = (char **)
+			    ((unsigned char *)dest + config_opts[i].offset);
+			if (*pstr != NULL) {
+				len = strlen(*pstr) + 1;
+				newstr = malloc(len);
+				strncpy(newstr, *pstr, len);
+				*pstr = newstr;
+			}
+		}
+	}
+}
+
+void
+config_free(CONFIG *cfg)
+{
+	int i;
+	char **pstr;
+
+	for (i = 0; i < sizeof(config_opts)/sizeof(config_opts[0]); i++) {
+		if (config_opts[i].type == STRING_TYPE) {
+			pstr = (char **)
+			    ((unsigned char *)cfg + config_opts[i].offset);
+			if (*pstr != NULL) {
+				free(*pstr);
+				*pstr = NULL;
+			}
+		}
+	}
+}
+
+int
+config_option(CONFIG *cfg, const char *name, const char *value)
+{
+	int i;
+	size_t nopt;
+	CONFIG_OPT *popt;
+	void *valueloc;
+	int ival;
+	char *newstr;
+	char **strp;
+
+	popt = NULL;
+	nopt = sizeof(config_opts)/sizeof(config_opts[0]);
+	for (i = 0; i < nopt; i++) {
+		if (strcmp(config_opts[i].name, name) == 0) {
+			popt = &config_opts[i];
+			break;
+		}
+	}
+	if (popt == NULL) {
+		fprintf(stderr, "wtperf: Error: "
+		    "unknown option \"%s\"\n", name);
+		fprintf(stderr, "Options:\n");
+		for (i = 0; i < nopt; i++) {
+			fprintf(stderr, "\t%s\n", config_opts[i].name);
+		}
+		return (EINVAL);
+	}
+	valueloc = ((unsigned char *)cfg + popt->offset);
+	if (popt->type == UINT32_TYPE) {
+		ival = atoi(value);
+		if (ival < 0) {
+			fprintf(stderr, "wtperf: Error: "
+			    "bad int value in \"%s\"\n", name);
+		}
+		*(uint32_t *)valueloc = (uint32_t)ival;
+	}
+	else if (popt->type == STRING_TYPE) {
+		strp = (char **)valueloc;
+		if (*strp != NULL) {
+			free(*strp);
+		}
+		newstr = malloc(strlen(value) + 1);
+		strncpy(newstr, value, strlen(value) + 1);
+		*strp = newstr;
+	}
+	else if (popt->type == BOOL_TYPE || popt->type == FLAG_TYPE) {
+		uint32_t *pconfigval;
+
+		if (strcmp(value, "true") || strcmp(value, "1")) {
+			ival = 1;
+		}
+		else if (strcmp(value, "false") || strcmp(value, "0")) {
+			ival = 0;
+		}
+		else {
+			fprintf(stderr, "wtperf: Error: "
+			    "bad bool value in \"%s=%s\"\n", name, value);
+			return (EINVAL);
+		}
+		pconfigval = (uint32_t *)valueloc;
+		if (popt->type == BOOL_TYPE) {
+			*pconfigval = ival;
+		}
+		else if (ival != 0) {
+			*pconfigval |= popt->flagmask;
+		}
+		else {
+			*pconfigval &= ~popt->flagmask;
+		}
+	}
+	return (0);
+}
+
+int
+config_option_file(CONFIG *cfg, const char *filename)
+{
+	FILE *fp;
+	char option[1024];
+	char line[256];
+	char *ltrim;
+	char *rtrim;
+	char *comment;
+	int ret;
+	int contline;
+	int optionpos;
+	size_t linelen;
+	int linenum;
+
+	if ((fp = fopen(filename, "r")) == NULL) {
+		fprintf(stderr, "wtperf: %s: %s\n", filename, strerror(errno));
+		return errno;
+	}
+
+	ret = 0;
+	optionpos = 0;
+	linenum = 0;
+	while (fgets(line, sizeof(line), fp) != NULL) {
+		linenum++;
+		/* trim the line */
+		for (ltrim = line; *ltrim && isspace(*ltrim); ltrim++)
+			;
+		rtrim = &ltrim[strlen(ltrim)];
+		if (rtrim > ltrim && rtrim[-1] == '\n')
+			rtrim--;
+
+		contline = (rtrim > ltrim && rtrim[-1] == '\\');
+		if (contline)
+			rtrim--;
+
+		comment = strchr(ltrim, '#');
+		if (comment != NULL && comment < rtrim)
+			rtrim = comment;
+		while (rtrim > ltrim && isspace(rtrim[-1]))
+			rtrim--;
+
+		linelen = rtrim - ltrim;
+		if (linelen == 0)
+			continue;
+
+		if (linelen + optionpos + 1 > sizeof(option)) {
+			fprintf(stderr, "wtperf: %s: %d: line overflow\n",
+			    filename, linenum);
+			ret = EINVAL;
+			break;
+		}
+		*rtrim = '\0';
+		strncpy(&option[optionpos], ltrim, linelen + 1);
+		if (contline) {
+			optionpos += linelen;
+		}
+		else {
+			if ((ret = config_option_line(cfg, option)) != 0) {
+				fprintf(stderr, "wtperf: %s: %d: parse error\n",
+				    filename, linenum);
+				break;
+			}
+			optionpos = 0;
+		}
+	}
+	if (ret == 0 && optionpos > 0) {
+		fprintf(stderr, "wtperf: %s: %d: last line continues\n",
+		    filename, linenum);
+		ret = EINVAL;
+	}
+
+	(void)fclose(fp);
+	return (ret);
+}
+
+int
+config_option_line(CONFIG *cfg, char *optstr)
+{
+	char *pval;
+
+	if ((pval = strchr(optstr, '=')) == NULL) {
+		fprintf(stderr, "wtperf: Error: "
+		    "missing '=' in option line \"%s\"\n", optstr);
+		return (EINVAL);
+	}
+	*pval++ = '\0';
+	return (config_option(cfg, optstr, pval));
+}
+
 int
 start_threads(
     CONFIG *cfg, u_int num, pthread_t **threadsp, void *(*func)(void *))
