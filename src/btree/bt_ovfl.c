@@ -291,9 +291,9 @@ __wt_val_ovfl_cache(WT_SESSION_IMPL *session,
 	 * Pages are repeatedly reconciled and we don't want to lock out readers
 	 * every time we reconcile an overflow item on a page.  Check if we've
 	 * already cached this overflow value, and if work appears required,
-	 * lock and check the again.  (Locking is required, it's possible we
-	 * have cached information about what's in the on-page cell and it has
-	 * changed.  Vanishingly unlikely, but I think it's possible.)
+	 * lock and check again.  (Locking is required, it's possible we have
+	 * cached information about what's in the on-page cell and it's changed.
+	 * Vanishingly unlikely, but I think it's possible.)
 	 */
 	if (unpack->raw == WT_CELL_VALUE_OVFL_RM)
 		return (0);
