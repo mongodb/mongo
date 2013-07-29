@@ -129,6 +129,12 @@ namespace mongo {
         //
 
         /**
+         * Returns true if the document key 'key' is a valid instance of a shard key for this
+         * metadata.  The 'key' must contain exactly the same fields as the shard key pattern.
+         */
+        bool isValidKey( const BSONObj& key ) const;
+
+        /**
          * Returns true if the document key 'key' belongs to this chunkset. Recall that documents of
          * an in-flight chunk migration may be present and should not be considered part of the
          * collection / chunkset yet. Key must be the full shard key.
@@ -142,16 +148,12 @@ namespace mongo {
         bool keyIsPending( const BSONObj& key ) const;
 
         /**
-         * Given the chunk's min key (or empty doc) in 'lookupKey', gets the boundaries of the
-         * chunk following that one (the first), and fills in 'foundChunk' with those
-         * boundaries.  If the next chunk happens to be the last one, returns true otherwise
-         * false.
+         * Given a key 'lookupKey' in the shard key range, get the next chunk which overlaps or is
+         * greater than this key.  Returns true if a chunk exists, false otherwise.
          *
-         * @param lookupKey passing a key that does not belong to this metadata is undefined.
-         *     An empty key is special and the chunk with the lowest range will be set on
-         *     foundChunk.
+         * Passing a key that is not a valid shard key for this range results in undefined behavior.
          */
-        bool getNextChunk( const BSONObj& lookupKey, ChunkType* foundChunk ) const;
+        bool getNextChunk( const BSONObj& lookupKey, ChunkType* chunk ) const;
 
         /**
          * Given a key in the shard key range, get the next range which overlaps or is greater than

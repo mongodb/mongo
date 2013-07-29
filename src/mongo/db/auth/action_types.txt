@@ -52,6 +52,7 @@
 "listShards",
 "logRotate",
 "mapReduceShardedFinish",
+"mergeChunks",
 "moveChunk",
 "movePrimary",
 "netstat",
