@@ -1241,17 +1241,15 @@ namespace mongo {
                 if( collMetadata->getNumChunks() > 0 ) {
 
                     // get another chunk on that shard
-                    BSONObj lookupKey;
-                    BSONObj bumpMin;
-                    BSONObj bumpMax;
-                    do {
-                        ChunkType bumpChunk;
-                        collMetadata->getNextChunk( lookupKey , &bumpChunk );
-                        bumpMin = bumpChunk.getMin();
-                        bumpMax = bumpChunk.getMax();
-                        lookupKey = bumpMin;
-                    }
-                    while( bumpMin == min );
+                    ChunkType bumpChunk;
+                    bool result = collMetadata->getNextChunk( collMetadata->getMinKey(),
+                                                              &bumpChunk );
+                    BSONObj bumpMin = bumpChunk.getMin();
+                    BSONObj bumpMax = bumpChunk.getMax();
+
+                    (void)result; // for compile warning on non-debug
+                    dassert( result );
+                    dassert( bumpMin.woCompare( min ) != 0 );
 
                     BSONObjBuilder op;
                     op.append( "op" , "u" );

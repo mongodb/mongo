@@ -735,7 +735,15 @@ namespace mongo {
         }
 
         for ( set<string>::iterator i=hosts.begin(); i!=hosts.end(); i++ ) {
+
             string host = *i;
+
+            // If this is a CUSTOM connection string (for testing) don't do DNS resolution
+            string errMsg;
+            if ( ConnectionString::parse( host, errMsg ).type() == ConnectionString::CUSTOM ) {
+                continue;
+            }
+
             bool ok = false;
             for ( int x=10; x>0; x-- ) {
                 if ( ! hostbyname( host.c_str() ).empty() ) {
