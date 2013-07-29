@@ -554,6 +554,16 @@ namespace mongo {
         return true;
     }
 
+    void yieldOrSleepFor1Microsecond() {
+#ifdef _WIN32
+        SwitchToThread();
+#elif defined(__linux__)
+        pthread_yield();
+#else
+        sleepmicros(1);
+#endif
+    }
+
     void ClientCursor::staticYield( int micros , const StringData& ns , Record * rec ) {
         bool haveReadLock = Lock::isReadLocked();
 
@@ -575,7 +585,7 @@ namespace mongo {
                     SwitchToThread();
 #else
                     if ( micros == 0 ) {
-                        pthread_yield();
+                        yieldOrSleepFor1Microsecond();
                     }
                     else {
                         sleepmicros(1);
@@ -587,11 +597,7 @@ namespace mongo {
                         micros = Client::recommendedYieldMicros();
                     }
                     else if ( micros == 0 ) {
-#ifdef _WIN32
-                        SwitchToThread();
-#else
-                        pthread_yield();
-#endif
+                        yieldOrSleepFor1Microsecond();
                     }
                     else if ( micros > 0 ) {
                         sleepmicros( micros );
