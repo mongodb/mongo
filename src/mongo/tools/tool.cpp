@@ -576,12 +576,14 @@ namespace mongo {
 // to process UTF-8 encoded arguments and environment variables without regard to platform.
 int wmain(int argc, wchar_t* argvW[], wchar_t* envpW[]) {
     mongo::WindowsCommandLine wcl(argc, argvW, envpW);
-    int exitCode = Tool::instance->main(argc, wcl.argv(), wcl.envp());
+    auto_ptr<Tool> instance = (*Tool::createInstance)();
+    int exitCode = instance->main(argc, wcl.argv(), wcl.envp());
     ::_exit(exitCode);
 }
 
 #else
 int main(int argc, char* argv[], char** envp) {
-  ::_exit(Tool::instance->main(argc, argv, envp));
+    auto_ptr<Tool> instance = (*Tool::createInstance)();
+    ::_exit(instance->main(argc, argv, envp));
 }
 #endif

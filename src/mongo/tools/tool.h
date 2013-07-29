@@ -47,7 +47,7 @@ namespace mongo {
               string defaultCollection="", bool usesstdout=true, bool quiet=false);
         virtual ~Tool();
 
-        static Tool* instance;
+        static auto_ptr<Tool> (*createInstance)();
 
         int main( int argc , char ** argv, char ** envp );
 
@@ -167,4 +167,5 @@ namespace mongo {
 }
 
 #define REGISTER_MONGO_TOOL(TYPENAME) \
-    Tool* Tool::instance = new TYPENAME();
+    auto_ptr<Tool> createInstanceOfThisTool() {return auto_ptr<Tool>(new TYPENAME());} \
+    auto_ptr<Tool> (*Tool::createInstance)() = createInstanceOfThisTool;
