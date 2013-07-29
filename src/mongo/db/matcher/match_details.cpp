@@ -16,28 +16,44 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "mongo/pch.h"
-
 #include "mongo/db/matcher/match_details.h"
+
+#include <sstream>
+
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 
     MatchDetails::MatchDetails() :
-    _elemMatchKeyRequested() {
+        _elemMatchKeyRequested() {
         resetOutput();
     }
 
     void MatchDetails::resetOutput() {
         _loadedRecord = false;
-        _elemMatchKeyFound = false;
-        _elemMatchKey = "";
+        _elemMatchKey.reset();
+    }
+
+    bool MatchDetails::hasElemMatchKey() const {
+        return _elemMatchKey.get();
+    }
+
+    std::string MatchDetails::elemMatchKey() const {
+        verify( hasElemMatchKey() );
+        return *(_elemMatchKey.get());
+    }
+
+    void MatchDetails::setElemMatchKey( const std::string &elemMatchKey ) {
+        if ( _elemMatchKeyRequested ) {
+            _elemMatchKey.reset( new std::string( elemMatchKey ) );
+        }
     }
 
     string MatchDetails::toString() const {
-        stringstream ss;
+        std::stringstream ss;
         ss << "loadedRecord: " << _loadedRecord << " ";
         ss << "elemMatchKeyRequested: " << _elemMatchKeyRequested << " ";
-        ss << "elemMatchKey: " << ( _elemMatchKeyFound ? _elemMatchKey : "NONE" ) << " ";
+        ss << "elemMatchKey: " << ( _elemMatchKey ? _elemMatchKey->c_str() : "NONE" ) << " ";
         return ss.str();
     }
 
