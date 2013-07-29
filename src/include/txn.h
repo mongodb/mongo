@@ -79,13 +79,12 @@ struct __wt_txn {
 	size_t		modref_alloc;
 	u_int		modref_count;
 
-	u_int32_t	force_evict_attempts;
+	uint32_t	force_evict_attempts;
 
 #define	TXN_AUTOCOMMIT	0x01
 #define	TXN_ERROR	0x02
-#define	TXN_FORCE_EVICT	0x04
-#define	TXN_OLDEST	0x08
-#define	TXN_RUNNING	0x10
+#define	TXN_OLDEST	0x04
+#define	TXN_RUNNING	0x08
 	uint32_t flags;
 };
 
