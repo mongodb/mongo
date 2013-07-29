@@ -191,7 +191,7 @@ namespace mongo {
         while( !finder->done() ) {
             if ( yieldCondition.intervalHasElapsed() ) {
                 if ( finder->prepareToYield() ) {
-                    ClientCursor::staticYield( -1, ns, 0 );
+                    ClientCursor::staticYield( 0, ns, 0 );
                     finder->recoverFromYield();
                 }
             }
