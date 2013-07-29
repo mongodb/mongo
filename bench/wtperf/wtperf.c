@@ -147,10 +147,11 @@ void *insert_thread(void *);
 int connection_reconfigure(WT_CONNECTION *, const char *);
 void config_assign(CONFIG *, const CONFIG *);
 void config_free(CONFIG *);
-int config_option(CONFIG *, WT_CONFIG_ITEM *, WT_CONFIG_ITEM *);
-int config_option_str(CONFIG *, WT_SESSION *, const char *, const char *);
-int config_option_file(CONFIG *, WT_SESSION *, const char *);
-int config_option_line(CONFIG *, WT_SESSION *, char *);
+int config_opt(CONFIG *, WT_CONFIG_ITEM *, WT_CONFIG_ITEM *);
+int config_opt_str(CONFIG *, WT_SESSION *, const char *, const char *);
+int config_opt_int(CONFIG *, WT_SESSION *, const char *, const char *);
+int config_opt_file(CONFIG *, WT_SESSION *, const char *);
+int config_opt_line(CONFIG *, WT_SESSION *, char *);
 void *populate_thread(void *);
 void print_config(CONFIG *);
 void *read_thread(void *);
@@ -977,7 +978,7 @@ int main(int argc, char **argv)
 			config_assign(&cfg, &large_cfg);
 			break;
 		case 'O':
-			if (config_option_file(&cfg,
+			if (config_opt_file(&cfg,
 				parse_session, optarg) != 0)
 				return (EINVAL);
 			break;
@@ -991,10 +992,11 @@ int main(int argc, char **argv)
 	while ((ch = getopt(argc, argv, opts)) != EOF)
 		switch (ch) {
 		case 'd':
-			cfg.data_sz = (uint32_t)atoi(optarg);
+			config_opt_int(&cfg, parse_session, "data_sz", optarg);
 			break;
 		case 'c':
-			cfg.checkpoint_interval = (uint32_t)atoi(optarg);
+			config_opt_int(&cfg, parse_session,
+			    "checkpoint_interval", optarg);
 			break;
 		case 'e':
 			cfg.create = 0;
@@ -1003,20 +1005,22 @@ int main(int argc, char **argv)
 			/* handled above */
 			break;
 		case 'i':
-			cfg.icount = (uint32_t)atoi(optarg);
+			config_opt_int(&cfg, parse_session, "icount", optarg);
 			break;
 		case 'j':
 			F_SET(&cfg, PERF_INSERT_RMW);
 			break;
 		case 'k':
-			cfg.key_sz = (uint32_t)atoi(optarg);
+			config_opt_int(&cfg, parse_session, "key_sz", optarg);
 			break;
 		case 'l':
-			cfg.stat_interval = (uint32_t)atoi(optarg);
+			config_opt_int(&cfg, parse_session,
+			    "stat_interval", optarg);
 			break;
 		case 'm':
 			F_SET(&cfg, PERF_RAND_WORKLOAD);
-			cfg.rand_range = (uint32_t)atoi(optarg);
+			config_opt_int(&cfg, parse_session,
+			    "rand_range", optarg);
 			if (cfg.rand_range == 0) {
 				fprintf(stderr, "Invalid random range.\n");
 				usage();
@@ -1025,7 +1029,8 @@ int main(int argc, char **argv)
 				
 			break;
 		case 'o':
-			if (config_option_line(&cfg,
+			/* Allow -o key=value */
+			if (config_opt_line(&cfg,
 				parse_session, optarg) != 0)
 				return (EINVAL);
 			break;
@@ -1033,35 +1038,40 @@ int main(int argc, char **argv)
 			F_SET(&cfg, PERF_RAND_PARETO);
 			break;
 		case 'r':
-			cfg.run_time = (uint32_t)atoi(optarg);
+			config_opt_int(&cfg, parse_session, "run_time", optarg);
 			break;
 		case 's':
-			cfg.rand_seed = (uint32_t)atoi(optarg);
+			config_opt_int(&cfg, parse_session,
+			    "rand_seed", optarg);
 			break;
 		case 't':
-			cfg.report_interval = (uint32_t)atoi(optarg);
+			config_opt_int(&cfg, parse_session,
+			    "report_interval", optarg);
 			break;
 		case 'u':
-			config_option_str(&cfg, parse_session,
-			    "uri", optarg);
+			config_opt_str(&cfg, parse_session, "uri", optarg);
 			break;
 		case 'v':
-			cfg.verbose = (uint32_t)atoi(optarg);
+			config_opt_int(&cfg, parse_session, "verbose", optarg);
 			break;
 		case 'C':
 			user_cconfig = optarg;
 			break;
 		case 'I':
-			cfg.insert_threads = (uint32_t)atoi(optarg);
+			config_opt_int(&cfg, parse_session,
+			    "insert_threads", optarg);
 			break;
 		case 'P':
-			cfg.populate_threads = (uint32_t)atoi(optarg);
+			config_opt_int(&cfg, parse_session,
+			    "populate_threads", optarg);
 			break;
 		case 'R':
-			cfg.read_threads = (uint32_t)atoi(optarg);
+			config_opt_int(&cfg, parse_session,
+			    "read_threads", optarg);
 			break;
 		case 'U':
-			cfg.update_threads = (uint32_t)atoi(optarg);
+			config_opt_int(&cfg, parse_session,
+			    "update_threads", optarg);
 			break;
 		case 'T':
 			user_tconfig = optarg;
@@ -1105,7 +1115,7 @@ int main(int argc, char **argv)
 		    cfg.verbose > 1 ? "," : "",
 		    cfg.verbose > 1 ? debug_cconfig : "",
 		    user_cconfig ? "," : "", user_cconfig ? user_cconfig : "");
-		config_option_str(&cfg, parse_session,
+		config_opt_str(&cfg, parse_session,
 		    "conn_config", cc_buf);
 	}
 	if (cfg.verbose > 1 || user_tconfig != NULL) {
@@ -1122,7 +1132,7 @@ int main(int argc, char **argv)
 		    cfg.verbose > 1 ? "," : "",
 		    cfg.verbose > 1 ? debug_tconfig : "",
 		    user_tconfig ? "," : "", user_tconfig ? user_tconfig : "");
-		config_option_str(&cfg, parse_session,
+		config_opt_str(&cfg, parse_session,
 		    "table_config", tc_buf);
 	}
 
@@ -1274,7 +1284,7 @@ config_free(CONFIG *cfg)
  * If everything is okay, set the value.
  */
 int
-config_option(CONFIG *cfg, WT_CONFIG_ITEM *k, WT_CONFIG_ITEM *v)
+config_opt(CONFIG *cfg, WT_CONFIG_ITEM *k, WT_CONFIG_ITEM *v)
 {
 	int i;
 	size_t nopt;
@@ -1360,7 +1370,7 @@ config_option(CONFIG *cfg, WT_CONFIG_ITEM *k, WT_CONFIG_ITEM *v)
  * We recognize comments '#' and continuation via lines ending in '\'.
  */
 int
-config_option_file(CONFIG *cfg, WT_SESSION *parse_session, const char *filename)
+config_opt_file(CONFIG *cfg, WT_SESSION *parse_session, const char *filename)
 {
 	FILE *fp;
 	char option[1024];
@@ -1418,7 +1428,7 @@ config_option_file(CONFIG *cfg, WT_SESSION *parse_session, const char *filename)
 			optionpos += linelen;
 		}
 		else {
-			if ((ret = config_option_line(cfg,
+			if ((ret = config_opt_line(cfg,
 				    parse_session, option)) != 0) {
 				fprintf(stderr, "wtperf: %s: %d: parse error\n",
 				    filename, linenum);
@@ -1441,7 +1451,7 @@ config_option_file(CONFIG *cfg, WT_SESSION *parse_session, const char *filename)
  * Continued lines have already been joined.
  */
 int
-config_option_line(CONFIG *cfg, WT_SESSION *parse_session, char *optstr)
+config_opt_line(CONFIG *cfg, WT_SESSION *parse_session, char *optstr)
 {
 	WT_CONFIG_ITEM k, v;
 	WT_CONFIG_SCAN *scan;
@@ -1467,7 +1477,7 @@ config_option_line(CONFIG *cfg, WT_SESSION *parse_session, char *optstr)
 				ret = 0;
 			break;
 		}
-		ret = config_option(cfg, &k, &v);
+		ret = config_opt(cfg, &k, &v);
 	}
 	if ((t_ret = wt_api->config_scan_end(wt_api, scan)) != 0) {
 		lprintf(cfg, ret, 0,
@@ -1481,7 +1491,7 @@ config_option_line(CONFIG *cfg, WT_SESSION *parse_session, char *optstr)
 
 /* Set a single string config option */
 int
-config_option_str(CONFIG *cfg, WT_SESSION *parse_session,
+config_opt_str(CONFIG *cfg, WT_SESSION *parse_session,
     const char *name, const char *value)
 {
 	char *optstr;
@@ -1489,7 +1499,22 @@ config_option_str(CONFIG *cfg, WT_SESSION *parse_session,
 
 	optstr = malloc(strlen(name) + strlen(value) + 4);  /* name="value" */
 	sprintf(optstr, "%s=\"%s\"", name, value);
-	ret = config_option_line(cfg, parse_session, optstr);
+	ret = config_opt_line(cfg, parse_session, optstr);
+	free(optstr);
+	return (ret);
+}
+
+/* Set a single int config option */
+int
+config_opt_int(CONFIG *cfg, WT_SESSION *parse_session,
+    const char *name, const char *value)
+{
+	char *optstr;
+	int ret;
+
+	optstr = malloc(strlen(name) + strlen(value) + 2);  /* name=value */
+	sprintf(optstr, "%s=%s", name, value);
+	ret = config_opt_line(cfg, parse_session, optstr);
 	free(optstr);
 	return (ret);
 }
