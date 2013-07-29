@@ -456,7 +456,12 @@ build(int ikey, int ivalue, int cnt)
 	char config[256], kbuf[64], vbuf[64];
 	int new_slvg;
 
-	assert(wiredtiger_open(NULL, NULL, "create", &conn) == 0);
+	/*
+	 * Disable logging: we're modifying files directly, we don't want to
+	 * run recovery.
+	 */
+	assert(wiredtiger_open(
+	    NULL, NULL, "create,log=(enabled=false)", &conn) == 0);
 	assert(conn->open_session(conn, NULL, NULL, &session) == 0);
 	assert(session->drop(session, "file:" LOAD, "force") == 0);
 
@@ -603,7 +608,9 @@ process(void)
 	config[0] = '\0';
 	if (verbose)
 		snprintf(config, sizeof(config),
-		    "error_prefix=\"%s\",verbose=[salvage,verify]",
+		    "error_prefix=\"%s\","
+		    "log=(enabled=false),"
+		    "verbose=[salvage,verify]",
 		    progname);
 	assert(wiredtiger_open(NULL, NULL, config, &conn) == 0);
 	assert(conn->open_session(conn, NULL, NULL, &session) == 0);
