@@ -528,6 +528,8 @@ ReplSetTest.prototype.awaitReplication = function(timeout) {
     print("ReplSetTest awaitReplication: starting: timestamp for primary, " +
           name + ", is " + tojson(this.latest));
 
+    var configVersion = this.liveNodes.master.getDB("local")['system.replset'].findOne().version;
+
     var self = this;
     assert.soon( function() {
                      try {
@@ -581,6 +583,15 @@ ReplSetTest.prototype.awaitReplication = function(timeout) {
                              else {
                                  print("ReplSetTest awaitReplication: waiting for secondary #" +
                                        secondaryCount + ", " + name + ", to have an oplog built");
+                                 return false;
+                             }
+
+                             var slaveConfigVersion = slave.getDB("local")['system.replset'].findOne().version;
+
+                             if (configVersion != slaveConfigVersion) {
+                                 print("ReplSetTest awaitReplication: secondary #" + secondaryCount +
+                                       ", " + name + ", has config version #" + slaveConfigVersion +
+                                       ", but expected config version #" + configVersion);
                                  return false;
                              }
                          }
