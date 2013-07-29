@@ -97,9 +97,6 @@ To update existing data using a cursor, use the WT_CURSOR::update method:
 
 @snippet ex_cursor.c cursor update
 
-In all cases, calling WT_CURSOR::update where the key does not already
-exist in the store will return an error.
-
 To remove existing data using a cursor, use the WT_CURSOR::remove method:
 
 @snippet ex_cursor.c cursor remove
