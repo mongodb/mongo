@@ -333,8 +333,11 @@ namespace mongo {
         _collMetadata[ns] = cloned;
     }
 
-    void ShardingState::resetVersion( const string& ns ) {
+    void ShardingState::resetMetadata( const string& ns ) {
         scoped_lock lk( _mutex );
+
+        warning() << "resetting metadata for " << ns << ", this should only be used in testing"
+                  << endl;
 
         _collMetadata.erase( ns );
     }
