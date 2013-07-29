@@ -273,6 +273,7 @@ namespace mongo {
         {"$hour", ExpressionHour::create, OpDesc::FIXED_COUNT, 1},
         {"$ifNull", ExpressionIfNull::create, OpDesc::FIXED_COUNT, 2},
         // $let handled specially in parseExpression
+        // $literal handled specially in parseExpression
         // $map handled specially in parseExpression
         {"$lt", ExpressionCompare::createLt, OpDesc::FIXED_COUNT, 2},
         {"$lte", ExpressionCompare::createLte, OpDesc::FIXED_COUNT, 2},
@@ -306,7 +307,7 @@ namespace mongo {
         /* look for the specified operator */
         const char* opName = exprElement.fieldName();
 
-        if (str::equals(opName, "$const")) {
+        if (str::equals(opName, "$const") || str::equals(opName, "$literal")) {
             return ExpressionConstant::createFromBsonElement(&exprElement);
         }
         else if (str::equals(opName, "$let")) {
