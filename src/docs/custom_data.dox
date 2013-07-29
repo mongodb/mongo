@@ -80,11 +80,16 @@ optionally specified for the WT_DATA_SOURCE::open_cursor method.  The
 \c append string configures WT_CURSOR::insert to allocate and return an
 new record number key.
 
-Custom data sources should consider the \c overwrite configuration
-string optionally specified for the WT_DATA_SOURCE::open_cursor method.
-The \c overwrite string implies the WT_CURSOR::insert method should
-overwrite any already existing value for the key instead of returning
-an error.
+Custom data sources should consider the \c overwrite configuration string
+optionally specified for the WT_DATA_SOURCE::open_cursor method.  If the
+\c overwrite configuration is \c true, WT_CURSOR::insert, WT_CURSOR::remove and
+WT_CURSOR::update should ignore the current state of the record, and these
+methods will succeed regardless of whether or not the record previously exists.
+
+When an application configures \c overwrite to \c false, WT_CURSOR::insert
+should fail with ::WT_DUPLICATE_KEY if the record previously exists, and
+WT_CURSOR::update and WT_CURSOR::remove will fail with ::WT_NOTFOUND if the
+record does not previously exist.
 
 Custom data sources supporting fixed-length bit field column-stores
 (that is, a store with an 'r' type key and 't' type value) must support

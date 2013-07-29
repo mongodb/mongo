@@ -76,19 +76,15 @@ use the WT_CURSOR::insert method:
 
 @snippet ex_cursor.c cursor insert
 
-By default, when inserting into a row-store, the WT_CURSOR::insert method
-returns an error if the key already exists in the store, otherwise it
-inserts a new key/value pair.  If the <code>overwrite</code> configuration
-string is specified to the WT_SESSION::open_cursor method, any previously
-existing key/value pair is updated to the new value rather than returning
-an error.
+The WT_SESSION::open_cursor \c overwrite configuration is \c true by default,
+causing WT_CURSOR::insert, WT_CURSOR::remove and WT_CURSOR::update to ignore
+the current state of the record, and these methods will succeed regardless of
+whether or not the record previously exists.
 
-By default, when updating an underlying column-store, the WT_CURSOR::insert
-method ignores the application's key value, instead, it allocates an unused
-record number in the store and returns that record number in the
-application's key.  If the <code>overwrite</code> configuration string is
-specified to the WT_SESSION::open_cursor method, the application's key
-value will be used to specify the record number being inserted or updated.
+When an application configures \c overwrite to \c false, WT_CURSOR::insert will
+fail with ::WT_DUPLICATE_KEY if the record previously exists, and
+WT_CURSOR::update and WT_CURSOR::remove will fail with ::WT_NOTFOUND if the
+record does not previously exist.
 
 To update existing data using a cursor, use the WT_CURSOR::update method:
 
@@ -115,4 +111,27 @@ cursor as the \c to_dup parameter before calling a cursor method that will
 attempt to re-position the cursor.  Cursor duplication is not supported
 for the backup, config and statistics cursor types.
 
+@section cursor_memory_scoping Cursor key/value memory scoping
+
+When applications pass pointers to WT_CURSOR::set_key or WT_CURSOR::set_value,
+which can be a WT_ITEM or a string, the application is required to keep
+the memory valid until the next operation that successfully positions the
+cursor.  These operations are WT_CURSOR::insert, WT_CURSOR::remove,
+WT_CURSOR::search, WT_CURSOR::search_near and WT_CURSOR::update.
+
+If such an operation fails (for example, due to a WT_DEADLOCK error), it may
+be retried without calling WT_CURSOR::set_key or WT_CURSOR::set_value again.
+That is, the cursor may still reference the application-supplied memory until
+it is successfully positioned.
+
+Any pointers returned by WT_CURSOR::get_key or WT_CURSOR::get_value are only
+valid until the cursor is positioned.  These pointers may reference private
+WiredTiger data structures that must not be modified or freed by the
+application.  If a longer scope is required, the application must make a copy
+of the memory before the cursor is positioned.
+
+The comments in this example code explain when the application can safely
+modify memory passed to WT_CURSOR::set_key or WT_CURSOR::set_value:
+
+@snippet ex_scope.c cursor scope operation
  */
