@@ -1238,14 +1238,6 @@ cache_clean:
 		if ((ret = wtext->collate(wtext, session, &a, &b, &cmp)) != 0)
 			return (ret);
 
-		/*
-		 * One special case: the two keys compare equal, but the cache
-		 * is a delete.  Move from the key we compared to the next/prev
-		 * item.
-		 */
-		if (cmp == 0 && cache_rm)
-			goto skip_deleted;
-
 		if (f == kvs_next) {
 			if (cmp >= 0)
 				ret = WT_NOTFOUND;
@@ -1256,6 +1248,16 @@ cache_clean:
 				ret = WT_NOTFOUND;
 			else
 				cache_ret = WT_NOTFOUND;
+		}
+
+		/*
+		 * If the cache is the key we'd choose, but it's a delete, skip
+		 * past it by moving from the deleted key to the next/prev item
+		 * in either the primary or the cache.
+		 */
+		if (cache_ret == 0 && cache_rm) {
+			memcpy(r->key, b.data, b.size);
+			goto skip_deleted;
 		}
 	}
 
