@@ -311,7 +311,8 @@ __wt_txn_release(WT_SESSION_IMPL *session)
 	if (session->ncursors == 0)
 		__wt_txn_release_snapshot(session);
 	txn->isolation = session->isolation;
-	F_CLR(txn, TXN_ERROR | TXN_FORCE_EVICT | TXN_OLDEST | TXN_RUNNING);
+	txn->force_evict_attempts = 0;
+	F_CLR(txn, TXN_ERROR | TXN_OLDEST | TXN_RUNNING);
 
 	/* Update the global generation number. */
 	++txn_global->gen;

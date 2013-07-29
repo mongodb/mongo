@@ -79,14 +79,20 @@ struct __wt_txn {
 	size_t		modref_alloc;
 	u_int		modref_count;
 
-	/* Requested notifications when the transaction is resolved. */
+	uint32_t	force_evict_attempts;
+
+	/*
+	 * Requested notification when transactions are resolved.
+	 */
 	int (*notify)(WT_SESSION *, void *, uint64_t, int);
 	void *notify_cookie;
 
 #define	TXN_AUTOCOMMIT	0x01
 #define	TXN_ERROR	0x02
-#define	TXN_FORCE_EVICT	0x04
-#define	TXN_OLDEST	0x08
-#define	TXN_RUNNING	0x10
+#define	TXN_OLDEST	0x04
+#define	TXN_RUNNING	0x08
 	uint32_t flags;
 };
+
+#define	WT_TXN_ACTIVE(txn)						\
+	(F_ISSET((txn), TXN_RUNNING) && (txn)->mod_count > 0)

@@ -116,8 +116,13 @@
 	memset(p, WT_DEBUG_BYTE, sizeof(*(p)));				\
 	__wt_free(session, p);						\
 } while (0)
+#define	__wt_overwrite_and_free_len(session, p, len) do {		\
+	memset(p, WT_DEBUG_BYTE, len);					\
+	__wt_free(session, p);						\
+} while (0)
 #else
-#define	__wt_overwrite_and_free(session, p)	__wt_free(session, p)
+#define	__wt_overwrite_and_free(session, p)		__wt_free(session, p)
+#define	__wt_overwrite_and_free_len(session, p, len)	__wt_free(session, p)
 #endif
 
 /*
