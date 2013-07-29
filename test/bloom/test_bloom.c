@@ -75,7 +75,7 @@ main(int argc, char *argv[])
 		++g.progname;
 
 	/* Configure the FreeBSD malloc for debugging. */
-	(void)setenv("MALLOC_OPTIONS", "AJZ", 1);
+	(void)setenv("MALLOC_OPTIONS", "AJ", 1);
 
 	/* Set default configuration values. */
 	g.c_cache = 10;
