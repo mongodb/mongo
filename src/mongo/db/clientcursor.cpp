@@ -555,7 +555,7 @@ namespace mongo {
                 // need to lock this else rec->touch won't be safe file could disappear
                 lk.reset( new LockMongoFilesShared() );
             }
-            
+
             dbtempreleasecond unlock;
             if ( unlock.unlocked() ) {
                 if ( haveReadLock ) {
@@ -565,16 +565,30 @@ namespace mongo {
 #ifdef _WIN32
                     SwitchToThread();
 #else
-                    sleepmicros(1);
+                    if ( micros == 0 ) {
+                        pthread_yield();
+                    }
+                    else {
+                        sleepmicros(1);
+                    }
 #endif
                 }
                 else {
-                    if ( micros == -1 )
+                    if ( micros == -1 ) {
                         micros = Client::recommendedYieldMicros();
-                    if ( micros > 0 )
+                    }
+                    else if ( micros == 0 ) {
+#ifdef _WIN32
+                        SwitchToThread();
+#else
+                        pthread_yield();
+#endif
+                    }
+                    else if ( micros > 0 ) {
                         sleepmicros( micros );
+                    }
                 }
-                
+
             }
             else if ( Listener::getTimeTracker() == 0 ) {
                 // we aren't running a server, so likely a repair, so don't complain
