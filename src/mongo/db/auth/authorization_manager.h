@@ -37,9 +37,7 @@ namespace mongo {
      * Internal secret key info.
      */
     struct AuthInfo {
-        AuthInfo();
-        UserName user;
-        std::string pwd;
+        User* user;
         BSONObj authParams;
     };
     extern AuthInfo internalSecurity; // set at startup and not changed after initialization.
@@ -143,6 +141,12 @@ namespace mongo {
          * deletes the User.  Caller must stop using its pointer to "user" after calling this.
          */
         void releaseUser(User* user);
+
+        /**
+         * Inserts the given user directly into the _userCache.  Used to add the internalSecurity
+         * user into the cache at process startup.
+         */
+        void addInternalUser(User* user);
 
         /**
          * Initializes the user cache with User objects for every v0 and v1 user document in the

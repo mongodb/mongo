@@ -24,6 +24,7 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/privilege.h"
+#include "mongo/db/auth/user.h"
 #include "mongo/client/sasl_client_authenticate.h"
 
 static bool authParamsSet = false;
@@ -129,16 +130,19 @@ namespace mongo {
 
         LOG(1) << "security key: " << str << endl;
 
-        internalSecurity.pwd = DBClientWithCommands::createPasswordDigest(
-                internalSecurity.user.getUser().toString(), str);
+        User::CredentialData credentials;
+        credentials.password = DBClientWithCommands::createPasswordDigest(
+                internalSecurity.user->getName().getUser().toString(), str);
+        internalSecurity.user->setCredentials(credentials);
 
         if (cmdLine.clusterAuthMode == "keyfile" || cmdLine.clusterAuthMode == "sendKeyfile") {
-            setInternalUserAuthParams(BSON(saslCommandMechanismFieldName << "MONGODB-CR" <<
-                                      saslCommandUserSourceFieldName <<
-                                      internalSecurity.user.getDB() <<
-                                      saslCommandUserFieldName << internalSecurity.user.getUser() <<
-                                      saslCommandPasswordFieldName << internalSecurity.pwd <<
-                                      saslCommandDigestPasswordFieldName << false));
+            setInternalUserAuthParams(
+                    BSON(saslCommandMechanismFieldName << "MONGODB-CR" <<
+                         saslCommandUserSourceFieldName <<
+                         internalSecurity.user->getName().getDB() <<
+                         saslCommandUserFieldName << internalSecurity.user->getName().getUser() <<
+                         saslCommandPasswordFieldName << credentials.password <<
+                         saslCommandDigestPasswordFieldName << false));
         }
         return true;
     }
