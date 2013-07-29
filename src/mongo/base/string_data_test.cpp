@@ -230,7 +230,7 @@ namespace {
         std::vector<char> chars;
         const char rawData[] = "This is some raw data.";
         StringData data(rawData, StringData::LiteralTag());
-        
+
         chars.resize(data.size());
         std::copy(data.begin(), data.end(), chars.begin());
 
