@@ -153,7 +153,7 @@ namespace mongo {
 
     Status CmdAuthenticate::_authenticateCR(const UserName& user, const BSONObj& cmdObj) {
 
-        if (user == internalSecurity.user && cmdLine.clusterAuthMode == "x509") {
+        if (user == internalSecurity.user->getName() && cmdLine.clusterAuthMode == "x509") {
             return Status(ErrorCodes::AuthenticationFailed,
                           "Mechanism x509 is required for internal cluster authentication");
         }
@@ -161,7 +161,7 @@ namespace mongo {
         if (!_areNonceAuthenticateCommandsEnabled) {
             // SERVER-8461, MONGODB-CR must be enabled for authenticating the internal user, so that
             // cluster members may communicate with each other.
-            if (user != internalSecurity.user) {
+            if (user != internalSecurity.user->getName()) {
                 return Status(ErrorCodes::BadValue, _nonceAuthenticateCommandsDisabledMessage);
             }
         }

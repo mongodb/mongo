@@ -1291,8 +1291,14 @@ static void processCommandLineOptions(const std::vector<std::string>& argv) {
     }
 }
 
-MONGO_INITIALIZER(CreateAuthorizationManager)(InitializerContext* context) {
-    setGlobalAuthorizationManager(new AuthorizationManager(new AuthzManagerExternalStateMongod()));
+MONGO_INITIALIZER_GENERAL(CreateAuthorizationManager,
+                          ("SetupInternalSecurityUser"),
+                          MONGO_NO_DEPENDENTS)
+        (InitializerContext* context) {
+    AuthorizationManager* authzManager =
+            new AuthorizationManager(new AuthzManagerExternalStateMongod());
+    authzManager->addInternalUser(internalSecurity.user);
+    setGlobalAuthorizationManager(authzManager);
     return Status::OK();
 }
 

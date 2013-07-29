@@ -548,8 +548,14 @@ namespace mongo {
 }  // namespace mongo
 #endif
 
-MONGO_INITIALIZER(CreateAuthorizationManager)(InitializerContext* context) {
-    setGlobalAuthorizationManager(new AuthorizationManager(new AuthzManagerExternalStateMongos()));
+MONGO_INITIALIZER_GENERAL(CreateAuthorizationManager,
+                          ("SetupInternalSecurityUser"),
+                          MONGO_NO_DEPENDENTS)
+        (InitializerContext* context) {
+    AuthorizationManager* authzManager =
+                new AuthorizationManager(new AuthzManagerExternalStateMongos());
+    authzManager->addInternalUser(internalSecurity.user);
+    setGlobalAuthorizationManager(authzManager);
     return Status::OK();
 }
 

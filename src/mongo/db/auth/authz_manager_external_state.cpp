@@ -44,16 +44,16 @@ namespace mongo {
             return Status(ErrorCodes::BadValue, "Bad database name \"" + dbname + "\"");
         }
 
-        if (userName == internalSecurity.user) {
-            if (internalSecurity.pwd.empty()) {
+        if (userName == internalSecurity.user->getName()) {
+            if (internalSecurity.user->getCredentials().password.empty()) {
                 return Status(ErrorCodes::UserNotFound,
                               "key file must be used to log in with internal user",
                               15889);
             }
             *result = BSON(AuthorizationManager::USER_NAME_FIELD_NAME <<
-                           internalSecurity.user.getUser() <<
+                           internalSecurity.user->getName().getUser() <<
                            AuthorizationManager::PASSWORD_FIELD_NAME <<
-                           internalSecurity.pwd).getOwned();
+                           internalSecurity.user->getCredentials().password).getOwned();
             return Status::OK();
         }
 
