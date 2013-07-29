@@ -32,6 +32,11 @@ namespace mongo {
 
     class MatchExpressionParser {
     public:
+
+        /**
+         * caller has to maintain ownership obj
+         * the tree has views (BSONElement) into obj
+         */
         static StatusWithMatchExpression parse( const BSONObj& obj ) {
             return _parse( obj, true );
         }
