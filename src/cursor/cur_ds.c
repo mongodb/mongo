@@ -80,14 +80,26 @@ err:	return (ret);
  * __curds_cursor_resolve -
  *	Resolve cursor operation.
  */
-static void
+static int
 __curds_cursor_resolve(WT_SESSION_IMPL *session, WT_CURSOR *cursor, int ret)
 {
 	WT_CURSOR *source;
+	const void *key_data, *value_data;
+	size_t key_size, value_size;
 
 	source = ((WT_CURSOR_DATA_SOURCE *)cursor)->source;
 
 	if (ret == 0) {
+		/*
+		 * Save a copy of the original key/value information the
+		 * application configured, that way we're never wrong on
+		 * error.
+		 */
+		key_data = cursor->key.data;
+		key_size = cursor->key.size;
+		value_data = cursor->value.data;
+		value_size = cursor->value.size;
+
 		/*
 		 * On success, retrieve the key and value and ensure we don't
 		 * reference application memory.  WiredTiger guarantees that
@@ -123,20 +135,19 @@ __curds_cursor_resolve(WT_SESSION_IMPL *session, WT_CURSOR *cursor, int ret)
 		/*
 		 * If a copy failed, then the return value might no longer
 		 * be 0, check again.
-		 *
-		 * XXX
-		 * If the first copy succeeds but the second fails, we may no
-		 * longer have the original or the copy and there's no way to
-		 * correctly set the flags.
 		 */
 		if (ret == 0) {
 			F_CLR(cursor, WT_CURSTD_KEY_APP | WT_CURSTD_VALUE_APP);
 			F_SET(cursor, WT_CURSTD_KEY_RET | WT_CURSTD_VALUE_RET);
-		}
-	}
+		} else {
+			cursor->key.data = key_data;
+			cursor->key.size = key_size;
+			cursor->value.data = value_data;
+			cursor->value.size = value_size;
 
-	/* On failure, we're not returning anything, and we can't iterate. */
-	if (ret != 0) {
+			F_CLR(cursor, WT_CURSTD_KEY_RET | WT_CURSTD_VALUE_RET);
+		}
+	} else {
 		F_CLR(cursor, WT_CURSTD_KEY_RET | WT_CURSTD_VALUE_RET);
 
 		/*
@@ -146,6 +157,7 @@ __curds_cursor_resolve(WT_SESSION_IMPL *session, WT_CURSOR *cursor, int ret)
 		 */
 		WT_TRET(source->reset(source));
 	}
+	return (ret);
 }
 
 /*
@@ -212,7 +224,7 @@ __curds_next(WT_CURSOR *cursor)
 	WT_ERR(__curds_txn_enter(session, 0));
 
 	ret = source->next(source);
-	__curds_cursor_resolve(session, cursor, ret);
+	WT_TRET(__curds_cursor_resolve(session, cursor, ret));
 
 err:	__curds_txn_leave(session);
 
@@ -238,7 +250,7 @@ __curds_prev(WT_CURSOR *cursor)
 	WT_ERR(__curds_txn_enter(session, 0));
 
 	ret = source->prev(source);
-	__curds_cursor_resolve(session, cursor, ret);
+	WT_TRET(__curds_cursor_resolve(session, cursor, ret));
 
 err:	__curds_txn_leave(session);
 
@@ -288,7 +300,7 @@ __curds_search(WT_CURSOR *cursor)
 
 	WT_ERR(__curds_key_set(cursor));
 	ret = source->search(source);
-	__curds_cursor_resolve(session, cursor, ret);
+	WT_TRET(__curds_cursor_resolve(session, cursor, ret));
 
 err:	__curds_txn_leave(session);
 
@@ -315,7 +327,7 @@ __curds_search_near(WT_CURSOR *cursor, int *exact)
 
 	WT_ERR(__curds_key_set(cursor));
 	ret = source->search_near(source, exact);
-	__curds_cursor_resolve(session, cursor, ret);
+	WT_TRET(__curds_cursor_resolve(session, cursor, ret));
 
 err:	__curds_txn_leave(session);
 
@@ -345,7 +357,7 @@ __curds_insert(WT_CURSOR *cursor)
 		WT_ERR(__curds_key_set(cursor));
 	WT_ERR(__curds_value_set(cursor));
 	ret = source->insert(source);
-	__curds_cursor_resolve(session, cursor, ret);
+	WT_TRET(__curds_cursor_resolve(session, cursor, ret));
 
 err:	__curds_txn_leave(session);
 
@@ -373,7 +385,7 @@ __curds_update(WT_CURSOR *cursor)
 	WT_ERR(__curds_key_set(cursor));
 	WT_ERR(__curds_value_set(cursor));
 	ret = source->update(source);
-	__curds_cursor_resolve(session, cursor, ret);
+	WT_TRET(__curds_cursor_resolve(session, cursor, ret));
 
 err:	__curds_txn_leave(session);
 
