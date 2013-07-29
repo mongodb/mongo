@@ -64,6 +64,12 @@ namespace mongo {
         // acquiring privileges for it.
         void addPrincipal(Principal* principal);
 
+        /**
+         * Adds the User identified by "UserName" to the authorization session, acquiring privileges
+         * for it in the process.
+         */
+        Status addAndAuthorizeUser(const UserName& userName);
+
         // Returns the authenticated principal with the given name.  Returns NULL
         // if no such user is found.
         // Ownership of the returned Principal remains with _authenticatedPrincipals
