@@ -260,6 +260,10 @@ namespace mongo {
         return _affectIndices;
     }
 
+    void UpdateDriver::refreshIndexKeys(const IndexPathSet& indexedFields) {
+        _indexedFields = indexedFields;
+    }
+
     bool UpdateDriver::multi() const {
         return _multi;
     }

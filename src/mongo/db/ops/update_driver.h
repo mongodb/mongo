@@ -78,6 +78,7 @@ namespace mongo {
         bool dollarModMode() const;
 
         bool modsAffectIndices() const;
+        void refreshIndexKeys(const IndexPathSet& indexedFields);
 
         bool multi() const;
         void setMulti(bool multi);
@@ -108,6 +109,8 @@ namespace mongo {
 
         // What are the list of fields in the collection over which the update is going to be
         // applied that participate in indices?
+        //
+        // TODO: Do we actually need to keep a copy of this?
         IndexPathSet _indexedFields;
 
         //
