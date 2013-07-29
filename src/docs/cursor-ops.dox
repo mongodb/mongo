@@ -10,10 +10,13 @@ A cursor includes:
 
 @section cursor_opening Opening a cursor
 
-Cursors are created using the WT_SESSION::open_cursor method.  The
-following are examples from the example program @ex_ref{ex_cursor.c}:
+Cursors are created using the WT_SESSION::open_cursor method.  For
+example, from the program @ex_ref{ex_cursor.c}:
 
 @snippet ex_cursor.c open cursor #1
+
+Another example from the same program:
+
 @snippet ex_cursor.c open cursor #2
 
 In addition to traditional data sources, cursors in WiredTiger are used
@@ -41,10 +44,14 @@ from the beginning or end of the data source, use the WT_CURSOR::reset method:
 
 @snippet ex_cursor.c cursor reset
 
-To move a cursor forward or backward in the data source, use the cursor
-WT_CURSOR::next and WT_CURSOR::prev methods:
+To move a cursor forward in the data source, use the cursor WT_CURSOR::next
+method:
 
 @snippet ex_cursor.c cursor next
+
+To move a cursor backward in the data source, use the cursor WT_CURSOR::prev
+method:
+
 @snippet ex_cursor.c cursor prev
 
 If the WT_CURSOR::next and WT_CURSOR::prev methods are called on cursors
