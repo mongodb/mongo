@@ -227,6 +227,10 @@ namespace mongo {
             ClientBasic::getCurrent()->getAuthorizationSession();
         Principal* principal = new Principal(user);
         authorizationSession->addAndAuthorizePrincipal(principal);
+        status = authorizationSession->addAndAuthorizeUser(user);
+        if (!status.isOK()) {
+            return status;
+        }
 
         return Status::OK();
     }

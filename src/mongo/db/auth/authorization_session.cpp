@@ -94,6 +94,23 @@ namespace {
         _externalState->onAddAuthorizedPrincipal(principal);
     }
 
+    Status AuthorizationSession::addAndAuthorizeUser(const UserName& userName) {
+        User* user;
+        Status status = getAuthorizationManager().acquireUser(userName, &user);
+        if (!status.isOK()) {
+            return status;
+        }
+
+        // Calling add() on the UserSet may return a user that was replaced because it was from the
+        // same database.
+        User* replacedUser = _authenticatedUsers.add(user);
+        if (replacedUser) {
+            getAuthorizationManager().releaseUser(replacedUser);
+        }
+
+        return Status::OK();
+    }
+
     void AuthorizationSession::_acquirePrivilegesForPrincipalFromDatabase(
             const std::string& dbname, const UserName& user) {
 
@@ -119,6 +136,12 @@ namespace {
             return;
         _acquiredPrivileges.revokePrivilegesFromUser(principal->getName());
         _authenticatedPrincipals.removeByDBName(dbname);
+
+        User* removedUser = _authenticatedUsers.removeByDBName(dbname);
+        if (removedUser) {
+            getAuthorizationManager().releaseUser(removedUser);
+        }
+
         _externalState->onLogoutDatabase(dbname);
     }
 
@@ -149,6 +172,8 @@ namespace {
         addPrincipal(principal);
         fassert(16581, acquirePrivilege(Privilege(PrivilegeSet::WILDCARD_RESOURCE, actions),
                                     principal->getName()).isOK());
+
+        _authenticatedUsers.add(internalSecurity.user);
     }
 
     bool AuthorizationSession::hasInternalAuthorization() {

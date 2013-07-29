@@ -708,6 +708,10 @@ namespace {
     }
 
     void AuthorizationManager::releaseUser(User* user) {
+        if (user == internalSecurity.user) {
+            return;
+        }
+
         boost::lock_guard<boost::mutex> lk(_lock);
         user->decrementRefCount();
         if (user->getRefCount() == 0) {
