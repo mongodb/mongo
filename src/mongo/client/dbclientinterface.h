@@ -700,7 +700,9 @@ namespace mongo {
                             bool j = false,
                             int w = 0,
                             int wtimeout = 0);
-        // Same as above but defaults to using admin DB
+        /**
+         * Same as the form of getLastError that takes a dbname, but just uses the admin DB.
+         */
         string getLastError(bool fsync = false, bool j = false, int w = 0, int wtimeout = 0);
 
         /** Get error result from the last write operation (insert/update/delete) on this connection.
@@ -715,7 +717,9 @@ namespace mongo {
                                              bool j = false,
                                              int w = 0,
                                              int wtimeout = 0);
-        // Same as above but defaults to using admin DB
+        /**
+         * Same as the form of getLastErrorDetailed that takes a dbname, but just uses the admin DB.
+         */
         virtual BSONObj getLastErrorDetailed(bool fsync = false, bool j = false, int w = 0, int wtimeout = 0);
 
         /** Can be called with the returned value from getLastErrorDetailed to extract an error string. 
