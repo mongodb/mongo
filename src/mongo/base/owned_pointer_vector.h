@@ -34,9 +34,20 @@ namespace mongo {
         OwnedPointerVector();
         ~OwnedPointerVector();
 
+        typedef typename std::vector<T*>::const_iterator const_iterator;
+        typedef typename std::vector<T*>::const_reverse_iterator const_reverse_iterator;
+
         /** Access the vector. */
         const std::vector<T*>& vector() const { return _vector; }
         std::vector<T*>& mutableVector() { return _vector; }
+
+        std::size_t size() const { return _vector.size(); }
+        bool empty() const { return _vector.empty(); }
+
+        const_iterator begin() const { return _vector.begin(); }
+        const_reverse_iterator rbegin() const { return _vector.rbegin(); }
+        const_iterator end() const { return _vector.end(); }
+        const_reverse_iterator rend() const { return _vector.rend(); }
 
         void clear();
 

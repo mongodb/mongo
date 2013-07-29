@@ -64,22 +64,6 @@ namespace mongo {
         const ChunkVersion getVersion( const string& ns ) const;
 
         /**
-         * Uninstalls the metadata for a given collection. This should be used when the collection
-         * is dropped.
-         *
-         * NOTE:
-         *   An existing collection with no chunks on this shard will have metadata on version 0,
-         *   which is different than a dropped collection, which will not have metadata.
-         *
-         * TODO:
-         *   All collections should have metadata. (The non-sharded ones are a degenerate case of
-         *   one-chunk collections).
-         *
-         * @param ns the collection to be dropped
-         */
-        void resetVersion( const string& ns );
-
-        /**
          * If the metadata for 'ns' at this shard is at or above the requested version,
          * 'reqShardVersion', returns OK and fills in 'latestShardVersion' with the latest shard
          * version.  The latter is always greater or equal than 'reqShardVersion' if in the same
@@ -236,6 +220,12 @@ namespace mongo {
          * @return true if we are NOT in the critical section
          */
         bool waitTillNotInCriticalSection( int maxSecondsToWait );
+
+        /**
+         * TESTING ONLY
+         * Uninstalls the metadata for a given collection.
+         */
+        void resetMetadata( const string& ns );
 
     private:
 
