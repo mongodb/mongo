@@ -36,8 +36,7 @@ namespace mongo {
     void IndexRebuilder::run() {
         Client::initThread(name().c_str()); 
         ON_BLOCK_EXIT_OBJ(cc(), &Client::shutdown);
-        cc().getAuthorizationSession()->grantInternalAuthorization(
-                UserName("_indexRebuilder", "local"));
+        cc().getAuthorizationSession()->grantInternalAuthorization();
 
         bool firstTime = true;
         std::vector<std::string> dbNames;
