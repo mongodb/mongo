@@ -39,8 +39,10 @@
 #include <unistd.h>
 #include <stddef.h>
 #include <ctype.h>
+#include <limits.h>
 
 #include <wiredtiger.h>
+#include <wiredtiger_ext.h>
 
 #define	ATOMIC_ADD(v, val)						\
 	__sync_add_and_fetch(&(v), val)
@@ -101,7 +103,8 @@ typedef struct {
 
 /* Parallels CONFIG, exposing what can be changed using -o or -O. */
 CONFIG_OPT config_opts[] = {
-	{ "home", STRING_TYPE, offsetof(CONFIG, home), 0 },
+	/* "home" cannot be set in the usual way,
+	   we need it set before parsing config */
 	{ "uri", STRING_TYPE, offsetof(CONFIG, uri), 0 },
 	{ "conn_config", STRING_TYPE, offsetof(CONFIG, conn_config), 0 },
 	{ "table_config", STRING_TYPE, offsetof(CONFIG, table_config), 0 },
@@ -141,11 +144,13 @@ int lprintf(CONFIG *cfg, int err, uint32_t level, const char *fmt, ...)
 void *checkpoint_worker(void *);
 int find_table_count(CONFIG *);
 void *insert_thread(void *);
+int connection_reconfigure(WT_CONNECTION *, const char *);
 void config_assign(CONFIG *, const CONFIG *);
 void config_free(CONFIG *);
-int config_option(CONFIG *, const char *, const char *);
-int config_option_file(CONFIG *, const char *);
-int config_option_line(CONFIG *, char *);
+int config_option(CONFIG *, WT_CONFIG_ITEM *, WT_CONFIG_ITEM *);
+int config_option_str(CONFIG *, WT_SESSION *, const char *, const char *);
+int config_option_file(CONFIG *, WT_SESSION *, const char *);
+int config_option_line(CONFIG *, WT_SESSION *, char *);
 void *populate_thread(void *);
 void print_config(CONFIG *);
 void *read_thread(void *);
@@ -153,6 +158,7 @@ int setup_log_file(CONFIG *);
 int start_threads(CONFIG *, u_int, pthread_t **, void *(*func)(void *));
 void *stat_worker(void *);
 int stop_threads(CONFIG *, u_int, pthread_t *);
+char *strstr_right(const char *str, const char *match, const char **rightp);
 void *update_thread(void *);
 void usage(void);
 void worker(CONFIG *, uint32_t);
@@ -200,7 +206,7 @@ CONFIG default_cfg = {
 };
 /* Small config values - these are small. */
 CONFIG small_cfg = {
-	"WT_TEST",	/* home */
+	NULL,		/* home can only be reset via the -h option */
 	"lsm:test",	/* uri */
 	"create,cache_size=500MB", /* conn_config */
 	DEFAULT_LSM_CONFIG /* table_config */
@@ -229,7 +235,7 @@ CONFIG small_cfg = {
 };
 /* Default values - these are small, we want the basic run to be fast. */
 CONFIG med_cfg = {
-	"WT_TEST",	/* home */
+	NULL,		/* home can only be reset via the -h option */
 	"lsm:test",	/* uri */
 	"create,cache_size=1GB", /* conn_config */
 	DEFAULT_LSM_CONFIG /* table_config */
@@ -258,7 +264,7 @@ CONFIG med_cfg = {
 };
 /* Default values - these are small, we want the basic run to be fast. */
 CONFIG large_cfg = {
-	"WT_TEST",	/* home */
+	NULL,		/* home can only be reset via the -h option */
 	"lsm:test",	/* uri */
 	"create,cache_size=2GB", /* conn_config */
 	DEFAULT_LSM_CONFIG /* table_config */
@@ -856,10 +862,57 @@ err:	session->close(session, NULL);
 	return (ret);
 }
 
+/* Same as strstr, but also returns the right boundary of the match if found */
+char *strstr_right(const char *str, const char *match, const char **rightp)
+{
+	char *result;
+
+	if ((result = strstr(str, match)) != NULL)
+		*rightp = result + strlen(match);
+	else
+		*rightp = NULL;
+	return result;
+}
+
+/* Strip out any create parameter before reconfiguring */
+int connection_reconfigure(WT_CONNECTION *conn, const char *orig)
+{
+	char *alloced;
+	const char *config;
+	const char *left;
+	const char *right;
+	int ret;
+
+	alloced = NULL;
+	if ((left = strstr_right(orig, ",create,", &right)) != NULL ||
+	    (left = strstr_right(orig, "create,", &right)) == orig ||
+	    ((left = strstr_right(orig, ",create", &right)) != NULL &&
+		right == &orig[strlen(orig)])) {
+		size_t alloclen;
+		size_t leftlen;
+
+		leftlen = left - orig;
+		alloclen = leftlen + strlen(right) + 1;
+		alloced = malloc(alloclen);
+		strncpy(alloced, orig, leftlen);
+		strncpy(&alloced[leftlen], right, alloclen - leftlen);
+		config = alloced;
+	}
+	else
+		config = orig;
+
+	ret = conn->reconfigure(conn, config);
+	if (alloced != NULL)
+		free(alloced);
+	return (ret);
+}
+
+
 int main(int argc, char **argv)
 {
 	CONFIG cfg;
 	WT_CONNECTION *conn;
+	WT_SESSION *parse_session;
 	const char *user_cconfig, *user_tconfig;
 	const char *opts = "C:I:O:P:R:U:T:c:d:eh:i:jk:l:m:o:r:ps:t:u:v:SML";
 	char *cc_buf, *tc_buf;
@@ -874,11 +927,44 @@ int main(int argc, char **argv)
 	user_cconfig = user_tconfig = NULL;
 	conn = NULL;
 	checkpoint_created = stat_created = 0;
+	parse_session = NULL;
 
 	/*
-	 * First parse different config structures - other options override
+	 * First do a basic validation of options,
+	 * and home is needed before open.
+	 */
+	while ((ch = getopt(argc, argv, opts)) != EOF)
+		switch (ch) {
+		case 'h':
+			cfg.home = optarg;
+			break;
+		case '?':
+			fprintf(stderr, "Invalid option\n");
+			usage();
+			return (EINVAL);
+		}
+
+	/*
+	 * We do the open now, since we'll need a connection and
+	 * session to use the extension config parser.  We will
+	 * reconfigure later as needed.
+	 */
+	if ((ret = wiredtiger_open(
+	    cfg.home, NULL, "create,cache_size=1M", &conn)) != 0) {
+		lprintf(&cfg, ret, 0, "Error connecting to %s", cfg.home);
+		goto err;
+	}
+
+	if ((ret = conn->open_session(conn, NULL, NULL, &parse_session)) != 0) {
+		lprintf(&cfg, ret, 0, "Error creating session");
+		goto err;
+	}
+
+	/*
+	 * Then parse different config structures - other options override
 	 * fields within the structure.
 	 */
+	optind = 1;
 	while ((ch = getopt(argc, argv, opts)) != EOF)
 		switch (ch) {
 		case 'S':
@@ -891,7 +977,8 @@ int main(int argc, char **argv)
 			config_assign(&cfg, &large_cfg);
 			break;
 		case 'O':
-			if (config_option_file(&cfg, optarg) != 0)
+			if (config_option_file(&cfg,
+				parse_session, optarg) != 0)
 				return (EINVAL);
 			break;
 		default:
@@ -913,7 +1000,7 @@ int main(int argc, char **argv)
 			cfg.create = 0;
 			break;
 		case 'h':
-			config_option(&cfg, "home", optarg);
+			/* handled above */
 			break;
 		case 'i':
 			cfg.icount = (uint32_t)atoi(optarg);
@@ -938,7 +1025,8 @@ int main(int argc, char **argv)
 				
 			break;
 		case 'o':
-			if (config_option_line(&cfg, optarg) != 0)
+			if (config_option_line(&cfg,
+				parse_session, optarg) != 0)
 				return (EINVAL);
 			break;
 		case 'p':
@@ -954,7 +1042,8 @@ int main(int argc, char **argv)
 			cfg.report_interval = (uint32_t)atoi(optarg);
 			break;
 		case 'u':
-			config_option(&cfg, "uri", optarg);
+			config_option_str(&cfg, parse_session,
+			    "uri", optarg);
 			break;
 		case 'v':
 			cfg.verbose = (uint32_t)atoi(optarg);
@@ -1016,7 +1105,8 @@ int main(int argc, char **argv)
 		    cfg.verbose > 1 ? "," : "",
 		    cfg.verbose > 1 ? debug_cconfig : "",
 		    user_cconfig ? "," : "", user_cconfig ? user_cconfig : "");
-		config_option(&cfg, "conn_config", cc_buf);
+		config_option_str(&cfg, parse_session,
+		    "conn_config", cc_buf);
 	}
 	if (cfg.verbose > 1 || user_tconfig != NULL) {
 		req_len = strlen(cfg.table_config) + strlen(debug_tconfig) + 3;
@@ -1032,18 +1122,22 @@ int main(int argc, char **argv)
 		    cfg.verbose > 1 ? "," : "",
 		    cfg.verbose > 1 ? debug_tconfig : "",
 		    user_tconfig ? "," : "", user_tconfig ? user_tconfig : "");
-		config_option(&cfg, "table_config", tc_buf);
+		config_option_str(&cfg, parse_session,
+		    "table_config", tc_buf);
 	}
 
 	wtperf_srand(&cfg);
 
+	parse_session->close(parse_session, NULL);
+	parse_session = NULL;
+
 	if (cfg.verbose > 1)
 		print_config(&cfg);
 
-	/* Open a connection to the database, creating it if necessary. */
-	if ((ret = wiredtiger_open(
-	    cfg.home, NULL, cfg.conn_config, &conn)) != 0) {
-		lprintf(&cfg, ret, 0, "Error connecting to %s", cfg.home);
+	/* Reconfigure our connection to the database. */
+	if ((ret = connection_reconfigure(conn, cfg.conn_config)) != 0) {
+		lprintf(&cfg, ret, 0, "Error configuring using %s",
+		    cfg.conn_config);
 		goto err;
 	}
 
@@ -1097,6 +1191,8 @@ int main(int argc, char **argv)
 
 err:	g_util_running = 0;
 
+	if (parse_session != NULL)
+		parse_session->close(parse_session, NULL);
 	if (checkpoint_created != 0 &&
 	    (ret = pthread_join(checkpoint, NULL)) != 0)
 		lprintf(&cfg, ret, 0, "Error joining checkpoint thread.");
@@ -1121,13 +1217,19 @@ err:	g_util_running = 0;
 /*
  * Following are utility functions.
  */
+
+/* Assign the src config to the dest.
+ * Any storage allocated in dest is freed as a result.
+ */
 void config_assign(CONFIG *dest, const CONFIG *src)
 {
 	int i;
 	char **pstr;
 	char *newstr;
 	size_t len;
+	const char *saved_home;
 
+	saved_home = dest->home;
 	config_free(dest);
 	memcpy(dest, src, sizeof(CONFIG));
 
@@ -1143,8 +1245,11 @@ void config_assign(CONFIG *dest, const CONFIG *src)
 			}
 		}
 	}
+	dest->home = saved_home;
 }
 
+/* Free any storage allocated in the config struct.
+ */
 void
 config_free(CONFIG *cfg)
 {
@@ -1163,28 +1268,33 @@ config_free(CONFIG *cfg)
 	}
 }
 
+/*
+ * Check a single key=value returned by the config parser
+ * against our table of valid keys, along with the expected type.
+ * If everything is okay, set the value.
+ */
 int
-config_option(CONFIG *cfg, const char *name, const char *value)
+config_option(CONFIG *cfg, WT_CONFIG_ITEM *k, WT_CONFIG_ITEM *v)
 {
 	int i;
 	size_t nopt;
 	CONFIG_OPT *popt;
 	void *valueloc;
-	int ival;
 	char *newstr;
 	char **strp;
 
 	popt = NULL;
 	nopt = sizeof(config_opts)/sizeof(config_opts[0]);
 	for (i = 0; i < nopt; i++) {
-		if (strcmp(config_opts[i].name, name) == 0) {
+		if (strlen(config_opts[i].name) == k->len &&
+		    strncmp(config_opts[i].name, k->str, k->len) == 0) {
 			popt = &config_opts[i];
 			break;
 		}
 	}
 	if (popt == NULL) {
 		fprintf(stderr, "wtperf: Error: "
-		    "unknown option \"%s\"\n", name);
+		    "unknown option \'%.*s\'\n", (int)k->len, k->str);
 		fprintf(stderr, "Options:\n");
 		for (i = 0; i < nopt; i++) {
 			fprintf(stderr, "\t%s\n", config_opts[i].name);
@@ -1193,41 +1303,50 @@ config_option(CONFIG *cfg, const char *name, const char *value)
 	}
 	valueloc = ((unsigned char *)cfg + popt->offset);
 	if (popt->type == UINT32_TYPE) {
-		ival = atoi(value);
-		if (ival < 0) {
+		if (v->type != WT_CONFIG_ITEM_NUM) {
 			fprintf(stderr, "wtperf: Error: "
-			    "bad int value in \"%s\"\n", name);
+			    "bad int value for \'%.*s=%.*s\'\n",
+			    (int)k->len, k->str, (int)v->len, v->str);
+			return (EINVAL);
 		}
-		*(uint32_t *)valueloc = (uint32_t)ival;
+		else if (v->val < 0 || v->val > UINT_MAX) {
+			fprintf(stderr, "wtperf: Error: "
+			    "uint32 value out of range for \'%.*s=%.*s\'\n",
+			    (int)k->len, k->str, (int)v->len, v->str);
+			return (EINVAL);
+		}
+		*(uint32_t *)valueloc = (uint32_t)v->val;
 	}
 	else if (popt->type == STRING_TYPE) {
+		if (v->type != WT_CONFIG_ITEM_STRING) {
+			fprintf(stderr, "wtperf: Error: "
+			    "bad string value for \'%.*s=%.*s\'\n",
+			    (int)k->len, k->str, (int)v->len, v->str);
+			return (EINVAL);
+		}
 		strp = (char **)valueloc;
 		if (*strp != NULL) {
 			free(*strp);
 		}
-		newstr = malloc(strlen(value) + 1);
-		strncpy(newstr, value, strlen(value) + 1);
+		newstr = malloc(v->len + 1);
+		strncpy(newstr, v->str, v->len);
+		newstr[v->len] = '\0';
 		*strp = newstr;
 	}
 	else if (popt->type == BOOL_TYPE || popt->type == FLAG_TYPE) {
 		uint32_t *pconfigval;
 
-		if (strcmp(value, "true") || strcmp(value, "1")) {
-			ival = 1;
-		}
-		else if (strcmp(value, "false") || strcmp(value, "0")) {
-			ival = 0;
-		}
-		else {
+		if (v->type != WT_CONFIG_ITEM_BOOL) {
 			fprintf(stderr, "wtperf: Error: "
-			    "bad bool value in \"%s=%s\"\n", name, value);
+			    "bad bool value for \'%.*s=%.*s\'\n",
+			    (int)k->len, k->str, (int)v->len, v->str);
 			return (EINVAL);
 		}
 		pconfigval = (uint32_t *)valueloc;
 		if (popt->type == BOOL_TYPE) {
-			*pconfigval = ival;
+			*pconfigval = v->val;
 		}
-		else if (ival != 0) {
+		else if (v->val != 0) {
 			*pconfigval |= popt->flagmask;
 		}
 		else {
@@ -1237,8 +1356,11 @@ config_option(CONFIG *cfg, const char *name, const char *value)
 	return (0);
 }
 
+/* Parse a configuration file.
+ * We recognize comments '#' and continuation via lines ending in '\'.
+ */
 int
-config_option_file(CONFIG *cfg, const char *filename)
+config_option_file(CONFIG *cfg, WT_SESSION *parse_session, const char *filename)
 {
 	FILE *fp;
 	char option[1024];
@@ -1290,12 +1412,14 @@ config_option_file(CONFIG *cfg, const char *filename)
 			break;
 		}
 		*rtrim = '\0';
-		strncpy(&option[optionpos], ltrim, linelen + 1);
+		strncpy(&option[optionpos], ltrim, linelen);
+		option[optionpos + linelen] = '\0';
 		if (contline) {
 			optionpos += linelen;
 		}
 		else {
-			if ((ret = config_option_line(cfg, option)) != 0) {
+			if ((ret = config_option_line(cfg,
+				    parse_session, option)) != 0) {
 				fprintf(stderr, "wtperf: %s: %d: parse error\n",
 				    filename, linenum);
 				break;
@@ -1313,18 +1437,61 @@ config_option_file(CONFIG *cfg, const char *filename)
 	return (ret);
 }
 
+/* Parse a single line of config options.
+ * Continued lines have already been joined.
+ */
 int
-config_option_line(CONFIG *cfg, char *optstr)
+config_option_line(CONFIG *cfg, WT_SESSION *parse_session, char *optstr)
 {
-	char *pval;
+	WT_CONFIG_ITEM k, v;
+	WT_CONFIG_SCAN *scan;
+	int ret;
+	int t_ret;
+	WT_EXTENSION_API *wt_api;
+	WT_CONNECTION *conn;
 
-	if ((pval = strchr(optstr, '=')) == NULL) {
-		fprintf(stderr, "wtperf: Error: "
-		    "missing '=' in option line \"%s\"\n", optstr);
-		return (EINVAL);
+	conn = parse_session->connection;
+	wt_api = conn->get_extension_api(conn);
+
+	if ((ret = wt_api->config_scan_begin(wt_api, parse_session, optstr,
+		    strlen(optstr), &scan)) != 0) {
+		lprintf(cfg, ret, 0, "Error in config_scan_begin");
+		return (ret);
 	}
-	*pval++ = '\0';
-	return (config_option(cfg, optstr, pval));
+
+	while (ret == 0) {
+		if ((ret = wt_api->config_scan_next(wt_api, scan, &k, &v))
+		    != 0) {
+			/* Any parse error has already been reported. */
+			if (ret == WT_NOTFOUND)
+				ret = 0;
+			break;
+		}
+		ret = config_option(cfg, &k, &v);
+	}
+	if ((t_ret = wt_api->config_scan_end(wt_api, scan)) != 0) {
+		lprintf(cfg, ret, 0,
+		    "Error in config_scan_end");
+		if (ret == 0)
+			ret = t_ret;
+	}
+
+	return (ret);
+}
+
+/* Set a single string config option */
+int
+config_option_str(CONFIG *cfg, WT_SESSION *parse_session,
+    const char *name, const char *value)
+{
+	char *optstr;
+	int ret;
+
+	optstr = malloc(strlen(name) + strlen(value) + 4);  /* name="value" */
+	sprintf(optstr, "%s=\"%s\"", name, value);
+	ret = config_option_line(cfg, parse_session, optstr);
+	free(optstr);
+	return (ret);
 }
 
 int
