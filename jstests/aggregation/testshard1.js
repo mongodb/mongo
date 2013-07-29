@@ -24,8 +24,10 @@ db = shardedAggTest.getDB( "aggShard" );
 
 /* make sure its cleaned up */
 db.ts1.drop();
+db.literal.drop();
 
 shardedAggTest.adminCommand( { shardcollection : "aggShard.ts1", key : { "_id" : 1 } } );
+shardedAggTest.adminCommand( { shardcollection : "aggShard.literal", key : { "_id" : 1 } } );
 
 
 /*
@@ -202,6 +204,13 @@ assert.eq(db.ts1.find().sort({_id:1}).toArray(),
 
 // Make sure we error out if $out collection is sharded
 assertErrorCode(db.outCollection, [{$out: db.ts1.getName()}], 17017);
+
+db.literal.save({dollar:false});
+
+result = db.literal.aggregate(
+            {$project:{_id:0, cost:{$cond:['$dollar', {$literal:'$1.00'}, {$literal:'$.99'}]}}});
+
+assert.eq([{cost:'$.99'}], result.result);
 
 // shut everything down
 shardedAggTest.stop();
