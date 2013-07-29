@@ -1982,8 +1982,7 @@ namespace mongo {
         Client::initThread( "migrateThread" );
         if (AuthorizationManager::isAuthEnabled()) {
             ShardedConnectionInfo::addHook();
-            cc().getAuthorizationSession()->grantInternalAuthorization(
-                    UserName("_migrateThread", "local"));
+            cc().getAuthorizationSession()->grantInternalAuthorization();
         }
         migrateStatus.go();
         cc().shutdown();

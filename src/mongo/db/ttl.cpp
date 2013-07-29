@@ -119,7 +119,7 @@ namespace mongo {
 
         virtual void run() {
             Client::initThread( name().c_str() );
-            cc().getAuthorizationSession()->grantInternalAuthorization(UserName("_ttl", "local"));
+            cc().getAuthorizationSession()->grantInternalAuthorization();
 
             while ( ! inShutdown() ) {
                 sleepsecs( 60 );

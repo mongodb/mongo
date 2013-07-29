@@ -69,8 +69,7 @@ namespace mongo {
 
         void run() {
             Client::initThread( "slaveTracking" );
-            cc().getAuthorizationSession()->grantInternalAuthorization(
-                    UserName("_slaveTracking", "local"));
+            cc().getAuthorizationSession()->grantInternalAuthorization();
             DBDirectClient db;
             while ( ! inShutdown() ) {
                 sleepsecs( 1 );

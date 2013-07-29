@@ -50,8 +50,7 @@ namespace mongo {
         }
 
         if (AuthorizationManager::isAuthEnabled()) {
-            cc().getAuthorizationSession()->grantInternalAuthorization(
-                    UserName("_cleanupOldData", "local"));
+            cc().getAuthorizationSession()->grantInternalAuthorization();
         }
 
         ShardForceVersionOkModeBlock forceVersion;

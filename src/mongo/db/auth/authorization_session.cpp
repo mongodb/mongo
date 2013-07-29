@@ -141,8 +141,8 @@ namespace {
         return Status::OK();
     }
 
-    void AuthorizationSession::grantInternalAuthorization(const UserName& userName) {
-        Principal* principal = new Principal(userName);
+    void AuthorizationSession::grantInternalAuthorization() {
+        Principal* principal = new Principal(internalSecurity.user->getName());
         ActionSet actions;
         actions.addAllActions();
 

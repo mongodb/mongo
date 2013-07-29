@@ -881,8 +881,7 @@ namespace mongo {
     void replLocalAuth() {
         if (!AuthorizationManager::isAuthEnabled())
             return;
-        cc().getAuthorizationSession()->grantInternalAuthorization(
-                UserName("_repl", "local"));
+        cc().getAuthorizationSession()->grantInternalAuthorization();
     }
 
     const char* ReplSetImpl::_initialSyncFlagString = "doingInitialSync";
