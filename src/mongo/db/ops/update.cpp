@@ -529,6 +529,7 @@ namespace mongo {
         opts.upsert = upsert;
         opts.logOp = logop;
         UpdateDriver driver( opts );
+        // TODO: This copies the index keys, but we may not actually need to.
         Status status = driver.parse( nsdt->indexKeys(), updateobj );
         if ( !status.isOK() ) {
             uasserted( 16840, status.reason() );
@@ -536,15 +537,23 @@ namespace mongo {
 
         shared_ptr<Cursor> cursor = getOptimizedCursor( ns, patternOrig, BSONObj(), planPolicy );
 
+        // If the update was marked with '$isolated' (a.k.a '$atomic'), we are not allowed to
+        // yield while evaluating the update loop below.
+        //
+        // TODO: Old code checks this repeatedly within the update loop. Is that necessary? It seems
+        // that once atomic should be always atomic.
+        const bool canYield =
+            cursor->ok() &&
+            cursor->matcher() &&
+            cursor->matcher()->docMatcher().atomic();
+
         // The 'cursor' the optimizer gave us may contain query plans that generate duplicate
         // diskloc's. We set up here the mechanims that will prevent us from processing those
         // twice if we see them. We also set up a 'ClientCursor' so that we can support
         // yielding.
+        //
+        // TODO: Is it valid to call this on a non-ok cursor?
         const bool dedupHere = cursor->autoDedup();
-        shared_ptr<Cursor> cPtr = cursor;
-        auto_ptr<ClientCursor> clientCursor( new ClientCursor( QueryOption_NoCursorTimeout,
-                                                               cPtr,
-                                                               ns ) );
 
         //
         // We'll start assuming we have one or more documents for this update. (Othwerwise,
@@ -562,7 +571,46 @@ namespace mongo {
         unordered_set<DiskLoc, DiskLoc::Hasher> seenLocs;
         int numUpdated = 0;
         debug.nscanned = 0;
-        while ( cursor->ok() ) {
+
+        // If we are going to be yielding, we will need a ClientCursor scoped to this loop. We
+        // only loop as long as the underlying cursor is OK.
+        for ( auto_ptr<ClientCursor> clientCursor; cursor->ok(); ) {
+
+            if ( !canYield && debug.nscanned != 0 ) {
+
+                // We are permitted to yield. To do so we need a ClientCursor, so create one
+                // now if we have not yet done so.
+                if ( !clientCursor.get() )
+                    clientCursor.reset(
+                        new ClientCursor( QueryOption_NoCursorTimeout, cursor, ns ) );
+
+                // Ask the client cursor to yield. We get two bits of state back: whether or not
+                // we yielded, and whether or not we correctly recovered from yielding.
+                bool yielded = false;
+                const bool recovered = clientCursor->yieldSometimes(
+                    ClientCursor::WillNeed, &yielded );
+
+                // If we couldn't recover from the yield, or if the cursor died while we were
+                // yielded, get out of the update loop right away. We don't need to reset
+                // 'clientCursor' since we are leaving the scope.
+                if ( !recovered || !cursor->ok() )
+                    break;
+
+                if ( yielded ) {
+                    // Details about our namespace may have changed while we were yielded, so
+                    // we re-acquire them here. If we can't do so, escape the update
+                    // loop. Otherwise, refresh the driver so that it knows about what is
+                    // currently indexed.
+                    d = nsdetails( ns );
+                    if ( !d )
+                        break;
+                    nsdt = &NamespaceDetailsTransient::get( ns );
+
+                    // TODO: This copies the index keys, but it may not need to do so.
+                    driver.refreshIndexKeys( nsdt->indexKeys() );
+                }
+
+            }
 
             // Let's fetch the next candidate object for this update.
             Record* r = cursor->_current();
@@ -627,8 +675,9 @@ namespace mongo {
             // prepareToTouchEarlierIterate() requires calling later
             // recoverFromTouchingEarlierIterate(), so we make a note here to do so.
             bool touchPreviousDoc = multi && cursor->ok();
-            if ( touchPreviousDoc  ) {
-                clientCursor->setDoingDeletes( true );
+            if ( touchPreviousDoc ) {
+                if ( clientCursor.get() )
+                    clientCursor->setDoingDeletes( true );
                 cursor->prepareToTouchEarlierIterate();
             }
 
