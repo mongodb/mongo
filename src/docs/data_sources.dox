@@ -8,7 +8,7 @@ statistics, and applications can further extend the supported types by
 implementing the ::WT_DATA_SOURCE interface.
 
 Common operations on all data sources are performed using WT_CURSOR
-handles.  See @subpage cursor_ops for a description of how to use
+handles.  See @ref cursor_ops for a description of how to use
 cursors.
 
 @section data_builtin Builtin data sources
