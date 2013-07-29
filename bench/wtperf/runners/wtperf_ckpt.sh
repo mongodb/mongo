@@ -11,7 +11,7 @@ RUNTIME=900
 REUSE=0
 VERBOSE=0
 WORKLOAD=0 # skip the populate phase.
-PERF_BASE="M"
+PERF_BASE="-M"
 OPTFILE=''
 DEBUG=
 GDB=${GDB:-gdb}
@@ -34,6 +34,7 @@ while getopts b:dhO:RWr:sv OPT; do
             ;;
         O)
             OPTFILE=-O$OPTARG
+            PERF_BASE=""
             ;;
         R)
             REUSE=1
@@ -43,7 +44,7 @@ while getopts b:dhO:RWr:sv OPT; do
             ;;
         s)
             RUNTIME=20
-	    PERF_BASE="S"
+	    PERF_BASE="-S"
             ;;
         v)
             VERBOSE=1
@@ -69,7 +70,7 @@ fi
 
 DB_HOME="$ROOT_DIR/WT_TEST"
 OUT_DIR="$ROOT_DIR/results"
-SHARED_OPTS="${OPTFILE} -${PERF_BASE} -R 1 -U 1 -t 1 -v 1 -h ${DB_HOME} -u table:test"
+SHARED_OPTS="${OPTFILE} ${PERF_BASE} -R 1 -U 1 -t 1 -v 1 -h ${DB_HOME} -u table:test"
 CREATE_OPTS="$SHARED_OPTS -r 0"
 RUN_OPTS="$SHARED_OPTS -r $RUNTIME"
 if [ $WORKLOAD -eq 0 ]; then
