@@ -49,14 +49,16 @@ method:
 
 @snippet ex_cursor.c cursor next
 
+If the WT_CURSOR::next method is called on a cursor without a position
+in the data source, it is positioned at the beginning of the data source.
+
 To move a cursor backward in the data source, use the cursor WT_CURSOR::prev
 method:
 
 @snippet ex_cursor.c cursor prev
 
-If the WT_CURSOR::next and WT_CURSOR::prev methods are called on cursors
-without a position in the data source, they are positioned at the beginning
-or end of the data source, respectively.
+If the WT_CURSOR::prev method is called on a cursor without a position
+in the data source, it is positioned at the end of the data source.
 
 To position a cursor at a specific location in the data source, use the
 WT_CURSOR::search method:
@@ -83,6 +85,14 @@ use the WT_CURSOR::insert method:
 
 @snippet ex_cursor.c cursor insert
 
+To update existing data using a cursor, use the WT_CURSOR::update method:
+
+@snippet ex_cursor.c cursor update
+
+To remove existing data using a cursor, use the WT_CURSOR::remove method:
+
+@snippet ex_cursor.c cursor remove
+
 The WT_SESSION::open_cursor \c overwrite configuration is \c true by default,
 causing WT_CURSOR::insert, WT_CURSOR::remove and WT_CURSOR::update to ignore
 the current state of the record, and these methods will succeed regardless of
@@ -92,14 +102,6 @@ When an application configures \c overwrite to \c false, WT_CURSOR::insert will
 fail with ::WT_DUPLICATE_KEY if the record previously exists, and
 WT_CURSOR::update and WT_CURSOR::remove will fail with ::WT_NOTFOUND if the
 record does not previously exist.
-
-To update existing data using a cursor, use the WT_CURSOR::update method:
-
-@snippet ex_cursor.c cursor update
-
-To remove existing data using a cursor, use the WT_CURSOR::remove method:
-
-@snippet ex_cursor.c cursor remove
 
 @section cursor_error Cursor position after error
 
@@ -123,10 +125,10 @@ the memory valid until the next operation that successfully positions the
 cursor.  These operations are WT_CURSOR::insert, WT_CURSOR::remove,
 WT_CURSOR::search, WT_CURSOR::search_near and WT_CURSOR::update.
 
-If such an operation fails (for example, due to a WT_DEADLOCK error), it may
-be retried without calling WT_CURSOR::set_key or WT_CURSOR::set_value again.
-That is, the cursor may still reference the application-supplied memory until
-it is successfully positioned.
+If such an operation fails (for example, due to a ::WT_DEADLOCK error),
+it may be retried without calling WT_CURSOR::set_key or
+WT_CURSOR::set_value again.  That is, the cursor may still reference the
+application-supplied memory until it is successfully positioned.
 
 Any pointers returned by WT_CURSOR::get_key or WT_CURSOR::get_value are only
 valid until the cursor is positioned.  These pointers may reference private
