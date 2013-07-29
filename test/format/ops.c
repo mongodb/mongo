@@ -145,9 +145,7 @@ ops(void *arg)
 	tinfo = arg;
 
 	/* Set up the default key and value buffers. */
-	memset(&key, 0, sizeof(key));
 	key_gen_setup(&keybuf);
-	memset(&value, 0, sizeof(value));
 	val_gen_setup(&valbuf);
 
 	/*
@@ -365,7 +363,6 @@ wts_read_scan(void)
 	conn = g.wts_conn;
 
 	/* Set up the default key buffer. */
-	memset(&key, 0, sizeof(key));
 	key_gen_setup(&keybuf);
 
 	/* Open a session and cursor pair. */
@@ -432,7 +429,6 @@ read_row(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno)
 			value.data = &bitfield;
 			value.size = 1;
 		} else {
-			memset(&value, 0, sizeof(value));
 			ret = cursor->get_value(cursor, &value);
 		}
 	}
@@ -454,7 +450,6 @@ read_row(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno)
 		return;
 
 	/* Retrieve the BDB value. */
-	memset(&bdb_value, 0, sizeof(bdb_value));
 	bdb_read(keyno, &bdb_value.data, &bdb_value.size, &notfound);
 
 	/* Check for not-found status. */

@@ -172,7 +172,6 @@ int run(void)
 	    sess, uri, NULL, g.c_ops, g.c_factor, g.c_k, &bloomp)) != 0)
 		die(ret, "__wt_bloom_create");
 
-	memset(&item, 0, sizeof(item));
 	item.size = g.c_key_max;
 	for (i = 0; i < g.c_ops; i++) {
 		item.data = g.entries[i];
