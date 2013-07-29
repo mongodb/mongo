@@ -90,15 +90,15 @@ namespace mongo {
     // todo: this is called a lot. streamline the common case
     DataFile* ExtentManager::getFile( int n, int sizeNeeded , bool preallocateOnly) {
         verify(this);
-        Lock::assertAtLeastReadLocked( _dbname );
+        DEV Lock::assertAtLeastReadLocked( _dbname );
 
         if ( n < 0 || n >= DiskLoc::MaxFiles ) {
-            out() << "getFile(): n=" << n << endl;
+            log() << "getFile(): n=" << n << endl;
             massert( 10295 , "getFile(): bad file number value (corrupt db?): run repair", false);
         }
         DEV {
             if ( n > 100 ) {
-                out() << "getFile(): n=" << n << endl;
+                log() << "getFile(): n=" << n << endl;
             }
         }
         DataFile* p = 0;
@@ -116,7 +116,7 @@ namespace mongo {
             p = _files[n];
         }
         if ( p == 0 ) {
-            Lock::assertWriteLocked( _dbname );
+            DEV Lock::assertWriteLocked( _dbname );
             boost::filesystem::path fullName = fileName( n );
             string fullNameString = fullName.string();
             p = new DataFile(n);
@@ -141,7 +141,7 @@ namespace mongo {
     }
 
     DataFile* ExtentManager::addAFile( int sizeNeeded, bool preallocateNextFile ) {
-        Lock::assertWriteLocked( _dbname );
+        DEV Lock::assertWriteLocked( _dbname );
         int n = (int) _files.size();
         DataFile *ret = getFile( n, sizeNeeded );
         if ( preallocateNextFile )
@@ -162,7 +162,7 @@ namespace mongo {
     }
 
     void ExtentManager::flushFiles( bool sync ) {
-        Lock::assertAtLeastReadLocked( _dbname );
+        DEV Lock::assertAtLeastReadLocked( _dbname );
         for( vector<DataFile*>::iterator i = _files.begin(); i != _files.end(); i++ ) {
             DataFile *f = *i;
             f->flush(sync);
