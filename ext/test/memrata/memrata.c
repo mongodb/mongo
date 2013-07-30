@@ -1249,20 +1249,20 @@ cache_clean:
 			else
 				cache_ret = WT_NOTFOUND;
 		}
-
-		/*
-		 * If the cache is the key we'd choose, but it's a delete, skip
-		 * past it by moving from the deleted key to the next/prev item
-		 * in either the primary or the cache.
-		 */
-		if (cache_ret == 0 && cache_rm) {
-			memcpy(r->key, b.data, b.size);
-			goto skip_deleted;
-		}
 	}
 
-	/* If no entry in the primary, copy the cache's entry into place. */
-	if (cache_ret == 0 && ret == WT_NOTFOUND) {
+	/*
+	 * If the cache is the key we'd choose, but it's a delete, skip past it
+	 * by moving from the deleted key to the next/prev item in either the
+	 * primary or the cache.
+	 */
+	if (cache_ret == 0 && cache_rm) {
+		memcpy(r->key, cursor->t2.v, cursor->t2.len);
+		goto skip_deleted;
+	}
+
+	/* If taking the cache's entry, copy the value into place. */
+	if (cache_ret == 0) {
 		memcpy(r->key, cursor->t2.v, cursor->t2.len);
 		r->key_len = cursor->t2.len;
 
