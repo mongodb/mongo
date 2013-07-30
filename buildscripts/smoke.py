@@ -553,7 +553,8 @@ def run_tests(tests):
         master = Nothing()
     try:
         if small_oplog:
-            slave = mongod(slave=True).__enter__()
+            slave = mongod(slave=True,
+                           set_parameters=set_parameters).__enter__()
         elif small_oplog_rs:
             slave = mongod(slave=True,
                            small_oplog_rs=small_oplog_rs,
