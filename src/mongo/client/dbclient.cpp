@@ -572,10 +572,19 @@ namespace mongo {
             uassertStatusOK(bsonExtractStringField(params,
                                                    saslCommandUserSourceFieldName,
                                                    &userSource));
+            std::string user;
+            uassertStatusOK(bsonExtractStringField(params,
+                                                   saslCommandUserFieldName,
+                                                   &user));
+ 
+            uassert(ErrorCodes::AuthenticationFailed,
+                    "Username does not match the provided client certificate",
+                    user ==  getSSLManager()->getClientSubjectName());
+ 
             std::string errmsg;
             uassert(ErrorCodes::AuthenticationFailed,
                     errmsg,
-                    _authX509(userSource, getSSLManager()->getClientSubjectName(), errmsg));
+                    _authX509(userSource, user, errmsg));
         }
 #endif
         else if (saslClientAuthenticate != NULL) {
