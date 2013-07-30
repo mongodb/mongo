@@ -249,12 +249,14 @@ namespace mongo {
         }
         else {
             StringData srvSubjectName = getSSLManager()->getServerSubjectName();
-            StringData srvClusterId = srvSubjectName.substr(0, srvSubjectName.find("/CN")+1);
-            StringData peerClusterId = subjectName.substr(0, subjectName.find("/CN")+1);
+            StringData srvClusterId = srvSubjectName.substr(srvSubjectName.find(",OU="));
+            StringData peerClusterId = subjectName.substr(subjectName.find(",OU="));
+
+            fassert(17002, !srvClusterId.empty() && srvClusterId != srvSubjectName);
 
             // Handle internal cluster member auth, only applies to server-server connections 
             if (srvClusterId == peerClusterId) {
-                if (cmdLine.clusterAuthMode == "keyfile") {
+                if (cmdLine.clusterAuthMode.empty() || cmdLine.clusterAuthMode == "keyfile") {
                     return Status(ErrorCodes::AuthenticationFailed,
                                   "X509 authentication is not allowed for cluster authentication");
                 }
