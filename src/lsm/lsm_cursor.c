@@ -141,13 +141,10 @@ __clsm_open_cursors(
 		F_SET(clsm, WT_CLSM_OPEN_READ);
 
 	/* Copy the key, so we don't lose the cursor position. */
-	if (F_ISSET(c, WT_CURSTD_KEY_RET)) {
-		F_CLR(c, WT_CURSTD_KEY_RET);
-		if (c->key.data != c->key.mem)
-			WT_RET(__wt_buf_set(
-			    session, &c->key, c->key.data, c->key.size));
-		F_SET(c, WT_CURSTD_KEY_APP);
-	}
+	if (F_ISSET(c, WT_CURSTD_KEY_RET) && c->key.data != c->key.mem)
+		WT_RET(__wt_buf_set(
+		    session, &c->key, c->key.data, c->key.size));
+
 	F_CLR(clsm, WT_CLSM_ITERATE_NEXT | WT_CLSM_ITERATE_PREV);
 
 	WT_RET(__wt_readlock(session, lsm_tree->rwlock));
@@ -310,7 +307,7 @@ __clsm_get_current(
 	multiple = 0;
 
 	WT_FORALL_CURSORS(clsm, c, i) {
-		if (!F_ISSET(c, WT_CURSTD_KEY_SET))
+		if (!F_ISSET(c, WT_CURSTD_KEY_RET))
 			continue;
 		if (current == NULL) {
 			current = c;
