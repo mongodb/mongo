@@ -53,9 +53,13 @@ namespace mongo {
         
         if ( _total > 0 ) {
             int per = (int)( ( (double)_done * 100.0 ) / (double)_total );
-            Nullstream& out = log() << "\t\t" << _name << ": " << _done
-                                    << '/' << _total << '\t' << per << '%';
+            Nullstream& out = log();
+            out << "\t\t" << _name << ": " << _done;
             
+            if (_showTotal) {
+                out << '/' << _total << '\t' << per << '%';
+            }
+
             if ( ! _units.empty() ) {
                 out << "\t(" << _units << ")";
             }
