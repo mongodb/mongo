@@ -73,6 +73,7 @@ catch (e) {
 }
 
 print("\nawait");
+replTest.awaitSecondaryNodes(90000);
 replTest.awaitReplication();
 
 // 31000 may have just voted for 31001, preventing it from becoming primary for the first 30 seconds
