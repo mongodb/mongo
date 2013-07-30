@@ -212,12 +212,6 @@ namespace replset {
     }
 
     bool BackgroundSync::connectOplogNotifier() {
-        // prevent writers from blocking readers during fsync
-        SimpleMutex::scoped_lock fsynclk(filesLockedFsync);
-        // we don't need the local write lock yet, but it's needed by OplogReader::connect
-        // so we take it preemptively to avoid deadlocking.
-        Lock::DBWrite lk("local");
-
         boost::unique_lock<boost::mutex> lock(_mutex);
 
         if (!_oplogMarkerTarget || _currentSyncTarget != _oplogMarkerTarget) {
@@ -543,15 +537,7 @@ namespace replset {
                 boost::unique_lock<boost::mutex> lock(_mutex);
                 _currentSyncTarget = target;
             }
-            {
-                // prevent writers from blocking readers during fsync
-                SimpleMutex::scoped_lock fsynclk(filesLockedFsync);
-                // we don't need the local write lock yet, but it's needed by ensureMe()
-                // so we take it preemptively to avoid deadlocking.
-                Lock::DBWrite lk("local");
-
-                theReplSet->syncSourceFeedback.connect(target);
-            }
+            theReplSet->syncSourceFeedback.connect(target);
 
             return;
         }
