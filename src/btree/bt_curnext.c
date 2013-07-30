@@ -409,7 +409,6 @@ __wt_btcur_next(WT_CURSOR_BTREE *cbt, int discard)
 		LF_SET(WT_TREE_DISCARD);
 
 retry:	WT_RET(__cursor_func_init(cbt, 0));
-	__cursor_position_clear(cbt);
 
 	/*
 	 * If we aren't already iterating in the right direction, there's
@@ -495,7 +494,8 @@ retry:	WT_RET(__cursor_func_init(cbt, 0));
 
 err:	if (ret == WT_RESTART)
 		goto retry;
-	WT_TRET(__cursor_func_resolve(cbt, ret));
+	if (ret != 0)
+		WT_TRET(__cursor_error_resolve(cbt));
 	return (ret);
 }
 
@@ -517,7 +517,6 @@ __wt_btcur_next_random(WT_CURSOR_BTREE *cbt)
 	WT_DSTAT_INCR(session, cursor_next);
 
 retry:	WT_RET(__cursor_func_init(cbt, 1));
-	__cursor_position_clear(cbt);
 
 	/*
 	 * Only supports row-store: applications can trivially select a random
@@ -530,6 +529,7 @@ retry:	WT_RET(__cursor_func_init(cbt, 1));
 
 err:	if (ret == WT_RESTART)
 		goto retry;
-	WT_TRET(__cursor_func_resolve(cbt, ret));
+	if (ret != 0)
+		WT_TRET(__cursor_error_resolve(cbt));
 	return (ret);
 }

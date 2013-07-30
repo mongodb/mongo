@@ -17,16 +17,6 @@ __cursor_set_recno(WT_CURSOR_BTREE *cbt, uint64_t v)
 }
 
 /*
- * __cursor_position_clear --
- *	Forget the current key and value in a cursor.
- */
-static inline void
-__cursor_position_clear(WT_CURSOR_BTREE *cbt)
-{
-	F_CLR(&cbt->iface, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
-}
-
-/*
  * __cursor_search_clear --
  *	Reset the cursor's state for a search.
  */
@@ -65,9 +55,6 @@ __cursor_leave(WT_CURSOR_BTREE *cbt)
 
 	cursor = &cbt->iface;
 	session = (WT_SESSION_IMPL *)cursor->session;
-
-	/* The key and value may be gone, clear the flags here. */
-	F_CLR(cursor, WT_CURSTD_KEY_RET | WT_CURSTD_VALUE_RET);
 
 	/*
 	 * If the cursor was active, decrement the count of active cursors in
@@ -132,28 +119,21 @@ __cursor_func_init(WT_CURSOR_BTREE *cbt, int reenter)
 }
 
 /*
- * __cursor_func_resolve --
- *	Resolve the cursor's state for return.
+ * __cursor_error_resolve --
+ *	Resolve the cursor's state for return on error.
  */
 static inline int
-__cursor_func_resolve(WT_CURSOR_BTREE *cbt, int ret)
+__cursor_error_resolve(WT_CURSOR_BTREE *cbt)
 {
-	WT_CURSOR *cursor;
-
-	cursor = &cbt->iface;
-
 	/*
-	 * On success, we're returning a key/value pair, and can iterate.
-	 * On error, we're not returning anything, we can't iterate, and
-	 * we should release any page references we're holding.
+	 * On error, we can't iterate, so clear the cursor's position and
+	 * release any page references we're holding.
 	 */
-	if (ret == 0) {
-		F_CLR(cursor, WT_CURSTD_KEY_APP | WT_CURSTD_VALUE_APP);
-		F_SET(cursor, WT_CURSTD_KEY_RET | WT_CURSTD_VALUE_RET);
-	} else {
-		WT_RET(__cursor_leave(cbt));
-		__cursor_search_clear(cbt);
-	}
+	WT_RET(__cursor_leave(cbt));
+
+	/* Clear the cursor's search state. */
+	__cursor_search_clear(cbt);
+
 	return (0);
 }
 
