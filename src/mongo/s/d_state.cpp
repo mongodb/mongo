@@ -309,6 +309,28 @@ namespace mongo {
         _collMetadata[ns] = cloned;
     }
 
+    void ShardingState::mergeChunks( const string& ns,
+                                     const BSONObj& minKey,
+                                     const BSONObj& maxKey,
+                                     ChunkVersion mergedVersion ) {
+
+        scoped_lock lk( _mutex );
+
+        CollectionMetadataMap::const_iterator it = _collMetadata.find( ns );
+        verify( it != _collMetadata.end() );
+
+        string errMsg;
+
+        CollectionMetadataPtr cloned( it->second->cloneMerge( minKey,
+                                                              maxKey,
+                                                              mergedVersion,
+                                                              &errMsg ) );
+        // uassert to match old behavior, TODO: report errors w/o throwing
+        uassert( 17004, errMsg, NULL != cloned.get() );
+
+        _collMetadata[ns] = cloned;
+    }
+
     void ShardingState::resetVersion( const string& ns ) {
         scoped_lock lk( _mutex );
 

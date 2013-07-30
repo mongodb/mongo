@@ -334,6 +334,88 @@ namespace mongo {
         return metadata.release();
     }
 
+    CollectionMetadata* CollectionMetadata::cloneMerge( const BSONObj& minKey,
+                                                        const BSONObj& maxKey,
+                                                        const ChunkVersion& newShardVersion,
+                                                        string* errMsg ) const {
+
+        if (newShardVersion <= _shardVersion) {
+
+            *errMsg = stream() << "cannot merge range " << rangeToString( minKey, maxKey )
+                               << ", new shard version " << newShardVersion.toString()
+                               << " is not greater than current version "
+                               << _shardVersion.toString();
+
+            warning() << *errMsg << endl;
+            return NULL;
+        }
+
+        RangeVector overlap;
+        getRangeMapOverlap( _chunksMap, minKey, maxKey, &overlap );
+
+        if ( overlap.empty() || overlap.size() == 1 ) {
+
+            *errMsg = stream() << "cannot merge range " << rangeToString( minKey, maxKey )
+                               << ( overlap.empty() ? ", no chunks found in this range" :
+                                                      ", only one chunk found in this range" );
+
+            warning() << *errMsg << endl;
+            return NULL;
+        }
+
+        bool validStartEnd = true;
+        bool validNoHoles = true;
+        if ( overlap.begin()->first.woCompare( minKey ) != 0 ) {
+            // First chunk doesn't start with minKey
+            validStartEnd = false;
+        }
+        else if ( overlap.rbegin()->second.woCompare( maxKey ) != 0 ) {
+            // Last chunk doesn't end with maxKey
+            validStartEnd = false;
+        }
+        else {
+            // Check that there are no holes
+            BSONObj prevMaxKey = minKey;
+            for ( RangeVector::iterator it = overlap.begin(); it != overlap.end(); ++it ) {
+                if ( it->first.woCompare( prevMaxKey ) != 0 ) {
+                    validNoHoles = false;
+                    break;
+                }
+                prevMaxKey = it->second;
+            }
+        }
+
+        if ( !validStartEnd || !validNoHoles ) {
+
+            *errMsg = stream() << "cannot merge range " << rangeToString( minKey, maxKey )
+                               << ", overlapping chunks " << overlapToString( overlap )
+                               << ( !validStartEnd ? " do not have the same min and max key" :
+                                                     " are not all adjacent" );
+
+            warning() << *errMsg << endl;
+            return NULL;
+        }
+
+        auto_ptr<CollectionMetadata> metadata( new CollectionMetadata );
+        metadata->_keyPattern = this->_keyPattern;
+        metadata->_keyPattern.getOwned();
+        metadata->_pendingMap = this->_pendingMap;
+        metadata->_chunksMap = this->_chunksMap;
+        metadata->_rangesMap = this->_rangesMap;
+        metadata->_shardVersion = newShardVersion;
+        metadata->_collVersion =
+                newShardVersion > _collVersion ? newShardVersion : this->_collVersion;
+
+        for ( RangeVector::iterator it = overlap.begin(); it != overlap.end(); ++it ) {
+            metadata->_chunksMap.erase( it->first );
+        }
+
+        metadata->_chunksMap.insert( make_pair( minKey, maxKey ) );
+
+        dassert(metadata->isValid());
+        return metadata.release();
+    }
+
     bool CollectionMetadata::keyBelongsToMe( const BSONObj& key ) const {
         // For now, collections don't move. So if the collection is not sharded, assume
         // the document with the given key can be accessed.

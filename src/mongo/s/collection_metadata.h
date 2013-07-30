@@ -111,6 +111,19 @@ namespace mongo {
                                         const ChunkVersion& newShardVersion,
                                         string* errMsg ) const;
 
+        /**
+         * Returns a new metadata instance by merging a key range which starts and ends at existing
+         * chunks into a single chunk.  The range may not have holes.  The resulting metadata will
+         * have the 'newShardVersion'.  The caller owns the new metadata.
+         *
+         * If a new metadata can't be created, returns NULL and fills in 'errMsg', if it was
+         * provided.
+         */
+        CollectionMetadata* cloneMerge( const BSONObj& minKey,
+                                        const BSONObj& maxKey,
+                                        const ChunkVersion& newShardVersion,
+                                        string* errMsg ) const;
+
         //
         // verification logic
         //

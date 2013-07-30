@@ -212,6 +212,24 @@ namespace mongo {
         void splitChunk( const string& ns , const BSONObj& min , const BSONObj& max , const vector<BSONObj>& splitKeys ,
                          ChunkVersion version );
 
+        /**
+         * Creates and installs a new chunk metadata for a given collection by merging a range of
+         * chunks ['minKey', 'maxKey') into a single chunk with version 'mergedVersion'.
+         * The current metadata must overlap the range completely and minKey and maxKey must not
+         * divide an existing chunk.
+         *
+         * The merged chunk version must have a greater version than the current shard version,
+         * and if it has a greater major version clients will need to reload metadata.
+         *
+         * @param ns the collection
+         * @param minKey maxKey the range which should be merged
+         * @param newShardVersion the shard version the newly merged chunk should have
+         */
+        void mergeChunks( const string& ns,
+                          const BSONObj& minKey,
+                          const BSONObj& maxKey,
+                          ChunkVersion mergedVersion );
+
         bool inCriticalMigrateSection();
 
         /**
