@@ -367,7 +367,7 @@ __curds_insert(WT_CURSOR *cursor)
 	WT_ERR(__curds_txn_enter(session, 1));
 
 	WT_CSTAT_INCR(session, cursor_insert);     
-	WT_DSTAT_INCR(session, cursor_insert);     
+	WT_DSTAT_INCR(session, cursor_insert);
 	WT_DSTAT_INCRV(session,
 	    cursor_insert_bytes, cursor->key.size + cursor->value.size);
 
@@ -400,9 +400,9 @@ __curds_update(WT_CURSOR *cursor)
 	CURSOR_UPDATE_API_CALL(cursor, session, update, NULL);
 
 	WT_CSTAT_INCR(session, cursor_update);     
-	WT_DSTAT_INCR(session, cursor_update);     
+	WT_DSTAT_INCR(session, cursor_update);
 	WT_DSTAT_INCRV(session, cursor_update_bytes, cursor->value.size);
-				    
+
 	WT_ERR(__curds_txn_enter(session, 1));
 
 	WT_ERR(__curds_key_set(cursor));
@@ -432,7 +432,7 @@ __curds_remove(WT_CURSOR *cursor)
 	CURSOR_UPDATE_API_CALL(cursor, session, remove, NULL);
 
 	WT_CSTAT_INCR(session, cursor_remove);     
-	WT_DSTAT_INCR(session, cursor_remove);     
+	WT_DSTAT_INCR(session, cursor_remove);
 	    WT_DSTAT_INCRV(session, cursor_remove_bytes, cursor->key.size);
 
 	WT_ERR(__curds_txn_enter(session, 1));
