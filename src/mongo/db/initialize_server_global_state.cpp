@@ -292,10 +292,14 @@ namespace mongo {
                 // error message printed in setUpPrivateKey
                 return false;
             }
-
-            AuthorizationManager::setAuthEnabled(true);
         }
  
+        // Auto-enable auth except if clusterAuthMode is not set.
+        // clusterAuthMode is automatically set if a --keyfile parameter is provided.
+        if (!cmdLine.clusterAuthMode.empty()) {
+            AuthorizationManager::setAuthEnabled(true);
+        }
+
 #ifdef MONGO_SSL
         if (cmdLine.clusterAuthMode == "x509" || cmdLine.clusterAuthMode == "sendX509") {
             setInternalUserAuthParams(BSON(saslCommandMechanismFieldName << "MONGODB-X509" <<

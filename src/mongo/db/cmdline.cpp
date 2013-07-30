@@ -445,7 +445,7 @@ namespace {
                 }
             }
         }
-        if (!params.count("clusterAuthMode")){
+        if (!params.count("clusterAuthMode") && params.count("keyfile")){
             cmdLine.clusterAuthMode = "keyfile";
         }
 
@@ -492,13 +492,13 @@ namespace {
                 return false;
             }
         }
-        else if (cmdLine.clusterAuthMode != "keyfile") {
+        else if (params.count("clusterAuthMode") && cmdLine.clusterAuthMode != "keyfile") {
             log() << "unsupported value for clusterAuthMode " << cmdLine.clusterAuthMode << endl;
             return false;
         }
 #else // ifdef MONGO_SSL
         // Keyfile is currently the only supported value if not using SSL 
-        if (cmdLine.clusterAuthMode != "keyfile") {
+        if (params.count("clusterAuthMode") && cmdLine.clusterAuthMode != "keyfile") {
             log() << "unsupported value for clusterAuthMode " << cmdLine.clusterAuthMode << endl;
             return false;
         }
