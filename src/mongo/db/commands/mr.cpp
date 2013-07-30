@@ -1167,9 +1167,23 @@ namespace mongo {
                     state.init();
                     state.prepTempCollection();
                     ON_BLOCK_EXIT_OBJ(state, &State::dropTempCollections);
-                    ProgressMeterHolder pm(op->setMessage("m/r: (1/3) emit phase",
-                                                          "M/R: (1/3) Emit Progress",
-                                                          state.incomingDocuments()));
+
+                    int progressTotal = 0;
+                    bool showTotal = true;
+                    if ( state.config().filter.isEmpty() ) {
+                        progressTotal = state.incomingDocuments();
+                    }
+                    else {
+                        showTotal = false;
+                        // Set an arbitrary total > 0 so the meter will be activated.
+                        progressTotal = 1;
+                    }
+
+                    ProgressMeter& progress( op->setMessage("m/r: (1/3) emit phase",
+                                             "M/R: (1/3) Emit Progress",
+                                             progressTotal ));
+                    progress.showTotal(showTotal);
+                    ProgressMeterHolder pm(progress);
 
                     wassert( config.limit < 0x4000000 ); // see case on next line to 32 bit unsigned
                     long long mapTime = 0;
