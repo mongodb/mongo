@@ -572,9 +572,24 @@ namespace mongo {
         int numUpdated = 0;
         debug.nscanned = 0;
 
+        Client& client = cc();
+
         // If we are going to be yielding, we will need a ClientCursor scoped to this loop. We
         // only loop as long as the underlying cursor is OK.
         for ( auto_ptr<ClientCursor> clientCursor; cursor->ok(); ) {
+
+            // If we haven't constructed a ClientCursor, and if the client allows us to throw
+            // page faults, and if we are referring to a location that is likely not in
+            // physical memory, then throw a PageFaultException. The entire operation will be
+            // restarted.
+            if ( clientCursor.get() == NULL &&
+                 client.allowedToThrowPageFaultException() &&
+                 !cursor->currLoc().isNull() &&
+                 !cursor->currLoc().rec()->likelyInPhysicalMemory() ) {
+                // We should never throw a PFE if we have already updated items.
+                dassert(numUpdated == 0);
+                throw PageFaultException( cursor->currLoc().rec() );
+            }
 
             if ( !canYield && debug.nscanned != 0 ) {
 
@@ -705,11 +720,12 @@ namespace mongo {
             // This code flow is admittedly odd. But, right now, journaling is baked in the file
             // manager. And if we aren't using the file manager, we have to do jounaling
             // ourselves.
+            bool objectWasChanged = false;
             BSONObj newObj;
             const char* source = NULL;
             mutablebson::DamageVector damages;
             bool inPlace = doc.getInPlaceUpdates(&damages, &source);
-            if ( inPlace && !driver.modsAffectIndices() ) {
+            if ( inPlace && !damages.empty() && !driver.modsAffectIndices() ) {
                 d->paddingFits();
 
                 // All updates were in place. Apply them via durability and writing pointer.
@@ -724,6 +740,8 @@ namespace mongo {
                 }
                 newObj = oldObj;
                 debug.fastmod = true;
+
+                objectWasChanged = true;
             }
             else {
 
@@ -747,6 +765,8 @@ namespace mongo {
                 if ( newLoc != loc || driver.modsAffectIndices()  ) {
                     seenLocs.insert( newLoc );
                 }
+
+                objectWasChanged = true;
             }
 
             // Log Obj
@@ -757,8 +777,10 @@ namespace mongo {
                 }
             }
 
-            // One more document updated.
-            numUpdated++;
+            // If we applied any in-place updates, or asked the DataFileMgr to write for us,
+            // then count this as an update.
+            if (objectWasChanged)
+                numUpdated++;
 
             if (!multi) {
                 break;
