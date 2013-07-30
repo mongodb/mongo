@@ -22,6 +22,9 @@ namespace mongo {
 
     class CanonicalQuery {
     public:
+        // TODO: make private when this is implemented.
+        CanonicalQuery() { }
+
         static CanonicalQuery* canonicalize(const QueryMessage& qm) {
             auto_ptr<CanonicalQuery> cq(new CanonicalQuery());
             return cq.release();
@@ -32,7 +35,6 @@ namespace mongo {
         }
 
     private:
-        CanonicalQuery() { }
 
         string _ns;
         BSONObj _sort;

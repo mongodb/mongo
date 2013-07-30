@@ -21,11 +21,11 @@
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/db/exec/collection_scan.h"
 #include "mongo/db/exec/plan_stage.h"
-#include "mongo/db/exec/simple_plan_runner.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/json.h"
 #include "mongo/db/matcher.h"
 #include "mongo/db/pdfile.h"
+#include "mongo/db/query/simple_plan_runner.h"
 #include "mongo/dbtests/dbtests.h"
 
 namespace QueryStageCollectionScan {
