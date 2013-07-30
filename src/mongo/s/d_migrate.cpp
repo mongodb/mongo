@@ -106,7 +106,7 @@ namespace mongo {
             verify( step <= _total );
 
             stringstream ss;
-            ss << "step" << step << " of " << _total;
+            ss << "step " << step << " of " << _total;
             string s = ss.str();
 
             CurOp * op = cc().curop();

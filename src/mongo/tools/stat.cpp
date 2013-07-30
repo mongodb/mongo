@@ -448,11 +448,16 @@ namespace mongo {
 
             sleepsecs(1);
 
-            int row = 0;
             bool discover = hasParam( "discover" );
+            bool resetRowCountOnce = false;
+
+            int expectedRowCount = getParam( "rowcount" , 0 );
+            int rowCount = discover ? 0 : expectedRowCount;
+            int rowNum = 0;
+
             int maxLockedDbWidth = 0;
 
-            while ( 1 ) {
+            while ( rowCount == 0 || rowNum < rowCount ) {
                 sleepsecs( (int)ceil(_statUtil.getSeconds()) );
 
                 // collect data
@@ -532,7 +537,7 @@ namespace mongo {
                 cout << endl;
 
                 //    header
-                if ( row++ % 5 == 0 && ! biggest.isEmpty() ) {
+                if ( rowNum++ % 5 == 0 && ! biggest.isEmpty() ) {
                     cout << setw( longestHost ) << "" << "\t";
                     printHeaders( biggest );
                 }
@@ -547,6 +552,13 @@ namespace mongo {
                     else
                         printData( rows[i].data , biggest );
                 }
+
+                if ( discover && ! resetRowCountOnce && ( rows.size() == threads.size() ) )
+                {
+                    resetRowCountOnce = true;
+                    rowCount = expectedRowCount > 0 ? expectedRowCount + rowNum - 1 : 0;
+                }
+
 
             }
 
