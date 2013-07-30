@@ -448,9 +448,13 @@ namespace mongo {
 
             sleepsecs(1);
 
-            int rowCount = getParam( "rowcount" , 0 );
-            int rowNum = 0;
             bool discover = hasParam( "discover" );
+            bool resetRowCountOnce = false;
+
+            int expectedRowCount = getParam( "rowcount" , 0 );
+            int rowCount = discover ? 0 : expectedRowCount;
+            int rowNum = 0;
+
             int maxLockedDbWidth = 0;
 
             while ( rowCount == 0 || rowNum < rowCount ) {
@@ -548,6 +552,13 @@ namespace mongo {
                     else
                         printData( rows[i].data , biggest );
                 }
+
+                if ( discover && ! resetRowCountOnce && ( rows.size() == threads.size() ) )
+                {
+                    resetRowCountOnce = true;
+                    rowCount = expectedRowCount > 0 ? expectedRowCount + rowNum - 1 : 0;
+                }
+
 
             }
 
