@@ -157,12 +157,16 @@ namespace {
     }
 #endif
 
-    void CmdLine::parseConfigFile( istream &f, stringstream &ss ) {
+    bool CmdLine::parseConfigFile( istream &f, stringstream &ss ) {
         string s;
         char line[MAX_LINE_LENGTH];
 
-        while ( f ) {
+        while ( !f.eof() ) {
             f.getline(line, MAX_LINE_LENGTH);
+            // Check if we failed to read from the stream for a reason other than eof
+            if ( f.fail() && !f.eof() ) {
+                return false;
+            }
             s = line;
             std::remove(s.begin(), s.end(), ' ');
             std::remove(s.begin(), s.end(), '\t');
@@ -179,7 +183,7 @@ namespace {
                 cout << "warning: remove or comment out this line by starting it with \'#\', skipping now : " << line << endl;
             }
         }
-        return;
+        return true;
     }
 
     bool CmdLine::store( const std::vector<std::string>& argv,
@@ -242,7 +246,11 @@ namespace {
                 }
 
                 stringstream ss;
-                CmdLine::parseConfigFile( f, ss );
+                if ( !CmdLine::parseConfigFile( f, ss ) ) {
+                    cout << "ERROR: could not read from config file" << endl << endl;
+                    cout << visible << endl;
+                    return false;
+                }
                 po::store( po::parse_config_file( ss , all ) , params );
                 f.close();
             }
