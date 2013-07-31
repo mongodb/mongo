@@ -83,11 +83,7 @@ namespace mongo {
         /** creates if DNE */
         void open(const char *filename, int requestedDataSize = 0, bool preallocateOnly = false);
 
-        /* allocate a new extent from this datafile.
-           @param capped - true if capped collection
-           @param loops is our recursion check variable - you want to pass in zero
-        */
-        Extent* createExtent(const char *ns, int approxSize, bool capped = false, int loops = 0);
+        DiskLoc allocExtentArea( int size );
 
         DataFileHeader *getHeader() { return header(); }
         HANDLE getFd() { return mmf.getFd(); }
@@ -99,17 +95,10 @@ namespace mongo {
         /** fsync */
         void flush( bool sync );
 
-        /** only use fore debugging */
-        Extent* debug_getExtent(DiskLoc loc) { return _getExtent( loc ); }
-
-        Extent* getExtent(DiskLoc loc) const;
-        Record* recordAt(DiskLoc dl) const;
     private:
         void badOfs(int) const;
         void badOfs2(int) const;
         int defaultSize( const char *filename ) const;
-
-        Extent* _getExtent(DiskLoc loc) const;
 
         void grow(DiskLoc dl, int size);
 

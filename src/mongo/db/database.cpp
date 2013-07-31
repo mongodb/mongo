@@ -264,66 +264,14 @@ namespace mongo {
         }
     }
 
-    bool fileIndexExceedsQuota( const char *ns, int fileIndex, bool enforceQuota ) {
-        return
-            cmdLine.quota &&
-            enforceQuota &&
-            fileIndex >= cmdLine.quotaFiles &&
-            // we don't enforce the quota on "special" namespaces as that could lead to problems -- e.g.
-            // rejecting an index insert after inserting the main record.
-            !NamespaceString::special( ns ) &&
-            nsToDatabaseSubstring( ns ) != "local";
-    }
-
-    DataFile* Database::suitableFile( const char *ns, int sizeNeeded, bool preallocate, bool enforceQuota ) {
-
-        sizeNeeded = ExtentManager::quantizeExtentSize( sizeNeeded );
-
-        // check existing files
-        for ( int i=numFiles()-1; i>=0; i-- ) {
-            DataFile* f = getFile( i );
-            if ( f->getHeader()->unusedLength >= sizeNeeded ) {
-                if ( fileIndexExceedsQuota( ns, i-1, enforceQuota ) ) // NOTE i-1 is the value used historically for this check.
-                    ;
-                else
-                    return f;
-            }
-        }
-
-        if ( fileIndexExceedsQuota( ns, numFiles(), enforceQuota ) ) {
-            if ( cc().hasWrittenThisPass() ) {
-                warning() << "quota exceeded, but can't assert, probably going over quota for: " << ns << endl;
-            }
-            else {
-                log() << "quota exceeded for namespace: " << ns << endl;
-                uasserted(12501, "quota exceeded");
-            }
-        }
-
-        // allocate files until we either get one big enough or hit maxSize
-        for ( int i = 0; i < 8; i++ ) {
-            DataFile* f = addAFile( sizeNeeded, preallocate );
-
-            if ( f->getHeader()->unusedLength >= sizeNeeded )
-                return f;
-
-            if ( f->getHeader()->fileLength >= DataFile::maxSize() ) // this is as big as they get so might as well stop
-                return f;
-        }
-
-        uasserted(14810, "couldn't allocate space (suitableFile)"); // callers don't check for null return code
-        return 0;
-    }
-
     Extent* Database::allocExtent( const char *ns, int size, bool capped, bool enforceQuota ) {
-        // todo: when profiling, these may be worth logging into profile collection
         bool fromFreeList = true;
         Extent *e = DataFileMgr::allocFromFreeList( ns, size, capped );
         if( e == 0 ) {
             fromFreeList = false;
-            e = suitableFile( ns, size, !capped, enforceQuota )->createExtent( ns, size, capped );
+            e = _extentManager.createExtent( ns, size, capped, enforceQuota );
         }
-        LOG(1) << "allocExtent " << ns << " size " << size << ' ' << fromFreeList << endl; 
+        LOG(1) << "allocExtent " << ns << " size " << size << ' ' << fromFreeList << endl;
         return e;
     }
 

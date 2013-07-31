@@ -26,15 +26,10 @@
 #include "mongo/db/d_concurrency.h"
 #include "mongo/db/dur.h"
 #include "mongo/db/lockstate.h"
-#include "mongo/db/pdfile.h"
-#include "mongo/db/storage/extent.h"
 #include "mongo/util/file_allocator.h"
 
 namespace mongo {
 
-
-    // XXX-ERH
-    void addNewExtentToNamespace(const char *ns, Extent *e, DiskLoc eloc, DiskLoc emptyLoc, bool capped);
 
     static void data_file_check(void *_mb) { 
         if( sizeof(char *) == 4 )
@@ -147,35 +142,20 @@ namespace mongo {
         mmf.flush( sync );
     }
 
-    Extent* DataFile::createExtent(const char *ns, int approxSize, bool newCapped, int loops) {
-        approxSize = ExtentManager::quantizeExtentSize( approxSize );
+    DiskLoc DataFile::allocExtentArea( int size ) {
 
-        massert( 10357 ,  "shutdown in progress", ! inShutdown() );
-        massert( 10358 ,  "bad new extent size", approxSize >= Extent::minSize() && approxSize <= Extent::maxSize() );
-        massert( 10359 ,  "header==0 on new extent: 32 bit mmap space exceeded?", header() ); // null if file open failed
-        int ExtentSize = min(header()->unusedLength, approxSize);
+        massert( 10357, "shutdown in progress", !inShutdown() );
+        massert( 10359, "header==0 on new extent: 32 bit mmap space exceeded?", header() ); // null if file open failed
 
-        verify( ExtentSize >= Extent::minSize() ); // TODO: maybe return NULL
+        size = min(header()->unusedLength, size);
 
         int offset = header()->unused.getOfs();
 
         DataFileHeader *h = header();
-        h->unused.writing().set( fileNo, offset + ExtentSize );
-        getDur().writingInt(h->unusedLength) = h->unusedLength - ExtentSize;
+        h->unused.writing().set( fileNo, offset + size );
+        getDur().writingInt(h->unusedLength) = h->unusedLength - size;
 
-        DiskLoc loc;
-        loc.set(fileNo, offset);
-        Extent *e = _getExtent(loc);
-        DiskLoc emptyLoc = getDur().writing(e)->init(ns, ExtentSize, fileNo, offset, newCapped);
-
-        addNewExtentToNamespace(ns, e, loc, emptyLoc, newCapped);
-
-        DEV {
-            MONGO_TLOG(1) << "new extent " << ns << " size: 0x" << hex << ExtentSize << " loc: 0x"
-                          << hex << offset << " emptyLoc:" << hex << emptyLoc.getOfs() << dec
-                          << endl;
-        }
-        return e;
+        return DiskLoc( fileNo, offset );
     }
 
     // -------------------------------------------------------------------------------

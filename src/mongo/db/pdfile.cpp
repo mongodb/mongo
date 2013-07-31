@@ -257,7 +257,7 @@ namespace mongo {
                 // $nExtents is just for testing - always allocate new extents
                 // rather than reuse existing extents so we have some predictibility
                 // in the extent size used by our tests
-                database->suitableFile( ns, (int) size, false, false )->createExtent( ns, (int) size, newCapped );
+                database->allocExtent( ns, (int)size, newCapped, false );
             }
         }
         else if ( int( e.number() ) > 0 ) {
@@ -269,7 +269,7 @@ namespace mongo {
                 // $nExtents is just for testing - always allocate new extents
                 // rather than reuse existing extents so we have some predictibility
                 // in the extent size used by our tests
-                database->suitableFile( ns, (int) size, false, false )->createExtent( ns, (int) size, newCapped );
+                database->allocExtent( ns, (int)size, newCapped, false );
             }
         }
         else {

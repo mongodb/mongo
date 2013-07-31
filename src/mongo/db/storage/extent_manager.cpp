@@ -171,7 +171,15 @@ namespace mongo {
     }
 
     Record* ExtentManager::recordFor( const DiskLoc& loc ) {
-        return getFile( loc.a() )->recordAt( loc );
+        loc.assertOk();
+        DataFile* df = getFile( loc.a() );
+
+        int ofs = loc.getOfs();
+        if ( ofs < DataFileHeader::HeaderSize ) {
+            df->badOfs(ofs); // will uassert - external call to keep out of the normal code path
+        }
+
+        return reinterpret_cast<Record*>( df->p() + ofs );
     }
 
     Extent* ExtentManager::extentFor( const DiskLoc& loc ) {
@@ -180,10 +188,11 @@ namespace mongo {
         return getExtent( extentLoc );
     }
 
-    Extent* ExtentManager::getExtent( const DiskLoc& loc ) {
+    Extent* ExtentManager::getExtent( const DiskLoc& loc, bool doSanityCheck ) {
         loc.assertOk();
         Extent* e = reinterpret_cast<Extent*>( getFile( loc.a() )->p() + loc.getOfs() );
-        e->assertOk();
+        if ( doSanityCheck )
+            e->assertOk();
         return e;
     }
 
@@ -263,6 +272,76 @@ namespace mongo {
         return newSize;
     }
 
+    bool fileIndexExceedsQuota( const char *ns, int fileIndex ) {
+        return
+            cmdLine.quota &&
+            fileIndex >= cmdLine.quotaFiles &&
+            // we don't enforce the quota on "special" namespaces as that could lead to problems -- e.g.
+            // rejecting an index insert after inserting the main record.
+            !NamespaceString::special( ns ) &&
+            nsToDatabaseSubstring( ns ) != "local";
+    }
 
+    // XXX-ERH
+    void addNewExtentToNamespace(const char *ns, Extent *e, DiskLoc eloc, DiskLoc emptyLoc, bool capped);
+
+    Extent* ExtentManager::_createExtentInFile( int fileNo, DataFile* f,
+                                                const char* ns, int size, bool newCapped,
+                                                bool enforceQuota ) {
+
+        size = ExtentManager::quantizeExtentSize( size );
+
+        if ( enforceQuota ) {
+            if ( fileIndexExceedsQuota( ns, fileNo - 1 ) ) {
+                if ( cc().hasWrittenThisPass() ) {
+                    warning() << "quota exceeded, but can't assert, going over quota for: " << ns << endl;
+                }
+                else {
+                    uasserted(12501, "quota exceeded");
+                }
+            }
+        }
+
+        massert( 10358, "bad new extent size", size >= Extent::minSize() && size <= Extent::maxSize() );
+
+        DiskLoc loc = f->allocExtentArea( size );
+        loc.assertOk();
+
+        Extent *e = getExtent( loc, false );
+        verify( e );
+
+        DiskLoc emptyLoc = getDur().writing(e)->init(ns, size, fileNo, loc.getOfs(), newCapped);
+
+        addNewExtentToNamespace(ns, e, loc, emptyLoc, newCapped);
+
+        return e;
+    }
+
+
+    Extent* ExtentManager::createExtent(const char *ns, int size, bool newCapped, bool enforceQuota ) {
+        size = quantizeExtentSize( size );
+
+        for ( int i = numFiles() - 1; i >= 0; i-- ) {
+            DataFile* f = getFile( i );
+            if ( f->getHeader()->unusedLength >= size ) {
+                return _createExtentInFile( i, f, ns, size, newCapped, enforceQuota );
+            }
+        }
+
+        // no space in an existing file
+        // allocate files until we either get one big enough or hit maxSize
+        for ( int i = 0; i < 8; i++ ) {
+            DataFile* f = addAFile( size, false );
+
+            if ( f->getHeader()->unusedLength >= size ||
+                 f->getHeader()->fileLength >= DataFile::maxSize() ) {
+                return _createExtentInFile( numFiles() - 1, f, ns, size, newCapped, enforceQuota );
+            }
+
+        }
+
+        // callers don't check for null return code, so assert
+        msgasserted(14810, "couldn't allocate space for a new extent" );
+    }
 
 }

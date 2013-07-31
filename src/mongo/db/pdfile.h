@@ -294,34 +294,12 @@ namespace mongo {
 
     // XXX-ERH
 
-    inline Extent* DataFile::_getExtent(DiskLoc loc) const {
-        loc.assertOk();
-        Extent *e = (Extent *) (p()+loc.getOfs());
-        return e;
-    }
-
-    inline Extent* DataFile::getExtent(DiskLoc loc) const {
-        Extent *e = _getExtent(loc);
-        e->assertOk();
-        memconcept::is(e, memconcept::concept::extent);
-        return e;
-    }
-
     inline Extent* Extent::getNextExtent() {
         return xnext.isNull() ? 0 : DataFileMgr::getExtent(xnext);
     }
 
     inline Extent* Extent::getPrevExtent() {
         return xprev.isNull() ? 0 : DataFileMgr::getExtent(xprev);
-    }
-
-    // XXX-ERH
-    inline Record* DataFile::recordAt(DiskLoc dl) const {
-        int ofs = dl.getOfs();
-        if (ofs < DataFileHeader::HeaderSize) {
-            badOfs(ofs); // will uassert - external call to keep out of the normal code path
-        }
-        return reinterpret_cast<Record*>(p() + ofs);
     }
 
     inline DiskLoc Record::getNext(const DiskLoc& myLoc) {
@@ -427,12 +405,12 @@ namespace mongo {
 
     inline Extent* DataFileMgr::getExtent(const DiskLoc& dl) {
         verify( dl.a() != -1 );
-        return cc().database()->getFile(dl.a())->getExtent(dl);
+        return cc().database()->getExtentManager().getExtent(dl);
     }
 
     inline Record* DataFileMgr::getRecord(const DiskLoc& dl) {
         verify(dl.a() != -1);
-        return cc().database()->getFile(dl.a())->recordAt(dl);
+        return cc().database()->getExtentManager().recordFor( dl );
     }
 
     BOOST_STATIC_ASSERT( 16 == sizeof(DeletedRecord) );

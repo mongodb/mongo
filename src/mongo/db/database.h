@@ -81,8 +81,6 @@ namespace mongo {
          */
         void preallocateAFile() { _extentManager.preallocateAFile(); }
 
-        DataFile* suitableFile( const char *ns, int sizeNeeded, bool preallocate, bool enforceQuota );
-
         Extent* allocExtent( const char *ns, int size, bool capped, bool enforceQuota );
 
         /**
