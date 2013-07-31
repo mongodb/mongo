@@ -487,19 +487,23 @@ cache_value_append(WT_CURSOR *wtcursor, int remove_op)
 	r = &cursor->record;
 
 	/*
-	 * The format of a cache update is the value, 8B of transaction ID
-	 * and 1B of remove tombstone.  Grow the value buffer as necessary,
-	 * then append the WiredTiger cursor's information.
+	 * A cache update is 4B that counts the number of entries in the update,
+	 * followed by sets of: 8B of txn ID then either a remove tombstone or a
+	 * 4B length and variable-length data pair.  Grow the value buffer, then
+	 * append the cursor's information.
 	 */
-	len = cursor->len + sizeof(uint32_t);		/* slots */
-	if (!remove_op)
-		len += wtcursor->value.size;		/* data */
-	len += sizeof(uint64_t) + 1;			/* txn ID, remove */
+	len = cursor->len +				/* current length */
+	    sizeof(uint32_t) +				/* slots */
+	    sizeof(uint64_t) +				/* txn ID */
+	    (remove_op ?				/* remove or data */
+	    1 : sizeof(uint32_t) + wtcursor->value.size) +
+	    64;						/* slop */
+
 	if (len > cursor->mem_len) {
-		if ((p = realloc(cursor->v, len + 64)) == NULL)
+		if ((p = realloc(cursor->v, len)) == NULL)
 			return (os_errno());
 		cursor->v = p;
-		cursor->mem_len = len + 64;
+		cursor->mem_len = len;
 	}
 
 	/* Get the transaction ID. */
