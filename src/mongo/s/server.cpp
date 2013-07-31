@@ -342,6 +342,14 @@ static bool runMongosServer( bool doUpgrade ) {
     if ( cmdLine.isHttpInterfaceEnabled )
         boost::thread web( boost::bind(&webServerThread, new NoAdminAccess() /* takes ownership */) );
 
+    // TODO(spencer): This should only be done if we haven't yet upgraded to the new V2 user data
+    // format.  Fix this as part of SERVER-9516.
+    Status status = getGlobalAuthorizationManager()->initializeAllV1UserData();
+    if (!status.isOK()) {
+        log() << "Initializing user data failed: " << status.toString() << endl;
+        return false;
+    }
+
     MessageServer::Options opts;
     opts.port = cmdLine.port;
     opts.ipList = cmdLine.bind_ip;
