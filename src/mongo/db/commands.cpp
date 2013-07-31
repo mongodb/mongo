@@ -53,6 +53,9 @@ namespace mongo {
     }
 
     string Command::parseNsFullyQualified(const string& dbname, const BSONObj& cmdObj) const {
+        BSONElement first = cmdObj.firstElement();
+        massert(17005, "first element of command passed to parseNsFullyQualified must be a string",
+                first.type() == mongo::String);
         string s = cmdObj.firstElement().valuestr();
         NamespaceString nss(s);
         // these are for security, do not remove:
@@ -64,6 +67,10 @@ namespace mongo {
     }
 
     /*virtual*/ string Command::parseNs(const string& dbname, const BSONObj& cmdObj) const {
+        BSONElement first = cmdObj.firstElement();
+        if (first.type() != mongo::String)
+            return dbname;
+
         string coll = cmdObj.firstElement().valuestr();
 #if defined(CLC)
         DEV if( mongoutils::str::startsWith(coll, dbname+'.') ) { 
