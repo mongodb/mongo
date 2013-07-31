@@ -73,6 +73,11 @@ namespace mongo {
 
         void flushFiles( bool sync );
 
+        /* allocate a new Extent
+           @param capped - true if capped collection
+        */
+        Extent* createExtent( const char *ns, int approxSize, bool newCapped, bool enforceQuota );
+
         /**
          * @param loc - has to be for a specific Record
          */
@@ -86,7 +91,7 @@ namespace mongo {
         /**
          * @param loc - has to be for a specific Extent
          */
-        Extent* getExtent( const DiskLoc& loc );
+        Extent* getExtent( const DiskLoc& loc, bool doSanityCheck = true );
 
         // get(Next|Prev)Record follows the Record linked list
         // these WILL cross Extent boundaries
@@ -108,6 +113,10 @@ namespace mongo {
         static int quantizeExtentSize( int size );
 
     private:
+
+        Extent* _createExtentInFile( int fileNo, DataFile* f,
+                                     const char* ns, int size, bool newCapped,
+                                     bool enforceQuota );
 
         boost::filesystem::path fileName( int n ) const;
 

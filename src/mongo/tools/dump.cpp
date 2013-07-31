@@ -263,15 +263,12 @@ public:
             error() << "invalid extent ofs: " << eLoc.getOfs() << endl;
             return DiskLoc();
         }
-        
 
-        DataFile * mdf = db->getFile( eLoc.a() );
-
-        Extent * e = mdf->debug_getExtent( eLoc );
+        Extent * e = db->getExtentManager().getExtent( eLoc, false );
         if ( ! e->isOk() ){
             warning() << "Extent not ok magic: " << e->magic << " going to try to continue" << endl;
         }
-        
+
         log() << "length:" << e->length << endl;
         
         LogIndentLevel lil2;
