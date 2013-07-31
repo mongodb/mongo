@@ -131,7 +131,7 @@ namespace mongo {
         }
 
         uasserted( 13403 , str::stream() << "didn't get writeback for: " << oid
-                                         << " after: " << t.millis() << " ms"
+                                         << " after: " << t.millis() << "ms"
                                          << " from connection " << ident.toString() );
 
         throw 1; // never gets here

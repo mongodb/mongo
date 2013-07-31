@@ -367,14 +367,14 @@ namespace mongo {
                 log() << "FlushViewOfFile for " << _filename
                         << " succeeded after " << loopCount
                         << " attempts taking " << t.millis()
-                        << " ms" << endl;
+                        << "ms" << endl;
             }
             else if ( !success ) {
                 log() << "FlushViewOfFile for " << _filename
                         << " failed with error " << dosError
                         << " after " << loopCount
                         << " attempts taking " << t.millis()
-                        << " ms" << endl;
+                        << "ms" << endl;
                 // Abort here to avoid data corruption
                 fassert(16387, false);
             }

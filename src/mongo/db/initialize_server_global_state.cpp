@@ -253,11 +253,7 @@ namespace mongo {
                                     new MessageEventDetailsEncoder, writer.getValue())));
 
             if (cmdLine.logAppend && exists) {
-                log() << std::endl;
-                log() << std::endl;
-                log() << "***** SERVER RESTARTED *****";
-                log() << std::endl;
-                log() << std::endl;
+                log() << "***** SERVER RESTARTED *****" << endl;
                 Status status =
                     logger::RotatableFileWriter::Use(writer.getValue()).status();
                 if (!status.isOK())
