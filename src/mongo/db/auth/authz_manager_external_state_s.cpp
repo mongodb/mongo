@@ -129,21 +129,19 @@ namespace {
     Status AuthzManagerExternalStateMongos::getAllDatabaseNames(
             std::vector<std::string>* dbnames) const {
         try {
-            std::vector<BSONObj> dbDocs;
             scoped_ptr<ScopedDbConnection> conn(
-                    getConnectionForUsersCollection("config.databases"));
-            conn->get()->findN(dbDocs, DatabaseType::ConfigNS, Query(), 0);
-            conn->done();
+                    getConnectionForUsersCollection(DatabaseType::ConfigNS));
+            auto_ptr<DBClientCursor> c = conn->get()->query(DatabaseType::ConfigNS, Query());
 
-            for (std::vector<BSONObj>::const_iterator it = dbDocs.begin();
-                    it != dbDocs.end(); ++it) {
+            while (c->more()) {
                 DatabaseType dbInfo;
                 std::string errmsg;
-                if (!dbInfo.parseBSON( *it, &errmsg) || !dbInfo.isValid( &errmsg )) {
-                     return Status(ErrorCodes::FailedToParse, errmsg);
+                if (!dbInfo.parseBSON( c->nextSafe(), &errmsg) || !dbInfo.isValid( &errmsg )) {
+                    return Status(ErrorCodes::FailedToParse, errmsg);
                 }
                 dbnames->push_back(dbInfo.getName());
             }
+            conn->done();
             dbnames->push_back("config"); // config db isn't listed in config.databases
             return Status::OK();
         } catch (const DBException& e) {
@@ -154,13 +152,15 @@ namespace {
     Status AuthzManagerExternalStateMongos::getAllV1PrivilegeDocsForDB(
             const std::string& dbname, std::vector<BSONObj>* privDocs) const {
         try {
-            std::vector<BSONObj> userDocs;
             std::string usersNamespace = dbname + ".system.users";
             scoped_ptr<ScopedDbConnection> conn(getConnectionForUsersCollection(usersNamespace));
-            conn->get()->findN(userDocs, usersNamespace, Query(), 0);
+            auto_ptr<DBClientCursor> c = conn->get()->query(usersNamespace, Query());
+
+            while (c->more()) {
+                privDocs->push_back(c->nextSafe().getOwned());
+            }
             conn->done();
-            *privDocs = userDocs;
-        return Status::OK();
+            return Status::OK();
         } catch (const DBException& e) {
             return e.toStatus();
         }
