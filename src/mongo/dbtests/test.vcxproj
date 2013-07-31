@@ -629,6 +629,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\db\auth\security_key.h" />
     <ClInclude Include="..\db\auth\user.h" />
     <ClInclude Include="..\db\auth\user_name_hash.h" />
+    <ClInclude Include="..\db\auth\user_set.h" />
     <ClInclude Include="..\db\background.h" />
     <ClInclude Include="..\db\btreebuilder.h" />
     <ClInclude Include="..\db\btreecursor.h" />
@@ -676,7 +677,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\db\exec\or.h" />
     <ClInclude Include="..\db\exec\plan_stage.h" />
     <ClInclude Include="..\db\exec\plan_stats.h" />
-    <ClInclude Include="..\db\exec\simple_plan_runner.h" />
     <ClInclude Include="..\db\exec\skip.h" />
     <ClInclude Include="..\db\exec\sort.h" />
     <ClInclude Include="..\db\exec\working_set.h" />
@@ -812,9 +812,17 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\db\querypattern.h" />
     <ClInclude Include="..\db\queryutil-inl.h" />
     <ClInclude Include="..\db\queryutil.h" />
+    <ClInclude Include="..\db\query\cached_plan_runner.h" />
+    <ClInclude Include="..\db\query\canonical_query.h" />
     <ClInclude Include="..\db\query\multi_plan_runner.h" />
+    <ClInclude Include="..\db\query\new_find.h" />
+    <ClInclude Include="..\db\query\plan_cache.h" />
     <ClInclude Include="..\db\query\plan_ranker.h" />
+    <ClInclude Include="..\db\query\query_planner.h" />
     <ClInclude Include="..\db\query\query_solution.h" />
+    <ClInclude Include="..\db\query\runner.h" />
+    <ClInclude Include="..\db\query\simple_plan_runner.h" />
+    <ClInclude Include="..\db\query\stage_builder.h" />
     <ClInclude Include="..\db\query\stage_types.h" />
     <ClInclude Include="..\db\query_optimizer.h" />
     <ClInclude Include="..\db\query_optimizer_internal.h" />
@@ -2483,6 +2491,17 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="..\db\auth\role_name.cpp" />
     <ClCompile Include="..\db\auth\security_key.cpp" />
     <ClCompile Include="..\db\auth\user.cpp" />
+    <ClCompile Include="..\db\auth\user_set.cpp" />
+    <ClCompile Include="..\db\auth\user_set_test.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">true</ExcludedFromBuild>
+    </ClCompile>
     <ClCompile Include="..\db\background.cpp">
       <ObjectFileName Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(IntDir)db_background.obj</ObjectFileName>
       <ObjectFileName Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(IntDir)db_background.obj</ObjectFileName>
@@ -3394,6 +3413,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\db\queryoptimizercursorimpl.h" />
     <ClCompile Include="..\db\querypattern.cpp" />
     <ClCompile Include="..\db\query\multi_plan_runner.cpp" />
+    <ClCompile Include="..\db\query\new_find.cpp" />
     <ClCompile Include="..\db\query\plan_ranker.cpp" />
     <ClCompile Include="..\db\query_optimizer.cpp" />
     <ClCompile Include="..\db\query_optimizer_internal.cpp" />
