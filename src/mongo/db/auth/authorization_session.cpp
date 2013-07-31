@@ -269,9 +269,9 @@ namespace {
 
         if (ns.coll() == "system.users") {
             if (newActions.contains(ActionType::insert) ||
-                    newActions.contains(ActionType::update)) {
-                // End users can't insert or update system.users directly, only the system can.
-                // TODO(spencer): check for remove also once there's a command to remove users.
+                    newActions.contains(ActionType::update) ||
+                    newActions.contains(ActionType::remove)) {
+                // End users can't modify system.users directly, only the system can.
                 newActions.addAction(ActionType::userAdminV1);
             } else {
                 newActions.addAction(ActionType::userAdmin);

@@ -13,8 +13,6 @@ for(var i = 0; i < 100; i++) {
   t["testcol"].save({ "x": i });
 }
 
-users = db.getCollection( "system.users" );
-
 db.addUser( "testuser" , "testuser" );
 
 assert( db.auth( "testuser" , "testuser" ) , "auth failed" );

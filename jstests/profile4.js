@@ -4,7 +4,7 @@
 var stddb = db;
 var db = db.getSisterDB("profile4");
 
-db.system.users.remove({});
+db.removeAllUsers();
 t = db.profile4;
 t.drop();
 

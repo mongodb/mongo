@@ -264,7 +264,51 @@ DB.prototype.logout = function(){
 };
 
 DB.prototype.removeUser = function( username ){
+    var res = this.runCommand({removeUsers:1, user: username});
+
+    if (res.ok) {
+        return true;
+    }
+
+    if (res.errmsg.startsWith("No users found on database")) {
+        return false;
+    }
+
+    if (res.errmsg == "no such cmd: removeUsers") {
+        return this._removeUserV1(username);
+    }
+
+    throw "Couldn't remove user: " + res.errmsg;
+}
+
+DB.prototype._removeUserV1 = function(username) {
     this.getCollection( "system.users" ).remove( { user : username } );
+
+    var le = db.getLastErrorObj();
+
+    if (le.err) {
+        throw "Couldn't remove user: " + le.err;
+    }
+
+    if (le.n == 1) {
+        return true;
+    } else {
+        return false;
+    }
+}
+
+DB.prototype.removeAllUsers = function() {
+    var res = this.runCommand({removeUsers:1});
+
+    if (res.ok) {
+        return true;
+    }
+
+    if (res.errmsg.startsWith("No users found on database")) {
+        return false;
+    }
+
+    throw "Couldn't remove users: " + res.errmsg;
 }
 
 DB.prototype.__pwHash = function( nonce, username, pass ) {

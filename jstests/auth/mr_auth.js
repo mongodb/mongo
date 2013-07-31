@@ -20,7 +20,7 @@ var t = d[ baseName ];
 for( var i = 0; i < 1000; i++) t.insert( {_id:i, x:i%10, y:i%100} );
 assert.eq( 1000, t.count(), "inserts failed" );
 
-d.system.users.remove( {} );
+d.removeAllUsers();
 d.addUser( "write" , "write" );
 d.addUser( "read" , "read", true );
 d.getSisterDB( "admin" ).addUser( "admin", "admin" );

@@ -9,8 +9,7 @@ db = m.getDB( "admin" );
 t = db[ baseName ];
 t.drop();
 
-users = db.getCollection( "system.users" );
-users.remove( {} );
+db.removeAllUsers();
 
 db.addUser( "eliot" , "eliot" );
 

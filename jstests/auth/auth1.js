@@ -16,8 +16,7 @@ mro = new Mongo(m.host);
 dbRO = mro.getDB( "test" );
 tRO = dbRO[ baseName ];
 
-users = db.getCollection( "system.users" );
-users.remove( {} );
+db.removeAllUsers();
 
 db.addUser( "eliot" , "eliot" );
 db.addUser( "guest" , "guest", true );
