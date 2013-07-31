@@ -58,24 +58,6 @@
 
 typedef struct {
 	const char *home;
-	const char *uri;
-	const char *conn_config;
-	const char *table_config;
-	uint32_t create;	/* Whether to populate for this run. */
-	uint32_t rand_seed;
-	uint32_t icount;	/* Items to insert. */
-	uint32_t data_sz;
-	uint32_t key_sz;
-	uint32_t report_interval;
-	uint32_t checkpoint_interval;	/* Zero to disable. */
-	uint32_t stat_interval;		/* Zero to disable. */
-	uint32_t run_time;
-	uint32_t elapsed_time;
-	uint32_t populate_threads;/* Number of populate threads. */
-	uint32_t read_threads;	/* Number of read threads. */
-	uint32_t insert_threads;/* Number of insert threads. */
-	uint32_t update_threads;/* Number of update threads. */
-	uint32_t verbose;
 	WT_CONNECTION *conn;
 	FILE *logf;
 #define	WT_PERF_INIT		0x00
@@ -88,6 +70,13 @@ typedef struct {
 	uint32_t flags;
 	struct timeval phase_start_time;
 	uint32_t rand_range; /* The range to use if doing random inserts. */
+	uint32_t elapsed_time;
+
+	/* Fields changeable on command line are listed in wtperf_opt.i */
+#define OPT_DECLARE_STRUCT
+#include "wtperf_opt.i"
+#undef OPT_DECLARE_STRUCT
+
 } CONFIG;
 
 typedef enum {
@@ -101,35 +90,13 @@ typedef struct {
 	uint32_t flagmask;
 } CONFIG_OPT;
 
-/* Parallels CONFIG, exposing what can be changed using -o or -O. */
+/* Al options changeable on command line using -o or -O are listed here. */
 CONFIG_OPT config_opts[] = {
-	/* "home" cannot be set in the usual way,
-	   we need it set before parsing config */
-	{ "uri", STRING_TYPE, offsetof(CONFIG, uri), 0 },
-	{ "conn_config", STRING_TYPE, offsetof(CONFIG, conn_config), 0 },
-	{ "table_config", STRING_TYPE, offsetof(CONFIG, table_config), 0 },
-	{ "create", BOOL_TYPE, offsetof(CONFIG, create), 0 },
-	{ "rand_seed", UINT32_TYPE, offsetof(CONFIG, rand_seed), 0 },
-	{ "icount", UINT32_TYPE, offsetof(CONFIG, icount), 0 },
-	{ "data_sz", UINT32_TYPE, offsetof(CONFIG, data_sz), 0 },
-	{ "key_sz", UINT32_TYPE, offsetof(CONFIG, key_sz), 0 },
-	{ "report_interval", UINT32_TYPE,
-	  offsetof(CONFIG, report_interval), 0 },
-	{ "checkpoint_interval", UINT32_TYPE,
-	  offsetof(CONFIG, checkpoint_interval), 0 },
-	{ "stat_interval", UINT32_TYPE, offsetof(CONFIG, stat_interval), 0 },
-	{ "run_time", UINT32_TYPE, offsetof(CONFIG, run_time), 0 },
-	{ "elapsed_time", UINT32_TYPE, offsetof(CONFIG, elapsed_time), 0 },
-	{ "populate_threads", UINT32_TYPE,
-	  offsetof(CONFIG, populate_threads), 0 },
-	{ "read_threads", UINT32_TYPE, offsetof(CONFIG, read_threads), 0 },
-	{ "insert_threads", UINT32_TYPE, offsetof(CONFIG, insert_threads), 0 },
-	{ "update_threads", UINT32_TYPE, offsetof(CONFIG, update_threads), 0 },
-	{ "verbose", UINT32_TYPE, offsetof(CONFIG, verbose), 0 },
-	{ "insert_rmw", FLAG_TYPE, offsetof(CONFIG, flags), PERF_INSERT_RMW },
-	{ "pareto", FLAG_TYPE, offsetof(CONFIG, flags), PERF_RAND_PARETO },
-	{ "random", FLAG_TYPE, offsetof(CONFIG, flags), PERF_RAND_WORKLOAD },
-	{ "random_range", UINT32_TYPE, offsetof(CONFIG, rand_range), 0 }
+
+#define OPT_DEFINE_DESC
+#include "wtperf_opt.i"
+#undef OPT_DEFINE_DESC
+
 };
 
 /* Forward function definitions. */
@@ -177,33 +144,21 @@ uint64_t wtperf_value_range(CONFIG *);
 #define WORKER_INSERT_RMW	0x03
 #define WORKER_UPDATE		0x04
 
-/* Default values - these are tiny, we want the basic run to be fast. */
+/* Default values. */
 CONFIG default_cfg = {
 	"WT_TEST",	/* home */
-	"lsm:test",	/* uri */
-	"create,cache_size=200MB", /* conn_config */
-	DEFAULT_LSM_CONFIG, /* table_config */
-	1,		/* create */
-	14023954,	/* rand_seed */
-	5000,		/* icount */
-	100,		/* data_sz */
-	20,		/* key_sz */
-	2,		/* report_interval */
-	0,		/* checkpoint_interval */
-	0,		/* stat_interval */
-	2,		/* run_time */
-	0,		/* elapsed_time */
-	1,		/* populate_threads */
-	2,		/* read_threads */
-	0,		/* insert_threads */
-	0,		/* update_threads */
-	0,		/* verbose */
 	NULL,		/* conn */
 	NULL,		/* logf */
 	WT_PERF_INIT, /* phase */
 	0,		/* flags */
 	{0, 0},		/* phase_start_time */
-	0		/* rand_range */
+	0,		/* rand_range */
+	0,		/* elapsed_time */
+
+#define OPT_DEFINE_DEFAULT
+#include "wtperf_opt.i"
+#undef OPT_DEFINE_DEFAULT
+
 };
 
 const char *small_config_str =
@@ -1631,7 +1586,7 @@ void print_config(CONFIG *cfg)
 	printf("\t Connection configuration: %s\n", cfg->conn_config);
 	printf("\t Table configuration: %s\n", cfg->table_config);
 	printf("\t %s\n", cfg->create ? "Creating" : "Using existing");
-	printf("\tCheckpoint interval: %d\n", cfg->checkpoint_interval);
+	printf("\t Checkpoint interval: %d\n", cfg->checkpoint_interval);
 	printf("\t Random seed: %d\n", cfg->rand_seed);
 	if (cfg->create) {
 		printf("\t Insert count: %d\n", cfg->icount);
