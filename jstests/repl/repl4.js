@@ -35,4 +35,7 @@ doTest = function() {
     soonCount( "c", "c", 2 );
 }
 
-doTest();
+// Disabled because of SERVER-10344
+if (false) {
+    doTest();
+}
