@@ -49,7 +49,7 @@ namespace mongo {
         MONGO_DISALLOW_COPYING( ExtentManager );
 
     public:
-        ExtentManager( const StringData& dbname, const StringData& path );
+        ExtentManager( const StringData& dbname, const StringData& path, bool directoryPerDB );
         ~ExtentManager();
 
         /**
@@ -104,6 +104,7 @@ namespace mongo {
 
         std::string _dbname; // i.e. "test"
         std::string _path; // i.e. "/data/db"
+        bool _directoryPerDB;
 
         // must be in the dbLock when touching this (and write locked when writing to of course)
         // however during Database object construction we aren't, which is ok as it isn't yet visible

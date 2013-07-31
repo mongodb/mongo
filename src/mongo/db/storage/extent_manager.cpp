@@ -30,11 +30,12 @@
 
 namespace mongo {
 
-    // XXX-ERH
-    extern bool directoryperdb;
-
-    ExtentManager::ExtentManager( const StringData& dbname, const StringData& path )
-        : _dbname( dbname.toString() ), _path( path.toString() ) {
+    ExtentManager::ExtentManager( const StringData& dbname,
+                                  const StringData& path,
+                                  bool directoryPerDB )
+        : _dbname( dbname.toString() ),
+          _path( path.toString() ),
+          _directoryPerDB( directoryPerDB ) {
     }
 
     ExtentManager::~ExtentManager() {
@@ -52,7 +53,7 @@ namespace mongo {
         stringstream ss;
         ss << _dbname << '.' << n;
         boost::filesystem::path fullName( _path );
-        if ( directoryperdb )
+        if ( _directoryPerDB )
             fullName /= _dbname;
         fullName /= ss.str();
         return fullName;
