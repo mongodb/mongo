@@ -177,8 +177,16 @@ namespace mongo {
     Extent* ExtentManager::extentFor( const DiskLoc& loc ) {
         Record* record = recordFor( loc );
         DiskLoc extentLoc( loc.a(), record->extentOfs() );
-        return getFile( loc.a() )->getExtent( extentLoc );
+        return getExtent( extentLoc );
     }
+
+    Extent* ExtentManager::getExtent( const DiskLoc& loc ) {
+        loc.assertOk();
+        Extent* e = reinterpret_cast<Extent*>( getFile( loc.a() )->p() + loc.getOfs() );
+        e->assertOk();
+        return e;
+    }
+
 
     DiskLoc ExtentManager::getNextRecordInExtent( const DiskLoc& loc ) {
         int nextOffset = recordFor( loc )->nextOfs();
