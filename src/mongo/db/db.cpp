@@ -653,6 +653,12 @@ namespace mongo {
         if ( shouldRepairDatabases )
             return;
 
+        // TODO(spencer): This should only be done if we haven't yet upgraded to the new V2 user
+        // data format.  Fix this as part of SERVER-9516.
+        Status status = getGlobalAuthorizationManager()->initializeAllV1UserData();
+        uassertStatusOK(status);
+
+
         /* this is for security on certain platforms (nonce generation) */
         srand((unsigned) (curTimeMicros() ^ startupSrandTimer.micros()));
 
