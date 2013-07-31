@@ -16,11 +16,9 @@
 
 /** Unit tests for BSONElementHasher. */
 
-/** These tests form test vectors for hashed indexes. */
-/** All of the values in these tests ve been determined experimentally. */
-
 #include "mongo/db/hasher.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/json.h"
 #include "mongo/bson/bsontypes.h"
 
 #include "mongo/unittest/unittest.h"
@@ -28,12 +26,164 @@
 namespace mongo {
 namespace {
 
-    // Helper method.
-    long long hashIt( const BSONObj& o ) {
-        return BSONElementHasher::hash64( o.firstElement(), 0 );
+    // Helper methods
+    long long hashIt( const BSONObj& object, int seed ) {
+        return BSONElementHasher::hash64( object.firstElement(), seed );
+    }
+    long long hashIt( const BSONObj& object ) {
+        int seed = 0;
+        return hashIt( object, seed );
     }
 
+    // Test different oids hash to different things
+    TEST( BSONElementHasher, DifferentOidsAreDifferentHashes ) {
+        int seed = 0;
 
+        long long int oidHash = BSONElementHasher::hash64(
+                BSONObjBuilder().genOID().obj().firstElement() , seed );
+        long long int oidHash2 = BSONElementHasher::hash64(
+                BSONObjBuilder().genOID().obj().firstElement() , seed );
+        long long int oidHash3 = BSONElementHasher::hash64(
+                BSONObjBuilder().genOID().obj().firstElement() , seed );
+
+        ASSERT_NOT_EQUALS( oidHash , oidHash2 );
+        ASSERT_NOT_EQUALS( oidHash , oidHash3 );
+        ASSERT_NOT_EQUALS( oidHash3 , oidHash2 );
+    }
+
+    // Test 32-bit ints, 64-bit ints, doubles hash to same thing
+    TEST( BSONElementHasher, ConsistentHashOfIntLongAndDouble ) {
+        int i = 3;
+        BSONObj p1 = BSON("a" << i);
+        long long int intHash = hashIt( p1 );
+
+        long long int ilong = 3;
+        BSONObj p2 = BSON("a" << ilong);
+        long long int longHash = hashIt( p2 );
+
+        double d = 3.1;
+        BSONObj p3 = BSON("a" << d);
+        long long int doubleHash = hashIt( p3 );
+
+        ASSERT_EQUALS( intHash, longHash );
+        ASSERT_EQUALS( doubleHash, longHash );
+    }
+
+    // Test different ints don't hash to same thing
+    TEST( BSONElementHasher, DifferentIntHashesDiffer ) {
+        ASSERT_NOT_EQUALS( 
+                hashIt( BSON("a" << 3) ) , 
+                hashIt( BSON("a" << 4) ) 
+        );
+    }
+
+    // Test seed makes a difference
+    TEST( BSONElementHasher, SeedMatters ) {
+        ASSERT_NOT_EQUALS( 
+                hashIt( BSON("a" << 4), 0 ) , 
+                hashIt( BSON("a" << 4), 1 ) 
+        );
+    }
+
+    // Test strings hash to different things
+    TEST( BSONElementHasher, IntAndStringHashesDiffer ) {
+        ASSERT_NOT_EQUALS( 
+                hashIt( BSON("a" << 3) ) , 
+                hashIt( BSON("a" << "3") ) 
+        );
+    }
+
+    // Test regexps and strings hash to different things
+    TEST( BSONElementHasher, RegexAndStringHashesDiffer ) {
+        BSONObjBuilder builder;
+
+        ASSERT_NOT_EQUALS( 
+                hashIt( BSON("a" << "3") ) , 
+                hashIt( builder.appendRegex("a","3").obj() ) 
+        );
+    }
+
+    // Test arrays and subobject hash to different things
+    TEST( BSONElementHasher, ArrayAndSubobjectHashesDiffer ) {
+        ASSERT_NOT_EQUALS(
+                hashIt( fromjson("{a : {'0' : 0 , '1' : 1}}") ) ,
+                hashIt( fromjson("{a : [0,1]}") )
+        );
+    }
+
+    // Testing sub-document grouping
+    TEST( BSONElementHasher, SubDocumentGroupingHashesDiffer ) {
+        ASSERT_NOT_EQUALS(
+                hashIt( fromjson("{x : {a : {}, b : 1}}") ) ,
+                hashIt( fromjson("{x : {a : {b : 1}}}") )
+        );
+    }
+
+    // Testing codeWscope scope squashing
+    TEST( BSONElementHasher, CodeWithScopeSquashesScopeIntsAndDoubles ) {
+        int seed = 0;
+
+        BSONObjBuilder b1;
+        b1.appendCodeWScope("a","print('this is some stupid code')", BSON("a" << 3));
+        BSONObj p10 = b1.obj();
+
+        BSONObjBuilder b2;
+        b2.appendCodeWScope("a","print('this is some stupid code')", BSON("a" << 3.1));
+
+        BSONObjBuilder b3;
+        b3.appendCodeWScope("a","print('this is \nsome stupider code')", BSON("a" << 3));
+        ASSERT_EQUALS(
+                BSONElementHasher::hash64( p10.firstElement() , seed ) ,
+                BSONElementHasher::hash64( b2.obj().firstElement() , seed )
+        );
+        ASSERT_NOT_EQUALS(
+                BSONElementHasher::hash64( p10.firstElement() , seed ) ,
+                BSONElementHasher::hash64( b3.obj().firstElement() , seed )
+        );
+    }
+
+    // Test some recursive squashing
+    TEST( BSONElementHasher, RecursiveSquashingIntsAndDoubles ) {
+        ASSERT_EQUALS(
+                hashIt( fromjson("{x : {a : 3 ,   b : [ 3.1, {c : 3  }]}}") ) ,
+                hashIt( fromjson("{x : {a : 3.1 , b : [ 3,   {c : 3.0}]}}") )
+        );
+    }
+
+    // Test minkey and maxkey don't hash to same thing
+    TEST( BSONElementHasher, MinKeyMaxKeyHashesDiffer ) {
+        ASSERT_NOT_EQUALS(
+                hashIt( BSON("a" << MAXKEY) ) ,
+                hashIt( BSON("a" << MINKEY) )
+        );
+    }
+
+    // Test squashing very large doubles and very small doubles
+    TEST( BSONElementHasher, VeryLargeAndSmallDoubles ) {    
+        long long maxInt = std::numeric_limits<long long>::max();
+        double smallerDouble = maxInt/2;
+        double biggerDouble = ( (double)maxInt )*( (double)maxInt );
+        ASSERT_NOT_EQUALS(
+                hashIt( BSON("a" << maxInt ) ) ,
+                hashIt( BSON("a" << smallerDouble ) )
+        );
+        ASSERT_EQUALS(
+                hashIt( BSON("a" << maxInt ) ) ,
+                hashIt( BSON("a" << biggerDouble ) )
+        );
+
+        long long minInt = std::numeric_limits<long long>::min();
+        double negativeDouble = -( (double)maxInt )*( (double)maxInt );
+        ASSERT_EQUALS(
+                hashIt( BSON("a" << minInt ) ) ,
+                hashIt( BSON("a" << negativeDouble ) )
+        );
+    }
+
+    // Remaining tests are hard-coded checks to ensure the hash function is
+    // consistent across platforms and server versions
+    //
+    // All of the values in the remaining tests have been determined experimentally.
     TEST( BSONElementHasher, HashIntOrLongOrDouble ) {
         BSONObj o = BSON( "check" << 42 );
         ASSERT_EQUALS( hashIt( o ), -944302157085130861LL );
