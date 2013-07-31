@@ -146,5 +146,4 @@ namespace {
         ASSERT( !rangeMapContains( rangeMap, BSON( "x" << 1 ), BSON( "x" << MAXKEY ) ) );
         ASSERT( !rangeMapContains( rangeMap, BSON( "x" << MINKEY ), BSON( "x" << 1 ) ) );
     }
-
 }

@@ -108,4 +108,19 @@ namespace mongo {
             && bounds.first->second.woCompare( exclusiveUpper ) == 0;
     }
 
+    string rangeToString( const BSONObj& inclusiveLower, const BSONObj& exclusiveUpper ) {
+        stringstream ss;
+        ss << "[" << inclusiveLower.toString() << ", " << exclusiveUpper.toString() << ")";
+        return ss.str();
+    }
+
+    string overlapToString( RangeVector overlap ) {
+        stringstream ss;
+        for ( RangeVector::const_iterator it = overlap.begin(); it != overlap.end(); ++it ) {
+            if ( it != overlap.begin() ) ss << ", ";
+            ss << rangeToString( it->first, it->second );
+        }
+        return ss.str();
+    }
+
 }

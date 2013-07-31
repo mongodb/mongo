@@ -447,7 +447,7 @@ namespace mongo {
         }
 
         //
-        // Load the metadata from the remote server
+        // Load the metadata from the remote server, start construction
         //
 
         LOG( 0 ) << "remotely refreshing metadata for " << ns
@@ -476,137 +476,158 @@ namespace mongo {
             remoteMetadataRaw = NULL;
         }
         else if ( !status.isOK() ) {
+
+            warning() << "could not remotely refresh metadata for " << ns
+                      << causedBy( status.reason() ) << endl;
+
             return status;
         }
 
         ChunkVersion remoteShardVersion;
         if ( remoteMetadata ) remoteShardVersion = remoteMetadata->getShardVersion();
 
+        //
+        // Get ready to install loaded metadata if needed
+        //
+
+        CollectionMetadataPtr afterMetadata;
+        ChunkVersion afterShardVersion;
+        ChunkVersion::VersionChoice choice;
+
+        // If we choose to install the new metadata, this describes the kind of install
+        enum InstallType {
+            InstallType_New, InstallType_Update, InstallType_Replace, InstallType_Drop,
+            InstallType_None
+        } installType = InstallType_None; // compiler complains otherwise
+
         {
-            CollectionMetadataPtr afterMetadata;
+            // DBLock needed since we're now potentially changing the metadata, and don't want
+            // reads/writes to be ongoing.
+            Lock::DBWrite writeLk( ns );
+
+            //
+            // Get the metadata now that the load has completed
+            //
+
+            scoped_lock lk( _mutex );
+            CollectionMetadataMap::iterator it = _collMetadata.find( ns );
+            if ( it != _collMetadata.end() ) afterMetadata = it->second;
+
             ChunkVersion afterShardVersion;
-            ChunkVersion::VersionChoice choice;
+            if ( afterMetadata ) afterShardVersion = afterMetadata->getShardVersion();
+            *latestShardVersion = afterShardVersion;
 
-            enum InstallType {
-                InstallType_New, InstallType_Update, InstallType_Replace, InstallType_Drop,
-                InstallType_None
-            } installType = InstallType_None; // compiler complains otherwise
+            //
+            // Resolve newer pending chunks with the remote metadata, finish construction
+            //
 
-            {
-                // DBLock needed since we're now potentially changing the metadata, and don't want
-                // reads/writes to be ongoing.
-                Lock::DBWrite writeLk( ns );
+            status = mdLoader.promotePendingChunks( afterMetadata.get(), remoteMetadataRaw );
 
-                //
-                // Get the metadata now that the load has completed
-                //
+            if ( !status.isOK() ) {
 
-                scoped_lock lk( _mutex );
-                CollectionMetadataMap::iterator it = _collMetadata.find( ns );
-                if ( it != _collMetadata.end() ) afterMetadata = it->second;
+                warning() << "remote metadata for " << ns
+                          << " is inconsistent with current pending chunks"
+                          << causedBy( status.reason() ) << endl;
 
-                ChunkVersion afterShardVersion;
-                if ( afterMetadata ) afterShardVersion = afterMetadata->getShardVersion();
-                *latestShardVersion = afterShardVersion;
+                return status;
+            }
 
-                //
-                // Compare the 'before', 'after', and 'remote' versions/epochs and choose newest
-                // Zero-epochs (sentinel value for "dropped" collections), are tested by
-                // !epoch.isSet().
-                //
+            //
+            // Compare the 'before', 'after', and 'remote' versions/epochs and choose newest
+            // Zero-epochs (sentinel value for "dropped" collections), are tested by
+            // !epoch.isSet().
+            //
 
-                choice = ChunkVersion::chooseNewestVersion( beforeShardVersion,
-                                                            afterShardVersion,
-                                                            remoteShardVersion );
+            choice = ChunkVersion::chooseNewestVersion( beforeShardVersion,
+                                                        afterShardVersion,
+                                                        remoteShardVersion );
 
-                if ( choice == ChunkVersion::VersionChoice_Remote ) {
+            if ( choice == ChunkVersion::VersionChoice_Remote ) {
 
-                    if ( !afterShardVersion.epoch().isSet() ) {
+                if ( !afterShardVersion.epoch().isSet() ) {
 
-                        // First metadata load
-                        installType = InstallType_New;
-                        dassert( it == _collMetadata.end() );
-                        _collMetadata.insert( make_pair( ns, remoteMetadata ) );
-                    }
-                    else if ( remoteShardVersion.epoch().isSet() &&
-                              remoteShardVersion.epoch() == afterShardVersion.epoch() ) {
-
-                        // Update to existing metadata
-                        installType = InstallType_Update;
-                        // TODO: Manage pending chunks from old to new version
-                        // mdLoader.propagatePendingChunks( afterMetadata.get(), newMetadataRaw );
-                        it->second = remoteMetadata;
-                    }
-                    else if ( remoteShardVersion.epoch().isSet() ) {
-
-                        // New epoch detected, replacing metadata
-                        installType = InstallType_Replace;
-                        it->second = remoteMetadata;
-                    }
-                    else {
-                        dassert( !remoteShardVersion.epoch().isSet() );
-
-                        // Drop detected
-                        installType = InstallType_Drop;
-                        _collMetadata.erase( it );
-                    }
-
-                    *latestShardVersion = remoteShardVersion;
+                    // First metadata load
+                    installType = InstallType_New;
+                    dassert( it == _collMetadata.end() );
+                    _collMetadata.insert( make_pair( ns, remoteMetadata ) );
                 }
+                else if ( remoteShardVersion.epoch().isSet() &&
+                          remoteShardVersion.epoch() == afterShardVersion.epoch() ) {
+
+                    // Update to existing metadata
+                    installType = InstallType_Update;
+                    it->second = remoteMetadata;
+                }
+                else if ( remoteShardVersion.epoch().isSet() ) {
+
+                    // New epoch detected, replacing metadata
+                    installType = InstallType_Replace;
+                    it->second = remoteMetadata;
+                }
+                else {
+                    dassert( !remoteShardVersion.epoch().isSet() );
+
+                    // Drop detected
+                    installType = InstallType_Drop;
+                    _collMetadata.erase( it );
+                }
+
+                *latestShardVersion = remoteShardVersion;
             }
-            // End DBWrite
+        }
+        // End _mutex
+        // End DBWrite
 
-            //
-            // Do messaging based on what happened above
-            //
+        //
+        // Do messaging based on what happened above
+        //
 
-            string versionMsg = str::stream()
-                << " (loaded version : " << remoteShardVersion.toString()
-                << ( beforeShardVersion.epoch() == afterShardVersion.epoch() ?
-                         string( ", stored version : " ) + afterShardVersion.toString() :
-                         string( ", stored versions : " ) +
-                             beforeShardVersion.toString() + "/" + afterShardVersion.toString() )
-                << ", took " << refreshMillis << "ms)";
+        string versionMsg = str::stream()
+            << " (loaded version : " << remoteShardVersion.toString()
+            << ( beforeShardVersion.epoch() == afterShardVersion.epoch() ?
+                     string( ", stored version : " ) + afterShardVersion.toString() :
+                     string( ", stored versions : " ) +
+                         beforeShardVersion.toString() + "/" + afterShardVersion.toString() )
+            << ", took " << refreshMillis << "ms)";
 
-            if ( choice == ChunkVersion::VersionChoice_Unknown ) {
+        if ( choice == ChunkVersion::VersionChoice_Unknown ) {
 
-                string errMsg =
-                    str::stream() << "need to retry loading metadata for " << ns
-                                  << ", collection may have been dropped or recreated during load"
-                                  << versionMsg;
+            string errMsg =
+                str::stream() << "need to retry loading metadata for " << ns
+                              << ", collection may have been dropped or recreated during load"
+                              << versionMsg;
 
-                warning() << errMsg << endl;
-                return Status( ErrorCodes::RemoteChangeDetected, errMsg );
-            }
+            warning() << errMsg << endl;
+            return Status( ErrorCodes::RemoteChangeDetected, errMsg );
+        }
 
-            if ( choice == ChunkVersion::VersionChoice_Local ) {
+        if ( choice == ChunkVersion::VersionChoice_Local ) {
 
-                LOG( 0 ) << "newer metadata not found for " << ns << versionMsg << endl;
-                return Status::OK();
-            }
-
-            dassert( choice == ChunkVersion::VersionChoice_Remote );
-
-            switch( installType ) {
-            case InstallType_New:
-                LOG( 0 ) << "loaded new metadata for " << ns << versionMsg << endl;
-                break;
-            case InstallType_Update:
-                LOG( 0 ) << "loaded newer metadata for " << ns << versionMsg << endl;
-                break;
-            case InstallType_Replace:
-                LOG( 0 ) << "replacing metadata for " << ns << versionMsg << endl;
-                break;
-            case InstallType_Drop:
-                LOG( 0 ) << "dropping metadata for " << ns << versionMsg << endl;
-                break;
-            default:
-                verify( false );
-                break;
-            }
-
+            LOG( 0 ) << "newer metadata not found for " << ns << versionMsg << endl;
             return Status::OK();
         }
+
+        dassert( choice == ChunkVersion::VersionChoice_Remote );
+
+        switch( installType ) {
+        case InstallType_New:
+            LOG( 0 ) << "loaded new metadata for " << ns << versionMsg << endl;
+            break;
+        case InstallType_Update:
+            LOG( 0 ) << "loaded newer metadata for " << ns << versionMsg << endl;
+            break;
+        case InstallType_Replace:
+            LOG( 0 ) << "replacing metadata for " << ns << versionMsg << endl;
+            break;
+        case InstallType_Drop:
+            LOG( 0 ) << "dropping metadata for " << ns << versionMsg << endl;
+            break;
+        default:
+            verify( false );
+            break;
+        }
+
+        return Status::OK();
     }
 
     void ShardingState::appendInfo( BSONObjBuilder& b ) {
