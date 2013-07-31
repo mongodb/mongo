@@ -69,7 +69,8 @@ namespace replset {
     BackgroundSyncInterface::~BackgroundSyncInterface() {}
 
     size_t getSize(const BSONObj& o) {
-        return o.objsize();
+        // SERVER-9808 Avoid Fortify complaint about implicit signed->unsigned conversion
+        return static_cast<size_t>(o.objsize());
     }
 
     BackgroundSync::BackgroundSync() : _buffer(bufferMaxSizeGauge, &getSize),
