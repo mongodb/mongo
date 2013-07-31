@@ -113,7 +113,7 @@ namespace mongo {
                  BSONObjBuilder& result,
                  bool fromRepl) {
             CreateUserArgs args;
-            Status status = _parseAndValidateInput(cmdObj, &args);
+            Status status = _parseAndValidateInput(dbname, cmdObj, &args);
             if (!status.isOK()) {
                 addStatus(status, result);
                 return false;
@@ -175,7 +175,9 @@ namespace mongo {
 
     private:
 
-        Status _parseAndValidateInput(BSONObj cmdObj, CreateUserArgs* parsedArgs) const {
+        Status _parseAndValidateInput(const std::string& dbname,
+                                      const BSONObj& cmdObj,
+                                      CreateUserArgs* parsedArgs) const {
             unordered_set<std::string> validFieldNames;
             validFieldNames.insert("createUser");
             validFieldNames.insert("user");
@@ -268,6 +270,17 @@ namespace mongo {
             if (parsedArgs->hasRoles && parsedArgs->hasReadOnly) {
                 return Status(ErrorCodes::BadValue,
                               "User objects can't have both 'roles' and 'readOnly'");
+            }
+
+            // Prevent creating a __system user on the local database, and also prevent creating
+            // privilege documents in other datbases for the __system@local user.
+            // TODO(spencer): The second part will go away once we use the new V2 user doc format
+            // as it doesn't have the same userSource notion.
+            if (parsedArgs->userName == internalSecurity.user->getName().getUser() &&
+                    ((!parsedArgs->hasUserSource && dbname == "local") ||
+                            parsedArgs->userSource == "local")) {
+                return Status(ErrorCodes::BadValue,
+                              "Cannot create user document for the internal user");
             }
 
             return Status::OK();

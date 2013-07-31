@@ -877,6 +877,11 @@ namespace {
                         source = dbname;
                     }
                     UserName userName(privDoc["user"].String(), source);
+                    if (userName == internalSecurity.user->getName()) {
+                        // Don't let clients override the internal user by creating a user with the
+                        // same name.
+                        continue;
+                    }
 
                     User* user = mapFindWithDefault(_userCache, userName, static_cast<User*>(NULL));
                     if (!user) {
