@@ -47,7 +47,7 @@ while getopts b:dhO:RWr:sv OPT; do
 	    PERF_BASE="-S"
             ;;
         v)
-            VERBOSE=1
+            VERBOSE=0
             ;;
         W)
             WORKLOAD=1
