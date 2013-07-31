@@ -92,7 +92,9 @@ main(int argc, char *argv[])
 
 	/* The "create" and "load" commands can create the database. */
 	if (config == NULL &&
-	    (strcmp(command, "create") == 0 || strcmp(command, "load") == 0))
+	    (strcmp(command, "create") == 0 ||
+	    strcmp(command, "load") == 0 ||
+	    strcmp(command, "loadtext") == 0))
 		config = "create";
 
 	if ((ret = wiredtiger_open(home,
@@ -109,10 +111,10 @@ main(int argc, char *argv[])
 			ret = usage();
 		break;
 	case 'c':
-		if (strcmp(command, "create") == 0)
-			ret = util_create(session, argc, argv);
-		else if (strcmp(command, "compact") == 0)
+		if (strcmp(command, "compact") == 0)
 			ret = util_compact(session, argc, argv);
+		else if (strcmp(command, "create") == 0)
+			ret = util_create(session, argc, argv);
 		else
 			ret = usage();
 		break;
@@ -156,15 +158,15 @@ main(int argc, char *argv[])
 		else
 			ret = usage();
 		break;
-	case 'v':
-		if (strcmp(command, "verify") == 0)
-			ret = util_verify(session, argc, argv);
-		else
-			ret = usage();
-		break;
 	case 'u':
 		if (strcmp(command, "upgrade") == 0)
 			ret = util_upgrade(session, argc, argv);
+		else
+			ret = usage();
+		break;
+	case 'v':
+		if (strcmp(command, "verify") == 0)
+			ret = util_verify(session, argc, argv);
 		else
 			ret = usage();
 		break;
@@ -207,6 +209,7 @@ usage(void)
 	    "\t" "dump\t  dump an object\n"
 	    "\t" "list\t  list database objects\n"
 	    "\t" "load\t  load an object\n"
+	    "\t" "loadtext\t  load an object from a text file\n"
 	    "\t" "printlog  display the database log\n"
 	    "\t" "read\t  read values from an object\n"
 	    "\t" "rename\t  rename an object\n"
