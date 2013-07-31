@@ -281,17 +281,6 @@ namespace mongo {
          */
         void fillRanges();
 
-        /**
-         * String representation of [inclusiveLower, exclusiveUpper)
-         */
-        std::string rangeToString( const BSONObj& inclusiveLower,
-                                   const BSONObj& exclusiveUpper ) const;
-
-        /**
-         * String representation of overlapping ranges as a list "[range1),[range2),..."
-         */
-        std::string overlapToString( RangeVector overlap ) const;
-
     };
 
 } // namespace mongo

@@ -684,20 +684,4 @@ namespace mongo {
         _rangesMap.insert(make_pair(min, max));
     }
 
-    string CollectionMetadata::rangeToString( const BSONObj& inclusiveLower,
-                                              const BSONObj& exclusiveUpper ) const {
-        stringstream ss;
-        ss << "[" << inclusiveLower.toString() << ", " << exclusiveUpper.toString() << ")";
-        return ss.str();
-    }
-
-    string CollectionMetadata::overlapToString( RangeVector overlap ) const {
-        stringstream ss;
-        for ( RangeVector::const_iterator it = overlap.begin(); it != overlap.end(); ++it ) {
-            if ( it != overlap.begin() ) ss << ", ";
-            ss << rangeToString( it->first, it->second );
-        }
-        return ss.str();
-    }
-
 } // namespace mongo
