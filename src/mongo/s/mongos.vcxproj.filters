@@ -1959,6 +1959,12 @@
     <ClCompile Include="..\db\exec\sort.cpp">
       <Filter>db\exec</Filter>
     </ClCompile>
+    <ClCompile Include="..\db\auth\user_set.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\auth\user_set_test.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\pch.h" />
@@ -3784,9 +3790,6 @@
     <ClInclude Include="..\db\exec\plan_stage.h">
       <Filter>db\exec</Filter>
     </ClInclude>
-    <ClInclude Include="..\db\exec\simple_plan_runner.h">
-      <Filter>db\exec</Filter>
-    </ClInclude>
     <ClInclude Include="..\db\exec\skip.h">
       <Filter>db\exec</Filter>
     </ClInclude>
@@ -3843,6 +3846,9 @@
     </ClInclude>
     <ClInclude Include="..\db\exec\sort.h">
       <Filter>db\exec</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\auth\user_set.h">
+      <Filter>db\auth</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

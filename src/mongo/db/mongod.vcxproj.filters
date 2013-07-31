@@ -2447,6 +2447,15 @@
     <ClCompile Include="query\plan_ranker.cpp">
       <Filter>db\query</Filter>
     </ClCompile>
+    <ClCompile Include="auth\user_set.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="auth\user_set_test.cpp">
+      <Filter>db\auth</Filter>
+    </ClCompile>
+    <ClCompile Include="query\new_find.cpp">
+      <Filter>db\query</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\third_party\snappy\config.h">
@@ -4815,9 +4824,6 @@
     <ClInclude Include="exec\plan_stage.h">
       <Filter>db\exec</Filter>
     </ClInclude>
-    <ClInclude Include="exec\simple_plan_runner.h">
-      <Filter>db\exec</Filter>
-    </ClInclude>
     <ClInclude Include="exec\skip.h">
       <Filter>db\exec</Filter>
     </ClInclude>
@@ -4921,6 +4927,33 @@
       <Filter>db\query</Filter>
     </ClInclude>
     <ClInclude Include="query\stage_types.h">
+      <Filter>db\query</Filter>
+    </ClInclude>
+    <ClInclude Include="auth\user_set.h">
+      <Filter>db\auth</Filter>
+    </ClInclude>
+    <ClInclude Include="query\cached_plan_runner.h">
+      <Filter>db\query</Filter>
+    </ClInclude>
+    <ClInclude Include="query\canonical_query.h">
+      <Filter>db\query</Filter>
+    </ClInclude>
+    <ClInclude Include="query\new_find.h">
+      <Filter>db\query</Filter>
+    </ClInclude>
+    <ClInclude Include="query\plan_cache.h">
+      <Filter>db\query</Filter>
+    </ClInclude>
+    <ClInclude Include="query\query_planner.h">
+      <Filter>db\query</Filter>
+    </ClInclude>
+    <ClInclude Include="query\runner.h">
+      <Filter>db\query</Filter>
+    </ClInclude>
+    <ClInclude Include="query\simple_plan_runner.h">
+      <Filter>db\query</Filter>
+    </ClInclude>
+    <ClInclude Include="query\stage_builder.h">
       <Filter>db\query</Filter>
     </ClInclude>
   </ItemGroup>
