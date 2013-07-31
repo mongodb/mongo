@@ -148,13 +148,12 @@ __curds_cursor_resolve(WT_SESSION_IMPL *session, WT_CURSOR *cursor, int ret)
 	} else {
 		/*
 		 * WiredTiger's semantic is a cursor operation failure implies
-		 * the cursor position is lost and key/value pairs are gone.
-		 * Simplify the underlying data source implementation and reset
-		 * the cursor explicitly here.
+		 * the cursor position is lost.  Simplify the underlying data
+		 * source implementation and reset the cursor explicitly here.
 		 */
 		WT_TRET(source->reset(source));
 
-		F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
+		F_CLR(cursor, WT_CURSTD_KEY_RET | WT_CURSTD_VALUE_RET);
 	}
 	return (ret);
 }
