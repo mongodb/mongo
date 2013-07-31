@@ -24,6 +24,8 @@
 
 namespace mongo {
 
+    class ExtentManager;
+
     /*  a datafile - i.e. the "dbname.<#>" files :
 
           ----------------------
@@ -71,6 +73,7 @@ namespace mongo {
     class DataFile {
         friend class DataFileMgr;
         friend class BasicCursor;
+        friend class ExtentManager;
     public:
         DataFile(int fn) : _mb(0), fileNo(fn) { }
 

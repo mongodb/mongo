@@ -73,8 +73,20 @@ namespace mongo {
 
         void flushFiles( bool sync );
 
+        /**
+         * @param loc - has to be for a specific Record
+         */
         Record* recordFor( const DiskLoc& loc );
+
+        /**
+         * @param loc - has to be for a specific Record (not an Extent)
+         */
         Extent* extentFor( const DiskLoc& loc );
+
+        /**
+         * @param loc - has to be for a specific Extent
+         */
+        Extent* getExtent( const DiskLoc& loc );
 
         // get(Next|Prev)Record follows the Record linked list
         // these WILL cross Extent boundaries
@@ -98,7 +110,6 @@ namespace mongo {
     private:
 
         boost::filesystem::path fileName( int n ) const;
-
 
 // -----
 
