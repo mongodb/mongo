@@ -192,7 +192,7 @@ var testOps = function(db, allowedActions) {
 
     checkErr(allowedActions.hasOwnProperty('user_w'), function() {
         db.addUser('a', 'a');
-        db.system.users.remove({ user: 'a' });
+        db.removeUser('a');
     }, db);
 
     // Test for kill cursor

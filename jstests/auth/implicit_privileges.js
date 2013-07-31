@@ -42,14 +42,15 @@ var admin = conn.getDB("admin");
 var test = conn.getDB("test");
 var test2 = conn.getDB("test2");
 
-assertInsertSucceeds(admin.system.users,
-                     { user: 'root',
-                       pwd: hex_md5('root:mongo:a'),
+assert.commandWorked(admin.runCommand(
+                     { createUser: 1,
+                       user: 'root',
+                       pwd: 'a',
                        roles: ["clusterAdmin",
                                "readWriteAnyDatabase",
                                "dbAdminAnyDatabase",
                                "userAdminAnyDatabase"]
-                     });
+                     }));
 
 var andyAddUserCommandTestDb = {
     createUser: 1,
