@@ -72,7 +72,7 @@ then
     DAEMON_OPTS=${DAEMON_OPTS:-"--config $CONF"}
 else
     NUMACTL=""
-    DAEMON_OPTS=${DAEMON_OPTS:-"-- --config $CONF"}
+    DAEMON_OPTS="-- "${DAEMON_OPTS:-"--config $CONF"}
 fi
 
 if test ! -x $DAEMON; then
