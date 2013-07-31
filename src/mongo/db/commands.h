@@ -40,9 +40,15 @@ namespace mutablebson {
         */
     class Command {
     protected:
+        // The type of the first field in 'cmdObj' must be mongo::String. The first field is
+        // interpreted as a collection name.
         string parseNsFullyQualified(const string& dbname, const BSONObj& cmdObj) const;
     public:
-        // only makes sense for commands where 1st parm is the collection.
+
+        // Return the namespace for the command. If the first field in 'cmdObj' is of type
+        // mongo::String, then that field is interpreted as the collection name, and is
+        // appended to 'dbname' after a '.' character. If the first field is not of type
+        // mongo::String, then 'dbname' is returned unmodified.
         virtual string parseNs(const string& dbname, const BSONObj& cmdObj) const;
 
         // warning: isAuthorized uses the lockType() return values, and values are being passed 
