@@ -46,6 +46,9 @@ namespace mongo {
 
     void printGitVersion();
 
+    const char * openSSLVersion();
+    void printOpenSSLVersion();
+
     std::string sysInfo();
     void printSysInfo();
     void printAllocator();

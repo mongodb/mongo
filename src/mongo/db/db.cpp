@@ -593,6 +593,9 @@ namespace mongo {
         show_warnings();
         log() << mongodVersion() << endl;
         printGitVersion();
+#ifdef MONGO_SSL
+        printOpenSSLVersion();
+#endif  
         printSysInfo();
         printAllocator();
         printCommandLineOpts();
@@ -896,6 +899,9 @@ static void processCommandLineOptions(const std::vector<std::string>& argv) {
         if (params.count("version")) {
             cout << mongodVersion() << endl;
             printGitVersion();
+#ifdef MONGO_SSL
+            printOpenSSLVersion();
+#endif
             ::_exit(EXIT_SUCCESS);
         }
         if (params.count("sysinfo")) {
