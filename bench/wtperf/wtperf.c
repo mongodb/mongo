@@ -151,7 +151,7 @@ int config_opt(CONFIG *, WT_CONFIG_ITEM *, WT_CONFIG_ITEM *);
 int config_opt_str(CONFIG *, WT_SESSION *, const char *, const char *);
 int config_opt_int(CONFIG *, WT_SESSION *, const char *, const char *);
 int config_opt_file(CONFIG *, WT_SESSION *, const char *);
-int config_opt_line(CONFIG *, WT_SESSION *, char *);
+int config_opt_line(CONFIG *, WT_SESSION *, const char *);
 void *populate_thread(void *);
 void print_config(CONFIG *);
 void *read_thread(void *);
@@ -205,93 +205,40 @@ CONFIG default_cfg = {
 	{0, 0},		/* phase_start_time */
 	0		/* rand_range */
 };
-/* Small config values - these are small. */
-CONFIG small_cfg = {
-	NULL,		/* home can only be reset via the -h option */
-	"lsm:test",	/* uri */
-	"create,cache_size=500MB", /* conn_config */
-	DEFAULT_LSM_CONFIG /* table_config */
-	    "lsm_chunk_size=5MB,",
-	1,		/* create */
-	14023954,	/* rand_seed */
-	500000,		/* icount 0.5 million */
-	100,		/* data_sz */
-	20,		/* key_sz */
-	5,		/* report_interval */
-	0,		/* checkpoint_interval */
-	0,		/* stat_interval */
-	20,		/* run_time */
-	0,		/* elapsed_time */
-	1,		/* populate_threads */
-	8,		/* read_threads */
-	0,		/* insert_threads */
-	0,		/* update_threads */
-	0,		/* verbose */
-	NULL,		/* conn */
-	NULL,		/* logf */
-	WT_PERF_INIT, /* phase */
-	0,		/* flags */
-	{0, 0},		/* phase_start_time */
-	0		/* rand_range */
-};
-/* Default values - these are small, we want the basic run to be fast. */
-CONFIG med_cfg = {
-	NULL,		/* home can only be reset via the -h option */
-	"lsm:test",	/* uri */
-	"create,cache_size=1GB", /* conn_config */
-	DEFAULT_LSM_CONFIG /* table_config */
-	    "lsm_chunk_size=20MB,",
-	1,		/* create */
-	14023954,	/* rand_seed */
-	50000000,	/* icount 50 million */
-	100,		/* data_sz */
-	20,		/* key_sz */
-	5,		/* report_interval */
-	0,		/* checkpoint_interval */
-	0,		/* stat_interval */
-	100,		/* run_time */
-	0,		/* elapsed_time */
-	1,		/* populate_threads */
-	16,		/* read_threads */
-	0,		/* insert_threads */
-	0,		/* update_threads */
-	0,		/* verbose */
-	NULL,		/* conn */
-	NULL,		/* logf */
-	WT_PERF_INIT, /* phase */
-	0,		/* flags */
-	{0, 0},		/* phase_start_time */
-	0		/* rand_range */
-};
-/* Default values - these are small, we want the basic run to be fast. */
-CONFIG large_cfg = {
-	NULL,		/* home can only be reset via the -h option */
-	"lsm:test",	/* uri */
-	"create,cache_size=2GB", /* conn_config */
-	DEFAULT_LSM_CONFIG /* table_config */
-	    "lsm_chunk_size=50MB,",
-	1,		/* create */
-	14023954,	/* rand_seed */
-	500000000,	/* icount 500 million */
-	100,		/* data_sz */
-	20,		/* key_sz */
-	5,		/* report_interval */
-	0,		/* checkpoint_interval */
-	0,		/* stat_interval */
-	600,		/* run_time */
-	0,		/* elapsed_time */
-	1,		/* populate_threads */
-	16,		/* read_threads */
-	0,		/* insert_threads */
-	0,		/* update_threads */
-	0,		/* verbose */
-	NULL,		/* conn */
-	NULL,		/* logf */
-	WT_PERF_INIT, /* phase */
-	0,		/* flags */
-	{0, 0},		/* phase_start_time */
-	0		/* rand_range */
-};
+
+const char *small_config_str =
+    "conn_config=\"create,cache_size=500MB\","
+    "table_config=\"" DEFAULT_LSM_CONFIG "lsm_chunk_size=5MB,\","
+    "icount=500000,"
+    "data_sz=100,"
+    "key_sz=20,"
+    "report_interval=5,"
+    "run_time=20,"
+    "populate_threads=1,"
+    "read_threads=8,";
+
+const char *med_config_str =
+    "conn_config=\"create,cache_size=1GB\","
+    "table_config=\"" DEFAULT_LSM_CONFIG "lsm_chunk_size=20MB,\","
+    "icount=50000000,"
+    "data_sz=100,"
+    "key_sz=20,"
+    "report_interval=5,"
+    "run_time=100,"
+    "populate_threads=1,"
+    "read_threads=16,";
+
+const char *large_config_str =
+    "conn_config=\"create,cache_size=2GB\","
+    "table_config=\"" DEFAULT_LSM_CONFIG "lsm_chunk_size=50MB,\","
+    "icount=500000000,"
+    "data_sz=100,"
+    "key_sz=20,"
+    "report_interval=5,"
+    "run_time=600,"
+    "populate_threads=1,"
+    "read_threads=16,";
+
 
 const char *debug_cconfig = "verbose=[lsm]";
 const char *debug_tconfig = "";
@@ -969,13 +916,19 @@ int main(int argc, char **argv)
 	while ((ch = getopt(argc, argv, opts)) != EOF)
 		switch (ch) {
 		case 'S':
-			config_assign(&cfg, &small_cfg);
+			if (config_opt_line(&cfg,
+				parse_session, small_config_str) != 0)
+				return (EINVAL);
 			break;
 		case 'M':
-			config_assign(&cfg, &med_cfg);
+			if (config_opt_line(&cfg,
+				parse_session, med_config_str) != 0)
+				return (EINVAL);
 			break;
 		case 'L':
-			config_assign(&cfg, &large_cfg);
+			if (config_opt_line(&cfg,
+				parse_session, large_config_str) != 0)
+				return (EINVAL);
 			break;
 		case 'O':
 			if (config_opt_file(&cfg,
@@ -1451,7 +1404,7 @@ config_opt_file(CONFIG *cfg, WT_SESSION *parse_session, const char *filename)
  * Continued lines have already been joined.
  */
 int
-config_opt_line(CONFIG *cfg, WT_SESSION *parse_session, char *optstr)
+config_opt_line(CONFIG *cfg, WT_SESSION *parse_session, const char *optstr)
 {
 	WT_CONFIG_ITEM k, v;
 	WT_CONFIG_SCAN *scan;
