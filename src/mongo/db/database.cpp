@@ -80,7 +80,7 @@ namespace mongo {
     Database::Database(const char *nm, bool& newDb, const string& path )
         : _name(nm), _path(path),
           _namespaceIndex( _path, _name ),
-          _extentManager( _name, _path ),
+          _extentManager( _name, _path, directoryperdb /* this is a global right now */ ),
           _profileName(_name + ".system.profile")
     {
         Status status = validateDBName( _name );
