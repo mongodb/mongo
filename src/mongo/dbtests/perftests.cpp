@@ -282,6 +282,9 @@ namespace PerfTests {
                         inf.append("os", "win");
 #endif
                         inf.append("git", gitVersion());
+#ifdef MONGO_SSL
+                        inf.append("OpenSSL", openSSLVersion());
+#endif
                         inf.append("boost", BOOST_VERSION);
                         b.append("info", inf.obj());
                     }

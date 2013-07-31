@@ -74,6 +74,9 @@ namespace mongo {
             ss << "<pre>";
             ss << mongodVersion() << '\n';
             ss << "git hash: " << gitVersion() << '\n';
+#ifdef MONGO_SSL
+            ss << "OpenSSL version: " << openSSLVersion() << '\n';
+#endif
             ss << "sys info: " << sysInfo() << '\n';
             ss << "uptime: " << time(0)-cmdLine.started << " seconds\n";
             ss << "</pre>";
