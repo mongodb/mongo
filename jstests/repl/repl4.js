@@ -34,7 +34,8 @@ doTest = function() {
     s = rt.start( false, { only: "c" }, true );
     soonCount( "c", "c", 2 );
 }
-// skip racy test on Windows
-if (!_isWindows()) {
+
+// Disabled because of SERVER-10344
+if (false) {
     doTest();
 }
