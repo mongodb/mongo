@@ -610,7 +610,7 @@ namespace mongo {
         }
 
         if ( curop.numYields() )
-            s << " numYields: " << curop.numYields();
+            s << " numYields:" << curop.numYields();
         
         s << " ";
         curop.lockStat().report( s );
