@@ -326,6 +326,11 @@ namespace {
         return _externalState->updatePrivilegeDocument(user, updateObj);
     }
 
+    Status AuthorizationManager::removePrivilegeDocuments(const std::string& dbname,
+                                                          const BSONObj& query) const {
+        return _externalState->removePrivilegeDocuments(dbname, query);
+    }
+
     ActionSet AuthorizationManager::getAllUserActions() const {
         ActionSet allActions;
         allActions.addAllActionsFromSet(readRoleActions);

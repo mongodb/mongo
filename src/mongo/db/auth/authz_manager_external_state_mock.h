@@ -45,6 +45,10 @@ namespace mongo {
         virtual Status updatePrivilegeDocument(const UserName& user,
                                                const BSONObj& updateObj) const;
 
+        // no-op for the mock
+        virtual Status removePrivilegeDocuments(const std::string& dbname,
+                                                const BSONObj& query) const;
+
         // Non-const version that puts document into a vector that can be accessed later
         Status insertPrivilegeDocument(const std::string& dbname, const BSONObj& userObj);
 

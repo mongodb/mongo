@@ -429,4 +429,78 @@ namespace mongo {
             return Status::OK();
         }
     } cmdUpdateUser;
+
+    class CmdRemoveUsers : public Command {
+    public:
+
+        virtual bool logTheOp() {
+            return false;
+        }
+
+        virtual bool slaveOk() const {
+            return false;
+        }
+
+        virtual LockType locktype() const {
+            return NONE;
+        }
+
+        CmdRemoveUsers() : Command("removeUsers") {}
+
+        virtual void help(stringstream& ss) const {
+            ss << "By default, removes all users for this database.  If given a \"user\""
+                    " argument, removes only that user."<< endl;
+        }
+
+        virtual void addRequiredPrivileges(const std::string& dbname,
+                                           const BSONObj& cmdObj,
+                                           std::vector<Privilege>* out) {
+            // TODO: update this with the new rules around user creation in 2.6.
+            ActionSet actions;
+            actions.addAction(ActionType::userAdmin);
+            out->push_back(Privilege(dbname, actions));
+        }
+
+        // TODO: The bulk of the implementation of this will need to change once we're using the
+        // new v2 authorization storage format.
+        bool run(const string& dbname,
+                 BSONObj& cmdObj,
+                 int options,
+                 string& errmsg,
+                 BSONObjBuilder& result,
+                 bool fromRepl) {
+            std::string user;
+
+            if (cmdObj.hasField("user")) {
+                Status status = bsonExtractStringField(cmdObj, "user", &user);
+                if (!status.isOK()) {
+                    addStatus(status, result);
+                    return false;
+                }
+            }
+
+            BSONObj query;
+            if (!user.empty()) {
+                query = BSON("user" << user);
+            }
+            AuthorizationManager* authzManager = getGlobalAuthorizationManager();
+            Status status = authzManager->removePrivilegeDocuments(dbname, query);
+            if (!status.isOK()) {
+                addStatus(status, result);
+                return false;
+            }
+
+            // Rebuild full user cache on every user modification.
+            // TODO(spencer): Remove this once we update user cache on-demand for each user
+            // modification.
+            status = authzManager->initializeAllV1UserData();
+            if (!status.isOK()) {
+                addStatus(status, result);
+                return false;
+            }
+
+            return true;
+        }
+
+    } cmdRemoveUser;
 }

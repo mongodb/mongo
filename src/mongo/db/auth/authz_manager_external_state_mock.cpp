@@ -36,6 +36,11 @@ namespace mongo {
         return Status::OK();
     }
 
+    Status AuthzManagerExternalStateMock::removePrivilegeDocuments(const std::string& dbname,
+                                                                   const BSONObj& query) const {
+        return Status::OK();
+    }
+
     Status AuthzManagerExternalStateMock::insertPrivilegeDocument(const std::string& dbname,
                                                                   const BSONObj& userObj) {
         _userDocuments[dbname].push_back(userObj);
