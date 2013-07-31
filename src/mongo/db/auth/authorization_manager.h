@@ -103,6 +103,9 @@ namespace mongo {
         // Updates the given user object with the given update modifier.
         Status updatePrivilegeDocument(const UserName& user, const BSONObj& updateObj) const;
 
+        // Removes users for the given database matching the given query.
+        Status removePrivilegeDocuments(const std::string& dbname, const BSONObj& query) const;
+
         // Checks to see if "doc" is a valid privilege document, assuming it is stored in the
         // "system.users" collection of database "dbname".
         //

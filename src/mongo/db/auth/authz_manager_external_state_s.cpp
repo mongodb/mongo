@@ -126,6 +126,35 @@ namespace {
         }
     }
 
+    Status AuthzManagerExternalStateMongos::removePrivilegeDocuments(const string& dbname,
+                                                                     const BSONObj& query) const {
+        try {
+            string userNS = dbname + ".system.users";
+            scoped_ptr<ScopedDbConnection> conn(getConnectionForUsersCollection(userNS));
+
+            conn->get()->remove(userNS, query);
+
+            // 30 second timeout for w:majority
+            BSONObj res = conn->get()->getLastErrorDetailed(false, false, -1, 30*1000);
+            string err = conn->get()->getLastErrorString(res);
+            conn->done();
+
+            if (!err.empty()) {
+                return Status(ErrorCodes::UserModificationFailed, err);
+            }
+
+            int numUpdated = res["n"].numberInt();
+            if (numUpdated == 0) {
+                return Status(ErrorCodes::UserNotFound,
+                              mongoutils::str::stream() << "No users found on database \"" << dbname
+                                      << "\" matching query: " << query.toString());
+            }
+            return Status::OK();
+        } catch (const DBException& e) {
+            return e.toStatus();
+        }
+    }
+
     Status AuthzManagerExternalStateMongos::getAllDatabaseNames(
             std::vector<std::string>* dbnames) const {
         try {

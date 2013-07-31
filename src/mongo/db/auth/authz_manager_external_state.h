@@ -58,6 +58,10 @@ namespace mongo {
         virtual Status updatePrivilegeDocument(const UserName& user,
                                                const BSONObj& updateObj) const = 0;
 
+        // Removes users for the given database matching the given query.
+        virtual Status removePrivilegeDocuments(const std::string& dbname,
+                                                const BSONObj& query) const = 0;
+
         /**
          * Puts into the *dbnames vector the name of every database in the cluster.
          */
