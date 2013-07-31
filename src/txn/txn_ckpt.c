@@ -7,9 +7,6 @@
 
 #include "wt_internal.h"
 
-static int __checkpoint_sync(WT_SESSION_IMPL *, const char *[]);
-static int __checkpoint_write_leaves(WT_SESSION_IMPL *, const char *[]);
-
 /*
  * __checkpoint_name_check --
  *	Check for an attempt to name a checkpoint that includes anything
@@ -168,7 +165,7 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 
 	/* Flush dirty leaf pages before we start the checkpoint. */
 	txn->isolation = TXN_ISO_READ_COMMITTED;
-	WT_ERR(__checkpoint_apply(session, cfg, __checkpoint_write_leaves));
+	WT_ERR(__checkpoint_apply(session, cfg, __wt_checkpoint_write_leaves));
 
 	WT_ERR(__wt_meta_track_on(session));
 	tracking = 1;
@@ -187,7 +184,7 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	 * lazy checkpoints, but we don't support them yet).
 	 */
 	if (F_ISSET(conn, WT_CONN_SYNC))
-		WT_ERR(__checkpoint_apply(session, cfg, __checkpoint_sync));
+		WT_ERR(__checkpoint_apply(session, cfg, __wt_checkpoint_sync));
 
 	/* Checkpoint the metadata file. */
 	TAILQ_FOREACH(dhandle, &conn->dhqh, q) {
@@ -727,11 +724,11 @@ __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 }
 
 /*
- * __checkpoint_write_leaves --
+ * __wt_checkpoint_write_leaves --
  *	Write dirty leaf pages before a checkpoint.
  */
-static int
-__checkpoint_write_leaves(WT_SESSION_IMPL *session, const char *cfg[])
+int
+__wt_checkpoint_write_leaves(WT_SESSION_IMPL *session, const char *cfg[])
 {
 	WT_UNUSED(cfg);
 
@@ -742,11 +739,11 @@ __checkpoint_write_leaves(WT_SESSION_IMPL *session, const char *cfg[])
 }
 
 /*
- * __checkpoint_sync --
+ * __wt_checkpoint_sync --
  *	Sync a file that has been checkpointed.
  */
-static int
-__checkpoint_sync(WT_SESSION_IMPL *session, const char *cfg[])
+int
+__wt_checkpoint_sync(WT_SESSION_IMPL *session, const char *cfg[])
 {
 	WT_BTREE *btree;
 
@@ -768,6 +765,6 @@ __wt_checkpoint_close(WT_SESSION_IMPL *session, const char *cfg[])
 {
 	WT_RET(__checkpoint_worker(session, cfg, 0));
 	if (F_ISSET(S2C(session), WT_CONN_SYNC))
-		WT_RET(__checkpoint_sync(session, cfg));
+		WT_RET(__wt_checkpoint_sync(session, cfg));
 	return (0);
 }

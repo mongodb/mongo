@@ -92,6 +92,14 @@ __wt_schema_worker(WT_SESSION_IMPL *session,
 		else if (file_func == __wt_verify && dsrc->verify != NULL)
 			WT_ERR(dsrc->verify(
 			   dsrc, wt_session, uri, (WT_CONFIG_ARG *)cfg));
+		else if (file_func == __wt_checkpoint &&
+		    dsrc->checkpoint != NULL)
+			WT_ERR(dsrc->checkpoint(
+			   dsrc, wt_session, (WT_CONFIG_ARG *)cfg));
+		else if (file_func == __wt_checkpoint_write_leaves)
+			;
+		else if (file_func == __wt_checkpoint_sync)
+			;
 		else
 			WT_ERR(__wt_object_unsupported(session, uri));
 	} else

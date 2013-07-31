@@ -569,6 +569,19 @@ my_verify(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 	return (0);
 }
 
+/*! [WT_DATA_SOURCE checkpoint] */
+static int
+my_checkpoint(WT_DATA_SOURCE *dsrc, WT_SESSION *session, WT_CONFIG_ARG *config)
+/*! [WT_DATA_SOURCE checkpoint] */
+{
+	/* Unused parameters */
+	(void)dsrc;
+	(void)session;
+	(void)config;
+
+	return (0);
+}
+
 /*! [WT_DATA_SOURCE terminate] */
 static int
 my_terminate(WT_DATA_SOURCE *dsrc, WT_SESSION *session)
@@ -604,6 +617,7 @@ main(void)
 		my_salvage,
 		my_truncate,
 		my_verify,
+		my_checkpoint,
 		my_terminate
 	};
 	ret = conn->add_data_source(conn, "dsrc:", &my_dsrc, NULL);

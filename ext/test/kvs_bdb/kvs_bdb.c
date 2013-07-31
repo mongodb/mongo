@@ -1014,6 +1014,7 @@ wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 		NULL,				/* No session.salvage */
 		kvs_session_truncate,		/* session.truncate */
 		kvs_session_verify,		/* session.verify */
+		NULL,				/* session.checkpoint */
 		kvs_terminate			/* termination */
 	};
 	DATA_SOURCE *ds;

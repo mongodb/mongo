@@ -2906,6 +2906,39 @@ kvs_session_verify(WT_DATA_SOURCE *wtds,
 }
 
 /*
+ * kvs_session_checkpoint --
+ *	WT_SESSION::checkpoint method.
+ */
+static int
+kvs_session_checkpoint(
+    WT_DATA_SOURCE *wtds, WT_SESSION *session, WT_CONFIG_ARG *config)
+{
+	DATA_SOURCE *ds;
+	KVS_SOURCE *ks;
+	WT_EXTENSION_API *wtext;
+	int ret = 0;
+
+	(void)config;
+
+	ds = (DATA_SOURCE *)wtds;
+	wtext = ds->wtext;
+
+	/*
+	 * Flush the device.
+	 *
+	 * XXX
+	 * This is a placeholder until we figure out what recovery is going
+	 * to look like.
+	 */
+	if ((ks = ds->kvs_head) != NULL &&
+	    (ret = kvs_commit(ks->kvs_device)) != 0)
+		ERET(wtext, session, WT_ERROR,
+		    "kvs_commit: %s", kvs_strerror(ret));
+
+	return (0);
+}
+
+/*
  * kvs_terminate --
  *	Unload the data-source.
  */
@@ -2958,6 +2991,7 @@ wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 		NULL,				/* No session.salvage */
 		kvs_session_truncate,		/* session.truncate */
 		kvs_session_verify,		/* session.verify */
+		kvs_session_checkpoint,		/* session.checkpoint */
 		kvs_terminate			/* termination */
 	};
 	DATA_SOURCE *ds;
