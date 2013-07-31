@@ -75,7 +75,7 @@ namespace mongo {
             _a = -1;
             ofs = 0; /* note NullOfs is different. todo clean up.  see refs to NullOfs in code - use is valid but outside DiskLoc context so confusing as-is. */
         }
-        void assertOk() { verify(!isNull()); }
+        void assertOk() const { verify(!isNull()); }
         void setInvalid() {
             _a = -2;
             ofs = 0;
