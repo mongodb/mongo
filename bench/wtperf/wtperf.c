@@ -85,6 +85,8 @@ typedef enum {
 
 typedef struct {
 	const char *name;
+	const char *description;
+	const char *defaultval;
 	CONFIG_OPT_TYPE type;
 	size_t offset;
 	uint32_t flagmask;
@@ -119,6 +121,7 @@ int config_opt_str(CONFIG *, WT_SESSION *, const char *, const char *);
 int config_opt_int(CONFIG *, WT_SESSION *, const char *, const char *);
 int config_opt_file(CONFIG *, WT_SESSION *, const char *);
 int config_opt_line(CONFIG *, WT_SESSION *, const char *);
+void config_opt_usage(void);
 void *populate_thread(void *);
 void print_config(CONFIG *);
 void *read_thread(void *);
@@ -817,7 +820,7 @@ int main(int argc, char **argv)
 	WT_CONNECTION *conn;
 	WT_SESSION *parse_session;
 	const char *user_cconfig, *user_tconfig;
-	const char *opts = "C:I:O:P:R:U:T:c:d:eh:i:jk:l:m:o:r:ps:t:u:v:SML";
+	const char *opts = "C:O:T:h:o:v:SML";
 	char *cc_buf, *tc_buf;
 	int ch, checkpoint_created, ret, stat_created;
 	pthread_t checkpoint, stat;
@@ -891,7 +894,7 @@ int main(int argc, char **argv)
 				return (EINVAL);
 			break;
 		default:
-			/* Validation is provided on the next parse. */
+			/* Validation done previously. */
 			break;
 		}
 
@@ -899,65 +902,11 @@ int main(int argc, char **argv)
 	optind = 1;
 	while ((ch = getopt(argc, argv, opts)) != EOF)
 		switch (ch) {
-		case 'd':
-			config_opt_int(&cfg, parse_session, "data_sz", optarg);
-			break;
-		case 'c':
-			config_opt_int(&cfg, parse_session,
-			    "checkpoint_interval", optarg);
-			break;
-		case 'e':
-			cfg.create = 0;
-			break;
-		case 'h':
-			/* handled above */
-			break;
-		case 'i':
-			config_opt_int(&cfg, parse_session, "icount", optarg);
-			break;
-		case 'j':
-			F_SET(&cfg, PERF_INSERT_RMW);
-			break;
-		case 'k':
-			config_opt_int(&cfg, parse_session, "key_sz", optarg);
-			break;
-		case 'l':
-			config_opt_int(&cfg, parse_session,
-			    "stat_interval", optarg);
-			break;
-		case 'm':
-			F_SET(&cfg, PERF_RAND_WORKLOAD);
-			config_opt_int(&cfg, parse_session,
-			    "rand_range", optarg);
-			if (cfg.rand_range == 0) {
-				fprintf(stderr, "Invalid random range.\n");
-				usage();
-				return (EINVAL);
-			}
-				
-			break;
 		case 'o':
 			/* Allow -o key=value */
 			if (config_opt_line(&cfg,
 				parse_session, optarg) != 0)
 				return (EINVAL);
-			break;
-		case 'p':
-			F_SET(&cfg, PERF_RAND_PARETO);
-			break;
-		case 'r':
-			config_opt_int(&cfg, parse_session, "run_time", optarg);
-			break;
-		case 's':
-			config_opt_int(&cfg, parse_session,
-			    "rand_seed", optarg);
-			break;
-		case 't':
-			config_opt_int(&cfg, parse_session,
-			    "report_interval", optarg);
-			break;
-		case 'u':
-			config_opt_str(&cfg, parse_session, "uri", optarg);
 			break;
 		case 'v':
 			config_opt_int(&cfg, parse_session, "verbose", optarg);
@@ -965,40 +914,20 @@ int main(int argc, char **argv)
 		case 'C':
 			user_cconfig = optarg;
 			break;
-		case 'I':
-			config_opt_int(&cfg, parse_session,
-			    "insert_threads", optarg);
-			break;
-		case 'P':
-			config_opt_int(&cfg, parse_session,
-			    "populate_threads", optarg);
-			break;
-		case 'R':
-			config_opt_int(&cfg, parse_session,
-			    "read_threads", optarg);
-			break;
-		case 'U':
-			config_opt_int(&cfg, parse_session,
-			    "update_threads", optarg);
-			break;
 		case 'T':
 			user_tconfig = optarg;
 			break;
-		case 'O':
-		case 'L':
-		case 'M':
-		case 'S':
 			break;
-		case '?':
-		default:
-			fprintf(stderr, "Invalid option\n");
-			usage();
-			return (EINVAL);
 		}
 
 	if (cfg.rand_range > 0 && !F_ISSET(&cfg, PERF_RAND_WORKLOAD)) {
 		fprintf(stderr, "rand_range cannot be set without "
 		    "random workload\n");
+		return (EINVAL);
+	}
+	if (cfg.rand_range == 0 && F_ISSET(&cfg, PERF_RAND_WORKLOAD)) {
+		fprintf(stderr, "Invalid random range.\n");
+		usage();
 		return (EINVAL);
 	}
 
@@ -1427,6 +1356,45 @@ config_opt_int(CONFIG *cfg, WT_SESSION *parse_session,
 	return (ret);
 }
 
+void
+config_opt_usage(void)
+{
+	int i;
+	size_t nopt;
+	const char *typestr;
+	const char *defaultval;
+	int linelen;
+
+	printf("Following are options setable using -o or -O, "
+	    "showing [default value].\n");
+	printf("String values must be enclosed by \" quotes,\n");
+	printf("bool values must be true or false.\n\n");
+
+	nopt = sizeof(config_opts)/sizeof(config_opts[0]);
+	for (i = 0; i < nopt; i++) {
+		typestr = "?";
+		defaultval = config_opts[i].defaultval;
+		if (config_opts[i].type == UINT32_TYPE)
+			typestr = "int";
+		else if (config_opts[i].type == STRING_TYPE)
+			typestr = "string";
+		else if (config_opts[i].type == BOOL_TYPE ||
+		    config_opts[i].type == FLAG_TYPE) {
+			typestr = "bool";
+			if (strcmp(defaultval, "0") == 0)
+				defaultval = "true";
+			else
+				defaultval = "false";
+		}
+		linelen = printf("  %s=<%s> [%s]",
+		    config_opts[i].name, typestr, defaultval);
+		if (linelen + 2 + strlen(config_opts[i].description) < 80)
+			printf("  %s\n", config_opts[i].description);
+		else
+			printf("\n        %s\n", config_opts[i].description);
+	}
+}
+
 int
 start_threads(
     CONFIG *cfg, u_int num, pthread_t **threadsp, void *(*func)(void *))
@@ -1606,32 +1574,18 @@ void print_config(CONFIG *cfg)
 
 void usage(void)
 {
-	printf("wtperf [-CLMPRSTdehikrsuv]\n");
+	printf("wtperf [-CLMOSThov]\n");
 	printf("\t-S Use a small default configuration\n");
 	printf("\t-M Use a medium default configuration\n");
 	printf("\t-L Use a large default configuration\n");
+	printf("\t-h <string> Wired Tiger home must exist, default WT_TEST\n");
 	printf("\t-C <string> additional connection configuration\n");
-	printf("\t-I <int> number of insert worker threads\n");
-	printf("\t-P <int> number of populate threads\n");
-	printf("\t-R <int> number of read threads\n");
-	printf("\t-U <int> number of update threads\n");
+	printf("\t            (added to option conn_config)\n");
 	printf("\t-T <string> additional table configuration\n");
-	printf("\t-c <int> checkpoint every <int> report intervals."
-	    "Default disabled,\n");
-	printf("\t-d <int> data item size\n");
-	printf("\t-e use existing database (skip population phase)\n");
-	printf("\t-h <string> Wired Tiger home must exist, default WT_TEST \n");
-	printf("\t-i <int> number of records to insert\n");
-	printf("\t-j Execute a read prior to each insert in populate\n");
-	printf("\t-k <int> key item size\n");
-	printf("\t-l <int> log statistics every <int> report intervals."
-	    "Default disabled.\n");
-	printf("\t-m <range> use random inserts in workload. Means reads"
-	    " and updates will ignore WT_NOTFOUND\n");
-	printf("\t-p use pareto 80/20 distribution for random numbers\n");
-	printf("\t-r <int> number of seconds to run workload phase\n");
-	printf("\t-s <int> seed for random number generator\n");
-	printf("\t-t <int> How often to output throughput information\n");
-	printf("\t-u <string> table uri, default lsm:test\n");
+	printf("\t            (added to option table_config)\n");
 	printf("\t-v <int> verbosity\n");
+	printf("\t-O <filename> file contains options as listed below\n");
+	printf("\t-o option=val[,option=val,...] set options listed below\n");
+	printf("\n");
+	config_opt_usage();
 }

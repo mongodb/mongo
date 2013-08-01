@@ -29,57 +29,79 @@
  */
 
 #ifdef OPT_DECLARE_STRUCT
-#define DEF_OPT_AS_STRING(name, initval)	const char *name;
-#define DEF_OPT_AS_BOOL(name, initval)		uint32_t name;
-#define DEF_OPT_AS_UINT32(name, initval)	uint32_t name;
-#define DEF_OPT_AS_FLAGVAL(name, bits)
+#define DEF_OPT_AS_STRING(name, initval, desc)	const char *name;
+#define DEF_OPT_AS_BOOL(name, initval, desc)	uint32_t name;
+#define DEF_OPT_AS_UINT32(name, initval, desc)	uint32_t name;
+#define DEF_OPT_AS_FLAGVAL(name, bits, desc)
 #endif
 
 #ifdef OPT_DEFINE_DESC
-#define DEF_OPT_AS_STRING(name, initval)			\
-	{ #name, STRING_TYPE, offsetof(CONFIG, name), 0 },
-#define DEF_OPT_AS_BOOL(name, initval)				\
-	{ #name, BOOL_TYPE, offsetof(CONFIG, name), 0 },
-#define DEF_OPT_AS_UINT32(name, initval)			\
-	{ #name, UINT32_TYPE, offsetof(CONFIG, name), 0 },
-#define DEF_OPT_AS_FLAGVAL(name, bits)				\
-	{ #name, FLAG_TYPE, offsetof(CONFIG, flags), bits },
+#define DEF_OPT_AS_STRING(name, initval, desc)			\
+	{ #name, desc, #initval, STRING_TYPE, offsetof(CONFIG, name), 0 },
+#define DEF_OPT_AS_BOOL(name, initval, desc)			\
+	{ #name, desc, #initval, BOOL_TYPE, offsetof(CONFIG, name), 0 },
+#define DEF_OPT_AS_UINT32(name, initval, desc)			\
+	{ #name, desc, #initval, UINT32_TYPE, offsetof(CONFIG, name), 0 },
+#define DEF_OPT_AS_FLAGVAL(name, bits, desc)			\
+	{ #name, desc, "0", FLAG_TYPE, offsetof(CONFIG, flags), bits },
 #endif
 
 #ifdef OPT_DEFINE_DEFAULT
-#define DEF_OPT_AS_STRING(name, initval)	initval,
-#define DEF_OPT_AS_BOOL(name, initval)		initval,
-#define DEF_OPT_AS_UINT32(name, initval)	initval,
-#define DEF_OPT_AS_FLAGVAL(name, bits)
+#define DEF_OPT_AS_STRING(name, initval, desc)	initval,
+#define DEF_OPT_AS_BOOL(name, initval, desc)	initval,
+#define DEF_OPT_AS_UINT32(name, initval, desc)	initval,
+#define DEF_OPT_AS_FLAGVAL(name, bits, desc)
 #endif
 
 /*
  * CONFIG struct fields that may be altered on command line via -o and -O.
  * The default values are tiny, we want the basic run to be fast.
  */
-DEF_OPT_AS_UINT32(checkpoint_interval, 0)	/* Zero to disable. */
-DEF_OPT_AS_STRING(conn_config, "create,cache_size=200MB")
-DEF_OPT_AS_BOOL(create, 1)		/* Whether to populate for this run. */
-DEF_OPT_AS_UINT32(data_sz, 100)
-DEF_OPT_AS_UINT32(icount, 5000)		/* Items to insert. */
-DEF_OPT_AS_UINT32(insert_threads, 0)	/* Number of insert threads. */
-DEF_OPT_AS_UINT32(key_sz, 20)
-DEF_OPT_AS_UINT32(populate_threads, 1)	/* Number of populate threads. */
-DEF_OPT_AS_UINT32(rand_seed, 14023954)
-DEF_OPT_AS_UINT32(random_range, 0)
-DEF_OPT_AS_UINT32(read_threads, 2)	/* Number of read threads. */
-DEF_OPT_AS_UINT32(report_interval, 2)
-DEF_OPT_AS_UINT32(run_time, 2)
-DEF_OPT_AS_UINT32(stat_interval, 0)	/* Zero to disable. */
-DEF_OPT_AS_STRING(table_config, DEFAULT_LSM_CONFIG)
-DEF_OPT_AS_UINT32(update_threads, 0)	/* Number of update threads. */
-DEF_OPT_AS_STRING(uri, "lsm:test")
-DEF_OPT_AS_UINT32(verbose, 0)
+DEF_OPT_AS_UINT32(checkpoint_interval, 0,
+    "checkpoint every <int> report intervals, zero to disable")
+DEF_OPT_AS_STRING(conn_config, "create,cache_size=200MB",
+    "connection configuration string")
+DEF_OPT_AS_BOOL(create, 1,
+    "do population phase; set to false to use existing database")
+DEF_OPT_AS_UINT32(data_sz, 100,
+    "data item size")
+DEF_OPT_AS_UINT32(icount, 5000,
+    "number of records to insert")
+DEF_OPT_AS_UINT32(insert_threads, 0,
+    "number of insert worker threads")
+DEF_OPT_AS_UINT32(key_sz, 20,
+    "key item size")
+DEF_OPT_AS_UINT32(populate_threads, 1,
+    "number of populate threads")
+DEF_OPT_AS_UINT32(rand_seed, 14023954,
+    "seed for random number generator")
+DEF_OPT_AS_UINT32(random_range, 0,
+    "use random inserts in workload, reads"
+    " and updates ignore WT_NOTFOUND")
+DEF_OPT_AS_UINT32(read_threads, 2,
+    "number of read threads")
+DEF_OPT_AS_UINT32(report_interval, 2,
+    "how often to output throughput information")
+DEF_OPT_AS_UINT32(run_time, 2,
+    "number of seconds to run workload phase")
+DEF_OPT_AS_UINT32(stat_interval, 0,
+    "log statistics every <int> report intervals, zero to disable")
+DEF_OPT_AS_STRING(table_config, DEFAULT_LSM_CONFIG,
+    "table configuration string")
+DEF_OPT_AS_UINT32(update_threads, 0,
+    "number of update threads")
+DEF_OPT_AS_STRING(uri,
+    "lsm:test", "table uri")
+DEF_OPT_AS_UINT32(verbose, 0,
+    "verbosity")
 
 /* values for CONFIG.flags */
-DEF_OPT_AS_FLAGVAL(insert_rmw, PERF_INSERT_RMW)
-DEF_OPT_AS_FLAGVAL(pareto, PERF_RAND_PARETO)
-DEF_OPT_AS_FLAGVAL(random, PERF_RAND_WORKLOAD)
+DEF_OPT_AS_FLAGVAL(insert_rmw, PERF_INSERT_RMW,
+    "execute a read prior to each insert in populate")
+DEF_OPT_AS_FLAGVAL(pareto, PERF_RAND_PARETO,
+    "use pareto 80/20 distribution for random numbers")
+DEF_OPT_AS_FLAGVAL(random, PERF_RAND_WORKLOAD,
+    "use random workload as specified with random_range")
 
 #undef DEF_OPT_AS_STRING
 #undef DEF_OPT_AS_BOOL
