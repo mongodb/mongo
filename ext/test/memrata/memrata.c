@@ -1262,6 +1262,7 @@ cache_clean:
 	 */
 	if (cache_ret == 0 && cache_rm) {
 		memcpy(r->key, cursor->t2.v, cursor->t2.len);
+		r->key_len = cursor->t2.len;
 		goto skip_deleted;
 	}
 
