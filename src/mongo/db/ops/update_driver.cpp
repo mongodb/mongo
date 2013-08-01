@@ -152,6 +152,11 @@ namespace mongo {
                 }
             }
 
+            // Skips things we can't store (like dots in field names)
+            // TODO: Find way to check without copy
+            if (!e.wrap().okForStorageAsRoot()) {
+                continue;
+            }
             eb.appendAs(e , e.fieldName());
         }
         eb.done();
