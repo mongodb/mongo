@@ -68,6 +68,8 @@ namespace mongo {
         ossmsg << msg;
         ossmsg << ": offset:";
         ossmsg << offset();
+        ossmsg << " of:";
+        ossmsg << _buf;
         return Status(ErrorCodes::FailedToParse, ossmsg.str());
     }
 
@@ -469,7 +471,7 @@ namespace mongo {
         BSONObjBuilder subBuilder(builder.subobjStart(fieldName));
 
         if (!accept(COLON)) {
-            return parseError("Expecting ':'");
+            return parseError("DBRef: Expecting ':'");
         }
         std::string ns;
         ns.reserve(NS_RESERVE_SIZE);
@@ -480,14 +482,14 @@ namespace mongo {
         subBuilder.append("$ref", ns);
 
         if (!accept(COMMA)) {
-            return parseError("Expecting ','");
+            return parseError("DBRef: Expecting ','");
         }
 
         if (!acceptField("$id")) {
-            return parseError("Expected field name: \"$id\" in \"$ref\" object");
+            return parseError("DBRef: Expected field name: \"$id\" in \"$ref\" object");
         }
         if (!accept(COLON)) {
-            return parseError("Expecting ':'");
+            return parseError("DBRef: Expecting ':'");
         }
         Status valueRet = value("$id", subBuilder);
         if (valueRet != Status::OK()) {
