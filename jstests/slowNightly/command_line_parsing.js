@@ -17,15 +17,10 @@ var m2expected = {
         "dbpath" : "/data/db/jstests_slowNightly_command_line_parsing2",
         "fastsync" : "true",
         "port" : 31002,
-        "setParameter" : [
-            "enableTestCommands=1"
-            ]
     }
 };
 var m2result = m2.getDB("admin").runCommand( "getCmdLineOpts" );
 
-print("Expected:");
-printjson(m2expected.parsed);
-print("Actual:");
-printjson(m2result.parsed);
-assert( friendlyEqual(m2expected.parsed, m2result.parsed) );
+//remove setParameter as it is variable depending on the way the test is started.
+delete m2result.parsed.setParameter
+assert.docEq( m2expected.parsed, m2result.parsed );
