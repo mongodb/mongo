@@ -1,4 +1,4 @@
-// @file collection.h
+// collection.h
 
 /**
 *    Copyright (C) 2012 10gen Inc.
@@ -20,12 +20,14 @@
 
 #include "mongo/db/namespace_details.h"
 
-namespace mongo { 
+namespace mongo {
 
-    class Collection { 
+    class Collection {
     public:
-        NamespaceDetails * const d;
-        NamespaceDetailsTransient * const nsd;
+
+    private:
+        NamespaceDetails* _details;
+        Database* _database;
     };
 
 }
