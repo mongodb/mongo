@@ -244,8 +244,6 @@ namespace QueryStageMergeSortTests {
                 // We inserted N objects but we get 2 * N from the runner because of dups.
                 ASSERT(runner.getNext(&first));
                 ASSERT(runner.getNext(&second));
-                cout << "first: " << first.toString() << endl;
-                cout << "second: " << second.toString() << endl;
                 ASSERT_EQUALS(first["c"].numberInt(), second["c"].numberInt());
                 ASSERT_EQUALS(i, first["c"].numberInt());
                 ASSERT((first.hasField("a") && second.hasField("b"))

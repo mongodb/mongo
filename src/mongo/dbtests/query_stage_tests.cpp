@@ -20,7 +20,7 @@
 #include "mongo/db/index/catalog_hack.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/json.h"
-#include "mongo/db/matcher.h"
+#include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/query/simple_plan_runner.h"
 #include "mongo/dbtests/dbtests.h"
 
@@ -57,11 +57,14 @@ namespace QueryStageTests {
             _client.ensureIndex(ns(), obj);
         }
 
-        int countResults(const IndexScanParams& params, Matcher* matcher = NULL) {
+        int countResults(const IndexScanParams& params, BSONObj filterObj = BSONObj()) {
             Client::ReadContext ctx(ns());
             SimplePlanRunner runner;
 
-            runner.setRoot(new IndexScan(params, runner.getWorkingSet(), matcher));
+            StatusWithMatchExpression swme = MatchExpressionParser::parse(filterObj);
+            verify(swme.isOK());
+            auto_ptr<MatchExpression> filterExpr(swme.getValue());
+            runner.setRoot(new IndexScan(params, runner.getWorkingSet(), filterExpr.get()));
 
             int count = 0;
             for (BSONObj obj; runner.getNext(&obj); ) {
@@ -162,8 +165,7 @@ namespace QueryStageTests {
             params.endKeyInclusive = true;
             params.direction = 1;
 
-            ASSERT_EQUALS(countResults(params, new Matcher(BSON("foo" << 25))),
-                          1);
+            ASSERT_EQUALS(countResults(params, BSON("foo" << 25)), 1);
         }
     };
 
@@ -181,8 +183,7 @@ namespace QueryStageTests {
             params.endKeyInclusive = true;
             params.direction = 1;
 
-            ASSERT_THROWS(countResults(params, new Matcher(BSON("baz" << 25))),
-                          MsgAssertionException);
+            ASSERT_THROWS(countResults(params, BSON("baz" << 25)), MsgAssertionException);
         }
     };
 

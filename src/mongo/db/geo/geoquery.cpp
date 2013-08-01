@@ -58,7 +58,7 @@ namespace mongo {
         return true;
     }
 
-    bool NearQuery::parseFrom(const BSONObj &obj, double radius) {
+    bool NearQuery::parseFrom(const BSONObj &obj) {
         bool hasGeometry = false;
 
         // First, try legacy near, e.g.:
@@ -96,11 +96,6 @@ namespace mongo {
                 maxDistance = e.Number();
                 uassert(16896, "$maxDistance must be non-negative", maxDistance >= 0.0);
             }
-        }
-
-        if (fromRadians) {
-            minDistance *= radius;
-            maxDistance *= radius;
         }
 
         if (hasGeometry) { return true; }

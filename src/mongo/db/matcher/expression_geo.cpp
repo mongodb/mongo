@@ -21,6 +21,10 @@
 
 namespace mongo {
 
+    //
+    // Geo queries we don't need an index to answer: geoWithin and geoIntersects
+    //
+
     Status GeoMatchExpression::init( const StringData& path, const GeoQuery& query ) {
         _query = query;
         return initPath( path );
@@ -58,6 +62,46 @@ namespace mongo {
 
     LeafMatchExpression* GeoMatchExpression::shallowClone() const {
         GeoMatchExpression* next = new GeoMatchExpression();
+        next->init( path(), _query );
+        return next;
+    }
+
+    //
+    // Parse-only geo expressions: geoNear (formerly known as near).
+    //
+
+    Status GeoNearMatchExpression::init( const StringData& path, const NearQuery& query ) {
+        _query = query;
+        return initPath( path );
+    }
+
+    bool GeoNearMatchExpression::matchesSingleElement( const BSONElement& e ) const {
+        // This shouldn't be called.
+        verify(0);
+        return false;
+    }
+
+    void GeoNearMatchExpression::debugString( StringBuilder& debug, int level ) const {
+        _debugAddSpace( debug, level );
+        debug << "GEONEAR\n";
+    }
+
+    bool GeoNearMatchExpression::equivalent( const MatchExpression* other ) const {
+        if ( matchType() != other->matchType() )
+            return false;
+
+        const GeoNearMatchExpression* realOther = static_cast<const GeoNearMatchExpression*>(other);
+
+        if ( path() != realOther->path() )
+            return false;
+
+        // TODO:
+        // return _query == realOther->_query;
+        return false;
+    }
+
+    LeafMatchExpression* GeoNearMatchExpression::shallowClone() const {
+        GeoNearMatchExpression* next = new GeoNearMatchExpression();
         next->init( path(), _query );
         return next;
     }

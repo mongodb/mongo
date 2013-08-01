@@ -17,10 +17,10 @@
 #pragma once
 
 #include "mongo/db/diskloc.h"
-#include "mongo/db/matcher.h"
 #include "mongo/db/exec/collection_iterator.h"
 #include "mongo/db/exec/collection_scan_common.h"
 #include "mongo/db/exec/plan_stage.h"
+#include "mongo/db/matcher/expression.h"
 
 namespace mongo {
 
@@ -35,7 +35,7 @@ namespace mongo {
     class CollectionScan : public PlanStage {
     public:
         CollectionScan(const CollectionScanParams& params, WorkingSet* workingSet,
-                       Matcher* matcher);
+                       const MatchExpression* filter);
 
         virtual StageState work(WorkingSetID* out);
         virtual bool isEOF();
@@ -49,7 +49,10 @@ namespace mongo {
     private:
         // WorkingSet is not owned by us.
         WorkingSet* _workingSet;
-        scoped_ptr<Matcher> _matcher;
+
+        // The filter is not owned by us.
+        const MatchExpression* _filter;
+
         scoped_ptr<CollectionIterator> _iter;
 
         CollectionScanParams _params;

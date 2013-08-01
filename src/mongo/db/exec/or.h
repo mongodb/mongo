@@ -17,9 +17,9 @@
 #pragma once
 
 #include "mongo/db/diskloc.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/matcher.h"
 #include "mongo/db/exec/plan_stage.h"
+#include "mongo/db/jsobj.h"
+#include "mongo/db/matcher/expression.h"
 #include "mongo/platform/unordered_set.h"
 
 namespace mongo {
@@ -33,7 +33,7 @@ namespace mongo {
      */
     class OrStage : public PlanStage {
     public:
-        OrStage(WorkingSet* ws, bool dedup, Matcher* matcher);
+        OrStage(WorkingSet* ws, bool dedup, const MatchExpression* filter);
         virtual ~OrStage();
 
         void addChild(PlanStage* child);
@@ -52,7 +52,8 @@ namespace mongo {
         // Not owned by us.
         WorkingSet* _ws;
 
-        scoped_ptr<Matcher> _matcher;
+        // The filter is not owned by us.
+        const MatchExpression* _filter;
 
         // Owned by us.
         vector<PlanStage*> _children;

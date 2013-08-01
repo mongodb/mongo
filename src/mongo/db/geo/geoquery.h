@@ -91,13 +91,24 @@ namespace mongo {
         NearQuery(const string& f) : field(f), minDistance(0),
                                      maxDistance(std::numeric_limits<double>::max()),
                                      fromRadians(false) {}
-        bool parseFrom(const BSONObj &obj, double radius);
+
+        /**
+         * If fromRadians is true after a parseFrom, minDistance and maxDistance are returned in
+         * radians, not meters.  The distances must be multiplied by the underlying index's radius
+         * to convert them to meters.
+         *
+         * This is annoying but useful when we don't know what index we're using at parse time.
+         */
+        bool parseFrom(const BSONObj &obj);
         bool parseFromGeoNear(const BSONObj &obj, double radius);
+
         string field;
         PointWithCRS centroid;
+
         // Min and max distance IN METERS from centroid that we're willing to search.
         double minDistance;
         double maxDistance;
+
         // Did we convert to this distance from radians?  (If so, we output distances in radians.)
         bool fromRadians;
     };

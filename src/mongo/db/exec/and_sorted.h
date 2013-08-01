@@ -20,9 +20,9 @@
 #include <vector>
 
 #include "mongo/db/diskloc.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/matcher.h"
 #include "mongo/db/exec/plan_stage.h"
+#include "mongo/db/jsobj.h"
+#include "mongo/db/matcher/expression.h"
 #include "mongo/platform/unordered_set.h"
 
 namespace mongo {
@@ -41,7 +41,7 @@ namespace mongo {
      */
     class AndSortedStage : public PlanStage {
     public:
-        AndSortedStage(WorkingSet* ws, Matcher* matcher);
+        AndSortedStage(WorkingSet* ws, const MatchExpression* filter);
         virtual ~AndSortedStage();
 
         void addChild(PlanStage* child);
@@ -65,7 +65,9 @@ namespace mongo {
 
         // Not owned by us.
         WorkingSet* _ws;
-        scoped_ptr<Matcher> _matcher;
+
+        // Not owned by us.
+        const MatchExpression* _filter;
 
         // Owned by us.
         vector<PlanStage*> _children;

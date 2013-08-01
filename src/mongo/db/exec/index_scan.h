@@ -16,10 +16,10 @@
 
 #pragma once
 
+#include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/diskloc.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/matcher.h"
-#include "mongo/db/exec/plan_stage.h"
+#include "mongo/db/matcher/expression.h"
 #include "mongo/platform/unordered_set.h"
 
 namespace mongo {
@@ -38,7 +38,9 @@ namespace mongo {
      */
     class IndexScan : public PlanStage {
     public:
-        IndexScan(const IndexScanParams& params, WorkingSet* workingSet, Matcher* matcher);
+        IndexScan(const IndexScanParams& params, WorkingSet* workingSet,
+                  const MatchExpression* filter);
+
         virtual ~IndexScan() { }
 
         virtual StageState work(WorkingSetID* out);
@@ -70,7 +72,8 @@ namespace mongo {
 
         // Contains expressions only over fields in the index key.  We assume this is built
         // correctly by whomever creates this class.
-        scoped_ptr<Matcher> _matcher;
+        // The filter is not owned by us.
+        const MatchExpression* _filter;
 
         // Could our index have duplicates?  If so, we use _returned to dedup.
         bool _shouldDedup;

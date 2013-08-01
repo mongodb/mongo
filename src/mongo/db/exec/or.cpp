@@ -15,11 +15,12 @@
  */
 
 #include "mongo/db/exec/or.h"
+#include "mongo/db/exec/filter.h"
 
 namespace mongo {
 
-    OrStage::OrStage(WorkingSet* ws, bool dedup, Matcher* matcher)
-        : _ws(ws), _matcher(matcher), _currentChild(0), _dedup(dedup) { }
+    OrStage::OrStage(WorkingSet* ws, bool dedup, const MatchExpression* filter)
+        : _ws(ws), _filter(filter), _currentChild(0), _dedup(dedup) { }
 
     OrStage::~OrStage() {
         for (size_t i = 0; i < _children.size(); ++i) {
@@ -65,8 +66,8 @@ namespace mongo {
                 }
             }
 
-            if (NULL == _matcher || _matcher->matches(member)) {
-                if (NULL != _matcher) {
+            if (Filter::passes(member, _filter)) {
+                if (NULL != _filter) {
                     ++_specificStats.matchTested[_currentChild];
                 }
                 // Match!  return it.

@@ -17,9 +17,9 @@
 #pragma once
 
 #include "mongo/db/diskloc.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/matcher.h"
 #include "mongo/db/exec/plan_stage.h"
+#include "mongo/db/jsobj.h"
+#include "mongo/db/matcher/expression.h"
 
 namespace mongo {
 
@@ -33,7 +33,7 @@ namespace mongo {
      */
     class FetchStage : public PlanStage {
     public:
-        FetchStage(WorkingSet* ws, PlanStage* child, Matcher* matcher);
+        FetchStage(WorkingSet* ws, PlanStage* child, const MatchExpression* filter);
         virtual ~FetchStage();
 
         virtual bool isEOF();
@@ -61,7 +61,9 @@ namespace mongo {
         // _ws is not owned by us.
         WorkingSet* _ws;
         scoped_ptr<PlanStage> _child;
-        scoped_ptr<Matcher> _matcher;
+
+        // The filter is not owned by us.
+        const MatchExpression* _filter;
 
         // If we're fetching a DiskLoc and it points at something that's not in memory, we return a
         // a "please page this in" result and hold on to the WSID until the next call to work(...).

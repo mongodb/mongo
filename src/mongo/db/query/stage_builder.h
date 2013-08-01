@@ -14,22 +14,11 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "mongo/db/exec/and_hash.h"
-#include "mongo/db/exec/and_sorted.h"
-#include "mongo/db/exec/collection_scan.h"
-#include "mongo/db/exec/fetch.h"
-#include "mongo/db/exec/index_scan.h"
-#include "mongo/db/exec/limit.h"
-#include "mongo/db/exec/or.h"
-#include "mongo/db/exec/skip.h"
-#include "mongo/db/index/catalog_hack.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/matcher/matcher.h"
-#include "mongo/db/namespace_details.h"
-#include "mongo/db/pdfile.h"
-#include "mongo/db/query/query_solution.h"
-
 #pragma once
+
+#include "mongo/db/exec/plan_stage.h"
+#include "mongo/db/exec/working_set.h"
+#include "mongo/db/query/query_solution.h"
 
 namespace mongo {
 
@@ -38,10 +27,15 @@ namespace mongo {
      */
     class StageBuilder {
     public:
-        static bool build(const QuerySolution& solution, PlanStage** rootOut, WorkingSet** wsOut) {
-            return false;
-            // TODO: Implement.
-        }
+        /**
+         * Turns 'solution' into an executable tree of PlanStage(s).
+         *
+         * Returns true if the PlanStage tree was built successfully.  The root of the tree is in
+         * *rootOut and the WorkingSet that the tree uses is in *wsOut.
+         *
+         * Returns false otherwise.  *rootOut and *wsOut are invalid.
+         */
+        static bool build(const QuerySolution& solution, PlanStage** rootOut, WorkingSet** wsOut);
     };
 
 }  // namespace mongo

@@ -27,16 +27,30 @@
 namespace mongo {
 
     StatusWithMatchExpression expressionParserGeoCallbackReal( const char* name,
-                                                                  const BSONObj& section ) {
-        GeoQuery gq;
-        if ( !gq.parseFrom( section ) )
-            return StatusWithMatchExpression( ErrorCodes::BadValue, "bad geo query" );
+                                                               int type,
+                                                               const BSONObj& section ) {
+        if (BSONObj::opWITHIN == type || BSONObj::opGEO_INTERSECTS == type) {
+            GeoQuery gq;
+            if ( !gq.parseFrom( section ) )
+                return StatusWithMatchExpression( ErrorCodes::BadValue, "bad geo query" );
 
-        auto_ptr<GeoMatchExpression> e( new GeoMatchExpression() );
-        Status s = e->init( name, gq );
-        if ( !s.isOK() )
-            return StatusWithMatchExpression( s );
-        return StatusWithMatchExpression( e.release() );
+            auto_ptr<GeoMatchExpression> e( new GeoMatchExpression() );
+            Status s = e->init( name, gq );
+            if ( !s.isOK() )
+                return StatusWithMatchExpression( s );
+            return StatusWithMatchExpression( e.release() );
+        }
+        else {
+            NearQuery nq;
+            if ( !nq.parseFrom( section ) )
+                return StatusWithMatchExpression( ErrorCodes::BadValue, "bad geo near query" );
+
+            auto_ptr<GeoNearMatchExpression> e( new GeoNearMatchExpression() );
+            Status s = e->init( name, nq );
+            if ( !s.isOK() )
+                return StatusWithMatchExpression( s );
+            return StatusWithMatchExpression( e.release() );
+        }
     }
 
     MONGO_INITIALIZER( MatchExpressionParserGeo )( ::mongo::InitializerContext* context ) {

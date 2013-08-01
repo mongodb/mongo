@@ -5,9 +5,12 @@ Import("env")
 env.StaticLibrary(
     target = 'query',
     source = [
+        "canonical_query.cpp",
         "multi_plan_runner.cpp",
         "new_find.cpp",
         "plan_ranker.cpp",
+        "query_planner.cpp",
+        "stage_builder.cpp",
     ],
     LIBDEPS = [
         "$BUILD_DIR/mongo/db/exec/exec"

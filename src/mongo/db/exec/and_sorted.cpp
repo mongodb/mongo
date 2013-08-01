@@ -17,12 +17,13 @@
 #include "mongo/db/exec/and_sorted.h"
 
 #include "mongo/db/exec/and_common-inl.h"
+#include "mongo/db/exec/filter.h"
 #include "mongo/db/exec/working_set_common.h"
 
 namespace mongo {
 
-    AndSortedStage::AndSortedStage(WorkingSet* ws, Matcher* matcher)
-        : _ws(ws), _matcher(matcher), _targetNode(numeric_limits<size_t>::max()),
+    AndSortedStage::AndSortedStage(WorkingSet* ws, const MatchExpression* filter)
+        : _ws(ws), _filter(filter), _targetNode(numeric_limits<size_t>::max()),
           _targetId(WorkingSet::INVALID_ID), _isEOF(false) { }
 
     AndSortedStage::~AndSortedStage() {
@@ -133,8 +134,8 @@ namespace mongo {
                     _targetLoc = DiskLoc();
 
                     // Everyone hit it, hooray.  Return it, if it matches.
-                    if (NULL == _matcher || _matcher->matches(toMatchTest)) {
-                        if (NULL != _matcher.get()) {
+                    if (Filter::passes(toMatchTest, _filter)) {
+                        if (NULL != _filter) {
                             ++_specificStats.matchTested;
                         }
 

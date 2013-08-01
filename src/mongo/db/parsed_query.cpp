@@ -90,14 +90,12 @@ namespace mongo {
             e = q["$query"];
         
         if ( e.isABSONObj() ) {
-            _filter = e.embeddedObject();
+            _filter = e.embeddedObject().getOwned();
             _initTop( q );
         }
         else {
-            _filter = q;
+            _filter = q.getOwned();
         }
-
-        _filter = _filter.getOwned();
 
         //
         // Parse options that are valid for both queries and commands

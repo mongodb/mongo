@@ -16,6 +16,7 @@
 
 #include "mongo/db/exec/index_scan.h"
 
+#include "mongo/db/exec/filter.h"
 #include "mongo/db/index/catalog_hack.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_cursor.h"
@@ -34,11 +35,12 @@ namespace {
 
 namespace mongo {
 
-    IndexScan::IndexScan(const IndexScanParams& params, WorkingSet* workingSet, Matcher* matcher)
+    IndexScan::IndexScan(const IndexScanParams& params, WorkingSet* workingSet,
+                         const MatchExpression* filter)
         : _workingSet(workingSet), _descriptor(params.descriptor), _startKey(params.startKey),
           _endKey(params.endKey), _endKeyInclusive(params.endKeyInclusive),
           _direction(params.direction), _hitEnd(false),
-          _matcher(matcher), _shouldDedup(params.descriptor->isMultikey()),
+          _filter(filter), _shouldDedup(params.descriptor->isMultikey()),
           _yieldMovedCursor(false), _numWanted(params.limit) {
 
         string amName;
@@ -114,8 +116,8 @@ namespace mongo {
                                                 _indexCursor->getKey().getOwned()));
         member->state = WorkingSetMember::LOC_AND_IDX;
 
-        if (NULL == _matcher || _matcher->matches(member)) {
-            if (NULL == _matcher) {
+        if (Filter::passes(member, _filter)) {
+            if (NULL != _filter) {
                 ++_specificStats.matchTested;
             }
             *out = id;

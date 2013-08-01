@@ -20,7 +20,7 @@
 #include "mongo/db/index/catalog_hack.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/json.h"
-#include "mongo/db/matcher.h"
+#include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/query/multi_plan_runner.h"
 #include "mongo/dbtests/dbtests.h"
 
@@ -91,13 +91,22 @@ namespace QueryMultiPlanRunner {
             csparams.ns = ns();
             csparams.direction = CollectionScanParams::FORWARD;
             auto_ptr<WorkingSet> secondWs(new WorkingSet());
+            // Make the filter.
+            BSONObj filterObj = BSON("foo" << 7);
+            StatusWithMatchExpression swme = MatchExpressionParser::parse(filterObj);
+            verify(swme.isOK());
+            auto_ptr<MatchExpression> filter(swme.getValue());
+            // Make the stage.
             auto_ptr<PlanStage> secondRoot(new CollectionScan(csparams, secondWs.get(),
-                                                              new Matcher(BSON("foo" << 7))));
+                                                              filter.get()));
 
             // Hand the plans off to the runner.
-            MultiPlanRunner mpr(new CanonicalQuery());
-            mpr.addPlan(new EmptyNode(), firstRoot.release(), firstWs.release());
-            mpr.addPlan(new EmptyNode(), secondRoot.release(), secondWs.release());
+            CanonicalQuery* cq = NULL;
+            verify(CanonicalQuery::canonicalize(ns(), BSON("foo" << 7), &cq).isOK());
+            verify(NULL != cq);
+            MultiPlanRunner mpr(cq);
+            mpr.addPlan(new QuerySolution(), firstRoot.release(), firstWs.release());
+            mpr.addPlan(new QuerySolution(), secondRoot.release(), secondWs.release());
 
             // Plan 0 aka the first plan aka the index scan should be the best.
             size_t best;

@@ -40,4 +40,18 @@ namespace mongo {
         ASSERT(result.getValue()->matchesBSON(fromjson("{a: {x: 5, y:5.1}}")));
 
     }
+
+    TEST( MatchExpressionParserGeoNear, ParseNear ) {
+        BSONObj query = fromjson("{loc:{$near:{$maxDistance:100, "
+                                 "$geometry:{type:\"Point\", coordinates:[0,0]}}}}");
+
+        StatusWithMatchExpression result = MatchExpressionParser::parse( query );
+        ASSERT_TRUE( result.isOK() );
+
+        MatchExpression* exp = result.getValue();
+        ASSERT_EQUALS(MatchExpression::GEO_NEAR, exp->matchType());
+
+        GeoNearMatchExpression* gnexp = static_cast<GeoNearMatchExpression*>(exp);
+        ASSERT_EQUALS(gnexp->getData().maxDistance, 100);
+    }
 }

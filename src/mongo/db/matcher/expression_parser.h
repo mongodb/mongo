@@ -105,7 +105,7 @@ namespace mongo {
 
     };
 
-    typedef boost::function<StatusWithMatchExpression(const char* name, const BSONObj& section)> MatchExpressionParserGeoCallback;
+    typedef boost::function<StatusWithMatchExpression(const char* name, int type, const BSONObj& section)> MatchExpressionParserGeoCallback;
     extern MatchExpressionParserGeoCallback expressionParserGeoCallback;
 
     typedef boost::function<StatusWithMatchExpression(const BSONElement& where)> MatchExpressionParserWhereCallback;

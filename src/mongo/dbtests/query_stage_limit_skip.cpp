@@ -65,7 +65,7 @@ namespace {
     //
     // Insert 50 objects.  Filter/skip 0, 1, 2, ..., 100 objects and expect the right # of results.
     //
-    class LimitSkipBasicTest {
+    class QueryStageLimitSkipBasicTest {
     public:
         void run() {
             for (int i = 0; i < 2 * N; ++i) {
@@ -85,7 +85,7 @@ namespace {
         All() : Suite( "query_stage_limit_skip" ) { }
 
         void setupTests() {
-            add<LimitSkipBasicTest>();
+            add<QueryStageLimitSkipBasicTest>();
         }
     }  queryStageLimitSkipAll;
 
