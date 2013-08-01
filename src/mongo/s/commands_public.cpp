@@ -40,6 +40,7 @@
 #include "mongo/s/client_info.h"
 #include "mongo/s/chunk.h"
 #include "mongo/s/config.h"
+#include "mongo/s/cursors.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/interrupt_status_mongos.h"
 #include "mongo/s/strategy.h"
@@ -1782,6 +1783,7 @@ namespace mongo {
                 const vector<Strategy::CommandResult>& shardResults,
                 const string& fullns);
 
+            void storePossibleCursor(const string& server, BSONObj cmdResult) const;
             void killAllCursors(const vector<Strategy::CommandResult>& shardResults);
             bool doAnyShardsNotSupportCursors(const vector<Strategy::CommandResult>& shardResults);
             bool wasMergeCursorsSupported(BSONObj cmdResult);
@@ -1794,6 +1796,14 @@ namespace mongo {
                                   int options,
                                   BSONObj cmdObj,
                                   BSONObjBuilder& result);
+
+            // These are temporary hacks because the runCommand method doesn't report the exact
+            // host the command was run on which is necessary for cursor support. The exact host
+            // could be different from conn->getServerAddress() for connections that map to
+            // multiple servers such as for replica sets. These also take care of registering
+            // returned cursors with mongos's cursorCache.
+            BSONObj aggRunCommand(DBClientBase* conn, const string& db, BSONObj cmd);
+            bool aggPassthrough(DBConfigPtr conf, BSONObj cmd, BSONObjBuilder& result);
 
         };
 
@@ -1815,12 +1825,7 @@ namespace mongo {
         bool PipelineCommand::run(const string &dbName , BSONObj &cmdObj,
                                   int options, string &errmsg,
                                   BSONObjBuilder &result, bool fromRepl) {
-            //const string shardedOutputCollection = getTmpName( collection );
-
-            uassert(16961, "Aggregation in a sharded system doesn't yet support cursors",
-                    !cmdObj.hasField("cursor"));
-
-            string fullns = parseNs(dbName, cmdObj);
+            const string fullns = parseNs(dbName, cmdObj);
 
             intrusive_ptr<ExpressionContext> pExpCtx =
                 ExpressionContext::create(&InterruptStatusMongos::status, NamespaceString(fullns));
@@ -1836,9 +1841,11 @@ namespace mongo {
               If the system isn't running sharded, or the target collection
               isn't sharded, pass this on to a mongod.
             */
-            DBConfigPtr conf(grid.getDBConfig(dbName , false));
-            if (!conf || !conf->isShardingEnabled() || !conf->isSharded(fullns))
-                return passthrough(conf, cmdObj, result);
+            DBConfigPtr conf = grid.getDBConfig(dbName , true);
+            massert(17015, "getDBConfig shouldn't return NULL",
+                    conf);
+            if (!conf->isShardingEnabled() || !conf->isSharded(fullns))
+                return aggPassthrough(conf, cmdObj, result);
 
             /* split the pipeline into pieces for mongods and this mongos */
             intrusive_ptr<Pipeline> pShardPipeline(
@@ -1887,8 +1894,8 @@ namespace mongo {
             // Not using ShardConnection because this shouldn't be versioned.
             const string mergeServer = conf->getPrimary().getConnString();
             ScopedDbConnection conn(mergeServer);
-            BSONObj mergedResults;
-            bool ok = conn->runCommand(dbName, mergeCmd.obj(), mergedResults);
+            BSONObj mergedResults = aggRunCommand(conn.get(), dbName, mergeCmd.obj());
+            bool ok = mergedResults["ok"].trueValue();
             conn.done();
 
             if (!ok && !wasMergeCursorsSupported(mergedResults)) {
@@ -2046,6 +2053,46 @@ namespace mongo {
                     log() << "Couldn't kill aggregation cursor on shard: "
                           << shardResults[i].target
                           << " due to non-exception";
+                }
+            }
+        }
+
+        BSONObj PipelineCommand::aggRunCommand(DBClientBase* conn, const string& db,  BSONObj cmd) {
+            // Temporary hack. See comment on declaration for details.
+
+            massert(17016, "should only be running an aggregate command here",
+                    str::equals(cmd.firstElementFieldName(), "aggregate"));
+
+            scoped_ptr<DBClientCursor> cursor(conn->query(db + ".$cmd", cmd, -1));
+            massert(17014, "aggregate command didn't return results",
+                    cursor->more());
+
+            BSONObj result = cursor->next().getOwned();
+            storePossibleCursor(cursor->originalHost(), result);
+            return result;
+        }
+
+        bool PipelineCommand::aggPassthrough(DBConfigPtr conf, BSONObj cmd, BSONObjBuilder& out) {
+            // Temporary hack. See comment on declaration for details.
+
+            ShardConnection conn( conf->getPrimary() , "" );
+            BSONObj result = aggRunCommand(conn.get(), conf->getName(), cmd);
+            conn.done();
+
+            bool ok = result["ok"].trueValue();
+            if (!ok && result["code"].numberInt() == SendStaleConfigCode) {
+                throw RecvStaleConfigException("command failed because of stale config", result);
+            }
+            out.appendElements(result);
+            return ok;
+        }
+
+        void PipelineCommand::storePossibleCursor(const string& server, BSONObj cmdResult) const {
+            if (cmdResult["ok"].trueValue() && cmdResult.hasField("cursor")) {
+                long long cursorId = cmdResult["cursor"]["id"].Long();
+                if (cursorId) {
+                    const string cursorNs = cmdResult["cursor"]["ns"].String();
+                    cursorCache.storeRef(server, cursorId, cursorNs);
                 }
             }
         }
