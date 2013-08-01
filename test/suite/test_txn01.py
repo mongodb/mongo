@@ -106,7 +106,7 @@ class test_txn01(wttest.WiredTigerTestCase):
 
     # Loop through a set of inserts, periodically committing; before each
     # commit, verify the number of visible records matches the expected value.
-    def test_visibilty(self):
+    def test_visibility(self):
         self.session.create(self.uri,
             'key_format=' + self.key_format +
             ',value_format=' + self.value_format)
