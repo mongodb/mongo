@@ -188,6 +188,11 @@
 #define	WT_DECL_ITEM(i)	WT_ITEM *i = NULL
 #define	WT_DECL_RET	int ret = 0
 
+/* If a WT_ITEM data field points somewhere in its allocated memory. */
+#define	WT_DATA_IN_ITEM(i)						\
+	((i)->mem != NULL && (i)->data >= (i)->mem &&			\
+	    WT_PTRDIFF((i)->data, (i)->mem) < (i)->memsize)
+
 /*
  * In diagnostic mode we track the locations from which hazard pointers and
  * scratch buffers were acquired.

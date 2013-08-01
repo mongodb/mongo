@@ -8,6 +8,34 @@
 #include "wt_internal.h"
 
 /*
+ * WT_BTREE_CURSOR_SAVE_AND_RESTORE
+ *	Save the cursor's key/value data/size fields, call an underlying btree
+ * function, and then consistently handle failure and success.
+ */
+#define	WT_BTREE_CURSOR_SAVE_AND_RESTORE(cursor, f, ret) do {		\
+	const void *__key_data = (cursor)->key.data;			\
+	const void *__value_data = (cursor)->value.data;		\
+	uint64_t __recno = (cursor)->recno;				\
+	uint32_t __key_size = (cursor)->key.size;			\
+	uint32_t __value_size = (cursor)->value.size;			\
+	if (((ret) = (f)) == 0) {					\
+		F_CLR(cursor, WT_CURSTD_KEY_APP | WT_CURSTD_VALUE_APP);	\
+		F_SET(cursor, WT_CURSTD_KEY_RET | WT_CURSTD_VALUE_RET);	\
+	} else {							\
+		if (F_ISSET(cursor, WT_CURSTD_KEY_APP)) {		\
+			(cursor)->recno = __recno;			\
+			(cursor)->key.data = __key_data;		\
+			(cursor)->key.size = __key_size;		\
+		}							\
+		if (F_ISSET(cursor, WT_CURSTD_VALUE_APP)) {		\
+			(cursor)->value.data = __value_data;		\
+			(cursor)->value.size = __value_size;		\
+		}							\
+		F_CLR(cursor, WT_CURSTD_KEY_RET | WT_CURSTD_VALUE_RET);	\
+	}								\
+} while (0)
+
+/*
  * __curfile_compare --
  *	WT_CURSOR->compare method for the btree cursor type.
  */
@@ -52,7 +80,8 @@ __curfile_next(WT_CURSOR *cursor)
 
 	cbt = (WT_CURSOR_BTREE *)cursor;
 	CURSOR_API_CALL(cursor, session, next, cbt->btree);
-	ret = __wt_btcur_next(cbt, 0);
+
+	WT_BTREE_CURSOR_SAVE_AND_RESTORE(cursor, __wt_btcur_next(cbt, 0), ret);
 
 err:	API_END(session);
 	return (ret);
@@ -72,7 +101,9 @@ __curfile_next_random(WT_CURSOR *cursor)
 
 	cbt = (WT_CURSOR_BTREE *)cursor;
 	CURSOR_API_CALL(cursor, session, next, cbt->btree);
-	ret = __wt_btcur_next_random(cbt);
+
+	WT_BTREE_CURSOR_SAVE_AND_RESTORE(
+	    cursor, __wt_btcur_next_random(cbt), ret);
 
 err:	API_END(session);
 	return (ret);
@@ -91,7 +122,8 @@ __curfile_prev(WT_CURSOR *cursor)
 
 	cbt = (WT_CURSOR_BTREE *)cursor;
 	CURSOR_API_CALL(cursor, session, prev, cbt->btree);
-	ret = __wt_btcur_prev(cbt, 0);
+
+	WT_BTREE_CURSOR_SAVE_AND_RESTORE(cursor, __wt_btcur_prev(cbt, 0), ret);
 
 err:	API_END(session);
 	return (ret);
@@ -110,7 +142,10 @@ __curfile_reset(WT_CURSOR *cursor)
 
 	cbt = (WT_CURSOR_BTREE *)cursor;
 	CURSOR_API_CALL(cursor, session, reset, cbt->btree);
+
 	ret = __wt_btcur_reset(cbt);
+
+	F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 
 err:	API_END(session);
 	return (ret);
@@ -129,8 +164,10 @@ __curfile_search(WT_CURSOR *cursor)
 
 	cbt = (WT_CURSOR_BTREE *)cursor;
 	CURSOR_API_CALL(cursor, session, search, cbt->btree);
+
 	WT_CURSOR_NEEDKEY(cursor);
-	ret = __wt_btcur_search(cbt);
+
+	WT_BTREE_CURSOR_SAVE_AND_RESTORE(cursor, __wt_btcur_search(cbt), ret);
 
 err:	API_END(session);
 	return (ret);
@@ -149,8 +186,11 @@ __curfile_search_near(WT_CURSOR *cursor, int *exact)
 
 	cbt = (WT_CURSOR_BTREE *)cursor;
 	CURSOR_API_CALL(cursor, session, search_near, cbt->btree);
+
 	WT_CURSOR_NEEDKEY(cursor);
-	ret = __wt_btcur_search_near(cbt, exact);
+
+	WT_BTREE_CURSOR_SAVE_AND_RESTORE(
+	    cursor, __wt_btcur_search_near(cbt, exact), ret);
 
 err:	API_END(session);
 	return (ret);
@@ -172,7 +212,8 @@ __curfile_insert(WT_CURSOR *cursor)
 	if (!F_ISSET(cursor, WT_CURSTD_APPEND))
 		WT_CURSOR_NEEDKEY(cursor);
 	WT_CURSOR_NEEDVALUE(cursor);
-	ret = __wt_btcur_insert(cbt);
+
+	WT_BTREE_CURSOR_SAVE_AND_RESTORE(cursor, __wt_btcur_insert(cbt), ret);
 
 err:	CURSOR_UPDATE_API_END(session, ret);
 	return (ret);
@@ -191,9 +232,11 @@ __curfile_update(WT_CURSOR *cursor)
 
 	cbt = (WT_CURSOR_BTREE *)cursor;
 	CURSOR_UPDATE_API_CALL(cursor, session, update, cbt->btree);
+
 	WT_CURSOR_NEEDKEY(cursor);
 	WT_CURSOR_NEEDVALUE(cursor);
-	ret = __wt_btcur_update(cbt);
+
+	WT_BTREE_CURSOR_SAVE_AND_RESTORE(cursor, __wt_btcur_update(cbt), ret);
 
 err:	CURSOR_UPDATE_API_END(session, ret);
 	return (ret);
@@ -212,8 +255,18 @@ __curfile_remove(WT_CURSOR *cursor)
 
 	cbt = (WT_CURSOR_BTREE *)cursor;
 	CURSOR_UPDATE_API_CALL(cursor, session, remove, cbt->btree);
+
 	WT_CURSOR_NEEDKEY(cursor);
-	ret = __wt_btcur_remove(cbt);
+
+	WT_BTREE_CURSOR_SAVE_AND_RESTORE(cursor, __wt_btcur_remove(cbt), ret);
+
+	/*
+	 * After a successful remove, the key and value are not available.
+	 * This has to come after the call to resolve the cursor, it sets
+	 * the same flags we're clearing.
+	 */
+	if (ret == 0)
+		F_CLR(cursor, WT_CURSTD_KEY_RET | WT_CURSTD_VALUE_RET);
 
 err:	CURSOR_UPDATE_API_END(session, ret);
 	return (ret);
