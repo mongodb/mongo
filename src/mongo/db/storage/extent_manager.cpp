@@ -255,6 +255,18 @@ namespace mongo {
         return e->firstRecord;
     }
 
+    Extent* ExtentManager::getNextExtent( Extent* e ) {
+        if ( e->xnext.isNull() )
+            return NULL;
+        return getExtent( e->xnext );
+    }
+
+    Extent* ExtentManager::getPrevExtent( Extent* e ) {
+        if ( e->xprev.isNull() )
+            return NULL;
+        return getExtent( e->xprev );
+    }
+
     int ExtentManager::quantizeExtentSize( int size ) {
         verify( size <= Extent::maxSize() );
 
