@@ -138,9 +138,9 @@ typedef struct __kvs_source {
 	 * and then simply reference it from other, subsequently created KVS
 	 * stores.
 	 */
-#define	TXN_ABORTED	1
-#define	TXN_COMMITTED	2
-#define	TXN_UNRESOLVED	3
+#define	TXN_ABORTED	'A'
+#define	TXN_COMMITTED	'C'
+#define	TXN_UNRESOLVED	0
 	kvs_t	kvstxn;				/* Underlying KVS txn store */
 	int	kvstxn_first;			/* First KVS store */
 
