@@ -45,7 +45,7 @@ namespace mongo {
          *
          * Ex. $pop: {'a':1} will remove the last item from this array: [1,2,3] -> [1,2]
          */
-        virtual Status init(const BSONElement& modExpr);
+        virtual Status init(const BSONElement& modExpr, const Options& opts);
 
         virtual Status prepare(mutablebson::Element root,
                                const StringData& matchedField,

@@ -90,6 +90,9 @@ namespace mongo {
         bool logOp() const;
         void setLogOp(bool logOp);
 
+        ModifierInterface::Options modOptions() const;
+        void setModOptions(ModifierInterface::Options modOpts);
+
         ModifierInterface::ExecInfo::UpdateContext context() const;
         void setContext(ModifierInterface::ExecInfo::UpdateContext context);
 
@@ -102,7 +105,7 @@ namespace mongo {
         // immutable properties after parsing
         //
 
-        // Is there a list of $mod's on '_mods' or is it just full object replacment?
+        // Is there a list of $mod's on '_mods' or is it just full object replacement?
         bool _dollarModMode;
 
         // Collection of update mod instances. Owned here.
@@ -127,6 +130,9 @@ namespace mongo {
         // Should this driver generate an oplog record when it applies the update?
         bool _logOp;
 
+        // The options to initiate the mods with
+        ModifierInterface::Options _modOptions;
+
         // Are any of the fields mentioned in the mods participating in any index? Is set anew
         // at each call to update.
         bool _affectIndices;
@@ -141,8 +147,9 @@ namespace mongo {
         bool multi;
         bool upsert;
         bool logOp;
+        ModifierInterface::Options modOptions;
 
-        Options() : multi(false), upsert(false), logOp(false) {}
+        Options() : multi(false), upsert(false), logOp(false), modOptions() {}
     };
 
 } // namespace mongo

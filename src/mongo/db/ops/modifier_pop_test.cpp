@@ -48,7 +48,8 @@ namespace {
 
         explicit Mod(BSONObj modObj) {
             _modObj = modObj;
-            ASSERT_OK(_mod.init(_modObj["$pop"].embeddedObject().firstElement()));
+            ASSERT_OK(_mod.init(_modObj["$pop"].embeddedObject().firstElement(),
+                                ModifierInterface::Options::normal()));
         }
 
         Status prepare(Element root,
@@ -81,19 +82,22 @@ namespace {
     TEST(Init, StringArg) {
         BSONObj modObj = fromjson("{$pop: {a: 'hi'}}");
         ModifierPop mod;
-        ASSERT_OK(mod.init(modObj["$pop"].embeddedObject().firstElement()));
+        ASSERT_OK(mod.init(modObj["$pop"].embeddedObject().firstElement(),
+                           ModifierInterface::Options::normal()));
     }
 
     TEST(Init, BoolTrueArg) {
         BSONObj modObj = fromjson("{$pop: {a: true}}");
         ModifierPop mod;
-        ASSERT_OK(mod.init(modObj["$pop"].embeddedObject().firstElement()));
+        ASSERT_OK(mod.init(modObj["$pop"].embeddedObject().firstElement(),
+                           ModifierInterface::Options::normal()));
     }
 
     TEST(Init, BoolFalseArg) {
         BSONObj modObj = fromjson("{$pop: {a: false}}");
         ModifierPop mod;
-        ASSERT_OK(mod.init(modObj["$pop"].embeddedObject().firstElement()));
+        ASSERT_OK(mod.init(modObj["$pop"].embeddedObject().firstElement(),
+                           ModifierInterface::Options::normal()));
     }
 
     TEST(MissingField, AllButApply) {

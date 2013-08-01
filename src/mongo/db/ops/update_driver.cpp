@@ -32,7 +32,8 @@ namespace mongo {
     UpdateDriver::UpdateDriver(const Options& opts)
         : _multi(opts.multi)
         , _upsert(opts.upsert)
-        , _logOp(opts.logOp) {
+        , _logOp(opts.logOp)
+        , _modOptions(opts.modOptions) {
     }
 
     UpdateDriver::~UpdateDriver() {
@@ -57,7 +58,7 @@ namespace mongo {
             // the object.
             auto_ptr<ModifierObjectReplace> mod(new ModifierObjectReplace);
             BSONObj wrapper = BSON( "dummy" << updateExpr );
-            Status status = mod->init(wrapper.firstElement());
+            Status status = mod->init(wrapper.firstElement(), _modOptions);
             if (!status.isOK()) {
                 return status;
             }
@@ -104,7 +105,7 @@ namespace mongo {
                                   "empty entry in $mod expression list");
                 }
 
-                Status status = mod->init(innerModElem);
+                Status status = mod->init(innerModElem, _modOptions);
                 if (!status.isOK()) {
                     return status;
                 }
@@ -289,6 +290,14 @@ namespace mongo {
 
     void UpdateDriver::setLogOp(bool logOp) {
         _logOp = logOp;
+    }
+
+    ModifierInterface::Options UpdateDriver::modOptions() const {
+        return _modOptions;
+    }
+
+    void UpdateDriver::setModOptions(ModifierInterface::Options modOpts) {
+        _modOptions = modOpts;
     }
 
     ModifierInterface::ExecInfo::UpdateContext UpdateDriver::context() const {

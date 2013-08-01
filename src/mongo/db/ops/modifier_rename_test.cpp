@@ -48,7 +48,8 @@ namespace {
 
         explicit Mod(BSONObj modObj) {
             _modObj = modObj;
-            ASSERT_OK(_mod.init(_modObj["$rename"].embeddedObject().firstElement()));
+            ASSERT_OK(_mod.init(_modObj["$rename"].embeddedObject().firstElement(),
+                                ModifierInterface::Options::normal()));
         }
 
         Status prepare(Element root,
@@ -81,17 +82,28 @@ namespace {
      */
     TEST(InvalidInit, FromDbTests) {
         ModifierRename mod;
-        ASSERT_NOT_OK(mod.init(fromjson("{'a.$':'b'}").firstElement()));
-        ASSERT_NOT_OK(mod.init(fromjson("{'a':'b.$'}").firstElement()));
-        ASSERT_NOT_OK(mod.init(fromjson("{'_id.a':'b'}").firstElement()));
-        ASSERT_NOT_OK(mod.init(fromjson("{'b':'_id.a'}").firstElement()));
-        ASSERT_NOT_OK(mod.init(fromjson("{'_id.a':'_id.b'}").firstElement()));
-        ASSERT_NOT_OK(mod.init(fromjson("{'_id.b':'_id.a'}").firstElement()));
-        ASSERT_NOT_OK(mod.init(fromjson("{'.b':'a'}").firstElement()));
-        ASSERT_NOT_OK(mod.init(fromjson("{'b.':'a'}").firstElement()));
-        ASSERT_NOT_OK(mod.init(fromjson("{'b':'.a'}").firstElement()));
-        ASSERT_NOT_OK(mod.init(fromjson("{'b':'a.'}").firstElement()));
-        ASSERT_NOT_OK(mod.init(fromjson("{'a':'$a'}").firstElement()));
+        ASSERT_NOT_OK(mod.init(fromjson("{'a.$':'b'}").firstElement(),
+                               ModifierInterface::Options::normal()));
+        ASSERT_NOT_OK(mod.init(fromjson("{'a':'b.$'}").firstElement(),
+                               ModifierInterface::Options::normal()));
+        ASSERT_NOT_OK(mod.init(fromjson("{'_id.a':'b'}").firstElement(),
+                               ModifierInterface::Options::normal()));
+        ASSERT_NOT_OK(mod.init(fromjson("{'b':'_id.a'}").firstElement(),
+                               ModifierInterface::Options::normal()));
+        ASSERT_NOT_OK(mod.init(fromjson("{'_id.a':'_id.b'}").firstElement(),
+                               ModifierInterface::Options::normal()));
+        ASSERT_NOT_OK(mod.init(fromjson("{'_id.b':'_id.a'}").firstElement(),
+                               ModifierInterface::Options::normal()));
+        ASSERT_NOT_OK(mod.init(fromjson("{'.b':'a'}").firstElement(),
+                               ModifierInterface::Options::normal()));
+        ASSERT_NOT_OK(mod.init(fromjson("{'b.':'a'}").firstElement(),
+                               ModifierInterface::Options::normal()));
+        ASSERT_NOT_OK(mod.init(fromjson("{'b':'.a'}").firstElement(),
+                               ModifierInterface::Options::normal()));
+        ASSERT_NOT_OK(mod.init(fromjson("{'b':'a.'}").firstElement(),
+                               ModifierInterface::Options::normal()));
+        ASSERT_NOT_OK(mod.init(fromjson("{'a':'$a'}").firstElement(),
+                               ModifierInterface::Options::normal()));
     }
 
     TEST(MissingFrom, InitPrepLog) {
@@ -115,12 +127,14 @@ namespace {
 
     TEST(MoveOnSamePath, MoveUp) {
         ModifierRename mod;
-        ASSERT_NOT_OK(mod.init(fromjson("{'b.a':'b'}").firstElement()));
+        ASSERT_NOT_OK(mod.init(fromjson("{'b.a':'b'}").firstElement(),
+                               ModifierInterface::Options::normal()));
     }
 
     TEST(MoveOnSamePath, MoveDown) {
         ModifierRename mod;
-        ASSERT_NOT_OK(mod.init(fromjson("{'b':'b.a'}").firstElement()));
+        ASSERT_NOT_OK(mod.init(fromjson("{'b':'b.a'}").firstElement(),
+                               ModifierInterface::Options::normal()));
     }
 
     TEST(MissingTo, SimpleNumberAtRoot) {

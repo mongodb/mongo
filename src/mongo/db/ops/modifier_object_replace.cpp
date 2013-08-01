@@ -68,7 +68,7 @@ namespace mongo {
     ModifierObjectReplace::~ModifierObjectReplace() {
     }
 
-    Status ModifierObjectReplace::init(const BSONElement& modExpr) {
+    Status ModifierObjectReplace::init(const BSONElement& modExpr, const Options& opts) {
 
         if (modExpr.type() != Object) {
             return Status(ErrorCodes::BadValue, mongoutils::str::stream() <<

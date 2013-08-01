@@ -528,6 +528,8 @@ namespace mongo {
         opts.multi = multi;
         opts.upsert = upsert;
         opts.logOp = logop;
+        opts.modOptions = forReplication ? ModifierInterface::Options::fromRepl():
+                                           ModifierInterface::Options::normal();
         UpdateDriver driver( opts );
         // TODO: This copies the index keys, but we may not actually need to.
         Status status = driver.parse( nsdt->indexKeys(), updateobj );

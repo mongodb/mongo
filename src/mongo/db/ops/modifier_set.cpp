@@ -32,7 +32,8 @@ namespace mongo {
             , idxFound(0)
             , elemFound(doc.end())
             , boundDollar("")
-            , noOp(false) {
+            , noOp(false)
+            , elemIsBlocking(false) {
         }
 
         // Document that is going to be changed.
@@ -50,19 +51,23 @@ namespace mongo {
         // This $set is a no-op?
         bool noOp;
 
+        // The element we find during a replication operation that blocks our update path
+        bool elemIsBlocking;
+
     };
 
     ModifierSet::ModifierSet(ModifierSet::ModifierSetMode mode)
         : _fieldRef()
         , _posDollar(0)
         , _setMode(mode)
-        , _val() {
+        , _val()
+        , _modOptions() {
     }
 
     ModifierSet::~ModifierSet() {
     }
 
-    Status ModifierSet::init(const BSONElement& modExpr) {
+    Status ModifierSet::init(const BSONElement& modExpr, const Options& opts) {
 
         //
         // field name analysis
@@ -106,6 +111,7 @@ namespace mongo {
         }
 
         _val = modExpr;
+        _modOptions = opts;
 
         return Status::OK();
     }
@@ -139,6 +145,11 @@ namespace mongo {
         // proceed.
         if (status.code() == ErrorCodes::NonExistentPath) {
             _preparedState->elemFound = root.getDocument().end();
+        }
+        else if (_modOptions.fromReplication && status.code() == ErrorCodes::PathNotViable) {
+            // If we are coming from replication and it is an invalid path,
+            // then push on indicating that we had a blocking element, which we stopped at
+            _preparedState->elemIsBlocking = true;
         }
         else if (!status.isOK()) {
             return status;
@@ -177,10 +188,11 @@ namespace mongo {
     Status ModifierSet::apply() const {
         dassert(!_preparedState->noOp);
 
+        const bool destExists = _preparedState->elemFound.ok() &&
+                                _preparedState->idxFound == (_fieldRef.numParts()-1);
         // If there's no need to create any further field part, the $set is simply a value
         // assignment.
-        if (_preparedState->elemFound.ok() &&
-            _preparedState->idxFound == (_fieldRef.numParts()-1)) {
+        if (destExists) {
             return _preparedState->elemFound.setValueBSONElement(_val);
         }
 
@@ -205,6 +217,39 @@ namespace mongo {
         }
         else {
             _preparedState->idxFound++;
+        }
+
+        // Remove the blocking element, if we are from replication applier. See comment below.
+        if (_modOptions.fromReplication && !destExists && _preparedState->elemFound.ok() &&
+            _preparedState->elemIsBlocking &&
+            (!(_preparedState->elemFound.isType(Array)) ||
+             !(_preparedState->elemFound.isType(Object)))
+           ) {
+
+            /**
+             * With replication we want to be able to remove blocking elements for $set (only).
+             *
+             * Imagine that we started with this:
+             * {_id:1, a:1} + {$set : {"a.b.c" : 1}} -> {_id:1, a: {b: {c:1}}}
+             * Above we found that element (a:1) is blocking at position 1. We now will remove it,
+             * point to its parent as the element we found and change our position so that
+             * the normal logic below can be applied from the root (in this example case).
+             */
+
+            // keep track of the one to remove
+            mutablebson::Element toRemove = _preparedState->elemFound;
+
+            // decrement index position, and get parent for apply below
+            _preparedState->idxFound--;
+            _preparedState->elemFound = _preparedState->elemFound.parent();
+
+            if (!_preparedState->elemFound.ok())
+                return Status(ErrorCodes::IllegalOperation, "The parent is not valid.");
+
+            // remove the element and check error
+            Status ok = toRemove.remove();
+            if (!ok.isOK())
+                return ok;
         }
 
         // createPathAt() will complete the path and attach 'elemToSet' at the end of it.

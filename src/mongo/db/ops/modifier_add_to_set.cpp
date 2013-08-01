@@ -103,7 +103,7 @@ namespace mongo {
     ModifierAddToSet::~ModifierAddToSet() {
     }
 
-    Status ModifierAddToSet::init(const BSONElement& modExpr) {
+    Status ModifierAddToSet::init(const BSONElement& modExpr, const Options& opts) {
 
         // Perform standard field name and updateable checks.
         _fieldRef.parse(modExpr.fieldName());

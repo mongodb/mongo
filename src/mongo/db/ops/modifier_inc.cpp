@@ -67,7 +67,7 @@ namespace mongo {
     ModifierInc::~ModifierInc() {
     }
 
-    Status ModifierInc::init(const BSONElement& modExpr) {
+    Status ModifierInc::init(const BSONElement& modExpr, const Options& opts) {
 
         //
         // field name analysis

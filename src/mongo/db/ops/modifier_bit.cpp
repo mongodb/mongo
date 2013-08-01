@@ -66,7 +66,7 @@ namespace mongo {
     ModifierBit::~ModifierBit() {
     }
 
-    Status ModifierBit::init(const BSONElement& modExpr) {
+    Status ModifierBit::init(const BSONElement& modExpr, const Options& opts) {
 
         // Perform standard field name and updateable checks.
         _fieldRef.parse(modExpr.fieldName());
