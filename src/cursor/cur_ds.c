@@ -222,13 +222,6 @@ __curds_next(WT_CURSOR *cursor)
 	WT_CSTAT_INCR(session, cursor_next); 
 	WT_DSTAT_INCR(session, cursor_next);
 
-	/*
-	 * XXX: In the current develop branch, cursor movement explicitly
-	 * clears the all of the cursor key/value set flags.  That code
-	 * is going away soon, this line corrects for now.
-	 */
-	F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
-
 	WT_ERR(__curds_txn_enter(session, 0));
 
 	ret = source->next(source);
@@ -257,13 +250,6 @@ __curds_prev(WT_CURSOR *cursor)
 
 	WT_CSTAT_INCR(session, cursor_prev);
 	WT_DSTAT_INCR(session, cursor_prev);
-
-	/*
-	 * XXX: In the current develop branch, cursor movement explicitly
-	 * clears the all of the cursor key/value set flags.  That code
-	 * is going away soon, this line corrects for now.
-	 */
-	F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 
 	WT_ERR(__curds_txn_enter(session, 0));
 
