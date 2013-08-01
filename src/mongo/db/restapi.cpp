@@ -135,7 +135,7 @@ namespace mongo {
             while ( i.more() ) {
                 BSONElement e = i.next();
                 string name = e.fieldName();
-                if ( ! name.find( "filter_" ) == 0 )
+                if ( name.find( "filter_" ) != 0 )
                     continue;
 
                 string field = name.substr(7);
