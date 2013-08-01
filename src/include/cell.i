@@ -719,9 +719,7 @@ __wt_cell_unpack_copy(
 	 * a copy.
 	 */
 	WT_RET(__wt_cell_unpack_ref(session, type, unpack, store));
-	if (store->mem != NULL &&
-	    store->data >= store->mem &&
-	    WT_PTRDIFF(store->data, store->mem) < store->memsize)
-		return (0);
-	return (__wt_buf_set(session, store, store->data, store->size));
+	if (!WT_DATA_IN_ITEM(store))
+		WT_RET(__wt_buf_set(session, store, store->data, store->size));
+	return (0);
 }
