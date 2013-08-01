@@ -291,39 +291,48 @@ unlock(WT_EXTENSION_API *wtext, WT_SESSION *session, pthread_rwlock_t *lockp)
 }
 
 #if 0
+static int
+kvs_dump_print(uint8_t *p, size_t len)
+{
+	for (; len > 0; --len, ++p)
+		if (isalpha(*p))
+			putchar(*p);
+		else
+			printf("%#x", *p);
+}
+
 /*
  * kvs_dump --
  *	Dump the records in a KVS store.
  */
-static void
-kvs_dump(
-    WT_EXTENSION_API *wtext, WT_SESSION *session, kvs_t kvs, const char *tag)
+static int
+kvs_dump(kvs_t kvs, const char *tag)
 {
 	struct kvs_record *r, _r;
-	uint64_t recno;
-	size_t len, size;
-	uint8_t *p, key[256], val[256];
+	size_t maxbuf = 4 * 1024;
+	int ret = 0;
 
 	printf("== %s\n", tag);
 
 	r = &_r;
 	memset(r, 0, sizeof(*r));
-	r->key = key;
+	r->key = malloc(maxbuf);
 	r->key_len = 0;
-	r->val = val;
-	r->val_len = sizeof(val);
-	while (kvs_next(kvs, r, 0UL, (unsigned long)sizeof(val)) == 0) {
-		p = r->key;
-		len = r->key_len;
-		(void)wtext->struct_unpack(wtext, session, p, 10, "r", &recno);
-		(void)wtext->struct_size(wtext, session, &size, "r", recno);
-		printf("\t%" PRIu64 ": ", recno);
-		printf("%.*s/%.*s\n",
-		    (int)(len - size), p + size,
-		    (int)r->val_len, (char *)r->val);
+	r->val = malloc(maxbuf);
+	r->val_len = maxbuf;
+	while ((ret = kvs_next(kvs, r, 0UL, (unsigned long)maxbuf)) == 0) {
+		putchar('\t');
+		kvs_dump_print(r->key, r->key_len);
+		putchar('/');
+		kvs_dump_print(r->val, r->val_len);
+		putchar('\n');
 
-		r->val_len = sizeof(val);
+		r->val_len = maxbuf;
 	}
+	if (ret == KVS_E_KEY_NOT_FOUND)
+		ret = 0;
+	printf("========================== (%d)\n", ret);
+	return (ret);
 }
 #endif
 
