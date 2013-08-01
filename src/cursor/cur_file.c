@@ -19,21 +19,21 @@
 	uint32_t __key_size = (cursor)->key.size;			\
 	uint32_t __value_size = (cursor)->value.size;			\
 	if (((ret) = (f)) == 0) {					\
-		F_CLR(cursor, WT_CURSTD_KEY_APP | WT_CURSTD_VALUE_APP);	\
-		F_SET(cursor, WT_CURSTD_KEY_RET | WT_CURSTD_VALUE_RET);	\
+		F_CLR(cursor, WT_CURSTD_KEY_EXT | WT_CURSTD_VALUE_EXT);	\
+		F_SET(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);	\
 	} else if ((ret) == WT_NOTFOUND)				\
 		F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);	\
 	else {								\
-		if (F_ISSET(cursor, WT_CURSTD_KEY_APP)) {		\
+		if (F_ISSET(cursor, WT_CURSTD_KEY_EXT)) {		\
 			(cursor)->recno = __recno;			\
 			(cursor)->key.data = __key_data;		\
 			(cursor)->key.size = __key_size;		\
 		}							\
-		if (F_ISSET(cursor, WT_CURSTD_VALUE_APP)) {		\
+		if (F_ISSET(cursor, WT_CURSTD_VALUE_EXT)) {		\
 			(cursor)->value.data = __value_data;		\
 			(cursor)->value.size = __value_size;		\
 		}							\
-		F_CLR(cursor, WT_CURSTD_KEY_RET | WT_CURSTD_VALUE_RET);	\
+		F_CLR(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);	\
 	}								\
 } while (0)
 
@@ -85,7 +85,7 @@ __curfile_next(WT_CURSOR *cursor)
 
 	F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 	if ((ret = __wt_btcur_next(cbt, 0)) == 0)
-		F_SET(cursor, WT_CURSTD_KEY_RET | WT_CURSTD_VALUE_RET);
+		F_SET(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);
 
 err:	API_END(session);
 	return (ret);
@@ -108,7 +108,7 @@ __curfile_next_random(WT_CURSOR *cursor)
 
 	F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 	if ((ret = __wt_btcur_next_random(cbt)) == 0)
-		F_SET(cursor, WT_CURSTD_KEY_RET | WT_CURSTD_VALUE_RET);
+		F_SET(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);
 
 err:	API_END(session);
 	return (ret);
@@ -130,7 +130,7 @@ __curfile_prev(WT_CURSOR *cursor)
 
 	F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 	if ((ret = __wt_btcur_prev(cbt, 0)) == 0)
-		F_SET(cursor, WT_CURSTD_KEY_RET | WT_CURSTD_VALUE_RET);
+		F_SET(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);
 
 err:	API_END(session);
 	return (ret);
@@ -271,7 +271,7 @@ __curfile_remove(WT_CURSOR *cursor)
 	 * After a successful remove, copy the key: the value is not available.
 	 */
 	if (ret == 0) {
-		if (F_ISSET(cursor, WT_CURSTD_KEY_RET) &&
+		if (F_ISSET(cursor, WT_CURSTD_KEY_INT) &&
 		    !WT_DATA_IN_ITEM(&(cursor)->key))
 			WT_ERR(__wt_buf_set(session, &cursor->key,
 			    cursor->key.data, cursor->key.size));

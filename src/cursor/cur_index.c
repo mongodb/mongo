@@ -100,11 +100,11 @@ __curindex_move(WT_CURSOR_INDEX *cindex)
 			(*cp)->key.size = first->key.size;
 			(*cp)->recno = first->recno;
 		}
-		F_SET(*cp, WT_CURSTD_KEY_APP);
+		F_SET(*cp, WT_CURSTD_KEY_EXT);
 		WT_RET((*cp)->search(*cp));
 	}
 
-	F_SET(&cindex->iface, WT_CURSTD_KEY_RET | WT_CURSTD_VALUE_RET);
+	F_SET(&cindex->iface, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);
 	return (0);
 }
 
@@ -225,7 +225,7 @@ __curindex_search(WT_CURSOR *cursor)
 	WT_ERR(__curindex_move(cindex));
 
 	if (0) {
-err:		F_CLR(cursor, WT_CURSTD_KEY_RET | WT_CURSTD_VALUE_RET);
+err:		F_CLR(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);
 	}
 
 	API_END(session);
@@ -249,7 +249,7 @@ __curindex_search_near(WT_CURSOR *cursor, int *exact)
 	if ((ret = cindex->child->search_near(cindex->child, exact)) == 0)
 		ret = __curindex_move(cindex);
 	else
-		F_CLR(cursor, WT_CURSTD_KEY_RET | WT_CURSTD_VALUE_RET);
+		F_CLR(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);
 
 err:	API_END(session);
 	return (ret);
