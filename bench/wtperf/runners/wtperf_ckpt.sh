@@ -70,13 +70,13 @@ fi
 
 DB_HOME="$ROOT_DIR/WT_TEST"
 OUT_DIR="$ROOT_DIR/results"
-SHARED_OPTS="${OPTFILE} ${PERF_BASE} -R 1 -U 1 -t 1 -v 1 -h ${DB_HOME} -u table:test"
-CREATE_OPTS="$SHARED_OPTS -r 0"
-RUN_OPTS="$SHARED_OPTS -r $RUNTIME"
+SHARED_OPTS="${OPTFILE} ${PERF_BASE} -o read_threads=1,update_threads=1,report_interval=1,uri=\"table:test\" -v 1 -h ${DB_HOME}"
+CREATE_OPTS="$SHARED_OPTS -o run_time=0"
+RUN_OPTS="$SHARED_OPTS -o run_time=$RUNTIME"
 if [ $WORKLOAD -eq 0 ]; then
-	RUN_OPTS="$RUN_OPTS -e"
+	RUN_OPTS="$RUN_OPTS -o create=false"
 else
-	RUN_OPTS="$RUN_OPTS -i 0"
+	RUN_OPTS="$RUN_OPTS -o icount=0"
 fi
 
 if [ $REUSE -eq 0 ]; then
@@ -96,22 +96,22 @@ rm -rf $OUT_DIR && mkdir $OUT_DIR
 
 # Run the benchmarks..
 # for ckpt in "" "-c 120"; do
-for ckpt in "-c 120"; do
+for ckpt in "checkpoint_interval=120"; do
 	# for opts in "" "-C eviction_dirty_target=20"; do
 	for opts in ""; do
 		if [ $VERBOSE -ne 0 ]; then
 			echo "Doing a run with:"
 			echo "\t$WTPERF $RUN_OPTS $ckpt $opts"
 		fi
-		res_name="run${ckpt}${opts}"
-		res_name=`echo $res_name | tr '[:upper:][=\- ]' '[:lower:]_'`
+		res_name="run_${ckpt},${opts}"
+		res_name=`echo $res_name | tr '[:upper:][=\- ,]' '[:lower:]_'`
 		if [ $WORKLOAD -eq 0 ]; then
 			rm -rf $DB_HOME && tar zxf $ROOT_DIR/WT_TEST.tgz -C $ROOT_DIR
 		else
 			rm -rf $DB_HOME && mkdir $DB_HOME
 		fi
 		if [ "$DEBUG" = '' ]; then
-			$WTPERF $RUN_OPTS $ckpt $opts &
+			$WTPERF $RUN_OPTS -o "$ckpt" -o "$opts" &
 			pid=$!
 			t=0
 			while kill -0 $pid 2> /dev/null; do
