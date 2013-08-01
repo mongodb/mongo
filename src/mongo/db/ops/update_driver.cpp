@@ -188,11 +188,14 @@ namespace mongo {
             // If a mod wants to be applied only if this is an upsert (or only if this is a
             // strict update), we should respect that. If a mod doesn't care, it would state
             // it is fine with ANY update context.
-            bool validContext = false;
-            if (execInfo.context == ModifierInterface::ExecInfo::ANY_CONTEXT ||
-                execInfo.context == _context) {
-                validContext = true;
+            const bool validContext = (execInfo.context == ModifierInterface::ExecInfo::ANY_CONTEXT ||
+                                 execInfo.context == _context);
+
+            // Nothing to do if not in a valid context.
+            if (!validContext) {
+                continue;
             }
+
 
             // Gather which fields this mod is interested on and whether these fields were
             // "taken" by previous mods.  Note that not all mods are multi-field mods. When we
@@ -219,14 +222,13 @@ namespace mongo {
                 // TODO: make mightBeIndexed and fieldRef like each other.
                 if (!_affectIndices &&
                     !execInfo.noOp &&
-                    validContext &&
                     _indexedFields.mightBeIndexed(execInfo.fieldRef[i]->dottedField())) {
                     _affectIndices = true;
                     doc->disableInPlaceUpdates();
                 }
             }
 
-            if (!execInfo.noOp && validContext) {
+            if (!execInfo.noOp) {
                 status = (*it)->apply();
                 if (!status.isOK()) {
                     return status;
