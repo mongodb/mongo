@@ -22,7 +22,7 @@
 
 #include "mongo/db/hasher.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/record.h"
+#include "mongo/db/storage/record.h"
 #include "mongo/util/unordered_fast_key_table.h"
 
 namespace mongo {

@@ -35,7 +35,7 @@
 #include "mongo/db/query_optimizer.h"
 #include "mongo/db/query_runner.h"
 #include "mongo/db/queryutil.h"
-#include "mongo/db/record.h"
+#include "mongo/db/storage/record.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/platform/unordered_set.h"
