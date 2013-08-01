@@ -52,12 +52,18 @@ namespace mongo {
             if (!e.isABSONObj()) { continue; }
             BSONObj obj = e.Obj();
 
-            if (nearQuery.parseFrom(obj, _params.radius)) {
+            if (nearQuery.parseFrom(obj)) {
                 if (isNearQuery) {
                     return Status(ErrorCodes::BadValue, "Only one $near clause allowed: " +
                                   position.toString(), 16685);
                 }
                 isNearQuery = true;
+
+                if (nearQuery.fromRadians) {
+                    nearQuery.minDistance *= _params.radius;
+                    nearQuery.maxDistance *= _params.radius;
+                }
+
                 nearQuery.field = keyElt.fieldName();
                 continue;
             }

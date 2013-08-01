@@ -29,7 +29,7 @@
 #include "mongo/db/index/catalog_hack.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/json.h"
-#include "mongo/db/matcher.h"
+#include "mongo/db/matcher/expression_parser.h"
 #include "mongo/dbtests/dbtests.h"
 
 namespace QueryStageAnd {
@@ -93,7 +93,7 @@ namespace QueryStageAnd {
      * Invalidate a DiskLoc held by a hashed AND before the AND finishes evaluating.  The AND should
      * process all other data just fine and flag the invalidated DiskLoc in the WorkingSet.
      */
-    class AndHashInvalidation : public QueryStageAndBase {
+    class QueryStageAndHashInvalidation : public QueryStageAndBase {
     public:
         void run() {
             Client::WriteContext ctx(ns());
@@ -184,7 +184,7 @@ namespace QueryStageAnd {
 
 
     // An AND with three children.
-    class AndHashThreeLeaf : public QueryStageAndBase {
+    class QueryStageAndHashThreeLeaf : public QueryStageAndBase {
     public:
         void run() {
             Client::WriteContext ctx(ns());
@@ -232,7 +232,7 @@ namespace QueryStageAnd {
     };
 
     // An AND with an index scan that returns nothing.
-    class AndHashWithNothing : public QueryStageAndBase {
+    class QueryStageAndHashWithNothing : public QueryStageAndBase {
     public:
         void run() {
             Client::WriteContext ctx(ns());
@@ -269,7 +269,7 @@ namespace QueryStageAnd {
     };
 
     // An AND that scans data but returns nothing.
-    class AndHashProducesNothing : public QueryStageAndBase {
+    class QueryStageAndHashProducesNothing : public QueryStageAndBase {
     public:
         void run() {
             Client::WriteContext ctx(ns());
@@ -310,7 +310,7 @@ namespace QueryStageAnd {
     };
 
     // An AND that would return more data but the matcher filters it.
-    class AndHashWithMatcher : public QueryStageAndBase {
+    class QueryStageAndHashWithMatcher : public QueryStageAndBase {
     public:
         void run() {
             Client::WriteContext ctx(ns());
@@ -324,7 +324,10 @@ namespace QueryStageAnd {
 
             WorkingSet ws;
             BSONObj filter = BSON("bar" << 97);
-            scoped_ptr<AndHashStage> ah(new AndHashStage(&ws, new Matcher(filter)));
+            StatusWithMatchExpression swme = MatchExpressionParser::parse(filter);
+            verify(swme.isOK());
+            auto_ptr<MatchExpression> filterExpr(swme.getValue());
+            scoped_ptr<AndHashStage> ah(new AndHashStage(&ws, filterExpr.get()));
 
             // Foo <= 20
             IndexScanParams params;
@@ -356,7 +359,7 @@ namespace QueryStageAnd {
      * Invalidate a DiskLoc held by a sorted AND before the AND finishes evaluating.  The AND should
      * process all other data just fine and flag the invalidated DiskLoc in the WorkingSet.
      */
-    class AndSortedInvalidation : public QueryStageAndBase {
+    class QueryStageAndSortedInvalidation : public QueryStageAndBase {
     public:
         void run() {
             Client::WriteContext ctx(ns());
@@ -466,7 +469,7 @@ namespace QueryStageAnd {
 
 
     // An AND with three children.
-    class AndSortedThreeLeaf : public QueryStageAndBase {
+    class QueryStageAndSortedThreeLeaf : public QueryStageAndBase {
     public:
         void run() {
             Client::WriteContext ctx(ns());
@@ -512,7 +515,7 @@ namespace QueryStageAnd {
     };
 
     // An AND with an index scan that returns nothing.
-    class AndSortedWithNothing : public QueryStageAndBase {
+    class QueryStageAndSortedWithNothing : public QueryStageAndBase {
     public:
         void run() {
             Client::WriteContext ctx(ns());
@@ -549,7 +552,7 @@ namespace QueryStageAnd {
     };
 
     // An AND that scans data but returns nothing.
-    class AndSortedProducesNothing : public QueryStageAndBase {
+    class QueryStageAndSortedProducesNothing : public QueryStageAndBase {
     public:
         void run() {
             Client::WriteContext ctx(ns());
@@ -590,7 +593,7 @@ namespace QueryStageAnd {
     };
 
     // An AND that would return data but the matcher prevents it.
-    class AndSortedWithMatcher : public QueryStageAndBase {
+    class QueryStageAndSortedWithMatcher : public QueryStageAndBase {
     public:
         void run() {
             Client::WriteContext ctx(ns());
@@ -603,8 +606,11 @@ namespace QueryStageAnd {
             addIndex(BSON("bar" << 1));
 
             WorkingSet ws;
-            BSONObj filter = BSON("foo" << BSON("$ne" << 1));
-            scoped_ptr<AndSortedStage> ah(new AndSortedStage(&ws, new Matcher(filter)));
+            BSONObj filterObj = BSON("foo" << BSON("$ne" << 1));
+            StatusWithMatchExpression swme = MatchExpressionParser::parse(filterObj);
+            verify(swme.isOK());
+            auto_ptr<MatchExpression> filterExpr(swme.getValue());
+            scoped_ptr<AndSortedStage> ah(new AndSortedStage(&ws, filterExpr.get()));
 
             // Scan over foo == 1
             IndexScanParams params;
@@ -624,22 +630,21 @@ namespace QueryStageAnd {
         }
     };
 
-
     class All : public Suite {
     public:
         All() : Suite( "query_stage_and" ) { }
 
         void setupTests() {
-            add<AndHashInvalidation>();
-            add<AndHashThreeLeaf>();
-            add<AndHashWithNothing>();
-            add<AndHashProducesNothing>();
-            add<AndHashWithMatcher>();
-            add<AndSortedInvalidation>();
-            add<AndSortedThreeLeaf>();
-            add<AndSortedWithNothing>();
-            add<AndSortedProducesNothing>();
-            add<AndSortedWithMatcher>();
+            add<QueryStageAndHashInvalidation>();
+            add<QueryStageAndHashThreeLeaf>();
+            add<QueryStageAndHashWithNothing>();
+            add<QueryStageAndHashProducesNothing>();
+            add<QueryStageAndHashWithMatcher>();
+            add<QueryStageAndSortedInvalidation>();
+            add<QueryStageAndSortedThreeLeaf>();
+            add<QueryStageAndSortedWithNothing>();
+            add<QueryStageAndSortedProducesNothing>();
+            add<QueryStageAndSortedWithMatcher>();
         }
     }  queryStageAndAll;
 

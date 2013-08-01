@@ -31,6 +31,7 @@
 #include "mongo/db/query_optimizer.h"
 #include "mongo/db/query_optimizer_internal.h"
 #include "mongo/db/queryoptimizercursor.h"
+#include "mongo/db/query/new_find.h"
 #include "mongo/db/repl/finding_start_cursor.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/repl_reads_ok.h"
@@ -41,6 +42,11 @@
 #include "mongo/util/fail_point_service.h"
 
 namespace mongo {
+
+    /**
+     * Set in db/query/new_find.cpp.  If true, use the new query system to handle queries.
+     */
+    extern bool useNewQuerySystem;
 
     /* We cut off further objects once we cross this threshold; thus, you might get
        a little bit more than this, it is a threshold rather than a limit.
@@ -1033,6 +1039,9 @@ namespace mongo {
             uassert( 10110 , "bad query object", false);
         }
 
+        if (useNewQuerySystem) {
+            return newRunQuery(m, q, curop, result);
+        }
 
         // Run a simple id query.
         if ( ! (explain || pq.showDiskLoc()) && isSimpleIdQuery( query ) && !pq.hasOption( QueryOption_CursorTailable ) ) {

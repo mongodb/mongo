@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/query_solution.h"
 
 namespace mongo {
@@ -32,8 +33,18 @@ namespace mongo {
          *
          * Caller owns the pointers in *out.
          */
-        static void plan(const CanonicalQuery& query, vector<QuerySolution*> *out) {
-        }
+        static void plan(const CanonicalQuery& query, vector<QuerySolution*>* out);
+
+    private:
+        /**
+         * Returns true if the tree rooted at 'node' requires an index to answer the query.  There
+         * is a default solution for every plan that is a collection scan + a filter for the full
+         * query.  We can use this default solution when the query doesn't require an index.
+         *
+         * TODO: When we create plans with indices, we'll want to know which nodes require an index
+         * and what the parents of those nodes are.
+         */
+        static bool requiresIndex(const MatchExpression* node);
     };
 
 }  // namespace mongo

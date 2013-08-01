@@ -114,6 +114,11 @@ namespace mongo {
 
         virtual bool equivalent( const MatchExpression* other ) const;
 
+        virtual size_t numChildren() const { return _list.size(); }
+        virtual const ArrayMatchingMatchExpression* getChild( size_t i ) const { return _list[i]; }
+
+        const StringData& path() const { return _path; }
+
     private:
         bool _allMatch( const BSONObj& anArray ) const;
 
@@ -132,6 +137,8 @@ namespace mongo {
         virtual void debugString( StringBuilder& debug, int level ) const;
 
         virtual bool equivalent( const MatchExpression* other ) const;
+
+        int getData() const { return _size; }
 
     private:
         int _size; // >= 0 real, < 0, nothing will match

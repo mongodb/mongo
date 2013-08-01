@@ -17,12 +17,13 @@
 #include "mongo/db/exec/and_hash.h"
 
 #include "mongo/db/exec/and_common-inl.h"
+#include "mongo/db/exec/filter.h"
 #include "mongo/db/exec/working_set_common.h"
 
 namespace mongo {
 
-    AndHashStage::AndHashStage(WorkingSet* ws, Matcher* matcher)
-        : _ws(ws), _matcher(matcher), _resultIterator(_dataMap.end()),
+    AndHashStage::AndHashStage(WorkingSet* ws, const MatchExpression* filter)
+        : _ws(ws), _filter(filter), _resultIterator(_dataMap.end()),
           _shouldScanChildren(true), _currentChild(0) {}
 
     AndHashStage::~AndHashStage() {
@@ -67,7 +68,7 @@ namespace mongo {
 
         // We should check for matching at the end so the matcher can use information in the
         // indices of all our children.
-        if (NULL == _matcher || _matcher->matches(member)) {
+        if (Filter::passes(member, _filter)) {
             *out = idToReturn;
             ++_commonStats.advanced;
             return PlanStage::ADVANCED;

@@ -19,6 +19,7 @@
 
 #pragma once
 
+#include "mongo/db/geo/geonear.h"
 #include "mongo/db/geo/geoquery.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_leaf.h"
@@ -44,4 +45,25 @@ namespace mongo {
         GeoQuery _query;
     };
 
-}
+    class GeoNearMatchExpression : public LeafMatchExpression {
+    public:
+        GeoNearMatchExpression() : LeafMatchExpression( GEO_NEAR ){}
+        virtual ~GeoNearMatchExpression(){}
+
+        Status init( const StringData& path, const NearQuery& query );
+
+        // This shouldn't be called and as such will crash.  GeoNear always requires an index.
+        virtual bool matchesSingleElement( const BSONElement& e ) const;
+
+        virtual void debugString( StringBuilder& debug, int level = 0 ) const;
+
+        virtual bool equivalent( const MatchExpression* other ) const;
+
+        virtual LeafMatchExpression* shallowClone() const;
+
+        const NearQuery& getData() const { return _query; }
+    private:
+        NearQuery _query;
+    };
+
+}  // namespace mongo

@@ -27,7 +27,7 @@
 #include "mongo/db/exec/mock_stage.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/json.h"
-#include "mongo/db/matcher.h"
+#include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/util/fail_point.h"
@@ -348,9 +348,15 @@ namespace QueryStageFetch {
                 mockStage->pushBack(mockMember);
             }
 
+            // Make the filter.
+            BSONObj filterObj = BSON("foo" << 6);
+            StatusWithMatchExpression swme = MatchExpressionParser::parse(filterObj);
+            verify(swme.isOK());
+            auto_ptr<MatchExpression> filterExpr(swme.getValue());
+
             // Matcher requires that foo==6 but we only have data with foo==5.
             auto_ptr<FetchStage> fetchStage(new FetchStage(&ws, mockStage.release(),
-                                                           new Matcher(BSON("foo" << 6))));
+                                                           filterExpr.get()));
 
             // Set the fail point to return not in memory so we get a fetch request.
             FailPointRegistry* reg = getGlobalFailPointRegistry();

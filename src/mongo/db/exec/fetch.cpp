@@ -16,6 +16,7 @@
 
 #include "mongo/db/exec/fetch.h"
 
+#include "mongo/db/exec/filter.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/util/fail_point_service.h"
@@ -26,8 +27,8 @@ namespace mongo {
     MONGO_FP_DECLARE(fetchInMemoryFail);
     MONGO_FP_DECLARE(fetchInMemorySucceed);
 
-    FetchStage::FetchStage(WorkingSet* ws, PlanStage* child, Matcher* matcher)
-        : _ws(ws), _child(child), _matcher(matcher), _idBeingPagedIn(WorkingSet::INVALID_ID) { }
+    FetchStage::FetchStage(WorkingSet* ws, PlanStage* child, const MatchExpression* filter)
+        : _ws(ws), _child(child), _filter(filter), _idBeingPagedIn(WorkingSet::INVALID_ID) { }
 
     FetchStage::~FetchStage() { }
 
@@ -176,8 +177,8 @@ namespace mongo {
     PlanStage::StageState FetchStage::returnIfMatches(WorkingSetMember* member,
                                                       WorkingSetID memberID,
                                                       WorkingSetID* out) {
-        if (NULL == _matcher || _matcher->matches(member)) {
-            if (NULL != _matcher) {
+        if (Filter::passes(member, _filter)) {
+            if (NULL != _filter) {
                 ++_specificStats.matchTested;
             }
 

@@ -16,30 +16,41 @@
 
 #pragma once
 
+#include "mongo/base/status.h"
 #include "mongo/db/dbmessage.h"
+#include "mongo/db/jsobj.h"
+#include "mongo/db/matcher/expression.h"
+#include "mongo/db/parsed_query.h"
 
 namespace mongo {
 
     class CanonicalQuery {
     public:
-        // TODO: make private when this is implemented.
-        CanonicalQuery() { }
+        // TODO: qm is mutable because ParsedQuery wants it mutable.  FIX.
+        static Status canonicalize(QueryMessage& qm, CanonicalQuery** out);
 
-        static CanonicalQuery* canonicalize(const QueryMessage& qm) {
-            auto_ptr<CanonicalQuery> cq(new CanonicalQuery());
-            return cq.release();
-        }
+        // This is for testing, when we don't have a QueryMessage.
+        static Status canonicalize(const string& ns, const BSONObj& query, CanonicalQuery** out);
 
-        const string& ns() {
-            return _ns;
-        }
+        // What namespace is this query over?
+        const char* ns() const { return _pq->ns(); }
+
+        //
+        // Accessors for the query
+        //
+        MatchExpression* root() const { return _root.get(); }
+        BSONObj getQueryObj() const { return _pq->getFilter(); }
+
+        string toString() const;
 
     private:
+        // You must go through canonicalize to create a CanonicalQuery.
+        CanonicalQuery() { }
 
-        string _ns;
-        BSONObj _sort;
-        int limit;
-        // TODO: Other query arguments.
+        scoped_ptr<ParsedQuery> _pq;
+
+        // _root points into _pq->getFilter()
+        scoped_ptr<MatchExpression> _root;
     };
 
 }  // namespace mongo

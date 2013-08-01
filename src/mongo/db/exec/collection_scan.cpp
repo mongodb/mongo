@@ -18,6 +18,7 @@
 
 #include "mongo/db/exec/collection_scan_common.h"
 #include "mongo/db/exec/collection_iterator.h"
+#include "mongo/db/exec/filter.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/namespace_details.h"
 #include "mongo/db/pdfile.h"
@@ -26,10 +27,8 @@ namespace mongo {
 
     CollectionScan::CollectionScan(const CollectionScanParams& params,
                                    WorkingSet* workingSet,
-                                   Matcher* matcher) : _workingSet(workingSet),
-                                                       _matcher(matcher),
-                                                       _params(params),
-                                                       _nsDropped(false) { }
+                                   const MatchExpression* filter)
+        : _workingSet(workingSet), _filter(filter), _params(params), _nsDropped(false) { }
 
     PlanStage::StageState CollectionScan::work(WorkingSetID* out) {
         ++_commonStats.works;
@@ -62,7 +61,7 @@ namespace mongo {
         member->obj = member->loc.obj();
         member->state = WorkingSetMember::LOC_AND_UNOWNED_OBJ;
 
-        if (NULL == _matcher || _matcher->matches(member)) {
+        if (Filter::passes(member, _filter)) {
             *out = id;
             ++_commonStats.advanced;
             return PlanStage::ADVANCED;

@@ -23,7 +23,7 @@
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/json.h"
-#include "mongo/db/matcher.h"
+#include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/db/query/simple_plan_runner.h"
 #include "mongo/dbtests/dbtests.h"
@@ -142,13 +142,13 @@ namespace QueryStageCollectionScan {
         Client::Context _context;
     };
 
-    class Empty : public QueryStageCollectionScanCappedBase {
+    class QueryStageCollscanEmpty : public QueryStageCollectionScanCappedBase {
         virtual void insertTestData() {}
         virtual int expectedCount() const { return 0; }
         virtual int nExtents() const { return 0; }
     };
 
-    class EmptyLooped : public QueryStageCollectionScanCappedBase {
+    class QueryStageCollscanEmptyLooped : public QueryStageCollectionScanCappedBase {
         virtual void insertTestData() {
             nsd()->writingWithExtra()->capFirstNewRecord() = DiskLoc();
         }
@@ -156,7 +156,7 @@ namespace QueryStageCollectionScan {
         virtual int nExtents() const { return 0; }
     };
 
-    class EmptyMultiExtentLooped : public QueryStageCollectionScanCappedBase {
+    class QueryStageCollscanEmptyMultiExtentLooped : public QueryStageCollectionScanCappedBase {
         virtual void insertTestData() {
             nsd()->writingWithExtra()->capFirstNewRecord() = DiskLoc();
         }
@@ -164,7 +164,7 @@ namespace QueryStageCollectionScan {
         virtual int nExtents() const { return 3; }
     };
 
-    class Single : public QueryStageCollectionScanCappedBase {
+    class QueryStageCollscanSingle : public QueryStageCollectionScanCappedBase {
         virtual void insertTestData() {
             nsd()->writingWithExtra()->capFirstNewRecord() = insert( nsd()->capExtent(), 0 );
         }
@@ -172,7 +172,7 @@ namespace QueryStageCollectionScan {
         virtual int nExtents() const { return 0; }
     };
 
-    class NewCapFirst : public QueryStageCollectionScanCappedBase {
+    class QueryStageCollscanNewCapFirst : public QueryStageCollectionScanCappedBase {
         virtual void insertTestData() {
             DiskLoc x = insert( nsd()->capExtent(), 0 );
             nsd()->writingWithExtra()->capFirstNewRecord() = x;
@@ -182,7 +182,7 @@ namespace QueryStageCollectionScan {
         virtual int nExtents() const { return 0; }
     };
 
-    class NewCapLast : public QueryStageCollectionScanCappedBase {
+    class QueryStageCollscanNewCapLast : public QueryStageCollectionScanCappedBase {
         virtual void insertTestData() {
             insert( nsd()->capExtent(), 0 );
             nsd()->capFirstNewRecord().writing() = insert( nsd()->capExtent(), 1 );
@@ -191,7 +191,7 @@ namespace QueryStageCollectionScan {
         virtual int nExtents() const { return 0; }
     };
 
-    class NewCapMiddle : public QueryStageCollectionScanCappedBase {
+    class QueryStageCollscanNewCapMiddle : public QueryStageCollectionScanCappedBase {
         virtual void insertTestData() {
             insert( nsd()->capExtent(), 0 );
             nsd()->capFirstNewRecord().writing() = insert( nsd()->capExtent(), 1 );
@@ -201,7 +201,7 @@ namespace QueryStageCollectionScan {
         virtual int nExtents() const { return 0; }
     };
 
-    class FirstExtent : public QueryStageCollectionScanCappedBase {
+    class QueryStageCollscanFirstExtent : public QueryStageCollectionScanCappedBase {
         virtual void insertTestData() {
             insert( nsd()->capExtent(), 0 );
             insert( nsd()->lastExtent(), 1 );
@@ -212,7 +212,7 @@ namespace QueryStageCollectionScan {
         virtual int nExtents() const { return 2; }
     };
 
-    class LastExtent : public QueryStageCollectionScanCappedBase {
+    class QueryStageCollscanLastExtent : public QueryStageCollectionScanCappedBase {
         virtual void insertTestData() {
             nsd()->capExtent().writing() = nsd()->lastExtent();
             insert( nsd()->capExtent(), 0 );
@@ -224,7 +224,7 @@ namespace QueryStageCollectionScan {
         virtual int nExtents() const { return 2; }
     };
 
-    class MidExtent : public QueryStageCollectionScanCappedBase {
+    class QueryStageCollscanMidExtent : public QueryStageCollectionScanCappedBase {
         virtual void insertTestData() {
             nsd()->capExtent().writing() = nsd()->firstExtent().ext()->xnext;
             insert( nsd()->capExtent(), 0 );
@@ -237,7 +237,7 @@ namespace QueryStageCollectionScan {
         virtual int nExtents() const { return 3; }
     };
 
-    class AloneInExtent : public QueryStageCollectionScanCappedBase {
+    class QueryStageCollscanAloneInExtent : public QueryStageCollectionScanCappedBase {
         virtual void insertTestData() {
             nsd()->capExtent().writing() = nsd()->firstExtent().ext()->xnext;
             insert( nsd()->lastExtent(), 0 );
@@ -248,7 +248,7 @@ namespace QueryStageCollectionScan {
         virtual int nExtents() const { return 3; }
     };
 
-    class FirstInExtent : public QueryStageCollectionScanCappedBase {
+    class QueryStageCollscanFirstInExtent : public QueryStageCollectionScanCappedBase {
         virtual void insertTestData() {
             nsd()->capExtent().writing() = nsd()->firstExtent().ext()->xnext;
             insert( nsd()->lastExtent(), 0 );
@@ -260,7 +260,7 @@ namespace QueryStageCollectionScan {
         virtual int nExtents() const { return 3; }
     };
 
-    class LastInExtent : public QueryStageCollectionScanCappedBase {
+    class QueryStageCollscanLastInExtent : public QueryStageCollectionScanCappedBase {
         virtual void insertTestData() {
             nsd()->capExtent().writing() = nsd()->firstExtent().ext()->xnext;
             insert( nsd()->capExtent(), 0 );
@@ -297,7 +297,7 @@ namespace QueryStageCollectionScan {
             _client.remove(ns(), obj);
         }
 
-        int countResults(CollectionScanParams::Direction direction, Matcher* matcher = NULL) {
+        int countResults(CollectionScanParams::Direction direction, const BSONObj& filterObj) {
             Client::ReadContext ctx(ns());
 
             // Configure the scan.
@@ -306,9 +306,14 @@ namespace QueryStageCollectionScan {
             params.direction = direction;
             params.tailable = false;
 
+            // Make the filter.
+            StatusWithMatchExpression swme = MatchExpressionParser::parse(filterObj);
+            verify(swme.isOK());
+            auto_ptr<MatchExpression> filterExpr(swme.getValue());
+
             // Make a scan and have the runner own it.
             SimplePlanRunner runner;
-            runner.setRoot(new CollectionScan(params, runner.getWorkingSet(), matcher));
+            runner.setRoot(new CollectionScan(params, runner.getWorkingSet(), filterExpr.get()));
 
             // Use the runner to count the number of objects scanned.
             int count = 0;
@@ -349,10 +354,10 @@ namespace QueryStageCollectionScan {
     //
     // Go forwards, get everything.
     //
-    class BasicForward : public QueryStageCollectionScanBase {
+    class QueryStageCollscanBasicForward : public QueryStageCollectionScanBase {
     public:
         void run() {
-            ASSERT_EQUALS(numObj(), countResults(CollectionScanParams::FORWARD, NULL));
+            ASSERT_EQUALS(numObj(), countResults(CollectionScanParams::FORWARD, BSONObj()));
         }
     };
 
@@ -360,10 +365,10 @@ namespace QueryStageCollectionScan {
     // Go backwards, get everything.
     //
 
-    class BasicBackward : public QueryStageCollectionScanBase {
+    class QueryStageCollscanBasicBackward : public QueryStageCollectionScanBase {
     public:
         void run() {
-            ASSERT_EQUALS(numObj(), countResults(CollectionScanParams::BACKWARD, NULL));
+            ASSERT_EQUALS(numObj(), countResults(CollectionScanParams::BACKWARD, BSONObj()));
         }
     };
 
@@ -371,11 +376,11 @@ namespace QueryStageCollectionScan {
     // Go forwards and match half the docs.
     //
 
-    class BasicForwardWithMatch : public QueryStageCollectionScanBase {
+    class QueryStageCollscanBasicForwardWithMatch : public QueryStageCollectionScanBase {
     public:
         void run() {
             BSONObj obj = BSON("foo" << BSON("$lt" << 25));
-            ASSERT_EQUALS(25, countResults(CollectionScanParams::FORWARD, new Matcher(obj)));
+            ASSERT_EQUALS(25, countResults(CollectionScanParams::FORWARD, obj));
         }
     };
 
@@ -383,11 +388,11 @@ namespace QueryStageCollectionScan {
     // Go backwards and match half the docs.
     //
 
-    class BasicBackwardWithMatch : public QueryStageCollectionScanBase {
+    class QueryStageCollscanBasicBackwardWithMatch : public QueryStageCollectionScanBase {
     public:
         void run() {
             BSONObj obj = BSON("foo" << BSON("$lt" << 25));
-            ASSERT_EQUALS(25, countResults(CollectionScanParams::BACKWARD, new Matcher(obj)));
+            ASSERT_EQUALS(25, countResults(CollectionScanParams::BACKWARD, obj));
         }
     };
 
@@ -395,7 +400,7 @@ namespace QueryStageCollectionScan {
     // Get objects in the order we inserted them.
     //
 
-    class ObjectsInOrderForward : public QueryStageCollectionScanBase {
+    class QueryStageCollscanObjectsInOrderForward : public QueryStageCollectionScanBase {
     public:
         void run() {
             Client::ReadContext ctx(ns());
@@ -425,7 +430,7 @@ namespace QueryStageCollectionScan {
     // Get objects in the reverse order we inserted them when we go backwards.
     //
 
-    class ObjectsInOrderBackward : public QueryStageCollectionScanBase {
+    class QueryStageCollscanObjectsInOrderBackward : public QueryStageCollectionScanBase {
     public:
         void run() {
             Client::ReadContext ctx(ns());
@@ -453,7 +458,7 @@ namespace QueryStageCollectionScan {
     // "next" object we would have gotten after that.
     //
 
-    class InvalidateUpcomingObject : public QueryStageCollectionScanBase {
+    class QueryStageCollscanInvalidateUpcomingObject : public QueryStageCollectionScanBase {
     public:
         void run() {
             Client::WriteContext ctx(ns());
@@ -511,7 +516,7 @@ namespace QueryStageCollectionScan {
     // "next" object we would have gotten after that.  But, do it in reverse!
     //
 
-    class InvalidateUpcomingObjectBackward : public QueryStageCollectionScanBase {
+    class QueryStageCollscanInvalidateUpcomingObjectBackward : public QueryStageCollectionScanBase {
     public:
         void run() {
             Client::WriteContext ctx(ns());
@@ -563,34 +568,35 @@ namespace QueryStageCollectionScan {
             ASSERT_EQUALS(numObj(), count);
         }
     };
+
     class All : public Suite {
     public:
         All() : Suite( "QueryStageCollectionScan" ) {}
 
         void setupTests() {
             // These tests are ported from pdfile.cpp
-            add<Empty>();
-            add<EmptyLooped>();
-            add<EmptyMultiExtentLooped>();
-            add<Single>();
-            add<NewCapFirst>();
-            add<NewCapLast>();
-            add<NewCapMiddle>();
-            add<FirstExtent>();
-            add<LastExtent>();
-            add<MidExtent>();
-            add<AloneInExtent>();
-            add<FirstInExtent>();
-            add<LastInExtent>();
+            add<QueryStageCollscanEmpty>();
+            add<QueryStageCollscanEmptyLooped>();
+            add<QueryStageCollscanEmptyMultiExtentLooped>();
+            add<QueryStageCollscanSingle>();
+            add<QueryStageCollscanNewCapFirst>();
+            add<QueryStageCollscanNewCapLast>();
+            add<QueryStageCollscanNewCapMiddle>();
+            add<QueryStageCollscanFirstExtent>();
+            add<QueryStageCollscanLastExtent>();
+            add<QueryStageCollscanMidExtent>();
+            add<QueryStageCollscanAloneInExtent>();
+            add<QueryStageCollscanFirstInExtent>();
+            add<QueryStageCollscanLastInExtent>();
             // These are not.  Stage-specific tests below.
-            add<BasicForward>();
-            add<BasicBackward>();
-            add<BasicForwardWithMatch>();
-            add<BasicBackwardWithMatch>();
-            add<ObjectsInOrderForward>();
-            add<ObjectsInOrderBackward>();
-            add<InvalidateUpcomingObject>();
-            add<InvalidateUpcomingObjectBackward>();
+            add<QueryStageCollscanBasicForward>();
+            add<QueryStageCollscanBasicBackward>();
+            add<QueryStageCollscanBasicForwardWithMatch>();
+            add<QueryStageCollscanBasicBackwardWithMatch>();
+            add<QueryStageCollscanObjectsInOrderForward>();
+            add<QueryStageCollscanObjectsInOrderBackward>();
+            add<QueryStageCollscanInvalidateUpcomingObject>();
+            add<QueryStageCollscanInvalidateUpcomingObjectBackward>();
         }
     } all;
 
