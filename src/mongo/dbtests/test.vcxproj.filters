@@ -2817,6 +2817,9 @@
     <ClInclude Include="..\db\query\stage_builder.h">
       <Filter>db\query</Filter>
     </ClInclude>
+    <ClInclude Include="..\db\query\index_bounds.h">
+      <Filter>db\query</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\client\connpool.cpp">
@@ -5414,6 +5417,12 @@
       <Filter>db\auth</Filter>
     </ClCompile>
     <ClCompile Include="..\db\query\new_find.cpp">
+      <Filter>db\query</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\query\index_bounds.cpp">
+      <Filter>db\query</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\query\index_bounds_test.cpp">
       <Filter>db\query</Filter>
     </ClCompile>
   </ItemGroup>
