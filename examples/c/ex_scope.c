@@ -100,7 +100,7 @@ cursor_scope_ops(WT_CURSOR *cursor)
 		 */
 
 		/* Check that the cursor's key and value are what we expect. */
-		if (key == keybuf || 
+		if (key == keybuf ||
 		    (op->apply != cursor->remove &&
 		    value == valuebuf)) {
 			fprintf(stderr,
