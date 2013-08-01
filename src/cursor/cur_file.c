@@ -81,7 +81,9 @@ __curfile_next(WT_CURSOR *cursor)
 	cbt = (WT_CURSOR_BTREE *)cursor;
 	CURSOR_API_CALL(cursor, session, next, cbt->btree);
 
-	WT_BTREE_CURSOR_SAVE_AND_RESTORE(cursor, __wt_btcur_next(cbt, 0), ret);
+	F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
+	if ((ret = __wt_btcur_next(cbt, 0)) == 0)
+		F_SET(cursor, WT_CURSTD_KEY_RET | WT_CURSTD_VALUE_RET);
 
 err:	API_END(session);
 	return (ret);
@@ -102,8 +104,9 @@ __curfile_next_random(WT_CURSOR *cursor)
 	cbt = (WT_CURSOR_BTREE *)cursor;
 	CURSOR_API_CALL(cursor, session, next, cbt->btree);
 
-	WT_BTREE_CURSOR_SAVE_AND_RESTORE(
-	    cursor, __wt_btcur_next_random(cbt), ret);
+	F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
+	if ((ret = __wt_btcur_next_random(cbt)) == 0)
+		F_SET(cursor, WT_CURSTD_KEY_RET | WT_CURSTD_VALUE_RET);
 
 err:	API_END(session);
 	return (ret);
@@ -123,7 +126,9 @@ __curfile_prev(WT_CURSOR *cursor)
 	cbt = (WT_CURSOR_BTREE *)cursor;
 	CURSOR_API_CALL(cursor, session, prev, cbt->btree);
 
-	WT_BTREE_CURSOR_SAVE_AND_RESTORE(cursor, __wt_btcur_prev(cbt, 0), ret);
+	F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
+	if ((ret = __wt_btcur_prev(cbt, 0)) == 0)
+		F_SET(cursor, WT_CURSTD_KEY_RET | WT_CURSTD_VALUE_RET);
 
 err:	API_END(session);
 	return (ret);
