@@ -1073,6 +1073,9 @@ def doConfigure(myenv):
         # including at least g++-4.6.
         AddToCCFLAGSIfSupported(myenv, "-Wno-deprecated-declarations")
 
+        # As of clang-3.4, this warning appears in v8, and gets escalated to an error.
+        AddToCCFLAGSIfSupported(myenv, "-Wno-tautological-constant-out-of-range-compare")
+
     if has_option('c++11'):
         # The Microsoft compiler does not need a switch to enable C++11. Again we should be
         # checking for MSVC, not windows. In theory, we might be using clang or icc on windows.
