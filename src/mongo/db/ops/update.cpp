@@ -826,6 +826,10 @@ namespace mongo {
             debug.fastmodinsert = true;
         }
         else {
+            // Copy the _id
+            if (patternOrig.hasElement("_id")) {
+                oldObj = patternOrig.getField("_id").wrap();
+            }
             debug.upsert = true;
         }
 
