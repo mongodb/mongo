@@ -71,7 +71,7 @@ namespace mongo {
     ModifierPull::~ModifierPull() {
     }
 
-    Status ModifierPull::init(const BSONElement& modExpr) {
+    Status ModifierPull::init(const BSONElement& modExpr, const Options& opts) {
         // Perform standard field name and updateable checks.
         _fieldRef.parse(modExpr.fieldName());
         Status status = fieldchecker::isUpdatable(_fieldRef);

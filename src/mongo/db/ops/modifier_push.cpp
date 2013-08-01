@@ -184,7 +184,7 @@ namespace mongo {
     ModifierPush::~ModifierPush() {
     }
 
-    Status ModifierPush::init(const BSONElement& modExpr) {
+    Status ModifierPush::init(const BSONElement& modExpr, const Options& opts) {
 
         //
         // field name analysis

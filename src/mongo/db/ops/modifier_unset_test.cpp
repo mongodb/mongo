@@ -48,7 +48,8 @@ namespace {
 
         explicit Mod(BSONObj modObj) {
             _modObj = modObj;
-            ASSERT_OK(_mod.init(_modObj["$unset"].embeddedObject().firstElement()));
+            ASSERT_OK(_mod.init(_modObj["$unset"].embeddedObject().firstElement(),
+                                ModifierInterface::Options::normal()));
         }
 
         Status prepare(Element root,

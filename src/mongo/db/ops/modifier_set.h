@@ -49,7 +49,7 @@ namespace mongo {
          * assigned to it from 'modExpr'. It returns OK if successful or a status describing
          * the error.
          */
-        virtual Status init(const BSONElement& modExpr);
+        virtual Status init(const BSONElement& modExpr, const Options& opts);
 
         /**
          * Looks up the field name in the sub-tree rooted at 'root', and binds, if necessary,
@@ -87,6 +87,9 @@ namespace mongo {
 
         // Element of the $set expression.
         BSONElement _val;
+
+        // See the class comments in modifier_interface.h
+        ModifierInterface::Options _modOptions;
 
         // The instance of the field in the provided doc. This state is valid after a
         // prepare() was issued and until a log() is issued. The document this mod is

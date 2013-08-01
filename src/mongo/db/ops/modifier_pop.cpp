@@ -60,7 +60,7 @@ namespace mongo {
     ModifierPop::~ModifierPop() {
     }
 
-    Status ModifierPop::init(const BSONElement& modExpr) {
+    Status ModifierPop::init(const BSONElement& modExpr, const Options& opts) {
         //
         // field name analysis
         //

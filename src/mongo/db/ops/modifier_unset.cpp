@@ -60,7 +60,7 @@ namespace mongo {
     ModifierUnset::~ModifierUnset() {
     }
 
-    Status ModifierUnset::init(const BSONElement& modExpr) {
+    Status ModifierUnset::init(const BSONElement& modExpr, const Options& opts) {
 
         //
         // field name analysis

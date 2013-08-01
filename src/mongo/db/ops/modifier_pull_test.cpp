@@ -46,7 +46,8 @@ namespace {
         explicit Mod(BSONObj modObj)
             : _modObj(modObj)
             , _mod() {
-            ASSERT_OK(_mod.init(_modObj["$pull"].embeddedObject().firstElement()));
+            ASSERT_OK(_mod.init(_modObj["$pull"].embeddedObject().firstElement(),
+                                ModifierInterface::Options::normal()));
         }
 
         Status prepare(Element root,

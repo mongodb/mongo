@@ -42,7 +42,7 @@ namespace mongo {
          * assigned to it from 'modExpr'. It returns OK if successful or a status describing
          * the error.
          */
-        virtual Status init(const BSONElement& modExpr);
+        virtual Status init(const BSONElement& modExpr, const Options& opts);
 
         /** Evaluates the validity of applying $inc to the identified node, and computes
          *  effects, handling upcasting and overflow as necessary.

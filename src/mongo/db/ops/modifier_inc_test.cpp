@@ -51,7 +51,8 @@ namespace {
         explicit Mod(BSONObj modObj)
             : _modObj(modObj)
             , _mod() {
-            ASSERT_OK(_mod.init(_modObj["$inc"].embeddedObject().firstElement()));
+            ASSERT_OK(_mod.init(_modObj["$inc"].embeddedObject().firstElement(),
+                                ModifierInterface::Options::normal()));
         }
 
         Status prepare(Element root,
@@ -81,15 +82,18 @@ namespace {
 
         // String is an invalid increment argument
         modObj = fromjson("{ $inc : { a : '' } }");
-        ASSERT_NOT_OK(mod.init(modObj["$inc"].embeddedObject().firstElement()));
+        ASSERT_NOT_OK(mod.init(modObj["$inc"].embeddedObject().firstElement(),
+                               ModifierInterface::Options::normal()));
 
         // Object is an invalid increment argument
         modObj = fromjson("{ $inc : { a : {} } }");
-        ASSERT_NOT_OK(mod.init(modObj["$inc"].embeddedObject().firstElement()));
+        ASSERT_NOT_OK(mod.init(modObj["$inc"].embeddedObject().firstElement(),
+                               ModifierInterface::Options::normal()));
 
         // Array is an invalid increment argument
         modObj = fromjson("{ $inc : { a : [] } }");
-        ASSERT_NOT_OK(mod.init(modObj["$inc"].embeddedObject().firstElement()));
+        ASSERT_NOT_OK(mod.init(modObj["$inc"].embeddedObject().firstElement(),
+                               ModifierInterface::Options::normal()));
     }
 
     TEST(Init, InitParsesNumberInt) {

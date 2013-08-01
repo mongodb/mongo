@@ -118,13 +118,15 @@ namespace {
     TEST(Init, SimplePush) {
         BSONObj modObj = fromjson("{$push: {x: 0}}");
         ModifierPush mod;
-        ASSERT_OK(mod.init(modObj["$push"].embeddedObject().firstElement()));
+        ASSERT_OK(mod.init(modObj["$push"].embeddedObject().firstElement(),
+                           ModifierInterface::Options::normal()));
     }
 
     TEST(Init, SimplePushNotOkForStorage) {
         BSONObj modObj = fromjson("{$push: {$inc: {x: 1}}}");
         ModifierPush mod;
-        ASSERT_NOT_OK(mod.init(modObj["$push"].embeddedObject().firstElement()));
+        ASSERT_NOT_OK(mod.init(modObj["$push"].embeddedObject().firstElement(),
+                               ModifierInterface::Options::normal()));
     }
 
     //
@@ -134,27 +136,31 @@ namespace {
     TEST(Init, PushEachNormal) {
         BSONObj modObj = fromjson("{$push: {x: {$each: [1, 2]}}}");
         ModifierPush mod;
-        ASSERT_OK(mod.init(modObj["$push"].embeddedObject().firstElement()));
+        ASSERT_OK(mod.init(modObj["$push"].embeddedObject().firstElement(),
+                           ModifierInterface::Options::normal()));
     }
 
     TEST(Init, PushEachMixed) {
         BSONObj modObj = fromjson("{$push: {x: {$each: [1, {a: 2}]}}}");
         ModifierPush mod;
-        ASSERT_OK(mod.init(modObj["$push"].embeddedObject().firstElement()));
+        ASSERT_OK(mod.init(modObj["$push"].embeddedObject().firstElement(),
+                           ModifierInterface::Options::normal()));
     }
 
     TEST(Init, PushEachObject) {
         // $each must be an array
         BSONObj modObj = fromjson("{$push: {x: {$each: {'0': 1}}}}");
         ModifierPush mod;
-        ASSERT_NOT_OK(mod.init(modObj["$push"].embeddedObject().firstElement()));
+        ASSERT_NOT_OK(mod.init(modObj["$push"].embeddedObject().firstElement(),
+                               ModifierInterface::Options::normal()));
     }
 
     TEST(Init, PushEachSimpleType) {
         // $each must be an array.
         BSONObj modObj = fromjson("{$push: {x: {$each: 1}}}");
         ModifierPush mod;
-        ASSERT_NOT_OK(mod.init(modObj["$push"].embeddedObject().firstElement()));
+        ASSERT_NOT_OK(mod.init(modObj["$push"].embeddedObject().firstElement(),
+                               ModifierInterface::Options::normal()));
     }
 
     // TODO Should we check this? We currently don't.
@@ -162,27 +168,31 @@ namespace {
     //     // Push does not create structure; so dotted fields are invalid
     //     BSONObj modObj = fromjson("{$push: {x: {$each: [{'a.b': 1}]}}}}");
     //     ModifierPush mod;
-    //     ASSERT_NOT_OK(mod.init(modObj["$push"].embeddedObject().firstElement()));
+    //     ASSERT_NOT_OK(mod.init(modObj["$push"].embeddedObject().firstElement(),
+    //                            ModifierInterface::Options::normal()));
     // }
 
     TEST(Init, PushEachEmpty) {
         BSONObj modObj = fromjson("{$push: {x: {$each: []}}}");
         ModifierPush mod;
-        ASSERT_OK(mod.init(modObj["$push"].embeddedObject().firstElement()));
+        ASSERT_OK(mod.init(modObj["$push"].embeddedObject().firstElement(),
+                           ModifierInterface::Options::normal()));
     }
 
     TEST(Init, PushEachWithNotOkForStorage) {
         // $each items shouldn't contain '$' in field names.
         BSONObj modObj = fromjson("{$push: {x: {$each: [{$inc: {b: 1}}]}}}");
         ModifierPush mod;
-        ASSERT_NOT_OK(mod.init(modObj["$push"].embeddedObject().firstElement()));
+        ASSERT_NOT_OK(mod.init(modObj["$push"].embeddedObject().firstElement(),
+                               ModifierInterface::Options::normal()));
     }
 
     TEST(Init, PushEachInvalidType) {
         // $each must be an array.
         BSONObj modObj = fromjson("{$push: {x: {$each: {b: 1}}}}");
         ModifierPush mod;
-        ASSERT_NOT_OK(mod.init(modObj["$push"].embeddedObject().firstElement()));
+        ASSERT_NOT_OK(mod.init(modObj["$push"].embeddedObject().firstElement(),
+                               ModifierInterface::Options::normal()));
     }
 
     //
@@ -192,43 +202,50 @@ namespace {
     TEST(Init, PushEachWithSlice) {
         BSONObj modObj = fromjson("{$push: {x: {$each: [1, 2], $slice: -3}}}");
         ModifierPush mod;
-        ASSERT_OK(mod.init(modObj["$push"].embeddedObject().firstElement()));
+        ASSERT_OK(mod.init(modObj["$push"].embeddedObject().firstElement(),
+                           ModifierInterface::Options::normal()));
     }
 
     TEST(Init, PushEachWithInvalidSliceObject) {
         BSONObj modObj = fromjson("{$push: {x: {$each: [1, 2], $slice: {a: 1}}}}");
         ModifierPush mod;
-        ASSERT_NOT_OK(mod.init(modObj["$push"].embeddedObject().firstElement()));
+        ASSERT_NOT_OK(mod.init(modObj["$push"].embeddedObject().firstElement(),
+                               ModifierInterface::Options::normal()));
     }
 
     TEST(Init, PushEachWithInvalidSliceDouble) {
         BSONObj modObj = fromjson("{$push: {x: {$each: [1, 2], $slice: -2.1}}}");
         ModifierPush mod;
-        ASSERT_NOT_OK(mod.init(modObj["$push"].embeddedObject().firstElement()));
+        ASSERT_NOT_OK(mod.init(modObj["$push"].embeddedObject().firstElement(),
+                               ModifierInterface::Options::normal()));
     }
 
     TEST(Init, PushEachWithValidSliceDouble) {
         BSONObj modObj = fromjson("{$push: {x: {$each: [1, 2], $slice: -2.0}}}");
         ModifierPush mod;
-        ASSERT_OK(mod.init(modObj["$push"].embeddedObject().firstElement()));
+        ASSERT_OK(mod.init(modObj["$push"].embeddedObject().firstElement(),
+                           ModifierInterface::Options::normal()));
     }
 
     TEST(Init, PushEachWithUnsupportedPositiveSlice) {
         BSONObj modObj = fromjson("{$push: {x: {$each: [1, 2], $slice: 3}}}");
         ModifierPush mod;
-        ASSERT_NOT_OK(mod.init(modObj["$push"].embeddedObject().firstElement()));
+        ASSERT_NOT_OK(mod.init(modObj["$push"].embeddedObject().firstElement(),
+                               ModifierInterface::Options::normal()));
     }
 
     TEST(Init, PushEachWithUnsupportedFullSlice) {
         BSONObj modObj = fromjson("{$push: {x: {$each: [1, 2], $slice: [1,2]}}}");
         ModifierPush mod;
-        ASSERT_NOT_OK(mod.init(modObj["$push"].embeddedObject().firstElement()));
+        ASSERT_NOT_OK(mod.init(modObj["$push"].embeddedObject().firstElement(),
+                               ModifierInterface::Options::normal()));
     }
 
     TEST(Init, PushEachWithWrongTypeSlice) {
         BSONObj modObj = fromjson("{$push: {x: {$each: [1, 2], $slice: '-1'}}}");
         ModifierPush mod;
-        ASSERT_NOT_OK(mod.init(modObj["$push"].embeddedObject().firstElement()));
+        ASSERT_NOT_OK(mod.init(modObj["$push"].embeddedObject().firstElement(),
+                               ModifierInterface::Options::normal()));
     }
 
     //
@@ -239,77 +256,88 @@ namespace {
         const char* c = "{$push: {x: {$each: [{a:1},{a:2}], $slice: -2.0, $sort: {a:1}}}}";
         BSONObj modObj = fromjson(c);
         ModifierPush mod;
-        ASSERT_OK(mod.init(modObj["$push"].embeddedObject().firstElement()));
+        ASSERT_OK(mod.init(modObj["$push"].embeddedObject().firstElement(),
+                           ModifierInterface::Options::normal()));
     }
 
     TEST(Init, PushEachWithInvalidSortType) {
         const char* c = "{$push: {x: {$each: [{a:1},{a:2}], $slice: -2.0, $sort: [{a:1}]}}}";
         BSONObj modObj = fromjson(c);
         ModifierPush mod;
-        ASSERT_NOT_OK(mod.init(modObj["$push"].embeddedObject().firstElement()));
+        ASSERT_NOT_OK(mod.init(modObj["$push"].embeddedObject().firstElement(),
+                               ModifierInterface::Options::normal()));
     }
 
     TEST(Init, PushEachDuplicateSortPattern) {
         const char* c = "{$push: {x: {$each: [{a:1},{a:2}], $slice: -2.0, $sort: [{a:1,a:1}]}}}";
         BSONObj modObj = fromjson(c);
         ModifierPush mod;
-        ASSERT_NOT_OK(mod.init(modObj["$push"].embeddedObject().firstElement()));
+        ASSERT_NOT_OK(mod.init(modObj["$push"].embeddedObject().firstElement(),
+                               ModifierInterface::Options::normal()));
     }
 
     TEST(Init, PushEachWithInvalidSortValue) {
         const char* c = "{$push: {x: {$each: [{a:1},{a:2}], $slice: -2.0, $sort: {a:100}}}}";
         BSONObj modObj = fromjson(c);
         ModifierPush mod;
-        ASSERT_NOT_OK(mod.init(modObj["$push"].embeddedObject().firstElement()));
+        ASSERT_NOT_OK(mod.init(modObj["$push"].embeddedObject().firstElement(),
+                               ModifierInterface::Options::normal()));
     }
 
     TEST(Init, PushEachWithEmptySortField) {
         const char* c = "{$push: {x: {$each: [{a:1},{a:2}], $slice: -2.0, $sort: {'':1}}}}";
         BSONObj modObj = fromjson(c);
         ModifierPush mod;
-        ASSERT_NOT_OK(mod.init(modObj["$push"].embeddedObject().firstElement()));
+        ASSERT_NOT_OK(mod.init(modObj["$push"].embeddedObject().firstElement(),
+                               ModifierInterface::Options::normal()));
     }
 
     TEST(Init, PushEachWithEmptyDottedSortField) {
         const char* c = "{$push: {x: {$each: [{a:1},{a:2}], $slice: -2.0, $sort: {'.':1}}}}";
         BSONObj modObj = fromjson(c);
         ModifierPush mod;
-        ASSERT_NOT_OK(mod.init(modObj["$push"].embeddedObject().firstElement()));
+        ASSERT_NOT_OK(mod.init(modObj["$push"].embeddedObject().firstElement(),
+                               ModifierInterface::Options::normal()));
     }
 
     TEST(Init, PushEachWithMissingSortFieldSuffix) {
         const char* c = "{$push: {x: {$each: [{a:1},{a:2}], $slice: -2.0, $sort: {'a.':1}}}}";
         BSONObj modObj = fromjson(c);
         ModifierPush mod;
-        ASSERT_NOT_OK(mod.init(modObj["$push"].embeddedObject().firstElement()));
+        ASSERT_NOT_OK(mod.init(modObj["$push"].embeddedObject().firstElement(),
+                               ModifierInterface::Options::normal()));
     }
 
     TEST(Init, PushEachWithMissingSortFieldPreffix) {
         const char* c = "{$push: {x: {$each: [{a:1},{a:2}], $slice: -2.0, $sort: {'.b':1}}}}";
         BSONObj modObj = fromjson(c);
         ModifierPush mod;
-        ASSERT_NOT_OK(mod.init(modObj["$push"].embeddedObject().firstElement()));
+        ASSERT_NOT_OK(mod.init(modObj["$push"].embeddedObject().firstElement(),
+                               ModifierInterface::Options::normal()));
     }
 
     TEST(Init, PushEachWithMissingSortFieldMiddle) {
         const char* c = "{$push: {x: {$each: [{a:1},{a:2}], $slice: -2.0, $sort: {'a..b':1}}}}";
         BSONObj modObj = fromjson(c);
         ModifierPush mod;
-        ASSERT_NOT_OK(mod.init(modObj["$push"].embeddedObject().firstElement()));
+        ASSERT_NOT_OK(mod.init(modObj["$push"].embeddedObject().firstElement(),
+                               ModifierInterface::Options::normal()));
     }
 
     TEST(Init, PushEachWithUnsupportedSort) {
         const char* c = "{$push: {x: {$each: [{a:1},{a:2}], $slice: -2.0, $sort:1 }}}";
         BSONObj modObj = fromjson(c);
         ModifierPush mod;
-        ASSERT_NOT_OK(mod.init(modObj["$push"].embeddedObject().firstElement()));
+        ASSERT_NOT_OK(mod.init(modObj["$push"].embeddedObject().firstElement(),
+                               ModifierInterface::Options::normal()));
     }
 
     TEST(Init, PushEachWithEmptySort) {
         const char* c = "{$push: {x: {$each: [{a:1},{a:2}], $slice: -2.0, $sort:{} }}}";
         BSONObj modObj = fromjson(c);
         ModifierPush mod;
-        ASSERT_NOT_OK(mod.init(modObj["$push"].embeddedObject().firstElement()));
+        ASSERT_NOT_OK(mod.init(modObj["$push"].embeddedObject().firstElement(),
+                               ModifierInterface::Options::normal()));
     }
 
     //
@@ -319,37 +347,43 @@ namespace {
     TEST(Init, PushAllSimple) {
         BSONObj modObj = fromjson("{$pushAll: {x: [0]}}");
         ModifierPush mod(ModifierPush::PUSH_ALL);
-        ASSERT_OK(mod.init(modObj["$pushAll"].embeddedObject().firstElement()));
+        ASSERT_OK(mod.init(modObj["$pushAll"].embeddedObject().firstElement(),
+                           ModifierInterface::Options::normal()));
     }
 
     TEST(Init, PushAllMultiple) {
         BSONObj modObj = fromjson("{$pushAll: {x: [1,2,3]}}");
         ModifierPush mod(ModifierPush::PUSH_ALL);
-        ASSERT_OK(mod.init(modObj["$pushAll"].embeddedObject().firstElement()));
+        ASSERT_OK(mod.init(modObj["$pushAll"].embeddedObject().firstElement(),
+                           ModifierInterface::Options::normal()));
     }
 
     TEST(Init, PushAllObject) {
         BSONObj modObj = fromjson("{$pushAll: {x: [{a:1},{a:2}]}}");
         ModifierPush mod(ModifierPush::PUSH_ALL);
-        ASSERT_OK(mod.init(modObj["$pushAll"].embeddedObject().firstElement()));
+        ASSERT_OK(mod.init(modObj["$pushAll"].embeddedObject().firstElement(),
+                           ModifierInterface::Options::normal()));
     }
 
     TEST(Init, PushAllMixed) {
         BSONObj modObj = fromjson("{$pushAll: {x: [1,{a:2}]}}");
         ModifierPush mod(ModifierPush::PUSH_ALL);
-        ASSERT_OK(mod.init(modObj["$pushAll"].embeddedObject().firstElement()));
+        ASSERT_OK(mod.init(modObj["$pushAll"].embeddedObject().firstElement(),
+                           ModifierInterface::Options::normal()));
     }
 
     TEST(Init, PushAllWrongType) {
         BSONObj modObj = fromjson("{$pushAll: {x: 1}}");
         ModifierPush mod(ModifierPush::PUSH_ALL);
-        ASSERT_NOT_OK(mod.init(modObj["$pushAll"].embeddedObject().firstElement()));
+        ASSERT_NOT_OK(mod.init(modObj["$pushAll"].embeddedObject().firstElement(),
+                               ModifierInterface::Options::normal()));
     }
 
     TEST(Init, PushAllNotArray) {
         BSONObj modObj = fromjson("{$pushAll: {x: {a:1}}}");
         ModifierPush mod(ModifierPush::PUSH_ALL);
-        ASSERT_NOT_OK(mod.init(modObj["$pushAll"].embeddedObject().firstElement()));
+        ASSERT_NOT_OK(mod.init(modObj["$pushAll"].embeddedObject().firstElement(),
+                               ModifierInterface::Options::normal()));
     }
 
     //
@@ -360,56 +394,64 @@ namespace {
         const char* c = "{$push: {x: {$each: [{a:1},{a:2}], $sort:{a:1}}}}";
         BSONObj modObj = fromjson(c);
         ModifierPush mod;
-        ASSERT_NOT_OK(mod.init(modObj["$push"].embeddedObject().firstElement()));
+        ASSERT_NOT_OK(mod.init(modObj["$push"].embeddedObject().firstElement(),
+                               ModifierInterface::Options::normal()));
     }
 
     TEST(Init, PushEachInvalidClause) {
         const char* c = "{$push: {x: {$each: [{a:1},{a:2}], $xxx: -1, $sort:{a:1}}}}";
         BSONObj modObj = fromjson(c);
         ModifierPush mod;
-        ASSERT_NOT_OK(mod.init(modObj["$push"].embeddedObject().firstElement()));
+        ASSERT_NOT_OK(mod.init(modObj["$push"].embeddedObject().firstElement(),
+                               ModifierInterface::Options::normal()));
     }
 
     TEST(Init, PushEachExtraField) {
         const char* c = "{$push: {x: {$each: [{a:1},{a:2}], $slice: -2.0, $sort: {a:1}, b: 1}}}";
         BSONObj modObj = fromjson(c);
         ModifierPush mod;
-        ASSERT_NOT_OK(mod.init(modObj["$push"].embeddedObject().firstElement()));
+        ASSERT_NOT_OK(mod.init(modObj["$push"].embeddedObject().firstElement(),
+                               ModifierInterface::Options::normal()));
     }
 
     TEST(Init, PushEachDuplicateSortClause) {
         const char* c = "{$push: {x:{$each:[{a:1},{a:2}], $slice:-2.0, $sort:{a:1}, $sort:{a:1}}}}";
         BSONObj modObj = fromjson(c);
         ModifierPush mod;
-        ASSERT_NOT_OK(mod.init(modObj["$push"].embeddedObject().firstElement()));
+        ASSERT_NOT_OK(mod.init(modObj["$push"].embeddedObject().firstElement(),
+                               ModifierInterface::Options::normal()));
     }
 
     TEST(Init, PushEachDuplicateSliceClause) {
         const char* c = "{$push: {x: {$each:[{a:1},{a:2}], $slice:-2.0, $slice:-2, $sort:{a:1}}}}";
         BSONObj modObj = fromjson(c);
         ModifierPush mod;
-        ASSERT_NOT_OK(mod.init(modObj["$push"].embeddedObject().firstElement()));
+        ASSERT_NOT_OK(mod.init(modObj["$push"].embeddedObject().firstElement(),
+                               ModifierInterface::Options::normal()));
     }
 
     TEST(Init, PushEachDuplicateEachClause) {
         const char* c = "{$push: {x: {$each:[{a:1}], $each:[{a:2}], $slice:-3, $sort:{a:1}}}}";
         BSONObj modObj = fromjson(c);
         ModifierPush mod;
-        ASSERT_NOT_OK(mod.init(modObj["$push"].embeddedObject().firstElement()));
+        ASSERT_NOT_OK(mod.init(modObj["$push"].embeddedObject().firstElement(),
+                               ModifierInterface::Options::normal()));
     }
 
     TEST(Init, PushEachWithSliceFirst) {
         const char* c = "{$push: {x: {$slice: -2.0, $each: [{a:1},{a:2}], $sort: {a:1}}}}";
         BSONObj modObj = fromjson(c);
         ModifierPush mod;
-        ASSERT_OK(mod.init(modObj["$push"].embeddedObject().firstElement()));
+        ASSERT_OK(mod.init(modObj["$push"].embeddedObject().firstElement(),
+                           ModifierInterface::Options::normal()));
     }
 
     TEST(Init, PushEachWithSortFirst) {
         const char* c = "{$push: {x: {$sort: {a:1}, $slice: -2.0, $each: [{a:1},{a:2}]}}}";
         BSONObj modObj = fromjson(c);
         ModifierPush mod;
-        ASSERT_OK(mod.init(modObj["$push"].embeddedObject().firstElement()));
+        ASSERT_OK(mod.init(modObj["$push"].embeddedObject().firstElement(),
+                           ModifierInterface::Options::normal()));
     }
 
     //
@@ -426,7 +468,8 @@ namespace {
                    ModifierPush::PUSH_ALL : ModifierPush::PUSH_NORMAL) {
             _modObj = modObj;
             const StringData& modName = modObj.firstElement().fieldName();
-            ASSERT_OK(_mod.init(_modObj[modName].embeddedObject().firstElement()));
+            ASSERT_OK(_mod.init(_modObj[modName].embeddedObject().firstElement(),
+                                ModifierInterface::Options::normal()));
         }
 
         Status prepare(Element root,
@@ -852,7 +895,8 @@ namespace {
                                 << BSON("$each" << arrBuilder.arr() <<
                                         "$slice" << slice)));
 
-            ASSERT_OK(_mod.init(_modObj["$push"].embeddedObject().firstElement()));
+            ASSERT_OK(_mod.init(_modObj["$push"].embeddedObject().firstElement(),
+                                ModifierInterface::Options::normal()));
         }
 
         /** Sets up the mod to be {$push: {a: {$each:[<Obj>,...], $slice:<slice>, $sort:<Obj>}}} */
@@ -871,7 +915,8 @@ namespace {
                                         "$slice" << slice <<
                                         "$sort" << sort)));
 
-            ASSERT_OK(_mod.init(_modObj["$push"].embeddedObject().firstElement()));
+            ASSERT_OK(_mod.init(_modObj["$push"].embeddedObject().firstElement(),
+                                ModifierInterface::Options::normal()));
         }
 
         /** Returns an object {a: [<'vec's content>]} */

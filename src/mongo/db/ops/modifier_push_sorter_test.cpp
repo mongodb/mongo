@@ -128,7 +128,19 @@ namespace {
         ASSERT_EQUALS(getOrigObj(2), getSortedObj(2));
     }
 
-    TEST_F(ObjectArray, NestedInnerObject) {
+    TEST_F(ObjectArray, SimpleNestedFields) {
+        addObj(fromjson("{a:{b: -1}}"));
+        addObj(fromjson("{a:{b: -100}}"));
+        addObj(fromjson("{a:{b: 34}}"));
+
+        sortChildren(getArray(), PatternElementCmp(fromjson("{'a.b':1}")));
+
+        ASSERT_EQUALS(getOrigObj(0), getSortedObj(1));
+        ASSERT_EQUALS(getOrigObj(1), getSortedObj(0));
+        ASSERT_EQUALS(getOrigObj(2), getSortedObj(2));
+    }
+
+    TEST_F(ObjectArray, NestedInnerObjectDescending) {
         addObj(fromjson("{a:{b:{c:2, d:0}}}"));
         addObj(fromjson("{a:{b:{c:1, d:2}}}"));
         addObj(fromjson("{a:{b:{c:3, d:1}}}"));
@@ -138,6 +150,18 @@ namespace {
         ASSERT_EQUALS(getOrigObj(0), getSortedObj(2));
         ASSERT_EQUALS(getOrigObj(1), getSortedObj(0));
         ASSERT_EQUALS(getOrigObj(2), getSortedObj(1));
+    }
+
+    TEST_F(ObjectArray, NestedInnerObjectAscending) {
+        addObj(fromjson("{a:{b:{c:2, d:0}}}"));
+        addObj(fromjson("{a:{b:{c:1, d:2}}}"));
+        addObj(fromjson("{a:{b:{c:3, d:1}}}"));
+
+        sortChildren(getArray(), PatternElementCmp(fromjson("{'a.b.d':1}")));
+
+        ASSERT_EQUALS(getOrigObj(0), getSortedObj(0));
+        ASSERT_EQUALS(getOrigObj(2), getSortedObj(1));
+        ASSERT_EQUALS(getOrigObj(1), getSortedObj(2));
     }
 
 } // unnamed namespace

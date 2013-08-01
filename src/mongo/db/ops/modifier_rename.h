@@ -47,7 +47,7 @@ namespace mongo {
         /**
          * We will check that the to/from are valid paths; in prepare more validation is done
          */
-        virtual Status init(const BSONElement& modExpr);
+        virtual Status init(const BSONElement& modExpr, const Options& opts);
 
         /**
          * In prepare we will ensure that all restrictions are met:

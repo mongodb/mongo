@@ -50,7 +50,8 @@ namespace {
         explicit Mod(BSONObj modObj)
             : _modObj(modObj)
             , _mod() {
-            ASSERT_OK(_mod.init(_modObj["$pullAll"].embeddedObject().firstElement()));
+            ASSERT_OK(_mod.init(_modObj["$pullAll"].embeddedObject().firstElement(),
+                                ModifierInterface::Options::normal()));
         }
 
         Status prepare(Element root,
@@ -79,16 +80,20 @@ namespace {
         ModifierPullAll mod;
 
         modObj = fromjson("{$pullAll: {a:1}}");
-        ASSERT_NOT_OK(mod.init(modObj["$pullAll"].embeddedObject().firstElement()));
+        ASSERT_NOT_OK(mod.init(modObj["$pullAll"].embeddedObject().firstElement(),
+                               ModifierInterface::Options::normal()));
 
         modObj = fromjson("{$pullAll: {a:'test'}}");
-        ASSERT_NOT_OK(mod.init(modObj["$pullAll"].embeddedObject().firstElement()));
+        ASSERT_NOT_OK(mod.init(modObj["$pullAll"].embeddedObject().firstElement(),
+                               ModifierInterface::Options::normal()));
 
         modObj = fromjson("{$pullAll: {a:{}}}");
-        ASSERT_NOT_OK(mod.init(modObj["$pullAll"].embeddedObject().firstElement()));
+        ASSERT_NOT_OK(mod.init(modObj["$pullAll"].embeddedObject().firstElement(),
+                               ModifierInterface::Options::normal()));
 
         modObj = fromjson("{$pullAll: {a:true}}");
-        ASSERT_NOT_OK(mod.init(modObj["$pullAll"].embeddedObject().firstElement()));
+        ASSERT_NOT_OK(mod.init(modObj["$pullAll"].embeddedObject().firstElement(),
+                               ModifierInterface::Options::normal()));
 
     }
 

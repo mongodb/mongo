@@ -35,7 +35,7 @@ namespace mongo {
         virtual ~ModifierPull();
 
         /** Evaluates the array items to be removed and the match expression. */
-        virtual Status init(const BSONElement& modExpr);
+        virtual Status init(const BSONElement& modExpr, const Options& opts);
 
         /** Decides which portion of the array items will be removed from the provided element */
         virtual Status prepare(mutablebson::Element root,

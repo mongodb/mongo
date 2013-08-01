@@ -51,7 +51,8 @@ namespace {
         explicit Mod(BSONObj modObj)
             : _mod() {
             _modObj = modObj;
-            ASSERT_OK(_mod.init(BSON("" << modObj).firstElement()));
+            ASSERT_OK(_mod.init(BSON("" << modObj).firstElement(),
+                                ModifierInterface::Options::normal()));
         }
 
         Status prepare(Element root,
@@ -241,58 +242,70 @@ namespace {
     TEST(ValidatePath, FailDottedField){
         ModifierObjectReplace mod;
         BSONObj input = fromjson("{'a.a':10}");
-        ASSERT_NOT_OK(mod.init(BSON("" << input).firstElement()));
+        ASSERT_NOT_OK(mod.init(BSON("" << input).firstElement(),
+                               ModifierInterface::Options::normal()));
     }
 
     TEST(ValidatePath, FailEmbeddedDottedField){
         ModifierObjectReplace mod;
         BSONObj input = fromjson("{a:{'a.a':10}}");
-        ASSERT_NOT_OK(mod.init(BSON("" << input).firstElement()));
+        ASSERT_NOT_OK(mod.init(BSON("" << input).firstElement(),
+                               ModifierInterface::Options::normal()));
     }
 
     TEST(ValidatePath, FailDollarPrefixField){
         ModifierObjectReplace mod;
         BSONObj input = fromjson("{$a:10}");
-        ASSERT_NOT_OK(mod.init(BSON("" << input).firstElement()));
+        ASSERT_NOT_OK(mod.init(BSON("" << input).firstElement(),
+                               ModifierInterface::Options::normal()));
     }
 
     TEST(ValidatePath, FailEmbeddedDollarPrefixField){
         ModifierObjectReplace mod;
         BSONObj input = fromjson("{a:{$foo:1}}");
-        ASSERT_NOT_OK(mod.init(BSON("" << input).firstElement()));
+        ASSERT_NOT_OK(mod.init(BSON("" << input).firstElement(),
+                               ModifierInterface::Options::normal()));
     }
 
     TEST(ValidatePath, FailArrayIdField){
         ModifierObjectReplace mod;
         BSONObj input = fromjson("{_id:[9]}");
-        ASSERT_NOT_OK(mod.init(BSON("" << input).firstElement()));
+        ASSERT_NOT_OK(mod.init(BSON("" << input).firstElement(),
+                               ModifierInterface::Options::normal()));
         input = fromjson("{blah:1, _id:[9]}");
-        ASSERT_NOT_OK(mod.init(BSON("" << input).firstElement()));
+        ASSERT_NOT_OK(mod.init(BSON("" << input).firstElement(),
+                               ModifierInterface::Options::normal()));
     }
 
     TEST(ValidatePath, FailRegexIdField){
         ModifierObjectReplace mod;
         BSONObj input = fromjson("{_id: /a/}");
-        ASSERT_NOT_OK(mod.init(BSON("" << input).firstElement()));
+        ASSERT_NOT_OK(mod.init(BSON("" << input).firstElement(),
+                               ModifierInterface::Options::normal()));
         input = fromjson("{foo:1, _id: /a/}");
-        ASSERT_NOT_OK(mod.init(BSON("" << input).firstElement()));
+        ASSERT_NOT_OK(mod.init(BSON("" << input).firstElement(),
+                               ModifierInterface::Options::normal()));
     }
 
     // These are similar to ones above but are allowed for embedded doc/elements
     TEST(ValidatePath, EmbeddedArrayIdField){
         ModifierObjectReplace mod;
         BSONObj input = fromjson("{a: {_id:[10]}}");
-        ASSERT_OK(mod.init(BSON("" << input).firstElement()));
+        ASSERT_OK(mod.init(BSON("" << input).firstElement(),
+                               ModifierInterface::Options::normal()));
         input = fromjson("{a: {blah:1, _id:[10]}}");
-        ASSERT_OK(mod.init(BSON("" << input).firstElement()));
+        ASSERT_OK(mod.init(BSON("" << input).firstElement(),
+                               ModifierInterface::Options::normal()));
     }
 
     TEST(ValidatePath, HasEmbeddedRegexIdField){
         ModifierObjectReplace mod;
         BSONObj input = fromjson("{a: {_id: /a/, hi:1}}");
-        ASSERT_OK(mod.init(BSON("" << input).firstElement()));
+        ASSERT_OK(mod.init(BSON("" << input).firstElement(),
+                               ModifierInterface::Options::normal()));
         input = fromjson("{a: {hi:1, _id: /a/}}");
-        ASSERT_OK(mod.init(BSON("" << input).firstElement()));
+        ASSERT_OK(mod.init(BSON("" << input).firstElement(),
+                               ModifierInterface::Options::normal()));
     }
 
 } // unnamed namespace

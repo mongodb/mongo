@@ -46,7 +46,8 @@ namespace {
         explicit Mod(BSONObj modObj)
             : _modObj(modObj)
             , _mod() {
-            ASSERT_OK(_mod.init(_modObj["$addToSet"].embeddedObject().firstElement()));
+            ASSERT_OK(_mod.init(_modObj["$addToSet"].embeddedObject().firstElement(),
+                                ModifierInterface::Options::normal()));
         }
 
         Status prepare(Element root,
@@ -77,18 +78,21 @@ namespace {
         ModifierAddToSet mod;
 
         modObj = fromjson("{ $addToSet : { a : { 'x.$.y' : 'bad' } } }");
-        ASSERT_NOT_OK(mod.init(modObj["$addToSet"].embeddedObject().firstElement()));
-
+        ASSERT_NOT_OK(mod.init(modObj["$addToSet"].embeddedObject().firstElement(),
+                                ModifierInterface::Options::normal()));
         modObj = fromjson("{ $addToSet : { a : { $each : [ { 'x.$.y' : 'bad' } ] } } }");
-        ASSERT_NOT_OK(mod.init(modObj["$addToSet"].embeddedObject().firstElement()));
+        ASSERT_NOT_OK(mod.init(modObj["$addToSet"].embeddedObject().firstElement(),
+                                ModifierInterface::Options::normal()));
 
         // An int is not valid after $each
         modObj = fromjson("{ $addToSet : { a : { $each : 0 } } }");
-        ASSERT_NOT_OK(mod.init(modObj["$addToSet"].embeddedObject().firstElement()));
+        ASSERT_NOT_OK(mod.init(modObj["$addToSet"].embeddedObject().firstElement(),
+                                ModifierInterface::Options::normal()));
 
         // An object is not valid after $each
         modObj = fromjson("{ $addToSet : { a : { $each : { a : 1 } } } }");
-        ASSERT_NOT_OK(mod.init(modObj["$addToSet"].embeddedObject().firstElement()));
+        ASSERT_NOT_OK(mod.init(modObj["$addToSet"].embeddedObject().firstElement(),
+                                ModifierInterface::Options::normal()));
     }
 
     TEST(Init, ParsesSimple) {

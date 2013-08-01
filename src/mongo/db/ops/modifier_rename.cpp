@@ -62,7 +62,7 @@ namespace mongo {
     ModifierRename::~ModifierRename() {
     }
 
-    Status ModifierRename::init(const BSONElement& modExpr) {
+    Status ModifierRename::init(const BSONElement& modExpr, const Options& opts) {
 
         if (modExpr.type() != String) {
             return Status(ErrorCodes::BadValue, "rename 'to' field must be a string");

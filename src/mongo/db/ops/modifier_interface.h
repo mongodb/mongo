@@ -54,6 +54,7 @@ namespace mongo {
     public:
         virtual ~ModifierInterface() { }
 
+        struct Options;
         /**
          * Returns OK and extracts the parameters for this given mod from 'modExpr'. For
          * instance, for a $inc, extracts the increment value. The init() method would be
@@ -70,7 +71,7 @@ namespace mongo {
          *     time of this mod. Therefore, taking references to elements inside modExpr is
          *     valid.
          */
-        virtual Status init(const BSONElement& modExpr) = 0;
+        virtual Status init(const BSONElement& modExpr, const Options& opts) = 0;
 
         /**
          * Returns OK if it would be correct to apply this mod over the document 'root' (e.g, if
@@ -121,6 +122,21 @@ namespace mongo {
          *     array before operating on it.
          */
         virtual Status log(LogBuilder* logBuilder) const = 0;
+    };
+
+    /**
+     * Options used to control Modifier behavior
+     */
+    struct ModifierInterface::Options {
+        Options() : fromReplication(false), enforceOkForStorage(true) {}
+        Options(bool repl, bool ofs) : fromReplication(repl), enforceOkForStorage(ofs) {}
+
+        static Options normal() { return Options(false, true); }
+        static Options fromRepl() { return Options(true, true); }
+        static Options unchecked() { return Options(false, false); }
+
+        bool fromReplication;
+        bool enforceOkForStorage;
     };
 
     struct ModifierInterface::ExecInfo {

@@ -75,7 +75,7 @@ namespace mongo {
     ModifierPullAll::~ModifierPullAll() {
     }
 
-    Status ModifierPullAll::init(const BSONElement& modExpr) {
+    Status ModifierPullAll::init(const BSONElement& modExpr, const Options& opts) {
 
         //
         // field name analysis
