@@ -2456,6 +2456,12 @@
     <ClCompile Include="query\new_find.cpp">
       <Filter>db\query</Filter>
     </ClCompile>
+    <ClCompile Include="query\index_bounds.cpp">
+      <Filter>db\query</Filter>
+    </ClCompile>
+    <ClCompile Include="query\index_bounds_test.cpp">
+      <Filter>db\query</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\third_party\snappy\config.h">
@@ -4954,6 +4960,9 @@
       <Filter>db\query</Filter>
     </ClInclude>
     <ClInclude Include="query\stage_builder.h">
+      <Filter>db\query</Filter>
+    </ClInclude>
+    <ClInclude Include="query\index_bounds.h">
       <Filter>db\query</Filter>
     </ClInclude>
   </ItemGroup>

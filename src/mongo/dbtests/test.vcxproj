@@ -814,6 +814,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\db\queryutil.h" />
     <ClInclude Include="..\db\query\cached_plan_runner.h" />
     <ClInclude Include="..\db\query\canonical_query.h" />
+    <ClInclude Include="..\db\query\index_bounds.h" />
     <ClInclude Include="..\db\query\multi_plan_runner.h" />
     <ClInclude Include="..\db\query\new_find.h" />
     <ClInclude Include="..\db\query\plan_cache.h" />
@@ -3412,6 +3413,8 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="..\db\queryoptimizercursorimpl.cpp" />
     <ClInclude Include="..\db\queryoptimizercursorimpl.h" />
     <ClCompile Include="..\db\querypattern.cpp" />
+    <ClCompile Include="..\db\query\index_bounds.cpp" />
+    <ClCompile Include="..\db\query\index_bounds_test.cpp" />
     <ClCompile Include="..\db\query\multi_plan_runner.cpp" />
     <ClCompile Include="..\db\query\new_find.cpp" />
     <ClCompile Include="..\db\query\plan_ranker.cpp" />
