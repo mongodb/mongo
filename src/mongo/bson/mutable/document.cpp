@@ -570,7 +570,9 @@ namespace mutablebson {
             , _leafBuf()
             , _leafBuilder(_leafBuf)
             , _fieldNameScratch()
-            , _damages() {
+            , _damages()
+            , _inPlaceMode(inPlaceMode) {
+
             // We always have a BSONObj for the leaves, so reserve one.
             _objects.reserve(1);
             // We need an object at _objects[0] so that we can access leaf elements we
@@ -580,12 +582,27 @@ namespace mutablebson {
             dassert(_objects.size() == kLeafObjIdx);
             _objects.push_back(_leafBuilder.asTempObj());
             dassert(_leafBuf.len() != 0);
+        }
 
-            // TODO: Could use boost optional to reduce pointer chasing.
-            if (inPlaceMode == Document::kInPlaceEnabled) {
-                _damages.reset(new DamageVector);
-            }
+        void reset(Document::InPlaceMode inPlaceMode) {
+            // Clear out the state in the vectors.
+            _elements.clear();
+            _objects.clear();
+            _fieldNames.clear();
 
+            // There is no way to reset the state of a BSONObjBuilder, so we need to call its
+            // dtor, reset the underlying buf, and re-invoke the constructor in-place.
+            _leafBuilder.doneFast();
+            _leafBuilder.~BSONObjBuilder();
+            _leafBuf.reset();
+            new (&_leafBuilder) BSONObjBuilder(_leafBuf);
+
+            _fieldNameScratch.clear();
+            _damages.clear();
+            _inPlaceMode = inPlaceMode;
+
+            // Ensure that we start in the same state as the ctor would leave us in.
+            _objects.push_back(_leafBuilder.asTempObj());
         }
 
         // Obtain the ElementRep for the given rep id.
@@ -893,15 +910,14 @@ namespace mutablebson {
         }
 
         void reserveDamageEvents(size_t expectedEvents) {
-            if (_damages)
-                _damages->reserve(expectedEvents);
+            _damages.reserve(expectedEvents);
         }
 
         bool getInPlaceUpdates(DamageVector* damages, const char** source, size_t* size) {
 
             // If some operations were not in-place, set source to NULL and return false to
             // inform upstream that we are not returning in-place result data.
-            if (!_damages) {
+            if (_inPlaceMode == Document::kInPlaceDisabled) {
                 damages->clear();
                 *source = NULL;
                 if (size)
@@ -916,17 +932,18 @@ namespace mutablebson {
 
             // Swap our damage event queue with upstream, and reset ours to an empty vector. In
             // princple, we can do another round of in-place updates.
-            damages->swap(*_damages);
-            _damages->clear();
+            damages->swap(_damages);
+            _damages.clear();
+
             return true;
         }
 
         void disableInPlaceUpdates() {
-            _damages.reset();
+            _inPlaceMode = Document::kInPlaceDisabled;
         }
 
         Document::InPlaceMode getCurrentInPlaceMode() const {
-            return (_damages ? Document::kInPlaceEnabled : kInPlaceDisabled);
+            return _inPlaceMode;
         }
 
         bool isInPlaceModeEnabled() const {
@@ -936,14 +953,14 @@ namespace mutablebson {
         void recordDamageEvent(DamageEvent::OffsetSizeType targetOffset,
                                DamageEvent::OffsetSizeType sourceOffset,
                                size_t size) {
-            _damages->push_back(DamageEvent());
-            _damages->back().targetOffset = targetOffset;
-            _damages->back().sourceOffset = sourceOffset;
-            _damages->back().size = size;
+            _damages.push_back(DamageEvent());
+            _damages.back().targetOffset = targetOffset;
+            _damages.back().sourceOffset = sourceOffset;
+            _damages.back().size = size;
             if (debug && paranoid) {
                 // Force damage events to new addresses to catch invalidation errors.
-                DamageVector new_damages(*_damages);
-                _damages->swap(new_damages);
+                DamageVector new_damages(_damages);
+                _damages.swap(new_damages);
             }
         }
 
@@ -1002,8 +1019,9 @@ namespace mutablebson {
         // creating and destroying a string and its buffer each time.
         std::string _fieldNameScratch;
 
-        // Queue of damage events if in-place updates are possible.
-        boost::scoped_ptr<DamageVector> _damages;
+        // Queue of damage events and status bit for whether  in-place updates are possible.
+        DamageVector _damages;
+        Document::InPlaceMode _inPlaceMode;
     };
 
     Status Element::addSiblingLeft(Element e) {
@@ -2011,6 +2029,25 @@ namespace mutablebson {
         : _impl(new Impl(inPlaceMode))
         , _root(makeElementObject(StringData(kRootFieldName, StringData::LiteralTag()), value)) {
         dassert(_root._repIdx == kRootRepIdx);
+    }
+
+    void Document::reset() {
+        _impl->reset(Document::kInPlaceDisabled);
+
+        const Element newRoot = makeElementObject(
+            StringData(kRootFieldName, StringData::LiteralTag()));
+
+        verify(newRoot._repIdx == _root._repIdx);
+    }
+
+    void Document::reset(const BSONObj& value, InPlaceMode inPlaceMode) {
+        _impl->reset(inPlaceMode);
+
+        const Element newRoot = makeElementObject(
+            StringData(kRootFieldName, StringData::LiteralTag()),
+            value);
+
+        verify(newRoot._repIdx == _root._repIdx);
     }
 
     Document::~Document() {}

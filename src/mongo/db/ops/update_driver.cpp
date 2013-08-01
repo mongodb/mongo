@@ -168,12 +168,8 @@ namespace mongo {
         FieldRefSet targetFields;
         _affectIndices = false;
 
-        // TODO: Should logBuilder own the document? Should we hold it by pointer to avoid
-        // creating it if we are not interested in logging? Or maybe by boost optional? For
-        // now, it is logically harmless to construct this and not use it, but a Document
-        // object isn't cheap, so we should avoid building it if we can.
-        mutablebson::Document logDoc;
-        LogBuilder logBuilder(logDoc.root());
+        _logDoc.reset();
+        LogBuilder logBuilder(_logDoc.root());
 
         // Ask each of the mods to type check whether they can operate over the current document
         // and, if so, to change that document accordingly.
@@ -243,7 +239,7 @@ namespace mongo {
         }
 
         if (_logOp && logOpRec)
-            *logOpRec = logDoc.getObject();
+            *logOpRec = _logDoc.getObject();
 
         return Status::OK();
     }

@@ -574,6 +574,8 @@ namespace mongo {
 
         Client& client = cc();
 
+        mutablebson::Document doc;
+
         // If we are going to be yielding, we will need a ClientCursor scoped to this loop. We
         // only loop as long as the underlying cursor is OK.
         for ( auto_ptr<ClientCursor> clientCursor; cursor->ok(); ) {
@@ -700,7 +702,7 @@ namespace mongo {
             // place", that is, some values of the old document just get adjusted without any
             // change to the binary layout on the bson layer. It may be that a whole new
             // document is needed to accomodate the new bson layout of the resulting document.
-            mutablebson::Document doc( oldObj, mutablebson::Document::kInPlaceEnabled );
+            doc.reset( oldObj, mutablebson::Document::kInPlaceEnabled );
             BSONObj logObj;
             StringData matchedField = matchDetails.hasElemMatchKey() ?
                                                     matchDetails.elemMatchKey():
@@ -834,7 +836,7 @@ namespace mongo {
         driver.setLogOp( false );
         driver.setContext( ModifierInterface::ExecInfo::INSERT_CONTEXT );
 
-        mutablebson::Document doc( oldObj, mutablebson::Document::kInPlaceDisabled );
+        doc.reset( oldObj, mutablebson::Document::kInPlaceDisabled );
         status = driver.update( StringData(), &doc, NULL /* no oplog record */);
         if ( !status.isOK() ) {
             uasserted( 16836, status.reason() );
