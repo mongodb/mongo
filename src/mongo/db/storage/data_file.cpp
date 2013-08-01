@@ -31,11 +31,11 @@
 namespace mongo {
 
 
-    static void data_file_check(void *_mb) { 
+    static void data_file_check(void *_mb) {
         if( sizeof(char *) == 4 )
-            uassert( 10084 , "can't map file memory - mongo requires 64 bit build for larger datasets", _mb != 0);
+            uassert( 10084, "can't map file memory - mongo requires 64 bit build for larger datasets", _mb != 0);
         else
-            uassert( 10085 , "can't map file memory", _mb != 0);
+            uassert( 10085, "can't map file memory", _mb != 0);
     }
 
     int DataFile::maxSize() {
