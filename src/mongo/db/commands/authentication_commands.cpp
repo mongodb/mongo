@@ -259,7 +259,7 @@ namespace mongo {
                     return Status(ErrorCodes::AuthenticationFailed,
                                   "X509 authentication is not allowed for cluster authentication");
                 }
-                authorizationSession->grantInternalAuthorization(user);
+                authorizationSession->grantInternalAuthorization();
             }
             // Handle normal client authentication, only applies to client-server connections
             else {
