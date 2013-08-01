@@ -307,7 +307,7 @@ __clsm_get_current(
 	multiple = 0;
 
 	WT_FORALL_CURSORS(clsm, c, i) {
-		if (!F_ISSET(c, WT_CURSTD_KEY_RET))
+		if (!F_ISSET(c, WT_CURSTD_KEY_SET))
 			continue;
 		if (current == NULL) {
 			current = c;
@@ -414,7 +414,8 @@ __clsm_next(WT_CURSOR *cursor)
 							F_SET(clsm,
 							    WT_CLSM_MULTIPLE);
 					}
-				}
+				} else
+					F_CLR(c, WT_CURSTD_KEY_SET);
 			}
 			WT_ERR_NOTFOUND_OK(ret);
 		}
@@ -630,13 +631,14 @@ __clsm_search(WT_CURSOR *cursor)
 			if (__clsm_deleted(clsm, &cursor->value))
 				ret = WT_NOTFOUND;
 			goto done;
-		} else if (ret != WT_NOTFOUND) {
-			goto err;
-		} else if (bloom != NULL) {
+		}
+		WT_ERR_NOTFOUND_OK(ret);
+		F_CLR(c, WT_CURSTD_KEY_SET);
+		/* Update stats: the active chunk can't have a bloom filter. */
+		if (bloom != NULL)
 			WT_STAT_INCR(session,
 			    &clsm->lsm_tree->stats, bloom_false_positive);
-		/* The active chunk can't have a bloom filter. */
-		} else if (clsm->primary_chunk == NULL || i != clsm->nchunks)
+		else if (clsm->primary_chunk == NULL || i != clsm->nchunks)
 			WT_STAT_INCR(session,
 			    &clsm->lsm_tree->stats, lsm_lookup_no_bloom);
 	}
@@ -702,6 +704,7 @@ __clsm_search_near(WT_CURSOR *cursor, int *exactp)
 	WT_FORALL_CURSORS(clsm, c, i) {
 		c->set_key(c, &cursor->key);
 		if ((ret = c->search_near(c, &cmp)) == WT_NOTFOUND) {
+			F_CLR(c, WT_CURSTD_KEY_SET);
 			ret = 0;
 			continue;
 		} else if (ret != 0)
