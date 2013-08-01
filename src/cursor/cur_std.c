@@ -388,8 +388,8 @@ __wt_cursor_range_truncate(
 		WT_RET_NOTFOUND_OK(ret);
 	} else {
 		do {
-			WT_RET(start->remove(start));
 			WT_RET(start->compare(start, stop, &cmp));
+			WT_RET(start->remove(start));
 		} while (cmp < 0 && (ret = start->next(start)) == 0);
 		WT_RET_NOTFOUND_OK(ret);
 	}
