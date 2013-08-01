@@ -125,12 +125,10 @@ namespace {
 
     Status AuthzManagerExternalStateMongod::getAllV1PrivilegeDocsForDB(
             const std::string& dbname, std::vector<BSONObj>* privDocs) const {
-        std::string usersNamespace = dbname + ".system.users";
-
         Client::GodScope gs;
-        Client::ReadContext ctx(usersNamespace);
+        Client::ReadContext ctx(dbname);
 
-        *privDocs = Helpers::findAll(usersNamespace, BSONObj());
+        *privDocs = Helpers::findAll(dbname, BSONObj());
         return Status::OK();
     }
 
