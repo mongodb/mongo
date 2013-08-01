@@ -1160,6 +1160,7 @@ def doConfigure(myenv):
         sanitizer_option = '-fsanitize=' + GetOption('sanitize')
         if AddToCCFLAGSIfSupported(myenv, sanitizer_option):
             myenv.Append(LINKFLAGS=[sanitizer_option])
+            myenv.Append(CCFLAGS=['-fno-omit-frame-pointer'])
         else:
             print( 'Failed to enable sanitizer with flag: ' + sanitizer_option )
             Exit(1)
