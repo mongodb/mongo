@@ -244,6 +244,22 @@ namespace mutablebson {
          */
         explicit Document(const BSONObj& value, InPlaceMode inPlaceMode = kInPlaceEnabled);
 
+        /** Abandon all internal state associated with this Document, and return to a state
+         *  semantically equivalent to that yielded by a call to the default constructor. All
+         *  objects associated with the current document state are invalidated (e.g. Elements,
+         *  BSONElements, BSONObj's values, field names, etc.). This method is useful because
+         *  it may (though it is not required to) preserve the memory allocation of the
+         *  internal data structures of Document. If you need to logically create and destroy
+         *  many Documents in serial, it may be faster to reset.
+         */
+        void reset();
+
+        /** As the no argument 'reset', but returns to a state semantically equivalent to that
+         *  yielded by a call to the two argument constructor with the arguments provided
+         *  here. As with the other 'reset' call, all associated objects are invalidated. */
+        void reset(const BSONObj& value, InPlaceMode inPlaceMode = kInPlaceEnabled);
+
+        /** Destroy this document permanently */
         ~Document();
 
 

@@ -20,6 +20,7 @@
 #include <vector>
 
 #include "mongo/base/status.h"
+#include "mongo/bson/mutable/document.h"
 #include "mongo/db/index_set.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/ops/modifier_interface.h"
@@ -132,6 +133,8 @@ namespace mongo {
 
         // Is this update going to be an upsert?
         ModifierInterface::ExecInfo::UpdateContext _context;
+
+        mutablebson::Document _logDoc;
     };
 
     struct UpdateDriver::Options {
