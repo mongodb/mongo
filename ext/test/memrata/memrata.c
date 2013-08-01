@@ -486,7 +486,7 @@ cache_value_append(WT_CURSOR *wtcursor, int remove_op)
 	WT_SESSION *session;
 	uint64_t txnid;
 	size_t len;
-	uint32_t slots;
+	uint32_t entries;
 	uint8_t *p;
 
 	session = wtcursor->session;
@@ -502,7 +502,7 @@ cache_value_append(WT_CURSOR *wtcursor, int remove_op)
 	 * append the cursor's information.
 	 */
 	len = cursor->len +				/* current length */
-	    sizeof(uint32_t) +				/* slots */
+	    sizeof(uint32_t) +				/* entries */
 	    sizeof(uint64_t) +				/* txn ID */
 	    (remove_op ?				/* remove or data */
 	    1 : sizeof(uint32_t) + wtcursor->value.size) +
@@ -520,13 +520,13 @@ cache_value_append(WT_CURSOR *wtcursor, int remove_op)
 
 	/* Update the number of records in this value. */
 	if (cursor->len == 0) {
-		slots = 1;
+		entries = 1;
 		cursor->len = sizeof(uint32_t);
 	} else {
-		memcpy(&slots, cursor->v, sizeof(uint32_t));
-		++slots;
+		memcpy(&entries, cursor->v, sizeof(uint32_t));
+		++entries;
 	}
-	memcpy(cursor->v, &slots, sizeof(uint32_t));
+	memcpy(cursor->v, &entries, sizeof(uint32_t));
 
 	/*
 	 * Copy the WiredTiger cursor's data into place: txn ID, remove
@@ -538,7 +538,7 @@ cache_value_append(WT_CURSOR *wtcursor, int remove_op)
 	if (remove_op)
 		*p++ = REMOVE_TOMBSTONE;
 	else {
-		*p++ = '\0';
+		*p++ = ' ';
 		memcpy(p, &wtcursor->value.size, sizeof(uint32_t));
 		p += sizeof(uint32_t);
 		memcpy(p, wtcursor->value.data, wtcursor->value.size);
@@ -1590,6 +1590,12 @@ update(WT_CURSOR *wtcursor, int remove_op)
 		if ((ret = kvs_call(
 		    wtcursor, "kvs_get", ws->kvs, kvs_get)) != 0)
 			goto err;
+
+		/*
+		 * All we care about is the cache entry, which didn't exist;
+		 * clear the returned value, we're about to "append" to it.
+		 */
+		cursor->len = 0;
 		break;
 	default:
 		goto err;
