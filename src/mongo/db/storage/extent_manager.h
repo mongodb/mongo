@@ -93,6 +93,9 @@ namespace mongo {
          */
         Extent* getExtent( const DiskLoc& loc, bool doSanityCheck = true );
 
+        Extent* getNextExtent( Extent* );
+        Extent* getPrevExtent( Extent* );
+
         // get(Next|Prev)Record follows the Record linked list
         // these WILL cross Extent boundaries
         // * @param loc - has to be the DiskLoc for a Record
