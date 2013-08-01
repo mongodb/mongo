@@ -18,7 +18,7 @@
 
 #include "mongo/pch.h"
 
-#include "mongo/db/record.h"
+#include "mongo/db/storage/record.h"
 
 #include "mongo/base/init.h"
 #include "mongo/db/commands/server_status.h"

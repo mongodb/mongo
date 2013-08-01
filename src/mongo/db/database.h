@@ -21,7 +21,7 @@
 #include "mongo/db/cc_by_loc.h"
 #include "mongo/db/cmdline.h"
 #include "mongo/db/namespace_details.h"
-#include "mongo/db/record.h"
+#include "mongo/db/storage/record.h"
 #include "mongo/db/storage/extent_manager.h"
 
 namespace mongo {

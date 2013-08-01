@@ -21,7 +21,7 @@
 
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/pdfile.h"
-#include "mongo/db/record.h"
+#include "mongo/db/storage/record.h"
 #include "mongo/util/processinfo.h"
 
 namespace mongo {
