@@ -13,18 +13,11 @@
  * function, and then consistently handle failure and success.
  */
 #define	WT_BTREE_CURSOR_SAVE_AND_RESTORE(cursor, f, ret) do {		\
-	uint64_t __recno;						\
-	uint32_t __key_size, __value_size;				\
-	const void *__key_data, *__value_data;				\
-	if (F_ISSET(cursor, WT_CURSTD_KEY_APP)) {			\
-		__recno = (cursor)->recno;				\
-		__key_data = (cursor)->key.data;			\
-		__key_size = (cursor)->key.size;			\
-	}								\
-	if (F_ISSET(cursor, WT_CURSTD_VALUE_APP)) {			\
-		__value_data = (cursor)->value.data;			\
-		__value_size = (cursor)->value.size;			\
-	}								\
+	const void *__key_data = (cursor)->key.data;			\
+	const void *__value_data = (cursor)->value.data;		\
+	uint64_t __recno = (cursor)->recno;				\
+	uint32_t __key_size = (cursor)->key.size;			\
+	uint32_t __value_size = (cursor)->value.size;			\
 	if (((ret) = (f)) == 0) {					\
 		F_CLR(cursor, WT_CURSTD_KEY_APP | WT_CURSTD_VALUE_APP);	\
 		F_SET(cursor, WT_CURSTD_KEY_RET | WT_CURSTD_VALUE_RET);	\
