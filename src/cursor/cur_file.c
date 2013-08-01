@@ -21,7 +21,9 @@
 	if (((ret) = (f)) == 0) {					\
 		F_CLR(cursor, WT_CURSTD_KEY_APP | WT_CURSTD_VALUE_APP);	\
 		F_SET(cursor, WT_CURSTD_KEY_RET | WT_CURSTD_VALUE_RET);	\
-	} else {							\
+	} else if ((ret) == WT_NOTFOUND)				\
+		F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);	\
+	else {								\
 		if (F_ISSET(cursor, WT_CURSTD_KEY_APP)) {		\
 			(cursor)->recno = __recno;			\
 			(cursor)->key.data = __key_data;		\
