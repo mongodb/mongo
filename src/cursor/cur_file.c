@@ -268,12 +268,15 @@ __curfile_remove(WT_CURSOR *cursor)
 	WT_BTREE_CURSOR_SAVE_AND_RESTORE(cursor, __wt_btcur_remove(cbt), ret);
 
 	/*
-	 * After a successful remove, the key and value are not available.
-	 * This has to come after the call to resolve the cursor, it sets
-	 * the same flags we're clearing.
+	 * After a successful remove, copy the key: the value is not available.
 	 */
-	if (ret == 0)
-		F_CLR(cursor, WT_CURSTD_KEY_RET | WT_CURSTD_VALUE_RET);
+	if (ret == 0) {
+		if (F_ISSET(cursor, WT_CURSTD_KEY_RET) &&
+		    !WT_DATA_IN_ITEM(&(cursor)->key))
+			WT_ERR(__wt_buf_set(session, &cursor->key,
+			    cursor->key.data, cursor->key.size));
+		F_CLR(cursor, WT_CURSTD_VALUE_SET);
+	}
 
 err:	CURSOR_UPDATE_API_END(session, ret);
 	return (ret);
