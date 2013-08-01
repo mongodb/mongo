@@ -932,12 +932,8 @@ DBCollection.prototype.aggregate = function( ops ) {
         // If we are running in a test, make sure cursor output is the same.
         // This block should go away with work on SERVER-10165.
 
-        if (this._db.isMaster().msg !== "isdbgrid") {
-            // agg cursors not supported sharded yet
-
-            var cursor = this.aggregateCursor(arr, {cursor: {batchSize: 0}});
-            assert.eq(cursor.toArray(), res.result);
-        }
+        var cursor = this.aggregateCursor(arr, {cursor: {batchSize: 0}});
+        assert.eq(cursor.toArray(), res.result);
     }
 
     return res;
