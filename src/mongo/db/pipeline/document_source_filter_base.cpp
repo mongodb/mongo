@@ -26,57 +26,20 @@ namespace mongo {
     DocumentSourceFilterBase::~DocumentSourceFilterBase() {
     }
 
-    void DocumentSourceFilterBase::findNext() {
-        unstarted = false;
+    boost::optional<Document> DocumentSourceFilterBase::getNext() {
+        pExpCtx->checkForInterrupt();
 
-        for(bool hasDoc = !pSource->eof(); hasDoc; hasDoc = pSource->advance()) {
-            pCurrent = pSource->getCurrent();
-            if (accept(pCurrent)) {
-                pSource->advance(); // Start next call at correct position
-                hasCurrent = true;
-                return;
-            }
+        while (boost::optional<Document> next = pSource->getNext()) {
+            if (accept(*next))
+                return next;
         }
 
         // Nothing matched
-        pCurrent = Document();
-        hasCurrent = false;
-    }
-
-    bool DocumentSourceFilterBase::eof() {
-        if (unstarted)
-            findNext();
-
-        return !hasCurrent;
-    }
-
-    bool DocumentSourceFilterBase::advance() {
-        DocumentSource::advance(); // check for interrupts
-
-        if (unstarted)
-            findNext();
-
-        /*
-          This looks weird after the above, but is correct.  Note that calling
-          getCurrent() when first starting already yields the first document
-          in the collection.  Calling advance() without using getCurrent()
-          first will skip over the first item.
-         */
-        findNext();
-
-        return hasCurrent;
-    }
-
-    Document DocumentSourceFilterBase::getCurrent() {
-        verify(hasCurrent);
-        return pCurrent;
+        return boost::none;
     }
 
     DocumentSourceFilterBase::DocumentSourceFilterBase(
-        const intrusive_ptr<ExpressionContext> &pExpCtx):
-        DocumentSource(pExpCtx),
-        unstarted(true),
-        hasCurrent(false),
-        pCurrent() {
-    }
+            const intrusive_ptr<ExpressionContext> &pExpCtx)
+        : DocumentSource(pExpCtx)
+    {}
 }

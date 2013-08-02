@@ -35,27 +35,15 @@ namespace mongo {
         return groupName;
     }
 
-    bool DocumentSourceGroup::eof() {
-        if (!populated)
-            populate();
-
-        return _spilled
-                ? _done
-                : (groupsIterator == groups.end());
-    }
-
-    bool DocumentSourceGroup::advance() {
-        DocumentSource::advance(); // check for interrupts
+    boost::optional<Document> DocumentSourceGroup::getNext() {
+        pExpCtx->checkForInterrupt();
 
         if (!populated)
             populate();
 
         if (_spilled) {
-            if (_doneAfterNextAdvance) {
-                verify(!_done);
-                _done = true;
-                return !_done;
-            }
+            if (!_sorterIterator)
+                return boost::none;
 
             const size_t numAccumulators = vpAccumulatorFactory.size();
             for (size_t i=0; i < numAccumulators; i++) {
@@ -88,38 +76,27 @@ namespace mongo {
                 }
 
                 if (!_sorterIterator->more()) {
-                    _doneAfterNextAdvance = true;
+                    dispose();
                     break;
                 }
 
                 _firstPartOfNextGroup = _sorterIterator->next();
             }
 
-        } else {
-            verify(groupsIterator != groups.end());
-
-            ++groupsIterator;
-            if (groupsIterator == groups.end()) {
-                dispose();
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    Document DocumentSourceGroup::getCurrent() {
-        if (!populated)
-            populate();
-
-        dassert(!eof());
-
-        if (_spilled) {
             return makeDocument(_currentId, _currentAccumulators, pExpCtx->getInShard());
+
         } else {
-            return makeDocument(groupsIterator->first,
-                                groupsIterator->second,
-                                pExpCtx->getInShard());
+            if (groups.empty())
+                return boost::none;
+
+            Document out = makeDocument(groupsIterator->first,
+                                        groupsIterator->second,
+                                        pExpCtx->getInShard());
+
+            if (++groupsIterator == groups.end())
+                dispose();
+
+            return out;
         }
     }
 
@@ -129,8 +106,6 @@ namespace mongo {
         _sorterIterator.reset();
 
         // make us look done
-        _doneAfterNextAdvance = true;
-        _done = true;
         groupsIterator = groups.end();
 
         // free our source's resources
@@ -188,8 +163,6 @@ namespace mongo {
         , _spilled(false)
         , _extSortAllowed(pExpCtx->getExtSortAllowed() && !pExpCtx->getInRouter())
         , _maxMemoryUsageBytes(100*1024*1024)
-        , _doneAfterNextAdvance(false)
-        , _done(false)
     {}
 
     void DocumentSourceGroup::addAccumulator(
@@ -371,7 +344,7 @@ namespace mongo {
         int memoryUsageBytes = 0;
 
         // This loop consumes all input from pSource and buckets it based on pIdExpression.
-        for (bool hasNext = !pSource->eof(); hasNext; hasNext = pSource->advance()) {
+        while (boost::optional<Document> input = pSource->getNext()) {
             if (memoryUsageBytes > _maxMemoryUsageBytes) {
                 uassert(16945, "Exceeded memory limit for $group, but didn't allow external sort",
                         _extSortAllowed);
@@ -379,8 +352,7 @@ namespace mongo {
                 memoryUsageBytes = 0;
             }
 
-            const Document input = pSource->getCurrent();
-            const Variables vars (input);
+            const Variables vars(*input);
 
             /* get the _id value */
             Value id = pIdExpression->evaluate(vars);
@@ -451,17 +423,14 @@ namespace mongo {
                 _currentAccumulators.push_back(vpAccumulatorFactory[i]());
             }
 
-            // must be before call to advance so we don't recurse
-            populated = true;
-
             verify(_sorterIterator->more()); // we put data in, we should get something out.
             _firstPartOfNextGroup = _sorterIterator->next();
-            verify(advance()); // moves first result into _currentId and _currentAccumulators
         } else {
             // start the group iterator
             groupsIterator = groups.begin();
-            populated = true;
         }
+
+        populated = true;
     }
 
     class DocumentSourceGroup::SpillSTLComparator {

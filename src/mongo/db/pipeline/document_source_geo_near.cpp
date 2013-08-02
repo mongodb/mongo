@@ -25,37 +25,25 @@ namespace mongo {
 
     DocumentSourceGeoNear::~DocumentSourceGeoNear() {}
 
-    bool DocumentSourceGeoNear::eof() {
+    boost::optional<Document> DocumentSourceGeoNear::getNext() {
+        pExpCtx->checkForInterrupt();
+
         if (!resultsIterator)
             runCommand();
 
-        return !hasCurrent;
-    }
+        if (!resultsIterator->more())
+            return boost::none;
 
-    bool DocumentSourceGeoNear::advance() {
-        if (!resultsIterator)
-            runCommand();
+        // each result from the geoNear command is wrapped in a wrapper object with "obj",
+        // "dis" and maybe "loc" fields. We want to take the object from "obj" and inject the
+        // other fields into it.
+        Document result (resultsIterator->next().embeddedObject());
+        MutableDocument output (result["obj"].getDocument());
+        output.setNestedField(*distanceField, result["dis"]);
+        if (includeLocs)
+            output.setNestedField(*includeLocs, result["loc"]);
 
-        hasCurrent = resultsIterator->more();
-        if (hasCurrent) {
-            // each result from the geoNear command is wrapped in a wrapper object with "obj",
-            // "dis" and maybe "loc" fields. We want to take the object from "obj" and inject the
-            // other fields into it.
-
-            Document result (resultsIterator->next().embeddedObject());
-            MutableDocument output (result["obj"].getDocument());
-            output.setNestedField(*distanceField, result["dis"]);
-            if (includeLocs)
-                output.setNestedField(*includeLocs, result["loc"]);
-
-            currentDoc = output.freeze();
-        }
-        return hasCurrent;
-    }
-
-    Document DocumentSourceGeoNear::getCurrent() {
-        verify(hasCurrent);
-        return currentDoc;
+        return output.freeze();
     }
 
     void DocumentSourceGeoNear::setSource(DocumentSource*) {
@@ -152,7 +140,6 @@ namespace mongo {
                 ok);
 
         resultsIterator.reset(new BSONObjIterator(cmdOutput["results"].embeddedObject()));
-        advance(); // consumes first result into currentDoc
     }
 
     intrusive_ptr<DocumentSourceGeoNear> DocumentSourceGeoNear::create(
@@ -216,6 +203,5 @@ namespace mongo {
         , spherical(false)
         , distanceMultiplier(1.0)
         , uniqueDocs(true)
-        , hasCurrent(false)
     {}
 }

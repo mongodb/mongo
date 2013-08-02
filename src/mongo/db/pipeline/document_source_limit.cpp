@@ -55,26 +55,15 @@ namespace mongo {
         return true;
     }
 
-    bool DocumentSourceLimit::eof() {
-        return pSource->eof() || count >= limit;
-    }
+    boost::optional<Document> DocumentSourceLimit::getNext() {
+        pExpCtx->checkForInterrupt();
 
-    bool DocumentSourceLimit::advance() {
-        DocumentSource::advance(); // check for interrupts
-
-        ++count;
-        if (count >= limit) {
-            // This is required for the DocumentSourceCursor to release its read lock, see
-            // SERVER-6123.
+        if (++count > limit) {
             pSource->dispose();
-
-            return false;
+            return boost::none;
         }
-        return pSource->advance();
-    }
 
-    Document DocumentSourceLimit::getCurrent() {
-        return pSource->getCurrent();
+        return pSource->getNext();
     }
 
     void DocumentSourceLimit::sourceToBson(

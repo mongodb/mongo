@@ -24,31 +24,6 @@ namespace mongo {
     DocumentSourceCommandShards::~DocumentSourceCommandShards() {
     }
 
-    bool DocumentSourceCommandShards::eof() {
-        /* if we haven't even started yet, do so */
-        if (unstarted)
-            getNextDocument();
-
-        return !hasCurrent;
-    }
-
-    bool DocumentSourceCommandShards::advance() {
-        DocumentSource::advance(); // check for interrupts
-
-        if (unstarted)
-            getNextDocument(); // skip first
-
-        /* advance */
-        getNextDocument();
-
-        return hasCurrent;
-    }
-
-    Document DocumentSourceCommandShards::getCurrent() {
-        verify(!eof());
-        return pCurrent;
-    }
-
     void DocumentSourceCommandShards::setSource(DocumentSource *pSource) {
         /* this doesn't take a source */
         verify(false);
@@ -82,20 +57,14 @@ namespace mongo {
         return pSource;
     }
 
-    void DocumentSourceCommandShards::getNextDocument() {
-        if (unstarted) {
-            unstarted = false;
-            hasCurrent = true;
-        }
+    boost::optional<Document> DocumentSourceCommandShards::getNext() {
+        pExpCtx->checkForInterrupt();
 
         while(true) {
             if (!pBsonSource.get()) {
                 /* if there aren't any more futures, we're done */
-                if (iterator == listEnd) {
-                    pCurrent = Document();
-                    hasCurrent = false;
-                    return;
-                }
+                if (iterator == listEnd)
+                    return boost::none;
 
                 /* grab the next command result */
                 BSONObj resultObj = iterator->result;
@@ -121,19 +90,13 @@ namespace mongo {
                 }
 
                 pBsonSource = DocumentSourceBsonArray::create(&resultArray, pExpCtx);
-                newSource = true;
             }
 
-            /* if we're done with this shard's results, try the next */
-            if (pBsonSource->eof() ||
-                (!newSource && !pBsonSource->advance())) {
-                pBsonSource.reset();
-                continue;
-            }
+            if (boost::optional<Document> out = pBsonSource->getNext())
+                return out;
 
-            pCurrent = pBsonSource->getCurrent();
-            newSource = false;
-            return;
+            // Source exhausted. Try next.
+            pBsonSource.reset();
         }
     }
 }

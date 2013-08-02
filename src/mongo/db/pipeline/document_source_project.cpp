@@ -39,18 +39,12 @@ namespace mongo {
         return projectName;
     }
 
-    bool DocumentSourceProject::eof() {
-        return pSource->eof();
-    }
+    boost::optional<Document> DocumentSourceProject::getNext() {
+        pExpCtx->checkForInterrupt();
 
-    bool DocumentSourceProject::advance() {
-        DocumentSource::advance(); // check for interrupts
-
-        return pSource->advance();
-    }
-
-    Document DocumentSourceProject::getCurrent() {
-        Document pInDocument(pSource->getCurrent());
+        boost::optional<Document> input = pSource->getNext();
+        if (!input)
+            return boost::none;
 
         /* create the result document */
         const size_t sizeHint = pEO->getSizeHint();
@@ -62,26 +56,21 @@ namespace mongo {
           If we're excluding fields at the top level, leave out the _id if
           it is found, because we took care of it above.
         */
-        pEO->addToDocument(out, pInDocument, Variables(pInDocument));
+        pEO->addToDocument(out, *input, Variables(*input));
 
 #if defined(_DEBUG)
         if (!_simpleProjection.getSpec().isEmpty()) {
             // Make sure we return the same results as Projection class
 
-            BSONObjBuilder inputBuilder;
-            pSource->getCurrent()->toBson(&inputBuilder);
-            BSONObj input = inputBuilder.done();
+            BSONObj inputBson = input->toBson();
+            BSONObj outputBson = out.peek().toBson();
 
-            BSONObjBuilder outputBuilder;
-            out.peek().toBson(&outputBuilder);
-            BSONObj output = outputBuilder.done();
+            BSONObj projected = _simpleProjection.transform(inputBson);
 
-            BSONObj projected = _simpleProjection.transform(input);
-
-            if (projected != output) {
+            if (projected != outputBson) {
                 log() << "$project applied incorrectly: " << getRaw() << endl;
-                log() << "input:  " << input << endl;
-                log() << "out: " << output << endl;
+                log() << "input:  " << inputBson << endl;
+                log() << "out: " << outputBson << endl;
                 log() << "projected: " << projected << endl;
                 verify(false); // exits in _DEBUG builds
             }

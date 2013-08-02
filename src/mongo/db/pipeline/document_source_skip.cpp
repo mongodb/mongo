@@ -29,8 +29,8 @@ namespace mongo {
 
     DocumentSourceSkip::DocumentSourceSkip(const intrusive_ptr<ExpressionContext> &pExpCtx):
         SplittableDocumentSource(pExpCtx),
-        skip(0),
-        count(0) {
+        _skip(0),
+        _needToSkip(true) {
     }
 
     DocumentSourceSkip::~DocumentSourceSkip() {
@@ -50,50 +50,27 @@ namespace mongo {
             return false;
 
         /* we need to skip over the sum of the two consecutive $skips */
-        skip += pSkip->skip;
+        _skip += pSkip->_skip;
         return true;
     }
 
-    void DocumentSourceSkip::skipper() {
-        if (count == 0) {
-            while (!pSource->eof() && count++ < skip) {
-                pSource->advance();
+    boost::optional<Document> DocumentSourceSkip::getNext() {
+        pExpCtx->checkForInterrupt();
+
+        if (_needToSkip) {
+            _needToSkip = false;
+            for (long long i=0; i < _skip; i++) {
+                if (!pSource->getNext())
+                    return boost::none;
             }
         }
 
-        if (pSource->eof()) {
-            pCurrent.reset();
-            return;
-        }
-
-        pCurrent = pSource->getCurrent();
-    }
-
-    bool DocumentSourceSkip::eof() {
-        skipper();
-        return pSource->eof();
-    }
-
-    bool DocumentSourceSkip::advance() {
-        DocumentSource::advance(); // check for interrupts
-
-        if (eof()) {
-            pCurrent.reset();
-            return false;
-        }
-
-        pCurrent = pSource->getCurrent();
-        return pSource->advance();
-    }
-
-    Document DocumentSourceSkip::getCurrent() {
-        skipper();
-        return pCurrent;
+        return pSource->getNext();
     }
 
     void DocumentSourceSkip::sourceToBson(
         BSONObjBuilder *pBuilder, bool explain) const {
-        pBuilder->append("$skip", skip);
+        pBuilder->append("$skip", _skip);
     }
 
     intrusive_ptr<DocumentSourceSkip> DocumentSourceSkip::create(
@@ -113,10 +90,10 @@ namespace mongo {
         intrusive_ptr<DocumentSourceSkip> pSkip(
             DocumentSourceSkip::create(pExpCtx));
 
-        pSkip->skip = pBsonElement->numberLong();
+        pSkip->_skip = pBsonElement->numberLong();
         uassert(15956, str::stream() << DocumentSourceSkip::skipName <<
                 ":  the number to skip cannot be negative",
-                pSkip->skip >= 0);
+                pSkip->_skip >= 0);
 
         return pSkip;
     }

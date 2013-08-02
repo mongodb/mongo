@@ -50,11 +50,6 @@ namespace mongo {
     void DocumentSource::optimize() {
     }
 
-    bool DocumentSource::advance() {
-        pExpCtx->checkForInterrupt(); // might not return
-        return false;
-    }
-
     void DocumentSource::dispose() {
         if ( pSource ) {
             // This is required for the DocumentSourceCursor to release its read lock, see

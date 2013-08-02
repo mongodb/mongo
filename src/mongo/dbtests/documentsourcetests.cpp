@@ -135,7 +135,7 @@ namespace DocumentSourceTests {
                 // The DocumentSourceCursor holds a ClientCursor.
                 assertNumClientCursors( 1 );
                 // The collection is empty, so the source produces no results.
-                ASSERT( source()->eof() );
+                ASSERT( !source()->getNext() );
                 // Exhausting the source releases the read lock.
                 ASSERT( !Lock::isReadLocked() );
                 // The ClientCursor is also cleaned up.
@@ -157,14 +157,12 @@ namespace DocumentSourceTests {
                 createSource();
                 // The DocumentSourceCursor doesn't hold a read lock.
                 ASSERT( !Lock::isReadLocked() );
-                // The cursor will produce a result.
-                ASSERT( !source()->eof() );
-                // The DocumentSourceCursor doesn't hold a read lock.
-                ASSERT( !Lock::isReadLocked() );
-                // The result is as expected.
-                ASSERT_EQUALS( 1, source()->getCurrent()->getValue( "a" ).coerceToInt() );
+                // The cursor will produce the expected result.
+                boost::optional<Document> next = source()->getNext();
+                ASSERT(bool(next));
+                ASSERT_EQUALS(Value(1), next->getField("a"));
                 // There are no more results.
-                ASSERT( !source()->advance() );
+                ASSERT( !source()->getNext() );
                 // Exhausting the source releases the read lock.
                 ASSERT( !Lock::isReadLocked() );                
             }
@@ -181,7 +179,7 @@ namespace DocumentSourceTests {
                 // Releasing the cursor releases the read lock.
                 ASSERT( !Lock::isReadLocked() );
                 // The source is marked as exhausted.
-                ASSERT( source()->eof() );
+                ASSERT( !source()->getNext() );
             }
         };
         
@@ -193,20 +191,21 @@ namespace DocumentSourceTests {
                 client.insert( ns, BSON( "a" << 2 ) );
                 client.insert( ns, BSON( "a" << 3 ) );
                 createSource();
-                ASSERT( !source()->eof() );
                 // The result is as expected.
-                ASSERT_EQUALS( 1, source()->getCurrent()->getValue( "a" ).coerceToInt() );
-                // Get the next result.
-                ASSERT( source()->advance() );
-                // The result is as expected.
-                ASSERT_EQUALS( 2, source()->getCurrent()->getValue( "a" ).coerceToInt() );
+                boost::optional<Document> next = source()->getNext();
+                ASSERT(bool(next));
+                ASSERT_EQUALS(Value(1), next->getField("a"));
+                // The next result is as expected.
+                next = source()->getNext();
+                ASSERT(bool(next));
+                ASSERT_EQUALS(Value(2), next->getField("a"));
                 // The DocumentSourceCursor doesn't hold a read lock.
                 ASSERT( !Lock::isReadLocked() );
                 source()->dispose();
                 // Disposing of the source releases the lock.
                 ASSERT( !Lock::isReadLocked() );
                 // The source cannot be advanced further.
-                ASSERT( source()->eof() );
+                ASSERT( !source()->getNext() );
             }
         };
 
@@ -277,7 +276,7 @@ namespace DocumentSourceTests {
                 createSource();
                 ASSERT_EQUALS( 0, cc().curop()->numYields() );
                 // Iterate through all results.
-                while( source()->advance() );
+                while( source()->getNext() );
                 // The lock was yielded during iteration.
                 ASSERT( 0 < cc().curop()->numYields() );
             }
@@ -311,15 +310,9 @@ namespace DocumentSourceTests {
                 ASSERT_EQUALS(source()->getLimit(), 2);
 
                 // The cursor allows exactly 2 documents through
-                ASSERT( !source()->eof() );
-                ASSERT_EQUALS( 1, source()->getCurrent()->getValue( "a" ).coerceToInt() );
-
-                ASSERT( source()->advance() );
-                ASSERT( !source()->eof() );
-                ASSERT_EQUALS( 2, source()->getCurrent()->getValue( "a" ).coerceToInt() );
-
-                ASSERT( !source()->advance() );
-                ASSERT( source()->eof() );
+                ASSERT(bool(source()->getNext()));
+                ASSERT(bool(source()->getNext()));
+                ASSERT(!source()->getNext());
             }
         };
 
@@ -353,12 +346,12 @@ namespace DocumentSourceTests {
                 ASSERT( !Lock::isReadLocked() );
                 createLimit( 1 );
                 limit()->setSource( source() );
-                // The limit is not exhauted.
-                ASSERT( !limit()->eof() );
                 // The limit's result is as expected.
-                ASSERT_EQUALS( 1, limit()->getCurrent()->getValue( "a" ).coerceToInt() );
+                boost::optional<Document> next = limit()->getNext();
+                ASSERT(bool(next));
+                ASSERT_EQUALS(Value(1), next->getField("a"));
                 // The limit is exhausted.
-                ASSERT( !limit()->advance() );
+                ASSERT( !limit()->getNext() );
                 // The limit disposes the source, releasing the read lock.
                 ASSERT( !Lock::isReadLocked() );
             }
@@ -382,11 +375,11 @@ namespace DocumentSourceTests {
                 createLimit( 1 );
                 limit()->setSource( match.get() );
                 // The limit is not exhauted.
-                ASSERT( !limit()->eof() );
-                // The limit's result is as expected.
-                ASSERT_EQUALS( 1, limit()->getCurrent()->getValue( "a" ).coerceToInt() );
+                boost::optional<Document> next = limit()->getNext();
+                ASSERT(bool(next));
+                ASSERT_EQUALS(Value(1), next->getField("a"));
                 // The limit is exhausted.
-                ASSERT( !limit()->advance() );
+                ASSERT( !limit()->getNext() );
                 // The limit disposes the match, which disposes the source and releases the read
                 // lock.
                 ASSERT( !Lock::isReadLocked() );
@@ -428,9 +421,10 @@ namespace DocumentSourceTests {
             DocumentSource* group() { return _group.get(); }
             /** Assert that iterator state accessors consistently report the source is exhausted. */
             void assertExhausted( const intrusive_ptr<DocumentSource> &source ) const {
-                // eof() is true.
-                ASSERT( source->eof() );
-                // advance() and getCurrent() are illegal to call if eof() is true
+                // It should be safe to check doneness multiple times
+                ASSERT( !source->getNext() );
+                ASSERT( !source->getNext() );
+                ASSERT( !source->getNext() );
             }
         private:
             /** Check that the group's spec round trips. */
@@ -467,11 +461,10 @@ namespace DocumentSourceTests {
                 createSource();
                 createGroup( spec() );
                 // A group result is available.
-                ASSERT( !group()->eof() );
-                BSONObjBuilder bob;
-                group()->getCurrent()->toBson( &bob );
+                boost::optional<Document> next = group()->getNext();
+                ASSERT(bool(next));
                 // The constant _id value from the $group spec is passed through.
-                ASSERT_EQUALS( expected(), bob.obj() );
+                ASSERT_EQUALS(expected(), next->toBson());
             }
         protected:
             virtual BSONObj doc() = 0;
@@ -678,18 +671,10 @@ namespace DocumentSourceTests {
             void checkResultSet( const intrusive_ptr<DocumentSource> &sink ) {
                 // Load the results from the DocumentSourceGroup and sort them by _id.
                 IdMap resultSet;
-                while( !sink->eof() ) {
-                    Document current = sink->getCurrent();
-                    
+                while (boost::optional<Document> current = sink->getNext()) {
                     // Save the current result.
-                    Value id = current->getValue( "_id" );
-                    resultSet[ id ] = current;
-                    
-                    // Advance.
-                    if ( sink->advance() ) {
-                        // If advance succeeded, eof() is false.
-                        ASSERT( !sink->eof() );
-                    }
+                    Value id = current->getField( "_id" );
+                    resultSet[ id ] = *current;
                 }
                 // Verify the DocumentSourceGroup is exhausted.
                 assertExhausted( sink );
@@ -709,42 +694,6 @@ namespace DocumentSourceTests {
 
         /** An empty collection generates no results. */
         class EmptyCollection : public CheckResultsBase {
-        };
-
-        /** eof() is the first iteration method called. */
-        class InitEof : public Base {
-        public:
-            void run() {
-                client.insert( ns, BSONObj() );
-                createSource();
-                createGroup( BSON( "_id" << 1 ) );
-                ASSERT( !group()->eof() );
-            }
-        };
-
-        /** advance() is the first iteration method called. */
-        class InitAdvance : public Base {
-        public:
-            void run() {
-                client.insert( ns, BSON( "_id" << 0 ) );
-                client.insert( ns, BSON( "_id" << 1 ) );
-                createSource();
-                createGroup( BSON( "_id" << "$_id" ) );
-                ASSERT( group()->advance() );
-                // Exhaust the results.
-                ASSERT( !group()->advance() );
-            }
-        };
-
-        /** getCurrent() is the first iteration method called. */
-        class InitGetCurrent : public Base {
-        public:
-            void run() {
-                client.insert( ns, BSONObj() );
-                createSource();
-                createGroup( BSON( "_id" << 1 ) );
-                ASSERT_EQUALS( 1, group()->getCurrent()->getValue( "_id" ).getInt() );
-            }
         };
 
         /** A $group performed on a single document. */
@@ -952,12 +901,9 @@ namespace DocumentSourceTests {
             DocumentSource* project() { return _project.get(); }
             /** Assert that iterator state accessors consistently report the source is exhausted. */
             void assertExhausted() const {
-                // eof() is true.
-                ASSERT( _project->eof() );
-                // advance() triggers a verify assertion.
-                //ASSERT( !_project->advance() );
-                // getCurrent() triggers a verify assertion.
-                //ASSERT( !_project->getCurrent() );
+                ASSERT( !_project->getNext() );
+                ASSERT( !_project->getNext() );
+                ASSERT( !_project->getNext() );
             }
             /**
              * Check that the BSON representation generated by the souce matches the BSON it was
@@ -973,32 +919,6 @@ namespace DocumentSourceTests {
             intrusive_ptr<DocumentSource> _project;
         };
 
-        /** eof() is the first member function called. */
-        class EofInit : public Base {
-        public:
-            void run() {
-                client.insert( ns, BSON( "_id" << 0 << "a" << 1 ) );
-                createSource();
-                createProject();
-                // A result is available, so not eof().
-                ASSERT( !project()->eof() );
-            }
-        };
-        
-        /** advance() is the first member function called. */
-        class AdvanceInit : public Base {
-        public:
-            void run() {
-                client.insert( ns, BSON( "_id" << 0 << "a" << 1 ) );
-                client.insert( ns, BSON( "_id" << 1 << "a" << 2 ) );
-                createSource();
-                createProject();
-                // Another result is available, so advance() succeeds.
-                ASSERT( project()->advance() );
-                ASSERT_EQUALS( 2, project()->getCurrent()->getField( "a" ).getInt() );
-            }
-        };
-
         /** The 'a' and 'c.d' fields are included, but the 'b' field is not. */
         class Inclusion : public Base {
         public:
@@ -1007,15 +927,14 @@ namespace DocumentSourceTests {
                 createSource();
                 createProject( BSON( "a" << true << "c" << BSON( "d" << true ) ) );
                 // The first result exists and is as expected.
-                ASSERT(!project()->eof());
-                ASSERT_EQUALS( 1, project()->getCurrent()->getField( "a" ).getInt() );
-                ASSERT( project()->getCurrent()->getField( "b" ).missing() );
+                boost::optional<Document> next = project()->getNext();
+                ASSERT(bool(next));
+                ASSERT_EQUALS( 1, next->getField( "a" ).getInt() );
+                ASSERT( next->getField( "b" ).missing() );
                 // The _id field is included by default in the root document.
-                ASSERT_EQUALS( 0, project()->getCurrent()->getField( "_id" ).getInt() );
+                ASSERT_EQUALS(0, next->getField( "_id" ).getInt());
                 // The nested c.d inclusion.
-                ASSERT_EQUALS( 1,
-                               project()->getCurrent()->getField( "c" ).getDocument()->
-                                getField( "d" ).getInt() );
+                ASSERT_EQUALS(1, (*next)["c"]["d"].getInt());
             }
         };
 
@@ -1075,14 +994,16 @@ namespace DocumentSourceTests {
                 client.insert( ns, BSON( "a" << 3 << "b" << 4 ) );
                 createSource();
                 createProject();
-                ASSERT( !project()->eof() );
-                ASSERT_EQUALS( 1, project()->getCurrent()->getField( "a" ).getInt() );
-                ASSERT( project()->getCurrent()->getField( "b" ).missing() );
-                ASSERT( project()->advance() );
-                ASSERT( !project()->eof() );
-                ASSERT_EQUALS( 3, project()->getCurrent()->getField( "a" ).getInt() );
-                ASSERT( project()->getCurrent()->getField( "b" ).missing() );
-                ASSERT( !project()->advance() );
+                boost::optional<Document> next = project()->getNext();
+                ASSERT(bool(next));
+                ASSERT_EQUALS( 1, next->getField( "a" ).getInt() );
+                ASSERT( next->getField( "b" ).missing() );
+
+                next = project()->getNext();
+                ASSERT(bool(next));
+                ASSERT_EQUALS( 3, next->getField( "a" ).getInt() );
+                ASSERT( next->getField( "b" ).missing() );
+
                 assertExhausted();
             }
         };
@@ -1126,9 +1047,9 @@ namespace DocumentSourceTests {
             DocumentSourceSort* sort() { return dynamic_cast<DocumentSourceSort*>(_sort.get()); }
             /** Assert that iterator state accessors consistently report the source is exhausted. */
             void assertExhausted() const {
-                // eof() is true.
-                ASSERT( _sort->eof() );
-                // advance() and getCurrent() are illegal to call if eof() is true
+                ASSERT( !_sort->getNext() );
+                ASSERT( !_sort->getNext() );
+                ASSERT( !_sort->getNext() );
             }
         private:
             /**
@@ -1142,32 +1063,6 @@ namespace DocumentSourceTests {
                 ASSERT_EQUALS( spec, generatedSpec );
             }
             intrusive_ptr<DocumentSource> _sort;
-        };
-        
-        /** eof() is the first member function called. */
-        class EofInit : public Base {
-        public:
-            void run() {
-                client.insert( ns, BSON( "_id" << 0 << "a" << 1 ) );
-                createSource();
-                createSort();
-                // A result is available, so not eof().
-                ASSERT( !sort()->eof() );
-            }
-        };
-        
-        /** advance() is the first member function called. */
-        class AdvanceInit : public Base {
-        public:
-            void run() {
-                client.insert( ns, BSON( "_id" << 0 << "a" << 1 ) );
-                client.insert( ns, BSON( "_id" << 1 << "a" << 2 ) );
-                createSource();
-                createSort();
-                // Another result is available, so advance() succeeds.
-                ASSERT( sort()->advance() );
-                ASSERT_EQUALS( 2, sort()->getCurrent()->getField( "a" ).getInt() );
-            }
         };
 
         class SortWithLimit : public Base {
@@ -1218,15 +1113,9 @@ namespace DocumentSourceTests {
                 
                 // Load the results from the DocumentSourceUnwind.
                 vector<Document> resultSet;
-                while( !sort()->eof() ) {
+                while (boost::optional<Document> current = sort()->getNext()) {
                     // Get the current result.
-                    resultSet.push_back( sort()->getCurrent() );
-                    
-                    // Advance.
-                    if ( sort()->advance() ) {
-                        // If advance succeeded, eof() is false.
-                        ASSERT( !sort()->eof() );
-                    }
+                    resultSet.push_back(*current);
                 }
                 // Verify the DocumentSourceUnwind is exhausted.
                 assertExhausted();
@@ -1281,8 +1170,8 @@ namespace DocumentSourceTests {
             virtual BSONObj sortSpec() { return BSON( "a" << 1 ); }
         private:
             void exhaust() {
-                while( !sort()->eof() ) {
-                    sort()->advance();
+                while (sort()->getNext()) {
+                    // do nothing
                 }
             }
         };
@@ -1492,9 +1381,9 @@ namespace DocumentSourceTests {
             DocumentSource* unwind() { return _unwind.get(); }
             /** Assert that iterator state accessors consistently report the source is exhausted. */
             void assertExhausted() const {
-                // eof() is true.
-                ASSERT( _unwind->eof() );
-                // advance() and getCurrent() are illegal to call if eof() is true
+                ASSERT( !_unwind->getNext() );
+                ASSERT( !_unwind->getNext() );
+                ASSERT( !_unwind->getNext() );
             }
         private:
             /**
@@ -1510,31 +1399,6 @@ namespace DocumentSourceTests {
             intrusive_ptr<DocumentSource> _unwind;
         };
 
-        /** eof() is the first member function called. */
-        class EofInit : public Base {
-        public:
-            void run() {
-                client.insert( ns, BSON( "_id" << 0 << "a" << BSON_ARRAY( 1 ) ) );
-                createSource();
-                createUnwind();
-                // A result is available, so not eof().
-                ASSERT( !unwind()->eof() );
-            }
-        };
-
-        /** advance() is the first member function called. */
-        class AdvanceInit : public Base {
-        public:
-            void run() {
-                client.insert( ns, BSON( "_id" << 0 << "a" << BSON_ARRAY( 1 << 2 ) ) );
-                createSource();
-                createUnwind();
-                // Another result is available, so advance() succeeds.
-                ASSERT( unwind()->advance() );
-                ASSERT_EQUALS( 2, unwind()->getCurrent()->getField( "a" ).coerceToInt() );
-            }
-        };
-
         class CheckResultsBase : public Base {
         public:
             virtual ~CheckResultsBase() {}
@@ -1545,15 +1409,9 @@ namespace DocumentSourceTests {
 
                 // Load the results from the DocumentSourceUnwind.
                 vector<Document> resultSet;
-                while( !unwind()->eof() ) {
+                while (boost::optional<Document> current = unwind()->getNext()) {
                     // Get the current result.
-                    resultSet.push_back( unwind()->getCurrent() );
-
-                    // Advance.
-                    if ( unwind()->advance() ) {
-                        // If advance succeeded, eof() is false.
-                        ASSERT( !unwind()->eof() );
-                    }
+                    resultSet.push_back(*current);
                 }
                 // Verify the DocumentSourceUnwind is exhausted.
                 assertExhausted();
@@ -1596,7 +1454,9 @@ namespace DocumentSourceTests {
             virtual void populateData() {}
         private:
             void iterateAll() {
-                while( unwind()->advance() );
+                while (unwind()->getNext()) {
+                    // do nothing
+                }
             }
         };
 
@@ -1832,9 +1692,6 @@ namespace DocumentSourceTests {
             add<DocumentSourceGroup::AggregateObjectExpression>();
             add<DocumentSourceGroup::AggregateOperatorExpression>();
             add<DocumentSourceGroup::EmptyCollection>();
-            add<DocumentSourceGroup::InitEof>();
-            add<DocumentSourceGroup::InitAdvance>();
-            add<DocumentSourceGroup::InitGetCurrent>();
             add<DocumentSourceGroup::SingleDocument>();
             add<DocumentSourceGroup::TwoValuesSingleKey>();
             add<DocumentSourceGroup::TwoValuesTwoKeys>();
@@ -1848,8 +1705,6 @@ namespace DocumentSourceTests {
             add<DocumentSourceGroup::StringConstantIdAndAccumulatorExpressions>();
             add<DocumentSourceGroup::ArrayConstantAccumulatorExpression>();
 
-            add<DocumentSourceProject::EofInit>();
-            add<DocumentSourceProject::AdvanceInit>();
             add<DocumentSourceProject::Inclusion>();
             add<DocumentSourceProject::Optimize>();
             add<DocumentSourceProject::NonObjectSpec>();
@@ -1859,8 +1714,6 @@ namespace DocumentSourceTests {
             add<DocumentSourceProject::TwoDocuments>();
             add<DocumentSourceProject::Dependencies>();
 
-            add<DocumentSourceSort::EofInit>();
-            add<DocumentSourceSort::AdvanceInit>();
             add<DocumentSourceSort::Empty>();
             add<DocumentSourceSort::SingleValue>();
             add<DocumentSourceSort::TwoValues>();
@@ -1881,8 +1734,6 @@ namespace DocumentSourceTests {
             add<DocumentSourceSort::ExtractArrayValues>();
             add<DocumentSourceSort::Dependencies>();
 
-            add<DocumentSourceUnwind::EofInit>();
-            add<DocumentSourceUnwind::AdvanceInit>();
             add<DocumentSourceUnwind::Empty>();
             add<DocumentSourceUnwind::MissingField>();
             add<DocumentSourceUnwind::NullField>();

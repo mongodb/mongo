@@ -25,31 +25,13 @@ namespace mongo {
     DocumentSourceBsonArray::~DocumentSourceBsonArray() {
     }
 
-    bool DocumentSourceBsonArray::eof() {
-        return !haveCurrent;
-    }
+    boost::optional<Document> DocumentSourceBsonArray::getNext() {
+        pExpCtx->checkForInterrupt();
 
-    bool DocumentSourceBsonArray::advance() {
-        DocumentSource::advance(); // check for interrupts
+        if (!arrayIterator.more())
+            return boost::none;
 
-        if (eof())
-            return false;
-
-        if (!arrayIterator.more()) {
-            haveCurrent = false;
-            return false;
-        }
-
-        currentElement = arrayIterator.next();
-        return true;
-    }
-
-    Document DocumentSourceBsonArray::getCurrent() {
-        verify(haveCurrent);
-        BSONObj documentObj(currentElement.Obj());
-        Document pDocument(
-            Document::createFromBsonObj(&documentObj));
-        return pDocument;
+        return Document(arrayIterator.next().Obj());
     }
 
     void DocumentSourceBsonArray::setSource(DocumentSource *pSource) {
@@ -58,17 +40,12 @@ namespace mongo {
     }
 
     DocumentSourceBsonArray::DocumentSourceBsonArray(
-        BSONElement *pBsonElement,
-        const intrusive_ptr<ExpressionContext> &pExpCtx):
-        DocumentSource(pExpCtx),
-        embeddedObject(pBsonElement->embeddedObject()),
-        arrayIterator(embeddedObject),
-        haveCurrent(false) {
-        if (arrayIterator.more()) {
-            currentElement = arrayIterator.next();
-            haveCurrent = true;
-        }
-    }
+            BSONElement *pBsonElement,
+            const intrusive_ptr<ExpressionContext> &pExpCtx)
+        : DocumentSource(pExpCtx)
+        , embeddedObject(pBsonElement->embeddedObject())
+        , arrayIterator(embeddedObject)
+    {}
 
     intrusive_ptr<DocumentSourceBsonArray> DocumentSourceBsonArray::create(
         BSONElement *pBsonElement,

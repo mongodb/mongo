@@ -31,33 +31,19 @@ namespace mongo {
         dispose();
     }
 
-    bool DocumentSourceCursor::eof() {
-        /* if we haven't gotten the first one yet, do so now */
-        if (unstarted)
+    boost::optional<Document> DocumentSourceCursor::getNext() {
+        pExpCtx->checkForInterrupt();
+
+        if (_currentBatch.empty()) {
             loadBatch();
 
-        return _currentBatch.empty();
-    }
+            if (_currentBatch.empty()) // exhausted the cursor
+                return boost::none;
+        }
 
-    bool DocumentSourceCursor::advance() {
-        DocumentSource::advance(); // check for interrupts
-
-        /* if we haven't gotten the first one yet, do so now */
-        if (unstarted)
-            loadBatch();
-
-        verify(!_currentBatch.empty());
+        Document out = _currentBatch.front();
         _currentBatch.pop_front();
-
-        if (_currentBatch.empty())
-            loadBatch();
-
-        return !_currentBatch.empty();
-    }
-
-    Document DocumentSourceCursor::getCurrent() {
-        verify(!_currentBatch.empty());
-        return _currentBatch.front();
+        return out;
     }
 
     void DocumentSourceCursor::dispose() {
@@ -96,8 +82,6 @@ namespace mongo {
     }
 
     void DocumentSourceCursor::loadBatch() {
-        unstarted = false;
-
         if (!_cursorId) {
             dispose();
             return;
@@ -251,7 +235,6 @@ namespace mongo {
                                                CursorId cursorId,
                                                const intrusive_ptr<ExpressionContext> &pCtx)
         : DocumentSource(pCtx)
-        , unstarted(true)
         , _docsAddedToBatches(0)
         , ns(ns)
         , _cursorId(cursorId)
