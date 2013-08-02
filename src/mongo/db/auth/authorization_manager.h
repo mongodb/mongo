@@ -195,6 +195,9 @@ namespace mongo {
         /**
          * Invalidates all User objects in the cache and removes them from the cache.
          * Should only be called when already holding _lock.
+         * TODO(spencer): This only exists because we're currently calling initializeAllV1UserData
+         * every time user data is changed.  Once we only call that once at startup, this function
+         * should be removed.
          */
         void _invalidateUserCache_inlock();
 
