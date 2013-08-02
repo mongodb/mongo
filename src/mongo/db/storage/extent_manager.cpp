@@ -297,6 +297,10 @@ namespace mongo {
     // XXX-ERH
     void addNewExtentToNamespace(const char *ns, Extent *e, DiskLoc eloc, DiskLoc emptyLoc, bool capped);
 
+    void _quotaExceeded() {
+        uasserted(12501, "quota exceeded");
+    }
+
     Extent* ExtentManager::_createExtentInFile( int fileNo, DataFile* f,
                                                 const char* ns, int size, bool newCapped,
                                                 bool enforceQuota ) {
@@ -306,10 +310,11 @@ namespace mongo {
         if ( enforceQuota ) {
             if ( fileIndexExceedsQuota( ns, fileNo - 1 ) ) {
                 if ( cc().hasWrittenThisPass() ) {
-                    warning() << "quota exceeded, but can't assert, going over quota for: " << ns << endl;
+                    warning() << "quota exceeded, but can't assert "
+                              << " going over quota for: " << ns << " " << fileNo << endl;
                 }
                 else {
-                    uasserted(12501, "quota exceeded");
+                    _quotaExceeded();
                 }
             }
         }
@@ -326,6 +331,9 @@ namespace mongo {
 
         addNewExtentToNamespace(ns, e, loc, emptyLoc, newCapped);
 
+        LOG(1) << "ExtentManager: creating new extent for: " << ns << " in file: " << fileNo
+               << " size: " << size << endl;
+
         return e;
     }
 
@@ -339,6 +347,13 @@ namespace mongo {
                 return _createExtentInFile( i, f, ns, size, newCapped, enforceQuota );
             }
         }
+
+        if ( enforceQuota &&
+             fileIndexExceedsQuota( ns, numFiles() ) &&
+             !cc().hasWrittenThisPass() ) {
+            _quotaExceeded();
+        }
+
 
         // no space in an existing file
         // allocate files until we either get one big enough or hit maxSize
