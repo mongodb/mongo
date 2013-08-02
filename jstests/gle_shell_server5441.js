@@ -17,6 +17,6 @@ for ( i=0; i<100; i++ ) {
 
 db.adminCommand( { replSetGetStatus : 1 , forShell : 1 } );
 shellPrintHelper( updateReturn )
-replSetMemberStatePrompt()
+defaultPrompt()
 
 checkgle("'final'");

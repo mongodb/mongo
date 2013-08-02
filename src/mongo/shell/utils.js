@@ -559,7 +559,7 @@ replSetMemberStatePrompt = function() {
 
 isMasterStatePrompt = function() {
     var state = '';
-    var isMaster = db.isMaster();
+    var isMaster = db.runCommand({isMaster:1, forShell:1});
     if ( isMaster.ok ) {
         var role = "";
 
