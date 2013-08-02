@@ -31,6 +31,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
 #include "mongo/util/background.h"
+#include "mongo/util/concurrency/mutex.h" // for StaticObserver
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/timer.h"
 
@@ -49,6 +50,7 @@ namespace mongo {
      *          _seedServers             -- list (map) of servers
      *          _sets                    -- list (map) of ReplicaSetMonitors
      *          replicaSetMonitorWatcher -- background job to check Replica Set members
+     *          staticObserver           -- sentinel to detect process termination
      *
      *      Related to:
      *          SERVER-8891 -- Simple client fail with segmentation fault in mongoclient library
@@ -80,8 +82,7 @@ namespace mongo {
     protected:
         void run() {
             log() << "starting" << endl;
-            while ( ! inShutdown() ) {
-                sleepsecs( 10 );
+            while ( !inShutdown() && !StaticObserver::_destroyingStatics ) {
                 try {
                     ReplicaSetMonitor::checkAll();
                 }
@@ -91,6 +92,7 @@ namespace mongo {
                 catch ( ... ) {
                     error() << "unknown error" << endl;
                 }
+                sleepsecs( 10 );
             }
         }
 
@@ -98,6 +100,8 @@ namespace mongo {
         bool _started;
 
     } replicaSetMonitorWatcher;
+
+    static StaticObserver staticObserver;
 
 
     /*
