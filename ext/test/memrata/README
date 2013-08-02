@@ -1,10 +1,10 @@
 Memrata/KVS README.
 
-The basic data structures are: "KVS sources" which map to one or more physical
-devices; each KVS source supports any number of WiredTiger sources (where a
-WiredTiger source is an object specified by a URI, so it would generally be a
-"file:".  Of course, each WiredTiger source supports any number of WiredTiger
-cursors.
+The basic data structures are: "KVS sources" which map to one or more
+physical devices; each KVS source supports any number of WiredTiger sources,
+where a WiredTiger source will be an object similar to a "file:" object.
+
+Each WiredTiger source supports any number of WiredTiger cursors.
 
 For each WiredTiger source, we create two namespaces on the underlying device,
 a "cache" and a "primary".
@@ -33,12 +33,13 @@ When an insert, update or remove is done:
 	release the lock
 
 When a search is done:
-	read any matching key from the cache
+	if there's a matching key/value pair in the cache {
 		if there's an item visible to the reading transaction
 			return it
-
-	read any matching key from the primary
+	}
+	if there's a matching key/value pair in the primary {
 		return it
+	}
 
 When a next/prev is done:
 	move to the next/prev visible item in the cache
@@ -86,7 +87,7 @@ We only need to lock the cache when removing rows, the initial copy to the
 primary does not require a lock.
 
 No lock is required when removing rows from the transaction store, once the
-transaction ID is less than the BaseTxnID, no access to it will be made.
+transaction ID is less than the BaseTxnID, it will never be read.
 
 =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 Questions, problems, whatever:
@@ -99,7 +100,7 @@ transaction ID, that is, all updates are globally visible by definition, and
 all update elements are discarded.
 
     We don't need recovery: we can simply start using the cache again, it's
-up-to-date (once transaction IDs are durable).
+up-to-date (once transaction IDs are durable in WiredTiger).
 
     We can't discard any elements from the txn namespace until we know all of
 the objects have been opened and "recovered", else we'd discard commit records
@@ -115,12 +116,9 @@ the same order to find it, which we can't guarantee?
 they must be the same as the ones used to create the object).  We need a
 better naming scheme.
 
-* Consider ways to avoid the lookup to see if transaction has aborted (maybe
-avoid the lookup when there are no aborted transactions in the transaction
-store, which should be the case most of the time).
-
-* If we have to single-thread a lot, maybe we could hash the keys and
-and pick a spin-lock out of a set and work with it.
+* Consider ways to avoid the lookup to see if a transaction has aborted
+(maybe avoid the lookup when there are no aborted transactions in the
+transaction store, which should be the case most of the time).
 
 * There's a general problem with data-sources in WiredTiger.   If we commit
 and push the commit record to stable storage, and then crash, the enclosing
@@ -131,4 +129,5 @@ durability is complete, we're going to need WiredTiger support to solve this.
 
 * If a record in the cache gets too busy, we could end up unable to remove it
 (there would always be an active transaction), and it would grow forever.  I
-suspect the solution is to clean it up when we realize we can't remove it.
+suspect the solution is to clean it up when we realize we can't remove it,
+that is, we can rebuild the record, discarding the no longer needed entries.
