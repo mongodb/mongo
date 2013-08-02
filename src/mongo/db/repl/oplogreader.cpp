@@ -86,29 +86,8 @@ namespace mongo {
         return true;
     }
 
-    bool replHandshake(DBClientConnection *conn) {
+    bool replHandshake(DBClientConnection *conn, const BSONObj& me) {
         string myname = getHostName();
-
-        BSONObj me;
-        {
-            
-            Lock::DBWrite l("local");
-            // local.me is an identifier for a server for getLastError w:2+
-            if ( ! Helpers::getSingleton( "local.me" , me ) ||
-                 ! me.hasField("host") ||
-                 me["host"].String() != myname ) {
-
-                // clean out local.me
-                Helpers::emptyCollection("local.me");
-
-                // repopulate
-                BSONObjBuilder b;
-                b.appendOID( "_id" , 0 , true );
-                b.append( "host", myname );
-                me = b.obj();
-                Helpers::putSingleton( "local.me" , me );
-            }
-        }
 
         BSONObjBuilder cmd;
         cmd.appendAs( me["_id"] , "handshake" );
@@ -124,9 +103,7 @@ namespace mongo {
         return true;
     }
 
-    OplogReader::OplogReader( bool doHandshake ) : 
-        _doHandshake( doHandshake ) { 
-        
+    OplogReader::OplogReader() {
         _tailingQueryOptions = QueryOption_SlaveOk;
         _tailingQueryOptions |= QueryOption_CursorTailable | QueryOption_OplogReplay;
         
@@ -151,18 +128,29 @@ namespace mongo {
         }
         return true;
     }
-    
+
     bool OplogReader::connect(const std::string& hostName) {
-        if (conn() != 0) {
+        if (conn()) {
             return true;
         }
 
-        if ( ! commonConnect(hostName) ) {
+        if (!commonConnect(hostName)) {
             return false;
         }
-        
-        
-        if ( _doHandshake && ! replHandshake(_conn.get() ) ) {
+
+        return true;
+    }
+
+    bool OplogReader::connect(const std::string& hostName, const BSONObj& me) {
+        if (conn()) {
+            return true;
+        }
+
+        if (!commonConnect(hostName)) {
+            return false;
+        }
+
+        if (!replHandshake(_conn.get(), me)) {
             return false;
         }
 
