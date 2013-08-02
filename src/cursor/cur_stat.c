@@ -145,7 +145,7 @@ __curstat_set_key(WT_CURSOR *cursor, ...)
 	va_end(ap);
 
 	if ((cursor->saved_err = ret) == 0)
-		F_SET(cursor, WT_CURSTD_KEY_APP);
+		F_SET(cursor, WT_CURSTD_KEY_EXT);
 
 err:	API_END(session);
 }
@@ -187,7 +187,7 @@ __curstat_next(WT_CURSOR *cursor)
 	}
 	cst->v = cst->stats_first[cst->key].v;
 	WT_ERR(__curstat_print_value(session, cst->v, &cst->pv));
-	F_SET(cursor, WT_CURSTD_KEY_RET | WT_CURSTD_VALUE_RET);
+	F_SET(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);
 
 err:	API_END(session);
 	return (ret);
@@ -214,13 +214,13 @@ __curstat_prev(WT_CURSOR *cursor)
 	} else if (cst->key > 0)
 		--cst->key;
 	else {
-		F_CLR(cursor, WT_CURSTD_KEY_RET | WT_CURSTD_VALUE_RET);
+		F_CLR(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);
 		WT_ERR(WT_NOTFOUND);
 	}
 
 	cst->v = cst->stats_first[cst->key].v;
 	WT_ERR(__curstat_print_value(session, cst->v, &cst->pv));
-	F_SET(cursor, WT_CURSTD_KEY_RET | WT_CURSTD_VALUE_RET);
+	F_SET(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);
 
 err:	API_END(session);
 	return (ret);
@@ -269,7 +269,7 @@ __curstat_search(WT_CURSOR *cursor)
 
 	cst->v = cst->stats_first[cst->key].v;
 	WT_ERR(__curstat_print_value(session, cst->v, &cst->pv));
-	F_SET(cursor, WT_CURSTD_KEY_RET | WT_CURSTD_VALUE_RET);
+	F_SET(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);
 
 err:	API_END(session);
 	return (ret);

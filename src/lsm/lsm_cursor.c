@@ -141,7 +141,7 @@ __clsm_open_cursors(
 		F_SET(clsm, WT_CLSM_OPEN_READ);
 
 	/* Copy the key, so we don't lose the cursor position. */
-	if (F_ISSET(c, WT_CURSTD_KEY_RET) && c->key.data != c->key.mem)
+	if (F_ISSET(c, WT_CURSTD_KEY_INT) && c->key.data != c->key.mem)
 		WT_RET(__wt_buf_set(
 		    session, &c->key, c->key.data, c->key.size));
 
@@ -336,8 +336,8 @@ __clsm_get_current(
 	WT_RET(current->get_value(current, &c->value));
 
 	if ((*deletedp = __clsm_deleted(clsm, &c->value)) == 0) {
-		F_CLR(c, WT_CURSTD_KEY_APP | WT_CURSTD_VALUE_APP);
-		F_SET(c, WT_CURSTD_KEY_RET | WT_CURSTD_VALUE_RET);
+		F_CLR(c, WT_CURSTD_KEY_EXT | WT_CURSTD_VALUE_EXT);
+		F_SET(c, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);
 	} else
 		F_CLR(c, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 
@@ -647,8 +647,8 @@ __clsm_search(WT_CURSOR *cursor)
 done:
 err:	API_END(session);
 	if (ret == 0) {
-		F_CLR(cursor, WT_CURSTD_KEY_APP | WT_CURSTD_VALUE_APP);
-		F_SET(cursor, WT_CURSTD_KEY_RET | WT_CURSTD_VALUE_RET);
+		F_CLR(cursor, WT_CURSTD_KEY_EXT | WT_CURSTD_VALUE_EXT);
+		F_SET(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);
 	} else {
 		F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 		clsm->current = NULL;
@@ -814,8 +814,8 @@ err:	API_END(session);
 		WT_TRET(larger->reset(larger));
 
 	if (ret == 0) {
-		F_CLR(cursor, WT_CURSTD_KEY_APP | WT_CURSTD_VALUE_APP);
-		F_SET(cursor, WT_CURSTD_KEY_RET | WT_CURSTD_VALUE_RET);
+		F_CLR(cursor, WT_CURSTD_KEY_EXT | WT_CURSTD_VALUE_EXT);
+		F_SET(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);
 	} else {
 		F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 		clsm->current = NULL;

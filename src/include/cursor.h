@@ -270,23 +270,38 @@ struct __wt_cursor_table {
 
 #define	WT_CURSOR_RECNO(cursor)	(strcmp((cursor)->key_format, "r") == 0)
 
+/*
+ * WT_CURSOR_NEEDKEY, WT_CURSOR_NEEDVALUE --
+ *	Check if we have a key/value set.  There's an additional semantic
+ * implemented here: if we're pointing into the tree, and about to perform
+ * a cursor operation, get a local copy of whatever we're referencing in
+ * the tree, there's an obvious race with the cursor moving and the key or
+ * value reference, and it's better to solve it here than in the underlying
+ * data-source layers.
+ */
 #define	WT_CURSOR_NEEDKEY(cursor) do {					\
-	if (F_ISSET(cursor, WT_CURSTD_KEY_RET) &&			\
-	    !WT_DATA_IN_ITEM(&(cursor)->key))				\
-		WT_ERR(__wt_buf_set(					\
-		    (WT_SESSION_IMPL *)(cursor)->session,		\
-		    &(cursor)->key,					\
-		    (cursor)->key.data, (cursor)->key.size));		\
+	if (F_ISSET(cursor, WT_CURSTD_KEY_INT)) {			\
+		if (!WT_DATA_IN_ITEM(&(cursor)->key))			\
+			WT_ERR(__wt_buf_set(				\
+			    (WT_SESSION_IMPL *)(cursor)->session,	\
+			    &(cursor)->key,				\
+			    (cursor)->key.data, (cursor)->key.size));	\
+		F_CLR(cursor, WT_CURSTD_KEY_INT);			\
+		F_SET(cursor, WT_CURSTD_KEY_EXT);			\
+	}								\
 	if (!F_ISSET(cursor, WT_CURSTD_KEY_SET))			\
 		WT_ERR(__wt_cursor_kv_not_set(cursor, 1));		\
 } while (0)
 #define	WT_CURSOR_NEEDVALUE(cursor) do {				\
-	if (F_ISSET(cursor, WT_CURSTD_VALUE_RET) &&			\
-	    !WT_DATA_IN_ITEM(&(cursor)->value))				\
-		WT_ERR(__wt_buf_set(					\
-		    (WT_SESSION_IMPL *)cursor->session,			\
-		    &cursor->value,					\
-		    cursor->value.data, cursor->value.size));		\
+	if (F_ISSET(cursor, WT_CURSTD_VALUE_INT)) {			\
+		if (WT_DATA_IN_ITEM(&(cursor)->value))			\
+			WT_ERR(__wt_buf_set(				\
+			    (WT_SESSION_IMPL *)(cursor)->session,	\
+			    &(cursor)->value,				\
+			    (cursor)->value.data, (cursor)->value.size));\
+		F_CLR(cursor, WT_CURSTD_VALUE_INT);			\
+		F_SET(cursor, WT_CURSTD_VALUE_EXT);			\
+	}								\
 	if (!F_ISSET(cursor, WT_CURSTD_VALUE_SET))			\
 		WT_ERR(__wt_cursor_kv_not_set(cursor, 0));		\
 } while (0)

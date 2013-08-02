@@ -89,72 +89,72 @@ __curds_cursor_resolve(WT_SESSION_IMPL *session, WT_CURSOR *cursor, int ret)
 
 	source = ((WT_CURSOR_DATA_SOURCE *)cursor)->source;
 
+	/*
+	 * On success, set the top-level cursor's key and value and ensure we
+	 * don't reference application memory.  WiredTiger guarantees that a
+	 * successful cursor operation leaves the cursor referencing private
+	 * memory, that is, the application's memory can be modified without
+	 * concern.  File cursors do this in the btree layer; don't complicate
+	 * underlying data sources by making them implement that semantic, do
+	 * it more generally here.
+	 *
+	 * Originally, we set the source's key/value to reference the original
+	 * cursor's value.  If that's still true, make a local copy of any key
+	 * or value so we can clean up on error, then do a copy to WiredTiger
+	 * memory.  If that's not still true, the data source must have set a
+	 * return key/value and we can reference it.
+	 */
 	if (ret == 0) {
-		/*
-		 * On success, retrieve the key and value and ensure we don't
-		 * reference application memory.  WiredTiger guarantees that
-		 * a successful cursor operation leaves the cursor referencing
-		 * private memory, that is, the application's memory can be
-		 * modified without concern.  File cursors do this in the btree
-		 * layer; we don't complicate underlying data sources by making
-		 * them implement that semantic, do it more generally here.
-		 *
-		 * Originally, we set the source's key/value to reference the
-		 * original cursor's value.  If that's still true, make a local
-		 * copy of any key or value so we can clean up on error, then
-		 * do a copy in WiredTiger memory.  If that's not true, the data
-		 * source set a return key/value and we can simply reference it.
-		 */
-		cursor->recno = source->recno;
-		if (F_ISSET(cursor, WT_CURSTD_KEY_APP) &&
-		    cursor->key.data == source->key.data) {
-			key_data = cursor->key.data;
-			key_size = cursor->key.size;
+		key_data = cursor->key.data;
+		key_size = cursor->key.size;
+		value_data = cursor->value.data;
+		value_size = cursor->value.size;
+		if (cursor->key.data == source->key.data)
 			WT_TRET(__wt_buf_set(session, &cursor->key,
 			    cursor->key.data, cursor->key.size));
-		} else {
+		else {
 			cursor->key.data = source->key.data;
 			cursor->key.size = source->key.size;
 		}
-		if (F_ISSET(cursor, WT_CURSTD_VALUE_APP) &&
-		    cursor->value.data == source->value.data) {
-			value_data = cursor->value.data;
-			value_size = cursor->value.size;
+		if (cursor->value.data == source->value.data)
 			WT_TRET(__wt_buf_set(session, &cursor->value,
 			    cursor->value.data, cursor->value.size));
-		} else {
+		else {
 			cursor->value.data = source->value.data;
 			cursor->value.size = source->value.size;
 		}
-
-		/*
-		 * If a copy failed, then the return value might no longer
-		 * be 0, check again.
-		 */
-		if (ret == 0) {
-			F_CLR(cursor, WT_CURSTD_KEY_APP | WT_CURSTD_VALUE_APP);
-			F_SET(cursor, WT_CURSTD_KEY_RET | WT_CURSTD_VALUE_RET);
-		} else {
-			if (F_ISSET(cursor, WT_CURSTD_KEY_APP)) {
-				cursor->key.data = key_data;
-				cursor->key.size = key_size;
-			}
-			if (F_ISSET(cursor, WT_CURSTD_VALUE_APP)) {
-				cursor->value.data = value_data;
-				cursor->value.size = value_size;
-			}
-			F_CLR(cursor, WT_CURSTD_KEY_RET | WT_CURSTD_VALUE_RET);
+		if (ret == 0)
+			cursor->recno = source->recno;
+		if (ret != 0) {
+			cursor->key.data = key_data;
+			cursor->key.size = key_size;
+			cursor->value.data = value_data;
+			cursor->value.size = value_size;
 		}
-	} else {
-		/*
-		 * WiredTiger's semantic is a cursor operation failure implies
-		 * the cursor position is lost.  Simplify the underlying data
-		 * source implementation and reset the cursor explicitly here.
-		 */
+	}
+
+	/*
+	 * Update the cursor's flags.  (We use the _INT flags in the same way
+	 * as file objects: there's some chance the underlying data source is
+	 * passing us a reference to data that's only pinned per operation,
+	 * might as well be safe.
+	 */
+	if (ret == 0) {
+		F_CLR(cursor, WT_CURSTD_KEY_EXT | WT_CURSTD_VALUE_EXT);
+		F_SET(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);
+	} else if (ret == WT_NOTFOUND)
+		F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
+	else
+		F_CLR(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);
+
+	/*
+	 * WiredTiger's semantic is cursor operation failure implies a lost
+	 * cursor position.  Simplify underlying data source implementations
+	 * and reset the cursor explicitly here.
+	 */
+	if (ret != 0)
 		WT_TRET(source->reset(source));
 
-		F_CLR(cursor, WT_CURSTD_KEY_RET | WT_CURSTD_VALUE_RET);
-	}
 	return (ret);
 }
 
@@ -224,8 +224,8 @@ __curds_next(WT_CURSOR *cursor)
 
 	WT_ERR(__curds_txn_enter(session, 0));
 
-	ret = source->next(source);
-	WT_TRET(__curds_cursor_resolve(session, cursor, ret));
+	F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);         
+	ret = __curds_cursor_resolve(session, cursor, source->next(source));
 
 err:	__curds_txn_leave(session);
 
@@ -253,8 +253,8 @@ __curds_prev(WT_CURSOR *cursor)
 
 	WT_ERR(__curds_txn_enter(session, 0));
 
-	ret = source->prev(source);
-	WT_TRET(__curds_cursor_resolve(session, cursor, ret));
+	F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);         
+	ret = __curds_cursor_resolve(session, cursor, source->prev(source));
 
 err:	__curds_txn_leave(session);
 
@@ -309,8 +309,7 @@ __curds_search(WT_CURSOR *cursor)
 	WT_ERR(__curds_txn_enter(session, 0));
 
 	WT_ERR(__curds_key_set(cursor));
-	ret = source->search(source);
-	WT_TRET(__curds_cursor_resolve(session, cursor, ret));
+	ret = __curds_cursor_resolve(session, cursor, source->search(source));
 
 err:	__curds_txn_leave(session);
 
@@ -339,8 +338,8 @@ __curds_search_near(WT_CURSOR *cursor, int *exact)
 	WT_ERR(__curds_txn_enter(session, 0));
 
 	WT_ERR(__curds_key_set(cursor));
-	ret = source->search_near(source, exact);
-	WT_TRET(__curds_cursor_resolve(session, cursor, ret));
+	ret = __curds_cursor_resolve(
+	    session, cursor, source->search_near(source, exact));
 
 err:	__curds_txn_leave(session);
 
@@ -370,12 +369,10 @@ __curds_insert(WT_CURSOR *cursor)
 	WT_DSTAT_INCRV(session,
 	    cursor_insert_bytes, cursor->key.size + cursor->value.size);
 
-	/* If not appending, we require a key. */
 	if (!F_ISSET(cursor, WT_CURSTD_APPEND))
 		WT_ERR(__curds_key_set(cursor));
 	WT_ERR(__curds_value_set(cursor));
-	ret = source->insert(source);
-	WT_TRET(__curds_cursor_resolve(session, cursor, ret));
+	ret = __curds_cursor_resolve(session, cursor, source->insert(source));
 
 err:	__curds_txn_leave(session);
 
@@ -406,8 +403,7 @@ __curds_update(WT_CURSOR *cursor)
 
 	WT_ERR(__curds_key_set(cursor));
 	WT_ERR(__curds_value_set(cursor));
-	ret = source->update(source);
-	WT_TRET(__curds_cursor_resolve(session, cursor, ret));
+	ret = __curds_cursor_resolve(session, cursor, source->update(source));
 
 err:	__curds_txn_leave(session);
 
@@ -437,11 +433,18 @@ __curds_remove(WT_CURSOR *cursor)
 	WT_ERR(__curds_txn_enter(session, 1));
 
 	WT_ERR(__curds_key_set(cursor));
-	ret = source->remove(source);
+	ret = __curds_cursor_resolve(session, cursor, source->remove(source));
 
-	/* After a successful remove, the key and value are not available. */
-	if (ret == 0)
-		F_CLR(cursor, WT_CURSTD_KEY_RET | WT_CURSTD_VALUE_RET);
+	/*
+	 * After a successful remove, copy the key: the value is not available.
+	 */
+	if (ret == 0) {
+		if (F_ISSET(cursor, WT_CURSTD_KEY_INT) &&
+		    !WT_DATA_IN_ITEM(&(cursor)->key))
+			WT_ERR(__wt_buf_set(session, &cursor->key,
+			    cursor->key.data, cursor->key.size));
+			F_CLR(cursor, WT_CURSTD_VALUE_SET);
+	}
 
 err:	__curds_txn_leave(session);
 

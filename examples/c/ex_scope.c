@@ -42,17 +42,16 @@ cursor_scope_ops(WT_CURSOR *cursor)
 		const char *key;
 		const char *value;
 		int (*apply)(WT_CURSOR *);
-		int post_op_ret;	/* Expected return for get_key/value. */
 	} *op, ops[] = {
-		{ "key1", "value1", cursor->insert, 0 },
-		{ "key1", "value2", cursor->update, 0 },
-		{ "key1", "value2", cursor->search, 0 },
-		{ "key1", "value2", cursor->remove, EINVAL },
-		{ NULL, NULL, NULL, 0 }
+		{ "key1", "value1", cursor->insert, },
+		{ "key1", "value2", cursor->update, },
+		{ "key1", "value2", cursor->search, },
+		{ "key1", "value2", cursor->remove, },
+		{ NULL, NULL, NULL }
 	};
 	const char *key, *value;
 	char keybuf[10], valuebuf[10];
-	int expected, ret;
+	int ret;
 
 	for (op = ops; op->key != NULL; op++) {
 		/*! [cursor scope operation] */
@@ -86,15 +85,13 @@ cursor_scope_ops(WT_CURSOR *cursor)
 		 * Check that get_key/value behave as expected after the
 		 * operation.
 		 */
-		expected = op->post_op_ret;
-		if ((ret = cursor->get_key(cursor, &key)) != expected ||
-		    (ret = cursor->get_value(cursor, &value)) != expected) {
+		if ((ret = cursor->get_key(cursor, &key)) != 0 ||
+		    (op->apply != cursor->remove &&
+		    (ret = cursor->get_value(cursor, &value)) != 0)) {
 			fprintf(stderr, "Error in get_key/value: %s\n",
 			    wiredtiger_strerror(ret));
 			return (ret);
 		}
-		if (expected != 0)
-			continue;
 
 		/*
 		 * The application now has pointers to memory that is owned by
@@ -103,14 +100,17 @@ cursor_scope_ops(WT_CURSOR *cursor)
 		 */
 
 		/* Check that the cursor's key and value are what we expect. */
-		if (key == keybuf || value == valuebuf) {
+		if (key == keybuf ||
+		    (op->apply != cursor->remove &&
+		    value == valuebuf)) {
 			fprintf(stderr,
 			    "Cursor points at application memory!\n");
 			return (EINVAL);
 		}
 
 		if (strcmp(key, op->key) != 0 ||
-		    strcmp(value, op->value) != 0) {
+		    (op->apply != cursor->remove &&
+		    strcmp(value, op->value) != 0)) {
 			fprintf(stderr, "Unexpected key / value!\n");
 			return (EINVAL);
 		}
