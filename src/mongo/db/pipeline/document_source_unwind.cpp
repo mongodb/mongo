@@ -24,24 +24,22 @@
 
 namespace mongo {
 
-    /** Helper class to unwind arrays within a series of documents. */
+    /** Helper class to unwind array from a single document. */
     class DocumentSourceUnwind::Unwinder {
     public:
         /** @param unwindPath is the field path to the array to unwind. */
         Unwinder(const FieldPath& unwindPath);
         /** Reset the unwinder to unwind a new document. */
         void resetDocument(const Document& document);
-        /** @return true if done unwinding the last document passed to resetDocument(). */
-        bool eof() const;
-        /** Try to advance to the next document unwound from the document passed to resetDocument().  */
-        void advance();
+
         /**
-         * @return the current document unwound from the document provided to resetDocument(), using
-         * the current value in the array located at the provided unwindPath.  But @return
-         * Document() if resetDocument() has not been called or the results to unwind
-         * have been exhausted.
+         * @return the next document unwound from the document provided to resetDocument(), using
+         * the current value in the array located at the provided unwindPath.
+         *
+         * Returns boost::none if the array is exhausted.
          */
-        Document getCurrent();
+        boost::optional<Document> getNext();
+
     private:
         // Path to the array to unwind.
         const FieldPath _unwindPath;
@@ -79,30 +77,12 @@ namespace mongo {
                 << typeName(pathValue.getType()),
                 pathValue.getType() == Array);
 
-        if (pathValue.getArray().empty()) {
-            // there are no values to unwind.
-            return;
-        }
-
         _inputArray = pathValue;
-        verify(!eof()); // Checked above that the array is nonempty.
     }
 
-    bool DocumentSourceUnwind::Unwinder::eof() const {
-        return (_inputArray.getType() != Array)
-            || (_index == _inputArray.getArrayLength());
-    }
-
-    void DocumentSourceUnwind::Unwinder::advance() {
-        if (!eof()) { // don't advance past end()
-            _index++;
-        }
-    }
-
-    Document DocumentSourceUnwind::Unwinder::getCurrent() {
-        if (eof()) {
-            return Document();
-        }
+    boost::optional<Document> DocumentSourceUnwind::Unwinder::getNext() {
+        if (_inputArray.missing() || _index == _inputArray.getArrayLength())
+            return boost::none;
 
         // If needed, this will automatically clone all the documents along the
         // field path so that the end values are not shared across documents
@@ -112,7 +92,7 @@ namespace mongo {
         // that change with any other clones (or the original).
 
         _output.setNestedField(_unwindPathFieldIndexes, _inputArray[_index]);
-
+        _index++;
         return _output.peek();
     }
 
@@ -126,55 +106,27 @@ namespace mongo {
         DocumentSource(pExpCtx) {
     }
 
-    void DocumentSourceUnwind::lazyInit() {
-        if (!_unwinder) {
-            verify(_unwindPath);
-            _unwinder.reset(new Unwinder(*_unwindPath));
-            if (!pSource->eof()) {
-                // Set up the first source document for unwinding.
-                _unwinder->resetDocument(pSource->getCurrent());
-            }
-            mayAdvanceSource();
-        }
-    }
-
-    void DocumentSourceUnwind::mayAdvanceSource() {
-        while(_unwinder->eof()) {
-            // The _unwinder is exhausted.
-
-            if (pSource->eof()) {
-                // The source is exhausted.
-                return;
-            }
-            if (!pSource->advance()) {
-                // The source is exhausted.
-                return;
-            }
-            // Reset the _unwinder with pSource's next document.
-            _unwinder->resetDocument(pSource->getCurrent());
-        }
-    }
-
     const char *DocumentSourceUnwind::getSourceName() const {
         return unwindName;
     }
 
-    bool DocumentSourceUnwind::eof() {
-        lazyInit();
-        return _unwinder->eof();
-    }
+    boost::optional<Document> DocumentSourceUnwind::getNext() {
+        pExpCtx->checkForInterrupt();
 
-    bool DocumentSourceUnwind::advance() {
-        DocumentSource::advance(); // check for interrupts
-        lazyInit();
-        _unwinder->advance();
-        mayAdvanceSource();
-        return !_unwinder->eof();
-    }
+        boost::optional<Document> out = _unwinder->getNext();
+        while (!out) {
+            // No more elements in array currently being unwound. This will loop if the input
+            // document is missing the unwind field or has an empty array.
+            boost::optional<Document> input = pSource->getNext();
+            if (!input)
+                return boost::none; // input exhausted
 
-    Document DocumentSourceUnwind::getCurrent() {
-        verify(!eof());
-        return _unwinder->getCurrent();
+            // Try to extract an output document from the new input document.
+            _unwinder->resetDocument(*input);
+            out = _unwinder->getNext();
+        }
+
+        return out;
     }
 
     void DocumentSourceUnwind::sourceToBson(
@@ -184,7 +136,6 @@ namespace mongo {
     }
 
     DocumentSource::GetDepsReturn DocumentSourceUnwind::getDependencies(set<string>& deps) const {
-        verify(_unwindPath);
         deps.insert(_unwindPath->getPath(false));
         return SEE_NEXT;
     }
@@ -195,6 +146,7 @@ namespace mongo {
                 !_unwindPath);
         // Record the unwind path.
         _unwindPath.reset(new FieldPath(fieldPath));
+        _unwinder.reset(new Unwinder(fieldPath));
     }
 
     intrusive_ptr<DocumentSource> DocumentSourceUnwind::createFromBson(

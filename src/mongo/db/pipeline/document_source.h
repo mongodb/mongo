@@ -65,37 +65,10 @@ namespace mongo {
         */
         int getPipelineStep() const;
 
-        /**
-          Is the source at EOF?
-
-          @returns true if the source has no more Documents to return.
-        */
-        virtual bool eof() = 0;
-
-        /**
-          Advance the state of the DocumentSource so that it will return the
-          next Document.
-
-          The default implementation returns false, after checking for
-          interrupts.  Derived classes can call the default implementation
-          in their own implementations in order to check for interrupts.
-
-          @returns whether there is another document to fetch, i.e., whether or
-            not getCurrent() will succeed.  This default implementation always
-            returns false.
-        */
-        virtual bool advance();
-
-        /** @returns the current Document without advancing.
-         *
-         *  It is illegal to call this without first checking eof() == false or advance() == true.
-         *
-         *  While it is legal to call getCurrent() multiple times between calls to advance, and
-         *  you will get the same Document returned, some DocumentSources do expensive work in
-         *  getCurrent(). You are advised to cache the result if you plan to access it more than
-         *  once.
+        /** Returns the next Document if there is one or boost::none if at EOF.
+         *  Subclasses must call pExpCtx->checkForInterupt().
          */
-        virtual Document getCurrent() = 0;
+        virtual boost::optional<Document> getNext() = 0;
 
         /**
          * Inform the source that it is no longer needed and may release its resources.  After
@@ -309,9 +282,7 @@ namespace mongo {
     public:
         // virtuals from DocumentSource
         virtual ~DocumentSourceBsonArray();
-        virtual bool eof();
-        virtual bool advance();
-        virtual Document getCurrent();
+        virtual boost::optional<Document> getNext();
         virtual void setSource(DocumentSource *pSource);
         virtual bool isValidInitialSource() const { return true; }
 
@@ -343,8 +314,6 @@ namespace mongo {
 
         BSONObj embeddedObject;
         BSONObjIterator arrayIterator;
-        BSONElement currentElement;
-        bool haveCurrent;
     };
 
     
@@ -353,9 +322,7 @@ namespace mongo {
     public:
         // virtuals from DocumentSource
         virtual ~DocumentSourceCommandShards();
-        virtual bool eof();
-        virtual bool advance();
-        virtual Document getCurrent();
+        virtual boost::optional<Document> getNext();
         virtual void setSource(DocumentSource *pSource);
         virtual bool isValidInitialSource() const { return true; }
 
@@ -409,9 +376,7 @@ namespace mongo {
     public:
         // virtuals from DocumentSource
         virtual ~DocumentSourceCursor();
-        virtual bool eof();
-        virtual bool advance();
-        virtual Document getCurrent();
+        virtual boost::optional<Document> getNext();
         virtual void setSource(DocumentSource *pSource);
         virtual bool coalesce(const intrusive_ptr<DocumentSource>& nextSource);
         virtual bool isValidInitialSource() const { return true; }
@@ -490,7 +455,6 @@ namespace mongo {
 
         void loadBatch();
 
-        bool unstarted;
         std::deque<Document> _currentBatch;
 
         // BSONObj members must outlive _projection and cursor.
@@ -530,9 +494,7 @@ namespace mongo {
     public:
         // virtuals from DocumentSource
         virtual ~DocumentSourceFilterBase();
-        virtual bool eof();
-        virtual bool advance();
-        virtual Document getCurrent();
+        virtual boost::optional<Document> getNext();
 
         /**
           Create a BSONObj suitable for Matcher construction.
@@ -561,12 +523,7 @@ namespace mongo {
         virtual bool accept(const Document& pDocument) const = 0;
 
     private:
-
-        void findNext();
-
         bool unstarted;
-        bool hasCurrent;
-        Document pCurrent;
     };
 
 
@@ -575,10 +532,8 @@ namespace mongo {
     public:
         // virtuals from DocumentSource
         virtual ~DocumentSourceGroup();
-        virtual bool eof();
-        virtual bool advance();
+        virtual boost::optional<Document> getNext();
         virtual const char *getSourceName() const;
-        virtual Document getCurrent();
         virtual GetDepsReturn getDependencies(set<string>& deps) const;
         virtual void dispose();
 
@@ -702,8 +657,6 @@ namespace mongo {
         pair<Value, Value> _firstPartOfNextGroup;
         Value _currentId;
         Accumulators _currentAccumulators;
-        bool _doneAfterNextAdvance;
-        bool _done;
     };
 
 
@@ -759,9 +712,7 @@ namespace mongo {
         typedef vector<pair<ConnectionString, CursorId> > CursorIds;
 
         // virtuals from DocumentSource
-        virtual bool eof();
-        virtual bool advance();
-        virtual Document getCurrent();
+        boost::optional<Document> getNext();
         virtual void setSource(DocumentSource *pSource);
         virtual const char *getSourceName() const;
         virtual void dispose();
@@ -795,12 +746,6 @@ namespace mongo {
             const CursorIds& cursorIds,
             const intrusive_ptr<ExpressionContext> &pExpCtx);
 
-        // sets _current and _hasCurrent by calling getNextDocumentImpl()
-        void getNextDocument();
-
-        // does the work of finding the next document if there is one
-        boost::optional<Document> getNextDocumentImpl();
-
         // This is the description of cursors to merge.
         const CursorIds _cursorIds;
 
@@ -809,8 +754,6 @@ namespace mongo {
         Cursors::iterator _currentCursor;
 
         bool _unstarted;
-        bool _hasCurrent;
-        Document _current;
     };
 
     class DocumentSourceOut : public SplittableDocumentSource
@@ -818,10 +761,8 @@ namespace mongo {
     public:
         // virtuals from DocumentSource
         virtual ~DocumentSourceOut();
-        virtual bool eof();
-        virtual bool advance();
+        virtual boost::optional<Document> getNext();
         virtual const char *getSourceName() const;
-        virtual Document getCurrent();
 
         // Virtuals for SplittableDocumentSource
         virtual intrusive_ptr<DocumentSource> getShardSource() { return NULL; }
@@ -868,10 +809,8 @@ namespace mongo {
     public:
         // virtuals from DocumentSource
         virtual ~DocumentSourceProject();
-        virtual bool eof();
-        virtual bool advance();
+        virtual boost::optional<Document> getNext();
         virtual const char *getSourceName() const;
-        virtual Document getCurrent();
         virtual void optimize();
 
         virtual GetDepsReturn getDependencies(set<string>& deps) const;
@@ -919,10 +858,8 @@ namespace mongo {
     public:
         // virtuals from DocumentSource
         virtual ~DocumentSourceSort();
-        virtual bool eof();
-        virtual bool advance();
+        virtual boost::optional<Document> getNext();
         virtual const char *getSourceName() const;
-        virtual Document getCurrent();
         virtual void addToBsonArray(BSONArrayBuilder *pBuilder, bool explain=false) const;
         virtual bool coalesce(const intrusive_ptr<DocumentSource> &pNextSource);
         virtual void dispose();
@@ -1028,7 +965,6 @@ namespace mongo {
         intrusive_ptr<DocumentSourceLimit> limitSrc;
 
         bool _done;
-        Document _current;
         scoped_ptr<MySorter::Iterator> _output;
     };
 
@@ -1037,9 +973,7 @@ namespace mongo {
     public:
         // virtuals from DocumentSource
         virtual ~DocumentSourceLimit();
-        virtual bool eof();
-        virtual bool advance();
-        virtual Document getCurrent();
+        virtual boost::optional<Document> getNext();
         virtual const char *getSourceName() const;
         virtual bool coalesce(const intrusive_ptr<DocumentSource> &pNextSource);
 
@@ -1099,9 +1033,7 @@ namespace mongo {
     public:
         // virtuals from DocumentSource
         virtual ~DocumentSourceSkip();
-        virtual bool eof();
-        virtual bool advance();
-        virtual Document getCurrent();
+        virtual boost::optional<Document> getNext();
         virtual const char *getSourceName() const;
         virtual bool coalesce(const intrusive_ptr<DocumentSource> &pNextSource);
 
@@ -1123,8 +1055,8 @@ namespace mongo {
         virtual intrusive_ptr<DocumentSource> getShardSource() { return NULL; }
         virtual intrusive_ptr<DocumentSource> getRouterSource() { return this; }
 
-        long long getSkip() const { return skip; }
-        void setSkip(long long newSkip) { skip = newSkip; }
+        long long getSkip() const { return _skip; }
+        void setSkip(long long newSkip) { _skip = newSkip; }
 
         /**
           Create a skipping DocumentSource from BSON.
@@ -1150,14 +1082,8 @@ namespace mongo {
     private:
         DocumentSourceSkip(const intrusive_ptr<ExpressionContext> &pExpCtx);
 
-        /*
-          Skips initial documents.
-         */
-        void skipper();
-
-        long long skip;
-        long long count;
-        Document pCurrent;
+        long long _skip;
+        bool _needToSkip;
     };
 
 
@@ -1166,10 +1092,8 @@ namespace mongo {
     public:
         // virtuals from DocumentSource
         virtual ~DocumentSourceUnwind();
-        virtual bool eof();
-        virtual bool advance();
+        virtual boost::optional<Document> getNext();
         virtual const char *getSourceName() const;
-        virtual Document getCurrent();
 
         virtual GetDepsReturn getDependencies(set<string>& deps) const;
 
@@ -1196,18 +1120,6 @@ namespace mongo {
     private:
         DocumentSourceUnwind(const intrusive_ptr<ExpressionContext> &pExpCtx);
 
-        /**
-         * Lazily construct the _unwinder and initialize the iterator state of this DocumentSource.
-         * To be called by all members that depend on the iterator state.
-         */
-        void lazyInit();
-
-        /**
-         * If the _unwinder is exhausted and the source may be advanced, advance the pSource and
-         * reset the _unwinder's source document.
-         */
-        void mayAdvanceSource();
-
         /** Specify the field to unwind. */
         void unwindPath(const FieldPath &fieldPath);
 
@@ -1224,9 +1136,7 @@ namespace mongo {
     public:
         // virtuals from DocumentSource
         virtual ~DocumentSourceGeoNear();
-        virtual bool eof();
-        virtual bool advance();
-        virtual Document getCurrent();
+        virtual boost::optional<Document> getNext();
         virtual const char *getSourceName() const;
         virtual void setSource(DocumentSource *pSource); // errors out since this must be first
         virtual bool coalesce(const intrusive_ptr<DocumentSource> &pNextSource);
@@ -1275,8 +1185,6 @@ namespace mongo {
         // these fields are used while processing the results
         BSONObj cmdOutput;
         boost::scoped_ptr<BSONObjIterator> resultsIterator; // iterator over cmdOutput["results"]
-        Document currentDoc;
-        bool hasCurrent;
     };
 }
 

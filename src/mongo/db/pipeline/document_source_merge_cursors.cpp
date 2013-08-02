@@ -28,31 +28,6 @@ namespace mongo {
         return name;
     }
 
-    bool DocumentSourceMergeCursors::eof() {
-        /* if we haven't even started yet, do so */
-        if (_unstarted)
-            getNextDocument();
-
-        return !_hasCurrent;
-    }
-
-    bool DocumentSourceMergeCursors::advance() {
-        DocumentSource::advance(); // check for interrupts
-
-        if (_unstarted)
-            getNextDocument(); // skip first
-
-        /* advance */
-        getNextDocument();
-
-        return _hasCurrent;
-    }
-
-    Document DocumentSourceMergeCursors::getCurrent() {
-        verify(!eof());
-        return _current;
-    }
-
     void DocumentSourceMergeCursors::setSource(DocumentSource *pSource) {
         /* this doesn't take a source */
         verify(false);
@@ -64,7 +39,6 @@ namespace mongo {
         : DocumentSource(pExpCtx)
         , _cursorIds(cursorIds)
         , _unstarted(true)
-        , _hasCurrent(false)
     {}
 
     intrusive_ptr<DocumentSource> DocumentSourceMergeCursors::create(
@@ -109,17 +83,7 @@ namespace mongo {
         , cursor(connection.get(), ns, id, 0, 0)
     {}
 
-    void DocumentSourceMergeCursors::getNextDocument() {
-        if (boost::optional<Document> doc = getNextDocumentImpl()) {
-            _current = *doc;
-            _hasCurrent = true;
-        }
-        else {
-            _hasCurrent = false;
-        }
-    }
-
-    boost::optional<Document> DocumentSourceMergeCursors::getNextDocumentImpl() {
+    boost::optional<Document> DocumentSourceMergeCursors::getNext() {
         if (_unstarted) {
             _unstarted = false;
 
@@ -172,6 +136,5 @@ namespace mongo {
     void DocumentSourceMergeCursors::dispose() {
         _cursors.clear();
         _currentCursor = _cursors.end();
-        _hasCurrent = false;
     }
 }

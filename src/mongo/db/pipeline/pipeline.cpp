@@ -466,12 +466,10 @@ namespace mongo {
             // cant use subArrayStart() due to error handling
             BSONArrayBuilder resultArray;
             DocumentSource* finalSource = sources.back().get();
-            for (bool hasDoc = !finalSource->eof(); hasDoc; hasDoc = finalSource->advance()) {
-                Document pDocument(finalSource->getCurrent());
-
+            while (boost::optional<Document> next = finalSource->getNext()) {
                 /* add the document to the result set */
                 BSONObjBuilder documentBuilder (resultArray.subobjStart());
-                pDocument->toBson(&documentBuilder);
+                next->toBson(&documentBuilder);
                 documentBuilder.doneFast();
                 // object will be too large, assert. the extra 1KB is for headers
                 uassert(16389,
@@ -522,12 +520,10 @@ namespace mongo {
         verify(pSourceBsonArray);
 
         BSONArrayBuilder shardOpArray; // where we'll put the pipeline ops
-        for(bool hasDocument = !pSourceBsonArray->eof(); hasDocument;
-            hasDocument = pSourceBsonArray->advance()) {
-            Document pDocument = pSourceBsonArray->getCurrent();
-            BSONObjBuilder opBuilder;
-            pDocument->toBson(&opBuilder);
-            shardOpArray.append(opBuilder.obj());
+        while (boost::optional<Document> next = pSourceBsonArray->getNext()) {
+            BSONObjBuilder opBuilder(shardOpArray.subobjStart());
+            next->toBson(&opBuilder);
+            opBuilder.doneFast();
         }
 
         BSONArrayBuilder mongosOpArray; // where we'll put the pipeline ops

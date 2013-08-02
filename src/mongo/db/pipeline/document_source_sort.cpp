@@ -34,34 +34,16 @@ namespace mongo {
         return sortName;
     }
 
-    bool DocumentSourceSort::eof() {
-        if (!populated)
-            populate();
-
-        return _done;
-    }
-
-    bool DocumentSourceSort::advance() {
-        DocumentSource::advance(); // check for interrupts
+    boost::optional<Document> DocumentSourceSort::getNext() {
+        pExpCtx->checkForInterrupt();
 
         if (!populated)
             populate();
 
-        verify(_output);
+        if (!_output || !_output->more())
+            return boost::none;
 
-        if (_output->more()) {
-            _current = _output->next().second;
-        }
-        else {
-            _done = true;
-        }
-
-        return !_done;
-    }
-
-    Document DocumentSourceSort::getCurrent() {
-        verify(populated && !_done);
-        return _current;
+        return _output->next().second;
     }
 
     void DocumentSourceSort::addToBsonArray(BSONArrayBuilder *pBuilder, bool explain) const {
@@ -94,16 +76,13 @@ namespace mongo {
     }
 
     void DocumentSourceSort::dispose() {
-        _current = Document();
         _output.reset();
-        _done = true;
         pSource->dispose();
     }
 
     DocumentSourceSort::DocumentSourceSort(const intrusive_ptr<ExpressionContext> &pExpCtx)
         : SplittableDocumentSource(pExpCtx)
         , populated(false)
-        , _done(false)
     {}
 
     long long DocumentSourceSort::getLimit() const {
@@ -203,11 +182,6 @@ namespace mongo {
         /* make sure we've got a sort key */
         verify(vSortKey.size());
 
-        if (pSource->eof()) {
-            _done = true;
-            return;
-        }
-
         SortOptions opts;
         if (limitSrc)
             opts.limit = limitSrc->getLimit();
@@ -217,15 +191,11 @@ namespace mongo {
 
         scoped_ptr<MySorter> sorter (MySorter::make(opts, Comparator(*this)));
 
-        do { // pSource->eof() checked above
-            const Document doc = pSource->getCurrent();
-            sorter->add(extractKey(doc), doc);
-        } while (pSource->advance());
+        while (boost::optional<Document> next = pSource->getNext()) {
+            sorter->add(extractKey(*next), *next);
+        }
 
         _output.reset(sorter->done());
-        verify(_output->more()); // we put something in so we should get something out
-        _current = _output->next().second;
-
         populated = true;
     }
 

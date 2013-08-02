@@ -79,11 +79,12 @@ namespace mongo {
         }
     }
 
-    // This is the only iteration method that should ever be called so it does all of the work.
-    bool DocumentSourceOut::eof() {
+    boost::optional<Document> DocumentSourceOut::getNext() {
+        pExpCtx->checkForInterrupt();
+
         // make sure we only write out once
         if (_done)
-            return true;
+            return boost::none;
         _done = true;
 
         verify(_mongod);
@@ -92,8 +93,8 @@ namespace mongo {
         prepTempCollection();
         verify(_tempNs.size() != 0);
 
-        for (bool haveNext = !pSource->eof(); haveNext; haveNext = pSource->advance()) {
-            BSONObj toInsert = pSource->getCurrent().toBson();
+        while (boost::optional<Document> next = pSource->getNext()) {
+            BSONObj toInsert = next->toBson();
             conn->insert(_tempNs.ns(), toInsert);
             BSONObj err = conn->getLastErrorDetailed();
             uassert(16996, str::stream() << "insert for $out failed: " << err,
@@ -119,17 +120,7 @@ namespace mongo {
 
         // This "DocumentSource" doesn't produce output documents. This can change in the future
         // if we support using $out in "tee" mode.
-        return true;
-    }
-
-    bool DocumentSourceOut::advance() {
-        msgasserted(16998,
-            "DocumentSourceOut::advance should never be called because eof() is always true.");
-    }
-
-    Document DocumentSourceOut::getCurrent() {
-        msgasserted(16999,
-            "DocumentSourceOut::getCurrent should never be called because eof() is always true.");
+        return boost::none;
     }
 
     DocumentSourceOut::DocumentSourceOut(const NamespaceString& outputNs,

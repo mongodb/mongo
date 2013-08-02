@@ -126,15 +126,31 @@ namespace mongo {
     public:
         PipelineCursor(intrusive_ptr<Pipeline> pipeline)
             : _pipeline(pipeline)
+            , _started(false)
+            , _done(false)
         {}
 
         // "core" cursor protocol
-        virtual bool ok() { return !iterator()->eof(); }
-        virtual bool advance() { return iterator()->advance(); }
+        virtual bool ok() {
+            if (!_started) {
+                _started = true;
+                getNext();
+            }
+            return !_done;
+        }
+        virtual bool advance() {
+            if (!_started) {
+                _started = true;
+                // skip first result
+                getNext();
+            }
+
+            getNext();
+            return !_done;
+        }
         virtual BSONObj current() {
-            BSONObjBuilder builder;
-            iterator()->getCurrent().toBson(&builder);
-            return builder.obj();
+            verify(ok());
+            return _currentObj;
         }
 
         virtual bool requiresLock() { return false; }
@@ -157,7 +173,19 @@ namespace mongo {
         const DocumentSource* iterator() const { return _pipeline->output(); }
         DocumentSource* iterator() { return _pipeline->output(); }
 
+        void getNext() {
+            if (boost::optional<Document> result = iterator()->getNext()) {
+                _currentObj = result->toBson();
+            }
+            else {
+                _done = true;
+            }
+        }
+
         intrusive_ptr<Pipeline> _pipeline;
+        bool _started;
+        bool _done;
+        BSONObj _currentObj;
     };
 
     class PipelineCommand :
