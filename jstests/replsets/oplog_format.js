@@ -168,33 +168,40 @@ assert.eq(gle.n, 1, "update failed for '" + msg +"': "+ tojson(gle));
 assert.docEq({_id:1, a: {b:[1,2]}}, coll.findOne({}), msg);
 assertLastOplog({$set:{"a.b": [1,2]}}, {_id:1}, msg);
 
-/* These are currently broken but the equiv c++ test passes 
 var msg = "bad array $push $sort ($slice -100)";
-coll.save({_id:1, a:{b:[{a:2}, {a:1}]}})
-coll.update({}, {$push:{"a.b":{$each:[{a:-1}], $sort:{"a.b":1}, $slice:-100}}});
+coll.save({_id:1, a:{b:[{c:2}, {c:1}]}})
+coll.update({}, {$push:{"a.b":{$each:[{c:-1}], $sort:{"c":1}, $slice:-100}}});
 var gle = cdb.getLastErrorObj();
 assert.isnull(gle.err, msg);
 assert.eq(gle.n, 1, "update failed for '" + msg +"': "+ tojson(gle));
-assert.docEq({_id:1, a: {b:[{a:-1}, {a:1}, {a:2}]}}, coll.findOne({}), msg);
-assertLastOplog({$set:{"a.b": [{a:-1},{a:1}, {a:2}]}}, {_id:1}, msg);
+assert.docEq({_id:1, a: {b:[{c:-1}, {c:1}, {c:2}]}}, coll.findOne({}), msg);
+assertLastOplog({$set:{"a.b": [{c:-1},{c:1}, {c:2}]}}, {_id:1}, msg);
 
 var msg = "bad array $push $slice $sort";
-coll.save({_id:1, a:[{a:2}, {a:1}]})
-coll.update({_id:{$gt:0}}, {$push:{"a":{$each:[{a:-1}], $slice:-2, $sort:{a:1}}}});
+coll.save({_id:1, a:[{b:2}, {b:1}]})
+coll.update({_id:{$gt:0}}, {$push:{"a":{$each:[{b:-1}], $slice:-2, $sort:{b:1}}}});
 var gle = cdb.getLastErrorObj();
 assert.isnull(gle.err, msg);
 assert.eq(gle.n, 1, "update failed for '" + msg +"': "+ tojson(gle));
-assert.docEq({_id:1, a: [{a:1}, {a:2}]}, coll.findOne({}), msg);
-assertLastOplog({$set:{a: [{a:1},{a:2}]}}, {_id:1}, msg);
+assert.docEq({_id:1, a: [{b:1}, {b:2}]}, coll.findOne({}), msg);
+assertLastOplog({$set:{a: [{b:1},{b:2}]}}, {_id:1}, msg);
 
-var msg = "bad array $push $slice $sort dotted";
-coll.save({_id:1, a:{b:[{a:2}, {a:1}]}})
-coll.update({_id:{$gt:0}}, {$push:{"a.b":{$each:[{a:-1}], $slice:-2, $sort:{"a.b":1}}}});
+var msg = "bad array $push $slice $sort first two";
+coll.save({_id:1, a:{b:[{c:2}, {c:1}]}})
+coll.update({_id:{$gt:0}}, {$push:{"a.b":{$each:[{c:-1}], $slice:-2, $sort:{"c":1}}}});
 var gle = cdb.getLastErrorObj();
 assert.isnull(gle.err, msg);
 assert.eq(gle.n, 1, "update failed for '" + msg +"': "+ tojson(gle));
-assert.docEq({_id:1, a: {b:[{a:-1}, {a:1}]}}, coll.findOne({}), msg);
-assertLastOplog({$set:{"a.b": [{a:-1},{a:1}]}}, {_id:1}, msg);
-*/
+assert.docEq({_id:1, a: {b:[{c:1}, {c:2}]}}, coll.findOne({}), msg);
+assertLastOplog({$set:{"a.b": [{c:1},{c:2}]}}, {_id:1}, msg);
+
+var msg = "bad array $push $slice $sort reversed first two";
+coll.save({_id:1, a:{b:[{c:1}, {c:2}]}})
+coll.update({_id:{$gt:0}}, {$push:{"a.b":{$each:[{c:-1}], $slice:-2, $sort:{"c":-1}}}});
+var gle = cdb.getLastErrorObj();
+assert.isnull(gle.err, msg);
+assert.eq(gle.n, 1, "update failed for '" + msg +"': "+ tojson(gle));
+assert.docEq({_id:1, a: {b:[{c:1}, {c:-1}]}}, coll.findOne({}), msg);
+assertLastOplog({$set:{"a.b": [{c:1},{c:-1}]}}, {_id:1}, msg);
 
 replTest.stopSet();
