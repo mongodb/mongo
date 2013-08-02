@@ -2397,6 +2397,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="commands_admin.cpp" />
     <ClCompile Include="commands_public.cpp" />
     <ClCompile Include="config.cpp" />
+    <ClCompile Include="config_server_checker_service.cpp" />
     <ClCompile Include="config_upgrade.cpp" />
     <ClCompile Include="config_upgrade_helpers.cpp" />
     <ClCompile Include="config_upgrade_v0_to_v4.cpp" />
@@ -2875,6 +2876,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="cluster_client_internal.h" />
     <ClInclude Include="collection_manager.h" />
     <ClInclude Include="config.h" />
+    <ClInclude Include="config_server_checker_service.h" />
     <ClInclude Include="config_upgrade.h" />
     <ClInclude Include="config_upgrade_helpers.h" />
     <ClInclude Include="cursors.h" />

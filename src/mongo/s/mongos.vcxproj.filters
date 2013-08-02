@@ -1641,6 +1641,9 @@
     <ClCompile Include="..\platform\posix_fadvise.cpp">
       <Filter>platform</Filter>
     </ClCompile>
+    <ClCompile Include="config_server_checker_service.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\pch.h" />
@@ -3227,6 +3230,9 @@
     </ClInclude>
     <ClInclude Include="..\platform\posix_fadvise.h">
       <Filter>platform</Filter>
+    </ClInclude>
+    <ClInclude Include="config_server_checker_service.h">
+      <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
