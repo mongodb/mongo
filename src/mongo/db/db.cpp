@@ -324,6 +324,52 @@ namespace mongo {
         return repairDatabase( dbName.c_str(), errmsg );
     }
 
+    void checkForIdIndexes(const std::string& dbName) {
+        if (!cmdLine.usingReplSets()) {
+            // we only care about the _id index if we are in a replset
+            return;
+        }
+        if (dbName == "local") {
+            // we do not need an _id index on anything in the local database
+            return;
+        }
+        const string systemNamespaces = cc().database()->name() + ".system.namespaces";
+        shared_ptr<Cursor> cursor = theDataFileMgr.findAll(systemNamespaces);
+        // gather collections
+        vector<string> collections = vector<string>();
+        for ( ; cursor && cursor->ok(); cursor->advance()) {
+            const BSONObj entry = cursor->current();
+            string name = entry["name"].valuestrsafe();
+            if (name.find('$') == string::npos && !NamespaceString(name).isSystem()) {
+                collections.push_back(name);
+            }
+        }
+        // for each collection, ensure there is a $_id_ index
+        for (vector<string>::iterator i = collections.begin();
+                i != collections.end(); ++i) {
+            bool idIndexExists = false;
+            string indexName = str::stream() << *i << ".$_id_";
+            boost::shared_ptr<Cursor> indexCursor = theDataFileMgr.findAll(systemNamespaces);
+            for ( ; indexCursor && indexCursor->ok(); indexCursor->advance()) {
+                const BSONObj entry = indexCursor->current();
+                string name = entry["name"].valuestrsafe();
+                if (!name.compare(indexName)) {
+                    idIndexExists = true;
+                    break;
+                }
+            }
+            if (!idIndexExists) {
+                log() << "WARNING: the collection '" << *i
+                      << "' lacks a unique index on _id."
+                      << " This index is needed for replication to function properly"
+                      << startupWarningsLog;
+                log() << "\t To fix this, on the primary run 'db." << i->substr(i->find('.')+1)
+                      << ".createIndex({_id: 1}, {unique: true})'"
+                      << startupWarningsLog;
+            }
+        }
+    }
+
     // ran at startup.
     static void repairDatabasesAndCheckVersion() {
         //        LastError * le = lastError.get( true );
@@ -339,6 +385,7 @@ namespace mongo {
             Client::Context ctx( dbName );
             DataFile *p = cc().database()->getFile( 0 );
             DataFileHeader *h = p->getHeader();
+            checkForIdIndexes(dbName);
             if ( !h->isCurrentVersion() || forceRepair ) {
 
                 if( h->version <= 0 ) {
