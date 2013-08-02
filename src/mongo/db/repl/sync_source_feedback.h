@@ -29,7 +29,7 @@ namespace mongo {
     public:
         SyncSourceFeedback() : BackgroundJob(false /*don't selfdelete*/),
                               _syncTarget(NULL),
-                              _oplogReader(new OplogReader(true)),
+                              _oplogReader(new OplogReader()),
                               _supportsUpdater(false) {}
 
         ~SyncSourceFeedback() {
@@ -83,7 +83,7 @@ namespace mongo {
          * does not support the update command.
          */
         bool connectOplogReader(const std::string& hostName) {
-            return _oplogReader->connect(hostName);
+            return _oplogReader->connect(hostName, _me);
         }
 
         bool connect(const mongo::OID& rid, const int from, const string& to) {

@@ -32,10 +32,9 @@ namespace mongo {
     class OplogReader {
         shared_ptr<DBClientConnection> _conn;
         shared_ptr<DBClientCursor> cursor;
-        bool _doHandshake;
         int _tailingQueryOptions;
     public:
-        OplogReader( bool doHandshake = true );
+        OplogReader();
         ~OplogReader() { }
         void resetCursor() { cursor.reset(); }
         void resetConnection() {
@@ -55,6 +54,8 @@ namespace mongo {
 
         /* ok to call if already connected */
         bool connect(const std::string& hostname);
+
+        bool connect(const std::string& hostname, const BSONObj& me);
 
         bool connect(const mongo::OID& rid, const int from, const string& to);
 

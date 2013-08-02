@@ -178,7 +178,7 @@ namespace mongo {
         const bo fields;
 
         /** todo fix we might want an so timeout here */
-        OplogReader reader(false);
+        OplogReader reader;
 
         if (reader.connect(m->fullName()) == false) {
             ss << "couldn't connect to " << m->fullName();
