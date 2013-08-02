@@ -341,7 +341,13 @@ DB.prototype._authOrThrow = function () {
     }
 
     params.userSource = this.getName();
-    return this.getMongo().auth(params);
+    var good = this.getMongo().auth(params);
+    if (good) {
+        // auth enabled, and should try to use isMaster and replSetGetStatus to build prompt
+        this.getMongo().authStatus = {authRequired:true, isMaster:true, replSetGetStatus:true};
+    }
+
+    return good;
 }
 
 

@@ -156,6 +156,9 @@ namespace mongo {
             /* currently request to arbiter is (somewhat arbitrarily) an ismaster request that is not
                authenticated.
             */
+            if ( cmdObj["forShell"].trueValue() )
+                lastError.disableForCommand();
+
             appendReplicationInfo(result, 0);
 
             result.appendNumber("maxBsonObjectSize", BSONObjMaxUserSize);

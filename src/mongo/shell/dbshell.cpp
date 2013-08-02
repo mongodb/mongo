@@ -1024,7 +1024,7 @@ int _main( int argc, char* argv[], char **envp ) {
             else if ( ( promptType == Code ) &&
                      execPrompt( *scope, "prompt", prompt ) ) {
             }
-            else if ( execPrompt( *scope, "replSetMemberStatePrompt", prompt ) ) {
+            else if ( execPrompt( *scope, "defaultPrompt", prompt ) ) {
             }
             else {
                 prompt = "> ";
