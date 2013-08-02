@@ -140,14 +140,15 @@ namespace mongo {
         Status checkAuthForPrivileges(const vector<Privilege>& privileges);
 
     private:
+
+        // Checks if this connection is authorized for the given Privilege, ignoring whether or not
+        // we should even be doing authorization checks in general.
+        Status _checkAuthForPrivilegeHelper(const Privilege& privilege);
+
         // Finds the set of privileges attributed to "principal" in database "dbname",
         // and adds them to the set of acquired privileges.
         void _acquirePrivilegesForPrincipalFromDatabase(const std::string& dbname,
                                                         const UserName& user);
-
-        // Checks to see if the given privilege is allowed, performing implicit privilege
-        // acquisition if enabled and necessary to resolve the privilege.
-        Status _probeForPrivilege(const Privilege& privilege);
 
         // Returns a new privilege that has replaced the actions needed to handle special casing
         // certain namespaces like system.users and system.profile.  Note that the special handling

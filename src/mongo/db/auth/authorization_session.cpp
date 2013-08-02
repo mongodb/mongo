@@ -132,10 +132,10 @@ namespace {
 
     void AuthorizationSession::logoutDatabase(const std::string& dbname) {
         Principal* principal = _authenticatedPrincipals.lookupByDBName(dbname);
-        if (!principal)
-            return;
-        _acquiredPrivileges.revokePrivilegesFromUser(principal->getName());
-        _authenticatedPrincipals.removeByDBName(dbname);
+        if (principal) {
+            _acquiredPrivileges.revokePrivilegesFromUser(principal->getName());
+            _authenticatedPrincipals.removeByDBName(dbname);
+        }
 
         User* removedUser = _authenticatedUsers.removeByDBName(dbname);
         if (removedUser) {
@@ -320,7 +320,7 @@ namespace {
         if (_externalState->shouldIgnoreAuthChecks())
             return Status::OK();
 
-        return _probeForPrivilege(privilege);
+        return _checkAuthForPrivilegeHelper(privilege);
     }
 
     Status AuthorizationSession::checkAuthForPrivileges(const vector<Privilege>& privileges) {
@@ -328,7 +328,7 @@ namespace {
             return Status::OK();
 
         for (size_t i = 0; i < privileges.size(); ++i) {
-            Status status = _probeForPrivilege(privileges[i]);
+            Status status = _checkAuthForPrivilegeHelper(privileges[i]);
             if (!status.isOK())
                 return status;
         }
@@ -336,25 +336,34 @@ namespace {
         return Status::OK();
     }
 
-    Status AuthorizationSession::_probeForPrivilege(const Privilege& privilege) {
+    Status AuthorizationSession::_checkAuthForPrivilegeHelper(const Privilege& privilege) {
         Privilege modifiedPrivilege = _modifyPrivilegeForSpecialCases(privilege);
-        if (_acquiredPrivileges.hasPrivilege(modifiedPrivilege))
-            return Status::OK();
 
-        std::string dbname = nsToDatabase(modifiedPrivilege.getResource());
-        for (PrincipalSet::iterator iter = _authenticatedPrincipals.begin(),
-                 end = _authenticatedPrincipals.end();
-             iter != end; ++iter) {
+        // Need to check not just the resource of the privilege, but also just the database
+        // component and the "*" resource.
+        std::string resourceSearchList[3];
+        resourceSearchList[0] = PrivilegeSet::WILDCARD_RESOURCE;
+        resourceSearchList[1] = nsToDatabase(modifiedPrivilege.getResource());
+        resourceSearchList[2] = modifiedPrivilege.getResource();
 
-            Principal* principal = *iter;
-            if (principal->isDatabaseProbed(dbname))
-                continue;
-            _acquirePrivilegesForPrincipalFromDatabase(dbname, principal->getName());
-            principal->markDatabaseAsProbed(dbname);
-            if (_acquiredPrivileges.hasPrivilege(modifiedPrivilege))
-                return Status::OK();
+
+        ActionSet unmetRequirements = modifiedPrivilege.getActions();
+        for (UserSet::iterator it = _authenticatedUsers.begin();
+                it != _authenticatedUsers.end(); ++it) {
+            User* user = *it;
+
+            // TODO(spencer): Handle if the user has been invalidated.
+
+            for (int i = 0; i < static_cast<int>(boost::size(resourceSearchList)); ++i) {
+                ActionSet userActions = user->getActionsForResource(resourceSearchList[i]);
+                unmetRequirements.removeAllActionsFromSet(userActions);
+
+                if (unmetRequirements.empty())
+                    return Status::OK();
+            }
         }
-        return Status(ErrorCodes::Unauthorized, "unauthorized", 0);
+
+        return Status(ErrorCodes::Unauthorized, "unauthorized");
     }
 
 } // namespace mongo

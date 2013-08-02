@@ -38,8 +38,8 @@ namespace {
     public:
         AuthzManagerExternalStateMock* managerState;
         AuthzSessionExternalStateMock* sessionState;
-        scoped_ptr<AuthorizationSession> authzSession;
         scoped_ptr<AuthorizationManager> authzManager;
+        scoped_ptr<AuthorizationSession> authzSession;
 
         void setUp() {
             managerState = new AuthzManagerExternalStateMock();
@@ -47,39 +47,66 @@ namespace {
             sessionState = new AuthzSessionExternalStateMock(authzManager.get());
             authzSession.reset(new AuthorizationSession(sessionState));
         }
+
+        void tearDown() {
+            // All users have to have a ref count of zero when the AuthorizationManager is destroyed
+            while (internalSecurity.user->getRefCount() > 0) {
+                internalSecurity.user->decrementRefCount();
+            }
+        }
     };
 
-    TEST_F(AuthorizationSessionTest, AcquirePrivilegeAndCheckAuthorization) {
-        Principal* principal = new Principal(UserName("Spencer", "test"));
-        ActionSet actions;
-        actions.addAction(ActionType::insert);
-        Privilege writePrivilege("test", actions);
-        Privilege allDBsWritePrivilege("*", actions);
-
+    TEST_F(AuthorizationSessionTest, AddUserAndCheckAuthorization) {
+        // Check that disabling auth checks works
         ASSERT_FALSE(authzSession->checkAuthorization("test", ActionType::insert));
         sessionState->setReturnValueForShouldIgnoreAuthChecks(true);
         ASSERT_TRUE(authzSession->checkAuthorization("test", ActionType::insert));
         sessionState->setReturnValueForShouldIgnoreAuthChecks(false);
         ASSERT_FALSE(authzSession->checkAuthorization("test", ActionType::insert));
 
+        // Check that you can't authorize a user that doesn't exist.
         ASSERT_EQUALS(ErrorCodes::UserNotFound,
-                      authzSession->acquirePrivilege(writePrivilege, principal->getName()));
-        authzSession->addAndAuthorizePrincipal(principal);
-        ASSERT_OK(authzSession->acquirePrivilege(writePrivilege, principal->getName()));
-        ASSERT_TRUE(authzSession->checkAuthorization("test", ActionType::insert));
+                      authzSession->addAndAuthorizeUser(UserName("spencer", "test")));
 
-        ASSERT_FALSE(authzSession->checkAuthorization("otherDb", ActionType::insert));
-        ASSERT_OK(authzSession->acquirePrivilege(allDBsWritePrivilege, principal->getName()));
-        ASSERT_TRUE(authzSession->checkAuthorization("otherDb", ActionType::insert));
+        // Add a user with readWrite and dbAdmin on the test DB
+        ASSERT_OK(managerState->insertPrivilegeDocument("test",
+                BSON("user" << "spencer" <<
+                     "pwd" << "a" <<
+                     "roles" << BSON_ARRAY("readWrite" << "dbAdmin"))));
+        ASSERT_OK(authzSession->addAndAuthorizeUser(UserName("spencer", "test")));
+
+        ASSERT_TRUE(authzSession->checkAuthorization("test", ActionType::insert));
+        ASSERT_TRUE(authzSession->checkAuthorization("test", ActionType::collMod));
         // Auth checks on a collection should be applied to the database name.
-        ASSERT_TRUE(authzSession->checkAuthorization("otherDb.collectionName", ActionType::insert));
+        ASSERT_TRUE(authzSession->checkAuthorization("test.foo", ActionType::insert));
+        ASSERT_FALSE(authzSession->checkAuthorization("otherDb", ActionType::insert));
+
+        // Add an admin user with readWriteAnyDatabase
+        ASSERT_OK(managerState->insertPrivilegeDocument("admin",
+                BSON("user" << "admin" <<
+                     "pwd" << "a" <<
+                     "roles" << BSON_ARRAY("readWriteAnyDatabase"))));
+        ASSERT_OK(authzSession->addAndAuthorizeUser(UserName("admin", "admin")));
+
+        ASSERT_TRUE(authzSession->checkAuthorization("*", ActionType::insert));
+        ASSERT_TRUE(authzSession->checkAuthorization("otherDb", ActionType::insert));
+        ASSERT_TRUE(authzSession->checkAuthorization("otherDb.foo", ActionType::insert));
+        ASSERT_FALSE(authzSession->checkAuthorization("otherDb.foo", ActionType::collMod));
+        ASSERT_TRUE(authzSession->checkAuthorization("test.foo", ActionType::insert));
 
         authzSession->logoutDatabase("test");
+        ASSERT_TRUE(authzSession->checkAuthorization("otherDb", ActionType::insert));
+        ASSERT_TRUE(authzSession->checkAuthorization("test", ActionType::insert));
+        ASSERT_FALSE(authzSession->checkAuthorization("test.foo", ActionType::collMod));
+
+        authzSession->logoutDatabase("admin");
+        ASSERT_FALSE(authzSession->checkAuthorization("otherDb", ActionType::insert));
         ASSERT_FALSE(authzSession->checkAuthorization("test", ActionType::insert));
+        ASSERT_FALSE(authzSession->checkAuthorization("test.foo", ActionType::collMod));
     }
 
 
-    TEST_F(AuthorizationSessionTest, ImplicitAcquireFromSomeDatabases) {
+    TEST_F(AuthorizationSessionTest, ImplicitAcquireFromSomeDatabasesWithV1Users) {
         managerState->insertPrivilegeDocument("test",
                                     BSON("user" << "andy" <<
                                          "pwd" << "a" <<
@@ -108,8 +135,8 @@ namespace {
         ASSERT(!authzSession->checkAuthorization("admin.foo", ActionType::collMod));
         ASSERT(!authzSession->checkAuthorization("$SERVER", ActionType::shutdown));
 
-        Principal* principal = new Principal(UserName("andy", "test"));
-        authzSession->addAndAuthorizePrincipal(principal);
+        ASSERT_OK(authzSession->addAndAuthorizeUser(UserName("andy", "test")));
+        ASSERT_OK(authzManager->initializeAllV1UserData());
 
         ASSERT(authzSession->checkAuthorization("test.foo", ActionType::find));
         ASSERT(authzSession->checkAuthorization("test.foo", ActionType::insert));
