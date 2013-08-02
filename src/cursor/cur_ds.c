@@ -109,14 +109,16 @@ __curds_cursor_resolve(WT_SESSION_IMPL *session, WT_CURSOR *cursor, int ret)
 		key_size = cursor->key.size;
 		value_data = cursor->value.data;
 		value_size = cursor->value.size;
-		if (cursor->key.data == source->key.data)
+		if (F_ISSET(cursor, WT_CURSTD_KEY_EXT) &&
+		    cursor->key.data == source->key.data)
 			WT_TRET(__wt_buf_set(session, &cursor->key,
 			    cursor->key.data, cursor->key.size));
 		else {
 			cursor->key.data = source->key.data;
 			cursor->key.size = source->key.size;
 		}
-		if (cursor->value.data == source->value.data)
+		if (F_ISSET(cursor, WT_CURSTD_VALUE_EXT) &&
+		    cursor->value.data == source->value.data)
 			WT_TRET(__wt_buf_set(session, &cursor->value,
 			    cursor->value.data, cursor->value.size));
 		else {
