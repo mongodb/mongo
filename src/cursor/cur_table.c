@@ -34,8 +34,8 @@ static int __curtable_update(WT_CURSOR *cursor);
 			(*__cp)->value.data = "";			\
 			(*__cp)->value.size = 1;			\
 		}							\
-		F_SET(*__cp, WT_CURSTD_KEY_APP |			\
-		    WT_CURSTD_VALUE_APP);				\
+		F_SET(*__cp, WT_CURSTD_KEY_EXT |			\
+		    WT_CURSTD_VALUE_EXT);				\
 		WT_ERR((*__cp)->f(*__cp));				\
 	}								\
 } while (0)
@@ -128,7 +128,7 @@ __wt_curtable_set_key(WT_CURSOR *cursor, ...)
 		(*cp)->recno = primary->recno;
 		(*cp)->key.data = primary->key.data;
 		(*cp)->key.size = primary->key.size;
-		F_SET(*cp, WT_CURSTD_KEY_APP);
+		F_SET(*cp, WT_CURSTD_KEY_EXT);
 	}
 }
 
@@ -166,7 +166,7 @@ __wt_curtable_set_value(WT_CURSOR *cursor, ...)
 	for (i = 0, cp = ctable->cg_cursors;
 	    i < WT_COLGROUPS(ctable->table); i++, cp++)
 		if (ret == 0)
-			F_SET(*cp, WT_CURSTD_VALUE_APP);
+			F_SET(*cp, WT_CURSTD_VALUE_EXT);
 		else {
 			(*cp)->saved_err = ret;
 			F_CLR(*cp, WT_CURSTD_VALUE_SET);
@@ -250,7 +250,7 @@ __curtable_next_random(WT_CURSOR *cursor)
 		(*cp)->key.data = primary->key.data;
 		(*cp)->key.size = primary->key.size;
 		(*cp)->recno = primary->recno;
-		F_SET(*cp, WT_CURSTD_KEY_APP);
+		F_SET(*cp, WT_CURSTD_KEY_EXT);
 		WT_ERR((*cp)->search(*cp));
 	}
 
@@ -376,7 +376,7 @@ __curtable_insert(WT_CURSOR *cursor)
 			 * for overwrite cursors, but for now we just reset the
 			 * flags.
 			 */
-			F_SET(primary, WT_CURSTD_KEY_APP | WT_CURSTD_VALUE_APP);
+			F_SET(primary, WT_CURSTD_KEY_EXT | WT_CURSTD_VALUE_EXT);
 			ret = __curtable_update(cursor);
 		}
 		goto err;

@@ -17,8 +17,8 @@ __curds_key_get(WT_CURSOR *cursor)
 	cursor->recno = cursor->data_source->recno;
 	cursor->key.data = cursor->data_source->key.data;
 	cursor->key.size = cursor->data_source->key.size;
-	F_CLR(cursor, WT_CURSTD_KEY_APP);
-	F_SET(cursor, WT_CURSTD_KEY_RET);
+	F_CLR(cursor, WT_CURSTD_KEY_EXT);
+	F_SET(cursor, WT_CURSTD_KEY_INT);
 }
 
 /*
@@ -30,8 +30,8 @@ __curds_value_get(WT_CURSOR *cursor)
 {
 	cursor->value.data = cursor->data_source->value.data;
 	cursor->value.size = cursor->data_source->value.size;
-	F_CLR(cursor, WT_CURSTD_VALUE_APP);
-	F_SET(cursor, WT_CURSTD_VALUE_RET);
+	F_CLR(cursor, WT_CURSTD_VALUE_EXT);
+	F_SET(cursor, WT_CURSTD_VALUE_INT);
 }
 
 /*
