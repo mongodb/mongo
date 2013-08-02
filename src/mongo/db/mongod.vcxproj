@@ -3760,6 +3760,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">true</ExcludedFromBuild>
     </ClCompile>
+    <ClCompile Include="storage\record.cpp" />
     <ClCompile Include="ttl.cpp" />
     <ClCompile Include="write_concern.cpp" />
     <ClInclude Include="..\..\third_party\boost\boost\smart_ptr\scoped_ptr.hpp" />
@@ -4441,7 +4442,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="cc_by_loc.h" />
     <ClInclude Include="client_basic.h" />
     <ClInclude Include="cloner.h" />
-    <ClInclude Include="collection.h" />
     <ClInclude Include="commands\authentication_commands.h" />
     <ClInclude Include="commands\find_and_modify.h" />
     <ClInclude Include="commands\fsync.h" />
@@ -4546,7 +4546,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="queryoptimizercursorimpl.h" />
     <ClCompile Include="queryoptimizercursorimpl.cpp" />
     <ClCompile Include="querypattern.cpp" />
-    <ClCompile Include="record.cpp" />
     <ClCompile Include="repl\consensus.cpp" />
     <ClCompile Include="repl\heartbeat.cpp" />
     <ClCompile Include="repl\manager.cpp" />
@@ -4633,7 +4632,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="query_plan_selection_policy.h" />
     <ClInclude Include="query_plan_summary.h" />
     <ClInclude Include="query_runner.h" />
-    <ClInclude Include="record.h" />
     <ClInclude Include="repl\bgsync.h" />
     <ClInclude Include="repl\finding_start_cursor.h" />
     <ClInclude Include="repl\is_master.h" />
@@ -4663,6 +4661,8 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="storage\namespace-inl.h" />
     <ClInclude Include="storage\namespace.h" />
     <ClInclude Include="storage\namespace_index.h" />
+    <ClInclude Include="storage\record.h" />
+    <ClInclude Include="structure\collection.h" />
     <ClInclude Include="taskqueue.h" />
     <ClInclude Include="ttl.h" />
     <ClInclude Include="write_concern.h" />

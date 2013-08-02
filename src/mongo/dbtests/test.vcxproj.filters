@@ -275,6 +275,9 @@
     <Filter Include="db\query">
       <UniqueIdentifier>{14071ec9-1e78-4463-bfee-593ddf265829}</UniqueIdentifier>
     </Filter>
+    <Filter Include="db\structure">
+      <UniqueIdentifier>{b01a07d0-5c5f-4f00-965e-a238453ffb45}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\client\connpool.h">
@@ -425,9 +428,6 @@
       <Filter>db\Header Files\a to d</Filter>
     </ClInclude>
     <ClInclude Include="..\db\cmdline.h">
-      <Filter>db\Header Files\a to d</Filter>
-    </ClInclude>
-    <ClInclude Include="..\db\collection.h">
       <Filter>db\Header Files\a to d</Filter>
     </ClInclude>
     <ClInclude Include="..\db\commands.h">
@@ -2345,9 +2345,6 @@
     <ClInclude Include="..\db\queryutil-inl.h">
       <Filter>db\Header Files\o to z</Filter>
     </ClInclude>
-    <ClInclude Include="..\db\record.h">
-      <Filter>db\Header Files\o to z</Filter>
-    </ClInclude>
     <ClInclude Include="..\db\restapi.h">
       <Filter>db\Header Files\o to z</Filter>
     </ClInclude>
@@ -2820,6 +2817,12 @@
     <ClInclude Include="..\db\query\index_bounds.h">
       <Filter>db\query</Filter>
     </ClInclude>
+    <ClInclude Include="..\db\structure\collection.h">
+      <Filter>db\structure</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\storage\record.h">
+      <Filter>db\storage</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\client\connpool.cpp">
@@ -3226,9 +3229,6 @@
       <Filter>db\Source Files\o to z</Filter>
     </ClCompile>
     <ClCompile Include="..\db\queryutil.cpp">
-      <Filter>db\Source Files\o to z</Filter>
-    </ClCompile>
-    <ClCompile Include="..\db\record.cpp">
       <Filter>db\Source Files\o to z</Filter>
     </ClCompile>
     <ClCompile Include="..\db\restapi.cpp">
@@ -5424,6 +5424,9 @@
     </ClCompile>
     <ClCompile Include="..\db\query\index_bounds_test.cpp">
       <Filter>db\query</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\storage\record.cpp">
+      <Filter>db\storage</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
