@@ -1,4 +1,4 @@
-// check that there is preallocation on explicit createCollection() and no unncessary preallocation after restart
+// check that there is preallocation, and there are 2 files
 
 port = allocatePorts( 1 )[ 0 ];
 
@@ -20,11 +20,11 @@ assert.eq( 0, getTotalNonLocalSize() );
 m.getDB( baseName ).createCollection( baseName + "1" );
 
 // Windows does not currently use preallocation
-expectedMB = ( _isWindows() ? 70 : 100 );
+expectedMB = 64 + 16;
 if ( m.getDB( baseName ).serverBits() < 64 )
     expectedMB /= 4;
 
-assert.soon(function() { return getTotalNonLocalSize() > expectedMB * 1000000; },
+assert.soon(function() { return getTotalNonLocalSize() >= expectedMB * 1024 * 1024; },
             "\n\n\nFAIL preallocate.js expected second file to bring total size over " +
             expectedMB + "MB" );
 
