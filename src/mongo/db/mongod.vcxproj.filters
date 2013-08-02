@@ -656,9 +656,6 @@
     <ClCompile Include="queryutil.cpp">
       <Filter>db\Source Files\o to z</Filter>
     </ClCompile>
-    <ClCompile Include="record.cpp">
-      <Filter>db\Source Files\o to z</Filter>
-    </ClCompile>
     <ClCompile Include="restapi.cpp">
       <Filter>db\Source Files\o to z</Filter>
     </ClCompile>
@@ -2462,6 +2459,9 @@
     <ClCompile Include="query\index_bounds_test.cpp">
       <Filter>db\query</Filter>
     </ClCompile>
+    <ClCompile Include="storage\record.cpp">
+      <Filter>db\storage</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\third_party\snappy\config.h">
@@ -3908,9 +3908,6 @@
     <ClInclude Include="queryutil-inl.h">
       <Filter>db\Header Files\o to z</Filter>
     </ClInclude>
-    <ClInclude Include="record.h">
-      <Filter>db\Header Files\o to z</Filter>
-    </ClInclude>
     <ClInclude Include="restapi.h">
       <Filter>db\Header Files\o to z</Filter>
     </ClInclude>
@@ -3939,9 +3936,6 @@
       <Filter>db\Header Files\e to n</Filter>
     </ClInclude>
     <ClInclude Include="cloner.h">
-      <Filter>db\Header Files\a to d</Filter>
-    </ClInclude>
-    <ClInclude Include="collection.h">
       <Filter>db\Header Files\a to d</Filter>
     </ClInclude>
     <ClInclude Include="curop-inl.h">
@@ -4965,6 +4959,12 @@
     <ClInclude Include="query\index_bounds.h">
       <Filter>db\query</Filter>
     </ClInclude>
+    <ClInclude Include="storage\record.h">
+      <Filter>db\storage</Filter>
+    </ClInclude>
+    <ClInclude Include="structure\collection.h">
+      <Filter>db\structure</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="mongo.ico">
@@ -5457,6 +5457,9 @@
     </Filter>
     <Filter Include="db\query">
       <UniqueIdentifier>{9d9e9477-2823-4e23-b417-a6f767231cca}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="db\structure">
+      <UniqueIdentifier>{425b220f-4691-4320-8f6a-22673acf99d6}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
