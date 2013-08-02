@@ -84,7 +84,7 @@ static int
 __curds_cursor_resolve(WT_SESSION_IMPL *session, WT_CURSOR *cursor, int ret)
 {
 	WT_CURSOR *source;
-	size_t key_size, value_size;
+	uint32_t key_size, value_size;
 	const void *key_data, *value_data;
 
 	source = ((WT_CURSOR_DATA_SOURCE *)cursor)->source;
@@ -443,7 +443,7 @@ __curds_remove(WT_CURSOR *cursor)
 		    !WT_DATA_IN_ITEM(&(cursor)->key))
 			WT_ERR(__wt_buf_set(session, &cursor->key,
 			    cursor->key.data, cursor->key.size));
-			F_CLR(cursor, WT_CURSTD_VALUE_SET);
+		F_CLR(cursor, WT_CURSTD_VALUE_SET);
 	}
 
 err:	__curds_txn_leave(session);
