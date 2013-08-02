@@ -475,6 +475,62 @@ jsTest.isMongos = function(conn) {
     return conn.getDB('admin').isMaster().msg=='isdbgrid';
 }
 
+defaultPrompt = function() {
+    var status = db.getMongo().authStatus;
+    try {
+        // try to use repl set prompt -- no status or auth detected yet
+        if (!status || !status.authRequired) {
+            try {
+                var prompt = replSetMemberStatePrompt();
+                // set our status that it was good
+                db.getMongo().authStatus = {replSetGetStatus:true, isMaster: true};
+                return prompt;
+            } catch (e) {
+                // don't have permission to run that, or requires auth
+                //print(e);
+                status = {authRequired: true, replSetGetStatus: false, isMaster: true};
+            }
+        }
+        // auth detected
+
+        // try to use replSetGetStatus?
+        if (status.replSetGetStatus) {
+            try {
+                var prompt = replSetMemberStatePrompt();
+                // set our status that it was good
+                status.replSetGetStatus = true;
+                db.getMongo().authStatus = status;
+                return prompt;
+            } catch (e) {
+                // don't have permission to run that, or requires auth
+                //print(e);
+                status.authRequired = true;
+                status.replSetGetStatus = false;
+            }
+        }
+
+        // try to use isMaster?
+        if (status.isMaster) {
+            try {
+                var prompt = isMasterStatePrompt();
+                status.isMaster = true;
+                db.getMongo().authStatus = status;
+                return prompt;
+            } catch (e) {
+                status.authRequired = true;
+                status.isMaster = false;
+            }
+        }
+    } catch (ex) {
+        printjson(ex);
+        // reset status and let it figure it out next time.
+        status = {isMaster:true};
+    }
+
+    db.getMongo().authStatus = status;
+    return "> ";
+}
+
 replSetMemberStatePrompt = function() {
     var state = '';
     var stateInfo = db.getSiblingDB( 'admin' ).runCommand( { replSetGetStatus:1, forShell:1 } );
@@ -490,12 +546,42 @@ replSetMemberStatePrompt = function() {
             state = stateInfo.myState;
         }
         state = '' + stateInfo.set + ':' + state;
+    } else {
+         var info = stateInfo.info;
+         if ( info && info.length < 20 ) {
+             state = info; // "mongos", "configsvr"
+         } else {
+             throw Error("Failed:" + info);
+         }
     }
-    else {
-        var info = stateInfo.info;
-        if ( info && info.length < 20 ) {
-            state = info; // "mongos", "configsvr"
+    return state + '> ';
+}
+
+isMasterStatePrompt = function() {
+    var state = '';
+    var isMaster = db.isMaster();
+    if ( isMaster.ok ) {
+        var role = "";
+
+        if (isMaster.msg == "isdbgrid") {
+            role = "mongos";
         }
+
+        if (isMaster.setName) {
+            if (isMaster.ismaster)
+                role = "PRIMARY";
+            else if (isMaster.secondary)
+                role = "SECONDARY";
+            else if (isMaster.arbiterOnly)
+                role = "ARBITER";
+            else {
+                role = "OTHER"
+            }
+            state = isMaster.setName + ':';
+        }
+        state = state + role;
+    } else {
+        throw Error("Failed: " + tojson(isMaster));
     }
     return state + '> ';
 }
