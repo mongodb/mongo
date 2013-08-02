@@ -825,7 +825,7 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 	 * for if/when we open indices.
 	 *
 	 * cfg[0] is the baseline configuration for the cursor open and we can
-	 * aquire another copy from the configuration structures, so it would
+	 * acquire another copy from the configuration structures, so it would
 	 * be reasonable not to copy it here: but I'd rather be safe than sorry.
 	 */
 	for (cfg_cnt = 0; cfg[cfg_cnt] != NULL; ++cfg_cnt)

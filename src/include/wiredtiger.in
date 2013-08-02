@@ -427,7 +427,7 @@ struct __wt_cursor {
 	 */
 	int (*range_truncate)(WT_SESSION *, WT_CURSOR *, WT_CURSOR *);
 
-	uint64_t recno;			/* Recno, recno in raw mode. */
+	uint64_t recno;			/* Record number, normal and raw mode */
 	uint8_t raw_recno_buf[WT_INTPACK64_MAXSIZE];
 
 	WT_ITEM key, value;

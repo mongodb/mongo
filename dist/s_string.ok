@@ -114,6 +114,7 @@ INITIALIZER
 INSERT's
 INUSE
 ISSET
+ITEMs
 Ippokratis
 JPEG
 JSON
@@ -151,6 +152,8 @@ Mewhort
 Multi
 Mutex
 Mutexes
+NEEDKEY
+NEEDVALUE
 NOLL
 NONINFRINGEMENT
 NOTFOUND
@@ -189,6 +192,7 @@ RNG
 RPC
 RUNDIR
 Radu
+Recno
 Recurse
 Redistributions
 Resize
