@@ -777,18 +777,69 @@ namespace {
         }
     }
 
-    Status _initializeUserRolesFromV1PrivilegeDocument(
-                User* user, const BSONObj& privDoc, const StringData& dbname) {
+    Status _initializeUserRolesFromV1RolesArray(User* user,
+                                                const BSONElement& rolesElement,
+                                                const StringData& dbname) {
         static const char privilegesTypeMismatchMessage[] =
-            "Roles in V1 user documents must be enumerated in an array of strings.";
+                "Roles in V1 user documents must be enumerated in an array of strings.";
 
-        for (BSONObjIterator iter(privDoc["roles"].embeddedObject()); iter.more(); iter.next()) {
+        if (dbname == PrivilegeSet::WILDCARD_RESOURCE) {
+            return Status(ErrorCodes::BadValue,
+                          PrivilegeSet::WILDCARD_RESOURCE + " is an invalid database name.");
+        }
+
+        if (rolesElement.type() != Array)
+            return Status(ErrorCodes::TypeMismatch, privilegesTypeMismatchMessage);
+
+        for (BSONObjIterator iter(rolesElement.embeddedObject()); iter.more(); iter.next()) {
             BSONElement roleElement = *iter;
             if (roleElement.type() != String)
                 return Status(ErrorCodes::TypeMismatch, privilegesTypeMismatchMessage);
 
             user->addRole(RoleName(roleElement.String(), dbname));
         }
+        return Status::OK();
+    }
+
+    Status _initializeUserRolesFromV1PrivilegeDocument(
+                User* user, const BSONObj& privDoc, const StringData& dbname) {
+        Status status = _initializeUserRolesFromV1RolesArray(user,
+                                                             privDoc[ROLES_FIELD_NAME],
+                                                             dbname);
+        if (!status.isOK()) {
+            return status;
+        }
+
+        // If "dbname" is the admin database, handle the otherDBPrivileges field, which
+        // grants privileges on databases other than "dbname".
+        BSONElement otherDbPrivileges = privDoc[OTHER_DB_ROLES_FIELD_NAME];
+        if (dbname == ADMIN_DBNAME) {
+            switch (otherDbPrivileges.type()) {
+            case EOO:
+                break;
+            case Object: {
+                for (BSONObjIterator iter(otherDbPrivileges.embeddedObject());
+                     iter.more(); iter.next()) {
+
+                    BSONElement rolesElement = *iter;
+                    status = _initializeUserRolesFromV1RolesArray(user,
+                                                                  rolesElement,
+                                                                  rolesElement.fieldName());
+                    if (!status.isOK())
+                        return status;
+                }
+                break;
+            }
+            default:
+                return Status(ErrorCodes::TypeMismatch,
+                              "Field \"otherDBRoles\" must be an object, if present.");
+            }
+        }
+        else if (!otherDbPrivileges.eoo()) {
+            return Status(ErrorCodes::BadValue, "Only the admin database may contain a field "
+                          "called \"otherDBRoles\"");
+        }
+
         return Status::OK();
     }
 
