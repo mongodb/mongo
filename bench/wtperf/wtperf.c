@@ -122,6 +122,7 @@ int config_opt_int(CONFIG *, WT_SESSION *, const char *, const char *);
 int config_opt_file(CONFIG *, WT_SESSION *, const char *);
 int config_opt_line(CONFIG *, WT_SESSION *, const char *);
 void config_opt_usage(void);
+void indent_lines(const char *, const char *);
 void *populate_thread(void *);
 void print_config(CONFIG *);
 void *read_thread(void *);
@@ -920,16 +921,8 @@ int main(int argc, char **argv)
 			break;
 		}
 
-	if (cfg.rand_range > 0 && !F_ISSET(&cfg, PERF_RAND_WORKLOAD)) {
-		fprintf(stderr, "rand_range cannot be set without "
-		    "random workload\n");
-		return (EINVAL);
-	}
-	if (cfg.rand_range == 0 && F_ISSET(&cfg, PERF_RAND_WORKLOAD)) {
-		fprintf(stderr, "Invalid random range.\n");
-		usage();
-		return (EINVAL);
-	}
+	if (cfg.rand_range > 0)
+		F_SET(&cfg, PERF_RAND_WORKLOAD);
 
 	if ((ret = setup_log_file(&cfg)) != 0)
 		goto err;
@@ -1390,8 +1383,10 @@ config_opt_usage(void)
 		    config_opts[i].name, typestr, defaultval);
 		if (linelen + 2 + strlen(config_opts[i].description) < 80)
 			printf("  %s\n", config_opts[i].description);
-		else
-			printf("\n        %s\n", config_opts[i].description);
+		else {
+			printf("\n");
+			indent_lines(config_opts[i].description, "        ");
+		}
 	}
 }
 
@@ -1544,6 +1539,24 @@ uint64_t wtperf_rand(CONFIG *cfg) {
 	/* Avoid zero - LSM doesn't like it. */
 	rval = (rval % wtperf_value_range(cfg)) + 1;
 	return rval;
+}
+
+void indent_lines(const char *lines, const char *indent)
+{
+	const char *bol;
+	const char *eol;
+	int len;
+
+	bol = lines;
+	while (bol != NULL) {
+		eol = strchr(bol, '\n');
+		if (eol == NULL)
+			len = strlen(bol);
+		else
+			len = eol++ - bol;
+		printf("%s%.*s\n", indent, len, bol);
+		bol = eol;
+	}
 }
 
 void print_config(CONFIG *cfg)
