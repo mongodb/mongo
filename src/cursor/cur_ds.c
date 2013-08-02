@@ -139,7 +139,7 @@ __curds_cursor_resolve(WT_SESSION_IMPL *session, WT_CURSOR *cursor, int ret)
 	 * Update the cursor's flags.  (We use the _INT flags in the same way
 	 * as file objects: there's some chance the underlying data source is
 	 * passing us a reference to data that's only pinned per operation,
-	 * might as well be safe.
+	 * might as well be safe.)
 	 */
 	if (ret == 0) {
 		F_CLR(cursor, WT_CURSTD_KEY_EXT | WT_CURSTD_VALUE_EXT);
