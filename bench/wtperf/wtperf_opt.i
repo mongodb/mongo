@@ -67,17 +67,21 @@ DEF_OPT_AS_UINT32(data_sz, 100,
     "data item size")
 DEF_OPT_AS_UINT32(icount, 5000,
     "number of records to insert")
+DEF_OPT_AS_FLAGVAL(insert_rmw, PERF_INSERT_RMW,
+    "execute a read prior to each insert in populate")
 DEF_OPT_AS_UINT32(insert_threads, 0,
     "number of insert worker threads")
 DEF_OPT_AS_UINT32(key_sz, 20,
     "key item size")
+DEF_OPT_AS_FLAGVAL(pareto, PERF_RAND_PARETO,
+    "use pareto 80/20 distribution for random numbers")
 DEF_OPT_AS_UINT32(populate_threads, 1,
     "number of populate threads")
 DEF_OPT_AS_UINT32(rand_seed, 14023954,
     "seed for random number generator")
 DEF_OPT_AS_UINT32(random_range, 0,
-    "use random inserts in workload, reads"
-    " and updates ignore WT_NOTFOUND")
+    "if non-zero, use random inserts in workload, reads"
+    " and updates\nignore WT_NOTFOUND")
 DEF_OPT_AS_UINT32(read_threads, 2,
     "number of read threads")
 DEF_OPT_AS_UINT32(report_interval, 2,
@@ -94,14 +98,6 @@ DEF_OPT_AS_STRING(uri,
     "lsm:test", "table uri")
 DEF_OPT_AS_UINT32(verbose, 0,
     "verbosity")
-
-/* values for CONFIG.flags */
-DEF_OPT_AS_FLAGVAL(insert_rmw, PERF_INSERT_RMW,
-    "execute a read prior to each insert in populate")
-DEF_OPT_AS_FLAGVAL(pareto, PERF_RAND_PARETO,
-    "use pareto 80/20 distribution for random numbers")
-DEF_OPT_AS_FLAGVAL(random, PERF_RAND_WORKLOAD,
-    "use random workload as specified with random_range")
 
 #undef DEF_OPT_AS_STRING
 #undef DEF_OPT_AS_BOOL
