@@ -177,6 +177,33 @@ namespace mongo {
             return _pendingMap.size();
         }
 
+        //
+        // reporting
+        //
+
+        /**
+         * BSON output of the metadata information.
+         */
+        BSONObj toBSON() const;
+
+        /**
+         * BSON output of the metadata information, into a builder.
+         */
+        void toBSON( BSONObjBuilder& bb ) const;
+
+        /**
+         * BSON output of the chunks metadata into a BSONArray
+         */
+        void toBSONChunks( BSONArrayBuilder& bb ) const;
+
+        /**
+         * BSON output of the pending metadata into a BSONArray
+         */
+        void toBSONPending( BSONArrayBuilder& bb ) const;
+
+        /**
+         * String output of the metadata information.
+         */
         string toString() const;
 
         /**

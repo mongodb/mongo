@@ -1108,6 +1108,12 @@ namespace mongo {
             else
                 result.appendTimestamp( "mine" , 0 );
 
+            if ( cmdObj["fullMetadata"].trueValue() ) {
+                CollectionMetadataPtr metadata = shardingState.getCollectionMetadata( ns );
+                if ( metadata ) result.append( "metadata", metadata->toBSON() );
+                else result.append( "metadata", BSONObj() );
+            }
+
             return true;
         }
 

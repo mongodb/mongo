@@ -488,6 +488,52 @@ namespace mongo {
         return true;
     }
 
+    BSONObj CollectionMetadata::toBSON() const {
+        BSONObjBuilder bb;
+        toBSON( bb );
+        return bb.obj();
+    }
+
+    void CollectionMetadata::toBSONChunks( BSONArrayBuilder& bb ) const {
+
+        if ( _chunksMap.empty() ) return;
+
+        for (RangeMap::const_iterator it = _chunksMap.begin(); it != _chunksMap.end(); ++it ) {
+            BSONArrayBuilder chunkBB( bb.subarrayStart() );
+            chunkBB.append( it->first );
+            chunkBB.append( it->second );
+            chunkBB.done();
+        }
+    }
+
+    void CollectionMetadata::toBSONPending( BSONArrayBuilder& bb ) const {
+
+        if ( _pendingMap.empty() ) return;
+
+        for (RangeMap::const_iterator it = _pendingMap.begin(); it != _pendingMap.end(); ++it ) {
+            BSONArrayBuilder pendingBB( bb.subarrayStart() );
+            pendingBB.append( it->first );
+            pendingBB.append( it->second );
+            pendingBB.done();
+        }
+    }
+
+    void CollectionMetadata::toBSON( BSONObjBuilder& bb ) const {
+
+        _collVersion.addToBSON( bb, "collVersion" );
+        _shardVersion.addToBSON( bb, "shardVersion" );
+        bb.append( "keyPattern", _keyPattern );
+
+        BSONArrayBuilder chunksBB( bb.subarrayStart( "chunks" ) );
+        toBSONChunks( chunksBB );
+        chunksBB.done();
+
+        BSONArrayBuilder pendingBB( bb.subarrayStart( "pending" ) );
+        toBSONPending( pendingBB );
+        pendingBB.done();
+    }
+
+
     string CollectionMetadata::toString() const {
         StringBuilder ss;
         ss << " CollectionManager version: " << _shardVersion.toString() << " key: " << _keyPattern;
