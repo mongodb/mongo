@@ -196,7 +196,10 @@ namespace mongo {
     bool CmdShutdown::run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
         bool force = cmdObj.hasField("force") && cmdObj["force"].trueValue();
 
-        if (!force && theReplSet && theReplSet->isPrimary()) {
+        if (!force &&
+                theReplSet &&
+                theReplSet->getConfig().members.size() > 1 &&
+                theReplSet->isPrimary()) {
             long long timeout, now, start;
             timeout = now = start = curTimeMicros64()/1000000;
             if (cmdObj.hasField("timeoutSecs")) {
