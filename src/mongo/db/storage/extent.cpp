@@ -177,11 +177,7 @@ namespace mongo {
     }
 
     int Extent::maxSize() {
-        int maxExtentSize = 0x7ff00000;
-        if ( cmdLine.smallfiles ) {
-            maxExtentSize >>= 2;
-        }
-        return maxExtentSize;
+        return DataFile::maxSize() - DataFileHeader::HeaderSize - 16;
     }
 
 
