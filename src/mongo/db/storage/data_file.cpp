@@ -147,7 +147,7 @@ namespace mongo {
         massert( 10357, "shutdown in progress", !inShutdown() );
         massert( 10359, "header==0 on new extent: 32 bit mmap space exceeded?", header() ); // null if file open failed
 
-        size = min(header()->unusedLength, size);
+        verify( size <= header()->unusedLength );
 
         int offset = header()->unused.getOfs();
 

@@ -193,6 +193,7 @@ namespace mongo {
         Extent* e = reinterpret_cast<Extent*>( getFile( loc.a() )->p() + loc.getOfs() );
         if ( doSanityCheck )
             e->assertOk();
+        memconcept::is(e, memconcept::concept::extent);
         return e;
     }
 
@@ -341,6 +342,11 @@ namespace mongo {
     Extent* ExtentManager::createExtent(const char *ns, int size, bool newCapped, bool enforceQuota ) {
         size = quantizeExtentSize( size );
 
+        if ( size > Extent::maxSize() )
+            size = Extent::maxSize();
+
+        verify( size < DataFile::maxSize() );
+
         for ( int i = numFiles() - 1; i >= 0; i-- ) {
             DataFile* f = getFile( i );
             if ( f->getHeader()->unusedLength >= size ) {
@@ -360,8 +366,7 @@ namespace mongo {
         for ( int i = 0; i < 8; i++ ) {
             DataFile* f = addAFile( size, false );
 
-            if ( f->getHeader()->unusedLength >= size ||
-                 f->getHeader()->fileLength >= DataFile::maxSize() ) {
+            if ( f->getHeader()->unusedLength >= size ) {
                 return _createExtentInFile( numFiles() - 1, f, ns, size, newCapped, enforceQuota );
             }
 
