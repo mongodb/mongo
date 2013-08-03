@@ -228,28 +228,30 @@ namespace mongo {
 
             /**
              * With replication we want to be able to remove blocking elements for $set (only).
+             * The reason they are blocking elements is that they are not embedded documents
+             * (objects) nor an array (a special type of an embedded doc) and we cannot
+             * add children to them (because the $set path requires adding children past
+             * the blocking element).
              *
              * Imagine that we started with this:
              * {_id:1, a:1} + {$set : {"a.b.c" : 1}} -> {_id:1, a: {b: {c:1}}}
-             * Above we found that element (a:1) is blocking at position 1. We now will remove it,
-             * point to its parent as the element we found and change our position so that
-             * the normal logic below can be applied from the root (in this example case).
+             * Above we found that element (a:1) is blocking at position 1. We now will replace
+             * it with an empty object so the normal logic below can be
+             * applied from the root (in this example case).
+             *
+             * Here is an array example:
+             * {_id:1, a:[1, 2]} + {$set : {"a.0.c" : 1}} -> {_id:1, a: [ {c:1}, 2]}
+             * The blocking element is "a.0" since it is a number, non-object, and we must
+             * then replace it with an empty object so we can add c:1 to that empty object
              */
 
-            // keep track of the one to remove
-            mutablebson::Element toRemove = _preparedState->elemFound;
-
-            // decrement index position, and get parent for apply below
-            _preparedState->idxFound--;
-            _preparedState->elemFound = _preparedState->elemFound.parent();
-
-            if (!_preparedState->elemFound.ok())
-                return Status(ErrorCodes::IllegalOperation, "The parent is not valid.");
-
-            // remove the element and check error
-            Status ok = toRemove.remove();
-            if (!ok.isOK())
-                return ok;
+            mutablebson::Element blockingElem = _preparedState->elemFound;
+            BSONObj newObj;
+            // Replace blocking non-object with an empty object
+            Status status = blockingElem.setValueObject(newObj);
+            if (!status.isOK()) {
+                return status;
+            }
         }
 
         // createPathAt() will complete the path and attach 'elemToSet' at the end of it.

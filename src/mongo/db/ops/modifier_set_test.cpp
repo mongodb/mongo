@@ -666,6 +666,21 @@ namespace {
         ASSERT_EQUALS(fromjson("{a: {a: {'1': {b: 1}}}}"), doc);
     }
 
+    TEST(NonViablePathWithRepl, ReplayArrayFieldNotAppendedItermediate) {
+        Document doc(fromjson("{_id: 0, a: [1, {b: [1]}]}"));
+        Mod setMod(fromjson("{$set: {'a.0.b': [0,2]}}}"), true);
+
+        ModifierInterface::ExecInfo execInfo;
+        ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
+
+        ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a.0.b");
+        ASSERT_FALSE(execInfo.noOp);
+
+        ASSERT_OK(setMod.apply());
+        ASSERT_FALSE(doc.isInPlaceModeEnabled());
+        ASSERT_EQUALS(fromjson("{_id: 0, a: [{b: [0,2]}, {b: [1]}]}"), doc);
+    }
+
     // Cases from users/issues/jstests
     TEST(JsTestIssues, Set6) {
         Document doc(fromjson("{_id: 1, r: {a:1, b:2}}"));
