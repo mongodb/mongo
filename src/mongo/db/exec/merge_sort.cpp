@@ -202,7 +202,10 @@ namespace mongo {
             if (x != 0) { return x > 0; }
         }
 
-        return true;
+        // A comparator for use with sort is required to model a strict weak ordering, so
+        // to satisfy irreflexivity we must return 'false' for elements that we consider
+        // equivalent under the pattern.
+        return false;
     }
 
     PlanStageStats* MergeSortStage::getStats() {
