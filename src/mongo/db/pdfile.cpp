@@ -187,16 +187,6 @@ namespace mongo {
         _applyOpToDataFiles( database, deleter, true );
     }
 
-    int Extent::initialSize(int len) {
-        long long sz = len * 16;
-        if ( len < 1000 ) sz = len * 64;
-        if ( sz > 1000000000 )
-            sz = 1000000000;
-        int z = ((int)sz) & 0xffffff00;
-        verify( z > len );
-        return z;
-    }
-
     void checkConfigNS(const char *ns) {
         if ( cmdLine.configsvr &&
              !( str::startsWith( ns, "config." ) ||
@@ -870,27 +860,6 @@ namespace mongo {
         return dl;
     }
 
-    int Extent::followupSize(int len, int lastExtentLen) {
-        verify( len < Extent::maxSize() );
-        int x = initialSize(len);
-        // changed from 1.20 to 1.35 in v2.1.x to get to larger extent size faster
-        int y = (int) (lastExtentLen < 4000000 ? lastExtentLen * 4.0 : lastExtentLen * 1.35);
-        int sz = y > x ? y : x;
-
-        if ( sz < lastExtentLen ) {
-            // this means there was an int overflow
-            // so we should turn it into maxSize
-            sz = Extent::maxSize();
-        }
-        else if ( sz > Extent::maxSize() ) {
-            sz = Extent::maxSize();
-        }
-
-        sz = ((int)sz) & 0xffffff00;
-        verify( sz > len );
-
-        return sz;
-    }
 
 #if 0    
     void testSorting() {
