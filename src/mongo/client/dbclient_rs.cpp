@@ -82,6 +82,7 @@ namespace mongo {
     protected:
         void run() {
             log() << "starting" << endl;
+            sleepsecs( 10 );
             while ( !inShutdown() && !StaticObserver::_destroyingStatics ) {
                 try {
                     ReplicaSetMonitor::checkAll();
