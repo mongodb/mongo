@@ -269,6 +269,12 @@ namespace mongo {
     }
 
     int ExtentManager::quantizeExtentSize( int size ) {
+
+        if ( size == Extent::maxSize() ) {
+            // no point doing quantizing for the entire file
+            return size;
+        }
+
         verify( size <= Extent::maxSize() );
 
         // make sizes align with VM page size

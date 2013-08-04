@@ -329,13 +329,43 @@ namespace PdfileTests {
         };
         void run() {
             SmallFilesControl c;
+
+            ASSERT_EQUALS( Extent::maxSize(),
+                           ExtentManager::quantizeExtentSize( Extent::maxSize() ) );
+
             // test that no matter what we start with, we always get to max extent size
             for ( int obj=16; obj<BSONObjMaxUserSize; obj += 111 ) {
+
                 int sz = Extent::initialSize( obj );
+
+                double totalExtentSize = sz;
+
+                int numFiles = 1;
+                int sizeLeftInExtent = Extent::maxSize() - 1;
+
                 for ( int i=0; i<100; i++ ) {
                     sz = Extent::followupSize( obj , sz );
+                    ASSERT( sz >= obj );
+                    ASSERT( sz >= Extent::minSize() );
+                    ASSERT( sz <= Extent::maxSize() );
+                    ASSERT( sz <= DataFile::maxSize() );
+
+                    totalExtentSize += sz;
+
+                    if ( sz < sizeLeftInExtent ) {
+                        sizeLeftInExtent -= sz;
+                    }
+                    else {
+                        numFiles++;
+                        sizeLeftInExtent = Extent::maxSize() - sz;
+                    }
                 }
                 ASSERT_EQUALS( Extent::maxSize() , sz );
+
+                double allocatedOnDisk = (double)numFiles * Extent::maxSize();
+
+                ASSERT( ( totalExtentSize / allocatedOnDisk ) > .95 );
+
             }
         }
     };
