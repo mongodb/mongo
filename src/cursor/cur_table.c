@@ -827,13 +827,16 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 	 * cfg[0] is the baseline configuration for the cursor open and we can
 	 * acquire another copy from the configuration structures, so it would
 	 * be reasonable not to copy it here: but I'd rather be safe than sorry.
+	 *
+	 * Underlying indices are always opened without dump.
 	 */
 	for (cfg_cnt = 0; cfg[cfg_cnt] != NULL; ++cfg_cnt)
 		;
-	WT_ERR(__wt_calloc_def(session, cfg_cnt + 1, &ctable->cfg));
+	WT_ERR(__wt_calloc_def(session, cfg_cnt + 2, &ctable->cfg));
 	for (cfg_cnt = 0; cfg[cfg_cnt] != NULL; ++cfg_cnt)
 		WT_ERR(
 		    __wt_strdup(session, cfg[cfg_cnt], &ctable->cfg[cfg_cnt]));
+	WT_ERR(__wt_strdup(session, "dump=\"\"", &ctable->cfg[cfg_cnt]));
 
 	if (0) {
 err:		WT_TRET(__curtable_close(cursor));
