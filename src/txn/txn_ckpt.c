@@ -136,6 +136,42 @@ err:	__wt_scr_free(&tmp);
 }
 
 /*
+ * __checkpoint_data_source --
+ *	Checkpoint all data sources.
+ */
+static int
+__checkpoint_data_source(WT_SESSION_IMPL *session, const char *cfg[])
+{
+	WT_NAMED_DATA_SOURCE *ndsrc;
+	WT_DATA_SOURCE *dsrc;
+
+	/*
+	 * A place-holder, to support Memrata devices: we assume calling the
+	 * underlying data-source session checkpoint function is sufficient to
+	 * checkpoint all objects in the data source, open or closed, and we
+	 * don't attempt to optimize the checkpoint of individual targets.
+	 * Those assumptions is correct for the Memrata device, but it's not
+	 * necessarily going to be true for other data sources.
+	 *
+	 * It's not difficult to support data-source checkpoints of individual
+	 * targets (__wt_schema_worker is the underlying function that will do
+	 * the work, and it's already written to support data-sources, although
+	 * we'd probably need to pass the URI of the object to the data source
+	 * checkpoint function which we don't currently do).  However, doing a
+	 * full data checkpoint is trickier: currently, the connection code is
+	 * written to ignore all objects other than "file:", and that code will
+	 * require significant changes to work with data sources.
+	 */
+	TAILQ_FOREACH(ndsrc, &S2C(session)->dsrcqh, q) {
+		dsrc = ndsrc->dsrc;
+		if (dsrc->checkpoint != NULL)
+			WT_RET(dsrc->checkpoint(dsrc,
+			    (WT_SESSION *)session, (WT_CONFIG_ARG *)cfg));
+	}
+	return (0);
+}
+
+/*
  * __wt_txn_checkpoint --
  *	Checkpoint a database or a list of objects in the database.
  */
@@ -162,6 +198,9 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	 * checkpoints.
 	 */
 	__wt_spin_lock(session, &conn->checkpoint_lock);
+
+	/* Flush data-sources before we start the checkpoint. */
+	WT_ERR(__checkpoint_data_source(session, cfg));
 
 	/* Flush dirty leaf pages before we start the checkpoint. */
 	txn->isolation = TXN_ISO_READ_COMMITTED;
@@ -206,8 +245,7 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	txn->isolation = TXN_ISO_READ_UNCOMMITTED;
 	saved_meta_next = session->meta_track_next;
 	session->meta_track_next = NULL;
-	WT_WITH_DHANDLE(session, dhandle,
-	    ret = __wt_checkpoint(session, cfg));
+	WT_WITH_DHANDLE(session, dhandle, ret = __wt_checkpoint(session, cfg));
 	session->meta_track_next = saved_meta_next;
 	WT_ERR(ret);
 
