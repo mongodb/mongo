@@ -9,6 +9,18 @@ The underlying file formats changed in the 1.6.4 release; tables and files
 should be dumped and re-loaded into a new database.
 </dd>
 
+<dt>wt utility load command</dt>
+<dd>
+The default behavior of the \c wt utility's \c load command has been
+changed to overwrite existing data, by default, and the \c -o flag to
+the \c load command (overwrite existing data) has been replaced with the
+\c -n flag (do not overwrite existing data).   Applications requiring
+the previous default behavior of not overwriting existing data should
+add the \c -n option to their command line configuration; applications
+previously using the \c -o option on their command line configurations
+should remove it.
+</dd>
+
 </dl>
 <hr>
 @section version_163 Upgrading to Version 1.6.3
