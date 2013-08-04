@@ -153,11 +153,11 @@ The data should be the format produced by the \c dump command; see @ref
 dump_formats for details.
 
 By default, if the table or file already exists, data in the file or
-table cannot be overwritten by the new data (use the \c -o option to
-overwrite existing data).
+table will be overwritten by the new data (use the \c -n option to
+make an attempt to overwrite existing data return an error).
 
 @subsection util_load_synopsis Synopsis
-<code>wt [-Vv] [-C config] [-h directory] load [-ao] [-f input] [-r name] [uri configuration ...]</code>
+<code>wt [-Vv] [-C config] [-h directory] load [-an] [-f input] [-r name] [uri configuration ...]</code>
 
 @subsection util_load_options Options
 The following are command-specific options for the \c load command:
@@ -172,15 +172,15 @@ column store.
 By default, the \c load command reads from the standard input; the \c
 -f option reads the input from the specified file.
 
+@par <code>-n</code>
+By default, input data will overwrite existing data where the key/value
+pair already exists in the data source; the \c -n option causes the \c
+load command to fail if there's an attempt to overwrite already existing
+data.
+
 @par <code>-r</code>
 By default, the \c load command uses the table or file name taken from
 the input; the \c -r option renames the data source.
-
-@par <code>-o</code>
-By default, input data will not overwrite existing data where the
-key/value pair already exists in the data source, and the attempt will
-fail; the \c -o option causes the \c load command to overwrite already
-existing data.
 
 Additionally, \c uri and \c configuration pairs may be specified to the
 \c load command.  Each of these pairs will be appended to the configuration
