@@ -21,6 +21,7 @@
 #include "mongo/db/storage/extent.h"
 
 #include "mongo/db/dur.h"
+#include "mongo/db/storage/extent_manager.h"
 #include "mongo/util/mongoutils/str.h"
 
 // XXX-ERH
@@ -48,12 +49,20 @@ namespace mongo {
     }
 
     int Extent::initialSize(int len) {
+        verify( len <= maxSize() );
+
         long long sz = len * 16;
-        if ( len < 1000 ) sz = len * 64;
-        if ( sz > 1000000000 )
-            sz = 1000000000;
-        int z = ((int)sz) & 0xffffff00;
-        verify( z > len );
+        if ( len < 1000 )
+            sz = len * 64;
+
+        if ( sz >= maxSize() )
+            return maxSize();
+
+        if ( sz <= minSize() )
+            return minSize();
+
+        int z = ExtentManager::quantizeExtentSize( sz );
+        verify( z >= len );
         return z;
     }
 
@@ -67,14 +76,14 @@ namespace mongo {
         if ( sz < lastExtentLen ) {
             // this means there was an int overflow
             // so we should turn it into maxSize
-            sz = Extent::maxSize();
+            return Extent::maxSize();
         }
         else if ( sz > Extent::maxSize() ) {
-            sz = Extent::maxSize();
+            return Extent::maxSize();
         }
 
-        sz = ((int)sz) & 0xffffff00;
-        verify( sz > len );
+        sz = ExtentManager::quantizeExtentSize( sz );
+        verify( sz >= len );
 
         return sz;
     }
