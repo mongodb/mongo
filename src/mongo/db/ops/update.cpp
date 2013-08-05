@@ -558,7 +558,7 @@ namespace mongo {
         //
         // TODO: Old code checks this repeatedly within the update loop. Is that necessary? It seems
         // that once atomic should be always atomic.
-        const bool canYield =
+        const bool isolated =
             cursor->ok() &&
             cursor->matcher() &&
             cursor->matcher()->docMatcher().atomic();
@@ -609,7 +609,7 @@ namespace mongo {
                 throw PageFaultException( cursor->currLoc().rec() );
             }
 
-            if ( !canYield && debug.nscanned != 0 ) {
+            if ( !isolated && debug.nscanned != 0 ) {
 
                 // We are permitted to yield. To do so we need a ClientCursor, so create one
                 // now if we have not yet done so.
