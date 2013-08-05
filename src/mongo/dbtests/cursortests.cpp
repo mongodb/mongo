@@ -579,7 +579,7 @@ namespace CursorTests {
                 }
 
                 boost::shared_ptr<Cursor> cursor;
-                ClientCursor::Holder clientCursor;
+                ClientCursorHolder clientCursor;
                 ClientCursor::YieldData yieldData;
 
                 {
@@ -629,7 +629,7 @@ namespace CursorTests {
                 while( !isExpectedIterate( cursor->current() ) ) {
                     ASSERT( cursor->advance() );
                 }
-                ClientCursor::Holder clientCursor( new ClientCursor( QueryOption_NoCursorTimeout,
+                ClientCursorHolder clientCursor( new ClientCursor( QueryOption_NoCursorTimeout,
                                                                     cursor, ns() ) );
                 DiskLoc loc = clientCursor->currLoc();
                 ASSERT( !loc.isNull() );
@@ -712,7 +712,7 @@ namespace CursorTests {
             private:
                 Client::WriteContext _ctx;
                 boost::shared_ptr<Cursor> _cursor;
-                ClientCursor::Holder _clientCursor;
+                ClientCursorHolder _clientCursor;
             };
             
             /** Pin pins a ClientCursor over its lifetime. */
@@ -721,7 +721,7 @@ namespace CursorTests {
                 void run() {
                     assertNotPinned();
                     {
-                        ClientCursor::Pin pin( cursorid() );
+                        ClientCursorPin pin( cursorid() );
                         assertPinned();
                         ASSERT_THROWS( erase(), AssertionException );
                     }
@@ -744,12 +744,12 @@ namespace CursorTests {
             class PinTwice : public Base {
             public:
                 void run() {
-                    ClientCursor::Pin pin( cursorid() );
+                    ClientCursorPin pin( cursorid() );
                     ASSERT_THROWS( pinCursor(), AssertionException );
                 }
             private:
                 void pinCursor() const {
-                    ClientCursor::Pin pin( cursorid() );
+                    ClientCursorPin pin( cursorid() );
                 }
             };
             
@@ -757,7 +757,7 @@ namespace CursorTests {
             class CursorDeleted : public Base {
             public:
                 void run() {
-                    ClientCursor::Pin pin( cursorid() );
+                    ClientCursorPin pin( cursorid() );
                     ASSERT( pin.c() );
                     // Delete the pinned cursor.
                     ClientCursor::invalidate( ns() );

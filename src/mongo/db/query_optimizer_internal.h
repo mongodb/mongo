@@ -242,7 +242,7 @@ namespace mongo {
         bool _mustAdvance;
         bool _capped;
         shared_ptr<Cursor> _c;
-        ClientCursor::Holder _cc;
+        ClientCursorHolder _cc;
         DiskLoc _posBeforeYield;
         ClientCursor::YieldData _yieldData;
         const QueryPlanSelectionPolicy& _selectionPolicy;

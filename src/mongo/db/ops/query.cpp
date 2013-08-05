@@ -97,6 +97,17 @@ namespace mongo {
         return qr;
     }
 
+    static BSONObj extractKey(Cursor* c, const KeyPattern& usingKeyPattern ) {
+        KeyPattern currentIndex( c->indexKeyPattern() );
+        if ( usingKeyPattern.isCoveredBy( currentIndex ) && ! currentIndex.isSpecial() ){
+            BSONObj currKey = c->currKey();
+            BSONObj prettyKey = currKey.replaceFieldNames( currentIndex.toBSON() );
+            return usingKeyPattern.extractSingleKey( prettyKey );
+        }
+
+        return usingKeyPattern.extractSingleKey( c->current() );
+    }
+
     QueryResult* processGetMore(const char* ns,
                                 int ntoreturn,
                                 long long cursorid,
@@ -118,7 +129,7 @@ namespace mongo {
         // call this readlocked so state can't change
         replVerifyReadsOk();
 
-        ClientCursor::Pin p(cursorid);
+        ClientCursorPin p(cursorid);
         ClientCursor *cc = p.c();
 
 
@@ -200,7 +211,7 @@ namespace mongo {
                 // in some cases (clone collection) there won't be a matcher
                 if ( !c->currentMatches( &details ) ) {
                 }
-                else if ( metadata && !metadata->keyBelongsToMe( cc->extractKey( keyPattern ) ) ) {
+                else if ( metadata && !metadata->keyBelongsToMe( extractKey(c, keyPattern ) ) ) {
                     LOG(2) << "cursor skipping document in un-owned chunk: " << c->current()
                                << endl;
                 }
@@ -212,7 +223,17 @@ namespace mongo {
                         last = c->currLoc();
                         n++;
 
-                        cc->fillQueryResultFromObj( b, &details );
+                        // Fill out the fields requested by the query.
+                        const Projection::KeyOnly *keyFieldsOnly = c->keyFieldsOnly();
+                        if ( keyFieldsOnly ) {
+                            fillQueryResultFromObj( b, 0, keyFieldsOnly->hydrate(
+                            c->currKey() ), &details );
+                        }
+                        else {
+                            DiskLoc loc = c->currLoc();
+                            fillQueryResultFromObj( b, cc->fields.get(), c->current(), &details,
+                                    ( ( cc->pq.get() && cc->pq->showDiskLoc() ) ? &loc : 0 ) );
+                        }
 
                         if ( ( ntoreturn && n >= ntoreturn ) || b.len() > MaxBytesToReturnToClientAtOnce ) {
                             c->advance();
@@ -240,7 +261,6 @@ namespace mongo {
                 else {
                     cc->c()->noteLocation();
                 }
-                cc->mayUpgradeStorage();
                 cc->storeOpForSlave( last );
                 exhaust = cc->queryOptions() & QueryOption_Exhaust;
 
@@ -740,7 +760,7 @@ namespace mongo {
                 ( QueryResponseBuilder::make( pq, cursor, queryPlan, oldPlan ) );
         bool saveClientCursor = false;
         OpTime slaveReadTill;
-        ClientCursor::Holder ccPointer( new ClientCursor( QueryOption_NoCursorTimeout, cursor,
+        ClientCursorHolder ccPointer( new ClientCursor( QueryOption_NoCursorTimeout, cursor,
                                                          ns ) );
         
         for( ; cursor->ok(); cursor->advance() ) {

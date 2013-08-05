@@ -67,6 +67,10 @@ namespace mongo {
          */
         bool pickBestPlan(size_t* out);
 
+        virtual void yield();
+        virtual void unYield();
+        virtual void invalidate(const DiskLoc& dl);
+
     private:
         /**
          * Have all our candidate plans do something.

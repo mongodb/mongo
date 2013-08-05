@@ -989,7 +989,7 @@ namespace mongo {
                 int len;
                 const char * data = owned["data"].binDataClean( len );
 
-                ClientCursor::YieldLock yield (cc.get());
+                ClientCursorYieldLock yield (cc.get());
                 try {
                     md5_append( &st , (const md5_byte_t*)(data) , len );
                     n++;

@@ -197,7 +197,7 @@ namespace mongo {
         }
 
         // Now wrap the Cursor in ClientCursor
-        ClientCursor::Holder cursor(
+        ClientCursorHolder cursor(
                 new ClientCursor(QueryOption_NoCursorTimeout, pCursor, fullName));
         CursorId cursorId = cursor->cursorid();
         massert(16917, str::stream()

@@ -2417,7 +2417,7 @@ namespace QueryOptimizerCursorTests {
             setQueryOptimizerCursor( BSON( "x" << GT << 0 ) );
             ASSERT_EQUALS( 1, current().getIntField( "x" ) );
             
-            ClientCursor::Holder p( new ClientCursor( QueryOption_NoCursorTimeout, c(), ns() ) );
+            ClientCursorHolder p( new ClientCursor( QueryOption_NoCursorTimeout, c(), ns() ) );
             ClientCursor::YieldData yieldData;
             p->prepareToYield( yieldData );
             
@@ -2441,7 +2441,7 @@ namespace QueryOptimizerCursorTests {
                 _cli.insert( ns(), BSON( "_id" << i << "x" << i ) );                
             }
 
-            ClientCursor::Holder p;
+            ClientCursorHolder p;
             ClientCursor::YieldData yieldData;
             {
                 Lock::GlobalWrite lk;
@@ -2482,7 +2482,7 @@ namespace QueryOptimizerCursorTests {
                 Lock::GlobalWrite lk;
 
                 Client::Context ctx( ns() );
-                ClientCursor::Holder p
+                ClientCursorHolder p
                         ( new ClientCursor
                          ( QueryOption_NoCursorTimeout,
                           getOptimizedCursor
@@ -2502,7 +2502,7 @@ namespace QueryOptimizerCursorTests {
             _cli.insert( ns(), BSON( "a" << 1 << "b" << 1 ) );
             Lock::GlobalWrite lk;
             Client::Context ctx( ns() );
-            ClientCursor::Holder p
+            ClientCursorHolder p
                     ( new ClientCursor
                      ( 0,
                       getOptimizedCursor
@@ -2529,7 +2529,7 @@ namespace QueryOptimizerCursorTests {
                 Lock::GlobalWrite lk;
 
                 Client::Context ctx( ns() );
-                ClientCursor::Holder p
+                ClientCursorHolder p
                         ( new ClientCursor
                          ( 0,
                           getOptimizedCursor
@@ -2565,7 +2565,7 @@ namespace QueryOptimizerCursorTests {
                 Lock::GlobalWrite lk;
 
                 Client::Context ctx( ns() );
-                ClientCursor::Holder p
+                ClientCursorHolder p
                         ( new ClientCursor
                          ( QueryOption_NoCursorTimeout,
                           getOptimizedCursor
@@ -2579,7 +2579,7 @@ namespace QueryOptimizerCursorTests {
                 }
                 
                 // Check that the btree plan was picked.
-                ASSERT_EQUALS( BSON( "a" << 1 ), p->indexKeyPattern() );
+                ASSERT_EQUALS( BSON( "a" << 1 ), p->c()->indexKeyPattern() );
                 
                 // Yield the cursor.
                 ClientCursor::YieldData yieldData;
@@ -2626,7 +2626,7 @@ namespace QueryOptimizerCursorTests {
                 Lock::GlobalWrite lk;
 
                 Client::Context ctx( ns() );
-                ClientCursor::Holder p
+                ClientCursorHolder p
                         ( new ClientCursor
                          ( QueryOption_NoCursorTimeout,
                           getOptimizedCursor
@@ -2640,7 +2640,7 @@ namespace QueryOptimizerCursorTests {
                 }
                 
                 // Check the key pattern.
-                ASSERT_EQUALS( BSON( "a" << 1 ), p->indexKeyPattern() );
+                ASSERT_EQUALS( BSON( "a" << 1 ), p->c()->indexKeyPattern() );
                 
                 // Yield the cursor.
                 ClientCursor::YieldData yieldData;
@@ -2674,7 +2674,7 @@ namespace QueryOptimizerCursorTests {
                 {
                     Lock::DBWrite lk(ns());
                     Client::Context ctx( ns() );
-                    ClientCursor::Holder p
+                    ClientCursorHolder p
                         ( new ClientCursor
                          ( QueryOption_NoCursorTimeout,
                           getOptimizedCursor
@@ -4738,7 +4738,7 @@ namespace QueryOptimizerCursorTests {
                 // The cursor was yielded once.
                 ASSERT_EQUALS( 1, _explain[ "nYields" ].number() );
             }
-            mongo::ClientCursor::Holder _clientCursor;
+            mongo::ClientCursorHolder _clientCursor;
         };
 
         /** nYields reporting of a QueryOptimizerCursor before it enters takeover mode. */
@@ -4815,7 +4815,7 @@ namespace QueryOptimizerCursorTests {
                     ASSERT( 0 < plans.next().Obj()[ "n" ].number() );
                 }
             }
-            mongo::ClientCursor::Holder _clientCursor;
+            mongo::ClientCursorHolder _clientCursor;
         };
 
     } // namespace Explain

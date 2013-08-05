@@ -108,7 +108,7 @@ namespace mongo {
         Lock::DBRead lk(ns);
         Client::Context ctx(ns, dbpath, /*doVersion=*/false);
 
-        ClientCursor::Pin pin(_cursorId);
+        ClientCursorPin pin(_cursorId);
         ClientCursor* cursor = pin.c();
 
         uassert(16950, "Cursor deleted. Was the collection or database dropped?",
@@ -272,7 +272,7 @@ namespace mongo {
         _projection.reset(new Projection);
         _projection->init(projection);
 
-        ClientCursor::Pin pin (_cursorId);
+        ClientCursorPin pin (_cursorId);
         verify(pin.c());
         pin.c()->fields = _projection;
 

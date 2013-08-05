@@ -111,7 +111,7 @@ namespace DocumentSourceTests {
             void createSource() {
                 Client::ReadContext ctx (ns);
                 boost::shared_ptr<Cursor> cursor = theDataFileMgr.findAll( ns );
-                ClientCursor::Holder cc(
+                ClientCursorHolder cc(
                         new ClientCursor(QueryOption_NoCursorTimeout, cursor, ns));
                 CursorId cursorId = cc->cursorid();
                 cc->c()->prepareToYield();

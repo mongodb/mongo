@@ -868,7 +868,7 @@ namespace mongo {
             shared_ptr<Cursor> temp = getBestGuessCursor(_config.incLong.c_str(),
                                                          BSONObj(),
                                                          sortKey);
-            ClientCursor::Holder cursor(new ClientCursor(QueryOption_NoCursorTimeout,
+            ClientCursorHolder cursor(new ClientCursor(QueryOption_NoCursorTimeout,
                                                          temp,
                                                          _config.incLong.c_str()));
             // iterate over all sorted objects
@@ -890,7 +890,7 @@ namespace mongo {
                     continue;
                 }
 
-                ClientCursor::YieldLock yield (cursor.get());
+                ClientCursorYieldLock yield (cursor.get());
 
                 try {
                     // reduce a finalize array
@@ -1123,7 +1123,7 @@ namespace mongo {
 
                 uassert( 16149 , "cannot run map reduce without the js engine", globalScriptEngine );
 
-                ClientCursor::Holder holdCursor;
+                ClientCursorHolder holdCursor;
                 CollectionMetadataPtr collMetadata;
 
                 {
@@ -1206,7 +1206,7 @@ namespace mongo {
                                                                       config.filter,
                                                                       config.sort );
                         uassert( 16052, str::stream() << "could not create cursor over " << config.ns << " for query : " << config.filter << " sort : " << config.sort, temp.get() );
-                        ClientCursor::Holder cursor(new ClientCursor(QueryOption_NoCursorTimeout,
+                        ClientCursorHolder cursor(new ClientCursor(QueryOption_NoCursorTimeout,
                                                                      temp,
                                                                      config.ns.c_str()));
                         uassert( 16053, str::stream() << "could not create client cursor over " << config.ns << " for query : " << config.filter << " sort : " << config.sort, cursor.get() );
@@ -1251,7 +1251,7 @@ namespace mongo {
                             num++;
                             if ( num % 100 == 0 ) {
                                 // try to yield lock regularly
-                                ClientCursor::YieldLock yield (cursor.get());
+                                ClientCursorYieldLock yield (cursor.get());
                                 Timer t;
                                 // check if map needs to be dumped to disk
                                 state.checkSize();

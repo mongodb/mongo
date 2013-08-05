@@ -110,6 +110,24 @@ namespace mongo {
             
             auto_ptr<ClientCursor> cc (new ClientCursor(QueryOption_NoCursorTimeout, cursor, ns));
 
+            // map from indexed field to offset in key object
+            map<string, int> indexedFields;  
+            if (!cursor->modifiedKeys()) {
+                // store index information so we can decide if we can
+                // get something out of the index key rather than full object
+
+                int x = 0;
+                BSONObjIterator i( cursor->indexKeyPattern() );
+                while ( i.more() ) {
+                    BSONElement e = i.next();
+                    if ( e.isNumber() ) {
+                        // only want basic index fields, not "2d" etc
+                        indexedFields[e.fieldName()] = x;
+                    }
+                    x++;
+                }
+            }
+
             while ( cursor->ok() ) {
                 nscanned++;
                 bool loadedRecord = false;
@@ -119,7 +137,8 @@ namespace mongo {
 
                     BSONObj holder;
                     BSONElementSet temp;
-                    loadedRecord = ! cc->getFieldsDotted( key , temp, holder );
+                    // Try to get the record from the key fields.
+                    loadedRecord = !getFieldsDotted(indexedFields, cursor, key, temp, holder);
 
                     for ( BSONElementSet::iterator i=temp.begin(); i!=temp.end(); ++i ) {
                         BSONElement e = *i;
@@ -164,6 +183,30 @@ namespace mongo {
                 result.append( "stats" , b.obj() );
             }
 
+            return true;
+        }
+    private:
+        /**
+         * Tries to get the fields from the key first, then the object if the keys don't have it.
+         */
+        bool getFieldsDotted(const map<string, int>& indexedFields, shared_ptr<Cursor> cursor,
+                             const string& name, BSONElementSet &ret, BSONObj& holder) {
+            map<string,int>::const_iterator i = indexedFields.find( name );
+            if ( i == indexedFields.end() ) {
+                cursor->current().getFieldsDotted( name , ret );
+                return false;
+            }
+
+            int x = i->second;
+
+            holder = cursor->currKey();
+            BSONObjIterator it( holder );
+            while ( x && it.more() ) {
+                it.next();
+                x--;
+            }
+            verify( x == 0 );
+            ret.insert( it.next() );
             return true;
         }
 
