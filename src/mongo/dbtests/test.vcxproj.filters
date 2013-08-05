@@ -523,9 +523,6 @@
     <ClInclude Include="..\db\ops\update.h">
       <Filter>db\ops</Filter>
     </ClInclude>
-    <ClInclude Include="..\db\collection.h">
-      <Filter>db\Header Files\a to d</Filter>
-    </ClInclude>
     <ClInclude Include="..\db\jsobjmanipulator.h">
       <Filter>db\Header Files\e to n</Filter>
     </ClInclude>
@@ -2822,6 +2819,9 @@
     </ClInclude>
     <ClInclude Include="..\db\storage\record.h">
       <Filter>db\storage</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\exec\filter.h">
+      <Filter>db\exec</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -5427,6 +5427,15 @@
     </ClCompile>
     <ClCompile Include="..\db\storage\record.cpp">
       <Filter>db\storage</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\query\canonical_query.cpp">
+      <Filter>db\query</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\query\query_planner.cpp">
+      <Filter>db\query</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\query\stage_builder.cpp">
+      <Filter>db\query</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

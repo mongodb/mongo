@@ -3850,6 +3850,9 @@
     <ClInclude Include="..\db\auth\user_set.h">
       <Filter>db\auth</Filter>
     </ClInclude>
+    <ClInclude Include="..\db\exec\filter.h">
+      <Filter>db\exec</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\base\error_codes.err">

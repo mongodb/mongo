@@ -3798,6 +3798,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\db\exec\collection_scan.h" />
     <ClInclude Include="..\db\exec\collection_scan_common.h" />
     <ClInclude Include="..\db\exec\fetch.h" />
+    <ClInclude Include="..\db\exec\filter.h" />
     <ClInclude Include="..\db\exec\index_scan.h" />
     <ClInclude Include="..\db\exec\limit.h" />
     <ClInclude Include="..\db\exec\merge_sort.h" />
