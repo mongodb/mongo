@@ -669,6 +669,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\db\exec\collection_scan.h" />
     <ClInclude Include="..\db\exec\collection_scan_common.h" />
     <ClInclude Include="..\db\exec\fetch.h" />
+    <ClInclude Include="..\db\exec\filter.h" />
     <ClInclude Include="..\db\exec\index_scan.h" />
     <ClInclude Include="..\db\exec\limit.h" />
     <ClInclude Include="..\db\exec\merge_sort.h" />
@@ -3413,11 +3414,14 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="..\db\queryoptimizercursorimpl.cpp" />
     <ClInclude Include="..\db\queryoptimizercursorimpl.h" />
     <ClCompile Include="..\db\querypattern.cpp" />
+    <ClCompile Include="..\db\query\canonical_query.cpp" />
     <ClCompile Include="..\db\query\index_bounds.cpp" />
     <ClCompile Include="..\db\query\index_bounds_test.cpp" />
     <ClCompile Include="..\db\query\multi_plan_runner.cpp" />
     <ClCompile Include="..\db\query\new_find.cpp" />
     <ClCompile Include="..\db\query\plan_ranker.cpp" />
+    <ClCompile Include="..\db\query\query_planner.cpp" />
+    <ClCompile Include="..\db\query\stage_builder.cpp" />
     <ClCompile Include="..\db\query_optimizer.cpp" />
     <ClCompile Include="..\db\query_optimizer_internal.cpp" />
     <ClCompile Include="..\db\query_plan.cpp" />

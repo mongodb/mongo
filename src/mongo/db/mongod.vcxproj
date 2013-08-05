@@ -2856,6 +2856,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">true</ExcludedFromBuild>
     </ClCompile>
+    <ClCompile Include="query\canonical_query.cpp" />
     <ClCompile Include="query\index_bounds.cpp" />
     <ClCompile Include="query\index_bounds_test.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
@@ -2870,6 +2871,8 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="query\multi_plan_runner.cpp" />
     <ClCompile Include="query\new_find.cpp" />
     <ClCompile Include="query\plan_ranker.cpp" />
+    <ClCompile Include="query\query_planner.cpp" />
+    <ClCompile Include="query\stage_builder.cpp" />
     <ClCompile Include="range_deleter.cpp" />
     <ClCompile Include="range_deleter_db_env.cpp" />
     <ClCompile Include="range_deleter_mock_env.cpp">
@@ -4299,6 +4302,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="exec\collection_scan.h" />
     <ClInclude Include="exec\collection_scan_common.h" />
     <ClInclude Include="exec\fetch.h" />
+    <ClInclude Include="exec\filter.h" />
     <ClInclude Include="exec\index_scan.h" />
     <ClInclude Include="exec\limit.h" />
     <ClInclude Include="exec\merge_sort.h" />
