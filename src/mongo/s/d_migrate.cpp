@@ -1469,8 +1469,8 @@ namespace mongo {
                 error() << "migrate failed with unknown exception" << migrateLog;
             }
 
-            {
-                // Unprotect the range if needed/possible
+            if ( state != DONE ) {
+                // Unprotect the range if needed/possible on unsuccessful TO migration
                 Lock::DBWrite lk( ns );
                 string errMsg;
                 if ( !shardingState.forgetPending( ns, min, max, epoch, &errMsg ) ) {
