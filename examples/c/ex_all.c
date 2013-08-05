@@ -240,25 +240,27 @@ cursor_ops(WT_SESSION *session)
 	cursor_search_near(cursor);
 
 	{
-	/*! [Insert a new record] */
-	/* Insert a new record. */
+	/*! [Insert a new record or overwrite an existing record] */
+	/* Insert a new record or overwrite an existing record. */
 	const char *key = "some key", *value = "some value";
+	ret = session->open_cursor(
+	    session, "table:mytable", NULL, NULL, &cursor);
 	cursor->set_key(cursor, key);
 	cursor->set_value(cursor, value);
 	ret = cursor->insert(cursor);
-	/*! [Insert a new record] */
+	/*! [Insert a new record or overwrite an existing record] */
 	}
 
 	{
+	/*! [Insert a new record and fail if the record exists] */
+	/* Insert a new record and fail if the record exists. */
 	const char *key = "some key", *value = "some value";
-	/*! [Insert a new record or overwrite an existing record] */
-	/* Insert a new record or overwrite an existing record. */
 	ret = session->open_cursor(
-	    session, "table:mytable", NULL, "overwrite", &cursor);
+	    session, "table:mytable", NULL, "overwrite=false", &cursor);
 	cursor->set_key(cursor, key);
 	cursor->set_value(cursor, value);
 	ret = cursor->insert(cursor);
-	/*! [Insert a new record or overwrite an existing record] */
+	/*! [Insert a new record and fail if the record exists] */
 	}
 
 	{
@@ -276,20 +278,45 @@ cursor_ops(WT_SESSION *session)
 	}
 
 	{
-	/*! [Update an existing record] */
+	/*! [Update an existing record or insert a new record] */
 	const char *key = "some key", *value = "some value";
+	ret = session->open_cursor(
+	    session, "table:mytable", NULL, NULL, &cursor);
 	cursor->set_key(cursor, key);
 	cursor->set_value(cursor, value);
 	ret = cursor->update(cursor);
-	/*! [Update an existing record] */
+	/*! [Update an existing record or insert a new record] */
+	}
+
+	{
+	/*! [Update an existing record and fail if DNE] */
+	const char *key = "some key", *value = "some value";
+	ret = session->open_cursor(
+	    session, "table:mytable", NULL, "overwrite=false", &cursor);
+	cursor->set_key(cursor, key);
+	cursor->set_value(cursor, value);
+	ret = cursor->update(cursor);
+	/*! [Update an existing record and fail if DNE] */
 	}
 
 	{
 	/*! [Remove a record] */
 	const char *key = "some key";
+	ret = session->open_cursor(
+	    session, "table:mytable", NULL, NULL, &cursor);
 	cursor->set_key(cursor, key);
 	ret = cursor->remove(cursor);
 	/*! [Remove a record] */
+	}
+
+	{
+	/*! [Remove a record and fail if DNE] */
+	const char *key = "some key";
+	ret = session->open_cursor(
+	    session, "table:mytable", NULL, "overwrite=false", &cursor);
+	cursor->set_key(cursor, key);
+	ret = cursor->remove(cursor);
+	/*! [Remove a record and fail if DNE] */
 	}
 
 	{

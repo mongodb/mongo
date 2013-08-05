@@ -328,62 +328,82 @@ struct __wt_cursor {
 	 * @{
 	 */
 	/*!
-	 * Insert a record, and optionally overwrite an existing record.
-	 * If the cursor was not configured with "append" or "overwrite", both
-	 * the key and value must be set and the record must not already exist;
+	 * Insert a record and optionally update an existing record.
+	 *
+	 * If the cursor was configured with "overwrite" (the default), both
+	 * the key and value must be set; if the record already exists, the
+	 * key's value will be updated, otherwise, the record will be inserted.
+	 *
+	 * @snippet ex_all.c Insert a new record or overwrite an existing record
+	 *
+	 * If the cursor was not configured with "overwrite", both the key
+	 * and value must be set and the record must not already exist;
 	 * the record will be inserted.
 	 *
-	 * If the cursor was configured with "overwrite", both the key and value
-	 * must be set; if the record already exists, the key's value will be
-	 * updated, otherwise, the record will be inserted.
+	 * @snippet ex_all.c Insert a new record and fail if the record exists
 	 *
 	 * If a cursor with record number keys was configured with "append",
 	 * the value must be set; a new record will be appended and the record
 	 * number set as the cursor key value.
+	 *
+	 * @snippet ex_all.c Insert a new record and assign a record number
 	 *
 	 * Inserting a new record after the current maximum record in a
 	 * fixed-length bit field column-store (that is, a store with an
 	 * 'r' type key and 't' type value) may implicitly create the missing
 	 * records as records with a value of 0.
 	 *
-	 * @snippet ex_all.c Insert a new record
-	 *
-	 * @snippet ex_all.c Insert a new record or overwrite an existing record
-	 *
-	 * @snippet ex_all.c Insert a new record and assign a record number
-	 *
 	 * @param cursor the cursor handle
 	 * @errors
+	 * In particular, if \c overwrite is not configured and a record with
+	 * the specified key already exists, ::WT_DUPLICATE_KEY is returned.
 	 */
 	int __F(insert)(WT_CURSOR *cursor);
 
 	/*!
-	 * Update a record.  Both key and value must be set, the key must
-	 * exist, and the value of the key's record will be updated.
+	 * Update a record and optionally insert an existing record.
 	 *
-	 * @snippet ex_all.c Update an existing record
+	 * If the cursor was configured with "overwrite" (the default), both
+	 * the key and value must be set; if the record already exists, the
+	 * key's value will be updated, otherwise, the record will be inserted.
+	 *
+	 * @snippet ex_all.c Update an existing record or insert a new record
+	 *
+	 * If the cursor was not configured with "overwrite", both the key
+	 * and value must be set and the record must already exist; the
+	 * record will be updated.
+	 *
+	 * @snippet ex_all.c Update an existing record and fail if DNE
 	 *
 	 * @param cursor the cursor handle
 	 * @errors
-	 * In particular, if no record with the specified key exists,
-	 * ::WT_NOTFOUND is returned.
+	 * In particular, if \c overwrite is not configured and no record with
+	 * the specified key exists, ::WT_NOTFOUND is returned.
 	 */
 	int __F(update)(WT_CURSOR *cursor);
 
 	/*!
-	 * Remove a record.  The key must be set, and the key's record will be
-	 * removed.
+	 * Remove a record.
+	 *
+	 * If the cursor was configured with "overwrite" (the default), the
+	 * key must be set; the key's record will be removed if it exists,
+	 * no error will be returned if the record does not exist.
+	 *
+	 * @snippet ex_all.c Remove a record
+	 *
+	 * If the cursor was not configured with "overwrite", the key must be
+	 * set and the key's record must exist; the record will be removed.
+	 *
+	 * @snippet ex_all.c Remove a record and fail if DNE
 	 *
 	 * Removing a record in a fixed-length bit field column-store
 	 * (that is, a store with an 'r' type key and 't' type value) is
 	 * identical to setting the record's value to 0.
 	 *
-	 * @snippet ex_all.c Remove a record
-	 *
 	 * @param cursor the cursor handle
 	 * @errors
-	 * In particular, if no record with the specified key exists,
-	 * ::WT_NOTFOUND is returned.
+	 * In particular, if \c overwrite is not configured and no record with
+	 * the specified key exists, ::WT_NOTFOUND is returned.
 	 */
 	int __F(remove)(WT_CURSOR *cursor);
 	/*! @} */
