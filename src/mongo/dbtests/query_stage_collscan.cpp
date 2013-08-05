@@ -489,8 +489,10 @@ namespace QueryStageCollectionScan {
             }
 
             // Remove locs[count].
+            scan->prepareToYield();
             scan->invalidate(locs[count]);
             remove(locs[count].obj());
+            scan->recoverFromYield();
 
             // Skip over locs[count].
             ++count;
@@ -547,8 +549,10 @@ namespace QueryStageCollectionScan {
             }
 
             // Remove locs[count].
+            scan->prepareToYield();
             scan->invalidate(locs[count]);
             remove(locs[count].obj());
+            scan->recoverFromYield();
 
             // Skip over locs[count].
             ++count;
