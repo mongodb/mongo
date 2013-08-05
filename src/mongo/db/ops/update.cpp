@@ -623,17 +623,23 @@ namespace mongo {
                 const bool recovered = clientCursor->yieldSometimes(
                     ClientCursor::WillNeed, &yielded );
 
-                // If we couldn't recover from the yield, or if the cursor died while we were
-                // yielded, get out of the update loop right away. We don't need to reset
-                // 'clientCursor' since we are leaving the scope.
-                if ( !recovered || !cursor->ok() )
+                if ( !recovered ) {
+                    // If we failed to recover from the yield, then the ClientCursor is already
+                    // gone. Release it so we don't destroy it a second time.
+                    clientCursor.release();
                     break;
+                }
+
+                if ( !cursor->ok() ) {
+                    // If the cursor died while we were yielded, just get out of the update loop.
+                    break;
+                }
 
                 if ( yielded ) {
-                    // Details about our namespace may have changed while we were yielded, so
-                    // we re-acquire them here. If we can't do so, escape the update
-                    // loop. Otherwise, refresh the driver so that it knows about what is
-                    // currently indexed.
+                    // We yielded and recovered OK, and our cursor is still good. Details about
+                    // our namespace may have changed while we were yielded, so we re-acquire
+                    // them here. If we can't do so, escape the update loop. Otherwise, refresh
+                    // the driver so that it knows about what is currently indexed.
                     d = nsdetails( ns );
                     if ( !d )
                         break;
