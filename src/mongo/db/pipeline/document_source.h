@@ -199,6 +199,9 @@ namespace mongo {
           @param explain create explain output
          */
         virtual void addToBsonArray(BSONArrayBuilder *pBuilder, bool explain=false) const;
+
+        /// Returns true if doesn't require an input source (most DocumentSources do).
+        virtual bool isValidInitialSource() const { return false; }
         
     protected:
         /**
@@ -247,6 +250,8 @@ namespace mongo {
 
     /** This class marks DocumentSources that should be split between the router and the shards
      *  See Pipeline::splitForSharded() for details
+     *
+     *  TODO inheriting from DocumentSource here was a mistake. It should be separate.
      */
     class SplittableDocumentSource : public DocumentSource {
     public:
@@ -264,6 +269,33 @@ namespace mongo {
     };
 
 
+    /** This class marks DocumentSources which need mongod-specific functionality.
+     *  It causes a MongodInterface to be injected when in a mongod and prevents mongos from
+     *  merging pipelines containing this stage.
+     */
+    class DocumentSourceNeedsMongod {
+    public:
+        // Wraps mongod-specific functions to allow linking into mongos.
+        class MongodInterface {
+        public:
+            virtual ~MongodInterface() {};
+            virtual DBClientBase* directClient() = 0; // Always returns a DBDirectClient
+            // Add new methods as needed.
+        };
+
+        void injectMongodInterface(boost::shared_ptr<MongodInterface> mongod) {
+            _mongod = mongod;
+        }
+
+    protected:
+        // It is invalid to delete through a DocumentSourceNeedsMongod-typed pointer.
+        virtual ~DocumentSourceNeedsMongod() {}
+
+        // Gives subclasses access to a MongodInterface implementation
+        shared_ptr<MongodInterface> _mongod;
+    };
+
+
     class DocumentSourceBsonArray :
         public DocumentSource {
     public:
@@ -273,6 +305,7 @@ namespace mongo {
         virtual bool advance();
         virtual Document getCurrent();
         virtual void setSource(DocumentSource *pSource);
+        virtual bool isValidInitialSource() const { return true; }
 
         /**
           Create a document source based on a BSON array.
@@ -316,6 +349,7 @@ namespace mongo {
         virtual bool advance();
         virtual Document getCurrent();
         virtual void setSource(DocumentSource *pSource);
+        virtual bool isValidInitialSource() const { return true; }
 
         /* convenient shorthand for a commonly used type */
         typedef vector<Strategy::CommandResult> ShardOutput;
@@ -372,6 +406,7 @@ namespace mongo {
         virtual Document getCurrent();
         virtual void setSource(DocumentSource *pSource);
         virtual bool coalesce(const intrusive_ptr<DocumentSource>& nextSource);
+        virtual bool isValidInitialSource() const { return true; }
 
         /**
          * Release the Cursor and the read lock it requires, but without changing the other data.
@@ -783,6 +818,7 @@ namespace mongo {
         virtual void setSource(DocumentSource *pSource);
         virtual const char *getSourceName() const;
         virtual void dispose();
+        virtual bool isValidInitialSource() const { return true; }
 
         static intrusive_ptr<DocumentSource> createFromBson(
             BSONElement *pBsonElement,
@@ -830,8 +866,8 @@ namespace mongo {
         Document _current;
     };
 
-    class DocumentSourceOut :
-        public SplittableDocumentSource {
+    class DocumentSourceOut : public SplittableDocumentSource
+                            , public DocumentSourceNeedsMongod {
     public:
         // virtuals from DocumentSource
         virtual ~DocumentSourceOut();
@@ -844,8 +880,7 @@ namespace mongo {
         virtual intrusive_ptr<DocumentSource> getShardSource() { return NULL; }
         virtual intrusive_ptr<DocumentSource> getRouterSource() { return this; }
 
-        /// Gives $out a way to add the outputNs to the command result.
-        void alterCommandResult(BSONObjBuilder& cmdResult);
+        const NamespaceString& getOutputNs() const { return _outputNs; }
 
         /**
           Create a document source for output and pass-through.
@@ -878,12 +913,6 @@ namespace mongo {
 
         NamespaceString _tempNs; // output goes here as it is being processed.
         const NamespaceString _outputNs; // output will go here after all data is processed.
-
-        // This field is injected by PipelineD. This division of labor allows the
-        // DocumentSourceOut class to be linked into both mongos and mongod while
-        // allowing it to use DBDirectClient when in mongod.
-        boost::scoped_ptr<DBClientBase> _conn; // either NULL or a DBDirectClient
-        friend class PipelineD;
     };
 
     
@@ -1243,7 +1272,8 @@ namespace mongo {
         scoped_ptr<Unwinder> _unwinder;
     };
 
-    class DocumentSourceGeoNear : public SplittableDocumentSource {
+    class DocumentSourceGeoNear : public SplittableDocumentSource
+                                , public DocumentSourceNeedsMongod {
     public:
         // virtuals from DocumentSource
         virtual ~DocumentSourceGeoNear();
@@ -1253,6 +1283,7 @@ namespace mongo {
         virtual const char *getSourceName() const;
         virtual void setSource(DocumentSource *pSource); // errors out since this must be first
         virtual bool coalesce(const intrusive_ptr<DocumentSource> &pNextSource);
+        virtual bool isValidInitialSource() const { return true; }
 
         // Virtuals for SplittableDocumentSource
         virtual intrusive_ptr<DocumentSource> getShardSource();
@@ -1293,12 +1324,6 @@ namespace mongo {
         double distanceMultiplier;
         scoped_ptr<FieldPath> includeLocs;
         bool uniqueDocs;
-
-        // This field is injected by PipelineD. This division of labor allows the
-        // DocumentSourceGeoNear class to be linked into both mongos and mongod while
-        // allowing it to run a command using DBDirectClient when in mongod.
-        boost::scoped_ptr<DBClientWithCommands> client; // either NULL or a DBDirectClient
-        friend class PipelineD;
 
         // these fields are used while processing the results
         BSONObj cmdOutput;

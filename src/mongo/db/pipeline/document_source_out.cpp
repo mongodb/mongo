@@ -27,8 +27,8 @@ namespace mongo {
             // Make sure we drop the temp collection if anything goes wrong. Errors are ignored
             // here because nothing can be done about them. Additionally, if this fails and the
             // collection is left behind, it will be cleaned up next time the server is started.
-            if (_conn && _tempNs.size())
-                _conn->dropCollection(_tempNs.ns());
+            if (_mongod && _tempNs.size())
+                _mongod->directClient()->dropCollection(_tempNs.ns());
         )
     }
 
@@ -36,14 +36,12 @@ namespace mongo {
         return outName;
     }
 
-    void DocumentSourceOut::alterCommandResult(BSONObjBuilder& cmdResult) {
-        cmdResult.append("outputNs",  _outputNs.ns());
-    }
-
     static AtomicUInt32 aggOutCounter;
     void DocumentSourceOut::prepTempCollection() {
-        verify(_conn);
+        verify(_mongod);
         verify(_tempNs.size() == 0);
+
+        DBClientBase* conn = _mongod->directClient();
 
         _tempNs = StringData(str::stream() << _outputNs.db()
                                            << ".tmp.agg_out."
@@ -52,24 +50,24 @@ namespace mongo {
 
         {
             BSONObj info;
-            bool ok =_conn->runCommand(_outputNs.db().toString(),
-                                       BSON("create" << _tempNs.coll() << "temp" << true),
-                                       info);
+            bool ok =conn->runCommand(_outputNs.db().toString(),
+                                      BSON("create" << _tempNs.coll() << "temp" << true),
+                                      info);
             uassert(16994, str::stream() << "failed to create temporary $out collection '"
                                          << _tempNs.ns() << "': " << info.toString(),
                     ok);
         }
 
         // copy indexes on _outputNs to _tempNs
-        scoped_ptr<DBClientCursor> indexes(_conn->getIndexes(_outputNs));
+        scoped_ptr<DBClientCursor> indexes(conn->getIndexes(_outputNs));
         while (indexes->more()) {
             MutableDocument index(Document(indexes->nextSafe()));
             index.remove("_id"); // indexes shouldn't have _ids but some existing ones do
             index["ns"] = Value(_tempNs.ns());
 
             BSONObj indexBson = index.freeze().toBson();
-            _conn->insert(_tempNs.getSystemIndexesCollection(), indexBson);
-            BSONObj err = _conn->getLastErrorDetailed();
+            conn->insert(_tempNs.getSystemIndexesCollection(), indexBson);
+            BSONObj err = conn->getLastErrorDetailed();
             uassert(16995, str::stream() << "copying index for $out failed."
                                          << " index: " << indexBson
                                          << " error: " <<  err,
@@ -84,15 +82,16 @@ namespace mongo {
             return true;
         _done = true;
 
-        verify(_conn);
+        verify(_mongod);
+        DBClientBase* conn = _mongod->directClient();
 
         prepTempCollection();
         verify(_tempNs.size() != 0);
 
         for (bool haveNext = !pSource->eof(); haveNext; haveNext = pSource->advance()) {
             BSONObj toInsert = pSource->getCurrent().toBson();
-            _conn->insert(_tempNs.ns(), toInsert);
-            BSONObj err = _conn->getLastErrorDetailed();
+            conn->insert(_tempNs.ns(), toInsert);
+            BSONObj err = conn->getLastErrorDetailed();
             uassert(16996, str::stream() << "insert for $out failed: " << err,
                     DBClientWithCommands::getLastErrorString(err).empty());
         }
@@ -102,7 +101,7 @@ namespace mongo {
                            << "dropTarget" << true
                            );
         BSONObj info;
-        bool ok = _conn->runCommand("admin", rename, info);
+        bool ok = conn->runCommand("admin", rename, info);
         uassert(16997,  str::stream() << "renameCollection for $out failed: " << info,
                 ok);
 

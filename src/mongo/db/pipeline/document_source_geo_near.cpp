@@ -145,9 +145,9 @@ namespace mongo {
         massert(16603, "Already ran geoNearCommand",
                 !resultsIterator);
 
-        bool ok = client->runCommand(pExpCtx->getNs().db().toString(),
-                                     buildGeoNearCmd(),
-                                     cmdOutput);
+        bool ok = _mongod->directClient()->runCommand(pExpCtx->getNs().db().toString(),
+                                                      buildGeoNearCmd(),
+                                                      cmdOutput);
         uassert(16604, "geoNear command failed: " + cmdOutput.toString(),
                 ok);
 
