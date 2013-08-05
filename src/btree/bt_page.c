@@ -198,7 +198,7 @@ __wt_page_alloc(WT_SESSION_IMPL *session,
 int
 __wt_page_inmem(
     WT_SESSION_IMPL *session, WT_PAGE *parent, WT_REF *parent_ref,
-    WT_PAGE_HEADER *dsk, int disk_not_alloc, WT_PAGE **pagep)
+    WT_PAGE_HEADER *dsk, uint32_t flags, WT_PAGE **pagep)
 {
 	WT_DECL_RET;
 	WT_PAGE *page;
@@ -254,14 +254,13 @@ __wt_page_inmem(
 	WT_RET(__wt_page_alloc(session, dsk->type, alloc_entries, &page));
 	page->dsk = dsk;
 	page->read_gen = WT_READ_GEN_NOTSET;
-	if (disk_not_alloc)
-		F_SET_ATOMIC(page, WT_PAGE_DISK_NOT_ALLOC);
+	F_SET_ATOMIC(page, flags);
 
 	/*
 	 * Track the memory allocated to build this page so we can update the
 	 * cache statistics in a single call.
 	 */
-	size = disk_not_alloc ? 0 : dsk->mem_size;
+	size = LF_ISSET(WT_PAGE_DISK_ALLOC) ? dsk->mem_size : 0;
 
 	switch (page->type) {
 	case WT_PAGE_COL_FIX:
