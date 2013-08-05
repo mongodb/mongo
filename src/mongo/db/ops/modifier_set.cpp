@@ -101,7 +101,7 @@ namespace mongo {
 
         case Object:
         case Array:
-            if (! modExpr.Obj().okForStorage()) {
+            if (opts.enforceOkForStorage && !modExpr.Obj().okForStorage()) {
                 return Status(ErrorCodes::BadValue, "cannot use '$' as values");
             }
             break;

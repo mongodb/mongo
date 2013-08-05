@@ -75,7 +75,7 @@ namespace mongo {
                           "object replace expects full object but type was " << modExpr.type());
         }
 
-        if (!modExpr.embeddedObject().okForStorageAsRoot()) {
+        if (opts.enforceOkForStorage && !modExpr.embeddedObject().okForStorageAsRoot()) {
             return Status(ErrorCodes::BadValue, "not okForStorage: "
                                                 " the document has invalid fields");
         }
