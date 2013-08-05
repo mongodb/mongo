@@ -524,13 +524,27 @@ namespace mongo {
         NamespaceDetails* d = nsdetails( ns );
         NamespaceDetailsTransient* nsdt = &NamespaceDetailsTransient::get( ns );
 
+        // TODO: Put this logic someplace central and check based on constants (maybe using the
+        // list of actually excluded config collections, and not global for the config db).
+        NamespaceString nsStr( ns );
+
+        // Should the modifiers validdate their embedded docs via okForStorage
+        bool shouldValidate = true;
+
+        // Config db docs shouldn't get checked for valid field names since the shard key can have
+        // a dot (".") in it. Therefore we disable validation for storage.
+        if ( nsStr.db() == "config" ) {
+            LOG(0) << "disabling okForStorage on config db";
+            shouldValidate = false;
+        }
+
         UpdateDriver::Options opts;
         opts.multi = multi;
         opts.upsert = upsert;
         opts.logOp = logop;
-        opts.modOptions = forReplication ? ModifierInterface::Options::fromRepl():
-                                           ModifierInterface::Options::normal();
+        opts.modOptions = ModifierInterface::Options( forReplication, shouldValidate );
         UpdateDriver driver( opts );
+
         // TODO: This copies the index keys, but we may not actually need to.
         Status status = driver.parse( nsdt->indexKeys(), updateobj );
         if ( !status.isOK() ) {
