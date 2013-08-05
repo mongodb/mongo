@@ -550,7 +550,7 @@ namespace mongo {
         if (pCtx->getExtSortAllowed())
             return false;
 
-        if (dynamic_cast<DocumentSourceOut*>(sources.back().get()))
+        if (dynamic_cast<DocumentSourceNeedsMongod*>(sources.back().get()))
             return false;
 
         return true;

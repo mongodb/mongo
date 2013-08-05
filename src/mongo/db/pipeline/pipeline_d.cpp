@@ -29,6 +29,17 @@
 
 namespace mongo {
 
+namespace {
+    class MongodImplementation : public DocumentSourceNeedsMongod::MongodInterface {
+    public:
+        DBClientBase* directClient() { return &_client; }
+
+    private:
+        DBDirectClient _client;
+    };
+
+}
+
     void PipelineD::prepareCursorSource(
         const intrusive_ptr<Pipeline> &pPipeline,
         const string &dbName,
@@ -37,21 +48,17 @@ namespace mongo {
         // We will be modifying the source vector as we go
         Pipeline::SourceContainer& sources = pPipeline->sources;
 
-        if (!sources.empty()) {
-            DocumentSource* last = sources.back().get();
-            if (DocumentSourceOut* out = dynamic_cast<DocumentSourceOut*>(last)) {
-                out->_conn.reset(new DBDirectClient());
+        // Inject a MongodImplementation to sources that need them.
+        for (size_t i = 0; i < sources.size(); i++) {
+            DocumentSourceNeedsMongod* needsMongod =
+                dynamic_cast<DocumentSourceNeedsMongod*>(sources[i].get());
+            if (needsMongod) {
+                needsMongod->injectMongodInterface(boost::make_shared<MongodImplementation>());
             }
+        }
 
-            DocumentSource* first = sources.front().get();
-            DocumentSourceGeoNear* geoNear = dynamic_cast<DocumentSourceGeoNear*>(first);
-            if (geoNear) {
-                geoNear->client.reset(new DBDirectClient);
-                return; // we don't need a DocumentSourceCursor in this case
-            }
-
-            if (dynamic_cast<DocumentSourceMergeCursors*>(sources.front().get()))
-                return;
+        if (!sources.empty() && sources.front()->isValidInitialSource()) {
+            return; // don't need a cursor
         }
 
         /* look for an initial match */

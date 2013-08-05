@@ -235,7 +235,7 @@ namespace mongo {
             }
 
             if (DocumentSourceOut* out = dynamic_cast<DocumentSourceOut*>(pPipeline->output())) {
-                out->alterCommandResult(result);
+                result.append("outputNs", out->getOutputNs());
             }
 
             return true;
