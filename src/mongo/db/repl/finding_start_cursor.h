@@ -95,7 +95,7 @@ namespace mongo {
         FindingStartMode _findingStartMode;
         auto_ptr< CoveredIndexMatcher > _matcher;
         Timer _findingStartTimer;
-        ClientCursor::Holder _findingStartCursor;
+        ClientCursorHolder _findingStartCursor;
         shared_ptr<Cursor> _c;
         ClientCursor::YieldData _yieldData;
         static int _initialTimeout;

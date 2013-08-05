@@ -77,7 +77,7 @@ namespace mongo {
         }
 
         shared_ptr<Cursor> cursor = getOptimizedCursor( ns, query, BSONObj(), _countPlanPolicies );
-        ClientCursor::Holder ccPointer;
+        ClientCursorHolder ccPointer;
         ElapsedTracker timeToStartYielding( 256, 20 );
         try {
             while( cursor->ok() ) {

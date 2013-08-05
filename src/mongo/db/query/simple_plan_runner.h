@@ -47,9 +47,17 @@ namespace mongo {
             _root.reset(root);
         }
 
-        PlanStageStats* getStats() {
-            return _root->getStats();
+        /**
+         * TODO: Explicit yielding is deprecated pending a ClientCursor rewrite.
+         */
+        virtual void yield() { _root->prepareToYield(); }
+        virtual void unYield() { _root->recoverFromYield(); }
+
+        virtual void invalidate(const DiskLoc& dl) {
+            _root->invalidate(dl);
         }
+
+        PlanStageStats* getStats() { return _root->getStats(); }
 
         bool getNext(BSONObj* objOut) {
             for (;;) {
@@ -65,7 +73,8 @@ namespace mongo {
                     return true;
                 }
                 else if (code == PlanStage::NEED_TIME) {
-                    // TODO: Occasionally yield.  For now, we run until we get another result.
+                    // TODO: Runners can't yield themselves until we rework ClientCursor to not
+                    // delete itself.
                 }
                 else if (PlanStage::NEED_FETCH == code) {
                     // id has a loc and refers to an obj we need to fetch.
@@ -78,6 +87,8 @@ namespace mongo {
 
                     // Actually bring record into memory.
                     Record* record = member->loc.rec();
+                    // TODO: We would yield ourselves here and call ClientCursor::staticYield once
+                    // we rework ClientCursor to not delete itself.
                     record->touch();
 
                     // Record should be in memory now.  Log if it's not.

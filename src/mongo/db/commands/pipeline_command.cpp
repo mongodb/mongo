@@ -67,7 +67,7 @@ namespace mongo {
                                     : 101; // same as query
 
         // Using limited cursor API that ignores many edge cases. Should be sufficient for commands.
-        ClientCursor::Pin pin(id);
+        ClientCursorPin pin(id);
         ClientCursor* cursor = pin.c();
 
         massert(16958, "Cursor shouldn't have been deleted",

@@ -19,21 +19,31 @@
 namespace mongo {
 
     /**
-     * A runner runs a query.  All yielding, fetching, and other query details are taken care of by
-     * the runner.
-     *
-     * TODO: Do we want to expand the interface to allow yielding?  IE, if update is running a query
-     * and updating at the same time?
+     * A runner runs a query.
      */
     class Runner {
     public:
+        virtual ~Runner() { }
+
         /**
          * Get the next result from the query.
          */
-        // TODO: This is inefficient and should probably append to some message buffer or similar.
         virtual bool getNext(BSONObj* objOut) = 0;
 
-        virtual ~Runner() { }
+        /**
+         * Inform the runner that the provided DiskLoc is about to disappear (or change entirely).
+         * The runner then takes any actions required to continue operating correctly, including
+         * broadcasting the invalidation request to the PlanStage tree being run.
+         *
+         * Called from ClientCursor::aboutToDelete.
+         */
+        virtual void invalidate(const DiskLoc& dl) = 0;
+
+        /**
+         * TODO: Kill these once yielding is controlled inside of a runner.
+         */
+        virtual void yield() = 0;
+        virtual void unYield() = 0;
     };
 
 }  // namespace mongo

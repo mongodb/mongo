@@ -38,6 +38,35 @@ namespace mongo {
         _candidates.push_back(CandidatePlan(solution, root, ws));
     }
 
+    void MultiPlanRunner::yield() {
+        if (NULL != _bestPlanRunner) {
+            _bestPlanRunner->yield();
+        }
+        else {
+            yieldAllPlans();
+        }
+    }
+
+    void MultiPlanRunner::unYield() {
+        if (NULL != _bestPlanRunner) {
+            _bestPlanRunner->yield();
+        }
+        else {
+            unyieldAllPlans();
+        }
+    }
+
+    void MultiPlanRunner::invalidate(const DiskLoc& dl) {
+        if (NULL != _bestPlanRunner) {
+            _bestPlanRunner->invalidate(dl);
+        }
+        else {
+            for (size_t i = 0; i < _candidates.size(); ++i) {
+                _candidates[i].root->invalidate(dl);
+            }
+        }
+    }
+
     bool MultiPlanRunner::getNext(BSONObj* objOut) {
         verify(!_failure);
 

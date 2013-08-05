@@ -107,7 +107,7 @@ namespace mongo {
             list<BSONObj> blah;
 
             shared_ptr<Cursor> cursor = getOptimizedCursor(ns.c_str() , query);
-            ClientCursor::Holder ccPointer( new ClientCursor( QueryOption_NoCursorTimeout, cursor,
+            ClientCursorHolder ccPointer( new ClientCursor( QueryOption_NoCursorTimeout, cursor,
                                                              ns ) );
 
             while ( cursor->ok() ) {
