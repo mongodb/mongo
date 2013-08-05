@@ -123,10 +123,19 @@ namespace mongo {
 
     void printGitVersion() { log() << "git version: " << gitVersion() << endl; }
 
+    const std::string openSSLVersion(const std::string &prefix, const std::string &suffix) {
 #ifdef MONGO_SSL
-    const char * openSSLVersion() { return SSLeay_version(SSLEAY_VERSION); }
-    void printOpenSSLVersion() { log() << "OpenSSL version: " << openSSLVersion() << endl; }
+        return prefix + SSLeay_version(SSLEAY_VERSION) + suffix;
+#else
+        return "";
 #endif
+    }
+
+    void printOpenSSLVersion() {
+#ifdef MONGO_SSL
+        log() << openSSLVersion("OpenSSL version: ") << endl;
+#endif
+    }
 
 #ifndef _SCONS
 #if defined(_WIN32)
@@ -158,9 +167,7 @@ namespace mongo {
     void appendBuildInfo(BSONObjBuilder& result) {
        result << "version" << versionString
               << "gitVersion" << gitVersion()
-#ifdef MONGO_SSL
               << "OpenSSLVersion" << openSSLVersion()
-#endif
               << "sysInfo" << sysInfo()
               << "loaderFlags" << loaderFlags()
               << "compilerFlags" << compilerFlags()
