@@ -339,7 +339,7 @@ extern int __wt_page_inmem( WT_SESSION_IMPL *session,
     WT_PAGE *parent,
     WT_REF *parent_ref,
     WT_PAGE_HEADER *dsk,
-    int disk_not_alloc,
+    uint32_t flags,
     WT_PAGE **pagep);
 extern int __wt_cache_read(WT_SESSION_IMPL *session,
     WT_PAGE *parent,

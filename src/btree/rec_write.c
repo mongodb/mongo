@@ -4007,7 +4007,6 @@ __rec_split_merge_new(WT_SESSION_IMPL *session,
 		page->u.intl.recno = r->bnd[0].recno;
 	page->read_gen = WT_READ_GEN_NOTSET;
 	page->entries = r->bnd_next;
-	page->flags_atomic = WT_PAGE_DISK_NOT_ALLOC;
 
 	/*
 	 * We don't re-write parent pages when child pages split, which means

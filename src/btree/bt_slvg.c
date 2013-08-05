@@ -533,7 +533,7 @@ __slvg_trk_leaf(WT_SESSION_IMPL *session,
 		 * on every leaf page, and if you need to speed up the salvage,
 		 * it's probably a great place to start.
 		 */
-		WT_ERR(__wt_page_inmem(session, NULL, NULL, dsk, 1, &page));
+		WT_ERR(__wt_page_inmem(session, NULL, NULL, dsk, 0, &page));
 		WT_ERR(__wt_row_leaf_key_copy(session,
 		    page, &page->u.row.d[0], &trk->row_start));
 		WT_ERR(__wt_row_leaf_key_copy(session,
@@ -1591,7 +1591,7 @@ __slvg_row_trk_update_start(
 	 */
 	WT_RET(__wt_scr_alloc(session, trk->size, &dsk));
 	WT_ERR(__wt_bt_read(session, dsk, trk->addr.addr, trk->addr.size));
-	WT_ERR(__wt_page_inmem(session, NULL, NULL, dsk->mem, 1, &page));
+	WT_ERR(__wt_page_inmem(session, NULL, NULL, dsk->mem, 0, &page));
 
 	/*
 	 * Walk the page, looking for a key sorting greater than the specified
