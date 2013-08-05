@@ -118,7 +118,6 @@ __wt_btcur_reset(WT_CURSOR_BTREE *cbt)
 
 	ret = __cursor_leave(cbt);
 	__cursor_search_clear(cbt);
-	__cursor_position_clear(cbt);
 
 	return (ret);
 }
@@ -167,7 +166,8 @@ retry:	WT_RET(__cursor_func_init(cbt, 1));
 
 err:	if (ret == WT_RESTART)
 		goto retry;
-	WT_TRET(__cursor_func_resolve(cbt, ret));
+	if (ret != 0)
+		WT_TRET(__cursor_error_resolve(cbt));
 	return (ret);
 }
 
@@ -239,7 +239,8 @@ retry:	WT_RET(__cursor_func_init(cbt, 1));
 
 err:	if (ret == WT_RESTART)
 		goto retry;
-	WT_TRET(__cursor_func_resolve(cbt, ret));
+	if (ret != 0)
+		WT_TRET(__cursor_error_resolve(cbt));
 	if (exactp != NULL && (ret == 0 || ret == WT_NOTFOUND))
 		*exactp = exact;
 	return (ret);
@@ -328,7 +329,11 @@ retry:	WT_RET(__cursor_func_init(cbt, 1));
 
 err:	if (ret == WT_RESTART)
 		goto retry;
-	WT_TRET(__cursor_func_resolve(cbt, ret));
+	/* If successful, point the cursor at internal copies of the data. */
+	if (ret == 0)
+		ret = __wt_kv_return(session, cbt);
+	if (ret != 0)
+		WT_TRET(__cursor_error_resolve(cbt));
 	return (ret);
 }
 
@@ -399,7 +404,10 @@ err:	if (ret == WT_RESTART)
 	 */
 	if (F_ISSET(cursor, WT_CURSTD_OVERWRITE) && ret == WT_NOTFOUND)
 		ret = 0;
-	WT_TRET(__cursor_func_resolve(cbt, ret));
+
+	if (ret != 0)
+		WT_TRET(__cursor_error_resolve(cbt));
+
 	return (ret);
 }
 
@@ -468,7 +476,11 @@ retry:	WT_RET(__cursor_func_init(cbt, 1));
 
 err:	if (ret == WT_RESTART)
 		goto retry;
-	WT_TRET(__cursor_func_resolve(cbt, ret));
+	/* If successful, point the cursor at internal copies of the data. */
+	if (ret == 0)
+		ret = __wt_kv_return(session, cbt);
+	if (ret != 0)
+		WT_TRET(__cursor_error_resolve(cbt));
 	return (ret);
 }
 

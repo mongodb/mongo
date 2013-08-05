@@ -72,21 +72,37 @@ class test_dump(wttest.WiredTigerTestCase, suite_subprocess):
         uri = self.type + self.name
         self.populate(self, uri, 'key_format=' + self.keyfmt, self.nentries)
 
-        # Dump and re-load the object.
+        # Dump the object.
         os.mkdir(self.dir)
         if self.hex == 1:
             self.runWt(['dump', '-x', uri], outfilename='dump.out')
         else:
             self.runWt(['dump', uri], outfilename='dump.out')
+
+        # Re-load the object.
         self.runWt(['-h', self.dir, 'load', '-f', 'dump.out'])
 
-        # Check the loaded contents are correct.
+        # Check the contents
         conn = wiredtiger.wiredtiger_open(self.dir)
         session = conn.open_session()
         cursor = session.open_cursor(uri, None, None)
         self.populate_check(self, cursor, self.nentries)
         conn.close()
 
+        # Re-load the object again.
+        self.runWt(['-h', self.dir, 'load', '-f', 'dump.out'])
+
+        # Check the contents, they shouldn't have changed.
+        conn = wiredtiger.wiredtiger_open(self.dir)
+        session = conn.open_session()
+        cursor = session.open_cursor(uri, None, None)
+        self.populate_check(self, cursor, self.nentries)
+        conn.close()
+
+        # Re-load the object again, but confirm -n (no overwrite) fails.
+        self.runWt(['-h', self.dir,
+            'load', '-n', '-f', 'dump.out'], errfilename='errfile.out')
+        self.check_non_empty_file('errfile.out')
 
 if __name__ == '__main__':
     wttest.run()

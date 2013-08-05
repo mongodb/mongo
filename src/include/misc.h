@@ -116,8 +116,13 @@
 	memset(p, WT_DEBUG_BYTE, sizeof(*(p)));				\
 	__wt_free(session, p);						\
 } while (0)
+#define	__wt_overwrite_and_free_len(session, p, len) do {		\
+	memset(p, WT_DEBUG_BYTE, len);					\
+	__wt_free(session, p);						\
+} while (0)
 #else
-#define	__wt_overwrite_and_free(session, p)	__wt_free(session, p)
+#define	__wt_overwrite_and_free(session, p)		__wt_free(session, p)
+#define	__wt_overwrite_and_free_len(session, p, len)	__wt_free(session, p)
 #endif
 
 /*
@@ -182,6 +187,11 @@
 /* Function return value and scratch buffer declaration and initialization. */
 #define	WT_DECL_ITEM(i)	WT_ITEM *i = NULL
 #define	WT_DECL_RET	int ret = 0
+
+/* If a WT_ITEM data field points somewhere in its allocated memory. */
+#define	WT_DATA_IN_ITEM(i)						\
+	((i)->mem != NULL && (i)->data >= (i)->mem &&			\
+	    WT_PTRDIFF((i)->data, (i)->mem) < (i)->memsize)
 
 /*
  * In diagnostic mode we track the locations from which hazard pointers and

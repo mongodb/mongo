@@ -48,7 +48,11 @@ class test_schema02(wttest.WiredTigerTestCase):
         # bogus formats
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda:self.session.create("table:main",
-                                       "key_format=Z,value_format=Y"),
+                                       "key_format=Z,value_format=S"),
+            "/Invalid type 'Z' found in format 'Z'/")
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda:self.session.create("table:main",
+                                       "key_format=S,value_format=Z"),
             "/Invalid type 'Z' found in format 'Z'/")
 
         # These should succeed

@@ -60,9 +60,7 @@ wts_load(void)
 		die(ret, "session.open_cursor");
 
 	/* Set up the default key buffer. */
-	memset(&key, 0, sizeof(key));
 	key_gen_setup(&keybuf);
-	memset(&value, 0, sizeof(value));
 	val_gen_setup(&valbuf);
 
 	for (;;) {

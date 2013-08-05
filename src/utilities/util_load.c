@@ -18,14 +18,14 @@ static int usage(void);
 static int	append;		/* -a append (ignore record number keys) */
 static char    *cmdname;	/* -r rename */
 static char   **cmdconfig;	/* configuration pairs */
-static int	overwrite;	/* -o overwrite existing data */
+static int	no_overwrite;	/* -n don't overwrite existing data */
 
 int
 util_load(WT_SESSION *session, int argc, char *argv[])
 {
 	int ch;
 
-	while ((ch = util_getopt(argc, argv, "af:r:o")) != EOF)
+	while ((ch = util_getopt(argc, argv, "af:nr:")) != EOF)
 		switch (ch) {
 		case 'a':	/* append (ignore record number keys) */
 			append = 1;
@@ -35,11 +35,11 @@ util_load(WT_SESSION *session, int argc, char *argv[])
 				return (
 				    util_err(errno, "%s: reopen", util_optarg));
 			break;
-		case 'r':	/* -r rename */
-			cmdname = util_optarg;
+		case 'n':	/* don't overwrite existing data */
+			no_overwrite = 1;
 			break;
-		case 'o':	/* -o (overwrite existing data) */
-			overwrite = 1;
+		case 'r':	/* rename */
+			cmdname = util_optarg;
 			break;
 		case '?':
 		default:
@@ -49,9 +49,9 @@ util_load(WT_SESSION *session, int argc, char *argv[])
 	argv += util_optind;
 
 	/* -a and -o are mutually exclusive. */
-	if (append == 1 && overwrite == 1)
+	if (append == 1 && no_overwrite == 1)
 		return (util_err(EINVAL,
-		    "the -a (append) and -o (overwrite) flags are mutually "
+		    "the -a (append) and -n (no-overwrite) flags are mutually "
 		    "exclusive"));
 
 	/* The remaining arguments are configuration uri/string pairs. */
@@ -126,7 +126,7 @@ load_dump(WT_SESSION *session)
 	(void)snprintf(config, sizeof(config),
 	    "dump=%s%s%s",
 	    hex ? "hex" : "print",
-	    append ? ",append" : "", overwrite ? ",overwrite" : "");
+	    append ? ",append" : "", no_overwrite ? ",overwrite=false" : "");
 	if ((ret = session->open_cursor(
 	    session, uri, NULL, config, &cursor)) != 0)
 		return (util_err(ret, "%s: session.open", uri));

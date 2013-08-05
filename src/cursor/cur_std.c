@@ -193,7 +193,7 @@ __wt_cursor_get_keyv(WT_CURSOR *cursor, uint32_t flags, va_list ap)
 	const char *fmt;
 
 	CURSOR_API_CALL(cursor, session, get_key, NULL);
-	if (!F_ISSET(cursor, WT_CURSTD_KEY_APP | WT_CURSTD_KEY_RET))
+	if (!F_ISSET(cursor, WT_CURSTD_KEY_EXT | WT_CURSTD_KEY_INT))
 		WT_ERR(__wt_cursor_kv_not_set(cursor, 1));
 
 	if (WT_CURSOR_RECNO(cursor)) {
@@ -287,7 +287,7 @@ __wt_cursor_set_keyv(WT_CURSOR *cursor, uint32_t flags, va_list ap)
 		    "Key size (%" PRIu64 ") out of range", (uint64_t)sz);
 	cursor->saved_err = 0;
 	cursor->key.size = WT_STORE_SIZE(sz);
-	F_SET(cursor, WT_CURSTD_KEY_APP);
+	F_SET(cursor, WT_CURSTD_KEY_EXT);
 	if (0) {
 err:		cursor->saved_err = ret;
 	}
@@ -310,7 +310,7 @@ __wt_cursor_get_value(WT_CURSOR *cursor, ...)
 
 	CURSOR_API_CALL(cursor, session, get_value, NULL);
 
-	if (!F_ISSET(cursor, WT_CURSTD_VALUE_APP | WT_CURSTD_VALUE_RET))
+	if (!F_ISSET(cursor, WT_CURSTD_VALUE_EXT | WT_CURSTD_VALUE_INT))
 		WT_ERR(__wt_cursor_kv_not_set(cursor, 0));
 
 	va_start(ap, cursor);
@@ -378,7 +378,7 @@ __wt_cursor_set_value(WT_CURSOR *cursor, ...)
 		WT_ERR(__wt_struct_packv(session, buf->mem, sz,
 		    cursor->value_format, ap));
 	}
-	F_SET(cursor, WT_CURSTD_VALUE_APP);
+	F_SET(cursor, WT_CURSTD_VALUE_EXT);
 	cursor->value.size = WT_STORE_SIZE(sz);
 
 	if (0) {
@@ -477,9 +477,15 @@ __wt_cursor_dup(WT_SESSION_IMPL *session,
 	 * Get a copy of the cursor's raw key, and set it in the new cursor,
 	 * then search for that key to position the cursor.
 	 *
-	 * Don't clear (or allocate memory for) the WT_ITEM structure because
-	 * all that happens underneath is the data and size fields are reset
-	 * to reference the cursor's key.
+	 * We don't clear the WT_ITEM structure: all that happens when getting
+	 * and setting the key is the data/size fields are reset to reference
+	 * the original cursor's key.
+	 *
+	 * That said, we're playing games with the cursor flags: setting the key
+	 * sets the key/value application-set flags in the new cursor, which may
+	 * or may not be correct, but there's nothing simple that fixes it.  We
+	 * depend on the subsequent cursor search to clean things up, as search
+	 * is required to copy and/or reference private memory after success.
 	 */
 	WT_ERR(__wt_cursor_get_raw_key(to_dup, &key));
 	__wt_cursor_set_raw_key(cursor, &key);
