@@ -22,9 +22,6 @@
 
 namespace mongo {
 
-    ExpressionContext::~ExpressionContext() {
-    }
-
     inline ExpressionContext::ExpressionContext(InterruptStatus *pS, const NamespaceString& ns)
         : inShard(false)
         , inRouter(false)

@@ -47,7 +47,7 @@ namespace mongo {
 
     class DocumentSource : public IntrusiveCounterUnsigned {
     public:
-        virtual ~DocumentSource();
+        virtual ~DocumentSource() {}
 
         /**
            Set the step for a user-specified pipeline step.
@@ -281,7 +281,6 @@ namespace mongo {
         public DocumentSource {
     public:
         // virtuals from DocumentSource
-        virtual ~DocumentSourceBsonArray();
         virtual boost::optional<Document> getNext();
         virtual void setSource(DocumentSource *pSource);
         virtual bool isValidInitialSource() const { return true; }
@@ -321,7 +320,6 @@ namespace mongo {
         public DocumentSource {
     public:
         // virtuals from DocumentSource
-        virtual ~DocumentSourceCommandShards();
         virtual boost::optional<Document> getNext();
         virtual void setSource(DocumentSource *pSource);
         virtual bool isValidInitialSource() const { return true; }
@@ -493,7 +491,6 @@ namespace mongo {
         public DocumentSource {
     public:
         // virtuals from DocumentSource
-        virtual ~DocumentSourceFilterBase();
         virtual boost::optional<Document> getNext();
 
         /**
@@ -531,7 +528,6 @@ namespace mongo {
         public SplittableDocumentSource {
     public:
         // virtuals from DocumentSource
-        virtual ~DocumentSourceGroup();
         virtual boost::optional<Document> getNext();
         virtual const char *getSourceName() const;
         virtual GetDepsReturn getDependencies(set<string>& deps) const;
@@ -664,7 +660,6 @@ namespace mongo {
         public DocumentSourceFilterBase {
     public:
         // virtuals from DocumentSource
-        virtual ~DocumentSourceMatch();
         virtual const char *getSourceName() const;
 
         /**
@@ -808,7 +803,6 @@ namespace mongo {
         public DocumentSource {
     public:
         // virtuals from DocumentSource
-        virtual ~DocumentSourceProject();
         virtual boost::optional<Document> getNext();
         virtual const char *getSourceName() const;
         virtual void optimize();
@@ -857,7 +851,6 @@ namespace mongo {
         public SplittableDocumentSource {
     public:
         // virtuals from DocumentSource
-        virtual ~DocumentSourceSort();
         virtual boost::optional<Document> getNext();
         virtual const char *getSourceName() const;
         virtual void addToBsonArray(BSONArrayBuilder *pBuilder, bool explain=false) const;
@@ -972,7 +965,6 @@ namespace mongo {
         public SplittableDocumentSource {
     public:
         // virtuals from DocumentSource
-        virtual ~DocumentSourceLimit();
         virtual boost::optional<Document> getNext();
         virtual const char *getSourceName() const;
         virtual bool coalesce(const intrusive_ptr<DocumentSource> &pNextSource);
@@ -1032,7 +1024,6 @@ namespace mongo {
         public SplittableDocumentSource {
     public:
         // virtuals from DocumentSource
-        virtual ~DocumentSourceSkip();
         virtual boost::optional<Document> getNext();
         virtual const char *getSourceName() const;
         virtual bool coalesce(const intrusive_ptr<DocumentSource> &pNextSource);
@@ -1091,7 +1082,6 @@ namespace mongo {
         public DocumentSource {
     public:
         // virtuals from DocumentSource
-        virtual ~DocumentSourceUnwind();
         virtual boost::optional<Document> getNext();
         virtual const char *getSourceName() const;
 
@@ -1135,7 +1125,6 @@ namespace mongo {
                                 , public DocumentSourceNeedsMongod {
     public:
         // virtuals from DocumentSource
-        virtual ~DocumentSourceGeoNear();
         virtual boost::optional<Document> getNext();
         virtual const char *getSourceName() const;
         virtual void setSource(DocumentSource *pSource); // errors out since this must be first

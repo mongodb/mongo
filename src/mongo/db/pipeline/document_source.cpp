@@ -29,9 +29,6 @@ namespace mongo {
         nRowsOut(0) {
     }
 
-    DocumentSource::~DocumentSource() {
-    }
-
     const char *DocumentSource::getSourceName() const {
         static const char unknown[] = "[UNKNOWN]";
         return unknown;

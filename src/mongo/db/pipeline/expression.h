@@ -267,7 +267,7 @@ namespace mongo {
         virtual const char *getOpName() const = 0;
 
     protected:
-        ExpressionNary();
+        ExpressionNary() {}
 
         ExpressionVector vpOperand;
 
@@ -302,7 +302,6 @@ namespace mongo {
         public ExpressionNary {
     public:
         // virtuals from Expression
-        virtual ~ExpressionAdd();
         virtual Value evaluateInternal(const Variables& vars) const;
         virtual const char *getOpName() const;
 
@@ -322,7 +321,6 @@ namespace mongo {
         public ExpressionNary {
     public:
         // virtuals from Expression
-        virtual ~ExpressionAnd();
         virtual intrusive_ptr<Expression> optimize();
         virtual Value evaluateInternal(const Variables& vars) const;
         virtual const char *getOpName() const;
@@ -343,7 +341,7 @@ namespace mongo {
         static intrusive_ptr<ExpressionNary> create();
 
     private:
-        ExpressionAnd();
+        ExpressionAnd() {}
     };
 
 
@@ -351,7 +349,6 @@ namespace mongo {
         public Expression {
     public:
         // virtuals from ExpressionNary
-        virtual ~ExpressionCoerceToBool();
         virtual intrusive_ptr<Expression> optimize();
         virtual void addDependencies(set<string>& deps, vector<string>* path=NULL) const;
         virtual Value evaluateInternal(const Variables& vars) const;
@@ -371,7 +368,6 @@ namespace mongo {
         public ExpressionNary {
     public:
         // virtuals from ExpressionNary
-        virtual ~ExpressionCompare();
         virtual intrusive_ptr<Expression> optimize();
         virtual Value evaluateInternal(const Variables& vars) const;
         virtual const char *getOpName() const;
@@ -404,7 +400,6 @@ namespace mongo {
     class ExpressionConcat : public ExpressionNary {
     public:
         // virtuals from ExpressionNary
-        virtual ~ExpressionConcat();
         virtual Value evaluateInternal(const Variables& vars) const;
         virtual const char *getOpName() const;
 
@@ -415,7 +410,6 @@ namespace mongo {
     class ExpressionCond : public ExpressionNary {
     public:
         // virtuals from ExpressionNary
-        virtual ~ExpressionCond();
         virtual Value evaluateInternal(const Variables& vars) const;
         virtual const char *getOpName() const;
         virtual void addOperand(const intrusive_ptr<Expression> &pExpression);
@@ -423,7 +417,7 @@ namespace mongo {
         static intrusive_ptr<ExpressionNary> create();
 
     private:
-        ExpressionCond();
+        ExpressionCond() {}
     };
 
 
@@ -431,7 +425,6 @@ namespace mongo {
         public Expression {
     public:
         // virtuals from Expression
-        virtual ~ExpressionConstant();
         virtual intrusive_ptr<Expression> optimize();
         virtual void addDependencies(set<string>& deps, vector<string>* path=NULL) const;
         virtual Value evaluateInternal(const Variables& vars) const;
@@ -461,7 +454,6 @@ namespace mongo {
         public ExpressionNary {
     public:
         // virtuals from ExpressionNary
-        virtual ~ExpressionDayOfMonth();
         virtual Value evaluateInternal(const Variables& vars) const;
         virtual const char *getOpName() const;
         virtual void addOperand(const intrusive_ptr<Expression> &pExpression);
@@ -469,7 +461,7 @@ namespace mongo {
         static intrusive_ptr<ExpressionNary> create();
 
     private:
-        ExpressionDayOfMonth();
+        ExpressionDayOfMonth() {}
     };
 
 
@@ -477,7 +469,6 @@ namespace mongo {
         public ExpressionNary {
     public:
         // virtuals from ExpressionNary
-        virtual ~ExpressionDayOfWeek();
         virtual Value evaluateInternal(const Variables& vars) const;
         virtual const char *getOpName() const;
         virtual void addOperand(const intrusive_ptr<Expression> &pExpression);
@@ -485,7 +476,7 @@ namespace mongo {
         static intrusive_ptr<ExpressionNary> create();
 
     private:
-        ExpressionDayOfWeek();
+        ExpressionDayOfWeek() {}
     };
 
 
@@ -493,7 +484,6 @@ namespace mongo {
         public ExpressionNary {
     public:
         // virtuals from ExpressionNary
-        virtual ~ExpressionDayOfYear();
         virtual Value evaluateInternal(const Variables& vars) const;
         virtual const char *getOpName() const;
         virtual void addOperand(const intrusive_ptr<Expression> &pExpression);
@@ -501,7 +491,7 @@ namespace mongo {
         static intrusive_ptr<ExpressionNary> create();
 
     private:
-        ExpressionDayOfYear();
+        ExpressionDayOfYear() {}
     };
 
 
@@ -509,7 +499,6 @@ namespace mongo {
         public ExpressionNary {
     public:
         // virtuals from ExpressionNary
-        virtual ~ExpressionDivide();
         virtual Value evaluateInternal(const Variables& vars) const;
         virtual const char *getOpName() const;
         virtual void addOperand(const intrusive_ptr<Expression> &pExpression);
@@ -517,7 +506,7 @@ namespace mongo {
         static intrusive_ptr<ExpressionNary> create();
 
     private:
-        ExpressionDivide();
+        ExpressionDivide() {}
     };
 
 
@@ -525,7 +514,6 @@ namespace mongo {
         public Expression {
     public:
         // virtuals from Expression
-        virtual ~ExpressionFieldPath();
         virtual intrusive_ptr<Expression> optimize();
         virtual void addDependencies(set<string>& deps, vector<string>* path=NULL) const;
         virtual Value evaluateInternal(const Variables& vars) const;
@@ -588,7 +576,6 @@ namespace mongo {
         public Expression {
     public:
         // virtuals from expression
-        virtual ~ExpressionFieldRange();
         virtual intrusive_ptr<Expression> optimize();
         virtual void addDependencies(set<string>& deps, vector<string>* path=NULL) const;
         virtual Value evaluateInternal(const Variables& vars) const;
@@ -666,7 +653,6 @@ namespace mongo {
         public ExpressionNary {
     public:
         // virtuals from ExpressionNary
-        virtual ~ExpressionHour();
         virtual Value evaluateInternal(const Variables& vars) const;
         virtual const char *getOpName() const;
         virtual void addOperand(const intrusive_ptr<Expression> &pExpression);
@@ -674,7 +660,7 @@ namespace mongo {
         static intrusive_ptr<ExpressionNary> create();
 
     private:
-        ExpressionHour();
+        ExpressionHour() {}
     };
 
 
@@ -682,7 +668,6 @@ namespace mongo {
         public ExpressionNary {
     public:
         // virtuals from ExpressionNary
-        virtual ~ExpressionIfNull();
         virtual Value evaluateInternal(const Variables& vars) const;
         virtual const char *getOpName() const;
         virtual void addOperand(const intrusive_ptr<Expression> &pExpression);
@@ -690,14 +675,13 @@ namespace mongo {
         static intrusive_ptr<ExpressionNary> create();
 
     private:
-        ExpressionIfNull();
+        ExpressionIfNull() {}
     };
 
 
     class ExpressionLet : public Expression {
     public:
         // virtuals from Expression
-        virtual ~ExpressionLet();
         virtual intrusive_ptr<Expression> optimize();
         virtual Value serialize() const;
         virtual Value evaluateInternal(const Variables& vars) const;
@@ -717,7 +701,6 @@ namespace mongo {
     class ExpressionMap : public Expression {
     public:
         // virtuals from Expression
-        virtual ~ExpressionMap();
         virtual intrusive_ptr<Expression> optimize();
         virtual Value serialize() const;
         virtual Value evaluateInternal(const Variables& vars) const;
@@ -739,7 +722,6 @@ namespace mongo {
         public ExpressionNary {
     public:
         // virtuals from ExpressionNary
-        virtual ~ExpressionMillisecond();
         virtual Value evaluateInternal(const Variables& vars) const;
         virtual const char* getOpName() const;
         virtual void addOperand(const intrusive_ptr<Expression>& pExpression);
@@ -747,7 +729,7 @@ namespace mongo {
         static intrusive_ptr<ExpressionNary> create();
 
     private:
-        ExpressionMillisecond();
+        ExpressionMillisecond() {}
     };
 
 
@@ -755,7 +737,6 @@ namespace mongo {
         public ExpressionNary {
     public:
         // virtuals from ExpressionNary
-        virtual ~ExpressionMinute();
         virtual Value evaluateInternal(const Variables& vars) const;
         virtual const char *getOpName() const;
         virtual void addOperand(const intrusive_ptr<Expression> &pExpression);
@@ -763,7 +744,7 @@ namespace mongo {
         static intrusive_ptr<ExpressionNary> create();
 
     private:
-        ExpressionMinute();
+        ExpressionMinute() {}
     };
 
 
@@ -771,7 +752,6 @@ namespace mongo {
         public ExpressionNary {
     public:
         // virtuals from ExpressionNary
-        virtual ~ExpressionMod();
         virtual Value evaluateInternal(const Variables& vars) const;
         virtual const char *getOpName() const;
         virtual void addOperand(const intrusive_ptr<Expression> &pExpression);
@@ -779,7 +759,7 @@ namespace mongo {
         static intrusive_ptr<ExpressionNary> create();
 
     private:
-        ExpressionMod();
+        ExpressionMod() {}
     };
     
 
@@ -787,7 +767,6 @@ namespace mongo {
         public ExpressionNary {
     public:
         // virtuals from Expression
-        virtual ~ExpressionMultiply();
         virtual Value evaluateInternal(const Variables& vars) const;
         virtual const char *getOpName() const;
 
@@ -802,7 +781,7 @@ namespace mongo {
         static intrusive_ptr<ExpressionNary> create();
 
     private:
-        ExpressionMultiply();
+        ExpressionMultiply() {}
     };
 
 
@@ -810,7 +789,6 @@ namespace mongo {
         public ExpressionNary {
     public:
         // virtuals from ExpressionNary
-        virtual ~ExpressionMonth();
         virtual Value evaluateInternal(const Variables& vars) const;
         virtual const char *getOpName() const;
         virtual void addOperand(const intrusive_ptr<Expression> &pExpression);
@@ -818,7 +796,7 @@ namespace mongo {
         static intrusive_ptr<ExpressionNary> create();
 
     private:
-        ExpressionMonth();
+        ExpressionMonth() {}
     };
 
 
@@ -826,7 +804,6 @@ namespace mongo {
         public ExpressionNary {
     public:
         // virtuals from ExpressionNary
-        virtual ~ExpressionNot();
         virtual Value evaluateInternal(const Variables& vars) const;
         virtual const char *getOpName() const;
         virtual void addOperand(const intrusive_ptr<Expression> &pExpression);
@@ -834,7 +811,7 @@ namespace mongo {
         static intrusive_ptr<ExpressionNary> create();
 
     private:
-        ExpressionNot();
+        ExpressionNot() {}
     };
 
 
@@ -842,7 +819,6 @@ namespace mongo {
         public Expression {
     public:
         // virtuals from Expression
-        virtual ~ExpressionObject();
         virtual intrusive_ptr<Expression> optimize();
         virtual bool isSimple();
         virtual void addDependencies(set<string>& deps, vector<string>* path=NULL) const;
@@ -954,7 +930,6 @@ namespace mongo {
         public ExpressionNary {
     public:
         // virtuals from Expression
-        virtual ~ExpressionOr();
         virtual intrusive_ptr<Expression> optimize();
         virtual Value evaluateInternal(const Variables& vars) const;
         virtual const char *getOpName() const;
@@ -975,7 +950,7 @@ namespace mongo {
         static intrusive_ptr<ExpressionNary> create();
 
     private:
-        ExpressionOr();
+        ExpressionOr() {}
     };
 
 
@@ -983,7 +958,6 @@ namespace mongo {
         public ExpressionNary {
     public:
         // virtuals from ExpressionNary
-        virtual ~ExpressionSecond();
         virtual Value evaluateInternal(const Variables& vars) const;
         virtual const char *getOpName() const;
         virtual void addOperand(const intrusive_ptr<Expression> &pExpression);
@@ -991,7 +965,7 @@ namespace mongo {
         static intrusive_ptr<ExpressionNary> create();
 
     private:
-        ExpressionSecond();
+        ExpressionSecond() {}
     };
 
 
@@ -999,7 +973,6 @@ namespace mongo {
         public ExpressionNary {
     public:
         // virtuals from ExpressionNary
-        virtual ~ExpressionStrcasecmp();
         virtual Value evaluateInternal(const Variables& vars) const;
         virtual const char *getOpName() const;
         virtual void addOperand(const intrusive_ptr<Expression> &pExpression);
@@ -1007,7 +980,7 @@ namespace mongo {
         static intrusive_ptr<ExpressionNary> create();
 
     private:
-        ExpressionStrcasecmp();
+        ExpressionStrcasecmp() {}
     };
 
 
@@ -1015,7 +988,6 @@ namespace mongo {
         public ExpressionNary {
     public:
         // virtuals from ExpressionNary
-        virtual ~ExpressionSubstr();
         virtual Value evaluateInternal(const Variables& vars) const;
         virtual const char *getOpName() const;
         virtual void addOperand(const intrusive_ptr<Expression> &pExpression);
@@ -1023,7 +995,7 @@ namespace mongo {
         static intrusive_ptr<ExpressionNary> create();
 
     private:
-        ExpressionSubstr();
+        ExpressionSubstr() {}
     };
 
 
@@ -1031,7 +1003,6 @@ namespace mongo {
         public ExpressionNary {
     public:
         // virtuals from ExpressionNary
-        virtual ~ExpressionSubtract();
         virtual Value evaluateInternal(const Variables& vars) const;
         virtual const char *getOpName() const;
         virtual void addOperand(const intrusive_ptr<Expression> &pExpression);
@@ -1039,7 +1010,7 @@ namespace mongo {
         static intrusive_ptr<ExpressionNary> create();
 
     private:
-        ExpressionSubtract();
+        ExpressionSubtract() {}
     };
 
 
@@ -1047,7 +1018,6 @@ namespace mongo {
         public ExpressionNary {
     public:
         // virtuals from ExpressionNary
-        virtual ~ExpressionToLower();
         virtual Value evaluateInternal(const Variables& vars) const;
         virtual const char *getOpName() const;
         virtual void addOperand(const intrusive_ptr<Expression> &pExpression);
@@ -1055,7 +1025,7 @@ namespace mongo {
         static intrusive_ptr<ExpressionNary> create();
 
     private:
-        ExpressionToLower();
+        ExpressionToLower() {}
     };
 
 
@@ -1063,7 +1033,6 @@ namespace mongo {
         public ExpressionNary {
     public:
         // virtuals from ExpressionNary
-        virtual ~ExpressionToUpper();
         virtual Value evaluateInternal(const Variables& vars) const;
         virtual const char *getOpName() const;
         virtual void addOperand(const intrusive_ptr<Expression> &pExpression);
@@ -1071,7 +1040,7 @@ namespace mongo {
         static intrusive_ptr<ExpressionNary> create();
 
     private:
-        ExpressionToUpper();
+        ExpressionToUpper() {}
     };
 
 
@@ -1079,7 +1048,6 @@ namespace mongo {
         public ExpressionNary {
     public:
         // virtuals from ExpressionNary
-        virtual ~ExpressionWeek();
         virtual Value evaluateInternal(const Variables& vars) const;
         virtual const char *getOpName() const;
         virtual void addOperand(const intrusive_ptr<Expression> &pExpression);
@@ -1087,7 +1055,7 @@ namespace mongo {
         static intrusive_ptr<ExpressionNary> create();
 
     private:
-        ExpressionWeek();
+        ExpressionWeek() {}
     };
 
 
@@ -1095,7 +1063,6 @@ namespace mongo {
         public ExpressionNary {
     public:
         // virtuals from ExpressionNary
-        virtual ~ExpressionYear();
         virtual Value evaluateInternal(const Variables& vars) const;
         virtual const char *getOpName() const;
         virtual void addOperand(const intrusive_ptr<Expression> &pExpression);
@@ -1103,7 +1070,7 @@ namespace mongo {
         static intrusive_ptr<ExpressionNary> create();
 
     private:
-        ExpressionYear();
+        ExpressionYear() {}
     };
 }
 

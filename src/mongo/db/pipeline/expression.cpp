@@ -391,9 +391,6 @@ namespace mongo {
 
     /* ------------------------- ExpressionAdd ----------------------------- */
 
-    ExpressionAdd::~ExpressionAdd() {
-    }
-
     intrusive_ptr<ExpressionNary> ExpressionAdd::create() {
         intrusive_ptr<ExpressionAdd> pExpression(new ExpressionAdd());
         return pExpression;
@@ -470,16 +467,9 @@ namespace mongo {
 
     /* ------------------------- ExpressionAnd ----------------------------- */
 
-    ExpressionAnd::~ExpressionAnd() {
-    }
-
     intrusive_ptr<ExpressionNary> ExpressionAnd::create() {
         intrusive_ptr<ExpressionNary> pExpression(new ExpressionAnd());
         return pExpression;
-    }
-
-    ExpressionAnd::ExpressionAnd():
-        ExpressionNary() {
     }
 
     intrusive_ptr<Expression> ExpressionAnd::optimize() {
@@ -572,9 +562,6 @@ namespace mongo {
 
     /* -------------------- ExpressionCoerceToBool ------------------------- */
 
-    ExpressionCoerceToBool::~ExpressionCoerceToBool() {
-    }
-
     intrusive_ptr<ExpressionCoerceToBool> ExpressionCoerceToBool::create(
         const intrusive_ptr<Expression> &pExpression) {
         intrusive_ptr<ExpressionCoerceToBool> pNew(
@@ -623,9 +610,6 @@ namespace mongo {
 
     /* ----------------------- ExpressionCompare --------------------------- */
 
-    ExpressionCompare::~ExpressionCompare() {
-    }
-
     intrusive_ptr<ExpressionNary> ExpressionCompare::createEq() {
         intrusive_ptr<ExpressionCompare> pExpression(
             new ExpressionCompare(EQ));
@@ -668,10 +652,9 @@ namespace mongo {
         return pExpression;
     }
 
-    ExpressionCompare::ExpressionCompare(CmpOp theCmpOp):
-        ExpressionNary(),
-        cmpOp(theCmpOp) {
-    }
+    ExpressionCompare::ExpressionCompare(CmpOp theCmpOp)
+        : cmpOp(theCmpOp)
+    {}
 
     void ExpressionCompare::addOperand(
         const intrusive_ptr<Expression> &pExpression) {
@@ -783,9 +766,6 @@ namespace mongo {
 
     /* ------------------------- ExpressionConcat ----------------------------- */
 
-    ExpressionConcat::~ExpressionConcat() {
-    }
-
     intrusive_ptr<ExpressionNary> ExpressionConcat::create() {
         return new ExpressionConcat();
     }
@@ -815,16 +795,9 @@ namespace mongo {
 
     /* ----------------------- ExpressionCond ------------------------------ */
 
-    ExpressionCond::~ExpressionCond() {
-    }
-
     intrusive_ptr<ExpressionNary> ExpressionCond::create() {
         intrusive_ptr<ExpressionCond> pExpression(new ExpressionCond());
         return pExpression;
-    }
-
-    ExpressionCond::ExpressionCond():
-        ExpressionNary() {
     }
 
     void ExpressionCond::addOperand(
@@ -845,9 +818,6 @@ namespace mongo {
     }
 
     /* ---------------------- ExpressionConstant --------------------------- */
-
-    ExpressionConstant::~ExpressionConstant() {
-    }
 
     intrusive_ptr<ExpressionConstant> ExpressionConstant::createFromBsonElement(
         BSONElement *pBsonElement) {
@@ -891,16 +861,9 @@ namespace mongo {
 
     /* ---------------------- ExpressionDayOfMonth ------------------------- */
 
-    ExpressionDayOfMonth::~ExpressionDayOfMonth() {
-    }
-
     intrusive_ptr<ExpressionNary> ExpressionDayOfMonth::create() {
         intrusive_ptr<ExpressionDayOfMonth> pExpression(new ExpressionDayOfMonth());
         return pExpression;
-    }
-
-    ExpressionDayOfMonth::ExpressionDayOfMonth():
-        ExpressionNary() {
     }
 
     void ExpressionDayOfMonth::addOperand(const intrusive_ptr<Expression> &pExpression) {
@@ -922,16 +885,9 @@ namespace mongo {
 
     /* ------------------------- ExpressionDayOfWeek ----------------------------- */
 
-    ExpressionDayOfWeek::~ExpressionDayOfWeek() {
-    }
-
     intrusive_ptr<ExpressionNary> ExpressionDayOfWeek::create() {
         intrusive_ptr<ExpressionDayOfWeek> pExpression(new ExpressionDayOfWeek());
         return pExpression;
-    }
-
-    ExpressionDayOfWeek::ExpressionDayOfWeek():
-        ExpressionNary() {
     }
 
     void ExpressionDayOfWeek::addOperand(const intrusive_ptr<Expression> &pExpression) {
@@ -952,16 +908,9 @@ namespace mongo {
 
     /* ------------------------- ExpressionDayOfYear ----------------------------- */
 
-    ExpressionDayOfYear::~ExpressionDayOfYear() {
-    }
-
     intrusive_ptr<ExpressionNary> ExpressionDayOfYear::create() {
         intrusive_ptr<ExpressionDayOfYear> pExpression(new ExpressionDayOfYear());
         return pExpression;
-    }
-
-    ExpressionDayOfYear::ExpressionDayOfYear():
-        ExpressionNary() {
     }
 
     void ExpressionDayOfYear::addOperand(const intrusive_ptr<Expression> &pExpression) {
@@ -982,16 +931,9 @@ namespace mongo {
 
     /* ----------------------- ExpressionDivide ---------------------------- */
 
-    ExpressionDivide::~ExpressionDivide() {
-    }
-
     intrusive_ptr<ExpressionNary> ExpressionDivide::create() {
         intrusive_ptr<ExpressionDivide> pExpression(new ExpressionDivide());
         return pExpression;
-    }
-
-    ExpressionDivide::ExpressionDivide():
-        ExpressionNary() {
     }
 
     void ExpressionDivide::addOperand(
@@ -1029,9 +971,6 @@ namespace mongo {
     }
 
     /* ---------------------- ExpressionObject --------------------------- */
-
-    ExpressionObject::~ExpressionObject() {
-    }
 
     intrusive_ptr<ExpressionObject> ExpressionObject::create() {
         return new ExpressionObject(false);
@@ -1330,9 +1269,6 @@ namespace mongo {
 
     /* --------------------- ExpressionFieldPath --------------------------- */
 
-    ExpressionFieldPath::~ExpressionFieldPath() {
-    }
-
     // this is the old deprecated version
     intrusive_ptr<ExpressionFieldPath> ExpressionFieldPath::create(const string& fieldPath) {
         return new ExpressionFieldPath("CURRENT." + fieldPath);
@@ -1446,9 +1382,6 @@ namespace mongo {
     }
 
     /* --------------------- ExpressionFieldRange -------------------------- */
-
-    ExpressionFieldRange::~ExpressionFieldRange() {
-    }
 
     intrusive_ptr<Expression> ExpressionFieldRange::optimize() {
         /* if there is no range to match, this will never evaluate true */
@@ -1734,8 +1667,6 @@ namespace mongo {
 
     /* ------------------------- ExpressionLet ----------------------------- */
 
-    ExpressionLet::~ExpressionLet() {}
-
     intrusive_ptr<ExpressionLet> ExpressionLet::parse(BSONElement expr) {
         verify(str::equals(expr.fieldName(), "$let"));
 
@@ -1838,8 +1769,6 @@ namespace mongo {
 
 
     /* ------------------------- ExpressionMap ----------------------------- */
-
-    ExpressionMap::~ExpressionMap() {}
 
     intrusive_ptr<ExpressionMap> ExpressionMap::parse(BSONElement expr) {
         verify(str::equals(expr.fieldName(), "$map"));
@@ -1949,16 +1878,9 @@ namespace mongo {
 
     /* ------------------------- ExpressionMillisecond ----------------------------- */
 
-    ExpressionMillisecond::~ExpressionMillisecond() {
-    }
-
     intrusive_ptr<ExpressionNary> ExpressionMillisecond::create() {
         intrusive_ptr<ExpressionMillisecond> pExpression(new ExpressionMillisecond());
         return pExpression;
-    }
-
-    ExpressionMillisecond::ExpressionMillisecond():
-        ExpressionNary() {
     }
 
     void ExpressionMillisecond::addOperand(const intrusive_ptr<Expression>& pExpression) {
@@ -1980,16 +1902,9 @@ namespace mongo {
 
     /* ------------------------- ExpressionMinute -------------------------- */
 
-    ExpressionMinute::~ExpressionMinute() {
-    }
-
     intrusive_ptr<ExpressionNary> ExpressionMinute::create() {
         intrusive_ptr<ExpressionMinute> pExpression(new ExpressionMinute());
         return pExpression;
-    }
-
-    ExpressionMinute::ExpressionMinute():
-        ExpressionNary() {
     }
 
     void ExpressionMinute::addOperand(
@@ -2011,16 +1926,9 @@ namespace mongo {
 
     /* ----------------------- ExpressionMod ---------------------------- */
 
-    ExpressionMod::~ExpressionMod() {
-    }
-
     intrusive_ptr<ExpressionNary> ExpressionMod::create() {
         intrusive_ptr<ExpressionMod> pExpression(new ExpressionMod());
         return pExpression;
-    }
-
-    ExpressionMod::ExpressionMod():
-        ExpressionNary() {
     }
 
     void ExpressionMod::addOperand(
@@ -2082,16 +1990,9 @@ namespace mongo {
 
     /* ------------------------ ExpressionMonth ----------------------------- */
 
-    ExpressionMonth::~ExpressionMonth() {
-    }
-
     intrusive_ptr<ExpressionNary> ExpressionMonth::create() {
         intrusive_ptr<ExpressionMonth> pExpression(new ExpressionMonth());
         return pExpression;
-    }
-
-    ExpressionMonth::ExpressionMonth():
-        ExpressionNary() {
     }
 
     void ExpressionMonth::addOperand(const intrusive_ptr<Expression> &pExpression) {
@@ -2112,16 +2013,9 @@ namespace mongo {
 
     /* ------------------------- ExpressionMultiply ----------------------------- */
 
-    ExpressionMultiply::~ExpressionMultiply() {
-    }
-
     intrusive_ptr<ExpressionNary> ExpressionMultiply::create() {
         intrusive_ptr<ExpressionMultiply> pExpression(new ExpressionMultiply());
         return pExpression;
-    }
-
-    ExpressionMultiply::ExpressionMultiply():
-        ExpressionNary() {
     }
 
     Value ExpressionMultiply::evaluateInternal(const Variables& vars) const {
@@ -2174,16 +2068,9 @@ namespace mongo {
 
     /* ------------------------- ExpressionHour ----------------------------- */
 
-    ExpressionHour::~ExpressionHour() {
-    }
-
     intrusive_ptr<ExpressionNary> ExpressionHour::create() {
         intrusive_ptr<ExpressionHour> pExpression(new ExpressionHour());
         return pExpression;
-    }
-
-    ExpressionHour::ExpressionHour():
-        ExpressionNary() {
     }
 
     void ExpressionHour::addOperand(const intrusive_ptr<Expression> &pExpression) {
@@ -2204,16 +2091,9 @@ namespace mongo {
 
     /* ----------------------- ExpressionIfNull ---------------------------- */
 
-    ExpressionIfNull::~ExpressionIfNull() {
-    }
-
     intrusive_ptr<ExpressionNary> ExpressionIfNull::create() {
         intrusive_ptr<ExpressionIfNull> pExpression(new ExpressionIfNull());
         return pExpression;
-    }
-
-    ExpressionIfNull::ExpressionIfNull():
-        ExpressionNary() {
     }
 
     void ExpressionIfNull::addOperand(
@@ -2238,10 +2118,6 @@ namespace mongo {
     }
 
     /* ------------------------ ExpressionNary ----------------------------- */
-
-    ExpressionNary::ExpressionNary():
-        vpOperand() {
-    }
 
     intrusive_ptr<Expression> ExpressionNary::optimize() {
         unsigned constCount = 0; // count of constant operands
@@ -2415,16 +2291,9 @@ namespace mongo {
 
     /* ------------------------- ExpressionNot ----------------------------- */
 
-    ExpressionNot::~ExpressionNot() {
-    }
-
     intrusive_ptr<ExpressionNary> ExpressionNot::create() {
         intrusive_ptr<ExpressionNot> pExpression(new ExpressionNot());
         return pExpression;
-    }
-
-    ExpressionNot::ExpressionNot():
-        ExpressionNary() {
     }
 
     void ExpressionNot::addOperand(const intrusive_ptr<Expression> &pExpression) {
@@ -2446,16 +2315,9 @@ namespace mongo {
 
     /* -------------------------- ExpressionOr ----------------------------- */
 
-    ExpressionOr::~ExpressionOr() {
-    }
-
     intrusive_ptr<ExpressionNary> ExpressionOr::create() {
         intrusive_ptr<ExpressionNary> pExpression(new ExpressionOr());
         return pExpression;
-    }
-
-    ExpressionOr::ExpressionOr():
-        ExpressionNary() {
     }
 
     Value ExpressionOr::evaluateInternal(const Variables& vars) const {
@@ -2542,16 +2404,9 @@ namespace mongo {
 
     /* ------------------------- ExpressionSecond ----------------------------- */
 
-    ExpressionSecond::~ExpressionSecond() {
-    }
-
     intrusive_ptr<ExpressionNary> ExpressionSecond::create() {
         intrusive_ptr<ExpressionSecond> pExpression(new ExpressionSecond());
         return pExpression;
-    }
-
-    ExpressionSecond::ExpressionSecond():
-        ExpressionNary() {
     }
 
     void ExpressionSecond::addOperand(const intrusive_ptr<Expression> &pExpression) {
@@ -2572,16 +2427,9 @@ namespace mongo {
 
     /* ----------------------- ExpressionStrcasecmp ---------------------------- */
 
-    ExpressionStrcasecmp::~ExpressionStrcasecmp() {
-    }
-
     intrusive_ptr<ExpressionNary> ExpressionStrcasecmp::create() {
         intrusive_ptr<ExpressionStrcasecmp> pExpression(new ExpressionStrcasecmp());
         return pExpression;
-    }
-
-    ExpressionStrcasecmp::ExpressionStrcasecmp():
-        ExpressionNary() {
     }
 
     void ExpressionStrcasecmp::addOperand(
@@ -2614,16 +2462,9 @@ namespace mongo {
 
     /* ----------------------- ExpressionSubstr ---------------------------- */
 
-    ExpressionSubstr::~ExpressionSubstr() {
-    }
-
     intrusive_ptr<ExpressionNary> ExpressionSubstr::create() {
         intrusive_ptr<ExpressionSubstr> pExpression(new ExpressionSubstr());
         return pExpression;
-    }
-
-    ExpressionSubstr::ExpressionSubstr():
-        ExpressionNary() {
     }
 
     void ExpressionSubstr::addOperand(
@@ -2667,16 +2508,9 @@ namespace mongo {
 
     /* ----------------------- ExpressionSubtract ---------------------------- */
 
-    ExpressionSubtract::~ExpressionSubtract() {
-    }
-
     intrusive_ptr<ExpressionNary> ExpressionSubtract::create() {
         intrusive_ptr<ExpressionSubtract> pExpression(new ExpressionSubtract());
         return pExpression;
-    }
-
-    ExpressionSubtract::ExpressionSubtract():
-        ExpressionNary() {
     }
 
     void ExpressionSubtract::addOperand(
@@ -2739,16 +2573,9 @@ namespace mongo {
 
     /* ------------------------- ExpressionToLower ----------------------------- */
 
-    ExpressionToLower::~ExpressionToLower() {
-    }
-
     intrusive_ptr<ExpressionNary> ExpressionToLower::create() {
         intrusive_ptr<ExpressionToLower> pExpression(new ExpressionToLower());
         return pExpression;
-    }
-
-    ExpressionToLower::ExpressionToLower():
-        ExpressionNary() {
     }
 
     void ExpressionToLower::addOperand(const intrusive_ptr<Expression> &pExpression) {
@@ -2770,16 +2597,9 @@ namespace mongo {
 
     /* ------------------------- ExpressionToUpper -------------------------- */
 
-    ExpressionToUpper::~ExpressionToUpper() {
-    }
-
     intrusive_ptr<ExpressionNary> ExpressionToUpper::create() {
         intrusive_ptr<ExpressionToUpper> pExpression(new ExpressionToUpper());
         return pExpression;
-    }
-
-    ExpressionToUpper::ExpressionToUpper():
-        ExpressionNary() {
     }
 
     void ExpressionToUpper::addOperand(
@@ -2802,16 +2622,9 @@ namespace mongo {
 
     /* ------------------------- ExpressionWeek ----------------------------- */
 
-    ExpressionWeek::~ExpressionWeek() {
-    }
-
     intrusive_ptr<ExpressionNary> ExpressionWeek::create() {
         intrusive_ptr<ExpressionWeek> pExpression(new ExpressionWeek());
         return pExpression;
-    }
-
-    ExpressionWeek::ExpressionWeek():
-        ExpressionNary() {
     }
 
     void ExpressionWeek::addOperand(const intrusive_ptr<Expression> &pExpression) {
@@ -2848,16 +2661,9 @@ namespace mongo {
 
     /* ------------------------- ExpressionYear ----------------------------- */
 
-    ExpressionYear::~ExpressionYear() {
-    }
-
     intrusive_ptr<ExpressionNary> ExpressionYear::create() {
         intrusive_ptr<ExpressionYear> pExpression(new ExpressionYear());
         return pExpression;
-    }
-
-    ExpressionYear::ExpressionYear():
-        ExpressionNary() {
     }
 
     void ExpressionYear::addOperand(

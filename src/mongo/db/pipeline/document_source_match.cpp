@@ -26,9 +26,6 @@ namespace mongo {
 
     const char DocumentSourceMatch::matchName[] = "$match";
 
-    DocumentSourceMatch::~DocumentSourceMatch() {
-    }
-
     const char *DocumentSourceMatch::getSourceName() const {
         return matchName;
     }

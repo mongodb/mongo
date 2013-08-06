@@ -23,8 +23,6 @@ namespace mongo {
     char DocumentSourceGeoNear::geoNearName[] = "$geoNear";
     const char *DocumentSourceGeoNear::getSourceName() const { return geoNearName; }
 
-    DocumentSourceGeoNear::~DocumentSourceGeoNear() {}
-
     boost::optional<Document> DocumentSourceGeoNear::getNext() {
         pExpCtx->checkForInterrupt();
 

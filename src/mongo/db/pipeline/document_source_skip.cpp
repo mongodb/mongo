@@ -33,9 +33,6 @@ namespace mongo {
         _needToSkip(true) {
     }
 
-    DocumentSourceSkip::~DocumentSourceSkip() {
-    }
-
     const char *DocumentSourceSkip::getSourceName() const {
         return skipName;
     }
