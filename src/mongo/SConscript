@@ -329,7 +329,6 @@ env.StaticLibrary("coredb", [
         "db/pipeline/document_source.cpp",
         "db/pipeline/document_source_bson_array.cpp",
         "db/pipeline/document_source_command_shards.cpp",
-        "db/pipeline/document_source_filter.cpp",
         "db/pipeline/document_source_filter_base.cpp",
         "db/pipeline/document_source_geo_near.cpp",
         "db/pipeline/document_source_group.cpp",
