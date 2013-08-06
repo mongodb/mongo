@@ -77,6 +77,8 @@ namespace mongo {
 
         set<string> incompleteCloneDbs;
 
+        BSONObj _me;
+
         ReplSource();
 
         // returns the dummy ns used to do the drop
@@ -93,6 +95,9 @@ namespace mongo {
          * @return true iff an op with the specified ns may be applied.
          */
         bool handleDuplicateDbName( const BSONObj &op, const char *ns, const char *db );
+
+        // populates _me so that it can be passed to oplogreader for handshakes
+        void ensureMe();
 
     public:
         OplogReader oplogReader;
