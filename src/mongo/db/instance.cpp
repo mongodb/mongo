@@ -52,6 +52,7 @@
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/ops/query.h"
 #include "mongo/db/ops/update.h"
+#include "mongo/db/ops/update_driver.h"
 #include "mongo/db/pagefault.h"
 #include "mongo/db/repl/is_master.h"
 #include "mongo/db/repl/oplog.h"
@@ -600,27 +601,103 @@ namespace mongo {
         op.debug().query = query;
         op.setQuery(query);
 
-        PageFaultRetryableSection s;
-        while ( 1 ) {
-            try {
-                Lock::DBWrite lk(ns);
-                
-                // void ReplSetImpl::relinquish() uses big write lock so 
-                // this is thus synchronized given our lock above.
-                uassert( 10054 ,  "not master", isMasterNs( ns ) );
-                
-                // if this ever moves to outside of lock, need to adjust check Client::Context::_finishInit
-                if ( ! broadcast && handlePossibleShardedMessage( m , 0 ) )
-                    return;
-                
-                Client::Context ctx( ns );
-                
-                UpdateResult res = updateObjects(ns, toupdate, query, upsert, multi, true, op.debug() );
-                lastError.getSafe()->recordUpdate( res.existing , res.num , res.upserted ); // for getlasterror
-                break;
+        if ( isNewUpdateFrameworkEnabled() ) {
+
+            // New style. This only works with the new update framework, and moves mod parsing
+            // out of the write lock.
+            //
+            // This code should look quite familiar, since it is basically the prelude code in
+            // _updateObjectsNEW. We could factor it into a common function, but that would
+            // require that we heap allocate the driver, which doesn't seem worth it right now,
+            // especially considering that we will probably rewrite much of this code in the
+            // near term.
+
+            UpdateDriver::Options options;
+            options.multi = multi;
+            options.upsert = upsert;
+
+            // TODO: This is wasteful. We really shouldn't need to generate the oplog entry
+            // just to throw it away if we are not generating an oplog.
+            options.logOp = true;
+
+            // Select the right modifier options. We aren't in a replication context here, so
+            // the only question is whether this update is against the 'config' database, in
+            // which case we want to disable checks, since config db docs can have field names
+            // containing a dot (".").
+            options.modOptions = ( NamespaceString( ns ).db() == "config" ) ?
+                ModifierInterface::Options::unchecked() :
+                ModifierInterface::Options::normal();
+
+            UpdateDriver driver( options );
+
+            Status status = driver.parse( toupdate );
+            if ( !status.isOK() ) {
+                uasserted( 17009, status.reason() );
             }
-            catch ( PageFaultException& e ) {
-                e.touch();
+
+            PageFaultRetryableSection s;
+            while ( 1 ) {
+                try {
+                    Lock::DBWrite lk(ns);
+
+                    // void ReplSetImpl::relinquish() uses big write lock so this is thus
+                    // synchronized given our lock above.
+                    uassert( 17010 ,  "not master", isMasterNs( ns ) );
+
+                    // if this ever moves to outside of lock, need to adjust check
+                    // Client::Context::_finishInit
+                    if ( ! broadcast && handlePossibleShardedMessage( m , 0 ) )
+                        return;
+
+                    Client::Context ctx( ns );
+
+                    UpdateResult res = updateObjects(
+                        &driver,
+                        ns, toupdate, query,
+                        upsert, multi, true, op.debug() );
+
+                    // for getlasterror
+                    lastError.getSafe()->recordUpdate( res.existing , res.num , res.upserted );
+                    break;
+                }
+                catch ( PageFaultException& e ) {
+                    e.touch();
+                }
+            }
+
+        }
+        else {
+
+            // This is the 'old style'. We may or may not call the new update code, but we are
+            // going to do so under the write lock in all cases.
+
+            PageFaultRetryableSection s;
+            while ( 1 ) {
+                try {
+                    Lock::DBWrite lk(ns);
+
+                    // void ReplSetImpl::relinquish() uses big write lock so this is thus
+                    // synchronized given our lock above.
+                    uassert( 10054 ,  "not master", isMasterNs( ns ) );
+
+                    // if this ever moves to outside of lock, need to adjust check
+                    // Client::Context::_finishInit
+                    if ( ! broadcast && handlePossibleShardedMessage( m , 0 ) )
+                        return;
+
+                    Client::Context ctx( ns );
+
+                    UpdateResult res = updateObjects(
+                        ns, toupdate, query,
+                        upsert, multi, true, op.debug() );
+
+                    // for getlasterror
+                    lastError.getSafe()->recordUpdate( res.existing , res.num , res.upserted );
+                    break;
+                }
+                catch ( PageFaultException& e ) {
+                    e.touch();
+                }
             }
         }
     }

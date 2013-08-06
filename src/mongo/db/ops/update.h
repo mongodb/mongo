@@ -24,6 +24,8 @@
 
 namespace mongo {
 
+    class UpdateDriver;
+
     // ---------- public -------------
 
     struct UpdateResult {
@@ -55,6 +57,20 @@ namespace mongo {
        su - allow access to system namespaces (super user)
     */
     UpdateResult updateObjects(const char* ns,
+                               const BSONObj& updateobj,
+                               const BSONObj& pattern,
+                               bool upsert,
+                               bool multi,
+                               bool logop,
+                               OpDebug& debug,
+                               bool fromMigrate = false,
+                               const QueryPlanSelectionPolicy& planPolicy = QueryPlanSelectionPolicy::any());
+
+    /** A variant of updateObjects that is only useable if the new update framework is enabled.
+     *  It assumes that the UpdateDriver has already been initialized outside the lock.
+     */
+    UpdateResult updateObjects(UpdateDriver* driver,
+                               const char* ns,
                                const BSONObj& updateobj,
                                const BSONObj& pattern,
                                bool upsert,
@@ -108,6 +124,22 @@ namespace mongo {
                                    const QueryPlanSelectionPolicy& planPolicy
                                        = QueryPlanSelectionPolicy::any(),
                                    bool forReplication = false);
+
+    UpdateResult _updateObjectsNEW(UpdateDriver* driver,
+                                   bool su,
+                                   const char* ns,
+                                   const BSONObj& updateobj,
+                                   const BSONObj& pattern,
+                                   bool upsert,
+                                   bool multi,
+                                   bool logop,
+                                   OpDebug& debug,
+                                   RemoveSaver* rs = 0,
+                                   bool fromMigrate = false,
+                                   const QueryPlanSelectionPolicy& planPolicy
+                                       = QueryPlanSelectionPolicy::any(),
+                                   bool forReplication = false);
+
 
     /**
      * takes the from document and returns a new document

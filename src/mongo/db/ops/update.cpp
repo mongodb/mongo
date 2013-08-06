@@ -502,28 +502,6 @@ namespace mongo {
                                     const QueryPlanSelectionPolicy& planPolicy,
                                     bool forReplication ) {
 
-        // TODO
-        // + Separate UpdateParser from UpdateRunner (the latter should be "stage-y")
-        //   + All the yield and deduplicate logic would move to the query stage
-        //     portion of it
-        //
-        // + Replication related
-        //   + fast path for update for query by _id
-        //   + support for relaxing viable path constraint in replication
-        //
-        // + Field Management
-        //   + Force all upsert to contain _id
-        //   + Prevent changes to immutable fields (_id, and those mentioned by sharding)
-        //
-        // + Yiedling related
-        //   + $atomic support (or better, support proper yielding if not)
-        //   + page fault support
-
-        debug.updateobj = updateobj;
-
-        NamespaceDetails* d = nsdetails( ns );
-        NamespaceDetailsTransient* nsdt = &NamespaceDetailsTransient::get( ns );
-
         // TODO: Put this logic someplace central and check based on constants (maybe using the
         // list of actually excluded config collections, and not global for the config db).
         NamespaceString nsStr( ns );
@@ -544,11 +522,44 @@ namespace mongo {
         opts.modOptions = ModifierInterface::Options( forReplication, shouldValidate );
         UpdateDriver driver( opts );
 
-        // TODO: This copies the index keys, but we may not actually need to.
-        Status status = driver.parse( nsdt->indexKeys(), updateobj );
+        Status status = driver.parse( updateobj );
         if ( !status.isOK() ) {
             uasserted( 16840, status.reason() );
         }
+
+        return _updateObjectsNEW( &driver, su, ns, updateobj, patternOrig,
+                                  upsert, multi, logop, debug, rs, fromMigrate,
+                                  planPolicy, forReplication);
+    }
+
+    UpdateResult _updateObjectsNEW( UpdateDriver* driver,
+                                    bool su,
+                                    const char* ns,
+                                    const BSONObj& updateobj,
+                                    const BSONObj& patternOrig,
+                                    bool upsert,
+                                    bool multi,
+                                    bool logop ,
+                                    OpDebug& debug,
+                                    RemoveSaver* rs,
+                                    bool fromMigrate,
+                                    const QueryPlanSelectionPolicy& planPolicy,
+                                    bool forReplication ) {
+
+        // TODO
+        // + Replication related
+        //   + fast path for update for query by _id
+        //
+        // + Field Management
+        //   + Prevent changes to immutable fields (_id, and those mentioned by sharding)
+        //
+
+        NamespaceDetails* d = nsdetails( ns );
+        NamespaceDetailsTransient* nsdt = &NamespaceDetailsTransient::get( ns );
+
+        debug.updateobj = updateobj;
+
+        driver->refreshIndexKeys( nsdt->indexKeys() );
 
         shared_ptr<Cursor> cursor = getOptimizedCursor( ns, patternOrig, BSONObj(), planPolicy );
 
@@ -577,7 +588,7 @@ namespace mongo {
 
         // We record that this will not be an upsert, in case a mod doesn't want to be applied
         // when in strict update mode.
-        driver.setContext( ModifierInterface::ExecInfo::UPDATE_CONTEXT );
+        driver->setContext( ModifierInterface::ExecInfo::UPDATE_CONTEXT );
 
         // Let's fetch each of them and pipe them through the update expression, making sure to
         // keep track of the necessary stats. Recall that we'll be pulling documents out of
@@ -645,7 +656,7 @@ namespace mongo {
                     nsdt = &NamespaceDetailsTransient::get( ns );
 
                     // TODO: This copies the index keys, but it may not need to do so.
-                    driver.refreshIndexKeys( nsdt->indexKeys() );
+                    driver->refreshIndexKeys( nsdt->indexKeys() );
                 }
 
             }
@@ -679,7 +690,7 @@ namespace mongo {
                 cursor->advance();
                 continue;
             }
-            else if (driver.dollarModMode() && multi) {
+            else if (driver->dollarModMode() && multi) {
                 // c)
                 cursor->advance();
                 if ( dedupHere ) {
@@ -728,7 +739,7 @@ namespace mongo {
             StringData matchedField = matchDetails.hasElemMatchKey() ?
                                                     matchDetails.elemMatchKey():
                                                     StringData();
-            status = driver.update( matchedField, &doc, &logObj );
+            Status status = driver->update( matchedField, &doc, &logObj );
             if ( !status.isOK() ) {
                 uasserted( 16837, status.reason() );
             }
@@ -748,7 +759,7 @@ namespace mongo {
             const char* source = NULL;
             mutablebson::DamageVector damages;
             bool inPlace = doc.getInPlaceUpdates(&damages, &source);
-            if ( inPlace && !damages.empty() && !driver.modsAffectIndices() ) {
+            if ( inPlace && !damages.empty() && !driver->modsAffectIndices() ) {
                 d->paddingFits();
 
                 // All updates were in place. Apply them via durability and writing pointer.
@@ -785,7 +796,7 @@ namespace mongo {
                 // We also take note that the diskloc if the updates are affecting indices.
                 // Chances are that we're traversing one of them and they may be multi key and
                 // therefore duplicate disklocs.
-                if ( newLoc != loc || driver.modsAffectIndices()  ) {
+                if ( newLoc != loc || driver->modsAffectIndices()  ) {
                     seenLocs.insert( newLoc );
                 }
 
@@ -795,7 +806,7 @@ namespace mongo {
             // Log Obj
             if ( logop ) {
                 if ( !logObj.isEmpty() ) {
-                    BSONObj idQuery = driver.makeOplogEntryQuery(newObj, multi);
+                    BSONObj idQuery = driver->makeOplogEntryQuery(newObj, multi);
                     logOp("u", ns, logObj , &idQuery, 0, fromMigrate, &newObj);
                 }
             }
@@ -821,13 +832,13 @@ namespace mongo {
 
         if (numUpdated > 0) {
             return UpdateResult( true /* updated existing object(s) */,
-                                 driver.dollarModMode() /* $mod or obj replacement */,
+                                 driver->dollarModMode() /* $mod or obj replacement */,
                                  numUpdated /* # of docments update */,
                                  BSONObj() );
         }
         else if (numUpdated == 0 && !upsert) {
             return UpdateResult( false /* no object updated */,
-                                 driver.dollarModMode() /* $mod or obj replacement */,
+                                 driver->dollarModMode() /* $mod or obj replacement */,
                                  0 /* no updates */,
                                  BSONObj() );
         }
@@ -842,8 +853,8 @@ namespace mongo {
         // as an insert in the oplog. We don't need the driver's help to build the
         // oplog record, then. We also set the context of the update driver to the INSERT_CONTEXT.
         // Some mods may only work in that context (e.g. $setOnInsert).
-        driver.setLogOp( false );
-        driver.setContext( ModifierInterface::ExecInfo::INSERT_CONTEXT );
+        driver->setLogOp( false );
+        driver->setContext( ModifierInterface::ExecInfo::INSERT_CONTEXT );
 
         BSONObj baseObj;
 
@@ -864,7 +875,7 @@ namespace mongo {
         }
 
         // Apply the update modifications and then log the update as an insert manually.
-        status = driver.update( StringData(), &doc, NULL /* no oplog record */);
+        Status status = driver->update( StringData(), &doc, NULL /* no oplog record */);
         if ( !status.isOK() ) {
             uasserted( 16836, status.reason() );
         }
@@ -876,7 +887,7 @@ namespace mongo {
         }
 
         return UpdateResult( false /* updated a non existing document */,
-                             driver.dollarModMode() /* $mod or obj replacement? */,
+                             driver->dollarModMode() /* $mod or obj replacement? */,
                              1 /* count of updated documents */,
                              newObj /* object that was upserted */ );
     }
@@ -909,6 +920,28 @@ namespace mongo {
             debug.nupdated = ur.num;
             return ur;
         }
+    }
+
+    UpdateResult updateObjects( UpdateDriver* driver,
+                                const char* ns,
+                                const BSONObj& updateobj,
+                                const BSONObj& patternOrig,
+                                bool upsert,
+                                bool multi,
+                                bool logop ,
+                                OpDebug& debug,
+                                bool fromMigrate,
+                                const QueryPlanSelectionPolicy& planPolicy ) {
+
+        validateUpdate( ns , updateobj , patternOrig );
+
+        verify( isNewUpdateFrameworkEnabled() );
+
+        UpdateResult ur = _updateObjectsNEW(driver, false, ns, updateobj, patternOrig,
+                                            upsert, multi, logop,
+                                            debug, NULL, fromMigrate, planPolicy );
+        debug.nupdated = ur.num;
+        return ur;
     }
 
     UpdateResult updateObjectsForReplication( const char* ns,
@@ -967,7 +1000,7 @@ namespace mongo {
             opts.multi = false;
             opts.upsert = false;
             UpdateDriver driver( opts );
-            Status status = driver.parse( IndexPathSet(), operators );
+            Status status = driver.parse( operators );
             if ( !status.isOK() ) {
                 uasserted( 16838, status.reason() );
             }
