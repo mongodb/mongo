@@ -27,7 +27,9 @@
 namespace mongo {
 
     User::User(const UserName& name) : _name(name), _refCount(0), _isValid(1) {}
-    User::~User() {}
+    User::~User() {
+        dassert(_refCount == 0);
+    }
 
     const UserName& User::getName() const {
         return _name;

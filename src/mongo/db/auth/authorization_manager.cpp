@@ -671,6 +671,7 @@ namespace {
         if (it != _userCache.end()) {
             fassert(16914, it->second);
             fassert(17003, it->second->isValid());
+            fassert(17008, it->second->getRefCount() > 0);
             it->second->incrementRefCount();
             *acquiredUser = it->second;
             return Status::OK();
@@ -717,7 +718,8 @@ namespace {
         if (user->getRefCount() == 0) {
             // If it's been invalidated then it's not in the _userCache anymore.
             if (user->isValid()) {
-                _userCache.erase(user->getName());
+                bool erased = _userCache.erase(user->getName());
+                dassert(erased);
             }
             delete user;
         }
