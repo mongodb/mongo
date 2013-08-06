@@ -5437,6 +5437,9 @@
     <ClCompile Include="..\db\query\stage_builder.cpp">
       <Filter>db\query</Filter>
     </ClCompile>
+    <ClCompile Include="..\db\commands\cleanup_orphaned_cmd.cpp">
+      <Filter>db\commands</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="btreetests.inl">

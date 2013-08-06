@@ -2522,6 +2522,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="..\db\client_basic.cpp" />
     <ClCompile Include="..\db\commands\apply_ops.cpp" />
     <ClCompile Include="..\db\commands\authentication_commands.cpp" />
+    <ClCompile Include="..\db\commands\cleanup_orphaned_cmd.cpp" />
     <ClCompile Include="..\db\commands\connection_status.cpp" />
     <ClCompile Include="..\db\commands\distinct.cpp" />
     <ClCompile Include="..\db\commands\fail_point_cmd.cpp" />
