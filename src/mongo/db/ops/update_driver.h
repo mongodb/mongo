@@ -36,12 +36,10 @@ namespace mongo {
         ~UpdateDriver();
 
         /**
-         * Returns OK and fills in '_mods' if 'updateExpr' is correct. In that case, take note
-         * that the collection that 'updateExpr' is built against have indices that encompass
-         * all fields present in 'indexedFields'. Otherwise returns an error status with a
-         * corresponding description.
+         * Returns OK and fills in '_mods' if 'updateExpr' is correct. Otherwise returns an
+         * error status with a corresponding description.
          */
-        Status parse(const IndexPathSet& indexedFields, const BSONObj& updateExpr);
+        Status parse(const BSONObj& updateExpr);
 
         /**
          * Fills in document with any fields in the query which are valid.

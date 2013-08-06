@@ -41,10 +41,8 @@ namespace mongo {
         clear();
     }
 
-    Status UpdateDriver::parse(const IndexPathSet& indexedFields, const BSONObj& updateExpr) {
+    Status UpdateDriver::parse(const BSONObj& updateExpr) {
         clear();
-
-        _indexedFields = indexedFields;
 
         // Check if the update expression is a full object replacement.
         if (*updateExpr.firstElementFieldName() != '$') {
