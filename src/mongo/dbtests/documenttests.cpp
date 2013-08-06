@@ -1304,9 +1304,14 @@ namespace DocumentTests {
                 ASSERT_EQUALS( expectedResult, cmp( a, b ) );
                 ASSERT_EQUALS( -expectedResult, cmp( b, a ) );
 
-                // equal values must hash equally.
                 if ( expectedResult == 0 ) {
+                    // equal values must hash equally.
                     ASSERT_EQUALS( hash( a ), hash( b ) );
+                }
+                else {
+                    // unequal values must hash unequally.
+                    // (not true in general but we should error if it fails in any of these cases)
+                    ASSERT_NOT_EQUALS( hash( a ), hash( b ) );
                 }
                 
                 // same as BSON
