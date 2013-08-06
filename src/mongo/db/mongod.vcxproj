@@ -2409,6 +2409,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
       <ObjectFileName Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">$(IntDir)db_background.obj</ObjectFileName>
     </ClCompile>
     <ClCompile Include="clientlistplugin.cpp" />
+    <ClCompile Include="commands\cleanup_orphaned_cmd.cpp" />
     <ClCompile Include="commands\shutdown.cpp" />
     <ClCompile Include="commands\user_management_commands.cpp" />
     <ClCompile Include="commands\write_commands\batch.cpp" />

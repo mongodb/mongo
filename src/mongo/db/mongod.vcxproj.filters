@@ -2471,6 +2471,9 @@
     <ClCompile Include="query\stage_builder.cpp">
       <Filter>db\query</Filter>
     </ClCompile>
+    <ClCompile Include="commands\cleanup_orphaned_cmd.cpp">
+      <Filter>db\commands</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\third_party\snappy\config.h">
