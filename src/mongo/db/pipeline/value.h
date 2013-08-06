@@ -79,11 +79,6 @@ namespace mongo {
             : _storage(Date, static_cast<long long>(date.millis)) // millis really signed
         {}
 
-        /** Creates an empty or zero value of specified type.
-         *  This is currently the only way to create Undefined or Null Values.
-         */
-        explicit Value(BSONType type);
-
         // TODO: add an unsafe version that can share storage with the BSONElement
         /// Deep-convert from BSONElement to Value
         explicit Value(const BSONElement& elem);

@@ -636,7 +636,7 @@ namespace DocumentTests {
         class Undefined {
         public:
             void run() {
-                Value value = Value(mongo::Undefined);
+                Value value = Value(BSONUndefined);
                 ASSERT_EQUALS( mongo::Undefined, value.getType() );
                 assertRoundTrips( value );
             }
@@ -646,7 +646,7 @@ namespace DocumentTests {
         class Null {
         public:
             void run() {
-                Value value = Value(mongo::jstNULL);
+                Value value = Value(BSONNULL);
                 ASSERT_EQUALS( jstNULL, value.getType() );
                 assertRoundTrips( value );
             }
@@ -800,12 +800,12 @@ namespace DocumentTests {
             
             /** Coerce null to bool. */
             class NullToBool : public ToBoolFalse {
-                Value value() { return Value(mongo::jstNULL); }
+                Value value() { return Value(BSONNULL); }
             };
             
             /** Coerce undefined to bool. */
             class UndefinedToBool : public ToBoolFalse {
-                Value value() { return Value(mongo::Undefined); }
+                Value value() { return Value(BSONUndefined); }
             };
 
             class ToIntBase {
@@ -844,13 +844,13 @@ namespace DocumentTests {
             
             /** Coerce null to int. */
             class NullToInt : public ToIntBase {
-                Value value() { return Value(mongo::jstNULL); }
+                Value value() { return Value(BSONNULL); }
                 bool asserts() { return true; }
             };
             
             /** Coerce undefined to int. */
             class UndefinedToInt : public ToIntBase {
-                Value value() { return Value(mongo::Undefined); }
+                Value value() { return Value(BSONUndefined); }
                 bool asserts() { return true; }
             };
             
@@ -898,13 +898,13 @@ namespace DocumentTests {
             
             /** Coerce null to long. */
             class NullToLong : public ToLongBase {
-                Value value() { return Value(mongo::jstNULL); }
+                Value value() { return Value(BSONNULL); }
                 bool asserts() { return true; }
             };
             
             /** Coerce undefined to long. */
             class UndefinedToLong : public ToLongBase {
-                Value value() { return Value(mongo::Undefined); }
+                Value value() { return Value(BSONUndefined); }
                 bool asserts() { return true; }
             };
             
@@ -955,13 +955,13 @@ namespace DocumentTests {
             
             /** Coerce null to double. */
             class NullToDouble : public ToDoubleBase {
-                Value value() { return Value(mongo::jstNULL); }
+                Value value() { return Value(BSONNULL); }
                 bool asserts() { return true; }
             };
             
             /** Coerce undefined to double. */
             class UndefinedToDouble : public ToDoubleBase {
-                Value value() { return Value(mongo::Undefined); }
+                Value value() { return Value(BSONUndefined); }
                 bool asserts() { return true; }
             };
             
@@ -1062,12 +1062,12 @@ namespace DocumentTests {
 
             /** Coerce null to string. */
             class NullToString : public ToStringBase {
-                Value value() { return Value(mongo::jstNULL); }
+                Value value() { return Value(BSONNULL); }
             };
 
             /** Coerce undefined to string. */
             class UndefinedToString : public ToStringBase {
-                Value value() { return Value(mongo::Undefined); }
+                Value value() { return Value(BSONUndefined); }
             };
 
             /** Coerce document to string unsupported. */
@@ -1249,17 +1249,17 @@ namespace DocumentTests {
 
                 // Cross-type comparisons. Listed in order of canonical types.
                 assertComparison(-1, Value(mongo::MINKEY), Value());
-                assertComparison(0,  Value(), Value(mongo::EOO));
-                assertComparison(0,  Value(), Value(mongo::Undefined));
-                assertComparison(-1, Value(mongo::Undefined), Value(mongo::jstNULL));
-                assertComparison(-1, Value(mongo::jstNULL), Value(1));
+                assertComparison(0,  Value(), Value());
+                assertComparison(0,  Value(), Value(BSONUndefined));
+                assertComparison(-1, Value(BSONUndefined), Value(BSONNULL));
+                assertComparison(-1, Value(BSONNULL), Value(1));
                 assertComparison(0,  Value(1), Value(1LL));
                 assertComparison(0,  Value(1), Value(1.0));
                 assertComparison(-1, Value(1), Value("string"));
                 assertComparison(0,  Value("string"), Value(BSONSymbol("string")));
                 assertComparison(-1, Value("string"), Value(mongo::Document()));
-                assertComparison(-1, Value(mongo::Document()), Value(mongo::Array));
-                assertComparison(-1, Value(mongo::Array), Value(BSONBinData("", 0, MD5Type)));
+                assertComparison(-1, Value(mongo::Document()), Value(vector<Value>()));
+                assertComparison(-1, Value(vector<Value>()), Value(BSONBinData("", 0, MD5Type)));
                 assertComparison(-1, Value(BSONBinData("", 0, MD5Type)), Value(mongo::OID()));
                 assertComparison(-1, Value(mongo::OID()), Value(false));
                 assertComparison(-1, Value(false), Value(OpTime()));

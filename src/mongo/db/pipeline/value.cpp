@@ -77,51 +77,6 @@ namespace mongo {
     // not in header because document is fwd declared
     Value::Value(const BSONObj& obj) : _storage(Object, Document(obj)) {}
 
-    Value::Value(BSONType theType): _storage(theType) {
-        switch(theType) {
-        case EOO:
-        case Undefined:
-        case jstNULL:
-        case Object: // empty
-            break;
-
-        case Array: // empty
-            _storage.putVector(new RCVector());
-            break;
-
-        case Bool:
-            _storage.boolValue = false;
-            break;
-
-        case NumberDouble:
-            _storage.doubleValue = 0;
-            break;
-
-        case NumberInt:
-            _storage.intValue = 0;
-            break;
-
-        case NumberLong:
-            _storage.longValue = 0;
-            break;
-
-        case Date:
-            _storage.dateValue = 0;
-            break;
-
-        case Timestamp:
-            _storage.timestampValue = 0;
-            break;
-
-        default:
-            // nothing else is allowed
-            uassert(16001, str::stream() <<
-                    "can't create empty Value of type " << typeName(getType()), false);
-            break;
-        }
-    }
-
-
     Value::Value(const BSONElement& elem) : _storage(elem.type()) {
         switch(elem.type()) {
         // These are all type-only, no data
