@@ -24,6 +24,7 @@
 #include "mongo/db/ops/log_builder.h"
 #include "mongo/db/ops/modifier_object_replace.h"
 #include "mongo/db/ops/modifier_table.h"
+#include "mongo/db/ops/path_support.h"
 #include "mongo/util/embedded_builder.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -97,13 +98,13 @@ namespace mongo {
             while (innerIter.more()) {
                 BSONElement innerModElem = innerIter.next();
 
-                auto_ptr<ModifierInterface> mod(modifiertable::makeUpdateMod(modType));
-                dassert(mod.get());
-
                 if (innerModElem.eoo()) {
                     return Status(ErrorCodes::FailedToParse,
                                   "empty entry in $mod expression list");
                 }
+
+                auto_ptr<ModifierInterface> mod(modifiertable::makeUpdateMod(modType));
+                dassert(mod.get());
 
                 Status status = mod->init(innerModElem, _modOptions);
                 if (!status.isOK()) {
@@ -121,17 +122,14 @@ namespace mongo {
         return Status::OK();
     }
 
-    bool UpdateDriver::createFromQuery(const BSONObj query, BSONObj* newObj) const {
-        // TODO
-        // This moved from ModSet::createNewFromQuery
-        // Check if it can be streamlined
-        BSONObjBuilder bb;
-        EmbeddedBuilder eb(&bb);
+    Status UpdateDriver::createFromQuery(const BSONObj& query, mutablebson::Document& doc) {
         BSONObjIteratorSorted i(query);
         while (i.more()) {
             BSONElement e = i.next();
-            if (e.fieldName()[0] == '$') // for $atomic and anything else we add
+            // TODO: get this logic/exclude-list from the query system?
+            if (e.fieldName()[0] == '$' || e.fieldNameStringData() == "_id")
                 continue;
+
 
             if (e.type() == Object && e.embeddedObject().firstElementFieldName()[0] == '$') {
                 // we have something like { x : { $gt : 5 } }
@@ -153,17 +151,29 @@ namespace mongo {
                 }
             }
 
-            // Skips things we can't store (like dots in field names)
-            // TODO: Find way to check without copy
-            if (!e.wrap().okForStorageAsRoot()) {
-                continue;
-            }
-            eb.appendAs(e , e.fieldName());
-        }
-        eb.done();
+            // Add to the field to doc after expanding and checking for conflicts.
+            FieldRef elemName;
+            const StringData& elemNameSD(e.fieldNameStringData());
+            elemName.parse(elemNameSD);
 
-        *newObj = bb.obj();
-        return true;
+            size_t pos;
+            mutablebson::Element* elemFound = NULL;
+
+            Status status = pathsupport::findLongestPrefix(elemName, doc.root(), &pos, elemFound);
+            // Not NonExistentPath, of OK, return
+            if (!(status.code() == ErrorCodes::NonExistentPath || status.isOK()))
+                return status;
+
+            status = pathsupport::createPathAt(elemName,
+                                               0,
+                                               doc.root(),
+                                               doc.makeElementWithNewFieldName(
+                                                       elemName.getPart(elemName.numParts()-1),
+                                                       e));
+            if (!status.isOK())
+                return status;
+        }
+        return Status::OK();
     }
 
     Status UpdateDriver::update(const StringData& matchedField,

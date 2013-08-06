@@ -44,11 +44,17 @@ namespace mongo {
         Status parse(const IndexPathSet& indexedFields, const BSONObj& updateExpr);
 
         /**
-         * Returns true and derives a BSONObj, 'newObj', from 'query'.
+         * Fills in document with any fields in the query which are valid.
          *
-         * TODO: Elaborate on the logic used here.
+         * Valid fields include equality matches like "a":1, or "a.b":false
+         *
+         * Each valid field will be expanded (from dot notation) and conflicts will be
+         * checked for all fields added to the underlying document.
+         *
+         * Returns Status::OK() if the document can be used. If there are any error or
+         * conflicts along the way then those errors will be returned.
          */
-        bool createFromQuery(const BSONObj query, BSONObj* newObj) const;
+        static Status createFromQuery(const BSONObj& query, mutablebson::Document& doc);
 
         /**
          * return a BSONObj with the _id field of the doc passed in, or the doc itself.

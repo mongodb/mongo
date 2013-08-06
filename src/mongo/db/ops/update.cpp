@@ -833,43 +833,44 @@ namespace mongo {
         }
 
         //
-        // We haven't succeeded updating any existing document but upserts are allowed.
+        // We haven't found any existing document so an insert is done
+        // (upsert is true).
         //
+        debug.upsert = true;
+
+        // Since this is an insert (no docs found and upsert:true), we will be logging it
+        // as an insert in the oplog. We don't need the driver's help to build the
+        // oplog record, then. We also set the context of the update driver to the INSERT_CONTEXT.
+        // Some mods may only work in that context (e.g. $setOnInsert).
+        driver.setLogOp( false );
+        driver.setContext( ModifierInterface::ExecInfo::INSERT_CONTEXT );
+
+        BSONObj baseObj;
+
+        // Reset the document we will be writing to
+        doc.reset( baseObj, mutablebson::Document::kInPlaceDisabled );
+        if ( patternOrig.hasElement("_id") ) {
+             uassertStatusOK(doc.root().appendElement(patternOrig.getField("_id")));
+        }
+
 
         // If this is a $mod base update, we need to generate a document by examining the
         // query and the mods. Otherwise, we can use the object replacement sent by the user
         // update command that was parsed by the driver before.
-        BSONObj oldObj;
+        // In the following block we handle the query part, and then do the regular mods after.
         if ( *updateobj.firstElementFieldName() == '$' ) {
-            if ( !driver.createFromQuery( patternOrig, &oldObj ) ) {
-                uasserted( 16835, "cannot create object to update" );
-            }
+            uassertStatusOK(UpdateDriver::createFromQuery(patternOrig, doc));
             debug.fastmodinsert = true;
         }
-        else {
-            // Copy the _id
-            if (patternOrig.hasElement("_id")) {
-                oldObj = patternOrig.getField("_id").wrap();
-            }
-            debug.upsert = true;
-        }
 
-        // Since this is an upsert, we will be oplogging it as an insert. We don't
-        // need the driver's help to build the oplog record, then. We also set the
-        // context of the update driver to an "upsert". Some mods may only work in that
-        // context (e.g. $setOnInsert).
-        driver.setLogOp( false );
-        driver.setContext( ModifierInterface::ExecInfo::INSERT_CONTEXT );
-
-        doc.reset( oldObj, mutablebson::Document::kInPlaceDisabled );
+        // Apply the update modifications and then log the update as an insert manually.
         status = driver.update( StringData(), &doc, NULL /* no oplog record */);
         if ( !status.isOK() ) {
             uasserted( 16836, status.reason() );
         }
+
         BSONObj newObj = doc.getObject();
-
         theDataFileMgr.insertWithObjMod( ns, newObj, false, su );
-
         if ( logop ) {
             logOp( "i", ns, newObj, 0, 0, fromMigrate, &newObj );
         }
