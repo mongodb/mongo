@@ -32,6 +32,9 @@ namespace po = boost::program_options;
 class Files : public Tool {
 public:
     Files() : Tool( "files" ) {
+        // Default collection for GridFS
+        _coll = "fs";
+
         add_options()
         ( "local,l", po::value<string>(), "local filename for put|get (default is to use the same name as 'gridfs filename')")
         ( "type,t", po::value<string>(), "MIME type for put (default is to omit)")
@@ -78,7 +81,7 @@ public:
             return -1;
         }
 
-        GridFS g( conn() , _db );
+        GridFS g( conn() , _db, _coll );
 
         string filename = getParam( "file" );
 
@@ -129,12 +132,14 @@ public:
             BSONObj file = g.storeFile(infile, filename, type);
             cout << "added file: " << file << endl;
 
-            if (hasParam("replace")) {
-                auto_ptr<DBClientCursor> cursor = conn().query(_db+".fs.files", BSON("filename" << filename << "_id" << NE << file["_id"] ));
-                while (cursor->more()) {
+            if (hasParam("replace")){
+                auto_ptr<DBClientCursor> cursor =
+                  conn().query(_db + "." _coll + ".files",
+                               BSON("filename" << filename << "_id" << NE << file["_id"] ));
+                while (cursor->more()){
                     BSONObj o = cursor->nextSafe();
-                    conn().remove(_db+".fs.files", BSON("_id" << o["_id"]));
-                    conn().remove(_db+".fs.chunks", BSON("_id" << o["_id"]));
+                    conn().remove(_db + "." + _coll + ".files", BSON("_id" << o["_id"]));
+                    conn().remove(_db + "." + _coll + ".chunks", BSON("files_id" << o["_id"]));
                     cout << "removed file: " << o << endl;
                 }
 
