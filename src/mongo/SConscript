@@ -562,10 +562,6 @@ env.CppUnitTest('v8_deadline_monitor_test', 'scripting/v8_deadline_monitor_test.
 
 env.Library('stacktrace', 'util/stacktrace.cpp')
 
-env.Program('lame_stacktrace_test', 'util/lame_stacktrace_test.cpp',
-            LIBDEPS=['stacktrace', 'foundation', 'unittest/unittest_crutch',
-                     '$BUILD_DIR/mongo/base/base'])
-
 serverOnlyFiles += mmapFiles
 
 serverOnlyFiles += [ "db/stats/snapshots.cpp" ]
@@ -796,13 +792,9 @@ for x in normalTools:
     env.Install( '#/', env.Program( "mongo" + x, [ "tools/" + x + ".cpp" ],
                                     LIBDEPS=["alltools"]) )
 
-env.StaticLibrary("docgenerator", "tools/docgenerator.cpp")
-
 #some special tools
 env.Install( '#/', [
         env.Program( "mongofiles", "tools/files.cpp", LIBDEPS=["alltools", "gridfs"] ),
-        env.Program( "docgen", "tools/docgeneratormain.cpp", LIBDEPS=["alltools", "docgenerator"] ),
-        env.Program( "loadgen", "tools/loadgenerator.cpp", LIBDEPS=["alltools", "docgenerator"] ),
         env.Program( "bsondump", "tools/bsondump.cpp", LIBDEPS=["alltools"]),
         env.Program( "mongobridge", "tools/bridge.cpp",
                      LIBDEPS=["serveronly", "coreserver", "coredb"] ),
