@@ -20,8 +20,10 @@
 
 #include "base/initializer.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/exception_filter_win32.h"
 
 int main( int argc, char **argv, char **envp ) {
+    ::mongo::setWindowsUnhandledExceptionFilter();
     ::mongo::runGlobalInitializersOrDie(argc, argv, envp);
     return ::mongo::unittest::Suite::run(std::vector<std::string>(), "", 1);
 }
