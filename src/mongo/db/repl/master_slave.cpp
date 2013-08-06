@@ -136,6 +136,7 @@ namespace mongo {
 
     ReplSource::ReplSource() {
         nClonedThisPass = 0;
+        ensureMe();
     }
 
     ReplSource::ReplSource(BSONObj o) : nClonedThisPass(0) {
@@ -172,6 +173,7 @@ namespace mongo {
                 incompleteCloneDbs.insert( e.fieldName() );
             }
         }
+        ensureMe();
     }
 
     /* Turn our C++ Source object into a BSONObj */
@@ -203,6 +205,28 @@ namespace mongo {
             b.append("incompleteCloneDbs", incompleteCloneDbsBuilder.done());
 
         return b.obj();
+    }
+
+    void ReplSource::ensureMe() {
+        string myname = getHostName();
+        {
+            Client::WriteContext ctx("local");
+            // local.me is an identifier for a server for getLastError w:2+
+            if (!Helpers::getSingleton("local.me", _me) ||
+                !_me.hasField("host") ||
+                _me["host"].String() != myname) {
+
+                // clean out local.me
+                Helpers::emptyCollection("local.me");
+
+                // repopulate
+                BSONObjBuilder b;
+                b.appendOID("_id", 0, true);
+                b.append("host", myname);
+                _me = b.obj();
+                Helpers::putSingleton("local.me", _me);
+            }
+        }
     }
 
     void ReplSource::save() {
@@ -334,7 +358,7 @@ namespace mongo {
         BSONObj info;
         {
             dbtemprelease t;
-            if (!oplogReader.connect(hostName)) {
+            if (!oplogReader.connect(hostName, _me)) {
                 msgassertedNoTrace( 14051 , "unable to connect to resync");
             }
             /* todo use getDatabaseNames() method here */
@@ -988,7 +1012,7 @@ namespace mongo {
             return -1;
         }
 
-        if ( !oplogReader.connect(hostName) ) {
+        if ( !oplogReader.connect(hostName, _me) ) {
             LOG(4) << "repl:  can't connect to sync source" << endl;
             return -1;
         }
