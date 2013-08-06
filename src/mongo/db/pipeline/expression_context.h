@@ -25,11 +25,8 @@ namespace mongo {
 
     class InterruptStatus;
 
-    class ExpressionContext :
-        public IntrusiveCounterUnsigned {
+    class ExpressionContext : public IntrusiveCounterUnsigned {
     public:
-        virtual ~ExpressionContext();
-
         void setInShard(bool b) { inShard = b; }
         void setInRouter(bool b) { inRouter = b; }
         void setExtSortAllowed(bool b) { extSortAllowed = b; }

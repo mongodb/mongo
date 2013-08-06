@@ -22,9 +22,6 @@
 
 namespace mongo {
 
-    DocumentSourceBsonArray::~DocumentSourceBsonArray() {
-    }
-
     boost::optional<Document> DocumentSourceBsonArray::getNext() {
         pExpCtx->checkForInterrupt();
 

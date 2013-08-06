@@ -41,8 +41,6 @@ namespace mongo {
     class Pipeline :
         public IntrusiveCounterUnsigned {
     public:
-        virtual ~Pipeline();
-
         /**
           Create a pipeline from the command.
 

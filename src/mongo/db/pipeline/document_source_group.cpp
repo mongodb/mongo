@@ -28,9 +28,6 @@
 namespace mongo {
     const char DocumentSourceGroup::groupName[] = "$group";
 
-    DocumentSourceGroup::~DocumentSourceGroup() {
-    }
-
     const char *DocumentSourceGroup::getSourceName() const {
         return groupName;
     }

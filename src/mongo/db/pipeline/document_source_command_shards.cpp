@@ -21,9 +21,6 @@
 
 namespace mongo {
 
-    DocumentSourceCommandShards::~DocumentSourceCommandShards() {
-    }
-
     void DocumentSourceCommandShards::setSource(DocumentSource *pSource) {
         /* this doesn't take a source */
         verify(false);

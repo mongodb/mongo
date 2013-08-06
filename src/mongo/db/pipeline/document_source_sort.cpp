@@ -27,9 +27,6 @@
 namespace mongo {
     const char DocumentSourceSort::sortName[] = "$sort";
 
-    DocumentSourceSort::~DocumentSourceSort() {
-    }
-
     const char *DocumentSourceSort::getSourceName() const {
         return sortName;
     }

@@ -98,9 +98,6 @@ namespace mongo {
 
     const char DocumentSourceUnwind::unwindName[] = "$unwind";
 
-    DocumentSourceUnwind::~DocumentSourceUnwind() {
-    }
-
     DocumentSourceUnwind::DocumentSourceUnwind(
         const intrusive_ptr<ExpressionContext> &pExpCtx):
         DocumentSource(pExpCtx) {

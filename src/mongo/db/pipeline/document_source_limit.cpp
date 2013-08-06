@@ -33,9 +33,6 @@ namespace mongo {
         , count(0)
     {}
 
-    DocumentSourceLimit::~DocumentSourceLimit() {
-    }
-
     const char *DocumentSourceLimit::getSourceName() const {
         return limitName;
     }

@@ -26,9 +26,6 @@ namespace mongo {
 
     const char DocumentSourceProject::projectName[] = "$project";
 
-    DocumentSourceProject::~DocumentSourceProject() {
-    }
-
     DocumentSourceProject::DocumentSourceProject(const intrusive_ptr<ExpressionContext>& pExpCtx,
                                                  const intrusive_ptr<ExpressionObject>& exprObj)
         : DocumentSource(pExpCtx)

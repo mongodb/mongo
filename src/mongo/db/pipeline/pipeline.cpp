@@ -38,9 +38,6 @@ namespace mongo {
     const char Pipeline::serverPipelineName[] = "serverPipeline";
     const char Pipeline::mongosPipelineName[] = "mongosPipeline";
 
-    Pipeline::~Pipeline() {
-    }
-
     Pipeline::Pipeline(const intrusive_ptr<ExpressionContext> &pTheCtx):
         collectionName(),
         explain(false),

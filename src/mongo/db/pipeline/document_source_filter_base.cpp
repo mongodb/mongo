@@ -23,9 +23,6 @@
 
 namespace mongo {
 
-    DocumentSourceFilterBase::~DocumentSourceFilterBase() {
-    }
-
     boost::optional<Document> DocumentSourceFilterBase::getNext() {
         pExpCtx->checkForInterrupt();
 
