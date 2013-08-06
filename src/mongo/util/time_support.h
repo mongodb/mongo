@@ -20,6 +20,7 @@
 #include <ctime>
 #include <string>
 #include <boost/thread/xtime.hpp>
+#include <boost/version.hpp>
 
 namespace mongo {
 

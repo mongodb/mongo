@@ -20,6 +20,11 @@
 #include <sstream>
 #include <string>
 #include <vector>
+#include <boost/version.hpp>
+
+#if BOOST_VERSION >= 105300
+#include <boost/thread/lock_guard.hpp>
+#endif
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/string_data.h"
