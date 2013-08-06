@@ -27,16 +27,16 @@
 
 #include "format.h"
 
-static void  col_insert(WT_CURSOR *, WT_ITEM *, WT_ITEM *, uint64_t *);
-static void  col_remove(WT_CURSOR *, WT_ITEM *, uint64_t, int *);
-static void  col_update(WT_CURSOR *, WT_ITEM *, WT_ITEM *, uint64_t);
-static void  nextprev(WT_CURSOR *, int, int *);
+static int   col_insert(WT_CURSOR *, WT_ITEM *, WT_ITEM *, uint64_t *);
+static int   col_remove(WT_CURSOR *, WT_ITEM *, uint64_t, int *);
+static int   col_update(WT_CURSOR *, WT_ITEM *, WT_ITEM *, uint64_t);
+static int   nextprev(WT_CURSOR *, int, int *);
 static int   notfound_chk(const char *, int, int, uint64_t);
 static void *ops(void *);
 static void  print_item(const char *, WT_ITEM *);
-static void  read_row(WT_CURSOR *, WT_ITEM *, uint64_t);
-static void  row_remove(WT_CURSOR *, WT_ITEM *, uint64_t, int *);
-static void  row_update(WT_CURSOR *, WT_ITEM *, WT_ITEM *, uint64_t, int);
+static int   read_row(WT_CURSOR *, WT_ITEM *, uint64_t);
+static int   row_remove(WT_CURSOR *, WT_ITEM *, uint64_t, int *);
+static int   row_update(WT_CURSOR *, WT_ITEM *, WT_ITEM *, uint64_t, int);
 
 /*
  * wts_ops --
@@ -93,8 +93,9 @@ wts_ops(void)
 				total.insert += tinfo[i].insert;
 				total.remove += tinfo[i].remove;
 				total.update += tinfo[i].update;
-				total.abort += tinfo[i].abort;
 				total.commit += tinfo[i].commit;
+				total.rollback += tinfo[i].rollback;
+				total.deadlock += tinfo[i].deadlock;
 				switch (tinfo[i].state) {
 				case TINFO_RUNNING:
 					running = 1;
@@ -264,9 +265,10 @@ ops(void *arg)
 
 		/* Compact the store (data-sources don't support compaction). */
 		if (cnt == compact_op &&
-		    !DATASOURCE("kvsbdb") && !DATASOURCE("memrata") &&
-		    (ret = session->compact(session, g.uri, NULL)) != 0)
-			die(ret, "session.compact");
+		    !DATASOURCE("kvsbdb") && !DATASOURCE("memrata"))
+			if ((ret = session->compact(
+			    session, g.uri, NULL)) != 0 && ret != WT_DEADLOCK)
+				die(ret, "session.compact");
 
 		/*
 		 * If we're not single-threaded and we're not in a transaction,
@@ -301,11 +303,13 @@ ops(void *arg)
 				 * If deleting a non-existent record, the cursor
 				 * won't be positioned, and so can't do a next.
 				 */
-				row_remove(cursor, &key, keyno, &notfound);
+				if (row_remove(cursor, &key, keyno, &notfound))
+					goto deadlock;
 				break;
 			case FIX:
 			case VAR:
-				col_remove(cursor, &key, keyno, &notfound);
+				if (col_remove(cursor, &key, keyno, &notfound))
+					goto deadlock;
 				break;
 			}
 		} else if (g.extend < MAX_EXTEND &&
@@ -313,7 +317,8 @@ ops(void *arg)
 			++tinfo->insert;
 			switch (g.type) {
 			case ROW:
-				row_update(cursor, &key, &value, keyno, 1);
+				if (row_update(cursor, &key, &value, keyno, 1))
+					goto deadlock;
 				break;
 			case FIX:
 			case VAR:
@@ -323,7 +328,9 @@ ops(void *arg)
 				 */
 				if ((ret = cursor->reset(cursor)) != 0)
 					die(ret, "cursor.reset");
-				col_insert(cursor_insert, &key, &value, &keyno);
+				if (col_insert(
+				    cursor_insert, &key, &value, &keyno))
+					goto deadlock;
 				insert = 1;
 				break;
 			}
@@ -332,16 +339,19 @@ ops(void *arg)
 			++tinfo->update;
 			switch (g.type) {
 			case ROW:
-				row_update(cursor, &key, &value, keyno, 0);
+				if (row_update(cursor, &key, &value, keyno, 0))
+					goto deadlock;
 				break;
 			case FIX:
 			case VAR:
-				col_update(cursor, &key, &value, keyno);
+				if (col_update(cursor, &key, &value, keyno))
+					goto deadlock;
 				break;
 			}
 		} else {
 			++tinfo->search;
-			read_row(cursor, &key, keyno);
+			if (read_row(cursor, &key, keyno))
+				goto deadlock;
 			continue;
 		}
 
@@ -353,19 +363,22 @@ ops(void *arg)
 		for (np = 0; np < MMRAND(1, 8); ++np) {
 			if (notfound)
 				break;
-			nextprev(
-			    insert ? cursor_insert : cursor, dir, &notfound);
+			if (nextprev(
+			    insert ? cursor_insert : cursor, dir, &notfound))
+				goto deadlock;
 		}
 
+		/* Reset the insert cursor. */
 		if (insert && (ret = cursor_insert->reset(cursor_insert)) != 0)
 			die(ret, "cursor.reset");
 
 		/* Read the value we modified to confirm the operation. */
-		read_row(cursor, &key, keyno);
+		if (read_row(cursor, &key, keyno))
+			goto deadlock;
 
 		/*
-		 * If we're in the transaction, commit 40% of the time and abort
-		 * abort 10% of the time.
+		 * If we're in the transaction, commit 40% of the time and
+		 * rollback 10% of the time.
 		 */
 		if (intxn)
 			switch (MMRAND(1, 10)) {
@@ -380,10 +393,13 @@ ops(void *arg)
 				intxn = 0;
 				break;
 			case 5:
+				if (0) {
+deadlock:				++tinfo->deadlock;
+				}
 				if ((ret = session->rollback_transaction(
 				    session, NULL)) != 0)
 					die(ret, "session.commit_transaction");
-				++tinfo->abort;
+				++tinfo->rollback;
 				intxn = 0;
 				break;
 			default:
@@ -440,7 +456,8 @@ wts_read_scan(void)
 		}
 
 		key.data = keybuf;
-		read_row(cursor, &key, cnt);
+		if ((ret = read_row(cursor, &key, cnt)) != 0)
+			die(ret, "read_scan");
 	}
 
 	if ((ret = session->close(session, NULL)) != 0)
@@ -453,7 +470,7 @@ wts_read_scan(void)
  * read_row --
  *	Read and verify a single element in a row- or column-store file.
  */
-static void
+static int
 read_row(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno)
 {
 	WT_ITEM bdb_value, value;
@@ -489,6 +506,8 @@ read_row(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno)
 			ret = cursor->get_value(cursor, &value);
 		}
 	}
+	if (ret == WT_DEADLOCK)
+		return (WT_DEADLOCK);
 	if (ret != 0 && ret != WT_NOTFOUND)
 		die(ret, "read_row: read row %" PRIu64, keyno);
 	/*
@@ -504,14 +523,14 @@ read_row(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno)
 	}
 
 	if (!SINGLETHREADED)
-		return;
+		return (0);
 
 	/* Retrieve the BDB value. */
 	bdb_read(keyno, &bdb_value.data, &bdb_value.size, &notfound);
 
 	/* Check for not-found status. */
 	if (notfound_chk("read_row", ret, notfound, keyno))
-		return;
+		return (0);
 
 	/* Compare the two. */
 	if (value.size != bdb_value.size ||
@@ -522,13 +541,14 @@ read_row(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno)
 		print_item(" wt", &value);
 		die(0, NULL);
 	}
+	return (0);
 }
 
 /*
  * nextprev --
  *	Read and verify the next/prev element in a row- or column-store file.
  */
-static void
+static int
 nextprev(WT_CURSOR *cursor, int next, int *notfoundp)
 {
 	WT_ITEM key, value, bdb_key, bdb_value;
@@ -544,6 +564,8 @@ nextprev(WT_CURSOR *cursor, int next, int *notfoundp)
 
 	keyno = 0;
 	ret = next ? cursor->next(cursor) : cursor->prev(cursor);
+	if (ret == WT_DEADLOCK)
+		return (WT_DEADLOCK);
 	if (ret == 0)
 		switch (g.type) {
 		case FIX:
@@ -567,14 +589,14 @@ nextprev(WT_CURSOR *cursor, int next, int *notfoundp)
 	*notfoundp = (ret == WT_NOTFOUND);
 
 	if (!SINGLETHREADED)
-		return;
+		return (0);
 
 	/* Retrieve the BDB value. */
 	bdb_np(next, &bdb_key.data, &bdb_key.size,
 	    &bdb_value.data, &bdb_value.size, &notfound);
 	if (notfound_chk(
 	    next ? "nextprev(next)" : "nextprev(prev)", ret, notfound, keyno))
-		return;
+		return (0);
 
 	/* Compare the two. */
 	if (g.type == ROW) {
@@ -623,13 +645,14 @@ nextprev(WT_CURSOR *cursor, int next, int *notfoundp)
 			    keyno, (int)value.size, (char *)value.data);
 			break;
 		}
+	return (0);
 }
 
 /*
  * row_update --
  *	Update a row in a row-store file.
  */
-static void
+static int
 row_update(
     WT_CURSOR *cursor, WT_ITEM *key, WT_ITEM *value, uint64_t keyno, int insert)
 {
@@ -653,23 +676,26 @@ row_update(
 	cursor->set_key(cursor, key);
 	cursor->set_value(cursor, value);
 	ret = cursor->insert(cursor);
+	if (ret == WT_DEADLOCK)
+		return (WT_DEADLOCK);
 	if (ret != 0 && ret != WT_NOTFOUND)
 		die(ret,
 		    "row_update: %s row %" PRIu64 " by key",
 		    insert ? "insert" : "update", keyno);
 
 	if (!SINGLETHREADED)
-		return;
+		return (0);
 
 	bdb_update(key->data, key->size, value->data, value->size, &notfound);
 	(void)notfound_chk("row_update", ret, notfound, keyno);
+	return (0);
 }
 
 /*
  * col_update --
  *	Update a row in a column-store file.
  */
-static void
+static int
 col_update(WT_CURSOR *cursor, WT_ITEM *key, WT_ITEM *value, uint64_t keyno)
 {
 	WT_SESSION *session;
@@ -699,15 +725,18 @@ col_update(WT_CURSOR *cursor, WT_ITEM *key, WT_ITEM *value, uint64_t keyno)
 	else
 		cursor->set_value(cursor, value);
 	ret = cursor->insert(cursor);
+	if (ret == WT_DEADLOCK)
+		return (WT_DEADLOCK);
 	if (ret != 0 && ret != WT_NOTFOUND)
 		die(ret, "col_update: %" PRIu64, keyno);
 
 	if (!SINGLETHREADED)
-		return;
+		return (0);
 
 	key_gen((uint8_t *)key->data, &key->size, keyno, 0);
 	bdb_update(key->data, key->size, value->data, value->size, &notfound);
 	(void)notfound_chk("col_update", ret, notfound, keyno);
+	return (0);
 }
 
 /*
@@ -717,7 +746,7 @@ col_update(WT_CURSOR *cursor, WT_ITEM *key, WT_ITEM *value, uint64_t keyno)
 static void
 table_extend(uint64_t keyno)
 {
-	static size_t n;
+	static size_t n = 0;
 	static uint64_t *slots;
 	static uint64_t *ep;
 	uint64_t *p;
@@ -779,7 +808,7 @@ table_extend(uint64_t keyno)
  * col_insert --
  *	Insert an element in a column-store file.
  */
-static void
+static int
 col_insert(WT_CURSOR *cursor, WT_ITEM *key, WT_ITEM *value, uint64_t *keynop)
 {
 	WT_SESSION *session;
@@ -794,8 +823,11 @@ col_insert(WT_CURSOR *cursor, WT_ITEM *key, WT_ITEM *value, uint64_t *keynop)
 		cursor->set_value(cursor, *(uint8_t *)value->data);
 	else
 		cursor->set_value(cursor, value);
-	if ((ret = cursor->insert(cursor)) != 0)
+	if ((ret = cursor->insert(cursor)) != 0) {
+		if (ret == WT_DEADLOCK)
+			return (WT_DEADLOCK);
 		die(ret, "cursor.insert");
+	}
 	if ((ret = cursor->get_key(cursor, &keyno)) != 0)
 		die(ret, "cursor.get_key");
 	*keynop = (uint32_t)keyno;
@@ -816,17 +848,18 @@ col_insert(WT_CURSOR *cursor, WT_ITEM *key, WT_ITEM *value, uint64_t *keynop)
 	}
 
 	if (!SINGLETHREADED)
-		return;
+		return (0);
 
 	key_gen((uint8_t *)key->data, &key->size, keyno, 0);
 	bdb_update(key->data, key->size, value->data, value->size, &notfound);
+	return (0);
 }
 
 /*
  * row_remove --
  *	Remove an row from a row-store file.
  */
-static void
+static int
 row_remove(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno, int *notfoundp)
 {
 	WT_SESSION *session;
@@ -845,23 +878,25 @@ row_remove(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno, int *notfoundp)
 	/* We use the cursor in overwrite mode, check for existence. */
 	if ((ret = cursor->search(cursor)) == 0)
 		ret = cursor->remove(cursor);
+	if (ret == WT_DEADLOCK)
+		return (WT_DEADLOCK);
 	if (ret != 0 && ret != WT_NOTFOUND)
 		die(ret, "row_remove: remove %" PRIu64 " by key", keyno);
 	*notfoundp = (ret == WT_NOTFOUND);
 
 	if (!SINGLETHREADED)
-		return;
+		return (0);
 
 	bdb_remove(keyno, &notfound);
-
 	(void)notfound_chk("row_remove", ret, notfound, keyno);
+	return (0);
 }
 
 /*
  * col_remove --
  *	Remove a row from a column-store file.
  */
-static void
+static int
 col_remove(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno, int *notfoundp)
 {
 	WT_SESSION *session;
@@ -878,12 +913,14 @@ col_remove(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno, int *notfoundp)
 	/* We use the cursor in overwrite mode, check for existence. */
 	if ((ret = cursor->search(cursor)) == 0)
 		ret = cursor->remove(cursor);
+	if (ret == WT_DEADLOCK)
+		return (WT_DEADLOCK);
 	if (ret != 0 && ret != WT_NOTFOUND)
 		die(ret, "col_remove: remove %" PRIu64 " by key", keyno);
 	*notfoundp = (ret == WT_NOTFOUND);
 
 	if (!SINGLETHREADED)
-		return;
+		return (0);
 
 	/*
 	 * Deleting a fixed-length item is the same as setting the bits to 0;
@@ -894,8 +931,8 @@ col_remove(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno, int *notfoundp)
 		bdb_update(key->data, key->size, "\0", 1, &notfound);
 	} else
 		bdb_remove(keyno, &notfound);
-
 	(void)notfound_chk("col_remove", ret, notfound, keyno);
+	return (0);
 }
 
 /*

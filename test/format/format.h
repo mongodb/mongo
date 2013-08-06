@@ -178,8 +178,9 @@ typedef struct {
 	uint64_t update;
 	uint64_t remove;
 
-	uint64_t abort;				/* transaction resolution */
-	uint64_t commit;
+	uint64_t commit;			/* transaction resolution */
+	uint64_t rollback;
+	uint64_t deadlock;
 
 	int       id;				/* simple thread ID */
 	pthread_t tid;				/* thread ID */
