@@ -32,6 +32,7 @@
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/auth/user_name_hash.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/platform/compiler.h"
 #include "mongo/platform/unordered_map.h"
 #include "mongo/util/map_util.h"
 #include "mongo/util/mongoutils/str.h"
@@ -718,7 +719,7 @@ namespace {
         if (user->getRefCount() == 0) {
             // If it's been invalidated then it's not in the _userCache anymore.
             if (user->isValid()) {
-                bool erased = _userCache.erase(user->getName());
+                MONGO_COMPILER_VARIABLE_UNUSED bool erased = _userCache.erase(user->getName());
                 dassert(erased);
             }
             delete user;
