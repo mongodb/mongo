@@ -1890,10 +1890,15 @@ namespace mongo {
             if (cmdObj.hasField("$queryOptions"))
                 mergeCmd.append(cmdObj["$queryOptions"]);
 
-            // Run merging command on primary shard of database.
-            // Not using ShardConnection because this shouldn't be versioned.
+            string outputNsOrEmpty;
+            if (DocumentSourceOut* out = dynamic_cast<DocumentSourceOut*>(pPipeline->output())) {
+                outputNsOrEmpty = out->getOutputNs().ns();
+            }
+
+            // Run merging command on primary shard of database. Need to use ShardConnection so
+            // that the merging mongod is sent the config servers on connection init.
             const string mergeServer = conf->getPrimary().getConnString();
-            ScopedDbConnection conn(mergeServer);
+            ShardConnection conn(mergeServer, outputNsOrEmpty);
             BSONObj mergedResults = aggRunCommand(conn.get(), dbName, mergeCmd.obj());
             bool ok = mergedResults["ok"].trueValue();
             conn.done();

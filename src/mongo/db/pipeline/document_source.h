@@ -279,7 +279,14 @@ namespace mongo {
         class MongodInterface {
         public:
             virtual ~MongodInterface() {};
+
             virtual DBClientBase* directClient() = 0; // Always returns a DBDirectClient
+
+            // Note that in some rare cases this could return a false negative but will never return
+            // a false positive. This method will be fixed in the future once it becomes possible to
+            // avoid false negatives.
+            virtual bool isSharded(const NamespaceString& ns) = 0;
+
             // Add new methods as needed.
         };
 

@@ -1,3 +1,5 @@
+load('jstests/aggregation/extras/utils.js');
+
 /*
 > ShardingTest
 function (testName, numShards, verboseLevel, numMongos, otherParams) {
@@ -190,6 +192,9 @@ assert.eq(res, {result: [], outputNs: outCollection.getFullName(), ok: 1});
 assert.eq(db.ts1.find().itcount(), outCollection.find().itcount());
 assert.eq(db.ts1.find().sort({_id:1}).toArray(),
           outCollection.find().sort({_id:1}).toArray());
+
+// Make sure we error out if $out collection is sharded
+assertErrorCode(db.outCollection, [{$out: db.ts1.getName()}], 17017);
 
 // shut everything down
 shardedAggTest.stop();
