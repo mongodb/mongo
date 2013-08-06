@@ -1905,7 +1905,7 @@ namespace ExpressionTests {
             }
             void prepareExpression() {
                 expression()->addField( mongo::FieldPath( "a" ),
-                                        ExpressionConstant::create( Value(mongo::Undefined) ) );
+                                        ExpressionConstant::create( Value(BSONUndefined) ) );
             }
             BSONObj expected() { return BSON( "_id" << 0 << "a" << BSONUndefined); }
             BSONArray expectedDependencies() { return BSON_ARRAY( "_id" ); }
@@ -1930,7 +1930,7 @@ namespace ExpressionTests {
             }
             void prepareExpression() {
                 expression()->addField( mongo::FieldPath( "a" ),
-                                        ExpressionConstant::create( Value(mongo::jstNULL) ) );
+                                        ExpressionConstant::create( Value(BSONNULL) ) );
             }
             BSONObj expected() { return BSON( "_id" << 0 << "a" << BSONNULL ); }
             BSONArray expectedDependencies() { return BSON_ARRAY( "_id" ); }
