@@ -28,7 +28,6 @@ namespace mongo {
     class BSONArrayBuilder;
     class BSONElement;
     class BSONObjBuilder;
-    class Builder;
     class Document;
     class MutableDocument;
     class DocumentSource;

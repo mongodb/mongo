@@ -22,7 +22,6 @@
 #include <cstdio>
 
 #include "mongo/db/jsobj.h"
-#include "mongo/db/pipeline/builder.h"
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/value.h"

@@ -21,7 +21,6 @@
 #include <boost/functional/hash.hpp>
 
 #include "mongo/db/jsobj.h"
-#include "mongo/db/pipeline/builder.h"
 #include "mongo/db/pipeline/document.h"
 #include "mongo/util/mongoutils/str.h"
 

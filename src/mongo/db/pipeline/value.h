@@ -20,7 +20,6 @@
 
 namespace mongo {
     class BSONElement;
-    class Builder;
 
     /** A variant type that can hold any type of data representable in BSON
      *
