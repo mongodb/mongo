@@ -93,6 +93,8 @@ wts_ops(void)
 				total.insert += tinfo[i].insert;
 				total.remove += tinfo[i].remove;
 				total.update += tinfo[i].update;
+				total.abort += tinfo[i].abort;
+				total.commit += tinfo[i].commit;
 				switch (tinfo[i].state) {
 				case TINFO_RUNNING:
 					running = 1;
@@ -133,16 +135,17 @@ ops(void *arg)
 	WT_CURSOR *cursor, *cursor_insert;
 	WT_SESSION *session;
 	WT_ITEM key, value;
-	uint64_t cnt, keyno, ckpt_op, compact_op, session_period, thread_ops;
+	uint64_t cnt, keyno, ckpt_op, compact_op, session_op, thread_ops;
 	uint32_t op;
 	uint8_t *keybuf, *valbuf;
 	u_int np;
-	int dir, insert, notfound, ret;
+	int dir, insert, intxn, notfound, ret;
 	char *ckpt_config, config[64];
 
-	conn = g.wts_conn;
-
 	tinfo = arg;
+
+	conn = g.wts_conn;
+	keybuf = valbuf = NULL;
 
 	/* Set up the default key and value buffers. */
 	key_gen_setup(&keybuf);
@@ -152,24 +155,37 @@ ops(void *arg)
 	 * Each thread does its share of the total operations, and make sure
 	 * that it's not 0 (testing runs: threads might be larger than ops).
 	 */
-	thread_ops = 1 + g.c_ops / g.c_threads;
+	thread_ops = 100 + g.c_ops / g.c_threads;
 
-	/* Pick a period for re-opening the session and cursors. */
-	session = NULL;
-	cursor = cursor_insert = NULL;
-	session_period = SINGLETHREADED ?
-	    MMRAND(1, thread_ops) :  100 * MMRAND(1, 50);
-
-	/* Pick an operation where we'll do a checkpoint, compaction. */
+	/*
+	 * Select the first operation where we'll create sessions and cursors,
+	 * perform checkpoint and compaction operations.
+	 */
 	ckpt_op = MMRAND(1, thread_ops);
 	compact_op = MMRAND(1, thread_ops);
+	session_op = 0;
 
-	for (cnt = 0; cnt < thread_ops; ++cnt) {
+	session = NULL;
+	cursor = cursor_insert = NULL;
+	for (intxn = 0, cnt = 0; cnt < thread_ops; ++cnt) {
+		if (SINGLETHREADED && cnt % 100 == 0)
+			track("read/write ops", 0ULL, tinfo);
+
 		/*
-		 * cnt starts at 0 and (0 % anything == 0), so we always open
-		 * a session and cursors the first time through the loop.
+		 * We can't checkpoint, compact or swap sessions/cursors in a
+		 * transaction, resolve any running transaction.
 		 */
-		if (cnt % session_period == 0) {
+		if (intxn && (cnt == ckpt_op ||
+		    cnt == compact_op || cnt == session_op)) {
+			if ((ret = session->commit_transaction(
+			    session, NULL)) != 0)
+				die(ret, "session.commit_transaction");
+			++tinfo->commit;
+			intxn = 0;
+		}
+
+		/* Open up a new session and cursors. */
+		if (cnt == session_op) {
 			if (session != NULL &&
 			    (ret = session->close(session, NULL)) != 0)
 				die(ret, "session.close");
@@ -201,11 +217,13 @@ ops(void *arg)
 			    oc_conf(config, sizeof(config), "append"),
 			    &cursor_insert)) != 0)
 				die(ret, "session.open_cursor");
+
+			/* Pick the next session/cursor close/open. */
+			session_op += SINGLETHREADED ?
+			    MMRAND(1, thread_ops) : 100 * MMRAND(1, 50);
 		}
 
-		if (SINGLETHREADED && cnt % 100 == 0)
-			track("read/write ops", 0ULL, tinfo);
-
+		/* Checkpoint the database. */
 		if (cnt == ckpt_op) {
 			/*
 			 * LSM trees don't support named checkpoints, else 25%
@@ -243,11 +261,22 @@ ops(void *arg)
 			ckpt_op += MMRAND(1, thread_ops) / 5;
 		}
 
-		/* Data-sources don't support compaction. */
+		/* Compact the store (data-sources don't support compaction). */
 		if (cnt == compact_op &&
 		    !DATASOURCE("kvsbdb") && !DATASOURCE("memrata") &&
 		    (ret = session->compact(session, g.uri, NULL)) != 0)
 			die(ret, "session.compact");
+
+		/*
+		 * If we're not single-threaded and we're not in a transaction,
+		 * start a transaction 80% of the time.
+		 */
+		if (!SINGLETHREADED && !intxn && MMRAND(1, 10) >= 8) {
+			if ((ret =
+			    session->begin_transaction(session, NULL)) != 0)
+				die(ret, "session.begin_transaction");
+			intxn = 1;
+		}
 
 		insert = notfound = 0;
 
@@ -332,6 +361,33 @@ ops(void *arg)
 
 		/* Read the value we modified to confirm the operation. */
 		read_row(cursor, &key, keyno);
+
+		/*
+		 * If we're in the transaction, commit 40% of the time and abort
+		 * abort 10% of the time.
+		 */
+		if (intxn)
+			switch (MMRAND(1, 10)) {
+			case 1:
+			case 2:
+			case 3:
+			case 4:
+				if ((ret = session->commit_transaction(
+				    session, NULL)) != 0)
+					die(ret, "session.commit_transaction");
+				++tinfo->commit;
+				intxn = 0;
+				break;
+			case 5:
+				if ((ret = session->rollback_transaction(
+				    session, NULL)) != 0)
+					die(ret, "session.commit_transaction");
+				++tinfo->abort;
+				intxn = 0;
+				break;
+			default:
+				break;
+			}
 	}
 
 	if ((ret = session->close(session, NULL)) != 0)
