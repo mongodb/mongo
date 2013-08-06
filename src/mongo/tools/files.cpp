@@ -39,6 +39,7 @@ public:
         ( "local,l", po::value<string>(), "local filename for put|get (default is to use the same name as 'gridfs filename')")
         ( "type,t", po::value<string>(), "MIME type for put (default is to omit)")
         ( "replace,r", "Remove other files with same name after PUT")
+        ( "chunk-size,s", po::value<int>(), "Chunk size for storing files (bytes)")
         ;
         add_hidden_options()
         ( "command" , po::value<string>() , "command (list|search|put|get)" )
@@ -128,6 +129,19 @@ public:
         if ( cmd == "put" ) {
             const string& infile = getParam("local", filename);
             const string& type = getParam("type", "");
+
+            if (hasParam("chunk-size")) {
+                int chunk_size = getParam("chunk-size", 0);
+                if (chunk_size < 0) {
+                    cerr << "ERROR: Chunk size cannot be negative" << endl;
+                    return -3;
+                } else if (chunk_size > (BSONObjMaxUserSize - (16 * 1024))) {
+                    cerr << "ERROR: Chunk size beyond maximum document size" << endl;
+                    return -3;
+                } else if (chunk_size > 0) {
+                    g.setChunkSize(chunk_size);
+                }
+            }
 
             BSONObj file = g.storeFile(infile, filename, type);
             cout << "added file: " << file << endl;
