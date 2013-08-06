@@ -25,6 +25,7 @@
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query_optimizer.h"
+#include "mongo/s/d_logic.h"
 
 
 namespace mongo {
@@ -33,6 +34,11 @@ namespace {
     class MongodImplementation : public DocumentSourceNeedsMongod::MongodInterface {
     public:
         DBClientBase* directClient() { return &_client; }
+
+        bool isSharded(const NamespaceString& ns) {
+            const ChunkVersion unsharded(0, 0, OID());
+            return !(shardingState.getVersion(ns.ns()).isWriteCompatibleWith(unsharded));
+        }
 
     private:
         DBDirectClient _client;

@@ -18,7 +18,6 @@
 
 #include "mongo/db/pipeline/document_source.h"
 
-
 namespace mongo {
     const char DocumentSourceOut::outName[] = "$out";
 
@@ -42,6 +41,11 @@ namespace mongo {
         verify(_tempNs.size() == 0);
 
         DBClientBase* conn = _mongod->directClient();
+
+        // Fail early by checking before we do any work.
+        uassert(17017, str::stream() << "namespace '" << _outputNs.ns()
+                                     << "' is sharded so it can't be used for $out'",
+                !_mongod->isSharded(_outputNs));
 
         _tempNs = StringData(str::stream() << _outputNs.db()
                                            << ".tmp.agg_out."
@@ -95,6 +99,11 @@ namespace mongo {
             uassert(16996, str::stream() << "insert for $out failed: " << err,
                     DBClientWithCommands::getLastErrorString(err).empty());
         }
+
+        // Checking again to make sure we didn't become sharded while running.
+        uassert(17018, str::stream() << "namespace '" << _outputNs.ns()
+                                     << "' became sharded so it can't be used for $out'",
+                !_mongod->isSharded(_outputNs));
 
         BSONObj rename = BSON("renameCollection" << _tempNs.ns()
                            << "to" << _outputNs.ns()
