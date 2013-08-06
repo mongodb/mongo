@@ -173,18 +173,21 @@ typedef struct {
 extern GLOBAL g;
 
 typedef struct {
-	uint64_t search;
+	uint64_t search;			/* operations */
 	uint64_t insert;
 	uint64_t update;
 	uint64_t remove;
 
-	int       id;					/* simple thread ID */
-	pthread_t tid;					/* thread ID */
+	uint64_t abort;				/* transaction resolution */
+	uint64_t commit;
 
-#define	TINFO_RUNNING	1				/* Running */
-#define	TINFO_COMPLETE	2				/* Finished */
-#define	TINFO_JOINED	3				/* Resolved */
-	volatile int state;				/* state */
+	int       id;				/* simple thread ID */
+	pthread_t tid;				/* thread ID */
+
+#define	TINFO_RUNNING	1			/* Running */
+#define	TINFO_COMPLETE	2			/* Finished */
+#define	TINFO_JOINED	3			/* Resolved */
+	volatile int state;			/* state */
 } TINFO;
 
 void	 bdb_close(void);

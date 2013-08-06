@@ -51,6 +51,8 @@ key_gen_setup(uint8_t **keyp)
 	uint8_t *key;
 	size_t i;
 
+	*keyp = NULL;
+
 	if ((key = malloc(g.c_key_max)) == NULL)
 		syserr("malloc");
 	for (i = 0; i < g.c_key_max; ++i)
@@ -90,6 +92,8 @@ val_gen_setup(uint8_t **valp)
 {
 	uint8_t *val;
 	size_t i, len;
+
+	*valp = NULL;
 
 	/*
 	 * Set initial buffer contents to recognizable text.
