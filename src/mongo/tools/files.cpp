@@ -20,6 +20,7 @@
 #include <fstream>
 #include <iostream>
 #include <pcrecpp.h>
+#include <stdio.h>
 
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/client/gridfs.h"
@@ -61,6 +62,7 @@ public:
         out << "  put - add a file with filename 'gridfs filename'" << endl;
         out << "  get - get a file with filename 'gridfs filename'" << endl;
         out << "  delete - delete all files with filename 'gridfs filename'" << endl;
+        out << "  re-chunk - change chunk size for file" << endl;
     }
 
     void display( GridFS * grid , BSONObj obj ) {
@@ -170,6 +172,49 @@ public:
             cout << "done!" << endl;
             return 0;
         }
+
+        if ( cmd == "re-chunk" ) {
+            GridFile f = g.findFile( filename );
+            const string& type = getParam("type", "");
+
+            if ( ! f.exists() ) {
+                cerr << "ERROR: file not found" << endl;
+                return -2;
+            }
+
+            if (hasParam("chunk-size")) {
+                int chunk_size = getParam("chunk-size", 0);
+                if (chunk_size < 0) {
+                    cerr << "ERROR: Chunk size cannot be negative" << endl;
+                    return -3;
+                } else if (chunk_size > (BSONObjMaxUserSize - (16 * 1024))) {
+                    cerr << "ERROR: Chunk size beyond maximum document size" << endl;
+                    return -3;
+                } else if (chunk_size > 0) {
+                    g.setChunkSize(chunk_size);
+		}
+            }
+
+            string out = getParam("local", tempnam(NULL, f.getFilename().c_str()));
+            f.write( out );
+
+            BSONObj file = g.storeFile(out, filename, type);
+            remove(out.c_str());
+
+            auto_ptr<DBClientCursor> cursor =
+
+            auto_ptr<DBClientCursor> cursor =
+              conn().query(_db + "." _coll + ".files",
+                           BSON("filename" << filename << "_id" << NE << file["_id"] ));
+            while (cursor->more()){
+                BSONObj o = cursor->nextSafe();
+                conn().remove(_db + "." + _coll + ".files", BSON("_id" << o["_id"]));
+                conn().remove(_db + "." + _coll + ".chunks", BSON("files_id" << o["_id"]));
+            }
+            conn().getLastError();
+            return 0;
+        }
+
 
         cerr << "ERROR: unknown command '" << cmd << "'" << endl << endl;
         printHelp(cout);
