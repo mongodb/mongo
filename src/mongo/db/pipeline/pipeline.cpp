@@ -58,10 +58,6 @@ namespace mongo {
 
     /* this table must be in alphabetical order by name for bsearch() */
     static const StageDesc stageDesc[] = {
-#ifdef NEVER /* disabled for now in favor of $match */
-        {DocumentSourceFilter::filterName,
-         DocumentSourceFilter::createFromBson},
-#endif
         {DocumentSourceGeoNear::geoNearName,
          DocumentSourceGeoNear::createFromBson},
         {DocumentSourceGroup::groupName,

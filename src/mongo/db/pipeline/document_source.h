@@ -570,67 +570,6 @@ namespace mongo {
     };
 
 
-    class DocumentSourceFilter :
-        public DocumentSourceFilterBase {
-    public:
-        // virtuals from DocumentSource
-        virtual ~DocumentSourceFilter();
-        virtual bool coalesce(const intrusive_ptr<DocumentSource> &pNextSource);
-        virtual void optimize();
-        virtual const char *getSourceName() const;
-
-        /**
-          Create a filter.
-
-          @param pBsonElement the raw BSON specification for the filter
-          @param pExpCtx the expression context for the pipeline
-          @returns the filter
-         */
-        static intrusive_ptr<DocumentSource> createFromBson(
-            BSONElement *pBsonElement,
-            const intrusive_ptr<ExpressionContext> &pExpCtx);
-
-        /**
-          Create a filter.
-
-          @param pFilter the expression to use to filter
-          @param pExpCtx the expression context for the pipeline
-          @returns the filter
-         */
-        static intrusive_ptr<DocumentSourceFilter> create(
-            const intrusive_ptr<Expression> &pFilter,
-            const intrusive_ptr<ExpressionContext> &pExpCtx);
-
-        /**
-          Create a BSONObj suitable for Matcher construction.
-
-          This is used after filter analysis has moved as many filters to
-          as early a point as possible in the document processing pipeline.
-          See db/Matcher.h and the associated documentation for the format.
-          This conversion is used to move back to the low-level find()
-          Cursor mechanism.
-
-          @param pBuilder the builder to write to
-         */
-        void toMatcherBson(BSONObjBuilder *pBuilder) const;
-
-        static const char filterName[];
-
-    protected:
-        // virtuals from DocumentSource
-        virtual void sourceToBson(BSONObjBuilder *pBuilder, bool explain) const;
-
-        // virtuals from DocumentSourceFilterBase
-        virtual bool accept(const Document& pDocument) const;
-
-    private:
-        DocumentSourceFilter(const intrusive_ptr<Expression> &pFilter,
-                             const intrusive_ptr<ExpressionContext> &pExpCtx);
-
-        intrusive_ptr<Expression> pFilter;
-    };
-
-
     class DocumentSourceGroup :
         public SplittableDocumentSource {
     public:
