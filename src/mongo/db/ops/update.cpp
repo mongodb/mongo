@@ -534,7 +534,6 @@ namespace mongo {
         // Config db docs shouldn't get checked for valid field names since the shard key can have
         // a dot (".") in it. Therefore we disable validation for storage.
         if ( nsStr.db() == "config" ) {
-            LOG(0) << "disabling okForStorage on config db";
             shouldValidate = false;
         }
 
