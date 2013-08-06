@@ -407,7 +407,7 @@ __session_compact(WT_SESSION *wt_session, const char *uri, const char *config)
 	 * context.  Check now so the error message isn't confusing.
 	 */
 	if (F_ISSET(txn, TXN_RUNNING))
-		WT_ERR_MSG(session, EINVAL,
+		WT_RET_MSG(session, EINVAL,
 		    "Compaction not permitted in a transaction");
 
 	/*
