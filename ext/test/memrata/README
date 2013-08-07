@@ -94,6 +94,9 @@ Questions, problems, whatever:
 
 * This design doesn't support named checkpoints.
 
+* This implementation is endian-specific, that is, a store created on a
+little-endian machine is not portable to a big-endian machine.
+
 * Recovery is not yet implemented.  The process is the same as migrating rows
 from the cache to the primary, with the BaseTxnID set to the maximum possible
 transaction ID, that is, all updates are globally visible by definition, and

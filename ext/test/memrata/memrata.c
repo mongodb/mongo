@@ -420,6 +420,10 @@ txn_state_set(WT_EXTENSION_API *wtext,
 	txn.key = &txnid;
 	txn.key_len = sizeof(txnid);
 
+	/*
+	 * Not endian-portable, we're writing a native transaction ID to the
+	 * store.
+	 */
 	val = commit ? TXN_COMMITTED : TXN_ABORTED;
 	txn.val = &val;
 	txn.val_len = 1;
@@ -531,6 +535,9 @@ cache_value_append(WT_CURSOR *wtcursor, int remove_op)
 	/*
 	 * Copy the WiredTiger cursor's data into place: txn ID, remove
 	 * tombstone, data length, data.
+	 *
+	 * Not endian-portable, we're writing a native transaction ID to the
+	 * store.
 	 */
 	p = cursor->v + cursor->len;
 	memcpy(p, &txnid, sizeof(uint64_t));
