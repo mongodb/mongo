@@ -508,9 +508,10 @@ cache_value_append(WT_CURSOR *wtcursor, int remove_op)
 	len = cursor->len +				/* current length */
 	    sizeof(uint32_t) +				/* entries */
 	    sizeof(uint64_t) +				/* txn ID */
-	    (remove_op ?				/* remove or data */
-	    1 : sizeof(uint32_t) + wtcursor->value.size) +
-	    64;						/* slop */
+	    1 +						/* remove byte */
+	    (remove_op ? 0 :				/* optional data */
+	    sizeof(uint32_t) + wtcursor->value.size) +
+	    32;						/* slop */
 
 	if (len > cursor->mem_len) {
 		if ((p = realloc(cursor->v, len)) == NULL)
