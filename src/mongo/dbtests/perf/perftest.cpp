@@ -60,7 +60,7 @@ string testNs( T *t ) {
 }
 
 template <class T>
-class Runner {
+class TestRunner {
 public:
     void run() {
         T test;
@@ -75,7 +75,7 @@ public:
              << setw( 6 ) << setfill( '0' ) << micro % 1000000
              << "}" << endl;
     }
-    ~Runner() {
+    ~TestRunner() {
         FileAllocator::get()->waitUntilFinished();
         client_->dropDatabase( testDb< T >().c_str() );
     }
@@ -87,7 +87,7 @@ public:
 protected:
     template< class T >
     void add() {
-        Suite::add< Runner< T > >();
+        Suite::add< TestRunner< T > >();
     }
 };
 
