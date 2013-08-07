@@ -1,3 +1,4 @@
+if (0) { // SERVER-10429, SERVER-7533
 load("jstests/replsets/rslib.js");
 
 var NODE_COUNT = 2;
@@ -343,3 +344,4 @@ testAllModes(st.s, st.rs0.nodes, true);
 
 st.stop();
 
+}
