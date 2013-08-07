@@ -161,9 +161,6 @@ namespace mongo {
         size_t getFieldCount() const { return size(); }
         Value getValue(StringData fieldName) const { return getField(fieldName); }
 
-        // TODO: replace with logical equality once all current usages are fixed
-        bool operator== (const Document& lhs) const { return _storage == lhs._storage; }
-
         explicit Document(const DocumentStorage* ptr) : _storage(ptr) {};
 
     private:
@@ -176,6 +173,26 @@ namespace mongo {
         }
         intrusive_ptr<const DocumentStorage> _storage;
     };
+
+    inline bool operator== (const Document& l, const Document& r) {
+        return Document::compare(l, r) == 0;
+    }
+    inline bool operator!= (const Document& l, const Document& r) {
+        return Document::compare(l, r) != 0;
+    }
+    inline bool operator<  (const Document& l, const Document& r) {
+        return Document::compare(l, r) <  0;
+    }
+    inline bool operator<= (const Document& l, const Document& r) {
+        return Document::compare(l, r) <= 0;
+    }
+    inline bool operator>  (const Document& l, const Document& r) {
+        return Document::compare(l, r) >  0;
+    }
+    inline bool operator>= (const Document& l, const Document& r) {
+        return Document::compare(l, r) >= 0;
+    }
+
 
     /** This class is returned by MutableDocument to allow you to modify its values.
      *  You are not allowed to hold variables of this type (enforced by the type system).
