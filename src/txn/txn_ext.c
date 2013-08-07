@@ -43,22 +43,11 @@ __wt_ext_transaction_isolation_level(
 }
 
 /*
- * __wt_ext_transaction_oldest --
- *	Return the oldest transaction ID not yet visible to a running
- * transaction.
- */
-uint64_t
-__wt_ext_transaction_oldest(WT_EXTENSION_API *wt_api)
-{
-	return (((WT_CONNECTION_IMPL *)wt_api->conn)->txn_global.oldest_id);
-}
-
-/*
- * __wt_ext_transaction_resolve --
+ * __wt_ext_transaction_notify --
  *	Request notification of transaction resolution.
  */
 int
-__wt_ext_transaction_resolve(
+__wt_ext_transaction_notify(
     WT_EXTENSION_API *wt_api, WT_SESSION *wt_session,
     int (*notify)(WT_SESSION *, void *, uint64_t, int), void *cookie)
 {
@@ -71,6 +60,7 @@ __wt_ext_transaction_resolve(
 	txn = &session->txn;
 
 	/*
+	 * XXX
 	 * For now, a single slot for notifications: I'm not bothering with
 	 * more than one because more than one data-source in a transaction
 	 * doesn't work anyway.
@@ -84,6 +74,17 @@ __wt_ext_transaction_resolve(
 	txn->notify_cookie = cookie;
 
 	return (0);
+}
+
+/*
+ * __wt_ext_transaction_oldest --
+ *	Return the oldest transaction ID not yet visible to a running
+ * transaction.
+ */
+uint64_t
+__wt_ext_transaction_oldest(WT_EXTENSION_API *wt_api)
+{
+	return (((WT_CONNECTION_IMPL *)wt_api->conn)->txn_global.oldest_id);
 }
 
 /*

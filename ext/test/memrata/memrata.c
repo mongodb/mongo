@@ -1524,8 +1524,7 @@ err:	ESET(unlock(wtext, session, &ws->lock));
 
 	/* If successful, request notification at transaction resolution. */
 	if (ret == 0)
-		ESET(
-		    wtext->transaction_resolve(wtext, session, txn_notify, ks));
+		ESET(wtext->transaction_notify(wtext, session, txn_notify, ks));
 
 	return (ret);
 }
@@ -1628,8 +1627,7 @@ err:	ESET(unlock(wtext, session, &ws->lock));
 
 	/* If successful, request notification at transaction resolution. */
 	if (ret == 0)
-		ESET(
-		    wtext->transaction_resolve(wtext, session, txn_notify, ks));
+		ESET(wtext->transaction_notify(wtext, session, txn_notify, ks));
 
 	return (ret);
 }

@@ -201,10 +201,10 @@ static int my_cursor_insert(WT_CURSOR *wtcursor)
 
 	{
 	void *cookie = NULL;
-	/*! [WT_EXTENSION transaction resolve] */
-	ret = wt_api->transaction_resolve(
+	/*! [WT_EXTENSION transaction notify] */
+	ret = wt_api->transaction_notify(
 	    wt_api, session, data_source_notify, cookie);
-	/*! [WT_EXTENSION transaction resolve] */
+	/*! [WT_EXTENSION transaction notify] */
 	}
 
 	{

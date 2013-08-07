@@ -366,19 +366,6 @@ struct __wt_extension_api {
 	    WT_SESSION *session);
 
 	/*!
-	 * Return the oldest transaction ID not yet visible to a running
-	 * transaction.
-	 *
-	 * @param wt_api the extension handle
-	 * @param session the session handle
-	 * @returns the oldest transaction ID not yet visible to a running
-	 * transaction.
-	 *
-	 * @snippet ex_data_source.c WT_EXTENSION transaction oldest
-	 */
-	uint64_t (*transaction_oldest)(WT_EXTENSION_API *wt_api);
-
-	/*!
 	 * Request notification of transaction resolution by specifying a
 	 * function to be called when the session's current transaction is
 	 * either committed or rolled back.  If the transaction is being
@@ -395,12 +382,25 @@ struct __wt_extension_api {
 	 * @param cookie a cookie passed to the resolution function
 	 * @errors
 	 *
-	 * @snippet ex_data_source.c WT_EXTENSION transaction resolve
+	 * @snippet ex_data_source.c WT_EXTENSION transaction notify
 	 */
-	int (*transaction_resolve)(WT_EXTENSION_API *wt_api,
+	int (*transaction_notify)(WT_EXTENSION_API *wt_api,
 	    WT_SESSION *session, int (*notify)(
 	    WT_SESSION *session, void *cookie, uint64_t txnid, int committed),
 	    void *cookie);
+
+	/*!
+	 * Return the oldest transaction ID not yet visible to a running
+	 * transaction.
+	 *
+	 * @param wt_api the extension handle
+	 * @param session the session handle
+	 * @returns the oldest transaction ID not yet visible to a running
+	 * transaction.
+	 *
+	 * @snippet ex_data_source.c WT_EXTENSION transaction oldest
+	 */
+	uint64_t (*transaction_oldest)(WT_EXTENSION_API *wt_api);
 
 	/*!
 	 * Return if the current transaction can see the given transaction ID.
