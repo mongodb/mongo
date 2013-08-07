@@ -24,6 +24,9 @@
 
 namespace mongo {
 
+    QueryResult* newGetMore(const char* ns, int ntoreturn, long long cursorid, CurOp& curop,
+                            int pass, bool& exhaust, bool* isCursorAuthorized);
+
     string newRunQuery(Message& m, QueryMessage& q, CurOp& curop, Message &result);
 
 }  // namespace mongo

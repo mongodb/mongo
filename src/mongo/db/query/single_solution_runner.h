@@ -25,21 +25,17 @@
 namespace mongo {
 
     /**
-     * CachedPlanRunner runs a plan retrieved from the cache.
-     *
-     * Cached plans are bundled with information describing why the plan is in the cache.
-     *
-     * If we run a plan from the cache and behavior wildly deviates from expected behavior, we may
-     * remove the plan from the cache.  See plan_cache.h.
+     * SingleSolutionRunner runs a plan that was the only possible solution to a query.  It exists
+     * only to dump stats into the cache after running.
      */
-    class CachedPlanRunner : public Runner {
+    class SingleSolutionRunner : public Runner {
     public:
         /**
          * Takes ownership of both arguments.
          */
-        CachedPlanRunner(CanonicalQuery* canonicalQuery, CachedSolution* cached,
-                         PlanStage* root, WorkingSet* ws)
-            : _canonicalQuery(canonicalQuery), _cachedQuery(cached),
+        SingleSolutionRunner(CanonicalQuery* canonicalQuery, QuerySolution* soln,
+                             PlanStage* root, WorkingSet* ws)
+            : _canonicalQuery(canonicalQuery), _solution(soln),
               _runner(new SimplePlanRunner(ws, root)) { }
 
         bool getNext(BSONObj* objOut) {
@@ -48,36 +44,23 @@ namespace mongo {
                 return true;
             }
 
+            // TODO: I'm not convinced we want to cache this.  What if it's a collscan solution and
+            // the user adds an index later?  We don't want to reach for this.
+
             // We're done.  Update the cache.
-            PlanCache* cache = PlanCache::get(_canonicalQuery->ns());
-
+            //PlanCache* cache = PlanCache::get(_canonicalQuery->ns());
             // TODO: is this a verify?
-            if (NULL == cache) { return false; }
-
-            // TODO: How do we decide this?
-            bool shouldRemovePlan = false;
-
-            if (shouldRemovePlan) {
-                if (!cache->remove(*_canonicalQuery, *_cachedQuery->solution)) {
-                    warning() << "Cached plan runner couldn't remove plan from cache.  Maybe"
-                                 " somebody else did already?";
-                }
-                return false;
-            }
-
+            //if (NULL == cache) { return false; }
             // We're done running.  Update cache.
-            auto_ptr<CachedSolutionFeedback> feedback(new CachedSolutionFeedback());
-            feedback->stats = _runner->getStats();
-            cache->feedback(*_canonicalQuery, *_cachedQuery->solution, feedback.release());
+            //auto_ptr<PlanRankingDecision> why(new PlanRankingDecision());
+            //why->onlyOneSolution = true;
+            //cache->add(canonicalQuery.release(), solutions[0], why.release());
             return false;
         }
 
         virtual void saveState() { _runner->saveState(); }
         virtual void restoreState() { _runner->restoreState(); }
-
-        virtual void invalidate(const DiskLoc& dl) {
-            _runner->invalidate(dl);
-        }
+        virtual void invalidate(const DiskLoc& dl) { _runner->invalidate(dl); }
 
         virtual const CanonicalQuery& getQuery() {
             return *_canonicalQuery;
@@ -85,8 +68,9 @@ namespace mongo {
 
     private:
         scoped_ptr<CanonicalQuery> _canonicalQuery;
-        scoped_ptr<CachedSolution> _cachedQuery;
+        scoped_ptr<QuerySolution> _solution;
         scoped_ptr<SimplePlanRunner> _runner;
     };
 
 }  // namespace mongo
+

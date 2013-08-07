@@ -31,8 +31,9 @@ namespace mongo {
      * TODO: Yielding policy
      * TODO: Graceful error handling
      * TODO: Stats, diagnostics, instrumentation, etc.
+     * TODO: Rename.  It's not a full runner.  It just holds the stage/WS and handles yielding.
      */
-    class SimplePlanRunner : public Runner {
+    class SimplePlanRunner {
     public:
         SimplePlanRunner() : _workingSet(new WorkingSet()) { }
         SimplePlanRunner(WorkingSet* ws, PlanStage* rt) : _workingSet(ws), _root(rt) { }
@@ -47,15 +48,9 @@ namespace mongo {
             _root.reset(root);
         }
 
-        /**
-         * TODO: Explicit yielding is deprecated pending a ClientCursor rewrite.
-         */
-        virtual void yield() { _root->prepareToYield(); }
-        virtual void unYield() { _root->recoverFromYield(); }
-
-        virtual void invalidate(const DiskLoc& dl) {
-            _root->invalidate(dl);
-        }
+        void saveState() { _root->prepareToYield(); }
+        void restoreState() { _root->recoverFromYield(); }
+        void invalidate(const DiskLoc& dl) { _root->invalidate(dl); }
 
         PlanStageStats* getStats() { return _root->getStats(); }
 

@@ -57,21 +57,24 @@ namespace mongo {
     ClientCursor::ClientCursor(int qopts, const shared_ptr<Cursor>& c, const string& ns,
                                BSONObj query) : _ns(ns), _query(query), _c(c),
                                                 _yieldSometimesTracker(128, 10) {
-        init(qopts);
+        _queryOptions = qopts;
         _doingDeletes = false;
+        init();
     }
 
-    ClientCursor::ClientCursor(int qopts, Runner* runner, const string& ns, BSONObj query)
-        : _ns(ns), _query(query), _runner(runner), _yieldSometimesTracker(128, 10) {
-        init(qopts);
+    ClientCursor::ClientCursor(Runner* runner) : _yieldSometimesTracker(128, 10) {
+        _runner.reset(runner);
+        _ns = runner->getQuery().getParsed().ns();
+        _query = runner->getQuery().getParsed().getFilter();
+        _queryOptions = runner->getQuery().getParsed().getOptions();
+        init();
     }
 
-    void ClientCursor::init(int qopts) {
+    void ClientCursor::init() {
         _db = cc().database();
         verify( _db );
         verify( _db->ownsNS( _ns ) );
 
-        _queryOptions = qopts;
         _idleAgeMillis = 0;
         _leftoverMaxTimeMicros = 0;
         _pinValue = 0;
@@ -79,7 +82,7 @@ namespace mongo {
         
         Lock::assertAtLeastReadLocked(_ns);
 
-        if (qopts & QueryOption_NoCursorTimeout) {
+        if (_queryOptions & QueryOption_NoCursorTimeout) {
             // cursors normally timeout after an inactivity period to prevent excess memory use
             // setting this prevents timeout of the cursor in question.
             ++_pinValue;
@@ -150,10 +153,13 @@ namespace mongo {
 
             bool shouldDelete = false;
             if (NULL != cc->_runner.get()) {
+                verify(NULL == cc->c());
                 shouldDelete = true;
             }
             // Begin cursor-only
             else if (cc->c()->shouldDestroyOnNSDeletion()) {
+                verify(NULL == cc->_runner.get());
+
                 if (isDB) {
                     // already checked that db matched above
                     dassert(str::startsWith(cc->_ns.c_str(), ns));
@@ -419,7 +425,9 @@ namespace mongo {
         }
     }
 
+    // DEPRECATED only used by Cursor.
     void ClientCursor::storeOpForSlave( DiskLoc last ) {
+        verify(NULL == _runner.get());
         if ( ! ( _queryOptions & QueryOption_OplogReplay ))
             return;
 

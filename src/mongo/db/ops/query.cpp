@@ -115,6 +115,10 @@ namespace mongo {
                                 int pass,
                                 bool& exhaust,
                                 bool* isCursorAuthorized ) {
+        if (useNewQuerySystem) {
+            return newGetMore(ns, ntoreturn, cursorid, curop, pass, exhaust, isCursorAuthorized);
+        }
+
         exhaust = false;
 
         int bufSize = 512 + sizeof( QueryResult ) + MaxBytesToReturnToClientAtOnce;
@@ -181,10 +185,10 @@ namespace mongo {
             while ( 1 ) {
                 if ( !c->ok() ) {
                     if ( c->tailable() ) {
-                        /* when a tailable cursor hits "EOF", ok() goes false, and current() is null.  however
-                           advance() can still be retries as a reactivation attempt.  when there is new data, it will
-                           return true.  that's what we are doing here.
-                           */
+                        // when a tailable cursor hits "EOF", ok() goes false, and current() is
+                        // null.  however advance() can still be retries as a reactivation attempt.
+                        // when there is new data, it will return true.  that's what we are doing
+                        // here.
                         if ( c->advance() )
                             continue;
 
@@ -835,7 +839,9 @@ namespace mongo {
             // we might be missing some data
             // and its safe to send this as mongos can resend
             // at this point
-            throw SendStaleConfigException( ns , "version changed during initial query", shardingVersionAtStart, shardingState.getVersion( ns ) );
+            throw SendStaleConfigException(ns, "version changed during initial query",
+                                           shardingVersionAtStart,
+                                           shardingState.getVersion(ns));
         }
         
         parentPageFaultSection.reset(0);
@@ -1060,6 +1066,7 @@ namespace mongo {
         }
 
         if (useNewQuerySystem) {
+            // TODO: Copy prequel curop debugging into runNewQuery
             return newRunQuery(m, q, curop, result);
         }
 

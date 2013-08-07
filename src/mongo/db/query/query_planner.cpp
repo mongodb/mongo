@@ -25,6 +25,9 @@ namespace mongo {
     void QueryPlanner::plan(const CanonicalQuery& query, vector<QuerySolution*> *out) {
         const MatchExpression* root = query.root();
 
+        // TODO: If pq.hasOption(QueryOption_OplogReplay) use FindingStartCursor equivalent which
+        // must be translated into stages.
+
         // The default plan is always a collection scan with a heavy filter.  This is a valid
         // solution for any query that does not require an index.
         if (!requiresIndex(root)) {

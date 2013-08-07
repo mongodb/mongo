@@ -49,7 +49,7 @@ namespace mongo {
         ClientCursor(int qopts, const shared_ptr<Cursor>& c, const string& ns,
                      BSONObj query = BSONObj());
 
-        ClientCursor(int qopts, Runner* runner, const string& ns, BSONObj query = BSONObj());
+        ClientCursor(Runner* runner);
 
         ~ClientCursor();
 
@@ -158,7 +158,6 @@ namespace mongo {
         // Replication-related stuff.  TODO: Document and clean.
         //
 
-        void storeOpForSlave( DiskLoc last );
         void updateSlaveLocation( CurOp& curop );
         void slaveReadTill( const OpTime& t ) { _slaveReadTill = t; }
         /** Just for testing. */
@@ -168,7 +167,9 @@ namespace mongo {
         // Query-specific functionality that may be adapted for the Runner.
         //
 
-        // Used by ops/query.cpp to stash how many results hvae been returned by a query.
+        Runner* getRunner() const { return _runner.get(); }
+
+        // Used by ops/query.cpp to stash how many results have been returned by a query.
         int pos() const { return _pos; }
         void incPos(int n) { _pos += n; }
         void setPos(int n) { _pos = n; }
@@ -213,6 +214,8 @@ namespace mongo {
         //
         // Cursor-only DEPRECATED methods.
         //
+
+        void storeOpForSlave( DiskLoc last );
 
         // Only used by ops/query.cpp, which will stop using them when queries are answered only by
         // a runner.
@@ -260,7 +263,7 @@ namespace mongo {
          * Initialization common between Cursor and Runner.
          * TODO: Remove when we're all-runner.
          */
-        void init(int qopts);
+        void init();
 
         /**
          * Allocates a new CursorId.
@@ -294,7 +297,7 @@ namespace mongo {
         unsigned _pinValue;
 
         // The namespace we're operating on.
-        const string _ns;
+        string _ns;
 
         // The database we're operating on.
         Database* _db;
@@ -303,7 +306,7 @@ namespace mongo {
         int _pos;
 
         // The query that prompted this ClientCursor.  Only used for debugging.
-        const BSONObj _query;
+        BSONObj _query;
 
         // See the QueryOptions enum in dbclient.h
         int _queryOptions;
@@ -317,7 +320,11 @@ namespace mongo {
         // TODO: Document.
         uint64_t _leftoverMaxTimeMicros;
 
-        // TODO: document better.  Somehow used in sharding.
+        // For chunks that are being migrated, there is a period of time when that chunks data is in
+        // two shards, the donor and the receiver one. That data is picked up by a cursor on the
+        // receiver side, even before the migration was decided.  The CollectionMetadata allow one
+        // to inquiry if any given document of the collection belongs indeed to this shard or if it
+        // is coming from (or a vestige of) an ongoing migration.
         CollectionMetadataPtr _collMetadata;
 
         //
