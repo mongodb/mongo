@@ -930,47 +930,60 @@ dodouble:
 
     // used by jsonString()
     inline std::string escape( const std::string& s , bool escape_slash=false) {
-        StringBuilder ret;
-        for ( std::string::const_iterator i = s.begin(); i != s.end(); ++i ) {
-            switch ( *i ) {
+        std::string ret;
+        ret.reserve(s.length());
+
+        std::string escapeStr = (escape_slash) ? "/" : "";
+        escapeStr.reserve(8+0x1f);
+        escapeStr.append("\"\\\b\f\n\r\t");
+        for( int i = 0x0; i <= 0x1f; ++i ) {
+            escapeStr.append<int>(1, i);
+        }
+
+        std::size_t start = 0;
+        std::size_t found = s.find_first_of(escapeStr.c_str());
+        while ( found != std::string::npos ) {
+            ret.append(s, start, found-start);
+            switch (s[found]) {
             case '"':
-                ret << "\\\"";
+                ret.append("\\\"");
                 break;
             case '\\':
-                ret << "\\\\";
+                ret.append("\\\\");
                 break;
             case '/':
-                ret << (escape_slash ? "\\/" : "/");
+                ret.append("\\/");
                 break;
             case '\b':
-                ret << "\\b";
+                ret.append("\\b");
                 break;
             case '\f':
-                ret << "\\f";
+                ret.append("\\f");
                 break;
             case '\n':
-                ret << "\\n";
+                ret.append("\\n");
                 break;
             case '\r':
-                ret << "\\r";
+                ret.append("\\r");
                 break;
             case '\t':
-                ret << "\\t";
+                ret.append("\\t");
                 break;
             default:
-                if ( *i >= 0 && *i <= 0x1f ) {
-                    //TODO: these should be utf16 code-units not bytes
-                    char c = *i;
-                    ret << "\\u00" << toHexLower(&c, 1);
-                }
-                else {
-                    ret << *i;
-                }
+                //TODO: these should be utf16 code-units not bytes          
+                char c = s[found];
+                ret.append("\\u00");
+                ret.append(toHexLower(&c, 1));
             }
-        }
-        return ret.str();
-    }
 
+            start = found + 1;
+            found = s.find_first_of(escapeStr.c_str(), start);
+        }
+        ret.append(s, start, found-start);
+
+        return ret;
+    }
+    
     inline std::string BSONObj::hexDump() const {
         std::stringstream ss;
         const char *d = objdata();
