@@ -102,6 +102,46 @@ err:	if (dlh != NULL)
 }
 
 /*
+ * __conn_load_extensions --
+ *	Load the list of application-configured extensions.
+ */
+static int
+__conn_load_extensions(WT_SESSION_IMPL *session, const char *cfg[])
+{
+	WT_CONFIG_ITEM cval, skey, sval;
+	WT_CONFIG subconfig;
+	WT_CONNECTION_IMPL *conn;
+	WT_DECL_ITEM(exconfig);
+	WT_DECL_ITEM(expath);
+	WT_DECL_RET;
+
+	conn = S2C(session);
+
+	WT_ERR(__wt_config_gets(session, cfg, "extensions", &cval));
+	WT_ERR(__wt_config_subinit(session, &subconfig, &cval));
+	while ((ret = __wt_config_next(&subconfig, &skey, &sval)) == 0) {
+		if (expath == NULL)
+			WT_ERR(__wt_scr_alloc(session, 0, &expath));
+		WT_ERR(__wt_buf_fmt(
+		    session, expath, "%.*s", (int)skey.len, skey.str));
+		if (sval.len > 0) {
+			if (exconfig == NULL)
+				WT_ERR(__wt_scr_alloc(session, 0, &exconfig));
+			WT_ERR(__wt_buf_fmt(session,
+			    exconfig, "%.*s", (int)sval.len, sval.str));
+		}
+		WT_ERR(conn->iface.load_extension(&conn->iface,
+		    expath->data, (sval.len > 0) ? exconfig->data : NULL));
+	}
+	WT_ERR_NOTFOUND_OK(ret);
+
+err:	__wt_scr_free(&expath);
+	__wt_scr_free(&exconfig);
+
+	return (ret);
+}
+
+/*
  * __conn_add_collator --
  *	WT_CONNECTION->add_collator method.
  */
@@ -849,11 +889,10 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 		{ "log",	WT_FILE_TYPE_LOG },
 		{ NULL, 0 }
 	};
-	WT_CONFIG subconfig;
-	WT_CONFIG_ITEM cval, skey, sval;
+	WT_CONFIG_ITEM cval, sval;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
-	WT_ITEM *cbuf, expath, exconfig;
+	WT_ITEM *cbuf;
 	WT_SESSION_IMPL *session;
 	const char *cfg[5], **cfgend;
 
@@ -861,8 +900,6 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 
 	session = NULL;
 	cbuf = NULL;
-	WT_CLEAR(expath);
-	WT_CLEAR(exconfig);
 
 	WT_RET(__wt_library_init());
 
@@ -991,20 +1028,6 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	WT_ERR(__wt_config_gets(session, cfg, "statistics", &cval));
 	conn->statistics = cval.val == 0 ? 0 : 1;
 
-	/* Load any extensions referenced in the config. */
-	WT_ERR(__wt_config_gets(session, cfg, "extensions", &cval));
-	WT_ERR(__wt_config_subinit(session, &subconfig, &cval));
-	while ((ret = __wt_config_next(&subconfig, &skey, &sval)) == 0) {
-		WT_ERR(__wt_buf_fmt(
-		    session, &expath, "%.*s", (int)skey.len, skey.str));
-		if (sval.len > 0)
-			WT_ERR(__wt_buf_fmt(session, &exconfig,
-			    "entry=%.*s\n", (int)sval.len, sval.str));
-		WT_ERR(conn->iface.load_extension(&conn->iface,
-		    expath.data, (sval.len > 0) ? exconfig.data : NULL));
-	}
-	WT_ERR_NOTFOUND_OK(ret);
-
 	/* Now that we know if verbose is configured, output the version. */
 	WT_VERBOSE_ERR(session, version, "%s", WIREDTIGER_VERSION_STRING);
 
@@ -1025,6 +1048,13 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	WT_ERR(__wt_turtle_init(session));
 	WT_ERR(__wt_metadata_open(session));
 
+	/*
+	 * Load the extensions last; the extension code expects everything else
+	 * to be in place and there are lots of callbacks it can make into the
+	 * library.
+	 */
+	WT_ERR(__conn_load_extensions(session, cfg));
+
 	STATIC_ASSERT(offsetof(WT_CONNECTION_IMPL, iface) == 0);
 	*wt_connp = &conn->iface;
 
@@ -1034,8 +1064,6 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	 */
 err:	if (cbuf != NULL)
 		__wt_buf_free(session, cbuf);
-	__wt_buf_free(session, &expath);
-	__wt_buf_free(session, &exconfig);
 
 	if (ret != 0 && conn != NULL)
 		WT_TRET(__wt_connection_close(conn));
