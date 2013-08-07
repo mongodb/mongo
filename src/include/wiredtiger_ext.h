@@ -22,6 +22,22 @@ extern "C" {
  */
 
 /*!
+ * Read-committed isolation level, returned by
+ * WT_EXTENSION_API::transaction_isolation_level.
+ */
+#define	WT_TXN_ISO_READ_COMMITTED       1
+/*!
+ * Read-uncommitted isolation level, returned by
+ * WT_EXTENSION_API::transaction_isolation_level.
+ */
+#define	WT_TXN_ISO_READ_UNCOMMITTED     2
+/*!
+ * Snapshot isolation level, returned by
+ * WT_EXTENSION_API::transaction_isolation_level.
+ */
+#define	WT_TXN_ISO_SNAPSHOT             3
+
+/*!
  * Table of WiredTiger extension methods.
  *
  * This structure is used to provide a set of WiredTiger methods to extension
@@ -336,6 +352,20 @@ struct __wt_extension_api {
 	    WT_SESSION *session);
 
 	/*!
+	 * Return the current transaction's isolation level; returns one of
+	 * ::WT_TXN_ISO_READ_COMMITTED, ::WT_TXN_ISO_READ_UNCOMMITTED, or
+	 * ::WT_TXN_ISO_SNAPSHOT.
+	 *
+	 * @param wt_api the extension handle
+	 * @param session the session handle
+	 * @returns the current transaction's isolation level.
+	 *
+	 * @snippet ex_data_source.c WT_EXTENSION transaction isolation level
+	 */
+	int (*transaction_isolation_level)(WT_EXTENSION_API *wt_api,
+	    WT_SESSION *session);
+
+	/*!
 	 * Return the oldest transaction ID not yet visible to a running
 	 * transaction.
 	 *
@@ -371,20 +401,6 @@ struct __wt_extension_api {
 	    WT_SESSION *session, int (*notify)(
 	    WT_SESSION *session, void *cookie, uint64_t txnid, int committed),
 	    void *cookie);
-
-	/*!
-	 * Return if the current transaction is configured for snapshot
-	 * isolation.
-	 *
-	 * @param wt_api the extension handle
-	 * @param session the session handle
-	 * @returns true (non-zero) if the current transaction is configured
-	 * for snapshot isolation.
-	 *
-	 * @snippet ex_data_source.c WT_EXTENSION transaction snapshot isolation
-	 */
-	int (*transaction_snapshot_isolation)(WT_EXTENSION_API *wt_api,
-	    WT_SESSION *session);
 
 	/*!
 	 * Return if the current transaction can see the given transaction ID.

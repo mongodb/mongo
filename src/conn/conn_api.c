@@ -120,8 +120,8 @@ __conn_get_extension_api(WT_CONNECTION *wt_conn)
 	conn->extension_api.transaction_id = __wt_ext_transaction_id;
 	conn->extension_api.transaction_oldest = __wt_ext_transaction_oldest;
 	conn->extension_api.transaction_resolve = __wt_ext_transaction_resolve;
-	conn->extension_api.transaction_snapshot_isolation =
-	    __wt_ext_transaction_snapshot_isolation;
+	conn->extension_api.transaction_isolation_level =
+	    __wt_ext_transaction_isolation_level;
 	conn->extension_api.transaction_visible = __wt_ext_transaction_visible;
 
 	return (&conn->extension_api);

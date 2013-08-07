@@ -644,7 +644,8 @@ cache_value_update_check(WT_CURSOR *wtcursor)
 	wtext = cursor->wtext;
 
 	/* Only interesting for snapshot isolation. */
-	if (!wtext->transaction_snapshot_isolation(wtext, session))
+	if (wtext->
+	    transaction_isolation_level(wtext, session) != WT_TXN_ISO_SNAPSHOT)
 		return (0);
 
 	/*

@@ -171,12 +171,14 @@ static int my_cursor_insert(WT_CURSOR *wtcursor)
 	(void)wtcursor;
 
 	{
-	int is_snapshot_isolation;
-	/*! [WT_EXTENSION transaction snapshot isolation] */
-	is_snapshot_isolation =
-	    wt_api->transaction_snapshot_isolation(wt_api, session);
-	/*! [WT_EXTENSION transaction snapshot isolation] */
-	(void)is_snapshot_isolation;
+	int is_snapshot_isolation, isolation_level;
+	/*! [WT_EXTENSION transaction isolation level] */
+	isolation_level = wt_api->transaction_isolation_level(wt_api, session);
+	if (isolation_level == WT_TXN_ISO_SNAPSHOT)
+		is_snapshot_isolation = 1;
+	else
+		is_snapshot_isolation = 0;
+	/*! [WT_EXTENSION transaction isolation level] */
 	}
 
 	{

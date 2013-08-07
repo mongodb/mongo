@@ -20,6 +20,29 @@ __wt_ext_transaction_id(WT_EXTENSION_API *wt_api, WT_SESSION *wt_session)
 }
 
 /*
+ * __wt_ext_transaction_isolation_level --
+ *	Return if the current transaction's isolation level.
+ */
+int
+__wt_ext_transaction_isolation_level(
+    WT_EXTENSION_API *wt_api, WT_SESSION *wt_session)
+{
+	WT_SESSION_IMPL *session;
+	WT_TXN *txn;
+
+	(void)wt_api;					/* Unused parameters */
+
+	session = (WT_SESSION_IMPL *)wt_session;
+	txn = &session->txn;
+
+	if (txn->isolation == TXN_ISO_READ_COMMITTED)
+	    return (WT_TXN_ISO_READ_COMMITTED);
+	if (txn->isolation == TXN_ISO_READ_UNCOMMITTED)
+	    return (WT_TXN_ISO_READ_UNCOMMITTED);
+	return (WT_TXN_ISO_SNAPSHOT);
+}
+
+/*
  * __wt_ext_transaction_oldest --
  *	Return the oldest transaction ID not yet visible to a running
  * transaction.
@@ -61,20 +84,6 @@ __wt_ext_transaction_resolve(
 	txn->notify_cookie = cookie;
 
 	return (0);
-}
-
-/*
- * __wt_ext_transaction_snapshot_isolation --
- *	Return if the current transaction is configured for snapshot isolation.
- */
-int
-__wt_ext_transaction_snapshot_isolation(
-    WT_EXTENSION_API *wt_api, WT_SESSION *wt_session)
-{
-	(void)wt_api;					/* Unused parameters */
-
-	return (((WT_SESSION_IMPL *)
-	    wt_session)->txn.isolation == TXN_ISO_SNAPSHOT ? 1 : 0);
 }
 
 /*
