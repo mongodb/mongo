@@ -16,24 +16,33 @@
 
 #include "mongo/db/query/new_find.h"
 
+#include "mongo/client/dbclientinterface.h"
+#include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/keypattern.h"
 #include "mongo/db/query/cached_plan_runner.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/multi_plan_runner.h"
 #include "mongo/db/query/plan_cache.h"
 #include "mongo/db/query/query_planner.h"
-#include "mongo/db/query/simple_plan_runner.h"
+#include "mongo/db/query/single_solution_runner.h"
 #include "mongo/db/query/stage_builder.h"
+#include "mongo/db/repl/repl_reads_ok.h"
+#include "mongo/s/chunk_version.h"
+#include "mongo/s/d_logic.h"
+#include "mongo/s/stale_exception.h"
 
 namespace mongo {
+
+    // Copied from db/ops/query.cpp.
+    static const int32_t MaxBytesToReturnToClientAtOnce = 4 * 1024 * 1024;
 
     // Used in db/ops/query.cpp.
     bool useNewQuerySystem = false;
 
     /**
-     * For a given query, get a runner.
-     * The runner could be a SimplePlanRunner, a CachedQueryRunner, or a MultiPlanRunner, depending
-     * on the cache/query solver/etc.
+     * For a given query, get a runner.  The runner could be a SingleSolutionRunner, a
+     * CachedQueryRunner, or a MultiPlanRunner, depending on the cache/query solver/etc.
      */
     Status getRunner(QueryMessage& q, Runner** out) {
         CanonicalQuery* rawCanonicalQuery = NULL;
@@ -70,21 +79,13 @@ namespace mongo {
         }
 
         if (1 == solutions.size()) {
-            // Only one possible plan.  Run it.  Cache it as well.  If we only found one solution
-            // now, we're only going to find one solution later.
-            auto_ptr<PlanRankingDecision> why(new PlanRankingDecision());
-            why->onlyOneSolution = true;
-
-            // Build the stages from the solution.
+            // Only one possible plan.  Run it.  Build the stages from the solution.
             WorkingSet* ws;
             PlanStage* root;
             verify(StageBuilder::build(*solutions[0], &root, &ws));
 
-            // Cache the solution.  Takes ownership of all arguments.
-            localCache->add(canonicalQuery.release(), solutions[0], why.release());
-
             // And, run the plan.
-            *out = new SimplePlanRunner(ws, root);
+            *out = new SingleSolutionRunner(canonicalQuery.release(), solutions[0], root, ws);
             return Status::OK();
         }
         else {
@@ -100,6 +101,123 @@ namespace mongo {
             *out = mpr.release();
             return Status::OK();
         }
+    }
+
+    /**
+     * Also called by db/ops/query.cpp.  This is the new getMore entry point.
+     */
+    QueryResult* newGetMore(const char* ns, int ntoreturn, long long cursorid, CurOp& curop,
+                            int pass, bool& exhaust, bool* isCursorAuthorized) {
+        exhaust = false;
+        int bufSize = 512 + sizeof(QueryResult) + MaxBytesToReturnToClientAtOnce;
+
+        BufBuilder bb(bufSize);
+        bb.skip(sizeof(QueryResult));
+
+        // This is a read lock.  TODO: There is a cursor flag for not needing this.  Do we care?
+        Client::ReadContext ctx(ns);
+
+        // TODO: Document.
+        replVerifyReadsOk();
+
+        ClientCursorPin ccPin(cursorid);
+        ClientCursor* cc = ccPin.c();
+
+        // These are set in the QueryResult msg we return.
+        int resultFlags = ResultFlag_AwaitCapable;
+
+        int numResults = 0;
+        int startingResult = 0;
+
+        if (NULL == cc) {
+            cursorid = 0;
+            resultFlags = ResultFlag_CursorNotFound;
+        }
+        else {
+            // Quote: check for spoofing of the ns such that it does not match the one originally
+            // there for the cursor
+            uassert(17011, "auth error", str::equals(ns, cc->ns().c_str()));
+            *isCursorAuthorized = true;
+
+            // TODO: fail point?
+
+            // If the operation that spawned this cursor had a time limit set, apply leftover
+            // time to this getmore.
+            curop.setMaxTimeMicros(cc->getLeftoverMaxTimeMicros());
+            // TODO:
+            // curop.debug().query = BSONForQuery
+            // curop.setQuery(curop.debug().query);
+
+            // TODO: What is pass?
+            if (0 == pass) { cc->updateSlaveLocation(curop); }
+
+            CollectionMetadataPtr collMetadata = cc->getCollMetadata();
+
+            // If we're replaying the oplog, we save the last time that we read.
+            OpTime slaveReadTill;
+
+            startingResult = cc->pos();
+
+            Runner* runner = cc->getRunner();
+            const ParsedQuery& pq = runner->getQuery().getParsed();
+
+            // Get results out of the runner.
+            // TODO: There may be special handling required for tailable cursors?
+            runner->restoreState();
+            BSONObj obj;
+            // TODO: Differentiate EOF from error.
+            while (runner->getNext(&obj)) {
+                // If we're sharded make sure that we don't return any data that hasn't been
+                // migrated off of our shard yet.
+                if (collMetadata) {
+                    KeyPattern kp(collMetadata->getKeyPattern());
+                    if (!collMetadata->keyBelongsToMe(kp.extractSingleKey(obj))) { continue; }
+                }
+
+                // Add result to output buffer.
+                bb.appendBuf((void*)obj.objdata(), obj.objsize());
+
+                // Count the result.
+                ++numResults;
+
+                // Possibly note slave's position in the oplog.
+                if (pq.hasOption(QueryOption_OplogReplay)) {
+                    BSONElement e = obj["ts"];
+                    if (Date == e.type() || Timestamp == e.type()) {
+                        slaveReadTill = e._opTime();
+                    }
+                }
+
+                if ((numResults && numResults >= ntoreturn)
+                    || bb.len() > MaxBytesToReturnToClientAtOnce) {
+                    break;
+                }
+            }
+
+            cc->incPos(numResults);
+            runner->saveState();
+
+            // Possibly note slave's position in the oplog.
+            if (pq.hasOption(QueryOption_OplogReplay) && !slaveReadTill.isNull()) {
+                cc->slaveReadTill(slaveReadTill);
+            }
+
+            exhaust = pq.hasOption(QueryOption_Exhaust);
+
+            // If the getmore had a time limit, remaining time is "rolled over" back to the
+            // cursor (for use by future getmore ops).
+            cc->setLeftoverMaxTimeMicros( curop.getRemainingMaxTimeMicros() );
+        }
+
+        QueryResult* qr = reinterpret_cast<QueryResult*>(bb.buf());
+        qr->len = bb.len();
+        qr->setOperation(opReply);
+        qr->_resultFlags() = resultFlags;
+        qr->cursorId = cursorid;
+        qr->startingFrom = startingResult;
+        qr->nReturned = numResults;
+        bb.decouple();
+        return qr;
     }
 
     /**
@@ -119,17 +237,133 @@ namespace mongo {
         verify(NULL != rawRunner);
         auto_ptr<Runner> runner(rawRunner);
 
+        // We freak out later if this changes before we're done with the query.
+        const ChunkVersion shardingVersionAtStart = shardingState.getVersion(q.ns);
+
+        // We use this a lot below.
+        const ParsedQuery& pq = runner->getQuery().getParsed();
+
+        // TODO: Document why we do this.
+        replVerifyReadsOk(&pq);
+
+        // If this exists, the collection is sharded.
+        // If it doesn't exist, we can assume we're not sharded.
+        // If we're sharded, we might encounter data that is not consistent with our sharding state.
+        // We must ignore this data.
+        CollectionMetadataPtr collMetadata;
+        if (!shardingState.needCollectionMetadata(pq.ns())) {
+            collMetadata = CollectionMetadataPtr();
+        }
+        else {
+            collMetadata = shardingState.getCollectionMetadata(pq.ns());
+        }
+
         // Run the query.
         BufBuilder bb(32768);
         bb.skip(sizeof(QueryResult));
+
+        // How many results have we obtained from the runner?
         int numResults = 0;
 
-        // Yielding is handled within the runner, as is page faulting.
-        // TODO: pay attention to numWanted.
+        // If we're replaying the oplog, we save the last time that we read.
+        OpTime slaveReadTill;
+
+        // Do we save the Runner in a ClientCursor for getMore calls later?
+        bool saveClientCursor = false;
+
         BSONObj obj;
+        // TODO: Differentiate EOF from error.
         while (runner->getNext(&obj)) {
+            // If we're sharded make sure that we don't return any data that hasn't been migrated
+            // off of our shared yet.
+            if (collMetadata) {
+                // This information can change if we yield and as such we must make sure to re-fetch
+                // it if we yield.
+                KeyPattern kp(collMetadata->getKeyPattern());
+                // This performs excessive BSONObj creation but that's OK for now.
+                if (!collMetadata->keyBelongsToMe(kp.extractSingleKey(obj))) { continue; }
+            }
+
+            // Add result to output buffer.
             bb.appendBuf((void*)obj.objdata(), obj.objsize());
+
+            // Count the result.
             ++numResults;
+
+            // Possibly note slave's position in the oplog.
+            if (pq.hasOption(QueryOption_OplogReplay)) {
+                BSONElement e = obj["ts"];
+                if (Date == e.type() || Timestamp == e.type()) {
+                    slaveReadTill = e._opTime();
+                }
+            }
+
+            // TODO: only one type of 2d search doesn't support this.  We need a way to pull it out
+            // of CanonicalQuery. :(
+            const bool supportsGetMore = true;
+            const bool isExplain = pq.isExplain();
+            if (isExplain && pq.enoughForExplain(numResults)) {
+                break;
+            }
+            else if (!supportsGetMore && (pq.enough(numResults)
+                                          || bb.len() >= MaxBytesToReturnToClientAtOnce)) {
+                break;
+            }
+            else if (pq.enoughForFirstBatch(numResults, bb.len())) {
+                // If only one result requested assume it's a findOne() and don't save the cursor.
+                if (pq.wantMore() && 1 != pq.getNumToReturn()) {
+                    saveClientCursor = true;
+                }
+                break;
+            }
+        }
+
+        // TODO: Stage creation can set tailable depending on what's in the parsed query.  We have
+        // the full parsed query available during planning...set it there.
+        //
+        // TODO: If we're tailable we want to save the client cursor.  Make sure we do this later.
+        //if (pq.hasOption(QueryOption_CursorTailable) && pq.getNumToReturn() != 1) { ... }
+
+        // TODO(greg): This will go away soon.
+        if (!shardingState.getVersion(pq.ns()).isWriteCompatibleWith(shardingVersionAtStart)) {
+            // if the version changed during the query we might be missing some data and its safe to
+            // send this as mongos can resend at this point
+            throw SendStaleConfigException(pq.ns(), "version changed during initial query",
+                                           shardingVersionAtStart,
+                                           shardingState.getVersion(pq.ns()));
+        }
+
+        long long ccId = 0;
+        if (saveClientCursor) {
+            // Allocate a new ClientCursor.
+            ClientCursorHolder ccHolder;
+            ccHolder.reset(new ClientCursor(runner.get()));
+            ccId = ccHolder->cursorid();
+
+            // We won't use the runner until it's getMore'd.
+            runner->saveState();
+
+            // ClientCursor takes ownership of runner.  Release to make sure it's not deleted.
+            runner.release();
+
+            if (pq.hasOption(QueryOption_OplogReplay) && !slaveReadTill.isNull()) {
+                ccHolder->slaveReadTill(slaveReadTill);
+            }
+
+            if (pq.hasOption(QueryOption_Exhaust)) {
+                curop.debug().exhaust = true;
+            }
+
+            // Set attributes for getMore.
+            ccHolder->setCollMetadata(collMetadata);
+            ccHolder->setPos(numResults);
+
+            // If the query had a time limit, remaining time is "rolled over" to the cursor (for
+            // use by future getmore ops).
+            ccHolder->setLeftoverMaxTimeMicros(curop.getRemainingMaxTimeMicros());
+
+            // Give up our reference to the CC.
+            ccHolder.release();
         }
 
         // Add the results from the query into the output buffer.
@@ -138,16 +372,19 @@ namespace mongo {
 
         // Fill out the output buffer's header.
         QueryResult* qr = static_cast<QueryResult*>(result.header());
-        // TODO: Figure out how to make this work with a clientcursor
-        qr->cursorId = 0;
+        qr->cursorId = ccId;
+        curop.debug().cursorid = (0 == ccId ? -1 : ccId);
         qr->setResultFlagsToOk();
         qr->setOperation(opReply);
         qr->startingFrom = 0;
         qr->nReturned = numResults;
-        // TODO: set curop.debug() fields.
+        // TODO: nscanned is bogus.
+        // curop.debug().nscanned = ( cursor ? cursor->nscanned() : 0LL );
+        curop.debug().ntoskip = pq.getSkip();
+        curop.debug().nreturned = numResults;
 
-        // TODO: what's this?  we either return the ns or we return "".
-        return "";
+        // curop.debug().exhaust is set above.
+        return curop.debug().exhaust ? pq.ns() : "";
     }
 
 }  // namespace mongo

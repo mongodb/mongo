@@ -40,6 +40,7 @@ namespace mongo {
         //
         MatchExpression* root() const { return _root.get(); }
         BSONObj getQueryObj() const { return _pq->getFilter(); }
+        const ParsedQuery& getParsed() const { return *_pq; }
 
         string toString() const;
 

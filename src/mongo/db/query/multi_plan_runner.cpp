@@ -38,18 +38,18 @@ namespace mongo {
         _candidates.push_back(CandidatePlan(solution, root, ws));
     }
 
-    void MultiPlanRunner::yield() {
+    void MultiPlanRunner::saveState() {
         if (NULL != _bestPlanRunner) {
-            _bestPlanRunner->yield();
+            _bestPlanRunner->saveState();
         }
         else {
             yieldAllPlans();
         }
     }
 
-    void MultiPlanRunner::unYield() {
+    void MultiPlanRunner::restoreState() {
         if (NULL != _bestPlanRunner) {
-            _bestPlanRunner->yield();
+            _bestPlanRunner->restoreState();
         }
         else {
             unyieldAllPlans();

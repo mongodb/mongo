@@ -28,6 +28,13 @@ namespace mongo {
         // TODO: ParsedQuery throws.  Fix it to return error.
         cq->_pq.reset(new ParsedQuery(qm));
 
+        // TODO: If pq.hasOption(QueryOption_CursorTailable) make sure it's a capped collection and
+        // make sure the order(??) is $natural: 1.
+
+        // TODO: Do we want to do this too?:
+        //if ( pq.getFields() != NULL )
+        //    pq.getFields()->validateQuery( query );
+
         StatusWithMatchExpression swme = MatchExpressionParser::parse(cq->_pq->getFilter());
         if (!swme.isOK()) {
             return swme.getStatus();

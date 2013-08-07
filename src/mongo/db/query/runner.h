@@ -16,6 +16,8 @@
 
 #pragma once
 
+#include "mongo/db/query/canonical_query.h"
+
 namespace mongo {
 
     /**
@@ -39,11 +41,13 @@ namespace mongo {
          */
         virtual void invalidate(const DiskLoc& dl) = 0;
 
+        virtual void saveState() = 0;
+        virtual void restoreState() = 0;
+
         /**
-         * TODO: Kill these once yielding is controlled inside of a runner.
+         * Return the query that the runner is running.
          */
-        virtual void yield() = 0;
-        virtual void unYield() = 0;
+        virtual const CanonicalQuery& getQuery() = 0;
     };
 
 }  // namespace mongo

@@ -67,9 +67,13 @@ namespace mongo {
          */
         bool pickBestPlan(size_t* out);
 
-        virtual void yield();
-        virtual void unYield();
+        virtual void saveState();
+        virtual void restoreState();
         virtual void invalidate(const DiskLoc& dl);
+
+        virtual const CanonicalQuery& getQuery() {
+            return *_query;
+        }
 
     private:
         /**
