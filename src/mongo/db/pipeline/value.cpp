@@ -680,7 +680,7 @@ namespace mongo {
         }
 
         case Object:
-            getDocument()->hash_combine(seed);
+            getDocument().hash_combine(seed);
             break;
 
         case Array: {
@@ -777,7 +777,7 @@ namespace mongo {
                                         : sizeof(RCString) + _storage.getString().size());
 
         case Object:
-            return sizeof(Value) + getDocument()->getApproximateSize();
+            return sizeof(Value) + getDocument().getApproximateSize();
 
         case Array: {
             size_t size = sizeof(Value);
@@ -839,7 +839,7 @@ namespace mongo {
         case Undefined: return out << "undefined";
         case Date: return out << tmToISODateString(val.coerceToTm());
         case Timestamp: return out << val.getTimestamp().toString();
-        case Object: return out << val.getDocument()->toString();
+        case Object: return out << val.getDocument().toString();
         case Array: {
             out << "[";
             const size_t n = val.getArray().size();

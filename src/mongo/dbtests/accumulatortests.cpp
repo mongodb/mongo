@@ -29,9 +29,7 @@ namespace AccumulatorTests {
     class Base {
     protected:
         BSONObj fromDocument( const Document& document ) {
-            BSONObjBuilder bob;
-            document->toBson( &bob );
-            return bob.obj();
+            return document.toBson();
         }
         BSONObj fromValue( const Value& value ) {
             BSONObjBuilder bob;

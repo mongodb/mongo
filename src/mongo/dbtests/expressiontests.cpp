@@ -67,14 +67,12 @@ namespace ExpressionTests {
 
     /** Convert Document to BSON. */
     static BSONObj toBson( const Document& document ) {
-        BSONObjBuilder bob;
-        document->toBson( &bob );
-        return bob.obj();
+        return document.toBson();
     }
     
     /** Create a Document from a BSONObj. */
     Document fromBson( BSONObj obj ) {
-        return Document::createFromBsonObj( &obj );
+        return Document(obj);
     }
 
     /** Create a Value from a BSONObj. */

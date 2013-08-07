@@ -1084,7 +1084,7 @@ namespace mongo {
                 Value pValue(expr->evaluateInternal(vars));
 
                 // don't add field if nothing was found in the subobject
-                if (exprObj && pValue.getDocument()->getFieldCount() == 0)
+                if (exprObj && pValue.getDocument().empty())
                     continue;
 
                 /*
@@ -1161,7 +1161,7 @@ namespace mongo {
 
             // don't add field if nothing was found in the subobject
             if (dynamic_cast<ExpressionObject*>(it->second.get())
-                    && pValue.getDocument()->getFieldCount() == 0)
+                    && pValue.getDocument().empty())
                 continue;
 
 

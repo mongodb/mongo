@@ -37,13 +37,11 @@ namespace DocumentTests {
         using mongo::Document;
 
         BSONObj toBson( const Document& document ) {
-            BSONObjBuilder bob;
-            document->toBson( &bob );
-            return bob.obj();
+            return document.toBson();
         }
 
         Document fromBson( BSONObj obj ) {
-            return Document::createFromBsonObj( &obj );
+            return Document(obj);
         }
 
         void assertRoundTrips( const Document& document1 ) {
@@ -59,7 +57,7 @@ namespace DocumentTests {
         public:
             void run() {
                 Document document;
-                ASSERT_EQUALS( 0U, document->getFieldCount() );
+                ASSERT_EQUALS( 0U, document.size() );
                 assertRoundTrips( document );
             }
         };
@@ -69,9 +67,9 @@ namespace DocumentTests {
         public:
             void run() {
                 Document document = fromBson( BSONObj() );
-                ASSERT_EQUALS( 0U, document->getFieldCount() );
+                ASSERT_EQUALS( 0U, document.size() );
                 document = fromBson( BSON( "a" << 1 << "b" << "q" ) );
-                ASSERT_EQUALS( 2U, document->getFieldCount() );
+                ASSERT_EQUALS( 2U, document.size() );
                 ASSERT_EQUALS( "a", getNthField(document, 0).first.toString() );
                 ASSERT_EQUALS( 1,   getNthField(document, 0).second.getInt() );
                 ASSERT_EQUALS( "b", getNthField(document, 1).first.toString() );
@@ -86,16 +84,16 @@ namespace DocumentTests {
             void run() {
                 MutableDocument md;
                 md.addField( "foo", Value( 1 ) );
-                ASSERT_EQUALS( 1U, md.peek().getFieldCount() );
-                ASSERT_EQUALS( 1, md.peek().getValue( "foo" ).getInt() );
+                ASSERT_EQUALS( 1U, md.peek().size() );
+                ASSERT_EQUALS( 1, md.peek()["foo"].getInt() );
                 md.addField( "bar", Value( 99 ) );
-                ASSERT_EQUALS( 2U, md.peek().getFieldCount() );
-                ASSERT_EQUALS( 99, md.peek().getValue( "bar" ).getInt() );
+                ASSERT_EQUALS( 2U, md.peek().size() );
+                ASSERT_EQUALS( 99, md.peek()["bar"].getInt() );
                 // No assertion is triggered by a duplicate field name.
                 md.addField( "a", Value( 5 ) );
 
                 Document final = md.freeze();
-                ASSERT_EQUALS( 3U, final.getFieldCount() );
+                ASSERT_EQUALS( 3U, final.size() );
                 assertRoundTrips( final );
             }
         };
@@ -105,13 +103,13 @@ namespace DocumentTests {
         public:
             void run() {
                 Document document = fromBson( BSON( "a" << 1 << "b" << 2.2 ) );
-                ASSERT_EQUALS( 1, document->getValue( "a" ).getInt() );
-                ASSERT_EQUALS( 1, document->getField( "a" ).getInt() );
-                ASSERT_EQUALS( 2.2, document->getValue( "b" ).getDouble() );
-                ASSERT_EQUALS( 2.2, document->getField( "b" ).getDouble() );
+                ASSERT_EQUALS( 1, document["a"].getInt() );
+                ASSERT_EQUALS( 1, document["a"].getInt() );
+                ASSERT_EQUALS( 2.2, document["b"].getDouble() );
+                ASSERT_EQUALS( 2.2, document["b"].getDouble() );
                 // Missing field.
-                ASSERT( document->getValue( "c" ).missing() );
-                ASSERT( document->getField( "c" ).missing() );
+                ASSERT( document["c"].missing() );
+                ASSERT( document["c"].missing() );
                 assertRoundTrips( document );
             }
         };
@@ -131,42 +129,42 @@ namespace DocumentTests {
 
                 // Set the first field.
                 md.setField( "a" , Value( "foo" ) );
-                ASSERT_EQUALS( 3U, md.peek().getFieldCount() );
-                ASSERT_EQUALS( "foo", md.peek().getValue( "a" ).getString() );
+                ASSERT_EQUALS( 3U, md.peek().size() );
+                ASSERT_EQUALS( "foo", md.peek()["a"].getString() );
                 ASSERT_EQUALS( "foo", getNthField(md.peek(), 0).second.getString() );
                 assertRoundTrips( md.peek() );
                 // Set the second field.
                 md["b"] = Value("bar");
-                ASSERT_EQUALS( 3U, md.peek().getFieldCount() );
-                ASSERT_EQUALS( "bar", md.peek().getValue( "b" ).getString() );
+                ASSERT_EQUALS( 3U, md.peek().size() );
+                ASSERT_EQUALS( "bar", md.peek()["b"].getString() );
                 ASSERT_EQUALS( "bar", getNthField(md.peek(), 1).second.getString() );
                 assertRoundTrips( md.peek() );
 
                 // Remove the second field.
                 md.setField("b", Value());
                 PRINT(md.peek().toString());
-                ASSERT_EQUALS( 2U, md.peek().getFieldCount() );
-                ASSERT( md.peek().getValue( "b" ).missing() );
+                ASSERT_EQUALS( 2U, md.peek().size() );
+                ASSERT( md.peek()["b"].missing() );
                 ASSERT_EQUALS( "a", getNthField(md.peek(), 0 ).first.toString() );
                 ASSERT_EQUALS( "c", getNthField(md.peek(), 1 ).first.toString() );
-                ASSERT_EQUALS( 99, md.peek().getValue("c").getInt() );
+                ASSERT_EQUALS( 99, md.peek()["c"].getInt() );
                 assertRoundTrips( md.peek() );
 
                 // Remove the first field.
                 md["a"] = Value();
-                ASSERT_EQUALS( 1U, md.peek().getFieldCount() );
-                ASSERT( md.peek().getValue( "a" ).missing() );
+                ASSERT_EQUALS( 1U, md.peek().size() );
+                ASSERT( md.peek()["a"].missing() );
                 ASSERT_EQUALS( "c", getNthField(md.peek(), 0 ).first.toString() );
-                ASSERT_EQUALS( 99, md.peek().getValue("c").getInt() );
+                ASSERT_EQUALS( 99, md.peek()["c"].getInt() );
                 assertRoundTrips( md.peek() );
 
                 // Remove the final field. Verify document is empty.
                 md.remove("c");
                 ASSERT( md.peek().empty() );
-                ASSERT_EQUALS( 0U, md.peek().getFieldCount() );
+                ASSERT_EQUALS( 0U, md.peek().size() );
                 ASSERT_EQUALS( md.peek(), Document() );
                 ASSERT( !FieldIterator(md.peek()).more() );
-                ASSERT( md.peek().getValue( "c" ).missing() );
+                ASSERT( md.peek()["c"].missing() );
                 assertRoundTrips( md.peek() );
 
                 // Make sure nothing moved
@@ -210,7 +208,7 @@ namespace DocumentTests {
             }
             size_t hash( const BSONObj& obj ) {
                 size_t seed = 0x106e1e1;
-                fromBson( obj )->hash_combine( seed );
+                Document(obj).hash_combine(seed);
                 return seed;
             }
         };
@@ -238,20 +236,20 @@ namespace DocumentTests {
                 // Check equality.
                 ASSERT_EQUALS(document, cloneOnDemand.peek());
                 // Check pointer equality of sub document.
-                ASSERT_EQUALS( document->getValue( "a" ).getDocument().getPtr(),
-                               cloneOnDemand.peek().getValue( "a" ).getDocument().getPtr() );
+                ASSERT_EQUALS( document["a"].getDocument().getPtr(),
+                               cloneOnDemand.peek()["a"].getDocument().getPtr() );
 
 
                 // Change field in clone and ensure the original document's field is unchanged.
                 cloneOnDemand.setField( StringData("a"), Value(2) );
-                ASSERT_EQUALS( Value(1), document->getNestedField(FieldPath("a.b")) );
+                ASSERT_EQUALS( Value(1), document.getNestedField(FieldPath("a.b")) );
 
 
                 // setNestedField and ensure the original document is unchanged.
 
                 cloneOnDemand.reset(document);
                 vector<Position> path;
-                ASSERT_EQUALS( Value(1), document->getNestedField(FieldPath("a.b"), &path) );
+                ASSERT_EQUALS( Value(1), document.getNestedField(FieldPath("a.b"), &path) );
 
                 cloneOnDemand.setNestedField(path, Value(2));
 
@@ -268,7 +266,7 @@ namespace DocumentTests {
             void run() {
                 Document document =
                         fromBson( fromjson( "{a:1,b:['ra',4],c:{z:1},d:'lal'}" ) );
-                Document clonedDocument = document->clone();
+                Document clonedDocument = document.clone();
                 ASSERT_EQUALS(document, clonedDocument);
             }
         };
@@ -538,9 +536,9 @@ namespace DocumentTests {
                 // Check document pointers are equal.
                 ASSERT_EQUALS( document.getPtr(), value.getDocument().getPtr() );
                 // Check document contents.
-                ASSERT_EQUALS( 5, document->getValue( "a" ).getInt() );
-                ASSERT_EQUALS( "rrr", document->getValue( "apple" ).getString() );
-                ASSERT_EQUALS( -.3, document->getValue( "banana" ).getDouble() );
+                ASSERT_EQUALS( 5, document["a"].getInt() );
+                ASSERT_EQUALS( "rrr", document["apple"].getString() );
+                ASSERT_EQUALS( -.3, document["banana"].getDouble() );
                 ASSERT_EQUALS( Object, value.getType() );                
                 assertRoundTrips( value );
             }

@@ -683,9 +683,7 @@ namespace DocumentSourceTests {
                 // resulting from incorrectly shared sub objects).
                 BSONArrayBuilder bsonResultSet;
                 for( IdMap::const_iterator i = resultSet.begin(); i != resultSet.end(); ++i ) {
-                    BSONObjBuilder bob;
-                    i->second->toBson( &bob );
-                    bsonResultSet << bob.obj();
+                    bsonResultSet << i->second;
                 }
                 // Check the result set.
                 ASSERT_EQUALS( expectedResultSet(), bsonResultSet.arr() );
@@ -1124,10 +1122,8 @@ namespace DocumentSourceTests {
                 // resulting from incorrectly shared sub objects).
                 BSONArrayBuilder bsonResultSet;
                 for( vector<Document>::const_iterator i = resultSet.begin();
-                    i != resultSet.end(); ++i ) {
-                    BSONObjBuilder bob;
-                    (*i)->toBson( &bob );
-                    bsonResultSet << bob.obj();
+                        i != resultSet.end(); ++i ) {
+                    bsonResultSet << *i;
                 }
                 // Check the result set.
                 ASSERT_EQUALS( expectedResultSet(), bsonResultSet.arr() );
@@ -1420,10 +1416,8 @@ namespace DocumentSourceTests {
                 // resulting from incorrectly shared sub objects).
                 BSONArrayBuilder bsonResultSet;
                 for( vector<Document>::const_iterator i = resultSet.begin();
-                     i != resultSet.end(); ++i ) {
-                    BSONObjBuilder bob;
-                    (*i)->toBson( &bob );
-                    bsonResultSet << bob.obj();
+                        i != resultSet.end(); ++i ) {
+                    bsonResultSet << *i;
                 }
                 // Check the result set.
                 ASSERT_EQUALS( expectedResultSet(), bsonResultSet.arr() );

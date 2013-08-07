@@ -150,23 +150,15 @@ namespace mongo {
         int memUsageForSorter() const { return getApproximateSize(); }
         Document getOwned() const { return *this; }
 
-        // TEMP for compatibility with legacy intrusive_ptr<Document>
-              Document& operator*()       { return *this; }
-        const Document& operator*() const { return *this; }
-              Document* operator->()       { return this; }
-        const Document* operator->() const { return this; }
+        /// only for testing
         const void* getPtr() const { return _storage.get(); }
-        void reset() { return _storage.reset(); }
-        static Document createFromBsonObj(BSONObj* pBsonObj) { return Document(*pBsonObj); }
-        size_t getFieldCount() const { return size(); }
-        Value getValue(StringData fieldName) const { return getField(fieldName); }
-
-        explicit Document(const DocumentStorage* ptr) : _storage(ptr) {};
 
     private:
         friend class FieldIterator;
         friend class ValueStorage;
         friend class MutableDocument;
+
+        explicit Document(const DocumentStorage* ptr) : _storage(ptr) {};
 
         const DocumentStorage& storage() const {
             return (_storage ? *_storage : DocumentStorage::emptyDoc());
