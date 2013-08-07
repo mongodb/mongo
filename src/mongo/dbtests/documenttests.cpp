@@ -51,7 +51,7 @@ namespace DocumentTests {
             Document document2 = fromBson( obj1 );
             BSONObj obj2 = toBson( document2 );
             ASSERT_EQUALS( obj1, obj2 );
-            ASSERT_EQUALS( 0, Document::compare( document1, document2 ) );
+            ASSERT_EQUALS( document1, document2 );
         }
 
         /** Create a Document. */
@@ -164,7 +164,7 @@ namespace DocumentTests {
                 md.remove("c");
                 ASSERT( md.peek().empty() );
                 ASSERT_EQUALS( 0U, md.peek().getFieldCount() );
-                ASSERT_EQUALS( 0, Document::compare(md.peek(), Document()) );
+                ASSERT_EQUALS( md.peek(), Document() );
                 ASSERT( !FieldIterator(md.peek()).more() );
                 ASSERT( md.peek().getValue( "c" ).missing() );
                 assertRoundTrips( md.peek() );
@@ -236,7 +236,7 @@ namespace DocumentTests {
                 MutableDocument cloneOnDemand (document);
 
                 // Check equality.
-                ASSERT_EQUALS( 0, Document::compare( document, cloneOnDemand.peek() ) );
+                ASSERT_EQUALS(document, cloneOnDemand.peek());
                 // Check pointer equality of sub document.
                 ASSERT_EQUALS( document->getValue( "a" ).getDocument().getPtr(),
                                cloneOnDemand.peek().getValue( "a" ).getDocument().getPtr() );
@@ -257,8 +257,8 @@ namespace DocumentTests {
 
                 ASSERT_EQUALS( Value(1), document.getNestedField(FieldPath("a.b")) );
                 ASSERT_EQUALS( Value(2), cloneOnDemand.peek().getNestedField(FieldPath("a.b")) );
-                ASSERT_EQUALS( BSON( "a" << BSON( "b" << 1 ) ), toBson( document ) );
-                ASSERT_EQUALS( BSON( "a" << BSON( "b" << 2 ) ), toBson( cloneOnDemand.freeze() ) );
+                ASSERT_EQUALS( DOC( "a" << DOC( "b" << 1 ) ), document );
+                ASSERT_EQUALS( DOC( "a" << DOC( "b" << 2 ) ), cloneOnDemand.freeze() );
             }
         };
 
@@ -269,7 +269,7 @@ namespace DocumentTests {
                 Document document =
                         fromBson( fromjson( "{a:1,b:['ra',4],c:{z:1},d:'lal'}" ) );
                 Document clonedDocument = document->clone();
-                ASSERT_EQUALS( 0, Document::compare( document, clonedDocument ) );
+                ASSERT_EQUALS(document, clonedDocument);
             }
         };
 
@@ -371,11 +371,7 @@ namespace DocumentTests {
 
                 // logical equality
                 ASSERT_EQUALS(obj, obj2);
-                if (Document::compare(doc, doc2)) {
-                    PRINT(doc);
-                    PRINT(doc2);
-                }
-                ASSERT_EQUALS(Document::compare(doc, doc2), 0);
+                ASSERT_EQUALS(doc, doc2);
 
                 // binary equality
                 ASSERT_EQUALS(obj.objsize(), obj2.objsize());
