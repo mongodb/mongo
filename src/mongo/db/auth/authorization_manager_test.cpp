@@ -525,6 +525,8 @@ namespace {
         ASSERT(actions.empty());
         actions = v0RW->getActionsForResource("admin");
         ASSERT(actions.empty());
+        // Make sure user's refCount is 0 at the end of the test to avoid an assertion failure
+        authzManager->releaseUser(v0RW);
 
         User* v0AdminRO;
         ASSERT_OK(authzManager->acquireUser(UserName("v0AdminRO", "admin"), &v0AdminRO));
@@ -542,6 +544,8 @@ namespace {
         ASSERT(actions.contains(ActionType::listDatabases));
         ASSERT_FALSE(actions.contains(ActionType::insert));
         ASSERT_FALSE(actions.contains(ActionType::dropDatabase));
+        // Make sure user's refCount is 0 at the end of the test to avoid an assertion failure
+        authzManager->releaseUser(v0AdminRO);
     }
 
     TEST_F(AuthorizationManagerTest, testAquireV1User) {
@@ -572,6 +576,8 @@ namespace {
         ASSERT(actions.empty());
         actions = v1read->getActionsForResource("admin");
         ASSERT(actions.empty());
+        // Make sure user's refCount is 0 at the end of the test to avoid an assertion failure
+        authzManager->releaseUser(v1read);
 
         User* v1cluster;
         ASSERT_OK(authzManager->acquireUser(UserName("v1cluster", "admin"), &v1cluster));
@@ -588,6 +594,8 @@ namespace {
         ASSERT(actions.contains(ActionType::listDatabases));
         ASSERT(actions.contains(ActionType::dropDatabase));
         ASSERT_FALSE(actions.contains(ActionType::find));
+        // Make sure user's refCount is 0 at the end of the test to avoid an assertion failure
+        authzManager->releaseUser(v1cluster);
     }
 
     TEST_F(AuthorizationManagerTest, initializeAllV1UserData) {
@@ -629,6 +637,8 @@ namespace {
         ASSERT(actions.empty());
         actions = readOnly->getActionsForResource("admin");
         ASSERT(actions.empty());
+        // Make sure user's refCount is 0 at the end of the test to avoid an assertion failure
+        authzManager->releaseUser(readOnly);
 
         User* clusterAdmin;
         ASSERT_OK(authzManager->acquireUser(UserName("clusterAdmin", "$external"), &clusterAdmin));
@@ -645,6 +655,8 @@ namespace {
         ASSERT(actions.contains(ActionType::listDatabases));
         ASSERT(actions.contains(ActionType::dropDatabase));
         ASSERT_FALSE(actions.contains(ActionType::find));
+        // Make sure user's refCount is 0 at the end of the test to avoid an assertion failure
+        authzManager->releaseUser(clusterAdmin);
 
         User* multiDB;
         status = authzManager->acquireUser(UserName("readWriteMultiDB", "test2"), &multiDB);
@@ -685,6 +697,15 @@ namespace {
         ASSERT_FALSE(actions.contains(ActionType::shutdown));
         actions = multiDB->getActionsForResource("admin");
         ASSERT(actions.empty());
+        // Make sure user's refCount is 0 at the end of the test to avoid an assertion failure
+        authzManager->releaseUser(multiDB);
+
+
+        // initializeAllV1UserData() pins the users by adding 1 to their refCount, so need to
+        // release each user an extra time to bring their refCounts to 0.
+        authzManager->releaseUser(readOnly);
+        authzManager->releaseUser(clusterAdmin);
+        authzManager->releaseUser(multiDB);
     }
 }  // namespace
 }  // namespace mongo
