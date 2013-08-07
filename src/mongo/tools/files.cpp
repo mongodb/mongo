@@ -195,23 +195,26 @@ public:
 		}
             }
 
-            string out = getParam("local", tempnam(NULL, f.getFilename().c_str()));
-            f.write( out );
+	    if ((unsigned int)f.getChunkSize() != g.getChunkSize()) {
+              string out = getParam("local", tempnam(NULL, f.getFilename().c_str()));
+              f.write( out );
 
-            BSONObj file = g.storeFile(out, filename, type);
-            remove(out.c_str());
+              BSONObj file = g.storeFile(out, filename, type);
+              remove(out.c_str());
 
-            auto_ptr<DBClientCursor> cursor =
-
-            auto_ptr<DBClientCursor> cursor =
-              conn().query(_db + "." _coll + ".files",
+              auto_ptr<DBClientCursor> cursor =
+              conn().query(_db+"."+_coll+".files",
                            BSON("filename" << filename << "_id" << NE << file["_id"] ));
-            while (cursor->more()){
-                BSONObj o = cursor->nextSafe();
-                conn().remove(_db + "." + _coll + ".files", BSON("_id" << o["_id"]));
-                conn().remove(_db + "." + _coll + ".chunks", BSON("files_id" << o["_id"]));
-            }
-            conn().getLastError();
+              while (cursor->more()) {
+                  BSONObj o = cursor->nextSafe();
+                  conn().remove(_db+"."+_coll+".files", BSON("_id" << o["_id"]));
+                  conn().remove(_db+"."+_coll+".chunks", BSON("files_id" << o["_id"]));
+              }
+
+              conn().getLastError();
+            } else {
+	      cout << "Skipping file " << filename << " (already desired chunk size)" << endl;
+	    }
             return 0;
         }
 
