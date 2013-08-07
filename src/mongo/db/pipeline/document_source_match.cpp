@@ -36,7 +36,7 @@ namespace mongo {
         pBuilder->append(matchName, *pQuery);
     }
 
-    bool DocumentSourceMatch::accept(const Document& pDocument) const {
+    bool DocumentSourceMatch::accept(const Document& input) const {
 
         /*
           The matcher only takes BSON documents, so we have to make one.
@@ -49,11 +49,8 @@ namespace mongo {
           in here, and give that pDocument to create the created subset of
           fields, and then convert that instead.
         */
-        BSONObjBuilder objBuilder;
-        pDocument->toBson(&objBuilder);
-        BSONObj obj(objBuilder.done());
 
-        return matcher.matches(obj);
+        return matcher.matches(input.toBson());
     }
 
     static void uassertNoDisallowedClauses(BSONObj query) {
