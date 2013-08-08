@@ -3907,7 +3907,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="histogram_test.cpp" />
     <ClCompile Include="indexupdatetests.cpp" />
     <ClCompile Include="intervalbtreecursortests.cpp" />
-    <ClCompile Include="jsobjhashingtests.cpp" />
     <ClCompile Include="jsobjtests.cpp" />
     <ClCompile Include="jsontests.cpp" />
     <ClCompile Include="jstests.cpp" />
