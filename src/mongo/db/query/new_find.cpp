@@ -28,17 +28,20 @@
 #include "mongo/db/query/single_solution_runner.h"
 #include "mongo/db/query/stage_builder.h"
 #include "mongo/db/repl/repl_reads_ok.h"
+#include "mongo/db/server_parameters.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/d_logic.h"
 #include "mongo/s/stale_exception.h"
 
 namespace mongo {
 
+    // Server parameter
+    MONGO_EXPORT_SERVER_PARAMETER(newQueryFrameworkEnabled, bool, false);
+
+    bool isNewQueryFrameworkEnabled() { return newQueryFrameworkEnabled; }
+
     // Copied from db/ops/query.cpp.
     static const int32_t MaxBytesToReturnToClientAtOnce = 4 * 1024 * 1024;
-
-    // Used in db/ops/query.cpp.
-    bool useNewQuerySystem = false;
 
     /**
      * For a given query, get a runner.  The runner could be a SingleSolutionRunner, a
