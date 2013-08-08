@@ -24,9 +24,20 @@
 
 namespace mongo {
 
+    /**
+     * A switch to choose between old Cursor-based code and new Runner-based code.
+     */
+    bool isNewQueryFrameworkEnabled();
+
+    /**
+     * Called from the getMore entry point in ops/query.cpp.
+     */
     QueryResult* newGetMore(const char* ns, int ntoreturn, long long cursorid, CurOp& curop,
                             int pass, bool& exhaust, bool* isCursorAuthorized);
 
+    /**
+     * Called from the runQuery entry point in ops/query.cpp.
+     */
     string newRunQuery(Message& m, QueryMessage& q, CurOp& curop, Message &result);
 
 }  // namespace mongo

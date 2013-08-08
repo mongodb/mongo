@@ -43,11 +43,6 @@
 
 namespace mongo {
 
-    /**
-     * Set in db/query/new_find.cpp.  If true, use the new query system to handle queries.
-     */
-    extern bool useNewQuerySystem;
-
     /* We cut off further objects once we cross this threshold; thus, you might get
        a little bit more than this, it is a threshold rather than a limit.
     */
@@ -115,7 +110,7 @@ namespace mongo {
                                 int pass,
                                 bool& exhaust,
                                 bool* isCursorAuthorized ) {
-        if (useNewQuerySystem) {
+        if (isNewQueryFrameworkEnabled()) {
             return newGetMore(ns, ntoreturn, cursorid, curop, pass, exhaust, isCursorAuthorized);
         }
 
@@ -1065,7 +1060,7 @@ namespace mongo {
             uassert( 10110 , "bad query object", false);
         }
 
-        if (useNewQuerySystem) {
+        if (isNewQueryFrameworkEnabled()) {
             // TODO: Copy prequel curop debugging into runNewQuery
             return newRunQuery(m, q, curop, result);
         }
