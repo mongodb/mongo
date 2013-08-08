@@ -171,6 +171,7 @@ namespace mongo {
         Client& client = cc();
 
         mutablebson::Document doc;
+        mutablebson::DamageVector damages;
 
         // If we are going to be yielding, we will need a ClientCursor scoped to this loop. We
         // only loop as long as the underlying cursor is OK.
@@ -333,7 +334,6 @@ namespace mongo {
             bool objectWasChanged = false;
             BSONObj newObj;
             const char* source = NULL;
-            mutablebson::DamageVector damages;
             bool inPlace = doc.getInPlaceUpdates(&damages, &source);
             if ( inPlace && !damages.empty() && !driver->modsAffectIndices() ) {
                 nsDetails->paddingFits();
