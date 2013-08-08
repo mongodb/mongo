@@ -125,7 +125,7 @@ namespace mongo {
 
             /* if the request came from the router, we're in a shard */
             if (!strcmp(pFieldName, fromRouterName)) {
-                pCtx->setInShard(cmdElement.Bool());
+                pCtx->inShard = cmdElement.Bool();
                 continue;
             }
 
@@ -140,7 +140,7 @@ namespace mongo {
                         str::stream() << "allowDiskUsage must be a bool, not a "
                                       << typeName(cmdElement.type()),
                         cmdElement.type() == Bool);
-                pCtx->setExtSortAllowed(cmdElement.Bool());
+                pCtx->extSortAllowed = cmdElement.Bool();
                 continue;
             }
 
@@ -418,7 +418,7 @@ namespace mongo {
             pBuilder->append(explainName, explain);
         }
 
-        if (pCtx->getExtSortAllowed()) {
+        if (pCtx->extSortAllowed) {
             pBuilder->append("allowDiskUsage", true);
         }
 
@@ -452,7 +452,7 @@ namespace mongo {
           the result documents for explain.
         */
         if (explain) {
-            if (!pCtx->getInRouter())
+            if (!pCtx->inRouter)
                 writeExplainShard(result);
             else {
                 writeExplainMongos(result);
@@ -536,7 +536,7 @@ namespace mongo {
     }
 
     bool Pipeline::canRunInMongos() const {
-        if (pCtx->getExtSortAllowed())
+        if (pCtx->extSortAllowed)
             return false;
 
         if (dynamic_cast<DocumentSourceNeedsMongod*>(sources.back().get()))

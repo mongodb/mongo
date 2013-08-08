@@ -16,7 +16,6 @@
 
 #pragma once
 
-#include "mongo/pch.h"
 #include "mongo/db/interrupt_status.h"
 
 namespace mongo {
@@ -26,13 +25,13 @@ namespace mongo {
         boost::noncopyable {
     public:
         // virtuals from InterruptStatus
-        virtual void checkForInterrupt();
-        virtual const char *checkForInterruptNoAssert();
+        virtual void checkForInterrupt() const;
+        virtual const char *checkForInterruptNoAssert() const;
 
         /*
           Static singleton instance.
          */
-        static InterruptStatusMongos status;
+        static const InterruptStatusMongos status;
 
     private:
         InterruptStatusMongos();

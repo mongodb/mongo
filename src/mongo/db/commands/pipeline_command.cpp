@@ -212,7 +212,7 @@ namespace mongo {
             string ns = parseNs(db, cmdObj);
 
             intrusive_ptr<ExpressionContext> pCtx =
-                ExpressionContext::create(&InterruptStatusMongod::status, NamespaceString(ns));
+                new ExpressionContext(InterruptStatusMongod::status, NamespaceString(ns));
 
             /* try to parse the command; if this fails, then we didn't run */
             intrusive_ptr<Pipeline> pPipeline = Pipeline::parseCommand(errmsg, cmdObj, pCtx);
@@ -227,7 +227,7 @@ namespace mongo {
 #if _DEBUG
             // This is outside of the if block to keep the object alive until the pipeline is finished.
             BSONObj parsed;
-            if (!pPipeline->isExplain() && !pCtx->getInShard()) {
+            if (!pPipeline->isExplain() && !pCtx->inShard) {
                 // Make sure all operations round-trip through Pipeline::toBson()
                 // correctly by reparsing every command on DEBUG builds. This is
                 // important because sharded aggregations rely on this ability.
@@ -281,7 +281,7 @@ namespace mongo {
                                   intrusive_ptr<Pipeline>& pPipeline,
                                   intrusive_ptr<ExpressionContext>& pCtx) {
             /* setup as if we're in the router */
-            pCtx->setInRouter(true);
+            pCtx->inRouter = true;
 
             /*
             Here, we'll split the pipeline in the same way we would for sharding,
@@ -315,8 +315,8 @@ namespace mongo {
             }
 
             /* on the shard servers, create the local pipeline */
-            intrusive_ptr<ExpressionContext> pShardCtx(
-                ExpressionContext::create(&InterruptStatusMongod::status, NamespaceString(ns)));
+            intrusive_ptr<ExpressionContext> pShardCtx =
+                new ExpressionContext(InterruptStatusMongod::status, NamespaceString(ns));
             intrusive_ptr<Pipeline> pShardPipeline(
                 Pipeline::parseCommand(errmsg, shardBson, pShardCtx));
             if (!pShardPipeline.get()) {

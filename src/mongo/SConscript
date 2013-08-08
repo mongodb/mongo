@@ -341,7 +341,6 @@ env.StaticLibrary("coredb", [
         "db/pipeline/document_source_sort.cpp",
         "db/pipeline/document_source_unwind.cpp",
         "db/pipeline/expression.cpp",
-        "db/pipeline/expression_context.cpp",
         "db/pipeline/field_path.cpp",
         "db/pipeline/value.cpp",
         "db/projection.cpp",

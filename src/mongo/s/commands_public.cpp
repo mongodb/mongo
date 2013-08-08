@@ -1828,8 +1828,8 @@ namespace mongo {
             const string fullns = parseNs(dbName, cmdObj);
 
             intrusive_ptr<ExpressionContext> pExpCtx =
-                ExpressionContext::create(&InterruptStatusMongos::status, NamespaceString(fullns));
-            pExpCtx->setInRouter(true);
+                new ExpressionContext(InterruptStatusMongos::status, NamespaceString(fullns));
+            pExpCtx->inRouter = true;
 
             /* parse the pipeline specification */
             intrusive_ptr<Pipeline> pPipeline(
