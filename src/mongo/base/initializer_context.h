@@ -19,7 +19,6 @@
 #include <string>
 #include <vector>
 
-#include "mongo/base/configuration_variable_manager.h"
 #include "mongo/base/disallow_copying.h"
 
 namespace mongo {
@@ -37,17 +36,14 @@ namespace mongo {
         typedef std::map<std::string, std::string> EnvironmentMap;
 
         InitializerContext(const ArgumentVector& args,
-                           const EnvironmentMap& env,
-                           const ConfigurationVariableManager* configVariables);
+                           const EnvironmentMap& env);
 
         const ArgumentVector& args() const { return _args; }
         const EnvironmentMap& env() const { return _env; }
-        const ConfigurationVariableManager* configurationVariables() { return _configVariables; }
 
     private:
         ArgumentVector _args;
         EnvironmentMap _env;
-        const ConfigurationVariableManager* _configVariables;
     };
 
 }  // namespace mongo

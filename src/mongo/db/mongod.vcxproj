@@ -1909,17 +1909,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
       <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">..\..\third_party\v8\src</AdditionalIncludeDirectories>
     </ClCompile>
     <ClCompile Include="..\..\third_party\v8\src\zone.cc" />
-    <ClCompile Include="..\base\configuration_variable_manager.cpp" />
-    <ClCompile Include="..\base\configuration_variable_manager_test.cpp">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">true</ExcludedFromBuild>
-    </ClCompile>
     <ClCompile Include="..\base\counter_test.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
@@ -4164,7 +4153,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     </ClInclude>
     <ClInclude Include="..\..\third_party\v8\src\zone-inl.h" />
     <ClInclude Include="..\..\third_party\v8\src\zone.h" />
-    <ClInclude Include="..\base\configuration_variable_manager.h" />
     <ClInclude Include="..\base\counter.h" />
     <ClInclude Include="..\base\disallow_copying.h" />
     <ClInclude Include="..\base\error_codes.h" />

@@ -14,7 +14,7 @@
  */
 
 /**
- * Utility macros for declaring global initializers and configurable variables.
+ * Utility macros for declaring global initializers
  *
  * Should NOT be included by other header files.  Include only in source files.
  *
@@ -24,33 +24,10 @@
  * Initializer functions take a parameter of type ::mongo::InitializerContext*, and return
  * a Status.  Any status other than Status::OK() is considered a failure that will stop further
  * intializer processing.
- *
- * Global configuration variables are declared and set using initializers and a few groups.  All
- * global configuration declarations have "globalVariableConfigurationStarted" as a prerequisite,
- * and "globalVariablesDeclared" as a dependent.  The easiest way for programs to then configure
- * those values to non-default settings is to use the MONGO_CONFIG_VARIABLE_SETTER macro
- * to declare exactly one function that has "globalVariablesDeclared" as a prerequisite and
- * "globalVariablesSet" as a dependent.
- *
- * Initializers that wish to use configurable global variables must have "globalVariablesConfigured"
- * as a direct or indirect prerequisite.  The "default" prerequisite depends on
- * "globalVariablesConfigured", so most initializer functions can safely use global configurable
- * variables.
- *
- * Programmers may validate global variables after they are set using an initializer declared as
- * MONGO_CONFIG_VARIABLE_VALIDATOR, which has "globalVariablesSet" as prerequisite and
- * "globalVariablesConfigured" as dependent.
- *
- * In summary, the following partial order is provided:
- *    All MONGO_CONFIG_VARIABLE_REGISTER()s are evaluated before
- *    The MONGO_CONFIG_VARIABLE_SETTER is evaluated before
- *    All MONGO_CONFIG_VARIABLE_VALIDATORs are evaluated before
- *    Things dependent on "default" are evaluated.
  */
 
 #pragma once
 
-#include "mongo/base/configuration_variable_manager.h"
 #include "mongo/base/initializer.h"
 #include "mongo/base/initializer_context.h"
 #include "mongo/base/initializer_function.h"
@@ -147,43 +124,6 @@
 #define MONGO_INITIALIZER_GROUP(NAME, PREREQUISITES, DEPENDENTS)        \
     MONGO_INITIALIZER_GENERAL(NAME, PREREQUISITES, DEPENDENTS)(         \
             ::mongo::InitializerContext*) { return ::mongo::Status::OK(); }
-
-
-/**
- * Macro to register a configurable global variable.
- *
- * "NAME" is the string name through which the variable's storage may be accessed
- * in the ConfigurationVariableManager supplied as part of the InitializerContext
- * to global initializer functions.  "STORAGE" is a pointer to the location in
- * memory where the variable is stored, and "DEFAULT_VALUE" is the value to be
- * assigned as the default, at registration time (once main has started).  This
- * allows DEFAULT_VALUE to be constructed after main() begins, so some options
- * that are not available to static initializers may be available here.
- */
-#define MONGO_CONFIG_VARIABLE_REGISTER(NAME, STORAGE, DEFAULT_VALUE)      \
-    MONGO_INITIALIZER_GENERAL(cvr_##NAME,                               \
-                              ("globalVariableConfigurationStarted"), \
-                              ("globalVariablesDeclared"))(             \
-                                      ::mongo::InitializerContext* context) { \
-        *(STORAGE) = (DEFAULT_VALUE);                                   \
-        return ::mongo::getGlobalInitializer().getConfigurationVariableManager().registerVariable( \
-                #NAME, (STORAGE));                                      \
-    }
-
-/**
- * Convenience macro for functions that validate already-set values of global
- * variables.  Run after the MONGO_CONFIG_VARIABLE_SETTER completes.
- */
-#define MONGO_CONFIG_VARIABLE_VALIDATOR(NAME) \
-    MONGO_INITIALIZER_GENERAL(NAME, ("globalVariablesConfigured"), ("default"))
-
-/**
- * Convenience macro for declaring the global variable setting function.
- */
-#define MONGO_CONFIG_VARIABLE_SETTER                                    \
-    MONGO_INITIALIZER_GENERAL(globalVariableSetter,                     \
-                              ("globalVariablesDeclared"),              \
-                              ("globalVariablesSet"))
 
 /**
  * Macro to produce a name for a mongo initializer function for an initializer operation

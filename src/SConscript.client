@@ -21,7 +21,6 @@ env.Command(['mongo/db/auth/action_type.h', 'mongo/db/auth/action_type.cpp'],
             '$PYTHON $SOURCES $TARGETS')
 
 clientSourceBasic = [
-    'mongo/base/configuration_variable_manager.cpp',
     'mongo/base/error_codes.cpp',
     'mongo/base/global_initializer.cpp',
     'mongo/base/global_initializer_registerer.cpp',

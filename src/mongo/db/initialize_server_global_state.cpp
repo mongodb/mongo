@@ -173,7 +173,7 @@ namespace mongo {
     }
 
     MONGO_INITIALIZER_GENERAL(ServerLogRedirection,
-                              ("GlobalLogManager", "globalVariablesConfigured"),
+                              ("GlobalLogManager", "completedStartupConfig"),
                               ("default"))(
             InitializerContext*) {
 

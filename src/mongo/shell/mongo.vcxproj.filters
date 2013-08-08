@@ -464,9 +464,6 @@
     <ClCompile Include="..\util\safe_num.cpp">
       <Filter>util\Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\base\configuration_variable_manager.cpp">
-      <Filter>base</Filter>
-    </ClCompile>
     <ClCompile Include="..\base\global_initializer.cpp">
       <Filter>base</Filter>
     </ClCompile>
@@ -1021,9 +1018,6 @@
     </ClCompile>
     <ClCompile Include="..\..\third_party\murmurhash3\MurmurHash3.cpp">
       <Filter>third_party\MurmurHash3</Filter>
-    </ClCompile>
-    <ClCompile Include="..\base\configuration_variable_manager_test.cpp">
-      <Filter>base</Filter>
     </ClCompile>
     <ClCompile Include="..\base\counter_test.cpp">
       <Filter>base</Filter>
@@ -1731,9 +1725,6 @@
     </ClInclude>
     <ClInclude Include="..\platform\unordered_set.h">
       <Filter>platform</Filter>
-    </ClInclude>
-    <ClInclude Include="..\base\configuration_variable_manager.h">
-      <Filter>base</Filter>
     </ClInclude>
     <ClInclude Include="..\base\disallow_copying.h">
       <Filter>base</Filter>

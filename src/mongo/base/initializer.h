@@ -18,7 +18,6 @@
 #include <string>
 #include <vector>
 
-#include "mongo/base/configuration_variable_manager.h"
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/initializer_context.h"
 #include "mongo/base/initializer_dependency_graph.h"
@@ -30,11 +29,9 @@ namespace mongo {
      * Class representing an initialization process.
      *
      * Such a process is described by a directed acyclic graph of initialization operations, the
-     * InitializerDependencyGraph, and a collection of mutable global state, the
-     * ConfigurationVariableManager.  One constructs an initialization process by adding nodes and
-     * edges to the graph, and variable mappings in the variable manager.  Then, one executes the
-     * process, causing each initialization operation to execute in an order that respects the
-     * programmer-established prerequistes.
+     * InitializerDependencyGraph.  One constructs an initialization process by adding nodes and
+     * edges to the graph.  Then, one executes the process, causing each initialization operation to
+     * execute in an order that respects the programmer-established prerequistes.
      */
     class Initializer {
         MONGO_DISALLOW_COPYING(Initializer);
@@ -48,12 +45,6 @@ namespace mongo {
         InitializerDependencyGraph& getInitializerDependencyGraph() { return _graph; }
 
         /**
-         * Get the configuration variable manager, for the purpose of describing more configurable
-         * variables.
-         */
-        ConfigurationVariableManager& getConfigurationVariableManager() { return _configVariables; }
-
-        /**
          * Execute the initializer process, using the given argv and environment data as input.
          *
          * Returns Status::OK on success.  All other returns constitute initialization failures,
@@ -65,7 +56,6 @@ namespace mongo {
     private:
 
         InitializerDependencyGraph _graph;
-        ConfigurationVariableManager _configVariables;
     };
 
     /**
