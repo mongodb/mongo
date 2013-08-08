@@ -32,7 +32,7 @@ namespace mongo {
         if (Status::OK() != status)
             return status;
 
-        InitializerContext context(args, env, &_configVariables);
+        InitializerContext context(args, env);
 
         for (size_t i = 0; i < sortedNodes.size(); ++i) {
             InitializerFunction fn = _graph.getInitializerFunction(sortedNodes[i]);

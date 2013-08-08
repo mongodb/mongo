@@ -702,9 +702,6 @@
     <ClCompile Include="..\util\safe_num.cpp">
       <Filter>util\Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\base\configuration_variable_manager.cpp">
-      <Filter>base</Filter>
-    </ClCompile>
     <ClCompile Include="..\base\global_initializer.cpp">
       <Filter>base</Filter>
     </ClCompile>
@@ -1689,9 +1686,6 @@
     <ClCompile Include="..\db\auth\privilege_set_test.cpp">
       <Filter>db\auth</Filter>
     </ClCompile>
-    <ClCompile Include="..\base\configuration_variable_manager_test.cpp">
-      <Filter>base</Filter>
-    </ClCompile>
     <ClCompile Include="..\base\counter_test.cpp">
       <Filter>base</Filter>
     </ClCompile>
@@ -2198,9 +2192,6 @@
     </ClInclude>
     <ClInclude Include="..\platform\unordered_set.h">
       <Filter>platform</Filter>
-    </ClInclude>
-    <ClInclude Include="..\base\configuration_variable_manager.h">
-      <Filter>base</Filter>
     </ClInclude>
     <ClInclude Include="..\base\disallow_copying.h">
       <Filter>base</Filter>

@@ -5,8 +5,7 @@ Import("env")
 env.Command(['error_codes.h', 'error_codes.cpp'], ['generate_error_codes.py', 'error_codes.err'],
             '$PYTHON $SOURCES $TARGETS')
 
-env.StaticLibrary('base', ['configuration_variable_manager.cpp',
-                           'error_codes.cpp',
+env.StaticLibrary('base', ['error_codes.cpp',
                            'global_initializer.cpp',
                            'global_initializer_registerer.cpp',
                            'init.cpp',
@@ -21,10 +20,6 @@ env.StaticLibrary('base', ['configuration_variable_manager.cpp',
                            LIBDEPS=[
                            '$BUILD_DIR/third_party/murmurhash3/murmurhash3',
                            ])
-
-env.CppUnitTest('configuration_variable_manager_test',
-                ['configuration_variable_manager_test.cpp'],
-                LIBDEPS=['base'])
 
 env.CppUnitTest('initializer_dependency_graph_test',
                 ['initializer_dependency_graph_test.cpp'],

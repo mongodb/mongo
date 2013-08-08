@@ -18,8 +18,7 @@
 namespace mongo {
 
     InitializerContext::InitializerContext(const ArgumentVector& args,
-                                           const EnvironmentMap& env,
-                                           const ConfigurationVariableManager* configVariables)
-        : _args(args), _env(env), _configVariables(configVariables) {}
+                                           const EnvironmentMap& env)
+        : _args(args), _env(env) {}
 
 }  // namespace mongo
