@@ -38,11 +38,6 @@ class test_base04(wttest.WiredTigerTestCase):
         wttest.WiredTigerTestCase.__init__(self, *args, **kwargs)
         self.reconcile = False
 
-    def reopen(self):
-        self.conn.close()
-        self.conn = wiredtiger.wiredtiger_open('.', None)
-        self.session = self.conn.open_session()
-
     def create_table(self):
         self.pr('create table')
         self.session.create(
@@ -72,7 +67,7 @@ class test_base04(wttest.WiredTigerTestCase):
         cursor.insert()
         cursor.close()
         if self.reconcile:
-            self.reopen()
+            self.reopen_conn()
 
     def remove(self, key):
         self.pr('remove')
@@ -81,7 +76,7 @@ class test_base04(wttest.WiredTigerTestCase):
         cursor.remove()
         cursor.close()
         if self.reconcile:
-            self.reopen()
+            self.reopen_conn()
 
     def test_empty(self):
         '''Create a table, look for a nonexistent key'''

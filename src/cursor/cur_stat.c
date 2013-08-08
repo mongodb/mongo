@@ -421,6 +421,8 @@ __wt_curstat_open(WT_SESSION_IMPL *session,
 	WT_DECL_RET;
 	uint32_t flags;
 
+	STATIC_ASSERT(offsetof(WT_CURSOR_STAT, iface) == 0);
+
 	cst = NULL;
 	flags = 0;
 
@@ -447,7 +449,6 @@ __wt_curstat_open(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_curstat_init(session, uri, cfg, cst, flags));
 
 	/* __wt_cursor_init is last so we don't have to clean up on error. */
-	STATIC_ASSERT(offsetof(WT_CURSOR_STAT, iface) == 0);
 	WT_ERR(__wt_cursor_init(cursor, uri, NULL, cfg, cursorp));
 
 	if (0) {

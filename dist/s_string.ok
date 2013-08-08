@@ -72,12 +72,15 @@ EB
 EBUSY
 EINTR
 EINVAL
+EMSG
 EMail
 ENOENT
 ENOMEM
 ENOTSUP
 ENV
 EOF
+ERET
+ESET
 ETIME
 ETIMEDOUT
 EXTLIST
@@ -112,6 +115,7 @@ INITIALIZER
 INSERT's
 INUSE
 ISSET
+ITEMs
 Ippokratis
 JPEG
 JSON
@@ -149,6 +153,8 @@ Mewhort
 Multi
 Mutex
 Mutexes
+NEEDKEY
+NEEDVALUE
 NOLL
 NONINFRINGEMENT
 NOTFOUND
@@ -187,6 +193,7 @@ RNG
 RPC
 RUNDIR
 Radu
+Recno
 Recurse
 Redistributions
 Resize
@@ -220,6 +227,7 @@ TRK
 TXN
 TXNID
 Timestamp
+TxnID
 UIDs
 UINT
 ULINE
@@ -228,6 +236,7 @@ URIs
 UTF
 UnixLib
 Unmap
+Unmarshall
 VARCHAR
 VLDB
 Vanishingly
@@ -478,6 +487,7 @@ goutf
 hashval
 havesize
 hdr
+highjack
 hrow
 html
 huffman
@@ -548,6 +558,8 @@ lzo
 madvise
 majorp
 malloc
+marshall
+marshalled
 maxid
 maxintlitem
 maxintlpage
@@ -808,6 +820,7 @@ twrite
 txn
 txnid
 txnidp
+txnmin
 typedef
 uB
 uid
@@ -823,6 +836,8 @@ unix
 unjams
 unlinked
 unmap
+unmarshall
+unmarshalled
 unmerged
 unmodify
 unpackv
@@ -830,6 +845,7 @@ unreferenced
 unsized
 untyped
 upd
+update's
 upg
 uri
 uri's
