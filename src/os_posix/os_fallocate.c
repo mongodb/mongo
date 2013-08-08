@@ -26,6 +26,10 @@ __wt_fallocate(WT_SESSION_IMPL *session, WT_FH *fh, off_t offset, off_t len)
 	WT_SYSCALL_RETRY(ftruncate(fh->fd, offset + len), ret);
 	if (ret != 0)
 		WT_RET_MSG(session, ret, "%s: ftruncate", fh->name);
+#else
+	WT_UNUSED(ret);
+	WT_UNUSED(offset);
+	WT_UNUSED(len);
 #endif
 	return (0);
 }
