@@ -38,6 +38,7 @@ import glob
 from optparse import OptionParser
 import os
 import parser
+import pprint
 import re
 import shutil
 import shlex
@@ -346,14 +347,24 @@ def check_db_hashes(master, slave):
 
     replicated_collections += master.dict.keys()
     
-    for db in replicated_collections:
-        if db not in slave.dict:
-            lost_in_slave.append(db)
-        mhash = master.dict[db]
-        shash = slave.dict[db]
+    for coll in replicated_collections:
+        if coll not in slave.dict:
+            lost_in_slave.append(coll)
+        mhash = master.dict[coll]
+        shash = slave.dict[coll]
         if mhash != shash:
-            screwy_in_slave[db] = mhash + "/" + shash
-
+            mTestDB = Connection(port=master.port, slave_okay=True).test
+            sTestDB = Connection(port=slave.port, slave_okay=True).test
+            mCount = mTestDB[coll].count()
+            sCount = sTestDB[coll].count()
+            stats = {'hashes': {'master': mhash, 'slave': shash},
+                     'counts':{'master': mCount, 'slave': sCount}}
+            try:
+                stats["docs"] = {'master':list(mTestDB[coll].find(limit=10)),
+                                  'slave':list(sTestDB[coll].find(limit=10))}
+            except Exception as e:
+                stats["error-docs"] = e;
+            screwy_in_slave[coll] = stats
     for db in slave.dict.keys():
         if db not in master.dict:
             lost_in_master.append(db)
@@ -658,8 +669,18 @@ at the end of testing:""" % (src, dst)
     if screwy_in_slave:
         print """The following collections has different hashes in master and slave
 at the end of testing:"""
-        for db in screwy_in_slave.keys():
-            print "%s\t %s" % (db, screwy_in_slave[db])
+        for coll in screwy_in_slave.keys():
+            stats = screwy_in_slave[coll]
+            print "collection: %s\t (master/slave) hashes: %s/%s counts: %i/%i" % (coll, stats['hashes']['master'], stats['hashes']['slave'], stats['counts']['master'], stats['counts']['slave'])
+            if "docs" in stats:
+                print "Master docs (limited):"
+                pprint.pprint(stats["docs"]["master"], indent=2)
+                print "Slave docs (limited):"
+                pprint.pprint(stats["docs"]["slave"], indent=2)
+            if "error-docs" in stats:
+                print "Error getting docs to diff:"
+                pprint.pprint(stats["error-docs"])
+
     if (small_oplog or small_oplog_rs) and not (lost_in_master or lost_in_slave or screwy_in_slave):
         print "replication ok for %d collections" % (len(replicated_collections))
     if losers or lost_in_slave or lost_in_master or screwy_in_slave:
