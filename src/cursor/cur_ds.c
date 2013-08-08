@@ -495,13 +495,6 @@ __wt_curds_create(
 	WT_ERR(
 	    __wt_strndup(session, cval.str, cval.len, &cursor->value_format));
 
-	/*
-	 * The assumption is data-sources don't need to provide WiredTiger with
-	 * cursor range truncation support, instead, we'll iterate the cursors
-	 * removing key/value pairs one at a time.
-	 */
-	cursor->range_truncate = __wt_cursor_range_truncate;
-
 	WT_ERR(__wt_cursor_init(cursor, uri, owner, cfg, cursorp));
 
 	/* Data-source cursors have a collator reference. */

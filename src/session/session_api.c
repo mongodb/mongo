@@ -557,7 +557,7 @@ __session_truncate(WT_SESSION *wt_session,
 	 * supporting methods we need, range_truncate and compare.
 	 */
 	cursor = start == NULL ? stop : start;
-	if (cursor->range_truncate == NULL || cursor->compare == NULL)
+	if (cursor->compare == NULL)
 		WT_ERR(__wt_bad_object_type(session, cursor->uri));
 
 	/*
@@ -607,7 +607,7 @@ __session_truncate(WT_SESSION *wt_session,
 		}
 	}
 
-	WT_ERR(cursor->range_truncate(wt_session, start, stop));
+	WT_ERR(__wt_schema_range_truncate(session, start, stop));
 
 done:
 err:	TXN_API_END_NOTFOUND_MAP(session, ret);

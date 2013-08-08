@@ -364,39 +364,6 @@ __cursor_search(WT_CURSOR *cursor)
 }
 
 /*
- * __wt_cursor_range_truncate --
- *	WT_SESSION->truncate of a cursor range, default implementation.
- */
-int
-__wt_cursor_range_truncate(
-    WT_SESSION *wt_session, WT_CURSOR *start, WT_CURSOR *stop)
-{
-	WT_DECL_RET;
-	int cmp;
-
-	WT_UNUSED(wt_session);
-
-	if (start == NULL) {
-		do {
-			WT_RET(stop->remove(stop));
-		} while ((ret = stop->prev(stop)) == 0);
-		WT_RET_NOTFOUND_OK(ret);
-	} else if (stop == NULL) {
-		do {
-			WT_RET(start->remove(start));
-		} while ((ret = start->next(start)) == 0);
-		WT_RET_NOTFOUND_OK(ret);
-	} else {
-		do {
-			WT_RET(start->compare(start, stop, &cmp));
-			WT_RET(start->remove(start));
-		} while (cmp < 0 && (ret = start->next(start)) == 0);
-		WT_RET_NOTFOUND_OK(ret);
-	}
-	return (0);
-}
-
-/*
  * __wt_cursor_close --
  *	WT_CURSOR->close default implementation.
  */
@@ -543,9 +510,6 @@ __wt_cursor_init(WT_CURSOR *cursor,
 		cursor->remove = __wt_cursor_notsup;
 	if (cursor->close == NULL)
 		WT_RET_MSG(session, EINVAL, "cursor lacks a close method");
-	if (cursor->range_truncate == NULL)
-		cursor->range_truncate = (int (*)
-		    (WT_SESSION *, WT_CURSOR *, WT_CURSOR *))__wt_cursor_notsup;
 
 	if (cursor->uri == NULL)
 		WT_RET(__wt_strdup(session, uri, &cursor->uri));

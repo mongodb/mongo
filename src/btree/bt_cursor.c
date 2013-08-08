@@ -596,23 +596,12 @@ __cursor_truncate(WT_SESSION_IMPL *session,
 					break;
 			}
 		} while (ret == WT_RESTART);
-	} else if (stop == NULL) {
-		do {
-			WT_RET(__wt_btcur_remove(start));
-			for (;;) {
-				if ((ret = __wt_btcur_next(start, 1)) != 0)
-					break;
-				start->compare = 0;	/* Exact match */
-				if ((ret = rmfunc(session, start, 2)) != 0)
-					break;
-			}
-		} while (ret == WT_RESTART);
 	} else {
-
 		do {
 			WT_RET(__wt_btcur_remove(start));
 			for (;;) {
-				if (__cursor_equals(start, stop))
+				if (stop != NULL &&
+				    __cursor_equals(start, stop))
 					break;
 				if ((ret = __wt_btcur_next(start, 1)) != 0)
 					break;
@@ -668,26 +657,13 @@ __cursor_truncate_fix(WT_SESSION_IMPL *session,
 					break;
 			}
 		} while (ret == WT_RESTART);
-	} else if (stop == NULL) {
-		value = (uint8_t *)&start->iface.value;
-		do {
-			WT_RET(__wt_btcur_remove(start));
-			for (;;) {
-				if ((ret = __wt_btcur_next(start, 1)) != 0)
-					break;
-				start->compare = 0;	/* Exact match */
-				value = (uint8_t *)start->iface.value.data;
-				if (*value != 0 &&
-				    (ret = rmfunc(session, start, 2)) != 0)
-					break;
-			}
-		} while (ret == WT_RESTART);
 	} else {
 		value = (uint8_t *)&start->iface.value;
 		do {
 			WT_RET(__wt_btcur_remove(start));
 			for (;;) {
-				if (__cursor_equals(start, stop))
+				if (stop != NULL &&
+				    __cursor_equals(start, stop))
 					break;
 				if ((ret = __wt_btcur_next(start, 1)) != 0)
 					break;
@@ -712,24 +688,21 @@ int
 __wt_btcur_range_truncate(WT_CURSOR_BTREE *start, WT_CURSOR_BTREE *stop)
 {
 	WT_BTREE *btree;
+	WT_CURSOR_BTREE *cbt;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 
-	if (start == NULL) {
-		session = (WT_SESSION_IMPL *)stop->iface.session;
-		btree = stop->btree;
-	} else {
-		session = (WT_SESSION_IMPL *)start->iface.session;
-		btree = start->btree;
-	}
+	cbt = (start != NULL) ? start : stop;
+	session = (WT_SESSION_IMPL *)cbt->iface.session;
+	btree = cbt->btree;
 
 	switch (btree->type) {
 	case BTREE_COL_FIX:
-		WT_RET(__cursor_truncate_fix(
+		WT_ERR(__cursor_truncate_fix(
 		    session, start, stop, __wt_col_modify));
 		break;
 	case BTREE_COL_VAR:
-		WT_RET(__cursor_truncate(
+		WT_ERR(__cursor_truncate(
 		    session, start, stop, __wt_col_modify));
 		break;
 	case BTREE_ROW:
@@ -744,13 +717,15 @@ __wt_btcur_range_truncate(WT_CURSOR_BTREE *start, WT_CURSOR_BTREE *stop)
 		 * are positioned in the tree.
 		 */
 		if (start != NULL)
-			WT_RET(__wt_btcur_search(start));
+			WT_ERR(__wt_btcur_search(start));
 		if (stop != NULL)
-			WT_RET(__wt_btcur_search(stop));
-		WT_RET(__cursor_truncate(
+			WT_ERR(__wt_btcur_search(stop));
+		WT_ERR(__cursor_truncate(
 		    session, start, stop, __wt_row_modify));
 		break;
 	}
+
+err:	WT_CLEAR_BTREE_IN_SESSION(session);
 	return (ret);
 }
 

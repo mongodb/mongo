@@ -462,15 +462,14 @@ err:	CURSOR_UPDATE_API_END(session, ret);
 }
 
 /*
- * __curtable_range_truncate --
- *	WT_SESSION->truncate of a cursor range, table implementation.
+ * __wt_table_range_truncate --
+ *	Truncate of a cursor range, table implementation.
  */
-static int
-__curtable_range_truncate(
-    WT_SESSION *wt_session, WT_CURSOR *start, WT_CURSOR *stop)
+int
+__wt_table_range_truncate(WT_CURSOR_TABLE *start, WT_CURSOR_TABLE *stop)
 {
-	WT_CURSOR *cursor, **list_start, **list_stop;
-	WT_CURSOR_TABLE *ctable, *ctable_start, *ctable_stop;
+	WT_CURSOR *wt_start, *wt_stop;
+	WT_CURSOR_TABLE *ctable;
 	WT_DECL_ITEM(key);
 	WT_DECL_RET;
 	WT_ITEM raw;
@@ -478,123 +477,64 @@ __curtable_range_truncate(
 	u_int i;
 	int cmp;
 
-	session = (WT_SESSION_IMPL *)wt_session;
+	ctable = (start != NULL) ? start : stop;
+	session = (WT_SESSION_IMPL *)ctable->iface.session;
+	wt_start = &start->iface;
+	wt_stop = &stop->iface;
 
-	/*
-	 * The underlying column-group data sources must support cursor range
-	 * truncation, check before we do any work.
-	 */
-	ctable = (WT_CURSOR_TABLE *)(start == NULL ? stop : start);
-	for (i = 0; i < WT_COLGROUPS(ctable->table); i++)
-		if (ctable->cg_cursors[i]->range_truncate == NULL) {
-			cursor = start == NULL ? stop : start;
-			WT_RET(__wt_bad_object_type(session, cursor->uri));
-		}
-
+	/* Open any indices. */
+	WT_RET(__curtable_open_indices(ctable));
 	WT_RET(__wt_scr_alloc(session, 128, &key));
 
 	/*
-	 * Step through the cursor range, removing any indices.
+	 * Step through the cursor range, removing the index entries.
 	 *
 	 * If there are indices, copy the key we're using to step through the
 	 * cursor range (so we can reset the cursor to its original position),
-	 * then remove all of the index records in the truncated range.  Get a
-	 * raw copy of the key because it's simplest to do, but copy the key:
-	 * all that happens underneath is the data and size fields are reset to
-	 * reference the cursor's key, and in the case of record numbers, it's
-	 * the cursor's recno buffer, which will be updated as we cursor through
-	 * the object.
+	 * then remove all of the index records in the truncated range.  Copy
+	 * the raw key because the memory is only valid until the cursor moves.
 	 */
-	if (start == NULL) {
-		ctable = (WT_CURSOR_TABLE *)stop;
-		WT_ERR(__curtable_open_indices(ctable));
-		if (ctable->table->nindices > 0) {
-			WT_ERR(__wt_cursor_get_raw_key(stop, &raw));
+	if (ctable->table->nindices > 0) {
+		if (start == NULL) {
+			WT_ERR(__wt_cursor_get_raw_key(wt_stop, &raw));
 			WT_ERR(__wt_buf_set(session, key, raw.data, raw.size));
 
 			do {
-				APPLY_CG(ctable, search);
+				APPLY_CG(stop, search);
 				WT_ERR(ret);
-				APPLY_IDX(ctable, remove);
-			} while ((ret = stop->prev(stop)) == 0);
+				APPLY_IDX(stop, remove);
+			} while ((ret = wt_stop->prev(wt_stop)) == 0);
 			WT_ERR_NOTFOUND_OK(ret);
-			ret = 0;
 
-			__wt_cursor_set_raw_key(stop, key);
-			APPLY_CG(ctable, search);
-		}
-	} else if (stop == NULL) {
-		ctable = (WT_CURSOR_TABLE *)start;
-		WT_ERR(__curtable_open_indices(ctable));
-		if (ctable->table->nindices > 0) {
-			WT_ERR(__wt_cursor_get_raw_key(start, &raw));
+			__wt_cursor_set_raw_key(wt_stop, key);
+			APPLY_CG(stop, search);
+		} else {
+			WT_ERR(__wt_cursor_get_raw_key(wt_start, &raw));
 			WT_ERR(__wt_buf_set(session, key, raw.data, raw.size));
 
+			cmp = -1;
 			do {
-				APPLY_CG(ctable, search);
+				APPLY_CG(start, search);
 				WT_ERR(ret);
-				APPLY_IDX(ctable, remove);
-			} while ((ret = start->next(start)) == 0);
+				APPLY_IDX(start, remove);
+				if (stop != NULL)
+					WT_ERR(wt_start->compare(
+					    wt_start, wt_stop,
+					    &cmp));
+			} while (cmp < 0 &&
+			    (ret = wt_start->next(wt_start)) == 0);
 			WT_ERR_NOTFOUND_OK(ret);
-			ret = 0;
 
-			__wt_cursor_set_raw_key(start, key);
-			APPLY_CG(ctable, search);
-		}
-	} else {
-		ctable = (WT_CURSOR_TABLE *)start;
-		WT_ERR(__curtable_open_indices(ctable));
-		if (ctable->table->nindices > 0) {
-			WT_ERR(__wt_cursor_get_raw_key(start, &raw));
-			WT_ERR(__wt_buf_set(session, key, raw.data, raw.size));
-
-			do {
-				APPLY_CG(ctable, search);
-				WT_ERR(ret);
-				APPLY_IDX(ctable, remove);
-				WT_ERR(start->compare(start, stop, &cmp));
-			} while (cmp < 0 && (ret = start->next(start)) == 0);
-			WT_ERR_NOTFOUND_OK(ret);
-			ret = 0;
-
-			__wt_cursor_set_raw_key(start, key);
-			APPLY_CG(ctable, search);
+			__wt_cursor_set_raw_key(wt_start, key);
+			APPLY_CG(start, search);
 		}
 	}
 
-	/*
-	 * Truncate the column groups.
-	 *
-	 * Assumes the table's cursors have the same set of underlying objects,
-	 * in the same order.
-	 */
-	if (start == NULL)
-		for (i = 0,
-		    ctable_stop = (WT_CURSOR_TABLE *)stop,
-		    list_stop = ctable_stop->cg_cursors;
-		    i < WT_COLGROUPS(ctable_stop->table);
-		    i++, ++list_stop)
-			WT_ERR((*list_stop)->range_truncate(
-			    wt_session, NULL, *list_stop));
-	else if (stop == NULL)
-		for (i = 0,
-		    ctable_start = (WT_CURSOR_TABLE *)start,
-		    list_start = ctable_start->cg_cursors;
-		    i < WT_COLGROUPS(ctable_start->table);
-		    i++, ++list_start)
-			WT_ERR((*list_start)->range_truncate(
-			    wt_session, *list_start, NULL));
-	else {
-		for (i = 0,
-		    ctable_start = (WT_CURSOR_TABLE *)start,
-		    list_start = ctable_start->cg_cursors,
-		    ctable_stop = (WT_CURSOR_TABLE *)stop,
-		    list_stop = ctable_stop->cg_cursors;
-		    i < WT_COLGROUPS(ctable_start->table);
-		    i++, ++list_start, ++list_stop)
-			WT_ERR((*list_start)->range_truncate(
-			    wt_session, *list_start, *list_stop));
-	}
+	/* Truncate the column groups. */
+	for (i = 0; i < WT_COLGROUPS(ctable->table); i++)
+		WT_ERR(__wt_range_truncate(
+		    (start == NULL) ? NULL : start->cg_cursors[i],
+		    (stop == NULL) ? NULL : stop->cg_cursors[i]));
 
 err:	__wt_scr_free(&key);
 	return (ret);
@@ -782,9 +722,6 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 
 	ctable->table = table;
 	ctable->plan = table->plan;
-
-	/* Table cursors support truncation. */
-	cursor->range_truncate = __curtable_range_truncate;
 
 	/* Handle projections. */
 	if (columns != NULL) {

@@ -557,6 +557,21 @@ my_truncate(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 	return (0);
 }
 
+/*! [WT_DATA_SOURCE range truncate] */
+static int
+my_range_truncate(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
+    WT_CURSOR *start, WT_CURSOR *stop)
+/*! [WT_DATA_SOURCE range truncate] */
+{
+	/* Unused parameters */
+	(void)dsrc;
+	(void)session;
+	(void)start;
+	(void)stop;
+
+	return (0);
+}
+
 /*! [WT_DATA_SOURCE verify] */
 static int
 my_verify(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
@@ -619,6 +634,7 @@ main(void)
 		my_rename,
 		my_salvage,
 		my_truncate,
+		my_range_truncate,
 		my_verify,
 		my_checkpoint,
 		my_terminate

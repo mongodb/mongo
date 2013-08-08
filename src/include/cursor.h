@@ -43,7 +43,6 @@
 	remove,								\
 	close,								\
 	{ NULL, NULL },			/* TAILQ_ENTRY q */		\
-	NULL,				/* WT_CURSOR.range_truncate */	\
 	0,				/* recno key */			\
 	{ 0 },				/* recno raw buffer */		\
 	{ NULL, 0, 0, NULL, 0 },	/* WT_ITEM key */		\
