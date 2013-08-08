@@ -519,6 +519,9 @@ methods = {
 'connection.reconfigure' : Method(connection_runtime_config),
 
 'connection.load_extension' : Method([
+	Config('config', '', r'''
+		configuration string passed to the entry point of the
+		extension as its WT_CONFIG_ARG argument'''),
 	Config('entry', 'wiredtiger_extension_init', r'''
 		the entry point of the extension, called to initialize the
 		extension when it is loaded.  The signature of the function
@@ -561,9 +564,10 @@ methods = {
 		type='list', choices=['data', 'log']),
 	Config('extensions', '', r'''
 		list of shared library extensions to load (using dlopen).
-		Optional values are passed as the \c config parameter to
-		WT_CONNECTION::load_extension.  For example,
-		<code>extensions=(/path/ext.so={entry=my_entry})</code>''',
+		Any values specified to an library extension are passed to
+		WT_CONNECTION::load_extension as the \c config parameter
+		(for example,
+		<code>extensions=(/path/ext.so={entry=my_entry})</code>)''',
 		type='list'),
 	Config('file_extend', '', r'''
 		file extension configuration.  If set, extend files of the set

@@ -536,6 +536,7 @@ lex
 lexicographically
 lf
 lfence
+libdatasource
 libs
 lld
 llll
@@ -710,6 +711,7 @@ scanp
 schemas
 schematab
 scr
+sd
 searchable
 sed
 serializable

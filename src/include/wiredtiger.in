@@ -1237,6 +1237,8 @@ struct __wt_connection {
 	 * @param connection the connection handle
 	 * @param path the filename of the extension module
 	 * @configstart{connection.load_extension, see dist/api_data.py}
+	 * @config{config, configuration string passed to the entry point of the
+	 * extension as its WT_CONFIG_ARG argument., a string; default empty.}
 	 * @config{entry, the entry point of the extension\, called to
 	 * initialize the extension when it is loaded.  The signature of the
 	 * function must match ::wiredtiger_extension_init., a string; default
@@ -1382,9 +1384,9 @@ struct __wt_connection {
  * @config{eviction_trigger, trigger eviction when the cache becomes this full
  * (as a percentage)., an integer between 10 and 99; default \c 95.}
  * @config{extensions, list of shared library extensions to load (using dlopen).
- * Optional values are passed as the \c config parameter to
- * WT_CONNECTION::load_extension.  For example\,
- * <code>extensions=(/path/ext.so={entry=my_entry})</code>., a list of strings;
+ * Any values specified to an library extension are passed to
+ * WT_CONNECTION::load_extension as the \c config parameter (for example\,
+ * <code>extensions=(/path/ext.so={entry=my_entry})</code>)., a list of strings;
  * default empty.}
  * @config{file_extend, file extension configuration.  If set\, extend files of
  * the set type in allocations of the set size\, instead of a block at a time as

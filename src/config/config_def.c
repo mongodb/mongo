@@ -10,6 +10,7 @@ static const WT_CONFIG_CHECK confchk_colgroup_meta[] = {
 };
 
 static const WT_CONFIG_CHECK confchk_connection_load_extension[] = {
+	{ "config", "string", NULL, NULL},
 	{ "entry", "string", NULL, NULL},
 	{ "terminate", "string", NULL, NULL},
 	{ NULL, NULL, NULL, NULL }
@@ -287,7 +288,7 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  NULL
 	},
 	{ "connection.load_extension",
-	  "entry=wiredtiger_extension_init,"
+	  "config=,entry=wiredtiger_extension_init,"
 	  "terminate=wiredtiger_extension_terminate",
 	  confchk_connection_load_extension
 	},
