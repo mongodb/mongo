@@ -287,6 +287,11 @@ namespace mongo {
                 while (!_positionChanged && !_handshakeNeeded) {
                     _cond.wait(lock);
                 }
+                if (theReplSet->isPrimary()) {
+                    _positionChanged = false;
+                    _handshakeNeeded = false;
+                    continue;
+                }
                 const Member* target = replset::BackgroundSync::get()->getSyncTarget();
                 boost::unique_lock<boost::mutex> connlock(_connmtx);
                 if (_syncTarget != target) {

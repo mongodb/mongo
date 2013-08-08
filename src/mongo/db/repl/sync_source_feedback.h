@@ -30,7 +30,9 @@ namespace mongo {
         SyncSourceFeedback() : BackgroundJob(false /*don't selfdelete*/),
                               _syncTarget(NULL),
                               _oplogReader(new OplogReader()),
-                              _supportsUpdater(false) {}
+                              _supportsUpdater(false),
+                              _positionChanged(false),
+                              _handshakeNeeded(false) {}
 
         ~SyncSourceFeedback() {
             delete _oplogReader;
