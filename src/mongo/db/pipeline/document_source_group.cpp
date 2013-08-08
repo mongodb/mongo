@@ -80,7 +80,7 @@ namespace mongo {
                 _firstPartOfNextGroup = _sorterIterator->next();
             }
 
-            return makeDocument(_currentId, _currentAccumulators, pExpCtx->getInShard());
+            return makeDocument(_currentId, _currentAccumulators, pExpCtx->inShard);
 
         } else {
             if (groups.empty())
@@ -88,7 +88,7 @@ namespace mongo {
 
             Document out = makeDocument(groupsIterator->first,
                                         groupsIterator->second,
-                                        pExpCtx->getInShard());
+                                        pExpCtx->inShard);
 
             if (++groupsIterator == groups.end())
                 dispose();
@@ -158,7 +158,7 @@ namespace mongo {
         , populated(false)
         , _doingMerge(false)
         , _spilled(false)
-        , _extSortAllowed(pExpCtx->getExtSortAllowed() && !pExpCtx->getInRouter())
+        , _extSortAllowed(pExpCtx->extSortAllowed && !pExpCtx->inRouter)
         , _maxMemoryUsageBytes(100*1024*1024)
     {}
 
@@ -391,7 +391,7 @@ namespace mongo {
             DEV {
                 // In debug mode, spill every time we have a duplicate id to stress merge logic.
                 if (!inserted // is a dup
-                        && !pExpCtx->getInRouter() // can't spill to disk in router
+                        && !pExpCtx->inRouter // can't spill to disk in router
                         && !_extSortAllowed // don't change behavior when testing external sort
                         && sortedFiles.size() < 20 // don't open too many FDs
                         ) {

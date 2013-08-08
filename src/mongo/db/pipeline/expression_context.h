@@ -16,46 +16,33 @@
 
 #pragma once
 
-#include "mongo/pch.h"
-
-#include "mongo/util/intrusive_counter.h"
+#include "mongo/db/interrupt_status.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/util/intrusive_counter.h"
 
 namespace mongo {
 
-    class InterruptStatus;
-
-    class ExpressionContext : public IntrusiveCounterUnsigned {
+    struct ExpressionContext : public IntrusiveCounterUnsigned {
     public:
-        void setInShard(bool b) { inShard = b; }
-        void setInRouter(bool b) { inRouter = b; }
-        void setExtSortAllowed(bool b) { extSortAllowed = b; }
-        void setNs(NamespaceString ns) { _ns = ns; }
-
-        bool getInShard() const { return inShard; }
-        bool getInRouter() const { return inRouter; }
-        bool getExtSortAllowed() const { return extSortAllowed; }
-        const NamespaceString& getNs() const { return _ns; }
-
-        /**
-           Used by a pipeline to check for interrupts so that killOp() works.
-
-           @throws if the operation has been interrupted
+        ExpressionContext(const InterruptStatus& status, const NamespaceString& ns)
+            : inShard(false)
+            , inRouter(false)
+            , extSortAllowed(false)
+            , interruptStatus(status)
+            , ns(ns)
+        {}
+        /** Used by a pipeline to check for interrupts so that killOp() works.
+         *  @throws if the operation has been interrupted
          */
-        void checkForInterrupt();
-
-        ExpressionContext* clone();
-
-        static ExpressionContext *create(InterruptStatus *pStatus, const NamespaceString& ns);
-
-    private:
-        ExpressionContext(InterruptStatus *pStatus, const NamespaceString& ns);
+        void checkForInterrupt() {
+            // The check could be expensive, at least in relative terms.
+            RARELY interruptStatus.checkForInterrupt();
+        }
         
         bool inShard;
         bool inRouter;
         bool extSortAllowed;
-        unsigned intCheckCounter; // interrupt check counter
-        InterruptStatus *const pStatus;
-        NamespaceString _ns;
+        const InterruptStatus& interruptStatus;
+        NamespaceString ns;
     };
 }

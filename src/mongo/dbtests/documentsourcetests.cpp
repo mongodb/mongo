@@ -102,11 +102,9 @@ namespace DocumentSourceTests {
 
         class Base : public CollectionBase {
         public:
-            Base() :
-                CollectionBase(),
-                _ctx(ExpressionContext::create(&InterruptStatusMongod::status,
-                                               NamespaceString(ns))) {
-            }
+            Base()
+                : _ctx(new ExpressionContext(InterruptStatusMongod::status, NamespaceString(ns)))
+            {}
         protected:
             void createSource() {
                 Client::ReadContext ctx (ns);
@@ -408,12 +406,11 @@ namespace DocumentSourceTests {
             void createGroup( const BSONObj &spec, bool inShard = false ) {
                 BSONObj namedSpec = BSON( "$group" << spec );
                 BSONElement specElement = namedSpec.firstElement();
+
                 intrusive_ptr<ExpressionContext> expressionContext =
-                        ExpressionContext::create(&InterruptStatusMongod::status,
-                                                  NamespaceString(ns));
-                if ( inShard ) {
-                    expressionContext->setInShard( true );
-                }
+                        new ExpressionContext(InterruptStatusMongod::status, NamespaceString(ns));
+                expressionContext->inShard = inShard;
+
                 _group = DocumentSourceGroup::createFromBson( &specElement, expressionContext );
                 assertRoundTrips( _group );
                 _group->setSource( source() );

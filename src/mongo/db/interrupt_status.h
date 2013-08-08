@@ -16,8 +16,6 @@
 
 #pragma once
 
-#include "mongo/pch.h"
-
 namespace mongo {
 
     /**
@@ -38,7 +36,7 @@ namespace mongo {
 
            @throws a uassert if the process has received an interrupt (SIGINT)
          */
-        virtual void checkForInterrupt() = 0;
+        virtual void checkForInterrupt() const =0;
 
         /**
            Check for interrupt.
@@ -47,7 +45,7 @@ namespace mongo {
              "" if there hasn't been an interrupt.  These strings are static
              and don't need to be freed.
          */
-        virtual const char *checkForInterruptNoAssert() = 0;
+        virtual const char *checkForInterruptNoAssert() const =0;
 
     protected:
         /**

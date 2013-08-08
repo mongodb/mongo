@@ -20,16 +20,16 @@
 
 namespace mongo {
 
-    InterruptStatusMongos InterruptStatusMongos::status;
+    const InterruptStatusMongos InterruptStatusMongos::status;
 
     InterruptStatusMongos::InterruptStatusMongos() {
     }
 
-    void InterruptStatusMongos::checkForInterrupt() {
+    void InterruptStatusMongos::checkForInterrupt() const {
         // nothing as yet
     }
 
-    const char *InterruptStatusMongos::checkForInterruptNoAssert() {
+    const char *InterruptStatusMongos::checkForInterruptNoAssert() const {
         return "";
     }
 

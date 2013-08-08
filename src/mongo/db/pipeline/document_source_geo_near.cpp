@@ -101,7 +101,7 @@ namespace mongo {
 
         BSONObjBuilder geoNear; // not building a subField
 
-        geoNear.append("geoNear", pExpCtx->getNs().coll()); // not in toBson
+        geoNear.append("geoNear", pExpCtx->ns.coll()); // not in toBson
 
         if (coordsIsArray) {
             geoNear.appendArray("near", coords);
@@ -131,7 +131,7 @@ namespace mongo {
         massert(16603, "Already ran geoNearCommand",
                 !resultsIterator);
 
-        bool ok = _mongod->directClient()->runCommand(pExpCtx->getNs().db().toString(),
+        bool ok = _mongod->directClient()->runCommand(pExpCtx->ns.db().toString(),
                                                       buildGeoNearCmd(),
                                                       cmdOutput);
         uassert(16604, "geoNear command failed: " + cmdOutput.toString(),

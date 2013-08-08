@@ -138,13 +138,13 @@ namespace mongo {
                                      << typeName(pBsonElement->type()),
                 pBsonElement->type() == String);
         
-        NamespaceString outputNs(pExpCtx->getNs().db().toString() + '.' + pBsonElement->str());
+        NamespaceString outputNs(pExpCtx->ns.db().toString() + '.' + pBsonElement->str());
         return new DocumentSourceOut(outputNs, pExpCtx);
     }
 
     void DocumentSourceOut::sourceToBson(BSONObjBuilder *pBuilder, bool explain) const {
         massert(17000, "$out shouldn't have different db than input",
-                _outputNs.db() == pExpCtx->getNs().db());
+                _outputNs.db() == pExpCtx->ns.db());
 
         pBuilder->append("$out", _outputNs.coll());
     }

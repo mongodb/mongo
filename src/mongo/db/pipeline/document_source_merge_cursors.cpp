@@ -90,7 +90,7 @@ namespace mongo {
             // open each cursor and send message asking for a batch
             for (CursorIds::const_iterator it = _cursorIds.begin(); it !=_cursorIds.end(); ++it) {
                 _cursors.push_back(boost::make_shared<CursorAndConnection>(
-                            it->first, pExpCtx->getNs(), it->second));
+                            it->first, pExpCtx->ns, it->second));
                 verify(_cursors.back()->connection->lazySupported());
                 _cursors.back()->cursor.initLazy(); // shouldn't block
             }

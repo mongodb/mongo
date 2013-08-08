@@ -184,7 +184,7 @@ namespace mongo {
             opts.limit = limitSrc->getLimit();
 
         opts.maxMemoryUsageBytes = 100*1024*1024;
-        opts.extSortAllowed = pExpCtx->getExtSortAllowed() && !pExpCtx->getInRouter();
+        opts.extSortAllowed = pExpCtx->extSortAllowed && !pExpCtx->inRouter;
 
         scoped_ptr<MySorter> sorter (MySorter::make(opts, Comparator(*this)));
 
