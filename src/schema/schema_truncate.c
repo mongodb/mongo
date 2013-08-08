@@ -135,14 +135,11 @@ __wt_range_truncate(WT_CURSOR *start, WT_CURSOR *stop)
 			WT_RET(stop->remove(stop));
 		} while ((ret = stop->prev(stop)) == 0);
 		WT_RET_NOTFOUND_OK(ret);
-	} else if (stop == NULL) {
-		do {
-			WT_RET(start->remove(start));
-		} while ((ret = start->next(start)) == 0);
-		WT_RET_NOTFOUND_OK(ret);
 	} else {
+		cmp = -1;
 		do {
-			WT_RET(start->compare(start, stop, &cmp));
+			if (stop != NULL)
+				WT_RET(start->compare(start, stop, &cmp));
 			WT_RET(start->remove(start));
 		} while (cmp < 0 && (ret = start->next(start)) == 0);
 		WT_RET_NOTFOUND_OK(ret);
