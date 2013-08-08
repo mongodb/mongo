@@ -382,11 +382,13 @@ err:	API_END_NOTFOUND_MAP(session, ret);
 static int
 __session_compact(WT_SESSION *wt_session, const char *uri, const char *config)
 {
+	WT_DECL_ITEM(t);
 	WT_DECL_RET;
-	WT_ITEM *t;
 	WT_SESSION_IMPL *session;
+	WT_TXN *txn;
 
 	session = (WT_SESSION_IMPL *)wt_session;
+	txn = &session->txn;
 
 	/* Disallow objects in the WiredTiger name space. */
 	WT_RET(__wt_schema_name_check(session, uri));
@@ -399,6 +401,14 @@ __session_compact(WT_SESSION *wt_session, const char *uri, const char *config)
 	    !WT_PREFIX_MATCH(uri, "index:") &&
 	    !WT_PREFIX_MATCH(uri, "table:"))
 		return (__wt_bad_object_type(session, uri));
+
+	/*
+	 * Compaction requires checkpoints, which will fail in a transactional
+	 * context.  Check now so the error message isn't confusing.
+	 */
+	if (F_ISSET(txn, TXN_RUNNING))
+		WT_RET_MSG(session, EINVAL,
+		    "Compaction not permitted in a transaction");
 
 	/*
 	 * Compaction requires 2, and possibly 3 checkpoints, how many is block

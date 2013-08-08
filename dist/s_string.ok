@@ -61,6 +61,7 @@ CustomersPhone
 DATAITEMs
 DESC
 DHANDLE
+DNE
 DOI
 DSRC
 DUPLICATEV
@@ -611,6 +612,7 @@ notsup
 notyet
 nowrite
 np
+nr
 nset
 nthread
 nul

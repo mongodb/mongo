@@ -324,8 +324,9 @@ struct __wt_page {
 	uint8_t type;			/* Page type */
 
 #define	WT_PAGE_BUILD_KEYS	0x01	/* Keys have been built in memory */
-#define	WT_PAGE_DISK_NOT_ALLOC	0x02	/* Ignore disk image on page discard */
-#define	WT_PAGE_EVICT_LRU	0x04	/* Page is on the LRU queue */
+#define	WT_PAGE_DISK_ALLOC	0x02	/* Disk image in allocated memory */
+#define	WT_PAGE_DISK_MAPPED	0x04	/* Disk image in mapped memory */
+#define	WT_PAGE_EVICT_LRU	0x08	/* Page is on the LRU queue */
 	uint8_t flags_atomic;		/* Atomic flags, use F_*_ATOMIC */
 };
 
