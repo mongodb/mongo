@@ -880,9 +880,6 @@
     <ClInclude Include="..\db\memconcept.h">
       <Filter>db\Header Files\e to n</Filter>
     </ClInclude>
-    <ClInclude Include="..\db\module.h">
-      <Filter>db\Header Files\e to n</Filter>
-    </ClInclude>
     <ClInclude Include="..\util\admin_access.h">
       <Filter>util\Header Files</Filter>
     </ClInclude>
