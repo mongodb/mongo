@@ -856,6 +856,8 @@ namespace {
                 delete it->second;
         }
         _userCache.clear();
+        // Make sure the internal user stays in the cache.
+        _userCache.insert(make_pair(internalSecurity.user->getName(), internalSecurity.user));
     }
 
     Status AuthorizationManager::initializeAllV1UserData() {
