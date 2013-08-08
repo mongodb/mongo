@@ -18,6 +18,7 @@
 
 #include "mongo/pch.h"
 
+#include <boost/optional.hpp>
 #include <boost/unordered_map.hpp>
 #include <deque>
 
