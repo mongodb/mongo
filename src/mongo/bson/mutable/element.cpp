@@ -23,6 +23,11 @@
 namespace mongo {
 namespace mutablebson {
 
+    // Storage for Element::RepIdx;
+    const Element::RepIdx Element::kInvalidRepIdx;
+    const Element::RepIdx Element::kOpaqueRepIdx;
+    const Element::RepIdx Element::kMaxRepIdx;
+
     // Many of the methods of Element are actually implemented in document.cpp, since they need
     // access to the firewalled implementation of Document.
 

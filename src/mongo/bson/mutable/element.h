@@ -100,6 +100,19 @@ namespace mutablebson {
     public:
         typedef uint32_t RepIdx;
 
+        // Some special RepIdx values. These are really implementation details, but they are
+        // here so that we can inline Element::OK, which gets called very frequently, and they
+        // need to be public so some free functions in document.cpp can use them. You must not
+        // use these values explicitly.
+
+        // Used to signal an invalid Element.
+        static const RepIdx kInvalidRepIdx = RepIdx(-1);
+
+        // A rep that points to an unexamined entity
+        static const RepIdx kOpaqueRepIdx = RepIdx(-2);
+
+        // This is the highest valid rep that does not overlap flag values.
+        static const RepIdx kMaxRepIdx = RepIdx(-3);
 
         //
         // Topology mutation API. Element arguments must belong to the same Document.
@@ -426,7 +439,7 @@ namespace mutablebson {
         //
 
         /** Returns true if this Element represents a valid part of the Document. */
-        bool ok() const;
+        inline bool ok() const;
 
         /** Returns the Document to which this Element belongs. */
         inline Document& getDocument();

@@ -47,6 +47,14 @@ namespace mutablebson {
         return _root;
     }
 
+    inline Element Document::end() {
+        return Element(this, Element::kInvalidRepIdx);
+    }
+
+    inline ConstElement Document::end() const {
+        return const_cast<Document*>(this)->end();
+    }
+
     inline std::string Document::toString() const {
         return getObject().toString();
     }

@@ -416,10 +416,10 @@ namespace mutablebson {
         inline ConstElement root() const;
 
         /** Returns an element that will compare equal to a non-ok element. */
-        Element end();
+        inline Element end();
 
         /** Returns an element that will compare equal to a non-ok element. */
-        ConstElement end() const;
+        inline ConstElement end() const;
 
         inline std::string toString() const;
 
