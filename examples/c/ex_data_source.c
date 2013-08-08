@@ -179,6 +179,7 @@ static int my_cursor_insert(WT_CURSOR *wtcursor)
 	else
 		is_snapshot_isolation = 0;
 	/*! [WT_EXTENSION transaction isolation level] */
+	(void)is_snapshot_isolation;
 	}
 
 	{
@@ -239,7 +240,7 @@ static int my_cursor_insert(WT_CURSOR *wtcursor)
 	/*! [WT_EXTENSION collate] */
 	}
 
-	return (0);
+	return (ret);
 }
 
 static int my_cursor_update(WT_CURSOR *wtcursor)
