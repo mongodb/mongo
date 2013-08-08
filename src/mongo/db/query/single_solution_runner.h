@@ -16,10 +16,12 @@
 
 #pragma once
 
+#include "mongo/db/clientcursor.h"
+#include "mongo/db/parsed_query.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/plan_cache.h"
+#include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/runner.h"
-#include "mongo/db/query/simple_plan_runner.h"
 #include "mongo/db/query/stage_builder.h"
 
 namespace mongo {
@@ -36,40 +38,56 @@ namespace mongo {
         SingleSolutionRunner(CanonicalQuery* canonicalQuery, QuerySolution* soln,
                              PlanStage* root, WorkingSet* ws)
             : _canonicalQuery(canonicalQuery), _solution(soln),
-              _runner(new SimplePlanRunner(ws, root)) { }
+              _exec(new PlanExecutor(ws, root)), _killed(false) { }
 
-        bool getNext(BSONObj* objOut) {
-            // Use the underlying runner until it's exhausted.
-            if (_runner->getNext(objOut)) {
-                return true;
-            }
-
-            // TODO: I'm not convinced we want to cache this.  What if it's a collscan solution and
-            // the user adds an index later?  We don't want to reach for this.
-
-            // We're done.  Update the cache.
-            //PlanCache* cache = PlanCache::get(_canonicalQuery->ns());
-            // TODO: is this a verify?
-            //if (NULL == cache) { return false; }
-            // We're done running.  Update cache.
-            //auto_ptr<PlanRankingDecision> why(new PlanRankingDecision());
-            //why->onlyOneSolution = true;
-            //cache->add(canonicalQuery.release(), solutions[0], why.release());
-            return false;
+        Runner::RunnerState getNext(BSONObj* objOut) {
+            if (_killed) { return Runner::RUNNER_DEAD; }
+            return _exec->getNext(objOut);
+            // TODO: I'm not convinced we want to cache this run.  What if it's a collscan solution
+            // and the user adds an index later?  We don't want to reach for this.  But if solving
+            // the query is v. hard, we do want to cache it.  Maybe we can remove single solution
+            // cache entries when we build an index?
         }
 
-        virtual void saveState() { _runner->saveState(); }
-        virtual void restoreState() { _runner->restoreState(); }
-        virtual void invalidate(const DiskLoc& dl) { _runner->invalidate(dl); }
+        virtual void saveState() {
+            if (!_killed) {
+                _exec->saveState();
+            }
+        }
 
-        virtual const CanonicalQuery& getQuery() {
-            return *_canonicalQuery;
+        virtual void restoreState() {
+            if (!_killed) {
+                _exec->restoreState();
+            }
+        }
+
+        virtual void invalidate(const DiskLoc& dl) {
+            if (!_killed) {
+                cout << "Sending invalidate to exec\n";
+                _exec->invalidate(dl);
+            }
+        }
+
+        virtual const CanonicalQuery& getQuery() { return *_canonicalQuery; }
+
+        virtual void kill() { _killed = true; }
+
+        virtual bool forceYield() {
+            saveState();
+            ClientCursor::registerRunner(this);
+            ClientCursor::staticYield(ClientCursor::suggestYieldMicros(), getQuery().getParsed().ns(), NULL);
+            ClientCursor::deregisterRunner(this);
+            if (!_killed) { restoreState(); }
+            return !_killed;
         }
 
     private:
         scoped_ptr<CanonicalQuery> _canonicalQuery;
         scoped_ptr<QuerySolution> _solution;
-        scoped_ptr<SimplePlanRunner> _runner;
+        scoped_ptr<PlanExecutor> _exec;
+
+        // Were we killed during a yield?
+        bool _killed;
     };
 
 }  // namespace mongo

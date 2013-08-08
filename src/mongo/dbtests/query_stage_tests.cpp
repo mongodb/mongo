@@ -21,7 +21,7 @@
 #include "mongo/db/instance.h"
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/expression_parser.h"
-#include "mongo/db/query/simple_plan_runner.h"
+#include "mongo/db/query/plan_executor.h"
 #include "mongo/dbtests/dbtests.h"
 
 /**
@@ -59,7 +59,7 @@ namespace QueryStageTests {
 
         int countResults(const IndexScanParams& params, BSONObj filterObj = BSONObj()) {
             Client::ReadContext ctx(ns());
-            SimplePlanRunner runner;
+            PlanExecutor runner;
 
             StatusWithMatchExpression swme = MatchExpressionParser::parse(filterObj);
             verify(swme.isOK());
@@ -67,7 +67,7 @@ namespace QueryStageTests {
             runner.setRoot(new IndexScan(params, runner.getWorkingSet(), filterExpr.get()));
 
             int count = 0;
-            for (BSONObj obj; runner.getNext(&obj); ) {
+            for (BSONObj obj; Runner::RUNNER_ADVANCED == runner.getNext(&obj); ) {
                 ++count;
             }
 

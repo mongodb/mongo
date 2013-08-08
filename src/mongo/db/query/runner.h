@@ -27,10 +27,21 @@ namespace mongo {
     public:
         virtual ~Runner() { }
 
+        enum RunnerState {
+            // We successfully populated the out parameter.
+            RUNNER_ADVANCED,
+
+            // We're EOF.  We won't return any more results (edge case exception: capped+tailable).
+            RUNNER_EOF,
+
+            // We were killed or had an error.
+            RUNNER_DEAD,
+        };
+
         /**
          * Get the next result from the query.
          */
-        virtual bool getNext(BSONObj* objOut) = 0;
+        virtual RunnerState getNext(BSONObj* objOut) = 0;
 
         /**
          * Inform the runner that the provided DiskLoc is about to disappear (or change entirely).
@@ -41,13 +52,33 @@ namespace mongo {
          */
         virtual void invalidate(const DiskLoc& dl) = 0;
 
+        /**
+         * Save any state required to yield.
+         */
         virtual void saveState() = 0;
+
+        /**
+         * Restore saved state, possibly after a yield.
+         */
         virtual void restoreState() = 0;
 
         /**
          * Return the query that the runner is running.
          */
         virtual const CanonicalQuery& getQuery() = 0;
+
+        /**
+         * Mark the Runner as no longer valid.  Can happen when a runner yields and the underlying
+         * database is dropped/indexes removed/etc.
+         */
+        virtual void kill() = 0;
+
+        /**
+         * Force the runner to yield.  Gives up any locks it had before.  Holds locks again when the
+         * runner returns from the yield.  Returns true if it's OK to continue using the runner,
+         * false if the runner was killed during a yield.
+         */
+        virtual bool forceYield() = 0;
     };
 
 }  // namespace mongo

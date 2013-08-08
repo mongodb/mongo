@@ -21,7 +21,7 @@
 #include "mongo/db/index/catalog_hack.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/json.h"
-#include "mongo/db/query/simple_plan_runner.h"
+#include "mongo/db/query/plan_executor.h"
 #include "mongo/dbtests/dbtests.h"
 
 /**
@@ -111,7 +111,7 @@ namespace QueryStageSortTests {
          * If limit is not zero, we limit the output of the sort stage to 'limit' results.
          */
         void sortAndCheck(int direction) {
-            SimplePlanRunner runner;
+            PlanExecutor runner;
             auto_ptr<MockStage> ms(new MockStage(runner.getWorkingSet()));
 
             // Insert a mix of the various types of data.
@@ -125,13 +125,13 @@ namespace QueryStageSortTests {
             // Look at pairs of objects to make sure that the sort order is pairwise (and therefore
             // totally) correct.
             BSONObj last;
-            ASSERT(runner.getNext(&last));
+            ASSERT_EQUALS(Runner::RUNNER_ADVANCED, runner.getNext(&last));
 
             // Count 'last'.
             int count = 1;
 
             BSONObj current;
-            while (runner.getNext(&current)) {
+            while (Runner::RUNNER_ADVANCED == runner.getNext(&current)) {
                 int cmp = sgn(current.woSortOrder(last, params.pattern));
                 // The next object should be equal to the previous or oriented according to the sort
                 // pattern.

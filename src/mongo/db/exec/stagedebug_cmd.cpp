@@ -33,7 +33,7 @@
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/namespace_details.h"
 #include "mongo/db/pdfile.h"
-#include "mongo/db/query/simple_plan_runner.h"
+#include "mongo/db/query/plan_executor.h"
 
 namespace mongo {
 
@@ -96,14 +96,14 @@ namespace mongo {
             BSONObj argObj = argElt.Obj();
 
             OwnedPointerVector<MatchExpression> exprs;
-            SimplePlanRunner runner;
+            PlanExecutor runner;
             auto_ptr<PlanStage> root(parseQuery(dbname, argObj, runner.getWorkingSet(), &exprs));
             uassert(16911, "Couldn't parse plan from " + argObj.toString(), root.get());
             runner.setRoot(root.release());
 
             BSONArrayBuilder resultBuilder(result.subarrayStart("results"));
 
-            for (BSONObj obj; runner.getNext(&obj); ) {
+            for (BSONObj obj; Runner::RUNNER_ADVANCED == runner.getNext(&obj); ) {
                 resultBuilder.append(obj);
             }
 

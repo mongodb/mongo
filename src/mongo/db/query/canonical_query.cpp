@@ -49,7 +49,11 @@ namespace mongo {
                                         CanonicalQuery** out) {
         auto_ptr<CanonicalQuery> cq(new CanonicalQuery());
 
-        cq->_pq.reset(new ParsedQuery(ns.c_str(), 0, 0, 0, query, BSONObj()));
+        // ParsedQuery saves the pointer to the NS that we provide it.  It's not going to remain
+        // valid unless we cache it ourselves.
+        cq->_ns = ns;
+
+        cq->_pq.reset(new ParsedQuery(cq->_ns.c_str(), 0, 0, 0, query, BSONObj()));
 
         StatusWithMatchExpression swme = MatchExpressionParser::parse(cq->_pq->getFilter());
         if (!swme.isOK()) { return swme.getStatus(); }
