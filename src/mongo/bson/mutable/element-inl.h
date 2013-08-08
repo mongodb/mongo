@@ -89,6 +89,10 @@ namespace mutablebson {
         return isType(mongo::MaxKey);
     }
 
+    inline bool Element::ok() const {
+        return ((_doc != NULL) && (_repIdx <= kMaxRepIdx));
+    }
+
     inline Document& Element::getDocument() {
         return *_doc;
     }

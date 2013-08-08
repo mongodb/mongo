@@ -463,15 +463,6 @@ namespace mutablebson {
         // The ElementRep for the root element is always zero.
         const Element::RepIdx kRootRepIdx = Element::RepIdx(0);
 
-        // A rep for entries that do not exist (this was 'x' in the example legend).
-        const Element::RepIdx kInvalidRepIdx = Element::RepIdx(-1);
-
-        // A rep that points to an unexamined entity (this was '?' in the example legend).
-        const Element::RepIdx kOpaqueRepIdx = Element::RepIdx(-2);
-
-        // This is the highest valid rep that does not overlap flag values.
-        const Element::RepIdx kMaxRepIdx = Element::RepIdx(-3);
-
         // This is the object index for elements in the leaf heap.
         const ElementRep::ObjIdx kLeafObjIdx = ElementRep::ObjIdx(0);
 
@@ -506,11 +497,11 @@ namespace mutablebson {
             rep.array = false;
             rep.reserved = 0;
             rep.offset = 0;
-            rep.sibling.left = kInvalidRepIdx;
-            rep.sibling.right = kInvalidRepIdx;
-            rep.child.left = kInvalidRepIdx;
-            rep.child.right = kInvalidRepIdx;
-            rep.parent = kInvalidRepIdx;
+            rep.sibling.left = Element::kInvalidRepIdx;
+            rep.sibling.right = Element::kInvalidRepIdx;
+            rep.child.left = Element::kInvalidRepIdx;
+            rep.child.right = Element::kInvalidRepIdx;
+            rep.parent = Element::kInvalidRepIdx;
             rep.pad = 0;
             return rep;
         }
@@ -522,20 +513,20 @@ namespace mutablebson {
         bool canAttach(const Element::RepIdx id, const ElementRep& rep) {
             return
                 (id != kRootRepIdx) &&
-                (rep.sibling.left == kInvalidRepIdx) &&
-                (rep.sibling.right == kInvalidRepIdx) &&
-                (rep.parent == kInvalidRepIdx);
+                (rep.sibling.left == Element::kInvalidRepIdx) &&
+                (rep.sibling.right == Element::kInvalidRepIdx) &&
+                (rep.parent == Element::kInvalidRepIdx);
         }
 
         // Returns a Status describing why 'canAttach' returned false. This function should not
         // be inlined since it just makes the callers larger for no real gain.
         NOINLINE_DECL Status getAttachmentError(const ElementRep& rep);
         Status getAttachmentError(const ElementRep& rep) {
-            if (rep.sibling.left != kInvalidRepIdx)
+            if (rep.sibling.left != Element::kInvalidRepIdx)
                 return Status(ErrorCodes::IllegalOperation, "dangling left sibling");
-            if (rep.sibling.right != kInvalidRepIdx)
+            if (rep.sibling.right != Element::kInvalidRepIdx)
                 return Status(ErrorCodes::IllegalOperation, "dangling right sibling");
-            if (rep.parent != kInvalidRepIdx)
+            if (rep.parent != Element::kInvalidRepIdx)
                 return Status(ErrorCodes::IllegalOperation, "dangling parent");
             return Status(ErrorCodes::IllegalOperation, "cannot add the root as a child");
         }
@@ -620,7 +611,7 @@ namespace mutablebson {
         // Insert the given ElementRep and return an ID for it.
         Element::RepIdx insertElement(const ElementRep& rep) {
             const Element::RepIdx id = _elements.size();
-            verify(id <= kMaxRepIdx);
+            verify(id <= Element::kMaxRepIdx);
             _elements.push_back(rep);
             if (debug && paranoid) {
                 // Force all reps to new addresses to help catch invalid rep usage.
@@ -740,12 +731,12 @@ namespace mutablebson {
         // left child to a realized Element if it is currently opaque. This may also cause the
         // parent elements child.right entry to be updated.
         Element::RepIdx resolveLeftChild(Element::RepIdx index) {
-            dassert(index != kInvalidRepIdx);
-            dassert(index != kOpaqueRepIdx);
+            dassert(index != Element::kInvalidRepIdx);
+            dassert(index != Element::kOpaqueRepIdx);
 
             // If the left child is anything other than opaque, then we are done here.
             ElementRep* rep = &getElementRep(index);
-            if (rep->child.left != kOpaqueRepIdx)
+            if (rep->child.left != Element::kOpaqueRepIdx)
                 return rep->child.left;
 
             // It should be impossible to have an opaque left child and be non-serialized,
@@ -762,11 +753,11 @@ namespace mutablebson {
                 newRep.offset =
                     getElementOffset(getObject(rep->objIdx), childElt);
                 newRep.parent = index;
-                newRep.sibling.right = kOpaqueRepIdx;
+                newRep.sibling.right = Element::kOpaqueRepIdx;
                 // If this new object has possible substructure, mark its children as opaque.
                 if (!isLeaf(newRep)) {
-                    newRep.child.left = kOpaqueRepIdx;
-                    newRep.child.right = kOpaqueRepIdx;
+                    newRep.child.left = Element::kOpaqueRepIdx;
+                    newRep.child.right = Element::kOpaqueRepIdx;
                 }
                 // Calling insertElement invalidates rep since insertElement may cause a
                 // reallocation of the element vector. After calling insertElement, we
@@ -775,11 +766,11 @@ namespace mutablebson {
                 rep = &getElementRep(index);
                 rep->child.left = inserted;
             } else {
-                rep->child.left = kInvalidRepIdx;
-                rep->child.right = kInvalidRepIdx;
+                rep->child.left = Element::kInvalidRepIdx;
+                rep->child.right = Element::kInvalidRepIdx;
             }
 
-            dassert(rep->child.left != kOpaqueRepIdx);
+            dassert(rep->child.left != Element::kOpaqueRepIdx);
             return rep->child.left;
         }
 
@@ -787,15 +778,15 @@ namespace mutablebson {
         // opaque nodes. Note that this may require resolving all of the right siblings of the
         // left child.
         Element::RepIdx resolveRightChild(Element::RepIdx index) {
-            dassert(index != kInvalidRepIdx);
-            dassert(index != kOpaqueRepIdx);
+            dassert(index != Element::kInvalidRepIdx);
+            dassert(index != Element::kOpaqueRepIdx);
 
             Element::RepIdx current = getElementRep(index).child.right;
-            if (current == kOpaqueRepIdx) {
+            if (current == Element::kOpaqueRepIdx) {
                 current = resolveLeftChild(index);
-                while (current != kInvalidRepIdx) {
+                while (current != Element::kInvalidRepIdx) {
                     Element::RepIdx next = resolveRightSibling(current);
-                    if (next == kInvalidRepIdx)
+                    if (next == Element::kInvalidRepIdx)
                         break;
                     current = next;
                 }
@@ -811,12 +802,12 @@ namespace mutablebson {
         // Return the index of the right sibling of the Element with index 'index', resolving
         // the right sibling to a realized Element if it is currently opaque.
         Element::RepIdx resolveRightSibling(Element::RepIdx index) {
-            dassert(index != kInvalidRepIdx);
-            dassert(index != kOpaqueRepIdx);
+            dassert(index != Element::kInvalidRepIdx);
+            dassert(index != Element::kOpaqueRepIdx);
 
             // If the right sibling is anything other than opaque, then we are done here.
             ElementRep* rep = &getElementRep(index);
-            if (rep->sibling.right != kOpaqueRepIdx)
+            if (rep->sibling.right != Element::kOpaqueRepIdx)
                 return rep->sibling.right;
 
             BSONElement elt = getSerializedElement(*rep);
@@ -830,11 +821,11 @@ namespace mutablebson {
                     getElementOffset(getObject(rep->objIdx), rightElt);
                 newRep.parent = rep->parent;
                 newRep.sibling.left = index;
-                newRep.sibling.right = kOpaqueRepIdx;
+                newRep.sibling.right = Element::kOpaqueRepIdx;
                 // If this new object has possible substructure, mark its children as opaque.
                 if (!isLeaf(newRep)) {
-                    newRep.child.left = kOpaqueRepIdx;
-                    newRep.child.right = kOpaqueRepIdx;
+                    newRep.child.left = Element::kOpaqueRepIdx;
+                    newRep.child.right = Element::kOpaqueRepIdx;
                 }
                 // Calling insertElement invalidates rep since insertElement may cause a
                 // reallocation of the element vector. After calling insertElement, we
@@ -843,23 +834,23 @@ namespace mutablebson {
                 rep = &getElementRep(index);
                 rep->sibling.right = inserted;
             } else {
-                rep->sibling.right = kInvalidRepIdx;
+                rep->sibling.right = Element::kInvalidRepIdx;
                 // If we have found the end of this object, then our (necessarily existing)
                 // parent's necessarily opaque right child is now determined to be us.
-                dassert(rep->parent <= kMaxRepIdx);
+                dassert(rep->parent <= Element::kMaxRepIdx);
                 ElementRep& parentRep = getElementRep(rep->parent);
-                dassert(parentRep.child.right == kOpaqueRepIdx);
+                dassert(parentRep.child.right == Element::kOpaqueRepIdx);
                 parentRep.child.right = index;
             }
 
-            dassert(rep->sibling.right != kOpaqueRepIdx);
+            dassert(rep->sibling.right != Element::kOpaqueRepIdx);
             return rep->sibling.right;
         }
 
         // Find the ElementRep at index 'index', and mark it and all of its currently
         // serialized parents as non-serialized.
         void deserialize(Element::RepIdx index) {
-            while (index != kInvalidRepIdx) {
+            while (index != Element::kInvalidRepIdx) {
                 ElementRep& rep = getElementRep(index);
                 // It does not make sense for leaf Elements to become deserialized, and
                 // requests to do so indicate a bug in the implementation of the library.
@@ -1769,10 +1760,6 @@ namespace mutablebson {
         }
     }
 
-    bool Element::ok() const {
-        return ((_doc != NULL) && (_repIdx <= kMaxRepIdx));
-    }
-
     BSONType Element::getType() const {
         verify(ok());
         const Document::Impl& impl = getDocument().getImpl();
@@ -2104,7 +2091,7 @@ namespace mutablebson {
         dassert(impl.doesNotAlias(fieldName));
         dassert(impl.doesNotAlias(value));
 
-        Element::RepIdx newEltIdx = kInvalidRepIdx;
+        Element::RepIdx newEltIdx = Element::kInvalidRepIdx;
         // A cheap hack to detect that this Object Element is for the root.
         if (fieldName.rawData() == &kRootFieldName[0]) {
             ElementRep newElt = makeRep();
@@ -2126,8 +2113,8 @@ namespace mutablebson {
             newEltIdx = impl.insertLeafElement(leafRef);
         }
         ElementRep& newElt = impl.getElementRep(newEltIdx);
-        newElt.child.left = kOpaqueRepIdx;
-        newElt.child.right = kOpaqueRepIdx;
+        newElt.child.left = Element::kOpaqueRepIdx;
+        newElt.child.right = Element::kOpaqueRepIdx;
         return Element(this, newEltIdx);
     }
 
@@ -2151,8 +2138,8 @@ namespace mutablebson {
         builder.appendArray(fieldName, value);
         Element::RepIdx newEltIdx = impl.insertLeafElement(leafRef);
         ElementRep& newElt = impl.getElementRep(newEltIdx);
-        newElt.child.left = kOpaqueRepIdx;
-        newElt.child.right = kOpaqueRepIdx;
+        newElt.child.left = Element::kOpaqueRepIdx;
+        newElt.child.right = Element::kOpaqueRepIdx;
         return Element(this, newEltIdx);
     }
 
@@ -2422,14 +2409,6 @@ namespace mutablebson {
             element.writeElement(&builder, fieldName);
             return Element(this, impl.insertLeafElement(leafRef));
         }
-    }
-
-    Element Document::end() {
-        return Element(this, kInvalidRepIdx);
-    }
-
-    ConstElement Document::end() const {
-        return const_cast<Document*>(this)->end();
     }
 
     inline Document::Impl& Document::getImpl() {
