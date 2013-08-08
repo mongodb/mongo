@@ -132,7 +132,7 @@ namespace mongo {
         Options(bool repl, bool ofs) : fromReplication(repl), enforceOkForStorage(ofs) {}
 
         static Options normal() { return Options(false, true); }
-        static Options fromRepl() { return Options(true, true); }
+        static Options fromRepl() { return Options(true, false); }
         static Options unchecked() { return Options(false, false); }
 
         bool fromReplication;

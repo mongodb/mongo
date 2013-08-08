@@ -506,14 +506,11 @@ namespace mongo {
         // list of actually excluded config collections, and not global for the config db).
         NamespaceString nsStr( ns );
 
-        // Should the modifiers validdate their embedded docs via okForStorage
-        bool shouldValidate = true;
-
+        // Should the modifiers validate their embedded docs via okForStorage
+        // Only user updates should be checked. Any system or replication stuff should pass through.
         // Config db docs shouldn't get checked for valid field names since the shard key can have
-        // a dot (".") in it. Therefore we disable validation for storage.
-        if ( nsStr.db() == "config" ) {
-            shouldValidate = false;
-        }
+        // a dot (".") in it.
+        bool shouldValidate = !(forReplication || nsStr.db() == "config");
 
         UpdateDriver::Options opts;
         opts.multi = multi;
