@@ -522,6 +522,7 @@ namespace replset {
                 LOG(2) << "replSet can't connect to " << current << " to read operations" << rsLog;
                 r.resetConnection();
                 theReplSet->veto(current);
+                sleepsecs(1);
                 continue;
             }
 
