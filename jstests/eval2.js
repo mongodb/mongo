@@ -1,12 +1,12 @@
 
-t = db.test;
+t = db.eval2;
 t.drop();
 t.save({a:1});
 t.save({a:1});
 
 var f = db.group(
     {
-        ns: "test",
+        ns: t.getName(),
         key: { a:true},
         cond: { a:1 },
         reduce: function(obj,prev) { prev.csum++; } ,
