@@ -7,6 +7,8 @@
 
 #include "wt_internal.h"
 
+static int __split_row_page_inmem(WT_SESSION_IMPL *, WT_PAGE *);
+
 /*
  * WT_VISIT_STATE --
  *	The state maintained across calls to the "visit" callback functions:
@@ -531,5 +533,209 @@ err:	WT_VERBOSE_TRET(session, evict,
 		__wt_page_out(session, &lchild);
 	if (rchild != NULL)
 		__wt_page_out(session, &rchild);
+	return (ret);
+}
+
+/*
+ * __wt_split_page_inmem --
+ *	Split a large in memory page into an in memory tree of pages. We must
+ *	have exclusive access to the page upon entry.
+ */
+int
+__wt_split_page_inmem(WT_SESSION_IMPL *session, WT_PAGE *orig)
+{
+
+	WT_VERBOSE_RET(session, evict,
+	    "Splitting page %p (%s)", orig, __wt_page_type_string(orig->type));
+
+	switch (orig->type) {
+	case WT_PAGE_ROW_INT:
+	case WT_PAGE_ROW_LEAF:
+		WT_RET(__split_row_page_inmem(session, orig));
+		break;
+	case WT_PAGE_COL_INT:
+	case WT_PAGE_COL_FIX:
+	case WT_PAGE_COL_VAR:
+		/*
+		 * TODO: Support column pages here.
+		 */
+		return (EBUSY);
+		break;
+	WT_ILLEGAL_VALUE(session);
+	}
+
+	return (0);
+}
+
+static int
+__split_row_page_inmem(
+    WT_SESSION_IMPL *session, WT_PAGE *orig)
+{
+	WT_DECL_RET;
+	WT_INSERT *ins, *prev_ins;
+	WT_INSERT **insp;
+	WT_INSERT_HEAD *ins_head;
+	WT_PAGE *new_parent, *right_child;
+	WT_REF *newref;
+	int i;
+
+	new_parent = right_child = NULL;
+	ins = prev_ins = NULL;
+
+	/*
+	 * Do all operations that can fail before futzing with the original
+	 * page.
+	 * Allocate two new pages:
+	 *  * One split merge page that will be the new parent.
+	 *  * One leaf page (right_child).
+	 * We will move the last key/value pair from the original page onto
+	 * the new leaf page.
+	 */
+
+	WT_RET(__merge_new_page(
+	    session, WT_PAGE_ROW_INT, 2, 1, &new_parent));
+
+	WT_ERR(__merge_new_page(
+	    session, WT_PAGE_ROW_LEAF, 0, 0, &right_child));
+
+	/* Find the final item on the original page. */
+	if (!F_ISSET_ATOMIC(orig, WT_PAGE_BUILD_KEYS))
+		WT_ERR(__wt_row_leaf_keys(session, orig));
+	if (orig->entries == 0)
+		ins_head = WT_ROW_INSERT_SMALLEST(orig);
+	else
+		ins_head = WT_ROW_INSERT_SLOT(orig, orig->entries - 1);
+
+	ins = WT_SKIP_LAST(ins_head);
+
+	/* Add the entry onto the right_child page, as a skip list. */
+	WT_ERR(__wt_calloc_def(
+	    session, 1, &(right_child->u.row.ins)));
+	WT_ERR(__wt_calloc_def(
+	    session, 1, &right_child->u.row.ins[0]));
+	right_child->u.row.ins[0]->tail[0] = ins;
+	right_child->u.row.ins[0]->head[0] = ins;
+
+	/* TODO: Transfer the memory footprint. */
+
+	/*
+	 * Remove the entry from the orig page (i.e truncate the skip list).
+	 * We need to iterate forward through the skip list first to find
+	 * the next-to last entries in the skip list stack.
+	 * Following is an ascii art skip list that might help.
+	 *
+	 *               __
+	 *              |c4|
+	 *               --
+	 *               |
+	 *   __          __    __
+	 *  |a3|--------|c3|--|d3|
+	 *   --          --    --
+	 *   |           |     |
+	 *   __          __    __          __
+	 *  |a2|--------|c2|--|d2|--------|f2|
+	 *   --          --    --          --
+	 *   |           |     |           |
+	 *   __    __    __    __    __    __
+	 *  |a1|--|b1|--|c1|--|d1|--|e1|--|f1|
+	 *   --    --    --    --    --    --
+	 *
+	 *   From the above picture.
+	 *   The head array will be: a1, a2, a3, c4, NULL
+	 *   The tail array will be: f1, f2, d3, c4, NULL
+	 *   We are looking for: e1, d2, NULL
+	 *   If there were no f2, we'd be looking for: e1, NULL
+	 *   If there were an f3, we'd be looking for: e1, d2, d3, NULL
+	 */
+#if 0
+	for (i = 0; ins_head->tail[i] == ins; ++i) {}
+	/*
+	 * If we are unlucky and the last element has a full height stack we
+	 * don't have any choice but to start at the head.
+	 */
+	if (i == WT_SKIP_MAXDEPTH)
+		insp = &ins_head->head[i];
+	else
+		insp = &ins_head->tail[i];
+
+	for (i--, insp--; i >= 0; i--, insp--) {
+		for (current_ins = *insp;
+		    current_ins != ins;
+		    current_ins = current_ins->next[i])
+			prev_ins = current_ins;
+		prev_ins->next[i] = NULL;
+		ins_head->tail[i] = prev_ins;
+	}
+#else
+	for (i = WT_SKIP_MAXDEPTH - 1, insp = &ins_head->head[i]; i >= 0;) {
+		if (*insp == NULL) {
+			i--;
+			insp--;
+			continue;
+		}
+
+		for (;
+		    *insp != ins_head->tail[i];
+		    *insp = (*insp)->next[i])
+			prev_ins = *insp;
+		/*
+		 * Update the tail pointer to the previous entry if it is
+		 * the entry that is moving to the next page and ensure that
+		 * we step down the right finger in the skip list.
+		 */
+		if (ins_head->tail[i] == ins) {
+			ins_head->tail[i] = prev_ins;
+			prev_ins->next[i] = NULL;
+			*insp = prev_ins;
+		}
+
+		/* Drop down a level. */
+		insp--;
+		i--;
+	}
+#endif
+
+	/* Setup the ref in the new parent to point to the original parent. */
+	new_parent->u.intl.recno = orig->u.intl.recno;
+	new_parent->parent = orig->parent;
+	new_parent->ref = orig->ref;
+
+	/*
+	 * Link the orig page into the new_parent. Copy the WT_REF from
+	 * the original parent - it's the same.
+	 * TODO: Should we just refer to the same thing? If so how do we stop
+	 * the memory being allocated when we create new_parent?
+	 */
+	newref = &new_parent->u.intl.t[0];
+	memcpy(newref, orig->ref, WT_REF_SIZE);
+	newref->state = WT_REF_MEM;
+
+	/* Link the right child page into the new parent. */
+	newref = &new_parent->u.intl.t[1];
+	WT_LINK_PAGE(new_parent, newref, right_child);
+	newref->state = WT_REF_MEM;
+
+	/*
+	 * Copy the key we moved onto the right child into the WT_REF
+	 * structure that is now linked into the parent page.
+	 * TODO: This needs to be done earlier - so we can error out if the
+	 * memory allocation fails.
+	 */
+	__wt_row_ikey_incr(session, right_child, ins->u.key.offset,
+	    WT_INSERT_KEY(ins), ins->u.key.size, &newref->key.ikey);
+
+	/*
+	 * Set up the new top-level page as a split so that it will be swapped
+	 * into place by our caller.
+	 */
+	new_parent->modify->flags = WT_PM_REC_SPLIT;
+	new_parent->modify->u.split = new_parent;
+
+err:	if (ret != 0) {
+		if (new_parent != NULL)
+			__wt_page_out(session, &new_parent);
+		if (right_child != NULL)
+			__wt_page_out(session, &right_child);
+	}
 	return (ret);
 }

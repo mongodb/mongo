@@ -84,7 +84,7 @@ __wt_page_in_func(
 			 */
 			if (!WT_TXN_ACTIVE(txn) &&
 			    txn->force_evict_attempts < 100 &&
-			    __wt_eviction_page_force(session, page)) {
+			    __wt_eviction_page_force(session, page) != 0) {
 				++txn->force_evict_attempts;
 				page->read_gen = WT_READ_GEN_OLDEST;
 				WT_RET(__wt_page_release(session, page));

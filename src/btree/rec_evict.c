@@ -55,7 +55,26 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, int exclusive)
 	 * or during salvage).  That's OK if exclusive is set: we won't check
 	 * hazard pointers in that case.
 	 */
-	WT_ERR(__rec_review(session, page->ref, page, exclusive, merge, 1));
+	ret = __rec_review(session, page->ref, page, exclusive, merge, 1);
+
+	/*
+	 * If reconciliation failed due to unwritable modifications and the
+	 * page is a lot larger than the maxiumum allowed, it's likely that
+	 * we are having trouble reconciling it due to contention. Attempt to
+	 * split the page in memory.
+	 */
+	if (!exclusive && ret == EBUSY &&
+	    __wt_eviction_page_force(session, page) > 2) {
+		WT_ERR(__wt_split_page_inmem(session, page));
+		__rec_excl_clear(session);
+		/*
+		 * The original page has been included in the split, so don't
+		 * discard it, or count the split towards eviction stats.
+		 */
+		/* TODO: Add a statistic for split pages. */
+		goto err;
+	}
+	WT_ERR(ret);
 
 	/* Try to merge internal pages. */
 	if (merge)
@@ -103,8 +122,8 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, int exclusive)
 		WT_CSTAT_INCR(session, cache_eviction_dirty);
 		WT_DSTAT_INCR(session, cache_eviction_dirty);
 	}
-	if (0) {
-err:		/*
+err:	if (ret != 0) {
+		/*
 		 * If unable to evict this page, release exclusive reference(s)
 		 * we've acquired.
 		 */
@@ -434,7 +453,8 @@ ckpt:		WT_CSTAT_INCR(session, cache_eviction_checkpoint);
 		/* If there are unwritten changes on the page, give up. */
 		if (ret == EBUSY) {
 			WT_VERBOSE_RET(session, evict,
-			    "eviction failed, reconciled page not clean");
+			    "eviction failed, reconciled page"
+			    " contained active updates");
 
 			/* 
 			 * We may be able to discard any "update" memory the
