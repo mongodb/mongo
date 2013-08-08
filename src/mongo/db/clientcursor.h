@@ -245,7 +245,7 @@ namespace mongo {
     private:
         friend class ClientCursorHolder;
         friend class ClientCursorPin;
-        friend class ClientCursorYieldLock;
+        friend struct ClientCursorYieldLock;
         friend class CmdCursorInfo;
 
         // A map from the CursorId to the ClientCursor behind it.
