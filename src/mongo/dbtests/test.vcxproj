@@ -758,7 +758,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\db\matcher\match_details.h" />
     <ClInclude Include="..\db\matcher_covered.h" />
     <ClInclude Include="..\db\memconcept.h" />
-    <ClInclude Include="..\db\module.h" />
     <ClInclude Include="..\db\mongomutex.h" />
     <ClInclude Include="..\db\namespace_details-inl.h" />
     <ClInclude Include="..\db\namespace_details.h" />
