@@ -520,16 +520,14 @@ methods = {
 
 'connection.load_extension' : Method([
 	Config('entry', 'wiredtiger_extension_init', r'''
-		the entry point of the extension, called to initialize the extension
-		when it is loaded.  The signature of the function must match
-		::wiredtiger_extension_init'''),
-	Config('prefix', '', r'''
-		a prefix for all names registered by this extension (e.g., to
-		make namespaces distinct or during upgrades)'''),
+		the entry point of the extension, called to initialize the
+		extension when it is loaded.  The signature of the function
+		must match ::wiredtiger_extension_init'''),
 	Config('terminate', 'wiredtiger_extension_terminate', r'''
-		a optional function in the extension that is called before the
-		extension is unloaded during WT_CONNECTION::close.  The signature of
-		the function must match ::wiredtiger_extension_terminate'''),
+		an optional function in the extension that is called before
+		the extension is unloaded during WT_CONNECTION::close.  The
+		signature of the function must match
+		::wiredtiger_extension_terminate'''),
 ]),
 
 'connection.open_session' : Method(session_config),

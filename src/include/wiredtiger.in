@@ -1241,10 +1241,7 @@ struct __wt_connection {
 	 * initialize the extension when it is loaded.  The signature of the
 	 * function must match ::wiredtiger_extension_init., a string; default
 	 * \c wiredtiger_extension_init.}
-	 * @config{prefix, a prefix for all names registered by this extension
-	 * (e.g.\, to make namespaces distinct or during upgrades)., a string;
-	 * default empty.}
-	 * @config{terminate, a optional function in the extension that is
+	 * @config{terminate, an optional function in the extension that is
 	 * called before the extension is unloaded during WT_CONNECTION::close.
 	 * The signature of the function must match
 	 * ::wiredtiger_extension_terminate., a string; default \c
