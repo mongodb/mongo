@@ -16,10 +16,11 @@
 
 #pragma once
 
+#include "mongo/db/parsed_query.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/plan_cache.h"
+#include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/runner.h"
-#include "mongo/db/query/simple_plan_runner.h"
 #include "mongo/db/query/stage_builder.h"
 
 namespace mongo {
@@ -40,53 +41,80 @@ namespace mongo {
         CachedPlanRunner(CanonicalQuery* canonicalQuery, CachedSolution* cached,
                          PlanStage* root, WorkingSet* ws)
             : _canonicalQuery(canonicalQuery), _cachedQuery(cached),
-              _runner(new SimplePlanRunner(ws, root)) { }
+              _exec(new PlanExecutor(ws, root)), _killed(false), _updatedCache(false) { }
 
-        bool getNext(BSONObj* objOut) {
-            // Use the underlying runner until it's exhausted.
-            if (_runner->getNext(objOut)) {
-                return true;
-            }
+        Runner::RunnerState getNext(BSONObj* objOut) {
+            if (_killed) { return Runner::RUNNER_DEAD; }
 
-            // We're done.  Update the cache.
-            PlanCache* cache = PlanCache::get(_canonicalQuery->ns());
+            Runner::RunnerState state = _exec->getNext(objOut);
 
-            // TODO: is this a verify?
-            if (NULL == cache) { return false; }
+            if (Runner::RUNNER_EOF == state && !_updatedCache) {
+                // We're done.  Update the cache.
+                PlanCache* cache = PlanCache::get(_canonicalQuery->ns());
 
-            // TODO: How do we decide this?
-            bool shouldRemovePlan = false;
+                // TODO: Is this an error?
+                if (NULL == cache) { return Runner::RUNNER_EOF; }
 
-            if (shouldRemovePlan) {
-                if (!cache->remove(*_canonicalQuery, *_cachedQuery->solution)) {
-                    warning() << "Cached plan runner couldn't remove plan from cache.  Maybe"
-                                 " somebody else did already?";
+                // TODO: How do we decide this?
+                bool shouldRemovePlan = false;
+
+                if (shouldRemovePlan) {
+                    if (!cache->remove(*_canonicalQuery, *_cachedQuery->solution)) {
+                        warning() << "Cached plan runner couldn't remove plan from cache.  Maybe"
+                            " somebody else did already?";
+                    }
+                    return Runner::RUNNER_EOF;
                 }
-                return false;
-            }
 
-            // We're done running.  Update cache.
-            auto_ptr<CachedSolutionFeedback> feedback(new CachedSolutionFeedback());
-            feedback->stats = _runner->getStats();
-            cache->feedback(*_canonicalQuery, *_cachedQuery->solution, feedback.release());
-            return false;
+                // We're done running.  Update cache.
+                auto_ptr<CachedSolutionFeedback> feedback(new CachedSolutionFeedback());
+                feedback->stats = _exec->getStats();
+                cache->feedback(*_canonicalQuery, *_cachedQuery->solution, feedback.release());
+            }
+            return state;
         }
 
-        virtual void saveState() { _runner->saveState(); }
-        virtual void restoreState() { _runner->restoreState(); }
+        virtual void saveState() {
+            if (!_killed) {
+                _exec->saveState();
+            }
+        }
+
+        virtual void restoreState() {
+            if (!_killed) {
+                _exec->restoreState();
+            }
+        }
 
         virtual void invalidate(const DiskLoc& dl) {
-            _runner->invalidate(dl);
+            if (!_killed) {
+                _exec->invalidate(dl);
+            }
         }
 
-        virtual const CanonicalQuery& getQuery() {
-            return *_canonicalQuery;
+        virtual const CanonicalQuery& getQuery() { return *_canonicalQuery; }
+
+        virtual void kill() { _killed = true; }
+
+        virtual bool forceYield() {
+            saveState();
+            ClientCursor::registerRunner(this);
+            ClientCursor::staticYield(ClientCursor::suggestYieldMicros(), getQuery().getParsed().ns(), NULL);
+            ClientCursor::deregisterRunner(this);
+            if (!_killed) { restoreState(); }
+            return !_killed;
         }
 
     private:
         scoped_ptr<CanonicalQuery> _canonicalQuery;
         scoped_ptr<CachedSolution> _cachedQuery;
-        scoped_ptr<SimplePlanRunner> _runner;
+        scoped_ptr<PlanExecutor> _exec;
+
+        // Were we killed during a yield?
+        bool _killed;
+
+        // Have we updated the cache with our plan stats yet?
+        bool _updatedCache;
     };
 
 }  // namespace mongo

@@ -85,11 +85,23 @@ namespace mongo {
                                   const NamespaceDetails* nsd,
                                   const DiskLoc& dl);
 
+        /**
+         * Register a runner so that it can be notified of deletion/invalidation during yields.
+         * Must be called before a runner yields.  If a runner is cached (inside a ClientCursor) it
+         * MUST NOT be registered; the two are mutually exclusive.
+         */
+        static void registerRunner(Runner* runner);
+
+        /**
+         * Remove a runner from the runner registry.
+         */
+        static void deregisterRunner(Runner* runner);
+
         //
         // Yielding.
         // 
 
-        static void staticYield(int micros, const StringData& ns, Record* rec );
+        static void staticYield(int micros, const StringData& ns, Record* rec);
 
         //
         // Static methods about all ClientCursors  TODO: Document.
@@ -252,6 +264,13 @@ namespace mongo {
         // TODO: Consider making this per-connection.
         typedef map<CursorId, ClientCursor*> CCById;
         static CCById clientCursorsById;
+
+        // A list of NON-CACHED runners.  Any runner that yields must be put into this map before
+        // yielding in order to be notified of invalidation and namespace deletion.  Before the
+        // runner is deleted, it must be removed from this map.
+        //
+        // TODO: This is temporary and as such is highly NOT optimized.
+        static set<Runner*> nonCachedRunners;
 
         // How many cursors have timed out?
         static long long numberTimedOut;

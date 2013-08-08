@@ -48,6 +48,7 @@ namespace mongo {
     ClientCursor::CCById ClientCursor::clientCursorsById;
     boost::recursive_mutex& ClientCursor::ccmutex( *(new boost::recursive_mutex()) );
     long long ClientCursor::numberTimedOut = 0;
+    set<Runner*> ClientCursor::nonCachedRunners;
 
     void aboutToDeleteForSharding(const StringData& ns,
                                   const Database* db,
@@ -140,6 +141,14 @@ namespace mongo {
         verify(db);
         verify(str::startsWith(ns, db->name()));
 
+        for (set<Runner*>::iterator it = nonCachedRunners.begin(); it != nonCachedRunners.end(); ++it) {
+            Runner* runner = *it;
+            const char* runnerNS = runner->getQuery().getParsed().ns();
+            if ((isDB && str::startsWith(runnerNS, ns)) || (str::equals(runnerNS, ns))) {
+                runner->kill();
+            }
+        }
+
         recursive_scoped_lock cclock(ccmutex);
         CCById::const_iterator it = clientCursorsById.begin();
         while (it != clientCursorsById.end()) {
@@ -202,6 +211,14 @@ namespace mongo {
         verify(db);
 
         aboutToDeleteForSharding( ns, db, nsd, dl );
+
+        // Check our non-cached active runner list.
+        for (set<Runner*>::iterator it = nonCachedRunners.begin(); it != nonCachedRunners.end(); ++it) {
+            Runner* runner = *it;
+            if (0 == ns.compare(runner->getQuery().getParsed().ns())) {
+                runner->invalidate(dl);
+            }
+        }
 
         // TODO: This requires optimization.  We walk through *all* CCs and send the delete to every
         // CC open on the db we're deleting from.  We could:
@@ -293,6 +310,18 @@ namespace mongo {
             cc->updateLocation();
         }
         // End cursor-only
+    }
+
+    void ClientCursor::registerRunner(Runner* runner) {
+        recursive_scoped_lock lock(ccmutex);
+        verify(nonCachedRunners.end() == nonCachedRunners.find(runner));
+        nonCachedRunners.insert(runner);
+    }
+
+    void ClientCursor::deregisterRunner(Runner* runner) {
+        recursive_scoped_lock lock(ccmutex);
+        verify(nonCachedRunners.end() != nonCachedRunners.find(runner));
+        nonCachedRunners.erase(runner);
     }
 
     void yieldOrSleepFor1Microsecond() {

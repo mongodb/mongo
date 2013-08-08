@@ -116,7 +116,7 @@ namespace QueryMultiPlanRunner {
             // Get all our results out.
             int results = 0;
             BSONObj obj;
-            while (mpr.getNext(&obj)) {
+            while (Runner::RUNNER_ADVANCED == mpr.getNext(&obj)) {
                 ASSERT_EQUALS(obj["foo"].numberInt(), 7);
                 ++results;
             }

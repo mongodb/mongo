@@ -169,7 +169,7 @@ namespace mongo {
             runner->restoreState();
             BSONObj obj;
             // TODO: Differentiate EOF from error.
-            while (runner->getNext(&obj)) {
+            while (Runner::RUNNER_ADVANCED == runner->getNext(&obj)) {
                 // If we're sharded make sure that we don't return any data that hasn't been
                 // migrated off of our shard yet.
                 if (collMetadata) {
@@ -276,7 +276,7 @@ namespace mongo {
 
         BSONObj obj;
         // TODO: Differentiate EOF from error.
-        while (runner->getNext(&obj)) {
+        while (Runner::RUNNER_ADVANCED == runner->getNext(&obj)) {
             // If we're sharded make sure that we don't return any data that hasn't been migrated
             // off of our shared yet.
             if (collMetadata) {

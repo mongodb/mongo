@@ -52,6 +52,8 @@ namespace mongo {
 
         // _root points into _pq->getFilter()
         scoped_ptr<MatchExpression> _root;
+
+        string _ns;
     };
 
 }  // namespace mongo

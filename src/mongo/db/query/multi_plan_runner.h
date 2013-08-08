@@ -23,10 +23,11 @@
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/parsed_query.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/plan_ranker.h"
+#include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/runner.h"
-#include "mongo/db/query/simple_plan_runner.h"
 #include "mongo/platform/cstdint.h"
 
 namespace mongo {
@@ -55,7 +56,7 @@ namespace mongo {
          * Get the next result.  Yielding is handled internally.  If a best plan is not picked when
          * this is called, we call pickBestPlan() internally.
          */
-        bool getNext(BSONObj* objOut);
+        Runner::RunnerState getNext(BSONObj* objOut);
 
         /**
          * Runs all plans added by addPlan, ranks them, and picks a best.  Deletes all loser plans.
@@ -71,9 +72,10 @@ namespace mongo {
         virtual void restoreState();
         virtual void invalidate(const DiskLoc& dl);
 
-        virtual const CanonicalQuery& getQuery() {
-            return *_query;
-        }
+        virtual const CanonicalQuery& getQuery() { return *_query; }
+        virtual void kill();
+
+        virtual bool forceYield();
 
     private:
         /**
@@ -87,7 +89,7 @@ namespace mongo {
         bool _failure;
 
         // The winner...
-        scoped_ptr<SimplePlanRunner> _bestPlanRunner;
+        scoped_ptr<PlanExecutor> _bestPlan;
         // ...and any results it produced while working toward winning.
         std::queue<WorkingSetID> _alreadyProduced;
 
@@ -96,6 +98,9 @@ namespace mongo {
 
         // The query that we're trying to figure out the best solution to.
         scoped_ptr<CanonicalQuery> _query;
+
+        // Were we killed during a yield?
+        bool _killed;
     };
 
 }  // namespace mongo

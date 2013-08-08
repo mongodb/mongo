@@ -16,6 +16,7 @@
 
 #include "mongo/db/query/multi_plan_runner.h"
 
+#include "mongo/db/clientcursor.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/query/plan_ranker.h"
 #include "mongo/db/pdfile.h"
@@ -23,7 +24,7 @@
 namespace mongo {
 
     MultiPlanRunner::MultiPlanRunner(CanonicalQuery* query)
-        : _failure(false), _query(query) { }
+        : _failure(false), _query(query), _killed(false) { }
 
     MultiPlanRunner::~MultiPlanRunner() {
         for (size_t i = 0; i < _candidates.size(); ++i) {
@@ -39,8 +40,9 @@ namespace mongo {
     }
 
     void MultiPlanRunner::saveState() {
-        if (NULL != _bestPlanRunner) {
-            _bestPlanRunner->saveState();
+        if (_killed) { return; }
+        if (NULL != _bestPlan) {
+            _bestPlan->saveState();
         }
         else {
             yieldAllPlans();
@@ -48,8 +50,9 @@ namespace mongo {
     }
 
     void MultiPlanRunner::restoreState() {
-        if (NULL != _bestPlanRunner) {
-            _bestPlanRunner->restoreState();
+        if (_killed) { return; }
+        if (NULL != _bestPlan) {
+            _bestPlan->restoreState();
         }
         else {
             unyieldAllPlans();
@@ -57,8 +60,10 @@ namespace mongo {
     }
 
     void MultiPlanRunner::invalidate(const DiskLoc& dl) {
-        if (NULL != _bestPlanRunner) {
-            _bestPlanRunner->invalidate(dl);
+        if (_killed) { return; }
+
+        if (NULL != _bestPlan) {
+            _bestPlan->invalidate(dl);
         }
         else {
             for (size_t i = 0; i < _candidates.size(); ++i) {
@@ -67,15 +72,30 @@ namespace mongo {
         }
     }
 
-    bool MultiPlanRunner::getNext(BSONObj* objOut) {
-        verify(!_failure);
+    void MultiPlanRunner::kill() {
+        _killed = true;
+    }
+
+    bool MultiPlanRunner::forceYield() {
+        saveState();
+        ClientCursor::registerRunner(this);
+        ClientCursor::staticYield(ClientCursor::suggestYieldMicros(), getQuery().getParsed().ns(), NULL);
+        ClientCursor::deregisterRunner(this);
+        if (!_killed) { restoreState(); }
+        return !_killed;
+    }
+
+    Runner::RunnerState MultiPlanRunner::getNext(BSONObj* objOut) {
+        if (_failure || _killed) {
+            return Runner::RUNNER_DEAD;
+        }
 
         // If we haven't picked the best plan yet...
-        if (NULL == _bestPlanRunner) {
+        if (NULL == _bestPlan) {
             // TODO: Consider rewriting pickBestPlan to return results as it iterates.
             if (!pickBestPlan(NULL)) {
                 verify(_failure);
-                return false;
+                return Runner::RUNNER_DEAD;
             }
         }
 
@@ -83,15 +103,15 @@ namespace mongo {
             WorkingSetID id = _alreadyProduced.front();
             _alreadyProduced.pop();
 
-            WorkingSetMember* member = _bestPlanRunner->getWorkingSet()->get(id);
+            WorkingSetMember* member = _bestPlan->getWorkingSet()->get(id);
             // TODO: getOwned?
             verify(WorkingSetCommon::fetch(member));
             *objOut = member->obj;
-            _bestPlanRunner->getWorkingSet()->free(id);
-            return true;
+            _bestPlan->getWorkingSet()->free(id);
+            return Runner::RUNNER_ADVANCED;
         }
 
-        return _bestPlanRunner->getNext(objOut);
+        return _bestPlan->getNext(objOut);
     }
 
     bool MultiPlanRunner::pickBestPlan(size_t* out) {
@@ -110,15 +130,13 @@ namespace mongo {
             }
         }
 
-        if (_failure) {
-            return false;
-        }
+        if (_failure) { return false; }
 
         size_t bestChild = PlanRanker::pickBestPlan(_candidates, NULL);
 
         // Run the best plan.  Store it.
-        _bestPlanRunner.reset(new SimplePlanRunner(_candidates[bestChild].ws,
-                    _candidates[bestChild].root));
+        _bestPlan.reset(new PlanExecutor(_candidates[bestChild].ws,
+                                         _candidates[bestChild].root));
         _alreadyProduced = _candidates[bestChild].results;
         // TODO: Normally we'd hand this to the cache, who would own it.
         delete _candidates[bestChild].solution;
@@ -138,9 +156,7 @@ namespace mongo {
         }
 
         _candidates.clear();
-        if (NULL != out) {
-            *out = bestChild;
-        }
+        if (NULL != out) { *out = bestChild; }
         return true;
     }
 
