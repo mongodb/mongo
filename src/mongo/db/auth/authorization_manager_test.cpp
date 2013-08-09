@@ -43,6 +43,13 @@ namespace {
             externalState = new AuthzManagerExternalStateMock();
             authzManager.reset(new AuthorizationManager(externalState));
         }
+
+        void tearDown() {
+            // All users have to have a ref count of zero when the AuthorizationManager is destroyed
+            while (internalSecurity.user->getRefCount() > 0) {
+                internalSecurity.user->decrementRefCount();
+            }
+        }
     };
 
     TEST_F(AuthorizationManagerTest, GetPrivilegesFromPrivilegeDocumentCompatible) {
