@@ -61,8 +61,11 @@ namespace mongo {
                 else if ( t.type == Token::DELIMITER ) {
                     char c = t.data[0];
                     if ( c == '-' ) {
-                        if ( t.previousWhiteSpace )
+                        if ( !inPhrase && t.previousWhiteSpace ) {
+                            // phrases can be negated, and terms not in phrases can be negated.
+                            // terms in phrases can not be negated.
                             inNegation = true;
+                        }
                     }
                     else if ( c == '"' ) {
                         if ( inPhrase ) {
