@@ -414,8 +414,6 @@ for ( var test = 0; test < numTests; test++ ) {
 	// printjson( t.find( { "locs.loc" : { $within : { $center : [ query.center, query.radius ], $uniqueDocs : 1 } }, "center.docIn" : randYesQuery() } ).toArray() )
 	t.update( { "locs.loc" : { $within : { $center : [ query.center, query.radius ], $uniqueDocs : true } }, "center.docIn" : randYesQuery() }, { $set : { "centerPaddingA" : padding } }, false, true )
 	assert.eq( results.center.docsIn, t.getDB().getLastErrorObj().n )
-	t.update( { "locs.loc" : { $within : { $center : [ query.center, query.radius ], $uniqueDocs : false } }, "center.docIn" : randYesQuery() }, { $set : { "centerPaddingB" : padding } }, false, true )
-    assert.eq( results.center.locsIn, t.getDB().getLastErrorObj().n )
 	
 	if( query.sphereRadius >= 0 ){
 	    
@@ -428,8 +426,6 @@ for ( var test = 0; test < numTests; test++ ) {
 		// printjson( t.find( { "locs.loc" : { $within : { $center : [ query.center, query.radius ], $uniqueDocs : 1 } }, "center.docIn" : randYesQuery() } ).toArray() )
 		t.update( { "locs.loc" : { $within : { $centerSphere : [ query.sphereCenter, query.sphereRadius ], $uniqueDocs : true } }, "sphere.docIn" : randYesQuery() }, { $set : { "spherePaddingA" : padding } }, false, true )
 		assert.eq( results.sphere.docsIn, t.getDB().getLastErrorObj().n )
-		t.update( { "locs.loc" : { $within : { $centerSphere : [ query.sphereCenter, query.sphereRadius ], $uniqueDocs : false } }, "sphere.docIn" : randYesQuery() }, { $set : { "spherePaddingB" : padding } }, false, true )
-		assert.eq( results.sphere.locsIn, t.getDB().getLastErrorObj().n )
 		
 	}
 	
