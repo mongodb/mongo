@@ -65,7 +65,7 @@ namespace mongo {
             _mods.push_back(mod.release());
 
             // Register the fact that this driver will only do full object replacements.
-            _dollarModMode = false;
+            _replacementMode = true;
 
             return Status::OK();
         }
@@ -115,7 +115,7 @@ namespace mongo {
 
         // Register the fact that there will be only $mod's in this driver -- no object
         // replacement.
-        _dollarModMode = true;
+        _replacementMode = false;
 
         return Status::OK();
     }
@@ -264,8 +264,8 @@ namespace mongo {
         return _mods.size();
     }
 
-    bool UpdateDriver::dollarModMode() const {
-        return _dollarModMode;
+    bool UpdateDriver::isDocReplacement() const {
+        return _replacementMode;
     }
 
     bool UpdateDriver::modsAffectIndices() const {
@@ -337,7 +337,7 @@ namespace mongo {
             delete *it;
         }
         _indexedFields.clear();
-        _dollarModMode = false;
+        _replacementMode = false;
     }
 
 } // namespace mongo

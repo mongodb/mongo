@@ -80,7 +80,7 @@ namespace mongo {
 
         size_t numMods() const;
 
-        bool dollarModMode() const;
+        bool isDocReplacement() const;
 
         bool modsAffectIndices() const;
         void refreshIndexKeys(const IndexPathSet& indexedFields);
@@ -110,7 +110,7 @@ namespace mongo {
         //
 
         // Is there a list of $mod's on '_mods' or is it just full object replacement?
-        bool _dollarModMode;
+        bool _replacementMode;
 
         // Collection of update mod instances. Owned here.
         vector<ModifierInterface*> _mods;

@@ -543,14 +543,6 @@ namespace mongo {
                                     const QueryPlanSelectionPolicy& planPolicy,
                                     bool forReplication ) {
 
-        // TODO
-        // + Replication related
-        //   + fast path for update for query by _id
-        //
-        // + Field Management
-        //   + Prevent changes to immutable fields (_id, and those mentioned by sharding)
-        //
-
         NamespaceDetails* d = nsdetails( ns );
         NamespaceDetailsTransient* nsdt = &NamespaceDetailsTransient::get( ns );
 
@@ -687,7 +679,7 @@ namespace mongo {
                 cursor->advance();
                 continue;
             }
-            else if (driver->dollarModMode() && multi) {
+            else if (!driver->isDocReplacement() && multi) {
                 // c)
                 cursor->advance();
                 if ( dedupHere ) {
@@ -802,7 +794,7 @@ namespace mongo {
 
             // Log Obj
             if ( logop ) {
-                if ( !logObj.isEmpty() ) {
+                if ( driver->isDocReplacement() || !logObj.isEmpty() ) {
                     BSONObj idQuery = driver->makeOplogEntryQuery(newObj, multi);
                     logOp("u", ns, logObj , &idQuery, 0, fromMigrate, &newObj);
                 }
@@ -829,13 +821,13 @@ namespace mongo {
 
         if (numUpdated > 0) {
             return UpdateResult( true /* updated existing object(s) */,
-                                 driver->dollarModMode() /* $mod or obj replacement */,
+                                 !driver->isDocReplacement() /* $mod or obj replacement */,
                                  numUpdated /* # of docments update */,
                                  BSONObj() );
         }
         else if (numUpdated == 0 && !upsert) {
             return UpdateResult( false /* no object updated */,
-                                 driver->dollarModMode() /* $mod or obj replacement */,
+                                 !driver->isDocReplacement() /* $mod or obj replacement */,
                                  0 /* no updates */,
                                  BSONObj() );
         }
@@ -884,7 +876,7 @@ namespace mongo {
         }
 
         return UpdateResult( false /* updated a non existing document */,
-                             driver->dollarModMode() /* $mod or obj replacement? */,
+                             !driver->isDocReplacement() /* $mod or obj replacement? */,
                              1 /* count of updated documents */,
                              newObj /* object that was upserted */ );
     }
