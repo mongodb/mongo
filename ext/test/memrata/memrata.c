@@ -2060,6 +2060,7 @@ kvs_source_open_txn(DATA_SOURCE *ds)
 	 * We've opened the KVS sources: check to see if any of them already
 	 * have a transaction store, and make sure we only find one.
 	 */
+	kstxn = NULL;
 	kvstxn = NULL;
 	for (ks = ds->kvs_head; ks != NULL; ks = ks->next)
 		if ((t =
