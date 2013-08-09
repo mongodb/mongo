@@ -1063,7 +1063,7 @@ err:	g_util_running = 0;
  */
 void config_assign(CONFIG *dest, const CONFIG *src)
 {
-	int i;
+	size_t i;
 	char **pstr;
 	char *newstr;
 	size_t len;
@@ -1093,7 +1093,7 @@ void config_assign(CONFIG *dest, const CONFIG *src)
 void
 config_free(CONFIG *cfg)
 {
-	int i;
+	size_t i;
 	char **pstr;
 
 	for (i = 0; i < sizeof(config_opts)/sizeof(config_opts[0]); i++) {
@@ -1116,7 +1116,7 @@ config_free(CONFIG *cfg)
 int
 config_opt(CONFIG *cfg, WT_CONFIG_ITEM *k, WT_CONFIG_ITEM *v)
 {
-	int i;
+	size_t i;
 	size_t nopt;
 	CONFIG_OPT *popt;
 	void *valueloc;
@@ -1184,7 +1184,7 @@ config_opt(CONFIG *cfg, WT_CONFIG_ITEM *k, WT_CONFIG_ITEM *v)
 		}
 		pconfigval = (uint32_t *)valueloc;
 		if (popt->type == BOOL_TYPE) {
-			*pconfigval = v->val;
+			*pconfigval = (uint32_t)v->val;
 		}
 		else if (v->val != 0) {
 			*pconfigval |= popt->flagmask;
@@ -1210,7 +1210,7 @@ config_opt_file(CONFIG *cfg, WT_SESSION *parse_session, const char *filename)
 	char *comment;
 	int ret;
 	int contline;
-	int optionpos;
+	size_t optionpos;
 	size_t linelen;
 	int linenum;
 
@@ -1352,7 +1352,7 @@ config_opt_int(CONFIG *cfg, WT_SESSION *parse_session,
 void
 config_opt_usage(void)
 {
-	int i;
+	size_t i;
 	size_t nopt;
 	const char *typestr;
 	const char *defaultval;
@@ -1545,7 +1545,7 @@ void indent_lines(const char *lines, const char *indent)
 {
 	const char *bol;
 	const char *eol;
-	int len;
+	size_t len;
 
 	bol = lines;
 	while (bol != NULL) {
@@ -1554,7 +1554,7 @@ void indent_lines(const char *lines, const char *indent)
 			len = strlen(bol);
 		else
 			len = eol++ - bol;
-		printf("%s%.*s\n", indent, len, bol);
+		printf("%s%.*s\n", indent, (int)len, bol);
 		bol = eol;
 	}
 }
