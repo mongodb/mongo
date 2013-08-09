@@ -9,6 +9,7 @@
 "authenticate",  # Not used for permission checks, but to id authentication events in logs.
 "captrunc",
 "clean",
+"cleanupOrphaned",
 "clone",
 "cloneCollectionLocalSource",
 "cloneCollectionTarget",

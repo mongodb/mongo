@@ -194,6 +194,7 @@ namespace {
         clusterAdminRoleReadActions.addAction(ActionType::writeBacksQueued);
 
         clusterAdminRoleWriteActions.addAction(ActionType::addShard);
+        clusterAdminRoleWriteActions.addAction(ActionType::cleanupOrphaned);
         clusterAdminRoleWriteActions.addAction(ActionType::closeAllDatabases);
         clusterAdminRoleWriteActions.addAction(ActionType::cpuProfiler);
         clusterAdminRoleWriteActions.addAction(ActionType::cursorInfo);
