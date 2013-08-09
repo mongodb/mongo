@@ -75,6 +75,12 @@ namespace mongo {
         // Ownership of the returned Principal remains with _authenticatedPrincipals
         Principal* lookupPrincipal(const UserName& name);
 
+        // Returns the authenticated user with the given name.  Returns NULL
+        // if no such user is found.
+        // The user remains in the _authenticatedUsers set for this AuthorizationSession,
+        // and ownership of the user stays with the AuthorizationManager
+        User* lookupUser(const UserName& name);
+
         // Gets an iterator over the names of all authenticated principals stored in this manager.
         PrincipalSet::NameIterator getAuthenticatedPrincipalNames();
 

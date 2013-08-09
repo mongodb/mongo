@@ -120,6 +120,7 @@ namespace {
                                          "userSource" << "test" <<
                                          "roles" << BSON_ARRAY("clusterAdmin") <<
                                          "otherDBRoles" << BSON("test3" << BSON_ARRAY("dbAdmin"))));
+        ASSERT_OK(authzManager->initializeAllV1UserData());
 
         ASSERT(!authzSession->checkAuthorization("test.foo", ActionType::find));
         ASSERT(!authzSession->checkAuthorization("test.foo", ActionType::insert));
@@ -136,7 +137,9 @@ namespace {
         ASSERT(!authzSession->checkAuthorization("$SERVER", ActionType::shutdown));
 
         ASSERT_OK(authzSession->addAndAuthorizeUser(UserName("andy", "test")));
-        ASSERT_OK(authzManager->initializeAllV1UserData());
+
+        User* user = authzSession->lookupUser(UserName("andy", "test"));
+        ASSERT(UserName("andy", "test") == user->getName());
 
         ASSERT(authzSession->checkAuthorization("test.foo", ActionType::find));
         ASSERT(authzSession->checkAuthorization("test.foo", ActionType::insert));
@@ -151,6 +154,26 @@ namespace {
         ASSERT(!authzSession->checkAuthorization("admin.foo", ActionType::insert));
         ASSERT(!authzSession->checkAuthorization("admin.foo", ActionType::collMod));
         ASSERT(authzSession->checkAuthorization("$SERVER", ActionType::shutdown));
+
+        authzSession->logoutDatabase("test");
+
+        ASSERT(!authzSession->checkAuthorization("test.foo", ActionType::find));
+        ASSERT(!authzSession->checkAuthorization("test.foo", ActionType::insert));
+        ASSERT(!authzSession->checkAuthorization("test.foo", ActionType::collMod));
+        ASSERT(!authzSession->checkAuthorization("test2.foo", ActionType::find));
+        ASSERT(!authzSession->checkAuthorization("test2.foo", ActionType::insert));
+        ASSERT(!authzSession->checkAuthorization("test2.foo", ActionType::collMod));
+        ASSERT(!authzSession->checkAuthorization("test3.foo", ActionType::find));
+        ASSERT(!authzSession->checkAuthorization("test3.foo", ActionType::insert));
+        ASSERT(!authzSession->checkAuthorization("test3.foo", ActionType::collMod));
+        ASSERT(!authzSession->checkAuthorization("admin.foo", ActionType::find));
+        ASSERT(!authzSession->checkAuthorization("admin.foo", ActionType::insert));
+        ASSERT(!authzSession->checkAuthorization("admin.foo", ActionType::collMod));
+        ASSERT(!authzSession->checkAuthorization("$SERVER", ActionType::shutdown));
+
+        // initializeAllV1UserData() pins the users by adding 1 to their refCount, so need to
+        // release the user an extra time to bring its refCount to 0.
+        authzManager->releaseUser(user);
     }
 
 }  // namespace
