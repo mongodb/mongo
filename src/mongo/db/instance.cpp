@@ -624,7 +624,7 @@ namespace mongo {
             // the only question is whether this update is against the 'config' database, in
             // which case we want to disable checks, since config db docs can have field names
             // containing a dot (".").
-            options.modOptions = ( NamespaceString( ns ).db() == "config" ) ?
+            options.modOptions = ( NamespaceString( ns ).isConfigDB() ) ?
                 ModifierInterface::Options::unchecked() :
                 ModifierInterface::Options::normal();
 
@@ -874,10 +874,10 @@ namespace mongo {
     void checkAndInsert(const char *ns, /*modifies*/BSONObj& js) { 
         uassert( 10059 , "object to insert too large", js.objsize() <= BSONObjMaxUserSize);
 
-        NamespaceString nsString(ns);
         // Do not allow objects to be stored which violate okForStorageAsRoot
-        if ( isNewUpdateFrameworkEnabled() && !nsString.isSystemCollOrConfigDB() ) {
-            bool ok = js.okForStorageAsRoot();
+        if ( isNewUpdateFrameworkEnabled() ) {
+            NamespaceString nsString(ns);
+            bool ok = nsString.isConfigDB() || nsString.isSystem() || js.okForStorageAsRoot();
             if (!ok) {
                 LOG(1) << "ns: " << ns << ", not okForStorageAsRoot: " << js;
             }
