@@ -283,31 +283,6 @@ err:	CURSOR_UPDATE_API_END(session, ret);
 }
 
 /*
- * __wt_curfile_truncate --
- *	WT_SESSION.truncate support when file cursors are specified.
- */
-int
-__wt_curfile_truncate(
-    WT_SESSION_IMPL *session, WT_CURSOR *start, WT_CURSOR *stop)
-{
-	WT_CURSOR_BTREE *cursor;
-	WT_DECL_RET;
-
-	/*
-	 * !!!
-	 * We're doing a cursor operation but in the service of the session API;
-	 * set the session handle to reference the appropriate Btree, but don't
-	 * do any of the other "standard" cursor API setup.
-	 */
-	cursor = (WT_CURSOR_BTREE *)(start == NULL ? stop : start);
-	WT_WITH_BTREE(session, cursor->btree,
-	    ret = __wt_btcur_truncate(
-	    (WT_CURSOR_BTREE *)start, (WT_CURSOR_BTREE *)stop));
-
-	return (ret);
-}
-
-/*
  * __curfile_close --
  *	WT_CURSOR->close method for the btree cursor type.
  */
@@ -362,6 +337,8 @@ __wt_curfile_create(WT_SESSION_IMPL *session,
 	WT_DECL_RET;
 	size_t csize;
 
+	STATIC_ASSERT(offsetof(WT_CURSOR_BTREE, iface) == 0);
+
 	cbt = NULL;
 
 	btree = S2BT(session);
@@ -378,8 +355,10 @@ __wt_curfile_create(WT_SESSION_IMPL *session,
 	cursor->value_format = btree->value_format;
 
 	cbt->btree = btree;
-	if (bulk)
+	if (bulk) {
+		F_SET(cursor, WT_CURSTD_BULK);
 		WT_ERR(__wt_curbulk_init((WT_CURSOR_BULK *)cbt, bitmap));
+	}
 
 	/*
 	 * random_retrieval
@@ -393,7 +372,6 @@ __wt_curfile_create(WT_SESSION_IMPL *session,
 	}
 
 	/* __wt_cursor_init is last so we don't have to clean up on error. */
-	STATIC_ASSERT(offsetof(WT_CURSOR_BTREE, iface) == 0);
 	WT_ERR(__wt_cursor_init(cursor, cursor->uri, owner, cfg, cursorp));
 
 	WT_CSTAT_INCR(session, cursor_create);

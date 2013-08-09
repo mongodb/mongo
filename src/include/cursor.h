@@ -48,7 +48,6 @@
 	{ NULL, 0, 0, NULL, 0 },	/* WT_ITEM key */		\
 	{ NULL, 0, 0, NULL, 0 },	/* WT_ITEM value */		\
 	0,				/* int saved_err */		\
-	NULL,				/* data_source */		\
 	0				/* uint32_t flags */		\
 }
 
@@ -202,6 +201,14 @@ struct __wt_cursor_config {
 	WT_CURSOR iface;
 };
 
+struct __wt_cursor_data_source {
+	WT_CURSOR iface;
+
+	WT_COLLATOR *collator;			/* Configured collator */
+
+	WT_CURSOR *source;			/* Application-owned cursor. */
+};
+
 struct __wt_cursor_dump {
 	WT_CURSOR iface;
 
@@ -250,6 +257,9 @@ struct __wt_cursor_table {
 
 	WT_TABLE *table;
 	const char *plan;
+
+	const char **cfg;		/* Saved configuration string */
+
 	WT_CURSOR **cg_cursors;
 	WT_CURSOR **idx_cursors;
 };
@@ -259,6 +269,15 @@ struct __wt_cursor_table {
 
 #define	WT_CURSOR_RECNO(cursor)	(strcmp((cursor)->key_format, "r") == 0)
 
+/*
+ * WT_CURSOR_NEEDKEY, WT_CURSOR_NEEDVALUE --
+ *	Check if we have a key/value set.  There's an additional semantic
+ * implemented here: if we're pointing into the tree, and about to perform
+ * a cursor operation, get a local copy of whatever we're referencing in
+ * the tree, there's an obvious race with the cursor moving and the key or
+ * value reference, and it's better to solve it here than in the underlying
+ * data-source layers.
+ */
 #define	WT_CURSOR_NEEDKEY(cursor) do {					\
 	if (F_ISSET(cursor, WT_CURSTD_KEY_INT)) {			\
 		if (!WT_DATA_IN_ITEM(&(cursor)->key))			\

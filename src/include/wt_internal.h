@@ -107,6 +107,8 @@ struct __wt_cursor_bulk;
     typedef struct __wt_cursor_bulk WT_CURSOR_BULK;
 struct __wt_cursor_config;
     typedef struct __wt_cursor_config WT_CURSOR_CONFIG;
+struct __wt_cursor_data_source;
+    typedef struct __wt_cursor_data_source WT_CURSOR_DATA_SOURCE;
 struct __wt_cursor_dump;
     typedef struct __wt_cursor_dump WT_CURSOR_DUMP;
 struct __wt_cursor_index;

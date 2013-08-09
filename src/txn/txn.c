@@ -56,6 +56,27 @@ __wt_txn_release_snapshot(WT_SESSION_IMPL *session)
 }
 
 /*
+ * __wt_txn_refresh_force --
+ *	Refresh the transaction state, called when the connection closes.
+ */
+void
+__wt_txn_refresh_force(WT_SESSION_IMPL *session)
+{
+	/*
+	 * !!!
+	 * If a data-source is calling the WT_EXTENSION_API.transaction_oldest
+	 * method (for the oldest transaction ID not yet visible to a running
+	 * transaction), and then comparing that oldest ID against committed
+	 * transactions to see if updates for a committed transaction are still
+	 * visible to running transactions, the oldest transaction ID may be
+	 * the same as the last committed transaction ID, if the transaction
+	 * state wasn't refreshed after the last transaction committed.  Push
+	 * past the last committed transaction.
+	 */
+	__wt_txn_refresh(session, WT_TXN_NONE, 0);
+}
+
+/*
  * __wt_txn_refresh --
  *	Allocate a transaction ID and/or a snapshot.
  */
@@ -269,6 +290,9 @@ __wt_txn_release(WT_SESSION_IMPL *session)
 
 	txn = &session->txn;
 	txn->mod_count = 0;
+	txn->notify = NULL;
+	txn->notify_cookie = NULL;
+
 	txn_global = &S2C(session)->txn_global;
 	txn_state = &txn_global->states[session->id];
 
@@ -312,16 +336,18 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 	if (!F_ISSET(txn, TXN_RUNNING))
 		WT_RET_MSG(session, EINVAL, "No transaction is active");
 
-#if 1
-	if (txn->mod_count > 0 && S2C(session)->logging &&
+	/* Rollback notification. */
+	if (txn->notify != NULL)
+		WT_TRET(txn->notify((WT_SESSION *)session, txn->notify_cookie,
+		    txn->id, 1));
+
+	if (ret != 0 ||
+	    (txn->mod_count > 0 && S2C(session)->logging &&
 	    !F_ISSET(session, WT_SESSION_NO_LOGGING) &&
-	    (ret = __wt_txn_commit_log(session, cfg)) != 0) {
+	    (ret = __wt_txn_commit_log(session, cfg)) != 0)) {
 		WT_TRET(__wt_txn_rollback(session, cfg));
 		return (ret);
 	}
-#else
-	WT_UNUSED(ret);
-#endif
 
 	/*
 	 * Auto-commit transactions need a new transaction snapshot so that the
@@ -344,6 +370,7 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 int
 __wt_txn_rollback(WT_SESSION_IMPL *session, const char *cfg[])
 {
+	WT_DECL_RET;
 	WT_TXN *txn;
 	WT_TXN_OP *op;
 	u_int i;
@@ -354,6 +381,11 @@ __wt_txn_rollback(WT_SESSION_IMPL *session, const char *cfg[])
 	if (!F_ISSET(txn, TXN_RUNNING))
 		WT_RET_MSG(session, EINVAL, "No transaction is active");
 
+	/* Rollback notification. */
+	if (txn->notify != NULL)
+		WT_TRET(txn->notify(
+		    (WT_SESSION *)session, txn->notify_cookie, txn->id, 0));
+
 	/* Rollback updates. */
 	for (i = 0, op = txn->mod; i < txn->mod_count; i++, op++) {
 		if (op->upd != NULL)
@@ -363,7 +395,7 @@ __wt_txn_rollback(WT_SESSION_IMPL *session, const char *cfg[])
 	}
 
 	__wt_txn_release(session);
-	return (0);
+	return (ret);
 }
 
 /*

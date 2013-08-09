@@ -82,7 +82,7 @@ wts_open(const char *home, int set_api, WT_CONNECTION **connp)
 	    "buffer_alignment=512,error_prefix=\"%s\","
 	    "%s,"
 	    "extensions="
-	    "[\"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\"],"
+	    "[\"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\"],"
 	    "%s,%s",
 	    g.c_cache,
 	    g.progname,
@@ -94,7 +94,6 @@ wts_open(const char *home, int set_api, WT_CONNECTION **connp)
 	    access(BZIP_PATH, R_OK) == 0) ? RAW_PATH : "",
 	    access(SNAPPY_PATH, R_OK) == 0 ? SNAPPY_PATH : "",
 	    DATASOURCE("kvsbdb") ? KVS_BDB_PATH : "",
-	    DATASOURCE("memrata") ? MEMRATA_PATH : "",
 	    g.c_config_open == NULL ? "" : g.c_config_open,
 	    g.config_open == NULL ? "" : g.config_open);
 
@@ -114,6 +113,16 @@ wts_open(const char *home, int set_api, WT_CONNECTION **connp)
 
 	if (set_api)
 		g.wt_api = conn->get_extension_api(conn);
+
+	/*
+	 * Load the Memrata shared library: it would be possible to do this as
+	 * part of the extensions configured for wiredtiger_open, there's no
+	 * difference, I am doing it here because it's easier to work with the
+	 * configuration strings.
+	 */
+	if (DATASOURCE("memrata") &&
+	    (ret = conn->load_extension(conn, MEMRATA_PATH, NULL)) != 0)
+		die(ret, "WT_CONNECTION.load_extension: %s", MEMRATA_PATH);
 
 	*connp = conn;
 }
