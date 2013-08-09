@@ -130,6 +130,10 @@ namespace {
         return _authenticatedPrincipals.lookup(name);
     }
 
+    User* AuthorizationSession::lookupUser(const UserName& name) {
+        return _authenticatedUsers.lookup(name);
+    }
+
     void AuthorizationSession::logoutDatabase(const std::string& dbname) {
         Principal* principal = _authenticatedPrincipals.lookupByDBName(dbname);
         if (principal) {
