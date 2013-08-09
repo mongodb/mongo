@@ -1965,6 +1965,9 @@
     <ClCompile Include="..\db\auth\user_set_test.cpp">
       <Filter>db\auth</Filter>
     </ClCompile>
+    <ClCompile Include="..\db\pipeline\document_source_merge_cursors.cpp">
+      <Filter>db\pipeline\Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\pch.h" />

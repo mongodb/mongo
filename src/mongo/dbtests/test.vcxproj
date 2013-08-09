@@ -3399,6 +3399,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="..\db\pipeline\document_source_group.cpp" />
     <ClCompile Include="..\db\pipeline\document_source_limit.cpp" />
     <ClCompile Include="..\db\pipeline\document_source_match.cpp" />
+    <ClCompile Include="..\db\pipeline\document_source_merge_cursors.cpp" />
     <ClCompile Include="..\db\pipeline\document_source_out.cpp" />
     <ClCompile Include="..\db\pipeline\document_source_project.cpp" />
     <ClCompile Include="..\db\pipeline\document_source_skip.cpp" />

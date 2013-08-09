@@ -2474,6 +2474,9 @@
     <ClCompile Include="commands\cleanup_orphaned_cmd.cpp">
       <Filter>db\commands</Filter>
     </ClCompile>
+    <ClCompile Include="pipeline\document_source_merge_cursors.cpp">
+      <Filter>db\pipeline\Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\third_party\snappy\config.h">
