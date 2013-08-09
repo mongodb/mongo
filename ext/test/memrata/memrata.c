@@ -1710,401 +1710,6 @@ kvs_cursor_close(WT_CURSOR *wtcursor)
 }
 
 /*
- * kvs_config_devices --
- *	Convert the device list into an argv[] array.
- */
-static int
-kvs_config_devices(
-    WT_EXTENSION_API *wtext, WT_CONFIG_ITEM *orig, char ***devices)
-{
-	WT_CONFIG_ITEM k, v;
-	WT_CONFIG_SCAN *scan;
-	size_t len;
-	u_int cnt, slots;
-	int ret = 0;
-	char **argv, **p;
-
-	argv = NULL;
-
-	/* Set up the scan of the device list. */
-	if ((ret = wtext->config_scan_begin(
-	    wtext, NULL, orig->str, orig->len, &scan)) != 0)
-		EMSG_ERR(wtext, NULL, ret,
-		    "WT_EXTENSION_API::config_scan_begin: %s",
-		    wtext->strerror(ret));
-
-	for (cnt = slots = 0; (ret = wtext->
-	    config_scan_next(wtext, scan, &k, &v)) == 0; ++cnt) {
-		if (cnt + 1 >= slots) {		/* NULL-terminate the array */
-			len = slots + 20 * sizeof(*argv);
-			if ((p = realloc(argv, len)) == NULL) {
-				ret = os_errno();
-				goto err;
-			}
-			argv = p;
-			slots += 20;
-		}
-		len = k.len + 1;
-		if ((argv[cnt] = calloc(len, sizeof(**argv))) == NULL) {
-			ret = os_errno();
-			goto err;
-		}
-		argv[cnt + 1] = NULL;
-		memcpy(argv[cnt], k.str, k.len);
-	}
-	if (ret != WT_NOTFOUND)
-		EMSG_ERR(wtext, NULL, ret,
-		    "WT_EXTENSION_API::config_scan_next: %s",
-		    wtext->strerror(ret));
-	if ((ret = wtext->config_scan_end(wtext, scan)) != 0)
-		EMSG_ERR(wtext, NULL, ret,
-		    "WT_EXTENSION_API::config_scan_end: %s",
-		    wtext->strerror(ret));
-
-	*devices = argv;
-	return (0);
-
-err:	if (argv != NULL) {
-		for (p = argv; *p != NULL; ++p)
-			free(*p);
-		free(argv);
-	}
-	return (ret);
-}
-
-/*
- * kvs_config_read --
- *	Read KVS configuration.
- */
-static int
-kvs_config_read(WT_EXTENSION_API *wtext, WT_CONFIG_ITEM *config,
-    char ***devices, struct kvs_config *kvs_config, int *flagsp)
-{
-	static const char **p, *kvs_options[] = {
-		"kvs_devices",
-		"kvs_parallelism",
-		"kvs_granularity",
-		"kvs_avg_key_len",
-		"kvs_avg_val_len",
-		"kvs_write_bufs",
-		"kvs_read_bufs",
-		"kvs_commit_timeout",
-		"kvs_reclaim_threshold",
-		"kvs_reclaim_period",
-		"kvs_open_o_debug",
-		"kvs_open_o_truncate",
-		NULL
-	};
-	WT_CONFIG_ITEM k, v;
-	WT_CONFIG_SCAN *scan;
-	int ret = 0, tret;
-
-	*flagsp = 0;			/* Return default values. */
-	if ((ret = kvs_default_config(kvs_config)) != 0)
-		ERET(wtext, NULL,
-		    EINVAL, "kvs_default_config: %s", kvs_strerror(os_errno()));
-
-	/* Set up the scan of the configuration arguments list. */
-	if ((ret = wtext->config_scan_begin(
-	    wtext, NULL, config->str, config->len, &scan)) != 0)
-		ERET(wtext, NULL, ret,
-		    "WT_EXTENSION_API::config_scan_begin: %s",
-		    wtext->strerror(ret));
-	while ((ret = wtext->config_scan_next(wtext, scan, &k, &v)) == 0) {
-		if (STRING_MATCH("kvs_devices", k.str, k.len)) {
-			if ((ret = kvs_config_devices(wtext, &v, devices)) != 0)
-				return (ret);
-			continue;
-		}
-
-#define	KVS_CONFIG_SET(s, f)						\
-	if (STRING_MATCH(s, k.str, k.len)) {				\
-		kvs_config->f = (unsigned long)v.val;			\
-		continue;						\
-	}
-			KVS_CONFIG_SET("kvs_parallelism", parallelism);
-			KVS_CONFIG_SET("kvs_granularity", granularity);
-			KVS_CONFIG_SET("kvs_avg_key_len", avg_key_len);
-			KVS_CONFIG_SET("kvs_avg_val_len", avg_val_len);
-			KVS_CONFIG_SET("kvs_write_bufs", write_bufs);
-			KVS_CONFIG_SET("kvs_read_bufs", read_bufs);
-			KVS_CONFIG_SET("kvs_commit_timeout", commit_timeout);
-			KVS_CONFIG_SET(
-			    "kvs_reclaim_threshold", reclaim_threshold);
-			KVS_CONFIG_SET("kvs_reclaim_period", reclaim_period);
-
-#define	KVS_FLAG_SET(s, f)						\
-	if (STRING_MATCH(s, k.str, k.len)) {				\
-		if (v.val != 0)						\
-			*flagsp |= f;					\
-		continue;						\
-	}
-			/*
-			 * We don't export KVS_O_CREATE: WT_SESSION.create
-			 * always adds it in.
-			 */
-			KVS_FLAG_SET("kvs_open_o_debug", KVS_O_DEBUG);
-			KVS_FLAG_SET("kvs_open_o_truncate",  KVS_O_TRUNCATE);
-
-			EMSG_ERR(wtext, NULL, EINVAL,
-			    "unknown configuration key value pair %.*s/%.*s",
-			    (int)k.len, k.str, (int)v.len, v.str);
-	}
-
-	if (ret == WT_NOTFOUND)
-		ret = 0;
-	if (ret != 0)
-		EMSG_ERR(wtext, NULL, ret,
-		    "WT_EXTENSION_API::config_scan_next: %s",
-		    wtext->strerror(ret));
-
-err:	if ((tret = wtext->config_scan_end(wtext, scan)) != 0)
-		EMSG(wtext, NULL, tret,
-		    "WT_EXTENSION_API::config_scan_end: %s",
-		    wtext->strerror(ret));
-
-	return (ret);
-}
-
-/* XXX */
-static int ws_source_close(WT_EXTENSION_API *, WT_SESSION *, WT_SOURCE *);
-
-/*
- * kvs_source_close --
- *	Kill a KVS_SOURCE structure.
- */
-static int
-kvs_source_close(WT_EXTENSION_API *wtext, WT_SESSION *session, KVS_SOURCE *ks)
-{
-	WT_SOURCE *ws;
-	int ret = 0, tret;
-
-	/* Resolve the cache into the primary one last time and quit. */
-	if (ks->cleaner_id != 0) {
-		ks->cleaner_stop = 1;
-		if ((tret = pthread_join(ks->cleaner_id, NULL)) != 0)
-			EMSG(wtext, session, tret,
-			    "pthread_join: %s", kvs_strerror(tret));
-		ks->cleaner_id = 0;
-	}
-
-	/* Close the underlying WiredTiger sources. */
-	while ((ws = ks->ws_head) != NULL) {
-		ks->ws_head = ws->next;
-		ESET(ws_source_close(wtext, session, ws));
-	}
-
-	/* Flush and close the KVS source. */
-	if (ks->kvs_device != NULL) {
-		if ((tret = kvs_commit(ks->kvs_device)) != 0)
-			EMSG(wtext, session, WT_ERROR,
-			    "kvs_commit: %s: %s", ks->name, kvs_strerror(tret));
-
-		/* If the owner, close the database transaction store. */
-		if (ks->kvsowner && (tret = kvs_close(ks->kvstxn)) != 0)
-			EMSG(wtext, session, tret,
-			    "kvs_close: %s.txn: %s",
-			    ks->name, kvs_strerror(tret));
-
-		if ((tret = kvs_close(ks->kvs_device)) != 0)
-			EMSG(wtext, session, WT_ERROR,
-			    "kvs_close: %s: %s", ks->name, kvs_strerror(tret));
-		ks->kvs_device = NULL;
-	}
-
-	free(ks->name);
-	OVERWRITE_AND_FREE(ks);
-
-	return (ret);
-}
-
-/*
- * kvs_cleaner --
- *	Thread to migrate data from the cache to the primary.
- */
-static void *
-kvs_cleaner(void *arg)
-{
-	struct timeval t;
-	KVS_SOURCE *ks;
-	WT_EXTENSION_API *wtext;
-	WT_SOURCE *ws;
-
-	ks = (KVS_SOURCE *)arg;
-	wtext = ks->wtext;
-	for (;;) {
-		/*
-		 * Check the underlying caches for either a number of operations
-		 * or a number of bytes.  It's more expensive to return values
-		 * from the cache (because we have to marshall/unmarshall them),
-		 * but there's no information yet on how to tune the values.
-		 */
-#undef	MEGABYTE
-#define	MEGABYTE	1048576
-		for (ws = ks->ws_head; ws != NULL; ws = ws->next)
-			if (ws->cleaner_ops > 1000 ||
-			    ws->cleaner_bytes > 10 * MEGABYTE)
-				break;
-
-		if (ws != NULL || ks->cleaner_stop)
-			(void)cache_process(wtext, ks, ks->cleaner_stop);
-
-		if (ks->cleaner_stop)
-			break;
-
-		/* Check once a second. */
-		t.tv_sec = 1;
-		t.tv_usec = 0;
-		(void)select(0, NULL, NULL, NULL, &t);
-	}
-	return (NULL);
-}
-
-/*
- * kvs_source_open --
- *	Allocate and open a KVS source.
- */
-static int
-kvs_source_open(DATA_SOURCE *ds, WT_CONFIG_ITEM *k, WT_CONFIG_ITEM *v)
-{
-	struct kvs_config kvs_config;
-	KVS_SOURCE *ks;
-	WT_EXTENSION_API *wtext;
-	int flags, ret = 0;
-	char **device_list, **p;
-
-	wtext = ds->wtext;
-
-	ks = NULL;
-	device_list = NULL;
-
-	/* Check for a KVS source we've already opened. */
-	for (ks = ds->kvs_head; ks != NULL; ks = ks->next)
-		if (STRING_MATCH(ks->name, k->str, k->len))
-			ERET(wtext, NULL,
-			    EINVAL, "%s: device already open", ks->name);
-
-	/* Allocate and initialize a new underlying KVS source object. */
-	if ((ks = calloc(1, sizeof(*ks))) == NULL ||
-	    (ks->name = calloc(1, k->len + 1)) == NULL) {
-		free(ks);
-		return (os_errno());
-	}
-	memcpy(ks->name, k->str, k->len);
-
-	ks->txn_notify.notify = txn_notify;
-	ks->wtext = wtext;
-
-	/*
-	 * Read the configuration.  We require a list of devices underlying the
-	 * KVS source, parse the device list found in the configuration string
-	 * into an array of paths.
-	 */
-	if ((ret =
-	    kvs_config_read(wtext, v, &device_list, &kvs_config, &flags)) != 0)
-		goto err;
-	if (device_list == NULL || device_list[0] == NULL)
-		EMSG_ERR(wtext, NULL,
-		    EINVAL, "%s: no devices specified", ks->name);
-
-	/* Open the underlying KVS store (creating it if necessary). */
-	ks->kvs_device = kvs_open(device_list, NULL, flags | KVS_O_CREATE);
-	if (ks->kvs_device == NULL)
-		EMSG_ERR(wtext, NULL, WT_ERROR,
-		    "kvs_open: %s: %s", ks->name, kvs_strerror(os_errno()));
-
-	/* Start a cleaner thread. */
-	if ((ret = pthread_create(&ks->cleaner_id, NULL, kvs_cleaner, ks)) != 0)
-		EMSG_ERR(wtext, NULL, ret,
-		    "%s: pthread_create: cleaner thread: %s",
-		    ks->name, wtext->strerror(ret));
-
-	/* Insert the new entry at the head of the list. */
-	ks->next = ds->kvs_head;
-	ds->kvs_head = ks;
-
-	if (0) {
-err:		if (ks != NULL)
-			ESET(kvs_source_close(wtext, NULL, ks));
-	}
-
-	if (device_list != NULL) {
-		for (p = device_list; *p != NULL; ++p)
-			free(*p);
-		free(device_list);
-	}
-
-	return (ret);
-}
-
-/*
- * kvs_source_open_txn --
- *	Open the database-wide transaction store.
- */
-static int
-kvs_source_open_txn(DATA_SOURCE *ds)
-{
-	KVS_SOURCE *ks, *kstxn;
-	WT_EXTENSION_API *wtext;
-	kvs_t kvstxn, t;
-	int ret = 0;
-
-	wtext = ds->wtext;
-
-	/*
-	 * The global txn namespace is per connection, it spans multiple KVS
-	 * sources.
-	 *
-	 * We've opened the KVS sources: check to see if any of them already
-	 * have a transaction store, and make sure we only find one.
-	 */
-	kstxn = NULL;
-	kvstxn = NULL;
-	for (ks = ds->kvs_head; ks != NULL; ks = ks->next)
-		if ((t =
-		    kvs_open_namespace(ks->kvs_device, "txn", 0)) != NULL) {
-			if (kvstxn != NULL) {
-				(void)kvs_close(t);
-				(void)kvs_close(kvstxn);
-				ERET(wtext, NULL, WT_ERROR,
-				    "found multiple transaction stores, "
-				    "unable to proceed");
-			}
-			kvstxn = t;
-			kstxn = ks;
-		}
-	ks = kstxn;
-
-	/*
-	 * If we didn't find a transaction store, open a transaction store in
-	 * the first KVS source we loaded.   (It could just as easily be the
-	 * last one we loaded, we're just picking one, but picking the first
-	 * seems slightly less likely to make people wonder.)
-	 */
-	if (ks == NULL) {
-		for (ks = ds->kvs_head; ks->next != NULL; ks = ks->next)
-			;
-		if ((kvstxn = kvs_open_namespace(
-		    ks->kvs_device, "txn", KVS_O_CREATE)) == NULL)
-			ERET(wtext, NULL, WT_ERROR,
-			    "kvs_open_namespace: %s.txn: %s",
-			    ks->name, kvs_strerror(os_errno()));
-		ks->kvsowner = 1;
-
-		/* Push the change. */
-		if ((ret = kvs_commit(ks->kvs_device)) != 0)
-			ERET(wtext, NULL, WT_ERROR,
-			    "kvs_commit: %s", kvs_strerror(ret));
-	}
-
-	/* Add a reference to the open transaction store in each KVS source. */
-	for (ks = ds->kvs_head; ks != NULL; ks = ks->next)
-		ks->kvstxn = kvstxn;
-
-	return (0);
-}
-
-/*
  * ws_source_name --
  *	Build a namespace name.
  */
@@ -2299,6 +1904,17 @@ bad_name:	ERET(wtext, session, EINVAL, "%s: illegal name format", uri);
 	if (ks == NULL)
 		ERET(wtext, NULL,
 		    EINVAL, "%s: no matching Memrata store found", uri);
+
+	/* Allocate and initialize a new underlying KVS source object. */
+	if ((ks = calloc(1, sizeof(*ks))) == NULL ||
+	    (ks->name = calloc(1, k->len + 1)) == NULL) {
+		free(ks);
+		return (os_errno());
+	}
+	memcpy(ks->name, k->str, k->len);
+
+	ks->txn_notify.notify = txn_notify;
+	ks->wtext = wtext;
 
 	/*
 	 * We're about to walk the KVS device's list of files, acquire the
@@ -2890,6 +2506,396 @@ kvs_session_checkpoint(
 	    (ret = kvs_commit(ks->kvs_device)) != 0)
 		ERET(wtext, session, WT_ERROR,
 		    "kvs_commit: %s", kvs_strerror(ret));
+
+	return (0);
+}
+
+/*
+ * kvs_config_devices --
+ *	Convert the device list into an argv[] array.
+ */
+static int
+kvs_config_devices(
+    WT_EXTENSION_API *wtext, WT_CONFIG_ITEM *orig, char ***devices)
+{
+	WT_CONFIG_ITEM k, v;
+	WT_CONFIG_SCAN *scan;
+	size_t len;
+	u_int cnt, slots;
+	int ret = 0;
+	char **argv, **p;
+
+	argv = NULL;
+
+	/* Set up the scan of the device list. */
+	if ((ret = wtext->config_scan_begin(
+	    wtext, NULL, orig->str, orig->len, &scan)) != 0)
+		EMSG_ERR(wtext, NULL, ret,
+		    "WT_EXTENSION_API::config_scan_begin: %s",
+		    wtext->strerror(ret));
+
+	for (cnt = slots = 0; (ret = wtext->
+	    config_scan_next(wtext, scan, &k, &v)) == 0; ++cnt) {
+		if (cnt + 1 >= slots) {		/* NULL-terminate the array */
+			len = slots + 20 * sizeof(*argv);
+			if ((p = realloc(argv, len)) == NULL) {
+				ret = os_errno();
+				goto err;
+			}
+			argv = p;
+			slots += 20;
+		}
+		len = k.len + 1;
+		if ((argv[cnt] = calloc(len, sizeof(**argv))) == NULL) {
+			ret = os_errno();
+			goto err;
+		}
+		argv[cnt + 1] = NULL;
+		memcpy(argv[cnt], k.str, k.len);
+	}
+	if (ret != WT_NOTFOUND)
+		EMSG_ERR(wtext, NULL, ret,
+		    "WT_EXTENSION_API::config_scan_next: %s",
+		    wtext->strerror(ret));
+	if ((ret = wtext->config_scan_end(wtext, scan)) != 0)
+		EMSG_ERR(wtext, NULL, ret,
+		    "WT_EXTENSION_API::config_scan_end: %s",
+		    wtext->strerror(ret));
+
+	*devices = argv;
+	return (0);
+
+err:	if (argv != NULL) {
+		for (p = argv; *p != NULL; ++p)
+			free(*p);
+		free(argv);
+	}
+	return (ret);
+}
+
+/*
+ * kvs_config_read --
+ *	Read KVS configuration.
+ */
+static int
+kvs_config_read(WT_EXTENSION_API *wtext, WT_CONFIG_ITEM *config,
+    char ***devices, struct kvs_config *kvs_config, int *flagsp)
+{
+	static const char **p, *kvs_options[] = {
+		"kvs_devices",
+		"kvs_parallelism",
+		"kvs_granularity",
+		"kvs_avg_key_len",
+		"kvs_avg_val_len",
+		"kvs_write_bufs",
+		"kvs_read_bufs",
+		"kvs_commit_timeout",
+		"kvs_reclaim_threshold",
+		"kvs_reclaim_period",
+		"kvs_open_o_debug",
+		"kvs_open_o_truncate",
+		NULL
+	};
+	WT_CONFIG_ITEM k, v;
+	WT_CONFIG_SCAN *scan;
+	int ret = 0, tret;
+
+	*flagsp = 0;			/* Return default values. */
+	if ((ret = kvs_default_config(kvs_config)) != 0)
+		ERET(wtext, NULL,
+		    EINVAL, "kvs_default_config: %s", kvs_strerror(os_errno()));
+
+	/* Set up the scan of the configuration arguments list. */
+	if ((ret = wtext->config_scan_begin(
+	    wtext, NULL, config->str, config->len, &scan)) != 0)
+		ERET(wtext, NULL, ret,
+		    "WT_EXTENSION_API::config_scan_begin: %s",
+		    wtext->strerror(ret));
+	while ((ret = wtext->config_scan_next(wtext, scan, &k, &v)) == 0) {
+		if (STRING_MATCH("kvs_devices", k.str, k.len)) {
+			if ((ret = kvs_config_devices(wtext, &v, devices)) != 0)
+				return (ret);
+			continue;
+		}
+
+#define	KVS_CONFIG_SET(s, f)						\
+	if (STRING_MATCH(s, k.str, k.len)) {				\
+		kvs_config->f = (unsigned long)v.val;			\
+		continue;						\
+	}
+			KVS_CONFIG_SET("kvs_parallelism", parallelism);
+			KVS_CONFIG_SET("kvs_granularity", granularity);
+			KVS_CONFIG_SET("kvs_avg_key_len", avg_key_len);
+			KVS_CONFIG_SET("kvs_avg_val_len", avg_val_len);
+			KVS_CONFIG_SET("kvs_write_bufs", write_bufs);
+			KVS_CONFIG_SET("kvs_read_bufs", read_bufs);
+			KVS_CONFIG_SET("kvs_commit_timeout", commit_timeout);
+			KVS_CONFIG_SET(
+			    "kvs_reclaim_threshold", reclaim_threshold);
+			KVS_CONFIG_SET("kvs_reclaim_period", reclaim_period);
+
+#define	KVS_FLAG_SET(s, f)						\
+	if (STRING_MATCH(s, k.str, k.len)) {				\
+		if (v.val != 0)						\
+			*flagsp |= f;					\
+		continue;						\
+	}
+			/*
+			 * We don't export KVS_O_CREATE: WT_SESSION.create
+			 * always adds it in.
+			 */
+			KVS_FLAG_SET("kvs_open_o_debug", KVS_O_DEBUG);
+			KVS_FLAG_SET("kvs_open_o_truncate",  KVS_O_TRUNCATE);
+
+			EMSG_ERR(wtext, NULL, EINVAL,
+			    "unknown configuration key value pair %.*s/%.*s",
+			    (int)k.len, k.str, (int)v.len, v.str);
+	}
+
+	if (ret == WT_NOTFOUND)
+		ret = 0;
+	if (ret != 0)
+		EMSG_ERR(wtext, NULL, ret,
+		    "WT_EXTENSION_API::config_scan_next: %s",
+		    wtext->strerror(ret));
+
+err:	if ((tret = wtext->config_scan_end(wtext, scan)) != 0)
+		EMSG(wtext, NULL, tret,
+		    "WT_EXTENSION_API::config_scan_end: %s",
+		    wtext->strerror(ret));
+
+	return (ret);
+}
+
+/*
+ * kvs_source_close --
+ *	Kill a KVS_SOURCE structure.
+ */
+static int
+kvs_source_close(WT_EXTENSION_API *wtext, WT_SESSION *session, KVS_SOURCE *ks)
+{
+	WT_SOURCE *ws;
+	int ret = 0, tret;
+
+	/* Resolve the cache into the primary one last time and quit. */
+	if (ks->cleaner_id != 0) {
+		ks->cleaner_stop = 1;
+		if ((tret = pthread_join(ks->cleaner_id, NULL)) != 0)
+			EMSG(wtext, session, tret,
+			    "pthread_join: %s", kvs_strerror(tret));
+		ks->cleaner_id = 0;
+	}
+
+	/* Close the underlying WiredTiger sources. */
+	while ((ws = ks->ws_head) != NULL) {
+		ks->ws_head = ws->next;
+		ESET(ws_source_close(wtext, session, ws));
+	}
+
+	/* Flush and close the KVS source. */
+	if (ks->kvs_device != NULL) {
+		if ((tret = kvs_commit(ks->kvs_device)) != 0)
+			EMSG(wtext, session, WT_ERROR,
+			    "kvs_commit: %s: %s", ks->name, kvs_strerror(tret));
+
+		/* If the owner, close the database transaction store. */
+		if (ks->kvsowner && (tret = kvs_close(ks->kvstxn)) != 0)
+			EMSG(wtext, session, tret,
+			    "kvs_close: %s.txn: %s",
+			    ks->name, kvs_strerror(tret));
+
+		if ((tret = kvs_close(ks->kvs_device)) != 0)
+			EMSG(wtext, session, WT_ERROR,
+			    "kvs_close: %s: %s", ks->name, kvs_strerror(tret));
+		ks->kvs_device = NULL;
+	}
+
+	free(ks->name);
+	OVERWRITE_AND_FREE(ks);
+
+	return (ret);
+}
+
+/*
+ * kvs_cleaner --
+ *	Thread to migrate data from the cache to the primary.
+ */
+static void *
+kvs_cleaner(void *arg)
+{
+	struct timeval t;
+	KVS_SOURCE *ks;
+	WT_EXTENSION_API *wtext;
+	WT_SOURCE *ws;
+
+	ks = (KVS_SOURCE *)arg;
+	wtext = ks->wtext;
+	for (;;) {
+		/*
+		 * Check the underlying caches for either a number of operations
+		 * or a number of bytes.  It's more expensive to return values
+		 * from the cache (because we have to marshall/unmarshall them),
+		 * but there's no information yet on how to tune the values.
+		 */
+#undef	MEGABYTE
+#define	MEGABYTE	1048576
+		for (ws = ks->ws_head; ws != NULL; ws = ws->next)
+			if (ws->cleaner_ops > 1000 ||
+			    ws->cleaner_bytes > 10 * MEGABYTE)
+				break;
+
+		if (ws != NULL || ks->cleaner_stop)
+			(void)cache_process(wtext, ks, ks->cleaner_stop);
+
+		if (ks->cleaner_stop)
+			break;
+
+		/* Check once a second. */
+		t.tv_sec = 1;
+		t.tv_usec = 0;
+		(void)select(0, NULL, NULL, NULL, &t);
+	}
+	return (NULL);
+}
+
+/*
+ * kvs_source_open --
+ *	Allocate and open a KVS source.
+ */
+static int
+kvs_source_open(DATA_SOURCE *ds, WT_CONFIG_ITEM *k, WT_CONFIG_ITEM *v)
+{
+	struct kvs_config kvs_config;
+	KVS_SOURCE *ks;
+	WT_EXTENSION_API *wtext;
+	int flags, ret = 0;
+	char **device_list, **p;
+
+	wtext = ds->wtext;
+
+	ks = NULL;
+	device_list = NULL;
+
+	/* Check for a KVS source we've already opened. */
+	for (ks = ds->kvs_head; ks != NULL; ks = ks->next)
+		if (STRING_MATCH(ks->name, k->str, k->len))
+			ERET(wtext, NULL,
+			    EINVAL, "%s: device already open", ks->name);
+
+	/* Allocate and initialize a new underlying KVS source object. */
+	if ((ks = calloc(1, sizeof(*ks))) == NULL ||
+	    (ks->name = calloc(1, k->len + 1)) == NULL) {
+		free(ks);
+		return (os_errno());
+	}
+	memcpy(ks->name, k->str, k->len);
+	ks->wtext = wtext;
+
+	/*
+	 * Read the configuration.  We require a list of devices underlying the
+	 * KVS source, parse the device list found in the configuration string
+	 * into an array of paths.
+	 */
+	if ((ret =
+	    kvs_config_read(wtext, v, &device_list, &kvs_config, &flags)) != 0)
+		goto err;
+	if (device_list == NULL || device_list[0] == NULL)
+		EMSG_ERR(wtext, NULL,
+		    EINVAL, "%s: no devices specified", ks->name);
+
+	/* Open the underlying KVS store (creating it if necessary). */
+	ks->kvs_device = kvs_open(device_list, NULL, flags | KVS_O_CREATE);
+	if (ks->kvs_device == NULL)
+		EMSG_ERR(wtext, NULL, WT_ERROR,
+		    "kvs_open: %s: %s", ks->name, kvs_strerror(os_errno()));
+
+	/* Start a cleaner thread. */
+	if ((ret = pthread_create(&ks->cleaner_id, NULL, kvs_cleaner, ks)) != 0)
+		EMSG_ERR(wtext, NULL, ret,
+		    "%s: pthread_create: cleaner thread: %s",
+		    ks->name, wtext->strerror(ret));
+
+	/* Insert the new entry at the head of the list. */
+	ks->next = ds->kvs_head;
+	ds->kvs_head = ks;
+
+	if (0) {
+err:		if (ks != NULL)
+			ESET(kvs_source_close(wtext, NULL, ks));
+	}
+
+	if (device_list != NULL) {
+		for (p = device_list; *p != NULL; ++p)
+			free(*p);
+		free(device_list);
+	}
+
+	return (ret);
+}
+
+/*
+ * kvs_source_open_txn --
+ *	Open the database-wide transaction store.
+ */
+static int
+kvs_source_open_txn(DATA_SOURCE *ds)
+{
+	KVS_SOURCE *ks, *kstxn;
+	WT_EXTENSION_API *wtext;
+	kvs_t kvstxn, t;
+	int ret = 0;
+
+	wtext = ds->wtext;
+
+	/*
+	 * The global txn namespace is per connection, it spans multiple KVS
+	 * sources.
+	 *
+	 * We've opened the KVS sources: check to see if any of them already
+	 * have a transaction store, and make sure we only find one.
+	 */
+	kstxn = NULL;
+	kvstxn = NULL;
+	for (ks = ds->kvs_head; ks != NULL; ks = ks->next)
+		if ((t =
+		    kvs_open_namespace(ks->kvs_device, "txn", 0)) != NULL) {
+			if (kvstxn != NULL) {
+				(void)kvs_close(t);
+				(void)kvs_close(kvstxn);
+				ERET(wtext, NULL, WT_ERROR,
+				    "found multiple transaction stores, "
+				    "unable to proceed");
+			}
+			kvstxn = t;
+			kstxn = ks;
+		}
+	ks = kstxn;
+
+	/*
+	 * If we didn't find a transaction store, open a transaction store in
+	 * the first KVS source we loaded.   (It could just as easily be the
+	 * last one we loaded, we're just picking one, but picking the first
+	 * seems slightly less likely to make people wonder.)
+	 */
+	if (ks == NULL) {
+		for (ks = ds->kvs_head; ks->next != NULL; ks = ks->next)
+			;
+		if ((kvstxn = kvs_open_namespace(
+		    ks->kvs_device, "txn", KVS_O_CREATE)) == NULL)
+			ERET(wtext, NULL, WT_ERROR,
+			    "kvs_open_namespace: %s.txn: %s",
+			    ks->name, kvs_strerror(os_errno()));
+		ks->kvsowner = 1;
+
+		/* Push the change. */
+		if ((ret = kvs_commit(ks->kvs_device)) != 0)
+			ERET(wtext, NULL, WT_ERROR,
+			    "kvs_commit: %s", kvs_strerror(ret));
+	}
+
+	/* Add a reference to the open transaction store in each KVS source. */
+	for (ks = ds->kvs_head; ks != NULL; ks = ks->next)
+		ks->kvstxn = kvstxn;
 
 	return (0);
 }
