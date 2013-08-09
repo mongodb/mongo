@@ -611,6 +611,11 @@ namespace mongo {
             _cloneLocs.erase( dl );
         }
 
+        std::size_t cloneLocsRemaining() {
+            scoped_spinlock lk( _trackerLocks );
+            return _cloneLocs.size();
+        }
+
         long long mbUsed() const { return _memoryUsed / ( 1024 * 1024 ); }
 
         bool getInCriticalSection() const { scoped_lock l(_m); return _inCriticalSection; }
@@ -1054,13 +1059,19 @@ namespace mongo {
             timing.done( 3 );
 
             // 4.
+
+            // Track last result from TO shard for sanity check
+            BSONObj res;
             for ( int i=0; i<86400; i++ ) { // don't want a single chunk move to take more than a day
                 verify( !Lock::isLocked() );
+
                 sleepsecs( 1 );
+
                 scoped_ptr<ScopedDbConnection> conn(
                         ScopedDbConnection::getScopedDbConnection( toShard.getConnString() ) );
-                BSONObj res;
+
                 bool ok;
+                res = BSONObj();
                 try {
                     ok = conn->get()->runCommand( "admin" , BSON( "_recvChunkStatus" << 1 ) , res );
                     res = res.getOwned();
@@ -1106,6 +1117,26 @@ namespace mongo {
             timing.done(4);
 
             // 5.
+
+            // Before we get into the critical section of the migration, let's double check
+            // that the docs have been cloned
+            log() << "About to check if it is safe to enter critical section" << endl;
+
+            // Ensure all cloned docs have actually been transferred
+            std::size_t locsRemaining = migrateFromStatus.cloneLocsRemaining();
+            if ( locsRemaining != 0 ) {
+
+                errmsg =
+                    str::stream() << "moveChunk cannot enter critical section before all data is"
+                                  << " cloned, " << locsRemaining << " locs were not transferred"
+                                  << " but to-shard reported " << res;
+
+                // Should never happen, but safe to abort before critical section
+                error() << errmsg << migrateLog;
+                dassert( false );
+                return false;
+            }
+
             {
                 // 5.a
                 // we're under the collection lock here, so no other migrate can change maxVersion or ShardChunkManager state
