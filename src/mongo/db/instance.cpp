@@ -873,7 +873,20 @@ namespace mongo {
 
     void checkAndInsert(const char *ns, /*modifies*/BSONObj& js) { 
         uassert( 10059 , "object to insert too large", js.objsize() <= BSONObjMaxUserSize);
-        {
+
+        NamespaceString nsString(ns);
+        // Do not allow objects to be stored which violate okForStorageAsRoot
+        if ( isNewUpdateFrameworkEnabled() && !nsString.isSystemCollOrConfigDB() ) {
+            bool ok = js.okForStorageAsRoot();
+            if (!ok) {
+                LOG(1) << "ns: " << ns << ", not okForStorageAsRoot: " << js;
+            }
+            uassert(17013,
+                    "Cannot insert object with _id field of array/regex or "
+                    "with any field name prefixed with $ or containing a dot. ",
+                    ok);
+        }
+        else {
             BSONObjIterator i( js );
             while ( i.more() ) {
                 BSONElement e = i.next();
