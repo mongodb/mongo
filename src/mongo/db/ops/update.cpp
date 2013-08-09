@@ -510,7 +510,7 @@ namespace mongo {
         // Only user updates should be checked. Any system or replication stuff should pass through.
         // Config db docs shouldn't get checked for valid field names since the shard key can have
         // a dot (".") in it.
-        bool shouldValidate = !(forReplication || nsStr.db() == "config");
+        bool shouldValidate = !(forReplication || nsStr.isConfigDB());
 
         UpdateDriver::Options opts;
         opts.multi = multi;
