@@ -30,7 +30,7 @@ namespace mongo {
     class DocumentSource;
     class DocumentSourceProject;
     class Expression;
-    class ExpressionContext;
+    struct ExpressionContext;
     class ExpressionNary;
     struct OpDesc; // local private struct
     class Privilege;

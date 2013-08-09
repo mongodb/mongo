@@ -40,7 +40,6 @@ namespace mongo {
     class Cursor;
     class Document;
     class Expression;
-    class ExpressionContext;
     class ExpressionFieldPath;
     class ExpressionObject;
     class DocumentSourceLimit;

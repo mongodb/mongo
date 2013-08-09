@@ -28,11 +28,7 @@ namespace mongo {
     class BSONArrayBuilder;
     class BSONElement;
     class BSONObjBuilder;
-    class Document;
-    class MutableDocument;
     class DocumentSource;
-    class ExpressionContext;
-    class Value;
 
     // TODO: Look into merging with ExpressionContext and possibly ObjectCtx.
     /// The state used as input to Expressions
