@@ -69,7 +69,8 @@ namespace mongo {
 
         /**
          * Mark the Runner as no longer valid.  Can happen when a runner yields and the underlying
-         * database is dropped/indexes removed/etc.
+         * database is dropped/indexes removed/etc.  All future to calls to getNext return
+         * RUNNER_DEAD. Every other call is a NOOP.
          */
         virtual void kill() = 0;
 

@@ -59,6 +59,8 @@ namespace mongo {
         // For each indexed field, the values that the field is allowed to take on.
         vector<OrderedIntervalList> fields;
 
+        string toString() const;
+
         // Debugging check.
         // We must have as many fields the key pattern does.
         // The fields must be oriented in the direction we'd encounter them given the indexing

@@ -17,6 +17,7 @@
 #pragma once
 
 #include "mongo/db/matcher/expression.h"
+#include "mongo/db/query/index_bounds.h"
 #include "mongo/db/query/stage_types.h"
 
 namespace mongo {
@@ -89,7 +90,37 @@ namespace mongo {
 
         // Not owned.
         // This is a sub-tree of the filter in the QuerySolution that owns us.
+        // TODO: This may change in the future.
         MatchExpression* filter;
+    };
+
+    struct IndexScanNode : public QuerySolutionNode {
+        IndexScanNode() : filter(NULL), limit(0), direction(1) { }
+
+        virtual StageType getType() const { return STAGE_IXSCAN; }
+
+        virtual void appendToString(stringstream* ss) const {
+            *ss << "IXSCAN kp=" << indexKeyPattern;
+            if (NULL != filter) {
+                *ss << " filter= " << filter->toString();
+            }
+            *ss << " dir = " << direction;
+            *ss << " bounds = " << bounds.toString();
+        }
+
+        BSONObj indexKeyPattern;
+
+        // Not owned.
+        // This is a sub-tree of the filter in the QuerySolution that owns us.
+        // TODO: This may change in the future.
+        MatchExpression* filter;
+
+        // Only set for 2d.
+        int limit;
+
+        int direction;
+
+        IndexBounds bounds;
     };
 
 }  // namespace mongo

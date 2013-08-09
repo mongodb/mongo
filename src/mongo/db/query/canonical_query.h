@@ -20,13 +20,13 @@
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression.h"
-#include "mongo/db/parsed_query.h"
+#include "mongo/db/query/lite_parsed_query.h"
 
 namespace mongo {
 
     class CanonicalQuery {
     public:
-        // TODO: qm is mutable because ParsedQuery wants it mutable.  FIX.
+        // TODO: qm is mutable because LiteParsedQuery wants it mutable.  FIX.
         static Status canonicalize(QueryMessage& qm, CanonicalQuery** out);
 
         // This is for testing, when we don't have a QueryMessage.
@@ -40,7 +40,7 @@ namespace mongo {
         //
         MatchExpression* root() const { return _root.get(); }
         BSONObj getQueryObj() const { return _pq->getFilter(); }
-        const ParsedQuery& getParsed() const { return *_pq; }
+        const LiteParsedQuery& getParsed() const { return *_pq; }
 
         string toString() const;
 
@@ -48,7 +48,7 @@ namespace mongo {
         // You must go through canonicalize to create a CanonicalQuery.
         CanonicalQuery() { }
 
-        scoped_ptr<ParsedQuery> _pq;
+        scoped_ptr<LiteParsedQuery> _pq;
 
         // _root points into _pq->getFilter()
         scoped_ptr<MatchExpression> _root;

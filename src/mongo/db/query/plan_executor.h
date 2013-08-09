@@ -25,6 +25,11 @@
 namespace mongo {
 
     /**
+     *
+     * A PlanExecutor is the abstraction that knows how to crank a tree of stages into execution.
+     * The executor is usually part of a larger abstraction that is interacting with the cache
+     * and/or the query optimizer.
+     *
      * Executes a plan.  Used by a runner.  Calls work() on a plan until a result is produced.
      * Stops when the plan is EOF or if the plan errors.
      *
@@ -40,7 +45,7 @@ namespace mongo {
         WorkingSet* getWorkingSet() { return _workingSet.get(); }
 
         /**
-         * Takes ownership of root.
+         * Takes ownership of root (and therefore the entire tree).
          */
         void setRoot(PlanStage* root) {
             verify(root);

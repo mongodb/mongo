@@ -79,7 +79,12 @@ namespace mongo {
     bool MultiPlanRunner::forceYield() {
         saveState();
         ClientCursor::registerRunner(this);
-        ClientCursor::staticYield(ClientCursor::suggestYieldMicros(), getQuery().getParsed().ns(), NULL);
+        ClientCursor::staticYield(ClientCursor::suggestYieldMicros(),
+                                  getQuery().getParsed().ns(),
+                                  NULL);
+        // During the yield, the database we're operating over or any collection we're relying on
+        // may be dropped.  When this happens all cursors and runners on that database and
+        // collection are killed or deleted in some fashion. (This is how the _killed gets set.)
         ClientCursor::deregisterRunner(this);
         if (!_killed) { restoreState(); }
         return !_killed;
