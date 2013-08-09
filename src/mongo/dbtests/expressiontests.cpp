@@ -1383,12 +1383,7 @@ namespace ExpressionTests {
             void assertContents( const BSONArray& expectedContents ) {
                 ASSERT_EQUALS( constify( BSON( "$testable" << expectedContents ) ), expressionToBson( this ) );
             }
-            void checkArgLimit( unsigned maxArgs ) const {
-                return ExpressionNary::checkArgLimit( maxArgs );
-            }
-            void checkArgCount( unsigned reqArgs ) const {
-                return ExpressionNary::checkArgCount( reqArgs );
-            }
+
         private:
             Testable( bool haveFactory ) :
                 _haveFactory( haveFactory ) {
@@ -1405,52 +1400,6 @@ namespace ExpressionTests {
                 testable->assertContents( BSON_ARRAY( 9 ) );
                 testable->addOperand( ExpressionFieldPath::create( "ab.c" ) );
                 testable->assertContents( BSON_ARRAY( 9 << "$ab.c" ) );
-            }
-        };
-
-        /** Checking the max number of operands. */
-        class CheckArgLimit {
-        public:
-            void run() {
-                intrusive_ptr<Testable> testable = Testable::create();
-
-                // No arguments.
-                testable->checkArgLimit( 1 ); // No assertion.
-
-                // One argument.
-                testable->addOperand( ExpressionConstant::create( Value( 1 ) ) );
-                ASSERT_THROWS( testable->checkArgLimit( 1 ), UserException );
-                testable->checkArgLimit( 2 ); // No assertion.
-
-                // Two arguments.
-                testable->addOperand( ExpressionConstant::create( Value( 2 ) ) );
-                ASSERT_THROWS( testable->checkArgLimit( 1 ), UserException );
-                ASSERT_THROWS( testable->checkArgLimit( 2 ), UserException );
-                testable->checkArgLimit( 3 ); // No assertion.                
-            }
-        };
-
-        /** Checking the expected count of operands. */
-        class CheckArgCount {
-        public:
-            void run() {
-                intrusive_ptr<Testable> testable = Testable::create();
-                
-                // No arguments.
-                testable->checkArgCount( 0 ); // No assertion.
-                ASSERT_THROWS( testable->checkArgCount( 1 ), UserException );
-                
-                // One argument.
-                testable->addOperand( ExpressionConstant::create( Value( 1 ) ) );
-                ASSERT_THROWS( testable->checkArgCount( 0 ), UserException );
-                testable->checkArgCount( 1 ); // No assertion.
-                ASSERT_THROWS( testable->checkArgCount( 2 ), UserException );
-                
-                // Two arguments.
-                testable->addOperand( ExpressionConstant::create( Value( 2 ) ) );
-                ASSERT_THROWS( testable->checkArgCount( 1 ), UserException );
-                testable->checkArgCount( 2 ); // No assertion.                
-                ASSERT_THROWS( testable->checkArgCount( 3 ), UserException );
             }
         };
 
@@ -3306,8 +3255,6 @@ namespace ExpressionTests {
             add<FieldRange::Multikey>();
 
             add<Nary::AddOperand>();
-            add<Nary::CheckArgLimit>();
-            add<Nary::CheckArgCount>();
             add<Nary::Dependencies>();
             add<Nary::AddToBsonObj>();
             add<Nary::AddToBsonArray>();
