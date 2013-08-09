@@ -76,5 +76,51 @@ namespace mongo {
             ASSERT_EQUALS( "industri||melbourn|physic||industry||", q.debugString() );
         }
 
+        TEST( FTSQuery, NegPhrase2) {
+            FTSQuery q1, q2, q3;
+            ASSERT( q1.parse( "foo \"bar\"", "english" ).isOK() );
+            ASSERT( q2.parse( "foo \"-bar\"", "english" ).isOK() );
+            ASSERT( q3.parse( "foo \" -bar\"", "english" ).isOK() );
+
+            ASSERT_EQUALS( 2U, q1.getTerms().size() );
+            ASSERT_EQUALS( 2U, q2.getTerms().size() );
+            ASSERT_EQUALS( 2U, q3.getTerms().size() );
+
+            ASSERT_EQUALS( 0U, q1.getNegatedTerms().size() );
+            ASSERT_EQUALS( 0U, q2.getNegatedTerms().size() );
+            ASSERT_EQUALS( 0U, q3.getNegatedTerms().size() );
+
+            ASSERT_EQUALS( 1U, q1.getPhr().size() );
+            ASSERT_EQUALS( 1U, q2.getPhr().size() );
+            ASSERT_EQUALS( 1U, q3.getPhr().size() );
+
+            ASSERT_EQUALS( 0U, q1.getNegatedPhr().size() );
+            ASSERT_EQUALS( 0U, q2.getNegatedPhr().size() );
+            ASSERT_EQUALS( 0U, q3.getNegatedPhr().size() );
+        }
+
+        TEST( FTSQuery, NegPhrase3) {
+            FTSQuery q1, q2, q3;
+            ASSERT( q1.parse( "foo -\"bar\"", "english" ).isOK() );
+            ASSERT( q2.parse( "foo -\"-bar\"", "english" ).isOK() );
+            ASSERT( q3.parse( "foo -\" -bar\"", "english" ).isOK() );
+
+            ASSERT_EQUALS( 1U, q1.getTerms().size() );
+            ASSERT_EQUALS( 1U, q2.getTerms().size() );
+            ASSERT_EQUALS( 1U, q3.getTerms().size() );
+
+            ASSERT_EQUALS( 0U, q1.getNegatedTerms().size() );
+            ASSERT_EQUALS( 0U, q2.getNegatedTerms().size() );
+            ASSERT_EQUALS( 0U, q3.getNegatedTerms().size() );
+
+            ASSERT_EQUALS( 0U, q1.getPhr().size() );
+            ASSERT_EQUALS( 0U, q2.getPhr().size() );
+            ASSERT_EQUALS( 0U, q3.getPhr().size() );
+
+            ASSERT_EQUALS( 1U, q1.getNegatedPhr().size() );
+            ASSERT_EQUALS( 1U, q2.getNegatedPhr().size() );
+            ASSERT_EQUALS( 1U, q3.getNegatedPhr().size() );
+        }
+
     }
 }
