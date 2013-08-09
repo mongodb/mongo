@@ -281,7 +281,12 @@ namespace mongo {
 
     void SyncSourceFeedback::run() {
         Client::initThread("SyncSourceFeedbackThread");
+        bool sleepNeeded = false;
         while (true) {
+            if (sleepNeeded) {
+                sleepmillis(500);
+                sleepNeeded = false;
+            }
             {
                 boost::unique_lock<boost::mutex> lock(_mtx);
                 while (!_positionChanged && !_handshakeNeeded) {
@@ -301,9 +306,11 @@ namespace mongo {
                 if (!hasConnection()) {
                     // fix connection if need be
                     if (!target) {
+                        sleepNeeded = true;
                         continue;
                     }
                     if (!_connect(target->fullName())) {
+                        sleepNeeded = true;
                         continue;
                     }
                     else if (!supportsUpdater()) {
