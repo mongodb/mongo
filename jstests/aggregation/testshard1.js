@@ -1,5 +1,12 @@
 load('jstests/aggregation/extras/utils.js');
 
+// Use this for aggregations that have arrays or results of unspecified order.
+// It will bypass the check that cursors return the same results as non-cursors.
+function aggregateNoOrder(coll, pipeline) {
+    var cursor = coll.aggregateCursor(pipeline);
+    return {result: cursor.toArray(), ok: 1};
+}
+
 /*
 > ShardingTest
 function (testName, numShards, verboseLevel, numMongos, otherParams) {
@@ -78,7 +85,7 @@ for ( var i = 0; i < shards.length; i++ ) {
 }
 
 // a project and group in shards, result combined in mongos
-var a1 = db.ts1.aggregate(
+var a1 = aggregateNoOrder(db.ts1, [
     { $project: {
         cMod10: {$mod:["$counter", 10]},
         number: 1,
@@ -90,7 +97,7 @@ var a1 = db.ts1.aggregate(
         avgCounter: {$avg: "$cMod10"}
     }},
     { $sort: {_id:1} }
-);
+]);
 
 var a1result = a1.result;
 for(i = 0 ; i < 10; ++i) {
@@ -128,12 +135,12 @@ for(i = 0 ; i < strings.length; ++i) {
 }
 
 // a match takes place in the shards; just returning the results from mongos
-var a4 = db.ts1.aggregate(
+var a4 = aggregateNoOrder(db.ts1, [
     { $match: {$or:[{counter:55}, {counter:1111},
                     {counter: 2222}, {counter: 33333},
                     {counter: 99999}, {counter: 55555}]}
     }
-);
+]);
 
 var a4result = a4.result;
 for(i = 0; i < 6; ++i) {
