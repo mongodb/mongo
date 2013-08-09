@@ -584,7 +584,7 @@ namespace mongo {
         // cursors and some of them do not deduplicate the entries they generate. We have
         // deduping logic in here, too -- for now.
         unordered_set<DiskLoc, DiskLoc::Hasher> seenLocs;
-        int numUpdated = 0;
+        int numMatched = 0;
         debug.nscanned = 0;
 
         Client& client = cc();
@@ -604,7 +604,7 @@ namespace mongo {
                  !cursor->currLoc().isNull() &&
                  !cursor->currLoc().rec()->likelyInPhysicalMemory() ) {
                 // We should never throw a PFE if we have already updated items.
-                dassert(numUpdated == 0);
+                dassert((numMatched == 0) || (numMatched == debug.nupdateNoops));
                 throw PageFaultException( cursor->currLoc().rec() );
             }
 
@@ -719,6 +719,9 @@ namespace mongo {
                 cursor->prepareToTouchEarlierIterate();
             }
 
+            // Found a matching document
+            numMatched++;
+
             // Ask the driver to apply the mods. It may be that the driver can apply those "in
             // place", that is, some values of the old document just get adjusted without any
             // change to the binary layout on the bson layer. It may be that a whole new
@@ -800,10 +803,9 @@ namespace mongo {
                 }
             }
 
-            // If we applied any in-place updates, or asked the DataFileMgr to write for us,
-            // then count this as an update.
-            if (objectWasChanged)
-                numUpdated++;
+            // If it was noop since the document didn't change, record that.
+            if (!objectWasChanged)
+                debug.nupdateNoops++;
 
             if (!multi) {
                 break;
@@ -819,13 +821,13 @@ namespace mongo {
 
         }
 
-        if (numUpdated > 0) {
+        if (numMatched > 0) {
             return UpdateResult( true /* updated existing object(s) */,
                                  !driver->isDocReplacement() /* $mod or obj replacement */,
-                                 numUpdated /* # of docments update */,
+                                 numMatched /* # of docments update, even no-ops */,
                                  BSONObj() );
         }
-        else if (numUpdated == 0 && !upsert) {
+        else if (numMatched == 0 && !upsert) {
             return UpdateResult( false /* no object updated */,
                                  !driver->isDocReplacement() /* $mod or obj replacement */,
                                  0 /* no updates */,
