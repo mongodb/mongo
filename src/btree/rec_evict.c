@@ -12,7 +12,8 @@ static void __rec_discard_tree(WT_SESSION_IMPL *, WT_PAGE *, int);
 static void __rec_excl_clear(WT_SESSION_IMPL *);
 static void __rec_page_clean_update(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_page_dirty_update(WT_SESSION_IMPL *, WT_PAGE *);
-static int  __rec_review(WT_SESSION_IMPL *, WT_REF *, WT_PAGE *, int, int, int);
+static int  __rec_review(
+    WT_SESSION_IMPL *, WT_REF *, WT_PAGE *, int, int, int, int *);
 static void __rec_root_update(WT_SESSION_IMPL *);
 
 /*
@@ -24,12 +25,13 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, int exclusive)
 {
 	WT_DECL_RET;
 	WT_PAGE_MODIFY *mod;
-	int merge;
+	int merge, try_split;
 
 	WT_VERBOSE_RET(session, evict,
 	    "page %p (%s)", page, __wt_page_type_string(page->type));
 
 	WT_ASSERT(session, session->excl_next == 0);
+	try_split = 0;
 
 	/*
 	 * If we get a split-merge page during normal eviction, try to collapse
@@ -43,6 +45,7 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, int exclusive)
 	WT_ASSERT(session, merge || mod == NULL ||
 	    !F_ISSET(mod, WT_PM_REC_SPLIT_MERGE));
 
+	try_split = 0;
 	/*
 	 * Get exclusive access to the page and review the page and its subtree
 	 * for conditions that would block our eviction of the page.  If the
@@ -55,30 +58,19 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, int exclusive)
 	 * or during salvage).  That's OK if exclusive is set: we won't check
 	 * hazard pointers in that case.
 	 */
-	ret = __rec_review(session, page->ref, page, exclusive, merge, 1);
-
-	/*
-	 * If reconciliation failed due to unwritable modifications and the
-	 * page is a lot larger than the maxiumum allowed, it's likely that
-	 * we are having trouble reconciling it due to contention. Attempt to
-	 * split the page in memory.
-	 */
-	if (!exclusive && ret == EBUSY &&
-	    __wt_eviction_page_force(session, page) > 2) {
-		WT_ERR(__wt_split_page_inmem(session, page));
-		__rec_excl_clear(session);
-		/*
-		 * The original page has been included in the split, so don't
-		 * discard it, or count the split towards eviction stats.
-		 */
-		/* TODO: Add a statistic for split pages. */
-		goto err;
-	}
-	WT_ERR(ret);
+	WT_ERR(__rec_review(
+	    session, page->ref, page, exclusive, merge, 1, &try_split));
 
 	/* Try to merge internal pages. */
 	if (merge)
 		WT_ERR(__wt_merge_tree(session, page));
+
+	/* Try to split the page in memory. */
+	if (try_split) {
+		WT_ERR(__wt_split_page_inmem(session, page));
+		WT_CSTAT_INCR(session, cache_eviction_split);
+		WT_DSTAT_INCR(session, cache_eviction_split);
+	}
 
 	/*
 	 * Update the page's modification reference, reconciliation might have
@@ -105,6 +97,9 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, int exclusive)
 		else
 			__rec_page_clean_update(session, page);
 
+		/* We should never split unmodified pages. */
+		WT_ASSERT(session, !try_split);
+
 		/* Discard the page. */
 		__wt_page_out(session, &page);
 
@@ -116,14 +111,16 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, int exclusive)
 		else
 			WT_ERR(__rec_page_dirty_update(session, page));
 
-		/* Discard the tree rooted in this page. */
-		__rec_discard_tree(session, page, exclusive);
+		if (!try_split) {
+			/* Discard the tree rooted in this page. */
+			__rec_discard_tree(session, page, exclusive);
 
-		WT_CSTAT_INCR(session, cache_eviction_dirty);
-		WT_DSTAT_INCR(session, cache_eviction_dirty);
+			WT_CSTAT_INCR(session, cache_eviction_dirty);
+			WT_DSTAT_INCR(session, cache_eviction_dirty);
+		}
 	}
-err:	if (ret != 0) {
-		/*
+	if (0) {
+err:		/*
 		 * If unable to evict this page, release exclusive reference(s)
 		 * we've acquired.
 		 */
@@ -293,8 +290,8 @@ __rec_discard_tree(WT_SESSION_IMPL *session, WT_PAGE *page, int exclusive)
  *	hazard pointer.
  */
 static int
-__rec_review(WT_SESSION_IMPL *session,
-    WT_REF *ref, WT_PAGE *page, int exclusive, int merge, int top)
+__rec_review(WT_SESSION_IMPL *session, WT_REF *ref,
+    WT_PAGE *page, int exclusive, int merge, int top, int *try_split)
 {
 	WT_BTREE *btree;
 	WT_DECL_RET;
@@ -303,6 +300,7 @@ __rec_review(WT_SESSION_IMPL *session,
 	uint32_t i;
 
 	btree = S2BT(session);
+	*try_split = 0;
 
 	/*
 	 * Get exclusive access to the page if our caller doesn't have the tree
@@ -333,8 +331,9 @@ __rec_review(WT_SESSION_IMPL *session,
 			case WT_REF_DELETED:		/* On-disk, deleted */
 				break;
 			case WT_REF_MEM:		/* In-memory */
-				WT_RET(__rec_review(session,
-				    ref, ref->page, exclusive, merge, 0));
+				WT_RET(__rec_review(
+				    session, ref, ref->page,
+				    exclusive, merge, 0, try_split));
 				break;
 			case WT_REF_EVICT_WALK:		/* Walk point */
 			case WT_REF_LOCKED:		/* Being evicted */
@@ -450,8 +449,19 @@ ckpt:		WT_CSTAT_INCR(session, cache_eviction_checkpoint);
 		 */
 		mod = page->modify;
 
-		/* If there are unwritten changes on the page, give up. */
+		/*
+		 * If reconciliation failed due to unwritable modifications
+		 * and the page is a lot larger than the maxiumum allowed, it
+		 * is likely that we are having trouble reconciling it due to
+		 * contention. Attempt to split the page in memory.
+		 */
+		if (ret == EBUSY &&
+		    __wt_eviction_page_force(session, page) > 2) {
+			*try_split = 1;
+			return (0);
+		}
 		if (ret == EBUSY) {
+			/* Give up if there are unwritten changes */
 			WT_VERBOSE_RET(session, evict,
 			    "eviction failed, reconciled page"
 			    " contained active updates");
@@ -491,6 +501,7 @@ ckpt:		WT_CSTAT_INCR(session, cache_eviction_checkpoint);
 	if (!top && (mod == NULL || !F_ISSET(mod,
 	    WT_PM_REC_EMPTY | WT_PM_REC_SPLIT | WT_PM_REC_SPLIT_MERGE)))
 		return (EBUSY);
+
 	return (0);
 }
 

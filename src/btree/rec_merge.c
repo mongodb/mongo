@@ -574,13 +574,16 @@ __split_row_page_inmem(
 	WT_DECL_RET;
 	WT_INSERT *ins, *prev_ins;
 	WT_INSERT **insp;
+	WT_INSERT *current_ins;
 	WT_INSERT_HEAD *ins_head;
 	WT_PAGE *new_parent, *right_child;
 	WT_REF *newref;
-	int i;
+	int i, ins_depth;
+	size_t transfer_size;
 
 	new_parent = right_child = NULL;
-	ins = prev_ins = NULL;
+	ins = NULL;
+	current_ins = NULL;
 
 	/*
 	 * Do all operations that can fail before futzing with the original
@@ -607,93 +610,28 @@ __split_row_page_inmem(
 		ins_head = WT_ROW_INSERT_SLOT(orig, orig->entries - 1);
 
 	ins = WT_SKIP_LAST(ins_head);
+	for (ins_depth = 0;
+	    ins_depth < WT_SKIP_MAXDEPTH && ins_head->tail[ins_depth] == ins;
+	    ins_depth++)
+		;
+	/*
+	 * If the skip list is empty or only contains a single element there
+	 * is nothing for us to do.
+	 */
+	if (ins == NULL || ins_head->head[0] == ins_head->tail[0])
+		return (EBUSY);
 
 	/* Add the entry onto the right_child page, as a skip list. */
 	WT_ERR(__wt_calloc_def(
 	    session, 1, &(right_child->u.row.ins)));
 	WT_ERR(__wt_calloc_def(
 	    session, 1, &right_child->u.row.ins[0]));
-	right_child->u.row.ins[0]->tail[0] = ins;
-	right_child->u.row.ins[0]->head[0] = ins;
-
-	/* TODO: Transfer the memory footprint. */
-
-	/*
-	 * Remove the entry from the orig page (i.e truncate the skip list).
-	 * We need to iterate forward through the skip list first to find
-	 * the next-to last entries in the skip list stack.
-	 * Following is an ascii art skip list that might help.
-	 *
-	 *               __
-	 *              |c4|
-	 *               --
-	 *               |
-	 *   __          __    __
-	 *  |a3|--------|c3|--|d3|
-	 *   --          --    --
-	 *   |           |     |
-	 *   __          __    __          __
-	 *  |a2|--------|c2|--|d2|--------|f2|
-	 *   --          --    --          --
-	 *   |           |     |           |
-	 *   __    __    __    __    __    __
-	 *  |a1|--|b1|--|c1|--|d1|--|e1|--|f1|
-	 *   --    --    --    --    --    --
-	 *
-	 *   From the above picture.
-	 *   The head array will be: a1, a2, a3, c4, NULL
-	 *   The tail array will be: f1, f2, d3, c4, NULL
-	 *   We are looking for: e1, d2, NULL
-	 *   If there were no f2, we'd be looking for: e1, NULL
-	 *   If there were an f3, we'd be looking for: e1, d2, d3, NULL
-	 */
-#if 0
-	for (i = 0; ins_head->tail[i] == ins; ++i) {}
-	/*
-	 * If we are unlucky and the last element has a full height stack we
-	 * don't have any choice but to start at the head.
-	 */
-	if (i == WT_SKIP_MAXDEPTH)
-		insp = &ins_head->head[i];
-	else
-		insp = &ins_head->tail[i];
-
-	for (i--, insp--; i >= 0; i--, insp--) {
-		for (current_ins = *insp;
-		    current_ins != ins;
-		    current_ins = current_ins->next[i])
-			prev_ins = current_ins;
-		prev_ins->next[i] = NULL;
-		ins_head->tail[i] = prev_ins;
+	__wt_cache_page_inmem_incr(session,
+	    right_child, sizeof(WT_INSERT_HEAD) + sizeof(WT_INSERT_HEAD *));
+	for (i = 0; i < ins_depth; i++) {
+		right_child->u.row.ins[0]->tail[i] = ins_head->tail[i];
+		right_child->u.row.ins[0]->head[i] = ins_head->tail[i];
 	}
-#else
-	for (i = WT_SKIP_MAXDEPTH - 1, insp = &ins_head->head[i]; i >= 0;) {
-		if (*insp == NULL) {
-			i--;
-			insp--;
-			continue;
-		}
-
-		for (;
-		    *insp != ins_head->tail[i];
-		    *insp = (*insp)->next[i])
-			prev_ins = *insp;
-		/*
-		 * Update the tail pointer to the previous entry if it is
-		 * the entry that is moving to the next page and ensure that
-		 * we step down the right finger in the skip list.
-		 */
-		if (ins_head->tail[i] == ins) {
-			ins_head->tail[i] = prev_ins;
-			prev_ins->next[i] = NULL;
-			*insp = prev_ins;
-		}
-
-		/* Drop down a level. */
-		insp--;
-		i--;
-	}
-#endif
 
 	/* Setup the ref in the new parent to point to the original parent. */
 	new_parent->u.intl.recno = orig->u.intl.recno;
@@ -717,19 +655,106 @@ __split_row_page_inmem(
 
 	/*
 	 * Copy the key we moved onto the right child into the WT_REF
-	 * structure that is now linked into the parent page.
-	 * TODO: This needs to be done earlier - so we can error out if the
-	 * memory allocation fails.
+	 * structure that is will be linked into the parent page.
 	 */
-	__wt_row_ikey_incr(session, right_child, ins->u.key.offset,
-	    WT_INSERT_KEY(ins), ins->u.key.size, &newref->key.ikey);
+	WT_ERR(__wt_row_ikey_incr(session, right_child, ins->u.key.offset,
+	    WT_INSERT_KEY(ins), ins->u.key.size, &newref->key.ikey));
+
+	/*
+	 * Now that all operations that could fail have completed, we start
+	 * updating the original page.
+	 */
+	transfer_size =
+	    sizeof(WT_INSERT) + (ins_depth * sizeof (WT_INSERT *)) +
+	    WT_INSERT_KEY_SIZE(ins);
+	__wt_cache_page_inmem_incr(session, right_child, transfer_size);
+	__wt_cache_page_inmem_decr(session, orig, transfer_size);
+
+	/*
+	 * Remove the entry from the orig page (i.e truncate the skip list).
+	 * Following is an ascii art skip list that might help.
+	 *
+	 *               __
+	 *              |c3|
+	 *               --
+	 *               |
+	 *   __          __    __
+	 *  |a2|--------|c2|--|d2|
+	 *   --          --    --
+	 *   |           |     |
+	 *   __          __    __          __
+	 *  |a1|--------|c1|--|d1|--------|f1|
+	 *   --          --    --          --
+	 *   |           |     |           |
+	 *   __    __    __    __    __    __
+	 *  |a0|--|b0|--|c0|--|d0|--|e0|--|f0|
+	 *   --    --    --    --    --    --
+	 *
+	 *   From the above picture.
+	 *   The head array will be: a1, a2, a3, c4, NULL
+	 *   The tail array will be: f1, f2, d3, c4, NULL
+	 *   We are looking for: e1, d2, NULL
+	 *   If there were no f2, we'd be looking for: e1, NULL
+	 *   If there were an f3, we'd be looking for: e1, d2, d3, NULL
+	 *
+	 *   The algorithm does:
+	 *   1) Start at the tail of level zero, walk up the tail pointers
+	 *      until it sees an element other than the one being removed -
+	 *      in the above diagram that is element d2.
+	 *   2) Step down a level in the skip list - in the above diagram to d1.
+	 *   3) Follow the next pointers on that level tracking previous items
+	 *      until we find the item prior to the tail pointer.
+	 *   4) Update the tail pointer with the previous item.
+	 *   5) Step down a level in the skip list.
+	 *   6) Go to step 3 until at level 0.
+	 */
+	for (i = 0; i < WT_SKIP_MAXDEPTH && ins_head->tail[i] == ins; ++i)
+		;
+	WT_ASSERT(session, ins_head->head[i] != NULL);
+	/*
+	 * If the item we are removing is the highest depth item in the stack
+	 * trim it down until it isn't.
+	 */
+	while (ins_head->head[i] == ins) {
+		ins_head->head[i] = ins_head->tail[i] = NULL;
+		i--;
+	}
+	/*
+	 * This should only happen is if there is only a single element and
+	 * we have checked for that above.
+	 */
+	WT_ASSERT(session, i >= 0);
+
+	/*
+	 * Start at the head if the last element has a full height stack, or
+	 * if the element we are removing was the deepest in the skip list.
+	 */
+	if (i == WT_SKIP_MAXDEPTH || ins_head->tail[i] == ins) {
+		prev_ins = NULL;
+		insp = &ins_head->head[i];
+	} else {
+		prev_ins = ins_head->tail[i];
+		insp = &prev_ins->next[i];
+	}
+
+	for (i--, insp--; i >= 0; i--, insp--) {
+		current_ins = NULL;
+		for (current_ins = *insp;
+		    current_ins != ins;
+		    current_ins = current_ins->next[i])
+			prev_ins = current_ins;
+		WT_ASSERT(session, prev_ins != NULL && current_ins == ins);
+		insp = &prev_ins->next[i];
+		*insp = NULL;
+		ins_head->tail[i] = prev_ins;
+	}
 
 	/*
 	 * Set up the new top-level page as a split so that it will be swapped
 	 * into place by our caller.
 	 */
-	new_parent->modify->flags = WT_PM_REC_SPLIT;
-	new_parent->modify->u.split = new_parent;
+	orig->modify->flags = WT_PM_REC_SPLIT;
+	orig->modify->u.split = new_parent;
 
 err:	if (ret != 0) {
 		if (new_parent != NULL)

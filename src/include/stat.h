@@ -148,6 +148,7 @@ struct __wt_dsrc_stats {
 	WT_STATS cache_eviction_merge;
 	WT_STATS cache_eviction_merge_fail;
 	WT_STATS cache_eviction_merge_levels;
+	WT_STATS cache_eviction_split;
 	WT_STATS cache_overflow_value;
 	WT_STATS cache_read;
 	WT_STATS cache_read_overflow;
@@ -219,6 +220,7 @@ struct __wt_connection_stats {
 	WT_STATS cache_eviction_merge_fail;
 	WT_STATS cache_eviction_merge_levels;
 	WT_STATS cache_eviction_slow;
+	WT_STATS cache_eviction_split;
 	WT_STATS cache_eviction_walk;
 	WT_STATS cache_pages_dirty;
 	WT_STATS cache_pages_inuse;
