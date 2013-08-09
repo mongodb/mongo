@@ -22,7 +22,7 @@
 #include <stdio.h>
 
 #include "mongo/base/status.h"
-#include "mongo/bson/bsonobjiterator.h"
+#include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
 #include "mongo/util/options_parser/environment.h"
 #include "mongo/util/options_parser/constraints.h"
