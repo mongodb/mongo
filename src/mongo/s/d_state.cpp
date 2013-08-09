@@ -513,7 +513,6 @@ namespace mongo {
             CollectionMetadataMap::iterator it = _collMetadata.find( ns );
             if ( it != _collMetadata.end() ) afterMetadata = it->second;
 
-            ChunkVersion afterShardVersion;
             if ( afterMetadata ) afterShardVersion = afterMetadata->getShardVersion();
             *latestShardVersion = afterShardVersion;
 
@@ -587,7 +586,7 @@ namespace mongo {
             << ( beforeShardVersion.epoch() == afterShardVersion.epoch() ?
                      string( ", stored version : " ) + afterShardVersion.toString() :
                      string( ", stored versions : " ) +
-                         beforeShardVersion.toString() + "/" + afterShardVersion.toString() )
+                         beforeShardVersion.toString() + " / " + afterShardVersion.toString() )
             << ", took " << refreshMillis << "ms)";
 
         if ( choice == ChunkVersion::VersionChoice_Unknown ) {
