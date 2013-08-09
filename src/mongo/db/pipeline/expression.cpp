@@ -346,10 +346,11 @@ namespace mongo {
             vector<BSONElement> bsonArray(pBsonElement->Array());
             const size_t n = bsonArray.size();
 
-            if (pOp->flag & OpDesc::FIXED_COUNT)
-                uassert(16020, str::stream() << "the " << pOp->pName <<
-                        " operator requires " << pOp->argCount <<
-                        " operand(s)", pOp->argCount == n);
+            if (pOp->flag & OpDesc::FIXED_COUNT) {
+                uassert(16020, str::stream() << "the " << pOp->pName << " operator "
+                                             << "requires " << pOp->argCount << " operand(s)",
+                        pOp->argCount == n);
+            }
 
             for(size_t i = 0; i < n; ++i) {
                 BSONElement *pBsonOperand = &bsonArray[i];
@@ -656,12 +657,6 @@ namespace mongo {
         : cmpOp(theCmpOp)
     {}
 
-    void ExpressionCompare::addOperand(
-        const intrusive_ptr<Expression> &pExpression) {
-        checkArgLimit(2);
-        ExpressionNary::addOperand(pExpression);
-    }
-
     /*
       Lookup table for truth value returns
     */
@@ -738,7 +733,6 @@ namespace mongo {
     }
 
     Value ExpressionCompare::evaluateInternal(const Variables& vars) const {
-        checkArgCount(2);
         Value pLeft(vpOperand[0]->evaluateInternal(vars));
         Value pRight(vpOperand[1]->evaluateInternal(vars));
 
@@ -800,14 +794,7 @@ namespace mongo {
         return pExpression;
     }
 
-    void ExpressionCond::addOperand(
-        const intrusive_ptr<Expression> &pExpression) {
-        checkArgLimit(3);
-        ExpressionNary::addOperand(pExpression);
-    }
-
     Value ExpressionCond::evaluateInternal(const Variables& vars) const {
-        checkArgCount(3);
         Value pCond(vpOperand[0]->evaluateInternal(vars));
         int idx = pCond.coerceToBool() ? 1 : 2;
         return vpOperand[idx]->evaluateInternal(vars);
@@ -866,14 +853,7 @@ namespace mongo {
         return pExpression;
     }
 
-    void ExpressionDayOfMonth::addOperand(const intrusive_ptr<Expression> &pExpression) {
-        checkArgLimit(1);
-
-        ExpressionNary::addOperand(pExpression);
-    }
-
     Value ExpressionDayOfMonth::evaluateInternal(const Variables& vars) const {
-        checkArgCount(1);
         Value pDate(vpOperand[0]->evaluateInternal(vars));
         tm date = pDate.coerceToTm();
         return Value(date.tm_mday);
@@ -890,13 +870,7 @@ namespace mongo {
         return pExpression;
     }
 
-    void ExpressionDayOfWeek::addOperand(const intrusive_ptr<Expression> &pExpression) {
-        checkArgLimit(1);
-        ExpressionNary::addOperand(pExpression);
-    }
-
     Value ExpressionDayOfWeek::evaluateInternal(const Variables& vars) const {
-        checkArgCount(1);
         Value pDate(vpOperand[0]->evaluateInternal(vars));
         tm date = pDate.coerceToTm();
         return Value(date.tm_wday+1); // MySQL uses 1-7 tm uses 0-6
@@ -913,13 +887,7 @@ namespace mongo {
         return pExpression;
     }
 
-    void ExpressionDayOfYear::addOperand(const intrusive_ptr<Expression> &pExpression) {
-        checkArgLimit(1);
-        ExpressionNary::addOperand(pExpression);
-    }
-
     Value ExpressionDayOfYear::evaluateInternal(const Variables& vars) const {
-        checkArgCount(1);
         Value pDate(vpOperand[0]->evaluateInternal(vars));
         tm date = pDate.coerceToTm();
         return Value(date.tm_yday+1); // MySQL uses 1-366 tm uses 0-365
@@ -936,14 +904,7 @@ namespace mongo {
         return pExpression;
     }
 
-    void ExpressionDivide::addOperand(
-        const intrusive_ptr<Expression> &pExpression) {
-        checkArgLimit(2);
-        ExpressionNary::addOperand(pExpression);
-    }
-
     Value ExpressionDivide::evaluateInternal(const Variables& vars) const {
-        checkArgCount(2);
         Value lhs = vpOperand[0]->evaluateInternal(vars);
         Value rhs = vpOperand[1]->evaluateInternal(vars);
 
@@ -1883,13 +1844,7 @@ namespace mongo {
         return pExpression;
     }
 
-    void ExpressionMillisecond::addOperand(const intrusive_ptr<Expression>& pExpression) {
-        checkArgLimit(1);
-        ExpressionNary::addOperand(pExpression);
-    }
-
     Value ExpressionMillisecond::evaluateInternal(const Variables& vars) const {
-        checkArgCount(1);
         Value date(vpOperand[0]->evaluateInternal(vars));
         const int ms = date.coerceToDate() % 1000LL;
         // adding 1000 since dates before 1970 would have negative ms
@@ -1907,14 +1862,7 @@ namespace mongo {
         return pExpression;
     }
 
-    void ExpressionMinute::addOperand(
-        const intrusive_ptr<Expression> &pExpression) {
-        checkArgLimit(1);
-        ExpressionNary::addOperand(pExpression);
-    }
-
     Value ExpressionMinute::evaluateInternal(const Variables& vars) const {
-        checkArgCount(1);
         Value pDate(vpOperand[0]->evaluateInternal(vars));
         tm date = pDate.coerceToTm();
         return Value(date.tm_min);
@@ -1931,14 +1879,7 @@ namespace mongo {
         return pExpression;
     }
 
-    void ExpressionMod::addOperand(
-        const intrusive_ptr<Expression> &pExpression) {
-        checkArgLimit(2);
-        ExpressionNary::addOperand(pExpression);
-    }
-
     Value ExpressionMod::evaluateInternal(const Variables& vars) const {
-        checkArgCount(2);
         Value lhs = vpOperand[0]->evaluateInternal(vars);
         Value rhs = vpOperand[1]->evaluateInternal(vars);
 
@@ -1995,13 +1936,7 @@ namespace mongo {
         return pExpression;
     }
 
-    void ExpressionMonth::addOperand(const intrusive_ptr<Expression> &pExpression) {
-        checkArgLimit(1);
-        ExpressionNary::addOperand(pExpression);
-    }
-
     Value ExpressionMonth::evaluateInternal(const Variables& vars) const {
-        checkArgCount(1);
         Value pDate(vpOperand[0]->evaluateInternal(vars));
         tm date = pDate.coerceToTm();
         return Value(date.tm_mon + 1); // MySQL uses 1-12 tm uses 0-11
@@ -2073,13 +2008,7 @@ namespace mongo {
         return pExpression;
     }
 
-    void ExpressionHour::addOperand(const intrusive_ptr<Expression> &pExpression) {
-        checkArgLimit(1);
-        ExpressionNary::addOperand(pExpression);
-    }
-
     Value ExpressionHour::evaluateInternal(const Variables& vars) const {
-        checkArgCount(1);
         Value pDate(vpOperand[0]->evaluateInternal(vars));
         tm date = pDate.coerceToTm();
         return Value(date.tm_hour);
@@ -2096,15 +2025,7 @@ namespace mongo {
         return pExpression;
     }
 
-    void ExpressionIfNull::addOperand(
-        const intrusive_ptr<Expression> &pExpression) {
-        checkArgLimit(2);
-        ExpressionNary::addOperand(pExpression);
-    }
-
     Value ExpressionIfNull::evaluateInternal(const Variables& vars) const {
-        checkArgCount(2);
-
         Value pLeft(vpOperand[0]->evaluateInternal(vars));
         if (!pLeft.nullish())
             return pLeft;
@@ -2256,8 +2177,7 @@ namespace mongo {
         }
     }
 
-    void ExpressionNary::addOperand(
-        const intrusive_ptr<Expression> &pExpression) {
+    void ExpressionNary::addOperand(const intrusive_ptr<Expression>& pExpression) {
         vpOperand.push_back(pExpression);
     }
 
@@ -2275,20 +2195,6 @@ namespace mongo {
         return Value(DOC(getOpName() << array));
     }
 
-    void ExpressionNary::checkArgLimit(unsigned maxArgs) const {
-        uassert(15993, str::stream() << getOpName() <<
-                " only takes " << maxArgs <<
-                " operand" << (maxArgs == 1 ? "" : "s"),
-                vpOperand.size() < maxArgs);
-    }
-
-    void ExpressionNary::checkArgCount(unsigned reqArgs) const {
-        uassert(15997, str::stream() << getOpName() <<
-                ":  insufficient operands; " << reqArgs <<
-                " required, only got " << vpOperand.size(),
-                vpOperand.size() == reqArgs);
-    }
-
     /* ------------------------- ExpressionNot ----------------------------- */
 
     intrusive_ptr<ExpressionNary> ExpressionNot::create() {
@@ -2296,13 +2202,7 @@ namespace mongo {
         return pExpression;
     }
 
-    void ExpressionNot::addOperand(const intrusive_ptr<Expression> &pExpression) {
-        checkArgLimit(1);
-        ExpressionNary::addOperand(pExpression);
-    }
-
     Value ExpressionNot::evaluateInternal(const Variables& vars) const {
-        checkArgCount(1);
         Value pOp(vpOperand[0]->evaluateInternal(vars));
 
         bool b = pOp.coerceToBool();
@@ -2409,13 +2309,7 @@ namespace mongo {
         return pExpression;
     }
 
-    void ExpressionSecond::addOperand(const intrusive_ptr<Expression> &pExpression) {
-        checkArgLimit(1);
-        ExpressionNary::addOperand(pExpression);
-    }
-
     Value ExpressionSecond::evaluateInternal(const Variables& vars) const {
-        checkArgCount(1);
         Value pDate(vpOperand[0]->evaluateInternal(vars));
         tm date = pDate.coerceToTm();
         return Value(date.tm_sec);
@@ -2432,14 +2326,7 @@ namespace mongo {
         return pExpression;
     }
 
-    void ExpressionStrcasecmp::addOperand(
-        const intrusive_ptr<Expression> &pExpression) {
-        checkArgLimit(2);
-        ExpressionNary::addOperand(pExpression);
-    }
-
     Value ExpressionStrcasecmp::evaluateInternal(const Variables& vars) const {
-        checkArgCount(2);
         Value pString1(vpOperand[0]->evaluateInternal(vars));
         Value pString2(vpOperand[1]->evaluateInternal(vars));
 
@@ -2467,14 +2354,7 @@ namespace mongo {
         return pExpression;
     }
 
-    void ExpressionSubstr::addOperand(
-        const intrusive_ptr<Expression> &pExpression) {
-        checkArgLimit(3);
-        ExpressionNary::addOperand(pExpression);
-    }
-
     Value ExpressionSubstr::evaluateInternal(const Variables& vars) const {
-        checkArgCount(3);
         Value pString(vpOperand[0]->evaluateInternal(vars));
         Value pLower(vpOperand[1]->evaluateInternal(vars));
         Value pLength(vpOperand[2]->evaluateInternal(vars));
@@ -2513,14 +2393,7 @@ namespace mongo {
         return pExpression;
     }
 
-    void ExpressionSubtract::addOperand(
-        const intrusive_ptr<Expression> &pExpression) {
-        checkArgLimit(2);
-        ExpressionNary::addOperand(pExpression);
-    }
-
     Value ExpressionSubtract::evaluateInternal(const Variables& vars) const {
-        checkArgCount(2);
         Value lhs = vpOperand[0]->evaluateInternal(vars);
         Value rhs = vpOperand[1]->evaluateInternal(vars);
             
@@ -2578,13 +2451,7 @@ namespace mongo {
         return pExpression;
     }
 
-    void ExpressionToLower::addOperand(const intrusive_ptr<Expression> &pExpression) {
-        checkArgLimit(1);
-        ExpressionNary::addOperand(pExpression);
-    }
-
     Value ExpressionToLower::evaluateInternal(const Variables& vars) const {
-        checkArgCount(1);
         Value pString(vpOperand[0]->evaluateInternal(vars));
         string str = pString.coerceToString();
         boost::to_lower(str);
@@ -2602,14 +2469,7 @@ namespace mongo {
         return pExpression;
     }
 
-    void ExpressionToUpper::addOperand(
-        const intrusive_ptr<Expression> &pExpression) {
-        checkArgLimit(1);
-        ExpressionNary::addOperand(pExpression);
-    }
-
     Value ExpressionToUpper::evaluateInternal(const Variables& vars) const {
-        checkArgCount(1);
         Value pString(vpOperand[0]->evaluateInternal(vars));
         string str(pString.coerceToString());
         boost::to_upper(str);
@@ -2627,13 +2487,7 @@ namespace mongo {
         return pExpression;
     }
 
-    void ExpressionWeek::addOperand(const intrusive_ptr<Expression> &pExpression) {
-        checkArgLimit(1);
-        ExpressionNary::addOperand(pExpression);
-    }
-
     Value ExpressionWeek::evaluateInternal(const Variables& vars) const {
-        checkArgCount(1);
         Value pDate(vpOperand[0]->evaluateInternal(vars));
         tm date = pDate.coerceToTm();
         int dayOfWeek = date.tm_wday;
@@ -2666,14 +2520,7 @@ namespace mongo {
         return pExpression;
     }
 
-    void ExpressionYear::addOperand(
-        const intrusive_ptr<Expression> &pExpression) {
-        checkArgLimit(1);
-        ExpressionNary::addOperand(pExpression);
-    }
-
     Value ExpressionYear::evaluateInternal(const Variables& vars) const {
-        checkArgCount(1);
         Value pDate(vpOperand[0]->evaluateInternal(vars));
         tm date = pDate.coerceToTm();
         return Value(date.tm_year + 1900); // tm_year is years since 1900
