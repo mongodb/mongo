@@ -18,10 +18,9 @@
 #include <vector>
 
 #include "mongo/base/init.h"
-#include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
-#include "mongo/db/auth/authorization_manager_global.h"
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/field_parser.h"
@@ -145,11 +144,12 @@ namespace mongo {
         virtual bool adminOnly() const { return true; }
         virtual bool localHostOnlyIfNoAuth( const BSONObj& cmdObj ) { return false; }
 
-        virtual void addRequiredPrivileges( const std::string& dbname,
-                                            const BSONObj& cmdObj,
-                                            std::vector<Privilege>* out ) {
-            out->push_back(Privilege(PrivilegeSet::WILDCARD_RESOURCE,
-                                     getGlobalAuthorizationManager()->getAllUserActions()));
+        virtual Status checkAuthForCommand( ClientBasic* client,
+                                            const std::string& dbname,
+                                            const BSONObj& cmdObj ) {
+            return client->getAuthorizationSession()->checkAuthForPrivilege(
+                Privilege( AuthorizationManager::CLUSTER_RESOURCE_NAME,
+                           ActionType::cleanupOrphaned ) );
         }
 
         virtual LockType locktype() const { return NONE; }
