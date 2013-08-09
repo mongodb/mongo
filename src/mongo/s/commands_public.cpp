@@ -1991,8 +1991,7 @@ namespace mongo {
                                     << " returned different ns: " << cursor["ns"],
                             cursor["ns"].String() == fullns);
 
-                    cursors.push_back(make_pair(shardResults[i].target.toString(),
-                                                cursor["id"].Long()));
+                    cursors.push_back(make_pair(shardResults[i].target, cursor["id"].Long()));
                 }
 
                 return cursors;
