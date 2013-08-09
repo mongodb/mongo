@@ -20,7 +20,7 @@
 
 namespace mongo {
     class DocumentSourceCursor;
-    class ExpressionContext;
+    struct ExpressionContext;
     class Pipeline;
 
     /*
