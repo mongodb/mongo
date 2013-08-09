@@ -1,5 +1,5 @@
 //
-// Tests cleanup of orphaned data via the orphaned data cleanup command
+// Tests failed cleanup of orphaned data when we have pending chunks
 //
 
 var options = { separateConfig : true, shardOptions : { verbose : 2 } };
@@ -32,6 +32,11 @@ printjson( metadata );
 assert.eq( metadata.pending[0][0]._id, 1 );
 assert.eq( metadata.pending[0][1]._id, MaxKey );
 
+jsTest.log( "Ensuring we won't remove orphaned data in pending chunk..." );
+
+assert( !st.shard1.getDB( "admin" )
+        .runCommand({ cleanupOrphaned : coll + "", startingFromKey : { _id : 1 } }).stoppedAtKey );
+
 jsTest.log( "Moving some chunks back to shard0 after empty..." );
 
 assert( admin.runCommand({ moveChunk : coll + "", find : { _id : -1 }, to : shards[1]._id }).ok );
@@ -55,6 +60,11 @@ assert.eq( metadata.shardVersion.t, 0 );
 assert.neq( metadata.collVersion.t, 0 );
 assert.eq( metadata.pending[0][0]._id, 1 );
 assert.eq( metadata.pending[0][1]._id, MaxKey );
+
+jsTest.log( "Ensuring again we won't remove orphaned data in pending chunk..." );
+
+assert( !st.shard0.getDB( "admin" )
+        .runCommand({ cleanupOrphaned : coll + "", startingFromKey : { _id : 1 } }).stoppedAtKey );
 
 jsTest.log( "Checking that pending chunk is promoted on reload..." );
 
