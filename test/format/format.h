@@ -68,8 +68,6 @@ extern WT_EXTENSION_API *wt_api;
 #define	LZO_PATH	".libs/lzo_compress.so"
 #define	RAW_PATH	".libs/raw_compress.so"
 
-#define	MEMRATA_DEVICE	"kvs_devices=[/dev/loop0]"
-
 #define	M(v)		((v) * 1000000)		/* Million */
 #define	UNUSED(var)	(void)(var)		/* Quiet unused var warnings */
 

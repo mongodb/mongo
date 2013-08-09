@@ -121,7 +121,10 @@ wts_open(const char *home, int set_api, WT_CONNECTION **connp)
 	 * configuration strings.
 	 */
 	if (DATASOURCE("memrata") &&
-	    (ret = conn->load_extension(conn, MEMRATA_PATH, NULL)) != 0)
+	    (ret = conn->load_extension(conn, MEMRATA_PATH,
+	    "entry=wiredtiger_extension_init,config=["
+	    "dev1=[kvs_devices=[/dev/loop0,/dev/loop1],kvs_open_o_truncate=1],"
+	    "dev2=[kvs_devices=[/dev/loop2],kvs_open_o_truncate=1]]")) != 0)
 		die(ret, "WT_CONNECTION.load_extension: %s", MEMRATA_PATH);
 
 	*connp = conn;
@@ -263,9 +266,8 @@ wts_create(void)
 		p += snprintf(p, (size_t)(end - p), ",type=lsm");
 
 	if (DATASOURCE("memrata"))
-		p += snprintf(
-		    p, (size_t)(end - p),
-		    ",type=memrata,kvs_open_o_truncate=1,%s", MEMRATA_DEVICE);
+		p += snprintf(p, (size_t)(end - p),
+		    ",type=memrata,kvs_open_o_truncate=1");
 
 	if ((ret = session->create(session, g.uri, config)) != 0)
 		die(ret, "session.create: %s", g.uri);

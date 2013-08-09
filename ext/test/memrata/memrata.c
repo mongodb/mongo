@@ -44,7 +44,9 @@
  *
  * ESET: update an error value, handling more/less important errors.
  * ERET: output a message and return the error.
- * EMSG: output a message and set the local error value.
+ * EMSG, EMSG_ERR:
+ *	 output a message and set the local error value, optionally jump to the
+ * err label.
  */
 #undef	ESET
 #define	ESET(a) do {							\
@@ -66,8 +68,26 @@
 	    wtext->err_printf(wtext, session, "memrata: " __VA_ARGS__);	\
 	ESET(v);							\
 } while (0)
+#undef	EMSG_ERR
+#define	EMSG_ERR(wtext, session, v, ...) do {				\
+	(void)								\
+	    wtext->err_printf(wtext, session, "memrata: " __VA_ARGS__);	\
+	ESET(v);							\
+	goto err;							\
+} while (0)
 
-/* Macro to make sure we don't re-use a structure after it's dead. */
+/*
+ * STRING_MATCH --
+ *	Return if a string matches a bytestring of a specified length.
+ */
+#undef	STRING_MATCH
+#define	STRING_MATCH(str, bytes, len)					\
+	(strncmp(str, bytes, len) == 0 && (str)[(len)] == '\0')
+
+/*
+ * OVERWRITE_AND_FREE --
+ *	Make sure we don't re-use a structure after it's dead.
+ */
 #undef	OVERWRITE_AND_FREE
 #define	OVERWRITE_AND_FREE(p) do {					\
 	memset(p, 0xab, sizeof(*(p)));                         		\
@@ -155,6 +175,7 @@ typedef struct __data_source {
 	WT_EXTENSION_API *wtext;		/* Extension functions */
 
 	pthread_rwlock_t global_lock;		/* Global lock */
+	int		 lockinit;		/* Lock created */
 
 	KVS_SOURCE *kvs_head;			/* List of KVS sources */
 } DATA_SOURCE;
@@ -875,17 +896,15 @@ cache_process(WT_EXTENSION_API *wtext, KVS_SOURCE *ks, int final)
 					ret = 0;
 					continue;
 				}
-				EMSG(wtext, NULL, WT_ERROR,
+				EMSG_ERR(wtext, NULL, WT_ERROR,
 				    "kvs_del: %s", kvs_strerror(ret));
-				goto err;
 			} else {
 				r->val = cp->v;
 				r->val_len = cp->len;
 				if ((ret = kvs_set(ws->kvs, r)) == 0)
 					continue;
-				EMSG(wtext, NULL, WT_ERROR,
+				EMSG_ERR(wtext, NULL, WT_ERROR,
 				    "kvs_set: %s", kvs_strerror(ret));
-				goto err;
 			}
 		}
 	}
@@ -895,11 +914,9 @@ cache_process(WT_EXTENSION_API *wtext, KVS_SOURCE *ks, int final)
 		goto err;
 
 	/* Push the primary store to stable storage for correctness. */
-	if ((ret = kvs_commit(ks->kvs_device)) != 0) {
-		EMSG(wtext, NULL, WT_ERROR,
+	if ((ret = kvs_commit(ks->kvs_device)) != 0)
+		EMSG_ERR(wtext, NULL, WT_ERROR,
 		    "kvs_commit: %s", kvs_strerror(ret));
-		goto err;
-	}
 
 	/*
 	 * For every source object cache:
@@ -924,11 +941,9 @@ cache_process(WT_EXTENSION_API *wtext, KVS_SOURCE *ks, int final)
 			if ((ret = cache_value_unmarshall(wtcursor)) != 0)
 				goto err;
 			if (cache_value_visible_all(wtcursor, oldest, final)) {
-				if ((ret = kvs_del(ws->kvscache, r)) != 0) {
-					EMSG(wtext, NULL, WT_ERROR,
+				if ((ret = kvs_del(ws->kvscache, r)) != 0)
+					EMSG_ERR(wtext, NULL, WT_ERROR,
 					    "kvs_del: %s", kvs_strerror(ret));
-					goto err;
-				}
 				continue;
 			}
 
@@ -965,11 +980,9 @@ cache_process(WT_EXTENSION_API *wtext, KVS_SOURCE *ks, int final)
 	    (ret = kvs_call(
 	    wtcursor, "kvs_next", ks->kvstxn, kvs_next)) == 0;) {
 		memcpy(&txnid, r->key, sizeof(txnid));
-		if (txnid < txnmin && (ret = kvs_del(ks->kvstxn, r)) != 0) {
-			EMSG(wtext, NULL, WT_ERROR,
+		if (txnid < txnmin && (ret = kvs_del(ks->kvstxn, r)) != 0)
+			EMSG_ERR(wtext, NULL, WT_ERROR,
 			    "kvs_del: %s", kvs_strerror(ret));
-			goto err;
-		}
 	}
 	if (ret == WT_NOTFOUND)
 		ret = 0;
@@ -1697,93 +1710,12 @@ kvs_cursor_close(WT_CURSOR *wtcursor)
 }
 
 /*
- * KVS kvs_config structure options.
- */
-typedef struct kvs_options {
-	const char *name, *type, *checks;
-} KVS_OPTIONS;
-static const KVS_OPTIONS kvs_options[] = {
-	/*
-	 * device list
-	 */
-	{ "kvs_devices=[]",		"list", NULL },
-
-	/*
-	 * struct kvs_config configuration
-	 */
-	{ "kvs_parallelism=64",		"int", "min=1,max=512" },
-	{ "kvs_granularity=2M",		"int", "min=1M,max=10M" },
-	{ "kvs_avg_key_len=16",		"int", "min=10,max=512" },
-	{ "kvs_avg_val_len=100",	"int", "min=10,max=1M" },
-	{ "kvs_write_bufs=32",		"int", "min=16,max=256" },
-	{ "kvs_read_bufs=2048",		"int", "min=16,max=1M" },
-	{ "kvs_commit_timeout=5M",	"int", "min=100,max=10M" },
-	{ "kvs_reclaim_threshold=60",	"int", "min=1,max=80" },
-	{ "kvs_reclaim_period=1000",	"int", "min=100,max=10K" },
-
-	/*
-	 * KVS_O_FLAG flag configuration
-	 */
-	{ "kvs_open_o_debug=0",		"boolean", NULL },
-	{ "kvs_open_o_truncate=0",	"boolean", NULL },
-
-	{ NULL, NULL, NULL }
-};
-
-/*
- * kvs_config_add --
- *	Add the KVS configuration options to the WiredTiger configuration
- * process.
- */
-static int
-kvs_config_add(WT_CONNECTION *connection, WT_EXTENSION_API *wtext)
-{
-	const KVS_OPTIONS *p;
-	const char *methods[] = {
-	    "session.create",
-	    "session.compact",
-	    "session.drop",
-	    "session.open_cursor",
-	    "session.rename",
-	    "session.salvage",
-	    "session.truncate",
-	    "session.verify",
-	    NULL
-	}, **method;
-	int ret = 0;
-
-	/*
-	 * All WiredTiger methods taking a URI must support kvs_devices, that's
-	 * how we name the underlying store.
-	 *
-	 * Additionally, any method taking a URI might be the first open of the
-	 * store, and we cache store handles, which means the first entrant gets
-	 * to configure the underlying device.  That's wrong: if we ever care,
-	 * we should check any method taking configuration options against the
-	 * already configured values, failing attempts to change configuration
-	 * on a cached handle.  There's no other fix, KVS configuration is tied
-	 * to device open.
-	 */
-	for (method = methods; *method != NULL; ++method)
-		for (p = kvs_options; p->name != NULL; ++p)
-			if ((ret = connection->configure_method(connection,
-			    *method,
-			    "memrata:", p->name, p->type, p->checks)) != 0)
-				ERET(wtext, NULL, ret,
-				    "WT_CONNECTION.configure_method: "
-				    "%s: {%s, %s, %s}",
-				    *method, p->name,
-				    p->type, p->checks, wtext->strerror(ret));
-	return (0);
-}
-
-/*
  * kvs_config_devices --
  *	Convert the device list into an argv[] array.
  */
 static int
-kvs_config_devices(WT_EXTENSION_API *wtext,
-    WT_SESSION *session, WT_CONFIG_ITEM *orig, char ***devices)
+kvs_config_devices(
+    WT_EXTENSION_API *wtext, WT_CONFIG_ITEM *orig, char ***devices)
 {
 	WT_CONFIG_ITEM k, v;
 	WT_CONFIG_SCAN *scan;
@@ -1796,12 +1728,10 @@ kvs_config_devices(WT_EXTENSION_API *wtext,
 
 	/* Set up the scan of the device list. */
 	if ((ret = wtext->config_scan_begin(
-	    wtext, session, orig->str, orig->len, &scan)) != 0) {
-		EMSG(wtext, session, ret,
+	    wtext, NULL, orig->str, orig->len, &scan)) != 0)
+		EMSG_ERR(wtext, NULL, ret,
 		    "WT_EXTENSION_API::config_scan_begin: %s",
 		    wtext->strerror(ret));
-		goto err;
-	}
 
 	for (cnt = slots = 0; (ret = wtext->
 	    config_scan_next(wtext, scan, &k, &v)) == 0; ++cnt) {
@@ -1822,18 +1752,14 @@ kvs_config_devices(WT_EXTENSION_API *wtext,
 		argv[cnt + 1] = NULL;
 		memcpy(argv[cnt], k.str, k.len);
 	}
-	if (ret != WT_NOTFOUND) {
-		EMSG(wtext, session, ret,
+	if (ret != WT_NOTFOUND)
+		EMSG_ERR(wtext, NULL, ret,
 		    "WT_EXTENSION_API::config_scan_next: %s",
 		    wtext->strerror(ret));
-		goto err;
-	}
-	if ((ret = wtext->config_scan_end(wtext, scan)) != 0) {
-		EMSG(wtext, session, ret,
+	if ((ret = wtext->config_scan_end(wtext, scan)) != 0)
+		EMSG_ERR(wtext, NULL, ret,
 		    "WT_EXTENSION_API::config_scan_end: %s",
 		    wtext->strerror(ret));
-		goto err;
-	}
 
 	*devices = argv;
 	return (0);
@@ -1851,110 +1777,93 @@ err:	if (argv != NULL) {
  *	Read KVS configuration.
  */
 static int
-kvs_config_read(WT_EXTENSION_API *wtext,
-    WT_SESSION *session, WT_CONFIG_ARG *config,
+kvs_config_read(WT_EXTENSION_API *wtext, WT_CONFIG_ITEM *config,
     char ***devices, struct kvs_config *kvs_config, int *flagsp)
 {
-	const KVS_OPTIONS *p;
-	WT_CONFIG_ITEM v;
-	int ret = 0;
-	char *t, name[128];
+	static const char **p, *kvs_options[] = {
+		"kvs_devices",
+		"kvs_parallelism",
+		"kvs_granularity",
+		"kvs_avg_key_len",
+		"kvs_avg_val_len",
+		"kvs_write_bufs",
+		"kvs_read_bufs",
+		"kvs_commit_timeout",
+		"kvs_reclaim_threshold",
+		"kvs_reclaim_period",
+		"kvs_open_o_debug",
+		"kvs_open_o_truncate",
+		NULL
+	};
+	WT_CONFIG_ITEM k, v;
+	WT_CONFIG_SCAN *scan;
+	int ret = 0, tret;
 
-	*flagsp = 0;				/* Clear return values */
-	memset(kvs_config, 0, sizeof(*kvs_config));
+	*flagsp = 0;			/* Return default values. */
+	if ((ret = kvs_default_config(kvs_config)) != 0)
+		ERET(wtext, NULL,
+		    EINVAL, "kvs_default_config: %s", kvs_strerror(os_errno()));
 
-	for (p = kvs_options; p->name != NULL; ++p) {
-		/* Truncate the name, discarding the trailing value. */
-		(void)snprintf(name, sizeof(name), "%s", p->name);
-		if ((t = strchr(name, '=')) != NULL)
-			*t = '\0';
-		if ((ret =
-		    wtext->config_get(wtext, session, config, name, &v)) != 0)
-			ERET(wtext, session, ret,
-			    "WT_EXTENSION_API.config: %s: %s",
-			    name, wtext->strerror(ret));
-
-		if (strcmp(name, "kvs_devices") == 0) {
-			if ((ret = kvs_config_devices(
-			    wtext, session, &v, devices)) != 0)
+	/* Set up the scan of the configuration arguments list. */
+	if ((ret = wtext->config_scan_begin(
+	    wtext, NULL, config->str, config->len, &scan)) != 0)
+		ERET(wtext, NULL, ret,
+		    "WT_EXTENSION_API::config_scan_begin: %s",
+		    wtext->strerror(ret));
+	while ((ret = wtext->config_scan_next(wtext, scan, &k, &v)) == 0) {
+		if (STRING_MATCH("kvs_devices", k.str, k.len)) {
+			if ((ret = kvs_config_devices(wtext, &v, devices)) != 0)
 				return (ret);
 			continue;
 		}
 
-#define	KVS_CONFIG_SET(n, f)						\
-		if (strcmp(name, n) == 0) {				\
-			kvs_config->f = (unsigned long)v.val;		\
-			continue;					\
-		}
-		KVS_CONFIG_SET("kvs_parallelism", parallelism);
-		KVS_CONFIG_SET("kvs_granularity", granularity);
-		KVS_CONFIG_SET("kvs_avg_key_len", avg_key_len);
-		KVS_CONFIG_SET("kvs_avg_val_len", avg_val_len);
-		KVS_CONFIG_SET("kvs_write_bufs", write_bufs);
-		KVS_CONFIG_SET("kvs_read_bufs", read_bufs);
-		KVS_CONFIG_SET("kvs_commit_timeout", commit_timeout);
-		KVS_CONFIG_SET("kvs_reclaim_threshold", reclaim_threshold);
-		KVS_CONFIG_SET("kvs_reclaim_period", reclaim_period);
-
-#define	KVS_FLAG_SET(n, f)						\
-		if (strcmp(name, n) == 0) {				\
-			if (v.val != 0)					\
-				*flagsp |= f;				\
-			continue;					\
-		}
-		/*
-		 * We don't export KVS_O_CREATE: WT_SESSION.create always adds
-		 * it in.
-		 */
-		KVS_FLAG_SET("kvs_open_o_debug", KVS_O_DEBUG);
-		KVS_FLAG_SET("kvs_open_o_truncate",  KVS_O_TRUNCATE);
+#define	KVS_CONFIG_SET(s, f)						\
+	if (STRING_MATCH(s, k.str, k.len)) {				\
+		kvs_config->f = (unsigned long)v.val;			\
+		continue;						\
 	}
-	return (0);
-}
+			KVS_CONFIG_SET("kvs_parallelism", parallelism);
+			KVS_CONFIG_SET("kvs_granularity", granularity);
+			KVS_CONFIG_SET("kvs_avg_key_len", avg_key_len);
+			KVS_CONFIG_SET("kvs_avg_val_len", avg_val_len);
+			KVS_CONFIG_SET("kvs_write_bufs", write_bufs);
+			KVS_CONFIG_SET("kvs_read_bufs", read_bufs);
+			KVS_CONFIG_SET("kvs_commit_timeout", commit_timeout);
+			KVS_CONFIG_SET(
+			    "kvs_reclaim_threshold", reclaim_threshold);
+			KVS_CONFIG_SET("kvs_reclaim_period", reclaim_period);
 
-/*
- * device_list_sort --
- *	Sort the list of devices.
- */
-static void
-device_list_sort(char **device_list)
-{
-	char **p, **t, *tmp;
-
-	/* Sort the list of devices. */
-	for (p = device_list; *p != NULL; ++p)
-		for (t = p + 1; *t != NULL; ++t)
-			if (strcmp(*p, *t) > 0) {
-				tmp = *p;
-				*p = *t;
-				*t = tmp;
-			}
-}
-
-/*
- * device_string --
- *	Convert the list of devices into a comma-separated string.
- */
-static int
-device_string(char **device_list, char **devicesp)
-{
-	size_t len;
-	char **p, *tmp;
-
-	/* Allocate a buffer and build the name. */
-	for (len = 0, p = device_list; *p != NULL; ++p)
-		len += strlen(*p) + 5;
-	if ((tmp = malloc(len)) == NULL)
-		return (os_errno());
-
-	tmp[0] = '\0';
-	for (p = device_list; *p != NULL; ++p) {
-		(void)strcat(tmp, *p);
-		if (p[1] != NULL)
-			(void)strcat(tmp, ",");
+#define	KVS_FLAG_SET(s, f)						\
+	if (STRING_MATCH(s, k.str, k.len)) {				\
+		if (v.val != 0)						\
+			*flagsp |= f;					\
+		continue;						\
 	}
-	*devicesp = tmp;
-	return (0);
+			/*
+			 * We don't export KVS_O_CREATE: WT_SESSION.create
+			 * always adds it in.
+			 */
+			KVS_FLAG_SET("kvs_open_o_debug", KVS_O_DEBUG);
+			KVS_FLAG_SET("kvs_open_o_truncate",  KVS_O_TRUNCATE);
+
+			EMSG_ERR(wtext, NULL, EINVAL,
+			    "unknown configuration key value pair %.*s/%.*s",
+			    (int)k.len, k.str, (int)v.len, v.str);
+	}
+
+	if (ret == WT_NOTFOUND)
+		ret = 0;
+	if (ret != 0)
+		EMSG_ERR(wtext, NULL, ret,
+		    "WT_EXTENSION_API::config_scan_next: %s",
+		    wtext->strerror(ret));
+
+err:	if ((tret = wtext->config_scan_end(wtext, scan)) != 0)
+		EMSG(wtext, NULL, tret,
+		    "WT_EXTENSION_API::config_scan_end: %s",
+		    wtext->strerror(ret));
+
+	return (ret);
 }
 
 /* XXX */
@@ -2055,146 +1964,146 @@ kvs_cleaner(void *arg)
 
 /*
  * kvs_source_open --
- *	Return a locked KVS source, allocating and opening if it doesn't already
- * exist.
+ *	Allocate and open a KVS source.
  */
 static int
-kvs_source_open(WT_DATA_SOURCE *wtds,
-    WT_SESSION *session, WT_CONFIG_ARG *config, KVS_SOURCE **refp)
+kvs_source_open(DATA_SOURCE *ds, WT_CONFIG_ITEM *k, WT_CONFIG_ITEM *v)
 {
 	struct kvs_config kvs_config;
-	DATA_SOURCE *ds;
 	KVS_SOURCE *ks;
 	WT_EXTENSION_API *wtext;
-	int flags, locked, ret = 0;
-	char **device_list, *devices, **p;
+	int flags, ret = 0;
+	char **device_list, **p;
 
-	*refp = NULL;
-
-	ds = (DATA_SOURCE *)wtds;
 	wtext = ds->wtext;
 
 	ks = NULL;
 	device_list = NULL;
-	devices = NULL;
-	locked = 0;
+
+	/* Check for a KVS source we've already opened. */
+	for (ks = ds->kvs_head; ks != NULL; ks = ks->next)
+		if (STRING_MATCH(ks->name, k->str, k->len))
+			ERET(wtext, NULL,
+			    EINVAL, "%s: device already open", ks->name);
+
+	/* Allocate and initialize a new underlying KVS source object. */
+	if ((ks = calloc(1, sizeof(*ks))) == NULL ||
+	    (ks->name = calloc(1, k->len + 1)) == NULL) {
+		free(ks);
+		return (os_errno());
+	}
+	memcpy(ks->name, k->str, k->len);
+
+	ks->txn_notify.notify = txn_notify;
+	ks->wtext = wtext;
 
 	/*
 	 * Read the configuration.  We require a list of devices underlying the
 	 * KVS source, parse the device list found in the configuration string
 	 * into an array of paths.
-	 *
-	 * That list of devices is a unique name.  Sort the list of devices so
-	 * ordering doesn't matter in naming, then create a "name" string for
-	 * the device so we can uniquely identify it.  The reason we go from a
-	 * configuration string to an array and then back to another string is
-	 * because we want to be sure the order the devices are listed in the
-	 * string doesn't change the "real" name of the store.
 	 */
-	if ((ret = kvs_config_read(wtext,
-	    session, config, &device_list, &kvs_config, &flags)) != 0)
+	if ((ret =
+	    kvs_config_read(wtext, v, &device_list, &kvs_config, &flags)) != 0)
 		goto err;
-	if (device_list == NULL || device_list[0] == NULL) {
-		EMSG(wtext, session, EINVAL, "kvs_open: no devices specified");
-		goto err;
-	}
-	device_list_sort(device_list);
-	if ((ret = device_string(device_list, &devices)) != 0)
-		goto err;
-
-	/*
-	 * kvs_open isn't re-entrant and you can't open a handle multiple times,
-	 * lock things down while we check.
-	 */
-	if ((ret = writelock(wtext, session, &ds->global_lock)) != 0)
-		goto err;
-	locked = 1;
-
-	/* Check for a match: if we find one we're done. */
-	for (ks = ds->kvs_head; ks != NULL; ks = ks->next)
-		if (strcmp(ks->name, devices) == 0)
-			goto done;
-
-	/* Allocate and initialize a new underlying KVS source object. */
-	if ((ks = calloc(1, sizeof(*ks))) == NULL) {
-		ret = os_errno();
-		goto err;
-	}
-	ks->txn_notify.notify = txn_notify;
-	ks->name = devices;
-	ks->wtext = wtext;
-	devices = NULL;
+	if (device_list == NULL || device_list[0] == NULL)
+		EMSG_ERR(wtext, NULL,
+		    EINVAL, "%s: no devices specified", ks->name);
 
 	/* Open the underlying KVS store (creating it if necessary). */
-	ks->kvs_device =
-	    kvs_open(device_list, &kvs_config, flags | KVS_O_CREATE);
-	if (ks->kvs_device == NULL) {
-		EMSG(wtext, session, WT_ERROR,
+	ks->kvs_device = kvs_open(device_list, NULL, flags | KVS_O_CREATE);
+	if (ks->kvs_device == NULL)
+		EMSG_ERR(wtext, NULL, WT_ERROR,
 		    "kvs_open: %s: %s", ks->name, kvs_strerror(os_errno()));
-		goto err;
-	}
-
-	/*
-	 * The global txn namespace is per connection, that is, it might span
-	 * multiple KVS sources.  Open it when opening the first KVS source;
-	 * for the second and subsequent KVS sources, reference it.
-	 *
-	 * XXX
-	 * This is where we'll handle recovery.
-	 */
-	if (ds->kvs_head == NULL) {
-		if ((ks->kvstxn = kvs_open_namespace(
-		    ks->kvs_device, "txn", KVS_O_CREATE)) == NULL) {
-			EMSG(wtext, session, WT_ERROR,
-			    "kvs_open_namespace: %s.txn: %s",
-			    ks->name, kvs_strerror(os_errno()));
-			goto err;
-		}
-		ks->kvstxn_first = 1;
-	} else {
-		ks->kvstxn = ds->kvs_head->kvstxn;
-		ks->kvstxn_first = 0;
-	}
-
-	/* Push any changes. */
-	if ((ret = kvs_commit(ks->kvs_device)) != 0) {
-		EMSG(wtext, session, WT_ERROR,
-		    "kvs_commit: %s", kvs_strerror(ret));
-		goto err;
-	}
 
 	/* Start a cleaner thread. */
-	if ((ret =
-	    pthread_create(&ks->cleaner_id, NULL, kvs_cleaner, ks)) != 0) {
-		EMSG(wtext, NULL, ret,
-		    "pthread_create: %s: cleaner thread: %s",
+	if ((ret = pthread_create(&ks->cleaner_id, NULL, kvs_cleaner, ks)) != 0)
+		EMSG_ERR(wtext, NULL, ret,
+		    "%s: pthread_create: cleaner thread: %s",
 		    ks->name, wtext->strerror(ret));
-		goto err;
-	}
 
 	/* Insert the new entry at the head of the list. */
 	ks->next = ds->kvs_head;
 	ds->kvs_head = ks;
 
-	/* Return the locked object. */
-done:	*refp = ks;
-	ks = NULL;
-
 	if (0) {
-err:		if (locked)
-			ESET(unlock(wtext, session, &ds->global_lock));
+err:		if (ks != NULL)
+			ESET(kvs_source_close(wtext, NULL, ks));
 	}
-
-	if (ks != NULL)
-		ESET(kvs_source_close(wtext, session, ks));
 
 	if (device_list != NULL) {
 		for (p = device_list; *p != NULL; ++p)
 			free(*p);
 		free(device_list);
 	}
-	free(devices);
+
 	return (ret);
+}
+
+/*
+ * kvs_source_open_txn --
+ *	Open the database-wide transaction store.
+ */
+static int
+kvs_source_open_txn(DATA_SOURCE *ds)
+{
+	KVS_SOURCE *ks, *kstxn;
+	WT_EXTENSION_API *wtext;
+	kvs_t kvstxn, t;
+	int ret = 0;
+
+	wtext = ds->wtext;
+
+	/*
+	 * The global txn namespace is per connection, it spans multiple KVS
+	 * sources.
+	 *
+	 * We've opened the KVS sources: check to see if any of them already
+	 * have a transaction store, and make sure we only find one.
+	 */
+	kvstxn = NULL;
+	for (ks = ds->kvs_head; ks != NULL; ks = ks->next)
+		if ((t =
+		    kvs_open_namespace(ks->kvs_device, "txn", 0)) != NULL) {
+			if (kvstxn != NULL) {
+				(void)kvs_close(t);
+				(void)kvs_close(kvstxn);
+				ERET(wtext, NULL, WT_ERROR,
+				    "found multiple transaction stores, "
+				    "unable to proceed");
+			}
+			kvstxn = t;
+			kstxn = ks;
+		}
+	ks = kstxn;
+
+	/*
+	 * If we didn't find a transaction store, open a transaction store in
+	 * one of the KVS sources we loaded.
+	 */
+	if (ks == NULL) {
+		ks = ds->kvs_head;
+		if ((kvstxn = kvs_open_namespace(
+		    ks->kvs_device, "txn", KVS_O_CREATE)) == NULL)
+			ERET(wtext, NULL, WT_ERROR,
+			    "kvs_open_namespace: %s.txn: %s",
+			    ks->name, kvs_strerror(os_errno()));
+
+		/* Push the change. */
+		if ((ret = kvs_commit(ks->kvs_device)) != 0)
+			ERET(wtext, NULL, WT_ERROR,
+			    "kvs_commit: %s", kvs_strerror(ret));
+	}
+
+	/* Add a reference to the open transaction store in each KVS source. */
+	ks->kvstxn = kvstxn;
+	ks->kvstxn_first = 1;
+	for (ks = ds->kvs_head; ks != NULL; ks = ks->next)
+		if (!ks->kvstxn_first) {
+			ks->kvstxn = kvstxn;
+			ks->kvstxn_first = 0;
+		}
+
+	return (0);
 }
 
 /*
@@ -2364,7 +2273,9 @@ ws_source_open(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 	KVS_SOURCE *ks;
 	WT_EXTENSION_API *wtext;
 	WT_SOURCE *ws;
+	size_t len;
 	int ret = 0;
+	const char *p, *t;
 
 	*refp = NULL;
 
@@ -2372,13 +2283,36 @@ ws_source_open(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 	wtext = ds->wtext;
 	ws = NULL;
 
-	/* Get the underlying, locked, KVS source. */
-	if ((ret = kvs_source_open(wtds, session, config, &ks)) != 0)
+	/*
+	 * The URI will be "memrata:" followed by a KVS name and object name
+	 * pair separated by a slash, for example, "memrata:dev/object".
+	 */
+	if (strncmp(uri, "memrata:", strlen("memrata:")) != 0)
+		goto bad_name;
+	p = uri + strlen("memrata:");
+	if (p[0] == '/' || (t = strchr(p, '/')) == NULL || t[1] == '\0')
+bad_name:	ERET(wtext, session, EINVAL, "%s: illegal name format", uri);
+	len = t - p;
+
+	/* Find a matching KVS device. */
+	for (ks = ds->kvs_head; ks != NULL; ks = ks->next)
+		if (STRING_MATCH(ks->name, p, len))
+			break;
+	if (ks == NULL)
+		ERET(wtext, NULL,
+		    EINVAL, "%s: no matching Memrata store found", uri);
+
+	/*
+	 * We're about to walk the KVS device's list of files, acquire the
+	 * global lock.
+	 */
+	if ((ret = writelock(wtext, session, &ds->global_lock)) != 0)
 		return (ret);
 
 	/*
 	 * Check for a match: if we find one, optionally trade the global lock
-	 * for the object, optionally check if the object is busy, and return.
+	 * for the object's lock, optionally check if the object is busy, and
+	 * return.
 	 */
 	for (ws = ks->ws_head; ws != NULL; ws = ws->next)
 		if (strcmp(ws->uri, uri) == 0) {
@@ -2417,19 +2351,17 @@ ws_source_open(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 	 * The naming scheme is simple: the URI names the primary store, and the
 	 * URI with a trailing suffix names the associated caching store.
 	 */
-	if ((ret = ws_source_open_namespace(
-	    wtds, session, uri, NULL, ks->kvs_device, &ws->kvs)) != 0)
+	if ((ret = ws_source_open_namespace(wtds,
+	    session, uri, NULL, ks->kvs_device, &ws->kvs)) != 0)
 		goto err;
-	if ((ret = ws_source_open_namespace(
-	    wtds, session, uri, "cache", ks->kvs_device, &ws->kvscache)) != 0)
+	if ((ret = ws_source_open_namespace(wtds,
+	    session, uri, "cache", ks->kvs_device, &ws->kvscache)) != 0)
 		goto err;
-	if ((ret = kvs_commit(ws->kvs)) != 0) {
-		EMSG(wtext, session, WT_ERROR,
+	if ((ret = kvs_commit(ws->kvs)) != 0)
+		EMSG_ERR(wtext, session, WT_ERROR,
 		    "kvs_commit: %s", kvs_strerror(ret));
-		goto err;
-	}
 
-	/* Optionally trade the global lock for the object. */
+	/* Optionally trade the global lock for the object lock. */
 	if (!(flags & WS_SOURCE_OPEN_GLOBAL) &&
 	    (ret = writelock(wtext, session, &ws->lock)) != 0)
 		goto err;
@@ -2441,15 +2373,18 @@ ws_source_open(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 	*refp = ws;
 	ws = NULL;
 
-err:	if (ws != NULL)
-		ESET(ws_source_close(wtext, session, ws));
+	if (0) {
+err:		if (ws != NULL)
+			ESET(ws_source_close(wtext, session, ws));
+	}
 
-	/*
+	/*      
 	 * If there was an error or our caller doesn't need the global lock,
 	 * release the global lock.
 	 */
 	if (!(flags & WS_SOURCE_OPEN_GLOBAL) || ret != 0)
 		ESET(unlock(wtext, session, &ds->global_lock));
+
 	return (ret);
 }
 
@@ -2572,8 +2507,7 @@ master_uri_set(WT_DATA_SOURCE *wtds,
 	 * update the master ID record.
 	 */
 	(void)snprintf(value, sizeof(value),
-	    ",version=(major=%d,minor=%d)"
-	    ",key_format=%.*s,value_format=%.*s",
+	    "version=(major=%d,minor=%d),key_format=%.*s,value_format=%.*s",
 	    KVS_MAJOR, KVS_MINOR, (int)a.len, a.str, (int)b.len, b.str);
 	if ((ret = wtext->metadata_insert(wtext, session, uri, value)) == 0)
 		return (0);
@@ -2613,26 +2547,20 @@ kvs_session_open_cursor(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 		return (os_errno());
 
 	if ((ret = wtext->config_get(		/* Parse configuration */
-	    wtext, session, config, "append", &v)) != 0) {
-		EMSG(wtext, session, ret,
+	    wtext, session, config, "append", &v)) != 0)
+		EMSG_ERR(wtext, session, ret,
 		    "append configuration: %s", wtext->strerror(ret));
-		goto err;
-	}
 	cursor->config_append = v.val != 0;
 
 	if ((ret = wtext->config_get(
-	    wtext, session, config, "overwrite", &v)) != 0) {
-		EMSG(wtext, session, ret,
+	    wtext, session, config, "overwrite", &v)) != 0)
+		EMSG_ERR(wtext, session, ret,
 		    "overwrite configuration: %s", wtext->strerror(ret));
-		goto err;
-	}
 	cursor->config_overwrite = v.val != 0;
 
-	if ((ret = wtext->collator_config(wtext, session, config)) != 0) {
-		EMSG(wtext, session, ret,
+	if ((ret = wtext->collator_config(wtext, session, config)) != 0)
+		EMSG_ERR(wtext, session, ret,
 		    "collator configuration: %s", wtext->strerror(ret));
-		goto err;
-	}
 
 	/* Finish initializing the cursor. */
 	cursor->wtcursor.close = kvs_cursor_close;
@@ -2666,21 +2594,17 @@ kvs_session_open_cursor(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 			goto err;
 
 		if ((ret = wtext->config_strget(
-		    wtext, session, value, "key_format", &v)) != 0) {
-			EMSG(wtext, session, ret,
+		    wtext, session, value, "key_format", &v)) != 0)
+			EMSG_ERR(wtext, session, ret,
 			    "key_format configuration: %s",
 			    wtext->strerror(ret));
-			goto err;
-		}
 		ws->config_recno = v.len == 1 && v.str[0] == 'r';
 
 		if ((ret = wtext->config_strget(
-		    wtext, session, value, "value_format", &v)) != 0) {
-			EMSG(wtext, session, ret,
+		    wtext, session, value, "value_format", &v)) != 0)
+			EMSG_ERR(wtext, session, ret,
 			    "value_format configuration: %s",
 			    wtext->strerror(ret));
-			goto err;
-		}
 		ws->config_bitfield =
 		    v.len == 2 && isdigit(v.str[0]) && v.str[1] == 't';
 
@@ -2749,6 +2673,9 @@ kvs_session_create(WT_DATA_SOURCE *wtds,
 
 	/*
 	 * Create the URI master record if it doesn't already exist.
+	 *
+	 * We've discarded the lock, but that's OK, creates are single-threaded
+	 * at the WiredTiger level, it's not our problem to solve.
 	 *
 	 * If unable to enter a WiredTiger record, leave the KVS store alone.
 	 * A subsequent create should do the right thing, we aren't leaving
@@ -2985,7 +2912,8 @@ kvs_terminate(WT_DATA_SOURCE *wtds, WT_SESSION *session)
 	wtext = ds->wtext;
 
 	/* Lock the system down. */
-	ret = writelock(wtext, session, &ds->global_lock);
+	if (ds->lockinit)
+		ret = writelock(wtext, session, &ds->global_lock);
 
 	/* Close the KVS sources. */
 	while ((ks = ds->kvs_head) != NULL) {
@@ -2994,8 +2922,10 @@ kvs_terminate(WT_DATA_SOURCE *wtds, WT_SESSION *session)
 	}
 
 	/* Unlock and destroy the system. */
-	ESET(unlock(wtext, session, &ds->global_lock));
-	ESET(lock_destroy(wtext, NULL, &ds->global_lock));
+	if (ds->lockinit) {
+		ESET(unlock(wtext, session, &ds->global_lock));
+		ESET(lock_destroy(wtext, NULL, &ds->global_lock));
+	}
 
 	OVERWRITE_AND_FREE(ds);
 
@@ -3027,6 +2957,8 @@ wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 		kvs_terminate			/* termination */
 	};
 	DATA_SOURCE *ds;
+	WT_CONFIG_ITEM k, v;
+	WT_CONFIG_SCAN *scan;
 	WT_EXTENSION_API *wtext;
 	int ret = 0;
 
@@ -3043,32 +2975,62 @@ wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 	    KVS_VERSION_MAJOR, KVS_VERSION_MINOR);
 #endif
 
-	/* Allocate the local data-source structure. */
+	/* Allocate and initialize the local data-source structure. */
 	if ((ds = calloc(1, sizeof(DATA_SOURCE))) == NULL)
 		return (os_errno());
+	ds->wtds = wtds;
 	ds->wtext = wtext;
-
-						/* Configure the global lock */
 	if ((ret = lock_init(wtext, NULL, &ds->global_lock)) != 0)
 		goto err;
+	ds->lockinit = 1;
 
-	ds->wtds = wtds;			/* Configure the methods */
+	/* Get the configuration string. */
+	if ((ret = wtext->config_get(wtext, NULL, config, "config", &v)) != 0)
+		EMSG_ERR(wtext, NULL, ret,
+		    "WT_EXTENSION_API.config_get: config: %s",
+		    wtext->strerror(ret));
 
-	if ((ret = connection->add_data_source(	/* Add the data source */
-	    connection, "memrata:", (WT_DATA_SOURCE *)ds, NULL)) != 0) {
-		EMSG(wtext, NULL, ret,
+	/* Step through the list of entries, opening each one. */
+	if ((ret =
+	    wtext->config_scan_begin(wtext, NULL, v.str, v.len, &scan)) != 0)
+		EMSG_ERR(wtext, NULL, ret,
+		    "WT_EXTENSION_API.config_scan_begin: config: %s",
+		    wtext->strerror(ret));
+	while ((ret = wtext->config_scan_next(wtext, scan, &k, &v)) == 0)
+		if ((ret = kvs_source_open(ds, &k, &v)) != 0)
+			goto err;
+	if (ret != WT_NOTFOUND)
+		EMSG_ERR(wtext, NULL, ret,
+		    "WT_EXTENSION_API.config_scan_next: config: %s",
+		    wtext->strerror(ret));
+	if ((ret = wtext->config_scan_end(wtext, scan)) != 0)
+		EMSG_ERR(wtext, NULL, ret,
+		    "WT_EXTENSION_API.config_scan_end: config: %s",
+		    wtext->strerror(ret));
+
+	/* Open the database transaction store. */
+	if ((ret = kvs_source_open_txn(ds)) != 0)
+		goto err;
+
+	/* Add KVS-specific configuration options.  */
+	if ((ret = connection->configure_method(connection,
+	    "session.create",
+	    "memrata:", "kvs_open_o_truncate=0", "boolean", NULL)) != 0)
+		EMSG_ERR(wtext, NULL, ret,
+		    "WT_CONNECTION.configure_method: session.create: "
+		    "kvs_open_o_truncate=0: %s",
+		    wtext->strerror(ret));
+
+	/* Add the data source */
+	if ((ret = connection->add_data_source(
+	    connection, "memrata:", (WT_DATA_SOURCE *)ds, NULL)) != 0)
+		EMSG_ERR(wtext, NULL, ret,
 		    "WT_CONNECTION.add_data_source: %s", wtext->strerror(ret));
-err:		OVERWRITE_AND_FREE(ds);
-		return (ret);
-	}
+	return (0);
 
-	/*
-	 * Add KVS-specific configuration options.
-	 *
-	 * Once we've successfully added the data source, error returns should
-	 * eventually remove it, don't free the structure here,
-	 */
-	return (kvs_config_add(connection, wtext));
+err:	if (ds != NULL)
+		ESET(kvs_terminate((WT_DATA_SOURCE *)ds, NULL));
+	return (ret);
 }
 
 /*
