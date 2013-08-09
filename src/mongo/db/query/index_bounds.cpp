@@ -29,6 +29,39 @@ namespace {
 
 namespace mongo {
 
+    // For debugging.
+    string IndexBounds::toString() const {
+        stringstream ss;
+        for (size_t i = 0; i < fields.size(); ++i) {
+            if (i > 0) {
+                ss << ", ";
+            }
+            const OrderedIntervalList& oil = fields[i];
+            ss << "field #" << i << "['" << oil.name << "']: ";
+            for (size_t j = 0; j < oil.intervals.size(); ++j) {
+                const Interval& iv = oil.intervals[j];
+                if (iv.startInclusive) {
+                    ss << "[";
+                }
+                else {
+                    ss << "(";
+                }
+                // false means omit the field name
+                ss << iv.start.toString(false);
+                ss << ", ";
+                ss << iv.end.toString(false);
+                if (iv.endInclusive) {
+                    ss << "]";
+                }
+                else {
+                    ss << ")";
+                }
+            }
+        }
+
+        return ss.str();
+    }
+
     //
     // Validity checking for bounds
     //
@@ -54,12 +87,17 @@ namespace mongo {
             for (size_t j = 0; j < field.intervals.size(); ++j) {
                 // false means don't consider field name.
                 int cmp = sgn(field.intervals[j].end.woCompare(field.intervals[j].start, false));
+
+                if (cmp == 0 && field.intervals[j].startInclusive
+                    && field.intervals[j].endInclusive) { continue; }
+
                 if (cmp != expectedOrientation) { return false; }
             }
 
             // Make sure each interval is oriented correctly with respect to its neighbors.
             for (size_t j = 1; j < field.intervals.size(); ++j) {
-                int cmp = sgn(field.intervals[j].start.woCompare(field.intervals[j - 1].end, false));
+                int cmp = sgn(field.intervals[j].start.woCompare(field.intervals[j - 1].end,
+                                                                 false));
 
                 if (cmp == 0) {
                     // The end of one interval is the start of another.  This is only valid if

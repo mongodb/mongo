@@ -16,8 +16,8 @@
 
 #pragma once
 
-#include "mongo/db/parsed_query.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/lite_parsed_query.h"
 #include "mongo/db/query/plan_cache.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/runner.h"
@@ -49,6 +49,8 @@ namespace mongo {
             Runner::RunnerState state = _exec->getNext(objOut);
 
             if (Runner::RUNNER_EOF == state && !_updatedCache) {
+                _updatedCache = true;
+
                 // We're done.  Update the cache.
                 PlanCache* cache = PlanCache::get(_canonicalQuery->ns());
 
@@ -62,8 +64,8 @@ namespace mongo {
                     if (!cache->remove(*_canonicalQuery, *_cachedQuery->solution)) {
                         warning() << "Cached plan runner couldn't remove plan from cache.  Maybe"
                             " somebody else did already?";
+                        return Runner::RUNNER_EOF;
                     }
-                    return Runner::RUNNER_EOF;
                 }
 
                 // We're done running.  Update cache.

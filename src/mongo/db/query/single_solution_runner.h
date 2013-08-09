@@ -17,8 +17,8 @@
 #pragma once
 
 #include "mongo/db/clientcursor.h"
-#include "mongo/db/parsed_query.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/lite_parsed_query.h"
 #include "mongo/db/query/plan_cache.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/runner.h"
@@ -63,7 +63,6 @@ namespace mongo {
 
         virtual void invalidate(const DiskLoc& dl) {
             if (!_killed) {
-                cout << "Sending invalidate to exec\n";
                 _exec->invalidate(dl);
             }
         }
@@ -75,7 +74,9 @@ namespace mongo {
         virtual bool forceYield() {
             saveState();
             ClientCursor::registerRunner(this);
-            ClientCursor::staticYield(ClientCursor::suggestYieldMicros(), getQuery().getParsed().ns(), NULL);
+            ClientCursor::staticYield(ClientCursor::suggestYieldMicros(),
+                                      getQuery().getParsed().ns(),
+                                      NULL);
             ClientCursor::deregisterRunner(this);
             if (!_killed) { restoreState(); }
             return !_killed;

@@ -25,8 +25,8 @@ namespace mongo {
     Status CanonicalQuery::canonicalize(QueryMessage& qm, CanonicalQuery** out) {
         auto_ptr<CanonicalQuery> cq(new CanonicalQuery());
 
-        // TODO: ParsedQuery throws.  Fix it to return error.
-        cq->_pq.reset(new ParsedQuery(qm));
+        // TODO: LiteParsedQuery throws.  Fix it to return error.
+        cq->_pq.reset(new LiteParsedQuery(qm));
 
         // TODO: If pq.hasOption(QueryOption_CursorTailable) make sure it's a capped collection and
         // make sure the order(??) is $natural: 1.
@@ -49,11 +49,11 @@ namespace mongo {
                                         CanonicalQuery** out) {
         auto_ptr<CanonicalQuery> cq(new CanonicalQuery());
 
-        // ParsedQuery saves the pointer to the NS that we provide it.  It's not going to remain
+        // LiteParsedQuery saves the pointer to the NS that we provide it.  It's not going to remain
         // valid unless we cache it ourselves.
         cq->_ns = ns;
 
-        cq->_pq.reset(new ParsedQuery(cq->_ns.c_str(), 0, 0, 0, query, BSONObj()));
+        cq->_pq.reset(new LiteParsedQuery(cq->_ns.c_str(), 0, 0, 0, query));
 
         StatusWithMatchExpression swme = MatchExpressionParser::parse(cq->_pq->getFilter());
         if (!swme.isOK()) { return swme.getStatus(); }

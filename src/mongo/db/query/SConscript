@@ -3,16 +3,41 @@
 Import("env")
 
 env.StaticLibrary(
-    target = 'query',
+    target = 'query_planner',
     source = [
         "canonical_query.cpp",
+        "lite_parsed_query.cpp",
+        "query_planner.cpp",
+    ],
+    LIBDEPS = [
+        "index_bounds",
+        "$BUILD_DIR/mongo/bson",
+        "$BUILD_DIR/mongo/expressions",
+        "$BUILD_DIR/mongo/expressions_geo",
+        "$BUILD_DIR/mongo/query_parsing",
+    ],
+)
+
+env.CppUnitTest(
+    target = "query_planner_test",
+    source = [
+        "query_planner_test.cpp"
+    ],
+    LIBDEPS = [
+        "query_planner",
+    ],
+)
+
+env.StaticLibrary(
+    target = 'query',
+    source = [
         "multi_plan_runner.cpp",
         "new_find.cpp",
         "plan_ranker.cpp",
-        "query_planner.cpp",
         "stage_builder.cpp",
     ],
     LIBDEPS = [
+        "query_planner",
         "$BUILD_DIR/mongo/db/exec/exec"
     ],
 )

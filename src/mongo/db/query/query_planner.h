@@ -35,6 +35,16 @@ namespace mongo {
          */
         static void plan(const CanonicalQuery& query, vector<QuerySolution*>* out);
 
+        /**
+         * Outputs a series of possible solutions for the provided 'query' into 'out'.  Uses the
+         * provided indices to generate a solution.
+         *
+         * Caller owns pointers in *out.
+         */
+        static void planWithIndices(const CanonicalQuery& query,
+                                    const BSONObjSet& indexKeyPatterns,
+                                    vector<QuerySolution*>* out);
+
     private:
         /**
          * Returns true if the tree rooted at 'node' requires an index to answer the query.  There

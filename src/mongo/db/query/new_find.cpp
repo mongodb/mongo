@@ -121,7 +121,8 @@ namespace mongo {
         Client::ReadContext ctx(ns);
 
         // TODO: Document.
-        replVerifyReadsOk();
+        // TODO: do this when we can pass in our own parsed query
+        //replVerifyReadsOk();
 
         ClientCursorPin ccPin(cursorid);
         ClientCursor* cc = ccPin.c();
@@ -162,7 +163,7 @@ namespace mongo {
             startingResult = cc->pos();
 
             Runner* runner = cc->getRunner();
-            const ParsedQuery& pq = runner->getQuery().getParsed();
+            const LiteParsedQuery& pq = runner->getQuery().getParsed();
 
             // Get results out of the runner.
             // TODO: There may be special handling required for tailable cursors?
@@ -244,10 +245,11 @@ namespace mongo {
         const ChunkVersion shardingVersionAtStart = shardingState.getVersion(q.ns);
 
         // We use this a lot below.
-        const ParsedQuery& pq = runner->getQuery().getParsed();
+        const LiteParsedQuery& pq = runner->getQuery().getParsed();
 
         // TODO: Document why we do this.
-        replVerifyReadsOk(&pq);
+        // TODO: do this when we can pass in our own parsed query
+        //replVerifyReadsOk(&pq);
 
         // If this exists, the collection is sharded.
         // If it doesn't exist, we can assume we're not sharded.
