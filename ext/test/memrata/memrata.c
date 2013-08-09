@@ -164,7 +164,7 @@ typedef struct __kvs_source {
 #define	TXN_COMMITTED	'C'
 #define	TXN_UNRESOLVED	0
 	kvs_t	kvstxn;				/* Underlying KVS txn store */
-	int	kvstxn_first;			/* First KVS store */
+	int	kvsowner;			/* Owns transaction store */
 
 	struct __kvs_source *next;		/* List of KVS sources */
 } KVS_SOURCE;
@@ -1894,23 +1894,21 @@ kvs_source_close(WT_EXTENSION_API *wtext, WT_SESSION *session, KVS_SOURCE *ks)
 		ESET(ws_source_close(wtext, session, ws));
 	}
 
-	/* Close the transaction name space in the first KVS source opened. */
-	if (ks->kvstxn_first && ks->kvstxn != NULL) {
-		if ((tret = kvs_close(ks->kvstxn)) != 0)
-			EMSG(wtext, session, WT_ERROR,
-			    "kvs_close: %s.txn: %s",
-			    ks->name, kvs_strerror(tret));
-		ks->kvstxn = NULL;
-	}
-
-	/* Flush and close the source. */
+	/* Flush and close the KVS source. */
 	if (ks->kvs_device != NULL) {
 		if ((tret = kvs_commit(ks->kvs_device)) != 0)
 			EMSG(wtext, session, WT_ERROR,
 			    "kvs_commit: %s: %s", ks->name, kvs_strerror(tret));
+
+		/* If the owner, close the database transaction store. */
+		if (ks->kvsowner && (tret = kvs_close(ks->kvstxn)) != 0)
+			EMSG(wtext, session, tret,
+			    "kvs_close: %s.txn: %s",
+			    ks->name, kvs_strerror(tret));
+
 		if ((tret = kvs_close(ks->kvs_device)) != 0)
 			EMSG(wtext, session, WT_ERROR,
-			    "kvs_close: %s: %s", ks->name, kvs_strerror(ret));
+			    "kvs_close: %s: %s", ks->name, kvs_strerror(tret));
 		ks->kvs_device = NULL;
 	}
 
@@ -2079,15 +2077,19 @@ kvs_source_open_txn(DATA_SOURCE *ds)
 
 	/*
 	 * If we didn't find a transaction store, open a transaction store in
-	 * one of the KVS sources we loaded.
+	 * the first KVS source we loaded.   (It could just as easily be the
+	 * last one we loaded, we're just picking one, but picking the first
+	 * seems slightly less likely to make people wonder.)
 	 */
 	if (ks == NULL) {
-		ks = ds->kvs_head;
+		for (ks = ds->kvs_head; ks->next != NULL; ks = ks->next)
+			;
 		if ((kvstxn = kvs_open_namespace(
 		    ks->kvs_device, "txn", KVS_O_CREATE)) == NULL)
 			ERET(wtext, NULL, WT_ERROR,
 			    "kvs_open_namespace: %s.txn: %s",
 			    ks->name, kvs_strerror(os_errno()));
+		ks->kvsowner = 1;
 
 		/* Push the change. */
 		if ((ret = kvs_commit(ks->kvs_device)) != 0)
@@ -2096,13 +2098,8 @@ kvs_source_open_txn(DATA_SOURCE *ds)
 	}
 
 	/* Add a reference to the open transaction store in each KVS source. */
-	ks->kvstxn = kvstxn;
-	ks->kvstxn_first = 1;
 	for (ks = ds->kvs_head; ks != NULL; ks = ks->next)
-		if (!ks->kvstxn_first) {
-			ks->kvstxn = kvstxn;
-			ks->kvstxn_first = 0;
-		}
+		ks->kvstxn = kvstxn;
 
 	return (0);
 }
@@ -2905,7 +2902,7 @@ static int
 kvs_terminate(WT_DATA_SOURCE *wtds, WT_SESSION *session)
 {
 	DATA_SOURCE *ds;
-	KVS_SOURCE *ks;
+	KVS_SOURCE *ks, *last;
 	WT_EXTENSION_API *wtext;
 	int ret = 0;
 
@@ -2916,11 +2913,21 @@ kvs_terminate(WT_DATA_SOURCE *wtds, WT_SESSION *session)
 	if (ds->lockinit)
 		ret = writelock(wtext, session, &ds->global_lock);
 
-	/* Close the KVS sources. */
+	/*
+	 * Close the KVS sources, close the KVS source that "owns" the
+	 * database transaction store last.
+	 */
+	last = NULL;
 	while ((ks = ds->kvs_head) != NULL) {
 		ds->kvs_head = ks->next;
+		if (ks->kvsowner) {
+			last = ks;
+			continue;
+		}
 		ESET(kvs_source_close(wtext, session, ks));
 	}
+	if (last != NULL)
+		ESET(kvs_source_close(wtext, session, last));
 
 	/* Unlock and destroy the system. */
 	if (ds->lockinit) {
