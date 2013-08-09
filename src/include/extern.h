@@ -1350,11 +1350,7 @@ extern int __wt_ext_transaction_isolation_level( WT_EXTENSION_API *wt_api,
     WT_SESSION *wt_session);
 extern int __wt_ext_transaction_notify( WT_EXTENSION_API *wt_api,
     WT_SESSION *wt_session,
-    int (*notify)(WT_SESSION *,
-    void *,
-    uint64_t,
-    int),
-    void *cookie);
+    WT_TXN_NOTIFY *notify);
 extern uint64_t __wt_ext_transaction_oldest(WT_EXTENSION_API *wt_api);
 extern int __wt_ext_transaction_visible( WT_EXTENSION_API *wt_api,
     WT_SESSION *wt_session,

@@ -141,11 +141,11 @@ data_source_error(int v)
 
 static int
 data_source_notify(
-    WT_SESSION *session, void *cookie, uint64_t txnid, int committed)
+    WT_TXN_NOTIFY *handler, WT_SESSION *session, uint64_t txnid, int committed)
 {
 	/* Unused parameters */
+	(void)handler;
 	(void)session;
-	(void)cookie;
 	(void)txnid;
 	(void)committed;
 
@@ -201,10 +201,10 @@ static int my_cursor_insert(WT_CURSOR *wtcursor)
 	}
 
 	{
-	void *cookie = NULL;
 	/*! [WT_EXTENSION transaction notify] */
-	ret = wt_api->transaction_notify(
-	    wt_api, session, data_source_notify, cookie);
+	WT_TXN_NOTIFY handler;
+	handler.notify = data_source_notify;
+	ret = wt_api->transaction_notify(wt_api, session, &handler);
 	/*! [WT_EXTENSION transaction notify] */
 	}
 

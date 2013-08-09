@@ -111,6 +111,8 @@ typedef struct __wt_source {
 } WT_SOURCE;
 
 typedef struct __kvs_source {
+	WT_TXN_NOTIFY txn_notify;		/* Transaction commit handler */
+
 	char *name;				/* Unique name */
 
 	kvs_t kvs_device;			/* Underlying KVS store */
@@ -443,12 +445,12 @@ txn_state_set(WT_EXTENSION_API *wtext,
  *	Resolve a transaction.
  */
 static int
-txn_notify(WT_SESSION *session, void *cookie, uint64_t txnid, int committed)
+txn_notify(WT_TXN_NOTIFY *handler,
+    WT_SESSION *session, uint64_t txnid, int committed)
 {
 	KVS_SOURCE *ks;
 
-	ks = cookie;
-
+	ks = (KVS_SOURCE *)handler;
 	return (txn_state_set(ks->wtext, session, ks, txnid, committed));
 }
 
@@ -1524,7 +1526,7 @@ err:	ESET(unlock(wtext, session, &ws->lock));
 
 	/* If successful, request notification at transaction resolution. */
 	if (ret == 0)
-		ESET(wtext->transaction_notify(wtext, session, txn_notify, ks));
+		ESET(wtext->transaction_notify(wtext, session, &ks.txn_notify));
 
 	return (ret);
 }
@@ -1627,7 +1629,7 @@ err:	ESET(unlock(wtext, session, &ws->lock));
 
 	/* If successful, request notification at transaction resolution. */
 	if (ret == 0)
-		ESET(wtext->transaction_notify(wtext, session, txn_notify, ks));
+		ESET(wtext->transaction_notify(wtext, session, &ks.txn_notify));
 
 	return (ret);
 }
@@ -2118,6 +2120,7 @@ kvs_source_open(WT_DATA_SOURCE *wtds,
 		ret = os_errno();
 		goto err;
 	}
+	ks->txn_notify.notify = txn_notify;
 	ks->name = devices;
 	ks->wtext = wtext;
 	devices = NULL;

@@ -48,8 +48,7 @@ __wt_ext_transaction_isolation_level(
  */
 int
 __wt_ext_transaction_notify(
-    WT_EXTENSION_API *wt_api, WT_SESSION *wt_session,
-    int (*notify)(WT_SESSION *, void *, uint64_t, int), void *cookie)
+    WT_EXTENSION_API *wt_api, WT_SESSION *wt_session, WT_TXN_NOTIFY *notify)
 {
 	WT_SESSION_IMPL *session;
 	WT_TXN *txn;
@@ -65,13 +64,12 @@ __wt_ext_transaction_notify(
 	 * more than one because more than one data-source in a transaction
 	 * doesn't work anyway.
 	 */
-	if (txn->notify == notify && txn->notify_cookie == cookie)
+	if (txn->notify == notify)
 		return (0);
 	if (txn->notify != NULL)
 		return (ENOMEM);
 
 	txn->notify = notify;
-	txn->notify_cookie = cookie;
 
 	return (0);
 }
