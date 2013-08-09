@@ -575,31 +575,17 @@ __split_row_page_inmem(
 	WT_INSERT *ins, *prev_ins;
 	WT_INSERT **insp;
 	WT_INSERT *current_ins;
-	WT_INSERT_HEAD *ins_head;
+	WT_INSERT_HEAD *ins_head, **new_ins_head_list, *new_ins_head;
 	WT_PAGE *new_parent, *right_child;
 	WT_REF *newref;
 	int i, ins_depth;
 	size_t transfer_size;
 
 	new_parent = right_child = NULL;
+	new_ins_head_list = NULL;
+	new_ins_head = NULL;
 	ins = NULL;
 	current_ins = NULL;
-
-	/*
-	 * Do all operations that can fail before futzing with the original
-	 * page.
-	 * Allocate two new pages:
-	 *  * One split merge page that will be the new parent.
-	 *  * One leaf page (right_child).
-	 * We will move the last key/value pair from the original page onto
-	 * the new leaf page.
-	 */
-
-	WT_RET(__merge_new_page(
-	    session, WT_PAGE_ROW_INT, 2, 1, &new_parent));
-
-	WT_ERR(__merge_new_page(
-	    session, WT_PAGE_ROW_LEAF, 0, 0, &right_child));
 
 	/* Find the final item on the original page. */
 	if (!F_ISSET_ATOMIC(orig, WT_PAGE_BUILD_KEYS))
@@ -621,11 +607,27 @@ __split_row_page_inmem(
 	if (ins == NULL || ins_head->head[0] == ins_head->tail[0])
 		return (EBUSY);
 
+	/*
+	 * Do all operations that can fail before futzing with the original
+	 * page.
+	 * Allocate two new pages:
+	 *  * One split merge page that will be the new parent.
+	 *  * One leaf page (right_child).
+	 * We will move the last key/value pair from the original page onto
+	 * the new leaf page.
+	 */
+
+	WT_RET(__merge_new_page(
+	    session, WT_PAGE_ROW_INT, 2, 1, &new_parent));
+
+	WT_ERR(__merge_new_page(
+	    session, WT_PAGE_ROW_LEAF, 0, 0, &right_child));
+
 	/* Add the entry onto the right_child page, as a skip list. */
-	WT_ERR(__wt_calloc_def(
-	    session, 1, &(right_child->u.row.ins)));
-	WT_ERR(__wt_calloc_def(
-	    session, 1, &right_child->u.row.ins[0]));
+	WT_ERR(__wt_calloc_def(session, 1, &new_ins_head_list));
+	WT_ERR(__wt_calloc_def(session, 1, &new_ins_head));
+	right_child->u.row.ins = new_ins_head_list;
+	right_child->u.row.ins[0] = new_ins_head;
 	__wt_cache_page_inmem_incr(session,
 	    right_child, sizeof(WT_INSERT_HEAD) + sizeof(WT_INSERT_HEAD *));
 	for (i = 0; i < ins_depth; i++) {
@@ -639,7 +641,7 @@ __split_row_page_inmem(
 	new_parent->ref = orig->ref;
 
 	/*
-	 * Link the orig page into the new_parent. Copy the WT_REF from
+	 * Link the orig page into the new parent. Copy the WT_REF from
 	 * the original parent - it's the same.
 	 * TODO: Should we just refer to the same thing? If so how do we stop
 	 * the memory being allocated when we create new_parent?
@@ -757,6 +759,8 @@ __split_row_page_inmem(
 	orig->modify->u.split = new_parent;
 
 err:	if (ret != 0) {
+		__wt_free(session, new_ins_head_list);
+		__wt_free(session, new_ins_head);
 		if (new_parent != NULL)
 			__wt_page_out(session, &new_parent);
 		if (right_child != NULL)
