@@ -78,9 +78,15 @@ catch(e) {
     myprint(e);
 }
 
-replTest.awaitReplication();
+assert.soon(function() {
+    try {
+        return nodes[2].getDB("admin").isMaster().ismaster;
+    } catch (x) {
+        return false;
+    }
+}, 'wait for 2 to be primary', 60000);
 
-myprint("primary should now be 2");
+myprint("primary is now 2");
 master = replTest.getMaster();
 config = master.getDB("local").system.replset.findOne();
 printjson(config);
