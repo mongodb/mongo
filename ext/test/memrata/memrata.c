@@ -2784,6 +2784,8 @@ kvs_source_open(DATA_SOURCE *ds, WT_CONFIG_ITEM *k, WT_CONFIG_ITEM *v)
 		return (os_errno());
 	}
 	memcpy(ks->name, k->str, k->len);
+
+	ks->txn_notify.notify = txn_notify;
 	ks->wtext = wtext;
 
 	/*
