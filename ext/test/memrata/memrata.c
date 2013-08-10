@@ -131,6 +131,10 @@ typedef struct __wt_source {
 } WT_SOURCE;
 
 typedef struct __kvs_source {
+	/*
+	 * XXX
+	 * The transaction commit handler must appear first in the structure.
+	 */
 	WT_TXN_NOTIFY txn_notify;		/* Transaction commit handler */
 
 	char *name;				/* Unique name */
