@@ -2961,11 +2961,17 @@ wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 		kvs_session_checkpoint,		/* session.checkpoint */
 		kvs_terminate			/* termination */
 	};
+	static const char *session_create_opts[] = {
+		"kvs_open_o_truncate=0",
+		"kvs_open_o_debug=0",
+		NULL
+	};
 	DATA_SOURCE *ds;
 	WT_CONFIG_ITEM k, v;
 	WT_CONFIG_SCAN *scan;
 	WT_EXTENSION_API *wtext;
 	int ret = 0;
+	const char **p;
 
 	(void)config;				/* Unused parameters */
 
@@ -3018,13 +3024,13 @@ wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 		goto err;
 
 	/* Add KVS-specific configuration options.  */
-	if ((ret = connection->configure_method(connection,
-	    "session.create",
-	    "memrata:", "kvs_open_o_truncate=0", "boolean", NULL)) != 0)
-		EMSG_ERR(wtext, NULL, ret,
-		    "WT_CONNECTION.configure_method: session.create: "
-		    "kvs_open_o_truncate=0: %s",
-		    wtext->strerror(ret));
+	for (p = session_create_opts; *p != NULL; ++p)
+		if ((ret = connection->configure_method(connection,
+		    "session.create", "memrata:", *p, "boolean", NULL)) != 0)
+			EMSG_ERR(wtext, NULL, ret,
+			    "WT_CONNECTION.configure_method: session.create: "
+			    "%s: %s",
+			    *p, wtext->strerror(ret));
 
 	/* Add the data source */
 	if ((ret = connection->add_data_source(
