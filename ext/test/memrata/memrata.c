@@ -2880,13 +2880,15 @@ kvs_source_open_txn(DATA_SOURCE *ds)
 			ERET(wtext, NULL, WT_ERROR,
 			    "kvs_open_namespace: %s.txn: %s",
 			    ks->name, kvs_strerror(os_errno()));
-		ks->kvsowner = 1;
 
 		/* Push the change. */
 		if ((ret = kvs_commit(ks->kvs_device)) != 0)
 			ERET(wtext, NULL, WT_ERROR,
 			    "kvs_commit: %s", kvs_strerror(ret));
 	}
+
+	/* Set the owner field, this KVS source has to be closed last. */
+	ks->kvsowner = 1;
 
 	/* Add a reference to the open transaction store in each KVS source. */
 	for (ks = ds->kvs_head; ks != NULL; ks = ks->next)
