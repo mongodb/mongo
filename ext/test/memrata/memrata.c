@@ -2846,11 +2846,10 @@ kvs_source_open_txn(DATA_SOURCE *ds)
 	 * have a transaction store, and make sure we only find one.
 	 */
 	kstxn = NULL;
-	kvstxn = NULL;
 	for (ks = ds->kvs_head; ks != NULL; ks = ks->next)
 		if ((t =
 		    kvs_open_namespace(ks->kvs_device, "txn", 0)) != NULL) {
-			if (kvstxn != NULL) {
+			if (kstxn != NULL) {
 				(void)kvs_close(t);
 				(void)kvs_close(kvstxn);
 				ERET(wtext, NULL, WT_ERROR,
@@ -2860,7 +2859,6 @@ kvs_source_open_txn(DATA_SOURCE *ds)
 			kvstxn = t;
 			kstxn = ks;
 		}
-	ks = kstxn;
 
 	/*
 	 * If we didn't find a transaction store, open a transaction store in
@@ -2868,7 +2866,7 @@ kvs_source_open_txn(DATA_SOURCE *ds)
 	 * last one we loaded, we're just picking one, but picking the first
 	 * seems slightly less likely to make people wonder.)
 	 */
-	if (ks == NULL) {
+	if ((ks = kstxn) == NULL) {
 		for (ks = ds->kvs_head; ks->next != NULL; ks = ks->next)
 			;
 		if ((kvstxn = kvs_open_namespace(
