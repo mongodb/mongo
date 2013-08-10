@@ -439,7 +439,6 @@ txn_state_set(WT_EXTENSION_API *wtext,
 
 	/* Update the store -- commits must be durable, flush the device. */
 	memset(&txn, 0, sizeof(txn));
-
 	txn.key = &txnid;
 	txn.key_len = sizeof(txnid);
 
@@ -490,6 +489,7 @@ txn_state(WT_CURSOR *wtcursor, uint64_t txnid)
 	cursor = (CURSOR *)wtcursor;
 	ks = cursor->ws->ks;
 
+	memset(&txn, 0, sizeof(txn));
 	txn.key = &txnid;
 	txn.key_len = sizeof(txnid);
 	txn.val = val_buf;
@@ -1539,7 +1539,8 @@ err:	ESET(unlock(wtext, session, &ws->lock));
 
 	/* If successful, request notification at transaction resolution. */
 	if (ret == 0)
-		ESET(wtext->transaction_notify(wtext, session, &ks.txn_notify));
+		ESET(
+		    wtext->transaction_notify(wtext, session, &ks->txn_notify));
 
 	return (ret);
 }
@@ -1642,7 +1643,8 @@ err:	ESET(unlock(wtext, session, &ws->lock));
 
 	/* If successful, request notification at transaction resolution. */
 	if (ret == 0)
-		ESET(wtext->transaction_notify(wtext, session, &ks.txn_notify));
+		ESET(
+		    wtext->transaction_notify(wtext, session, &ks->txn_notify));
 
 	return (ret);
 }
@@ -1904,17 +1906,6 @@ bad_name:	ERET(wtext, session, EINVAL, "%s: illegal name format", uri);
 	if (ks == NULL)
 		ERET(wtext, NULL,
 		    EINVAL, "%s: no matching Memrata store found", uri);
-
-	/* Allocate and initialize a new underlying KVS source object. */
-	if ((ks = calloc(1, sizeof(*ks))) == NULL ||
-	    (ks->name = calloc(1, k->len + 1)) == NULL) {
-		free(ks);
-		return (os_errno());
-	}
-	memcpy(ks->name, k->str, k->len);
-
-	ks->txn_notify.notify = txn_notify;
-	ks->wtext = wtext;
 
 	/*
 	 * We're about to walk the KVS device's list of files, acquire the
