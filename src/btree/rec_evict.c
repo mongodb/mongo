@@ -235,11 +235,14 @@ __rec_page_dirty_update(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 * Publish: a barrier to ensure the structure fields are set
 		 * before the state change makes the page available to readers.
 		 */
+		if (mod->split_parent_ref != NULL)
+			parent_ref = mod->split_parent_ref;
 		parent_ref->page = mod->u.split;
 		WT_PUBLISH(parent_ref->state, WT_REF_MEM);
 
 		/* Clear the reference else discarding the page will free it. */
 		mod->u.split = NULL;
+		mod->split_parent_ref = NULL;
 		F_CLR(mod, WT_PM_REC_SPLIT);
 		break;
 	WT_ILLEGAL_VALUE(session);

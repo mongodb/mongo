@@ -580,6 +580,8 @@ __split_row_page_inmem(
 	WT_REF *newref;
 	int i, ins_depth;
 	size_t transfer_size;
+	void *p;
+	uint32_t size;
 
 	new_parent = right_child = NULL;
 	new_ins_head_list = NULL;
@@ -640,16 +642,6 @@ __split_row_page_inmem(
 	new_parent->parent = orig->parent;
 	new_parent->ref = orig->ref;
 
-	/*
-	 * Link the orig page into the new parent. Copy the WT_REF from
-	 * the original parent - it's the same.
-	 * TODO: Should we just refer to the same thing? If so how do we stop
-	 * the memory being allocated when we create new_parent?
-	 */
-	newref = &new_parent->u.intl.t[0];
-	memcpy(newref, orig->ref, WT_REF_SIZE);
-	newref->state = WT_REF_MEM;
-
 	/* Link the right child page into the new parent. */
 	newref = &new_parent->u.intl.t[1];
 	WT_LINK_PAGE(new_parent, newref, right_child);
@@ -657,10 +649,22 @@ __split_row_page_inmem(
 
 	/*
 	 * Copy the key we moved onto the right child into the WT_REF
-	 * structure that is will be linked into the parent page.
+	 * structure that is linked into the new parent page.
 	 */
-	WT_ERR(__wt_row_ikey_incr(session, right_child, ins->u.key.offset,
+	WT_ERR(__wt_row_ikey_incr(session, new_parent, ins->u.key.offset,
 	    WT_INSERT_KEY(ins), ins->u.key.size, &newref->key.ikey));
+
+	/*
+	 * Create a copy of the key for the left child in the new parent - do
+	 * this first, since we copy it out of the original ref. Then update
+	 * the original ref to point to the new parent
+	 */
+	newref = &new_parent->u.intl.t[0];
+	__wt_ref_key(orig->ref->page, orig->ref, &p, &size);
+	WT_ERR (__wt_row_ikey_incr(
+	    session, new_parent, 0, p, size, &newref->key.ikey));
+	WT_LINK_PAGE(new_parent, newref, orig);
+	newref->state = WT_REF_MEM;
 
 	/*
 	 * Now that all operations that could fail have completed, we start
@@ -757,6 +761,7 @@ __split_row_page_inmem(
 	 */
 	orig->modify->flags = WT_PM_REC_SPLIT;
 	orig->modify->u.split = new_parent;
+	orig->modify->split_parent_ref = new_parent->ref;
 
 err:	if (ret != 0) {
 		__wt_free(session, new_ins_head_list);

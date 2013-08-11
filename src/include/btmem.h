@@ -148,6 +148,7 @@ struct __wt_page_modify {
 		WT_PAGE *split;		/* Resulting split */
 		WT_ADDR	 replace;	/* Resulting replacement */
 	} u;
+	WT_REF *split_parent_ref;
 
 	/*
 	 * Appended items to column-stores: there is only a single one of these
