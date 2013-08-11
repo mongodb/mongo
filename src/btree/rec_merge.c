@@ -763,6 +763,9 @@ __split_row_page_inmem(
 	orig->modify->u.split = new_parent;
 	orig->modify->split_parent_ref = new_parent->ref;
 
+	/* Make it likely we evict the page we just split. */
+	orig->read_gen = WT_READ_GEN_OLDEST;
+
 err:	if (ret != 0) {
 		__wt_free(session, new_ins_head_list);
 		__wt_free(session, new_ins_head);
