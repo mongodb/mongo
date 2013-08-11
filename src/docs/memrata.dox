@@ -1,0 +1,118 @@
+/*! @page memrata WiredTiger Memrata support
+
+WiredTiger supports Memrata KVS devices as a data-source.
+
+To configure one or more Memrata KVS devices as WiredTiger data sources,
+take the following steps.
+
+@section memrata_build Building the WiredTiger Memrata Support
+
+To build the Memrata support, add a link in the WiredTiger build
+directory to the installed location of the Memrata software.  For
+example:
+
+@code
+% cd wiredtiger
+% ls /usr/local/memrata
+kvs.h		libkvs.a	libkvs.so
+kvs.h.4.2	libkvs.a.4.2	libkvs.so.4.2
+% ln -s memrata /usr/local//memrata
+% ./configure && make
+@endcode
+
+@section memrata_load Loading the WiredTiger Memrata Support
+
+Second, change your application to load the Memrata shared library.  The
+following example loads the Memrata shared library, configuring and
+naming two separate Memrata device pools.  The first device pool is
+named \c dev1, the second device pool is named \c dev2.  Device pool \c
+dev1 has two underlying Memrata devices, \c /dev/ssd0 and \c /dev/ssd1.
+Device pool \c dev2 has a single underlying Memrata device, \c
+/dev/ssd2.
+
+@code
+#define	MEMRATA_LIBRARY_PATH	"/usr/local/memrata/libkvs.so"
+ret = connection->load_extension(connection, MEMRATA_LIBRARY_PATH,
+    "config=["
+    "dev1=[kvs_devices=[/dev/ssd0,/dev/ssd1],kvs_open_o_truncate=1],"
+    "dev2=[kvs_devices=[/dev/ssd2],kvs_open_o_truncate=1]]");
+@endcode
+
+The \c kvs_devices configuration string takes a WiredTiger configuration
+list, that is, a comma-separated list of Memrata devices.
+
+In this example, both device pools are configured to be truncated (that
+is, all previously existing contents discarded), when they are configured.
+
+When loading a Memrata device, the following configuration strings are
+supported:
+
+<table>
+@hrow{String, Type}
+@row{kvs_devices, list of lists}
+@row{kvs_parallelism, int}
+@row{kvs_granularity, int}
+@row{kvs_avg_key_len, int}
+@row{kvs_avg_val_len, int}
+@row{kvs_write_bufs, int}
+@row{kvs_read_bufs, int}
+@row{kvs_commit_timeout, int}
+@row{kvs_reclaim_threshold, int}
+@row{kvs_reclaim_period, int}
+@row{kvs_open_o_debug, boolean}
+@row{kvs_open_o_truncate, boolean}
+</table>
+
+With the exception of the configuration string \c kvs_devices (which is
+WiredTiger specific), see the Memrata device documentation for details
+on their use.
+
+@section memrata_objects Creating Memrata-backed objects
+
+The device pool names are used as part of the URI specified to WiredTiger
+methods such as WT_SESSION::create or WT_SESSION::rename, separated from
+the object name by a single slash character.  The following example creates
+a table in device pool \c dev1 and the opens a cursor on the table:
+
+@code
+WT_CURSOR *cursor;
+WT_SESSION *session;
+
+ret = session->create(
+    session, "table:dev1/access", "key_format=S,value_format=S");
+ret = session->open_cursor(session, "table:dev1/access", NULL, NULL, &cursor);
+@endcode
+
+When opening a Memrata-backed object, the following configuration strings
+are supported:
+
+<table>
+@hrow{String, Type}
+@row{kvs_open_o_debug, boolean}
+@row{kvs_open_o_truncate, boolean}
+</table>
+
+See the Memrata device documentation for details on their use.
+
+@section memrata_notes Memrata notes
+
+- Memrata devices do not support named checkpoints.
+- Inserting a new record after the current maximum record in a fixed-length
+bit field column-store (that is, a store with an 'r' type key and 't' type
+value) does not implicitly create the missing records.
+- Memrata devices do not support bulk load as a special case, and configuring
+cursors for bulk load has no effect.
+- Memrata devices do not support compression of any kind.
+
+@section memrata_limitations Memrata limitations
+
+The Memrata device support is not yet complete; currently:
+
+- WiredTiger transactions cannot include operations on both Memrata devices
+and other stores.
+- Memrata devices cannot be recovered, and must be shut down cleanly to be
+used again.
+
+These limitations will be removed shortly.
+
+*/
