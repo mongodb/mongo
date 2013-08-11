@@ -31,7 +31,7 @@ Device pool \c dev2 has a single underlying Memrata device, \c
 /dev/ssd2.
 
 @code
-#define	MEMRATA_LIBRARY_PATH	"/usr/local/memrata/libkvs.so"
+#define	MEMRATA_LIBRARY_PATH	"test/memrata/.libs/libwiredtiger_memrata.so""
 ret = connection->load_extension(connection, MEMRATA_LIBRARY_PATH,
     "config=["
     "dev1=[kvs_devices=[/dev/ssd0,/dev/ssd1],kvs_open_o_truncate=1],"
