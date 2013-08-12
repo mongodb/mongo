@@ -32,6 +32,10 @@ namespace {
 
     static const char* ns = "somebogusns";
 
+    //
+    // Equality
+    //
+
     // Test the most basic index-using functionality.
     TEST(QueryPlannerTest, EqualityIndexScan) {
         // Get the canonical query.
@@ -45,12 +49,21 @@ namespace {
 
         // If we can't get this right...
         vector<QuerySolution*> solns;
-        QueryPlanner::planWithIndices(*cq, indices, &solns);
-        ASSERT_EQUALS(size_t(1), solns.size());
+        QueryPlanner::plan(*cq, indices, &solns);
+        ASSERT_EQUALS(size_t(2), solns.size());
 
-        QuerySolutionNode* node = solns[0]->root.get();
-        ASSERT_EQUALS(STAGE_IXSCAN, node->getType());
+        IndexScanNode* ixnode;
+        if (STAGE_IXSCAN == solns[0]->root->getType()) {
+            ASSERT_EQUALS(STAGE_COLLSCAN, solns[1]->root->getType());
+            ixnode = static_cast<IndexScanNode*>(solns[0]->root.get());
+        }
+        else {
+            ASSERT_EQUALS(STAGE_COLLSCAN, solns[0]->root->getType());
+            ASSERT_EQUALS(STAGE_IXSCAN, solns[1]->root->getType());
+            ixnode = static_cast<IndexScanNode*>(solns[1]->root.get());
+        }
 
+        cout << ixnode->bounds.toString() << endl;
         // TODO: Check bounds.
     }
 
@@ -64,14 +77,162 @@ namespace {
         indices.insert(BSON("x" << 1 << "y" << 1));
 
         vector<QuerySolution*> solns;
-        QueryPlanner::planWithIndices(*cq, indices, &solns);
+        QueryPlanner::plan(*cq, indices, &solns);
 
         // Available index is prefixed by our equality, use it.
-        ASSERT_EQUALS(size_t(1), solns.size());
+        ASSERT_EQUALS(size_t(2), solns.size());
 
-        QuerySolutionNode* node = solns[0]->root.get();
-        ASSERT_EQUALS(STAGE_IXSCAN, node->getType());
+        IndexScanNode* ixnode;
+        if (STAGE_IXSCAN == solns[0]->root->getType()) {
+            ASSERT_EQUALS(STAGE_COLLSCAN, solns[1]->root->getType());
+            ixnode = static_cast<IndexScanNode*>(solns[0]->root.get());
+        }
+        else {
+            ASSERT_EQUALS(STAGE_COLLSCAN, solns[0]->root->getType());
+            ASSERT_EQUALS(STAGE_IXSCAN, solns[1]->root->getType());
+            ixnode = static_cast<IndexScanNode*>(solns[1]->root.get());
+        }
 
+        cout << ixnode->bounds.toString() << endl;
+        // TODO: Check bounds.
+    }
+
+    // TODO: Check compound indices.
+    // TODO: Check diff. index directions for ranges below.
+
+    //
+    // <
+    //
+
+    TEST(QueryPlannerTest, LessThan) {
+        BSONObj queryObj = BSON("x" << BSON("$lt" << 5));
+
+        CanonicalQuery* cq;
+        ASSERT(CanonicalQuery::canonicalize(ns, queryObj, &cq).isOK());
+
+        BSONObjSet indices;
+        indices.insert(BSON("x" << 1));
+
+        vector<QuerySolution*> solns;
+        QueryPlanner::plan(*cq, indices, &solns);
+
+        // Available index is prefixed by our equality, use it.
+        ASSERT_EQUALS(size_t(2), solns.size());
+
+        IndexScanNode* ixnode;
+        if (STAGE_IXSCAN == solns[0]->root->getType()) {
+            ASSERT_EQUALS(STAGE_COLLSCAN, solns[1]->root->getType());
+            ixnode = static_cast<IndexScanNode*>(solns[0]->root.get());
+        }
+        else {
+            ASSERT_EQUALS(STAGE_COLLSCAN, solns[0]->root->getType());
+            ASSERT_EQUALS(STAGE_IXSCAN, solns[1]->root->getType());
+            ixnode = static_cast<IndexScanNode*>(solns[1]->root.get());
+        }
+
+        cout << ixnode->bounds.toString() << endl;
+        // TODO: Check bounds.
+    }
+
+    //
+    // <=
+    //
+
+    TEST(QueryPlannerTest, LessThanEqual) {
+        BSONObj queryObj = BSON("x" << BSON("$lte" << 5));
+
+        CanonicalQuery* cq;
+        ASSERT(CanonicalQuery::canonicalize(ns, queryObj, &cq).isOK());
+
+        BSONObjSet indices;
+        indices.insert(BSON("x" << 1));
+
+        vector<QuerySolution*> solns;
+        QueryPlanner::plan(*cq, indices, &solns);
+
+        // Available index is prefixed by our equality, use it.
+        ASSERT_EQUALS(size_t(2), solns.size());
+
+        IndexScanNode* ixnode;
+        if (STAGE_IXSCAN == solns[0]->root->getType()) {
+            ASSERT_EQUALS(STAGE_COLLSCAN, solns[1]->root->getType());
+            ixnode = static_cast<IndexScanNode*>(solns[0]->root.get());
+        }
+        else {
+            ASSERT_EQUALS(STAGE_COLLSCAN, solns[0]->root->getType());
+            ASSERT_EQUALS(STAGE_IXSCAN, solns[1]->root->getType());
+            ixnode = static_cast<IndexScanNode*>(solns[1]->root.get());
+        }
+
+        cout << ixnode->bounds.toString() << endl;
+        // TODO: Check bounds.
+    }
+
+    //
+    // >
+    //
+
+    TEST(QueryPlannerTest, GreaterThan) {
+        BSONObj queryObj = BSON("x" << BSON("$gt" << 5));
+
+        CanonicalQuery* cq;
+        ASSERT(CanonicalQuery::canonicalize(ns, queryObj, &cq).isOK());
+
+        BSONObjSet indices;
+        indices.insert(BSON("x" << 1));
+
+        vector<QuerySolution*> solns;
+        QueryPlanner::plan(*cq, indices, &solns);
+
+        // Available index is prefixed by our equality, use it.
+        ASSERT_EQUALS(size_t(2), solns.size());
+
+        IndexScanNode* ixnode;
+        if (STAGE_IXSCAN == solns[0]->root->getType()) {
+            ASSERT_EQUALS(STAGE_COLLSCAN, solns[1]->root->getType());
+            ixnode = static_cast<IndexScanNode*>(solns[0]->root.get());
+        }
+        else {
+            ASSERT_EQUALS(STAGE_COLLSCAN, solns[0]->root->getType());
+            ASSERT_EQUALS(STAGE_IXSCAN, solns[1]->root->getType());
+            ixnode = static_cast<IndexScanNode*>(solns[1]->root.get());
+        }
+
+        cout << ixnode->bounds.toString() << endl;
+        // TODO: Check bounds.
+    }
+
+    //
+    // >=
+    //
+
+    TEST(QueryPlannerTest, GreaterThanEqual) {
+        BSONObj queryObj = BSON("x" << BSON("$gte" << 5));
+
+        CanonicalQuery* cq;
+        ASSERT(CanonicalQuery::canonicalize(ns, queryObj, &cq).isOK());
+
+        BSONObjSet indices;
+        indices.insert(BSON("x" << 1));
+
+        vector<QuerySolution*> solns;
+        QueryPlanner::plan(*cq, indices, &solns);
+
+        // Available index is prefixed by our equality, use it.
+        ASSERT_EQUALS(size_t(2), solns.size());
+
+        IndexScanNode* ixnode;
+        if (STAGE_IXSCAN == solns[0]->root->getType()) {
+            ASSERT_EQUALS(STAGE_COLLSCAN, solns[1]->root->getType());
+            ixnode = static_cast<IndexScanNode*>(solns[0]->root.get());
+        }
+        else {
+            ASSERT_EQUALS(STAGE_COLLSCAN, solns[0]->root->getType());
+            ASSERT_EQUALS(STAGE_IXSCAN, solns[1]->root->getType());
+            ixnode = static_cast<IndexScanNode*>(solns[1]->root.get());
+        }
+
+        cout << ixnode->bounds.toString() << endl;
         // TODO: Check bounds.
     }
 

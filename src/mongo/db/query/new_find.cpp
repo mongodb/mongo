@@ -19,9 +19,12 @@
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/index/catalog_hack.h"
+#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/query/cached_plan_runner.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/eof_runner.h"
 #include "mongo/db/query/multi_plan_runner.h"
 #include "mongo/db/query/plan_cache.h"
 #include "mongo/db/query/query_planner.h"
@@ -112,8 +115,26 @@ namespace mongo {
         }
 
         // No entry in cache for the query.  We have to solve the query ourself.
+
+        // Get the indices that we could possibly use.
+        BSONObjSet indices;
+        NamespaceDetails* nsd = nsdetails(canonicalQuery->ns().c_str());
+
+        // If this is NULL, there is no data but the query is valid.  You're allowed to query for
+        // data on an empty collection and it's not an error.  There just isn't any data...
+        if (NULL == nsd) {
+            *out = new EOFRunner(canonicalQuery.release());
+            return Status::OK();
+        }
+
+        // If it's not NULL, we may have indices.
+        for (int i = 0; i < nsd->getCompletedIndexCount(); ++i) {
+            auto_ptr<IndexDescriptor> desc(CatalogHack::getDescriptor(nsd, i));
+            indices.insert(desc->keyPattern());
+        }
+
         vector<QuerySolution*> solutions;
-        QueryPlanner::plan(*canonicalQuery, &solutions);
+        QueryPlanner::plan(*canonicalQuery, indices, &solutions);
 
         // We cannot figure out how to answer the query.  Should this ever happen?
         if (0 == solutions.size()) {
