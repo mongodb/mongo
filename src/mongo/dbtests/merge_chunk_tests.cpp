@@ -15,6 +15,7 @@
  */
 
 #include "mongo/dbtests/config_server_fixture.h"
+#include "mongo/s/chunk.h" // for genID
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/collection_metadata.h"
 #include "mongo/s/d_logic.h"
@@ -32,6 +33,9 @@ namespace mongo {
     class MergeChunkFixture: public ConfigServerFixture {
     public:
 
+        /**
+         * Stores ranges for a particular collection and shard starting from some version
+         */
         void storeCollectionRanges( const NamespaceString& nss,
                                     const string& shardName,
                                     const vector<KeyRange>& ranges,
@@ -56,7 +60,9 @@ namespace mongo {
             for ( vector<KeyRange>::const_iterator it = ranges.begin(); it != ranges.end(); ++it ) {
 
                 ChunkType chunk;
-                chunk.setName( OID::gen().toString() );
+                // TODO: We should not rely on the serialized ns, minkey being unique in the future,
+                // causes problems since it links string serialization to correctness.
+                chunk.setName( Chunk::genID( nss, it->minKey ) );
                 chunk.setShard( shardName );
                 chunk.setNS( nss.ns() );
                 chunk.setVersion( nextVersion );
@@ -66,6 +72,39 @@ namespace mongo {
 
                 client().insert( ChunkType::ConfigNS, chunk.toBSON() );
             }
+        }
+
+        /**
+         * Makes sure that all the ranges here no longer exist on disk but the merged range does
+         */
+        void assertWrittenAsMerged( const vector<KeyRange>& ranges ) {
+
+            dumpServer();
+
+            BSONObj rangeMin;
+            BSONObj rangeMax;
+
+            // Ensure written
+            for( vector<KeyRange>::const_iterator it = ranges.begin(); it != ranges.end(); ++it ) {
+
+                Query query( BSON( ChunkType::min( it->minKey ) <<
+                                   ChunkType::max( it->maxKey ) <<
+                                   ChunkType::shard( shardName() ) ) );
+                ASSERT( client().findOne( ChunkType::ConfigNS, query ).isEmpty() );
+
+                if ( rangeMin.isEmpty() || rangeMin.woCompare( it->minKey ) > 0 ) {
+                    rangeMin = it->minKey;
+                }
+
+                if ( rangeMax.isEmpty() || rangeMax.woCompare( it->maxKey ) < 0 ) {
+                    rangeMax = it->maxKey;
+                }
+            }
+
+            Query query( BSON( ChunkType::min( rangeMin ) <<
+                               ChunkType::max( rangeMax ) <<
+                               ChunkType::shard( shardName() ) ) );
+            ASSERT( !client().findOne( ChunkType::ConfigNS, query ).isEmpty() );
         }
 
         string shardName() { return "shard0000"; }
@@ -281,30 +320,8 @@ namespace mongo {
         ASSERT_EQUALS( metadata->getShardVersion().majorVersion(), latestVersion.majorVersion() );
         ASSERT_GREATER_THAN( metadata->getShardVersion().minorVersion(),
                              latestVersion.minorVersion() );
-    }
 
-    TEST_F(MergeChunkTests, BasicMergeWritten) {
-
-        const NamespaceString nss( "foo.bar" );
-        const BSONObj kp = BSON( "x" << 1 );
-        const OID epoch = OID::gen();
-        vector<KeyRange> ranges;
-
-        // Setup chunk metadata
-        ranges.push_back( KeyRange( nss, BSON( "x" << 0 ), BSON( "x" << 1 ), kp ) );
-        ranges.push_back( KeyRange( nss, BSON( "x" << 1 ), BSON( "x" << 2 ), kp ) );
-        storeCollectionRanges( nss, shardName(), ranges, ChunkVersion( 1, 0, epoch ) );
-
-        // Do merge
-        string errMsg;
-        bool result = mergeChunks( nss, BSON( "x" << 0 ), BSON( "x" << 2 ), epoch, false, &errMsg );
-        ASSERT_EQUALS( errMsg, "" );
-        ASSERT( result );
-
-        for( vector<KeyRange>::const_iterator it = ranges.begin(); it != ranges.end(); ++it ) {
-            Query query( BSON( ChunkType::min( it->minKey ) << ChunkType::max( it->maxKey ) ) );
-            ASSERT( !client().findOne( ChunkType::ConfigNS, query ).isEmpty() );
-        }
+        assertWrittenAsMerged( ranges );
     }
 
     TEST_F(MergeChunkTests, BasicMergeMinMax ) {
@@ -343,31 +360,50 @@ namespace mongo {
         ASSERT_EQUALS( metadata->getShardVersion().majorVersion(), latestVersion.majorVersion() );
         ASSERT_GREATER_THAN( metadata->getShardVersion().minorVersion(),
                              latestVersion.minorVersion() );
+
+        assertWrittenAsMerged( ranges );
     }
 
-    TEST_F(MergeChunkTests, BasicMergeMinMaxWritten ) {
+    TEST_F(MergeChunkTests, CompoundMerge ) {
 
         const NamespaceString nss( "foo.bar" );
-        const BSONObj kp = BSON( "x" << 1 );
+        const BSONObj kp = BSON( "x" << 1 << "y" << 1 );
         const OID epoch = OID::gen();
         vector<KeyRange> ranges;
 
         // Setup chunk metadata
-        ranges.push_back( KeyRange( nss, BSON( "x" << MINKEY ), BSON( "x" << 0 ), kp ) );
-        ranges.push_back( KeyRange( nss, BSON( "x" << 0 ), BSON( "x" << MAXKEY ), kp ) );
+        ranges.push_back( KeyRange( nss, BSON( "x" << 0 << "y" << 1 ),
+                                         BSON( "x" << 1 << "y" << 0 ), kp ) );
+        ranges.push_back( KeyRange( nss, BSON( "x" << 1 << "y" << 0 ),
+                                         BSON( "x" << 2 << "y" << 1 ), kp ) );
         storeCollectionRanges( nss, shardName(), ranges, ChunkVersion( 1, 0, epoch ) );
+
+        // Get latest version
+        ChunkVersion latestVersion;
+        shardingState.refreshMetadataNow( nss, &latestVersion );
+        shardingState.resetMetadata( nss );
 
         // Do merge
         string errMsg;
-        bool result = mergeChunks( nss, BSON( "x" << MINKEY ),
-                                        BSON( "x" << MAXKEY ), epoch, false, &errMsg );
+        bool result = mergeChunks( nss, BSON( "x" << 0 << "y" << 1 ),
+                                        BSON( "x" << 2 << "y" << 1 ), epoch, false, &errMsg );
         ASSERT_EQUALS( errMsg, "" );
         ASSERT( result );
 
-        for( vector<KeyRange>::const_iterator it = ranges.begin(); it != ranges.end(); ++it ) {
-            Query query( BSON( ChunkType::min( it->minKey ) << ChunkType::max( it->maxKey ) ) );
-            ASSERT( !client().findOne( ChunkType::ConfigNS, query ).isEmpty() );
-        }
+        // Verify result
+        CollectionMetadataPtr metadata = shardingState.getCollectionMetadata( nss );
+
+        ChunkType chunk;
+        ASSERT( metadata->getNextChunk( BSON( "x" << 0 << "y" << 1 ), &chunk ) );
+        ASSERT( chunk.getMin().woCompare( BSON( "x" << 0 << "y" << 1 ) ) == 0 );
+        ASSERT( chunk.getMax().woCompare( BSON( "x" << 2 << "y" << 1 ) ) == 0 );
+        ASSERT_EQUALS( metadata->getNumChunks(), 1u );
+
+        ASSERT_EQUALS( metadata->getShardVersion().majorVersion(), latestVersion.majorVersion() );
+        ASSERT_GREATER_THAN( metadata->getShardVersion().minorVersion(),
+                             latestVersion.minorVersion() );
+
+        assertWrittenAsMerged( ranges );
     }
 
 } // end namespace
