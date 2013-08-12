@@ -62,7 +62,11 @@ namespace mongo {
     // global background job responsible for checking every X amount of time
     class ReplicaSetMonitorWatcher : public BackgroundJob {
     public:
-        ReplicaSetMonitorWatcher() : _safego("ReplicaSetMonitorWatcher::_safego") , _started(false) {}
+        ReplicaSetMonitorWatcher():
+            _monitorMutex("ReplicaSetMonitorWatcher::_safego"),
+            _started(false),
+            _stopRequested(false) {
+        }
 
         virtual string name() const { return "ReplicaSetMonitorWatcher"; }
 
@@ -71,19 +75,39 @@ namespace mongo {
             if ( _started )
                 return;
 
-            scoped_lock lk( _safego );
+            scoped_lock lk( _monitorMutex );
             if ( _started )
                 return;
+
             _started = true;
+            _stopRequested = false;
 
             go();
+        }
+
+        /**
+         * Stops monitoring the sets and wait for the monitoring thread to terminate.
+         */
+        void stop() {
+            scoped_lock sl( _monitorMutex );
+            _stopRequested = true;
+            _stopRequestedCV.notify_one();
         }
 
     protected:
         void run() {
             log() << "starting" << endl;
-            sleepsecs( 10 );
-            while ( !inShutdown() && !StaticObserver::_destroyingStatics ) {
+
+            scoped_lock sl( _monitorMutex );
+            // Added only for patching timing problems in test. Remove after tests
+            // are fixed - see 392b933598668768bf12b1e41ad444aa3548d970.
+            // Should not be needed after SERVER-7533 gets implemented and tests start
+            // using it.
+            _stopRequestedCV.timed_wait(sl.boost(), boost::posix_time::seconds(10));
+
+            while ( !inShutdown() &&
+                    !_stopRequested &&
+                    !StaticObserver::_destroyingStatics ) {
                 try {
                     ReplicaSetMonitor::checkAll();
                 }
@@ -93,12 +117,19 @@ namespace mongo {
                 catch ( ... ) {
                     error() << "unknown error" << endl;
                 }
-                sleepsecs( 10 );
+
+                _stopRequestedCV.timed_wait(sl.boost(), boost::posix_time::seconds(10));
             }
+
+            _started = false;
         }
 
-        mongo::mutex _safego;
+        // protects _started, _stopRequested
+        mongo::mutex _monitorMutex;
         bool _started;
+
+        boost::condition _stopRequestedCV;
+        bool _stopRequested;
 
     } replicaSetMonitorWatcher;
 
@@ -1253,6 +1284,19 @@ namespace mongo {
         }
 
         return false;
+    }
+
+    void ReplicaSetMonitor::clearAll() {
+        {
+            scoped_lock lock(_setsLock);
+            _sets.clear();
+            _seedServers.clear();
+
+            replicaSetMonitorWatcher.stop();
+        }
+
+        // Join thread outside of _setsLock to avoid deadlock.
+        replicaSetMonitorWatcher.wait();
     }
 
     bool ReplicaSetMonitor::Node::matchesTag(const BSONObj& tag) const {
