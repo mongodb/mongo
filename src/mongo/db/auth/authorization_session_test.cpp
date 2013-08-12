@@ -101,6 +101,33 @@ namespace {
         ASSERT_FALSE(authzSession->checkAuthorization("test.foo", ActionType::collMod));
     }
 
+    TEST_F(AuthorizationSessionTest, InvalidateUser) {
+        // Add a readWrite user
+        ASSERT_OK(managerState->insertPrivilegeDocument("test",
+                BSON("user" << "spencer" <<
+                     "pwd" << "a" <<
+                     "roles" << BSON_ARRAY("readWrite"))));
+        ASSERT_OK(authzSession->addAndAuthorizeUser(UserName("spencer", "test")));
+
+        ASSERT_TRUE(authzSession->checkAuthorization("test", ActionType::find));
+        ASSERT_TRUE(authzSession->checkAuthorization("test", ActionType::insert));
+
+        User* user = authzSession->lookupUser(UserName("spencer", "test"));
+        ASSERT(user->isValid());
+
+        // Change the user to be read-only
+        managerState->clearPrivilegeDocuments();
+        ASSERT_OK(managerState->insertPrivilegeDocument("test",
+                BSON("user" << "spencer" <<
+                     "pwd" << "a" <<
+                     "roles" << BSON_ARRAY("read"))));
+
+        // Make sure that invalidating the user causes the session to reload its privileges.
+        authzManager->invalidateUser(user);
+        ASSERT_TRUE(authzSession->checkAuthorization("test", ActionType::find));
+        ASSERT_FALSE(authzSession->checkAuthorization("test", ActionType::insert));
+    }
+
 
     TEST_F(AuthorizationSessionTest, ImplicitAcquireFromSomeDatabasesWithV1Users) {
         managerState->insertPrivilegeDocument("test",

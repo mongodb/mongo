@@ -356,7 +356,21 @@ namespace {
                 it != _authenticatedUsers.end(); ++it) {
             User* user = *it;
 
-            // TODO(spencer): Handle if the user has been invalidated.
+            if (!user->isValid()) {
+                // Need to release and re-acquire user if it's been invalidated.
+                UserName name = user->getName();
+
+                _authenticatedUsers.removeByDBName(name.getDB());
+                getAuthorizationManager().releaseUser(user);
+
+                Status status = getAuthorizationManager().acquireUser(name, &user);
+                if (!status.isOK()) {
+                    return Status(ErrorCodes::Unauthorized,
+                                  mongoutils::str::stream() << "Re-acquiring invalidated user "
+                                          "failed due to: " << status.reason());
+                }
+                _authenticatedUsers.add(user);
+            }
 
             for (int i = 0; i < static_cast<int>(boost::size(resourceSearchList)); ++i) {
                 ActionSet userActions = user->getActionsForResource(resourceSearchList[i]);

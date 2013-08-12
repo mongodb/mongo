@@ -146,6 +146,11 @@ namespace mongo {
         void releaseUser(User* user);
 
         /**
+         * Marks the given user as invalid and removes it from the user cache.
+         */
+        void invalidateUser(User* user);
+
+        /**
          * Inserts the given user directly into the _userCache.  Used to add the internalSecurity
          * user into the cache at process startup.
          */
