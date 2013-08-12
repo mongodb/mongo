@@ -488,7 +488,10 @@ namespace optionenvironment {
 
         // Read into a vector first since it's guaranteed to have contiguous storage
         std::vector<char> configVector;
-        configVector.resize(configSize);
+
+        // We need to allocate an extra byte for our vector because fread on windows accesses memory
+        // one byte past the size that we pass in.
+        configVector.resize(configSize + 1);
         long nread = fread(&configVector[0], sizeof(char), configSize, config);
         if (nread != configSize) {
             const int current_errno = errno;
@@ -497,6 +500,10 @@ namespace optionenvironment {
             sb << "Error reading in config file: " << strerror(current_errno);
             return Status(ErrorCodes::InternalError, sb.str());
         }
+
+        // We had to allocate an extra byte for our vector because fread on windows accesses memory
+        // one byte past the size that we pass in.  Resize back to the actual size of the file.
+        configVector.resize(configSize);
 
         // Copy the vector contents into our result string
         *contents = std::string(configVector.begin(), configVector.end());
