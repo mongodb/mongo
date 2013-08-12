@@ -43,31 +43,17 @@ namespace mongo {
         return _output->next().second;
     }
 
-    void DocumentSourceSort::addToBsonArray(BSONArrayBuilder *pBuilder, bool explain) const {
-        if (explain) { // always one obj for combined $sort + $limit
-            BSONObjBuilder sortObj (pBuilder->subobjStart());
-            BSONObjBuilder insides (sortObj.subobjStart(sortName));
-            BSONObjBuilder sortKey (insides.subobjStart("sortKey"));
-            sortKeyToBson(&sortKey, false);
-            sortKey.doneFast();
-
-            if (explain && limitSrc) {
-                insides.appendNumber("limit", limitSrc->getLimit());
-            }
-            insides.doneFast();
-            sortObj.doneFast();
+    void DocumentSourceSort::serializeToArray(vector<Value>& array, bool explain) const {
+        if (explain) { // always one Value for combined $sort + $limit
+            array.push_back(Value(
+                    DOC(getSourceName() << DOC("sortKey" << serializeSortKey()
+                                            << "limit" << (limitSrc ? Value(limitSrc->getLimit())
+                                                                    : Value())))));
         }
-        else { // one obj for $sort + maybe one obj for $limit
-            {
-                BSONObjBuilder sortObj (pBuilder->subobjStart());
-                BSONObjBuilder insides (sortObj.subobjStart(sortName));
-                sortKeyToBson(&insides, false);
-                insides.doneFast();
-                sortObj.doneFast();
-            }
-
+        else { // one Value for $sort and maybe a Value for $limit
+            array.push_back(Value(DOC(getSourceName() << serializeSortKey())));
             if (limitSrc) {
-                limitSrc->addToBsonArray(pBuilder, explain);
+                limitSrc->serializeToArray(array);
             }
         }
     }
@@ -101,8 +87,9 @@ namespace mongo {
         vAscending.push_back(ascending);
     }
 
-    void DocumentSourceSort::sortKeyToBson(BSONObjBuilder* pBuilder, bool usePrefix) const {
-        /* add the key fields */
+    Document DocumentSourceSort::serializeSortKey() const {
+        MutableDocument keyObj;
+        // add the key fields
         const size_t n = vSortKey.size();
         for(size_t i = 0; i < n; ++i) {
             // get the field name out of each ExpressionFieldPath
@@ -111,10 +98,12 @@ namespace mongo {
             verify(withVariable.getFieldName(0) == "ROOT");
             const string fieldPath = withVariable.tail().getPath(false);
 
-            /* append a named integer based on the sort order */
-            pBuilder->append(fieldPath, (vAscending[i] ? 1 : -1));
+            // append a named integer based on the sort order
+            keyObj.setField(fieldPath, Value(vAscending[i] ? 1 : -1));
         }
+        return keyObj.freeze();
     }
+
     DocumentSource::GetDepsReturn DocumentSourceSort::getDependencies(set<string>& deps) const {
         for(size_t i = 0; i < vSortKey.size(); ++i) {
             vSortKey[i]->addDependencies(deps);

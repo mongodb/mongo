@@ -31,9 +31,10 @@ namespace DocumentSourceTests {
     static DBDirectClient client;
 
     BSONObj toBson( const intrusive_ptr<DocumentSource>& source ) {
-        BSONArrayBuilder bab;
-        source->addToBsonArray( &bab );
-        return bab.arr()[ 0 ].Obj().getOwned();
+        vector<Value> arr;
+        source->serializeToArray(arr);
+        ASSERT_EQUALS(arr.size(), 1UL);
+        return arr[0].getDocument().toBson();
     }
 
     class CollectionBase {
@@ -428,7 +429,7 @@ namespace DocumentSourceTests {
             void assertRoundTrips( const intrusive_ptr<DocumentSource>& group ) {
                 // We don't check against the spec that generated 'group' originally, because
                 // $const operators may be introduced in the first serialization.
-                BSONObj spec = toBson( group );
+                BSONObj spec = toBson(group);
                 BSONElement specElement = spec.firstElement();
                 intrusive_ptr<DocumentSource> generated =
                         DocumentSourceGroup::createFromBson( &specElement, ctx() );
@@ -905,9 +906,9 @@ namespace DocumentSourceTests {
              * created with.
              */
             void checkBsonRepresentation( const BSONObj& spec ) {
-                BSONArrayBuilder bab;
-                _project->addToBsonArray( &bab, false );
-                BSONObj generatedSpec = bab.arr()[ 0 ].Obj().getOwned();
+                vector<Value> arr;
+                _project->serializeToArray(arr);
+                BSONObj generatedSpec = arr[0].getDocument().toBson();
                 ASSERT_EQUALS( spec, generatedSpec );
             }
         private:
@@ -1052,9 +1053,9 @@ namespace DocumentSourceTests {
              * created with.
              */
             void checkBsonRepresentation( const BSONObj& spec ) {
-                BSONArrayBuilder bab;
-                _sort->addToBsonArray( &bab, false );
-                BSONObj generatedSpec = bab.arr()[ 0 ].Obj().getOwned();
+                vector<Value> arr;
+                _sort->serializeToArray(arr);
+                BSONObj generatedSpec = arr[0].getDocument().toBson();
                 ASSERT_EQUALS( spec, generatedSpec );
             }
             intrusive_ptr<DocumentSource> _sort;
@@ -1067,9 +1068,9 @@ namespace DocumentSourceTests {
                 ASSERT_EQUALS(sort()->getLimit(), -1);
 
                 { // pre-limit checks
-                    BSONArrayBuilder arr;
-                    sort()->addToBsonArray(&arr, false);
-                    ASSERT_EQUALS(arr.arr(), BSON_ARRAY(BSON("$sort" << BSON("a" << 1))));
+                    vector<Value> arr;
+                    sort()->serializeToArray(arr);
+                    ASSERT_EQUALS(arr[0].getDocument().toBson(), BSON("$sort" << BSON("a" << 1)));
 
                     ASSERT(sort()->getShardSource() == NULL);
                     ASSERT(sort()->getRouterSource() != NULL);
@@ -1082,10 +1083,10 @@ namespace DocumentSourceTests {
                 ASSERT_TRUE(sort()->coalesce(mkLimit(5)));
                 ASSERT_EQUALS(sort()->getLimit(), 5); // reduced
 
-                BSONArrayBuilder arr;
-                sort()->addToBsonArray(&arr, false);
-                ASSERT_EQUALS(arr.arr(), BSON_ARRAY(BSON("$sort" << BSON("a" << 1))
-                                                 << BSON("$limit" << sort()->getLimit())));
+                vector<Value> arr;
+                sort()->serializeToArray(arr);
+                ASSERT_EQUALS(Value(arr), DOC_ARRAY(DOC("$sort" << DOC("a" << 1))
+                                          << DOC("$limit" << sort()->getLimit())));
 
                 ASSERT(sort()->getShardSource() != NULL);
                 ASSERT(sort()->getRouterSource() != NULL);
@@ -1384,9 +1385,9 @@ namespace DocumentSourceTests {
              * created with.
              */
             void checkBsonRepresentation( const BSONObj& spec ) {
-                BSONArrayBuilder bab;
-                _unwind->addToBsonArray( &bab, false );
-                BSONObj generatedSpec = bab.arr()[ 0 ].Obj().getOwned();
+                vector<Value> arr;
+                _unwind->serializeToArray(arr);
+                BSONObj generatedSpec = Value(arr[0]).getDocument().toBson();
                 ASSERT_EQUALS( spec, generatedSpec );
             }
             intrusive_ptr<DocumentSource> _unwind;

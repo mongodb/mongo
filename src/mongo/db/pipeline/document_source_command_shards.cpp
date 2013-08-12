@@ -26,9 +26,8 @@ namespace mongo {
         verify(false);
     }
 
-    void DocumentSourceCommandShards::sourceToBson(
-        BSONObjBuilder *pBuilder, bool explain) const {
-        /* this has no BSON equivalent */
+    Value DocumentSourceCommandShards::serialize(bool explain) const {
+        // this has no BSON equivalent
         verify(false);
     }
 

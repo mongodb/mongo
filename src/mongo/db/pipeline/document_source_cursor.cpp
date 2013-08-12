@@ -190,28 +190,25 @@ namespace mongo {
         return false;
     }
 
-    void DocumentSourceCursor::sourceToBson(
-        BSONObjBuilder *pBuilder, bool explain) const {
-
-        /* this has no analog in the BSON world, so only allow it for explain */
-        if (explain)
-        {
-            BSONObj bsonObj;
+    Value DocumentSourceCursor::serialize(bool explain) const {
+        // we never parse a documentSourceCursor, so we do not serialize it
+        if (explain) {
+            MutableDocument result;
             
-            pBuilder->append("query", _query);
+            result.setField("query", Value(_query));
 
             if (!_sort.isEmpty()) {
-                pBuilder->append("sort", _sort);
+                result.setField("sort", Value(_sort));
             }
 
             if (_limit) {
-                pBuilder->append("limit", _limit->getLimit());
+                result.setField("limit", Value(_limit->getLimit()));
             }
 
             BSONObj projectionSpec;
             if (_projection) {
                 projectionSpec = _projection->getSpec();
-                pBuilder->append("projection", projectionSpec);
+                result.setField("projection", Value(projectionSpec));
             }
 
             // construct query for explain
@@ -227,8 +224,10 @@ namespace mongo {
                                                                   ? &projectionSpec
                                                                   : NULL));
 
-            pBuilder->append("cursor", explainResult);
+            result.setField("cursor", Value(explainResult));
+            return result.freezeToValue();
         }
+        return Value();
     }
 
     DocumentSourceCursor::DocumentSourceCursor(const string& ns,

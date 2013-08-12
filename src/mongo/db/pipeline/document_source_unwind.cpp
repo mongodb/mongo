@@ -126,10 +126,9 @@ namespace mongo {
         return out;
     }
 
-    void DocumentSourceUnwind::sourceToBson(
-        BSONObjBuilder *pBuilder, bool explain) const {
+    Value DocumentSourceUnwind::serialize(bool explain) const {
         verify(_unwindPath);
-        pBuilder->append(unwindName, _unwindPath->getPath(true));
+        return Value(DOC(getSourceName() << _unwindPath->getPath(true)));
     }
 
     DocumentSource::GetDepsReturn DocumentSourceUnwind::getDependencies(set<string>& deps) const {

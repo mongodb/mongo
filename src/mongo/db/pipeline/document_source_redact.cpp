@@ -124,8 +124,8 @@ namespace mongo {
         _expression = _expression->optimize();
     }
 
-    void DocumentSourceRedact::sourceToBson(BSONObjBuilder* pBuilder, bool explain) const {
-        *pBuilder << redactName << _expression.get()->serialize();
+    Value DocumentSourceRedact::serialize(bool explain) const {
+        return Value(DOC(getSourceName() << _expression.get()->serialize()));
     }
 
     intrusive_ptr<DocumentSource> DocumentSourceRedact::createFromBson(

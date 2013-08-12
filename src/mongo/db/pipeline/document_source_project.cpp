@@ -82,8 +82,8 @@ namespace mongo {
         pEO = dynamic_pointer_cast<ExpressionObject>(pE);
     }
 
-    void DocumentSourceProject::sourceToBson(BSONObjBuilder* pBuilder, bool explain) const {
-        *pBuilder << projectName << pEO->serialize();
+    Value DocumentSourceProject::serialize(bool explain) const {
+        return Value(DOC(getSourceName() << pEO->serialize()));
     }
 
     intrusive_ptr<DocumentSource> DocumentSourceProject::createFromBson(

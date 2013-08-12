@@ -109,18 +109,17 @@ namespace mongo {
         pSource->dispose();
     }
 
-    void DocumentSourceGroup::sourceToBson(BSONObjBuilder* pBuilder, bool explain) const {
+    Value DocumentSourceGroup::serialize(bool explain) const {
         MutableDocument insides;
 
-        /* add the _id */
+        // add the _id
         insides["_id"] = pIdExpression->serialize();
 
-        /* add the remaining fields */
+        // add the remaining fields
         const size_t n = vFieldName.size();
         for(size_t i = 0; i < n; ++i) {
             intrusive_ptr<Accumulator> accum = vpAccumulatorFactory[i]();
-            insides[vFieldName[i]] = Value(
-                    DOC(accum->getOpName() << vpExpression[i]->serialize()));
+            insides[vFieldName[i]] = Value(DOC(accum->getOpName() << vpExpression[i]->serialize()));
         }
 
         if (_doingMerge) {
@@ -130,7 +129,7 @@ namespace mongo {
             insides["$doingMerge"] = Value(true);
         }
 
-        *pBuilder << groupName << insides.freeze();
+        return Value(DOC(getSourceName() << insides.freeze()));
     }
 
     DocumentSource::GetDepsReturn DocumentSourceGroup::getDependencies(set<string>& deps) const {

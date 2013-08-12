@@ -30,10 +30,8 @@ namespace mongo {
         return matchName;
     }
 
-    void DocumentSourceMatch::sourceToBson(
-        BSONObjBuilder *pBuilder, bool explain) const {
-        const BSONObj *pQuery = matcher.getQuery();
-        pBuilder->append(matchName, *pQuery);
+    Value DocumentSourceMatch::serialize(bool explain) const {
+        return Value(DOC(getSourceName() << Document(*matcher.getQuery())));
     }
 
     bool DocumentSourceMatch::accept(const Document& input) const {

@@ -119,24 +119,21 @@ namespace {
           index scan.
         */
         intrusive_ptr<DocumentSourceSort> pSort;
-        BSONObjBuilder sortBuilder;
+        BSONObj sortObj;
         if (!sources.empty()) {
             const intrusive_ptr<DocumentSource> &pSC = sources.front();
             pSort = dynamic_cast<DocumentSourceSort *>(pSC.get());
 
             if (pSort) {
-                /* build the sort key */
-                pSort->sortKeyToBson(&sortBuilder, false);
+                // build the sort key
+                sortObj = pSort->serializeSortKey().toBson();
             }
         }
 
-        /* Create the sort object; see comments on the query object above */
-        BSONObj sortObj = sortBuilder.obj();
-
-        /* get the full "namespace" name */
+        // get the full "namespace" name
         string fullName(dbName + "." + pPipeline->getCollectionName());
 
-        /* for debugging purposes, show what the query and sort are */
+        // for debugging purposes, show what the query and sort are
         DEV {
             (log() << "\n---- query BSON\n" <<
              queryObj.jsonString(Strict, 1) << "\n----\n");

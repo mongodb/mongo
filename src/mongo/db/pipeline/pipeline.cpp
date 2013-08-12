@@ -401,33 +401,36 @@ namespace mongo {
         return true;
     }
 
-    void Pipeline::toBson(BSONObjBuilder *pBuilder) const {
-        /* create an array out of the pipeline operations */
-        BSONArrayBuilder arrayBuilder;
+    Document Pipeline::serialize() const {
+        MutableDocument serialized;
+        // create an array out of the pipeline operations
+        vector<Value> array;
         for(SourceContainer::const_iterator iter(sources.begin()),
                                             listEnd(sources.end());
                                         iter != listEnd;
                                         ++iter) {
             intrusive_ptr<DocumentSource> pSource(*iter);
-            pSource->addToBsonArray(&arrayBuilder);
+            pSource->serializeToArray(array);
         }
 
-        /* add the top-level items to the command */
-        pBuilder->append(commandName, getCollectionName());
-        pBuilder->append(pipelineName, arrayBuilder.arr());
+        // add the top-level items to the command
+        serialized.setField(commandName, Value(getCollectionName()));
+        serialized.setField(pipelineName, Value(array));
 
         if (explain) {
-            pBuilder->append(explainName, explain);
+            serialized.setField(explainName, Value(explain));
         }
 
         if (pCtx->extSortAllowed) {
-            pBuilder->append("allowDiskUsage", true);
+            serialized.setField("allowDiskUsage", Value(true));
         }
 
         bool btemp;
         if ((btemp = getSplitMongodPipeline())) {
-            pBuilder->append(splitMongodPipelineName, btemp);
+            serialized.setField(splitMongodPipelineName, Value(btemp));
         }
+
+        return serialized.freeze();
     }
 
     void Pipeline::stitch() {
@@ -482,7 +485,8 @@ namespace mongo {
         }
     }
 
-    void Pipeline::writeExplainOps(BSONArrayBuilder *pArrayBuilder) const {
+    vector<Value> Pipeline::writeExplainOps() const {
+        vector<Value> array;
         for(SourceContainer::const_iterator iter(sources.begin()),
                                             listEnd(sources.end());
                                         iter != listEnd;
@@ -493,17 +497,13 @@ namespace mongo {
             if (dynamic_cast<DocumentSourceBsonArray*>(pSource.get()))
                 continue;
 
-            pSource->addToBsonArray(pArrayBuilder, true);
+            pSource->serializeToArray(array, true);
         }
+        return array;
     }
 
     void Pipeline::writeExplainShard(BSONObjBuilder &result) const {
-        BSONArrayBuilder opArray; // where we'll put the pipeline ops
-
-        // next, add the pipeline operators
-        writeExplainOps(&opArray);
-
-        result.appendArray(serverPipelineName, opArray.arr());
+        result << serverPipelineName << Value(writeExplainOps());
     }
 
     void Pipeline::writeExplainMongos(BSONObjBuilder &result) const {
@@ -525,12 +525,9 @@ namespace mongo {
             opBuilder.doneFast();
         }
 
-        BSONArrayBuilder mongosOpArray; // where we'll put the pipeline ops
-        writeExplainOps(&mongosOpArray);
-
         // now we combine the shard pipelines with the one here
         result.append(serverPipelineName, shardOpArray.arr());
-        result.append(mongosPipelineName, mongosOpArray.arr());
+        result << mongosPipelineName << Value(writeExplainOps());
     }
 
     void Pipeline::addInitialSource(intrusive_ptr<DocumentSource> source) {
