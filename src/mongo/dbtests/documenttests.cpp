@@ -444,6 +444,14 @@ namespace DocumentTests {
             ASSERT_EQUALS(value1.getType(), value2.getType());
         }
 
+        class BSONArrayTest {
+        public:
+            void run() {
+                ASSERT_EQUALS(Value(BSON_ARRAY(1 << 2 << 3)), DOC_ARRAY(1 << 2 << 3));
+                ASSERT_EQUALS(Value(BSONArray()), Value(vector<Value>()));
+            }
+        };
+
         /** Int type. */
         class Int {
         public:
@@ -1409,6 +1417,7 @@ namespace DocumentTests {
             add<Document::FieldIteratorMultiple>();
             add<Document::AllTypesDoc>();
 
+            add<Value::BSONArrayTest>();
             add<Value::Int>();
             add<Value::Long>();
             add<Value::Double>();

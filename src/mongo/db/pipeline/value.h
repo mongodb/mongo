@@ -64,7 +64,8 @@ namespace mongo {
         explicit Value(const string& value)       : _storage(String, StringData(value)) {}
         explicit Value(const char* value)         : _storage(String, StringData(value)) {}
         explicit Value(const Document& doc)       : _storage(Object, doc) {}
-        explicit Value(const BSONObj& obj);//     : _storage(Object, Document(obj)) {} // in cpp
+        explicit Value(const BSONObj& obj);
+        explicit Value(const BSONArray& arr);
         explicit Value(const vector<Value>& vec)  : _storage(Array, new RCVector(vec)) {}
         explicit Value(const BSONBinData& bd)     : _storage(BinData, bd) {}
         explicit Value(const BSONRegEx& re)       : _storage(RegEx, re) {}
