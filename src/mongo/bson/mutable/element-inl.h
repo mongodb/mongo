@@ -90,7 +90,8 @@ namespace mutablebson {
     }
 
     inline bool Element::ok() const {
-        return ((_doc != NULL) && (_repIdx <= kMaxRepIdx));
+        dassert(_doc != NULL);
+        return _repIdx <= kMaxRepIdx;
     }
 
     inline Document& Element::getDocument() {
@@ -111,7 +112,9 @@ namespace mutablebson {
 
     inline Element::Element(Document* doc, RepIdx repIdx)
         : _doc(doc)
-        , _repIdx(repIdx) {}
+        , _repIdx(repIdx) {
+        dassert(_doc != NULL);
+    }
 
     inline StringData Element::getValueStringOrSymbol() const {
         const BSONElement value = getValue();
