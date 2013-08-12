@@ -507,7 +507,8 @@ namespace mongo {
 
                         // use the builder size instead of accumulating 'o's size so that we take into consideration
                         // the overhead of BSONArray indices
-                        if ( a.len() + o.objsize() + 1024 > BSONObjMaxUserSize ) {
+                        if ( a.arrSize() != 0 &&
+                             a.len() + o.objsize() + 1024 > BSONObjMaxUserSize ) {
                             filledBuffer = true; // break out of outer while loop
                             break;
                         }
