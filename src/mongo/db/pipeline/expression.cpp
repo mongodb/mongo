@@ -234,10 +234,14 @@ namespace mongo {
         return pExpression;
     }
 
+namespace {
+    typedef intrusive_ptr<ExpressionNary> (*ExpressionFactory)(void);
 
     struct OpDesc {
+        intrusive_ptr<ExpressionNary> create() const { return pFactory(); }
+
         const char *pName;
-        intrusive_ptr<ExpressionNary> (*pFactory)(void);
+        ExpressionFactory pFactory;
 
         unsigned flag;
         static const unsigned FIXED_COUNT = 0x0001;
@@ -303,6 +307,13 @@ namespace mongo {
 
     static const size_t NOp = sizeof(OpTable)/sizeof(OpTable[0]);
 
+    const OpDesc* lookupExpression(const char* name) {
+        OpDesc key;
+        key.pName = name;
+        return static_cast<const OpDesc *>(bsearch(&key, OpTable, NOp, sizeof(OpDesc), OpDescCmp));
+    }
+}
+
     intrusive_ptr<Expression> Expression::parseExpression(BSONElement exprElement) {
         /* look for the specified operator */
         const char* opName = exprElement.fieldName();
@@ -317,16 +328,12 @@ namespace mongo {
             return ExpressionMap::parse(exprElement);
         }
 
-        OpDesc key;
-        key.pName = opName;
-        const OpDesc *pOp = (const OpDesc *)bsearch(
-                                &key, OpTable, NOp, sizeof(OpDesc), OpDescCmp);
-
-        uassert(15999, str::stream() << "invalid operator '" <<
-                opName << "'", pOp);
+        const OpDesc* pOp = lookupExpression(opName);
+        uassert(15999, str::stream() << "invalid operator '" << opName << "'",
+                pOp);
 
         /* make the expression node */
-        intrusive_ptr<ExpressionNary> pExpression((*pOp->pFactory)());
+        intrusive_ptr<ExpressionNary> pExpression = pOp->create();
 
         /* add the operands to the expression node */
         BSONType elementType = exprElement.type();
@@ -467,10 +474,6 @@ namespace mongo {
         return "$add";
     }
 
-    intrusive_ptr<ExpressionNary> (*ExpressionAdd::getFactory() const)() {
-        return ExpressionAdd::create;
-    }
-
     /* ------------------------- ExpressionAll -------------------------- */
 
     intrusive_ptr<ExpressionNary> ExpressionAll::create() {
@@ -586,9 +589,6 @@ namespace mongo {
         verify(false && "unimplemented");
     }
 
-    intrusive_ptr<ExpressionNary> (*ExpressionAnd::getFactory() const)() {
-        return ExpressionAnd::create;
-    }
 
     /* ------------------------- ExpressionAny -------------------------- */
 
@@ -2050,10 +2050,6 @@ namespace mongo {
     return "$multiply";
     }
 
-    intrusive_ptr<ExpressionNary> (*ExpressionMultiply::getFactory() const)() {
-    return ExpressionMultiply::create;
-    }
-
     /* ------------------------- ExpressionHour ----------------------------- */
 
     intrusive_ptr<ExpressionNary> ExpressionHour::create() {
@@ -2094,9 +2090,10 @@ namespace mongo {
     /* ------------------------ ExpressionNary ----------------------------- */
 
     intrusive_ptr<Expression> ExpressionNary::optimize() {
-        unsigned constCount = 0; // count of constant operands
-        unsigned stringCount = 0; // count of constant string operands
         const size_t n = vpOperand.size();
+
+        // optimize sub-expressions and count constants
+        unsigned constCount = 0;
         for(size_t i = 0; i < n; ++i) {
             intrusive_ptr<Expression> pNew(vpOperand[i]->optimize());
 
@@ -2104,12 +2101,8 @@ namespace mongo {
             vpOperand[i] = pNew;
 
             /* check to see if the result was a constant */
-            const ExpressionConstant *pConst =
-                dynamic_cast<ExpressionConstant *>(pNew.get());
-            if (pConst) {
-                ++constCount;
-                if (pConst->getValue().getType() == String)
-                    ++stringCount;
+            if (dynamic_cast<ExpressionConstant *>(pNew.get())) {
+                constCount++;
             }
         }
 
@@ -2127,100 +2120,58 @@ namespace mongo {
         }
 
         /*
-          If there are any strings, we can't re-arrange anything, so stop
-          now.
-
-          LATER:  we could concatenate adjacent strings as a special case.
-         */
-        if (stringCount)
-            return intrusive_ptr<Expression>(this);
-
-        /*
-          If there's no more than one constant, then we can't do any
-          constant folding, so don't bother going any further.
-         */
-        if (constCount <= 1)
-            return intrusive_ptr<Expression>(this);
-            
-        /*
           If the operator isn't commutative or associative, there's nothing
           more we can do.  We test that by seeing if we can get a factory;
           if we can, we can use it to construct a temporary expression which
           we'll evaluate to collapse as many constants as we can down to
           a single one.
          */
-        intrusive_ptr<ExpressionNary> (*const pFactory)() = getFactory();
-        if (!pFactory)
-            return intrusive_ptr<Expression>(this);
+        if (!isAssociativeAndCommutative())
+            return this;
 
-        /*
-          Create a new Expression that will be the replacement for this one.
-          We actually create two:  one to hold constant expressions, and
-          one to hold non-constants.  Once we've got these, we evaluate
-          the constant expression to produce a single value, as above.
-          We then add this operand to the end of the non-constant expression,
-          and return that.
-         */
-        intrusive_ptr<ExpressionNary> pNew((*pFactory)());
-        intrusive_ptr<ExpressionNary> pConst((*pFactory)());
-        for(size_t i = 0; i < n; ++i) {
-            intrusive_ptr<Expression> pE(vpOperand[i]);
-            if (dynamic_cast<ExpressionConstant *>(pE.get()))
-                pConst->addOperand(pE);
+        // Process vpOperand to split it into constant and nonconstant vectors.
+        // This can leave vpOperand in an invalid state that is cleaned up after the loop.
+        ExpressionVector constExprs;
+        ExpressionVector nonConstExprs;
+        for(size_t i = 0; i < vpOperand.size(); ++i) { // NOTE: vpOperand grows in loop
+            intrusive_ptr<Expression> expr = vpOperand[i];
+            if (dynamic_cast<ExpressionConstant*>(expr.get())) {
+                constExprs.push_back(expr);
+            }
             else {
-                /*
-                  If the child operand is the same type as this, then we can
-                  extract its operands and inline them here because we already
-                  know this is commutative and associative because it has a
-                  factory.  We can detect sameness of the child operator by
-                  checking for equality of the factory
-
-                  Note we don't have to do this recursively, because we
-                  called optimize() on all the children first thing in
-                  this call to optimize().
-                */
-                ExpressionNary *pNary =
-                    dynamic_cast<ExpressionNary *>(pE.get());
-                if (!pNary)
-                    pNew->addOperand(pE);
+                /* If the child operand is the same type as this, then we can
+                 * extract its operands and inline them here because we know
+                 * this is commutative and associative.  We detect sameness of
+                 * the child operator by checking for equality of the opNames
+                 */
+                ExpressionNary* nary = dynamic_cast<ExpressionNary*>(expr.get());
+                if (!nary || !str::equals(nary->getOpName(), getOpName())) {
+                    nonConstExprs.push_back(expr);
+                }
                 else {
-                    intrusive_ptr<ExpressionNary> (*const pChildFactory)() =
-                        pNary->getFactory();
-                    if (pChildFactory != pFactory)
-                        pNew->addOperand(pE);
-                    else {
-                        /* same factory, so flatten */
-                        size_t nChild = pNary->vpOperand.size();
-                        for(size_t iChild = 0; iChild < nChild; ++iChild) {
-                            intrusive_ptr<Expression> pCE(
-                                pNary->vpOperand[iChild]);
-                            if (dynamic_cast<ExpressionConstant *>(pCE.get()))
-                                pConst->addOperand(pCE);
-                            else
-                                pNew->addOperand(pCE);
-                        }
-                    }
+                    // same expression, so flatten by adding to vpOperand which
+                    // will be processed later in this loop.
+                    vpOperand.insert(vpOperand.end(),
+                                     nary->vpOperand.begin(),
+                                     nary->vpOperand.end());
                 }
             }
         }
 
-        /*
-          If there was only one constant, add it to the end of the expression
-          operand vector.
-        */
-        if (pConst->vpOperand.size() == 1)
-            pNew->addOperand(pConst->vpOperand[0]);
-        else if (pConst->vpOperand.size() > 1) {
-            /*
-              If there was more than one constant, collapse all the constants
-              together before adding the result to the end of the expression
-              operand vector.
-            */
-            Value pResult(pConst->evaluateInternal(Variables()));
-            pNew->addOperand(ExpressionConstant::create(pResult));
+        // collapse all constant expressions (if any)
+        Value constValue;
+        if (!constExprs.empty()) {
+            vpOperand = constExprs;
+            constValue = evaluateInternal(Variables());
         }
 
-        return pNew;
+        // now set the final expression list with constant (if any) at the end
+        vpOperand = nonConstExprs;
+        if (!constExprs.empty()) {
+            vpOperand.push_back(ExpressionConstant::create(constValue));
+        }
+
+        return this;
     }
 
     void ExpressionNary::addDependencies(set<string>& deps, vector<string>* path) const {
@@ -2232,10 +2183,6 @@ namespace mongo {
 
     void ExpressionNary::addOperand(const intrusive_ptr<Expression>& pExpression) {
         vpOperand.push_back(pExpression);
-    }
-
-    intrusive_ptr<ExpressionNary> (*ExpressionNary::getFactory() const)() {
-        return NULL;
     }
 
     Value ExpressionNary::serialize() const {
@@ -2316,10 +2263,6 @@ namespace mongo {
             vpOperand[i]->toMatcherBson(&opArray);
 
         pBuilder->append("$or", opArray.done());
-    }
-
-    intrusive_ptr<ExpressionNary> (*ExpressionOr::getFactory() const)() {
-        return ExpressionOr::create;
     }
 
     intrusive_ptr<Expression> ExpressionOr::optimize() {
@@ -2534,10 +2477,6 @@ namespace mongo {
         return "$setIntersection";
     }
 
-    intrusive_ptr<ExpressionNary> (*ExpressionSetIntersection::getFactory() const)() {
-        return ExpressionSetIntersection::create;
-    }
-
     /* ----------------------- ExpressionSetIsSubset ---------------------------- */
 
     intrusive_ptr<ExpressionNary> ExpressionSetIsSubset::create() {
@@ -2603,10 +2542,6 @@ namespace mongo {
 
     const char *ExpressionSetUnion::getOpName() const {
         return "$setUnion";
-    }
-
-    intrusive_ptr<ExpressionNary> (*ExpressionSetUnion::getFactory() const)() {
-        return ExpressionSetUnion::create;
     }
 
     /* ----------------------- ExpressionStrcasecmp ---------------------------- */
