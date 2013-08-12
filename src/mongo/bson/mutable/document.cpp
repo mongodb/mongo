@@ -967,8 +967,13 @@ namespace mutablebson {
             const BSONType type = getType(rep);
             switch(type) {
             case mongo::NumberDouble:
+            case mongo::String:
+            case mongo::BinData:
+            case mongo::jstOID:
             case mongo::Bool:
+            case mongo::Date:
             case mongo::NumberInt:
+            case mongo::Timestamp:
             case mongo::NumberLong:
                 return true;
             default:
