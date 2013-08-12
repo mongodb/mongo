@@ -204,6 +204,14 @@ namespace mongo {
         }
     }
 
+    Value::Value(const BSONArray& arr) : _storage(Array) {
+        intrusive_ptr<RCVector> vec (new RCVector);
+        BSONForEach(sub, arr) {
+            vec->vec.push_back(Value(sub));
+        }
+        _storage.putVector(vec.get());
+    }
+
     Value Value::createIntOrLong(long long longValue) {
         int intValue = longValue;
         if (intValue != longValue) {
