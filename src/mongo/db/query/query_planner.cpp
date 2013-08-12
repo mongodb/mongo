@@ -123,8 +123,8 @@ namespace mongo {
             commonBounds.fields.push_back(oil);
 
             // For every index that we can use...
-            for (BSONObjSet::iterator it = overField.begin(); it != overField.end(); ++it) {
-                const BSONObj& indexKeyPattern = *it;
+            for (BSONObjSet::iterator kpit = overField.begin(); kpit != overField.end(); ++kpit) {
+                const BSONObj& indexKeyPattern = *kpit;
 
                 // Create an index scan solution node.
                 IndexScanNode* ixscan = new IndexScanNode();

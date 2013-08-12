@@ -1,4 +1,5 @@
-/*    Copyright 2013 10gen Inc.
+/**
+ *    Copyright 2013 10gen Inc.
  *
  *    Licensed under the Apache License, Version 2.0 (the "License");
  *    you may not use this file except in compliance with the License.
@@ -25,81 +26,68 @@ namespace mongo {
      * Parses the QueryMessage received from the user and makes the various fields more easily
      * accessible.
      *
-     * TODO: This is ported from mongo/db/parsed_query.cpp.  It needs some clean-up.  In particular
-     * it should be parse-only.  No query logic.
-     *
-     * Notably missing is a projection.
-     */
-
-    /**
-     * this represents a total user query
-     * includes fields from the query message, both possible query levels
-     * parses everything up front
+     * TODO: Projection.
+     * TODO: Tailable + Capped.
      */
     class LiteParsedQuery {
     public:
-        LiteParsedQuery(QueryMessage& qm);
+        /**
+         * Parse the provided QueryMessage and set *out to point to the output.
+         *
+         * Return Status::OK() if parsing succeeded.  Caller owns *out.
+         * Otherwise, *out is invalid and the returned Status indicates why parsing failed.
+         */
+        static Status make(const QueryMessage& qm, LiteParsedQuery** out);
 
-        LiteParsedQuery(const char* ns,
-                        int ntoskip,
-                        int ntoreturn,
-                        int queryoptions,
-                        const BSONObj& query);
-        
-        const char* ns() const { return _ns; }
-        bool isLocalDB() const { return strncmp( _ns, "local.", 6 ) == 0; }
-        
+        /**
+         * Fills out a LiteParsedQuery.  Used for debugging and testing, when we don't have a
+         * QueryMessage.
+         */
+        static Status make(const string& ns,
+                           int ntoskip,
+                           int ntoreturn,
+                           int queryoptions,
+                           const BSONObj& query,
+                           LiteParsedQuery** out);
+
+        const string& ns() const { return _ns; }
+        bool isLocalDB() const { return _ns.compare(0, 6, "local.") == 0; }
+
         const BSONObj& getFilter() const { return _filter; }
-        
+
         int getSkip() const { return _ntoskip; }
         int getNumToReturn() const { return _ntoreturn; }
         bool wantMore() const { return _wantMore; }
         int getOptions() const { return _options; }
         bool hasOption(int x) const { return ( x & _options ) != 0; }
         bool hasReadPref() const { return _hasReadPref; }
-        
+
         bool isExplain() const { return _explain; }
         bool isSnapshot() const { return _snapshot; }
         bool returnKey() const { return _returnKey; }
         bool showDiskLoc() const { return _showDiskLoc; }
-        
+
         const BSONObj& getMin() const { return _min; }
         const BSONObj& getMax() const { return _max; }
         const BSONObj& getOrder() const { return _order; }
         const BSONObj& getHint() const { return _hint; }
         int getMaxScan() const { return _maxScan; }
         int getMaxTimeMS() const { return _maxTimeMS; }
-
-        bool hasIndexSpecifier() const;
-        
-        /* if ntoreturn is zero, we return up to 101 objects.  on the subsequent getmore, there
-         is only a size limit.  The idea is that on a find() where one doesn't use much results,
-         we don't return much, but once getmore kicks in, we start pushing significant quantities.
-         
-         The n limit (vs. size) is important when someone fetches only one small field from big
-         objects, which causes massive scanning server-side.
-         */
-        bool enoughForFirstBatch( int n, int len ) const;
-        
-        bool enough( int n ) const;
-        
-        bool enoughForExplain( long long n ) const;
         
     private:
-        void init( const BSONObj& q );
-        
-        void _reset();
-        
-        void _initTop( const BSONObj& top );
+        LiteParsedQuery();
 
-        void initFields( const BSONObj& fields );
-        
-        const char* const _ns;
-        const int _ntoskip;
+        Status init(const string& ns, int ntoskip, int ntoreturn, int queryOptions,
+                    const BSONObj& queryObj, bool fromQueryMessage);
+
+        Status initFullQuery(const BSONObj& top);
+
+        string _ns;
+        int _ntoskip;
         int _ntoreturn;
         BSONObj _filter;
         BSONObj _order;
-        const int _options;
+        int _options;
         bool _wantMore;
         bool _explain;
         bool _snapshot;

@@ -26,14 +26,13 @@ namespace mongo {
 
     class CanonicalQuery {
     public:
-        // TODO: qm is mutable because LiteParsedQuery wants it mutable.  FIX.
-        static Status canonicalize(QueryMessage& qm, CanonicalQuery** out);
+        static Status canonicalize(const QueryMessage& qm, CanonicalQuery** out);
 
         // This is for testing, when we don't have a QueryMessage.
         static Status canonicalize(const string& ns, const BSONObj& query, CanonicalQuery** out);
 
         // What namespace is this query over?
-        const char* ns() const { return _pq->ns(); }
+        const string& ns() const { return _pq->ns(); }
 
         //
         // Accessors for the query
@@ -52,8 +51,6 @@ namespace mongo {
 
         // _root points into _pq->getFilter()
         scoped_ptr<MatchExpression> _root;
-
-        string _ns;
     };
 
 }  // namespace mongo

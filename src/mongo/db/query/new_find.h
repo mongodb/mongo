@@ -30,6 +30,11 @@ namespace mongo {
     bool isNewQueryFrameworkEnabled();
 
     /**
+     * Use the new query framework.  Called from the dbtest initialization.
+     */
+    void enableNewQueryFramework();
+
+    /**
      * Called from the getMore entry point in ops/query.cpp.
      */
     QueryResult* newGetMore(const char* ns, int ntoreturn, long long cursorid, CurOp& curop,

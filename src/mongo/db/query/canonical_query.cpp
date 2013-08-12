@@ -22,23 +22,18 @@
 namespace mongo {
 
     // static
-    Status CanonicalQuery::canonicalize(QueryMessage& qm, CanonicalQuery** out) {
+    Status CanonicalQuery::canonicalize(const QueryMessage& qm, CanonicalQuery** out) {
         auto_ptr<CanonicalQuery> cq(new CanonicalQuery());
 
-        // TODO: LiteParsedQuery throws.  Fix it to return error.
-        cq->_pq.reset(new LiteParsedQuery(qm));
+        // Parse the query.
+        LiteParsedQuery* lpq;
+        Status parseStatus = LiteParsedQuery::make(qm, &lpq);
+        if (!parseStatus.isOK()) { return parseStatus; }
+        cq->_pq.reset(lpq);
 
-        // TODO: If pq.hasOption(QueryOption_CursorTailable) make sure it's a capped collection and
-        // make sure the order(??) is $natural: 1.
-
-        // TODO: Do we want to do this too?:
-        //if ( pq.getFields() != NULL )
-        //    pq.getFields()->validateQuery( query );
-
+        // Build a parse tree from the BSONObj in the parsed query.
         StatusWithMatchExpression swme = MatchExpressionParser::parse(cq->_pq->getFilter());
-        if (!swme.isOK()) {
-            return swme.getStatus();
-        }
+        if (!swme.isOK()) { return swme.getStatus(); }
 
         cq->_root.reset(swme.getValue());
         *out = cq.release();
@@ -49,11 +44,10 @@ namespace mongo {
                                         CanonicalQuery** out) {
         auto_ptr<CanonicalQuery> cq(new CanonicalQuery());
 
-        // LiteParsedQuery saves the pointer to the NS that we provide it.  It's not going to remain
-        // valid unless we cache it ourselves.
-        cq->_ns = ns;
-
-        cq->_pq.reset(new LiteParsedQuery(cq->_ns.c_str(), 0, 0, 0, query));
+        LiteParsedQuery* lpq;
+        Status parseStatus = LiteParsedQuery::make(ns, 0, 0, 0, query, &lpq);
+        if (!parseStatus.isOK()) { return parseStatus; }
+        cq->_pq.reset(lpq);
 
         StatusWithMatchExpression swme = MatchExpressionParser::parse(cq->_pq->getFilter());
         if (!swme.isOK()) { return swme.getStatus(); }

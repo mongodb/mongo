@@ -143,8 +143,8 @@ namespace mongo {
 
         for (set<Runner*>::iterator it = nonCachedRunners.begin(); it != nonCachedRunners.end(); ++it) {
             Runner* runner = *it;
-            const char* runnerNS = runner->getQuery().getParsed().ns();
-            if ((isDB && str::startsWith(runnerNS, ns)) || (str::equals(runnerNS, ns))) {
+            const string& runnerNS = runner->getQuery().getParsed().ns();
+            if ((isDB && str::startsWith(runnerNS, ns)) || (str::equals(runnerNS.c_str(), ns))) {
                 runner->kill();
             }
         }
