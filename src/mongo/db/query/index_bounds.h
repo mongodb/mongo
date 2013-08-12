@@ -35,6 +35,9 @@ namespace mongo {
         bool endInclusive;
 
         // No BSONValue means we have to keep a BSONObj and pointers (BSONElement) into it.
+        // 'start' may not point at the first field in _intervalData.
+        // 'end' may not point at the last field in _intervalData.
+        // 'start' and 'end' may point at the same field.
         BSONObj _intervalData;
     };
 
