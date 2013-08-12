@@ -33,15 +33,55 @@
 #include "mongo/s/d_logic.h"
 #include "mongo/s/stale_exception.h"
 
+namespace {
+
+    using mongo::LiteParsedQuery;
+
+    // Copied from db/ops/query.cpp.  Quote:
+    // We cut off further objects once we cross this threshold; thus, you might get
+    // a little bit more than this, it is a threshold rather than a limit.
+    static const int32_t MaxBytesToReturnToClientAtOnce = 4 * 1024 * 1024;
+
+    // TODO: Remove this or use it.
+    bool hasIndexSpecifier(const LiteParsedQuery& pq) {
+        return !pq.getHint().isEmpty() || !pq.getMin().isEmpty() || !pq.getMax().isEmpty();
+    }
+
+    /**
+     * Quote:
+     * if ntoreturn is zero, we return up to 101 objects.  on the subsequent getmore, there
+     * is only a size limit.  The idea is that on a find() where one doesn't use much results,
+     * we don't return much, but once getmore kicks in, we start pushing significant quantities.
+     *
+     * The n limit (vs. size) is important when someone fetches only one small field from big
+     * objects, which causes massive scanning server-side.
+     */
+    bool enoughForFirstBatch(const LiteParsedQuery& pq, int n, int len) {
+        if (0 == pq.getNumToReturn()) {
+            return (len > 1024 * 1024) || n >= 101;
+        }
+        return n >= pq.getNumToReturn() || len > MaxBytesToReturnToClientAtOnce;
+    }
+
+    bool enough(const LiteParsedQuery& pq, int n) {
+        if (0 == pq.getNumToReturn()) { return false; }
+        return n >= pq.getNumToReturn();
+    }
+
+    bool enoughForExplain(const LiteParsedQuery& pq, long long n) {
+        if (pq.wantMore() || 0 == pq.getNumToReturn()) { return false; }
+        return n >= pq.getNumToReturn();
+    }
+
+}  // namespace
+
 namespace mongo {
 
     // Server parameter
     MONGO_EXPORT_SERVER_PARAMETER(newQueryFrameworkEnabled, bool, false);
 
     bool isNewQueryFrameworkEnabled() { return newQueryFrameworkEnabled; }
-
-    // Copied from db/ops/query.cpp.
-    static const int32_t MaxBytesToReturnToClientAtOnce = 4 * 1024 * 1024;
+    void enableNewQueryFramework() { newQueryFrameworkEnabled = true; }
 
     /**
      * For a given query, get a runner.  The runner could be a SingleSolutionRunner, a
@@ -228,6 +268,8 @@ namespace mongo {
      * This is called by db/ops/query.cpp.  This is the entry point for answering a query.
      */
     string newRunQuery(Message& m, QueryMessage& q, CurOp& curop, Message &result) {
+        log() << "Running query on new system: " << q.query.toString() << endl;
+
         // This is a read lock.
         Client::ReadContext ctx(q.ns, dbpath);
 
@@ -307,14 +349,14 @@ namespace mongo {
             // of CanonicalQuery. :(
             const bool supportsGetMore = true;
             const bool isExplain = pq.isExplain();
-            if (isExplain && pq.enoughForExplain(numResults)) {
+            if (isExplain && enoughForExplain(pq, numResults)) {
                 break;
             }
-            else if (!supportsGetMore && (pq.enough(numResults)
+            else if (!supportsGetMore && (enough(pq, numResults)
                                           || bb.len() >= MaxBytesToReturnToClientAtOnce)) {
                 break;
             }
-            else if (pq.enoughForFirstBatch(numResults, bb.len())) {
+            else if (enoughForFirstBatch(pq, numResults, bb.len())) {
                 // If only one result requested assume it's a findOne() and don't save the cursor.
                 if (pq.wantMore() && 1 != pq.getNumToReturn()) {
                     saveClientCursor = true;

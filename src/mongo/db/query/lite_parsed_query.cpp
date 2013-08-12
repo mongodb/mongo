@@ -1,4 +1,5 @@
-/*    Copyright 2013 10gen Inc.
+/**
+ *    Copyright 2013 10gen Inc.
  *
  *    Licensed under the Apache License, Version 2.0 (the "License");
  *    you may not use this file except in compliance with the License.
@@ -20,80 +21,65 @@
 
 namespace mongo {
 
-    // XXX: THIS DOESNT BELONG HERE
-    /* We cut off further objects once we cross this threshold; thus, you might get
-       a little bit more than this, it is a threshold rather than a limit.
-    */
-    static const int32_t MaxBytesToReturnToClientAtOnce = 4 * 1024 * 1024;
+    // static
+    Status LiteParsedQuery::make(const QueryMessage& qm, LiteParsedQuery** out) {
+        auto_ptr<LiteParsedQuery> pq(new LiteParsedQuery());
 
-    LiteParsedQuery::LiteParsedQuery( QueryMessage& qm ) :
-        _ns( qm.ns ),
-        _ntoskip( qm.ntoskip ),
-        _ntoreturn( qm.ntoreturn ),
-        _options( qm.queryOptions ) {
-        init( qm.query );
+        Status status = pq->init(qm.ns, qm.ntoskip, qm.ntoreturn, qm.queryOptions, qm.query, true);
+        if (status.isOK()) { *out = pq.release(); }
+        return status;
     }
 
-    LiteParsedQuery::LiteParsedQuery( const char* ns,
-                              int ntoskip,
-                              int ntoreturn,
-                              int queryoptions,
-                              const BSONObj& query) :
-        _ns( ns ),
-        _ntoskip( ntoskip ),
-        _ntoreturn( ntoreturn ),
-        _options( queryoptions ) {
-        init( query );
+    // static
+    Status LiteParsedQuery::make(const string& ns, int ntoskip, int ntoreturn, int queryOptions,
+                                 const BSONObj& query, LiteParsedQuery** out) {
+        auto_ptr<LiteParsedQuery> pq(new LiteParsedQuery());
+
+        Status status = pq->init(ns, ntoskip, ntoreturn, queryOptions, query, false);
+        if (status.isOK()) { *out = pq.release(); }
+        return status;
     }
 
-    bool LiteParsedQuery::hasIndexSpecifier() const {
-        return ! _hint.isEmpty() || ! _min.isEmpty() || ! _max.isEmpty();
-    }
+    LiteParsedQuery::LiteParsedQuery() : _wantMore(false), _explain(false), _snapshot(false),
+                                         _returnKey(false), _showDiskLoc(false), _maxScan(0) { }
 
-    // XXX THIS DOESNT BELONG HERE
-    bool LiteParsedQuery::enoughForFirstBatch( int n , int len ) const {
-        if ( _ntoreturn == 0 )
-            return ( len > 1024 * 1024 ) || n >= 101;
-        return n >= _ntoreturn || len > MaxBytesToReturnToClientAtOnce;
-    }
+    Status LiteParsedQuery::init(const string& ns, int ntoskip, int ntoreturn, int queryOptions,
+                                 const BSONObj& queryObj, bool fromQueryMessage) {
+        _ns = ns;
+        _ntoskip = ntoskip;
+        _ntoreturn = ntoreturn;
+        _options = queryOptions;
 
-    bool LiteParsedQuery::enough( int n ) const {
-        if ( _ntoreturn == 0 )
-            return false;
-        return n >= _ntoreturn;
-    }
+        // TODO: If pq.hasOption(QueryOption_CursorTailable) make sure it's a capped collection and
+        // make sure the order(??) is $natural: 1.
 
-    bool LiteParsedQuery::enoughForExplain( long long n ) const {
-        if ( _wantMore || _ntoreturn == 0 ) {
-            return false;
+        if (_ntoskip < 0) {
+            return Status(ErrorCodes::BadValue, "bad skip value in query");
         }
-        return n >= _ntoreturn;            
-    }
-    
-    void LiteParsedQuery::init( const BSONObj& q ) {
-        _reset();
-        uassert(17032, "bad skip value in query", _ntoskip >= 0);
         
-        if ( _ntoreturn < 0 ) {
-            /* _ntoreturn greater than zero is simply a hint on how many objects to send back per
-             "cursor batch".
-             A negative number indicates a hard limit.
-             */
+        if (_ntoreturn < 0) {
+            // _ntoreturn greater than zero is simply a hint on how many objects to send back per
+            // "cursor batch".  A negative number indicates a hard limit.
             _wantMore = false;
             _ntoreturn = -_ntoreturn;
         }
-        
-        
-        BSONElement e = q["query"];
-        if ( ! e.isABSONObj() )
-            e = q["$query"];
-        
-        if ( e.isABSONObj() ) {
-            _filter = e.embeddedObject().getOwned();
-            _initTop( q );
+
+        if (fromQueryMessage) {
+            BSONElement queryField = queryObj["query"];
+            if (!queryField.isABSONObj()) { queryField = queryObj["$query"]; }
+            if (queryField.isABSONObj()) {
+                _filter = queryField.embeddedObject().getOwned();
+                Status status = initFullQuery(queryObj);
+                if (!status.isOK()) { return status; }
+            }
+            else {
+                // TODO: Does this ever happen?
+                _filter = queryObj.getOwned();
+            }
         }
         else {
-            _filter = q.getOwned();
+            // This is the debugging code path.
+            _filter = queryObj.getOwned();
         }
 
         //
@@ -101,107 +87,123 @@ namespace mongo {
         //
 
         // $readPreference
-        _hasReadPref = q.hasField("$readPreference");
+        _hasReadPref = queryObj.hasField("$readPreference");
 
         // $maxTimeMS
-        BSONElement maxTimeMSElt = q.getField("$maxTimeMS");
-        if (!maxTimeMSElt.eoo()) {
-            uassert(17033,
-                    mongoutils::str::stream() <<
-                        "$maxTimeMS must be a number type, instead found type: " <<
-                        maxTimeMSElt.type(),
-                    maxTimeMSElt.isNumber());
+        BSONElement maxTimeMSElt = queryObj.getField("$maxTimeMS");
+        if (!maxTimeMSElt.eoo() && !maxTimeMSElt.isNumber()) {
+            return Status(ErrorCodes::BadValue, "$maxTimeMS must be a number");
         }
+
         // If $maxTimeMS was not specified, _maxTimeMS is set to 0 (special value for "allow to
         // run indefinitely").
         long long maxTimeMSLongLong = maxTimeMSElt.safeNumberLong();
-        uassert(17034,
-                "$maxTimeMS out of range [0,2147483647]",
-                maxTimeMSLongLong >= 0 && maxTimeMSLongLong <= INT_MAX);
-        _maxTimeMS = static_cast<int>(maxTimeMSLongLong);
-    }
-
-    void LiteParsedQuery::_reset() {
-        _wantMore = true;
-        _explain = false;
-        _snapshot = false;
-        _returnKey = false;
-        _showDiskLoc = false;
-        _maxScan = 0;
-    }
-
-    /* This is for languages whose "objects" are not well ordered (JSON is well ordered).
-     [ { a : ... } , { b : ... } ] -> { a : ..., b : ... }
-     */
-    static BSONObj transformOrderFromArrayFormat(BSONObj order) {
-        /* note: this is slow, but that is ok as order will have very few pieces */
-        BSONObjBuilder b;
-        char p[2] = "0";
-        
-        while ( 1 ) {
-            BSONObj j = order.getObjectField(p);
-            if ( j.isEmpty() )
-                break;
-            BSONElement e = j.firstElement();
-            uassert(17035, "bad order array", !e.eoo());
-            uassert(17036, "bad order array [2]", e.isNumber());
-            b.append(e);
-            (*p)++;
-            uassert(17037, "too many ordering elements", *p <= '9');
+        if (maxTimeMSLongLong < 0 || maxTimeMSLongLong > INT_MAX) {
+            return Status(ErrorCodes::BadValue, "$maxTimeMS is out of range");
         }
-        
-        return b.obj();
+        _maxTimeMS = static_cast<int>(maxTimeMSLongLong);
+
+        return Status::OK();
     }
 
-    void LiteParsedQuery::_initTop( const BSONObj& top ) {
-        BSONObjIterator i( top );
-        while ( i.more() ) {
+    Status LiteParsedQuery::initFullQuery(const BSONObj& top) {
+        BSONObjIterator i(top);
+
+        while (i.more()) {
             BSONElement e = i.next();
-            const char * name = e.fieldName();
+            const char* name = e.fieldName();
             
-            if ( strcmp( "$orderby" , name ) == 0 ||
-                strcmp( "orderby" , name ) == 0 ) {
-                if ( e.type() == Object ) {
+            if (0 == strcmp("$orderby", name) || 0 == strcmp("orderby", name)) {
+                if (Object == e.type()) {
                     _order = e.embeddedObject();
                 }
-                else if ( e.type() == Array ) {
-                    _order = transformOrderFromArrayFormat( _order );
+                else if (Array == e.type()) {
+                    _order = e.embeddedObject();
+                    // TODO: Is this ever used?  I don't think so.
+
+                    // Quote:
+                    // This is for languages whose "objects" are not well ordered (JSON is well ordered).
+                    // [ { a : ... } , { b : ... } ] -> { a : ..., b : ... }
+                    // note: this is slow, but that is ok as order will have very few pieces
+                    BSONObjBuilder b;
+                    char p[2] = "0";
+
+                    while (1) {
+                        BSONObj j = _order.getObjectField(p);
+                        if (j.isEmpty()) { break; }
+                        BSONElement e = j.firstElement();
+                        if (e.eoo()) {
+                            return Status(ErrorCodes::BadValue, "bad order array");
+                        }
+                        if (!e.isNumber()) {
+                            return Status(ErrorCodes::BadValue, "bad order array [2]");
+                        }
+                        b.append(e);
+                        (*p)++;
+                        if (!(*p <= '9')) {
+                            return Status(ErrorCodes::BadValue, "too many ordering elements");
+                        }
+                    }
+
+                    _order = b.obj();
                 }
                 else {
-                    uasserted(17038, "sort must be an object or array");
+                    return Status(ErrorCodes::BadValue, "sort must be object or array");
                 }
-                continue;
             }
-            
-            if( *name == '$' ) {
+            else if ('$' == *name) {
                 name++;
-                if ( strcmp( "explain" , name ) == 0 )
+                if (str::equals("explain", name)) {
+                    // Won't throw.
                     _explain = e.trueValue();
-                else if ( strcmp( "snapshot" , name ) == 0 )
+                }
+                else if (str::equals("snapshot", name)) {
+                    // Won't throw.
                     _snapshot = e.trueValue();
-                else if ( strcmp( "min" , name ) == 0 )
+                }
+                else if (str::equals("min", name)) {
+                    if (!e.isABSONObj()) {
+                        return Status(ErrorCodes::BadValue, "$min must be a BSONObj");
+                    }
                     _min = e.embeddedObject();
-                else if ( strcmp( "max" , name ) == 0 )
+                }
+                else if (str::equals("max", name)) {
+                    if (!e.isABSONObj()) {
+                        return Status(ErrorCodes::BadValue, "$max must be a BSONObj");
+                    }
                     _max = e.embeddedObject();
-                else if ( strcmp( "hint" , name ) == 0 )
-                    _hint = e.wrap();
-                else if ( strcmp( "returnKey" , name ) == 0 )
+                }
+                else if (str::equals("hint", name)) {
+                    if (!e.isABSONObj()) {
+                        return Status(ErrorCodes::BadValue, "$hint must be a BSONObj");
+                    }
+                    _hint = e.embeddedObject();
+                }
+                else if (str::equals("returnKey", name)) {
+                    // Won't throw.
                     _returnKey = e.trueValue();
-                else if ( strcmp( "maxScan" , name ) == 0 )
+                }
+                else if (str::equals("maxScan", name)) {
+                    // Won't throw.
                     _maxScan = e.numberInt();
-                else if ( strcmp( "showDiskLoc" , name ) == 0 )
+                }
+                else if (str::equals("showDiskLoc", name)) {
+                    // Won't throw.
                     _showDiskLoc = e.trueValue();
-                else if ( strcmp( "comment" , name ) == 0 ) {
-                    ; // no-op
                 }
             }
         }
         
-        if ( _snapshot ) {
-            uassert(17039, "E12001 can't sort with $snapshot", _order.isEmpty() );
-            uassert(17050, "E12002 can't use hint with $snapshot", _hint.isEmpty() );
+        if (_snapshot) {
+            if (!_order.isEmpty()) {
+                return Status(ErrorCodes::BadValue, "E12001 can't use sort with $snapshot");
+            }
+            if (!_hint.isEmpty()) {
+                return Status(ErrorCodes::BadValue, "E12002 can't use hint with $snapshot");
+            }
         }
-        
+
+        return Status::OK();
     }
 
 } // namespace mongo
