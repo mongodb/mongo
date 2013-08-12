@@ -1127,10 +1127,10 @@ namespace mongo {
                         }
                         catch( DBException& e ){
                             //This is handled below and logged
-                            Strategy::CommandResult result;
-                            result.shardTarget = Shard();
-                            result.result = BSON("errmsg" << e.what() << "ok" << 0 );
-                            results.push_back( result );
+                            Strategy::CommandResult errResult;
+                            errResult.shardTarget = Shard();
+                            errResult.result = BSON("errmsg" << e.what() << "ok" << 0 );
+                            results.push_back( errResult );
                         }
 
                         verify(results.size() == 1); // querying on shard key so should only talk to one shard
@@ -1274,7 +1274,7 @@ namespace mongo {
                     sub.append("btreelocs", btreelocs);
                     sub.append("nscanned", nscanned);
                     sub.append("objectsLoaded", objectsLoaded);
-                    sub.append("avgDistance", totalDistance / outCount);
+                    sub.append("avgDistance", (outCount == 0) ? 0: (totalDistance / outCount));
                     sub.append("maxDistance", maxDistance);
                     sub.append("shards", shardArray.arr());
                     sub.done();

@@ -1080,7 +1080,11 @@ namespace mongo {
                     ScopedDbConnection conn(toShard.getConnString());
 
                     BSONObj res;
-                    conn->runCommand( "admin" , BSON( "_recvChunkAbort" << 1 ) , res );
+                    if (!conn->runCommand( "admin", BSON( "_recvChunkAbort" << 1 ), res )) {
+                        warning() << "Error encountered while trying to abort migration on "
+                                  << "destination shard" << toShard.getConnString() << endl;
+                    }
+
                     res = res.getOwned();
                     conn.done();
                     error() << "aborting migrate because too much memory used res: " << res << migrateLog;

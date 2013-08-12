@@ -224,7 +224,7 @@ namespace mongo {
                 // Replace with unique_ptr (also owned ptr map goes away)
                 auto_ptr<CollectionType> coll(new CollectionType());
                 string errMsg;
-                coll->parseBSON(collDoc, &errMsg);
+                bool parseOk = coll->parseBSON(collDoc, &errMsg);
 
                 // Needed for the v3 to v4 upgrade
                 bool epochNotSet = !coll->isEpochSet() || !coll->getEpoch().isSet();
@@ -233,7 +233,7 @@ namespace mongo {
                     coll->setEpoch(OID::gen());
                 }
 
-                if (errMsg != "" || !coll->isValid(&errMsg)) {
+                if (!parseOk || !coll->isValid(&errMsg)) {
                     return Status(ErrorCodes::UnsupportedFormat,
                                   stream() << "invalid collection " << collDoc
                                            << " read from the config server" << causedBy(errMsg));

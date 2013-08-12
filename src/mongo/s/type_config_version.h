@@ -119,7 +119,7 @@ namespace mongo {
         bool isMinCompatibleVersionSet() const { return _isMinCompatibleVersionSet; }
 
         // Calling get*() methods when the member is not set results in undefined behavior
-        const int getMinCompatibleVersion() const {
+        int getMinCompatibleVersion() const {
             dassert(_isMinCompatibleVersionSet);
             return _minCompatibleVersion;
         }
@@ -134,7 +134,7 @@ namespace mongo {
         bool isCurrentVersionSet() const { return _isCurrentVersionSet; }
 
         // Calling get*() methods when the member is not set results in undefined behavior
-        const int getCurrentVersion() const {
+        int getCurrentVersion() const {
             dassert(_isCurrentVersionSet);
             return _currentVersion;
         }

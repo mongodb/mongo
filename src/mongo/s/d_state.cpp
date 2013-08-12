@@ -58,6 +58,8 @@ namespace mongo {
     }
 
     void ShardingState::enable( const string& server ) {
+        scoped_lock lk(_mutex);
+
         _enabled = true;
         verify( server.size() );
         if ( _configServer.size() == 0 )
@@ -555,12 +557,18 @@ namespace mongo {
 
                     // Update to existing metadata
                     installType = InstallType_Update;
+
+                    // Invariant: If CollMetadata was not found, version should be have been 0.
+                    dassert( it != _collMetadata.end() );
                     it->second = remoteMetadata;
                 }
                 else if ( remoteShardVersion.epoch().isSet() ) {
 
                     // New epoch detected, replacing metadata
                     installType = InstallType_Replace;
+
+                    // Invariant: If CollMetadata was not found, version should be have been 0.
+                    dassert( it != _collMetadata.end() );
                     it->second = remoteMetadata;
                 }
                 else {
