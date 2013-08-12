@@ -14,7 +14,6 @@ env.StaticLibrary(
         "$BUILD_DIR/mongo/bson",
         "$BUILD_DIR/mongo/expressions",
         "$BUILD_DIR/mongo/expressions_geo",
-        "$BUILD_DIR/mongo/query_parsing",
     ],
 )
 
