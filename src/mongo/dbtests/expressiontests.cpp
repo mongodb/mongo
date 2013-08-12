@@ -403,9 +403,16 @@ namespace ExpressionTests {
             BSONObj spec() { return BSON( "$and" << BSON_ARRAY( "$a" ) ); }            
         };
 
-        /** An expression beginning with a single constant is not optimized.  SERVER-6192 */
-        class ConstantNonConstant : public NoOptimizeBase {
+        /** An expression beginning with a single constant is optimized. */
+        class ConstantNonConstantTrue : public OptimizeBase {
             BSONObj spec() { return BSON( "$and" << BSON_ARRAY( 1 << "$a" ) ); }
+            BSONObj expectedOptimized() { return BSON( "$and" << BSON_ARRAY( "$a" ) ); }
+            // note: using $and as serialization of ExpressionCoerceToBool rather than ExpressionAnd
+        };
+
+        class ConstantNonConstantFalse : public OptimizeBase {
+            BSONObj spec() { return BSON( "$and" << BSON_ARRAY( 0 << "$a" ) ); }
+            BSONObj expectedOptimized() { return BSON( "$const" << false ); }
         };
 
         /** An expression with a field path and '1'. */
@@ -1361,14 +1368,14 @@ namespace ExpressionTests {
                 return Value( values );
             }
             virtual const char* getOpName() const { return "$testable"; }
-            virtual intrusive_ptr<ExpressionNary> (*getFactory() const)() {
-                return _haveFactory ? factory : NULL;
+            virtual bool isAssociativeAndCommutative() const {
+                return _isAssociativeAndCommutative;
             }
-            static intrusive_ptr<Testable> create( bool haveFactory = false ) {
-                return new Testable( haveFactory );
+            static intrusive_ptr<Testable> create( bool associativeAndCommutative = false ) {
+                return new Testable(associativeAndCommutative);
             }
             static intrusive_ptr<ExpressionNary> factory() {
-                return new Testable( true );
+                return new Testable(true);
             }
             static intrusive_ptr<Testable> createFromOperands( const BSONArray& operands,
                                                                bool haveFactory = false ) {
@@ -1385,10 +1392,10 @@ namespace ExpressionTests {
             }
 
         private:
-            Testable( bool haveFactory ) :
-                _haveFactory( haveFactory ) {
-            }
-            bool _haveFactory;
+            Testable(bool isAssociativeAndCommutative)
+                : _isAssociativeAndCommutative(isAssociativeAndCommutative)
+            {}
+            bool _isAssociativeAndCommutative;
         };
 
         /** Adding operands to the expression. */
@@ -1531,8 +1538,6 @@ namespace ExpressionTests {
                 intrusive_ptr<Testable> testable =
                         Testable::createFromOperands( BSON_ARRAY( 55 << 66 << "$path" ), true );
                 intrusive_ptr<Expression> optimized = testable->optimize();
-                // Optimization generates a new expression.
-                ASSERT( testable != optimized );
                 // The constant expressions are evaluated separately and placed at the end.
                 ASSERT_EQUALS( constify( BSON( "$testable"
                                          << BSON_ARRAY( "$path" << BSON_ARRAY( 55 << 66 ) ) ) ),
@@ -1557,7 +1562,6 @@ namespace ExpressionTests {
                         ( Testable::createFromOperands
                           ( BSON_ARRAY( 99 << 100 << "$another_path" ), true ) );
                 intrusive_ptr<Expression> optimized = testable->optimize();
-                ASSERT( testable != optimized );
                 ASSERT_EQUALS
                         ( constify( BSON( "$testable" <<
                                 BSON_ARRAY( // non constant parts
@@ -1582,7 +1586,6 @@ namespace ExpressionTests {
                         ( Testable::createFromOperands( BSON_ARRAY( 5 << 6 << "$c" ), true ) );
                 top->addOperand( nested );
                 intrusive_ptr<Expression> optimized = top->optimize();
-                ASSERT( top != optimized );
                 ASSERT_EQUALS
                         ( constify( BSON( "$testable" <<
                                 BSON_ARRAY( "$a" << "$b" << "$c" <<
@@ -2458,9 +2461,17 @@ namespace ExpressionTests {
             BSONObj spec() { return BSON( "$or" << BSON_ARRAY( "$a" ) ); }            
         };
         
-        /** An expression beginning with a single constant is not optimized.  SERVER-6192 */
-        class ConstantNonConstant : public NoOptimizeBase {
+        /** An expression beginning with a single constant is optimized. */
+        class ConstantNonConstantTrue : public OptimizeBase {
             BSONObj spec() { return BSON( "$or" << BSON_ARRAY( 1 << "$a" ) ); }
+            BSONObj expectedOptimized() { return BSON( "$const" << true ); }
+        };
+
+        /** An expression beginning with a single constant is optimized. */
+        class ConstantNonConstantFalse : public OptimizeBase {
+            BSONObj spec() { return BSON( "$or" << BSON_ARRAY( 0 << "$a" ) ); }
+            BSONObj expectedOptimized() { return BSON( "$and" << BSON_ARRAY("$a") ); }
+            // note: using $and as serialization of ExpressionCoerceToBool rather than ExpressionAnd
         };
         
         /** An expression with a field path and '1'. */
@@ -3562,7 +3573,8 @@ namespace ExpressionTests {
             add<And::FieldPath>();
             add<And::OptimizeConstantExpression>();
             add<And::NonConstant>();
-            add<And::ConstantNonConstant>();
+            add<And::ConstantNonConstantTrue>();
+            add<And::ConstantNonConstantFalse>();
             add<And::NonConstantOne>();
             add<And::NonConstantZero>();
             add<And::NonConstantNonConstantOne>();
@@ -3742,7 +3754,8 @@ namespace ExpressionTests {
             add<Or::FieldPath>();
             add<Or::OptimizeConstantExpression>();
             add<Or::NonConstant>();
-            add<Or::ConstantNonConstant>();
+            add<Or::ConstantNonConstantTrue>();
+            add<Or::ConstantNonConstantFalse>();
             add<Or::NonConstantOne>();
             add<Or::NonConstantZero>();
             add<Or::NonConstantNonConstantOne>();

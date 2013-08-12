@@ -230,23 +230,8 @@ namespace mongo {
         */
         virtual void addOperand(const intrusive_ptr<Expression> &pExpression);
 
-        /*
-          Return a factory function that will make Expression nodes of
-          the same type as this.  This will be used to create constant
-          expressions for constant folding for optimize().  Only return
-          a factory function if this operator is both associative and
-          commutative.  The default implementation returns NULL; optimize()
-          will recognize that and stop.
-
-          Note that ExpressionNary::optimize() promises that if it uses this
-          to fold constants, then if optimize() returns an ExpressionNary,
-          any remaining constant will be the last one in vpOperand.  Derived
-          classes may take advantage of this to do further optimizations in
-          their optimize().
-
-          @returns pointer to a factory function or NULL
-         */
-        virtual intrusive_ptr<ExpressionNary> (*getFactory() const)();
+        // TODO split this into two functions
+        virtual bool isAssociativeAndCommutative() const { return false; }
 
         /*
           Get the name of the operator.
@@ -270,10 +255,7 @@ namespace mongo {
         // virtuals from Expression
         virtual Value evaluateInternal(const Variables& vars) const;
         virtual const char *getOpName() const;
-
-        // virtuals from ExpressionNary
-        virtual intrusive_ptr<ExpressionNary> (*getFactory() const)();
-
+        virtual bool isAssociativeAndCommutative() const { return true; }
         /*
           Create an expression that finds the sum of n operands.
 
@@ -305,9 +287,7 @@ namespace mongo {
         virtual Value evaluateInternal(const Variables& vars) const;
         virtual const char *getOpName() const;
         virtual void toMatcherBson(BSONObjBuilder *pBuilder) const;
-
-        // virtuals from ExpressionNary
-        virtual intrusive_ptr<ExpressionNary> (*getFactory() const)();
+        virtual bool isAssociativeAndCommutative() const { return true; }
 
         /*
           Create an expression that finds the conjunction of n operands.
@@ -752,9 +732,7 @@ namespace mongo {
         // virtuals from Expression
         virtual Value evaluateInternal(const Variables& vars) const;
         virtual const char *getOpName() const;
-
-        // virtuals from ExpressionNary
-        virtual intrusive_ptr<ExpressionNary> (*getFactory() const)();
+        virtual bool isAssociativeAndCommutative() const { return true; }
 
         /*
           Create an expression that finds the product of n operands.
@@ -929,9 +907,7 @@ namespace mongo {
         virtual Value evaluateInternal(const Variables& vars) const;
         virtual const char *getOpName() const;
         virtual void toMatcherBson(BSONObjBuilder *pBuilder) const;
-
-        // virtuals from ExpressionNary
-        virtual intrusive_ptr<ExpressionNary> (*getFactory() const)();
+        virtual bool isAssociativeAndCommutative() const { return true; }
 
         /*
           Create an expression that finds the conjunction of n operands.
@@ -998,7 +974,7 @@ namespace mongo {
         // virtuals from ExpressionNary
         virtual Value evaluateInternal(const Variables& vars) const;
         virtual const char *getOpName() const;
-        virtual intrusive_ptr<ExpressionNary> (*getFactory() const)();
+        virtual bool isAssociativeAndCommutative() const { return true; }
 
         static intrusive_ptr<ExpressionNary> create();
 
@@ -1029,7 +1005,7 @@ namespace mongo {
         // virtual intrusive_ptr<Expression> optimize();
         virtual Value evaluateInternal(const Variables& vars) const;
         virtual const char *getOpName() const;
-        virtual intrusive_ptr<ExpressionNary> (*getFactory() const)();
+        virtual bool isAssociativeAndCommutative() const { return true; }
 
         static intrusive_ptr<ExpressionNary> create();
 
