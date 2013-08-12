@@ -133,7 +133,7 @@ namespace mongo {
         bool isStateSet() const { return _isStateSet; }
 
         // Calling get*() methods when the member is not set results in undefined behavior
-        const int getState() const {
+        int getState() const {
             dassert(_isStateSet);
             return _state;
         }

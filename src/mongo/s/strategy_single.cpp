@@ -122,8 +122,7 @@ namespace mongo {
         }
 
         bool handleSpecialNamespaces( Request& r , QueryMessage& q ) {
-            const char * ns = r.getns();
-            ns = strstr( r.getns() , ".$cmd.sys." );
+            const char * ns = strstr( r.getns() , ".$cmd.sys." );
             if ( ! ns )
                 return false;
             ns += 10;

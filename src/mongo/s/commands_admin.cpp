@@ -574,11 +574,10 @@ namespace mongo {
                 if ( hasUsefulIndexForKey ) {
                     // Check 2.iii and 2.iv. Make sure no null entries in the sharding index
                     // and that there is a useful, non-multikey index available
-                    BSONObjBuilder cmd;
-                    cmd.append( "checkShardingIndex" , ns );
-                    cmd.append( "keyPattern" , proposedKey );
-                    BSONObj cmdObj = cmd.obj();
-                    if ( ! conn.get()->runCommand( "admin" , cmdObj , res ) ) {
+                    BSONObjBuilder checkShardingIndexCmd;
+                    checkShardingIndexCmd.append( "checkShardingIndex" , ns );
+                    checkShardingIndexCmd.append( "keyPattern" , proposedKey );
+                    if ( ! conn.get()->runCommand( "admin", checkShardingIndexCmd.obj(), res ) ) {
                         errmsg = res["errmsg"].str();
                         conn.done();
                         return false;
@@ -1411,6 +1410,7 @@ namespace mongo {
                 string theShard = *i;
                 ShardConnection conn( theShard , "" );
                 BSONObj res;
+                // Don't care about result from shards.
                 conn->runCommand( dbName , cmdObj , res );
                 conn.done();
             }

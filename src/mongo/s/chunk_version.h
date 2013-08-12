@@ -268,7 +268,7 @@ namespace mongo {
             if( ! it.more() ) return version;
 
             version = fromBSON( it.next(), "", canParse );
-            if( ! canParse ) return version;
+            if( ! (*canParse) ) return version;
 
             *canParse = true;
 

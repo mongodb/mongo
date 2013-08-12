@@ -148,7 +148,7 @@ namespace mongo {
         bool isUpSet() const { return _isUpSet; }
 
         // Calling get*() methods when the member is not set results in undefined behavior
-        const int getUp() const {
+        int getUp() const {
             dassert(_isUpSet);
             return _up;
         }
@@ -163,7 +163,7 @@ namespace mongo {
         bool isWaitingSet() const { return _isWaitingSet; }
 
         // Calling get*() methods when the member is not set results in undefined behavior
-        const bool getWaiting() const {
+        bool getWaiting() const {
             dassert(_isWaitingSet);
             return _waiting;
         }
