@@ -580,6 +580,7 @@ mongosLibraryFiles = [
     "s/strategy_single.cpp",
     "s/commands_admin.cpp",
     "s/commands_public.cpp",
+    "s/merge_chunks_cmd.cpp",
     "s/request.cpp",
     "s/client_info.cpp",
     "s/config_server_checker_service.cpp",
