@@ -1860,21 +1860,19 @@ namespace mongo {
                 return aggPassthrough(conf, cmdObj, result);
 
             /* split the pipeline into pieces for mongods and this mongos */
-            intrusive_ptr<Pipeline> pShardPipeline(
-                pPipeline->splitForSharded());
+            intrusive_ptr<Pipeline> pShardPipeline(pPipeline->splitForSharded());
 
-            /* create the command for the shards */
-            BSONObjBuilder commandBuilder;
-            pShardPipeline->toBson(&commandBuilder);
-            commandBuilder.append("fromRouter", true); // this means produce output to be merged
+            // create the command for the shards
+            MutableDocument commandBuilder(pShardPipeline->serialize());
+            commandBuilder.setField("fromRouter", Value(true)); // this means produce output to be merged
 
             if (cmdObj.hasField("$queryOptions")) {
-                commandBuilder.append(cmdObj["$queryOptions"]);
+                commandBuilder.setField("$queryOptions", Value(cmdObj["$queryOptions"]));
             }
 
-            commandBuilder.append("cursor", BSON("batchSize" << 0));
-            BSONObj shardedCommand(commandBuilder.done());
+            commandBuilder.setField("cursor", Value(DOC("batchSize" << 0)));
 
+            BSONObj shardedCommand = commandBuilder.freeze().toBson();
             BSONObjBuilder shardQueryBuilder;
             pShardPipeline->getInitialQuery(&shardQueryBuilder);
             BSONObj shardQuery(shardQueryBuilder.done());
@@ -1894,13 +1892,12 @@ namespace mongo {
             DocumentSourceMergeCursors::CursorIds cursorIds = parseCursors(shardResults, fullns);
             pPipeline->addInitialSource(DocumentSourceMergeCursors::create(cursorIds, pExpCtx));
 
-            BSONObjBuilder mergeCmd;
-            pPipeline->toBson(&mergeCmd);
+            MutableDocument mergeCmd(pPipeline->serialize());
 
             if (cmdObj.hasField("cursor"))
-                mergeCmd.append(cmdObj["cursor"]);
+                mergeCmd["cursor"] = Value(cmdObj["cursor"]);
             if (cmdObj.hasField("$queryOptions"))
-                mergeCmd.append(cmdObj["$queryOptions"]);
+                mergeCmd["$queryOptions"] = Value(cmdObj["$queryOptions"]);
 
             string outputNsOrEmpty;
             if (DocumentSourceOut* out = dynamic_cast<DocumentSourceOut*>(pPipeline->output())) {
@@ -1911,7 +1908,7 @@ namespace mongo {
             // that the merging mongod is sent the config servers on connection init.
             const string mergeServer = conf->getPrimary().getConnString();
             ShardConnection conn(mergeServer, outputNsOrEmpty);
-            BSONObj mergedResults = aggRunCommand(conn.get(), dbName, mergeCmd.obj());
+            BSONObj mergedResults = aggRunCommand(conn.get(), dbName, mergeCmd.freeze().toBson());
             bool ok = mergedResults["ok"].trueValue();
             conn.done();
 
@@ -1950,14 +1947,13 @@ namespace mongo {
                                                BSONObjBuilder& result) {
             uassertCanMergeInMongos(mergePipeline, cmdObj);
 
-            BSONObjBuilder commandBuilder;
-            shardPipeline->toBson(&commandBuilder);
-            commandBuilder.append("fromRouter", true);
+            MutableDocument commandBuilder(shardPipeline->serialize());
+            commandBuilder["fromRouter"] = Value(true);
 
             if (cmdObj.hasField("$queryOptions")) {
-                commandBuilder.append(cmdObj["$queryOptions"]);
+                commandBuilder["$queryOptions"] = Value(cmdObj["$queryOptions"]);
             }
-            BSONObj shardedCommand(commandBuilder.done());
+            BSONObj shardedCommand = commandBuilder.freeze().toBson();
 
             BSONObjBuilder shardQueryBuilder;
             shardPipeline->getInitialQuery(&shardQueryBuilder);

@@ -67,12 +67,13 @@ namespace mongo {
         return new DocumentSourceMergeCursors(cursorIds, pExpCtx);
     }
 
-    void DocumentSourceMergeCursors::sourceToBson(BSONObjBuilder* builder, bool explain) const {
-        BSONArrayBuilder cursors(builder->subarrayStart("$mergeCursors"));
+    Value DocumentSourceMergeCursors::serialize(bool explain) const {
+        vector<Value> cursors;
         for (size_t i = 0; i < _cursorIds.size(); i++) {
-            cursors.append(BSON("host" << _cursorIds[i].first.toString()
-                             << "id" << _cursorIds[i].second));
+            cursors.push_back(Value(DOC("host" << Value(_cursorIds[i].first.toString())
+                                     << "id" << _cursorIds[i].second)));
         }
+        return Value(DOC(getSourceName() << Value(cursors)));
     }
 
     DocumentSourceMergeCursors::CursorAndConnection::CursorAndConnection(

@@ -234,9 +234,7 @@ namespace mongo {
                 // important because sharded aggregations rely on this ability.
                 // Skipping when inShard because this has already been through the
                 // transformation (and this unsets pCtx->inShard).
-                BSONObjBuilder bb;
-                pPipeline->toBson(&bb);
-                parsed = bb.obj();
+                parsed = pPipeline->serialize().toBson();
                 pPipeline = Pipeline::parseCommand(errmsg, parsed, pCtx);
                 verify(pPipeline);
             }
@@ -295,31 +293,20 @@ namespace mongo {
             */
             intrusive_ptr<Pipeline> pShardSplit = pPipeline->splitForSharded();
 
-            /*
-            Write the split pipeline as we would in order to transmit it to
-            the shard servers.
-            */
-            BSONObjBuilder shardBuilder;
-            pShardSplit->toBson(&shardBuilder);
-            BSONObj shardBson(shardBuilder.done());
+            // Write the split pipeline as we would in order to transmit it to the shard servers.
+            Document shardCmd = pShardSplit->serialize();
 
-            DEV (log() << "\n---- shardBson\n" <<
-                 shardBson.jsonString(Strict, 1) << "\n----\n");
+            DEV log() << "\n---- shardDescription\n" << shardCmd.toString() << "\n----\n";
 
-            /* for debugging purposes, show what the pipeline now looks like */
-            DEV {
-                BSONObjBuilder pipelineBuilder;
-                pPipeline->toBson(&pipelineBuilder);
-                BSONObj pipelineBson(pipelineBuilder.done());
-                (log() << "\n---- pipelineBson\n" <<
-                 pipelineBson.jsonString(Strict, 1) << "\n----\n");
-            }
+            // for debugging purposes, show what the pipeline now looks like
+            DEV log() << "\n---- pipelineDescription\n" << pPipeline->serialize() << "\n----\n";
 
             /* on the shard servers, create the local pipeline */
             intrusive_ptr<ExpressionContext> pShardCtx =
                 new ExpressionContext(InterruptStatusMongod::status, NamespaceString(ns));
+            BSONObj shardObj = shardCmd.toBson();
             intrusive_ptr<Pipeline> pShardPipeline(
-                Pipeline::parseCommand(errmsg, shardBson, pShardCtx));
+                Pipeline::parseCommand(errmsg, shardObj, pShardCtx));
             if (!pShardPipeline.get()) {
                 return false;
             }

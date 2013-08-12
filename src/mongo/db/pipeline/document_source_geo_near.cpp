@@ -67,32 +67,34 @@ namespace mongo {
                                           limit);
     }
 
-    void DocumentSourceGeoNear::sourceToBson(BSONObjBuilder *pBuilder, bool explain) const {
-        BSONObjBuilder geoNear (pBuilder->subobjStart("$geoNear"));
+    Value DocumentSourceGeoNear::serialize(bool explain) const {
+        MutableDocument result;
 
         if (coordsIsArray) {
-            geoNear.appendArray("near", coords);
+            result.setField("near", Value(BSONArray(coords)));
         }
         else {
-            geoNear.append("near", coords);
+            result.setField("near", Value(coords));
         }
 
-        geoNear.append("distanceField", distanceField->getPath(false)); // not in buildGeoNearCmd
-        geoNear.append("limit", limit);
+        // not in buildGeoNearCmd
+        result.setField("distanceField", Value(distanceField->getPath(false)));
+
+        result.setField("limit", Value(limit));
 
         if (maxDistance > 0)
-            geoNear.append("maxDistance", maxDistance);
+            result.setField("maxDistance", Value(maxDistance));
 
-        geoNear.append("query", query);
-        geoNear.append("spherical", spherical);
-        geoNear.append("distanceMultiplier", distanceMultiplier);
+        result.setField("query", Value(query));
+        result.setField("spherical", Value(spherical));
+        result.setField("distanceMultiplier", Value(distanceMultiplier));
 
         if (includeLocs)
-            geoNear.append("includeLocs", includeLocs->getPath(false));
+            result.setField("includeLocs", Value(includeLocs->getPath(false)));
 
-        geoNear.append("uniqueDocs", uniqueDocs);
+        result.setField("uniqueDocs", Value(uniqueDocs));
 
-        geoNear.doneFast();
+        return Value(DOC(getSourceName() << result.freeze()));
     }
 
     BSONObj DocumentSourceGeoNear::buildGeoNearCmd() const {

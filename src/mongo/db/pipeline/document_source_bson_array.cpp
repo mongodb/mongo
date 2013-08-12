@@ -55,13 +55,10 @@ namespace mongo {
         return pSource;
     }
 
-    void DocumentSourceBsonArray::sourceToBson(
-        BSONObjBuilder *pBuilder, bool explain) const {
-
+    Value DocumentSourceBsonArray::serialize(bool explain) const {
         if (explain) {
-            BSONObj empty;
-
-            pBuilder->append("bsonArray", empty);
+            return Value(DOC("bsonArray" << Document()));
         }
+        return Value();
     }
 }

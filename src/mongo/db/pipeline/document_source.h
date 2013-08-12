@@ -159,19 +159,13 @@ namespace mongo {
         static Document documentFromBsonWithDeps(const BSONObj& object, const ParsedDeps& deps);
 
         /**
-          Add the DocumentSource to the array builder.
-
-          The default implementation calls sourceToBson() in order to
-          convert the inner part of the object which will be added to the
-          array being built here.
-
-          A subclass may choose to overwrite this rather than addToBsonArray
-          if it should output multiple stages.
-
-          @param pBuilder the array builder to add the operation to.
-          @param explain create explain output
+         * In the default case, serializes the DocumentSource and adds it to the vector<Value>.
+         *
+         * A subclass may choose to overwrite this, rather than serialize,
+         * if it should output multiple stages (eg, $sort sometimes also outputs a $limit).
          */
-        virtual void addToBsonArray(BSONArrayBuilder *pBuilder, bool explain=false) const;
+
+        virtual void serializeToArray(vector<Value>& array, bool explain = false) const;
 
         /// Returns true if doesn't require an input source (most DocumentSources do).
         virtual bool isValidInitialSource() const { return false; }
@@ -181,18 +175,6 @@ namespace mongo {
            Base constructor.
          */
         DocumentSource(const intrusive_ptr<ExpressionContext> &pExpCtx);
-
-        /**
-          Create an object that represents the document source.  The object
-          will have a single field whose name is the source's name.  This
-          will be used by the default implementation of addToBsonArray()
-          to add this object to a pipeline being represented in BSON.
-
-          @param pBuilder a blank object builder to write to
-          @param explain create explain output
-         */
-        virtual void sourceToBson(BSONObjBuilder *pBuilder,
-                                  bool explain) const = 0;
 
         /*
           Most DocumentSources have an underlying source they get their data
@@ -219,6 +201,16 @@ namespace mongo {
           This is *not* unsigned so it can be passed to BSONObjBuilder.append().
          */
         long long nRowsOut;
+
+    private:
+        /**
+         * Create a Value that represents the document source.
+         *
+         * This is used by the default implementation of serializeToArray() to add this object
+         * to a pipeline being serialized. Returning a missing() Value results in no entry
+         * being added to the array for this stage (DocumentSource).
+         */
+        virtual Value serialize(bool explain = false) const = 0;
     };
 
     /** This class marks DocumentSources that should be split between the router and the shards
@@ -281,6 +273,7 @@ namespace mongo {
     public:
         // virtuals from DocumentSource
         virtual boost::optional<Document> getNext();
+        virtual Value serialize(bool explain = false) const;
         virtual void setSource(DocumentSource *pSource);
         virtual bool isValidInitialSource() const { return true; }
 
@@ -302,10 +295,6 @@ namespace mongo {
             BSONElement *pBsonElement,
             const intrusive_ptr<ExpressionContext> &pExpCtx);
 
-    protected:
-        // virtuals from DocumentSource
-        virtual void sourceToBson(BSONObjBuilder *pBuilder, bool explain) const;
-
     private:
         DocumentSourceBsonArray(BSONElement *pBsonElement,
             const intrusive_ptr<ExpressionContext> &pExpCtx);
@@ -320,6 +309,7 @@ namespace mongo {
     public:
         // virtuals from DocumentSource
         virtual boost::optional<Document> getNext();
+        virtual Value serialize(bool explain = false) const;
         virtual void setSource(DocumentSource *pSource);
         virtual bool isValidInitialSource() const { return true; }
 
@@ -336,10 +326,6 @@ namespace mongo {
         static intrusive_ptr<DocumentSourceCommandShards> create(
             const ShardOutput& shardOutput,
             const intrusive_ptr<ExpressionContext>& pExpCtx);
-
-    protected:
-        // virtuals from DocumentSource
-        virtual void sourceToBson(BSONObjBuilder *pBuilder, bool explain) const;
 
     private:
         DocumentSourceCommandShards(const ShardOutput& shardOutput,
@@ -374,6 +360,7 @@ namespace mongo {
         // virtuals from DocumentSource
         virtual ~DocumentSourceCursor();
         virtual boost::optional<Document> getNext();
+        virtual Value serialize(bool explain = false) const;
         virtual void setSource(DocumentSource *pSource);
         virtual bool coalesce(const intrusive_ptr<DocumentSource>& nextSource);
         virtual bool isValidInitialSource() const { return true; }
@@ -440,9 +427,6 @@ namespace mongo {
 
         /// returns -1 for no limit
         long long getLimit() const;
-    protected:
-        // virtuals from DocumentSource
-        virtual void sourceToBson(BSONObjBuilder *pBuilder, bool explain) const;
 
     private:
         DocumentSourceCursor(
@@ -531,6 +515,7 @@ namespace mongo {
         virtual const char *getSourceName() const;
         virtual GetDepsReturn getDependencies(set<string>& deps) const;
         virtual void dispose();
+        virtual Value serialize(bool explain = false) const;
 
         /**
           Create a new grouping DocumentSource.
@@ -591,10 +576,6 @@ namespace mongo {
         virtual intrusive_ptr<DocumentSource> getRouterSource();
 
         static const char groupName[];
-
-    protected:
-        // virtuals from DocumentSource
-        virtual void sourceToBson(BSONObjBuilder *pBuilder, bool explain) const;
 
     private:
         DocumentSourceGroup(const intrusive_ptr<ExpressionContext> &pExpCtx);
@@ -660,6 +641,7 @@ namespace mongo {
     public:
         // virtuals from DocumentSource
         virtual const char *getSourceName() const;
+        virtual Value serialize(bool explain = false) const;
 
         /**
           Create a filter.
@@ -686,10 +668,6 @@ namespace mongo {
 
         static const char matchName[];
 
-    protected:
-        // virtuals from DocumentSource
-        virtual void sourceToBson(BSONObjBuilder *pBuilder, bool explain) const;
-
         // virtuals from DocumentSourceFilterBase
         virtual bool accept(const Document& pDocument) const;
 
@@ -710,6 +688,7 @@ namespace mongo {
         virtual void setSource(DocumentSource *pSource);
         virtual const char *getSourceName() const;
         virtual void dispose();
+        virtual Value serialize(bool explain = false) const;
         virtual bool isValidInitialSource() const { return true; }
 
         static intrusive_ptr<DocumentSource> createFromBson(
@@ -721,9 +700,6 @@ namespace mongo {
             const intrusive_ptr<ExpressionContext> &pExpCtx);
 
         static const char name[];
-    protected:
-        // virtuals from DocumentSource
-        virtual void sourceToBson(BSONObjBuilder *pBuilder, bool explain) const;
 
     private:
 
@@ -757,6 +733,7 @@ namespace mongo {
         virtual ~DocumentSourceOut();
         virtual boost::optional<Document> getNext();
         virtual const char *getSourceName() const;
+        virtual Value serialize(bool explain = false) const;
 
         // Virtuals for SplittableDocumentSource
         virtual intrusive_ptr<DocumentSource> getShardSource() { return NULL; }
@@ -779,10 +756,6 @@ namespace mongo {
             const intrusive_ptr<ExpressionContext> &pExpCtx);
 
         static const char outName[];
-
-    protected:
-        // virtuals from DocumentSource
-        virtual void sourceToBson(BSONObjBuilder *pBuilder, bool explain) const;
 
     private:
         DocumentSourceOut(const NamespaceString& outputNs,
@@ -807,6 +780,7 @@ namespace mongo {
         virtual boost::optional<Document> getNext();
         virtual const char *getSourceName() const;
         virtual void optimize();
+        virtual Value serialize(bool explain = false) const;
 
         virtual GetDepsReturn getDependencies(set<string>& deps) const;
 
@@ -828,10 +802,6 @@ namespace mongo {
 
         /** projection as specified by the user */
         BSONObj getRaw() const { return _raw; }
-
-    protected:
-        // virtuals from DocumentSource
-        virtual void sourceToBson(BSONObjBuilder *pBuilder, bool explain) const;
 
     private:
         DocumentSourceProject(const intrusive_ptr<ExpressionContext>& pExpCtx,
@@ -859,8 +829,7 @@ namespace mongo {
         static intrusive_ptr<DocumentSource> createFromBson(BSONElement* bsonElement,
                 const intrusive_ptr<ExpressionContext>& expCtx);
 
-    protected:
-        virtual void sourceToBson(BSONObjBuilder* pBuilder, bool explain) const;
+        virtual Value serialize(bool explain = false) const;
 
     private:
         DocumentSourceRedact(const intrusive_ptr<ExpressionContext>& expCtx,
@@ -877,7 +846,7 @@ namespace mongo {
         // virtuals from DocumentSource
         virtual boost::optional<Document> getNext();
         virtual const char *getSourceName() const;
-        virtual void addToBsonArray(BSONArrayBuilder *pBuilder, bool explain=false) const;
+        virtual void serializeToArray(vector<Value>& array, bool explain = false) const;
         virtual bool coalesce(const intrusive_ptr<DocumentSource> &pNextSource);
         virtual void dispose();
 
@@ -902,13 +871,8 @@ namespace mongo {
         */
         void addKey(const string &fieldPath, bool ascending);
 
-        /**
-          Write out an object whose contents are the sort key.
-
-          @param pBuilder initialized object builder.
-          @param fieldPrefix specify whether or not to include the field prefix
-         */
-        void sortKeyToBson(BSONObjBuilder *pBuilder, bool usePrefix) const;
+        /// Write out a Document whose contents are the sort key.
+        Document serializeSortKey() const;
 
         /**
           Create a sorting DocumentSource from BSON.
@@ -937,14 +901,13 @@ namespace mongo {
         intrusive_ptr<DocumentSourceLimit> getLimitSrc() const { return limitSrc; }
 
         static const char sortName[];
-    protected:
-        // virtuals from DocumentSource
-        virtual void sourceToBson(BSONObjBuilder *pBuilder, bool explain) const {
-            verify(false); // should call addToBsonArray instead
-        }
 
     private:
         DocumentSourceSort(const intrusive_ptr<ExpressionContext> &pExpCtx);
+
+        virtual Value serialize(bool explain = false) const {
+            verify(false); // should call addToBsonArray instead
+        }
 
         /*
           Before returning anything, this source must fetch everything from
@@ -992,6 +955,7 @@ namespace mongo {
         virtual boost::optional<Document> getNext();
         virtual const char *getSourceName() const;
         virtual bool coalesce(const intrusive_ptr<DocumentSource> &pNextSource);
+        virtual Value serialize(bool explain = false) const;
 
         virtual GetDepsReturn getDependencies(set<string>& deps) const {
             return SEE_NEXT; // This doesn't affect needed fields
@@ -1032,10 +996,6 @@ namespace mongo {
 
         static const char limitName[];
 
-    protected:
-        // virtuals from DocumentSource
-        virtual void sourceToBson(BSONObjBuilder *pBuilder, bool explain) const;
-
     private:
         DocumentSourceLimit(const intrusive_ptr<ExpressionContext> &pExpCtx,
                             long long limit);
@@ -1051,6 +1011,7 @@ namespace mongo {
         virtual boost::optional<Document> getNext();
         virtual const char *getSourceName() const;
         virtual bool coalesce(const intrusive_ptr<DocumentSource> &pNextSource);
+        virtual Value serialize(bool explain = false) const;
 
         virtual GetDepsReturn getDependencies(set<string>& deps) const {
             return SEE_NEXT; // This doesn't affect needed fields
@@ -1090,10 +1051,6 @@ namespace mongo {
 
         static const char skipName[];
 
-    protected:
-        // virtuals from DocumentSource
-        virtual void sourceToBson(BSONObjBuilder *pBuilder, bool explain) const;
-
     private:
         DocumentSourceSkip(const intrusive_ptr<ExpressionContext> &pExpCtx);
 
@@ -1108,6 +1065,7 @@ namespace mongo {
         // virtuals from DocumentSource
         virtual boost::optional<Document> getNext();
         virtual const char *getSourceName() const;
+        virtual Value serialize(bool explain = false) const;
 
         virtual GetDepsReturn getDependencies(set<string>& deps) const;
 
@@ -1126,10 +1084,6 @@ namespace mongo {
             const intrusive_ptr<ExpressionContext> &pExpCtx);
 
         static const char unwindName[];
-
-    protected:
-        // virtuals from DocumentSource
-        virtual void sourceToBson(BSONObjBuilder *pBuilder, bool explain) const;
 
     private:
         DocumentSourceUnwind(const intrusive_ptr<ExpressionContext> &pExpCtx);
@@ -1154,6 +1108,7 @@ namespace mongo {
         virtual void setSource(DocumentSource *pSource); // errors out since this must be first
         virtual bool coalesce(const intrusive_ptr<DocumentSource> &pNextSource);
         virtual bool isValidInitialSource() const { return true; }
+        virtual Value serialize(bool explain = false) const;
 
         // Virtuals for SplittableDocumentSource
         virtual intrusive_ptr<DocumentSource> getShardSource();
@@ -1170,10 +1125,6 @@ namespace mongo {
         // this should only be used for testing
         static intrusive_ptr<DocumentSourceGeoNear> create(
             const intrusive_ptr<ExpressionContext> &pCtx);
-
-    protected:
-        // virtuals from DocumentSource
-        virtual void sourceToBson(BSONObjBuilder *pBuilder, bool explain) const;
 
     private:
         DocumentSourceGeoNear(const intrusive_ptr<ExpressionContext> &pExpCtx);

@@ -18,6 +18,7 @@
 
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/value.h"
 
 namespace mongo {
 
@@ -55,18 +56,11 @@ namespace mongo {
         }
     }
 
-    void DocumentSource::addToBsonArray(
-        BSONArrayBuilder *pBuilder, bool explain) const {
-        BSONObjBuilder insides;
-        sourceToBson(&insides, explain);
-
-/* No statistics at this time
-        if (explain) {
-            insides.append("nOut", nOut);
+    void DocumentSource::serializeToArray(vector<Value>& array, bool explain) const {
+        Value entry = serialize(explain);
+        if (!entry.missing()) {
+            array.push_back(entry);
         }
-*/
-
-        pBuilder->append(insides.done());
     }
 
     BSONObj DocumentSource::depsToProjection(const set<string>& deps) {

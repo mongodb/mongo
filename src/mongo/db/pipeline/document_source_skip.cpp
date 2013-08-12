@@ -65,9 +65,8 @@ namespace mongo {
         return pSource->getNext();
     }
 
-    void DocumentSourceSkip::sourceToBson(
-        BSONObjBuilder *pBuilder, bool explain) const {
-        pBuilder->append("$skip", _skip);
+    Value DocumentSourceSkip::serialize(bool explain) const {
+        return Value(DOC(getSourceName() << _skip));
     }
 
     intrusive_ptr<DocumentSourceSkip> DocumentSourceSkip::create(

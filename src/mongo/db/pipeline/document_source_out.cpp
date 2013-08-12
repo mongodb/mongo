@@ -157,10 +157,10 @@ namespace mongo {
         return new DocumentSourceOut(outputNs, pExpCtx);
     }
 
-    void DocumentSourceOut::sourceToBson(BSONObjBuilder *pBuilder, bool explain) const {
+    Value DocumentSourceOut::serialize(bool explain) const {
         massert(17000, "$out shouldn't have different db than input",
                 _outputNs.db() == pExpCtx->ns.db());
 
-        pBuilder->append("$out", _outputNs.coll());
+        return Value(DOC(getSourceName() << _outputNs.coll()));
     }
 }

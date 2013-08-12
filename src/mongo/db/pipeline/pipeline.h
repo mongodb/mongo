@@ -20,6 +20,7 @@
 
 #include "mongo/pch.h"
 
+#include "mongo/db/pipeline/value.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/timer.h"
 
@@ -98,7 +99,7 @@ namespace mongo {
 
           @param the builder to write the command to
         */
-        void toBson(BSONObjBuilder *pBuilder) const;
+        Document serialize() const;
 
         /** Stitch together the source pointers (by calling setSource) for each source in sources.
          *  Must be called after optimize and addInitialSource but before trying to get results.
@@ -167,13 +168,11 @@ namespace mongo {
 
         Pipeline(const intrusive_ptr<ExpressionContext> &pCtx);
 
-        /*
-          Write the pipeline's operators to the given array, with the
-          explain flag true (for DocumentSource::addToBsonArray()).
-
-          @param pArrayBuilder where to write the ops to
+        /**
+         * Write the pipeline's operators to a vector<Value>, with the
+         * explain flag true (for DocumentSource::serializeToArray()).
          */
-        void writeExplainOps(BSONArrayBuilder *pArrayBuilder) const;
+        vector<Value> writeExplainOps() const;
 
         /*
           Write the pipeline's operators to the given result document,

@@ -63,9 +63,8 @@ namespace mongo {
         return pSource->getNext();
     }
 
-    void DocumentSourceLimit::sourceToBson(
-        BSONObjBuilder *pBuilder, bool explain) const {
-        pBuilder->append("$limit", limit);
+    Value DocumentSourceLimit::serialize(bool explain) const {
+        return Value(DOC(getSourceName() << limit));
     }
 
     intrusive_ptr<DocumentSourceLimit> DocumentSourceLimit::create(
