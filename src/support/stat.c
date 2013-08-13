@@ -345,6 +345,11 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	stats->cursor_search.desc = "Btree cursor search calls";
 	stats->cursor_search_near.desc = "Btree cursor search near calls";
 	stats->cursor_update.desc = "Btree cursor update calls";
+	stats->dh_conn_handles.desc = "dhandle: connection dhandles swept";
+	stats->dh_evict_locks.desc = "dhandle: locked by eviction";
+	stats->dh_session_handles.desc = "dhandle: session dhandles swept";
+	stats->dh_sweep_evict.desc = "dhandle: sweeps conflicting with evict";
+	stats->dh_sweeps.desc = "dhandle: number of sweep attempts";
 	stats->file_open.desc = "files currently open";
 	stats->log_bytes_user.desc =
 	    "log: total user provided log bytes written";
@@ -429,6 +434,11 @@ __wt_stat_clear_connection_stats(void *stats_arg)
 	stats->cursor_search.v = 0;
 	stats->cursor_search_near.v = 0;
 	stats->cursor_update.v = 0;
+	stats->dh_conn_handles.v = 0;
+	stats->dh_evict_locks.v = 0;
+	stats->dh_session_handles.v = 0;
+	stats->dh_sweep_evict.v = 0;
+	stats->dh_sweeps.v = 0;
 	stats->log_bytes_user.v = 0;
 	stats->log_bytes_written.v = 0;
 	stats->log_reads.v = 0;

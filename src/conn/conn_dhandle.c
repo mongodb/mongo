@@ -341,6 +341,87 @@ err:		F_CLR(btree, WT_BTREE_SPECIAL_FLAGS);
 }
 
 /*
+ * __conn_dhandle_sweep --
+ *	Check if it's time to clean up the connection dhandle list.  If so
+ *	remove items onto a private list and release it for eviction.  We
+ *	hold the schema lock.  Eviction does not when it walks this list.
+ */
+static int
+__conn_dhandle_sweep(WT_SESSION_IMPL *session)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_DATA_HANDLE *dhandle, *dhandle_next, *save_dhandle;
+	TAILQ_HEAD(__wt_dhandle_qh, __wt_data_handle) sweepqh;
+	WT_DECL_RET;
+
+	conn = S2C(session);
+	if (conn->dhandle_dead < CONN_DHANDLE_SWEEP_PERIOD)
+		return (0);
+	/*
+	 * Coordinate with eviction or other threads sweeping.  If the lock
+	 * is not free, we're done.  Cleaning up the list is a best effort only.
+	 */
+	if (__wt_spin_trylock(session, &conn->dhandle_lock) != 0) {
+		WT_CSTAT_INCR(session, dh_sweep_evict);
+		return (0);
+	}
+	/*
+	 * Move dead items off the list onto a local list and unlock the
+	 * lock so that eviction can be unblocked.
+	 */
+	TAILQ_INIT(&sweepqh);
+	dhandle = TAILQ_FIRST(&conn->dhqh);
+	while (dhandle != NULL) {
+		dhandle_next = TAILQ_NEXT(dhandle, q);
+		if (!F_ISSET(dhandle, WT_DHANDLE_OPEN) &&
+		    dhandle->refcnt == 0) {
+			WT_CSTAT_INCR(session, dh_conn_handles);
+			TAILQ_REMOVE(&conn->dhqh, dhandle, q);
+			TAILQ_INSERT_HEAD(&sweepqh, dhandle, q);
+		}
+		dhandle = dhandle_next;
+	}
+	__wt_spin_unlock(session, &conn->dhandle_lock);
+	/*
+	 * Now actually clean up any dead handles.
+	 */
+	while ((dhandle = TAILQ_FIRST(&sweepqh)) != NULL) {
+		TAILQ_REMOVE(&sweepqh, dhandle, q);
+		/*
+		 * Record any errors, but still discard all of them.
+		 * This call will clear the session dhandle field.  Save
+		 * the value and restore it after it returns.
+		 */
+		save_dhandle = session->dhandle;
+		WT_TRET(__wt_conn_dhandle_discard_single(session, dhandle));
+		session->dhandle = save_dhandle;
+	}
+	conn->dhandle_dead = 0;
+	return (ret);
+}
+
+/*
+ * Wrapper function to first sweep the session and possibly the connection
+ * dhandle lists.  This is only called when a session notices it has dead
+ * handles on its session dhandle list.  Must be called with schema lock.
+ */
+int
+__wt_conn_dhandle_sweep(WT_SESSION_IMPL *session,
+    const char *name, const char *ckpt, const char *op_cfg[],
+    uint32_t flags, int dead)
+{
+	WT_DECL_RET;
+
+	if (dead) {
+		WT_CSTAT_INCR(session, dh_sweeps);
+		WT_TRET(__wt_session_dhandle_sweep(session));
+		WT_TRET(__conn_dhandle_sweep(session));
+	}
+	WT_TRET(__wt_conn_btree_get(session, name, ckpt, op_cfg, flags));
+	return (ret);
+}
+
+/*
  * __wt_conn_btree_get --
  *	Get an open btree file handle, otherwise open a new one.
  */

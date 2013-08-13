@@ -557,6 +557,12 @@ extern int __wt_conn_remove_compressor( WT_CONNECTION_IMPL *conn,
 extern int __wt_conn_remove_data_source( WT_CONNECTION_IMPL *conn,
     WT_NAMED_DATA_SOURCE *ndsrc);
 extern int __wt_conn_btree_sync_and_close(WT_SESSION_IMPL *session);
+extern int __wt_conn_dhandle_sweep(WT_SESSION_IMPL *session,
+    const char *name,
+    const char *ckpt,
+    const char *op_cfg[],
+    uint32_t flags,
+    int dead);
 extern int __wt_conn_btree_get(WT_SESSION_IMPL *session,
     const char *name,
     const char *ckpt,
@@ -1151,6 +1157,7 @@ extern int __wt_session_get_btree_ckpt(WT_SESSION_IMPL *session,
     const char *uri,
     const char *cfg[],
     uint32_t flags);
+extern int __wt_session_dhandle_sweep(WT_SESSION_IMPL *session);
 extern int __wt_session_get_btree(WT_SESSION_IMPL *session,
     const char *uri,
     const char *checkpoint,

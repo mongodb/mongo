@@ -205,6 +205,28 @@ retry:			WT_RET(__wt_meta_checkpoint_last_name(
 	return (ret);
 }
 
+int
+__wt_session_dhandle_sweep(WT_SESSION_IMPL *session)
+{
+	WT_DATA_HANDLE *dhandle;
+	WT_DATA_HANDLE_CACHE *dhandle_cache, *dhandle_cache_next;
+	WT_DECL_RET;
+
+	dhandle_cache = TAILQ_FIRST(&session->dhandles);
+	while (dhandle_cache != NULL) {
+		dhandle_cache_next = TAILQ_NEXT(dhandle_cache, q);
+		dhandle = dhandle_cache->dhandle;
+		if (!F_ISSET(dhandle, WT_DHANDLE_OPEN)) {
+			WT_CSTAT_INCR(session, dh_session_handles);
+			WT_TRET(__wt_session_discard_btree(
+			    session, dhandle_cache));
+		}
+		dhandle_cache = dhandle_cache_next;
+	}
+	return (ret);
+
+}
+
 /*
  * __wt_session_get_btree --
  *	Get a btree handle for the given name, set session->dhandle.
@@ -217,14 +239,20 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 	WT_DATA_HANDLE_CACHE *dhandle_cache;
 	WT_DECL_RET;
 	uint64_t hash;
-	int candidate;
+	int candidate, dead;
 
 	dhandle = NULL;
-	candidate = 0;
+	candidate = dead = 0;
 
 	hash = __wt_hash_city64(uri, strlen(uri));
 	TAILQ_FOREACH(dhandle_cache, &session->dhandles, q) {
 		dhandle = dhandle_cache->dhandle;
+		if (!LF_ISSET(WT_DHANDLE_LOCK_ONLY) &&
+		    !F_ISSET(dhandle, WT_DHANDLE_EXCLUSIVE|WT_DHANDLE_OPEN) &&
+		    dead == 0) {
+			dead++;
+			S2C(session)->dhandle_dead++;
+		}
 		if (hash != dhandle->name_hash ||
 		    strcmp(uri, dhandle->name) != 0)
 			continue;
@@ -253,10 +281,13 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 	if (dhandle_cache == NULL) {
 		/*
 		 * If we don't already hold the schema lock, get it now so that
-		 * we can find and/or open the handle.
+		 * we can find and/or open the handle.  We call a wrapper
+		 * function that will optionally sweep the handle list to
+		 * remove any dead handles.
 		 */
 		WT_WITH_SCHEMA_LOCK_OPT(session, ret =
-		    __wt_conn_btree_get(session, uri, checkpoint, cfg, flags));
+		    __wt_conn_dhandle_sweep(
+		    session, uri, checkpoint, cfg, flags, dead));
 		WT_RET(ret);
 
 		if (!candidate)
