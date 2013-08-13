@@ -111,18 +111,18 @@ int lprintf(CONFIG *cfg, int err, uint32_t level, const char *fmt, ...)
 #endif
 ;
 void *checkpoint_worker(void *);
-int find_table_count(CONFIG *);
-void *insert_thread(void *);
-int connection_reconfigure(WT_CONNECTION *, const char *);
 void config_assign(CONFIG *, const CONFIG *);
 void config_free(CONFIG *);
 int config_opt(CONFIG *, WT_CONFIG_ITEM *, WT_CONFIG_ITEM *);
-int config_opt_str(CONFIG *, WT_SESSION *, const char *, const char *);
-int config_opt_int(CONFIG *, WT_SESSION *, const char *, const char *);
 int config_opt_file(CONFIG *, WT_SESSION *, const char *);
+int config_opt_int(CONFIG *, WT_SESSION *, const char *, const char *);
 int config_opt_line(CONFIG *, WT_SESSION *, const char *);
+int config_opt_str(CONFIG *, WT_SESSION *, const char *, const char *);
 void config_opt_usage(void);
+int connection_reconfigure(WT_CONNECTION *, const char *);
+int find_table_count(CONFIG *);
 void indent_lines(const char *, const char *);
+void *insert_thread(void *);
 void *populate_thread(void *);
 void print_config(CONFIG *);
 void *read_thread(void *);
@@ -134,8 +134,8 @@ char *strstr_right(const char *str, const char *match, const char **rightp);
 void *update_thread(void *);
 void usage(void);
 void worker(CONFIG *, uint32_t);
-void wtperf_srand(CONFIG *);
 uint64_t wtperf_rand(CONFIG *);
+void wtperf_srand(CONFIG *);
 uint64_t wtperf_value_range(CONFIG *);
 
 #define	DEFAULT_LSM_CONFIG						\
