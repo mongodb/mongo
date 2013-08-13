@@ -205,7 +205,6 @@ namespace {
         clusterAdminRoleWriteActions.addAction(ActionType::fsync);
         clusterAdminRoleWriteActions.addAction(ActionType::inprog);
         clusterAdminRoleWriteActions.addAction(ActionType::killop);
-        clusterAdminRoleWriteActions.addAction(ActionType::mergeChunks);
         clusterAdminRoleWriteActions.addAction(ActionType::moveChunk);
         clusterAdminRoleWriteActions.addAction(ActionType::movePrimary);
         clusterAdminRoleWriteActions.addAction(ActionType::removeShard);

@@ -464,27 +464,28 @@ namespace mongo {
         return isPending;
     }
 
-    bool CollectionMetadata::getNextChunk( const BSONObj& lookupKey, ChunkType* chunk ) const {
-
-        RangeMap::const_iterator upperChunkIt = _chunksMap.upper_bound( lookupKey );
-        RangeMap::const_iterator lowerChunkIt = upperChunkIt;
-        if ( upperChunkIt != _chunksMap.begin() ) --lowerChunkIt;
-        else lowerChunkIt = _chunksMap.end();
-
-        if ( lowerChunkIt != _chunksMap.end() &&
-             lowerChunkIt->second.woCompare( lookupKey ) > 0 ) {
-            chunk->setMin( lowerChunkIt->first );
-            chunk->setMax( lowerChunkIt->second );
+    bool CollectionMetadata::getNextChunk(const BSONObj& lookupKey,
+                                         ChunkType* chunk) const {
+        if (_chunksMap.empty()) {
             return true;
         }
 
-        if ( upperChunkIt != _chunksMap.end() ) {
-            chunk->setMin( upperChunkIt->first );
-            chunk->setMax( upperChunkIt->second );
-            return true;
+        RangeMap::const_iterator it;
+        if (lookupKey.isEmpty()) {
+            it = _chunksMap.begin();
+            chunk->setMin(it->first);
+            chunk->setMax(it->second);
+            return _chunksMap.size() == 1;
         }
 
-        return false;
+        it = _chunksMap.upper_bound(lookupKey);
+        if (it != _chunksMap.end()) {
+            chunk->setMin(it->first);
+            chunk->setMax(it->second);
+            return false;
+        }
+
+        return true;
     }
 
     BSONObj CollectionMetadata::toBSON() const {
@@ -647,16 +648,6 @@ namespace mongo {
         if ( _collVersion.majorVersion() == 0 ) return false;
         if ( _collVersion.epoch() != _shardVersion.epoch() ) return false;
         return true;
-    }
-
-    bool CollectionMetadata::isValidKey( const BSONObj& key ) const {
-        BSONObjIterator it( _keyPattern );
-        BSONObjBuilder maxKeyB;
-        while ( it.more() ) {
-            BSONElement next = it.next();
-            if ( !key.hasField( next.fieldName() ) ) return false;
-        }
-        return key.nFields() == _keyPattern.nFields();
     }
 
     void CollectionMetadata::fillRanges() {
