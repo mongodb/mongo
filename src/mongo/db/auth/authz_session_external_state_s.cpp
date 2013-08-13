@@ -31,7 +31,7 @@ namespace mongo {
                     AuthzSessionExternalStateServerCommon(authzManager) {}
     AuthzSessionExternalStateMongos::~AuthzSessionExternalStateMongos() {}
 
-    void AuthzSessionExternalStateMongos::onAddAuthorizedPrincipal(Principal*) { }
+    void AuthzSessionExternalStateMongos::onAddAuthorizedUser() { }
 
     void AuthzSessionExternalStateMongos::onLogoutDatabase(const std::string&) { }
 

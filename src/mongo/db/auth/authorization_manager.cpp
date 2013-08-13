@@ -27,7 +27,6 @@
 #include "mongo/base/status.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/privilege.h"
-#include "mongo/db/auth/privilege_set.h"
 #include "mongo/db/auth/user.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/auth/user_name_hash.h"
@@ -471,63 +470,6 @@ namespace {
         return Status::OK();
     }
 
-    Status AuthorizationManager::buildPrivilegeSet(const std::string& dbname,
-                                                   const UserName& user,
-                                                   const BSONObj& privilegeDocument,
-                                                   PrivilegeSet* result) const {
-        if (!privilegeDocument.hasField(ROLES_FIELD_NAME)) {
-            // Old-style (v2.2 and prior) privilege document
-            if (AuthorizationManager::getSupportOldStylePrivilegeDocuments()) {
-                return _buildPrivilegeSetFromOldStylePrivilegeDocument(dbname,
-                                                                       user,
-                                                                       privilegeDocument,
-                                                                       result);
-            }
-            else {
-                return _oldPrivilegeFormatNotSupported();
-            }
-        }
-        else {
-            return _buildPrivilegeSetFromExtendedPrivilegeDocument(
-                    dbname, user, privilegeDocument, result);
-        }
-    }
-
-    Status AuthorizationManager::_buildPrivilegeSetFromOldStylePrivilegeDocument(
-            const std::string& dbname,
-            const UserName& user,
-            const BSONObj& privilegeDocument,
-            PrivilegeSet* result) const {
-        if (!(privilegeDocument.hasField(AuthorizationManager::USER_NAME_FIELD_NAME) &&
-              privilegeDocument.hasField(AuthorizationManager::PASSWORD_FIELD_NAME))) {
-
-            return Status(ErrorCodes::UnsupportedFormat,
-                          mongoutils::str::stream() << "Invalid old-style privilege document "
-                                  "received when trying to extract privileges: "
-                                   << privilegeDocument,
-                          0);
-        }
-        std::string userName = privilegeDocument[AuthorizationManager::USER_NAME_FIELD_NAME].str();
-        if (userName != user.getUser()) {
-            return Status(ErrorCodes::BadValue,
-                          mongoutils::str::stream() << "Principal name from privilege document \""
-                                  << userName
-                                  << "\" doesn't match name of provided Principal \""
-                                  << user.getUser()
-                                  << "\"",
-                          0);
-        }
-
-        bool readOnly = privilegeDocument[READONLY_FIELD_NAME].trueValue();
-        ActionSet actions = getActionsForOldStyleUser(dbname, readOnly);
-        std::string resourceName = (dbname == ADMIN_DBNAME || dbname == LOCAL_DBNAME) ?
-            AuthorizationManager::WILDCARD_RESOURCE_NAME : dbname;
-        result->grantPrivilege(Privilege(resourceName, actions), user);
-
-        return Status::OK();
-    }
-
-
     /**
      * Adds to "outPrivileges" the privileges associated with having the named "role" on "dbname".
      *
@@ -591,90 +533,6 @@ namespace {
             warning() << "No such role, \"" << role << "\", in database " << dbname <<
                     ". No privileges will be acquired from this role" << endl;
         }
-    }
-
-    /**
-     * Given a database name and a BSONElement representing an array of roles, populates
-     * "outPrivileges" with the privileges associated with the given roles on the named database.
-     *
-     * Returns Status::OK() on success.
-     */
-    Status _getPrivilegesFromRoles(const std::string& dbname,
-                                   const BSONElement& rolesElement,
-                                   std::vector<Privilege>* outPrivileges) {
-
-        static const char privilegesTypeMismatchMessage[] =
-            "Roles must be enumerated in an array of strings.";
-
-        if (dbname == AuthorizationManager::WILDCARD_RESOURCE_NAME) {
-            return Status(ErrorCodes::BadValue,
-                          AuthorizationManager::WILDCARD_RESOURCE_NAME +
-                                  " is an invalid database name.");
-        }
-
-        if (rolesElement.type() != Array)
-            return Status(ErrorCodes::TypeMismatch, privilegesTypeMismatchMessage);
-
-        for (BSONObjIterator iter(rolesElement.embeddedObject()); iter.more(); iter.next()) {
-            BSONElement roleElement = *iter;
-            if (roleElement.type() != String)
-                return Status(ErrorCodes::TypeMismatch, privilegesTypeMismatchMessage);
-            _addPrivilegesForSystemRole(dbname, roleElement.str(), outPrivileges);
-        }
-        return Status::OK();
-    }
-
-    Status AuthorizationManager::_buildPrivilegeSetFromExtendedPrivilegeDocument(
-            const std::string& dbname,
-            const UserName& user,
-            const BSONObj& privilegeDocument,
-            PrivilegeSet* result) const {
-
-        if (!privilegeDocument[READONLY_FIELD_NAME].eoo()) {
-            return Status(ErrorCodes::UnsupportedFormat,
-                          "Privilege documents may not contain both \"readonly\" and "
-                          "\"roles\" fields");
-        }
-
-        std::vector<Privilege> acquiredPrivileges;
-
-        // Acquire privileges on "dbname".
-        Status status = _getPrivilegesFromRoles(
-                dbname, privilegeDocument[ROLES_FIELD_NAME], &acquiredPrivileges);
-        if (!status.isOK())
-            return status;
-
-        // If "dbname" is the admin database, handle the otherDBPrivileges field, which
-        // grants privileges on databases other than "dbname".
-        BSONElement otherDbPrivileges = privilegeDocument[OTHER_DB_ROLES_FIELD_NAME];
-        if (dbname == ADMIN_DBNAME) {
-            switch (otherDbPrivileges.type()) {
-            case EOO:
-                break;
-            case Object: {
-                for (BSONObjIterator iter(otherDbPrivileges.embeddedObject());
-                     iter.more(); iter.next()) {
-
-                    BSONElement rolesElement = *iter;
-                    status = _getPrivilegesFromRoles(
-                            rolesElement.fieldName(), rolesElement, &acquiredPrivileges);
-                    if (!status.isOK())
-                        return status;
-                }
-                break;
-            }
-            default:
-                return Status(ErrorCodes::TypeMismatch,
-                              "Field \"otherDBRoles\" must be an object, if present.");
-            }
-        }
-        else if (!otherDbPrivileges.eoo()) {
-            return Status(ErrorCodes::BadValue, "Only the admin database may contain a field "
-                          "called \"otherDBRoles\"");
-        }
-
-        result->grantPrivileges(acquiredPrivileges, user);
-        return Status::OK();
     }
 
     Status AuthorizationManager::acquireUser(const UserName& userName, User** acquiredUser) {
@@ -764,21 +622,21 @@ namespace {
      */
     Status _initializeUserCredentialsFromPrivilegeDocument(User* user, const BSONObj& privDoc) {
         User::CredentialData credentials;
-        if (privDoc.hasField("pwd")) {
-            credentials.password = privDoc["pwd"].String();
+        if (privDoc.hasField(AuthorizationManager::PASSWORD_FIELD_NAME)) {
+            credentials.password = privDoc[AuthorizationManager::PASSWORD_FIELD_NAME].String();
             credentials.isExternal = false;
         }
-        else if (privDoc.hasField("userSource")) {
-            std::string userSource = privDoc["userSource"].String();
+        else if (privDoc.hasField(AuthorizationManager::USER_SOURCE_FIELD_NAME)) {
+            std::string userSource = privDoc[AuthorizationManager::USER_SOURCE_FIELD_NAME].String();
             if (userSource != "$external") {
-                return Status(ErrorCodes::FailedToParse,
+                return Status(ErrorCodes::UnsupportedFormat,
                               "Cannot extract credentials from user documents without a password "
                               "and with userSource != \"$external\"");
             } else {
                 credentials.isExternal = true;
             }
         } else {
-            return Status(ErrorCodes::FailedToParse,
+            return Status(ErrorCodes::UnsupportedFormat,
                           "Invalid user document: must have one of \"pwd\" and \"userSource\"");
         }
 
@@ -831,6 +689,13 @@ namespace {
 
     Status _initializeUserRolesFromV1PrivilegeDocument(
                 User* user, const BSONObj& privDoc, const StringData& dbname) {
+
+        if (!privDoc[READONLY_FIELD_NAME].eoo()) {
+            return Status(ErrorCodes::UnsupportedFormat,
+                          "Privilege documents may not contain both \"readonly\" and "
+                          "\"roles\" fields");
+        }
+
         Status status = _initializeUserRolesFromV1RolesArray(user,
                                                              privDoc[ROLES_FIELD_NAME],
                                                              dbname);
@@ -864,8 +729,8 @@ namespace {
             }
         }
         else if (!otherDbPrivileges.eoo()) {
-            return Status(ErrorCodes::BadValue, "Only the admin database may contain a field "
-                          "called \"otherDBRoles\"");
+            return Status(ErrorCodes::UnsupportedFormat,
+                          "Only the admin database may contain a field called \"otherDBRoles\"");
         }
 
         return Status::OK();
@@ -906,6 +771,17 @@ namespace {
 
     Status AuthorizationManager::_initializeUserFromPrivilegeDocument(
             User* user, const BSONObj& privDoc) const {
+        std::string userName = privDoc[AuthorizationManager::USER_NAME_FIELD_NAME].str();
+        if (userName != user->getName().getUser()) {
+            return Status(ErrorCodes::BadValue,
+                          mongoutils::str::stream() << "User name from privilege document \""
+                                  << userName
+                                  << "\" doesn't match name of provided User \""
+                                  << user->getName().getUser()
+                                  << "\"",
+                          0);
+        }
+
         Status status = _initializeUserCredentialsFromPrivilegeDocument(user, privDoc);
         if (!status.isOK()) {
             return status;

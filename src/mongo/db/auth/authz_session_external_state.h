@@ -57,7 +57,7 @@ namespace mongo {
         // Authorization event hooks
 
         // Handle any global state which needs to be updated when a new user has been authorized
-        virtual void onAddAuthorizedPrincipal(Principal*) = 0;
+        virtual void onAddAuthorizedUser() = 0;
 
         // Handle any global state which needs to be updated when a user logs out
         virtual void onLogoutDatabase(const std::string& dbname) = 0;

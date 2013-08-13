@@ -35,7 +35,7 @@ namespace mongo {
 
         virtual void startRequest();
 
-        virtual void onAddAuthorizedPrincipal(Principal*);
+        virtual void onAddAuthorizedUser();
 
         virtual void onLogoutDatabase(const std::string&);
 

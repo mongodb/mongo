@@ -24,7 +24,6 @@
 #include "mongo/base/status.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/authz_manager_external_state.h"
-#include "mongo/db/auth/privilege_set.h"
 #include "mongo/db/auth/user.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/auth/user_name_hash.h"
@@ -113,13 +112,6 @@ namespace mongo {
         // Returns Status::OK() if the document is good, or Status(ErrorCodes::BadValue), otherwise.
         Status checkValidPrivilegeDocument(const StringData& dbname, const BSONObj& doc);
 
-        // Parses the privilege document and returns a PrivilegeSet of all the Privileges that
-        // the privilege document grants.
-        Status buildPrivilegeSet(const std::string& dbname,
-                                 const UserName& user,
-                                 const BSONObj& privilegeDocument,
-                                 PrivilegeSet* result) const;
-
         // Given a database name and a readOnly flag return an ActionSet describing all the actions
         // that an old-style user with those attributes should be given.
         ActionSet getActionsForOldStyleUser(const std::string& dbname, bool readOnly) const;
@@ -170,33 +162,16 @@ namespace mongo {
          */
         Status initializeAllV1UserData();
 
-    private:
-
-        // Parses the old-style (pre 2.4) privilege document and returns a PrivilegeSet of all the
-        // Privileges that the privilege document grants.
-        Status _buildPrivilegeSetFromOldStylePrivilegeDocument(
-                const std::string& dbname,
-                const UserName& user,
-                const BSONObj& privilegeDocument,
-                PrivilegeSet* result) const ;
-
-        // Parses extended-form (2.4+) privilege documents and returns a PrivilegeSet of all the
-        // privileges that the document grants.
-        //
-        // The document, "privilegeDocument", is assumed to describe privileges for "principal", and
-        // to come from database "dbname".
-        Status _buildPrivilegeSetFromExtendedPrivilegeDocument(
-                const std::string& dbname,
-                const UserName& user,
-                const BSONObj& privilegeDocument,
-                PrivilegeSet* result) const;
-
         /**
          * Parses privDoc and initializes the user object with the information extracted from the
          * privilege document.
+         * This should never be called from outside the AuthorizationManager - the only reason it's
+         * public instead of private is so it can be unit tested.
          */
         Status _initializeUserFromPrivilegeDocument(User* user,
                                                     const BSONObj& privDoc) const;
+
+    private:
 
         /**
          * Invalidates all User objects in the cache and removes them from the cache.

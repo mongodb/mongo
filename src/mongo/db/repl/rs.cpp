@@ -20,7 +20,6 @@
 #include "mongo/base/status.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/auth/principal.h"
 #include "mongo/db/client.h"
 #include "mongo/db/cmdline.h"
 #include "mongo/db/dbhelpers.h"
