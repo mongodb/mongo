@@ -68,8 +68,6 @@ extern WT_EXTENSION_API *wt_api;
 #define	LZO_PATH	".libs/lzo_compress.so"
 #define	RAW_PATH	".libs/raw_compress.so"
 
-#define	MEMRATA_DEVICE	"kvs_devices=[/dev/loop0]"
-
 #define	M(v)		((v) * 1000000)		/* Million */
 #define	UNUSED(var)	(void)(var)		/* Quiet unused var warnings */
 
@@ -210,7 +208,6 @@ void	*hot_backup(void *);
 void	 key_len_setup(void);
 void	 key_gen_setup(uint8_t **);
 void	 key_gen(uint8_t *, uint32_t *, uint64_t, int);
-char	*oc_conf(char *, size_t, const char *);
 void	 syserr(const char *);
 void	 track(const char *, uint64_t, TINFO *);
 void	 val_gen_setup(uint8_t **);

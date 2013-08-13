@@ -291,7 +291,6 @@ __wt_txn_release(WT_SESSION_IMPL *session)
 	txn = &session->txn;
 	txn->mod_count = 0;
 	txn->notify = NULL;
-	txn->notify_cookie = NULL;
 
 	txn_global = &S2C(session)->txn_global;
 	txn_state = &txn_global->states[session->id];
@@ -338,7 +337,7 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 
 	/* Rollback notification. */
 	if (txn->notify != NULL)
-		WT_TRET(txn->notify((WT_SESSION *)session, txn->notify_cookie,
+		WT_RET(txn->notify->notify(txn->notify, (WT_SESSION *)session,
 		    txn->id, 1));
 
 	if (ret != 0 ||
@@ -383,8 +382,8 @@ __wt_txn_rollback(WT_SESSION_IMPL *session, const char *cfg[])
 
 	/* Rollback notification. */
 	if (txn->notify != NULL)
-		WT_TRET(txn->notify(
-		    (WT_SESSION *)session, txn->notify_cookie, txn->id, 0));
+		WT_TRET(txn->notify->notify(txn->notify, (WT_SESSION *)session,
+		    txn->id, 0));
 
 	/* Rollback updates. */
 	for (i = 0, op = txn->mod; i < txn->mod_count; i++, op++) {

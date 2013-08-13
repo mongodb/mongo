@@ -37,6 +37,26 @@ extern "C" {
  */
 #define	WT_TXN_ISO_SNAPSHOT             3
 
+typedef struct __wt_txn_notify WT_TXN_NOTIFY;
+/*!
+ * Snapshot isolation level, returned by
+ * WT_EXTENSION_API::transaction_isolation_level.
+ */
+struct __wt_txn_notify {
+	/*!
+	 * A method called when the session's current transaction is committed
+	 * or rolled back.
+	 *
+	 * @param notify a pointer to the event handler
+	 * @param session the current session handle
+	 * @param txnid the transaction ID
+	 * @param committed an integer value which is non-zero if the
+	 * transaction is being committed.
+	 */
+	int (*notify)(WT_TXN_NOTIFY *notify, WT_SESSION *session,
+	    uint64_t txnid, int committed);
+};
+
 /*!
  * Table of WiredTiger extension methods.
  *
@@ -374,20 +394,13 @@ struct __wt_extension_api {
 	 *
 	 * @param wt_api the extension handle
 	 * @param session the session handle
-	 * @param notify a function called when the session's current
-	 * transaction is committed or rolled back; the resolution function is
-	 * passed the session handle, a memory reference, the transaction ID,
-	 * and an integer value which is non-zero if the transaction is being
-	 * committed
-	 * @param cookie a cookie passed to the resolution function
+	 * @param notify a handler for commit or rollback events
 	 * @errors
 	 *
 	 * @snippet ex_data_source.c WT_EXTENSION transaction notify
 	 */
 	int (*transaction_notify)(WT_EXTENSION_API *wt_api,
-	    WT_SESSION *session, int (*notify)(
-	    WT_SESSION *session, void *cookie, uint64_t txnid, int committed),
-	    void *cookie);
+	    WT_SESSION *session, WT_TXN_NOTIFY *notify);
 
 	/*!
 	 * Return the oldest transaction ID not yet visible to a running

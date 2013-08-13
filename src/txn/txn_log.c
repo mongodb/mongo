@@ -103,7 +103,7 @@ __txn_op_log(WT_SESSION_IMPL *session, WT_ITEM *logrec, WT_TXN_OP *op)
 		}
 	}
 
-	logrec->size += size;
+	logrec->size += (uint32_t)size;
 	return (0);
 }
 
@@ -233,7 +233,8 @@ __wt_txn_commit_log(WT_SESSION_IMPL *session, const char *cfg[])
 
 	p = (uint8_t *)logrec->data + offsetof(WT_LOG_RECORD, record);
 	WT_RET(__wt_vpack_uint(&p, header_size, rectype));
-	logrec->size = offsetof(WT_LOG_RECORD, record) + header_size;
+	logrec->size =
+	    (uint32_t)(offsetof(WT_LOG_RECORD, record) + header_size);
 
 	/* Write updates to the log. */
 	for (i = 0, op = txn->mod; i < txn->mod_count; i++, op++) {

@@ -29,6 +29,7 @@ LSM
 MERCHANTABILITY
 MVCC's
 Makefiles
+Memrata
 Mewhort
 NOTFOUND
 NoSQL
@@ -64,6 +65,7 @@ boolean
 booleans
 br
 btree
+bufs
 builtin
 bzip
 cachesize
@@ -103,6 +105,7 @@ del
 desc
 destructor
 destructors
+dev
 distclean
 dl
 dlp
@@ -173,9 +176,11 @@ lastname
 len
 li
 libdir
+libkvs
 libtool
 libwiredtiger
 lmin
+ln
 loadtext
 logc
 lookup
@@ -197,6 +202,7 @@ maxleafpage
 memalloc
 memfree
 memp
+memrata
 metadata
 minkey
 mkdir
@@ -287,6 +293,7 @@ spinlock
 spinlocks
 sql
 src
+ssd
 startsync
 statlog
 str
