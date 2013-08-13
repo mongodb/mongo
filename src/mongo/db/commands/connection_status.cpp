@@ -43,12 +43,12 @@ namespace mongo {
             {
                 BSONArrayBuilder authenticatedUsers(authInfo.subarrayStart("authenticatedUsers"));
 
-                PrincipalSet::NameIterator nameIter = authSession->getAuthenticatedPrincipalNames();
+                UserSet::NameIterator nameIter = authSession->getAuthenticatedUserNames();
                 for ( ; nameIter.more(); nameIter.next()) {
-                    BSONObjBuilder principal(authenticatedUsers.subobjStart());
-                    principal.append("user", nameIter->getUser());
-                    principal.append("userSource", nameIter->getDB());
-                    principal.doneFast();
+                    BSONObjBuilder userInfoBuilder(authenticatedUsers.subobjStart());
+                    userInfoBuilder.append("user", nameIter->getUser());
+                    userInfoBuilder.append("userSource", nameIter->getDB());
+                    userInfoBuilder.doneFast();
                 }
                 authenticatedUsers.doneFast();
             }

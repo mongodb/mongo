@@ -19,7 +19,7 @@
 #include "mongo/base/init.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/auth/principal_set.h"
+#include "mongo/db/auth/user_set.h"
 #include "mongo/db/client_basic.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/util/log.h"
@@ -41,17 +41,17 @@ namespace {
         if (!clientBasic->hasAuthorizationSession())
             return;
 
-        PrincipalSet::NameIterator principals =
-            clientBasic->getAuthorizationSession()->getAuthenticatedPrincipalNames();
+        UserSet::NameIterator users =
+                clientBasic->getAuthorizationSession()->getAuthenticatedUserNames();
 
-        if (!principals.more())
+        if (!users.more())
             return;
 
         builder.appendStr("user:", false);
-        builder.appendStr(principals.next().toString(), false);
-        while (principals.more()) {
+        builder.appendStr(users.next().toString(), false);
+        while (users.more()) {
             builder.appendChar(',');
-            builder.appendStr(principals.next().toString(), false);
+            builder.appendStr(users.next().toString(), false);
         }
         builder.appendChar(' ');
     }
