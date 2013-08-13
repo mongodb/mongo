@@ -792,7 +792,7 @@ int connection_reconfigure(WT_CONNECTION *conn, const char *orig)
 	if ((left = strstr_right(orig, ",create,", &right)) != NULL ||
 	    (left = strstr_right(orig, "create,", &right)) == orig ||
 	    ((left = strstr_right(orig, ",create", &right)) != NULL &&
-		right == &orig[strlen(orig)])) {
+	    right == &orig[strlen(orig)])) {
 		size_t alloclen;
 		size_t leftlen;
 
@@ -802,8 +802,7 @@ int connection_reconfigure(WT_CONNECTION *conn, const char *orig)
 		strncpy(alloced, orig, leftlen);
 		strncpy(&alloced[leftlen], right, alloclen - leftlen);
 		config = alloced;
-	}
-	else
+	} else
 		config = orig;
 
 	ret = conn->reconfigure(conn, config);
