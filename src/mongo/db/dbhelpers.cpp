@@ -214,30 +214,14 @@ namespace mongo {
         OpDebug debug;
         Client::Context context(ns);
 
-        if (isNewUpdateFrameworkEnabled()) {
-
-            _updateObjectsNEW(/*god=*/true,
-                              ns,
-                              obj,
-                              /*pattern=*/BSONObj(),
-                              /*upsert=*/true,
-                              /*multi=*/false,
-                              logTheOp,
-                              debug );
-
-        }
-        else {
-
-            _updateObjects(/*god=*/true,
-                           ns,
-                           obj,
-                           /*pattern=*/BSONObj(),
-                           /*upsert=*/true,
-                           /*multi=*/false,
-                           logTheOp,
-                           debug );
-
-        }
+        _updateObjects(/*god=*/true,
+                       ns,
+                       obj,
+                       /*pattern=*/BSONObj(),
+                       /*upsert=*/true,
+                       /*multi=*/false,
+                       logTheOp,
+                       debug );
 
         context.getClient()->curop()->done();
     }

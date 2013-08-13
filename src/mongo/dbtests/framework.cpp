@@ -116,7 +116,6 @@ namespace mongo {
             ("bigfiles", "use big datafiles instead of smallfiles which is the default")
             ("filter,f" , po::value<string>() , "string substring filter on test name" )
             ("verbose,v", "verbose")
-            ("testNewUpdateFramework", "test the new update framework")
             ("useNewQueryFramework", "use the new query framework")
             ("dur", "enable journaling (currently the default)")
             ("nodur", "disable journaling")
@@ -155,10 +154,6 @@ namespace mongo {
             if (params.count("help")) {
                 show_help_text(argv[0], shell_options);
                 return EXIT_CLEAN;
-            }
-
-            if (params.count("testNewUpdateFramework") && !mongo::isNewUpdateFrameworkEnabled()) {
-                mongo::toggleNewUpdateFrameworkEnabled();
             }
 
             if (params.count("useNewQueryFramework")) {
