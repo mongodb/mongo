@@ -449,9 +449,9 @@ ckpt:		WT_CSTAT_INCR(session, cache_eviction_checkpoint);
 		mod = page->modify;
 
 		/*
-		 * If reconciliation failed due to unwritable modifications
-		 * and the page is a lot larger than the maxiumum allowed, it
-		 * is likely that we are having trouble reconciling it due to
+		 * If reconciliation failed due to active modifications and
+		 * the page is a lot larger than the maximum allowed, it is
+		 * likely that we are having trouble reconciling it due to
 		 * contention. Attempt to split the page in memory.
 		 */
 		if (ret == EBUSY &&

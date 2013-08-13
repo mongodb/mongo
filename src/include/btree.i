@@ -21,7 +21,7 @@ __wt_page_is_modified(WT_PAGE *page)
  *	Check if a page matches the criteria for forced eviction.
  *	Returns how many times larger than the configured maximum a page is.
  *	We only split pages in memory when they are a multiple larger than
- *	the configured maxiumum.
+ *	the configured maximum.
  */
 static inline int
 __wt_eviction_page_force(WT_SESSION_IMPL *session, WT_PAGE *page)
