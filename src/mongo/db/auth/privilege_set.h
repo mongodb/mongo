@@ -44,8 +44,6 @@ namespace mongo {
     class PrivilegeSet {
         MONGO_DISALLOW_COPYING(PrivilegeSet);
     public:
-        static const std::string WILDCARD_RESOURCE;
-
         PrivilegeSet();
         ~PrivilegeSet();
 

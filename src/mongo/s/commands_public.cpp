@@ -1713,7 +1713,7 @@ namespace mongo {
                                                const BSONObj& cmdObj,
                                                std::vector<Privilege>* out) {
                 // applyOps can do pretty much anything, so require all privileges.
-                out->push_back(Privilege(PrivilegeSet::WILDCARD_RESOURCE,
+                out->push_back(Privilege(AuthorizationManager::WILDCARD_RESOURCE_NAME,
                                          getGlobalAuthorizationManager()->getAllUserActions()));
             }
             virtual bool run(const string& dbName , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
@@ -1746,7 +1746,7 @@ namespace mongo {
                                                const BSONObj& cmdObj,
                                                std::vector<Privilege>* out) {
                 // $eval can do pretty much anything, so require all privileges.
-                out->push_back(Privilege(PrivilegeSet::WILDCARD_RESOURCE,
+                out->push_back(Privilege(AuthorizationManager::WILDCARD_RESOURCE_NAME,
                                          getGlobalAuthorizationManager()->getAllUserActions()));
             }
             virtual bool run(const string& dbName,
