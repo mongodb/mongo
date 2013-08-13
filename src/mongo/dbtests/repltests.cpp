@@ -1632,12 +1632,6 @@ namespace ReplTests {
             add< Idempotence::EmptyPush >();
             add< Idempotence::EmptyPushSparseIndex >();
             add< Idempotence::PushAll >();
-
-            // The new update framework does not allow field names with a leading '$' to be
-            // pushed.
-            if (!isNewUpdateFrameworkEnabled())
-                add< Idempotence::PushWithDollarSigns >();
-
             add< Idempotence::PushSlice >();
             add< Idempotence::PushSliceInitiallyInexistent >();
             add< Idempotence::PushSliceToZero >();
@@ -1657,12 +1651,6 @@ namespace ReplTests {
             add< Idempotence::SingletonNoRename >();
             add< Idempotence::IndexedSingletonNoRename >();
             add< Idempotence::AddToSetEmptyMissing >();
-
-            // The new update framework does not allow field names with a leading '$' to be
-            // added to a set.
-            if (!isNewUpdateFrameworkEnabled())
-                add< Idempotence::AddToSetWithDollarSigns >();
-
             add< Idempotence::ReplaySetPreexistingNoOpPull >();
             add< Idempotence::ReplayArrayFieldNotAppended >();
             add< DeleteOpIsIdBased >();

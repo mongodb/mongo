@@ -601,103 +601,62 @@ namespace mongo {
         op.debug().query = query;
         op.setQuery(query);
 
-        if ( isNewUpdateFrameworkEnabled() ) {
+        // This code should look quite familiar, since it is basically the prelude code in the
+        // other overload of _updateObjectsNEW. We could factor it into a common function, but
+        // that would require that we heap allocate the driver, which doesn't seem worth it
+        // right now, especially considering that we will probably rewrite much of this code in
+        // the near term.
 
-            // New style. This only works with the new update framework, and moves mod parsing
-            // out of the write lock.
-            //
-            // This code should look quite familiar, since it is basically the prelude code in
-            // _updateObjectsNEW. We could factor it into a common function, but that would
-            // require that we heap allocate the driver, which doesn't seem worth it right now,
-            // especially considering that we will probably rewrite much of this code in the
-            // near term.
+        UpdateDriver::Options options;
+        options.multi = multi;
+        options.upsert = upsert;
 
-            UpdateDriver::Options options;
-            options.multi = multi;
-            options.upsert = upsert;
+        // TODO: This is wasteful. We really shouldn't need to generate the oplog entry
+        // just to throw it away if we are not generating an oplog.
+        options.logOp = true;
 
-            // TODO: This is wasteful. We really shouldn't need to generate the oplog entry
-            // just to throw it away if we are not generating an oplog.
-            options.logOp = true;
+        // Select the right modifier options. We aren't in a replication context here, so
+        // the only question is whether this update is against the 'config' database, in
+        // which case we want to disable checks, since config db docs can have field names
+        // containing a dot (".").
+        options.modOptions = ( NamespaceString( ns ).isConfigDB() ) ?
+            ModifierInterface::Options::unchecked() :
+            ModifierInterface::Options::normal();
 
-            // Select the right modifier options. We aren't in a replication context here, so
-            // the only question is whether this update is against the 'config' database, in
-            // which case we want to disable checks, since config db docs can have field names
-            // containing a dot (".").
-            options.modOptions = ( NamespaceString( ns ).isConfigDB() ) ?
-                ModifierInterface::Options::unchecked() :
-                ModifierInterface::Options::normal();
+        UpdateDriver driver( options );
 
-            UpdateDriver driver( options );
-
-            Status status = driver.parse( toupdate );
-            if ( !status.isOK() ) {
-                uasserted( 17009, status.reason() );
-            }
-
-            PageFaultRetryableSection s;
-            while ( 1 ) {
-                try {
-                    Lock::DBWrite lk(ns);
-
-                    // void ReplSetImpl::relinquish() uses big write lock so this is thus
-                    // synchronized given our lock above.
-                    uassert( 17010 ,  "not master", isMasterNs( ns ) );
-
-                    // if this ever moves to outside of lock, need to adjust check
-                    // Client::Context::_finishInit
-                    if ( ! broadcast && handlePossibleShardedMessage( m , 0 ) )
-                        return;
-
-                    Client::Context ctx( ns );
-
-                    UpdateResult res = updateObjects(
-                        &driver,
-                        ns, toupdate, query,
-                        upsert, multi, true, op.debug() );
-
-                    // for getlasterror
-                    lastError.getSafe()->recordUpdate( res.existing , res.num , res.upserted );
-                    break;
-                }
-                catch ( PageFaultException& e ) {
-                    e.touch();
-                }
-            }
-
+        status = driver.parse( toupdate );
+        if ( !status.isOK() ) {
+            uasserted( 17009, status.reason() );
         }
-        else {
 
-            // This is the 'old style'. We may or may not call the new update code, but we are
-            // going to do so under the write lock in all cases.
+        PageFaultRetryableSection s;
+        while ( 1 ) {
+            try {
+                Lock::DBWrite lk(ns);
 
-            PageFaultRetryableSection s;
-            while ( 1 ) {
-                try {
-                    Lock::DBWrite lk(ns);
+                // void ReplSetImpl::relinquish() uses big write lock so this is thus
+                // synchronized given our lock above.
+                uassert( 17010 ,  "not master", isMasterNs( ns ) );
 
-                    // void ReplSetImpl::relinquish() uses big write lock so this is thus
-                    // synchronized given our lock above.
-                    uassert( 10054 ,  "not master", isMasterNs( ns ) );
+                // if this ever moves to outside of lock, need to adjust check
+                // Client::Context::_finishInit
+                if ( ! broadcast && handlePossibleShardedMessage( m , 0 ) )
+                    return;
 
-                    // if this ever moves to outside of lock, need to adjust check
-                    // Client::Context::_finishInit
-                    if ( ! broadcast && handlePossibleShardedMessage( m , 0 ) )
-                        return;
+                Client::Context ctx( ns );
 
-                    Client::Context ctx( ns );
+                UpdateResult res = updateObjects(
+                    &driver,
+                    ns, toupdate, query,
+                    upsert, multi, true, op.debug() );
 
-                    UpdateResult res = updateObjects(
-                        ns, toupdate, query,
-                        upsert, multi, true, op.debug() );
-
-                    // for getlasterror
-                    lastError.getSafe()->recordUpdate( res.existing , res.num , res.upserted );
-                    break;
-                }
-                catch ( PageFaultException& e ) {
-                    e.touch();
-                }
+                // for getlasterror
+                lastError.getSafe()->recordUpdate( res.existing , res.num , res.upserted );
+                break;
+            }
+            catch ( PageFaultException& e ) {
+                e.touch();
             }
         }
     }
@@ -871,36 +830,18 @@ namespace mongo {
         return ok;
     }
 
-    void checkAndInsert(const char *ns, /*modifies*/BSONObj& js) { 
+    void checkAndInsert(const char *ns, /*modifies*/BSONObj& js) {
         uassert( 10059 , "object to insert too large", js.objsize() <= BSONObjMaxUserSize);
 
-        // Do not allow objects to be stored which violate okForStorageAsRoot
-        if ( isNewUpdateFrameworkEnabled() ) {
-            NamespaceString nsString(ns);
-            bool ok = nsString.isConfigDB() || nsString.isSystem() || js.okForStorageAsRoot();
-            if (!ok) {
-                LOG(1) << "ns: " << ns << ", not okForStorageAsRoot: " << js;
-            }
-            uassert(17013,
-                    "Cannot insert object with _id field of array/regex or "
-                    "with any field name prefixed with $ or containing a dot. ",
-                    ok);
+        NamespaceString nsString(ns);
+        bool ok = nsString.isConfigDB() || nsString.isSystem() || js.okForStorageAsRoot();
+        if (!ok) {
+            LOG(1) << "ns: " << ns << ", not okForStorageAsRoot: " << js;
         }
-        else {
-            BSONObjIterator i( js );
-            while ( i.more() ) {
-                BSONElement e = i.next();
-
-                // check no $ modifiers.  note we only check top level.  
-                // (scanning deep would be quite expensive)
-                uassert( 13511, "document to insert can't have $ fields", e.fieldName()[0] != '$' );
-                
-                // check no regexp for _id (SERVER-9502)
-                if (str::equals(e.fieldName(), "_id")) {
-                    uassert(16824, "can't use a regex for _id", e.type() != RegEx);
-                }
-            }
-        }
+        uassert(17013,
+                "Cannot insert object with _id field of array/regex or "
+                "with any field name prefixed with $ or containing a dot. ",
+                ok);
 
         theDataFileMgr.insertWithObjMod(ns,
                                         // May be modified in the call to add an _id field.

@@ -46,12 +46,6 @@ namespace mongo {
 
     class RemoveSaver;
 
-    /** Returns true if updates are supposed to be handle by the new update framework */
-    bool isNewUpdateFrameworkEnabled();
-
-    /** switches state from enabled/disabled; returns new state */
-    bool toggleNewUpdateFrameworkEnabled();
-
     /* returns true if an existing object was updated, false if no existing object was found.
        multi - update multiple objects - mostly useful with things like $set
        su - allow access to system namespaces (super user)
@@ -111,34 +105,20 @@ namespace mongo {
                                     = QueryPlanSelectionPolicy::any(),
                                 bool forReplication = false);
 
-    UpdateResult _updateObjectsNEW(bool su,
-                                   const char* ns,
-                                   const BSONObj& updateobj,
-                                   const BSONObj& pattern,
-                                   bool upsert,
-                                   bool multi,
-                                   bool logop,
-                                   OpDebug& debug,
-                                   RemoveSaver* rs = 0,
-                                   bool fromMigrate = false,
-                                   const QueryPlanSelectionPolicy& planPolicy
-                                       = QueryPlanSelectionPolicy::any(),
-                                   bool forReplication = false);
-
-    UpdateResult _updateObjectsNEW(UpdateDriver* driver,
-                                   bool su,
-                                   const char* ns,
-                                   const BSONObj& updateobj,
-                                   const BSONObj& pattern,
-                                   bool upsert,
-                                   bool multi,
-                                   bool logop,
-                                   OpDebug& debug,
-                                   RemoveSaver* rs = 0,
-                                   bool fromMigrate = false,
-                                   const QueryPlanSelectionPolicy& planPolicy
-                                       = QueryPlanSelectionPolicy::any(),
-                                   bool forReplication = false);
+    UpdateResult _updateObjects(UpdateDriver* driver,
+                                bool su,
+                                const char* ns,
+                                const BSONObj& updateobj,
+                                const BSONObj& pattern,
+                                bool upsert,
+                                bool multi,
+                                bool logop,
+                                OpDebug& debug,
+                                RemoveSaver* rs = 0,
+                                bool fromMigrate = false,
+                                const QueryPlanSelectionPolicy& planPolicy
+                                    = QueryPlanSelectionPolicy::any(),
+                                bool forReplication = false);
 
 
     /**
