@@ -28,8 +28,6 @@
 
 namespace mongo {
 
-    const std::string PrivilegeSet::WILDCARD_RESOURCE = "*";
-
     PrivilegeSet::PrivilegeSet() {}
     PrivilegeSet::~PrivilegeSet() {}
 
@@ -75,7 +73,7 @@ namespace mongo {
             return true;
 
         StringData resourceSearchList[2];
-        resourceSearchList[0] = WILDCARD_RESOURCE;
+        resourceSearchList[0] = "*";
         resourceSearchList[1] = nsToDatabaseSubstring(desiredPrivilege.getResource());
 
         ActionSet unmetRequirements = desiredPrivilege.getActions();
@@ -122,7 +120,7 @@ namespace mongo {
     PrivilegeSet::ResourcePrivilegeCacheEntry* PrivilegeSet::_lookupEntry(
             const StringData& resource) {
 
-        if (resource == WILDCARD_RESOURCE)
+        if (resource == "*")
             return &_globalPrivilegeEntry;
 
         ResourcePrivilegeCache::const_iterator iter = _byResource.find(resource);
@@ -137,7 +135,7 @@ namespace mongo {
     PrivilegeSet::ResourcePrivilegeCacheEntry* PrivilegeSet::_lookupOrInsertEntry(
             const StringData& resource) {
 
-        if (resource == WILDCARD_RESOURCE)
+        if (resource == "*")
             return &_globalPrivilegeEntry;
         return &_byResource[resource];
     }

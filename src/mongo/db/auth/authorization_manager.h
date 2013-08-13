@@ -56,6 +56,7 @@ namespace mongo {
 
         static const std::string SERVER_RESOURCE_NAME;
         static const std::string CLUSTER_RESOURCE_NAME;
+        static const std::string WILDCARD_RESOURCE_NAME;
 
         static const std::string USER_NAME_FIELD_NAME;
         static const std::string USER_SOURCE_FIELD_NAME;

@@ -47,7 +47,7 @@ namespace mongo {
         user->incrementRefCount(); // Pin this user so the ref count never drops below 1.
         ActionSet allActions;
         allActions.addAllActions();
-        user->addPrivilege(Privilege(PrivilegeSet::WILDCARD_RESOURCE, allActions));
+        user->addPrivilege(Privilege(AuthorizationManager::WILDCARD_RESOURCE_NAME, allActions));
 
         internalSecurity.user = user;
 
@@ -56,6 +56,7 @@ namespace mongo {
 
     const std::string AuthorizationManager::SERVER_RESOURCE_NAME = "$SERVER";
     const std::string AuthorizationManager::CLUSTER_RESOURCE_NAME = "$CLUSTER";
+    const std::string AuthorizationManager::WILDCARD_RESOURCE_NAME = "*";
     const std::string AuthorizationManager::USER_NAME_FIELD_NAME = "user";
     const std::string AuthorizationManager::USER_SOURCE_FIELD_NAME = "userSource";
     const std::string AuthorizationManager::PASSWORD_FIELD_NAME = "pwd";
@@ -520,7 +521,7 @@ namespace {
         bool readOnly = privilegeDocument[READONLY_FIELD_NAME].trueValue();
         ActionSet actions = getActionsForOldStyleUser(dbname, readOnly);
         std::string resourceName = (dbname == ADMIN_DBNAME || dbname == LOCAL_DBNAME) ?
-            PrivilegeSet::WILDCARD_RESOURCE : dbname;
+            AuthorizationManager::WILDCARD_RESOURCE_NAME : dbname;
         result->grantPrivilege(Privilege(resourceName, actions), user);
 
         return Status::OK();
@@ -556,31 +557,35 @@ namespace {
             outPrivileges->push_back(Privilege(dbname, compatibilityReadWriteActions));
         }
         else if (isAdminDB && role == SYSTEM_ROLE_READ_ANY_DB) {
-            outPrivileges->push_back(Privilege(PrivilegeSet::WILDCARD_RESOURCE, readRoleActions));
+            outPrivileges->push_back(Privilege(AuthorizationManager::WILDCARD_RESOURCE_NAME,
+                                               readRoleActions));
         }
         else if (isAdminDB && role == SYSTEM_ROLE_READ_WRITE_ANY_DB) {
             outPrivileges->push_back(
-                    Privilege(PrivilegeSet::WILDCARD_RESOURCE, readWriteRoleActions));
+                    Privilege(AuthorizationManager::WILDCARD_RESOURCE_NAME, readWriteRoleActions));
         }
         else if (isAdminDB && role == SYSTEM_ROLE_USER_ADMIN_ANY_DB) {
             outPrivileges->push_back(
-                    Privilege(PrivilegeSet::WILDCARD_RESOURCE, userAdminRoleActions));
+                    Privilege(AuthorizationManager::WILDCARD_RESOURCE_NAME, userAdminRoleActions));
         }
         else if (isAdminDB && role == SYSTEM_ROLE_DB_ADMIN_ANY_DB) {
             outPrivileges->push_back(
-                    Privilege(PrivilegeSet::WILDCARD_RESOURCE, dbAdminRoleActions));
+                    Privilege(AuthorizationManager::WILDCARD_RESOURCE_NAME, dbAdminRoleActions));
         }
         else if (isAdminDB && role == SYSTEM_ROLE_CLUSTER_ADMIN) {
             outPrivileges->push_back(
-                    Privilege(PrivilegeSet::WILDCARD_RESOURCE, clusterAdminRoleActions));
+                    Privilege(AuthorizationManager::WILDCARD_RESOURCE_NAME,
+                              clusterAdminRoleActions));
         }
         else if (isAdminDB && role == SYSTEM_ROLE_V0_ADMIN_READ) {
             outPrivileges->push_back(
-                    Privilege(PrivilegeSet::WILDCARD_RESOURCE, compatibilityReadOnlyAdminActions));
+                    Privilege(AuthorizationManager::WILDCARD_RESOURCE_NAME,
+                              compatibilityReadOnlyAdminActions));
         }
         else if (isAdminDB && role == SYSTEM_ROLE_V0_ADMIN_READ_WRITE) {
             outPrivileges->push_back(
-                    Privilege(PrivilegeSet::WILDCARD_RESOURCE, compatibilityReadWriteAdminActions));
+                    Privilege(AuthorizationManager::WILDCARD_RESOURCE_NAME,
+                              compatibilityReadWriteAdminActions));
         }
         else {
             warning() << "No such role, \"" << role << "\", in database " << dbname <<
@@ -601,9 +606,10 @@ namespace {
         static const char privilegesTypeMismatchMessage[] =
             "Roles must be enumerated in an array of strings.";
 
-        if (dbname == PrivilegeSet::WILDCARD_RESOURCE) {
+        if (dbname == AuthorizationManager::WILDCARD_RESOURCE_NAME) {
             return Status(ErrorCodes::BadValue,
-                          PrivilegeSet::WILDCARD_RESOURCE + " is an invalid database name.");
+                          AuthorizationManager::WILDCARD_RESOURCE_NAME +
+                                  " is an invalid database name.");
         }
 
         if (rolesElement.type() != Array)
@@ -804,9 +810,10 @@ namespace {
         static const char privilegesTypeMismatchMessage[] =
                 "Roles in V1 user documents must be enumerated in an array of strings.";
 
-        if (dbname == PrivilegeSet::WILDCARD_RESOURCE) {
+        if (dbname == AuthorizationManager::WILDCARD_RESOURCE_NAME) {
             return Status(ErrorCodes::BadValue,
-                          PrivilegeSet::WILDCARD_RESOURCE + " is an invalid database name.");
+                          AuthorizationManager::WILDCARD_RESOURCE_NAME +
+                                  " is an invalid database name.");
         }
 
         if (rolesElement.type() != Array)

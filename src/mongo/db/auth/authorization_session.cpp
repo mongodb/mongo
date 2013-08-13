@@ -73,7 +73,7 @@ namespace {
             // Grant full access to internal user
             ActionSet allActions;
             allActions.addAllActions();
-            acquirePrivilege(Privilege(PrivilegeSet::WILDCARD_RESOURCE, allActions),
+            acquirePrivilege(Privilege(AuthorizationManager::WILDCARD_RESOURCE_NAME, allActions),
                              principal->getName());
             return;
         }
@@ -174,8 +174,9 @@ namespace {
         actions.addAllActions();
 
         addPrincipal(principal);
-        fassert(16581, acquirePrivilege(Privilege(PrivilegeSet::WILDCARD_RESOURCE, actions),
-                                    principal->getName()).isOK());
+        fassert(16581,
+                acquirePrivilege(Privilege(AuthorizationManager::WILDCARD_RESOURCE_NAME, actions),
+                                 principal->getName()).isOK());
 
         _authenticatedUsers.add(internalSecurity.user);
     }
@@ -183,8 +184,8 @@ namespace {
     bool AuthorizationSession::hasInternalAuthorization() {
         ActionSet allActions;
         allActions.addAllActions();
-        return _acquiredPrivileges.hasPrivilege(Privilege(PrivilegeSet::WILDCARD_RESOURCE,
-                                                          allActions));
+        return _acquiredPrivileges.hasPrivilege(
+                Privilege(AuthorizationManager::WILDCARD_RESOURCE_NAME, allActions));
     }
 
     Status AuthorizationSession::acquirePrivilegesFromPrivilegeDocument(
@@ -346,7 +347,7 @@ namespace {
         // Need to check not just the resource of the privilege, but also just the database
         // component and the "*" resource.
         std::string resourceSearchList[3];
-        resourceSearchList[0] = PrivilegeSet::WILDCARD_RESOURCE;
+        resourceSearchList[0] = AuthorizationManager::WILDCARD_RESOURCE_NAME;
         resourceSearchList[1] = nsToDatabase(modifiedPrivilege.getResource());
         resourceSearchList[2] = modifiedPrivilege.getResource();
 

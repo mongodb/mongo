@@ -124,7 +124,7 @@ namespace mongo {
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {
             // $eval can do pretty much anything, so require all privileges.
-            out->push_back(Privilege(PrivilegeSet::WILDCARD_RESOURCE,
+            out->push_back(Privilege(AuthorizationManager::WILDCARD_RESOURCE_NAME,
                                      getGlobalAuthorizationManager()->getAllUserActions()));
         }
         CmdEval() : Command("eval", false, "$eval") { }
