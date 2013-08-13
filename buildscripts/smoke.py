@@ -362,7 +362,7 @@ def check_db_hashes(master, slave):
             try:
                 stats["docs"] = {'master':list(mTestDB[coll].find(limit=10)),
                                   'slave':list(sTestDB[coll].find(limit=10))}
-            except Exception as e:
+            except Exception, e:
                 stats["error-docs"] = e;
             screwy_in_slave[coll] = stats
     for db in slave.dict.keys():
