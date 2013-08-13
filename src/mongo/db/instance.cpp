@@ -646,13 +646,17 @@ namespace mongo {
 
                 Client::Context ctx( ns );
 
-                UpdateResult res = updateObjects(
-                    &driver,
-                    ns, toupdate, query,
-                    upsert, multi, true, op.debug() );
+                UpdateResult res = update(
+                    UpdateRequest(NamespaceString(ns), op.debug())
+                    .upsert(upsert)
+                    .multi(multi)
+                    .query(query)
+                    .updates(toupdate)
+                    .updateOpLog(), // TODO: This is wasteful if repl is not active.
+                    &driver);
 
                 // for getlasterror
-                lastError.getSafe()->recordUpdate( res.existing , res.num , res.upserted );
+                lastError.getSafe()->recordUpdate( res.existing , res.numMatched , res.upserted );
                 break;
             }
             catch ( PageFaultException& e ) {

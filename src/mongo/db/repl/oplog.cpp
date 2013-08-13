@@ -468,8 +468,16 @@ namespace mongo {
                 if( !o.getObjectID(_id) ) {
                     /* No _id.  This will be very slow. */
                     Timer t;
-                    updateObjectsForReplication(ns, o, o, true, false, false, debug, false,
-                                                QueryPlanSelectionPolicy::idElseNatural() );
+
+                    update(
+                        UpdateRequest(NamespaceString(ns),
+                                      debug,
+                                      QueryPlanSelectionPolicy::idElseNatural())
+                        .query(o)
+                        .updates(o)
+                        .upsert()
+                        .fromReplication());
+
                     if( t.millis() >= 2 ) {
                         RARELY OCCASIONALLY log() << "warning, repl doing slow updates (no _id field) for " << ns << endl;
                     }
@@ -484,8 +492,15 @@ namespace mongo {
                               */
                     BSONObjBuilder b;
                     b.append(_id);
-                    updateObjectsForReplication(ns, o, b.done(), true, false, false , debug, false,
-                                                QueryPlanSelectionPolicy::idElseNatural() );
+
+                    update(
+                        UpdateRequest(NamespaceString(ns),
+                                      debug,
+                                      QueryPlanSelectionPolicy::idElseNatural())
+                        .query(b.done())
+                        .updates(o)
+                        .upsert()
+                        .fromReplication());
                 }
             }
         }
@@ -498,20 +513,19 @@ namespace mongo {
 
             OpDebug debug;
             BSONObj updateCriteria = op.getObjectField("o2");
-            bool upsert = fields[3].booleanSafe() || convertUpdateToUpsert;
-            UpdateResult ur =
-                updateObjectsForReplication(ns,
-                                            o,
-                                            updateCriteria,
-                                            upsert,
-                                            /*multi*/ false,
-                                            /*logop*/ false,
-                                            debug,
-                                            /*fromMigrate*/ false,
-                                            QueryPlanSelectionPolicy::idElseNatural() );
+            const bool upsert = fields[3].booleanSafe() || convertUpdateToUpsert;
 
-            if( ur.num == 0 ) {
-                if( ur.mod ) {
+            UpdateResult ur = update(
+                UpdateRequest(NamespaceString(ns),
+                              debug,
+                              QueryPlanSelectionPolicy::idElseNatural())
+                .query(updateCriteria)
+                .updates(o)
+                .upsert(upsert)
+                .fromReplication());
+
+            if( ur.numMatched == 0 ) {
+                if( ur.modifiers ) {
                     if( updateCriteria.nFields() == 1 ) {
                         // was a simple { _id : ... } update criteria
                         failedUpdate = true;
