@@ -2460,7 +2460,7 @@ namespace mongo {
 
         for (size_t i = 0; i < n; i++) {
             const Value nextEntry = vpOperand[i]->evaluateInternal(vars);
-            uassert(17044, str::stream() << "All operands of $setIntersection must be arrays. One "
+            uassert(17044, str::stream() << "All operands of $setEquals must be arrays. One "
                                          << "argument is of type: " << nextEntry.getType(),
                     nextEntry.getType() == Array);
 
@@ -2509,11 +2509,15 @@ namespace mongo {
                     // to iterate over whichever is the smaller set
                     nextSet.swap(currentIntersection);
                 }
-
-                for (ValueSet::iterator it = currentIntersection.begin();
-                        it != currentIntersection.end(); ++it) {
+                ValueSet::iterator it = currentIntersection.begin();
+                while (it != currentIntersection.end()) {
                     if (!nextSet.count(*it)) {
-                        currentIntersection.erase(*it);
+                        ValueSet::iterator del = it;
+                        ++it;
+                        currentIntersection.erase(del);
+                    }
+                    else {
+                        ++it;
                     }
                 }
             }
