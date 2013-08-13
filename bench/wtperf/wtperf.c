@@ -92,7 +92,7 @@ typedef struct {
 	uint32_t flagmask;
 } CONFIG_OPT;
 
-/* Al options changeable on command line using -o or -O are listed here. */
+/* All options changeable on command line using -o or -O are listed here. */
 CONFIG_OPT config_opts[] = {
 
 #define OPT_DEFINE_DESC
@@ -905,8 +905,7 @@ int main(int argc, char **argv)
 		switch (ch) {
 		case 'o':
 			/* Allow -o key=value */
-			if (config_opt_line(&cfg,
-				parse_session, optarg) != 0)
+			if (config_opt_line(&cfg, parse_session, optarg) != 0)
 				return (EINVAL);
 			break;
 		case 'v':
@@ -917,7 +916,6 @@ int main(int argc, char **argv)
 			break;
 		case 'T':
 			user_tconfig = optarg;
-			break;
 			break;
 		}
 
