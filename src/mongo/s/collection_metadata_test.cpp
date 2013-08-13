@@ -126,7 +126,7 @@ namespace {
 
     TEST_F(NoChunkFixture, getNextFromEmpty) {
         ChunkType nextChunk;
-        ASSERT( !getCollMetadata().getNextChunk( getCollMetadata().getMinKey(), &nextChunk ) );
+        ASSERT( getCollMetadata().getNextChunk( BSONObj(), &nextChunk ) );
     }
 
     TEST_F(NoChunkFixture, FirstChunkClonePlus) {
@@ -522,14 +522,14 @@ namespace {
 
     TEST_F(SingleChunkFixture, getNextFromEmpty) {
         ChunkType nextChunk;
-        ASSERT( getCollMetadata().getNextChunk( getCollMetadata().getMinKey(), &nextChunk ) );
+        ASSERT( getCollMetadata().getNextChunk( BSONObj(), &nextChunk ) );
         ASSERT_EQUALS( 0, nextChunk.getMin().woCompare(BSON("a" << 10)) );
         ASSERT_EQUALS( 0, nextChunk.getMax().woCompare(BSON("a" << 20)) );
     }
 
-    TEST_F(SingleChunkFixture, GetLastChunkIsFalse) {
+    TEST_F(SingleChunkFixture, GetNextFromLast) {
         ChunkType nextChunk;
-        ASSERT( !getCollMetadata().getNextChunk( getCollMetadata().getMaxKey(), &nextChunk ) );
+        ASSERT( getCollMetadata().getNextChunk( BSONObj(), &nextChunk ) );
     }
 
     TEST_F(SingleChunkFixture, LastChunkCloneMinus) {
@@ -1116,14 +1116,14 @@ namespace {
 
     TEST_F(ThreeChunkWithRangeGapFixture, GetNextFromEmpty) {
         ChunkType nextChunk;
-        ASSERT( getCollMetadata().getNextChunk( getCollMetadata().getMinKey(), &nextChunk ) );
+        ASSERT_FALSE( getCollMetadata().getNextChunk( BSONObj(), &nextChunk ) );
         ASSERT_EQUALS( 0, nextChunk.getMin().woCompare(BSON("a" << MINKEY)) );
         ASSERT_EQUALS( 0, nextChunk.getMax().woCompare(BSON("a" << 10)) );
     }
 
     TEST_F(ThreeChunkWithRangeGapFixture, GetNextFromMiddle) {
         ChunkType nextChunk;
-        ASSERT( getCollMetadata().getNextChunk(BSON("a" << 20), &nextChunk) );
+        ASSERT_FALSE( getCollMetadata().getNextChunk(BSON("a" << 10), &nextChunk) );
         ASSERT_EQUALS( 0, nextChunk.getMin().woCompare(BSON("a" << 30)) );
         ASSERT_EQUALS( 0, nextChunk.getMax().woCompare(BSON("a" << MAXKEY)) );
     }

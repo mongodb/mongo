@@ -396,7 +396,7 @@ namespace {
         loader.makeCollectionMetadata( "test.foo", "shard0000", NULL, /* no old metadata */
                                        &metadata );
         ChunkType chunkInfo;
-        ASSERT_TRUE( metadata.getNextChunk( metadata.getMinKey(), &chunkInfo) );
+        ASSERT_TRUE( metadata.getNextChunk(BSON("a" << MINKEY), &chunkInfo) );
     }
 
     TEST_F(ConfigServerFixture, SingleChunkGetShardKey) {
