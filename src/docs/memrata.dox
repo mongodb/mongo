@@ -16,7 +16,7 @@ example:
 % ls /usr/local/memrata
 kvs.h		libkvs.a	libkvs.so
 kvs.h.4.2	libkvs.a.4.2	libkvs.so.4.2
-% ln -s /usr/local/memrata memrata 
+% ln -s /usr/local/memrata memrata
 % ./configure && make
 @endcode
 
