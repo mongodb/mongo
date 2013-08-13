@@ -68,8 +68,6 @@ extern WT_EXTENSION_API *wt_api;
 #define	LZO_PATH	".libs/lzo_compress.so"
 #define	RAW_PATH	".libs/raw_compress.so"
 
-#define	MEMRATA_DEVICE	"kvs_devices=[/dev/loop0]"
-
 #define	M(v)		((v) * 1000000)		/* Million */
 #define	UNUSED(var)	(void)(var)		/* Quiet unused var warnings */
 
@@ -173,18 +171,22 @@ typedef struct {
 extern GLOBAL g;
 
 typedef struct {
-	uint64_t search;
+	uint64_t search;			/* operations */
 	uint64_t insert;
 	uint64_t update;
 	uint64_t remove;
 
-	int       id;					/* simple thread ID */
-	pthread_t tid;					/* thread ID */
+	uint64_t commit;			/* transaction resolution */
+	uint64_t rollback;
+	uint64_t deadlock;
 
-#define	TINFO_RUNNING	1				/* Running */
-#define	TINFO_COMPLETE	2				/* Finished */
-#define	TINFO_JOINED	3				/* Resolved */
-	volatile int state;				/* state */
+	int       id;				/* simple thread ID */
+	pthread_t tid;				/* thread ID */
+
+#define	TINFO_RUNNING	1			/* Running */
+#define	TINFO_COMPLETE	2			/* Finished */
+#define	TINFO_JOINED	3			/* Resolved */
+	volatile int state;			/* state */
 } TINFO;
 
 void	 bdb_close(void);
@@ -206,7 +208,6 @@ void	*hot_backup(void *);
 void	 key_len_setup(void);
 void	 key_gen_setup(uint8_t **);
 void	 key_gen(uint8_t *, uint32_t *, uint64_t, int);
-char	*oc_conf(char *, size_t, const char *);
 void	 syserr(const char *);
 void	 track(const char *, uint64_t, TINFO *);
 void	 val_gen_setup(uint8_t **);

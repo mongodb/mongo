@@ -497,6 +497,15 @@ __create_data_source(WT_SESSION_IMPL *session,
 	    WT_CONFIG_BASE(session, session_create), config, NULL };
 
 	/*
+	 * Check to be sure the key/value formats are legal: the underlying
+	 * data source doesn't have access to the functions that check.
+	 */
+	WT_RET(__wt_config_gets(session, cfg, "key_format", &cval));
+	WT_RET(__wt_struct_check(session, cval.str, cval.len, NULL, NULL));
+	WT_RET(__wt_config_gets(session, cfg, "value_format", &cval));
+	WT_RET(__wt_struct_check(session, cval.str, cval.len, NULL, NULL));
+
+	/*
 	 * User-specified collators aren't supported for data-source objects.
 	 */
 	if (__wt_config_getones(

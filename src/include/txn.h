@@ -81,6 +81,9 @@ struct __wt_txn {
 
 	uint32_t	force_evict_attempts;
 
+	/* Requested notification when transactions are resolved. */
+	WT_TXN_NOTIFY *notify;
+
 #define	TXN_AUTOCOMMIT	0x01
 #define	TXN_ERROR	0x02
 #define	TXN_OLDEST	0x04

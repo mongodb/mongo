@@ -386,7 +386,7 @@ __wt_cursor_close(WT_CURSOR *cursor)
 	}
 
 	__wt_free(session, cursor->uri);
-	__wt_free(session, cursor);
+	__wt_overwrite_and_free(session, cursor);
 
 err:	API_END(session);
 	return (ret);
@@ -421,19 +421,13 @@ __cursor_runtime_config(WT_CURSOR *cursor, const char *cfg[])
 }
 
 /*
- * __wt_cursor_dup --
- *	Duplicate a cursor.
+ * __wt_cursor_dup_position --
+ *	Set a cursor to another cursor's position.
  */
 int
-__wt_cursor_dup(WT_SESSION_IMPL *session,
-    WT_CURSOR *to_dup, const char *cfg[], WT_CURSOR **cursorp)
+__wt_cursor_dup_position(WT_CURSOR *to_dup, WT_CURSOR *cursor)
 {
-	WT_CURSOR *cursor;
-	WT_DECL_RET;
 	WT_ITEM key;
-
-	/* Open a new cursor with the same URI. */
-	WT_ERR(__wt_open_cursor(session, to_dup->uri, NULL, cfg, &cursor));
 
 	/*
 	 * Get a copy of the cursor's raw key, and set it in the new cursor,
@@ -449,18 +443,22 @@ __wt_cursor_dup(WT_SESSION_IMPL *session,
 	 * depend on the subsequent cursor search to clean things up, as search
 	 * is required to copy and/or reference private memory after success.
 	 */
-	WT_ERR(__wt_cursor_get_raw_key(to_dup, &key));
+	WT_RET(__wt_cursor_get_raw_key(to_dup, &key));
 	__wt_cursor_set_raw_key(cursor, &key);
-	WT_ERR(cursor->search(cursor));
 
-	if (0) {
-err:		if (cursor != NULL)
-			WT_TRET(cursor->close(cursor));
-		cursor = NULL;
-	}
+	/*
+	 * We now have a reference to the raw key, but we don't know anything
+	 * about the memory in which it's stored, it could be btree/file page
+	 * memory in the cache, application memory or the original cursor's
+	 * key/value WT_ITEMs.  Memory allocated in support of another cursor
+	 * could be discarded when that cursor is closed, so it's a problem.
+	 * However, doing a search to position the cursor will fix the problem:
+	 * cursors cannot reference application memory after cursor operations
+	 * and that requirement will save the day.
+	 */
+	WT_RET(cursor->search(cursor));
 
-	*cursorp = cursor;
-	return (ret);
+	return (0);
 }
 
 /*
@@ -478,9 +476,9 @@ __wt_cursor_init(WT_CURSOR *cursor,
 	session = (WT_SESSION_IMPL *)cursor->session;
 
 	/*
-	 * Fill in unspecified cursor methods: get/set key/value, equality,
-	 * search and reconfiguration are all standard.  Otherwise, if the
-	 * method isn't set, assume it's unsupported.
+	 * Fill in unspecified cursor methods: get/set key/value, position
+	 * duplication, search and reconfiguration are all standard, else
+	 * if the method isn't set, assume it's unsupported.
 	 */
 	if (cursor->get_key == NULL)
 		cursor->get_key = __wt_cursor_get_key;
@@ -512,9 +510,6 @@ __wt_cursor_init(WT_CURSOR *cursor,
 		cursor->remove = __wt_cursor_notsup;
 	if (cursor->close == NULL)
 		WT_RET_MSG(session, EINVAL, "cursor lacks a close method");
-	if (cursor->compare == NULL)
-		cursor->compare = (int (*)
-		    (WT_CURSOR *, WT_CURSOR *, int *))__wt_cursor_notsup;
 
 	if (cursor->uri == NULL)
 		WT_RET(__wt_strdup(session, uri, &cursor->uri));

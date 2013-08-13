@@ -350,7 +350,7 @@ struct __wt_cursor {
 	 *
 	 * Inserting a new record after the current maximum record in a
 	 * fixed-length bit field column-store (that is, a store with an
-	 * 'r' type key and 't' type value) implicitly creates the missing
+	 * 'r' type key and 't' type value) may implicitly create the missing
 	 * records as records with a value of 0.
 	 *
 	 * @param cursor the cursor handle
@@ -436,26 +436,25 @@ struct __wt_cursor {
 		WT_CURSOR **tqe_prev;
 	} q;				/* Linked list of WT_CURSORs. */
 
-	uint64_t recno;
+	uint64_t recno;			/* Record number, normal and raw mode */
 	uint8_t raw_recno_buf[WT_INTPACK64_MAXSIZE];
-					/* Holds a recno in raw mode. */
+
 	WT_ITEM key, value;
 	int saved_err;			/* Saved error in set_{key,value}. */
 
-	/* Data source cursors have underlying application-owned cursors. */
-	WT_CURSOR *data_source;
-
 #define	WT_CURSTD_APPEND	0x0001
-#define	WT_CURSTD_DUMP_HEX	0x0002
-#define	WT_CURSTD_DUMP_PRINT	0x0004
-#define	WT_CURSTD_KEY_EXT	0x0008	/* Key points out of the tree. */
-#define	WT_CURSTD_KEY_INT	0x0010	/* Key points into the tree. */
+#define	WT_CURSTD_BULK		0x0002
+#define	WT_CURSTD_DATA_SOURCE	0x0004
+#define	WT_CURSTD_DUMP_HEX	0x0008
+#define	WT_CURSTD_DUMP_PRINT	0x0010
+#define	WT_CURSTD_KEY_EXT	0x0020	/* Key points out of the tree. */
+#define	WT_CURSTD_KEY_INT	0x0040	/* Key points into the tree. */
 #define	WT_CURSTD_KEY_SET	(WT_CURSTD_KEY_EXT | WT_CURSTD_KEY_INT)
-#define	WT_CURSTD_OPEN		0x0020
-#define	WT_CURSTD_OVERWRITE	0x0040
-#define	WT_CURSTD_RAW		0x0080
-#define	WT_CURSTD_VALUE_EXT	0x0100	/* Value points out of the tree. */
-#define	WT_CURSTD_VALUE_INT	0x0200	/* Value points into the tree. */
+#define	WT_CURSTD_OPEN		0x0080
+#define	WT_CURSTD_OVERWRITE	0x0100
+#define	WT_CURSTD_RAW		0x0200
+#define	WT_CURSTD_VALUE_EXT	0x0400	/* Value points out of the tree. */
+#define	WT_CURSTD_VALUE_INT	0x0800	/* Value points into the tree. */
 #define	WT_CURSTD_VALUE_SET	(WT_CURSTD_VALUE_EXT | WT_CURSTD_VALUE_INT)
 	uint32_t flags;
 #endif
@@ -1238,14 +1237,13 @@ struct __wt_connection {
 	 * @param connection the connection handle
 	 * @param path the filename of the extension module
 	 * @configstart{connection.load_extension, see dist/api_data.py}
+	 * @config{config, configuration string passed to the entry point of the
+	 * extension as its WT_CONFIG_ARG argument., a string; default empty.}
 	 * @config{entry, the entry point of the extension\, called to
 	 * initialize the extension when it is loaded.  The signature of the
 	 * function must match ::wiredtiger_extension_init., a string; default
 	 * \c wiredtiger_extension_init.}
-	 * @config{prefix, a prefix for all names registered by this extension
-	 * (e.g.\, to make namespaces distinct or during upgrades)., a string;
-	 * default empty.}
-	 * @config{terminate, a optional function in the extension that is
+	 * @config{terminate, an optional function in the extension that is
 	 * called before the extension is unloaded during WT_CONNECTION::close.
 	 * The signature of the function must match
 	 * ::wiredtiger_extension_terminate., a string; default \c
@@ -1386,9 +1384,9 @@ struct __wt_connection {
  * @config{eviction_trigger, trigger eviction when the cache becomes this full
  * (as a percentage)., an integer between 10 and 99; default \c 95.}
  * @config{extensions, list of shared library extensions to load (using dlopen).
- * Optional values are passed as the \c config parameter to
- * WT_CONNECTION::load_extension.  For example\,
- * <code>extensions=(/path/ext.so={entry=my_entry})</code>., a list of strings;
+ * Any values specified to an library extension are passed to
+ * WT_CONNECTION::load_extension as the \c config parameter (for example\,
+ * <code>extensions=(/path/ext.so={entry=my_entry})</code>)., a list of strings;
  * default empty.}
  * @config{file_extend, file extension configuration.  If set\, extend files of
  * the set type in allocations of the set size\, instead of a block at a time as
@@ -2206,12 +2204,28 @@ struct __wt_data_source {
 	    const char *uri, WT_CONFIG_ARG *config);
 
 	/*!
+	 * Callback to truncate a range of an object.
+	 *
+	 * @snippet ex_data_source.c WT_DATA_SOURCE range truncate
+	 */
+	int (*range_truncate)(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
+	    WT_CURSOR *start, WT_CURSOR *stop);
+
+	/*!
 	 * Callback to verify an object.
 	 *
 	 * @snippet ex_data_source.c WT_DATA_SOURCE verify
 	 */
 	int (*verify)(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 	    const char *uri, WT_CONFIG_ARG *config);
+
+	/*!
+	 * Callback to checkpoint the database.
+	 *
+	 * @snippet ex_data_source.c WT_DATA_SOURCE checkpoint
+	 */
+	int (*checkpoint)(
+	    WT_DATA_SOURCE *dsrc, WT_SESSION *session, WT_CONFIG_ARG *config);
 
 	/*!
 	 * If non-NULL, a callback performed when the database is closed.

@@ -139,6 +139,19 @@ data_source_error(int v)
 	return (v == 0 ? "one" : "two");
 }
 
+static int
+data_source_notify(
+    WT_TXN_NOTIFY *handler, WT_SESSION *session, uint64_t txnid, int committed)
+{
+	/* Unused parameters */
+	(void)handler;
+	(void)session;
+	(void)txnid;
+	(void)committed;
+
+	return (0);
+}
+
 static int my_cursor_next(WT_CURSOR *wtcursor)
 	{ (void)wtcursor; return (0); }
 static int my_cursor_prev(WT_CURSOR *wtcursor)
@@ -150,7 +163,86 @@ static int my_cursor_search(WT_CURSOR *wtcursor)
 static int my_cursor_search_near(WT_CURSOR *wtcursor, int *exactp)
 	{ (void)wtcursor; (void)exactp; return (0); }
 static int my_cursor_insert(WT_CURSOR *wtcursor)
-	{ (void)wtcursor; return (0); }
+{
+	WT_SESSION *session = NULL;
+	int ret;
+
+	/* Unused parameters */
+	(void)wtcursor;
+
+	{
+	int is_snapshot_isolation, isolation_level;
+	/*! [WT_EXTENSION transaction isolation level] */
+	isolation_level = wt_api->transaction_isolation_level(wt_api, session);
+	if (isolation_level == WT_TXN_ISO_SNAPSHOT)
+		is_snapshot_isolation = 1;
+	else
+		is_snapshot_isolation = 0;
+	/*! [WT_EXTENSION transaction isolation level] */
+	(void)is_snapshot_isolation;
+	}
+
+	{
+	/*! [WT_EXTENSION transaction ID] */
+	uint64_t transaction_id;
+
+	transaction_id = wt_api->transaction_id(wt_api, session);
+	/*! [WT_EXTENSION transaction ID] */
+	(void)transaction_id;
+	}
+
+	{
+	/*! [WT_EXTENSION transaction oldest] */
+	uint64_t transaction_oldest;
+
+	transaction_oldest = wt_api->transaction_oldest(wt_api);
+	/*! [WT_EXTENSION transaction oldest] */
+	(void)transaction_oldest;
+	}
+
+	{
+	/*! [WT_EXTENSION transaction notify] */
+	WT_TXN_NOTIFY handler;
+	handler.notify = data_source_notify;
+	ret = wt_api->transaction_notify(wt_api, session, &handler);
+	/*! [WT_EXTENSION transaction notify] */
+	}
+
+	{
+	uint64_t transaction_id = 1;
+	int is_visible;
+	/*! [WT_EXTENSION transaction visible] */
+	is_visible =
+	    wt_api->transaction_visible(wt_api, session, transaction_id);
+	/*! [WT_EXTENSION transaction visible] */
+	(void)is_visible;
+	}
+
+	{
+	const char *key1 = NULL, *key2 = NULL;
+	uint32_t key1_len = 0, key2_len = 0;
+	/*! [WT_EXTENSION collate] */
+	WT_ITEM first, second;
+	int cmp;
+
+	first.data = key1;
+	first.size = key1_len;
+	second.data = key2;
+	second.size = key2_len;
+
+	ret = wt_api->collate(wt_api, session, &first, &second, &cmp);
+	if (cmp == 0)
+		printf("key1 collates identically to key2\n");
+	else if (cmp < 0)
+		printf("key1 collates less than key2\n");
+	else
+		printf("key1 collates greater than key2\n");
+	/*! [WT_EXTENSION collate] */
+	}
+
+	return (ret);
+}
+
 static int my_cursor_update(WT_CURSOR *wtcursor)
 	{ (void)wtcursor; return (0); }
 static int my_cursor_remove(WT_CURSOR *wtcursor)
@@ -324,6 +416,19 @@ my_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 	/*! [WT_EXTENSION config scan] */
 	}
 
+	{
+	/*! [WT_EXTENSION collator config] */
+	/*
+	 * Configure the appropriate collator.
+	 */
+	if ((ret = wt_api->collator_config(wt_api, session, config)) != 0) {
+		(void)wt_api->err_printf(wt_api, session,
+		    "collator configuration: %s", wiredtiger_strerror(ret));
+		return (ret);
+	}
+	/*! [WT_EXTENSION collator config] */
+	}
+
 	/*! [WT_DATA_SOURCE error message] */
 	/*
 	 * If an underlying function fails, log the error and then return an
@@ -452,6 +557,21 @@ my_truncate(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 	return (0);
 }
 
+/*! [WT_DATA_SOURCE range truncate] */
+static int
+my_range_truncate(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
+    WT_CURSOR *start, WT_CURSOR *stop)
+/*! [WT_DATA_SOURCE range truncate] */
+{
+	/* Unused parameters */
+	(void)dsrc;
+	(void)session;
+	(void)start;
+	(void)stop;
+
+	return (0);
+}
+
 /*! [WT_DATA_SOURCE verify] */
 static int
 my_verify(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
@@ -462,6 +582,19 @@ my_verify(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 	(void)dsrc;
 	(void)session;
 	(void)uri;
+	(void)config;
+
+	return (0);
+}
+
+/*! [WT_DATA_SOURCE checkpoint] */
+static int
+my_checkpoint(WT_DATA_SOURCE *dsrc, WT_SESSION *session, WT_CONFIG_ARG *config)
+/*! [WT_DATA_SOURCE checkpoint] */
+{
+	/* Unused parameters */
+	(void)dsrc;
+	(void)session;
 	(void)config;
 
 	return (0);
@@ -501,7 +634,9 @@ main(void)
 		my_rename,
 		my_salvage,
 		my_truncate,
+		my_range_truncate,
 		my_verify,
+		my_checkpoint,
 		my_terminate
 	};
 	ret = conn->add_data_source(conn, "dsrc:", &my_dsrc, NULL);
@@ -564,24 +699,6 @@ main(void)
 	/*! [WT_EXTENSION_API default_session] */
 	(void)wt_api->msg_printf(wt_api, NULL, "configuration complete");
 	/*! [WT_EXTENSION_API default_session] */
-
-	{
-	/*! [WT_EXTENSION transaction ID] */
-	uint64_t transaction_id;
-
-	ret = wt_api->transaction_id(wt_api, session, &transaction_id);
-	/*! [WT_EXTENSION transaction ID] */
-	}
-
-	{
-	uint64_t transaction_id = 1;
-	int is_visible;
-	/*! [WT_EXTENSION transaction visible] */
-	is_visible =
-	    wt_api->transaction_visible(wt_api, session, transaction_id);
-	/*! [WT_EXTENSION transaction visible] */
-	(void)is_visible;
-	}
 
 	(void)conn->close(conn, NULL);
 

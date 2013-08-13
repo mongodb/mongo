@@ -102,9 +102,11 @@ config_setup(void)
 	 * our configuration, LSM or KVS devices are "tables", but files are
 	 * tested as well.
 	 */
-	if ((g.uri = malloc(strlen("table:") + strlen(WT_NAME) + 1)) == NULL)
+	if ((g.uri = malloc(256)) == NULL)
 		syserr("malloc");
 	strcpy(g.uri, DATASOURCE("file") ? "file:" : "table:");
+	if (DATASOURCE("memrata"))
+		strcat(g.uri, "dev1/");
 	strcat(g.uri, WT_NAME);
 
 	/* Default single-threaded half of the time. */

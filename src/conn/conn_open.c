@@ -95,6 +95,8 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 	wt_conn = &conn->iface;
 	session = conn->default_session;
 
+	__wt_txn_refresh_force(session);
+
 	/*
 	 * Shut down server threads other than the eviction server, which is
 	 * needed later to close btree handles.  Some of these threads access

@@ -49,7 +49,7 @@ class test_bug006(wttest.WiredTigerTestCase):
             cursor.set_value(value_populate(cursor, i))
             cursor.insert()
 
-        # Table operations should fail, the cursor is closed.
+        # Table operations should fail, the cursor is open.
         self.assertRaises(
             wiredtiger.WiredTigerError, lambda: self.session.drop(uri, None))
         self.assertRaises(

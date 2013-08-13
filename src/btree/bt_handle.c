@@ -175,7 +175,6 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 	WT_BTREE *btree;
 	WT_CONFIG_ITEM cval;
 	WT_CONNECTION_IMPL *conn;
-	WT_NAMED_COLLATOR *ncoll;
 	WT_NAMED_COMPRESSOR *ncomp;
 	int64_t maj_version, min_version;
 	uint32_t bitcnt;
@@ -211,24 +210,13 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 
 	/* Row-store key comparison and key gap for prefix compression. */
 	if (btree->type == BTREE_ROW) {
-		WT_RET(__wt_config_gets(session, cfg, "collator", &cval));
-		if (cval.len > 0) {
-			TAILQ_FOREACH(ncoll, &conn->collqh, q) {
-				if (WT_STRING_MATCH(
-				    ncoll->name, cval.str, cval.len)) {
-					btree->collator = ncoll->collator;
-					break;
-				}
-			}
-			if (btree->collator == NULL)
-				WT_RET_MSG(session, EINVAL,
-				    "unknown collator '%.*s'",
-				    (int)cval.len, cval.str);
-		}
+		WT_RET(__wt_collator_config(session, cfg, &btree->collator));
+
 		WT_RET(__wt_config_gets(session, cfg, "key_gap", &cval));
 		btree->key_gap = (uint32_t)cval.val;
 	}
-	/* Check for fixed-size data. */
+
+	/* Column-store: check for fixed-size data. */
 	if (btree->type == BTREE_COL_VAR) {
 		WT_RET(__wt_struct_check(
 		    session, cval.str, cval.len, &fixed, &bitcnt));

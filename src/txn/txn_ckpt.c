@@ -7,47 +7,52 @@
 
 #include "wt_internal.h"
 
-static int __checkpoint_sync(WT_SESSION_IMPL *, const char *[]);
-static int __checkpoint_write_leaves(WT_SESSION_IMPL *, const char *[]);
-
 /*
- * __checkpoint_lsm_check --
- *	Check for an attempt to name a checkpoint that includes an LSM tree.
+ * __checkpoint_name_check --
+ *	Check for an attempt to name a checkpoint that includes anything
+ * other than a file object.
  */
 static int
-__checkpoint_lsm_check(WT_SESSION_IMPL *session, const char *uri)
+__checkpoint_name_check(WT_SESSION_IMPL *session, const char *uri)
 {
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
-	int cmp, fail;
+	const char *fail;
 
 	cursor = NULL;
-	fail = 0;
+	fail = NULL;
 
 	/*
-	 * This function exists as a place to hang this comment: LSM trees don't
-	 * support named checkpoints.   If a target list for the checkpoint is
-	 * provided, this function is called with each target list entry; check
-	 * the entry to make sure it's not an LSM tree.  If no target list is
-	 * provided, confirm the metadata file contains no LSM trees.
+	 * This function exists as a place for this comment: named checkpoints
+	 * are only supported on file objects, and not on LSM trees or Memrata
+	 * devices.  If a target list is configured for the checkpoint, this
+	 * function is called with each target list entry; check the entry to
+	 * make sure it's backed by a file.  If no target list is configured,
+	 * confirm the metadata file contains no non-file objects.
 	 */
 	if (uri == NULL) {
 		WT_ERR(__wt_metadata_cursor(session, NULL, &cursor));
-		cursor->set_key(cursor, "lsm:");
-		if ((ret = cursor->search_near(cursor, &cmp)) == 0 && cmp < 0)
-			ret = cursor->next(cursor);
-		if (ret == 0) {
+		while ((ret = cursor->next(cursor)) == 0) {
 			WT_ERR(cursor->get_key(cursor, &uri));
-			if (WT_PREFIX_MATCH(uri, "lsm:"))
-				fail = 1;
-		} else
-			WT_ERR_NOTFOUND_OK(ret);
-	} else if (WT_PREFIX_MATCH(uri, "lsm:"))
-			fail = 1;
+			if (!WT_PREFIX_MATCH(uri, "colgroup:") &&
+			    !WT_PREFIX_MATCH(uri, "file:") &&
+			    !WT_PREFIX_MATCH(uri, "index:") &&
+			    !WT_PREFIX_MATCH(uri, "table:")) {
+				fail = uri;
+				break;
+			}
+		}
+		WT_ERR_NOTFOUND_OK(ret);
+	} else
+		if (!WT_PREFIX_MATCH(uri, "colgroup:") &&
+		    !WT_PREFIX_MATCH(uri, "file:") &&
+		    !WT_PREFIX_MATCH(uri, "index:") &&
+		    !WT_PREFIX_MATCH(uri, "table:"))
+			fail = uri;
 
-	if (fail)
+	if (fail != NULL)
 		WT_ERR_MSG(session, EINVAL,
-		    "LSM trees do not support named checkpoints");
+		    "%s object does not support named checkpoints", fail);
 
 err:	if (cursor != NULL)
 		WT_TRET(cursor->close(cursor));
@@ -89,9 +94,9 @@ __checkpoint_apply(WT_SESSION_IMPL *session, const char *cfg[],
 			    "quoting",
 			    (int)cval.len, (char *)cval.str);
 
-		/* LSM trees don't support named checkpoints. */
+		/* Some objects don't support named checkpoints. */
 		if (named)
-			WT_ERR(__checkpoint_lsm_check(session, k.str));
+			WT_ERR(__checkpoint_name_check(session, k.str));
 
 		WT_ERR(__wt_buf_fmt(session, tmp, "%.*s", (int)k.len, k.str));
 		if ((ret = __wt_schema_worker(
@@ -101,9 +106,9 @@ __checkpoint_apply(WT_SESSION_IMPL *session, const char *cfg[],
 	WT_ERR_NOTFOUND_OK(ret);
 
 	if (!target_list) {
-		/* LSM trees don't support named checkpoints. */
+		/* Some objects don't support named checkpoints. */
 		if (named)
-			WT_ERR(__checkpoint_lsm_check(session, NULL));
+			WT_ERR(__checkpoint_name_check(session, NULL));
 
 		/*
 		 * If the checkpoint is named or we're dropping checkpoints, we
@@ -128,6 +133,42 @@ __checkpoint_apply(WT_SESSION_IMPL *session, const char *cfg[],
 
 err:	__wt_scr_free(&tmp);
 	return (ret);
+}
+
+/*
+ * __checkpoint_data_source --
+ *	Checkpoint all data sources.
+ */
+static int
+__checkpoint_data_source(WT_SESSION_IMPL *session, const char *cfg[])
+{
+	WT_NAMED_DATA_SOURCE *ndsrc;
+	WT_DATA_SOURCE *dsrc;
+
+	/*
+	 * A place-holder, to support Memrata devices: we assume calling the
+	 * underlying data-source session checkpoint function is sufficient to
+	 * checkpoint all objects in the data source, open or closed, and we
+	 * don't attempt to optimize the checkpoint of individual targets.
+	 * Those assumptions is correct for the Memrata device, but it's not
+	 * necessarily going to be true for other data sources.
+	 *
+	 * It's not difficult to support data-source checkpoints of individual
+	 * targets (__wt_schema_worker is the underlying function that will do
+	 * the work, and it's already written to support data-sources, although
+	 * we'd probably need to pass the URI of the object to the data source
+	 * checkpoint function which we don't currently do).  However, doing a
+	 * full data checkpoint is trickier: currently, the connection code is
+	 * written to ignore all objects other than "file:", and that code will
+	 * require significant changes to work with data sources.
+	 */
+	TAILQ_FOREACH(ndsrc, &S2C(session)->dsrcqh, q) {
+		dsrc = ndsrc->dsrc;
+		if (dsrc->checkpoint != NULL)
+			WT_RET(dsrc->checkpoint(dsrc,
+			    (WT_SESSION *)session, (WT_CONFIG_ARG *)cfg));
+	}
+	return (0);
 }
 
 /*
@@ -158,9 +199,12 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	 */
 	__wt_spin_lock(session, &conn->checkpoint_lock);
 
+	/* Flush data-sources before we start the checkpoint. */
+	WT_ERR(__checkpoint_data_source(session, cfg));
+
 	/* Flush dirty leaf pages before we start the checkpoint. */
 	txn->isolation = TXN_ISO_READ_COMMITTED;
-	WT_ERR(__checkpoint_apply(session, cfg, __checkpoint_write_leaves));
+	WT_ERR(__checkpoint_apply(session, cfg, __wt_checkpoint_write_leaves));
 
 	WT_ERR(__wt_meta_track_on(session));
 	tracking = 1;
@@ -179,7 +223,7 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	 * lazy checkpoints, but we don't support them yet).
 	 */
 	if (F_ISSET(conn, WT_CONN_SYNC))
-		WT_ERR(__checkpoint_apply(session, cfg, __checkpoint_sync));
+		WT_ERR(__checkpoint_apply(session, cfg, __wt_checkpoint_sync));
 
 	/* Checkpoint the metadata file. */
 	TAILQ_FOREACH(dhandle, &conn->dhqh, q) {
@@ -201,8 +245,7 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	txn->isolation = TXN_ISO_READ_UNCOMMITTED;
 	saved_meta_next = session->meta_track_next;
 	session->meta_track_next = NULL;
-	WT_WITH_DHANDLE(session, dhandle,
-	    ret = __wt_checkpoint(session, cfg));
+	WT_WITH_DHANDLE(session, dhandle, ret = __wt_checkpoint(session, cfg));
 	session->meta_track_next = saved_meta_next;
 	WT_ERR(ret);
 
@@ -719,11 +762,11 @@ __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 }
 
 /*
- * __checkpoint_write_leaves --
+ * __wt_checkpoint_write_leaves --
  *	Write dirty leaf pages before a checkpoint.
  */
-static int
-__checkpoint_write_leaves(WT_SESSION_IMPL *session, const char *cfg[])
+int
+__wt_checkpoint_write_leaves(WT_SESSION_IMPL *session, const char *cfg[])
 {
 	WT_UNUSED(cfg);
 
@@ -734,11 +777,11 @@ __checkpoint_write_leaves(WT_SESSION_IMPL *session, const char *cfg[])
 }
 
 /*
- * __checkpoint_sync --
+ * __wt_checkpoint_sync --
  *	Sync a file that has been checkpointed.
  */
-static int
-__checkpoint_sync(WT_SESSION_IMPL *session, const char *cfg[])
+int
+__wt_checkpoint_sync(WT_SESSION_IMPL *session, const char *cfg[])
 {
 	WT_BTREE *btree;
 
@@ -760,6 +803,6 @@ __wt_checkpoint_close(WT_SESSION_IMPL *session, const char *cfg[])
 {
 	WT_RET(__checkpoint_worker(session, cfg, 0));
 	if (F_ISSET(S2C(session), WT_CONN_SYNC))
-		WT_RET(__checkpoint_sync(session, cfg));
+		WT_RET(__wt_checkpoint_sync(session, cfg));
 	return (0);
 }
