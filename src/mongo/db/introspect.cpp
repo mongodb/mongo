@@ -21,7 +21,7 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/auth/principal_set.h"
+#include "mongo/db/auth/user_set.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/database_holder.h"
 #include "mongo/db/introspect.h"
@@ -39,7 +39,7 @@ namespace {
     void _appendUserInfo(const Client& c,
                          BSONObjBuilder& builder,
                          AuthorizationSession* authSession) {
-        PrincipalSet::NameIterator nameIter = authSession->getAuthenticatedPrincipalNames();
+        UserSet::NameIterator nameIter = authSession->getAuthenticatedUserNames();
 
         UserName bestUser;
         if (nameIter.more())
