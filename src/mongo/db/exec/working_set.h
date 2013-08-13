@@ -117,11 +117,8 @@ namespace mongo {
             // Data is from 1 or more indices.
             LOC_AND_IDX,
 
-            // Data is from a collection scan.
+            // Data is from a collection scan, or data is from an index scan and was fetched.
             LOC_AND_UNOWNED_OBJ,
-
-            // Data is from a fetch.
-            LOC_AND_OWNED_OBJ,
 
             // DiskLoc has been invalidated, or the obj doesn't correspond to an on-disk document
             // anymore (e.g. is a computed expression).

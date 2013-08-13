@@ -41,79 +41,64 @@ namespace mongo {
         CachedPlanRunner(CanonicalQuery* canonicalQuery, CachedSolution* cached,
                          PlanStage* root, WorkingSet* ws)
             : _canonicalQuery(canonicalQuery), _cachedQuery(cached),
-              _exec(new PlanExecutor(ws, root)), _killed(false), _updatedCache(false) { }
+              _exec(new PlanExecutor(ws, root)), _updatedCache(false) { }
 
-        Runner::RunnerState getNext(BSONObj* objOut) {
-            if (_killed) { return Runner::RUNNER_DEAD; }
-
-            Runner::RunnerState state = _exec->getNext(objOut);
+        Runner::RunnerState getNext(BSONObj* objOut, DiskLoc* dlOut) {
+            Runner::RunnerState state = _exec->getNext(objOut, dlOut);
 
             if (Runner::RUNNER_EOF == state && !_updatedCache) {
-                _updatedCache = true;
-
-                // We're done.  Update the cache.
-                PlanCache* cache = PlanCache::get(_canonicalQuery->ns());
-
-                // TODO: Is this an error?
-                if (NULL == cache) { return Runner::RUNNER_EOF; }
-
-                // TODO: How do we decide this?
-                bool shouldRemovePlan = false;
-
-                if (shouldRemovePlan) {
-                    if (!cache->remove(*_canonicalQuery, *_cachedQuery->solution)) {
-                        warning() << "Cached plan runner couldn't remove plan from cache.  Maybe"
-                            " somebody else did already?";
-                        return Runner::RUNNER_EOF;
-                    }
-                }
-
-                // We're done running.  Update cache.
-                auto_ptr<CachedSolutionFeedback> feedback(new CachedSolutionFeedback());
-                feedback->stats = _exec->getStats();
-                cache->feedback(*_canonicalQuery, *_cachedQuery->solution, feedback.release());
+                updateCache();
             }
+
             return state;
         }
 
-        virtual void saveState() {
-            if (!_killed) {
-                _exec->saveState();
-            }
-        }
+        virtual void saveState() { _exec->saveState(); }
 
-        virtual void restoreState() {
-            if (!_killed) {
-                _exec->restoreState();
-            }
-        }
+        virtual bool restoreState() { return _exec->restoreState(); }
 
-        virtual void invalidate(const DiskLoc& dl) {
-            if (!_killed) {
-                _exec->invalidate(dl);
-            }
+        virtual void invalidate(const DiskLoc& dl) { _exec->invalidate(dl); }
+
+        virtual void setYieldPolicy(Runner::YieldPolicy policy) {
+            _exec->setYieldPolicy(policy);
         }
 
         virtual const CanonicalQuery& getQuery() { return *_canonicalQuery; }
 
-        virtual void kill() { _killed = true; }
+        virtual const string& ns() { return getQuery().getParsed().ns(); }
 
-        virtual bool forceYield() {
-            saveState();
-            ClientCursor::registerRunner(this);
-            ClientCursor::staticYield(ClientCursor::suggestYieldMicros(), getQuery().getParsed().ns(), NULL);
-            ClientCursor::deregisterRunner(this);
-            if (!_killed) { restoreState(); }
-            return !_killed;
-        }
+        virtual void kill() { _exec->kill(); }
 
     private:
+        void updateCache() {
+            _updatedCache = true;
+
+            // We're done.  Update the cache.
+            PlanCache* cache = PlanCache::get(_canonicalQuery->ns());
+
+            // TODO: Is this an error?
+            if (NULL == cache) { return; }
+
+            // TODO: How do we decide this?
+            bool shouldRemovePlan = false;
+
+            if (shouldRemovePlan) {
+                if (!cache->remove(*_canonicalQuery, *_cachedQuery->solution)) {
+                    warning() << "Cached plan runner couldn't remove plan from cache.  Maybe"
+                        " somebody else did already?";
+                    return;
+                }
+            }
+
+            // We're done running.  Update cache.
+            auto_ptr<CachedSolutionFeedback> feedback(new CachedSolutionFeedback());
+            feedback->stats = _exec->getStats();
+            cache->feedback(*_canonicalQuery, *_cachedQuery->solution, feedback.release());
+        }
+
         scoped_ptr<CanonicalQuery> _canonicalQuery;
         scoped_ptr<CachedSolution> _cachedQuery;
         scoped_ptr<PlanExecutor> _exec;
-
-        // Were we killed during a yield?
-        bool _killed;
 
         // Have we updated the cache with our plan stats yet?
         bool _updatedCache;

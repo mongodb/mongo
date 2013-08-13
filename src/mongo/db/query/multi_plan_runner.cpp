@@ -24,7 +24,7 @@
 namespace mongo {
 
     MultiPlanRunner::MultiPlanRunner(CanonicalQuery* query)
-        : _failure(false), _query(query), _killed(false) { }
+        : _failure(false), _policy(Runner::YIELD_MANUAL) { }
 
     MultiPlanRunner::~MultiPlanRunner() {
         for (size_t i = 0; i < _candidates.size(); ++i) {
@@ -39,28 +39,49 @@ namespace mongo {
         _candidates.push_back(CandidatePlan(solution, root, ws));
     }
 
+    void MultiPlanRunner::setYieldPolicy(Runner::YieldPolicy policy) {
+        if (_failure) { return; }
+
+        _policy = policy;
+
+        if (NULL != _bestPlan) {
+            _bestPlan->setYieldPolicy(policy);
+        } else {
+            // Still running our candidates and doing our own yielding.
+            if (Runner::YIELD_MANUAL == policy) {
+                _yieldPolicy.reset();
+            }
+            else {
+                _yieldPolicy.reset(new RunnerYieldPolicy());
+            }
+        }
+    }
+
     void MultiPlanRunner::saveState() {
-        if (_killed) { return; }
+        if (_failure) { return; }
+
         if (NULL != _bestPlan) {
             _bestPlan->saveState();
         }
         else {
-            yieldAllPlans();
+            allPlansSaveState();
         }
     }
 
-    void MultiPlanRunner::restoreState() {
-        if (_killed) { return; }
+    bool MultiPlanRunner::restoreState() {
+        if (_failure) { return false; }
+
         if (NULL != _bestPlan) {
-            _bestPlan->restoreState();
+            return _bestPlan->restoreState();
         }
         else {
-            unyieldAllPlans();
+            allPlansRestoreState();
+            return true;
         }
     }
 
     void MultiPlanRunner::invalidate(const DiskLoc& dl) {
-        if (_killed) { return; }
+        if (_failure) { return; }
 
         if (NULL != _bestPlan) {
             _bestPlan->invalidate(dl);
@@ -73,31 +94,15 @@ namespace mongo {
     }
 
     void MultiPlanRunner::kill() {
-        _killed = true;
+        _failure = true;
+        if (NULL != _bestPlan) { _bestPlan->kill(); }
     }
 
-    bool MultiPlanRunner::forceYield() {
-        saveState();
-        ClientCursor::registerRunner(this);
-        ClientCursor::staticYield(ClientCursor::suggestYieldMicros(),
-                                  getQuery().getParsed().ns(),
-                                  NULL);
-        // During the yield, the database we're operating over or any collection we're relying on
-        // may be dropped.  When this happens all cursors and runners on that database and
-        // collection are killed or deleted in some fashion. (This is how the _killed gets set.)
-        ClientCursor::deregisterRunner(this);
-        if (!_killed) { restoreState(); }
-        return !_killed;
-    }
-
-    Runner::RunnerState MultiPlanRunner::getNext(BSONObj* objOut) {
-        if (_failure || _killed) {
-            return Runner::RUNNER_DEAD;
-        }
+    Runner::RunnerState MultiPlanRunner::getNext(BSONObj* objOut, DiskLoc* dlOut) {
+        if (_failure) { return Runner::RUNNER_DEAD; }
 
         // If we haven't picked the best plan yet...
         if (NULL == _bestPlan) {
-            // TODO: Consider rewriting pickBestPlan to return results as it iterates.
             if (!pickBestPlan(NULL)) {
                 verify(_failure);
                 return Runner::RUNNER_DEAD;
@@ -109,30 +114,41 @@ namespace mongo {
             _alreadyProduced.pop();
 
             WorkingSetMember* member = _bestPlan->getWorkingSet()->get(id);
-            // TODO: getOwned?
-            verify(WorkingSetCommon::fetch(member));
-            *objOut = member->obj;
+            // Note that this copies code from PlanExecutor.
+            if (NULL != objOut) {
+                if (member->hasObj()) {
+                    *objOut = member->obj;
+                }
+                else {
+                    // TODO: Checking the WSM for covered fields goes here.
+                    _bestPlan->getWorkingSet()->free(id);
+                    return Runner::RUNNER_ERROR;
+                }
+            }
+
+            if (NULL != dlOut) {
+                if (member->hasLoc()) {
+                    *dlOut = member->loc;
+                }
+                else {
+                    _bestPlan->getWorkingSet()->free(id);
+                    return Runner::RUNNER_ERROR;
+                }
+            }
             _bestPlan->getWorkingSet()->free(id);
             return Runner::RUNNER_ADVANCED;
         }
 
-        return _bestPlan->getNext(objOut);
+        return _bestPlan->getNext(objOut, dlOut);
     }
 
     bool MultiPlanRunner::pickBestPlan(size_t* out) {
         static const int timesEachPlanIsWorked = 100;
-        static const int yieldInterval = 10;
 
         // Run each plan some number of times.
         for (int i = 0; i < timesEachPlanIsWorked; ++i) {
             bool moreToDo = workAllPlans();
             if (!moreToDo) { break; }
-
-            if (0 == ((i + 1) % yieldInterval)) {
-                yieldAllPlans();
-                // TODO: Actually yield...
-                unyieldAllPlans();
-            }
         }
 
         if (_failure) { return false; }
@@ -142,6 +158,7 @@ namespace mongo {
         // Run the best plan.  Store it.
         _bestPlan.reset(new PlanExecutor(_candidates[bestChild].ws,
                                          _candidates[bestChild].root));
+        _bestPlan->setYieldPolicy(_policy);
         _alreadyProduced = _candidates[bestChild].results;
         // TODO: Normally we'd hand this to the cache, who would own it.
         delete _candidates[bestChild].solution;
@@ -171,19 +188,15 @@ namespace mongo {
 
             WorkingSetID id;
             PlanStage::StageState state = candidate.root->work(&id);
+
             if (PlanStage::ADVANCED == state) {
                 // Save result for later.
                 candidate.results.push(id);
             }
             else if (PlanStage::NEED_TIME == state) {
-                // Nothing to do here.
+                // Fall through to yield check at end of large conditional.
             }
             else if (PlanStage::NEED_FETCH == state) {
-                // XXX: We can yield to do this.  We have to deal with synchronization issues with
-                // regards to the working set and invalidation.  What if another thread invalidates
-                // the thing we're fetching?  The loc could vanish between hasLoc() and the actual
-                // fetch...
-
                 // id has a loc and refers to an obj we need to fetch.
                 WorkingSetMember* member = candidate.ws->get(id);
 
@@ -194,7 +207,18 @@ namespace mongo {
 
                 // Actually bring record into memory.
                 Record* record = member->loc.rec();
-                record->touch();
+
+                // If we're allowed to, go to disk outside of the lock.
+                if (NULL != _yieldPolicy.get()) {
+                    saveState();
+                    _yieldPolicy->yield(record);
+                    if (_failure) { return Runner::RUNNER_DEAD; }
+                    restoreState();
+                }
+                else {
+                    // We're set to manually yield.  We go to disk in the lock.
+                    record->touch();
+                }
 
                 // Record should be in memory now.  Log if it's not.
                 if (!Record::likelyInPhysicalMemory(record->dataNoThrowing())) {
@@ -217,18 +241,26 @@ namespace mongo {
                 _failure = true;
                 return false;
             }
+
+            // Yield, if we can yield ourselves.
+            if (NULL != _yieldPolicy.get() && _yieldPolicy->shouldYield()) {
+                saveState();
+                _yieldPolicy->yield();
+                if (_failure) { return false; }
+                restoreState();
+            }
         }
 
         return true;
     }
 
-    void MultiPlanRunner::yieldAllPlans() {
+    void MultiPlanRunner::allPlansSaveState() {
         for (size_t i = 0; i < _candidates.size(); ++i) {
             _candidates[i].root->prepareToYield();
         }
     }
 
-    void MultiPlanRunner::unyieldAllPlans() {
+    void MultiPlanRunner::allPlansRestoreState() {
         for (size_t i = 0; i < _candidates.size(); ++i) {
             _candidates[i].root->recoverFromYield();
         }

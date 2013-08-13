@@ -40,7 +40,7 @@ namespace mongo {
         return status;
     }
 
-    LiteParsedQuery::LiteParsedQuery() : _wantMore(false), _explain(false), _snapshot(false),
+    LiteParsedQuery::LiteParsedQuery() : _wantMore(true), _explain(false), _snapshot(false),
                                          _returnKey(false), _showDiskLoc(false), _maxScan(0) { }
 
     Status LiteParsedQuery::init(const string& ns, int ntoskip, int ntoreturn, int queryOptions,

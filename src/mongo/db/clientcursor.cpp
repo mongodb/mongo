@@ -88,6 +88,7 @@ namespace mongo {
             // setting this prevents timeout of the cursor in question.
             ++_pinValue;
         }
+
         recursive_scoped_lock lock(ccmutex);
         _cursorid = allocCursorId_inlock();
         clientCursorsById.insert( make_pair(_cursorid, this) );
@@ -141,9 +142,14 @@ namespace mongo {
         verify(db);
         verify(str::startsWith(ns, db->name()));
 
-        for (set<Runner*>::iterator it = nonCachedRunners.begin(); it != nonCachedRunners.end(); ++it) {
+        // Look at all active non-cached Runners.  These are the runners that are in auto-yield mode
+        // that are not attached to the the client cursor. For example, all internal runners don't
+        // need to be cached -- there will be no getMore.
+        for (set<Runner*>::iterator it = nonCachedRunners.begin(); it != nonCachedRunners.end();
+             ++it) {
+
             Runner* runner = *it;
-            const string& runnerNS = runner->getQuery().getParsed().ns();
+            const string& runnerNS = runner->ns();
             if ((isDB && str::startsWith(runnerNS, ns)) || (str::equals(runnerNS.c_str(), ns))) {
                 runner->kill();
             }
@@ -161,11 +167,25 @@ namespace mongo {
             }
 
             bool shouldDelete = false;
+
+            // We will only delete CCs with runners that are not actively in use.  The runners that
+            // are actively in use are instead kill()-ed.
             if (NULL != cc->_runner.get()) {
                 verify(NULL == cc->c());
-                shouldDelete = true;
+
+                // If there is a pinValue >= 100, somebody is actively using the CC and we do not
+                // delete it.  Instead we notify the holder that we killed it.  The holder will then
+                // delete the CC.
+                if (cc->_pinValue >= 100) {
+                    cc->_runner->kill();
+                }
+                else {
+                    // pinvalue is <100, so there is nobody actively holding the CC.  We can safely
+                    // delete it as nobody is holding the CC.
+                    shouldDelete = true;
+                }
             }
-            // Begin cursor-only
+            // Begin cursor-only DEPRECATED
             else if (cc->c()->shouldDestroyOnNSDeletion()) {
                 verify(NULL == cc->_runner.get());
 
@@ -180,7 +200,7 @@ namespace mongo {
                     }
                 }
             }
-            // End cursor-only
+            // End cursor-only DEPRECATED
 
             if (shouldDelete) {
                 ClientCursor* toDelete = it->second;
@@ -213,9 +233,11 @@ namespace mongo {
         aboutToDeleteForSharding( ns, db, nsd, dl );
 
         // Check our non-cached active runner list.
-        for (set<Runner*>::iterator it = nonCachedRunners.begin(); it != nonCachedRunners.end(); ++it) {
+        for (set<Runner*>::iterator it = nonCachedRunners.begin(); it != nonCachedRunners.end();
+             ++it) {
+
             Runner* runner = *it;
-            if (0 == ns.compare(runner->getQuery().getParsed().ns())) {
+            if (0 == ns.compare(runner->ns())) {
                 runner->invalidate(dl);
             }
         }
@@ -822,6 +844,8 @@ namespace mongo {
 
     //
     // Pin methods
+    // TODO: Simplify when we kill Cursor.  In particular, once we've pinned a CC, it won't be
+    // deleted from underneath us, so we can save the pointer and ignore the ID.
     //
 
     ClientCursorPin::ClientCursorPin(long long cursorid) : _cursorid( INVALID_CURSOR_ID ) {
@@ -849,12 +873,21 @@ namespace mongo {
         }
     }
 
+    void ClientCursorPin::free() {
+        if (_cursorid == INVALID_CURSOR_ID) {
+            return;
+        }
+        ClientCursor *cursor = c();
+        _cursorid = INVALID_CURSOR_ID;
+        delete cursor;
+    }
+
     ClientCursor* ClientCursorPin::c() const {
         return ClientCursor::find( _cursorid );
     }
 
     //
-    // Holder methods
+    // Holder methods DEPRECATED
     //
     ClientCursorHolder::ClientCursorHolder(ClientCursor *c) : _c(0), _id(INVALID_CURSOR_ID) {
         reset(c);

@@ -81,7 +81,7 @@ namespace RunnerRegistry {
 
             // Read some of it.
             for (int i = 0; i < 10; ++i) {
-                ASSERT_EQUALS(Runner::RUNNER_ADVANCED, run->getNext(&obj));
+                ASSERT_EQUALS(Runner::RUNNER_ADVANCED, run->getNext(&obj, NULL));
                 ASSERT_EQUALS(i, obj["foo"].numberInt());
             }
 
@@ -106,11 +106,11 @@ namespace RunnerRegistry {
             // Make sure that the runner moved forward over the deleted data.  We don't see foo==10
             // or foo==11.
             for (int i = 12; i < N(); ++i) {
-                ASSERT_EQUALS(Runner::RUNNER_ADVANCED, run->getNext(&obj));
+                ASSERT_EQUALS(Runner::RUNNER_ADVANCED, run->getNext(&obj, NULL));
                 ASSERT_EQUALS(i, obj["foo"].numberInt());
             }
 
-            ASSERT_EQUALS(Runner::RUNNER_EOF, run->getNext(&obj));
+            ASSERT_EQUALS(Runner::RUNNER_EOF, run->getNext(&obj, NULL));
         }
     };
 
@@ -123,7 +123,7 @@ namespace RunnerRegistry {
 
             // Read some of it.
             for (int i = 0; i < 10; ++i) {
-                ASSERT_EQUALS(Runner::RUNNER_ADVANCED, run->getNext(&obj));
+                ASSERT_EQUALS(Runner::RUNNER_ADVANCED, run->getNext(&obj, NULL));
                 ASSERT_EQUALS(i, obj["foo"].numberInt());
             }
 
@@ -138,7 +138,7 @@ namespace RunnerRegistry {
             ClientCursor::deregisterRunner(run.get());
             run->restoreState();
 
-            ASSERT_EQUALS(Runner::RUNNER_ADVANCED, run->getNext(&obj));
+            ASSERT_EQUALS(Runner::RUNNER_ADVANCED, run->getNext(&obj, NULL));
             ASSERT_EQUALS(10, obj["foo"].numberInt());
 
             // Save state and register.
@@ -153,7 +153,7 @@ namespace RunnerRegistry {
             run->restoreState();
 
             // Runner was killed.
-            ASSERT_EQUALS(Runner::RUNNER_DEAD, run->getNext(&obj));
+            ASSERT_EQUALS(Runner::RUNNER_DEAD, run->getNext(&obj, NULL));
         }
     };
 
@@ -168,7 +168,7 @@ namespace RunnerRegistry {
 
             // Read some of it.
             for (int i = 0; i < 10; ++i) {
-                ASSERT_EQUALS(Runner::RUNNER_ADVANCED, run->getNext(&obj));
+                ASSERT_EQUALS(Runner::RUNNER_ADVANCED, run->getNext(&obj, NULL));
                 ASSERT_EQUALS(i, obj["foo"].numberInt());
             }
 
@@ -184,7 +184,7 @@ namespace RunnerRegistry {
             run->restoreState();
 
             // Runner was killed.
-            ASSERT_EQUALS(Runner::RUNNER_DEAD, run->getNext(&obj));
+            ASSERT_EQUALS(Runner::RUNNER_DEAD, run->getNext(&obj, NULL));
         }
     };
 
@@ -199,7 +199,7 @@ namespace RunnerRegistry {
 
             // Read some of it.
             for (int i = 0; i < 10; ++i) {
-                ASSERT_EQUALS(Runner::RUNNER_ADVANCED, run->getNext(&obj));
+                ASSERT_EQUALS(Runner::RUNNER_ADVANCED, run->getNext(&obj, NULL));
                 ASSERT_EQUALS(i, obj["foo"].numberInt());
             }
 
@@ -215,7 +215,7 @@ namespace RunnerRegistry {
             run->restoreState();
 
             // Runner was killed.
-            ASSERT_EQUALS(Runner::RUNNER_DEAD, run->getNext(&obj));
+            ASSERT_EQUALS(Runner::RUNNER_DEAD, run->getNext(&obj, NULL));
         }
     };
 
@@ -228,7 +228,7 @@ namespace RunnerRegistry {
 
             // Read some of it.
             for (int i = 0; i < 10; ++i) {
-                ASSERT_EQUALS(Runner::RUNNER_ADVANCED, run->getNext(&obj));
+                ASSERT_EQUALS(Runner::RUNNER_ADVANCED, run->getNext(&obj, NULL));
                 ASSERT_EQUALS(i, obj["foo"].numberInt());
             }
 
@@ -246,7 +246,7 @@ namespace RunnerRegistry {
             ClientCursor::deregisterRunner(run.get());
             run->restoreState();
 
-            ASSERT_EQUALS(Runner::RUNNER_ADVANCED, run->getNext(&obj));
+            ASSERT_EQUALS(Runner::RUNNER_ADVANCED, run->getNext(&obj, NULL));
             ASSERT_EQUALS(10, obj["foo"].numberInt());
 
             // Save state and register.
@@ -263,7 +263,7 @@ namespace RunnerRegistry {
             run->restoreState();
 
             // Runner was killed.
-            ASSERT_EQUALS(Runner::RUNNER_DEAD, run->getNext(&obj));
+            ASSERT_EQUALS(Runner::RUNNER_DEAD, run->getNext(&obj, NULL));
         }
     };
 

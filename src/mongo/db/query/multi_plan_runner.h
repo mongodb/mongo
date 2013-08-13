@@ -56,7 +56,7 @@ namespace mongo {
          * Get the next result.  Yielding is handled internally.  If a best plan is not picked when
          * this is called, we call pickBestPlan() internally.
          */
-        Runner::RunnerState getNext(BSONObj* objOut);
+        Runner::RunnerState getNext(BSONObj* objOut, DiskLoc* dlOut);
 
         /**
          * Runs all plans added by addPlan, ranks them, and picks a best.  Deletes all loser plans.
@@ -69,38 +69,44 @@ namespace mongo {
         bool pickBestPlan(size_t* out);
 
         virtual void saveState();
-        virtual void restoreState();
+        virtual bool restoreState();
         virtual void invalidate(const DiskLoc& dl);
 
-        virtual const CanonicalQuery& getQuery() { return *_query; }
-        virtual void kill();
+        virtual void setYieldPolicy(Runner::YieldPolicy policy);
 
-        virtual bool forceYield();
+        virtual const CanonicalQuery& getQuery() { return *_query; }
+        virtual const string& ns() { return getQuery().getParsed().ns(); }
+
+        virtual void kill();
 
     private:
         /**
          * Have all our candidate plans do something.
          */
         bool workAllPlans();
-        void yieldAllPlans();
-        void unyieldAllPlans();
+        void allPlansSaveState();
+        void allPlansRestoreState();
 
-        // Did some plan fail?  Just give up if so.
+        // Did some plan fail while we were running it to compare against other plans?  Just give up
+        // if so.  Also set if we were killed during a yield.
         bool _failure;
 
-        // The winner...
+        // We need to cache this so that when we switch from running our candidates to using a
+        // PlanExecutor, we can set the right yielding policy on it.
+        Runner::YieldPolicy _policy;
+
+        // The winner of the plan competition...
         scoped_ptr<PlanExecutor> _bestPlan;
         // ...and any results it produced while working toward winning.
         std::queue<WorkingSetID> _alreadyProduced;
 
         // Candidate plans.
         vector<CandidatePlan> _candidates;
+        // Yielding policy we use when we're running candidates.
+        scoped_ptr<RunnerYieldPolicy> _yieldPolicy;
 
         // The query that we're trying to figure out the best solution to.
         scoped_ptr<CanonicalQuery> _query;
-
-        // Were we killed during a yield?
-        bool _killed;
     };
 
 }  // namespace mongo

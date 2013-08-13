@@ -15,6 +15,7 @@
  */
 
 #include "mongo/client/dbclientcursor.h"
+#include "mongo/db/exec/fetch.h"
 #include "mongo/db/exec/index_scan.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/merge_sort.h"
@@ -106,11 +107,11 @@ namespace QueryStageMergeSortTests {
             addIndex(firstIndex);
             addIndex(secondIndex);
 
-            PlanExecutor runner;
+            WorkingSet* ws = new WorkingSet();
             // Sort by c:1
             MergeSortStageParams msparams;
             msparams.pattern = BSON("c" << 1);
-            auto_ptr<MergeSortStage> ms(new MergeSortStage(msparams, runner.getWorkingSet()));
+            MergeSortStage* ms = new MergeSortStage(msparams, ws);
 
             // a:1
             IndexScanParams params;
@@ -119,18 +120,19 @@ namespace QueryStageMergeSortTests {
             params.endKey = objWithMaxKey(1);
             params.endKeyInclusive = true;
             params.direction = 1;
-            ms->addChild(new IndexScan(params, runner.getWorkingSet(), NULL));
+            ms->addChild(new IndexScan(params, ws, NULL));
 
             // b:1
             params.descriptor = getIndex(secondIndex);
-            ms->addChild(new IndexScan(params, runner.getWorkingSet(), NULL));
+            ms->addChild(new IndexScan(params, ws, NULL));
 
-            runner.setRoot(ms.release());
+            // Must fetch if we want to easily pull out an obj.
+            PlanExecutor runner(ws, new FetchStage(ws, ms, NULL));
 
             for (int i = 0; i < N; ++i) {
                 BSONObj first, second;
-                ASSERT_EQUALS(Runner::RUNNER_ADVANCED, runner.getNext(&first));
-                ASSERT_EQUALS(Runner::RUNNER_ADVANCED, runner.getNext(&second));
+                ASSERT_EQUALS(Runner::RUNNER_ADVANCED, runner.getNext(&first, NULL));
+                ASSERT_EQUALS(Runner::RUNNER_ADVANCED, runner.getNext(&second, NULL));
                 ASSERT_EQUALS(first["c"].numberInt(), second["c"].numberInt());
                 ASSERT_EQUALS(i, first["c"].numberInt());
                 ASSERT((first.hasField("a") && second.hasField("b"))
@@ -139,7 +141,7 @@ namespace QueryStageMergeSortTests {
 
             // Should be done now.
             BSONObj foo;
-            ASSERT_NOT_EQUALS(Runner::RUNNER_ADVANCED, runner.getNext(&foo));
+            ASSERT_NOT_EQUALS(Runner::RUNNER_ADVANCED, runner.getNext(&foo, NULL));
         }
     };
 
@@ -162,11 +164,11 @@ namespace QueryStageMergeSortTests {
             addIndex(firstIndex);
             addIndex(secondIndex);
 
-            PlanExecutor runner;
+            WorkingSet* ws = new WorkingSet();
             // Sort by c:1
             MergeSortStageParams msparams;
             msparams.pattern = BSON("c" << 1);
-            auto_ptr<MergeSortStage> ms(new MergeSortStage(msparams, runner.getWorkingSet()));
+            MergeSortStage* ms = new MergeSortStage(msparams, ws);
 
             // a:1
             IndexScanParams params;
@@ -175,18 +177,18 @@ namespace QueryStageMergeSortTests {
             params.endKey = objWithMaxKey(1);
             params.endKeyInclusive = true;
             params.direction = 1;
-            ms->addChild(new IndexScan(params, runner.getWorkingSet(), NULL));
+            ms->addChild(new IndexScan(params, ws, NULL));
 
             // b:1
             params.descriptor = getIndex(secondIndex);
-            ms->addChild(new IndexScan(params, runner.getWorkingSet(), NULL));
+            ms->addChild(new IndexScan(params, ws, NULL));
 
-            runner.setRoot(ms.release());
+            PlanExecutor runner(ws, new FetchStage(ws, ms, NULL));
 
             for (int i = 0; i < N; ++i) {
                 BSONObj first, second;
-                ASSERT_EQUALS(Runner::RUNNER_ADVANCED, runner.getNext(&first));
-                ASSERT_EQUALS(Runner::RUNNER_ADVANCED, runner.getNext(&second));
+                ASSERT_EQUALS(Runner::RUNNER_ADVANCED, runner.getNext(&first, NULL));
+                ASSERT_EQUALS(Runner::RUNNER_ADVANCED, runner.getNext(&second, NULL));
                 ASSERT_EQUALS(first["c"].numberInt(), second["c"].numberInt());
                 ASSERT_EQUALS(i, first["c"].numberInt());
                 ASSERT((first.hasField("a") && second.hasField("b"))
@@ -195,7 +197,7 @@ namespace QueryStageMergeSortTests {
 
             // Should be done now.
             BSONObj foo;
-            ASSERT_EQUALS(Runner::RUNNER_EOF, runner.getNext(&foo));
+            ASSERT_EQUALS(Runner::RUNNER_EOF, runner.getNext(&foo, NULL));
         }
     };
 
@@ -217,12 +219,12 @@ namespace QueryStageMergeSortTests {
             addIndex(firstIndex);
             addIndex(secondIndex);
 
-            PlanExecutor runner;
+            WorkingSet* ws = new WorkingSet();
             // Sort by c:1
             MergeSortStageParams msparams;
             msparams.dedup = false;
             msparams.pattern = BSON("c" << 1);
-            auto_ptr<MergeSortStage> ms(new MergeSortStage(msparams, runner.getWorkingSet()));
+            MergeSortStage* ms = new MergeSortStage(msparams, ws);
 
             // a:1
             IndexScanParams params;
@@ -231,19 +233,19 @@ namespace QueryStageMergeSortTests {
             params.endKey = objWithMaxKey(1);
             params.endKeyInclusive = true;
             params.direction = 1;
-            ms->addChild(new IndexScan(params, runner.getWorkingSet(), NULL));
+            ms->addChild(new IndexScan(params, ws, NULL));
 
             // b:1
             params.descriptor = getIndex(secondIndex);
-            ms->addChild(new IndexScan(params, runner.getWorkingSet(), NULL));
+            ms->addChild(new IndexScan(params, ws, NULL));
 
-            runner.setRoot(ms.release());
+            PlanExecutor runner(ws, new FetchStage(ws, ms, NULL));
 
             for (int i = 0; i < N; ++i) {
                 BSONObj first, second;
                 // We inserted N objects but we get 2 * N from the runner because of dups.
-                ASSERT_EQUALS(Runner::RUNNER_ADVANCED, runner.getNext(&first));
-                ASSERT_EQUALS(Runner::RUNNER_ADVANCED, runner.getNext(&second));
+                ASSERT_EQUALS(Runner::RUNNER_ADVANCED, runner.getNext(&first, NULL));
+                ASSERT_EQUALS(Runner::RUNNER_ADVANCED, runner.getNext(&second, NULL));
                 ASSERT_EQUALS(first["c"].numberInt(), second["c"].numberInt());
                 ASSERT_EQUALS(i, first["c"].numberInt());
                 ASSERT((first.hasField("a") && second.hasField("b"))
@@ -252,7 +254,7 @@ namespace QueryStageMergeSortTests {
 
             // Should be done now.
             BSONObj foo;
-            ASSERT_EQUALS(Runner::RUNNER_EOF, runner.getNext(&foo));
+            ASSERT_EQUALS(Runner::RUNNER_EOF, runner.getNext(&foo, NULL));
         }
     };
 
@@ -276,11 +278,11 @@ namespace QueryStageMergeSortTests {
             addIndex(firstIndex);
             addIndex(secondIndex);
 
-            PlanExecutor runner;
+            WorkingSet* ws = new WorkingSet();
             // Sort by c:-1
             MergeSortStageParams msparams;
             msparams.pattern = BSON("c" << -1);
-            auto_ptr<MergeSortStage> ms(new MergeSortStage(msparams, runner.getWorkingSet()));
+            MergeSortStage* ms = new MergeSortStage(msparams, ws);
 
             // a:1
             IndexScanParams params;
@@ -290,18 +292,18 @@ namespace QueryStageMergeSortTests {
             params.endKeyInclusive = true;
             // This is the direction along the index.
             params.direction = 1;
-            ms->addChild(new IndexScan(params, runner.getWorkingSet(), NULL));
+            ms->addChild(new IndexScan(params, ws, NULL));
 
             // b:1
             params.descriptor = getIndex(secondIndex);
-            ms->addChild(new IndexScan(params, runner.getWorkingSet(), NULL));
+            ms->addChild(new IndexScan(params, ws, NULL));
 
-            runner.setRoot(ms.release());
+            PlanExecutor runner(ws, new FetchStage(ws, ms, NULL));
 
             for (int i = 0; i < N; ++i) {
                 BSONObj first, second;
-                ASSERT_EQUALS(Runner::RUNNER_ADVANCED, runner.getNext(&first));
-                ASSERT_EQUALS(Runner::RUNNER_ADVANCED, runner.getNext(&second));
+                ASSERT_EQUALS(Runner::RUNNER_ADVANCED, runner.getNext(&first, NULL));
+                ASSERT_EQUALS(Runner::RUNNER_ADVANCED, runner.getNext(&second, NULL));
                 ASSERT_EQUALS(first["c"].numberInt(), second["c"].numberInt());
                 ASSERT_EQUALS(N - i - 1, first["c"].numberInt());
                 ASSERT((first.hasField("a") && second.hasField("b"))
@@ -310,7 +312,7 @@ namespace QueryStageMergeSortTests {
 
             // Should be done now.
             BSONObj foo;
-            ASSERT_EQUALS(Runner::RUNNER_EOF, runner.getNext(&foo));
+            ASSERT_EQUALS(Runner::RUNNER_EOF, runner.getNext(&foo, NULL));
         }
     };
 
@@ -333,11 +335,11 @@ namespace QueryStageMergeSortTests {
             addIndex(firstIndex);
             addIndex(secondIndex);
 
-            PlanExecutor runner;
+            WorkingSet* ws = new WorkingSet();
             // Sort by c:1
             MergeSortStageParams msparams;
             msparams.pattern = BSON("c" << 1);
-            auto_ptr<MergeSortStage> ms(new MergeSortStage(msparams, runner.getWorkingSet()));
+            MergeSortStage* ms = new MergeSortStage(msparams, ws);
 
             // a:1
             IndexScanParams params;
@@ -346,27 +348,27 @@ namespace QueryStageMergeSortTests {
             params.endKey = objWithMaxKey(1);
             params.endKeyInclusive = true;
             params.direction = 1;
-            ms->addChild(new IndexScan(params, runner.getWorkingSet(), NULL));
+            ms->addChild(new IndexScan(params, ws, NULL));
 
             // b:51 (EOF)
             params.descriptor = getIndex(secondIndex);
             params.startKey = BSON("" << 51 << "" << MinKey);
             params.endKey = BSON("" << 51 << "" << MaxKey);
-            ms->addChild(new IndexScan(params, runner.getWorkingSet(), NULL));
+            ms->addChild(new IndexScan(params, ws, NULL));
 
-            runner.setRoot(ms.release());
+            PlanExecutor runner(ws, new FetchStage(ws, ms, NULL));
 
             // Only getting results from the a:1 index scan.
             for (int i = 0; i < N; ++i) {
                 BSONObj obj;
-                ASSERT_EQUALS(Runner::RUNNER_ADVANCED, runner.getNext(&obj));
+                ASSERT_EQUALS(Runner::RUNNER_ADVANCED, runner.getNext(&obj, NULL));
                 ASSERT_EQUALS(i, obj["c"].numberInt());
                 ASSERT_EQUALS(1, obj["a"].numberInt());
             }
 
             // Should be done now.
             BSONObj foo;
-            ASSERT_EQUALS(Runner::RUNNER_EOF, runner.getNext(&foo));
+            ASSERT_EQUALS(Runner::RUNNER_EOF, runner.getNext(&foo, NULL));
         }
     };
 
@@ -376,11 +378,11 @@ namespace QueryStageMergeSortTests {
         void run() {
             Client::WriteContext ctx(ns());
 
-            PlanExecutor runner;
+            WorkingSet* ws = new WorkingSet();
             // Sort by foo:1
             MergeSortStageParams msparams;
             msparams.pattern = BSON("foo" << 1);
-            auto_ptr<MergeSortStage> ms(new MergeSortStage(msparams, runner.getWorkingSet()));
+            MergeSortStage* ms = new MergeSortStage(msparams, ws);
 
             IndexScanParams params;
             params.startKey = objWithMinKey(1);
@@ -397,14 +399,14 @@ namespace QueryStageMergeSortTests {
                 BSONObj indexSpec = BSON(index << 1 << "foo" << 1);
                 addIndex(indexSpec);
                 params.descriptor = getIndex(indexSpec);
-                ms->addChild(new IndexScan(params, runner.getWorkingSet(), NULL));
+                ms->addChild(new IndexScan(params, ws, NULL));
             }
 
-            runner.setRoot(ms.release());
+            PlanExecutor runner(ws, new FetchStage(ws, ms, NULL));
 
             for (int i = 0; i < numIndices; ++i) {
                 BSONObj obj;
-                ASSERT_EQUALS(Runner::RUNNER_ADVANCED, runner.getNext(&obj));
+                ASSERT_EQUALS(Runner::RUNNER_ADVANCED, runner.getNext(&obj, NULL));
                 ASSERT_EQUALS(i, obj["foo"].numberInt());
                 string index(1, 'a' + i);
                 ASSERT_EQUALS(1, obj[index].numberInt());
@@ -412,7 +414,7 @@ namespace QueryStageMergeSortTests {
 
             // Should be done now.
             BSONObj foo;
-            ASSERT_EQUALS(Runner::RUNNER_EOF, runner.getNext(&foo));
+            ASSERT_EQUALS(Runner::RUNNER_EOF, runner.getNext(&foo, NULL));
         }
     };
 

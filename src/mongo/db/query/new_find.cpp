@@ -123,7 +123,8 @@ namespace mongo {
         // If this is NULL, there is no data but the query is valid.  You're allowed to query for
         // data on an empty collection and it's not an error.  There just isn't any data...
         if (NULL == nsd) {
-            *out = new EOFRunner(canonicalQuery.release());
+            *out = new EOFRunner(canonicalQuery->ns());
+            canonicalQuery.reset();
             return Status::OK();
         }
 
@@ -181,10 +182,15 @@ namespace mongo {
         // This is a read lock.  TODO: There is a cursor flag for not needing this.  Do we care?
         Client::ReadContext ctx(ns);
 
+        log() << "running getMore in new system, cursorid " << cursorid << endl;
+
         // TODO: Document.
         // TODO: do this when we can pass in our own parsed query
         //replVerifyReadsOk();
 
+        // A pin performs a CC lookup and if there is a CC, increments the CC's pin value so it
+        // doesn't time out.  Also informs ClientCursor that there is somebody actively holding the
+        // CC, so don't delete it.
         ClientCursorPin ccPin(cursorid);
         ClientCursor* cc = ccPin.c();
 
@@ -221,17 +227,20 @@ namespace mongo {
             // If we're replaying the oplog, we save the last time that we read.
             OpTime slaveReadTill;
 
+            // What number result are we starting at?  Used to fill out the reply.
             startingResult = cc->pos();
 
+            // What gives us results.
             Runner* runner = cc->getRunner();
             const LiteParsedQuery& pq = runner->getQuery().getParsed();
 
             // Get results out of the runner.
             // TODO: There may be special handling required for tailable cursors?
             runner->restoreState();
+
             BSONObj obj;
-            // TODO: Differentiate EOF from error.
-            while (Runner::RUNNER_ADVANCED == runner->getNext(&obj)) {
+            Runner::RunnerState state;
+            while (Runner::RUNNER_ADVANCED == (state = runner->getNext(&obj, NULL))) {
                 // If we're sharded make sure that we don't return any data that hasn't been
                 // migrated off of our shard yet.
                 if (collMetadata) {
@@ -259,19 +268,31 @@ namespace mongo {
                 }
             }
 
-            cc->incPos(numResults);
-            runner->saveState();
-
-            // Possibly note slave's position in the oplog.
-            if (pq.hasOption(QueryOption_OplogReplay) && !slaveReadTill.isNull()) {
-                cc->slaveReadTill(slaveReadTill);
+            if (Runner::RUNNER_DEAD == state || Runner::RUNNER_EOF == state) {
+                log() << "getMore(): runner with id " << cursorid << " EOF/DEAD, state = "
+                      << static_cast<int>(state) << endl;
+                // TODO: If the cursor is tailable we don't kill it if it's eof.
+                ccPin.free();
+                // cc is now invalid, as is the runner, as is 'pq'.
+                cursorid = 0;
+                cc = NULL;
             }
+            else {
+                // Continue caching the ClientCursor.
+                cc->incPos(numResults);
+                runner->saveState();
 
-            exhaust = pq.hasOption(QueryOption_Exhaust);
+                // Possibly note slave's position in the oplog.
+                if (pq.hasOption(QueryOption_OplogReplay) && !slaveReadTill.isNull()) {
+                    cc->slaveReadTill(slaveReadTill);
+                }
 
-            // If the getmore had a time limit, remaining time is "rolled over" back to the
-            // cursor (for use by future getmore ops).
-            cc->setLeftoverMaxTimeMicros( curop.getRemainingMaxTimeMicros() );
+                exhaust = pq.hasOption(QueryOption_Exhaust);
+
+                // If the getmore had a time limit, remaining time is "rolled over" back to the
+                // cursor (for use by future getmore ops).
+                cc->setLeftoverMaxTimeMicros( curop.getRemainingMaxTimeMicros() );
+            }
         }
 
         QueryResult* qr = reinterpret_cast<QueryResult*>(bb.buf());
@@ -339,9 +360,15 @@ namespace mongo {
         // Do we save the Runner in a ClientCursor for getMore calls later?
         bool saveClientCursor = false;
 
+        // We turn on auto-yielding for the runner here, so we must register it with the active
+        // runners list in ClientCursor.
+        ClientCursor::registerRunner(runner.get());
+        runner->setYieldPolicy(Runner::YIELD_AUTO);
+
         BSONObj obj;
-        // TODO: Differentiate EOF from error.
-        while (Runner::RUNNER_ADVANCED == runner->getNext(&obj)) {
+        Runner::RunnerState state;
+
+        while (Runner::RUNNER_ADVANCED == (state = runner->getNext(&obj, NULL))) {
             // If we're sharded make sure that we don't return any data that hasn't been migrated
             // off of our shared yet.
             if (collMetadata) {
@@ -386,6 +413,17 @@ namespace mongo {
             }
         }
 
+        // If we cache the runner later, we want to deregister it as it receives notifications
+        // anyway by virtue of being cached.
+        //
+        // If we don't cache the runner later, we are deleting it, so it must be deregistered.
+        //
+        // So, no matter what, deregister the runner.
+        ClientCursor::deregisterRunner(runner.get());
+
+        // Why save a dead runner?
+        if (Runner::RUNNER_DEAD == state) { saveClientCursor = false; }
+
         // TODO: Stage creation can set tailable depending on what's in the parsed query.  We have
         // the full parsed query available during planning...set it there.
         //
@@ -403,35 +441,36 @@ namespace mongo {
 
         long long ccId = 0;
         if (saveClientCursor) {
-            // Allocate a new ClientCursor.
-            ClientCursorHolder ccHolder;
-            ccHolder.reset(new ClientCursor(runner.get()));
-            ccId = ccHolder->cursorid();
-
             // We won't use the runner until it's getMore'd.
             runner->saveState();
+
+            // Allocate a new ClientCursor.  We don't have to worry about leaking it as it's
+            // inserted into a global map by its ctor.
+            ClientCursor* cc = new ClientCursor(runner.get());
+            ccId = cc->cursorid();
+
+            log() << "caching runner with cursorid " << ccId << endl;
 
             // ClientCursor takes ownership of runner.  Release to make sure it's not deleted.
             runner.release();
 
+            // TODO document
             if (pq.hasOption(QueryOption_OplogReplay) && !slaveReadTill.isNull()) {
-                ccHolder->slaveReadTill(slaveReadTill);
+                cc->slaveReadTill(slaveReadTill);
             }
 
+            // TODO document
             if (pq.hasOption(QueryOption_Exhaust)) {
                 curop.debug().exhaust = true;
             }
 
             // Set attributes for getMore.
-            ccHolder->setCollMetadata(collMetadata);
-            ccHolder->setPos(numResults);
+            cc->setCollMetadata(collMetadata);
+            cc->setPos(numResults);
 
             // If the query had a time limit, remaining time is "rolled over" to the cursor (for
             // use by future getmore ops).
-            ccHolder->setLeftoverMaxTimeMicros(curop.getRemainingMaxTimeMicros());
-
-            // Give up our reference to the CC.
-            ccHolder.release();
+            cc->setLeftoverMaxTimeMicros(curop.getRemainingMaxTimeMicros());
         }
 
         // Add the results from the query into the output buffer.

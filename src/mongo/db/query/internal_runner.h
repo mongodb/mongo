@@ -27,48 +27,53 @@
 namespace mongo {
 
     /**
-     * SingleSolutionRunner runs a plan that was the only possible solution to a query.  It exists
-     * only to dump stats into the cache after running.
+     * This is a runner that was requested by an internal client of the query system, as opposed to
+     * runners that are built in response to a query entering the system. It is only used by
+     * internal clients of the query systems (e.g., chunk migration, index building, commands that
+     * traverse data such as md5, ... )
+     *
+     * The salient feature of this Runner is that it does not interact with the cache at all.
      */
-    class SingleSolutionRunner : public Runner {
+    class InternalRunner : public Runner {
     public:
         /**
-         * Takes ownership of both arguments.
+         * Takes ownership of all arguments.
          */
-        SingleSolutionRunner(CanonicalQuery* canonicalQuery, QuerySolution* soln,
-                             PlanStage* root, WorkingSet* ws)
-            : _canonicalQuery(canonicalQuery), _solution(soln),
-              _exec(new PlanExecutor(ws, root)) { }
+        InternalRunner(const string& ns, PlanStage* root, WorkingSet* ws)
+              : _ns(ns), _exec(new PlanExecutor(ws, root)) {
+            _canonicalQuery.reset(CanonicalQuery::getInternalQuery());
+        }
 
         Runner::RunnerState getNext(BSONObj* objOut, DiskLoc* dlOut) {
             return _exec->getNext(objOut, dlOut);
-            // TODO: I'm not convinced we want to cache this run.  What if it's a collscan solution
-            // and the user adds an index later?  We don't want to reach for this.  But if solving
-            // the query is v. hard, we do want to cache it.  Maybe we can remove single solution
-            // cache entries when we build an index?
         }
 
         virtual void saveState() { _exec->saveState(); }
 
         virtual bool restoreState() { return _exec->restoreState(); }
 
+        virtual const string& ns() { return _ns; }
+
+        virtual void invalidate(const DiskLoc& dl) { _exec->invalidate(dl); }
+
         virtual void setYieldPolicy(Runner::YieldPolicy policy) {
             _exec->setYieldPolicy(policy);
         }
 
-        virtual void invalidate(const DiskLoc& dl) { _exec->invalidate(dl); }
-
-        virtual const CanonicalQuery& getQuery() { return *_canonicalQuery; }
-
-        virtual const string& ns() { return getQuery().getParsed().ns(); }
+        // TODO: Remove this from the runner spec, only used in creating a ClientCursor.
+        virtual const CanonicalQuery& getQuery() { 
+            verify(0);
+            return *_canonicalQuery;
+        }
 
         virtual void kill() { _exec->kill(); }
 
     private:
+        string _ns;
+
+        // This is a dummy query.
         scoped_ptr<CanonicalQuery> _canonicalQuery;
-        scoped_ptr<QuerySolution> _solution;
         scoped_ptr<PlanExecutor> _exec;
     };
 
 }  // namespace mongo
-

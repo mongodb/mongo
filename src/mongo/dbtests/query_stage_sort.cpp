@@ -15,6 +15,7 @@
  */
 
 #include "mongo/client/dbclientcursor.h"
+#include "mongo/db/exec/fetch.h"
 #include "mongo/db/exec/mock_stage.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/sort.h"
@@ -111,27 +112,28 @@ namespace QueryStageSortTests {
          * If limit is not zero, we limit the output of the sort stage to 'limit' results.
          */
         void sortAndCheck(int direction) {
-            PlanExecutor runner;
-            auto_ptr<MockStage> ms(new MockStage(runner.getWorkingSet()));
+            WorkingSet* ws = new WorkingSet();
+            MockStage* ms = new MockStage(ws);
 
             // Insert a mix of the various types of data.
-            insertVarietyOfObjects(ms.get());
+            insertVarietyOfObjects(ms);
 
             SortStageParams params;
             params.pattern = BSON("foo" << direction);
 
-            runner.setRoot(new SortStage(params, runner.getWorkingSet(), ms.release()));
+            // Must fetch so we can look at the doc as a BSONObj.
+            PlanExecutor runner(ws, new FetchStage(ws, new SortStage(params, ws, ms), NULL));
 
             // Look at pairs of objects to make sure that the sort order is pairwise (and therefore
             // totally) correct.
             BSONObj last;
-            ASSERT_EQUALS(Runner::RUNNER_ADVANCED, runner.getNext(&last));
+            ASSERT_EQUALS(Runner::RUNNER_ADVANCED, runner.getNext(&last, NULL));
 
             // Count 'last'.
             int count = 1;
 
             BSONObj current;
-            while (Runner::RUNNER_ADVANCED == runner.getNext(&current)) {
+            while (Runner::RUNNER_ADVANCED == runner.getNext(&current, NULL)) {
                 int cmp = sgn(current.woSortOrder(last, params.pattern));
                 // The next object should be equal to the previous or oriented according to the sort
                 // pattern.

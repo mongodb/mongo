@@ -96,14 +96,20 @@ namespace mongo {
             BSONObj argObj = argElt.Obj();
 
             OwnedPointerVector<MatchExpression> exprs;
-            PlanExecutor runner;
-            auto_ptr<PlanStage> root(parseQuery(dbname, argObj, runner.getWorkingSet(), &exprs));
-            uassert(16911, "Couldn't parse plan from " + argObj.toString(), root.get());
-            runner.setRoot(root.release());
+            auto_ptr<WorkingSet> ws(new WorkingSet());
+
+            PlanStage* userRoot = parseQuery(dbname, argObj, ws.get(), &exprs);
+            uassert(16911, "Couldn't parse plan from " + argObj.toString(), NULL != userRoot);
+
+            // Add a fetch at the top for the user so we can get obj back for sure.
+            // TODO: Do we want to do this for the user?  I think so.
+            PlanStage* rootFetch = new FetchStage(ws.get(), userRoot, NULL);
+
+            PlanExecutor runner(ws.release(), rootFetch);
 
             BSONArrayBuilder resultBuilder(result.subarrayStart("results"));
 
-            for (BSONObj obj; Runner::RUNNER_ADVANCED == runner.getNext(&obj); ) {
+            for (BSONObj obj; Runner::RUNNER_ADVANCED == runner.getNext(&obj, NULL); ) {
                 resultBuilder.append(obj);
             }
 

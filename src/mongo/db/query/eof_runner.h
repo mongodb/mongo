@@ -32,36 +32,36 @@ namespace mongo {
      */
     class EOFRunner : public Runner {
     public:
-        EOFRunner(CanonicalQuery* canonicalQuery) : _canonicalQuery(canonicalQuery),
-                                                    _killed(false) { }
+        EOFRunner(const string& ns) : _ns(ns), _cq(CanonicalQuery::getInternalQuery()) { }
 
-        Runner::RunnerState getNext(BSONObj* objOut) {
+        Runner::RunnerState getNext(BSONObj* objOut, DiskLoc* dlOut) {
             return Runner::RUNNER_EOF;
         }
 
         virtual void saveState() { }
 
-        virtual void restoreState() { }
+        virtual bool restoreState() {
+            // TODO: Does this value matter?
+            return false;
+        }
+
+        virtual void setYieldPolicy(Runner::YieldPolicy policy) { }
 
         virtual void invalidate(const DiskLoc& dl) { }
 
-        virtual const CanonicalQuery& getQuery() { return *_canonicalQuery; }
+        virtual const string& ns() { return _ns; }
 
-        virtual void kill() { _killed = true; }
-
-        virtual bool forceYield() {
-            // Not sure when this would ever happen.
-            ClientCursor::registerRunner(this);
-            ClientCursor::staticYield(ClientCursor::suggestYieldMicros(),
-                                      getQuery().getParsed().ns(),
-                                      NULL);
-            ClientCursor::deregisterRunner(this);
-            return !_killed;
+        virtual const CanonicalQuery& getQuery() {
+            // This shouldn't be called and is going away shortly anyway.
+            verify(0);
+            return *_cq;
         }
 
+        virtual void kill() { }
+
     private:
-        scoped_ptr<CanonicalQuery> _canonicalQuery;
-        bool _killed;
+        string _ns;
+        scoped_ptr<CanonicalQuery> _cq;
     };
 
 }  // namespace mongo

@@ -62,8 +62,7 @@ namespace mongo {
     WorkingSetMember::WorkingSetMember() : state(WorkingSetMember::INVALID) { }
 
     bool WorkingSetMember::hasLoc() const {
-        return state == LOC_AND_IDX || state == LOC_AND_UNOWNED_OBJ
-               || state == LOC_AND_OWNED_OBJ;
+        return state == LOC_AND_IDX || state == LOC_AND_UNOWNED_OBJ;
     }
 
     bool WorkingSetMember::hasObj() const {
@@ -71,7 +70,7 @@ namespace mongo {
     }
 
     bool WorkingSetMember::hasOwnedObj() const {
-        return state == OWNED_OBJ || state == LOC_AND_OWNED_OBJ;
+        return state == OWNED_OBJ;
     }
 
     bool WorkingSetMember::hasUnownedObj() const {

@@ -29,6 +29,7 @@
 #include "mongo/db/instance.h"
 #include "mongo/db/introspect.h"
 #include "mongo/db/pdfile.h"
+#include "mongo/db/query/internal_plans.h"
 
 namespace mongo {
 
@@ -232,11 +233,10 @@ namespace mongo {
         // to avoid modifying the system.namespaces collection while iterating over it since that
         // would corrupt the cursor.
         vector<string> toDelete;
-        shared_ptr<Cursor> cursor = theDataFileMgr.findAll(systemNamespaces);
-        while ( cursor && cursor->ok() ) {
-            BSONObj nsObj = cursor->current();
-            cursor->advance();
-
+        auto_ptr<Runner> runner(InternalPlanner::findAll(systemNamespaces));
+        BSONObj nsObj;
+        Runner::RunnerState state;
+        while (Runner::RUNNER_ADVANCED == (state = runner->getNext(&nsObj, NULL))) {
             BSONElement e = nsObj.getFieldDotted( "options.temp" );
             if ( !e.trueValue() )
                 continue;
@@ -248,6 +248,10 @@ namespace mongo {
                 continue;
 
             toDelete.push_back(ns);
+        }
+
+        if (Runner::RUNNER_EOF != state) {
+            warning() << "Internal error while reading collection " << systemNamespaces << endl;
         }
 
         for (size_t i=0; i < toDelete.size(); i++) {
