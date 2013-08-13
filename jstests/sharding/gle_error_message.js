@@ -136,7 +136,9 @@ jsTest.log( "Testing stale version GLE when host goes down..." )
 var staleColl = st.s1.getCollection( coll + "" )
 staleColl.findOne()
 
-printjson( admin.runCommand({ moveChunk : "" + coll, find : { _id : 0 }, to : shards[2]._id }) )
+printjson( admin.runCommand({ connPoolStats : true }) );
+//printjson( admin.runCommand({ connPoolSync : true }) );
+assert( admin.runCommand({ moveChunk : "" + coll, find : { _id : 0 }, to : shards[2]._id }).ok );
 
 waitForWrite(2, {goodnight: "moon"}, 3);
 
