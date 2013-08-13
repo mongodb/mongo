@@ -785,9 +785,7 @@ char *strstr_right(const char *str, const char *match, const char **rightp)
 int connection_reconfigure(WT_CONNECTION *conn, const char *orig)
 {
 	char *alloced;
-	const char *config;
-	const char *left;
-	const char *right;
+	const char *config, *left, *right;
 	int ret;
 
 	alloced = NULL;
@@ -1198,16 +1196,10 @@ int
 config_opt_file(CONFIG *cfg, WT_SESSION *parse_session, const char *filename)
 {
 	FILE *fp;
-	char option[1024];
-	char line[256];
-	char *ltrim;
-	char *rtrim;
-	char *comment;
-	int ret;
-	int contline;
-	size_t optionpos;
-	size_t linelen;
-	int linenum;
+	char line[256], option[1024];
+	char *comment, *ltrim, *rtrim;
+	int contline, linenum, ret;
+	size_t linelen, optionpos;
 
 	if ((fp = fopen(filename, "r")) == NULL) {
 		fprintf(stderr, "wtperf: %s: %s\n", filename, strerror(errno));
@@ -1280,8 +1272,7 @@ config_opt_line(CONFIG *cfg, WT_SESSION *parse_session, const char *optstr)
 {
 	WT_CONFIG_ITEM k, v;
 	WT_CONFIG_SCAN *scan;
-	int ret;
-	int t_ret;
+	int ret, t_ret;
 	WT_EXTENSION_API *wt_api;
 	WT_CONNECTION *conn;
 
@@ -1347,10 +1338,8 @@ config_opt_int(CONFIG *cfg, WT_SESSION *parse_session,
 void
 config_opt_usage(void)
 {
-	size_t i;
-	size_t nopt;
-	const char *typestr;
-	const char *defaultval;
+	size_t i, nopt;
+	const char *defaultval, *typestr;
 	int linelen;
 
 	printf("Following are options settable using -o or -O, "
@@ -1538,8 +1527,7 @@ uint64_t wtperf_rand(CONFIG *cfg) {
 
 void indent_lines(const char *lines, const char *indent)
 {
-	const char *bol;
-	const char *eol;
+	const char *bol, *eol;
 	size_t len;
 
 	bol = lines;
