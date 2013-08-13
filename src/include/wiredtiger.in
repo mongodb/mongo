@@ -2332,10 +2332,10 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_CONN_CACHE_EVICTION_MERGE_LEVELS	20
 /*! cache: eviction server unable to reach eviction goal */
 #define	WT_STAT_CONN_CACHE_EVICTION_SLOW		21
-/*! pages split because they grew too large */
-#define	WT_STAT_CONN_CACHE_EVICTION_SPLIT		22
 /*! cache: pages walked for eviction */
-#define	WT_STAT_CONN_CACHE_EVICTION_WALK		23
+#define	WT_STAT_CONN_CACHE_EVICTION_WALK		22
+/*! pages split because they were unable to be evicted */
+#define	WT_STAT_CONN_CACHE_INMEM_SPLIT			23
 /*! cache: tracked dirty pages in the cache */
 #define	WT_STAT_CONN_CACHE_PAGES_DIRTY			24
 /*! cache: pages currently held in the cache */
@@ -2521,8 +2521,8 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_DSRC_CACHE_EVICTION_MERGE_FAIL		40
 /*! cache: internal levels merged */
 #define	WT_STAT_DSRC_CACHE_EVICTION_MERGE_LEVELS	41
-/*! pages split because they grew too large */
-#define	WT_STAT_DSRC_CACHE_EVICTION_SPLIT		42
+/*! pages split because they were unable to be evicted */
+#define	WT_STAT_DSRC_CACHE_INMEM_SPLIT			42
 /*! overflow values cached in memory */
 #define	WT_STAT_DSRC_CACHE_OVERFLOW_VALUE		43
 /*! pages read into cache */

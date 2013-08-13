@@ -7,8 +7,6 @@
 
 #include "wt_internal.h"
 
-static int __split_row_page_inmem(WT_SESSION_IMPL *, WT_PAGE *);
-
 /*
  * WT_VISIT_STATE --
  *	The state maintained across calls to the "visit" callback functions:
@@ -196,7 +194,7 @@ __merge_switch_page(WT_PAGE *parent, WT_REF *ref, WT_VISIT_STATE *state)
 		 */
 		if ((modify = child->modify) != NULL &&
 		    F_ISSET(modify, WT_PM_REC_SPLIT))
-			WT_LINK_PAGE(state->page, newref, modify->u.split);
+			WT_LINK_PAGE(state->page, newref, modify->u.split.page);
 
 		WT_LINK_PAGE(state->page, newref, child);
 
@@ -495,7 +493,8 @@ __wt_merge_tree(WT_SESSION_IMPL *session, WT_PAGE *top)
 	 * into place by our caller.
 	 */
 	top->modify->flags = WT_PM_REC_SPLIT;
-	top->modify->u.split = newtop;
+	top->modify->u.split.page = newtop;
+	top->modify->u.split.ref = top->ref;
 
 	WT_VERBOSE_ERR(session, evict,
 	    "Successfully %s %" PRIu32
@@ -537,44 +536,20 @@ err:	WT_VERBOSE_TRET(session, evict,
 }
 
 /*
- * __wt_split_page_inmem --
- *	Split a large in memory page into an in memory tree of pages. We must
- *	have exclusive access to the page upon entry.
+ * __split_row_page_inmem --
+ *	Split a row leaf page in memory. This is done when we are unable to evict
+ *	the page due to contention. The code is aimed at append workloads, we
+ *	turn a single page into three pages:
+ *	 * A SPLIT_MERGE internal page with two children.
+ *	 * The left child is the original page, with it's right most element
+ *	   removed.
+ *	 * The right child has the element removed from the original page.
  */
-int
-__wt_split_page_inmem(WT_SESSION_IMPL *session, WT_PAGE *orig)
-{
-
-	WT_VERBOSE_RET(session, evict,
-	    "Splitting page %p (%s)", orig, __wt_page_type_string(orig->type));
-
-	switch (orig->type) {
-	case WT_PAGE_ROW_INT:
-	case WT_PAGE_ROW_LEAF:
-		WT_RET(__split_row_page_inmem(session, orig));
-		break;
-	case WT_PAGE_COL_INT:
-	case WT_PAGE_COL_FIX:
-	case WT_PAGE_COL_VAR:
-		/*
-		 * TODO: Support column pages here.
-		 */
-		return (EBUSY);
-		break;
-	WT_ILLEGAL_VALUE(session);
-	}
-
-	return (0);
-}
-
 static int
-__split_row_page_inmem(
-    WT_SESSION_IMPL *session, WT_PAGE *orig)
+__split_row_page_inmem(WT_SESSION_IMPL *session, WT_PAGE *orig)
 {
 	WT_DECL_RET;
-	WT_INSERT *ins, *prev_ins;
-	WT_INSERT **insp;
-	WT_INSERT *current_ins;
+	WT_INSERT *current_ins, *ins, **insp, *prev_ins;
 	WT_INSERT_HEAD *ins_head, **new_ins_head_list, *new_ins_head;
 	WT_PAGE *new_parent, *right_child;
 	WT_REF *newref;
@@ -586,22 +561,16 @@ __split_row_page_inmem(
 	new_parent = right_child = NULL;
 	new_ins_head_list = NULL;
 	new_ins_head = NULL;
-	ins = NULL;
-	current_ins = NULL;
+	current_ins = ins = NULL;
 
 	/* Find the final item on the original page. */
-	if (!F_ISSET_ATOMIC(orig, WT_PAGE_BUILD_KEYS))
-		WT_ERR(__wt_row_leaf_keys(session, orig));
 	if (orig->entries == 0)
 		ins_head = WT_ROW_INSERT_SMALLEST(orig);
 	else
 		ins_head = WT_ROW_INSERT_SLOT(orig, orig->entries - 1);
 
 	ins = WT_SKIP_LAST(ins_head);
-	for (ins_depth = 0;
-	    ins_depth < WT_SKIP_MAXDEPTH && ins_head->tail[ins_depth] == ins;
-	    ins_depth++)
-		;
+
 	/*
 	 * If the skip list is empty or only contains a single element there
 	 * is nothing for us to do.
@@ -632,13 +601,21 @@ __split_row_page_inmem(
 	right_child->u.row.ins[0] = new_ins_head;
 	__wt_cache_page_inmem_incr(session,
 	    right_child, sizeof(WT_INSERT_HEAD) + sizeof(WT_INSERT_HEAD *));
+
+	/*
+	 * Figure out how deep the skip list stack is for the element we are
+	 * removing and install the element on the new child page.
+	 */
+	for (ins_depth = 0;
+	    ins_depth < WT_SKIP_MAXDEPTH && ins_head->tail[ins_depth] == ins;
+	    ins_depth++)
+		;
 	for (i = 0; i < ins_depth; i++) {
 		right_child->u.row.ins[0]->tail[i] = ins_head->tail[i];
 		right_child->u.row.ins[0]->head[i] = ins_head->tail[i];
 	}
 
 	/* Setup the ref in the new parent to point to the original parent. */
-	new_parent->u.intl.recno = orig->u.intl.recno;
 	new_parent->parent = orig->parent;
 	new_parent->ref = orig->ref;
 
@@ -697,11 +674,11 @@ __split_row_page_inmem(
 	 *   --    --    --    --    --    --
 	 *
 	 *   From the above picture.
-	 *   The head array will be: a1, a2, a3, c4, NULL
-	 *   The tail array will be: f1, f2, d3, c4, NULL
+	 *   The head array will be: a0, a1, a2, c3, NULL
+	 *   The tail array will be: f0, f1, d2, c3, NULL
 	 *   We are looking for: e1, d2, NULL
-	 *   If there were no f2, we'd be looking for: e1, NULL
-	 *   If there were an f3, we'd be looking for: e1, d2, d3, NULL
+	 *   If there were no f1, we'd be looking for: e0, NULL
+	 *   If there were an f2, we'd be looking for: e0, d1, d2, NULL
 	 *
 	 *   The algorithm does:
 	 *   1) Start at the tail of level zero, walk up the tail pointers
@@ -744,7 +721,6 @@ __split_row_page_inmem(
 	}
 
 	for (i--, insp--; i >= 0; i--, insp--) {
-		current_ins = NULL;
 		for (current_ins = *insp;
 		    current_ins != ins;
 		    current_ins = current_ins->next[i])
@@ -760,8 +736,8 @@ __split_row_page_inmem(
 	 * into place by our caller.
 	 */
 	orig->modify->flags = WT_PM_REC_SPLIT;
-	orig->modify->u.split = new_parent;
-	orig->modify->split_parent_ref = new_parent->ref;
+	orig->modify->u.split.page = new_parent;
+	orig->modify->u.split.ref = new_parent->ref;
 
 	/* Make it likely we evict the page we just split. */
 	orig->read_gen = WT_READ_GEN_OLDEST;
@@ -776,3 +752,20 @@ err:	if (ret != 0) {
 	}
 	return (ret);
 }
+
+/*
+ * __wt_split_page_inmem --
+ *	Split a large in memory page into an in memory tree of pages. We must
+ *	have exclusive access to the page upon entry.
+ */
+int
+__wt_split_page_inmem(WT_SESSION_IMPL *session, WT_PAGE *page)
+{
+
+	WT_VERBOSE_RET(session, evict,
+	    "Splitting page %p (%s)", page, __wt_page_type_string(page->type));
+
+	return (page->type == WT_PAGE_ROW_LEAF ?
+	    __split_row_page_inmem(session, page) : EBUSY);
+}
+

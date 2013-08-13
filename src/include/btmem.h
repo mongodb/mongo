@@ -145,10 +145,12 @@ struct __wt_page_modify {
 	uint64_t disk_txn;
 
 	union {
-		WT_PAGE *split;		/* Resulting split */
+		struct {
+			WT_PAGE *page;	/* Resulting split page */
+			WT_REF *ref;	/* WT_REF slot on the parent */
+		} split;
 		WT_ADDR	 replace;	/* Resulting replacement */
 	} u;
-	WT_REF *split_parent_ref;
 
 	/*
 	 * Appended items to column-stores: there is only a single one of these

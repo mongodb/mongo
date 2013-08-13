@@ -25,13 +25,13 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, int exclusive)
 {
 	WT_DECL_RET;
 	WT_PAGE_MODIFY *mod;
-	int merge, try_split;
+	int merge, inmem_split;
 
 	WT_VERBOSE_RET(session, evict,
 	    "page %p (%s)", page, __wt_page_type_string(page->type));
 
 	WT_ASSERT(session, session->excl_next == 0);
-	try_split = 0;
+	inmem_split = 0;
 
 	/*
 	 * If we get a split-merge page during normal eviction, try to collapse
@@ -45,7 +45,6 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, int exclusive)
 	WT_ASSERT(session, merge || mod == NULL ||
 	    !F_ISSET(mod, WT_PM_REC_SPLIT_MERGE));
 
-	try_split = 0;
 	/*
 	 * Get exclusive access to the page and review the page and its subtree
 	 * for conditions that would block our eviction of the page.  If the
@@ -59,17 +58,17 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, int exclusive)
 	 * hazard pointers in that case.
 	 */
 	WT_ERR(__rec_review(
-	    session, page->ref, page, exclusive, merge, 1, &try_split));
+	    session, page->ref, page, exclusive, merge, 1, &inmem_split));
 
 	/* Try to merge internal pages. */
 	if (merge)
 		WT_ERR(__wt_merge_tree(session, page));
 
 	/* Try to split the page in memory. */
-	if (try_split) {
+	if (inmem_split) {
 		WT_ERR(__wt_split_page_inmem(session, page));
-		WT_CSTAT_INCR(session, cache_eviction_split);
-		WT_DSTAT_INCR(session, cache_eviction_split);
+		WT_CSTAT_INCR(session, cache_inmem_split);
+		WT_DSTAT_INCR(session, cache_inmem_split);
 	}
 
 	/*
@@ -97,9 +96,7 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, int exclusive)
 		else
 			__rec_page_clean_update(session, page);
 
-		/* We should never split unmodified pages. */
-		WT_ASSERT(session, !try_split);
-
+		WT_ASSERT(session, !inmem_split);
 		/* Discard the page. */
 		__wt_page_out(session, &page);
 
@@ -111,7 +108,7 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, int exclusive)
 		else
 			WT_ERR(__rec_page_dirty_update(session, page));
 
-		if (!try_split) {
+		if (!inmem_split) {
 			/* Discard the tree rooted in this page. */
 			__rec_discard_tree(session, page, exclusive);
 
@@ -235,14 +232,13 @@ __rec_page_dirty_update(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 * Publish: a barrier to ensure the structure fields are set
 		 * before the state change makes the page available to readers.
 		 */
-		if (mod->split_parent_ref != NULL)
-			parent_ref = mod->split_parent_ref;
-		parent_ref->page = mod->u.split;
+		parent_ref = mod->u.split.ref;
+		parent_ref->page = mod->u.split.page;
 		WT_PUBLISH(parent_ref->state, WT_REF_MEM);
 
-		/* Clear the reference else discarding the page will free it. */
-		mod->u.split = NULL;
-		mod->split_parent_ref = NULL;
+		/* Clear the page else discarding the page will free it. */
+		mod->u.split.page = NULL;
+		mod->u.split.ref = NULL;
 		F_CLR(mod, WT_PM_REC_SPLIT);
 		break;
 	WT_ILLEGAL_VALUE(session);
@@ -294,7 +290,7 @@ __rec_discard_tree(WT_SESSION_IMPL *session, WT_PAGE *page, int exclusive)
  */
 static int
 __rec_review(WT_SESSION_IMPL *session, WT_REF *ref,
-    WT_PAGE *page, int exclusive, int merge, int top, int *try_split)
+    WT_PAGE *page, int exclusive, int merge, int top, int *inmem_split)
 {
 	WT_BTREE *btree;
 	WT_DECL_RET;
@@ -303,7 +299,7 @@ __rec_review(WT_SESSION_IMPL *session, WT_REF *ref,
 	uint32_t i;
 
 	btree = S2BT(session);
-	*try_split = 0;
+	*inmem_split = 0;
 
 	/*
 	 * Get exclusive access to the page if our caller doesn't have the tree
@@ -336,7 +332,7 @@ __rec_review(WT_SESSION_IMPL *session, WT_REF *ref,
 			case WT_REF_MEM:		/* In-memory */
 				WT_RET(__rec_review(
 				    session, ref, ref->page,
-				    exclusive, merge, 0, try_split));
+				    exclusive, merge, 0, inmem_split));
 				break;
 			case WT_REF_EVICT_WALK:		/* Walk point */
 			case WT_REF_LOCKED:		/* Being evicted */
@@ -460,7 +456,7 @@ ckpt:		WT_CSTAT_INCR(session, cache_eviction_checkpoint);
 		 */
 		if (ret == EBUSY &&
 		    __wt_eviction_page_force(session, page) > 1) {
-			*try_split = 1;
+			*inmem_split = 1;
 			return (0);
 		}
 		if (ret == EBUSY) {
