@@ -244,9 +244,15 @@ namespace mongo {
         {
             OpDebug debug;
             Client::Context ctx("local.sources");
-            UpdateResult res = updateObjects("local.sources", o, pattern, true/*upsert for pair feature*/, false,false,debug);
-            verify( ! res.mod );
-            verify( res.num == 1 );
+
+            UpdateResult res = update(
+                UpdateRequest(NamespaceString("local.sources"), debug)
+                .query(pattern)
+                .updates(o)
+                .upsert());
+
+            verify( ! res.modifiers );
+            verify( res.numMatched == 1 );
         }
     }
 

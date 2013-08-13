@@ -30,6 +30,8 @@
 #include "mongo/db/json.h"
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/ops/update.h"
+#include "mongo/db/ops/update_request.h"
+#include "mongo/db/ops/update_result.h"
 #include "mongo/db/pagefault.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/db/query_optimizer.h"
@@ -200,13 +202,26 @@ namespace mongo {
 
         OpDebug debug;
         Client::Context context(ns);
-        updateObjects(ns.c_str(), o, /*pattern=*/id, /*upsert=*/true, /*multi=*/false , /*logtheop=*/true , debug, fromMigrate );
+
+        update(
+            UpdateRequest(NamespaceString(ns), debug)
+            .query(id)
+            .updates(o)
+            .upsert()
+            .updateOpLog()
+            .fromMigration(fromMigrate));
     }
 
     void Helpers::putSingleton(const char *ns, BSONObj obj) {
         OpDebug debug;
         Client::Context context(ns);
-        updateObjects(ns, obj, /*pattern=*/BSONObj(), /*upsert=*/true, /*multi=*/false , /*logtheop=*/true , debug );
+
+        update(
+            UpdateRequest(NamespaceString(ns), debug)
+            .updates(obj)
+            .upsert()
+            .updateOpLog());
+
         context.getClient()->curop()->done();
     }
 
@@ -214,14 +229,12 @@ namespace mongo {
         OpDebug debug;
         Client::Context context(ns);
 
-        _updateObjects(/*god=*/true,
-                       ns,
-                       obj,
-                       /*pattern=*/BSONObj(),
-                       /*upsert=*/true,
-                       /*multi=*/false,
-                       logTheOp,
-                       debug );
+        update(
+            UpdateRequest(NamespaceString(ns), debug)
+            .god()
+            .updates(obj)
+            .upsert()
+            .updateOpLog(logTheOp));
 
         context.getClient()->curop()->done();
     }

@@ -241,15 +241,16 @@ namespace mongo {
         long long resNum = 0;
         OID resUpserted = OID();
         try {
-            UpdateResult res = updateObjects(ns.c_str(),
-                                             updateObj,
-                                             queryObj,
-                                             upsert,
-                                             multi,
-                                             /*logOp*/true,
-                                             opDebug);
+            UpdateResult res = update(
+                UpdateRequest(NamespaceString(ns), opDebug)
+                .query(queryObj)
+                .updates(updateObj)
+                .upsert(upsert)
+                .multi(multi)
+                .updateOpLog());
+
             resExisting = res.existing;
-            resNum = res.num;
+            resNum = res.numMatched;
             resUpserted = res.upserted;
         }
         catch (UserException& e) {

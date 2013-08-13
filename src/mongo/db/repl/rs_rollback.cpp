@@ -20,6 +20,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/cloner.h"
 #include "mongo/db/ops/update.h"
+#include "mongo/db/ops/update_request.h"
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/rs.h"
@@ -549,15 +550,14 @@ namespace mongo {
                     // todo faster...
                     OpDebug debug;
                     updates++;
-                    _updateObjects(/*god*/true,
-                                   d.ns,
-                                   i->second,
-                                   pattern,
-                                   /*upsert=*/true,
-                                   /*multi=*/false,
-                                   /*logtheop=*/false,
-                                   debug,
-                                   rs.get());
+
+                    update(
+                        UpdateRequest(NamespaceString(d.ns), debug)
+                        .query(pattern)
+                        .updates(i->second)
+                        .god()
+                        .upsert());
+
                 }
             }
             catch(DBException& e) {

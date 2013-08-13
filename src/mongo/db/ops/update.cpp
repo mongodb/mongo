@@ -36,122 +36,92 @@
 #include "mongo/db/queryutil.h"
 #include "mongo/db/storage/record.h"
 #include "mongo/db/repl/oplog.h"
-#include "mongo/db/server_parameters.h"
 #include "mongo/platform/unordered_set.h"
-
-//#define DEBUGUPDATE(x) cout << x << endl;
-#define DEBUGUPDATE(x)
 
 namespace mongo {
 
-    void checkNoMods( BSONObj o ) {
-        BSONObjIterator i( o );
-        while( i.moreWithEOO() ) {
-            BSONElement e = i.next();
-            if ( e.eoo() )
-                break;
-            uassert( 10154 ,  "Modifiers and non-modifiers cannot be mixed", e.fieldName()[ 0 ] != '$' );
+    namespace {
+
+        // TODO: Make this a function on NamespaceString, or make it cleaner.
+        inline void validateUpdate( const char* ns , const BSONObj& updateobj, const BSONObj& patternOrig ) {
+            uassert( 10155 , "cannot update reserved $ collection", strchr(ns, '$') == 0 );
+            if ( strstr(ns, ".system.") ) {
+                /* dm: it's very important that system.indexes is never updated as IndexDetails
+                   has pointers into it */
+                uassert( 10156,
+                         str::stream() << "cannot update system collection: "
+                         << ns << " q: " << patternOrig << " u: " << updateobj,
+                         legalClientSystemNS( ns , true ) );
+            }
         }
-    }
 
-    static void checkTooLarge(const BSONObj& newObj) {
-        uassert( 12522 , "$ operator made object too large" , newObj.objsize() <= BSONObjMaxUserSize );
-    }
-
-    /**
-     * return a BSONObj with the _id field of the doc passed in. If no _id and multi, error.
-     */
-    BSONObj makeOplogEntryQuery(const BSONObj doc, bool multi) {
-        BSONObjBuilder idPattern;
-        BSONElement id;
-        // NOTE: If the matching object lacks an id, we'll log
-        // with the original pattern.  This isn't replay-safe.
-        // It might make sense to suppress the log instead
-        // if there's no id.
-        if ( doc.getObjectID( id ) ) {
-           idPattern.append( id );
-           return idPattern.obj();
+        /**
+         * return a BSONObj with the _id field of the doc passed in. If no _id and multi, error.
+         */
+        BSONObj makeOplogEntryQuery(const BSONObj doc, bool multi) {
+            BSONObjBuilder idPattern;
+            BSONElement id;
+            // NOTE: If the matching object lacks an id, we'll log
+            // with the original pattern.  This isn't replay-safe.
+            // It might make sense to suppress the log instead
+            // if there's no id.
+            if ( doc.getObjectID( id ) ) {
+                idPattern.append( id );
+                return idPattern.obj();
+            }
+            else {
+                uassert( 10157, "multi-update requires all modified objects to have an _id" , ! multi );
+                return doc;
+            }
         }
-        else {
-           uassert( 10157, "multi-update requires all modified objects to have an _id" , ! multi );
-           return doc;
-        }
-    }
 
-    void validateUpdate( const char* ns , const BSONObj& updateobj, const BSONObj& patternOrig ) {
-        uassert( 10155 , "cannot update reserved $ collection", strchr(ns, '$') == 0 );
-        if ( strstr(ns, ".system.") ) {
-            /* dm: it's very important that system.indexes is never updated as IndexDetails
-               has pointers into it */
-            uassert( 10156,
-                     str::stream() << "cannot update system collection: "
-                                   << ns << " q: " << patternOrig << " u: " << updateobj,
-                     legalClientSystemNS( ns , true ) );
-        }
-    }
+    } // namespace
 
-    UpdateResult _updateObjects( bool su,
-                                 const char* ns,
-                                 const BSONObj& updateobj,
-                                 const BSONObj& patternOrig,
-                                 bool upsert,
-                                 bool multi,
-                                 bool logop ,
-                                 OpDebug& debug,
-                                 RemoveSaver* rs,
-                                 bool fromMigrate,
-                                 const QueryPlanSelectionPolicy& planPolicy,
-                                 bool forReplication ) {
-
-        // TODO: Put this logic someplace central and check based on constants (maybe using the
-        // list of actually excluded config collections, and not global for the config db).
-        NamespaceString nsStr( ns );
+    UpdateResult update(UpdateRequest& request) {
 
         // Should the modifiers validate their embedded docs via okForStorage
         // Only user updates should be checked. Any system or replication stuff should pass through.
         // Config db docs shouldn't get checked for valid field names since the shard key can have
         // a dot (".") in it.
-        bool shouldValidate = !(forReplication || nsStr.isConfigDB());
+        bool shouldValidate = !(request.isFromReplication() ||
+                                request.getNamespaceString().isConfigDB());
 
+        // TODO: Consider some sort of unification between the UpdateDriver, ModifierInterface
+        // and UpdateRequest structures.
         UpdateDriver::Options opts;
-        opts.multi = multi;
-        opts.upsert = upsert;
-        opts.logOp = logop;
-        opts.modOptions = ModifierInterface::Options( forReplication, shouldValidate );
+        opts.multi = request.isMulti();
+        opts.upsert = request.isUpsert();
+        opts.logOp = request.shouldUpdateOpLog();
+        opts.modOptions = ModifierInterface::Options( request.isFromReplication(), shouldValidate );
         UpdateDriver driver( opts );
 
-        Status status = driver.parse( updateobj );
+        Status status = driver.parse( request.getUpdates() );
         if ( !status.isOK() ) {
             uasserted( 16840, status.reason() );
         }
 
-        return _updateObjects( &driver, su, ns, updateobj, patternOrig,
-                               upsert, multi, logop, debug, rs, fromMigrate,
-                               planPolicy, forReplication);
+        return update(request, &driver);
     }
 
-    UpdateResult _updateObjects( UpdateDriver* driver,
-                                 bool su,
-                                 const char* ns,
-                                 const BSONObj& updateobj,
-                                 const BSONObj& patternOrig,
-                                 bool upsert,
-                                 bool multi,
-                                 bool logop ,
-                                 OpDebug& debug,
-                                 RemoveSaver* rs,
-                                 bool fromMigrate,
-                                 const QueryPlanSelectionPolicy& planPolicy,
-                                 bool forReplication ) {
+    UpdateResult update(UpdateRequest& request, UpdateDriver* driver) {
 
-        NamespaceDetails* d = nsdetails( ns );
-        NamespaceDetailsTransient* nsdt = &NamespaceDetailsTransient::get( ns );
+        const NamespaceString& nsString = request.getNamespaceString();
 
-        debug.updateobj = updateobj;
+        validateUpdate( nsString.ns().c_str(), request.getUpdates(), request.getQuery() );
 
-        driver->refreshIndexKeys( nsdt->indexKeys() );
+        NamespaceDetails* nsDetails = nsdetails( nsString.ns() );
+        NamespaceDetailsTransient* nsDetailsTransient =
+            &NamespaceDetailsTransient::get( nsString.ns().c_str() );
 
-        shared_ptr<Cursor> cursor = getOptimizedCursor( ns, patternOrig, BSONObj(), planPolicy );
+        OpDebug& debug = request.getDebug();
+
+        // TODO: This seems a bit circuitious.
+        debug.updateobj = request.getUpdates();
+
+        driver->refreshIndexKeys( nsDetailsTransient->indexKeys() );
+
+        shared_ptr<Cursor> cursor = getOptimizedCursor(
+            nsString.ns(), request.getQuery(), BSONObj(), request.getQueryPlanSelectionPolicy() );
 
         // If the update was marked with '$isolated' (a.k.a '$atomic'), we are not allowed to
         // yield while evaluating the update loop below.
@@ -215,7 +185,7 @@ namespace mongo {
                 // now if we have not yet done so.
                 if ( !clientCursor.get() )
                     clientCursor.reset(
-                        new ClientCursor( QueryOption_NoCursorTimeout, cursor, ns ) );
+                        new ClientCursor( QueryOption_NoCursorTimeout, cursor, nsString.ns() ) );
 
                 // Ask the client cursor to yield. We get two bits of state back: whether or not
                 // we yielded, and whether or not we correctly recovered from yielding.
@@ -240,19 +210,19 @@ namespace mongo {
                     // our namespace may have changed while we were yielded, so we re-acquire
                     // them here. If we can't do so, escape the update loop. Otherwise, refresh
                     // the driver so that it knows about what is currently indexed.
-                    d = nsdetails( ns );
-                    if ( !d )
+                    nsDetails = nsdetails( nsString.ns() );
+                    if ( !nsDetails )
                         break;
-                    nsdt = &NamespaceDetailsTransient::get( ns );
+                    nsDetailsTransient = &NamespaceDetailsTransient::get( nsString.ns().c_str() );
 
                     // TODO: This copies the index keys, but it may not need to do so.
-                    driver->refreshIndexKeys( nsdt->indexKeys() );
+                    driver->refreshIndexKeys( nsDetailsTransient->indexKeys() );
                 }
 
             }
 
             // Let's fetch the next candidate object for this update.
-            Record* r = cursor->_current();
+            Record* record = cursor->_current();
             DiskLoc loc = cursor->currLoc();
             const BSONObj oldObj = loc.obj();
 
@@ -280,7 +250,7 @@ namespace mongo {
                 cursor->advance();
                 continue;
             }
-            else if (!driver->isDocReplacement() && multi) {
+            else if (!driver->isDocReplacement() && request.isMulti()) {
                 // c)
                 cursor->advance();
                 if ( dedupHere ) {
@@ -313,7 +283,7 @@ namespace mongo {
             // we also tell the cursor we're about to write a document that we've just seen.
             // prepareToTouchEarlierIterate() requires calling later
             // recoverFromTouchingEarlierIterate(), so we make a note here to do so.
-            bool touchPreviousDoc = multi && cursor->ok();
+            bool touchPreviousDoc = request.isMulti() && cursor->ok();
             if ( touchPreviousDoc ) {
                 if ( clientCursor.get() )
                     clientCursor->setDoingDeletes( true );
@@ -353,7 +323,7 @@ namespace mongo {
             mutablebson::DamageVector damages;
             bool inPlace = doc.getInPlaceUpdates(&damages, &source);
             if ( inPlace && !damages.empty() && !driver->modsAffectIndices() ) {
-                d->paddingFits();
+                nsDetails->paddingFits();
 
                 // All updates were in place. Apply them via durability and writing pointer.
                 mutablebson::DamageVector::const_iterator where = damages.begin();
@@ -374,10 +344,10 @@ namespace mongo {
 
                 // The updates were not in place. Apply them through the file manager.
                 newObj = doc.getObject();
-                DiskLoc newLoc = theDataFileMgr.updateRecord(ns,
-                                                             d,
-                                                             nsdt,
-                                                             r,
+                DiskLoc newLoc = theDataFileMgr.updateRecord(nsString.ns().c_str(),
+                                                             nsDetails,
+                                                             nsDetailsTransient,
+                                                             record,
                                                              loc,
                                                              newObj.objdata(),
                                                              newObj.objsize(),
@@ -397,10 +367,11 @@ namespace mongo {
             }
 
             // Log Obj
-            if ( logop ) {
+            if ( request.shouldUpdateOpLog() ) {
                 if ( driver->isDocReplacement() || !logObj.isEmpty() ) {
-                    BSONObj idQuery = driver->makeOplogEntryQuery(newObj, multi);
-                    logOp("u", ns, logObj , &idQuery, 0, fromMigrate, &newObj);
+                    BSONObj idQuery = driver->makeOplogEntryQuery(newObj, request.isMulti());
+                    logOp("u", nsString.ns().c_str(), logObj , &idQuery,
+                          NULL, request.isFromMigration(), &newObj);
                 }
             }
 
@@ -408,7 +379,7 @@ namespace mongo {
             if (!objectWasChanged)
                 debug.nupdateNoops++;
 
-            if (!multi) {
+            if (!request.isMulti()) {
                 break;
             }
 
@@ -422,16 +393,12 @@ namespace mongo {
 
         }
 
-        if (numMatched > 0) {
-            return UpdateResult( true /* updated existing object(s) */,
+        // TODO: Can this be simplified?
+        if ((numMatched > 0) || (numMatched == 0 && !request.isUpsert()) ) {
+            debug.nupdated = numMatched;
+            return UpdateResult( numMatched > 0 /* updated existing object(s) */,
                                  !driver->isDocReplacement() /* $mod or obj replacement */,
                                  numMatched /* # of docments update, even no-ops */,
-                                 BSONObj() );
-        }
-        else if (numMatched == 0 && !upsert) {
-            return UpdateResult( false /* no object updated */,
-                                 !driver->isDocReplacement() /* $mod or obj replacement */,
-                                 0 /* no updates */,
                                  BSONObj() );
         }
 
@@ -452,8 +419,8 @@ namespace mongo {
 
         // Reset the document we will be writing to
         doc.reset( baseObj, mutablebson::Document::kInPlaceDisabled );
-        if ( patternOrig.hasElement("_id") ) {
-             uassertStatusOK(doc.root().appendElement(patternOrig.getField("_id")));
+        if ( request.getQuery().hasElement("_id") ) {
+            uassertStatusOK(doc.root().appendElement(request.getQuery().getField("_id")));
         }
 
 
@@ -461,8 +428,8 @@ namespace mongo {
         // query and the mods. Otherwise, we can use the object replacement sent by the user
         // update command that was parsed by the driver before.
         // In the following block we handle the query part, and then do the regular mods after.
-        if ( *updateobj.firstElementFieldName() == '$' ) {
-            uassertStatusOK(UpdateDriver::createFromQuery(patternOrig, doc));
+        if ( *request.getUpdates().firstElementFieldName() == '$' ) {
+            uassertStatusOK(UpdateDriver::createFromQuery(request.getQuery(), doc));
             debug.fastmodinsert = true;
         }
 
@@ -473,83 +440,17 @@ namespace mongo {
         }
 
         BSONObj newObj = doc.getObject();
-        theDataFileMgr.insertWithObjMod( ns, newObj, false, su );
-        if ( logop ) {
-            logOp( "i", ns, newObj, 0, 0, fromMigrate, &newObj );
+        theDataFileMgr.insertWithObjMod( nsString.ns().c_str(), newObj, false, request.isGod() );
+        if ( request.shouldUpdateOpLog() ) {
+            logOp( "i", nsString.ns().c_str(), newObj,
+                   NULL, NULL, request.isFromMigration(), &newObj );
         }
 
+        debug.nupdated = 1;
         return UpdateResult( false /* updated a non existing document */,
                              !driver->isDocReplacement() /* $mod or obj replacement? */,
                              1 /* count of updated documents */,
                              newObj /* object that was upserted */ );
-    }
-
-    UpdateResult updateObjects( const char* ns,
-                                const BSONObj& updateobj,
-                                const BSONObj& patternOrig,
-                                bool upsert,
-                                bool multi,
-                                bool logop ,
-                                OpDebug& debug,
-                                bool fromMigrate,
-                                const QueryPlanSelectionPolicy& planPolicy ) {
-
-        validateUpdate( ns , updateobj , patternOrig );
-
-        UpdateResult ur = _updateObjects(false, ns, updateobj, patternOrig,
-                                         upsert, multi, logop,
-                                         debug, NULL, fromMigrate, planPolicy );
-        debug.nupdated = ur.num;
-        return ur;
-    }
-
-    UpdateResult updateObjects( UpdateDriver* driver,
-                                const char* ns,
-                                const BSONObj& updateobj,
-                                const BSONObj& patternOrig,
-                                bool upsert,
-                                bool multi,
-                                bool logop ,
-                                OpDebug& debug,
-                                bool fromMigrate,
-                                const QueryPlanSelectionPolicy& planPolicy ) {
-
-        validateUpdate( ns , updateobj , patternOrig );
-
-        UpdateResult ur = _updateObjects(driver, false, ns, updateobj, patternOrig,
-                                         upsert, multi, logop,
-                                         debug, NULL, fromMigrate, planPolicy );
-        debug.nupdated = ur.num;
-        return ur;
-    }
-
-    UpdateResult updateObjectsForReplication( const char* ns,
-                                              const BSONObj& updateobj,
-                                              const BSONObj& patternOrig,
-                                              bool upsert,
-                                              bool multi,
-                                              bool logop ,
-                                              OpDebug& debug,
-                                              bool fromMigrate,
-                                              const QueryPlanSelectionPolicy& planPolicy ) {
-
-        validateUpdate( ns , updateobj , patternOrig );
-
-        UpdateResult ur = _updateObjects(false,
-                                         ns,
-                                         updateobj,
-                                         patternOrig,
-                                         upsert,
-                                         multi,
-                                         logop,
-                                         debug,
-                                         NULL /* no remove saver */,
-                                         fromMigrate,
-                                         planPolicy,
-                                         true /* for replication */ );
-        debug.nupdated = ur.num;
-        return ur;
-
     }
 
     BSONObj applyUpdateOperators( const BSONObj& from, const BSONObj& operators ) {
