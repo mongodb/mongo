@@ -36,12 +36,82 @@ namespace mongo {
 
             // We were killed or had an error.
             RUNNER_DEAD,
+
+            // getNext was asked for data it cannot provide.  This is an internal error and should
+            // not occur.
+            RUNNER_ERROR,
         };
 
         /**
-         * Get the next result from the query.
+         * The yielding policy of the runner.  By default, a runner does not yield itself
+         * (YIELD_MANUAL).
          */
-        virtual RunnerState getNext(BSONObj* objOut) = 0;
+        enum YieldPolicy {
+            // Any call to getNext() may yield.  In particular, the runner may be killed during any
+            // call to getNext().  If this occurs, getNext() will return RUNNER_DEAD.
+            //
+            // If you are enabling autoyield, you must register the Runner with ClientCursor via
+            // ClientCursor::registerRunner and deregister via ClientCursor::deregisterRunnerwhen
+            // done.  Registered runners are informed about DiskLoc deletions and Namespace
+            // invalidations and other important events.
+            //
+            // Exception: This is not required if the Runner is cached inside of a ClientCursor.
+            // This is only done if the Runner is cached and can be referred to by a cursor id.
+            // This is not a popular thing to do.
+            YIELD_AUTO,
+
+            // Owner must yield manually if yields are requested.  How to yield yourself:
+            //
+            // 0. Let's say you have Runner* runner.
+            //
+            // 1. Register your runner with ClientCursor.  Registered runners are informed about
+            // DiskLoc deletions and Namespace invalidation and other important events.  Do this by
+            // calling ClientCursor::registerRunner(runner).  This could be done once when you get
+            // your runner, or per-yield.
+            //
+            // 2. Call runner->saveState() before you yield.
+            //
+            // 3. Call RunnerYieldPolicy::staticYield(runner->ns(), NULL) to yield.  Any state that
+            // may change between yields must be checked by you.  (For example, DiskLocs may not be
+            // valid across yielding, indices may be dropped, etc.)
+            //
+            // 4. Call runner->restoreState() before using the runner again.
+            //
+            // 5. Your runner's next call to getNext may return RUNNER_DEAD.
+            //
+            // 6. When you're done with your runner, deregister it from ClientCursor via
+            // ClientCursor::deregister(runner).
+            YIELD_MANUAL,
+        };
+
+        /**
+         * Set the yielding policy of the underlying runner.  See the RunnerYieldPolicy enum above.
+         */
+        virtual void setYieldPolicy(YieldPolicy policy) = 0;
+
+        /**
+         * Get the next result from the query.
+         *
+         * If objOut is not-NULL, it is filled with the next result, if there is one.  If there is
+         * not, getNext returns RUNNER_ERROR.
+         *
+         * If dlOut is not-NULL:
+         *   If objOut is unowned, dlOut is set to its associated DiskLoc.
+         *   If objOut is owned, getNext returns RUNNER_ERROR.
+         *
+         * If the caller is running a query, they only care about the object.
+         * If the caller is an internal client, they may only care about DiskLocs (index scan), or
+         * about object + DiskLocs (collection scan).
+         *
+         * Some notes on objOut and ownership:
+         *
+         * objOut may be an owned object in certain cases: invalidation of the underlying DiskLoc,
+         * object is created from covered index key data, object is projected or otherwise the
+         * result of a computation.
+         *
+         * objOut will be unowned if it's the result of a fetch or a collection scan.
+         */
+        virtual RunnerState getNext(BSONObj* objOut, DiskLoc* dlOut) = 0;
 
         /**
          * Inform the runner that the provided DiskLoc is about to disappear (or change entirely).
@@ -53,21 +123,6 @@ namespace mongo {
         virtual void invalidate(const DiskLoc& dl) = 0;
 
         /**
-         * Save any state required to yield.
-         */
-        virtual void saveState() = 0;
-
-        /**
-         * Restore saved state, possibly after a yield.
-         */
-        virtual void restoreState() = 0;
-
-        /**
-         * Return the query that the runner is running.
-         */
-        virtual const CanonicalQuery& getQuery() = 0;
-
-        /**
          * Mark the Runner as no longer valid.  Can happen when a runner yields and the underlying
          * database is dropped/indexes removed/etc.  All future to calls to getNext return
          * RUNNER_DEAD. Every other call is a NOOP.
@@ -75,11 +130,26 @@ namespace mongo {
         virtual void kill() = 0;
 
         /**
-         * Force the runner to yield.  Gives up any locks it had before.  Holds locks again when the
-         * runner returns from the yield.  Returns true if it's OK to continue using the runner,
-         * false if the runner was killed during a yield.
+         * Save any state required to yield.
          */
-        virtual bool forceYield() = 0;
+        virtual void saveState() = 0;
+
+        /**
+         * Restore saved state, possibly after a yield.  Return true if the runner is OK, false if
+         * it was killed.
+         */
+        virtual bool restoreState() = 0;
+
+        /**
+         * Return the query that the runner is running.
+         */
+        virtual const CanonicalQuery& getQuery() = 0;
+
+        /**
+         * Return the NS that the query is running over.
+         */
+        virtual const string& ns() = 0;
+
     };
 
 }  // namespace mongo

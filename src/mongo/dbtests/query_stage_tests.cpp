@@ -59,15 +59,16 @@ namespace QueryStageTests {
 
         int countResults(const IndexScanParams& params, BSONObj filterObj = BSONObj()) {
             Client::ReadContext ctx(ns());
-            PlanExecutor runner;
 
             StatusWithMatchExpression swme = MatchExpressionParser::parse(filterObj);
             verify(swme.isOK());
             auto_ptr<MatchExpression> filterExpr(swme.getValue());
-            runner.setRoot(new IndexScan(params, runner.getWorkingSet(), filterExpr.get()));
+
+            WorkingSet* ws = new WorkingSet();
+            PlanExecutor runner(ws, new IndexScan(params, ws, filterExpr.get()));
 
             int count = 0;
-            for (BSONObj obj; Runner::RUNNER_ADVANCED == runner.getNext(&obj); ) {
+            for (DiskLoc dl; Runner::RUNNER_ADVANCED == runner.getNext(NULL, &dl); ) {
                 ++count;
             }
 
@@ -100,9 +101,9 @@ namespace QueryStageTests {
 
     DBDirectClient IndexScanBase::_client;
 
-    class QueryStageBasicIXScan : public IndexScanBase {
+    class QueryStageIXScanBasic : public IndexScanBase {
     public:
-        virtual ~QueryStageBasicIXScan() { }
+        virtual ~QueryStageIXScanBasic() { }
 
         void run() {
             // foo <= 20
@@ -234,7 +235,7 @@ namespace QueryStageTests {
         All() : Suite( "query_stage_tests" ) { }
 
         void setupTests() {
-            add<QueryStageBasicIXScan>();
+            add<QueryStageIXScanBasic>();
             add<QueryStageIXScanLowerUpper>();
             add<QueryStageIXScanLowerUpperIncl>();
             add<QueryStageIXScanLowerUpperInclFilter>();

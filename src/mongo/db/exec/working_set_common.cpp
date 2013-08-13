@@ -21,36 +21,18 @@
 namespace mongo {
 
     // static
-    bool WorkingSetCommon::fetch(WorkingSetMember* member) {
-        // Already fetched.
-        if (member->hasObj()) {
-            // If we did a fetch we shouldn't have this around...
-            verify(member->keyData.empty());
-            return true;
-        }
-
-        if (!member->hasLoc()) { return false; }
-
-        member->obj = member->loc.obj();
-        member->state = WorkingSetMember::LOC_AND_OWNED_OBJ;
-
-        // We have an obj. so get rid of the key data.
-        member->keyData.clear();
-        return true;
-    }
-
-    // static
     bool WorkingSetCommon::fetchAndInvalidateLoc(WorkingSetMember* member) {
         // Already in our desired state.
         if (member->state == WorkingSetMember::OWNED_OBJ) { return true; }
 
-        if (fetch(member)) {
-            member->obj = member->obj.getOwned();
-            member->state = WorkingSetMember::OWNED_OBJ;
-            member->loc = DiskLoc();
-            return true;
-        }
-        else { return false; }
+        // We can't do anything without a DiskLoc.
+        if (!member->hasLoc()) { return false; }
+
+        // Do the fetch, invalidate the DL.
+        member->obj = member->loc.obj().getOwned();
+        member->state = WorkingSetMember::OWNED_OBJ;
+        member->loc = DiskLoc();
+        return true;
     }
 
 }  // namespace mongo

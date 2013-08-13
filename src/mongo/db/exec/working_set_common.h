@@ -23,17 +23,6 @@ namespace mongo {
     class WorkingSetCommon {
     public:
         /**
-         * Fetch an unowned copy of the BSONObj that the provided WSM refers to.  Updates
-         * member->obj to refer to that unowned BSONObj.  Requires a valid DiskLoc.  Does nothing if
-         * WSM has a valid obj already.
-         *
-         * Returns true if the fetch succeeded, false otherwise.
-         *
-         * Used in SORT and FETCH.
-         */
-        static bool fetch(WorkingSetMember* member);
-
-        /**
          * Get an owned copy of the BSONObj the WSM refers to.
          * Requires either a valid BSONObj or valid DiskLoc.
          * Returns true if the fetch and invalidate succeeded, false otherwise.

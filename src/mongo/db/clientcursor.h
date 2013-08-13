@@ -388,6 +388,8 @@ namespace mongo {
         ClientCursorPin( long long cursorid );
         ~ClientCursorPin();
         void release();
+        // Call this to delete the underlying ClientCursor.
+        void free();
         ClientCursor *c() const;
     private:
         CursorId _cursorid;

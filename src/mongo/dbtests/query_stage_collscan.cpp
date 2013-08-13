@@ -61,12 +61,13 @@ namespace QueryStageCollectionScan {
             // Walk the collection going forward.
             {
                 // Create an executor to handle the scan.
-                PlanExecutor runner;
-                runner.setRoot(new CollectionScan(params, runner.getWorkingSet(), NULL));
+                WorkingSet* ws = new WorkingSet();
+                PlanStage* ps = new CollectionScan(params, ws, NULL);
+                PlanExecutor runner(ws, ps);
 
                 int resultCount = 0;
                 BSONObj obj;
-                while (Runner::RUNNER_ADVANCED == runner.getNext(&obj)) {
+                while (Runner::RUNNER_ADVANCED == runner.getNext(&obj, NULL)) {
                     ASSERT_EQUALS(resultCount, obj.firstElement().number());
                     ++resultCount;
                 }
@@ -78,13 +79,14 @@ namespace QueryStageCollectionScan {
             {
                 params.direction = CollectionScanParams::BACKWARD;
 
-                PlanExecutor runner;
-                runner.setRoot(new CollectionScan(params, runner.getWorkingSet(), NULL));
+                WorkingSet* ws = new WorkingSet();
+                PlanStage* ps = new CollectionScan(params, ws, NULL);
+                PlanExecutor runner(ws, ps);
 
                 // Going backwards.
                 int resultCount = expectedCount() - 1;
                 BSONObj obj;
-                while (Runner::RUNNER_ADVANCED == runner.getNext(&obj)) {
+                while (Runner::RUNNER_ADVANCED == runner.getNext(&obj, NULL)) {
                     ASSERT_EQUALS(resultCount, obj.firstElement().number());
                     --resultCount;
                 }
@@ -312,12 +314,13 @@ namespace QueryStageCollectionScan {
             auto_ptr<MatchExpression> filterExpr(swme.getValue());
 
             // Make a scan and have the runner own it.
-            PlanExecutor runner;
-            runner.setRoot(new CollectionScan(params, runner.getWorkingSet(), filterExpr.get()));
+            WorkingSet* ws = new WorkingSet();
+            PlanStage* ps = new CollectionScan(params, ws, filterExpr.get());
+            PlanExecutor runner(ws, ps);
 
             // Use the runner to count the number of objects scanned.
             int count = 0;
-            for (BSONObj obj; Runner::RUNNER_ADVANCED == runner.getNext(&obj); ) { ++count; }
+            for (BSONObj obj; Runner::RUNNER_ADVANCED == runner.getNext(&obj, NULL); ) { ++count; }
             return count;
         }
 
@@ -412,11 +415,12 @@ namespace QueryStageCollectionScan {
             params.tailable = false;
 
             // Make a scan and have the runner own it.
-            PlanExecutor runner;
-            runner.setRoot(new CollectionScan(params, runner.getWorkingSet(), NULL));
+            WorkingSet* ws = new WorkingSet();
+            PlanStage* ps = new CollectionScan(params, ws, NULL);
+            PlanExecutor runner(ws, ps);
 
             int count = 0;
-            for (BSONObj obj; Runner::RUNNER_ADVANCED == runner.getNext(&obj); ) {
+            for (BSONObj obj; Runner::RUNNER_ADVANCED == runner.getNext(&obj, NULL); ) {
                 // Make sure we get the objects in the order we want
                 ASSERT_EQUALS(count, obj["foo"].numberInt());
                 ++count;
@@ -440,11 +444,12 @@ namespace QueryStageCollectionScan {
             params.direction = CollectionScanParams::BACKWARD;
             params.tailable = false;
 
-            PlanExecutor runner;
-            runner.setRoot(new CollectionScan(params, runner.getWorkingSet(), NULL));
+            WorkingSet* ws = new WorkingSet();
+            PlanStage* ps = new CollectionScan(params, ws, NULL);
+            PlanExecutor runner(ws, ps);
 
             int count = 0;
-            for (BSONObj obj; Runner::RUNNER_ADVANCED == runner.getNext(&obj); ) {
+            for (BSONObj obj; Runner::RUNNER_ADVANCED == runner.getNext(&obj, NULL); ) {
                 ++count;
                 ASSERT_EQUALS(numObj() - count, obj["foo"].numberInt());
             }
