@@ -24,10 +24,7 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authz_session_external_state.h"
 #include "mongo/db/auth/authorization_manager.h"
-#include "mongo/db/auth/principal.h"
-#include "mongo/db/auth/principal_set.h"
 #include "mongo/db/auth/privilege.h"
-#include "mongo/db/auth/privilege_set.h"
 #include "mongo/db/auth/security_key.h"
 #include "mongo/db/client.h"
 #include "mongo/db/jsobj.h"
@@ -61,39 +58,6 @@ namespace {
         _externalState->startRequest();
     }
 
-    void AuthorizationSession::addAndAuthorizePrincipal(Principal* principal) {
-
-        // Log out any already-logged-in user on the same database as "principal".
-        logoutDatabase(principal->getName().getDB().toString());  // See SERVER-8144.
-
-        _authenticatedPrincipals.add(principal);
-
-        if (principal->getName() == internalSecurity.user->getName()) {
-
-            // Grant full access to internal user
-            ActionSet allActions;
-            allActions.addAllActions();
-            acquirePrivilege(Privilege(AuthorizationManager::WILDCARD_RESOURCE_NAME, allActions),
-                             principal->getName());
-            return;
-        }
-
-        const std::string dbname = principal->getName().getDB().toString();
-        _acquirePrivilegesForPrincipalFromDatabase(ADMIN_DBNAME, principal->getName());
-        principal->markDatabaseAsProbed(ADMIN_DBNAME);
-        _acquirePrivilegesForPrincipalFromDatabase(dbname, principal->getName());
-        principal->markDatabaseAsProbed(dbname);
-        _externalState->onAddAuthorizedPrincipal(principal);
-    }
-
-    void AuthorizationSession::addPrincipal(Principal* principal) {
-
-        // Log out any already-logged-in user on the same database as "principal".
-        logoutDatabase(principal->getName().getDB().toString());  // See SERVER-8144.
-        _authenticatedPrincipals.add(principal);
-        _externalState->onAddAuthorizedPrincipal(principal);
-    }
-
     Status AuthorizationSession::addAndAuthorizeUser(const UserName& userName) {
         User* user;
         Status status = getAuthorizationManager().acquireUser(userName, &user);
@@ -108,26 +72,8 @@ namespace {
             getAuthorizationManager().releaseUser(replacedUser);
         }
 
+        _externalState->onAddAuthorizedUser();
         return Status::OK();
-    }
-
-    void AuthorizationSession::_acquirePrivilegesForPrincipalFromDatabase(
-            const std::string& dbname, const UserName& user) {
-
-        BSONObj privilegeDocument;
-        Status status = _externalState->getAuthorizationManager().getPrivilegeDocument(
-                dbname, user, &privilegeDocument);
-        if (status.isOK()) {
-            status = acquirePrivilegesFromPrivilegeDocument(dbname, user, privilegeDocument);
-        }
-        if (!status.isOK() && status != ErrorCodes::UserNotFound) {
-            log() << "Privilege acquisition failed for " << user << " in database " <<
-                dbname << ": " << status.reason() << " (" << status.codeString() << ")" << endl;
-        }
-    }
-
-    Principal* AuthorizationSession::lookupPrincipal(const UserName& name) {
-        return _authenticatedPrincipals.lookup(name);
     }
 
     User* AuthorizationSession::lookupUser(const UserName& name) {
@@ -135,12 +81,6 @@ namespace {
     }
 
     void AuthorizationSession::logoutDatabase(const std::string& dbname) {
-        Principal* principal = _authenticatedPrincipals.lookupByDBName(dbname);
-        if (principal) {
-            _acquiredPrivileges.revokePrivilegesFromUser(principal->getName());
-            _authenticatedPrincipals.removeByDBName(dbname);
-        }
-
         User* removedUser = _authenticatedUsers.removeByDBName(dbname);
         if (removedUser) {
             getAuthorizationManager().releaseUser(removedUser);
@@ -153,56 +93,15 @@ namespace {
         return _authenticatedUsers.getNames();
     }
 
-    Status AuthorizationSession::acquirePrivilege(const Privilege& privilege,
-                                                  const UserName& authorizingUser) {
-        if (!_authenticatedPrincipals.lookup(authorizingUser)) {
-            return Status(ErrorCodes::UserNotFound,
-                          mongoutils::str::stream()
-                                  << "No authenticated user found with name: "
-                                  << authorizingUser.getUser()
-                                  << " from database "
-                                  << authorizingUser.getDB(),
-                          0);
-        }
-        _acquiredPrivileges.grantPrivilege(privilege, authorizingUser);
-        return Status::OK();
-    }
-
     void AuthorizationSession::grantInternalAuthorization() {
-        Principal* principal = new Principal(internalSecurity.user->getName());
-        ActionSet actions;
-        actions.addAllActions();
-
-        addPrincipal(principal);
-        fassert(16581,
-                acquirePrivilege(Privilege(AuthorizationManager::WILDCARD_RESOURCE_NAME, actions),
-                                 principal->getName()).isOK());
-
         _authenticatedUsers.add(internalSecurity.user);
     }
 
     bool AuthorizationSession::hasInternalAuthorization() {
         ActionSet allActions;
         allActions.addAllActions();
-        return _acquiredPrivileges.hasPrivilege(
-                Privilege(AuthorizationManager::WILDCARD_RESOURCE_NAME, allActions));
-    }
-
-    Status AuthorizationSession::acquirePrivilegesFromPrivilegeDocument(
-            const std::string& dbname, const UserName& user, const BSONObj& privilegeDocument) {
-        if (!_authenticatedPrincipals.lookup(user)) {
-            return Status(ErrorCodes::UserNotFound,
-                          mongoutils::str::stream()
-                                  << "No authenticated principle found with name: "
-                                  << user.getUser()
-                                  << " from database "
-                                  << user.getDB(),
-                          0);
-        }
-        return _externalState->getAuthorizationManager().buildPrivilegeSet(dbname,
-                                                                           user,
-                                                                           privilegeDocument,
-                                                                           &_acquiredPrivileges);
+        return _checkAuthForPrivilegeHelper(
+                Privilege(AuthorizationManager::WILDCARD_RESOURCE_NAME, allActions)).isOK();
     }
 
     bool AuthorizationSession::checkAuthorization(const std::string& resource,

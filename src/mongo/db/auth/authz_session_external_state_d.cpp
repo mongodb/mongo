@@ -43,7 +43,7 @@ namespace mongo {
         return cc().isGod() || AuthzSessionExternalStateServerCommon::shouldIgnoreAuthChecks();
     }
 
-    void AuthzSessionExternalStateMongod::onAddAuthorizedPrincipal(Principal*) {
+    void AuthzSessionExternalStateMongod::onAddAuthorizedUser() {
         // invalidate all thread-local JS scopes due to new user authentication
         if (globalScriptEngine)
             globalScriptEngine->threadDone();

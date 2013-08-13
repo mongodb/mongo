@@ -14,10 +14,7 @@ env.StaticLibrary('authcore', ['action_set.cpp',
                                'authorization_session.cpp',
                                'authz_manager_external_state.cpp',
                                'authz_session_external_state.cpp',
-                               'principal.cpp',
-                               'principal_set.cpp',
                                'privilege.cpp',
-                               'privilege_set.cpp',
                                'role_graph.cpp',
                                'role_name.cpp',
                                'user.cpp',
@@ -50,8 +47,6 @@ env.StaticLibrary('authmocks',
                   LIBDEPS=['$BUILD_DIR/mongo/expressions'])
 
 env.CppUnitTest('action_set_test', 'action_set_test.cpp', LIBDEPS=['authcore'])
-env.CppUnitTest('principal_set_test', 'principal_set_test.cpp', LIBDEPS=['authcore'])
-env.CppUnitTest('privilege_set_test', 'privilege_set_test.cpp', LIBDEPS=['authcore'])
 env.CppUnitTest('role_graph_test', 'role_graph_test.cpp', LIBDEPS=['authcore'])
 env.CppUnitTest('user_set_test', 'user_set_test.cpp', LIBDEPS=['authcore'])
 env.CppUnitTest('authorization_manager_test', 'authorization_manager_test.cpp',

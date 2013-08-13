@@ -20,7 +20,6 @@
 
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
-#include "mongo/db/auth/principal.h"
 
 namespace mongo {
 

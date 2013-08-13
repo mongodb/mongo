@@ -25,10 +25,7 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authz_session_external_state.h"
-#include "mongo/db/auth/principal.h"
-#include "mongo/db/auth/principal_set.h"
 #include "mongo/db/auth/privilege.h"
-#include "mongo/db/auth/privilege_set.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/auth/user_set.h"
 
@@ -56,24 +53,11 @@ namespace mongo {
         // TODO: try to eliminate the need for this call.
         void startRequest();
 
-        // Adds "principal" to the authorization session, acquiring privileges for that principal,
-        // and takes ownership of it.
-        void addAndAuthorizePrincipal(Principal* principal);
-
-        // Adds "principal" to the authorization session and takes ownership of it, without
-        // acquiring privileges for it.
-        void addPrincipal(Principal* principal);
-
         /**
          * Adds the User identified by "UserName" to the authorization session, acquiring privileges
          * for it in the process.
          */
         Status addAndAuthorizeUser(const UserName& userName);
-
-        // Returns the authenticated principal with the given name.  Returns NULL
-        // if no such user is found.
-        // Ownership of the returned Principal remains with _authenticatedPrincipals
-        Principal* lookupPrincipal(const UserName& name);
 
         // Returns the authenticated user with the given name.  Returns NULL
         // if no such user is found.
@@ -87,10 +71,6 @@ namespace mongo {
         // Removes any authenticated principals whose authorization credentials came from the given
         // database, and revokes any privileges that were granted via that principal.
         void logoutDatabase(const std::string& dbname);
-
-        // Grant this connection the given privilege.
-        Status acquirePrivilege(const Privilege& privilege,
-                                const UserName& authorizingUser);
 
         // Adds the internalSecurity user to the set of authenticated users.
         // Used to grant internal threads full access.
@@ -108,12 +88,6 @@ namespace mongo {
         // Same as above but takes an ActionSet instead of a single ActionType.  Returns true if
         // all of the actions may proceed on the resource.
         bool checkAuthorization(const std::string& resource, ActionSet actions);
-
-        // Parses the privilege documents and acquires all privileges that the privilege document
-        // grants
-        Status acquirePrivilegesFromPrivilegeDocument(const std::string& dbname,
-                                                      const UserName& user,
-                                                      const BSONObj& privilegeDocument);
 
         // Checks if this connection has the privileges necessary to perform the given query on the
         // given namespace.
@@ -151,11 +125,6 @@ namespace mongo {
         // we should even be doing authorization checks in general.
         Status _checkAuthForPrivilegeHelper(const Privilege& privilege);
 
-        // Finds the set of privileges attributed to "principal" in database "dbname",
-        // and adds them to the set of acquired privileges.
-        void _acquirePrivilegesForPrincipalFromDatabase(const std::string& dbname,
-                                                        const UserName& user);
-
         // Returns a new privilege that has replaced the actions needed to handle special casing
         // certain namespaces like system.users and system.profile.  Note that the special handling
         // of system.indexes takes place in checkAuthForInsert, not here.
@@ -164,10 +133,6 @@ namespace mongo {
 
         scoped_ptr<AuthzSessionExternalState> _externalState;
 
-        // All the privileges that have been acquired by the authenticated principals.
-        PrivilegeSet _acquiredPrivileges;
-        // All principals who have been authenticated on this connection
-        PrincipalSet _authenticatedPrincipals;
         // All Users who have been authenticated on this connection
         UserSet _authenticatedUsers;
     };
