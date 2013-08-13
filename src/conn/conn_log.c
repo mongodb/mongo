@@ -66,7 +66,8 @@ __log_archive_server(void *arg)
 	 * The log archive server may be running before the database is
 	 * created.  Wait for the wiredtiger_open call to complete.
 	 */
-	while (!conn->connection_initialized)
+	while (F_ISSET(conn, WT_CONN_SERVER_RUN) &&
+	    !conn->connection_initialized)
 		__wt_sleep(0, 1000);
 
 	while (F_ISSET(conn, WT_CONN_SERVER_RUN)) {

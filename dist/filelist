@@ -73,7 +73,7 @@ src/cursor/cur_stat.c
 src/cursor/cur_std.c
 src/cursor/cur_table.c
 src/log/log.c
-src/log/log_desc.c
+src/log/log_auto.c
 src/log/log_slot.c
 src/lsm/lsm_cursor.c
 src/lsm/lsm_merge.c

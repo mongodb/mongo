@@ -105,7 +105,3 @@ struct __wt_txn {
 #define	WT_TXN_ACTIVE(txn)						\
 	(F_ISSET((txn), TXN_RUNNING) && (txn)->mod_count > 0)
 
-/*
- * Transactional logging.
- */
-#define	TXN_LOG_COMMIT	1

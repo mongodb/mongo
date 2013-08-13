@@ -708,6 +708,57 @@ extern int __wt_log_write(WT_SESSION_IMPL *session,
 extern int __wt_log_vprintf(WT_SESSION_IMPL *session,
     const char *fmt,
     va_list ap);
+extern int __wt_logrec_alloc(WT_SESSION_IMPL *session, WT_ITEM **logrecp);
+extern void __wt_logrec_free(WT_SESSION_IMPL *session, WT_ITEM **logrecp);
+extern int __wt_logrec_read(WT_SESSION_IMPL *session,
+    const uint8_t **pp,
+    const uint8_t *end,
+    uint32_t *rectypep);
+extern int __wt_logop_read(WT_SESSION_IMPL *session,
+    const uint8_t **pp,
+    const uint8_t *end,
+    uint32_t *optypep,
+    uint32_t *opsizep);
+extern int __wt_logop_col_put_pack( WT_SESSION_IMPL *session,
+    WT_ITEM *logrec,
+    const char *uri,
+    uint64_t recno,
+    WT_ITEM *value);
+extern int __wt_logop_col_put_unpack( WT_SESSION_IMPL *session,
+    const uint8_t **pp,
+    const uint8_t *end,
+    const char **urip,
+    uint64_t *recnop,
+    WT_ITEM *valuep);
+extern int __wt_logop_col_remove_pack( WT_SESSION_IMPL *session,
+    WT_ITEM *logrec,
+    const char *uri,
+    uint64_t recno);
+extern int __wt_logop_col_remove_unpack( WT_SESSION_IMPL *session,
+    const uint8_t **pp,
+    const uint8_t *end,
+    const char **urip,
+    uint64_t *recnop);
+extern int __wt_logop_row_put_pack( WT_SESSION_IMPL *session,
+    WT_ITEM *logrec,
+    const char *uri,
+    WT_ITEM *key,
+    WT_ITEM *value);
+extern int __wt_logop_row_put_unpack( WT_SESSION_IMPL *session,
+    const uint8_t **pp,
+    const uint8_t *end,
+    const char **urip,
+    WT_ITEM *keyp,
+    WT_ITEM *valuep);
+extern int __wt_logop_row_remove_pack( WT_SESSION_IMPL *session,
+    WT_ITEM *logrec,
+    const char *uri,
+    WT_ITEM *key);
+extern int __wt_logop_row_remove_unpack( WT_SESSION_IMPL *session,
+    const uint8_t **pp,
+    const uint8_t *end,
+    const char **urip,
+    WT_ITEM *keyp);
 extern int __wt_log_slot_init(WT_SESSION_IMPL *session);
 extern int __wt_log_slot_join(WT_SESSION_IMPL *session,
     uint64_t mysize,

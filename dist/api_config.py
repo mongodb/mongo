@@ -248,7 +248,7 @@ for name in sorted(api_data.methods.keys()):
     # #defines are used to avoid a list search where we know the correct slot).
     config_defines +=\
 	'#define\tWT_CONFIG_ENTRY_' + name.replace('.', '_') + '\t' * \
-	    max(1, 6 - int ((len('WT_CONFIG_ENTRY_' + name)) / 8)) + \
+	    max(1, 6 - (len('WT_CONFIG_ENTRY_' + name) / 8)) + \
 	    "%2s" % str(slot) + '\n'
 
     # Write the method name and base.
@@ -318,12 +318,12 @@ tfile = open(tmp_file, 'w')
 skip = 0
 for line in open('../src/include/config.h', 'r'):
 	if skip:
-		if line.count('configuration section: END'):
+		if 'configuration section: END' in line:
 			tfile.write('/*\n' + line)
 			skip = 0
 	else:
 		tfile.write(line)
-	if line.count('configuration section: BEGIN'):
+	if 'configuration section: BEGIN' in line:
 		skip = 1
 		tfile.write(' */\n')
 		tfile.write(config_defines)

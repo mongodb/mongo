@@ -16,21 +16,6 @@ struct __wt_lsn {
 	off_t		offset;		/* Log file offset */
 };
 
-typedef enum {
-	WT_LOGREC_INT16,
-	WT_LOGREC_UINT16,
-	WT_LOGREC_INT32,
-	WT_LOGREC_UINT32,
-	WT_LOGREC_INT64,
-	WT_LOGREC_UINT64,
-	WT_LOGREC_STRING,
-} WT_LOGREC_FIELDTYPE;
-
-typedef struct {
-	const char *fmt;
-	const char *fields[];
-} WT_LOGREC_DESC;
-
 #define	INIT_LSN(l)	do {						\
 	(l)->file = 1;							\
 	(l)->offset = 0;						\
@@ -164,3 +149,38 @@ struct __wt_log_desc {
 	uint16_t	minorv;		/* 06-07: Minor version */
 	uint64_t	log_size;	/* 08-15: Log file size */
 };
+
+/*
+ * WT_LOG_REC_DESC --
+ *	A descriptor for a log record type.
+ */
+struct __wt_log_rec_desc {
+	const char *fmt;
+	int (*print)(WT_SESSION_IMPL *session, uint8_t **pp, uint8_t *end);
+};
+
+/*
+ * WT_LOG_OP_DESC --
+ *	A descriptor for a log operation type.
+ */
+struct __wt_log_op_desc {
+	const char *fmt;
+	int (*print)(WT_SESSION_IMPL *session, uint8_t **pp, uint8_t *end);
+};
+
+/*
+ * DO NOT EDIT: automatically built by dist/log.py.
+ * Log record declarations: BEGIN
+ */
+#define	WT_LOGREC_INVALID	0
+#define	WT_LOGREC_COMMIT	1
+#define	WT_LOGREC_DEBUG	2
+#define	WT_LOGREC_INVALID	0
+#define	WT_LOGOP_COL_PUT	1
+#define	WT_LOGOP_COL_REMOVE	2
+#define	WT_LOGOP_ROW_PUT	3
+#define	WT_LOGOP_ROW_REMOVE	4
+/*
+ * Log record declarations: END
+ * DO NOT EDIT: automatically built by dist/log.py.
+ */

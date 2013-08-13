@@ -281,7 +281,8 @@ __statlog_server(void *arg)
 	 * sense and we have the information we need to wait).  Wait for
 	 * the wiredtiger_open call.
 	 */
-	while (!conn->connection_initialized)
+	while (F_ISSET(conn, WT_CONN_SERVER_RUN) &&
+	    !conn->connection_initialized)
 		__wt_sleep(0, 1000);
 
 	while (F_ISSET(conn, WT_CONN_SERVER_RUN)) {

@@ -184,6 +184,12 @@
 #define	WT_STRING_MATCH(str, bytes, len)				\
 	(strncmp(str, bytes, len) == 0 && (str)[(len)] == '\0')
 
+/*
+ * Macro that produces a string literal that isn't wrapped in quotes, to avoid
+ * tripping up spell checkers.
+ */
+#define	WT_UNCHECKED_STRING(str) #str
+
 /* Function return value and scratch buffer declaration and initialization. */
 #define	WT_DECL_ITEM(i)	WT_ITEM *i = NULL
 #define	WT_DECL_RET	int ret = 0

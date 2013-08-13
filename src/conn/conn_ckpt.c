@@ -69,7 +69,8 @@ __ckpt_server(void *arg)
 	 * The checkpoint server may be running before the database is created,
 	 * and checkpoints would fail.   Wait for the wiredtiger_open call.
 	 */
-	while (!conn->connection_initialized)
+	while (F_ISSET(conn, WT_CONN_SERVER_RUN) &&
+	    !conn->connection_initialized)
 		__wt_sleep(0, 1000);
 
 	while (F_ISSET(conn, WT_CONN_SERVER_RUN)) {
