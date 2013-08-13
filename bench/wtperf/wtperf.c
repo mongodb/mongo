@@ -821,7 +821,7 @@ int main(int argc, char **argv)
 	WT_CONNECTION *conn;
 	WT_SESSION *parse_session;
 	const char *user_cconfig, *user_tconfig;
-	const char *opts = "C:O:T:h:o:v:SML";
+	const char *opts = "C:O:T:h:o:SML";
 	char *cc_buf, *tc_buf;
 	int ch, checkpoint_created, ret, stat_created;
 	pthread_t checkpoint, stat;
@@ -907,9 +907,6 @@ int main(int argc, char **argv)
 			/* Allow -o key=value */
 			if (config_opt_line(&cfg, parse_session, optarg) != 0)
 				return (EINVAL);
-			break;
-		case 'v':
-			config_opt_int(&cfg, parse_session, "verbose", optarg);
 			break;
 		case 'C':
 			user_cconfig = optarg;
@@ -1356,7 +1353,7 @@ config_opt_usage(void)
 	const char *defaultval;
 	int linelen;
 
-	printf("Following are options setable using -o or -O, "
+	printf("Following are options settable using -o or -O, "
 	    "showing [default value].\n");
 	printf("String values must be enclosed by \" quotes,\n");
 	printf("bool values must be true or false.\n\n");
@@ -1594,7 +1591,6 @@ void usage(void)
 	printf("\t            (added to option conn_config)\n");
 	printf("\t-T <string> additional table configuration\n");
 	printf("\t            (added to option table_config)\n");
-	printf("\t-v <int> verbosity\n");
 	printf("\t-O <filename> file contains options as listed below\n");
 	printf("\t-o option=val[,option=val,...] set options listed below\n");
 	printf("\n");
