@@ -392,6 +392,7 @@ desc
 dest
 dev
 dhandle
+dhandles
 dirlist
 dlclose
 dlh
