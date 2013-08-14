@@ -284,7 +284,10 @@ namespace {
     AuthorizationManager::~AuthorizationManager() {
         for (unordered_map<UserName, User*>::iterator it = _userCache.begin();
                 it != _userCache.end(); ++it) {
-            delete it->second ;
+            if (it->second != internalSecurity.user) {
+                // The internal user should never be deleted.
+                delete it->second ;
+            }
         }
     }
 
