@@ -38,7 +38,7 @@ __wt_eviction_page_force(WT_SESSION_IMPL *session, WT_PAGE *page)
 	    !F_ISSET(btree, WT_BTREE_NO_EVICTION) &&
 	    __wt_page_is_modified(page) &&
 	    page->memory_footprint > btree->maxmempage)
-		return (page->memory_footprint / btree->maxmempage);
+		return (1);
 
 	return (0);
 }

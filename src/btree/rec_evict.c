@@ -455,7 +455,7 @@ ckpt:		WT_CSTAT_INCR(session, cache_eviction_checkpoint);
 		 * contention. Attempt to split the page in memory.
 		 */
 		if (ret == EBUSY &&
-		    __wt_eviction_page_force(session, page) > 1) {
+		    __wt_eviction_page_force(session, page)) {
 			*inmem_split = 1;
 			return (0);
 		}

@@ -203,6 +203,7 @@ struct __wt_page_modify {
 #define	WT_PM_REC_REPLACE	0x02	/* Reconciliation: page replaced */
 #define	WT_PM_REC_SPLIT		0x04	/* Reconciliation: page split */
 #define	WT_PM_REC_SPLIT_MERGE	0x08	/* Reconciliation: page split merge */
+#define	WT_PM_WAS_SPLIT		0x10	/* Page was split in memory */
 #define	WT_PM_REC_MASK							\
 	(WT_PM_REC_EMPTY |						\
 	    WT_PM_REC_REPLACE | WT_PM_REC_SPLIT | WT_PM_REC_SPLIT_MERGE)

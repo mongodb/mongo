@@ -35,6 +35,14 @@ __split_row_page_inmem(WT_SESSION_IMPL *session, WT_PAGE *orig)
 	new_ins_head = NULL;
 	current_ins = ins = NULL;
 
+	/*
+	 * Only split a page once, otherwise workloads that update in the
+	 * middle of the page could continually split without any benefit.
+	 */
+	if (orig->modify == NULL || F_ISSET(orig->modify, WT_PM_WAS_SPLIT))
+		return (EBUSY);
+	F_SET(orig->modify, WT_PM_WAS_SPLIT);
+
 	/* Find the final item on the original page. */
 	if (orig->entries == 0)
 		ins_head = WT_ROW_INSERT_SMALLEST(orig);
@@ -44,10 +52,13 @@ __split_row_page_inmem(WT_SESSION_IMPL *session, WT_PAGE *orig)
 	ins = WT_SKIP_LAST(ins_head);
 
 	/*
-	 * If the skip list is empty or only contains a single element there
-	 * is nothing for us to do.
+	 * The logic below requires more than one element in the skip list.
+	 * There is no point splitting if the list is small (no deep items is
+	 * a good heurisitc for that) - it's likely that the page isn't
+	 * part of an append workload.
 	 */
-	if (ins == NULL || ins_head->head[0] == ins_head->tail[0])
+	if (ins == NULL || ins_head->head[4] == NULL ||
+	    ins_head->head[0] == ins_head->tail[0])
 		return (EBUSY);
 
 	/*
