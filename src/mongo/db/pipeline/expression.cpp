@@ -235,23 +235,17 @@ namespace mongo {
     }
 
 namespace {
-    typedef intrusive_ptr<ExpressionNary> (*ExpressionFactory)(void);
+    typedef intrusive_ptr<Expression> (*ExpressionParser)(BSONElement);
 
     struct OpDesc {
-        intrusive_ptr<ExpressionNary> create() const { return pFactory(); }
+        intrusive_ptr<Expression> parse(BSONElement elem) const { return parser(elem); }
 
-        const char *pName;
-        ExpressionFactory pFactory;
-
-        unsigned flag;
-        static const unsigned FIXED_COUNT = 0x0001;
-        static const unsigned OBJECT_ARG = 0x0002;
-
-        unsigned argCount;
+        const char* name;
+        ExpressionParser parser;
     };
 
     static int OpDescCmp(const void *pL, const void *pR) {
-        return strcmp(((const OpDesc *)pL)->pName, ((const OpDesc *)pR)->pName);
+        return strcmp(((const OpDesc *)pL)->name, ((const OpDesc *)pR)->name);
     }
 
     /*
@@ -259,57 +253,57 @@ namespace {
       OpDescCmp() above.
     */
     static const OpDesc OpTable[] = {
-        {"$add", ExpressionAdd::create, 0},
-        {"$all", ExpressionAll::create, OpDesc::FIXED_COUNT, 1},
-        {"$and", ExpressionAnd::create, 0},
-        {"$any", ExpressionAny::create, OpDesc::FIXED_COUNT, 1},
-        {"$cmp", ExpressionCompare::createCmp, OpDesc::FIXED_COUNT, 2},
-        {"$concat", ExpressionConcat::create, 0},
-        {"$cond", ExpressionCond::create, OpDesc::FIXED_COUNT, 3},
-        // $const handled specially in parseExpression
-        {"$dayOfMonth", ExpressionDayOfMonth::create, OpDesc::FIXED_COUNT, 1},
-        {"$dayOfWeek", ExpressionDayOfWeek::create, OpDesc::FIXED_COUNT, 1},
-        {"$dayOfYear", ExpressionDayOfYear::create, OpDesc::FIXED_COUNT, 1},
-        {"$divide", ExpressionDivide::create, OpDesc::FIXED_COUNT, 2},
-        {"$eq", ExpressionCompare::createEq, OpDesc::FIXED_COUNT, 2},
-        {"$gt", ExpressionCompare::createGt, OpDesc::FIXED_COUNT, 2},
-        {"$gte", ExpressionCompare::createGte, OpDesc::FIXED_COUNT, 2},
-        {"$hour", ExpressionHour::create, OpDesc::FIXED_COUNT, 1},
-        {"$ifNull", ExpressionIfNull::create, OpDesc::FIXED_COUNT, 2},
-        // $let handled specially in parseExpression
-        // $literal handled specially in parseExpression
-        // $map handled specially in parseExpression
-        {"$lt", ExpressionCompare::createLt, OpDesc::FIXED_COUNT, 2},
-        {"$lte", ExpressionCompare::createLte, OpDesc::FIXED_COUNT, 2},
-        {"$millisecond", ExpressionMillisecond::create, OpDesc::FIXED_COUNT, 1},
-        {"$minute", ExpressionMinute::create, OpDesc::FIXED_COUNT, 1},
-        {"$mod", ExpressionMod::create, OpDesc::FIXED_COUNT, 2},
-        {"$month", ExpressionMonth::create, OpDesc::FIXED_COUNT, 1},
-        {"$multiply", ExpressionMultiply::create, 0},
-        {"$ne", ExpressionCompare::createNe, OpDesc::FIXED_COUNT, 2},
-        {"$none", ExpressionNone::create, OpDesc::FIXED_COUNT, 1},
-        {"$not", ExpressionNot::create, OpDesc::FIXED_COUNT, 1},
-        {"$or", ExpressionOr::create, 0},
-        {"$second", ExpressionSecond::create, OpDesc::FIXED_COUNT, 1},
-        {"$setDifference", ExpressionSetDifference::create, OpDesc::FIXED_COUNT, 2},
-        {"$setEquals", ExpressionSetEquals::create, 0},
-        {"$setIntersection", ExpressionSetIntersection::create, 0},
-        {"$setIsSubset", ExpressionSetIsSubset::create, OpDesc::FIXED_COUNT, 2},
-        {"$setUnion", ExpressionSetUnion::create, 0},
-        {"$strcasecmp", ExpressionStrcasecmp::create, OpDesc::FIXED_COUNT, 2},
-        {"$substr", ExpressionSubstr::create, OpDesc::FIXED_COUNT, 3},
-        {"$subtract", ExpressionSubtract::create, OpDesc::FIXED_COUNT, 2},
-        {"$toLower", ExpressionToLower::create, OpDesc::FIXED_COUNT, 1},
-        {"$toUpper", ExpressionToUpper::create, OpDesc::FIXED_COUNT, 1},
-        {"$week", ExpressionWeek::create, OpDesc::FIXED_COUNT, 1},
-        {"$year", ExpressionYear::create, OpDesc::FIXED_COUNT, 1},
+        {"$add", ExpressionAdd::parse},
+        {"$all", ExpressionAll::parse},
+        {"$and", ExpressionAnd::parse},
+        {"$any", ExpressionAny::parse},
+        {"$cmp", ExpressionCompare::parse},
+        {"$concat", ExpressionConcat::parse},
+        {"$cond", ExpressionCond::parse},
+        {"$const", ExpressionConstant::parse},
+        {"$dayOfMonth", ExpressionDayOfMonth::parse},
+        {"$dayOfWeek", ExpressionDayOfWeek::parse},
+        {"$dayOfYear", ExpressionDayOfYear::parse},
+        {"$divide", ExpressionDivide::parse},
+        {"$eq", ExpressionCompare::parse},
+        {"$gt", ExpressionCompare::parse},
+        {"$gte", ExpressionCompare::parse},
+        {"$hour", ExpressionHour::parse},
+        {"$ifNull", ExpressionIfNull::parse},
+        {"$let", ExpressionLet::parse},
+        {"$literal", ExpressionConstant::parse}, // alias for "$const"
+        {"$lt", ExpressionCompare::parse},
+        {"$lte", ExpressionCompare::parse},
+        {"$map", ExpressionMap::parse},
+        {"$millisecond", ExpressionMillisecond::parse},
+        {"$minute", ExpressionMinute::parse},
+        {"$mod", ExpressionMod::parse},
+        {"$month", ExpressionMonth::parse},
+        {"$multiply", ExpressionMultiply::parse},
+        {"$ne", ExpressionCompare::parse},
+        {"$none", ExpressionNone::parse},
+        {"$not", ExpressionNot::parse},
+        {"$or", ExpressionOr::parse},
+        {"$second", ExpressionSecond::parse},
+        {"$setDifference", ExpressionSetDifference::parse},
+        {"$setEquals", ExpressionSetEquals::parse},
+        {"$setIntersection", ExpressionSetIntersection::parse},
+        {"$setIsSubset", ExpressionSetIsSubset::parse},
+        {"$setUnion", ExpressionSetUnion::parse},
+        {"$strcasecmp", ExpressionStrcasecmp::parse},
+        {"$substr", ExpressionSubstr::parse},
+        {"$subtract", ExpressionSubtract::parse},
+        {"$toLower", ExpressionToLower::parse},
+        {"$toUpper", ExpressionToUpper::parse},
+        {"$week", ExpressionWeek::parse},
+        {"$year", ExpressionYear::parse},
     };
 
     static const size_t NOp = sizeof(OpTable)/sizeof(OpTable[0]);
 
     const OpDesc* lookupExpression(const char* name) {
         OpDesc key;
-        key.pName = name;
+        key.name = name;
         return static_cast<const OpDesc *>(bsearch(&key, OpTable, NOp, sizeof(OpDesc), OpDescCmp));
     }
 }
@@ -317,97 +311,45 @@ namespace {
     intrusive_ptr<Expression> Expression::parseExpression(BSONElement exprElement) {
         /* look for the specified operator */
         const char* opName = exprElement.fieldName();
-
-        if (str::equals(opName, "$const") || str::equals(opName, "$literal")) {
-            return ExpressionConstant::createFromBsonElement(&exprElement);
-        }
-        else if (str::equals(opName, "$let")) {
-            return ExpressionLet::parse(exprElement);
-        }
-        else if (str::equals(opName, "$map")) {
-            return ExpressionMap::parse(exprElement);
-        }
-
         const OpDesc* pOp = lookupExpression(opName);
         uassert(15999, str::stream() << "invalid operator '" << opName << "'",
                 pOp);
 
         /* make the expression node */
-        intrusive_ptr<ExpressionNary> pExpression = pOp->create();
-
-        /* add the operands to the expression node */
-        BSONType elementType = exprElement.type();
-
-        if (pOp->flag & OpDesc::FIXED_COUNT) {
-            if (pOp->argCount > 1)
-                uassert(16019, str::stream() << "the " << pOp->pName <<
-                        " operator requires an array of " << pOp->argCount <<
-                        " operands", elementType == Array);
-        }
-
-        if (elementType == Object) {
-            /* the operator must be unary and accept an object argument */
-            uassert(16021, str::stream() << "the " << pOp->pName <<
-                    " operator does not accept an object as an operand",
-                    pOp->flag & OpDesc::OBJECT_ARG);
-
-            BSONObj objOperand(exprElement.Obj());
-            ObjectCtx oCtx(ObjectCtx::DOCUMENT_OK);
-            pExpression->addOperand(Expression::parseObject(&exprElement, &oCtx));
-        }
-        else if (elementType == Array) {
-            /* multiple operands - an n-ary operator */
-            vector<BSONElement> bsonArray(exprElement.Array());
-            const size_t n = bsonArray.size();
-
-            if (pOp->flag & OpDesc::FIXED_COUNT) {
-                uassert(16020, str::stream() << "the " << pOp->pName << " operator "
-                                             << "requires " << pOp->argCount << " operand(s)",
-                        pOp->argCount == n);
-            }
-
-            for(size_t i = 0; i < n; ++i) {
-                BSONElement *pBsonOperand = &bsonArray[i];
-                intrusive_ptr<Expression> pOperand(
-                    Expression::parseOperand(pBsonOperand));
-                pExpression->addOperand(pOperand);
-            }
-        }
-        else {
-            /* assume it's an atomic operand */
-            if (pOp->flag & OpDesc::FIXED_COUNT)
-                uassert(16022, str::stream() << "the " << pOp->pName <<
-                        " operator requires an array of " << pOp->argCount <<
-                        " operands", pOp->argCount == 1);
-
-            pExpression->addOperand(Expression::parseOperand(&exprElement));
-        }
-
-        return pExpression;
+        return pOp->parse(exprElement);
     }
 
-    intrusive_ptr<Expression> Expression::parseOperand(BSONElement *pBsonElement) {
-        BSONType type = pBsonElement->type();
+    Expression::ExpressionVector ExpressionNary::parseArguments(BSONElement exprElement) {
+        ExpressionVector out;
+        if (exprElement.type() == Array) {
+            BSONForEach(elem, exprElement.Obj()) {
+                out.push_back(Expression::parseOperand(elem));
+            }
+        }
+        else { // assume it's an atomic operand
+            out.push_back(Expression::parseOperand(exprElement));
+        }
 
-        if (type == String && pBsonElement->valuestr()[0] == '$') {
+        return out;
+    }
+
+    intrusive_ptr<Expression> Expression::parseOperand(BSONElement exprElement) {
+        BSONType type = exprElement.type();
+
+        if (type == String && exprElement.valuestr()[0] == '$') {
             /* if we got here, this is a field path expression */
-            return ExpressionFieldPath::parse(pBsonElement->str());
+            return ExpressionFieldPath::parse(exprElement.str());
         }
         else if (type == Object) {
             ObjectCtx oCtx(ObjectCtx::DOCUMENT_OK);
-            return Expression::parseObject(pBsonElement, &oCtx);
+            return Expression::parseObject(&exprElement, &oCtx);
         }
         else {
-            return ExpressionConstant::createFromBsonElement(pBsonElement);
+            return ExpressionConstant::parse(exprElement);
         }
     }
 
     /* ------------------------- ExpressionAdd ----------------------------- */
-
-    intrusive_ptr<ExpressionNary> ExpressionAdd::create() {
-        intrusive_ptr<ExpressionAdd> pExpression(new ExpressionAdd());
-        return pExpression;
-    }
 
     Value ExpressionAdd::evaluateInternal(const Variables& vars) const {
 
@@ -476,10 +418,6 @@ namespace {
 
     /* ------------------------- ExpressionAll -------------------------- */
 
-    intrusive_ptr<ExpressionNary> ExpressionAll::create() {
-        return new ExpressionAll();
-    }
-
     Value ExpressionAll::evaluateInternal(const Variables& vars) const {
         const Value arr = vpOperand[0]->evaluateInternal(vars);
         uassert(17040, str::stream() << getOpName() << "'s argument must be an array, but is "
@@ -499,11 +437,6 @@ namespace {
     }
 
     /* ------------------------- ExpressionAnd ----------------------------- */
-
-    intrusive_ptr<ExpressionNary> ExpressionAnd::create() {
-        intrusive_ptr<ExpressionNary> pExpression(new ExpressionAnd());
-        return pExpression;
-    }
 
     intrusive_ptr<Expression> ExpressionAnd::optimize() {
         /* optimize the conjunction as much as possible */
@@ -592,10 +525,6 @@ namespace {
 
     /* ------------------------- ExpressionAny -------------------------- */
 
-    intrusive_ptr<ExpressionNary> ExpressionAny::create() {
-        return new ExpressionAny();
-    }
-
     Value ExpressionAny::evaluateInternal(const Variables& vars) const {
         const Value arr = vpOperand[0]->evaluateInternal(vars);
         uassert(17041, str::stream() << getOpName() << "'s argument must be an array, but is "
@@ -664,46 +593,33 @@ namespace {
 
     /* ----------------------- ExpressionCompare --------------------------- */
 
-    intrusive_ptr<ExpressionNary> ExpressionCompare::createEq() {
-        intrusive_ptr<ExpressionCompare> pExpression(
-            new ExpressionCompare(EQ));
-        return pExpression;
-    }
+    intrusive_ptr<Expression> ExpressionCompare::parse(BSONElement bsonExpr) {
+        const char* compTypeStr = bsonExpr.fieldName();
+        CmpOp op;
+        if (str::equals(compTypeStr, "$cmp")) {
+            op = CMP;
+        } else if (str::equals(compTypeStr, "$eq")) {
+            op = EQ;
+        } else if (str::equals(compTypeStr, "$gt")) {
+            op = GT;
+        } else if (str::equals(compTypeStr, "$gte")) {
+            op = GTE;
+        } else if (str::equals(compTypeStr, "$lt")) {
+            op = LT;
+        } else if (str::equals(compTypeStr, "$lte")) {
+            op = LTE;
+        } else if (str::equals(compTypeStr, "$ne")) {
+            op = NE;
+        } else {
+            msgasserted(17063,
+                        str::stream() << "ExpressionCompare got unexpected op: " << compTypeStr);
+        }
 
-    intrusive_ptr<ExpressionNary> ExpressionCompare::createNe() {
-        intrusive_ptr<ExpressionCompare> pExpression(
-            new ExpressionCompare(NE));
-        return pExpression;
-    }
-
-    intrusive_ptr<ExpressionNary> ExpressionCompare::createGt() {
-        intrusive_ptr<ExpressionCompare> pExpression(
-            new ExpressionCompare(GT));
-        return pExpression;
-    }
-
-    intrusive_ptr<ExpressionNary> ExpressionCompare::createGte() {
-        intrusive_ptr<ExpressionCompare> pExpression(
-            new ExpressionCompare(GTE));
-        return pExpression;
-    }
-
-    intrusive_ptr<ExpressionNary> ExpressionCompare::createLt() {
-        intrusive_ptr<ExpressionCompare> pExpression(
-            new ExpressionCompare(LT));
-        return pExpression;
-    }
-
-    intrusive_ptr<ExpressionNary> ExpressionCompare::createLte() {
-        intrusive_ptr<ExpressionCompare> pExpression(
-            new ExpressionCompare(LTE));
-        return pExpression;
-    }
-
-    intrusive_ptr<ExpressionNary> ExpressionCompare::createCmp() {
-        intrusive_ptr<ExpressionCompare> pExpression(
-            new ExpressionCompare(CMP));
-        return pExpression;
+        intrusive_ptr<ExpressionCompare> expr = new ExpressionCompare(op);
+        ExpressionVector args = parseArguments(bsonExpr);
+        expr->validateArguments(args);
+        expr->vpOperand = args;
+        return expr;
     }
 
     ExpressionCompare::ExpressionCompare(CmpOp theCmpOp)
@@ -813,10 +729,6 @@ namespace {
 
     /* ------------------------- ExpressionConcat ----------------------------- */
 
-    intrusive_ptr<ExpressionNary> ExpressionConcat::create() {
-        return new ExpressionConcat();
-    }
-
     Value ExpressionConcat::evaluateInternal(const Variables& vars) const {
         const size_t n = vpOperand.size();
 
@@ -842,11 +754,6 @@ namespace {
 
     /* ----------------------- ExpressionCond ------------------------------ */
 
-    intrusive_ptr<ExpressionNary> ExpressionCond::create() {
-        intrusive_ptr<ExpressionCond> pExpression(new ExpressionCond());
-        return pExpression;
-    }
-
     Value ExpressionCond::evaluateInternal(const Variables& vars) const {
         Value pCond(vpOperand[0]->evaluateInternal(vars));
         int idx = pCond.coerceToBool() ? 1 : 2;
@@ -859,16 +766,10 @@ namespace {
 
     /* ---------------------- ExpressionConstant --------------------------- */
 
-    intrusive_ptr<ExpressionConstant> ExpressionConstant::createFromBsonElement(
-        BSONElement *pBsonElement) {
-        intrusive_ptr<ExpressionConstant> pEC(
-            new ExpressionConstant(pBsonElement));
-        return pEC;
+    intrusive_ptr<Expression> ExpressionConstant::parse(BSONElement exprElement) {
+        return new ExpressionConstant(Value(exprElement));
     }
 
-    ExpressionConstant::ExpressionConstant(BSONElement *pBsonElement):
-        pValue(Value(*pBsonElement)) {
-    }
 
     intrusive_ptr<ExpressionConstant> ExpressionConstant::create(const Value& pValue) {
         intrusive_ptr<ExpressionConstant> pEC(new ExpressionConstant(pValue));
@@ -901,11 +802,6 @@ namespace {
 
     /* ---------------------- ExpressionDayOfMonth ------------------------- */
 
-    intrusive_ptr<ExpressionNary> ExpressionDayOfMonth::create() {
-        intrusive_ptr<ExpressionDayOfMonth> pExpression(new ExpressionDayOfMonth());
-        return pExpression;
-    }
-
     Value ExpressionDayOfMonth::evaluateInternal(const Variables& vars) const {
         Value pDate(vpOperand[0]->evaluateInternal(vars));
         tm date = pDate.coerceToTm();
@@ -917,11 +813,6 @@ namespace {
     }
 
     /* ------------------------- ExpressionDayOfWeek ----------------------------- */
-
-    intrusive_ptr<ExpressionNary> ExpressionDayOfWeek::create() {
-        intrusive_ptr<ExpressionDayOfWeek> pExpression(new ExpressionDayOfWeek());
-        return pExpression;
-    }
 
     Value ExpressionDayOfWeek::evaluateInternal(const Variables& vars) const {
         Value pDate(vpOperand[0]->evaluateInternal(vars));
@@ -935,11 +826,6 @@ namespace {
 
     /* ------------------------- ExpressionDayOfYear ----------------------------- */
 
-    intrusive_ptr<ExpressionNary> ExpressionDayOfYear::create() {
-        intrusive_ptr<ExpressionDayOfYear> pExpression(new ExpressionDayOfYear());
-        return pExpression;
-    }
-
     Value ExpressionDayOfYear::evaluateInternal(const Variables& vars) const {
         Value pDate(vpOperand[0]->evaluateInternal(vars));
         tm date = pDate.coerceToTm();
@@ -951,11 +837,6 @@ namespace {
     }
 
     /* ----------------------- ExpressionDivide ---------------------------- */
-
-    intrusive_ptr<ExpressionNary> ExpressionDivide::create() {
-        intrusive_ptr<ExpressionDivide> pExpression(new ExpressionDivide());
-        return pExpression;
-    }
 
     Value ExpressionDivide::evaluateInternal(const Variables& vars) const {
         Value lhs = vpOperand[0]->evaluateInternal(vars);
@@ -1681,7 +1562,7 @@ namespace {
 
     /* ------------------------- ExpressionLet ----------------------------- */
 
-    intrusive_ptr<ExpressionLet> ExpressionLet::parse(BSONElement expr) {
+    intrusive_ptr<Expression> ExpressionLet::parse(BSONElement expr) {
         verify(str::equals(expr.fieldName(), "$let"));
 
         uassert(16874, "$let only supports an object as it's argument",
@@ -1699,11 +1580,11 @@ namespace {
                 haveVars = true;
                 BSONForEach(variable, arg.embeddedObjectUserCheck()) {
                     Variables::uassertValidNameForUserWrite(variable.fieldName());
-                    vars[variable.fieldName()] = parseOperand(&variable);
+                    vars[variable.fieldName()] = parseOperand(variable);
                 }
             } else if (str::equals(arg.fieldName(), "in")) {
                 haveIn = true;
-                subExpression = parseOperand(&arg);
+                subExpression = parseOperand(arg);
             } else {
                 uasserted(16875, str::stream()
                         << "Unrecognized parameter to $let: " << arg.fieldName());
@@ -1784,7 +1665,7 @@ namespace {
 
     /* ------------------------- ExpressionMap ----------------------------- */
 
-    intrusive_ptr<ExpressionMap> ExpressionMap::parse(BSONElement expr) {
+    intrusive_ptr<Expression> ExpressionMap::parse(BSONElement expr) {
         verify(str::equals(expr.fieldName(), "$map"));
 
         uassert(16878, "$map only supports an object as it's argument",
@@ -1803,14 +1684,14 @@ namespace {
         BSONForEach(arg, args) {
             if (str::equals(arg.fieldName(), "input")) {
                 haveInput = true;
-                input = parseOperand(&arg);
+                input = parseOperand(arg);
             } else if (str::equals(arg.fieldName(), "as")) {
                 haveAs = true;
                 varName = arg.str();
                 Variables::uassertValidNameForUserWrite(varName);
             } else if (str::equals(arg.fieldName(), "in")) {
                 haveIn = true;
-                in = parseOperand(&arg);
+                in = parseOperand(arg);
             } else {
                 uasserted(16879, str::stream()
                         << "Unrecognized parameter to $map: " << arg.fieldName());
@@ -1892,11 +1773,6 @@ namespace {
 
     /* ------------------------- ExpressionMillisecond ----------------------------- */
 
-    intrusive_ptr<ExpressionNary> ExpressionMillisecond::create() {
-        intrusive_ptr<ExpressionMillisecond> pExpression(new ExpressionMillisecond());
-        return pExpression;
-    }
-
     Value ExpressionMillisecond::evaluateInternal(const Variables& vars) const {
         Value date(vpOperand[0]->evaluateInternal(vars));
         const int ms = date.coerceToDate() % 1000LL;
@@ -1910,11 +1786,6 @@ namespace {
 
     /* ------------------------- ExpressionMinute -------------------------- */
 
-    intrusive_ptr<ExpressionNary> ExpressionMinute::create() {
-        intrusive_ptr<ExpressionMinute> pExpression(new ExpressionMinute());
-        return pExpression;
-    }
-
     Value ExpressionMinute::evaluateInternal(const Variables& vars) const {
         Value pDate(vpOperand[0]->evaluateInternal(vars));
         tm date = pDate.coerceToTm();
@@ -1926,11 +1797,6 @@ namespace {
     }
 
     /* ----------------------- ExpressionMod ---------------------------- */
-
-    intrusive_ptr<ExpressionNary> ExpressionMod::create() {
-        intrusive_ptr<ExpressionMod> pExpression(new ExpressionMod());
-        return pExpression;
-    }
 
     Value ExpressionMod::evaluateInternal(const Variables& vars) const {
         Value lhs = vpOperand[0]->evaluateInternal(vars);
@@ -1984,11 +1850,6 @@ namespace {
 
     /* ------------------------ ExpressionMonth ----------------------------- */
 
-    intrusive_ptr<ExpressionNary> ExpressionMonth::create() {
-        intrusive_ptr<ExpressionMonth> pExpression(new ExpressionMonth());
-        return pExpression;
-    }
-
     Value ExpressionMonth::evaluateInternal(const Variables& vars) const {
         Value pDate(vpOperand[0]->evaluateInternal(vars));
         tm date = pDate.coerceToTm();
@@ -2000,11 +1861,6 @@ namespace {
     }
 
     /* ------------------------- ExpressionMultiply ----------------------------- */
-
-    intrusive_ptr<ExpressionNary> ExpressionMultiply::create() {
-        intrusive_ptr<ExpressionMultiply> pExpression(new ExpressionMultiply());
-        return pExpression;
-    }
 
     Value ExpressionMultiply::evaluateInternal(const Variables& vars) const {
         /*
@@ -2052,11 +1908,6 @@ namespace {
 
     /* ------------------------- ExpressionHour ----------------------------- */
 
-    intrusive_ptr<ExpressionNary> ExpressionHour::create() {
-        intrusive_ptr<ExpressionHour> pExpression(new ExpressionHour());
-        return pExpression;
-    }
-
     Value ExpressionHour::evaluateInternal(const Variables& vars) const {
         Value pDate(vpOperand[0]->evaluateInternal(vars));
         tm date = pDate.coerceToTm();
@@ -2068,11 +1919,6 @@ namespace {
     }
 
     /* ----------------------- ExpressionIfNull ---------------------------- */
-
-    intrusive_ptr<ExpressionNary> ExpressionIfNull::create() {
-        intrusive_ptr<ExpressionIfNull> pExpression(new ExpressionIfNull());
-        return pExpression;
-    }
 
     Value ExpressionIfNull::evaluateInternal(const Variables& vars) const {
         Value pLeft(vpOperand[0]->evaluateInternal(vars));
@@ -2197,10 +2043,6 @@ namespace {
 
     /* ------------------------- ExpressionNone -------------------------- */
 
-    intrusive_ptr<ExpressionNary> ExpressionNone::create() {
-        return new ExpressionNone();
-    }
-
     Value ExpressionNone::evaluateInternal(const Variables& vars) const {
         const Value arr = vpOperand[0]->evaluateInternal(vars);
         uassert(16964, str::stream() << getOpName() << "'s argument must be an array, but is "
@@ -2221,11 +2063,6 @@ namespace {
 
     /* ------------------------- ExpressionNot ----------------------------- */
 
-    intrusive_ptr<ExpressionNary> ExpressionNot::create() {
-        intrusive_ptr<ExpressionNot> pExpression(new ExpressionNot());
-        return pExpression;
-    }
-
     Value ExpressionNot::evaluateInternal(const Variables& vars) const {
         Value pOp(vpOperand[0]->evaluateInternal(vars));
 
@@ -2238,11 +2075,6 @@ namespace {
     }
 
     /* -------------------------- ExpressionOr ----------------------------- */
-
-    intrusive_ptr<ExpressionNary> ExpressionOr::create() {
-        intrusive_ptr<ExpressionNary> pExpression(new ExpressionOr());
-        return pExpression;
-    }
 
     Value ExpressionOr::evaluateInternal(const Variables& vars) const {
         const size_t n = vpOperand.size();
@@ -2324,11 +2156,6 @@ namespace {
 
     /* ------------------------- ExpressionSecond ----------------------------- */
 
-    intrusive_ptr<ExpressionNary> ExpressionSecond::create() {
-        intrusive_ptr<ExpressionSecond> pExpression(new ExpressionSecond());
-        return pExpression;
-    }
-
     Value ExpressionSecond::evaluateInternal(const Variables& vars) const {
         Value pDate(vpOperand[0]->evaluateInternal(vars));
         tm date = pDate.coerceToTm();
@@ -2349,14 +2176,6 @@ namespace {
     }
 
     /* ----------------------- ExpressionSetDifference ---------------------------- */
-
-    intrusive_ptr<ExpressionNary> ExpressionSetDifference::create() {
-        return new ExpressionSetDifference();
-    }
-
-    void ExpressionSetDifference::addOperand(const intrusive_ptr<Expression> &pExpression) {
-        ExpressionNary::addOperand(pExpression);
-    }
 
     Value ExpressionSetDifference::evaluateInternal(const Variables& vars) const {
         const Value lhs = vpOperand[0]->evaluateInternal(vars);
@@ -2391,14 +2210,14 @@ namespace {
 
     /* ----------------------- ExpressionSetEquals ---------------------------- */
 
-    intrusive_ptr<ExpressionNary> ExpressionSetEquals::create() {
-        return new ExpressionSetEquals();
+    void ExpressionSetEquals::validateArguments(const ExpressionVector& args) const {
+        uassert(17045, str::stream() << "$setEquals needs at least two arguments had: "
+                                     << args.size(),
+                args.size() >= 2);
     }
 
     Value ExpressionSetEquals::evaluateInternal(const Variables& vars) const {
         const size_t n = vpOperand.size();
-        uassert(17045, str::stream() << "$setEquals needs at least two arguments had: " << n,
-                n >= 2);
         std::set<Value> lhs;
 
         for (size_t i = 0; i < n; i++) {
@@ -2425,10 +2244,6 @@ namespace {
     }
 
     /* ----------------------- ExpressionSetIntersection ---------------------------- */
-
-    intrusive_ptr<ExpressionNary> ExpressionSetIntersection::create() {
-        return new ExpressionSetIntersection();
-    }
 
     Value ExpressionSetIntersection::evaluateInternal(const Variables& vars) const {
         const size_t n = vpOperand.size();
@@ -2479,14 +2294,6 @@ namespace {
 
     /* ----------------------- ExpressionSetIsSubset ---------------------------- */
 
-    intrusive_ptr<ExpressionNary> ExpressionSetIsSubset::create() {
-        return new ExpressionSetIsSubset();
-    }
-
-    void ExpressionSetIsSubset::addOperand(const intrusive_ptr<Expression> &pExpression) {
-        ExpressionNary::addOperand(pExpression);
-    }
-
     Value ExpressionSetIsSubset::evaluateInternal(const Variables& vars) const {
         const Value lhs = vpOperand[0]->evaluateInternal(vars);
         const Value rhs = vpOperand[1]->evaluateInternal(vars);
@@ -2518,10 +2325,6 @@ namespace {
 
     /* ----------------------- ExpressionSetUnion ---------------------------- */
 
-    intrusive_ptr<ExpressionNary> ExpressionSetUnion::create() {
-        return new ExpressionSetUnion();
-    }
-
     Value ExpressionSetUnion::evaluateInternal(const Variables& vars) const {
         ValueSet unionedSet;
         const size_t n = vpOperand.size();
@@ -2546,11 +2349,6 @@ namespace {
 
     /* ----------------------- ExpressionStrcasecmp ---------------------------- */
 
-    intrusive_ptr<ExpressionNary> ExpressionStrcasecmp::create() {
-        intrusive_ptr<ExpressionStrcasecmp> pExpression(new ExpressionStrcasecmp());
-        return pExpression;
-    }
-
     Value ExpressionStrcasecmp::evaluateInternal(const Variables& vars) const {
         Value pString1(vpOperand[0]->evaluateInternal(vars));
         Value pString2(vpOperand[1]->evaluateInternal(vars));
@@ -2573,11 +2371,6 @@ namespace {
     }
 
     /* ----------------------- ExpressionSubstr ---------------------------- */
-
-    intrusive_ptr<ExpressionNary> ExpressionSubstr::create() {
-        intrusive_ptr<ExpressionSubstr> pExpression(new ExpressionSubstr());
-        return pExpression;
-    }
 
     Value ExpressionSubstr::evaluateInternal(const Variables& vars) const {
         Value pString(vpOperand[0]->evaluateInternal(vars));
@@ -2612,11 +2405,6 @@ namespace {
     }
 
     /* ----------------------- ExpressionSubtract ---------------------------- */
-
-    intrusive_ptr<ExpressionNary> ExpressionSubtract::create() {
-        intrusive_ptr<ExpressionSubtract> pExpression(new ExpressionSubtract());
-        return pExpression;
-    }
 
     Value ExpressionSubtract::evaluateInternal(const Variables& vars) const {
         Value lhs = vpOperand[0]->evaluateInternal(vars);
@@ -2671,11 +2459,6 @@ namespace {
 
     /* ------------------------- ExpressionToLower ----------------------------- */
 
-    intrusive_ptr<ExpressionNary> ExpressionToLower::create() {
-        intrusive_ptr<ExpressionToLower> pExpression(new ExpressionToLower());
-        return pExpression;
-    }
-
     Value ExpressionToLower::evaluateInternal(const Variables& vars) const {
         Value pString(vpOperand[0]->evaluateInternal(vars));
         string str = pString.coerceToString();
@@ -2689,11 +2472,6 @@ namespace {
 
     /* ------------------------- ExpressionToUpper -------------------------- */
 
-    intrusive_ptr<ExpressionNary> ExpressionToUpper::create() {
-        intrusive_ptr<ExpressionToUpper> pExpression(new ExpressionToUpper());
-        return pExpression;
-    }
-
     Value ExpressionToUpper::evaluateInternal(const Variables& vars) const {
         Value pString(vpOperand[0]->evaluateInternal(vars));
         string str(pString.coerceToString());
@@ -2706,11 +2484,6 @@ namespace {
     }
 
     /* ------------------------- ExpressionWeek ----------------------------- */
-
-    intrusive_ptr<ExpressionNary> ExpressionWeek::create() {
-        intrusive_ptr<ExpressionWeek> pExpression(new ExpressionWeek());
-        return pExpression;
-    }
 
     Value ExpressionWeek::evaluateInternal(const Variables& vars) const {
         Value pDate(vpOperand[0]->evaluateInternal(vars));
@@ -2739,11 +2512,6 @@ namespace {
     }
 
     /* ------------------------- ExpressionYear ----------------------------- */
-
-    intrusive_ptr<ExpressionNary> ExpressionYear::create() {
-        intrusive_ptr<ExpressionYear> pExpression(new ExpressionYear());
-        return pExpression;
-    }
 
     Value ExpressionYear::evaluateInternal(const Variables& vars) const {
         Value pDate(vpOperand[0]->evaluateInternal(vars));
