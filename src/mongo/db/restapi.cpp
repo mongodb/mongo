@@ -21,6 +21,9 @@
 
 #include "mongo/db/restapi.h"
 
+#include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/user_name.h"
 #include "mongo/db/background.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/dbhelpers.h"
@@ -245,37 +248,24 @@ namespace mongo {
 
     } restHandler;
 
-    void openAdminDb() { 
-        {
-            readlocktry rl(/*"admin.system.users", */10000);
-            uassert( 16172 , "couldn't get readlock to open admin db" , rl.got() );
-            if( dbHolder().get("admin.system.users",dbpath) )
-                return;
-        }
-
-        writelocktry wl(10000);
-        verify( wl.got() );
-        Client::Context cx("admin.system.users", dbpath);
-    }
-
     bool RestAdminAccess::haveAdminUsers() const {
-        openAdminDb();
-        readlocktry rl(/*"admin.system.users", */10000);
-        uassert( 16173 , "couldn't get read lock to get admin auth credentials" , rl.got() );
-        Client::Context cx("admin.system.users", dbpath);
-        return ! Helpers::isEmpty("admin.system.users");
+        AuthorizationSession* authzSession = cc().getAuthorizationSession();
+        return authzSession->getAuthorizationManager().hasPrivilegeDocument("admin");
     }
 
-    BSONObj RestAdminAccess::getAdminUser( const string& username ) const {
-        openAdminDb();
-        Client::GodScope gs;
-        readlocktry rl(/*"admin.system.users", */10000);
-        uassert( 16174 , "couldn't get read lock to check admin user" , rl.got() );
-        Client::Context cx( "admin.system.users" );
+    BSONObj RestAdminAccess::getAdminUser(const UserName& username) const {
+        AuthorizationSession* authzSession = cc().getAuthorizationSession();
         BSONObj user;
-        if ( Helpers::findOne( "admin.system.users" , BSON( "user" << username ) , user ) )
-            return user.copy();
-        return BSONObj();
+        Status status = authzSession->getAuthorizationManager().getPrivilegeDocument("admin",
+                                                                                     username,
+                                                                                     &user);
+        if (status.isOK()) {
+            return user;
+        }
+        if (status.code() == ErrorCodes::UserNotFound) {
+            return BSONObj();
+        }
+        uasserted(17050, status.reason());
     }
 
     class LowLevelMongodStatus : public WebStatusPlugin {

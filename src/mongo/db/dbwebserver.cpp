@@ -32,6 +32,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/principal.h"
 #include "mongo/db/auth/privilege.h"
+#include "mongo/db/auth/user_name.h"
 #include "mongo/db/background.h"
 #include "mongo/db/cmdline.h"
 #include "mongo/db/commands.h"
@@ -80,22 +81,16 @@ namespace mongo {
             ss << "</pre>";
         }
 
-        void _authorizePrincipal(const std::string& principalName, bool readOnly) {
-            // TODO(spencer): Re-enable this using the new way of authorizing users. SERVER-10323
-//            Principal* principal = new Principal(UserName(principalName, "local"));
-//            ActionSet actions = getGlobalAuthorizationManager()->getActionsForOldStyleUser(
-//                    "admin", readOnly);
-//
-//            AuthorizationSession* authorizationSession = cc().getAuthorizationSession();
-//            authorizationSession->addPrincipal(principal);
-//            Status status = authorizationSession->acquirePrivilege(
-//                    Privilege(PrivilegeSet::WILDCARD_RESOURCE, actions), principal->getName());
-//            verify (status == Status::OK());
+        void _authorizePrincipal(const UserName& userName) {
+            Status status = cc().getAuthorizationSession()->addAndAuthorizeUser(userName);
+            uassertStatusOK(status);
         }
 
         bool allowed( const char * rq , vector<string>& headers, const SockAddr &from ) {
             if ( from.isLocalHost() || !_webUsers->haveAdminUsers() ) {
-                _authorizePrincipal("RestUser", false);
+                // TODO(spencer): should the above check use "&&" not "||"?  Currently this is much
+                // more permissive than the server's localhost auth bypass.
+                cc().getAuthorizationSession()->grantInternalAuthorization();
                 return true;
             }
 
@@ -113,7 +108,9 @@ namespace mongo {
                     parms[name] = val;
                 }
 
-                BSONObj user = _webUsers->getAdminUser( parms["username"] );
+                // Only users in the admin DB are visible by the webserver
+                UserName userName(parms["username"], "admin");
+                BSONObj user = _webUsers->getAdminUser(userName);
                 if ( ! user.isEmpty() ) {
                     string ha1 = user["pwd"].str();
                     string ha2 = md5simpledigest( (string)"GET" + ":" + parms["uri"] );
@@ -133,11 +130,7 @@ namespace mongo {
                     string r1 = md5simpledigest( r.str() );
 
                     if ( r1 == parms["response"] ) {
-                        std::string principalName = user["user"].str();
-                        bool readOnly = user[ "readOnly" ].isBoolean() &&
-                                user[ "readOnly" ].boolean();
-
-                        _authorizePrincipal(principalName, readOnly);
+                        _authorizePrincipal(userName);
                         return true;
                     }
                 }
