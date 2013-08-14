@@ -54,7 +54,7 @@ __split_row_page_inmem(WT_SESSION_IMPL *session, WT_PAGE *orig)
 	/*
 	 * The logic below requires more than one element in the skip list.
 	 * There is no point splitting if the list is small (no deep items is
-	 * a good heurisitc for that) - it's likely that the page isn't
+	 * a good heuristic for that) - it's likely that the page isn't
 	 * part of an append workload.
 	 */
 	if (ins == NULL || ins_head->head[4] == NULL ||
@@ -142,19 +142,15 @@ __split_row_page_inmem(WT_SESSION_IMPL *session, WT_PAGE *orig)
 	 *
 	 *               __
 	 *              |c3|
-	 *               --
 	 *               |
-	 *   __          __    __
+	 *   __		 __    __
 	 *  |a2|--------|c2|--|d2|
-	 *   --          --    --
-	 *   |           |     |
-	 *   __          __    __          __
+	 *   |		 |	|
+	 *   __		 __    __	   __
 	 *  |a1|--------|c1|--|d1|--------|f1|
-	 *   --          --    --          --
-	 *   |           |     |           |
+	 *   |		 |	|	   |
 	 *   __    __    __    __    __    __
 	 *  |a0|--|b0|--|c0|--|d0|--|e0|--|f0|
-	 *   --    --    --    --    --    --
 	 *
 	 *   From the above picture.
 	 *   The head array will be: a0, a1, a2, c3, NULL

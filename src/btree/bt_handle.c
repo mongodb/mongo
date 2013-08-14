@@ -462,7 +462,7 @@ err:	if (leaf != NULL)
  */
 int
 __wt_btree_new_modified_page(WT_SESSION_IMPL *session,
-	uint8_t type, uint32_t entries, int merge, WT_PAGE **pagep)
+    uint8_t type, uint32_t entries, int merge, WT_PAGE **pagep)
 {
 	WT_DECL_RET;
 	WT_PAGE *newpage;

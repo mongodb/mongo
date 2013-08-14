@@ -286,7 +286,7 @@ extern int __wt_btree_tree_open( WT_SESSION_IMPL *session,
     const uint8_t *addr,
     uint32_t addr_size);
 extern int __wt_btree_new_modified_page(WT_SESSION_IMPL *session,
-    	uint8_t type,
+    uint8_t type,
     uint32_t entries,
     int merge,
     WT_PAGE **pagep);
