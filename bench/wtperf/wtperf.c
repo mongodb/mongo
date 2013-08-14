@@ -102,14 +102,6 @@ CONFIG_OPT config_opts[] = {
 };
 
 /* Forward function definitions. */
-int execute_populate(CONFIG *);
-int execute_workload(CONFIG *);
-int get_next_op(uint64_t *);
-int lprintf(CONFIG *cfg, int err, uint32_t level, const char *fmt, ...)
-#ifdef __GNUC__
-    __attribute__((format (printf, 4, 5)))
-#endif
-;
 void *checkpoint_worker(void *);
 void config_assign(CONFIG *, const CONFIG *);
 void config_free(CONFIG *);
@@ -120,9 +112,17 @@ int config_opt_line(CONFIG *, WT_SESSION *, const char *);
 int config_opt_str(CONFIG *, WT_SESSION *, const char *, const char *);
 void config_opt_usage(void);
 int connection_reconfigure(WT_CONNECTION *, const char *);
+int execute_populate(CONFIG *);
+int execute_workload(CONFIG *);
 int find_table_count(CONFIG *);
+int get_next_op(uint64_t *);
 void indent_lines(const char *, const char *);
 void *insert_thread(void *);
+int lprintf(CONFIG *cfg, int err, uint32_t level, const char *fmt, ...)
+#ifdef __GNUC__
+    __attribute__((format (printf, 4, 5)))
+#endif
+;
 void *populate_thread(void *);
 void print_config(CONFIG *);
 void *read_thread(void *);
@@ -248,12 +248,12 @@ void
 worker(CONFIG *cfg, uint32_t worker_type)
 {
 	WT_CONNECTION *conn;
-	WT_SESSION *session;
 	WT_CURSOR *cursor;
+	WT_SESSION *session;
+	uint64_t next_incr, next_val;
+	int ret, op_ret;
 	const char *op_name = "search";
 	char *data_buf, *key_buf, *value;
-	int ret, op_ret;
-	uint64_t next_incr, next_val;
 
 	session = NULL;
 	data_buf = key_buf = NULL;
@@ -387,9 +387,9 @@ populate_thread(void *arg)
 	WT_CONNECTION *conn;
 	WT_CURSOR *cursor;
 	WT_SESSION *session;
-	char *data_buf, *key_buf;
-	int ret;
 	uint64_t op;
+	int ret;
+	char *data_buf, *key_buf;
 
 	cfg = (CONFIG *)arg;
 	conn = cfg->conn;
@@ -418,10 +418,8 @@ populate_thread(void *arg)
 	}
 
 	/* Do a bulk load if populate is single-threaded. */
-	if ((ret = session->open_cursor(
-	    session, cfg->uri, NULL,
-	    cfg->populate_threads == 1 ? "bulk" : NULL,
-	    &cursor)) != 0) {
+	if ((ret = session->open_cursor(session, cfg->uri, NULL,
+	    cfg->populate_threads == 1 ? "bulk" : NULL, &cursor)) != 0) {
 		lprintf(cfg, ret, 0, "Error opening cursor %s", cfg->uri);
 		goto err;
 	}
@@ -459,14 +457,14 @@ stat_worker(void *arg)
 	WT_CONNECTION *conn;
 	WT_CURSOR *cursor;
 	WT_SESSION *session;
+	struct timeval e;
+	double secs;
+	size_t uri_len;
+	uint64_t value;
+	uint32_t i;
+	int ret;
 	const char *desc, *pvalue;
 	char *stat_uri;
-	double secs;
-	int ret;
-	size_t uri_len;
-	struct timeval e;
-	uint32_t i;
-	uint64_t value;
 
 	session = NULL;
 	cfg = (CONFIG *)arg;
@@ -554,10 +552,10 @@ checkpoint_worker(void *arg)
 	CONFIG *cfg;
 	WT_CONNECTION *conn;
 	WT_SESSION *session;
-	int ret;
 	struct timeval e, s;
-	uint32_t i;
 	uint64_t ms;
+	uint32_t i;
+	int ret;
 
 	session = NULL;
 	cfg = (CONFIG *)arg;
@@ -600,10 +598,10 @@ int execute_populate(CONFIG *cfg)
 	WT_CONNECTION *conn;
 	WT_SESSION *session;
 	pthread_t *threads;
+	struct timeval e;
 	double secs;
 	int ret;
 	uint64_t elapsed, last_ops;
-	struct timeval e;
 
 	conn = cfg->conn;
 	cfg->phase = WT_PERF_POP;
@@ -672,8 +670,8 @@ int execute_populate(CONFIG *cfg)
 int execute_workload(CONFIG *cfg)
 {
 	pthread_t *ithreads, *rthreads, *uthreads;
-	int ret;
 	uint64_t last_inserts, last_reads, last_updates;
+	int ret;
 
 	cfg->phase = WT_PERF_READ;
 	last_inserts = last_reads = last_updates = 0;
@@ -817,12 +815,12 @@ int main(int argc, char **argv)
 	CONFIG cfg;
 	WT_CONNECTION *conn;
 	WT_SESSION *parse_session;
+	pthread_t checkpoint, stat;
+	uint64_t req_len;
+	int ch, checkpoint_created, ret, stat_created;
 	const char *user_cconfig, *user_tconfig;
 	const char *opts = "C:O:T:h:o:SML";
 	char *cc_buf, *tc_buf;
-	int ch, checkpoint_created, ret, stat_created;
-	pthread_t checkpoint, stat;
-	uint64_t req_len;
 
 	/* Setup the default configuration values. */
 	memset(&cfg, 0, sizeof(cfg));
@@ -1003,7 +1001,7 @@ int main(int argc, char **argv)
 	if (cfg.run_time != 0 &&
 	    cfg.read_threads + cfg.insert_threads + cfg.update_threads != 0 &&
 	    (ret = execute_workload(&cfg)) != 0)
-			goto err;
+		goto err;
 
 	lprintf(&cfg, 0, 1,
 	    "Ran performance test example with %d read threads, %d insert"
@@ -1055,17 +1053,15 @@ err:	g_util_running = 0;
  */
 void config_assign(CONFIG *dest, const CONFIG *src)
 {
-	size_t i;
-	char **pstr;
-	char *newstr;
-	size_t len;
+	size_t i, len;
 	const char *saved_home;
+	char *newstr, **pstr;
 
 	saved_home = dest->home;
 	config_free(dest);
 	memcpy(dest, src, sizeof(CONFIG));
 
-	for (i = 0; i < sizeof(config_opts)/sizeof(config_opts[0]); i++) {
+	for (i = 0; i < sizeof(config_opts) / sizeof(config_opts[0]); i++)
 		if (config_opts[i].type == STRING_TYPE) {
 			pstr = (char **)
 			    ((unsigned char *)dest + config_opts[i].offset);
@@ -1076,7 +1072,6 @@ void config_assign(CONFIG *dest, const CONFIG *src)
 				*pstr = newstr;
 			}
 		}
-	}
 	dest->home = saved_home;
 }
 
@@ -1088,7 +1083,7 @@ config_free(CONFIG *cfg)
 	size_t i;
 	char **pstr;
 
-	for (i = 0; i < sizeof(config_opts)/sizeof(config_opts[0]); i++) {
+	for (i = 0; i < sizeof(config_opts) / sizeof(config_opts[0]); i++)
 		if (config_opts[i].type == STRING_TYPE) {
 			pstr = (char **)
 			    ((unsigned char *)cfg + config_opts[i].offset);
@@ -1097,7 +1092,6 @@ config_free(CONFIG *cfg)
 				*pstr = NULL;
 			}
 		}
-	}
 }
 
 /*
@@ -1108,29 +1102,25 @@ config_free(CONFIG *cfg)
 int
 config_opt(CONFIG *cfg, WT_CONFIG_ITEM *k, WT_CONFIG_ITEM *v)
 {
-	size_t i;
-	size_t nopt;
 	CONFIG_OPT *popt;
+	size_t i, nopt;
+	char *newstr, **strp;
 	void *valueloc;
-	char *newstr;
-	char **strp;
 
 	popt = NULL;
 	nopt = sizeof(config_opts)/sizeof(config_opts[0]);
-	for (i = 0; i < nopt; i++) {
+	for (i = 0; i < nopt; i++)
 		if (strlen(config_opts[i].name) == k->len &&
 		    strncmp(config_opts[i].name, k->str, k->len) == 0) {
 			popt = &config_opts[i];
 			break;
 		}
-	}
 	if (popt == NULL) {
 		fprintf(stderr, "wtperf: Error: "
 		    "unknown option \'%.*s\'\n", (int)k->len, k->str);
 		fprintf(stderr, "Options:\n");
-		for (i = 0; i < nopt; i++) {
+		for (i = 0; i < nopt; i++)
 			fprintf(stderr, "\t%s\n", config_opts[i].name);
-		}
 		return (EINVAL);
 	}
 	valueloc = ((unsigned char *)cfg + popt->offset);
@@ -1140,16 +1130,14 @@ config_opt(CONFIG *cfg, WT_CONFIG_ITEM *k, WT_CONFIG_ITEM *v)
 			    "bad int value for \'%.*s=%.*s\'\n",
 			    (int)k->len, k->str, (int)v->len, v->str);
 			return (EINVAL);
-		}
-		else if (v->val < 0 || v->val > UINT_MAX) {
+		} else if (v->val < 0 || v->val > UINT_MAX) {
 			fprintf(stderr, "wtperf: Error: "
 			    "uint32 value out of range for \'%.*s=%.*s\'\n",
 			    (int)k->len, k->str, (int)v->len, v->str);
 			return (EINVAL);
 		}
 		*(uint32_t *)valueloc = (uint32_t)v->val;
-	}
-	else if (popt->type == STRING_TYPE) {
+	} else if (popt->type == STRING_TYPE) {
 		if (v->type != WT_CONFIG_ITEM_STRING) {
 			fprintf(stderr, "wtperf: Error: "
 			    "bad string value for \'%.*s=%.*s\'\n",
@@ -1157,15 +1145,13 @@ config_opt(CONFIG *cfg, WT_CONFIG_ITEM *k, WT_CONFIG_ITEM *v)
 			return (EINVAL);
 		}
 		strp = (char **)valueloc;
-		if (*strp != NULL) {
+		if (*strp != NULL)
 			free(*strp);
-		}
 		newstr = malloc(v->len + 1);
 		strncpy(newstr, v->str, v->len);
 		newstr[v->len] = '\0';
 		*strp = newstr;
-	}
-	else if (popt->type == BOOL_TYPE || popt->type == FLAG_TYPE) {
+	} else if (popt->type == BOOL_TYPE || popt->type == FLAG_TYPE) {
 		uint32_t *pconfigval;
 
 		if (v->type != WT_CONFIG_ITEM_BOOL) {
@@ -1175,15 +1161,12 @@ config_opt(CONFIG *cfg, WT_CONFIG_ITEM *k, WT_CONFIG_ITEM *v)
 			return (EINVAL);
 		}
 		pconfigval = (uint32_t *)valueloc;
-		if (popt->type == BOOL_TYPE) {
+		if (popt->type == BOOL_TYPE)
 			*pconfigval = (uint32_t)v->val;
-		}
-		else if (v->val != 0) {
+		else if (v->val != 0)
 			*pconfigval |= popt->flagmask;
-		}
-		else {
+		else
 			*pconfigval &= ~popt->flagmask;
-		}
 	}
 	return (0);
 }
@@ -1195,10 +1178,10 @@ int
 config_opt_file(CONFIG *cfg, WT_SESSION *parse_session, const char *filename)
 {
 	FILE *fp;
+	size_t linelen, optionpos;
+	int contline, linenum, ret;
 	char line[256], option[1024];
 	char *comment, *ltrim, *rtrim;
-	int contline, linenum, ret;
-	size_t linelen, optionpos;
 
 	if ((fp = fopen(filename, "r")) == NULL) {
 		fprintf(stderr, "wtperf: %s: %s\n", filename, strerror(errno));
@@ -1240,9 +1223,8 @@ config_opt_file(CONFIG *cfg, WT_SESSION *parse_session, const char *filename)
 		*rtrim = '\0';
 		strncpy(&option[optionpos], ltrim, linelen);
 		option[optionpos + linelen] = '\0';
-		if (contline) {
+		if (contline)
 			optionpos += linelen;
-		}
 		else {
 			if ((ret = config_opt_line(cfg,
 				    parse_session, option)) != 0) {
@@ -1271,22 +1253,22 @@ config_opt_line(CONFIG *cfg, WT_SESSION *parse_session, const char *optstr)
 {
 	WT_CONFIG_ITEM k, v;
 	WT_CONFIG_SCAN *scan;
-	int ret, t_ret;
-	WT_EXTENSION_API *wt_api;
 	WT_CONNECTION *conn;
+	WT_EXTENSION_API *wt_api;
+	int ret, t_ret;
 
 	conn = parse_session->connection;
 	wt_api = conn->get_extension_api(conn);
 
 	if ((ret = wt_api->config_scan_begin(wt_api, parse_session, optstr,
-		    strlen(optstr), &scan)) != 0) {
+	    strlen(optstr), &scan)) != 0) {
 		lprintf(cfg, ret, 0, "Error in config_scan_begin");
 		return (ret);
 	}
 
 	while (ret == 0) {
-		if ((ret = wt_api->config_scan_next(wt_api, scan, &k, &v))
-		    != 0) {
+		if ((ret =
+		    wt_api->config_scan_next(wt_api, scan, &k, &v)) != 0) {
 			/* Any parse error has already been reported. */
 			if (ret == WT_NOTFOUND)
 				ret = 0;
@@ -1295,8 +1277,7 @@ config_opt_line(CONFIG *cfg, WT_SESSION *parse_session, const char *optstr)
 		ret = config_opt(cfg, &k, &v);
 	}
 	if ((t_ret = wt_api->config_scan_end(wt_api, scan)) != 0) {
-		lprintf(cfg, ret, 0,
-		    "Error in config_scan_end");
+		lprintf(cfg, ret, 0, "Error in config_scan_end");
 		if (ret == 0)
 			ret = t_ret;
 	}
@@ -1309,8 +1290,8 @@ int
 config_opt_str(CONFIG *cfg, WT_SESSION *parse_session,
     const char *name, const char *value)
 {
-	char *optstr;
 	int ret;
+	char *optstr;
 
 	optstr = malloc(strlen(name) + strlen(value) + 4);  /* name="value" */
 	sprintf(optstr, "%s=\"%s\"", name, value);
@@ -1324,8 +1305,8 @@ int
 config_opt_int(CONFIG *cfg, WT_SESSION *parse_session,
     const char *name, const char *value)
 {
-	char *optstr;
 	int ret;
+	char *optstr;
 
 	optstr = malloc(strlen(name) + strlen(value) + 2);  /* name=value */
 	sprintf(optstr, "%s=%s", name, value);
@@ -1387,14 +1368,13 @@ start_threads(
 	threads = calloc(num, sizeof(pthread_t *));
 	if (threads == NULL)
 		return (ENOMEM);
-	for (i = 0; i < num; i++) {
+	for (i = 0; i < num; i++)
 		if ((ret = pthread_create(
 		    &threads[i], NULL, func, cfg)) != 0) {
 			g_running = 0;
 			lprintf(cfg, ret, 0, "Error creating thread: %d", i);
 			return (ret);
 		}
-	}
 	*threadsp = threads;
 	return (0);
 }
@@ -1407,12 +1387,11 @@ stop_threads(CONFIG *cfg, u_int num, pthread_t *threads)
 
 	g_running = 0;
 
-	for (i = 0; i < num; i++) {
+	for (i = 0; i < num; i++)
 		if ((ret = pthread_join(threads[i], NULL)) != 0) {
 			lprintf(cfg, ret, 0, "Error joining thread %d", i);
 			return (ret);
 		}
-	}
 
 	free(threads);
 	return (0);
