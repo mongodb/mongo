@@ -10,9 +10,10 @@ env.StaticLibrary('options_parser', ['environment.cpp',
                                      ],
                                     LIBDEPS=['$BUILD_DIR/mongo/bson'])
 
-env.CppUnitTest('options_parser_test',
-                'options_parser_test.cpp',
-                LIBDEPS=['options_parser', '$BUILD_DIR/mongo/unittest/unittest'])
+# SERVER-10507
+#env.CppUnitTest('options_parser_test',
+                #'options_parser_test.cpp',
+                #LIBDEPS=['options_parser', '$BUILD_DIR/mongo/unittest/unittest'])
 
 env.CppUnitTest('environment_test',
                 'environment_test.cpp',
