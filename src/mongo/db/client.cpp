@@ -53,6 +53,15 @@
 #include "mongo/util/mongoutils/checksum.h"
 #include "mongo/util/mongoutils/str.h"
 
+#ifndef __has_feature
+#define __has_feature(x) 0
+#endif
+
+#define ASAN_ENABLED __has_feature(address_sanitizer)
+#define MSAN_ENABLED __has_feature(memory_sanitizer)
+#define TSAN_ENABLED __has_feature(thread_sanitizer)
+#define XSAN_ENABLED (ASAN_ENABLED || MSAN_ENABLED || TSAN_ENABLED)
+
 namespace mongo {
 
     mongo::mutex& Client::clientsMutex = *(new mutex("clientsMutex"));
@@ -60,7 +69,7 @@ namespace mongo {
 
     TSP_DEFINE(Client, currentClient)
 
-#if defined(_DEBUG)
+#if defined(_DEBUG) && !XSAN_ENABLED
     struct StackChecker;
     ThreadLocalValue<StackChecker *> checker;
 
@@ -113,7 +122,7 @@ namespace mongo {
        call this when your thread starts.
     */
     Client& Client::initThread(const char *desc, AbstractMessagingPort *mp) {
-#if defined(_DEBUG)
+#if defined(_DEBUG) && !XSAN_ENABLED
         {
             if( sizeof(void*) == 8 ) {
                 StackChecker sc;
@@ -209,7 +218,7 @@ namespace mongo {
     }
 
     bool Client::shutdown() {
-#if defined(_DEBUG)
+#if defined(_DEBUG) && !XSAN_ENABLED
         {
             if( sizeof(void*) == 8 ) {
                 StackChecker::check( desc() );
