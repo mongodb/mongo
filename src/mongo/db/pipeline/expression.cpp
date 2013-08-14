@@ -19,12 +19,15 @@
 #include "db/pipeline/expression.h"
 
 #include <boost/algorithm/string.hpp>
+#include <boost/preprocessor/cat.hpp> // like the ## operator but works with __LINE__
 #include <cstdio>
 
+#include "mongo/base/init.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/value.h"
+#include "mongo/util/string_map.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
@@ -236,87 +239,35 @@ namespace mongo {
 
 namespace {
     typedef intrusive_ptr<Expression> (*ExpressionParser)(BSONElement);
-
-    struct OpDesc {
-        intrusive_ptr<Expression> parse(BSONElement elem) const { return parser(elem); }
-
-        const char* name;
-        ExpressionParser parser;
-    };
-
-    static int OpDescCmp(const void *pL, const void *pR) {
-        return strcmp(((const OpDesc *)pL)->name, ((const OpDesc *)pR)->name);
-    }
-
-    /*
-      Keep these sorted alphabetically so we can bsearch() them using
-      OpDescCmp() above.
-    */
-    static const OpDesc OpTable[] = {
-        {"$add", ExpressionAdd::parse},
-        {"$all", ExpressionAll::parse},
-        {"$and", ExpressionAnd::parse},
-        {"$any", ExpressionAny::parse},
-        {"$cmp", ExpressionCompare::parse},
-        {"$concat", ExpressionConcat::parse},
-        {"$cond", ExpressionCond::parse},
-        {"$const", ExpressionConstant::parse},
-        {"$dayOfMonth", ExpressionDayOfMonth::parse},
-        {"$dayOfWeek", ExpressionDayOfWeek::parse},
-        {"$dayOfYear", ExpressionDayOfYear::parse},
-        {"$divide", ExpressionDivide::parse},
-        {"$eq", ExpressionCompare::parse},
-        {"$gt", ExpressionCompare::parse},
-        {"$gte", ExpressionCompare::parse},
-        {"$hour", ExpressionHour::parse},
-        {"$ifNull", ExpressionIfNull::parse},
-        {"$let", ExpressionLet::parse},
-        {"$literal", ExpressionConstant::parse}, // alias for "$const"
-        {"$lt", ExpressionCompare::parse},
-        {"$lte", ExpressionCompare::parse},
-        {"$map", ExpressionMap::parse},
-        {"$millisecond", ExpressionMillisecond::parse},
-        {"$minute", ExpressionMinute::parse},
-        {"$mod", ExpressionMod::parse},
-        {"$month", ExpressionMonth::parse},
-        {"$multiply", ExpressionMultiply::parse},
-        {"$ne", ExpressionCompare::parse},
-        {"$none", ExpressionNone::parse},
-        {"$not", ExpressionNot::parse},
-        {"$or", ExpressionOr::parse},
-        {"$second", ExpressionSecond::parse},
-        {"$setDifference", ExpressionSetDifference::parse},
-        {"$setEquals", ExpressionSetEquals::parse},
-        {"$setIntersection", ExpressionSetIntersection::parse},
-        {"$setIsSubset", ExpressionSetIsSubset::parse},
-        {"$setUnion", ExpressionSetUnion::parse},
-        {"$strcasecmp", ExpressionStrcasecmp::parse},
-        {"$substr", ExpressionSubstr::parse},
-        {"$subtract", ExpressionSubtract::parse},
-        {"$toLower", ExpressionToLower::parse},
-        {"$toUpper", ExpressionToUpper::parse},
-        {"$week", ExpressionWeek::parse},
-        {"$year", ExpressionYear::parse},
-    };
-
-    static const size_t NOp = sizeof(OpTable)/sizeof(OpTable[0]);
-
-    const OpDesc* lookupExpression(const char* name) {
-        OpDesc key;
-        key.name = name;
-        return static_cast<const OpDesc *>(bsearch(&key, OpTable, NOp, sizeof(OpDesc), OpDescCmp));
-    }
+    StringMap<ExpressionParser> expressionParserMap;
 }
+
+/** Registers an ExpressionParser so it can be called from parseExpression and friends.
+ *
+ *  As an example, if your expression looks like {"$foo": [1,2,3]} you would add this line:
+ *  REGISTER_EXPRESSION("$foo", ExpressionFoo::parse);
+ */
+#define REGISTER_EXPRESSION(key, parserFunc) \
+    MONGO_INITIALIZER(BOOST_PP_CAT(addToExpressionParserMap, __LINE__))(InitializerContext*) { \
+        /* prevent duplicate expressions */ \
+        StringMap<ExpressionParser>::const_iterator op = expressionParserMap.find(key); \
+        massert(17064, str::stream() << "Duplicate expression (" << key << ") detected at " \
+                                     << __FILE__ << ":" << __LINE__, \
+                op == expressionParserMap.end()); \
+        /* register expression */ \
+        expressionParserMap[key] = parserFunc; \
+        return Status::OK(); \
+    }
 
     intrusive_ptr<Expression> Expression::parseExpression(BSONElement exprElement) {
         /* look for the specified operator */
         const char* opName = exprElement.fieldName();
-        const OpDesc* pOp = lookupExpression(opName);
+        StringMap<ExpressionParser>::const_iterator op = expressionParserMap.find(opName);
         uassert(15999, str::stream() << "invalid operator '" << opName << "'",
-                pOp);
+                op != expressionParserMap.end());
 
         /* make the expression node */
-        return pOp->parse(exprElement);
+        return op->second(exprElement);
     }
 
     Expression::ExpressionVector ExpressionNary::parseArguments(BSONElement exprElement) {
@@ -412,6 +363,7 @@ namespace {
         }
     }
 
+    REGISTER_EXPRESSION("$add", ExpressionAdd::parse);
     const char *ExpressionAdd::getOpName() const {
         return "$add";
     }
@@ -432,6 +384,7 @@ namespace {
         return Value(true);
     }
 
+    REGISTER_EXPRESSION("$all", ExpressionAll::parse);
     const char *ExpressionAll::getOpName() const {
         return "$all";
     }
@@ -506,6 +459,7 @@ namespace {
         return Value(true);
     }
 
+    REGISTER_EXPRESSION("$and", ExpressionAnd::parse);
     const char *ExpressionAnd::getOpName() const {
         return "$and";
     }
@@ -539,6 +493,7 @@ namespace {
         return Value(false);
     }
 
+    REGISTER_EXPRESSION("$any", ExpressionAny::parse);
     const char *ExpressionAny::getOpName() const {
         return "$any";
     }
@@ -593,6 +548,13 @@ namespace {
 
     /* ----------------------- ExpressionCompare --------------------------- */
 
+    REGISTER_EXPRESSION("$cmp", ExpressionCompare::parse);
+    REGISTER_EXPRESSION("$eq", ExpressionCompare::parse);
+    REGISTER_EXPRESSION("$gt", ExpressionCompare::parse);
+    REGISTER_EXPRESSION("$gte", ExpressionCompare::parse);
+    REGISTER_EXPRESSION("$lt", ExpressionCompare::parse);
+    REGISTER_EXPRESSION("$lte", ExpressionCompare::parse);
+    REGISTER_EXPRESSION("$ne", ExpressionCompare::parse);
     intrusive_ptr<Expression> ExpressionCompare::parse(BSONElement bsonExpr) {
         const char* compTypeStr = bsonExpr.fieldName();
         CmpOp op;
@@ -748,6 +710,7 @@ namespace {
         return Value(result.str());
     }
 
+    REGISTER_EXPRESSION("$concat", ExpressionConcat::parse);
     const char *ExpressionConcat::getOpName() const {
         return "$concat";
     }
@@ -760,6 +723,7 @@ namespace {
         return vpOperand[idx]->evaluateInternal(vars);
     }
 
+    REGISTER_EXPRESSION("$cond", ExpressionCond::parse);
     const char *ExpressionCond::getOpName() const {
         return "$cond";
     }
@@ -796,6 +760,8 @@ namespace {
         return serializeConstant(pValue);
     }
 
+    REGISTER_EXPRESSION("$const", ExpressionConstant::parse);
+    REGISTER_EXPRESSION("$literal", ExpressionConstant::parse); // alias
     const char *ExpressionConstant::getOpName() const {
         return "$const";
     }
@@ -808,6 +774,7 @@ namespace {
         return Value(date.tm_mday);
     }
 
+    REGISTER_EXPRESSION("$dayOfMonth", ExpressionDayOfMonth::parse);
     const char *ExpressionDayOfMonth::getOpName() const {
         return "$dayOfMonth";
     }
@@ -820,6 +787,7 @@ namespace {
         return Value(date.tm_wday+1); // MySQL uses 1-7 tm uses 0-6
     }
 
+    REGISTER_EXPRESSION("$dayOfWeek", ExpressionDayOfWeek::parse);
     const char *ExpressionDayOfWeek::getOpName() const {
         return "$dayOfWeek";
     }
@@ -832,6 +800,7 @@ namespace {
         return Value(date.tm_yday+1); // MySQL uses 1-366 tm uses 0-365
     }
 
+    REGISTER_EXPRESSION("$dayOfYear", ExpressionDayOfYear::parse);
     const char *ExpressionDayOfYear::getOpName() const {
         return "$dayOfYear";
     }
@@ -861,6 +830,7 @@ namespace {
         }
     }
 
+    REGISTER_EXPRESSION("$divide", ExpressionDivide::parse);
     const char *ExpressionDivide::getOpName() const {
         return "$divide";
     }
@@ -1562,6 +1532,7 @@ namespace {
 
     /* ------------------------- ExpressionLet ----------------------------- */
 
+    REGISTER_EXPRESSION("$let", ExpressionLet::parse);
     intrusive_ptr<Expression> ExpressionLet::parse(BSONElement expr) {
         verify(str::equals(expr.fieldName(), "$let"));
 
@@ -1665,6 +1636,7 @@ namespace {
 
     /* ------------------------- ExpressionMap ----------------------------- */
 
+    REGISTER_EXPRESSION("$map", ExpressionMap::parse);
     intrusive_ptr<Expression> ExpressionMap::parse(BSONElement expr) {
         verify(str::equals(expr.fieldName(), "$map"));
 
@@ -1780,6 +1752,7 @@ namespace {
         return Value(ms >= 0 ? ms : 1000 + ms);
     }
 
+    REGISTER_EXPRESSION("$millisecond", ExpressionMillisecond::parse);
     const char *ExpressionMillisecond::getOpName() const {
         return "$millisecond";
     }
@@ -1792,6 +1765,7 @@ namespace {
         return Value(date.tm_min);
     }
 
+    REGISTER_EXPRESSION("$minute", ExpressionMinute::parse);
     const char *ExpressionMinute::getOpName() const {
         return "$minute";
     }
@@ -1844,6 +1818,7 @@ namespace {
         }
     }
 
+    REGISTER_EXPRESSION("$mod", ExpressionMod::parse);
     const char *ExpressionMod::getOpName() const {
         return "$mod";
     }
@@ -1856,6 +1831,7 @@ namespace {
         return Value(date.tm_mon + 1); // MySQL uses 1-12 tm uses 0-11
     }
 
+    REGISTER_EXPRESSION("$month", ExpressionMonth::parse);
     const char *ExpressionMonth::getOpName() const {
         return "$month";
     }
@@ -1902,8 +1878,9 @@ namespace {
             massert(16418, "$multiply resulted in a non-numeric type", false);
     }
 
+    REGISTER_EXPRESSION("$multiply", ExpressionMultiply::parse);
     const char *ExpressionMultiply::getOpName() const {
-    return "$multiply";
+        return "$multiply";
     }
 
     /* ------------------------- ExpressionHour ----------------------------- */
@@ -1914,6 +1891,7 @@ namespace {
         return Value(date.tm_hour);
     }
 
+    REGISTER_EXPRESSION("$hour", ExpressionHour::parse);
     const char *ExpressionHour::getOpName() const {
         return "$hour";
     }
@@ -1929,6 +1907,7 @@ namespace {
         return pRight;
     }
 
+    REGISTER_EXPRESSION("$ifNull", ExpressionIfNull::parse);
     const char *ExpressionIfNull::getOpName() const {
         return "$ifNull";
     }
@@ -2057,6 +2036,7 @@ namespace {
         return Value(true);
     }
 
+    REGISTER_EXPRESSION("$none", ExpressionNone::parse);
     const char *ExpressionNone::getOpName() const {
         return "$none";
     }
@@ -2070,6 +2050,7 @@ namespace {
         return Value(!b);
     }
 
+    REGISTER_EXPRESSION("$not", ExpressionNot::parse);
     const char *ExpressionNot::getOpName() const {
         return "$not";
     }
@@ -2150,6 +2131,7 @@ namespace {
         return pE;
     }
 
+    REGISTER_EXPRESSION("$or", ExpressionOr::parse);
     const char *ExpressionOr::getOpName() const {
         return "$or";
     }
@@ -2162,6 +2144,7 @@ namespace {
         return Value(date.tm_sec);
     }
 
+    REGISTER_EXPRESSION("$second", ExpressionSecond::parse);
     const char *ExpressionSecond::getOpName() const {
         return "$second";
     }
@@ -2204,6 +2187,7 @@ namespace {
         return Value::consume(returnVec);
     }
 
+    REGISTER_EXPRESSION("$setDifference", ExpressionSetDifference::parse);
     const char *ExpressionSetDifference::getOpName() const {
         return "$setDifference";
     }
@@ -2239,6 +2223,7 @@ namespace {
         return Value(true);
     }
 
+    REGISTER_EXPRESSION("$setEquals", ExpressionSetEquals::parse);
     const char *ExpressionSetEquals::getOpName() const {
         return "$setEquals";
     }
@@ -2288,6 +2273,7 @@ namespace {
         return Value::consume(result);
     }
 
+    REGISTER_EXPRESSION("$setIntersection", ExpressionSetIntersection::parse);
     const char *ExpressionSetIntersection::getOpName() const {
         return "$setIntersection";
     }
@@ -2319,6 +2305,7 @@ namespace {
         return Value(true);
     }
 
+    REGISTER_EXPRESSION("$setIsSubset", ExpressionSetIsSubset::parse);
     const char *ExpressionSetIsSubset::getOpName() const {
         return "$setIsSubset";
     }
@@ -2343,6 +2330,7 @@ namespace {
         return Value::consume(result);
     }
 
+    REGISTER_EXPRESSION("$setUnion", ExpressionSetUnion::parse);
     const char *ExpressionSetUnion::getOpName() const {
         return "$setUnion";
     }
@@ -2366,6 +2354,7 @@ namespace {
             return Value(-1);
     }
 
+    REGISTER_EXPRESSION("$strcasecmp", ExpressionStrcasecmp::parse);
     const char *ExpressionStrcasecmp::getOpName() const {
         return "$strcasecmp";
     }
@@ -2400,6 +2389,7 @@ namespace {
         return Value(str.substr(lower, length));
     }
 
+    REGISTER_EXPRESSION("$substr", ExpressionSubstr::parse);
     const char *ExpressionSubstr::getOpName() const {
         return "$substr";
     }
@@ -2453,6 +2443,7 @@ namespace {
         }
     }
 
+    REGISTER_EXPRESSION("$subtract", ExpressionSubtract::parse);
     const char *ExpressionSubtract::getOpName() const {
         return "$subtract";
     }
@@ -2466,6 +2457,7 @@ namespace {
         return Value(str);
     }
 
+    REGISTER_EXPRESSION("$toLower", ExpressionToLower::parse);
     const char *ExpressionToLower::getOpName() const {
         return "$toLower";
     }
@@ -2479,6 +2471,7 @@ namespace {
         return Value(str);
     }
 
+    REGISTER_EXPRESSION("$toUpper", ExpressionToUpper::parse);
     const char *ExpressionToUpper::getOpName() const {
         return "$toUpper";
     }
@@ -2507,6 +2500,7 @@ namespace {
         return Value(nextSundayWeek);
     }
 
+    REGISTER_EXPRESSION("$week", ExpressionWeek::parse);
     const char *ExpressionWeek::getOpName() const {
         return "$week";
     }
@@ -2519,6 +2513,7 @@ namespace {
         return Value(date.tm_year + 1900); // tm_year is years since 1900
     }
 
+    REGISTER_EXPRESSION("$year", ExpressionYear::parse);
     const char *ExpressionYear::getOpName() const {
         return "$year";
     }
