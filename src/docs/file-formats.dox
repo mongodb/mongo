@@ -43,23 +43,31 @@ dictionary compression, Huffman encoding and block compression.
 
 - Key prefix compression reduces the size requirement of both in-memory
 and on-disk objects by storing any identical key prefix only once per
-page.  The cost is minor additional CPU and memory use when reading
-pages into memory, when searching the in-memory tree and when writing
-pages to disk.
+page.
 
-  Key prefix compression is configured by default.  Applications
-where performance is more important than memory and disk size may choose
-to turn off key prefix compression using the WT_SESSION::create method's
-\c prefix_compression configuration string.  Applications wanting to
-minimize disk size but maximize performance at the cost of memory size,
-or which have poor cache locality of reference, may choose to
-instantiate more or less keys in memory using the WT_SESSION::create
-method's \c key_gap configuration string.
+  The cost is minor additional CPU and some additional memory use when
+operating on the in-memory tree.  Specifically, sequential cursor
+movement through prefix-compressed page in reverse (but not forward)
+order, or the random lookup of a key/value pair will allocate sufficient
+memory to hold some number of uncompressed keys.  So, for example, if
+key prefix compression only saves a small number of bytes per key, the
+additional memory cost of instantiating the uncompressed key may mean
+prefix compression is not worthwhile.  Further, in cases where the
+on-disk cost is the primary concern, block compression may mean prefix
+compression is less useful.
+
+  Applications may limit the use of prefix compression by configuring the
+minimum number of bytes that must be gained before prefix compression is
+used with the WT_SESSION::create method's \c prefix_compression_min
+configuration string, or turn off key prefix compression entirely using
+the WT_SESSION::create method's \c prefix_compression configuration string.
+
+  Key prefix compression is configured by default.
 
 - Dictionary compression reduces the size requirement of both the
 in-memory and on-disk objects by storing any identical value only once
-per page.  The cost is minor additional CPU and memory use when
-returning values from the in-memory tree and when writing pages to disk.
+per page.  The cost is minor additional CPU and memory use when writing
+pages to disk.
 
   Dictionary compression is not configured by default.
 

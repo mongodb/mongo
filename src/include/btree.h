@@ -86,7 +86,8 @@ struct __wt_btree {
 	u_int dictionary;		/* Reconcile: dictionary slots */
 	int   internal_key_truncate;	/* Reconcile: internal key truncate */
 	int   maximum_depth;		/* Reconcile: maximum tree depth */
-	int   prefix_compression;	/* Reconcile: key prefix compression */
+	int   prefix_compression;	/* Reconcile: prefix compression */
+	u_int prefix_compression_min;	/* Reconcile: prefix compression min */
 	int   split_pct;		/* Reconcile: split page percent */
 	WT_COMPRESSOR *compressor;	/* Reconcile: page compressor */
 	WT_RWLOCK *val_ovfl_lock;	/* Reconcile: overflow value lock */
