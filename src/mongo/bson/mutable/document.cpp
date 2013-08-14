@@ -711,10 +711,17 @@ namespace mutablebson {
             return rep.array ? mongo::Array : mongo::Object;
         }
 
+        static bool isLeafType(BSONType type) {
+            return ((type != mongo::Object) && (type != mongo::Array));
+        }
+
         // Returns true if rep is not an object or array.
         bool isLeaf(const ElementRep& rep) const {
-            const BSONType type = getType(rep);
-            return ((type != mongo::Object) && (type != mongo::Array));
+            return isLeafType(getType(rep));
+        }
+
+        bool isLeaf(const BSONElement& elt) const {
+            return isLeafType(elt.type());
         }
 
         // Returns true if rep's value can be provided as a BSONElement.
@@ -755,7 +762,7 @@ namespace mutablebson {
                 newRep.parent = index;
                 newRep.sibling.right = Element::kOpaqueRepIdx;
                 // If this new object has possible substructure, mark its children as opaque.
-                if (!isLeaf(newRep)) {
+                if (!isLeaf(childElt)) {
                     newRep.child.left = Element::kOpaqueRepIdx;
                     newRep.child.right = Element::kOpaqueRepIdx;
                 }
@@ -823,7 +830,7 @@ namespace mutablebson {
                 newRep.sibling.left = index;
                 newRep.sibling.right = Element::kOpaqueRepIdx;
                 // If this new object has possible substructure, mark its children as opaque.
-                if (!isLeaf(newRep)) {
+                if (!isLeaf(rightElt)) {
                     newRep.child.left = Element::kOpaqueRepIdx;
                     newRep.child.right = Element::kOpaqueRepIdx;
                 }
