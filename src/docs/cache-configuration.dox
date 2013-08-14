@@ -6,7 +6,7 @@ The WiredTiger cache implements an approximation of a least recently used
 algorithm. Ideally the cache should be configured to be large enough to
 hold an application's working set.
 
-The WiredTiger cache size can be configured when first opening a database via 
+The WiredTiger cache size can be configured when first opening a database via
 @ref wiredtiger_open or changed after open using the
 WT_CONNECTION::reconfigure method.
 

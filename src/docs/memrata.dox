@@ -71,15 +71,22 @@ on their use.
 
 The device pool names are used as part of the URI specified to WiredTiger
 methods such as WT_SESSION::create or WT_SESSION::rename, separated from
-the object name by a single slash character.  The following example creates
-a table in device pool \c dev1 and the opens a cursor on the table:
+the object name by a single slash character.
+
+Additionally, the \c memrata \c type configuration string must be included.
+
+The following example creates a Memrata table named \c access in the
+device pool \c dev1, and then opens a cursor on the table:
 
 @code
 WT_CURSOR *cursor;
 WT_SESSION *session;
 
+/* Create the access table. */
 ret = session->create(
-    session, "table:dev1/access", "key_format=S,value_format=S");
+    session, "table:dev1/access", "key_format=S,value_format=S,type=memrata");
+
+/* Open a cursor on the access table. */
 ret = session->open_cursor(session, "table:dev1/access", NULL, NULL, &cursor);
 @endcode
 
