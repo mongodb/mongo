@@ -45,6 +45,7 @@
 #include "mongo/db/introspect.h"
 #include "mongo/db/json.h"
 #include "mongo/db/kill_current_op.h"
+#include "mongo/db/mongod_options.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/range_deleter_service.h"
@@ -66,6 +67,8 @@
 #include "mongo/util/net/message_server.h"
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/ntservice.h"
+#include "mongo/util/options_parser/environment.h"
+#include "mongo/util/options_parser/option_section.h"
 #include "mongo/util/ramlog.h"
 #include "mongo/util/stacktrace.h"
 #include "mongo/util/startup_test.h"
@@ -103,6 +106,8 @@ namespace mongo {
 #endif
 
     CmdLine cmdLine;
+    moe::Environment params;
+    moe::OptionSection options("Allowed options");
     static bool scriptingEnabled = true;
     bool shouldRepairDatabases = 0;
     static bool forceRepair = 0;
@@ -781,12 +786,8 @@ namespace mongo {
 
 using namespace mongo;
 
-#include <boost/program_options.hpp>
-
-namespace po = boost::program_options;
-
-void show_help_text(po::options_description options) {
-    cout << options << endl;
+void show_help_text(const moe::OptionSection& options) {
+    std::cout << options.helpString() << std::endl;
 };
 
 static int mongoDbMain(int argc, char* argv[], char** envp);
@@ -809,147 +810,23 @@ int main(int argc, char* argv[], char** envp) {
 }
 #endif
 
-static void buildOptionsDescriptions(po::options_description *pVisible,
-                                     po::options_description *pHidden,
-                                     po::positional_options_description *pPositional) {
-
-    po::options_description& visible_options = *pVisible;
-    po::options_description& hidden_options = *pHidden;
-    po::positional_options_description& positional_options = *pPositional;
-
-    po::options_description general_options("General options");
-#if defined(_WIN32)
-    po::options_description windows_scm_options("Windows Service Control Manager options");
-#endif
-    po::options_description ms_options("Master/slave options (old; use replica sets instead)");
-    po::options_description rs_options("Replica set options");
-    po::options_description replication_options("Replication options");
-    po::options_description sharding_options("Sharding options");
-    po::options_description hidden_sharding_options("Sharding options");
-    po::options_description ssl_options("SSL options");
-
-    CmdLine::addGlobalOptions( general_options , hidden_options , ssl_options );
-
-    StringBuilder dbpathBuilder;
-    dbpathBuilder << "directory for datafiles - defaults to " << dbpath;
-
-    general_options.add_options()
-    ("auth", "run with security")
-    ("cpu", "periodically show cpu and iowait utilization")
-    ("dbpath", po::value<string>() , dbpathBuilder.str().c_str())
-    ("diaglog", po::value<int>(), "0=off 1=W 2=R 3=both 7=W+some reads")
-    ("directoryperdb", "each database will be stored in a separate directory")
-    ("ipv6", "enable IPv6 support (disabled by default)")
-    ("journal", "enable journaling")
-    ("journalCommitInterval", po::value<unsigned>(), "how often to group/batch commit (ms)")
-    ("journalOptions", po::value<int>(), "journal diagnostic options")
-    ("jsonp","allow JSONP access via http (has security implications)")
-    ("noauth", "run without security")
-    ("noIndexBuildRetry", "don't retry any index builds that were interrupted by shutdown")
-    ("nojournal", "disable journaling (journaling is on by default for 64 bit)")
-    ("noprealloc", "disable data file preallocation - will often hurt performance")
-    ("noscripting", "disable scripting engine")
-    ("notablescan", "do not allow table scans")
-    ("nssize", po::value<int>()->default_value(16), ".ns file size (in MB) for new databases")
-    ("profile",po::value<int>(), "0=off 1=slow, 2=all")
-    ("quota", "limits each database to a certain number of files (8 default)")
-    ("quotaFiles", po::value<int>(), "number of files allowed per db, requires --quota")
-    ("repair", "run repair on all dbs")
-    ("repairpath", po::value<string>() , "root directory for repair files - defaults to dbpath" )
-    ("rest","turn on simple rest api")
-#if defined(__linux__)
-    ("shutdown", "kill a running server (for init scripts)")
-#endif
-    ("slowms",po::value<int>()->default_value(100), "value of slow for profile and console log" )
-    ("smallfiles", "use a smaller default file size")
-    ("syncdelay",po::value<double>()->default_value(60), "seconds between disk syncs (0=never, but not recommended)")
-    ("sysinfo", "print some diagnostic system information")
-    ("upgrade", "upgrade db if needed")
-    ;
-
-#if defined(_WIN32)
-    CmdLine::addWindowsOptions( windows_scm_options, hidden_options );
-#endif
-
-    replication_options.add_options()
-    ("oplogSize", po::value<int>(), "size to use (in MB) for replication op log. default is 5% of disk space (i.e. large is good)")
-    ;
-
-    ms_options.add_options()
-    ("master", "master mode")
-    ("slave", "slave mode")
-    ("source", po::value<string>(), "when slave: specify master as <server:port>")
-    ("only", po::value<string>(), "when slave: specify a single database to replicate")
-    ("slavedelay", po::value<int>(), "specify delay (in seconds) to be used when applying master ops to slave")
-    ("autoresync", "automatically resync if slave data is stale")
-    ;
-
-    rs_options.add_options()
-    ("replSet", po::value<string>(), "arg is <setname>[/<optionalseedhostlist>]")
-    ("replIndexPrefetch", po::value<string>(), "specify index prefetching behavior (if secondary) [none|_id_only|all]")
-    ;
-
-    sharding_options.add_options()
-    ("configsvr", "declare this is a config db of a cluster; default port 27019; default dir /data/configdb")
-    ("shardsvr", "declare this is a shard db of a cluster; default port 27018")
-    ;
-
-    hidden_sharding_options.add_options()
-    ("noMoveParanoia" , "turn off paranoid saving of data for the moveChunk command; default" )
-    ("moveParanoia" , "turn on paranoid saving of data during the moveChunk command (used for internal system diagnostics)" )
-    ;
-    hidden_options.add(hidden_sharding_options);
-
-    hidden_options.add_options()
-    ("fastsync", "indicate that this instance is starting from a dbpath snapshot of the repl peer")
-    ("pretouch", po::value<int>(), "n pretouch threads for applying master/slave operations")
-    ("command", po::value< vector<string> >(), "command")
-    ("cacheSize", po::value<long>(), "cache size (in MB) for rec store")
-    ("nodur", "disable journaling")
-    // things we don't want people to use
-    ("nohints", "ignore query hints")
-    ("nopreallocj", "don't preallocate journal files")
-    ("dur", "enable journaling") // old name for --journal
-    ("durOptions", po::value<int>(), "durability diagnostic options") // deprecated name
-    // deprecated pairing command line options
-    ("pairwith", "DEPRECATED")
-    ("arbiter", "DEPRECATED")
-    ("opIdMem", "DEPRECATED")
-    ;
-
-    positional_options.add("command", 3);
-    visible_options.add(general_options);
-#if defined(_WIN32)
-    visible_options.add(windows_scm_options);
-#endif
-    visible_options.add(replication_options);
-    visible_options.add(ms_options);
-    visible_options.add(rs_options);
-    visible_options.add(sharding_options);
-#ifdef MONGO_SSL
-    visible_options.add(ssl_options);
-#endif
-}
-
-static void processCommandLineOptions(const std::vector<std::string>& argv) {
-    po::options_description visible_options("Allowed options");
-    po::options_description hidden_options("Hidden options");
-    po::positional_options_description positional_options;
-    buildOptionsDescriptions(&visible_options, &hidden_options, &positional_options);
+static Status processCommandLineOptions(const std::vector<std::string>& argv) {
+    Status ret = addMongodOptions(&options);
+    if (!ret.isOK()) {
+        StringBuilder sb;
+        sb << "Error getting mongod options descriptions: " << ret.toString();
+        return Status(ErrorCodes::InternalError, sb.str());
+    }
 
     {
-        po::variables_map params;
-
-        if (!CmdLine::store(argv,
-                            visible_options,
-                            hidden_options,
-                            positional_options,
-                            params)) {
-            ::_exit(EXIT_FAILURE);
+        ret = CmdLine::store(argv, options, params);
+        if (!ret.isOK()) {
+            std::cerr << "Error parsing command line: " << ret.toString() << std::endl;
+            ::_exit(EXIT_BADOPTIONS);
         }
 
         if (params.count("help")) {
-            show_help_text(visible_options);
+            std::cout << options.helpString() << std::endl;
             ::_exit(EXIT_SUCCESS);
         }
         if (params.count("version")) {
@@ -1013,7 +890,7 @@ static void processCommandLineOptions(const std::vector<std::string>& argv) {
         }
         if( params.count("dur") || params.count( "journal" ) ) {
             if (journalExplicit) {
-                log() << "Can't specify both --journal and --nojournal options." << endl;
+                std::cerr << "Can't specify both --journal and --nojournal options." << std::endl;
                 ::_exit(EXIT_BADOPTIONS);
             }
             journalExplicit = true;
@@ -1027,8 +904,8 @@ static void processCommandLineOptions(const std::vector<std::string>& argv) {
             // ie no point making life a little more complex by giving an error on a dev environment.
             cmdLine.journalCommitInterval = params["journalCommitInterval"].as<unsigned>();
             if( cmdLine.journalCommitInterval <= 1 || cmdLine.journalCommitInterval > 300 ) {
-                out() << "--journalCommitInterval out of allowed range (0-300ms)" << endl;
-                dbexit( EXIT_BADOPTIONS );
+                std::cerr << "--journalCommitInterval out of allowed range (0-300ms)" << std::endl;
+                ::_exit(EXIT_BADOPTIONS);
             }
         }
         if (params.count("journalOptions")) {
@@ -1037,13 +914,14 @@ static void processCommandLineOptions(const std::vector<std::string>& argv) {
         if (params.count("repairpath")) {
             repairpath = params["repairpath"].as<string>();
             if (!repairpath.size()) {
-                out() << "repairpath is empty" << endl;
-                dbexit( EXIT_BADOPTIONS );
+                std::cerr << "repairpath is empty" << std::endl;
+                ::_exit(EXIT_BADOPTIONS);
             }
 
             if (cmdLine.dur && !str::startsWith(repairpath, dbpath)) {
-                out() << "You must use a --repairpath that is a subdirectory of --dbpath when using journaling" << endl;
-                dbexit( EXIT_BADOPTIONS );
+                std::cerr << "You must use a --repairpath that is a subdirectory of "
+                          << "--dbpath when using journaling" << std::endl;
+                ::_exit(EXIT_BADOPTIONS);
             }
         }
         if (params.count("nohints")) {
@@ -1054,8 +932,8 @@ static void processCommandLineOptions(const std::vector<std::string>& argv) {
         }
         if (params.count("httpinterface")) {
             if (params.count("nohttpinterface")) {
-                log() << "can't have both --httpinterface and --nohttpinterface" << endl;
-                ::_exit( EXIT_BADOPTIONS );
+                std::cerr << "can't have both --httpinterface and --nohttpinterface" << std::endl;
+                ::_exit(EXIT_BADOPTIONS);
             }
             cmdLine.isHttpInterfaceEnabled = true;
         }
@@ -1101,14 +979,14 @@ static void processCommandLineOptions(const std::vector<std::string>& argv) {
         if (params.count("diaglog")) {
             int x = params["diaglog"].as<int>();
             if ( x < 0 || x > 7 ) {
-                out() << "can't interpret --diaglog setting" << endl;
-                dbexit( EXIT_BADOPTIONS );
+                std::cerr << "can't interpret --diaglog setting" << std::endl;
+                ::_exit(EXIT_BADOPTIONS);
             }
             _diaglog.setLevel(x);
         }
         if (params.count("repair")) {
             if (journalExplicit && cmdLine.dur) {
-                log() << "Can't specify both --journal and --repair options." << endl;
+                std::cerr << "Can't specify both --journal and --repair options." << std::endl;
                 ::_exit(EXIT_BADOPTIONS);
             }
 
@@ -1139,9 +1017,10 @@ static void processCommandLineOptions(const std::vector<std::string>& argv) {
         if (params.count("autoresync")) {
             replSettings.autoresync = true;
             if( params.count("replSet") ) {
-                out() << "--autoresync is not used with --replSet" << endl;
-                out() << "see http://dochub.mongodb.org/core/resyncingaverystalereplicasetmember" << endl;
-                dbexit( EXIT_BADOPTIONS );
+                std::cerr << "--autoresync is not used with --replSet\nsee "
+                          << "http://dochub.mongodb.org/core/resyncingaverystalereplicasetmember"
+                          << std::endl;
+                ::_exit(EXIT_BADOPTIONS);
             }
         }
         if (params.count("source")) {
@@ -1153,12 +1032,12 @@ static void processCommandLineOptions(const std::vector<std::string>& argv) {
         }
         if (params.count("replSet")) {
             if (params.count("slavedelay")) {
-                out() << "--slavedelay cannot be used with --replSet" << endl;
-                dbexit( EXIT_BADOPTIONS );
+                std::cerr << "--slavedelay cannot be used with --replSet" << std::endl;
+                ::_exit(EXIT_BADOPTIONS);
             }
             else if (params.count("only")) {
-                out() << "--only cannot be used with --replSet" << endl;
-                dbexit( EXIT_BADOPTIONS );
+                std::cerr << "--only cannot be used with --replSet" << std::endl;
+                ::_exit(EXIT_BADOPTIONS);
             }
             /* seed list of hosts for the repl set */
             cmdLine._replSet = params["replSet"].as<string>().c_str();
@@ -1175,8 +1054,8 @@ static void processCommandLineOptions(const std::vector<std::string>& argv) {
         if( params.count("nssize") ) {
             int x = params["nssize"].as<int>();
             if (x <= 0 || x > (0x7fffffff/1024/1024)) {
-                out() << "bad --nssize arg" << endl;
-                dbexit( EXIT_BADOPTIONS );
+                std::cerr << "bad --nssize arg" << std::endl;
+                ::_exit(EXIT_BADOPTIONS);
             }
             lenForNewNsFiles = x * 1024 * 1024;
             verify(lenForNewNsFiles > 0);
@@ -1184,13 +1063,16 @@ static void processCommandLineOptions(const std::vector<std::string>& argv) {
         if (params.count("oplogSize")) {
             long long x = params["oplogSize"].as<int>();
             if (x <= 0) {
-                out() << "bad --oplogSize arg" << endl;
-                dbexit( EXIT_BADOPTIONS );
+                std::cerr << "bad --oplogSize arg" << std::endl;
+                ::_exit(EXIT_BADOPTIONS);
             }
             // note a small size such as x==1 is ok for an arbiter.
             if( x > 1000 && sizeof(void*) == 4 ) {
-                out() << "--oplogSize of " << x << "MB is too big for 32 bit version. Use 64 bit build instead." << endl;
-                dbexit( EXIT_BADOPTIONS );
+                StringBuilder sb;
+                std::cerr << "--oplogSize of " << x
+                          << "MB is too big for 32 bit version. Use 64 bit build instead."
+                          << std::endl;
+                ::_exit(EXIT_BADOPTIONS);
             }
             cmdLine.oplogSize = x * 1024 * 1024;
             verify(cmdLine.oplogSize > 0);
@@ -1198,10 +1080,11 @@ static void processCommandLineOptions(const std::vector<std::string>& argv) {
         if (params.count("cacheSize")) {
             long x = params["cacheSize"].as<long>();
             if (x <= 0) {
-                out() << "bad --cacheSize arg" << endl;
-                dbexit( EXIT_BADOPTIONS );
+                std::cerr << "bad --cacheSize arg" << std::endl;
+                ::_exit(EXIT_BADOPTIONS);
             }
-            log() << "--cacheSize option not currently supported" << endl;
+            std::cerr << "--cacheSize option not currently supported" << std::endl;
+            ::_exit(EXIT_BADOPTIONS);
         }
         if (params.count("port") == 0 ) {
             if( params.count("configsvr") ) {
@@ -1209,16 +1092,16 @@ static void processCommandLineOptions(const std::vector<std::string>& argv) {
             }
             if( params.count("shardsvr") ) {
                 if( params.count("configsvr") ) {
-                    log() << "can't do --shardsvr and --configsvr at the same time" << endl;
-                    dbexit( EXIT_BADOPTIONS );
+                    std::cerr << "can't do --shardsvr and --configsvr at the same time" << std::endl;
+                    ::_exit(EXIT_BADOPTIONS);
                 }
                 cmdLine.port = CmdLine::ShardServerPort;
             }
         }
         else {
             if ( cmdLine.port <= 0 || cmdLine.port > 65535 ) {
-                out() << "bad --port number" << endl;
-                dbexit( EXIT_BADOPTIONS );
+                std::cerr << "bad --port number" << std::endl;
+                ::_exit(EXIT_BADOPTIONS);
             }
         }
         if ( params.count("configsvr" ) ) {
@@ -1226,8 +1109,8 @@ static void processCommandLineOptions(const std::vector<std::string>& argv) {
             cmdLine.smallfiles = true; // config server implies small files
             dur::DataLimitPerJournalFile = 128 * 1024 * 1024;
             if (cmdLine.usingReplSets() || replSettings.master || replSettings.slave) {
-                log() << "replication should not be enabled on a config server" << endl;
-                ::_exit(-1);
+                std::cerr << "replication should not be enabled on a config server" << std::endl;
+                ::_exit(EXIT_BADOPTIONS);
             }
             if ( params.count( "nodur" ) == 0 && params.count( "nojournal" ) == 0 )
                 cmdLine.dur = true;
@@ -1245,8 +1128,9 @@ static void processCommandLineOptions(const std::vector<std::string>& argv) {
         }
 
         if (params.count("noMoveParanoia") > 0 && params.count("moveParanoia") > 0) {
-            out() << "The moveParanoia and noMoveParanoia flags cannot both be set; please use only one of them." << endl;
-            ::_exit( EXIT_BADOPTIONS );
+            std::cerr << "The moveParanoia and noMoveParanoia flags cannot both be set; "
+                      << "please use only one of them." << std::endl;
+            ::_exit(EXIT_BADOPTIONS);
         }
 
         if (params.count("noMoveParanoia"))
@@ -1256,104 +1140,132 @@ static void processCommandLineOptions(const std::vector<std::string>& argv) {
             cmdLine.moveParanoia = true;
 
         if (params.count("pairwith") || params.count("arbiter") || params.count("opIdMem")) {
-            out() << "****" << endl;
-            out() << "Replica Pairs have been deprecated. Invalid options: --pairwith, --arbiter, and/or --opIdMem" << endl;
-            out() << "<http://dochub.mongodb.org/core/replicapairs>" << endl;
-            out() << "****" << endl;
-            dbexit( EXIT_BADOPTIONS );
+            std::cerr << "****\n"
+                      << "Replica Pairs have been deprecated. Invalid options: --pairwith, "
+                      << "--arbiter, and/or --opIdMem\n"
+                      << "<http://dochub.mongodb.org/core/replicapairs>\n"
+                      << "****" << std::endl;
+            ::_exit(EXIT_BADOPTIONS);
         }
 
         // needs to be after things like --configsvr parsing, thus here.
         if( repairpath.empty() )
             repairpath = dbpath;
 
-        // The "command" option is deprecated.  For backward compatibility, still support the "run"
-        // and "dbppath" command.  The "run" command is the same as just running mongod, so just
-        // falls through.
-        if (params.count("command")) {
-            vector<string> command = params["command"].as< vector<string> >();
-
-            if (command[0].compare("dbpath") == 0) {
-                cout << dbpath << endl;
-                ::_exit(EXIT_SUCCESS);
-            }
-
-            if (command[0].compare("run") != 0) {
-                cout << "Invalid command: " << command[0] << endl;
-                cout << visible_options << endl;
-                ::_exit(EXIT_FAILURE);
-            }
-
-            if (command.size() > 1) {
-                cout << "Too many parameters to 'run' command" << endl;
-                cout << visible_options << endl;
-                ::_exit(EXIT_FAILURE);
-            }
-        }
-
         if( cmdLine.pretouch )
             log() << "--pretouch " << cmdLine.pretouch << endl;
 
-        if (sizeof(void*) == 4 && !journalExplicit){
+        if (sizeof(void*) == 4 && !journalExplicit) {
             // trying to make this stand out more like startup warnings
             log() << endl;
             warning() << "32-bit servers don't have journaling enabled by default. Please use --journal if you want durability." << endl;
             log() << endl;
         }
+    }
+
+    return Status::OK();
+}
+
+MONGO_INITIALIZER_GENERAL(ParseStartupConfiguration,
+                            ("GlobalLogManager"),
+                            ("default", "completedStartupConfig"))(InitializerContext* context) {
+
+    Status ret = processCommandLineOptions(context->args());
+    if (!ret.isOK()) {
+        return ret;
+    }
+
+    return Status::OK();
+}
+
+MONGO_INITIALIZER_GENERAL(ForkServerOrDie,
+                          ("completedStartupConfig"),
+                          ("default"))(InitializerContext* context) {
+    mongo::forkServerOrDie();
+    return Status::OK();
+}
+
+/*
+ * This function should contain the startup "actions" that we take based on the startup config.  It
+ * is intended to separate the actions from "storage" and "validation" of our startup configuration.
+ */
+static void startupConfigActions(const std::vector<std::string>& argv) {
+    // The "command" option is deprecated.  For backward compatibility, still support the "run"
+    // and "dbppath" command.  The "run" command is the same as just running mongod, so just
+    // falls through.
+    if (params.count("command")) {
+        vector<string> command = params["command"].as< vector<string> >();
+
+        if (command[0].compare("dbpath") == 0) {
+            cout << dbpath << endl;
+            ::_exit(EXIT_SUCCESS);
+        }
+
+        if (command[0].compare("run") != 0) {
+            cout << "Invalid command: " << command[0] << endl;
+            show_help_text(options);
+            ::_exit(EXIT_FAILURE);
+        }
+
+        if (command.size() > 1) {
+            cout << "Too many parameters to 'run' command" << endl;
+            show_help_text(options);
+            ::_exit(EXIT_FAILURE);
+        }
+    }
 
 #ifdef _WIN32
-        ntservice::configureService(initService,
-                                    params,
-                                    defaultServiceStrings,
-                                    std::vector<std::string>(),
-                                    argv);
+    ntservice::configureService(initService,
+            params,
+            defaultServiceStrings,
+            std::vector<std::string>(),
+            argv);
 #endif  // _WIN32
 
 #ifdef __linux__
-        if (params.count("shutdown")){
-            bool failed = false;
+    if (params.count("shutdown")){
+        bool failed = false;
 
-            string name = ( boost::filesystem::path( dbpath ) / "mongod.lock" ).string();
-            if ( !boost::filesystem::exists( name ) || boost::filesystem::file_size( name ) == 0 )
-                failed = true;
+        string name = ( boost::filesystem::path( dbpath ) / "mongod.lock" ).string();
+        if ( !boost::filesystem::exists( name ) || boost::filesystem::file_size( name ) == 0 )
+            failed = true;
 
-            pid_t pid;
-            string procPath;
-            if (!failed){
-                try {
-                    ifstream f (name.c_str());
-                    f >> pid;
-                    procPath = (str::stream() << "/proc/" << pid);
-                    if (!boost::filesystem::exists(procPath))
-                        failed = true;
-                }
-                catch (const std::exception& e){
-                    cerr << "Error reading pid from lock file [" << name << "]: " << e.what() << endl;
+        pid_t pid;
+        string procPath;
+        if (!failed){
+            try {
+                ifstream f (name.c_str());
+                f >> pid;
+                procPath = (str::stream() << "/proc/" << pid);
+                if (!boost::filesystem::exists(procPath))
                     failed = true;
-                }
             }
-
-            if (failed) {
-                cerr << "There doesn't seem to be a server running with dbpath: " << dbpath << endl;
-                ::_exit(EXIT_FAILURE);
+            catch (const std::exception& e){
+                cerr << "Error reading pid from lock file [" << name << "]: " << e.what() << endl;
+                failed = true;
             }
-
-            cout << "killing process with pid: " << pid << endl;
-            int ret = kill(pid, SIGTERM);
-            if (ret) {
-                int e = errno;
-                cerr << "failed to kill process: " << errnoWithDescription(e) << endl;
-                ::_exit(EXIT_FAILURE);
-            }
-
-            while (boost::filesystem::exists(procPath)) {
-                sleepsecs(1);
-            }
-
-            ::_exit(EXIT_SUCCESS);
         }
-#endif
+
+        if (failed) {
+            cerr << "There doesn't seem to be a server running with dbpath: " << dbpath << endl;
+            ::_exit(EXIT_FAILURE);
+        }
+
+        cout << "killing process with pid: " << pid << endl;
+        int ret = kill(pid, SIGTERM);
+        if (ret) {
+            int e = errno;
+            cerr << "failed to kill process: " << errnoWithDescription(e) << endl;
+            ::_exit(EXIT_FAILURE);
+        }
+
+        while (boost::filesystem::exists(procPath)) {
+            sleepsecs(1);
+        }
+
+        ::_exit(EXIT_SUCCESS);
     }
+#endif
 }
 
 MONGO_INITIALIZER_GENERAL(CreateAuthorizationManager,
@@ -1399,10 +1311,8 @@ static int mongoDbMain(int argc, char* argv[], char **envp) {
     if( argc == 1 )
         cout << dbExecCommand << " --help for help and startup options" << endl;
 
-
-    processCommandLineOptions(std::vector<std::string>(argv, argv + argc));
-    mongo::forkServerOrDie();
     mongo::runGlobalInitializersOrDie(argc, argv, envp);
+    startupConfigActions(std::vector<std::string>(argv, argv + argc));
     CmdLine::censor(argc, argv);
 
     if (!initializeServerGlobalState())

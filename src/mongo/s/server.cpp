@@ -54,6 +54,7 @@
 #include "mongo/s/config_upgrade.h"
 #include "mongo/s/cursors.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/mongos_options.h"
 #include "mongo/s/request.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/util/admin_access.h"
@@ -65,6 +66,8 @@
 #include "mongo/util/net/message_server.h"
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/ntservice.h"
+#include "mongo/util/options_parser/environment.h"
+#include "mongo/util/options_parser/option_section.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/ramlog.h"
 #include "mongo/util/signal_handlers.h"
@@ -90,6 +93,8 @@ namespace mongo {
 #endif
 
     CmdLine cmdLine;
+    moe::Environment params;
+    moe::OptionSection options("Allowed options");
     Database *database = 0;
     string mongosCommand;
     bool dbexitCalled = false;
@@ -370,62 +375,19 @@ static bool runMongosServer( bool doUpgrade ) {
     return true;
 }
 
-#include <boost/program_options.hpp>
-
-namespace po = boost::program_options;
-
-static void processCommandLineOptions(const std::vector<std::string>& argv) {
-    po::options_description general_options("General options");
-#if defined(_WIN32)
-    po::options_description windows_scm_options("Windows Service Control Manager options");
-#endif
-    po::options_description ssl_options("SSL options");
-    po::options_description sharding_options("Sharding options");
-    po::options_description visible_options("Allowed options");
-    po::options_description hidden_options("Hidden options");
-    po::positional_options_description positional_options;
-
-    CmdLine::addGlobalOptions( general_options, hidden_options, ssl_options );
-
-    hidden_options.add_options()
-    ("noAutoSplit", "do not send split commands with writes");
-
-#if defined(_WIN32)
-    CmdLine::addWindowsOptions( windows_scm_options, hidden_options );
-#endif
-
-    sharding_options.add_options()
-    ( "configdb" , po::value<string>() , "1 or 3 comma separated config servers" )
-    ( "localThreshold", po::value <int>(), "ping time (in ms) for a node to be "
-                                           "considered local (default 15ms)" )
-    ( "test" , "just run unit tests" )
-    ( "upgrade" , "upgrade meta data version" )
-    ( "chunkSize" , po::value<int>(), "maximum amount of data per chunk" )
-    ( "ipv6", "enable IPv6 support (disabled by default)" )
-    ( "jsonp","allow JSONP access via http (has security implications)" )
-    ( "noscripting", "disable scripting engine" )
-    ;
-
-    visible_options.add(general_options);
-
-#if defined(_WIN32)
-    visible_options.add(windows_scm_options);
-#endif
-
-    visible_options.add(sharding_options);
-
-#ifdef MONGO_SSL
-    visible_options.add(ssl_options);
-#endif
+static Status processCommandLineOptions(const std::vector<std::string>& argv) {
+    Status ret = addMongosOptions(&options);
+    if (!ret.isOK()) {
+        StringBuilder sb;
+        sb << "Error getting mongos options descriptions: " << ret.toString();
+        return Status(ErrorCodes::InternalError, sb.str());
+    }
 
     // parse options
-    po::variables_map params;
-    if (!CmdLine::store(argv,
-                        visible_options,
-                        hidden_options,
-                        positional_options,
-                        params)) {
-        ::_exit(EXIT_FAILURE);
+    ret = CmdLine::store(argv, options, params);
+    if (!ret.isOK()) {
+        std::cerr << "Error parsing command line: " << ret.toString() << std::endl;
+        ::_exit(EXIT_BADOPTIONS);
     }
 
     // The default value may vary depending on compile options, but for mongos
@@ -433,10 +395,9 @@ static void processCommandLineOptions(const std::vector<std::string>& argv) {
     cmdLine.dur = false;
 
     if ( params.count( "help" ) ) {
-        cout << visible_options << endl;
+        std::cout << options.helpString() << std::endl;
         ::_exit(EXIT_SUCCESS);
     }
-
     if ( params.count( "version" ) ) {
         printShardingVersionInfo(true);
         ::_exit(EXIT_SUCCESS);
@@ -447,13 +408,13 @@ static void processCommandLineOptions(const std::vector<std::string>& argv) {
 
         // validate chunksize before proceeding
         if ( csize == 0 ) {
-            out() << "error: need a non-zero chunksize" << endl;
-            ::_exit(EXIT_FAILURE);
+            std::cerr << "error: need a non-zero chunksize" << std::endl;
+            ::_exit(EXIT_BADOPTIONS);
         }
 
         if ( !Chunk::setMaxChunkSizeSizeMB( csize ) ) {
-            out() << "MaxChunkSize invalid" << endl;
-            ::_exit(EXIT_FAILURE);
+            std::cerr << "MaxChunkSize invalid" << std::endl;
+            ::_exit(EXIT_BADOPTIONS);
         }
     }
 
@@ -478,9 +439,9 @@ static void processCommandLineOptions(const std::vector<std::string>& argv) {
     }
 
     if ( params.count( "test" ) ) {
-        ::mongo::logger::globalLogDomain()->setMinimumLoggedSeverity(::mongo::logger::LogSeverity::Debug(5));
+        ::mongo::logger::globalLogDomain()->setMinimumLoggedSeverity(
+                                                        ::mongo::logger::LogSeverity::Debug(5));
         StartupTest::runTests();
-        cout << "tests passed" << endl;
         ::_exit(EXIT_SUCCESS);
     }
 
@@ -490,8 +451,8 @@ static void processCommandLineOptions(const std::vector<std::string>& argv) {
 
     if (params.count("httpinterface")) {
         if (params.count("nohttpinterface")) {
-            out() << "can't have both --httpinterface and --nohttpinterface" << endl;
-            ::_exit(EXIT_FAILURE);
+            std::cerr << "can't have both --httpinterface and --nohttpinterface" << std::endl;
+            ::_exit(EXIT_BADOPTIONS);
         }
         cmdLine.isHttpInterfaceEnabled = true;
     }
@@ -502,14 +463,14 @@ static void processCommandLineOptions(const std::vector<std::string>& argv) {
     }
 
     if ( ! params.count( "configdb" ) ) {
-        out() << "error: no args for --configdb" << endl;
-        ::_exit(EXIT_FAILURE);
+        std::cerr << "error: no args for --configdb" << std::endl;
+        ::_exit(EXIT_BADOPTIONS);
     }
 
     splitStringDelim( params["configdb"].as<string>() , &configdbs , ',' );
     if ( configdbs.size() != 1 && configdbs.size() != 3 ) {
-        out() << "need either 1 or 3 configdbs" << endl;
-        ::_exit(EXIT_FAILURE);
+        std::cerr << "need either 1 or 3 configdbs" << std::endl;
+        ::_exit(EXIT_BADOPTIONS);
     }
 
     if( configdbs.size() == 1 ) {
@@ -521,6 +482,33 @@ static void processCommandLineOptions(const std::vector<std::string>& argv) {
     // dbpath currently must be linked in to mongos, but the directory should never be written to.
     dbpath = "";
 
+    return Status::OK();
+}
+
+MONGO_INITIALIZER_GENERAL(ParseStartupConfiguration,
+                            ("GlobalLogManager"),
+                            ("default", "completedStartupConfig"))(InitializerContext* context) {
+
+    Status ret = processCommandLineOptions(context->args());
+    if (!ret.isOK()) {
+        return ret;
+    }
+
+    return Status::OK();
+}
+
+MONGO_INITIALIZER_GENERAL(ForkServerOrDie,
+                          ("completedStartupConfig"),
+                          ("default"))(InitializerContext* context) {
+    mongo::forkServerOrDie();
+    return Status::OK();
+}
+
+/*
+ * This function should contain the startup "actions" that we take based on the startup config.  It
+ * is intended to separate the actions from "storage" and "validation" of our startup configuration.
+ */
+static void startupConfigActions(const std::vector<std::string>& argv) {
 #if defined(_WIN32)
     vector<string> disallowedOptions;
     disallowedOptions.push_back( "upgrade" );
@@ -607,9 +595,8 @@ int mongoSMain(int argc, char* argv[], char** envp) {
 
     mongosCommand = argv[0];
 
-    processCommandLineOptions(std::vector<std::string>(argv, argv + argc));
-    mongo::forkServerOrDie();
     mongo::runGlobalInitializersOrDie(argc, argv, envp);
+    startupConfigActions(std::vector<std::string>(argv, argv + argc));
     CmdLine::censor(argc, argv);
     try {
         int exitCode = _main();

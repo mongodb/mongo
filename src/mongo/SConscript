@@ -374,7 +374,9 @@ coreServerFiles = [ "db/client_basic.cpp",
                     "db/stats/service_stats.cpp",
                     ]
 
-env.StaticLibrary('ntservice', ['util/ntservice.cpp'], LIBDEPS=['foundation'])
+env.StaticLibrary('ntservice', ['util/ntservice.cpp'],
+                  LIBDEPS=['foundation',
+                           '$BUILD_DIR/mongo/util/options_parser/options_parser'])
 if windows:
     env.CppUnitTest('ntservice_test', 'util/ntservice_test.cpp',
                     LIBDEPS=['ntservice'],
@@ -562,8 +564,16 @@ serverOnlyFiles = [ "db/curop.cpp",
                     "db/pipeline/document_source_cursor.cpp",
                     "db/driverHelpers.cpp" ]
 
-env.Library( "dbcmdline", "db/cmdline.cpp", LIBDEPS=['bson', 'server_parameters'] )
-env.CppUnitTest('cmdline_test', 'db/cmdline_test.cpp', LIBDEPS=['dbcmdline'])
+env.Library("dbcmdline", ["db/cmdline.cpp", "db/server_options.cpp"],
+            LIBDEPS=['bson',
+                    'server_parameters',
+                    '$BUILD_DIR/mongo/util/options_parser/options_parser',
+                    ])
+env.CppUnitTest('cmdline_test', 'db/cmdline_test.cpp',
+                LIBDEPS=['bson',
+                         'dbcmdline',
+                         '$BUILD_DIR/mongo/util/options_parser/options_parser',
+                         ])
 
 env.CppUnitTest('diskloc_test', 'db/diskloc_test.cpp', LIBDEPS=[])
 
@@ -765,7 +775,7 @@ env.StaticLibrary("mongodwebserver",
                    ],
                   LIBDEPS=["coredb", "mongodandmongos"])
 
-mongodOnlyFiles = [ "db/db.cpp", "db/commands/touch.cpp", ]
+mongodOnlyFiles = [ "db/db.cpp", "db/commands/touch.cpp", "db/mongod_options.cpp" ]
 
 # ----- TARGETS ------
 
@@ -817,7 +827,7 @@ env.Install( '#/', [
 
 # mongos
 mongos = env.Program(
-    "mongos", [ "s/server.cpp"] ,
+    "mongos", [ "s/server.cpp", "s/mongos_options.cpp" ] ,
     LIBDEPS=["mongoscore", "coreserver", "coredb", "mongocommon", "coreshard", "dbcmdline", "ntservice",
              "mongodandmongos", "s/upgrade"])
 env.Install( '#/', mongos )

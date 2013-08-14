@@ -29,6 +29,9 @@
 #include "mongo/util/map_util.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/listen.h"
+#include "mongo/util/options_parser/environment.h"
+#include "mongo/util/options_parser/option_section.h"
+#include "mongo/util/options_parser/options_parser.h"
 #include "mongo/util/password.h"
 
 #ifdef _WIN32
@@ -39,9 +42,9 @@
 
 #include <fstream>
 
-namespace po = boost::program_options;
-
 namespace mongo {
+
+    namespace moe = mongo::optionenvironment;
 
 #ifdef _WIN32
     string dbpath = "\\data\\db\\";
@@ -65,253 +68,227 @@ namespace {
         return parsedOpts;
     }
 
-    void CmdLine::addGlobalOptions( boost::program_options::options_description& general ,
-                                    boost::program_options::options_description& hidden ,
-                                    boost::program_options::options_description& ssl_options ) {
-        /* support for -vv -vvvv etc. */
-        for (string s = "vv"; s.length() <= 12; s.append("v")) {
-            hidden.add_options()(s.c_str(), "verbose");
+    Status CmdLine::setupBinaryName(const std::vector<std::string>& argv) {
+
+        if (argv.empty()) {
+            return Status(ErrorCodes::InternalError, "Cannot get binary name: argv array is empty");
         }
 
-        StringBuilder portInfoBuilder;
-        StringBuilder maxConnInfoBuilder;
-
-        portInfoBuilder << "specify port number - " << DefaultDBPort << " by default";
-        maxConnInfoBuilder << "max number of simultaneous connections - " << DEFAULT_MAX_CONN << " by default";
-
-        general.add_options()
-        ("help,h", "show this usage information")
-        ("version", "show version information")
-        ("config,f", po::value<string>(), "configuration file specifying additional options")
-        ("verbose,v", "be more verbose (include multiple times for more verbosity e.g. -vvvvv)")
-        ("quiet", "quieter output")
-        ("port", po::value<int>(), portInfoBuilder.str().c_str())
-        ("bind_ip", po::value<string>(), "comma separated list of ip addresses to listen on - all local ips by default")
-        ("maxConns",po::value<int>(), maxConnInfoBuilder.str().c_str())
-        ("logpath", po::value<string>() , "log file to send write to instead of stdout - has to be a file, not directory" )
-        ("logappend" , "append to logpath instead of over-writing" )
-        ("logTimestampFormat", po::value<string>(), "Desired format for timestamps in log "
-         "messages. One of ctime, iso8601-utc or iso8601-local")
-        ("pidfilepath", po::value<string>(), "full path to pidfile (if not set, no pidfile is created)")
-        ("keyFile", po::value<string>(), "private key for cluster authentication")
-        ("setParameter", po::value< std::vector<std::string> >()->composing(),
-                "Set a configurable parameter")
-        ("httpinterface", "enable http interface")
-        ("clusterAuthMode", po::value<std::string>(),
-         "Authentication mode used for cluster authentication."
-         " Alternatives are (keyfile|sendKeyfile|sendX509|x509)")
-#ifndef _WIN32
-        ("nounixsocket", "disable listening on unix sockets")
-        ("unixSocketPrefix", po::value<string>(), "alternative directory for UNIX domain sockets (defaults to /tmp)")
-        ("fork" , "fork server process" )
-        ("syslog" , "log to system's syslog facility instead of file or stdout" )
-#endif
-        ;
-        
-
-#ifdef MONGO_SSL
-        ssl_options.add_options()
-        ("sslOnNormalPorts" , "use ssl on configured ports" )
-        ("sslPEMKeyFile" , po::value<string>(), "PEM file for ssl" )
-        ("sslPEMKeyPassword" , po::value<string>()->implicit_value(""),
-         "PEM file password" )
-        ("sslClusterFile", po::value<string>(),
-         "Key file for internal SSL authentication" )
-        ("sslClusterPassword", po::value<string>()->implicit_value(""),
-         "Internal authentication key file password" )
-        ("sslCAFile", po::value<std::string>(),
-         "Certificate Authority file for SSL")
-        ("sslCRLFile", po::value<std::string>(),
-         "Certificate Revocation List file for SSL")
-        ("sslWeakCertificateValidation", "allow client to connect without presenting a certificate")
-        ("sslFIPSMode", "activate FIPS 140-2 mode at startup")
-#endif
-        ;
-        
-        // Extra hidden options
-        hidden.add_options()
-        ("nohttpinterface", "disable http interface")
-        ("objcheck", "inspect client data for validity on receipt (DEFAULT)")
-        ("noobjcheck", "do NOT inspect client data for validity on receipt")
-        ("traceExceptions", "log stack traces for every exception")
-        ("enableExperimentalIndexStatsCmd", po::bool_switch(),
-                "EXPERIMENTAL (UNSUPPORTED). Enable command computing aggregate statistics on indexes.")
-        ("enableExperimentalStorageDetailsCmd", po::bool_switch(),
-                "EXPERIMENTAL (UNSUPPORTED). Enable command computing aggregate statistics on storage.")
-        ;
-    }
-
-#if defined(_WIN32)
-    void CmdLine::addWindowsOptions( boost::program_options::options_description& windows ,
-                                     boost::program_options::options_description& hidden ) {
-        windows.add_options()
-        ("install", "install Windows service")
-        ("remove", "remove Windows service")
-        ("reinstall", "reinstall Windows service (equivalent to --remove followed by --install)")
-        ("serviceName", po::value<string>(), "Windows service name")
-        ("serviceDisplayName", po::value<string>(), "Windows service display name")
-        ("serviceDescription", po::value<string>(), "Windows service description")
-        ("serviceUser", po::value<string>(), "account for service execution")
-        ("servicePassword", po::value<string>(), "password used to authenticate serviceUser")
-        ;
-        hidden.add_options()("service", "start mongodb service");
-    }
-#endif
-
-    bool CmdLine::parseConfigFile( istream &f, stringstream &ss ) {
-        string s;
-        char line[MAX_LINE_LENGTH];
-
-        while ( !f.eof() ) {
-            f.getline(line, MAX_LINE_LENGTH);
-            // Check if we failed to read from the stream for a reason other than eof
-            if ( f.fail() && !f.eof() ) {
-                return false;
-            }
-            s = line;
-            std::remove(s.begin(), s.end(), ' ');
-            std::remove(s.begin(), s.end(), '\t');
-            boost::to_upper(s);
-
-            if ( s.find( "FASTSYNC" ) != string::npos )
-                cout << "warning \"fastsync\" should not be put in your configuration file" << endl;
-
-            if ( s.c_str()[0] == '#' ) { 
-                // skipping commented line
-            } else if ( s.find( "=FALSE" ) == string::npos ) {
-                ss << line << endl;
-            } else {
-                cout << "warning: remove or comment out this line by starting it with \'#\', skipping now : " << line << endl;
-            }
+        // setup binary name
+        cmdLine.binaryName = argv[0];
+        size_t i = cmdLine.binaryName.rfind( '/' );
+        if ( i != string::npos ) {
+            cmdLine.binaryName = cmdLine.binaryName.substr( i + 1 );
         }
-        return true;
+        return Status::OK();
     }
 
-    bool CmdLine::store( const std::vector<std::string>& argv,
-                         boost::program_options::options_description& visible,
-                         boost::program_options::options_description& hidden,
-                         boost::program_options::positional_options_description& positional,
-                         boost::program_options::variables_map &params ) {
-
-
-        if (argv.empty())
-            return false;
-
-        {
-            // setup binary name
-            cmdLine.binaryName = argv[0];
-            size_t i = cmdLine.binaryName.rfind( '/' );
-            if ( i != string::npos )
-                cmdLine.binaryName = cmdLine.binaryName.substr( i + 1 );
-            
+    Status CmdLine::setupCwd() {
             // setup cwd
-            char buffer[1024];
+        char buffer[1024];
 #ifdef _WIN32
-            verify( _getcwd( buffer , 1000 ) );
+        verify( _getcwd( buffer , 1000 ) );
 #else
-            verify( getcwd( buffer , 1000 ) );
+        verify( getcwd( buffer , 1000 ) );
 #endif
-            cmdLine.cwd = buffer;
+        cmdLine.cwd = buffer;
+        return Status::OK();
+    }
+
+    Status CmdLine::setArgvArray(const std::vector<std::string>& argv) {
+        BSONArrayBuilder b;
+        std::vector<std::string> censoredArgv = argv;
+        censor(&censoredArgv);
+        for (size_t i=0; i < censoredArgv.size(); i++) {
+            b << censoredArgv[i];
         }
-        
+        argvArray = b.arr();
+        return Status::OK();
+    }
 
-        /* don't allow guessing - creates ambiguities when some options are
-         * prefixes of others. allow long disguises and don't allow guessing
-         * to get away with our vvvvvvv trick. */
-        int style = (((po::command_line_style::unix_style ^
-                       po::command_line_style::allow_guessing) |
-                      po::command_line_style::allow_long_disguise) ^
-                     po::command_line_style::allow_sticky);
+namespace {
 
+    // Converts a map of values with dotted key names to a BSONObj with sub objects.
+    // 1. Check for dotted field names and call valueMapToBSON recursively.
+    // 2. Append the actual value to our builder if we did not find a dot in our key name.
+    Status valueMapToBSON(const std::map<moe::Key, moe::Value>& params,
+                          BSONObjBuilder* builder,
+                          const std::string& prefix = std::string()) {
+        for (std::map<moe::Key, moe::Value>::const_iterator it(params.begin());
+                it != params.end(); it++) {
+            moe::Key key = it->first;
+            moe::Value value = it->second;
 
-        try {
+            // 1. Check for dotted field names and call valueMapToBSON recursively.
+            // NOTE: this code depends on the fact that std::map is sorted
+            //
+            // EXAMPLE:
+            // The map:
+            // {
+            //     "var1.dotted1" : false,
+            //     "var2" : true,
+            //     "var1.dotted2" : 6
+            // }
+            //
+            // Gets sorted by keys as:
+            // {
+            //     "var1.dotted1" : false,
+            //     "var1.dotted2" : 6,
+            //     "var2" : true
+            // }
+            //
+            // Which means when we see the "var1" prefix, we can iterate until we see either a name
+            // without a dot or without "var1" as a prefix, aggregating its fields in a new map as
+            // we go.  Because the map is sorted, once we see a name without a dot or a "var1"
+            // prefix we know that we've seen everything with "var1" as a prefix and can recursively
+            // build the entire sub object at once using our new map (which is the only way to make
+            // a single coherent BSON sub object using this append only builder).
+            //
+            // The result of this function for this example should be a BSON object of the form:
+            // {
+            //     "var1" : {
+            //         "dotted1" : false,
+            //         "dotted2" : 6
+            //     },
+            //     "var2" : true
+            // }
 
-            po::options_description all;
-            all.add( visible );
-            all.add( hidden );
+            // Check to see if this key name is dotted
+            std::string::size_type dotOffset = key.find('.');
+            if (dotOffset != string::npos) {
 
-            po::store( po::command_line_parser(std::vector<std::string>(argv.begin() + 1,
-                                                                        argv.end()))
-                       .options( all )
-                       .positional( positional )
-                       .style( style )
-                       .run(),
-                       params );
+                // Get the name of the "section" that we are currently iterating.  This will be
+                // the name of our sub object.
+                std::string sectionName = key.substr(0, dotOffset);
 
-            if ( params.count("config") ) {
-                ifstream f( params["config"].as<string>().c_str() );
-                if ( ! f.is_open() ) {
-                    cout << "ERROR: could not read from config file" << endl << endl;
-                    cout << visible << endl;
-                    return false;
-                }
+                // Build a map of the "section" that we are iterating to be passed in a
+                // recursive call.
+                std::map<moe::Key, moe::Value> sectionMap;
 
-                stringstream ss;
-                if ( !CmdLine::parseConfigFile( f, ss ) ) {
-                    cout << "ERROR: could not read from config file" << endl << endl;
-                    cout << visible << endl;
-                    return false;
-                }
-                po::store( po::parse_config_file( ss , all ) , params );
-                f.close();
-            }
-        }
-        catch (po::error &e) {
-            cout << "error command line: " << e.what() << endl;
-            cout << "use --help for help" << endl;
-            //cout << visible << endl;
-            return false;
-        }
+                std::string beforeDot = key.substr(0, dotOffset);
+                std::string afterDot = key.substr(dotOffset + 1, key.size() - dotOffset - 1);
+                std::map<moe::Key, moe::Value>::const_iterator it_next = it;
 
-        {
-            BSONArrayBuilder b;
-            std::vector<std::string> censoredArgv = argv;
-            censor(&censoredArgv);
-            for (size_t i=0; i < censoredArgv.size(); i++) {
-                b << censoredArgv[i];
-            }
-            argvArray = b.arr();
-        }
+                do {
+                    // Here we know that the key at it_next has a dot and has the prefix we are
+                    // currently creating a sub object for.  Since that means we will definitely
+                    // process that element in this loop, advance the outer for loop iterator here.
+                    it = it_next;
 
-        {
-            BSONObjBuilder b;
-            for (po::variables_map::const_iterator it(params.begin()), end(params.end()); it != end; it++){
-                if (!it->second.defaulted()){
-                    const string& key = it->first;
-                    const po::variable_value& value = it->second;
-                    const type_info& type = value.value().type();
+                    // Add the value to our section map with a key of whatever is after the dot
+                    // since the section name itself will be part of our sub object builder.
+                    sectionMap[afterDot] = value;
 
-                    if (type == typeid(string)){
-                        if (value.as<string>().empty())
-                            b.appendBool(key, true); // boost po uses empty string for flags like --quiet
-                        else {
-                            if ( _isPasswordArgument(key.c_str()) ) {
-                                b.append( key, "<password>" );
-                            }
-                            else {
-                                b.append( key, value.as<string>() );
-                            }
-                        }
+                    // Peek at the next value for our iterator and check to see if we've finished.
+                    if (++it_next == params.end()) {
+                        break;
                     }
-                    else if (type == typeid(int))
-                        b.append(key, value.as<int>());
-                    else if (type == typeid(double))
-                        b.append(key, value.as<double>());
-                    else if (type == typeid(bool))
-                        b.appendBool(key, value.as<bool>());
-                    else if (type == typeid(long))
-                        b.appendNumber(key, (long long)value.as<long>());
-                    else if (type == typeid(unsigned))
-                        b.appendNumber(key, (long long)value.as<unsigned>());
-                    else if (type == typeid(unsigned long long))
-                        b.appendNumber(key, (long long)value.as<unsigned long long>());
-                    else if (type == typeid(vector<string>))
-                        b.append(key, value.as<vector<string> >());
-                    else
-                        b.append(key, "UNKNOWN TYPE: " + demangleName(type));
+                    key = it_next->first;
+                    value = it_next->second;
+
+                    // Look for a dot for our next iteration.
+                    dotOffset = key.find('.');
+
+                    beforeDot = key.substr(0, dotOffset);
+                    afterDot = key.substr(dotOffset + 1, key.size() - dotOffset - 1);
+                }
+                while (dotOffset != string::npos && beforeDot == sectionName);
+
+                // Use the section name in our object builder, and recursively call
+                // valueMapToBSON with our sub map with keys that have the section name removed.
+                BSONObjBuilder sectionObjBuilder(builder->subobjStart(sectionName));
+                valueMapToBSON(sectionMap, &sectionObjBuilder, sectionName);
+                sectionObjBuilder.done();
+
+                // Our iterator is currently on the last field that matched our dot and prefix, so
+                // continue to the next loop iteration.
+                continue;
+            }
+
+            // 2. Append the actual value to our builder if we did not find a dot in our key name.
+            const type_info& type = value.type();
+
+            if (type == typeid(string)){
+                if (value.as<string>().empty()) {
+                    // boost po uses empty string for flags like --quiet
+                    // TODO: Remove this when we remove boost::program_options
+                    builder->appendBool(key, true);
+                }
+                else {
+                    if ( _isPasswordArgument(key.c_str()) ) {
+                        builder->append( key, "<password>" );
+                    }
+                    else {
+                        builder->append( key, value.as<string>() );
+                    }
                 }
             }
-            parsedOpts = b.obj();
+            else if (type == typeid(int))
+                builder->append(key, value.as<int>());
+            else if (type == typeid(double))
+                builder->append(key, value.as<double>());
+            else if (type == typeid(bool))
+                builder->appendBool(key, value.as<bool>());
+            else if (type == typeid(long))
+                builder->appendNumber(key, (long long)value.as<long>());
+            else if (type == typeid(unsigned))
+                builder->appendNumber(key, (long long)value.as<unsigned>());
+            else if (type == typeid(unsigned long long))
+                builder->appendNumber(key, (long long)value.as<unsigned long long>());
+            else if (type == typeid(vector<string>))
+                builder->append(key, value.as<vector<string> >());
+            else
+                builder->append(key, "UNKNOWN TYPE: " + demangleName(type));
+        }
+        return Status::OK();
+    }
+} // namespace
+
+    Status CmdLine::setParsedOpts(moe::Environment& params) {
+        const std::map<moe::Key, moe::Value> paramsMap = params.getExplicitlySet();
+        BSONObjBuilder builder;
+        Status ret = valueMapToBSON(paramsMap, &builder);
+        if (!ret.isOK()) {
+            return ret;
+        }
+        parsedOpts = builder.obj();
+        return Status::OK();
+    }
+
+    Status CmdLine::store( const std::vector<std::string>& argv,
+                           moe::OptionSection& options,
+                           moe::Environment& params ) {
+
+        Status ret = CmdLine::setupBinaryName(argv);
+        if (!ret.isOK()) {
+            return ret;
+        }
+
+        ret = CmdLine::setupCwd();
+        if (!ret.isOK()) {
+            return ret;
+        }
+
+        moe::OptionsParser parser;
+
+        // XXX: env is not used in the parser at this point, so just leave it empty
+        std::map<std::string, std::string> env;
+
+        ret = parser.run(options, argv, env, &params);
+        if (!ret.isOK()) {
+            std::cerr << "Error parsing command line: " << ret.toString() << std::endl;
+            std::cerr << "use --help for help" << std::endl;
+            return ret;
+        }
+
+        ret = CmdLine::setArgvArray(argv);
+        if (!ret.isOK()) {
+            return ret;
+        }
+
+        ret = CmdLine::setParsedOpts(params);
+        if (!ret.isOK()) {
+            return ret;
         }
 
         if (params.count("verbose")) {
@@ -356,8 +333,7 @@ namespace {
             cmdLine.maxConns = params["maxConns"].as<int>();
 
             if ( cmdLine.maxConns < 5 ) {
-                out() << "maxConns has to be at least 5" << endl;
-                return false;
+                return Status(ErrorCodes::BadValue, "maxConns has to be at least 5");
             }
         }
 
@@ -366,8 +342,7 @@ namespace {
         }
         if (params.count("noobjcheck")) {
             if (params.count("objcheck")) {
-                out() << "can't have both --objcheck and --noobjcheck" << endl;
-                return false;
+                return Status(ErrorCodes::BadValue, "can't have both --objcheck and --noobjcheck");
             }
             cmdLine.objcheck = false;
         }
@@ -407,29 +382,27 @@ namespace {
                 MessageEventDetailsEncoder::setDateFormatter(dateToISOStringLocal);
             }
             else {
-                cout << "Value of logTimestampFormat must be one of ctime, iso8601-utc or "
-                    "iso8601-local; not \"" << formatterName << "\"." << endl;
-                return false;
+                StringBuilder sb;
+                sb << "Value of logTimestampFormat must be one of ctime, iso8601-utc " <<
+                      "or iso8601-local; not \"" << formatterName << "\".";
+                return Status(ErrorCodes::BadValue, sb.str());
             }
         }
         if (params.count("logpath")) {
             cmdLine.logpath = params["logpath"].as<string>();
             if (cmdLine.logpath.empty()) {
-                cout << "logpath cannot be empty if supplied" << endl;
-                return false;
+                return Status(ErrorCodes::BadValue, "logpath cannot be empty if supplied");
             }
         }
 
         cmdLine.logWithSyslog = params.count("syslog");
         cmdLine.logAppend = params.count("logappend");
         if (!cmdLine.logpath.empty() && cmdLine.logWithSyslog) {
-            cout << "Cant use both a logpath and syslog " << endl;
-            return false;
+            return Status(ErrorCodes::BadValue, "Cant use both a logpath and syslog ");
         }
 
         if (cmdLine.doFork && cmdLine.logpath.empty() && !cmdLine.logWithSyslog) {
-            cout << "--fork has to be used with --logpath or --syslog" << endl;
-            return false;
+            return Status(ErrorCodes::BadValue, "--fork has to be used with --logpath or --syslog");
         }
 
         if (params.count("keyFile")) {
@@ -447,27 +420,29 @@ namespace {
                 std::string name;
                 std::string value;
                 if (!mongoutils::str::splitOn(parameters[i], '=', name, value)) {
-                    cout << "Illegal option assignment: \"" << parameters[i] << "\"" << endl;
-                    return false;
+                    StringBuilder sb;
+                    sb << "Illegal option assignment: \"" << parameters[i] << "\"";
+                    return Status(ErrorCodes::BadValue, sb.str());
                 }
                 ServerParameter* parameter = mapFindWithDefault(
                         ServerParameterSet::getGlobal()->getMap(),
                         name,
                         static_cast<ServerParameter*>(NULL));
                 if (NULL == parameter) {
-                    cout << "Illegal --setParameter parameter: \"" << name << "\"" << endl;
-                    return false;
+                    StringBuilder sb;
+                    sb << "Illegal --setParameter parameter: \"" << name << "\"";
+                    return Status(ErrorCodes::BadValue, sb.str());
                 }
                 if (!parameter->allowedToChangeAtStartup()) {
-                    cout << "Cannot use --setParameter to set \"" << name << "\" at startup" <<
-                        endl;
-                    return false;
+                    StringBuilder sb;
+                    sb << "Cannot use --setParameter to set \"" << name << "\" at startup";
+                    return Status(ErrorCodes::BadValue, sb.str());
                 }
                 Status status = parameter->setFromString(value);
                 if (!status.isOK()) {
-                    cout << "Bad value for parameter \"" << name << "\": " << status.reason()
-                         << endl;
-                    return false;
+                    StringBuilder sb;
+                    sb << "Bad value for parameter \"" << name << "\": " << status.reason();
+                    return Status(ErrorCodes::BadValue, sb.str());
                 }
             }
         }
@@ -477,50 +452,49 @@ namespace {
 
 #ifdef MONGO_SSL
 
-        if (params.count("sslPEMKeyFile")) {
-            cmdLine.sslPEMKeyFile = params["sslPEMKeyFile"].as<string>();
+        if (params.count("ssl.PEMKeyFile")) {
+            cmdLine.sslPEMKeyFile = params["ssl.PEMKeyFile"].as<string>();
         }
 
-        if (params.count("sslPEMKeyPassword")) {
-            cmdLine.sslPEMKeyPassword = params["sslPEMKeyPassword"].as<string>();
+        if (params.count("ssl.PEMKeyPassword")) {
+            cmdLine.sslPEMKeyPassword = params["ssl.PEMKeyPassword"].as<string>();
         }
 
-        if (params.count("sslClusterFile")) {
-            cmdLine.sslClusterFile = params["sslClusterFile"].as<string>();
+        if (params.count("ssl.clusterFile")) {
+            cmdLine.sslClusterFile = params["ssl.clusterFile"].as<string>();
         }
 
-        if (params.count("sslClusterPassword")) {
-            cmdLine.sslClusterPassword = params["sslClusterPassword"].as<string>();
+        if (params.count("ssl.clusterPassword")) {
+            cmdLine.sslClusterPassword = params["ssl.clusterPassword"].as<string>();
         }
 
-        if (params.count("sslCAFile")) {
-            cmdLine.sslCAFile = params["sslCAFile"].as<std::string>();
+        if (params.count("ssl.CAFile")) {
+            cmdLine.sslCAFile = params["ssl.CAFile"].as<std::string>();
         }
 
-        if (params.count("sslCRLFile")) {
-            cmdLine.sslCRLFile = params["sslCRLFile"].as<std::string>();
+        if (params.count("ssl.CRLFile")) {
+            cmdLine.sslCRLFile = params["ssl.CRLFile"].as<std::string>();
         }
 
-        if (params.count("sslWeakCertificateValidation")) {
+        if (params.count("ssl.weakCertificateValidation")) {
             cmdLine.sslWeakCertificateValidation = true;
         }
-        if (params.count("sslOnNormalPorts")) {
+        if (params.count("ssl.sslOnNormalPorts")) {
             cmdLine.sslOnNormalPorts = true;
             if ( cmdLine.sslPEMKeyFile.size() == 0 ) {
-                log() << "need sslPEMKeyFile with sslOnNormalPorts" << endl;
-                return false;
+                return Status(ErrorCodes::BadValue,
+                              "need sslPEMKeyFile with sslOnNormalPorts");
             }
             if (cmdLine.sslWeakCertificateValidation &&
                 cmdLine.sslCAFile.empty()) {
-                log() << "need sslCAFile with sslWeakCertificateValidation" << endl;
-                return false;
+                return Status(ErrorCodes::BadValue,
+                              "need sslCAFile with sslWeakCertificateValidation");
             }
             if (!cmdLine.sslCRLFile.empty() &&
                 cmdLine.sslCAFile.empty()) {
-                log() << "need sslCAFile with sslCRLFile" << endl;
-                return false;
+                return Status(ErrorCodes::BadValue, "need sslCAFile with sslCRLFile");
             }
-            if (params.count("sslFIPSMode")) {
+            if (params.count("ssl.FIPSMode")) {
                 cmdLine.sslFIPSMode = true;
             }
         }
@@ -532,35 +506,36 @@ namespace {
                  cmdLine.sslCRLFile.size() ||
                  cmdLine.sslWeakCertificateValidation ||
                  cmdLine.sslFIPSMode) {
-            log() << "need to enable sslOnNormalPorts" << endl;
-            return false;
+            return Status(ErrorCodes::BadValue, "need to enable sslOnNormalPorts");
         }
         if (cmdLine.clusterAuthMode == "sendKeyfile" || 
             cmdLine.clusterAuthMode == "sendX509" || 
             cmdLine.clusterAuthMode == "x509") {
             if (!cmdLine.sslOnNormalPorts){
-                log() << "need to enable sslOnNormalPorts" << endl;
-                return false;
+                return Status(ErrorCodes::BadValue, "need to enable sslOnNormalPorts");
             }
         }
         else if (params.count("clusterAuthMode") && cmdLine.clusterAuthMode != "keyfile") {
-            log() << "unsupported value for clusterAuthMode " << cmdLine.clusterAuthMode << endl;
-            return false;
+            StringBuilder sb;
+            sb << "unsupported value for clusterAuthMode " << cmdLine.clusterAuthMode;
+            return Status(ErrorCodes::BadValue, sb.str());
         }
 #else // ifdef MONGO_SSL
         // Keyfile is currently the only supported value if not using SSL 
         if (params.count("clusterAuthMode") && cmdLine.clusterAuthMode != "keyfile") {
-            log() << "unsupported value for clusterAuthMode " << cmdLine.clusterAuthMode << endl;
-            return false;
+            StringBuilder sb;
+            sb << "unsupported value for clusterAuthMode " << cmdLine.clusterAuthMode;
+            return Status(ErrorCodes::BadValue, sb.str());
         }
 #endif
 
-        return true;
+        return Status::OK();
     }
 
     static bool _isPasswordArgument(const char* argumentName) {
         static const char* const passwordArguments[] = {
             "sslPEMKeyPassword",
+            "ssl.PEMKeyPassword",
             "servicePassword",
             NULL  // Last entry sentinel.
         };
