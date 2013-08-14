@@ -46,13 +46,9 @@ namespace {
             authzManager.reset(new AuthorizationManager(managerState));
             sessionState = new AuthzSessionExternalStateMock(authzManager.get());
             authzSession.reset(new AuthorizationSession(sessionState));
-        }
-
-        void tearDown() {
-            // All users have to have a ref count of zero when the AuthorizationManager is destroyed
-            while (internalSecurity.user->getRefCount() > 0) {
-                internalSecurity.user->decrementRefCount();
-            }
+            // This duplicates the behavior from the server that adds the internal user at process
+            // startup via a MONGO_INITIALIZER
+            authzManager->addInternalUser(internalSecurity.user);
         }
     };
 
