@@ -61,6 +61,21 @@ namespace mongo {
 
             int before = result.len();
 
+            // TODO: convert to ServerParameters -- SERVER-10515
+
+            if( cmdLine.dur && (all || cmdObj.hasElement("journalCommitInterval")) ) {
+                result.append("journalCommitInterval",
+                              cmdLine.journalCommitInterval);
+            }
+            if( all || cmdObj.hasElement( "traceExceptions" ) ) {
+                result.append("traceExceptions",
+                              DBException::traceExceptions);
+            }
+            if( all || cmdObj.hasElement( "replMonitorMaxFailedChecks" ) ) {
+                result.append("replMonitorMaxFailedChecks",
+                              ReplicaSetMonitor::getMaxFailedChecks());
+            }
+
             const ServerParameter::Map& m = ServerParameterSet::getGlobal()->getMap();
             for ( ServerParameter::Map::const_iterator i = m.begin(); i != m.end(); ++i ) {
                 if ( all || cmdObj.hasElement( i->first.c_str() ) ) {
@@ -98,7 +113,7 @@ namespace mongo {
             int s = 0;
             bool found = false;
 
-            // TODO: remove these manual things
+            // TODO: convert to ServerParameters -- SERVER-10515
 
             if( cmdObj.hasElement("journalCommitInterval") ) {
                 if( !cmdLine.dur ) {
