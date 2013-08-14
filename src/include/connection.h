@@ -62,7 +62,7 @@ struct __wt_named_data_source {
 /*
  * Periodically clear out unused dhandles from the connection list.
  */
-#define	CONN_DHANDLE_SWEEP_PERIOD	10
+#define	CONN_DHANDLE_SWEEP_TRIGGER	10
 
 /*
  * WT_CONNECTION_IMPL --

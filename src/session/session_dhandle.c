@@ -205,8 +205,11 @@ retry:			WT_RET(__wt_meta_checkpoint_last_name(
 	return (ret);
 }
 
-int
-__wt_session_dhandle_sweep(WT_SESSION_IMPL *session)
+/*
+ * Discard any session dhandles that are not open.
+ */
+static int
+__session_dhandle_sweep(WT_SESSION_IMPL *session)
 {
 	WT_DATA_HANDLE *dhandle;
 	WT_DATA_HANDLE_CACHE *dhandle_cache, *dhandle_cache_next;
@@ -224,7 +227,26 @@ __wt_session_dhandle_sweep(WT_SESSION_IMPL *session)
 		dhandle_cache = dhandle_cache_next;
 	}
 	return (ret);
+}
 
+/*
+ * Wrapper function to first sweep the session and then get the btree.
+ * Sweeping is only called when a session notices it has dead dhandles
+ * on its session dhandle list.  Must be called with schema lock.
+ */
+static int
+__session_open_btree(WT_SESSION_IMPL *session,
+    const char *name, const char *ckpt, const char *op_cfg[],
+    int dead, uint32_t flags)
+{
+	WT_DECL_RET;
+
+	if (dead) {
+		WT_CSTAT_INCR(session, dh_sweeps);
+		WT_TRET(__session_dhandle_sweep(session));
+	}
+	WT_TRET(__wt_conn_btree_get(session, name, ckpt, op_cfg, flags));
+	return (ret);
 }
 
 /*
@@ -249,10 +271,8 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 		dhandle = dhandle_cache->dhandle;
 		if (!LF_ISSET(WT_DHANDLE_LOCK_ONLY) &&
 		    !F_ISSET(dhandle, WT_DHANDLE_EXCLUSIVE|WT_DHANDLE_OPEN) &&
-		    dead == 0) {
+		    dead == 0)
 			dead++;
-			S2C(session)->dhandle_dead++;
-		}
 		if (hash != dhandle->name_hash ||
 		    strcmp(uri, dhandle->name) != 0)
 			continue;
@@ -286,8 +306,8 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 		 * remove any dead handles.
 		 */
 		WT_WITH_SCHEMA_LOCK_OPT(session, ret =
-		    __wt_conn_dhandle_sweep(
-		    session, uri, checkpoint, cfg, flags, dead));
+		    __session_open_btree(
+		    session, uri, checkpoint, cfg, dead, flags));
 		WT_RET(ret);
 
 		if (!candidate)

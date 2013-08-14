@@ -342,9 +342,9 @@ err:		F_CLR(btree, WT_BTREE_SPECIAL_FLAGS);
 
 /*
  * __conn_dhandle_sweep --
- *	Check if it's time to clean up the connection dhandle list.  If so
- *	remove items onto a private list and release it for eviction.  We
- *	hold the schema lock.  Eviction does not when it walks this list.
+ *	Close and clean up any unused dhandles on the connection dhandle list.
+ *	We hold a spin lock to coordinate walking this list with eviction.
+ *	Put unused dhandles on a private list and unlock for eviction.
  */
 static int
 __conn_dhandle_sweep(WT_SESSION_IMPL *session)
@@ -355,8 +355,6 @@ __conn_dhandle_sweep(WT_SESSION_IMPL *session)
 	WT_DECL_RET;
 
 	conn = S2C(session);
-	if (conn->dhandle_dead < CONN_DHANDLE_SWEEP_PERIOD)
-		return (0);
 	/*
 	 * Coordinate with eviction or other threads sweeping.  If the lock
 	 * is not free, we're done.  Cleaning up the list is a best effort only.
@@ -381,6 +379,7 @@ __conn_dhandle_sweep(WT_SESSION_IMPL *session)
 		}
 		dhandle = dhandle_next;
 	}
+	conn->dhandle_dead = 0;
 	__wt_spin_unlock(session, &conn->dhandle_lock);
 	/*
 	 * Now actually clean up any dead handles.
@@ -396,28 +395,6 @@ __conn_dhandle_sweep(WT_SESSION_IMPL *session)
 		WT_TRET(__wt_conn_dhandle_discard_single(session, dhandle));
 		session->dhandle = save_dhandle;
 	}
-	conn->dhandle_dead = 0;
-	return (ret);
-}
-
-/*
- * Wrapper function to first sweep the session and possibly the connection
- * dhandle lists.  This is only called when a session notices it has dead
- * handles on its session dhandle list.  Must be called with schema lock.
- */
-int
-__wt_conn_dhandle_sweep(WT_SESSION_IMPL *session,
-    const char *name, const char *ckpt, const char *op_cfg[],
-    uint32_t flags, int dead)
-{
-	WT_DECL_RET;
-
-	if (dead) {
-		WT_CSTAT_INCR(session, dh_sweeps);
-		WT_TRET(__wt_session_dhandle_sweep(session));
-		WT_TRET(__conn_dhandle_sweep(session));
-	}
-	WT_TRET(__wt_conn_btree_get(session, name, ckpt, op_cfg, flags));
 	return (ret);
 }
 
@@ -432,6 +409,8 @@ __wt_conn_btree_get(WT_SESSION_IMPL *session,
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
 
+	if (S2C(session)->dhandle_dead >= CONN_DHANDLE_SWEEP_TRIGGER)
+		WT_RET(__conn_dhandle_sweep(session));
 	WT_RET(__conn_dhandle_get(session, name, ckpt, flags));
 	dhandle = session->dhandle;
 
@@ -572,8 +551,10 @@ __wt_conn_btree_close(WT_SESSION_IMPL *session, int locked)
 		    S2BT(session) != session->metafile ||
 		    session == S2C(session)->default_session);
 
-		if (F_ISSET(dhandle, WT_DHANDLE_OPEN))
+		if (F_ISSET(dhandle, WT_DHANDLE_OPEN)) {
 			WT_TRET(__wt_conn_btree_sync_and_close(session));
+			S2C(session)->dhandle_dead++;
+		}
 		if (!locked) {
 			F_CLR(dhandle, WT_DHANDLE_EXCLUSIVE);
 			WT_TRET(__wt_rwunlock(session, dhandle->rwlock));
