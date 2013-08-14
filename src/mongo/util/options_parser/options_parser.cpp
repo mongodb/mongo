@@ -488,22 +488,22 @@ namespace optionenvironment {
 
         // Read into a vector first since it's guaranteed to have contiguous storage
         std::vector<char> configVector;
-
-        // We need to allocate an extra byte for our vector because fread on windows accesses memory
-        // one byte past the size that we pass in.
-        configVector.resize(configSize + 1);
-        long nread = fread(&configVector[0], sizeof(char), configSize, config);
-        if (nread != configSize) {
-            const int current_errno = errno;
-            // TODO: Make sure errno is the correct way to do this
-            StringBuilder sb;
-            sb << "Error reading in config file: " << strerror(current_errno);
-            return Status(ErrorCodes::InternalError, sb.str());
-        }
-
-        // We had to allocate an extra byte for our vector because fread on windows accesses memory
-        // one byte past the size that we pass in.  Resize back to the actual size of the file.
         configVector.resize(configSize);
+
+        if (configSize > 0) {
+            long nread = 0;
+            while (!feof(config) && nread < configSize) {
+                nread = nread + fread(&configVector[nread], sizeof(char),
+                                      configSize - nread, config);
+                if (ferror(config)) {
+                    const int current_errno = errno;
+                    // TODO: Make sure errno is the correct way to do this
+                    StringBuilder sb;
+                    sb << "Error reading in config file: " << strerror(current_errno);
+                    return Status(ErrorCodes::InternalError, sb.str());
+                }
+            }
+        }
 
         // Copy the vector contents into our result string
         *contents = std::string(configVector.begin(), configVector.end());
