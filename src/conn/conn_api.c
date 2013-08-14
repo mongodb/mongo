@@ -977,15 +977,14 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	};
 	WT_CONFIG_ITEM cval, sval;
 	WT_CONNECTION_IMPL *conn;
+	WT_DECL_ITEM(cbuf);
 	WT_DECL_RET;
-	WT_ITEM *cbuf;
 	WT_SESSION_IMPL *session;
 	const char *cfg[5], **cfgend;
 
 	*wt_connp = NULL;
 
 	session = NULL;
-	cbuf = NULL;
 
 	WT_RET(__wt_library_init());
 
@@ -1117,13 +1116,11 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	/* Now that we know if verbose is configured, output the version. */
 	WT_VERBOSE_ERR(session, version, "%s", WIREDTIGER_VERSION_STRING);
 
-	/* Open the connection. */
-	WT_ERR(__wt_connection_open(conn, cfg));
-
 	/*
-	 * Reset the local session as the real one was allocated in
-	 * __wt_connection_open.
+	 * Open the connection, then reset the local session as the real one
+	 * was allocated in __wt_connection_open.
 	 */
+	WT_ERR(__wt_connection_open(conn, cfg));
 	session = conn->default_session;
 
 	/*
@@ -1135,11 +1132,16 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	WT_ERR(__wt_metadata_open(session));
 
 	/*
-	 * Load the extensions last; the extension code expects everything else
-	 * to be in place and there are lots of callbacks it can make into the
+	 * Load the extensions after initialization completes; extensions expect
+	 * everything else to be in place, and the extensions call back into the
 	 * library.
 	 */
 	WT_ERR(__conn_load_extensions(session, cfg));
+
+	/*
+	 * Start the worker threads last.
+	 */
+	WT_ERR(__wt_connection_workers(session, cfg));
 
 	STATIC_ASSERT(offsetof(WT_CONNECTION_IMPL, iface) == 0);
 	*wt_connp = &conn->iface;
@@ -1153,10 +1155,6 @@ err:	if (cbuf != NULL)
 
 	if (ret != 0 && conn != NULL)
 		WT_TRET(__wt_connection_close(conn));
-
-	/* Let the server threads proceed. */
-	if (ret == 0)
-		conn->connection_initialized = 1;
 
 	return (ret);
 }

@@ -594,6 +594,7 @@ extern int __wt_logmgr_create(WT_CONNECTION_IMPL *conn, const char *cfg[]);
 extern int __wt_logmgr_destroy(WT_CONNECTION_IMPL *conn);
 extern int __wt_connection_open(WT_CONNECTION_IMPL *conn, const char *cfg[]);
 extern int __wt_connection_close(WT_CONNECTION_IMPL *conn);
+extern int __wt_connection_workers(WT_SESSION_IMPL *session, const char *cfg[]);
 extern void __wt_conn_stat_init(WT_SESSION_IMPL *session, uint32_t flags);
 extern int __wt_statlog_create(WT_CONNECTION_IMPL *conn, const char *cfg[]);
 extern int __wt_statlog_destroy(WT_CONNECTION_IMPL *conn);

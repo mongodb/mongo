@@ -274,16 +274,6 @@ __statlog_server(void *arg)
 	WT_ERR(__wt_buf_init(session, &tmp,
 	    strlen(conn->stat_path) + ENTRY_SIZE));
 
-	/*
-	 * The statistics log server may be running before the database is
-	 * created (it should run fine because we're looking at statistics
-	 * structures that have already been allocated, but it doesn't make
-	 * sense and we have the information we need to wait).  Wait for
-	 * the wiredtiger_open call.
-	 */
-	while (!conn->connection_initialized)
-		__wt_sleep(0, 1000);
-
 	while (F_ISSET(conn, WT_CONN_SERVER_RUN)) {
 		/*
 		 * If statistics are turned off, wait until it's time to output
