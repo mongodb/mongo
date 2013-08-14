@@ -24,6 +24,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/instance.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/options_parser/environment.h"
 #include "mongo/util/text.h"
 #include "mongo/util/winutil.h"
 
@@ -57,7 +58,7 @@ namespace {
 
     void configureService(
             ServiceCallback serviceCallback,
-            const boost::program_options::variables_map& params,
+            const moe::Environment& params,
             const NtServiceDefaultStrings& defaultStrings,
             const std::vector<std::string>& disallowedOptions,
             const std::vector<std::string>& argv

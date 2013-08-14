@@ -19,13 +19,17 @@
 #include <vector>
 
 #include "mongo/db/cmdline.h"
+#include "mongo/db/jsobj.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/options_parser/environment.h"
 
 namespace mongo {
 
     CmdLine cmdLine;
 
 namespace {
+
+    namespace moe = mongo::optionenvironment;
 
     void testCensoringArgv(const char* const * expected,
                            const char* const * toCensor,
@@ -218,6 +222,50 @@ namespace {
         ASSERT_EQUALS(static_cast<int>(boost::size(expected)), argc);
 
         testCensoringVector(expected, argv, argc);
+    }
+
+    TEST(ParsedOptsTests, NormalValues) {
+        moe::Environment environment;
+        ASSERT_OK(environment.set(moe::Key("val1"), moe::Value(6)));
+        ASSERT_OK(environment.set(moe::Key("val2"), moe::Value(std::string("string"))));
+        ASSERT_OK(CmdLine::setParsedOpts(environment));
+        BSONObj obj = BSON( "val1" << 6 << "val2" << "string" );
+        // TODO: Put a comparison here that doesn't depend on the field order.  Right now it is
+        // based on the sort order of keys in a std::map.
+        ASSERT_EQUALS(obj, CmdLine::getParsedOpts());
+    }
+
+    TEST(ParsedOptsTests, DottedValues) {
+        moe::Environment environment;
+        ASSERT_OK(environment.set(moe::Key("val1.dotted1"), moe::Value(6)));
+        ASSERT_OK(environment.set(moe::Key("val2"), moe::Value(true)));
+        ASSERT_OK(environment.set(moe::Key("val1.dotted2"), moe::Value(std::string("string"))));
+        ASSERT_OK(CmdLine::setParsedOpts(environment));
+        BSONObj obj = BSON( "val1" << BSON( "dotted1" << 6 << "dotted2" << "string" )
+                         << "val2" << true );
+        // TODO: Put a comparison here that doesn't depend on the field order.  Right now it is
+        // based on the sort order of keys in a std::map.
+        ASSERT_EQUALS(obj, CmdLine::getParsedOpts());
+    }
+
+    TEST(ParsedOptsTests, DeepDottedValues) {
+        moe::Environment environment;
+        ASSERT_OK(environment.set(moe::Key("val1.first1.second1.third1"), moe::Value(6)));
+        ASSERT_OK(environment.set(moe::Key("val1.first1.second2.third1"), moe::Value(false)));
+        ASSERT_OK(environment.set(moe::Key("val1.first2"), moe::Value(std::string("string"))));
+        ASSERT_OK(environment.set(moe::Key("val1.first1.second1.third2"), moe::Value(true)));
+        ASSERT_OK(environment.set(moe::Key("val2"), moe::Value(6.0)));
+        ASSERT_OK(CmdLine::setParsedOpts(environment));
+        BSONObj obj = BSON( "val1" << BSON( "first1" <<
+                                            BSON( "second1" <<
+                                                  BSON( "third1" << 6 << "third2" << true ) <<
+                                                  "second2" <<
+                                                  BSON( "third1" << false ) ) <<
+                                            "first2" << "string" ) <<
+                            "val2" << 6.0 );
+        // TODO: Put a comparison here that doesn't depend on the field order.  Right now it is
+        // based on the sort order of keys in a std::map.
+        ASSERT_EQUALS(obj, CmdLine::getParsedOpts());
     }
 
 }  // namespace

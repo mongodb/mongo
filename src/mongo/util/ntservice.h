@@ -24,13 +24,19 @@
 
 #ifdef _WIN32
 
-#include <boost/program_options.hpp>
 #include <string>
 #include <vector>
 
 #include "mongo/platform/compiler.h"
 
 namespace mongo {
+
+    namespace optionenvironment {
+        class OptionSection;
+        class Environment;
+    } // namespace optionenvironment
+
+    namespace moe = mongo::optionenvironment;
 
 namespace ntservice {
     struct NtServiceDefaultStrings {
@@ -55,7 +61,7 @@ namespace ntservice {
      */
     void configureService(
             ServiceCallback serviceCallback,
-            const boost::program_options::variables_map& params,
+            const moe::Environment& params,
             const NtServiceDefaultStrings& defaultStrings,
             const std::vector<std::string>& disallowedOptions,
             const std::vector<std::string>& argv);

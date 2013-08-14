@@ -776,6 +776,39 @@ namespace {
         ASSERT_EQUALS(str, "NotCommented");
     }
 
+    TEST(INIConfigFile, Monkeys) {
+        OptionsParserTester parser;
+        moe::Environment environment;
+
+        moe::OptionSection testOpts;
+        testOpts.addOption(moe::OptionDescription("config", "config",
+                                                moe::String, "Config file to parse"));
+        testOpts.addOption(moe::OptionDescription("this", "this", moe::Switch, "This"));
+        testOpts.addOption(moe::OptionDescription("that", "that", moe::Switch, "That"));
+        testOpts.addOption(moe::OptionDescription("another", "another", moe::String, "Another"));
+        testOpts.addOption(moe::OptionDescription("other", "other", moe::String, "Other"));
+
+        std::vector<std::string> argv;
+        argv.push_back("binaryname");
+        argv.push_back("--config");
+        argv.push_back("default.conf");
+        std::map<std::string, std::string> env_map;
+
+        parser.setConfig("default.conf",
+                         "\t this = false \n#that = true\n #another = whocares"
+                         "\n\n other = monkeys ");
+
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        moe::Value value;
+        ASSERT_NOT_OK(environment.get(moe::Key("this"), &value));
+        ASSERT_NOT_OK(environment.get(moe::Key("that"), &value));
+        ASSERT_NOT_OK(environment.get(moe::Key("another"), &value));
+        ASSERT_OK(environment.get(moe::Key("other"), &value));
+        std::string str;
+        ASSERT_OK(value.get(&str));
+        ASSERT_EQUALS(str, "monkeys");
+    }
+
     TEST(INIConfigFile, DefaultValueOverride) {
         OptionsParserTester parser;
         moe::Environment environment;

@@ -475,7 +475,9 @@ string finishCode( string code ) {
     return code;
 }
 
-namespace moe = mongo::optionenvironment;
+namespace mongo {
+    namespace moe = mongo::optionenvironment;
+}
 
 moe::OptionSection options;
 moe::Environment params;

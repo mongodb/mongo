@@ -568,25 +568,6 @@ namespace BasicTests {
         }
     };
 
-    class CmdLineParseConfigTest {
-    public:
-        void run() {
-            stringstream ss1;
-            istringstream iss1("");
-            ASSERT(CmdLine::parseConfigFile( iss1, ss1 ));
-            stringstream ss2;
-            istringstream iss2("password=\'foo bar baz\'");
-            ASSERT(CmdLine::parseConfigFile( iss2, ss2 ));
-            stringstream ss3;
-            istringstream iss3("\t    this = false  \n#that = true\n  #another = whocares\n\n  other = monkeys  ");
-            ASSERT(CmdLine::parseConfigFile( iss3, ss3 ));
-
-            ASSERT( ss1.str().compare("\n") == 0 );
-            ASSERT( ss2.str().compare("password=\'foo bar baz\'\n") == 0 );
-            ASSERT( ss3.str().compare("\n  other = monkeys  \n") == 0 );
-        }
-    };
-
     struct CompressionTest1 { 
         void run() { 
             const char * c = "this is a test";
@@ -636,7 +617,6 @@ namespace BasicTests {
 
             add< HostAndPortTests >();
             add< RelativePathTest >();
-            add< CmdLineParseConfigTest >();
 
             add< CompressionTest1 >();
 
