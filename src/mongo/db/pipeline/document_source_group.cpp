@@ -304,7 +304,7 @@ namespace mongo {
                                 << "aggregating group operators are unary (" << key.name << ")");
                     }
                     else { /* assume its an atomic single operand */
-                        pGroupExpr = Expression::parseOperand(&subElement);
+                        pGroupExpr = Expression::parseOperand(subElement);
                     }
 
                     pGroup->addAccumulator(pFieldName, pOp->factory, pGroupExpr);
