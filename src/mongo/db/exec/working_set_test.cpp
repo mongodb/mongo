@@ -61,9 +61,6 @@ namespace {
         member->state = WorkingSetMember::LOC_AND_UNOWNED_OBJ;
         ASSERT_TRUE(member->getFieldDotted("foo", &elt));
 
-        member->state = WorkingSetMember::LOC_AND_OWNED_OBJ;
-        ASSERT_TRUE(member->getFieldDotted("foo", &elt));
-
         member->state = WorkingSetMember::OWNED_OBJ;
         ASSERT_TRUE(member->getFieldDotted("foo", &elt));
     }
@@ -88,16 +85,10 @@ namespace {
         string fieldName = "x";
 
         BSONObj obj = BSON(fieldName << 5);
-        member->state = WorkingSetMember::LOC_AND_OWNED_OBJ;
-        member->obj = obj.getOwned();
+        member->obj = obj;
         ASSERT_TRUE(member->obj.isOwned());
-
-        BSONElement elt;
-        ASSERT_TRUE(member->getFieldDotted(fieldName, &elt));
-        ASSERT_EQUALS(elt.numberInt(), 5);
-
-        // Try OWNED_OBJ state as well.
         member->state = WorkingSetMember::OWNED_OBJ;
+        BSONElement elt;
         ASSERT_TRUE(member->getFieldDotted(fieldName, &elt));
         ASSERT_EQUALS(elt.numberInt(), 5);
     }
