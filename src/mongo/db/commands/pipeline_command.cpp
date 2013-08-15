@@ -83,11 +83,12 @@ namespace mongo {
             // can't use result BSONObjBuilder directly since it won't handle exceptions correctly.
             BSONArrayBuilder resultsArray;
             const int byteLimit = MaxBytesToReturnToClientAtOnce;
-            for (int objs = 0;
-                    objs < batchSize && cursor->ok() && resultsArray.len() <= byteLimit;
-                    objs++) {
-                // TODO may need special logic if cursor->current() would cause results to be > 16MB
-                resultsArray.append(cursor->current());
+            for (int objCount = 0; objCount < batchSize && cursor->ok(); objCount++) {
+                BSONObj current = cursor->current();
+                if (resultsArray.len() + current.objsize() > byteLimit)
+                    break; // too big. current will be the first doc in the second batch
+
+                resultsArray.append(current);
                 cursor->advance();
             }
 
