@@ -685,7 +685,7 @@ namespace mutablebson {
                 return StringData();
 
             if (rep.serialized || (rep.objIdx != kInvalidObjIdx))
-                return getSerializedElement(rep).fieldName();
+                return getSerializedElement(rep).fieldNameStringData();
 
             return getFieldName(rep.offset);
         }
@@ -1459,7 +1459,7 @@ namespace mutablebson {
         // If we are considering field names, and the field names do not compare as equal,
         // return the field name ordering as the element ordering.
         if (considerFieldName) {
-            const int fnamesComp = impl.getFieldName(thisRep).compare(other.fieldName());
+            const int fnamesComp = impl.getFieldName(thisRep).compare(other.fieldNameStringData());
             if (fnamesComp != 0)
                 return fnamesComp;
         }
@@ -2334,9 +2334,9 @@ namespace mutablebson {
         if (value.type() == mongo::EOO)
             return end();
         else if(value.type() == mongo::Object)
-            return makeElementObject(value.fieldName(), value.Obj());
+            return makeElementObject(value.fieldNameStringData(), value.Obj());
         else if(value.type() == mongo::Array)
-            return makeElementArray(value.fieldName(), value.Obj());
+            return makeElementArray(value.fieldNameStringData(), value.Obj());
         else {
             BSONObjBuilder& builder = impl.leafBuilder();
             const int leafRef = builder.len();
