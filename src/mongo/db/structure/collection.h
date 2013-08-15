@@ -44,6 +44,10 @@ namespace mongo {
                         NamespaceDetails* details,
                         Database* database );
 
+        ~CollectionTemp();
+
+        bool ok() const { return _magic == 1357924; }
+
         StringData ns() const { return _ns; }
 
         CollectionIterator* getIterator( const DiskLoc& start, bool tailable,
@@ -53,6 +57,8 @@ namespace mongo {
 
         ExtentManager* getExtentManager();
         const ExtentManager* getExtentManager() const;
+
+        int _magic;
 
         std::string _ns; // TODO: this copy might be annoyingly slow
         NamespaceDetails* _details;

@@ -32,10 +32,17 @@ namespace mongo {
         _ns = fullNS.toString();
         _details = details;
         _database = database;
+        _magic = 1357924;
+    }
+
+    CollectionTemp::~CollectionTemp() {
+        verify( ok() );
+        _magic = 0;
     }
 
     CollectionIterator* CollectionTemp::getIterator( const DiskLoc& start, bool tailable,
                                                      const CollectionScanParams::Direction& dir) const {
+        verify( ok() );
         if ( _details->isCapped() )
             return new CappedIterator( _ns, start, tailable, dir );
         return new FlatIterator( this, start, dir );
@@ -43,10 +50,12 @@ namespace mongo {
 
 
     ExtentManager* CollectionTemp::getExtentManager() {
+        verify( ok() );
         return &_database->getExtentManager();
     }
 
     const ExtentManager* CollectionTemp::getExtentManager() const {
+        verify( ok() );
         return &_database->getExtentManager();
     }
 

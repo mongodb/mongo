@@ -16,7 +16,12 @@
 
 #include "mongo/db/structure/collection_iterator.h"
 
-#include "mongo/db/pdfile.h"
+#include "mongo/db/namespace_details.h"
+#include "mongo/db/storage/extent.h"
+#include "mongo/db/storage/extent_manager.h"
+#include "mongo/db/structure/collection.h"
+
+#include "mongo/db/pdfile.h" // XXX-ERH
 
 namespace mongo {
 
@@ -27,7 +32,7 @@ namespace mongo {
     FlatIterator::FlatIterator(const CollectionTemp* collection,
                                const DiskLoc& start,
                                const CollectionScanParams::Direction& dir)
-        : _curr(start), _ns(collection->ns().toString()), _collection(collection), _direction(dir) {
+        : _curr(start), _collection(collection), _direction(dir) {
 
         if (_curr.isNull()) {
 
@@ -85,37 +90,24 @@ namespace mongo {
     }
 
     void FlatIterator::invalidate(const DiskLoc& dl) {
+        verify( _collection->ok() );
+
         // Just move past the thing being deleted.
         if (dl == _curr) {
-
-            _collection = cc().database()->getCollectionTemp( _ns );
-            if ( _collection == NULL ) {
-                return;
-            }
-
             // We don't care about the return of getNext so much as the side effect of moving _curr
             // to the 'next' thing.
             getNext();
-
-            _collection = NULL;
         }
     }
 
     void FlatIterator::prepareToYield() {
-        _collection = NULL;
     }
 
     bool FlatIterator::recoverFromYield() {
-        _collection = cc().database()->getCollectionTemp( _ns );
-
-        // If the collection we're iterating over was dropped...
-        if ( _collection == NULL ) {
-            // Go right to EOF as a preventative measure.
-            _curr = DiskLoc();
-
-            // And return "NOT OK."
-            return false;
-        }
+        // if the collection is dropped, then the cursor should be destroyed
+        // this check is just a sanity check that the Collection instance we're about to use
+        // has need been destroyed
+        verify( _collection->ok() );
 
         return true;
     }
