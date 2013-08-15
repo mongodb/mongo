@@ -3670,7 +3670,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="ops\update.cpp" />
     <ClCompile Include="ops\update_internal.cpp" />
     <ClCompile Include="pagefault.cpp" />
-    <ClCompile Include="pipeline\accumulator.cpp" />
     <ClCompile Include="pipeline\accumulator_add_to_set.cpp" />
     <ClCompile Include="pipeline\accumulator_avg.cpp" />
     <ClCompile Include="pipeline\accumulator_first.cpp" />

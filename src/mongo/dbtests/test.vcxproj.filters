@@ -3705,9 +3705,6 @@
     <ClCompile Include="stacktests.cpp">
       <Filter>dbtests</Filter>
     </ClCompile>
-    <ClCompile Include="..\db\pipeline\accumulator.cpp">
-      <Filter>db\pipeline\Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\db\pipeline\accumulator_add_to_set.cpp">
       <Filter>db\pipeline\Source Files</Filter>
     </ClCompile>
