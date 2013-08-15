@@ -299,9 +299,12 @@ namespace mongo {
             // document is needed to accomodate the new bson layout of the resulting document.
             doc.reset( oldObj, mutablebson::Document::kInPlaceEnabled );
             BSONObj logObj;
-            StringData matchedField = matchDetails.hasElemMatchKey() ?
-                                                    matchDetails.elemMatchKey():
-                                                    StringData();
+
+            // If there was a matched field, obtain it.
+            string matchedField;
+            if (matchDetails.hasElemMatchKey())
+                matchedField = matchDetails.elemMatchKey();
+
             Status status = driver->update( matchedField, &doc, &logObj );
             if ( !status.isOK() ) {
                 uasserted( 16837, status.reason() );
