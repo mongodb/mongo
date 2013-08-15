@@ -79,6 +79,13 @@ namespace mongo {
         }
     }
 
+    void DocumentSourceOut::spill(DBClientBase* conn, const vector<BSONObj>& toInsert) {
+        conn->insert(_tempNs.ns(), toInsert);
+        BSONObj err = conn->getLastErrorDetailed();
+        uassert(16996, str::stream() << "insert for $out failed: " << err,
+                DBClientWithCommands::getLastErrorString(err).empty());
+    }
+
     boost::optional<Document> DocumentSourceOut::getNext() {
         pExpCtx->checkForInterrupt();
 
@@ -93,13 +100,21 @@ namespace mongo {
         prepTempCollection();
         verify(_tempNs.size() != 0);
 
+        vector<BSONObj> bufferedObjects;
+        size_t bufferedBytes = 0;
         while (boost::optional<Document> next = pSource->getNext()) {
             BSONObj toInsert = next->toBson();
-            conn->insert(_tempNs.ns(), toInsert);
-            BSONObj err = conn->getLastErrorDetailed();
-            uassert(16996, str::stream() << "insert for $out failed: " << err,
-                    DBClientWithCommands::getLastErrorString(err).empty());
+            bufferedBytes += toInsert.objsize();
+            if (!bufferedObjects.empty() && bufferedBytes > BSONObjMaxUserSize) {
+                spill(conn, bufferedObjects);
+                bufferedObjects.clear();
+                bufferedBytes = toInsert.objsize();
+            }
+            bufferedObjects.push_back(toInsert);
         }
+
+        if (!bufferedObjects.empty())
+            spill(conn, bufferedObjects);
 
         // Checking again to make sure we didn't become sharded while running.
         uassert(17018, str::stream() << "namespace '" << _outputNs.ns()
