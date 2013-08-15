@@ -114,6 +114,7 @@ namespace mongo {
 
         // TODO: do not think this method should exist, so should try and encapsulate better
         ExtentManager& getExtentManager() { return _extentManager; }
+        const ExtentManager& getExtentManager() const { return _extentManager; }
 
         /**
          * @param ns - this is fully qualified, which is maybe not ideal ???

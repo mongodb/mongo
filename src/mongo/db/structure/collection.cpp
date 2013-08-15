@@ -21,6 +21,8 @@
 #include "mongo/db/database.h"
 #include "mongo/db/namespace_details.h"
 #include "mongo/db/storage/extent.h"
+#include "mongo/db/storage/extent_manager.h"
+#include "mongo/db/structure/collection_iterator.h"
 
 namespace mongo {
 
@@ -30,6 +32,22 @@ namespace mongo {
         _ns = fullNS.toString();
         _details = details;
         _database = database;
+    }
+
+    CollectionIterator* CollectionTemp::getIterator( const DiskLoc& start, bool tailable,
+                                                     const CollectionScanParams::Direction& dir) const {
+        if ( _details->isCapped() )
+            return new CappedIterator( _ns, start, tailable, dir );
+        return new FlatIterator( this, start, dir );
+    }
+
+
+    ExtentManager* CollectionTemp::getExtentManager() {
+        return &_database->getExtentManager();
+    }
+
+    const ExtentManager* CollectionTemp::getExtentManager() const {
+        return &_database->getExtentManager();
     }
 
 }

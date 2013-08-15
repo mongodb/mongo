@@ -20,6 +20,7 @@
 
 namespace mongo {
 
+    class CollectionTemp;
     class DiskLoc;
     class NamespaceDetails;
 
@@ -56,7 +57,7 @@ namespace mongo {
      */
     class FlatIterator : public CollectionIterator {
     public:
-        FlatIterator(const string& ns, const DiskLoc& start,
+        FlatIterator(const CollectionTemp* collection, const DiskLoc& start,
                      const CollectionScanParams::Direction& dir);
         virtual ~FlatIterator() { }
 
@@ -73,6 +74,8 @@ namespace mongo {
 
         // The collection we're iterating over.
         string _ns;
+
+        const CollectionTemp* _collection;
 
         CollectionScanParams::Direction _direction;
     };

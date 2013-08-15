@@ -24,21 +24,22 @@ namespace mongo {
     // Regular / non-capped collection traversal
     //
 
-    FlatIterator::FlatIterator(const string& ns, const DiskLoc& start,
+    FlatIterator::FlatIterator(const CollectionTemp* collection,
+                               const DiskLoc& start,
                                const CollectionScanParams::Direction& dir)
-        : _curr(start), _ns(ns), _direction(dir) {
+        : _curr(start), _ns(collection->ns().toString()), _collection(collection), _direction(dir) {
 
         if (_curr.isNull()) {
-            // No valid start provided so we must find the start.
-            NamespaceDetails* details = nsdetails(ns);
-            verify(NULL != details);
+
+            const ExtentManager* em = _collection->getExtentManager();
 
             if (CollectionScanParams::FORWARD == _direction) {
+
                 // Find a non-empty extent and start with the first record in it.
-                Extent* e = DataFileMgr::getExtent(details->firstExtent());
+                Extent* e = em->getExtent( _collection->_details->firstExtent() );
 
                 while (e->firstRecord.isNull() && !e->xnext.isNull()) {
-                    e = e->getNextExtent();
+                    e = em->getNextExtent( e );
                 }
 
                 // _curr may be set to DiskLoc() here if e->lastRecord isNull but there is no
@@ -48,12 +49,12 @@ namespace mongo {
             else {
                 // Walk backwards, skipping empty extents, and use the last record in the first
                 // non-empty extent we see.
-                Extent* e = details->lastExtent().ext();
+                Extent* e = em->getExtent( _collection->_details->lastExtent() );
 
                 // TODO ELABORATE
                 // Does one of e->lastRecord.isNull(), e.firstRecord.isNull() imply the other?
                 while (e->lastRecord.isNull() && !e->xprev.isNull()) {
-                    e = e->getPrevExtent();
+                    e = em->getPrevExtent( e );
                 }
 
                 // _curr may be set to DiskLoc() here if e->lastRecord isNull but there is no
@@ -63,7 +64,9 @@ namespace mongo {
         }
     }
 
-    bool FlatIterator::isEOF() { return _curr.isNull(); }
+    bool FlatIterator::isEOF() {
+        return _curr.isNull();
+    }
 
     DiskLoc FlatIterator::getNext() {
         DiskLoc ret = _curr;
@@ -71,10 +74,10 @@ namespace mongo {
         // Move to the next thing.
         if (!isEOF()) {
             if (CollectionScanParams::FORWARD == _direction) {
-                _curr = _curr.rec()->getNext(_curr);
+                _curr = _collection->getExtentManager()->getNextRecord( _curr );
             }
             else {
-                _curr = _curr.rec()->getPrev(_curr);
+                _curr = _collection->getExtentManager()->getPrevRecord( _curr );
             }
         }
 
@@ -84,21 +87,29 @@ namespace mongo {
     void FlatIterator::invalidate(const DiskLoc& dl) {
         // Just move past the thing being deleted.
         if (dl == _curr) {
-            // TODO: do we need this for sure?  Playing it safe for now.
-            if (NULL == nsdetails(_ns)) {
+
+            _collection = cc().database()->getCollectionTemp( _ns );
+            if ( _collection == NULL ) {
                 return;
             }
+
             // We don't care about the return of getNext so much as the side effect of moving _curr
             // to the 'next' thing.
             getNext();
+
+            _collection = NULL;
         }
     }
 
-    void FlatIterator::prepareToYield() { }
+    void FlatIterator::prepareToYield() {
+        _collection = NULL;
+    }
 
     bool FlatIterator::recoverFromYield() {
+        _collection = cc().database()->getCollectionTemp( _ns );
+
         // If the collection we're iterating over was dropped...
-        if (NULL == nsdetails(_ns)) {
+        if ( _collection == NULL ) {
             // Go right to EOF as a preventative measure.
             _curr = DiskLoc();
 
