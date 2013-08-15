@@ -35,8 +35,7 @@ _ disallow system* manipulations from the database.
 #include "mongo/base/counter.h"
 #include "mongo/base/owned_pointer_vector.h"
 #include "mongo/db/auth/auth_index_d.h"
-#include "mongo/db/auth/authorization_manager.h"
-#include "mongo/db/auth/authorization_manager_global.h"
+#include "mongo/db/auth/privilege_document_parser.h"
 #include "mongo/db/pdfile_private.h"
 #include "mongo/db/background.h"
 #include "mongo/db/btree.h"
@@ -795,7 +794,8 @@ namespace mongo {
 
         NamespaceString nsstring(ns);
         if (nsstring.coll() == "system.users") {
-            uassertStatusOK(getGlobalAuthorizationManager()->checkValidPrivilegeDocument(nsstring.db(), objNew));
+            V1PrivilegeDocumentParser parser;
+            uassertStatusOK(parser.checkValidPrivilegeDocument(nsstring.db(), objNew));
         }
 
         uassert( 13596 , str::stream() << "cannot change _id of a document old:" << objOld << " new:" << objNew,
@@ -1013,8 +1013,9 @@ namespace mongo {
             else if ( legalClientSystemNS( ns , true ) ) {
                 if ( obuf && strstr( ns , ".system.users" ) ) {
                     BSONObj t( reinterpret_cast<const char *>( obuf ) );
-                    uassertStatusOK(getGlobalAuthorizationManager()->checkValidPrivilegeDocument(
-                                            nsToDatabaseSubstring(ns), t));
+                    V1PrivilegeDocumentParser parser;
+                    uassertStatusOK(parser.checkValidPrivilegeDocument(nsToDatabaseSubstring(ns),
+                                                                       t));
                 }
             }
             else if ( !god ) {
