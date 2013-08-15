@@ -39,9 +39,9 @@ __split_row_page_inmem(WT_SESSION_IMPL *session, WT_PAGE *orig)
 	 * Only split a page once, otherwise workloads that update in the
 	 * middle of the page could continually split without any benefit.
 	 */
-	if (orig->modify == NULL || F_ISSET(orig->modify, WT_PM_WAS_SPLIT))
+	if (F_ISSET_ATOMIC(orig, WT_PAGE_WAS_SPLIT))
 		return (EBUSY);
-	F_SET(orig->modify, WT_PM_WAS_SPLIT);
+	F_SET_ATOMIC(orig, WT_PAGE_WAS_SPLIT);
 
 	/* Find the final item on the original page. */
 	if (orig->entries == 0)
@@ -57,8 +57,9 @@ __split_row_page_inmem(WT_SESSION_IMPL *session, WT_PAGE *orig)
 	 * a good heuristic for that) - it's likely that the page isn't
 	 * part of an append workload.
 	 */
-	if (ins == NULL || ins_head->head[4] == NULL ||
-	    ins_head->head[0] == ins_head->tail[0])
+#define	WT_MIN_SPLIT_SKIPLIST_DEPTH	WT_MIN(5, WT_SKIP_MAXDEPTH -1)
+	if (ins == NULL || ins_head->head[0] == ins_head->tail[0] ||
+	    ins_head->head[WT_MIN_SPLIT_SKIPLIST_DEPTH] == NULL)
 		return (EBUSY);
 
 	/*
