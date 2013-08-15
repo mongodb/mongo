@@ -791,6 +791,8 @@ namespace mongo {
         // Sets _tempsNs and prepares it to receive data.
         void prepTempCollection();
 
+        void spill(DBClientBase* conn, const vector<BSONObj>& toInsert);
+
         bool _done;
 
         NamespaceString _tempNs; // output goes here as it is being processed.
