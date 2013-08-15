@@ -353,6 +353,11 @@ struct __wt_cursor {
 	 * 'r' type key and 't' type value) may implicitly create the missing
 	 * records as records with a value of 0.
 	 *
+	 * When loading a large amount of data into a new object, using
+	 * a cursor with the \c bulk configuration string enabled and
+	 * loading the data in sorted order will be much faster than doing
+	 * out-of-order inserts.  See @ref bulk_load for more information.
+	 *
 	 * @param cursor the cursor handle
 	 * @errors
 	 * In particular, if \c overwrite is not configured and a record with
