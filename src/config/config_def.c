@@ -10,8 +10,8 @@ static const WT_CONFIG_CHECK confchk_colgroup_meta[] = {
 };
 
 static const WT_CONFIG_CHECK confchk_connection_load_extension[] = {
+	{ "config", "string", NULL, NULL},
 	{ "entry", "string", NULL, NULL},
-	{ "prefix", "string", NULL, NULL},
 	{ "terminate", "string", NULL, NULL},
 	{ NULL, NULL, NULL, NULL }
 };
@@ -75,6 +75,7 @@ static const WT_CONFIG_CHECK confchk_file_meta[] = {
 	{ "os_cache_dirty_max", "int", "min=0", NULL},
 	{ "os_cache_max", "int", "min=0", NULL},
 	{ "prefix_compression", "boolean", NULL, NULL},
+	{ "prefix_compression_min", "int", "min=0", NULL},
 	{ "split_pct", "int", "min=25,max=100", NULL},
 	{ "value_format", "format", NULL, NULL},
 	{ "version", "string", NULL, NULL},
@@ -151,6 +152,7 @@ static const WT_CONFIG_CHECK confchk_session_create[] = {
 	{ "os_cache_dirty_max", "int", "min=0", NULL},
 	{ "os_cache_max", "int", "min=0", NULL},
 	{ "prefix_compression", "boolean", NULL, NULL},
+	{ "prefix_compression_min", "int", "min=0", NULL},
 	{ "source", "string", NULL, NULL},
 	{ "split_pct", "int", "min=25,max=100", NULL},
 	{ "type", "string", NULL, NULL},
@@ -288,7 +290,7 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  NULL
 	},
 	{ "connection.load_extension",
-	  "entry=wiredtiger_extension_init,prefix=,"
+	  "config=,entry=wiredtiger_extension_init,"
 	  "terminate=wiredtiger_extension_terminate",
 	  confchk_connection_load_extension
 	},
@@ -312,8 +314,9 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  "huffman_key=,huffman_value=,internal_item_max=0,"
 	  "internal_key_truncate=,internal_page_max=4KB,key_format=u,key_gap=10"
 	  ",leaf_item_max=0,leaf_page_max=1MB,memory_page_max=5MB,"
-	  "os_cache_dirty_max=0,os_cache_max=0,prefix_compression=,split_pct=75"
-	  ",value_format=u,version=(major=0,minor=0)",
+	  "os_cache_dirty_max=0,os_cache_max=0,prefix_compression=,"
+	  "prefix_compression_min=4,split_pct=75,value_format=u,"
+	  "version=(major=0,minor=0)",
 	  confchk_file_meta
 	},
 	{ "index.meta",
@@ -350,8 +353,8 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  "lsm_bloom_config=,lsm_bloom_hash_count=4,lsm_bloom_newest=0,"
 	  "lsm_bloom_oldest=0,lsm_chunk_size=2MB,lsm_merge_max=15,"
 	  "lsm_merge_threads=1,memory_page_max=5MB,os_cache_dirty_max=0,"
-	  "os_cache_max=0,prefix_compression=,source=,split_pct=75,type=file,"
-	  "value_format=u",
+	  "os_cache_max=0,prefix_compression=,prefix_compression_min=4,source=,"
+	  "split_pct=75,type=file,value_format=u",
 	  confchk_session_create
 	},
 	{ "session.drop",

@@ -124,7 +124,7 @@ __wt_open(WT_SESSION_IMPL *session,
 		WT_ERR_MSG(session, ret,
 		    direct_io ?
 		    "%s: open failed with direct I/O configured, some "
-		    "filesystem types do not support direct I/O" : "%s", name);
+		    "filesystem types do not support direct I/O" : "%s", path);
 
 #if defined(HAVE_FCNTL) && defined(FD_CLOEXEC) && !defined(O_CLOEXEC)
 	/*

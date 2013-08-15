@@ -747,6 +747,10 @@ connection_ops(WT_CONNECTION *conn)
 #ifdef MIGHT_NOT_RUN
 	/*! [Load an extension] */
 	ret = conn->load_extension(conn, "my_extension.dll", NULL);
+
+	ret = conn->load_extension(conn,
+	    "datasource/libdatasource.so",
+	    "config=[device=/dev/sd1,alignment=64]");
 	/*! [Load an extension] */
 #endif
 

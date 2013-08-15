@@ -10,6 +10,83 @@
 static int __conn_verbose_config(WT_SESSION_IMPL *, const char *[]);
 
 /*
+ * ext_collate --
+ *	Call the collation function (external API version).
+ */
+static int
+ext_collate(WT_EXTENSION_API *wt_api,
+    WT_SESSION *wt_session, WT_ITEM *first, WT_ITEM *second, int *cmpp)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_SESSION_IMPL *session;
+
+	conn = (WT_CONNECTION_IMPL *)wt_api->conn;
+	if ((session = (WT_SESSION_IMPL *)wt_session) == NULL)
+		session = conn->default_session;
+
+	WT_RET(WT_LEX_CMP(session, wt_api->collator, first, second, *cmpp));
+
+	return (0);
+}
+
+/*
+ * ext_collator_config --
+ *	Given a configuration, configure the collator (external API version).
+ */
+static int
+ext_collator_config(
+    WT_EXTENSION_API *wt_api, WT_SESSION *wt_session, WT_CONFIG_ARG *cfg_arg)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_SESSION_IMPL *session;
+	const char **cfg;
+
+	conn = (WT_CONNECTION_IMPL *)wt_api->conn;
+	if ((session = (WT_SESSION_IMPL *)wt_session) == NULL)
+		session = conn->default_session;
+
+	/* The default is a standard lexicographic comparison. */
+	if ((cfg = (const char **)cfg_arg) == NULL)
+		return (0);
+
+	return (__wt_collator_config(session, cfg, &wt_api->collator));
+}
+
+/*
+ * __wt_collator_config --
+ *	Given a configuration, configure the collator.
+ */
+int
+__wt_collator_config(
+    WT_SESSION_IMPL *session, const char **cfg, WT_COLLATOR **collatorp)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_CONFIG_ITEM cval;
+	WT_DECL_RET;
+	WT_NAMED_COLLATOR *ncoll;
+
+	*collatorp = NULL;
+
+	conn = S2C(session);
+
+	if ((ret = __wt_config_gets(session, cfg, "collator", &cval)) != 0)
+		return (ret == WT_NOTFOUND ? 0 : ret);
+
+	if (cval.len > 0) {
+		TAILQ_FOREACH(ncoll, &conn->collqh, q)
+			if (WT_STRING_MATCH(
+			    ncoll->name, cval.str, cval.len)) {
+				*collatorp = ncoll->collator;
+				return (0);
+			}
+
+		WT_RET_MSG(session, EINVAL,
+		    "unknown collator '%.*s'", (int)cval.len, cval.str);
+	}
+	return (0);
+}
+
+/*
  * __conn_get_extension_api --
  *	WT_CONNECTION.get_extension_api method.
  */
@@ -26,6 +103,8 @@ __conn_get_extension_api(WT_CONNECTION *wt_conn)
 	conn->extension_api.strerror = wiredtiger_strerror;
 	conn->extension_api.scr_alloc = __wt_ext_scr_alloc;
 	conn->extension_api.scr_free = __wt_ext_scr_free;
+	conn->extension_api.collator_config = ext_collator_config;
+	conn->extension_api.collate = ext_collate;
 	conn->extension_api.config_get = __wt_ext_config_get;
 	conn->extension_api.config_strget = __wt_ext_config_strget;
 	conn->extension_api.config_scan_begin = __wt_ext_config_scan_begin;
@@ -39,6 +118,10 @@ __conn_get_extension_api(WT_CONNECTION *wt_conn)
 	conn->extension_api.struct_size = __wt_ext_struct_size;
 	conn->extension_api.struct_unpack = __wt_ext_struct_unpack;
 	conn->extension_api.transaction_id = __wt_ext_transaction_id;
+	conn->extension_api.transaction_isolation_level =
+	    __wt_ext_transaction_isolation_level;
+	conn->extension_api.transaction_notify = __wt_ext_transaction_notify;
+	conn->extension_api.transaction_oldest = __wt_ext_transaction_oldest;
 	conn->extension_api.transaction_visible = __wt_ext_transaction_visible;
 
 	return (&conn->extension_api);
@@ -66,26 +149,29 @@ __conn_load_extension(
 	conn = (WT_CONNECTION_IMPL *)wt_conn;
 	CONNECTION_API_CALL(conn, session, load_extension, config, cfg);
 
-	WT_ERR(__wt_config_gets(session, cfg, "entry", &cval));
-	WT_ERR(__wt_strndup(session, cval.str, cval.len, &init_name));
-
 	/*
 	 * This assumes the underlying shared libraries are reference counted,
 	 * that is, that re-opening a shared library simply increments a ref
 	 * count, and closing it simply decrements the ref count, and the last
 	 * close discards the reference entirely -- in other words, we do not
 	 * check to see if we've already opened this shared library.
-	 *
-	 * Fill in the extension structure and call the load function.
 	 */
 	WT_ERR(__wt_dlopen(session, path, &dlh));
-	WT_ERR(__wt_dlsym(session, dlh, init_name, 1, &load));
-	WT_ERR(load(wt_conn, (WT_CONFIG_ARG *)cfg));
 
-	/* Remember the unload function for when we close. */
+	/*
+	 * Find the load function, remember the unload function for when we
+	 * close.
+	 */
+	WT_ERR(__wt_config_gets(session, cfg, "entry", &cval));
+	WT_ERR(__wt_strndup(session, cval.str, cval.len, &init_name));
+	WT_ERR(__wt_dlsym(session, dlh, init_name, 1, &load));
+
 	WT_ERR(__wt_config_gets(session, cfg, "terminate", &cval));
 	WT_ERR(__wt_strndup(session, cval.str, cval.len, &terminate_name));
 	WT_ERR(__wt_dlsym(session, dlh, terminate_name, 0, &dlh->terminate));
+
+	/* Call the load function last, it simplifies error handling. */
+	WT_ERR(load(wt_conn, (WT_CONFIG_ARG *)cfg));
 
 	/* Link onto the environment's list of open libraries. */
 	__wt_spin_lock(session, &conn->api_lock);

@@ -208,15 +208,12 @@ ops(void *arg)
 			 * have to specify the record number, which requires an
 			 * append configuration.
 			 */
-			if ((ret = session->open_cursor(session, g.uri, NULL,
-			    oc_conf(config, sizeof(config), "overwrite"),
-			    &cursor)) != 0)
+			if ((ret = session->open_cursor(session,
+			    g.uri, NULL, "overwrite", &cursor)) != 0)
 				die(ret, "session.open_cursor");
 			if ((g.type == FIX || g.type == VAR) &&
-			    (ret = session->open_cursor(
-			    session, g.uri, NULL,
-			    oc_conf(config, sizeof(config), "append"),
-			    &cursor_insert)) != 0)
+			    (ret = session->open_cursor(session,
+			    g.uri, NULL, "append", &cursor_insert)) != 0)
 				die(ret, "session.open_cursor");
 
 			/* Pick the next session/cursor close/open. */
@@ -227,10 +224,11 @@ ops(void *arg)
 		/* Checkpoint the database. */
 		if (cnt == ckpt_op) {
 			/*
-			 * LSM trees don't support named checkpoints, else 25%
-			 * of the time we name the checkpoint.
+			 * LSM and data-sources don't support named checkpoints,
+			 * else 25% of the time we name the checkpoint.
 			 */
-			if (DATASOURCE("lsm") || MMRAND(1, 4) == 1)
+			if (DATASOURCE("lsm") || DATASOURCE("kvsbdb") ||
+			    DATASOURCE("memrata") || MMRAND(1, 4) == 1)
 				ckpt_config = NULL;
 			else {
 				(void)snprintf(config, sizeof(config),
@@ -430,7 +428,6 @@ wts_read_scan(void)
 	uint64_t cnt, last_cnt;
 	uint8_t *keybuf;
 	int ret;
-	char config[64];
 
 	conn = g.wts_conn;
 
@@ -440,8 +437,8 @@ wts_read_scan(void)
 	/* Open a session and cursor pair. */
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
 		die(ret, "connection.open_session");
-	if ((ret = session->open_cursor(session,
-	    g.uri, NULL, oc_conf(config, sizeof(config), NULL), &cursor)) != 0)
+	if ((ret = session->open_cursor(
+	    session, g.uri, NULL, NULL, &cursor)) != 0)
 		die(ret, "session.open_cursor");
 
 	/* Check a random subset of the records using the key. */

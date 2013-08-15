@@ -36,7 +36,6 @@ wts_load(void)
 	WT_SESSION *session;
 	uint8_t *keybuf, *valbuf;
 	int is_bulk, ret;
-	char config[64];
 
 	conn = g.wts_conn;
 
@@ -55,8 +54,7 @@ wts_load(void)
 	is_bulk = !g.c_reverse &&
 	    !DATASOURCE("kvsbdb") && !DATASOURCE("memrata");
 	if ((ret = session->open_cursor(session, g.uri, NULL,
-	    oc_conf(config, sizeof(config), is_bulk ? "bulk" : NULL),
-	    &cursor)) != 0)
+	    is_bulk ? "bulk" : NULL, &cursor)) != 0)
 		die(ret, "session.open_cursor");
 
 	/* Set up the default key buffer. */

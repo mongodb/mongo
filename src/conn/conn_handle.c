@@ -36,6 +36,7 @@ __wt_connection_init(WT_CONNECTION_IMPL *conn)
 	/* Locks. */
 	__wt_spin_init(session, &conn->api_lock);
 	__wt_spin_init(session, &conn->checkpoint_lock);
+	__wt_spin_init(session, &conn->dhandle_lock);
 	__wt_spin_init(session, &conn->fh_lock);
 	__wt_spin_init(session, &conn->hot_backup_lock);
 	__wt_spin_init(session, &conn->schema_lock);

@@ -202,7 +202,7 @@ __wt_open_cursor(WT_SESSION_IMPL *session,
 	else if ((dsrc = __wt_schema_get_source(session, uri)) != NULL)
 		ret = dsrc->open_cursor == NULL ?
 		    __wt_object_unsupported(session, uri) :
-		    __wt_curds_create(session, uri, cfg, dsrc, cursorp);
+		    __wt_curds_create(session, uri, owner, cfg, dsrc, cursorp);
 	else
 		ret = __wt_bad_object_type(session, uri);
 
@@ -217,10 +217,11 @@ static int
 __session_open_cursor(WT_SESSION *wt_session,
     const char *uri, WT_CURSOR *to_dup, const char *config, WT_CURSOR **cursorp)
 {
+	WT_CURSOR *cursor;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 
-	*cursorp = NULL;
+	cursor = *cursorp = NULL;
 
 	session = (WT_SESSION_IMPL *)wt_session;
 	SESSION_API_CALL(session, open_cursor, config, cfg);
@@ -232,18 +233,27 @@ __session_open_cursor(WT_SESSION *wt_session,
 
 	if (to_dup != NULL) {
 		uri = to_dup->uri;
-		if (WT_PREFIX_MATCH(uri, "colgroup:") ||
-		    WT_PREFIX_MATCH(uri, "index:") ||
-		    WT_PREFIX_MATCH(uri, "file:") ||
-		    WT_PREFIX_MATCH(uri, "lsm:") ||
-		    WT_PREFIX_MATCH(uri, "table:"))
-			ret = __wt_cursor_dup(session, to_dup, cfg, cursorp);
-		else
-			ret = __wt_bad_object_type(session, uri);
-	} else
-		ret = __wt_open_cursor(session, uri, NULL, cfg, cursorp);
+		if (!WT_PREFIX_MATCH(uri, "colgroup:") &&
+		    !WT_PREFIX_MATCH(uri, "index:") &&
+		    !WT_PREFIX_MATCH(uri, "file:") &&
+		    !WT_PREFIX_MATCH(uri, "lsm:") &&
+		    !WT_PREFIX_MATCH(uri, "table:") &&
+		    __wt_schema_get_source(session, uri) == NULL)
+			WT_ERR(__wt_bad_object_type(session, uri));
+	}
 
-err:	API_END_NOTFOUND_MAP(session, ret);
+	WT_ERR(__wt_open_cursor(session, uri, NULL, cfg, &cursor));
+	if (to_dup != NULL)
+		WT_ERR(__wt_cursor_dup_position(to_dup, cursor));
+
+	*cursorp = cursor;
+
+	if (0) {
+err:		if (cursor != NULL)
+			WT_TRET(cursor->close(cursor));
+	}
+
+	API_END_NOTFOUND_MAP(session, ret);
 }
 
 /*
@@ -542,10 +552,12 @@ __session_truncate(WT_SESSION *wt_session,
 		goto done;
 	}
 
-	/* Cursor truncate is only supported for file and table objects. */
+	/*
+	 * Cursor truncate is only supported for some objects, check for the
+	 * supporting methods we need, range_truncate and compare.
+	 */
 	cursor = start == NULL ? stop : start;
-	if (!WT_PREFIX_MATCH(cursor->uri, "file:") &&
-	    !WT_PREFIX_MATCH(cursor->uri, "table:"))
+	if (cursor->compare == NULL)
 		WT_ERR(__wt_bad_object_type(session, cursor->uri));
 
 	/*
@@ -595,10 +607,7 @@ __session_truncate(WT_SESSION *wt_session,
 		}
 	}
 
-	if (WT_PREFIX_MATCH(cursor->uri, "file:"))
-		WT_ERR(__wt_curfile_truncate(session, start, stop));
-	else
-		WT_ERR(__wt_curtable_truncate(session, start, stop));
+	WT_ERR(__wt_schema_range_truncate(session, start, stop));
 
 done:
 err:	TXN_API_END_NOTFOUND_MAP(session, ret);
