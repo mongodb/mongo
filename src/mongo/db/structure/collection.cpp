@@ -1,7 +1,7 @@
-// collection.h
+// collection.cpp
 
 /**
-*    Copyright (C) 2012 10gen Inc.
+*    Copyright (C) 2013 10gen Inc.
 *
 *    This program is free software: you can redistribute it and/or  modify
 *    it under the terms of the GNU Affero General Public License, version 3,
@@ -16,32 +16,20 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#pragma once
+#include "mongo/db/structure/collection.h"
 
-#include <string>
-
-#include "mongo/base/string_data.h"
-#include "mongo/db/diskloc.h"
+#include "mongo/db/database.h"
+#include "mongo/db/namespace_details.h"
+#include "mongo/db/storage/extent.h"
 
 namespace mongo {
 
-    class Database;
-    class NamespaceDetails;
-
-    /**
-     * this is NOT safe through a yield right now
-     * not sure if it will be, or what yet
-     */
-    class CollectionTemp {
-    public:
-        CollectionTemp( const StringData& fullNS,
-                        NamespaceDetails* details,
-                        Database* database );
-
-    private:
-        std::string _ns; // TODO: this copy might be annoyingly slow
-        NamespaceDetails* _details;
-        Database* _database;
-    };
+    CollectionTemp::CollectionTemp( const StringData& fullNS,
+                                    NamespaceDetails* details,
+                                    Database* database ) {
+        _ns = fullNS.toString();
+        _details = details;
+        _database = database;
+    }
 
 }

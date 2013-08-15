@@ -303,5 +303,16 @@ namespace mongo {
         return true;
     }
 
+    CollectionTemp* Database::getCollectionTemp( const StringData& ns ) {
+        StringData dbName = nsToDatabaseSubstring( ns );
+        verify( dbName == _name);
+
+        NamespaceDetails* details = _namespaceIndex.details( ns );
+        if ( !details ) {
+            return NULL;
+        }
+
+        return new CollectionTemp( ns, details, this );
+    }
 
 } // namespace mongo
