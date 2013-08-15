@@ -132,7 +132,7 @@ __split_row_page_inmem(WT_SESSION_IMPL *session, WT_PAGE *orig)
 	 * updating the original page.
 	 */
 	transfer_size =
-	    sizeof(WT_INSERT) + (ins_depth * sizeof(WT_INSERT *)) +
+	    sizeof(WT_INSERT) + ((size_t)ins_depth * sizeof(WT_INSERT *)) +
 	    WT_INSERT_KEY_SIZE(ins);
 	__wt_cache_page_inmem_incr(session, right_child, transfer_size);
 	__wt_cache_page_inmem_decr(session, orig, transfer_size);
