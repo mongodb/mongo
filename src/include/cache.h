@@ -6,6 +6,17 @@
  */
 
 /*
+ * Tuning constants: I hesitate to call this tuning, but we want to review some
+ * number of pages from each file's in-memory tree for each page we evict.
+ */
+#define	WT_EVICT_INT_SKEW  (1<<12)	/* Prefer leaf pages over internal
+					   pages by this many increments of the
+					   read generation. */
+#define	WT_EVICT_WALK_PER_FILE	10	/* Pages to visit per file */
+#define	WT_EVICT_WALK_BASE     300	/* Pages tracked across file visits */
+#define	WT_EVICT_WALK_INCR     100	/* Pages added each walk */
+
+/*
  * WT_EVICT_ENTRY --
  *	Encapsulation of an eviction candidate.
  */
@@ -40,9 +51,11 @@ struct __wt_cache {
 	/*
 	 * Eviction thread information.
 	 */
-	WT_CONDVAR *evict_cond;		/* Cache eviction server mutex */
+	WT_CONDVAR *evict_cond;		/* Eviction server condition */
 	WT_SPINLOCK evict_lock;		/* Eviction LRU queue */
 	WT_SPINLOCK evict_walk_lock;	/* Eviction walk location */
+	/* Condition signalled when the eviction server populates the queue */
+	WT_CONDVAR *evict_waiter_cond;
 
 	u_int eviction_trigger;		/* Percent to trigger eviction */
 	u_int eviction_target;		/* Percent to end eviction */
@@ -53,8 +66,10 @@ struct __wt_cache {
 	 */
 	WT_EVICT_ENTRY *evict;		/* LRU pages being tracked */
 	WT_EVICT_ENTRY *evict_current;	/* LRU current page to be evicted */
-	uint32_t evict_entries;		/* LRU list eviction slots */
 	uint32_t evict_candidates;	/* LRU list pages to evict */
+	uint32_t evict_entries;		/* LRU entries in the queue */
+	volatile uint32_t evict_max;	/* LRU maximum eviction slot used */
+	uint32_t evict_slots;		/* LRU list eviction slots */
 	u_int    evict_file_next;	/* LRU: next file to search */
 	uint32_t force_entries;		/* Forced eviction page count */
 

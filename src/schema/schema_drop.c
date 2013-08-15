@@ -15,9 +15,13 @@ static int
 __drop_file(
     WT_SESSION_IMPL *session, const char *uri, int force, const char *cfg[])
 {
+	WT_CONFIG_ITEM cval;
 	WT_DECL_RET;
-	int exist;
+	int exist, remove_files;
 	const char *filename;
+
+	WT_RET(__wt_config_gets(session, cfg, "remove_files", &cval));
+	remove_files = (cval.val != 0);
 
 	filename = uri;
 	if (!WT_PREFIX_SKIP(filename, "file:"))
@@ -38,6 +42,9 @@ __drop_file(
 	WT_TRET(__wt_metadata_remove(session, uri));
 	if (force && ret == WT_NOTFOUND)
 		ret = 0;
+
+	if (!remove_files)
+		return (ret);
 
 	/* Remove the underlying physical file. */
 	exist = 0;
@@ -158,11 +165,8 @@ __wt_schema_drop(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
 	WT_DECL_RET;
 	int force;
 
-	WT_RET(__wt_config_gets_defno(session, cfg, "force", &cval));
+	WT_RET(__wt_config_gets_def(session, cfg, "force", 0, &cval));
 	force = (cval.val != 0);
-
-	/* Disallow drops from the WiredTiger name space. */
-	WT_RET(__wt_schema_name_check(session, uri));
 
 	WT_RET(__wt_meta_track_on(session));
 
@@ -175,10 +179,17 @@ __wt_schema_drop(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
 		ret = __drop_file(session, uri, force, cfg);
 	else if (WT_PREFIX_MATCH(uri, "index:"))
 		ret = __drop_index(session, uri, cfg);
+	else if (WT_PREFIX_MATCH(uri, "lsm:"))
+		ret = __wt_lsm_tree_drop(session, uri, cfg);
 	else if (WT_PREFIX_MATCH(uri, "table:"))
 		ret = __drop_table(session, uri, force, cfg);
-	else if ((ret = __wt_schema_get_source(session, uri, &dsrc)) == 0)
-		ret = dsrc->drop(dsrc, &session->iface, uri, cfg);
+	else if ((dsrc = __wt_schema_get_source(session, uri)) != NULL)
+		ret = dsrc->drop == NULL ?
+		    __wt_object_unsupported(session, uri) :
+		    dsrc->drop(
+		    dsrc, &session->iface, uri, (WT_CONFIG_ARG *)cfg);
+	else
+		ret = __wt_bad_object_type(session, uri);
 
 	/*
 	 * Map WT_NOTFOUND to ENOENT (or to 0 if "force" is set), based on the

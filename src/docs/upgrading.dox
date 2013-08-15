@@ -1,7 +1,201 @@
 /*! @page upgrading Upgrading WiredTiger applications
 
+@section version_164 Upgrading to Version 1.6.4
+<dl>
+
+<dt>File format changes</dt>
+<dd>
+The underlying file formats changed in the 1.6.4 release; tables and files
+should be dumped and re-loaded into a new database.
+</dd>
+
+<dt>wt utility load command</dt>
+<dd>
+The default behavior of the \c wt utility's \c load command has been
+changed to overwrite existing data, by default, and the \c -o flag to
+the \c load command (overwrite existing data) has been replaced with the
+\c -n flag (do not overwrite existing data).   Applications requiring
+the previous default behavior of not overwriting existing data should
+add the \c -n option to their command line configuration; applications
+previously using the \c -o option on their command line configurations
+should remove it.
+</dd>
+
+</dl>
+<hr>
+@section version_163 Upgrading to Version 1.6.3
+<dl>
+
+<dt>Cursor overwrite configuration</dt>
+<dd>
+In previous releases, the WT_SESSION::open_cursor \c overwrite configuration
+string behaved inconsistently across Btree and LSM data sources.  In Btree,
+\c overwrite was \c false by default and was limited to the WT_CURSOR::insert
+method, changing an insert to succeed regardless of whether or not the record
+previously existed.   In LSM trees, \c overwrite was \c true by default, and
+applied to the WT_CURSOR::insert, WT_CURSOR::remove and WT_CURSOR::update
+methods, configuring all three methods to ignore the existing state of the
+record.
+
+In the 1.6.3 release, the \c overwrite configuration is consistent across both
+Btree and LSM tree data sources.  For performance reasons, the default is the
+behavior previously described for LSM trees: in other words, \c overwrite is
+\c true by default, causing WT_CURSOR::insert, WT_CURSOR::remove and
+WT_CURSOR::update to ignore the current state of the record, and these methods
+will succeed regardless of whether or not the record previously exists.  When
+an application configures \c overwrite to \c false, WT_CURSOR::insert will fail
+with ::WT_DUPLICATE_KEY if the record previously exists, and WT_CURSOR::update
+and WT_CURSOR::remove will fail with ::WT_NOTFOUND if the record does not
+previously exist.
+
+<b>This is a potentially serious API change that will not be detected by
+compilation.</b>  Application cursors should be reviewed to confirm they are
+configured for the desired behavior.
+</dd>
+
+</dl>
+<hr>
+@section version_162 Upgrading to Version 1.6.2
+<dl>
+
+<dt>Table of WiredTiger extension methods</dt>
+<dd>
+New functionality was added to the list of WiredTiger extension methods;
+applications using the extension methods will require recompilation.
+</dd>
+
+<dt>WT_SESSION::create no longer accepts a "source" configuration</dt>
+<dd>
+The \c "source" configuration key has been removed from WT_SESSION::create.
+Normal applications should not have been using it, and there were a number of
+bugs associated with it.
+</dd>
+
+<dt>Default checksum configuration</dt>
+<dd>
+The default file checksum configuration was changed to \c uncompressed,
+which means blocks that are compressed will no longer also include a
+checksum, by default.  Applications using compression insufficient for
+the purposes of corrupted block identification should change their file
+checksum configuration to \c on.
+</dd>
+
+</dl>
+<hr>
+@section version_161 Upgrading to Version 1.6.1
+<dl>
+
+<dt>Default page sizes</dt>
+<dd>
+In the 1.6.1 release, the default for the WT_SESSION::create configuration
+string \c allocation_size changed from 512B to 4KB, and the default for the
+configuration string \c internal_page_max changed from 2KB to 4KB.
+Applications wanting to create files with smaller allocation or internal
+page sizes will need to set those configuration values explicitly.
+</dd>
+
+<dt>Shared cache configuration</dt>
+<dd>
+In the 1.6.1 release, an explicit shared_cache=(enable=boolean) option was
+added to the wiredtiger_open configuration options. Existing applications that
+use shared cache functionality will need to add the enable option to the
+configuration string. The default value for the option is false.
+</dd>
+
+<dt>WT_COMPRESSOR::compress_raw signature</dt>
+<dd>
+In the 1.6.1 release, the \c split_pct argument to the
+WT_COMPRESSOR::compress_raw function changed type from \c u_int to \c int,
+applications may require modification to avoid compiler warnings.
+</dd>
+
+</dl>
+<hr>
+@section version_160 Upgrading to Version 1.6.0
+<dl>
+
+<dt>File format changes</dt>
+<dd>
+The underlying file formats changed in the 1.6.0 release; tables and files
+should be dumped and re-loaded into a new database.
+</dd>
+
+</dl>
+<hr>
+@section version_153 Upgrading to Version 1.5.3
+<dl>
+
+<dt>Configuration strings</dt>
+<dd>
+An undocumented feature where configuration string case was ignored has
+been removed, and all configuration strings are now case-dependent.
+Applications may require modifications to resolve run-time errors.
+</dd>
+
+<dt>Loading extensions and WT_EXTENSION_API</dt>
+<dd>
+The following changes are only applicable to applications loading
+extensions and/or using the WiredTiger extension functions described in
+WT_EXTENSION_API.
+
+<ul>
+<li>
+The signature of ::wiredtiger_extension_init has changed
+from <code>(WT_SESSION *session, WT_EXTENSION_API *api)</code> to
+<code>(WT_CONNECTION *connection)</code>.   As no WT_EXTENSION_API
+handle reference is passed to the function, the
+WT_CONNECTION::get_extension_api has been added to support retrieval of
+the extension API.  Applications may require modifications.
+
+<li>
+The type of all configuration arguments to extension methods has changed
+from \c "const char *" to \c "WT_CONFIG_ARG *", and the WT_EXTENSION::config
+method added to support configuration parsing; applications may require
+modifications.
+
+<li>
+The undocumented \c wiredtiger_XXX defines for WT_EXTENSION_API extension
+methods have been removed from the \c wiredtiger_ext.h include file;
+applications should instead use the method handles referenced by the
+WT_EXTENSION_API handle to call extension functions.
+
+<li>
+The extension API methods have all changed to require an additional
+parameter, the WT_EXTENSION_API method handle; applications may require
+modifications.
+
+<li>
+The WT_SESSION::msg_printf method was replaced by WT_EXTENSION_API::msg_printf;
+applications may require modifications.
+</ul>
+</dd>
+
+<dt>WT_DATA_SOURCE</dt>
+<dd>
+The following changes are only applicable to applications providing new
+implementations of the WiredTiger WT_DATA_SOURCE class.
+
+<ul>
+<li>
+The WT_DATA_SOURCE class has three new methods: WT_DATA_SOURCE::compact,
+WT_DATA_SOURCE::salvage, and WT_DATA_SOURCE::verify; applications may
+require modifications to resolve compile errors.
+
+<li>
+The \c owner argument to the WT_DATA_SOURCE::open_cursor method has been
+removed; applications may require modifications to resolve compile errors.
+
+<li>
+The \c exclusive argument to the WT_DATA_SOURCE::create method has been
+removed; applications may require modifications to resolve compile errors.
+</ul>
+</dd>
+
+</dl>
+<hr>
 @section version_143 Upgrading to Version 1.4.3
 <dl>
+
 <dt>Statistics</dt>
 <dd>
 WiredTiger statistics are no longer maintained by default; to configure

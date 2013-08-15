@@ -26,6 +26,7 @@
  */
 
 #include <bzlib.h>
+#include <errno.h>
 #include <inttypes.h>
 #include <stdlib.h>
 #include <string.h>
@@ -33,69 +34,104 @@
 #include <wiredtiger.h>
 #include <wiredtiger_ext.h>
 
-WT_EXTENSION_API *wt_api;
-
 static int
 bzip2_compress(WT_COMPRESSOR *, WT_SESSION *,
     uint8_t *, size_t, uint8_t *, size_t, size_t *, int *);
 static int
 bzip2_decompress(WT_COMPRESSOR *, WT_SESSION *,
     uint8_t *, size_t, uint8_t *, size_t, size_t *);
+static int
+bzip2_terminate(WT_COMPRESSOR *, WT_SESSION *);
 #ifdef WIREDTIGER_TEST_COMPRESS_RAW
 static int
-bzip2_compress_raw(WT_COMPRESSOR *, WT_SESSION *, size_t, u_int,
+bzip2_compress_raw(WT_COMPRESSOR *, WT_SESSION *, size_t, int,
     size_t, uint8_t *, uint32_t *, uint32_t, uint8_t *, size_t, int,
     size_t *, uint32_t *);
 #endif
 
-static WT_COMPRESSOR bzip2_compressor = {
-    bzip2_compress, NULL, bzip2_decompress, NULL };
+/* Local compressor structure. */
+typedef struct {
+	WT_COMPRESSOR compressor;		/* Must come first */
 
-#define	__UNUSED(v)	((void)(v))
+	WT_EXTENSION_API *wt_api;		/* Extension API */
 
-/* between 0-4: set the amount of verbosity to stderr */
-static int bz_verbosity = 0;
-
-/* between 1-9: set the block size to 100k x this number (compression only) */
-static int bz_blocksize100k = 1;
+	int bz_verbosity;			/* Configuration */
+	int bz_blocksize100k;
+	int bz_workfactor;
+	int bz_small;
+} BZIP_COMPRESSOR;
 
 /*
- * between 0-250: workFactor: see bzip2 manual.  0 is a reasonable default
- * (compression only)
+ * Bzip gives us a cookie to pass to the underlying allocation functions; we
+ * we need two handles, package them up.
  */
-static int bz_workfactor = 0;
-
-/* if nonzero, decompress using less memory, but slower (decompression only) */
-static int bz_small = 0;
+typedef struct {
+	WT_COMPRESSOR *compressor;
+	WT_SESSION *session;
+} BZIP_OPAQUE;
 
 int
-wiredtiger_extension_init(
-    WT_SESSION *session, WT_EXTENSION_API *api, const char *config)
+wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 {
-	WT_CONNECTION *conn;
+	BZIP_COMPRESSOR *bzip_compressor;
 
-	__UNUSED(config);
+	(void)config;				/* Unused parameters */
 
-	wt_api = api;
-	conn = session->connection;
+	if ((bzip_compressor = calloc(1, sizeof(BZIP_COMPRESSOR))) == NULL)
+		return (errno);
 
+	bzip_compressor->compressor.compress = bzip2_compress;
+	bzip_compressor->compressor.compress_raw = NULL;
+	bzip_compressor->compressor.decompress = bzip2_decompress;
+	bzip_compressor->compressor.pre_size = NULL;
+	bzip_compressor->compressor.terminate = bzip2_terminate;
+
+	bzip_compressor->wt_api = connection->get_extension_api(connection);
+
+	/* between 0-4: set the amount of verbosity to stderr */
+	bzip_compressor->bz_verbosity = 0;
+
+	/*
+	 * between 1-9: set the block size to 100k x this number (compression
+	 * only)
+	 */
+	bzip_compressor->bz_blocksize100k = 1;
+
+	/*
+	 * between 0-250: workFactor: see bzip2 manual.  0 is a reasonable
+	 * default (compression only)
+	 */
+	bzip_compressor->bz_workfactor = 0;
+
+	/*
+	 * if nonzero, decompress using less memory, but slower (decompression
+	 * only)
+	 */
+	bzip_compressor->bz_small = 0;
+
+						/* Load the compressor */
 #ifdef WIREDTIGER_TEST_COMPRESS_RAW
-	bzip2_compressor.compress_raw = bzip2_compress_raw;
-	return (conn->add_compressor(conn, "raw", &bzip2_compressor, NULL));
+	bzip_compressor->compressor.compress_raw = bzip2_compress_raw;
+	return (connection->add_compressor(
+	    connection, "raw", (WT_COMPRESSOR *)bzip_compressor, NULL));
 #else
-	return (conn->add_compressor(conn, "bzip2", &bzip2_compressor, NULL));
+	return (connection->add_compressor(
+	    connection, "bzip2", (WT_COMPRESSOR *)bzip_compressor, NULL));
 #endif
 }
 
-/* Bzip2 WT_COMPRESSOR implementation for WT_CONNECTION::add_compressor. */
 /*
  * bzip2_error --
  *	Output an error message, and return a standard error code.
  */
 static int
-bzip2_error(WT_SESSION *session, const char *call, int bzret)
+bzip2_error(
+    WT_COMPRESSOR *compressor, WT_SESSION *session, const char *call, int bzret)
 {
+	WT_EXTENSION_API *wt_api;
 	const char *msg;
+
+	wt_api = ((BZIP_COMPRESSOR *)compressor)->wt_api;
 
 	switch (bzret) {
 	case BZ_MEM_ERROR:
@@ -130,21 +166,32 @@ bzip2_error(WT_SESSION *session, const char *call, int bzret)
 		break;
 	}
 
-	(void)wiredtiger_err_printf(
-	    session, "bzip2 error: %s: %s: %d", call, msg, bzret);
+	(void)wt_api->err_printf(wt_api, session,
+	    "bzip2 error: %s: %s: %d", call, msg, bzret);
 	return (WT_ERROR);
 }
 
 static void *
 bzalloc(void *cookie, int number, int size)
 {
-	return (wiredtiger_scr_alloc(cookie, (size_t)(number * size)));
+	BZIP_OPAQUE *opaque;
+	WT_EXTENSION_API *wt_api;
+
+	opaque = cookie;
+	wt_api = ((BZIP_COMPRESSOR *)opaque->compressor)->wt_api;
+	return (wt_api->scr_alloc(
+	    wt_api, opaque->session, (size_t)(number * size)));
 }
 
 static void
 bzfree(void *cookie, void *p)
 {
-	wiredtiger_scr_free(cookie, p);
+	BZIP_OPAQUE *opaque;
+	WT_EXTENSION_API *wt_api;
+
+	opaque = cookie;
+	wt_api = ((BZIP_COMPRESSOR *)opaque->compressor)->wt_api;
+	wt_api->scr_free(wt_api, opaque->session, p);
 }
 
 static int
@@ -153,19 +200,26 @@ bzip2_compress(WT_COMPRESSOR *compressor, WT_SESSION *session,
     uint8_t *dst, size_t dst_len,
     size_t *result_lenp, int *compression_failed)
 {
+	BZIP_COMPRESSOR *bzip_compressor;
+	BZIP_OPAQUE opaque;
 	bz_stream bz;
 	int ret;
 
-	__UNUSED(compressor);
+	bzip_compressor = (BZIP_COMPRESSOR *)compressor;
 
 	memset(&bz, 0, sizeof(bz));
 	bz.bzalloc = bzalloc;
 	bz.bzfree = bzfree;
-	bz.opaque = session;
+	opaque.compressor = compressor;
+	opaque.session = session;
+	bz.opaque = &opaque;
 
 	if ((ret = BZ2_bzCompressInit(&bz,
-	    bz_blocksize100k, bz_verbosity, bz_workfactor)) != BZ_OK)
-		return (bzip2_error(session, "BZ2_bzCompressInit", ret));
+	    bzip_compressor->bz_blocksize100k,
+	    bzip_compressor->bz_verbosity,
+	    bzip_compressor->bz_workfactor)) != BZ_OK)
+		return (bzip2_error(
+		    compressor, session, "BZ2_bzCompressInit", ret));
 
 	bz.next_in = (char *)src;
 	bz.avail_in = (uint32_t)src_len;
@@ -178,7 +232,8 @@ bzip2_compress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 		*compression_failed = 1;
 
 	if ((ret = BZ2_bzCompressEnd(&bz)) != BZ_OK)
-		return (bzip2_error(session, "BZ2_bzCompressEnd", ret));
+		return (
+		    bzip2_error(compressor, session, "BZ2_bzCompressEnd", ret));
 
 	return (0);
 }
@@ -209,7 +264,7 @@ __bzip2_compress_raw_random(void)
  */
 static int
 bzip2_compress_raw(WT_COMPRESSOR *compressor, WT_SESSION *session,
-    size_t page_max, u_int split_pct, size_t extra,
+    size_t page_max, int split_pct, size_t extra,
     uint8_t *src, uint32_t *offsets, uint32_t slots,
     uint8_t *dst, size_t dst_len, int final,
     size_t *result_lenp, uint32_t *result_slotsp)
@@ -217,10 +272,10 @@ bzip2_compress_raw(WT_COMPRESSOR *compressor, WT_SESSION *session,
 	uint32_t take, twenty_pct;
 	int compression_failed, ret;
 
-	__UNUSED(page_max);
-	__UNUSED(split_pct);
-	__UNUSED(extra);
-	__UNUSED(final);
+	(void)page_max;					/* Unused  parameters */
+	(void)split_pct;
+	(void)extra;
+	(void)final;
 
 	/*
 	 * This function is used by the test/format utility to test the
@@ -283,18 +338,24 @@ bzip2_decompress(WT_COMPRESSOR *compressor, WT_SESSION *session,
     uint8_t *dst, size_t dst_len,
     size_t *result_lenp)
 {
+	BZIP_COMPRESSOR *bzip_compressor;
+	BZIP_OPAQUE opaque;
 	bz_stream bz;
 	int ret, tret;
 
-	__UNUSED(compressor);
+	bzip_compressor = (BZIP_COMPRESSOR *)compressor;
 
 	memset(&bz, 0, sizeof(bz));
 	bz.bzalloc = bzalloc;
 	bz.bzfree = bzfree;
-	bz.opaque = session;
+	opaque.compressor = compressor;
+	opaque.session = session;
+	bz.opaque = &opaque;
 
-	if ((ret = BZ2_bzDecompressInit(&bz, bz_small, bz_verbosity)) != BZ_OK)
-		return (bzip2_error(session, "BZ2_bzDecompressInit", ret));
+	if ((ret = BZ2_bzDecompressInit(&bz,
+	    bzip_compressor->bz_small, bzip_compressor->bz_verbosity)) != BZ_OK)
+		return (bzip2_error(
+		    compressor, session, "BZ2_bzDecompressInit", ret));
 
 	bz.next_in = (char *)src;
 	bz.avail_in = (uint32_t)src_len;
@@ -304,12 +365,21 @@ bzip2_decompress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 		*result_lenp = dst_len - bz.avail_out;
 		ret = 0;
 	} else
-		(void)bzip2_error(session, "BZ2_bzDecompress", ret);
+		(void)bzip2_error(compressor, session, "BZ2_bzDecompress", ret);
 
 	if ((tret = BZ2_bzDecompressEnd(&bz)) != BZ_OK)
-		return (bzip2_error(session, "BZ2_bzDecompressEnd", tret));
+		return (bzip2_error(
+		    compressor, session, "BZ2_bzDecompressEnd", tret));
 
 	return (ret == 0 ?
-	    0 : bzip2_error(session, "BZ2_bzDecompressEnd", ret));
+	    0 : bzip2_error(compressor, session, "BZ2_bzDecompressEnd", ret));
 }
-/* End Bzip2 WT_COMPRESSOR implementation for WT_CONNECTION::add_compressor. */
+
+static int
+bzip2_terminate(WT_COMPRESSOR *compressor, WT_SESSION *session)
+{
+	(void)session;					/* Unused parameters */
+
+	free(compressor);
+	return (0);
+}

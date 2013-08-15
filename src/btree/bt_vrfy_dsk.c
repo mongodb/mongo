@@ -158,8 +158,8 @@ __verify_dsk_row(
 
 	btree = S2BT(session);
 	bm = btree->bm;
-	huffman = btree->huffman_key;
 	unpack = &_unpack;
+	huffman = dsk->type == WT_PAGE_ROW_INT ? NULL : btree->huffman_key;
 
 	WT_ERR(__wt_scr_alloc(session, 0, &current));
 	WT_ERR(__wt_scr_alloc(session, 0, &last_pfx));
@@ -254,7 +254,8 @@ __verify_dsk_row(
 		case WT_CELL_KEY:
 			break;
 		case WT_CELL_KEY_OVFL:
-			WT_ERR(__wt_cell_unpack_ref(session, unpack, current));
+			WT_ERR(__wt_cell_unpack_ref(
+			    session, dsk->type, unpack, current));
 			goto key_compare;
 		default:
 			/* Not a key -- continue with the next cell. */
@@ -291,7 +292,8 @@ __verify_dsk_row(
 		 * much.
 		 */
 		if (huffman != NULL) {
-			WT_ERR(__wt_cell_unpack_ref(session, unpack, current));
+			WT_ERR(__wt_cell_unpack_ref(
+			    session, dsk->type, unpack, current));
 
 			/*
 			 * If there's a prefix, make sure there's enough buffer
@@ -333,8 +335,8 @@ key_compare:	/*
 		 */
 		if ((dsk->type == WT_PAGE_ROW_INT && cell_num > 3) ||
 		    (dsk->type != WT_PAGE_ROW_INT && cell_num > 1)) {
-			WT_ERR(
-			    WT_BTREE_CMP(session, btree, last, current, cmp));
+			WT_ERR(WT_LEX_CMP(
+			    session, btree->collator, last, current, cmp));
 			if (cmp >= 0)
 				WT_ERR_VRFY(session,
 				    "the %" PRIu32 " and %" PRIu32 " keys on "
@@ -597,6 +599,11 @@ __err_cell_type(WT_SESSION_IMPL *session,
 	case WT_CELL_KEY_SHORT:
 		if (dsk_type == WT_PAGE_ROW_INT ||
 		    dsk_type == WT_PAGE_ROW_LEAF)
+			return (0);
+		break;
+	case WT_CELL_KEY_PFX:
+	case WT_CELL_KEY_SHORT_PFX:
+		if (dsk_type == WT_PAGE_ROW_LEAF)
 			return (0);
 		break;
 	case WT_CELL_VALUE:

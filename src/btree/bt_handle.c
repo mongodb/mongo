@@ -10,10 +10,11 @@
 static int __btree_conf(WT_SESSION_IMPL *, WT_CKPT *ckpt);
 static int __btree_get_last_recno(WT_SESSION_IMPL *);
 static int __btree_page_sizes(WT_SESSION_IMPL *);
+static int __btree_preload(WT_SESSION_IMPL *);
 static int __btree_tree_open_empty(WT_SESSION_IMPL *, int);
 
 static int pse1(WT_SESSION_IMPL *, const char *, uint32_t, uint32_t);
-static int pse2(WT_SESSION_IMPL *, const char *, uint32_t, uint32_t, uint32_t);
+static int pse2(WT_SESSION_IMPL *, const char *, uint32_t, uint32_t, int);
 
 /*
  * __wt_btree_open --
@@ -68,8 +69,8 @@ __wt_btree_open(WT_SESSION_IMPL *session, const char *op_cfg[])
 	if (!WT_PREFIX_SKIP(filename, "file:"))
 		WT_ERR_MSG(session, EINVAL, "expected a 'file:' URI");
 
-	WT_ERR(__wt_block_manager_open(
-	    session, filename, dhandle->cfg, forced_salvage, &btree->bm));
+	WT_ERR(__wt_block_manager_open(session, filename,
+	    dhandle->cfg, forced_salvage, btree->allocsize, &btree->bm));
 	bm = btree->bm;
 
 	/*
@@ -105,6 +106,9 @@ __wt_btree_open(WT_SESSION_IMPL *session, const char *op_cfg[])
 		else {
 			WT_ERR(__wt_btree_tree_open(
 			    session, root_addr, root_addr_size));
+
+			/* Warm the cache, if possible. */
+			WT_ERR(__btree_preload(session));
 
 			/* Get the last record number in a column-store file. */
 			if (btree->type != BTREE_ROW)
@@ -154,8 +158,7 @@ __wt_btree_close(WT_SESSION_IMPL *session)
 	/* Free allocated memory. */
 	__wt_free(session, btree->key_format);
 	__wt_free(session, btree->value_format);
-	if (btree->val_ovfl_lock != NULL)
-		WT_TRET(__wt_rwlock_destroy(session, &btree->val_ovfl_lock));
+	WT_TRET(__wt_rwlock_destroy(session, &btree->val_ovfl_lock));
 
 	btree->bulk_load_ok = 0;
 
@@ -172,8 +175,8 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 	WT_BTREE *btree;
 	WT_CONFIG_ITEM cval;
 	WT_CONNECTION_IMPL *conn;
-	WT_NAMED_COLLATOR *ncoll;
 	WT_NAMED_COMPRESSOR *ncomp;
+	int64_t maj_version, min_version;
 	uint32_t bitcnt;
 	int fixed;
 	const char **cfg;
@@ -181,6 +184,16 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 	btree = S2BT(session);
 	conn = S2C(session);
 	cfg = btree->dhandle->cfg;
+
+	/* Dump out format information. */
+	if (WT_VERBOSE_ISSET(session, version)) {
+		WT_RET(__wt_config_gets(session, cfg, "version.major", &cval));
+		maj_version = cval.val;
+		WT_RET(__wt_config_gets(session, cfg, "version.minor", &cval));
+		min_version = cval.val;
+		WT_VERBOSE_RET(session, version,
+		    "%" PRIu64 ".%" PRIu64, maj_version, min_version);
+	}
 
 	/* Validate file types and check the data format plan. */
 	WT_RET(__wt_config_gets(session, cfg, "key_format", &cval));
@@ -192,28 +205,18 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 	WT_RET(__wt_strndup(session, cval.str, cval.len, &btree->key_format));
 
 	WT_RET(__wt_config_gets(session, cfg, "value_format", &cval));
+	WT_RET(__wt_struct_check(session, cval.str, cval.len, NULL, NULL));
 	WT_RET(__wt_strndup(session, cval.str, cval.len, &btree->value_format));
 
 	/* Row-store key comparison and key gap for prefix compression. */
 	if (btree->type == BTREE_ROW) {
-		WT_RET(__wt_config_gets(session, cfg, "collator", &cval));
-		if (cval.len > 0) {
-			TAILQ_FOREACH(ncoll, &conn->collqh, q) {
-				if (WT_STRING_MATCH(
-				    ncoll->name, cval.str, cval.len)) {
-					btree->collator = ncoll->collator;
-					break;
-				}
-			}
-			if (btree->collator == NULL)
-				WT_RET_MSG(session, EINVAL,
-				    "unknown collator '%.*s'",
-				    (int)cval.len, cval.str);
-		}
+		WT_RET(__wt_collator_config(session, cfg, &btree->collator));
+
 		WT_RET(__wt_config_gets(session, cfg, "key_gap", &cval));
 		btree->key_gap = (uint32_t)cval.val;
 	}
-	/* Check for fixed-size data. */
+
+	/* Column-store: check for fixed-size data. */
 	if (btree->type == BTREE_COL_VAR) {
 		WT_RET(__wt_struct_check(
 		    session, cval.str, cval.len, &fixed, &bitcnt));
@@ -272,6 +275,9 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 		WT_RET(__wt_config_gets(
 		    session, cfg, "prefix_compression", &cval));
 		btree->prefix_compression = cval.val == 0 ? 0 : 1;
+		WT_RET(__wt_config_gets(
+		    session, cfg, "prefix_compression_min", &cval));
+		btree->prefix_compression_min = (u_int)cval.val;
 		/* FALLTHROUGH */
 	case BTREE_COL_VAR:
 		WT_RET(__wt_config_gets(session, cfg, "dictionary", &cval));
@@ -327,8 +333,9 @@ __wt_btree_tree_open(
 
 	/* Read the page, then build the in-memory version of the page. */
 	WT_ERR(__wt_bt_read(session, &dsk, addr, addr_size));
-	WT_ERR(__wt_page_inmem(session,
-	    NULL, NULL, dsk.mem, F_ISSET(&dsk, WT_ITEM_MAPPED) ? 1 : 0, &page));
+	WT_ERR(__wt_page_inmem(session, NULL, NULL, dsk.mem,
+	    F_ISSET(&dsk, WT_ITEM_MAPPED) ?
+	    WT_PAGE_DISK_MAPPED : WT_PAGE_DISK_ALLOC, &page));
 	btree->root_page = page;
 
 	if (0) {
@@ -380,19 +387,19 @@ __btree_tree_open_empty(WT_SESSION_IMPL *session, int creation)
 		WT_ERR(__wt_page_alloc(session, WT_PAGE_COL_INT, 1, &root));
 		root->u.intl.recno = 1;
 		ref = root->u.intl.t;
-		WT_ERR(__wt_btree_leaf_create(session, root, ref, &leaf));
+		WT_ERR(__wt_btree_new_leaf_page(session, root, ref, &leaf));
 		ref->addr = NULL;
 		ref->state = WT_REF_MEM;
-		ref->u.recno = 1;
+		ref->key.recno = 1;
 		break;
 	case BTREE_ROW:
 		WT_ERR(__wt_page_alloc(session, WT_PAGE_ROW_INT, 1, &root));
 		ref = root->u.intl.t;
-		WT_ERR(__wt_btree_leaf_create(session, root, ref, &leaf));
+		WT_ERR(__wt_btree_new_leaf_page(session, root, ref, &leaf));
 		ref->addr = NULL;
 		ref->state = WT_REF_MEM;
-		WT_ERR(
-		    __wt_row_ikey_incr(session, root, 0, "", 1, &ref->u.key));
+		WT_ERR(__wt_row_ikey_incr(
+		    session, root, 0, "", 1, &ref->key.ikey));
 		break;
 	WT_ILLEGAL_VALUE_ERR(session);
 	}
@@ -440,11 +447,41 @@ err:	if (leaf != NULL)
 }
 
 /*
- * __wt_btree_leaf_create --
+ * __wt_btree_new_modified_page --
+ *	Create a new in-memory page could be an internal or leaf page. Setup
+ *	the page modify structure.
+ */
+int
+__wt_btree_new_modified_page(WT_SESSION_IMPL *session,
+    uint8_t type, uint32_t entries, int merge, WT_PAGE **pagep)
+{
+	WT_DECL_RET;
+	WT_PAGE *newpage;
+
+	/* Allocate a new page and fill it in. */
+	WT_RET(__wt_page_alloc(session, type, entries, &newpage));
+	newpage->read_gen = WT_READ_GEN_NOTSET;
+	newpage->entries = entries;
+
+	WT_ERR(__wt_page_modify_init(session, newpage));
+	if (merge)
+		F_SET(newpage->modify, WT_PM_REC_SPLIT_MERGE);
+	else
+		__wt_page_modify_set(session, newpage);
+
+	*pagep = newpage;
+	return (0);
+
+err:	__wt_page_out(session, &newpage);
+	return (ret);
+}
+
+/*
+ * __wt_btree_new_leaf_page --
  *	Create an empty leaf page and link it into a reference in its parent.
  */
 int
-__wt_btree_leaf_create(
+__wt_btree_new_leaf_page(
     WT_SESSION_IMPL *session, WT_PAGE *parent, WT_REF *ref, WT_PAGE **pagep)
 {
 	WT_BTREE *btree;
@@ -487,6 +524,30 @@ __wt_btree_evictable(WT_SESSION_IMPL *session, int on)
 }
 
 /*
+ * __btree_preload --
+ *	Pre-load internal pages.
+ */
+static int
+__btree_preload(WT_SESSION_IMPL *session)
+{
+	WT_BM *bm;
+	WT_BTREE *btree;
+	WT_REF *ref;
+	uint32_t addr_size, i;
+	const uint8_t *addr;
+
+	btree = S2BT(session);
+	bm = btree->bm;
+
+	/* Pre-load the second-level internal pages. */
+	WT_REF_FOREACH(btree->root_page, ref, i) {
+		__wt_get_addr(btree->root_page, ref, &addr, &addr_size);
+		WT_RET(bm->preload(bm, session, addr, addr_size));
+	}
+	return (0);
+}
+
+/*
  * __btree_get_last_recno --
  *	Set the last record number for a column-store.
  */
@@ -523,19 +584,19 @@ __btree_page_sizes(WT_SESSION_IMPL *session)
 	btree = S2BT(session);
 	cfg = btree->dhandle->cfg;
 
-	WT_RET(__wt_config_gets(session, cfg, "allocation_size", &cval));
-	btree->allocsize = (uint32_t)cval.val;
-	WT_RET(__wt_config_gets(session, cfg, "internal_page_max", &cval));
-	btree->maxintlpage = (uint32_t)cval.val;
+	WT_RET(__wt_direct_io_size_check(
+	    session, cfg, "allocation_size", &btree->allocsize));
+	WT_RET(__wt_direct_io_size_check(
+	    session, cfg, "internal_page_max", &btree->maxintlpage));
 	WT_RET(__wt_config_gets(session, cfg, "internal_item_max", &cval));
 	btree->maxintlitem = (uint32_t)cval.val;
-	WT_RET(__wt_config_gets(session, cfg, "leaf_page_max", &cval));
-	btree->maxleafpage = (uint32_t)cval.val;
+	WT_RET(__wt_direct_io_size_check(
+	    session, cfg, "leaf_page_max", &btree->maxleafpage));
 	WT_RET(__wt_config_gets(session, cfg, "leaf_item_max", &cval));
 	btree->maxleafitem = (uint32_t)cval.val;
 
 	WT_RET(__wt_config_gets(session, cfg, "split_pct", &cval));
-	btree->split_pct = (u_int)cval.val;
+	btree->split_pct = (int)cval.val;
 
 	/*
 	 * When a page is forced to split, we want at least 50 entries on its
@@ -622,8 +683,8 @@ __wt_split_page_size(WT_BTREE *btree, uint32_t maxpagesize)
 	 * we don't waste space when we write).
 	 */
 	a = maxpagesize;			/* Don't overflow. */
-	split_size =
-	    (uint32_t)WT_ALIGN((a * btree->split_pct) / 100, btree->allocsize);
+	split_size = (uint32_t)
+	    WT_ALIGN((a * (u_int)btree->split_pct) / 100, btree->allocsize);
 
 	/*
 	 * If the result of that calculation is the same as the allocation unit
@@ -631,7 +692,7 @@ __wt_split_page_size(WT_BTREE *btree, uint32_t maxpagesize)
 	 * unit, use a percentage of the maximum page size).
 	 */
 	if (split_size == btree->allocsize)
-		split_size = (uint32_t)((a * btree->split_pct) / 100);
+		split_size = (uint32_t)((a * (u_int)btree->split_pct) / 100);
 
 	return (split_size);
 }
@@ -647,11 +708,11 @@ pse1(WT_SESSION_IMPL *session, const char *type, uint32_t max, uint32_t ovfl)
 
 static int
 pse2(WT_SESSION_IMPL *session,
-    const char *type, uint32_t max, uint32_t ovfl, uint32_t pct)
+    const char *type, uint32_t max, uint32_t ovfl, int pct)
 {
 	WT_RET_MSG(session, EINVAL,
 	    "%s page size (%" PRIu32 "B) too small for the maximum item size "
-	    "(%" PRIu32 "B), because of the split percentage (%" PRIu32
-	    "%%); a split page must be able to hold at least 2 items",
+	    "(%" PRIu32 "B), because of the split percentage (%d %%); a split "
+	    "page must be able to hold at least 2 items",
 	    type, max, ovfl, pct);
 }

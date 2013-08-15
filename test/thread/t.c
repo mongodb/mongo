@@ -30,6 +30,7 @@
 WT_CONNECTION *conn;				/* WiredTiger connection */
 __ftype ftype;					/* File type */
 u_int nkeys, nops;				/* Keys, Operations */
+int log_print;					/* Log print per operation */
 int session_per_op;				/* New session per operation */
 
 static char *progname;				/* Program name */
@@ -57,6 +58,7 @@ main(int argc, char *argv[])
 
 	config_open = NULL;
 	ftype = ROW;
+	log_print = 0;
 	nkeys = 1000;
 	nops = 10000;
 	readers = 10;
@@ -64,13 +66,16 @@ main(int argc, char *argv[])
 	session_per_op = 0;
 	writers = 10;
 
-	while ((ch = getopt(argc, argv, "C:k:l:n:R:r:St:W:")) != EOF)
+	while ((ch = getopt(argc, argv, "C:k:Ll:n:R:r:St:W:")) != EOF)
 		switch (ch) {
 		case 'C':			/* wiredtiger_open config */
 			config_open = optarg;
 			break;
 		case 'k':			/* rows */
 			nkeys = (u_int)atoi(optarg);
+			break;
+		case 'L':			/* log print per operation */
+			log_print = 1;
 			break;
 		case 'l':			/* log */
 			if ((logfp = fopen(optarg, "w")) == NULL) {

@@ -18,26 +18,36 @@ __wt_page_is_modified(WT_PAGE *page)
 
 /*
  * __wt_eviction_page_force --
- *      Add a page for forced eviction if it matches the criteria.
+ *	Check if a page matches the criteria for forced eviction.
  */
-static inline void
+static inline int
 __wt_eviction_page_force(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_BTREE *btree;
 
 	btree = S2BT(session);
 
-	/*
-	 * Ignore internal pages (check read-only information first to the
-	 * extent possible, this is shared data).
-	 */
-	if (page->type == WT_PAGE_ROW_INT || page->type == WT_PAGE_COL_INT)
-		return;
+	/* Pages are usually small enough, check that first. */
+	if (page->memory_footprint < btree->maxmempage)
+		return (0);
 
-	if (!F_ISSET(btree, WT_BTREE_NO_EVICTION) &&
-	    __wt_page_is_modified(page) &&
-	    page->memory_footprint > btree->maxmempage)
-		__wt_evict_forced_page(session, page);
+	/* Leaf pages only. */
+	if (page->type != WT_PAGE_COL_FIX &&
+	    page->type != WT_PAGE_COL_VAR && page->type != WT_PAGE_ROW_LEAF)
+		return (0);
+
+	/* Eviction may be turned off,  although that's rare. */
+	if (F_ISSET(btree, WT_BTREE_NO_EVICTION))
+		return (0);
+
+	/*
+	 * It's hard to imagine a page with a huge memory footprint that's also
+	 * clean, check to be sure.
+	 */
+	if (!__wt_page_is_modified(page))
+		return (0);
+
+	return (1);
 }
 
 /*
@@ -255,7 +265,7 @@ __wt_page_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 * running transaction.
 		 */
 		if (F_ISSET(&session->txn, TXN_RUNNING))
-			page->modify->disk_txn = session->txn.snap_min - 1;
+			page->modify->disk_snap_min = session->txn.snap_min;
 	}
 
 	/*
@@ -353,11 +363,87 @@ __wt_off_page(WT_PAGE *page, const void *p)
 }
 
 /*
- * __wt_row_key --
- *	Set a buffer to reference a key as cheaply as possible.
+ * __wt_ref_key --
+ *	Return a reference to a row-store internal page key as cheaply as
+ * possible.
+ */
+static inline void
+__wt_ref_key(WT_PAGE *page, WT_REF *ref, void *keyp, uint32_t *sizep)
+{
+	/*
+	 * An internal page key is in one of two places: if we instantiated the
+	 * key (for example, when reading the page), WT_REF.key.ikey references
+	 * a WT_IKEY structure, otherwise, WT_REF.key.pkey references an on-page
+	 * key.
+	 *
+	 * Now the magic: Any allocated memory will have a low-order bit of 0
+	 * (the return from malloc must be aligned to store any standard type,
+	 * and we assume there's always going to be a standard type requiring
+	 * even-byte alignment).  An on-page key consists of an offset/length
+	 * pair.  We can fit the maximum page size into 31 bits, so we use the
+	 * low-order bit in the on-page value to flag the next 31 bits as a
+	 * page offset and the other 32 bits as the key's length, not a WT_IKEY
+	 * pointer.  This breaks if allocation chunks aren't even-byte aligned
+	 * or pointers and uint64_t's don't always map their low-order bits to
+	 * the same location.
+	 */
+	if (ref->key.pkey & 0x01) {
+		*(void **)keyp =
+		    WT_PAGE_REF_OFFSET(page, (ref->key.pkey & 0xFFFFFFFF) >> 1);
+		*sizep = (uint32_t)(ref->key.pkey >> 32);
+	} else {
+		*(void **)keyp = WT_IKEY_DATA(ref->key.ikey);
+		*sizep = ((WT_IKEY *)ref->key.ikey)->size;
+	}
+}
+
+/*
+ * __wt_ref_key_onpage_set --
+ *	Set a WT_REF to reference an on-page key.
+ */
+static inline void
+__wt_ref_key_onpage_set(WT_PAGE *page, WT_REF *ref, WT_CELL_UNPACK *unpack)
+{
+	/*
+	 * See the comment in __wt_ref_key for an explanation of the magic.
+	 */
+	ref->key.pkey =
+	    (uint64_t)unpack->size << 32 |
+	    (uint32_t)WT_PAGE_DISK_OFFSET(page, unpack->data) << 1 |
+	    0x01;
+}
+
+/*
+ * __wt_ref_key_instantiated --
+ *	Return an instantiated key from a WT_REF.
+ */
+static inline WT_IKEY *
+__wt_ref_key_instantiated(WT_REF *ref)
+{
+	/*
+	 * See the comment in __wt_ref_key for an explanation of the magic.
+	 */
+	return (ref->key.pkey & 0x01 ? NULL : ref->key.ikey);
+}
+
+/*
+ * __wt_ref_key_clear --
+ *	Clear a WT_REF key.
+ */
+static inline void
+__wt_ref_key_clear(WT_REF *ref)
+{
+	/* The key union has 3 fields, all of which are 8B. */
+	ref->key.recno = 0;
+}
+
+/*
+ * __wt_row_leaf_key --
+ *	Set a buffer to reference a row-store leaf page key as cheaply as
+ * possible.
  */
 static inline int
-__wt_row_key(WT_SESSION_IMPL *session,
+__wt_row_leaf_key(WT_SESSION_IMPL *session,
     WT_PAGE *page, WT_ROW *rip, WT_ITEM *key, int instantiate)
 {
 	WT_BTREE *btree;
@@ -366,9 +452,18 @@ __wt_row_key(WT_SESSION_IMPL *session,
 
 	btree = S2BT(session);
 
+	/*
+	 * A subset of __wt_row_leaf_key_work, that is, calling that function
+	 * should give you the same results as calling this one; this function
+	 * exists to inline fast-path checks for already instantiated keys and
+	 * on-page uncompressed keys.
+	 */
 retry:	ikey = WT_ROW_KEY_COPY(rip);
 
-	/* If the key has been instantiated for any reason, off-page, use it. */
+	/*
+	 * Key copied.
+	 * If the key has been instantiated for any reason, off-page, use it.
+	 */
 	if (__wt_off_page(page, ikey)) {
 		key->data = WT_IKEY_DATA(ikey);
 		key->size = ikey->size;
@@ -376,26 +471,35 @@ retry:	ikey = WT_ROW_KEY_COPY(rip);
 	}
 
 	/* If the key isn't compressed or an overflow, take it from the page. */
-	if (btree->huffman_key == NULL)
+	if (btree->huffman_key == NULL) {
 		__wt_cell_unpack((WT_CELL *)ikey, &unpack);
-	if (btree->huffman_key == NULL &&
-	    unpack.type == WT_CELL_KEY && unpack.prefix == 0) {
-		key->data = unpack.data;
-		key->size = unpack.size;
-		return (0);
+		if (unpack.type == WT_CELL_KEY && unpack.prefix == 0) {
+			key->data = unpack.data;
+			key->size = unpack.size;
+			return (0);
+		}
 	}
 
 	/*
-	 * We're going to have to build the key (it's never been instantiated,
-	 * and it's compressed or an overflow key).
+	 * We have to build the key (it's never been instantiated, and it's some
+	 * kind of compressed or overflow key).
 	 *
-	 * If we're instantiating the key on the page, do that, and then look
-	 * it up again, else, we have a copy and we can return.
+	 * Magic: the row-store leaf page search loop calls us to instantiate
+	 * keys, and it's not prepared to handle memory being allocated in the
+	 * key's WT_ITEM.  Call __wt_row_leaf_key_work to instantiate the key
+	 * with no buffer reference, then retry to pick up a simple reference
+	 * to the instantiated key.
 	 */
-	WT_RET(__wt_row_key_copy(session, page, rip, instantiate ? NULL : key));
-	if (instantiate)
+	if (instantiate) {
+		WT_RET(__wt_row_leaf_key_work(session, page, rip, NULL, 1));
 		goto retry;
-	return (0);
+	}
+
+	/*
+	 * If instantiate wasn't set, our caller is prepared to handle memory
+	 * allocations in the key's WT_ITEM, pass the key.
+	 */
+	return (__wt_row_leaf_key_work(session, page, rip, key, 0));
 }
 
 /*
@@ -435,12 +539,33 @@ __wt_get_addr(
 static inline int
 __wt_page_release(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
+	WT_DECL_RET;
+
 	/*
 	 * Discard our hazard pointer.  Ignore pages we don't have and the root
 	 * page, which sticks in memory, regardless.
 	 */
-	return (page == NULL ||
-	    WT_PAGE_IS_ROOT(page) ? 0 : __wt_hazard_clear(session, page));
+	if (page == NULL || WT_PAGE_IS_ROOT(page))
+		return (0);
+
+	/*
+	 * Try to immediately evict pages if they have the special "oldest"
+	 * read generation and we have some chance of succeeding.
+	 */
+	if (!WT_TXN_ACTIVE(&session->txn) &&
+	    page->read_gen == WT_READ_GEN_OLDEST &&
+	    WT_ATOMIC_CAS(page->ref->state, WT_REF_MEM, WT_REF_LOCKED)) {
+		if ((ret = __wt_hazard_clear(session, page)) != 0) {
+			page->ref->state = WT_REF_MEM;
+			return (ret);
+		}
+
+		if ((ret = __wt_evict_page(session, page)) == EBUSY)
+			ret = 0;
+		return (ret);
+	}
+
+	return (__wt_hazard_clear(session, page));
 }
 
 /*
@@ -559,7 +684,7 @@ __wt_btree_size_overflow(WT_SESSION_IMPL *session, uint32_t maxsize)
 }
 
 /*
- * __wt_btree_lex_compare --
+ * __wt_lex_compare --
  *	Lexicographic comparison routine.
  *
  * Returns:
@@ -567,11 +692,11 @@ __wt_btree_size_overflow(WT_SESSION_IMPL *session, uint32_t maxsize)
  *	= 0 if user_item is lexicographically = tree_item
  *	> 0 if user_item is lexicographically > tree_item
  *
- * We use the names "user" and "tree" so it's clear which the application is
- * looking at when we call its comparison func.
+ * We use the names "user" and "tree" so it's clear in the btree code which
+ * the application is looking at when we call its comparison func.
  */
 static inline int
-__wt_btree_lex_compare(const WT_ITEM *user_item, const WT_ITEM *tree_item)
+__wt_lex_compare(const WT_ITEM *user_item, const WT_ITEM *tree_item)
 {
 	const uint8_t *userp, *treep;
 	uint32_t len, usz, tsz;
@@ -590,11 +715,49 @@ __wt_btree_lex_compare(const WT_ITEM *user_item, const WT_ITEM *tree_item)
 	return ((usz == tsz) ? 0 : (usz < tsz) ? -1 : 1);
 }
 
-#define	WT_BTREE_CMP(s, bt, k1, k2, cmp)				\
-	(((bt)->collator == NULL) ?					\
-	(((cmp) = __wt_btree_lex_compare((k1), (k2))), 0) :		\
-	(bt)->collator->compare((bt)->collator, &(s)->iface,		\
-	    (k1), (k2), &(cmp)))
+#define	WT_LEX_CMP(s, collator, k1, k2, cmp)				\
+	((collator) == NULL ?						\
+	(((cmp) = __wt_lex_compare((k1), (k2))), 0) :			\
+	(collator)->compare(collator, &(s)->iface, (k1), (k2), &(cmp)))
+
+/*
+ * __wt_lex_compare_skip --
+ *	Lexicographic comparison routine, but skipping leading bytes.
+ *
+ * Returns:
+ *	< 0 if user_item is lexicographically < tree_item
+ *	= 0 if user_item is lexicographically = tree_item
+ *	> 0 if user_item is lexicographically > tree_item
+ *
+ * We use the names "user" and "tree" so it's clear in the btree code which
+ * the application is looking at when we call its comparison func.
+ */
+static inline int
+__wt_lex_compare_skip(
+    const WT_ITEM *user_item, const WT_ITEM *tree_item, uint32_t *matchp)
+{
+	const uint8_t *userp, *treep;
+	uint32_t len, usz, tsz;
+
+	usz = user_item->size;
+	tsz = tree_item->size;
+	len = WT_MIN(usz, tsz) - *matchp;
+
+	for (userp = (uint8_t *)user_item->data + *matchp,
+	    treep = (uint8_t *)tree_item->data + *matchp;
+	    len > 0;
+	    --len, ++userp, ++treep, ++*matchp)
+		if (*userp != *treep)
+			return (*userp < *treep ? -1 : 1);
+
+	/* Contents are equal up to the smallest length. */
+	return ((usz == tsz) ? 0 : (usz < tsz) ? -1 : 1);
+}
+
+#define	WT_LEX_CMP_SKIP(s, collator, k1, k2, cmp, matchp)		\
+	((collator) == NULL ?						\
+	(((cmp) = __wt_lex_compare_skip((k1), (k2), matchp)), 0) :	\
+	(collator)->compare(collator, &(s)->iface, (k1), (k2), &(cmp)))
 
 /*
  * __wt_btree_mergeable --

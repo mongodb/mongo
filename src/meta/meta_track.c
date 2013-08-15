@@ -92,7 +92,6 @@ __wt_meta_track_on(WT_SESSION_IMPL *session)
 static int
 __meta_track_apply(WT_SESSION_IMPL *session, WT_META_TRACK *trk, int unroll)
 {
-	WT_DATA_HANDLE *saved_dhandle;
 	WT_BM *bm;
 	WT_DECL_RET;
 	int tret;
@@ -108,21 +107,17 @@ __meta_track_apply(WT_SESSION_IMPL *session, WT_META_TRACK *trk, int unroll)
 	case WT_ST_EMPTY:	/* Unused slot */
 		break;
 	case WT_ST_CHECKPOINT:	/* Checkpoint, see above */
-		saved_dhandle = session->dhandle;
-		WT_SET_BTREE_IN_SESSION(session, trk->btree);
 		if (!unroll) {
 			bm = trk->btree->bm;
-			WT_TRET(bm->checkpoint_resolve(bm, session));
+			WT_WITH_BTREE(session, trk->btree,
+			    WT_TRET(bm->checkpoint_resolve(bm, session)));
 		}
-		session->dhandle = saved_dhandle;
 		break;
 	case WT_ST_LOCK:	/* Handle lock, see above */
-		saved_dhandle = session->dhandle;
-		WT_SET_BTREE_IN_SESSION(session, trk->btree);
 		if (unroll && trk->created)
-			F_SET(session->dhandle, WT_DHANDLE_DISCARD);
-		WT_TRET(__wt_session_release_btree(session));
-		session->dhandle = saved_dhandle;
+			F_SET(trk->btree->dhandle, WT_DHANDLE_DISCARD);
+		WT_WITH_BTREE(session, trk->btree,
+		    WT_TRET(__wt_session_release_btree(session)));
 		break;
 	case WT_ST_FILEOP:	/* File operation */
 		/*
@@ -189,31 +184,37 @@ free:	trk->op = WT_ST_EMPTY;
 int
 __wt_meta_track_off(WT_SESSION_IMPL *session, int unroll)
 {
-	WT_DATA_HANDLE *saved_dhandle;
 	WT_DECL_RET;
 	WT_META_TRACK *trk, *trk_orig;
 
 	WT_ASSERT(session,
 	    WT_META_TRACKING(session) && session->meta_track_nest > 0);
-	if (--session->meta_track_nest != 0)
-		return (0);
 
 	trk_orig = session->meta_track;
 	trk = session->meta_track_next;
 
+	/* If it was a nested transaction, there is nothing to do. */
+	if (--session->meta_track_nest != 0)
+		return (0);
+
 	/* Turn off tracking for unroll. */
 	session->meta_track_next = session->meta_track_sub = NULL;
+
+	/*
+	 * If there were no operations logged, return now and avoid unnecessary
+	 * metadata checkpoints.  For example, this happens if attempting to
+	 * create a data source that already exists (or drop one that doesn't).
+	 */
+	if (trk == trk_orig)
+		return (0);
 
 	while (--trk >= trk_orig)
 		WT_TRET(__meta_track_apply(session, trk, unroll));
 
 	/* If the operation succeeded, checkpoint the metadata. */
-	if (!unroll && ret == 0 && session->metafile != NULL) {
-		saved_dhandle = session->dhandle;
-		WT_SET_BTREE_IN_SESSION(session, session->metafile);
-		ret = __wt_checkpoint(session, NULL);
-		session->dhandle = saved_dhandle;
-	}
+	if (!unroll && ret == 0 && session->metafile != NULL)
+		WT_WITH_BTREE(session, session->metafile,
+		    ret = __wt_checkpoint(session, NULL));
 
 	return (ret);
 }
@@ -310,7 +311,8 @@ __wt_meta_track_update(WT_SESSION_IMPL *session, const char *key)
 	 * If there was a previous value, keep it around -- if not, then this
 	 * "update" is really an insert.
 	 */
-	if ((ret = __wt_metadata_read(session, key, &trk->b)) == WT_NOTFOUND) {
+	if ((ret =
+	    __wt_metadata_search(session, key, &trk->b)) == WT_NOTFOUND) {
 		trk->op = WT_ST_REMOVE;
 		ret = 0;
 	}

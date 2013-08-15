@@ -139,10 +139,16 @@ struct __wt_page_modify {
 	 * times if a snapshot is keeping old versions pinned (e.g., in a
 	 * checkpoint).
 	 */
-	wt_txnid_t disk_txn;
+	uint64_t disk_snap_min;
+
+	/* The largest transaction ID written to disk, for clean pages. */
+	uint64_t disk_txn;
 
 	union {
-		WT_PAGE *split;		/* Resulting split */
+		struct {
+			WT_PAGE *page;	/* Resulting split page */
+			WT_REF *ref;	/* WT_REF slot on the parent */
+		} split;
 		WT_ADDR	 replace;	/* Resulting replacement */
 	} u;
 
@@ -192,11 +198,6 @@ struct __wt_page_modify {
 		uint8_t  flags;
 	} *track;			/* Array of tracked objects */
 	uint32_t track_entries;		/* Total track slots */
-
-	wt_txnid_t first_id;		/* Earliest transactional update, used
-					 * to avoid errors from transaction ID
-					 * wraparound.
-					 */
 
 #define	WT_PM_REC_EMPTY		0x01	/* Reconciliation: page empty */
 #define	WT_PM_REC_REPLACE	0x02	/* Reconciliation: page replaced */
@@ -326,8 +327,10 @@ struct __wt_page {
 	uint8_t type;			/* Page type */
 
 #define	WT_PAGE_BUILD_KEYS	0x01	/* Keys have been built in memory */
-#define	WT_PAGE_DISK_NOT_ALLOC	0x02	/* Ignore disk image on page discard */
-#define	WT_PAGE_EVICT_LRU	0x04	/* Page is on the LRU queue */
+#define	WT_PAGE_DISK_ALLOC	0x02	/* Disk image in allocated memory */
+#define	WT_PAGE_DISK_MAPPED	0x04	/* Disk image in mapped memory */
+#define	WT_PAGE_EVICT_LRU	0x08	/* Page is on the LRU queue */
+#define	WT_PAGE_WAS_SPLIT	0x10	/* Page has been split in memory */
 	uint8_t flags_atomic;		/* Atomic flags, use F_*_ATOMIC */
 };
 
@@ -356,11 +359,6 @@ struct __wt_page {
  *	The page is on disk, but has been deleted from the tree; we can delete
  *	row-store leaf pages without reading them if they don't reference
  *	overflow items.
- *
- * WT_REF_EVICT_FORCE:
- *	An application thread has selected this page for eviction. No other
- *	hazard references should be granted. If eviction fails, the eviction
- *	server should set the state back to WT_REF_MEM.
  *
  * WT_REF_EVICT_WALK:
  *	The next page to be walked for LRU eviction.  This page is available
@@ -404,7 +402,6 @@ struct __wt_page {
 enum __wt_page_state {
 	WT_REF_DISK=0,			/* Page is on disk */
 	WT_REF_DELETED,			/* Page is on disk, but deleted */
-	WT_REF_EVICT_FORCE,		/* Page is ready for forced eviction */
 	WT_REF_EVICT_WALK,		/* Next page for LRU eviction */
 	WT_REF_LOCKED,			/* Page locked for exclusive access */
 	WT_REF_MEM,			/* Page is in cache and valid */
@@ -421,14 +418,27 @@ struct __wt_ref {
 
 	void	*addr;			/* On-page cell or off_page WT_ADDR */
 
+	/*
+	 * The child page's key.  Do NOT change this union without reviewing
+	 * __wt_ref_key.
+	 */
 	union {
 		uint64_t recno;		/* Column-store: starting recno */
-		void	*key;		/* Row-store: on-page cell or WT_IKEY */
-	} u;
-	wt_txnid_t txnid;		/* Transaction ID */
+		void	*ikey;		/* Row-store: instantiated key */
+		uint64_t pkey;		/* Row-store: on-page key */
+	} key;
+
+	uint64_t txnid;			/* Transaction ID */
 
 	volatile WT_PAGE_STATE state;	/* Page state */
+
+	uint32_t unused;
 };
+/*
+ * WT_REF_SIZE is the expected structure size -- we verify the build to ensure
+ * the compiler hasn't inserted padding which would break the world.
+ */
+#define	WT_REF_SIZE	40
 
 /*
  * WT_REF_FOREACH --
@@ -456,9 +466,14 @@ struct __wt_ref {
  * WT_MERGE_FULL_PAGE --
  * When the result of a merge contains more than this number of keys, it is
  * considered "done" and will not be merged again.
+ *
+ * WT_MERGE_MAX_REFS --
+ * Don't complete merges that contain more than this number of keys, they tend
+ * to generate pathological trees.
  */
 #define	WT_MERGE_STACK_MIN	3
 #define	WT_MERGE_FULL_PAGE	100
+#define	WT_MERGE_MAX_REFS	1000
 
 /*
  * WT_ROW --
@@ -614,7 +629,7 @@ struct __wt_update {
 #define	WT_UPDATE_DELETED_ISSET(upd)	((upd)->size == UINT32_MAX)
 #define	WT_UPDATE_DELETED_SET(upd)	((upd)->size = UINT32_MAX)
 	uint32_t size;			/* update length */
-	wt_txnid_t txnid;		/* update transaction */
+	uint64_t txnid;			/* update transaction */
 
 	WT_UPDATE *next;		/* forward-linked list */
 

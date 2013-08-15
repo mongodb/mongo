@@ -27,16 +27,16 @@
 
 #include "format.h"
 
-static void  col_insert(WT_CURSOR *, WT_ITEM *, WT_ITEM *, uint64_t *);
-static void  col_remove(WT_CURSOR *, WT_ITEM *, uint64_t, int *);
-static void  col_update(WT_CURSOR *, WT_ITEM *, WT_ITEM *, uint64_t);
-static void  nextprev(WT_CURSOR *, int, int *);
+static int   col_insert(WT_CURSOR *, WT_ITEM *, WT_ITEM *, uint64_t *);
+static int   col_remove(WT_CURSOR *, WT_ITEM *, uint64_t, int *);
+static int   col_update(WT_CURSOR *, WT_ITEM *, WT_ITEM *, uint64_t);
+static int   nextprev(WT_CURSOR *, int, int *);
 static int   notfound_chk(const char *, int, int, uint64_t);
 static void *ops(void *);
 static void  print_item(const char *, WT_ITEM *);
-static void  read_row(WT_CURSOR *, WT_ITEM *, uint64_t);
-static void  row_remove(WT_CURSOR *, WT_ITEM *, uint64_t, int *);
-static void  row_update(WT_CURSOR *, WT_ITEM *, WT_ITEM *, uint64_t, int);
+static int   read_row(WT_CURSOR *, WT_ITEM *, uint64_t);
+static int   row_remove(WT_CURSOR *, WT_ITEM *, uint64_t, int *);
+static int   row_update(WT_CURSOR *, WT_ITEM *, WT_ITEM *, uint64_t, int);
 
 /*
  * wts_ops --
@@ -48,6 +48,7 @@ wts_ops(void)
 	TINFO *tinfo, total;
 	WT_CONNECTION *conn;
 	WT_SESSION *session;
+	pthread_t backup_tid;
 	int ret, running;
 	uint32_t i;
 
@@ -57,7 +58,7 @@ wts_ops(void)
 	if (g.logging != 0) {
 		if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
 			die(ret, "connection.open_session");
-		(void)session->msg_printf(session,
+		(void)g.wt_api->msg_printf(g.wt_api, session,
 		    "=============== thread ops start ===============");
 	}
 
@@ -66,7 +67,9 @@ wts_ops(void)
 		total.id = 1;
 		(void)ops(&total);
 	} else {
-		/* Create thread structure. */
+		g.threads_finished = 0;
+
+		/* Create thread structure, start worker, hot-backup threads. */
 		if ((tinfo =
 		    calloc((size_t)g.c_threads, sizeof(*tinfo))) == NULL)
 			die(errno, "calloc");
@@ -77,6 +80,9 @@ wts_ops(void)
 			    &tinfo[i].tid, NULL, ops, &tinfo[i])) != 0)
 				die(ret, "pthread_create");
 		}
+		if ((ret =
+		    pthread_create(&backup_tid, NULL, hot_backup, NULL)) != 0)
+			die(ret, "pthread_create");
 
 		/* Wait for the threads. */
 		for (;;) {
@@ -87,6 +93,9 @@ wts_ops(void)
 				total.insert += tinfo[i].insert;
 				total.remove += tinfo[i].remove;
 				total.update += tinfo[i].update;
+				total.commit += tinfo[i].commit;
+				total.rollback += tinfo[i].rollback;
+				total.deadlock += tinfo[i].deadlock;
 				switch (tinfo[i].state) {
 				case TINFO_RUNNING:
 					running = 1;
@@ -105,10 +114,14 @@ wts_ops(void)
 			(void)usleep(100000);		/* 1/10th of a second */
 		}
 		free(tinfo);
+
+		/* Wait for the backup thread. */
+		g.threads_finished = 1;
+		(void)pthread_join(backup_tid, NULL);
 	}
 
 	if (g.logging != 0) {
-		(void)session->msg_printf(session,
+		(void)g.wt_api->msg_printf(g.wt_api, session,
 		    "=============== thread ops stop ===============");
 		if ((ret = session->close(session, NULL)) != 0)
 			die(ret, "session.close");
@@ -123,44 +136,57 @@ ops(void *arg)
 	WT_CURSOR *cursor, *cursor_insert;
 	WT_SESSION *session;
 	WT_ITEM key, value;
-	uint64_t cnt, keyno, ckpt_op, compact_op, session_period, thread_ops;
+	uint64_t cnt, keyno, ckpt_op, compact_op, session_op, thread_ops;
 	uint32_t op;
 	uint8_t *keybuf, *valbuf;
 	u_int np;
-	int dir, insert, notfound, ret;
-	char *ckpt_config, buf[64];
-
-	conn = g.wts_conn;
+	int dir, insert, intxn, notfound, ret;
+	char *ckpt_config, config[64];
 
 	tinfo = arg;
 
+	conn = g.wts_conn;
+	keybuf = valbuf = NULL;
+
 	/* Set up the default key and value buffers. */
-	memset(&key, 0, sizeof(key));
 	key_gen_setup(&keybuf);
-	memset(&value, 0, sizeof(value));
 	val_gen_setup(&valbuf);
 
 	/*
 	 * Each thread does its share of the total operations, and make sure
 	 * that it's not 0 (testing runs: threads might be larger than ops).
 	 */
-	thread_ops = g.c_threads + g.c_ops / g.c_threads;
+	thread_ops = 100 + g.c_ops / g.c_threads;
 
-	/* Pick a period for re-opening the session and cursors. */
-	session = NULL;
-	cursor = cursor_insert = NULL;
-	session_period = 100 * MMRAND(1, 50);
-
-	/* Pick an operation where we'll do a checkpoint, compaction. */
+	/*
+	 * Select the first operation where we'll create sessions and cursors,
+	 * perform checkpoint and compaction operations.
+	 */
 	ckpt_op = MMRAND(1, thread_ops);
 	compact_op = MMRAND(1, thread_ops);
+	session_op = 0;
 
-	for (cnt = 0; cnt < thread_ops; ++cnt) {
+	session = NULL;
+	cursor = cursor_insert = NULL;
+	for (intxn = 0, cnt = 0; cnt < thread_ops; ++cnt) {
+		if (SINGLETHREADED && cnt % 100 == 0)
+			track("read/write ops", 0ULL, tinfo);
+
 		/*
-		 * cnt starts at 0 and (0 % anything == 0), so we always open
-		 * a session and cursors the first time through the loop.
+		 * We can't checkpoint, compact or swap sessions/cursors in a
+		 * transaction, resolve any running transaction.
 		 */
-		if (cnt % session_period == 0) {
+		if (intxn && (cnt == ckpt_op ||
+		    cnt == compact_op || cnt == session_op)) {
+			if ((ret = session->commit_transaction(
+			    session, NULL)) != 0)
+				die(ret, "session.commit_transaction");
+			++tinfo->commit;
+			intxn = 0;
+		}
+
+		/* Open up a new session and cursors. */
+		if (cnt == session_op) {
 			if (session != NULL &&
 			    (ret = session->close(session, NULL)) != 0)
 				die(ret, "session.close");
@@ -186,29 +212,46 @@ ops(void *arg)
 			    g.uri, NULL, "overwrite", &cursor)) != 0)
 				die(ret, "session.open_cursor");
 			if ((g.type == FIX || g.type == VAR) &&
-			    (ret = session->open_cursor(
-			    session, g.uri,
-			    NULL, "append", &cursor_insert)) != 0)
+			    (ret = session->open_cursor(session,
+			    g.uri, NULL, "append", &cursor_insert)) != 0)
 				die(ret, "session.open_cursor");
+
+			/* Pick the next session/cursor close/open. */
+			session_op += SINGLETHREADED ?
+			    MMRAND(1, thread_ops) : 100 * MMRAND(1, 50);
 		}
 
-		if (SINGLETHREADED && cnt % 100 == 0)
-			track("read/write ops", 0ULL, tinfo);
-
+		/* Checkpoint the database. */
 		if (cnt == ckpt_op) {
-			/* Half the time we name the checkpoint. */
-			if (MMRAND(1, 2) == 1)
+			/*
+			 * LSM and data-sources don't support named checkpoints,
+			 * else 25% of the time we name the checkpoint.
+			 */
+			if (DATASOURCE("lsm") || DATASOURCE("kvsbdb") ||
+			    DATASOURCE("memrata") || MMRAND(1, 4) == 1)
 				ckpt_config = NULL;
 			else {
-				(void)snprintf(buf, sizeof(buf),
+				(void)snprintf(config, sizeof(config),
 				    "name=thread-%d", tinfo->id);
-				ckpt_config = buf;
+				ckpt_config = config;
 			}
+
+			/* Named checkpoints lock out hot backups */
+			if (ckpt_config != NULL &&
+			    (ret = pthread_rwlock_wrlock(&g.backup_lock)) != 0)
+				die(ret,
+				    "pthread_rwlock_wrlock: hot-backup lock");
+
 			if ((ret =
 			    session->checkpoint(session, ckpt_config)) != 0)
 				die(ret, "session.checkpoint%s%s",
 				    ckpt_config == NULL ? "" : ": ",
 				    ckpt_config == NULL ? "" : ckpt_config);
+
+			if (ckpt_config != NULL &&
+			    (ret = pthread_rwlock_unlock(&g.backup_lock)) != 0)
+				die(ret,
+				    "pthread_rwlock_wrlock: hot-backup lock");
 
 			/*
 			 * Pick the next checkpoint operation, try for roughly
@@ -216,9 +259,24 @@ ops(void *arg)
 			 */
 			ckpt_op += MMRAND(1, thread_ops) / 5;
 		}
+
+		/* Compact the store (data-sources don't support compaction). */
 		if (cnt == compact_op &&
-		    (ret = session->compact(session, g.uri, NULL)) != 0)
-			die(ret, "session.compact");
+		    !DATASOURCE("kvsbdb") && !DATASOURCE("memrata"))
+			if ((ret = session->compact(
+			    session, g.uri, NULL)) != 0 && ret != WT_DEADLOCK)
+				die(ret, "session.compact");
+
+		/*
+		 * If we're not single-threaded and we're not in a transaction,
+		 * start a transaction 80% of the time.
+		 */
+		if (!SINGLETHREADED && !intxn && MMRAND(1, 10) >= 8) {
+			if ((ret =
+			    session->begin_transaction(session, NULL)) != 0)
+				die(ret, "session.begin_transaction");
+			intxn = 1;
+		}
 
 		insert = notfound = 0;
 
@@ -242,18 +300,22 @@ ops(void *arg)
 				 * If deleting a non-existent record, the cursor
 				 * won't be positioned, and so can't do a next.
 				 */
-				row_remove(cursor, &key, keyno, &notfound);
+				if (row_remove(cursor, &key, keyno, &notfound))
+					goto deadlock;
 				break;
 			case FIX:
 			case VAR:
-				col_remove(cursor, &key, keyno, &notfound);
+				if (col_remove(cursor, &key, keyno, &notfound))
+					goto deadlock;
 				break;
 			}
-		} else if (op < g.c_delete_pct + g.c_insert_pct) {
+		} else if (g.extend < MAX_EXTEND &&
+		    op < g.c_delete_pct + g.c_insert_pct) {
 			++tinfo->insert;
 			switch (g.type) {
 			case ROW:
-				row_update(cursor, &key, &value, keyno, 1);
+				if (row_update(cursor, &key, &value, keyno, 1))
+					goto deadlock;
 				break;
 			case FIX:
 			case VAR:
@@ -263,7 +325,9 @@ ops(void *arg)
 				 */
 				if ((ret = cursor->reset(cursor)) != 0)
 					die(ret, "cursor.reset");
-				col_insert(cursor_insert, &key, &value, &keyno);
+				if (col_insert(
+				    cursor_insert, &key, &value, &keyno))
+					goto deadlock;
 				insert = 1;
 				break;
 			}
@@ -272,16 +336,19 @@ ops(void *arg)
 			++tinfo->update;
 			switch (g.type) {
 			case ROW:
-				row_update(cursor, &key, &value, keyno, 0);
+				if (row_update(cursor, &key, &value, keyno, 0))
+					goto deadlock;
 				break;
 			case FIX:
 			case VAR:
-				col_update(cursor, &key, &value, keyno);
+				if (col_update(cursor, &key, &value, keyno))
+					goto deadlock;
 				break;
 			}
 		} else {
 			++tinfo->search;
-			read_row(cursor, &key, keyno);
+			if (read_row(cursor, &key, keyno))
+				goto deadlock;
 			continue;
 		}
 
@@ -293,15 +360,48 @@ ops(void *arg)
 		for (np = 0; np < MMRAND(1, 8); ++np) {
 			if (notfound)
 				break;
-			nextprev(
-			    insert ? cursor_insert : cursor, dir, &notfound);
+			if (nextprev(
+			    insert ? cursor_insert : cursor, dir, &notfound))
+				goto deadlock;
 		}
 
+		/* Reset the insert cursor. */
 		if (insert && (ret = cursor_insert->reset(cursor_insert)) != 0)
 			die(ret, "cursor.reset");
 
 		/* Read the value we modified to confirm the operation. */
-		read_row(cursor, &key, keyno);
+		if (read_row(cursor, &key, keyno))
+			goto deadlock;
+
+		/*
+		 * If we're in the transaction, commit 40% of the time and
+		 * rollback 10% of the time.
+		 */
+		if (intxn)
+			switch (MMRAND(1, 10)) {
+			case 1:
+			case 2:
+			case 3:
+			case 4:
+				if ((ret = session->commit_transaction(
+				    session, NULL)) != 0)
+					die(ret, "session.commit_transaction");
+				++tinfo->commit;
+				intxn = 0;
+				break;
+			case 5:
+				if (0) {
+deadlock:				++tinfo->deadlock;
+				}
+				if ((ret = session->rollback_transaction(
+				    session, NULL)) != 0)
+					die(ret, "session.commit_transaction");
+				++tinfo->rollback;
+				intxn = 0;
+				break;
+			default:
+				break;
+			}
 	}
 
 	if ((ret = session->close(session, NULL)) != 0)
@@ -332,7 +432,6 @@ wts_read_scan(void)
 	conn = g.wts_conn;
 
 	/* Set up the default key buffer. */
-	memset(&key, 0, sizeof(key));
 	key_gen_setup(&keybuf);
 
 	/* Open a session and cursor pair. */
@@ -353,7 +452,8 @@ wts_read_scan(void)
 		}
 
 		key.data = keybuf;
-		read_row(cursor, &key, cnt);
+		if ((ret = read_row(cursor, &key, cnt)) != 0)
+			die(ret, "read_scan");
 	}
 
 	if ((ret = session->close(session, NULL)) != 0)
@@ -366,7 +466,7 @@ wts_read_scan(void)
  * read_row --
  *	Read and verify a single element in a row- or column-store file.
  */
-static void
+static int
 read_row(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno)
 {
 	WT_ITEM bdb_value, value;
@@ -378,7 +478,7 @@ read_row(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno)
 
 	/* Log the operation */
 	if (g.logging == LOG_OPS)
-		(void)session->msg_printf(
+		(void)g.wt_api->msg_printf(g.wt_api,
 		    session, "%-10s%" PRIu64, "read", keyno);
 
 	/* Retrieve the key/value pair by key. */
@@ -399,34 +499,34 @@ read_row(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno)
 			value.data = &bitfield;
 			value.size = 1;
 		} else {
-			memset(&value, 0, sizeof(value));
 			ret = cursor->get_value(cursor, &value);
 		}
 	}
+	if (ret == WT_DEADLOCK)
+		return (WT_DEADLOCK);
 	if (ret != 0 && ret != WT_NOTFOUND)
 		die(ret, "read_row: read row %" PRIu64, keyno);
-
-	if (!SINGLETHREADED)
-		return;
-
-	/* Retrieve the BDB value. */
-	memset(&bdb_value, 0, sizeof(bdb_value));
-	bdb_read(keyno, &bdb_value.data, &bdb_value.size, &notfound);
-
 	/*
-	 * Check for not-found status.
-	 *
-	 * In fixed length stores, zero values at the end of the key space
-	 * are treated as not found.  Treat this the same as a zero value
-	 * in the key space, to match BDB's behavior.
+	 * In fixed length stores, zero values at the end of the key space are
+	 * returned as not found.  Treat this the same as a zero value in the
+	 * key space, to match BDB's behavior.
 	 */
-	if (g.type == FIX && ret == WT_NOTFOUND) {
+	if (ret == WT_NOTFOUND && g.type == FIX) {
 		bitfield = 0;
+		value.data = &bitfield;
+		value.size = 1;
 		ret = 0;
 	}
 
+	if (!SINGLETHREADED)
+		return (0);
+
+	/* Retrieve the BDB value. */
+	bdb_read(keyno, &bdb_value.data, &bdb_value.size, &notfound);
+
+	/* Check for not-found status. */
 	if (notfound_chk("read_row", ret, notfound, keyno))
-		return;
+		return (0);
 
 	/* Compare the two. */
 	if (value.size != bdb_value.size ||
@@ -437,13 +537,14 @@ read_row(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno)
 		print_item(" wt", &value);
 		die(0, NULL);
 	}
+	return (0);
 }
 
 /*
  * nextprev --
  *	Read and verify the next/prev element in a row- or column-store file.
  */
-static void
+static int
 nextprev(WT_CURSOR *cursor, int next, int *notfoundp)
 {
 	WT_ITEM key, value, bdb_key, bdb_value;
@@ -459,6 +560,8 @@ nextprev(WT_CURSOR *cursor, int next, int *notfoundp)
 
 	keyno = 0;
 	ret = next ? cursor->next(cursor) : cursor->prev(cursor);
+	if (ret == WT_DEADLOCK)
+		return (WT_DEADLOCK);
 	if (ret == 0)
 		switch (g.type) {
 		case FIX:
@@ -479,17 +582,17 @@ nextprev(WT_CURSOR *cursor, int next, int *notfoundp)
 		}
 	if (ret != 0 && ret != WT_NOTFOUND)
 		die(ret, "%s", which);
-	*notfoundp = ret == WT_NOTFOUND;
+	*notfoundp = (ret == WT_NOTFOUND);
 
 	if (!SINGLETHREADED)
-		return;
+		return (0);
 
 	/* Retrieve the BDB value. */
 	bdb_np(next, &bdb_key.data, &bdb_key.size,
 	    &bdb_value.data, &bdb_value.size, &notfound);
 	if (notfound_chk(
 	    next ? "nextprev(next)" : "nextprev(prev)", ret, notfound, keyno))
-		return;
+		return (0);
 
 	/* Compare the two. */
 	if (g.type == ROW) {
@@ -522,29 +625,30 @@ nextprev(WT_CURSOR *cursor, int next, int *notfoundp)
 	if (g.logging == LOG_OPS)
 		switch (g.type) {
 		case FIX:
-			(void)session->msg_printf(
+			(void)g.wt_api->msg_printf(g.wt_api,
 			    session, "%-10s%" PRIu64 " {0x%02x}", which,
 			    keyno, ((char *)value.data)[0]);
 			break;
 		case ROW:
-			(void)session->msg_printf(session, "%-10s{%.*s/%.*s}",
-			    which,
+			(void)g.wt_api->msg_printf(
+			    g.wt_api, session, "%-10s{%.*s/%.*s}", which,
 			    (int)key.size, (char *)key.data,
 			    (int)value.size, (char *)value.data);
 			break;
 		case VAR:
-			(void)session->msg_printf(
-			    session, "%-10s%" PRIu64 " {%.*s}",
-			    which, keyno, (int)value.size, (char *)value.data);
+			(void)g.wt_api->msg_printf(g.wt_api, session,
+			    "%-10s%" PRIu64 " {%.*s}", which,
+			    keyno, (int)value.size, (char *)value.data);
 			break;
 		}
+	return (0);
 }
 
 /*
  * row_update --
  *	Update a row in a row-store file.
  */
-static void
+static int
 row_update(
     WT_CURSOR *cursor, WT_ITEM *key, WT_ITEM *value, uint64_t keyno, int insert)
 {
@@ -558,7 +662,8 @@ row_update(
 
 	/* Log the operation */
 	if (g.logging == LOG_OPS)
-		(void)session->msg_printf(session, "%-10s{%.*s}\n%-10s{%.*s}",
+		(void)g.wt_api->msg_printf(g.wt_api, session,
+		    "%-10s{%.*s}\n%-10s{%.*s}",
 		    insert ? "insertK" : "putK",
 		    (int)key->size, (char *)key->data,
 		    insert ? "insertV" : "putV",
@@ -567,23 +672,26 @@ row_update(
 	cursor->set_key(cursor, key);
 	cursor->set_value(cursor, value);
 	ret = cursor->insert(cursor);
+	if (ret == WT_DEADLOCK)
+		return (WT_DEADLOCK);
 	if (ret != 0 && ret != WT_NOTFOUND)
 		die(ret,
 		    "row_update: %s row %" PRIu64 " by key",
 		    insert ? "insert" : "update", keyno);
 
 	if (!SINGLETHREADED)
-		return;
+		return (0);
 
 	bdb_update(key->data, key->size, value->data, value->size, &notfound);
 	(void)notfound_chk("row_update", ret, notfound, keyno);
+	return (0);
 }
 
 /*
  * col_update --
  *	Update a row in a column-store file.
  */
-static void
+static int
 col_update(WT_CURSOR *cursor, WT_ITEM *key, WT_ITEM *value, uint64_t keyno)
 {
 	WT_SESSION *session;
@@ -596,12 +704,12 @@ col_update(WT_CURSOR *cursor, WT_ITEM *key, WT_ITEM *value, uint64_t keyno)
 	/* Log the operation */
 	if (g.logging == LOG_OPS) {
 		if (g.type == FIX)
-			(void)session->msg_printf(session,
+			(void)g.wt_api->msg_printf(g.wt_api, session,
 			    "%-10s%" PRIu64 " {0x%02" PRIx8 "}",
 			    "update", keyno,
 			    ((uint8_t *)value->data)[0]);
 		else
-			(void)session->msg_printf(session,
+			(void)g.wt_api->msg_printf(g.wt_api, session,
 			    "%-10s%" PRIu64 " {%.*s}",
 			    "update", keyno,
 			    (int)value->size, (char *)value->data);
@@ -613,22 +721,90 @@ col_update(WT_CURSOR *cursor, WT_ITEM *key, WT_ITEM *value, uint64_t keyno)
 	else
 		cursor->set_value(cursor, value);
 	ret = cursor->insert(cursor);
+	if (ret == WT_DEADLOCK)
+		return (WT_DEADLOCK);
 	if (ret != 0 && ret != WT_NOTFOUND)
 		die(ret, "col_update: %" PRIu64, keyno);
 
 	if (!SINGLETHREADED)
-		return;
+		return (0);
 
 	key_gen((uint8_t *)key->data, &key->size, keyno, 0);
 	bdb_update(key->data, key->size, value->data, value->size, &notfound);
 	(void)notfound_chk("col_update", ret, notfound, keyno);
+	return (0);
+}
+
+/*
+ * table_extend --
+ *	Handle the complexity of extending the table.
+ */
+static void
+table_extend(uint64_t keyno)
+{
+	static size_t n = 0;
+	static uint64_t *slots;
+	static uint64_t *ep;
+	uint64_t *p;
+	int ret;
+
+	/*
+	 * We don't want to ignore records we append, which requires we update
+	 * the "last row" as we insert new records.   There are problems: if
+	 * the underlying record numbers are allocated such that the threads
+	 * allocating the record number can race with other threads, the thread
+	 * allocating record N may return after the thread allocating N + 1.
+	 * Since it will cause problems if we try and replace a record before
+	 * it's been inserted, we have to make sure we don't skip records as we
+	 * increment the last record in the table.
+	 */
+	if ((ret = pthread_rwlock_wrlock(&g.table_extend_lock)) != 0)
+		die(ret, "pthread_rwlock_wrlock: table_extend");
+
+	/*
+	 * It's possible to get more than an allocated record per thread, if the
+	 * scheduler pauses a particular thread and other threads race allocate
+	 * multiple new records while it's sleeping.  Give ourselves some room.
+	 */
+	if (n < MAX_EXTEND) {
+		free(slots);
+		n = MAX_EXTEND;
+		if ((slots = calloc(n, sizeof(uint64_t))) == NULL)
+			die(errno, "calloc");
+		ep = slots + n;
+	}
+
+	/* Enter the new key into the list. */
+	for (p = slots; p < ep; ++p) {
+		if (*p == 0) {
+			*p = keyno;
+			break;
+		}
+		++g.extend;
+	}
+
+	/* Process the table until we don't find the "next" value. */
+	for (;;) {
+		for (p = slots; p < ep; ++p)
+			if (*p == g.rows + 1) {
+				g.rows = *p;
+				*p = 0;
+				--g.extend;
+				break;
+			}
+		if (p == ep)
+			break;
+	}
+
+	if ((ret = pthread_rwlock_unlock(&g.table_extend_lock)) != 0)
+		die(ret, "pthread_rwlock_unlock: table_extend");
 }
 
 /*
  * col_insert --
  *	Insert an element in a column-store file.
  */
-static void
+static int
 col_insert(WT_CURSOR *cursor, WT_ITEM *key, WT_ITEM *value, uint64_t *keynop)
 {
 	WT_SESSION *session;
@@ -643,45 +819,43 @@ col_insert(WT_CURSOR *cursor, WT_ITEM *key, WT_ITEM *value, uint64_t *keynop)
 		cursor->set_value(cursor, *(uint8_t *)value->data);
 	else
 		cursor->set_value(cursor, value);
-	if ((ret = cursor->insert(cursor)) != 0)
+	if ((ret = cursor->insert(cursor)) != 0) {
+		if (ret == WT_DEADLOCK)
+			return (WT_DEADLOCK);
 		die(ret, "cursor.insert");
+	}
 	if ((ret = cursor->get_key(cursor, &keyno)) != 0)
 		die(ret, "cursor.get_key");
 	*keynop = (uint32_t)keyno;
 
-	/*
-	 * Assign the maximum number of rows to the returned key: that key may
-	 * not be the current maximum value, if we race with another thread,
-	 * but that's OK, we just want it to keep increasing so we don't ignore
-	 * records at the end of the table.
-	 */
-	g.rows = (uint32_t)keyno;
+	table_extend(keyno);		/* Extend the object. */
 
 	if (g.logging == LOG_OPS) {
 		if (g.type == FIX)
-			(void)session->msg_printf(session,
+			(void)g.wt_api->msg_printf(g.wt_api, session,
 			    "%-10s%" PRIu64 " {0x%02" PRIx8 "}",
 			    "insert", keyno,
 			    ((uint8_t *)value->data)[0]);
 		else
-			(void)session->msg_printf(session,
+			(void)g.wt_api->msg_printf(g.wt_api, session,
 			    "%-10s%" PRIu64 " {%.*s}",
 			    "insert", keyno,
 			    (int)value->size, (char *)value->data);
 	}
 
 	if (!SINGLETHREADED)
-		return;
+		return (0);
 
 	key_gen((uint8_t *)key->data, &key->size, keyno, 0);
 	bdb_update(key->data, key->size, value->data, value->size, &notfound);
+	return (0);
 }
 
 /*
  * row_remove --
  *	Remove an row from a row-store file.
  */
-static void
+static int
 row_remove(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno, int *notfoundp)
 {
 	WT_SESSION *session;
@@ -693,32 +867,32 @@ row_remove(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno, int *notfoundp)
 
 	/* Log the operation */
 	if (g.logging == LOG_OPS)
-		(void)session->msg_printf(
-		    session, "%-10s%" PRIu64, "remove", keyno);
+		(void)g.wt_api->msg_printf(
+		    g.wt_api, session, "%-10s%" PRIu64, "remove", keyno);
 
 	cursor->set_key(cursor, key);
-	ret = cursor->remove(cursor);
+	/* We use the cursor in overwrite mode, check for existence. */
+	if ((ret = cursor->search(cursor)) == 0)
+		ret = cursor->remove(cursor);
+	if (ret == WT_DEADLOCK)
+		return (WT_DEADLOCK);
 	if (ret != 0 && ret != WT_NOTFOUND)
 		die(ret, "row_remove: remove %" PRIu64 " by key", keyno);
-	*notfoundp = ret == WT_NOTFOUND;
+	*notfoundp = (ret == WT_NOTFOUND);
 
 	if (!SINGLETHREADED)
-		return;
+		return (0);
 
 	bdb_remove(keyno, &notfound);
-
-	/* LSM trees don't check for existence if "overwrite" is set. */
-	if (strncmp(cursor->uri, "lsm:", 4) == 0)
-		*notfoundp = notfound;
-	else
-		(void)notfound_chk("row_remove", ret, notfound, keyno);
+	(void)notfound_chk("row_remove", ret, notfound, keyno);
+	return (0);
 }
 
 /*
  * col_remove --
  *	Remove a row from a column-store file.
  */
-static void
+static int
 col_remove(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno, int *notfoundp)
 {
 	WT_SESSION *session;
@@ -728,17 +902,21 @@ col_remove(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno, int *notfoundp)
 
 	/* Log the operation */
 	if (g.logging == LOG_OPS)
-		(void)session->msg_printf(
-		    session, "%-10s%" PRIu64, "remove", keyno);
+		(void)g.wt_api->msg_printf(
+		    g.wt_api, session, "%-10s%" PRIu64, "remove", keyno);
 
 	cursor->set_key(cursor, keyno);
-	ret = cursor->remove(cursor);
+	/* We use the cursor in overwrite mode, check for existence. */
+	if ((ret = cursor->search(cursor)) == 0)
+		ret = cursor->remove(cursor);
+	if (ret == WT_DEADLOCK)
+		return (WT_DEADLOCK);
 	if (ret != 0 && ret != WT_NOTFOUND)
 		die(ret, "col_remove: remove %" PRIu64 " by key", keyno);
-	*notfoundp = ret == WT_NOTFOUND;
+	*notfoundp = (ret == WT_NOTFOUND);
 
 	if (!SINGLETHREADED)
-		return;
+		return (0);
 
 	/*
 	 * Deleting a fixed-length item is the same as setting the bits to 0;
@@ -749,8 +927,8 @@ col_remove(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno, int *notfoundp)
 		bdb_update(key->data, key->size, "\0", 1, &notfound);
 	} else
 		bdb_remove(keyno, &notfound);
-
 	(void)notfound_chk("col_remove", ret, notfound, keyno);
+	return (0);
 }
 
 /*

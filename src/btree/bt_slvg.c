@@ -476,9 +476,8 @@ __slvg_trk_leaf(WT_SESSION_IMPL *session,
 	trk = NULL;
 
 	/* Re-allocate the array of pages, as necessary. */
-	if (ss->pages_next * sizeof(WT_TRACK *) == ss->pages_allocated)
-		WT_RET(__wt_realloc(session, &ss->pages_allocated,
-		   (ss->pages_next + 1000) * sizeof(WT_TRACK *), &ss->pages));
+	WT_RET(__wt_realloc_def(
+	    session, &ss->pages_allocated, ss->pages_next + 1, &ss->pages));
 
 	/* Allocate a WT_TRACK entry for this new page and fill it in. */
 	WT_RET(__slvg_trk_init(
@@ -534,10 +533,10 @@ __slvg_trk_leaf(WT_SESSION_IMPL *session,
 		 * on every leaf page, and if you need to speed up the salvage,
 		 * it's probably a great place to start.
 		 */
-		WT_ERR(__wt_page_inmem(session, NULL, NULL, dsk, 1, &page));
-		WT_ERR(__wt_row_key_copy(session,
+		WT_ERR(__wt_page_inmem(session, NULL, NULL, dsk, 0, &page));
+		WT_ERR(__wt_row_leaf_key_copy(session,
 		    page, &page->u.row.d[0], &trk->row_start));
-		WT_ERR(__wt_row_key_copy(session,
+		WT_ERR(__wt_row_leaf_key_copy(session,
 		    page, &page->u.row.d[page->entries - 1], &trk->row_stop));
 
 		if (WT_VERBOSE_ISSET(session, salvage)) {
@@ -585,9 +584,8 @@ __slvg_trk_ovfl(WT_SESSION_IMPL *session,
 	 * Reallocate the overflow page array as necessary, then save the
 	 * page's location information.
 	 */
-	if (ss->ovfl_next * sizeof(WT_TRACK *) == ss->ovfl_allocated)
-		WT_RET(__wt_realloc(session, &ss->ovfl_allocated,
-		   (ss->ovfl_next + 1000) * sizeof(WT_TRACK *), &ss->ovfl));
+	WT_RET(__wt_realloc_def(
+	    session, &ss->ovfl_allocated, ss->ovfl_next + 1, &ss->ovfl));
 
 	WT_RET(__slvg_trk_init(
 	    session, addr, size, dsk->mem_size, dsk->write_gen, ss, &trk));
@@ -933,9 +931,8 @@ delete:		WT_RET(__slvg_trk_free(session,
 	 * the new element into the array after the existing element (that's
 	 * probably wrong, but we'll fix it up in a second).
 	 */
-	if (ss->pages_next * sizeof(WT_TRACK *) == ss->pages_allocated)
-		WT_RET(__wt_realloc(session, &ss->pages_allocated,
-		   (ss->pages_next + 1000) * sizeof(WT_TRACK *), &ss->pages));
+	WT_RET(__wt_realloc_def(
+	    session, &ss->pages_allocated, ss->pages_next + 1, &ss->pages));
 	memmove(ss->pages + a_slot + 1, ss->pages + a_slot,
 	    (ss->pages_next - a_slot) * sizeof(*ss->pages));
 	ss->pages[a_slot + 1] = new;
@@ -1108,7 +1105,7 @@ __slvg_col_build_internal(
 
 		ref->page = NULL;
 		ref->addr = addr;
-		ref->u.recno = trk->col_start;
+		ref->key.recno = trk->col_start;
 		ref->state = WT_REF_DISK;
 
 		/*
@@ -1197,7 +1194,7 @@ __slvg_col_build_leaf(
 		    session, trk->ss->tmp1, trk->addr.addr, trk->addr.size),
 		    cookie->missing);
 	}
-	ref->u.recno = page->u.col_var.recno;
+	ref->key.recno = page->u.col_var.recno;
 
 	/*
 	 * We can't discard the original blocks associated with this page now.
@@ -1314,7 +1311,7 @@ __slvg_row_range(WT_SESSION_IMPL *session, WT_STUFF *ss)
 			 * We're done if this page starts after our stop, no
 			 * subsequent pages can overlap our page.
 			 */
-			WT_RET(WT_BTREE_CMP(session, btree,
+			WT_RET(WT_LEX_CMP(session, btree->collator,
 			    &ss->pages[j]->row_start,
 			    &ss->pages[i]->row_stop, cmp));
 			if (cmp > 0)
@@ -1406,7 +1403,8 @@ __slvg_row_range_overlap(
 #define	__slvg_key_copy(session, dst, src)				\
 	__wt_buf_set(session, dst, (src)->data, (src)->size)
 
-	WT_RET(WT_BTREE_CMP(session, btree, A_TRK_START, B_TRK_START, cmp));
+	WT_RET(WT_LEX_CMP(
+	    session, btree->collator, A_TRK_START, B_TRK_START, cmp));
 	if (cmp == 0) {					/* Case #1, #4, #9 */
 		/*
 		 * The secondary sort of the leaf page array was the page's LSN,
@@ -1416,8 +1414,8 @@ __slvg_row_range_overlap(
 		 * this simplifies things, it guarantees a_trk has a higher LSN
 		 * than b_trk.
 		 */
-		WT_RET(
-		    WT_BTREE_CMP(session, btree, A_TRK_STOP, B_TRK_STOP, cmp));
+		WT_RET(WT_LEX_CMP(
+		    session, btree->collator, A_TRK_STOP, B_TRK_STOP, cmp));
 		if (cmp >= 0)
 			/*
 			 * Case #1, #4: a_trk is a superset of b_trk, and a_trk
@@ -1436,7 +1434,8 @@ __slvg_row_range_overlap(
 		goto merge;
 	}
 
-	WT_RET(WT_BTREE_CMP(session, btree, A_TRK_STOP, B_TRK_STOP, cmp));
+	WT_RET(WT_LEX_CMP(
+	    session, btree->collator, A_TRK_STOP, B_TRK_STOP, cmp));
 	if (cmp == 0) {					/* Case #6 */
 		if (a_trk->gen > b_trk->gen)
 			/*
@@ -1454,7 +1453,8 @@ __slvg_row_range_overlap(
 		goto merge;
 	}
 
-	WT_RET(WT_BTREE_CMP(session, btree, A_TRK_STOP, B_TRK_STOP, cmp));
+	WT_RET(WT_LEX_CMP(
+	    session, btree->collator, A_TRK_STOP, B_TRK_STOP, cmp));
 	if (cmp < 0) {					/* Case #3/7 */
 		if (a_trk->gen > b_trk->gen) {
 			/*
@@ -1503,9 +1503,8 @@ delete:		WT_RET(__slvg_trk_free(session,
 	 * the new element into the array after the existing element (that's
 	 * probably wrong, but we'll fix it up in a second).
 	 */
-	if (ss->pages_next * sizeof(WT_TRACK *) == ss->pages_allocated)
-		WT_RET(__wt_realloc(session, &ss->pages_allocated,
-		   (ss->pages_next + 1000) * sizeof(WT_TRACK *), &ss->pages));
+	WT_RET(__wt_realloc_def(
+	    session, &ss->pages_allocated, ss->pages_next + 1, &ss->pages));
 	memmove(ss->pages + a_slot + 1, ss->pages + a_slot,
 	    (ss->pages_next - a_slot) * sizeof(*ss->pages));
 	ss->pages[a_slot + 1] = new;
@@ -1592,7 +1591,7 @@ __slvg_row_trk_update_start(
 	 */
 	WT_RET(__wt_scr_alloc(session, trk->size, &dsk));
 	WT_ERR(__wt_bt_read(session, dsk, trk->addr.addr, trk->addr.size));
-	WT_ERR(__wt_page_inmem(session, NULL, NULL, dsk->mem, 1, &page));
+	WT_ERR(__wt_page_inmem(session, NULL, NULL, dsk->mem, 0, &page));
 
 	/*
 	 * Walk the page, looking for a key sorting greater than the specified
@@ -1600,8 +1599,8 @@ __slvg_row_trk_update_start(
 	 */
 	WT_ERR(__wt_scr_alloc(session, 0, &key));
 	WT_ROW_FOREACH(page, rip, i) {
-		WT_ERR(__wt_row_key(session, page, rip, key, 0));
-		WT_ERR(WT_BTREE_CMP(session, btree, key, stop, cmp));
+		WT_ERR(__wt_row_leaf_key_work(session, page, rip, key, 0));
+		WT_ERR(WT_LEX_CMP(session, btree->collator, key, stop, cmp));
 		if (cmp > 0) {
 			found = 1;
 			break;
@@ -1626,7 +1625,7 @@ __slvg_row_trk_update_start(
 	for (i = slot + 1; i < ss->pages_next; ++i) {
 		if (ss->pages[i] == NULL)
 			continue;
-		WT_ERR(WT_BTREE_CMP(session, btree,
+		WT_ERR(WT_LEX_CMP(session, btree->collator,
 		    SLOT_START(i), &trk->row_stop, cmp));
 		if (cmp > 0)
 			break;
@@ -1681,7 +1680,7 @@ __slvg_row_build_internal(
 
 		ref->page = NULL;
 		ref->addr = addr;
-		ref->u.key = NULL;
+		__wt_ref_key_clear(ref);
 		ref->state = WT_REF_DISK;
 
 		/*
@@ -1700,7 +1699,7 @@ __slvg_row_build_internal(
 		} else
 			WT_ERR(__wt_row_ikey_incr(session, page, 0,
 			    trk->row_start.data, trk->row_start.size,
-			    &ref->u.key));
+			    &ref->key.ikey));
 		++ref;
 	}
 
@@ -1760,13 +1759,14 @@ __slvg_row_build_leaf(WT_SESSION_IMPL *session,
 	skip_start = skip_stop = 0;
 	if (F_ISSET(trk, WT_TRACK_CHECK_START))
 		WT_ROW_FOREACH(page, rip, i) {
-			WT_ERR(__wt_row_key(session, page, rip, key, 0));
+			WT_ERR(
+			    __wt_row_leaf_key_work(session, page, rip, key, 0));
 
 			/*
 			 * >= is correct: see the comment above.
 			 */
-			WT_ERR(WT_BTREE_CMP(
-			    session, btree, key, &trk->row_start, cmp));
+			WT_ERR(WT_LEX_CMP(session,
+			    btree->collator, key, &trk->row_start, cmp));
 			if (cmp >= 0)
 				break;
 			if (WT_VERBOSE_ISSET(session, salvage)) {
@@ -1783,13 +1783,14 @@ __slvg_row_build_leaf(WT_SESSION_IMPL *session,
 		}
 	if (F_ISSET(trk, WT_TRACK_CHECK_STOP))
 		WT_ROW_FOREACH_REVERSE(page, rip, i) {
-			WT_ERR(__wt_row_key(session, page, rip, key, 0));
+			WT_ERR(
+			    __wt_row_leaf_key_work(session, page, rip, key, 0));
 
 			/*
 			 * < is correct: see the comment above.
 			 */
-			WT_ERR(WT_BTREE_CMP(
-			    session, btree, key, &trk->row_stop, cmp));
+			WT_ERR(WT_LEX_CMP(session,
+			    btree->collator, key, &trk->row_stop, cmp));
 			if (cmp < 0)
 				break;
 			if (WT_VERBOSE_ISSET(session, salvage)) {
@@ -1816,9 +1817,9 @@ __slvg_row_build_leaf(WT_SESSION_IMPL *session,
 	 * a copy from the page.
 	 */
 	rip = page->u.row.d + skip_start;
-	WT_ERR(__wt_row_key(session, page, rip, key, 0));
+	WT_ERR(__wt_row_leaf_key_work(session, page, rip, key, 0));
 	WT_ERR(__wt_row_ikey_incr(
-	    session, parent, 0, key->data, key->size, &ref->u.key));
+	    session, parent, 0, key->data, key->size, &ref->key.ikey));
 
 	/*
 	 * Discard backing overflow pages for any items being discarded that
@@ -2115,12 +2116,12 @@ __slvg_trk_compare_key(const void *a, const void *b)
 		btree = a_trk->ss->btree;
 		/*
 		 * XXX
-		 * WT_BTREE_CMP can potentially fail, and we're ignoring that
+		 * WT_LEX_CMP can potentially fail, and we're ignoring that
 		 * error because this routine is called as an underlying qsort
 		 * routine.
 		 */
-		(void)WT_BTREE_CMP(a_trk->ss->session, btree,
-		    &a_trk->row_start, &b_trk->row_start, cmp);
+		(void)WT_LEX_CMP(a_trk->ss->session,
+		    btree->collator, &a_trk->row_start, &b_trk->row_start, cmp);
 		if (cmp != 0)
 			return (cmp);
 		break;

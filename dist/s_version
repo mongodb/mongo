@@ -5,7 +5,21 @@
 
 m4dir=../build_posix/aclocal
 
-if test -f $m4dir/version.m4 -a -f $m4dir/version-set.m4 ; then
+force=no
+while :
+	do case "$1" in
+	-f)	# Force versions to be updated
+		force=yes
+		shift;;
+	*)
+		break;;
+	esac
+done
+
+# If the version hasn't changed and we're not forcing the issue, we're done.
+if test "$force" = no -a \
+    -f $m4dir/version.m4 -a \
+    -f $m4dir/version-set.m4 ; then
 	eval `grep '^VERSION_[A-Z]*=' $m4dir/version-set.m4`
 	if test x${WIREDTIGER_VERSION_MAJOR} = x${VERSION_MAJOR} -a \
 		x${WIREDTIGER_VERSION_MINOR} = x${VERSION_MINOR} -a \

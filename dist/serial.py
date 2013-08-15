@@ -39,10 +39,6 @@ Serial('insert', [
 		SerialArg('u_int', 'skipdepth'),
 	]),
 
-Serial('sync_file', [
-		SerialArg('int', 'syncop'),
-	]),
-
 Serial('update', [
 		SerialArg('WT_PAGE *', 'page'),
 		SerialArg('uint32_t', 'write_gen'),

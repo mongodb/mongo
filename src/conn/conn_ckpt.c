@@ -65,13 +65,6 @@ __ckpt_server(void *arg)
 	conn = S2C(session);
 	wt_session = (WT_SESSION *)session;
 
-	/*
-	 * The checkpoint server may be running before the database is created,
-	 * and checkpoints would fail.   Wait for the wiredtiger_open call.
-	 */
-	while (!conn->connection_initialized)
-		__wt_sleep(1, 0);
-
 	while (F_ISSET(conn, WT_CONN_SERVER_RUN)) {
 		/* Get the current local time of day. */
 		WT_ERR(__wt_epoch(session, &ts));
@@ -144,8 +137,7 @@ __wt_checkpoint_destroy(WT_CONNECTION_IMPL *conn)
 		WT_TRET(__wt_thread_join(session, conn->ckpt_tid));
 		conn->ckpt_tid_set = 0;
 	}
-	if (conn->ckpt_cond != NULL)
-		WT_TRET(__wt_cond_destroy(session, conn->ckpt_cond));
+	WT_TRET(__wt_cond_destroy(session, &conn->ckpt_cond));
 
 	__wt_free(session, conn->ckpt_config);
 

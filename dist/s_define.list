@@ -20,13 +20,14 @@ WT_CSTAT_SET
 WT_DEBUG_BYTE
 WT_DSTAT_DECR
 WT_READ_BARRIER
+WT_REF_SIZE
+WT_STAT_ATOMIC_DECR
+WT_STAT_ATOMIC_INCR
+WT_STAT_ATOMIC_V
 WT_STAT_DECR
 __F
 __WIREDTIGER_EXT_H_
 __WIREDTIGER_H_
-wiredtiger_err_printf
-wiredtiger_scr_alloc
-wiredtiger_scr_free
 
 # List of queue.h #defines that are "unused", but it's OK.
 LIST_EMPTY

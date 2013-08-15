@@ -205,8 +205,9 @@ TAB_SIZE               = 8
 # will result in a user-defined paragraph with heading "Side Effects:". 
 # You can put \n's in the value part of an alias to insert newlines.
 
-ALIASES                = "notyet{1}=<b>Not yet supported in WiredTiger.</b>\n@todo fix when \1 supported\n\n" \
+ALIASES                = "notyet{1}=Note: <b>"\1"</b> not yet supported in WiredTiger.\n@todo fix when \1 supported\n\n" \
                          "errors=@returns zero on success and a non-zero error code on failure.  See @ref error_returns \"Error Returns\" for details." \
+                         "ebusy_errors=@returns zero on success, EBUSY if there are open cursors on the object and a non-zero error code on failure.  See @ref error_returns \"Error Returns\" for details." \
                          "ex_ref{1}=@ref \1 \"\1\"" \
                          "hrow{1}=<tr><th>\1</th></tr>" \
                          "hrow{2}=<tr><th>\1</th><th>\2</th></tr>" \
@@ -354,22 +355,6 @@ INLINE_SIMPLE_STRUCTS  = YES
 # types are typedef'ed and only the typedef is referenced, never the tag name.
 
 TYPEDEF_HIDES_STRUCT   = YES
-
-# The SYMBOL_CACHE_SIZE determines the size of the internal cache use to 
-# determine which symbols to keep in memory and which to flush to disk. 
-# When the cache is full, less often used symbols will be written to disk. 
-# For small to medium size projects (<1000 input files) the default value is 
-# probably good enough. For larger projects a too small cache size can cause 
-# doxygen to be busy swapping symbols to and from disk most of the time 
-# causing a significant performance penalty. 
-# If the system has enough physical memory increasing the cache will improve the 
-# performance by keeping more symbols in memory. Note that the value works on 
-# a logarithmic scale so increasing the size by one will roughly double the 
-# memory usage. The cache size is given by this formula: 
-# 2^(16+SYMBOL_CACHE_SIZE). The valid range is 0..9, the default is 0, 
-# corresponding to a cache size of 2^16 = 65536 symbols.
-
-SYMBOL_CACHE_SIZE      = 0
 
 # Similar to the SYMBOL_CACHE_SIZE the size of the symbol lookup cache can be 
 # set using LOOKUP_CACHE_SIZE. This cache is used to resolve symbols given 
@@ -788,7 +773,8 @@ EXCLUDE_SYMBOLS        = __F
 # directories that contain example code fragments that are included (see 
 # the \include command).
 
-EXAMPLE_PATH           = ../../examples/c
+EXAMPLE_PATH           = ../../examples/c \
+			 ../../ext/compressors/nop
 
 # If the value of the EXAMPLE_PATH tag contains directories, you can use the 
 # EXAMPLE_PATTERNS tag to specify one or more wildcard pattern (like *.cpp 
@@ -1588,6 +1574,9 @@ INCLUDE_FILE_PATTERNS  =
 PREDEFINED             = DOXYGEN \
                          __wt_collator:=WT_COLLATOR \
                          __wt_compressor:=WT_COMPRESSOR \
+                         __wt_config_arg:=WT_CONFIG_ARG \
+                         __wt_config_item:=WT_CONFIG_ITEM \
+                         __wt_config_scan:=WT_CONFIG_SCAN \
                          __wt_connection:=WT_CONNECTION \
                          __wt_cursor:=WT_CURSOR \
                          __wt_data_source:=WT_DATA_SOURCE \
@@ -1700,7 +1689,7 @@ DOT_NUM_THREADS        = 0
 # the DOTFONTPATH environment variable or by setting DOT_FONTPATH to the 
 # directory containing the font.
 
-DOT_FONTNAME           = FreeSans.ttf
+DOT_FONTNAME           = 
 
 # The DOT_FONTSIZE tag can be used to set the size of the font of dot graphs. 
 # The default size is 10pt.

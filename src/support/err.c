@@ -122,7 +122,8 @@ __eventv(WT_SESSION_IMPL *session, int msg_event, int error,
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
 	size_t len, remain, wlen;
-	const char *err, *prefix1, *prefix2;
+	int prefix_cnt;
+	const char *err, *prefix;
 	char *end, *p;
 
 	/*
@@ -139,20 +140,39 @@ __eventv(WT_SESSION_IMPL *session, int msg_event, int error,
 	end = s + sizeof(s);
 
 	dhandle = session->dhandle;
-	prefix1 = (dhandle != NULL) ? dhandle->name : NULL;
-	prefix2 = session->name;
 
-	remain = WT_PTRDIFF(end, p);
-	if (prefix1 != NULL && prefix2 != NULL)
-		wlen =
-		    (size_t)snprintf(p, remain, "%s [%s]: ", prefix1, prefix2);
-	else if (prefix1 != NULL)
-		wlen = (size_t)snprintf(p, remain, "%s: ", prefix1);
-	else if (prefix2 != NULL)
-		wlen = (size_t)snprintf(p, remain, "%s: ", prefix2);
-	else
-		wlen = 0;
-	p = wlen >= remain ? end : p + wlen;
+	/*
+	 * We have several prefixes for the error message: the database error
+	 * prefix, the data-source's name, and the session's name.  Write them
+	 * as a comma-separate list, followed by a colon.
+	 */
+	prefix_cnt = 0;
+	if ((prefix = S2C(session)->error_prefix) != NULL) {
+		remain = WT_PTRDIFF(end, p);
+		wlen = (size_t)snprintf(p, remain, "%s", prefix);
+		p = wlen >= remain ? end : p + wlen;
+		++prefix_cnt;
+	}
+	prefix = dhandle == NULL ? NULL : dhandle->name;
+	if (prefix != NULL) {
+		remain = WT_PTRDIFF(end, p);
+		wlen = (size_t)snprintf(p, remain,
+		    "%s%s", prefix_cnt == 0 ? "" : ", ", prefix);
+		p = wlen >= remain ? end : p + wlen;
+		++prefix_cnt;
+	}
+	if ((prefix = session->name) != NULL) {
+		remain = WT_PTRDIFF(end, p);
+		wlen = (size_t)snprintf(p, remain,
+		    "%s%s", prefix_cnt == 0 ? "" : ", ", prefix);
+		p = wlen >= remain ? end : p + wlen;
+		++prefix_cnt;
+	}
+	if (prefix_cnt != 0) {
+		remain = WT_PTRDIFF(end, p);
+		wlen = (size_t)snprintf(p, remain, ": ");
+		p = wlen >= remain ? end : p + wlen;
+	}
 
 	if (file_name != NULL) {
 		remain = WT_PTRDIFF(end, p);
@@ -251,38 +271,33 @@ __wt_errx(WT_SESSION_IMPL *session, const char *fmt, ...)
 }
 
 /*
- * __wt_verrx --
- *	Interface to support the extension API.
+ * __wt_ext_err_printf --
+ *	Extension API call to print to the error stream.
  */
 int
-__wt_verrx(WT_SESSION_IMPL *session, const char *fmt, va_list ap)
-{
-	return (__eventv(session, 0, 0, NULL, 0, fmt, ap));
-}
-/*
- * __wt_msg --
- * 	Informational message.
- */
-int
-__wt_msg(WT_SESSION_IMPL *session, const char *fmt, ...)
-    WT_GCC_FUNC_ATTRIBUTE((format (printf, 2, 3)))
+__wt_ext_err_printf(
+    WT_EXTENSION_API *wt_api, WT_SESSION *wt_session, const char *fmt, ...)
+    WT_GCC_FUNC_ATTRIBUTE((format (printf, 3, 4)))
 {
 	WT_DECL_RET;
+	WT_SESSION_IMPL *session;
 	va_list ap;
 
-	va_start(ap, fmt);
-	ret = __wt_vmsg(session, fmt, ap);
-	va_end(ap);
+	if ((session = (WT_SESSION_IMPL *)wt_session) == NULL)
+		session = ((WT_CONNECTION_IMPL *)wt_api->conn)->default_session;
 
+	va_start(ap, fmt);
+	ret = __eventv(session, 0, 0, NULL, 0, fmt, ap);
+	va_end(ap);
 	return (ret);
 }
 
 /*
- * __wt_vmsg --
+ * info_msg --
  * 	Informational message.
  */
-int
-__wt_vmsg(WT_SESSION_IMPL *session, const char *fmt, va_list ap)
+static int
+info_msg(WT_SESSION_IMPL *session, const char *fmt, va_list ap)
 {
 	WT_EVENT_HANDLER *handler;
 
@@ -297,6 +312,46 @@ __wt_vmsg(WT_SESSION_IMPL *session, const char *fmt, va_list ap)
 
 	handler = session->event_handler;
 	return (handler->handle_message(handler, s));
+}
+
+/*
+ * __wt_msg --
+ * 	Informational message.
+ */
+int
+__wt_msg(WT_SESSION_IMPL *session, const char *fmt, ...)
+    WT_GCC_FUNC_ATTRIBUTE((format (printf, 2, 3)))
+{
+	WT_DECL_RET;
+	va_list ap;
+
+	va_start(ap, fmt);
+	ret = info_msg(session, fmt, ap);
+	va_end(ap);
+
+	return (ret);
+}
+
+/*
+ * __wt_ext_msg_printf --
+ *	Extension API call to print to the message stream.
+ */
+int
+__wt_ext_msg_printf(
+    WT_EXTENSION_API *wt_api, WT_SESSION *wt_session, const char *fmt, ...)
+    WT_GCC_FUNC_ATTRIBUTE((format (printf, 3, 4)))
+{
+	WT_DECL_RET;
+	WT_SESSION_IMPL *session;
+	va_list ap;
+
+	if ((session = (WT_SESSION_IMPL *)wt_session) == NULL)
+		session = ((WT_CONNECTION_IMPL *)wt_api->conn)->default_session;
+
+	va_start(ap, fmt);
+	ret = info_msg(session, fmt, ap);
+	va_end(ap);
+	return (ret);
 }
 
 /*
@@ -401,6 +456,17 @@ __wt_illegal_value(WT_SESSION_IMPL *session, const char *name)
 }
 
 /*
+ * __wt_object_unsupported --
+ *	Print a standard error message for an object that doesn't support a
+ * particular operation.
+ */
+int
+__wt_object_unsupported(WT_SESSION_IMPL *session, const char *uri)
+{
+	WT_RET_MSG(session, ENOTSUP, "unsupported object operation: %s", uri);
+}
+
+/*
  * __wt_bad_object_type --
  *	Print a standard error message when given an unknown or unsupported
  * object type.
@@ -416,8 +482,7 @@ __wt_bad_object_type(WT_SESSION_IMPL *session, const char *uri)
 	    WT_PREFIX_MATCH(uri, "lsm:") ||
 	    WT_PREFIX_MATCH(uri, "statistics:") ||
 	    WT_PREFIX_MATCH(uri, "table:"))
-		WT_RET_MSG(session, ENOTSUP,
-		    "unsupported object type: %s", uri);
+		return (__wt_object_unsupported(session, uri));
 
 	WT_RET_MSG(session, ENOTSUP, "unknown object type: %s", uri);
 }

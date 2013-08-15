@@ -69,10 +69,12 @@ __wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 {
 	WT_BLOCK_HEADER *blk;
 	WT_DECL_RET;
+	WT_FH *fh;
 	off_t offset;
 	uint32_t align_size;
 
 	blk = WT_BLOCK_HEADER_REF(buf->mem);
+	fh = block->fh;
 
 	/* Buffers should be aligned for writing. */
 	if (!F_ISSET(buf, WT_ITEM_ALIGNED)) {
@@ -131,8 +133,27 @@ __wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 		__wt_spin_unlock(session, &block->live_lock);
 	WT_RET(ret);
 
-	if ((ret = __wt_write(
-	    session, block->fh, offset, align_size, buf->mem)) != 0) {
+#if defined(HAVE_POSIX_FALLOCATE) || defined(HAVE_FTRUNCATE)
+	/*
+	 * Extend the file in chunks.  We aren't holding a lock and we'd prefer
+	 * to limit the number of threads extending the file at the same time,
+	 * so choose the one thread that's crossing the extended boundary.  We
+	 * don't extend newly created files, and it's theoretically possible we
+	 * might wait so long our extension of the file is passed by another
+	 * thread writing single blocks, that's why there's a check in case the
+	 * extended file size becomes too small: if the file size catches up,
+	 * every thread will try to extend it.
+	 */
+	if (fh->extend_len != 0 &&
+	    (fh->extend_size <= fh->size ||
+	    (offset + fh->extend_len <= fh->extend_size &&
+	    offset + fh->extend_len + align_size >= fh->extend_size))) {
+		fh->extend_size = offset + fh->extend_len * 2;
+		WT_RET(__wt_fallocate(session, fh, offset, fh->extend_len * 2));
+	}
+#endif
+	if ((ret =
+	    __wt_write(session, fh, offset, align_size, buf->mem)) != 0) {
 		if (!locked)
 			__wt_spin_lock(session, &block->live_lock);
 		WT_TRET(
@@ -150,7 +171,7 @@ __wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	if (block->os_cache_dirty_max != 0 &&
 	    (block->os_cache_dirty += align_size) > block->os_cache_dirty_max) {
 		block->os_cache_dirty = 0;
-		if ((ret = sync_file_range(block->fh->fd,
+		if ((ret = sync_file_range(fh->fd,
 		    (off64_t)0, (off64_t)0, SYNC_FILE_RANGE_WRITE)) != 0)
 			WT_RET_MSG(
 			    session, ret, "%s: sync_file_range", block->name);
@@ -161,7 +182,7 @@ __wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	if (block->os_cache_max != 0 &&
 	    (block->os_cache += align_size) > block->os_cache_max) {
 		block->os_cache = 0;
-		if ((ret = posix_fadvise(block->fh->fd,
+		if ((ret = posix_fadvise(fh->fd,
 		    (off_t)0, (off_t)0, POSIX_FADV_DONTNEED)) != 0)
 			WT_RET_MSG(
 			    session, ret, "%s: posix_fadvise", block->name);

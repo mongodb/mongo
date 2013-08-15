@@ -28,7 +28,8 @@ typedef struct {
 static const char *sep = "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=\n";
 
 static int  __debug_cell(WT_DBG *, WT_PAGE_HEADER *, WT_CELL_UNPACK *);
-static int  __debug_cell_data(WT_DBG *, const char *, WT_CELL_UNPACK *);
+static int  __debug_cell_data(
+	WT_DBG *, int type, const char *, WT_CELL_UNPACK *);
 static void __debug_col_skip(WT_DBG *, WT_INSERT_HEAD *, const char *, int);
 static int  __debug_config(WT_SESSION_IMPL *, WT_DBG *, const char *);
 static int  __debug_dsk_cell(WT_DBG *, WT_PAGE_HEADER *);
@@ -217,7 +218,7 @@ __wt_debug_offset(WT_SESSION_IMPL *session,
 	/*
 	 * This routine depends on the default block manager's view of files,
 	 * where an address consists of a file offset, length, and checksum.
-	 * This is for debugging only.  Other block manager's might not see a
+	 * This is for debugging only.  Other block managers might not see a
 	 * file or address the same way, that's why there's no block manager
 	 * method.
 	 */
@@ -526,10 +527,11 @@ __debug_page_modify(WT_DBG *ds, WT_PAGE *page)
 		    mod->u.replace.addr, mod->u.replace.size));
 		break;
 	case WT_PM_REC_SPLIT:
-		__dmsg(ds, "\t" "split page %p\n", mod->u.split);
+		__dmsg(ds, "\t" "split page %p ref: %p\n",
+		    mod->u.split.page, mod->u.split.ref);
 		break;
 	case WT_PM_REC_SPLIT_MERGE:
-		__dmsg(ds, "\t" "split-merge page %p\n", mod->u.split);
+		__dmsg(ds, "\t" "split-merge page %p\n", mod->u.split.page);
 		break;
 	WT_ILLEGAL_VALUE(session);
 	}
@@ -607,7 +609,7 @@ __debug_page_col_int(WT_DBG *ds, WT_PAGE *page, uint32_t flags)
 	uint32_t i;
 
 	WT_REF_FOREACH(page, ref, i) {
-		__dmsg(ds, "\trecno %" PRIu64 "\n", ref->u.recno);
+		__dmsg(ds, "\trecno %" PRIu64 "\n", ref->key.recno);
 		WT_RET(__debug_ref(ds, ref, page));
 	}
 
@@ -648,7 +650,7 @@ __debug_page_col_var(WT_DBG *ds, WT_PAGE *page)
 			rle = __wt_cell_rle(unpack);
 		}
 		snprintf(tag, sizeof(tag), "%" PRIu64 " %" PRIu64, recno, rle);
-		WT_RET(__debug_cell_data(ds, tag, unpack));
+		WT_RET(__debug_cell_data(ds, WT_PAGE_COL_VAR, tag, unpack));
 
 		if ((update = WT_COL_UPDATE(page, cip)) != NULL)
 			__debug_col_skip(ds, update, "update", 0);
@@ -671,10 +673,12 @@ static int
 __debug_page_row_int(WT_DBG *ds, WT_PAGE *page, uint32_t flags)
 {
 	WT_REF *ref;
-	uint32_t i;
+	uint8_t *p;
+	uint32_t i, len;
 
 	WT_REF_FOREACH(page, ref, i) {
-		__debug_ikey(ds, ref->u.key);
+		__wt_ref_key(page, ref, &p, &len);
+		__debug_item(ds, "K", p, len);
 		WT_RET(__debug_ref(ds, ref, page));
 	}
 
@@ -718,14 +722,16 @@ __debug_page_row_leaf(WT_DBG *ds, WT_PAGE *page)
 			__debug_ikey(ds, ripkey);
 		else {
 			__wt_cell_unpack(ripkey, unpack);
-			WT_RET(__debug_cell_data(ds, "K", unpack));
+			WT_RET(__debug_cell_data(
+			    ds, WT_PAGE_ROW_LEAF, "K", unpack));
 		}
 
 		if ((cell = __wt_row_value(page, rip)) == NULL)
 			__dmsg(ds, "\tV {}\n");
 		else {
 			__wt_cell_unpack(cell, unpack);
-			WT_RET(__debug_cell_data(ds, "V", unpack));
+			WT_RET(__debug_cell_data(
+			    ds, WT_PAGE_ROW_LEAF, "V", unpack));
 		}
 
 		if ((upd = WT_ROW_UPDATE(page, rip)) != NULL)
@@ -810,9 +816,6 @@ __debug_ref(WT_DBG *ds, WT_REF *ref, WT_PAGE *page)
 		break;
 	case WT_REF_DELETED:
 		__dmsg(ds, "deleted");
-		break;
-	case WT_REF_EVICT_FORCE:
-		__dmsg(ds, "evict-force %p", ref->page);
 		break;
 	case WT_REF_EVICT_WALK:
 		__dmsg(ds, "evict-walk %p", ref->page);
@@ -909,7 +912,7 @@ addr:		WT_RET(__wt_scr_alloc(session, 128, &buf));
 	}
 	__dmsg(ds, "\n");
 
-	return (__debug_cell_data(ds, NULL, unpack));
+	return (__debug_cell_data(ds, dsk->type, NULL, unpack));
 }
 
 /*
@@ -917,7 +920,7 @@ addr:		WT_RET(__wt_scr_alloc(session, 128, &buf));
  *	Dump a single cell's data in debugging mode.
  */
 static int
-__debug_cell_data(WT_DBG *ds, const char *tag, WT_CELL_UNPACK *unpack)
+__debug_cell_data(WT_DBG *ds, int type, const char *tag, WT_CELL_UNPACK *unpack)
 {
 	WT_DECL_ITEM(buf);
 	WT_DECL_RET;
@@ -954,7 +957,8 @@ deleted:	__debug_item(ds, tag, "deleted", strlen("deleted"));
 	case WT_CELL_VALUE_OVFL_RM:
 	case WT_CELL_VALUE_SHORT:
 		WT_RET(__wt_scr_alloc(session, 256, &buf));
-		if ((ret = __wt_cell_unpack_ref(session, unpack, buf)) == 0)
+		if ((ret =
+		    __wt_cell_unpack_ref(session, type, unpack, buf)) == 0)
 			__debug_item(ds, tag, buf->data, buf->size);
 		__wt_scr_free(&buf);
 		break;

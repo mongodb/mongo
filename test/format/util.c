@@ -28,7 +28,7 @@
 #include "format.h"
 
 void
-key_len_setup()
+key_len_setup(void)
 {
 	size_t i;
 
@@ -50,6 +50,8 @@ key_gen_setup(uint8_t **keyp)
 {
 	uint8_t *key;
 	size_t i;
+
+	*keyp = NULL;
 
 	if ((key = malloc(g.c_key_max)) == NULL)
 		syserr("malloc");
@@ -90,6 +92,8 @@ val_gen_setup(uint8_t **valp)
 {
 	uint8_t *val;
 	size_t i, len;
+
+	*valp = NULL;
 
 	/*
 	 * Set initial buffer contents to recognizable text.
@@ -136,7 +140,7 @@ value_gen(uint8_t *val, uint32_t *sizep, uint64_t keyno)
 	 * test that by inserting a zero-length data item every so often.
 	 * LSM doesn't support zero length items.
 	 */
-	if (keyno % 63 == 0 && strcmp("lsm", g.c_data_source) != 0) {
+	if (keyno % 63 == 0 && !DATASOURCE("lsm")) {
 		val[0] = '\0';
 		*sizep = 0;
 		return;

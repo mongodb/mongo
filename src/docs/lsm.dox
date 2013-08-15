@@ -42,7 +42,7 @@ An LSM tree can be created as follows, in much the same way as a
 WiredTiger btree file:
 
 @code
-session->create(session, "lsm:bucket", "key_format=S,value_format=S");
+session->create(session, "table:bucket", "type=lsm,key_format=S,value_format=S");
 @endcode
 
 Once created, the LSM tree can be accessed using the same cursor interface
@@ -51,7 +51,7 @@ as other data sources in WiredTiger:
 @code
 WT_CURSOR *c;
 
-session->open_cursor(session, "lsm:bucket", NULL, NULL, &c);
+session->open_cursor(session, "table:bucket", NULL, NULL, &c);
 for(;;) {
     c->set_key("key");
     c->set_value("data");
@@ -59,16 +59,9 @@ for(;;) {
 }
 @endcode
 
-Unlike ordinary file cursors, LSM cursors default to \c overwrite mode, where:
-
-- WT_CURSOR::insert will update existing values without checking;
-- WT_CURSOR::update will insert values regardless of whether they exist; and
-- WT_CURSOR::remove will succeed regardless of whether the specified record
-  exists.
-
-This behavior can be disabled by passing \c "overwrite=false" to
-WT_SESSION::open_cursor, but the result will be a search through the levels
-of the LSM tree before every modification.
+If an LSM cursor is configured with \c "overwrite=false" passed to
+WT_SESSION::open_cursor, the result will be a search through the levels of the
+LSM tree before every modification.
 
 @section lsm_merge Merging
 

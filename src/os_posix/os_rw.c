@@ -21,6 +21,15 @@ __wt_read(WT_SESSION_IMPL *session,
 	    "%s: read %" PRIu32 " bytes at offset %" PRIuMAX,
 	    fh->name, bytes, (uintmax_t)offset);
 
+	/* Assert direct I/O is aligned and a multiple of the alignment. */
+	WT_ASSERT(session,
+	    !fh->direct_io ||
+	    S2C(session)->buffer_alignment == 0 ||
+	    (!((uintptr_t)buf &
+	    (uintptr_t)(S2C(session)->buffer_alignment - 1)) &&
+	    bytes >= S2C(session)->buffer_alignment &&
+	    bytes % S2C(session)->buffer_alignment == 0));
+
 	if (pread(fh->fd, buf, (size_t)bytes, offset) != (ssize_t)bytes)
 		WT_RET_MSG(session, __wt_errno(),
 		    "%s read error: failed to read %" PRIu32
@@ -43,6 +52,15 @@ __wt_write(WT_SESSION_IMPL *session,
 	WT_VERBOSE_RET(session, fileops,
 	    "%s: write %" PRIu32 " bytes at offset %" PRIuMAX,
 	    fh->name, bytes, (uintmax_t)offset);
+
+	/* Assert direct I/O is aligned and a multiple of the alignment. */
+	WT_ASSERT(session,
+	    !fh->direct_io ||
+	    S2C(session)->buffer_alignment == 0 ||
+	    (!((uintptr_t)buf &
+	    (uintptr_t)(S2C(session)->buffer_alignment - 1)) &&
+	    bytes >= S2C(session)->buffer_alignment &&
+	    bytes % S2C(session)->buffer_alignment == 0));
 
 	if (pwrite(fh->fd, buf, (size_t)bytes, offset) != (ssize_t)bytes)
 		WT_RET_MSG(session, __wt_errno(),

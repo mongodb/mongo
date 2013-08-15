@@ -109,15 +109,16 @@ typedef enum {
  *		['0' ... '9'] = &&l_numbare,
  *		['_'] = &&l_bare,
  *		['A' ... 'Z'] = &&l_bare, ['a' ... 'z'] = &&l_bare,
+ *		['/'] = &&l_bare,
  *	};
  */
-static int8_t gostruct[256] = {
+static const int8_t gostruct[256] = {
 	A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD,
 	A_LOOP, A_LOOP, A_BAD, A_BAD, A_LOOP, A_BAD, A_BAD, A_BAD,
 	A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD,
 	A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_LOOP, A_BAD, A_QUP,
 	A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_UP, A_DOWN, A_BAD, A_BAD,
-	A_NEXT, A_NUMBARE, A_BAD, A_BAD, A_NUMBARE, A_NUMBARE,
+	A_NEXT, A_NUMBARE, A_BAD, A_BARE, A_NUMBARE, A_NUMBARE,
 	A_NUMBARE, A_NUMBARE, A_NUMBARE, A_NUMBARE, A_NUMBARE,
 	A_NUMBARE, A_NUMBARE, A_NUMBARE, A_VALUE, A_BAD, A_BAD,
 	A_VALUE, A_BAD, A_BAD, A_BAD, A_BARE, A_BARE, A_BARE, A_BARE,
@@ -159,7 +160,7 @@ static int8_t gostruct[256] = {
  *		[127 ... 255] = &&l_bad
  *	};
  */
-static int8_t gobare[256] = {
+static const int8_t gobare[256] = {
 	A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD,
 	A_UNBARE, A_UNBARE, A_BAD, A_BAD, A_UNBARE, A_BAD, A_BAD,
 	A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD,
@@ -206,7 +207,7 @@ static int8_t gobare[256] = {
  *		[248 ... 255] = &&l_bad
  *	};
  */
-static int8_t gostring[256] = {
+static const int8_t gostring[256] = {
 	A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD,
 	A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD,
 	A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD,
@@ -250,7 +251,7 @@ static int8_t gostring[256] = {
  *		[192 ... 255] = &&l_bad
  *	};
  */
-static int8_t goutf8_continue[256] = {
+static const int8_t goutf8_continue[256] = {
 	A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD,
 	A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD,
 	A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD,
@@ -301,7 +302,7 @@ static int8_t goutf8_continue[256] = {
  *		['r'] = &&l_unesc, ['t'] = &&l_unesc, ['u'] = &&l_unesc
  *	};
  */
-static int8_t goesc[256] = {
+static const int8_t goesc[256] = {
 	A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD,
 	A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD,
 	A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD,
@@ -343,7 +344,7 @@ __config_next(WT_CONFIG *conf, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value)
 	WT_CONFIG_ITEM *out = key;
 	int utf8_remain = 0;
 	static const WT_CONFIG_ITEM true_value = {
-		"", 0, 1, ITEM_BOOL
+		"", 0, 1, WT_CONFIG_ITEM_BOOL
 	};
 
 	key->len = 0;
@@ -370,7 +371,7 @@ __config_next(WT_CONFIG *conf, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value)
 		case A_UP:
 			if (conf->top == -1)
 				conf->top = 1;
-			PUSH(0, ITEM_STRUCT);
+			PUSH(0, WT_CONFIG_ITEM_STRUCT);
 			++conf->depth;
 			break;
 
@@ -404,7 +405,7 @@ __config_next(WT_CONFIG *conf, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value)
 			break;
 
 		case A_QUP:
-			PUSH(1, ITEM_STRING);
+			PUSH(1, WT_CONFIG_ITEM_STRING);
 			conf->go = gostring;
 			break;
 
@@ -417,12 +418,12 @@ __config_next(WT_CONFIG *conf, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value)
 			break;
 
 		case A_BARE:
-			PUSH(0, ITEM_ID);
+			PUSH(0, WT_CONFIG_ITEM_ID);
 			conf->go = gobare;
 			break;
 
 		case A_NUMBARE:
-			PUSH(0, ITEM_NUM);
+			PUSH(0, WT_CONFIG_ITEM_NUM);
 			conf->go = gobare;
 			break;
 
@@ -497,15 +498,15 @@ __config_process_value(WT_CONFIG *conf, WT_CONFIG_ITEM *value)
 	if (value->len == 0)
 		return (0);
 
-	if (value->type == ITEM_ID) {
+	if (value->type == WT_CONFIG_ITEM_ID) {
 		if (strncasecmp(value->str, "true", value->len) == 0) {
-			value->type = ITEM_BOOL;
+			value->type = WT_CONFIG_ITEM_BOOL;
 			value->val = 1;
 		} else if (strncasecmp(value->str, "false", value->len) == 0) {
-			value->type = ITEM_BOOL;
+			value->type = WT_CONFIG_ITEM_BOOL;
 			value->val = 0;
 		}
-	} else if (value->type == ITEM_NUM) {
+	} else if (value->type == WT_CONFIG_ITEM_NUM) {
 		errno = 0;
 		value->val = strtoll(value->str, &endptr, 10);
 
@@ -542,7 +543,7 @@ __config_process_value(WT_CONFIG *conf, WT_CONFIG_ITEM *value)
 				 * might be okay, the required type will be
 				 * checked by __wt_config_check.
 				 */
-				value->type = ITEM_ID;
+				value->type = WT_CONFIG_ITEM_ID;
 				break;
 			}
 
@@ -552,7 +553,7 @@ __config_process_value(WT_CONFIG *conf, WT_CONFIG_ITEM *value)
 		 * aren't well-formed integers: if an integer is expected, that
 		 * will be caught by __wt_config_check.
 		 */
-		if (value->type == ITEM_NUM && errno == ERANGE)
+		if (value->type == WT_CONFIG_ITEM_NUM && errno == ERANGE)
 			goto range;
 	}
 
@@ -588,7 +589,8 @@ __config_getraw(
 
 	found = 0;
 	while ((ret = __config_next(cparser, &k, &v)) == 0) {
-		if (k.type != ITEM_STRING && k.type != ITEM_ID)
+		if (k.type != WT_CONFIG_ITEM_STRING &&
+		    k.type != WT_CONFIG_ITEM_ID)
 			continue;
 		if (k.len == key->len &&
 		    strncasecmp(key->str, k.str, k.len) == 0) {
@@ -646,7 +648,8 @@ int
 __wt_config_gets(WT_SESSION_IMPL *session,
     const char **cfg, const char *key, WT_CONFIG_ITEM *value)
 {
-	WT_CONFIG_ITEM key_item = { key, strlen(key), 0, ITEM_STRING };
+	WT_CONFIG_ITEM key_item =
+	    { key, strlen(key), 0, WT_CONFIG_ITEM_STRING };
 
 	return (__wt_config_get(session, cfg, &key_item, value));
 }
@@ -674,38 +677,36 @@ __wt_config_getones(WT_SESSION_IMPL *session,
     const char *config, const char *key, WT_CONFIG_ITEM *value)
 {
 	WT_CONFIG cparser;
-	WT_CONFIG_ITEM key_item = { key, strlen(key), 0, ITEM_STRING };
+	WT_CONFIG_ITEM key_item =
+	    { key, strlen(key), 0, WT_CONFIG_ITEM_STRING };
 
 	WT_RET(__wt_config_init(session, &cparser, config));
 	return (__config_getraw(&cparser, &key_item, value, 1));
 }
 
 /*
- * __wt_config_gets_defno --
- *	Given a NULL-terminated list of configuration strings, and if the
- * application supplied any configuration strings, find the final value for
- * a given string key
+ * __wt_config_gets_def --
+ *	Performance hack: skip parsing config strings by hard-coding defaults.
+ *
+ *	It's expensive to repeatedly parse configuration strings, so don't do
+ *	it unless it's necessary in performance paths like cursor creation.
+ *	Assume the second configuration string is the application's
+ *	configuration string, and if it's not set (which is true most of the
+ *	time), then use the supplied default value.  This makes it faster to
+ *	open cursors when checking for obscure open configuration strings like
+ *	"next_random".
  */
 int
-__wt_config_gets_defno(WT_SESSION_IMPL *session,
-    const char **cfg, const char *key, WT_CONFIG_ITEM *value)
+__wt_config_gets_def(WT_SESSION_IMPL *session,
+    const char **cfg, const char *key, int def, WT_CONFIG_ITEM *value)
 {
 	static const WT_CONFIG_ITEM false_value = {
-		"", 0, 0, ITEM_NUM
+		"", 0, 0, WT_CONFIG_ITEM_NUM
 	};
 
-	/*
-	 * This is a performance hack: it's expensive to repeatedly parse
-	 * configuration strings, so don't do it unless it's necessary in
-	 * performance paths like cursor creation.  Assume the second
-	 * configuration string is the application's configuration string, and
-	 * if it's not set (which is true most of the time), then assume the
-	 * default answer is "false", and return that.  This makes it much
-	 * faster to open cursors when checking for obscure open configuration
-	 * strings like "next_random".
-	 */
 	*value = false_value;
-	if (cfg == NULL || cfg[1] == NULL)
+	value->val = def;
+	if (cfg == NULL || cfg[0] == NULL || cfg[1] == NULL)
 		return (0);
 	else if (cfg[2] == NULL)
 		WT_RET_NOTFOUND_OK(

@@ -64,6 +64,7 @@ list_print(WT_SESSION *session, const char *name, int cflag, int vflag)
 {
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
+	WT_EXTENSION_API *wtext;
 	int found;
 	const char *key, *value, *uri;
 
@@ -79,10 +80,12 @@ list_print(WT_SESSION *session, const char *name, int cflag, int vflag)
 		if (cflag && (ret = list_print_checkpoint(session, uri)) != 0)
 			return (ret);
 		if (vflag) {
-			if ((ret =
-			    __wt_metadata_get(session, uri, &value)) != 0)
+			wtext = session->
+			    connection->get_extension_api(session->connection);
+			if ((ret = wtext->
+			    metadata_search(wtext, session, uri, &value)) != 0)
 				return (
-				    util_err(ret, "metadata read: %s", uri));
+				    util_err(ret, "metadata search: %s", uri));
 			printf("%s\n", value);
 		}
 	}

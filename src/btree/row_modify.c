@@ -67,7 +67,7 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 			upd_entry = &cbt->ins->upd;
 
 		/* Make sure the update can proceed. */
-		WT_ERR(__wt_update_check(session, page, old_upd = *upd_entry));
+		WT_ERR(__wt_update_check(session, old_upd = *upd_entry));
 
 		/* Allocate the WT_UPDATE structure and transaction ID. */
 		WT_ERR(__wt_update_alloc(session, value, &upd, &upd_size));
@@ -84,7 +84,7 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 			__wt_update_obsolete_free(session, page, upd_obsolete);
 	} else {
 		/* Make sure the update can proceed. */
-		WT_ERR(__wt_update_check(session, page, NULL));
+		WT_ERR(__wt_update_check(session, NULL));
 
 		/*
 		 * Allocate insert array if necessary, and set the array
@@ -234,8 +234,8 @@ __wt_insert_serial_func(WT_SESSION_IMPL *session, void *args)
 			    *ins_stack[i] != next_stack[i])
 				return (WT_RESTART);
 			if (next_stack[i] == NULL &&
-			    (inshead->tail[i] == NULL ||
-			    ins_stack[i] != &inshead->tail[i]->next[i]))
+			    inshead->tail[i] != NULL &&
+			    ins_stack[i] != &inshead->tail[i]->next[i])
 				return (WT_RESTART);
 		}
 	}
@@ -294,25 +294,13 @@ __wt_insert_serial_func(WT_SESSION_IMPL *session, void *args)
 
 /*
  * __wt_update_check --
- *	Check whether an update can proceed, and maintain the first txnid in
- *	the page->modify structure.
+ *	Check whether an update can proceed.
  */
 int
-__wt_update_check(WT_SESSION_IMPL *session, WT_PAGE *page, WT_UPDATE *next)
+__wt_update_check(WT_SESSION_IMPL *session, WT_UPDATE *next)
 {
-	WT_TXN *txn;
-
 	/* Before allocating anything, make sure this update is permitted. */
 	WT_RET(__wt_txn_update_check(session, next));
-
-	/*
-	 * Record the transaction ID for the first update to a page.
-	 * We don't care if this races: there is a buffer built into the
-	 * check for ancient updates.
-	 */
-	txn = &session->txn;
-	if (page->modify->first_id == WT_TXN_NONE && txn->id != WT_TXN_NONE)
-		page->modify->first_id = txn->id;
 
 	return (0);
 }
@@ -461,7 +449,7 @@ __wt_update_serial_func(WT_SESSION_IMPL *session, void *args)
 	 */
 	WT_RET(__wt_page_write_gen_wrapped_check(page));
 	if (old_upd != *upd_entry)
-		WT_RET(__wt_update_check(session, page, *upd_entry));
+		WT_RET(__wt_update_check(session, *upd_entry));
 
 	upd->next = *upd_entry;
 	/*

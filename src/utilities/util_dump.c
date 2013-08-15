@@ -140,6 +140,7 @@ dump_config(WT_SESSION *session, const char *uri, int hex)
 {
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
+	WT_EXTENSION_API *wtext;
 	int tret;
 	const char *value;
 
@@ -185,7 +186,10 @@ dump_config(WT_SESSION *session, const char *uri, int hex)
 		 * This where we find out a file object doesn't exist, use a
 		 * simple error message.
 		 */
-		if ((ret = __wt_metadata_get(session, uri, &value)) == 0) {
+		wtext = session->
+		    connection->get_extension_api(session->connection);
+		if ((ret =
+		    wtext->metadata_search(wtext, session, uri, &value)) == 0) {
 			if (dump_prefix(hex) != 0 ||
 			    print_config(session, uri, value, NULL) != 0 ||
 			    dump_suffix() != 0)

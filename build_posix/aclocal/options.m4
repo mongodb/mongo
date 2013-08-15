@@ -22,7 +22,13 @@ no)	wt_cv_enable_bzip2=no;;
 *)	wt_cv_enable_bzip2=yes;;
 esac
 AC_MSG_RESULT($wt_cv_enable_bzip2)
-AM_CONDITIONAL([BZIP2], [test x$wt_cv_enable_bzip2 = xyes])
+if test "$wt_cv_enable_bzip2" = "yes"; then
+	AC_CHECK_HEADER(bzlib.h,,
+	    [AC_MSG_ERROR([--enable-bzip2 requires bzlib.h])])
+	AC_CHECK_LIB(bz2, BZ2_bzCompress,,
+	    [AC_MSG_ERROR([--enable-bzip2 requires bz2 library])])
+fi
+AM_CONDITIONAL([BZIP2], [test "$wt_cv_enable_bzip2" = "yes"])
 
 AC_MSG_CHECKING(if --enable-debug option specified)
 AC_ARG_ENABLE(debug,
@@ -74,6 +80,12 @@ esac
 AC_MSG_RESULT($wt_cv_enable_python)
 AM_CONDITIONAL([PYTHON], [test x$wt_cv_enable_python = xyes])
 
+AC_MSG_CHECKING(if --with-python-prefix option specified)
+AC_ARG_WITH(python-prefix,
+	[AS_HELP_STRING([--with-python-prefix=DIR],
+	    [Installation prefix for Python module.])])
+AC_MSG_RESULT($with_python_prefix)
+
 AC_MSG_CHECKING(if --enable-snappy option specified)
 AC_ARG_ENABLE(snappy,
 	[AS_HELP_STRING([--enable-snappy],
@@ -83,7 +95,15 @@ no)	wt_cv_enable_snappy=no;;
 *)	wt_cv_enable_snappy=yes;;
 esac
 AC_MSG_RESULT($wt_cv_enable_snappy)
-AM_CONDITIONAL([SNAPPY], [test x$wt_cv_enable_snappy = xyes])
+if test "$wt_cv_enable_snappy" = "yes"; then
+	AC_LANG_PUSH([C++])
+	AC_CHECK_HEADER(snappy.h,,
+	    [AC_MSG_ERROR([--enable-snappy requires snappy.h])])
+	AC_LANG_POP([C++])
+	AC_CHECK_LIB(snappy, snappy_compress,,
+	    [AC_MSG_ERROR([--enable-snappy requires snappy library])])
+fi
+AM_CONDITIONAL([SNAPPY], [test "$wt_cv_enable_snappy" = "yes"])
 
 AC_MSG_CHECKING(if --with-spinlock option specified)
 AH_TEMPLATE(SPINLOCK_TYPE, [Spinlock type from mutex.h.])

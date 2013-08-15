@@ -8,7 +8,7 @@ statistics, and applications can further extend the supported types by
 implementing the ::WT_DATA_SOURCE interface.
 
 Common operations on all data sources are performed using WT_CURSOR
-handles.  See @subpage cursor_ops for a description of how to use
+handles.  See @ref cursor_ops for a description of how to use
 cursors.
 
 @section data_builtin Builtin data sources
@@ -16,27 +16,34 @@ cursors.
 The following are the builtin cursor types:
 
 <table>
-  @hrow{URI, Type, Notes}
-   @row{<tt>backup:</tt>,
-hot backup cursor, See also: @ref hot_backup}
-   @row{<tt>colgroup:\<table name\>:\<column group name\></tt>,
-column group cursor,}
-   @row{<tt>config:[\<uri\>]</tt>,
-object configuration cursor (key=config string\,
-value=config value),}
-  @row{<tt>file:\<file name\></tt>,
-file cursor (key=file key\, value=file value),}
-  @row{<tt>index:\<table name\>:\<index name\></tt>,
-index cursor (key=index key\, value=table value),}
-  @row{<tt>join:\<cursor1\>\&\<cursor2\>[&\<cursor3\>...]</tt>,
-join cursor, @notyet{join cursors}}
-  @row{<tt>lsm:\<name\></tt>,
-LSM cursor (key=LSM key\, value=LSM value), See also: @ref lsm}
-  @row{<tt>statistics:[\<data source URI\>]</tt>,
-database or data source statistics (key=(int)\,
-value=(string)description\, (string)value\, (uint64_t)value),}
-  @row{<tt>table:\<table name\></tt>,
-table cursor (key=table key\, value=table value),}
+@hrow{URI, Type, Key/Value types}
+@row{<tt>backup:</tt>,
+	hot backup cursor,
+	key=<code>string</code>\, see @ref hot_backup for details}
+@row{<tt>colgroup:\<table name\>:\<column group name\></tt>,
+	column group cursor,
+	table key\, column group value(s)}
+@row{<tt>index:\<table name\>:\<index name\>[\<projection\>]</tt>,
+	index cursor,
+	key=index key\, value=table value(s) with optional projection
+	of columns}
+@row{<tt>statistics:[\<data source URI\>]</tt>,
+	database or data source statistics cursor,
+	key=<code>int id</code>\, value=(<code>string description\,
+	string value\, uint64_t value</code>)\,
+	see @ref data_statistics for details}
+@row{<tt>table:\<table name\>[\<projection\>]</tt>,
+	table cursor,
+	table key\, table value(s) with optional projection of columns}
+</table>
+
+Advanced applications may also open the following low-level cursor types:
+<table>
+@row{<tt>file:\<file name\></tt>,
+	file cursor,
+	file key\, file value(s)}
+@row{<tt>lsm:\<name\></tt>,
+	LSM cursor (key=LSM key\, value=LSM value), See also: @ref lsm}
 </table>
 
 @subsection data_files Raw Files

@@ -80,8 +80,10 @@ typedef struct {
 	uint32_t phase;
 #define PERF_INSERT_RMW		0x01
 #define PERF_RAND_PARETO	0x02 /* Use the Pareto random distribution. */
+#define PERF_RAND_WORKLOAD	0x04
 	uint32_t flags;
 	struct timeval phase_start_time;
+	uint32_t rand_range; /* The range to use if doing random inserts. */
 } CONFIG;
 
 /* Forward function definitions. */
@@ -108,6 +110,7 @@ void usage(void);
 void worker(CONFIG *, uint32_t);
 void wtperf_srand(CONFIG *);
 uint64_t wtperf_rand(CONFIG *);
+uint64_t wtperf_value_range(CONFIG *);
 
 #define	DEFAULT_LSM_CONFIG						\
 	"key_format=S,value_format=S,exclusive,"			\
@@ -144,7 +147,8 @@ CONFIG default_cfg = {
 	NULL,		/* logf */
 	WT_PERF_INIT, /* phase */
 	0,		/* flags */
-	{0, 0}		/* phase_start_time */
+	{0, 0},		/* phase_start_time */
+	0		/* rand_range */
 };
 /* Small config values - these are small. */
 CONFIG small_cfg = {
@@ -172,7 +176,8 @@ CONFIG small_cfg = {
 	NULL,		/* logf */
 	WT_PERF_INIT, /* phase */
 	0,		/* flags */
-	{0, 0}		/* phase_start_time */
+	{0, 0},		/* phase_start_time */
+	0		/* rand_range */
 };
 /* Default values - these are small, we want the basic run to be fast. */
 CONFIG med_cfg = {
@@ -200,7 +205,8 @@ CONFIG med_cfg = {
 	NULL,		/* logf */
 	WT_PERF_INIT, /* phase */
 	0,		/* flags */
-	{0, 0}		/* phase_start_time */
+	{0, 0},		/* phase_start_time */
+	0		/* rand_range */
 };
 /* Default values - these are small, we want the basic run to be fast. */
 CONFIG large_cfg = {
@@ -228,7 +234,8 @@ CONFIG large_cfg = {
 	NULL,		/* logf */
 	WT_PERF_INIT, /* phase */
 	0,		/* flags */
-	{0, 0}		/* phase_start_time */
+	{0, 0},		/* phase_start_time */
+	0		/* rand_range */
 };
 
 const char *debug_cconfig = "verbose=[lsm]";
@@ -249,7 +256,6 @@ int g_running;
 int g_util_running;
 uint32_t g_threads_quit; /* For tracking threads that exit early. */
 
-#define VALUE_RANGE (cfg->icount + g_nins_ops - (cfg->insert_threads + 1))
 /* End global values shared by threads. */
 
 void *
@@ -286,7 +292,7 @@ worker(CONFIG *cfg, uint32_t worker_type)
 	const char *op_name = "search";
 	char *data_buf, *key_buf, *value;
 	int ret, op_ret;
-	uint64_t next_val;
+	uint64_t next_incr, next_val;
 
 	session = NULL;
 	data_buf = key_buf = NULL;
@@ -321,14 +327,20 @@ worker(CONFIG *cfg, uint32_t worker_type)
 
 	while (g_running) {
 		/* Get a value in range, avoid zero. */
-		next_val = (worker_type == WORKER_INSERT ?
-		    (cfg->icount + ATOMIC_ADD(g_nins_ops, 1)) :
-		    wtperf_rand(cfg));
+		if (worker_type == WORKER_INSERT)
+			next_incr = ATOMIC_ADD(g_nins_ops, 1);
+
+		if (!F_ISSET(cfg, PERF_RAND_WORKLOAD) &&
+		    worker_type == WORKER_INSERT)
+			next_val = cfg->icount + next_incr;
+		else
+			next_val = wtperf_rand(cfg);
 		/*
 		 * If the workload is started without a populate phase we
 		 * rely on at least one insert to get a valid item id.
 		 */
-		if (worker_type != WORKER_INSERT && VALUE_RANGE < next_val)
+		if (worker_type != WORKER_INSERT &&
+		    wtperf_value_range(cfg) < next_val)
 			continue;
 		sprintf(key_buf, "%0*" PRIu64, cfg->key_sz, next_val);
 		cursor->set_key(cursor, key_buf);
@@ -336,6 +348,9 @@ worker(CONFIG *cfg, uint32_t worker_type)
 		case WORKER_READ:
 			op_name = "read";
 			op_ret = cursor->search(cursor);
+			if (F_ISSET(cfg, PERF_RAND_WORKLOAD) &&
+			    op_ret == WT_NOTFOUND)
+				op_ret = 0;
 			if (op_ret == 0)
 				++g_nread_ops;
 			break;
@@ -349,6 +364,9 @@ worker(CONFIG *cfg, uint32_t worker_type)
 			op_name = "insert";
 			cursor->set_value(cursor, data_buf);
 			op_ret = cursor->insert(cursor);
+			if (F_ISSET(cfg, PERF_RAND_WORKLOAD) &&
+			    op_ret == WT_DUPLICATE_KEY)
+				op_ret = 0;
 			if (op_ret != 0)
 				++g_nfailedins_ops;
 			break;
@@ -365,6 +383,9 @@ worker(CONFIG *cfg, uint32_t worker_type)
 				cursor->set_value(cursor, data_buf);
 				op_ret = cursor->update(cursor);
 			}
+			if (F_ISSET(cfg, PERF_RAND_WORKLOAD) &&
+			    op_ret == WT_NOTFOUND)
+				op_ret = 0;
 			if (op_ret == 0)
 				++g_nupdate_ops;
 			break;
@@ -413,6 +434,7 @@ populate_thread(void *arg)
 	conn = cfg->conn;
 	session = NULL;
 	data_buf = key_buf = NULL;
+	ret = 0;
 
 	cfg->phase = WT_PERF_POP;
 
@@ -531,7 +553,7 @@ stat_worker(void *arg)
 
 		/* Report data source stats. */
 		if ((ret = session->open_cursor(session, stat_uri,
-		    NULL, NULL, &cursor)) != 0) {
+		    NULL, "statistics_fast", &cursor)) != 0) {
 			lprintf(cfg, ret, 0,
 			    "open_cursor failed for data source statistics");
 			goto err;
@@ -791,7 +813,7 @@ int main(int argc, char **argv)
 	CONFIG cfg;
 	WT_CONNECTION *conn;
 	const char *user_cconfig, *user_tconfig;
-	const char *opts = "C:I:P:R:U:T:c:d:eh:i:jk:l:r:ps:t:u:v:SML";
+	const char *opts = "C:I:P:R:U:T:c:d:eh:i:jk:l:m:r:ps:t:u:v:SML";
 	char *cc_buf, *tc_buf;
 	int ch, checkpoint_created, ret, stat_created;
 	pthread_t checkpoint, stat;
@@ -851,6 +873,16 @@ int main(int argc, char **argv)
 			break;
 		case 'l':
 			cfg.stat_interval = (uint32_t)atoi(optarg);
+			break;
+		case 'm':
+			F_SET(&cfg, PERF_RAND_WORKLOAD);
+			cfg.rand_range = (uint32_t)atoi(optarg);
+			if (cfg.rand_range == 0) {
+				fprintf(stderr, "Invalid random range.\n");
+				usage();
+				return (EINVAL);
+			}
+				
 			break;
 		case 'p':
 			F_SET(&cfg, PERF_RAND_PARETO);
@@ -1145,6 +1177,13 @@ void wtperf_srand(CONFIG *cfg) {
 	srand(cfg->rand_seed);
 }
 
+uint64_t wtperf_value_range(CONFIG *cfg) {
+	if (F_ISSET(cfg, PERF_RAND_WORKLOAD))
+		return (cfg->icount + cfg->rand_range);
+	else 
+		return (cfg->icount + g_nins_ops - (cfg->insert_threads + 1));
+}
+
 uint64_t wtperf_rand(CONFIG *cfg) {
 	double S1, S2, U;
 	uint64_t rval = (uint64_t)rand();
@@ -1152,7 +1191,7 @@ uint64_t wtperf_rand(CONFIG *cfg) {
 	if (F_ISSET(cfg, PERF_RAND_PARETO)) {
 #define	PARETO_SHAPE	1.5
 		S1 = (-1 / PARETO_SHAPE);
-		S2 = VALUE_RANGE * 0.2 * (PARETO_SHAPE - 1);
+		S2 = wtperf_value_range(cfg) * 0.2 * (PARETO_SHAPE - 1);
 		U = 1 - (double)rval / (double)RAND_MAX;
 		rval = (pow(U, S1) - 1) * S2;
 		/*
@@ -1160,11 +1199,11 @@ uint64_t wtperf_rand(CONFIG *cfg) {
 		 * about 2% of the time, from my testing. That will lead to the
 		 * last item in the table being "hot".
 		 */
-		if (rval > VALUE_RANGE)
-			rval = VALUE_RANGE;
+		if (rval > wtperf_value_range(cfg))
+			rval = wtperf_value_range(cfg);
 	}
 	/* Avoid zero - LSM doesn't like it. */
-	rval = (rval % VALUE_RANGE) + 1;
+	rval = (rval % wtperf_value_range(cfg)) + 1;
 	return rval;
 }
 
@@ -1216,6 +1255,8 @@ void usage(void)
 	printf("\t-k <int> key item size\n");
 	printf("\t-l <int> log statistics every <int> report intervals."
 	    "Default disabled.\n");
+	printf("\t-m <range> use random inserts in workload. Means reads"
+	    " and updates will ignore WT_NOTFOUND\n");
 	printf("\t-p use pareto 80/20 distribution for random numbers\n");
 	printf("\t-r <int> number of seconds to run workload phase\n");
 	printf("\t-s <int> seed for random number generator\n");

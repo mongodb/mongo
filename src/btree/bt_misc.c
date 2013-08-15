@@ -46,29 +46,35 @@ __wt_cell_type_string(uint8_t type)
 {
 	switch (type) {
 	case WT_CELL_ADDR:
-		return ("address");
+		return ("addr");
 	case WT_CELL_ADDR_DEL:
-		return ("address/del");
+		return ("addr/del");
 	case WT_CELL_ADDR_LNO:
-		return ("address/lno");
+		return ("addr/lno");
 	case WT_CELL_DEL:
 		return ("deleted");
 	case WT_CELL_KEY:
 		return ("key");
+	case WT_CELL_KEY_PFX:
+		return ("key/pfx");
 	case WT_CELL_KEY_OVFL:
-		return ("key-overflow");
+		return ("key/ovfl");
 	case WT_CELL_KEY_SHORT:
-		return ("key-short");
+		return ("key/short");
+	case WT_CELL_KEY_SHORT_PFX:
+		return ("key/short,pfx");
 	case WT_CELL_VALUE:
 		return ("value");
 	case WT_CELL_VALUE_COPY:
-		return ("value-copy");
+		return ("value/copy");
 	case WT_CELL_VALUE_OVFL:
-		return ("value-overflow");
+		return ("value/ovfl");
+	case WT_CELL_VALUE_OVFL_RM:
+		return ("value/ovfl,rm");
 	case WT_CELL_VALUE_SHORT:
-		return ("value-short");
+		return ("value/short");
 	default:
-		return ("illegal");
+		return ("unknown");
 	}
 	/* NOTREACHED */
 }

@@ -57,7 +57,8 @@ __wt_row_leaf_keys(WT_SESSION_IMPL *session, WT_PAGE *page)
 	/* Instantiate the keys. */
 	for (rip = page->u.row.d, i = 0; i < page->entries; ++rip, ++i)
 		if (__bit_test(tmp->mem, i))
-			WT_ERR(__wt_row_key_copy(session, page, rip, NULL));
+			WT_ERR(__wt_row_leaf_key_work(
+			    session, page, rip, NULL, 1));
 
 	F_SET_ATOMIC(page, WT_PAGE_BUILD_KEYS);
 
@@ -100,32 +101,49 @@ __inmem_row_leaf_slots(
 }
 
 /*
- * __wt_row_key_copy --
- *	Copy an on-page key into a return buffer, or, if no return buffer
- * is specified, instantiate the key into the in-memory page.
+ * __wt_row_leaf_key_copy --
+ *	Get a copy of a row-store leaf-page key.
  */
 int
-__wt_row_key_copy(
+__wt_row_leaf_key_copy(
     WT_SESSION_IMPL *session, WT_PAGE *page, WT_ROW *rip_arg, WT_ITEM *retb)
 {
+	WT_RET(__wt_row_leaf_key_work(session, page, rip_arg, retb, 0));
+
+	/* The return buffer may only hold a reference to a key, copy it. */
+	if (retb->data != retb->mem)
+		WT_RET(__wt_buf_set(session, retb, retb->data, retb->size));
+
+	return (0);
+}
+
+/*
+ * __wt_row_leaf_key_work --
+ *	Return a reference to, or copy of, a row-store leaf-page key.
+ * Optionally instantiate the key into the in-memory page.
+ */
+int
+__wt_row_leaf_key_work(WT_SESSION_IMPL *session,
+    WT_PAGE *page, WT_ROW *rip_arg, WT_ITEM *retb_arg, int instantiate)
+{
 	enum { FORWARD, BACKWARD } direction;
+	WT_BTREE *btree;
 	WT_CELL_UNPACK *unpack, _unpack;
+	WT_DECL_ITEM(retb);
 	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
 	WT_IKEY *ikey;
 	WT_ROW *rip;
-	int is_local, slot_offset;
+	int slot_offset;
 	void *key;
 
-	rip = rip_arg;
+	btree = S2BT(session);
 	unpack = &_unpack;
+	rip = rip_arg;
 
-	/* If the caller didn't pass us a buffer, create one. */
-	is_local = 0;
-	if (retb == NULL) {
-		is_local = 1;
+	/* If the caller didn't pass us a buffer, allocate a scratch one. */
+	if ((retb = retb_arg) == NULL)
 		WT_ERR(__wt_scr_alloc(session, 0, &retb));
-	}
 
 	direction = BACKWARD;
 	for (slot_offset = 0;;) {
@@ -165,8 +183,14 @@ __wt_row_key_copy(
 			 * Take a copy and wrap up.
 			 */
 			if (slot_offset == 0) {
-				WT_ERR(__wt_buf_set(session,
-				    retb, WT_IKEY_DATA(ikey), ikey->size));
+				retb->data = WT_IKEY_DATA(ikey);
+				retb->size = ikey->size;
+
+				/*
+				 * The key is already instantiated, ignore the
+				 * caller's suggestion.
+				 */
+				instantiate = 0;
 				break;
 			}
 
@@ -198,8 +222,8 @@ __wt_row_key_copy(
 			 * In short: if it's not an overflow key, take a copy
 			 * and roll forward.
 			 */
-			WT_ERR(__wt_buf_set(
-			    session, retb, WT_IKEY_DATA(ikey), ikey->size));
+			retb->data = WT_IKEY_DATA(ikey);
+			retb->size = ikey->size;
 			direction = FORWARD;
 			goto next;
 		}
@@ -214,8 +238,8 @@ __wt_row_key_copy(
 			 * care if it's an overflow key, get a copy and wrap up.
 			 */
 			if (slot_offset == 0) {
-				WT_ERR(__wt_cell_unpack_copy(
-				    session, unpack, retb));
+				WT_ERR(__wt_cell_unpack_ref(
+				    session, WT_PAGE_ROW_LEAF, unpack, retb));
 				break;
 			}
 
@@ -250,9 +274,20 @@ __wt_row_key_copy(
 			 * found this key while rolling backwards and switched
 			 * directions then.
 			 */
-			WT_ERR(__wt_cell_unpack_copy(session, unpack, retb));
-			if (slot_offset == 0)
+			WT_ERR(__wt_cell_unpack_ref(
+			    session, WT_PAGE_ROW_LEAF, unpack, retb));
+			if (slot_offset == 0) {
+				/*
+				 * If we have an uncompressed, on-page key with
+				 * no prefix, don't bother instantiating it,
+				 * regardless of what our caller thought.  The
+				 * memory cost is greater than the performance
+				 * cost of finding the key each time we need it.
+				 */
+				if (btree->huffman_key == NULL)
+					instantiate = 0;
 				break;
+			}
 
 			WT_ASSERT(session, direction == BACKWARD);
 			direction = FORWARD;
@@ -267,15 +302,26 @@ __wt_row_key_copy(
 		 * forward.
 		 */
 		if (direction == FORWARD) {
+			/* Get a reference to the current key's bytes. */
+			if (tmp == NULL)
+				WT_ERR(__wt_scr_alloc(session, 0, &tmp));
+			WT_ERR(__wt_cell_unpack_ref(
+			    session, WT_PAGE_ROW_LEAF, unpack, tmp));
+
 			/*
-			 * Get a reference to the current key's bytes;
+			 * The return buffer may only hold a reference to a key,
+			 * if we've not actually rolled forward until now.  Copy
+			 * the data into real buffer memory.
+			 */
+			if (retb->data != retb->mem)
+				WT_ERR(__wt_buf_set(
+				    session, retb, retb->data, retb->size));
+
+			/*
 			 * Ensure the buffer can hold the key's bytes plus the
 			 *    prefix (and also setting the final buffer size);
 			 * Append the key to the prefix (already in the buffer).
 			 */
-			if (tmp == NULL)
-				WT_ERR(__wt_scr_alloc(session, 0, &tmp));
-			WT_ERR(__wt_cell_unpack_ref(session, unpack, tmp));
 			WT_ERR(__wt_buf_initsize(
 			    session, retb, tmp->size + unpack->prefix));
 			memcpy((uint8_t *)
@@ -297,41 +343,31 @@ next:		switch (direction) {
 		}
 	}
 
-	__wt_scr_free(&tmp);
+	/* Optionally instantiate the key. */
+	if (instantiate) {
+		key = WT_ROW_KEY_COPY(rip_arg);
+		if (!__wt_off_page(page, key)) {
+			WT_ERR(__wt_row_ikey(session,
+			    WT_PAGE_DISK_OFFSET(page, key),
+			    retb->data, retb->size, &ikey));
 
-	/*
-	 * If a return buffer was specified, the caller just wants a copy and
-	 * no further work is needed.
-	 */
-	if (!is_local)
-		return (0);
-
-	/* If still needed, instantiate the key. */
-	key = WT_ROW_KEY_COPY(rip_arg);
-	if (!__wt_off_page(page, key)) {
-		WT_ERR(__wt_row_ikey(session,
-		    WT_PAGE_DISK_OFFSET(page, key),
-		    retb->data, retb->size, &ikey));
-
-		/*
-		 * Serialize the swap of the key into place.  If we succeed,
-		 * update the page's memory footprint; if we fail, free the
-		 * WT_IKEY structure.
-		 */
-		if (WT_ATOMIC_CAS(WT_ROW_KEY_COPY(rip), key, ikey))
-			__wt_cache_page_inmem_incr(
-			    session, page, sizeof(WT_IKEY) + ikey->size);
-		else
-			__wt_free(session, ikey);
+			/*
+			 * Serialize the swap of the key into place: on success,
+			 * update the page's memory footprint, on failure, free
+			 * the allocated memory.
+			 */
+			if (WT_ATOMIC_CAS(WT_ROW_KEY_COPY(rip), key, ikey))
+				__wt_cache_page_inmem_incr(session,
+				    page, sizeof(WT_IKEY) + ikey->size);
+			else
+				__wt_free(session, ikey);
+		}
 	}
 
-	__wt_scr_free(&retb);
-
-	return (ret);
-
-err:	if (is_local && retb != NULL)
+err:	__wt_scr_free(&tmp);
+	if (retb != retb_arg)
 		__wt_scr_free(&retb);
-	__wt_scr_free(&tmp);
+
 	return (ret);
 }
 

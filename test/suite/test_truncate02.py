@@ -44,8 +44,9 @@ class test_truncate_fast_delete(wttest.WiredTigerTestCase):
     # Use a small page size and lots of keys because we want to create lots
     # of individual pages in the file.
     types = [
-        ('file', dict(type='file:',\
-            config='leaf_page_max=512,value_format=S,key_format=')),
+        ('file', dict(type='file:', config=\
+            'allocation_size=512,leaf_page_max=512,' +\
+            'value_format=S,key_format=')),
     ]
 
     # This is all about testing the btree layer, not the schema layer, test
@@ -127,7 +128,7 @@ class test_truncate_fast_delete(wttest.WiredTigerTestCase):
         # Optionally add a few overflow records so we block fast delete on
         # those pages.
         if self.overflow:
-            cursor = self.session.open_cursor(uri, None)
+            cursor = self.session.open_cursor(uri, None, 'overwrite=false')
             for i in range(1, self.nentries, 3123):
                 cursor.set_key(key_populate(cursor, i))
                 cursor.set_value(value_populate(cursor, i))
@@ -139,7 +140,7 @@ class test_truncate_fast_delete(wttest.WiredTigerTestCase):
 
         # Optionally read/write a few rows before truncation.
         if self.readbefore or self.writebefore:
-            cursor = self.session.open_cursor(uri, None)
+            cursor = self.session.open_cursor(uri, None, 'overwrite=false')
             if self.readbefore:
                     for i in range(1, self.nentries, 737):
                         cursor.set_key(key_populate(cursor, i))
@@ -163,7 +164,7 @@ class test_truncate_fast_delete(wttest.WiredTigerTestCase):
 
         # Optionally read/write a few rows after truncation.
         if self.readafter or self.writeafter:
-            cursor = self.session.open_cursor(uri, None)
+            cursor = self.session.open_cursor(uri, None, 'overwrite=false')
             if self.readafter:
                     for i in range(1, self.nentries, 1123):
                         cursor.set_key(key_populate(cursor, i))

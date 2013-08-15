@@ -64,7 +64,6 @@ __merge_walk(WT_SESSION_IMPL *session, WT_PAGE *page, u_int depth,
 			(*visit)(page, ref, state);
 			break;
 
-		case WT_REF_EVICT_FORCE:
 		case WT_REF_EVICT_WALK:
 		case WT_REF_MEM:
 		case WT_REF_READING:
@@ -85,9 +84,6 @@ __merge_count(WT_PAGE *parent, WT_REF *ref, WT_VISIT_STATE *state)
 	WT_UNUSED(parent);
 
 	if (ref->state == WT_REF_LOCKED) {
-		/* Prevent eviction until it is hooked into the new tree. */
-		__wt_evict_list_clr_page(state->session, ref->page);
-
 		if (!state->seen_live) {
 			state->first_live = state->refcnt;
 			state->seen_live = 1;
@@ -162,6 +158,7 @@ __merge_transfer_footprint(WT_SESSION_IMPL *session,
 static void
 __merge_switch_page(WT_PAGE *parent, WT_REF *ref, WT_VISIT_STATE *state)
 {
+	WT_IKEY *ikey;
 	WT_PAGE *child;
 	WT_PAGE_MODIFY *modify;
 	WT_REF *newref;
@@ -178,10 +175,11 @@ __merge_switch_page(WT_PAGE *parent, WT_REF *ref, WT_VISIT_STATE *state)
 		    state->session, state->page, parent,
 		    (uint32_t)sizeof(WT_ADDR) + ((WT_ADDR *)ref->addr)->size);
 
-	if (parent->type == WT_PAGE_ROW_INT)
+	if (parent->type == WT_PAGE_ROW_INT &&
+	    (ikey = __wt_ref_key_instantiated(ref)) != NULL)
 		__merge_transfer_footprint(
-		    state->session, state->page, parent,
-		    (uint32_t)sizeof(WT_IKEY) + ((WT_IKEY *)ref->u.key)->size);
+		    state->session, state->page,
+		    parent, (uint32_t)sizeof(WT_IKEY) + ikey->size);
 
 	if (ref->state == WT_REF_LOCKED) {
 		child = ref->page;
@@ -196,7 +194,7 @@ __merge_switch_page(WT_PAGE *parent, WT_REF *ref, WT_VISIT_STATE *state)
 		 */
 		if ((modify = child->modify) != NULL &&
 		    F_ISSET(modify, WT_PM_REC_SPLIT))
-			WT_LINK_PAGE(state->page, newref, modify->u.split);
+			WT_LINK_PAGE(state->page, newref, modify->u.split.page);
 
 		WT_LINK_PAGE(state->page, newref, child);
 
@@ -243,35 +241,6 @@ __merge_check_discard(WT_SESSION_IMPL *session, WT_PAGE *page)
 #endif
 
 /*
- * __merge_new_page --
- *	Create a new in-memory internal page.
- */
-static int
-__merge_new_page(WT_SESSION_IMPL *session,
-	uint8_t type, uint32_t entries, int merge, WT_PAGE **pagep)
-{
-	WT_DECL_RET;
-	WT_PAGE *newpage;
-
-	/* Allocate a new internal page and fill it in. */
-	WT_RET(__wt_page_alloc(session, type, entries, &newpage));
-	newpage->read_gen = WT_READ_GEN_NOTSET;
-	newpage->entries = entries;
-
-	WT_ERR(__wt_page_modify_init(session, newpage));
-	if (merge)
-		F_SET(newpage->modify, WT_PM_REC_SPLIT_MERGE);
-	else
-		__wt_page_modify_set(session, newpage);
-
-	*pagep = newpage;
-	return (0);
-
-err:	__wt_page_out(session, &newpage);
-	return (ret);
-}
-
-/*
  * __merge_promote_key --
  *	Copy a key from a child page into the reference in its parent, so it
  *	can be found by searches.
@@ -279,23 +248,23 @@ err:	__wt_page_out(session, &newpage);
 static int
 __merge_promote_key(WT_SESSION_IMPL *session, WT_REF *ref)
 {
-	WT_IKEY *ikey;
 	WT_PAGE *page;
 	WT_REF *child_ref;
+	void *p;
+	uint32_t size;
 
 	page = ref->page;
 	switch (page->type) {
 	case WT_PAGE_COL_INT:
 		child_ref = &page->u.intl.t[0];
-		ref->u.recno = page->u.intl.recno = child_ref->u.recno;
+		ref->key.recno = page->u.intl.recno = child_ref->key.recno;
 		return (0);
 
 	case WT_PAGE_ROW_INT:
 		child_ref = &page->u.intl.t[0];
-		ikey = child_ref->u.key;
-		WT_ASSERT(session, ikey != NULL);
-		return (__wt_row_ikey_incr(session,
-		    page, 0, WT_IKEY_DATA(ikey), ikey->size, &ref->u.key));
+		__wt_ref_key(child_ref->page, child_ref, &p, &size);
+		return (__wt_row_ikey_incr(
+		    session, page, 0, p, size, &ref->key.ikey));
 
 	WT_ILLEGAL_VALUE(session);
 	}
@@ -340,15 +309,14 @@ __wt_merge_tree(WT_SESSION_IMPL *session, WT_PAGE *top)
 	if (visit_state.maxdepth < WT_MERGE_STACK_MIN)
 		return (EBUSY);
 
-	/* Pages cannot grow larger than 2**32, but that should never happen. */
-	if (visit_state.refcnt > UINT32_MAX)
-		return (ENOMEM);
-
-	/* Make sure the top page isn't queued for eviction. */
-	__wt_evict_list_clr_page(session, top);
-
-	/* Clear the eviction walk: it may be in our subtree. */
-	__wt_evict_clear_tree_walk(session, NULL);
+	/*
+	 * Don't allow split merges to generate arbitrarily large pages.
+	 * Ideally we would choose a size based on the internal_page_max
+	 * setting for the btree, but we don't have the correct btree handle
+	 * available.
+	 */
+	if (visit_state.refcnt > WT_MERGE_MAX_REFS)
+		return (EBUSY);
 
 	/*
 	 * Now we either collapse the internal pages into one split-merge page,
@@ -393,7 +361,8 @@ __wt_merge_tree(WT_SESSION_IMPL *session, WT_PAGE *top)
 
 	if (promote) {
 		/* Create a new top-level split-merge page with two entries. */
-		WT_ERR(__merge_new_page(session, page_type, 2, 1, &newtop));
+		WT_ERR(__wt_btree_new_modified_page(
+		    session, page_type, 2, 1, &newtop));
 
 		visit_state.split = split;
 
@@ -401,7 +370,8 @@ __wt_merge_tree(WT_SESSION_IMPL *session, WT_PAGE *top)
 		if (split == 1)
 			visit_state.first = newtop;
 		else {
-			WT_ERR(__merge_new_page(session, page_type, split,
+			WT_ERR(__wt_btree_new_modified_page(
+			    session, page_type, split,
 			    visit_state.first_live < split, &lchild));
 			visit_state.first = lchild;
 		}
@@ -411,7 +381,8 @@ __wt_merge_tree(WT_SESSION_IMPL *session, WT_PAGE *top)
 			visit_state.second = newtop;
 			visit_state.second_ref = &newtop->u.intl.t[1];
 		} else {
-			WT_ERR(__merge_new_page(session, page_type,
+			WT_ERR(__wt_btree_new_modified_page(
+			    session, page_type,
 			    refcnt - split, visit_state.last_live >= split,
 			    &rchild));
 			visit_state.second = rchild;
@@ -427,7 +398,8 @@ __wt_merge_tree(WT_SESSION_IMPL *session, WT_PAGE *top)
 		 * workload the tree will grow deeper, but that's inevitable,
 		 * and this keeps individual merges small.
 		 */
-		WT_ERR(__merge_new_page(session, page_type, refcnt,
+		WT_ERR(__wt_btree_new_modified_page(
+		    session, page_type, refcnt,
 		    refcnt < WT_MERGE_FULL_PAGE ||
 		    __wt_btree_mergeable(top->parent),
 		    &newtop));
@@ -496,18 +468,19 @@ __wt_merge_tree(WT_SESSION_IMPL *session, WT_PAGE *top)
 	 * into place by our caller.
 	 */
 	top->modify->flags = WT_PM_REC_SPLIT;
-	top->modify->u.split = newtop;
+	top->modify->u.split.page = newtop;
+	top->modify->u.split.ref = top->ref;
 
 	WT_VERBOSE_ERR(session, evict,
 	    "Successfully %s %" PRIu32
 	    " split-merge pages containing %" PRIu32 " keys\n",
 	    promote ? "promoted" : "merged", visit_state.maxdepth, refcnt);
 
-	/* Queue new child pages for forced eviction, if possible. */
+	/* Evict new child pages as soon as possible. */
 	if (lchild != NULL && !F_ISSET(lchild->modify, WT_PM_REC_SPLIT_MERGE))
-		__wt_evict_forced_page(session, lchild);
+		lchild->read_gen = WT_READ_GEN_OLDEST;
 	if (rchild != NULL && !F_ISSET(rchild->modify, WT_PM_REC_SPLIT_MERGE))
-		__wt_evict_forced_page(session, rchild);
+		rchild->read_gen = WT_READ_GEN_OLDEST;
 
 	/* Update statistics. */
 	WT_CSTAT_INCR(session, cache_eviction_merge);

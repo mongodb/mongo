@@ -13,6 +13,10 @@
 			break;						\
 		}							\
 		switch ((ret) = __wt_errno()) {				\
+		case 0:							\
+			/* The call failed but didn't set errno. */	\
+			(ret) = WT_ERROR;				\
+			break;						\
 		case EAGAIN:						\
 		case EBUSY:						\
 		case EINTR:						\
@@ -29,13 +33,20 @@
 	}								\
 } while (0)
 
+#define	WT_TIMEDIFF(end, begin)						\
+	(1000000000 * (uint64_t)((end).tv_sec - (begin).tv_sec) +	\
+	    (uint64_t)(end).tv_nsec - (uint64_t)(begin).tv_nsec)
+
 struct __wt_fh {
 	u_int	refcnt;				/* Reference count */
 	TAILQ_ENTRY(__wt_fh) q;			/* List of open handles */
 
 	char	*name;				/* File name */
-	off_t	file_size;			/* File size */
+
 	int	fd;				/* POSIX file handle */
+	off_t	size;				/* File size */
+	off_t   extend_size;			/* File extended size */
+	off_t   extend_len;			/* File extend chunk size */
 
 	int	direct_io;			/* O_DIRECT configured */
 };

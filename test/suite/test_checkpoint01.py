@@ -26,7 +26,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import wiredtiger, wttest
-from helper import key_populate, simple_populate
+from helper import key_populate, complex_populate_lsm, simple_populate
 
 # test_checkpoint01.py
 #    Checkpoint tests
@@ -113,7 +113,8 @@ class test_checkpoint(wttest.WiredTigerTestCase):
         # Build a file with a set of checkpoints, and confirm they all have
         # the correct key/value pairs.
         self.session.create(self.uri,
-            "key_format=" + self.fmt + ",value_format=S,leaf_page_max=512")
+            "key_format=" + self.fmt +\
+                ",value_format=S,allocation_size=512,leaf_page_max=512")
         self.build_file_with_checkpoints()
         self.check()
 
@@ -323,6 +324,17 @@ class test_checkpoint_last_name(wttest.WiredTigerTestCase):
             'drop=(to=WiredTigerCheckpointX)'):
                 self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
                     lambda: self.session.checkpoint(conf), msg)
+
+
+# Check we can't name checkpoints that include LSM tables.
+class test_checkpoint_lsm_name(wttest.WiredTigerTestCase):
+    def test_checkpoint_lsm_name(self):
+        complex_populate_lsm(self,
+            "table:checkpoint", 'type=lsm,key_format=S', 1000)
+        msg = '/object does not support named checkpoints/'
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: self.session.checkpoint("name=ckpt"), msg)
+
 
 class test_checkpoint_empty(wttest.WiredTigerTestCase):
     scenarios = [

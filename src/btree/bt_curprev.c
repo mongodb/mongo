@@ -365,8 +365,8 @@ new_page:	if (cbt->recno < cbt->page->u.col_var.recno)
 			 * the page's reconciliation structures, and that's as
 			 * easy here as higher up the stack.
 			 */
-			if ((ret = __wt_cell_unpack_ref(
-			    session, &unpack, &cbt->tmp)) == WT_RESTART)
+			if ((ret = __wt_cell_unpack_ref(session,
+			    WT_PAGE_COL_VAR, &unpack, &cbt->tmp)) == WT_RESTART)
 				ret = __wt_ovfl_cache_col_restart(
 				    session, cbt->page, &unpack, &cbt->tmp);
 			WT_RET(ret);
@@ -492,6 +492,8 @@ __wt_btcur_prev(WT_CURSOR_BTREE *cbt, int discard)
 	int newpage;
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
+
+	WT_CSTAT_INCR(session, cursor_prev);
 	WT_DSTAT_INCR(session, cursor_prev);
 
 	flags = WT_TREE_SKIP_INTL | WT_TREE_PREV;	/* Tree walk flags. */
@@ -499,7 +501,6 @@ __wt_btcur_prev(WT_CURSOR_BTREE *cbt, int discard)
 		LF_SET(WT_TREE_DISCARD);
 
 retry:	WT_RET(__cursor_func_init(cbt, 0));
-	__cursor_position_clear(cbt);
 
 	/*
 	 * If we aren't already iterating in the right direction, there's
@@ -585,6 +586,7 @@ retry:	WT_RET(__cursor_func_init(cbt, 0));
 
 err:	if (ret == WT_RESTART)
 		goto retry;
-	WT_TRET(__cursor_func_resolve(cbt, ret));
+	if (ret != 0)
+		WT_TRET(__cursor_error_resolve(cbt));
 	return (ret);
 }

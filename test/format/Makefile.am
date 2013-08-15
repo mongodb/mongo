@@ -1,12 +1,14 @@
-BDB = $(top_builddir)/db
 AM_CPPFLAGS = -DWIREDTIGER_TEST_COMPRESS_RAW \
-	-I$(top_builddir) -I$(top_srcdir)/src/include -I$(BDB)
+	-DBERKELEY_DB_PATH=\"$(BERKELEY_DB_PATH)\" \
+	-I$(top_builddir) -I$(top_srcdir)/src/include \
+	-I$(BERKELEY_DB_PATH)/include
 
 noinst_PROGRAMS = t
 noinst_SCRIPTS = s_dumpcmp
 t_SOURCES =\
-	config.h format.h bdb.c config.c t.c util.c wts.c wts_bulk.c wts_ops.c
-t_LDADD = $(top_builddir)/libwiredtiger.la -L$(BDB)/build_unix -ldb
+	config.h format.h backup.c bdb.c bulk.c config.c ops.c t.c util.c wts.c
+
+t_LDADD = $(top_builddir)/libwiredtiger.la -L$(BERKELEY_DB_PATH)/lib -ldb
 t_LDFLAGS = -static
 
 noinst_LTLIBRARIES = raw_compress.la

@@ -1,3 +1,147 @@
+WiredTiger release 1.6.3, 2013-07-12
+------------------------------------
+
+This is a bugfix and performance tuning release. The main changes are:
+
+* Change the default cursor overwrite configuration so that it is consistent
+  across all data sources. This change may alter the behavior of existing
+  applications without triggering any compilation or runtime warnings. See
+  the upgrade documentation for details. [#512]
+
+* Require platform support for 64 bit atomic operations. [#553]
+
+
+WiredTiger release 1.6.2, 2013-06-18
+------------------------------------
+
+This is a bugfix and performance tuning release. The main changes are:
+
+* Fix a race in the WiredTiger pseudo random number generator that was leading
+  to poor distribution of numbers.
+
+* Change the default compression configuration to "uncompressed".
+
+* Fix a race between checkpoints and LSM that could result in a crash. [#543]
+
+* Add an option to output version information at runtime. Configure by
+  including "verbose=[version]" in the wiredtiger_open connection
+  configuration string. [#564]
+
+* Add a configurable prefix to error messages. [#527]
+
+* Add two new extension APIs, one to return a transaction ID, one to return
+  if a transaction ID is visible to the current transaction.
+
+* Add standard metadata functions to the extension API and make extension data
+  sources responsible for their own metadata entries.
+
+* Add a new extension function __wt_ext_config_strget that returns the
+  configuration value from a single string.
+
+
+WiredTiger release 1.6.1, 2013-05-31
+------------------------------------
+
+This is a bugfix and performance tuning release. The main changes are:
+
+* Fix the compress_raw API so that it uses platform independent types. See the
+  upgrade guide for further information. [#561]
+
+* Add an explicit enable setting to shared_cache configuration. See the
+  upgrade guide for further information.
+
+* Fix several bugs in hot backup, including race conditions between backup and
+  table drop (and other schema level operations). [#556] [#557]
+
+* Allow any data source type for indices as well as column groups. [#545]
+
+* Preload btree internal pages into file system cache when opening a table.
+
+* Change the default allocation size to 4KB so that DIRECT_IO with 4KB blocks
+  works. [#547]
+
+* Fix some bugs related to tracking the oldest active transaction. [#552]
+
+* Fix a bug in the extension API when using multiple databases.
+
+* Disallow named checkpoints on LSM trees - they aren't supported. [#546]
+
+* Fix support for custom collators with LSM trees. [#544]
+
+* Build fixes for gcc 4.1.2.
+
+See the upgrade documentation for details of API changes that may require
+altering existing applications.
+
+
+WiredTiger release 1.6.0, 2013-05-16
+------------------------------------
+
+This release contains new features, bug fixes and performance improvements.
+The significant changes are highlighted below:
+
+* Fix a bug where configuring direct I/O could cause checksum errors at
+  runtime.  NOTE: database file format change.  [#526]
+
+* Fix a race that allowed checkpoints to be deleted while hot backups are
+  running.  [#515]
+
+* Scale to events per second in graphs generated from statistics log output.
+  [#518]
+
+* Changes to reduce the latency of LSM operations.
+
+* Add a new terminate callback to extension interfaces that is called when the
+  WiredTiger connection is closed.  [#530]
+
+* Various optimizations and bug fixes to cache management and eviction code.
+
+* Update various statistics.
+
+* Fix a bug where using a combination of read-committed and snapshot
+  transactions could result in inconsistent values being returned.  [#539]
+
+* Fix a bug where using LSM trees with compression enabled could result in an
+  invalid system call. [#535]
+
+* Enhance statistics logging so that it can dump "lsm:" statistics.
+
+See the upgrade documentation for information about database format changes
+in this release.
+
+
+WiredTiger release 1.5.3, 2013-04-26
+------------------------------------
+
+This release contains some major new features along with numerous bug fixes
+and performance improvements. The significant changes are highlighted
+below:
+
+* Enhance the extension data source API to facilitate implementation of new
+  data stores in WiredTiger.
+
+* Add support for the STEC / Memrata KVS data source.
+
+* Add a Berkeley DB data source via the WiredTiger extension API.
+
+* Various enhancements to cache eviction management. Mostly to avoid stalls in
+  application threads.
+
+* Fixes to shared cache pool implementation, so resources are more
+  aggressively reallocated.
+
+* Add new statistics.
+
+* Implement automatic insert throttling in LSM - enabled by default.
+
+* Configuration strings are now case sensitive.
+
+* Enhance LSM merge algorithms to be more efficient as trees grow very large.
+
+See the upgrade documentation for details of API changes that may require
+altering existing applications.
+
+
 WiredTiger release 1.5.2, 2013-03-28
 ------------------------------------
 

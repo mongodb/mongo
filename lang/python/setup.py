@@ -15,14 +15,13 @@ if not 'ARCHFLAGS' in os.environ:
 
 # Suppress warnings building SWIG generated code
 extra_cflags = [
-				'-Wno-error',
+				'-w',
 ]
 
 dir = os.path.dirname(__file__)
 
 # Read the version information from the RELEASE file
-top = os.path.dirname(os.path.dirname(dir))
-for l in open(os.path.join(top, 'RELEASE')):
+for l in open(os.path.join(dir, '..', '..', 'RELEASE')):
     if re.match(r'WIREDTIGER_VERSION_(?:MAJOR|MINOR|PATCH)=', l):
         exec(l)
 
@@ -30,11 +29,12 @@ wt_ver = '%d.%d' % (WIREDTIGER_VERSION_MAJOR, WIREDTIGER_VERSION_MINOR)
 
 setup(name='wiredtiger', version=wt_ver,
     ext_modules=[Extension('_wiredtiger',
-        [os.path.join(dir, 'wiredtiger_wrap.c')],
+		[os.path.join(dir, 'wiredtiger_wrap.c')],
         include_dirs=['../..'],
         library_dirs=['../../.libs'],
         libraries=['wiredtiger'],
         extra_compile_args=extra_cflags,
     )],
-    py_modules=['wiredtiger'],
+	package_dir={'' : dir},
+    packages=['wiredtiger'],
 )

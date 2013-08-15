@@ -55,8 +55,9 @@ spellchk()
 valid_build()
 {
 	# Complain if there are pages we don't reference directly.
-	egrep 'Related Pages' ../docs/navtree.js > /dev/null && {
-		echo 'Unreferenced page: see "Related Pages" for the list.'
+	sed -n '/<table.*directory/,/\/table/p' < ../docs/pages.html | \
+	    grep href > /dev/null && {
+		echo 'Unreferenced page: see docs/pages.html for the list.'
 		e=1
 	}
 }

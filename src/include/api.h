@@ -6,9 +6,6 @@
  */
 
 /* Standard entry points to the API: declares/initializes local variables. */
-#define	API_CONF_DEFAULTS(h, n, cfg)					\
-	{ __wt_confdfl_##h##_##n, (cfg), NULL }
-
 #define	API_SESSION_INIT(s, h, n, cur, dh)				\
 	WT_DATA_HANDLE *__olddh = (s)->dhandle;				\
 	const char *__oldname = (s)->name;				\
@@ -20,12 +17,14 @@
 	API_SESSION_INIT(s, h, n, cur, dh);				\
 	WT_ERR(F_ISSET(S2C(s), WT_CONN_PANIC) ? __wt_panic(s) : 0)
 
-#define	API_CALL(s, h, n, cur, dh, cfg, cfgvar) do {			\
-	const char *cfgvar[] = API_CONF_DEFAULTS(h, n, cfg);		\
+#define	API_CALL(s, h, n, cur, dh, config, cfg) do {			\
+	const char *cfg[] =						\
+	    { WT_CONFIG_BASE(s, h##_##n), config, NULL };		\
 	API_SESSION_INIT(s, h, n, cur, dh);				\
 	WT_ERR(F_ISSET(S2C(s), WT_CONN_PANIC) ? __wt_panic(s) : 0);	\
-	WT_ERR(((cfg) != NULL) ?					\
-	    __wt_config_check((s), __wt_confchk_##h##_##n, (cfg), 0) : 0)
+	WT_ERR(((config) != NULL) ?					\
+	    __wt_config_check((s),					\
+	    WT_CONFIG_REF(session, h##_##n), (config), 0) : 0)
 
 #define	API_END(s)							\
 	if ((s) != NULL) {						\
@@ -35,11 +34,10 @@
 } while (0)
 
 /* An API call wrapped in a transaction if necessary. */
-#define	TXN_API_CALL(s, h, n, cur, bt, cfg, cfgvar) do {		\
+#define	TXN_API_CALL(s, h, n, cur, bt, config, cfg) do {		\
 	int __autotxn = 0;						\
-	API_CALL(s, h, n, bt, cur, cfg, cfgvar);			\
-	__autotxn = F_ISSET(S2C(s), WT_CONN_TRANSACTIONAL) &&		\
-	    !F_ISSET(&(s)->txn, TXN_RUNNING);				\
+	API_CALL(s, h, n, bt, cur, config, cfg);			\
+	__autotxn = !F_ISSET(&(s)->txn, TXN_RUNNING);			\
 	if (__autotxn)							\
 		F_SET(&(s)->txn, TXN_AUTOCOMMIT)
 
@@ -47,8 +45,7 @@
 #define	TXN_API_CALL_NOCONF(s, h, n, cur, bt) do {			\
 	int __autotxn = 0;						\
 	API_CALL_NOCONF(s, h, n, cur, bt);				\
-	__autotxn = F_ISSET(S2C(s), WT_CONN_TRANSACTIONAL) &&		\
-	    !F_ISSET(&(s)->txn, TXN_AUTOCOMMIT | TXN_RUNNING);		\
+	__autotxn = !F_ISSET(&(s)->txn, TXN_AUTOCOMMIT | TXN_RUNNING);	\
 	if (__autotxn)							\
 		F_SET(&(s)->txn, TXN_AUTOCOMMIT)
 
@@ -89,15 +86,19 @@
 	TXN_API_END(s, ret);						\
 	return ((ret) == WT_NOTFOUND ? ENOENT : (ret))
 
-#define	CONNECTION_API_CALL(conn, s, n, cfg, cfgvar)			\
+#define	CONNECTION_API_CALL(conn, s, n, config, cfg)			\
 	s = (conn)->default_session;					\
-	API_CALL(s, connection, n, NULL, NULL, cfg, cfgvar)
+	API_CALL(s, connection, n, NULL, NULL, config, cfg)
 
-#define	SESSION_API_CALL(s, n, cfg, cfgvar)				\
-	API_CALL(s, session, n, NULL, NULL, cfg, cfgvar)
+#define	CONNECTION_API_CALL_NOCONF(conn, s, n)				\
+	s = (conn)->default_session;					\
+	API_CALL_NOCONF(s, connection, n, NULL, NULL)
 
-#define	SESSION_TXN_API_CALL(s, n, cfg, cfgvar)				\
-	TXN_API_CALL(s, session, n, NULL, NULL, cfg, cfgvar)
+#define	SESSION_API_CALL(s, n, config, cfg)				\
+	API_CALL(s, session, n, NULL, NULL, config, cfg)
+
+#define	SESSION_TXN_API_CALL(s, n, config, cfg)				\
+	TXN_API_CALL(s, session, n, NULL, NULL, config, cfg)
 
 #define	CURSOR_API_CALL(cur, s, n, bt)					\
 	(s) = (WT_SESSION_IMPL *)(cur)->session;			\

@@ -62,8 +62,8 @@ class test_cursor01(wttest.WiredTigerTestCase):
             return 'value' + str(i)
 
     def assertCursorHasNoKeyValue(self, cursor):
-        keymsg = 'cursor.get_key: requires key be set: Invalid argument\n'
-        valuemsg = 'cursor.get_value: requires value be set: Invalid argument\n'
+        keymsg = '/requires key be set/'
+        valuemsg = '/requires value be set/'
         self.assertRaisesWithMessage(
             wiredtiger.WiredTigerError, cursor.get_key, keymsg)
         self.assertRaisesWithMessage(

@@ -49,8 +49,6 @@ class test_config03(test_base03.test_base03):
         [50, 90, 95, 99], None)
     hazard_max_scenarios = wtscenario.quick_scenarios('s_hazard_max',
         [15, 50, 500], [0.4, 0.8, 0.8])
-    logging_scenarios = wtscenario.quick_scenarios('s_logging',
-        [True,False], [1.0,1.0])
     multiprocess_scenarios = wtscenario.quick_scenarios('s_multiprocess',
         [True,False], [1.0,1.0])
     session_max_scenarios = wtscenario.quick_scenarios('s_session_max',
@@ -67,14 +65,13 @@ class test_config03(test_base03.test_base03):
     verbose_scenarios = wtscenario.quick_scenarios('s_verbose', [None], None)
 
     config_vars = [ 'cache_size', 'create', 'error_prefix', 'eviction_target',
-                    'eviction_trigger', 'hazard_max', 'logging',
-                    'multiprocess', 'session_max', 'transactional', 'verbose' ]
+                    'eviction_trigger', 'hazard_max', 'multiprocess',
+                    'session_max', 'verbose' ]
 
     all_scenarios = wtscenario.multiply_scenarios('_',
         cache_size_scenarios, create_scenarios, error_prefix_scenarios,
         eviction_target_scenarios, eviction_trigger_scenarios,
-        hazard_max_scenarios, logging_scenarios,
-        multiprocess_scenarios, session_max_scenarios,
+        hazard_max_scenarios, multiprocess_scenarios, session_max_scenarios,
         transactional_scenarios, verbose_scenarios)
 
     scenarios = wtscenario.prune_scenarios(all_scenarios, 1000)
@@ -105,22 +102,27 @@ class test_config03(test_base03.test_base03):
         if self.s_create == False:
             successargs = successargs.replace(',create=false,',',create,')
             expect_fail = True
+            fail_msg = '/No such file or directory/'
         elif self.s_create == None:
             successargs = successargs + 'create=true,'
             expect_fail = True
+            fail_msg = '/No such file or directory/'
+        
         if self.s_eviction_target >= self.s_eviction_trigger:
             # construct args that guarantee that target < trigger
             # we know that trigger >= 1
             repfrom = ',eviction_target=' + str(self.s_eviction_target)
             repto = ',eviction_target=' + str(self.s_eviction_trigger - 1)
             successargs = successargs.replace(repfrom, repto)
-            expect_fail = True
+            if not expect_fail:
+                expect_fail = True
+                fail_msg = \
+                    '/eviction target must be lower than the eviction trigger/'
 
         if expect_fail:
             self.verbose(3, 'wiredtiger_open (should fail) with args: ' + args)
             self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-                lambda: wiredtiger.wiredtiger_open(dir, args),
-                "/eviction target must be lower than the eviction trigger/")
+                lambda: wiredtiger.wiredtiger_open(dir, args), fail_msg)
             args = successargs
 
         self.verbose(3, 'wiredtiger_open with args: ' + args)

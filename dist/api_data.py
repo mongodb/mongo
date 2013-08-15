@@ -20,11 +20,11 @@ errors = [
 	Error('WT_ERROR', 'non-specific WiredTiger error', '''
 		This error is returned when an error is not covered by a
 		specific error return.'''),
-	Error('WT_NOTFOUND', 'cursor item not found', '''
-		This error indicates a cursor operation did not find a
-		record to return.  This includes search and other
-		operations where no record matched the cursor's search
-		key such as WT_CURSOR::update or WT_CURSOR::remove.'''),
+	Error('WT_NOTFOUND', 'item not found', '''
+		This error indicates an operation did not find a value to
+		return.  This includes cursor search and other operations
+		where no record matched the cursor's search key such as
+		WT_CURSOR::update or WT_CURSOR::remove.'''),
 	Error('WT_PANIC', 'WiredTiger library panic', '''
 		This error indicates an underlying problem that requires the
 		application exit and restart.'''),
@@ -64,14 +64,13 @@ source_meta = [
 		table.  By default, the data source URI is derived from the \c
 		type and the column group or index name.  Applications can
 		create tables from existing data sources by supplying a \c
-		source configuration'''),
+		source configuration''', undoc=True),
 	Config('type', 'file', r'''
 		set the type of data source used to store a column group, index
 		or simple table.  By default, a \c "file:" URI is derived from
 		the object name.  The \c type configuration can be used to
-		switch to a different storage format, such as LSM.  Ignored if
-		an explicit URI is supplied with a \c source configuration''',
-		choices=['file', 'lsm']),
+		switch to a different data source, such as LSM or an extension
+		configured by the application.'''),
 ]
 
 format_meta = column_meta + [
@@ -94,12 +93,16 @@ format_meta = column_meta + [
 ]
 
 lsm_config = [
+	Config('lsm_auto_throttle', 'true', r'''
+		Throttle inserts into LSM trees if flushing to disk isn't
+		keeping up''',
+		type='boolean'),
 	Config('lsm_bloom', 'true', r'''
 		create bloom filters on LSM tree chunks as they are merged''',
 		type='boolean'),
 	Config('lsm_bloom_config', '', r'''
-		config string used when creating Bloom filter files, passed to
-		WT_SESSION::create'''),
+		config string used when creating Bloom filter files, passed
+		to WT_SESSION::create'''),
 	Config('lsm_bloom_bit_count', '8', r'''
 		the number of bits used per item for LSM bloom filters''',
 		min='2', max='1000'),
@@ -108,12 +111,12 @@ lsm_config = [
 		filters''',
 		min='2', max='100'),
 	Config('lsm_bloom_newest', 'false', r'''
-		create a bloom filter on an LSM tree chunk before it's first merge.
-		Only supported if bloom filters are enabled''',
+		create a bloom filter on an LSM tree chunk before it's first
+		merge.  Only supported if bloom filters are enabled''',
 		type='boolean'),
 	Config('lsm_bloom_oldest', 'false', r'''
-		create a bloom filter on the oldest LSM tree chunk. Only supported if
-		bloom filters are enabled''',
+		create a bloom filter on the oldest LSM tree chunk. Only
+		supported if bloom filters are enabled''',
 		type='boolean'),
 	Config('lsm_chunk_size', '2MB', r'''
 		the maximum size of the in-memory chunk of an LSM tree''',
@@ -128,10 +131,10 @@ lsm_config = [
 
 # Per-file configuration
 file_config = format_meta + [
-	Config('allocation_size', '512B', r'''
+	Config('allocation_size', '4KB', r'''
 		the file unit allocation size, in bytes, must a power-of-two;
 		smaller values decrease the file space required by overflow
-		items, and the default value of 512B is a good choice absent
+		items, and the default value of 4KB is a good choice absent
 		requirements from the operating system or storage device''',
 		min='512B', max='128MB'),
 	Config('block_compressor', '', r'''
@@ -143,15 +146,13 @@ file_config = format_meta + [
 		do not ever evict the object's pages; see @ref
 		tuning_cache_resident for more information''',
 		type='boolean'),
-	Config('checksum', 'on', r'''
-		configure file block checksums; permitted values are
-		<code>on</code> (checksum all file blocks),
-		<code>off</code> (checksum no file blocks) and
-		<code>uncompresssed</code> (checksum only file blocks
-		which are not compressed for some reason).  The \c
-		uncompressed value is for applications which can
-		reasonably rely on decompression to fail if a block has
-		been corrupted''',
+	Config('checksum', 'uncompressed', r'''
+		configure block checksums; permitted values are <code>on</code>
+		(checksum all blocks), <code>off</code> (checksum no blocks) and
+		<code>uncompresssed</code> (checksum only blocks which are not
+		compressed for any reason).  The \c uncompressed setting is for
+		applications which can rely on decompression to fail if a block
+		has been corrupted''',
 		choices=['on', 'off', 'uncompressed']),
 	Config('collator', '', r'''
 		configure custom collation for keys.  Value must be a collator
@@ -177,7 +178,7 @@ file_config = format_meta + [
 		trailing bytes on internal keys (ignored for custom
 		collators)''',
 		type='boolean'),
-	Config('internal_page_max', '2KB', r'''
+	Config('internal_page_max', '4KB', r'''
 		the maximum page size for internal nodes, in bytes; the size
 		must be a multiple of the allocation size and is significant
 		for applications wanting to avoid excessive L2 cache misses
@@ -196,7 +197,7 @@ file_config = format_meta + [
 		the maximum gap between instantiated keys in a Btree leaf page,
 		constraining the number of keys processed to instantiate a
 		random Btree leaf page key''',
-		min='0'),
+		min='0', undoc=True),
 	Config('leaf_page_max', '1MB', r'''
 		the maximum page size for leaf nodes, in bytes; the size must
 		be a multiple of the allocation size, and is significant for
@@ -231,8 +232,12 @@ file_config = format_meta + [
 		written into the buffer cache''',
 		min=0),
 	Config('prefix_compression', 'true', r'''
-		configure row-store format key prefix compression''',
+		configure prefix compression on row-store leaf pages''',
 		type='boolean'),
+	Config('prefix_compression_min', '4', r'''
+		minimum gain before prefix compression will be used on row-store
+		leaf pages''',
+		min=0),
 	Config('split_pct', '75', r'''
 		the Btree page split size as a percentage of the maximum Btree
 		page size, that is, when a Btree page is split, it will be
@@ -269,21 +274,24 @@ table_meta = format_meta + table_only_meta
 # Connection runtime config, shared by conn.reconfigure and wiredtiger_open
 connection_runtime_config = [
 	Config('shared_cache', '', r'''
-		shared cache configuration options. A database should configure either
-		a cache_size or a shared_cache not both''',
+		shared cache configuration options. A database should configure
+		either a cache_size or a shared_cache not both''',
 		type='category', subconfig=[
+		Config('enable', 'false', r'''
+			whether the connection is using a shared cache''',
+			type='boolean'),
 		Config('chunk', '10MB', r'''
 			the granularity that a shared cache is redistributed''',
 			min='1MB', max='10TB'),
 		Config('reserve', '0', r'''
-			amount of cache this database is guaranteed to have available
-			from the shared cache. This setting is per database. Defaults
-			to the chunk size''', type='int'),
+			amount of cache this database is guaranteed to have
+			available from the shared cache. This setting is per
+			database. Defaults to the chunk size''', type='int'),
 		Config('name', 'pool', r'''
 			name of a cache that is shared between databases'''),
 		Config('size', '500MB', r'''
-			maximum memory to allocate for the shared cache. Setting this
-			will update the value if one is already set''',
+			maximum memory to allocate for the shared cache. Setting
+			this will update the value if one is already set''',
 			min='1MB', max='10TB')
 		]),
 	Config('cache_size', '100MB', r'''
@@ -319,6 +327,7 @@ connection_runtime_config = [
 		    'evictserver',
 		    'fileops',
 		    'hazard',
+		    'log',
 		    'lsm',
 		    'mutex',
 		    'read',
@@ -326,6 +335,7 @@ connection_runtime_config = [
 		    'reconcile',
 		    'salvage',
 		    'verify',
+		    'version',
 		    'write']),
 ]
 
@@ -368,6 +378,9 @@ methods = {
 	Config('force', 'false', r'''
 		return success if the object does not exist''',
 		type='boolean'),
+	Config('remove_files', 'true', r'''
+		should the underlying files be removed?''',
+		type='boolean'),
 	]),
 
 'session.log_printf' : Method([]),
@@ -408,13 +421,16 @@ methods = {
 	Config('next_random', 'false', r'''
 		configure the cursor to return a pseudo-random record from
 		the object; valid only for row-store cursors.  Cursors
-		configured with next_random only support the WT_CURSOR::next
+		configured with \c next_random only support the WT_CURSOR::next
 		and WT_CURSOR::close methods.  See @ref cursor_random for
 		details''',
 		type='boolean'),
-	Config('overwrite', 'false', r'''
-		change the behavior of the cursor's insert method to overwrite
-		previously existing values''',
+	Config('overwrite', 'true', r'''
+		configures whether the cursor's insert, update and remove
+		methods check the existing state of the record.  If \c overwrite
+		is \c false, WT_CURSOR::insert fails with ::WT_DUPLICATE_KEY
+		if the record exists, WT_CURSOR::update and WT_CURSOR::remove
+		fail with ::WT_NOTFOUND if the record does not exist''',
 		type='boolean'),
 	Config('raw', 'false', r'''
 		ignore the encodings for the key and value, manage data as if
@@ -489,11 +505,12 @@ methods = {
 		dropped while a hot backup is in progress or if open in
 		a cursor''', type='list'),
 	Config('force', 'false', r'''
-		checkpoints may be skipped if the underlying object has not
-		been modified, this option forces the checkpoint''',
+		by default, checkpoints may be skipped if the underlying object
+		has not been modified, this option forces the checkpoint''',
 		type='boolean'),
 	Config('name', '', r'''
-		if non-empty, specify a name for the checkpoint'''),
+		if non-empty, specify a name for the checkpoint (note that
+		checkpoints including LSM trees may not be named)'''),
 	Config('target', '', r'''
 		if non-empty, checkpoint the list of objects''', type='list'),
 ]),
@@ -506,11 +523,18 @@ methods = {
 'connection.reconfigure' : Method(connection_runtime_config),
 
 'connection.load_extension' : Method([
+	Config('config', '', r'''
+		configuration string passed to the entry point of the
+		extension as its WT_CONFIG_ARG argument'''),
 	Config('entry', 'wiredtiger_extension_init', r'''
-		the entry point of the extension'''),
-	Config('prefix', '', r'''
-		a prefix for all names registered by this extension (e.g., to
-		make namespaces distinct or during upgrades'''),
+		the entry point of the extension, called to initialize the
+		extension when it is loaded.  The signature of the function
+		must match ::wiredtiger_extension_init'''),
+	Config('terminate', 'wiredtiger_extension_terminate', r'''
+		an optional function in the extension that is called before
+		the extension is unloaded during WT_CONNECTION::close.  The
+		signature of the function must match
+		::wiredtiger_extension_terminate'''),
 ]),
 
 'connection.open_session' : Method(session_config),
@@ -520,9 +544,8 @@ methods = {
 'wiredtiger_open' : Method(connection_runtime_config + [
 	Config('buffer_alignment', '-1', r'''
 		in-memory alignment (in bytes) for buffers used for I/O.  The
-		default value of -1 indicates that a platform-specific
-		alignment value should be used (512 bytes on Linux systems,
-		zero elsewhere)''',
+		default value of -1 indicates a platform-specific alignment
+		value should be used (4KB on Linux systems, zero elsewhere)''',
 		min='-1', max='1MB'),
 	Config('checkpoint', '', r'''
 		periodically checkpoint the database''',
@@ -538,23 +561,45 @@ methods = {
 		create the database if it does not exist''',
 		type='boolean'),
 	Config('direct_io', '', r'''
-		Use \c O_DIRECT to access files.  Options are given as a
-		list, such as <code>"direct_io=[data]"</code>''',
+		Use \c O_DIRECT to access files.  Options are given as a list,
+		such as <code>"direct_io=[data]"</code>.  Configuring
+		\c direct_io requires care, see @ref
+		tuning_system_buffer_cache_direct_io for important warnings''',
 		type='list', choices=['data', 'log']),
 	Config('extensions', '', r'''
 		list of shared library extensions to load (using dlopen).
-		Optional values are passed as the \c config parameter to
-		WT_CONNECTION::load_extension.  Complex paths may require
-		quoting, for example,
-		<code>extensions=("/path/ext.so"="entry=my_entry")</code>''',
+		Any values specified to an library extension are passed to
+		WT_CONNECTION::load_extension as the \c config parameter
+		(for example,
+		<code>extensions=(/path/ext.so={entry=my_entry})</code>)''',
 		type='list'),
+	Config('file_extend', '', r'''
+		file extension configuration.  If set, extend files of the set
+		type in allocations of the set size, instead of a block at a
+		time as each new block is written.  For example,
+		<code>file_extend=(data=16MB)</code>''',
+		type='list', choices=['data', 'log']),
 	Config('hazard_max', '1000', r'''
 		maximum number of simultaneous hazard pointers per session
 		handle''',
 		min='15'),
-	Config('logging', 'false', r'''
+	Config('log', '', r'''
 		enable logging''',
+		type='category', subconfig=[
+		Config('archive', 'true', r'''
+		automatically archive unneeded log files''',
 		type='boolean'),
+		Config('enabled', 'true', r'''
+		enable logging subsystem''',
+		type='boolean'),
+		Config('file_max', '100MB', r'''
+		the maximum size of the log file''',
+		min='1MB', max='2GB'),
+		Config('path', '""', r'''
+		the path to a directory into which the log files are written.
+		If the value is not an absolute path name, the files are created
+		relative to the database home'''),
+		]),
 	Config('lsm_merge', 'true', r'''
 		merge LSM chunks where possible''',
 		type='boolean'),
@@ -571,9 +616,9 @@ methods = {
 		threads)''',
 		min='1'),
 	Config('statistics_log', '', r'''
-		log database connection statistics into a file when the
-		\c statistics configuration value is set to true.  See
-		@ref statistics_log for more information''',
+		log database connection statistics to a file (implies
+		setting the \c statistics configuration value to true).
+		See @ref statistics_log for more information''',
 		type='category', subconfig=[
 		Config('clear', 'true', r'''
 		reset statistics counters after each set of log records are
@@ -603,9 +648,6 @@ methods = {
 	Config('sync', 'true', r'''
 		flush files to stable storage when closing or writing
 		checkpoints''',
-		type='boolean'),
-	Config('transactional', 'true', r'''
-		support transactional semantics''',
 		type='boolean'),
 	Config('use_environment_priv', 'false', r'''
 		use the \c WIREDTIGER_CONFIG and \c WIREDTIGER_HOME environment

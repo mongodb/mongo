@@ -27,10 +27,12 @@
 
 #include <sys/stat.h>
 #include <sys/time.h>
+#include <sys/types.h>
 
 #include <assert.h>
 #include <ctype.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <inttypes.h>
 #include <limits.h>
 #include <pthread.h>
@@ -41,18 +43,27 @@
 #include <unistd.h>
 
 #ifdef BDB
-#include "build_unix/db.h"
-#else
-#include <wiredtiger.h>
+#include <db.h>
 #endif
+#include <wiredtiger.h>
+
+#include <wiredtiger_ext.h>
+extern WT_EXTENSION_API *wt_api;
 
 #define	EXTPATH	"../../ext/"			/* Extensions path */
+
 #define	BZIP_PATH							\
 	EXTPATH "compressors/bzip2/.libs/libwiredtiger_bzip2.so"
 #define	SNAPPY_PATH							\
 	EXTPATH "compressors/snappy/.libs/libwiredtiger_snappy.so"
+
 #define	REVERSE_PATH							\
 	EXTPATH "collators/reverse/.libs/libwiredtiger_reverse_collator.so"
+
+#define	KVS_BDB_PATH							\
+	EXTPATH "test/kvs_bdb/.libs/libwiredtiger_kvs_bdb.so"
+#define	MEMRATA_PATH							\
+	EXTPATH "test/memrata/.libs/libwiredtiger_memrata.so"
 
 #define	LZO_PATH	".libs/lzo_compress.so"
 #define	RAW_PATH	".libs/raw_compress.so"
@@ -65,8 +76,11 @@
 
 #define	WT_NAME	"wt"				/* Object name */
 
-#define	RUNDIR	"RUNDIR"			/* Run home */
+#define	RUNDIR		"RUNDIR"		/* Run home */
+#define	RUNDIR_BACKUP	"RUNDIR/BACKUP"		/* Hot-backup directory */
+#define	RUNDIR_KVS	"RUNDIR/KVS"		/* Run home for data-source */
 
+#define	DATASOURCE(v)	(strcmp(v, g.c_data_source) == 0 ? 1 : 0)
 #define	SINGLETHREADED	(g.c_threads == 1)
 
 typedef struct {
@@ -75,7 +89,8 @@ typedef struct {
 	void *bdb;				/* BDB comparison handle */
 	void *dbc;				/* BDB cursor handle */
 
-	void *wts_conn;				/* WT_CONNECTION handle */
+	WT_CONNECTION	 *wts_conn;
+	WT_EXTENSION_API *wt_api;
 
 	FILE *rand_log;				/* Random number log */
 
@@ -89,6 +104,10 @@ typedef struct {
 
 	int replay;				/* Replaying a run. */
 	int track;				/* Track progress */
+	int threads_finished;			/* Operations completed */
+
+	pthread_rwlock_t backup_lock;		/* Hot backup running */
+	pthread_rwlock_t table_extend_lock;	/* Updating last record */
 
 	char *uri;				/* Object name */
 
@@ -110,9 +129,11 @@ typedef struct {
 	u_int c_cache;
 	char *c_compression;
 	char *c_config_open;
+	u_int c_data_extend;
 	char *c_data_source;
 	u_int c_delete_pct;
 	u_int c_dictionary;
+	u_int c_hot_backups;
 	char *c_file_type;
 	u_int c_huffman_key;
 	u_int c_huffman_value;
@@ -135,25 +156,37 @@ typedef struct {
 	u_int c_value_min;
 	u_int c_write_pct;
 
-	uint32_t key_cnt;			/* Keys loaded so far */
-	uint32_t rows;				/* Total rows */
+	uint64_t key_cnt;			/* Keys loaded so far */
+	uint64_t rows;				/* Total rows */
+
+	/*
+	 * We don't want to get to far past the end of the original bulk
+	 * load, we can run out of space to track the added records.
+	 */
+#define	MAX_EXTEND	(g.c_threads * 3)
+	uint32_t extend;			/* Total extended slots */
+
 	uint16_t key_rand_len[1031];		/* Key lengths */
 } GLOBAL;
 extern GLOBAL g;
 
 typedef struct {
-	uint64_t search;
+	uint64_t search;			/* operations */
 	uint64_t insert;
 	uint64_t update;
 	uint64_t remove;
 
-	int       id;					/* simple thread ID */
-	pthread_t tid;					/* thread ID */
+	uint64_t commit;			/* transaction resolution */
+	uint64_t rollback;
+	uint64_t deadlock;
 
-#define	TINFO_RUNNING	1				/* Running */
-#define	TINFO_COMPLETE	2				/* Finished */
-#define	TINFO_JOINED	3				/* Resolved */
-	volatile int state;				/* state */
+	int       id;				/* simple thread ID */
+	pthread_t tid;				/* thread ID */
+
+#define	TINFO_RUNNING	1			/* Running */
+#define	TINFO_COMPLETE	2			/* Finished */
+#define	TINFO_JOINED	3			/* Resolved */
+	volatile int state;			/* state */
 } TINFO;
 
 void	 bdb_close(void);
@@ -171,6 +204,7 @@ void	 config_print(int);
 void	 config_setup(void);
 void	 config_single(const char *, int);
 void	 die(int, const char *, ...);
+void	*hot_backup(void *);
 void	 key_len_setup(void);
 void	 key_gen_setup(uint8_t **);
 void	 key_gen(uint8_t *, uint32_t *, uint64_t, int);
@@ -179,9 +213,10 @@ void	 track(const char *, uint64_t, TINFO *);
 void	 val_gen_setup(uint8_t **);
 void	 value_gen(uint8_t *, uint32_t *, uint64_t);
 void	 wts_close(void);
+void	 wts_create(void);
 void	 wts_dump(const char *, int);
 void	 wts_load(void);
-void	 wts_open(void);
+void	 wts_open(const char *, int, WT_CONNECTION **);
 void	 wts_ops(void);
 uint32_t wts_rand(void);
 void	 wts_read_scan(void);

@@ -17,16 +17,6 @@ __cursor_set_recno(WT_CURSOR_BTREE *cbt, uint64_t v)
 }
 
 /*
- * __cursor_position_clear --
- *	Forget the current key and value in a cursor.
- */
-static inline void
-__cursor_position_clear(WT_CURSOR_BTREE *cbt)
-{
-	F_CLR(&cbt->iface, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
-}
-
-/*
  * __cursor_search_clear --
  *	Reset the cursor's state for a search.
  */
@@ -66,28 +56,35 @@ __cursor_leave(WT_CURSOR_BTREE *cbt)
 	cursor = &cbt->iface;
 	session = (WT_SESSION_IMPL *)cursor->session;
 
-	/* The key and value may be gone, clear the flags here. */
-	F_CLR(cursor, WT_CURSTD_KEY_RET | WT_CURSTD_VALUE_RET);
-
-	/* Release any page references we're holding. */
-	WT_RET(__wt_page_release(session, cbt->page));
-	cbt->page = NULL;
-
+	/*
+	 * If the cursor was active, decrement the count of active cursors in
+	 * the session.  When that goes to zero, there are no active cursors,
+	 * and we can release any snapshot we're holding for read committed
+	 * isolation.
+	 */
 	if (F_ISSET(cbt, WT_CBT_ACTIVE)) {
 		WT_ASSERT(session, session->ncursors > 0);
 		if (--session->ncursors == 0)
 			__wt_txn_read_last(session);
 		F_CLR(cbt, WT_CBT_ACTIVE);
-
-		/*
-		 * If this is an autocommit operation that is just getting
-		 * started, check that the cache isn't full.  We may have other
-		 * cursors open, but the one we just closed might help eviction
-		 * make progress.
-		 */
-		if (F_ISSET(&session->txn, TXN_AUTOCOMMIT))
-			WT_RET(__wt_cache_full_check(session));
 	}
+
+	/*
+	 * Release any page references we're holding.  This can trigger
+	 * eviction (e.g., forced eviction of big pages), so it is important to
+	 * do it after releasing our snapshot above.
+	 */
+	WT_RET(__wt_page_release(session, cbt->page));
+	cbt->page = NULL;
+
+	/*
+	 * If this is an autocommit operation that is just getting started,
+	 * check that the cache isn't full.  We may have other cursors open,
+	 * but the one we just closed might help eviction make progress.
+	 */
+	if (F_ISSET(&session->txn, TXN_AUTOCOMMIT))
+		WT_RET(__wt_cache_full_check(session, 1));
+
 	return (0);
 }
 
@@ -122,34 +119,27 @@ __cursor_func_init(WT_CURSOR_BTREE *cbt, int reenter)
 }
 
 /*
- * __cursor_func_resolve --
- *	Resolve the cursor's state for return.
+ * __cursor_error_resolve --
+ *	Resolve the cursor's state for return on error.
  */
 static inline int
-__cursor_func_resolve(WT_CURSOR_BTREE *cbt, int ret)
+__cursor_error_resolve(WT_CURSOR_BTREE *cbt)
 {
-	WT_CURSOR *cursor;
-
-	cursor = &cbt->iface;
-
 	/*
-	 * On success, we're returning a key/value pair, and can iterate.
-	 * On error, we're not returning anything, we can't iterate, and
-	 * we should release any page references we're holding.
+	 * On error, we can't iterate, so clear the cursor's position and
+	 * release any page references we're holding.
 	 */
-	if (ret == 0) {
-		F_CLR(cursor, WT_CURSTD_KEY_APP | WT_CURSTD_VALUE_APP);
-		F_SET(cursor, WT_CURSTD_KEY_RET | WT_CURSTD_VALUE_RET);
-	} else {
-		WT_RET(__cursor_leave(cbt));
-		__cursor_search_clear(cbt);
-	}
+	WT_RET(__cursor_leave(cbt));
+
+	/* Clear the cursor's search state. */
+	__cursor_search_clear(cbt);
+
 	return (0);
 }
 
 /*
  * __cursor_row_slot_return --
- *	Return a WT_ROW slot's K/V pair.
+ *	Return a row-store leaf page slot's K/V pair.
  */
 static inline int
 __cursor_row_slot_return(WT_CURSOR_BTREE *cbt, WT_ROW *rip, WT_UPDATE *upd)
@@ -176,11 +166,14 @@ __cursor_row_slot_return(WT_CURSOR_BTREE *cbt, WT_ROW *rip, WT_UPDATE *upd)
 	/*
 	 * Key copied.
 	 *
-	 * If another thread instantiated the key, we don't have any work to do.
-	 * Figure this out using the key's value:
+	 * Get a reference to the key, ideally without doing a copy: we could
+	 * call __wt_row_leaf_key, but if a cursor is running through the tree,
+	 * we actually have more information here than that function has, we
+	 * may have the prefix-compressed key that comes immediately before the
+	 * one we want.
 	 *
-	 * If the key points off-page, the key has been instantiated, just use
-	 * it.
+	 * If the key has been instantiated (the key points off-page), we don't
+	 * have any work to do.
 	 *
 	 * If the key points on-page, we have a copy of a WT_CELL value that can
 	 * be processed, regardless of what any other thread is doing.
@@ -190,12 +183,10 @@ __cursor_row_slot_return(WT_CURSOR_BTREE *cbt, WT_ROW *rip, WT_UPDATE *upd)
 		kb->size = ikey->size;
 	} else {
 		/*
-		 * Get a reference to the key, ideally without doing a copy.  If
-		 * the key is simple and on-page, just reference it; if the key
-		 * is simple, on-page and prefix-compressed, and we have the
-		 * previous expanded key in the cursor buffer, build the key
-		 * here.  Else, call the underlying routines to do it the hard
-		 * way.
+		 * If the key is simple and on-page and not prefix-compressed,
+		 * or we have the previous expanded key in the cursor buffer,
+		 * reference or build it.  Else, call __wt_row_leaf_key_work to
+		 * do it the hard way.
 		 */
 		if (btree->huffman_key != NULL)
 			goto slow;
@@ -230,8 +221,14 @@ __cursor_row_slot_return(WT_CURSOR_BTREE *cbt, WT_ROW *rip, WT_UPDATE *upd)
 			kb->data = cbt->tmp.data;
 			kb->size = cbt->tmp.size;
 			cbt->rip_saved = rip;
-		} else
-slow:			WT_RET(__wt_row_key_copy(session, cbt->page, rip, kb));
+		} else {
+			/*
+			 * __wt_row_leaf_key_work instead of __wt_row_leaf_key:
+			 * we do __wt_row_leaf_key's fast-path checks inline.
+			 */
+slow:			WT_RET(__wt_row_leaf_key_work(
+			    session, cbt->page, rip, kb, 0));
+		}
 	}
 
 	/*
@@ -249,7 +246,8 @@ slow:			WT_RET(__wt_row_key_copy(session, cbt->page, rip, kb));
 		vb->size = 0;
 	} else {
 		__wt_cell_unpack(cell, unpack);
-		WT_RET(__wt_cell_unpack_ref(session, unpack, vb));
+		WT_RET(__wt_cell_unpack_ref(
+		    session, WT_PAGE_ROW_LEAF, unpack, vb));
 	}
 
 	return (0);

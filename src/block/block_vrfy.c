@@ -15,11 +15,11 @@ static int __verify_filefrag_chk(WT_SESSION_IMPL *, WT_BLOCK *);
 static int __verify_last_avail(WT_SESSION_IMPL *, WT_BLOCK *, WT_CKPT *);
 static int __verify_last_truncate(WT_SESSION_IMPL *, WT_BLOCK *, WT_CKPT *);
 
-/* The bit list ignores the first sector: convert to/from a frag/offset. */
+/* The bit list ignores the first block: convert to/from a frag/offset. */
 #define	WT_OFF_TO_FRAG(block, off)					\
-	(((off) - WT_BLOCK_DESC_SECTOR) / (block)->allocsize)
+	((off) / (block)->allocsize - 1)
 #define	WT_FRAG_TO_OFF(block, frag)					\
-	(((off_t)(frag)) * (block)->allocsize + WT_BLOCK_DESC_SECTOR)
+	(((off_t)(frag + 1)) * (block)->allocsize)
 
 /*
  * __wt_block_verify_start --
@@ -29,6 +29,7 @@ int
 __wt_block_verify_start(
     WT_SESSION_IMPL *session, WT_BLOCK *block, WT_CKPT *ckptbase)
 {
+	WT_CKPT *ckpt;
 	WT_FH *fh;
 
 	/*
@@ -37,20 +38,28 @@ __wt_block_verify_start(
 	 * sense if we don't have a checkpoint.
 	 */
 	fh = block->fh;
-	if (fh->file_size == WT_BLOCK_DESC_SECTOR)
+	if (fh->size == block->allocsize)
 		return (0);
-	if (ckptbase[0].name == NULL)
-		WT_RET_MSG(session, WT_ERROR,
-		    "%s has no checkpoints to verify", block->name);
-
-	/* Truncate the file to the size of the last checkpoint. */
-	WT_RET(__verify_last_truncate(session, block, ckptbase));
 
 	/*
-	 * The file size should be a multiple of the allocsize, offset by the
-	 * size of the descriptor sector, the first 512B of the file.
+	 * Find the last checkpoint in the list: if there are none, or the only
+	 * checkpoint we have is fake, there's no work to do.  Don't complain,
+	 * that's not our problem to solve.
 	 */
-	if ((fh->file_size - WT_BLOCK_DESC_SECTOR) % block->allocsize != 0)
+	WT_CKPT_FOREACH(ckptbase, ckpt)
+		;
+	for (;; --ckpt) {
+		if (ckpt->name != NULL && !F_ISSET(ckpt, WT_CKPT_FAKE))
+			break;
+		if (ckpt == ckptbase)
+			return (0);
+	}
+
+	/* Truncate the file to the size of the last checkpoint. */
+	WT_RET(__verify_last_truncate(session, block, ckpt));
+
+	/* The file size should be a multiple of the allocation size. */
+	if (fh->size % block->allocsize != 0)
 		WT_RET_MSG(session, WT_ERROR,
 		    "the file size is not a multiple of the allocation size");
 
@@ -71,7 +80,7 @@ __wt_block_verify_start(
 	 * verify many non-contiguous blocks creating too many entries on the
 	 * list to fit into memory.
 	 */
-	block->frags = (uint64_t)WT_OFF_TO_FRAG(block, fh->file_size);
+	block->frags = (uint64_t)WT_OFF_TO_FRAG(block, fh->size);
 	WT_RET(__bit_alloc(session, block->frags, &block->fragfile));
 
 	/*
@@ -85,7 +94,7 @@ __wt_block_verify_start(
 	 * The only checkpoint avail list we care about is the last one written;
 	 * get it now and initialize the list of file fragments.
 	 */
-	WT_RET(__verify_last_avail(session, block, ckptbase));
+	WT_RET(__verify_last_avail(session, block, ckpt));
 
 	block->verify = 1;
 	return (0);
@@ -97,21 +106,12 @@ __wt_block_verify_start(
  * fragments.
  */
 static int
-__verify_last_avail(
-    WT_SESSION_IMPL *session, WT_BLOCK *block, WT_CKPT *ckptbase)
+__verify_last_avail(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_CKPT *ckpt)
 {
 	WT_BLOCK_CKPT *ci, _ci;
-	WT_CKPT *ckpt;
 	WT_DECL_RET;
 	WT_EXT *ext;
 	WT_EXTLIST *el;
-
-	/* Get the last on-disk checkpoint, if one exists. */
-	WT_CKPT_FOREACH(ckptbase, ckpt)
-		;
-	if (ckpt == ckptbase)
-		return (0);
-	--ckpt;
 
 	ci = &_ci;
 	WT_RET(__wt_block_ckpt_init(session, ci, ckpt->name));
@@ -136,19 +136,10 @@ err:	__wt_block_ckpt_destroy(session, ci);
  *	Truncate the file to the last checkpoint's size.
  */
 static int
-__verify_last_truncate(
-    WT_SESSION_IMPL *session, WT_BLOCK *block, WT_CKPT *ckptbase)
+__verify_last_truncate(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_CKPT *ckpt)
 {
 	WT_BLOCK_CKPT *ci, _ci;
-	WT_CKPT *ckpt;
 	WT_DECL_RET;
-
-	/* Get the last on-disk checkpoint, if one exists. */
-	WT_CKPT_FOREACH(ckptbase, ckpt)
-		;
-	if (ckpt == ckptbase)
-		return (0);
-	--ckpt;
 
 	ci = &_ci;
 	WT_RET(__wt_block_ckpt_init(session, ci, ckpt->name));
@@ -341,7 +332,7 @@ __verify_filefrag_add(WT_SESSION_IMPL *session,
 	    (uintmax_t)offset, (uintmax_t)(offset + size), (uintmax_t)size);
 
 	/* Check each chunk against the total file size. */
-	if (offset + size > block->fh->file_size)
+	if (offset + size > block->fh->size)
 		WT_RET_MSG(session, WT_ERROR,
 		    "fragment %" PRIuMAX "-%" PRIuMAX " references "
 		    "non-existent file blocks",

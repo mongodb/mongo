@@ -28,8 +28,6 @@ __wt_block_ckpt_init(
 	WT_RET(__wt_block_extlist_init(session, &ci->alloc, name, "alloc"));
 	WT_RET(__wt_block_extlist_init(session, &ci->avail, name, "avail"));
 	WT_RET(__wt_block_extlist_init(session, &ci->discard, name, "discard"));
-
-	ci->file_size = WT_BLOCK_DESC_SECTOR;
 	WT_RET(__wt_block_extlist_init(
 	    session, &ci->ckpt_avail, name, "ckpt_avail"));
 
@@ -89,8 +87,13 @@ __wt_block_checkpoint_load(WT_SESSION_IMPL *session, WT_BLOCK *block,
 		WT_ERR(__wt_block_ckpt_init(session, ci, "live"));
 	}
 
-	/* If the checkpoint has an on-disk root page, load it. */
-	if (addr != NULL && addr_size != 0) {
+	/*
+	 * If the checkpoint has an on-disk root page, load it.  Otherwise, size
+	 * the file past the description information.
+	 */
+	if (addr == NULL || addr_size == 0)
+		ci->file_size = block->allocsize;
+	else {
 		/* Crack the checkpoint cookie. */
 		WT_ERR(__wt_block_buffer_to_ckpt(session, block, addr, ci));
 
@@ -114,21 +117,20 @@ __wt_block_checkpoint_load(WT_SESSION_IMPL *session, WT_BLOCK *block,
 			WT_ERR(__wt_block_extlist_read_avail(
 			    session, block, &ci->avail, ci->file_size));
 
-		/*
-		 * If the checkpoint can be written, that means anything written
-		 * after the checkpoint is no longer interesting, truncate the
-		 * file.  Don't bother checking the avail list for a block at
-		 * the end of the file, that was done when the checkpoint was
-		 * first written (re-writing the checkpoint might possibly make
-		 * it relevant here, but it's unlikely enough I don't bother).
-		 */
-		if (!checkpoint) {
-			WT_VERBOSE_ERR(session, ckpt,
-			    "truncate file to %" PRIuMAX,
-			    (uintmax_t)ci->file_size);
-			WT_ERR(
-			    __wt_ftruncate(session, block->fh, ci->file_size));
-		}
+	}
+
+	/*
+	 * If the checkpoint can be written, that means anything written after
+	 * the checkpoint is no longer interesting, truncate the file.  Don't
+	 * bother checking the avail list for a block at the end of the file,
+	 * that was done when the checkpoint was first written (re-writing the
+	 * checkpoint might possibly make it relevant here, but it's unlikely
+	 * enough I don't bother).
+	 */
+	if (!checkpoint) {
+		WT_VERBOSE_ERR(session, ckpt,
+		    "truncate file to %" PRIuMAX, (uintmax_t)ci->file_size);
+		WT_ERR(__wt_ftruncate(session, block->fh, ci->file_size));
 	}
 
 	if (0) {
@@ -158,6 +160,11 @@ __wt_block_checkpoint_unload(
 	if (block->verify)
 		WT_TRET(__wt_verify_ckpt_unload(session, block));
 
+	/* If it's the live system, truncate to discard any extended blocks. */
+	if (!checkpoint)
+		WT_TRET(__wt_ftruncate(session, block->fh, block->fh->size));
+
+	/* If it's the live system, discard the active extent lists. */
 	if (!checkpoint)
 		__wt_block_ckpt_destroy(session, &block->live);
 
@@ -612,7 +619,7 @@ __ckpt_update(
 	 * if there ever is, this will need to be fixed.
 	 */
 	if (is_live)
-		WT_RET(__wt_filesize(session, block->fh, &ci->file_size));
+		ci->file_size = block->fh->size;
 
 	/* Set the checkpoint size for the live system. */
 	if (is_live)

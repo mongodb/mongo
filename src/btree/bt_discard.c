@@ -37,6 +37,11 @@ __wt_page_out(WT_SESSION_IMPL *session, WT_PAGE **pagep)
 	page->parent = NULL;
 	page->ref = NULL;
 
+	/*
+	 * We should never discard the file's current eviction point or a page
+	 * queued for LRU eviction.
+	 */
+	WT_ASSERT(session, S2BT(session)->evict_page != page);
 	WT_ASSERT(session, !F_ISSET_ATOMIC(page, WT_PAGE_EVICT_LRU));
 
 #ifdef HAVE_DIAGNOSTIC
@@ -72,9 +77,12 @@ __wt_page_out(WT_SESSION_IMPL *session, WT_PAGE **pagep)
 		break;
 	}
 
-	/* Free any allocated disk image. */
-	if (!F_ISSET_ATOMIC(page, WT_PAGE_DISK_NOT_ALLOC))
-		__wt_free(session, page->dsk);
+	/* Discard any disk image. */
+	if (F_ISSET_ATOMIC(page, WT_PAGE_DISK_ALLOC))
+		__wt_overwrite_and_free_len(
+		    session, page->dsk, page->dsk->mem_size);
+	if (F_ISSET_ATOMIC(page, WT_PAGE_DISK_MAPPED))
+		__wt_mmap_discard(session, page->dsk, page->dsk->mem_size);
 
 	__wt_overwrite_and_free(session, page);
 }
@@ -97,7 +105,7 @@ __free_page_modify(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 * If the page split, there may one or more pages linked from
 		 * the page; walk the list, discarding pages.
 		 */
-		__wt_page_out(session, &mod->u.split);
+		__wt_page_out(session, &mod->u.split.page);
 		break;
 	case WT_PM_REC_REPLACE:
 		/*
@@ -179,7 +187,7 @@ __free_page_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * so, free it.
 	 */
 	WT_REF_FOREACH(page, ref, i) {
-		if ((ikey = ref->u.key) != NULL)
+		if ((ikey = __wt_ref_key_instantiated(ref)) != NULL)
 			__wt_free(session, ikey);
 		if (ref->addr != NULL &&
 		    __wt_off_page(page, ref->addr)) {

@@ -76,7 +76,7 @@ load(void)
 
 	key = &_key;
 	value = &_value;
-	for (keyno = 0; keyno < nkeys; ++keyno) {
+	for (keyno = 1; keyno <= nkeys; ++keyno) {
 		if (ftype == ROW) {
 			key->data = keybuf;
 			key->size = (uint32_t)

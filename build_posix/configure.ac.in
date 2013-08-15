@@ -72,6 +72,10 @@ fi
 
 if test "$wt_cv_enable_python" = "yes"; then
 	AM_PATH_PYTHON([2.6])
+	if test -n "$with_python_prefix" ; then
+		PYTHON_INSTALL_ARG="-d $with_python_prefix"
+	fi
+	AC_SUBST(PYTHON_INSTALL_ARG)
 fi
 
 AM_TYPES
@@ -83,19 +87,29 @@ AC_CHECK_LIB(pthread, pthread_create)
 AC_CHECK_LIB(dl, dlopen)
 AC_CHECK_LIB(rt, sched_yield)
 AC_CHECK_FUNCS([\
-	clock_gettime fcntl gettimeofday pthread_timedjoin_np posix_fadvise\
-	posix_memalign strtouq sync_file_range])
+	clock_gettime fcntl ftruncate gettimeofday posix_fadvise\
+	posix_fallocate posix_madvise posix_memalign strtouq sync_file_range])
 AC_SYS_LARGEFILE
+
+AC_MSG_CHECKING([if the adaptive mutex type is available])
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <pthread.h>]],[[
+	pthread_mutexattr_t attr;
+	pthread_mutexattr_init(&attr);
+	pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_ADAPTIVE_NP);]])],
+    [AC_MSG_RESULT([yes])
+     AC_DEFINE([HAVE_MUTEX_ADAPTIVE], [1],
+        [Define if adaptive mutexes are supported.])],
+    [AC_MSG_RESULT([no])])
 
 AC_C_BIGENDIAN
 
-# Linux requires _GNU_SOURCE to be defined and buffers aligned to 512 byte
+# Linux requires _GNU_SOURCE to be defined and buffers aligned to 4KB
 # boundaries for O_DIRECT to work.
 BUFFER_ALIGNMENT=0
 if test "$ac_cv_func_posix_memalign" = "yes" ; then
 	case "`uname -s`" in
 	Linux)	AM_CFLAGS="$AM_CFLAGS -D_GNU_SOURCE"
-		BUFFER_ALIGNMENT=512
+		BUFFER_ALIGNMENT=4096
 		;;
 	esac
 fi
@@ -104,8 +118,21 @@ AC_DEFINE_UNQUOTED(WT_BUFFER_ALIGNMENT_DEFAULT, $BUFFER_ALIGNMENT,
 
 AC_SUBST(AM_CFLAGS)
 
-# Is there a link to a BDB tree that we can use for test/format?
-AM_CONDITIONAL([HAVE_BDB], [test -d ../test/format && test -e db])
+# test/format requires an installed Berkeley DB release tree.
+bdbdir=`ls -d "$ac_pwd/db" /usr/local/BerkeleyDB* 2>/dev/null | head -1`
+if ! test -d "$bdbdir" ; then
+	bdbdir="NO_BERKELEY_DB_LIBRARY_FOUND"
+fi
+AM_CONDITIONAL([HAVE_BERKELEY_DB], [test -d $bdbdir])
+AC_SUBST(BERKELEY_DB_PATH, [$bdbdir])
+
+# test/format optionally supports the MEMRATA KVS library.
+memrata_dir=`ls -d "$ac_pwd/memrata" 2>/dev/null | head -1`
+if ! test -d "$memrata_dir" ; then
+	memrata_dir="NO_MEMRATA_LIBRARY_FOUND"
+fi
+AM_CONDITIONAL([HAVE_MEMRATA], [test -d $memrata_dir])
+AC_SUBST(MEMRATA_PATH, [$memrata_dir])
 
 # Warn that diagnostic builds should not be used in production
 if test "$wt_cv_enable_diagnostic" = "yes"; then

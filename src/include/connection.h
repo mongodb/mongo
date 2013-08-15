@@ -60,6 +60,11 @@ struct __wt_named_data_source {
 #define	WT_NUM_INTERNAL_SESSIONS	2
 
 /*
+ * Periodically clear out unused dhandles from the connection list.
+ */
+#define	CONN_DHANDLE_SWEEP_TRIGGER	10
+
+/*
  * WT_CONNECTION_IMPL --
  *	Implementation of WT_CONNECTION
  */
@@ -71,8 +76,8 @@ struct __wt_connection_impl {
 	WT_SESSION_IMPL  dummy_session;
 
 	WT_SPINLOCK api_lock;		/* Connection API spinlock */
+	WT_SPINLOCK checkpoint_lock;	/* Checkpoint spinlock */
 	WT_SPINLOCK fh_lock;		/* File handle queue spinlock */
-	WT_SPINLOCK metadata_lock;	/* Metadata spinlock */
 	WT_SPINLOCK schema_lock;	/* Schema operation spinlock */
 	WT_SPINLOCK serial_lock;	/* Serial function call spinlock */
 
@@ -82,15 +87,25 @@ struct __wt_connection_impl {
 	TAILQ_ENTRY(__wt_connection_impl) cpq;
 
 	const char *home;		/* Database home */
+	const char *error_prefix;	/* Database error prefix */
 	int is_new;			/* Connection created database */
 
-	int connection_initialized;	/* Connection is initialized */
+	WT_EXTENSION_API extension_api;	/* Extension API */
+
+					/* Configuration */
+	const WT_CONFIG_ENTRY **config_entries;
+
+	void  **foc;			/* Free-on-close array */
+	size_t  foc_cnt;		/* Array entries */
+	size_t  foc_size;		/* Array size */
 
 	WT_FH *lock_fh;			/* Lock file handle */
 
 	pthread_t cache_evict_tid;	/* Eviction server thread ID */
 	int	  cache_evict_tid_set;	/* Eviction server thread ID set */
 
+	int32_t	dhandle_dead;		/* Not locked: dead dhandles seen */
+	WT_SPINLOCK dhandle_lock;	/* Locked: dhandle sweep */
 					/* Locked: data handle list */
 	TAILQ_HEAD(__wt_dhandle_qh, __wt_data_handle) dhqh;
 					/* Locked: LSM handle list. */
@@ -132,7 +147,8 @@ struct __wt_connection_impl {
 
 	WT_TXN_GLOBAL txn_global;	/* Global transaction state */
 
-	int ckpt_backup;		/* Backup: don't delete checkpoints */
+	WT_SPINLOCK hot_backup_lock;	/* Hot backup serialization */
+	int hot_backup;
 
 	WT_SESSION_IMPL *ckpt_session;	/* Checkpoint thread session */
 	pthread_t	 ckpt_tid;	/* Checkpoint thread */
@@ -156,7 +172,15 @@ struct __wt_connection_impl {
 	const char	*stat_stamp;	/* Statistics log entry timestamp */
 	long		 stat_usecs;	/* Statistics log period */
 
-	WT_FH	   *log_fh;		/* Logging file handle */
+	int		 logging;	/* Global logging configuration */
+	int		 archive;	/* Global archive configuration */
+	WT_CONDVAR	*arch_cond;	/* Log archive wait mutex */
+	WT_SESSION_IMPL *arch_session;	/* Log archive session */
+	pthread_t	 arch_tid;	/* Log archive thread */
+	int		 arch_tid_set;	/* Log archive thread set */
+	WT_LOG		*log;		/* Logging structure */
+	off_t		log_file_max;	/* Log file max size */
+	const char	*log_path;	/* Logging path format */
 
 					/* Locked: collator list */
 	TAILQ_HEAD(__wt_coll_qh, __wt_named_collator) collqh;
@@ -167,15 +191,15 @@ struct __wt_connection_impl {
 					/* Locked: data source list */
 	TAILQ_HEAD(__wt_dsrc_qh, __wt_named_data_source) dsrcqh;
 
-	FILE *msgfile;
-	void (*msgcall)(const WT_CONNECTION_IMPL *, const char *);
-
 	/* If non-zero, all buffers used for I/O will be aligned to this. */
 	size_t buffer_alignment;
 
 	uint32_t schema_gen;		/* Schema generation number */
 
-	uint32_t direct_io;		/* O_DIRECT configuration */
+	off_t	 data_extend_len;	/* file_extend data length */
+	off_t	 log_extend_len;	/* file_extend log length */
+
+	uint32_t direct_io;		/* O_DIRECT file type flags */
 	int	 mmap;			/* mmap configuration */
 	uint32_t verbose;
 

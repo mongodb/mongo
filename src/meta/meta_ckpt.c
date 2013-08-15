@@ -30,7 +30,7 @@ __wt_meta_checkpoint(WT_SESSION_IMPL *session,
 	config = NULL;
 
 	/* Retrieve the metadata entry for the file. */
-	WT_ERR(__wt_metadata_read(session, fname, &config));
+	WT_ERR(__wt_metadata_search(session, fname, &config));
 
 	/* Check the major/minor version numbers. */
 	WT_ERR(__ckpt_version_chk(session, fname, config));
@@ -69,7 +69,7 @@ __wt_meta_checkpoint_last_name(
 	config = NULL;
 
 	/* Retrieve the metadata entry for the file. */
-	WT_ERR(__wt_metadata_read(session, fname, &config));
+	WT_ERR(__wt_metadata_search(session, fname, &config));
 
 	/* Check the major/minor version numbers. */
 	WT_ERR(__ckpt_version_chk(session, fname, config));
@@ -111,7 +111,7 @@ __ckpt_set(WT_SESSION_IMPL *session, const char *fname, const char *v)
 	config = newcfg = NULL;
 
 	/* Retrieve the metadata for this file. */
-	WT_ERR(__wt_metadata_read(session, fname, &config));
+	WT_ERR(__wt_metadata_search(session, fname, &config));
 
 	/* Replace the checkpoint entry. */
 	cfg[0] = config;
@@ -263,16 +263,15 @@ __wt_meta_ckptlist_get(
 	config = NULL;
 
 	/* Retrieve the metadata information for the file. */
-	WT_RET(__wt_metadata_read(session, fname, &config));
+	WT_RET(__wt_metadata_search(session, fname, &config));
 
 	/* Load any existing checkpoints into the array. */
 	WT_ERR(__wt_scr_alloc(session, 0, &buf));
 	if (__wt_config_getones(session, config, "checkpoint", &v) == 0 &&
 	    __wt_config_subinit(session, &ckptconf, &v) == 0)
 		for (; __wt_config_next(&ckptconf, &k, &v) == 0; ++slot) {
-			if (slot * sizeof(WT_CKPT) == allocated)
-				WT_ERR(__wt_realloc(session, &allocated,
-				    (slot + 50) * sizeof(WT_CKPT), &ckptbase));
+			WT_ERR(__wt_realloc_def(
+			    session, &allocated, slot + 1, &ckptbase));
 			ckpt = &ckptbase[slot];
 
 			WT_ERR(__ckpt_load(session, &k, &v, ckpt));
@@ -288,9 +287,7 @@ __wt_meta_ckptlist_get(
 	 * checkpoint).  All of that cooperation is handled in the WT_CKPT
 	 * structure referenced from the WT_BTREE structure.
 	 */
-	if ((slot + 2) * sizeof(WT_CKPT) > allocated)
-		WT_ERR(__wt_realloc(session, &allocated,
-		    (slot + 2) * sizeof(WT_CKPT), &ckptbase));
+	WT_ERR(__wt_realloc_def(session, &allocated, slot + 2, &ckptbase));
 
 	/* Sort in creation-order. */
 	qsort(ckptbase, slot, sizeof(WT_CKPT), __ckpt_compare_order);
@@ -504,11 +501,21 @@ __ckpt_version_chk(
 	WT_RET(__wt_config_subgets(session, &v, "minor", &a));
 	minorv = (int)a.val;
 
-	if (majorv > WT_BTREE_MAJOR_VERSION ||
-	    (majorv == WT_BTREE_MAJOR_VERSION &&
-	    minorv > WT_BTREE_MINOR_VERSION))
+	if (majorv < WT_BTREE_MAJOR_VERSION_MIN ||
+	    majorv > WT_BTREE_MAJOR_VERSION_MAX ||
+	    (majorv == WT_BTREE_MAJOR_VERSION_MIN &&
+	    minorv < WT_BTREE_MINOR_VERSION_MIN) ||
+	    (majorv == WT_BTREE_MAJOR_VERSION_MAX &&
+	    minorv > WT_BTREE_MINOR_VERSION_MAX))
 		WT_RET_MSG(session, EACCES,
-		    "%s is an unsupported version of a WiredTiger file",
-		    fname);
+		    "%s is an unsupported WiredTiger source file version %d.%d"
+		    "; this WiredTiger build only supports versions from %d.%d "
+		    "to %d.%d",
+		    fname,
+		    majorv, minorv,
+		    WT_BTREE_MAJOR_VERSION_MIN,
+		    WT_BTREE_MINOR_VERSION_MIN,
+		    WT_BTREE_MAJOR_VERSION_MAX,
+		    WT_BTREE_MINOR_VERSION_MAX);
 	return (0);
 }

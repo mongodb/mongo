@@ -31,8 +31,8 @@
  * a type guaranteed to be written atomically in a single cycle, without writing
  * an adjacent memory location.
  *
- * WiredTiger doesn't require atomic writes for any 64-bit memory locations and
- * can run on machines with a 32-bit memory bus.
+ * WiredTiger additionally requires atomic writes for 64-bit memory locations,
+ * and so cannot run on machines with a 32-bit memory bus.
  *
  * We don't depend on writes across cache lines being atomic, and to make sure
  * that never happens, we check address alignment: we know of no architectures
@@ -73,6 +73,9 @@
 #define	WT_ATOMIC_ADD(v, val)	((v) += (val), (v))
 #define	WT_ATOMIC_CAS(v, oldv, newv)					\
 	((v) == (oldv) && (v) = (newv) ? 1 : 0)
+#define	WT_ATOMIC_CAS_VAL(v, oldv, newv)				\
+	((v) == (oldv) && (v) = (newv) ? (oldv) : (v))
+#define	WT_ATOMIC_STORE(v, val)	((v) = (val))
 #define	WT_ATOMIC_SUB(v, val)	((v) -= (val), (v))
 #define	WT_FULL_BARRIER()
 #define	WT_READ_BARRIER()
@@ -83,6 +86,10 @@
 	__sync_add_and_fetch(&(v), val)
 #define	WT_ATOMIC_CAS(v, oldv, newv)					\
 	__sync_bool_compare_and_swap(&(v), oldv, newv)
+#define	WT_ATOMIC_CAS_VAL(v, oldv, newv)				\
+	__sync_val_compare_and_swap(&(v), oldv, newv)
+#define	WT_ATOMIC_STORE(v, val)						\
+	__sync_lock_test_and_set(&(v), val)
 #define	WT_ATOMIC_SUB(v, val)						\
 	__sync_sub_and_fetch(&(v), val)
 

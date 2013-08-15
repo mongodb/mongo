@@ -8,6 +8,52 @@
 #include "wt_internal.h"
 
 /*
+ * __wt_bm_preload --
+ *	Pre-load a page.
+ */
+int
+__wt_bm_preload(WT_BM *bm,
+    WT_SESSION_IMPL *session, const uint8_t *addr, uint32_t addr_size)
+{
+	WT_BLOCK *block;
+	WT_DECL_RET;
+	off_t offset;
+	uint32_t cksum, size;
+	int mapped;
+
+	WT_UNUSED(addr_size);
+	block = bm->block;
+
+	/* Crack the cookie. */
+	WT_RET(__wt_block_buffer_to_addr(block, addr, &offset, &size, &cksum));
+
+	/* Check for a mapped block. */
+	mapped = bm->map != NULL && offset + size <= (off_t)bm->maplen;
+	if (mapped)
+		WT_RET(__wt_mmap_preload(
+		    session, (uint8_t *)bm->map + offset, size));
+	else {
+#ifdef HAVE_POSIX_FADVISE
+		if ((ret = posix_fadvise(block->fh->fd,
+		    (off_t)offset, (off_t)size, POSIX_FADV_WILLNEED)) != 0)
+			WT_RET_MSG(
+			    session, ret, "%s: posix_fadvise", block->name);
+#else
+		WT_DECL_ITEM(tmp);
+		WT_RET(__wt_scr_alloc(session, size, &tmp));
+		ret = __wt_block_read_off(
+		    session, block, tmp, offset, size, cksum);
+		__wt_scr_free(&tmp);
+		WT_RET(ret);
+#endif
+	}
+
+	WT_CSTAT_INCR(session, block_preload);
+
+	return (0);
+}
+
+/*
  * __wt_bm_read --
  *	Map or read address cookie referenced block into a buffer.
  */
@@ -16,9 +62,9 @@ __wt_bm_read(WT_BM *bm, WT_SESSION_IMPL *session,
     WT_ITEM *buf, const uint8_t *addr, uint32_t addr_size)
 {
 	WT_BLOCK *block;
-	off_t offset;
-	uint32_t size, cksum;
 	int mapped;
+	off_t offset;
+	uint32_t cksum, size;
 
 	WT_UNUSED(addr_size);
 	block = bm->block;
@@ -48,6 +94,7 @@ __wt_bm_read(WT_BM *bm, WT_SESSION_IMPL *session,
 		buf->data = buf->mem;
 		buf->size = size;
 		F_SET(buf, WT_ITEM_MAPPED);
+		WT_RET(__wt_mmap_preload(session, buf->mem, buf->size));
 
 		WT_CSTAT_INCR(session, block_map_read);
 		WT_CSTAT_INCRV(session, block_byte_map_read, size);

@@ -32,7 +32,8 @@ __wt_search_insert(WT_SESSION_IMPL *session,
 	/* Fast-path appends. */
 	insert_key.data = WT_INSERT_KEY(ret_ins);
 	insert_key.size = WT_INSERT_KEY_SIZE(ret_ins);
-	WT_RET(WT_BTREE_CMP(session, btree, srch_key, &insert_key, cmp));
+	WT_RET(
+	    WT_LEX_CMP(session, btree->collator, srch_key, &insert_key, cmp));
 	if (cmp >= 0) {
 		/*
 		 * XXX We may race with another appending thread.
@@ -74,8 +75,8 @@ __wt_search_insert(WT_SESSION_IMPL *session,
 			last_ins = ret_ins;
 			insert_key.data = WT_INSERT_KEY(ret_ins);
 			insert_key.size = WT_INSERT_KEY_SIZE(ret_ins);
-			WT_RET(WT_BTREE_CMP(
-			    session, btree, srch_key, &insert_key, cmp));
+			WT_RET(WT_LEX_CMP(session,
+			    btree->collator, srch_key, &insert_key, cmp));
 		}
 
 		if (cmp > 0)		/* Keep going at this level */
@@ -109,12 +110,11 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 {
 	WT_BTREE *btree;
 	WT_DECL_RET;
-	WT_IKEY *ikey;
 	WT_ITEM *item, _item, *srch_key;
 	WT_PAGE *page;
 	WT_REF *ref;
 	WT_ROW *rip;
-	uint32_t base, indx, limit;
+	uint32_t base, indx, limit, match, skiphigh, skiplow;
 	int cmp, depth;
 
 	__cursor_search_clear(cbt);
@@ -124,9 +124,11 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 	btree = S2BT(session);
 	rip = NULL;
 
+	item = &_item;
+	WT_CLEAR(_item);
+
 	/* Search the internal pages of the tree. */
 	cmp = -1;
-	item = &_item;
 	for (depth = 2,
 	    page = btree->root_page; page->type == WT_PAGE_ROW_INT; ++depth) {
 		/*
@@ -139,15 +141,23 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 			goto descend;
 
 		/* Fast-path appends. */
-		ikey = ref->u.key;
-		item->data = WT_IKEY_DATA(ikey);
-		item->size = ikey->size;
-
-		WT_ERR(WT_BTREE_CMP(session, btree, srch_key, item, cmp));
+		__wt_ref_key(page, ref, &item->data, &item->size);
+		WT_ERR(
+		    WT_LEX_CMP(session, btree->collator, srch_key, item, cmp));
 		if (cmp >= 0)
 			goto descend;
 
-		/* Binary search of internal pages. */
+		/*
+		 * Binary search of internal pages.
+		 *
+		 * The row-store search routine uses a different comparison API.
+		 * The assumption is we're comparing more than a few keys with
+		 * matching prefixes, and it's a win to avoid the memory fetches
+		 * by skipping over those prefixes.  That's done by tracking the
+		 * length of the prefix match for the lowest and highest keys we
+		 * compare.
+		 */
+		skiphigh = skiplow = 0;
 		for (base = 0, ref = NULL,
 		    limit = page->entries - 1; limit != 0; limit >>= 1) {
 			indx = base + (limit >> 1);
@@ -161,16 +171,19 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 			 * application stores a new, "smallest" key in the tree.
 			 */
 			if (indx != 0) {
-				ikey = ref->u.key;
-				item->data = WT_IKEY_DATA(ikey);
-				item->size = ikey->size;
-
-				WT_ERR(WT_BTREE_CMP(
-				    session, btree, srch_key, item, cmp));
+				__wt_ref_key(
+				    page, ref, &item->data, &item->size);
+				match = WT_MIN(skiplow, skiphigh);
+				WT_ERR(WT_LEX_CMP_SKIP(
+				    session, btree->collator,
+				    srch_key, item, cmp, &match));
 				if (cmp == 0)
 					break;
-				if (cmp < 0)
+				if (cmp < 0) {
+					skiplow = match;
 					continue;
+				}
+				skiphigh = match;
 			}
 			base = indx + 1;
 			--limit;
@@ -227,19 +240,40 @@ descend:	WT_ASSERT(session, ref != NULL);
 	 * the comparison value.
 	 */
 	cmp = -1;
+	skiphigh = skiplow = 0;			/* See internal loop comment. */
 	for (base = 0, limit = page->entries; limit != 0; limit >>= 1) {
 		indx = base + (limit >> 1);
 		rip = page->u.row.d + indx;
 
-		WT_ERR(__wt_row_key(session, page, rip, item, 1));
-		WT_ERR(WT_BTREE_CMP(session, btree, srch_key, item, cmp));
+		WT_ERR(__wt_row_leaf_key(session, page, rip, item, 1));
+		match = WT_MIN(skiplow, skiphigh);
+		WT_ERR(WT_LEX_CMP_SKIP(
+		    session, btree->collator, srch_key, item, cmp, &match));
 		if (cmp == 0)
 			break;
-		if (cmp < 0)
+		if (cmp < 0) {
+			skiplow = match;
 			continue;
+		}
 
+		skiphigh = match;
 		base = indx + 1;
 		--limit;
+	}
+
+	/*
+	 * We don't expect the search item to have any allocated memory (it's a
+	 * performance problem if it does).  Trust, but verify, and complain if
+	 * there's a problem.
+	 */
+	if (item->mem != NULL) {
+		static int complain = 1;
+		if (complain) {
+			__wt_errx(session,
+			    "unexpected key item memory allocation in search");
+			complain = 0;
+		}
+		__wt_buf_free(session, item);
 	}
 
 	/*

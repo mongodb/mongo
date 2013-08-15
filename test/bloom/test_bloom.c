@@ -76,7 +76,7 @@ main(int argc, char *argv[])
 		++g.progname;
 
 	/* Configure the FreeBSD malloc for debugging. */
-	(void)setenv("MALLOC_OPTIONS", "AJZ", 1);
+	(void)setenv("MALLOC_OPTIONS", "AJ", 1);
 
 	/* Set default configuration values. */
 	g.c_cache = 10;
@@ -173,7 +173,6 @@ int run(void)
 	    sess, uri, NULL, g.c_ops, g.c_factor, g.c_k, &bloomp)) != 0)
 		die(ret, "__wt_bloom_create");
 
-	memset(&item, 0, sizeof(item));
 	item.size = g.c_key_max;
 	for (i = 0; i < g.c_ops; i++) {
 		item.data = g.entries[i];

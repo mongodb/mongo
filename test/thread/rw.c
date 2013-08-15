@@ -116,7 +116,7 @@ rw_start(u_int readers, u_int writers)
  *	Read operation.
  */
 static inline void
-reader_op(WT_CURSOR *cursor)
+reader_op(WT_SESSION *session, WT_CURSOR *cursor)
 {
 	WT_ITEM *key, _key;
 	u_int keyno;
@@ -125,7 +125,7 @@ reader_op(WT_CURSOR *cursor)
 
 	key = &_key;
 
-	keyno = r() % nkeys;
+	keyno = r() % nkeys + 1;
 	if (ftype == ROW) {
 		key->data = keybuf;
 		key->size = (uint32_t)
@@ -135,6 +135,9 @@ reader_op(WT_CURSOR *cursor)
 		cursor->set_key(cursor, (uint32_t)keyno);
 	if ((ret = cursor->search(cursor)) != 0 && ret != WT_NOTFOUND)
 		die("cursor.search", ret);
+	if (log_print)
+		(void)session->log_printf(session,
+		    "Reader Thread %p key %017u", pthread_self(), keyno);
 }
 
 /*
@@ -166,7 +169,7 @@ reader(void *arg)
 			if ((ret = session->open_cursor(
 			    session, FNAME, NULL, NULL, &cursor)) != 0)
 				die("session.open_cursor", ret);
-			reader_op(cursor);
+			reader_op(session, cursor);
 			if ((ret = session->close(session, NULL)) != 0)
 				die("session.close", ret);
 		}
@@ -178,7 +181,7 @@ reader(void *arg)
 		    session, FNAME, NULL, NULL, &cursor)) != 0)
 			die("session.open_cursor", ret);
 		for (i = 0; i < nops; ++i, ++s->reads, sched_yield())
-			reader_op(cursor);
+			reader_op(session, cursor);
 		if ((ret = session->close(session, NULL)) != 0)
 			die("session.close", ret);
 	}
@@ -191,7 +194,7 @@ reader(void *arg)
  *	Write operation.
  */
 static inline void
-writer_op(WT_CURSOR *cursor, STATS *s)
+writer_op(WT_SESSION *session, WT_CURSOR *cursor, STATS *s)
 {
 	WT_ITEM *key, _key, *value, _value;
 	u_int keyno;
@@ -201,7 +204,7 @@ writer_op(WT_CURSOR *cursor, STATS *s)
 	key = &_key;
 	value = &_value;
 
-	keyno = r() % nkeys;
+	keyno = r() % nkeys + 1;
 	if (ftype == ROW) {
 		key->data = keybuf;
 		key->size = (uint32_t)
@@ -227,6 +230,9 @@ writer_op(WT_CURSOR *cursor, STATS *s)
 		if ((ret = cursor->update(cursor)) != 0)
 			die("cursor.update", ret);
 	}
+	if (log_print)
+		(void)session->log_printf(session,
+		    "Writer Thread %p key %017u", pthread_self(), keyno);
 }
 
 /*
@@ -258,7 +264,7 @@ writer(void *arg)
 			if ((ret = session->open_cursor(
 			    session, FNAME, NULL, NULL, &cursor)) != 0)
 				die("session.open_cursor", ret);
-			writer_op(cursor, s);
+			writer_op(session, cursor, s);
 			if ((ret = session->close(session, NULL)) != 0)
 				die("session.close", ret);
 		}
@@ -270,7 +276,7 @@ writer(void *arg)
 		    session, FNAME, NULL, NULL, &cursor)) != 0)
 			die("session.open_cursor", ret);
 		for (i = 0; i < nops; ++i, sched_yield())
-			writer_op(cursor, s);
+			writer_op(session, cursor, s);
 		if ((ret = session->close(session, NULL)) != 0)
 			die("session.close", ret);
 	}

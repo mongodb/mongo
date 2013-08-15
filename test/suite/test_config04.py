@@ -73,7 +73,7 @@ class test_config04(wttest.WiredTigerTestCase):
         Call wiredtiger_open and run a simple test.
         configextra are any extra configuration strings needed on the open.
         """
-        configarg = 'create'
+        configarg = 'create,statistics'
         if configextra != None:
             configarg += ',' + configextra
         self.conn = wiredtiger.wiredtiger_open('.', configarg)
@@ -87,10 +87,10 @@ class test_config04(wttest.WiredTigerTestCase):
         cursor.close()
 
     def test_bad_config(self):
+        msg = '/unknown configuration key/'
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: wiredtiger.wiredtiger_open('.', 'not_valid,another_bad=10'),
-            "wiredtiger_open: Unknown configuration key"
-            " found: 'not_valid': Invalid argument\n")
+            msg)
 
     def test_cache_size_number(self):
         # Use a number without multipliers
@@ -168,12 +168,13 @@ class test_config04(wttest.WiredTigerTestCase):
         # TODO: how do we verify that it was set?
 
     def test_logging(self):
-        # Note: this will have functional tests in the future.
-        self.common_test('logging')
+        self.common_test('log=(enabled=true)')
+        # TODO: how do we verify that it was set?  For this we could look
+        # for the existence of the log file in the home dir.
 
     def test_transactional(self):
         # Note: this will have functional tests in the future.
-        self.common_test('transactional')
+        self.common_test('')
 
 if __name__ == '__main__':
     wttest.run()

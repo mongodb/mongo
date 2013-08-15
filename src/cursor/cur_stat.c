@@ -80,6 +80,8 @@ __curstat_get_value(WT_CURSOR *cursor, ...)
 	WT_SESSION_IMPL *session;
 	va_list ap;
 	size_t size;
+	uint64_t *v;
+	const char **p;
 
 	cst = (WT_CURSOR_STAT *)cursor;
 	va_start(ap, cursor);
@@ -99,9 +101,16 @@ __curstat_get_value(WT_CURSOR *cursor, ...)
 		item->data = cursor->value.data;
 		item->size = cursor->value.size;
 	} else {
-		*va_arg(ap, const char **) = cst->stats_first[cst->key].desc;
-		*va_arg(ap, const char **) = cst->pv.data;
-		*va_arg(ap, uint64_t *) = cst->v;
+		/*
+		 * Don't drop core if the statistics value isn't requested; NULL
+		 * pointer support isn't documented, but it's a cheap test.
+		 */
+		if ((p = va_arg(ap, const char **)) != NULL)
+			*p = cst->stats_first[cst->key].desc;
+		if ((p = va_arg(ap, const char **)) != NULL)
+			*p = cst->pv.data;
+		if ((v = va_arg(ap, uint64_t *)) != NULL)
+			*v = cst->v;
 	}
 
 err:	va_end(ap);
@@ -136,7 +145,7 @@ __curstat_set_key(WT_CURSOR *cursor, ...)
 	va_end(ap);
 
 	if ((cursor->saved_err = ret) == 0)
-		F_SET(cursor, WT_CURSTD_KEY_APP);
+		F_SET(cursor, WT_CURSTD_KEY_EXT);
 
 err:	API_END(session);
 }
@@ -178,7 +187,7 @@ __curstat_next(WT_CURSOR *cursor)
 	}
 	cst->v = cst->stats_first[cst->key].v;
 	WT_ERR(__curstat_print_value(session, cst->v, &cst->pv));
-	F_SET(cursor, WT_CURSTD_KEY_RET | WT_CURSTD_VALUE_RET);
+	F_SET(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);
 
 err:	API_END(session);
 	return (ret);
@@ -205,13 +214,13 @@ __curstat_prev(WT_CURSOR *cursor)
 	} else if (cst->key > 0)
 		--cst->key;
 	else {
-		F_CLR(cursor, WT_CURSTD_KEY_RET | WT_CURSTD_VALUE_RET);
+		F_CLR(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);
 		WT_ERR(WT_NOTFOUND);
 	}
 
 	cst->v = cst->stats_first[cst->key].v;
 	WT_ERR(__curstat_print_value(session, cst->v, &cst->pv));
-	F_SET(cursor, WT_CURSTD_KEY_RET | WT_CURSTD_VALUE_RET);
+	F_SET(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);
 
 err:	API_END(session);
 	return (ret);
@@ -260,7 +269,7 @@ __curstat_search(WT_CURSOR *cursor)
 
 	cst->v = cst->stats_first[cst->key].v;
 	WT_ERR(__curstat_print_value(session, cst->v, &cst->pv));
-	F_SET(cursor, WT_CURSTD_KEY_RET | WT_CURSTD_VALUE_RET);
+	F_SET(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);
 
 err:	API_END(session);
 	return (ret);
@@ -412,13 +421,16 @@ __wt_curstat_open(WT_SESSION_IMPL *session,
 	WT_DECL_RET;
 	uint32_t flags;
 
+	STATIC_ASSERT(offsetof(WT_CURSOR_STAT, iface) == 0);
+
 	cst = NULL;
 	flags = 0;
 
-	WT_RET(__wt_config_gets_defno(session, cfg, "statistics_clear", &cval));
+	WT_RET(
+	    __wt_config_gets_def(session, cfg, "statistics_clear", 0, &cval));
 	if (cval.val != 0)
 		LF_SET(WT_STATISTICS_CLEAR);
-	WT_RET(__wt_config_gets_defno(session, cfg, "statistics_fast", &cval));
+	WT_RET(__wt_config_gets_def(session, cfg, "statistics_fast", 0, &cval));
 	if (cval.val != 0)
 		LF_SET(WT_STATISTICS_FAST);
 
@@ -437,7 +449,6 @@ __wt_curstat_open(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_curstat_init(session, uri, cfg, cst, flags));
 
 	/* __wt_cursor_init is last so we don't have to clean up on error. */
-	STATIC_ASSERT(offsetof(WT_CURSOR_STAT, iface) == 0);
 	WT_ERR(__wt_cursor_init(cursor, uri, NULL, cfg, cursorp));
 
 	if (0) {

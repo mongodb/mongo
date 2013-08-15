@@ -89,6 +89,7 @@ __conn_dhandle_get(WT_SESSION_IMPL *session,
 	WT_CONNECTION_IMPL *conn;
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
+	uint64_t hash;
 
 	conn = S2C(session);
 
@@ -96,15 +97,18 @@ __conn_dhandle_get(WT_SESSION_IMPL *session,
 	WT_ASSERT(session, F_ISSET(session, WT_SESSION_SCHEMA_LOCKED));
 
 	/* Increment the reference count if we already have the btree open. */
+	hash = __wt_hash_city64(name, strlen(name));
 	TAILQ_FOREACH(dhandle, &conn->dhqh, q)
-		if (strcmp(name, dhandle->name) == 0 &&
+		if ((hash == dhandle->name_hash &&
+		     strcmp(name, dhandle->name) == 0) &&
 		    ((ckpt == NULL && dhandle->checkpoint == NULL) ||
 		    (ckpt != NULL && dhandle->checkpoint != NULL &&
 		    strcmp(ckpt, dhandle->checkpoint) == 0))) {
+			WT_RET(__conn_dhandle_open_lock(
+			    session, dhandle, flags));
 			++dhandle->refcnt;
 			session->dhandle = dhandle;
-			return (__conn_dhandle_open_lock(
-			    session, dhandle, flags));
+			return (0);
 		}
 
 	/*
@@ -125,9 +129,16 @@ __conn_dhandle_get(WT_SESSION_IMPL *session,
 	    (ret = __wt_writelock(session, dhandle->rwlock)) == 0) {
 		F_SET(dhandle, WT_DHANDLE_EXCLUSIVE);
 
-		/* Add to the connection list. */
+		dhandle->name_hash = hash;
+		/*
+		 * Add the handle to the connection list.
+		 *
+		 * Put it at the beginning on the basis that we're likely to
+		 * need new files again soon until they are cached by all
+		 * sessions.
+		 */
 		dhandle->refcnt = 1;
-		TAILQ_INSERT_TAIL(&conn->dhqh, dhandle, q);
+		TAILQ_INSERT_HEAD(&conn->dhqh, dhandle, q);
 	}
 
 	if (ret == 0)
@@ -183,7 +194,7 @@ __wt_conn_btree_sync_and_close(WT_SESSION_IMPL *session)
 	ckpt_lock = 0;
 	if (F_ISSET(btree, WT_BTREE_BULK)) {
 		ckpt_lock = 1;
-		__wt_spin_lock(session, &S2C(session)->metadata_lock);
+		__wt_spin_lock(session, &S2C(session)->checkpoint_lock);
 	}
 
 	if (!F_ISSET(btree,
@@ -195,7 +206,7 @@ __wt_conn_btree_sync_and_close(WT_SESSION_IMPL *session)
 	F_CLR(btree, WT_BTREE_SPECIAL_FLAGS);
 
 	if (ckpt_lock)
-		__wt_spin_unlock(session, &S2C(session)->metadata_lock);
+		__wt_spin_unlock(session, &S2C(session)->checkpoint_lock);
 
 	return (ret);
 }
@@ -237,7 +248,7 @@ __conn_btree_config_set(WT_SESSION_IMPL *session)
 	 * don't find one.
 	 */
 	if ((ret =
-	    __wt_metadata_read(session, dhandle->name, &metaconf)) != 0) {
+	    __wt_metadata_search(session, dhandle->name, &metaconf)) != 0) {
 		if (ret == WT_NOTFOUND)
 			ret = ENOENT;
 		WT_RET(ret);
@@ -257,7 +268,8 @@ __conn_btree_config_set(WT_SESSION_IMPL *session)
 	 * it, after the copy, we don't want to free it.
 	 */
 	WT_ERR(__wt_calloc_def(session, 3, &dhandle->cfg));
-	WT_ERR(__wt_strdup(session, __wt_confdfl_file_meta, &dhandle->cfg[0]));
+	WT_ERR(__wt_strdup(
+	    session, WT_CONFIG_BASE(session, file_meta), &dhandle->cfg[0]));
 	dhandle->cfg[1] = metaconf;
 	metaconf = NULL;
 	return (0);
@@ -329,6 +341,64 @@ err:		F_CLR(btree, WT_BTREE_SPECIAL_FLAGS);
 }
 
 /*
+ * __conn_dhandle_sweep --
+ *	Close and clean up any unused dhandles on the connection dhandle list.
+ *	We hold a spin lock to coordinate walking this list with eviction.
+ *	Put unused dhandles on a private list and unlock for eviction.
+ */
+static int
+__conn_dhandle_sweep(WT_SESSION_IMPL *session)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_DATA_HANDLE *dhandle, *dhandle_next, *save_dhandle;
+	TAILQ_HEAD(__wt_dhandle_qh, __wt_data_handle) sweepqh;
+	WT_DECL_RET;
+
+	conn = S2C(session);
+	/*
+	 * Coordinate with eviction or other threads sweeping.  If the lock
+	 * is not free, we're done.  Cleaning up the list is a best effort only.
+	 */
+	if (__wt_spin_trylock(session, &conn->dhandle_lock) != 0) {
+		WT_CSTAT_INCR(session, dh_sweep_evict);
+		return (0);
+	}
+	/*
+	 * Move dead items off the list onto a local list and unlock the
+	 * lock so that eviction can be unblocked.
+	 */
+	TAILQ_INIT(&sweepqh);
+	dhandle = TAILQ_FIRST(&conn->dhqh);
+	while (dhandle != NULL) {
+		dhandle_next = TAILQ_NEXT(dhandle, q);
+		if (!F_ISSET(dhandle, WT_DHANDLE_OPEN) &&
+		    dhandle->refcnt == 0) {
+			WT_CSTAT_INCR(session, dh_conn_handles);
+			TAILQ_REMOVE(&conn->dhqh, dhandle, q);
+			TAILQ_INSERT_HEAD(&sweepqh, dhandle, q);
+		}
+		dhandle = dhandle_next;
+	}
+	conn->dhandle_dead = 0;
+	__wt_spin_unlock(session, &conn->dhandle_lock);
+	/*
+	 * Now actually clean up any dead handles.
+	 */
+	while ((dhandle = TAILQ_FIRST(&sweepqh)) != NULL) {
+		TAILQ_REMOVE(&sweepqh, dhandle, q);
+		/*
+		 * Record any errors, but still discard all of them.
+		 * This call will clear the session dhandle field.  Save
+		 * the value and restore it after it returns.
+		 */
+		save_dhandle = session->dhandle;
+		WT_TRET(__wt_conn_dhandle_discard_single(session, dhandle));
+		session->dhandle = save_dhandle;
+	}
+	return (ret);
+}
+
+/*
  * __wt_conn_btree_get --
  *	Get an open btree file handle, otherwise open a new one.
  */
@@ -339,8 +409,8 @@ __wt_conn_btree_get(WT_SESSION_IMPL *session,
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
 
-	WT_CSTAT_INCR(session, file_open);
-
+	if (S2C(session)->dhandle_dead >= CONN_DHANDLE_SWEEP_TRIGGER)
+		WT_RET(__conn_dhandle_sweep(session));
 	WT_RET(__conn_dhandle_get(session, name, ckpt, flags));
 	dhandle = session->dhandle;
 
@@ -369,11 +439,10 @@ __wt_conn_btree_apply(WT_SESSION_IMPL *session,
     int (*func)(WT_SESSION_IMPL *, const char *[]), const char *cfg[])
 {
 	WT_CONNECTION_IMPL *conn;
-	WT_DATA_HANDLE *dhandle, *saved_dhandle;
+	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
 
 	conn = S2C(session);
-	saved_dhandle = session->dhandle;
 
 	WT_ASSERT(session, F_ISSET(session, WT_SESSION_SCHEMA_LOCKED));
 
@@ -382,16 +451,30 @@ __wt_conn_btree_apply(WT_SESSION_IMPL *session,
 		    WT_PREFIX_MATCH(dhandle->name, "file:") &&
 		    !WT_IS_METADATA(dhandle)) {
 			/*
-			 * We have the schema lock, which prevents handles being
-			 * opened or closed, so there is no need for additional
-			 * handle locking here, or pulling every tree into this
-			 * session's handle cache.
+			 * We need to pull the handle into the session handle
+			 * cache and make sure it's referenced to stop other
+			 * internal code dropping the handle (e.g in LSM when
+			 * cleaning up obsolete chunks). Holding the metadata
+			 * lock isn't enough.
 			 */
-			session->dhandle = dhandle;
-			WT_ERR(func(session, cfg));
+			ret = __wt_session_get_btree(
+			    session, dhandle->name, NULL, NULL, 0);
+			if (ret == 0) {
+				ret = func(session, cfg);
+				if (WT_META_TRACKING(session))
+					WT_TRET(__wt_meta_track_handle_lock(
+					    session, 0));
+				else
+					WT_TRET(__wt_session_release_btree(
+					    session));
+			} else if (ret == EBUSY) {
+				ret = 0;
+				WT_RET(__wt_conn_btree_apply_single(
+				    session, dhandle->name, func, cfg));
+			}
+			WT_RET(ret);
 		}
 
-err:	session->dhandle = saved_dhandle;
 	return (ret);
 }
 
@@ -435,12 +518,10 @@ err:	session->dhandle = saved_dhandle;
 int
 __wt_conn_btree_close(WT_SESSION_IMPL *session, int locked)
 {
-	WT_BTREE *btree;
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
 	int inuse;
 
-	btree = S2BT(session);
 	dhandle = session->dhandle;
 
 	WT_ASSERT(session, F_ISSET(session, WT_SESSION_SCHEMA_LOCKED));
@@ -467,11 +548,13 @@ __wt_conn_btree_close(WT_SESSION_IMPL *session, int locked)
 		 * last session (i.e., the default session for the connection).
 		 */
 		WT_ASSERT(session,
-		    btree != session->metafile ||
+		    S2BT(session) != session->metafile ||
 		    session == S2C(session)->default_session);
 
-		if (F_ISSET(dhandle, WT_DHANDLE_OPEN))
+		if (F_ISSET(dhandle, WT_DHANDLE_OPEN)) {
 			WT_TRET(__wt_conn_btree_sync_and_close(session));
+			S2C(session)->dhandle_dead++;
+		}
 		if (!locked) {
 			F_CLR(dhandle, WT_DHANDLE_EXCLUSIVE);
 			WT_TRET(__wt_rwunlock(session, dhandle->rwlock));

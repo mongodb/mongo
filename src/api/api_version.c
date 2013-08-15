@@ -20,5 +20,5 @@ wiredtiger_version(int *majorp, int *minorp, int *patchp)
 		*minorp = WIREDTIGER_VERSION_MINOR;
 	if (patchp != NULL)
 		*patchp = WIREDTIGER_VERSION_PATCH;
-	return ((char *)WIREDTIGER_VERSION_STRING);
+	return (WIREDTIGER_VERSION_STRING);
 }

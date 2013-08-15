@@ -17,8 +17,10 @@ __wt_block_salvage_start(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	off_t len;
 	uint32_t allocsize;
 
-	/* Reset the description sector. */
-	WT_RET(__wt_desc_init(session, block->fh));
+	allocsize = block->allocsize;
+
+	/* Reset the description information in the first block. */
+	WT_RET(__wt_desc_init(session, block->fh, allocsize));
 
 	/*
 	 * Salvage creates a new checkpoint when it's finished, set up for
@@ -27,33 +29,30 @@ __wt_block_salvage_start(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	WT_RET(__wt_block_ckpt_init(session, &block->live, "live"));
 
 	/*
-	 * Truncate the file to an initial sector plus N allocation size
-	 * units (bytes trailing the last multiple of an allocation size
-	 * unit must be garbage, by definition).
+	 * Truncate the file to an allocation-size multiple of blocks (bytes
+	 * trailing the last block must be garbage, by definition).
 	 */
-	if (block->fh->file_size > WT_BLOCK_DESC_SECTOR) {
-		allocsize = block->allocsize;
-		len = block->fh->file_size - WT_BLOCK_DESC_SECTOR;
-		len = (len / allocsize) * allocsize;
-		len += WT_BLOCK_DESC_SECTOR;
-		if (len != block->fh->file_size)
+	if (block->fh->size > allocsize) {
+		len = (block->fh->size / allocsize) * allocsize;
+		if (len != block->fh->size)
 			WT_RET(__wt_ftruncate(session, block->fh, len));
 	} else
-		len = WT_BLOCK_DESC_SECTOR;
+		len = allocsize;
+	block->live.file_size = len;
 
 	/*
-	 * The first sector of the file is the description record, skip it as
-	 * we read the file.
+	 * The file's first allocation-sized block is description information,
+	 * skip it when reading through the file.
 	 */
-	block->slvg_off = WT_BLOCK_DESC_SECTOR;
+	block->slvg_off = allocsize;
 
 	/*
 	 * The only checkpoint extent we care about is the allocation list.
 	 * Start with the entire file on the allocation list, we'll "free"
 	 * any blocks we don't want as we process the file.
 	 */
-	WT_RET(__wt_block_insert_ext(session, block, &block->live.alloc,
-	    WT_BLOCK_DESC_SECTOR, len - WT_BLOCK_DESC_SECTOR));
+	WT_RET(__wt_block_insert_ext(
+	    session, block, &block->live.alloc, allocsize, len - allocsize));
 
 	return (0);
 }
@@ -92,7 +91,7 @@ __wt_block_salvage_next(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_scr_alloc(session, allocsize, &tmp));
 
 	/* Read through the file, looking for pages. */
-	for (max = fh->file_size;;) {
+	for (max = fh->size;;) {
 		offset = block->slvg_off;
 		if (offset >= max) {			/* Check eof. */
 			*eofp = 1;

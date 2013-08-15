@@ -24,21 +24,21 @@ __block_buffer_to_addr(WT_BLOCK *block,
 
 	/*
 	 * To avoid storing large offsets, we minimize the value by subtracting
-	 * 512B (the size of the description sector), and then storing a count
-	 * of block allocation units.   That implies there is no such thing as
-	 * an "invalid" offset though, they could all be valid (other than very
+	 * a block for description information, then storing a count of block
+	 * allocation units.  That implies there is no such thing as an
+	 * "invalid" offset though, they could all be valid (other than very
 	 * large numbers), which is what we didn't want to store in the first
 	 * place.  Use the size: writing a block of size 0 makes no sense, so
 	 * that's the out-of-band value.  Once we're out of this function and
 	 * are working with a real file offset, size and checksum triplet, there
-	 * are invalid offsets, that's simpler than testing sizes of 0 all over
-	 * the place.
+	 * can be invalid offsets, that's simpler than testing sizes of 0 all
+	 * over the place.
 	 */
 	if (s == 0) {
 		*offsetp = 0;
 		*sizep = *cksump = 0;
 	} else {
-		*offsetp = (off_t)o * block->allocsize + WT_BLOCK_DESC_SECTOR;
+		*offsetp = (off_t)(o + 1) * block->allocsize;
 		*sizep = (uint32_t)s * block->allocsize;
 		*cksump = (uint32_t)c;
 	}
@@ -60,8 +60,7 @@ __wt_block_addr_to_buffer(WT_BLOCK *block,
 		o = WT_BLOCK_INVALID_OFFSET;
 		s = c = 0;
 	} else {
-		o = (uint64_t)
-		    (offset - WT_BLOCK_DESC_SECTOR) / block->allocsize;
+		o = (uint64_t)offset / block->allocsize - 1;
 		s = size / block->allocsize;
 		c = cksum;
 	}
@@ -101,7 +100,7 @@ __wt_block_addr_valid(WT_SESSION_IMPL *session,
 	WT_RET(__wt_block_buffer_to_addr(block, addr, &offset, &size, &cksum));
 
 	/* All we care about is if it's past the end of the file. */
-	return (offset + size > block->fh->file_size ? 0 : 1);
+	return (offset + size > block->fh->size ? 0 : 1);
 }
 
 /*

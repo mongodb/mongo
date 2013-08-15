@@ -91,20 +91,24 @@ struct __wt_config;
     typedef struct __wt_config WT_CONFIG;
 struct __wt_config_check;
     typedef struct __wt_config_check WT_CONFIG_CHECK;
-struct __wt_config_item;
-    typedef struct __wt_config_item WT_CONFIG_ITEM;
+struct __wt_config_entry;
+    typedef struct __wt_config_entry WT_CONFIG_ENTRY;
 struct __wt_connection_impl;
     typedef struct __wt_connection_impl WT_CONNECTION_IMPL;
 struct __wt_connection_stats;
     typedef struct __wt_connection_stats WT_CONNECTION_STATS;
 struct __wt_cursor_backup;
     typedef struct __wt_cursor_backup WT_CURSOR_BACKUP;
+struct __wt_cursor_backup_entry;
+    typedef struct __wt_cursor_backup_entry WT_CURSOR_BACKUP_ENTRY;
 struct __wt_cursor_btree;
     typedef struct __wt_cursor_btree WT_CURSOR_BTREE;
 struct __wt_cursor_bulk;
     typedef struct __wt_cursor_bulk WT_CURSOR_BULK;
 struct __wt_cursor_config;
     typedef struct __wt_cursor_config WT_CURSOR_CONFIG;
+struct __wt_cursor_data_source;
+    typedef struct __wt_cursor_data_source WT_CURSOR_DATA_SOURCE;
 struct __wt_cursor_dump;
     typedef struct __wt_cursor_dump WT_CURSOR_DUMP;
 struct __wt_cursor_index;
@@ -141,6 +145,8 @@ struct __wt_insert;
     typedef struct __wt_insert WT_INSERT;
 struct __wt_insert_head;
     typedef struct __wt_insert_head WT_INSERT_HEAD;
+struct __wt_log_desc;
+    typedef struct __wt_log_desc WT_LOG_DESC;
 struct __wt_lsm_chunk;
     typedef struct __wt_lsm_chunk WT_LSM_CHUNK;
 struct __wt_lsm_data_source;
@@ -151,6 +157,8 @@ struct __wt_lsm_worker_args;
     typedef struct __wt_lsm_worker_args WT_LSM_WORKER_ARGS;
 struct __wt_lsm_worker_cookie;
     typedef struct __wt_lsm_worker_cookie WT_LSM_WORKER_COOKIE;
+struct __wt_lsn;
+    typedef struct __wt_lsn WT_LSN;
 struct __wt_named_collator;
     typedef struct __wt_named_collator WT_NAMED_COLLATOR;
 struct __wt_named_compressor;
@@ -205,7 +213,6 @@ struct __wt_update;
 #include "mutex.h"
 #include "posix.h"
 
-#include "txn.h"			/* typedef for wt_txnid_t */
 #include "stat.h"			/* required by dhandle.h */
 #include "dhandle.h"			/* required by btree.h */
 
@@ -225,6 +232,7 @@ struct __wt_update;
 #include "meta.h"
 #include "os.h"
 #include "schema.h"
+#include "txn.h"
 
 #include "session.h"			/* required by connection.h */
 #include "connection.h"

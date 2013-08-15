@@ -67,6 +67,7 @@ class test_base02(wttest.WiredTigerTestCase):
             'columns=(first,   second,,,)',
             'key_format="5S", value_format="Su", columns=(first,second, third)',
             ',,columns=(first=S,second="4u"),,',
+            'columns=(/path/key,   /other/path/value,,,)',
             ]
         conf_encoding = [
             None,

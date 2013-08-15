@@ -23,6 +23,7 @@ __wt_struct_check(WT_SESSION_IMPL *session,
 
 	WT_RET(__pack_initn(session, &pack, fmt, len));
 
+	WT_CLEAR(pv);
 	for (fields = 0; (ret = __pack_next(&pack, &pv)) == 0; fields++)
 		;
 
@@ -44,28 +45,6 @@ __wt_struct_check(WT_SESSION_IMPL *session,
 }
 
 /*
- * __wt_struct_sizev --
- *	Calculate the size of a packed byte string (va_list version).
- */
-int
-__wt_struct_sizev(
-    WT_SESSION_IMPL *session, size_t *sizep, const char *fmt, va_list ap)
-{
-	WT_PACK pack;
-	WT_PACK_VALUE pv;
-	size_t total;
-
-	WT_RET(__pack_init(session, &pack, fmt));
-
-	for (total = 0; __pack_next(&pack, &pv) == 0;) {
-		WT_PACK_GET(session, pv, ap);
-		total += __pack_size(session, &pv);
-	}
-	*sizep = total;
-	return (0);
-}
-
-/*
  * __wt_struct_size --
  *	Calculate the size of a packed byte string.
  */
@@ -80,38 +59,6 @@ __wt_struct_size(WT_SESSION_IMPL *session, size_t *sizep, const char *fmt, ...)
 	va_end(ap);
 
 	return (ret);
-}
-
-/*
- * __wt_struct_packv --
- *	Pack a byte string (va_list version).
- */
-int
-__wt_struct_packv(WT_SESSION_IMPL *session,
-    void *buffer, size_t size, const char *fmt, va_list ap)
-{
-	WT_DECL_RET;
-	WT_PACK pack;
-	WT_PACK_VALUE pv;
-	uint8_t *p, *end;
-
-	WT_RET(__pack_init(session, &pack, fmt));
-
-	p = buffer;
-	end = p + size;
-
-	while ((ret = __pack_next(&pack, &pv)) == 0) {
-		WT_PACK_GET(session, pv, ap);
-		WT_RET(__pack_write(session, &pv, &p, (size_t)(end - p)));
-	}
-
-	/* Be paranoid - __pack_write should never overflow. */
-	WT_ASSERT(session, p <= end);
-
-	if (ret != WT_NOTFOUND)
-		return (ret);
-
-	return (0);
 }
 
 /*
@@ -130,38 +77,6 @@ __wt_struct_pack(WT_SESSION_IMPL *session,
 	va_end(ap);
 
 	return (ret);
-}
-
-/*
- * __wt_struct_unpackv --
- *	Unpack a byte string (va_list version).
- */
-int
-__wt_struct_unpackv(WT_SESSION_IMPL *session,
-    const void *buffer, size_t size, const char *fmt, va_list ap)
-{
-	WT_DECL_RET;
-	WT_PACK pack;
-	WT_PACK_VALUE pv;
-	const uint8_t *p, *end;
-
-	WT_RET(__pack_init(session, &pack, fmt));
-
-	p = buffer;
-	end = p + size;
-
-	while ((ret = __pack_next(&pack, &pv)) == 0) {
-		WT_RET(__unpack_read(session, &pv, &p, (size_t)(end - p)));
-		WT_UNPACK_PUT(session, pv, ap);
-	}
-
-	/* Be paranoid - __pack_write should never overflow. */
-	WT_ASSERT(session, p <= end);
-
-	if (ret != WT_NOTFOUND)
-		return (ret);
-
-	return (0);
 }
 
 /*

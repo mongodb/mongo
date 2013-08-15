@@ -59,8 +59,84 @@ static WT_EVENT_HANDLER event_handler = {
 	NULL	/* Close handler. */
 };
 
+/*
+ * wts_open --
+ *	Open a connection to a WiredTiger database.
+ */
 void
-wts_open(void)
+wts_open(const char *home, int set_api, WT_CONNECTION **connp)
+{
+	WT_CONNECTION *conn;
+	int ret;
+	char config[2048];
+
+	*connp = NULL;
+
+	/*
+	 * Put configuration file configuration options second to last. Put
+	 * command line configuration options at the end. Do this so they
+	 * override the standard configuration.
+	 */
+	(void)snprintf(config, sizeof(config),
+	    "create,"
+	    "sync=false,cache_size=%" PRIu32 "MB,"
+	    "buffer_alignment=512,error_prefix=\"%s\","
+	    "%s,"
+	    "extensions="
+	    "[\"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\"],"
+	    "%s,%s",
+	    g.c_cache,
+	    g.progname,
+	    g.c_data_extend ? "file_extend=(data=8MB)," : "",
+	    g.c_reverse ? REVERSE_PATH : "",
+	    access(BZIP_PATH, R_OK) == 0 ? BZIP_PATH : "",
+	    access(LZO_PATH, R_OK) == 0 ? LZO_PATH : "",
+	    (access(RAW_PATH, R_OK) == 0 &&
+	    access(BZIP_PATH, R_OK) == 0) ? RAW_PATH : "",
+	    access(SNAPPY_PATH, R_OK) == 0 ? SNAPPY_PATH : "",
+	    DATASOURCE("kvsbdb") ? KVS_BDB_PATH : "",
+	    g.c_config_open == NULL ? "" : g.c_config_open,
+	    g.config_open == NULL ? "" : g.config_open);
+
+	/*
+	 * Direct I/O may not work with hot-backups, doing copies through the
+	 * buffer cache after configuring direct I/O in Linux won't work.  If
+	 * direct I/O is configured, turn off hot backups.   This isn't a great
+	 * place to do this check, but it's only here we have the configuration
+	 * string.
+	 */
+	if (strstr(config, "direct_io") != NULL)
+		g.c_hot_backups = 0;
+
+	if ((ret =
+	    wiredtiger_open(home, &event_handler, config, &conn)) != 0)
+		die(ret, "wiredtiger_open: %s", home);
+
+	if (set_api)
+		g.wt_api = conn->get_extension_api(conn);
+
+	/*
+	 * Load the Memrata shared library: it would be possible to do this as
+	 * part of the extensions configured for wiredtiger_open, there's no
+	 * difference, I am doing it here because it's easier to work with the
+	 * configuration strings.
+	 */
+	if (DATASOURCE("memrata") &&
+	    (ret = conn->load_extension(conn, MEMRATA_PATH,
+	    "entry=wiredtiger_extension_init,config=["
+	    "dev1=[kvs_devices=[/dev/loop0,/dev/loop1],kvs_open_o_truncate=1],"
+	    "dev2=[kvs_devices=[/dev/loop2],kvs_open_o_truncate=1]]")) != 0)
+		die(ret, "WT_CONNECTION.load_extension: %s", MEMRATA_PATH);
+
+	*connp = conn;
+}
+
+/*
+ * wts_create --
+ *	Create the underlying store.
+ */
+void
+wts_create(void)
 {
 	WT_CONNECTION *conn;
 	WT_SESSION *session;
@@ -68,53 +144,35 @@ wts_open(void)
 	int ret;
 	char config[2048], *end, *p;
 
+	conn = g.wts_conn;
+
 	/*
-	 * Open configuration.
-	 *
-	 * Put configuration file configuration options second to last. Put
-	 * command line configuration options at the end. Do this so they
-	 * override the standard configuration.
+	 * Create the underlying store.
 	 */
-	snprintf(config, sizeof(config),
-	    "create,cache_size=%" PRIu32 "MB,"
-	    "error_prefix=\"%s\","
-	    "extensions=[\"%s\", \"%s\", \"%s\", \"%s\", \"%s\"],%s,%s,"
-	    "sync=false,",
-	    g.c_cache,
-	    g.progname,
-	    REVERSE_PATH,
-	    access(BZIP_PATH, R_OK) == 0 ? BZIP_PATH : "",
-	    access(LZO_PATH, R_OK) == 0 ? LZO_PATH : "",
-	    (access(RAW_PATH, R_OK) == 0 &&
-	    access(BZIP_PATH, R_OK) == 0) ? RAW_PATH : "",
-	    access(SNAPPY_PATH, R_OK) == 0 ? SNAPPY_PATH : "",
-	    g.c_config_open == NULL ? "" : g.c_config_open,
-	    g.config_open == NULL ? "" : g.config_open);
-
-	if ((ret =
-	    wiredtiger_open("RUNDIR", &event_handler, config, &conn)) != 0)
-		die(ret, "wiredtiger_open");
-	g.wts_conn = conn;
-
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
 		die(ret, "connection.open_session");
 
 	/*
-	 * Create the object.
-	 *
-	 * Make sure at least 2 internal page per thread can fit in cache.
+	 * Ensure that we can service at least one operation per-thread
+	 * concurrently without filling the cache with pinned pages. We
+	 * choose a multiplier of three because the max configurations control
+	 * on disk size and in memory pages are often significantly larger
+	 * than their disk counterparts.
 	 */
 	maxintlpage = 1U << g.c_intl_page_max;
-	while (2 * g.c_threads * maxintlpage > g.c_cache << 20)
-		maxintlpage >>= 1;
+	maxleafpage = 1U << g.c_leaf_page_max;
+	while (3 * g.c_threads * (maxintlpage + maxleafpage) >
+	    g.c_cache << 20) {
+		if (maxleafpage <= 512 && maxintlpage <= 512)
+			break;
+		if (maxintlpage > 512)
+			maxintlpage >>= 1;
+		if (maxleafpage > 512)
+			maxleafpage >>= 1;
+	}
 	maxintlitem = MMRAND(maxintlpage / 50, maxintlpage / 40);
 	if (maxintlitem < 40)
 		maxintlitem = 40;
-
-	/* Make sure at least one leaf page per thread can fit in cache. */
-	maxleafpage = 1U << g.c_leaf_page_max;
-	while (g.c_threads * (maxintlpage + maxleafpage) > g.c_cache << 20)
-		maxleafpage >>= 1;
 	maxleafitem = MMRAND(maxleafpage / 50, maxleafpage / 40);
 	if (maxleafitem < 40)
 		maxleafitem = 40;
@@ -124,7 +182,7 @@ wts_open(void)
 	p += snprintf(p, (size_t)(end - p),
 	    "key_format=%s,"
 	    "internal_page_max=%d,internal_item_max=%d,"
-	    "leaf_page_max=%d,leaf_item_max=%d",
+	    "allocation_size=512,leaf_page_max=%d,leaf_item_max=%d",
 	    (g.type == ROW) ? "u" : "r",
 	    maxintlpage, maxintlitem, maxleafpage, maxleafitem);
 
@@ -201,6 +259,17 @@ wts_open(void)
 	/* Configure Btree split page percentage. */
 	p += snprintf(p, (size_t)(end - p), ",split_pct=%u", g.c_split_pct);
 
+	/* Configure data types. */
+	if (DATASOURCE("kvsbdb"))
+		p += snprintf(p, (size_t)(end - p), ",type=kvsbdb");
+
+	if (DATASOURCE("lsm"))
+		p += snprintf(p, (size_t)(end - p), ",type=lsm");
+
+	if (DATASOURCE("memrata"))
+		p += snprintf(p, (size_t)(end - p),
+		    ",type=memrata,kvs_open_o_truncate=1");
+
 	if ((ret = session->create(session, g.uri, config)) != 0)
 		die(ret, "session.create: %s", g.uri);
 
@@ -209,7 +278,7 @@ wts_open(void)
 }
 
 void
-wts_close()
+wts_close(void)
 {
 	WT_CONNECTION *conn;
 	int ret;
@@ -226,11 +295,16 @@ wts_dump(const char *tag, int dump_bdb)
 	int offset, ret;
 	char cmd[256];
 
+	/* Data-sources that don't support dump through the wt utility. */
+	if (DATASOURCE("kvsbdb") || DATASOURCE("memrata"))
+		return;
+
 	track("dump files and compare", 0ULL, NULL);
+
 	offset = snprintf(cmd, sizeof(cmd), "sh s_dumpcmp");
 	if (dump_bdb)
 		offset += snprintf(cmd + offset,
-		    sizeof(cmd) - (size_t)offset, " -b");
+		    sizeof(cmd) - (size_t)offset, " -b %s", BERKELEY_DB_PATH);
 	if (g.type == FIX || g.type == VAR)
 		offset += snprintf(cmd + offset,
 		    sizeof(cmd) - (size_t)offset, " -c");
@@ -249,8 +323,17 @@ wts_salvage(void)
 	WT_SESSION *session;
 	int ret;
 
-	conn = g.wts_conn;
+	/*
+	 * Data-sources that don't support salvage.
+	 *
+	 * XXX
+	 * LSM can deadlock if WT_SESSION methods are called at the wrong time,
+	 * don't do that for now.
+	 */
+	if (DATASOURCE("kvsbdb") || DATASOURCE("lsm") || DATASOURCE("memrata"))
+		return;
 
+	conn = g.wts_conn;
 	track("salvage", 0ULL, NULL);
 
 	/*
@@ -279,19 +362,28 @@ wts_verify(const char *tag)
 	WT_SESSION *session;
 	int ret;
 
-	conn = g.wts_conn;
+	/*
+	 * Data-sources that don't support verify.
+	 *
+	 * XXX
+	 * LSM can deadlock if WT_SESSION methods are called at the wrong time,
+	 * don't do that for now.
+	 */
+	if (DATASOURCE("lsm") || DATASOURCE("memrata"))
+		return;
 
+	conn = g.wts_conn;
 	track("verify", 0ULL, NULL);
 
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
 		die(ret, "connection.open_session");
 	if (g.logging != 0)
-		(void)session->msg_printf(session,
+		(void)g.wt_api->msg_printf(g.wt_api, session,
 		    "=============== verify start ===============");
 	if ((ret = session->verify(session, g.uri, NULL)) != 0)
 		die(ret, "session.verify: %s: %s", g.uri, tag);
 	if (g.logging != 0)
-		(void)session->msg_printf(session,
+		(void)g.wt_api->msg_printf(g.wt_api, session,
 		    "=============== verify stop ===============");
 	if ((ret = session->close(session, NULL)) != 0)
 		die(ret, "session.close");
@@ -313,9 +405,13 @@ wts_stats(void)
 	uint64_t v;
 	int ret;
 
-	track("stat", 0ULL, NULL);
+	/* Data-sources that don't support statistics. */
+	if (DATASOURCE("kvsbdb") || DATASOURCE("memrata"))
+		return;
 
 	conn = g.wts_conn;
+	track("stat", 0ULL, NULL);
+
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
 		die(ret, "connection.open_session");
 

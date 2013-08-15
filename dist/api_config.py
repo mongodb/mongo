@@ -200,8 +200,7 @@ def add_subconfig(c):
         return
     created_subconfigs.add(c.name)
     tfile.write('''
-WT_CONFIG_CHECK
-__wt_confchk_%(name)s_subconfigs[] = {
+static const WT_CONFIG_CHECK confchk_%(name)s_subconfigs[] = {
 \t%(check)s
 \t{ NULL, NULL, NULL, NULL }
 };
@@ -216,44 +215,117 @@ def getsubconfigstr(c):
     ctype = gettype(c)
     if ctype == 'category':
         add_subconfig(c)
-        return '__wt_confchk_' + c.name + '_subconfigs'
+        return 'confchk_' + c.name + '_subconfigs'
     else:
         return 'NULL'
 
+# Write structures of arrays of allowable configuration options, including a
+# NULL as a terminator for iteration.
 for name in sorted(api_data.methods.keys()):
     ctype = api_data.methods[name].config
-    name = name.replace('.', '_')
-    tfile.write('''
-const char *
-__wt_confdfl_%(name)s =
-%(config)s;
-''' % {
-    'name' : name,
-    'config' : '\n'.join('\t"%s"' % line
-        for line in w.wrap(','.join('%s=%s' % (c.name, get_default(c))
-            for c in sorted(ctype))) or [""]),
-})
-
-# Construct an array of allowable configuration options. Always append an empty
-# string as a terminator for iteration
-    if not ctype:
+    if ctype:
         tfile.write('''
-WT_CONFIG_CHECK
-__wt_confchk_%(name)s[] = {
-\t{ NULL, NULL, NULL, NULL }
-};
-''' % { 'name' : name })
-    else:
-        tfile.write('''
-WT_CONFIG_CHECK
-__wt_confchk_%(name)s[] = {
+static const WT_CONFIG_CHECK confchk_%(name)s[] = {
 \t%(check)s
 \t{ NULL, NULL, NULL, NULL }
 };
 ''' % {
-    'name' : name,
+    'name' : name.replace('.', '_'),
     'check' : '\n\t'.join(getconfcheck(c) for c in sorted(ctype)),
 })
 
+# Write the initialized list of configuration entry structures.
+tfile.write('\n')
+tfile.write('static const WT_CONFIG_ENTRY config_entries[] = {')
+
+slot=-1
+config_defines = ''
+for name in sorted(api_data.methods.keys()):
+    ctype = api_data.methods[name].config
+    slot += 1
+
+    # Build a list of #defines that reference specific slots in the list (the
+    # #defines are used to avoid a list search where we know the correct slot).
+    config_defines +=\
+	'#define\tWT_CONFIG_ENTRY_' + name.replace('.', '_') + '\t' * \
+	    max(1, 6 - int ((len('WT_CONFIG_ENTRY_' + name)) / 8)) + \
+	    "%2s" % str(slot) + '\n'
+
+    # Write the method name and base.
+    tfile.write('''
+\t{ "%(name)s",
+%(config)s,''' % {
+    'config' : '\n'.join('\t  "%s"' % line
+        for line in w.wrap(','.join('%s=%s' % (c.name, get_default(c))
+            for c in sorted(ctype))) or [""]),
+    'name' : name
+})
+
+    # Write the checks reference, or NULL if no related checks structure.
+    tfile.write('\n\t  ')
+    if ctype:
+        tfile.write('confchk_' + name.replace('.', '_'))
+    else:
+        tfile.write('NULL')
+
+    tfile.write('\n\t},')
+
+# Write a NULL as a terminator for iteration.
+tfile.write('\n\t{ NULL, NULL, NULL }')
+tfile.write('\n};\n')
+
+# Write the routine that connects the WT_CONNECTION_IMPL structure to the list
+# of configuration entry structures.
+tfile.write('''
+int
+__wt_conn_config_init(WT_SESSION_IMPL *session)
+{
+\tWT_CONNECTION_IMPL *conn;
+\tconst WT_CONFIG_ENTRY *ep, **epp;
+
+\tconn = S2C(session);
+
+\t/* Build a list of pointers to the configuration information. */
+\tWT_RET(__wt_calloc_def(session,
+\t    sizeof(config_entries) / sizeof(config_entries[0]), &epp));
+\tconn->config_entries = epp;
+
+\t/* Fill in the list to reference the default information. */
+\tfor (ep = config_entries;;) {
+\t\t*epp++ = ep++;
+\t\tif (ep->method == NULL)
+\t\t\tbreak;
+\t}
+\treturn (0);
+}
+
+void
+__wt_conn_config_discard(WT_SESSION_IMPL *session)
+{
+\tWT_CONNECTION_IMPL *conn;
+
+\tconn = S2C(session);
+
+\t__wt_free(session, conn->config_entries);
+}
+''')
+
 tfile.close()
 compare_srcfile(tmp_file, f)
+
+# Update the config.h file with the #defines for the configuration entries.
+tfile = open(tmp_file, 'w')
+skip = 0
+for line in open('../src/include/config.h', 'r'):
+	if skip:
+		if line.count('configuration section: END'):
+			tfile.write('/*\n' + line)
+			skip = 0
+	else:
+		tfile.write(line)
+	if line.count('configuration section: BEGIN'):
+		skip = 1
+		tfile.write(' */\n')
+		tfile.write(config_defines)
+tfile.close()
+compare_srcfile(tmp_file, '../src/include/config.h')
