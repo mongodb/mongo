@@ -35,6 +35,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/ops/update.h"
+#include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replication_server_status.h"  // replSettings
 #include "mongo/db/repl/rs.h" // replLocalAuth()
@@ -286,11 +287,13 @@ namespace mongo {
             // --source <host> specified.
             // check that no items are in sources other than that
             // add if missing
-            shared_ptr<Cursor> c = findTableScan("local.sources", BSONObj());
             int n = 0;
-            while ( c->ok() ) {
+            auto_ptr<Runner> runner(InternalPlanner::collectionScan("local.sources"));
+            BSONObj obj;
+            Runner::RunnerState state;
+            while (Runner::RUNNER_ADVANCED == (state = runner->getNext(&obj, NULL))) {
                 n++;
-                ReplSource tmp(c->current());
+                ReplSource tmp(obj);
                 if ( tmp.hostName != cmdLine.source ) {
                     log() << "repl: --source " << cmdLine.source << " != " << tmp.hostName << " from local.sources collection" << endl;
                     log() << "repl: for instructions on changing this slave's source, see:" << endl;
@@ -305,8 +308,8 @@ namespace mongo {
                     sleepsecs(30);
                     dbexit( EXIT_REPLICATION_ERROR );
                 }
-                c->advance();
             }
+            uassert(17065, "Internal error reading from local.sources", Runner::RUNNER_EOF == state);
             uassert( 10002 ,  "local.sources collection corrupt?", n<2 );
             if ( n == 0 ) {
                 // source missing.  add.
@@ -325,9 +328,11 @@ namespace mongo {
             }
         }
 
-        shared_ptr<Cursor> c = findTableScan("local.sources", BSONObj());
-        while ( c->ok() ) {
-            ReplSource tmp(c->current());
+        auto_ptr<Runner> runner(InternalPlanner::collectionScan("local.sources"));
+        BSONObj obj;
+        Runner::RunnerState state;
+        while (Runner::RUNNER_ADVANCED == (state = runner->getNext(&obj, NULL))) {
+            ReplSource tmp(obj);
             if ( tmp.syncedTo.isNull() ) {
                 DBDirectClient c;
                 if ( c.exists( "local.oplog.$main" ) ) {
@@ -338,8 +343,8 @@ namespace mongo {
                 }
             }
             addSourceToList(v, tmp, old);
-            c->advance();
         }
+        uassert(17066, "Internal error reading from local.sources", Runner::RUNNER_EOF == state);
     }
 
     bool ReplSource::throttledForceResyncDead( const char *requester ) {

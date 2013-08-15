@@ -165,9 +165,10 @@ namespace mongo {
 
                 IndexScanParams params;
                 params.descriptor = CatalogHack::getDescriptor(nsd, idxNo);
-                params.startKey = nodeArgs["startKey"].Obj();
-                params.endKey = nodeArgs["endKey"].Obj();
-                params.endKeyInclusive = nodeArgs["endKeyInclusive"].Bool();
+                params.bounds.isSimpleRange = true;
+                params.bounds.startKey = nodeArgs["startKey"].Obj();
+                params.bounds.endKey = nodeArgs["endKey"].Obj();
+                params.bounds.endKeyInclusive = nodeArgs["endKeyInclusive"].Bool();
                 params.direction = nodeArgs["direction"].numberInt();
                 params.limit = nodeArgs["limit"].numberInt();
                 params.forceBtreeAccessMethod = false;

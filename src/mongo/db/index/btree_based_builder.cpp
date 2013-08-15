@@ -148,7 +148,7 @@ namespace mongo {
                            int64_t nrecords,
                            ProgressMeter* progressMeter,
                            bool mayInterrupt, int idxNo) {
-        auto_ptr<Runner> runner(InternalPlanner::findAll(ns));
+        auto_ptr<Runner> runner(InternalPlanner::collectionScan(ns));
         phaseOne->sortCmp.reset(getComparison(idx.version(), idx.keyPattern()));
         phaseOne->sorter.reset(new BSONObjExternalSorter(phaseOne->sortCmp.get()));
         phaseOne->sorter->hintNumObjects( nrecords );

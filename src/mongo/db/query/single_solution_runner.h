@@ -48,6 +48,8 @@ namespace mongo {
             // cache entries when we build an index?
         }
 
+        virtual bool isEOF() { return _exec->isEOF(); }
+
         virtual void saveState() { _exec->saveState(); }
 
         virtual bool restoreState() { return _exec->restoreState(); }
@@ -58,9 +60,7 @@ namespace mongo {
 
         virtual void invalidate(const DiskLoc& dl) { _exec->invalidate(dl); }
 
-        virtual const CanonicalQuery& getQuery() { return *_canonicalQuery; }
-
-        virtual const string& ns() { return getQuery().getParsed().ns(); }
+        virtual const string& ns() { return _canonicalQuery->getParsed().ns(); }
 
         virtual void kill() { _exec->kill(); }
 

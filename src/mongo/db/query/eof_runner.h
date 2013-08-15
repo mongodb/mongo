@@ -38,6 +38,8 @@ namespace mongo {
             return Runner::RUNNER_EOF;
         }
 
+        virtual bool isEOF() { return true; }
+
         virtual void saveState() { }
 
         virtual bool restoreState() {

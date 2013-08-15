@@ -93,6 +93,13 @@ namespace mongo {
         }
     }
 
+    bool MultiPlanRunner::isEOF() {
+        if (_failure) { return true; }
+        // If _bestPlan is not NULL, you haven't picked the best plan yet, so you're not EOF.
+        if (NULL == _bestPlan) { return false; }
+        return _bestPlan->isEOF();
+    }
+
     void MultiPlanRunner::kill() {
         _failure = true;
         if (NULL != _bestPlan) { _bestPlan->kill(); }
@@ -116,7 +123,14 @@ namespace mongo {
             WorkingSetMember* member = _bestPlan->getWorkingSet()->get(id);
             // Note that this copies code from PlanExecutor.
             if (NULL != objOut) {
-                if (member->hasObj()) {
+                if (WorkingSetMember::LOC_AND_IDX == member->state) {
+                    if (1 != member->keyData.size()) {
+                        _bestPlan->getWorkingSet()->free(id);
+                        return Runner::RUNNER_ERROR;
+                    }
+                    *objOut = member->keyData[0].keyData;
+                }
+                else if (member->hasObj()) {
                     *objOut = member->obj;
                 }
                 else {

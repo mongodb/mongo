@@ -131,13 +131,19 @@ namespace mongo {
         ClientCursorPin p(cursorid);
         ClientCursor *cc = p.c();
 
-
         if ( unlikely(!cc) ) {
             LOGSOME << "getMore: cursorid not found " << ns << " " << cursorid << endl;
             cursorid = 0;
             resultFlags = ResultFlag_CursorNotFound;
         }
         else {
+            // Some internal users create a ClientCursor with a Runner.  Don't crash if this
+            // happens.  Instead, hand them off to the new framework.
+            if (NULL != cc->getRunner()) {
+                p.release();
+                return newGetMore(ns, ntoreturn, cursorid, curop, pass, exhaust, isCursorAuthorized);
+            }
+
             // check for spoofing of the ns such that it does not match the one originally there for the cursor
             uassert(14833, "auth error", str::equals(ns, cc->ns().c_str()));
 

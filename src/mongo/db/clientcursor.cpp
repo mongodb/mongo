@@ -56,18 +56,21 @@ namespace mongo {
                                   const DiskLoc& dl ); // from s/d_logic.h
 
     ClientCursor::ClientCursor(int qopts, const shared_ptr<Cursor>& c, const string& ns,
-                               BSONObj query) : _ns(ns), _query(query), _c(c),
-                                                _yieldSometimesTracker(128, 10) {
+                               BSONObj query)
+        : _ns(ns), _query(query), _runner(NULL), _c(c), _yieldSometimesTracker(128, 10) {
+
         _queryOptions = qopts;
         _doingDeletes = false;
         init();
     }
 
-    ClientCursor::ClientCursor(Runner* runner) : _yieldSometimesTracker(128, 10) {
+    ClientCursor::ClientCursor(Runner* runner, int qopts, const BSONObj query)
+        : _yieldSometimesTracker(128, 10) {
+
         _runner.reset(runner);
-        _ns = runner->getQuery().getParsed().ns();
-        _query = runner->getQuery().getParsed().getFilter();
-        _queryOptions = runner->getQuery().getParsed().getOptions();
+        _ns = runner->ns();
+        _query = query;
+        _queryOptions = qopts;
         init();
     }
 

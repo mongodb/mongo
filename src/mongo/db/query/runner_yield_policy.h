@@ -23,21 +23,27 @@ namespace mongo {
 
     class RunnerYieldPolicy {
     public:
-        RunnerYieldPolicy() : _elapsedTracker(256, 20) { }
+        RunnerYieldPolicy() : _elapsedTracker(128, 10) { }
 
         bool shouldYield() {
             return _elapsedTracker.intervalHasElapsed();
         }
 
         void yield(Record* rec = NULL) {
-            _elapsedTracker.resetLastTime();
-            staticYield(rec);
+            if (staticYield(rec)) {
+                _elapsedTracker.resetLastTime();
+            }
         }
 
-        // TODO: ns is only used in staticYield for an error condition that we may or may not
-        // actually care about.
-        static void staticYield(Record* rec = NULL) {
-            ClientCursor::staticYield(ClientCursor::suggestYieldMicros(), "", rec);
+        static bool staticYield(Record* rec = NULL) {
+            int micros = ClientCursor::suggestYieldMicros();
+
+            if (micros > 0) {
+                ClientCursor::staticYield(micros, "", rec);
+                return true;
+            }
+
+            return false;
         }
 
     private:

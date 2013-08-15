@@ -58,6 +58,8 @@ namespace mongo {
          */
         Runner::RunnerState getNext(BSONObj* objOut, DiskLoc* dlOut);
 
+        virtual bool isEOF();
+
         /**
          * Runs all plans added by addPlan, ranks them, and picks a best.  Deletes all loser plans.
          * All further calls to getNext(...) will return results from the best plan.
@@ -74,8 +76,7 @@ namespace mongo {
 
         virtual void setYieldPolicy(Runner::YieldPolicy policy);
 
-        virtual const CanonicalQuery& getQuery() { return *_query; }
-        virtual const string& ns() { return getQuery().getParsed().ns(); }
+        virtual const string& ns() { return _query->getParsed().ns(); }
 
         virtual void kill();
 

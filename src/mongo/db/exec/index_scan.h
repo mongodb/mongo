@@ -18,8 +18,10 @@
 
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/diskloc.h"
+#include "mongo/db/index/btree_index_cursor.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression.h"
+#include "mongo/db/query/index_bounds.h"
 #include "mongo/platform/unordered_set.h"
 
 namespace mongo {
@@ -27,8 +29,24 @@ namespace mongo {
     class IndexAccessMethod;
     class IndexCursor;
     class IndexDescriptor;
-    struct IndexScanParams;
     class WorkingSet;
+
+    struct IndexScanParams {
+        IndexScanParams() : descriptor(NULL), direction(1), limit(0),
+                            forceBtreeAccessMethod(false) { }
+
+        IndexDescriptor* descriptor;
+
+        IndexBounds bounds;
+
+        int direction;
+
+        // This only matters for 2d indices and will be ignored by every other index.
+        int limit;
+
+        // Special indices internally open an IndexCursor over themselves but as a straight Btree.
+        bool forceBtreeAccessMethod;
+    };
 
     /**
      * Stage scans over an index from startKey to endKey, returning results that pass the provided
@@ -63,11 +81,7 @@ namespace mongo {
         scoped_ptr<IndexCursor> _indexCursor;
         scoped_ptr<IndexDescriptor> _descriptor;
 
-        // Bounds for the cursor.  TODO: take a set of bounds.
-        BSONObj _startKey;
-        BSONObj _endKey;
-        bool _endKeyInclusive;
-        int _direction;
+        // Have we hit the end of the index scan?
         bool _hitEnd;
 
         // Contains expressions only over fields in the index key.  We assume this is built
@@ -86,28 +100,19 @@ namespace mongo {
         // True if there was a yield and the yield changed the cursor position.
         bool _yieldMovedCursor;
 
-        // This is IndexScanParams::limit.  See comment there.
-        int _numWanted;
+        IndexScanParams _params;
+
+        // For our "fast" Btree-only navigation AKA the index bounds optimization.
+        scoped_ptr<IndexBoundsChecker> _checker;
+        BtreeIndexCursor* _btreeCursor;
+        int _keyEltsToUse;
+        bool _movePastKeyElts;
+        vector<const BSONElement*> _keyElts;
+        vector<bool> _keyEltsInc;
 
         // Stats
         CommonStats _commonStats;
         IndexScanStats _specificStats;
-    };
-
-    struct IndexScanParams {
-        IndexScanParams() : descriptor(NULL), endKeyInclusive(true), direction(1), limit(0),
-                            forceBtreeAccessMethod(false) { }
-        IndexDescriptor* descriptor;
-        BSONObj startKey;
-        BSONObj endKey;
-        bool endKeyInclusive;
-        int direction;
-
-        // This only matters for 2d indices and will be ignored by every other index.
-        int limit;
-
-        // Special indices internally open an IndexCursor over themselves but as a straight Btree.
-        bool forceBtreeAccessMethod;
     };
 
 }  // namespace mongo

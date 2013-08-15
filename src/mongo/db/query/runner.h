@@ -114,6 +114,12 @@ namespace mongo {
         virtual RunnerState getNext(BSONObj* objOut, DiskLoc* dlOut) = 0;
 
         /**
+         * Will the next call to getNext() return EOF?  It's useful to know if the runner is done
+         * without having to take responsibility for a result.
+         */
+        virtual bool isEOF() = 0;
+
+        /**
          * Inform the runner that the provided DiskLoc is about to disappear (or change entirely).
          * The runner then takes any actions required to continue operating correctly, including
          * broadcasting the invalidation request to the PlanStage tree being run.
@@ -139,11 +145,6 @@ namespace mongo {
          * it was killed.
          */
         virtual bool restoreState() = 0;
-
-        /**
-         * Return the query that the runner is running.
-         */
-        virtual const CanonicalQuery& getQuery() = 0;
 
         /**
          * Return the NS that the query is running over.

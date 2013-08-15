@@ -25,7 +25,6 @@
 #include <fstream>
 
 #include "mongo/client/dbclientinterface.h"
-#include "mongo/db/btreecursor.h"
 #include "mongo/db/db.h"
 #include "mongo/db/json.h"
 #include "mongo/db/ops/delete.h"
@@ -36,6 +35,7 @@
 #include "mongo/db/pdfile.h"
 #include "mongo/db/query_optimizer.h"
 #include "mongo/db/query_runner.h"
+#include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/write_concern.h"
 #include "mongo/s/d_logic.h"
@@ -163,8 +163,8 @@ namespace mongo {
 
     bool Helpers::isEmpty(const char *ns) {
         Client::Context context(ns, dbpath);
-        shared_ptr<Cursor> c = DataFileMgr::findAll(ns);
-        return !c->ok();
+        auto_ptr<Runner> runner(InternalPlanner::collectionScan(ns));
+        return Runner::RUNNER_EOF == runner->getNext(NULL, NULL);
     }
 
     /* Get the first object from a collection.  Generally only useful if the collection
@@ -174,25 +174,17 @@ namespace mongo {
     */
     bool Helpers::getSingleton(const char *ns, BSONObj& result) {
         Client::Context context(ns);
-
-        shared_ptr<Cursor> c = DataFileMgr::findAll(ns);
-        if ( !c->ok() ) {
-            context.getClient()->curop()->done();
-            return false;
-        }
-
-        result = c->current();
+        auto_ptr<Runner> runner(InternalPlanner::collectionScan(ns));
+        Runner::RunnerState state = runner->getNext(&result, NULL);
         context.getClient()->curop()->done();
-        return true;
+        return Runner::RUNNER_ADVANCED == state;
     }
 
     bool Helpers::getLast(const char *ns, BSONObj& result) {
         Client::Context ctx(ns);
-        shared_ptr<Cursor> c = findTableScan(ns, reverseNaturalObj);
-        if( !c->ok() )
-            return false;
-        result = c->current();
-        return true;
+        auto_ptr<Runner> runner(InternalPlanner::collectionScan(ns, InternalPlanner::BACKWARD));
+        Runner::RunnerState state = runner->getNext(&result, NULL);
+        return Runner::RUNNER_ADVANCED == state;
     }
 
     void Helpers::upsert( const string& ns , const BSONObj& o, bool fromMigrate ) {
@@ -333,38 +325,32 @@ namespace mongo {
         long long millisWaitingForReplication = 0;
 
         while ( 1 ) {
-            try {
-
+            // Scoping for write lock.
+            {
                 Client::WriteContext ctx(ns);
 
-                scoped_ptr<Cursor> c;
-                
-                {
-                    NamespaceDetails* nsd = nsdetails( ns );
-                    if ( ! nsd )
-                        break;
+                NamespaceDetails* nsd = nsdetails( ns );
+                if (NULL == nsd) { break; }
+                int ii = nsd->findIndexByKeyPattern( indexKeyPattern.toBSON() );
 
-                    int ii = nsd->findIndexByKeyPattern( indexKeyPattern.toBSON() );
-                    verify( ii >= 0 );
-                    
-                    IndexDetails& i = nsd->idx( ii );
-                    
-                    c.reset( BtreeCursor::make( nsd, i, min, max, maxInclusive, 1 ) );
-                }
-                
-                if ( ! c->ok() ) {
-                    // we're done
-                    break;
-                }
-                
-                DiskLoc rloc = c->currLoc();
-                BSONObj obj = c->current();
+                auto_ptr<Runner> runner(InternalPlanner::indexScan(ns, nsd, ii, min, max,
+                                                                   maxInclusive,
+                                                                   InternalPlanner::FORWARD,
+                                                                   InternalPlanner::IXSCAN_FETCH));
 
-                // this is so that we don't have to handle this cursor in the delete code
-                c.reset(0);
+                ClientCursor::registerRunner(runner.get());
+                runner->setYieldPolicy(Runner::YIELD_AUTO);
+
+                DiskLoc rloc;
+                BSONObj obj;
+                Runner::RunnerState state;
+                // This may yield so we cannot touch nsd after this.
+                state = runner->getNext(&obj, &rloc);
+                ClientCursor::deregisterRunner(runner.get());
+                runner.reset();
+                if (Runner::RUNNER_EOF == state) { break; }
 
                 if ( onlyRemoveOrphanedDocs ) {
-
                     // Do a final check in the write lock to make absolutely sure that our
                     // collection hasn't been modified in a way that invalidates our migration
                     // cleanup.
@@ -398,13 +384,9 @@ namespace mongo {
                 if ( callback )
                     callback->goingToDelete( obj );
                 
-                logOp( "d" , ns.c_str() , rloc.obj()["_id"].wrap() , 0 , 0 , fromMigrate );
+                logOp("d", ns.c_str(), obj["_id"].wrap(), 0, 0, fromMigrate);
                 theDataFileMgr.deleteRecord(ns.c_str() , rloc.rec(), rloc);
                 numDeleted++;
-            }
-            catch( PageFaultException& e ) {
-                e.touch();
-                continue;
             }
 
             Timer secondaryThrottleTime;
@@ -423,7 +405,6 @@ namespace mongo {
                     sleepmicros( micros );
                 }
             }
-                
         }
         
         if ( secondaryThrottle )
@@ -462,17 +443,6 @@ namespace mongo {
             return Status( ErrorCodes::IndexNotFound, range.keyPattern.toString() );
         }
 
-        // Assume both min and max non-empty, append MinKey's to make them fit chosen index
-        KeyPattern idxKeyPattern( idx->keyPattern() );
-        BSONObj min = Helpers::toKeyFormat( idxKeyPattern.extendRangeBound( range.minKey, false ) );
-        BSONObj max = Helpers::toKeyFormat( idxKeyPattern.extendRangeBound( range.maxKey, false ) );
-
-        // TODO: May not always be btreecursor?
-        BtreeCursor* btreeCursor = BtreeCursor::make( details, *idx, min, max, false, 1 );
-        auto_ptr<ClientCursor> cc( new ClientCursor( QueryOption_NoCursorTimeout,
-                                                     shared_ptr<Cursor>( btreeCursor ),
-                                                     ns ) );
-
         // use the average object size to estimate how many objects a full chunk would carry
         // do that while traversing the chunk's range using the sharding index, below
         // there's a fair amount of slack before we determine a chunk is too large because object
@@ -492,29 +462,35 @@ namespace mongo {
             avgDocsWhenFull = kMaxDocsPerChunk + 1;
         }
 
+        // Assume both min and max non-empty, append MinKey's to make them fit chosen index
+        KeyPattern idxKeyPattern( idx->keyPattern() );
+        BSONObj min = Helpers::toKeyFormat( idxKeyPattern.extendRangeBound( range.minKey, false ) );
+        BSONObj max = Helpers::toKeyFormat( idxKeyPattern.extendRangeBound( range.maxKey, false ) );
+
+
         // do a full traversal of the chunk and don't stop even if we think it is a large chunk
         // we want the number of records to better report, in that case
         bool isLargeChunk = false;
         long long docCount = 0;
 
-        while ( cc->ok() ) {
-            DiskLoc loc = cc->currLoc();
+        auto_ptr<Runner> runner(InternalPlanner::indexScan(ns, details, details->idxNo(*idx), min, max, false));
+        ClientCursor::registerRunner(runner.get());
+        // we can afford to yield here because any change to the base data that we might miss  is
+        // already being queued and will be migrated in the 'transferMods' stage
+        runner->setYieldPolicy(Runner::YIELD_AUTO);
+
+        DiskLoc loc;
+        Runner::RunnerState state;
+        while (Runner::RUNNER_ADVANCED == (state = runner->getNext(NULL, &loc))) {
             if ( !isLargeChunk ) {
                 locs->insert( loc );
-            }
-            cc->advance();
-
-            // we can afford to yield here because any change to the base data that we might miss
-            // is already being queued and will be migrated in the 'transferMods' stage
-            if ( !cc->yieldSometimes( ClientCursor::DontNeed ) ) {
-                cc.release();
-                break;
             }
 
             if ( ++docCount > avgDocsWhenFull ) {
                 isLargeChunk = true;
             }
         }
+        ClientCursor::deregisterRunner(runner.get());
 
         *numDocs = docCount;
         *estChunkSizeBytes = docCount * avgDocSizeBytes;

@@ -77,7 +77,7 @@ namespace mongo {
         return state == LOC_AND_UNOWNED_OBJ;
     }
 
-    bool WorkingSetMember::getFieldDotted(const string& field, BSONElement* out) {
+    bool WorkingSetMember::getFieldDotted(const string& field, BSONElement* out) const {
         // If our state is such that we have an object, use it.
         if (hasObj()) {
             *out = obj.getFieldDotted(field);

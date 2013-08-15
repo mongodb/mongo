@@ -53,6 +53,8 @@ namespace mongo {
             return state;
         }
 
+        virtual bool isEOF() { return _exec->isEOF(); }
+
         virtual void saveState() { _exec->saveState(); }
 
         virtual bool restoreState() { return _exec->restoreState(); }
@@ -63,9 +65,7 @@ namespace mongo {
             _exec->setYieldPolicy(policy);
         }
 
-        virtual const CanonicalQuery& getQuery() { return *_canonicalQuery; }
-
-        virtual const string& ns() { return getQuery().getParsed().ns(); }
+        virtual const string& ns() { return _canonicalQuery->getParsed().ns(); }
 
         virtual void kill() { _exec->kill(); }
 

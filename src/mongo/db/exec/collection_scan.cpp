@@ -35,12 +35,13 @@ namespace mongo {
 
     PlanStage::StageState CollectionScan::work(WorkingSetID* out) {
         ++_commonStats.works;
+        if (_nsDropped) { return PlanStage::IS_EOF; }
 
         if (NULL == _iter) {
             CollectionTemp* collection = cc().database()->getCollectionTemp( _params.ns );
             if ( collection == NULL ) {
                 _nsDropped = true;
-                return PlanStage::FAILURE;
+                return PlanStage::IS_EOF;
             }
 
             _iter.reset( collection->getIterator( _params.start,
@@ -78,19 +79,25 @@ namespace mongo {
     }
 
     void CollectionScan::invalidate(const DiskLoc& dl) {
-        ++_commonStats.yields;
-        _iter->invalidate(dl);
+        ++_commonStats.invalidates;
+        if (NULL != _iter) {
+            _iter->invalidate(dl);
+        }
     }
 
     void CollectionScan::prepareToYield() {
-        ++_commonStats.unyields;
-        _iter->prepareToYield();
+        ++_commonStats.yields;
+        if (NULL != _iter) {
+            _iter->prepareToYield();
+        }
     }
 
     void CollectionScan::recoverFromYield() {
-        ++_commonStats.invalidates;
-        if (!_iter->recoverFromYield()) {
-            _nsDropped = true;
+        ++_commonStats.unyields;
+        if (NULL != _iter) {
+            if (!_iter->recoverFromYield()) {
+                _nsDropped = true;
+            }
         }
     }
 

@@ -34,7 +34,6 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/background.h"
-#include "mongo/db/btreecursor.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/server_status.h"
@@ -51,6 +50,7 @@
 #include "mongo/db/lasterror.h"
 #include "mongo/db/ops/count.h"
 #include "mongo/db/pdfile.h"
+#include "mongo/db/query/internal_plans.h"
 #include "mongo/db/query_optimizer.h"
 #include "mongo/db/repl/is_master.h"
 #include "mongo/db/repl/oplog.h"
@@ -1086,7 +1086,7 @@ namespace mongo {
 
             result.appendBool( "estimate" , estimate );
 
-            shared_ptr<Cursor> c;
+            auto_ptr<Runner> runner;
             if ( min.isEmpty() && max.isEmpty() ) {
                 if ( estimate ) {
                     result.appendNumber( "size" , d->dataSize() );
@@ -1094,7 +1094,7 @@ namespace mongo {
                     result.append( "millis" , timer.millis() );
                     return 1;
                 }
-                c = theDataFileMgr.findAll( ns.c_str() );
+                runner.reset(InternalPlanner::collectionScan(ns));
             }
             else if ( min.isEmpty() || max.isEmpty() ) {
                 errmsg = "only one of min or max specified";
@@ -1118,7 +1118,7 @@ namespace mongo {
                 min = Helpers::toKeyFormat( kp.extendRangeBound( min, false ) );
                 max = Helpers::toKeyFormat( kp.extendRangeBound( max, false ) );
 
-                c.reset( BtreeCursor::make( d, *idx, min, max, false, 1 ) );
+                runner.reset(InternalPlanner::indexScan(ns, d, d->idxNo(*idx), min, max, false));
             }
 
             long long avgObjSize = d->dataSize() / d->numRecords();
@@ -1128,12 +1128,14 @@ namespace mongo {
 
             long long size = 0;
             long long numObjects = 0;
-            while( c->ok() ) {
 
+            DiskLoc loc;
+            Runner::RunnerState state;
+            while (Runner::RUNNER_ADVANCED == (state = runner->getNext(NULL, &loc))) {
                 if ( estimate )
                     size += avgObjSize;
                 else
-                    size += c->currLoc().rec()->netLength();
+                    size += loc.rec()->netLength();
 
                 numObjects++;
 
@@ -1142,8 +1144,10 @@ namespace mongo {
                     result.appendBool( "maxReached" , true );
                     break;
                 }
+            }
 
-                c->advance();
+            if (Runner::RUNNER_EOF != state) {
+                warning() << "Internal error while reading " << ns << endl;
             }
 
             ostringstream os;
@@ -1514,8 +1518,9 @@ namespace mongo {
 
             CursorId id;
             {
-                shared_ptr<Cursor> c = theDataFileMgr.findAll( fromNs.c_str(), startLoc );
-                ClientCursor *cc = new ClientCursor(0, c, fromNs.c_str());
+                Runner* runner = InternalPlanner::collectionScan(fromNs, InternalPlanner::FORWARD, startLoc);
+                // Takes ownership of runner.  The cc will timeout, eventually...
+                ClientCursor *cc = new ClientCursor(runner);
                 id = cc->cursorid();
             }
 
@@ -1717,8 +1722,6 @@ namespace mongo {
                      desiredCollections.count( shortCollectionName ) == 0 )
                     continue;
 
-                shared_ptr<Cursor> cursor;
-
                 NamespaceDetails * nsd = nsdetails( fullCollectionName );
 
                 // debug SERVER-761
@@ -1733,17 +1736,20 @@ namespace mongo {
                     }
                 }
 
+                auto_ptr<Runner> runner;
                 int idNum = nsd->findIdIndex();
                 if ( idNum >= 0 ) {
-                    cursor.reset( BtreeCursor::make( nsd,
-                                                     nsd->idx( idNum ),
-                                                     BSONObj(),
-                                                     BSONObj(),
-                                                     false,
-                                                     1 ) );
+                    runner.reset(InternalPlanner::indexScan(fullCollectionName,
+                                                            nsd,
+                                                            idNum,
+                                                            BSONObj(),
+                                                            BSONObj(),
+                                                            false,
+                                                            InternalPlanner::FORWARD,
+                                                            InternalPlanner::IXSCAN_FETCH));
                 }
                 else if ( nsd->isCapped() ) {
-                    cursor = findTableScan( fullCollectionName.c_str() , BSONObj() );
+                    runner.reset(InternalPlanner::collectionScan(fullCollectionName));
                 }
                 else {
                     log() << "can't find _id index for: " << fullCollectionName << endl;
@@ -1754,11 +1760,15 @@ namespace mongo {
                 md5_init(&st);
 
                 long long n = 0;
-                while ( cursor->ok() ) {
-                    BSONObj c = cursor->current();
+                Runner::RunnerState state;
+                BSONObj c;
+                verify(NULL != runner.get());
+                while (Runner::RUNNER_ADVANCED == (state = runner->getNext(&c, NULL))) {
                     md5_append( &st , (const md5_byte_t*)c.objdata() , c.objsize() );
                     n++;
-                    cursor->advance();
+                }
+                if (Runner::RUNNER_EOF != state) {
+                    warning() << "error while hashing, db dropped? ns=" << fullCollectionName << endl;
                 }
                 md5digest d;
                 md5_finish(&st, d);

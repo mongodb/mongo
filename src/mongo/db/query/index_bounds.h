@@ -74,6 +74,14 @@ namespace mongo {
         // We can traverse this forward if indexed ascending
         // We can traverse this backwards if indexed descending.
         bool isValidFor(const BSONObj& keyPattern, int direction);
+
+        // TODO: KILL THIS?
+        // We need this for legacy non-index indices (2d/2dsphere) that take a BSONObj and don't
+        // deal with the kind of absurd Btree-only behavior of IndexBoundsChecker.
+        bool isSimpleRange;
+        BSONObj startKey;
+        BSONObj endKey;
+        bool endKeyInclusive;
     };
 
     /**

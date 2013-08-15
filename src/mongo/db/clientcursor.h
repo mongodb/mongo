@@ -49,7 +49,7 @@ namespace mongo {
         ClientCursor(int qopts, const shared_ptr<Cursor>& c, const string& ns,
                      BSONObj query = BSONObj());
 
-        ClientCursor(Runner* runner);
+        ClientCursor(Runner* runner, int qopts = 0, const BSONObj query = BSONObj());
 
         ~ClientCursor();
 
@@ -180,6 +180,7 @@ namespace mongo {
         //
 
         Runner* getRunner() const { return _runner.get(); }
+        int queryOptions() const { return _queryOptions; }
 
         // Used by ops/query.cpp to stash how many results have been returned by a query.
         int pos() const { return _pos; }
@@ -232,7 +233,6 @@ namespace mongo {
         // Only used by ops/query.cpp, which will stop using them when queries are answered only by
         // a runner.
         const BSONObj& query() const { return _query; }
-        int queryOptions() const { return _queryOptions; }
         shared_ptr<ParsedQuery> pq;
         // This one is used also by pipeline/document_source_cursor.cpp
         shared_ptr<Projection> fields; // which fields query wants returned

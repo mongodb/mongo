@@ -240,7 +240,7 @@ namespace mongo {
         // to avoid modifying the system.namespaces collection while iterating over it since that
         // would corrupt the cursor.
         vector<string> toDelete;
-        auto_ptr<Runner> runner(InternalPlanner::findAll(systemNamespaces));
+        auto_ptr<Runner> runner(InternalPlanner::collectionScan(systemNamespaces));
         BSONObj nsObj;
         Runner::RunnerState state;
         while (Runner::RUNNER_ADVANCED == (state = runner->getNext(&nsObj, NULL))) {
