@@ -15,6 +15,7 @@
  */
 
 #include "mongo/db/exec/collection_scan.h"
+#include "mongo/db/exec/fetch.h"
 #include "mongo/db/exec/index_scan.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/index/catalog_hack.h"
@@ -84,7 +85,8 @@ namespace QueryMultiPlanRunner {
             ixparams.endKeyInclusive = true;
             ixparams.direction = 1;
             auto_ptr<WorkingSet> firstWs(new WorkingSet());
-            auto_ptr<PlanStage> firstRoot(new IndexScan(ixparams, firstWs.get(), NULL));
+            IndexScan* ix = new IndexScan(ixparams, firstWs.get(), NULL);
+            auto_ptr<PlanStage> firstRoot(new FetchStage(firstWs.get(), ix, NULL));
 
             // Plan 1: CollScan with matcher.
             CollectionScanParams csparams;
