@@ -16,12 +16,14 @@
 
 #include "mongo/db/exec/collection_scan.h"
 
+#include "mongo/db/database.h"
 #include "mongo/db/exec/collection_scan_common.h"
 #include "mongo/db/exec/filter.h"
 #include "mongo/db/exec/working_set.h"
-#include "mongo/db/namespace_details.h"
-#include "mongo/db/pdfile.h"
+#include "mongo/db/structure/collection.h"
 #include "mongo/db/structure/collection_iterator.h"
+
+#include "mongo/db/client.h" // XXX-ERH
 
 namespace mongo {
 
@@ -34,20 +36,15 @@ namespace mongo {
         ++_commonStats.works;
 
         if (NULL == _iter) {
-            NamespaceDetails* nsd = nsdetails(_params.ns);
-
-            if (NULL == nsd) {
+            CollectionTemp* collection = cc().database()->getCollectionTemp( _params.ns );
+            if ( collection == NULL ) {
                 _nsDropped = true;
                 return PlanStage::FAILURE;
             }
 
-            if (nsd->isCapped()) {
-                _iter.reset(new CappedIterator(_params.ns, _params.start, _params.tailable,
-                                               _params.direction));
-            }
-            else {
-                _iter.reset(new FlatIterator(_params.ns, _params.start, _params.direction));
-            }
+            _iter.reset( collection->getIterator( _params.start,
+                                                  _params.tailable,
+                                                  _params.direction ) );
 
             ++_commonStats.needTime;
             return PlanStage::NEED_TIME;

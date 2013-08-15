@@ -22,11 +22,17 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/diskloc.h"
+#include "mongo/db/exec/collection_scan_common.h"
 
 namespace mongo {
 
     class Database;
+    class ExtentManager;
     class NamespaceDetails;
+
+    class CollectionIterator;
+    class FlatIterator;
+    class CappedIterator;
 
     /**
      * this is NOT safe through a yield right now
@@ -38,10 +44,22 @@ namespace mongo {
                         NamespaceDetails* details,
                         Database* database );
 
+        StringData ns() const { return _ns; }
+
+        CollectionIterator* getIterator( const DiskLoc& start, bool tailable,
+                                         const CollectionScanParams::Direction& dir) const;
+
     private:
+
+        ExtentManager* getExtentManager();
+        const ExtentManager* getExtentManager() const;
+
         std::string _ns; // TODO: this copy might be annoyingly slow
         NamespaceDetails* _details;
         Database* _database;
+
+        friend class FlatIterator;
+        friend class CappedIterator;
     };
 
 }

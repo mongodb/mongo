@@ -81,34 +81,34 @@ namespace mongo {
         /**
          * @param loc - has to be for a specific Record
          */
-        Record* recordFor( const DiskLoc& loc );
+        Record* recordFor( const DiskLoc& loc ) const;
 
         /**
          * @param loc - has to be for a specific Record (not an Extent)
          */
-        Extent* extentFor( const DiskLoc& loc );
+        Extent* extentFor( const DiskLoc& loc ) const;
 
         /**
          * @param loc - has to be for a specific Extent
          */
-        Extent* getExtent( const DiskLoc& loc, bool doSanityCheck = true );
+        Extent* getExtent( const DiskLoc& loc, bool doSanityCheck = true ) const;
 
-        Extent* getNextExtent( Extent* );
-        Extent* getPrevExtent( Extent* );
+        Extent* getNextExtent( Extent* ) const;
+        Extent* getPrevExtent( Extent* ) const;
 
         // get(Next|Prev)Record follows the Record linked list
         // these WILL cross Extent boundaries
         // * @param loc - has to be the DiskLoc for a Record
 
-        DiskLoc getNextRecord( const DiskLoc& loc );
+        DiskLoc getNextRecord( const DiskLoc& loc ) const;
 
-        DiskLoc getPrevRecord( const DiskLoc& loc );
+        DiskLoc getPrevRecord( const DiskLoc& loc ) const;
 
         // does NOT traverse extent boundaries
 
-        DiskLoc getNextRecordInExtent( const DiskLoc& loc );
+        DiskLoc getNextRecordInExtent( const DiskLoc& loc ) const;
 
-        DiskLoc getPrevRecordInExtent( const DiskLoc& loc );
+        DiskLoc getPrevRecordInExtent( const DiskLoc& loc ) const;
 
         /**
          * quantizes extent size to >= min + page boundary
@@ -116,6 +116,8 @@ namespace mongo {
         static int quantizeExtentSize( int size );
 
     private:
+
+        const DataFile* _getOpenFile( int n ) const;
 
         Extent* _createExtentInFile( int fileNo, DataFile* f,
                                      const char* ns, int size, bool newCapped,

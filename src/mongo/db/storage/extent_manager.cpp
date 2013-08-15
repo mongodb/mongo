@@ -88,6 +88,14 @@ namespace mongo {
         return Status::OK();
     }
 
+    const DataFile* ExtentManager::_getOpenFile( int n ) const {
+        verify(this);
+        DEV Lock::assertAtLeastReadLocked( _dbname );
+        verify( n >= 0 && n < static_cast<int>(_files.size()) );
+        return _files[n];
+    }
+
+
     // todo: this is called a lot. streamline the common case
     DataFile* ExtentManager::getFile( int n, int sizeNeeded , bool preallocateOnly) {
         verify(this);
@@ -170,9 +178,9 @@ namespace mongo {
         }
     }
 
-    Record* ExtentManager::recordFor( const DiskLoc& loc ) {
+    Record* ExtentManager::recordFor( const DiskLoc& loc ) const {
         loc.assertOk();
-        DataFile* df = getFile( loc.a() );
+        const DataFile* df = _getOpenFile( loc.a() );
 
         int ofs = loc.getOfs();
         if ( ofs < DataFileHeader::HeaderSize ) {
@@ -182,15 +190,15 @@ namespace mongo {
         return reinterpret_cast<Record*>( df->p() + ofs );
     }
 
-    Extent* ExtentManager::extentFor( const DiskLoc& loc ) {
+    Extent* ExtentManager::extentFor( const DiskLoc& loc ) const {
         Record* record = recordFor( loc );
         DiskLoc extentLoc( loc.a(), record->extentOfs() );
         return getExtent( extentLoc );
     }
 
-    Extent* ExtentManager::getExtent( const DiskLoc& loc, bool doSanityCheck ) {
+    Extent* ExtentManager::getExtent( const DiskLoc& loc, bool doSanityCheck ) const {
         loc.assertOk();
-        Extent* e = reinterpret_cast<Extent*>( getFile( loc.a() )->p() + loc.getOfs() );
+        Extent* e = reinterpret_cast<Extent*>( _getOpenFile( loc.a() )->p() + loc.getOfs() );
         if ( doSanityCheck )
             e->assertOk();
         memconcept::is(e, memconcept::concept::extent);
@@ -198,7 +206,7 @@ namespace mongo {
     }
 
 
-    DiskLoc ExtentManager::getNextRecordInExtent( const DiskLoc& loc ) {
+    DiskLoc ExtentManager::getNextRecordInExtent( const DiskLoc& loc ) const {
         int nextOffset = recordFor( loc )->nextOfs();
 
         if ( nextOffset == DiskLoc::NullOfs )
@@ -208,7 +216,7 @@ namespace mongo {
         return DiskLoc( loc.a(), nextOffset );
     }
 
-    DiskLoc ExtentManager::getNextRecord( const DiskLoc& loc ) {
+    DiskLoc ExtentManager::getNextRecord( const DiskLoc& loc ) const {
         DiskLoc next = getNextRecordInExtent( loc );
         if ( !next.isNull() )
             return next;
@@ -227,7 +235,7 @@ namespace mongo {
         return e->firstRecord;
     }
 
-    DiskLoc ExtentManager::getPrevRecordInExtent( const DiskLoc& loc ) {
+    DiskLoc ExtentManager::getPrevRecordInExtent( const DiskLoc& loc ) const {
         int prevOffset = recordFor( loc )->prevOfs();
 
         if ( prevOffset == DiskLoc::NullOfs )
@@ -237,7 +245,7 @@ namespace mongo {
         return DiskLoc( loc.a(), prevOffset );
     }
 
-    DiskLoc ExtentManager::getPrevRecord( const DiskLoc& loc ) {
+    DiskLoc ExtentManager::getPrevRecord( const DiskLoc& loc ) const {
         DiskLoc prev = getPrevRecordInExtent( loc );
         if ( !prev.isNull() )
             return prev;
@@ -256,13 +264,13 @@ namespace mongo {
         return e->firstRecord;
     }
 
-    Extent* ExtentManager::getNextExtent( Extent* e ) {
+    Extent* ExtentManager::getNextExtent( Extent* e ) const {
         if ( e->xnext.isNull() )
             return NULL;
         return getExtent( e->xnext );
     }
 
-    Extent* ExtentManager::getPrevExtent( Extent* e ) {
+    Extent* ExtentManager::getPrevExtent( Extent* e ) const {
         if ( e->xprev.isNull() )
             return NULL;
         return getExtent( e->xprev );
