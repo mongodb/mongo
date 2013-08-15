@@ -785,16 +785,15 @@ int connection_reconfigure(WT_CONNECTION *conn, const char *orig)
 	char *alloced;
 	const char *config, *left, *right;
 	int ret;
+	size_t alloclen, leftlen;
 
 	alloced = NULL;
 	if ((left = strstr_right(orig, ",create,", &right)) != NULL ||
 	    (left = strstr_right(orig, "create,", &right)) == orig ||
 	    ((left = strstr_right(orig, ",create", &right)) != NULL &&
 	    right == &orig[strlen(orig)])) {
-		size_t alloclen;
-		size_t leftlen;
 
-		leftlen = left - orig;
+		leftlen = (size_t)(left - orig);
 		alloclen = leftlen + strlen(right) + 1;
 		alloced = malloc(alloclen);
 		strncpy(alloced, orig, leftlen);
@@ -1210,7 +1209,7 @@ config_opt_file(CONFIG *cfg, WT_SESSION *parse_session, const char *filename)
 		while (rtrim > ltrim && isspace(rtrim[-1]))
 			rtrim--;
 
-		linelen = rtrim - ltrim;
+		linelen = (size_t)(rtrim - ltrim);
 		if (linelen == 0)
 			continue;
 
@@ -1318,9 +1317,8 @@ config_opt_int(CONFIG *cfg, WT_SESSION *parse_session,
 void
 config_opt_usage(void)
 {
-	size_t i, nopt;
+	size_t i, linelen, nopt;
 	const char *defaultval, *typestr;
-	int linelen;
 
 	printf("Following are options settable using -o or -O, "
 	    "showing [default value].\n");
@@ -1343,7 +1341,7 @@ config_opt_usage(void)
 			else
 				defaultval = "false";
 		}
-		linelen = printf("  %s=<%s> [%s]",
+		linelen = (size_t)printf("  %s=<%s> [%s]",
 		    config_opts[i].name, typestr, defaultval);
 		if (linelen + 2 + strlen(config_opts[i].description) < 80)
 			printf("  %s\n", config_opts[i].description);
@@ -1506,7 +1504,7 @@ uint64_t wtperf_rand(CONFIG *cfg) {
 void indent_lines(const char *lines, const char *indent)
 {
 	const char *bol, *eol;
-	size_t len;
+	int len;
 
 	bol = lines;
 	while (bol != NULL) {
@@ -1515,7 +1513,7 @@ void indent_lines(const char *lines, const char *indent)
 			len = strlen(bol);
 		else
 			len = eol++ - bol;
-		printf("%s%.*s\n", indent, (int)len, bol);
+		printf("%s%.*s\n", indent, len, bol);
 		bol = eol;
 	}
 }
