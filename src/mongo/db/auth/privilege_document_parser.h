@@ -25,7 +25,7 @@
 namespace mongo {
 
     /**
-     * Interface for class used to initialize User objects from their privilege documents
+     * Interface for class used to initialize User objects from their privilege documents.
      */
     class PrivilegeDocumentParser {
         MONGO_DISALLOW_COPYING(PrivilegeDocumentParser);
@@ -51,7 +51,7 @@ namespace mongo {
          * with the information extracted from the privilege document.
          */
         virtual Status initializeUserFromPrivilegeDocument(User* user,
-                                                           const BSONObj& privDoc) const = 0;
+                                                           const BSONObj& privDoc) const;
 
         /**
          * Parses privDoc and initializes the user's "credentials" field with the credential
@@ -85,8 +85,24 @@ namespace mongo {
         virtual Status checkValidPrivilegeDocument(const StringData& dbname,
                                                    const BSONObj& doc) const;
 
-        virtual Status initializeUserFromPrivilegeDocument(User* user,
-                                                           const BSONObj& privDoc) const;
+        virtual Status initializeUserCredentialsFromPrivilegeDocument(User* user,
+                                                                      const BSONObj& privDoc) const;
+
+        virtual Status initializeUserRolesFromPrivilegeDocument(
+                        User* user, const BSONObj& privDoc, const StringData& dbname) const;
+
+        virtual void initializeUserPrivilegesFromRoles(User* user) const;
+    };
+
+    class V2PrivilegeDocumentParser : public PrivilegeDocumentParser {
+        MONGO_DISALLOW_COPYING(V2PrivilegeDocumentParser);
+    public:
+
+        V2PrivilegeDocumentParser() {}
+        virtual ~V2PrivilegeDocumentParser() {}
+
+        virtual Status checkValidPrivilegeDocument(const StringData& dbname,
+                                                   const BSONObj& doc) const;
 
         virtual Status initializeUserCredentialsFromPrivilegeDocument(User* user,
                                                                       const BSONObj& privDoc) const;

@@ -23,6 +23,7 @@
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/user.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
@@ -34,6 +35,11 @@ namespace {
     const std::string ROLES_FIELD_NAME = "roles";
     const std::string OTHER_DB_ROLES_FIELD_NAME = "otherDBRoles";
     const std::string READONLY_FIELD_NAME = "readOnly";
+    const std::string CREDENTIALS_FIELD_NAME = "credentials";
+    const std::string DELEGATABLE_ROLES_FIELD_NAME = "delegatableRoles";
+    const std::string ROLE_NAME_FIELD_NAME = "name";
+    const std::string ROLE_SOURCE_FIELD_NAME = "source";
+    const std::string MONGODB_CR_CREDENTIAL_FIELD_NAME = "MONGODB-CR";
 
     const std::string SYSTEM_ROLE_READ = "read";
     const std::string SYSTEM_ROLE_READ_WRITE = "readWrite";
@@ -251,8 +257,32 @@ namespace {
         return allActions;
     }
 
+    Status PrivilegeDocumentParser::initializeUserFromPrivilegeDocument(
+            User* user, const BSONObj& privDoc) const {
+        std::string userName = privDoc[AuthorizationManager::USER_NAME_FIELD_NAME].str();
+        if (userName != user->getName().getUser()) {
+            return Status(ErrorCodes::BadValue,
+                          mongoutils::str::stream() << "User name from privilege document \""
+                                  << userName
+                                  << "\" doesn't match name of provided User \""
+                                  << user->getName().getUser()
+                                  << "\"",
+                          0);
+        }
 
-    Status _checkRolesArray(const BSONElement& rolesElement) {
+        Status status = initializeUserCredentialsFromPrivilegeDocument(user, privDoc);
+        if (!status.isOK()) {
+            return status;
+        }
+        status = initializeUserRolesFromPrivilegeDocument(user, privDoc, user->getName().getDB());
+        if (!status.isOK()) {
+            return status;
+        }
+        initializeUserPrivilegesFromRoles(user);
+        return Status::OK();
+    }
+
+    Status _checkV1RolesArray(const BSONElement& rolesElement) {
         if (rolesElement.type() != Array) {
             return _badValue("Role fields must be an array when present in system.users entries",
                              0);
@@ -327,7 +357,7 @@ namespace {
 
         // Validate the "roles" element.
         if (!rolesElement.eoo()) {
-            Status status = _checkRolesArray(rolesElement);
+            Status status = _checkV1RolesArray(rolesElement);
             if (!status.isOK())
                 return status;
         }
@@ -348,7 +378,7 @@ namespace {
             for (BSONObjIterator iter(otherDBRolesElement.embeddedObject());
                  iter.more(); iter.next()) {
 
-                Status status = _checkRolesArray(*iter);
+                Status status = _checkV1RolesArray(*iter);
                 if (!status.isOK())
                     return status;
             }
@@ -568,29 +598,122 @@ namespace {
         user->addPrivileges(privileges);
     }
 
-    Status V1PrivilegeDocumentParser::initializeUserFromPrivilegeDocument(
-            User* user, const BSONObj& privDoc) const {
-        std::string userName = privDoc[AuthorizationManager::USER_NAME_FIELD_NAME].str();
-        if (userName != user->getName().getUser()) {
-            return Status(ErrorCodes::BadValue,
-                          mongoutils::str::stream() << "User name from privilege document \""
-                                  << userName
-                                  << "\" doesn't match name of provided User \""
-                                  << user->getName().getUser()
-                                  << "\"",
-                          0);
+    Status _checkV2RolesArray(const BSONElement& rolesElement) {
+        StringData fieldName = rolesElement.fieldNameStringData();
+
+        if (rolesElement.eoo()) {
+            return _badValue(mongoutils::str::stream() << "User document needs '" << fieldName <<
+                                     "' field to be provided",
+                             0);
+        }
+        if (rolesElement.type() != Array) {
+            return _badValue(mongoutils::str::stream() << fieldName << " field must be an array",
+                             0);
+        }
+        for (BSONObjIterator iter(rolesElement.embeddedObject()); iter.more(); iter.next()) {
+            if ((*iter).type() != Object) {
+                return _badValue(mongoutils::str::stream() << "Elements in '" << fieldName <<
+                                         "' array must objects.",
+                                 0);
+            }
+            BSONObj roleObj = (*iter).Obj();
+            BSONElement nameElement = roleObj[ROLE_NAME_FIELD_NAME];
+            BSONElement sourceElement = roleObj[ROLE_SOURCE_FIELD_NAME];
+            if (nameElement.type() != String ||
+                    makeStringDataFromBSONElement(nameElement).empty()) {
+                return _badValue(mongoutils::str::stream() << "Entries in '" << fieldName <<
+                                         "' array need 'name' field to be a non-empty string",
+                                 0);
+            }
+            if (sourceElement.type() != String ||
+                    makeStringDataFromBSONElement(sourceElement).empty()) {
+                return _badValue(mongoutils::str::stream() << "Entries in '" << fieldName <<
+                                         "' array need 'source' field to be a non-empty string",
+                                 0);
+            }
+        }
+        return Status::OK();
+    }
+
+    Status V2PrivilegeDocumentParser::checkValidPrivilegeDocument(const StringData& dbname,
+                                                                  const BSONObj& doc) const {
+        BSONElement userElement = doc[AuthorizationManager::USER_NAME_FIELD_NAME];
+        BSONElement userSourceElement = doc[AuthorizationManager::USER_SOURCE_FIELD_NAME];
+        BSONElement credentialsElement = doc[CREDENTIALS_FIELD_NAME];
+        BSONElement rolesElement = doc[ROLES_FIELD_NAME];
+        BSONElement delegatableRolesElement = doc[DELEGATABLE_ROLES_FIELD_NAME];
+
+        // Validate the "user" element.
+        if (userElement.type() != String)
+            return _badValue("User document needs 'user' field to be a string", 0);
+        if (makeStringDataFromBSONElement(userElement).empty())
+            return _badValue("User document needs 'user' field to be non-empty", 0);
+
+        // Validate the "userSource" element
+        if (userSourceElement.type() != String ||
+                makeStringDataFromBSONElement(userSourceElement).empty()) {
+            return _badValue("User document needs 'userSource' field to be a non-empty string", 0);
+        }
+        StringData userSourceStr = makeStringDataFromBSONElement(userSourceElement);
+        if (!NamespaceString::validDBName(userSourceStr) && userSourceStr != "$external") {
+            return _badValue(mongoutils::str::stream() << "'" << userSourceStr <<
+                                     "' is not a valid value for the userSource field.",
+                             0);
+        }
+        if (userSourceStr != dbname) {
+            return _badValue(mongoutils::str::stream() << "userSource '" << userSourceStr <<
+                                     "' does not match database '" << dbname << "'", 0);
         }
 
-        Status status = initializeUserCredentialsFromPrivilegeDocument(user, privDoc);
-        if (!status.isOK()) {
-            return status;
+        // Validate the "credentials" element
+        if (credentialsElement.eoo() && userSourceStr != "$external") {
+            return _badValue("User document needs 'credentials' field unless userSource is "
+                            "'$external'",
+                    0);
         }
-        status = initializeUserRolesFromPrivilegeDocument(user, privDoc, user->getName().getDB());
-        if (!status.isOK()) {
-            return status;
+        if (!credentialsElement.eoo()) {
+            if (credentialsElement.type() != Object) {
+                return _badValue("User document needs 'credentials' field to be an object", 0);
+            }
+
+            BSONObj credentialsObj = credentialsElement.Obj();
+            if (credentialsObj.isEmpty()) {
+                return _badValue("User document needs 'credentials' field to be a non-empty object",
+                                 0);
+            }
+            BSONElement MongoCRElement = credentialsObj[MONGODB_CR_CREDENTIAL_FIELD_NAME];
+            if (!MongoCRElement.eoo() && (MongoCRElement.type() != String ||
+                    makeStringDataFromBSONElement(MongoCRElement).empty())) {
+                return _badValue("MONGODB-CR credential must to be a non-empty string, if present",
+                                 0);
+            }
         }
-        initializeUserPrivilegesFromRoles(user);
+
+        // Validate the "roles" element.
+        Status status = _checkV2RolesArray(rolesElement);
+        if (!status.isOK())
+            return status;
+
+        // Validate the "delegatableRoles" element.
+        status = _checkV2RolesArray(delegatableRolesElement);
+        if (!status.isOK())
+            return status;
+
         return Status::OK();
+    }
+
+    Status V2PrivilegeDocumentParser::initializeUserCredentialsFromPrivilegeDocument(
+            User* user, const BSONObj& privDoc) const {
+        return Status(ErrorCodes::InternalError, "NOT YET IMPLEMENTED");
+    }
+
+    Status V2PrivilegeDocumentParser::initializeUserRolesFromPrivilegeDocument(
+            User* user, const BSONObj& privDoc, const StringData& dbname) const {
+        return Status(ErrorCodes::InternalError, "NOT YET IMPLEMENTED");
+    }
+
+    void V2PrivilegeDocumentParser::initializeUserPrivilegesFromRoles(User* user) const {
+        // NOT YET IMPELEMENTED
     }
 
 } // namespace mongo
