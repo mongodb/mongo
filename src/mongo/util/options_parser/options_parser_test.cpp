@@ -73,6 +73,29 @@ namespace {
                                                                                     moe::Int)));
     }
 
+    TEST(Registration, DefaultValueWrongType) {
+        moe::OptionsParser parser;
+        moe::Environment environment;
+
+        moe::OptionSection testOpts;
+        testOpts.addOption(moe::OptionDescription("help", "help", moe::Switch, "Display help"));
+        ASSERT_NOT_OK(testOpts.addOption(moe::OptionDescription("port", "port", moe::Int, "Port",
+                                                                true, moe::Value("String"))));
+    }
+
+    TEST(Registration, ComposableNotVector) {
+        moe::OptionsParser parser;
+        moe::Environment environment;
+
+        moe::OptionSection testOpts;
+        ASSERT_NOT_OK(testOpts.addOption(moe::OptionDescription("setParameter", "setParameter",
+                                                                moe::String,
+                                                                "Multiple Values", true/*visible*/,
+                                                                moe::Value()/*no default*/,
+                                                                moe::Value()/*no implicit value*/,
+                                                                true/*composing*/)));
+    }
+
     TEST(Parsing, Good) {
         moe::OptionsParser parser;
         moe::Environment environment;
@@ -372,6 +395,119 @@ namespace {
         ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
     }
 
+    TEST(Parsing, DefaultValue) {
+        moe::OptionsParser parser;
+        moe::Environment environment;
+
+        moe::OptionSection testOpts;
+        testOpts.addOption(moe::OptionDescription("help", "help", moe::Switch, "Display help"));
+        testOpts.addOption(moe::OptionDescription("port", "port", moe::Int, "Port", true,
+                                                                                    moe::Value(5)));
+
+        std::vector<std::string> argv;
+        argv.push_back("binaryname");
+        std::map<std::string, std::string> env_map;
+
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        moe::Value value;
+        ASSERT_OK(environment.get(moe::Key("port"), &value));
+        int port;
+        ASSERT_OK(value.get(&port));
+        ASSERT_EQUALS(port, 5);
+    }
+
+    TEST(Parsing, DefaultValueOverride) {
+        moe::OptionsParser parser;
+        moe::Environment environment;
+
+        moe::OptionSection testOpts;
+        testOpts.addOption(moe::OptionDescription("help", "help", moe::Switch, "Display help"));
+        testOpts.addOption(moe::OptionDescription("port", "port", moe::Int, "Port", true,
+                                                                                    moe::Value(5)));
+
+        std::vector<std::string> argv;
+        argv.push_back("binaryname");
+        argv.push_back("--port");
+        argv.push_back("6");
+        std::map<std::string, std::string> env_map;
+
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        moe::Value value;
+        ASSERT_OK(environment.get(moe::Key("port"), &value));
+        int port;
+        ASSERT_OK(value.get(&port));
+        ASSERT_EQUALS(port, 6);
+    }
+
+    TEST(Parsing, ImplicitValue) {
+        moe::OptionsParser parser;
+        moe::Environment environment;
+
+        moe::OptionSection testOpts;
+        testOpts.addOption(moe::OptionDescription("help", "help", moe::Switch, "Display help"));
+        testOpts.addOption(moe::OptionDescription("port", "port", moe::Int, "Port", true,
+                                                                                    moe::Value(6),
+                                                                                    moe::Value(7)));
+
+        std::vector<std::string> argv;
+        argv.push_back("binaryname");
+        argv.push_back("--port");
+        std::map<std::string, std::string> env_map;
+
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        moe::Value value;
+        ASSERT_OK(environment.get(moe::Key("port"), &value));
+        int port;
+        ASSERT_OK(value.get(&port));
+        ASSERT_EQUALS(port, 7);
+    }
+
+    TEST(Parsing, ImplicitValueDefault) {
+        moe::OptionsParser parser;
+        moe::Environment environment;
+
+        moe::OptionSection testOpts;
+        testOpts.addOption(moe::OptionDescription("help", "help", moe::Switch, "Display help"));
+        testOpts.addOption(moe::OptionDescription("port", "port", moe::Int, "Port", true,
+                                                                                    moe::Value(6),
+                                                                                    moe::Value(7)));
+
+        std::vector<std::string> argv;
+        argv.push_back("binaryname");
+        std::map<std::string, std::string> env_map;
+
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        moe::Value value;
+        ASSERT_OK(environment.get(moe::Key("port"), &value));
+        int port;
+        ASSERT_OK(value.get(&port));
+        ASSERT_EQUALS(port, 6);
+    }
+
+    TEST(Parsing, ImplicitValueOverride) {
+        moe::OptionsParser parser;
+        moe::Environment environment;
+
+        moe::OptionSection testOpts;
+        testOpts.addOption(moe::OptionDescription("help", "help", moe::Switch, "Display help"));
+        testOpts.addOption(moe::OptionDescription("port", "port", moe::Int, "Port", true,
+                                                                                    moe::Value(6),
+                                                                                    moe::Value(7)));
+
+        std::vector<std::string> argv;
+        argv.push_back("binaryname");
+        argv.push_back("--port");
+        argv.push_back("5");
+        std::map<std::string, std::string> env_map;
+
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        moe::Value value;
+        ASSERT_OK(environment.get(moe::Key("port"), &value));
+        int port;
+        ASSERT_OK(value.get(&port));
+        ASSERT_EQUALS(port, 5);
+    }
+
     TEST(Style, NoSticky) {
         moe::OptionsParser parser;
         moe::Environment environment;
@@ -559,6 +695,32 @@ namespace {
         std::string str;
         ASSERT_OK(value.get(&str));
         ASSERT_EQUALS(str, "NotCommented");
+    }
+
+    TEST(INIConfigFile, DefaultValueOverride) {
+        OptionsParserTester parser;
+        moe::Environment environment;
+
+        moe::OptionSection testOpts;
+        testOpts.addOption(moe::OptionDescription("config", "config",
+                                                moe::String, "Config file to parse"));
+        testOpts.addOption(moe::OptionDescription("port", "port", moe::Int, "Port", true,
+                                                                                    moe::Value(5)));
+
+        std::vector<std::string> argv;
+        argv.push_back("binaryname");
+        argv.push_back("--config");
+        argv.push_back("default.conf");
+        std::map<std::string, std::string> env_map;
+
+        parser.setConfig("default.conf", "port=6");
+
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        moe::Value value;
+        ASSERT_OK(environment.get(moe::Key("port"), &value));
+        int port;
+        ASSERT_OK(value.get(&port));
+        ASSERT_EQUALS(port, 6);
     }
 
     TEST(JSONConfigFile, Basic) {
@@ -842,6 +1004,32 @@ namespace {
         ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
     }
 
+    TEST(JSONConfigFile, DefaultValueOverride) {
+        OptionsParserTester parser;
+        moe::Environment environment;
+
+        moe::OptionSection testOpts;
+        testOpts.addOption(moe::OptionDescription("config", "config",
+                                                moe::String, "Config file to parse"));
+        testOpts.addOption(moe::OptionDescription("port", "port", moe::Int, "Port", true,
+                                                                                    moe::Value(5)));
+
+        std::vector<std::string> argv;
+        argv.push_back("binaryname");
+        argv.push_back("--config");
+        argv.push_back("config.json");
+        std::map<std::string, std::string> env_map;
+
+        parser.setConfig("config.json", "{ port : 6 }");
+
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        moe::Value value;
+        ASSERT_OK(environment.get(moe::Key("port"), &value));
+        int port;
+        ASSERT_OK(value.get(&port));
+        ASSERT_EQUALS(port, 6);
+    }
+
     TEST(Parsing, BadConfigFileOption) {
         OptionsParserTester parser;
         moe::Environment environment;
@@ -925,6 +1113,90 @@ namespace {
 
         moe::Value value;
         ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+    }
+
+    TEST(JSONConfigFile, Composing) {
+        OptionsParserTester parser;
+        moe::Environment environment;
+
+        moe::OptionSection testOpts;
+        testOpts.addOption(moe::OptionDescription("config", "config",
+                                                  moe::String, "Config file to parse"));
+        testOpts.addOption(moe::OptionDescription("setParameter", "setParameter", moe::StringVector,
+                                                  "Multiple Values", true/*visible*/,
+                                                  moe::Value()/*no default*/,
+                                                  moe::Value()/*no implicit value*/,
+                                                  true/*composing*/));
+
+        std::vector<std::string> argv;
+        argv.push_back("binaryname");
+        argv.push_back("--config");
+        argv.push_back("config.json");
+        argv.push_back("--setParameter");
+        argv.push_back("val1");
+        argv.push_back("--setParameter");
+        argv.push_back("val2");
+        std::map<std::string, std::string> env_map;
+
+        parser.setConfig("config.json", "{ setParameter : [ \"val3\", \"val4\" ] }");
+
+        moe::Value value;
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        ASSERT_OK(environment.get(moe::Key("setParameter"), &value));
+        std::vector<std::string> setParameter;
+        std::vector<std::string>::iterator setParameterit;
+        ASSERT_OK(value.get(&setParameter));
+        ASSERT_EQUALS(setParameter.size(), static_cast<size_t>(4));
+        setParameterit = setParameter.begin();
+        ASSERT_EQUALS(*setParameterit, "val1");
+        setParameterit++;
+        ASSERT_EQUALS(*setParameterit, "val2");
+        setParameterit++;
+        ASSERT_EQUALS(*setParameterit, "val3");
+        setParameterit++;
+        ASSERT_EQUALS(*setParameterit, "val4");
+    }
+
+    TEST(INIConfigFile, Composing) {
+        OptionsParserTester parser;
+        moe::Environment environment;
+
+        moe::OptionSection testOpts;
+        testOpts.addOption(moe::OptionDescription("config", "config",
+                                                  moe::String, "Config file to parse"));
+        testOpts.addOption(moe::OptionDescription("setParameter", "setParameter", moe::StringVector,
+                                                  "Multiple Values", true/*visible*/,
+                                                  moe::Value()/*no default*/,
+                                                  moe::Value()/*no implicit value*/,
+                                                  true/*composing*/));
+
+        std::vector<std::string> argv;
+        argv.push_back("binaryname");
+        argv.push_back("--config");
+        argv.push_back("default.conf");
+        argv.push_back("--setParameter");
+        argv.push_back("val1");
+        argv.push_back("--setParameter");
+        argv.push_back("val2");
+        std::map<std::string, std::string> env_map;
+
+        parser.setConfig("default.conf", "setParameter=val3\nsetParameter=val4");
+
+        moe::Value value;
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        ASSERT_OK(environment.get(moe::Key("setParameter"), &value));
+        std::vector<std::string> setParameter;
+        std::vector<std::string>::iterator setParameterit;
+        ASSERT_OK(value.get(&setParameter));
+        ASSERT_EQUALS(setParameter.size(), static_cast<size_t>(4));
+        setParameterit = setParameter.begin();
+        ASSERT_EQUALS(*setParameterit, "val1");
+        setParameterit++;
+        ASSERT_EQUALS(*setParameterit, "val2");
+        setParameterit++;
+        ASSERT_EQUALS(*setParameterit, "val3");
+        setParameterit++;
+        ASSERT_EQUALS(*setParameterit, "val4");
     }
 
 } // unnamed namespace

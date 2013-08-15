@@ -18,6 +18,7 @@
 #include <iostream>
 
 #include "mongo/base/status.h"
+#include "mongo/util/options_parser/value.h"
 
 namespace mongo {
 namespace optionenvironment {
@@ -48,18 +49,27 @@ namespace optionenvironment {
                 const std::string& singleName, // Used for boost command line and INI
                 const OptionType type,
                 const std::string& description,
-                const bool isVisible = true)
+                const bool isVisible = true,
+                const Value defaultValue = Value(),
+                const Value implicitValue = Value(),
+                const bool isComposing = false)
             : _dottedName(dottedName),
             _singleName(singleName),
             _type(type),
             _description(description),
-            _isVisible(isVisible) { }
+            _isVisible(isVisible),
+            _default(defaultValue),
+            _implicit(implicitValue),
+            _isComposing(isComposing) { }
 
         std::string _dottedName;
         std::string _singleName;
         OptionType _type;
         std::string _description;
         bool _isVisible;
+        Value _default;
+        Value _implicit;
+        bool _isComposing;
     };
 
     class PositionalOptionDescription {
