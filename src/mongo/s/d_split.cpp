@@ -29,12 +29,12 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/authorization_manager.h"
-#include "mongo/db/btreecursor.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/index_legacy.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/query/internal_plans.h"
 #include "mongo/s/chunk.h" // for static genID only
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/config.h"
@@ -124,13 +124,11 @@ namespace mongo {
                 max = Helpers::toKeyFormat( kp.extendRangeBound( max, false ) );
             }
 
-            BtreeCursor* bc = BtreeCursor::make( d, *idx, min, max, false, 1 );
-            shared_ptr<Cursor> c( bc );
-            auto_ptr<ClientCursor> cc( new ClientCursor( QueryOption_NoCursorTimeout , c , ns ) );
-            if ( ! cc->ok() ) {
-                // range is empty
-                return true;
-            }
+            auto_ptr<Runner> runner(InternalPlanner::indexScan(ns, d, d->idxNo(*idx), min, max,
+                                                               false, InternalPlanner::FORWARD));
+
+            ClientCursor::registerRunner(runner.get());
+            runner->setYieldPolicy(Runner::YIELD_AUTO);
 
             // Find the 'missingField' value used to represent a missing document field in a key of
             // this index.
@@ -143,15 +141,17 @@ namespace mongo {
             // a 'missingField' valued index key is ok if the field is present in the document,
             // TODO if $exist for nulls were picking the index, it could be used instead efficiently
             int keyPatternLength = keyPattern.nFields();
-            while ( cc->ok() ) {
-                BSONObj currKey = c->currKey();
-                
+
+            DiskLoc loc;
+            BSONObj currKey;
+            while (Runner::RUNNER_ADVANCED == runner->getNext(&currKey, &loc)) {
                 //check that current key contains non missing elements for all fields in keyPattern
                 BSONObjIterator i( currKey );
                 for( int k = 0; k < keyPatternLength ; k++ ) {
                     if( ! i.more() ) {
                         errmsg = str::stream() << "index key " << currKey
                                                << " too short for pattern " << keyPattern;
+                        ClientCursor::deregisterRunner(runner.get());
                         return false;
                     }
                     BSONElement currKeyElt = i.next();
@@ -159,7 +159,9 @@ namespace mongo {
                     if ( !currKeyElt.eoo() && !currKeyElt.valuesEqual( missingField ) )
                         continue;
 
-                    BSONObj obj = c->current();
+                    // This is a fetch, but it's OK.  The underlying code won't throw a page fault
+                    // exception.
+                    BSONObj obj = loc.obj();
                     BSONObjIterator j( keyPattern );
                     BSONElement real;
                     for ( int x=0; x <= k; x++ )
@@ -171,24 +173,24 @@ namespace mongo {
                         continue;
                     
                     ostringstream os;
-                    os << "found missing value in key " << bc->prettyKey( currKey ) << " for doc: "
+                    os << "found missing value in key " << currKey << " for doc: "
                        << ( obj.hasField( "_id" ) ? obj.toString() : obj["_id"].toString() );
                     log() << "checkShardingIndex for '" << ns << "' failed: " << os.str() << endl;
                     
                     errmsg = os.str();
+                    ClientCursor::deregisterRunner(runner.get());
                     return false;
-                }
-                cc->advance();
-
-                if ( ! cc->yieldSometimes( ClientCursor::DontNeed ) ) {
-                    cc.release();
-                    break;
                 }
             }
 
+            ClientCursor::deregisterRunner(runner.get());
             return true;
         }
     } cmdCheckShardingIndex;
+
+    BSONObj prettyKey(const BSONObj& keyPattern, const BSONObj& key) {
+        return key.replaceFieldNames(keyPattern).clientReadable();
+    }
 
     class SplitVector : public Command {
     public:
@@ -350,10 +352,12 @@ namespace mongo {
                 long long currCount = 0;
                 long long numChunks = 0;
                 
-                BtreeCursor * bc = BtreeCursor::make( d, *idx, min, max, false, 1 );
-                shared_ptr<Cursor> c( bc );
-                auto_ptr<ClientCursor> cc( new ClientCursor( QueryOption_NoCursorTimeout , c , ns ) );
-                if ( ! cc->ok() ) {
+                auto_ptr<Runner> runner(InternalPlanner::indexScan(ns, d, d->idxNo(*idx), min, max,
+                    false, InternalPlanner::FORWARD));
+
+                BSONObj currKey;
+                Runner::RunnerState state = runner->getNext(&currKey, NULL);
+                if (Runner::RUNNER_ADVANCED != state) {
                     errmsg = "can't open a cursor for splitting (desired range is possibly empty)";
                     return false;
                 }
@@ -362,31 +366,28 @@ namespace mongo {
                 // at the end. If a key appears more times than entries allowed on a chunk, we issue a warning and
                 // split on the following key.
                 set<BSONObj> tooFrequentKeys;
-                splitKeys.push_back( bc->prettyKey( c->currKey().getOwned() ).extractFields( keyPattern ) );
+                splitKeys.push_back(prettyKey(idx->keyPattern(), currKey.getOwned()).extractFields( keyPattern ) );
+
+                ClientCursor::registerRunner(runner.get());
+                runner->setYieldPolicy(Runner::YIELD_AUTO);
                 while ( 1 ) {
-                    while ( cc->ok() ) {
+                    while (Runner::RUNNER_ADVANCED == state) {
                         currCount++;
                         
                         if ( currCount > keyCount && !forceMedianSplit ) {
-
-                            BSONObj currKey = bc->prettyKey( c->currKey() ).extractFields(keyPattern);
+                            currKey = prettyKey(idx->keyPattern(), currKey.getOwned()).extractFields(keyPattern);
                             // Do not use this split key if it is the same used in the previous split point.
                             if ( currKey.woCompare( splitKeys.back() ) == 0 ) {
                                 tooFrequentKeys.insert( currKey.getOwned() );
-                                
                             }
                             else {
                                 splitKeys.push_back( currKey.getOwned() );
                                 currCount = 0;
                                 numChunks++;
-                                
                                 LOG(4) << "picked a split key: " << currKey << endl;
                             }
-                            
                         }
-                        
-                        cc->advance();
-                        
+
                         // Stop if we have enough split points.
                         if ( maxSplitPoints && ( numChunks >= maxSplitPoints ) ) {
                             log() << "max number of requested split points reached (" << numChunks
@@ -394,16 +395,8 @@ namespace mongo {
                                   << endl;
                             break;
                         }
-                        
-                        if ( ! cc->yieldSometimes( ClientCursor::DontNeed ) ) {
-                            // we were near and and got pushed to the end
-                            // i think returning the splits we've already found is fine
-                            
-                            // don't use the btree cursor pointer to access keys beyond this point but ok
-                            // to use it for format the keys we've got already
-                            cc.release();
-                            break;
-                        }
+
+                        state = runner->getNext(&currKey, NULL);
                     }
                     
                     if ( ! forceMedianSplit )
@@ -419,10 +412,16 @@ namespace mongo {
                     currCount = 0;
                     log() << "splitVector doing another cycle because of force, keyCount now: " << keyCount << endl;
                     
-                    bc = BtreeCursor::make( d, *idx, min, max, false, 1 );
-                    c.reset( bc );
-                    cc.reset( new ClientCursor( QueryOption_NoCursorTimeout , c , ns ) );
+                    ClientCursor::deregisterRunner(runner.get());
+                    runner.reset(InternalPlanner::indexScan(ns, d, d->idxNo(*idx), min, max,
+                        false, InternalPlanner::FORWARD));
+
+                    runner->setYieldPolicy(Runner::YIELD_AUTO);
+                    ClientCursor::registerRunner(runner.get());
+                    state = runner->getNext(&currKey, NULL);
                 }
+
+                ClientCursor::deregisterRunner(runner.get());
                 
                 //
                 // 3. Format the result and issue any warnings about the data we gathered while traversing the
@@ -432,12 +431,11 @@ namespace mongo {
                 // Warn for keys that are more numerous than maxChunkSize allows.
                 for ( set<BSONObj>::const_iterator it = tooFrequentKeys.begin(); it != tooFrequentKeys.end(); ++it ) {
                     warning() << "chunk is larger than " << maxChunkSize
-                              << " bytes because of key " << bc->prettyKey( *it ) << endl;
+                              << " bytes because of key " << prettyKey(idx->keyPattern(), *it ) << endl;
                 }
                 
                 // Remove the sentinel at the beginning before returning
                 splitKeys.erase( splitKeys.begin() );
-                verify( c.get() );
                 
                 if ( timer.millis() > cmdLine.slowMS ) {
                     warning() << "Finding the split vector for " <<  ns << " over "<< keyPattern
@@ -836,17 +834,12 @@ namespace mongo {
                     BSONObj newmin = Helpers::toKeyFormat( kp.extendRangeBound( chunk.min, false) );
                     BSONObj newmax = Helpers::toKeyFormat( kp.extendRangeBound( chunk.max, false) );
 
-                    scoped_ptr<BtreeCursor> bc( BtreeCursor::make( d,
-                                                                   *idx,
-                                                                   newmin, /* lower */
-                                                                   newmax, /* upper */
-                                                                   false, /* upper noninclusive */
-                                                                   1 ) ); /* direction */
+                    auto_ptr<Runner> runner(InternalPlanner::indexScan(ns, d, d->idxNo(*idx),
+                        newmin, newmax, false));
 
                     // check if exactly one document found
-                    if ( bc->ok() ) {
-                        bc->advance();
-                        if ( bc->eof() ) {
+                    if (Runner::RUNNER_ADVANCED == runner->getNext(NULL, NULL)) {
+                        if (Runner::RUNNER_EOF == runner->getNext(NULL, NULL)) {
                             result.append( "shouldMigrate",
                                            BSON("min" << chunk.min << "max" << chunk.max) );
                             break;

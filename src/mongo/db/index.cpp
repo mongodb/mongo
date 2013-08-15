@@ -32,6 +32,7 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_update.h"
 #include "mongo/db/ops/delete.h"
+#include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/mongoutils/str.h"
@@ -142,9 +143,10 @@ namespace mongo {
 
     static void upgradeMinorVersionOrAssert(const string& newPluginName) {
         const string systemIndexes = cc().database()->name() + ".system.indexes";
-        shared_ptr<Cursor> cursor(theDataFileMgr.findAll(systemIndexes));
-        for ( ; cursor && cursor->ok(); cursor->advance()) {
-            const BSONObj index = cursor->current();
+        auto_ptr<Runner> runner(InternalPlanner::collectionScan(systemIndexes));
+        BSONObj index;
+        Runner::RunnerState state;
+        while (Runner::RUNNER_ADVANCED == (state = runner->getNext(&index, NULL))) {
             const BSONObj key = index.getObjectField("key");
             const string plugin = IndexNames::findPluginName(key);
             if (IndexNames::existedBefore24(plugin))
@@ -158,6 +160,10 @@ namespace mongo {
 
             error() << errmsg << endl;
             uasserted(16738, errmsg);
+        }
+
+        if (Runner::RUNNER_EOF != state) {
+            warning() << "Internal error while reading collection " << systemIndexes << endl;
         }
 
         DataFileHeader* dfh = cc().database()->getFile(0)->getHeader();

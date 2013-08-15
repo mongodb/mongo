@@ -144,7 +144,7 @@ namespace mongo {
          *
          * Returns false otherwise.  Returning false indicates a query planning error.
          */
-        bool getFieldDotted(const string& field, BSONElement* out);
+        bool getFieldDotted(const string& field, BSONElement* out) const;
     };
 
 }  // namespace mongo

@@ -116,9 +116,10 @@ namespace QueryStageMergeSortTests {
             // a:1
             IndexScanParams params;
             params.descriptor = getIndex(firstIndex);
-            params.startKey = objWithMinKey(1);
-            params.endKey = objWithMaxKey(1);
-            params.endKeyInclusive = true;
+            params.bounds.isSimpleRange = true;
+            params.bounds.startKey = objWithMinKey(1);
+            params.bounds.endKey = objWithMaxKey(1);
+            params.bounds.endKeyInclusive = true;
             params.direction = 1;
             ms->addChild(new IndexScan(params, ws, NULL));
 
@@ -173,9 +174,10 @@ namespace QueryStageMergeSortTests {
             // a:1
             IndexScanParams params;
             params.descriptor = getIndex(firstIndex);
-            params.startKey = objWithMinKey(1);
-            params.endKey = objWithMaxKey(1);
-            params.endKeyInclusive = true;
+            params.bounds.isSimpleRange = true;
+            params.bounds.startKey = objWithMinKey(1);
+            params.bounds.endKey = objWithMaxKey(1);
+            params.bounds.endKeyInclusive = true;
             params.direction = 1;
             ms->addChild(new IndexScan(params, ws, NULL));
 
@@ -229,9 +231,10 @@ namespace QueryStageMergeSortTests {
             // a:1
             IndexScanParams params;
             params.descriptor = getIndex(firstIndex);
-            params.startKey = objWithMinKey(1);
-            params.endKey = objWithMaxKey(1);
-            params.endKeyInclusive = true;
+            params.bounds.isSimpleRange = true;
+            params.bounds.startKey = objWithMinKey(1);
+            params.bounds.endKey = objWithMaxKey(1);
+            params.bounds.endKeyInclusive = true;
             params.direction = 1;
             ms->addChild(new IndexScan(params, ws, NULL));
 
@@ -287,9 +290,10 @@ namespace QueryStageMergeSortTests {
             // a:1
             IndexScanParams params;
             params.descriptor = getIndex(firstIndex);
-            params.startKey = objWithMaxKey(1);
-            params.endKey = objWithMinKey(1);
-            params.endKeyInclusive = true;
+            params.bounds.isSimpleRange = true;
+            params.bounds.startKey = objWithMaxKey(1);
+            params.bounds.endKey = objWithMinKey(1);
+            params.bounds.endKeyInclusive = true;
             // This is the direction along the index.
             params.direction = 1;
             ms->addChild(new IndexScan(params, ws, NULL));
@@ -344,16 +348,17 @@ namespace QueryStageMergeSortTests {
             // a:1
             IndexScanParams params;
             params.descriptor = getIndex(firstIndex);
-            params.startKey = objWithMinKey(1);
-            params.endKey = objWithMaxKey(1);
-            params.endKeyInclusive = true;
+            params.bounds.isSimpleRange = true;
+            params.bounds.startKey = objWithMinKey(1);
+            params.bounds.endKey = objWithMaxKey(1);
+            params.bounds.endKeyInclusive = true;
             params.direction = 1;
             ms->addChild(new IndexScan(params, ws, NULL));
 
             // b:51 (EOF)
             params.descriptor = getIndex(secondIndex);
-            params.startKey = BSON("" << 51 << "" << MinKey);
-            params.endKey = BSON("" << 51 << "" << MaxKey);
+            params.bounds.startKey = BSON("" << 51 << "" << MinKey);
+            params.bounds.endKey = BSON("" << 51 << "" << MaxKey);
             ms->addChild(new IndexScan(params, ws, NULL));
 
             PlanExecutor runner(ws, new FetchStage(ws, ms, NULL));
@@ -385,9 +390,10 @@ namespace QueryStageMergeSortTests {
             MergeSortStage* ms = new MergeSortStage(msparams, ws);
 
             IndexScanParams params;
-            params.startKey = objWithMinKey(1);
-            params.endKey = objWithMaxKey(1);
-            params.endKeyInclusive = true;
+            params.bounds.isSimpleRange = true;
+            params.bounds.startKey = objWithMinKey(1);
+            params.bounds.endKey = objWithMaxKey(1);
+            params.bounds.endKeyInclusive = true;
             params.direction = 1;
 
             int numIndices = 20;
@@ -431,9 +437,10 @@ namespace QueryStageMergeSortTests {
             auto_ptr<MergeSortStage> ms(new MergeSortStage(msparams, &ws));
 
             IndexScanParams params;
-            params.startKey = objWithMinKey(1);
-            params.endKey = objWithMaxKey(1);
-            params.endKeyInclusive = true;
+            params.bounds.isSimpleRange = true;
+            params.bounds.startKey = objWithMinKey(1);
+            params.bounds.endKey = objWithMaxKey(1);
+            params.bounds.endKeyInclusive = true;
             params.direction = 1;
 
             // Index 'a'+i has foo equal to 'i'.

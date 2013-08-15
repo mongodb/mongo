@@ -38,7 +38,6 @@
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege.h"
-#include "mongo/db/btreecursor.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/cmdline.h"
 #include "mongo/db/commands.h"
@@ -49,6 +48,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/kill_current_op.h"
 #include "mongo/db/pagefault.h"
+#include "mongo/db/query/internal_plans.h"
 #include "mongo/db/range_deleter_service.h"
 #include "mongo/db/repl/replication_server_status.h"
 #include "mongo/db/repl/rs.h"
@@ -391,10 +391,12 @@ namespace mongo {
             BSONObj min = Helpers::toKeyFormat( kp.extendRangeBound( _min, false ) );
             BSONObj max = Helpers::toKeyFormat( kp.extendRangeBound( _max, false ) );
 
-            BtreeCursor* btreeCursor = BtreeCursor::make( d , *idx , min , max , false , 1 );
-            auto_ptr<ClientCursor> cc(
-                    new ClientCursor( QueryOption_NoCursorTimeout ,
-                            shared_ptr<Cursor>( btreeCursor ) ,  _ns ) );
+            auto_ptr<Runner> runner(InternalPlanner::indexScan(_ns, d, d->idxNo(*idx),
+                                                               min, max, false));
+            ClientCursor::registerRunner(runner.get());
+            // we can afford to yield here because any change to the base data that we might miss is
+            // already being  queued and will be migrated in the 'transferMods' stage
+            runner->setYieldPolicy(Runner::YIELD_AUTO);
 
             // use the average object size to estimate how many objects a full chunk would carry
             // do that while traversing the chunk's range using the sharding index, below
@@ -416,25 +418,19 @@ namespace mongo {
             // we want the number of records to better report, in that case
             bool isLargeChunk = false;
             unsigned long long recCount = 0;;
-            while ( cc->ok() ) {
-                DiskLoc dl = cc->currLoc();
+            DiskLoc dl;
+            while (Runner::RUNNER_ADVANCED == runner->getNext(NULL, &dl)) {
                 if ( ! isLargeChunk ) {
                     scoped_spinlock lk( _trackerLocks );
                     _cloneLocs.insert( dl );
-                }
-                cc->advance();
-
-                // we can afford to yield here because any change to the base data that we might miss is already being
-                // queued and will be migrated in the 'transferMods' stage
-                if ( ! cc->yieldSometimes( ClientCursor::DontNeed ) ) {
-                    cc.release();
-                    break;
                 }
 
                 if ( ++recCount > maxRecsWhenFull ) {
                     isLargeChunk = true;
                 }
             }
+            ClientCursor::deregisterRunner(runner.get());
+            runner.reset();
 
             if ( isLargeChunk ) {
                 warning() << "can't move chunk of size (approximately) " << recCount * avgRecSize

@@ -23,6 +23,7 @@
 #include "mongo/client/connpool.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repl/is_master.h"
 #include "mongo/db/repl/master_slave.h"
 #include "mongo/db/repl/rs.h"
@@ -73,10 +74,11 @@ namespace mongo {
             list<BSONObj> src;
             {
                 Client::ReadContext ctx("local.sources", dbpath);
-                shared_ptr<Cursor> c = findTableScan("local.sources", BSONObj());
-                while ( c->ok() ) {
-                    src.push_back(c->current());
-                    c->advance();
+                auto_ptr<Runner> runner(InternalPlanner::collectionScan("local.sources"));
+                BSONObj obj;
+                Runner::RunnerState state;
+                while (Runner::RUNNER_ADVANCED == (state = runner->getNext(&obj, NULL))) {
+                    src.push_back(obj);
                 }
             }
             

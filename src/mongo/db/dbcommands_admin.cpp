@@ -44,6 +44,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/kill_current_op.h"
 #include "mongo/db/pdfile.h"
+#include "mongo/db/query/internal_plans.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/util/alignedbuilder.h"
 #include "mongo/util/background.h"
@@ -299,7 +300,6 @@ namespace mongo {
 
                 set<DiskLoc> recs;
                 if( scanData ) {
-                    shared_ptr<Cursor> c = theDataFileMgr.findAll(ns);
                     int n = 0;
                     int nInvalid = 0;
                     long long nQuantizedSize = 0;
@@ -309,10 +309,13 @@ namespace mongo {
                     long long bsonLen = 0;
                     int outOfOrder = 0;
                     DiskLoc cl_last;
-                    while ( c->ok() ) {
+
+                    DiskLoc cl;
+                    Runner::RunnerState state;
+                    auto_ptr<Runner> runner(InternalPlanner::collectionScan(ns));
+                    while (Runner::RUNNER_ADVANCED == (state = runner->getNext(NULL, &cl))) {
                         n++;
 
-                        DiskLoc cl = c->currLoc();
                         if ( n < 1000000 )
                             recs.insert(cl);
                         if ( d->isCapped() ) {
@@ -321,7 +324,7 @@ namespace mongo {
                             cl_last = cl;
                         }
 
-                        Record *r = c->_current();
+                        Record *r = cl.rec();
                         len += r->lengthWithHeaders();
                         nlen += r->netLength();
                         
@@ -369,8 +372,10 @@ namespace mongo {
                                 bsonLen += obj.objsize();
                             }
                         }
-
-                        c->advance();
+                    }
+                    if (Runner::RUNNER_EOF != state) {
+                        // TODO: more descriptive logging.
+                        warning() << "Internal error while reading collection " << ns << endl;
                     }
                     if ( d->isCapped() && !d->capLooped() ) {
                         result.append("cappedOutOfOrder", outOfOrder);

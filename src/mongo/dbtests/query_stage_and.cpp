@@ -111,17 +111,18 @@ namespace QueryStageAnd {
             // Foo <= 20
             IndexScanParams params;
             params.descriptor = getIndex(BSON("foo" << 1));
-            params.startKey = BSON("" << 20);
-            params.endKey = BSONObj();
-            params.endKeyInclusive = true;
+            params.bounds.isSimpleRange = true;
+            params.bounds.startKey = BSON("" << 20);
+            params.bounds.endKey = BSONObj();
+            params.bounds.endKeyInclusive = true;
             params.direction = -1;
             ah->addChild(new IndexScan(params, &ws, NULL));
 
             // Bar >= 10
             params.descriptor = getIndex(BSON("bar" << 1));
-            params.startKey = BSON("" << 10);
-            params.endKey = BSONObj();
-            params.endKeyInclusive = true;
+            params.bounds.startKey = BSON("" << 10);
+            params.bounds.endKey = BSONObj();
+            params.bounds.endKeyInclusive = true;
             params.direction = 1;
             ah->addChild(new IndexScan(params, &ws, NULL));
 
@@ -203,25 +204,26 @@ namespace QueryStageAnd {
             // Foo <= 20
             IndexScanParams params;
             params.descriptor = getIndex(BSON("foo" << 1));
-            params.startKey = BSON("" << 20);
-            params.endKey = BSONObj();
-            params.endKeyInclusive = true;
+            params.bounds.isSimpleRange = true;
+            params.bounds.startKey = BSON("" << 20);
+            params.bounds.endKey = BSONObj();
+            params.bounds.endKeyInclusive = true;
             params.direction = -1;
             ah->addChild(new IndexScan(params, &ws, NULL));
 
             // Bar >= 10
             params.descriptor = getIndex(BSON("bar" << 1));
-            params.startKey = BSON("" << 10);
-            params.endKey = BSONObj();
-            params.endKeyInclusive = true;
+            params.bounds.startKey = BSON("" << 10);
+            params.bounds.endKey = BSONObj();
+            params.bounds.endKeyInclusive = true;
             params.direction = 1;
             ah->addChild(new IndexScan(params, &ws, NULL));
 
             // 5 <= baz <= 15
             params.descriptor = getIndex(BSON("baz" << 1));
-            params.startKey = BSON("" << 5);
-            params.endKey = BSON("" << 15);
-            params.endKeyInclusive = true;
+            params.bounds.startKey = BSON("" << 5);
+            params.bounds.endKey = BSON("" << 15);
+            params.bounds.endKeyInclusive = true;
             params.direction = 1;
             ah->addChild(new IndexScan(params, &ws, NULL));
 
@@ -250,17 +252,18 @@ namespace QueryStageAnd {
             // Foo <= 20
             IndexScanParams params;
             params.descriptor = getIndex(BSON("foo" << 1));
-            params.startKey = BSON("" << 20);
-            params.endKey = BSONObj();
-            params.endKeyInclusive = true;
+            params.bounds.isSimpleRange = true;
+            params.bounds.startKey = BSON("" << 20);
+            params.bounds.endKey = BSONObj();
+            params.bounds.endKeyInclusive = true;
             params.direction = -1;
             ah->addChild(new IndexScan(params, &ws, NULL));
 
             // Bar == 5.  Index scan should be eof.
             params.descriptor = getIndex(BSON("bar" << 1));
-            params.startKey = BSON("" << 5);
-            params.endKey = BSON("" << 5);
-            params.endKeyInclusive = true;
+            params.bounds.startKey = BSON("" << 5);
+            params.bounds.endKey = BSON("" << 5);
+            params.bounds.endKeyInclusive = true;
             params.direction = 1;
             ah->addChild(new IndexScan(params, &ws, NULL));
 
@@ -288,20 +291,21 @@ namespace QueryStageAnd {
             // Foo >= 100
             IndexScanParams params;
             params.descriptor = getIndex(BSON("foo" << 1));
-            params.startKey = BSON("" << 100);
-            params.endKey = BSONObj();
-            params.endKeyInclusive = true;
+            params.bounds.isSimpleRange = true;
+            params.bounds.startKey = BSON("" << 100);
+            params.bounds.endKey = BSONObj();
+            params.bounds.endKeyInclusive = true;
             params.direction = 1;
             ah->addChild(new IndexScan(params, &ws, NULL));
 
             // Bar <= 100
             params.descriptor = getIndex(BSON("bar" << 1));
-            params.startKey = BSON("" << 100);
+            params.bounds.startKey = BSON("" << 100);
             // This is subtle and confusing.  We couldn't extract any keys from the elements with
             // 'foo' in them so we would normally index them with the "nothing found" key.  We don't
             // want to include that in our scan.
-            params.endKey = BSON("" << "");
-            params.endKeyInclusive = false;
+            params.bounds.endKey = BSON("" << "");
+            params.bounds.endKeyInclusive = false;
             params.direction = -1;
             ah->addChild(new IndexScan(params, &ws, NULL));
 
@@ -332,17 +336,18 @@ namespace QueryStageAnd {
             // Foo <= 20
             IndexScanParams params;
             params.descriptor = getIndex(BSON("foo" << 1));
-            params.startKey = BSON("" << 20);
-            params.endKey = BSONObj();
-            params.endKeyInclusive = true;
+            params.bounds.isSimpleRange = true;
+            params.bounds.startKey = BSON("" << 20);
+            params.bounds.endKey = BSONObj();
+            params.bounds.endKeyInclusive = true;
             params.direction = -1;
             ah->addChild(new IndexScan(params, &ws, NULL));
 
             // Bar >= 95
             params.descriptor = getIndex(BSON("bar" << 1));
-            params.startKey = BSON("" << 10);
-            params.endKey = BSONObj();
-            params.endKeyInclusive = true;
+            params.bounds.startKey = BSON("" << 10);
+            params.bounds.endKey = BSONObj();
+            params.bounds.endKeyInclusive = true;
             params.direction = 1;
             ah->addChild(new IndexScan(params, &ws, NULL));
 
@@ -377,9 +382,10 @@ namespace QueryStageAnd {
             // Scan over foo == 1
             IndexScanParams params;
             params.descriptor = getIndex(BSON("foo" << 1));
-            params.startKey = BSON("" << 1);
-            params.endKey = BSON("" << 1);
-            params.endKeyInclusive = true;
+            params.bounds.isSimpleRange = true;
+            params.bounds.startKey = BSON("" << 1);
+            params.bounds.endKey = BSON("" << 1);
+            params.bounds.endKeyInclusive = true;
             params.direction = 1;
             ah->addChild(new IndexScan(params, &ws, NULL));
 
@@ -496,9 +502,10 @@ namespace QueryStageAnd {
             // Scan over foo == 1
             IndexScanParams params;
             params.descriptor = getIndex(BSON("foo" << 1));
-            params.startKey = BSON("" << 1);
-            params.endKey = BSON("" << 1);
-            params.endKeyInclusive = true;
+            params.bounds.isSimpleRange = true;
+            params.bounds.startKey = BSON("" << 1);
+            params.bounds.endKey = BSON("" << 1);
+            params.bounds.endKeyInclusive = true;
             params.direction = 1;
             ah->addChild(new IndexScan(params, &ws, NULL));
 
@@ -533,17 +540,18 @@ namespace QueryStageAnd {
             // Foo == 7.  Should be EOF.
             IndexScanParams params;
             params.descriptor = getIndex(BSON("foo" << 1));
-            params.startKey = BSON("" << 7);
-            params.endKey = BSON("" << 7);
-            params.endKeyInclusive = true;
+            params.bounds.isSimpleRange = true;
+            params.bounds.startKey = BSON("" << 7);
+            params.bounds.endKey = BSON("" << 7);
+            params.bounds.endKeyInclusive = true;
             params.direction = 1;
             ah->addChild(new IndexScan(params, &ws, NULL));
 
             // Bar == 20, not EOF.
             params.descriptor = getIndex(BSON("bar" << 1));
-            params.startKey = BSON("" << 20);
-            params.endKey = BSON("" << 20);
-            params.endKeyInclusive = true;
+            params.bounds.startKey = BSON("" << 20);
+            params.bounds.endKey = BSON("" << 20);
+            params.bounds.endKeyInclusive = true;
             params.direction = 1;
             ah->addChild(new IndexScan(params, &ws, NULL));
 
@@ -574,17 +582,18 @@ namespace QueryStageAnd {
             // foo == 7.
             IndexScanParams params;
             params.descriptor = getIndex(BSON("foo" << 1));
-            params.startKey = BSON("" << 7);
-            params.endKey = BSON("" << 7);
-            params.endKeyInclusive = true;
+            params.bounds.isSimpleRange = true;
+            params.bounds.startKey = BSON("" << 7);
+            params.bounds.endKey = BSON("" << 7);
+            params.bounds.endKeyInclusive = true;
             params.direction = 1;
             ah->addChild(new IndexScan(params, &ws, NULL));
 
             // bar == 20.
             params.descriptor = getIndex(BSON("bar" << 1));
-            params.startKey = BSON("" << 20);
-            params.endKey = BSON("" << 20);
-            params.endKeyInclusive = true;
+            params.bounds.startKey = BSON("" << 20);
+            params.bounds.endKey = BSON("" << 20);
+            params.bounds.endKeyInclusive = true;
             params.direction = 1;
             ah->addChild(new IndexScan(params, &ws, NULL));
 
@@ -615,9 +624,10 @@ namespace QueryStageAnd {
             // Scan over foo == 1
             IndexScanParams params;
             params.descriptor = getIndex(BSON("foo" << 1));
-            params.startKey = BSON("" << 1);
-            params.endKey = BSON("" << 1);
-            params.endKeyInclusive = true;
+            params.bounds.isSimpleRange = true;
+            params.bounds.startKey = BSON("" << 1);
+            params.bounds.endKey = BSON("" << 1);
+            params.bounds.endKeyInclusive = true;
             params.direction = 1;
             ah->addChild(new IndexScan(params, &ws, NULL));
 

@@ -14,9 +14,15 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#pragma once
+
 #include "mongo/db/exec/collection_scan.h"
 #include "mongo/db/query/eof_runner.h"
+#include "mongo/db/exec/fetch.h"
+#include "mongo/db/exec/index_scan.h"
+#include "mongo/db/index/catalog_hack.h"
 #include "mongo/db/query/internal_runner.h"
+#include "mongo/db/query/query_projection.h"
 
 namespace mongo {
 
@@ -26,20 +32,76 @@ namespace mongo {
      */
     class InternalPlanner {
     public:
+        enum Direction {
+            FORWARD = 1,
+            BACKWARD = -1,
+        };
+
+        enum IndexScanOptions {
+            // The client is interested in the default outputs of an index scan: BSONObj of the key,
+            // DiskLoc of the record that's indexed.  The client does its own fetching if required.
+            IXSCAN_DEFAULT = 0,
+
+            // The client wants the fetched object and the DiskLoc that refers to it.  Delegating
+            // the fetch to the runner allows fetching outside of a lock.
+            IXSCAN_FETCH = 1,
+        };
+
         /**
-         * A collection scan.  Caller owns pointer.
+         * Return a collection scan.  Caller owns pointer.
          */
-        static Runner* findAll(const StringData& ns, const DiskLoc startLoc = DiskLoc()) {
+        static Runner* collectionScan(const StringData& ns,
+                                      const Direction direction = FORWARD,
+                                      const DiskLoc startLoc = DiskLoc()) {
             NamespaceDetails* nsd = nsdetails(ns);
             if (NULL == nsd) { return new EOFRunner(ns.toString()); }
 
             CollectionScanParams params;
             params.ns = ns.toString();
             params.start = startLoc;
+
+            if (FORWARD == direction) {
+                params.direction = CollectionScanParams::FORWARD;
+            }
+            else {
+                params.direction = CollectionScanParams::BACKWARD;
+            }
+
             WorkingSet* ws = new WorkingSet();
             CollectionScan* cs = new CollectionScan(params, ws, NULL);
-
             return new InternalRunner(ns.toString(), cs, ws);
+        }
+
+        /**
+         * Return an index scan.  Caller owns returned pointer.
+         */
+        static Runner* indexScan(const StringData& ns, NamespaceDetails* nsd, int idxNo,
+                                 const BSONObj& startKey, const BSONObj& endKey,
+                                 bool endKeyInclusive, Direction direction = FORWARD,
+                                 int options = 0) {
+            verify(NULL != nsd);
+
+            IndexScanParams params;
+            params.descriptor = CatalogHack::getDescriptor(nsd, idxNo);
+            verify(NULL != params.descriptor);
+            params.direction = direction;
+            params.bounds.isSimpleRange = true;
+            params.bounds.startKey = startKey;
+            params.bounds.endKey = endKey;
+            params.bounds.endKeyInclusive = endKeyInclusive;
+            // This always as 'true' as this is the new btreecursor.  Even if the underlying index
+            // is 'special' (ie, expression) we treat it like a Btree.
+            params.forceBtreeAccessMethod = true;
+
+            WorkingSet* ws = new WorkingSet();
+            IndexScan* ix = new IndexScan(params, ws, NULL);
+
+            if (IXSCAN_FETCH & options) {
+                return new InternalRunner(ns.toString(), new FetchStage(ws, ix, NULL), ws);
+            }
+            else {
+                return new InternalRunner(ns.toString(), ix, ws);
+            }
         }
     };
 

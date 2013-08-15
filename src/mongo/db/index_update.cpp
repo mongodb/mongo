@@ -27,6 +27,8 @@
 #include "mongo/db/kill_current_op.h"
 #include "mongo/db/namespace_details.h"
 #include "mongo/db/pdfile_private.h"
+#include "mongo/db/query/internal_plans.h"
+#include "mongo/db/query/runner_yield_policy.h"
 #include "mongo/db/repl/is_master.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/util/processinfo.h"
@@ -132,11 +134,12 @@ namespace mongo {
 
             unsigned long long n = 0;
             unsigned long long numDropped = 0;
-            auto_ptr<ClientCursor> cc;
-            {
-                shared_ptr<Cursor> c = theDataFileMgr.findAll(ns);
-                cc.reset( new ClientCursor(QueryOption_NoCursorTimeout, c, ns) );
-            }
+
+            auto_ptr<Runner> runner(InternalPlanner::collectionScan(ns));
+            // We're not delegating yielding to the runner because we need to know when a yield
+            // happens.
+            RunnerYieldPolicy yieldPolicy;
+            ClientCursor::registerRunner(runner.get());
 
             std::string idxName = idx.indexName();
             int idxNo = IndexBuildsInProgress::get(ns, idxName);
@@ -145,71 +148,72 @@ namespace mongo {
             // flipped, see insert_makeIndex) or even an empty IndexDetails, so nothing below should
             // depend on idx. idxNo should be recalculated after each yield.
 
-            while ( cc->ok() ) {
-                BSONObj js = cc->current();
+            BSONObj js;
+            DiskLoc loc;
+            while (Runner::RUNNER_ADVANCED == runner->getNext(&js, &loc)) {
                 try {
-                    {
-                        if ( !dupsAllowed && dropDups ) {
-                            LastError::Disabled led( lastError.get() );
-                            addKeysToIndex(ns, d, idxNo, js, cc->currLoc(), dupsAllowed);
-                        }
-                        else {
-                            addKeysToIndex(ns, d, idxNo, js, cc->currLoc(), dupsAllowed);
-                        }
+                    if ( !dupsAllowed && dropDups ) {
+                        LastError::Disabled led( lastError.get() );
+                        addKeysToIndex(ns, d, idxNo, js, loc, dupsAllowed);
                     }
-                    cc->advance();
+                    else {
+                        addKeysToIndex(ns, d, idxNo, js, loc, dupsAllowed);
+                    }
                 }
                 catch( AssertionException& e ) {
                     if( e.interrupted() ) {
                         killCurrentOp.checkForInterrupt();
                     }
 
-                    if ( dropDups ) {
-                        DiskLoc toDelete = cc->currLoc();
-                        bool ok = cc->advance();
-                        ClientCursor::YieldData yieldData;
-                        massert( 16093, "after yield cursor deleted" , cc->prepareToYield( yieldData ) );
-                        theDataFileMgr.deleteRecord( d, ns, toDelete.rec(), toDelete, false, true , true );
-                        if( !cc->recoverFromYield( yieldData ) ) {
-                            cc.release();
-                            if( !ok ) {
-                                /* we were already at the end. normal. */
+                    // TODO: Does exception really imply dropDups exception?
+                    if (dropDups) {
+                        bool runnerEOF = runner->isEOF();
+                        runner->saveState();
+                        theDataFileMgr.deleteRecord(d, ns, loc.rec(), loc, false, true, true);
+                        if (!runner->restoreState()) {
+                            // Runner got killed somehow.  This probably shouldn't happen.
+                            if (runnerEOF) {
+                                // Quote: "We were already at the end.  Normal.
+                                // TODO: Why is this normal?
                             }
                             else {
+                                ClientCursor::deregisterRunner(runner.get());
                                 uasserted(12585, "cursor gone during bg index; dropDups");
                             }
                             break;
                         }
-
-                        // Recalculate idxNo if we yielded
-                        idxNo = IndexBuildsInProgress::get(ns, idxName);
-                        // This index must still be around, because this is thread that would clean
-                        // it up
+                        // We deleted a record, but we didn't actually yield the dblock.
+                        // TODO: Why did the old code assume we yielded the lock?
                         numDropped++;
                     }
                     else {
+                        ClientCursor::deregisterRunner(runner.get());
                         log() << "background addExistingToIndex exception " << e.what() << endl;
                         throw;
                     }
                 }
+
                 n++;
                 progress.hit();
 
                 getDur().commitIfNeeded();
+                if (yieldPolicy.shouldYield()) {
+                    runner->saveState();
+                    yieldPolicy.yield();
 
-                if ( cc->yieldSometimes( ClientCursor::WillNeed ) ) {
+                    if (!runner->restoreState()) {
+                        ClientCursor::deregisterRunner(runner.get());
+                        uasserted(12584, "cursor gone during bg index");
+                        break;
+                    }
+
                     progress.setTotalWhileRunning( d->numRecords() );
-
                     // Recalculate idxNo if we yielded
                     idxNo = IndexBuildsInProgress::get(ns, idxName);
                 }
-                else {
-                    idxNo = -1;
-                    cc.release();
-                    uasserted(12584, "cursor gone during bg index");
-                    break;
-                }
             }
+
+            ClientCursor::deregisterRunner(runner.get());
             progress.finished();
             if ( dropDups )
                 log() << "\t backgroundIndexBuild dupsToDrop: " << numDropped << endl;

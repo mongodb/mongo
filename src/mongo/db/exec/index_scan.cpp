@@ -37,11 +37,9 @@ namespace mongo {
 
     IndexScan::IndexScan(const IndexScanParams& params, WorkingSet* workingSet,
                          const MatchExpression* filter)
-        : _workingSet(workingSet), _descriptor(params.descriptor), _startKey(params.startKey),
-          _endKey(params.endKey), _endKeyInclusive(params.endKeyInclusive),
-          _direction(params.direction), _hitEnd(false),
-          _filter(filter), _shouldDedup(params.descriptor->isMultikey()),
-          _yieldMovedCursor(false), _numWanted(params.limit) {
+        : _workingSet(workingSet), _descriptor(params.descriptor), _hitEnd(false), _filter(filter), 
+          _shouldDedup(params.descriptor->isMultikey()), _yieldMovedCursor(false), _params(params),
+          _btreeCursor(NULL) {
 
         string amName;
 
@@ -56,7 +54,8 @@ namespace mongo {
 
         if (IndexNames::GEO_2D == amName || IndexNames::GEO_2DSPHERE == amName) {
             // _endKey is meaningless for 2d and 2dsphere.
-            verify(_endKey.isEmpty());
+            verify(_params.bounds.isSimpleRange);
+            verify(_params.bounds.endKey.isEmpty());
         }
     }
 
@@ -69,8 +68,9 @@ namespace mongo {
 
             // The limit is *required* for 2d $near, which is the only index that pays attention to
             // it anyway.
-            cursorOptions.numWanted = _numWanted;
-            if (1 == _direction) {
+            cursorOptions.numWanted = _params.limit;
+
+            if (1 == _params.direction) {
                 cursorOptions.direction = CursorOptions::INCREASING;
             }
             else {
@@ -81,7 +81,27 @@ namespace mongo {
             _iam->newCursor(&cursor);
             _indexCursor.reset(cursor);
             _indexCursor->setOptions(cursorOptions);
-            _indexCursor->seek(_startKey);
+
+            if (_params.bounds.isSimpleRange) {
+                // Start at one key, end at another.
+                _indexCursor->seek(_params.bounds.startKey);
+            }
+            else {
+                // "Fast" Btree-specific navigation.
+                _btreeCursor = static_cast<BtreeIndexCursor*>(_indexCursor.get());
+                _checker.reset(new IndexBoundsChecker(&_params.bounds,
+                                                      _descriptor->keyPattern(),
+                                                      _params.direction));
+                vector<const BSONElement*> key;
+                vector<bool> inc;
+                _checker->getStartKey(&key, &inc);
+                _btreeCursor->seek(key, inc);
+
+                int nFields = _descriptor->keyPattern().nFields();
+                _keyElts.resize(nFields);
+                _keyEltsInc.resize(nFields);
+            }
+
             checkEnd();
         }
         else if (_yieldMovedCursor) {
@@ -186,14 +206,51 @@ namespace mongo {
             return;
         }
 
-        // If there is an empty endKey we will scan until we run out of index to scan over.
-        if (_endKey.isEmpty()) { return; }
+        if (_params.bounds.isSimpleRange) {
+            // "Normal" start -> end scanning.
+            verify(NULL == _btreeCursor);
+            verify(NULL == _checker.get());
 
-        int cmp = sgn(_endKey.woCompare(_indexCursor->getKey(), _descriptor->keyPattern()));
+            // If there is an empty endKey we will scan until we run out of index to scan over.
+            if (_params.bounds.endKey.isEmpty()) { return; }
 
-        if ((cmp != 0 && cmp != _direction) || (cmp == 0 && !_endKeyInclusive)) {
-            _hitEnd = true;
-            _commonStats.isEOF = true;
+            int cmp = sgn(_params.bounds.endKey.woCompare(_indexCursor->getKey(),
+                _descriptor->keyPattern()));
+
+            if ((cmp != 0 && cmp != _params.direction)
+                || (cmp == 0 && !_params.bounds.endKeyInclusive)) {
+
+                _hitEnd = true;
+                _commonStats.isEOF = true;
+            }
+        }
+        else {
+            verify(NULL != _btreeCursor);
+            verify(NULL != _checker.get());
+
+            // Use _checker to see how things are.
+            for (;;) {
+                IndexBoundsChecker::KeyState keyState;
+                keyState = _checker->checkKey(_indexCursor->getKey(),
+                                              &_keyEltsToUse,
+                                              &_movePastKeyElts,
+                                              &_keyElts,
+                                              &_keyEltsInc);
+
+                if (IndexBoundsChecker::VALID == keyState) {
+                    break;
+                }
+                if (IndexBoundsChecker::DONE == keyState) {
+                    _hitEnd = true;
+                    break;
+                }
+                verify(IndexBoundsChecker::MUST_ADVANCE == keyState);
+                _btreeCursor->skip(_indexCursor->getKey(), _keyEltsToUse, _movePastKeyElts,
+                                   _keyElts, _keyEltsInc);
+
+                // TODO: Can we do too much scanning here?  Old BtreeCursor stops scanning after a
+                // while and relies on a Matcher to make sure the result is ok.
+            }
         }
     }
 

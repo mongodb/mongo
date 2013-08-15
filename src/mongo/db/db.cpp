@@ -47,6 +47,7 @@
 #include "mongo/db/kill_current_op.h"
 #include "mongo/db/module.h"
 #include "mongo/db/pdfile.h"
+#include "mongo/db/query/internal_plans.h"
 #include "mongo/db/range_deleter_service.h"
 #include "mongo/db/repl/repl_start.h"
 #include "mongo/db/repl/replication_server_status.h"
@@ -371,9 +372,10 @@ namespace mongo {
             else {
                 if (h->versionMinor == PDFILE_VERSION_MINOR_22_AND_OLDER) {
                     const string systemIndexes = cc().database()->name() + ".system.indexes";
-                    shared_ptr<Cursor> cursor(theDataFileMgr.findAll(systemIndexes));
-                    for ( ; cursor && cursor->ok(); cursor->advance()) {
-                        const BSONObj index = cursor->current();
+                    auto_ptr<Runner> runner(InternalPlanner::collectionScan(systemIndexes));
+                    BSONObj index;
+                    Runner::RunnerState state;
+                    while (Runner::RUNNER_ADVANCED == (state = runner->getNext(&index, NULL))) {
                         const BSONObj key = index.getObjectField("key");
                         const string plugin = IndexNames::findPluginName(key);
                         if (IndexNames::existedBefore24(plugin))
@@ -384,6 +386,10 @@ namespace mongo {
                               << "See the upgrade section: "
                               << "http://dochub.mongodb.org/core/upgrade-2.4"
                               << startupWarningsLog;
+                    }
+
+                    if (Runner::RUNNER_EOF != state) {
+                        warning() << "Internal error while reading collection " << systemIndexes;
                     }
                 }
                 Database::closeDatabase( dbName.c_str(), dbpath );

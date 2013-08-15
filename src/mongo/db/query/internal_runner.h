@@ -40,13 +40,13 @@ namespace mongo {
          * Takes ownership of all arguments.
          */
         InternalRunner(const string& ns, PlanStage* root, WorkingSet* ws)
-              : _ns(ns), _exec(new PlanExecutor(ws, root)) {
-            _canonicalQuery.reset(CanonicalQuery::getInternalQuery());
-        }
+              : _ns(ns), _exec(new PlanExecutor(ws, root)) { }
 
         Runner::RunnerState getNext(BSONObj* objOut, DiskLoc* dlOut) {
             return _exec->getNext(objOut, dlOut);
         }
+
+        virtual bool isEOF() { return _exec->isEOF(); }
 
         virtual void saveState() { _exec->saveState(); }
 
@@ -60,19 +60,11 @@ namespace mongo {
             _exec->setYieldPolicy(policy);
         }
 
-        // TODO: Remove this from the runner spec, only used in creating a ClientCursor.
-        virtual const CanonicalQuery& getQuery() { 
-            verify(0);
-            return *_canonicalQuery;
-        }
-
         virtual void kill() { _exec->kill(); }
 
     private:
         string _ns;
 
-        // This is a dummy query.
-        scoped_ptr<CanonicalQuery> _canonicalQuery;
         scoped_ptr<PlanExecutor> _exec;
     };
 

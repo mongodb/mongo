@@ -90,15 +90,13 @@ namespace mongo {
      * For a given query, get a runner.  The runner could be a SingleSolutionRunner, a
      * CachedQueryRunner, or a MultiPlanRunner, depending on the cache/query solver/etc.
      */
-    Status getRunner(QueryMessage& q, Runner** out) {
-        CanonicalQuery* rawCanonicalQuery = NULL;
-
+    Status getRunner(QueryMessage& q, Runner** out, CanonicalQuery** rawCanonicalQuery) {
         // Canonicalize the query and wrap it in an auto_ptr so we don't leak it if something goes
         // wrong.
-        Status status = CanonicalQuery::canonicalize(q, &rawCanonicalQuery);
+        Status status = CanonicalQuery::canonicalize(q, rawCanonicalQuery);
         if (!status.isOK()) { return status; }
         verify(rawCanonicalQuery);
-        auto_ptr<CanonicalQuery> canonicalQuery(rawCanonicalQuery);
+        auto_ptr<CanonicalQuery> canonicalQuery(*rawCanonicalQuery);
 
         // Try to look up a cached solution for the query.
         // TODO: Can the cache have negative data about a solution?
@@ -232,7 +230,7 @@ namespace mongo {
 
             // What gives us results.
             Runner* runner = cc->getRunner();
-            const LiteParsedQuery& pq = runner->getQuery().getParsed();
+            const int queryOptions = cc->queryOptions();
 
             // Get results out of the runner.
             // TODO: There may be special handling required for tailable cursors?
@@ -255,7 +253,7 @@ namespace mongo {
                 ++numResults;
 
                 // Possibly note slave's position in the oplog.
-                if (pq.hasOption(QueryOption_OplogReplay)) {
+                if (queryOptions & QueryOption_OplogReplay) {
                     BSONElement e = obj["ts"];
                     if (Date == e.type() || Timestamp == e.type()) {
                         slaveReadTill = e._opTime();
@@ -273,7 +271,7 @@ namespace mongo {
                       << static_cast<int>(state) << endl;
                 // TODO: If the cursor is tailable we don't kill it if it's eof.
                 ccPin.free();
-                // cc is now invalid, as is the runner, as is 'pq'.
+                // cc is now invalid, as is the runner
                 cursorid = 0;
                 cc = NULL;
             }
@@ -283,11 +281,11 @@ namespace mongo {
                 runner->saveState();
 
                 // Possibly note slave's position in the oplog.
-                if (pq.hasOption(QueryOption_OplogReplay) && !slaveReadTill.isNull()) {
+                if ((queryOptions & QueryOption_OplogReplay) && !slaveReadTill.isNull()) {
                     cc->slaveReadTill(slaveReadTill);
                 }
 
-                exhaust = pq.hasOption(QueryOption_Exhaust);
+                exhaust = (queryOptions & QueryOption_Exhaust);
 
                 // If the getmore had a time limit, remaining time is "rolled over" back to the
                 // cursor (for use by future getmore ops).
@@ -317,7 +315,8 @@ namespace mongo {
 
         // Parse, canonicalize, plan, transcribe, and get a runner.
         Runner* rawRunner;
-        Status status = getRunner(q, &rawRunner);
+        CanonicalQuery* cq;
+        Status status = getRunner(q, &rawRunner, &cq);
         if (!status.isOK()) {
             uasserted(17007, "Couldn't process query " + q.query.toString()
                          + " why: " + status.reason());
@@ -329,7 +328,7 @@ namespace mongo {
         const ChunkVersion shardingVersionAtStart = shardingState.getVersion(q.ns);
 
         // We use this a lot below.
-        const LiteParsedQuery& pq = runner->getQuery().getParsed();
+        const LiteParsedQuery& pq = cq->getParsed();
 
         // TODO: Document why we do this.
         // TODO: do this when we can pass in our own parsed query
@@ -446,7 +445,8 @@ namespace mongo {
 
             // Allocate a new ClientCursor.  We don't have to worry about leaking it as it's
             // inserted into a global map by its ctor.
-            ClientCursor* cc = new ClientCursor(runner.get());
+            ClientCursor* cc = new ClientCursor(runner.get(), cq->getParsed().getOptions(),
+                                                cq->getParsed().getFilter());
             ccId = cc->cursorid();
 
             log() << "caching runner with cursorid " << ccId << endl;

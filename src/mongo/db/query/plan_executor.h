@@ -35,9 +35,8 @@ namespace mongo {
      */
     class PlanExecutor {
     public:
-        PlanExecutor(WorkingSet* ws, PlanStage* rt) : _workingSet(ws),
-                                                      _root(rt),
-                                                      _killed(false) { }
+        PlanExecutor(WorkingSet* ws, PlanStage* rt)
+            : _workingSet(ws), _root(rt), _killed(false) { }
 
         WorkingSet* getWorkingSet() { return _workingSet.get(); }
 
@@ -78,6 +77,8 @@ namespace mongo {
             }
         }
 
+        bool isEOF() { return _killed || _root->isEOF(); }
+
         Runner::RunnerState getNext(BSONObj* objOut, DiskLoc* dlOut) {
             if (_killed) { return Runner::RUNNER_DEAD; }
 
@@ -89,12 +90,17 @@ namespace mongo {
                     WorkingSetMember* member = _workingSet->get(id);
 
                     if (NULL != objOut) {
-                        if (member->hasObj()) {
+                        if (WorkingSetMember::LOC_AND_IDX == member->state) {
+                            if (1 != member->keyData.size()) {
+                                _workingSet->free(id);
+                                return Runner::RUNNER_ERROR;
+                            }
+                            *objOut = member->keyData[0].keyData;
+                        }
+                        else if (member->hasObj()) {
                             *objOut = member->obj;
                         }
                         else {
-                            // TODO: When we deal with projection and inclusion/exclusion, we'd fill
-                            // out 'objOut' from the index data here.
                             _workingSet->free(id);
                             return Runner::RUNNER_ERROR;
                         }

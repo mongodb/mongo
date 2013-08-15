@@ -80,9 +80,10 @@ namespace QueryMultiPlanRunner {
             // at least).
             IndexScanParams ixparams;
             ixparams.descriptor = getIndex(BSON("foo" << 1));
-            ixparams.startKey = BSON("" << 7);
-            ixparams.endKey = BSON("" << 7);
-            ixparams.endKeyInclusive = true;
+            ixparams.bounds.isSimpleRange = true;
+            ixparams.bounds.startKey = BSON("" << 7);
+            ixparams.bounds.endKey = BSON("" << 7);
+            ixparams.bounds.endKeyInclusive = true;
             ixparams.direction = 1;
             auto_ptr<WorkingSet> firstWs(new WorkingSet());
             IndexScan* ix = new IndexScan(ixparams, firstWs.get(), NULL);
