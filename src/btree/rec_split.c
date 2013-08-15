@@ -247,4 +247,3 @@ __wt_split_page_inmem(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	return (__split_row_page_inmem(session, page));
 }
-

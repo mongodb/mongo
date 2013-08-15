@@ -140,6 +140,11 @@
  * Atomic versions of F_ISSET, F_SET and F_CLR.
  * Spin until the new value can be swapped into place.
  */
+#if defined(_lint)
+#define	F_ISSET_ATOMIC(p, mask)	((p)->flags_atomic & ((uint32_t)(mask)))
+#define	F_SET_ATOMIC(p, mask)	((p)->flags_atomic |= ((uint32_t)(mask)))
+#define	F_CLR_ATOMIC(p, mask)	((p)->flags_atomic &= ~((uint32_t)(mask)))
+#else
 #define	F_ISSET_ATOMIC(p, mask)	((p)->flags_atomic & (uint32_t)(mask))
 
 #define	F_SET_ATOMIC(p, mask)	do {					\
@@ -157,6 +162,7 @@
 	} while (!WT_ATOMIC_CAS((p)->flags_atomic,			\
 	    __orig, __orig & ~(uint32_t)(mask)));			\
 } while (0)
+#endif
 
 /*
  * Condition variables:
