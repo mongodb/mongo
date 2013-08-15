@@ -18,20 +18,46 @@
 
 #include <boost/algorithm/string.hpp>
 #include <boost/filesystem/operations.hpp>
-#include <boost/program_options.hpp>
 #include <fstream>
 #include <iostream>
 
+#include "mongo/base/init.h"
 #include "mongo/base/initializer.h"
 #include "mongo/db/json.h"
 #include "mongo/tools/tool.h"
+#include "mongo/tools/tool_options.h"
+#include "mongo/util/options_parser/option_section.h"
+#include "mongo/util/options_parser/options_parser.h"
 #include "mongo/util/text.h"
 
 using namespace mongo;
 using std::string;
 using std::stringstream;
 
-namespace po = boost::program_options;
+namespace mongo {
+    MONGO_INITIALIZER_GENERAL(ParseStartupConfiguration,
+                              MONGO_NO_PREREQUISITES,
+                              ("default"))(InitializerContext* context) {
+
+        options = moe::OptionSection( "options" );
+        moe::OptionsParser parser;
+
+        Status retStatus = addMongoImportOptions(&options);
+        if (!retStatus.isOK()) {
+            return retStatus;
+        }
+
+        retStatus = parser.run(options, context->args(), context->env(), &_params);
+        if (!retStatus.isOK()) {
+            std::ostringstream oss;
+            oss << retStatus.toString() << "\n";
+            printMongoImportHelp(options, &oss);
+            return Status(ErrorCodes::FailedToParse, oss.str());
+        }
+
+        return Status::OK();
+    }
+} // namespace mongo
 
 class Import : public Tool {
 
@@ -274,35 +300,10 @@ class Import : public Tool {
     }
 
 public:
-    Import() : Tool( "import" ) {
-        addFieldOptions();
-        add_options()
-        ("ignoreBlanks","if given, empty fields in csv and tsv will be ignored")
-        ("type",po::value<string>() , "type of file to import.  default: json (json,csv,tsv)")
-        ("file",po::value<string>() , "file to import from; if not specified stdin is used" )
-        ("drop", "drop collection first " )
-        ("headerline","first line in input file is a header (CSV and TSV only)")
-        ("upsert", "insert or update objects that already exist" )
-        ("upsertFields", po::value<string>(), "comma-separated fields for the query part of the upsert. You should make sure this is indexed" )
-        ("stopOnError", "stop importing at first error rather than continuing" )
-        ("jsonArray", "load a json array, not one item per line. Currently limited to 16MB." )
-        ;
-        add_hidden_options()
-        ("noimport", "don't actually import. useful for benchmarking parser" )
-        ;
-        addPositionArg( "file" , 1 );
-        _type = JSON;
-        _ignoreBlanks = false;
-        _headerLine = false;
-        _upsert = false;
-        _doimport = true;
-    }
-    ;
-    virtual void printExtraHelp( ostream & out ) {
-        out << "Import CSV, TSV or JSON data into MongoDB.\n" << endl;
-        out << "When importing JSON documents, each document must be a separate line of the input file.\n";
-        out << "\nExample:\n";
-        out << "  mongoimport --host myhost --db my_cms --collection docs < mydocfile.json\n" << endl;
+    Import() : Tool( "import" ) { }
+
+    virtual void printHelp( ostream & out ) {
+        printMongoImportHelp(options, &out);
     }
 
     unsigned long long lastErrorFailures;

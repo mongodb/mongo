@@ -16,47 +16,51 @@
 
 #include "mongo/pch.h"
 
-#include <boost/program_options.hpp>
 #include <fstream>
 #include <iostream>
 #include <pcrecpp.h>
 
+#include "mongo/base/init.h"
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/client/gridfs.h"
 #include "mongo/tools/tool.h"
+#include "mongo/tools/tool_options.h"
+#include "mongo/util/options_parser/option_section.h"
+#include "mongo/util/options_parser/options_parser.h"
 
 using namespace mongo;
 
-namespace po = boost::program_options;
+namespace mongo {
+    MONGO_INITIALIZER_GENERAL(ParseStartupConfiguration,
+                              MONGO_NO_PREREQUISITES,
+                              ("default"))(InitializerContext* context) {
+
+        options = moe::OptionSection( "options" );
+        moe::OptionsParser parser;
+
+        Status retStatus = addMongoFilesOptions(&options);
+        if (!retStatus.isOK()) {
+            return retStatus;
+        }
+
+        retStatus = parser.run(options, context->args(), context->env(), &_params);
+        if (!retStatus.isOK()) {
+            std::ostringstream oss;
+            oss << retStatus.toString() << "\n";
+            printMongoFilesHelp(options, &oss);
+            return Status(ErrorCodes::FailedToParse, oss.str());
+        }
+
+        return Status::OK();
+    }
+} // namespace mongo
 
 class Files : public Tool {
 public:
-    Files() : Tool( "files" ) {
-        add_options()
-        ( "local,l", po::value<string>(), "local filename for put|get (default is to use the same name as 'gridfs filename')")
-        ( "type,t", po::value<string>(), "MIME type for put (default is to omit)")
-        ( "replace,r", "Remove other files with same name after PUT")
-        ;
-        add_hidden_options()
-        ( "command" , po::value<string>() , "command (list|search|put|get)" )
-        ( "file" , po::value<string>() , "filename for get|put" )
-        ;
-        addPositionArg( "command" , 1 );
-        addPositionArg( "file" , 2 );
-    }
+    Files() : Tool( "files" ) { }
 
-    virtual void printExtraHelp( ostream & out ) {
-        out << "Browse and modify a GridFS filesystem.\n" << endl;
-        out << "usage: " << _name << " [options] command [gridfs filename]" << endl;
-        out << "command:" << endl;
-        out << "  one of (list|search|put|get)" << endl;
-        out << "  list - list all files.  'gridfs filename' is an optional prefix " << endl;
-        out << "         which listed filenames must begin with." << endl;
-        out << "  search - search all files. 'gridfs filename' is a substring " << endl;
-        out << "           which listed filenames must contain." << endl;
-        out << "  put - add a file with filename 'gridfs filename'" << endl;
-        out << "  get - get a file with filename 'gridfs filename'" << endl;
-        out << "  delete - delete all files with filename 'gridfs filename'" << endl;
+    virtual void printHelp( ostream & out ) {
+        printMongoFilesHelp(options, &out);
     }
 
     void display( GridFS * grid , BSONObj obj ) {

@@ -19,26 +19,52 @@
 #include <boost/filesystem/convenience.hpp>
 #include <boost/filesystem/operations.hpp>
 #include <boost/lexical_cast.hpp>
-#include <boost/program_options.hpp>
 #include <boost/scoped_ptr.hpp>
 #include <fcntl.h>
 #include <fstream>
 #include <set>
 
+#include "mongo/base/init.h"
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/db/json.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/tools/tool.h"
+#include "mongo/tools/tool_options.h"
 #include "mongo/util/mmap.h"
+#include "mongo/util/options_parser/option_section.h"
+#include "mongo/util/options_parser/options_parser.h"
 #include "mongo/util/stringutils.h"
 
 using namespace mongo;
 
-namespace po = boost::program_options;
-
 namespace {
     const char* OPLOG_SENTINEL = "$oplog";  // compare by ptr not strcmp
 }
+
+namespace mongo {
+    MONGO_INITIALIZER_GENERAL(ParseStartupConfiguration,
+                              MONGO_NO_PREREQUISITES,
+                              ("default"))(InitializerContext* context) {
+
+        options = moe::OptionSection( "options" );
+        moe::OptionsParser parser;
+
+        Status retStatus = addMongoRestoreOptions(&options);
+        if (!retStatus.isOK()) {
+            return retStatus;
+        }
+
+        retStatus = parser.run(options, context->args(), context->env(), &_params);
+        if (!retStatus.isOK()) {
+            std::ostringstream oss;
+            oss << retStatus.toString() << "\n";
+            printMongoRestoreHelp(options, &oss);
+            return Status(ErrorCodes::FailedToParse, oss.str());
+        }
+
+        return Status::OK();
+    }
+} // namespace mongo
 
 class Restore : public BSONTool {
 public:
@@ -56,29 +82,10 @@ public:
     scoped_ptr<OpTime> _oplogLimitTS; // for oplog replay (limit)
     int _oplogEntrySkips; // oplog entries skipped
     int _oplogEntryApplies; // oplog entries applied
-    Restore() : BSONTool( "restore" ) , _drop(false) {
-        // Default values set here will show up in help text, but will supercede any default value
-        // used when calling getParam below.
-        add_options()
-        ("drop" , "drop each collection before import" )
-        ("oplogReplay", "replay oplog for point-in-time restore")
-        ("oplogLimit", po::value<string>(), "include oplog entries before the provided Timestamp "
-                "(seconds[:ordinal]) during the oplog replay; the ordinal value is optional")
-        ("keepIndexVersion" , "don't upgrade indexes to newest version")
-        ("noOptionsRestore" , "don't restore collection options")
-        ("noIndexRestore" , "don't restore indexes")
-        ("w" , po::value<int>()->default_value(0) , "minimum number of replicas per write" )
-        ;
-        add_hidden_options()
-        ("dir", po::value<string>()->default_value("dump"), "directory to restore from")
-        ("indexesLast" , "wait to add indexes (now default)") // left in for backwards compatibility
-        ;
-        addPositionArg("dir", 1);
-    }
+    Restore() : BSONTool( "restore" ) , _drop(false) { }
 
-    virtual void printExtraHelp(ostream& out) {
-        out << "Import BSON files into MongoDB.\n" << endl;
-        out << "usage: " << _name << " [options] [directory or filename to restore from]" << endl;
+    virtual void printHelp(ostream& out) {
+        printMongoRestoreHelp(options, &out);
     }
 
     virtual int doRun() {

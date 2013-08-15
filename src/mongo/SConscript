@@ -790,11 +790,14 @@ mongod = env.Install(
 Default( mongod )
 
 # tools
-allToolFiles = [ "tools/tool.cpp", "tools/stat_util.cpp" ]
-env.StaticLibrary("alltools", allToolFiles, LIBDEPS=["serveronly",
-                                                     "coreserver",
-                                                     "coredb",
-                                                     "$BUILD_DIR/mongo/db/auth/authmocks"])
+allToolFiles = [ "tools/tool.cpp", "tools/stat_util.cpp", "tools/tool_options.cpp" ]
+env.StaticLibrary("alltools",
+                  allToolFiles,
+                  LIBDEPS=["serveronly",
+                           "coreserver",
+                           "coredb",
+                           "$BUILD_DIR/mongo/util/options_parser/options_parser",
+                           "$BUILD_DIR/mongo/db/auth/authmocks"])
 
 normalTools = [ "dump", "restore", "export", "import", "stat", "top", "oplog" ]
 env.Alias( "tools", [ "#/${PROGPREFIX}mongo" + x + "${PROGSUFFIX}" for x in normalTools ] )

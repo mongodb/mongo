@@ -34,6 +34,7 @@
 #include "mongo/db/namespace_details.h"
 #include "mongo/platform/posix_fadvise.h"
 #include "mongo/util/file_allocator.h"
+#include "mongo/util/options_parser/option_section.h"
 #include "mongo/util/password.h"
 #include "mongo/util/text.h"
 #include "mongo/util/version.h"
@@ -41,80 +42,22 @@
 using namespace std;
 using namespace mongo;
 
-namespace po = boost::program_options;
-
 namespace mongo {
 
     CmdLine cmdLine;
 
-    Tool::Tool( string name , DBAccess access , string defaultDB ,
+    moe::OptionSection options("options");
+    moe::Environment _params;
+
+    Tool::Tool( string name , string defaultDB ,
                 string defaultCollection , bool usesstdout , bool quiet) :
         _name( name ) , _db( defaultDB ) , _coll( defaultCollection ) ,
         _usesstdout(usesstdout) , _quiet(quiet) , _noconnection(false) ,
-        _autoreconnect(false) , _conn(0) , _slaveConn(0) , _paired(false) {
-
-        _options = new po::options_description( "options" );
-        _options->add_options()
-        ("help","produce help message")
-        ("verbose,v", "be more verbose (include multiple times for more verbosity e.g. -vvvvv)")
-        ("quiet", "silence all non error diagnostic messages" )
-        ("version", "print the program's version and exit" )
-        ;
-
-        if ( access & REMOTE_SERVER )
-            _options->add_options()
-            ("host,h",po::value<string>(), "mongo host to connect to ( <set name>/s1,s2 for sets)" )
-            ("port",po::value<string>(), "server port. Can also use --host hostname:port" )
-            ("ipv6", "enable IPv6 support (disabled by default)")
-#ifdef MONGO_SSL
-            ("ssl", "use SSL for all connections")
-#endif
-
-            ("username,u",po::value<string>(), "username" )
-            ("password,p",po::value<string>()->implicit_value(""), "password" )
-            ("authenticationDatabase",
-             po::value<string>()->default_value(""),
-             "user source (defaults to dbname)" )
-            ("authenticationMechanism",
-             po::value<string>()->default_value("MONGODB-CR"),
-             "authentication mechanism")
-            ;
-
-        if ( access & LOCAL_SERVER )
-            _options->add_options()
-            ("dbpath",po::value<string>(), "directly access mongod database "
-             "files in the given path, instead of connecting to a mongod  "
-             "server - needs to lock the data directory, so cannot be "
-             "used if a mongod is currently accessing the same path" )
-            ("directoryperdb", "each db is in a separate directly (relevant only if dbpath specified)" )
-            ("journal", "enable journaling (relevant only if dbpath specified)" )
-            ;
-
-        if ( access & SPECIFY_DBCOL )
-            _options->add_options()
-            ("db,d",po::value<string>(), "database to use" )
-            ("collection,c",po::value<string>(), "collection to use (some commands)" )
-            ;
-
-        _hidden_options = new po::options_description( name + " hidden options" );
-
-        /* support for -vv -vvvv etc. */
-        for (string s = "vv"; s.length() <= 10; s.append("v")) {
-            _hidden_options->add_options()(s.c_str(), "verbose");
-        }
-    }
+        _autoreconnect(false) , _conn(0) , _slaveConn(0) , _paired(false) { }
 
     Tool::~Tool() {
-        delete( _options );
-        delete( _hidden_options );
         if ( _conn )
             delete _conn;
-    }
-
-    void Tool::printHelp(ostream &out) {
-        printExtraHelp(out);
-        _options->print(out);
-        printExtraHelpAfter(out);
     }
 
     void Tool::printVersion(ostream &out) {
@@ -136,25 +79,7 @@ namespace mongo {
 
         _name = argv[0];
 
-        /* using the same style as db.cpp */
-        int command_line_style = (((po::command_line_style::unix_style ^
-                                    po::command_line_style::allow_guessing) |
-                                   po::command_line_style::allow_long_disguise) ^
-                                  po::command_line_style::allow_sticky);
-        try {
-            po::options_description all_options("all options");
-            all_options.add(*_options).add(*_hidden_options);
-
-            po::store( po::command_line_parser( argc , argv ).
-                       options(all_options).
-                       positional( _positonalOptions ).
-                       style(command_line_style).run() , _params );
-        }
-        catch (po::error &e) {
-            cerr << "ERROR: " << e.what() << endl << endl;
-            printHelp(cerr);
-            ::_exit(EXIT_BADOPTIONS);
-        }
+        mongo::runGlobalInitializersOrDie(argc, argv, envp);
 
         // Set authentication parameters
         if ( _params.count( "authenticationDatabase" ) ) {
@@ -228,8 +153,6 @@ namespace mongo {
         if ( useDirectClient && _params.count("journal")){
             cmdLine.dur = true;
         }
-
-        mongo::runGlobalInitializersOrDie(argc, argv, envp);
 
         preSetup();
 
@@ -377,13 +300,6 @@ namespace mongo {
         return isdbgrid["isdbgrid"].trueValue();
     }
 
-    void Tool::addFieldOptions() {
-        add_options()
-        ("fields,f" , po::value<string>() , "comma separated list of field names e.g. -f name,age" )
-        ("fieldFile" , po::value<string>() , "file with field names - 1 per line" )
-        ;
-    }
-
     void Tool::needFields() {
 
         if ( hasParam( "fields" ) ) {
@@ -464,15 +380,8 @@ namespace mongo {
                            saslCommandMechanismFieldName << _authenticationMechanism ) );
     }
 
-    BSONTool::BSONTool( const char * name, DBAccess access , bool objcheck )
-        : Tool( name , access , "" , "" , false ) , _objcheck( objcheck ) {
-
-        add_options()
-        ("objcheck" , "validate object before inserting (default)" )
-        ("noobjcheck" , "don't validate object before inserting" )
-        ("filter" , po::value<string>() , "filter to apply before inserting" )
-        ;
-    }
+    BSONTool::BSONTool( const char * name, bool objcheck )
+        : Tool( name , "" , "" , false ) , _objcheck( objcheck ) { }
 
 
     int BSONTool::run() {
