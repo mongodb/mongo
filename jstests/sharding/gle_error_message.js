@@ -111,8 +111,10 @@ jsTest.log( "Testing stale version GLE when host goes down..." )
 var staleColl = st.s1.getCollection( coll + "" )
 staleColl.findOne()
 
-printjson( admin.runCommand({ connPoolStats : true }) );
-//printjson( admin.runCommand({ connPoolSync : true }) );
+// As it turns out, on the *second* auto-reconnect attempt we need to wait at least 2 secs,
+// otherwise reconnect fails with FAILED_STATE 
+sleep( 2000 );
+
 assert( admin.runCommand({ moveChunk : "" + coll, find : { _id : 0 }, to : shards[2]._id }).ok );
 
 MongoRunner.stopMongod( st.shard2 )
