@@ -90,8 +90,6 @@ struct __wt_connection_impl {
 	const char *error_prefix;	/* Database error prefix */
 	int is_new;			/* Connection created database */
 
-	int connection_initialized;	/* Connection is initialized */
-
 	WT_EXTENSION_API extension_api;	/* Extension API */
 
 					/* Configuration */
