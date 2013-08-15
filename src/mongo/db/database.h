@@ -23,6 +23,7 @@
 #include "mongo/db/namespace_details.h"
 #include "mongo/db/storage/record.h"
 #include "mongo/db/storage/extent_manager.h"
+#include "mongo/db/structure/collection.h"
 
 namespace mongo {
 
@@ -113,6 +114,11 @@ namespace mongo {
 
         // TODO: do not think this method should exist, so should try and encapsulate better
         ExtentManager& getExtentManager() { return _extentManager; }
+
+        /**
+         * @param ns - this is fully qualified, which is maybe not ideal ???
+         */
+        CollectionTemp* getCollectionTemp( const StringData& ns );
 
         /**
          * @return name of an existing database with same text name but different
