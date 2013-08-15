@@ -72,9 +72,6 @@ namespace mongo {
         // The result returned on the next call to getNext().
         DiskLoc _curr;
 
-        // The collection we're iterating over.
-        string _ns;
-
         const CollectionTemp* _collection;
 
         CollectionScanParams::Direction _direction;
