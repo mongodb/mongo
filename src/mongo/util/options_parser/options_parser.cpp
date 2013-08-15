@@ -310,6 +310,59 @@ namespace optionenvironment {
             return Status::OK();
         }
 
+        /**
+        * For all options that we registered as composable, combine the values from source and dest
+        * and set the result in dest.  Note that this only works for options that are registered as
+        * vectors of strings.
+        */
+        Status addCompositions(const OptionSection& options,
+                               const Environment& source,
+                               Environment* dest) {
+            std::vector<OptionDescription> options_vector;
+            Status ret = options.getAllOptions(&options_vector);
+            if (!ret.isOK()) {
+                return ret;
+            }
+
+            for(std::vector<OptionDescription>::const_iterator iterator = options_vector.begin();
+                iterator != options_vector.end(); iterator++) {
+                if (iterator->_isComposing) {
+                    std::vector<std::string> source_value;
+                    ret = source.get(iterator->_dottedName, &source_value);
+                    if (!ret.isOK() && ret != ErrorCodes::NoSuchKey) {
+                        StringBuilder sb;
+                        sb << "Error getting composable vector value from source: "
+                            << ret.toString();
+                        return Status(ErrorCodes::InternalError, sb.str());
+                    }
+                    // Only do something if our source environment has something to add
+                    else if (ret.isOK()) {
+                        std::vector<std::string> dest_value;
+                        ret = dest->get(iterator->_dottedName, &dest_value);
+                        if (!ret.isOK() && ret != ErrorCodes::NoSuchKey) {
+                            StringBuilder sb;
+                            sb << "Error getting composable vector value from dest: "
+                                << ret.toString();
+                            return Status(ErrorCodes::InternalError, sb.str());
+                        }
+
+                        // Append source_value on the end of dest_value
+                        dest_value.insert(dest_value.end(),
+                                          source_value.begin(),
+                                          source_value.end());
+
+                        // Set the resulting value in our output environment
+                        ret = dest->set(Key(iterator->_dottedName), Value(dest_value));
+                        if (!ret.isOK()) {
+                            return ret;
+                        }
+                    }
+                }
+            }
+
+            return Status::OK();
+        }
+
     } // namespace
 
     /**
@@ -451,6 +504,46 @@ namespace optionenvironment {
     }
 
     /**
+     * Extract default values from the given options and add to environment
+     */
+    Status OptionsParser::getDefaultValues(const OptionSection& options,
+                                           Environment* environment) {
+        Environment defaultEnvironment;
+
+        // This should have been caught at the time we registered our options, but we check that the
+        // default types match our declared types here just to be sure.
+        Status ret = addTypeConstraints(options, &defaultEnvironment);
+        if (!ret.isOK()) {
+            return ret;
+        }
+
+        std::map <Key, Value> defaultOptions;
+
+        ret = options.getDefaults(&defaultOptions);
+        if (!ret.isOK()) {
+            return ret;
+        }
+
+        typedef std::map<Key, Value>::iterator it_type;
+        for(it_type iterator = defaultOptions.begin();
+            iterator != defaultOptions.end(); iterator++) {
+            ret = defaultEnvironment.set(iterator->first, iterator->second);
+            if (!ret.isOK()) {
+                return ret;
+            }
+        }
+
+        ret = defaultEnvironment.validate();
+        if (!ret.isOK()) {
+            return ret;
+        }
+
+        *environment = defaultEnvironment;
+
+        return Status::OK();
+    }
+
+    /**
      * Reads the entire config file into the output string.  This is done this way because the JSON
      * parser only takes complete strings
      */
@@ -550,10 +643,17 @@ namespace optionenvironment {
             const std::map<std::string, std::string>& env, // XXX: Currently unused
             Environment* environment) {
 
+        Environment defaultEnvironment;
         Environment commandLineEnvironment;
         Environment configEnvironment;
+        Environment composedEnvironment;
 
-        Status ret = parseCommandLine(options, argv, &commandLineEnvironment);
+        Status ret = getDefaultValues(options, &defaultEnvironment);
+        if (!ret.isOK()) {
+            return ret;
+        }
+
+        ret = parseCommandLine(options, argv, &commandLineEnvironment);
         if (!ret.isOK()) {
             return ret;
         }
@@ -602,13 +702,41 @@ namespace optionenvironment {
             }
         }
 
+        // Adds the values for all our options that were registered as composable to the composed
+        // environment.  addCompositions doesn't override the values like "setAll" on our
+        // environment.  Instead it aggregates the values in the result environment.
+        ret = addCompositions(options, commandLineEnvironment, &composedEnvironment);
+        if (!ret.isOK()) {
+            return ret;
+        }
+
+        ret = addCompositions(options, configEnvironment, &composedEnvironment);
+        if (!ret.isOK()) {
+            return ret;
+        }
+
+        ret = addCompositions(options, defaultEnvironment, &composedEnvironment);
+        if (!ret.isOK()) {
+            return ret;
+        }
+
         // Add the values to our result in the order of override
         // NOTE: This should not fail validation as we haven't called environment->validate() yet
+        ret = environment->setAll(defaultEnvironment);
+        if (!ret.isOK()) {
+            return ret;
+        }
         ret = environment->setAll(configEnvironment);
         if (!ret.isOK()) {
             return ret;
         }
         ret = environment->setAll(commandLineEnvironment);
+        if (!ret.isOK()) {
+            return ret;
+        }
+
+        // Add this last because it represents the aggregated results of composing all environments
+        ret = environment->setAll(composedEnvironment);
         if (!ret.isOK()) {
             return ret;
         }

@@ -18,12 +18,75 @@
 #include <sstream>
 
 #include "mongo/bson/util/builder.h"
+#include "mongo/util/options_parser/value.h"
 
 namespace mongo {
 namespace optionenvironment {
 
     // Registration interface
 
+    namespace {
+        /**
+         * Utility function check that the type of our Value matches our OptionType
+         */
+        Status checkValueType(OptionType type, Value value) {
+            switch (type) {
+                case StringVector:
+                    {
+                        std::vector<std::string>  valueType;
+                        return value.get(&valueType);
+                    }
+                case Bool:
+                    {
+                        bool valueType;
+                        return value.get(&valueType);
+                    }
+                case Double:
+                    {
+                        double valueType;
+                        return value.get(&valueType);
+                    }
+                case Int:
+                    {
+                        int valueType;
+                        return value.get(&valueType);
+                    }
+                case Long:
+                    {
+                        long valueType;
+                        return value.get(&valueType);
+                    }
+                case String:
+                    {
+                        std::string valueType;
+                        return value.get(&valueType);
+                    }
+                case UnsignedLongLong:
+                    {
+                        unsigned long long valueType;
+                        return value.get(&valueType);
+                    }
+                case Unsigned:
+                    {
+                        unsigned valueType;
+                        return value.get(&valueType);
+                    }
+                case Switch:
+                    {
+                        bool valueType;
+                        return value.get(&valueType);
+                    }
+                default:
+                    {
+                        StringBuilder sb;
+                        sb << "Unrecognized option type: " << type;
+                        return Status(ErrorCodes::InternalError, sb.str());
+                    }
+            }
+        }
+    } // namespace
+
+    // TODO: Make sure the section we are adding does not have duplicate options
     Status OptionSection::addSection(const OptionSection& subSection) {
         if (!subSection._positionalOptions.empty()) {
             return Status(ErrorCodes::InternalError,
@@ -51,6 +114,47 @@ namespace optionenvironment {
                 return Status(ErrorCodes::InternalError, sb.str());
             }
         }
+
+        // Make sure the type of our default value matches our declared type
+        if (!option._default.isEmpty()) {
+            Status ret = checkValueType(option._type, option._default);
+            if (!ret.isOK()) {
+                StringBuilder sb;
+                sb << "Could not register option \"" << option._dottedName << "\": "
+                << "mismatch between declared type and type of default value: "
+                << ret.toString();
+                return Status(ErrorCodes::TypeMismatch, sb.str());
+            }
+        }
+
+        // Make sure that if we are registering a composing option it has the type of StringVector
+        if (option._isComposing) {
+            if (option._type != StringVector) {
+                StringBuilder sb;
+                sb << "Could not register option \"" << option._dottedName << "\": "
+                   << "only options registered as StringVector can be composing";
+                return Status(ErrorCodes::TypeMismatch, sb.str());
+            }
+        }
+
+        // Disallow registering a default for a composing option since the interaction between the
+        // two is unclear (for example, should we override or compose the default)
+        if (option._isComposing && !option._default.isEmpty()) {
+            StringBuilder sb;
+            sb << "Could not register option \"" << option._dottedName << "\": "
+                << "Cannot register a default value for a composing option";
+            return Status(ErrorCodes::InternalError, sb.str());
+        }
+
+        // Disallow registering an implicit value for a composing option since the interaction
+        // between the two is unclear
+        if (option._isComposing && !option._implicit.isEmpty()) {
+            StringBuilder sb;
+            sb << "Could not register option \"" << option._dottedName << "\": "
+                << "Cannot register an implicit value for a composing option";
+            return Status(ErrorCodes::InternalError, sb.str());
+        }
+
         _options.push_back(option);
         return Status::OK();
     }
@@ -86,30 +190,279 @@ namespace optionenvironment {
         /** Helper function to convert the values of our OptionType enum into the classes that
          *  boost::program_option uses to pass around this information
          */
-        po::value_semantic* typeToBoostType(OptionType type) {
+        Status typeToBoostType(std::auto_ptr<po::value_semantic>* boostType,
+                OptionType type,
+                const Value defaultValue = Value(),
+                const Value implicitValue = Value()) {
             switch (type) {
-                case StringVector:     return po::value< std::vector<std::string> >();
-                case Bool:             return po::value<bool>();
-                case Double:           return po::value<double>();
-                case Int:              return po::value<int>();
-                case Long:             return po::value<long>();
-                case String:           return po::value<std::string>();
-                case UnsignedLongLong: return po::value<unsigned long long>();
-                case Unsigned:         return po::value<unsigned>();
-                case Switch:           return po::bool_switch();
-                default:               return NULL; /* XXX: should not get here */
+                case StringVector:
+                    {
+                        *boostType = std::auto_ptr<po::value_semantic>(
+                                                    po::value< std::vector<std::string> >());
+
+                        if (!implicitValue.isEmpty()) {
+                            StringBuilder sb;
+                            sb << "Implicit value not supported for string vector";
+                            return Status(ErrorCodes::InternalError, sb.str());
+                        }
+
+                        if (!defaultValue.isEmpty()) {
+                            StringBuilder sb;
+                            sb << "Default value not supported for string vector";
+                            return Status(ErrorCodes::InternalError, sb.str());
+                        }
+
+                        return Status::OK();
+                    }
+                case Bool:
+                    {
+                        std::auto_ptr<po::typed_value<bool> > boostTypeBuilder(po::value<bool>());
+
+                        if (!implicitValue.isEmpty()) {
+                            bool implicitValueType;
+                            Status ret = implicitValue.get(&implicitValueType);
+                            if(!ret.isOK()) {
+                                StringBuilder sb;
+                                sb << "Error getting implicit value: " << ret.toString();
+                                return Status(ErrorCodes::InternalError, sb.str());
+                            }
+                            boostTypeBuilder->implicit_value(implicitValueType);
+                        }
+
+                        if (!defaultValue.isEmpty()) {
+                            bool defaultValueType;
+                            Status ret = defaultValue.get(&defaultValueType);
+                            if(!ret.isOK()) {
+                                StringBuilder sb;
+                                sb << "Error getting default value: " << ret.toString();
+                                return Status(ErrorCodes::InternalError, sb.str());
+                            }
+                            boostTypeBuilder->default_value(defaultValueType);
+                        }
+
+                        *boostType = boostTypeBuilder;
+
+                        return Status::OK();
+                    }
+                case Double:
+                    {
+                        std::auto_ptr<po::typed_value<double> >
+                                        boostTypeBuilder(po::value<double>());
+
+                        if (!implicitValue.isEmpty()) {
+                            double implicitValueType;
+                            Status ret = implicitValue.get(&implicitValueType);
+                            if(!ret.isOK()) {
+                                StringBuilder sb;
+                                sb << "Error getting implicit value: " << ret.toString();
+                                return Status(ErrorCodes::InternalError, sb.str());
+                            }
+                            boostTypeBuilder->implicit_value(implicitValueType);
+                        }
+
+                        if (!defaultValue.isEmpty()) {
+                            double defaultValueType;
+                            Status ret = defaultValue.get(&defaultValueType);
+                            if(!ret.isOK()) {
+                                StringBuilder sb;
+                                sb << "Error getting default value: " << ret.toString();
+                                return Status(ErrorCodes::InternalError, sb.str());
+                            }
+                            boostTypeBuilder->default_value(defaultValueType);
+                        }
+
+                        *boostType = boostTypeBuilder;
+
+                        return Status::OK();
+                    }
+                case Int:
+                    {
+                        std::auto_ptr<po::typed_value<int> > boostTypeBuilder(po::value<int>());
+
+                        if (!implicitValue.isEmpty()) {
+                            int implicitValueType;
+                            Status ret = implicitValue.get(&implicitValueType);
+                            if(!ret.isOK()) {
+                                StringBuilder sb;
+                                sb << "Error getting implicit value: " << ret.toString();
+                                return Status(ErrorCodes::InternalError, sb.str());
+                            }
+                            boostTypeBuilder->implicit_value(implicitValueType);
+                        }
+
+                        if (!defaultValue.isEmpty()) {
+                            int defaultValueType;
+                            Status ret = defaultValue.get(&defaultValueType);
+                            if(!ret.isOK()) {
+                                StringBuilder sb;
+                                sb << "Error getting default value: " << ret.toString();
+                                return Status(ErrorCodes::InternalError, sb.str());
+                            }
+                            boostTypeBuilder->default_value(defaultValueType);
+                        }
+
+                        *boostType = boostTypeBuilder;
+
+                        return Status::OK();
+                    }
+                case Long:
+                    {
+                        std::auto_ptr<po::typed_value<long> > boostTypeBuilder(po::value<long>());
+
+                        if (!implicitValue.isEmpty()) {
+                            long implicitValueType;
+                            Status ret = implicitValue.get(&implicitValueType);
+                            if(!ret.isOK()) {
+                                StringBuilder sb;
+                                sb << "Error getting implicit value: " << ret.toString();
+                                return Status(ErrorCodes::InternalError, sb.str());
+                            }
+                            boostTypeBuilder->implicit_value(implicitValueType);
+                        }
+
+                        if (!defaultValue.isEmpty()) {
+                            long defaultValueType;
+                            Status ret = defaultValue.get(&defaultValueType);
+                            if(!ret.isOK()) {
+                                StringBuilder sb;
+                                sb << "Error getting default value: " << ret.toString();
+                                return Status(ErrorCodes::InternalError, sb.str());
+                            }
+                            boostTypeBuilder->default_value(defaultValueType);
+                        }
+
+                        *boostType = boostTypeBuilder;
+
+                        return Status::OK();
+                    }
+                case String:
+                    {
+                        std::auto_ptr<po::typed_value<std::string> >
+                                        boostTypeBuilder(po::value<std::string>());
+
+                        if (!implicitValue.isEmpty()) {
+                            std::string implicitValueType;
+                            Status ret = implicitValue.get(&implicitValueType);
+                            if(!ret.isOK()) {
+                                StringBuilder sb;
+                                sb << "Error getting implicit value: " << ret.toString();
+                                return Status(ErrorCodes::InternalError, sb.str());
+                            }
+                            boostTypeBuilder->implicit_value(implicitValueType);
+                        }
+
+                        if (!defaultValue.isEmpty()) {
+                            std::string defaultValueType;
+                            Status ret = defaultValue.get(&defaultValueType);
+                            if(!ret.isOK()) {
+                                StringBuilder sb;
+                                sb << "Error getting default value: " << ret.toString();
+                                return Status(ErrorCodes::InternalError, sb.str());
+                            }
+                            boostTypeBuilder->default_value(defaultValueType);
+                        }
+
+                        *boostType = boostTypeBuilder;
+
+                        return Status::OK();
+                    }
+                case UnsignedLongLong:
+                    {
+                        std::auto_ptr<po::typed_value<unsigned long long> >
+                                        boostTypeBuilder(po::value<unsigned long long>());
+
+                        if (!implicitValue.isEmpty()) {
+                            unsigned long long implicitValueType;
+                            Status ret = implicitValue.get(&implicitValueType);
+                            if(!ret.isOK()) {
+                                StringBuilder sb;
+                                sb << "Error getting implicit value: " << ret.toString();
+                                return Status(ErrorCodes::InternalError, sb.str());
+                            }
+                            boostTypeBuilder->implicit_value(implicitValueType);
+                        }
+
+                        if (!defaultValue.isEmpty()) {
+                            unsigned long long defaultValueType;
+                            Status ret = defaultValue.get(&defaultValueType);
+                            if(!ret.isOK()) {
+                                StringBuilder sb;
+                                sb << "Error getting default value: " << ret.toString();
+                                return Status(ErrorCodes::InternalError, sb.str());
+                            }
+                            boostTypeBuilder->default_value(defaultValueType);
+                        }
+
+                        *boostType = boostTypeBuilder;
+
+                        return Status::OK();
+                    }
+                case Unsigned:
+                    {
+                        std::auto_ptr<po::typed_value<unsigned> >
+                                        boostTypeBuilder(po::value<unsigned>());
+
+                        if (!implicitValue.isEmpty()) {
+                            unsigned implicitValueType;
+                            Status ret = implicitValue.get(&implicitValueType);
+                            if(!ret.isOK()) {
+                                StringBuilder sb;
+                                sb << "Error getting implicit value: " << ret.toString();
+                                return Status(ErrorCodes::InternalError, sb.str());
+                            }
+                            boostTypeBuilder->implicit_value(implicitValueType);
+                        }
+
+                        if (!defaultValue.isEmpty()) {
+                            unsigned defaultValueType;
+                            Status ret = defaultValue.get(&defaultValueType);
+                            if(!ret.isOK()) {
+                                StringBuilder sb;
+                                sb << "Error getting default value: " << ret.toString();
+                                return Status(ErrorCodes::InternalError, sb.str());
+                            }
+                            boostTypeBuilder->default_value(defaultValueType);
+                        }
+
+                        *boostType = boostTypeBuilder;
+
+                        return Status::OK();
+                    }
+                case Switch:
+                    {
+                        *boostType = std::auto_ptr<po::value_semantic>(po::bool_switch());
+                        return Status::OK();
+                    }
+                default:
+                    {
+                        StringBuilder sb;
+                        sb << "Unrecognized option type: " << type;
+                        return Status(ErrorCodes::InternalError, sb.str());
+                    }
             }
         }
     } // namespace
 
     Status OptionSection::getBoostOptions(po::options_description* boostOptions,
-                                          bool visibleOnly) const {
+                                          bool visibleOnly,
+                                          bool includeDefaults) const {
 
         std::vector<OptionDescription>::const_iterator oditerator;
         for (oditerator = _options.begin(); oditerator != _options.end(); oditerator++) {
             if (!visibleOnly || (oditerator->_isVisible)) {
+                std::auto_ptr<po::value_semantic> boostType;
+                Status ret = typeToBoostType(&boostType,
+                                             oditerator->_type,
+                                             includeDefaults ? oditerator->_default : Value(),
+                                             oditerator->_implicit);
+                if (!ret.isOK()) {
+                    StringBuilder sb;
+                    sb << "Error getting boost type for option \""
+                       << oditerator->_dottedName << "\": " << ret.toString();
+                    return Status(ErrorCodes::InternalError, sb.str());
+                }
                 boostOptions->add_options()(oditerator->_singleName.c_str(),
-                        typeToBoostType(oditerator->_type),
+                        boostType.release(),
                         oditerator->_description.c_str());
             }
         }
@@ -119,7 +472,7 @@ namespace optionenvironment {
             po::options_description subGroup = ositerator->_name.empty()
                                                ? po::options_description()
                                                : po::options_description(ositerator->_name.c_str());
-            ositerator->getBoostOptions(&subGroup, visibleOnly);
+            ositerator->getBoostOptions(&subGroup, visibleOnly, includeDefaults);
             boostOptions->add(subGroup);
         }
 
@@ -151,6 +504,23 @@ namespace optionenvironment {
         std::vector<OptionSection>::const_iterator ositerator;
         for (ositerator = _subSections.begin(); ositerator != _subSections.end(); ositerator++) {
             ositerator->getAllOptions(options);
+        }
+
+        return Status::OK();
+    }
+
+    Status OptionSection::getDefaults(std::map<Key, Value>* values) const {
+
+        std::vector<OptionDescription>::const_iterator oditerator;
+        for (oditerator = _options.begin(); oditerator != _options.end(); oditerator++) {
+            if (!oditerator->_default.isEmpty()) {
+                (*values)[oditerator->_dottedName] = oditerator->_default;
+            }
+        }
+
+        std::vector<OptionSection>::const_iterator ositerator;
+        for (ositerator = _subSections.begin(); ositerator != _subSections.end(); ositerator++) {
+            ositerator->getDefaults(values);
         }
 
         return Status::OK();

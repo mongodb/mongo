@@ -84,7 +84,8 @@ namespace optionenvironment {
 
         // These functions are used by the OptionsParser to make calls into boost::program_options
         Status getBoostOptions(po::options_description* boostOptions,
-                               bool visibleOnly = false) const;
+                               bool visibleOnly = false,
+                               bool includeDefaults = false) const;
         Status getBoostPositionalOptions(
                 po::positional_options_description* boostPositionalOptions) const;
 
@@ -92,6 +93,12 @@ namespace optionenvironment {
         // correct names when populating the Environment, as well as check that a parameter that was
         // found has been registered and has the correct type
         Status getAllOptions(std::vector<OptionDescription>* options) const;
+
+        /**
+         * Populates the given map with all the default values for any options in this option
+         * section and all sub sections.
+         */
+        Status getDefaults(std::map<Key, Value>* values) const;
 
         std::string positionalHelpString(const std::string& execName) const;
         std::string helpString() const;
