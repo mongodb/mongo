@@ -14,7 +14,7 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "mongo/db/exec/collection_iterator.h"
+#include "mongo/db/structure/collection_iterator.h"
 
 #include "mongo/db/pdfile.h"
 

@@ -17,11 +17,11 @@
 #include "mongo/db/exec/collection_scan.h"
 
 #include "mongo/db/exec/collection_scan_common.h"
-#include "mongo/db/exec/collection_iterator.h"
 #include "mongo/db/exec/filter.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/namespace_details.h"
 #include "mongo/db/pdfile.h"
+#include "mongo/db/structure/collection_iterator.h"
 
 namespace mongo {
 
