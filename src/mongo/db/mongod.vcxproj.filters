@@ -160,9 +160,6 @@
     <ClCompile Include="commands\distinct.cpp">
       <Filter>db\commands</Filter>
     </ClCompile>
-    <ClCompile Include="pipeline\accumulator.cpp">
-      <Filter>db\pipeline\Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="pipeline\document_source_unwind.cpp">
       <Filter>db\pipeline\Source Files</Filter>
     </ClCompile>

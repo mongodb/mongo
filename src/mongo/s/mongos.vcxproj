@@ -3001,7 +3001,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="..\db\dbmessage.cpp" />
     <ClCompile Include="..\db\dbcommands_generic.cpp" />
     <ClCompile Include="..\db\dbwebserver.cpp" />
-    <ClCompile Include="..\db\pipeline\accumulator.cpp" />
     <ClCompile Include="..\db\pipeline\accumulator_add_to_set.cpp" />
     <ClCompile Include="..\db\pipeline\accumulator_avg.cpp" />
     <ClCompile Include="..\db\pipeline\accumulator_first.cpp" />

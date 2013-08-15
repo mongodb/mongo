@@ -579,9 +579,6 @@
     <ClCompile Include="..\shell\mongo.cpp">
       <Filter>Generated from JavaScript source</Filter>
     </ClCompile>
-    <ClCompile Include="..\db\pipeline\accumulator.cpp">
-      <Filter>db\pipeline\Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\db\pipeline\value.cpp">
       <Filter>db\pipeline\Source Files</Filter>
     </ClCompile>

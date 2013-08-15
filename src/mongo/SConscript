@@ -317,7 +317,6 @@ env.StaticLibrary("coredb", [
         "db/index/btree_key_generator.cpp",
         "db/keypattern.cpp",
         "db/matcher/matcher.cpp",
-        "db/pipeline/accumulator.cpp",
         "db/pipeline/accumulator_add_to_set.cpp",
         "db/pipeline/accumulator_avg.cpp",
         "db/pipeline/accumulator_first.cpp",
