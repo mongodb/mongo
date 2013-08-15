@@ -503,6 +503,8 @@ namespace optionenvironment {
                     return Status(ErrorCodes::InternalError, sb.str());
                 }
             }
+            // Resize our config vector to the number of bytes we actually read
+            configVector.resize(nread);
         }
 
         // Copy the vector contents into our result string
