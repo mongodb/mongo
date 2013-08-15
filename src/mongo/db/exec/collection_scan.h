@@ -17,10 +17,10 @@
 #pragma once
 
 #include "mongo/db/diskloc.h"
-#include "mongo/db/exec/collection_iterator.h"
 #include "mongo/db/exec/collection_scan_common.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/matcher/expression.h"
+#include "mongo/db/structure/collection_iterator.h"
 
 namespace mongo {
 
