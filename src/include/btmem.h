@@ -145,7 +145,10 @@ struct __wt_page_modify {
 	uint64_t disk_txn;
 
 	union {
-		WT_PAGE *split;		/* Resulting split */
+		struct {
+			WT_PAGE *page;	/* Resulting split page */
+			WT_REF *ref;	/* WT_REF slot on the parent */
+		} split;
 		WT_ADDR	 replace;	/* Resulting replacement */
 	} u;
 
@@ -327,6 +330,7 @@ struct __wt_page {
 #define	WT_PAGE_DISK_ALLOC	0x02	/* Disk image in allocated memory */
 #define	WT_PAGE_DISK_MAPPED	0x04	/* Disk image in mapped memory */
 #define	WT_PAGE_EVICT_LRU	0x08	/* Page is on the LRU queue */
+#define	WT_PAGE_WAS_SPLIT	0x10	/* Page has been split in memory */
 	uint8_t flags_atomic;		/* Atomic flags, use F_*_ATOMIC */
 };
 

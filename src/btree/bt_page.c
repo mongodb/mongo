@@ -83,7 +83,7 @@ __wt_page_in_func(
 			 * stuck if the page doesn't become available.
 			 */
 			if (!WT_TXN_ACTIVE(txn) &&
-			    txn->force_evict_attempts < 100 &&
+			    txn->force_evict_attempts < 4 &&
 			    __wt_eviction_page_force(session, page)) {
 				++txn->force_evict_attempts;
 				page->read_gen = WT_READ_GEN_OLDEST;

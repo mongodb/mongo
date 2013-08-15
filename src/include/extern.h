@@ -286,7 +286,12 @@ extern int __wt_btree_close(WT_SESSION_IMPL *session);
 extern int __wt_btree_tree_open( WT_SESSION_IMPL *session,
     const uint8_t *addr,
     uint32_t addr_size);
-extern int __wt_btree_leaf_create( WT_SESSION_IMPL *session,
+extern int __wt_btree_new_modified_page(WT_SESSION_IMPL *session,
+    uint8_t type,
+    uint32_t entries,
+    int merge,
+    WT_PAGE **pagep);
+extern int __wt_btree_new_leaf_page( WT_SESSION_IMPL *session,
     WT_PAGE *parent,
     WT_REF *ref,
     WT_PAGE **pagep);
@@ -374,6 +379,7 @@ extern int __wt_rec_evict(WT_SESSION_IMPL *session,
     WT_PAGE *page,
     int exclusive);
 extern int __wt_merge_tree(WT_SESSION_IMPL *session, WT_PAGE *top);
+extern int __wt_split_page_inmem(WT_SESSION_IMPL *session, WT_PAGE *page);
 extern int __wt_rec_track(WT_SESSION_IMPL *session,
     WT_PAGE *page,
     const uint8_t *addr,
