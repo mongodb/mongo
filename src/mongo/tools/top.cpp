@@ -16,37 +16,54 @@
 
 #include "mongo/pch.h"
 
-#include <boost/program_options.hpp>
 #include <fstream>
 #include <iostream>
 
+#include "mongo/base/init.h"
 #include "mongo/db/json.h"
-#include "mongo/tools/tool.h"
 #include "mongo/tools/stat_util.h"
+#include "mongo/tools/tool.h"
+#include "mongo/tools/tool_options.h"
+#include "mongo/util/options_parser/option_section.h"
+#include "mongo/util/options_parser/options_parser.h"
 
-namespace po = boost::program_options;
+namespace mongo {
+    MONGO_INITIALIZER_GENERAL(ParseStartupConfiguration,
+                              MONGO_NO_PREREQUISITES,
+                              ("default"))(InitializerContext* context) {
+
+        options = moe::OptionSection( "options" );
+        moe::OptionsParser parser;
+
+        Status retStatus = addMongoTopOptions(&options);
+        if (!retStatus.isOK()) {
+            return retStatus;
+        }
+
+        retStatus = parser.run(options, context->args(), context->env(), &_params);
+        if (!retStatus.isOK()) {
+            std::ostringstream oss;
+            oss << retStatus.toString() << "\n";
+            printMongoTopHelp(options, &oss);
+            return Status(ErrorCodes::FailedToParse, oss.str());
+        }
+
+        return Status::OK();
+    }
+} // namespace mongo
 
 namespace mongo {
 
     class TopTool : public Tool {
     public:
 
-        TopTool() : Tool( "top" , REMOTE_SERVER , "admin" ) {
+        TopTool() : Tool( "top" , "admin" ) {
             _sleep = 1;
-
-            add_hidden_options()
-            ( "sleep" , po::value<int>() , "time to sleep between calls" )
-            ;
-            add_options()
-            ( "locks" , "use db lock info instead of top" )
-            ;
-            addPositionArg( "sleep" , 1 );
-
             _autoreconnect = true;
         }
 
-        virtual void printExtraHelp( ostream & out ) {
-            out << "View live MongoDB collection statistics.\n" << endl;
+        virtual void printHelp( ostream & out ) {
+            printMongoTopHelp(options, &out);
         }
         
         bool useLocks() {

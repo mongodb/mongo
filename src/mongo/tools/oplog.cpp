@@ -16,30 +16,50 @@
 
 #include "mongo/pch.h"
 
-#include <boost/program_options.hpp>
 #include <fstream>
 #include <iostream>
 
+#include "mongo/base/init.h"
 #include "mongo/db/json.h"
 #include "mongo/db/repl/oplogreader.h"
 #include "mongo/tools/tool.h"
+#include "mongo/tools/tool_options.h"
+#include "mongo/util/options_parser/option_section.h"
+#include "mongo/util/options_parser/options_parser.h"
 
 using namespace mongo;
 
-namespace po = boost::program_options;
+namespace mongo {
+    MONGO_INITIALIZER_GENERAL(ParseStartupConfiguration,
+                              MONGO_NO_PREREQUISITES,
+                              ("default"))(InitializerContext* context) {
+
+        options = moe::OptionSection( "options" );
+        moe::OptionsParser parser;
+
+        Status retStatus = addMongoOplogOptions(&options);
+        if (!retStatus.isOK()) {
+            return retStatus;
+        }
+
+        retStatus = parser.run(options, context->args(), context->env(), &_params);
+        if (!retStatus.isOK()) {
+            std::ostringstream oss;
+            oss << retStatus.toString() << "\n";
+            printMongoOplogHelp(options, &oss);
+            return Status(ErrorCodes::FailedToParse, oss.str());
+        }
+
+        return Status::OK();
+    }
+} // namespace mongo
 
 class OplogTool : public Tool {
 public:
-    OplogTool() : Tool( "oplog" ) {
-        add_options()
-        ("seconds,s" , po::value<int>() , "seconds to go back default:86400" )
-        ("from", po::value<string>() , "host to pull from" )
-        ("oplogns", po::value<string>()->default_value( "local.oplog.rs" ) , "ns to pull from" )
-        ;
-    }
+    OplogTool() : Tool( "oplog" ) { }
 
-    virtual void printExtraHelp(ostream& out) {
-        out << "Pull and replay a remote MongoDB oplog.\n" << endl;
+    virtual void printHelp( ostream & out ) {
+        printMongoOplogHelp(options, &out);
     }
 
     int run() {

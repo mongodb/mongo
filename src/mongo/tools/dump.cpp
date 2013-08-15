@@ -22,14 +22,41 @@
 #include <fstream>
 #include <map>
 
+#include "mongo/base/init.h"
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/db/db.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/tools/tool.h"
+#include "mongo/tools/tool_options.h"
+#include "mongo/util/options_parser/option_section.h"
+#include "mongo/util/options_parser/options_parser.h"
 
 using namespace mongo;
 
-namespace po = boost::program_options;
+namespace mongo {
+    MONGO_INITIALIZER_GENERAL(ParseStartupConfiguration,
+                              MONGO_NO_PREREQUISITES,
+                              ("default"))(InitializerContext* context) {
+
+        options = moe::OptionSection( "options" );
+        moe::OptionsParser parser;
+
+        Status retStatus = addMongoDumpOptions(&options);
+        if (!retStatus.isOK()) {
+            return retStatus;
+        }
+
+        retStatus = parser.run(options, context->args(), context->env(), &_params);
+        if (!retStatus.isOK()) {
+            std::ostringstream oss;
+            oss << retStatus.toString() << "\n";
+            printMongoDumpHelp(options, &oss);
+            return Status(ErrorCodes::FailedToParse, oss.str());
+        }
+
+        return Status::OK();
+    }
+} // namespace mongo
 
 class Dump : public Tool {
     class FilePtr : boost::noncopyable {
@@ -41,15 +68,7 @@ class Dump : public Tool {
         FILE* _f;
     };
 public:
-    Dump() : Tool( "dump" , ALL , "" , "" , true ) {
-        add_options()
-        ("out,o", po::value<string>()->default_value("dump"), "output directory or \"-\" for stdout")
-        ("query,q", po::value<string>() , "json query" )
-        ("oplog", "Use oplog for point-in-time snapshotting" )
-        ("repair", "try to recover a crashed database" )
-        ("forceTableScan", "force a table scan (do not use $snapshot)" )
-        ;
-    }
+    Dump() : Tool( "dump" , "" , "" , true ) { }
 
     virtual void preSetup() {
         string out = getParam("out");
@@ -60,8 +79,8 @@ public:
         }
     }
 
-    virtual void printExtraHelp(ostream& out) {
-        out << "Export MongoDB data to BSON files.\n" << endl;
+    virtual void printHelp(ostream& out) {
+        printMongoDumpHelp(options, &out);
     }
 
     // This is a functor that writes a BSONObj to a file

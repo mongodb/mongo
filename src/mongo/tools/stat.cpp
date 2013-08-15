@@ -16,82 +16,61 @@
 
 #include "mongo/pch.h"
 
-#include <boost/program_options.hpp>
 #include <boost/thread/thread.hpp>
 #include <fstream>
 #include <iostream>
 
+#include "mongo/base/init.h"
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/db/jsobjmanipulator.h"
 #include "mongo/db/json.h"
 #include "mongo/s/type_shard.h"
 #include "mongo/tools/stat_util.h"
 #include "mongo/tools/tool.h"
+#include "mongo/tools/tool_options.h"
 #include "mongo/util/net/httpclient.h"
+#include "mongo/util/options_parser/option_section.h"
+#include "mongo/util/options_parser/options_parser.h"
 #include "mongo/util/text.h"
 
-namespace po = boost::program_options;
+namespace mongo {
+    MONGO_INITIALIZER_GENERAL(ParseStartupConfiguration,
+                              MONGO_NO_PREREQUISITES,
+                              ("default"))(InitializerContext* context) {
+
+        options = moe::OptionSection( "options" );
+        moe::OptionsParser parser;
+
+        Status retStatus = addMongoStatOptions(&options);
+        if (!retStatus.isOK()) {
+            return retStatus;
+        }
+
+        retStatus = parser.run(options, context->args(), context->env(), &_params);
+        if (!retStatus.isOK()) {
+            std::ostringstream oss;
+            oss << retStatus.toString() << "\n";
+            printMongoStatHelp(options, &oss);
+            return Status(ErrorCodes::FailedToParse, oss.str());
+        }
+
+        return Status::OK();
+    }
+} // namespace mongo
 
 namespace mongo {
 
     class Stat : public Tool {
     public:
 
-        Stat() : Tool( "stat" , REMOTE_SERVER , "admin" ) {
+        Stat() : Tool( "stat" , "admin" ) {
             _http = false;
             _many = false;
-
-            add_hidden_options()
-            ( "sleep" , po::value<int>() , "time to sleep between calls" )
-            ;
-            add_options()
-            ("noheaders", "don't output column names")
-            ("rowcount,n", po::value<int>()->default_value(0), "number of stats lines to print (0 for indefinite)")
-            ("http", "use http instead of raw db connection")
-            ("discover" , "discover nodes and display stats for all" )
-            ("all" , "all optional fields" )
-            ;
-
-            addPositionArg( "sleep" , 1 );
-
             _autoreconnect = true;
         }
 
-        virtual void printExtraHelp( ostream & out ) {
-            out << "View live MongoDB performance statistics.\n" << endl;
-            out << "usage: " << _name << " [options] [sleep time]" << endl;
-            out << "sleep time: time to wait (in seconds) between calls" << endl;
-        }
-
-        virtual void printExtraHelpAfter( ostream & out ) {
-            out << "\n";
-            out << " Fields\n";
-            out << "   inserts  \t- # of inserts per second (* means replicated op)\n";
-            out << "   query    \t- # of queries per second\n";
-            out << "   update   \t- # of updates per second\n";
-            out << "   delete   \t- # of deletes per second\n";
-            out << "   getmore  \t- # of get mores (cursor batch) per second\n";
-            out << "   command  \t- # of commands per second, on a slave its local|replicated\n";
-            out << "   flushes  \t- # of fsync flushes per second\n";
-            out << "   mapped   \t- amount of data mmaped (total data size) megabytes\n";
-            out << "   vsize    \t- virtual size of process in megabytes\n";
-            out << "   res      \t- resident size of process in megabytes\n";
-            out << "   faults   \t- # of pages faults per sec\n";
-            out << "   locked   \t- name of and percent time for most locked database\n";
-            out << "   idx miss \t- percent of btree page misses (sampled)\n";
-            out << "   qr|qw    \t- queue lengths for clients waiting (read|write)\n";
-            out << "   ar|aw    \t- active clients (read|write)\n";
-            out << "   netIn    \t- network traffic in - bytes\n";
-            out << "   netOut   \t- network traffic out - bytes\n";
-            out << "   conn     \t- number of open connections\n";
-            out << "   set      \t- replica set name\n";
-            out << "   repl     \t- replication type \n";
-            out << "            \t    PRI - primary (master)\n";
-            out << "            \t    SEC - secondary\n";
-            out << "            \t    REC - recovering\n";
-            out << "            \t    UNK - unknown\n";
-            out << "            \t    SLV - slave\n";
-            out << "            \t    RTR - mongos process (\"router\")\n";
+        virtual void printHelp( ostream & out ) {
+            printMongoStatHelp(options, &out);
         }
 
         BSONObj stats() {
