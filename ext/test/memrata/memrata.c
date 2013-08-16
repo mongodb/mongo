@@ -155,7 +155,7 @@ typedef struct __kvs_source {
 	 */
 	WT_EXTENSION_API *wtext;		/* Extension functions */
 	pthread_t cleaner_id;			/* Cleaner thread ID */
-	int	  cleaner_stop;			/* Cleaner thread quit flag */
+	volatile int cleaner_stop;		/* Cleaner thread quit flag */
 
 	/*
 	 * Each WiredTiger connection has a transaction namespace which lists
@@ -319,13 +319,15 @@ unlock(WT_EXTENSION_API *wtext, WT_SESSION *session, pthread_rwlock_t *lockp)
 
 #if 0
 static int
-kvs_dump_print(uint8_t *p, size_t len)
+kvs_dump_print(uint8_t *p, size_t len, FILE *fp)
 {
 	for (; len > 0; --len, ++p)
-		if (isalpha(*p))
-			putchar(*p);
+		if (!isspace(*p) && isprint(*p))
+			putc(*p, fp);
+		else if (len == 1 && *p == '\0')	/* Skip string nuls. */
+			continue;
 		else
-			printf("%#x", *p);
+			fprintf(fp, "%#x", *p);
 }
 
 /*
@@ -335,11 +337,10 @@ kvs_dump_print(uint8_t *p, size_t len)
 static int
 kvs_dump(kvs_t kvs, const char *tag)
 {
+	FILE *fp;
 	struct kvs_record *r, _r;
 	size_t maxbuf = 4 * 1024;
 	int ret = 0;
-
-	printf("== %s\n", tag);
 
 	r = &_r;
 	memset(r, 0, sizeof(*r));
@@ -347,18 +348,27 @@ kvs_dump(kvs_t kvs, const char *tag)
 	r->key_len = 0;
 	r->val = malloc(maxbuf);
 	r->val_len = maxbuf;
+
+	(void)snprintf(r->val, maxbuf, "dump.%s", tag);
+	fp = fopen(r->val, "w");
+	fprintf(fp, "== %s\n", tag);
+
 	while ((ret = kvs_next(kvs, r, 0UL, (unsigned long)maxbuf)) == 0) {
-		putchar('\t');
-		kvs_dump_print(r->key, r->key_len);
-		putchar('/');
-		kvs_dump_print(r->val, r->val_len);
-		putchar('\n');
+		kvs_dump_print(r->key, r->key_len, fp);
+		putc('\t', fp);
+		kvs_dump_print(r->val, r->val_len, fp);
+		putc('\n', fp);
 
 		r->val_len = maxbuf;
 	}
 	if (ret == KVS_E_KEY_NOT_FOUND)
 		ret = 0;
-	printf("========================== (%d)\n", ret);
+	fprintf(fp, "========================== (%d)\n", ret);
+	fclose(fp);
+
+	free(r->key);
+	free(r->val);
+
 	return (ret);
 }
 #endif
@@ -1839,7 +1849,8 @@ ws_source_close(WT_EXTENSION_API *wtext, WT_SESSION *session, WT_SOURCE *ws)
  */
 static int
 ws_source_open_namespace(WT_DATA_SOURCE *wtds, WT_SESSION *session,
-    const char *uri, const char *suffix, kvs_t kvs_device, kvs_t *kvsp)
+    const char *uri, const char *suffix, kvs_t kvs_device, int flags,
+    kvs_t *kvsp)
 {
 	DATA_SOURCE *ds;
 	WT_EXTENSION_API *wtext;
@@ -1857,7 +1868,7 @@ ws_source_open_namespace(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 	/* Open the underlying KVS namespace (creating it if necessary). */
 	if ((ret = ws_source_name(uri, suffix, &p, &buf)) != 0)
 		return (ret);
-	if ((kvs = kvs_open_namespace(kvs_device, p, KVS_O_CREATE)) == NULL)
+	if ((kvs = kvs_open_namespace(kvs_device, p, flags)) == NULL)
 		EMSG(wtext, session, WT_ERROR,
 		    "kvs_open_namespace: %s: %s", p, kvs_strerror(os_errno()));
 	*kvsp = kvs;
@@ -1880,10 +1891,11 @@ ws_source_open(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 {
 	DATA_SOURCE *ds;
 	KVS_SOURCE *ks;
+	WT_CONFIG_ITEM a;
 	WT_EXTENSION_API *wtext;
 	WT_SOURCE *ws;
 	size_t len;
-	int ret = 0;
+	int oflags, ret = 0;
 	const char *p, *t;
 
 	*refp = NULL;
@@ -1954,17 +1966,38 @@ bad_name:	ERET(wtext, session, EINVAL, "%s: illegal name format", uri);
 	ws->ks = ks;
 
 	/*
-	 * Open the underlying KVS namespaces (optionally creating them), then
-	 * push the change.
+	 * Open the underlying KVS namespaces, then push the change.
 	 *
 	 * The naming scheme is simple: the URI names the primary store, and the
 	 * URI with a trailing suffix names the associated caching store.
+	 *
+	 * We can set debug and truncate flags, we always set the create flag,
+	 * our caller handles attempts to create existing objects.
 	 */
+	oflags = KVS_O_CREATE;
+	if ((ret = wtext->config_get(wtext,
+	    session, config, "kvs_open_o_debug", &a)) == 0 && a.val != 0)
+		oflags |= KVS_O_DEBUG;
+	if (ret != 0 && ret != WT_NOTFOUND) {
+		EMSG(wtext, session, ret,
+		    "kvs_open_o_debug configuration: %s", wtext->strerror(ret));
+		goto err;
+	}
+	if ((ret = wtext->config_get(wtext,
+	    session, config, "kvs_open_o_truncate", &a)) == 0 && a.val != 0)
+		oflags |= KVS_O_TRUNCATE;
+	if (ret != 0 && ret != WT_NOTFOUND) {
+		EMSG(wtext, session, ret,
+		    "kvs_open_o_truncate configuration: %s",
+		    wtext->strerror(ret));
+		goto err;
+	}
+
 	if ((ret = ws_source_open_namespace(wtds,
-	    session, uri, NULL, ks->kvs_device, &ws->kvs)) != 0)
+	    session, uri, NULL, ks->kvs_device, oflags, &ws->kvs)) != 0)
 		goto err;
 	if ((ret = ws_source_open_namespace(wtds,
-	    session, uri, "cache", ks->kvs_device, &ws->kvscache)) != 0)
+	    session, uri, "cache", ks->kvs_device, oflags, &ws->kvscache)) != 0)
 		goto err;
 	if ((ret = kvs_commit(ws->kvs)) != 0)
 		EMSG_ERR(wtext, session, WT_ERROR,
@@ -2675,6 +2708,7 @@ kvs_source_close(WT_EXTENSION_API *wtext, WT_SESSION *session, KVS_SOURCE *ks)
 	/* Resolve the cache into the primary one last time and quit. */
 	if (ks->cleaner_id != 0) {
 		ks->cleaner_stop = 1;
+
 		if ((tret = pthread_join(ks->cleaner_id, NULL)) != 0)
 			EMSG(wtext, session, tret,
 			    "pthread_join: %s", kvs_strerror(tret));
@@ -2722,6 +2756,7 @@ kvs_cleaner(void *arg)
 	KVS_SOURCE *ks;
 	WT_EXTENSION_API *wtext;
 	WT_SOURCE *ws;
+	int cleaner_stop;
 
 	ks = (KVS_SOURCE *)arg;
 	wtext = ks->wtext;
@@ -2731,18 +2766,31 @@ kvs_cleaner(void *arg)
 		 * or a number of bytes.  It's more expensive to return values
 		 * from the cache (because we have to marshall/unmarshall them),
 		 * but there's no information yet on how to tune the values.
+		 *
+		 * For now, use 10MB as the limit, and a corresponding number of
+		 * operations, assuming roughly 40B per key/value pair.
 		 */
-#undef	MEGABYTE
-#define	MEGABYTE	1048576
+#undef	BYTELIMIT
+#define	BYTELIMIT	(10 * 1048576)
+#undef	OPLIMIT
+#define	OPLIMIT		(BYTELIMIT / (2 * 20))
 		for (ws = ks->ws_head; ws != NULL; ws = ws->next)
-			if (ws->cleaner_ops > 1000 ||
-			    ws->cleaner_bytes > 10 * MEGABYTE)
+			if (ws->cleaner_ops > OPLIMIT ||
+			    ws->cleaner_bytes > BYTELIMIT)
 				break;
 
-		if (ws != NULL || ks->cleaner_stop)
-			(void)cache_process(wtext, ks, ks->cleaner_stop);
+		/*
+		 * Check if this will be the final run; cleaner_stop is declared
+		 * volatile, and so the read will happen.  We don't much care if
+		 * there's extra loops, it's enough if a read eventually happens
+		 * and finds the variable set.  Store the read locally, reading
+		 * the variable twice might race.
+		 */
+		cleaner_stop = ks->cleaner_stop;
+		if (ws != NULL || cleaner_stop)
+			(void)cache_process(wtext, ks, cleaner_stop);
 
-		if (ks->cleaner_stop)
+		if (cleaner_stop)
 			break;
 
 		/* Check once a second. */

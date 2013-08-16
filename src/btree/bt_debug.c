@@ -527,11 +527,10 @@ __debug_page_modify(WT_DBG *ds, WT_PAGE *page)
 		    mod->u.replace.addr, mod->u.replace.size));
 		break;
 	case WT_PM_REC_SPLIT:
-		__dmsg(ds, "\t" "split page %p ref: %p\n",
-		    mod->u.split.page, mod->u.split.ref);
+		__dmsg(ds, "\t" "split page %p\n", mod->u.split);
 		break;
 	case WT_PM_REC_SPLIT_MERGE:
-		__dmsg(ds, "\t" "split-merge page %p\n", mod->u.split.page);
+		__dmsg(ds, "\t" "split-merge page %p\n", mod->u.split);
 		break;
 	WT_ILLEGAL_VALUE(session);
 	}

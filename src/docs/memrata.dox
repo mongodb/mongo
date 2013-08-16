@@ -44,8 +44,8 @@ list, that is, a comma-separated list of Memrata devices.
 In this example, both device pools are configured to be truncated (that
 is, all previously existing contents discarded), when they are configured.
 
-When loading a Memrata device, the following configuration strings are
-supported:
+When loading a Memrata device, the following additional configuration strings
+are supported:
 
 <table>
 @hrow{String, Type}
@@ -90,8 +90,8 @@ ret = session->create(
 ret = session->open_cursor(session, "table:dev1/access", NULL, NULL, &cursor);
 @endcode
 
-When opening a Memrata-backed object, the following configuration strings
-are supported:
+When creating a Memrata-backed object with the WT_SESSION::create method,
+the following additional configuration strings are supported:
 
 <table>
 @hrow{String, Type}
@@ -100,6 +100,16 @@ are supported:
 </table>
 
 See the Memrata device documentation for details on their use.
+
+For example, creating and truncating a table could be done as follows:
+
+@code
+WT_SESSION *session;
+
+/* Create and truncate the access table. */
+ret = session->create(session, "table:dev1/access",
+    "key_format=S,value_format=S,type=memrata,kvs_open_o_truncate=1");
+@endcode
 
 @section memrata_notes Memrata notes
 
