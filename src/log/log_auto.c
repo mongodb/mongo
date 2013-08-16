@@ -84,6 +84,24 @@ __wt_logop_col_put_unpack(
 }
 
 int
+__wt_logop_col_put_print(
+    WT_SESSION_IMPL *session, const uint8_t **pp, const uint8_t *end, FILE *out)
+{
+	const char *uri;
+	uint64_t recno;
+	WT_ITEM value;
+
+	WT_RET(__wt_logop_col_put_unpack(
+	    session, pp, end, &uri, &recno, &value));
+
+	fprintf(out, "\t" "uri: %s\n", uri);
+	fprintf(out, "\t" "recno: %" PRIu64 "\n", recno);
+	fprintf(out, "\t" "value: %.*s\n",
+	    (int)value.size, (const char *)value.data);
+	return (0);
+}
+
+int
 __wt_logop_col_remove_pack(
     WT_SESSION_IMPL *session, WT_ITEM *logrec,
     const char *uri, uint64_t recno)
@@ -120,6 +138,21 @@ __wt_logop_col_remove_unpack(
 	WT_ASSERT(session, optype == WT_LOGOP_COL_REMOVE);
 
 	*pp += size;
+	return (0);
+}
+
+int
+__wt_logop_col_remove_print(
+    WT_SESSION_IMPL *session, const uint8_t **pp, const uint8_t *end, FILE *out)
+{
+	const char *uri;
+	uint64_t recno;
+
+	WT_RET(__wt_logop_col_remove_unpack(
+	    session, pp, end, &uri, &recno));
+
+	fprintf(out, "\t" "uri: %s\n", uri);
+	fprintf(out, "\t" "recno: %" PRIu64 "\n", recno);
 	return (0);
 }
 
@@ -164,6 +197,25 @@ __wt_logop_row_put_unpack(
 }
 
 int
+__wt_logop_row_put_print(
+    WT_SESSION_IMPL *session, const uint8_t **pp, const uint8_t *end, FILE *out)
+{
+	const char *uri;
+	WT_ITEM key;
+	WT_ITEM value;
+
+	WT_RET(__wt_logop_row_put_unpack(
+	    session, pp, end, &uri, &key, &value));
+
+	fprintf(out, "\t" "uri: %s\n", uri);
+	fprintf(out, "\t" "key: %.*s\n",
+	    (int)key.size, (const char *)key.data);
+	fprintf(out, "\t" "value: %.*s\n",
+	    (int)value.size, (const char *)value.data);
+	return (0);
+}
+
+int
 __wt_logop_row_remove_pack(
     WT_SESSION_IMPL *session, WT_ITEM *logrec,
     const char *uri, WT_ITEM *key)
@@ -203,10 +255,18 @@ __wt_logop_row_remove_unpack(
 	return (0);
 }
 
-#if 0
-static WT_LOGREC_DESC __logrecs[] = {
-	{ "I", __logrec_print_invalid, },
-	{ "IQ", __logrec_print_commit, },
-	{ "IS", __logrec_print_debug, },
-};
-#endif
+int
+__wt_logop_row_remove_print(
+    WT_SESSION_IMPL *session, const uint8_t **pp, const uint8_t *end, FILE *out)
+{
+	const char *uri;
+	WT_ITEM key;
+
+	WT_RET(__wt_logop_row_remove_unpack(
+	    session, pp, end, &uri, &key));
+
+	fprintf(out, "\t" "uri: %s\n", uri);
+	fprintf(out, "\t" "key: %.*s\n",
+	    (int)key.size, (const char *)key.data);
+	return (0);
+}

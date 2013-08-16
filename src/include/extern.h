@@ -737,6 +737,10 @@ extern int __wt_logop_col_put_unpack( WT_SESSION_IMPL *session,
     const char **urip,
     uint64_t *recnop,
     WT_ITEM *valuep);
+extern int __wt_logop_col_put_print( WT_SESSION_IMPL *session,
+    const uint8_t **pp,
+    const uint8_t *end,
+    FILE *out);
 extern int __wt_logop_col_remove_pack( WT_SESSION_IMPL *session,
     WT_ITEM *logrec,
     const char *uri,
@@ -746,6 +750,10 @@ extern int __wt_logop_col_remove_unpack( WT_SESSION_IMPL *session,
     const uint8_t *end,
     const char **urip,
     uint64_t *recnop);
+extern int __wt_logop_col_remove_print( WT_SESSION_IMPL *session,
+    const uint8_t **pp,
+    const uint8_t *end,
+    FILE *out);
 extern int __wt_logop_row_put_pack( WT_SESSION_IMPL *session,
     WT_ITEM *logrec,
     const char *uri,
@@ -757,6 +765,10 @@ extern int __wt_logop_row_put_unpack( WT_SESSION_IMPL *session,
     const char **urip,
     WT_ITEM *keyp,
     WT_ITEM *valuep);
+extern int __wt_logop_row_put_print( WT_SESSION_IMPL *session,
+    const uint8_t **pp,
+    const uint8_t *end,
+    FILE *out);
 extern int __wt_logop_row_remove_pack( WT_SESSION_IMPL *session,
     WT_ITEM *logrec,
     const char *uri,
@@ -766,6 +778,10 @@ extern int __wt_logop_row_remove_unpack( WT_SESSION_IMPL *session,
     const uint8_t *end,
     const char **urip,
     WT_ITEM *keyp);
+extern int __wt_logop_row_remove_print( WT_SESSION_IMPL *session,
+    const uint8_t **pp,
+    const uint8_t *end,
+    FILE *out);
 extern int __wt_log_slot_init(WT_SESSION_IMPL *session);
 extern int __wt_log_slot_join(WT_SESSION_IMPL *session,
     uint64_t mysize,

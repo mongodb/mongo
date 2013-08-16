@@ -7,29 +7,50 @@ import log_data
 # Temporary file.
 tmp_file = '__tmp'
 
-# Map log record types to (C input type, C output type, pack type)
+# Map log record types to:
+# (C type, pack type, printf format, printf arg(s))
 field_types = {
-		'string' : ('const char *', 'const char **', 'S'),
-		'item' : ('WT_ITEM *', 'WT_ITEM *', 'u'),
-		'recno' : ('uint64_t', 'uint64_t *', 'r'),
-		'uint32' : ('uint32_t', 'uint32_t *', 'I'),
-		'uint64' : ('uint64_t', 'uint64_t *', 'Q'),
+		'string' : ('const char *', 'S', '%s', 'arg'),
+		'item' : ('WT_ITEM *', 'u', '%.*s', '(int)arg.size, (const char *)arg.data'),
+		'recno' : ('uint64_t', 'r', '%" PRIu64 "', 'arg'),
+		'uint32' : ('uint32_t', 'I', '%" PRIu32 "', 'arg'),
+		'uint64' : ('uint64_t', 'Q', '%" PRIu64 "', 'arg'),
 }
 
 def cintype(f):
 	return field_types[f[0]][0]
 
 def couttype(f):
-	return field_types[f[0]][1]
+	type = cintype(f)
+	# We already have a pointer to a WT_ITEM
+	if f[0] == 'item':
+		return type
+	if type[-1] != '*':
+		type += ' '
+	return type + '*'
+
+def clocaltype(f):
+	type = cintype(f)
+	# Allocate a WT_ITEM struct on the stack
+	if f[0] == 'item':
+		return type[:-2]
+	return type
 
 def pack_fmt(fields):
-	return ''.join(field_types[f[0]][2] for f in fields)
+	return ''.join(field_types[f[0]][1] for f in fields)
 
 def op_pack_fmt(r):
 	return 'II' + pack_fmt(r.fields)
 
 def rec_pack_fmt(r):
 	return 'I' + pack_fmt(r.fields)
+
+def printf_fmt(f):
+	return field_types[f[0]][2]
+
+def printf_arg(f):
+	arg = field_types[f[0]][3].replace('arg', f[1])
+	return '\n\t    ' + arg if f[0] == 'item' else ' ' + arg
 
 #####################################################################
 # Update log.h with #defines for types
@@ -110,10 +131,6 @@ __wt_logop_read(WT_SESSION_IMPL *session,
 }
 ''')
 
-# Emit code to read, write and print log records
-for rectype in log_data.rectypes:
-	pass
-
 # Emit code to read, write and print log operations (within a log record)
 for optype in log_data.optypes:
 	if not optype.fields:
@@ -173,17 +190,25 @@ __wt_logop_%(name)s_unpack(
 	'fmt' : op_pack_fmt(optype)
 })
 
-tfile.write('''
-#if 0
-static WT_LOGREC_DESC __logrecs[] = {
-''')
+	tfile.write('''
+int
+__wt_logop_%(name)s_print(
+    WT_SESSION_IMPL *session, const uint8_t **pp, const uint8_t *end, FILE *out)
+{
+	%(arg_decls)s
 
-for rectype in log_data.rectypes:
-	tfile.write('\t{ "%s", %s, },\n' % (rec_pack_fmt(rectype), rectype.prname()))
+	WT_RET(__wt_logop_%(name)s_unpack(
+	    session, pp, end%(arg_addrs)s));
 
-tfile.write('''};
-#endif
-''')
+	%(print_args)s
+	return (0);
+}
+''' % {
+	'name' : optype.name,
+	'arg_decls' : '\n\t'.join('%s%s%s;' % (clocaltype(f), '' if clocaltype(f)[-1] == '*' else ' ', f[1]) for f in optype.fields),
+	'arg_addrs' : ''.join(', &%s' % f[1] for f in optype.fields),
+	'print_args' : '\n\t'.join('fprintf(out, "\\t" "%s: %s\\n",%s);' % (f[1], printf_fmt(f), printf_arg(f)) for f in optype.fields),
+})
 
 tfile.close()
 compare_srcfile(tmp_file, f)
