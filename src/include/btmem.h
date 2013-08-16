@@ -145,10 +145,7 @@ struct __wt_page_modify {
 	uint64_t disk_txn;
 
 	union {
-		struct {
-			WT_PAGE *page;	/* Resulting split page */
-			WT_REF *ref;	/* WT_REF slot on the parent */
-		} split;
+		WT_PAGE *split;		/* Resulting split page */
 		WT_ADDR	 replace;	/* Resulting replacement */
 	} u;
 
