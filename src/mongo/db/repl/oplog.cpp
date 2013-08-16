@@ -469,14 +469,17 @@ namespace mongo {
                     /* No _id.  This will be very slow. */
                     Timer t;
 
-                    update(
-                        UpdateRequest(NamespaceString(ns),
-                                      debug,
-                                      QueryPlanSelectionPolicy::idElseNatural())
-                        .query(o)
-                        .updates(o)
-                        .upsert()
-                        .fromReplication());
+                    const NamespaceString requestNs(ns);
+                    UpdateRequest request(
+                        requestNs, debug,
+                        QueryPlanSelectionPolicy::idElseNatural());
+
+                    request.setQuery(o);
+                    request.setUpdates(o);
+                    request.setUpsert();
+                    request.setFromReplication();
+
+                    update(request);
 
                     if( t.millis() >= 2 ) {
                         RARELY OCCASIONALLY log() << "warning, repl doing slow updates (no _id field) for " << ns << endl;
@@ -493,14 +496,17 @@ namespace mongo {
                     BSONObjBuilder b;
                     b.append(_id);
 
-                    update(
-                        UpdateRequest(NamespaceString(ns),
-                                      debug,
-                                      QueryPlanSelectionPolicy::idElseNatural())
-                        .query(b.done())
-                        .updates(o)
-                        .upsert()
-                        .fromReplication());
+                    const NamespaceString requestNs(ns);
+                    UpdateRequest request(
+                        requestNs, debug,
+                        QueryPlanSelectionPolicy::idElseNatural());
+
+                    request.setQuery(b.done());
+                    request.setUpdates(o);
+                    request.setUpsert();
+                    request.setFromReplication();
+
+                    update(request);
                 }
             }
         }
@@ -515,14 +521,17 @@ namespace mongo {
             BSONObj updateCriteria = op.getObjectField("o2");
             const bool upsert = fields[3].booleanSafe() || convertUpdateToUpsert;
 
-            UpdateResult ur = update(
-                UpdateRequest(NamespaceString(ns),
-                              debug,
-                              QueryPlanSelectionPolicy::idElseNatural())
-                .query(updateCriteria)
-                .updates(o)
-                .upsert(upsert)
-                .fromReplication());
+            const NamespaceString requestNs(ns);
+            UpdateRequest request(
+                requestNs, debug,
+                QueryPlanSelectionPolicy::idElseNatural());
+
+            request.setQuery(updateCriteria);
+            request.setUpdates(o);
+            request.setUpsert(upsert);
+            request.setFromReplication();
+
+            UpdateResult ur = update(request);
 
             if( ur.numMatched == 0 ) {
                 if( ur.modifiers ) {

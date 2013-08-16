@@ -551,12 +551,15 @@ namespace mongo {
                     OpDebug debug;
                     updates++;
 
-                    update(
-                        UpdateRequest(NamespaceString(d.ns), debug)
-                        .query(pattern)
-                        .updates(i->second)
-                        .god()
-                        .upsert());
+                    const NamespaceString requestNs(d.ns);
+                    UpdateRequest request(requestNs, debug);
+
+                    request.setQuery(pattern);
+                    request.setUpdates(i->second);
+                    request.setGod();
+                    request.setUpsert();
+
+                    update(request);
 
                 }
             }

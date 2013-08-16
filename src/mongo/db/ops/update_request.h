@@ -55,18 +55,16 @@ namespace mongo {
             return _queryPlanPolicy;
         }
 
-        inline UpdateRequest& query(const BSONObj& query) {
+        inline void setQuery(const BSONObj& query) {
             _query = query;
-            return *this;
         }
 
         inline const BSONObj& getQuery() const {
             return _query;
         }
 
-        inline UpdateRequest& updates(const BSONObj& updates) {
+        inline void setUpdates(const BSONObj& updates) {
             _updates = updates;
-            return *this;
         }
 
         inline const BSONObj& getUpdates() const {
@@ -76,54 +74,48 @@ namespace mongo {
         // Please see documentation on the private members matching these names for
         // explanations of the following fields.
 
-        inline UpdateRequest& god(bool value = true) {
+        inline void setGod(bool value = true) {
             _god = value;
-            return *this;
         }
 
         bool isGod() const {
             return _god;
         }
 
-        inline UpdateRequest& upsert(bool value = true) {
+        inline void setUpsert(bool value = true) {
             _upsert = value;
-            return *this;
         }
 
         bool isUpsert() const {
             return _upsert;
         }
 
-        inline UpdateRequest& multi(bool value = true) {
+        inline void setMulti(bool value = true) {
             _multi = value;
-            return *this;
         }
 
         bool isMulti() const {
             return _multi;
         }
 
-        inline UpdateRequest& updateOpLog(bool value = true) {
+        inline void setUpdateOpLog(bool value = true) {
             _updateOpLog = value;
-            return *this;
         }
 
         bool shouldUpdateOpLog() const {
             return _updateOpLog;
         }
 
-        inline UpdateRequest& fromMigration(bool value = true) {
+        inline void setFromMigration(bool value = true) {
             _fromMigration = value;
-            return *this;
         }
 
         bool isFromMigration() const {
             return _fromMigration;
         }
 
-        inline UpdateRequest& fromReplication(bool value = true) {
+        inline void setFromReplication(bool value = true) {
             _fromReplication = value;
-            return *this;
         }
 
         bool isFromReplication() const {
