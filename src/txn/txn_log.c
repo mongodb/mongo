@@ -26,80 +26,25 @@ __txn_op_log(WT_SESSION_IMPL *session, WT_ITEM *logrec, WT_TXN_OP *op)
 	 * We first calculate the size being packed (assuming the size itself
 	 * is zero), then fix the calculation once we know the size.
 	 */
-#define	WT_TXNOP_COL_INSERT	1
-#define	WT_TXNOP_COL_REMOVE	2
-#define	WT_TXNOP_ROW_INSERT	3
-#define	WT_TXNOP_ROW_REMOVE	4
 	if (op->key.data == NULL) {
 		WT_ASSERT(session, op->ins != NULL);
 		recno = op->ins->u.recno;
 
-		if (WT_UPDATE_DELETED_ISSET(op->upd)) {
-			fmt = "IISq";
-			optype = WT_TXNOP_COL_REMOVE;
-
-			WT_RET(__wt_struct_size(session, &size, fmt,
-			    0, optype, op->uri, recno));
-
-			size += __wt_vsize_uint(size) - 1;
-			WT_RET(__wt_buf_grow(
-			    session, logrec, logrec->size + size));
-			recsize = (uint32_t)size;
-			WT_RET(__wt_struct_pack(session,
-			    (uint8_t *)logrec->data + logrec->size,
-			    size, fmt,
-			    recsize, optype, op->uri, recno));
-		} else {
-			fmt = "IISqu";
-			optype = WT_TXNOP_COL_INSERT;
-
-			WT_RET(__wt_struct_size(session, &size, fmt,
-			    0, optype, op->uri, recno, &value));
-
-			size += __wt_vsize_uint(size) - 1;
-			WT_RET(__wt_buf_grow(
-			    session, logrec, logrec->size + size));
-			recsize = (uint32_t)size;
-			WT_RET(__wt_struct_pack(session,
-			    (uint8_t *)logrec->data + logrec->size,
-			    size, fmt,
-			    recsize, optype, op->uri, recno, &value));
-		}
+		if (WT_UPDATE_DELETED_ISSET(op->upd))
+			WT_RET(__wt_logop_col_remove_pack(
+			    session, logrec, op->uri, recno));
+		else
+			WT_RET(__wt_logop_col_put_pack(
+			    session, logrec, op->uri, recno, &value));
 	} else {
-		if (WT_UPDATE_DELETED_ISSET(op->upd)) {
-			fmt = "IISu";
-			optype = WT_TXNOP_ROW_REMOVE;
-
-			WT_RET(__wt_struct_size(session, &size, fmt,
-			    0, optype, op->uri, &op->key));
-
-			size += __wt_vsize_uint(size) - 1;
-			WT_RET(__wt_buf_grow(
-			    session, logrec, logrec->size + size));
-			recsize = (uint32_t)size;
-			WT_RET(__wt_struct_pack(session,
-			    (uint8_t *)logrec->data + logrec->size,
-			    size, fmt,
-			    recsize, optype, op->uri, &op->key));
-		} else {
-			fmt = "IISuu";
-			optype = WT_TXNOP_ROW_INSERT;
-
-			WT_RET(__wt_struct_size(session, &size, fmt,
-			    0, optype, op->uri, &op->key, &value));
-
-			size += __wt_vsize_uint(size) - 1;
-			WT_RET(__wt_buf_grow(
-			    session, logrec, logrec->size + size));
-			recsize = (uint32_t)size;
-			WT_RET(__wt_struct_pack(session,
-			    (uint8_t *)logrec->data + logrec->size,
-			    size, fmt,
-			    recsize, optype, op->uri, &op->key, &value));
-		}
+		if (WT_UPDATE_DELETED_ISSET(op->upd))
+			WT_RET(__wt_logop_row_remove_pack(
+			    session, logrec, op->uri, &op->key));
+		else
+			WT_RET(__wt_logop_row_put_pack(
+			    session, logrec, op->uri, &op->key, &value));
 	}
 
-	logrec->size += (uint32_t)size;
 	return (0);
 }
 
