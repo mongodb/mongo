@@ -220,7 +220,7 @@ static int my_cursor_insert(WT_CURSOR *wtcursor)
 
 	{
 	const char *key1 = NULL, *key2 = NULL;
-	size_t key1_len = 0, key2_len = 0;
+	uint32_t key1_len = 0, key2_len = 0;
 	/*! [WT_EXTENSION collate] */
 	WT_ITEM first, second;
 	int cmp;
