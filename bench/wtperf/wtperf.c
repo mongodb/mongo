@@ -1053,10 +1053,8 @@ err:	g_util_running = 0;
 void config_assign(CONFIG *dest, const CONFIG *src)
 {
 	size_t i, len;
-	const char *saved_home;
 	char *newstr, **pstr;
 
-	saved_home = dest->home;
 	config_free(dest);
 	memcpy(dest, src, sizeof(CONFIG));
 
