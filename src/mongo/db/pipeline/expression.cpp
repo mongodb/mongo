@@ -1920,23 +1920,19 @@ namespace {
         // optimize sub-expressions and count constants
         unsigned constCount = 0;
         for(size_t i = 0; i < n; ++i) {
-            intrusive_ptr<Expression> pNew(vpOperand[i]->optimize());
+            intrusive_ptr<Expression> optimized = vpOperand[i]->optimize();
 
-            /* subsitute the optimized expression */
-            vpOperand[i] = pNew;
+            // substitute the optimized expression
+            vpOperand[i] = optimized;
 
-            /* check to see if the result was a constant */
-            if (dynamic_cast<ExpressionConstant *>(pNew.get())) {
+            // check to see if the result was a constant
+            if (dynamic_cast<ExpressionConstant*>(optimized.get())) {
                 constCount++;
             }
         }
 
-        /*
-          If all the operands are constant, we can replace this expression
-          with a constant.  We can find the value by evaluating this
-          expression over a NULL Document because evaluating the
-          ExpressionConstant never refers to the argument Document.
-        */
+        // If all the operands are constant, we can replace this expression with a constant. Using
+        // an empty Variables since it will never be accessed.  
         if (constCount == n) {
             Value pResult(evaluateInternal(Variables()));
             intrusive_ptr<Expression> pReplacement(
@@ -1944,13 +1940,7 @@ namespace {
             return pReplacement;
         }
 
-        /*
-          If the operator isn't commutative or associative, there's nothing
-          more we can do.  We test that by seeing if we can get a factory;
-          if we can, we can use it to construct a temporary expression which
-          we'll evaluate to collapse as many constants as we can down to
-          a single one.
-         */
+        // Remaining optimizations are only for associative and commutative expressions.
         if (!isAssociativeAndCommutative())
             return this;
 
@@ -1964,11 +1954,10 @@ namespace {
                 constExprs.push_back(expr);
             }
             else {
-                /* If the child operand is the same type as this, then we can
-                 * extract its operands and inline them here because we know
-                 * this is commutative and associative.  We detect sameness of
-                 * the child operator by checking for equality of the opNames
-                 */
+                // If the child operand is the same type as this, then we can
+                // extract its operands and inline them here because we know
+                // this is commutative and associative.  We detect sameness of
+                // the child operator by checking for equality of the opNames
                 ExpressionNary* nary = dynamic_cast<ExpressionNary*>(expr.get());
                 if (!nary || !str::equals(nary->getOpName(), getOpName())) {
                     nonConstExprs.push_back(expr);
