@@ -399,8 +399,8 @@ __wt_rec_write(WT_SESSION_IMPL *session,
 	 * be common.
 	 */
 	WT_VERBOSE_RET(session, reconcile,
-	    "root page split %p -> %p", page, page->modify->u.split);
-	page = page->modify->u.split;
+	    "root page split %p -> %p", page, page->modify->u.split.page);
+	page = page->modify->u.split.page;
 	__wt_page_modify_set(session, page);
 	F_CLR(page->modify, WT_PM_REC_SPLIT_MERGE);
 
@@ -2261,7 +2261,7 @@ __rec_col_merge(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 				break;
 			case WT_PM_REC_SPLIT:
 				WT_RET(__rec_col_merge(
-				    session, r, rp->modify->u.split));
+				    session, r, rp->modify->u.split.page));
 				continue;
 			case WT_PM_REC_SPLIT_MERGE:
 				WT_RET(__rec_col_merge(session, r, rp));
@@ -3027,7 +3027,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 
 				WT_RET(__rec_row_merge(session, r,
 				    F_ISSET(rp->modify, WT_PM_REC_SPLIT_MERGE) ?
-				    rp : rp->modify->u.split));
+				    rp : rp->modify->u.split.page));
 				continue;
 			WT_ILLEGAL_VALUE(session);
 			}
@@ -3174,7 +3174,7 @@ __rec_row_merge(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 			case WT_PM_REC_SPLIT_MERGE:
 				WT_RET(__rec_row_merge(session, r,
 				    F_ISSET(rp->modify, WT_PM_REC_SPLIT_MERGE) ?
-				    rp : rp->modify->u.split));
+				    rp : rp->modify->u.split.page));
 				continue;
 			WT_ILLEGAL_VALUE(session);
 			}
@@ -3684,7 +3684,7 @@ __rec_split_discard(WT_SESSION_IMPL *session, WT_PAGE *page)
 			 * Root page split: continue walking the list of split
 			 * pages, cleaning up as we go.
 			 */
-			WT_RET(__rec_split_discard(session, mod->u.split));
+			WT_RET(__rec_split_discard(session, mod->u.split.page));
 			break;
 		case WT_PM_REC_REPLACE:
 			/*
@@ -3781,9 +3781,9 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		break;
 	case WT_PM_REC_SPLIT:				/* Page split */
 		/* Discard the split page. */
-		WT_RET(__rec_split_discard(session, mod->u.split));
-		__wt_page_out(session, &mod->u.split);
-		mod->u.split = NULL;
+		WT_RET(__rec_split_discard(session, mod->u.split.page));
+		__wt_page_out(session, &mod->u.split.page);
+		mod->u.split.page = NULL;
 		break;
 	case WT_PM_REC_SPLIT_MERGE:			/* Page split */
 		/*
@@ -3905,17 +3905,18 @@ err:			__wt_scr_free(&tkey);
 		switch (page->type) {
 		case WT_PAGE_ROW_INT:
 		case WT_PAGE_ROW_LEAF:
-			WT_RET(
-			    __rec_split_row(session, r, page, &mod->u.split));
+			WT_RET(__rec_split_row(
+			    session, r, page, &mod->u.split.page));
 			break;
 		case WT_PAGE_COL_INT:
 		case WT_PAGE_COL_FIX:
 		case WT_PAGE_COL_VAR:
-			WT_RET(
-			    __rec_split_col(session, r, page, &mod->u.split));
+			WT_RET(__rec_split_col(
+			    session, r, page, &mod->u.split.page));
 			break;
 		WT_ILLEGAL_VALUE(session);
 		}
+		mod->u.split.ref = page->ref;
 		F_SET(mod, WT_PM_REC_SPLIT);
 		break;
 	}
@@ -4240,10 +4241,13 @@ __rec_cell_build_leaf_key(WT_SESSION_IMPL *session,
 		 * Do prefix compression on the key.  We know by definition the
 		 * previous key sorts before the current key, which means the
 		 * keys must differ and we just need to compare up to the
-		 * shorter of the two keys.   Also, we can't compress out more
-		 * than 256 bytes, limit the comparison to that.
+		 * shorter of the two keys.
 		 */
 		if (r->key_pfx_compress) {
+			/*
+			 * We can't compress out more than 256 bytes, limit the
+			 * comparison to that.
+			 */
 			pfx_max = UINT8_MAX;
 			if (size < pfx_max)
 				pfx_max = size;
@@ -4252,6 +4256,14 @@ __rec_cell_build_leaf_key(WT_SESSION_IMPL *session,
 			for (a = data, b = r->last->data; pfx < pfx_max; ++pfx)
 				if (*a++ != *b++)
 					break;
+
+			/*
+			 * Prefix compression may cost us CPU and memory when
+			 * the page is re-loaded, don't do it unless there's
+			 * reasonable gain.
+			 */
+			if (pfx < btree->prefix_compression_min)
+				pfx = 0;
 		}
 
 		/* Copy the non-prefix bytes into the key buffer. */

@@ -97,7 +97,7 @@ __wt_cache_read(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_REF *ref)
 	if (addr == NULL) {
 		WT_ASSERT(session, previous_state == WT_REF_DELETED);
 
-		WT_ERR(__wt_btree_leaf_create(session, parent, ref, &page));
+		WT_ERR(__wt_btree_new_leaf_page(session, parent, ref, &page));
 	} else {
 		/* Read the backing disk page. */
 		WT_ERR(__wt_bt_read(session, &tmp, addr, size));

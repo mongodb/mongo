@@ -197,7 +197,7 @@ file_config = format_meta + [
 		the maximum gap between instantiated keys in a Btree leaf page,
 		constraining the number of keys processed to instantiate a
 		random Btree leaf page key''',
-		min='0'),
+		min='0', undoc=True),
 	Config('leaf_page_max', '1MB', r'''
 		the maximum page size for leaf nodes, in bytes; the size must
 		be a multiple of the allocation size, and is significant for
@@ -234,6 +234,10 @@ file_config = format_meta + [
 	Config('prefix_compression', 'true', r'''
 		configure prefix compression on row-store leaf pages''',
 		type='boolean'),
+	Config('prefix_compression_min', '4', r'''
+		minimum gain before prefix compression will be used on row-store
+		leaf pages''',
+		min=0),
 	Config('split_pct', '75', r'''
 		the Btree page split size as a percentage of the maximum Btree
 		page size, that is, when a Btree page is split, it will be

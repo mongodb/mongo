@@ -58,6 +58,8 @@ __wt_stat_init_dsrc_stats(WT_DSRC_STATS *stats)
 	    "cache: internal page merge attempts that could not complete";
 	stats->cache_eviction_merge_levels.desc =
 	    "cache: internal levels merged";
+	stats->cache_inmem_split.desc =
+	    "pages split because they were unable to be evicted";
 	stats->cache_overflow_value.desc = "overflow values cached in memory";
 	stats->cache_read.desc = "pages read into cache";
 	stats->cache_read_overflow.desc = "overflow pages read into cache";
@@ -163,6 +165,7 @@ __wt_stat_clear_dsrc_stats(void *stats_arg)
 	stats->cache_eviction_merge.v = 0;
 	stats->cache_eviction_merge_fail.v = 0;
 	stats->cache_eviction_merge_levels.v = 0;
+	stats->cache_inmem_split.v = 0;
 	stats->cache_overflow_value.v = 0;
 	stats->cache_read.v = 0;
 	stats->cache_read_overflow.v = 0;
@@ -248,6 +251,7 @@ __wt_stat_aggregate_dsrc_stats(void *child, void *parent)
 	p->cache_eviction_merge.v += c->cache_eviction_merge.v;
 	p->cache_eviction_merge_fail.v += c->cache_eviction_merge_fail.v;
 	p->cache_eviction_merge_levels.v += c->cache_eviction_merge_levels.v;
+	p->cache_inmem_split.v += c->cache_inmem_split.v;
 	p->cache_overflow_value.v += c->cache_overflow_value.v;
 	p->cache_read.v += c->cache_read.v;
 	p->cache_read_overflow.v += c->cache_read_overflow.v;
@@ -329,6 +333,8 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	stats->cache_eviction_slow.desc =
 	    "cache: eviction server unable to reach eviction goal";
 	stats->cache_eviction_walk.desc = "cache: pages walked for eviction";
+	stats->cache_inmem_split.desc =
+	    "pages split because they were unable to be evicted";
 	stats->cache_pages_dirty.desc =
 	    "cache: tracked dirty pages in the cache";
 	stats->cache_pages_inuse.desc =
@@ -345,6 +351,11 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	stats->cursor_search.desc = "Btree cursor search calls";
 	stats->cursor_search_near.desc = "Btree cursor search near calls";
 	stats->cursor_update.desc = "Btree cursor update calls";
+	stats->dh_conn_handles.desc = "dhandle: connection dhandles swept";
+	stats->dh_evict_locks.desc = "dhandle: locked by eviction";
+	stats->dh_session_handles.desc = "dhandle: session dhandles swept";
+	stats->dh_sweep_evict.desc = "dhandle: sweeps conflicting with evict";
+	stats->dh_sweeps.desc = "dhandle: number of sweep attempts";
 	stats->file_open.desc = "files currently open";
 	stats->log_bytes_user.desc =
 	    "log: total user provided log bytes written";
@@ -416,6 +427,7 @@ __wt_stat_clear_connection_stats(void *stats_arg)
 	stats->cache_eviction_merge_levels.v = 0;
 	stats->cache_eviction_slow.v = 0;
 	stats->cache_eviction_walk.v = 0;
+	stats->cache_inmem_split.v = 0;
 	stats->cache_pages_dirty.v = 0;
 	stats->cache_read.v = 0;
 	stats->cache_write.v = 0;
@@ -429,6 +441,11 @@ __wt_stat_clear_connection_stats(void *stats_arg)
 	stats->cursor_search.v = 0;
 	stats->cursor_search_near.v = 0;
 	stats->cursor_update.v = 0;
+	stats->dh_conn_handles.v = 0;
+	stats->dh_evict_locks.v = 0;
+	stats->dh_session_handles.v = 0;
+	stats->dh_sweep_evict.v = 0;
+	stats->dh_sweeps.v = 0;
 	stats->log_bytes_user.v = 0;
 	stats->log_bytes_written.v = 0;
 	stats->log_reads.v = 0;

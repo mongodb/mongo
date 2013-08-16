@@ -275,6 +275,9 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 		WT_RET(__wt_config_gets(
 		    session, cfg, "prefix_compression", &cval));
 		btree->prefix_compression = cval.val == 0 ? 0 : 1;
+		WT_RET(__wt_config_gets(
+		    session, cfg, "prefix_compression_min", &cval));
+		btree->prefix_compression_min = (u_int)cval.val;
 		/* FALLTHROUGH */
 	case BTREE_COL_VAR:
 		WT_RET(__wt_config_gets(session, cfg, "dictionary", &cval));
@@ -384,7 +387,7 @@ __btree_tree_open_empty(WT_SESSION_IMPL *session, int creation)
 		WT_ERR(__wt_page_alloc(session, WT_PAGE_COL_INT, 1, &root));
 		root->u.intl.recno = 1;
 		ref = root->u.intl.t;
-		WT_ERR(__wt_btree_leaf_create(session, root, ref, &leaf));
+		WT_ERR(__wt_btree_new_leaf_page(session, root, ref, &leaf));
 		ref->addr = NULL;
 		ref->state = WT_REF_MEM;
 		ref->key.recno = 1;
@@ -392,7 +395,7 @@ __btree_tree_open_empty(WT_SESSION_IMPL *session, int creation)
 	case BTREE_ROW:
 		WT_ERR(__wt_page_alloc(session, WT_PAGE_ROW_INT, 1, &root));
 		ref = root->u.intl.t;
-		WT_ERR(__wt_btree_leaf_create(session, root, ref, &leaf));
+		WT_ERR(__wt_btree_new_leaf_page(session, root, ref, &leaf));
 		ref->addr = NULL;
 		ref->state = WT_REF_MEM;
 		WT_ERR(__wt_row_ikey_incr(
@@ -444,11 +447,41 @@ err:	if (leaf != NULL)
 }
 
 /*
- * __wt_btree_leaf_create --
+ * __wt_btree_new_modified_page --
+ *	Create a new in-memory page could be an internal or leaf page. Setup
+ *	the page modify structure.
+ */
+int
+__wt_btree_new_modified_page(WT_SESSION_IMPL *session,
+    uint8_t type, uint32_t entries, int merge, WT_PAGE **pagep)
+{
+	WT_DECL_RET;
+	WT_PAGE *newpage;
+
+	/* Allocate a new page and fill it in. */
+	WT_RET(__wt_page_alloc(session, type, entries, &newpage));
+	newpage->read_gen = WT_READ_GEN_NOTSET;
+	newpage->entries = entries;
+
+	WT_ERR(__wt_page_modify_init(session, newpage));
+	if (merge)
+		F_SET(newpage->modify, WT_PM_REC_SPLIT_MERGE);
+	else
+		__wt_page_modify_set(session, newpage);
+
+	*pagep = newpage;
+	return (0);
+
+err:	__wt_page_out(session, &newpage);
+	return (ret);
+}
+
+/*
+ * __wt_btree_new_leaf_page --
  *	Create an empty leaf page and link it into a reference in its parent.
  */
 int
-__wt_btree_leaf_create(
+__wt_btree_new_leaf_page(
     WT_SESSION_IMPL *session, WT_PAGE *parent, WT_REF *ref, WT_PAGE **pagep)
 {
 	WT_BTREE *btree;

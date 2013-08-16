@@ -12,7 +12,8 @@ static void __rec_discard_tree(WT_SESSION_IMPL *, WT_PAGE *, int);
 static void __rec_excl_clear(WT_SESSION_IMPL *);
 static void __rec_page_clean_update(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_page_dirty_update(WT_SESSION_IMPL *, WT_PAGE *);
-static int  __rec_review(WT_SESSION_IMPL *, WT_REF *, WT_PAGE *, int, int, int);
+static int  __rec_review(
+    WT_SESSION_IMPL *, WT_REF *, WT_PAGE *, int, int, int, int *);
 static void __rec_root_update(WT_SESSION_IMPL *);
 
 /*
@@ -24,12 +25,13 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, int exclusive)
 {
 	WT_DECL_RET;
 	WT_PAGE_MODIFY *mod;
-	int merge;
+	int merge, inmem_split;
 
 	WT_VERBOSE_RET(session, evict,
 	    "page %p (%s)", page, __wt_page_type_string(page->type));
 
 	WT_ASSERT(session, session->excl_next == 0);
+	inmem_split = 0;
 
 	/*
 	 * If we get a split-merge page during normal eviction, try to collapse
@@ -55,11 +57,19 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, int exclusive)
 	 * or during salvage).  That's OK if exclusive is set: we won't check
 	 * hazard pointers in that case.
 	 */
-	WT_ERR(__rec_review(session, page->ref, page, exclusive, merge, 1));
+	WT_ERR(__rec_review(
+	    session, page->ref, page, exclusive, merge, 1, &inmem_split));
 
 	/* Try to merge internal pages. */
 	if (merge)
 		WT_ERR(__wt_merge_tree(session, page));
+
+	/* Try to split the page in memory. */
+	if (inmem_split) {
+		WT_ERR(__wt_split_page_inmem(session, page));
+		WT_CSTAT_INCR(session, cache_inmem_split);
+		WT_DSTAT_INCR(session, cache_inmem_split);
+	}
 
 	/*
 	 * Update the page's modification reference, reconciliation might have
@@ -86,6 +96,7 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, int exclusive)
 		else
 			__rec_page_clean_update(session, page);
 
+		WT_ASSERT(session, !inmem_split);
 		/* Discard the page. */
 		__wt_page_out(session, &page);
 
@@ -97,11 +108,13 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, int exclusive)
 		else
 			WT_ERR(__rec_page_dirty_update(session, page));
 
-		/* Discard the tree rooted in this page. */
-		__rec_discard_tree(session, page, exclusive);
+		if (!inmem_split) {
+			/* Discard the tree rooted in this page. */
+			__rec_discard_tree(session, page, exclusive);
 
-		WT_CSTAT_INCR(session, cache_eviction_dirty);
-		WT_DSTAT_INCR(session, cache_eviction_dirty);
+			WT_CSTAT_INCR(session, cache_eviction_dirty);
+			WT_DSTAT_INCR(session, cache_eviction_dirty);
+		}
 	}
 	if (0) {
 err:		/*
@@ -219,11 +232,13 @@ __rec_page_dirty_update(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 * Publish: a barrier to ensure the structure fields are set
 		 * before the state change makes the page available to readers.
 		 */
-		parent_ref->page = mod->u.split;
+		parent_ref = mod->u.split.ref;
+		parent_ref->page = mod->u.split.page;
 		WT_PUBLISH(parent_ref->state, WT_REF_MEM);
 
-		/* Clear the reference else discarding the page will free it. */
-		mod->u.split = NULL;
+		/* Clear the page else discarding the page will free it. */
+		mod->u.split.page = NULL;
+		mod->u.split.ref = NULL;
 		F_CLR(mod, WT_PM_REC_SPLIT);
 		break;
 	WT_ILLEGAL_VALUE(session);
@@ -274,8 +289,8 @@ __rec_discard_tree(WT_SESSION_IMPL *session, WT_PAGE *page, int exclusive)
  *	hazard pointer.
  */
 static int
-__rec_review(WT_SESSION_IMPL *session,
-    WT_REF *ref, WT_PAGE *page, int exclusive, int merge, int top)
+__rec_review(WT_SESSION_IMPL *session, WT_REF *ref,
+    WT_PAGE *page, int exclusive, int merge, int top, int *inmem_split)
 {
 	WT_BTREE *btree;
 	WT_DECL_RET;
@@ -284,6 +299,7 @@ __rec_review(WT_SESSION_IMPL *session,
 	uint32_t i;
 
 	btree = S2BT(session);
+	*inmem_split = 0;
 
 	/*
 	 * Get exclusive access to the page if our caller doesn't have the tree
@@ -314,8 +330,9 @@ __rec_review(WT_SESSION_IMPL *session,
 			case WT_REF_DELETED:		/* On-disk, deleted */
 				break;
 			case WT_REF_MEM:		/* In-memory */
-				WT_RET(__rec_review(session,
-				    ref, ref->page, exclusive, merge, 0));
+				WT_RET(__rec_review(
+				    session, ref, ref->page,
+				    exclusive, merge, 0, inmem_split));
 				break;
 			case WT_REF_EVICT_WALK:		/* Walk point */
 			case WT_REF_LOCKED:		/* Being evicted */
@@ -431,10 +448,22 @@ ckpt:		WT_CSTAT_INCR(session, cache_eviction_checkpoint);
 		 */
 		mod = page->modify;
 
-		/* If there are unwritten changes on the page, give up. */
+		/*
+		 * If reconciliation failed due to active modifications and
+		 * the page is a lot larger than the maximum allowed, it is
+		 * likely that we are having trouble reconciling it due to
+		 * contention. Attempt to split the page in memory.
+		 */
+		if (ret == EBUSY &&
+		    __wt_eviction_page_force(session, page)) {
+			*inmem_split = 1;
+			return (0);
+		}
 		if (ret == EBUSY) {
+			/* Give up if there are unwritten changes */
 			WT_VERBOSE_RET(session, evict,
-			    "eviction failed, reconciled page not clean");
+			    "eviction failed, reconciled page"
+			    " contained active updates");
 
 			/* 
 			 * We may be able to discard any "update" memory the
@@ -471,6 +500,7 @@ ckpt:		WT_CSTAT_INCR(session, cache_eviction_checkpoint);
 	if (!top && (mod == NULL || !F_ISSET(mod,
 	    WT_PM_REC_EMPTY | WT_PM_REC_SPLIT | WT_PM_REC_SPLIT_MERGE)))
 		return (EBUSY);
+
 	return (0);
 }
 

@@ -143,7 +143,7 @@ class test_config02(wttest.WiredTigerTestCase):
         dir = 'nondir'
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: wiredtiger.wiredtiger_open(dir, 'create'),
-            'wiredtiger_open: WiredTiger: No such file or directory\n')
+            '/No such file or directory/')
 
     def test_home_not_writeable(self):
         dir = 'subdir'
@@ -151,7 +151,7 @@ class test_config02(wttest.WiredTigerTestCase):
         os.chmod(dir, 0555)
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: wiredtiger.wiredtiger_open(dir, 'create'),
-            'wiredtiger_open: WiredTiger: Permission denied\n')
+            '/Permission denied/')
 
 if __name__ == '__main__':
     wttest.run()

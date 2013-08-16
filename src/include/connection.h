@@ -60,6 +60,11 @@ struct __wt_named_data_source {
 #define	WT_NUM_INTERNAL_SESSIONS	2
 
 /*
+ * Periodically clear out unused dhandles from the connection list.
+ */
+#define	CONN_DHANDLE_SWEEP_TRIGGER	10
+
+/*
  * WT_CONNECTION_IMPL --
  *	Implementation of WT_CONNECTION
  */
@@ -85,8 +90,6 @@ struct __wt_connection_impl {
 	const char *error_prefix;	/* Database error prefix */
 	int is_new;			/* Connection created database */
 
-	int connection_initialized;	/* Connection is initialized */
-
 	WT_EXTENSION_API extension_api;	/* Extension API */
 
 					/* Configuration */
@@ -101,6 +104,8 @@ struct __wt_connection_impl {
 	pthread_t cache_evict_tid;	/* Eviction server thread ID */
 	int	  cache_evict_tid_set;	/* Eviction server thread ID set */
 
+	int32_t	dhandle_dead;		/* Not locked: dead dhandles seen */
+	WT_SPINLOCK dhandle_lock;	/* Locked: dhandle sweep */
 					/* Locked: data handle list */
 	TAILQ_HEAD(__wt_dhandle_qh, __wt_data_handle) dhqh;
 					/* Locked: LSM handle list. */

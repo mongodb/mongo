@@ -79,12 +79,23 @@ connection_stats = [
 	Stat('cache_eviction_slow',
 	    'cache: eviction server unable to reach eviction goal'),
 	Stat('cache_eviction_walk', 'cache: pages walked for eviction'),
+	Stat('cache_inmem_split',
+	    'pages split because they were unable to be evicted'),
 	Stat('cache_pages_dirty',
 	    'cache: tracked dirty pages in the cache', 'no_scale'),
 	Stat('cache_pages_inuse',
 	    'cache: pages currently held in the cache', 'no_clear,no_scale'),
 	Stat('cache_read', 'cache: pages read into cache'),
 	Stat('cache_write', 'cache: pages written from cache'),
+
+	##########################################
+	# Dhandle statistics
+	##########################################
+	Stat('dh_conn_handles', 'dhandle: connection dhandles swept'),
+	Stat('dh_evict_locks', 'dhandle: locked by eviction'),
+	Stat('dh_session_handles', 'dhandle: session dhandles swept'),
+	Stat('dh_sweep_evict', 'dhandle: sweeps conflicting with evict'),
+	Stat('dh_sweeps', 'dhandle: number of sweep attempts'),
 
 	##########################################
 	# Logging statistics
@@ -262,6 +273,8 @@ dsrc_stats = [
 	Stat('cache_eviction_merge_fail',
 	    'cache: internal page merge attempts that could not complete'),
 	Stat('cache_eviction_merge_levels', 'cache: internal levels merged'),
+	Stat('cache_inmem_split',
+	    'pages split because they were unable to be evicted'),
 	Stat('cache_overflow_value',
 	    'overflow values cached in memory', 'no_scale'),
 	Stat('cache_read', 'pages read into cache'),

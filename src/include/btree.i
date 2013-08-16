@@ -18,7 +18,7 @@ __wt_page_is_modified(WT_PAGE *page)
 
 /*
  * __wt_eviction_page_force --
- *      Check if a page matches the criteria for forced eviction.
+ *	Check if a page matches the criteria for forced eviction.
  */
 static inline int
 __wt_eviction_page_force(WT_SESSION_IMPL *session, WT_PAGE *page)
@@ -27,17 +27,27 @@ __wt_eviction_page_force(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	btree = S2BT(session);
 
-	/*
-	 * Ignore internal pages (check read-only information first to the
-	 * extent possible, this is shared data).
-	 */
-	if (page->type != WT_PAGE_ROW_INT && page->type != WT_PAGE_COL_INT &&
-	    !F_ISSET(btree, WT_BTREE_NO_EVICTION) &&
-	    __wt_page_is_modified(page) &&
-	    page->memory_footprint > btree->maxmempage)
-		return (1);
+	/* Pages are usually small enough, check that first. */
+	if (page->memory_footprint < btree->maxmempage)
+		return (0);
 
-	return (0);
+	/* Leaf pages only. */
+	if (page->type != WT_PAGE_COL_FIX &&
+	    page->type != WT_PAGE_COL_VAR && page->type != WT_PAGE_ROW_LEAF)
+		return (0);
+
+	/* Eviction may be turned off,  although that's rare. */
+	if (F_ISSET(btree, WT_BTREE_NO_EVICTION))
+		return (0);
+
+	/*
+	 * It's hard to imagine a page with a huge memory footprint that's also
+	 * clean, check to be sure.
+	 */
+	if (!__wt_page_is_modified(page))
+		return (0);
+
+	return (1);
 }
 
 /*

@@ -14,7 +14,7 @@
 int
 __wt_connection_open(WT_CONNECTION_IMPL *conn, const char *cfg[])
 {
-	WT_SESSION_IMPL *evict_session, *session;
+	WT_SESSION_IMPL *session;
 
 	/* Default session. */
 	session = conn->default_session;
@@ -43,35 +43,6 @@ __wt_connection_open(WT_CONNECTION_IMPL *conn, const char *cfg[])
 	 */
 	WT_RET(__wt_open_session(conn, 1, NULL, NULL, &session));
 	conn->default_session = session;
-
-	/* Start worker threads. */
-	F_SET(conn, WT_CONN_EVICTION_RUN | WT_CONN_SERVER_RUN);
-
-	/*
-	 * Start the eviction thread.
-	 *
-	 * It needs a session handle because it is reading/writing pages.
-	 * Allocate a session here so the eviction thread never needs
-	 * to acquire the connection spinlock, which can lead to deadlock.
-	 */
-	WT_RET(__wt_open_session(conn, 1, NULL, NULL, &evict_session));
-	evict_session->name = "eviction-server";
-	WT_RET(__wt_thread_create(session,
-	    &conn->cache_evict_tid, __wt_cache_evict_server, evict_session));
-	conn->cache_evict_tid_set = 1;
-
-	/*
-	 * Start the optional statistics thread.  Start statistics first
-	 * so that other optional threads can know whether statistics are
-	 * enabled or not.
-	 */
-	WT_RET(__wt_statlog_create(conn, cfg));
-
-	/* Start the optional logging/archive thread. */
-	WT_RET(__wt_logmgr_create(conn, cfg));
-
-	/* Start the optional checkpoint thread. */
-	WT_RET(__wt_checkpoint_create(conn, cfg));
 
 	return (0);
 }
@@ -188,4 +159,46 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 	WT_TRET(__wt_connection_destroy(conn));
 
 	return (ret);
+}
+
+/*
+ * __wt_connection_workers --
+ *	Start the worker threads.
+ */
+int
+__wt_connection_workers(WT_SESSION_IMPL *session, const char *cfg[])
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_SESSION_IMPL *evict_session;
+
+	conn = S2C(session);
+
+	F_SET(conn, WT_CONN_EVICTION_RUN | WT_CONN_SERVER_RUN);
+
+	/*
+	 * Start the eviction thread.
+	 *
+	 * It needs a session handle because it is reading/writing pages.
+	 * Allocate a session here so the eviction thread never needs
+	 * to acquire the connection spinlock, which can lead to deadlock.
+	 */
+	WT_RET(__wt_open_session(conn, 1, NULL, NULL, &evict_session));
+	evict_session->name = "eviction-server";
+	WT_RET(__wt_thread_create(session,
+	    &conn->cache_evict_tid, __wt_cache_evict_server, evict_session));
+	conn->cache_evict_tid_set = 1;
+
+	/*
+	 * Start the optional statistics thread.  Start statistics first so that
+	 * other optional threads can know if statistics are enabled or not.
+	 */
+	WT_RET(__wt_statlog_create(conn, cfg));
+
+	/* Start the optional logging/archive thread. */
+	WT_RET(__wt_logmgr_create(conn, cfg));
+
+	/* Start the optional checkpoint thread. */
+	WT_RET(__wt_checkpoint_create(conn, cfg));
+
+	return (0);
 }
