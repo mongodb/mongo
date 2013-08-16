@@ -1510,9 +1510,9 @@ void indent_lines(const char *lines, const char *indent)
 	while (bol != NULL) {
 		eol = strchr(bol, '\n');
 		if (eol == NULL)
-			len = strlen(bol);
+			len = (int)strlen(bol);
 		else
-			len = eol++ - bol;
+			len = (int)(eol++ - bol);
 		printf("%s%.*s\n", indent, len, bol);
 		bol = eol;
 	}
