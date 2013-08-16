@@ -399,8 +399,8 @@ __wt_rec_write(WT_SESSION_IMPL *session,
 	 * be common.
 	 */
 	WT_VERBOSE_RET(session, reconcile,
-	    "root page split %p -> %p", page, page->modify->u.split.page);
-	page = page->modify->u.split.page;
+	    "root page split %p -> %p", page, page->modify->u.split);
+	page = page->modify->u.split;
 	__wt_page_modify_set(session, page);
 	F_CLR(page->modify, WT_PM_REC_SPLIT_MERGE);
 
@@ -2261,7 +2261,7 @@ __rec_col_merge(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 				break;
 			case WT_PM_REC_SPLIT:
 				WT_RET(__rec_col_merge(
-				    session, r, rp->modify->u.split.page));
+				    session, r, rp->modify->u.split));
 				continue;
 			case WT_PM_REC_SPLIT_MERGE:
 				WT_RET(__rec_col_merge(session, r, rp));
@@ -3027,7 +3027,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 
 				WT_RET(__rec_row_merge(session, r,
 				    F_ISSET(rp->modify, WT_PM_REC_SPLIT_MERGE) ?
-				    rp : rp->modify->u.split.page));
+				    rp : rp->modify->u.split));
 				continue;
 			WT_ILLEGAL_VALUE(session);
 			}
@@ -3174,7 +3174,7 @@ __rec_row_merge(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 			case WT_PM_REC_SPLIT_MERGE:
 				WT_RET(__rec_row_merge(session, r,
 				    F_ISSET(rp->modify, WT_PM_REC_SPLIT_MERGE) ?
-				    rp : rp->modify->u.split.page));
+				    rp : rp->modify->u.split));
 				continue;
 			WT_ILLEGAL_VALUE(session);
 			}
@@ -3684,7 +3684,7 @@ __rec_split_discard(WT_SESSION_IMPL *session, WT_PAGE *page)
 			 * Root page split: continue walking the list of split
 			 * pages, cleaning up as we go.
 			 */
-			WT_RET(__rec_split_discard(session, mod->u.split.page));
+			WT_RET(__rec_split_discard(session, mod->u.split));
 			break;
 		case WT_PM_REC_REPLACE:
 			/*
@@ -3781,9 +3781,9 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		break;
 	case WT_PM_REC_SPLIT:				/* Page split */
 		/* Discard the split page. */
-		WT_RET(__rec_split_discard(session, mod->u.split.page));
-		__wt_page_out(session, &mod->u.split.page);
-		mod->u.split.page = NULL;
+		WT_RET(__rec_split_discard(session, mod->u.split));
+		__wt_page_out(session, &mod->u.split);
+		mod->u.split = NULL;
 		break;
 	case WT_PM_REC_SPLIT_MERGE:			/* Page split */
 		/*
@@ -3906,17 +3906,16 @@ err:			__wt_scr_free(&tkey);
 		case WT_PAGE_ROW_INT:
 		case WT_PAGE_ROW_LEAF:
 			WT_RET(__rec_split_row(
-			    session, r, page, &mod->u.split.page));
+			    session, r, page, &mod->u.split));
 			break;
 		case WT_PAGE_COL_INT:
 		case WT_PAGE_COL_FIX:
 		case WT_PAGE_COL_VAR:
 			WT_RET(__rec_split_col(
-			    session, r, page, &mod->u.split.page));
+			    session, r, page, &mod->u.split));
 			break;
 		WT_ILLEGAL_VALUE(session);
 		}
-		mod->u.split.ref = page->ref;
 		F_SET(mod, WT_PM_REC_SPLIT);
 		break;
 	}

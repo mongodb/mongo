@@ -10,8 +10,8 @@
 static int  __hazard_exclusive(WT_SESSION_IMPL *, WT_REF *, int);
 static void __rec_discard_tree(WT_SESSION_IMPL *, WT_PAGE *, int);
 static void __rec_excl_clear(WT_SESSION_IMPL *);
-static void __rec_page_clean_update(WT_SESSION_IMPL *, WT_PAGE *);
-static int  __rec_page_dirty_update(WT_SESSION_IMPL *, WT_PAGE *);
+static void __rec_page_clean_update(WT_SESSION_IMPL *, WT_REF *);
+static int  __rec_page_dirty_update(WT_SESSION_IMPL *, WT_REF *, WT_PAGE *);
 static int  __rec_review(
     WT_SESSION_IMPL *, WT_REF *, WT_PAGE *, int, int, int, int *);
 static void __rec_root_update(WT_SESSION_IMPL *);
@@ -25,6 +25,7 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, int exclusive)
 {
 	WT_DECL_RET;
 	WT_PAGE_MODIFY *mod;
+	WT_REF *parent_ref;
 	int merge, inmem_split;
 
 	WT_VERBOSE_RET(session, evict,
@@ -57,8 +58,9 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, int exclusive)
 	 * or during salvage).  That's OK if exclusive is set: we won't check
 	 * hazard pointers in that case.
 	 */
+	parent_ref = page->ref;
 	WT_ERR(__rec_review(
-	    session, page->ref, page, exclusive, merge, 1, &inmem_split));
+	    session, parent_ref, page, exclusive, merge, 1, &inmem_split));
 
 	/* Try to merge internal pages. */
 	if (merge)
@@ -89,12 +91,12 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, int exclusive)
 	 */
 	if (mod == NULL || !F_ISSET(mod, WT_PM_REC_MASK)) {
 		WT_ASSERT(session,
-		    exclusive || page->ref->state == WT_REF_LOCKED);
+		    exclusive || parent_ref->state == WT_REF_LOCKED);
 
 		if (WT_PAGE_IS_ROOT(page))
 			__rec_root_update(session);
 		else
-			__rec_page_clean_update(session, page);
+			__rec_page_clean_update(session, parent_ref);
 
 		WT_ASSERT(session, !inmem_split);
 		/* Discard the page. */
@@ -106,7 +108,8 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, int exclusive)
 		if (WT_PAGE_IS_ROOT(page))
 			__rec_root_update(session);
 		else
-			WT_ERR(__rec_page_dirty_update(session, page));
+			WT_ERR(__rec_page_dirty_update(
+			    session, parent_ref, page));
 
 		if (!inmem_split) {
 			/* Discard the tree rooted in this page. */
@@ -146,20 +149,17 @@ __rec_root_update(WT_SESSION_IMPL *session)
  *	Update a clean page's reference on eviction.
  */
 static void
-__rec_page_clean_update(WT_SESSION_IMPL *session, WT_PAGE *page)
+__rec_page_clean_update(WT_SESSION_IMPL *session, WT_REF *parent_ref)
 {
-	WT_REF *ref;
-
-	ref = page->ref;
-
 	/*
-	 * Update the page's WT_REF structure.  If the page has an address, it's
-	 * a disk page; if it has no address, it must be a deleted page that was
-	 * re-instantiated (for example, by searching) and never written.
+	 * Update the WT_REF structure in the parent.  If the page has an
+	 * address, it's a disk page; if it has no address, it must be a
+	 * deleted page that was re-instantiated (for example, by searching)
+	 * and never written.
 	 */
-	ref->page = NULL;
-	WT_PUBLISH(ref->state,
-	    ref->addr == NULL ? WT_REF_DELETED : WT_REF_DISK);
+	parent_ref->page = NULL;
+	WT_PUBLISH(parent_ref->state,
+	    parent_ref->addr == NULL ? WT_REF_DELETED : WT_REF_DISK);
 
 	WT_UNUSED(session);
 }
@@ -169,15 +169,13 @@ __rec_page_clean_update(WT_SESSION_IMPL *session, WT_PAGE *page)
  *	Update a dirty page's reference on eviction.
  */
 static int
-__rec_page_dirty_update(WT_SESSION_IMPL *session, WT_PAGE *page)
+__rec_page_dirty_update(
+    WT_SESSION_IMPL *session, WT_REF *parent_ref, WT_PAGE *page)
 {
 	WT_ADDR *addr;
 	WT_PAGE_MODIFY *mod;
-	WT_REF *parent_ref;
 
 	mod = page->modify;
-	parent_ref = page->ref;
-
 	switch (F_ISSET(mod, WT_PM_REC_MASK)) {
 	case WT_PM_REC_EMPTY:				/* Page is empty */
 		if (parent_ref->addr != NULL &&
@@ -232,13 +230,11 @@ __rec_page_dirty_update(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 * Publish: a barrier to ensure the structure fields are set
 		 * before the state change makes the page available to readers.
 		 */
-		parent_ref = mod->u.split.ref;
-		parent_ref->page = mod->u.split.page;
+		parent_ref->page = mod->u.split;
 		WT_PUBLISH(parent_ref->state, WT_REF_MEM);
 
 		/* Clear the page else discarding the page will free it. */
-		mod->u.split.page = NULL;
-		mod->u.split.ref = NULL;
+		mod->u.split = NULL;
 		F_CLR(mod, WT_PM_REC_SPLIT);
 		break;
 	WT_ILLEGAL_VALUE(session);
@@ -455,6 +451,7 @@ ckpt:		WT_CSTAT_INCR(session, cache_eviction_checkpoint);
 		 * contention. Attempt to split the page in memory.
 		 */
 		if (ret == EBUSY &&
+		    page->type == WT_PAGE_ROW_LEAF &&
 		    __wt_eviction_page_force(session, page)) {
 			*inmem_split = 1;
 			return (0);
