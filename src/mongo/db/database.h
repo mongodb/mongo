@@ -164,6 +164,14 @@ namespace mongo {
 
         int _magic; // used for making sure the object is still loaded in memory
 
+        // TODO: probably shouldn't be a std::map
+        // TODO: make sure deletes go through
+        // this in some ways is a dupe of _namespaceIndex
+        // but it points to a much more useful data structure
+        typedef std::map< std::string, CollectionTemp* > CollectionMap;
+        CollectionMap _collections;
+        mutex _collectionLock;
+
     };
 
 } // namespace mongo

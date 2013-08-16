@@ -60,10 +60,11 @@ namespace mongo {
 
         int _magic;
 
-        std::string _ns; // TODO: this copy might be annoyingly slow
+        std::string _ns;
         NamespaceDetails* _details;
         Database* _database;
 
+        friend class Database;
         friend class FlatIterator;
         friend class CappedIterator;
     };
