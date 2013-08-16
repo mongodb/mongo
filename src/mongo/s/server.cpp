@@ -256,9 +256,7 @@ namespace mongo {
                 " (--help for usage)" << endl;
             DEV cout << "_DEBUG build" << endl;
             cout << "git version: " << gitVersion() << endl;
-#ifdef MONGO_SSL
-            cout << "OpenSSL version: " << openSSLVersion() << endl;
-#endif
+            cout << openSSLVersion("OpenSSL version: ") << endl;
             cout <<  "build sys info: " << sysInfo() << endl;
         }
         else {
@@ -268,9 +266,7 @@ namespace mongo {
                 " (--help for usage)" << endl;
             DEV log() << "_DEBUG build" << endl;
             printGitVersion();
-#ifdef MONGO_SSL
             printOpenSSLVersion();
-#endif
             printSysInfo();
             printCommandLineOpts();
         }

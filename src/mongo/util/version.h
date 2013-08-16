@@ -46,7 +46,7 @@ namespace mongo {
 
     void printGitVersion();
 
-    const char * openSSLVersion();
+    const std::string openSSLVersion(const std::string &prefix = "", const std::string &suffix = "");
     void printOpenSSLVersion();
 
     std::string sysInfo();
