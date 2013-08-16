@@ -22,6 +22,7 @@ namespace mongo {
 
     class CollectionTemp;
     class DiskLoc;
+    class ExtentManager;
     class NamespaceDetails;
 
     /**
@@ -88,7 +89,7 @@ namespace mongo {
      */
     class CappedIterator : public CollectionIterator {
     public:
-        CappedIterator(const string& ns, const DiskLoc& start, bool tailable,
+        CappedIterator(const CollectionTemp* collection, const DiskLoc& start, bool tailable,
                        const CollectionScanParams::Direction& dir);
         virtual ~CappedIterator() { }
 
@@ -104,18 +105,15 @@ namespace mongo {
         /**
          * Internal collection navigation helper methods.
          */
-        static DiskLoc getNextCapped(const DiskLoc& dl, CollectionScanParams::Direction direction,
-                              NamespaceDetails* nsd);
-        static DiskLoc prevLoop(NamespaceDetails* nsd, const DiskLoc& curr);
-        static DiskLoc nextLoop(NamespaceDetails* nsd, const DiskLoc& prev);
+        static DiskLoc getNextCapped(const NamespaceDetails* nsd, const ExtentManager* em,
+                                     const DiskLoc& dl, CollectionScanParams::Direction direction );
+        static DiskLoc prevLoop(const NamespaceDetails* nsd, const ExtentManager* em,
+                                const DiskLoc& curr);
+        static DiskLoc nextLoop(const NamespaceDetails* nsd, const ExtentManager* em,
+                                const DiskLoc& prev);
 
         // The collection we're iterating over.
-        string _ns;
-
-        // Not valid between calls to prepareToYield and recoverFromYield.
-        // The actual on-disk catalog information for the collection referred to by '_ns'.
-        // We need the extent information in this to navigate capped collections.
-        NamespaceDetails* _details;
+        const CollectionTemp* _collection;
 
         // The result returned on the next call to getNext().
         DiskLoc _curr;

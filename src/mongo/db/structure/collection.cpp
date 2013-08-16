@@ -44,7 +44,7 @@ namespace mongo {
                                                      const CollectionScanParams::Direction& dir) const {
         verify( ok() );
         if ( _details->isCapped() )
-            return new CappedIterator( _ns, start, tailable, dir );
+            return new CappedIterator( this, start, tailable, dir );
         return new FlatIterator( this, start, dir );
     }
 
