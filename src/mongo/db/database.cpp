@@ -41,6 +41,12 @@ namespace mongo {
             log() << "\n\n\nWARNING: ccByLoc not empty on database close! "
                   << _ccByLoc.size() << ' ' << _name << endl;
         }
+
+        for ( CollectionMap::iterator i = _collections.begin(); i != _collections.end(); ++i ) {
+            delete i->second;
+        }
+        _collections.clear();
+
     }
 
     Status Database::validateDBName( const StringData& dbname ) {
@@ -82,7 +88,8 @@ namespace mongo {
         : _name(nm), _path(path),
           _namespaceIndex( _path, _name ),
           _extentManager( _name, _path, directoryperdb /* this is a global right now */ ),
-          _profileName(_name + ".system.profile")
+          _profileName(_name + ".system.profile"),
+          _collectionLock( "Database::_collectionLock" )
     {
         Status status = validateDBName( _name );
         if ( !status.isOK() ) {
@@ -307,12 +314,29 @@ namespace mongo {
         StringData dbName = nsToDatabaseSubstring( ns );
         verify( dbName == _name);
 
+        scoped_lock lk( _collectionLock );
+
+        string myns = ns.toString();
+
+        CollectionMap::const_iterator it = _collections.find( myns );
+        if ( it != _collections.end() ) {
+            if ( it->second ) {
+                //DEV {
+                    NamespaceDetails* details = _namespaceIndex.details( ns );
+                    verify( details == it->second->_details );
+                    //}
+                return it->second;
+            }
+        }
+
         NamespaceDetails* details = _namespaceIndex.details( ns );
         if ( !details ) {
             return NULL;
         }
 
-        return new CollectionTemp( ns, details, this );
+        CollectionTemp* c = new CollectionTemp( ns, details, this );
+        _collections[myns] = c;
+        return c;
     }
 
 } // namespace mongo
