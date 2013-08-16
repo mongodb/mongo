@@ -206,12 +206,15 @@ namespace mongo {
                         _appendHelper( result , doc , found , fields );
                     }
                     
-                    UpdateResult res = mongo::update(
-                        UpdateRequest(NamespaceString(ns), cc().curop()->debug())
-                        .query(queryModified)
-                        .updates(update)
-                        .upsert(upsert)
-                        .updateOpLog());
+                    const NamespaceString requestNs(ns);
+                    UpdateRequest request(requestNs, cc().curop()->debug());
+
+                    request.setQuery(queryModified);
+                    request.setUpdates(update);
+                    request.setUpsert(upsert);
+                    request.setUpdateOpLog();
+
+                    UpdateResult res = mongo::update(request);
 
                     if ( returnNew ) {
                         if ( res.upserted.isSet() ) {

@@ -203,24 +203,30 @@ namespace mongo {
         OpDebug debug;
         Client::Context context(ns);
 
-        update(
-            UpdateRequest(NamespaceString(ns), debug)
-            .query(id)
-            .updates(o)
-            .upsert()
-            .updateOpLog()
-            .fromMigration(fromMigrate));
+        const NamespaceString requestNs(ns);
+        UpdateRequest request(requestNs, debug);
+
+        request.setQuery(id);
+        request.setUpdates(o);
+        request.setUpsert();
+        request.setUpdateOpLog();
+        request.setFromMigration(fromMigrate);
+
+        update(request);
     }
 
     void Helpers::putSingleton(const char *ns, BSONObj obj) {
         OpDebug debug;
         Client::Context context(ns);
 
-        update(
-            UpdateRequest(NamespaceString(ns), debug)
-            .updates(obj)
-            .upsert()
-            .updateOpLog());
+        const NamespaceString requestNs(ns);
+        UpdateRequest request(requestNs, debug);
+
+        request.setUpdates(obj);
+        request.setUpsert();
+        request.setUpdateOpLog();
+
+        update(request);
 
         context.getClient()->curop()->done();
     }
@@ -229,12 +235,15 @@ namespace mongo {
         OpDebug debug;
         Client::Context context(ns);
 
-        update(
-            UpdateRequest(NamespaceString(ns), debug)
-            .god()
-            .updates(obj)
-            .upsert()
-            .updateOpLog(logTheOp));
+        const NamespaceString requestNs(ns);
+        UpdateRequest request(requestNs, debug);
+
+        request.setGod();
+        request.setUpdates(obj);
+        request.setUpsert();
+        request.setUpdateOpLog(logTheOp);
+
+        update(request);
 
         context.getClient()->curop()->done();
     }

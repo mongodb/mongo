@@ -245,11 +245,14 @@ namespace mongo {
             OpDebug debug;
             Client::Context ctx("local.sources");
 
-            UpdateResult res = update(
-                UpdateRequest(NamespaceString("local.sources"), debug)
-                .query(pattern)
-                .updates(o)
-                .upsert());
+            const NamespaceString requestNs("local.sources");
+            UpdateRequest request(requestNs, debug);
+
+            request.setQuery(pattern);
+            request.setUpdates(o);
+            request.setUpsert();
+
+            UpdateResult res = update(request);
 
             verify( ! res.modifiers );
             verify( res.numMatched == 1 );
