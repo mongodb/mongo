@@ -1071,7 +1071,6 @@ void config_assign(CONFIG *dest, const CONFIG *src)
 				*pstr = newstr;
 			}
 		}
-	dest->home = saved_home;
 }
 
 /* Free any storage allocated in the config struct.
