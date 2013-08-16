@@ -24,6 +24,7 @@
 #include "mongo/db/structure/collection_iterator.h"
 
 #include "mongo/db/client.h" // XXX-ERH
+#include "mongo/db/pdfile.h" // XXX-ERH/ACM
 
 namespace mongo {
 
