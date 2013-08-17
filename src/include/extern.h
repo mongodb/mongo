@@ -1426,10 +1426,7 @@ extern int __wt_txn_printlog( WT_SESSION_IMPL *session,
     WT_ITEM *logrec,
     WT_LSN *lsnp,
     void *cookie);
-extern int __wt_txn_recover( WT_SESSION_IMPL *session,
-    WT_ITEM *logrec,
-    WT_LSN *lsnp,
-    void *cookie);
+extern int __wt_txn_recover(WT_SESSION_IMPL *default_session);
 extern uint64_t __wt_ext_transaction_id(WT_EXTENSION_API *wt_api,
     WT_SESSION *wt_session);
 extern int __wt_ext_transaction_isolation_level( WT_EXTENSION_API *wt_api,

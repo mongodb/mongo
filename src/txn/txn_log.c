@@ -69,7 +69,8 @@ __txn_commit_printlog(WT_SESSION_IMPL *session, WT_ITEM *logrec, FILE *out)
 }
 
 static int
-__txn_op_apply(WT_SESSION_IMPL *session, const uint8_t **pp, const uint8_t *end)
+__txn_op_apply(WT_SESSION_IMPL *session,
+    const uint8_t **pp, const uint8_t *end, int metadata)
 {
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
@@ -79,6 +80,7 @@ __txn_op_apply(WT_SESSION_IMPL *session, const uint8_t **pp, const uint8_t *end)
 	    "overwrite", NULL };
 	uint64_t recno;
 	uint32_t optype, opsize;
+	int is_metadata;
 
 	/* Peek at the size and the type. */
 	WT_RET(__wt_logop_read(session, pp, end, &optype, &opsize));
@@ -88,6 +90,9 @@ __txn_op_apply(WT_SESSION_IMPL *session, const uint8_t **pp, const uint8_t *end)
 	case WT_LOGOP_COL_PUT:
 		WT_RET(__wt_logop_col_put_unpack(session, pp, end,
 		    &uri, &recno, &value));
+		is_metadata = (strcmp(uri, WT_METADATA_URI) == 0);
+		if (metadata != is_metadata)
+			break;
 		WT_RET(__wt_open_cursor(session, uri, NULL, cfg, &cursor));
 		cursor->set_key(cursor, recno);
 		__wt_cursor_set_raw_value(cursor, &value);
@@ -98,6 +103,9 @@ __txn_op_apply(WT_SESSION_IMPL *session, const uint8_t **pp, const uint8_t *end)
 	case WT_LOGOP_COL_REMOVE:
 		WT_RET(__wt_logop_col_remove_unpack(session, pp, end,
 		    &uri, &recno));
+		is_metadata = (strcmp(uri, WT_METADATA_URI) == 0);
+		if (metadata != is_metadata)
+			break;
 		WT_RET(__wt_open_cursor(session, uri, NULL, cfg, &cursor));
 		cursor->set_key(cursor, recno);
 		WT_TRET(cursor->remove(cursor));
@@ -107,6 +115,9 @@ __txn_op_apply(WT_SESSION_IMPL *session, const uint8_t **pp, const uint8_t *end)
 	case WT_LOGOP_ROW_PUT:
 		WT_RET(__wt_logop_row_put_unpack(session, pp, end,
 		    &uri, &key, &value));
+		is_metadata = (strcmp(uri, WT_METADATA_URI) == 0);
+		if (metadata != is_metadata)
+			break;
 		WT_RET(__wt_open_cursor(session, uri, NULL, cfg, &cursor));
 		__wt_cursor_set_raw_key(cursor, &key);
 		__wt_cursor_set_raw_value(cursor, &value);
@@ -117,6 +128,9 @@ __txn_op_apply(WT_SESSION_IMPL *session, const uint8_t **pp, const uint8_t *end)
 	case WT_LOGOP_ROW_REMOVE:
 		WT_RET(__wt_logop_row_remove_unpack(session, pp, end,
 		    &uri, &key));
+		is_metadata = (strcmp(uri, WT_METADATA_URI) == 0);
+		if (metadata != is_metadata)
+			break;
 		WT_RET(__wt_open_cursor(session, uri, NULL, cfg, &cursor));
 		__wt_cursor_set_raw_key(cursor, &key);
 		WT_TRET(cursor->remove(cursor));
@@ -132,13 +146,13 @@ __txn_op_apply(WT_SESSION_IMPL *session, const uint8_t **pp, const uint8_t *end)
 
 static int
 __txn_commit_apply(WT_SESSION_IMPL *session,
-    WT_LSN *lsnp, const uint8_t **pp, const uint8_t *end)
+    WT_LSN *lsnp, const uint8_t **pp, const uint8_t *end, int metadata)
 {
 	WT_UNUSED(lsnp);
 
 	/* The logging subsystem zero-pads records. */
 	while (*pp < end && **pp)
-		WT_RET(__txn_op_apply(session, pp, end));
+		WT_RET(__txn_op_apply(session, pp, end, metadata));
 
 	return (0);
 }
@@ -220,18 +234,18 @@ __wt_txn_printlog(
 }
 
 /*
- * __wt_txn_recover --
+ * __txn_log_recover --
  *	Roll the log forward to recover committed changes.
  */
-int
-__wt_txn_recover(
+static int
+__txn_log_recover(
     WT_SESSION_IMPL *session, WT_ITEM *logrec, WT_LSN *lsnp, void *cookie)
 {
 	const uint8_t *end, *p;
 	uint32_t rectype;
+	int metadata;
 
-	WT_UNUSED(cookie);
-
+	metadata = *(int *)cookie;
 	p = (const uint8_t *)logrec->data + offsetof(WT_LOG_RECORD, record);
 	end = (const uint8_t *)logrec->data + logrec->size;
 
@@ -240,9 +254,44 @@ __wt_txn_recover(
 
 	switch (rectype) {
 	case WT_LOGREC_COMMIT:
-		WT_RET(__txn_commit_apply(session, lsnp, &p, end));
+		WT_RET(__txn_commit_apply(session, lsnp, &p, end, metadata));
 		break;
 	}
 
 	return (0);
+}
+
+/*
+ * __wt_txn_recover --
+ *	Run recovery.
+ */
+int
+__wt_txn_recover(WT_SESSION_IMPL *default_session)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
+	WT_SESSION_IMPL *rec_session;
+	int metadata;
+
+	conn = S2C(default_session);
+	/* We need a real session for recovery. */
+	rec_session = NULL;
+	WT_ERR(__wt_open_session(conn, 0, NULL, NULL, &rec_session));
+	F_SET(rec_session, WT_SESSION_NO_LOGGING);
+
+	metadata = 1;
+	WT_ERR(__wt_log_scan(rec_session,
+	    NULL, WT_LOGSCAN_FIRST | WT_LOGSCAN_RECOVER,
+	    __txn_log_recover, &metadata));
+
+	metadata = 0;
+	WT_ERR(__wt_log_scan(rec_session,
+	    NULL, WT_LOGSCAN_FIRST | WT_LOGSCAN_RECOVER,
+	    __txn_log_recover, &metadata));
+
+
+err:	if (rec_session != NULL)
+		WT_TRET(rec_session->iface.close(&rec_session->iface, NULL));
+
+	return (ret);
 }
