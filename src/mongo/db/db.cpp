@@ -860,9 +860,9 @@ static void buildOptionsDescriptions(po::options_description *pVisible,
 #if defined(__linux__)
     ("shutdown", "kill a running server (for init scripts)")
 #endif
-    ("slowms",po::value<int>(&cmdLine.slowMS)->default_value(100), "value of slow for profile and console log" )
+    ("slowms",po::value<int>()->default_value(100), "value of slow for profile and console log" )
     ("smallfiles", "use a smaller default file size")
-    ("syncdelay",po::value<double>(&cmdLine.syncdelay)->default_value(60), "seconds between disk syncs (0=never, but not recommended)")
+    ("syncdelay",po::value<double>()->default_value(60), "seconds between disk syncs (0=never, but not recommended)")
     ("sysinfo", "print some diagnostic system information")
     ("upgrade", "upgrade db if needed")
     ;
@@ -979,6 +979,13 @@ static void processCommandLineOptions(const std::vector<std::string>& argv) {
             dbpath = dbpath.erase(dbpath.size()-1);
         }
 #endif
+        if ( params.count("slowms")) {
+            cmdLine.slowMS = params["slowms"].as<int>();
+        }
+
+        if ( params.count("syncdelay")) {
+            cmdLine.syncdelay = params["syncdelay"].as<double>();
+        }
 
         if ( params.count("directoryperdb")) {
             directoryperdb = true;
