@@ -225,8 +225,8 @@ __backup_start(
 	WT_ERR(__backup_list_append(session, cb, WT_METADATA_BACKUP));
 	WT_ERR(__backup_list_append(session, cb, WT_SINGLETHREAD));
 
-	/* Add log files if logging is on. */
-	if (conn->log) {
+	/* Add log files if logging is on and we're doing a full backup. */
+	if (!target_list && conn->log) {
 		WT_ERR(__wt_log_getfiles(session, &logfiles, &logcount));
 		for (i = 0; i < logcount; i++)
 			WT_ERR(__backup_list_append(session, cb, logfiles[i]));
