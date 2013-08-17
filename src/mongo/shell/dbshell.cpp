@@ -700,16 +700,17 @@ int _main( int argc, char* argv[], char **envp ) {
     ( "nodb", "don't connect to mongod on startup - no 'db address' arg expected" )
     ( "norc", "will not run the \".mongorc.js\" file on start up" )
     ( "quiet", "be less chatty" )
-    ( "port", po::value<string>( &port ), "port to connect to" )
-    ( "host", po::value<string>( &dbhost ), "server to connect to" )
-    ( "eval", po::value<string>( &script ), "evaluate javascript" )
-    ( "username,u", po::value<string>(&username), "username for authentication" )
-    ( "password,p", new mongo::PasswordValue( &password ), "password for authentication" )
+    ( "port", po::value<string>(), "port to connect to" )
+    ( "host", po::value<string>(), "server to connect to" )
+    ( "eval", po::value<string>(), "evaluate javascript" )
+    ( "username,u", po::value<string>(), "username for authentication" )
+    ( "password,p", po::value<string>()->implicit_value(""),
+      "password for authentication" )
     ("authenticationDatabase",
-     po::value<string>(&authenticationDatabase)->default_value(""),
+     po::value<string>()->default_value(""),
      "user source (defaults to dbname)" )
     ("authenticationMechanism",
-     po::value<string>(&authenticationMechanism)->default_value("MONGODB-CR"),
+     po::value<string>()->default_value("MONGODB-CR"),
      "authentication mechanism")
     ( "help,h", "show this usage information" )
     ( "version", "show version information" )
@@ -717,12 +718,10 @@ int _main( int argc, char* argv[], char **envp ) {
     ( "ipv6", "enable IPv6 support (disabled by default)" )
 #ifdef MONGO_SSL
     ( "ssl", "use SSL for all connections" )
-    ( "sslCAFile", po::value<std::string>(&sslCAFile), "Certificate Authority for SSL" )
-    ( "sslPEMKeyFile", po::value<std::string>(&sslPEMKeyFile), "PEM certificate/key file for SSL" )
-    ( "sslPEMKeyPassword", po::value<std::string>(&sslPEMKeyFile), 
-      "password for key in PEM file for SSL" )
-    ( "sslCRLFile", po::value<std::string>(&sslCRLFile),
-      "Certificate Revocation List file for SSL")
+    ( "sslCAFile", po::value<std::string>(), "Certificate Authority for SSL" )
+    ( "sslPEMKeyFile", po::value<std::string>(), "PEM certificate/key file for SSL" )
+    ( "sslPEMKeyPassword", po::value<std::string>(), "password for key in PEM file for SSL" )
+    ( "sslCRLFile", po::value<std::string>(), "Certificate Revocation List file for SSL")
     ( "sslFIPSMode", "activate FIPS 140-2 mode at startup")
 #endif
     ;
@@ -752,12 +751,39 @@ int _main( int argc, char* argv[], char **envp ) {
         po::store(po::command_line_parser(argc, argv).options(cmdline_options).
                   positional(positional_options).
                   style(command_line_style).run(), params);
-        po::notify( params );
     }
     catch ( po::error &e ) {
         cout << "ERROR: " << e.what() << endl << endl;
         show_help_text( argv[0], shell_options );
         return mongo::EXIT_BADOPTIONS;
+    }
+
+    if (params.count("port")) {
+        port = params["port"].as<string>();
+    }
+
+    if (params.count("host")) {
+        dbhost = params["host"].as<string>();
+    }
+
+    if (params.count("eval")) {
+        script = params["eval"].as<string>();
+    }
+
+    if (params.count("username,u")) {
+        username = params["username,u"].as<string>();
+    }
+
+    if (params.count("password,p")) {
+        password = params["password,p"].as<string>();
+    }
+
+    if (params.count("authenticationDatabase")) {
+        authenticationDatabase = params["authenticationDatabase"].as<string>();
+    }
+
+    if (params.count("authenticationMechanism")) {
+        authenticationMechanism = params["authenticationMechanism"].as<string>();
     }
 
     // hide password from ps output

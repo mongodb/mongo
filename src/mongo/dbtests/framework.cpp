@@ -108,7 +108,7 @@ namespace mongo {
 
             shell_options.add_options()
             ("help,h", "show this usage information")
-            ("dbpath", po::value<string>(&dbpathSpec)->default_value(default_dbpath),
+            ("dbpath", po::value<string>()->default_value(default_dbpath),
              "db data path for this test run. NOTE: the contents of this "
              "directory will be overwritten if it already exists")
             ("debug", "run tests with verbose output")
@@ -119,9 +119,9 @@ namespace mongo {
             ("useNewQueryFramework", "use the new query framework")
             ("dur", "enable journaling (currently the default)")
             ("nodur", "disable journaling")
-            ("seed", po::value<unsigned long long>(&seed), "random number seed")
-            ("runs", po::value<int>(&runsPerTest), "number of times to run each test")
-            ("perfHist", po::value<unsigned>(&perfHist), "number of back runs of perf stats to display")
+            ("seed", po::value<unsigned long long>(), "random number seed")
+            ("runs", po::value<int>(), "number of times to run each test")
+            ("perfHist", po::value<unsigned>(), "number of back runs of perf stats to display")
             ;
 
             hidden_options.add_options()
@@ -143,7 +143,6 @@ namespace mongo {
                 po::store(po::command_line_parser(argc, argv).options(cmdline_options).
                           positional(positional_options).
                           style(command_line_style).run(), params);
-                po::notify(params);
             }
             catch (po::error &e) {
                 cout << "ERROR: " << e.what() << endl << endl;
@@ -158,6 +157,22 @@ namespace mongo {
 
             if (params.count("useNewQueryFramework")) {
                 mongo::enableNewQueryFramework();
+            }
+
+            if (params.count("dbpath")) {
+                dbpathSpec = params["dbpath"].as<string>();
+            }
+
+            if (params.count("seed")) {
+                seed = params["seed"].as<unsigned long long>();
+            }
+
+            if (params.count("runs")) {
+                runsPerTest = params["runs"].as<int>();
+            }
+
+            if (params.count("perfHist")) {
+                perfHist = params["perfHist"].as<unsigned>();
             }
 
             bool nodur = false;
