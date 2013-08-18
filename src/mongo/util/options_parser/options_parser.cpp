@@ -122,6 +122,20 @@ namespace optionenvironment {
                     if (!ret.isOK()) {
                         return ret;
                     }
+
+                    // XXX: Don't set switches that are false, to maintain backwards compatibility
+                    // with the old behavior during the transition to the new parser
+                    if (iterator->_type == Switch) {
+                        bool value;
+                        ret = optionValue.get(&value);
+                        if (!ret.isOK()) {
+                            return ret;
+                        }
+                        if (!value) {
+                            continue;
+                        }
+                    }
+
                     environment->set(iterator->_dottedName, optionValue);
                 }
             }

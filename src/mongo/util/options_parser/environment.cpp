@@ -135,6 +135,29 @@ namespace optionenvironment {
         return Status::OK();
     }
 
+    /** Implementation of legacy interface to be consistent with
+     *  boost::program_options::variables_map during the transition period
+     *
+     *  boost::program_options::variables_map inherits the count function from std::map, which
+     *  returns 1 if the value is set, and 0 if it is not set
+     */
+    bool Environment::count(const Key& key) const {
+        Value value;
+        Status ret = get(key, &value);
+        if (ret.isOK()) {
+            return true;
+        }
+        else {
+            return false;
+        }
+    }
+
+    Value Environment::operator[](const Key& key) const {
+        Value value;
+        Status ret = get(key, &value);
+        return value;
+    }
+
     /* Debugging */
     void Environment::dump() {
         std::map<Key, Value>::iterator iter;

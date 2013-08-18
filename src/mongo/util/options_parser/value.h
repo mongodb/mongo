@@ -18,6 +18,7 @@
 #include <vector>
 
 #include "mongo/base/status.h"
+#include "mongo/bson/util/builder.h"
 
 namespace mongo {
 namespace optionenvironment {
@@ -94,6 +95,23 @@ namespace optionenvironment {
          */
         std::string toString() const;
 
+        /**
+         *  The functions below are the legacy interface to be consistent with boost::any during the
+         *  transition period
+         */
+
+        /**
+         *  Returns the contents of this Value as type T.  Throws MsgAssertionException if the type
+         *  does not match
+         */
+        template <typename T>
+        T as() const;
+
+        /**
+         *  Return the type_info for this value
+         */
+        const std::type_info& type() const;
+
     private:
         std::vector<std::string> _stringVectorVal;
         std::string _stringVal;
@@ -121,6 +139,20 @@ namespace optionenvironment {
 
         Type _type;
     };
+
+    template <typename T>
+    T Value::as() const {
+        T valueType;
+
+        Status ret = get(&valueType);
+        if (!ret.isOK()) {
+            StringBuilder message;
+            message << "failed to extract typed value from Value container: " << ret.toString();
+            throw MsgAssertionException(17114, message.str());
+        }
+
+        return valueType;
+    }
 
 } // namespace optionenvironment
 } // namespace mongo

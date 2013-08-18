@@ -177,6 +177,20 @@ namespace optionenvironment {
         }
         return sb.str();
     }
+    const std::type_info& Value::type() const {
+        switch (_type) {
+            case StringVector: return typeid(std::vector<std::string>);
+            case Bool: return typeid(bool);
+            case Double: return typeid(double);
+            case Int: return typeid(int);
+            case Long: return typeid(long);
+            case String: return typeid(std::string);
+            case UnsignedLongLong: return typeid(unsigned long long);
+            case Unsigned: return typeid(unsigned);
+            case None: return typeid(void);
+            default: return typeid(void);
+        }
+    }
 
 } // namespace optionenvironment
 } // namespace mongo

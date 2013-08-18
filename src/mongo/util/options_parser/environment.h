@@ -139,6 +139,21 @@ namespace optionenvironment {
              */
             Status setAll(const Environment& other);
 
+            /** The functions below are the legacy interface to be consistent with
+             *  boost::program_options::variables_map during the transition period
+             */
+
+            /**
+             *  @return 1 if the given Key has a Value set in this Environment and 0 if not
+             */
+            bool count(const Key& key) const;
+
+            /**
+             *  @return the Value for the given Key in this Environment.  Returns an empty Value if
+             *  Key is not set.
+             */
+            Value operator[](const Key& key) const;
+
             /* Debugging */
             void dump();
 

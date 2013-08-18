@@ -589,12 +589,7 @@ namespace {
                 ASSERT_EQUALS(verbose, true);
             }
             else {
-                // TODO: Figure out if these are the semantics we want for switches.  Right now they
-                // will always set a boolean value in the environment even if they aren't present.
-                ASSERT_OK(environment.get(moe::Key(s), &value));
-                bool verbose;
-                ASSERT_OK(value.get(&verbose));
-                ASSERT_EQUALS(verbose, false);
+                ASSERT_NOT_OK(environment.get(moe::Key(s), &value));
             }
         }
     }
@@ -1197,6 +1192,70 @@ namespace {
         ASSERT_EQUALS(*setParameterit, "val3");
         setParameterit++;
         ASSERT_EQUALS(*setParameterit, "val4");
+    }
+
+    TEST(LegacyInterface, Good) {
+        moe::OptionsParser parser;
+        moe::Environment environment;
+
+        moe::OptionSection testOpts;
+        testOpts.addOption(moe::OptionDescription("port", "port", moe::Int, "Port"));
+
+        std::vector<std::string> argv;
+        argv.push_back("binaryname");
+        argv.push_back("--port");
+        argv.push_back("5");
+        std::map<std::string, std::string> env_map;
+
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        ASSERT_TRUE(environment.count("port"));
+        int port;
+        try {
+            port = environment["port"].as<int>();
+        }
+        catch ( std::exception &e ) {
+            FAIL(e.what());
+        }
+        ASSERT_EQUALS(port, 5);
+    }
+
+    TEST(LegacyInterface, NotSpecified) {
+        moe::OptionsParser parser;
+        moe::Environment environment;
+
+        moe::OptionSection testOpts;
+        testOpts.addOption(moe::OptionDescription("port", "port", moe::Int, "Port"));
+
+        std::vector<std::string> argv;
+        argv.push_back("binaryname");
+        std::map<std::string, std::string> env_map;
+
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        ASSERT_FALSE(environment.count("port"));
+    }
+
+    TEST(LegacyInterface, BadType) {
+        moe::OptionsParser parser;
+        moe::Environment environment;
+
+        moe::OptionSection testOpts;
+        testOpts.addOption(moe::OptionDescription("port", "port", moe::Int, "Port"));
+
+        std::vector<std::string> argv;
+        argv.push_back("binaryname");
+        argv.push_back("--port");
+        argv.push_back("5");
+        std::map<std::string, std::string> env_map;
+
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        ASSERT_TRUE(environment.count("port"));
+        std::string port;
+        try {
+            port = environment["port"].as<std::string>();
+            FAIL("Expected exception trying to convert int to type string");
+        }
+        catch ( std::exception &e ) {
+        }
     }
 
 } // unnamed namespace
