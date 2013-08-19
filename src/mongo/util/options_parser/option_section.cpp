@@ -195,8 +195,10 @@ namespace optionenvironment {
 
     std::string OptionSection::helpString() const {
 
-        po::options_description boostOptions;
-        Status ret = getBoostOptions(&boostOptions);
+        po::options_description boostOptions = _name.empty()
+                                             ? po::options_description()
+                                             : po::options_description(_name.c_str());
+        Status ret = getBoostOptions(&boostOptions, true, true);
         if (!ret.isOK()) {
             StringBuilder sb;
             sb << "Error constructing help string: " << ret.toString();
