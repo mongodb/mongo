@@ -269,4 +269,27 @@ namespace mongo {
         return SafeNum();
     }
 
+    SafeNum SafeNum::xorInternal(const SafeNum& lhs, const SafeNum& rhs) {
+        const BSONType lType = lhs._type;
+        const BSONType rType = rhs._type;
+
+        if (lType == NumberInt && rType == NumberInt) {
+            return (lhs._value.int32Val ^ rhs._value.int32Val);
+        }
+
+        if (lType == NumberInt && rType == NumberLong) {
+            return (static_cast<long long int>(lhs._value.int32Val) ^ rhs._value.int64Val);
+        }
+
+        if (lType == NumberLong && rType == NumberInt) {
+            return (lhs._value.int64Val ^ static_cast<long long int>(rhs._value.int32Val));
+        }
+
+        if (lType == NumberLong && rType == NumberLong) {
+            return (lhs._value.int64Val ^ rhs._value.int64Val);
+        }
+
+        return SafeNum();
+    }
+
 } // namespace mongo
