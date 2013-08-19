@@ -1140,7 +1140,7 @@ namespace mongo {
            Connect timeout is fixed, but short, at 5 seconds.
          */
         DBClientConnection(bool _autoReconnect=false, DBClientReplicaSet* cp=0, double so_timeout=0) :
-            clientSet(cp), _failed(false), autoReconnect(_autoReconnect), lastReconnectTry(0), _so_timeout(so_timeout) {
+            clientSet(cp), _failed(false), autoReconnect(_autoReconnect), autoReconnectBackoff(1000, 2000), _so_timeout(so_timeout) {
             _numConnections++;
         }
 
@@ -1281,7 +1281,7 @@ namespace mongo {
         boost::scoped_ptr<SockAddr> server;
         bool _failed;
         const bool autoReconnect;
-        time_t lastReconnectTry;
+        Backoff autoReconnectBackoff;
         HostAndPort _server; // remember for reconnects
         string _serverString;
         void _checkConnection();
