@@ -951,9 +951,9 @@ namespace mongo {
             } catch (UserException& ex) {
                 if (ex.getCode() != ErrorCodes::AuthenticationFailed)
                     throw;
-                LOG(_logLevel) << "reconnect: auth failed db:" <<
+                LOG(_logLevel) << "reconnect: auth failed " <<
                     i->second[saslCommandUserSourceFieldName] <<
-                    " user:" << i->second[saslCommandUserFieldName] << ' ' <<
+                    i->second[saslCommandUserFieldName] << ' ' <<
                     ex.what() << std::endl;
             }
         }
