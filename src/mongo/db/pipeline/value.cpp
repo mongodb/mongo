@@ -27,6 +27,48 @@
 namespace mongo {
     using namespace mongoutils;
 
+    void ValueStorage::verifyRefCountingIfShould() const {
+        switch (type) {
+        case MinKey:
+        case MaxKey:
+        case jstOID:
+        case Date:
+        case Timestamp:
+        case EOO:
+        case jstNULL:
+        case Undefined:
+        case Bool:
+        case NumberInt:
+        case NumberLong:
+        case NumberDouble:
+            // the above types never reference external data
+            verify(!refCounter);
+            break;
+
+        case String:
+        case RegEx:
+        case Code:
+        case Symbol:
+            // the above types reference data when not using short-string optimization
+            verify(refCounter == !shortStr);
+            break;
+
+        case BinData: // TODO this should probably support short-string optimization
+        case Array: // TODO this should probably support empty-is-NULL optimization
+        case DBRef:
+        case CodeWScope:
+            // the above types always reference external data.
+            verify(refCounter);
+            verify(bool(genericRCPtr));
+            break;
+
+        case Object:
+            // Objects either hold a NULL ptr or should be ref-counting
+            verify(refCounter == bool(genericRCPtr));
+            break;
+        }
+    }
+
     void ValueStorage::putString(const StringData& s) {
         // Note: this also stores data portion of BinData
         const size_t sizeNoNUL = s.size();
