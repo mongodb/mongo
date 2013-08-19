@@ -148,8 +148,8 @@ namespace mongo {
          // remaining field components
         std::vector<StringData> _variable;
 
-        // concatenation of null-terminated parts pointed to by _fixed and _variable
-        boost::scoped_array<char> _fieldBase;
+        // cached dotted name
+        std::string _dotted;
 
         // back memory added with the setPart call pointed to by _fized and _variable
         std::vector<std::string> _replacements;
