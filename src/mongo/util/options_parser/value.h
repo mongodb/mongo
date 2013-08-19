@@ -48,15 +48,16 @@ namespace optionenvironment {
 
         // Constructors
 
-        explicit Value() : type(None) { }
-        explicit Value(std::vector<std::string> val) : stringVectorVal(val), type(StringVector) { }
-        explicit Value(bool val) : boolVal(val), type(Bool) { }
-        explicit Value(double val) : doubleVal(val), type(Double) { }
-        explicit Value(int val) : intVal(val), type(Int) { }
-        explicit Value(long val) : longVal(val), type(Long) { }
-        explicit Value(std::string val) : stringVal(val), type(String) { }
-        explicit Value(unsigned long long val) : unsignedLongLongVal(val), type(UnsignedLongLong) {}
-        explicit Value(unsigned val) : unsignedVal(val), type(Unsigned) { }
+        explicit Value() : _type(None) { }
+        explicit Value(std::vector<std::string> val) : _stringVectorVal(val), _type(StringVector) {}
+        explicit Value(bool val) : _boolVal(val), _type(Bool) { }
+        explicit Value(double val) : _doubleVal(val), _type(Double) { }
+        explicit Value(int val) : _intVal(val), _type(Int) { }
+        explicit Value(long val) : _longVal(val), _type(Long) { }
+        explicit Value(std::string val) : _stringVal(val), _type(String) { }
+        explicit Value(unsigned long long val) : _unsignedLongLongVal(val),
+                                                 _type(UnsignedLongLong) { }
+        explicit Value(unsigned val) : _unsignedVal(val), _type(Unsigned) { }
 
         // Access interface
 
@@ -94,15 +95,15 @@ namespace optionenvironment {
         std::string toString() const;
 
     private:
-        std::vector<std::string> stringVectorVal;
-        std::string stringVal;
+        std::vector<std::string> _stringVectorVal;
+        std::string _stringVal;
         union {
-            bool boolVal;
-            double doubleVal;
-            int intVal;
-            long longVal;
-            unsigned long long unsignedLongLongVal;
-            unsigned unsignedVal;
+            bool _boolVal;
+            double _doubleVal;
+            int _intVal;
+            long _longVal;
+            unsigned long long _unsignedLongLongVal;
+            unsigned _unsignedVal;
         };
 
         // Types currently supported by Value
@@ -118,7 +119,7 @@ namespace optionenvironment {
             None,             // (not set)
         };
 
-        Type type;
+        Type _type;
     };
 
 } // namespace optionenvironment

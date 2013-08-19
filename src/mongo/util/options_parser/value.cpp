@@ -25,74 +25,98 @@ namespace optionenvironment {
     // Value access functions
 
     Status Value::get(std::vector<std::string>* val) const {
-        if (type != StringVector) {
-            return Status(ErrorCodes::TypeMismatch, "Value not of type: stringVector");
+        if (_type != StringVector) {
+            StringBuilder sb;
+            sb << "Attempting to get Value as type: StringVector, but Value is of type: "
+               << typeToString();
+            return Status(ErrorCodes::TypeMismatch, sb.str());
         }
-        *val = stringVectorVal;
+        *val = _stringVectorVal;
         return Status::OK();
     }
     Status Value::get(bool* val) const {
-        if (type != Bool) {
-            return Status(ErrorCodes::TypeMismatch, "Value not of type: bool");
+        if (_type != Bool) {
+            StringBuilder sb;
+            sb << "Attempting to get Value as type: Bool, but Value is of type: "
+               << typeToString();
+            return Status(ErrorCodes::TypeMismatch, sb.str());
         }
-        *val = boolVal;
+        *val = _boolVal;
         return Status::OK();
     }
     Status Value::get(double* val) const {
-        if (type != Double) {
-            return Status(ErrorCodes::TypeMismatch, "Value not of type: double");
+        if (_type != Double) {
+            StringBuilder sb;
+            sb << "Attempting to get Value as type: Double, but Value is of type: "
+               << typeToString();
+            return Status(ErrorCodes::TypeMismatch, sb.str());
         }
-        *val = doubleVal;
+        *val = _doubleVal;
         return Status::OK();
     }
     Status Value::get(int* val) const {
-        if (type != Int) {
-            return Status(ErrorCodes::TypeMismatch, "Value not of type: int");
+        if (_type != Int) {
+            StringBuilder sb;
+            sb << "Attempting to get Value as type: Int, but Value is of type: "
+               << typeToString();
+            return Status(ErrorCodes::TypeMismatch, sb.str());
         }
-        *val = intVal;
+        *val = _intVal;
         return Status::OK();
     }
     Status Value::get(long* val) const {
-        if (type == Long) {
-            *val = longVal;
+        if (_type == Long) {
+            *val = _longVal;
             return Status::OK();
         }
-        else if (type == Int) {
-            *val = intVal;
+        else if (_type == Int) {
+            *val = _intVal;
             return Status::OK();
         }
-        return Status(ErrorCodes::TypeMismatch, "Value not convertible to type: long");
+        StringBuilder sb;
+        sb << "Value of type: " << typeToString()
+           << " is not convertible to type: Long";
+        return Status(ErrorCodes::TypeMismatch, sb.str());
     }
     Status Value::get(std::string* val) const {
-        if (type != String) {
-            return Status(ErrorCodes::TypeMismatch, "Value not of type: string");
+        if (_type != String) {
+            StringBuilder sb;
+            sb << "Attempting to get Value as type: string, but Value is of type: "
+               << typeToString();
+            return Status(ErrorCodes::TypeMismatch, sb.str());
         }
-        *val = stringVal;
+        *val = _stringVal;
         return Status::OK();
     }
     Status Value::get(unsigned long long* val) const {
-        if (type == UnsignedLongLong) {
-            *val = unsignedLongLongVal;
+        if (_type == UnsignedLongLong) {
+            *val = _unsignedLongLongVal;
             return Status::OK();
         }
-        else if (type == Unsigned) {
-            *val = unsignedVal;
+        else if (_type == Unsigned) {
+            *val = _unsignedVal;
             return Status::OK();
         }
-        return Status(ErrorCodes::TypeMismatch, "Value not convertible to type: unsignedlonglong");
+        StringBuilder sb;
+        sb << "Value of type: " << typeToString()
+           << " is not convertible to type: UnsignedLongLong";
+        return Status(ErrorCodes::TypeMismatch, sb.str());
     }
     Status Value::get(unsigned* val) const {
-        if (type != Unsigned) {
-            return Status(ErrorCodes::TypeMismatch, "Value not of type: unsigned");
+        if (_type != Unsigned) {
+            StringBuilder sb;
+            sb << "Attempting to get Value as type: Unsigned, but Value is of type: "
+               << typeToString();
+            return Status(ErrorCodes::TypeMismatch, sb.str());
         }
-        *val = unsignedVal;
+        *val = _unsignedVal;
         return Status::OK();
     }
 
     // Value utility functions
 
     std::string Value::typeToString() const {
-        switch (type) {
+        switch (_type) {
             case StringVector: return "StringVector";
             case Bool: return "Bool";
             case Double: return "Double";
@@ -106,48 +130,48 @@ namespace optionenvironment {
         }
     }
     bool Value::isEmpty() const {
-        return type == None;
+        return _type == None;
     }
     bool Value::equal(Value& otherVal) const {
-        if (type != otherVal.type) {
+        if (_type != otherVal._type) {
             return false;
         }
-        switch (type) {
-            case StringVector: return stringVectorVal == otherVal.stringVectorVal;
-            case Bool: return boolVal == otherVal.boolVal;
-            case Double: return doubleVal == otherVal.doubleVal;
-            case Int: return intVal == otherVal.intVal;
-            case Long: return longVal == otherVal.longVal;
-            case String: return stringVal == otherVal.stringVal;
-            case UnsignedLongLong: return unsignedLongLongVal == otherVal.unsignedLongLongVal;
-            case Unsigned: return unsignedVal == otherVal.unsignedVal;
+        switch (_type) {
+            case StringVector: return _stringVectorVal == otherVal._stringVectorVal;
+            case Bool: return _boolVal == otherVal._boolVal;
+            case Double: return _doubleVal == otherVal._doubleVal;
+            case Int: return _intVal == otherVal._intVal;
+            case Long: return _longVal == otherVal._longVal;
+            case String: return _stringVal == otherVal._stringVal;
+            case UnsignedLongLong: return _unsignedLongLongVal == otherVal._unsignedLongLongVal;
+            case Unsigned: return _unsignedVal == otherVal._unsignedVal;
             case None: return true;
             default: return false; /* Undefined */
         }
     }
     std::string Value::toString() const {
         StringBuilder sb;
-        switch (type) {
+        switch (_type) {
             case StringVector:
-                if (!stringVectorVal.empty())
+                if (!_stringVectorVal.empty())
                 {
                     // Convert all but the last element to avoid a trailing ","
-                    for(std::vector<std::string>::const_iterator iterator = stringVectorVal.begin();
-                        iterator != stringVectorVal.end() - 1; iterator++) {
+                    for(std::vector<std::string>::const_iterator iterator = _stringVectorVal.begin();
+                        iterator != _stringVectorVal.end() - 1; iterator++) {
                         sb << *iterator;
                     }
 
                     // Now add the last element with no delimiter
-                    sb << stringVectorVal.back();
+                    sb << _stringVectorVal.back();
                 }
                 break;
-            case Bool: sb << boolVal; break;
-            case Double: sb << doubleVal; break;
-            case Int: sb << intVal; break;
-            case Long: sb << longVal; break;
-            case String: sb << stringVal; break;
-            case UnsignedLongLong: sb << unsignedLongLongVal; break;
-            case Unsigned: sb << unsignedVal; break;
+            case Bool: sb << _boolVal; break;
+            case Double: sb << _doubleVal; break;
+            case Int: sb << _intVal; break;
+            case Long: sb << _longVal; break;
+            case String: sb << _stringVal; break;
+            case UnsignedLongLong: sb << _unsignedLongLongVal; break;
+            case Unsigned: sb << _unsignedVal; break;
             case None: sb << "(not set)"; break;
             default: sb << "(undefined)"; break;
         }
