@@ -99,11 +99,17 @@ namespace mutablebson {
 
         /**
          * Sums the 'rhs' -- right-hand side -- safe num with this, taking care of
-         * upconvertions and overflow (see class header).
+         * upconversions and overflow (see class header).
          */
         SafeNum operator+(const SafeNum& rhs) const;
         SafeNum& operator+=(const SafeNum& rhs);
-        // TODO other operations than sum
+
+        /**
+         * Multiplies the 'rhs' -- right-hand side -- safe num with this, taking care of
+         * upconversions and overflow (see class header).
+         */
+        SafeNum operator*(const SafeNum& rhs) const;
+        SafeNum& operator*=(const SafeNum& rhs);
 
         //
         // logical operation support. Note that these operations are only supported for
@@ -169,6 +175,13 @@ namespace mutablebson {
          * an EOO-type instance.
          */
         static SafeNum addInternal(const SafeNum& lhs, const SafeNum& rhs);
+
+        /**
+         * Returns the product of 'lhs' and 'rhs', taking into consideration their types. The
+         * type of the result would upcast, if necessary and permitted. Otherwise, returns an
+         * EOO-type instance.
+         */
+        static SafeNum mulInternal(const SafeNum& lhs, const SafeNum& rhs);
 
         /** Returns the bitwise 'and' of lhs and rhs, taking into consideration their types. If
          *  the operation is invalid for the underlying types, returns an EOO instance.
