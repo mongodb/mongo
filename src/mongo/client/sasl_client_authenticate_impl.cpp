@@ -137,7 +137,9 @@ namespace {
             return status;
         session->setParameter(SaslClientSession::parameterUser, value);
 
-        bool digestPasswordDefault = !(targetDatabase == "$external" && mechanism == "PLAIN");
+        bool digestPasswordDefault =
+            !(targetDatabase == "$external" && mechanism == "PLAIN") &&
+            !(targetDatabase == "$external" && mechanism == "GSSAPI");
         bool digestPassword;
         status = bsonExtractBooleanFieldWithDefault(saslParameters,
                                                     saslCommandDigestPasswordFieldName,
