@@ -150,36 +150,50 @@ namespace mongo {
         }
     }
 
-    //
-    // addition support
-    //
+    namespace {
 
-    SafeNum addInt32Int32(int lInt32, int rInt32) {
-        int sum = lInt32 + rInt32;
-        if ((sum < 0 && lInt32 > 0 && rInt32 > 0) ||
-            (sum > 0 && lInt32 < 0 && rInt32 < 0)) {
-            long long int result = static_cast<long long int>(lInt32) +
-                                   static_cast<long long int>(rInt32);
+        SafeNum addInt32Int32(int lInt32, int rInt32) {
+            // NOTE: Please see "Secure Coding in C and C++", Second Edition, page 264-265 for
+            // details on this algorithm (for an alternative resources, see
+            //
+            // https://www.securecoding.cert.org/confluence/display/seccode/INT32-C.+Ensure+that+operations+on+signed+integers+do+not+result+in+overflow?showComments=false).
+            //
+            // We are using the "Downcast from a larger type" algorithm here. We always perform
+            // the arithmetic in 64-bit mode, which can never overflow for 32-bit
+            // integers. Then, if we fall within the allowable range of int, we downcast,
+            // otherwise, we retain the 64-bit result.
+
+            const long long int result =
+                static_cast<long long int>(lInt32) +
+                static_cast<long long int>(rInt32);
+
+            if (result <= std::numeric_limits<int>::max() &&
+                result >= std::numeric_limits<int>::min()) {
+                return SafeNum(static_cast<int>(result));
+            }
+
             return SafeNum(result);
         }
 
-        return SafeNum(sum);
-    }
+        SafeNum addInt64Int64(long long lInt64, long long rInt64) {
+            // NOTE: Please see notes in addInt32Int32 above for references. In this case, since we
+            // have no larger integer size, if our precondition test detects overflow we must
+            // return an invalid SafeNum. Otherwise, the operation is safely performed by standard
+            // arithmetic.
+            if (((rInt64 > 0) && (lInt64 > (std::numeric_limits<long long>::max() - rInt64))) ||
+                ((rInt64 < 0) && (lInt64 < (std::numeric_limits<long long>::min() - rInt64)))) {
+                return SafeNum();
+            }
 
-    SafeNum addInt64Int64(long long lInt64, long long rInt64) {
-        long long sum = lInt64 + rInt64;
-        if ((sum < 0 && lInt64 > 0 && rInt64 > 0) ||
-            (sum > 0 && lInt64 < 0 && rInt64 < 0)) {
-            return SafeNum();
+            return SafeNum(lInt64 + rInt64);
         }
 
-        return SafeNum(sum);
-    }
+        SafeNum addFloats(double lDouble, double rDouble) {
+            double sum = lDouble + rDouble;
+            return SafeNum(sum);
+        }
 
-    SafeNum addFloats(double lDouble, double rDouble) {
-        double sum = lDouble + rDouble;
-        return SafeNum(sum);
-    }
+    } // namespace
 
     SafeNum SafeNum::addInternal(const SafeNum& lhs, const SafeNum& rhs) {
         BSONType lType = lhs._type;
