@@ -388,7 +388,7 @@ populate_thread(void *arg)
 	WT_CURSOR *cursor;
 	WT_SESSION *session;
 	uint64_t op;
-	int ret;
+	int opcount, ret;
 	char *data_buf, *key_buf;
 
 	cfg = (CONFIG *)arg;
@@ -396,6 +396,7 @@ populate_thread(void *arg)
 	session = NULL;
 	data_buf = key_buf = NULL;
 	ret = 0;
+	opcount = 0;
 
 	cfg->phase = WT_PERF_POP;
 
@@ -425,22 +426,38 @@ populate_thread(void *arg)
 	}
 
 	memset(data_buf, 'a', cfg->data_sz - 1);
-	cursor->set_value(cursor, data_buf);
 	/* Populate the database. */
+	if (cfg->populate_ops_per_txn > 0)
+		session->begin_transaction(session, NULL);
 	while (1) {
+		if (cfg->populate_ops_per_txn > 0 &&
+		    opcount++ % cfg->populate_ops_per_txn == 0) {
+			if ((ret =
+			    session->commit_transaction(session, NULL)) != 0)
+				lprintf(cfg, ret, 0,
+				    "Fail committing, transaction was aborted");
+			session->begin_transaction(session, NULL);
+		}
 		get_next_op(&op);
 		if (op > cfg->icount)
 			break;
 		sprintf(key_buf, "%0*" PRIu64, cfg->key_sz, op);
 		cursor->set_key(cursor, key_buf);
+		cursor->set_value(cursor, data_buf);
 		if ((ret = cursor->insert(cursor)) != 0) {
 			lprintf(cfg, ret, 0, "Failed inserting");
 			goto err;
 		}
 	}
+	if (cfg->populate_ops_per_txn > 0 &&
+	    (ret = session->commit_transaction(session, NULL)) != 0)
+		lprintf(cfg, ret, 0,
+		    "Fail committing final populate transaction");
 	/* To ensure managing thread knows if we exited early. */
-err:	if (ret != 0)
+err:	if (ret != 0) {
+		lprintf(cfg,ret, 0, "Error from populate thread.");
 		++g_threads_quit;
+	}
 	if (session != NULL)
 		session->close(session, NULL);
 	if (data_buf)
