@@ -59,6 +59,12 @@ namespace modifiertable {
             ModifierEntry* entryBit = new ModifierEntry("$bit", MOD_BIT);
             nameMap->insert(make_pair(StringData(entryBit->name), entryBit));
 
+            ModifierEntry* entryInc = new ModifierEntry("$inc", MOD_INC);
+            nameMap->insert(make_pair(StringData(entryInc->name), entryInc));
+
+            ModifierEntry* entryMul = new ModifierEntry("$mul", MOD_MUL);
+            nameMap->insert(make_pair(StringData(entryMul->name), entryMul));
+
             ModifierEntry* entryPop = new ModifierEntry("$pop", MOD_POP);
             nameMap->insert(make_pair(StringData(entryPop->name), entryPop));
 
@@ -73,9 +79,6 @@ namespace modifiertable {
 
             ModifierEntry* entryPushAll = new ModifierEntry("$pushAll", MOD_PUSH_ALL);
             nameMap->insert(make_pair(StringData(entryPushAll->name), entryPushAll));
-
-            ModifierEntry* entryInc = new ModifierEntry("$inc", MOD_INC);
-            nameMap->insert(make_pair(StringData(entryInc->name), entryInc));
 
             ModifierEntry* entrySet = new ModifierEntry("$set", MOD_SET);
             nameMap->insert(make_pair(StringData(entrySet->name), entrySet));
@@ -114,7 +117,9 @@ namespace modifiertable {
         case MOD_BIT:
             return new ModifierBit;
         case MOD_INC:
-            return new ModifierInc;
+            return new ModifierInc(ModifierInc::MODE_INC);
+        case MOD_MUL:
+            return new ModifierInc(ModifierInc::MODE_MUL);
         case MOD_POP:
             return new ModifierPop;
         case MOD_PULL:

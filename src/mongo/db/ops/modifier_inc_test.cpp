@@ -46,12 +46,13 @@ namespace {
     /** Helper to build and manipulate a $inc mod. */
     class Mod {
     public:
-        Mod() : _mod() {}
 
         explicit Mod(BSONObj modObj)
             : _modObj(modObj)
-            , _mod() {
-            ASSERT_OK(_mod.init(_modObj["$inc"].embeddedObject().firstElement(),
+            , _mod(mongoutils::str::equals(modObj.firstElement().fieldName(), "$mul") ?
+                   ModifierInc::MODE_MUL : ModifierInc::MODE_INC) {
+            const StringData& modName = modObj.firstElement().fieldName();
+            ASSERT_OK(_mod.init(_modObj[modName].embeddedObject().firstElement(),
                                 ModifierInterface::Options::normal()));
         }
 
@@ -416,6 +417,27 @@ namespace {
         ASSERT_OK(incMod.apply());
         ASSERT_TRUE(doc2.isInPlaceModeEnabled());
         ASSERT_EQUALS(fromjson("{ a : 2 }"), doc2);
+    }
+
+    // Given the current implementation of $mul, we really only need one test for
+    // $mul. However, in the future, we should probably write additional ones, or, perhaps find
+    // a way to run all the obove tests in both modes.
+    TEST(Multiplication, ApplyAndLogSimpleDocument) {
+        Document doc(fromjson("{ a : { b : 2 } }"));
+        Mod incMod(fromjson("{ $mul: { 'a.b' : 3 } }"));
+
+        ModifierInterface::ExecInfo execInfo;
+        ASSERT_OK(incMod.prepare(doc.root(), "", &execInfo));
+        ASSERT_FALSE(execInfo.noOp);
+
+        ASSERT_OK(incMod.apply());
+        ASSERT_TRUE(doc.isInPlaceModeEnabled());
+        ASSERT_EQUALS(fromjson("{ a : { b : 6 } }"), doc);
+
+        Document logDoc;
+        LogBuilder logBuilder(logDoc.root());
+        ASSERT_OK(incMod.log(&logBuilder));
+        ASSERT_EQUALS(fromjson("{ $set : { 'a.b' : 6 } }"), logDoc);
     }
 
 } // namespace

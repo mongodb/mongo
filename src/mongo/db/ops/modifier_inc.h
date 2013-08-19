@@ -33,7 +33,19 @@ namespace mongo {
 
     public:
 
-        ModifierInc();
+        // TODO: This is a shortcut to implementing $mul by hijacking $inc. In the near future,
+        // we should consider either pulling $mul into its own operator, or creating a general
+        // purpose "numeric binary op" operator. Potentially, that operator could also subsume
+        // $bit (thought there are some subtleties, like that $bit can have multiple
+        // operations, and doing so with arbirary math operations introduces potential
+        // associativity difficulties). At the very least, if this mechanism is retained, then
+        // this class should be renamed at some point away from ModifierInc.
+        enum ModifierIncMode {
+            MODE_INC,
+            MODE_MUL
+        };
+
+        ModifierInc(ModifierIncMode mode = MODE_INC);
         virtual ~ModifierInc();
 
         /**
@@ -58,6 +70,7 @@ namespace mongo {
         virtual Status log(LogBuilder* logBuilder) const;
 
     private:
+        const ModifierIncMode _mode;
 
         // Access to each component of fieldName that's the target of this mod.
         FieldRef _fieldRef;
