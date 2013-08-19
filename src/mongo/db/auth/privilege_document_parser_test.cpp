@@ -562,5 +562,52 @@ namespace {
                      "delegatableRoles" << emptyArray)));
     }
 
+    TEST_F(PrivilegeDocumentParsing, V2CredentialExtraction) {
+        // Old "pwd" field not valid
+        ASSERT_NOT_OK(v2parser.initializeUserCredentialsFromPrivilegeDocument(
+                user.get(),
+                BSON("user" << "spencer" <<
+                     "userSource" << "test" <<
+                     "pwd" << "")));
+
+        // Credentials must be provided (so long as userSource is not $external)
+        ASSERT_NOT_OK(v2parser.initializeUserCredentialsFromPrivilegeDocument(
+                user.get(),
+                BSON("user" << "spencer" <<
+                     "userSource" << "test")));
+
+        // Credentials must be object
+        ASSERT_NOT_OK(v2parser.initializeUserCredentialsFromPrivilegeDocument(
+                user.get(),
+                BSON("user" << "spencer" <<
+                     "userSource" << "test" <<
+                     "credentials" << "a")));
+
+        // Must specify credentials for MONGODB-CR
+        ASSERT_NOT_OK(v2parser.initializeUserCredentialsFromPrivilegeDocument(
+                user.get(),
+                BSON("user" << "spencer" <<
+                     "userSource" << "test" <<
+                     "credentials" << BSON("foo" << "bar"))));
+
+        // Make sure extracting valid credentials works
+        ASSERT_OK(v2parser.initializeUserCredentialsFromPrivilegeDocument(
+                user.get(),
+                BSON("user" << "spencer" <<
+                     "userSource" << "test" <<
+                     "credentials" << BSON("MONGODB-CR" << "a"))));
+        ASSERT(user->getCredentials().password == "a");
+        ASSERT(!user->getCredentials().isExternal);
+
+        // Leaving out 'credentials' field is OK so long as userSource is $external
+        ASSERT_OK(v2parser.initializeUserCredentialsFromPrivilegeDocument(
+                user.get(),
+                BSON("user" << "spencer" <<
+                     "userSource" << "$external")));
+        ASSERT(user->getCredentials().password.empty());
+        ASSERT(user->getCredentials().isExternal);
+
+    }
+
 }  // namespace
 }  // namespace mongo

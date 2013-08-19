@@ -704,7 +704,41 @@ namespace {
 
     Status V2PrivilegeDocumentParser::initializeUserCredentialsFromPrivilegeDocument(
             User* user, const BSONObj& privDoc) const {
-        return Status(ErrorCodes::InternalError, "NOT YET IMPLEMENTED");
+        User::CredentialData credentials;
+        std::string userSource = privDoc[AuthorizationManager::USER_SOURCE_FIELD_NAME].String();
+        BSONElement credentialsElement = privDoc[CREDENTIALS_FIELD_NAME];
+        if (!credentialsElement.eoo()) {
+            if (credentialsElement.type() != Object) {
+                return Status(ErrorCodes::UnsupportedFormat,
+                              "'credentials' field in privilege documents must be an object");
+            }
+            BSONElement mongoCRCredentialElement =
+                    credentialsElement.Obj()[MONGODB_CR_CREDENTIAL_FIELD_NAME];
+            if (!mongoCRCredentialElement.eoo()) {
+                if (mongoCRCredentialElement.type() != String ||
+                        makeStringDataFromBSONElement(mongoCRCredentialElement).empty()) {
+                    return Status(ErrorCodes::UnsupportedFormat,
+                                  "MONGODB-CR credentials must be non-empty strings");
+                } else {
+                    credentials.isExternal = false;
+                    credentials.password = mongoCRCredentialElement.String();
+                }
+            } else {
+                return Status(ErrorCodes::UnsupportedFormat,
+                              "Privilege documents must provide credentials for MONGODB-CR"
+                              " authentication");
+            }
+        }
+        else if (userSource == "$external") {
+            credentials.isExternal = true;
+        } else {
+                return Status(ErrorCodes::UnsupportedFormat,
+                              "Cannot extract credentials from user documents without a "
+                              "'credentials' field and with userSource != \"$external\"");
+        }
+
+        user->setCredentials(credentials);
+        return Status::OK();
     }
 
     Status V2PrivilegeDocumentParser::initializeUserRolesFromPrivilegeDocument(
