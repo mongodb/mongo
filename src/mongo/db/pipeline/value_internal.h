@@ -89,6 +89,7 @@ namespace mongo {
         }
 
         ~ValueStorage() {
+            DEV verifyRefCountingIfShould();
             if (refCounter)
                 intrusive_ptr_release(genericRCPtr);
             DEV memset(this, 0xee, sizeof(*this));
@@ -109,6 +110,7 @@ namespace mongo {
 
         /// Call this after memcpying to update ref counts if needed
         void memcpyed() const {
+            DEV verifyRefCountingIfShould();
             if (refCounter)
                 intrusive_ptr_add_ref(genericRCPtr);
         }
@@ -140,6 +142,7 @@ namespace mongo {
                 intrusive_ptr_add_ref(genericRCPtr);
                 refCounter = true;
             }
+            DEV verifyRefCountingIfShould();
         }
 
         StringData getString() const {
@@ -190,6 +193,8 @@ namespace mongo {
             return  (i64[0] == other.i64[0]
                   && i64[1] == other.i64[1]);
         }
+
+        void verifyRefCountingIfShould() const;
 
         // This data is public because this should only be used by Value which would be a friend
         union {
