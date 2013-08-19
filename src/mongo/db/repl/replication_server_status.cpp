@@ -26,6 +26,7 @@
 #include "mongo/db/repl/is_master.h"
 #include "mongo/db/repl/master_slave.h"
 #include "mongo/db/repl/rs.h"
+#include "mongo/db/wire_version.h"
 
 namespace mongo {
 
@@ -164,6 +165,8 @@ namespace mongo {
             result.appendNumber("maxBsonObjectSize", BSONObjMaxUserSize);
             result.appendNumber("maxMessageSizeBytes", MaxMessageSizeBytes);
             result.appendDate("localTime", jsTime());
+            result.append("maxWireVersion", maxWireVersion);
+            result.append("minWireVersion", minWireVersion);
             return true;
         }
     } cmdismaster;
