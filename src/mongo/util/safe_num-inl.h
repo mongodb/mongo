@@ -84,6 +84,18 @@ namespace mongo {
         return *this = bitOr(rhs);
     }
 
+    inline SafeNum SafeNum::bitXor(const SafeNum& rhs) const {
+        return xorInternal(*this, rhs);
+    }
+
+    inline SafeNum SafeNum::operator^(const SafeNum& rhs) const {
+        return bitXor(rhs);
+    }
+
+    inline SafeNum& SafeNum::operator^=(const SafeNum& rhs) {
+        return *this = bitXor(rhs);
+    }
+
     inline bool SafeNum::isValid() const {
         return _type != EOO;
     }

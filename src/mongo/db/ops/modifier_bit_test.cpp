@@ -116,12 +116,20 @@ namespace {
         Mod mod(BSON("$bit" << BSON("a" << BSON("or" << static_cast<int>(1)))));
     }
 
+    TEST(Init, ParsesXorInt) {
+        Mod mod(BSON("$bit" << BSON("a" << BSON("xor" << static_cast<int>(1)))));
+    }
+
     TEST(Init, ParsesAndLong) {
         Mod mod(BSON("$bit" << BSON("a" << BSON("and" << static_cast<long long>(1)))));
     }
 
     TEST(Init, ParsesOrLong) {
         Mod mod(BSON("$bit" << BSON("a" << BSON("or" << static_cast<long long>(1)))));
+    }
+
+    TEST(Init, ParsesXorLong) {
+        Mod mod(BSON("$bit" << BSON("a" << BSON("xor" << static_cast<long long>(1)))));
     }
 
     TEST(SimpleMod, PrepareOKTargetNotFound) {
@@ -210,6 +218,24 @@ namespace {
         ASSERT_EQUALS(fromjson("{ $set : { a : 1 } }"), logDoc);
     }
 
+    TEST(SimpleMod, ApplyAndLogEmptyDocumentXor) {
+        Document doc(fromjson("{}"));
+        Mod mod(fromjson("{ $bit : { a : { xor : 1 } } }"));
+
+        ModifierInterface::ExecInfo execInfo;
+        ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
+        ASSERT_FALSE(execInfo.noOp);
+
+        ASSERT_OK(mod.apply());
+        ASSERT_FALSE(doc.isInPlaceModeEnabled());
+        ASSERT_EQUALS(fromjson("{ a : 1 }"), doc);
+
+        Document logDoc;
+        LogBuilder logBuilder(logDoc.root());
+        ASSERT_OK(mod.log(&logBuilder));
+        ASSERT_EQUALS(fromjson("{ $set : { a : 1 } }"), logDoc);
+    }
+
     TEST(SimpleMod, ApplyAndLogSimpleDocumentAnd) {
         Document doc(fromjson("{ a : 5 }"));
         Mod mod(fromjson("{ $bit : { a : { and : 6 } } }"));
@@ -246,6 +272,24 @@ namespace {
         ASSERT_EQUALS(fromjson("{ $set : { a : 7 } }"), logDoc);
     }
 
+    TEST(SimpleMod, ApplyAndLogSimpleDocumentXor) {
+        Document doc(fromjson("{ a : 5 }"));
+        Mod mod(fromjson("{ $bit : { a : { xor : 6 } } }"));
+
+        ModifierInterface::ExecInfo execInfo;
+        ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
+        ASSERT_FALSE(execInfo.noOp);
+
+        ASSERT_OK(mod.apply());
+        ASSERT_TRUE(doc.isInPlaceModeEnabled());
+        ASSERT_EQUALS(fromjson("{ a : 3 }"), doc);
+
+        Document logDoc;
+        LogBuilder logBuilder(logDoc.root());
+        ASSERT_OK(mod.log(&logBuilder));
+        ASSERT_EQUALS(fromjson("{ $set : { a : 3 } }"), logDoc);
+    }
+
     TEST(InPlace, IntToIntAndIsInPlace) {
         Document doc(BSON("a" << static_cast<int>(1)));
         Mod mod(BSON("$bit" << BSON("a" << BSON("and" << static_cast<int>(1)))));
@@ -272,6 +316,19 @@ namespace {
         LogBuilder logBuilder(logDoc.root());
         ASSERT_OK(mod.log(&logBuilder));
         ASSERT_EQUALS(BSON("$set" << BSON("a" << static_cast<int>(1))), logDoc);
+    }
+
+    TEST(InPlace, IntToIntXorIsInPlace) {
+        Document doc(BSON("a" << static_cast<int>(1)));
+        Mod mod(BSON("$bit" << BSON("a" << BSON("xor" << static_cast<int>(1)))));
+
+        ModifierInterface::ExecInfo execInfo;
+        ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
+
+        Document logDoc;
+        LogBuilder logBuilder(logDoc.root());
+        ASSERT_OK(mod.log(&logBuilder));
+        ASSERT_EQUALS(BSON("$set" << BSON("a" << static_cast<int>(0))), logDoc);
     }
 
     TEST(InPlace, LongToLongAndIsInPlace) {
@@ -302,6 +359,19 @@ namespace {
         ASSERT_EQUALS(BSON("$set" << BSON("a" << static_cast<long long>(1))), logDoc);
     }
 
+    TEST(InPlace, LongToLongXorIsInPlace) {
+        Document doc(BSON("a" << static_cast<long long>(1)));
+        Mod mod(BSON("$bit" << BSON("a" << BSON("xor" << static_cast<long long>(1)))));
+
+        ModifierInterface::ExecInfo execInfo;
+        ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
+
+        Document logDoc;
+        LogBuilder logBuilder(logDoc.root());
+        ASSERT_OK(mod.log(&logBuilder));
+        ASSERT_EQUALS(BSON("$set" << BSON("a" << static_cast<long long>(0))), logDoc);
+    }
+
     TEST(InPlace, IntToLongAndIsNotInPlace) {
         Document doc(BSON("a" << static_cast<int>(1)));
         Mod mod(BSON("$bit" << BSON("a" << BSON("and" << static_cast<long long>(1)))));
@@ -314,6 +384,15 @@ namespace {
     TEST(InPlace, IntToLongOrIsNotInPlace) {
         Document doc(BSON("a" << static_cast<int>(1)));
         Mod mod(BSON("$bit" << BSON("a" << BSON("or" << static_cast<long long>(1)))));
+
+        ModifierInterface::ExecInfo execInfo;
+        ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
+        ASSERT_FALSE(execInfo.noOp);
+    }
+
+    TEST(InPlace, IntToLongXorIsNotInPlace) {
+        Document doc(BSON("a" << static_cast<int>(1)));
+        Mod mod(BSON("$bit" << BSON("a" << BSON("xor" << static_cast<long long>(1)))));
 
         ModifierInterface::ExecInfo execInfo;
         ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
@@ -337,6 +416,20 @@ namespace {
     TEST(NoOp, IntOr) {
         Document doc(BSON("a" << static_cast<int>(0xABCD1234U)));
         Mod mod(BSON("$bit" << BSON("a" << BSON("or" << static_cast<int>(0x0U)))));
+
+        ModifierInterface::ExecInfo execInfo;
+        ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
+        ASSERT_TRUE(execInfo.noOp);
+
+        Document logDoc;
+        LogBuilder logBuilder(logDoc.root());
+        ASSERT_OK(mod.log(&logBuilder));
+        ASSERT_EQUALS(BSON("$set" << BSON("a" << static_cast<int>(0xABCD1234U))), logDoc);
+    }
+
+    TEST(NoOp, IntXor) {
+        Document doc(BSON("a" << static_cast<int>(0xABCD1234U)));
+        Mod mod(BSON("$bit" << BSON("a" << BSON("xor" << static_cast<int>(0x0U)))));
 
         ModifierInterface::ExecInfo execInfo;
         ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
@@ -378,6 +471,21 @@ namespace {
                                           static_cast<long long>(0xABCD1234EF981234ULL))), logDoc);
     }
 
+    TEST(NoOp, LongXor) {
+        Document doc(BSON("a" << static_cast<long long>(0xABCD1234EF981234ULL)));
+        Mod mod(BSON("$bit" << BSON("a" << BSON("xor" << static_cast<long long>(0x0ULL)))));
+
+        ModifierInterface::ExecInfo execInfo;
+        ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
+        ASSERT_TRUE(execInfo.noOp);
+
+        Document logDoc;
+        LogBuilder logBuilder(logDoc.root());
+        ASSERT_OK(mod.log(&logBuilder));
+        ASSERT_EQUALS(BSON("$set" << BSON("a" <<
+                                          static_cast<long long>(0xABCD1234EF981234ULL))), logDoc);
+    }
+
     TEST(Upcasting, UpcastIntToLongAnd) {
         Document doc(BSON("a" << static_cast<int>(1)));
         Mod mod(BSON("$bit" << BSON("a" << BSON("and" << static_cast<long long>(1)))));
@@ -395,6 +503,20 @@ namespace {
     TEST(Upcasting, UpcastIntToLongOr) {
         Document doc(BSON("a" << static_cast<int>(1)));
         Mod mod(BSON("$bit" << BSON("a" << BSON("or" << static_cast<long long>(1)))));
+
+        ModifierInterface::ExecInfo execInfo;
+        ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
+        ASSERT_FALSE(execInfo.noOp);
+
+        ASSERT_OK(mod.apply());
+        ASSERT_FALSE(doc.isInPlaceModeEnabled());
+        ASSERT_EQUALS(fromjson("{ a : 1 }"), doc);
+        ASSERT_EQUALS(mongo::NumberLong, doc.root()["a"].getType());
+    }
+
+    TEST(Upcasting, UpcastIntToLongXor) {
+        Document doc(BSON("a" << static_cast<int>(1)));
+        Mod mod(BSON("$bit" << BSON("a" << BSON("xor" << static_cast<long long>(0)))));
 
         ModifierInterface::ExecInfo execInfo;
         ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
@@ -431,6 +553,20 @@ namespace {
         ASSERT_OK(mod.apply());
         ASSERT_TRUE(doc.isInPlaceModeEnabled());
         ASSERT_EQUALS(fromjson("{ a : 3 }"), doc);
+        ASSERT_EQUALS(mongo::NumberLong, doc.root()["a"].getType());
+    }
+
+    TEST(Upcasting, LongsStayLongsXor) {
+        Document doc(BSON("a" << static_cast<long long>(1)));
+        Mod mod(BSON("$bit" << BSON("a" << BSON("xor" << static_cast<int>(1)))));
+
+        ModifierInterface::ExecInfo execInfo;
+        ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
+        ASSERT_FALSE(execInfo.noOp);
+
+        ASSERT_OK(mod.apply());
+        ASSERT_TRUE(doc.isInPlaceModeEnabled());
+        ASSERT_EQUALS(fromjson("{ a : 0 }"), doc);
         ASSERT_EQUALS(mongo::NumberLong, doc.root()["a"].getType());
     }
 

@@ -265,4 +265,47 @@ namespace {
         ASSERT_TRUE(expected.isIdentical(result_b_s));
     }
 
+    TEST(BitXor, DoubleIsIgnored) {
+        const SafeNum val_int(static_cast<int>(1));
+        const SafeNum val_ll(static_cast<long long>(1));
+        const SafeNum val_double(1.0);
+        ASSERT_FALSE((val_int ^ val_double).isValid());
+        ASSERT_FALSE((val_double ^ val_int).isValid());
+        ASSERT_FALSE((val_ll ^ val_double).isValid());
+        ASSERT_FALSE((val_double ^ val_ll).isValid());
+        ASSERT_FALSE((val_double ^ val_double).isValid());
+    }
+
+    TEST(BitXor, 32and32) {
+        const SafeNum val1(static_cast<int>(0xE0F1U));
+        const SafeNum val2(static_cast<int>(0xDF01U));
+        const SafeNum result = val1 ^ val2;
+        const SafeNum expected(static_cast<int>(0x3FF0U));
+        ASSERT_EQUALS(mongo::NumberInt, result.type());
+        ASSERT_TRUE(expected.isIdentical(result));
+    }
+
+    TEST(BitXor, 64and64) {
+        const SafeNum val1(static_cast<long long>(0xE0F1E0F1E0F1ULL));
+        const SafeNum val2(static_cast<long long>(0xDF01DF01DF01ULL));
+        const SafeNum result = val1 ^ val2;
+        const SafeNum expected(static_cast<long long>(0x3FF03FF03FF0ULL));
+        ASSERT_EQUALS(mongo::NumberLong, result.type());
+        ASSERT_TRUE(expected.isIdentical(result));
+    }
+
+    TEST(BitXor, MixedSize) {
+        const SafeNum val_small(static_cast<int>(0xE0F1U));
+        const SafeNum val_big(static_cast<long long>(0xDF01U));
+        const SafeNum expected(static_cast<long long>(0x3FF0U));
+        const SafeNum result_s_b = val_small ^ val_big;
+        const SafeNum result_b_s = val_big ^ val_small;
+
+        ASSERT_EQUALS(mongo::NumberLong, result_s_b.type());
+        ASSERT_TRUE(expected.isIdentical(result_s_b));
+
+        ASSERT_EQUALS(mongo::NumberLong, result_b_s.type());
+        ASSERT_TRUE(expected.isIdentical(result_b_s));
+    }
+
 } // unnamed namespace

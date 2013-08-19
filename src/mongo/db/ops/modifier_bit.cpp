@@ -94,25 +94,30 @@ namespace mongo {
 
             const StringData payloadFieldName = curOp.fieldName();
 
-            const bool isAnd = (payloadFieldName == "and");
-            const bool isOr = (payloadFieldName == "or");
-
-            if (!(isAnd || isOr))
-                return Status(
-                    ErrorCodes::BadValue,
-                    "Only 'and' and 'or' are supported $bit sub-operators");
-
             if ((curOp.type() != mongo::NumberInt) &&
                 (curOp.type() != mongo::NumberLong))
                 return Status(
                     ErrorCodes::BadValue,
                     "Argument to $bit operation must be a NumberInt or NumberLong");
 
-            const OpEntry entry = {
-                SafeNum(curOp),
-                isAnd ? &SafeNum::bitAnd : &SafeNum::bitOr
-            };
+            SafeNumOp op = NULL;
 
+            if (payloadFieldName == "and") {
+                op = &SafeNum::bitAnd;
+            }
+            else if (payloadFieldName == "or") {
+                op = &SafeNum::bitOr;
+            }
+            else if (payloadFieldName == "xor") {
+                op = &SafeNum::bitXor;
+            }
+            else {
+                return Status(
+                    ErrorCodes::BadValue,
+                    "Only 'and', 'or', and 'xor' are supported $bit sub-operators");
+            }
+
+            const OpEntry entry = {SafeNum(curOp), op};
             _ops.push_back(entry);
         }
 

@@ -121,6 +121,12 @@ namespace mutablebson {
         SafeNum operator|(const SafeNum& rhs) const;
         SafeNum& operator|=(const SafeNum& rhs);
 
+        // Bitwise 'xor' support
+        SafeNum bitXor(const SafeNum& rhs) const;
+        SafeNum operator^(const SafeNum& rhs) const;
+        SafeNum& operator^=(const SafeNum& rhs);
+
+
         //
         // output support
         //
@@ -173,6 +179,11 @@ namespace mutablebson {
          *  the operation is invalid for the underlying types, returns an EOO instance.
          */
         static SafeNum orInternal(const SafeNum& lhs, const SafeNum& rhs);
+
+        /** Returns the bitwise 'xor' of lhs and rhs, taking into consideration their types. If
+         *  the operation is invalid for the underlying types, returns an EOO instance.
+         */
+        static SafeNum xorInternal(const SafeNum& lhs, const SafeNum& rhs);
 
         /**
          * Extracts the value of 'snum' in a long format. It assumes 'snum' is an NumberInt
