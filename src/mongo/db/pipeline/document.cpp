@@ -206,7 +206,7 @@ namespace mongo {
         BSONObjIterator it(bson);
         while(it.more()) {
             BSONElement bsonElement(it.next());
-            md.addField(bsonElement.fieldName(), Value(bsonElement));
+            md.addField(bsonElement.fieldNameStringData(), Value(bsonElement));
         }
 
         *this = md.freeze();
