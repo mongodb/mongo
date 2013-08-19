@@ -30,6 +30,7 @@
 #include "mongo/db/hasher.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/stats/counters.h"
+#include "mongo/db/wire_version.h"
 #include "mongo/s/chunk.h"
 #include "mongo/s/client_info.h"
 #include "mongo/s/config.h"
@@ -1308,6 +1309,11 @@ namespace mongo {
                 result.appendNumber("maxBsonObjectSize", BSONObjMaxUserSize);
                 result.appendNumber("maxMessageSizeBytes", MaxMessageSizeBytes);
                 result.appendDate("localTime", jsTime());
+
+                // Mongos tries to keep exactly the same version range of the server it is
+                // compiled for.
+                result.append("maxWireVersion", maxWireVersion);
+                result.append("minWireVersion", minWireVersion);
 
                 return true;
             }
