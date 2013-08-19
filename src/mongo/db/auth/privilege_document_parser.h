@@ -108,7 +108,7 @@ namespace mongo {
                                                                       const BSONObj& privDoc) const;
 
         virtual Status initializeUserRolesFromPrivilegeDocument(
-                        User* user, const BSONObj& privDoc, const StringData& dbname) const;
+                        User* user, const BSONObj& privDoc, const StringData& unused) const;
 
         virtual void initializeUserPrivilegesFromRoles(User* user) const;
     };

@@ -609,5 +609,71 @@ namespace {
 
     }
 
+    TEST_F(PrivilegeDocumentParsing, V2RoleExtraction) {
+        // "roles" field must be provided
+        ASSERT_NOT_OK(v2parser.initializeUserRolesFromPrivilegeDocument(
+                user.get(),
+                BSON("user" << "spencer"),
+                "test"));
+
+        // V1-style roles arrays no longer work
+        ASSERT_NOT_OK(v2parser.initializeUserRolesFromPrivilegeDocument(
+                user.get(),
+                BSON("user" << "spencer" <<
+                     "roles" << BSON_ARRAY("read")),
+                "test"));
+
+        // Roles must have "name" and "source" fields
+        ASSERT_NOT_OK(v2parser.initializeUserRolesFromPrivilegeDocument(
+                user.get(),
+                BSON("user" << "spencer" <<
+                     "roles" << BSON_ARRAY(BSONObj())),
+                "test"));
+
+        ASSERT_NOT_OK(v2parser.initializeUserRolesFromPrivilegeDocument(
+                user.get(),
+                BSON("user" << "spencer" <<
+                     "roles" << BSON_ARRAY(BSON("name" << "roleA"))),
+                "test"));
+
+        ASSERT_NOT_OK(v2parser.initializeUserRolesFromPrivilegeDocument(
+                user.get(),
+                BSON("user" << "spencer" <<
+                     "roles" << BSON_ARRAY(BSON("name" << "roleA" << "source" << ""))),
+                "test"));
+
+        // Valid role names are extracted successfully
+        ASSERT_OK(v2parser.initializeUserRolesFromPrivilegeDocument(
+                user.get(),
+                BSON("user" << "spencer" <<
+                     "roles" << BSON_ARRAY(BSON("name" << "roleA" << "source" << "dbA"))),
+                "test"));
+        RoleNameIterator nameIt = user->getRoles();
+        ASSERT(nameIt.more());
+        ASSERT(nameIt.next() == RoleName("roleA", "dbA"));
+        ASSERT(!nameIt.more());
+
+        // Multiple roles OK
+        ASSERT_OK(v2parser.initializeUserRolesFromPrivilegeDocument(
+                user.get(),
+                BSON("user" << "spencer" <<
+                     "roles" << BSON_ARRAY(BSON("name" << "roleA" << "source" << "dbA") <<
+                                           BSON("name" << "roleB" << "source" << "dbB"))),
+                "test"));
+        nameIt = user->getRoles();
+        ASSERT(nameIt.more());
+        RoleName firstRole = nameIt.next();
+        if (firstRole == RoleName("roleA", "dbA")) {
+            ASSERT(nameIt.more());
+            ASSERT(nameIt.next() == RoleName("roleB", "dbB"));
+        } else if (firstRole == RoleName("roleB", "dbB")) {
+            ASSERT(nameIt.more());
+            ASSERT(nameIt.next() == RoleName("roleA", "dbA"));
+        } else {
+            ASSERT(false);
+        }
+        ASSERT(!nameIt.more());
+    }
+
 }  // namespace
 }  // namespace mongo
