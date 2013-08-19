@@ -14,6 +14,7 @@
  */
 
 #include <sstream>
+#include <boost/static_assert.hpp>
 
 #include "mongo/pch.h" // for malloc/realloc/INFINITY pulled from bson
 
@@ -163,6 +164,9 @@ namespace mongo {
             // integers. Then, if we fall within the allowable range of int, we downcast,
             // otherwise, we retain the 64-bit result.
 
+            // This algorithm is only correct if sizeof(long long) > sizeof(int)
+            BOOST_STATIC_ASSERT(sizeof(long long) > sizeof(int));
+
             const long long int result =
                 static_cast<long long int>(lInt32) +
                 static_cast<long long int>(rInt32);
@@ -203,6 +207,9 @@ namespace mongo {
             // the arithmetic in 64-bit mode, which can never overflow for 32-bit
             // integers. Then, if we fall within the allowable range of int, we downcast,
             // otherwise, we retain the 64-bit result.
+
+            // This algorithm is only correct if sizeof(long long) >= (2 * sizeof(int))
+            BOOST_STATIC_ASSERT(sizeof(long long) >= (2 * sizeof(int)));
 
             const long long int result =
                 static_cast<long long int>(lInt32) *
