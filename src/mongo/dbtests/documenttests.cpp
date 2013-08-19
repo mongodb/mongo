@@ -167,6 +167,22 @@ namespace DocumentTests {
                 ASSERT( md.peek()["c"].missing() );
                 assertRoundTrips( md.peek() );
 
+                // Set a nested field using []
+                md["x"]["y"]["z"] = Value("nested");
+                ASSERT_EQUALS(md.peek()["x"]["y"]["z"], Value("nested"));
+
+                // Set a nested field using setNestedField
+                FieldPath xxyyzz = string("xx.yy.zz");
+                md.setNestedField(xxyyzz, Value("nested"));
+                ASSERT_EQUALS(md.peek().getNestedField(xxyyzz), Value("nested") );
+
+                // Set a nested fields through an existing empty document
+                md["xxx"] = Value(Document());
+                md["xxx"]["yyy"] = Value(Document());
+                FieldPath xxxyyyzzz = string("xxx.yyy.zzz");
+                md.setNestedField(xxxyyyzzz, Value("nested"));
+                ASSERT_EQUALS(md.peek().getNestedField(xxxyyyzzz), Value("nested") );
+
                 // Make sure nothing moved
                 ASSERT_EQUALS(apos, md.peek().positionOf("a"));
                 ASSERT_EQUALS(bpos, md.peek().positionOf("c"));

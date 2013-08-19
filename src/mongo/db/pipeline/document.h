@@ -157,6 +157,7 @@ namespace mongo {
         friend class FieldIterator;
         friend class ValueStorage;
         friend class MutableDocument;
+        friend class MutableValue;
 
         explicit Document(const DocumentStorage* ptr) : _storage(ptr) {};
 
@@ -211,8 +212,17 @@ namespace mongo {
 
         /// Used by MutableDocument(MutableValue)
         const RefCountable*& getDocPtr() {
-            if (_val.getType() != Object)
-                *this = Value(Document());
+            if (_val.getType() != Object || _val._storage.genericRCPtr == NULL) {
+                // If the current value isn't an object we replace it with a Object-typed Value.
+                // Note that we can't just use Document() here because that is a NULL pointer and
+                // Value doesn't refcount NULL pointers. This led to a memory leak (SERVER-10554)
+                // because MutableDocument::newStorage() would set a non-NULL pointer into the Value
+                // without setting the refCounter bit. While allocating a DocumentStorage here could
+                // result in an allocation where none is needed, in practice this is only called
+                // when we are about to add a field to the sub-document so this just changes where
+                // the allocation is done.
+                _val = Value(Document(new DocumentStorage()));
+            }
 
             return _val._storage.genericRCPtr;
         }
