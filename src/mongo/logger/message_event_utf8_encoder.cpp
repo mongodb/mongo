@@ -24,7 +24,7 @@
 namespace mongo {
 namespace logger {
 
-    static MessageEventDetailsEncoder::DateFormatter _dateFormatter = dateToCtimeString;
+    static MessageEventDetailsEncoder::DateFormatter _dateFormatter = dateToISOStringLocal;
 
     void MessageEventDetailsEncoder::setDateFormatter(DateFormatter dateFormatter) {
         _dateFormatter = dateFormatter;
