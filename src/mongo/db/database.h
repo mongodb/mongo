@@ -116,6 +116,8 @@ namespace mongo {
         ExtentManager& getExtentManager() { return _extentManager; }
         const ExtentManager& getExtentManager() const { return _extentManager; }
 
+        void dropCollection( const StringData& fullns );
+
         /**
          * @param ns - this is fully qualified, which is maybe not ideal ???
          */
