@@ -265,7 +265,7 @@ namespace mongo {
         if (status.code() == ErrorCodes::UserNotFound) {
             return BSONObj();
         }
-        uasserted(17050, status.reason());
+        uasserted(17051, status.reason());
     }
 
     class LowLevelMongodStatus : public WebStatusPlugin {
