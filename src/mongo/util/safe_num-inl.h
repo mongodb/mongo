@@ -60,6 +60,14 @@ namespace mongo {
         return *this = addInternal(*this, rhs);
     }
 
+    inline SafeNum SafeNum::operator*(const SafeNum& rhs) const {
+        return mulInternal(*this, rhs);
+    }
+
+    inline SafeNum& SafeNum::operator*=(const SafeNum& rhs) {
+        return *this = mulInternal(*this, rhs);
+    }
+
     inline SafeNum SafeNum::bitAnd(const SafeNum& rhs) const {
         return andInternal(*this, rhs);
     }
