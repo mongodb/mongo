@@ -101,7 +101,7 @@ namespace mongo {
         verify(_tempNs.size() != 0);
 
         vector<BSONObj> bufferedObjects;
-        size_t bufferedBytes = 0;
+        int bufferedBytes = 0;
         while (boost::optional<Document> next = pSource->getNext()) {
             BSONObj toInsert = next->toBson();
             bufferedBytes += toInsert.objsize();

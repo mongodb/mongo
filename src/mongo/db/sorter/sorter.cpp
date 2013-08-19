@@ -729,9 +729,9 @@ namespace mongo {
             bool _haveCutoff;
             Data _cutoff; // We can definitely ignore values worse than this.
             Data _worstSeen; // The worst Data seen so far. Reset when _worstCount >= _opts.limit.
-            int _worstCount; // Number of docs better or equal to _worstSeen kept so far.
+            size_t _worstCount; // Number of docs better or equal to _worstSeen kept so far.
             Data _lastMedian; // Median of a batch. Reset when _medianCount >= _opts.limit.
-            int _medianCount; // Number of docs better or equal to _lastMedian kept so far.
+            size_t _medianCount; // Number of docs better or equal to _lastMedian kept so far.
         };
 
         inline unsigned nextFileNumber() {
@@ -790,10 +790,10 @@ namespace mongo {
 
         std::string compressed;
         snappy::Compress(_buffer.buf(), _buffer.len(), &compressed);
-        verify(compressed.size() <= std::numeric_limits<int32_t>::max());
+        verify(compressed.size() <= size_t(std::numeric_limits<int32_t>::max()));
 
         try {
-            if (compressed.size() < _buffer.len()/9*10) {
+            if (compressed.size() < size_t(_buffer.len()/9*10)) {
                 const int32_t size = -compressed.size(); // negative means compressed
                 _file.write(reinterpret_cast<const char*>(&size), sizeof(size));
                 _file.write(compressed.data(), compressed.size());
