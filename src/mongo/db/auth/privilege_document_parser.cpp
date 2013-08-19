@@ -742,8 +742,39 @@ namespace {
     }
 
     Status V2PrivilegeDocumentParser::initializeUserRolesFromPrivilegeDocument(
-            User* user, const BSONObj& privDoc, const StringData& dbname) const {
-        return Status(ErrorCodes::InternalError, "NOT YET IMPLEMENTED");
+            User* user, const BSONObj& privDoc, const StringData&) const {
+
+        BSONElement rolesElement = privDoc[ROLES_FIELD_NAME];
+
+        if (rolesElement.type() != Array) {
+            return Status(ErrorCodes::UnsupportedFormat,
+                          "User document needs 'roles' field to be an array");
+        }
+
+        for (BSONObjIterator it(rolesElement.Obj()); it.more(); it.next()) {
+            if ((*it).type() != Object) {
+                return Status(ErrorCodes::UnsupportedFormat,
+                              "User document needs values in 'roles' array to be a sub-documents");
+            }
+            BSONObj roleObject = (*it).Obj();
+
+            BSONElement roleNameElement = roleObject[ROLE_NAME_FIELD_NAME];
+            BSONElement roleSourceElement = roleObject[ROLE_SOURCE_FIELD_NAME];
+
+            if (roleNameElement.type() != String ||
+                    makeStringDataFromBSONElement(roleNameElement).empty()) {
+                return Status(ErrorCodes::UnsupportedFormat,
+                              "Role names must be non-empty strings");
+            }
+            if (roleSourceElement.type() != String ||
+                    makeStringDataFromBSONElement(roleSourceElement).empty()) {
+                return Status(ErrorCodes::UnsupportedFormat,
+                              "Role source must be non-empty strings");
+            }
+
+            user->addRole(RoleName(roleNameElement.String(), roleSourceElement.String()));
+        }
+        return Status::OK();
     }
 
     void V2PrivilegeDocumentParser::initializeUserPrivilegesFromRoles(User* user) const {
