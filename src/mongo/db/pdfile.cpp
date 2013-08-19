@@ -671,6 +671,8 @@ namespace mongo {
         Top::global.collectionDropped( name );
         NamespaceDetailsTransient::eraseCollection( name );
         dropNS(name);
+
+        cc().database()->dropCollection( name );
     }
 
     /* deletes a record, just the pdfile portion -- no index cleanup, no cursor cleanup, etc.

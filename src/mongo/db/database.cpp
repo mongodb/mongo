@@ -266,7 +266,7 @@ namespace mongo {
 
             string errmsg;
             BSONObjBuilder result;
-            dropCollection(ns, errmsg, result);
+            mongo::dropCollection(ns, errmsg, result); // XXX-ERH
 
             if ( errmsg.size() > 0 ) {
                 warning() << "could not delete temp collection: " << ns
@@ -308,6 +308,14 @@ namespace mongo {
 
         _profile = newLevel;
         return true;
+    }
+
+    void Database::dropCollection( const StringData& fullns ) {
+        // TODO: XXX-ERH
+        // move impl from pdfile.cpp here
+
+        scoped_lock lk( _collectionLock );
+        _collections.erase( fullns.toString() );
     }
 
     CollectionTemp* Database::getCollectionTemp( const StringData& ns ) {
