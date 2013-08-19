@@ -57,8 +57,9 @@ namespace mongo {
         bool noOp;
     };
 
-    ModifierInc::ModifierInc()
+    ModifierInc::ModifierInc(ModifierIncMode mode)
         : ModifierInterface ()
+        , _mode(mode)
         , _fieldRef()
         , _posDollar(0)
         , _val() {
@@ -166,7 +167,10 @@ namespace mongo {
         const SafeNum currentValue = _preparedState->elemFound.getValueSafeNum();
 
         // Update newValue w.r.t to the current value of the found element.
-        _preparedState->newValue += currentValue;
+        if (_mode == MODE_INC)
+            _preparedState->newValue += currentValue;
+        else
+            _preparedState->newValue *= currentValue;
 
         // If the result of the addition is invalid, we must return an error.
         if (!_preparedState->newValue.isValid())
@@ -236,7 +240,7 @@ namespace mongo {
             _preparedState->newValue);
 
         if (!logElement.ok()) {
-            return Status(ErrorCodes::InternalError, "cannot append details for $inc mod");
+            return Status(ErrorCodes::InternalError, "cannot append details for $inc/$mul mod");
         }
 
         // Now, we attach the {<fieldname>: <value>} Element under the {$set: ...} segment.

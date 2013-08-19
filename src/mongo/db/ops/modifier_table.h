@@ -25,6 +25,7 @@ namespace modifiertable {
         MOD_ADD_TO_SET,
         MOD_BIT,
         MOD_INC,
+        MOD_MUL,
         MOD_POP,
         MOD_PULL,
         MOD_PULL_ALL,
