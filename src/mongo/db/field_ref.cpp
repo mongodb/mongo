@@ -45,24 +45,23 @@ namespace mongo {
         }
 
         // We guarantee that accesses through getPart() will be valid while 'this' is. So we
-        // take a copy. We're going to be "chopping" up the copy into c-strings.
-        _fieldBase.reset(new char[dottedField.size()+1]);
-        dottedField.copyTo( _fieldBase.get(), true );
+        // keep a copy in a local sting.
+
+        _dotted = dottedField.toString();
 
         // Separate the field parts using '.' as a delimiter.
-        char* beg = _fieldBase.get();
-        char* cur = beg;
-        char* end = beg + dottedField.size();
+        std::string::iterator beg = _dotted.begin();
+        std::string::iterator cur = beg;
+        const std::string::iterator end = _dotted.end();
         while (true) {
             if (cur != end && *cur != '.') {
                 cur++;
                 continue;
             }
 
-            appendPart(StringData(beg, cur - beg));
+            appendPart(StringData(&*beg, cur - beg));
 
             if (cur != end) {
-                *cur = '\0';
                 beg = ++cur;
                 continue;
             }
@@ -142,19 +141,27 @@ namespace mongo {
     }
 
     std::string FieldRef::dottedField( size_t offset ) const {
-        std::string res;
+        std::string result;
 
         if (_size == 0 || offset >= numParts() ) {
-            return res;
+            // fall through, we will return the empty string.
+        }
+        else if (_replacements.empty() && (offset == 0)) {
+            result = _dotted;
+        }
+        else {
+            // Reserve some space in the string. We know we will have, at minimum, a character
+            // for each component we are writing, and a dot for each component, less one.
+            result.reserve(((_size - offset) * 2) - 1);
+            for (size_t i=offset; i<_size; i++) {
+                if ( i > offset )
+                    result.append(1, '.');
+                StringData part = getPart(i);
+                result.append(part.rawData(), part.size());
+            }
         }
 
-        for (size_t i=offset; i<_size; i++) {
-            if ( i > offset )
-                res.append(1, '.');
-            StringData part = getPart(i);
-            res.append(part.rawData(), part.size());
-        }
-        return res;
+        return result;
     }
 
     bool FieldRef::equalsDottedField( const StringData& other ) const {
@@ -208,7 +215,7 @@ namespace mongo {
     void FieldRef::clear() {
         _size = 0;
         _variable.clear();
-        _fieldBase.reset();
+        _dotted.clear();
         _replacements.clear();
     }
 
