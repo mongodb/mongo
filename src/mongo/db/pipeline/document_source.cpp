@@ -161,7 +161,7 @@ namespace mongo {
         BSONObjIterator it(bson);
         while (it.more()) {
             BSONElement bsonElement (it.next());
-            StringData fieldName (bsonElement.fieldName(), bsonElement.fieldNameSize()-1);
+            StringData fieldName = bsonElement.fieldNameStringData();
             Value isNeeded = neededFields[fieldName];
 
             if (isNeeded.missing())
