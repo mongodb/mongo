@@ -79,6 +79,11 @@ namespace {
         ASSERT_NULL(set.lookupByDBName("test"));
         ASSERT_EQUALS(p3, set.lookup(UserName("Bob", "test2")));
         ASSERT_EQUALS(p3, set.lookupByDBName("test2"));
+
+        UserSet::NameIterator iter = set.getNames();
+        ASSERT_TRUE(iter.more());
+        ASSERT_EQUALS(iter.next(), UserName("Bob", "test2"));
+        ASSERT_FALSE(iter.more());
     }
 
     TEST(UserSetTest, IterateNames) {

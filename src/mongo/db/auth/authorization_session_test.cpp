@@ -33,16 +33,36 @@
 namespace mongo {
 namespace {
 
+    class FailureCapableAuthzManagerExternalStateMock :
+        public AuthzManagerExternalStateMock {
+    public:
+        FailureCapableAuthzManagerExternalStateMock() : _findsShouldFail(false) {}
+        virtual ~FailureCapableAuthzManagerExternalStateMock() {}
+
+        void setFindsShouldFail(bool enable) { _findsShouldFail = enable; }
+
+        virtual Status _findUser(const std::string& usersNamespace,
+                                 const BSONObj& query,
+                                 BSONObj* result) const {
+            if (_findsShouldFail) {
+                return Status(ErrorCodes::UnknownError, "_findUser set to fail in mock.");
+            }
+            return AuthzManagerExternalStateMock::_findUser(usersNamespace, query, result);
+        }
+
+    private:
+        bool _findsShouldFail;
+    };
 
     class AuthorizationSessionTest : public ::mongo::unittest::Test {
     public:
-        AuthzManagerExternalStateMock* managerState;
+        FailureCapableAuthzManagerExternalStateMock* managerState;
         AuthzSessionExternalStateMock* sessionState;
         scoped_ptr<AuthorizationManager> authzManager;
         scoped_ptr<AuthorizationSession> authzSession;
 
         void setUp() {
-            managerState = new AuthzManagerExternalStateMock();
+            managerState = new FailureCapableAuthzManagerExternalStateMock();
             authzManager.reset(new AuthorizationManager(managerState));
             sessionState = new AuthzSessionExternalStateMock(authzManager.get());
             authzSession.reset(new AuthorizationSession(sessionState));
@@ -126,6 +146,47 @@ namespace {
         authzManager->invalidateUser(user);
         ASSERT_TRUE(authzSession->checkAuthorization("test", ActionType::find));
         ASSERT_FALSE(authzSession->checkAuthorization("test", ActionType::insert));
+
+        user = authzSession->lookupUser(UserName("spencer", "test"));
+        ASSERT(user->isValid());
+
+        // Delete the user.
+        managerState->clearPrivilegeDocuments();
+        // Make sure that invalidating the user causes the session to reload its privileges.
+        authzManager->invalidateUser(user);
+        ASSERT_FALSE(authzSession->checkAuthorization("test", ActionType::find));
+        ASSERT_FALSE(authzSession->checkAuthorization("test", ActionType::insert));
+        ASSERT_FALSE(authzSession->lookupUser(UserName("spencer", "test")));
+    }
+
+    TEST_F(AuthorizationSessionTest, UseOldUserInfoInFaceOfConnectivityProblems) {
+        // Add a readWrite user
+        ASSERT_OK(managerState->insertPrivilegeDocument("test",
+                BSON("user" << "spencer" <<
+                     "pwd" << "a" <<
+                     "roles" << BSON_ARRAY("readWrite"))));
+        ASSERT_OK(authzSession->addAndAuthorizeUser(UserName("spencer", "test")));
+
+        ASSERT_TRUE(authzSession->checkAuthorization("test", ActionType::find));
+        ASSERT_TRUE(authzSession->checkAuthorization("test", ActionType::insert));
+
+        User* user = authzSession->lookupUser(UserName("spencer", "test"));
+        ASSERT(user->isValid());
+
+        // Change the user to be read-only
+        managerState->setFindsShouldFail(true);
+        managerState->clearPrivilegeDocuments();
+        ASSERT_OK(managerState->insertPrivilegeDocument("test",
+                BSON("user" << "spencer" <<
+                     "pwd" << "a" <<
+                     "roles" << BSON_ARRAY("read"))));
+
+        // Even though the user's privileges have been reduced, since we've configured user
+        // document lookup to fail, the authz session should continue to use its known out-of-date
+        // privilege data.
+        authzManager->invalidateUser(user);
+        ASSERT_TRUE(authzSession->checkAuthorization("test", ActionType::find));
+        ASSERT_TRUE(authzSession->checkAuthorization("test", ActionType::insert));
     }
 
 
