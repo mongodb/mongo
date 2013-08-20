@@ -265,8 +265,7 @@ namespace mongo {
             }
             // Handle normal client authentication, only applies to client-server connections
             else {
-                Principal* principal = new Principal(user);
-                authorizationSession->addAndAuthorizePrincipal(principal);
+                authorizationSession->addAndAuthorizeUser(user);
             }
             return Status::OK();
         }
