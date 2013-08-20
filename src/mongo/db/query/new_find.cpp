@@ -121,9 +121,26 @@ namespace mongo {
         // If this is NULL, there is no data but the query is valid.  You're allowed to query for
         // data on an empty collection and it's not an error.  There just isn't any data...
         if (NULL == nsd) {
-            *out = new EOFRunner(canonicalQuery->ns());
-            canonicalQuery.reset();
+            const string& ns = canonicalQuery->ns();
+            *out = new EOFRunner(canonicalQuery.release(), ns);
             return Status::OK();
+        }
+
+        // Tailable: If the query requests tailable the collection must be capped.
+        if (canonicalQuery->getParsed().hasOption(QueryOption_CursorTailable)) {
+            if (!nsd->isCapped()) {
+                return Status(ErrorCodes::BadValue,
+                              "tailable cursor requested on non capped collection");
+            }
+
+            // If a sort is specified it must be equal to expectedSort.
+            const BSONObj expectedSort = BSON("$natural" << 1);
+            const BSONObj& actualSort = canonicalQuery->getParsed().getOrder();
+            if (!actualSort.isEmpty() && !(actualSort == expectedSort)) {
+                return Status(ErrorCodes::BadValue,
+                              "invalid sort specified for tailable cursor: "
+                              + actualSort.toString());
+            }
         }
 
         // If it's not NULL, we may have indices.
@@ -180,11 +197,13 @@ namespace mongo {
         // This is a read lock.  TODO: There is a cursor flag for not needing this.  Do we care?
         Client::ReadContext ctx(ns);
 
-        log() << "running getMore in new system, cursorid " << cursorid << endl;
+        //log() << "running getMore in new system, cursorid " << cursorid << endl;
 
-        // TODO: Document.
-        // TODO: do this when we can pass in our own parsed query
-        //replVerifyReadsOk();
+        // This checks to make sure the operation is allowed on a replicated node.  Since we are not
+        // passing in a query object (necessary to check SlaveOK query option), the only state where
+        // reads are allowed is PRIMARY (or master in master/slave).  This function uasserts if
+        // reads are not okay.
+        replVerifyReadsOk();
 
         // A pin performs a CC lookup and if there is a CC, increments the CC's pin value so it
         // doesn't time out.  Also informs ClientCursor that there is somebody actively holding the
@@ -233,7 +252,6 @@ namespace mongo {
             const int queryOptions = cc->queryOptions();
 
             // Get results out of the runner.
-            // TODO: There may be special handling required for tailable cursors?
             runner->restoreState();
 
             BSONObj obj;
@@ -266,10 +284,15 @@ namespace mongo {
                 }
             }
 
-            if (Runner::RUNNER_DEAD == state || Runner::RUNNER_EOF == state) {
-                log() << "getMore(): runner with id " << cursorid << " EOF/DEAD, state = "
-                      << static_cast<int>(state) << endl;
-                // TODO: If the cursor is tailable we don't kill it if it's eof.
+            if (Runner::RUNNER_EOF == state
+                && 0 == numResults
+                && (queryOptions & QueryOption_CursorTailable) && (queryOptions & QueryOption_AwaitData)
+                && (pass < 1000)) {
+                // If the cursor is tailable we don't kill it if it's eof.  We let it try to get
+                // data some # of times first.
+                return 0;
+            }
+            else if (Runner::RUNNER_DEAD == state || Runner::RUNNER_EOF == state) {
                 ccPin.free();
                 // cc is now invalid, as is the runner
                 cursorid = 0;
@@ -330,9 +353,13 @@ namespace mongo {
         // We use this a lot below.
         const LiteParsedQuery& pq = cq->getParsed();
 
-        // TODO: Document why we do this.
-        // TODO: do this when we can pass in our own parsed query
-        //replVerifyReadsOk(&pq);
+        // TODO: Remove when impl'd
+        if (pq.hasOption(QueryOption_OplogReplay)) {
+            warning() << "haven't implemented findingstartcursor yet\n";
+        }
+
+        // uassert if we are not on a primary, and not a secondary with SlaveOk query parameter set.
+        replVerifyReadsOk(&pq);
 
         // If this exists, the collection is sharded.
         // If it doesn't exist, we can assume we're not sharded.
@@ -421,13 +448,14 @@ namespace mongo {
         ClientCursor::deregisterRunner(runner.get());
 
         // Why save a dead runner?
-        if (Runner::RUNNER_DEAD == state) { saveClientCursor = false; }
-
-        // TODO: Stage creation can set tailable depending on what's in the parsed query.  We have
-        // the full parsed query available during planning...set it there.
-        //
-        // TODO: If we're tailable we want to save the client cursor.  Make sure we do this later.
-        //if (pq.hasOption(QueryOption_CursorTailable) && pq.getNumToReturn() != 1) { ... }
+        if (Runner::RUNNER_DEAD == state) {
+            saveClientCursor = false;
+        }
+        else if (pq.hasOption(QueryOption_CursorTailable) && (1 != pq.getNumToReturn())) {
+            // If pq.hasOption(tailable) the only plan the planner will output is a collscan with
+            // tailable set.
+            saveClientCursor = true;
+        }
 
         // TODO(greg): This will go away soon.
         if (!shardingState.getVersion(pq.ns()).isWriteCompatibleWith(shardingVersionAtStart)) {

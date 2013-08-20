@@ -16,6 +16,9 @@
 
 #include "mongo/db/query/query_planner.h"
 
+// For QueryOption_XXX
+#include "mongo/client/dbclientinterface.h"
+#include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/matcher/expression_parser.h"
 
@@ -221,33 +224,62 @@ namespace mongo {
         }
     }
 
+    QuerySolution* makeCollectionScan(const CanonicalQuery& query, bool tailable) {
+        auto_ptr<QuerySolution> soln(new QuerySolution());
+        soln->filterData = query.getQueryObj();
+        // TODO: have a MatchExpression::copy function(?)
+        StatusWithMatchExpression swme = MatchExpressionParser::parse(soln->filterData);
+        verify(swme.isOK());
+        soln->filter.reset(swme.getValue());
+
+        // Make the (only) node, a collection scan.
+        CollectionScanNode* csn = new CollectionScanNode();
+        csn->name = query.ns();
+        csn->filter = soln->filter.get();
+        csn->tailable = tailable;
+
+        const BSONObj& sortObj = query.getParsed().getOrder();
+        // TODO: We need better checking for this.  Should be done in CanonicalQuery and we should
+        // be able to assume it's correct.
+        if (!sortObj.isEmpty()) {
+            BSONElement natural = sortObj.getFieldDotted("$natural");
+            csn->direction = natural.numberInt() >= 0 ? 1 : -1;
+        }
+
+        // Add this solution to the list of solutions.
+        soln->root.reset(csn);
+        return soln.release();
+    }
+
     // static
     void QueryPlanner::plan(const CanonicalQuery& query, const BSONObjSet& indexKeyPatterns,
                             vector<QuerySolution*>* out) {
         const MatchExpression* root = query.root();
+        bool queryRequiresIndex = requiresIndex(root);
 
-        // TODO: If pq.hasOption(QueryOption_OplogReplay) use FindingStartCursor equivalent which
+        // If the query requests a tailable cursor, the only solution is a collscan + filter with
+        // tailable set on the collscan.  TODO: This is a policy departure.  Previously I think you
+        // could ask for a tailable cursor and it just tried to give you one.  Now, we fail if we
+        // can't provide one.  Is this what we want?
+        if (query.getParsed().hasOption(QueryOption_CursorTailable)) {
+            if (!queryRequiresIndex) {
+                out->push_back(makeCollectionScan(query, true));
+            }
+            return;
+        }
+
+        // XXX: If pq.hasOption(QueryOption_OplogReplay) use FindingStartCursor equivalent which
         // must be translated into stages.
 
         // The default plan is always a collection scan with a heavy filter.  This is a valid
         // solution for any query that does not require an index.
-        if (!requiresIndex(root)) {
-            auto_ptr<QuerySolution> soln(new QuerySolution());
-            soln->filterData = query.getQueryObj();
-            // TODO: have a MatchExpression::copy function(?)
-            StatusWithMatchExpression swme = MatchExpressionParser::parse(soln->filterData);
-            verify(swme.isOK());
-            soln->filter.reset(swme.getValue());
-
-            // Make the (only) node, a collection scan.
-            CollectionScanNode* csn = new CollectionScanNode();
-            csn->name = query.ns();
-            csn->filter = soln->filter.get();
-
-            // Add this solution to the list of solutions.
-            soln->root.reset(csn);
-            out->push_back(soln.release());
+        if (!queryRequiresIndex) {
+            out->push_back(makeCollectionScan(query, false));
+            // TODO: SORT + PROJ
         }
+
+        // TODO: REMOVE THIS AND BUILD IXSCAN PLANS!
+        return;
 
         if (isSimpleComparison(root->matchType())) {
             // This builds a simple index scan over the value.

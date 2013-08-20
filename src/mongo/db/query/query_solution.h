@@ -78,7 +78,7 @@ namespace mongo {
     };
 
     struct CollectionScanNode : public QuerySolutionNode {
-        CollectionScanNode() : filter(NULL) { }
+        CollectionScanNode() : tailable(false), direction(1), filter(NULL) { }
 
         virtual StageType getType() const { return STAGE_COLLSCAN; }
 
@@ -86,7 +86,13 @@ namespace mongo {
             *ss << "COLLSCAN ns=" << name << " filter= " << filter->toString() << endl;
         }
 
+        // Name of the namespace.
         string name;
+
+        // Should we make a tailable cursor?
+        bool tailable;
+
+        int direction;
 
         // Not owned.
         // This is a sub-tree of the filter in the QuerySolution that owns us.

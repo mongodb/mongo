@@ -19,8 +19,13 @@
 namespace mongo {
 
     class ParsedQuery;
+    class LiteParsedQuery;
 
     // Check to see if slaveOk reads are allowed,
     // based on read preference and query options
+
+    // DEPRECATED impl
     void replVerifyReadsOk(const ParsedQuery* pq = 0);
+
+    void replVerifyReadsOk(const LiteParsedQuery* pq);
 }

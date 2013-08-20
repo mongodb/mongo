@@ -18,6 +18,7 @@
 
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/parsed_query.h"
+#include "mongo/db/query/lite_parsed_query.h"
 #include "mongo/db/repl/is_master.h"
 #include "mongo/db/repl/replication_server_status.h"
 #include "mongo/db/repl/rs.h"
@@ -42,6 +43,30 @@ namespace mongo {
         else {
             // master/slave
             uassert( 10107,
+                     "not master", 
+                     isMaster() || 
+                     (!pq || pq->hasOption(QueryOption_SlaveOk)) ||
+                     replSettings.slave == SimpleSlave );
+        }
+    }
+
+    /** we allow queries to SimpleSlave's */
+    void replVerifyReadsOk(const LiteParsedQuery* pq) {
+        if( replSet ) {
+            // todo: speed up the secondary case.  as written here there are 2 mutex entries, it
+            // can b 1.
+            if( isMaster() ) return;
+            if ( cc().isGod() ) return;
+
+            uassert(17069, "not master and slaveOk=false",
+                    !pq || pq->hasOption(QueryOption_SlaveOk) || pq->hasReadPref());
+            uassert(17070,
+                    "not master or secondary; cannot currently read from this replSet member",
+                    theReplSet && theReplSet->isSecondary() );
+        }
+        else {
+            // master/slave
+            uassert(17071,
                      "not master", 
                      isMaster() || 
                      (!pq || pq->hasOption(QueryOption_SlaveOk)) ||

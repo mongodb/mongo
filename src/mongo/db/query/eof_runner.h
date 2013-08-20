@@ -32,7 +32,7 @@ namespace mongo {
      */
     class EOFRunner : public Runner {
     public:
-        EOFRunner(const string& ns) : _ns(ns), _cq(CanonicalQuery::getInternalQuery()) { }
+        EOFRunner(CanonicalQuery* cq, const string& ns) : _cq(cq), _ns(ns) { }
 
         Runner::RunnerState getNext(BSONObj* objOut, DiskLoc* dlOut) {
             return Runner::RUNNER_EOF;
@@ -53,19 +53,11 @@ namespace mongo {
 
         virtual const string& ns() { return _ns; }
 
-        virtual const CanonicalQuery& getQuery() {
-            // This shouldn't be called and is going away shortly anyway.
-            verify(0);
-            return *_cq;
-        }
-
         virtual void kill() { }
 
     private:
-        string _ns;
         scoped_ptr<CanonicalQuery> _cq;
+        string _ns;
     };
 
 }  // namespace mongo
-
-

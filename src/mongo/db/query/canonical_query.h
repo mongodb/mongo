@@ -31,10 +31,6 @@ namespace mongo {
         // This is for testing, when we don't have a QueryMessage.
         static Status canonicalize(const string& ns, const BSONObj& query, CanonicalQuery** out);
 
-        // TODO: Make this more legit and useful
-        // Get a dummy query for internal use or testing.  Accessing any of it will crash.
-        static CanonicalQuery* getInternalQuery() { return new CanonicalQuery(); }
-
         // What namespace is this query over?
         const string& ns() const { return _pq->ns(); }
 
@@ -50,6 +46,9 @@ namespace mongo {
     private:
         // You must go through canonicalize to create a CanonicalQuery.
         CanonicalQuery() { }
+
+        // Takes ownership of lpq
+        Status init(LiteParsedQuery* lpq);
 
         scoped_ptr<LiteParsedQuery> _pq;
 

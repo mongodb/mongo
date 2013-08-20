@@ -30,6 +30,9 @@ namespace mongo {
             const CollectionScanNode* csn = static_cast<const CollectionScanNode*>(root);
             CollectionScanParams params;
             params.ns = csn->name;
+            params.tailable = csn->tailable;
+            params.direction = (csn->direction == 1) ? CollectionScanParams::FORWARD
+                                                     : CollectionScanParams::BACKWARD;
             *wsOut = new WorkingSet();
             *rootOut = new CollectionScan(params, *wsOut, csn->filter);
             return true;

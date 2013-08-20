@@ -54,7 +54,7 @@ namespace mongo {
                                       const Direction direction = FORWARD,
                                       const DiskLoc startLoc = DiskLoc()) {
             NamespaceDetails* nsd = nsdetails(ns);
-            if (NULL == nsd) { return new EOFRunner(ns.toString()); }
+            if (NULL == nsd) { return new EOFRunner(NULL, ns.toString()); }
 
             CollectionScanParams params;
             params.ns = ns.toString();
