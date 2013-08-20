@@ -229,6 +229,8 @@ __wt_insert_serial_func(WT_SESSION_IMPL *session, void *args)
 
 	if ((inshead = *insheadp) == NULL)
 		inshead = new_inshead;
+	else if (new_inshead != NULL)
+		return (WT_RESTART);
 
 	/*
 	 * Check the page's write-generation: if that fails, check whether we
