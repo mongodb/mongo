@@ -236,6 +236,28 @@ namespace {
         ASSERT_EQUALS(port, 5);
     }
 
+    TEST(Parsing, PositionalAlreadyRegistered) {
+        moe::OptionsParser parser;
+        moe::Environment environment;
+
+        moe::OptionSection testOpts;
+        testOpts.addOption(moe::OptionDescription("positional", "positional", moe::String,
+                                                  "Positional"));
+        testOpts.addPositionalOption(moe::PositionalOptionDescription("positional", moe::String));
+
+        std::vector<std::string> argv;
+        argv.push_back("binaryname");
+        argv.push_back("positional");
+        std::map<std::string, std::string> env_map;
+
+        moe::Value value;
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        ASSERT_OK(environment.get(moe::Key("positional"), &value));
+        std::string positional;
+        ASSERT_OK(value.get(&positional));
+        ASSERT_EQUALS(positional, "positional");
+    }
+
     TEST(Parsing, PositionalMultiple) {
         moe::OptionsParser parser;
         moe::Environment environment;
