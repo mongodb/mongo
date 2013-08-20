@@ -176,7 +176,7 @@ namespace {
         }
 
         void tearDown() {
-            ReplicaSetMonitor::ReplicaSetMonitor::clearAll();
+            ReplicaSetMonitor::clearAll();
             _replSet.reset();
 
             // TODO: remove this after we remove replSetGetStatus from ReplicaSetMonitor.
