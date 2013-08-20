@@ -194,7 +194,8 @@ __wt_txn_commit_log(WT_SESSION_IMPL *session, const char *cfg[])
 			return (ENOTSUP);
 	}
 
-	WT_ERR(__wt_log_write(session, logrec, &lsn, 0));
+	WT_ERR(__wt_log_write(session, logrec, &lsn,
+	    F_ISSET(S2C(session), WT_CONN_SYNC) ? WT_LOG_SYNC : 0));
 
 err:	__wt_logrec_free(session, &logrec);
 	return (ret);
