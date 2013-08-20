@@ -52,11 +52,29 @@ namespace mongo {
             return PlanStage::NEED_TIME;
         }
 
-        if (isEOF()) { return PlanStage::IS_EOF; }
+        DiskLoc nextLoc;
+
+        // Should we try getNext() on the underlying _iter if we're EOF?  Yes, if we're tailable.
+        if (isEOF()) {
+            if (!_params.tailable) {
+                return PlanStage::IS_EOF;
+            }
+            else {
+                // See if _iter gives us anything new.
+                nextLoc = _iter->getNext();
+                if (nextLoc.isNull()) {
+                    // Nope, still EOF.
+                    return PlanStage::IS_EOF;
+                }
+            }
+        }
+        else {
+            nextLoc = _iter->getNext();
+        }
 
         WorkingSetID id = _workingSet->allocate();
         WorkingSetMember* member = _workingSet->get(id);
-        member->loc = _iter->getNext();;
+        member->loc = nextLoc;
         member->obj = member->loc.obj();
         member->state = WorkingSetMember::LOC_AND_UNOWNED_OBJ;
 

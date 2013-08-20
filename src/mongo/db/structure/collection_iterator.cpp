@@ -169,7 +169,8 @@ namespace mongo {
 
         // Move to the next thing.
         if (!isEOF()) {
-            _curr = getNextCapped(nsd, em, _curr, _direction );
+            _prev = _curr;
+            _curr = getNextCapped(nsd, em, _curr, _direction);
         }
         else if (_tailable && !_prev.isNull()) {
             // If we're tailable, there COULD have been something inserted even though we were
@@ -179,7 +180,7 @@ namespace mongo {
             if (!newCurr.isNull()) {
                 // There's something new to return.  _curr always points to the next thing to
                 // return.  Update it, and move _prev to the thing we just returned.
-                ret = _prev = newCurr;
+                _prev = ret = newCurr;
                 _curr = getNextCapped(nsd, em, _prev, _direction);
             }
         }

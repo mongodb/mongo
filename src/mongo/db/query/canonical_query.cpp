@@ -23,37 +23,41 @@ namespace mongo {
 
     // static
     Status CanonicalQuery::canonicalize(const QueryMessage& qm, CanonicalQuery** out) {
-        auto_ptr<CanonicalQuery> cq(new CanonicalQuery());
-
-        // Parse the query.
         LiteParsedQuery* lpq;
         Status parseStatus = LiteParsedQuery::make(qm, &lpq);
         if (!parseStatus.isOK()) { return parseStatus; }
-        cq->_pq.reset(lpq);
 
-        // Build a parse tree from the BSONObj in the parsed query.
-        StatusWithMatchExpression swme = MatchExpressionParser::parse(cq->_pq->getFilter());
-        if (!swme.isOK()) { return swme.getStatus(); }
+        auto_ptr<CanonicalQuery> cq(new CanonicalQuery());
+        Status initStatus = cq->init(lpq);
+        if (!initStatus.isOK()) { return initStatus; }
 
-        cq->_root.reset(swme.getValue());
         *out = cq.release();
         return Status::OK();
     }
 
+    // static
     Status CanonicalQuery::canonicalize(const string& ns, const BSONObj& query,
                                         CanonicalQuery** out) {
-        auto_ptr<CanonicalQuery> cq(new CanonicalQuery());
-
         LiteParsedQuery* lpq;
         Status parseStatus = LiteParsedQuery::make(ns, 0, 0, 0, query, &lpq);
         if (!parseStatus.isOK()) { return parseStatus; }
-        cq->_pq.reset(lpq);
 
-        StatusWithMatchExpression swme = MatchExpressionParser::parse(cq->_pq->getFilter());
+        auto_ptr<CanonicalQuery> cq(new CanonicalQuery());
+        Status initStatus = cq->init(lpq);
+        if (!initStatus.isOK()) { return initStatus; }
+
+        *out = cq.release();
+        return Status::OK();
+    }
+
+    Status CanonicalQuery::init(LiteParsedQuery* lpq) {
+        _pq.reset(lpq);
+
+        // Build a parse tree from the BSONObj in the parsed query.
+        StatusWithMatchExpression swme = MatchExpressionParser::parse(_pq->getFilter());
         if (!swme.isOK()) { return swme.getStatus(); }
 
-        cq->_root.reset(swme.getValue());
-        *out = cq.release();
+        _root.reset(swme.getValue());
         return Status::OK();
     }
 

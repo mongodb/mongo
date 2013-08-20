@@ -50,9 +50,6 @@ namespace mongo {
         _ntoreturn = ntoreturn;
         _options = queryOptions;
 
-        // TODO: If pq.hasOption(QueryOption_CursorTailable) make sure it's a capped collection and
-        // make sure the order(??) is $natural: 1.
-
         if (_ntoskip < 0) {
             return Status(ErrorCodes::BadValue, "bad skip value in query");
         }
