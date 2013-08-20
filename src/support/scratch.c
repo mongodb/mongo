@@ -77,6 +77,22 @@ __wt_buf_grow(WT_SESSION_IMPL *session, WT_ITEM *buf, size_t size)
 }
 
 /*
+ * __wt_buf_extend --
+ *	Extend a buffer that's currently in-use.  The difference from
+ *	__wt_buf_grow is that extend is expected to be called repeatedly for
+ *	the same buffer, and so grows the buffer exponentially to avoid
+ *	repeated costly calls to realloc.
+ */
+int
+__wt_buf_extend(WT_SESSION_IMPL *session, WT_ITEM *buf, size_t size)
+{
+	if (size <= buf->memsize)
+		return (0);
+
+	return (__wt_buf_grow(session, buf, WT_MAX(size, 2 * buf->memsize)));
+}
+
+/*
  * __wt_buf_init --
  *	Initialize a buffer at a specific size.
  */

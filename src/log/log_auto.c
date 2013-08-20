@@ -57,7 +57,7 @@ __wt_logop_col_put_pack(
 	    optype, 0, uri, recno, value));
 
 	size += __wt_vsize_uint(size) - 1;
-	WT_RET(__wt_buf_grow(session, logrec, logrec->size + size));
+	WT_RET(__wt_buf_extend(session, logrec, logrec->size + size));
 	recsize = (uint32_t)size;
 	WT_RET(__wt_struct_pack(session,
 	    (uint8_t *)logrec->data + logrec->size, size, fmt,
@@ -115,7 +115,7 @@ __wt_logop_col_remove_pack(
 	    optype, 0, uri, recno));
 
 	size += __wt_vsize_uint(size) - 1;
-	WT_RET(__wt_buf_grow(session, logrec, logrec->size + size));
+	WT_RET(__wt_buf_extend(session, logrec, logrec->size + size));
 	recsize = (uint32_t)size;
 	WT_RET(__wt_struct_pack(session,
 	    (uint8_t *)logrec->data + logrec->size, size, fmt,
@@ -170,7 +170,7 @@ __wt_logop_row_put_pack(
 	    optype, 0, uri, key, value));
 
 	size += __wt_vsize_uint(size) - 1;
-	WT_RET(__wt_buf_grow(session, logrec, logrec->size + size));
+	WT_RET(__wt_buf_extend(session, logrec, logrec->size + size));
 	recsize = (uint32_t)size;
 	WT_RET(__wt_struct_pack(session,
 	    (uint8_t *)logrec->data + logrec->size, size, fmt,
@@ -229,7 +229,7 @@ __wt_logop_row_remove_pack(
 	    optype, 0, uri, key));
 
 	size += __wt_vsize_uint(size) - 1;
-	WT_RET(__wt_buf_grow(session, logrec, logrec->size + size));
+	WT_RET(__wt_buf_extend(session, logrec, logrec->size + size));
 	recsize = (uint32_t)size;
 	WT_RET(__wt_struct_pack(session,
 	    (uint8_t *)logrec->data + logrec->size, size, fmt,

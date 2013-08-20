@@ -140,7 +140,9 @@ __txn_op_apply(WT_SESSION_IMPL *session,
 	WT_ILLEGAL_VALUE(session);
 	}
 
-	WT_ASSERT(session, ret == 0);
+	if (ret != 0)
+		__wt_err(session, ret,
+		    "Operation failed during recovery");
 	return (ret);
 }
 
@@ -189,9 +191,7 @@ __wt_txn_commit_log(WT_SESSION_IMPL *session, const char *cfg[])
 	for (i = 0, op = txn->mod; i < txn->mod_count; i++, op++) {
 		if (op->upd != NULL)
 			WT_ERR(__txn_op_log(session, logrec, op));
-		else if (op->ref != NULL)
-			/* We can't handle physical truncate yet. */
-			return (ENOTSUP);
+		/* XXX We can't handle physical truncate yet. */
 	}
 
 	WT_ERR(__wt_log_write(session, logrec, &lsn,
@@ -289,7 +289,6 @@ __wt_txn_recover(WT_SESSION_IMPL *default_session)
 	WT_ERR(__wt_log_scan(rec_session,
 	    NULL, WT_LOGSCAN_FIRST | WT_LOGSCAN_RECOVER,
 	    __txn_log_recover, &metadata));
-
 
 err:	if (rec_session != NULL)
 		WT_TRET(rec_session->iface.close(&rec_session->iface, NULL));
