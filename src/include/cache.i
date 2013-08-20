@@ -62,7 +62,7 @@ __wt_cache_full_check(WT_SESSION_IMPL *session, int onepass)
 	if (F_ISSET(session,
 	    WT_SESSION_NO_CACHE_CHECK | WT_SESSION_SCHEMA_LOCKED))
 		return (0);
-	
+
 	if ((btree = S2BT(session)) != NULL &&
 	    F_ISSET(btree, WT_BTREE_BULK | WT_BTREE_NO_EVICTION))
 		return (0);
