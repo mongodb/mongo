@@ -56,7 +56,7 @@ __clsm_enter(WT_CURSOR_LSM *clsm, int update)
 				(void)WT_ATOMIC_CAS(
 				    primary->txnid_max, id, myid);
 		}
-	
+
 		/*
 		 * Stop when we are up-to-date, as long as this is an update
 		 * operation, or the cursor is open for reading.
@@ -170,8 +170,8 @@ __clsm_open_cursors(
 		if (clsm->primary_chunk == NULL) {
 			WT_RET(__wt_writelock(session, lsm_tree->rwlock));
 			if (clsm->dsk_gen == lsm_tree->dsk_gen)
-				WT_WITH_SCHEMA_LOCK(session,
-				    ret = __wt_lsm_tree_switch(session, lsm_tree));
+				WT_WITH_SCHEMA_LOCK(session, ret =
+				    __wt_lsm_tree_switch(session, lsm_tree));
 			WT_TRET(__wt_rwunlock(session, lsm_tree->rwlock));
 			WT_RET(ret);
 		}
@@ -883,7 +883,8 @@ __clsm_put(WT_SESSION_IMPL *session,
 
 	WT_ASSERT(session, clsm->primary_chunk != NULL);
 	WT_ASSERT(session, !F_ISSET(clsm->primary_chunk, WT_LSM_CHUNK_ONDISK));
-	WT_ASSERT(session, TXNID_LE(session->txn.id, clsm->primary_chunk->txnid_max));
+	WT_ASSERT(session,
+	    TXNID_LE(session->txn.id, clsm->primary_chunk->txnid_max));
 
 	/*
 	 * Set the position for future scans.  If we were already positioned in

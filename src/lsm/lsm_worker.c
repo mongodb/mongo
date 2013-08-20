@@ -295,7 +295,6 @@ __wt_lsm_checkpoint_worker(void *arg)
 			++lsm_tree->dsk_gen;
 			WT_TRET(__wt_rwunlock(session, lsm_tree->rwlock));
 
-
 			if (ret != 0) {
 				__wt_err(session, ret,
 				    "LSM checkpoint metadata write");
