@@ -59,10 +59,12 @@ __clsm_enter(WT_CURSOR_LSM *clsm, int update)
 
 		/*
 		 * Stop when we are up-to-date, as long as this is an update
-		 * operation, or the cursor is open for reading.
+		 * operation with a primary chunk, or a read operation and the
+		 * cursor is open for reading.
 		 */
 		if (clsm->dsk_gen == clsm->lsm_tree->dsk_gen &&
-		    (update || F_ISSET(clsm, WT_CLSM_OPEN_READ)))
+		    ((update && clsm->primary_chunk != NULL) ||
+		    (!update && F_ISSET(clsm, WT_CLSM_OPEN_READ))))
 			break;
 
 		WT_RET(__clsm_open_cursors(clsm, update, 0, 0));
