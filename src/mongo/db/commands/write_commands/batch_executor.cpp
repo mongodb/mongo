@@ -243,7 +243,7 @@ namespace mongo {
         try {
 
             const NamespaceString requestNs(ns);
-            UpdateRequest request(requestNs, opDebug);
+            UpdateRequest request(requestNs);
 
             request.setQuery(queryObj);
             request.setUpdates(updateObj);
@@ -251,7 +251,7 @@ namespace mongo {
             request.setMulti(multi);
             request.setUpdateOpLog();
 
-            UpdateResult res = update(request);
+            UpdateResult res = update(request, &opDebug);
 
             resExisting = res.existing;
             resNum = res.numMatched;

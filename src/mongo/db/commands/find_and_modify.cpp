@@ -207,14 +207,14 @@ namespace mongo {
                     }
                     
                     const NamespaceString requestNs(ns);
-                    UpdateRequest request(requestNs, cc().curop()->debug());
+                    UpdateRequest request(requestNs);
 
                     request.setQuery(queryModified);
                     request.setUpdates(update);
                     request.setUpsert(upsert);
                     request.setUpdateOpLog();
 
-                    UpdateResult res = mongo::update(request);
+                    UpdateResult res = mongo::update(request, &cc().curop()->debug());
 
                     if ( returnNew ) {
                         if ( res.upserted.isSet() ) {

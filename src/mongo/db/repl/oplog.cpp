@@ -470,16 +470,14 @@ namespace mongo {
                     Timer t;
 
                     const NamespaceString requestNs(ns);
-                    UpdateRequest request(
-                        requestNs, debug,
-                        QueryPlanSelectionPolicy::idElseNatural());
+                    UpdateRequest request(requestNs, QueryPlanSelectionPolicy::idElseNatural());
 
                     request.setQuery(o);
                     request.setUpdates(o);
                     request.setUpsert();
                     request.setFromReplication();
 
-                    update(request);
+                    update(request, &debug);
 
                     if( t.millis() >= 2 ) {
                         RARELY OCCASIONALLY log() << "warning, repl doing slow updates (no _id field) for " << ns << endl;
@@ -497,16 +495,14 @@ namespace mongo {
                     b.append(_id);
 
                     const NamespaceString requestNs(ns);
-                    UpdateRequest request(
-                        requestNs, debug,
-                        QueryPlanSelectionPolicy::idElseNatural());
+                    UpdateRequest request(requestNs, QueryPlanSelectionPolicy::idElseNatural());
 
                     request.setQuery(b.done());
                     request.setUpdates(o);
                     request.setUpsert();
                     request.setFromReplication();
 
-                    update(request);
+                    update(request, &debug);
                 }
             }
         }
@@ -522,16 +518,14 @@ namespace mongo {
             const bool upsert = fields[3].booleanSafe() || convertUpdateToUpsert;
 
             const NamespaceString requestNs(ns);
-            UpdateRequest request(
-                requestNs, debug,
-                QueryPlanSelectionPolicy::idElseNatural());
+            UpdateRequest request(requestNs, QueryPlanSelectionPolicy::idElseNatural());
 
             request.setQuery(updateCriteria);
             request.setUpdates(o);
             request.setUpsert(upsert);
             request.setFromReplication();
 
-            UpdateResult ur = update(request);
+            UpdateResult ur = update(request, &debug);
 
             if( ur.numMatched == 0 ) {
                 if( ur.modifiers ) {

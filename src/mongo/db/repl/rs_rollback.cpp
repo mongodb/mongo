@@ -552,14 +552,14 @@ namespace mongo {
                     updates++;
 
                     const NamespaceString requestNs(d.ns);
-                    UpdateRequest request(requestNs, debug);
+                    UpdateRequest request(requestNs);
 
                     request.setQuery(pattern);
                     request.setUpdates(i->second);
                     request.setGod();
                     request.setUpsert();
 
-                    update(request);
+                    update(request, &debug);
 
                 }
             }

@@ -204,7 +204,7 @@ namespace mongo {
         Client::Context context(ns);
 
         const NamespaceString requestNs(ns);
-        UpdateRequest request(requestNs, debug);
+        UpdateRequest request(requestNs);
 
         request.setQuery(id);
         request.setUpdates(o);
@@ -212,7 +212,7 @@ namespace mongo {
         request.setUpdateOpLog();
         request.setFromMigration(fromMigrate);
 
-        update(request);
+        update(request, &debug);
     }
 
     void Helpers::putSingleton(const char *ns, BSONObj obj) {
@@ -220,13 +220,13 @@ namespace mongo {
         Client::Context context(ns);
 
         const NamespaceString requestNs(ns);
-        UpdateRequest request(requestNs, debug);
+        UpdateRequest request(requestNs);
 
         request.setUpdates(obj);
         request.setUpsert();
         request.setUpdateOpLog();
 
-        update(request);
+        update(request, &debug);
 
         context.getClient()->curop()->done();
     }
@@ -236,14 +236,14 @@ namespace mongo {
         Client::Context context(ns);
 
         const NamespaceString requestNs(ns);
-        UpdateRequest request(requestNs, debug);
+        UpdateRequest request(requestNs);
 
         request.setGod();
         request.setUpdates(obj);
         request.setUpsert();
         request.setUpdateOpLog(logTheOp);
 
-        update(request);
+        update(request, &debug);
 
         context.getClient()->curop()->done();
     }
