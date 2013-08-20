@@ -387,8 +387,9 @@ populate_thread(void *arg)
 	WT_CONNECTION *conn;
 	WT_CURSOR *cursor;
 	WT_SESSION *session;
+	uint32_t opcount;
 	uint64_t op;
-	int opcount, ret;
+	int ret;
 	char *data_buf, *key_buf;
 
 	cfg = (CONFIG *)arg;
