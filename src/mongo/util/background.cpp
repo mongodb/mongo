@@ -54,7 +54,9 @@ namespace mongo {
         LOG(1) << "BackgroundJob starting: " << name() << endl;
         {
             scoped_lock l( status->m );
-            massert( 13643 , mongoutils::str::stream() << "backgroundjob already started: " << name() , status->state == NotStarted );
+            massert( 13643, mongoutils::str::stream() << "backgroundjob already started: "
+                                                      << name(),
+                            status->state != Running );
             status->state = Running;
         }
 
