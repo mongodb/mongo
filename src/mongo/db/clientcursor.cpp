@@ -345,7 +345,9 @@ namespace mongo {
 
     void ClientCursor::deregisterRunner(Runner* runner) {
         recursive_scoped_lock lock(ccmutex);
-        verify(nonCachedRunners.end() != nonCachedRunners.find(runner));
+        if (nonCachedRunners.end() == nonCachedRunners.find(runner)) {
+            warning() << "deregistering runner twice, op killed?  ns = " << runner->ns();
+        }
         nonCachedRunners.erase(runner);
     }
 

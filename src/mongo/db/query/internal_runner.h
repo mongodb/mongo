@@ -42,6 +42,10 @@ namespace mongo {
         InternalRunner(const string& ns, PlanStage* root, WorkingSet* ws)
               : _ns(ns), _exec(new PlanExecutor(ws, root)) { }
 
+        virtual ~InternalRunner() {
+            ClientCursor::deregisterRunner(this);
+        }
+
         Runner::RunnerState getNext(BSONObj* objOut, DiskLoc* dlOut) {
             return _exec->getNext(objOut, dlOut);
         }
