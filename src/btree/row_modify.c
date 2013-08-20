@@ -218,6 +218,15 @@ __wt_insert_serial_func(WT_SESSION_IMPL *session, void *args)
 	    &ins_stack, &next_stack,
 	    &new_inslist, &new_inshead, &new_ins, &skipdepth);
 
+	/*
+	 * If we allocated an insert list for the page and another thread has
+	 * set one up in the meantime, restart the operation.
+	 */
+	if (new_inslist != NULL &&
+	    ((page->type == WT_PAGE_ROW_LEAF) ?
+	    page->u.row.ins : page->modify->update) != NULL)
+		return (WT_RESTART);
+
 	if ((inshead = *insheadp) == NULL)
 		inshead = new_inshead;
 
@@ -443,6 +452,13 @@ __wt_update_serial_func(WT_SESSION_IMPL *session, void *args)
 	    &upd_entry, &old_upd, &new_upd, &upd, &upd_obsolete);
 
 	/*
+	 * If we allocated an update array for the page and another thread has
+	 * set one up in the meantime, restart the operation.
+	 */
+	if (new_upd != NULL && page->u.row.upd != NULL)
+		return (WT_RESTART);
+
+	/*
 	 * Ignore the page's write-generation (other than the special case of
 	 * it wrapping).  If we're still in the expected position, we're good
 	 * to go and no update has been added where ours belongs.  If a new
@@ -463,8 +479,7 @@ __wt_update_serial_func(WT_SESSION_IMPL *session, void *args)
 	/*
 	 * If the page needs an update array (column-store pages and inserts on
 	 * row-store pages do not use the update array), our caller passed us
-	 * one of the correct size.   Check the page still needs one (the write
-	 * generation test should have caught that, though).
+	 * one of the correct size.
 	 *
 	 * NOTE: it is important to do this after publishing that the update is
 	 * set.  Code can assume that if the array is set, it is non-empty.

@@ -2609,21 +2609,6 @@ static int
 kvs_config_read(WT_EXTENSION_API *wtext, WT_CONFIG_ITEM *config,
     char ***devices, struct kvs_config *kvs_config, int *flagsp)
 {
-	static const char **p, *kvs_options[] = {
-		"kvs_devices",
-		"kvs_parallelism",
-		"kvs_granularity",
-		"kvs_avg_key_len",
-		"kvs_avg_val_len",
-		"kvs_write_bufs",
-		"kvs_read_bufs",
-		"kvs_commit_timeout",
-		"kvs_reclaim_threshold",
-		"kvs_reclaim_period",
-		"kvs_open_o_debug",
-		"kvs_open_o_truncate",
-		NULL
-	};
 	WT_CONFIG_ITEM k, v;
 	WT_CONFIG_SCAN *scan;
 	int ret = 0, tret;

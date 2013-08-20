@@ -89,6 +89,9 @@ DEF_OPT_AS_UINT32(insert_threads, 0, "number of insert worker threads")
 DEF_OPT_AS_UINT32(key_sz, 20, "key item size")
 DEF_OPT_AS_FLAGVAL(pareto, PERF_RAND_PARETO,
     "use pareto 80/20 distribution for random numbers")
+DEF_OPT_AS_UINT32(populate_ops_per_txn, 0,
+    "number of operations to group into each transaction in the populate phase."
+    " Zero for auto-commit.")
 DEF_OPT_AS_UINT32(populate_threads, 1, "number of populate threads")
 DEF_OPT_AS_UINT32(rand_seed, 14023954, "seed for random number generator")
 DEF_OPT_AS_UINT32(random_range, 0,

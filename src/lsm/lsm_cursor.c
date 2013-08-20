@@ -126,6 +126,7 @@ __clsm_open_cursors(
 	const char *checkpoint, *ckpt_cfg[3];
 	size_t alloc;
 	u_int i, nchunks, skip_chunks;
+	int locked;
 
 	session = (WT_SESSION_IMPL *)clsm->iface.session;
 	lsm_tree = clsm->lsm_tree;
@@ -148,6 +149,7 @@ __clsm_open_cursors(
 	F_CLR(clsm, WT_CLSM_ITERATE_NEXT | WT_CLSM_ITERATE_PREV);
 
 	WT_RET(__wt_readlock(session, lsm_tree->rwlock));
+	locked = 1;
 
 	if (!F_ISSET(clsm, WT_CLSM_MERGE)) {
 		/* Calculate how many cursors are open in unchanged chunks. */
@@ -179,7 +181,18 @@ __clsm_open_cursors(
 			clsm->dsk_gen = lsm_tree->dsk_gen;
 			goto err;
 		}
-		WT_RET(__clsm_close_cursors(clsm, update, skip_chunks));
+
+		/*
+		 * Close the cursors we no longer need.
+		 *
+		 * Drop the LSM tree lock while we do this: if the cache is
+		 * full, we may block while closing a cursor.
+		 */
+		locked = 0;
+		WT_ERR(__wt_rwunlock(session, lsm_tree->rwlock));
+		WT_ERR(__clsm_close_cursors(clsm, update, skip_chunks));
+		WT_ERR(__wt_readlock(session, lsm_tree->rwlock));
+		locked = 1;
 	}
 
 	F_SET(session, WT_SESSION_NO_CACHE_CHECK);
@@ -269,7 +282,8 @@ __clsm_open_cursors(
 
 	clsm->dsk_gen = lsm_tree->dsk_gen;
 err:	F_CLR(session, WT_SESSION_NO_CACHE_CHECK);
-	WT_TRET(__wt_rwunlock(session, lsm_tree->rwlock));
+	if (locked)
+		WT_TRET(__wt_rwunlock(session, lsm_tree->rwlock));
 	return (ret);
 }
 
