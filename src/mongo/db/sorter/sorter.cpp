@@ -793,7 +793,7 @@ namespace mongo {
         verify(compressed.size() <= size_t(std::numeric_limits<int32_t>::max()));
 
         try {
-            if (compressed.size() < size_t(_buffer.len()/9*10)) {
+            if (compressed.size() < size_t(_buffer.len()/10*9)) {
                 const int32_t size = -compressed.size(); // negative means compressed
                 _file.write(reinterpret_cast<const char*>(&size), sizeof(size));
                 _file.write(compressed.data(), compressed.size());
