@@ -8,7 +8,7 @@ env.StaticLibrary(
         "canonical_query.cpp",
         "lite_parsed_query.cpp",
         "query_planner.cpp",
-        "query_projection.cpp",
+        # "query_projection.cpp",
     ],
     LIBDEPS = [
         "index_bounds",
