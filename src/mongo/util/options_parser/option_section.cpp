@@ -172,6 +172,24 @@ namespace optionenvironment {
                 return Status(ErrorCodes::InternalError, sb.str());
             }
         }
+
+        // Don't register this positional option if it has already been registered to support
+        // positional options that we also want to be visible command line flags
+        //
+        // TODO: More robust way to do this.  This only works if we register the flag first
+        std::vector<OptionDescription>::const_iterator oditerator;
+        for (oditerator = _options.begin(); oditerator != _options.end(); oditerator++) {
+            if (positionalOption._name == oditerator->_dottedName) {
+                _positionalOptions.push_back(positionalOption);
+                return Status::OK();
+            }
+
+            if (positionalOption._name == oditerator->_singleName) {
+                _positionalOptions.push_back(positionalOption);
+                return Status::OK();
+            }
+        }
+
         Status ret = addOption(OptionDescription(positionalOption._name,
                                                  positionalOption._name,
                                                  positionalOption._type,
