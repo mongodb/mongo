@@ -241,6 +241,7 @@ namespace {
     }
 
     Status AuthorizationSession::_checkAuthForPrivilegeHelper(const Privilege& privilege) {
+        AuthorizationManager& authMan = getAuthorizationManager();
         Privilege modifiedPrivilege = _modifyPrivilegeForSpecialCases(privilege);
 
         // Need to check not just the resource of the privilege, but also just the database
@@ -252,24 +253,41 @@ namespace {
 
 
         ActionSet unmetRequirements = modifiedPrivilege.getActions();
-        for (UserSet::iterator it = _authenticatedUsers.begin();
-                it != _authenticatedUsers.end(); ++it) {
+        UserSet::iterator it = _authenticatedUsers.begin();
+        while (it != _authenticatedUsers.end()) {
             User* user = *it;
 
             if (!user->isValid()) {
-                // Need to release and re-acquire user if it's been invalidated.
+                // Make a good faith effort to acquire an up-to-date user object, since the one
+                // we've cached is marked "out-of-date."
                 UserName name = user->getName();
+                User* updatedUser;
 
-                _authenticatedUsers.removeByDBName(name.getDB());
-                getAuthorizationManager().releaseUser(user);
-
-                Status status = getAuthorizationManager().acquireUser(name, &user);
-                if (!status.isOK()) {
-                    return Status(ErrorCodes::Unauthorized,
-                                  mongoutils::str::stream() << "Re-acquiring invalidated user "
-                                          "failed due to: " << status.reason());
+                Status status = authMan.acquireUser(name, &updatedUser);
+                switch (status.code()) {
+                case ErrorCodes::OK: {
+                    // Success! Replace the old User object with the updated one.
+                    fassert(17067, _authenticatedUsers.replaceAt(it, updatedUser) == user);
+                    authMan.releaseUser(user);
+                    user = updatedUser;
+                    LOG(1) << "Updated session cache of user information for " << name;
+                    break;
                 }
-                _authenticatedUsers.add(user);
+                case ErrorCodes::UserNotFound: {
+                    // User does not exist anymore; remove it from _authenticatedUsers.
+                    fassert(17068, _authenticatedUsers.removeAt(it) == user);
+                    authMan.releaseUser(user);
+                    LOG(1) << "Removed deleted user " << name <<
+                        " from session cache of user information.";
+                    continue;  // No need to advance "it" in this case.
+                }
+                default:
+                    // Unrecognized error; assume that it's transient, and continue working with the
+                    // out-of-date privilege data.
+                    warning() << "Could not fetch updated user privilege information for " <<
+                        name << "; continuing to use old information.  Reason is " << status;
+                    break;
+                }
             }
 
             for (int i = 0; i < static_cast<int>(boost::size(resourceSearchList)); ++i) {
@@ -279,6 +297,7 @@ namespace {
                 if (unmetRequirements.empty())
                     return Status::OK();
             }
+            ++it;
         }
 
         return Status(ErrorCodes::Unauthorized, "unauthorized");
