@@ -35,9 +35,10 @@ namespace {
     const std::string OTHER_DB_ROLES_FIELD_NAME = "otherDBRoles";
     const std::string READONLY_FIELD_NAME = "readOnly";
     const std::string CREDENTIALS_FIELD_NAME = "credentials";
-    const std::string DELEGATABLE_ROLES_FIELD_NAME = "delegatableRoles";
     const std::string ROLE_NAME_FIELD_NAME = "name";
     const std::string ROLE_SOURCE_FIELD_NAME = "source";
+    const std::string ROLE_CAN_DELEGATE_FIELD_NAME = "canDelegate";
+    const std::string ROLE_HAS_ROLE_FIELD_NAME = "hasRole";
     const std::string MONGODB_CR_CREDENTIAL_FIELD_NAME = "MONGODB-CR";
 }  // namespace
 
@@ -296,36 +297,45 @@ namespace {
 
 
     Status _checkV2RolesArray(const BSONElement& rolesElement) {
-        StringData fieldName = rolesElement.fieldNameStringData();
-
         if (rolesElement.eoo()) {
-            return _badValue(mongoutils::str::stream() << "User document needs '" << fieldName <<
-                                     "' field to be provided",
-                             0);
+            return _badValue("User document needs 'roles' field to be provided", 0);
         }
         if (rolesElement.type() != Array) {
-            return _badValue(mongoutils::str::stream() << fieldName << " field must be an array",
-                             0);
+            return _badValue("'roles' field must be an array", 0);
         }
         for (BSONObjIterator iter(rolesElement.embeddedObject()); iter.more(); iter.next()) {
             if ((*iter).type() != Object) {
-                return _badValue(mongoutils::str::stream() << "Elements in '" << fieldName <<
-                                         "' array must objects.",
-                                 0);
+                return _badValue("Elements in 'roles' array must objects", 0);
             }
             BSONObj roleObj = (*iter).Obj();
             BSONElement nameElement = roleObj[ROLE_NAME_FIELD_NAME];
             BSONElement sourceElement = roleObj[ROLE_SOURCE_FIELD_NAME];
+            BSONElement canDelegateElement = roleObj[ROLE_CAN_DELEGATE_FIELD_NAME];
+            BSONElement hasRoleElement = roleObj[ROLE_HAS_ROLE_FIELD_NAME];
+
             if (nameElement.type() != String ||
                     makeStringDataFromBSONElement(nameElement).empty()) {
-                return _badValue(mongoutils::str::stream() << "Entries in '" << fieldName <<
-                                         "' array need 'name' field to be a non-empty string",
+                return _badValue("Entries in 'roles' array need 'name' field to be a non-empty "
+                                         "string",
                                  0);
             }
             if (sourceElement.type() != String ||
                     makeStringDataFromBSONElement(sourceElement).empty()) {
-                return _badValue(mongoutils::str::stream() << "Entries in '" << fieldName <<
-                                         "' array need 'source' field to be a non-empty string",
+                return _badValue("Entries in 'roles' array need 'source' field to be a non-empty "
+                                         "string",
+                                 0);
+            }
+            if (canDelegateElement.type() != Bool) {
+                return _badValue("Entries in 'roles' array need a 'canDelegate' boolean field",
+                                 0);
+            }
+            if (hasRoleElement.type() != Bool) {
+                return _badValue("Entries in 'roles' array need a 'canDelegate' boolean field",
+                                 0);
+            }
+            if (!canDelegateElement.Bool() && !hasRoleElement.Bool()) {
+                return _badValue("At least one of 'canDelegate' and 'hasRole' must be true for "
+                                         "every role in the 'roles' array",
                                  0);
             }
         }
@@ -338,7 +348,6 @@ namespace {
         BSONElement userSourceElement = doc[AuthorizationManager::USER_SOURCE_FIELD_NAME];
         BSONElement credentialsElement = doc[CREDENTIALS_FIELD_NAME];
         BSONElement rolesElement = doc[ROLES_FIELD_NAME];
-        BSONElement delegatableRolesElement = doc[DELEGATABLE_ROLES_FIELD_NAME];
 
         // Validate the "user" element.
         if (userElement.type() != String)
@@ -388,11 +397,6 @@ namespace {
 
         // Validate the "roles" element.
         Status status = _checkV2RolesArray(rolesElement);
-        if (!status.isOK())
-            return status;
-
-        // Validate the "delegatableRoles" element.
-        status = _checkV2RolesArray(delegatableRolesElement);
         if (!status.isOK())
             return status;
 
@@ -457,6 +461,8 @@ namespace {
 
             BSONElement roleNameElement = roleObject[ROLE_NAME_FIELD_NAME];
             BSONElement roleSourceElement = roleObject[ROLE_SOURCE_FIELD_NAME];
+            BSONElement canDelegateElement = roleObject[ROLE_CAN_DELEGATE_FIELD_NAME];
+            BSONElement hasRoleElement = roleObject[ROLE_HAS_ROLE_FIELD_NAME];
 
             if (roleNameElement.type() != String ||
                     makeStringDataFromBSONElement(roleNameElement).empty()) {
@@ -468,8 +474,24 @@ namespace {
                 return Status(ErrorCodes::UnsupportedFormat,
                               "Role source must be non-empty strings");
             }
+            if (canDelegateElement.type() != Bool) {
+                return Status(ErrorCodes::UnsupportedFormat,
+                              "Entries in 'roles' array need a 'canDelegate' boolean field");
+            }
+            if (hasRoleElement.type() != Bool) {
+                return Status(ErrorCodes::UnsupportedFormat,
+                              "Entries in 'roles' array need a 'hasRole' boolean field");
+            }
 
-            user->addRole(RoleName(roleNameElement.String(), roleSourceElement.String()));
+            if (hasRoleElement.Bool()) {
+                user->addRole(RoleName(roleNameElement.String(), roleSourceElement.String()));
+            } else if (canDelegateElement.Bool()) {
+                // TODO(spencer): record the fact that this user can delegate this role
+            } else {
+                return Status(ErrorCodes::UnsupportedFormat,
+                              "At least one of 'canDelegate' and 'hasRole' must be true for "
+                              "every role in the 'roles' array");
+            }
         }
         return Status::OK();
     }
