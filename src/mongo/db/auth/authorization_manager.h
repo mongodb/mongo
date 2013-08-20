@@ -61,6 +61,12 @@ namespace mongo {
         static const std::string USER_SOURCE_FIELD_NAME;
         static const std::string PASSWORD_FIELD_NAME;
 
+        // System roles for backwards compatibility with 2.2 and prior
+        static const std::string SYSTEM_ROLE_V0_READ;
+        static const std::string SYSTEM_ROLE_V0_READ_WRITE;
+        static const std::string SYSTEM_ROLE_V0_ADMIN_READ;
+        static const std::string SYSTEM_ROLE_V0_ADMIN_READ_WRITE;
+
         // TODO: Make the following functions no longer static.
 
         /**
@@ -163,8 +169,8 @@ namespace mongo {
         Status initializeAllV1UserData();
 
         /**
-         * Parses privDoc and initializes the user object with the information extracted from the
-         * privilege document.
+         * Parses privDoc and fully initializes the user object (credentials, roles, and privileges)
+         * with the information extracted from the privilege document.
          * This should never be called from outside the AuthorizationManager - the only reason it's
          * public instead of private is so it can be unit tested.
          */
