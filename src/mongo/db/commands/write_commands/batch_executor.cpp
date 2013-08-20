@@ -24,6 +24,7 @@
 #include "mongo/db/ops/update.h"
 #include "mongo/db/pagefault.h"
 #include "mongo/db/stats/counters.h"
+#include "mongo/db/write_concern.h"
 
 namespace mongo {
 
@@ -47,21 +48,21 @@ namespace mongo {
 
         // TODO Define final layout for write commands result object.
 
-        // bool writeConcernSuccess = waitForWriteConcern(writeBatch.getWriteConcern(),
-        //                                                writeConcernResults,
-        //                                                !batchSuccess,
-        //                                                *errMsg);
-        // if (!writeConcernSuccess) {
-        //     return false;
-        // }
-        //
-        // const char *writeConcernErrField = writeConcernResults.asTempObj().getStringField("err");
-        // // TODO Should consider changing following existing strange behavior with GLE?
-        // // - {w:2} specified with batch where any op fails skips replication wait, yields success
-        // bool writeConcernFulfilled = !writeConcernErrField || strlen(writeConcernErrField) == 0;
-        // writeConcernResults.append("micros", static_cast<long long>(writeConcernTimer.micros()));
-        // writeConcernResults.append("ok", writeConcernFulfilled);
-        // result->append("writeConcernResults", writeConcernResults.obj());
+        bool writeConcernSuccess = waitForWriteConcern(writeBatch.getWriteConcern(),
+                                                       !batchSuccess,
+                                                       &writeConcernResults,
+                                                       errMsg);
+        if (!writeConcernSuccess) {
+            return false;
+        }
+
+        const char *writeConcernErrField = writeConcernResults.asTempObj().getStringField("err");
+        // TODO Should consider changing following existing strange behavior with GLE?
+        // - {w:2} specified with batch where any op fails skips replication wait, yields success
+        bool writeConcernFulfilled = !writeConcernErrField || strlen(writeConcernErrField) == 0;
+        writeConcernResults.append("micros", static_cast<long long>(writeConcernTimer.micros()));
+        writeConcernResults.append("ok", writeConcernFulfilled);
+        result->append("writeConcernResults", writeConcernResults.obj());
 
         result->append("micros", static_cast<long long>(commandTimer.micros()));
 
