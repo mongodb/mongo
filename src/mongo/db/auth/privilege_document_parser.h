@@ -34,24 +34,11 @@ namespace mongo {
         virtual ~PrivilegeDocumentParser() {};
 
         /**
-         *  Returns an ActionSet of all actions that can be be granted to users.  This does not
-         *  include internal-only actions.
-         */
-        virtual ActionSet getAllUserActions() const;
-
-        /**
          * Returns Status::OK() if the given privilege document is valid to be inserted for a user
          * in the given database, returns a non-OK status otherwise.
          */
         virtual Status checkValidPrivilegeDocument(const StringData& dbname,
                                                    const BSONObj& doc) const = 0;
-
-        /**
-         * Parses privDoc and fully initializes the user object (credentials, roles, and privileges)
-         * with the information extracted from the privilege document.
-         */
-        virtual Status initializeUserFromPrivilegeDocument(User* user,
-                                                           const BSONObj& privDoc) const;
 
         /**
          * Parses privDoc and initializes the user's "credentials" field with the credential
@@ -66,12 +53,6 @@ namespace mongo {
          */
         virtual Status initializeUserRolesFromPrivilegeDocument(
                 User* user, const BSONObj& privDoc, const StringData& dbname) const = 0;
-
-        /**
-         * Modifies the given User object by inspecting its roles and giving it the relevant
-         * privileges from those roles.
-         */
-        virtual void initializeUserPrivilegesFromRoles(User* user) const = 0;
 
     };
 
@@ -90,8 +71,6 @@ namespace mongo {
 
         virtual Status initializeUserRolesFromPrivilegeDocument(
                         User* user, const BSONObj& privDoc, const StringData& dbname) const;
-
-        virtual void initializeUserPrivilegesFromRoles(User* user) const;
     };
 
     class V2PrivilegeDocumentParser : public PrivilegeDocumentParser {
@@ -109,8 +88,6 @@ namespace mongo {
 
         virtual Status initializeUserRolesFromPrivilegeDocument(
                         User* user, const BSONObj& privDoc, const StringData& unused) const;
-
-        virtual void initializeUserPrivilegesFromRoles(User* user) const;
     };
 
 } // namespace mongo
