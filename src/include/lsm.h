@@ -44,7 +44,8 @@ struct __wt_lsm_chunk {
 	uint64_t count;			/* Approximate count of records */
 	struct timespec create_ts;	/* Creation time (for rate limiting) */
 
-	uint32_t ncursor;		/* Cursors with the chunk as primary */
+	uint64_t txnid_max;		/* Newest transactional update */
+
 #define	WT_LSM_CHUNK_BLOOM	0x01
 #define	WT_LSM_CHUNK_EVICTED	0x02
 #define	WT_LSM_CHUNK_MERGING	0x04
