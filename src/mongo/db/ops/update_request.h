@@ -27,10 +27,8 @@ namespace mongo {
     public:
         inline UpdateRequest(
             const NamespaceString& nsString,
-            OpDebug& debug,
             const QueryPlanSelectionPolicy& policy = QueryPlanSelectionPolicy::any() )
             : _nsString(nsString)
-            , _debug(debug)
             , _queryPlanPolicy(policy)
             , _god(false)
             , _upsert(false)
@@ -41,14 +39,6 @@ namespace mongo {
 
         const NamespaceString& getNamespaceString() const {
             return _nsString;
-        }
-
-        OpDebug& getDebug() {
-            return _debug;
-        }
-
-        const OpDebug& getDebug() const {
-            return _debug;
         }
 
         const QueryPlanSelectionPolicy& getQueryPlanSelectionPolicy() const {
@@ -125,7 +115,6 @@ namespace mongo {
     private:
 
         const NamespaceString& _nsString;
-        OpDebug& _debug;
         const QueryPlanSelectionPolicy& _queryPlanPolicy;
 
         // Contains the query that selects documents to update.

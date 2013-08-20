@@ -77,7 +77,7 @@ namespace mongo {
 
     } // namespace
 
-    UpdateResult update(UpdateRequest& request) {
+    UpdateResult update(const UpdateRequest& request, OpDebug* opDebug) {
 
         // Should the modifiers validate their embedded docs via okForStorage
         // Only user updates should be checked. Any system or replication stuff should pass through.
@@ -100,10 +100,10 @@ namespace mongo {
             uasserted( 16840, status.reason() );
         }
 
-        return update(request, &driver);
+        return update(request, opDebug, &driver);
     }
 
-    UpdateResult update(UpdateRequest& request, UpdateDriver* driver) {
+    UpdateResult update(const UpdateRequest& request, OpDebug* opDebug, UpdateDriver* driver) {
 
         const NamespaceString& nsString = request.getNamespaceString();
 
@@ -113,10 +113,8 @@ namespace mongo {
         NamespaceDetailsTransient* nsDetailsTransient =
             &NamespaceDetailsTransient::get( nsString.ns().c_str() );
 
-        OpDebug& debug = request.getDebug();
-
         // TODO: This seems a bit circuitious.
-        debug.updateobj = request.getUpdates();
+        opDebug->updateobj = request.getUpdates();
 
         driver->refreshIndexKeys( nsDetailsTransient->indexKeys() );
 
@@ -156,7 +154,7 @@ namespace mongo {
         // deduping logic in here, too -- for now.
         unordered_set<DiskLoc, DiskLoc::Hasher> seenLocs;
         int numMatched = 0;
-        debug.nscanned = 0;
+        opDebug->nscanned = 0;
 
         Client& client = cc();
 
@@ -175,11 +173,11 @@ namespace mongo {
                  !cursor->currLoc().isNull() &&
                  !cursor->currLoc().rec()->likelyInPhysicalMemory() ) {
                 // We should never throw a PFE if we have already updated items.
-                dassert((numMatched == 0) || (numMatched == debug.nupdateNoops));
+                dassert((numMatched == 0) || (numMatched == opDebug->nupdateNoops));
                 throw PageFaultException( cursor->currLoc().rec() );
             }
 
-            if ( !isolated && debug.nscanned != 0 ) {
+            if ( !isolated && opDebug->nscanned != 0 ) {
 
                 // We are permitted to yield. To do so we need a ClientCursor, so create one
                 // now if we have not yet done so.
@@ -229,7 +227,7 @@ namespace mongo {
             // We count how many documents we scanned even though we may skip those that are
             // deemed duplicated. The final 'numUpdated' and 'nscanned' numbers may differ for
             // that reason.
-            debug.nscanned++;
+            opDebug->nscanned++;
 
             // Skips this document if it:
             // a) doesn't match the query portion of the update
@@ -339,7 +337,7 @@ namespace mongo {
                     std::memcpy(targetPtr, sourcePtr, where->size);
                 }
                 newObj = oldObj;
-                debug.fastmod = true;
+                opDebug->fastmod = true;
 
                 objectWasChanged = true;
             }
@@ -354,7 +352,7 @@ namespace mongo {
                                                              loc,
                                                              newObj.objdata(),
                                                              newObj.objsize(),
-                                                             debug);
+                                                             *opDebug);
 
                 // If we've moved this object to a new location, make sure we don't apply
                 // that update again if our traversal picks the objecta again.
@@ -380,7 +378,7 @@ namespace mongo {
 
             // If it was noop since the document didn't change, record that.
             if (!objectWasChanged)
-                debug.nupdateNoops++;
+                opDebug->nupdateNoops++;
 
             if (!request.isMulti()) {
                 break;
@@ -398,7 +396,7 @@ namespace mongo {
 
         // TODO: Can this be simplified?
         if ((numMatched > 0) || (numMatched == 0 && !request.isUpsert()) ) {
-            debug.nupdated = numMatched;
+            opDebug->nupdated = numMatched;
             return UpdateResult( numMatched > 0 /* updated existing object(s) */,
                                  !driver->isDocReplacement() /* $mod or obj replacement */,
                                  numMatched /* # of docments update, even no-ops */,
@@ -409,7 +407,7 @@ namespace mongo {
         // We haven't found any existing document so an insert is done
         // (upsert is true).
         //
-        debug.upsert = true;
+        opDebug->upsert = true;
 
         // Since this is an insert (no docs found and upsert:true), we will be logging it
         // as an insert in the oplog. We don't need the driver's help to build the
@@ -433,7 +431,7 @@ namespace mongo {
         // In the following block we handle the query part, and then do the regular mods after.
         if ( *request.getUpdates().firstElementFieldName() == '$' ) {
             uassertStatusOK(UpdateDriver::createFromQuery(request.getQuery(), doc));
-            debug.fastmodinsert = true;
+            opDebug->fastmodinsert = true;
         }
 
         // Apply the update modifications and then log the update as an insert manually.
@@ -449,7 +447,7 @@ namespace mongo {
                    NULL, NULL, request.isFromMigration(), &newObj );
         }
 
-        debug.nupdated = 1;
+        opDebug->nupdated = 1;
         return UpdateResult( false /* updated a non existing document */,
                              !driver->isDocReplacement() /* $mod or obj replacement? */,
                              1 /* count of updated documents */,

@@ -246,13 +246,13 @@ namespace mongo {
             Client::Context ctx("local.sources");
 
             const NamespaceString requestNs("local.sources");
-            UpdateRequest request(requestNs, debug);
+            UpdateRequest request(requestNs);
 
             request.setQuery(pattern);
             request.setUpdates(o);
             request.setUpsert();
 
-            UpdateResult res = update(request);
+            UpdateResult res = update(request, &debug);
 
             verify( ! res.modifiers );
             verify( res.numMatched == 1 );
