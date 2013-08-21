@@ -256,8 +256,7 @@ namespace mongo {
     BSONObj RestAdminAccess::getAdminUser(const UserName& username) const {
         AuthorizationSession* authzSession = cc().getAuthorizationSession();
         BSONObj user;
-        Status status = authzSession->getAuthorizationManager().getPrivilegeDocument("admin",
-                                                                                     username,
+        Status status = authzSession->getAuthorizationManager().getPrivilegeDocument(username,
                                                                                      &user);
         if (status.isOK()) {
             return user;

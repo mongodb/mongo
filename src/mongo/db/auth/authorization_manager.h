@@ -92,13 +92,11 @@ namespace mongo {
 
         AuthzManagerExternalState* getExternalState() const;
 
-        // Gets the privilege information document for "userName" on "dbname".
+        // Gets the privilege information document for "userName".
         //
         // On success, returns Status::OK() and stores a shared-ownership copy of the document into
         // "result".
-        Status getPrivilegeDocument(const std::string& dbname,
-                                    const UserName& userName,
-                                    BSONObj* result) const;
+        Status getPrivilegeDocument(const UserName& userName, BSONObj* result) const;
 
         // Returns true if there exists at least one privilege document in the system.
         bool hasAnyPrivilegeDocuments() const;
