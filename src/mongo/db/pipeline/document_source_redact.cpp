@@ -39,7 +39,7 @@ namespace mongo {
         return redactName;
     }
 
-    static const Value continueVal = Value("continue");
+    static const Value descendVal = Value("descend");
     static const Value pruneVal = Value("prune");
     static const Value keepVal = Value("keep");
 
@@ -47,7 +47,7 @@ namespace mongo {
         while (boost::optional<Document> in = pSource->getNext()) {
             Variables vars = Variables(*in,
                                        Value(*in),
-                                       DOC("CONTINUE" << continueVal
+                                       DOC("DESCEND" << descendVal
                                         << "PRUNE" << pruneVal
                                         << "KEEP" << keepVal));
 
@@ -93,18 +93,14 @@ namespace mongo {
 
     boost::optional<Document> DocumentSourceRedact::redactObject(const Variables& in) {
         const Value expressionResult = _expression->evaluate(in);
-        uassert(17055, str::stream() << "$redact's expression should only return a string, but "
-                                     << "returned a " << typeName(expressionResult.getType()),
-                expressionResult.getType() == String);
-        const string expressionResultString = expressionResult.getString();
 
-        if (expressionResultString == "keep") {
+        if (expressionResult == keepVal) {
             return in.current.getDocument();
         }
-        else if (expressionResultString == "prune") {
+        else if (expressionResult == pruneVal) {
             return boost::optional<Document>();
         }
-        else if (expressionResultString == "continue") {
+        else if (expressionResult == descendVal) {
             MutableDocument out;
             FieldIterator fields(in.current.getDocument());
             while (fields.more()) {
@@ -117,10 +113,10 @@ namespace mongo {
             return out.freeze();
         }
         else {
-            // shouldnt be able to get here
             uasserted(17053, str::stream() << "$redact's expression should not return anything "
-                                           << "aside from the strings 'keep', 'prune', or 'continue"
-                                           << "', but returned " << expressionResultString);
+                                           << "aside from the variables $$KEEP, $$DESCEND, and "
+                                           << "$$PRUNE, but returned "
+                                           << expressionResult.toString());
         }
     }
 

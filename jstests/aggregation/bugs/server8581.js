@@ -47,11 +47,11 @@ t.save({ _id: 2,
          level: 4,
       });
 
-a1 = t.aggregate({$redact:  {$cond: [{$lte: ['$level', 1]}, "$$CONTINUE", "$$PRUNE"]}});
-a2 = t.aggregate({$redact:  {$cond: [{$lte: ['$level', 2]}, "$$CONTINUE", "$$PRUNE"]}});
-a3 = t.aggregate({$redact:  {$cond: [{$lte: ['$level', 3]}, "$$CONTINUE", "$$PRUNE"]}});
-a4 = t.aggregate({$redact:  {$cond: [{$lte: ['$level', 4]}, "$$CONTINUE", "$$PRUNE"]}});
-a5 = t.aggregate({$redact:  {$cond: [{$lte: ['$level', 5]}, "$$CONTINUE", "$$PRUNE"]}});
+a1 = t.aggregate({$redact:  {$cond: [{$lte: ['$level', 1]}, "$$DESCEND", "$$PRUNE"]}});
+a2 = t.aggregate({$redact:  {$cond: [{$lte: ['$level', 2]}, "$$DESCEND", "$$PRUNE"]}});
+a3 = t.aggregate({$redact:  {$cond: [{$lte: ['$level', 3]}, "$$DESCEND", "$$PRUNE"]}});
+a4 = t.aggregate({$redact:  {$cond: [{$lte: ['$level', 4]}, "$$DESCEND", "$$PRUNE"]}});
+a5 = t.aggregate({$redact:  {$cond: [{$lte: ['$level', 5]}, "$$DESCEND", "$$PRUNE"]}});
 
 a1result = [{ _id: 1,
               level: 1,
