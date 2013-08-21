@@ -658,7 +658,6 @@ __cursor_truncate_fix(WT_SESSION_IMPL *session,
 			}
 		} while (ret == WT_RESTART);
 	} else {
-		value = (uint8_t *)&start->iface.value;
 		do {
 			WT_RET(__wt_btcur_remove(start));
 			for (;;) {
