@@ -228,6 +228,9 @@ namespace mongo {
          * threads that has a DBClientReplicaSet instance or will create one before this
          * fully terminates as it will cause a deadlock. This is intended for performing cleanups
          * in unit tests.
+         *
+         * Warning: Make sure that the monitor thread is running, otherwise this can hang
+         * indefinitely.
          */
         static void cleanup();
 

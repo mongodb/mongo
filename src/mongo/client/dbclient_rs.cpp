@@ -70,7 +70,13 @@ namespace mongo {
 
         ~ReplicaSetMonitorWatcher() {
             stop();
-            wait();
+
+            // We relying on the fact that if the monitor was rerun again, wait will not hang
+            // because _destroyingStatics will make the run method exit immediately.
+            dassert(StaticObserver::_destroyingStatics);
+            if (running()) {
+                wait();
+            }
         }
 
         virtual string name() const { return "ReplicaSetMonitorWatcher"; }
