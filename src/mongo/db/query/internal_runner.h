@@ -40,10 +40,12 @@ namespace mongo {
          * Takes ownership of all arguments.
          */
         InternalRunner(const string& ns, PlanStage* root, WorkingSet* ws)
-              : _ns(ns), _exec(new PlanExecutor(ws, root)) { }
+              : _ns(ns), _exec(new PlanExecutor(ws, root)), _policy(Runner::YIELD_MANUAL) { }
 
         virtual ~InternalRunner() {
-            ClientCursor::deregisterRunner(this);
+            if (Runner::YIELD_AUTO == _policy) {
+                ClientCursor::deregisterRunner(this);
+            }
         }
 
         Runner::RunnerState getNext(BSONObj* objOut, DiskLoc* dlOut) {
@@ -61,6 +63,19 @@ namespace mongo {
         virtual void invalidate(const DiskLoc& dl) { _exec->invalidate(dl); }
 
         virtual void setYieldPolicy(Runner::YieldPolicy policy) {
+            // No-op.
+            if (_policy == policy) { return; }
+
+            if (Runner::YIELD_AUTO == policy) {
+                // Going from manual to auto.
+                ClientCursor::registerRunner(this);
+            }
+            else {
+                // Going from auto to manual.
+                ClientCursor::deregisterRunner(this);
+            }
+
+            _policy = policy;
             _exec->setYieldPolicy(policy);
         }
 
@@ -70,6 +85,7 @@ namespace mongo {
         string _ns;
 
         scoped_ptr<PlanExecutor> _exec;
+        Runner::YieldPolicy _policy;
     };
 
 }  // namespace mongo

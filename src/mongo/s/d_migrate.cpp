@@ -393,7 +393,6 @@ namespace mongo {
 
             auto_ptr<Runner> runner(InternalPlanner::indexScan(_ns, d, d->idxNo(*idx),
                                                                min, max, false));
-            ClientCursor::registerRunner(runner.get());
             // we can afford to yield here because any change to the base data that we might miss is
             // already being  queued and will be migrated in the 'transferMods' stage
             runner->setYieldPolicy(Runner::YIELD_AUTO);
@@ -429,7 +428,6 @@ namespace mongo {
                     isLargeChunk = true;
                 }
             }
-            ClientCursor::deregisterRunner(runner.get());
             runner.reset();
 
             if ( isLargeChunk ) {

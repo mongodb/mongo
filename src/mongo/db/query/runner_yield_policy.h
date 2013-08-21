@@ -23,31 +23,64 @@ namespace mongo {
 
     class RunnerYieldPolicy {
     public:
-        RunnerYieldPolicy() : _elapsedTracker(128, 10) { }
+        RunnerYieldPolicy() : _elapsedTracker(128, 10), _runnerYielding(NULL) { }
+
+        ~RunnerYieldPolicy() {
+            if (NULL != _runnerYielding) {
+                // We were destructed mid-yield.  Since we're being used to yield a runner, we have
+                // to deregister the runner.
+                ClientCursor::deregisterRunner(_runnerYielding);
+            }
+        }
 
         bool shouldYield() {
             return _elapsedTracker.intervalHasElapsed();
         }
 
+        /**
+         * Yield the provided runner, registering and deregistering it appropriately.  Deal with
+         * deletion during a yield by setting _runnerYielding to ensure deregistration.
+         *
+         * Provided runner MUST be YIELD_MANUAL.
+         */
+        bool yieldAndCheckIfOK(Runner* runner) {
+            verify(runner);
+            int micros = ClientCursor::suggestYieldMicros();
+            // No point in yielding.
+            if (micros <= 0) { return true; }
+
+            // If micros > 0, we should yield.
+            runner->saveState();
+            _runnerYielding = runner;
+            ClientCursor::registerRunner(_runnerYielding);
+            staticYield(micros, NULL);
+            ClientCursor::deregisterRunner(_runnerYielding);
+            _runnerYielding = NULL;
+            _elapsedTracker.resetLastTime();
+            return runner->restoreState();
+        }
+
+        /**
+         * Yield, possibly fetching the provided record.  Caller is in charge of all runner
+         * registration.
+         *
+         * Used for YIELD_AUTO runners.
+         */
         void yield(Record* rec = NULL) {
-            if (staticYield(rec)) {
+            int micros = ClientCursor::suggestYieldMicros();
+            if (micros > 0) {
+                staticYield(micros, rec);
                 _elapsedTracker.resetLastTime();
             }
         }
 
-        static bool staticYield(Record* rec = NULL) {
-            int micros = ClientCursor::suggestYieldMicros();
-
-            if (micros > 0) {
-                ClientCursor::staticYield(micros, "", rec);
-                return true;
-            }
-
-            return false;
+        static void staticYield(int micros, Record* rec = NULL) {
+            ClientCursor::staticYield(micros, "", rec);
         }
 
     private:
         ElapsedTracker _elapsedTracker;
+        Runner* _runnerYielding;
     };
 
 } // namespace mongo
