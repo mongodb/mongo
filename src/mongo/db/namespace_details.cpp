@@ -935,6 +935,7 @@ namespace mongo {
         // transient (including query cache) so clear these.
         ClientCursor::invalidate( from );
         NamespaceDetailsTransient::eraseCollection( from );
+        cc().database()->dropCollection( from ); // XXX-ERH
 
         NamespaceDetails *details = ni->details( from );
         ni->add_ns( to, details );
