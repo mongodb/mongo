@@ -723,6 +723,39 @@ namespace {
         return vpOperand[idx]->evaluateInternal(vars);
     }
 
+    intrusive_ptr<Expression> ExpressionCond::parse(BSONElement expr) {
+        if (expr.type() != Object) {
+            return Base::parse(expr);
+        }
+        verify(str::equals(expr.fieldName(), "$cond"));
+
+        intrusive_ptr<ExpressionCond> ret = new ExpressionCond();
+        ret->vpOperand.resize(3);
+
+        const BSONObj args = expr.embeddedObject();
+        BSONForEach(arg, args) {
+            if (str::equals(arg.fieldName(), "if")) {
+                ret->vpOperand[0] = parseOperand(arg);
+            } else if (str::equals(arg.fieldName(), "then")) {
+                ret->vpOperand[1] = parseOperand(arg);
+            } else if (str::equals(arg.fieldName(), "else")) {
+                ret->vpOperand[2] = parseOperand(arg);
+            } else {
+                uasserted(17083, str::stream()
+                        << "Unrecognized parameter to $cond: " << arg.fieldName());
+            }
+        }
+
+        uassert(17080, "Missing 'if' parameter to $cond",
+                ret->vpOperand[0]);
+        uassert(17081, "Missing 'then' parameter to $cond",
+                ret->vpOperand[1]);
+        uassert(17082, "Missing 'else' parameter to $cond",
+                ret->vpOperand[2]);
+
+        return ret;
+    }
+
     REGISTER_EXPRESSION("$cond", ExpressionCond::parse);
     const char *ExpressionCond::getOpName() const {
         return "$cond";
