@@ -170,46 +170,4 @@ namespace {
         y = m;
         ASSERT_EQUALS( 5, y["eliot"] );
     }
-
-    template<typename M>
-    unsigned long long test_perf( M& m ) {
-        Timer t;
-
-        PseudoRandom r(17);
-        char buf[64];
-        for ( int i = 0; i< 100000; i++ ) {
-            sprintf( buf, "%dfoo%d", r.nextInt32(), r.nextInt32() );
-            m[buf] = i;
-            ASSERT_EQUALS( i, m[buf] );
-        }
-
-        return t.micros();
-    }
-
-#if !defined(_DEBUG)
-    TEST( StringMapTest, perf1 ) {
-        unsigned long long standard = 0;
-        unsigned long long unordered = 0;
-        unsigned long long custom = 0;
-        for ( int i = 0; i < 5; i++ ) {
-            {
-                std::map<string,int> m;
-                standard += test_perf( m );
-            }
-            {
-                unordered_map<string,int> m;
-                unordered += test_perf( m );
-            }
-            {
-                StringMap<int> m;
-                custom += test_perf( m );
-            }
-        }
-
-        log() << "std::map :\t" << standard << std::endl;
-        log() << "unordered:\t" << unordered << std::endl;
-        log() << "StringMap:\t" << custom << std::endl;
-        ASSERT_LESS_THAN( custom, standard );
-    }
-#endif
 }
