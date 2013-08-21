@@ -368,9 +368,9 @@ namespace {
         return "$add";
     }
 
-    /* ------------------------- ExpressionAll -------------------------- */
+    /* ------------------------- ExpressionAllElementsTrue -------------------------- */
 
-    Value ExpressionAll::evaluateInternal(const Variables& vars) const {
+    Value ExpressionAllElementsTrue::evaluateInternal(const Variables& vars) const {
         const Value arr = vpOperand[0]->evaluateInternal(vars);
         uassert(17040, str::stream() << getOpName() << "'s argument must be an array, but is "
                                      << typeName(arr.getType()),
@@ -384,9 +384,9 @@ namespace {
         return Value(true);
     }
 
-    REGISTER_EXPRESSION("$all", ExpressionAll::parse);
-    const char *ExpressionAll::getOpName() const {
-        return "$all";
+    REGISTER_EXPRESSION("$allElementsTrue", ExpressionAllElementsTrue::parse);
+    const char *ExpressionAllElementsTrue::getOpName() const {
+        return "$allElementsTrue";
     }
 
     /* ------------------------- ExpressionAnd ----------------------------- */
@@ -477,9 +477,9 @@ namespace {
     }
 
 
-    /* ------------------------- ExpressionAny -------------------------- */
+    /* ------------------------- ExpressionAnyElementTrue -------------------------- */
 
-    Value ExpressionAny::evaluateInternal(const Variables& vars) const {
+    Value ExpressionAnyElementTrue::evaluateInternal(const Variables& vars) const {
         const Value arr = vpOperand[0]->evaluateInternal(vars);
         uassert(17041, str::stream() << getOpName() << "'s argument must be an array, but is "
                                      << typeName(arr.getType()),
@@ -493,9 +493,9 @@ namespace {
         return Value(false);
     }
 
-    REGISTER_EXPRESSION("$any", ExpressionAny::parse);
-    const char *ExpressionAny::getOpName() const {
-        return "$any";
+    REGISTER_EXPRESSION("$anyElementTrue", ExpressionAnyElementTrue::parse);
+    const char *ExpressionAnyElementTrue::getOpName() const {
+        return "$anyElementTrue";
     }
 
     /* -------------------- ExpressionCoerceToBool ------------------------- */
@@ -2007,27 +2007,6 @@ namespace {
             array.push_back(vpOperand[i]->serialize());
 
         return Value(DOC(getOpName() << array));
-    }
-
-    /* ------------------------- ExpressionNone -------------------------- */
-
-    Value ExpressionNone::evaluateInternal(const Variables& vars) const {
-        const Value arr = vpOperand[0]->evaluateInternal(vars);
-        uassert(16964, str::stream() << getOpName() << "'s argument must be an array, but is "
-                                     << typeName(arr.getType()),
-                arr.getType() == Array);
-        const vector<Value>& array = arr.getArray();
-        for (vector<Value>::const_iterator it = array.begin(); it != array.end(); ++it) {
-            if (it->coerceToBool()) {
-                return Value(false);
-            }
-        }
-        return Value(true);
-    }
-
-    REGISTER_EXPRESSION("$none", ExpressionNone::parse);
-    const char *ExpressionNone::getOpName() const {
-        return "$none";
     }
 
     /* ------------------------- ExpressionNot ----------------------------- */

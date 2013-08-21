@@ -3423,7 +3423,7 @@ namespace ExpressionTests {
         
     } // namespace ToUpper
 
-    namespace AllAnyNone {
+    namespace AllAnyElements {
         class ExpectedResultBase {
         public:
             virtual ~ExpectedResultBase() {}
@@ -3472,67 +3472,60 @@ namespace ExpressionTests {
         class JustFalse : public ExpectedResultBase {
             Document getSpec() {
                 return DOC("input" << DOC_ARRAY( DOC_ARRAY(false) )
-                        << "expected" << DOC("$all" << false
-                                          << "$any" << false
-                                          << "$none" << true) );
+                        << "expected" << DOC("$allElementsTrue" << false
+                                          << "$anyElementTrue" << false) );
             }
         };
 
         class JustTrue : public ExpectedResultBase {
             Document getSpec() {
                 return DOC("input" << DOC_ARRAY( DOC_ARRAY(true) )
-                        << "expected" << DOC("$all" << true
-                                          << "$any" << true
-                                          << "$none" << false) );
+                        << "expected" << DOC("$allElementsTrue" << true
+                                          << "$anyElementTrue" << true) );
             }
         };
 
         class OneTrueOneFalse : public ExpectedResultBase {
             Document getSpec() {
                 return DOC("input" << DOC_ARRAY( DOC_ARRAY(true << false) )
-                        << "expected" << DOC("$all" << false
-                                          << "$any" << true
-                                          << "$none" << false) );
+                        << "expected" << DOC("$allElementsTrue" << false
+                                          << "$anyElementTrue" << true) );
             }
         };
 
         class Empty : public ExpectedResultBase {
             Document getSpec() {
                 return DOC("input" << DOC_ARRAY( vector<Value>() )
-                        << "expected" << DOC("$all" << true
-                                          << "$any" << false
-                                          << "$none" << true ) );
+                        << "expected" << DOC("$allElementsTrue" << true
+                                          << "$anyElementTrue" << false) );
             }
         };
 
         class TrueViaInt : public ExpectedResultBase {
             Document getSpec() {
                 return DOC("input" << DOC_ARRAY( DOC_ARRAY(1) )
-                        << "expected" << DOC("$all" << true
-                                          << "$any" << true
-                                          << "$none" << false ) );
+                        << "expected" << DOC("$allElementsTrue" << true
+                                          << "$anyElementTrue" << true) );
             }
         };
 
         class FalseViaInt : public ExpectedResultBase {
             Document getSpec() {
                 return DOC("input" << DOC_ARRAY( DOC_ARRAY(0) )
-                        << "expected" << DOC("$all" << false
-                                          << "$any" << false
-                                          << "$none" << true ) );
+                        << "expected" << DOC("$allElementsTrue" << false
+                                          << "$anyElementTrue" << false) );
             }
         };
 
         class Null : public ExpectedResultBase {
             Document getSpec() {
                 return DOC("input" << DOC_ARRAY(BSONNULL)
-                        << "error" << DOC_ARRAY("$all"
-                                             << "$any"
-                                             << "$none") );
+                        << "error" << DOC_ARRAY("$allElementsTrue"
+                                             << "$anyElementTrue") );
             }
         };
 
-    } // namespace AllAnyNone
+    } // namespace AllAnyElements
 
     class All : public Suite {
     public:
@@ -3848,13 +3841,13 @@ namespace ExpressionTests {
             add<Set::ManyArgs>();
             add<Set::ManyArgsEqual>();
 
-            add<AllAnyNone::JustFalse>();
-            add<AllAnyNone::JustTrue>();
-            add<AllAnyNone::OneTrueOneFalse>();
-            add<AllAnyNone::Empty>();
-            add<AllAnyNone::TrueViaInt>();
-            add<AllAnyNone::FalseViaInt>();
-            add<AllAnyNone::Null>();
+            add<AllAnyElements::JustFalse>();
+            add<AllAnyElements::JustTrue>();
+            add<AllAnyElements::OneTrueOneFalse>();
+            add<AllAnyElements::Empty>();
+            add<AllAnyElements::TrueViaInt>();
+            add<AllAnyElements::FalseViaInt>();
+            add<AllAnyElements::Null>();
         }
     } myall;
 
