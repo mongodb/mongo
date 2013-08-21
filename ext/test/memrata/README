@@ -1,10 +1,15 @@
-Memrata/KVS README.
+Memrata README.
 
-The basic data structures are: "KVS sources" which map to one or more
-physical devices; each KVS source supports any number of WiredTiger sources,
-where a WiredTiger source will be an object similar to a "file:" object.
+The data structures are "KVS sources" which map to one or more physical
+devices; each KVS source supports any number of "WiredTiger sources",
+where a WiredTiger source will be an object similar to a Btree "file:"
+object.  Each WiredTiger source supports any number of WiredTiger cursors.
 
-Each WiredTiger source supports any number of WiredTiger cursors.
+Each KVS source is given a logical name when the Memrata device is loaded,
+and that logical name is subsequently used when a WiredTiger source is
+created.  For example, a KVS source might be named "dev1", and correspond
+to /dev/sd0 and /dev/sd1; subsequent WT_SESSION.create calls would specify
+a URI like "table:dev1/my_table".
 
 For each WiredTiger source, we create two namespaces on the underlying device,
 a "cache" and a "primary".
@@ -52,12 +57,12 @@ any of these operations.
 We also create one additional namespace, the "txn" name space, which serves
 all of the WiredTiger and KVS sources.  Whenever a transaction commits, we
 insert a commit record into the txn name space and flush the device.  When a
-transaction rolls back, we insert a rollback record into the txn name space,
+transaction rolls back, we insert an abort record into the txn name space,
 but don't flush the device.
 
 The visibility check is slightly different than the rest of WiredTiger: we do
-not reset anything when a transaction aborts, and so we have to check the
-transaction ID for visibility as well as if the transaction has been aborted.
+not reset anything when a transaction aborts, and so we have to check if the
+transaction has been aborted as well as check the transaction ID for visibility.
 
 We create a "cleanup" thread for every KVS source.  The job of this thread is
 to migrate rows from the cache into the primary.  Any committed, globally
@@ -84,53 +89,35 @@ the cache:
 			remove the row
 
 We only need to lock the cache when removing rows, the initial copy to the
-primary does not require a lock.
+primary does not require locks because only the cleanup thread ever writes
+to the primary.
 
 No lock is required when removing rows from the transaction store, once the
 transaction ID is less than the BaseTxnID, it will never be read.
 
+Memrata recovery is almost identical to the cleanup thread, which migrates
+rows from the cache into the primary.  For every cache/primary name space,
+we migrate every commit to the primary (by definition, at recovery time it
+must be globally visible), and discard everything (by defintion, at recovery
+time anything not committed has been aborted.
+
 =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 Questions, problems, whatever:
-
-* This design doesn't support named checkpoints.
 
 * This implementation is endian-specific, that is, a store created on a
 little-endian machine is not portable to a big-endian machine.
 
-* Recovery is not yet implemented.  The process is the same as migrating rows
-from the cache to the primary, with the BaseTxnID set to the maximum possible
-transaction ID, that is, all updates are globally visible by definition, and
-all update elements are discarded.
+* There's a problem with transactions in WiredTiger that span more than a
+single data source.   For example, consider a transaction that modifies
+both a KVS object and a Btree object.  If we commit and push the KVS
+commit record to stable storage, and then crash before committing the Btree
+change, the enclosing WiredTiger transaction will/should end up aborting,
+and there's no way for us to back out the change in KVS.  I'm leaving
+this problem alone until WiredTiger fine-grained durability is complete,
+we're going to need WiredTiger support for some kind of 2PC to solve this.
 
-    We don't need recovery: we can simply start using the cache again, it's
-up-to-date (once transaction IDs are durable in WiredTiger).
-
-    We can't discard any elements from the txn namespace until we know all of
-the objects have been opened and "recovered", else we'd discard commit records
-and that's not safe.   Can we depend on all data sources being opened before
-we change any of them?
-
-    What if the txn namespace isn't found -- we have to open the devices in
-the same order to find it, which we can't guarantee?
-
-    For now, we should limit ourselves to a single KVS device.
-
-* Each open-cursor call has to list the KVS devices for the object (and
-they must be the same as the ones used to create the object).  We need a
-better naming scheme.
-
-* Consider ways to avoid the lookup to see if a transaction has aborted
-(maybe avoid the lookup when there are no aborted transactions in the
-transaction store, which should be the case most of the time).
-
-* There's a general problem with data-sources in WiredTiger.   If we commit
-and push the commit record to stable storage, and then crash, the enclosing
-WiredTiger transaction will/should end up aborting, and there's no way for us
-to back out the change in KVS.  This only applies to transactions that span
-more than one data-source; I'm leaving this problem alone until fine-grained
-durability is complete, we're going to need WiredTiger support to solve this.
-
-* If a record in the cache gets too busy, we could end up unable to remove it
-(there would always be an active transaction), and it would grow forever.  I
-suspect the solution is to clean it up when we realize we can't remove it,
-that is, we can rebuild the record, discarding the no longer needed entries.
+* If a record in the cache gets too busy, we could end up unable to remove
+it (there would always be an active transaction), and it would grow forever.
+I suspect the solution is to clean it up when we realize we can't remove it,
+that is, we can rebuild the record, discarding the no longer needed entries,
+even if the record can't be entirely discarded.
