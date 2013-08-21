@@ -49,7 +49,7 @@ namespace {
             return;
         }
 
-        _allowLocalhost = !_authzManager->hasPrivilegeDocument("admin");
+        _allowLocalhost = !_authzManager->hasAnyPrivilegeDocuments();
         if (_allowLocalhost) {
             ONCE {
                 log() << "note: no users configured in admin.system.users, allowing localhost "
