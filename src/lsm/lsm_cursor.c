@@ -290,7 +290,7 @@ __clsm_open_cursors(
 		 * Drop the LSM tree lock while we do this: if the cache is
 		 * full, we may block while closing a cursor.
 		 */
-		if (clsm->cursors != NULL && skip_chunks > 0) {
+		if (clsm->cursors != NULL && skip_chunks < clsm->nchunks) {
 			locked = 0;
 			WT_ERR(__wt_rwunlock(session, lsm_tree->rwlock));
 			WT_ERR(__clsm_close_cursors(clsm, skip_chunks));
