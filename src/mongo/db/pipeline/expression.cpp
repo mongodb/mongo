@@ -2143,12 +2143,14 @@ namespace {
                                      << "argument is of type: " << rhs.getType(),
                 rhs.getType() == Array);
 
-        const ValueSet rhsSet = arrayToSet(rhs);
+        ValueSet rhsSet = arrayToSet(rhs);
         const vector<Value>& lhsArray = lhs.getArray();
         vector<Value> returnVec;
 
         for (vector<Value>::const_iterator it = lhsArray.begin(); it != lhsArray.end(); ++it) {
-            if (!rhsSet.count(*it)) {
+            // rhsSet serves the dual role of filtering out elements that were originally present
+            // in RHS and of eleminating duplicates from LHS
+            if (rhsSet.insert(*it).second) {
                 returnVec.push_back(*it);
             }
         }
