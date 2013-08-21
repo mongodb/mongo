@@ -288,10 +288,9 @@ namespace {
         return _authEnabled;
     }
 
-    Status AuthorizationManager::getPrivilegeDocument(const std::string& dbname,
-                                                      const UserName& userName,
+    Status AuthorizationManager::getPrivilegeDocument(const UserName& userName,
                                                       BSONObj* result) const {
-        return _externalState->getPrivilegeDocument(dbname, userName, result);
+        return _externalState->getPrivilegeDocument(userName, result);
     }
 
     bool AuthorizationManager::hasAnyPrivilegeDocuments() const {
@@ -452,9 +451,7 @@ namespace {
 
         BSONObj userObj;
         if (_version == 1) {
-            Status status = _externalState->getPrivilegeDocument(userName.getDB().toString(),
-                                                                 userName,
-                                                                 &userObj);
+            Status status = _externalState->getPrivilegeDocument(userName,  &userObj);
             if (!status.isOK()) {
                 return status;
             }
