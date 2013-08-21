@@ -127,7 +127,6 @@ namespace mongo {
             auto_ptr<Runner> runner(InternalPlanner::indexScan(ns, d, d->idxNo(*idx), min, max,
                                                                false, InternalPlanner::FORWARD));
 
-            ClientCursor::registerRunner(runner.get());
             runner->setYieldPolicy(Runner::YIELD_AUTO);
 
             // Find the 'missingField' value used to represent a missing document field in a key of
@@ -151,7 +150,6 @@ namespace mongo {
                     if( ! i.more() ) {
                         errmsg = str::stream() << "index key " << currKey
                                                << " too short for pattern " << keyPattern;
-                        ClientCursor::deregisterRunner(runner.get());
                         return false;
                     }
                     BSONElement currKeyElt = i.next();
@@ -178,12 +176,10 @@ namespace mongo {
                     log() << "checkShardingIndex for '" << ns << "' failed: " << os.str() << endl;
                     
                     errmsg = os.str();
-                    ClientCursor::deregisterRunner(runner.get());
                     return false;
                 }
             }
 
-            ClientCursor::deregisterRunner(runner.get());
             return true;
         }
     } cmdCheckShardingIndex;
@@ -368,7 +364,6 @@ namespace mongo {
                 set<BSONObj> tooFrequentKeys;
                 splitKeys.push_back(prettyKey(idx->keyPattern(), currKey.getOwned()).extractFields( keyPattern ) );
 
-                ClientCursor::registerRunner(runner.get());
                 runner->setYieldPolicy(Runner::YIELD_AUTO);
                 while ( 1 ) {
                     while (Runner::RUNNER_ADVANCED == state) {
@@ -412,17 +407,13 @@ namespace mongo {
                     currCount = 0;
                     log() << "splitVector doing another cycle because of force, keyCount now: " << keyCount << endl;
                     
-                    ClientCursor::deregisterRunner(runner.get());
                     runner.reset(InternalPlanner::indexScan(ns, d, d->idxNo(*idx), min, max,
                         false, InternalPlanner::FORWARD));
 
                     runner->setYieldPolicy(Runner::YIELD_AUTO);
-                    ClientCursor::registerRunner(runner.get());
                     state = runner->getNext(&currKey, NULL);
                 }
 
-                ClientCursor::deregisterRunner(runner.get());
-                
                 //
                 // 3. Format the result and issue any warnings about the data we gathered while traversing the
                 //    index

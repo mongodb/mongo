@@ -139,7 +139,6 @@ namespace mongo {
             // We're not delegating yielding to the runner because we need to know when a yield
             // happens.
             RunnerYieldPolicy yieldPolicy;
-            ClientCursor::registerRunner(runner.get());
 
             std::string idxName = idx.indexName();
             int idxNo = IndexBuildsInProgress::get(ns, idxName);
@@ -177,7 +176,6 @@ namespace mongo {
                                 // TODO: Why is this normal?
                             }
                             else {
-                                ClientCursor::deregisterRunner(runner.get());
                                 uasserted(12585, "cursor gone during bg index; dropDups");
                             }
                             break;
@@ -187,7 +185,6 @@ namespace mongo {
                         numDropped++;
                     }
                     else {
-                        ClientCursor::deregisterRunner(runner.get());
                         log() << "background addExistingToIndex exception " << e.what() << endl;
                         throw;
                     }
@@ -198,11 +195,7 @@ namespace mongo {
 
                 getDur().commitIfNeeded();
                 if (yieldPolicy.shouldYield()) {
-                    runner->saveState();
-                    yieldPolicy.yield();
-
-                    if (!runner->restoreState()) {
-                        ClientCursor::deregisterRunner(runner.get());
+                    if (!yieldPolicy.yieldAndCheckIfOK(runner.get())) {
                         uasserted(12584, "cursor gone during bg index");
                         break;
                     }
@@ -213,7 +206,6 @@ namespace mongo {
                 }
             }
 
-            ClientCursor::deregisterRunner(runner.get());
             progress.finished();
             if ( dropDups )
                 log() << "\t backgroundIndexBuild dupsToDrop: " << numDropped << endl;

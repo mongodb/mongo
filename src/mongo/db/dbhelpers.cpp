@@ -338,7 +338,6 @@ namespace mongo {
                                                                    InternalPlanner::FORWARD,
                                                                    InternalPlanner::IXSCAN_FETCH));
 
-                ClientCursor::registerRunner(runner.get());
                 runner->setYieldPolicy(Runner::YIELD_AUTO);
 
                 DiskLoc rloc;
@@ -346,7 +345,6 @@ namespace mongo {
                 Runner::RunnerState state;
                 // This may yield so we cannot touch nsd after this.
                 state = runner->getNext(&obj, &rloc);
-                ClientCursor::deregisterRunner(runner.get());
                 runner.reset();
                 if (Runner::RUNNER_EOF == state) { break; }
 
@@ -474,7 +472,6 @@ namespace mongo {
         long long docCount = 0;
 
         auto_ptr<Runner> runner(InternalPlanner::indexScan(ns, details, details->idxNo(*idx), min, max, false));
-        ClientCursor::registerRunner(runner.get());
         // we can afford to yield here because any change to the base data that we might miss  is
         // already being queued and will be migrated in the 'transferMods' stage
         runner->setYieldPolicy(Runner::YIELD_AUTO);
@@ -490,7 +487,6 @@ namespace mongo {
                 isLargeChunk = true;
             }
         }
-        ClientCursor::deregisterRunner(runner.get());
 
         *numDocs = docCount;
         *estChunkSizeBytes = docCount * avgDocSizeBytes;
