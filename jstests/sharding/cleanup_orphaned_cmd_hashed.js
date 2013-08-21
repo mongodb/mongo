@@ -42,7 +42,7 @@ assert.eq( 200, st.shard0.getCollection( coll + "" ).find().itcount() +
                 st.shard1.getCollection( coll + "" ).find().itcount() );
 assert.eq( 100, coll.find().itcount() );
 
-jsTest.log( "Cleaning up orphaned data..." );
+jsTest.log( "Cleaning up orphaned data in hashed coll..." );
 
 for ( var s = 0; s < 2; s++ ) {
     var shardAdmin = ( s == 0 ? st.shard0 : st.shard1 ).getDB( "admin" );
@@ -53,10 +53,11 @@ for ( var s = 0; s < 2; s++ ) {
         result = shardAdmin.runCommand({ cleanupOrphaned : coll + "",
                                          startingFromKey : result.stoppedAtKey });
     }
+    
+    printjson( result );
+    assert( result.ok );
 }
 
-printjson( result );
-assert( result.ok );
 assert.eq( 100, st.shard0.getCollection( coll + "" ).find().itcount() +
                 st.shard1.getCollection( coll + "" ).find().itcount() );
 assert.eq( 100, coll.find().itcount() );
