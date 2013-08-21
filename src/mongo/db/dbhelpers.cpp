@@ -320,7 +320,6 @@ namespace mongo {
         Client& c = cc();
 
         long long numDeleted = 0;
-        PageFaultRetryableSection pgrs;
         
         long long millisWaitingForReplication = 0;
 
