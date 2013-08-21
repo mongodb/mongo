@@ -295,7 +295,7 @@ namespace mongo {
     };
 
 
-    class ExpressionAll : public ExpressionFixedArity<ExpressionAll, 1> {
+    class ExpressionAllElementsTrue : public ExpressionFixedArity<ExpressionAllElementsTrue, 1> {
     public:
         // virtuals from ExpressionNary
         virtual Value evaluateInternal(const Variables& vars) const;
@@ -314,7 +314,7 @@ namespace mongo {
     };
 
 
-    class ExpressionAny : public ExpressionFixedArity<ExpressionAny, 1> {
+    class ExpressionAnyElementTrue : public ExpressionFixedArity<ExpressionAnyElementTrue, 1> {
     public:
         // virtuals from ExpressionNary
         virtual Value evaluateInternal(const Variables& vars) const;
@@ -658,14 +658,6 @@ namespace mongo {
 
 
     class ExpressionMonth : public ExpressionFixedArity<ExpressionMonth, 1> {
-    public:
-        // virtuals from ExpressionNary
-        virtual Value evaluateInternal(const Variables& vars) const;
-        virtual const char *getOpName() const;
-    };
-
-
-    class ExpressionNone : public ExpressionFixedArity<ExpressionNone, 1> {
     public:
         // virtuals from ExpressionNary
         virtual Value evaluateInternal(const Variables& vars) const;
