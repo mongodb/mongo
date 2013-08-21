@@ -1546,7 +1546,7 @@ namespace mongo_test {
 
         void tearDown() {
             ConnectionString::setConnectionHook(_originalConnectionHook);
-            ReplicaSetMonitor::clearAll();
+            ReplicaSetMonitor::cleanup();
             _replSet.reset();
             mongo::ScopedDbConnection::clearPool();
         }
@@ -1626,7 +1626,7 @@ namespace mongo_test {
             replMonitor->check(); // Force refresh -> should not crash
         }
 
-        ReplicaSetMonitor::clearAll();
+        ReplicaSetMonitor::cleanup();
         ConnectionString::setConnectionHook(originalConnHook);
         mongo::ScopedDbConnection::clearPool();
     }
@@ -1667,7 +1667,7 @@ namespace mongo_test {
 
         void tearDown() {
             ConnectionString::setConnectionHook(_originalConnectionHook);
-            ReplicaSetMonitor::clearAll();
+            ReplicaSetMonitor::cleanup();
             _replSet.reset();
         }
 

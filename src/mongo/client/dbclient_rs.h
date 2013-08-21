@@ -229,7 +229,7 @@ namespace mongo {
          * fully terminates as it will cause a deadlock. This is intended for performing cleanups
          * in unit tests.
          */
-        static void clearAll();
+        static void cleanup();
 
         ~ReplicaSetMonitor();
 

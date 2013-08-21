@@ -68,6 +68,11 @@ namespace mongo {
             _stopRequested(false) {
         }
 
+        ~ReplicaSetMonitorWatcher() {
+            stop();
+            wait();
+        }
+
         virtual string name() const { return "ReplicaSetMonitorWatcher"; }
 
         void safeGo() {
@@ -98,16 +103,24 @@ namespace mongo {
         void run() {
             log() << "starting" << endl;
 
-            scoped_lock sl( _monitorMutex );
             // Added only for patching timing problems in test. Remove after tests
             // are fixed - see 392b933598668768bf12b1e41ad444aa3548d970.
             // Should not be needed after SERVER-7533 gets implemented and tests start
             // using it.
-            _stopRequestedCV.timed_wait(sl.boost(), boost::posix_time::seconds(10));
+            if (!inShutdown() && !StaticObserver::_destroyingStatics) {
+                scoped_lock sl( _monitorMutex );
+                _stopRequestedCV.timed_wait(sl.boost(), boost::posix_time::seconds(10));
+            }
 
             while ( !inShutdown() &&
-                    !_stopRequested &&
                     !StaticObserver::_destroyingStatics ) {
+                {
+                    scoped_lock sl( _monitorMutex );
+                    if (_stopRequested) {
+                        break;
+                    }
+                }
+
                 try {
                     ReplicaSetMonitor::checkAll();
                 }
@@ -118,9 +131,15 @@ namespace mongo {
                     error() << "unknown error" << endl;
                 }
 
+                scoped_lock sl( _monitorMutex );
+                if (_stopRequested) {
+                    break;
+                }
+
                 _stopRequestedCV.timed_wait(sl.boost(), boost::posix_time::seconds(10));
             }
 
+            scoped_lock sl( _monitorMutex );
             _started = false;
         }
 
@@ -1286,7 +1305,7 @@ namespace mongo {
         return false;
     }
 
-    void ReplicaSetMonitor::clearAll() {
+    void ReplicaSetMonitor::cleanup() {
         {
             scoped_lock lock(_setsLock);
             _sets.clear();
