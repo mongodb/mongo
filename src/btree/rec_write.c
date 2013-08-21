@@ -2606,7 +2606,7 @@ __rec_col_var(WT_SESSION_IMPL *session,
 
 	/* For each entry in the in-memory page... */
 	rle = 0;
-	deleted = last_deleted = 0;
+	last_deleted = 0;
 	WT_COL_FOREACH(page, cip, i) {
 		ovfl_state = OVFL_IGNORE;
 		if ((cell = WT_COL_PTR(page, cip)) == NULL) {
