@@ -250,7 +250,7 @@ namespace mongo {
 
     bool RestAdminAccess::haveAdminUsers() const {
         AuthorizationSession* authzSession = cc().getAuthorizationSession();
-        return authzSession->getAuthorizationManager().hasPrivilegeDocument("admin");
+        return authzSession->getAuthorizationManager().hasAnyPrivilegeDocuments();
     }
 
     BSONObj RestAdminAccess::getAdminUser(const UserName& username) const {

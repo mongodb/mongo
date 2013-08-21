@@ -103,8 +103,8 @@ namespace mongo {
         return _externalState->getPrivilegeDocument(dbname, userName, result);
     }
 
-    bool AuthorizationManager::hasPrivilegeDocument(const std::string& dbname) const {
-        return _externalState->hasPrivilegeDocument(dbname);
+    bool AuthorizationManager::hasAnyPrivilegeDocuments() const {
+        return _externalState->hasAnyPrivilegeDocuments();
     }
 
     Status AuthorizationManager::insertPrivilegeDocument(const std::string& dbname,

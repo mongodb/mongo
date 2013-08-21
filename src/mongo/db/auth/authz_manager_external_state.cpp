@@ -78,8 +78,8 @@ namespace mongo {
         return Status::OK();
     }
 
-    bool AuthzManagerExternalState::hasPrivilegeDocument(const std::string& dbname) const {
-        std::string usersNamespace = dbname + ".system.users";
+    bool AuthzManagerExternalState::hasAnyPrivilegeDocuments() const {
+        std::string usersNamespace = "admin.system.users";
 
         BSONObj userBSONObj;
         BSONObj query;
