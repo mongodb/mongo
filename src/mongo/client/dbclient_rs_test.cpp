@@ -91,7 +91,7 @@ namespace {
         }
 
         void tearDown() {
-            ReplicaSetMonitor::clearAll();
+            ReplicaSetMonitor::cleanup();
             _replSet.reset();
 
             // TODO: remove this after we remove replSetGetStatus from ReplicaSetMonitor.
@@ -176,7 +176,7 @@ namespace {
         }
 
         void tearDown() {
-            ReplicaSetMonitor::clearAll();
+            ReplicaSetMonitor::cleanup();
             _replSet.reset();
 
             // TODO: remove this after we remove replSetGetStatus from ReplicaSetMonitor.
@@ -249,7 +249,7 @@ namespace {
         }
 
         void tearDown() {
-            ReplicaSetMonitor::clearAll();
+            ReplicaSetMonitor::cleanup();
             _replSet.reset();
 
             // TODO: remove this after we remove replSetGetStatus from ReplicaSetMonitor.
@@ -337,7 +337,7 @@ namespace {
         }
 
         void tearDown() {
-            ReplicaSetMonitor::clearAll();
+            ReplicaSetMonitor::cleanup();
             _replSet.reset();
 
             // TODO: remove this after we remove replSetGetStatus from ReplicaSetMonitor.
@@ -487,7 +487,7 @@ namespace {
 
         void tearDown() {
             ConnectionString::setConnectionHook(_originalConnectionHook);
-            ReplicaSetMonitor::clearAll();
+            ReplicaSetMonitor::cleanup();
             _replSet.reset();
 
             // TODO: remove this after we remove replSetGetStatus from ReplicaSetMonitor.
