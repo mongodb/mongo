@@ -367,10 +367,13 @@ namespace mongo {
 
 
     class ExpressionCond : public ExpressionFixedArity<ExpressionCond, 3> {
+        typedef ExpressionFixedArity Base;
     public:
         // virtuals from ExpressionNary
         virtual Value evaluateInternal(const Variables& vars) const;
         virtual const char *getOpName() const;
+
+        static intrusive_ptr<Expression> parse(BSONElement expr);
     };
 
 
