@@ -54,14 +54,6 @@ namespace mongo {
         // necessary to determine if localhost connections should be given full access.
         virtual void startRequest() = 0;
 
-        // Authorization event hooks
-
-        // Handle any global state which needs to be updated when a new user has been authorized
-        virtual void onAddAuthorizedUser() = 0;
-
-        // Handle any global state which needs to be updated when a user logs out
-        virtual void onLogoutDatabase(const std::string& dbname) = 0;
-
     protected:
         // This class should never be instantiated directly.
         AuthzSessionExternalState(AuthorizationManager* authzManager);

@@ -41,7 +41,7 @@ namespace mongo {
 
     Scope::Scope() : _localDBName(""),
                      _loadedVersion(0),
-                     _numTimeUsed(0),
+                     _numTimesUsed(0),
                      _lastRetIsNativeCode(false) {
     }
 
@@ -268,119 +268,80 @@ namespace mongo {
         injectNative("benchFinish", BenchRunner::benchFinish);
     }
 
-    typedef map<string, list<Scope*> > PoolToScopes;
-    typedef unordered_set<Scope*> ActiveScopes;
-
+namespace {
     class ScopeCache {
     public:
-        ScopeCache() : _mutex("ScopeCache") {
-        }
+        ScopeCache() : _mutex("ScopeCache") {}
 
-        ~ScopeCache() {
-            if (inShutdown())
-                return;
-            clear();
-        }
-
-        void done(const string& pool, Scope* s) {
+        void release(const string& poolName, const boost::shared_ptr<Scope>& scope) {
             scoped_lock lk(_mutex);
-            list<Scope*>& l = _pools[pool];
-            bool oom = s->hasOutOfMemoryException();
 
-            const unsigned kMaxPoolSize = 10;
-            const int kMaxScopeReuse = 10;
-
-            // 'orphaned' scopes were in-use while the ScopeCache was clear()ed.  they should not
-            // be returned to any pool since authentication credentials may have changed.
-            bool orphaned = !_active.erase(s);
-
-            // do not keep too many contexts, use them for too long, or reuse after error
-            if (l.size() > kMaxPoolSize ||
-                s->getTimeUsed() > kMaxScopeReuse ||
-                !s->getError().empty() ||
-                oom ||
-                orphaned) {
-                delete s;
-            }
-            else {
-                l.push_back(s);
-                s->reset();
-            }
-
-            if (oom) {
-                // out of mem, make some room
+            if (scope->hasOutOfMemoryException()) {
+                // make some room
                 log() << "Clearing all idle JS contexts due to out of memory" << endl;
-                clear();
+                _pools.clear();
+                return;
             }
+
+            if (scope->getTimesUsed() > kMaxScopeReuse)
+                return; // used too many times to save
+
+            if (!scope->getError().empty())
+                return; // not saving errored scopes
+
+            if (_pools.size() >= kMaxPoolSize) {
+                // prefer to keep recently-used scopes
+                _pools.pop_back();
+            }
+
+            ScopeAndPool toStore = {scope, poolName};
+            _pools.push_front(toStore);
         }
 
-        Scope* get(const string& pool) {
+        boost::shared_ptr<Scope> tryAcquire(const string& poolName) {
             scoped_lock lk(_mutex);
-            list<Scope*>& l = _pools[pool];
-            if (l.size() == 0)
-                return NULL;
 
-            Scope* s = l.back();
-            l.pop_back();
-            _active.insert(s);
-            s->reset();
-            s->incTimeUsed();
-            return s;
-        }
-
-        void clear() {
-            set<Scope*> seen;
-            for (PoolToScopes::iterator i = _pools.begin(); i != _pools.end(); ++i) {
-                for (list<Scope*>::iterator j = i->second.begin(); j != i->second.end(); ++j) {
-                    Scope* s = *j;
-                    fassert(16652, seen.insert(s).second);
-                    delete s;
+            for (Pools::iterator it = _pools.begin(); it != _pools.end(); ++it) {
+                if (it->poolName == poolName) {
+                    boost::shared_ptr<Scope> scope = it->scope;
+                    _pools.erase(it);
+                    scope->incTimesUsed();
+                    scope->reset();
+                    return scope;
                 }
             }
-            _pools.clear();
-            _active.clear();
 
-        }
-
-        /**
-         * Add a scope to the active (or in-use) set of scopes.
-         * A scope is considered active if it is not in the pool.  If the pool is cleared while an
-         * active scope is still running, the active scope will become orphaned.  When the orphaned
-         * scope calls done(), it will be freed instead of being placed back in the pool for reuse.
-         *
-         * This should only be called when ScriptEngine::getPooledScope() must create a new scope
-         * for the pool.
-         */
-        void addActive(Scope* scope) {
-            _active.insert(scope);
+            return boost::shared_ptr<Scope>();
         }
 
     private:
-        PoolToScopes _pools;    // protected by _mutex
-        ActiveScopes _active;   // protected by _mutex
+        struct ScopeAndPool {
+            boost::shared_ptr<Scope> scope;
+            string poolName;
+        };
+
+        // Note: if these numbers change, reconsider choice of datastructure for _pools
+        static const unsigned kMaxPoolSize = 10;
+        static const int kMaxScopeReuse = 10;
+
+        typedef deque<ScopeAndPool> Pools; // More-recently used Scopes are kept at the front.
+        Pools _pools;    // protected by _mutex
         mongo::mutex _mutex;
     };
 
-    thread_specific_ptr<ScopeCache> scopeCache;
+    ScopeCache scopeCache;
+} // anonymous namespace
 
     class PooledScope : public Scope {
     public:
-        PooledScope(const std::string& pool, Scope* real) : _pool(pool), _real(real) {
+        PooledScope(const std::string& pool, const boost::shared_ptr<Scope>& real)
+            : _pool(pool)
+            , _real(real) {
             _real->loadStored(true);
-        };
+        }
+
         virtual ~PooledScope() {
-            ScopeCache* sc = scopeCache.get();
-            if (sc) {
-                sc->done(_pool, _real);
-                _real = NULL;
-            }
-            else {
-                // this means that the Scope was killed from a different thread
-                // for example a cursor got timed out that has a $where clause
-                LOG(3) << "warning: scopeCache is empty!" << endl;
-                delete _real;
-                _real = 0;
-            }
+            scopeCache.release(_pool, _real);
         }
 
         // wrappers for the derived (_real) scope
@@ -442,31 +403,22 @@ namespace mongo {
 
     private:
         string _pool;
-        Scope* _real;
+        boost::shared_ptr<Scope> _real;
     };
 
     /** Get a scope from the pool of scopes matching the supplied pool name */
-    auto_ptr<Scope> ScriptEngine::getPooledScope(const string& pool, const string& scopeType) {
-        if (!scopeCache.get())
-            scopeCache.reset(new ScopeCache());
-
-        Scope* s = scopeCache->get(pool + scopeType);
+    auto_ptr<Scope> ScriptEngine::getPooledScope(const string& db, const string& scopeType) {
+        const string fullPoolName = db + scopeType;
+        boost::shared_ptr<Scope> s = scopeCache.tryAcquire(fullPoolName);
         if (!s) {
-            s = newScope();
-            scopeCache->addActive(s);
+            s.reset(newScope());
         }
 
         auto_ptr<Scope> p;
-        p.reset(new PooledScope(pool + scopeType, s));
-        p->setLocalDB(pool);
+        p.reset(new PooledScope(fullPoolName, s));
+        p->setLocalDB(db);
         p->loadStored(true);
         return p;
-    }
-
-    void ScriptEngine::threadDone() {
-        ScopeCache* sc = scopeCache.get();
-        if (sc)
-            sc->clear();
     }
 
     void (*ScriptEngine::_connectCallback)(DBClientWithCommands&) = 0;

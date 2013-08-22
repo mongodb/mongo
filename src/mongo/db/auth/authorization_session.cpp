@@ -72,7 +72,6 @@ namespace {
             getAuthorizationManager().releaseUser(replacedUser);
         }
 
-        _externalState->onAddAuthorizedUser();
         return Status::OK();
     }
 
@@ -85,12 +84,22 @@ namespace {
         if (removedUser) {
             getAuthorizationManager().releaseUser(removedUser);
         }
-
-        _externalState->onLogoutDatabase(dbname);
     }
 
     UserSet::NameIterator AuthorizationSession::getAuthenticatedUserNames() {
         return _authenticatedUsers.getNames();
+    }
+
+    std::string AuthorizationSession::getAuthenticatedUserNamesToken() {
+        std::string ret;
+        for (UserSet::NameIterator nameIter = getAuthenticatedUserNames();
+                nameIter.more();
+                nameIter.next()) {
+            ret += '\0'; // Using a NUL byte which isn't valid in usernames to separate them.
+            ret += nameIter->getFullName();
+        }
+
+        return ret;
     }
 
     void AuthorizationSession::grantInternalAuthorization() {

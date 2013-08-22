@@ -242,7 +242,6 @@ namespace mongo {
         virtual void disconnected( AbstractMessagingPort* p ) {
             Client * c = currentClient.get();
             if( c ) c->shutdown();
-            globalScriptEngine->threadDone();
         }
 
     };

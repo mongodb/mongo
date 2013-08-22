@@ -31,10 +31,6 @@ namespace mongo {
                     AuthzSessionExternalStateServerCommon(authzManager) {}
     AuthzSessionExternalStateMongos::~AuthzSessionExternalStateMongos() {}
 
-    void AuthzSessionExternalStateMongos::onAddAuthorizedUser() { }
-
-    void AuthzSessionExternalStateMongos::onLogoutDatabase(const std::string&) { }
-
     void AuthzSessionExternalStateMongos::startRequest() {
         _checkShouldAllowLocalhost();
     }

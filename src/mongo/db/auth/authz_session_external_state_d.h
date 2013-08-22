@@ -36,11 +36,6 @@ namespace mongo {
         virtual bool shouldIgnoreAuthChecks() const;
 
         virtual void startRequest();
-
-        virtual void onAddAuthorizedUser();
-
-        virtual void onLogoutDatabase(const std::string&);
-
     };
 
 } // namespace mongo
