@@ -76,7 +76,7 @@
  *    desc:     a description that will appear in the usage message.
  *
  * The difference between CONFIG_STRING and STRING is that CONFIG_STRING
- * options are appended to existing content, wheras string options overwrite.
+ * options are appended to existing content, whereas STRING options overwrite.
  *
  * DEF_OPT_AS_FLAGVAL defines an option that sets a bit in the CONFIG->flags
  * field.  It has these parameters:

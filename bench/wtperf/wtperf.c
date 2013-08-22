@@ -1179,13 +1179,18 @@ config_opt(CONFIG *cfg, WT_CONFIG_ITEM *k, WT_CONFIG_ITEM *v)
 		}
 		strp = (char **)valueloc;
 		newlen = v->len + 1;
-		if (*strp != NULL)
+		if (*strp == NULL) {
+			newstr = calloc(newlen, sizeof(char));
+			strncpy(newstr, v->str, v->len);
+		} else {
 			newlen += (strlen(*strp) + 1);
-		newstr = calloc(newlen, sizeof(char));
-		snprintf(newstr, newlen, "%s,%*s", *strp, (int)v->len, v->str);
-		/* Free the old value now we've copied it. */
-		if (*strp != NULL)
-			free(*strp);
+			newstr = calloc(newlen, sizeof(char));
+			snprintf(newstr, newlen,
+			    "%s,%*s", *strp, (int)v->len, v->str);
+			/* Free the old value now we've copied it. */
+			if (*strp != NULL)
+				free(*strp);
+		}
 		*strp = newstr;
 	} else if (popt->type == STRING_TYPE) {
 		if (v->type != WT_CONFIG_ITEM_STRING) {
@@ -1495,7 +1500,7 @@ int setup_log_file(CONFIG *cfg)
 		return (0);
 
 	if ((fname = calloc(strlen(cfg->home) +
-	    strlen(cfg->table_name) + strlen(".stat") + 1, 1)) == NULL) {
+	    strlen(cfg->table_name) + strlen(".stat") + 2, 1)) == NULL) {
 		fprintf(stderr, "No memory in stat thread\n");
 		return (ENOMEM);
 	}
