@@ -429,7 +429,7 @@ populate_thread(void *arg)
 	memset(data_buf, 'a', cfg->data_sz - 1);
 	/* Populate the database. */
 	if (cfg->populate_ops_per_txn > 0)
-		session->begin_transaction(session, NULL);
+		session->begin_transaction(session, cfg->transaction_config);
 	while (1) {
 		if (cfg->populate_ops_per_txn > 0 &&
 		    opcount++ % cfg->populate_ops_per_txn == 0) {
