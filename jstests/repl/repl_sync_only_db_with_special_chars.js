@@ -1,4 +1,5 @@
-(function() {
+
+doTest = function() {
 
 var rt = new ReplTest( "repl_sync_only_db_with_special_chars" );
 var normalDB = "abc";
@@ -16,5 +17,9 @@ assert.soon( function() {
   return normalDocs == 0 && specialDocs == 1;
 }, "Failed to only sync to " + specialDB );
 
-})();
+}
 
+// Disabled because of SERVER-10344
+if (false) {
+    doTest()
+}
