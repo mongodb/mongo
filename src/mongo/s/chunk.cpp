@@ -561,7 +561,7 @@ namespace mongo {
             return;
         }
 
-        LOG(1) << "Refreshing MaxChunkSize: " << csize << endl;
+        LOG(1) << "Refreshing MaxChunkSize: " << csize << "MB" << endl;
 
         if (csize != Chunk::MaxChunkSize/(1024*1024)) {
             log() << "MaxChunkSize changing from " << Chunk::MaxChunkSize/(1024*1024) << "MB"

@@ -892,7 +892,9 @@ namespace mongo {
                 }
 
                 verify(chunk.get());
-                log().stream() << "splitting: " << ns << "  shard: " << chunk << endl;
+                log() << "splitting chunk [" << chunk->getMin() << "," << chunk->getMax() << ")"
+                      << " in collection " << ns
+                      << " on shard " << chunk->getShard().getName() << endl;
 
                 BSONObj res;
                 bool worked;
