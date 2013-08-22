@@ -16,7 +16,10 @@ assert( admin.runCommand({ enableSharding : coll.getDB() + "" }).ok );
 printjson( admin.runCommand({ movePrimary : coll.getDB() + "", to : shards[0]._id }) );
 assert( admin.runCommand({ shardCollection : coll + "", key : { _id : 1 } }).ok );
 assert( admin.runCommand({ split : coll + "", middle : { _id : 0 } }).ok );
-assert( admin.runCommand({ moveChunk : coll + "", find : { _id : 0 }, to : shards[1]._id }).ok );
+assert( admin.runCommand({ moveChunk : coll + "", 
+                           find : { _id : 0 }, 
+                           to : shards[1]._id,
+                           _waitForDelete : true }).ok );
 
 st.printShardingStatus();
 
@@ -55,7 +58,11 @@ jsTest.log( "Moving half the data out again (making a hole)..." );
 
 assert( admin.runCommand({ split : coll + "", middle : { _id : -35 } }).ok );
 assert( admin.runCommand({ split : coll + "", middle : { _id : -10 } }).ok );
-assert( admin.runCommand({ moveChunk : coll + "", find : { _id : -35 }, to : shards[1]._id }).ok );
+// Make sure we wait for the deletion here, otherwise later cleanup could fail
+assert( admin.runCommand({ moveChunk : coll + "", 
+                           find : { _id : -35 }, 
+                           to : shards[1]._id,
+                           _waitForDelete : true }).ok );
 
 // 1/4 the data is on the first shard
 

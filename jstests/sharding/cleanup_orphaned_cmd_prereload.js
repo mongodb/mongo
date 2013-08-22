@@ -21,8 +21,14 @@ jsTest.log( "Moving some chunks to shard1..." );
 assert( admin.runCommand({ split : coll + "", middle : { _id : 0 } }).ok );
 assert( admin.runCommand({ split : coll + "", middle : { _id : 1 } }).ok );
 
-assert( admin.runCommand({ moveChunk : coll + "", find : { _id : 0 }, to : shards[1]._id }).ok );
-assert( admin.runCommand({ moveChunk : coll + "", find : { _id : 1 }, to : shards[1]._id }).ok );
+assert( admin.runCommand({ moveChunk : coll + "", 
+                           find : { _id : 0 }, 
+                           to : shards[1]._id,
+                           _waitForDelete : true }).ok );
+assert( admin.runCommand({ moveChunk : coll + "", 
+                           find : { _id : 1 }, 
+                           to : shards[1]._id,
+                           _waitForDelete : true }).ok );
 
 var metadata = st.shard1.getDB( "admin" )
                    .runCommand({ getShardVersion : coll + "", fullMetadata : true }).metadata;
@@ -50,7 +56,10 @@ assert.eq( metadata.shardVersion.t, 0 );
 assert.neq( metadata.collVersion.t, 0 );
 assert.eq( metadata.pending.length, 0 );
 
-assert( admin.runCommand({ moveChunk : coll + "", find : { _id : 1 }, to : shards[0]._id }).ok );
+assert( admin.runCommand({ moveChunk : coll + "", 
+                           find : { _id : 1 }, 
+                           to : shards[0]._id,
+                           _waitForDelete : true }).ok );
 
 var metadata = st.shard0.getDB( "admin" )
                    .runCommand({ getShardVersion : coll + "", fullMetadata : true }).metadata;
