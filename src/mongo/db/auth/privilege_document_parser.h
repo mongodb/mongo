@@ -41,6 +41,11 @@ namespace mongo {
                                                    const BSONObj& doc) const = 0;
 
         /**
+         * Returns the name of the user in the given privilege document.
+         */
+        virtual std::string extractUserNameFromPrivilegeDocument(const BSONObj& doc) const = 0;
+
+        /**
          * Parses privDoc and initializes the user's "credentials" field with the credential
          * information extracted from the privilege document.
          */
@@ -66,6 +71,8 @@ namespace mongo {
         virtual Status checkValidPrivilegeDocument(const StringData& dbname,
                                                    const BSONObj& doc) const;
 
+        virtual std::string extractUserNameFromPrivilegeDocument(const BSONObj& doc) const;
+
         virtual Status initializeUserCredentialsFromPrivilegeDocument(User* user,
                                                                       const BSONObj& privDoc) const;
 
@@ -82,6 +89,8 @@ namespace mongo {
 
         virtual Status checkValidPrivilegeDocument(const StringData& dbname,
                                                    const BSONObj& doc) const;
+
+        virtual std::string extractUserNameFromPrivilegeDocument(const BSONObj& doc) const;
 
         virtual Status initializeUserCredentialsFromPrivilegeDocument(User* user,
                                                                       const BSONObj& privDoc) const;

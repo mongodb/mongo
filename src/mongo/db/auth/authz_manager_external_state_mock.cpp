@@ -71,8 +71,8 @@ namespace mongo {
 
 
     Status AuthzManagerExternalStateMock::_findUser(const std::string& usersNamespace,
-                           const BSONObj& query,
-                           BSONObj* result) const {
+                                                    const BSONObj& query,
+                                                    BSONObj* result) const {
         StatusWithMatchExpression parseResult = MatchExpressionParser::parse(query);
         if (!parseResult.isOK()) {
             return parseResult.getStatus();

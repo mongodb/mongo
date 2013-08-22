@@ -38,16 +38,21 @@ namespace mongo {
 
         virtual ~AuthzManagerExternalState();
 
-        // Gets the privilege information document for "userName".
+        // Gets the privilege information document for "userName".  authzVersion indicates what
+        // version of the privilege document format is being used, which is needed to know how to
+        // query for the user's privilege document.
         //
         // On success, returns Status::OK() and stores a shared-ownership copy of the document into
         // "result".
-        Status getPrivilegeDocument(const UserName& userName, BSONObj* result) const;
+        Status getPrivilegeDocument(const UserName& userName,
+                                    int authzVersion,
+                                    BSONObj* result) const;
 
         // Returns true if there exists at least one privilege document in the system.
         bool hasAnyPrivilegeDocuments() const;
 
         // Creates the given user object in the given database.
+        // TODO(spencer): remove dbname argument once users are only written into the admin db
         virtual Status insertPrivilegeDocument(const std::string& dbname,
                                                const BSONObj& userObj) const = 0;
 
@@ -56,6 +61,7 @@ namespace mongo {
                                                const BSONObj& updateObj) const = 0;
 
         // Removes users for the given database matching the given query.
+        // TODO(spencer): remove dbname argument once users are only written into the admin db
         virtual Status removePrivilegeDocuments(const std::string& dbname,
                                                 const BSONObj& query) const = 0;
 
@@ -81,7 +87,6 @@ namespace mongo {
         virtual Status _findUser(const std::string& usersNamespace,
                                  const BSONObj& query,
                                  BSONObj* result) const = 0;
-
     };
 
 } // namespace mongo

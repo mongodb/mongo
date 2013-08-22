@@ -196,62 +196,62 @@ namespace {
                 BSON("user" << "spencer" << "pwd" << "a" <<
                      "roles" << BSON_ARRAY("read"))));
 
-        // Need user field
+        // Need name field
         ASSERT_NOT_OK(v2parser.checkValidPrivilegeDocument("test",
-                BSON("userSource" << "test" <<
+                BSON("source" << "test" <<
                      "credentials" << BSON("MONGODB-CR" << "a") <<
                      "roles" << emptyArray)));
 
-        // Need userSource field
+        // Need source field
         ASSERT_NOT_OK(v2parser.checkValidPrivilegeDocument("test",
-                BSON("user" << "spencer" <<
+                BSON("name" << "spencer" <<
                      "credentials" << BSON("MONGODB-CR" << "a") <<
                      "roles" << emptyArray)));
 
         // Need credentials field
         ASSERT_NOT_OK(v2parser.checkValidPrivilegeDocument("test",
-                BSON("user" << "spencer" <<
-                     "userSource" << "test" <<
+                BSON("name" << "spencer" <<
+                     "source" << "test" <<
                      "roles" << emptyArray)));
 
         // Need roles field
         ASSERT_NOT_OK(v2parser.checkValidPrivilegeDocument("test",
-                BSON("user" << "spencer" <<
-                     "userSource" << "test" <<
+                BSON("name" << "spencer" <<
+                     "source" << "test" <<
                      "credentials" << BSON("MONGODB-CR" << "a"))));
 
 
-        // db the user command is run on must match the userSource
+        // db the user command is run on must match the source
         ASSERT_NOT_OK(v2parser.checkValidPrivilegeDocument("test",
-                BSON("user" << "spencer" <<
-                     "userSource" << "test2" <<
+                BSON("name" << "spencer" <<
+                     "source" << "test2" <<
                      "credentials" << BSON("MONGODB-CR" << "a") <<
                      "roles" << emptyArray)));
 
         // Don't need credentials field if userSource is $external
         ASSERT_OK(v2parser.checkValidPrivilegeDocument("$external",
-                BSON("user" << "spencer" <<
-                     "userSource" << "$external" <<
+                BSON("name" << "spencer" <<
+                     "source" << "$external" <<
                      "roles" << emptyArray)));
 
         // Empty roles arrays are OK
         ASSERT_OK(v2parser.checkValidPrivilegeDocument("test",
-                BSON("user" << "spencer" <<
-                     "userSource" << "test" <<
+                BSON("name" << "spencer" <<
+                     "source" << "test" <<
                      "credentials" << BSON("MONGODB-CR" << "a") <<
                      "roles" << emptyArray)));
 
         // Roles must be objects
         ASSERT_NOT_OK(v2parser.checkValidPrivilegeDocument("test",
-                BSON("user" << "spencer" <<
-                     "userSource" << "test" <<
+                BSON("name" << "spencer" <<
+                     "source" << "test" <<
                      "credentials" << BSON("MONGODB-CR" << "a") <<
                      "roles" << BSON_ARRAY("read"))));
 
         // Role needs name
         ASSERT_NOT_OK(v2parser.checkValidPrivilegeDocument("test",
-                BSON("user" << "spencer" <<
-                     "userSource" << "test" <<
+                BSON("name" << "spencer" <<
+                     "source" << "test" <<
                      "credentials" << BSON("MONGODB-CR" << "a") <<
                      "roles" << BSON_ARRAY(BSON("source" << "dbA" <<
                                                 "canDelegate" << true <<
@@ -259,8 +259,8 @@ namespace {
 
         // Role needs source
         ASSERT_NOT_OK(v2parser.checkValidPrivilegeDocument("test",
-                BSON("user" << "spencer" <<
-                     "userSource" << "test" <<
+                BSON("name" << "spencer" <<
+                     "source" << "test" <<
                      "credentials" << BSON("MONGODB-CR" << "a") <<
                      "roles" << BSON_ARRAY(BSON("name" << "roleA" <<
                                                 "canDelegate" << true <<
@@ -268,8 +268,8 @@ namespace {
 
         // Role needs canDelegate
         ASSERT_NOT_OK(v2parser.checkValidPrivilegeDocument("test",
-                BSON("user" << "spencer" <<
-                     "userSource" << "test" <<
+                BSON("name" << "spencer" <<
+                     "source" << "test" <<
                      "credentials" << BSON("MONGODB-CR" << "a") <<
                      "roles" << BSON_ARRAY(BSON("name" << "roleA" <<
                                                 "source" << "dbA" <<
@@ -277,8 +277,8 @@ namespace {
 
         // Role needs hasRole
         ASSERT_NOT_OK(v2parser.checkValidPrivilegeDocument("test",
-                BSON("user" << "spencer" <<
-                     "userSource" << "test" <<
+                BSON("name" << "spencer" <<
+                     "source" << "test" <<
                      "credentials" << BSON("MONGODB-CR" << "a") <<
                      "roles" << BSON_ARRAY(BSON("name" << "roleA" <<
                                                 "source" << "dbA" <<
@@ -287,8 +287,8 @@ namespace {
 
         // Basic valid privilege document
         ASSERT_OK(v2parser.checkValidPrivilegeDocument("test",
-                BSON("user" << "spencer" <<
-                     "userSource" << "test" <<
+                BSON("name" << "spencer" <<
+                     "source" << "test" <<
                      "credentials" << BSON("MONGODB-CR" << "a") <<
                      "roles" << BSON_ARRAY(BSON("name" << "roleA" <<
                                                 "source" << "dbA" <<
@@ -297,8 +297,8 @@ namespace {
 
         // Multiple roles OK
         ASSERT_OK(v2parser.checkValidPrivilegeDocument("test",
-                BSON("user" << "spencer" <<
-                     "userSource" << "test" <<
+                BSON("name" << "spencer" <<
+                     "source" << "test" <<
                      "credentials" << BSON("MONGODB-CR" << "a") <<
                      "roles" << BSON_ARRAY(BSON("name" << "roleA" <<
                                                 "source" << "dbA" <<
@@ -311,8 +311,8 @@ namespace {
 
         // Optional extraData field OK
         ASSERT_OK(v2parser.checkValidPrivilegeDocument("test",
-                BSON("user" << "spencer" <<
-                     "userSource" << "test" <<
+                BSON("name" << "spencer" <<
+                     "source" << "test" <<
                      "credentials" << BSON("MONGODB-CR" << "a") <<
                      "extraData" << BSON("foo" << "bar") <<
                      "roles" << BSON_ARRAY(BSON("name" << "roleA" <<
@@ -325,35 +325,35 @@ namespace {
         // Old "pwd" field not valid
         ASSERT_NOT_OK(v2parser.initializeUserCredentialsFromPrivilegeDocument(
                 user.get(),
-                BSON("user" << "spencer" <<
-                     "userSource" << "test" <<
+                BSON("name" << "spencer" <<
+                     "source" << "test" <<
                      "pwd" << "")));
 
         // Credentials must be provided (so long as userSource is not $external)
         ASSERT_NOT_OK(v2parser.initializeUserCredentialsFromPrivilegeDocument(
                 user.get(),
-                BSON("user" << "spencer" <<
-                     "userSource" << "test")));
+                BSON("name" << "spencer" <<
+                     "source" << "test")));
 
         // Credentials must be object
         ASSERT_NOT_OK(v2parser.initializeUserCredentialsFromPrivilegeDocument(
                 user.get(),
-                BSON("user" << "spencer" <<
-                     "userSource" << "test" <<
+                BSON("name" << "spencer" <<
+                     "source" << "test" <<
                      "credentials" << "a")));
 
         // Must specify credentials for MONGODB-CR
         ASSERT_NOT_OK(v2parser.initializeUserCredentialsFromPrivilegeDocument(
                 user.get(),
-                BSON("user" << "spencer" <<
-                     "userSource" << "test" <<
+                BSON("name" << "spencer" <<
+                     "source" << "test" <<
                      "credentials" << BSON("foo" << "bar"))));
 
         // Make sure extracting valid credentials works
         ASSERT_OK(v2parser.initializeUserCredentialsFromPrivilegeDocument(
                 user.get(),
-                BSON("user" << "spencer" <<
-                     "userSource" << "test" <<
+                BSON("name" << "spencer" <<
+                     "source" << "test" <<
                      "credentials" << BSON("MONGODB-CR" << "a"))));
         ASSERT(user->getCredentials().password == "a");
         ASSERT(!user->getCredentials().isExternal);
@@ -361,8 +361,8 @@ namespace {
         // Leaving out 'credentials' field is OK so long as userSource is $external
         ASSERT_OK(v2parser.initializeUserCredentialsFromPrivilegeDocument(
                 user.get(),
-                BSON("user" << "spencer" <<
-                     "userSource" << "$external")));
+                BSON("name" << "spencer" <<
+                     "source" << "$external")));
         ASSERT(user->getCredentials().password.empty());
         ASSERT(user->getCredentials().isExternal);
 
@@ -372,37 +372,37 @@ namespace {
         // "roles" field must be provided
         ASSERT_NOT_OK(v2parser.initializeUserRolesFromPrivilegeDocument(
                 user.get(),
-                BSON("user" << "spencer"),
+                BSON("name" << "spencer"),
                 "test"));
 
         // V1-style roles arrays no longer work
         ASSERT_NOT_OK(v2parser.initializeUserRolesFromPrivilegeDocument(
                 user.get(),
-                BSON("user" << "spencer" <<
+                BSON("name" << "spencer" <<
                      "roles" << BSON_ARRAY("read")),
                 "test"));
 
         // Roles must have "name", "source", "canDelegate", and "hasRole" fields
         ASSERT_NOT_OK(v2parser.initializeUserRolesFromPrivilegeDocument(
                 user.get(),
-                BSON("user" << "spencer" <<
+                BSON("name" << "spencer" <<
                      "roles" << BSON_ARRAY(BSONObj())),
                 "test"));
 
         ASSERT_NOT_OK(v2parser.initializeUserRolesFromPrivilegeDocument(
                 user.get(),
-                BSON("user" << "spencer" <<
+                BSON("name" << "spencer" <<
                      "roles" << BSON_ARRAY(BSON("name" << "roleA"))),
                 "test"));
 
         ASSERT_NOT_OK(v2parser.initializeUserRolesFromPrivilegeDocument(
                 user.get(),
-                BSON("user" << "spencer" <<
+                BSON("name" << "spencer" <<
                      "roles" << BSON_ARRAY(BSON("name" << "roleA" << "source" << "dbA"))),
                 "test"));
         ASSERT_NOT_OK(v2parser.initializeUserRolesFromPrivilegeDocument(
                 user.get(),
-                BSON("user" << "spencer" <<
+                BSON("name" << "spencer" <<
                      "roles" << BSON_ARRAY(BSON("name" << "roleA" <<
                                                 "source" << "dbA" <<
                                                 "canDelegate" << true))),
@@ -411,7 +411,7 @@ namespace {
         // Role doesn't get added if hasRole is false
         ASSERT_OK(v2parser.initializeUserRolesFromPrivilegeDocument(
                 user.get(),
-                BSON("user" << "spencer" <<
+                BSON("name" << "spencer" <<
                      "roles" << BSON_ARRAY(BSON("name" << "roleA" <<
                                                 "source" << "dbA" <<
                                                 "canDelegate" << true <<
@@ -423,7 +423,7 @@ namespace {
         // Valid role names are extracted successfully
         ASSERT_OK(v2parser.initializeUserRolesFromPrivilegeDocument(
                 user.get(),
-                BSON("user" << "spencer" <<
+                BSON("name" << "spencer" <<
                      "roles" << BSON_ARRAY(BSON("name" << "roleA" <<
                                                 "source" << "dbA" <<
                                                 "canDelegate" << true <<
@@ -437,7 +437,7 @@ namespace {
         // Multiple roles OK
         ASSERT_OK(v2parser.initializeUserRolesFromPrivilegeDocument(
                 user.get(),
-                BSON("user" << "spencer" <<
+                BSON("name" << "spencer" <<
                      "roles" << BSON_ARRAY(BSON("name" << "roleA" <<
                                                 "source" << "dbA" <<
                                                 "canDelegate" << true <<

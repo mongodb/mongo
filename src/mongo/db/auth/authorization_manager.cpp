@@ -57,9 +57,11 @@ namespace mongo {
     const std::string AuthorizationManager::SERVER_RESOURCE_NAME = "$SERVER";
     const std::string AuthorizationManager::CLUSTER_RESOURCE_NAME = "$CLUSTER";
     const std::string AuthorizationManager::WILDCARD_RESOURCE_NAME = "*";
-    const std::string AuthorizationManager::USER_NAME_FIELD_NAME = "user";
-    const std::string AuthorizationManager::USER_SOURCE_FIELD_NAME = "userSource";
+    const std::string AuthorizationManager::USER_NAME_FIELD_NAME = "name";
+    const std::string AuthorizationManager::USER_SOURCE_FIELD_NAME = "source";
     const std::string AuthorizationManager::PASSWORD_FIELD_NAME = "pwd";
+    const std::string AuthorizationManager::V1_USER_NAME_FIELD_NAME = "user";
+    const std::string AuthorizationManager::V1_USER_SOURCE_FIELD_NAME = "userSource";
 
     const std::string AuthorizationManager::SYSTEM_ROLE_V0_READ = "oldRead";
     const std::string AuthorizationManager::SYSTEM_ROLE_V0_READ_WRITE= "oldReadWrite";
@@ -256,7 +258,9 @@ namespace {
 
 
     AuthorizationManager::AuthorizationManager(AuthzManagerExternalState* externalState) :
-            _version(1), _externalState(externalState) {}
+            _externalState(externalState) {
+        setAuthorizationVersion(1);
+    }
 
     AuthorizationManager::~AuthorizationManager() {
         for (unordered_map<UserName, User*>::iterator it = _userCache.begin();
@@ -270,6 +274,24 @@ namespace {
 
     AuthzManagerExternalState* AuthorizationManager::getExternalState() const {
         return _externalState.get();
+    }
+
+    Status AuthorizationManager::setAuthorizationVersion(int version) {
+        boost::lock_guard<boost::mutex> lk(_lock);
+
+        if (version == 1) {
+            _parser.reset(new V1PrivilegeDocumentParser());
+        } else if (version == 2) {
+            _parser.reset(new V2PrivilegeDocumentParser());
+        } else {
+            return Status(ErrorCodes::UnsupportedFormat,
+                          mongoutils::str::stream() <<
+                                  "Unrecognized authorization format version: " <<
+                                  version);
+        }
+
+        _version = version;
+        return Status::OK();
     }
 
     void AuthorizationManager::setSupportOldStylePrivilegeDocuments(bool enabled) {
@@ -288,9 +310,13 @@ namespace {
         return _authEnabled;
     }
 
-    Status AuthorizationManager::getPrivilegeDocument(const UserName& userName,
-                                                      BSONObj* result) const {
-        return _externalState->getPrivilegeDocument(userName, result);
+    Status AuthorizationManager::getPrivilegeDocument(const UserName& userName, BSONObj* result) {
+        int version;
+        {
+            boost::lock_guard<boost::mutex> lk(_lock);
+            version = _getVersion_inlock();
+        }
+        return _externalState->getPrivilegeDocument(userName, version, result);
     }
 
     bool AuthorizationManager::hasAnyPrivilegeDocuments() const {
@@ -406,7 +432,7 @@ namespace {
 
     Status AuthorizationManager::_initializeUserFromPrivilegeDocument(
             User* user, const BSONObj& privDoc) const {
-        std::string userName = privDoc[AuthorizationManager::USER_NAME_FIELD_NAME].str();
+        std::string userName = _parser->extractUserNameFromPrivilegeDocument(privDoc);
         if (userName != user->getName().getUser()) {
             return Status(ErrorCodes::BadValue,
                           mongoutils::str::stream() << "User name from privilege document \""
@@ -417,12 +443,11 @@ namespace {
                           0);
         }
 
-        V1PrivilegeDocumentParser parser;
-        Status status = parser.initializeUserCredentialsFromPrivilegeDocument(user, privDoc);
+        Status status = _parser->initializeUserCredentialsFromPrivilegeDocument(user, privDoc);
         if (!status.isOK()) {
             return status;
         }
-        status = parser.initializeUserRolesFromPrivilegeDocument(user,
+        status = _parser->initializeUserRolesFromPrivilegeDocument(user,
                                                                  privDoc,
                                                                  user->getName().getDB());
         if (!status.isOK()) {
@@ -450,19 +475,14 @@ namespace {
         User* user = userHolder.get();
 
         BSONObj userObj;
-        if (_version == 1) {
-            Status status = _externalState->getPrivilegeDocument(userName,  &userObj);
-            if (!status.isOK()) {
-                return status;
-            }
-        } else {
-            return Status(ErrorCodes::UnsupportedFormat,
-                          mongoutils::str::stream() <<
-                                  "Unrecognized authorization format version: " << _version);
+        Status status = _externalState->getPrivilegeDocument(userName,
+                                                             _getVersion_inlock(),
+                                                             &userObj);
+        if (!status.isOK()) {
+            return status;
         }
 
-
-        Status status = _initializeUserFromPrivilegeDocument(user, userObj);
+        status = _initializeUserFromPrivilegeDocument(user, userObj);
         if (!status.isOK()) {
             return status;
         }
