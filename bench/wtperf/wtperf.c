@@ -437,7 +437,8 @@ populate_thread(void *arg)
 			    session->commit_transaction(session, NULL)) != 0)
 				lprintf(cfg, ret, 0,
 				    "Fail committing, transaction was aborted");
-			session->begin_transaction(session, NULL);
+			session->begin_transaction(
+			    session, cfg->transaction_config);
 		}
 		get_next_op(&op);
 		if (op > cfg->icount)
