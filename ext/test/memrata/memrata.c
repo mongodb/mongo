@@ -2905,7 +2905,7 @@ kvs_cleaner(void *arg)
 		 *
 		 * !!!
 		 * I'm playing fast-and-loose with whether or not the cursor
-		 * references an underying WT_SOURCE, there's a structural
+		 * references an underlying WT_SOURCE, there's a structural
 		 * problem here.
 		 */
 		cursor->ws = NULL;
