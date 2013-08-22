@@ -222,7 +222,8 @@ __clsm_open_cursors(
 		    lsm_tree->nchunks > clsm->nchunks) {
 			alloc = clsm->nchunks * sizeof(uint64_t);
 			WT_ERR(__wt_realloc(session,
-			    (clsm->txnid_max != NULL) ? &alloc : NULL,
+			    (clsm->txnid_max != NULL && clsm->nchunks > 0) ?
+			    &alloc : NULL,
 			    (lsm_tree->nchunks) * sizeof(uint64_t),
 			    &clsm->txnid_max));
 		}
@@ -304,6 +305,10 @@ __clsm_open_cursors(
 			WT_ERR(__clsm_close_cursors(clsm, skip_chunks));
 			WT_ERR(__wt_readlock(session, lsm_tree->rwlock));
 			locked = 1;
+		} else {
+			/* Detach from our old primary. */
+			clsm->primary_chunk = NULL;
+			clsm->current = NULL;
 		}
 	}
 
@@ -314,11 +319,11 @@ __clsm_open_cursors(
 		 * size parameter in that case (but only if the count is
 		 * non-zero), otherwise the new array will be cleared.
 		 */
-		alloc = skip_chunks * sizeof(WT_BLOOM *);
-		WT_ERR(__wt_realloc(session, skip_chunks ? &alloc : NULL,
+		alloc = clsm->nchunks * sizeof(WT_BLOOM *);
+		WT_ERR(__wt_realloc(session, alloc ? &alloc : NULL,
 		    nchunks * sizeof(WT_BLOOM *), &clsm->blooms));
-		alloc = skip_chunks * sizeof(WT_CURSOR *);
-		WT_ERR(__wt_realloc(session, skip_chunks ? &alloc : NULL,
+		alloc = clsm->nchunks * sizeof(WT_CURSOR *);
+		WT_ERR(__wt_realloc(session, alloc ? &alloc : NULL,
 		    nchunks * sizeof(WT_CURSOR *), &clsm->cursors));
 	}
 
@@ -1121,6 +1126,8 @@ __clsm_close(WT_CURSOR *cursor)
 	WT_TRET(__clsm_close_cursors(clsm, 0));
 	__wt_free(session, clsm->blooms);
 	__wt_free(session, clsm->cursors);
+	__wt_free(session, clsm->txnid_max);
+
 	/* The WT_LSM_TREE owns the URI. */
 	cursor->uri = NULL;
 	if (clsm->lsm_tree != NULL)
