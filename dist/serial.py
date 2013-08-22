@@ -44,7 +44,6 @@ Serial('update', [
 		SerialArg('uint32_t', 'write_gen'),
 		SerialArg('WT_UPDATE **', 'srch_upd'),
 		SerialArg('WT_UPDATE *', 'old_upd'),
-		SerialArg('WT_UPDATE **', 'new_upd', 1),
 		SerialArg('WT_UPDATE *', 'upd', 1),
 		SerialArg('WT_UPDATE **', 'upd_obsolete'),
 	]),

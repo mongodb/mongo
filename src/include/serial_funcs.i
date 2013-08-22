@@ -283,8 +283,6 @@ typedef struct {
 	uint32_t write_gen;
 	WT_UPDATE **srch_upd;
 	WT_UPDATE *old_upd;
-	WT_UPDATE **new_upd;
-	int new_upd_taken;
 	WT_UPDATE *upd;
 	int upd_taken;
 	WT_UPDATE **upd_obsolete;
@@ -293,9 +291,8 @@ typedef struct {
 static inline int
 __wt_update_serial(
 	WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t write_gen, WT_UPDATE
-	**srch_upd, WT_UPDATE *old_upd, WT_UPDATE ***new_updp, size_t
-	new_upd_size, WT_UPDATE **updp, size_t upd_size, WT_UPDATE
-	**upd_obsolete) {
+	**srch_upd, WT_UPDATE *old_upd, WT_UPDATE **updp, size_t upd_size,
+	WT_UPDATE **upd_obsolete) {
 	__wt_update_args _args, *args = &_args;
 	WT_DECL_RET;
 	size_t incr_mem;
@@ -307,14 +304,6 @@ __wt_update_serial(
 	args->srch_upd = srch_upd;
 
 	args->old_upd = old_upd;
-
-	if (new_updp == NULL)
-		args->new_upd = NULL;
-	else {
-		args->new_upd = *new_updp;
-		*new_updp = NULL;
-	}
-	args->new_upd_taken = 0;
 
 	if (updp == NULL)
 		args->upd = NULL;
@@ -331,10 +320,6 @@ __wt_update_serial(
 
 	/* Increment in-memory footprint before decrement is possible. */
 	incr_mem = 0;
-	if (args->new_upd_taken) {
-		WT_ASSERT(session, new_upd_size != 0);
-		incr_mem += new_upd_size;
-	}
 	if (args->upd_taken) {
 		WT_ASSERT(session, upd_size != 0);
 		incr_mem += upd_size;
@@ -345,8 +330,6 @@ __wt_update_serial(
 	__wt_spin_unlock(session, &S2C(session)->serial_lock);
 
 	/* Free any unused memory after releasing serialization mutex. */
-	if (!args->new_upd_taken)
-		__wt_free(session, args->new_upd);
 	if (!args->upd_taken)
 		__wt_free(session, args->upd);
 
@@ -356,8 +339,8 @@ __wt_update_serial(
 static inline void
 __wt_update_unpack(
     void *untyped_args, WT_PAGE **pagep, uint32_t *write_genp, WT_UPDATE
-    ***srch_updp, WT_UPDATE **old_updp, WT_UPDATE ***new_updp, WT_UPDATE
-    **updp, WT_UPDATE ***upd_obsoletep)
+    ***srch_updp, WT_UPDATE **old_updp, WT_UPDATE **updp, WT_UPDATE
+    ***upd_obsoletep)
 {
 	__wt_update_args *args = (__wt_update_args *)untyped_args;
 
@@ -365,17 +348,8 @@ __wt_update_unpack(
 	*write_genp = args->write_gen;
 	*srch_updp = args->srch_upd;
 	*old_updp = args->old_upd;
-	*new_updp = args->new_upd;
 	*updp = args->upd;
 	*upd_obsoletep = args->upd_obsolete;
-}
-
-static inline void
-__wt_update_new_upd_taken(void *untyped_args)
-{
-	__wt_update_args *args = (__wt_update_args *)untyped_args;
-
-	args->new_upd_taken = 1;
 }
 
 static inline void

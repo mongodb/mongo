@@ -91,7 +91,7 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int op)
 		/* Serialize the update. */
 		WT_ERR(__wt_update_serial(session, page,
 		    cbt->write_gen, &cbt->ins->upd, old_upd,
-		    NULL, 0, &upd, upd_size, &upd_obsolete));
+		    &upd, upd_size, &upd_obsolete));
 
 		/* Discard any obsolete WT_UPDATE structures. */
 		if (upd_obsolete != NULL)

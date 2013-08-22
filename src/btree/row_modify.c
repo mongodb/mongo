@@ -19,9 +19,9 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 	WT_INSERT_HEAD **inshead, *new_inshead, **new_inslist;
 	WT_ITEM *key, *value;
 	WT_PAGE *page;
-	WT_UPDATE **new_upd, *old_upd, *upd, **upd_entry, *upd_obsolete;
+	WT_UPDATE *old_upd, *upd, **upd_entry, *upd_obsolete;
 	size_t ins_size, upd_size;
-	size_t new_inshead_size, new_inslist_size, new_upd_size;
+	size_t new_inshead_size, new_inslist_size;
 	uint32_t ins_slot;
 	u_int skipdepth;
 	int i, logged;
@@ -34,7 +34,6 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 	ins = NULL;
 	new_inshead = NULL;
 	new_inslist = NULL;
-	new_upd = NULL;
 	upd = NULL;
 	logged = 0;
 
@@ -48,21 +47,21 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 	 * insert the WT_INSERT structure.
 	 */
 	if (cbt->compare == 0) {
-		new_upd_size = 0;
 		if (cbt->ins == NULL) {
-			/*
-			 * Allocate an update array as necessary.
-			 *
-			 * Set the WT_UPDATE array reference.
-			 */
+			/* Allocate an update array as necessary. */
 			if (page->u.row.upd == NULL) {
 				WT_ERR(__wt_calloc_def(
-				    session, page->entries, &new_upd));
-				new_upd_size =
-				    page->entries * sizeof(WT_UPDATE *);
-				upd_entry = &new_upd[cbt->slot];
-			} else
-				upd_entry = &page->u.row.upd[cbt->slot];
+				    session, page->entries, &upd));
+				if (WT_ATOMIC_CAS(page->u.row.upd, NULL, upd))
+					__wt_cache_page_inmem_incr(session,
+					    page, page->entries *
+					    sizeof(WT_UPDATE *));
+				else
+					__wt_free(session, upd);
+			}
+
+			/* Set the WT_UPDATE array reference. */
+			upd_entry = &page->u.row.upd[cbt->slot];
 		} else
 			upd_entry = &cbt->ins->upd;
 
@@ -76,8 +75,7 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 
 		/* Serialize the update. */
 		WT_ERR(__wt_update_serial(session, page, cbt->write_gen,
-		    upd_entry, old_upd, &new_upd, new_upd_size, &upd, upd_size,
-		    &upd_obsolete));
+		    upd_entry, old_upd, &upd, upd_size, &upd_obsolete));
 
 		/* Discard any obsolete WT_UPDATE structures. */
 		if (upd_obsolete != NULL)
@@ -163,7 +161,6 @@ err:		/*
 	/* Free any insert, update arrays. */
 	__wt_free(session, new_inslist);
 	__wt_free(session, new_inshead);
-	__wt_free(session, new_upd);
 
 	return (ret);
 }
@@ -430,18 +427,11 @@ int
 __wt_update_serial_func(WT_SESSION_IMPL *session, void *args)
 {
 	WT_PAGE *page;
-	WT_UPDATE **new_upd, *old_upd, *upd, **upd_entry, **upd_obsolete;
+	WT_UPDATE *old_upd, *upd, **upd_entry, **upd_obsolete;
 	uint32_t write_gen;
 
 	__wt_update_unpack(args, &page, &write_gen,
-	    &upd_entry, &old_upd, &new_upd, &upd, &upd_obsolete);
-
-	/*
-	 * If we allocated an update array for the page and another thread has
-	 * set one up in the meantime, restart the operation.
-	 */
-	if (new_upd != NULL && page->u.row.upd != NULL)
-		return (WT_RESTART);
+	    &upd_entry, &old_upd, &upd, &upd_obsolete);
 
 	/*
 	 * Ignore the page's write-generation (other than the special case of
@@ -460,19 +450,6 @@ __wt_update_serial_func(WT_SESSION_IMPL *session, void *args)
 	 */
 	WT_PUBLISH(*upd_entry, upd);
 	__wt_update_upd_taken(args);
-
-	/*
-	 * If the page needs an update array (column-store pages and inserts on
-	 * row-store pages do not use the update array), our caller passed us
-	 * one of the correct size.
-	 *
-	 * NOTE: it is important to do this after publishing that the update is
-	 * set.  Code can assume that if the array is set, it is non-empty.
-	 */
-	if (new_upd != NULL && page->u.row.upd == NULL) {
-		page->u.row.upd = new_upd;
-		__wt_update_new_upd_taken(args);
-	}
 
 	/* Discard obsolete WT_UPDATE structures. */
 	*upd_obsolete = __wt_update_obsolete_check(session, upd->next);
