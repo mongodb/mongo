@@ -443,6 +443,18 @@ namespace {
         return _authenticatedPrincipals.getNames();
     }
 
+    std::string AuthorizationManager::getAuthenticatedPrincipalNamesToken() {
+        std::string ret;
+        for (PrincipalSet::NameIterator nameIter = getAuthenticatedPrincipalNames();
+                nameIter.more();
+                nameIter.next()) {
+            ret += '\0'; // Using a NUL byte which isn't valid in usernames to separate them.
+            ret += nameIter->getFullName();
+        }
+
+        return ret;
+    }
+
     Status AuthorizationManager::acquirePrivilege(const Privilege& privilege,
                                                   const PrincipalName& authorizingPrincipal) {
         if (!_authenticatedPrincipals.lookup(authorizingPrincipal)) {

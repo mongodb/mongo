@@ -91,6 +91,10 @@ namespace mongo {
         // Gets an iterator over the names of all authenticated principals stored in this manager.
         PrincipalSet::NameIterator getAuthenticatedPrincipalNames();
 
+        // Returns a string representing all logged-in principals on the current session.
+        // WARNING: this string will contain NUL bytes so don't call c_str()!
+        std::string getAuthenticatedPrincipalNamesToken();
+
         // Removes any authenticated principals whose authorization credentials came from the given
         // database, and revokes any privileges that were granted via that principal.
         void logoutDatabase(const std::string& dbname);

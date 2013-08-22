@@ -27,6 +27,7 @@
 #include "db.h"
 #include "queryutil.h"
 #include "client.h"
+#include "mongo/db/auth/authorization_manager.h"
 
 #include "pdfile.h"
 
@@ -74,8 +75,10 @@ namespace mongo {
                 return;
             _initCalled = true;
 
+            const string userToken = ClientBasic::getCurrent()->getAuthorizationManager()
+                                                              ->getAuthenticatedPrincipalNamesToken();
             NamespaceString ns( _ns );
-            _scope = globalScriptEngine->getPooledScope( ns.db.c_str(), "where" );
+            _scope = globalScriptEngine->getPooledScope( ns.db.c_str(), "where" + userToken );
 
             massert( 10341 ,  "code has to be set first!" , ! _jsCode.empty() );
 

@@ -135,10 +135,10 @@ namespace mongo {
         static void validateObjectIdString(const string& str);
 
         /** increments the number of times a scope was used */
-        void incTimeUsed() { ++_numTimeUsed; }
+        void incTimesUsed() { ++_numTimesUsed; }
 
         /** gets the number of times a scope was used */
-        int getTimeUsed() { return _numTimeUsed; }
+        int getTimesUsed() { return _numTimesUsed; }
 
         /** return true if last invoke() return'd native code */
         virtual bool isLastRetNativeCode() { return _lastRetIsNativeCode; }
@@ -168,7 +168,7 @@ namespace mongo {
         set<string> _storedNames;
         static long long _lastVersion;
         FunctionCacheMap _cachedFunctions;
-        int _numTimeUsed;
+        int _numTimesUsed;
         bool _lastRetIsNativeCode; // v8 only: set to true if eval'd script returns a native func
     };
 
@@ -188,15 +188,12 @@ namespace mongo {
         static void setup();
 
         /** gets a scope from the pool or a new one if pool is empty
-         * @param pool An identifier for the pool, usually the db name
+         * @param db The db name
+         * @param scopeType A unique id to limit scope sharing.
+         *                  This must include authenticated users.
          * @return the scope
          */
-        auto_ptr<Scope> getPooledScope(const string& pool, const string& scopeType);
-
-        /**
-         * call this method to release some JS resources when a thread is done
-         */
-        void threadDone();
+        auto_ptr<Scope> getPooledScope(const string& db, const string& scopeType);
 
         void setScopeInitCallback(void (*func)(Scope&)) { _scopeInitCallback = func; }
         static void setConnectCallback(void (*func)(DBClientWithCommands&)) {
