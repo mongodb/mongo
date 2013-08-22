@@ -76,8 +76,8 @@ namespace {
 
     Status V1PrivilegeDocumentParser::checkValidPrivilegeDocument(const StringData& dbname,
                                                                   const BSONObj& doc) const {
-        BSONElement userElement = doc[AuthorizationManager::USER_NAME_FIELD_NAME];
-        BSONElement userSourceElement = doc[AuthorizationManager::USER_SOURCE_FIELD_NAME];
+        BSONElement userElement = doc[AuthorizationManager::V1_USER_NAME_FIELD_NAME];
+        BSONElement userSourceElement = doc[AuthorizationManager::V1_USER_SOURCE_FIELD_NAME];
         BSONElement passwordElement = doc[AuthorizationManager::PASSWORD_FIELD_NAME];
         BSONElement rolesElement = doc[ROLES_FIELD_NAME];
         BSONElement otherDBRolesElement = doc[OTHER_DB_ROLES_FIELD_NAME];
@@ -165,6 +165,11 @@ namespace {
         return Status::OK();
     }
 
+    std::string V1PrivilegeDocumentParser::extractUserNameFromPrivilegeDocument(
+            const BSONObj& doc) const {
+        return doc[AuthorizationManager::V1_USER_NAME_FIELD_NAME].str();
+    }
+
     Status V1PrivilegeDocumentParser::initializeUserCredentialsFromPrivilegeDocument(
             User* user, const BSONObj& privDoc) const {
         User::CredentialData credentials;
@@ -172,8 +177,8 @@ namespace {
             credentials.password = privDoc[AuthorizationManager::PASSWORD_FIELD_NAME].String();
             credentials.isExternal = false;
         }
-        else if (privDoc.hasField(AuthorizationManager::USER_SOURCE_FIELD_NAME)) {
-            std::string userSource = privDoc[AuthorizationManager::USER_SOURCE_FIELD_NAME].String();
+        else if (privDoc.hasField(AuthorizationManager::V1_USER_SOURCE_FIELD_NAME)) {
+            std::string userSource = privDoc[AuthorizationManager::V1_USER_SOURCE_FIELD_NAME].String();
             if (userSource != "$external") {
                 return Status(ErrorCodes::UnsupportedFormat,
                               "Cannot extract credentials from user documents without a password "
@@ -401,6 +406,11 @@ namespace {
             return status;
 
         return Status::OK();
+    }
+
+    std::string V2PrivilegeDocumentParser::extractUserNameFromPrivilegeDocument(
+            const BSONObj& doc) const {
+        return doc[AuthorizationManager::USER_NAME_FIELD_NAME].str();
     }
 
     Status V2PrivilegeDocumentParser::initializeUserCredentialsFromPrivilegeDocument(

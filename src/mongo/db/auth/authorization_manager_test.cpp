@@ -530,5 +530,67 @@ namespace {
         authzManager->releaseUser(clusterAdmin);
         authzManager->releaseUser(multiDB);
     }
+
+    TEST_F(AuthorizationManagerTest, testAquireV2User) {
+        authzManager->setAuthorizationVersion(2);
+
+        externalState->insertPrivilegeDocument(
+                "admin",
+                BSON("name" << "v2read" <<
+                     "source" << "test" <<
+                     "credentials" << BSON("MONGODB-CR" << "password") <<
+                     "roles" << BSON_ARRAY(BSON("name" << "read" <<
+                                                "source" << "test" <<
+                                                "canDelegate" << false <<
+                                                "hasRole" << true))));
+        externalState->insertPrivilegeDocument(
+                "admin",
+                BSON("name" << "v2cluster" <<
+                     "source" << "admin" <<
+                     "credentials" << BSON("MONGODB-CR" << "password") <<
+                     "roles" << BSON_ARRAY(BSON("name" << "clusterAdmin" <<
+                                                "source" << "admin" <<
+                                                "canDelegate" << false <<
+                                                "hasRole" << true))));
+
+        User* v2read;
+        ASSERT_OK(authzManager->acquireUser(UserName("v2read", "test"), &v2read));
+        ASSERT(UserName("v2read", "test") == v2read->getName());
+        ASSERT(v2read->isValid());
+        ASSERT_EQUALS((uint32_t)1, v2read->getRefCount());
+        RoleNameIterator it = v2read->getRoles();
+        ASSERT(it.more());
+        RoleName roleName = it.next();
+        ASSERT_EQUALS("test", roleName.getDB());
+        ASSERT_EQUALS("read", roleName.getRole());
+        ASSERT_FALSE(it.more());
+        ActionSet actions = v2read->getActionsForResource("test");
+        ASSERT(actions.contains(ActionType::find));
+        ASSERT_FALSE(actions.contains(ActionType::insert));
+        actions = v2read->getActionsForResource("test2");
+        ASSERT(actions.empty());
+        actions = v2read->getActionsForResource("admin");
+        ASSERT(actions.empty());
+        // Make sure user's refCount is 0 at the end of the test to avoid an assertion failure
+        authzManager->releaseUser(v2read);
+
+        User* v2cluster;
+        ASSERT_OK(authzManager->acquireUser(UserName("v2cluster", "admin"), &v2cluster));
+        ASSERT(UserName("v2cluster", "admin") == v2cluster->getName());
+        ASSERT(v2cluster->isValid());
+        ASSERT_EQUALS((uint32_t)1, v2cluster->getRefCount());
+        it = v2cluster->getRoles();
+        ASSERT(it.more());
+        roleName = it.next();
+        ASSERT_EQUALS("admin", roleName.getDB());
+        ASSERT_EQUALS("clusterAdmin", roleName.getRole());
+        ASSERT_FALSE(it.more());
+        actions = v2cluster->getActionsForResource("*");
+        ASSERT(actions.contains(ActionType::listDatabases));
+        ASSERT(actions.contains(ActionType::dropDatabase));
+        ASSERT_FALSE(actions.contains(ActionType::find));
+        // Make sure user's refCount is 0 at the end of the test to avoid an assertion failure
+        authzManager->releaseUser(v2cluster);
+    }
 }  // namespace
 }  // namespace mongo

@@ -32,6 +32,8 @@
 
 namespace mongo {
 
+    class PrivilegeDocumentParser;
+
     /**
      * Internal secret key info.
      */
@@ -60,6 +62,8 @@ namespace mongo {
         static const std::string USER_NAME_FIELD_NAME;
         static const std::string USER_SOURCE_FIELD_NAME;
         static const std::string PASSWORD_FIELD_NAME;
+        static const std::string V1_USER_NAME_FIELD_NAME;
+        static const std::string V1_USER_SOURCE_FIELD_NAME;
 
         // System roles for backwards compatibility with 2.2 and prior
         static const std::string SYSTEM_ROLE_V0_READ;
@@ -92,11 +96,17 @@ namespace mongo {
 
         AuthzManagerExternalState* getExternalState() const;
 
+        /**
+         * Sets the version number of the authorization system.  Returns an invalid status if the
+         * version number is not recognized.
+         */
+        Status setAuthorizationVersion(int version);
+
         // Gets the privilege information document for "userName".
         //
         // On success, returns Status::OK() and stores a shared-ownership copy of the document into
         // "result".
-        Status getPrivilegeDocument(const UserName& userName, BSONObj* result) const;
+        Status getPrivilegeDocument(const UserName& userName, BSONObj* result);
 
         // Returns true if there exists at least one privilege document in the system.
         bool hasAnyPrivilegeDocuments() const;
@@ -178,6 +188,12 @@ namespace mongo {
     private:
 
         /**
+         * Returns the current version number of the authorization system.  Should only be called
+         * when holding _lock.
+         */
+        int _getVersion_inlock() const { return _version; }
+
+        /**
          * Invalidates all User objects in the cache and removes them from the cache.
          * Should only be called when already holding _lock.
          * TODO(spencer): This only exists because we're currently calling initializeAllV1UserData
@@ -198,7 +214,13 @@ namespace mongo {
         // The current version is 2.  When upgrading to v2.6 or later from v2.4 or prior, the
         // version is 1.  After running the upgrade process to upgrade to the new privilege document
         // format, the version will be 2.
+        // All reads/writes to _version must be done within _lock.
         int _version;
+
+        /**
+         * Used for parsing privilege documents.  Set whenever _version is set.  Guarded by _lock.
+         */
+        scoped_ptr<PrivilegeDocumentParser> _parser;
 
         scoped_ptr<AuthzManagerExternalState> _externalState;
 
@@ -211,7 +233,7 @@ namespace mongo {
         unordered_map<UserName, User*> _userCache;
 
         /**
-         * Protects _userCache.
+         * Protects _userCache, _version, and _parser.
          */
         boost::mutex _lock;
     };
