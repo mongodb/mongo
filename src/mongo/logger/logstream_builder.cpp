@@ -89,6 +89,7 @@ namespace logger {
 
     LogstreamBuilder::~LogstreamBuilder() {
         if (_os) {
+            if ( !_baseMessage.empty() ) _baseMessage.push_back(' ');
             _baseMessage += _os->str();
             MessageEventEphemeral message(curTimeMillis64(), _severity, _contextName, _baseMessage);
             _domain->append(message);
