@@ -24,10 +24,12 @@ assert( admin.runCommand({ split : coll + "", middle : { _id : NumberLong(50) } 
 assert( admin.runCommand({ split : coll + "", middle : { _id : NumberLong(100) } }).ok );
 assert( admin.runCommand({ moveChunk : coll + "", bounds : [{ _id : NumberLong(-100) },
                                                             { _id : NumberLong(-50) }],
-                                                  to : shards[1]._id }).ok );
+                                                  to : shards[1]._id,
+                                                  _waitForDelete : true }).ok );
 assert( admin.runCommand({ moveChunk : coll + "", bounds : [{ _id : NumberLong(50) },
                                                             { _id : NumberLong(100) }],
-                                                  to : shards[0]._id }).ok );
+                                                  to : shards[0]._id,
+                                                  _waitForDelete : true }).ok );
 st.printShardingStatus();
 
 jsTest.log( "Inserting some docs on each shard, so 1/2 will be orphaned..." );
