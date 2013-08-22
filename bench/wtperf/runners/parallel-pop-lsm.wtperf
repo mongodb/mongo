@@ -1,0 +1,11 @@
+# wtperf options file: evict btree configuration
+conn_config="cache_size=200MB"
+table_config="lsm_chunk_size=1M,type=lsm"
+transaction_config="isolation=snapshot"
+icount=10000000
+report_interval=5
+stat_interval=4
+run_time=0
+populate_ops_per_txn=100
+populate_threads=5
+verbose=1
