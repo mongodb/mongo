@@ -217,7 +217,15 @@ __clsm_open_cursors(
 	 */
 	if (F_ISSET(clsm, WT_CLSM_MERGE | WT_CLSM_OPEN_READ))
 		skip_chunks = 0;
-	else if (F_ISSET(clsm, WT_CLSM_OPEN_SNAPSHOT))
+	else if (F_ISSET(clsm, WT_CLSM_OPEN_SNAPSHOT)) {
+		if (clsm->txnid_max == NULL ||
+		    lsm_tree->nchunks > clsm->nchunks) {
+			alloc = clsm->nchunks * sizeof(uint64_t);
+			WT_ERR(__wt_realloc(session,
+			    (clsm->txnid_max != NULL) ? &alloc : NULL,
+			    (lsm_tree->nchunks) * sizeof(uint64_t),
+			    &clsm->txnid_max));
+		}
 		for (skip_chunks = lsm_tree->nchunks - 1;
 		    skip_chunks > 0;
 		    skip_chunks--) {
@@ -228,7 +236,7 @@ __clsm_open_cursors(
 			if (!__wt_txn_visible_all(session, chunk->txnid_max))
 				break;
 		}
-	else
+	} else
 		skip_chunks = lsm_tree->nchunks - 1;
 
 	/* Merge cursors have already figured out how many chunks they need. */
@@ -312,14 +320,6 @@ __clsm_open_cursors(
 		alloc = skip_chunks * sizeof(WT_CURSOR *);
 		WT_ERR(__wt_realloc(session, skip_chunks ? &alloc : NULL,
 		    nchunks * sizeof(WT_CURSOR *), &clsm->cursors));
-	}
-
-	if (F_ISSET(clsm, WT_CLSM_OPEN_SNAPSHOT) &&
-	    (clsm->txnid_max == NULL || nchunks > clsm->nchunks)) {
-		alloc = skip_chunks * sizeof(uint64_t);
-		WT_ERR(__wt_realloc(session,
-		    (skip_chunks && clsm->txnid_max != NULL) ? &alloc : NULL,
-		    nchunks * sizeof(uint64_t), &clsm->txnid_max));
 	}
 
 	clsm->nchunks = nchunks;
