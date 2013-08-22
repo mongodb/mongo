@@ -1042,6 +1042,8 @@ nextprev(WT_CURSOR *wtcursor, const char *fname,
 	wtext = cursor->wtext;
 	r = &cursor->record;
 
+	cache_rm = 0;
+
 	/*
 	 * If the cache isn't yet in use, it's a simpler problem, just check
 	 * the store.  We don't care if we race, we're not guaranteeing any
@@ -1145,7 +1147,7 @@ cache_clean:
 	 */
 	if (cache_ret == 0 && ret == 0) {
 		a.data = r->key;		/* a is the primary */
-		a.size = r->key_len;
+		a.size = (uint32_t)r->key_len;
 		b.data = cursor->t2.v;		/* b is the cache */
 		b.size = (uint32_t)cursor->t2.len;
 		if ((ret = wtext->collate(wtext, session, &a, &b, &cmp)) != 0)
@@ -1772,7 +1774,7 @@ ws_source_open(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 	p = uri + strlen("memrata:");
 	if (p[0] == '/' || (t = strchr(p, '/')) == NULL || t[1] == '\0')
 bad_name:	ERET(wtext, session, EINVAL, "%s: illegal name format", uri);
-	len = t - p;
+	len = (size_t)(t - p);
 
 	/* Find a matching KVS device. */
 	for (ks = ds->kvs_head; ks != NULL; ks = ks->next)
@@ -2491,37 +2493,36 @@ kvs_config_read(WT_EXTENSION_API *wtext, WT_CONFIG_ITEM *config,
 		}
 
 #define	KVS_CONFIG_SET(s, f)						\
-	if (STRING_MATCH(s, k.str, k.len)) {				\
-		kvs_config->f = (unsigned long)v.val;			\
-		continue;						\
-	}
-			KVS_CONFIG_SET("kvs_parallelism", parallelism);
-			KVS_CONFIG_SET("kvs_granularity", granularity);
-			KVS_CONFIG_SET("kvs_avg_key_len", avg_key_len);
-			KVS_CONFIG_SET("kvs_avg_val_len", avg_val_len);
-			KVS_CONFIG_SET("kvs_write_bufs", write_bufs);
-			KVS_CONFIG_SET("kvs_read_bufs", read_bufs);
-			KVS_CONFIG_SET("kvs_commit_timeout", commit_timeout);
-			KVS_CONFIG_SET(
-			    "kvs_reclaim_threshold", reclaim_threshold);
-			KVS_CONFIG_SET("kvs_reclaim_period", reclaim_period);
+		if (STRING_MATCH(s, k.str, k.len)) {			\
+			kvs_config->f = (unsigned long)v.val;		\
+			continue;					\
+		}
+		KVS_CONFIG_SET("kvs_parallelism", parallelism);
+		KVS_CONFIG_SET("kvs_granularity", granularity);
+		KVS_CONFIG_SET("kvs_avg_key_len", avg_key_len);
+		KVS_CONFIG_SET("kvs_avg_val_len", avg_val_len);
+		KVS_CONFIG_SET("kvs_write_bufs", write_bufs);
+		KVS_CONFIG_SET("kvs_read_bufs", read_bufs);
+		KVS_CONFIG_SET("kvs_commit_timeout", commit_timeout);
+		KVS_CONFIG_SET("kvs_reclaim_threshold", reclaim_threshold);
+		KVS_CONFIG_SET("kvs_reclaim_period", reclaim_period);
 
 #define	KVS_FLAG_SET(s, f)						\
-	if (STRING_MATCH(s, k.str, k.len)) {				\
-		if (v.val != 0)						\
-			*flagsp |= f;					\
-		continue;						\
-	}
-			/*
-			 * We don't export KVS_O_CREATE: WT_SESSION.create
-			 * always adds it in.
-			 */
-			KVS_FLAG_SET("kvs_open_o_debug", KVS_O_DEBUG);
-			KVS_FLAG_SET("kvs_open_o_truncate",  KVS_O_TRUNCATE);
+		if (STRING_MATCH(s, k.str, k.len)) {			\
+			if (v.val != 0)					\
+				*flagsp |= f;				\
+			continue;					\
+		}
+		/*
+		 * We don't export KVS_O_CREATE: WT_SESSION.create
+		 * always adds it in.
+		 */
+		KVS_FLAG_SET("kvs_open_o_debug", KVS_O_DEBUG);
+		KVS_FLAG_SET("kvs_open_o_truncate",  KVS_O_TRUNCATE);
 
-			EMSG_ERR(wtext, NULL, EINVAL,
-			    "unknown configuration key value pair %.*s/%.*s",
-			    (int)k.len, k.str, (int)v.len, v.str);
+		EMSG_ERR(wtext, NULL, EINVAL,
+		    "unknown configuration key value pair %.*s/%.*s",
+		    (int)k.len, k.str, (int)v.len, v.str);
 	}
 
 	if (ret == WT_NOTFOUND)
@@ -2802,8 +2803,10 @@ fake_cursor(WT_EXTENSION_API *wtext, WT_CURSOR **wtcursorp)
 		return (os_errno());
 	cursor->wtext = wtext;
 	cursor->record.key = cursor->__key;
-	if ((cursor->v = malloc(128)) == NULL)
+	if ((cursor->v = malloc(128)) == NULL) {
+		free(cursor);
 		return (os_errno());
+	}
 	cursor->mem_len = 128;
 
 	/*
@@ -3015,6 +3018,7 @@ kvs_source_open_txn(DATA_SOURCE *ds)
 	 * have a transaction store, and make sure we only find one.
 	 */
 	kstxn = NULL;
+	kvstxn = NULL;
 	for (ks = ds->kvs_head; ks != NULL; ks = ks->next)
 		if ((t =
 		    kvs_open_namespace(ks->kvs_device, "txn", 0)) != NULL) {
