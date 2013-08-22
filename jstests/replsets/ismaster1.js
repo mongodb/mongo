@@ -89,7 +89,28 @@ config.members[2].buildIndexes = false;
 config.members[3].arbiterOnly = true;
 replTest.initiate(config);
 
+var agreeOnPrimaryAndSetVersion = function( setVersion ) {
+    
+    print( "Waiting for primary and replica set version " + setVersion );
+    
+    var nodes = replTest.nodes;
+    var primary = undefined;
+    var lastSetVersion = setVersion; 
+    for ( var i = 0; i < nodes.length; i++ ) {
+        var isMasterResult = nodes[i].getDB( "admin" ).runCommand({ isMaster : 1 });
+        printjson( isMasterResult );
+        if ( !primary ) primary = isMasterResult.primary;
+        if ( !lastSetVersion ) lastSetVersion = isMasterResult.setVersion;
+        if ( isMasterResult.primary != primary || !primary ) return false;
+        if ( isMasterResult.setVersion != lastSetVersion ) return false;
+    }
+    
+    return true;
+}
+
 var master = replTest.getMaster();
+assert.soon( function() { return agreeOnPrimaryAndSetVersion( 1 ); },
+             "Nodes did not initiate in less than a minute", 60000 );
 
 // check to see if the information from isMaster() is correct at each node
 // the checker only checks that the field exists when its value is "has"
@@ -170,26 +191,10 @@ catch(e) {
     print(e);
 }
 
-// wait til they all have the new config
-assert.soon(function() {
-    try {
-    var config1 = master.getDB("admin").runCommand({isMaster:1});
-    var config2 = replTest.liveNodes.slaves[0].getDB("admin").runCommand({isMaster:1});
-    var config3 = replTest.liveNodes.slaves[1].getDB("admin").runCommand({isMaster:1});
-    var config4 = replTest.liveNodes.slaves[2].getDB("admin").runCommand({isMaster:1});
-
-    return (config1.setVersion === config2.setVersion)
-            && (config2.setVersion === config3.setVersion)
-            && (config3.setVersion === config4.setVersion)
-            && (config1.primary === config2.primary) && (config2.primary === config3.primary)
-            && (config3.primary === config4.primary) && config4.hasOwnProperty("primary");
-    }
-    catch(e) {
-        return false;
-    }
-}, "Nodes did not sync in less than a minute", 60000);
-
 master = replTest.getMaster();
+assert.soon( function() { return agreeOnPrimaryAndSetVersion( 2 ); },
+             "Nodes did not sync in less than a minute", 60000 );
+
 // check nodes for their new settings
 checkMember({ conn: master,
               name: "master2",
@@ -261,19 +266,7 @@ checkMember({ conn: replTest.liveNodes.slaves[2],
 config = master.getDB("local").system.replset.findOne();
 master.getDB("admin").runCommand({replSetReconfig : config, force: true});
 
-assert.soon(function() {
-    try {
-    var config1 = master.getDB("admin").runCommand({isMaster:1});
-    var config2 = replTest.liveNodes.slaves[0].getDB("admin").runCommand({isMaster:1});
-    var config3 = replTest.liveNodes.slaves[1].getDB("admin").runCommand({isMaster:1});
-    var config4 = replTest.liveNodes.slaves[2].getDB("admin").runCommand({isMaster:1});
+assert.soon( function() { return agreeOnPrimaryAndSetVersion(); },
+             "Nodes did not sync in less than a minute after forced reconfig", 60000 );
 
-    return (config1.setVersion === config2.setVersion)
-            && (config2.setVersion === config3.setVersion)
-            && (config3.setVersion === config4.setVersion);
-    }
-    catch(e) {
-        return false;
-    }
-}, "Nodes did not sync in less than a minute after forced reconfig", 60000);
 replTest.stopSet();
