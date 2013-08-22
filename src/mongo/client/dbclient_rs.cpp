@@ -1554,8 +1554,7 @@ namespace mongo {
     }
 
     bool DBClientReplicaSet::connect() {
-        // Lazily perform connect on primary/secondary only when needed.
-        return true;
+        return _getMonitor()->isAnyNodeOk();
     }
 
     void DBClientReplicaSet::_auth(const BSONObj& params) {
