@@ -68,6 +68,10 @@ namespace mongo {
         // Gets an iterator over the names of all authenticated users stored in this manager.
         UserSet::NameIterator getAuthenticatedUserNames();
 
+        // Returns a string representing all logged-in users on the current session.
+        // WARNING: this string will contain NUL bytes so don't call c_str()!
+        std::string getAuthenticatedUserNamesToken();
+
         // Removes any authenticated principals whose authorization credentials came from the given
         // database, and revokes any privileges that were granted via that principal.
         void logoutDatabase(const std::string& dbname);

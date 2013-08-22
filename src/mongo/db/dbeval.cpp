@@ -60,7 +60,9 @@ namespace mongo {
             return false;
         }
 
-        auto_ptr<Scope> s = globalScriptEngine->getPooledScope( dbName, "dbeval" );
+        const string userToken = ClientBasic::getCurrent()->getAuthorizationSession()
+                                                          ->getAuthenticatedUserNamesToken();
+        auto_ptr<Scope> s = globalScriptEngine->getPooledScope( dbName, "dbeval" + userToken );
         ScriptingFunction f = s->createFunction(code);
         if ( f == 0 ) {
             errmsg = (string)"compile failed: " + s->getError();

@@ -43,16 +43,4 @@ namespace mongo {
         return cc().isGod() || AuthzSessionExternalStateServerCommon::shouldIgnoreAuthChecks();
     }
 
-    void AuthzSessionExternalStateMongod::onAddAuthorizedUser() {
-        // invalidate all thread-local JS scopes due to new user authentication
-        if (globalScriptEngine)
-            globalScriptEngine->threadDone();
-    }
-
-    void AuthzSessionExternalStateMongod::onLogoutDatabase(const std::string&) {
-        // invalidate all thread-local JS scopes due to logout
-        if (globalScriptEngine)
-            globalScriptEngine->threadDone();
-    }
-
 } // namespace mongo

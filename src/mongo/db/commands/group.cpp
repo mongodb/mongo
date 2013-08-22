@@ -20,9 +20,11 @@
 
 #include <vector>
 
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/privilege.h"
+#include "mongo/db/client_basic.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/instance.h"
@@ -73,7 +75,9 @@ namespace mongo {
                     string& errmsg,
                     BSONObjBuilder& result ) {
 
-            auto_ptr<Scope> s = globalScriptEngine->getPooledScope( realdbname, "group");
+            const string userToken = ClientBasic::getCurrent()->getAuthorizationSession()
+                                                              ->getAuthenticatedUserNamesToken();
+            auto_ptr<Scope> s = globalScriptEngine->getPooledScope(realdbname, "group" + userToken);
 
             if ( reduceScope )
                 s->init( reduceScope );
