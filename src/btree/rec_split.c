@@ -121,7 +121,7 @@ __split_row_page_inmem(WT_SESSION_IMPL *session, WT_PAGE *orig)
 	 * the original ref to point to the new parent
 	 */
 	newref = &new_parent->u.intl.t[0];
-	__wt_ref_key(orig->ref->page, orig->ref, &p, &size);
+	__wt_ref_key(orig->parent, orig->ref, &p, &size);
 	WT_ERR (__wt_row_ikey_incr(
 	    session, new_parent, 0, p, size, &newref->key.ikey));
 	WT_LINK_PAGE(new_parent, newref, orig);

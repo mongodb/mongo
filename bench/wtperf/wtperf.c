@@ -58,6 +58,7 @@
 
 typedef struct {
 	const char *home;
+	char *uri;
 	WT_CONNECTION *conn;
 	FILE *logf;
 #define	WT_PERF_INIT		0x00
@@ -80,7 +81,7 @@ typedef struct {
 } CONFIG;
 
 typedef enum {
-	UINT32_TYPE, STRING_TYPE, BOOL_TYPE, FLAG_TYPE
+	UINT32_TYPE, CONFIG_STRING_TYPE, STRING_TYPE, BOOL_TYPE, FLAG_TYPE
 } CONFIG_OPT_TYPE;
 
 typedef struct {
@@ -139,7 +140,7 @@ void wtperf_srand(CONFIG *);
 uint64_t wtperf_value_range(CONFIG *);
 
 #define	DEFAULT_LSM_CONFIG						\
-	"key_format=S,value_format=S,exclusive,"			\
+	"key_format=S,value_format=S,type=lsm,exclusive=true,"		\
 	"leaf_page_max=4kb,internal_page_max=64kb,allocation_size=4kb,"
 
 /* Worker thread types. */
@@ -151,6 +152,7 @@ uint64_t wtperf_value_range(CONFIG *);
 /* Default values. */
 CONFIG default_cfg = {
 	"WT_TEST",	/* home */
+	NULL,		/* uri */
 	NULL,		/* conn */
 	NULL,		/* logf */
 	WT_PERF_INIT, /* phase */
@@ -166,8 +168,8 @@ CONFIG default_cfg = {
 };
 
 const char *small_config_str =
-    "conn_config=\"create,cache_size=500MB\","
-    "table_config=\"" DEFAULT_LSM_CONFIG "lsm_chunk_size=5MB,\","
+    "conn_config=\"cache_size=500MB\","
+    "table_config=\"lsm_chunk_size=5MB\","
     "icount=500000,"
     "data_sz=100,"
     "key_sz=20,"
@@ -177,8 +179,8 @@ const char *small_config_str =
     "read_threads=8,";
 
 const char *med_config_str =
-    "conn_config=\"create,cache_size=1GB\","
-    "table_config=\"" DEFAULT_LSM_CONFIG "lsm_chunk_size=20MB,\","
+    "conn_config=\"cache_size=1GB\","
+    "table_config=\"lsm_chunk_size=20MB\","
     "icount=50000000,"
     "data_sz=100,"
     "key_sz=20,"
@@ -188,8 +190,8 @@ const char *med_config_str =
     "read_threads=16,";
 
 const char *large_config_str =
-    "conn_config=\"create,cache_size=2GB\","
-    "table_config=\"" DEFAULT_LSM_CONFIG "lsm_chunk_size=50MB,\","
+    "conn_config=\"cache_size=2GB\","
+    "table_config=\"lsm_chunk_size=50MB\","
     "icount=500000000,"
     "data_sz=100,"
     "key_sz=20,"
@@ -250,10 +252,10 @@ worker(CONFIG *cfg, uint32_t worker_type)
 	WT_CONNECTION *conn;
 	WT_CURSOR *cursor;
 	WT_SESSION *session;
-	uint64_t next_incr, next_val;
-	int ret, op_ret;
 	const char *op_name = "search";
 	char *data_buf, *key_buf, *value;
+	int op_ret, ret;
+	uint64_t next_incr, next_val;
 
 	session = NULL;
 	data_buf = key_buf = NULL;
@@ -309,11 +311,20 @@ worker(CONFIG *cfg, uint32_t worker_type)
 		case WORKER_READ:
 			op_name = "read";
 			op_ret = cursor->search(cursor);
-			if (F_ISSET(cfg, PERF_RAND_WORKLOAD) &&
-			    op_ret == WT_NOTFOUND)
+			/*
+			 * If the item wasn't found and we are in either rand
+			 * workload, or it was within 10% of the end of the
+			 * range and we are doing inserts ignore the failure.
+			 */
+			if (op_ret == WT_NOTFOUND &&
+			    (F_ISSET(cfg, PERF_RAND_WORKLOAD) ||
+			    (cfg->insert_threads > 0 &&
+			    next_val * 1.1 > wtperf_value_range(cfg))))
 				op_ret = 0;
-			if (op_ret == 0)
+			if (op_ret == 0) {
 				++g_nread_ops;
+				break;
+			}
 			break;
 		case WORKER_INSERT_RMW:
 			op_name="insert_rmw";
@@ -344,9 +355,17 @@ worker(CONFIG *cfg, uint32_t worker_type)
 				cursor->set_value(cursor, data_buf);
 				op_ret = cursor->update(cursor);
 			}
-			if (F_ISSET(cfg, PERF_RAND_WORKLOAD) &&
-			    op_ret == WT_NOTFOUND)
+			/*
+			 * If the item wasn't found and we are in either rand
+			 * workload, or it was within 10% of the end of the
+			 * range and we are doing inserts ignore the failure.
+			 */
+			if (op_ret == WT_NOTFOUND &&
+			    (F_ISSET(cfg, PERF_RAND_WORKLOAD) ||
+			    (cfg->insert_threads > 0 &&
+			    next_val * 1.1 > wtperf_value_range(cfg))))
 				op_ret = 0;
+			    
 			if (op_ret == 0)
 				++g_nupdate_ops;
 			break;
@@ -358,7 +377,8 @@ worker(CONFIG *cfg, uint32_t worker_type)
 		/* Report errors and continue. */
 		if (op_ret != 0)
 			lprintf(cfg, op_ret, 0,
-			    "%s failed for: %s", op_name, key_buf);
+			    "%s failed for: %s, range: %"PRIu64,
+			    op_name, key_buf, wtperf_value_range(cfg));
 		else
 			++g_nworker_ops;
 	}
@@ -540,7 +560,7 @@ stat_worker(void *arg)
 		    cursor->get_value(cursor, &desc, &pvalue, &value)) == 0 &&
 		    value != 0)
 			lprintf(cfg, 0, cfg->verbose,
-			    "stat:lsm: %s=%s", desc, pvalue);
+			    "stat:table: %s=%s", desc, pvalue);
 		cursor->close(cursor);
 		lprintf(cfg, 0, cfg->verbose, "-----------------");
 
@@ -807,6 +827,10 @@ int connection_reconfigure(WT_CONNECTION *conn, const char *orig)
 	size_t alloclen, leftlen;
 
 	alloced = NULL;
+
+	if (strcmp(orig, "create") == 0)
+		return (0);
+
 	if ((left = strstr_right(orig, ",create,", &right)) != NULL ||
 	    (left = strstr_right(orig, "create,", &right)) == orig ||
 	    ((left = strstr_right(orig, ",create", &right)) != NULL &&
@@ -870,7 +894,7 @@ int main(int argc, char **argv)
 	 * reconfigure later as needed.
 	 */
 	if ((ret = wiredtiger_open(
-	    cfg.home, NULL, "create,cache_size=1M", &conn)) != 0) {
+	    cfg.home, NULL, "create", &conn)) != 0) {
 		lprintf(&cfg, ret, 0, "Error connecting to %s", cfg.home);
 		goto err;
 	}
@@ -929,6 +953,15 @@ int main(int argc, char **argv)
 			break;
 		}
 
+	/* Pre-populate the URI from the table name. */
+	req_len = strlen("table:") + strlen(cfg.table_name) + 1;
+	cfg.uri = (char *)calloc(req_len, 1);
+	if (cfg.uri == NULL) {
+		ret = ENOMEM;
+		goto err;
+	}
+	snprintf(cfg.uri, req_len, "table:%s", cfg.table_name);
+	
 	if (cfg.rand_range > 0)
 		F_SET(&cfg, PERF_RAND_WORKLOAD);
 
@@ -1078,7 +1111,8 @@ void config_assign(CONFIG *dest, const CONFIG *src)
 	memcpy(dest, src, sizeof(CONFIG));
 
 	for (i = 0; i < sizeof(config_opts) / sizeof(config_opts[0]); i++)
-		if (config_opts[i].type == STRING_TYPE) {
+		if (config_opts[i].type == STRING_TYPE ||
+		    config_opts[i].type == CONFIG_STRING_TYPE) {
 			pstr = (char **)
 			    ((unsigned char *)dest + config_opts[i].offset);
 			if (*pstr != NULL) {
@@ -1099,7 +1133,8 @@ config_free(CONFIG *cfg)
 	char **pstr;
 
 	for (i = 0; i < sizeof(config_opts) / sizeof(config_opts[0]); i++)
-		if (config_opts[i].type == STRING_TYPE) {
+		if (config_opts[i].type == STRING_TYPE ||
+		    config_opts[i].type == CONFIG_STRING_TYPE) {
 			pstr = (char **)
 			    ((unsigned char *)cfg + config_opts[i].offset);
 			if (*pstr != NULL) {
@@ -1107,6 +1142,8 @@ config_free(CONFIG *cfg)
 				*pstr = NULL;
 			}
 		}
+
+	free(cfg->uri);
 }
 
 /*
@@ -1118,8 +1155,9 @@ int
 config_opt(CONFIG *cfg, WT_CONFIG_ITEM *k, WT_CONFIG_ITEM *v)
 {
 	CONFIG_OPT *popt;
-	size_t i, nopt;
 	char *newstr, **strp;
+	size_t i, nopt;
+	uint64_t newlen;
 	void *valueloc;
 
 	popt = NULL;
@@ -1152,6 +1190,28 @@ config_opt(CONFIG *cfg, WT_CONFIG_ITEM *k, WT_CONFIG_ITEM *v)
 			return (EINVAL);
 		}
 		*(uint32_t *)valueloc = (uint32_t)v->val;
+	} else if (popt->type == CONFIG_STRING_TYPE) {
+		if (v->type != WT_CONFIG_ITEM_STRING) {
+			fprintf(stderr, "wtperf: Error: "
+			    "bad string value for \'%.*s=%.*s\'\n",
+			    (int)k->len, k->str, (int)v->len, v->str);
+			return (EINVAL);
+		}
+		strp = (char **)valueloc;
+		newlen = v->len + 1;
+		if (*strp == NULL) {
+			newstr = calloc(newlen, sizeof(char));
+			strncpy(newstr, v->str, v->len);
+		} else {
+			newlen += (strlen(*strp) + 1);
+			newstr = calloc(newlen, sizeof(char));
+			snprintf(newstr, newlen,
+			    "%s,%*s", *strp, (int)v->len, v->str);
+			/* Free the old value now we've copied it. */
+			if (*strp != NULL)
+				free(*strp);
+		}
+		*strp = newstr;
 	} else if (popt->type == STRING_TYPE) {
 		if (v->type != WT_CONFIG_ITEM_STRING) {
 			fprintf(stderr, "wtperf: Error: "
@@ -1347,7 +1407,8 @@ config_opt_usage(void)
 		defaultval = config_opts[i].defaultval;
 		if (config_opts[i].type == UINT32_TYPE)
 			typestr = "int";
-		else if (config_opts[i].type == STRING_TYPE)
+		else if (config_opts[i].type == STRING_TYPE ||
+		    config_opts[i].type == CONFIG_STRING_TYPE)
 			typestr = "string";
 		else if (config_opts[i].type == BOOL_TYPE ||
 		    config_opts[i].type == FLAG_TYPE) {
@@ -1454,24 +1515,16 @@ lprintf(CONFIG *cfg, int err, uint32_t level, const char *fmt, ...)
 int setup_log_file(CONFIG *cfg)
 {
 	char *fname;
-	int offset;
 
 	if (cfg->verbose < 1 && cfg->stat_interval == 0)
 		return (0);
 
 	if ((fname = calloc(strlen(cfg->home) +
-	    strlen(cfg->uri) + strlen(".stat") + 1, 1)) == NULL) {
+	    strlen(cfg->table_name) + strlen(".stat") + 2, 1)) == NULL) {
 		fprintf(stderr, "No memory in stat thread\n");
 		return (ENOMEM);
 	}
-	for (offset = 0;
-	    cfg->uri[offset] != 0 && cfg->uri[offset] != ':';
-	    offset++) {}
-	if (cfg->uri[offset] == 0)
-		offset = 0;
-	else
-		++offset;
-	sprintf(fname, "%s/%s.stat", cfg->home, cfg->uri + offset);
+	sprintf(fname, "%s/%s.stat", cfg->home, cfg->table_name);
 	if ((cfg->logf = fopen(fname, "w")) == NULL) {
 		fprintf(stderr, "Statistics failed to open log file.\n");
 		return (EINVAL);
@@ -1538,7 +1591,7 @@ void print_config(CONFIG *cfg)
 {
 	printf("Workload configuration:\n");
 	printf("\t home: %s\n", cfg->home);
-	printf("\t uri: %s\n", cfg->uri);
+	printf("\t table_name: %s\n", cfg->table_name);
 	printf("\t Connection configuration: %s\n", cfg->conn_config);
 	printf("\t Table configuration: %s\n", cfg->table_config);
 	printf("\t %s\n", cfg->create ? "Creating" : "Using existing");

@@ -30,6 +30,7 @@
 
 #ifdef OPT_DECLARE_STRUCT
 #define DEF_OPT_AS_STRING(name, initval, desc)	const char *name;
+#define DEF_OPT_AS_CONFIG_STRING(name, initval, desc)	const char *name;
 #define DEF_OPT_AS_BOOL(name, initval, desc)	uint32_t name;
 #define DEF_OPT_AS_UINT32(name, initval, desc)	uint32_t name;
 #define DEF_OPT_AS_FLAGVAL(name, bits, desc)
@@ -38,6 +39,9 @@
 #ifdef OPT_DEFINE_DESC
 #define DEF_OPT_AS_STRING(name, initval, desc)			\
 	{ #name, desc, #initval, STRING_TYPE, offsetof(CONFIG, name), 0 },
+#define DEF_OPT_AS_CONFIG_STRING(name, initval, desc)			\
+	{ #name, desc, #initval, CONFIG_STRING_TYPE,                    \
+        offsetof(CONFIG, name), 0 },
 #define DEF_OPT_AS_BOOL(name, initval, desc)			\
 	{ #name, desc, #initval, BOOL_TYPE, offsetof(CONFIG, name), 0 },
 #define DEF_OPT_AS_UINT32(name, initval, desc)			\
@@ -48,6 +52,7 @@
 
 #ifdef OPT_DEFINE_DEFAULT
 #define DEF_OPT_AS_STRING(name, initval, desc)	initval,
+#define DEF_OPT_AS_CONFIG_STRING(name, initval, desc)	initval,
 #define DEF_OPT_AS_BOOL(name, initval, desc)	initval,
 #define DEF_OPT_AS_UINT32(name, initval, desc)	initval,
 #define DEF_OPT_AS_FLAGVAL(name, bits, desc)
@@ -57,16 +62,21 @@
  * Each option listed here represents a CONFIG struct field that may be
  * altered on command line via -o and -O.  Each option appears here as:
  *    DEF_OPT_AS_STRING(name, initval, desc)
+ *    DEF_OPT_AS_CONFIG_STRING(name, initval, desc)
  *    DEF_OPT_AS_BOOL(name, initval, desc)
  *    DEF_OPT_AS_UINT32(name, initval, desc)
  *    DEF_OPT_AS_FLAGVAL(name, bit, desc) 
  *
- * The first three forms (*_{STRING|BOOL|UINT}) have these parameters:
+ * The first four forms (*_{CONFIG_STRING|STRING|BOOL|UINT}) have these
+ * parameters:
  *    name:     a C identifier, this identifier will be a field in CONFIG,
  *              and identifies the option for -o or -O.
  *    initval:  a default initial value for the field.
  *              The default values are tiny, we want the basic run to be fast.
  *    desc:     a description that will appear in the usage message.
+ *
+ * The difference between CONFIG_STRING and STRING is that CONFIG_STRING
+ * options are appended to existing content, whereas STRING options overwrite.
  *
  * DEF_OPT_AS_FLAGVAL defines an option that sets a bit in the CONFIG->flags
  * field.  It has these parameters:
@@ -77,7 +87,7 @@
  */
 DEF_OPT_AS_UINT32(checkpoint_interval, 0,
     "checkpoint every <int> report intervals, zero to disable")
-DEF_OPT_AS_STRING(conn_config, "create,cache_size=200MB",
+DEF_OPT_AS_CONFIG_STRING(conn_config, "create",
     "connection configuration string")
 DEF_OPT_AS_BOOL(create, 1,
     "do population phase; set to false to use existing database")
@@ -103,16 +113,17 @@ DEF_OPT_AS_UINT32(report_interval, 2,
 DEF_OPT_AS_UINT32(run_time, 2, "number of seconds to run workload phase")
 DEF_OPT_AS_UINT32(stat_interval, 0,
     "log statistics every <int> report intervals, zero to disable")
-DEF_OPT_AS_STRING(table_config, DEFAULT_LSM_CONFIG,
+DEF_OPT_AS_CONFIG_STRING(table_config, DEFAULT_LSM_CONFIG,
     "table configuration string")
-DEF_OPT_AS_STRING(transaction_config, "",
+DEF_OPT_AS_CONFIG_STRING(transaction_config, "",
     "transaction configuration string,\n"
     "relevant when populate_opts_per_txn is nonzero")
 DEF_OPT_AS_UINT32(update_threads, 0, "number of update threads")
-DEF_OPT_AS_STRING(uri, "lsm:test", "table uri")
+DEF_OPT_AS_STRING(table_name, "test", "table name")
 DEF_OPT_AS_UINT32(verbose, 0, "verbosity")
 
 #undef DEF_OPT_AS_STRING
+#undef DEF_OPT_AS_CONFIG_STRING
 #undef DEF_OPT_AS_BOOL
 #undef DEF_OPT_AS_UINT32
 #undef DEF_OPT_AS_FLAGVAL
