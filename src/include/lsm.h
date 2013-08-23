@@ -15,12 +15,15 @@ struct __wt_cursor_lsm {
 	WT_LSM_TREE *lsm_tree;
 	uint64_t dsk_gen;
 
-	u_int nchunks;
+	u_int nchunks;			/* Number of chunks in the cursor */
+	u_int nupdates;			/* Updates needed (including
+					   snapshot isolation checks). */
 	WT_BLOOM **blooms;
 	WT_CURSOR **cursors;
 	WT_CURSOR *current;     	/* The current cursor for iteration */
 
 	WT_LSM_CHUNK *primary_chunk;	/* The current primary chunk */
+	uint64_t *txnid_max;		/* Maximum txn for each chunk */
 
 #define	WT_CLSM_ITERATE_NEXT    0x01    /* Forward iteration */
 #define	WT_CLSM_ITERATE_PREV    0x02    /* Backward iteration */
@@ -29,6 +32,7 @@ struct __wt_cursor_lsm {
 #define	WT_CLSM_MULTIPLE        0x10    /* Multiple cursors have values for the
 					   current key */
 #define	WT_CLSM_OPEN_READ	0x20    /* Open for reads */
+#define	WT_CLSM_OPEN_SNAPSHOT	0x40    /* Open for snapshot isolation */
 	uint32_t flags;
 };
 
@@ -44,7 +48,8 @@ struct __wt_lsm_chunk {
 	uint64_t count;			/* Approximate count of records */
 	struct timespec create_ts;	/* Creation time (for rate limiting) */
 
-	uint32_t ncursor;		/* Cursors with the chunk as primary */
+	uint64_t txnid_max;		/* Newest transactional update */
+
 #define	WT_LSM_CHUNK_BLOOM	0x01
 #define	WT_LSM_CHUNK_EVICTED	0x02
 #define	WT_LSM_CHUNK_MERGING	0x04
