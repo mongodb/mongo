@@ -152,9 +152,14 @@ past_end:
 	 * This is a rarely used path: we normally find exact matches, because
 	 * column-store files are dense, but in this case the caller searched
 	 * past the end of the table.
+	 *
+	 * Don't bother searching if the caller is appending a new record where
+	 * we'll allocate the record number; we're not going to find a match by
+	 * definition, and we're going to repeat the search when we do the work.
 	 */
 	cbt->ins_head = WT_COL_APPEND(page);
-	if ((cbt->ins = __col_insert_search(
+	if ((cbt->ins = recno == UINT64_MAX ? NULL :
+	    __col_insert_search(
 	    cbt->ins_head, cbt->ins_stack, cbt->next_stack, recno)) == NULL)
 		cbt->compare = -1;
 	else {
