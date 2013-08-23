@@ -20,11 +20,11 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int op)
 	WT_BTREE *btree;
 	WT_DECL_RET;
 	WT_INSERT *ins, *ins_copy;
-	WT_INSERT_HEAD **inshead, *new_inshead, **new_inslist;
+	WT_INSERT_HEAD **inshead, *new_inshead;
 	WT_ITEM *value, _value;
 	WT_PAGE *page;
 	WT_UPDATE *old_upd, *upd, *upd_obsolete;
-	size_t ins_size, new_inshead_size, new_inslist_size, upd_size;
+	size_t ins_size, new_inshead_size, upd_size;
 	uint64_t recno;
 	u_int skipdepth;
 	int i, logged;
@@ -65,7 +65,6 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int op)
 
 	ins = NULL;
 	new_inshead = NULL;
-	new_inslist = NULL;
 	upd = NULL;
 
 	/*
@@ -98,33 +97,43 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int op)
 			__wt_update_obsolete_free(session, page, upd_obsolete);
 	} else {
 		/* There may be no insert list, allocate as necessary. */
-		new_inshead_size = new_inslist_size = 0;
+		new_inshead_size = 0;
 		if (op == 1) {
 			if (page->modify->append == NULL) {
-				new_inslist_size = 1 * sizeof(WT_INSERT_HEAD *);
-				WT_ERR(
-				    __wt_calloc_def(session, 1, &new_inslist));
-				inshead = &new_inslist[0];
-			} else
-				inshead = &page->modify->append[0];
+				WT_ERR(__wt_calloc_def(session, 1, &inshead));
+				if (WT_ATOMIC_CAS(
+				    page->modify->append, NULL, inshead))
+					__wt_cache_page_inmem_incr(session,
+					    page, sizeof(WT_INSERT_HEAD *));
+				else
+					__wt_free(session, inshead);
+			}
+			inshead = &page->modify->append[0];
 			cbt->ins_head = *inshead;
 		} else if (page->type == WT_PAGE_COL_FIX) {
 			if (page->modify->update == NULL) {
-				new_inslist_size = 1 * sizeof(WT_INSERT_HEAD *);
-				WT_ERR(
-				    __wt_calloc_def(session, 1, &new_inslist));
-				inshead = &new_inslist[0];
-			} else
-				inshead = &page->modify->update[0];
+				WT_ERR(__wt_calloc_def(session, 1, &inshead));
+				if (WT_ATOMIC_CAS(
+				    page->modify->update, NULL, inshead))
+					__wt_cache_page_inmem_incr(session,
+					    page, sizeof(WT_INSERT_HEAD *));
+				else
+					__wt_free(session, inshead);
+			}
+			inshead = &page->modify->update[0];
 		} else {
 			if (page->modify->update == NULL) {
-				new_inslist_size =
-				    page->entries * sizeof(WT_INSERT_HEAD *);
 				WT_ERR(__wt_calloc_def(
-				    session, page->entries, &new_inslist));
-				inshead = &new_inslist[cbt->slot];
-			} else
-				inshead = &page->modify->update[cbt->slot];
+				    session, page->entries, &inshead));
+				if (WT_ATOMIC_CAS(
+				    page->modify->update, NULL, inshead))
+					__wt_cache_page_inmem_incr(session,
+					    page, page->entries *
+					    sizeof(WT_INSERT_HEAD *));
+				else
+					__wt_free(session, inshead);
+			}
+			inshead = &page->modify->update[cbt->slot];
 		}
 
 		/* There may be no WT_INSERT list, allocate as necessary. */
@@ -165,7 +174,6 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int op)
 			WT_ERR(__wt_col_append_serial(session,
 			    page, cbt->write_gen, inshead,
 			    cbt->ins_stack, cbt->next_stack,
-			    &new_inslist, new_inslist_size,
 			    &new_inshead, new_inshead_size,
 			    &ins, ins_size, skipdepth));
 
@@ -175,7 +183,6 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int op)
 			WT_ERR(__wt_insert_serial(session,
 			    page, cbt->write_gen, inshead,
 			    cbt->ins_stack, cbt->next_stack,
-			    &new_inslist, new_inslist_size,
 			    &new_inshead, new_inshead_size,
 			    &ins, ins_size, skipdepth));
 	}
@@ -191,7 +198,6 @@ err:		/*
 		__wt_free(session, upd);
 	}
 
-	__wt_free(session, new_inslist);
 	__wt_free(session, new_inshead);
 
 	return (ret);
@@ -231,7 +237,7 @@ __wt_col_append_serial_func(WT_SESSION_IMPL *session, void *args)
 {
 	WT_BTREE *btree;
 	WT_INSERT *ins, *new_ins, ***ins_stack, **next_stack;
-	WT_INSERT_HEAD *inshead, **insheadp, **new_inslist, *new_inshead;
+	WT_INSERT_HEAD *inshead, **insheadp, *new_inshead;
 	WT_PAGE *page;
 	uint64_t recno;
 	uint32_t write_gen;
@@ -241,7 +247,7 @@ __wt_col_append_serial_func(WT_SESSION_IMPL *session, void *args)
 
 	__wt_col_append_unpack(args,
 	    &page, &write_gen, &insheadp, &ins_stack, &next_stack,
-	    &new_inslist, &new_inshead, &new_ins, &skipdepth);
+	    &new_inshead, &new_ins, &skipdepth);
 
 	/* Check the page's write-generation. */
 	WT_RET(__wt_page_write_gen_check(session, page, write_gen));
@@ -297,20 +303,8 @@ __wt_col_append_serial_func(WT_SESSION_IMPL *session, void *args)
 	}
 
 	/*
-	 * If the page does not yet have an insert array, our caller passed
-	 * us one.
-	 *
-	 * NOTE: it is important to do this after publishing the list entry.
-	 * Code can assume that if the array is set, it is non-empty.
-	 */
-	if (page->modify->append == NULL) {
-		page->modify->append = new_inslist;
-		__wt_col_append_new_inslist_taken(args);
-	}
-
-	/*
-	 * If we don't find the record, check to see if we extended the file,
-	 * and update the last record number.
+	 * Check to see if we extended the file, and update the last record
+	 * number.
 	 */
 	if (recno > btree->last_recno)
 		btree->last_recno = recno;

@@ -16,12 +16,12 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 {
 	WT_DECL_RET;
 	WT_INSERT *ins;
-	WT_INSERT_HEAD **inshead, *new_inshead, **new_inslist;
+	WT_INSERT_HEAD **inshead, *new_inshead;
 	WT_ITEM *key, *value;
 	WT_PAGE *page;
 	WT_UPDATE *old_upd, *upd, **upd_entry, *upd_obsolete;
 	size_t ins_size, upd_size;
-	size_t new_inshead_size, new_inslist_size;
+	size_t new_inshead_size;
 	uint32_t ins_slot;
 	u_int skipdepth;
 	int i, logged;
@@ -33,7 +33,6 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 
 	ins = NULL;
 	new_inshead = NULL;
-	new_inslist = NULL;
 	upd = NULL;
 	logged = 0;
 
@@ -58,6 +57,7 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 					    sizeof(WT_UPDATE *));
 				else
 					__wt_free(session, upd);
+				upd = NULL;
 			}
 
 			/* Set the WT_UPDATE array reference. */
@@ -82,8 +82,7 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 			__wt_update_obsolete_free(session, page, upd_obsolete);
 	} else {
 		/*
-		 * Allocate insert array if necessary, and set the array
-		 * reference.
+		 * Allocate insert array if necessary.
 		 *
 		 * We allocate an additional insert array slot for insert keys
 		 * sorting less than any key on the page.  The test to select
@@ -96,15 +95,19 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 		ins_slot = F_ISSET(
 		    cbt, WT_CBT_SEARCH_SMALLEST) ? page->entries : cbt->slot;
 
-		new_inshead_size = new_inslist_size = 0;
+		new_inshead_size = 0;
 		if (page->u.row.ins == NULL) {
 			WT_ERR(__wt_calloc_def(
-			    session, page->entries + 1, &new_inslist));
-			new_inslist_size =
-			    (page->entries + 1) * sizeof(WT_INSERT_HEAD *);
-			inshead = &new_inslist[ins_slot];
-		} else
-			inshead = &page->u.row.ins[ins_slot];
+			    session, page->entries + 1, &ins));
+			if (WT_ATOMIC_CAS(page->u.row.ins, NULL, ins))
+				__wt_cache_page_inmem_incr(session,
+				    page, (page->entries + 1) *
+				    sizeof(WT_INSERT_HEAD *));
+			else
+				__wt_free(session, ins);
+			ins = NULL;
+		}
+		inshead = &page->u.row.ins[ins_slot];
 
 		/*
 		 * Allocate a new insert list head as necessary.
@@ -142,7 +145,6 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 		/* Insert the WT_INSERT structure. */
 		WT_ERR(__wt_insert_serial(session, page, cbt->write_gen,
 		    inshead, cbt->ins_stack, cbt->next_stack,
-		    &new_inslist, new_inslist_size,
 		    &new_inshead, new_inshead_size,
 		    &ins, ins_size, skipdepth));
 	}
@@ -158,8 +160,7 @@ err:		/*
 		__wt_free(session, upd);
 	}
 
-	/* Free any insert, update arrays. */
-	__wt_free(session, new_inslist);
+	/* Free any unused, allocated memory. */
 	__wt_free(session, new_inshead);
 
 	return (ret);
@@ -202,23 +203,13 @@ int
 __wt_insert_serial_func(WT_SESSION_IMPL *session, void *args)
 {
 	WT_INSERT *new_ins, ***ins_stack, **next_stack;
-	WT_INSERT_HEAD *inshead, **insheadp, **new_inslist, *new_inshead;
+	WT_INSERT_HEAD *inshead, **insheadp, *new_inshead;
 	WT_PAGE *page;
 	uint32_t write_gen;
 	u_int i, skipdepth;
 
 	__wt_insert_unpack(args, &page, &write_gen, &insheadp,
-	    &ins_stack, &next_stack,
-	    &new_inslist, &new_inshead, &new_ins, &skipdepth);
-
-	/*
-	 * If we allocated an insert list for the page and another thread has
-	 * set one up in the meantime, restart the operation.
-	 */
-	if (new_inslist != NULL &&
-	    ((page->type == WT_PAGE_ROW_LEAF) ?
-	    page->u.row.ins : page->modify->update) != NULL)
-		return (WT_RESTART);
+	    &ins_stack, &next_stack, &new_inshead, &new_ins, &skipdepth);
 
 	if ((inshead = *insheadp) == NULL)
 		inshead = new_inshead;
@@ -276,23 +267,6 @@ __wt_insert_serial_func(WT_SESSION_IMPL *session, void *args)
 		__wt_insert_new_inshead_taken(args);
 	}
 
-	/*
-	 * If the page does not yet have an insert array, our caller passed
-	 * us one.
-	 *
-	 * NOTE: it is important to do this after publishing the list entry.
-	 * Code can assume that if the array is set, it is non-empty.
-	 */
-	if (page->type == WT_PAGE_ROW_LEAF) {
-		if (page->u.row.ins == NULL) {
-			page->u.row.ins = new_inslist;
-			__wt_insert_new_inslist_taken(args);
-		}
-	} else
-		if (page->modify->update == NULL) {
-			page->modify->update = new_inslist;
-			__wt_insert_new_inslist_taken(args);
-		}
 	__wt_page_and_tree_modify_set(session, page);
 	return (0);
 }

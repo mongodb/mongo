@@ -6,8 +6,6 @@ typedef struct {
 	WT_INSERT_HEAD **insheadp;
 	WT_INSERT ***ins_stack;
 	WT_INSERT **next_stack;
-	WT_INSERT_HEAD **new_inslist;
-	int new_inslist_taken;
 	WT_INSERT_HEAD *new_inshead;
 	int new_inshead_taken;
 	WT_INSERT *new_ins;
@@ -19,9 +17,8 @@ static inline int
 __wt_col_append_serial(
 	WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t write_gen,
 	WT_INSERT_HEAD **insheadp, WT_INSERT ***ins_stack, WT_INSERT
-	**next_stack, WT_INSERT_HEAD ***new_inslistp, size_t new_inslist_size,
-	WT_INSERT_HEAD **new_insheadp, size_t new_inshead_size, WT_INSERT
-	**new_insp, size_t new_ins_size, u_int skipdepth) {
+	**next_stack, WT_INSERT_HEAD **new_insheadp, size_t new_inshead_size,
+	WT_INSERT **new_insp, size_t new_ins_size, u_int skipdepth) {
 	__wt_col_append_args _args, *args = &_args;
 	WT_DECL_RET;
 	size_t incr_mem;
@@ -35,14 +32,6 @@ __wt_col_append_serial(
 	args->ins_stack = ins_stack;
 
 	args->next_stack = next_stack;
-
-	if (new_inslistp == NULL)
-		args->new_inslist = NULL;
-	else {
-		args->new_inslist = *new_inslistp;
-		*new_inslistp = NULL;
-	}
-	args->new_inslist_taken = 0;
 
 	if (new_insheadp == NULL)
 		args->new_inshead = NULL;
@@ -67,10 +56,6 @@ __wt_col_append_serial(
 
 	/* Increment in-memory footprint before decrement is possible. */
 	incr_mem = 0;
-	if (args->new_inslist_taken) {
-		WT_ASSERT(session, new_inslist_size != 0);
-		incr_mem += new_inslist_size;
-	}
 	if (args->new_inshead_taken) {
 		WT_ASSERT(session, new_inshead_size != 0);
 		incr_mem += new_inshead_size;
@@ -85,8 +70,6 @@ __wt_col_append_serial(
 	__wt_spin_unlock(session, &S2C(session)->serial_lock);
 
 	/* Free any unused memory after releasing serialization mutex. */
-	if (!args->new_inslist_taken)
-		__wt_free(session, args->new_inslist);
 	if (!args->new_inshead_taken)
 		__wt_free(session, args->new_inshead);
 	if (!args->new_ins_taken)
@@ -99,8 +82,8 @@ static inline void
 __wt_col_append_unpack(
     void *untyped_args, WT_PAGE **pagep, uint32_t *write_genp,
     WT_INSERT_HEAD ***insheadpp, WT_INSERT ****ins_stackp, WT_INSERT
-    ***next_stackp, WT_INSERT_HEAD ***new_inslistp, WT_INSERT_HEAD
-    **new_insheadp, WT_INSERT **new_insp, u_int *skipdepthp)
+    ***next_stackp, WT_INSERT_HEAD **new_insheadp, WT_INSERT **new_insp,
+    u_int *skipdepthp)
 {
 	__wt_col_append_args *args = (__wt_col_append_args *)untyped_args;
 
@@ -109,18 +92,9 @@ __wt_col_append_unpack(
 	*insheadpp = args->insheadp;
 	*ins_stackp = args->ins_stack;
 	*next_stackp = args->next_stack;
-	*new_inslistp = args->new_inslist;
 	*new_insheadp = args->new_inshead;
 	*new_insp = args->new_ins;
 	*skipdepthp = args->skipdepth;
-}
-
-static inline void
-__wt_col_append_new_inslist_taken(void *untyped_args)
-{
-	__wt_col_append_args *args = (__wt_col_append_args *)untyped_args;
-
-	args->new_inslist_taken = 1;
 }
 
 static inline void
@@ -145,8 +119,6 @@ typedef struct {
 	WT_INSERT_HEAD **inshead;
 	WT_INSERT ***ins_stack;
 	WT_INSERT **next_stack;
-	WT_INSERT_HEAD **new_inslist;
-	int new_inslist_taken;
 	WT_INSERT_HEAD *new_inshead;
 	int new_inshead_taken;
 	WT_INSERT *new_ins;
@@ -158,9 +130,8 @@ static inline int
 __wt_insert_serial(
 	WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t write_gen,
 	WT_INSERT_HEAD **inshead, WT_INSERT ***ins_stack, WT_INSERT
-	**next_stack, WT_INSERT_HEAD ***new_inslistp, size_t new_inslist_size,
-	WT_INSERT_HEAD **new_insheadp, size_t new_inshead_size, WT_INSERT
-	**new_insp, size_t new_ins_size, u_int skipdepth) {
+	**next_stack, WT_INSERT_HEAD **new_insheadp, size_t new_inshead_size,
+	WT_INSERT **new_insp, size_t new_ins_size, u_int skipdepth) {
 	__wt_insert_args _args, *args = &_args;
 	WT_DECL_RET;
 	size_t incr_mem;
@@ -174,14 +145,6 @@ __wt_insert_serial(
 	args->ins_stack = ins_stack;
 
 	args->next_stack = next_stack;
-
-	if (new_inslistp == NULL)
-		args->new_inslist = NULL;
-	else {
-		args->new_inslist = *new_inslistp;
-		*new_inslistp = NULL;
-	}
-	args->new_inslist_taken = 0;
 
 	if (new_insheadp == NULL)
 		args->new_inshead = NULL;
@@ -206,10 +169,6 @@ __wt_insert_serial(
 
 	/* Increment in-memory footprint before decrement is possible. */
 	incr_mem = 0;
-	if (args->new_inslist_taken) {
-		WT_ASSERT(session, new_inslist_size != 0);
-		incr_mem += new_inslist_size;
-	}
 	if (args->new_inshead_taken) {
 		WT_ASSERT(session, new_inshead_size != 0);
 		incr_mem += new_inshead_size;
@@ -224,8 +183,6 @@ __wt_insert_serial(
 	__wt_spin_unlock(session, &S2C(session)->serial_lock);
 
 	/* Free any unused memory after releasing serialization mutex. */
-	if (!args->new_inslist_taken)
-		__wt_free(session, args->new_inslist);
 	if (!args->new_inshead_taken)
 		__wt_free(session, args->new_inshead);
 	if (!args->new_ins_taken)
@@ -238,8 +195,8 @@ static inline void
 __wt_insert_unpack(
     void *untyped_args, WT_PAGE **pagep, uint32_t *write_genp,
     WT_INSERT_HEAD ***insheadp, WT_INSERT ****ins_stackp, WT_INSERT
-    ***next_stackp, WT_INSERT_HEAD ***new_inslistp, WT_INSERT_HEAD
-    **new_insheadp, WT_INSERT **new_insp, u_int *skipdepthp)
+    ***next_stackp, WT_INSERT_HEAD **new_insheadp, WT_INSERT **new_insp,
+    u_int *skipdepthp)
 {
 	__wt_insert_args *args = (__wt_insert_args *)untyped_args;
 
@@ -248,18 +205,9 @@ __wt_insert_unpack(
 	*insheadp = args->inshead;
 	*ins_stackp = args->ins_stack;
 	*next_stackp = args->next_stack;
-	*new_inslistp = args->new_inslist;
 	*new_insheadp = args->new_inshead;
 	*new_insp = args->new_ins;
 	*skipdepthp = args->skipdepth;
-}
-
-static inline void
-__wt_insert_new_inslist_taken(void *untyped_args)
-{
-	__wt_insert_args *args = (__wt_insert_args *)untyped_args;
-
-	args->new_inslist_taken = 1;
 }
 
 static inline void
