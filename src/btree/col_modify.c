@@ -301,13 +301,14 @@ __wt_col_append_serial_func(WT_SESSION_IMPL *session, void *args)
 	 * this ensures the list is never inconsistent.
 	 */
 	for (i = 0; i < skipdepth; i++)
-		new_ins->next[i] = *ins_stack[i];
+		new_ins->next[i] = ins_stack[i] == NULL ? NULL : *ins_stack[i];
 	WT_WRITE_BARRIER();
 	for (i = 0; i < skipdepth; i++) {
 		if (inshead->tail[i] == NULL ||
 		    ins_stack[i] == &inshead->tail[i]->next[i])
 			inshead->tail[i] = new_ins;
-		*ins_stack[i] = new_ins;
+		if (ins_stack[i] != NULL)
+			*ins_stack[i] = new_ins;
 	}
 
 	__wt_col_append_new_ins_taken(args);
