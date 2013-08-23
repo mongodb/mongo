@@ -252,10 +252,10 @@ worker(CONFIG *cfg, uint32_t worker_type)
 	WT_CONNECTION *conn;
 	WT_CURSOR *cursor;
 	WT_SESSION *session;
-	uint64_t next_incr, next_val;
-	int ret, op_ret;
 	const char *op_name = "search";
 	char *data_buf, *key_buf, *value;
+	int op_ret, ret;
+	uint64_t next_incr, next_val;
 
 	session = NULL;
 	data_buf = key_buf = NULL;
@@ -311,11 +311,20 @@ worker(CONFIG *cfg, uint32_t worker_type)
 		case WORKER_READ:
 			op_name = "read";
 			op_ret = cursor->search(cursor);
-			if (F_ISSET(cfg, PERF_RAND_WORKLOAD) &&
-			    op_ret == WT_NOTFOUND)
+			/*
+			 * If the item wasn't found and we are in either rand
+			 * workload, or it was within 10% of the end of the
+			 * range and we are doing inserts ignore the failure.
+			 */
+			if (op_ret == WT_NOTFOUND &&
+			    (F_ISSET(cfg, PERF_RAND_WORKLOAD) ||
+			    (cfg->insert_threads > 0 &&
+			    next_val * 1.1 > wtperf_value_range(cfg))))
 				op_ret = 0;
-			if (op_ret == 0)
+			if (op_ret == 0) {
 				++g_nread_ops;
+				break;
+			}
 			break;
 		case WORKER_INSERT_RMW:
 			op_name="insert_rmw";
@@ -346,9 +355,17 @@ worker(CONFIG *cfg, uint32_t worker_type)
 				cursor->set_value(cursor, data_buf);
 				op_ret = cursor->update(cursor);
 			}
-			if (F_ISSET(cfg, PERF_RAND_WORKLOAD) &&
-			    op_ret == WT_NOTFOUND)
+			/*
+			 * If the item wasn't found and we are in either rand
+			 * workload, or it was within 10% of the end of the
+			 * range and we are doing inserts ignore the failure.
+			 */
+			if (op_ret == WT_NOTFOUND &&
+			    (F_ISSET(cfg, PERF_RAND_WORKLOAD) ||
+			    (cfg->insert_threads > 0 &&
+			    next_val * 1.1 > wtperf_value_range(cfg))))
 				op_ret = 0;
+			    
 			if (op_ret == 0)
 				++g_nupdate_ops;
 			break;
@@ -360,7 +377,8 @@ worker(CONFIG *cfg, uint32_t worker_type)
 		/* Report errors and continue. */
 		if (op_ret != 0)
 			lprintf(cfg, op_ret, 0,
-			    "%s failed for: %s", op_name, key_buf);
+			    "%s failed for: %s, range: %"PRIu64,
+			    op_name, key_buf, wtperf_value_range(cfg));
 		else
 			++g_nworker_ops;
 	}
@@ -1124,6 +1142,8 @@ config_free(CONFIG *cfg)
 				*pstr = NULL;
 			}
 		}
+
+	free(cfg->uri);
 }
 
 /*
