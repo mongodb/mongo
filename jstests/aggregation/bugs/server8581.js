@@ -148,3 +148,38 @@ assert.eq(a2.result, a2result);
 assert.eq(a3.result, a3result);
 assert.eq(a4.result, a4result);
 assert.eq(a5.result, a5result);
+
+// test $$KEEP
+t.drop();
+// entire document should be present at 2 and beyond
+t.save({ _id: 1,
+         level: 2,
+         b: { level: 3,
+              c: 2
+            },
+         d: { level: 1,
+              e: 8
+            },
+         f: 9
+      });
+
+b1 = t.aggregate({$redact:  {$cond: [{$lte: ['$level', 1]}, "$$KEEP", "$$PRUNE"]}});
+b2 = t.aggregate({$redact:  {$cond: [{$lte: ['$level', 2]}, "$$KEEP", "$$PRUNE"]}});
+b3 = t.aggregate({$redact:  {$cond: [{$lte: ['$level', 3]}, "$$KEEP", "$$PRUNE"]}});
+
+b1result = [];
+
+b23result = [{ _id: 1,
+              level: 2,
+              b: { level: 3,
+                   c: 2
+                 },
+              d: { level: 1,
+                   e: 8
+                 },
+              f: 9
+           }];
+
+assert.eq(b1.result, b1result);
+assert.eq(b2.result, b23result);
+assert.eq(b3.result, b23result);
