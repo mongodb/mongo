@@ -1,5 +1,4 @@
 # wtperf options file: btree with inserts/updates and checkpointing, in memory
-uri="table:test"
 conn_config="cache_size=1G"
 table_config="type=file"
 icount=5000000
