@@ -16,12 +16,11 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 {
 	WT_DECL_RET;
 	WT_INSERT *ins;
-	WT_INSERT_HEAD **inshead, *new_inshead;
+	WT_INSERT_HEAD *inshead, **insheadp, *t;
 	WT_ITEM *key, *value;
 	WT_PAGE *page;
 	WT_UPDATE *old_upd, *upd, **upd_entry, *upd_obsolete;
 	size_t ins_size, upd_size;
-	size_t new_inshead_size;
 	uint32_t ins_slot;
 	u_int skipdepth;
 	int i, logged;
@@ -32,7 +31,6 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 	page = cbt->page;
 
 	ins = NULL;
-	new_inshead = NULL;
 	upd = NULL;
 	logged = 0;
 
@@ -82,7 +80,7 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 			__wt_update_obsolete_free(session, page, upd_obsolete);
 	} else {
 		/*
-		 * Allocate insert array if necessary.
+		 * Allocate the insert array as necessary.
 		 *
 		 * We allocate an additional insert array slot for insert keys
 		 * sorting less than any key on the page.  The test to select
@@ -95,7 +93,6 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 		ins_slot = F_ISSET(
 		    cbt, WT_CBT_SEARCH_SMALLEST) ? page->entries : cbt->slot;
 
-		new_inshead_size = 0;
 		if (page->u.row.ins == NULL) {
 			WT_ERR(__wt_calloc_def(
 			    session, page->entries + 1, &ins));
@@ -107,23 +104,41 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 				__wt_free(session, ins);
 			ins = NULL;
 		}
-		inshead = &page->u.row.ins[ins_slot];
+		insheadp = &page->u.row.ins[ins_slot];
 
-		/*
-		 * Allocate a new insert list head as necessary.
-		 *
-		 * If allocating a new insert list head, we have to initialize
-		 * the cursor's insert list stack and insert head reference as
-		 * well, search couldn't have.
-		 */
-		if (*inshead == NULL) {
-			new_inshead_size = sizeof(WT_INSERT_HEAD);
-			WT_ERR(__wt_calloc_def(session, 1, &new_inshead));
-			for (i = 0; i < WT_SKIP_MAXDEPTH; i++) {
-				cbt->ins_stack[i] = &new_inshead->head[i];
-				cbt->next_stack[i] = NULL;
+		/* Allocate the WT_INSERT_HEAD structure as necessary. */
+		if ((inshead = *insheadp) == NULL) {
+			WT_ERR(__wt_calloc_def(session, 1, &t));
+			if (WT_ATOMIC_CAS(*insheadp, NULL, t)) {
+				__wt_cache_page_inmem_incr(session,
+				    page, sizeof(WT_INSERT_HEAD));
+
+				/*
+				 * If allocating a new insert list head, we have
+				 * to initialize the cursor's insert list stack
+				 * and insert head reference as well, search
+				 * couldn't have.
+				 */
+				for (i = 0; i < WT_SKIP_MAXDEPTH; i++) {
+					cbt->ins_stack[i] = &t->head[i];
+					cbt->next_stack[i] = NULL;
+				}
+				cbt->ins_head = t;
+			} else {
+				/*
+				 * I'm not returning restart here, even though
+				 * the update will fail (the cursor's insert
+				 * stack is by definition wrong because it was
+				 * never set).   The reason is because it won't
+				 * close the race, it only makes it less likely
+				 * (and maybe simplifies the serialization
+				 * function check).  Let the serialization code
+				 * own the problem.
+				 */
+				__wt_free(session, t);
 			}
-			cbt->ins_head = new_inshead;
+
+			inshead = *insheadp;
 		}
 
 		/* Choose a skiplist depth for this insert. */
@@ -145,7 +160,6 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 		/* Insert the WT_INSERT structure. */
 		WT_ERR(__wt_insert_serial(session, page, cbt->write_gen,
 		    inshead, cbt->ins_stack, cbt->next_stack,
-		    &new_inshead, new_inshead_size,
 		    &ins, ins_size, skipdepth));
 	}
 
@@ -159,9 +173,6 @@ err:		/*
 		__wt_free(session, ins);
 		__wt_free(session, upd);
 	}
-
-	/* Free any unused, allocated memory. */
-	__wt_free(session, new_inshead);
 
 	return (ret);
 }
@@ -203,37 +214,33 @@ int
 __wt_insert_serial_func(WT_SESSION_IMPL *session, void *args)
 {
 	WT_INSERT *new_ins, ***ins_stack, **next_stack;
-	WT_INSERT_HEAD *inshead, **insheadp, *new_inshead;
+	WT_INSERT_HEAD *inshead;
 	WT_PAGE *page;
 	uint32_t write_gen;
 	u_int i, skipdepth;
 
-	__wt_insert_unpack(args, &page, &write_gen, &insheadp,
-	    &ins_stack, &next_stack, &new_inshead, &new_ins, &skipdepth);
-
-	if ((inshead = *insheadp) == NULL)
-		inshead = new_inshead;
-	else if (new_inshead != NULL)
-		return (WT_RESTART);
+	__wt_insert_unpack(args, &page, &write_gen,
+	    &inshead, &ins_stack, &next_stack, &new_ins, &skipdepth);
 
 	/*
-	 * Check the page's write-generation: if that fails, check whether we
-	 * are still in the expected position, and no item has been added where
-	 * our insert belongs.  Take extra care at the beginning and end of the
-	 * list (at each level): retry if we race there.
+	 * Largely ignore the page's write-generation, just confirm it hasn't
+	 * wrapped.
 	 */
 	WT_RET(__wt_page_write_gen_wrapped_check(page));
 
-	if (page->modify->write_gen != write_gen) {
-		for (i = 0; i < skipdepth; i++) {
-			if (ins_stack[i] == NULL ||
-			    *ins_stack[i] != next_stack[i])
-				return (WT_RESTART);
-			if (next_stack[i] == NULL &&
-			    inshead->tail[i] != NULL &&
-			    ins_stack[i] != &inshead->tail[i]->next[i])
-				return (WT_RESTART);
-		}
+	/*
+	 * Confirm we are still in the expected position, and no item has been
+	 * added where our insert belongs.  Take extra care at the beginning
+	 * and end of the list (at each level): retry if we race there.
+	 */
+	for (i = 0; i < skipdepth; i++) {
+		if (ins_stack[i] == NULL ||
+		    *ins_stack[i] != next_stack[i])
+			return (WT_RESTART);
+		if (next_stack[i] == NULL &&
+		    inshead->tail[i] != NULL &&
+		    ins_stack[i] != &inshead->tail[i]->next[i])
+			return (WT_RESTART);
 	}
 
 	/*
@@ -244,7 +251,6 @@ __wt_insert_serial_func(WT_SESSION_IMPL *session, void *args)
 	 */
 	for (i = 0; i < skipdepth; i++)
 		new_ins->next[i] = *ins_stack[i];
-
 	WT_WRITE_BARRIER();
 	for (i = 0; i < skipdepth; i++) {
 		if (inshead->tail[i] == NULL ||
@@ -254,18 +260,6 @@ __wt_insert_serial_func(WT_SESSION_IMPL *session, void *args)
 	}
 
 	__wt_insert_new_ins_taken(args);
-
-	/*
-	 * If the insert head does not yet have an insert list, our caller
-	 * passed us one.
-	 *
-	 * NOTE: it is important to do this after the item has been added to
-	 * the list.  Code can assume that if the list is set, it is non-empty.
-	 */
-	if (*insheadp == NULL) {
-		WT_PUBLISH(*insheadp, new_inshead);
-		__wt_insert_new_inshead_taken(args);
-	}
 
 	__wt_page_and_tree_modify_set(session, page);
 	return (0);
