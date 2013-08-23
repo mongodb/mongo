@@ -222,8 +222,7 @@ __clsm_open_cursors(
 		    lsm_tree->nchunks > clsm->nchunks) {
 			alloc = clsm->nchunks * sizeof(uint64_t);
 			WT_ERR(__wt_realloc(session,
-			    (clsm->txnid_max != NULL && clsm->nchunks > 0) ?
-			    &alloc : NULL,
+			    (alloc && clsm->txnid_max != NULL) ? &alloc : NULL,
 			    (lsm_tree->nchunks) * sizeof(uint64_t),
 			    &clsm->txnid_max));
 		}
@@ -320,10 +319,12 @@ __clsm_open_cursors(
 		 * non-zero), otherwise the new array will be cleared.
 		 */
 		alloc = clsm->nchunks * sizeof(WT_BLOOM *);
-		WT_ERR(__wt_realloc(session, alloc ? &alloc : NULL,
+		WT_ERR(__wt_realloc(session,
+		    (alloc && clsm->blooms != NULL) ? &alloc : NULL,
 		    nchunks * sizeof(WT_BLOOM *), &clsm->blooms));
 		alloc = clsm->nchunks * sizeof(WT_CURSOR *);
-		WT_ERR(__wt_realloc(session, alloc ? &alloc : NULL,
+		WT_ERR(__wt_realloc(session,
+		    (alloc && clsm->cursors != NULL) ? &alloc : NULL,
 		    nchunks * sizeof(WT_CURSOR *), &clsm->cursors));
 	}
 
