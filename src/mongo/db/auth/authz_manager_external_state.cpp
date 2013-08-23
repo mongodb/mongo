@@ -30,7 +30,7 @@ namespace mongo {
 
     Status AuthzManagerExternalState::getPrivilegeDocument(const UserName& userName,
                                                            int authzVersion,
-                                                           BSONObj* result) const {
+                                                           BSONObj* result) {
         if (userName == internalSecurity.user->getName()) {
             return Status(ErrorCodes::InternalError,
                           "Requested privilege document for the internal user");
@@ -88,7 +88,7 @@ namespace mongo {
         return Status::OK();
     }
 
-    bool AuthzManagerExternalState::hasAnyPrivilegeDocuments() const {
+    bool AuthzManagerExternalState::hasAnyPrivilegeDocuments() {
         std::string usersNamespace = "admin.system.users";
 
         BSONObj userBSONObj;

@@ -36,23 +36,45 @@ namespace mongo {
         virtual ~AuthzManagerExternalStateMongod();
 
         virtual Status insertPrivilegeDocument(const std::string& dbname,
-                                               const BSONObj& userObj) const;
+                                               const BSONObj& userObj);
 
         virtual Status updatePrivilegeDocument(const UserName& user,
-                                               const BSONObj& updateObj) const;
+                                               const BSONObj& updateObj);
 
         virtual Status removePrivilegeDocuments(const std::string& dbname,
-                                                const BSONObj& query) const;
+                                                const BSONObj& query);
 
-        virtual Status getAllDatabaseNames(std::vector<std::string>* dbnames) const;
+        virtual Status getAllDatabaseNames(std::vector<std::string>* dbnames);
 
         virtual Status getAllV1PrivilegeDocsForDB(const std::string& dbname,
-                                                  std::vector<BSONObj>* privDocs) const;
+                                                  std::vector<BSONObj>* privDocs);
+
+        virtual Status findOne(const NamespaceString& collectionName,
+                               const BSONObj& query,
+                               BSONObj* result);
+        virtual Status insert(const NamespaceString& collectionName,
+                              const BSONObj& document);
+        virtual Status updateOne(const NamespaceString& collectionName,
+                                 const BSONObj& query,
+                                 const BSONObj& updatePattern,
+                                 bool upsert);
+        virtual Status remove(const NamespaceString& collectionName,
+                              const BSONObj& query);
+        virtual Status createIndex(const NamespaceString& collectionName,
+                                   const BSONObj& pattern,
+                                   bool unique);
+        virtual Status dropCollection(const NamespaceString& collectionName);
+        virtual Status renameCollection(const NamespaceString& oldName,
+                                        const NamespaceString& newName);
+        virtual Status copyCollection(const NamespaceString& fromName,
+                                      const NamespaceString& toName);
+        virtual bool tryLockUpgradeProcess();
+        virtual void unlockUpgradeProcess();
 
     protected:
         virtual Status _findUser(const string& usersNamespace,
                                  const BSONObj& query,
-                                 BSONObj* result) const;
+                                 BSONObj* result);
     };
 
 } // namespace mongo

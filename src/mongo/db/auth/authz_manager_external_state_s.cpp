@@ -52,7 +52,7 @@ namespace {
 
     Status AuthzManagerExternalStateMongos::_findUser(const string& usersNamespace,
                                                       const BSONObj& query,
-                                                      BSONObj* result) const {
+                                                      BSONObj* result) {
         try {
             scoped_ptr<ScopedDbConnection> conn(getConnectionForUsersCollection(usersNamespace));
             *result = conn->get()->findOne(usersNamespace, query).getOwned();
@@ -67,7 +67,7 @@ namespace {
     }
 
     Status AuthzManagerExternalStateMongos::insertPrivilegeDocument(const string& dbname,
-                                                                    const BSONObj& userObj) const {
+                                                                    const BSONObj& userObj) {
         try {
             string userNS = dbname + ".system.users";
             scoped_ptr<ScopedDbConnection> conn(getConnectionForUsersCollection(userNS));
@@ -94,7 +94,7 @@ namespace {
     }
 
     Status AuthzManagerExternalStateMongos::updatePrivilegeDocument(
-            const UserName& user, const BSONObj& updateObj) const {
+            const UserName& user, const BSONObj& updateObj) {
         try {
             string userNS = mongoutils::str::stream() << user.getDB() << ".system.users";
             scoped_ptr<ScopedDbConnection> conn(getConnectionForUsersCollection(userNS));
@@ -127,7 +127,7 @@ namespace {
     }
 
     Status AuthzManagerExternalStateMongos::removePrivilegeDocuments(const string& dbname,
-                                                                     const BSONObj& query) const {
+                                                                     const BSONObj& query) {
         try {
             string userNS = dbname + ".system.users";
             scoped_ptr<ScopedDbConnection> conn(getConnectionForUsersCollection(userNS));
@@ -156,7 +156,7 @@ namespace {
     }
 
     Status AuthzManagerExternalStateMongos::getAllDatabaseNames(
-            std::vector<std::string>* dbnames) const {
+            std::vector<std::string>* dbnames) {
         try {
             scoped_ptr<ScopedDbConnection> conn(
                     getConnectionForUsersCollection(DatabaseType::ConfigNS));
@@ -179,7 +179,7 @@ namespace {
     }
 
     Status AuthzManagerExternalStateMongos::getAllV1PrivilegeDocsForDB(
-            const std::string& dbname, std::vector<BSONObj>* privDocs) const {
+            const std::string& dbname, std::vector<BSONObj>* privDocs) {
         try {
             std::string usersNamespace = dbname + ".system.users";
             scoped_ptr<ScopedDbConnection> conn(getConnectionForUsersCollection(usersNamespace));
@@ -193,6 +193,65 @@ namespace {
         } catch (const DBException& e) {
             return e.toStatus();
         }
+    }
+
+    Status AuthzManagerExternalStateMongos::findOne(
+            const NamespaceString& collectionName,
+            const BSONObj& query,
+            BSONObj* result) {
+        fassertFailed(17101);
+    }
+
+    Status AuthzManagerExternalStateMongos::insert(
+            const NamespaceString& collectionName,
+            const BSONObj& document) {
+        fassertFailed(17102);
+    }
+
+    Status AuthzManagerExternalStateMongos::updateOne(
+            const NamespaceString& collectionName,
+            const BSONObj& query,
+            const BSONObj& updatePattern,
+            bool upsert) {
+        fassertFailed(17103);
+    }
+
+    Status AuthzManagerExternalStateMongos::remove(
+            const NamespaceString& collectionName,
+            const BSONObj& query) {
+        fassertFailed(17104);
+    }
+
+    Status AuthzManagerExternalStateMongos::createIndex(
+            const NamespaceString& collectionName,
+            const BSONObj& pattern,
+            bool unique) {
+        fassertFailed(17105);
+    }
+
+    Status AuthzManagerExternalStateMongos::dropCollection(
+            const NamespaceString& collectionName) {
+        fassertFailed(17106);
+    }
+
+    Status AuthzManagerExternalStateMongos::renameCollection(
+            const NamespaceString& oldName,
+            const NamespaceString& newName) {
+        fassertFailed(17107);
+    }
+
+    Status AuthzManagerExternalStateMongos::copyCollection(
+            const NamespaceString& fromName,
+            const NamespaceString& toName) {
+        fassertFailed(17108);
+    }
+
+    bool AuthzManagerExternalStateMongos::tryLockUpgradeProcess() {
+        fassertFailed(17109);
+    }
+
+    void AuthzManagerExternalStateMongos::unlockUpgradeProcess() {
+        fassertFailed(17110);
     }
 
 } // namespace mongo

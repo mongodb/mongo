@@ -65,6 +65,8 @@ namespace mongo {
         bool operator!=( const string& nsIn ) const { return nsIn != _ns; }
         bool operator!=( const NamespaceString& nsIn ) const { return nsIn._ns != _ns; }
 
+        bool operator<( const NamespaceString& rhs ) const { return _ns < rhs._ns; }
+
         /** ( foo.bar ).getSisterNS( "blah" ) == foo.blah
          */
         string getSisterNS( const StringData& local ) const;
