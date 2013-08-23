@@ -298,6 +298,7 @@ worker(CONFIG *cfg, uint32_t worker_type)
 			next_val = cfg->icount + next_incr;
 		else
 			next_val = wtperf_rand(cfg);
+
 		/*
 		 * If the workload is started without a populate phase we
 		 * rely on at least one insert to get a valid item id.
@@ -311,20 +312,6 @@ worker(CONFIG *cfg, uint32_t worker_type)
 		case WORKER_READ:
 			op_name = "read";
 			op_ret = cursor->search(cursor);
-			/*
-			 * If the item wasn't found and we are in either rand
-			 * workload, or it was within 10% of the end of the
-			 * range and we are doing inserts ignore the failure.
-			 */
-			if (op_ret == WT_NOTFOUND &&
-			    (F_ISSET(cfg, PERF_RAND_WORKLOAD) ||
-			    (cfg->insert_threads > 0 &&
-			    next_val * 1.1 > wtperf_value_range(cfg))))
-				op_ret = 0;
-			if (op_ret == 0) {
-				++g_nread_ops;
-				break;
-			}
 			break;
 		case WORKER_INSERT_RMW:
 			op_name="insert_rmw";
@@ -336,11 +323,6 @@ worker(CONFIG *cfg, uint32_t worker_type)
 			op_name = "insert";
 			cursor->set_value(cursor, data_buf);
 			op_ret = cursor->insert(cursor);
-			if (F_ISSET(cfg, PERF_RAND_WORKLOAD) &&
-			    op_ret == WT_DUPLICATE_KEY)
-				op_ret = 0;
-			if (op_ret != 0)
-				++g_nfailedins_ops;
 			break;
 		case WORKER_UPDATE:
 			op_name = "update";
@@ -355,19 +337,6 @@ worker(CONFIG *cfg, uint32_t worker_type)
 				cursor->set_value(cursor, data_buf);
 				op_ret = cursor->update(cursor);
 			}
-			/*
-			 * If the item wasn't found and we are in either rand
-			 * workload, or it was within 10% of the end of the
-			 * range and we are doing inserts ignore the failure.
-			 */
-			if (op_ret == WT_NOTFOUND &&
-			    (F_ISSET(cfg, PERF_RAND_WORKLOAD) ||
-			    (cfg->insert_threads > 0 &&
-			    next_val * 1.1 > wtperf_value_range(cfg))))
-				op_ret = 0;
-			    
-			if (op_ret == 0)
-				++g_nupdate_ops;
 			break;
 		default:
 			lprintf(cfg, EINVAL, 0, "Invalid worker type");
@@ -375,12 +344,41 @@ worker(CONFIG *cfg, uint32_t worker_type)
 		}
 
 		/* Report errors and continue. */
-		if (op_ret != 0)
-			lprintf(cfg, op_ret, 0,
-			    "%s failed for: %s, range: %"PRIu64,
-			    op_name, key_buf, wtperf_value_range(cfg));
-		else
+		if (op_ret != 0) {
+			if (op_ret == WT_NOTFOUND &&
+			    F_ISSET(cfg, PERF_RAND_WORKLOAD))
+				continue;
+
+			/*
+			 * Emit a warning instead of an error if there are
+			 * insert threads, and the failed op was for an old
+			 * item.
+			 */
+			if (op_ret == WT_NOTFOUND && cfg->insert_threads > 0 &&
+			    (worker_type == WORKER_READ ||
+			    worker_type == WORKER_UPDATE)) {
+				if (next_val * 1.1 > wtperf_value_range(cfg))
+					continue;
+				lprintf(cfg, op_ret, 1,
+				    "%s not found for: %s, range: %" PRIu64
+				    " an insert is likely more than ten "
+				    "percent behind reads",
+				    op_name, key_buf, wtperf_value_range(cfg));
+			} else
+				lprintf(cfg, op_ret, 0,
+				    "%s failed for: %s, range: %"PRIu64,
+				    op_name, key_buf, wtperf_value_range(cfg));
+
+			if (worker_type == WORKER_INSERT ||
+			    worker_type == WORKER_INSERT_RMW)
+				++g_nfailedins_ops;
+		} else {
+			if (worker_type == WORKER_READ)
+				++g_nread_ops;
+			else if (worker_type == WORKER_UPDATE)
+				++g_nupdate_ops;
 			++g_nworker_ops;
+		}
 	}
 
 err:	if (ret != 0)
