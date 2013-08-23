@@ -592,7 +592,6 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 	rd_lsn = start_lsn;
 	WT_ERR(__wt_buf_initsize(session, &buf, LOG_ALIGN));
 	do {
-		reclen = 0;
 		if (rd_lsn.offset >= log_size) {
 			/*
 			 * If we read the last record, go to the next file.

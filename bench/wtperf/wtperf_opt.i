@@ -90,8 +90,8 @@ DEF_OPT_AS_UINT32(key_sz, 20, "key item size")
 DEF_OPT_AS_FLAGVAL(pareto, PERF_RAND_PARETO,
     "use pareto 80/20 distribution for random numbers")
 DEF_OPT_AS_UINT32(populate_ops_per_txn, 0,
-    "number of operations to group into each transaction in the populate phase."
-    " Zero for auto-commit.")
+    "number of operations to group into each transaction in the\n"
+    "populate phase. Zero for auto-commit.")
 DEF_OPT_AS_UINT32(populate_threads, 1, "number of populate threads")
 DEF_OPT_AS_UINT32(rand_seed, 14023954, "seed for random number generator")
 DEF_OPT_AS_UINT32(random_range, 0,
@@ -105,6 +105,9 @@ DEF_OPT_AS_UINT32(stat_interval, 0,
     "log statistics every <int> report intervals, zero to disable")
 DEF_OPT_AS_STRING(table_config, DEFAULT_LSM_CONFIG,
     "table configuration string")
+DEF_OPT_AS_STRING(transaction_config, "",
+    "transaction configuration string,\n"
+    "relevant when populate_opts_per_txn is nonzero")
 DEF_OPT_AS_UINT32(update_threads, 0, "number of update threads")
 DEF_OPT_AS_STRING(uri, "lsm:test", "table uri")
 DEF_OPT_AS_UINT32(verbose, 0, "verbosity")

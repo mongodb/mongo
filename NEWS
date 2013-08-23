@@ -1,3 +1,45 @@
+WiredTiger release 1.6.4, 2013-08-20
+------------------------------------
+
+This is primarily a bugfix and performance tuning release. The main changes are:
+
+* Make prefix compression of keys conditional on the amount of space saved.
+  A database format change was required for this enhancement. See upgrading
+  documentation for details. [#624]
+
+* The default behavior of the wt utility's load command has been changed to
+  overwrite existing data.
+
+* Add a WT_SESSION.create prefix_compression_min configuration option with a
+  default value of 4. [#624] and [#624]
+
+* Fix "make install" of Python API. [#598]
+
+* Require platform support for atomic read/write of 64 bit values. [#553]
+
+* Support transaction semantics for custom data source implementations. Enhance
+  Memrata data source to support transactions.
+
+* Changes to the wtperf testing tool related to how configuration options are
+  specified.
+
+* Enhance cursor key/value memory management to be more efficient, consistent,
+  and have stricter checking of inputs and outputs.
+
+* Increase the likelihood of being able to evict hot pages. [#604]
+
+* Reference on-page keys instead of copying them to allocated memory. This
+  saves space in the cache and overhead when reading pages into cache.
+  [#592] and [#600]
+
+* Add a btree search optimization that skips matching prefixes. [#595]
+
+* Turn off Huffman encoding for keys on row-store internal pages. [#592]
+
+* Add concurrent logging infrastructure that will be used to support write
+  ahead logging in a future release.
+
+
 WiredTiger release 1.6.3, 2013-07-12
 ------------------------------------
 

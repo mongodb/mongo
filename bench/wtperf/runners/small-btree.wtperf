@@ -1,0 +1,20 @@
+# wtperf options file: small btree configuration
+uri="table:test"
+conn_config="create,cache_size=500MB"
+table_config="key_format=S,value_format=S,exclusive,\
+	leaf_page_max=4kb,internal_page_max=64kb,allocation_size=4kb,\
+	lsm_chunk_size=5MB"
+create=true
+rand_seed=14023954
+icount=500000
+data_sz=100
+key_sz=20
+report_interval=5
+checkpoint_interval=0
+stat_interval=4
+run_time=120
+populate_threads=1
+read_threads=8
+insert_threads=0
+update_threads=0
+verbose=1
