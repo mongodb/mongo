@@ -29,10 +29,6 @@
 
 #define	WT_LSM_UPDATE_LEAVE(clsm, session, ret)				\
 	CURSOR_UPDATE_API_END(session, ret);				\
-	if (clsm->primary_chunk != NULL) {				\
-		WT_ASSERT(session, clsm->primary_chunk->ncursor > 0);	\
-		(void)WT_ATOMIC_SUB(clsm->primary_chunk->ncursor, 1);	\
-	}
 
 static int __clsm_open_cursors(WT_CURSOR_LSM *, int, u_int, uint32_t);
 static int __clsm_search(WT_CURSOR *);
@@ -40,12 +36,62 @@ static int __clsm_search(WT_CURSOR *);
 static inline int
 __clsm_enter(WT_CURSOR_LSM *clsm, int update)
 {
-	if (update && clsm->primary_chunk != NULL)
-		(void)WT_ATOMIC_ADD(clsm->primary_chunk->ncursor, 1);
-	if (!F_ISSET(clsm, WT_CLSM_MERGE) &&
-	    (clsm->dsk_gen != clsm->lsm_tree->dsk_gen ||
-	    (!update && !F_ISSET(clsm, WT_CLSM_OPEN_READ))))
+	WT_LSM_CHUNK *chunk;
+	WT_SESSION_IMPL *session;
+	uint64_t *txnid_maxp;
+	uint64_t id, myid, snap_min;
+
+	session = (WT_SESSION_IMPL *)clsm->iface.session;
+
+	/* Merge cursors never update. */
+	if (F_ISSET(clsm, WT_CLSM_MERGE))
+		return (0);
+
+	for (;;) {
+		/* Update the maximum transaction ID in the primary chunk. */
+		if (update && (chunk = clsm->primary_chunk) != NULL) {
+			__wt_txn_autocommit_check(session);
+			for (id = chunk->txnid_max, myid = session->txn.id;
+			    !TXNID_LE(myid, id);
+			    id = chunk->txnid_max)
+				(void)WT_ATOMIC_CAS(chunk->txnid_max, id, myid);
+		}
+
+		/*
+		 * Figure out how many updates are required for snapshot
+		 * isolation.
+		 *
+		 * This is not a normal visibility check on the maximum
+		 * transaction ID in each chunk: any transaction ID that
+		 * overlaps with our snapshot is a potential conflict.
+		 */
+		clsm->nupdates = 1;
+		if (session->txn.isolation == TXN_ISO_SNAPSHOT &&
+		    F_ISSET(clsm, WT_CLSM_OPEN_SNAPSHOT)) {
+			snap_min = session->txn.snap_min;
+			for (txnid_maxp = &clsm->txnid_max[clsm->nchunks - 2];
+			    clsm->nupdates < clsm->nchunks;
+			    clsm->nupdates++, txnid_maxp--)
+				if (TXNID_LT(*txnid_maxp, snap_min))
+					break;
+		}
+
+		/*
+		 * Stop when we are up-to-date, as long as this is:
+		 *   - a snapshot isolation update and the cursor is set up for
+		 *     that;
+		 *   - an update operation with a primary chunk, or
+		 *   - a read operation and the cursor is open for reading.
+		 */
+		if (clsm->dsk_gen == clsm->lsm_tree->dsk_gen &&
+		    (!update || session->txn.isolation != TXN_ISO_SNAPSHOT ||
+		    F_ISSET(clsm, WT_CLSM_OPEN_SNAPSHOT)) &&
+		    ((update && clsm->primary_chunk != NULL) ||
+		    (!update && F_ISSET(clsm, WT_CLSM_OPEN_READ))))
+			break;
+
 		WT_RET(__clsm_open_cursors(clsm, update, 0, 0));
+	}
 
 	return (0);
 }
@@ -78,7 +124,7 @@ __clsm_deleted(WT_CURSOR_LSM *clsm, WT_ITEM *item)
  *	Close all of the btree cursors currently open.
  */
 static int
-__clsm_close_cursors(WT_CURSOR_LSM *clsm, int update, u_int skip_chunks)
+__clsm_close_cursors(WT_CURSOR_LSM *clsm, u_int skip_chunks)
 {
 	WT_BLOOM *bloom;
 	WT_CURSOR *c;
@@ -88,11 +134,7 @@ __clsm_close_cursors(WT_CURSOR_LSM *clsm, int update, u_int skip_chunks)
 		return (0);
 
 	/* Detach from our old primary. */
-	if (clsm->primary_chunk != NULL) {
-		if (update)
-			(void)WT_ATOMIC_SUB(clsm->primary_chunk->ncursor, 1);
-		clsm->primary_chunk = NULL;
-	}
+	clsm->primary_chunk = NULL;
 
 	if (skip_chunks < clsm->nchunks)
 		WT_FORALL_CURSORS(clsm, c, i) {
@@ -123,23 +165,21 @@ __clsm_open_cursors(
 	WT_LSM_CHUNK *chunk;
 	WT_LSM_TREE *lsm_tree;
 	WT_SESSION_IMPL *session;
+	WT_TXN *txn;
 	const char *checkpoint, *ckpt_cfg[3];
 	size_t alloc;
 	u_int i, nchunks, skip_chunks;
 	int locked;
 
 	session = (WT_SESSION_IMPL *)clsm->iface.session;
+	txn = &session->txn;
 	lsm_tree = clsm->lsm_tree;
 	c = &clsm->iface;
 	chunk = NULL;
-	skip_chunks = 0;
 
 	ckpt_cfg[0] = WT_CONFIG_BASE(session, session_open_cursor);
 	ckpt_cfg[1] = "checkpoint=WiredTigerCheckpoint,raw";
 	ckpt_cfg[2] = NULL;
-
-	if (!update)
-		F_SET(clsm, WT_CLSM_OPEN_READ);
 
 	/* Copy the key, so we don't lose the cursor position. */
 	if (F_ISSET(c, WT_CURSTD_KEY_INT) && c->key.data != c->key.mem)
@@ -148,16 +188,86 @@ __clsm_open_cursors(
 
 	F_CLR(clsm, WT_CLSM_ITERATE_NEXT | WT_CLSM_ITERATE_PREV);
 
+	if (update) {
+		/*
+		 * If this is the first update in this cursor, check if a new
+		 * in-memory chunk is needed.
+		 */
+		if (clsm->primary_chunk == NULL) {
+			WT_RET(__wt_writelock(session, lsm_tree->rwlock));
+			if (clsm->dsk_gen == lsm_tree->dsk_gen)
+				WT_WITH_SCHEMA_LOCK(session, ret =
+				    __wt_lsm_tree_switch(session, lsm_tree));
+			WT_TRET(__wt_rwunlock(session, lsm_tree->rwlock));
+			WT_RET(ret);
+		}
+		if (txn->isolation == TXN_ISO_SNAPSHOT)
+			F_SET(clsm, WT_CLSM_OPEN_SNAPSHOT);
+	} else
+		F_SET(clsm, WT_CLSM_OPEN_READ);
+
 	WT_RET(__wt_readlock(session, lsm_tree->rwlock));
 	locked = 1;
+	F_SET(session, WT_SESSION_NO_CACHE_CHECK);
 
-	if (!F_ISSET(clsm, WT_CLSM_MERGE)) {
+	/*
+	 * If we are only opening the cursor for updates, only open the primary
+	 * chunk, plus any other chunks that might be required to detect
+	 * snapshot isolation conflicts.
+	 */
+	if (F_ISSET(clsm, WT_CLSM_MERGE | WT_CLSM_OPEN_READ))
+		skip_chunks = 0;
+	else if (F_ISSET(clsm, WT_CLSM_OPEN_SNAPSHOT)) {
+		if (clsm->txnid_max == NULL ||
+		    lsm_tree->nchunks > clsm->nchunks) {
+			alloc = clsm->nchunks * sizeof(uint64_t);
+			WT_ERR(__wt_realloc(session,
+			    (alloc && clsm->txnid_max != NULL) ? &alloc : NULL,
+			    (lsm_tree->nchunks) * sizeof(uint64_t),
+			    &clsm->txnid_max));
+		}
+		for (skip_chunks = lsm_tree->nchunks - 1;
+		    skip_chunks > 0;
+		    skip_chunks--) {
+			chunk = lsm_tree->chunk[skip_chunks];
+			/* Copy the maximum transaction ID. */
+			if (clsm->txnid_max != NULL)
+				clsm->txnid_max[skip_chunks] = chunk->txnid_max;
+			if (!__wt_txn_visible_all(session, chunk->txnid_max))
+				break;
+		}
+	} else
+		skip_chunks = lsm_tree->nchunks - 1;
+
+	/* Merge cursors have already figured out how many chunks they need. */
+	if (F_ISSET(clsm, WT_CLSM_MERGE)) {
+		nchunks = clsm->nchunks;
+
+		/*
+		 * We may have raced with another merge completing.  Check that
+		 * we're starting at the right offset in the chunk array.
+		 */
+		if (start_chunk >= lsm_tree->nchunks ||
+		    lsm_tree->chunk[start_chunk]->id != start_id)
+			for (start_chunk = 0;
+			    start_chunk < lsm_tree->nchunks;
+			    start_chunk++) {
+				chunk = lsm_tree->chunk[start_chunk];
+				if (chunk->id == start_id)
+					break;
+			}
+
+		WT_ASSERT(session, start_chunk + nchunks <= lsm_tree->nchunks);
+	} else {
+		nchunks = lsm_tree->nchunks;
+
 		/* Calculate how many cursors are open in unchanged chunks. */
 		for (cp = clsm->cursors;
 		    skip_chunks < clsm->nchunks &&
 		    skip_chunks < lsm_tree->nchunks;
 		    cp++, skip_chunks++) {
 			chunk = lsm_tree->chunk[skip_chunks];
+
 			/* Easy case: the URIs don't match. */
 			if (*cp == NULL || strcmp((*cp)->uri, chunk->uri) != 0)
 				break;
@@ -183,41 +293,23 @@ __clsm_open_cursors(
 		}
 
 		/*
-		 * Close the cursors we no longer need.
+		 * Close any cursors we no longer need.
 		 *
 		 * Drop the LSM tree lock while we do this: if the cache is
 		 * full, we may block while closing a cursor.
 		 */
-		locked = 0;
-		WT_ERR(__wt_rwunlock(session, lsm_tree->rwlock));
-		WT_ERR(__clsm_close_cursors(clsm, update, skip_chunks));
-		WT_ERR(__wt_readlock(session, lsm_tree->rwlock));
-		locked = 1;
+		if (clsm->cursors != NULL && skip_chunks < clsm->nchunks) {
+			locked = 0;
+			WT_ERR(__wt_rwunlock(session, lsm_tree->rwlock));
+			WT_ERR(__clsm_close_cursors(clsm, skip_chunks));
+			WT_ERR(__wt_readlock(session, lsm_tree->rwlock));
+			locked = 1;
+		} else {
+			/* Detach from our old primary. */
+			clsm->primary_chunk = NULL;
+			clsm->current = NULL;
+		}
 	}
-
-	F_SET(session, WT_SESSION_NO_CACHE_CHECK);
-
-	/* Merge cursors have already figured out how many chunks they need. */
-	if (F_ISSET(clsm, WT_CLSM_MERGE)) {
-		nchunks = clsm->nchunks;
-
-		/*
-		 * We may have raced with another merge completing.  Check that
-		 * we're starting at the right offset in the chunk array.
-		 */
-		if (start_chunk >= lsm_tree->nchunks ||
-		    lsm_tree->chunk[start_chunk]->id != start_id)
-			for (start_chunk = 0;
-			    start_chunk < lsm_tree->nchunks;
-			    start_chunk++) {
-				chunk = lsm_tree->chunk[start_chunk];
-				if (chunk->id == start_id)
-					break;
-			}
-
-		WT_ASSERT(session, start_chunk + nchunks <= lsm_tree->nchunks);
-	} else
-		nchunks = lsm_tree->nchunks;
 
 	if (clsm->cursors == NULL || nchunks > clsm->nchunks) {
 		/*
@@ -226,26 +318,30 @@ __clsm_open_cursors(
 		 * size parameter in that case (but only if the count is
 		 * non-zero), otherwise the new array will be cleared.
 		 */
-		alloc = skip_chunks * sizeof(WT_BLOOM *);
-		WT_ERR(__wt_realloc(session, skip_chunks ? &alloc : NULL,
+		alloc = clsm->nchunks * sizeof(WT_BLOOM *);
+		WT_ERR(__wt_realloc(session,
+		    (alloc && clsm->blooms != NULL) ? &alloc : NULL,
 		    nchunks * sizeof(WT_BLOOM *), &clsm->blooms));
-		alloc = skip_chunks * sizeof(WT_CURSOR *);
-		WT_ERR(__wt_realloc(session, skip_chunks ? &alloc : NULL,
+		alloc = clsm->nchunks * sizeof(WT_CURSOR *);
+		WT_ERR(__wt_realloc(session,
+		    (alloc && clsm->cursors != NULL) ? &alloc : NULL,
 		    nchunks * sizeof(WT_CURSOR *), &clsm->cursors));
 	}
+
 	clsm->nchunks = nchunks;
 
 	for (i = skip_chunks, cp = clsm->cursors + i;
 	    i != clsm->nchunks;
 	    i++, cp++) {
-		if (!F_ISSET(clsm, WT_CLSM_OPEN_READ) && i < clsm->nchunks - 1)
-			continue;
+		chunk = lsm_tree->chunk[i + start_chunk];
+		/* Copy the maximum transaction ID. */
+		if (F_ISSET(clsm, WT_CLSM_OPEN_SNAPSHOT))
+			clsm->txnid_max[i] = chunk->txnid_max;
 
 		/*
 		 * Read from the checkpoint if the file has been written.
 		 * Once all cursors switch, the in-memory tree can be evicted.
 		 */
-		chunk = lsm_tree->chunk[i + start_chunk];
 		ret = __wt_open_cursor(session,
 		    chunk->uri, &clsm->iface,
 		    !F_ISSET(chunk, WT_LSM_CHUNK_ONDISK) ? NULL : ckpt_cfg, cp);
@@ -274,9 +370,6 @@ __clsm_open_cursors(
 	/* The last chunk is our new primary. */
 	if (chunk != NULL && !F_ISSET(chunk, WT_LSM_CHUNK_ONDISK)) {
 		clsm->primary_chunk = chunk;
-		if (update)
-			(void)WT_ATOMIC_ADD(clsm->primary_chunk->ncursor, 1);
-
 		__wt_btree_evictable(session, 0);
 	}
 
@@ -847,30 +940,18 @@ static inline int
 __clsm_put(WT_SESSION_IMPL *session,
     WT_CURSOR_LSM *clsm, const WT_ITEM *key, const WT_ITEM *value)
 {
-	WT_CURSOR *primary;
+	WT_CURSOR *c, *primary;
 	WT_DECL_RET;
 	WT_LSM_TREE *lsm_tree;
+	u_int i;
 	int need_signal, ovfl;
 
 	lsm_tree = clsm->lsm_tree;
 
-	/*
-	 * If this is the first update in this cursor, check if a new in-memory
-	 * chunk is needed.
-	 */
-	if (clsm->primary_chunk == NULL) {
-		WT_RET(__wt_writelock(session, lsm_tree->rwlock));
-		if (clsm->dsk_gen == lsm_tree->dsk_gen)
-			WT_WITH_SCHEMA_LOCK(session,
-			    ret = __wt_lsm_tree_switch(session, lsm_tree));
-		WT_TRET(__wt_rwunlock(session, lsm_tree->rwlock));
-		WT_RET(ret);
-
-		/* We changed the structure, or someone else did: update. */
-		WT_RET(__clsm_enter(clsm, 1));
-
-		WT_ASSERT(session, clsm->primary_chunk != NULL);
-	}
+	WT_ASSERT(session, clsm->primary_chunk != NULL);
+	WT_ASSERT(session, !F_ISSET(clsm->primary_chunk, WT_LSM_CHUNK_ONDISK));
+	WT_ASSERT(session,
+	    TXNID_LE(session->txn.id, clsm->primary_chunk->txnid_max));
 
 	/*
 	 * Set the position for future scans.  If we were already positioned in
@@ -879,9 +960,17 @@ __clsm_put(WT_SESSION_IMPL *session,
 	 */
 	F_CLR(clsm, WT_CLSM_ITERATE_NEXT | WT_CLSM_ITERATE_PREV);
 	clsm->current = primary = clsm->cursors[clsm->nchunks - 1];
-	primary->set_key(primary, key);
-	primary->set_value(primary, value);
-	WT_RET(primary->insert(primary));
+
+	/*
+	 * Update the primary, plus any older chunks needed to detect
+	 * write-write conflicts across chunk boundaries.
+	 */
+	for (i = 0; i < clsm->nupdates; i++) {
+		c = clsm->cursors[clsm->nchunks - i - 1];
+		c->set_key(c, key);
+		c->set_value(c, value);
+		WT_RET(c->insert(c));
+	}
 
 	/*
 	 * The count is in a shared structure, but it's only approximate, so
@@ -1035,9 +1124,11 @@ __clsm_close(WT_CURSOR *cursor)
 	 */
 	clsm = (WT_CURSOR_LSM *)cursor;
 	CURSOR_API_CALL(cursor, session, close, NULL);
-	WT_TRET(__clsm_close_cursors(clsm, 0, 0));
+	WT_TRET(__clsm_close_cursors(clsm, 0));
 	__wt_free(session, clsm->blooms);
 	__wt_free(session, clsm->cursors);
+	__wt_free(session, clsm->txnid_max);
+
 	/* The WT_LSM_TREE owns the URI. */
 	cursor->uri = NULL;
 	if (clsm->lsm_tree != NULL)
