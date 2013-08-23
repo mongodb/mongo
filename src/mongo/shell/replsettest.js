@@ -919,7 +919,13 @@ ReplSetTest.prototype.waitForIndicator = function( node, states, ind, timeout ){
     var self = this;
     assert.soon(function() {
         
-        status = self.status()
+        try {
+            status = self.status();
+        }
+        catch ( ex ) {
+            print( "ReplSetTest waitForIndicator could not get status: " + tojson( ex ) );
+            return false;
+        }
         
         var printStatus = false
         if( lastTime == null || ( currTime = new Date().getTime() ) - (1000 * 5) > lastTime ){
