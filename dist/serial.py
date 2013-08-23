@@ -22,6 +22,7 @@ Serial('col_append', [
 		SerialArg('WT_INSERT ***', 'ins_stack'),
 		SerialArg('WT_INSERT **', 'next_stack'),
 		SerialArg('WT_INSERT *', 'new_ins', 1),
+		SerialArg('uint64_t *', 'recno'),
 		SerialArg('u_int', 'skipdepth'),
 	]),
 

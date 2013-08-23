@@ -19,7 +19,7 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int op)
 {
 	WT_BTREE *btree;
 	WT_DECL_RET;
-	WT_INSERT *ins, *ins_copy;
+	WT_INSERT *ins;
 	WT_INSERT_HEAD *inshead, **insheadp, *t;
 	WT_ITEM *value, _value;
 	WT_PAGE *page;
@@ -193,21 +193,12 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int op)
 		cbt->ins = ins;
 
 		/* Insert or append the WT_INSERT structure. */
-		if (op == 1) {
-			/*
-			 * The serialized function clears ins: take a copy of
-			 * the pointer so we can look up the record number.
-			 */
-			ins_copy = ins;
-
+		if (op == 1)
 			WT_ERR(__wt_col_append_serial(session,
 			    page, cbt->write_gen, inshead,
 			    cbt->ins_stack, cbt->next_stack,
-			    &ins, ins_size, skipdepth));
-
-			/* Put the new recno into the cursor. */
-			cbt->recno = WT_INSERT_RECNO(ins_copy);
-		} else
+			    &ins, ins_size, &cbt->recno, skipdepth));
+		else
 			WT_ERR(__wt_insert_serial(session,
 			    page, cbt->write_gen, inshead,
 			    cbt->ins_stack, cbt->next_stack,
@@ -264,14 +255,14 @@ __wt_col_append_serial_func(WT_SESSION_IMPL *session, void *args)
 	WT_INSERT *ins, *new_ins, ***ins_stack, **next_stack;
 	WT_INSERT_HEAD *inshead;
 	WT_PAGE *page;
-	uint64_t recno;
+	uint64_t recno, *recnop;
 	uint32_t write_gen;
 	u_int i, skipdepth;
 
 	btree = S2BT(session);
 
 	__wt_col_append_unpack(args, &page, &write_gen,
-	    &inshead, &ins_stack, &next_stack, &new_ins, &skipdepth);
+	    &inshead, &ins_stack, &next_stack, &new_ins, &recnop, &skipdepth);
 
 	/*
 	 * Largely ignore the page's write-generation, just confirm it hasn't
@@ -291,7 +282,8 @@ __wt_col_append_serial_func(WT_SESSION_IMPL *session, void *args)
 	 * to do a search in order to create the insert stack we need.
 	 */
 	if ((recno = WT_INSERT_RECNO(new_ins)) == 0)
-		recno = WT_INSERT_RECNO(new_ins) = ++btree->last_recno;
+		recno = *recnop  =
+		    WT_INSERT_RECNO(new_ins) = ++btree->last_recno;
 
 	ins = __col_insert_search(inshead, ins_stack, next_stack, recno);
 
