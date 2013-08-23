@@ -20,7 +20,7 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int op)
 	WT_BTREE *btree;
 	WT_DECL_RET;
 	WT_INSERT *ins;
-	WT_INSERT_HEAD *inshead, **insheadp, *t;
+	WT_INSERT_HEAD *ins_head, **ins_headp, *t;
 	WT_ITEM *value, _value;
 	WT_PAGE *page;
 	WT_UPDATE *old_upd, *upd, *upd_obsolete;
@@ -99,45 +99,45 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int op)
 		/* Allocate the append/update list reference as necessary. */
 		if (op == 1) {
 			if (page->modify->append == NULL) {
-				WT_ERR(__wt_calloc_def(session, 1, &insheadp));
+				WT_ERR(__wt_calloc_def(session, 1, &ins_headp));
 				if (WT_ATOMIC_CAS(
-				    page->modify->append, NULL, insheadp))
+				    page->modify->append, NULL, ins_headp))
 					__wt_cache_page_inmem_incr(session,
 					    page, sizeof(WT_INSERT_HEAD *));
 				else
-					__wt_free(session, insheadp);
+					__wt_free(session, ins_headp);
 			}
-			insheadp = &page->modify->append[0];
+			ins_headp = &page->modify->append[0];
 		} else if (page->type == WT_PAGE_COL_FIX) {
 			if (page->modify->update == NULL) {
-				WT_ERR(__wt_calloc_def(session, 1, &insheadp));
+				WT_ERR(__wt_calloc_def(session, 1, &ins_headp));
 				if (WT_ATOMIC_CAS(
-				    page->modify->update, NULL, insheadp))
+				    page->modify->update, NULL, ins_headp))
 					__wt_cache_page_inmem_incr(session,
 					    page, sizeof(WT_INSERT_HEAD *));
 				else
-					__wt_free(session, insheadp);
+					__wt_free(session, ins_headp);
 			}
-			insheadp = &page->modify->update[0];
+			ins_headp = &page->modify->update[0];
 		} else {
 			if (page->modify->update == NULL) {
 				WT_ERR(__wt_calloc_def(
-				    session, page->entries, &insheadp));
+				    session, page->entries, &ins_headp));
 				if (WT_ATOMIC_CAS(
-				    page->modify->update, NULL, insheadp))
+				    page->modify->update, NULL, ins_headp))
 					__wt_cache_page_inmem_incr(session,
 					    page, page->entries *
 					    sizeof(WT_INSERT_HEAD *));
 				else
-					__wt_free(session, insheadp);
+					__wt_free(session, ins_headp);
 			}
-			insheadp = &page->modify->update[cbt->slot];
+			ins_headp = &page->modify->update[cbt->slot];
 		}
 
 		/* Allocate the WT_INSERT_HEAD structure as necessary. */
-		if ((inshead = *insheadp) == NULL) {
+		if ((ins_head = *ins_headp) == NULL) {
 			WT_ERR(__wt_calloc_def(session, 1, &t));
-			if (WT_ATOMIC_CAS(*insheadp, NULL, t)) {
+			if (WT_ATOMIC_CAS(*ins_headp, NULL, t)) {
 				__wt_cache_page_inmem_incr(session,
 				    page, sizeof(WT_INSERT_HEAD));
 
@@ -172,8 +172,7 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int op)
 				 */
 				__wt_free(session, t);
 			}
-
-			inshead = *insheadp;
+			ins_head = *ins_headp;
 		}
 
 		/* Choose a skiplist depth for this insert. */
@@ -195,12 +194,12 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int op)
 		/* Insert or append the WT_INSERT structure. */
 		if (op == 1)
 			WT_ERR(__wt_col_append_serial(session,
-			    page, cbt->write_gen, inshead,
+			    page, cbt->write_gen, ins_head,
 			    cbt->ins_stack, cbt->next_stack,
 			    &ins, ins_size, &cbt->recno, skipdepth));
 		else
 			WT_ERR(__wt_insert_serial(session,
-			    page, cbt->write_gen, inshead,
+			    page, cbt->write_gen, ins_head,
 			    cbt->ins_stack, cbt->next_stack,
 			    &ins, ins_size, skipdepth));
 	}
@@ -253,7 +252,7 @@ __wt_col_append_serial_func(WT_SESSION_IMPL *session, void *args)
 {
 	WT_BTREE *btree;
 	WT_INSERT *ins, *new_ins, ***ins_stack, **next_stack;
-	WT_INSERT_HEAD *inshead;
+	WT_INSERT_HEAD *ins_head;
 	WT_PAGE *page;
 	uint64_t recno, *recnop;
 	uint32_t write_gen;
@@ -262,7 +261,7 @@ __wt_col_append_serial_func(WT_SESSION_IMPL *session, void *args)
 	btree = S2BT(session);
 
 	__wt_col_append_unpack(args, &page, &write_gen,
-	    &inshead, &ins_stack, &next_stack, &new_ins, &recnop, &skipdepth);
+	    &ins_head, &ins_stack, &next_stack, &new_ins, &recnop, &skipdepth);
 
 	/*
 	 * Largely ignore the page's write-generation, just confirm it hasn't
@@ -285,7 +284,7 @@ __wt_col_append_serial_func(WT_SESSION_IMPL *session, void *args)
 		recno = *recnop  =
 		    WT_INSERT_RECNO(new_ins) = ++btree->last_recno;
 
-	ins = __col_insert_search(inshead, ins_stack, next_stack, recno);
+	ins = __col_insert_search(ins_head, ins_stack, next_stack, recno);
 
 	/*
 	 * If we find the record number, there's been a race, and we should
@@ -304,9 +303,9 @@ __wt_col_append_serial_func(WT_SESSION_IMPL *session, void *args)
 		new_ins->next[i] = ins_stack[i] == NULL ? NULL : *ins_stack[i];
 	WT_WRITE_BARRIER();
 	for (i = 0; i < skipdepth; i++) {
-		if (inshead->tail[i] == NULL ||
-		    ins_stack[i] == &inshead->tail[i]->next[i])
-			inshead->tail[i] = new_ins;
+		if (ins_head->tail[i] == NULL ||
+		    ins_stack[i] == &ins_head->tail[i]->next[i])
+			ins_head->tail[i] = new_ins;
 		if (ins_stack[i] != NULL)
 			*ins_stack[i] = new_ins;
 	}

@@ -16,7 +16,7 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 {
 	WT_DECL_RET;
 	WT_INSERT *ins;
-	WT_INSERT_HEAD *inshead, **insheadp, *t;
+	WT_INSERT_HEAD *ins_head, **ins_headp, *t;
 	WT_ITEM *key, *value;
 	WT_PAGE *page;
 	WT_UPDATE *old_upd, *upd, **upd_entry, *upd_obsolete;
@@ -104,12 +104,12 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 				__wt_free(session, ins);
 			ins = NULL;
 		}
-		insheadp = &page->u.row.ins[ins_slot];
+		ins_headp = &page->u.row.ins[ins_slot];
 
 		/* Allocate the WT_INSERT_HEAD structure as necessary. */
-		if ((inshead = *insheadp) == NULL) {
+		if ((ins_head = *ins_headp) == NULL) {
 			WT_ERR(__wt_calloc_def(session, 1, &t));
-			if (WT_ATOMIC_CAS(*insheadp, NULL, t)) {
+			if (WT_ATOMIC_CAS(*ins_headp, NULL, t)) {
 				__wt_cache_page_inmem_incr(session,
 				    page, sizeof(WT_INSERT_HEAD));
 
@@ -138,7 +138,7 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 				__wt_free(session, t);
 			}
 
-			inshead = *insheadp;
+			ins_head = *ins_headp;
 		}
 
 		/* Choose a skiplist depth for this insert. */
@@ -159,7 +159,7 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 
 		/* Insert the WT_INSERT structure. */
 		WT_ERR(__wt_insert_serial(session, page, cbt->write_gen,
-		    inshead, cbt->ins_stack, cbt->next_stack,
+		    ins_head, cbt->ins_stack, cbt->next_stack,
 		    &ins, ins_size, skipdepth));
 	}
 
@@ -214,13 +214,13 @@ int
 __wt_insert_serial_func(WT_SESSION_IMPL *session, void *args)
 {
 	WT_INSERT *new_ins, ***ins_stack, **next_stack;
-	WT_INSERT_HEAD *inshead;
+	WT_INSERT_HEAD *ins_head;
 	WT_PAGE *page;
 	uint32_t write_gen;
 	u_int i, skipdepth;
 
 	__wt_insert_unpack(args, &page, &write_gen,
-	    &inshead, &ins_stack, &next_stack, &new_ins, &skipdepth);
+	    &ins_head, &ins_stack, &next_stack, &new_ins, &skipdepth);
 
 	/*
 	 * Largely ignore the page's write-generation, just confirm it hasn't
@@ -238,8 +238,8 @@ __wt_insert_serial_func(WT_SESSION_IMPL *session, void *args)
 		    *ins_stack[i] != next_stack[i])
 			return (WT_RESTART);
 		if (next_stack[i] == NULL &&
-		    inshead->tail[i] != NULL &&
-		    ins_stack[i] != &inshead->tail[i]->next[i])
+		    ins_head->tail[i] != NULL &&
+		    ins_stack[i] != &ins_head->tail[i]->next[i])
 			return (WT_RESTART);
 	}
 
@@ -253,9 +253,9 @@ __wt_insert_serial_func(WT_SESSION_IMPL *session, void *args)
 		new_ins->next[i] = *ins_stack[i];
 	WT_WRITE_BARRIER();
 	for (i = 0; i < skipdepth; i++) {
-		if (inshead->tail[i] == NULL ||
-		    ins_stack[i] == &inshead->tail[i]->next[i])
-			inshead->tail[i] = new_ins;
+		if (ins_head->tail[i] == NULL ||
+		    ins_stack[i] == &ins_head->tail[i]->next[i])
+			ins_head->tail[i] = new_ins;
 		*ins_stack[i] = new_ins;
 	}
 
