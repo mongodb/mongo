@@ -31,6 +31,10 @@ namespace mongo {
     Status AuthzManagerExternalState::getPrivilegeDocument(const std::string& dbname,
                                                            const UserName& userName,
                                                            BSONObj* result) const {
+        if (userName == internalSecurity.user->getName()) {
+            return Status(ErrorCodes::InternalError,
+                          "Requested privilege document for the internal user");
+        }
 
         if (dbname == StringData("$external", StringData::LiteralTag()) ||
             dbname == AuthorizationManager::SERVER_RESOURCE_NAME ||
@@ -42,19 +46,6 @@ namespace mongo {
 
         if (!NamespaceString::validDBName(dbname)) {
             return Status(ErrorCodes::BadValue, "Bad database name \"" + dbname + "\"");
-        }
-
-        if (userName == internalSecurity.user->getName()) {
-            if (internalSecurity.user->getCredentials().password.empty()) {
-                return Status(ErrorCodes::UserNotFound,
-                              "key file must be used to log in with internal user",
-                              15889);
-            }
-            *result = BSON(AuthorizationManager::USER_NAME_FIELD_NAME <<
-                           internalSecurity.user->getName().getUser() <<
-                           AuthorizationManager::PASSWORD_FIELD_NAME <<
-                           internalSecurity.user->getCredentials().password).getOwned();
-            return Status::OK();
         }
 
         std::string usersNamespace = dbname + ".system.users";
