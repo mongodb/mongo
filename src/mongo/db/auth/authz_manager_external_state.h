@@ -23,6 +23,7 @@
 #include "mongo/base/status.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/namespace_string.h"
 
 namespace mongo {
 
@@ -46,36 +47,106 @@ namespace mongo {
         // "result".
         Status getPrivilegeDocument(const UserName& userName,
                                     int authzVersion,
-                                    BSONObj* result) const;
+                                    BSONObj* result);
 
         // Returns true if there exists at least one privilege document in the system.
-        bool hasAnyPrivilegeDocuments() const;
+        bool hasAnyPrivilegeDocuments();
 
         // Creates the given user object in the given database.
         // TODO(spencer): remove dbname argument once users are only written into the admin db
         virtual Status insertPrivilegeDocument(const std::string& dbname,
-                                               const BSONObj& userObj) const = 0;
+                                               const BSONObj& userObj) = 0;
 
         // Updates the given user object with the given update modifier.
         virtual Status updatePrivilegeDocument(const UserName& user,
-                                               const BSONObj& updateObj) const = 0;
+                                               const BSONObj& updateObj) = 0;
 
         // Removes users for the given database matching the given query.
         // TODO(spencer): remove dbname argument once users are only written into the admin db
         virtual Status removePrivilegeDocuments(const std::string& dbname,
-                                                const BSONObj& query) const = 0;
+                                                const BSONObj& query) = 0;
 
         /**
          * Puts into the *dbnames vector the name of every database in the cluster.
          */
-        virtual Status getAllDatabaseNames(std::vector<std::string>* dbnames) const = 0;
+        virtual Status getAllDatabaseNames(std::vector<std::string>* dbnames) = 0;
 
         /**
          * Puts into the *privDocs vector every privilege document from the given database's
          * system.users collection.
          */
         virtual Status getAllV1PrivilegeDocsForDB(const std::string& dbname,
-                                                  std::vector<BSONObj>* privDocs) const = 0;
+                                                  std::vector<BSONObj>* privDocs) = 0;
+
+        /**
+         * Finds a document matching "query" in "collectionName", and store a shared-ownership
+         * copy into "result".
+         *
+         * Returns Status::OK() on success.  If no match is found, returns
+         * ErrorCodes::NoMatchingDocument.  Other errors returned as appropriate.
+         */
+        virtual Status findOne(const NamespaceString& collectionName,
+                               const BSONObj& query,
+                               BSONObj* result) = 0;
+
+        /**
+         * Inserts "document" into "collectionName".
+         */
+        virtual Status insert(const NamespaceString& collectionName,
+                              const BSONObj& document) = 0;
+
+        /**
+         * Update one document matching "query" according to "updatePattern" in "collectionName".
+         *
+         * If "upsert" is true and no document matches "query", inserts one using "query" as a
+         * template.
+         */
+        virtual Status updateOne(const NamespaceString& collectionName,
+                                 const BSONObj& query,
+                                 const BSONObj& updatePattern,
+                                 bool upsert) = 0;
+
+        /**
+         * Removes all documents matching "query" from "collectionName".
+         */
+        virtual Status remove(const NamespaceString& collectionName,
+                              const BSONObj& query) = 0;
+
+        /**
+         * Creates an index with the given pattern on "collectionName".
+         */
+        virtual Status createIndex(const NamespaceString& collectionName,
+                                   const BSONObj& pattern,
+                                   bool unique) = 0;
+
+        /**
+         * Drops the named collection.
+         */
+        virtual Status dropCollection(const NamespaceString& collectionName) = 0;
+
+        /**
+         * Renames collection "oldName" to "newName", possibly dropping the previous
+         * collection named "newName".
+         */
+        virtual Status renameCollection(const NamespaceString& oldName,
+                                        const NamespaceString& newName) = 0;
+
+        /**
+         * Copies the contents of collection "fromName" into "toName".  Fails
+         * if "toName" is already a collection.
+         */
+        virtual Status copyCollection(const NamespaceString& fromName,
+                                      const NamespaceString& toName) = 0;
+
+        /**
+         * Tries to acquire the global lock guarding the upgrade process.
+         */
+        virtual bool tryLockUpgradeProcess() = 0;
+
+        /**
+         * Releases the lock guarding the upgrade process, which must already be held.
+         */
+        virtual void unlockUpgradeProcess() = 0;
 
     protected:
         AuthzManagerExternalState(); // This class should never be instantiated directly.
@@ -86,7 +157,7 @@ namespace mongo {
         // errors may return other Status codes.
         virtual Status _findUser(const std::string& usersNamespace,
                                  const BSONObj& query,
-                                 BSONObj* result) const = 0;
+                                 BSONObj* result) = 0;
     };
 
 } // namespace mongo

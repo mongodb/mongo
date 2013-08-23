@@ -43,7 +43,7 @@ namespace {
 
         virtual Status _findUser(const std::string& usersNamespace,
                                  const BSONObj& query,
-                                 BSONObj* result) const {
+                                 BSONObj* result) {
             if (_findsShouldFail) {
                 return Status(ErrorCodes::UnknownError, "_findUser set to fail in mock.");
             }

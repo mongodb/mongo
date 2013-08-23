@@ -45,7 +45,8 @@ env.StaticLibrary('authmongos',
 
 env.StaticLibrary('authmocks',
                   ['authz_manager_external_state_mock.cpp'],
-                  LIBDEPS=['$BUILD_DIR/mongo/expressions'])
+                  LIBDEPS=['$BUILD_DIR/mongo/db/ops/update_driver',
+                           '$BUILD_DIR/mongo/expressions'])
 
 env.CppUnitTest('action_set_test', 'action_set_test.cpp', LIBDEPS=['authcore'])
 env.CppUnitTest('privilege_document_parser_test', 'privilege_document_parser_test.cpp',

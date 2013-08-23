@@ -613,4 +613,176 @@ namespace {
 
         return Status::OK();
     }
+
+    namespace {
+        class AuthzUpgradeLockGuard {
+            MONGO_DISALLOW_COPYING(AuthzUpgradeLockGuard);
+        public:
+            explicit AuthzUpgradeLockGuard(AuthzManagerExternalState* externalState)
+                : _externalState(externalState), _locked(false) {
+            }
+
+            ~AuthzUpgradeLockGuard() {
+                if (_locked)
+                    unlock();
+            }
+
+            bool tryLock() {
+                fassert(17111, !_locked);
+                _locked = _externalState->tryLockUpgradeProcess();
+                return _locked;
+            }
+
+            void unlock() {
+                fassert(17112, _locked);
+                _externalState->unlockUpgradeProcess();
+                _locked = false;
+            }
+        private:
+            AuthzManagerExternalState* _externalState;
+            bool _locked;
+        };
+
+        BSONObj userAsV2PrivilegeDocument(const User& user) {
+            BSONObjBuilder builder;
+
+            const UserName& name = user.getName();
+            builder.append(AuthorizationManager::USER_NAME_FIELD_NAME, name.getUser());
+            builder.append(AuthorizationManager::USER_SOURCE_FIELD_NAME, name.getDB());
+
+            const User::CredentialData& credentials = user.getCredentials();
+            if (!credentials.isExternal) {
+                BSONObjBuilder credentialsBuilder(builder.subobjStart("credentials"));
+                credentialsBuilder.append("MONGODB-CR", credentials.password);
+                credentialsBuilder.doneFast();
+            }
+
+            BSONArrayBuilder rolesArray(builder.subarrayStart("roles"));
+            for (RoleNameIterator roles = user.getRoles(); roles.more(); roles.next()) {
+                const RoleName& roleName = roles.get();
+                BSONObjBuilder roleBuilder(rolesArray.subobjStart());
+                roleBuilder.append("name", roleName.getRole());
+                roleBuilder.append("source", roleName.getDB());
+                roleBuilder.appendBool("canDelegate", false);
+                roleBuilder.appendBool("hasRole", true);
+                roleBuilder.doneFast();
+            }
+            rolesArray.doneFast();
+            return builder.obj();
+        }
+
+        const NamespaceString newusersCollectionName("admin._newusers");
+        const NamespaceString usersCollectionName("admin.system.users");
+        const NamespaceString backupUsersCollectionName("admin.backup.users");
+        const NamespaceString versionCollectionName("admin.system.version");
+        const BSONObj versionDocumentQuery = BSON("_id" << 1);
+
+        /**
+         * Fetches the admin.system.version document and extracts the currentVersion field's
+         * value, supposing it is an integer, and writes it to outVersion.
+         */
+        Status readAuthzVersion(AuthzManagerExternalState* externalState, int* outVersion) {
+            BSONObj versionDoc;
+            Status status = externalState->findOne(
+                    versionCollectionName, versionDocumentQuery, &versionDoc);
+            if (!status.isOK() && ErrorCodes::NoMatchingDocument != status) {
+                return status;
+            }
+            BSONElement currentVersionElement = versionDoc["currentVersion"];
+            if (!versionDoc.isEmpty() && !currentVersionElement.isNumber()) {
+                return Status(ErrorCodes::TypeMismatch,
+                              "Field 'currentVersion' in admin.system.version must be a number.");
+            }
+            *outVersion = currentVersionElement.numberInt();
+            return Status::OK();
+        }
+    }  // namespace
+
+    Status AuthorizationManager::upgradeAuthCollections() {
+        boost::lock_guard<boost::mutex> lkLocal(_lock);
+        AuthzUpgradeLockGuard lkUpgrade(_externalState.get());
+        if (!lkUpgrade.tryLock()) {
+            return Status(ErrorCodes::LockBusy, "Could not lock auth data upgrade process lock.");
+        }
+        int durableVersion;
+        Status status = readAuthzVersion(_externalState.get(), &durableVersion);
+        if (!status.isOK())
+            return status;
+
+        if (_version == 2) {
+            switch (durableVersion) {
+            case 0:
+            case 1: {
+                const char msg[] = "User data format version in memory and on disk inconsistent; "
+                    "please restart this node.";
+                error() << msg;
+                return Status(ErrorCodes::UserDataInconsistent, msg);
+            }
+            case 2:
+                return Status::OK();
+            default:
+                return Status(ErrorCodes::BadValue,
+                              mongoutils::str::stream() <<
+                              "Cannot upgrade admin.system.version to 2 from " <<
+                              durableVersion);
+            }
+        }
+        fassert(17113, _version == 1);
+        switch (durableVersion) {
+        case 0:
+        case 1:
+            break;
+        case 2: {
+            const char msg[] = "User data format version in memory and on disk inconsistent; "
+                "please restart this node.";
+            error() << msg;
+            return Status(ErrorCodes::UserDataInconsistent, msg);
+        }
+        default:
+                return Status(ErrorCodes::BadValue,
+                              mongoutils::str::stream() <<
+                              "Cannot upgrade admin.system.version from 2 to " <<
+                              durableVersion);
+        }
+
+        // Upgrade from v1 to v2.
+        status = _externalState->copyCollection(usersCollectionName, backupUsersCollectionName);
+        if (!status.isOK())
+            return status;
+        status = _externalState->dropCollection(newusersCollectionName);
+        if (!status.isOK())
+            return status;
+        status = _externalState->createIndex(
+                newusersCollectionName,
+                BSON(USER_NAME_FIELD_NAME << 1 << USER_SOURCE_FIELD_NAME << 1),
+                true // unique
+                );
+        if (!status.isOK())
+            return status;
+        for (unordered_map<UserName, User*>::const_iterator iter = _userCache.begin();
+             iter != _userCache.end(); ++iter) {
+
+            // Do not create a user document for the internal user.
+            if (iter->second == internalSecurity.user)
+                continue;
+
+            status = _externalState->insert(
+                    newusersCollectionName, userAsV2PrivilegeDocument(*iter->second));
+            if (!status.isOK())
+                return status;
+        }
+        status = _externalState->renameCollection(newusersCollectionName, usersCollectionName);
+        if (!status.isOK())
+            return status;
+        status = _externalState->updateOne(
+                versionCollectionName,
+                versionDocumentQuery,
+                BSON("$set" << BSON("currentVersion" << 2)),
+                true);
+        if (!status.isOK())
+            return status;
+        _version = 2;
+        return status;
+    }
+
 } // namespace mongo
