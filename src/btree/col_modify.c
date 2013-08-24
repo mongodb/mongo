@@ -257,8 +257,7 @@ __wt_col_append_serial_func(WT_SESSION_IMPL *session, void *args)
 	 * to do a search in order to create the insert stack we need.
 	 */
 	if ((recno = WT_INSERT_RECNO(new_ins)) == 0)
-		recno = *recnop  =
-		    WT_INSERT_RECNO(new_ins) = btree->last_recno + 1;
+		recno = WT_INSERT_RECNO(new_ins) = btree->last_recno + 1;
 
 	/*
 	 * If an empty WT_INSERT_HEAD, the cursor's information cannot be
@@ -301,9 +300,10 @@ __wt_col_append_serial_func(WT_SESSION_IMPL *session, void *args)
 	__wt_col_append_new_ins_taken(args);
 
 	/*
-	 * Check to see if we extended the file, and update the last record
-	 * number.
+	 * Set the calling cursor's record number.
+	 * If we extended the file, update the last record number.
 	 */
+	*recnop = recno;
 	if (recno > btree->last_recno)
 		btree->last_recno = recno;
 
