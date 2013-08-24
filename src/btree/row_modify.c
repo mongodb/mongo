@@ -23,7 +23,7 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 	size_t ins_size, upd_size;
 	uint32_t ins_slot;
 	u_int skipdepth;
-	int i, logged;
+	int logged;
 
 	key = &cbt->iface.key;
 	value = is_remove ? NULL : &cbt->iface.value;
@@ -109,35 +109,11 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 		/* Allocate the WT_INSERT_HEAD structure as necessary. */
 		if ((ins_head = *ins_headp) == NULL) {
 			WT_ERR(__wt_calloc_def(session, 1, &t));
-			if (WT_ATOMIC_CAS(*ins_headp, NULL, t)) {
-				__wt_cache_page_inmem_incr(session,
-				    page, sizeof(WT_INSERT_HEAD));
-
-				/*
-				 * If allocating a new insert list head, we have
-				 * to initialize the cursor's insert list stack
-				 * and insert head reference as well, search
-				 * couldn't have.
-				 */
-				for (i = 0; i < WT_SKIP_MAXDEPTH; i++) {
-					cbt->ins_stack[i] = &t->head[i];
-					cbt->next_stack[i] = NULL;
-				}
-				cbt->ins_head = t;
-			} else {
-				/*
-				 * I'm not returning restart here, even though
-				 * the update will fail (the cursor's insert
-				 * stack is by definition wrong because it was
-				 * never set).   The reason is because it won't
-				 * close the race, it only makes it less likely
-				 * (and maybe simplifies the serialization
-				 * function check).  Let the serialization code
-				 * own the problem.
-				 */
+			if (WT_ATOMIC_CAS(*ins_headp, NULL, t))
+				__wt_cache_page_inmem_incr(
+				    session, page, sizeof(WT_INSERT_HEAD));
+			else
 				__wt_free(session, t);
-			}
-
 			ins_head = *ins_headp;
 		}
 
@@ -155,11 +131,17 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 		logged = 1;
 		ins->upd = upd;
 		ins_size += upd_size;
+
+		/*
+		 * Update the cursor: the insert head may have been allocated,
+		 * the ins field was allocated.
+		 */
+		cbt->ins_head = ins_head;
 		cbt->ins = ins;
 
 		/* Insert the WT_INSERT structure. */
 		WT_ERR(__wt_insert_serial(session, page, cbt->write_gen,
-		    ins_head, cbt->ins_stack, cbt->next_stack,
+		    cbt->ins_head, cbt->ins_stack, cbt->next_stack,
 		    &ins, ins_size, skipdepth));
 	}
 
@@ -229,19 +211,35 @@ __wt_insert_serial_func(WT_SESSION_IMPL *session, void *args)
 	WT_RET(__wt_page_write_gen_wrapped_check(page));
 
 	/*
-	 * Confirm we are still in the expected position, and no item has been
-	 * added where our insert belongs.  Take extra care at the beginning
-	 * and end of the list (at each level): retry if we race there.
+	 * If an empty WT_INSERT_HEAD, the cursor's information cannot be
+	 * correct, search could not have initialized it.
 	 */
-	for (i = 0; i < skipdepth; i++) {
-		if (ins_stack[i] == NULL ||
-		    *ins_stack[i] != next_stack[i])
-			return (WT_RESTART);
-		if (next_stack[i] == NULL &&
-		    ins_head->tail[i] != NULL &&
-		    ins_stack[i] != &ins_head->tail[i]->next[i])
-			return (WT_RESTART);
-	}
+	if (WT_SKIP_FIRST(ins_head) == NULL)
+		for (i = 0; i < WT_SKIP_MAXDEPTH; i++) {
+			ins_stack[i] = &ins_head->head[i];
+			next_stack[i] = NULL;
+		}
+	else
+		/*
+		 * Confirm we are still in the expected position, and no item
+		 * has been added where our insert belongs.  Take extra care
+		 * at the beginning and end of the list (at each level): retry
+		 * if we race there.
+		 *
+		 * !!!
+		 * Note the test for ins_stack[0] == NULL: that's the test for
+		 * an uninitialized cursor, ins_stack[0] is cleared as part of
+		 * initializing a cursor for a search.
+		 */
+		for (i = 0; i < skipdepth; i++) {
+			if (ins_stack[i] == NULL ||
+			    *ins_stack[i] != next_stack[i])
+				return (WT_RESTART);
+			if (next_stack[i] == NULL &&
+			    ins_head->tail[i] != NULL &&
+			    ins_stack[i] != &ins_head->tail[i]->next[i])
+				return (WT_RESTART);
+		}
 
 	/*
 	 * Publish: First, point the new WT_INSERT item's skiplist references

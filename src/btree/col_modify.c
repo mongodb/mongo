@@ -27,7 +27,7 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int op)
 	size_t ins_size, upd_size;
 	uint64_t recno;
 	u_int skipdepth;
-	int i, logged;
+	int logged;
 
 	btree = cbt->btree;
 	page = cbt->page;
@@ -137,41 +137,11 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int op)
 		/* Allocate the WT_INSERT_HEAD structure as necessary. */
 		if ((ins_head = *ins_headp) == NULL) {
 			WT_ERR(__wt_calloc_def(session, 1, &t));
-			if (WT_ATOMIC_CAS(*ins_headp, NULL, t)) {
-				__wt_cache_page_inmem_incr(session,
-				    page, sizeof(WT_INSERT_HEAD));
-
-				/*
-				 * If allocating a new insert list head, we have
-				 * to initialize the cursor's insert list stack
-				 * and insert head reference as well, search
-				 * couldn't have.
-				 */
-				for (i = 0; i < WT_SKIP_MAXDEPTH; i++) {
-					cbt->ins_stack[i] = &t->head[i];
-					cbt->next_stack[i] = NULL;
-				}
-				cbt->ins_head = t;
-			} else {
-				/*
-				 * I'm not returning restart here, even though
-				 * the update will fail (the cursor's insert
-				 * stack is by definition wrong because it was
-				 * never set).   The reason is because it won't
-				 * close the race, it only makes it less likely
-				 * (and maybe simplifies the serialization
-				 * function check).  Let the serialization code
-				 * own the problem.
-				 *
-				 * !!!
-				 * Caveat: the comment here is the same as in
-				 * the row-modify code, and it's correct with
-				 * the exception that column-append actually
-				 * will work because we're going to repeat the
-				 * search.
-				 */
+			if (WT_ATOMIC_CAS(*ins_headp, NULL, t))
+				__wt_cache_page_inmem_incr(
+				    session, page, sizeof(WT_INSERT_HEAD));
+			else
 				__wt_free(session, t);
-			}
 			ins_head = *ins_headp;
 		}
 
@@ -189,17 +159,23 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int op)
 		logged = 1;
 		ins->upd = upd;
 		ins_size += upd_size;
+
+		/*
+		 * Update the cursor: the insert head may have been allocated,
+		 * the ins field was allocated.
+		 */
+		cbt->ins_head = ins_head;
 		cbt->ins = ins;
 
 		/* Insert or append the WT_INSERT structure. */
 		if (op == 1)
 			WT_ERR(__wt_col_append_serial(session,
-			    page, cbt->write_gen, ins_head,
+			    page, cbt->write_gen, cbt->ins_head,
 			    cbt->ins_stack, cbt->next_stack,
 			    &ins, ins_size, &cbt->recno, skipdepth));
 		else
 			WT_ERR(__wt_insert_serial(session,
-			    page, cbt->write_gen, ins_head,
+			    page, cbt->write_gen, cbt->ins_head,
 			    cbt->ins_stack, cbt->next_stack,
 			    &ins, ins_size, skipdepth));
 	}
@@ -284,14 +260,26 @@ __wt_col_append_serial_func(WT_SESSION_IMPL *session, void *args)
 		recno = *recnop  =
 		    WT_INSERT_RECNO(new_ins) = ++btree->last_recno;
 
-	ins = __col_insert_search(ins_head, ins_stack, next_stack, recno);
-
 	/*
-	 * If we find the record number, there's been a race, and we should
-	 * be updating an existing record, restart so that happens.
+	 * If an empty WT_INSERT_HEAD, the cursor's information cannot be
+	 * correct, search could not have initialized it.
 	 */
-	if (ins != NULL && WT_INSERT_RECNO(ins) == recno)
-		WT_RET(WT_RESTART);
+	if (WT_SKIP_FIRST(ins_head) == NULL)
+		for (i = 0; i < WT_SKIP_MAXDEPTH; i++) {
+			ins_stack[i] = &ins_head->head[i];
+			next_stack[i] = NULL;
+		}
+	else {
+		ins =
+		    __col_insert_search(ins_head, ins_stack, next_stack, recno);
+
+		/*
+		 * If we find the record number, there's been a race, and we
+		 * should be updating an existing record, restart.
+		 */
+		if (ins != NULL && WT_INSERT_RECNO(ins) == recno)
+			WT_RET(WT_RESTART);
+	}
 
 	/*
 	 * Publish: First, point the new WT_INSERT item's skiplist references
@@ -300,7 +288,7 @@ __wt_col_append_serial_func(WT_SESSION_IMPL *session, void *args)
 	 * this ensures the list is never inconsistent.
 	 */
 	for (i = 0; i < skipdepth; i++)
-		new_ins->next[i] = ins_stack[i] == NULL ? NULL : *ins_stack[i];
+		new_ins->next[i] = *ins_stack[i];
 	WT_WRITE_BARRIER();
 	for (i = 0; i < skipdepth; i++) {
 		if (ins_head->tail[i] == NULL ||
