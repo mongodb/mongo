@@ -43,7 +43,7 @@ namespace optionenvironment {
         if (value == values.end()) {
             StringBuilder sb;
             sb << "Value not found for key: " << get_key;
-            return Status(ErrorCodes::KeyNotFound, sb.str());
+            return Status(ErrorCodes::NoSuchKey, sb.str());
         }
         else {
             *get_value = value->second;

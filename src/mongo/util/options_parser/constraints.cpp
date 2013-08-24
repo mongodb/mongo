@@ -25,7 +25,7 @@ namespace optionenvironment {
         Value val;
         Status s = env.get(_key, &val);
 
-        if (s == ErrorCodes::KeyNotFound) {
+        if (s == ErrorCodes::NoSuchKey) {
             // Key not set, skipping numeric constraint check
             return Status::OK();
         }

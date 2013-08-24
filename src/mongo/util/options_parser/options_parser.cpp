@@ -675,7 +675,7 @@ namespace optionenvironment {
         Value config_value;
         ret = commandLineEnvironment.get(Key("config"), &config_value);
         // We had an error other than "config" not existing in our environment
-        if (!ret.isOK() && ret != ErrorCodes::KeyNotFound) {
+        if (!ret.isOK() && ret != ErrorCodes::NoSuchKey) {
             return ret;
         }
         // "config" exists in our environment

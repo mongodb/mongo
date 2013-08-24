@@ -169,7 +169,7 @@ namespace optionenvironment {
         typedef std::map<Key, Value>::const_iterator it_type;
         it_type value = values.find(get_key);
         if (value == values.end()) {
-            return Status(ErrorCodes::InternalError, "Value not found!");
+            return Status(ErrorCodes::NoSuchKey, "Value not found!");
         }
         else {
             return value->second.get(get_value);
