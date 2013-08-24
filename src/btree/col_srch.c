@@ -158,9 +158,12 @@ past_end:
 	 * definition, and we're going to repeat the search when we do the work.
 	 */
 	cbt->ins_head = WT_COL_APPEND(page);
-	if ((cbt->ins = recno == UINT64_MAX ? NULL :
-	    __col_insert_search(
-	    cbt->ins_head, cbt->ins_stack, cbt->next_stack, recno)) == NULL)
+	if (recno == UINT64_MAX)
+		cbt->ins = NULL;
+	else
+		cbt->ins = __col_insert_search(
+		    cbt->ins_head, cbt->ins_stack, cbt->next_stack, recno);
+	if (cbt->ins == NULL)
 		cbt->compare = -1;
 	else {
 		cbt->recno = WT_INSERT_RECNO(cbt->ins);
