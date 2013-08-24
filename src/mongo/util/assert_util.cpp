@@ -55,7 +55,8 @@ namespace mongo {
     bool DBException::traceExceptions = false;
 
     string DBException::toString() const {
-        stringstream ss; ss << getCode() << " " << what(); return ss.str();
+        stringstream ss;
+        ss << getCode() << " " << what();
         return ss.str();
     }
 
