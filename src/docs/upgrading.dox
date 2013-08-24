@@ -53,6 +53,13 @@ compilation.</b>  Application cursors should be reviewed to confirm they are
 configured for the desired behavior.
 </dd>
 
+<dt>::wiredtiger_open no longer accepts a \c transactional configuration</dt>
+<dd>
+The \c transactional configuration key has been removed from
+::wiredtiger_open.  Any application setting it should simply remove it,
+no change in application behavior is needed.
+</dd>
+
 </dl>
 <hr>
 @section version_162 Upgrading to Version 1.6.2
