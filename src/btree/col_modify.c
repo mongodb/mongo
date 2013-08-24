@@ -258,7 +258,7 @@ __wt_col_append_serial_func(WT_SESSION_IMPL *session, void *args)
 	 */
 	if ((recno = WT_INSERT_RECNO(new_ins)) == 0)
 		recno = *recnop  =
-		    WT_INSERT_RECNO(new_ins) = ++btree->last_recno;
+		    WT_INSERT_RECNO(new_ins) = btree->last_recno + 1;
 
 	/*
 	 * If an empty WT_INSERT_HEAD, the cursor's information cannot be
