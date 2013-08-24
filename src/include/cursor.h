@@ -91,7 +91,6 @@ struct __wt_cursor_btree {
 	WT_INSERT	*next_stack[WT_SKIP_MAXDEPTH];
 
 	uint64_t recno;			/* Record number */
-	uint32_t write_gen;		/* Saved leaf page's write generation */
 
 	/*
 	 * The search function sets compare to:

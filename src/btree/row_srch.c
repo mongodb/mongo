@@ -106,7 +106,7 @@ __wt_search_insert(WT_SESSION_IMPL *session,
  *	Search a row-store tree for a specific key.
  */
 int
-__wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
+__wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 {
 	WT_BTREE *btree;
 	WT_DECL_RET;
@@ -222,18 +222,6 @@ descend:	WT_ASSERT(session, ref != NULL);
 	 */
 	if (depth > btree->maximum_depth)
 		btree->maximum_depth = depth;
-
-	/*
-	 * Copy the leaf page's write generation value before reading the page.
-	 * Use a read memory barrier to ensure we read the value before we read
-	 * any of the page's contents.
-	 */
-	if (is_modify) {
-		/* Initialize the page's modification information */
-		WT_ERR(__wt_page_modify_init(session, page));
-
-		WT_ORDERED_READ(cbt->write_gen, page->modify->write_gen);
-	}
 
 	/*
 	 * Do a binary search of the leaf page; the page might be empty, reset

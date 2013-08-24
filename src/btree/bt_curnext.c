@@ -417,15 +417,7 @@ retry:	WT_RET(__cursor_func_init(cbt, 0));
 	if (!F_ISSET(cbt, WT_CBT_ITERATE_NEXT))
 		__wt_btcur_iterate_setup(cbt, 1);
 
-	/*
-	 * If this is a modification, we're about to read information from the
-	 * page, save the write generation.
-	 */
 	page = cbt->page;
-	if (discard && page != NULL) {
-		WT_ERR(__wt_page_modify_init(session, page));
-		WT_ORDERED_READ(cbt->write_gen, page->modify->write_gen);
-	}
 
 	/*
 	 * Walk any page we're holding until the underlying call returns not-
@@ -483,13 +475,6 @@ retry:	WT_RET(__cursor_func_init(cbt, 0));
 		    page->type != WT_PAGE_COL_INT &&
 		    page->type != WT_PAGE_ROW_INT);
 		cbt->page = page;
-
-		/* Initialize the page's modification information */
-		if (discard) {
-			WT_ERR(__wt_page_modify_init(session, page));
-			WT_ORDERED_READ(
-			    cbt->write_gen, page->modify->write_gen);
-		}
 	}
 
 err:	if (ret == WT_RESTART)

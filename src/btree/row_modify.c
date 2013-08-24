@@ -30,6 +30,9 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 
 	page = cbt->page;
 
+	/* If we don't yet have a modify structure, we'll need one. */
+	WT_RET(__wt_page_modify_init(session, page));
+
 	ins = NULL;
 	upd = NULL;
 	logged = 0;
@@ -72,7 +75,7 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 		logged = 1;
 
 		/* Serialize the update. */
-		WT_ERR(__wt_update_serial(session, page, cbt->write_gen,
+		WT_ERR(__wt_update_serial(session, page,
 		    upd_entry, old_upd, &upd, upd_size, &upd_obsolete));
 
 		/* Discard any obsolete WT_UPDATE structures. */
@@ -140,7 +143,7 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 		cbt->ins = ins;
 
 		/* Insert the WT_INSERT structure. */
-		WT_ERR(__wt_insert_serial(session, page, cbt->write_gen,
+		WT_ERR(__wt_insert_serial(session, page,
 		    cbt->ins_head, cbt->ins_stack, cbt->next_stack,
 		    &ins, ins_size, skipdepth));
 	}
@@ -198,10 +201,9 @@ __wt_insert_serial_func(WT_SESSION_IMPL *session, void *args)
 	WT_INSERT *new_ins, ***ins_stack, **next_stack;
 	WT_INSERT_HEAD *ins_head;
 	WT_PAGE *page;
-	uint32_t write_gen;
 	u_int i, skipdepth;
 
-	__wt_insert_unpack(args, &page, &write_gen,
+	__wt_insert_unpack(args, &page,
 	    &ins_head, &ins_stack, &next_stack, &new_ins, &skipdepth);
 
 	/*
@@ -394,10 +396,9 @@ __wt_update_serial_func(WT_SESSION_IMPL *session, void *args)
 {
 	WT_PAGE *page;
 	WT_UPDATE *old_upd, *upd, **upd_entry, **upd_obsolete;
-	uint32_t write_gen;
 
-	__wt_update_unpack(args, &page, &write_gen,
-	    &upd_entry, &old_upd, &upd, &upd_obsolete);
+	__wt_update_unpack(
+	    args, &page, &upd_entry, &old_upd, &upd, &upd_obsolete);
 
 	/*
 	 * Ignore the page's write-generation (other than the special case of

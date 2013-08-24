@@ -114,7 +114,6 @@ __wt_stat_init_dsrc_stats(WT_DSRC_STATS *stats)
 	stats->session_compact.desc = "object compaction";
 	stats->session_cursor_open.desc = "open cursor count";
 	stats->txn_update_conflict.desc = "update conflicts";
-	stats->txn_write_conflict.desc = "write generation conflicts";
 }
 
 void
@@ -207,7 +206,6 @@ __wt_stat_clear_dsrc_stats(void *stats_arg)
 	stats->rec_split_max.v = 0;
 	stats->session_compact.v = 0;
 	stats->txn_update_conflict.v = 0;
-	stats->txn_write_conflict.v = 0;
 }
 
 void
@@ -295,7 +293,6 @@ __wt_stat_aggregate_dsrc_stats(void *child, void *parent)
 	p->session_compact.v += c->session_compact.v;
 	p->session_cursor_open.v += c->session_cursor_open.v;
 	p->txn_update_conflict.v += c->txn_update_conflict.v;
-	p->txn_write_conflict.v += c->txn_write_conflict.v;
 }
 
 void

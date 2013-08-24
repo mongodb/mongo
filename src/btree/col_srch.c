@@ -12,11 +12,10 @@
  *	Search a column-store tree for a specific record-based key.
  */
 int
-__wt_col_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
+__wt_col_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 {
 	WT_BTREE *btree;
 	WT_COL *cip;
-	WT_DECL_RET;
 	WT_INSERT *ins;
 	WT_INSERT_HEAD *ins_head;
 	WT_PAGE *page;
@@ -91,18 +90,6 @@ descend:	WT_ASSERT(session, ref != NULL);
 	 */
 	if (depth > btree->maximum_depth)
 		btree->maximum_depth = depth;
-
-	/*
-	 * Copy the leaf page's write generation value before reading the page.
-	 * Use a read memory barrier to ensure we read the value before we read
-	 * any of the page's contents.
-	 */
-	if (is_modify) {
-		/* Initialize the page's modification information */
-		WT_ERR(__wt_page_modify_init(session, page));
-
-		WT_ORDERED_READ(cbt->write_gen, page->modify->write_gen);
-	}
 
 	cbt->page = page;
 	cbt->recno = recno;
@@ -184,7 +171,4 @@ past_end:
 	if (cbt->compare == -1)
 		F_SET(cbt, WT_CBT_MAX_RECORD);
 	return (0);
-
-err:	WT_TRET(__wt_page_release(session, page));
-	return (ret);
 }

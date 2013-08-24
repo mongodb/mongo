@@ -89,7 +89,7 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int op)
 
 		/* Serialize the update. */
 		WT_ERR(__wt_update_serial(session, page,
-		    cbt->write_gen, &cbt->ins->upd, old_upd,
+		    &cbt->ins->upd, old_upd,
 		    &upd, upd_size, &upd_obsolete));
 
 		/* Discard any obsolete WT_UPDATE structures. */
@@ -169,14 +169,14 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int op)
 
 		/* Insert or append the WT_INSERT structure. */
 		if (op == 1)
-			WT_ERR(__wt_col_append_serial(session,
-			    page, cbt->write_gen, cbt->ins_head,
-			    cbt->ins_stack, cbt->next_stack,
+			WT_ERR(__wt_col_append_serial(
+			    session, page,
+			    cbt->ins_head, cbt->ins_stack, cbt->next_stack,
 			    &ins, ins_size, &cbt->recno, skipdepth));
 		else
-			WT_ERR(__wt_insert_serial(session,
-			    page, cbt->write_gen, cbt->ins_head,
-			    cbt->ins_stack, cbt->next_stack,
+			WT_ERR(__wt_insert_serial(
+			    session, page,
+			    cbt->ins_head, cbt->ins_stack, cbt->next_stack,
 			    &ins, ins_size, skipdepth));
 	}
 
@@ -231,12 +231,11 @@ __wt_col_append_serial_func(WT_SESSION_IMPL *session, void *args)
 	WT_INSERT_HEAD *ins_head;
 	WT_PAGE *page;
 	uint64_t recno, *recnop;
-	uint32_t write_gen;
 	u_int i, skipdepth;
 
 	btree = S2BT(session);
 
-	__wt_col_append_unpack(args, &page, &write_gen,
+	__wt_col_append_unpack(args, &page,
 	    &ins_head, &ins_stack, &next_stack, &new_ins, &recnop, &skipdepth);
 
 	/*

@@ -2,7 +2,6 @@
 
 typedef struct {
 	WT_PAGE *page;
-	uint32_t write_gen;
 	WT_INSERT_HEAD *inshead;
 	WT_INSERT ***ins_stack;
 	WT_INSERT **next_stack;
@@ -14,17 +13,14 @@ typedef struct {
 
 static inline int
 __wt_col_append_serial(
-	WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t write_gen,
-	WT_INSERT_HEAD *inshead, WT_INSERT ***ins_stack, WT_INSERT
-	**next_stack, WT_INSERT **new_insp, size_t new_ins_size, uint64_t
-	*recno, u_int skipdepth) {
+	WT_SESSION_IMPL *session, WT_PAGE *page, WT_INSERT_HEAD *inshead,
+	WT_INSERT ***ins_stack, WT_INSERT **next_stack, WT_INSERT **new_insp,
+	size_t new_ins_size, uint64_t *recno, u_int skipdepth) {
 	__wt_col_append_args _args, *args = &_args;
 	WT_DECL_RET;
 	size_t incr_mem;
 
 	args->page = page;
-
-	args->write_gen = write_gen;
 
 	args->inshead = inshead;
 
@@ -67,15 +63,13 @@ __wt_col_append_serial(
 
 static inline void
 __wt_col_append_unpack(
-    void *untyped_args, WT_PAGE **pagep, uint32_t *write_genp,
-    WT_INSERT_HEAD **insheadp, WT_INSERT ****ins_stackp, WT_INSERT
-    ***next_stackp, WT_INSERT **new_insp, uint64_t **recnop, u_int
-    *skipdepthp)
+    void *untyped_args, WT_PAGE **pagep, WT_INSERT_HEAD **insheadp,
+    WT_INSERT ****ins_stackp, WT_INSERT ***next_stackp, WT_INSERT
+    **new_insp, uint64_t **recnop, u_int *skipdepthp)
 {
 	__wt_col_append_args *args = (__wt_col_append_args *)untyped_args;
 
 	*pagep = args->page;
-	*write_genp = args->write_gen;
 	*insheadp = args->inshead;
 	*ins_stackp = args->ins_stack;
 	*next_stackp = args->next_stack;
@@ -94,7 +88,6 @@ __wt_col_append_new_ins_taken(void *untyped_args)
 
 typedef struct {
 	WT_PAGE *page;
-	uint32_t write_gen;
 	WT_INSERT_HEAD *inshead;
 	WT_INSERT ***ins_stack;
 	WT_INSERT **next_stack;
@@ -105,17 +98,14 @@ typedef struct {
 
 static inline int
 __wt_insert_serial(
-	WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t write_gen,
-	WT_INSERT_HEAD *inshead, WT_INSERT ***ins_stack, WT_INSERT
-	**next_stack, WT_INSERT **new_insp, size_t new_ins_size, u_int
-	skipdepth) {
+	WT_SESSION_IMPL *session, WT_PAGE *page, WT_INSERT_HEAD *inshead,
+	WT_INSERT ***ins_stack, WT_INSERT **next_stack, WT_INSERT **new_insp,
+	size_t new_ins_size, u_int skipdepth) {
 	__wt_insert_args _args, *args = &_args;
 	WT_DECL_RET;
 	size_t incr_mem;
 
 	args->page = page;
-
-	args->write_gen = write_gen;
 
 	args->inshead = inshead;
 
@@ -156,14 +146,13 @@ __wt_insert_serial(
 
 static inline void
 __wt_insert_unpack(
-    void *untyped_args, WT_PAGE **pagep, uint32_t *write_genp,
-    WT_INSERT_HEAD **insheadp, WT_INSERT ****ins_stackp, WT_INSERT
-    ***next_stackp, WT_INSERT **new_insp, u_int *skipdepthp)
+    void *untyped_args, WT_PAGE **pagep, WT_INSERT_HEAD **insheadp,
+    WT_INSERT ****ins_stackp, WT_INSERT ***next_stackp, WT_INSERT
+    **new_insp, u_int *skipdepthp)
 {
 	__wt_insert_args *args = (__wt_insert_args *)untyped_args;
 
 	*pagep = args->page;
-	*write_genp = args->write_gen;
 	*insheadp = args->inshead;
 	*ins_stackp = args->ins_stack;
 	*next_stackp = args->next_stack;
@@ -181,7 +170,6 @@ __wt_insert_new_ins_taken(void *untyped_args)
 
 typedef struct {
 	WT_PAGE *page;
-	uint32_t write_gen;
 	WT_UPDATE **srch_upd;
 	WT_UPDATE *old_upd;
 	WT_UPDATE *upd;
@@ -191,16 +179,14 @@ typedef struct {
 
 static inline int
 __wt_update_serial(
-	WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t write_gen, WT_UPDATE
-	**srch_upd, WT_UPDATE *old_upd, WT_UPDATE **updp, size_t upd_size,
-	WT_UPDATE **upd_obsolete) {
+	WT_SESSION_IMPL *session, WT_PAGE *page, WT_UPDATE **srch_upd,
+	WT_UPDATE *old_upd, WT_UPDATE **updp, size_t upd_size, WT_UPDATE
+	**upd_obsolete) {
 	__wt_update_args _args, *args = &_args;
 	WT_DECL_RET;
 	size_t incr_mem;
 
 	args->page = page;
-
-	args->write_gen = write_gen;
 
 	args->srch_upd = srch_upd;
 
@@ -239,14 +225,12 @@ __wt_update_serial(
 
 static inline void
 __wt_update_unpack(
-    void *untyped_args, WT_PAGE **pagep, uint32_t *write_genp, WT_UPDATE
-    ***srch_updp, WT_UPDATE **old_updp, WT_UPDATE **updp, WT_UPDATE
-    ***upd_obsoletep)
+    void *untyped_args, WT_PAGE **pagep, WT_UPDATE ***srch_updp, WT_UPDATE
+    **old_updp, WT_UPDATE **updp, WT_UPDATE ***upd_obsoletep)
 {
 	__wt_update_args *args = (__wt_update_args *)untyped_args;
 
 	*pagep = args->page;
-	*write_genp = args->write_gen;
 	*srch_updp = args->srch_upd;
 	*old_updp = args->old_upd;
 	*updp = args->upd;

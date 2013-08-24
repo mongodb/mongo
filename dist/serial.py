@@ -17,7 +17,6 @@ class Serial:
 msgtypes = [
 Serial('col_append', [
 		SerialArg('WT_PAGE *', 'page'),
-		SerialArg('uint32_t', 'write_gen'),
 		SerialArg('WT_INSERT_HEAD *', 'inshead'),
 		SerialArg('WT_INSERT ***', 'ins_stack'),
 		SerialArg('WT_INSERT **', 'next_stack'),
@@ -28,7 +27,6 @@ Serial('col_append', [
 
 Serial('insert', [
 		SerialArg('WT_PAGE *', 'page'),
-		SerialArg('uint32_t', 'write_gen'),
 		SerialArg('WT_INSERT_HEAD *', 'inshead'),
 		SerialArg('WT_INSERT ***', 'ins_stack'),
 		SerialArg('WT_INSERT **', 'next_stack'),
@@ -38,7 +36,6 @@ Serial('insert', [
 
 Serial('update', [
 		SerialArg('WT_PAGE *', 'page'),
-		SerialArg('uint32_t', 'write_gen'),
 		SerialArg('WT_UPDATE **', 'srch_upd'),
 		SerialArg('WT_UPDATE *', 'old_upd'),
 		SerialArg('WT_UPDATE *', 'upd', 1),

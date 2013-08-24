@@ -316,34 +316,8 @@ __wt_page_write_gen_wrapped_check(WT_PAGE *page)
 	 * disk generation (wildly unlikely but technically possible as it
 	 * implies 4B updates between page reconciliations), fail the update.
 	 */
-	return (mod->write_gen + 1 == mod->disk_gen ? WT_RESTART : 0);
-}
-
-/*
- * __wt_page_write_gen_check --
- *	Confirm the page's write generation number is correct.
- */
-static inline int
-__wt_page_write_gen_check(
-    WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t write_gen)
-{
-	WT_PAGE_MODIFY *mod;
-
-	WT_RET(__wt_page_write_gen_wrapped_check(page));
-
-	/*
-	 * If the page's write generation matches the search generation, we can
-	 * proceed.  Except, if the page's write generation has wrapped and
-	 * caught up with the disk generation (wildly unlikely but technically
-	 * possible as it implies 4B updates between page reconciliations), fail
-	 * the update.
-	 */
-	mod = page->modify;
-	if (mod->write_gen == write_gen)
-		return (0);
-
-	WT_DSTAT_INCR(session, txn_write_conflict);
-	return (WT_RESTART);
+	return (mod != NULL &&
+	    mod->write_gen + 1 == mod->disk_gen ? WT_RESTART : 0);
 }
 
 /*
