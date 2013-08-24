@@ -136,15 +136,15 @@ __cursor_var_append_next(WT_CURSOR_BTREE *cbt, int newpage)
 
 	if (newpage) {
 		cbt->ins = WT_SKIP_FIRST(cbt->ins_head);
-		WT_ASSERT(session, cbt->ins != NULL);
 		goto new_page;
 	}
 
 	for (;;) {
-		if ((cbt->ins = WT_SKIP_NEXT(cbt->ins)) == NULL)
+		cbt->ins = WT_SKIP_NEXT(cbt->ins);
+new_page:	if (cbt->ins == NULL)
 			return (WT_NOTFOUND);
 
-new_page:	__cursor_set_recno(cbt, WT_INSERT_RECNO(cbt->ins));
+		__cursor_set_recno(cbt, WT_INSERT_RECNO(cbt->ins));
 		if ((upd = __wt_txn_read(session, cbt->ins->upd)) == NULL ||
 		    WT_UPDATE_DELETED_ISSET(upd))
 			continue;
