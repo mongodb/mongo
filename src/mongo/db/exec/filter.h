@@ -82,7 +82,7 @@ namespace mongo {
             }
 
             // This should not happen.
-            massert(16920, "trying to match on unknown field: " + path->fieldRef().dottedField(),
+            massert(16920, "trying to match on unknown field: " + path->fieldRef().dottedField().toString(),
                     0);
 
             return new SingleElementElementIterator(BSONElement());

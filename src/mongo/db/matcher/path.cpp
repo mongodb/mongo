@@ -110,7 +110,7 @@ namespace mongo {
 
 
     void BSONElementIterator::ArrayIterationState::reset( const FieldRef& ref, int start ) {
-        restOfPath = ref.dottedField( start );
+        restOfPath = ref.dottedField( start ).toString();
         hasMore = restOfPath.size() > 0;
         if ( hasMore ) {
             nextPieceOfPath = ref.getPart( start );

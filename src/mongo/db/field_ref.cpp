@@ -108,6 +108,37 @@ namespace mongo {
         return ++_size;
     }
 
+    void FieldRef::reserialize() const {
+        std::string nextDotted;
+        // Reserve some space in the string. We know we will have, at minimum, a character for
+        // each component we are writing, and a dot for each component, less one. We don't want
+        // to reserve more, since we don't want to forfeit the SSO if it is applicable.
+        nextDotted.reserve((_size * 2) - 1);
+
+        // Concatenate the fields to a new string
+        for (size_t i = 0; i != _size; ++i) {
+            if (i > 0)
+                nextDotted.append(1, '.');
+            const StringData part = getPart(i);
+            nextDotted.append(part.rawData(), part.size());
+        }
+
+        // Make the new string our contents
+        _dotted.swap(nextDotted);
+
+        // Fixup the parts to refer to the new string
+        std::string::const_iterator where = _dotted.begin();
+        for (size_t i = 0; i != _size; ++i) {
+            StringData& part = (i < kReserveAhead) ? _fixed[i] : _variable[getIndex(i)];
+            const size_t size = part.size();
+            part = StringData(&*where, size);
+            where += (size + 1); // account for '.'
+        }
+
+        // Drop any replacements
+        _replacements.clear();
+    }
+
     StringData FieldRef::getPart(size_t i) const {
         dassert(i < _size);
 
@@ -152,25 +183,23 @@ namespace mongo {
         return prefixSize;
     }
 
-    std::string FieldRef::dottedField( size_t offset ) const {
-        std::string result;
+    StringData FieldRef::dottedField( size_t offset ) const {
+        if (_size == 0 || offset >= numParts() )
+            return StringData();
 
-        if (_size == 0 || offset >= numParts() ) {
-            // fall through, we will return the empty string.
-        }
-        else if (_replacements.empty() && (offset == 0)) {
-            result = _dotted;
-        }
-        else {
-            // Reserve some space in the string. We know we will have, at minimum, a character
-            // for each component we are writing, and a dot for each component, less one.
-            result.reserve(((_size - offset) * 2) - 1);
-            for (size_t i=offset; i<_size; i++) {
-                if ( i > offset )
-                    result.append(1, '.');
-                StringData part = getPart(i);
-                result.append(part.rawData(), part.size());
-            }
+        if (!_replacements.empty())
+            reserialize();
+        dassert(_replacements.empty());
+
+        // Assume we want the whole thing
+        StringData result(_dotted);
+
+        // Strip off any leading parts we were asked to ignore
+        for (size_t i = 0; i < offset; ++i) {
+            const StringData part = getPart(i);
+            result = StringData(
+                result.rawData() + part.size() + 1,
+                result.size() - part.size() - 1);
         }
 
         return result;
@@ -229,16 +258,6 @@ namespace mongo {
         _variable.clear();
         _dotted.clear();
         _replacements.clear();
-    }
-
-    size_t FieldRef::numReplaced() const {
-        size_t res = 0;
-        for (size_t i = 0; i < _replacements.size(); i++) {
-            if (!_replacements[i].empty()) {
-                res++;
-            }
-        }
-        return res;
     }
 
     std::ostream& operator<<(std::ostream& stream, const FieldRef& field) {

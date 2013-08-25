@@ -253,8 +253,10 @@ namespace mongo {
         dassert(_preparedState->applyCalled);
 
         const bool isPrefix = _fromFieldRef.isPrefixOf(_toFieldRef);
-        const string setPath = (isPrefix ? _fromFieldRef : _toFieldRef).dottedField();
-        const string unsetPath = isPrefix ? "" : _fromFieldRef.dottedField();
+        const StringData setPath =
+            (isPrefix ? _fromFieldRef : _toFieldRef).dottedField();
+        const StringData unsetPath =
+            isPrefix ? StringData() : _fromFieldRef.dottedField();
         const bool doUnset = !isPrefix;
 
         // We'd like to create an entry such as {$set: {<fieldname>: <value>}} under 'logRoot'.
