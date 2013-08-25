@@ -147,7 +147,6 @@ namespace {
             fieldRef.setPart(1, parts[i]);
             ASSERT_EQUALS(fieldRef.dottedField(), prefix + parts[i]);
         }
-        ASSERT_EQUALS(fieldRef.numReplaced(), 1U);
     }
 
     TEST( Prefix, Normal ) {
