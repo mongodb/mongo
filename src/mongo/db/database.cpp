@@ -169,55 +169,6 @@ namespace mongo {
         return "";
     }
 
-    /*
-    bool Database::openExistingFile( int n ) {
-        verify(this);
-        Lock::assertWriteLocked(_name);
-        {
-            // must not yet be visible to others as we aren't in the db's write lock and
-            // we will write to _files vector - thus this assert.
-            bool loaded = dbHolder().__isLoaded(_name, _path);
-            verify( !loaded );
-        }
-        // additionally must be in the dbholder mutex (no assert for that yet)
-
-        // todo: why here? that could be bad as we may be read locked only here
-        _namespaceIndex.init();
-
-        if ( n < 0 || n >= DiskLoc::MaxFiles ) {
-            massert( 15924 , str::stream() << "getFile(): bad file number value " << n << " (corrupt db?): run repair", false);
-        }
-
-        {
-            if( n < (int) _files.size() && _files[n] ) {
-                MONGO_DLOG(2) << "openExistingFile " << n << " is already open" << endl;
-                return true;
-            }
-        }
-
-        {
-            boost::filesystem::path fullName = fileName( n );
-            string fullNameString = fullName.string();
-            DataFile *df = new DataFile(n);
-            try {
-                if( !df->openExisting( fullNameString.c_str() ) ) { 
-                    delete df;
-                    return false;
-                }
-            }
-            catch ( AssertionException& ) {
-                delete df;
-                throw;
-            }
-            while ( n >= (int) _files.size() ) {
-                _files.push_back(0);
-            }
-            _files[n] = df;
-        }
-
-        return true;
-    }
-    */
     // todo : we stop once a datafile dne.
     //        if one datafile were missing we should keep going for
     //        repair purposes yet we do not.
