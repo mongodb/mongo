@@ -846,7 +846,7 @@ namespace mongo {
             LOG(1) << "ns: " << ns << ", not okForStorageAsRoot: " << js;
         }
         uassert(17013,
-                "Cannot insert object with _id field of array/regex or "
+                "Cannot insert object with _id field of array/regex/undefined or "
                 "with any field name prefixed with $ or containing a dot. ",
                 ok);
 
