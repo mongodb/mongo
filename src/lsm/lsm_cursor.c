@@ -208,6 +208,7 @@ __clsm_open_cursors(
 
 	WT_RET(__wt_readlock(session, lsm_tree->rwlock));
 	locked = 1;
+retry:
 	F_SET(session, WT_SESSION_NO_CACHE_CHECK);
 
 	/*
@@ -304,6 +305,13 @@ __clsm_open_cursors(
 			WT_ERR(__clsm_close_cursors(clsm, skip_chunks));
 			WT_ERR(__wt_readlock(session, lsm_tree->rwlock));
 			locked = 1;
+			/*
+			 * Dropping the lock means the number of chunks in
+			 * the LSM tree may have changed, and gotten smaller.
+			 * Retry if it did so we recompute all the values.
+			 */
+			if (lsm_tree->nchunks < skip_chunks)
+				goto retry;
 		} else {
 			/* Detach from our old primary. */
 			clsm->primary_chunk = NULL;
