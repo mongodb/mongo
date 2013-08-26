@@ -173,8 +173,9 @@ struct __wt_log_op_desc {
  * Log record declarations: BEGIN
  */
 #define	WT_LOGREC_INVALID	0
-#define	WT_LOGREC_COMMIT	1
-#define	WT_LOGREC_DEBUG	2
+#define	WT_LOGREC_CHECKPOINT	1
+#define	WT_LOGREC_COMMIT	2
+#define	WT_LOGREC_DEBUG	3
 #define	WT_LOGREC_INVALID	0
 #define	WT_LOGOP_COL_PUT	1
 #define	WT_LOGOP_COL_REMOVE	2

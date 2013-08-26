@@ -152,17 +152,17 @@ __wt_log_open(WT_SESSION_IMPL *session)
 	log->first_lsn.offset = 0;
 
 	/*
+	 * Start logging at the beginning of the next log file, no matter
+	 * where the previous log file ends.
+	 */
+	WT_ERR(__wt_log_newfile(session, 1));
+
+	/*
 	 * If there were log files, run recovery.
 	 * XXX belongs at a higher level than this.
 	 */
 	if (logcount > 0)
 		WT_ERR(__wt_txn_recover(session));
-
-	/*
-	 * Start logging at the beginning of the next log file, no matter
-	 * where the previous log file ends.
-	 */
-	WT_ERR(__wt_log_newfile(session, 1));
 
 err:	__wt_log_files_free(session, logfiles, logcount);
 	return (ret);

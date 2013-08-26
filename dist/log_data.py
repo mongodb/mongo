@@ -19,6 +19,7 @@ class LogRecordType:
 
 rectypes = [
 	LogRecordType('invalid', []),
+	LogRecordType('checkpoint', [('string', 'uri'), ('int', 'start')]),
 	LogRecordType('commit', [('uint64', 'txnid')]),
 	LogRecordType('debug', [('string', 'message')]),
 ]

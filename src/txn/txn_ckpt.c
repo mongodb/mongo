@@ -402,6 +402,7 @@ __checkpoint_worker(
 	WT_CONNECTION_IMPL *conn;
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
+	WT_LSN ckptlsn;
 	WT_TXN *txn;
 	WT_TXN_ISOLATION saved_isolation;
 	const char *name;
@@ -412,6 +413,7 @@ __checkpoint_worker(
 	btree = S2BT(session);
 	bm = btree->bm;
 	ckpt = ckptbase = NULL;
+	INIT_LSN(&ckptlsn);
 	dhandle = session->dhandle;
 	name_alloc = NULL;
 	txn = &session->txn;
@@ -694,6 +696,13 @@ __checkpoint_worker(
 	WT_ERR(__wt_bt_cache_force_write(session));
 
 	/*
+	 * If logging, write a checkpoint start record and get an LSN for
+	 * this checkpoint.
+	 */
+	if (S2C(session)->logging)
+		WT_ERR(__wt_txn_log_checkpoint(session, 1, &ckptlsn));
+
+	/*
 	 * Clear the tree's modified flag; any changes before we clear the flag
 	 * are guaranteed to be part of this checkpoint (unless reconciliation
 	 * skips updates for transactional reasons), and changes subsequent to
@@ -723,11 +732,10 @@ __checkpoint_worker(
 		if (F_ISSET(ckpt, WT_CKPT_ADD))
 			ckpt->write_gen = btree->write_gen;
 
-fake:
-	/* Update the object's metadata. */
+fake:	/* Update the object's metadata. */
 	txn->isolation = TXN_ISO_READ_UNCOMMITTED;
-	ret = __wt_meta_ckptlist_set(session, dhandle->name, ckptbase);
-	WT_ERR(ret);
+	WT_ERR(__wt_meta_ckptlist_set(
+	    session, dhandle->name, ckptbase, &ckptlsn));
 
 	/*
 	 * If we wrote a checkpoint (rather than faking one), pages may be
@@ -742,6 +750,10 @@ fake:
 		else
 			WT_ERR(bm->checkpoint_resolve(bm, session));
 	}
+
+	/* If logging, mark that the checkpoint is complete (for debugging). */
+	if (S2C(session)->logging)
+		WT_ERR(__wt_txn_log_checkpoint(session, 0, NULL));
 
 err:	if (hot_backup_locked)
 		__wt_spin_unlock(session, &conn->hot_backup_lock);

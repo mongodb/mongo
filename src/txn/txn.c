@@ -343,7 +343,7 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 	if (ret != 0 ||
 	    (txn->mod_count > 0 && S2C(session)->logging &&
 	    !F_ISSET(session, WT_SESSION_NO_LOGGING) &&
-	    (ret = __wt_txn_commit_log(session, cfg)) != 0)) {
+	    (ret = __wt_txn_log_commit(session, cfg)) != 0)) {
 		WT_TRET(__wt_txn_rollback(session, cfg));
 		return (ret);
 	}

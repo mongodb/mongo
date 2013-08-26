@@ -365,8 +365,8 @@ format:
  *	Set a file's checkpoint value from the WT_CKPT list.
  */
 int
-__wt_meta_ckptlist_set(
-    WT_SESSION_IMPL *session, const char *fname, WT_CKPT *ckptbase)
+__wt_meta_ckptlist_set(WT_SESSION_IMPL *session,
+    const char *fname, WT_CKPT *ckptbase, WT_LSN *ckptlsn)
 {
 	struct timespec ts;
 	WT_CKPT *ckpt;
@@ -443,6 +443,10 @@ __wt_meta_ckptlist_set(
 		sep = ",";
 	}
 	WT_ERR(__wt_buf_catfmt(session, buf, ")"));
+	if (ckptlsn != NULL)
+		WT_ERR(__wt_buf_catfmt(session, buf,
+		    ",checkpoint_lsn=(%" PRIu32 ", %" PRIuMAX ")",
+		    ckptlsn->file, (uintmax_t)ckptlsn->offset));
 	WT_ERR(__ckpt_set(session, fname, buf->mem));
 
 err:	__wt_scr_free(&buf);

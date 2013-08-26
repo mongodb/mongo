@@ -164,14 +164,13 @@ __txn_commit_apply(WT_SESSION_IMPL *session,
  *	Write the operations of a transaction to the log at commit time.
  */
 int
-__wt_txn_commit_log(WT_SESSION_IMPL *session, const char *cfg[])
+__wt_txn_log_commit(WT_SESSION_IMPL *session, const char *cfg[])
 {
 	WT_DECL_RET;
 	WT_ITEM *logrec;
-	WT_LSN lsn;
 	WT_TXN *txn;
 	WT_TXN_OP *op;
-	uint8_t *p;
+	const char *fmt = "I";
 	size_t header_size;
 	uint32_t rectype = WT_LOGREC_COMMIT;
 	u_int i;
@@ -179,13 +178,12 @@ __wt_txn_commit_log(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_UNUSED(cfg);
 	txn = &session->txn;
 
-	header_size = __wt_vsize_uint(rectype);
-	WT_RET(__wt_logrec_alloc(session, &logrec));
+	WT_RET(__wt_struct_size(session, &header_size, fmt, rectype));
+	WT_RET(__wt_logrec_alloc(session, header_size, &logrec));
 
-	p = (uint8_t *)logrec->data + logrec->size;
-	WT_RET(__wt_vpack_uint(&p, header_size, rectype));
-	logrec->size =
-	    (uint32_t)(offsetof(WT_LOG_RECORD, record) + header_size);
+	WT_ERR(__wt_struct_pack(session,
+	    (uint8_t *)logrec->data + logrec->size, header_size, fmt, rectype));
+	logrec->size += (uint32_t)header_size;
 
 	/* Write updates to the log. */
 	for (i = 0, op = txn->mod; i < txn->mod_count; i++, op++) {
@@ -194,9 +192,39 @@ __wt_txn_commit_log(WT_SESSION_IMPL *session, const char *cfg[])
 		/* XXX We can't handle physical truncate yet. */
 	}
 
-	WT_ERR(__wt_log_write(session, logrec, &lsn,
+	WT_ERR(__wt_log_write(session, logrec, NULL,
 	    F_ISSET(S2C(session), WT_CONN_SYNC) ? WT_LOG_SYNC : 0));
 
+err:	__wt_logrec_free(session, &logrec);
+	return (ret);
+}
+
+/*
+ * __wt_txn_log_checkpoint --
+ *	Write a log record for a checkpoint operation.
+ */
+int
+__wt_txn_log_checkpoint(WT_SESSION_IMPL *session, int start, WT_LSN *lsnp)
+{
+	WT_DATA_HANDLE *dhandle;
+	WT_DECL_RET;
+	WT_ITEM *logrec;
+	const char *fmt = WT_UNCHECKED_STRING(ISI);
+	size_t header_size;
+	uint32_t rectype = WT_LOGREC_CHECKPOINT;
+
+	dhandle = session->dhandle;
+
+	WT_RET(__wt_struct_size(
+	    session, &header_size, fmt, rectype, dhandle->name, start));
+	WT_RET(__wt_logrec_alloc(session, header_size, &logrec));
+
+	WT_ERR(__wt_struct_pack(session,
+	    (uint8_t *)logrec->data + logrec->size, header_size,
+	    fmt, rectype, dhandle->name, start));
+	logrec->size += (uint32_t)header_size;
+
+	WT_ERR(__wt_log_write(session, logrec, lsnp, 0));
 err:	__wt_logrec_free(session, &logrec);
 	return (ret);
 }

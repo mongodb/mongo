@@ -710,7 +710,9 @@ extern int __wt_log_write(WT_SESSION_IMPL *session,
 extern int __wt_log_vprintf(WT_SESSION_IMPL *session,
     const char *fmt,
     va_list ap);
-extern int __wt_logrec_alloc(WT_SESSION_IMPL *session, WT_ITEM **logrecp);
+extern int __wt_logrec_alloc(WT_SESSION_IMPL *session,
+    size_t size,
+    WT_ITEM **logrecp);
 extern void __wt_logrec_free(WT_SESSION_IMPL *session, WT_ITEM **logrecp);
 extern int __wt_logrec_read(WT_SESSION_IMPL *session,
     const uint8_t **pp,
@@ -872,9 +874,10 @@ extern int __wt_meta_checkpoint_clear(WT_SESSION_IMPL *session,
 extern int __wt_meta_ckptlist_get( WT_SESSION_IMPL *session,
     const char *fname,
     WT_CKPT **ckptbasep);
-extern int __wt_meta_ckptlist_set( WT_SESSION_IMPL *session,
+extern int __wt_meta_ckptlist_set(WT_SESSION_IMPL *session,
     const char *fname,
-    WT_CKPT *ckptbase);
+    WT_CKPT *ckptbase,
+    WT_LSN *ckptlsn);
 extern void __wt_meta_ckptlist_free(WT_SESSION_IMPL *session,
     WT_CKPT *ckptbase);
 extern void __wt_meta_checkpoint_free(WT_SESSION_IMPL *session, WT_CKPT *ckpt);
@@ -1417,7 +1420,10 @@ extern int __wt_checkpoint_write_leaves(WT_SESSION_IMPL *session,
     const char *cfg[]);
 extern int __wt_checkpoint_sync(WT_SESSION_IMPL *session, const char *cfg[]);
 extern int __wt_checkpoint_close(WT_SESSION_IMPL *session, const char *cfg[]);
-extern int __wt_txn_commit_log(WT_SESSION_IMPL *session, const char *cfg[]);
+extern int __wt_txn_log_commit(WT_SESSION_IMPL *session, const char *cfg[]);
+extern int __wt_txn_log_checkpoint(WT_SESSION_IMPL *session,
+    int start,
+    WT_LSN *lsnp);
 extern int __wt_txn_printlog( WT_SESSION_IMPL *session,
     WT_ITEM *logrec,
     WT_LSN *lsnp,

@@ -55,6 +55,7 @@ static const WT_CONFIG_CHECK confchk_file_meta[] = {
 	{ "block_compressor", "string", NULL, NULL},
 	{ "cache_resident", "boolean", NULL, NULL},
 	{ "checkpoint", "string", NULL, NULL},
+	{ "checkpoint_lsn", "string", NULL, NULL},
 	{ "checksum", "string",
 	    "choices=[\"on\",\"off\",\"uncompressed\"]",
 	    NULL},
@@ -310,13 +311,13 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	},
 	{ "file.meta",
 	  "allocation_size=4KB,block_compressor=,cache_resident=0,checkpoint=,"
-	  "checksum=uncompressed,collator=,columns=,dictionary=0,format=btree,"
-	  "huffman_key=,huffman_value=,internal_item_max=0,"
-	  "internal_key_truncate=,internal_page_max=4KB,key_format=u,key_gap=10"
-	  ",leaf_item_max=0,leaf_page_max=1MB,memory_page_max=5MB,"
-	  "os_cache_dirty_max=0,os_cache_max=0,prefix_compression=,"
-	  "prefix_compression_min=4,split_pct=75,value_format=u,"
-	  "version=(major=0,minor=0)",
+	  "checkpoint_lsn=,checksum=uncompressed,collator=,columns=,"
+	  "dictionary=0,format=btree,huffman_key=,huffman_value=,"
+	  "internal_item_max=0,internal_key_truncate=,internal_page_max=4KB,"
+	  "key_format=u,key_gap=10,leaf_item_max=0,leaf_page_max=1MB,"
+	  "memory_page_max=5MB,os_cache_dirty_max=0,os_cache_max=0,"
+	  "prefix_compression=,prefix_compression_min=4,split_pct=75,"
+	  "value_format=u,version=(major=0,minor=0)",
 	  confchk_file_meta
 	},
 	{ "index.meta",

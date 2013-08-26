@@ -50,8 +50,8 @@ __wt_salvage(WT_SESSION_IMPL *session, const char *cfg[])
 	if (ckptbase[0].raw.data == NULL)
 		WT_ERR(__wt_meta_checkpoint_clear(session, dhandle->name));
 	else
-		WT_ERR(
-		    __wt_meta_ckptlist_set(session, dhandle->name, ckptbase));
+		WT_ERR(__wt_meta_ckptlist_set(
+		    session, dhandle->name, ckptbase, NULL));
 
 err:	__wt_meta_ckptlist_free(session, ckptbase);
 	return (ret);
