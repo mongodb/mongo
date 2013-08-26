@@ -103,8 +103,8 @@ namespace optionenvironment {
         /** Handles parsing of a JSON config string and adds the results to the given Environment */
         Status parseJSONConfigFile(const OptionSection&, const std::string& config, Environment*);
 
-        /** Gets defaults from the OptionSection and adds the results to the given Environment */
-        Status getDefaultValues(const OptionSection&, Environment*);
+        /** Gets defaults from the OptionSection and adds them to the given Environment */
+        Status addDefaultValues(const OptionSection&, Environment*);
 
         /** Detects whether the given string represents a JSON config file or an INI config file */
         bool isJSONConfig(const std::string& config);
