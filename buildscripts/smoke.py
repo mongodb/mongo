@@ -101,6 +101,7 @@ small_oplog = False
 small_oplog_rs = False
 
 all_test_results = []
+report_file = None
 
 # This class just implements the with statement API, for a sneaky
 # purpose below.
@@ -121,7 +122,6 @@ def buildlogger(cmd, is_global=False):
         else:
             return [utils.find_python(), 'buildscripts/buildlogger.py'] + cmd
     return cmd
-
 
 class mongod(object):
     def __init__(self, **kwargs):
@@ -319,8 +319,8 @@ class TestFailure(Exception):
 class TestExitFailure(TestFailure):
     def __init__(self, *args):
         self.path = args[0]
-
         self.status=args[1]
+
     def __str__(self):
         return "test %s exited with status %d" % (self.path, self.status)
 
@@ -417,7 +417,9 @@ def skipTest(path):
 
     return False
 
-def runTest(test):
+def runTest(test, result):
+    # result is a map containing test result details, like result["url"]
+
     # test is a tuple of ( filename , usedb<bool> )
     # filename should be a js file to run
     # usedb is true if the test expects a mongod to be running
@@ -515,7 +517,19 @@ def runTest(test):
 
     os.environ['MONGO_TEST_FILENAME'] = mongo_test_filename
     t1 = time.time()
-    r = call(buildlogger(argv), cwd=test_path)
+
+    proc = Popen(buildlogger(argv), cwd=test_path, stdout=PIPE)
+    first_line = proc.stdout.readline() # Get suppressed output URL
+    m = re.search(r"\s*\(output suppressed; see (?P<url>.*)\)$", first_line)
+    if m:
+        result["url"] = m.group("url")
+    sys.stdout.write(first_line)
+    for line in proc.stdout: # print until subprocess's stdout closed
+        sys.stdout.write(line)
+
+    proc.wait() # wait if stdout is closed before subprocess exits.
+    r = proc.returncode
+
     t2 = time.time()
     del os.environ['MONGO_TEST_FILENAME']
 
@@ -533,6 +547,8 @@ def runTest(test):
         suffix = "minutes"
     sys.stdout.write("                %10.4f %s\n" % ((timediff) * scale, suffix))
     sys.stdout.flush()
+
+    result["exit_code"] = r
 
     if r != 0:
         raise TestExitFailure(path, r)
@@ -600,15 +616,22 @@ def run_tests(tests):
 
             tests_run = 0
             for tests_run, test in enumerate(tests):
-                test_result = { "test": test[0], "start": time.time() }
+                test_result = { "start": time.time() }
+
+                if test[0].startswith(mongo_repo + os.path.sep):
+                    test_result["test_file"] = test[0][len(mongo_repo)+1:]
+                else:
+                    # user could specify a file not in repo. leave it alone.
+                    test_result["test_file"] = test[0]
+
                 try:
                     fails.append(test)
-                    runTest(test)
+                    runTest(test, test_result)
                     fails.pop()
                     winners.append(test)
 
-                    test_result["passed"] = True
                     test_result["end"] = time.time()
+                    test_result["status"] = "pass"
                     all_test_results.append( test_result )
 
                     if small_oplog or small_oplog_rs:
@@ -627,9 +650,9 @@ def run_tests(tests):
                                             use_ssl=use_ssl).__enter__()
 
                 except TestFailure, f:
-                    test_result["passed"] = False
                     test_result["end"] = time.time()
                     test_result["error"] = str(f)
+                    test_result["status"] = "fail"
                     all_test_results.append( test_result )
                     try:
                         print f
@@ -787,6 +810,7 @@ def set_globals(options, tests):
     global no_journal, set_parameters, no_preallocj, auth, authMechanism, keyFile, smoke_db_prefix, test_path, start_mongod
     global use_ssl
     global file_of_commands_mode
+    global report_file
     start_mongod = options.start_mongod
     if hasattr(options, 'use_ssl'):
         use_ssl = options.use_ssl
@@ -831,6 +855,8 @@ def set_globals(options, tests):
     # if smoke.py is running a list of commands read from a
     # file (or stdin) rather than running a suite of js tests
     file_of_commands_mode = options.File and options.mode == 'files'
+    # generate json report
+    report_file = options.report_file
 
 def file_version():
     return md5(open(__file__, 'r').read()).hexdigest()
@@ -982,6 +1008,10 @@ def main():
                       action="store", help='Path to Python file containing buildlogger credentials')
     parser.add_option('--buildlogger-phase', dest='buildlogger_phase', default=None,
                       action="store", help='Set the "phase" for buildlogger (e.g. "core", "auth") for display in the webapp (optional)')
+    parser.add_option('--report-file', dest='report_file', default=None,
+                      action='store',
+                      help='Path to generate detailed json report containing all test details')
+
 
     global tests
     (options, tests) = parser.parse_args()
@@ -1047,9 +1077,10 @@ def main():
     finally:
         add_to_failfile(fails, options)
 
-        f = open( "smoke-last.json", "wb" )
-        f.write( json.dumps( { "results" : all_test_results } ) )
-        f.close()
+        if report_file:
+            f = open( report_file, "wb" )
+            f.write( json.dumps( { "results" : all_test_results } ) )
+            f.close()
 
         report()
 
