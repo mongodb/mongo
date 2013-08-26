@@ -49,18 +49,8 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 	if (cbt->compare == 0) {
 		if (cbt->ins == NULL) {
 			/* Allocate an update array as necessary. */
-			if ((upd_entry = page->u.row.upd) == NULL) {
-				WT_ERR(__wt_calloc_def(
-				    session, page->entries, &upd_entry));
-				if (WT_ATOMIC_CAS(
-				    page->u.row.upd, NULL, upd_entry))
-					__wt_cache_page_inmem_incr(session,
-					    page, page->entries *
-					    sizeof(WT_UPDATE *));
-				else
-					__wt_free(session, upd_entry);
-				upd_entry = NULL;
-			}
+			WT_PAGE_ALLOC_AND_SWAP(session, page,
+			    page->u.row.upd, upd_entry, page->entries);
 
 			/* Set the WT_UPDATE array reference. */
 			upd_entry = &page->u.row.upd[cbt->slot];
@@ -94,31 +84,16 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 		 * the returned slot, then we're using the smallest-key insert
 		 * slot.  That's hard, so we set a flag.
 		 */
-		ins_slot = F_ISSET(
-		    cbt, WT_CBT_SEARCH_SMALLEST) ? page->entries : cbt->slot;
+		WT_PAGE_ALLOC_AND_SWAP(session, page,
+		    page->u.row.ins, ins_headp, page->entries + 1);
 
-		if ((ins_headp = page->u.row.ins) == NULL) {
-			WT_ERR(__wt_calloc_def(
-			    session, page->entries + 1, &ins_headp));
-			if (WT_ATOMIC_CAS(page->u.row.ins, NULL, ins_headp))
-				__wt_cache_page_inmem_incr(session,
-				    page, (page->entries + 1) *
-				    sizeof(WT_INSERT_HEAD *));
-			else
-				__wt_free(session, ins_headp);
-		}
+		ins_slot = F_ISSET(cbt, WT_CBT_SEARCH_SMALLEST) ?
+		    page->entries : cbt->slot;
 		ins_headp = &page->u.row.ins[ins_slot];
 
 		/* Allocate the WT_INSERT_HEAD structure as necessary. */
-		if ((ins_head = *ins_headp) == NULL) {
-			WT_ERR(__wt_calloc_def(session, 1, &ins_head));
-			if (WT_ATOMIC_CAS(*ins_headp, NULL, ins_head))
-				__wt_cache_page_inmem_incr(
-				    session, page, sizeof(WT_INSERT_HEAD));
-			else
-				__wt_free(session, ins_head);
-			ins_head = *ins_headp;
-		}
+		WT_PAGE_ALLOC_AND_SWAP(session, page, *ins_headp, ins_head, 1);
+		ins_head = *ins_headp;
 
 		/* Choose a skiplist depth for this insert. */
 		skipdepth = __wt_skip_choose_depth();
