@@ -270,12 +270,11 @@ __free_skip_list(WT_SESSION_IMPL *session, WT_INSERT *ins)
 {
 	WT_INSERT *next;
 
-	do {
+	for (; ins != NULL; ins = next) {
 		__free_update_list(session, ins->upd);
-
 		next = WT_SKIP_NEXT(ins);
 		__wt_free(session, ins);
-	} while ((ins = next) != NULL);
+	}
 }
 
 /*

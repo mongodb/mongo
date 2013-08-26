@@ -2636,8 +2636,6 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_DSRC_SESSION_CURSOR_OPEN		83
 /*! update conflicts */
 #define	WT_STAT_DSRC_TXN_UPDATE_CONFLICT		84
-/*! write generation conflicts */
-#define	WT_STAT_DSRC_TXN_WRITE_CONFLICT			85
 /*! @} */
 /*
  * Statistics section: END

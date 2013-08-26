@@ -775,13 +775,12 @@ table_extend(uint64_t keyno)
 	}
 
 	/* Enter the new key into the list. */
-	for (p = slots; p < ep; ++p) {
+	for (p = slots; p < ep; ++p)
 		if (*p == 0) {
 			*p = keyno;
+			++g.extend;
 			break;
 		}
-		++g.extend;
-	}
 
 	/* Process the table until we don't find the "next" value. */
 	for (;;) {

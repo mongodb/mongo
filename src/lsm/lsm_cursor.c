@@ -50,7 +50,7 @@ __clsm_enter(WT_CURSOR_LSM *clsm, int update)
 	for (;;) {
 		/* Update the maximum transaction ID in the primary chunk. */
 		if (update && (chunk = clsm->primary_chunk) != NULL) {
-			__wt_txn_autocommit_check(session);
+			WT_RET(__wt_txn_autocommit_check(session));
 			for (id = chunk->txnid_max, myid = session->txn.id;
 			    !TXNID_LE(myid, id);
 			    id = chunk->txnid_max)
@@ -966,7 +966,7 @@ __clsm_put(WT_SESSION_IMPL *session,
 	 * write-write conflicts across chunk boundaries.
 	 */
 	for (i = 0; i < clsm->nupdates; i++) {
-		c = clsm->cursors[clsm->nchunks - i - 1];
+		c = clsm->cursors[(clsm->nchunks - i) - 1];
 		c->set_key(c, key);
 		c->set_value(c, value);
 		WT_RET(c->insert(c));

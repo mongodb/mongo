@@ -17,34 +17,27 @@ class Serial:
 msgtypes = [
 Serial('col_append', [
 		SerialArg('WT_PAGE *', 'page'),
-		SerialArg('uint32_t', 'write_gen'),
-		SerialArg('WT_INSERT_HEAD **', 'insheadp'),
+		SerialArg('WT_INSERT_HEAD *', 'inshead'),
 		SerialArg('WT_INSERT ***', 'ins_stack'),
 		SerialArg('WT_INSERT **', 'next_stack'),
-		SerialArg('WT_INSERT_HEAD **', 'new_inslist', 1),
-		SerialArg('WT_INSERT_HEAD *', 'new_inshead', 1),
 		SerialArg('WT_INSERT *', 'new_ins', 1),
+		SerialArg('uint64_t *', 'recno'),
 		SerialArg('u_int', 'skipdepth'),
 	]),
 
 Serial('insert', [
 		SerialArg('WT_PAGE *', 'page'),
-		SerialArg('uint32_t', 'write_gen'),
-		SerialArg('WT_INSERT_HEAD **', 'inshead'),
+		SerialArg('WT_INSERT_HEAD *', 'inshead'),
 		SerialArg('WT_INSERT ***', 'ins_stack'),
 		SerialArg('WT_INSERT **', 'next_stack'),
-		SerialArg('WT_INSERT_HEAD **', 'new_inslist', 1),
-		SerialArg('WT_INSERT_HEAD *', 'new_inshead', 1),
 		SerialArg('WT_INSERT *', 'new_ins', 1),
 		SerialArg('u_int', 'skipdepth'),
 	]),
 
 Serial('update', [
 		SerialArg('WT_PAGE *', 'page'),
-		SerialArg('uint32_t', 'write_gen'),
 		SerialArg('WT_UPDATE **', 'srch_upd'),
 		SerialArg('WT_UPDATE *', 'old_upd'),
-		SerialArg('WT_UPDATE **', 'new_upd', 1),
 		SerialArg('WT_UPDATE *', 'upd', 1),
 		SerialArg('WT_UPDATE **', 'upd_obsolete'),
 	]),

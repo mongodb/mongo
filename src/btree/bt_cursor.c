@@ -147,8 +147,8 @@ __wt_btcur_search(WT_CURSOR_BTREE *cbt)
 retry:	WT_RET(__cursor_func_init(cbt, 1));
 
 	WT_ERR(btree->type == BTREE_ROW ?
-	    __wt_row_search(session, cbt, 0) :
-	    __wt_col_search(session, cbt, 0));
+	    __wt_row_search(session, cbt) :
+	    __wt_col_search(session, cbt));
 	if (cbt->compare != 0 || __cursor_invalid(cbt)) {
 		/*
 		 * Creating a record past the end of the tree in a fixed-length
@@ -198,8 +198,8 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exactp)
 retry:	WT_RET(__cursor_func_init(cbt, 1));
 
 	WT_ERR(btree->type == BTREE_ROW ?
-	    __wt_row_search(session, cbt, 0) :
-	    __wt_col_search(session, cbt, 0));
+	    __wt_row_search(session, cbt) :
+	    __wt_col_search(session, cbt));
 
 	/*
 	 * Creating a record past the end of the tree in a fixed-length column-
@@ -228,8 +228,8 @@ retry:	WT_RET(__cursor_func_init(cbt, 1));
 		exact = 1;
 	else {
 		WT_ERR(btree->type == BTREE_ROW ?
-		    __wt_row_search(session, cbt, 0) :
-		    __wt_col_search(session, cbt, 0));
+		    __wt_row_search(session, cbt) :
+		    __wt_col_search(session, cbt));
 		if (!__cursor_invalid(cbt)) {
 			exact = cbt->compare;
 			ret = __wt_kv_return(session, cbt);
@@ -292,7 +292,7 @@ retry:	WT_RET(__cursor_func_init(cbt, 1));
 		if (F_ISSET(cursor, WT_CURSTD_APPEND))
 			cbt->iface.recno = UINT64_MAX;
 
-		WT_ERR(__wt_col_search(session, cbt, 1));
+		WT_ERR(__wt_col_search(session, cbt));
 
 		if (F_ISSET(cursor, WT_CURSTD_APPEND))
 			cbt->iface.recno = 0;
@@ -313,7 +313,7 @@ retry:	WT_RET(__cursor_func_init(cbt, 1));
 			cbt->iface.recno = cbt->recno;
 		break;
 	case BTREE_ROW:
-		WT_ERR(__wt_row_search(session, cbt, 1));
+		WT_ERR(__wt_row_search(session, cbt));
 		/*
 		 * If not overwriting, fail if the key exists, else insert the
 		 * key/value pair.
@@ -365,7 +365,7 @@ retry:	WT_RET(__cursor_func_init(cbt, 1));
 	switch (btree->type) {
 	case BTREE_COL_FIX:
 	case BTREE_COL_VAR:
-		WT_ERR(__wt_col_search(session, cbt, 1));
+		WT_ERR(__wt_col_search(session, cbt));
 
 		/* Remove the record if it exists. */
 		if (cbt->compare != 0 || __cursor_invalid(cbt)) {
@@ -387,7 +387,7 @@ retry:	WT_RET(__cursor_func_init(cbt, 1));
 		break;
 	case BTREE_ROW:
 		/* Remove the record if it exists. */
-		WT_ERR(__wt_row_search(session, cbt, 1));
+		WT_ERR(__wt_row_search(session, cbt));
 		if (cbt->compare != 0 || __cursor_invalid(cbt))
 			WT_ERR(WT_NOTFOUND);
 
@@ -446,7 +446,7 @@ retry:	WT_RET(__cursor_func_init(cbt, 1));
 	switch (btree->type) {
 	case BTREE_COL_FIX:
 	case BTREE_COL_VAR:
-		WT_ERR(__wt_col_search(session, cbt, 1));
+		WT_ERR(__wt_col_search(session, cbt));
 
 		/*
 		 * If not overwriting, fail if the key doesn't exist.  Update
@@ -462,7 +462,7 @@ retry:	WT_RET(__cursor_func_init(cbt, 1));
 		ret = __wt_col_modify(session, cbt, 3);
 		break;
 	case BTREE_ROW:
-		WT_ERR(__wt_row_search(session, cbt, 1));
+		WT_ERR(__wt_row_search(session, cbt));
 		/*
 		 * If not overwriting, fail if the key does not exist.
 		 */

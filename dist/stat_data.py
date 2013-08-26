@@ -320,7 +320,6 @@ dsrc_stats = [
 	# Transaction statistics
 	##########################################
 	Stat('txn_update_conflict', 'update conflicts'),
-	Stat('txn_write_conflict', 'write generation conflicts'),
 ]
 
 dsrc_stats = sorted(dsrc_stats, key=attrgetter('name'))

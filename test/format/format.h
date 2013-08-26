@@ -163,7 +163,7 @@ typedef struct {
 	 * We don't want to get to far past the end of the original bulk
 	 * load, we can run out of space to track the added records.
 	 */
-#define	MAX_EXTEND	(g.c_threads * 3)
+#define	MAX_EXTEND	(g.c_threads * 10)
 	uint32_t extend;			/* Total extended slots */
 
 	uint16_t key_rand_len[1031];		/* Key lengths */

@@ -33,7 +33,6 @@ __cursor_search_clear(WT_CURSOR_BTREE *cbt)
 	/* We don't bother clearing the insert stack, that's more expensive. */
 
 	cbt->recno = 0;				/* Illegal value */
-	cbt->write_gen = 0;
 
 	cbt->compare = 2;			/* Illegal value */
 
