@@ -32,10 +32,10 @@ namespace mongo {
 
     private:
         /**
-         * Check each collection in a database to see if it has any in-progress index builds that
-         * need to be retried.  If so, calls retryIndexBuild.
+         * Check each collection in the passed in vector to see if it has any in-progress index
+         * builds that need to be retried.  If so, calls retryIndexBuild.
          */
-        void checkDB(const std::string& dbname, bool* firstTime);
+        void checkNS(const std::vector<std::string>& nsToCheck);
 
         /**
          * Actually retry an index build on a given namespace.

@@ -479,6 +479,12 @@ namespace mongo {
 
     /* call after constructing to start - returns fairly quickly after launching its threads */
     void ReplSetImpl::_go() {
+        {
+            boost::unique_lock<boost::mutex> lk(rss.mtx);
+            while (!rss.indexRebuildDone) {
+                rss.cond.wait(lk);
+            }
+        }
         try {
             loadLastOpTimeWritten();
         }
@@ -497,6 +503,7 @@ namespace mongo {
 
     ReplSetImpl::StartupStatus ReplSetImpl::startupStatus = PRESTART;
     DiagStr ReplSetImpl::startupStatusMsg;
+    ReplicationStartSynchronizer ReplSetImpl::rss;
 
     extern BSONObj *getLastErrorDefault;
 
