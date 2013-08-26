@@ -461,6 +461,44 @@ namespace {
         ASSERT_EQUALS(port, 6);
     }
 
+    TEST(Parsing, DefaultValueIterateExplicit) {
+        moe::OptionsParser parser;
+        moe::Environment environment;
+
+        moe::OptionSection testOpts;
+        testOpts.addOption(moe::OptionDescription("help", "help", moe::Switch, "Display help"));
+        testOpts.addOption(moe::OptionDescription("val1", "val1", moe::Int, "Val1", true,
+                                                                                    moe::Value(5)));
+        testOpts.addOption(moe::OptionDescription("val2", "val2", moe::Int, "Val2", true,
+                                                                                    moe::Value(5)));
+
+        std::vector<std::string> argv;
+        argv.push_back("binaryname");
+        argv.push_back("--val1");
+        argv.push_back("6");
+        std::map<std::string, std::string> env_map;
+
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+
+        const std::map<moe::Key, moe::Value> values = environment.getExplicitlySet();
+        ASSERT_EQUALS((static_cast<std::map<moe::Key, moe::Value>::size_type>(1)), values.size());
+
+        typedef std::map<moe::Key, moe::Value>::const_iterator it_type;
+        for(it_type iterator = values.begin();
+            iterator != values.end(); iterator++) {
+            ASSERT_EQUALS(moe::Key("val1"), iterator->first);
+            int val1;
+            ASSERT_OK(iterator->second.get(&val1));
+            ASSERT_EQUALS(6, val1);
+        }
+
+        moe::Value value;
+        ASSERT_OK(environment.get(moe::Key("val2"), &value));
+        int val2;
+        ASSERT_OK(value.get(&val2));
+        ASSERT_EQUALS(val2, 5);
+    }
+
     TEST(Parsing, ImplicitValue) {
         moe::OptionsParser parser;
         moe::Environment environment;

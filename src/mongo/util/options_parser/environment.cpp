@@ -41,14 +41,15 @@ namespace optionenvironment {
         typedef std::map<Key, Value>::const_iterator it_type;
         it_type value = values.find(get_key);
         if (value == values.end()) {
-            StringBuilder sb;
-            sb << "Value not found for key: " << get_key;
-            return Status(ErrorCodes::NoSuchKey, sb.str());
+            value = default_values.find(get_key);
+            if (value == default_values.end()) {
+                StringBuilder sb;
+                sb << "Value not found for key: " << get_key;
+                return Status(ErrorCodes::NoSuchKey, sb.str());
+            }
         }
-        else {
-            *get_value = value->second;
-            return Status::OK();
-        }
+        *get_value = value->second;
+        return Status::OK();
     }
 
     /** Set the Value in our Environment.  Always disallow empty values */
@@ -74,6 +75,26 @@ namespace optionenvironment {
                 return ret;
             }
         }
+
+        return Status::OK();
+    }
+
+    /** Set the default Value for the given Key in our Environment.  Always disallow empty values */
+    Status Environment::setDefault(const Key& add_key, const Value& add_value) {
+
+        // 1. Make sure value is not empty
+        if (add_value.isEmpty()) {
+            return Status(ErrorCodes::InternalError, "Attempted to set an empty default value");
+        }
+
+        // 2. Disallow modifying defaults after calling validate on this Environment
+        if (valid) {
+            return Status(ErrorCodes::InternalError,
+                          "Attempted to set a default value after calling validate");
+        }
+
+        // 3. Add this value to our defaults
+        default_values[add_key] = add_value;
 
         return Status::OK();
     }

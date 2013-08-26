@@ -518,22 +518,13 @@ namespace optionenvironment {
     }
 
     /**
-     * Extract default values from the given options and add to environment
+     * Add default values from the given OptionSection to the given Environment
      */
-    Status OptionsParser::getDefaultValues(const OptionSection& options,
+    Status OptionsParser::addDefaultValues(const OptionSection& options,
                                            Environment* environment) {
-        Environment defaultEnvironment;
-
-        // This should have been caught at the time we registered our options, but we check that the
-        // default types match our declared types here just to be sure.
-        Status ret = addTypeConstraints(options, &defaultEnvironment);
-        if (!ret.isOK()) {
-            return ret;
-        }
-
         std::map <Key, Value> defaultOptions;
 
-        ret = options.getDefaults(&defaultOptions);
+        Status ret = options.getDefaults(&defaultOptions);
         if (!ret.isOK()) {
             return ret;
         }
@@ -541,18 +532,11 @@ namespace optionenvironment {
         typedef std::map<Key, Value>::iterator it_type;
         for(it_type iterator = defaultOptions.begin();
             iterator != defaultOptions.end(); iterator++) {
-            ret = defaultEnvironment.set(iterator->first, iterator->second);
+            ret = environment->setDefault(iterator->first, iterator->second);
             if (!ret.isOK()) {
                 return ret;
             }
         }
-
-        ret = defaultEnvironment.validate();
-        if (!ret.isOK()) {
-            return ret;
-        }
-
-        *environment = defaultEnvironment;
 
         return Status::OK();
     }
@@ -657,17 +641,11 @@ namespace optionenvironment {
             const std::map<std::string, std::string>& env, // XXX: Currently unused
             Environment* environment) {
 
-        Environment defaultEnvironment;
         Environment commandLineEnvironment;
         Environment configEnvironment;
         Environment composedEnvironment;
 
-        Status ret = getDefaultValues(options, &defaultEnvironment);
-        if (!ret.isOK()) {
-            return ret;
-        }
-
-        ret = parseCommandLine(options, argv, &commandLineEnvironment);
+        Status ret = parseCommandLine(options, argv, &commandLineEnvironment);
         if (!ret.isOK()) {
             return ret;
         }
@@ -729,17 +707,14 @@ namespace optionenvironment {
             return ret;
         }
 
-        ret = addCompositions(options, defaultEnvironment, &composedEnvironment);
+        // Add the default values to our resulting environment
+        ret = addDefaultValues(options, environment);
         if (!ret.isOK()) {
             return ret;
         }
 
         // Add the values to our result in the order of override
         // NOTE: This should not fail validation as we haven't called environment->validate() yet
-        ret = environment->setAll(defaultEnvironment);
-        if (!ret.isOK()) {
-            return ret;
-        }
         ret = environment->setAll(configEnvironment);
         if (!ret.isOK()) {
             return ret;

@@ -117,6 +117,12 @@ namespace optionenvironment {
              */
             Status set(const Key& key, const Value& value);
 
+            /** Add a default Value to this Environment with the given Key.  Fails if validate has
+             *  already been called on our environment.  The get functions will return the default
+             *  if one exists and the value has not been explicitly set.
+             */
+            Status setDefault(const Key& key, const Value& value);
+
             /** Populate the given Value with the Value stored for the given Key.  Return a success
              *  status if the value was found, or an error status if the value was not found.
              *  Leaves the Value unchanged on error.
@@ -154,6 +160,15 @@ namespace optionenvironment {
              */
             Value operator[](const Key& key) const;
 
+            /**
+             * Get all values that we have set explicitly as a map in case we need to iterate or
+             * move to another structure, as is currently the use case for the parsed command line
+             * options structure that we present to the user.
+             */
+            const std::map<Key, Value>& getExplicitlySet() const {
+                return values;
+            }
+
             /* Debugging */
             void dump();
 
@@ -161,19 +176,24 @@ namespace optionenvironment {
             std::vector<boost::shared_ptr<Constraint> > constraints;
             std::vector<boost::shared_ptr<KeyConstraint> > keyConstraints;
             std::map <Key, Value> values;
+            std::map <Key, Value> default_values;
             bool valid;
     };
 
     template <typename T>
     Status Environment::get(const Key& get_key, T* get_value) const {
-        typedef std::map<Key, Value>::const_iterator it_type;
-        it_type value = values.find(get_key);
-        if (value == values.end()) {
-            return Status(ErrorCodes::NoSuchKey, "Value not found!");
+        Value value;
+        Status ret = get(get_key, &value);
+        if (!ret.isOK()) {
+            return ret;
         }
-        else {
-            return value->second.get(get_value);
+        ret = value.get(get_value);
+        if (!ret.isOK()) {
+            StringBuilder sb;
+            sb << "Error getting value for key: \"" << get_key << "\": " << ret.toString();
+            return Status(ErrorCodes::NoSuchKey, sb.str());
         }
+        return Status::OK();
     }
 
 } // namespace optionenvironment
