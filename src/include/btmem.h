@@ -705,10 +705,10 @@ struct __wt_insert {
 	if ((v = dest) == NULL) {					\
 		WT_ERR(__wt_calloc_def((s), (count), &v));		\
 		if (WT_ATOMIC_CAS(dest, NULL, v))			\
-			__wt_cache_page_inmem_incr(session,		\
-			    (page), (count) * sizeof (*v));		\
+			__wt_cache_page_inmem_incr(			\
+			    (s), (page), (count) * sizeof (*v));	\
 		else							\
-			__wt_free(session, v);				\
+			__wt_free((s), v);				\
 	}								\
 } while (0)
 
