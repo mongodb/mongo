@@ -59,6 +59,9 @@ else {
     printjson( connPoolStats );
     
     jsTest.log("Shutdown shard " + (killWith == 9 ? "uncleanly" : "" ) + "...");
+   
+    // Flush writes to disk, since sometimes we're killing uncleanly
+    assert( mongos.getDB( "admin" ).runCommand({ fsync : 1 }).ok );
     
     MongoRunner.stopMongod( st.shard0, killWith );
     
