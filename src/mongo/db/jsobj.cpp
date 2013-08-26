@@ -922,7 +922,7 @@ namespace mongo {
 
             // (SERVER-9502) Do not allow storing an _id field with a RegEx type or
             // Array type in a root document
-            if (root && (e.type() == RegEx || e.type() == Array || e.type() == Undefined)
+            if (root && (e.type() == RegEx || e.type() == Array)
                      && mongoutils::str::equals(name,"_id")) {
                 return false;
             }
