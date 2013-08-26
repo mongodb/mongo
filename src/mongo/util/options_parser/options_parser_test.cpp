@@ -568,6 +568,30 @@ namespace {
         ASSERT_EQUALS(port, 5);
     }
 
+    TEST(Parsing, ShortName) {
+        moe::OptionsParser parser;
+        moe::Environment environment;
+
+        moe::OptionSection testOpts;
+        testOpts.addOption(moe::OptionDescription("help", "help,h", moe::Switch, "Display help"));
+        testOpts.addOption(moe::OptionDescription("port", "port,p", moe::Int, "Port"));
+
+        std::vector<std::string> argv;
+        argv.push_back("binaryname");
+        argv.push_back("-p");
+        argv.push_back("5");
+        argv.push_back("-h");
+        std::map<std::string, std::string> env_map;
+
+        moe::Value value;
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        ASSERT_OK(environment.get(moe::Key("help"), &value));
+        ASSERT_OK(environment.get(moe::Key("port"), &value));
+        int port;
+        ASSERT_OK(value.get(&port));
+        ASSERT_EQUALS(port, 5);
+    }
+
     TEST(Style, NoSticky) {
         moe::OptionsParser parser;
         moe::Environment environment;

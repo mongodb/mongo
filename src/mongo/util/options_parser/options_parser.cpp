@@ -116,9 +116,27 @@ namespace optionenvironment {
 
             for(std::vector<OptionDescription>::const_iterator iterator = options_vector.begin();
                 iterator != options_vector.end(); iterator++) {
-                if (vm.count(iterator->_singleName)) {
+
+                // Trim off the short option from our name so we can look it up correctly in our map
+                std::string long_name;
+                std::string::size_type commaOffset = iterator->_singleName.find(',');
+                if (commaOffset != string::npos) {
+                    if (commaOffset != iterator->_singleName.size() - 2) {
+                        StringBuilder sb;
+                        sb << "Unexpected comma in option name: \"" << iterator->_singleName << "\""
+                           << ": option name must be in the format \"option,o\" or \"option\", "
+                           << "where \"option\" is the long name and \"o\" is the optional one "
+                           << "character short alias";
+                        return Status(ErrorCodes::InternalError, sb.str());
+                    }
+                    long_name = iterator->_singleName.substr(0, commaOffset);
+                } else {
+                    long_name = iterator->_singleName;
+                }
+
+                if (vm.count(long_name)) {
                     Value optionValue;
-                    Status ret = boostAnyToValue(vm[iterator->_singleName].value(), &optionValue);
+                    Status ret = boostAnyToValue(vm[long_name].value(), &optionValue);
                     if (!ret.isOK()) {
                         return ret;
                     }
