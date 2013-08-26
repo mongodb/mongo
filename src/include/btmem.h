@@ -706,7 +706,7 @@ struct __wt_insert {
 		WT_ERR(__wt_calloc_def((s), (count), &v));		\
 		if (WT_ATOMIC_CAS(dest, NULL, v))			\
 			__wt_cache_page_inmem_incr(			\
-			    (s), (page), (count) * sizeof (*v));	\
+			    (s), (page), (count) * sizeof(*v));		\
 		else							\
 			__wt_free((s), v);				\
 	}								\
