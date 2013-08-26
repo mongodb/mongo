@@ -25,9 +25,6 @@ namespace mongo {
     /**
      * Parses the QueryMessage received from the user and makes the various fields more easily
      * accessible.
-     *
-     * TODO: Projection.
-     * TODO: Tailable + Capped.
      */
     class LiteParsedQuery {
     public:
@@ -48,12 +45,17 @@ namespace mongo {
                            int ntoreturn,
                            int queryoptions,
                            const BSONObj& query,
+                           const BSONObj& proj,
+                           const BSONObj& sort,
                            LiteParsedQuery** out);
 
         const string& ns() const { return _ns; }
         bool isLocalDB() const { return _ns.compare(0, 6, "local.") == 0; }
 
         const BSONObj& getFilter() const { return _filter; }
+        const BSONObj& getProj() const { return _proj; }
+        const BSONObj& getSort() const { return _sort; }
+        const BSONObj& getHint() const { return _hint; }
 
         int getSkip() const { return _ntoskip; }
         int getNumToReturn() const { return _ntoreturn; }
@@ -69,8 +71,6 @@ namespace mongo {
 
         const BSONObj& getMin() const { return _min; }
         const BSONObj& getMax() const { return _max; }
-        const BSONObj& getOrder() const { return _order; }
-        const BSONObj& getHint() const { return _hint; }
         int getMaxScan() const { return _maxScan; }
         int getMaxTimeMS() const { return _maxTimeMS; }
         
@@ -78,7 +78,7 @@ namespace mongo {
         LiteParsedQuery();
 
         Status init(const string& ns, int ntoskip, int ntoreturn, int queryOptions,
-                    const BSONObj& queryObj, bool fromQueryMessage);
+                    const BSONObj& queryObj, const BSONObj& proj, bool fromQueryMessage);
 
         Status initFullQuery(const BSONObj& top);
 
@@ -86,7 +86,8 @@ namespace mongo {
         int _ntoskip;
         int _ntoreturn;
         BSONObj _filter;
-        BSONObj _order;
+        BSONObj _sort;
+        BSONObj _proj;
         int _options;
         bool _wantMore;
         bool _explain;

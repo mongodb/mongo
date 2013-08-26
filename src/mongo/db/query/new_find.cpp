@@ -115,7 +115,6 @@ namespace mongo {
         // No entry in cache for the query.  We have to solve the query ourself.
 
         // Get the indices that we could possibly use.
-        BSONObjSet indices;
         NamespaceDetails* nsd = nsdetails(canonicalQuery->ns().c_str());
 
         // If this is NULL, there is no data but the query is valid.  You're allowed to query for
@@ -135,7 +134,7 @@ namespace mongo {
 
             // If a sort is specified it must be equal to expectedSort.
             const BSONObj expectedSort = BSON("$natural" << 1);
-            const BSONObj& actualSort = canonicalQuery->getParsed().getOrder();
+            const BSONObj& actualSort = canonicalQuery->getParsed().getSort();
             if (!actualSort.isEmpty() && !(actualSort == expectedSort)) {
                 return Status(ErrorCodes::BadValue,
                               "invalid sort specified for tailable cursor: "
@@ -144,9 +143,10 @@ namespace mongo {
         }
 
         // If it's not NULL, we may have indices.
+        vector<BSONObj> indices;
         for (int i = 0; i < nsd->getCompletedIndexCount(); ++i) {
             auto_ptr<IndexDescriptor> desc(CatalogHack::getDescriptor(nsd, i));
-            indices.insert(desc->keyPattern());
+            indices.push_back(desc->keyPattern());
         }
 
         vector<QuerySolution*> solutions;

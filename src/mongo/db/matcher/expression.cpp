@@ -26,9 +26,7 @@
 namespace mongo {
 
     MatchExpression::MatchExpression( MatchType type )
-        : _matchType( type ){
-    }
-
+        : _matchType( type ) { }
 
     string MatchExpression::toString() const {
         StringBuilder buf;

@@ -28,6 +28,19 @@
 
 namespace mongo {
 
+    /**
+     * This file contains leaves in the parse tree that are not array-based.
+     *
+     * LeafMatchExpression: REGEX MOD EXISTS MATCH_IN
+     * ComparisonMatchExpression: EQ LTE LT GT GTE
+     * MatchExpression: TYPE_OPERATOR
+     */
+
+    /**
+     * Many operators subclass from this:
+     * REGEX, MOD, EXISTS, IN
+     * Everything that inherits from ComparisonMatchExpression.
+     */
     class LeafMatchExpression : public MatchExpression {
     public:
         LeafMatchExpression( MatchType matchType )
@@ -36,13 +49,11 @@ namespace mongo {
 
         virtual ~LeafMatchExpression(){}
 
-        virtual LeafMatchExpression* shallowClone() const = 0;
-
         virtual bool matches( const MatchableDocument* doc, MatchDetails* details = 0 ) const;
 
         virtual bool matchesSingleElement( const BSONElement& e ) const = 0;
 
-        const StringData path() const { return _path; }
+        virtual const StringData path() const { return _path; }
 
     protected:
         Status initPath( const StringData& path );
@@ -52,8 +63,9 @@ namespace mongo {
         ElementPath _elementPath;
     };
 
-    // -----
-
+    /**
+     * EQ, LTE, LT, GT, GTE subclass from ComparisonMatchExpression.
+     */
     class ComparisonMatchExpression : public LeafMatchExpression {
     public:
         ComparisonMatchExpression( MatchType type ) : LeafMatchExpression( type ){}
@@ -75,6 +87,10 @@ namespace mongo {
     protected:
         BSONElement _rhs;
     };
+
+    //
+    // ComparisonMatchExpression inheritors
+    //
 
     class EqualityMatchExpression : public ComparisonMatchExpression {
     public:
@@ -129,6 +145,10 @@ namespace mongo {
         }
 
     };
+
+    //
+    // LeafMatchExpression inheritors
+    //
 
     class RegexMatchExpression : public LeafMatchExpression {
     public:
@@ -210,32 +230,6 @@ namespace mongo {
         virtual bool equivalent( const MatchExpression* other ) const;
     };
 
-    class TypeMatchExpression : public MatchExpression {
-    public:
-        TypeMatchExpression() : MatchExpression( TYPE_OPERATOR ){}
-
-        Status init( const StringData& path, int type );
-
-        virtual bool matchesSingleElement( const BSONElement& e ) const;
-
-        virtual bool matches( const MatchableDocument* doc, MatchDetails* details = 0 ) const;
-
-        virtual void debugString( StringBuilder& debug, int level ) const;
-
-        virtual bool equivalent( const MatchExpression* other ) const;
-
-        int getType() const { return _type; }
-
-    private:
-        bool _matches( const StringData& path,
-                       const MatchableDocument* doc,
-                       MatchDetails* details = 0 ) const;
-
-        StringData _path;
-        ElementPath _elementPath;
-        int _type;
-    };
-
     /**
      * INTERNAL
      * terrible name
@@ -300,4 +294,49 @@ namespace mongo {
         ArrayFilterEntries _arrayEntries;
     };
 
-}
+    //
+    // The odd duck out, TYPE_OPERATOR.
+    //
+
+    /**
+     * Type has some odd semantics with arrays and as such it can't inherit from
+     * LeafMatchExpression.
+     */
+    class TypeMatchExpression : public MatchExpression {
+    public:
+        TypeMatchExpression() : MatchExpression( TYPE_OPERATOR ){}
+
+        Status init( const StringData& path, int type );
+
+        virtual MatchExpression* shallowClone() const {
+            TypeMatchExpression* e = new TypeMatchExpression();
+            e->init(_path, _type);
+            return e;
+        }
+
+        virtual bool matchesSingleElement( const BSONElement& e ) const;
+
+        virtual bool matches( const MatchableDocument* doc, MatchDetails* details = 0 ) const;
+
+        virtual void debugString( StringBuilder& debug, int level ) const;
+
+        virtual bool equivalent( const MatchExpression* other ) const;
+
+        /**
+         * What is the type we're matching against?
+         */
+        int getData() const { return _type; }
+
+        virtual const StringData path() const { return _path; }
+
+    private:
+        bool _matches( const StringData& path,
+                       const MatchableDocument* doc,
+                       MatchDetails* details = 0 ) const;
+
+        StringData _path;
+        ElementPath _elementPath;
+        int _type;
+    };
+
+}  // namespace mongo

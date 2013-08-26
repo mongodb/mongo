@@ -43,7 +43,13 @@ namespace mongo {
 
     void GeoMatchExpression::debugString( StringBuilder& debug, int level ) const {
         _debugAddSpace( debug, level );
-        debug << "GEO\n";
+        debug << "GEO";
+        MatchExpression::TagData* td = getTag();
+        if (NULL != td) {
+            debug << " ";
+            td->debugString(&debug);
+        }
+        debug << "\n";
     }
 
     bool GeoMatchExpression::equivalent( const MatchExpression* other ) const {
@@ -83,7 +89,13 @@ namespace mongo {
 
     void GeoNearMatchExpression::debugString( StringBuilder& debug, int level ) const {
         _debugAddSpace( debug, level );
-        debug << "GEONEAR\n";
+        debug << "GEONEAR";
+        MatchExpression::TagData* td = getTag();
+        if (NULL != td) {
+            debug << " ";
+            td->debugString(&debug);
+        }
+        debug << "\n";
     }
 
     bool GeoNearMatchExpression::equivalent( const MatchExpression* other ) const {
