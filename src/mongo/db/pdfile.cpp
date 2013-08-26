@@ -39,6 +39,7 @@ _ disallow system* manipulations from the database.
 #include "mongo/db/pdfile_private.h"
 #include "mongo/db/background.h"
 #include "mongo/db/btree.h"
+#include "mongo/db/clientcursor.h"
 #include "mongo/db/cloner.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/curop-inl.h"

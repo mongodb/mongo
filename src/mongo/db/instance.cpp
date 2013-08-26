@@ -34,6 +34,7 @@
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/background.h"
+#include "mongo/db/clientcursor.h"
 #include "mongo/db/cmdline.h"
 #include "mongo/db/commands/fsync.h"
 #include "mongo/db/d_concurrency.h"

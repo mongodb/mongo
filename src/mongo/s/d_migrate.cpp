@@ -1564,7 +1564,7 @@ namespace mongo {
 
             {
                 // 2. delete any data already in range
-                RemoveSaver rs( "moveChunk" , ns , "preCleanup" );
+                Helpers::RemoveSaver rs( "moveChunk" , ns , "preCleanup" );
                 KeyRange range( ns, min, max, shardKeyPattern );
                 long long num = Helpers::removeRange( range,
                                                       false, /*maxInclusive*/
@@ -1821,7 +1821,7 @@ namespace mongo {
             bool didAnything = false;
 
             if ( xfer["deleted"].isABSONObj() ) {
-                RemoveSaver rs( "moveChunk" , ns , "removedDuring" );
+                Helpers::RemoveSaver rs( "moveChunk" , ns , "removedDuring" );
 
                 BSONObjIterator i( xfer["deleted"].Obj() );
                 while ( i.more() ) {

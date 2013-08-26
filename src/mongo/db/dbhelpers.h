@@ -39,6 +39,8 @@ namespace mongo {
      */
     struct Helpers {
 
+        class RemoveSaver;
+
         /* ensure the specified index exists.
 
            @param keyPattern key pattern, e.g., { ts : 1 }
@@ -121,12 +123,6 @@ namespace mongo {
          */
         static BSONObj inferKeyPattern( const BSONObj& o );
 
-        class RemoveCallback {
-        public:
-            virtual ~RemoveCallback() {}
-            virtual void goingToDelete( const BSONObj& o ) = 0;
-        };
-
         /**
          * Takes a namespace range, specified by a min and max and qualified by an index pattern,
          * and removes all the documents in that range found by iterating
@@ -145,7 +141,7 @@ namespace mongo {
         static long long removeRange( const KeyRange& range,
                                       bool maxInclusive = false,
                                       bool secondaryThrottle = false,
-                                      RemoveCallback * callback = 0,
+                                      RemoveSaver* callback = NULL,
                                       bool fromMigrate = false,
                                       bool onlyRemoveOrphanedDocs = false );
 
@@ -182,22 +178,21 @@ namespace mongo {
          */
         static void emptyCollection(const char *ns);
 
-    };
+        /**
+         * for saving deleted bson objects to a flat file
+         */
+        class RemoveSaver : public boost::noncopyable {
+        public:
+            RemoveSaver(const string& type, const string& ns, const string& why);
+            ~RemoveSaver();
 
-    /**
-     * user for saving deleted bson objects to a flat file
-     */
-    class RemoveSaver : public Helpers::RemoveCallback , boost::noncopyable {
-    public:
-        RemoveSaver( const string& type , const string& ns , const string& why);
-        ~RemoveSaver();
+            void goingToDelete( const BSONObj& o );
 
-        void goingToDelete( const BSONObj& o );
-
-    private:
-        boost::filesystem::path _root;
-        boost::filesystem::path _file;
-        ofstream* _out;
+        private:
+            boost::filesystem::path _root;
+            boost::filesystem::path _file;
+            ofstream* _out;
+        };
 
     };
 
