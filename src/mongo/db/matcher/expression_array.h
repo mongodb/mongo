@@ -28,6 +28,9 @@
 
 namespace mongo {
 
+    /**
+     * ALL and ELEM_MATCH inherit from this.
+     */
     class ArrayMatchingMatchExpression : public MatchExpression {
     public:
         ArrayMatchingMatchExpression( MatchType matchType ) : MatchExpression( matchType ){}
@@ -46,12 +49,11 @@ namespace mongo {
 
         bool equivalent( const MatchExpression* other ) const;
 
-        const StringData& path() const { return _path; }
+        const StringData path() const { return _path; }
     private:
         StringData _path;
         ElementPath _elementPath;
     };
-
 
     class ElemMatchObjectMatchExpression : public ArrayMatchingMatchExpression {
     public:
@@ -59,6 +61,12 @@ namespace mongo {
         Status init( const StringData& path, const MatchExpression* sub );
 
         bool matchesArray( const BSONObj& anArray, MatchDetails* details ) const;
+
+        virtual ElemMatchObjectMatchExpression* shallowClone() const {
+            ElemMatchObjectMatchExpression* e = new ElemMatchObjectMatchExpression();
+            e->init(path(), _sub->shallowClone());
+            return e;
+        }
 
         virtual void debugString( StringBuilder& debug, int level ) const;
 
@@ -80,6 +88,15 @@ namespace mongo {
 
         bool matchesArray( const BSONObj& anArray, MatchDetails* details ) const;
 
+        virtual ElemMatchValueMatchExpression* shallowClone() const {
+            ElemMatchValueMatchExpression* e = new ElemMatchValueMatchExpression();
+            e->init(path());
+            for (size_t i = 0; i < _subs.size(); ++i) {
+                e->add(_subs[i]->shallowClone());
+            }
+            return e;
+        }
+
         virtual void debugString( StringBuilder& debug, int level ) const;
 
         virtual size_t numChildren() const { return _subs.size(); }
@@ -91,6 +108,28 @@ namespace mongo {
         std::vector< const MatchExpression* > _subs;
     };
 
+    class SizeMatchExpression : public ArrayMatchingMatchExpression {
+    public:
+        SizeMatchExpression() : ArrayMatchingMatchExpression( SIZE ){}
+        Status init( const StringData& path, int size );
+
+        virtual SizeMatchExpression* shallowClone() const {
+            SizeMatchExpression* e = new SizeMatchExpression();
+            e->init(path(), _size);
+            return e;
+        }
+
+        virtual bool matchesArray( const BSONObj& anArray, MatchDetails* details ) const;
+
+        virtual void debugString( StringBuilder& debug, int level ) const;
+
+        virtual bool equivalent( const MatchExpression* other ) const;
+
+        int getData() const { return _size; }
+
+    private:
+        int _size; // >= 0 real, < 0, nothing will match
+    };
 
     /**
      * i'm suprised this isn't a regular AllMatchExpression
@@ -102,6 +141,16 @@ namespace mongo {
 
         Status init( const StringData& path );
         void add( const ArrayMatchingMatchExpression* expr );
+
+        virtual MatchExpression* shallowClone() const {
+            AllElemMatchOp* e = new AllElemMatchOp();
+            e->init(path());
+            for (size_t i = 0; i < _list.size(); ++i) {
+                e->add(reinterpret_cast<const ArrayMatchingMatchExpression*>(
+                    _list[i]->shallowClone()));
+            }
+            return e;
+        }
 
         virtual bool matches( const MatchableDocument* doc, MatchDetails* details ) const;
 
@@ -117,7 +166,7 @@ namespace mongo {
         virtual size_t numChildren() const { return _list.size(); }
         virtual const ArrayMatchingMatchExpression* getChild( size_t i ) const { return _list[i]; }
 
-        const StringData& path() const { return _path; }
+        const StringData path() const { return _path; }
 
     private:
         bool _allMatch( const BSONObj& anArray ) const;
@@ -125,23 +174,6 @@ namespace mongo {
         StringData _path;
         ElementPath _elementPath;
         std::vector< const ArrayMatchingMatchExpression* > _list;
-    };
-
-    class SizeMatchExpression : public ArrayMatchingMatchExpression {
-    public:
-        SizeMatchExpression() : ArrayMatchingMatchExpression( SIZE ){}
-        Status init( const StringData& path, int size );
-
-        virtual bool matchesArray( const BSONObj& anArray, MatchDetails* details ) const;
-
-        virtual void debugString( StringBuilder& debug, int level ) const;
-
-        virtual bool equivalent( const MatchExpression* other ) const;
-
-        int getData() const { return _size; }
-
-    private:
-        int _size; // >= 0 real, < 0, nothing will match
     };
 
 }

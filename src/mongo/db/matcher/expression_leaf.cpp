@@ -143,7 +143,15 @@ namespace mongo {
         case GTE: debug << "$gte"; break;
         default: debug << " UNKNOWN - should be impossible"; break;
         }
-        debug << " " << _rhs.toString( false ) << "\n";
+        debug << " " << _rhs.toString( false );
+
+        MatchExpression::TagData* td = getTag();
+        if (NULL != td) {
+            debug << " ";
+            td->debugString(&debug);
+        }
+
+        debug << "\n";
     }
 
     // ---------------
@@ -216,7 +224,14 @@ namespace mongo {
 
     void RegexMatchExpression::debugString( StringBuilder& debug, int level ) const {
         _debugAddSpace( debug, level );
-        debug << path() << " regex /" << _regex << "/" << _flags << "\n";
+        debug << path() << " regex /" << _regex << "/" << _flags;
+
+        MatchExpression::TagData* td = getTag();
+        if (NULL != td) {
+            debug << " ";
+            td->debugString(&debug);
+        }
+        debug << "\n";
     }
 
     // ---------
@@ -237,7 +252,13 @@ namespace mongo {
 
     void ModMatchExpression::debugString( StringBuilder& debug, int level ) const {
         _debugAddSpace( debug, level );
-        debug << path() << " mod " << _divisor << " % x == "  << _remainder << "\n";
+        debug << path() << " mod " << _divisor << " % x == "  << _remainder;
+        MatchExpression::TagData* td = getTag();
+        if (NULL != td) {
+            debug << " ";
+            td->debugString(&debug);
+        }
+        debug << "\n";
     }
 
     bool ModMatchExpression::equivalent( const MatchExpression* other ) const {
@@ -264,7 +285,13 @@ namespace mongo {
 
     void ExistsMatchExpression::debugString( StringBuilder& debug, int level ) const {
         _debugAddSpace( debug, level );
-        debug << path() << " exists\n";
+        debug << path() << " exists";
+        MatchExpression::TagData* td = getTag();
+        if (NULL != td) {
+            debug << " ";
+            td->debugString(&debug);
+        }
+        debug << "\n";
     }
 
     bool ExistsMatchExpression::equivalent( const MatchExpression* other ) const {
@@ -307,7 +334,13 @@ namespace mongo {
 
     void TypeMatchExpression::debugString( StringBuilder& debug, int level ) const {
         _debugAddSpace( debug, level );
-        debug << _path << " type: " << _type << "\n";
+        debug << _path << " type: " << _type;
+        MatchExpression::TagData* td = getTag();
+        if (NULL != td) {
+            debug << " ";
+            td->debugString(&debug);
+        }
+        debug << "\n";
     }
 
 
@@ -421,7 +454,13 @@ namespace mongo {
 
     void InMatchExpression::debugString( StringBuilder& debug, int level ) const {
         _debugAddSpace( debug, level );
-        debug << path() << " $in: TODO\n";
+        debug << path() << ";$in: TODO ";
+        MatchExpression::TagData* td = getTag();
+        if (NULL != td) {
+            debug << " ";
+            td->debugString(&debug);
+        }
+        debug << "\n";
     }
 
     bool InMatchExpression::equivalent( const MatchExpression* other ) const {

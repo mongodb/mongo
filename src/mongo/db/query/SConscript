@@ -6,6 +6,7 @@ env.StaticLibrary(
     target = 'query_planner',
     source = [
         "canonical_query.cpp",
+        "index_bounds_builder.cpp",
         "lite_parsed_query.cpp",
         "query_planner.cpp",
         # "query_projection.cpp",
@@ -49,5 +50,15 @@ env.CppUnitTest(
     ],
     LIBDEPS = [
         "index_bounds",
+    ],
+)
+
+env.CppUnitTest(
+    target = "query_planner_test",
+    source = [
+        "query_planner_test.cpp"
+    ],
+    LIBDEPS = [
+        "query_planner",
     ],
 )

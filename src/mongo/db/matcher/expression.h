@@ -18,6 +18,8 @@
 
 #pragma once
 
+#include <boost/scoped_ptr.hpp>
+
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
@@ -55,25 +57,110 @@ namespace mongo {
         MatchExpression( MatchType type );
         virtual ~MatchExpression(){}
 
+        //
+        // Structural/AST information
+        //
+
         /**
-         * determins if the doc matches the expression
-         * there could be an expression that looks at fields, or the entire doc
+         * What type is the node?  See MatchType above.
          */
+        MatchType matchType() const { return _matchType; }
+
+        /**
+         * How many children does the node have?  Most nodes are leaves so the default impl. is for
+         * a leaf.
+         */
+        virtual size_t numChildren() const { return 0; }
+
+        /**
+         * Get the i-th child.
+         */
+        virtual const MatchExpression* getChild( size_t i ) const { return NULL; }
+
+        /**
+         * Get the path of the leaf.  Returns StringData() if there is no path (node is logical).
+         */
+        virtual const StringData path() const { return StringData(); }
+
+        /**
+         * Notes on structure:
+         * isLogical, isArray, and isLeaf define three partitions of all possible operators.
+         *
+         * isLogical can have children and its children can be arbitrary operators.
+         *
+         * isArray can have children and its children are predicates over one field.
+         *
+         * isLeaf is a predicate over one field.
+         */
+
+        /**
+         * Is this node a logical operator?  All of these inherit from ListOfMatchExpression.
+         * AND, OR, NOT, NOR.
+         */
+        bool isLogical() const {
+            return AND == _matchType || OR == _matchType || NOT == _matchType || NOR == _matchType;
+        }
+
+        /**
+         * Is this node an array operator?  Array operators have multiple clauses but operate on one
+         * field.
+         *
+         * ALL (AllElemMatchOp)
+         * ELEM_MATCH_VALUE, ELEM_MATCH_OBJECT, SIZE (ArrayMatchingMatchExpression)
+         */
+        bool isArray() const {
+            return SIZE == _matchType || ALL == _matchType || ELEM_MATCH_VALUE == _matchType
+                   || ELEM_MATCH_OBJECT == _matchType;
+        }
+
+        /**
+         * Not-internal nodes, predicates over one field.  Almost all of these inherit from
+         * LeafMatchExpression.
+         *
+         * Exceptions: WHERE, which doesn't have a field.
+         *             TYPE_OPERATOR, which inherits from MatchExpression due to unique array
+         *                            semantics.
+         */
+        bool isLeaf() const {
+            return !isArray() && !isLogical();
+        }
+
+        // XXX: document
+        virtual MatchExpression* shallowClone() const = 0;
+
+        //
+        // Determine if a document satisfies the tree-predicate.
+        //
+
         virtual bool matches( const MatchableDocument* doc, MatchDetails* details = 0 ) const = 0;
 
         virtual bool matchesBSON( const BSONObj& doc, MatchDetails* details = 0 ) const;
 
         /**
-         * does the element match the expression
-         * not valid for all expressions ($where) where this will immediately return false
+         * Determines if the element satisfies the tree-predicate.
+         * Not valid for all expressions (e.g. $where); in those cases, returns false.
          */
         virtual bool matchesSingleElement( const BSONElement& e ) const = 0;
 
-        virtual size_t numChildren() const { return 0; }
-        virtual const MatchExpression* getChild( size_t i ) const { return NULL; }
+        //
+        // Tagging mechanism: Hang data off of the tree for retrieval later.
+        //
 
-        MatchType matchType() const { return _matchType; }
+        class TagData {
+        public:
+            virtual ~TagData() { }
+            virtual void debugString(StringBuilder* builder) const = 0;
+        };
 
+        /**
+         * Takes ownership
+         */
+        void setTag(TagData* data) { _tagData.reset(data); }
+        TagData* getTag() const { return _tagData.get(); }
+
+        //
+        // Debug information
+        //
         virtual string toString() const;
         virtual void debugString( StringBuilder& debug, int level = 0 ) const = 0;
 
@@ -83,6 +170,7 @@ namespace mongo {
 
     private:
         MatchType _matchType;
+        boost::scoped_ptr<TagData> _tagData;
     };
 
     /**
@@ -99,6 +187,10 @@ namespace mongo {
 
         virtual bool matchesSingleElement( const BSONElement& e ) const {
             return true;
+        }
+
+        virtual MatchExpression* shallowClone() const {
+            return new AtomicMatchExpression();
         }
 
         virtual void debugString( StringBuilder& debug, int level = 0 ) const;
@@ -119,6 +211,10 @@ namespace mongo {
 
         virtual bool matchesSingleElement( const BSONElement& e ) const {
             return false;
+        }
+
+        virtual MatchExpression* shallowClone() const {
+            return new FalseMatchExpression();
         }
 
         virtual void debugString( StringBuilder& debug, int level = 0 ) const;

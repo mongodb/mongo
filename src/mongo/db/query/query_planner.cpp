@@ -16,221 +16,139 @@
 
 #include "mongo/db/query/query_planner.h"
 
-// For QueryOption_XXX
+// For QueryOption_foobar
 #include "mongo/client/dbclientinterface.h"
-#include "mongo/db/query/canonical_query.h"
-#include "mongo/db/query/query_solution.h"
+#include "mongo/db/matcher/expression_array.h"
 #include "mongo/db/matcher/expression_parser.h"
+#include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/index_bounds_builder.h"
+#include "mongo/db/query/query_solution.h"
 
 namespace mongo {
 
-    static void getIndicesStartingWith(const StringData& field, const BSONObjSet& kps,
-                                       BSONObjSet* out) {
-        for (BSONObjSet::const_iterator i = kps.begin(); i != kps.end(); ++i) {
-            const BSONObj& obj = *i;
-            if (field == obj.firstElement().fieldName()) {
-                out->insert(obj);
+    /**
+     * Describes an index that could be used to answer a predicate.
+     */
+    struct RelevantIndex {
+        enum Relevance {
+            // Is the index prefixed by the predicate's field?  If so it can be used.
+            FIRST,
+
+            // Is the predicate's field in the index but not as a prefix?  If so, the index might be
+            // able to be used, if there is another predicate that prefixes the index.
+            NOT_FIRST,
+        };
+
+        RelevantIndex(int i, Relevance r) : index(i), relevance(r) { }
+
+        // What index is relevant?
+        int index;
+
+        // How useful is it?
+        Relevance relevance;
+
+        // To allow insertion into a set and sorting by something.
+        bool operator<(const RelevantIndex& other) const {
+            // We're only ever comparing these inside of a predicate.  A predicate should only be
+            // tagged for an index once.  This of course assumes that values are only indexed once
+            // in an index.
+            verify(other.index != index);
+            return index < other.index;
+        }
+    };
+
+    /**
+     * Caches information about the predicates we're trying to plan for.
+     */
+    struct PredicateInfo {
+        PredicateInfo(MatchExpression::MatchType t) : type(t) { }
+
+        // The type of the predicate.  See db/matcher/expression.h
+        MatchExpression::MatchType type;
+
+        // Any relevant indices.  Ordered by index no.
+        set<RelevantIndex> relevant;
+    };
+
+    // This is a multimap because the same field name can easily appear more than once in a query.
+    typedef multimap<string, PredicateInfo> PredicateMap;
+
+    /**
+     * Scan the parse tree, adding all predicates to the provided map.
+     */
+    void makePredicateMap(const MatchExpression* node, PredicateMap* out) {
+        StringData path = node->path();
+
+        if (!path.empty()) {
+            // XXX: make sure the (path, pred) pair isn't in there already?
+            out->insert(std::make_pair(path.toString(), PredicateInfo(node->matchType())));
+        }
+
+        // XXX XXX XXX XXX
+        // XXX Do we do this if the node is logical, or if it's array, or both?
+        // XXX XXX XXX XXX
+        for (size_t i = 0; i < node->numChildren(); ++i) {
+            makePredicateMap(node->getChild(i), out);
+        }
+    }
+
+    /**
+     * Find all indices prefixed by fields we have predicates over.  Only these indices are useful
+     * in answering the query.
+     */
+    void findRelevantIndices(const PredicateMap& pm, const vector<BSONObj>& allIndices,
+                             vector<BSONObj>* out) {
+        for (size_t i = 0; i < allIndices.size(); ++i) {
+            BSONObjIterator it(allIndices[i]);
+            verify(it.more());
+            BSONElement elt = it.next();
+            if (pm.end() != pm.find(elt.fieldName())) {
+                out->push_back(allIndices[i]);
             }
         }
     }
 
-    static BSONObj objFromElement(const BSONElement& elt) {
-        BSONObjBuilder bob;
-        bob.append(elt);
-        return bob.obj();
-    }
-
     /**
-     * Make a point interval from the provided object.
-     * The object must have exactly one field which is the value of the point interval.
+     * Given the set of relevant indices, annotate predicates with any applicable indices.  Also
+     * mark how applicable the indices are (see RelevantIndex::Relevance).
      */
-    static Interval makePointInterval(const BSONObj& obj) {
-        Interval ret;
-        ret._intervalData = obj;
-        ret.startInclusive = ret.endInclusive = true;
-        ret.start = ret.end = obj.firstElement();
-        return ret;
-    }
+    void rateIndices(const vector<BSONObj>& indices, PredicateMap* predicates) {
+        for (size_t i = 0; i < indices.size(); ++i) {
+            BSONObjIterator kpIt(indices[i]);
+            BSONElement elt = kpIt.next();
 
-    static void reverseInterval(Interval* ival) {
-        BSONElement tmp = ival->start;
-        ival->start = ival->end;
-        ival->end = tmp;
-
-        bool tmpInc = ival->startInclusive;
-        ival->startInclusive = ival->endInclusive;
-        ival->endInclusive = tmpInc;
-    }
-
-    /**
-     * Make a range interval from the provided object.
-     * The object must have exactly two fields.  The first field is the start, the second the end.
-     * The two inclusive flags indicate whether or not the start/end fields are included in the
-     * interval (closed interval if included, open if not).
-     */
-    static Interval makeRangeInterval(const BSONObj& obj, bool startInclusive, bool endInclusive) {
-        Interval ret;
-        ret._intervalData = obj;
-        ret.startInclusive = startInclusive;
-        ret.endInclusive = endInclusive;
-        BSONObjIterator it(obj);
-        verify(it.more());
-        ret.start = it.next();
-        verify(it.more());
-        ret.end = it.next();
-        return ret;
-    }
-
-    /**
-     * Populates 'out' with the full index bounds required to traverse the index described by
-     * 'kpObj'.  'first' specifies the allowed interval for the first field.  The remaining fields
-     * are allowed to take on any value.
-     *
-     * kpObj is the full index key pattern.
-     *
-     * first is the interval for the first field.  It is always oriented such that the start of the
-     * interval is less than or equal to the end of the interval.  As such, it may be reversed if
-     * the index is backwards.
-     */
-    static void fillBoundsForRestOfIndex(const BSONObj& kpObj, const Interval& first,
-                                         IndexBounds* out) {
-        out->fields.clear();
-
-        BSONObjIterator kpIt(kpObj);
-        BSONElement elt = kpIt.next();
-
-        // Every index that we're using to satisfy this query has these bounds.
-        OrderedIntervalList oil(elt.fieldName());
-        oil.intervals.push_back(first);
-        // The first interval is always passed in ascending.
-        if (-1 == elt.number()) {
-            reverseInterval(&oil.intervals.back());
-        }
-        out->fields.push_back(oil);
-
-        // For every other field in the index, add bounds that say "look at all values for this
-        // field."
-        while (kpIt.more()) {
-            elt = kpIt.next();
-
-            // ARGH, BSONValue would make this shorter.
-            BSONObjBuilder bob;
-            if (-1 == elt.number()) {
-                // Index should go from MaxKey to MinKey as it's descending.
-                bob.appendMaxKey("");
-                bob.appendMinKey("");
-            }
-            else {
-                // Index goes from MinKey to MaxKey as it's ascending.
-                bob.appendMinKey("");
-                bob.appendMaxKey("");
+            // We're looking at the first element in the index.  We can definitely use any index
+            // prefixed by the predicate's field to answer that predicate.
+            for (PredicateMap::iterator it = predicates->find(elt.fieldName());
+                 it != predicates->end(); ++it) {
+                it->second.relevant.insert(RelevantIndex(i, RelevantIndex::FIRST));
             }
 
-            OrderedIntervalList oil(elt.fieldName());
-            oil.intervals.push_back(makeRangeInterval(bob.obj(), true, true));
-            out->fields.push_back(oil);
+            // We're now looking at the subsequent elements of the index.  We can only use these if
+            // we have a restriction of all the previous fields.  We won't figure that out until
+            // later.
+            while (kpIt.more()) {
+                elt = kpIt.next();
+                for (PredicateMap::iterator it = predicates->find(elt.fieldName());
+                     it != predicates->end(); ++it) {
+                    it->second.relevant.insert(RelevantIndex(i, RelevantIndex::NOT_FIRST));
+                }
+            }
         }
     }
 
-    static bool isSimpleComparison(MatchExpression::MatchType type) {
-        return MatchExpression::EQ == type
-               || MatchExpression::LTE == type
-               || MatchExpression::LT == type
-               || MatchExpression::GT == type
-               || MatchExpression::GTE == type;
-    }
-
-    static void handleSimpleComparison(const MatchExpression* root, const BSONObjSet& allIndices,
-                                       vector<QuerySolution*>* out) {
-        const ComparisonMatchExpression* cme = static_cast<const ComparisonMatchExpression*>(root);
-
-        // The field that we're comparing against in the doc.
-        StringData path;
-        path = cme->path();
-
-        // TODO: this is going to be cached/precomputed in a smarter way.
-        BSONObjSet idxToUse;
-        getIndicesStartingWith(path, allIndices, &idxToUse);
-
-        // No indices over the field, can't do anything here.
-        if (idxToUse.empty()) { return; }
-
-        Interval firstFieldBounds;
-
-        if (MatchExpression::EQ == root->matchType()) {
-            const EqualityMatchExpression* node = static_cast<const EqualityMatchExpression*>(root);
-
-            // We have to copy the data out of the parse tree and stuff it into the index bounds.
-            // BSONValue will be useful here.
-            BSONObj dataObj = objFromElement(node->getData());
-            verify(dataObj.isOwned());
-            firstFieldBounds = makePointInterval(dataObj);
+    bool hasPredicate(const PredicateMap& pm, MatchExpression::MatchType type) {
+        for (PredicateMap::const_iterator i = pm.begin(); i != pm.end(); ++i) {
+            if (i->second.type == type) { return true; }
         }
-        else if (MatchExpression::LTE == root->matchType()) {
-            const LTEMatchExpression* node = static_cast<const LTEMatchExpression*>(root);
-            BSONObjBuilder bob;
-            bob.appendMinKey("");
-            bob.append(node->getData());
-            BSONObj dataObj = bob.obj();
-            verify(dataObj.isOwned());
-            firstFieldBounds = makeRangeInterval(dataObj, true, true);
-        }
-        else if (MatchExpression::LT == root->matchType()) {
-            const LTMatchExpression* node = static_cast<const LTMatchExpression*>(root);
-            BSONObjBuilder bob;
-            bob.appendMinKey("");
-            bob.append(node->getData());
-            BSONObj dataObj = bob.obj();
-            verify(dataObj.isOwned());
-            firstFieldBounds = makeRangeInterval(dataObj, true, false);
-        }
-        else if (MatchExpression::GT == root->matchType()) {
-            const GTMatchExpression* node = static_cast<const GTMatchExpression*>(root);
-            BSONObjBuilder bob;
-            bob.append(node->getData());
-            bob.appendMaxKey("");
-            BSONObj dataObj = bob.obj();
-            verify(dataObj.isOwned());
-            firstFieldBounds = makeRangeInterval(dataObj, false, true);
-        }
-        else if (MatchExpression::GTE == root->matchType()) {
-            const GTEMatchExpression* node = static_cast<const GTEMatchExpression*>(root);
-            BSONObjBuilder bob;
-            bob.append(node->getData());
-            bob.appendMaxKey("");
-            BSONObj dataObj = bob.obj();
-            verify(dataObj.isOwned());
-            firstFieldBounds = makeRangeInterval(dataObj, true, true);
-        }
-        else { verify(0); }
-
-        // For every index that we can use...
-        for (BSONObjSet::iterator kpit = idxToUse.begin(); kpit != idxToUse.end(); ++kpit) {
-            const BSONObj& indexKeyPattern = *kpit;
-
-            // Create an index scan solution node.
-            IndexScanNode* ixscan = new IndexScanNode();
-            ixscan->indexKeyPattern = indexKeyPattern;
-            fillBoundsForRestOfIndex(indexKeyPattern, firstFieldBounds, &ixscan->bounds);
-
-            // TODO: This can be a debug check eventually.
-            // TODO: We might change the direction depending on the requested sort.
-            verify(ixscan->bounds.isValidFor(indexKeyPattern, 1));
-
-            // Wrap the ixscan in a solution node.
-            QuerySolution* soln = new QuerySolution();
-            soln->root.reset(ixscan);
-            out->push_back(soln);
-        }
+        return false;
     }
 
     QuerySolution* makeCollectionScan(const CanonicalQuery& query, bool tailable) {
         auto_ptr<QuerySolution> soln(new QuerySolution());
+        soln->filter.reset(query.root()->shallowClone());
+        // BSONValue, where are you?
         soln->filterData = query.getQueryObj();
-        // TODO: have a MatchExpression::copy function(?)
-        StatusWithMatchExpression swme = MatchExpressionParser::parse(soln->filterData);
-        verify(swme.isOK());
-        soln->filter.reset(swme.getValue());
 
         // Make the (only) node, a collection scan.
         CollectionScanNode* csn = new CollectionScanNode();
@@ -238,7 +156,7 @@ namespace mongo {
         csn->filter = soln->filter.get();
         csn->tailable = tailable;
 
-        const BSONObj& sortObj = query.getParsed().getOrder();
+        const BSONObj& sortObj = query.getParsed().getSort();
         // TODO: We need better checking for this.  Should be done in CanonicalQuery and we should
         // be able to assume it's correct.
         if (!sortObj.isEmpty()) {
@@ -251,55 +169,252 @@ namespace mongo {
         return soln.release();
     }
 
+    /**
+     * Provides elements from the power set of possible indices to use.  Uses the available
+     * predicate information to make better decisions about what indices are best.
+     *
+     * TODO: Use stats about indices.
+     * TODO: Use predicate information.
+     */
+    class PlanEnumerator {
+    public:
+        class OutputTag : public MatchExpression::TagData {
+        public:
+            OutputTag(size_t i) : index(i) { }
+            virtual ~OutputTag() { }
+            virtual void debugString(StringBuilder* builder) const {
+                *builder << " || Selected Index #" << index;
+            }
+            // What index should we try to use for this leaf?
+            size_t index;
+        };
+
+        /**
+         * Internal tag used to explore what indices to use for a leaf node.
+         */
+        class EnumeratorTag : public MatchExpression::TagData {
+        public:
+            EnumeratorTag(const PredicateInfo* p) : pred(p), nextIndexToUse(0) { }
+
+            virtual ~EnumeratorTag() { }
+
+            virtual void debugString(StringBuilder* builder) const {
+                *builder << " || Relevant Indices:";
+
+                for (set<RelevantIndex>::const_iterator it = pred->relevant.begin();
+                     it != pred->relevant.end(); ++it) {
+
+                    *builder << " #" << it->index << " ";
+                    if (RelevantIndex::FIRST == it->relevance) {
+                        *builder << "[prefix]";
+                    }
+                    else {
+                        verify(RelevantIndex::NOT_FIRST == it->relevance);
+                        *builder << "[not-prefix]";
+                    }
+                }
+            }
+
+            // Not owned here.
+            const PredicateInfo* pred;
+            size_t nextIndexToUse;
+        };
+
+        // TODO: This is inefficient.  We could create the tagged tree as part of the PredicateMap
+        // construction.
+        void tag(MatchExpression* node) {
+            StringData path = node->path();
+
+            if (!path.empty()) {
+
+                for (PredicateMap::const_iterator it = _pm.find(path.toString()); _pm.end() != it;
+                     ++it) {
+
+                    if (it->second.type == node->matchType()) {
+                        EnumeratorTag* td = new EnumeratorTag(&it->second);
+                        node->setTag(td);
+                        _taggedLeaves.push_back(node);
+                        break;
+                    }
+                }
+            }
+
+            // XXX XXX XXX XXX
+            // XXX Do we do this if the node is logical, or if it's array, or both?
+            // XXX XXX XXX XXX
+            for (size_t i = 0; i < node->numChildren(); ++i) {
+                tag(const_cast<MatchExpression*>(node->getChild(i)));
+            }
+        }
+
+        vector<MatchExpression*> _taggedLeaves;
+
+        /**
+         * Does not take ownership of any arguments.  They must outlive any calls to getNext(...).
+         */
+        PlanEnumerator(const CanonicalQuery* cq, const PredicateMap* pm,
+                       const vector<BSONObj>* indices)
+            : _cq(*cq), _pm(*pm), _indices(*indices) {
+
+            // Copy the query tree.
+            // TODO: have a MatchExpression::copy function(?)
+            StatusWithMatchExpression swme = MatchExpressionParser::parse(cq->getQueryObj());
+            verify(swme.isOK());
+            _taggedTree.reset(swme.getValue());
+
+            // Walk the query tree and tag with possible indices
+            tag(_taggedTree.get());
+
+            for (size_t i = 0; i < indices->size(); ++i) {
+                cout << "Index #" << i << ": " << (*indices)[i].toString() << endl;
+            }
+
+            cout << "Tagged tree: " << _taggedTree->toString() << endl;
+        }
+
+        /**
+         * Outputs a possible plan.  Leaves in the plan are tagged with an index to use.
+         * Returns true if a plan was outputted, false if no more plans will be outputted.
+         *
+         * 'tree' is set to point to the query tree.  A QuerySolution is built from this tree.
+         * Caller owns the pointer.  Note that 'tree' itself points into data owned by the provided
+         * CanonicalQuery.
+         *
+         * Nodes in 'tree' are tagged with indices that should be used to answer the tagged nodes.
+         * Only nodes that have a field name (isLogical() == false) will be tagged.
+         */
+        bool getNext(MatchExpression** tree) {
+            // TODO: ALBERTO
+
+            // Clone tree
+            // MatchExpression* ret = _taggedTree->shallowClone();
+
+            // Walk over cloned tree and tagged tree.  Select indices out of tagged tree and mark
+            // the cloned tree.
+
+            // *tree = ret;
+            // return true;
+
+            return false;
+        }
+
+    private:
+        // Not owned by us.
+        const CanonicalQuery& _cq;
+
+        // Not owned by us.
+        const PredicateMap& _pm;
+
+        // Not owned by us.
+        const vector<BSONObj>& _indices;
+
+        scoped_ptr<MatchExpression> _taggedTree;
+    };
+
     // static
-    void QueryPlanner::plan(const CanonicalQuery& query, const BSONObjSet& indexKeyPatterns,
+    void QueryPlanner::plan(const CanonicalQuery& query, const vector<BSONObj>& indexKeyPatterns,
                             vector<QuerySolution*>* out) {
-        const MatchExpression* root = query.root();
-        bool queryRequiresIndex = requiresIndex(root);
+        // XXX: If pq.hasOption(QueryOption_OplogReplay) use FindingStartCursor equivalent which
+        // must be translated into stages.
+
+        //
+        // Planner Section 1: Calculate predicate/index data.
+        //
+
+        // Get all the predicates (and their fields).
+        PredicateMap predicates;
+        makePredicateMap(query.root(), &predicates);
 
         // If the query requests a tailable cursor, the only solution is a collscan + filter with
         // tailable set on the collscan.  TODO: This is a policy departure.  Previously I think you
         // could ask for a tailable cursor and it just tried to give you one.  Now, we fail if we
         // can't provide one.  Is this what we want?
         if (query.getParsed().hasOption(QueryOption_CursorTailable)) {
-            if (!queryRequiresIndex) {
+            if (!hasPredicate(predicates, MatchExpression::GEO_NEAR)) {
                 out->push_back(makeCollectionScan(query, true));
             }
             return;
         }
 
-        // XXX: If pq.hasOption(QueryOption_OplogReplay) use FindingStartCursor equivalent which
-        // must be translated into stages.
+        // NOR and NOT we can't handle well with indices.  If we see them here, they weren't
+        // rewritten.  Just output a collscan for those.
+        if (hasPredicate(predicates, MatchExpression::NOT)
+            || hasPredicate(predicates, MatchExpression::NOR)) {
 
-        // The default plan is always a collection scan with a heavy filter.  This is a valid
-        // solution for any query that does not require an index.
-        if (!queryRequiresIndex) {
+            // If there's a near predicate, we can't handle this.
+            // TODO: Should canonicalized query detect this?
+            if (hasPredicate(predicates, MatchExpression::GEO_NEAR)) {
+                warning() << "Can't handle NOT/NOR with GEO_NEAR";
+                return;
+            }
             out->push_back(makeCollectionScan(query, false));
-            // TODO: SORT + PROJ
+            return;
         }
 
-        // TODO: REMOVE THIS AND BUILD IXSCAN PLANS!
-        return;
+        // Filter our indices so we only look at indices that are over our predicates.
+        vector<BSONObj> relevantIndices;
+        findRelevantIndices(predicates, indexKeyPatterns, &relevantIndices);
 
-        if (isSimpleComparison(root->matchType())) {
-            // This builds a simple index scan over the value.
-            handleSimpleComparison(root, indexKeyPatterns, out);
-        }
-    }
+        // No indices, no work to do.
+        if (0 == relevantIndices.size()) { return; }
 
-    // static 
-    bool QueryPlanner::requiresIndex(const MatchExpression* node) {
-        if (MatchExpression::GEO_NEAR == node->matchType()) {
-            return true;
-        }
+        // Figure out how useful each index is to each predicate.
+        rateIndices(relevantIndices, &predicates);
 
-        for (size_t i = 0; i < node->numChildren(); ++i) {
-            if (requiresIndex(node->getChild(i))) {
-                return true;
+        //
+        // Planner Section 2: Use predicate/index data to output sets of indices that we can use.
+        //
+
+        PlanEnumerator isp(&query, &predicates, &relevantIndices);
+
+        MatchExpression* rawTree;
+        while (isp.getNext(&rawTree)) {
+            QuerySolutionNode* solutionRoot = NULL;
+
+            //
+            // Planner Section 3: Logical Rewrite.  Use the index selection and the tree structure
+            // to try to rewrite the tree.  TODO: Do this for real.  We treat the tree as static.
+            //
+
+
+            //
+            // Planner Section 4: Covering.  If we're projecting, See if we get any covering from
+            // this plan.  If not, add a fetch.
+            //
+            if (!query.getParsed().getProj().isEmpty()) {
+                warning() << "Can't deal with proj yet" << endl;
+            }
+            else {
+                // Note that we need a fetch, possibly tack on to end?
+            }
+
+            //
+            // Planner Section 5: Sort.  If we're sorting, see if the plan gives us a sort for free.
+            // If not, add a sort.
+            //
+            if (!query.getParsed().getSort().isEmpty()) {
+            }
+            else {
+                // Note that we need a sort, possibly tack on to end?  may want to see if sort is
+                // covered and then tack fetch on after the covered sort...
+            }
+
+            //
+            // Planner Section 6: Final check.  Make sure that we build a valid solution.
+            // TODO: Validate.
+            //
+
+            if (NULL != solutionRoot) {
+                QuerySolution* qs = new QuerySolution();
+                qs->root.reset(solutionRoot);
+                out->push_back(qs);
             }
         }
 
-        return false;
+        // TODO: Do we always want to offer a collscan solution?
+        if (!hasPredicate(predicates, MatchExpression::GEO_NEAR)) {
+            out->push_back(makeCollectionScan(query, false));
+        }
     }
 
 }  // namespace mongo

@@ -64,6 +64,14 @@ namespace mongo {
         virtual bool matches( const MatchableDocument* doc, MatchDetails* details = 0 ) const;
         virtual bool matchesSingleElement( const BSONElement& e ) const;
 
+        virtual MatchExpression* shallowClone() const {
+            AndMatchExpression* self = new AndMatchExpression();
+            for (size_t i = 0; i < numChildren(); ++i) {
+                self->add(getChild(i)->shallowClone());
+            }
+            return self;
+        }
+
         virtual void debugString( StringBuilder& debug, int level = 0 ) const;
     };
 
@@ -75,6 +83,14 @@ namespace mongo {
         virtual bool matches( const MatchableDocument* doc, MatchDetails* details = 0 ) const;
         virtual bool matchesSingleElement( const BSONElement& e ) const;
 
+        virtual MatchExpression* shallowClone() const {
+            OrMatchExpression* self = new OrMatchExpression();
+            for (size_t i = 0; i < numChildren(); ++i) {
+                self->add(getChild(i)->shallowClone());
+            }
+            return self;
+        }
+
         virtual void debugString( StringBuilder& debug, int level = 0 ) const;
     };
 
@@ -85,6 +101,14 @@ namespace mongo {
 
         virtual bool matches( const MatchableDocument* doc, MatchDetails* details = 0 ) const;
         virtual bool matchesSingleElement( const BSONElement& e ) const;
+
+        virtual MatchExpression* shallowClone() const {
+            NorMatchExpression* self = new NorMatchExpression();
+            for (size_t i = 0; i < numChildren(); ++i) {
+                self->add(getChild(i)->shallowClone());
+            }
+            return self;
+        }
 
         virtual void debugString( StringBuilder& debug, int level = 0 ) const;
     };
@@ -99,6 +123,13 @@ namespace mongo {
         virtual Status init( MatchExpression* exp ) {
             _exp.reset( exp );
             return Status::OK();
+        }
+
+        virtual MatchExpression* shallowClone() const {
+            NotMatchExpression* self = new NotMatchExpression();
+            MatchExpression* child = _exp->shallowClone();
+            self->init(child);
+            return self;
         }
 
         virtual bool matches( const MatchableDocument* doc, MatchDetails* details = 0 ) const {

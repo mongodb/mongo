@@ -39,7 +39,9 @@ namespace mongo {
     Status CanonicalQuery::canonicalize(const string& ns, const BSONObj& query,
                                         CanonicalQuery** out) {
         LiteParsedQuery* lpq;
-        Status parseStatus = LiteParsedQuery::make(ns, 0, 0, 0, query, &lpq);
+        // Pass empty sort and projection.
+        BSONObj emptyObj;
+        Status parseStatus = LiteParsedQuery::make(ns, 0, 0, 0, query, emptyObj, emptyObj, &lpq);
         if (!parseStatus.isOK()) { return parseStatus; }
 
         auto_ptr<CanonicalQuery> cq(new CanonicalQuery());
