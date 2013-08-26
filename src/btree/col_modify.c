@@ -20,7 +20,7 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int op)
 	WT_BTREE *btree;
 	WT_DECL_RET;
 	WT_INSERT *ins;
-	WT_INSERT_HEAD *ins_head, **ins_headp, *t;
+	WT_INSERT_HEAD *ins_head, **ins_headp;
 	WT_ITEM *value, _value;
 	WT_PAGE *page;
 	WT_UPDATE *old_upd, *upd, *upd_obsolete;
@@ -98,7 +98,7 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int op)
 	} else {
 		/* Allocate the append/update list reference as necessary. */
 		if (op == 1) {
-			if (page->modify->append == NULL) {
+			if ((ins_headp = page->modify->append) == NULL) {
 				WT_ERR(__wt_calloc_def(session, 1, &ins_headp));
 				if (WT_ATOMIC_CAS(
 				    page->modify->append, NULL, ins_headp))
@@ -109,7 +109,7 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int op)
 			}
 			ins_headp = &page->modify->append[0];
 		} else if (page->type == WT_PAGE_COL_FIX) {
-			if (page->modify->update == NULL) {
+			if ((ins_headp = page->modify->update) == NULL) {
 				WT_ERR(__wt_calloc_def(session, 1, &ins_headp));
 				if (WT_ATOMIC_CAS(
 				    page->modify->update, NULL, ins_headp))
@@ -120,7 +120,7 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int op)
 			}
 			ins_headp = &page->modify->update[0];
 		} else {
-			if (page->modify->update == NULL) {
+			if ((ins_headp = page->modify->update) == NULL) {
 				WT_ERR(__wt_calloc_def(
 				    session, page->entries, &ins_headp));
 				if (WT_ATOMIC_CAS(
@@ -136,12 +136,12 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int op)
 
 		/* Allocate the WT_INSERT_HEAD structure as necessary. */
 		if ((ins_head = *ins_headp) == NULL) {
-			WT_ERR(__wt_calloc_def(session, 1, &t));
-			if (WT_ATOMIC_CAS(*ins_headp, NULL, t))
+			WT_ERR(__wt_calloc_def(session, 1, &ins_head));
+			if (WT_ATOMIC_CAS(*ins_headp, NULL, ins_head))
 				__wt_cache_page_inmem_incr(
 				    session, page, sizeof(WT_INSERT_HEAD));
 			else
-				__wt_free(session, t);
+				__wt_free(session, ins_head);
 			ins_head = *ins_headp;
 		}
 
