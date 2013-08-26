@@ -186,6 +186,7 @@ namespace replset {
         }
         else {
             if (!hasCursor()) {
+                sleepmillis(500);
                 return;
             }
 
