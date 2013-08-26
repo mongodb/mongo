@@ -15,7 +15,7 @@ static int __col_insert_alloc(
  *	Column-store delete, insert, and update.
  */
 int
-__wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int op)
+__wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 {
 	WT_BTREE *btree;
 	WT_DECL_RET;
@@ -27,26 +27,21 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int op)
 	size_t ins_size, upd_size;
 	uint64_t recno;
 	u_int skipdepth;
-	int logged;
+	int append, logged;
 
 	btree = cbt->btree;
 	page = cbt->page;
 	recno = cbt->iface.recno;
-	logged = 0;
+	append = logged = 0;
 
-	WT_ASSERT(session, op != 1);
-
-	switch (op) {
-	case 2:						/* Remove */
+	if (is_remove) {
 		if (btree->type == BTREE_COL_FIX) {
 			value = &_value;
 			value->data = "";
 			value->size = 1;
 		} else
 			value = NULL;
-		break;
-	case 3:						/* Insert/Update */
-	default:
+	} else {
 		value = &cbt->iface.value;
 
 		/*
@@ -57,8 +52,7 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int op)
 		 * 0 implies an append operation, we're allocating a new row.
 		 */
 		if (recno == 0 || recno > __col_last_recno(page))
-			op = 1;
-		break;
+			append = 1;
 	}
 
 	/* If we don't yet have a modify structure, we'll need one. */
@@ -97,7 +91,7 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int op)
 			__wt_update_obsolete_free(session, page, upd_obsolete);
 	} else {
 		/* Allocate the append/update list reference as necessary. */
-		if (op == 1) {
+		if (append) {
 			WT_PAGE_ALLOC_AND_SWAP(
 			    session, page, page->modify->append, ins_headp, 1);
 			ins_headp = &page->modify->append[0];
@@ -137,8 +131,8 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int op)
 		cbt->ins_head = ins_head;
 		cbt->ins = ins;
 
-		/* Insert or append the WT_INSERT structure. */
-		if (op == 1)
+		/* Append or insert the WT_INSERT structure. */
+		if (append)
 			WT_ERR(__wt_col_append_serial(
 			    session, page,
 			    cbt->ins_head, cbt->ins_stack, cbt->next_stack,
