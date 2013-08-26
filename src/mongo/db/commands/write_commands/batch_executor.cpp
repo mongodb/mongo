@@ -292,8 +292,7 @@ namespace mongo {
                               queryObj,
                               /*justOne*/false,
                               /*logOp*/true,
-                              /*god*/false,
-                              /*rs*/NULL);
+                              /*god*/false);
         }
         catch (UserException& e) {
             opDebug.exceptionInfo = e.getInfo();

@@ -21,6 +21,10 @@
 #include "mongo/db/ops/delete.h"
 
 #include "mongo/client/dbclientinterface.h"
+#include "mongo/db/cc_by_loc.h"
+#include "mongo/db/clientcursor.h"
+#include "mongo/db/cursor.h"
+#include "mongo/db/namespace_details.h"
 #include "mongo/db/query_optimizer.h"
 #include "mongo/db/queryutil.h"
 #include "mongo/db/repl/oplog.h"
@@ -33,7 +37,7 @@ namespace mongo {
        justOne: stop after 1 match
        god:     allow access to system namespaces, and don't yield
     */
-    long long deleteObjects(const char *ns, BSONObj pattern, bool justOne, bool logop, bool god, RemoveSaver * rs ) {
+    long long deleteObjects(const char *ns, BSONObj pattern, bool justOne, bool logop, bool god) {
         if( !god ) {
             if ( strstr(ns, ".system.") ) {
                 /* note a delete from system.indexes would corrupt the db

@@ -55,7 +55,7 @@ namespace mongo {
 
         ShardForceVersionOkModeBlock forceVersion;
         {
-            RemoveSaver removeSaver("moveChunk", ns.toString(), "post-cleanup");
+            Helpers::RemoveSaver removeSaver("moveChunk", ns.toString(), "post-cleanup");
 
             // log the opId so the user can use it to cancel the delete using killOp.
             unsigned int opId = cc().curop()->opNum();

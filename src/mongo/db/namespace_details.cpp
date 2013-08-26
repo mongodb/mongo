@@ -21,7 +21,9 @@
 #include <algorithm>
 #include <list>
 
+#include "mongo/db/clientcursor.h"
 #include "mongo/db/db.h"
+#include "mongo/db/dbhelpers.h"
 #include "mongo/db/json.h"
 #include "mongo/db/storage/durable_mapped_file.h"
 #include "mongo/db/ops/delete.h"

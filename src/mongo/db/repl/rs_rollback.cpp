@@ -444,7 +444,7 @@ namespace mongo {
         NamespaceDetails *oplogDetails = nsdetails(rsoplog);
         uassert(13423, str::stream() << "replSet error in rollback can't find " << rsoplog, oplogDetails);
 
-        map<string,shared_ptr<RemoveSaver> > removeSavers;
+        map<string,shared_ptr<Helpers::RemoveSaver> > removeSavers;
 
         unsigned deletes = 0, updates = 0;
         for( list<pair<DocID,bo> >::iterator i = goodVersions.begin(); i != goodVersions.end(); i++ ) {
@@ -460,9 +460,9 @@ namespace mongo {
                 getDur().commitIfNeeded();
 
                 /* keep an archive of items rolled back */
-                shared_ptr<RemoveSaver>& rs = removeSavers[d.ns];
+                shared_ptr<Helpers::RemoveSaver>& rs = removeSavers[d.ns];
                 if ( ! rs )
-                    rs.reset( new RemoveSaver( "rollback" , "" , d.ns ) );
+                    rs.reset( new Helpers::RemoveSaver( "rollback" , "" , d.ns ) );
 
                 // todo: lots of overhead in context, this can be faster
                 Client::Context c(d.ns);
@@ -516,7 +516,7 @@ namespace mongo {
                         else {
                             try {
                                 deletes++;
-                                deleteObjects(d.ns, pattern, /*justone*/true, /*logop*/false, /*god*/true, rs.get() );
+                                deleteObjects(d.ns, pattern, /*justone*/true, /*logop*/false, /*god*/true);
                             }
                             catch(...) {
                                 log() << "replSet error rollback delete failed ns:" << d.ns << rsLog;

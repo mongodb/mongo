@@ -282,7 +282,7 @@ namespace mongo {
     long long Helpers::removeRange( const KeyRange& range,
                                     bool maxInclusive,
                                     bool secondaryThrottle,
-                                    RemoveCallback * callback,
+                                    RemoveSaver* callback,
                                     bool fromMigrate,
                                     bool onlyRemoveOrphanedDocs )
     {
@@ -505,7 +505,8 @@ namespace mongo {
         deleteObjects(ns, BSONObj(), false);
     }
 
-    RemoveSaver::RemoveSaver( const string& a , const string& b , const string& why) : _out(0) {
+    Helpers::RemoveSaver::RemoveSaver( const string& a , const string& b , const string& why) 
+        : _out(0) {
         static int NUM = 0;
 
         _root = dbpath;
@@ -522,7 +523,7 @@ namespace mongo {
         _file /= ss.str();
     }
 
-    RemoveSaver::~RemoveSaver() {
+    Helpers::RemoveSaver::~RemoveSaver() {
         if ( _out ) {
             _out->close();
             delete _out;
@@ -530,7 +531,7 @@ namespace mongo {
         }
     }
 
-    void RemoveSaver::goingToDelete( const BSONObj& o ) {
+    void Helpers::RemoveSaver::goingToDelete( const BSONObj& o ) {
         if ( ! _out ) {
             boost::filesystem::create_directories( _root );
             _out = new ofstream();
