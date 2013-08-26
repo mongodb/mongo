@@ -60,6 +60,14 @@ namespace mongo {
     // Main entry point for replica sets
     void startReplSets(ReplSetCmdline *replSetCmdline);
 
+    class ReplicationStartSynchronizer {
+    public:
+        ReplicationStartSynchronizer() : indexRebuildDone(false) {}
+        boost::mutex mtx;
+        bool indexRebuildDone;
+        boost::condition cond;
+    };
+
     /* member of a replica set */
     class Member : public List1<Member>::Base {
     private:
@@ -331,6 +339,7 @@ namespace mongo {
         static StartupStatus startupStatus;
         static DiagStr startupStatusMsg;
         static string stateAsHtml(MemberState state);
+        static ReplicationStartSynchronizer rss;
 
         /* todo thread */
         void msgUpdateHBInfo(HeartbeatInfo);
