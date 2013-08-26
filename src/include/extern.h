@@ -372,9 +372,7 @@ extern int __wt_col_modify(WT_SESSION_IMPL *session,
     int op);
 extern int __wt_col_append_serial_func(WT_SESSION_IMPL *session, void *args);
 extern void __wt_col_leaf_obsolete(WT_SESSION_IMPL *session, WT_PAGE *page);
-extern int __wt_col_search(WT_SESSION_IMPL *session,
-    WT_CURSOR_BTREE *cbt,
-    int is_modify);
+extern int __wt_col_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt);
 extern int __wt_rec_evict(WT_SESSION_IMPL *session,
     WT_PAGE *page,
     int exclusive);
@@ -466,9 +464,7 @@ extern int __wt_search_insert(WT_SESSION_IMPL *session,
     WT_CURSOR_BTREE *cbt,
     WT_INSERT_HEAD *inshead,
     WT_ITEM *srch_key);
-extern int __wt_row_search(WT_SESSION_IMPL *session,
-    WT_CURSOR_BTREE *cbt,
-    int is_modify);
+extern int __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt);
 extern int __wt_row_random(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt);
 extern int __wt_config_initn( WT_SESSION_IMPL *session,
     WT_CONFIG *conf,

@@ -191,7 +191,6 @@ struct __wt_dsrc_stats {
 	WT_STATS session_compact;
 	WT_STATS session_cursor_open;
 	WT_STATS txn_update_conflict;
-	WT_STATS txn_write_conflict;
 };
 
 /*

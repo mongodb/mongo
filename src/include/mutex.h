@@ -70,18 +70,18 @@
  * (compare and swap) operations.
  */
 #if defined(_lint)
-#define	WT_ATOMIC_ADD(v, val)	((v) += (val), (v))
-#define	WT_ATOMIC_CAS(v, oldv, newv)					\
-	((v) == (oldv) && (v) = (newv) ? 1 : 0)
-#define	WT_ATOMIC_CAS_VAL(v, oldv, newv)				\
-	((v) == (oldv) && (v) = (newv) ? (oldv) : (v))
-#define	WT_ATOMIC_STORE(v, val)	((v) = (val))
-#define	WT_ATOMIC_SUB(v, val)	((v) -= (val), (v))
+#define	WT_ATOMIC_ADD(v, val)			((v) += (val), (v))
+#define	WT_ATOMIC_CAS(v, oldv, newv)		(1)
+#define	WT_ATOMIC_CAS_VAL(v, oldv, newv)	(1)
+#define	WT_ATOMIC_STORE(v, val)			((v) = (val))
+#define	WT_ATOMIC_SUB(v, val)			((v) -= (val), (v))
 #define	WT_FULL_BARRIER()
 #define	WT_READ_BARRIER()
 #define	WT_WRITE_BARRIER()
 #define	HAVE_ATOMICS 1
+
 #elif defined(__GNUC__)
+
 #define	WT_ATOMIC_ADD(v, val)						\
 	__sync_add_and_fetch(&(v), val)
 #define	WT_ATOMIC_CAS(v, oldv, newv)					\
@@ -104,12 +104,13 @@
 	asm volatile ("sfence" ::: "memory");				\
 } while (0)
 #define	HAVE_ATOMICS 1
+
 #elif defined(i386) || defined(__i386__)
 #define	WT_FULL_BARRIER() do {						\
 	asm volatile ("lock; addl $0, 0(%%esp)" ::: "memory");		\
 } while (0);
-#define	WT_READ_BARRIER() WT_FULL_BARRIER()
-#define	WT_WRITE_BARRIER() WT_FULL_BARRIER()
+#define	WT_READ_BARRIER()	WT_FULL_BARRIER()
+#define	WT_WRITE_BARRIER()	WT_FULL_BARRIER()
 #define	HAVE_ATOMICS 1
 #endif
 #endif

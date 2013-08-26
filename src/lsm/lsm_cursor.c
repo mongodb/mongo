@@ -966,7 +966,7 @@ __clsm_put(WT_SESSION_IMPL *session,
 	 * write-write conflicts across chunk boundaries.
 	 */
 	for (i = 0; i < clsm->nupdates; i++) {
-		c = clsm->cursors[clsm->nchunks - i - 1];
+		c = clsm->cursors[(clsm->nchunks - i) - 1];
 		c->set_key(c, key);
 		c->set_value(c, value);
 		WT_RET(c->insert(c));
