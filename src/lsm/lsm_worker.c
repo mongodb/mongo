@@ -367,7 +367,7 @@ __lsm_bloom_create(
 	    lsm_tree->bloom_bit_count, lsm_tree->bloom_hash_count, &bloom));
 
 	cur_cfg[0] = WT_CONFIG_BASE(session, session_open_cursor);
-	cur_cfg[1] = "raw";
+	cur_cfg[1] = "checkpoint=WiredTigerCheckpoint,raw";
 	cur_cfg[2] = NULL;
 	WT_ERR(__wt_open_cursor(session, chunk->uri, NULL, cur_cfg, &src));
 
