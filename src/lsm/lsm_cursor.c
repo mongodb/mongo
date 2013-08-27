@@ -206,9 +206,9 @@ __clsm_open_cursors(
 	} else
 		F_SET(clsm, WT_CLSM_OPEN_READ);
 
+retry:
 	WT_RET(__wt_readlock(session, lsm_tree->rwlock));
 	locked = 1;
-retry:
 	F_SET(session, WT_SESSION_NO_CACHE_CHECK);
 
 	/*
@@ -297,21 +297,15 @@ retry:
 		 * Close any cursors we no longer need.
 		 *
 		 * Drop the LSM tree lock while we do this: if the cache is
-		 * full, we may block while closing a cursor.
+		 * full, we may block while closing a cursor.  Then we need
+		 * to get the lock again and retry.
 		 */
 		if (clsm->cursors != NULL && skip_chunks < clsm->nchunks) {
 			locked = 0;
 			WT_ERR(__wt_rwunlock(session, lsm_tree->rwlock));
 			WT_ERR(__clsm_close_cursors(clsm, skip_chunks));
-			WT_ERR(__wt_readlock(session, lsm_tree->rwlock));
-			locked = 1;
-			/*
-			 * Dropping the lock means the number of chunks in
-			 * the LSM tree may have changed, and gotten smaller.
-			 * Retry if it did so we recompute all the values.
-			 */
-			if (lsm_tree->nchunks < skip_chunks)
-				goto retry;
+			clsm->nchunks = skip_chunks;
+			goto retry;
 		} else {
 			/* Detach from our old primary. */
 			clsm->primary_chunk = NULL;
