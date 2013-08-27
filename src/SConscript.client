@@ -37,6 +37,7 @@ clientSourceBasic = [
     'mongo/bson/oid.cpp',
     'mongo/bson/util/bson_extract.cpp',
     'mongo/buildinfo.cpp',
+    'mongo/client/auth_helpers.cpp',
     'mongo/client/clientAndShell.cpp',
     'mongo/client/clientOnly.cpp',
     'mongo/client/connpool.cpp',
