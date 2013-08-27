@@ -124,7 +124,7 @@ __clsm_deleted(WT_CURSOR_LSM *clsm, WT_ITEM *item)
  *	Close all of the btree cursors currently open.
  */
 static int
-__clsm_close_cursors(WT_CURSOR_LSM *clsm, u_int skip_chunks)
+__clsm_close_cursors(WT_CURSOR_LSM *clsm, u_int live_chunks)
 {
 	WT_BLOOM *bloom;
 	WT_CURSOR *c;
@@ -136,7 +136,7 @@ __clsm_close_cursors(WT_CURSOR_LSM *clsm, u_int skip_chunks)
 	/* Detach from our old primary. */
 	clsm->primary_chunk = NULL;
 
-	if (skip_chunks < clsm->nchunks)
+	if (live_chunks < clsm->nchunks)
 		WT_FORALL_CURSORS(clsm, c, i) {
 			clsm->cursors[i] = NULL;
 			WT_RET(c->close(c));
@@ -144,7 +144,7 @@ __clsm_close_cursors(WT_CURSOR_LSM *clsm, u_int skip_chunks)
 				clsm->blooms[i] = NULL;
 				WT_RET(__wt_bloom_close(bloom));
 			}
-			if (i == skip_chunks)
+			if (i == live_chunks)
 				break;
 		}
 
@@ -168,7 +168,7 @@ __clsm_open_cursors(
 	WT_TXN *txn;
 	const char *checkpoint, *ckpt_cfg[3];
 	size_t alloc;
-	u_int i, nchunks, skip_chunks;
+	u_int i, nchunks, live_chunks;
 	int locked;
 
 	session = (WT_SESSION_IMPL *)clsm->iface.session;
@@ -217,7 +217,7 @@ retry:
 	 * snapshot isolation conflicts.
 	 */
 	if (F_ISSET(clsm, WT_CLSM_MERGE | WT_CLSM_OPEN_READ))
-		skip_chunks = 0;
+		live_chunks = 0;
 	else if (F_ISSET(clsm, WT_CLSM_OPEN_SNAPSHOT)) {
 		if (clsm->txnid_max == NULL ||
 		    lsm_tree->nchunks > clsm->nchunks) {
@@ -227,18 +227,18 @@ retry:
 			    (lsm_tree->nchunks) * sizeof(uint64_t),
 			    &clsm->txnid_max));
 		}
-		for (skip_chunks = lsm_tree->nchunks - 1;
-		    skip_chunks > 0;
-		    skip_chunks--) {
-			chunk = lsm_tree->chunk[skip_chunks];
+		for (live_chunks = lsm_tree->nchunks - 1;
+		    live_chunks > 0;
+		    live_chunks--) {
+			chunk = lsm_tree->chunk[live_chunks];
 			/* Copy the maximum transaction ID. */
 			if (clsm->txnid_max != NULL)
-				clsm->txnid_max[skip_chunks] = chunk->txnid_max;
+				clsm->txnid_max[live_chunks] = chunk->txnid_max;
 			if (!__wt_txn_visible_all(session, chunk->txnid_max))
 				break;
 		}
 	} else
-		skip_chunks = lsm_tree->nchunks - 1;
+		live_chunks = lsm_tree->nchunks - 1;
 
 	/* Merge cursors have already figured out how many chunks they need. */
 	if (F_ISSET(clsm, WT_CLSM_MERGE)) {
@@ -264,10 +264,10 @@ retry:
 
 		/* Calculate how many cursors are open in unchanged chunks. */
 		for (cp = clsm->cursors;
-		    skip_chunks < clsm->nchunks &&
-		    skip_chunks < lsm_tree->nchunks;
-		    cp++, skip_chunks++) {
-			chunk = lsm_tree->chunk[skip_chunks];
+		    live_chunks < clsm->nchunks &&
+		    live_chunks < lsm_tree->nchunks;
+		    cp++, live_chunks++) {
+			chunk = lsm_tree->chunk[live_chunks];
 
 			/* Easy case: the URIs don't match. */
 			if (*cp == NULL || strcmp((*cp)->uri, chunk->uri) != 0)
@@ -281,13 +281,13 @@ retry:
 				break;
 
 			/* Make sure the Bloom config matches. */
-			if (clsm->blooms[skip_chunks] == NULL &&
+			if (clsm->blooms[live_chunks] == NULL &&
 			    F_ISSET(chunk, WT_LSM_CHUNK_BLOOM))
 				break;
 		}
 
 		/* Spurious generation bump? */
-		if (skip_chunks == clsm->nchunks &&
+		if (live_chunks == clsm->nchunks &&
 		    clsm->nchunks == lsm_tree->nchunks) {
 			clsm->dsk_gen = lsm_tree->dsk_gen;
 			goto err;
@@ -300,11 +300,11 @@ retry:
 		 * full, we may block while closing a cursor.  Then we need
 		 * to get the lock again and retry.
 		 */
-		if (clsm->cursors != NULL && skip_chunks < clsm->nchunks) {
+		if (clsm->cursors != NULL && live_chunks < clsm->nchunks) {
 			locked = 0;
 			WT_ERR(__wt_rwunlock(session, lsm_tree->rwlock));
-			WT_ERR(__clsm_close_cursors(clsm, skip_chunks));
-			clsm->nchunks = skip_chunks;
+			WT_ERR(__clsm_close_cursors(clsm, live_chunks));
+			clsm->nchunks = live_chunks;
 			goto retry;
 		} else {
 			/* Detach from our old primary. */
@@ -332,7 +332,7 @@ retry:
 
 	clsm->nchunks = nchunks;
 
-	for (i = skip_chunks, cp = clsm->cursors + i;
+	for (i = live_chunks, cp = clsm->cursors + i;
 	    i != clsm->nchunks;
 	    i++, cp++) {
 		chunk = lsm_tree->chunk[i + start_chunk];
