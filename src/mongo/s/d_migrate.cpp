@@ -1176,7 +1176,7 @@ namespace mongo {
 
                         // revert the chunk manager back to the state before "forgetting" about the
                         // chunk
-                        shardingState.undoDonateChunk( ns, min, max, startingVersion );
+                        shardingState.undoDonateChunk( ns, collMetadata );
                     }
                     log() << "Shard version successfully reset to clean up failed migration"
                           << endl;
@@ -1331,7 +1331,7 @@ namespace mongo {
 
                         // Revert the metadata back to the state before "forgetting"
                         // about the chunk.
-                        shardingState.undoDonateChunk( ns , min , max , startingVersion );
+                        shardingState.undoDonateChunk( ns, collMetadata );
                     }
 
                     log() << "Shard version successfully reset to clean up failed migration" << endl;

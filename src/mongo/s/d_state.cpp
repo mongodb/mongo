@@ -176,7 +176,7 @@ namespace mongo {
         chunk.setMax( max );
         string errMsg;
 
-        CollectionMetadataPtr cloned( p->cloneMinusChunk( chunk, version, &errMsg ) );
+        CollectionMetadataPtr cloned( p->cloneMigrate( chunk, version, &errMsg ) );
         // uassert to match old behavior, TODO: report errors w/o throwing
         uassert( 16855, errMsg, NULL != cloned.get() );
 
@@ -185,23 +185,13 @@ namespace mongo {
         _collMetadata[ns] = cloned;
     }
 
-    void ShardingState::undoDonateChunk( const string& ns , const BSONObj& min , const BSONObj& max , ChunkVersion version ) {
+    void ShardingState::undoDonateChunk( const string& ns, CollectionMetadataPtr prevMetadata ) {
         scoped_lock lk( _mutex );
         log() << "ShardingState::undoDonateChunk acquired _mutex" << endl;
 
-        CollectionMetadataMap::const_iterator it = _collMetadata.find( ns );
-        verify( it != _collMetadata.end() ) ;
-
-        ChunkType chunk;
-        chunk.setMin( min );
-        chunk.setMax( max );
-        string errMsg;
-
-        CollectionMetadataPtr cloned( it->second->clonePlusChunk( chunk, version, &errMsg ) );
-        // uassert to match old behavior, TODO: report errors w/o throwing
-        uassert( 16856, errMsg, NULL != cloned.get() );
-
-        _collMetadata[ns] = cloned;
+        CollectionMetadataMap::iterator it = _collMetadata.find( ns );
+        verify( it != _collMetadata.end() );
+        it->second = prevMetadata;
     }
 
     bool ShardingState::notePending( const string& ns,

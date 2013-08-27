@@ -539,9 +539,9 @@ namespace {
 
         string errMsg;
         const ChunkVersion zeroVersion( 0, 0, getCollMetadata().getShardVersion().epoch() );
-        scoped_ptr<CollectionMetadata> cloned( getCollMetadata().cloneMinusChunk( chunk,
-                                                                                  zeroVersion,
-                                                                                  &errMsg ) );
+        scoped_ptr<CollectionMetadata> cloned( getCollMetadata().cloneMigrate( chunk,
+                                                                               zeroVersion,
+                                                                               &errMsg ) );
 
         ASSERT( errMsg.empty() );
         ASSERT_EQUALS( 0u, cloned->getNumChunks() );
@@ -558,9 +558,9 @@ namespace {
 
         string errMsg;
         ChunkVersion version( 99, 0, OID() );
-        scoped_ptr<CollectionMetadata> cloned( getCollMetadata().cloneMinusChunk( chunk,
-                                                                                  version,
-                                                                                  &errMsg ) );
+        scoped_ptr<CollectionMetadata> cloned( getCollMetadata().cloneMigrate( chunk,
+                                                                               version,
+                                                                               &errMsg ) );
 
         ASSERT( cloned == NULL );
         ASSERT_FALSE( errMsg.empty() );
@@ -621,11 +621,9 @@ namespace {
         chunk.setMin( BSON("a" << 10) );
         chunk.setMax( BSON("a" << 20) );
 
-        cloned.reset( cloned->cloneMinusChunk( chunk,
-                                               ChunkVersion( 0,
-                                                             0,
-                                                             cloned->getCollVersion().epoch() ),
-                                               &errMsg ) );
+        cloned.reset( cloned->cloneMigrate( chunk,
+                                            ChunkVersion( 0, 0, cloned->getCollVersion().epoch() ),
+                                            &errMsg ) );
 
         ASSERT_EQUALS( errMsg, "" );
         ASSERT( cloned != NULL );
@@ -872,9 +870,9 @@ namespace {
 
         string errMsg;
         ChunkVersion version( 2, 0, OID() );
-        scoped_ptr<CollectionMetadata> cloned( getCollMetadata().cloneMinusChunk( chunk,
-                                                                                  version,
-                                                                                  &errMsg ) );
+        scoped_ptr<CollectionMetadata> cloned( getCollMetadata().cloneMigrate( chunk,
+                                                                               version,
+                                                                               &errMsg ) );
 
         ASSERT( errMsg.empty() );
         ASSERT_EQUALS( 2u, getCollMetadata().getNumChunks() );
@@ -895,11 +893,11 @@ namespace {
         chunk.setMax( BSON("a" << 28 << "b" << 0) );
 
         string errMsg;
-        scoped_ptr<CollectionMetadata> cloned( getCollMetadata().cloneMinusChunk( chunk,
-                                                                                  ChunkVersion( 1,
-                                                                                                0,
-                                                                                                OID() ),
-                                                                                  &errMsg ) );
+        scoped_ptr<CollectionMetadata> cloned( getCollMetadata().cloneMigrate( chunk,
+                                                                               ChunkVersion( 1,
+                                                                                             0,
+                                                                                             OID() ),
+                                                                               &errMsg ) );
         ASSERT( cloned == NULL );
         ASSERT_FALSE( errMsg.empty() );
         ASSERT_EQUALS( 2u, getCollMetadata().getNumChunks() );

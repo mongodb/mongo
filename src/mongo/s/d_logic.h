@@ -128,6 +128,9 @@ namespace mongo {
          *
          * If it runs successfully, clients need to grab the new version to access the collection.
          *
+         * LOCKING NOTE:
+         * Only safe to do inside the
+         *
          * @param ns the collection
          * @param min max the chunk to eliminate from the current metadata
          * @param version at which the new metadata should be at
@@ -141,11 +144,14 @@ namespace mongo {
          * If it runs successfully, clients that became stale by the previous donateChunk will be
          * able to access the collection again.
          *
+         * Note: If a migration has aborted but not yet unregistered a pending chunk, replacing the
+         * metadata may leave the chunk as pending - this is not dangerous and should be rare, but
+         * will require a stepdown to fully recover.
+         *
          * @param ns the collection
-         * @param min max the chunk to reclaim and add to the current metadata
-         * @param version at which the new metadata should be at
+         * @param prevMetadata the previous metadata before we donated a chunk
          */
-        void undoDonateChunk( const string& ns , const BSONObj& min , const BSONObj& max , ChunkVersion version );
+        void undoDonateChunk( const string& ns, CollectionMetadataPtr prevMetadata );
 
         /**
          * Remembers a chunk range between 'min' and 'max' as a range which will have data migrated
