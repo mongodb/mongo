@@ -1,0 +1,285 @@
+/**
+*    Copyright (C) 2013 10gen Inc.
+*
+*    This program is free software: you can redistribute it and/or  modify
+*    it under the terms of the GNU Affero General Public License, version 3,
+*    as published by the Free Software Foundation.
+*
+*    This program is distributed in the hope that it will be useful,
+*    but WITHOUT ANY WARRANTY; without even the implied warranty of
+*    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+*    GNU Affero General Public License for more details.
+*
+*    You should have received a copy of the GNU Affero General Public License
+*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
+#include "mongo/db/commands/user_management_commands_parser.h"
+
+#include <string>
+
+#include "mongo/base/status.h"
+#include "mongo/bson/util/bson_extract.h"
+#include "mongo/client/auth_helpers.h"
+#include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/privilege_document_parser.h"
+#include "mongo/db/auth/user_name.h"
+#include "mongo/db/jsobj.h"
+#include "mongo/platform/unordered_set.h"
+#include "mongo/util/mongoutils/str.h"
+
+namespace mongo {
+namespace auth {
+
+    /**
+     * Validates that the roles array described by rolesElement is valid.
+     * Also returns a new roles array (via the modifiedRolesArray output param) where any roles
+     * from the input array that were listed as strings have been expanded to a full role document.
+     */
+    Status _validateAndModifyRolesArray(const BSONElement& rolesElement,
+                                        const std::string& dbname,
+                                        const AuthorizationManager* authzManager,
+                                        BSONArray* modifiedRolesArray) {
+        BSONArrayBuilder rolesBuilder;
+
+        for (BSONObjIterator it(rolesElement.Obj()); it.more(); it.next()) {
+            BSONElement element = *it;
+            if (element.type() == String) {
+                RoleName roleName(element.String(), dbname);
+                if (!authzManager->roleExists(roleName)) {
+                    return Status(ErrorCodes::RoleNotFound,
+                                  mongoutils::str::stream() << roleName.toString() <<
+                                  " does not name an existing role");
+                }
+
+                rolesBuilder.append(BSON("name" << element.String() <<
+                                         "source" << dbname <<
+                                         "hasRole" << true <<
+                                         "canDelegate" << false));
+            } else if (element.type() == Object) {
+                // Check that the role object is valid
+                V2PrivilegeDocumentParser parser;
+                BSONObj roleObj = element.Obj();
+                Status status = parser.checkValidRoleObject(roleObj);
+                if (!status.isOK()) {
+                    return status;
+                }
+
+                // Check that the role actually exists
+                std::string roleNameString;
+                std::string roleSource;
+                status = bsonExtractStringField(roleObj, "name", &roleNameString);
+                if (!status.isOK()) {
+                    return status;
+                }
+                status = bsonExtractStringField(roleObj, "source", &roleSource);
+                if (!status.isOK()) {
+                    return status;
+                }
+
+                RoleName roleName(roleNameString, roleSource);
+                if (!authzManager->roleExists(roleName)) {
+                    return Status(ErrorCodes::RoleNotFound,
+                                  mongoutils::str::stream() << roleName.toString() <<
+                                  " does not name an existing role");
+                }
+
+                rolesBuilder.append(element);
+            } else {
+                return Status(ErrorCodes::UnsupportedFormat,
+                              "Values in 'roles' array must be sub-documents or strings");
+            }
+        }
+
+        *modifiedRolesArray = rolesBuilder.arr();
+        return Status::OK();
+    }
+
+    Status parseAndValidateCreateUserCommand(const BSONObj& cmdObj,
+                                             const std::string& dbname,
+                                             const AuthorizationManager* authzManager,
+                                             BSONObj* parsedUserObj) {
+        unordered_set<std::string> validFieldNames;
+        validFieldNames.insert("createUser");
+        validFieldNames.insert("customData");
+        validFieldNames.insert("pwd");
+        validFieldNames.insert("roles");
+
+        // Iterate through all fields in command object and make sure there are no unexpected
+        // ones.
+        for (BSONObjIterator iter(cmdObj); iter.more(); iter.next()) {
+            StringData fieldName = (*iter).fieldNameStringData();
+            if (!validFieldNames.count(fieldName.toString())) {
+                return Status(ErrorCodes::BadValue,
+                              mongoutils::str::stream() << "\"" << fieldName << "\" is not "
+                                      "a valid argument to createUser");
+            }
+        }
+
+        BSONObjBuilder userObjBuilder;
+        userObjBuilder.append("_id", OID::gen());
+
+        // Parse user name
+        std::string userName;
+        Status status = bsonExtractStringField(cmdObj, "createUser", &userName);
+        if (!status.isOK()) {
+            return status;
+        }
+
+        // Prevent creating users in the local database
+        if (dbname == "local") {
+            return Status(ErrorCodes::BadValue, "Cannot create users in the local database");
+        }
+
+        userObjBuilder.append(AuthorizationManager::USER_NAME_FIELD_NAME, userName);
+        userObjBuilder.append(AuthorizationManager::USER_SOURCE_FIELD_NAME, dbname);
+
+
+        // Parse password
+        if (cmdObj.hasField("pwd")) {
+            std::string clearTextPassword;
+            status = bsonExtractStringField(cmdObj, "pwd", &clearTextPassword);
+            if (!status.isOK()) {
+                return status;
+            }
+
+            std::string password = auth::createPasswordDigest(userName, clearTextPassword);
+            userObjBuilder.append("credentials", BSON("MONGODB-CR" << password));
+        } else {
+            if (dbname != "$external") {
+                return Status(ErrorCodes::BadValue,
+                              "Must provide a 'pwd' field for all user documents, except those"
+                                      " with '$external' as the user's source");
+            }
+        }
+
+
+        // Parse custom data
+        if (cmdObj.hasField("customData")) {
+            BSONElement element;
+            status = bsonExtractTypedField(cmdObj, "customData", Object, &element);
+            if (!status.isOK()) {
+                return status;
+            }
+            userObjBuilder.append("customData", element.Obj());
+        }
+
+        // Parse roles
+        if (cmdObj.hasField("roles")) {
+            BSONElement rolesElement;
+            status = bsonExtractTypedField(cmdObj, "roles", Array, &rolesElement);
+            if (!status.isOK()) {
+                return status;
+            }
+            BSONArray modifiedRolesArray;
+            status = _validateAndModifyRolesArray(rolesElement,
+                                                  dbname,
+                                                  authzManager,
+                                                  &modifiedRolesArray);
+            if (!status.isOK()) {
+                return status;
+            }
+
+            userObjBuilder.append("roles", modifiedRolesArray);
+        }
+
+        *parsedUserObj = userObjBuilder.obj();
+
+        // Make sure document to insert is valid
+        V2PrivilegeDocumentParser parser;
+        status = parser.checkValidPrivilegeDocument(dbname, *parsedUserObj);
+        if (!status.isOK()) {
+            return status;
+        }
+
+        return Status::OK();
+    }
+
+
+    Status parseAndValidateUpdateUserCommand(const BSONObj& cmdObj,
+                                             const std::string& dbname,
+                                             const AuthorizationManager* authzManager,
+                                             BSONObj* parsedUpdateObj,
+                                             UserName* parsedUserName) {
+        unordered_set<std::string> validFieldNames;
+        validFieldNames.insert("updateUser");
+        validFieldNames.insert("customData");
+        validFieldNames.insert("pwd");
+        validFieldNames.insert("roles");
+
+        // Iterate through all fields in command object and make sure there are no unexpected
+        // ones.
+        for (BSONObjIterator iter(cmdObj); iter.more(); iter.next()) {
+            StringData fieldName = (*iter).fieldNameStringData();
+            if (!validFieldNames.count(fieldName.toString())) {
+                return Status(ErrorCodes::BadValue,
+                              mongoutils::str::stream() << "\"" << fieldName << "\" is not "
+                                      "a valid argument to createUser");
+            }
+        }
+
+        BSONObjBuilder updateSetBuilder;
+
+        // Parse user name
+        std::string userName;
+        Status status = bsonExtractStringField(cmdObj, "updateUser", &userName);
+        if (!status.isOK()) {
+            return status;
+        }
+        *parsedUserName = UserName(userName, dbname);
+
+        // Parse password
+        if (cmdObj.hasField("pwd")) {
+            std::string clearTextPassword;
+            status = bsonExtractStringField(cmdObj, "pwd", &clearTextPassword);
+            if (!status.isOK()) {
+                return status;
+            }
+
+            std::string password = auth::createPasswordDigest(userName, clearTextPassword);
+            updateSetBuilder.append("credentials.MONGODB-CR", password);
+        }
+
+
+        // Parse custom data
+        if (cmdObj.hasField("customData")) {
+            BSONElement element;
+            status = bsonExtractTypedField(cmdObj, "customData", Object, &element);
+            if (!status.isOK()) {
+                return status;
+            }
+            updateSetBuilder.append("customData", element.Obj());
+        }
+
+        // Parse roles
+        if (cmdObj.hasField("roles")) {
+            BSONElement rolesElement;
+            Status status = bsonExtractTypedField(cmdObj, "roles", Array, &rolesElement);
+            if (!status.isOK()) {
+                return status;
+            }
+
+            BSONArray modifiedRolesObj;
+            status = _validateAndModifyRolesArray(rolesElement,
+                                                  dbname,
+                                                  authzManager,
+                                                  &modifiedRolesObj);
+            if (!status.isOK()) {
+                return status;
+            }
+
+            updateSetBuilder.append("roles", modifiedRolesObj);
+        }
+
+        BSONObj updateSet = updateSetBuilder.obj();
+        if (updateSet.isEmpty()) {
+            return Status(ErrorCodes::UserModificationFailed,
+                          "Must specify at least one field to update in updateUser");
+        }
+
+        *parsedUpdateObj = BSON("$set" << updateSet);
+        return Status::OK();
+    }
+
+} // namespace auth
+} // namespace mongo

@@ -17,6 +17,7 @@ Import("darwin windows solaris linux nix")
 
 env.SConscript(['base/SConscript',
                 'db/auth/SConscript',
+                'db/commands/SConscript',
                 'db/exec/SConscript',
                 'db/fts/SConscript',
                 'db/ops/SConscript',
@@ -356,6 +357,7 @@ env.StaticLibrary("coredb", [
         "s/shardconnection.cpp",
         ],
                   LIBDEPS=['db/auth/serverauth',
+                           'db/commands/usercommandsparser',
                            'db/common',
                            'server_parameters',
                            'geoparser',

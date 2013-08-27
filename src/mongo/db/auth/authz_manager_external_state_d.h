@@ -41,8 +41,7 @@ namespace mongo {
         virtual Status updatePrivilegeDocument(const UserName& user,
                                                const BSONObj& updateObj);
 
-        virtual Status removePrivilegeDocuments(const std::string& dbname,
-                                                const BSONObj& query);
+        virtual Status removePrivilegeDocuments(const BSONObj& query, int* numRemoved);
 
         virtual Status getAllDatabaseNames(std::vector<std::string>* dbnames);
 

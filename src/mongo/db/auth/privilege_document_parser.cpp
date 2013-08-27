@@ -452,6 +452,41 @@ namespace {
         return Status::OK();
     }
 
+    Status V2PrivilegeDocumentParser::checkValidRoleObject(
+            const BSONObj& roleObject) const {
+        BSONElement roleNameElement = roleObject[ROLE_NAME_FIELD_NAME];
+        BSONElement roleSourceElement = roleObject[ROLE_SOURCE_FIELD_NAME];
+        BSONElement canDelegateElement = roleObject[ROLE_CAN_DELEGATE_FIELD_NAME];
+        BSONElement hasRoleElement = roleObject[ROLE_HAS_ROLE_FIELD_NAME];
+
+        if (roleNameElement.type() != String ||
+                makeStringDataFromBSONElement(roleNameElement).empty()) {
+            return Status(ErrorCodes::UnsupportedFormat,
+                          "Role names must be non-empty strings");
+        }
+        if (roleSourceElement.type() != String ||
+                makeStringDataFromBSONElement(roleSourceElement).empty()) {
+            return Status(ErrorCodes::UnsupportedFormat,
+                          "Role source must be non-empty strings");
+        }
+        if (canDelegateElement.type() != Bool) {
+            return Status(ErrorCodes::UnsupportedFormat,
+                          "Entries in 'roles' array need a 'canDelegate' boolean field");
+        }
+        if (hasRoleElement.type() != Bool) {
+            return Status(ErrorCodes::UnsupportedFormat,
+                          "Entries in 'roles' array need a 'hasRole' boolean field");
+        }
+
+        if (!hasRoleElement.Bool() && !canDelegateElement.Bool()) {
+            return Status(ErrorCodes::UnsupportedFormat,
+                          "At least one of 'canDelegate' and 'hasRole' must be true for "
+                          "every role in the 'roles' array");
+        }
+
+        return Status::OK();
+    }
+
     Status V2PrivilegeDocumentParser::initializeUserRolesFromPrivilegeDocument(
             User* user, const BSONObj& privDoc, const StringData&) const {
 
@@ -469,38 +504,21 @@ namespace {
             }
             BSONObj roleObject = (*it).Obj();
 
+            Status status = checkValidRoleObject(roleObject);
+            if (!status.isOK()) {
+                return status;
+            }
+
             BSONElement roleNameElement = roleObject[ROLE_NAME_FIELD_NAME];
             BSONElement roleSourceElement = roleObject[ROLE_SOURCE_FIELD_NAME];
             BSONElement canDelegateElement = roleObject[ROLE_CAN_DELEGATE_FIELD_NAME];
             BSONElement hasRoleElement = roleObject[ROLE_HAS_ROLE_FIELD_NAME];
 
-            if (roleNameElement.type() != String ||
-                    makeStringDataFromBSONElement(roleNameElement).empty()) {
-                return Status(ErrorCodes::UnsupportedFormat,
-                              "Role names must be non-empty strings");
-            }
-            if (roleSourceElement.type() != String ||
-                    makeStringDataFromBSONElement(roleSourceElement).empty()) {
-                return Status(ErrorCodes::UnsupportedFormat,
-                              "Role source must be non-empty strings");
-            }
-            if (canDelegateElement.type() != Bool) {
-                return Status(ErrorCodes::UnsupportedFormat,
-                              "Entries in 'roles' array need a 'canDelegate' boolean field");
-            }
-            if (hasRoleElement.type() != Bool) {
-                return Status(ErrorCodes::UnsupportedFormat,
-                              "Entries in 'roles' array need a 'hasRole' boolean field");
-            }
-
             if (hasRoleElement.Bool()) {
                 user->addRole(RoleName(roleNameElement.String(), roleSourceElement.String()));
-            } else if (canDelegateElement.Bool()) {
+            }
+            if (canDelegateElement.Bool()) {
                 // TODO(spencer): record the fact that this user can delegate this role
-            } else {
-                return Status(ErrorCodes::UnsupportedFormat,
-                              "At least one of 'canDelegate' and 'hasRole' must be true for "
-                              "every role in the 'roles' array");
             }
         }
         return Status::OK();

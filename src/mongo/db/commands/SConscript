@@ -1,0 +1,14 @@
+# -*- mode: python -*-
+
+Import("env")
+
+env.StaticLibrary('usercommandsparser',
+                  ['user_management_commands_parser.cpp'],
+                  LIBDEPS=['$BUILD_DIR/mongo/db/auth/authcore',
+                           '$BUILD_DIR/mongo/bson'])
+
+env.CppUnitTest('user_management_commands_parser_test', 'user_management_commands_parser_test.cpp',
+                LIBDEPS=['usercommandsparser',
+                         '$BUILD_DIR/mongo/mongocommon',
+                         '$BUILD_DIR/mongo/db/auth/authmocks'],
+                NO_CRUTCH=True)

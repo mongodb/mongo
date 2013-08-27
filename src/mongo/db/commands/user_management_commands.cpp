@@ -27,7 +27,9 @@
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/auth/privilege.h"
+#include "mongo/db/auth/user.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/user_management_commands_parser.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/platform/unordered_set.h"
 #include "mongo/util/mongoutils/str.h"
@@ -83,207 +85,33 @@ namespace mongo {
             out->push_back(Privilege(dbname, actions));
         }
 
-        struct CreateUserArgs {
-            std::string userName;
-            std::string clearTextPassword;
-            std::string userSource; // TODO(spencer): remove this once we're using v2 user format
-            bool readOnly; // TODO(spencer): remove this once we're using the new v2 user format
-            BSONObj extraData; // Owned by the owner of the command object used to call createUser
-            BSONArray roles; // Owned by the owner of the command object used to call createUser
-            // Owned by the owner of the command object used to call createUser
-            // TODO(spencer): remove otherDBRoles once we're using the new v2 user format
-            BSONObj otherDBRoles;
-            bool hasPassword;
-            bool hasUserSource;
-            bool hasReadOnly;
-            bool hasExtraData;
-            bool hasRoles;
-            bool hasOtherDBRoles;
-            CreateUserArgs() : readOnly(false), hasPassword(false), hasUserSource(false),
-                    hasReadOnly(false), hasExtraData(false), hasRoles(false),
-                    hasOtherDBRoles(false) {}
-        };
-
-        // TODO: The bulk of the implementation of this will need to change once we're using the
-        // new v2 authorization storage format.
         bool run(const string& dbname,
                  BSONObj& cmdObj,
                  int options,
                  string& errmsg,
                  BSONObjBuilder& result,
                  bool fromRepl) {
-            CreateUserArgs args;
-            Status status = _parseAndValidateInput(dbname, cmdObj, &args);
-            if (!status.isOK()) {
-                addStatus(status, result);
-                return false;
-            }
-
-            std::string password = DBClientWithCommands::createPasswordDigest(
-                    args.userName, args.clearTextPassword);
-
-
-            BSONObjBuilder userObjBuilder;
-            userObjBuilder.append("_id", OID::gen());
-            userObjBuilder.append("user", args.userName);
-            if (args.hasPassword) {
-                userObjBuilder.append("pwd", password);
-            }
-
-            if (args.hasUserSource) {
-                userObjBuilder.append("userSource", args.userSource);
-            }
-
-            if (args.hasReadOnly) {
-                userObjBuilder.append("readOnly", args.readOnly);
-            }
-
-            if (args.hasExtraData) {
-                userObjBuilder.append("extraData", args.extraData);
-            }
-
-            if (args.hasRoles) {
-                userObjBuilder.append("roles", args.roles);
-            }
-
-            if (args.hasOtherDBRoles) {
-                userObjBuilder.append("otherDBRoles", args.otherDBRoles);
-            }
-
             AuthorizationManager* authzManager = getGlobalAuthorizationManager();
-            status = authzManager->insertPrivilegeDocument(dbname, userObjBuilder.obj());
+            BSONObj userObj;
+            Status status = auth::parseAndValidateCreateUserCommand(cmdObj,
+                                                                    dbname,
+                                                                    authzManager,
+                                                                    &userObj);
             if (!status.isOK()) {
                 addStatus(status, result);
                 return false;
             }
 
-            // Rebuild full user cache on every user modification.
-            // TODO(spencer): Remove this once we update user cache on-demand for each user
-            // modification.
-            status = authzManager->initializeAllV1UserData();
+            status = authzManager->insertPrivilegeDocument(dbname, userObj);
             if (!status.isOK()) {
                 addStatus(status, result);
                 return false;
             }
-
             return true;
         }
 
         virtual void redactForLogging(mutablebson::Document* cmdObj) {
             redactPasswordData(cmdObj->root());
-        }
-
-    private:
-
-        Status _parseAndValidateInput(const std::string& dbname,
-                                      const BSONObj& cmdObj,
-                                      CreateUserArgs* parsedArgs) const {
-            unordered_set<std::string> validFieldNames;
-            validFieldNames.insert("createUser");
-            validFieldNames.insert("user");
-            validFieldNames.insert("pwd");
-            validFieldNames.insert("userSource");
-            validFieldNames.insert("roles");
-            validFieldNames.insert("readOnly");
-            validFieldNames.insert("otherDBRoles");
-
-
-            // Iterate through all fields in command object and make sure there are no unexpected
-            // ones.
-            for (BSONObjIterator iter(cmdObj); iter.more(); iter.next()) {
-                StringData fieldName = (*iter).fieldNameStringData();
-                if (!validFieldNames.count(fieldName.toString())) {
-                    return Status(ErrorCodes::BadValue,
-                                  mongoutils::str::stream() << "\"" << fieldName << "\" is not "
-                                          "a valid argument to createUser");
-                }
-            }
-
-            Status status = bsonExtractStringField(cmdObj, "user", &parsedArgs->userName);
-            if (!status.isOK()) {
-                return status;
-            }
-
-            if (cmdObj.hasField("pwd")) {
-                parsedArgs->hasPassword = true;
-                status = bsonExtractStringField(cmdObj, "pwd", &parsedArgs->clearTextPassword);
-                if (!status.isOK()) {
-                    return status;
-                }
-            }
-
-
-            if (cmdObj.hasField("userSource")) {
-                parsedArgs->hasUserSource = true;
-                status = bsonExtractStringField(cmdObj, "userSource", &parsedArgs->userSource);
-                if (!status.isOK()) {
-                    return status;
-                }
-            }
-
-            if (cmdObj.hasField("readOnly")) {
-                parsedArgs->hasReadOnly = true;
-                status = bsonExtractBooleanField(cmdObj, "readOnly", &parsedArgs->readOnly);
-                if (!status.isOK()) {
-                    return status;
-                }
-            }
-
-            if (cmdObj.hasField("extraData")) {
-                parsedArgs->hasExtraData = true;
-                BSONElement element;
-                status = bsonExtractTypedField(cmdObj, "extraData", Object, &element);
-                if (!status.isOK()) {
-                    return status;
-                }
-                parsedArgs->extraData = element.Obj();
-            }
-
-            if (cmdObj.hasField("roles")) {
-                parsedArgs->hasRoles = true;
-                BSONElement element;
-                status = bsonExtractTypedField(cmdObj, "roles", Array, &element);
-                if (!status.isOK()) {
-                    return status;
-                }
-                parsedArgs->roles = BSONArray(element.Obj());
-            }
-
-            if (cmdObj.hasField("otherDBRoles")) {
-                parsedArgs->hasOtherDBRoles = true;
-                BSONElement element;
-                status = bsonExtractTypedField(cmdObj, "otherDBRoles", Object, &element);
-                if (!status.isOK()) {
-                    return status;
-                }
-                parsedArgs->otherDBRoles = element.Obj();
-            }
-
-            if (parsedArgs->hasPassword && parsedArgs->hasUserSource) {
-                return Status(ErrorCodes::BadValue,
-                              "User objects can't have both 'pwd' and 'userSource'");
-            }
-            if (!parsedArgs->hasPassword && !parsedArgs->hasUserSource) {
-                return Status(ErrorCodes::BadValue,
-                              "User objects must have one of 'pwd' and 'userSource'");
-            }
-            if (parsedArgs->hasRoles && parsedArgs->hasReadOnly) {
-                return Status(ErrorCodes::BadValue,
-                              "User objects can't have both 'roles' and 'readOnly'");
-            }
-
-            // Prevent creating a __system user on the local database, and also prevent creating
-            // privilege documents in other datbases for the __system@local user.
-            // TODO(spencer): The second part will go away once we use the new V2 user doc format
-            // as it doesn't have the same userSource notion.
-            if (parsedArgs->userName == internalSecurity.user->getName().getUser() &&
-                    ((!parsedArgs->hasUserSource && dbname == "local") ||
-                            parsedArgs->userSource == "local")) {
-                return Status(ErrorCodes::BadValue,
-                              "Cannot create user document for the internal user");
-            }
-
-            return Status::OK();
         }
 
     } cmdCreateUser;
@@ -318,59 +146,32 @@ namespace mongo {
             out->push_back(Privilege(dbname, actions));
         }
 
-        struct UpdateUserArgs {
-            std::string userName;
-            std::string clearTextPassword;
-            BSONObj extraData; // Owned by the owner of the command object given to updateUser
-            bool hasPassword;
-            bool hasExtraData;
-            UpdateUserArgs() : hasPassword(false), hasExtraData(false) {}
-        };
-
         bool run(const string& dbname,
                  BSONObj& cmdObj,
                  int options,
                  string& errmsg,
                  BSONObjBuilder& result,
                  bool fromRepl) {
-            UpdateUserArgs args;
-            Status status = _parseAndValidateInput(cmdObj, &args);
-            if (!status.isOK()) {
-                addStatus(status, result);
-                return false;
-            }
-
-            // TODO: This update will have to change once we're using the new v2 user
-            // storage format.
-            BSONObjBuilder setBuilder;
-            if (args.hasPassword) {
-                std::string password = DBClientWithCommands::createPasswordDigest(
-                        args.userName, args.clearTextPassword);
-                setBuilder.append("pwd", password);
-            }
-            if (args.hasExtraData) {
-                setBuilder.append("extraData", args.extraData);
-            }
-            BSONObj updateObj = BSON("$set" << setBuilder.obj());
-
             AuthorizationManager* authzManager = getGlobalAuthorizationManager();
-            status = authzManager->updatePrivilegeDocument(UserName(args.userName, dbname),
-                                                           updateObj);
-
+            BSONObj updateObj;
+            UserName userName;
+            Status status = auth::parseAndValidateUpdateUserCommand(cmdObj,
+                                                                    dbname,
+                                                                    authzManager,
+                                                                    &updateObj,
+                                                                    &userName);
             if (!status.isOK()) {
                 addStatus(status, result);
                 return false;
             }
 
-            // Rebuild full user cache on every user modification.
-            // TODO(spencer): Remove this once we update user cache on-demand for each user
-            // modification.
-            status = authzManager->initializeAllV1UserData();
+            status = authzManager->updatePrivilegeDocument(userName, updateObj);
             if (!status.isOK()) {
                 addStatus(status, result);
                 return false;
             }
 
+            authzManager->invalidateUserByName(userName);
             return true;
         }
 
@@ -378,59 +179,9 @@ namespace mongo {
             redactPasswordData(cmdObj->root());
         }
 
-    private:
-
-        Status _parseAndValidateInput(BSONObj cmdObj, UpdateUserArgs* parsedArgs) const {
-            unordered_set<std::string> validFieldNames;
-            validFieldNames.insert("updateUser");
-            validFieldNames.insert("user");
-            validFieldNames.insert("pwd");
-            validFieldNames.insert("extraData");
-
-            // Iterate through all fields in command object and make sure there are no
-            // unexpected ones.
-            for (BSONObjIterator iter(cmdObj); iter.more(); iter.next()) {
-                StringData fieldName = (*iter).fieldNameStringData();
-                if (!validFieldNames.count(fieldName.toString())) {
-                    return Status(ErrorCodes::BadValue,
-                                  mongoutils::str::stream() << "\"" << fieldName << "\" is not "
-                                          "a valid argument to updateUser");
-                }
-            }
-
-            Status status = bsonExtractStringField(cmdObj, "user", &parsedArgs->userName);
-            if (!status.isOK()) {
-                return status;
-            }
-
-            if (cmdObj.hasField("pwd")) {
-                parsedArgs->hasPassword = true;
-                status = bsonExtractStringField(cmdObj, "pwd", &parsedArgs->clearTextPassword);
-                if (!status.isOK()) {
-                    return status;
-                }
-            }
-
-            if (cmdObj.hasField("extraData")) {
-                parsedArgs->hasExtraData = true;
-                BSONElement element;
-                status = bsonExtractTypedField(cmdObj, "extraData", Object, &element);
-                if (!status.isOK()) {
-                    return status;
-                }
-                parsedArgs->extraData = element.Obj();
-            }
-
-
-            if (!parsedArgs->hasPassword && !parsedArgs->hasExtraData) {
-                return Status(ErrorCodes::BadValue,
-                              "Must specify at least one of 'pwd' and 'extraData'");
-            }
-            return Status::OK();
-        }
     } cmdUpdateUser;
 
-    class CmdRemoveUsers : public Command {
+    class CmdRemoveUser : public Command {
     public:
 
         virtual bool logTheOp() {
@@ -445,11 +196,10 @@ namespace mongo {
             return NONE;
         }
 
-        CmdRemoveUsers() : Command("removeUsers") {}
+        CmdRemoveUser() : Command("removeUser") {}
 
         virtual void help(stringstream& ss) const {
-            ss << "By default, removes all users for this database.  If given a \"user\""
-                    " argument, removes only that user."<< endl;
+            ss << "Removes a single user." << endl;
         }
 
         virtual void addRequiredPrivileges(const std::string& dbname,
@@ -461,8 +211,6 @@ namespace mongo {
             out->push_back(Privilege(dbname, actions));
         }
 
-        // TODO: The bulk of the implementation of this will need to change once we're using the
-        // new v2 authorization storage format.
         bool run(const string& dbname,
                  BSONObj& cmdObj,
                  int options,
@@ -471,36 +219,88 @@ namespace mongo {
                  bool fromRepl) {
             std::string user;
 
-            if (cmdObj.hasField("user")) {
-                Status status = bsonExtractStringField(cmdObj, "user", &user);
-                if (!status.isOK()) {
-                    addStatus(status, result);
-                    return false;
-                }
+            Status status = bsonExtractStringField(cmdObj, "removeUser", &user);
+            if (!status.isOK()) {
+                addStatus(status, result);
+                return false;
             }
 
-            BSONObj query;
-            if (!user.empty()) {
-                query = BSON("user" << user);
-            }
+            int numUpdated;
             AuthorizationManager* authzManager = getGlobalAuthorizationManager();
-            Status status = authzManager->removePrivilegeDocuments(dbname, query);
+            status = authzManager->removePrivilegeDocuments(
+                    BSON(AuthorizationManager::USER_NAME_FIELD_NAME << user <<
+                         AuthorizationManager::USER_SOURCE_FIELD_NAME << dbname),
+                    &numUpdated);
             if (!status.isOK()) {
                 addStatus(status, result);
                 return false;
             }
 
-            // Rebuild full user cache on every user modification.
-            // TODO(spencer): Remove this once we update user cache on-demand for each user
-            // modification.
-            status = authzManager->initializeAllV1UserData();
-            if (!status.isOK()) {
-                addStatus(status, result);
+            if (numUpdated == 0) {
+                addStatus(Status(ErrorCodes::UserNotFound,
+                                 mongoutils::str::stream() << "User '" << user << "@" <<
+                                         dbname << "' not found"),
+                          result);
                 return false;
             }
 
+            authzManager->invalidateUserByName(UserName(user, dbname));
             return true;
         }
 
     } cmdRemoveUser;
+
+    class CmdRemoveUsersFromDatabase : public Command {
+    public:
+
+        virtual bool logTheOp() {
+            return false;
+        }
+
+        virtual bool slaveOk() const {
+            return false;
+        }
+
+        virtual LockType locktype() const {
+            return NONE;
+        }
+
+        CmdRemoveUsersFromDatabase() : Command("removeUsersFromDatabase") {}
+
+        virtual void help(stringstream& ss) const {
+            ss << "Removes all users for a single database." << endl;
+        }
+
+        virtual void addRequiredPrivileges(const std::string& dbname,
+                                           const BSONObj& cmdObj,
+                                           std::vector<Privilege>* out) {
+            // TODO: update this with the new rules around user creation in 2.6.
+            ActionSet actions;
+            actions.addAction(ActionType::userAdmin);
+            out->push_back(Privilege(dbname, actions));
+        }
+
+        bool run(const string& dbname,
+                 BSONObj& cmdObj,
+                 int options,
+                 string& errmsg,
+                 BSONObjBuilder& result,
+                 bool fromRepl) {
+            int numRemoved;
+            AuthorizationManager* authzManager = getGlobalAuthorizationManager();
+            Status status = authzManager->removePrivilegeDocuments(
+                    BSON(AuthorizationManager::USER_SOURCE_FIELD_NAME << dbname),
+                    &numRemoved);
+            if (!status.isOK()) {
+                addStatus(status, result);
+                return false;
+            }
+
+            result.append("n", numRemoved);
+
+            authzManager->invalidateUsersFromDB(dbname);
+            return true;
+        }
+
+    } cmdRemoveUsersFromDatabase;
 }

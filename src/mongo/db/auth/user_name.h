@@ -15,6 +15,7 @@
 
 #pragma once
 
+#include <iosfwd>
 #include <string>
 
 #include "mongo/base/string_data.h"
@@ -67,5 +68,7 @@ namespace mongo {
     static inline bool operator<(const UserName& lhs, const UserName& rhs) {
         return lhs.getFullName() < rhs.getFullName();
     }
+
+    std::ostream& operator<<(std::ostream& os, const UserName& name);
 
 }  // namespace mongo

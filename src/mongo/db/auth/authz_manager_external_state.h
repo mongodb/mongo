@@ -62,9 +62,8 @@ namespace mongo {
                                                const BSONObj& updateObj) = 0;
 
         // Removes users for the given database matching the given query.
-        // TODO(spencer): remove dbname argument once users are only written into the admin db
-        virtual Status removePrivilegeDocuments(const std::string& dbname,
-                                                const BSONObj& query) = 0;
+        // Writes into *numRemoved the number of user documents that were modified.
+        virtual Status removePrivilegeDocuments(const BSONObj& query, int* numRemoved) = 0;
 
         /**
          * Puts into the *dbnames vector the name of every database in the cluster.

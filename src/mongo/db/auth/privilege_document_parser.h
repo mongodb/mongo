@@ -90,6 +90,11 @@ namespace mongo {
         virtual Status checkValidPrivilegeDocument(const StringData& dbname,
                                                    const BSONObj& doc) const;
 
+        /**
+         * Returns Status::OK() iff the given BSONObj describes a valid element from a roles array.
+         */
+        Status checkValidRoleObject(const BSONObj& roleObject) const;
+
         virtual std::string extractUserNameFromPrivilegeDocument(const BSONObj& doc) const;
 
         virtual Status initializeUserCredentialsFromPrivilegeDocument(User* user,

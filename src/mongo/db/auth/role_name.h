@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include <iosfwd>
 #include <string>
 
 #include <boost/scoped_ptr.hpp>
@@ -76,6 +77,8 @@ namespace mongo {
     static inline bool operator<(const RoleName& lhs, const RoleName& rhs) {
         return lhs.getFullName() < rhs.getFullName();
     }
+
+    std::ostream& operator<<(std::ostream& os, const RoleName& name);
 
 
     /**
