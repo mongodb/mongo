@@ -159,7 +159,7 @@ s.getDB("test").foo.remove({})
 
 var num = 100000;
 for (i=0; i<num; i++) {
-    s.getDB("test").foo.insert({x:i, abc : "defg", date : new Date(), str : "all the talk on the market"});
+    s.getDB("test").foo.insert({_id:i, x:i, abc : "defg", date : new Date(), str : "all the talk on the market"});
 }
 
 // Make sure all data gets sent through
@@ -199,6 +199,14 @@ if (numDocs != num) {
     assert.eq(numDocs, numDocsSeen, "More docs discovered on second find() even though getLastError was already called")
     assert.eq(num - numDocs, missingDocNumbers.length);
 
+    load('jstests/libs/trace_missing_docs.js');
+    
+    for ( var i = 0; i < missingDocNumbers.length; i++ ) {
+        jsTest.log( "Tracing doc: " + missingDocNumbers[i] );
+        traceMissingDoc( s.getDB( "test" ).foo, { _id : missingDocNumbers[i], 
+                                                    x : missingDocNumbers[i] } );
+    }
+    
     assert(false, "Number of docs found does not equal the number inserted. Missing docs: " + missingDocNumbers);
 }
 
