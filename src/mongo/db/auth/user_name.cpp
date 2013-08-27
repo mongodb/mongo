@@ -35,4 +35,8 @@ namespace mongo {
         _splitPoint = user.size();
     }
 
+    std::ostream& operator<<(std::ostream& os, const UserName& name) {
+        return os << name.getFullName();
+    }
+
 }  // namespace mongo

@@ -25,11 +25,6 @@
 #define ASSERT_NULL(EXPR) ASSERT_FALSE((EXPR))
 
 namespace mongo {
-
-    static inline std::ostream& operator<<(std::ostream& os, const UserName& uname) {
-        return os << uname.toString();
-    }
-
 namespace {
 
     TEST(UserSetTest, BasicTest) {

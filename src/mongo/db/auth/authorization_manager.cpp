@@ -324,9 +324,9 @@ namespace {
         return _externalState->updatePrivilegeDocument(user, updateObj);
     }
 
-    Status AuthorizationManager::removePrivilegeDocuments(const std::string& dbname,
-                                                          const BSONObj& query) const {
-        return _externalState->removePrivilegeDocuments(dbname, query);
+    Status AuthorizationManager::removePrivilegeDocuments(const BSONObj& query,
+                                                          int* numRemoved) const {
+        return _externalState->removePrivilegeDocuments(query, numRemoved);
     }
 
     ActionSet AuthorizationManager::getAllUserActions() const {
@@ -339,6 +339,54 @@ namespace {
         return allActions;
     }
 
+    bool AuthorizationManager::roleExists(const RoleName& role) const {
+        bool isAdminDB = role.getDB() == "admin";
+
+        if (role.getRole() == SYSTEM_ROLE_READ) {
+            return true;
+        }
+        else if (role.getRole() == SYSTEM_ROLE_READ_WRITE) {
+            return true;
+        }
+        else if (role.getRole() == SYSTEM_ROLE_USER_ADMIN) {
+            return true;
+        }
+        else if (role.getRole() == SYSTEM_ROLE_DB_ADMIN) {
+            return true;
+        }
+        else if (role.getRole() == AuthorizationManager::SYSTEM_ROLE_V0_READ) {
+            return true;
+        }
+        else if (role.getRole() == AuthorizationManager::SYSTEM_ROLE_V0_READ_WRITE) {
+            return true;
+        }
+        else if (isAdminDB && role.getRole() == SYSTEM_ROLE_READ_ANY_DB) {
+            return true;
+        }
+        else if (isAdminDB && role.getRole() == SYSTEM_ROLE_READ_WRITE_ANY_DB) {
+            return true;
+        }
+        else if (isAdminDB && role.getRole() == SYSTEM_ROLE_USER_ADMIN_ANY_DB) {
+            return true;
+        }
+        else if (isAdminDB && role.getRole() == SYSTEM_ROLE_DB_ADMIN_ANY_DB) {
+            return true;
+        }
+        else if (isAdminDB && role.getRole() == SYSTEM_ROLE_CLUSTER_ADMIN) {
+            return true;
+        }
+        else if (isAdminDB && role.getRole() == AuthorizationManager::SYSTEM_ROLE_V0_ADMIN_READ) {
+            return true;
+        }
+        else if (isAdminDB &&
+                role.getRole() == AuthorizationManager::SYSTEM_ROLE_V0_ADMIN_READ_WRITE) {
+            return true;
+        } else {
+            // TODO(spencer): Check the role graph to see if this is a valid user-defined-role
+            return false;
+        }
+
+    }
     /**
      * Adds to "outPrivileges" the privileges associated with having the named "role" on "dbname".
      *
@@ -510,12 +558,41 @@ namespace {
         unordered_map<UserName, User*>::iterator it = _userCache.find(user->getName());
         massert(17052,
                 mongoutils::str::stream() <<
-                        "Invalidating cache for user " << user->getName().toString() <<
+                        "Invalidating cache for user " << user->getName().getFullName() <<
                         " failed as it is not present in the user cache",
                 it != _userCache.end() && it->second == user);
         _userCache.erase(it);
         user->invalidate();
     }
+
+    void AuthorizationManager::invalidateUserByName(const UserName& userName) {
+        boost::lock_guard<boost::mutex> lk(_lock);
+
+        unordered_map<UserName, User*>::iterator it = _userCache.find(userName);
+        if (it == _userCache.end()) {
+            return;
+        }
+
+        User* user = it->second;
+        _userCache.erase(it);
+        user->invalidate();
+    }
+
+    void AuthorizationManager::invalidateUsersFromDB(const std::string& dbname) {
+        boost::lock_guard<boost::mutex> lk(_lock);
+
+        unordered_map<UserName, User*>::iterator it = _userCache.begin();
+        while (it != _userCache.end()) {
+            User* user = it->second;
+            if (user->getName().getDB() == dbname) {
+                _userCache.erase(it++);
+                user->invalidate();
+            } else {
+                ++it;
+            }
+        }
+    }
+
 
     void AuthorizationManager::addInternalUser(User* user) {
         boost::lock_guard<boost::mutex> lk(_lock);

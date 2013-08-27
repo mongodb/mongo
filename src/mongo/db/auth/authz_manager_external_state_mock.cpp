@@ -36,8 +36,8 @@ namespace mongo {
         return Status(ErrorCodes::InternalError, "Not implemented in mock.");
     }
 
-    Status AuthzManagerExternalStateMock::removePrivilegeDocuments(const std::string& dbname,
-                                                                   const BSONObj& query) {
+    Status AuthzManagerExternalStateMock::removePrivilegeDocuments(const BSONObj& query,
+                                                                   int* numRemoved) {
         return Status(ErrorCodes::InternalError, "Not implemented in mock.");
     }
 

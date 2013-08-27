@@ -19,6 +19,7 @@
 #include <string>
 
 #include "mongo/client/dbclientinterface.h"
+#include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/s/type_database.h"
@@ -69,7 +70,7 @@ namespace {
     Status AuthzManagerExternalStateMongos::insertPrivilegeDocument(const string& dbname,
                                                                     const BSONObj& userObj) {
         try {
-            string userNS = dbname + ".system.users";
+            const std::string userNS = "admin.system.users";
             scoped_ptr<ScopedDbConnection> conn(getConnectionForUsersCollection(userNS));
 
             conn->get()->insert(userNS, userObj);
@@ -83,9 +84,11 @@ namespace {
                 return Status::OK();
             }
             if (res.hasField("code") && res["code"].Int() == ASSERT_ID_DUPKEY) {
+                std::string name = userObj[AuthorizationManager::USER_NAME_FIELD_NAME].String();
+                std::string source = userObj[AuthorizationManager::USER_SOURCE_FIELD_NAME].String();
                 return Status(ErrorCodes::DuplicateKey,
-                              mongoutils::str::stream() << "User \"" << userObj["user"].String() <<
-                                     "\" already exists on database \"" << dbname << "\"");
+                              mongoutils::str::stream() << "User \"" << name << "@" << source <<
+                                      "\" already exists");
             }
             return Status(ErrorCodes::UserModificationFailed, errstr);
         } catch (const DBException& e) {
@@ -96,12 +99,14 @@ namespace {
     Status AuthzManagerExternalStateMongos::updatePrivilegeDocument(
             const UserName& user, const BSONObj& updateObj) {
         try {
-            string userNS = mongoutils::str::stream() << user.getDB() << ".system.users";
+            const std::string userNS = "admin.system.users";
             scoped_ptr<ScopedDbConnection> conn(getConnectionForUsersCollection(userNS));
 
-            conn->get()->update(userNS,
-                                QUERY("user" << user.getUser() << "userSource" << BSONNULL),
-                                updateObj);
+            conn->get()->update(
+                    userNS,
+                    QUERY(AuthorizationManager::USER_NAME_FIELD_NAME << user.getUser() <<
+                          AuthorizationManager::USER_SOURCE_FIELD_NAME << user.getDB()),
+                    updateObj);
 
             // 30 second timeout for w:majority
             BSONObj res = conn->get()->getLastErrorDetailed(false, false, -1, 30*1000);
@@ -126,10 +131,10 @@ namespace {
         }
     }
 
-    Status AuthzManagerExternalStateMongos::removePrivilegeDocuments(const string& dbname,
-                                                                     const BSONObj& query) {
+    Status AuthzManagerExternalStateMongos::removePrivilegeDocuments(const BSONObj& query,
+                                                                     int* numRemoved) {
         try {
-            string userNS = dbname + ".system.users";
+            string userNS = "admin.system.users";
             scoped_ptr<ScopedDbConnection> conn(getConnectionForUsersCollection(userNS));
 
             conn->get()->remove(userNS, query);
@@ -143,12 +148,7 @@ namespace {
                 return Status(ErrorCodes::UserModificationFailed, err);
             }
 
-            int numUpdated = res["n"].numberInt();
-            if (numUpdated == 0) {
-                return Status(ErrorCodes::UserNotFound,
-                              mongoutils::str::stream() << "No users found on database \"" << dbname
-                                      << "\" matching query: " << query.toString());
-            }
+            *numRemoved = res["n"].numberInt();
             return Status::OK();
         } catch (const DBException& e) {
             return e.toStatus();

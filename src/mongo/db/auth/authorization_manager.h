@@ -112,7 +112,8 @@ namespace mongo {
         Status updatePrivilegeDocument(const UserName& user, const BSONObj& updateObj) const;
 
         // Removes users for the given database matching the given query.
-        Status removePrivilegeDocuments(const std::string& dbname, const BSONObj& query) const;
+        // Writes into *numRemoved the number of user documents that were modified.
+        Status removePrivilegeDocuments(const BSONObj& query, int* numRemoved) const;
 
         // Checks to see if "doc" is a valid privilege document, assuming it is stored in the
         // "system.users" collection of database "dbname".
@@ -152,10 +153,25 @@ namespace mongo {
         void invalidateUser(User* user);
 
         /**
+         * Marks the given user as invalid and removes it from the user cache.
+         */
+        void invalidateUserByName(const UserName& user);
+
+        /**
+         * Invalidates all users who's source is "dbname" and removes them from the user cache.
+         */
+        void invalidateUsersFromDB(const std::string& dbname);
+
+        /**
          * Inserts the given user directly into the _userCache.  Used to add the internalSecurity
          * user into the cache at process startup.
          */
         void addInternalUser(User* user);
+
+        /**
+         * Returns true if the role name given refers to a valid system or user defined role.
+         */
+        bool roleExists(const RoleName& role) const;
 
         /**
          * Initializes the user cache with User objects for every v0 and v1 user document in the
