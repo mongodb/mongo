@@ -57,138 +57,139 @@ typedef struct {
 #define	C_STRING	0x020
 	uint32_t 	flags;
 
-	uint32_t	min;			/* Minimum value */
-	uint32_t	max;			/* Maximum value */
-	u_int		*v;			/* Value for this run */
-	char		**vstr;			/* Value for string options */
+	uint32_t	min;		/* Minimum value */
+	uint32_t	maxrand;	/* Maximum value randomly chosen */
+	uint32_t	maxset;		/* Maximum value explicitly set */
+	u_int		*v;		/* Value for this run */
+	char		**vstr;		/* Value for string options */
 } CONFIG;
 
 /*
  * Get a random value between a config min/max pair (inclusive for both min
  * and max).
  */
-#define	CONF_RAND(cp)	MMRAND((cp)->min, (cp)->max)
+#define	CONF_RAND(cp)	MMRAND((cp)->min, (cp)->maxrand)
 
 static CONFIG c[] = {
 	{ "bitcnt",
 	  "number of bits for fixed-length column-store files",
-	  C_FIX, 0, 1, 8, &g.c_bitcnt, NULL },
+	  C_FIX, 0x0, 1, 8, 8, &g.c_bitcnt, NULL },
 
 	{ "cache",
 	  "size of the cache in MB",
-	  0, 0, 1, 100, &g.c_cache, NULL },
+	  0x0, 0x0, 1, 100, 1024, &g.c_cache, NULL },
 
 	{ "compression",
 	  "type of compression (none | bzip | lzo | raw | snappy)",
-	  0, C_IGNORE|C_STRING, 1, 5, NULL, &g.c_compression },
+	  0x0, C_IGNORE|C_STRING, 1, 5, 5, NULL, &g.c_compression },
 
 	{ "data_extend",
 	  "if data files are extended",			/* 5% */
-	  0, C_BOOL, 5, 0, &g.c_data_extend, NULL },
+	  0x0, C_BOOL, 5, 0, 0, &g.c_data_extend, NULL },
 
 	{ "data_source",
 	  "data source (file | kvsbdb | lsm | memrata | table)",
-	  0, C_IGNORE | C_STRING, 0, 0, NULL, &g.c_data_source },
+	  0x0, C_IGNORE | C_STRING, 0, 0, 0, NULL, &g.c_data_source },
 
 	{ "delete_pct",
 	  "percent operations that are deletes",
-	  0, C_OPS, 0, 45, &g.c_delete_pct, NULL },
+	  0x0, C_OPS, 0, 45, 90, &g.c_delete_pct, NULL },
 
 	{ "dictionary",
 	  "if values are dictionary compressed",	/* 20% */
-	  C_ROW | C_VAR, C_BOOL, 20, 0, &g.c_dictionary, NULL },
+	  C_ROW | C_VAR, C_BOOL, 20, 0, 0, &g.c_dictionary, NULL },
 
 	{ "file_type",
 	  "type of store to create (fix | var | row)",
-	  0, C_IGNORE|C_STRING, 1, 3, NULL, &g.c_file_type },
+	  0x0, C_IGNORE|C_STRING, 1, 3, 3, NULL, &g.c_file_type },
 
 	{ "hot_backups",
 	  "if hot backups are enabled",			/* 5% */
-	  0, C_BOOL, 5, 0, &g.c_hot_backups, NULL },
+	  0x0, C_BOOL, 5, 0, 0, &g.c_hot_backups, NULL },
 
 	{ "huffman_key",
 	  "if keys are huffman encoded",		/* 20% */
-	  C_ROW, C_BOOL, 20, 0, &g.c_huffman_key, NULL },
+	  C_ROW, C_BOOL, 20, 0, 0, &g.c_huffman_key, NULL },
 
 	{ "huffman_value",
 	 "if values are huffman encoded",		/* 20% */
-	 C_ROW|C_VAR, C_BOOL, 20, 0, &g.c_huffman_value, NULL },
+	 C_ROW|C_VAR, C_BOOL, 20, 0, 0, &g.c_huffman_value, NULL },
 
 	{ "insert_pct",
 	  "percent operations that are inserts",
-	  0, C_OPS, 0, 45, &g.c_insert_pct, NULL },
+	  0x0, C_OPS, 0, 45, 90, &g.c_insert_pct, NULL },
 
 	{ "internal_key_truncation",
 	 "if values are huffman encoded",		/* 2% */
-	 0, C_BOOL, 2, 0, &g.c_internal_key_truncation, NULL },
+	 0x0, C_BOOL, 2, 0, 0, &g.c_internal_key_truncation, NULL },
 
 	{ "internal_page_max",
 	  "maximum size of Btree internal nodes",
-	  0, 0, 9, 17, &g.c_intl_page_max, NULL },
+	  0x0, 0x0, 9, 17, 27, &g.c_intl_page_max, NULL },
 
 	{ "key_gap",
 	  "gap between instantiated keys on a Btree page",
-	  0, 0, 0, 20, &g.c_key_gap, NULL },
+	  0x0, 0x0, 0, 20, 20, &g.c_key_gap, NULL },
 
 	{ "key_max",
 	  "maximum size of keys",
-	  C_ROW, 0, 64, 128, &g.c_key_max, NULL },
+	  C_ROW, 0x0, 64, 128, 4096, &g.c_key_max, NULL },
 
 	{ "key_min",
 	  "minimum size of keys",
-	  C_ROW, 0, 10, 32, &g.c_key_min, NULL },
+	  C_ROW, 0x0, 10, 32, 256, &g.c_key_min, NULL },
 
 	{ "leaf_page_max",
 	  "maximum size of Btree leaf nodes",
-	  0, 0, 9, 24, &g.c_leaf_page_max, NULL },
+	  0x0, 0x0, 9, 17, 27, &g.c_leaf_page_max, NULL },
 
 	{ "ops",
 	  "the number of modification operations done per run",
-	  0, 0, 0, M(2), &g.c_ops, NULL },
+	  0x0, 0x0, 0, M(2), M(100), &g.c_ops, NULL },
 
 	{ "prefix",
 	  "if keys are prefix compressed",		/* 80% */
-	  C_ROW, C_BOOL, 80, 0, &g.c_prefix, NULL },
+	  C_ROW, C_BOOL, 80, 0, 0, &g.c_prefix, NULL },
 
 	{ "repeat_data_pct",
 	  "percent duplicate values in row- or variable-length column-stores",
-	  C_ROW|C_VAR, 0, 0, 90, &g.c_repeat_data_pct, NULL },
+	  C_ROW|C_VAR, 0x0, 0, 90, 90, &g.c_repeat_data_pct, NULL },
 
 	{ "reverse",
 	  "collate in reverse order",			/* 10% */
-	  0, C_BOOL, 10, 0, &g.c_reverse, NULL },
+	  0x0, C_BOOL, 10, 0, 0, &g.c_reverse, NULL },
 
 	{ "rows",
 	  "the number of rows to create",
-	  0, 0, 10, M(1), &g.c_rows, NULL },
+	  0x0, 0x0, 10, M(1), M(100), &g.c_rows, NULL },
 
 	{ "runs",
 	  "the number of runs",
-	  0, C_IGNORE, 0, UINT_MAX, &g.c_runs, NULL },
+	  0x0, C_IGNORE, 0, UINT_MAX, UINT_MAX, &g.c_runs, NULL },
 
 	{ "split_pct",
 	  "Btree page split size as a percentage of the maximum page size",
-	  0, 0, 40, 85, &g.c_split_pct, NULL },
+	  0x0, 0x0, 40, 85, 85, &g.c_split_pct, NULL },
 
 	{ "threads",
 	  "the number of threads",
-	  0, C_IGNORE, 1, 32, &g.c_threads, NULL },
+	  0x0, C_IGNORE, 1, 32, 128, &g.c_threads, NULL },
 
 	{ "value_max",
 	  "maximum size of values",
-	  C_ROW|C_VAR, 0, 32, 4096, &g.c_value_max, NULL },
+	  C_ROW|C_VAR, 0x0, 32, 4096, 65536, &g.c_value_max, NULL },
 
 	{ "value_min",
 	  "minimum size of values",
-	  C_ROW|C_VAR, 0, 1, 20, &g.c_value_min, NULL },
+	  C_ROW|C_VAR, 0x0, 1, 20, 4096, &g.c_value_min, NULL },
 
 	{ "wiredtiger_config",
 	  "configuration string used to wiredtiger_open",
-	  0, C_IGNORE|C_STRING, 0, 0, NULL, &g.c_config_open },
+	  0x0, C_IGNORE|C_STRING, 0, 0, 0, NULL, &g.c_config_open },
 
 	{ "write_pct",
 	  "percent operations that are writes",
-	  0, C_OPS, 0, 90, &g.c_write_pct, NULL },
+	  0x0, C_OPS, 0, 90, 90, &g.c_write_pct, NULL },
 
-	{ NULL, NULL, 0, 0, 0, 0, NULL, NULL }
+	{ NULL, NULL, 0x0, 0x0, 0, 0, 0, NULL, NULL }
 };
