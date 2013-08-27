@@ -362,7 +362,6 @@ recno_chk:	if (recno != vs->record_total + 1)
 			 */
 			++entry;
 			if (ref->key.recno != vs->record_total + 1) {
-				__wt_cell_unpack(ref->addr, unpack);
 				WT_RET_MSG(session, WT_ERROR,
 				    "the starting record number in entry %"
 				    PRIu32 " of the column internal page at "
