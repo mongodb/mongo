@@ -449,6 +449,7 @@ namespace mongo {
 
             int row = 0;
             bool discover = hasParam( "discover" );
+            bool showHeaders = ! hasParam( "noheaders" );
             int maxLockedDbWidth = 0;
 
             while ( 1 ) {
@@ -531,7 +532,7 @@ namespace mongo {
                 cout << endl;
 
                 //    header
-                if ( row++ % 5 == 0 && ! biggest.isEmpty() ) {
+                if ( row++ % 5 == 0 && showHeaders && ! biggest.isEmpty() ) {
                     cout << setw( longestHost ) << "" << "\t";
                     printHeaders( biggest );
                 }
