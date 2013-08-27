@@ -1086,8 +1086,9 @@ rs.help = function () {
     print("\trs.remove(hostportstr)          remove a host from the replica set (disconnects)");
     print("\trs.slaveOk()                    shorthand for db.getMongo().setSlaveOk()");
     print();
+    print("\trs.printReplicationInfo()       check oplog size and time range");
+    print("\trs.printSlaveReplicationInfo()  check replica set members and replication lag");
     print("\tdb.isMaster()                   check who is primary");
-    print("\tdb.printReplicationInfo()       check oplog size and time range");
     print();
     print("\treconfiguration helpers disconnect from the database so the shell will display");
     print("\tan error, even if the command succeeds.");
@@ -1097,6 +1098,8 @@ rs.slaveOk = function (value) { return db.getMongo().setSlaveOk(value); }
 rs.status = function () { return db._adminCommand("replSetGetStatus"); }
 rs.isMaster = function () { return db.isMaster(); }
 rs.initiate = function (c) { return db._adminCommand({ replSetInitiate: c }); }
+rs.printSlaveReplicationInfo = function () { return db.printSlaveReplicationInfo() };
+rs.printReplicationInfo = function () { return db.printReplicationInfo() };
 rs._runCmd = function (c) {
     // after the command, catch the disconnect and reconnect if necessary
     var res = null;
