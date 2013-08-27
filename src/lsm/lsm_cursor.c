@@ -167,6 +167,7 @@ __clsm_open_cursors(
 	WT_SESSION_IMPL *session;
 	WT_TXN *txn;
 	const char *checkpoint, *ckpt_cfg[3];
+	uint64_t saved_gen;
 	u_int i, nchunks, live_chunks;
 	int locked;
 
@@ -205,9 +206,9 @@ __clsm_open_cursors(
 	} else
 		F_SET(clsm, WT_CLSM_OPEN_READ);
 
-retry:
 	WT_RET(__wt_readlock(session, lsm_tree->rwlock));
 	locked = 1;
+retry:
 	F_SET(session, WT_SESSION_NO_CACHE_CHECK);
 
 	/*
@@ -290,15 +291,18 @@ retry:
 		 * Close any cursors we no longer need.
 		 *
 		 * Drop the LSM tree lock while we do this: if the cache is
-		 * full, we may block while closing a cursor.  Then we need
-		 * to get the lock again and retry.
+		 * full, we may block while closing a cursor.  Save the
+		 * generation number and retry if it has changed under us.
 		 */
 		if (clsm->cursors != NULL && live_chunks < clsm->nchunks) {
 			locked = 0;
+			saved_gen = lsm_tree->dsk_gen;
 			WT_ERR(__wt_rwunlock(session, lsm_tree->rwlock));
 			WT_ERR(__clsm_close_cursors(clsm, live_chunks));
-			clsm->nchunks = live_chunks;
-			goto retry;
+			WT_ERR(__wt_readlock(session, lsm_tree->rwlock));
+			locked = 1;
+			if (lsm_tree->dsk_gen != saved_gen)
+				goto retry;
 		} else {
 			/* Detach from our old primary. */
 			clsm->primary_chunk = NULL;
