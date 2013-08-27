@@ -457,6 +457,14 @@ static void processCommandLineOptions(const std::vector<std::string>& argv) {
         }
     }
 
+    if (params.count( "port" ) ) {
+        int port = params["port"].as<int>();
+        if ( port <= 0 || port > 65535 ) {
+            out() << "error: port number must be between 1 and 65535" << endl;
+            ::_exit(EXIT_FAILURE);
+        }
+    }
+
     if ( params.count( "localThreshold" ) ) {
         cmdLine.defaultLocalThresholdMillis = params["localThreshold"].as<int>();
     }
