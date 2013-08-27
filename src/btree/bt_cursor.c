@@ -56,7 +56,6 @@ __cursor_invalid(WT_CURSOR_BTREE *cbt)
 {
 	WT_BTREE *btree;
 	WT_CELL *cell;
-	WT_CELL_UNPACK unpack;
 	WT_COL *cip;
 	WT_INSERT *ins;
 	WT_PAGE *page;
@@ -87,8 +86,7 @@ __cursor_invalid(WT_CURSOR_BTREE *cbt)
 		cip = &page->u.col_var.d[cbt->slot];
 		if ((cell = WT_COL_PTR(page, cip)) == NULL)
 			return (WT_NOTFOUND);
-		__wt_cell_unpack(cell, &unpack);
-		if (unpack.type == WT_CELL_DEL)
+		if (__wt_cell_type(cell) == WT_CELL_DEL)
 			return (1);
 		break;
 	case BTREE_ROW:
