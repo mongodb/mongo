@@ -211,7 +211,7 @@ namespace mongo {
             BSONElement e = options.getField("size");
             if ( e.isNumber() ) {
                 size = e.numberLong();
-                uassert( 10083 , "create collection invalid size spec", size > 0 );
+                uassert( 10083 , "create collection invalid size spec", size >= 0 );
 
                 size += 0xff;
                 size &= 0xffffffffffffff00LL;
