@@ -370,7 +370,7 @@ extern int __wt_tree_walk(WT_SESSION_IMPL *session,
     uint32_t flags);
 extern int __wt_col_modify(WT_SESSION_IMPL *session,
     WT_CURSOR_BTREE *cbt,
-    int op);
+    int is_remove);
 extern int __wt_col_append_serial_func(WT_SESSION_IMPL *session, void *args);
 extern void __wt_col_leaf_obsolete(WT_SESSION_IMPL *session, WT_PAGE *page);
 extern int __wt_col_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt);

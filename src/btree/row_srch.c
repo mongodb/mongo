@@ -18,6 +18,7 @@ __wt_search_insert(WT_SESSION_IMPL *session,
 	WT_BTREE *btree;
 	WT_INSERT **insp, *last_ins, *ret_ins;
 	WT_ITEM insert_key;
+	uint32_t match, skiphigh, skiplow;
 	int cmp, i;
 
 	btree = S2BT(session);
@@ -59,6 +60,7 @@ __wt_search_insert(WT_SESSION_IMPL *session,
 	 * The insert list is a skip list: start at the highest skip level, then
 	 * go as far as possible at each level before stepping down to the next.
 	 */
+	match = skiphigh = skiplow = 0;
 	last_ins = ret_ins = NULL;
 	for (i = WT_SKIP_MAXDEPTH - 1, insp = &inshead->head[i]; i >= 0;) {
 		if ((ret_ins = *insp) == NULL) {
@@ -75,13 +77,16 @@ __wt_search_insert(WT_SESSION_IMPL *session,
 			last_ins = ret_ins;
 			insert_key.data = WT_INSERT_KEY(ret_ins);
 			insert_key.size = WT_INSERT_KEY_SIZE(ret_ins);
-			WT_RET(WT_LEX_CMP(session,
-			    btree->collator, srch_key, &insert_key, cmp));
+			match = WT_MIN(skiplow, skiphigh);
+			WT_RET(WT_LEX_CMP_SKIP(session,
+			    btree->collator,
+			    srch_key, &insert_key, cmp, &match));
 		}
 
-		if (cmp > 0)		/* Keep going at this level */
+		if (cmp > 0) {		/* Keep going at this level */
 			insp = &ret_ins->next[i];
-		else if (cmp == 0)
+			skiplow = match;
+		} else if (cmp == 0)
 			for (; i >= 0; i--) {
 				cbt->next_stack[i] = ret_ins->next[i];
 				cbt->ins_stack[i] = &ret_ins->next[i];
@@ -89,6 +94,7 @@ __wt_search_insert(WT_SESSION_IMPL *session,
 		else {			/* Drop down a level */
 			cbt->next_stack[i] = ret_ins;
 			cbt->ins_stack[i--] = insp--;
+			skiphigh = match;
 		}
 	}
 
@@ -180,10 +186,10 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 				if (cmp == 0)
 					break;
 				if (cmp < 0) {
-					skiplow = match;
+					skiphigh = match;
 					continue;
 				}
-				skiphigh = match;
+				skiplow = match;
 			}
 			base = indx + 1;
 			--limit;
@@ -240,11 +246,11 @@ descend:	WT_ASSERT(session, ref != NULL);
 		if (cmp == 0)
 			break;
 		if (cmp < 0) {
-			skiplow = match;
+			skiphigh = match;
 			continue;
 		}
 
-		skiphigh = match;
+		skiplow = match;
 		base = indx + 1;
 		--limit;
 	}

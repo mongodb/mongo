@@ -308,7 +308,7 @@ retry:	WT_RET(__cursor_func_init(cbt, 1));
 		    (cbt->compare != 0 && __cursor_fix_implicit(btree, cbt))))
 			WT_ERR(WT_DUPLICATE_KEY);
 
-		WT_ERR(__wt_col_modify(session, cbt, 3));
+		WT_ERR(__wt_col_modify(session, cbt, 0));
 		if (F_ISSET(cursor, WT_CURSTD_APPEND))
 			cbt->iface.recno = cbt->recno;
 		break;
@@ -383,7 +383,7 @@ retry:	WT_RET(__cursor_func_init(cbt, 1));
 			 */
 			cbt->recno = cursor->recno;
 		} else
-			ret = __wt_col_modify(session, cbt, 2);
+			ret = __wt_col_modify(session, cbt, 1);
 		break;
 	case BTREE_ROW:
 		/* Remove the record if it exists. */
@@ -459,7 +459,7 @@ retry:	WT_RET(__cursor_func_init(cbt, 1));
 		    (cbt->compare != 0 || __cursor_invalid(cbt)) &&
 		    !__cursor_fix_implicit(btree, cbt))
 			WT_ERR(WT_NOTFOUND);
-		ret = __wt_col_modify(session, cbt, 3);
+		ret = __wt_col_modify(session, cbt, 0);
 		break;
 	case BTREE_ROW:
 		WT_ERR(__wt_row_search(session, cbt));
@@ -592,7 +592,7 @@ __cursor_truncate(WT_SESSION_IMPL *session,
 				if ((ret = __wt_btcur_prev(stop, 1)) != 0)
 					break;
 				stop->compare = 0;	/* Exact match */
-				if ((ret = rmfunc(session, stop, 2)) != 0)
+				if ((ret = rmfunc(session, stop, 1)) != 0)
 					break;
 			}
 		} while (ret == WT_RESTART);
@@ -606,7 +606,7 @@ __cursor_truncate(WT_SESSION_IMPL *session,
 				if ((ret = __wt_btcur_next(start, 1)) != 0)
 					break;
 				start->compare = 0;	/* Exact match */
-				if ((ret = rmfunc(session, start, 2)) != 0)
+				if ((ret = rmfunc(session, start, 1)) != 0)
 					break;
 			}
 		} while (ret == WT_RESTART);
@@ -653,7 +653,7 @@ __cursor_truncate_fix(WT_SESSION_IMPL *session,
 				stop->compare = 0;	/* Exact match */
 				value = (uint8_t *)stop->iface.value.data;
 				if (*value != 0 &&
-				    (ret = rmfunc(session, stop, 2)) != 0)
+				    (ret = rmfunc(session, stop, 1)) != 0)
 					break;
 			}
 		} while (ret == WT_RESTART);
@@ -669,7 +669,7 @@ __cursor_truncate_fix(WT_SESSION_IMPL *session,
 				start->compare = 0;	/* Exact match */
 				value = (uint8_t *)start->iface.value.data;
 				if (*value != 0 &&
-				    (ret = rmfunc(session, start, 2)) != 0)
+				    (ret = rmfunc(session, start, 1)) != 0)
 					break;
 			}
 		} while (ret == WT_RESTART);
