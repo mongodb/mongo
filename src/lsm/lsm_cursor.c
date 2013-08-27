@@ -167,7 +167,6 @@ __clsm_open_cursors(
 	WT_SESSION_IMPL *session;
 	WT_TXN *txn;
 	const char *checkpoint, *ckpt_cfg[3];
-	size_t alloc;
 	u_int i, nchunks, live_chunks;
 	int locked;
 
@@ -219,14 +218,8 @@ retry:
 	if (F_ISSET(clsm, WT_CLSM_MERGE | WT_CLSM_OPEN_READ))
 		live_chunks = 0;
 	else if (F_ISSET(clsm, WT_CLSM_OPEN_SNAPSHOT)) {
-		if (clsm->txnid_max == NULL ||
-		    lsm_tree->nchunks > clsm->nchunks) {
-			alloc = clsm->nchunks * sizeof(uint64_t);
-			WT_ERR(__wt_realloc(session,
-			    (alloc && clsm->txnid_max != NULL) ? &alloc : NULL,
-			    (lsm_tree->nchunks) * sizeof(uint64_t),
-			    &clsm->txnid_max));
-		}
+		WT_ERR(__wt_realloc_def(session,
+		    &clsm->txnid_alloc, lsm_tree->nchunks, &clsm->txnid_max));
 		for (live_chunks = lsm_tree->nchunks - 1;
 		    live_chunks > 0;
 		    live_chunks--) {
@@ -313,22 +306,10 @@ retry:
 		}
 	}
 
-	if (clsm->cursors == NULL || nchunks > clsm->nchunks) {
-		/*
-		 * If we are growing the arrays, we need to keep the pointers
-		 * we are skipping.  Our realloc interface requires a non-NULL
-		 * size parameter in that case (but only if the count is
-		 * non-zero), otherwise the new array will be cleared.
-		 */
-		alloc = clsm->nchunks * sizeof(WT_BLOOM *);
-		WT_ERR(__wt_realloc(session,
-		    (alloc && clsm->blooms != NULL) ? &alloc : NULL,
-		    nchunks * sizeof(WT_BLOOM *), &clsm->blooms));
-		alloc = clsm->nchunks * sizeof(WT_CURSOR *);
-		WT_ERR(__wt_realloc(session,
-		    (alloc && clsm->cursors != NULL) ? &alloc : NULL,
-		    nchunks * sizeof(WT_CURSOR *), &clsm->cursors));
-	}
+	WT_ERR(__wt_realloc_def(session,
+	    &clsm->bloom_alloc, lsm_tree->nchunks, &clsm->blooms));
+	WT_ERR(__wt_realloc_def(session,
+	    &clsm->cursor_alloc, lsm_tree->nchunks, &clsm->cursors));
 
 	clsm->nchunks = nchunks;
 
