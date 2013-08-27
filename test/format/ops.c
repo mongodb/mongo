@@ -832,7 +832,7 @@ table_append(uint64_t keyno)
 				if (p == ep)
 					break;
 			}
-		} else 
+		} else
 			/* Enter the key into the table. */
 			for (p = g.append; p < ep; ++p)
 				if (*p == 0) {
