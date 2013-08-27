@@ -27,9 +27,9 @@ namespace mongo {
 
     CollectionMetadata::~CollectionMetadata() { }
 
-    CollectionMetadata* CollectionMetadata::cloneMinusChunk( const ChunkType& chunk,
-                                                             const ChunkVersion& newShardVersion,
-                                                             string* errMsg ) const {
+    CollectionMetadata* CollectionMetadata::cloneMigrate( const ChunkType& chunk,
+                                                          const ChunkVersion& newShardVersion,
+                                                          string* errMsg ) const {
         // The error message string is optional.
         string dummy;
         if (errMsg == NULL) {

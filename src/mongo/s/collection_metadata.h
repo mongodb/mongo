@@ -53,29 +53,6 @@ namespace mongo {
         //
 
         /**
-         * Returns a new metadata's instance based on 'this's state by removing 'chunk'.
-         * When cloning away the last chunk, 'newShardVersion' must be zero. In any case,
-         * the caller owns the new metadata when the cloning is successful.
-         *
-         * If a new metadata can't be created, returns NULL and fills in 'errMsg', if it was
-         * provided.
-         */
-        CollectionMetadata* cloneMinusChunk( const ChunkType& chunk,
-                                             const ChunkVersion& newShardVersion,
-                                             string* errMsg ) const;
-
-        /**
-         * Returns a new metadata's instance based on 'this's state by adding 'chunk'. The new
-         * metadata can never be zero, though (see cloneMinus). The caller owns the new metadata.
-         *
-         * If a new metadata can't be created, returns NULL and fills in 'errMsg', if it was
-         * provided.
-         */
-        CollectionMetadata* clonePlusChunk( const ChunkType& chunk,
-                                            const ChunkVersion& newShardVersion,
-                                            string* errMsg ) const;
-
-        /**
          * Returns a new metadata's instance based on 'this's state by removing a 'pending' chunk.
          *
          * The shard and collection version of the new metadata are unaffected.  The caller owns the
@@ -96,6 +73,18 @@ namespace mongo {
          * provided.
          */
         CollectionMetadata* clonePlusPending( const ChunkType& pending, string* errMsg ) const;
+
+        /**
+         * Returns a new metadata's instance based on 'this's state by removing 'chunk'.
+         * When cloning away the last chunk, 'newShardVersion' must be zero. In any case,
+         * the caller owns the new metadata when the cloning is successful.
+         *
+         * If a new metadata can't be created, returns NULL and fills in 'errMsg', if it was
+         * provided.
+         */
+        CollectionMetadata* cloneMigrate( const ChunkType& chunk,
+                                          const ChunkVersion& newShardVersion,
+                                          string* errMsg ) const;
 
         /**
          * Returns a new metadata's instance by splitting an existing 'chunk' at the points
@@ -237,6 +226,19 @@ namespace mongo {
          * directly.
          */
         CollectionMetadata();
+
+        /**
+         * TESTING ONLY
+         *
+         * Returns a new metadata's instance based on 'this's state by adding 'chunk'. The new
+         * metadata can never be zero, though (see cloneMinus). The caller owns the new metadata.
+         *
+         * If a new metadata can't be created, returns NULL and fills in 'errMsg', if it was
+         * provided.
+         */
+        CollectionMetadata* clonePlusChunk( const ChunkType& chunk,
+                                            const ChunkVersion& newShardVersion,
+                                            string* errMsg ) const;
 
     private:
         // Effectively, the MetadataLoader is this class's builder. So we open an exception
