@@ -181,6 +181,7 @@ struct __wt_connection_impl {
 	WT_LOG		*log;		/* Logging structure */
 	off_t		log_file_max;	/* Log file max size */
 	const char	*log_path;	/* Logging path format */
+	uint32_t	txn_logsync;	/* Log sync configuration */
 
 					/* Locked: collator list */
 	TAILQ_HEAD(__wt_coll_qh, __wt_named_collator) collqh;

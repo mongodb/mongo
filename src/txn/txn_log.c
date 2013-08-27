@@ -192,8 +192,8 @@ __wt_txn_log_commit(WT_SESSION_IMPL *session, const char *cfg[])
 		/* XXX We can't handle physical truncate yet. */
 	}
 
-	WT_ERR(__wt_log_write(session, logrec, NULL,
-	    F_ISSET(S2C(session), WT_CONN_SYNC) ? WT_LOG_SYNC : 0));
+	WT_ERR(__wt_log_write(session,
+	    logrec, NULL, S2C(session)->txn_logsync));
 
 err:	__wt_logrec_free(session, &logrec);
 	return (ret);

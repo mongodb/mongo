@@ -1006,8 +1006,8 @@ struct __wt_session {
 	 * conflicts.  Transactions with higher values are less likely to
 	 * abort., an integer between -100 and 100; default \c 0.}
 	 * @config{sync, how to sync log records when the transaction commits.,
-	 * a string\, chosen from the following options: \c "full"\, \c
-	 * "flush"\, \c "write"\, \c "none"; default \c full.}
+	 * a string\, chosen from the following options: \c "dsync"\, \c
+	 * "fsync"\, \c "none"; default \c dsync.}
 	 * @configend
 	 * @errors
 	 */
@@ -1369,6 +1369,8 @@ struct __wt_connection {
  * wait between each checkpoint; setting this value configures periodic
  * checkpoints., an integer between 1 and 100000; default \c 0.}
  * @config{ ),,}
+ * @config{checkpoint_sync, flush files to stable storage when closing or
+ * writing checkpoints., a boolean flag; default \c true.}
  * @config{create, create the database if it does not exist., a boolean flag;
  * default \c false.}
  * @config{direct_io, Use \c O_DIRECT to access files.  Options are given as a
@@ -1467,8 +1469,9 @@ struct __wt_connection {
  * statistics and statistics logging., an integer between 1 and 100000; default
  * \c 0.}
  * @config{ ),,}
- * @config{sync, flush files to stable storage when closing or writing
- * checkpoints., a boolean flag; default \c true.}
+ * @config{transaction_log_sync, how to sync log records when the transaction
+ * commits., a string\, chosen from the following options: \c "dsync"\, \c
+ * "fsync"\, \c "none"; default \c dsync.}
  * @config{use_environment_priv, use the \c WIREDTIGER_CONFIG and \c
  * WIREDTIGER_HOME environment variables regardless of whether or not the
  * process is running with special privileges.  See @ref home for more
