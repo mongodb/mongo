@@ -74,4 +74,4 @@ Contributor Agreement
 A patch will only be considered for merging into the upstream codebase after you have signed the
 `contributor agreement`_.
 
-.. _contributor agreement: http://www.10gen.com/contributor
+.. _contributor agreement: http://www.mongodb.com/contributor
