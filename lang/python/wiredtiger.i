@@ -445,73 +445,12 @@ typedef int int_void;
 
 /* Add event handler support. */
 %{
-
-static int writeToPythonStream(const char *streamname, const char *message) {
-	PyObject *sys = NULL;
-	PyObject *se = NULL;
-	PyObject *sys_stderr_write = NULL;
-	PyObject *written = NULL;
-	PyObject *arglist = NULL;
-	int ret = 0;
-	/*PyGILState_STATE gstate;*/
-
-	/* Aquire python Global Interpreter Lock. Otherwise can segfault. */
-        SWIG_PYTHON_THREAD_BEGIN_BLOCK; 
-	/*gstate = PyGILState_Ensure();*/
-
-	sys = PyImport_ImportModule("sys");
-	if (!sys) {
-		ret = 1;
-		goto err;
-	}
-	se = PyObject_GetAttrString(sys, streamname);
-	if (!se) {
-		ret = 1;
-		goto err;
-	}
-	sys_stderr_write = PyObject_GetAttrString(se, "write");
-	if (!sys_stderr_write) {
-		ret = 1;
-		goto err;
-	}
-
-	arglist = Py_BuildValue("(s)", message);
-	if (!arglist) {
-		ret = 1;
-		goto err;
-	}
-	written = PyObject_CallObject(sys_stderr_write, arglist);
-err:	  /* Release python Global Interpreter Lock */
-        SWIG_PYTHON_THREAD_END_BLOCK;
-	/*PyGILState_Release(gstate);*/
-	if (arglist)
-		Py_XDECREF(arglist);
-	if (sys_stderr_write)
-		Py_XDECREF(sys_stderr_write);
-	if (se)
-		Py_XDECREF(se);
-	if (sys)
-		Py_XDECREF(sys);
-	if (written)
-		Py_XDECREF(written);
-	return ret;
-}
-static int pythonErrorCallback(WT_EVENT_HANDLER *handler, int err, const char *message)
-{
-	return writeToPythonStream("stderr", message);
-}
-
-static int pythonMessageCallback(WT_EVENT_HANDLER *handler, const char *message)
-{
-	return writeToPythonStream("stdout", message);
-}
-
 static int pythonCloseCallback(WT_EVENT_HANDLER *handler, WT_SESSION *session, WT_CURSOR *cursor)
 {
 	return 0;
 }
 
-WT_EVENT_HANDLER pyApiEventHandler = {pythonErrorCallback, pythonMessageCallback, NULL, pythonCloseCallback};
+WT_EVENT_HANDLER pyApiEventHandler = {NULL, NULL, NULL, pythonCloseCallback};
 %}
 
 %pythoncode %{
