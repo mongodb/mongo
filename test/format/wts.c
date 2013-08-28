@@ -78,7 +78,7 @@ wts_open(const char *home, int set_api, WT_CONNECTION **connp)
 	 */
 	(void)snprintf(config, sizeof(config),
 	    "create,"
-	    "sync=false,cache_size=%" PRIu32 "MB,"
+	    "checkpoint_sync=false,cache_size=%" PRIu32 "MB,"
 	    "buffer_alignment=512,error_prefix=\"%s\","
 	    "%s,"
 	    "extensions="
