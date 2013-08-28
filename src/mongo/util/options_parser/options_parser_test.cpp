@@ -977,6 +977,62 @@ namespace {
         ASSERT_EQUALS(port, 5);
     }
 
+    TEST(JSONConfigFile, Dotted) {
+        OptionsParserTester parser;
+        moe::Environment environment;
+
+        moe::OptionSection testOpts;
+        testOpts.addOption(moe::OptionDescription("config", "config",
+                                                  moe::String, "Config file to parse"));
+        testOpts.addOption(moe::OptionDescription("dotted.port", "port", moe::Int, "Port"));
+
+        std::vector<std::string> argv;
+        argv.push_back("binaryname");
+        argv.push_back("--config");
+        argv.push_back("config.json");
+        std::map<std::string, std::string> env_map;
+
+        parser.setConfig("config.json", "{ \"dotted.port\" : 5 }");
+
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        moe::Value value;
+        ASSERT_OK(environment.get(moe::Key("dotted.port"), &value));
+        int port;
+        ASSERT_OK(value.get(&port));
+        ASSERT_EQUALS(port, 5);
+    }
+
+    TEST(JSONConfigFile, DottedAndNested) {
+        OptionsParserTester parser;
+        moe::Environment environment;
+
+        moe::OptionSection testOpts;
+        testOpts.addOption(moe::OptionDescription("config", "config",
+                                                  moe::String, "Config file to parse"));
+        testOpts.addOption(moe::OptionDescription("dottednested.var1", "var1", moe::Int, "Var1"));
+        testOpts.addOption(moe::OptionDescription("dottednested.var2", "var2", moe::Int, "Var2"));
+
+        std::vector<std::string> argv;
+        argv.push_back("binaryname");
+        argv.push_back("--config");
+        argv.push_back("config.json");
+        std::map<std::string, std::string> env_map;
+
+        parser.setConfig("config.json",
+                         "{ \"dottednested.var1\" : 5, dottednested : { var2 : 6 } }");
+
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        moe::Value value;
+        ASSERT_OK(environment.get(moe::Key("dottednested.var1"), &value));
+        int var1;
+        ASSERT_OK(value.get(&var1));
+        ASSERT_EQUALS(var1, 5);
+        ASSERT_OK(environment.get(moe::Key("dottednested.var2"), &value));
+        int var2;
+        ASSERT_OK(value.get(&var2));
+        ASSERT_EQUALS(var2, 6);
+    }
+
     TEST(JSONConfigFile, StringVector) {
         OptionsParserTester parser;
         moe::Environment environment;
