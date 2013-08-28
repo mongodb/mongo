@@ -378,10 +378,6 @@ extern int __wt_rec_evict(WT_SESSION_IMPL *session,
     int exclusive);
 extern int __wt_merge_tree(WT_SESSION_IMPL *session, WT_PAGE *top);
 extern int __wt_split_page_inmem(WT_SESSION_IMPL *session, WT_PAGE *page);
-extern int __wt_rec_track_addr(WT_SESSION_IMPL *session,
-    WT_PAGE *page,
-    const uint8_t *addr,
-    uint32_t addr_size);
 extern int __wt_rec_track(WT_SESSION_IMPL *session,
     WT_PAGE *page,
     const uint8_t *addr,

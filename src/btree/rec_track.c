@@ -6,127 +6,6 @@
  */
 
 #include "wt_internal.h"
-
-/*
- * In-memory pages track certain blocks and overflow items.  We use different
- * tracking APIs and memory for blocks vs. overflow items for a few reasons
- * (even though there's some overlap, such as overflow items have associated
- * blocks).  The reasons are: pages without overflow items usually only have
- * 1 or 2 blocks they're tracking (for example, the replacement block created
- * by the last reconciliation); blocks not associated with overflow items are
- * simply discarded after reconciliation succeeds, we don't ever search and/or
- * re-use them, no matter how many times the page is reconciled; finally, block
- * addresses are a small number of bytes, typically less than 10, we don't need
- * a lot of structure to work with them.
- */
-
-/*
- * __rec_track_addr_extend --
- *	Extend the page's list of tracked addresses.
- */
-static int
-__rec_track_addr_extend(WT_SESSION_IMPL *session, WT_PAGE_MODIFY *mod)
-{
-	size_t allocate, offset;
-
-	/*
-	 * A block address in the system is normally less than 10 bytes, and
-	 * a typical page only remembers one.  Be conservative at first, then
-	 * double if the demand increases.
-	 */
-	allocate = mod->track_addr_len == 0 ? 32 : mod->track_addr_len * 2;
-
-	offset = WT_PTRDIFF(mod->track_addr_end, mod->track_addr);
-	WT_RET(__wt_realloc(
-	    session, &mod->track_addr_len, allocate, &mod->track_addr));
-
-	mod->track_addr_end = mod->track_addr + offset;
-	return (0);
-}
-
-/*
- * __rec_track_addr_init --
- *	Initialize the page's list of tracked addresses.
- */
-static void
-__rec_track_addr_init(WT_SESSION_IMPL *session, WT_PAGE_MODIFY *mod)
-{
-	(void)session;				/* Unused */
-
-	mod->track_addr_end = mod->track_addr;
-}
-
-/*
- * __rec_track_addr_wrapup_err --
- *	Resolve the page's list of tracked addresses after an error occurs.
- */
-static void
-__rec_track_addr_wrapup_err(WT_SESSION_IMPL *session, WT_PAGE_MODIFY *mod)
-{
-	__rec_track_addr_init(session, mod);
-}
-
-/*
- * __rec_track_addr_wrapup --
- *	Resolve the page's list of tracked addresses after the page is written.
- */
-static int
-__rec_track_addr_wrapup(WT_SESSION_IMPL *session, WT_PAGE_MODIFY *mod)
-{
-	WT_BM *bm;
-	uint8_t *p;
-
-	bm = S2BT(session)->bm;
-
-	for (p = mod->track_addr; p < mod->track_addr_end; p += p[0] + 1)
-		WT_RET(bm->free(bm, session, p + 1, (uint32_t)p[0]));
-	return (0);
-}
-
-/*
- * __rec_track_addr_discard --
- *	Discard the page's list of tracked addresses.
- */
-static void
-__rec_track_addr_discard(WT_SESSION_IMPL *session, WT_PAGE_MODIFY *mod)
-{
-	__wt_free(session, mod->track_addr);
-}
-
-/*
- * __wt_rec_track_addr --
- *	Add a new address to the page's list of tracked addresses.
- */
-int
-__wt_rec_track_addr(WT_SESSION_IMPL *session,
-    WT_PAGE *page, const uint8_t *addr, uint32_t addr_size)
-{
-	WT_PAGE_MODIFY *mod;
-	size_t offset;
-
-	mod = page->modify;
-
-	/*
-	 * The address tracking memory is a list of 1B lengths, followed by
-	 * length bytes of address.
-	 */
-	WT_ASSERT(session, addr_size <= UINT8_MAX);
-
-	/* Grow until the item fits. */
-	for (;;) {
-		offset = WT_PTRDIFF(mod->track_addr_end, mod->track_addr);
-		if (offset + 1 + addr_size < mod->track_addr_len)
-			break;
-		WT_RET(__rec_track_addr_extend(session, mod));
-	}
-	mod->track_addr_end[0] = (uint8_t)addr_size;
-	memcpy(mod->track_addr_end + 1, addr, addr_size);
-	mod->track_addr_end += 1 + addr_size;
-	return (0);
-}
-
-/* NOW THE OVERFLOW STUFF */
-
 /*
  * An in-memory page has a list of tracked blocks and overflow items we use for
  * three different tasks.  First, each tracked object has flag information set:
@@ -445,8 +324,6 @@ __wt_rec_track_ovfl_reuse(
 int
 __wt_rec_track_init(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
-	__rec_track_addr_init(session, page->modify);	/* Addresses */
-
 	if (WT_VERBOSE_ISSET(session, reconcile))
 		WT_RET(__track_dump(session, page, "reconcile init"));
 	return (0);
@@ -465,9 +342,6 @@ __wt_rec_track_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 	uint32_t i;
 
 	bm = S2BT(session)->bm;
-	mod = page->modify;
-
-	__rec_track_addr_wrapup(session, mod);		/* Addresses */
 
 	if (WT_VERBOSE_ISSET(session, reconcile))
 		WT_RET(__track_dump(session, page, "reconcile wrapup"));
@@ -476,6 +350,7 @@ __wt_rec_track_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * After the successful reconciliation of a page, some of the objects
 	 * we're tracking are no longer needed, free what we can free.
 	 */
+	mod = page->modify;
 	for (track = mod->track, i = 0; i < mod->track_entries; ++track, ++i) {
 		/* Ignore empty slots */
 		if (!F_ISSET(track, WT_TRK_OBJECT))
@@ -550,15 +425,13 @@ __wt_rec_track_wrapup_err(WT_SESSION_IMPL *session, WT_PAGE *page)
 	uint32_t i;
 
 	bm = S2BT(session)->bm;
-	mod = page->modify;
-
-	__rec_track_addr_wrapup_err(session, mod);	/* Addresses */
 
 	/*
 	 * After a failed reconciliation of a page, discard entries added in the
 	 * current reconciliation, their information is incorrect, additionally,
 	 * clear the in-use flag in preparation for the next reconciliation.
 	 */
+	mod = page->modify;
 	for (track = mod->track, i = 0; i < mod->track_entries; ++track, ++i)
 		if (F_ISSET(track, WT_TRK_JUST_ADDED)) {
 			/*
@@ -585,15 +458,11 @@ __wt_rec_track_wrapup_err(WT_SESSION_IMPL *session, WT_PAGE *page)
 void
 __wt_rec_track_discard(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
-	WT_PAGE_MODIFY *mod;
 	WT_PAGE_TRACK *track;
 	uint32_t i;
 
-	mod = page->modify;
-
-	__rec_track_addr_discard(session, mod);		/* Addresses */
-
-	for (track = mod->track, i = 0; i < mod->track_entries; ++track, ++i)
+	for (track = page->modify->track,
+	    i = 0; i < page->modify->track_entries; ++track, ++i)
 		__wt_free(session, track->addr.addr);
 }
 

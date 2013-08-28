@@ -3744,12 +3744,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		if (ref->addr != NULL) {
 			/*
 			 * Free the page and clear the address (so we don't free
-			 * it twice).  Logically, this is the same as adding the
-			 * address to the reconciliation tracking information
-			 * and freeing it when reconciliation ends as part of
-			 * cleaning up the track information, but that is going
-			 * to happen right at the end of this switch statement,
-			 * might as well save the work.
+			 * it twice).
 			 */
 			__wt_get_addr(page->parent, ref, &addr, &size);
 			WT_RET(bm->free(bm, session, addr, size));
@@ -3771,7 +3766,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		 * are checkpoints, and must be explicitly dropped.
 		 */
 		if (!WT_PAGE_IS_ROOT(page))
-			WT_RET(__wt_rec_track_addr(session, page,
+			WT_RET(bm->free(bm, session,
 			    mod->u.replace.addr, mod->u.replace.size));
 
 		/* Discard the replacement page's address. */
