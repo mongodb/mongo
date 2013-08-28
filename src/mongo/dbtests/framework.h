@@ -25,6 +25,6 @@
 
 namespace mongo {
     namespace dbtests {
-        int runDbTests( int argc, char ** argv, string default_dbpath );
+        int runDbTests(int argc, char ** argv);
     }  // dbtests
 }  // namespace mongo

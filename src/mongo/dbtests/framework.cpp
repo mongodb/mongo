@@ -26,34 +26,41 @@
 #endif
 
 #include <boost/filesystem/operations.hpp>
-#include <boost/program_options.hpp>
 
+#include "mongo/base/init.h"
+#include "mongo/base/status.h"
 #include "mongo/db/client.h"
 #include "mongo/db/cmdline.h"
 #include "mongo/db/dur.h"
-#include "mongo/db/instance.h"
 #include "mongo/db/ops/update.h"
 #include "mongo/db/query/new_find.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/dbtests/dbtests.h"
 #include "mongo/util/background.h"
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/file_allocator.h"
+#include "mongo/util/options_parser/environment.h"
+#include "mongo/util/options_parser/option_section.h"
+#include "mongo/util/options_parser/options_parser.h"
 #include "mongo/util/version.h"
 
-namespace po = boost::program_options;
+namespace moe = mongo::optionenvironment;
 
 namespace mongo {
 
     CmdLine cmdLine;
+    moe::OptionSection options;
+    moe::Environment params;
 
     namespace dbtests {
 
         mutex globalCurrentTestNameMutex("globalCurrentTestNameMutex");
         std::string globalCurrentTestName;
 
-        void show_help_text(const char* name, po::options_description options) {
-            cout << "usage: " << name << " [options] [suite]..." << endl
-                 << options << "suite: run the specified test suite(s) only" << endl;
+        std::string get_help_string(const StringData& name, const moe::OptionSection& options) {
+            StringBuilder sb;
+            sb << "usage: " << name << " [options] [suite]...\n"
+               << options.helpString() << "suite: run the specified test suite(s) only\n";
+            return sb.str();
         }
 
         class TestWatchDog : public BackgroundJob {
@@ -96,62 +103,126 @@ namespace mongo {
 
         unsigned perfHist = 1;
 
-        int runDbTests( int argc , char** argv , string default_dbpath ) {
+        Status addTestFrameworkOptions(moe::OptionSection* options) {
+
+            typedef moe::OptionDescription OD;
+            typedef moe::PositionalOptionDescription POD;
+
+            Status ret = options->addOption(OD("help", "help,h", moe::Switch,
+                        "show this usage information", true));
+            if (!ret.isOK()) {
+                return ret;
+            }
+            ret = options->addOption(OD("dbpath", "dbpath", moe::String,
+                        "db data path for this test run. NOTE: the contents of this directory will "
+                        "be overwritten if it already exists", true,
+                        moe::Value(default_test_dbpath)));
+            if (!ret.isOK()) {
+                return ret;
+            }
+            ret = options->addOption(OD("debug", "debug", moe::Switch,
+                        "run tests with verbose output", true));
+            if (!ret.isOK()) {
+                return ret;
+            }
+            ret = options->addOption(OD("list", "list,l", moe::Switch, "list available test suites",
+                        true));
+            if (!ret.isOK()) {
+                return ret;
+            }
+            ret = options->addOption(OD("bigfiles", "bigfiles", moe::Switch,
+                        "use big datafiles instead of smallfiles which is the default", true));
+            if (!ret.isOK()) {
+                return ret;
+            }
+            ret = options->addOption(OD("filter", "filter,f", moe::String,
+                        "string substring filter on test name" , true));
+            if (!ret.isOK()) {
+                return ret;
+            }
+            ret = options->addOption(OD("verbose", "verbose,v", moe::Switch, "verbose", true));
+            if (!ret.isOK()) {
+                return ret;
+            }
+            ret = options->addOption(OD("useNewQueryFramework", "useNewQueryFramework", moe::Switch,
+                        "use the new query framework", true));
+            if (!ret.isOK()) {
+                return ret;
+            }
+            ret = options->addOption(OD("dur", "dur", moe::Switch,
+                        "enable journaling (currently the default)", true));
+            if (!ret.isOK()) {
+                return ret;
+            }
+            ret = options->addOption(OD("nodur", "nodur", moe::Switch, "disable journaling", true));
+            if (!ret.isOK()) {
+                return ret;
+            }
+            ret = options->addOption(OD("seed", "seed", moe::UnsignedLongLong, "random number seed",
+                        true));
+            if (!ret.isOK()) {
+                return ret;
+            }
+            ret = options->addOption(OD("runs", "runs", moe::Int,
+                        "number of times to run each test", true));
+            if (!ret.isOK()) {
+                return ret;
+            }
+            ret = options->addOption(OD("perfHist", "perfHist", moe::Unsigned,
+                        "number of back runs of perf stats to display", true));
+            if (!ret.isOK()) {
+                return ret;
+            }
+
+            ret = options->addOption(OD("suites", "suites", moe::StringVector, "test suites to run",
+                        false));
+            if (!ret.isOK()) {
+                return ret;
+            }
+            ret = options->addOption(OD("nopreallocj", "nopreallocj", moe::Switch,
+                        "disable journal prealloc", false));
+            if (!ret.isOK()) {
+                return ret;
+            }
+
+            ret = options->addPositionalOption(POD("suites", moe::String, -1));
+            if (!ret.isOK()) {
+                return ret;
+            }
+
+            return Status::OK();
+        }
+
+MONGO_INITIALIZER_GENERAL(ParseStartupConfiguration,
+                            ("GlobalLogManager"),
+                            ("default", "completedStartupConfig"))(InitializerContext* context) {
+
+    options = moe::OptionSection("options");
+    moe::OptionsParser parser;
+
+    Status retStatus = addTestFrameworkOptions(&options);
+    if (!retStatus.isOK()) {
+        return retStatus;
+    }
+
+    retStatus = parser.run(options, context->args(), context->env(), &params);
+    if (!retStatus.isOK()) {
+        StringBuilder sb;
+        sb << "Error parsing options: " << retStatus.toString() << "\n";
+        sb << get_help_string(context->args()[0], options);
+        return Status(ErrorCodes::FailedToParse, sb.str());
+    }
+
+    return Status::OK();
+}
+
+        int runDbTests(int argc, char** argv) {
             unsigned long long seed = time( 0 );
             int runsPerTest = 1;
             string dbpathSpec;
 
-            po::options_description shell_options("options");
-            po::options_description hidden_options("Hidden options");
-            po::options_description cmdline_options("Command line options");
-            po::positional_options_description positional_options;
-
-            shell_options.add_options()
-            ("help,h", "show this usage information")
-            ("dbpath", po::value<string>()->default_value(default_dbpath),
-             "db data path for this test run. NOTE: the contents of this "
-             "directory will be overwritten if it already exists")
-            ("debug", "run tests with verbose output")
-            ("list,l", "list available test suites")
-            ("bigfiles", "use big datafiles instead of smallfiles which is the default")
-            ("filter,f" , po::value<string>() , "string substring filter on test name" )
-            ("verbose,v", "verbose")
-            ("useNewQueryFramework", "use the new query framework")
-            ("dur", "enable journaling (currently the default)")
-            ("nodur", "disable journaling")
-            ("seed", po::value<unsigned long long>(), "random number seed")
-            ("runs", po::value<int>(), "number of times to run each test")
-            ("perfHist", po::value<unsigned>(), "number of back runs of perf stats to display")
-            ;
-
-            hidden_options.add_options()
-            ("suites", po::value< vector<string> >(), "test suites to run")
-            ("nopreallocj", "disable journal prealloc")
-            ;
-
-            positional_options.add("suites", -1);
-
-            cmdline_options.add(shell_options).add(hidden_options);
-
-            po::variables_map params;
-            int command_line_style = (((po::command_line_style::unix_style ^
-                                        po::command_line_style::allow_guessing) |
-                                       po::command_line_style::allow_long_disguise) ^
-                                      po::command_line_style::allow_sticky);
-
-            try {
-                po::store(po::command_line_parser(argc, argv).options(cmdline_options).
-                          positional(positional_options).
-                          style(command_line_style).run(), params);
-            }
-            catch (po::error &e) {
-                cout << "ERROR: " << e.what() << endl << endl;
-                show_help_text(argv[0], shell_options);
-                return EXIT_BADOPTIONS;
-            }
-
             if (params.count("help")) {
-                show_help_text(argv[0], shell_options);
+                std::cout << get_help_string(argv[0], options) << std::endl;
                 return EXIT_CLEAN;
             }
 
@@ -207,8 +278,9 @@ namespace mongo {
             /* remove the contents of the test directory if it exists. */
             if (boost::filesystem::exists(p)) {
                 if (!boost::filesystem::is_directory(p)) {
-                    cout << "ERROR: path \"" << p.string() << "\" is not a directory" << endl << endl;
-                    show_help_text(argv[0], shell_options);
+                    std::cerr << "ERROR: path \"" << p.string() << "\" is not a directory"
+                              << std::endl;
+                    std::cerr << get_help_string(argv[0], options) << std::endl;
                     return EXIT_BADOPTIONS;
                 }
                 boost::filesystem::directory_iterator end_iter;

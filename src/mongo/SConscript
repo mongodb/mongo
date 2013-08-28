@@ -826,7 +826,10 @@ env.Library("clientandshell", ["client/clientAndShell.cpp"],
 env.Library("allclient", "client/clientOnly.cpp", LIBDEPS=["clientandshell"])
 
 # dbtests test binary
-env.StaticLibrary('testframework', ['dbtests/framework.cpp'], LIBDEPS=['unittest/unittest'])
+env.StaticLibrary('testframework', ['dbtests/framework.cpp'],
+                  LIBDEPS=['unittest/unittest',
+                  '$BUILD_DIR/mongo/util/options_parser/options_parser',
+                  ])
 
 env.StaticLibrary('mocklib', [
         'dbtests/mock/mock_conn_registry.cpp',
