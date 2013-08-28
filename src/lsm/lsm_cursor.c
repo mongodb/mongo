@@ -241,12 +241,16 @@ retry:
 			WT_ERR(__wt_realloc_def(session,
 			    &clsm->txnid_alloc, nchunks,
 			    &clsm->txnid_max));
+			/*
+			 * Keep going until all updates in the next
+			 * chunk are globally visible.  Copy the maximum
+			 * transaction IDs into the cursor as we go.
+			 */
 			for (ngood = nchunks - 1; ngood > 0; ngood--) {
-				chunk = lsm_tree->chunk[ngood];
-				/* Copy the maximum transaction ID. */
-				clsm->txnid_max[ngood] =
+				chunk = lsm_tree->chunk[ngood - 1];
+				clsm->txnid_max[ngood - 1] =
 				    chunk->txnid_max;
-				if (!__wt_txn_visible_all(
+				if (__wt_txn_visible_all(
 				    session, chunk->txnid_max))
 					break;
 			}
