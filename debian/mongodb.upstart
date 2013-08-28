@@ -1,19 +1,32 @@
-# Ubuntu upstart file at /etc/init/mongodb.conf
+# mongodb - mongodb server deamon
+#
+# MongoDB (from "humongous") is a scalable, high-performance, open source NoSQL database written in C++
+
+start on (filesystem and net-device-up)
+stop on runlevel [!2345]
+
+# only available since upstart 1.4 (Ubuntu 12.04 LTS)
+setuid mongodb
+
+pre-start script
+    mkdir -p /var/lib/mongodb/
+    mkdir -p /var/log/mongodb/
+    ENABLE_MONGODB="yes"
+    if [ -r /etc/default/mongodb ]; then . /etc/default/mongodb; fi
+    if [ ! "$ENABLE_MONGODB" = "yes" ]; then stop; exit 0; fi
+end script
+
+respawn
+respawn limit 5 30
 
 limit nofile 20000 20000
 
 kill timeout 300 # wait 300s between SIGTERM and SIGKILL.
 
-pre-start script
-    mkdir -p /var/lib/mongodb/
-    mkdir -p /var/log/mongodb/
-end script
-
-start on runlevel [2345]
-stop on runlevel [06]
-
 script
-  ENABLE_MONGODB="yes"
-  if [ -f /etc/default/mongodb ]; then . /etc/default/mongodb; fi
-  if [ "x$ENABLE_MONGODB" = "xyes" ]; then exec start-stop-daemon --start --quiet --chuid mongodb --exec  /usr/bin/mongod -- --config /etc/mongodb.conf; fi
+  if [ "$(which numactl)" ]; then
+    exec numactl --interleave=all mongod --config /etc/mongodb.conf
+  else
+    exec mongod --config /etc/mongodb.conf
+  fi
 end script
