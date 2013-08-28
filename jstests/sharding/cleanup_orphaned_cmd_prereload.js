@@ -45,7 +45,10 @@ assert( !st.shard1.getDB( "admin" )
 
 jsTest.log( "Moving some chunks back to shard0 after empty..." );
 
-assert( admin.runCommand({ moveChunk : coll + "", find : { _id : -1 }, to : shards[1]._id }).ok );
+assert(admin.runCommand({moveChunk : coll + "",
+                         find : { _id : -1 },
+                         to : shards[1]._id,
+                         _waitForDelete : true }).ok);
 
 var metadata = st.shard0.getDB( "admin" )
                    .runCommand({ getShardVersion : coll + "", fullMetadata : true }).metadata;
