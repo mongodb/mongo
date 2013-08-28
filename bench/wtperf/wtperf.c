@@ -550,6 +550,12 @@ stat_worker(void *arg)
 		/* Report data source stats. */
 		if ((ret = session->open_cursor(session, stat_uri,
 		    NULL, "statistics_fast", &cursor)) != 0) {
+			/*
+			 * It is possible the data source is exclusively
+			 * locked at this moment.  Ignore it and try again.
+			 */
+			if (ret == EBUSY)
+				continue;
 			lprintf(cfg, ret, 0,
 			    "open_cursor failed for data source statistics");
 			goto err;

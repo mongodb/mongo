@@ -164,7 +164,7 @@ __clsm_open_cursors(
 	WT_TXN *txn;
 	const char *checkpoint, *ckpt_cfg[3];
 	uint64_t saved_gen;
-	u_int i, nchunks, ngood, nsnapshot;
+	u_int i, nchunks, ngood;
 	int locked;
 
 	session = (WT_SESSION_IMPL *)clsm->iface.session;
@@ -241,14 +241,16 @@ retry:
 			WT_ERR(__wt_realloc_def(session,
 			    &clsm->txnid_alloc, nchunks,
 			    &clsm->txnid_max));
-			for (ngood = nchunks - 1, nsnapshot = 1;
-			    ngood > 0;
-			    ngood--, nsnapshot++) {
-				chunk = lsm_tree->chunk[ngood];
-				/* Copy the maximum transaction ID. */
-				clsm->txnid_max[ngood] =
+			/*
+			 * Keep going until all updates in the next
+			 * chunk are globally visible.  Copy the maximum
+			 * transaction IDs into the cursor as we go.
+			 */
+			for (ngood = nchunks - 1; ngood > 0; ngood--) {
+				chunk = lsm_tree->chunk[ngood - 1];
+				clsm->txnid_max[ngood - 1] =
 				    chunk->txnid_max;
-				if (!__wt_txn_visible_all(
+				if (__wt_txn_visible_all(
 				    session, chunk->txnid_max))
 					break;
 			}

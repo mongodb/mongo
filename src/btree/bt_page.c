@@ -351,6 +351,33 @@ __inmem_col_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 }
 
 /*
+ * __inmem_col_var_repeats --
+ *	Count the number of repeat entries on the page.
+ */
+static int
+__inmem_col_var_repeats(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t *np)
+{
+	WT_BTREE *btree;
+	WT_CELL *cell;
+	WT_CELL_UNPACK *unpack, _unpack;
+	WT_PAGE_HEADER *dsk;
+	uint32_t i;
+
+	btree = S2BT(session);
+	dsk = page->dsk;
+	unpack = &_unpack;
+
+	/* Walk the page, counting entries for the repeats array. */
+	*np = 0;
+	WT_CELL_FOREACH(btree, dsk, cell, unpack, i) {
+		__wt_cell_unpack(cell, unpack);
+		if (__wt_cell_rle(unpack) > 1)
+			++*np;
+	}
+	return (0);
+}
+
+/*
  * __inmem_col_var --
  *	Build in-memory index for variable-length, data-only leaf pages in
  *	column-store trees.
@@ -366,13 +393,14 @@ __inmem_col_var(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *sizep)
 	WT_PAGE_HEADER *dsk;
 	uint64_t recno, rle;
 	size_t bytes_allocated;
-	uint32_t i, indx, nrepeats;
+	uint32_t i, indx, n, repeat_off;
 
 	btree = S2BT(session);
 	dsk = page->dsk;
 	unpack = &_unpack;
 	repeats = NULL;
-	bytes_allocated = nrepeats = 0;
+	repeat_off = 0;
+	bytes_allocated = 0;
 	recno = page->u.col_var.recno;
 
 	/*
@@ -388,23 +416,30 @@ __inmem_col_var(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *sizep)
 
 		/*
 		 * Add records with repeat counts greater than 1 to an array we
-		 * use for fast lookups.
+		 * use for fast lookups.  The first entry we find needing the
+		 * repeats array triggers a re-walk from the start of the page
+		 * to determine the size of the array.
 		 */
 		rle = __wt_cell_rle(unpack);
 		if (rle > 1) {
-			WT_RET(__wt_realloc_def(session, &bytes_allocated,
-			    nrepeats + 1, &repeats));
-			repeats[nrepeats].indx = indx;
-			repeats[nrepeats].recno = recno;
-			repeats[nrepeats++].rle = rle;
+			if (repeats == NULL) {
+				WT_RET(
+				    __inmem_col_var_repeats(session, page, &n));
+				WT_RET(__wt_realloc_def(session,
+				    &bytes_allocated, n + 1, &repeats));
+
+				page->u.col_var.repeats = repeats;
+				page->u.col_var.nrepeats = n;
+				*sizep += bytes_allocated;
+			}
+			repeats[repeat_off].indx = indx;
+			repeats[repeat_off].recno = recno;
+			repeats[repeat_off++].rle = rle;
 		}
 		indx++;
 		recno += rle;
 	}
-	*sizep += bytes_allocated;
 
-	page->u.col_var.repeats = repeats;
-	page->u.col_var.nrepeats = nrepeats;
 	return (0);
 }
 
