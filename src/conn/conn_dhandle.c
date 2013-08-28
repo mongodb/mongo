@@ -351,7 +351,7 @@ __conn_dhandle_sweep(WT_SESSION_IMPL *session)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DATA_HANDLE *dhandle, *dhandle_next, *save_dhandle;
-	TAILQ_HEAD(__wt_dhandle_qh, __wt_data_handle) sweepqh;
+	TAILQ_HEAD(__wt_dhtmp_qh, __wt_data_handle) sweepqh;
 	WT_DECL_RET;
 
 	conn = S2C(session);

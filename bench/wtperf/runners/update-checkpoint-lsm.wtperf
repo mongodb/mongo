@@ -1,0 +1,13 @@
+# wtperf options file: lsm with inserts/updates and checkpointing, in memory
+conn_config="cache_size=1G"
+table_config="lsm_chunk_size=20MB,type=lsm"
+icount=5000000
+report_interval=5
+checkpoint_interval=10
+stat_interval=4
+run_time=120
+populate_threads=1
+read_threads=2
+insert_threads=2
+update_threads=2
+verbose=1

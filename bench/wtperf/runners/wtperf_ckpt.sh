@@ -11,19 +11,30 @@ RUNTIME=900
 REUSE=0
 VERBOSE=0
 WORKLOAD=0 # skip the populate phase.
-PERF_BASE="M"
+PERF_BASE="-M"
+OPTFILE=''
+DEBUG=
+GDB=${GDB:-gdb}
 
-USAGE="Usage: `basename $0` [-hRWsv] [-b binary dir] [-r root dir]"
+USAGE="Usage: `basename $0` [-hdRWsv] [-b binary dir] [-r root dir] [-O optfile]"
 
 # Parse command line options.
-while getopts b:hRWr:sv OPT; do
+while getopts b:dhO:RWr:sv OPT; do
     case "$OPT" in
         b)
             BIN_DIR=$OPTARG
             ;;
+        d)
+            export TERM=dtterm
+            DEBUG="$GDB --args"
+            ;;
         h)
             echo $USAGE
             exit 0
+            ;;
+        O)
+            OPTFILE=-O$OPTARG
+            PERF_BASE=""
             ;;
         R)
             REUSE=1
@@ -33,10 +44,10 @@ while getopts b:hRWr:sv OPT; do
             ;;
         s)
             RUNTIME=20
-	    PERF_BASE="S"
+	    PERF_BASE="-S"
             ;;
         v)
-            VERBOSE=1
+            VERBOSE=0
             ;;
         W)
             WORKLOAD=1
@@ -59,13 +70,13 @@ fi
 
 DB_HOME="$ROOT_DIR/WT_TEST"
 OUT_DIR="$ROOT_DIR/results"
-SHARED_OPTS="-${PERF_BASE} -R 1 -U 1 -t 1 -v 1 -h ${DB_HOME} -u table:test"
-CREATE_OPTS="$SHARED_OPTS -r 0"
-RUN_OPTS="$SHARED_OPTS -r $RUNTIME"
+SHARED_OPTS="${OPTFILE} ${PERF_BASE} -o read_threads=1,update_threads=1,report_interval=1,uri=\"table:test\" -o verbose=1 -h ${DB_HOME}"
+CREATE_OPTS="$SHARED_OPTS -o run_time=0"
+RUN_OPTS="$SHARED_OPTS -o run_time=$RUNTIME"
 if [ $WORKLOAD -eq 0 ]; then
-	RUN_OPTS="$RUN_OPTS -e"
+	RUN_OPTS="$RUN_OPTS -o create=false"
 else
-	RUN_OPTS="$RUN_OPTS -i 0"
+	RUN_OPTS="$RUN_OPTS -o icount=0"
 fi
 
 if [ $REUSE -eq 0 ]; then
@@ -73,7 +84,7 @@ if [ $REUSE -eq 0 ]; then
 		echo "Creating database and archiving it for reuse."
 	fi
 	rm -rf $DB_HOME && mkdir $DB_HOME
-	$WTPERF $CREATE_OPTS
+	$DEBUG $WTPERF $CREATE_OPTS || exit 1
 
 	# Save the database so that it can be re-used by all runs.
 	# I'd rather not hard code WT_TEST, but need to get the path right.
@@ -85,29 +96,33 @@ rm -rf $OUT_DIR && mkdir $OUT_DIR
 
 # Run the benchmarks..
 # for ckpt in "" "-c 120"; do
-for ckpt in "-c 120"; do
+for ckpt in "checkpoint_interval=120"; do
 	# for opts in "" "-C eviction_dirty_target=20"; do
 	for opts in ""; do
 		if [ $VERBOSE -ne 0 ]; then
 			echo "Doing a run with:"
 			echo "\t$WTPERF $RUN_OPTS $ckpt $opts"
 		fi
-		res_name="run${ckpt}${opts}"
-		res_name=`echo $res_name | tr '[:upper:][=\- ]' '[:lower:]_'`
+		res_name="run_${ckpt},${opts}"
+		res_name=`echo $res_name | tr '[:upper:][=\- ,]' '[:lower:]_'`
 		if [ $WORKLOAD -eq 0 ]; then
 			rm -rf $DB_HOME && tar zxf $ROOT_DIR/WT_TEST.tgz -C $ROOT_DIR
 		else
 			rm -rf $DB_HOME && mkdir $DB_HOME
 		fi
-		$WTPERF $RUN_OPTS $ckpt $opts &
-		pid=$!
-		t=0
-		while kill -0 $pid 2> /dev/null; do
-			echo "Time $t"
-			pmp $pid
-			sleep 1
-			(( t++ ))
-		done > $OUT_DIR/${res_name}.trace
+		if [ "$DEBUG" = '' ]; then
+			$WTPERF $RUN_OPTS -o "$ckpt" -o "$opts" &
+			pid=$!
+			t=0
+			while kill -0 $pid 2> /dev/null; do
+				echo "Time $t"
+				pmp $pid
+				sleep 1
+				(( t++ ))
+			done > $OUT_DIR/${res_name}.trace
+		else
+			$DEBUG $WTPERF $RUN_OPTS $ckpt $opts
+		fi
 		cp $DB_HOME/test.stat "$OUT_DIR/${res_name}.res"
 	done
 done

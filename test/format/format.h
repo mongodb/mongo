@@ -107,7 +107,16 @@ typedef struct {
 	int threads_finished;			/* Operations completed */
 
 	pthread_rwlock_t backup_lock;		/* Hot backup running */
-	pthread_rwlock_t table_extend_lock;	/* Updating last record */
+
+	/*
+	 * We have a list of records that are appended, but not yet "resolved",
+	 * that is, we haven't yet incremented the g.rows value to reflect the
+	 * new records.
+	 */
+	uint64_t *append;			/* Appended records */
+	size_t    append_max;			/* Maximum unresolved records */
+	size_t	  append_cnt;			/* Current unresolved records */
+	pthread_rwlock_t append_lock;		/* Single-thread resolution */
 
 	char *uri;				/* Object name */
 
@@ -158,13 +167,6 @@ typedef struct {
 
 	uint64_t key_cnt;			/* Keys loaded so far */
 	uint64_t rows;				/* Total rows */
-
-	/*
-	 * We don't want to get to far past the end of the original bulk
-	 * load, we can run out of space to track the added records.
-	 */
-#define	MAX_EXTEND	(g.c_threads * 3)
-	uint32_t extend;			/* Total extended slots */
 
 	uint16_t key_rand_len[1031];		/* Key lengths */
 } GLOBAL;

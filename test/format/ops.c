@@ -37,6 +37,7 @@ static void  print_item(const char *, WT_ITEM *);
 static int   read_row(WT_CURSOR *, WT_ITEM *, uint64_t);
 static int   row_remove(WT_CURSOR *, WT_ITEM *, uint64_t, int *);
 static int   row_update(WT_CURSOR *, WT_ITEM *, WT_ITEM *, uint64_t, int);
+static void  table_append_init(void);
 
 /*
  * wts_ops --
@@ -53,6 +54,9 @@ wts_ops(void)
 	uint32_t i;
 
 	conn = g.wts_conn;
+
+	/* Initialize the table extension code. */
+	table_append_init();
 
 	/* Open a session. */
 	if (g.logging != 0) {
@@ -309,8 +313,7 @@ ops(void *arg)
 					goto deadlock;
 				break;
 			}
-		} else if (g.extend < MAX_EXTEND &&
-		    op < g.c_delete_pct + g.c_insert_pct) {
+		} else if (op < g.c_delete_pct + g.c_insert_pct) {
 			++tinfo->insert;
 			switch (g.type) {
 			case ROW:
@@ -319,6 +322,14 @@ ops(void *arg)
 				break;
 			case FIX:
 			case VAR:
+				/*
+				 * We can only append so many new records, if
+				 * we've reached that limit, update a record
+				 * instead of doing an insert.
+				 */
+				if (g.append_cnt >= g.append_max)
+					goto skip_insert;
+
 				/*
 				 * Reset the standard cursor so it doesn't keep
 				 * pages pinned.
@@ -341,7 +352,7 @@ ops(void *arg)
 				break;
 			case FIX:
 			case VAR:
-				if (col_update(cursor, &key, &value, keyno))
+skip_insert:			if (col_update(cursor, &key, &value, keyno))
 					goto deadlock;
 				break;
 			}
@@ -736,68 +747,108 @@ col_update(WT_CURSOR *cursor, WT_ITEM *key, WT_ITEM *value, uint64_t keyno)
 }
 
 /*
- * table_extend --
- *	Handle the complexity of extending the table.
+ * table_append_init --
+ *	Re-initialize the appended records list.
  */
 static void
-table_extend(uint64_t keyno)
+table_append_init(void)
 {
-	static size_t n = 0;
-	static uint64_t *slots;
-	static uint64_t *ep;
-	uint64_t *p;
-	int ret;
+	/* Append up to 10 records per thread before waiting on resolution. */
+	g.append_max = (size_t)g.c_threads * 10;
+	g.append_cnt = 0;
+
+	if (g.append != NULL) {
+		free(g.append);
+		g.append = NULL;
+	}
+	if ((g.append = calloc(g.append_max, sizeof(uint64_t))) == NULL)
+		die(errno, "calloc");
+}
+
+/*
+ * table_append --
+ *	Resolve the appended records.
+ */
+static void
+table_append(uint64_t keyno)
+{
+	uint64_t *p, *ep;
+	int done, ret;
+
+	ep = g.append + g.append_max;
 
 	/*
 	 * We don't want to ignore records we append, which requires we update
-	 * the "last row" as we insert new records.   There are problems: if
-	 * the underlying record numbers are allocated such that the threads
-	 * allocating the record number can race with other threads, the thread
-	 * allocating record N may return after the thread allocating N + 1.
-	 * Since it will cause problems if we try and replace a record before
-	 * it's been inserted, we have to make sure we don't skip records as we
-	 * increment the last record in the table.
+	 * the "last row" as we insert new records.   Threads allocating record
+	 * numbers can race with other threads, so the thread allocating record
+	 * N may return after the thread allocating N + 1.  We can't update a
+	 * record before it's been inserted, and so we can't leave gaps when the
+	 * count of records in the table is incremented.
+	 *
+	 * The solution is the append table, which contains an unsorted list of
+	 * appended records.  Every time we finish appending a record, process
+	 * the table, trying to update the total records in the object.
+	 *
+	 * First, enter the new key into the append list.
+	 *
+	 * It's technically possible to race: we allocated space for 10 records
+	 * per thread, but the check for the maximum number of records being
+	 * appended doesn't lock.  If a thread allocated a new record and went
+	 * to sleep (so the append table fills up), then N threads of control
+	 * used the same g.append_cnt value to decide there was an available
+	 * slot in the append table and both allocated new records, we could run
+	 * out of space in the table.   It's unfortunately not even unlikely in
+	 * the case of a large number of threads all inserting as fast as they
+	 * can and a single thread going to sleep for an unexpectedly long time.
+	 * If it happens, sleep and retry until earlier records are resolved
+	 * and we find a slot.
 	 */
-	if ((ret = pthread_rwlock_wrlock(&g.table_extend_lock)) != 0)
-		die(ret, "pthread_rwlock_wrlock: table_extend");
+	for (done = 0;;) {
+		if ((ret = pthread_rwlock_wrlock(&g.append_lock)) != 0)
+			die(ret, "pthread_rwlock_wrlock: append_lock");
 
-	/*
-	 * It's possible to get more than an allocated record per thread, if the
-	 * scheduler pauses a particular thread and other threads race allocate
-	 * multiple new records while it's sleeping.  Give ourselves some room.
-	 */
-	if (n < MAX_EXTEND) {
-		free(slots);
-		n = MAX_EXTEND;
-		if ((slots = calloc(n, sizeof(uint64_t))) == NULL)
-			die(errno, "calloc");
-		ep = slots + n;
-	}
+		/*
+		 * If this is the thread we've been waiting for, and its record
+		 * won't fit, we'd loop infinitely.  If there are many append
+		 * operations and a thread goes to sleep for a little too long,
+		 * it can happen.
+		 */
+		if (keyno == g.rows + 1) {
+			g.rows = keyno;
+			done = 1;
 
-	/* Enter the new key into the list. */
-	for (p = slots; p < ep; ++p) {
-		if (*p == 0) {
-			*p = keyno;
-			break;
-		}
-		++g.extend;
-	}
-
-	/* Process the table until we don't find the "next" value. */
-	for (;;) {
-		for (p = slots; p < ep; ++p)
-			if (*p == g.rows + 1) {
-				g.rows = *p;
-				*p = 0;
-				--g.extend;
-				break;
+			/*
+			 * Clean out the table, incrementing the total count of
+			 * records until we don't find the next key.
+			 */
+			for (;;) {
+				for (p = g.append; p < ep; ++p)
+					if (*p == g.rows + 1) {
+						g.rows = *p;
+						*p = 0;
+						--g.append_cnt;
+						break;
+					}
+				if (p == ep)
+					break;
 			}
-		if (p == ep)
-			break;
-	}
+		} else
+			/* Enter the key into the table. */
+			for (p = g.append; p < ep; ++p)
+				if (*p == 0) {
+					*p = keyno;
+					++g.append_cnt;
+					done = 1;
+					break;
+				}
 
-	if ((ret = pthread_rwlock_unlock(&g.table_extend_lock)) != 0)
-		die(ret, "pthread_rwlock_unlock: table_extend");
+		if ((ret = pthread_rwlock_unlock(&g.append_lock)) != 0)
+			die(ret, "pthread_rwlock_unlock: append_lock");
+
+		if (done)
+			break;
+		sleep(1);
+	}
 }
 
 /*
@@ -828,7 +879,7 @@ col_insert(WT_CURSOR *cursor, WT_ITEM *key, WT_ITEM *value, uint64_t *keynop)
 		die(ret, "cursor.get_key");
 	*keynop = (uint32_t)keyno;
 
-	table_extend(keyno);		/* Extend the object. */
+	table_append(keyno);			/* Extend the object. */
 
 	if (g.logging == LOG_OPS) {
 		if (g.type == FIX)

@@ -194,7 +194,7 @@ __merge_switch_page(WT_PAGE *parent, WT_REF *ref, WT_VISIT_STATE *state)
 		 */
 		if ((modify = child->modify) != NULL &&
 		    F_ISSET(modify, WT_PM_REC_SPLIT))
-			WT_LINK_PAGE(state->page, newref, modify->u.split.page);
+			WT_LINK_PAGE(state->page, newref, modify->u.split);
 
 		WT_LINK_PAGE(state->page, newref, child);
 
@@ -468,8 +468,7 @@ __wt_merge_tree(WT_SESSION_IMPL *session, WT_PAGE *top)
 	 * into place by our caller.
 	 */
 	top->modify->flags = WT_PM_REC_SPLIT;
-	top->modify->u.split.page = newtop;
-	top->modify->u.split.ref = top->ref;
+	top->modify->u.split = newtop;
 
 	WT_VERBOSE_ERR(session, evict,
 	    "Successfully %s %" PRIu32

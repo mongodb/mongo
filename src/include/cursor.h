@@ -91,7 +91,6 @@ struct __wt_cursor_btree {
 	WT_INSERT	*next_stack[WT_SKIP_MAXDEPTH];
 
 	uint64_t recno;			/* Record number */
-	uint32_t write_gen;		/* Saved leaf page's write generation */
 
 	/*
 	 * The search function sets compare to:
@@ -293,7 +292,7 @@ struct __wt_cursor_table {
 } while (0)
 #define	WT_CURSOR_NEEDVALUE(cursor) do {				\
 	if (F_ISSET(cursor, WT_CURSTD_VALUE_INT)) {			\
-		if (WT_DATA_IN_ITEM(&(cursor)->value))			\
+		if (!WT_DATA_IN_ITEM(&(cursor)->value))			\
 			WT_ERR(__wt_buf_set(				\
 			    (WT_SESSION_IMPL *)(cursor)->session,	\
 			    &(cursor)->value,				\

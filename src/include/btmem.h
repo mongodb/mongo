@@ -145,10 +145,7 @@ struct __wt_page_modify {
 	uint64_t disk_txn;
 
 	union {
-		struct {
-			WT_PAGE *page;	/* Resulting split page */
-			WT_REF *ref;	/* WT_REF slot on the parent */
-		} split;
+		WT_PAGE *split;		/* Resulting split page */
 		WT_ADDR	 replace;	/* Resulting replacement */
 	} u;
 
@@ -700,6 +697,20 @@ struct __wt_insert {
 	for ((ins) = WT_SKIP_FIRST(ins_head);				\
 	    (ins) != NULL;						\
 	    (ins) = WT_SKIP_NEXT(ins))
+
+/*
+ * Atomically allocate and swap a structure or array into place.
+ */
+#define	WT_PAGE_ALLOC_AND_SWAP(s, page, dest, v, count)	do {		\
+	if (((v) = (dest)) == NULL) {					\
+		WT_ERR(__wt_calloc_def(s, count, &(v)));		\
+		if (WT_ATOMIC_CAS(dest, NULL, v))			\
+			__wt_cache_page_inmem_incr(			\
+			    s, page, (count) * sizeof(*(v)));		\
+		else							\
+			__wt_free(s, v);				\
+	}								\
+} while (0)
 
 /*
  * WT_INSERT_HEAD --

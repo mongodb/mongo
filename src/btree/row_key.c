@@ -194,10 +194,6 @@ __wt_row_leaf_key_work(WT_SESSION_IMPL *session,
 				break;
 			}
 
-			__wt_cell_unpack(
-			    WT_PAGE_REF_OFFSET(page, ikey->cell_offset),
-			    unpack);
-
 			/*
 			 * If we wanted a different key and this key is an
 			 * overflow key:
@@ -208,7 +204,8 @@ __wt_row_leaf_key_work(WT_SESSION_IMPL *session,
 			 * done because prefixes skip overflow keys: keep
 			 * rolling forward.
 			 */
-			if (unpack->ovfl)
+			if (__wt_cell_type(WT_PAGE_REF_OFFSET(
+			    page, ikey->cell_offset)) == WT_CELL_KEY_OVFL)
 				goto next;
 
 			/*

@@ -105,7 +105,7 @@ __free_page_modify(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 * If the page split, there may one or more pages linked from
 		 * the page; walk the list, discarding pages.
 		 */
-		__wt_page_out(session, &mod->u.split.page);
+		__wt_page_out(session, &mod->u.split);
 		break;
 	case WT_PM_REC_REPLACE:
 		/*
@@ -270,12 +270,11 @@ __free_skip_list(WT_SESSION_IMPL *session, WT_INSERT *ins)
 {
 	WT_INSERT *next;
 
-	do {
+	for (; ins != NULL; ins = next) {
 		__free_update_list(session, ins->upd);
-
 		next = WT_SKIP_NEXT(ins);
 		__wt_free(session, ins);
-	} while ((ins = next) != NULL);
+	}
 }
 
 /*

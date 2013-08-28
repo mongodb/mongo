@@ -404,6 +404,7 @@ ds
 dsk
 dsrc
 dst
+dsync
 dt
 dtype
 dumpable
@@ -630,6 +631,7 @@ nr
 nset
 nthread
 nul
+nuls
 numSymbols
 numbare
 oc

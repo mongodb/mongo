@@ -154,10 +154,9 @@ __wt_lsm_bloom_worker(void *arg)
 			 * Skip if a thread is still active in the chunk or it
 			 * isn't suitable.
 			 */
-			if (chunk->ncursor != 0 ||
-			    !F_ISSET(chunk, WT_LSM_CHUNK_ONDISK) ||
-			    F_ISSET(chunk, WT_LSM_CHUNK_BLOOM) ||
-			    F_ISSET(chunk, WT_LSM_CHUNK_MERGING) ||
+			if (!F_ISSET(chunk, WT_LSM_CHUNK_ONDISK) ||
+			    F_ISSET(chunk,
+				WT_LSM_CHUNK_BLOOM | WT_LSM_CHUNK_MERGING) ||
 			    chunk->generation > 0 ||
 			    chunk->count == 0)
 				continue;
@@ -228,8 +227,10 @@ __wt_lsm_checkpoint_worker(void *arg)
 				break;
 
 			chunk = cookie.chunk_array[i];
-			/* Stop if a thread is still active in the chunk. */
-			if (chunk->ncursor != 0)
+
+			/* Stop if a running transaction needs the chunk. */
+			__wt_txn_refresh_force(session);
+			if (!__wt_txn_visible_all(session, chunk->txnid_max))
 				break;
 
 			/*
@@ -366,7 +367,7 @@ __lsm_bloom_create(
 	    lsm_tree->bloom_bit_count, lsm_tree->bloom_hash_count, &bloom));
 
 	cur_cfg[0] = WT_CONFIG_BASE(session, session_open_cursor);
-	cur_cfg[1] = "raw";
+	cur_cfg[1] = "checkpoint=WiredTigerCheckpoint,raw";
 	cur_cfg[2] = NULL;
 	WT_ERR(__wt_open_cursor(session, chunk->uri, NULL, cur_cfg, &src));
 

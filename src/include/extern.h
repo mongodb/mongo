@@ -369,12 +369,10 @@ extern int __wt_tree_walk(WT_SESSION_IMPL *session,
     uint32_t flags);
 extern int __wt_col_modify(WT_SESSION_IMPL *session,
     WT_CURSOR_BTREE *cbt,
-    int op);
+    int is_remove);
 extern int __wt_col_append_serial_func(WT_SESSION_IMPL *session, void *args);
 extern void __wt_col_leaf_obsolete(WT_SESSION_IMPL *session, WT_PAGE *page);
-extern int __wt_col_search(WT_SESSION_IMPL *session,
-    WT_CURSOR_BTREE *cbt,
-    int is_modify);
+extern int __wt_col_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt);
 extern int __wt_rec_evict(WT_SESSION_IMPL *session,
     WT_PAGE *page,
     int exclusive);
@@ -451,7 +449,6 @@ extern int __wt_row_insert_alloc(WT_SESSION_IMPL *session,
     WT_INSERT **insp,
     size_t *ins_sizep);
 extern int __wt_insert_serial_func(WT_SESSION_IMPL *session, void *args);
-extern int __wt_update_check(WT_SESSION_IMPL *session, WT_UPDATE *next);
 extern int __wt_update_alloc(WT_SESSION_IMPL *session,
     WT_ITEM *value,
     WT_UPDATE **updp,
@@ -467,9 +464,7 @@ extern int __wt_search_insert(WT_SESSION_IMPL *session,
     WT_CURSOR_BTREE *cbt,
     WT_INSERT_HEAD *inshead,
     WT_ITEM *srch_key);
-extern int __wt_row_search(WT_SESSION_IMPL *session,
-    WT_CURSOR_BTREE *cbt,
-    int is_modify);
+extern int __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt);
 extern int __wt_row_random(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt);
 extern int __wt_config_initn( WT_SESSION_IMPL *session,
     WT_CONFIG *conf,

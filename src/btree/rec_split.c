@@ -121,7 +121,7 @@ __split_row_page_inmem(WT_SESSION_IMPL *session, WT_PAGE *orig)
 	 * the original ref to point to the new parent
 	 */
 	newref = &new_parent->u.intl.t[0];
-	__wt_ref_key(orig->ref->page, orig->ref, &p, &size);
+	__wt_ref_key(orig->parent, orig->ref, &p, &size);
 	WT_ERR (__wt_row_ikey_incr(
 	    session, new_parent, 0, p, size, &newref->key.ikey));
 	WT_LINK_PAGE(new_parent, newref, orig);
@@ -216,8 +216,7 @@ __split_row_page_inmem(WT_SESSION_IMPL *session, WT_PAGE *orig)
 	 * into place by our caller.
 	 */
 	orig->modify->flags = WT_PM_REC_SPLIT;
-	orig->modify->u.split.page = new_parent;
-	orig->modify->u.split.ref = new_parent->ref;
+	orig->modify->u.split = new_parent;
 
 	/* Make it likely we evict the page we just split. */
 	orig->read_gen = WT_READ_GEN_OLDEST;
@@ -241,11 +240,10 @@ err:	if (ret != 0) {
 int
 __wt_split_page_inmem(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
+	WT_ASSERT(session, page->type == WT_PAGE_ROW_LEAF);
 
 	WT_VERBOSE_RET(session, evict,
 	    "Splitting page %p (%s)", page, __wt_page_type_string(page->type));
 
-	return (page->type == WT_PAGE_ROW_LEAF ?
-	    __split_row_page_inmem(session, page) : EBUSY);
+	return (__split_row_page_inmem(session, page));
 }
-
