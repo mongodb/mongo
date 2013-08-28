@@ -166,7 +166,7 @@ struct __wt_page_modify {
 	WT_INSERT_HEAD **update;	/* Updated items */
 
 	/*
-	 * Track pages, blocks to discard: as pages are reconciled, overflow
+	 * Track blocks, pages to discard: as pages are reconciled, overflow
 	 * K/V items are discarded along with their underlying blocks, and as
 	 * pages are evicted, split and emptied pages are merged into their
 	 * parents and discarded.  If an overflow item was discarded and page
@@ -174,7 +174,12 @@ struct __wt_page_modify {
 	 * To keep the tree correct until we're sure page reconciliation has
 	 * succeeded, we track the objects we'll discard when the reconciled
 	 * page is evicted.
-	 *
+	 */
+	uint8_t *track_addr;		/* Addresses to be discarded: start */
+	uint8_t *track_addr_end;	/* Addresses to be discarded: end */
+	size_t	 track_addr_len;	/* Bytes allocated */
+
+	/*
 	 * Track overflow objects: if pages are reconciled more than once, an
 	 * overflow item might be written repeatedly.  Instead, when overflow
 	 * items are written we save a copy and resulting location so we only

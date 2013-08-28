@@ -3647,27 +3647,27 @@ __rec_row_leaf_insert(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins)
 static int
 __rec_split_discard(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
+	WT_BM *bm;
 	WT_PAGE_MODIFY *mod;
 	WT_REF *ref;
 	uint32_t i;
 
+	bm = S2BT(session)->bm;
+
 	/*
 	 * A page that split is being reconciled for the second, or subsequent
-	 * time; discard any the underlying block space or overflow items used
-	 * in the previous reconciliation.
+	 * time; discard the underlying block space and overflow items used in
+	 * the previous reconciliation.
 	 *
 	 * This routine would be trivial, and only walk a single page freeing
 	 * any blocks that were written to support the split -- the problem is
 	 * root splits.  In the case of root splits, we potentially have to
-	 * cope with the underlying blocks of multiple pages, but also there
-	 * may be overflow items that we have to resolve.
-	 *
-	 * These pages are discarded -- add them to the object tracking list.
+	 * cope with the underlying sets of multiple pages.
 	 */
 	WT_REF_FOREACH(page, ref, i)
-		WT_RET(__wt_rec_track(session, page,
+		WT_RET(bm->free(bm, session,
 		    ((WT_ADDR *)ref->addr)->addr,
-		    ((WT_ADDR *)ref->addr)->size, NULL, 0, 0));
+		    ((WT_ADDR *)ref->addr)->size));
 	WT_RET(__wt_rec_track_wrapup(session, page));
 
 	if ((mod = page->modify) != NULL)
@@ -3771,9 +3771,8 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		 * are checkpoints, and must be explicitly dropped.
 		 */
 		if (!WT_PAGE_IS_ROOT(page))
-			WT_RET(__wt_rec_track(session, page,
-			    mod->u.replace.addr, mod->u.replace.size,
-			    NULL, 0, 0));
+			WT_RET(__wt_rec_track_addr(session, page,
+			    mod->u.replace.addr, mod->u.replace.size));
 
 		/* Discard the replacement page's address. */
 		__wt_free(session, mod->u.replace.addr);
