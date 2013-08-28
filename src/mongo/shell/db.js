@@ -1024,7 +1024,7 @@ DB.prototype.printSlaveReplicationInfo = function() {
 
     function r(x) {
         assert( x , "how could this be null (printSlaveReplicationInfo rx)" );
-        if ( x.state == 1 ) {
+        if ( x.state == 1 || x.state == 7 ) {  // ignore primaries (1) and arbiters (7)
             return;
         }
         
