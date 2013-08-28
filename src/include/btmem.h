@@ -186,12 +186,12 @@ struct __wt_page_modify {
 		uint8_t *data;		/* Overflow data reference */
 		uint32_t size;		/* Overflow data length */
 
-#define	WT_TRK_DISCARD		0x001	/* Object was discarded */
-#define	WT_TRK_INUSE		0x002	/* Object is currently in-use */
-#define	WT_TRK_JUST_ADDED	0x004	/* Object added this reconciliation */
-#define	WT_TRK_OBJECT		0x008	/* Slot set (not empty) */
-#define	WT_TRK_ONPAGE		0x010	/* Object was referenced from a page */
-#define	WT_TRK_OVFL_VALUE	0x020	/* Cached deleted overflow value */
+#define	WT_TRK_CACHE_DEL	0x001	/* Cached deleted overflow value */
+#define	WT_TRK_DISCARD		0x002	/* Object was discarded */
+#define	WT_TRK_INUSE		0x004	/* Object is currently in-use */
+#define	WT_TRK_JUST_ADDED	0x008	/* Object added this reconciliation */
+#define	WT_TRK_OBJECT		0x010	/* Slot set (not empty) */
+#define	WT_TRK_ONPAGE		0x020	/* Object was referenced from a page */
 		uint8_t  flags;
 	} *track;			/* Array of tracked objects */
 	uint32_t track_entries;		/* Total track slots */

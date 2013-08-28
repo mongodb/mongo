@@ -385,18 +385,18 @@ extern int __wt_rec_track(WT_SESSION_IMPL *session,
     const void *data,
     uint32_t data_size,
     uint32_t flags);
-extern int __wt_rec_track_ovfl_srch( WT_PAGE *page,
+extern int __wt_rec_track_cache_del_srch( WT_PAGE *page,
     const uint8_t *addr,
     uint32_t addr_size,
     WT_ITEM *data);
-extern int __wt_rec_track_onpage_srch( WT_PAGE *page,
+extern int __wt_rec_track_srch(WT_PAGE *page,
     const uint8_t *addr,
     uint32_t addr_size);
-extern int __wt_rec_track_onpage_addr(WT_SESSION_IMPL *session,
+extern int __wt_rec_track_add(WT_SESSION_IMPL *session,
     WT_PAGE *page,
     const uint8_t *addr,
     uint32_t addr_size);
-extern int __wt_rec_track_ovfl_reuse( WT_SESSION_IMPL *session,
+extern int __wt_rec_track_reuse(WT_SESSION_IMPL *session,
     WT_PAGE *page,
     const void *data,
     uint32_t data_size,

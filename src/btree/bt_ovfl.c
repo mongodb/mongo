@@ -115,8 +115,8 @@ __val_ovfl_cache_col(
 	 * we enter the value into the reconciliation tracking system.
 	 */
 	WT_ERR(__ovfl_read(session, &value, addr, addr_size));
-	WT_ERR(__wt_rec_track(session, page, addr, addr_size,
-	    value.data, value.size, WT_TRK_ONPAGE | WT_TRK_OVFL_VALUE));
+	WT_ERR(__wt_rec_track(session, page,
+	    addr, addr_size, value.data, value.size, WT_TRK_CACHE_DEL));
 
 err:	__wt_buf_free(session, &value);
 	return (ret);
@@ -141,8 +141,8 @@ __wt_ovfl_cache_col_restart(WT_SESSION_IMPL *session,
 	if (__wt_cell_type_raw(unpack->cell) != WT_CELL_VALUE_OVFL_RM)
 		return (WT_RESTART);
 
-	found =
-	    __wt_rec_track_ovfl_srch(page, unpack->data, unpack->size, store);
+	found = __wt_rec_track_cache_del_srch(
+	    page, unpack->data, unpack->size, store);
 	WT_ASSERT(session, found == 1);
 	WT_ASSERT(session, store->size != 0);
 

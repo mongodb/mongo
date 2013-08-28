@@ -2818,7 +2818,7 @@ compare:		/*
 		 * might read the original value.
 		 */
 		if (ovfl_state == OVFL_UNUSED) {
-			WT_ERR(__wt_rec_track_onpage_addr(
+			WT_ERR(__wt_rec_track_add(
 			    session, page, unpack->data, unpack->size));
 			WT_ERR(__wt_val_ovfl_cache(session, page, upd, unpack));
 		}
@@ -2972,7 +2972,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 			 * reusing this key in this reconciliation is unlikely.
 			 */
 			if (onpage_ovfl)
-				WT_RET(__wt_rec_track_onpage_addr(
+				WT_RET(__wt_rec_track_add(
 				    session, page, kpack->data, kpack->size));
 			continue;
 		}
@@ -2998,7 +2998,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 				 * reconciliation is unlikely.
 				 */
 				if (onpage_ovfl)
-					WT_RET(__wt_rec_track_onpage_addr(
+					WT_RET(__wt_rec_track_add(
 					    session, page,
 					    kpack->data, kpack->size));
 				continue;
@@ -3021,7 +3021,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 				 * reconciliation is unlikely.
 				 */
 				if (onpage_ovfl)
-					WT_RET(__wt_rec_track_onpage_addr(
+					WT_RET(__wt_rec_track_add(
 					    session, page,
 					    kpack->data, kpack->size));
 
@@ -3061,7 +3061,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		 * key.  If there's no tracking entry, use the original blocks.
 		 */
 		if (onpage_ovfl &&
-		    __wt_rec_track_onpage_srch(page, kpack->data, kpack->size))
+		    __wt_rec_track_srch(page, kpack->data, kpack->size))
 			onpage_ovfl = 0;
 
 		/*
@@ -3362,7 +3362,7 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 			 * might read the original value.
 			 */
 			if (val_cell != NULL && unpack->ovfl) {
-				WT_ERR(__wt_rec_track_onpage_addr(
+				WT_ERR(__wt_rec_track_add(
 				    session, page, unpack->data, unpack->size));
 				WT_ERR(__wt_val_ovfl_cache(
 				    session, page, rip, unpack));
@@ -3388,7 +3388,7 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 						WT_ERR(__wt_row_leaf_key_work(
 						    session,
 						    page, rip, NULL, 1));
-					WT_ERR(__wt_rec_track_onpage_addr(
+					WT_ERR(__wt_rec_track_add(
 					    session, page,
 					    unpack->data, unpack->size));
 				}
@@ -3429,8 +3429,7 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 		__wt_cell_unpack(cell, unpack);
 		onpage_ovfl = unpack->ovfl;
 		if (onpage_ovfl &&
-		    __wt_rec_track_onpage_srch(
-		    page, unpack->data, unpack->size)) {
+		    __wt_rec_track_srch(page, unpack->data, unpack->size)) {
 			onpage_ovfl = 0;
 			WT_ASSERT(session, ikey != NULL);
 		}
@@ -4399,7 +4398,7 @@ __rec_cell_build_ovfl(WT_SESSION_IMPL *session,
 	 * See if this overflow record has already been written and reuse it if
 	 * possible.  Else, write a new overflow record.
 	 */
-	WT_RET(__wt_rec_track_ovfl_reuse(
+	WT_RET(__wt_rec_track_reuse(
 	    session, page, kv->buf.data, kv->buf.size, &addr, &size, &found));
 	if (!found) {
 		/* Allocate a buffer big enough to write the overflow record. */
