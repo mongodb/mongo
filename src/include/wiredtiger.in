@@ -1558,7 +1558,8 @@ struct __wt_event_handler {
 	 * non-zero, the error may cause the WiredTiger function posting the
 	 * event to fail, and may even cause operation or library failure.
 	 *
-	 * @param session The handle that is being closed
+	 * @param session The session handle that is being closed if the
+	 * cursor parameter is NULL.
 	 * @param cursor The cursor handle that is being closed, or NULL if
 	 * it is a session handle being closed.
 	 */
