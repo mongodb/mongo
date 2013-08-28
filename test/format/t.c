@@ -43,8 +43,14 @@ main(int argc, char *argv[])
 	else
 		++g.progname;
 
+#if 0
+	/* Configure the GNU malloc for debugging. */
+	(void)setenv("MALLOC_CHECK_", "2", 1);
+#endif
+#if 0
 	/* Configure the FreeBSD malloc for debugging. */
 	(void)setenv("MALLOC_OPTIONS", "AJ", 1);
+#endif
 
 	/* Set values from the "CONFIG" file, if it exists. */
 	if (access("CONFIG", R_OK) == 0)
