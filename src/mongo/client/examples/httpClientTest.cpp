@@ -64,7 +64,7 @@ int main( int argc, const char **argv, char **envp) {
     play( str::stream() << "http://localhost:" << port << "/" );
     
 #ifdef MONGO_SSL
-    play( "https://www.10gen.com/" );
+    play( "https://www.mongodb.com/" );
 #endif
 
     return EXIT_SUCCESS;
