@@ -263,15 +263,16 @@ namespace mongo {
                       IndexDetails& idx,
                       bool mayInterrupt) {
 
-        bool background = idx.info.obj()["background"].trueValue();
+        BSONObj idxInfo = idx.info.obj();
 
-        MONGO_TLOG(0) << "build index " << ns << ' ' << idx.keyPattern() << ( background ? " background" : "" ) << endl;
+        MONGO_TLOG(0) << "build index on: " << ns << " properties: " << idxInfo.jsonString() << endl;
+
         Timer t;
         unsigned long long n;
 
         verify( Lock::isWriteLocked(ns) );
 
-        if( inDBRepair || !background ) {
+        if( inDBRepair || !idxInfo["background"].trueValue() ) {
             int idxNo = IndexBuildsInProgress::get(ns.c_str(), idx.info.obj()["name"].valuestr());
             n = BtreeBasedBuilder::fastBuildIndex(ns.c_str(), d, idx, mayInterrupt, idxNo);
             verify( !idx.head.isNull() );
