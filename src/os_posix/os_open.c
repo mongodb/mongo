@@ -121,7 +121,14 @@ __wt_open(WT_SESSION_IMPL *session,
 #endif
 	if (dio_type == WT_FILE_TYPE_LOG &&
 	    FLD_ISSET(conn->txn_logsync, WT_LOG_DSYNC))
+#ifdef O_DSYNC
 		f |= O_DSYNC;
+#elif defined(O_SYNC)
+		f |= O_SYNC;
+#else
+		WT_ERR_MSG(session, ENOTSUP,
+		    "Unsupported log sync mode requested");
+#endif
 	WT_SYSCALL_RETRY(((fd = open(path, f, mode)) == -1 ? 1 : 0), ret);
 	if (ret != 0)
 		WT_ERR_MSG(session, ret,
