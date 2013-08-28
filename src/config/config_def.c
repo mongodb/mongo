@@ -98,9 +98,6 @@ static const WT_CONFIG_CHECK confchk_session_begin_transaction[] = {
 	    NULL},
 	{ "name", "string", NULL, NULL},
 	{ "priority", "int", "min=-100,max=100", NULL},
-	{ "sync", "string",
-	    "choices=[\"dsync\",\"fsync\",\"none\"]",
-	    NULL},
 	{ NULL, NULL, NULL, NULL }
 };
 
@@ -255,7 +252,7 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open[] = {
 	{ "statistics", "boolean", NULL, NULL},
 	{ "statistics_log", "category", NULL,
 	     confchk_statistics_log_subconfigs},
-	{ "transaction_log_sync", "string",
+	{ "transaction_sync", "string",
 	    "choices=[\"dsync\",\"fsync\",\"none\"]",
 	    NULL},
 	{ "use_environment_priv", "boolean", NULL, NULL},
@@ -328,7 +325,7 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  confchk_index_meta
 	},
 	{ "session.begin_transaction",
-	  "isolation=,name=,priority=0,sync=dsync",
+	  "isolation=,name=,priority=0",
 	  confchk_session_begin_transaction
 	},
 	{ "session.checkpoint",
@@ -415,8 +412,8 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  "lsm_merge=,mmap=,multiprocess=0,session_max=50,"
 	  "shared_cache=(chunk=10MB,enable=0,name=pool,reserve=0,size=500MB),"
 	  "statistics=0,statistics_log=(clear=,path=\"WiredTigerStat.%H\","
-	  "sources=,timestamp=\"%b %d %H:%M:%S\",wait=0),"
-	  "transaction_log_sync=dsync,use_environment_priv=0,verbose=",
+	  "sources=,timestamp=\"%b %d %H:%M:%S\",wait=0),transaction_sync=dsync"
+	  ",use_environment_priv=0,verbose=",
 	  confchk_wiredtiger_open
 	},
 	{ NULL, NULL, NULL }

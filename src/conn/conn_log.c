@@ -48,7 +48,7 @@ __logmgr_config(WT_SESSION_IMPL *session, const char **cfg, int *runp)
 	WT_RET(__wt_strndup(session, cval.str, cval.len, &conn->log_path));
 
 	conn->txn_logsync = WT_LOG_DSYNC;
-	WT_RET(__wt_config_gets(session, cfg, "transaction_log_sync", &cval));
+	WT_RET(__wt_config_gets(session, cfg, "transaction_sync", &cval));
 	for (st = sync_types; st->name != NULL; st++) {
 		ret = __wt_config_subgets(session, &cval, st->name, &sval);
 		if (ret == 0) {

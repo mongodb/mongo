@@ -487,9 +487,6 @@ methods = {
 		priority of the transaction for resolving conflicts.
 		Transactions with higher values are less likely to abort''',
 		min='-100', max='100'),
-	Config('sync', 'dsync', r'''
-		how to sync log records when the transaction commits''',
-		choices=['dsync', 'fsync', 'none']),
 ]),
 
 'session.commit_transaction' : Method([]),
@@ -651,7 +648,7 @@ methods = {
 		this value configures \c statistics and statistics logging''',
 		min='1', max='100000'),
 		]),
-	Config('transaction_log_sync', 'dsync', r'''
+	Config('transaction_sync', 'dsync', r'''
 		how to sync log records when the transaction commits''',
 		choices=['dsync', 'fsync', 'none']),
 	Config('use_environment_priv', 'false', r'''
