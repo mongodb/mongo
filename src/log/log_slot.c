@@ -106,7 +106,7 @@ join_slot:
 	 * the caller.
 	 */
 	WT_CSTAT_INCR(session, log_slot_joins);
-	if (LF_ISSET(WT_LOG_SYNC))
+	if (LF_ISSET(WT_LOG_FSYNC))
 		FLD_SET(slot->slot_flags, SLOT_SYNC);
 	myslotp->slot = slot;
 	myslotp->offset = (off_t)old_state - WT_LOG_SLOT_READY;

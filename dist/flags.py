@@ -27,7 +27,8 @@ flags = {
         ],
         'log_write' : [
 		'LOG_CKPT',
-		'LOG_SYNC'
+		'LOG_DSYNC',
+		'LOG_FSYNC'
         ],
 	'rec_write' : [
 		'EVICTION_SERVER_LOCKED',
@@ -71,11 +72,11 @@ flags = {
 ###################################################
 	'conn' : [
 		'CONN_CACHE_POOL',
+		'CONN_CKPT_SYNC',
 		'CONN_EVICTION_RUN',
 		'CONN_LSM_MERGE',
 		'CONN_PANIC',
 		'CONN_SERVER_RUN',
-		'CONN_SYNC',
 	],
 	'session' : [
 		'SESSION_INTERNAL',

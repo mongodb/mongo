@@ -222,7 +222,7 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	 * Checkpoints have to hit disk (it would be reasonable to configure for
 	 * lazy checkpoints, but we don't support them yet).
 	 */
-	if (F_ISSET(conn, WT_CONN_SYNC))
+	if (F_ISSET(conn, WT_CONN_CKPT_SYNC))
 		WT_ERR(__checkpoint_apply(session, cfg, __wt_checkpoint_sync));
 
 	/* Checkpoint the metadata file. */
@@ -802,7 +802,7 @@ int
 __wt_checkpoint_close(WT_SESSION_IMPL *session, const char *cfg[])
 {
 	WT_RET(__checkpoint_worker(session, cfg, 0));
-	if (F_ISSET(S2C(session), WT_CONN_SYNC))
+	if (F_ISSET(S2C(session), WT_CONN_CKPT_SYNC))
 		WT_RET(__wt_checkpoint_sync(session, cfg));
 	return (0);
 }

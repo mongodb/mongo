@@ -14,8 +14,18 @@
 static int
 __logmgr_config(WT_SESSION_IMPL *session, const char **cfg, int *runp)
 {
-	WT_CONFIG_ITEM cval;
+	static const struct {
+		const char *name;
+		uint32_t flag;
+	} *st, sync_types[] = {
+		{ "dsync",	WT_LOG_DSYNC},
+		{ "fsync",	WT_LOG_FSYNC},
+		{ "none",	0 },
+		{ NULL, 0 }
+	};
+	WT_CONFIG_ITEM cval, sval;
 	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
 
 	conn = S2C(session);
 
@@ -37,7 +47,19 @@ __logmgr_config(WT_SESSION_IMPL *session, const char **cfg, int *runp)
 	WT_RET(__wt_config_gets(session, cfg, "log.path", &cval));
 	WT_RET(__wt_strndup(session, cval.str, cval.len, &conn->log_path));
 
-	return (0);
+	conn->txn_logsync = WT_LOG_DSYNC;
+	WT_RET(__wt_config_gets(session, cfg, "transaction_sync", &cval));
+	for (st = sync_types; st->name != NULL; st++) {
+		ret = __wt_config_subgets(session, &cval, st->name, &sval);
+		if (ret == 0) {
+			if (sval.val)
+				conn->txn_logsync = st->flag;
+		} else if (ret != WT_NOTFOUND)
+			goto err;
+	}
+	ret = 0;
+err:
+	return (ret);
 }
 
 /*

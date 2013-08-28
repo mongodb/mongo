@@ -726,7 +726,7 @@ __wt_log_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 		 * the consolidation arrays, so send in the tmp slot.
 		 */
 		locked = 1;
-		if (LF_ISSET(WT_LOG_SYNC))
+		if (LF_ISSET(WT_LOG_FSYNC))
 			FLD_SET(tmp.slot_flags, SLOT_SYNC);
 		WT_ERR(__log_acquire(session, rdup_len, &tmp));
 		__wt_spin_unlock(session, &log->log_slot_lock);
@@ -752,7 +752,7 @@ __wt_log_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 	    WT_LOG_SLOT_DONE) {
 		WT_ERR(__log_release(session, myslot.slot));
 		WT_ERR(__wt_log_slot_free(myslot.slot));
-	} else if (LF_ISSET(WT_LOG_SYNC)) {
+	} else if (LF_ISSET(WT_LOG_FSYNC)) {
 		while (LOG_CMP(&log->sync_lsn, &tmp_lsn) <= 0 &&
 		    myslot.slot->slot_error == 0)
 			__wt_yield();
@@ -769,7 +769,7 @@ err:
 	 * If we're not synchronous, only report if our own operation got
 	 * an error.
 	 */
-	if (LF_ISSET(WT_LOG_SYNC) && ret == 0)
+	if (LF_ISSET(WT_LOG_DSYNC | WT_LOG_FSYNC) && ret == 0)
 		ret = myslot.slot->slot_error;
 	if (LF_ISSET(WT_LOG_CKPT) && ret == 0) {
 		log->ckpt_lsn = tmp_lsn;
