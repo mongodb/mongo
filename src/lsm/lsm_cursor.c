@@ -235,12 +235,13 @@ retry:
 		 * primary chunk, plus any other chunks that might be required
 		 * to detect snapshot isolation conflicts.
 		 */
-		if (F_ISSET(clsm, WT_CLSM_OPEN_READ))
-			ngood = 0;
-		else if (F_ISSET(clsm, WT_CLSM_OPEN_SNAPSHOT)) {
+		if (F_ISSET(clsm, WT_CLSM_OPEN_SNAPSHOT))
 			WT_ERR(__wt_realloc_def(session,
 			    &clsm->txnid_alloc, nchunks,
 			    &clsm->txnid_max));
+		if (F_ISSET(clsm, WT_CLSM_OPEN_READ))
+			ngood = 0;
+		else if (F_ISSET(clsm, WT_CLSM_OPEN_SNAPSHOT)) {
 			/*
 			 * Keep going until all updates in the next
 			 * chunk are globally visible.  Copy the maximum
