@@ -30,6 +30,12 @@
 #include "mongo/util/startup_test.h"
 #include "mongo/util/text.h"
 
+namespace mongo {
+    // This specifies default dbpath for our testing framework
+    const std::string default_test_dbpath = "/tmp/unittest";
+} // namespace mongo
+
+
 int dbtestsMain( int argc, char** argv, char** envp ) {
     static StaticObserver StaticObserver;
     setWindowsUnhandledExceptionFilter();
@@ -37,7 +43,7 @@ int dbtestsMain( int argc, char** argv, char** envp ) {
     Command::testCommandsEnabled = 1;
     mongo::runGlobalInitializersOrDie(argc, argv, envp);
     StartupTest::runTests();
-    return mongo::dbtests::runDbTests( argc, argv, "/tmp/unittest" );
+    return mongo::dbtests::runDbTests(argc, argv);
 }
 
 #if defined(_WIN32)

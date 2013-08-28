@@ -26,3 +26,7 @@ using namespace mongo;
 using namespace mongo::unittest;
 using boost::shared_ptr;
 
+namespace mongo {
+    // This specifies default dbpath for our testing framework
+    extern const std::string default_test_dbpath;
+}

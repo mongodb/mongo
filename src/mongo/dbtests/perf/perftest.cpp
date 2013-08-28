@@ -26,12 +26,16 @@
 #include "mongo/db/instance.h"
 #include "mongo/db/json.h"
 #include "mongo/db/query_optimizer_internal.h"
+#include "mongo/dbtests/dbtests.h"
 #include "mongo/dbtests/framework.h"
 #include "mongo/util/file_allocator.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
     extern string dbpath;
+
+    // This specifies default dbpath for our testing framework
+    const std::string default_test_dbpath = "/data/db/perftest";
 } // namespace mongo
 
 
@@ -766,6 +770,6 @@ int main( int argc, char **argv, char** envp ) {
     mongo::logger::globalLogDomain()->setMinimumLoggedSeverity(mongo::logger::LogSeverity::Log());
     client_ = new DBDirectClient();
 
-    return mongo::dbtests::runDbTests(argc, argv, "/data/db/perftest");
+    return mongo::dbtests::runDbTests(argc, argv);
 }
 
