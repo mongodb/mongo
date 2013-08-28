@@ -1062,9 +1062,9 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	if (cval.val)
 		F_SET(conn, WT_CONN_LSM_MERGE);
 
-	WT_ERR(__wt_config_gets(session, cfg, "sync", &cval));
+	WT_ERR(__wt_config_gets(session, cfg, "checkpoint_sync", &cval));
 	if (cval.val)
-		F_SET(conn, WT_CONN_SYNC);
+		F_SET(conn, WT_CONN_CKPT_SYNC);
 
 	WT_ERR(__conn_verbose_config(session, cfg));
 

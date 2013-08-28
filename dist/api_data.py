@@ -487,9 +487,6 @@ methods = {
 		priority of the transaction for resolving conflicts.
 		Transactions with higher values are less likely to abort''',
 		min='-100', max='100'),
-	Config('sync', 'full', r'''
-		how to sync log records when the transaction commits''',
-		choices=['full', 'flush', 'write', 'none']),
 ]),
 
 'session.commit_transaction' : Method([]),
@@ -559,6 +556,10 @@ methods = {
 		configures periodic checkpoints''',
 		min='1', max='100000'),
 		]),
+	Config('checkpoint_sync', 'true', r'''
+		flush files to stable storage when closing or writing
+		checkpoints''',
+		type='boolean'),
 	Config('create', 'false', r'''
 		create the database if it does not exist''',
 		type='boolean'),
@@ -647,10 +648,9 @@ methods = {
 		this value configures \c statistics and statistics logging''',
 		min='1', max='100000'),
 		]),
-	Config('sync', 'true', r'''
-		flush files to stable storage when closing or writing
-		checkpoints''',
-		type='boolean'),
+	Config('transaction_sync', 'dsync', r'''
+		how to sync log records when the transaction commits''',
+		choices=['dsync', 'fsync', 'none']),
 	Config('use_environment_priv', 'false', r'''
 		use the \c WIREDTIGER_CONFIG and \c WIREDTIGER_HOME environment
 		variables regardless of whether or not the process is running
