@@ -21,6 +21,8 @@ struct __wt_lsn {
 	(l)->offset = 0;						\
 } while (0)
 
+#define	IS_INIT_LSN(l)	((l)->file == 1 && (l)->offset == 0)
+
 #define	MAX_LSN(l)	do {						\
 	(l)->file = UINT32_MAX;						\
 	(l)->offset = INT64_MAX;					\

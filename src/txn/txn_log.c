@@ -92,9 +92,6 @@ __recovery_cursor(WT_SESSION_IMPL *session, WT_RECOVERY *r,
 	const char *cfg[] = { WT_CONFIG_BASE(session, session_open_cursor),
 	    "overwrite", NULL };
 
-	if (id >= r->nfiles || r->files[id].uri == NULL)
-		WT_RET_MSG(session, ENOENT, "No file found with ID %u", id);
-
 	/*
 	 * Only apply operations in the correct metadata phase, and if the LSN
 	 * is more recent than th last checkpoint.
@@ -102,6 +99,8 @@ __recovery_cursor(WT_SESSION_IMPL *session, WT_RECOVERY *r,
 	if (r->metadata_only != (id == 0) ||
 	    LOG_CMP(lsnp, &r->files[id].ckpt_lsn) < 0)
 		c = NULL;
+	else if (id >= r->nfiles || r->files[id].uri == NULL)
+		WT_RET_MSG(session, ENOENT, "No file found with ID %u (max %u)", id, r->nfiles);
 	else if ((c = r->files[id].c) == NULL) {
 		WT_RET(__wt_open_cursor(
 		    session, r->files[id].uri, NULL, cfg, &c));
@@ -347,8 +346,9 @@ __recovery_setup_file(WT_RECOVERY *r,
 	WT_RET(__wt_strdup(r->session, uri, &r->files[fileid].uri));
 	WT_RET(
 	    __wt_config_getones(r->session, config, "checkpoint_lsn", &cval));
+	/* If there is checkpoint logged for the file, apply everything. */
 	if (cval.type != WT_CONFIG_ITEM_STRUCT)
-		MAX_LSN(&lsn);
+		INIT_LSN(&lsn);
 	else if (sscanf(cval.str, "(%" PRIu32 ",%" PRIuMAX ")",
 	    &lsn.file, &lsn.offset) != 2)
 		WT_RET_MSG(r->session, EINVAL,
@@ -401,11 +401,15 @@ __recovery_file_scan(WT_RECOVERY *r, WT_LSN *start_lsnp)
 	/* Scan through all files in the metadata. */
 	c = r->files[0].c;
 	c->set_key(c, "file:");
-	cmp = 0;
-	WT_ERR_NOTFOUND_OK(c->search_near(c, &cmp));
+	if ((ret = c->search_near(c, &cmp)) != 0) {
+		/* Is the metadata empty? */
+		if (ret == WT_NOTFOUND)
+			ret = 0;
+		goto err;
+	}
 	if (cmp < 0)
 		WT_ERR_NOTFOUND_OK(c->next(c));
-	while ((ret = c->next(c)) == 0) {
+	for (; ret == 0; ret = c->next(c)) {
 		WT_ERR(c->get_key(c, &uri));
 		if (!WT_PREFIX_MATCH(uri, "file:"))
 			break;
@@ -452,9 +456,13 @@ __wt_txn_recover(WT_SESSION_IMPL *default_session)
 
 	/* Now, recover all the files apart from the metadata. */
 	r.metadata_only = 0;
-	WT_ERR(__wt_log_scan(session,
-	    NULL, WT_LOGSCAN_FIRST | WT_LOGSCAN_RECOVER,
-	    __txn_log_recover, &r));
+	if (IS_INIT_LSN(&start_lsn))
+		WT_ERR(__wt_log_scan(session, NULL,
+		    WT_LOGSCAN_FIRST | WT_LOGSCAN_RECOVER,
+		    __txn_log_recover, &r));
+	else
+		WT_ERR(__wt_log_scan(session, &start_lsn,
+		    WT_LOGSCAN_RECOVER, __txn_log_recover, &r));
 
 err:	__recovery_free(&r);
 	__wt_free(session, config);
