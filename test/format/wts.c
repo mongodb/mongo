@@ -28,9 +28,11 @@
 #include "format.h"
 
 static int
-handle_message(WT_EVENT_HANDLER *handler, const char *message)
+handle_message(WT_EVENT_HANDLER *handler,
+    WT_SESSION *session, const char *message)
 {
 	UNUSED(handler);
+	UNUSED(session);
 
 	if (g.logfp != NULL)
 		return (fprintf(g.logfp, "%s\n", message) < 0 ? -1 : 0);
@@ -43,10 +45,11 @@ handle_message(WT_EVENT_HANDLER *handler, const char *message)
  *	Default WT_EVENT_HANDLER->handle_progress implementation: ignore.
  */
 static int
-handle_progress(
-    WT_EVENT_HANDLER *handler, const char *operation, uint64_t progress)
+handle_progress(WT_EVENT_HANDLER *handler,
+    WT_SESSION *session, const char *operation, uint64_t progress)
 {
 	UNUSED(handler);
+	UNUSED(session);
 
 	track(operation, progress, NULL);
 	return (0);

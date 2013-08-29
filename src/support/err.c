@@ -12,9 +12,11 @@
  *	Default WT_EVENT_HANDLER->handle_error implementation: send to stderr.
  */
 static int
-__handle_error_default(WT_EVENT_HANDLER *handler, int error, const char *errmsg)
+__handle_error_default(WT_EVENT_HANDLER *handler,
+    WT_SESSION *session, int error, const char *errmsg)
 {
 	WT_UNUSED(handler);
+	WT_UNUSED(session);
 	WT_UNUSED(error);
 
 	return (fprintf(stderr, "%s\n", errmsg) >= 0 ? 0 : EIO);
@@ -25,9 +27,11 @@ __handle_error_default(WT_EVENT_HANDLER *handler, int error, const char *errmsg)
  *	Default WT_EVENT_HANDLER->handle_message implementation: send to stdout.
  */
 static int
-__handle_message_default(WT_EVENT_HANDLER *handler, const char *message)
+__handle_message_default(WT_EVENT_HANDLER *handler,
+    WT_SESSION *session, const char *message)
 {
 	WT_UNUSED(handler);
+	WT_UNUSED(session);
 
 	return (printf("%s\n", message) >= 0 ? 0 : EIO);
 }
@@ -37,12 +41,28 @@ __handle_message_default(WT_EVENT_HANDLER *handler, const char *message)
  *	Default WT_EVENT_HANDLER->handle_progress implementation: ignore.
  */
 static int
-__handle_progress_default(
-    WT_EVENT_HANDLER *handler, const char *operation, uint64_t progress)
+__handle_progress_default(WT_EVENT_HANDLER *handler,
+    WT_SESSION *session, const char *operation, uint64_t progress)
 {
 	WT_UNUSED(handler);
+	WT_UNUSED(session);
 	WT_UNUSED(operation);
 	WT_UNUSED(progress);
+
+	return (0);
+}
+
+/*
+ * __handle_close_default --
+ *	Default WT_EVENT_HANDLER->handle_close implementation: ignore.
+ */
+static int
+__handle_close_default(WT_EVENT_HANDLER *handler,
+    WT_SESSION *session, WT_CURSOR *cursor)
+{
+	WT_UNUSED(handler);
+	WT_UNUSED(session);
+	WT_UNUSED(cursor);
 
 	return (0);
 }
@@ -51,7 +71,7 @@ static WT_EVENT_HANDLER __event_handler_default = {
 	__handle_error_default,
 	__handle_message_default,
 	__handle_progress_default,
-	NULL	/* Default close handler. */
+	__handle_close_default
 };
 
 /*
@@ -63,6 +83,7 @@ __handler_failure(WT_SESSION_IMPL *session,
     int error, const char *which, int error_handler_failed)
 {
 	WT_EVENT_HANDLER *handler;
+	WT_SESSION *wt_session;
 
 	/*
 	 * !!!
@@ -80,13 +101,14 @@ __handler_failure(WT_SESSION_IMPL *session,
 	 * handler that failed.  If it was the error handler that failed, or a
 	 * call to the error handler fails, use the default error handler.
 	 */
+	wt_session = (WT_SESSION *)session;
 	handler = session->event_handler;
 	if (!error_handler_failed &&
 	    handler->handle_error != __handle_error_default &&
-	    handler->handle_error(handler, error, s) == 0)
+	    handler->handle_error(handler, wt_session, error, s) == 0)
 		return;
 
-	(void)__handle_error_default(NULL, error, s);
+	(void)__handle_error_default(NULL, wt_session, error, s);
 }
 
 /*
@@ -121,6 +143,7 @@ __eventv(WT_SESSION_IMPL *session, int msg_event, int error,
 	WT_EVENT_HANDLER *handler;
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
+	WT_SESSION *wt_session;
 	size_t len, remain, wlen;
 	int prefix_cnt;
 	const char *err, *prefix;
@@ -218,13 +241,14 @@ __eventv(WT_SESSION_IMPL *session, int msg_event, int error,
 	 * using the default error handler.  If the default error handler fails,
 	 * there's nothing to do.
 	 */
+	wt_session = (WT_SESSION *)session;
 	handler = session->event_handler;
 	if (msg_event) {
-		ret = handler->handle_message(handler, s);
+		ret = handler->handle_message(handler, wt_session, s);
 		if (ret != 0)
 			__handler_failure(session, ret, "message", 0);
 	} else {
-		ret = handler->handle_error(handler, error, s);
+		ret = handler->handle_error(handler, wt_session, error, s);
 		if (ret != 0 && handler->handle_error != __handle_error_default)
 			__handler_failure(session, ret, "error", 1);
 	}
@@ -300,6 +324,7 @@ static int
 info_msg(WT_SESSION_IMPL *session, const char *fmt, va_list ap)
 {
 	WT_EVENT_HANDLER *handler;
+	WT_SESSION *wt_session;
 
 	/*
 	 * !!!
@@ -310,8 +335,9 @@ info_msg(WT_SESSION_IMPL *session, const char *fmt, va_list ap)
 
 	(void)vsnprintf(s, sizeof(s), fmt, ap);
 
+	wt_session = (WT_SESSION *)session;
 	handler = session->event_handler;
-	return (handler->handle_message(handler, s));
+	return (handler->handle_message(handler, wt_session, s));
 }
 
 /*
@@ -363,11 +389,14 @@ __wt_progress(WT_SESSION_IMPL *session, const char *s, uint64_t v)
 {
 	WT_DECL_RET;
 	WT_EVENT_HANDLER *handler;
+	WT_SESSION *wt_session;
 
+	wt_session = (WT_SESSION *)session;
 	handler = session->event_handler;
 	if (handler != NULL && handler->handle_progress != NULL)
 		if ((ret = handler->handle_progress(
-		    handler, s == NULL ? session->name : s, v)) != 0)
+		    handler, wt_session,
+		    s == NULL ? session->name : s, v)) != 0)
 			__handler_failure(session, ret, "progress", 0);
 	return (0);
 }

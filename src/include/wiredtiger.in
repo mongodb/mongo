@@ -1523,7 +1523,7 @@ struct __wt_event_handler {
 	 * @param message an error string
 	 */
 	int (*handle_error)(WT_EVENT_HANDLER *handler,
-	    int error, const char *message);
+	    WT_SESSION *session, int error, const char *message);
 
 	/*!
 	 * Callback to handle informational messages; by default, informational
@@ -1535,7 +1535,8 @@ struct __wt_event_handler {
 	 *
 	 * @param message an informational string
 	 */
-	int (*handle_message)(WT_EVENT_HANDLER *handler, const char *message);
+	int (*handle_message)(WT_EVENT_HANDLER *handler,
+	    WT_SESSION *session, const char *message);
 
 	/*!
 	 * Callback to handle progress messages; by default, no progress
@@ -1549,7 +1550,7 @@ struct __wt_event_handler {
 	 * @param progress a counter
 	 */
 	int (*handle_progress)(WT_EVENT_HANDLER *handler,
-	    const char *operation, uint64_t progress);
+	    WT_SESSION *session, const char *operation, uint64_t progress);
 
 	/*!
 	 * Callback to handle automatic close of a WiredTiger handle.

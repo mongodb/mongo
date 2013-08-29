@@ -12,7 +12,8 @@
  *	Verbose WT_EVENT_HANDLER->handle_error implementation: send to stderr.
  */
 static int
-__handle_error_verbose(WT_EVENT_HANDLER *handler, int error, const char *errmsg)
+__handle_error_verbose(WT_EVENT_HANDLER *handler,
+    WT_SESSION *session, int error, const char *errmsg)
 {
 	WT_UNUSED(handler);
 	WT_UNUSED(error);
@@ -25,7 +26,8 @@ __handle_error_verbose(WT_EVENT_HANDLER *handler, int error, const char *errmsg)
  *	Verbose WT_EVENT_HANDLER->handle_message implementation: send to stdout.
  */
 static int
-__handle_message_verbose(WT_EVENT_HANDLER *handler, const char *message)
+__handle_message_verbose(WT_EVENT_HANDLER *handler,
+    WT_SESSION *session, const char *message)
 {
 	WT_UNUSED(handler);
 
@@ -37,8 +39,8 @@ __handle_message_verbose(WT_EVENT_HANDLER *handler, const char *message)
  *	Default WT_EVENT_HANDLER->handle_progress implementation: ignore.
  */
 static int
-__handle_progress_verbose(
-    WT_EVENT_HANDLER *handler, const char *operation, uint64_t progress)
+__handle_progress_verbose(WT_EVENT_HANDLER *handler,
+    WT_SESSION *session, const char *operation, uint64_t progress)
 {
 	WT_UNUSED(handler);
 
