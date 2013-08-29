@@ -21,8 +21,6 @@
 
 #include "mongo/base/status.h"
 
-class Status;
-
 namespace mongo {
 namespace optionenvironment {
 
