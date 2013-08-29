@@ -906,7 +906,8 @@ if shellEnv is not None:
     mongo_shell = shellEnv.Program(
         "mongo",
         coreShellFiles,
-        LIBDEPS=[ "clientandshell", "mongocommon", "scripting",
+        LIBDEPS=["clientandshell", "mongocommon", "scripting",
+                 "$BUILD_DIR/mongo/util/options_parser/options_parser",
                  "$BUILD_DIR/third_party/shim_pcrecpp"])
 
     shellEnv.Install( '#/', mongo_shell )
