@@ -1420,15 +1420,6 @@ extern int __wt_checkpoint_write_leaves(WT_SESSION_IMPL *session,
     const char *cfg[]);
 extern int __wt_checkpoint_sync(WT_SESSION_IMPL *session, const char *cfg[]);
 extern int __wt_checkpoint_close(WT_SESSION_IMPL *session, const char *cfg[]);
-extern int __wt_txn_log_commit(WT_SESSION_IMPL *session, const char *cfg[]);
-extern int __wt_txn_log_checkpoint(WT_SESSION_IMPL *session,
-    int start,
-    WT_LSN *lsnp);
-extern int __wt_txn_printlog( WT_SESSION_IMPL *session,
-    WT_ITEM *logrec,
-    WT_LSN *lsnp,
-    void *cookie);
-extern int __wt_txn_recover(WT_SESSION_IMPL *default_session);
 extern uint64_t __wt_ext_transaction_id(WT_EXTENSION_API *wt_api,
     WT_SESSION *wt_session);
 extern int __wt_ext_transaction_isolation_level( WT_EXTENSION_API *wt_api,
@@ -1440,3 +1431,12 @@ extern uint64_t __wt_ext_transaction_oldest(WT_EXTENSION_API *wt_api);
 extern int __wt_ext_transaction_visible( WT_EXTENSION_API *wt_api,
     WT_SESSION *wt_session,
     uint64_t transaction_id);
+extern int __wt_txn_log_commit(WT_SESSION_IMPL *session, const char *cfg[]);
+extern int __wt_txn_log_checkpoint(WT_SESSION_IMPL *session,
+    int start,
+    WT_LSN *lsnp);
+extern int __wt_txn_printlog( WT_SESSION_IMPL *session,
+    WT_ITEM *logrec,
+    WT_LSN *lsnp,
+    void *cookie);
+extern int __wt_txn_recover(WT_SESSION_IMPL *default_session);
