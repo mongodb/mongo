@@ -50,6 +50,7 @@ namespace mongo {
         size_t size() const { return _ns.size(); }
 
         bool isSystem() const { return coll().startsWith( "system." ); }
+        bool isSystemDotIndexes() const { return coll() == "system.indexes"; }
         bool isConfigDB() const { return db() == "config"; }
         bool isCommand() const { return coll() == "$cmd"; }
         bool isSpecialCommand() const { return coll().startsWith("$cmd.sys"); }
