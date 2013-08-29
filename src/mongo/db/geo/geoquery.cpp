@@ -44,7 +44,6 @@ namespace mongo {
         if (!obj["maxDistance"].eoo()) {
             uassert(17036, "maxDistance must be a number", obj["maxDistance"].isNumber());
             double distArg = obj["maxDistance"].number();
-            log() << "parseFromGeoNear got maxDistance " << distArg;
             uassert(16902, "maxDistance must be non-negative", distArg >= 0.0);
             if (fromRadians) {
                 maxDistance = distArg * radius;
@@ -52,7 +51,8 @@ namespace mongo {
                 maxDistance = distArg;
             }
 
-            uassert(17037, "maxDistance too large", maxDistance <= M_PI * radius);
+            uassert(17037, "maxDistance too large",
+                    maxDistance <= nextafter(M_PI * radius, DBL_MAX));
         }
         return true;
     }
@@ -99,7 +99,11 @@ namespace mongo {
             }
         }
 
-        double maxValidDistance = fromRadians ? M_PI : kRadiusOfEarthInMeters * M_PI;
+        // Add fudge to maxValidDistance so we don't throw when the provided maxDistance
+        // is on the edge.
+        double maxValidDistance = nextafter(fromRadians ?
+                                            M_PI :
+                                            kRadiusOfEarthInMeters * M_PI, DBL_MAX);
 
         uassert(17038, "$minDistance too large", minDistance < maxValidDistance);
         uassert(17039, "$maxDistance too large",
