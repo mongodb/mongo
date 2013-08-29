@@ -334,9 +334,11 @@ namespace mongo {
 
         // the collection for which we are building an index
         sourceNS = io.getStringField("ns");
+        NamespaceString nss(sourceNS);
         uassert(10096, "invalid ns to index", sourceNS.find( '.' ) != string::npos);
-        massert(10097, str::stream() << "bad table to index name on add index attempt current db: " << cc().database()->name << "  source: " << sourceNS ,
-                cc().database()->name == nsToDatabase(sourceNS));
+        uassert(17072, "cannot create indexes on the system.indexes collection",
+                !nss.isSystemDotIndexes());
+        massert(10097, str::stream() << "bad table to index name on add index attempt current db: " << cc().database()->name << "  source: " << sourceNS , cc().database()->name == nsToDatabase(sourceNS));
 
         // logical name of the index.  todo: get rid of the name, we don't need it!
         const char *name = io.getStringField("name");

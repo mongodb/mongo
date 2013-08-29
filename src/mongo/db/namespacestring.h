@@ -46,6 +46,7 @@ namespace mongo {
 
         bool isSystem() const { return strncmp(coll.c_str(), "system.", 7) == 0; }
         bool isCommand() const { return coll == "$cmd"; }
+        bool isSystemDotIndexes() const { return strncmp(coll.c_str(), "system.indexes", 14) == 0; }
 
         /**
          * @return true if the namespace is valid. Special namespaces for internal use are considered as valid.
