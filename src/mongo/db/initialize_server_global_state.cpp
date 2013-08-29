@@ -45,6 +45,7 @@
 #include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/auth/security_key.h"
 #include "mongo/logger/logger.h"
+#include "mongo/logger/console_appender.h"
 #include "mongo/logger/message_event.h"
 #include "mongo/logger/message_event_utf8_encoder.h"
 #include "mongo/logger/ramlog.h"
@@ -198,10 +199,13 @@ namespace mongo {
         using logger::RotatableFileAppender;
         using logger::StatusWithRotatableFileWriter;
 
-#ifndef _WIN32
-        using logger::SyslogAppender;
-
         if (serverGlobalParams.logWithSyslog) {
+#ifdef _WIN32
+            return Status(ErrorCodes::InternalError,
+                          "Syslog requested in Windows build; command line processor logic error");
+#else
+            using logger::SyslogAppender;
+
             StringBuilder sb;
             sb << serverGlobalParams.binaryName << "." << serverGlobalParams.port;
             openlog(strdup(sb.str().c_str()), LOG_PID | LOG_CONS, LOG_USER);
@@ -215,10 +219,9 @@ namespace mongo {
                     MessageLogDomain::AppenderAutoPtr(
                             new SyslogAppender<MessageEventEphemeral>(
                                     new logger::MessageEventWithContextEncoder)));
-        }
 #endif // defined(_WIN32)
-
-        if (!serverGlobalParams.logpath.empty()) {
+        }
+        else if (!serverGlobalParams.logpath.empty()) {
             fassert(16448, !serverGlobalParams.logWithSyslog);
             std::string absoluteLogpath = boost::filesystem::absolute(
                     serverGlobalParams.logpath, serverGlobalParams.cwd).string();
@@ -282,6 +285,12 @@ namespace mongo {
                 if (!status.isOK())
                     return status;
             }
+        }
+        else {
+            logger::globalLogManager()->getNamedDomain("javascriptOutput")->attachAppender(
+                    MessageLogDomain::AppenderAutoPtr(
+                            new logger::ConsoleAppender<MessageEventEphemeral>(
+                                    new MessageEventDetailsEncoder)));
         }
 
         logger::globalLogDomain()->attachAppender(
