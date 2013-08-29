@@ -87,7 +87,13 @@ namespace mongo {
 
     static S2Point coordToPoint(double lng, double lat) {
         // Note that it's (lat, lng) for S2 but (lng, lat) for MongoDB.
-        return S2LatLng::FromDegrees(lat, lng).Normalized().ToPoint();
+        S2LatLng ll = S2LatLng::FromDegrees(lat, lng).Normalized();
+        if (!ll.is_valid()) {
+            stringstream ss;
+            ss << "coords invalid after normalization, lng = " << lng << " lat = " << lat << endl;
+            uasserted(17125, ss.str());
+        }
+        return ll.ToPoint();
     }
 
     static void eraseDuplicatePoints(vector<S2Point>* vertices) {
@@ -568,7 +574,7 @@ namespace mongo {
             BSONObjIterator it(centerObj);
             BSONElement x = it.next();
             BSONElement y = it.next();
-            centerPoint = S2LatLng::FromDegrees(y.Number(), x.Number()).Normalized().ToPoint();
+            centerPoint = coordToPoint(x.Number(), y.Number());
             BSONElement radiusElt = objIt.next();
             double radius = radiusElt.number();
             out->cap = S2Cap::FromAxisAngle(centerPoint, S1Angle::Radians(radius));
