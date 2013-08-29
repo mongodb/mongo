@@ -427,7 +427,7 @@ namespace mongo {
         log() << "FIPS 140-2 mode activated" << endl;
 #else
         error() << "this version of mongodb was not compiled with FIPS support";
-        fassertFailed(17084);
+        fassertFailed(17089);
 #endif
     }
 
