@@ -751,6 +751,21 @@ extern int __wt_logop_col_remove_print( WT_SESSION_IMPL *session,
     const uint8_t **pp,
     const uint8_t *end,
     FILE *out);
+extern int __wt_logop_col_truncate_pack( WT_SESSION_IMPL *session,
+    WT_ITEM *logrec,
+    uint32_t fileid,
+    uint64_t start,
+    uint64_t stop);
+extern int __wt_logop_col_truncate_unpack( WT_SESSION_IMPL *session,
+    const uint8_t **pp,
+    const uint8_t *end,
+    uint32_t *fileidp,
+    uint64_t *startp,
+    uint64_t *stopp);
+extern int __wt_logop_col_truncate_print( WT_SESSION_IMPL *session,
+    const uint8_t **pp,
+    const uint8_t *end,
+    FILE *out);
 extern int __wt_logop_row_put_pack( WT_SESSION_IMPL *session,
     WT_ITEM *logrec,
     uint32_t fileid,
@@ -776,6 +791,23 @@ extern int __wt_logop_row_remove_unpack( WT_SESSION_IMPL *session,
     uint32_t *fileidp,
     WT_ITEM *keyp);
 extern int __wt_logop_row_remove_print( WT_SESSION_IMPL *session,
+    const uint8_t **pp,
+    const uint8_t *end,
+    FILE *out);
+extern int __wt_logop_row_truncate_pack( WT_SESSION_IMPL *session,
+    WT_ITEM *logrec,
+    uint32_t fileid,
+    WT_ITEM *start,
+    WT_ITEM *stop,
+    uint32_t mode);
+extern int __wt_logop_row_truncate_unpack( WT_SESSION_IMPL *session,
+    const uint8_t **pp,
+    const uint8_t *end,
+    uint32_t *fileidp,
+    WT_ITEM *startp,
+    WT_ITEM *stopp,
+    uint32_t *modep);
+extern int __wt_logop_row_truncate_print( WT_SESSION_IMPL *session,
     const uint8_t **pp,
     const uint8_t *end,
     FILE *out);
@@ -1435,6 +1467,10 @@ extern int __wt_txn_log_commit(WT_SESSION_IMPL *session, const char *cfg[]);
 extern int __wt_txn_log_checkpoint(WT_SESSION_IMPL *session,
     int start,
     WT_LSN *lsnp);
+extern int __wt_txn_truncate_log( WT_SESSION_IMPL *session,
+    WT_CURSOR_BTREE *start,
+    WT_CURSOR_BTREE *stop);
+extern int __wt_txn_truncate_end(WT_SESSION_IMPL *session);
 extern int __wt_txn_printlog( WT_SESSION_IMPL *session,
     WT_ITEM *logrec,
     WT_LSN *lsnp,

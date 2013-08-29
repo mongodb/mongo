@@ -686,19 +686,32 @@ __wt_btcur_range_truncate(WT_CURSOR_BTREE *start, WT_CURSOR_BTREE *stop)
 {
 	WT_BTREE *btree;
 	WT_CURSOR_BTREE *cbt;
+	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 
 	cbt = (start != NULL) ? start : stop;
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
 	btree = cbt->btree;
 
+	/*
+	 * For recovery, we log the start and stop keys for a truncate
+	 * operation, not the individual records removed.  On the other hand,
+	 * for rollback we need to keep track of all the in-memory operations.
+	 *
+	 * We deal with this here by logging the truncate range first, then (in
+	 * the logging code) disabling writing of the in-memory remove records
+	 * to disk.
+	 */
+	if (S2C(session)->logging)
+		WT_RET(__wt_txn_truncate_log(session, start, stop));
+
 	switch (btree->type) {
 	case BTREE_COL_FIX:
-		WT_RET(__cursor_truncate_fix(
+		WT_ERR(__cursor_truncate_fix(
 		    session, start, stop, __wt_col_modify));
 		break;
 	case BTREE_COL_VAR:
-		WT_RET(__cursor_truncate(
+		WT_ERR(__cursor_truncate(
 		    session, start, stop, __wt_col_modify));
 		break;
 	case BTREE_ROW:
@@ -713,15 +726,17 @@ __wt_btcur_range_truncate(WT_CURSOR_BTREE *start, WT_CURSOR_BTREE *stop)
 		 * are positioned in the tree.
 		 */
 		if (start != NULL)
-			WT_RET(__wt_btcur_search(start));
+			WT_ERR(__wt_btcur_search(start));
 		if (stop != NULL)
-			WT_RET(__wt_btcur_search(stop));
-		WT_RET(__cursor_truncate(
+			WT_ERR(__wt_btcur_search(stop));
+		WT_ERR(__cursor_truncate(
 		    session, start, stop, __wt_row_modify));
 		break;
 	}
 
-	return (0);
+err:	if (S2C(session)->logging)
+		WT_TRET(__wt_txn_truncate_end(session));
+	return (ret);
 }
 
 /*

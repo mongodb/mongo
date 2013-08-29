@@ -35,7 +35,7 @@ __wt_row_key_get(WT_CURSOR_BTREE *cbt, WT_ITEM *key)
 			key->data = WT_INSERT_KEY(cbt->ins);
 			key->size = WT_INSERT_KEY_SIZE(cbt->ins);
 		} else
-			WT_RET(__wt_row_leaf_key(session, page, rip, key, 0));
+			WT_RET(__wt_row_leaf_key(session, page, rip, key, 1));
 		break;
 	WT_ILLEGAL_VALUE(session);
 	}

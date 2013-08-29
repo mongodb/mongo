@@ -49,14 +49,41 @@ enum __wt_txn_isolation {
 
 /*
  * WT_TXN_OP --
- *	A transactional operation.
+ *	A transactional operation.  Each transaction builds an in-memory array
+ *	of these operations as it runs, then uses the array to either write log
+ *	records during commit or undo the operations during rollback.
  */
 struct __wt_txn_op {
-	WT_INSERT *ins;
-	WT_UPDATE *upd;
-	WT_ITEM key;
-	WT_REF *ref;
 	uint32_t fileid;
+	enum {
+		TXN_OP_BASIC,
+		TXN_OP_INMEM,
+		TXN_OP_REF,
+		TXN_OP_TRUNCATE_COL,
+		TXN_OP_TRUNCATE_ROW
+	} type;
+	union {
+		/* TXN_OP_BASIC, TXN_OP_INMEM */
+		struct {
+			WT_INSERT *ins;
+			WT_UPDATE *upd;
+			WT_ITEM key;
+		} op;
+		/* TXN_OP_REF */
+		WT_REF *ref;
+		/* TXN_OP_TRUNCATE_COL */
+		struct {
+			uint64_t start, stop;
+		} truncate_col;
+		/* TXN_OP_TRUNCATE_ROW */
+		struct {
+			WT_ITEM start, stop;
+			uint32_t mode;  /* 0 = no start / stop,
+					   1 = stop but no start,
+					   2 = start but no stop,
+					   3 = start and stop */
+		} truncate_row;
+	} u;
 };
 
 /*

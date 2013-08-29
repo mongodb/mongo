@@ -33,10 +33,12 @@ __wt_txn_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_UPDATE *upd)
 	WT_TXN_OP *op;
 
 	WT_RET(__txn_next_op(session, &op));
+	op->type = F_ISSET(session, WT_SESSION_LOGGING_INMEM) ?
+	    TXN_OP_INMEM : TXN_OP_BASIC;
 	if (cbt->btree->type == BTREE_ROW)
-		WT_RET(__wt_row_key_get(cbt, &op->key));
-	op->ins = cbt->ins;
-	op->upd = upd;
+		WT_RET(__wt_row_key_get(cbt, &op->u.op.key));
+	op->u.op.ins = cbt->ins;
+	op->u.op.upd = upd;
 	op->fileid = S2BT(session)->id;
 	upd->txnid = session->txn.id;
 	return (0);
@@ -52,7 +54,8 @@ __wt_txn_modify_ref(WT_SESSION_IMPL *session, WT_REF *ref)
 	WT_TXN_OP *op;
 
 	WT_RET(__txn_next_op(session, &op));
-	op->ref = ref;
+	op->type = TXN_OP_REF;
+	op->u.ref = ref;
 	ref->txnid = session->txn.id;
 	return (0);
 }

@@ -25,7 +25,7 @@ typedef struct {
 
 static int
 __recovery_cursor(WT_SESSION_IMPL *session, WT_RECOVERY *r,
-    WT_LSN *lsnp, u_int id, WT_CURSOR **cp)
+    WT_LSN *lsnp, u_int id, int dup, WT_CURSOR **cp)
 {
 	WT_CURSOR *c;
 	const char *cfg[] = { WT_CONFIG_BASE(session, session_open_cursor),
@@ -52,6 +52,10 @@ __recovery_cursor(WT_SESSION_IMPL *session, WT_RECOVERY *r,
 		r->files[id].c = c;
 	}
 
+	if (dup && c != NULL)
+		WT_RET(__wt_open_cursor(
+		    session, r->files[id].uri, NULL, cfg, &c));
+
 	*cp = c;
 	return (0);
 }
@@ -60,66 +64,141 @@ static int
 __txn_op_apply(
     WT_RECOVERY *r, WT_LSN *lsnp, const uint8_t **pp, const uint8_t *end)
 {
-	WT_CURSOR *cursor;
+	WT_CURSOR *cursor, *start, *stop;
 	WT_DECL_RET;
-	WT_ITEM key, value;
+	WT_ITEM key, start_key, stop_key, value;
 	WT_SESSION_IMPL *session;
-	uint64_t recno;
-	uint32_t fileid, optype, opsize;
+	uint64_t recno, start_recno, stop_recno;
+	uint32_t fileid, mode, optype, opsize;
 
 	session = r->session;
 
 	/* Peek at the size and the type. */
-	WT_RET(__wt_logop_read(session, pp, end, &optype, &opsize));
+	WT_ERR(__wt_logop_read(session, pp, end, &optype, &opsize));
 	end = *pp + opsize;
 
 	switch (optype) {
 	case WT_LOGOP_COL_PUT:
-		WT_RET(__wt_logop_col_put_unpack(session, pp, end,
+		WT_ERR(__wt_logop_col_put_unpack(session, pp, end,
 		    &fileid, &recno, &value));
-		WT_RET(__recovery_cursor(session, r, lsnp, fileid, &cursor));
+		WT_ERR(__recovery_cursor(session, r, lsnp, fileid, 0, &cursor));
 		if (cursor == NULL)
 			break;
 		cursor->set_key(cursor, recno);
 		__wt_cursor_set_raw_value(cursor, &value);
-		WT_TRET(cursor->insert(cursor));
+		WT_ERR(cursor->insert(cursor));
 		break;
 
 	case WT_LOGOP_COL_REMOVE:
-		WT_RET(__wt_logop_col_remove_unpack(session, pp, end,
+		WT_ERR(__wt_logop_col_remove_unpack(session, pp, end,
 		    &fileid, &recno));
-		WT_RET(__recovery_cursor(session, r, lsnp, fileid, &cursor));
+		WT_ERR(__recovery_cursor(session, r, lsnp, fileid, 0, &cursor));
 		if (cursor == NULL)
 			break;
 		cursor->set_key(cursor, recno);
-		WT_TRET(cursor->remove(cursor));
+		WT_ERR(cursor->remove(cursor));
+		break;
+
+	case WT_LOGOP_COL_TRUNCATE:
+		WT_ERR(__wt_logop_col_truncate_unpack(session, pp, end,
+		    &fileid, &start_recno, &stop_recno));
+		WT_ERR(__recovery_cursor(session, r, lsnp, fileid, 0, &cursor));
+		if (cursor == NULL)
+			break;
+
+		/* Set up the cursors. */
+		start = stop = NULL;
+		switch (mode) {
+		case 1:
+			stop = cursor;
+			break;
+		case 2:
+			start = cursor;
+			break;
+		case 3:
+			start = cursor;
+			WT_ERR(__recovery_cursor(
+			    session, r, lsnp, fileid, 1, &stop));
+			break;
+
+		WT_ILLEGAL_VALUE(session);
+		}
+
+		/* Set the keys. */
+		if (start != NULL)
+			start->set_key(stop, start_recno);
+		if (stop != NULL)
+			stop->set_key(stop, stop_recno);
+
+		WT_TRET(session->iface.truncate(&session->iface, NULL,
+		    start, stop, NULL));
+		if (mode == 3)
+			WT_TRET(stop->close(stop));
+		WT_ERR(ret);
 		break;
 
 	case WT_LOGOP_ROW_PUT:
-		WT_RET(__wt_logop_row_put_unpack(session, pp, end,
+		WT_ERR(__wt_logop_row_put_unpack(session, pp, end,
 		    &fileid, &key, &value));
-		WT_RET(__recovery_cursor(session, r, lsnp, fileid, &cursor));
+		WT_ERR(__recovery_cursor(session, r, lsnp, fileid, 0, &cursor));
 		if (cursor == NULL)
 			break;
 		__wt_cursor_set_raw_key(cursor, &key);
 		__wt_cursor_set_raw_value(cursor, &value);
-		WT_TRET(cursor->insert(cursor));
+		WT_ERR(cursor->insert(cursor));
 		break;
 
 	case WT_LOGOP_ROW_REMOVE:
-		WT_RET(__wt_logop_row_remove_unpack(session, pp, end,
+		WT_ERR(__wt_logop_row_remove_unpack(session, pp, end,
 		    &fileid, &key));
-		WT_RET(__recovery_cursor(session, r, lsnp, fileid, &cursor));
+		WT_ERR(__recovery_cursor(session, r, lsnp, fileid, 0, &cursor));
 		if (cursor == NULL)
 			break;
 		__wt_cursor_set_raw_key(cursor, &key);
-		WT_TRET(cursor->remove(cursor));
+		WT_ERR(cursor->remove(cursor));
 		break;
 
+	case WT_LOGOP_ROW_TRUNCATE:
+		WT_ERR(__wt_logop_row_truncate_unpack(session, pp, end,
+		    &fileid, &start_key, &stop_key, &mode));
+		WT_ERR(__recovery_cursor(session, r, lsnp, fileid, 0, &cursor));
+		if (cursor == NULL)
+			break;
+		/* Set up the cursors. */
+		start = stop = NULL;
+		switch (mode) {
+		case 1:
+			stop = cursor;
+			break;
+		case 2:
+			start = cursor;
+			break;
+		case 3:
+			start = cursor;
+			WT_ERR(__recovery_cursor(
+			    session, r, lsnp, fileid, 1, &stop));
+			break;
+
+		WT_ILLEGAL_VALUE(session);
+		}
+
+		/* Set the keys. */
+		if (start != NULL)
+			__wt_cursor_set_raw_key(start, &start_key);
+		if (stop != NULL)
+			__wt_cursor_set_raw_key(stop, &stop_key);
+
+		WT_TRET(session->iface.truncate(&session->iface, NULL,
+		    start, stop, NULL));
+		if (mode == 3)
+			WT_TRET(stop->close(stop));
+		WT_ERR(ret);
+		break;
+	
 	WT_ILLEGAL_VALUE(session);
 	}
 
-	if (ret != 0)
+err:	if (ret != 0)
 		__wt_err(session, ret,
 		    "Operation failed during recovery");
 	return (ret);
@@ -288,7 +367,7 @@ __wt_txn_recover(WT_SESSION_IMPL *default_session)
 
 	/* We need a real session for recovery. */
 	WT_RET(__wt_open_session(conn, 0, NULL, NULL, &session));
-	F_SET(session, WT_SESSION_NO_LOGGING);
+	F_SET(session, WT_SESSION_LOGGING_DISABLED);
 	r.session = session;
 
 	WT_ERR(__wt_metadata_search(session, WT_METADATA_URI, &config));

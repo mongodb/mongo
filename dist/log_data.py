@@ -38,8 +38,13 @@ optypes = [
 		[('uint32', 'fileid'), ('recno', 'recno'), ('item', 'value')]),
 	LogOperationType('col_remove',
 		[('uint32', 'fileid'), ('recno', 'recno')]),
+	LogOperationType('col_truncate',
+		[('uint32', 'fileid'), ('recno', 'start'), ('recno', 'stop')]),
 	LogOperationType('row_put',
 		[('uint32', 'fileid'), ('item', 'key'), ('item', 'value')]),
 	LogOperationType('row_remove',
 		[('uint32', 'fileid'), ('item', 'key')]),
+	LogOperationType('row_truncate',
+		[('uint32', 'fileid'), ('item', 'start'), ('item', 'stop'),
+			('uint32', 'mode')]),
 ]

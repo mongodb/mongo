@@ -157,6 +157,63 @@ __wt_logop_col_remove_print(
 }
 
 int
+__wt_logop_col_truncate_pack(
+    WT_SESSION_IMPL *session, WT_ITEM *logrec,
+    uint32_t fileid, uint64_t start, uint64_t stop)
+{
+	const char *fmt = WT_UNCHECKED_STRING(IIIrr);
+	size_t size;
+	uint32_t optype, recsize;
+
+	optype = WT_LOGOP_COL_TRUNCATE;
+	WT_RET(__wt_struct_size(session, &size, fmt,
+	    optype, 0, fileid, start, stop));
+
+	size += __wt_vsize_uint(size) - 1;
+	WT_RET(__wt_buf_extend(session, logrec, logrec->size + size));
+	recsize = (uint32_t)size;
+	WT_RET(__wt_struct_pack(session,
+	    (uint8_t *)logrec->data + logrec->size, size, fmt,
+	    optype, recsize, fileid, start, stop));
+
+	logrec->size += size;
+	return (0);
+}
+
+int
+__wt_logop_col_truncate_unpack(
+    WT_SESSION_IMPL *session, const uint8_t **pp, const uint8_t *end,
+    uint32_t *fileidp, uint64_t *startp, uint64_t *stopp)
+{
+	const char *fmt = WT_UNCHECKED_STRING(IIIrr);
+	uint32_t optype, size;
+
+	WT_RET(__wt_struct_unpack(session, *pp, WT_PTRDIFF(end, *pp), fmt,
+	    &optype, &size, fileidp, startp, stopp));
+	WT_ASSERT(session, optype == WT_LOGOP_COL_TRUNCATE);
+
+	*pp += size;
+	return (0);
+}
+
+int
+__wt_logop_col_truncate_print(
+    WT_SESSION_IMPL *session, const uint8_t **pp, const uint8_t *end, FILE *out)
+{
+	uint32_t fileid;
+	uint64_t start;
+	uint64_t stop;
+
+	WT_RET(__wt_logop_col_truncate_unpack(
+	    session, pp, end, &fileid, &start, &stop));
+
+	fprintf(out, "\t" "fileid: %" PRIu32 "\n", fileid);
+	fprintf(out, "\t" "start: %" PRIu64 "\n", start);
+	fprintf(out, "\t" "stop: %" PRIu64 "\n", stop);
+	return (0);
+}
+
+int
 __wt_logop_row_put_pack(
     WT_SESSION_IMPL *session, WT_ITEM *logrec,
     uint32_t fileid, WT_ITEM *key, WT_ITEM *value)
@@ -268,5 +325,66 @@ __wt_logop_row_remove_print(
 	fprintf(out, "\t" "fileid: %" PRIu32 "\n", fileid);
 	fprintf(out, "\t" "key: %.*s\n",
 	    (int)key.size, (const char *)key.data);
+	return (0);
+}
+
+int
+__wt_logop_row_truncate_pack(
+    WT_SESSION_IMPL *session, WT_ITEM *logrec,
+    uint32_t fileid, WT_ITEM *start, WT_ITEM *stop, uint32_t mode)
+{
+	const char *fmt = WT_UNCHECKED_STRING(IIIuuI);
+	size_t size;
+	uint32_t optype, recsize;
+
+	optype = WT_LOGOP_ROW_TRUNCATE;
+	WT_RET(__wt_struct_size(session, &size, fmt,
+	    optype, 0, fileid, start, stop, mode));
+
+	size += __wt_vsize_uint(size) - 1;
+	WT_RET(__wt_buf_extend(session, logrec, logrec->size + size));
+	recsize = (uint32_t)size;
+	WT_RET(__wt_struct_pack(session,
+	    (uint8_t *)logrec->data + logrec->size, size, fmt,
+	    optype, recsize, fileid, start, stop, mode));
+
+	logrec->size += size;
+	return (0);
+}
+
+int
+__wt_logop_row_truncate_unpack(
+    WT_SESSION_IMPL *session, const uint8_t **pp, const uint8_t *end,
+    uint32_t *fileidp, WT_ITEM *startp, WT_ITEM *stopp, uint32_t *modep)
+{
+	const char *fmt = WT_UNCHECKED_STRING(IIIuuI);
+	uint32_t optype, size;
+
+	WT_RET(__wt_struct_unpack(session, *pp, WT_PTRDIFF(end, *pp), fmt,
+	    &optype, &size, fileidp, startp, stopp, modep));
+	WT_ASSERT(session, optype == WT_LOGOP_ROW_TRUNCATE);
+
+	*pp += size;
+	return (0);
+}
+
+int
+__wt_logop_row_truncate_print(
+    WT_SESSION_IMPL *session, const uint8_t **pp, const uint8_t *end, FILE *out)
+{
+	uint32_t fileid;
+	WT_ITEM start;
+	WT_ITEM stop;
+	uint32_t mode;
+
+	WT_RET(__wt_logop_row_truncate_unpack(
+	    session, pp, end, &fileid, &start, &stop, &mode));
+
+	fprintf(out, "\t" "fileid: %" PRIu32 "\n", fileid);
+	fprintf(out, "\t" "start: %.*s\n",
+	    (int)start.size, (const char *)start.data);
+	fprintf(out, "\t" "stop: %.*s\n",
+	    (int)stop.size, (const char *)stop.data);
+	fprintf(out, "\t" "mode: %" PRIu32 "\n", mode);
 	return (0);
 }

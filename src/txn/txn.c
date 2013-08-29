@@ -342,7 +342,7 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 
 	if (ret != 0 ||
 	    (txn->mod_count > 0 && S2C(session)->logging &&
-	    !F_ISSET(session, WT_SESSION_NO_LOGGING) &&
+	    !F_ISSET(session, WT_SESSION_LOGGING_DISABLED) &&
 	    (ret = __wt_txn_log_commit(session, cfg)) != 0)) {
 		WT_TRET(__wt_txn_rollback(session, cfg));
 		return (ret);
@@ -386,12 +386,25 @@ __wt_txn_rollback(WT_SESSION_IMPL *session, const char *cfg[])
 		    txn->id, 0));
 
 	/* Rollback updates. */
-	for (i = 0, op = txn->mod; i < txn->mod_count; i++, op++) {
-		if (op->upd != NULL)
-			op->upd->txnid = WT_TXN_ABORTED;
-		if (op->ref != NULL)
-			__wt_tree_walk_delete_rollback(op->ref);
-	}
+	for (i = 0, op = txn->mod; i < txn->mod_count; i++, op++)
+		switch (op->type) {
+		case TXN_OP_BASIC:
+		case TXN_OP_INMEM:
+			op->u.op.upd->txnid = WT_TXN_ABORTED;
+			break;
+		case TXN_OP_REF:
+			__wt_tree_walk_delete_rollback(op->u.ref);
+			break;
+		case TXN_OP_TRUNCATE_COL:
+		case TXN_OP_TRUNCATE_ROW:
+			/*
+			 * Nothing to do: these operations are only logged for
+			 * recovery.  The in-memory changes will be rolled back
+			 * with a combination of TXN_OP_REF and TXN_OP_INMEM
+			 * operations.
+			 */
+			break;
+		}
 
 	__wt_txn_release(session);
 	return (ret);
