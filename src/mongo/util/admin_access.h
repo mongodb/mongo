@@ -49,11 +49,6 @@ namespace mongo {
          *          block for long and throw if can't get a lock if needed.
          */
         virtual bool haveAdminUsers() const = 0;
-
-        /** @return privileged user with this name. This should not block
-         *          for long and throw if can't get a lock if needed
-         */
-        virtual BSONObj getAdminUser(const UserName& username) const = 0;
     };
 
     class NoAdminAccess : public AdminAccess {
@@ -61,7 +56,6 @@ namespace mongo {
         virtual ~NoAdminAccess() { }
 
         virtual bool haveAdminUsers() const { return false; }
-        virtual BSONObj getAdminUser(const UserName& username) const { return BSONObj(); }
     };
 
 }  // namespace mongo

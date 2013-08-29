@@ -253,20 +253,6 @@ namespace mongo {
         return authzSession->getAuthorizationManager().hasAnyPrivilegeDocuments();
     }
 
-    BSONObj RestAdminAccess::getAdminUser(const UserName& username) const {
-        AuthorizationSession* authzSession = cc().getAuthorizationSession();
-        BSONObj user;
-        Status status = authzSession->getAuthorizationManager().getPrivilegeDocument(username,
-                                                                                     &user);
-        if (status.isOK()) {
-            return user;
-        }
-        if (status.code() == ErrorCodes::UserNotFound) {
-            return BSONObj();
-        }
-        uasserted(17051, status.reason());
-    }
-
     class LowLevelMongodStatus : public WebStatusPlugin {
     public:
         LowLevelMongodStatus() : WebStatusPlugin( "overview" , 5 , "(only reported if can acquire read lock quickly)" ) {}
