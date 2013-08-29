@@ -102,12 +102,6 @@ namespace mongo {
          */
         Status setAuthorizationVersion(int version);
 
-        // Gets the privilege information document for "userName".
-        //
-        // On success, returns Status::OK() and stores a shared-ownership copy of the document into
-        // "result".
-        Status getPrivilegeDocument(const UserName& userName, BSONObj* result);
-
         // Returns true if there exists at least one privilege document in the system.
         bool hasAnyPrivilegeDocuments() const;
 

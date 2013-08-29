@@ -310,15 +310,6 @@ namespace {
         return _authEnabled;
     }
 
-    Status AuthorizationManager::getPrivilegeDocument(const UserName& userName, BSONObj* result) {
-        int version;
-        {
-            boost::lock_guard<boost::mutex> lk(_lock);
-            version = _getVersion_inlock();
-        }
-        return _externalState->getPrivilegeDocument(userName, version, result);
-    }
-
     bool AuthorizationManager::hasAnyPrivilegeDocuments() const {
         return _externalState->hasAnyPrivilegeDocuments();
     }
