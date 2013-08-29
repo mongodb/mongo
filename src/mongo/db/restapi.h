@@ -32,7 +32,6 @@ namespace mongo {
         virtual ~RestAdminAccess() { }
 
         virtual bool haveAdminUsers() const;
-        virtual BSONObj getAdminUser(const UserName& username) const;
     };
 
 } // namespace mongo
