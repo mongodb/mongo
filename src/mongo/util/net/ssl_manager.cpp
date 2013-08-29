@@ -417,6 +417,7 @@ namespace mongo {
 
     void SSLManager::_setupFIPS() {
         // Turn on FIPS mode if requested.
+#ifdef OPENSSL_FIPS
         int status = FIPS_mode_set(1);
         if (!status) {
             error() << "can't activate FIPS mode: " << 
@@ -424,6 +425,10 @@ namespace mongo {
             fassertFailed(16703);
         }
         log() << "FIPS 140-2 mode activated" << endl;
+#else
+        error() << "this version of mongodb was not compiled with FIPS support";
+        fassertFailed(17084);
+#endif
     }
 
     bool SSLManager::_initSSLContext(SSL_CTX** context, const Params& params) {
