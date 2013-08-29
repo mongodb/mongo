@@ -921,6 +921,7 @@ __conn_verbose_config(WT_SESSION_IMPL *session, const char *cfg[])
 		{ "mutex",	WT_VERB_mutex },
 		{ "read",	WT_VERB_read },
 		{ "reconcile",	WT_VERB_reconcile },
+		{ "recovery",	WT_VERB_recovery },
 		{ "salvage",	WT_VERB_salvage },
 		{ "verify",	WT_VERB_verify },
 		{ "version",	WT_VERB_version },

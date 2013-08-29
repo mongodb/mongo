@@ -60,6 +60,7 @@ flags = {
 		'VERB_mutex',
 		'VERB_read',
 		'VERB_reconcile',
+		'VERB_recovery',
 		'VERB_salvage',
 		'VERB_shared_cache',
 		'VERB_verify',

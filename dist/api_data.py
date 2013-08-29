@@ -337,6 +337,7 @@ connection_runtime_config = [
 		    'read',
 		    'readserver',
 		    'reconcile',
+		    'recovery',
 		    'salvage',
 		    'verify',
 		    'version',

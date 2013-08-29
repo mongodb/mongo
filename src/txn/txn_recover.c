@@ -31,6 +31,8 @@ __recovery_cursor(WT_SESSION_IMPL *session, WT_RECOVERY *r,
 	const char *cfg[] = { WT_CONFIG_BASE(session, session_open_cursor),
 	    "overwrite", NULL };
 
+	c = NULL;
+
 	/*
 	 * Only apply operations in the correct metadata phase, and if the LSN
 	 * is more recent than th last checkpoint.  If there is no entry for a
@@ -38,11 +40,11 @@ __recovery_cursor(WT_SESSION_IMPL *session, WT_RECOVERY *r,
 	 */
 	if (r->metadata_only != (id == 0) ||
 	    LOG_CMP(lsnp, &r->files[id].ckpt_lsn) < 0)
-		c = NULL;
+		;
 	else if (id > r->max_fileid)
 		r->max_fileid = id;
 	else if (id >= r->nfiles || r->files[id].uri == NULL)
-		WT_RET_MSG(session, ENOENT,
+		WT_VERBOSE_RET(session, recovery,
 		    "No file found with ID %u (max %u)", id, r->nfiles);
 	else if ((c = r->files[id].c) == NULL) {
 		WT_RET(__wt_open_cursor(
@@ -198,6 +200,11 @@ __recovery_setup_file(WT_RECOVERY *r,
 	r->files[fileid].ckpt_lsn = lsn;
 	if (LOG_CMP(&lsn, start_lsnp) < 0)
 		*start_lsnp = lsn;
+
+	WT_VERBOSE_RET(r->session, recovery,
+	    "Recovering %s with id %u @ (%" PRIu32 ", %" PRIu64 ")",
+	    uri, fileid, lsn.file, lsn.offset);
+
 	return (0);
 
 }
