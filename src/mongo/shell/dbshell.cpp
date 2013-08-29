@@ -23,7 +23,8 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "mongo/base/initializer.h"
+#include "mongo/base/init.h"
+#include "mongo/base/status.h"
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/client/sasl_client_authenticate.h"
 #include "mongo/db/cmdline.h"
@@ -36,6 +37,9 @@
 #include "mongo/shell/shell_utils.h"
 #include "mongo/shell/shell_utils_launcher.h"
 #include "mongo/util/file.h"
+#include "mongo/util/options_parser/environment.h"
+#include "mongo/util/options_parser/option_section.h"
+#include "mongo/util/options_parser/options_parser.h"
 #include "mongo/util/password.h"
 #include "mongo/util/stacktrace.h"
 #include "mongo/util/startup_test.h"
@@ -471,20 +475,24 @@ string finishCode( string code ) {
     return code;
 }
 
-#include <boost/program_options.hpp>
-namespace po = boost::program_options;
+namespace moe = mongo::optionenvironment;
 
-void show_help_text( const char* name, po::options_description options ) {
-    cout << "MongoDB shell version: " << mongo::versionString << endl;
-    cout << "usage: " << name << " [options] [db address] [file names (ending in .js)]" << endl
-         << "db address can be:" << endl
-         << "  foo                   foo database on local machine" << endl
-         << "  192.169.0.5/foo       foo database on 192.168.0.5 machine" << endl
-         << "  192.169.0.5:9999/foo  foo database on 192.168.0.5 machine on port 9999" << endl
-         << options << endl
-         << "file names: a list of files to run. files have to end in .js and will exit after "
-         << "unless --shell is specified" << endl;
-};
+moe::OptionSection options;
+moe::Environment params;
+
+std::string get_help_string(const StringData& name, const moe::OptionSection& options) {
+    StringBuilder sb;
+    sb << "MongoDB shell version: " << mongo::versionString << "\n";
+    sb << "usage: " << name << " [options] [db address] [file names (ending in .js)]\n"
+       << "db address can be:\n"
+       << "  foo                   foo database on local machine\n"
+       << "  192.169.0.5/foo       foo database on 192.168.0.5 machine\n"
+       << "  192.169.0.5:9999/foo  foo database on 192.168.0.5 machine on port 9999\n"
+       << options.helpString() << "\n"
+       << "file names: a list of files to run. files have to end in .js and will exit after "
+       << "unless --shell is specified";
+    return sb.str();
+}
 
 bool fileExists(const std::string& file) {
     try {
@@ -663,6 +671,206 @@ static void edit( const string& whatToEdit ) {
     }
 }
 
+Status addMongoShellOptions(moe::OptionSection* options) {
+
+    typedef moe::OptionDescription OD;
+    typedef moe::PositionalOptionDescription POD;
+
+    Status ret = options->addOption(OD("shell", "shell", moe::Switch,
+                "run the shell after executing files", true));
+    if (!ret.isOK()) {
+        return ret;
+    }
+    ret = options->addOption(OD("nodb", "nodb", moe::Switch,
+                "don't connect to mongod on startup - no 'db address' arg expected", true));
+    if (!ret.isOK()) {
+        return ret;
+    }
+    ret = options->addOption(OD("norc", "norc", moe::Switch,
+                "will not run the \".mongorc.js\" file on start up", true));
+    if (!ret.isOK()) {
+        return ret;
+    }
+    ret = options->addOption(OD("quiet", "quiet", moe::Switch, "be less chatty", true));
+    if (!ret.isOK()) {
+        return ret;
+    }
+    ret = options->addOption(OD("port", "port", moe::String, "port to connect to" , true));
+    if (!ret.isOK()) {
+        return ret;
+    }
+    ret = options->addOption(OD("host", "host", moe::String, "server to connect to" , true));
+    if (!ret.isOK()) {
+        return ret;
+    }
+    ret = options->addOption(OD("eval", "eval", moe::String, "evaluate javascript" , true));
+    if (!ret.isOK()) {
+        return ret;
+    }
+    ret = options->addOption(OD("username", "username,u", moe::String,
+                "username for authentication" , true));
+    if (!ret.isOK()) {
+        return ret;
+    }
+    ret = options->addOption(OD("password", "password,p", moe::String,
+                "password for authentication" , true, moe::Value(), moe::Value(std::string(""))));
+    if (!ret.isOK()) {
+        return ret;
+    }
+    ret = options->addOption(OD("authenticationDatabase", "authenticationDatabase", moe::String,
+                "user source (defaults to dbname)" , true, moe::Value(std::string(""))));
+    if (!ret.isOK()) {
+        return ret;
+    }
+    ret = options->addOption(OD("authenticationMechanism", "authenticationMechanism", moe::String,
+                "authentication mechanism", true, moe::Value(std::string("MONGODB-CR"))));
+    if (!ret.isOK()) {
+        return ret;
+    }
+    ret = options->addOption(OD("help", "help,h", moe::Switch, "show this usage information",
+                true));
+    if (!ret.isOK()) {
+        return ret;
+    }
+    ret = options->addOption(OD("version", "version", moe::Switch, "show version information",
+                true));
+    if (!ret.isOK()) {
+        return ret;
+    }
+    ret = options->addOption(OD("verbose", "verbose", moe::Switch, "increase verbosity", true));
+    if (!ret.isOK()) {
+        return ret;
+    }
+    ret = options->addOption(OD("ipv6", "ipv6", moe::Switch,
+                "enable IPv6 support (disabled by default)", true));
+    if (!ret.isOK()) {
+        return ret;
+    }
+#ifdef MONGO_SSL
+    ret = options->addOption(OD("ssl", "ssl", moe::Switch, "use SSL for all connections", true));
+    if (!ret.isOK()) {
+        return ret;
+    }
+    ret = options->addOption(OD("ssl.CAFile", "sslCAFile", moe::String,
+                "Certificate Authority for SSL" , true));
+    if (!ret.isOK()) {
+        return ret;
+    }
+    ret = options->addOption(OD("ssl.PEMKeyFile", "sslPEMKeyFile", moe::String,
+                "PEM certificate/key file for SSL" , true));
+    if (!ret.isOK()) {
+        return ret;
+    }
+    ret = options->addOption(OD("ssl.PEMKeyPassword", "sslPEMKeyPassword", moe::String,
+                "password for key in PEM file for SSL" , true));
+    if (!ret.isOK()) {
+        return ret;
+    }
+    ret = options->addOption(OD("ssl.CRLFile", "sslCRLFile", moe::String,
+                "Certificate Revocation List file for SSL", true));
+    if (!ret.isOK()) {
+        return ret;
+    }
+    ret = options->addOption(OD("ssl.FIPSMode", "sslFIPSMode", moe::Switch,
+                "activate FIPS 140-2 mode at startup", true));
+    if (!ret.isOK()) {
+        return ret;
+    }
+#endif
+
+    ret = options->addOption(OD("dbaddress", "dbaddress", moe::String, "dbaddress" , false));
+    if (!ret.isOK()) {
+        return ret;
+    }
+    ret = options->addOption(OD("files", "files", moe::StringVector, "files" , false));
+    if (!ret.isOK()) {
+        return ret;
+    }
+    // for testing, kill op will also be disabled automatically if the tests starts a mongo program
+    ret = options->addOption(OD("nokillop", "nokillop", moe::Switch, "nokillop", false));
+    if (!ret.isOK()) {
+        return ret;
+    }
+    // for testing, will kill op without prompting
+    ret = options->addOption(OD("autokillop", "autokillop", moe::Switch, "autokillop", false));
+    if (!ret.isOK()) {
+        return ret;
+    }
+
+    ret = options->addPositionalOption(POD("dbaddress", moe::String, 1));
+    if (!ret.isOK()) {
+        return ret;
+    }
+    ret = options->addPositionalOption(POD("files", moe::String, -1));
+    if (!ret.isOK()) {
+        return ret;
+    }
+
+    return Status::OK();
+}
+
+Status storeMongoShellOptions() {
+    if ( params.count( "quiet" ) ) {
+        mongo::cmdLine.quiet = true;
+    }
+#ifdef MONGO_SSL
+    if ( params.count( "ssl" ) ) {
+        mongo::cmdLine.sslOnNormalPorts = true;
+    }
+    if (params.count("ssl.PEMKeyFile")) {
+        mongo::cmdLine.sslPEMKeyFile = params["ssl.PEMKeyFile"].as<std::string>();
+    }
+    if (params.count("ssl.PEMKeyPassword")) {
+        mongo::cmdLine.sslPEMKeyPassword = params["ssl.PEMKeyPassword"].as<std::string>();
+    }
+    if (params.count("ssl.CAFile")) {
+        mongo::cmdLine.sslCAFile = params["ssl.CAFile"].as<std::string>();
+    }
+    if (params.count("ssl.CRLFile")) {
+        mongo::cmdLine.sslCRLFile = params["ssl.CRLFile"].as<std::string>();
+    }
+    if (params.count( "ssl.FIPSMode")) {
+        mongo::cmdLine.sslFIPSMode = true;
+    }
+#endif
+    if ( params.count( "ipv6" ) ) {
+        mongo::enableIPv6();
+    }
+    if ( params.count( "verbose" ) ) {
+        logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogSeverity::Debug(1));
+    }
+    return Status::OK();
+}
+
+MONGO_INITIALIZER_GENERAL(ParseStartupConfiguration,
+                            ("GlobalLogManager"),
+                            ("default", "completedStartupConfig"))(InitializerContext* context) {
+
+    options = moe::OptionSection("options");
+    moe::OptionsParser parser;
+
+    Status retStatus = addMongoShellOptions(&options);
+    if (!retStatus.isOK()) {
+        return retStatus;
+    }
+
+    retStatus = parser.run(options, context->args(), context->env(), &params);
+    if (!retStatus.isOK()) {
+        StringBuilder sb;
+        sb << "Error parsing options: " << retStatus.toString() << "\n";
+        sb << get_help_string(context->args()[0], options);
+        return Status(ErrorCodes::FailedToParse, sb.str());
+    }
+
+    // Handle storage in globals that may be needed in other MONGO_INITIALIZERS
+    retStatus = storeMongoShellOptions();
+    if (!retStatus.isOK()) {
+        return retStatus;
+    }
+
+    return Status::OK();
+}
+
 int _main( int argc, char* argv[], char **envp ) {
     mongo::isShell = true;
     setupSignals();
@@ -690,73 +898,7 @@ int _main( int argc, char* argv[], char **envp ) {
 
     string script;
 
-    po::options_description shell_options( "options" );
-    po::options_description hidden_options( "Hidden options" );
-    po::options_description cmdline_options( "Command line options" );
-    po::positional_options_description positional_options;
-
-    shell_options.add_options()
-    ( "shell", "run the shell after executing files" )
-    ( "nodb", "don't connect to mongod on startup - no 'db address' arg expected" )
-    ( "norc", "will not run the \".mongorc.js\" file on start up" )
-    ( "quiet", "be less chatty" )
-    ( "port", po::value<string>(), "port to connect to" )
-    ( "host", po::value<string>(), "server to connect to" )
-    ( "eval", po::value<string>(), "evaluate javascript" )
-    ( "username,u", po::value<string>(), "username for authentication" )
-    ( "password,p", po::value<string>()->implicit_value(""),
-      "password for authentication" )
-    ("authenticationDatabase",
-     po::value<string>()->default_value(""),
-     "user source (defaults to dbname)" )
-    ("authenticationMechanism",
-     po::value<string>()->default_value("MONGODB-CR"),
-     "authentication mechanism")
-    ( "help,h", "show this usage information" )
-    ( "version", "show version information" )
-    ( "verbose", "increase verbosity" )
-    ( "ipv6", "enable IPv6 support (disabled by default)" )
-#ifdef MONGO_SSL
-    ( "ssl", "use SSL for all connections" )
-    ( "sslCAFile", po::value<std::string>(), "Certificate Authority for SSL" )
-    ( "sslPEMKeyFile", po::value<std::string>(), "PEM certificate/key file for SSL" )
-    ( "sslPEMKeyPassword", po::value<std::string>(), "password for key in PEM file for SSL" )
-    ( "sslCRLFile", po::value<std::string>(), "Certificate Revocation List file for SSL")
-    ( "sslFIPSMode", "activate FIPS 140-2 mode at startup")
-#endif
-    ;
-
-    hidden_options.add_options()
-    ( "dbaddress", po::value<string>(), "dbaddress" )
-    ( "files", po::value< vector<string> >(), "files" )
-    ( "nokillop", "nokillop" ) // for testing, kill op will also be disabled automatically if the tests starts a mongo program
-    ( "autokillop", "autokillop" ) // for testing, will kill op without prompting
-    ;
-
-    positional_options.add( "dbaddress", 1 );
-    positional_options.add( "files", -1 );
-
-    cmdline_options.add( shell_options ).add( hidden_options );
-
-    po::variables_map params;
-
-    /* using the same style as db.cpp uses because eventually we're going
-     * to merge some of this stuff. */
-    int command_line_style = (((po::command_line_style::unix_style ^
-                                po::command_line_style::allow_guessing) |
-                               po::command_line_style::allow_long_disguise) ^
-                              po::command_line_style::allow_sticky);
-
-    try {
-        po::store(po::command_line_parser(argc, argv).options(cmdline_options).
-                  positional(positional_options).
-                  style(command_line_style).run(), params);
-    }
-    catch ( po::error &e ) {
-        cout << "ERROR: " << e.what() << endl << endl;
-        show_help_text( argv[0], shell_options );
-        return mongo::EXIT_BADOPTIONS;
-    }
+    mongo::runGlobalInitializersOrDie(argc, argv, envp);
 
     if (params.count("port")) {
         port = params["port"].as<string>();
@@ -806,7 +948,7 @@ int _main( int argc, char* argv[], char **envp ) {
         norc = true;
     }
     if ( params.count( "help" ) ) {
-        show_help_text( argv[0], shell_options );
+        std::cout << get_help_string(argv[0], options) << std::endl;
         return mongo::EXIT_CLEAN;
     }
     if ( params.count( "files" ) ) {
@@ -816,29 +958,6 @@ int _main( int argc, char* argv[], char **envp ) {
         cout << "MongoDB shell version: " << mongo::versionString << endl;
         return mongo::EXIT_CLEAN;
     }
-    if ( params.count( "quiet" ) ) {
-        mongo::cmdLine.quiet = true;
-    }
-#ifdef MONGO_SSL
-    if ( params.count( "ssl" ) ) {
-        mongo::cmdLine.sslOnNormalPorts = true;
-    }
-    if (params.count("sslPEMKeyFile")) {
-        mongo::cmdLine.sslPEMKeyFile = params["sslPEMKeyFile"].as<std::string>();
-    }
-    if (params.count("sslPEMKeyPassword")) {
-        mongo::cmdLine.sslPEMKeyPassword = params["sslPEMKeyPassword"].as<std::string>();
-    }
-    if (params.count("sslCAFile")) {
-        mongo::cmdLine.sslCAFile = params["sslCAFile"].as<std::string>();
-    }
-    if (params.count("sslCRLFile")) {
-        mongo::cmdLine.sslCRLFile = params["sslCRLFile"].as<std::string>();
-    }
-    if (params.count( "sslFIPSMode")) {
-        mongo::cmdLine.sslFIPSMode = true;
-    }
-#endif
     if ( params.count( "nokillop" ) ) {
         mongo::shell_utils::_nokillop = true;
     }
@@ -869,23 +988,16 @@ int _main( int argc, char* argv[], char **envp ) {
             }
         }
     }
-    if ( params.count( "ipv6" ) ) {
-        mongo::enableIPv6();
-    }
-    if ( params.count( "verbose" ) ) {
-        logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogSeverity::Debug(1));
-    }
 
     if ( url == "*" ) {
-        cout << "ERROR: " << "\"*\" is an invalid db address" << endl << endl;
-        show_help_text( argv[0], shell_options );
+        std::cerr << "ERROR: " << "\"*\" is an invalid db address" << std::endl;
+        std::cerr << get_help_string(argv[0], options) << std::endl;
         return mongo::EXIT_BADOPTIONS;
     }
 
     if ( ! mongo::cmdLine.quiet )
         cout << "MongoDB shell version: " << mongo::versionString << endl;
 
-    mongo::runGlobalInitializersOrDie(argc, argv, envp);
     mongo::StartupTest::runTests();
 
     logger::globalLogManager()->getNamedDomain("javascriptOutput")->attachAppender(
