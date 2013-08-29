@@ -725,13 +725,13 @@ extern int __wt_logop_read(WT_SESSION_IMPL *session,
     uint32_t *opsizep);
 extern int __wt_logop_col_put_pack( WT_SESSION_IMPL *session,
     WT_ITEM *logrec,
-    const char *uri,
+    uint32_t fileid,
     uint64_t recno,
     WT_ITEM *value);
 extern int __wt_logop_col_put_unpack( WT_SESSION_IMPL *session,
     const uint8_t **pp,
     const uint8_t *end,
-    const char **urip,
+    uint32_t *fileidp,
     uint64_t *recnop,
     WT_ITEM *valuep);
 extern int __wt_logop_col_put_print( WT_SESSION_IMPL *session,
@@ -740,12 +740,12 @@ extern int __wt_logop_col_put_print( WT_SESSION_IMPL *session,
     FILE *out);
 extern int __wt_logop_col_remove_pack( WT_SESSION_IMPL *session,
     WT_ITEM *logrec,
-    const char *uri,
+    uint32_t fileid,
     uint64_t recno);
 extern int __wt_logop_col_remove_unpack( WT_SESSION_IMPL *session,
     const uint8_t **pp,
     const uint8_t *end,
-    const char **urip,
+    uint32_t *fileidp,
     uint64_t *recnop);
 extern int __wt_logop_col_remove_print( WT_SESSION_IMPL *session,
     const uint8_t **pp,
@@ -753,13 +753,13 @@ extern int __wt_logop_col_remove_print( WT_SESSION_IMPL *session,
     FILE *out);
 extern int __wt_logop_row_put_pack( WT_SESSION_IMPL *session,
     WT_ITEM *logrec,
-    const char *uri,
+    uint32_t fileid,
     WT_ITEM *key,
     WT_ITEM *value);
 extern int __wt_logop_row_put_unpack( WT_SESSION_IMPL *session,
     const uint8_t **pp,
     const uint8_t *end,
-    const char **urip,
+    uint32_t *fileidp,
     WT_ITEM *keyp,
     WT_ITEM *valuep);
 extern int __wt_logop_row_put_print( WT_SESSION_IMPL *session,
@@ -768,12 +768,12 @@ extern int __wt_logop_row_put_print( WT_SESSION_IMPL *session,
     FILE *out);
 extern int __wt_logop_row_remove_pack( WT_SESSION_IMPL *session,
     WT_ITEM *logrec,
-    const char *uri,
+    uint32_t fileid,
     WT_ITEM *key);
 extern int __wt_logop_row_remove_unpack( WT_SESSION_IMPL *session,
     const uint8_t **pp,
     const uint8_t *end,
-    const char **urip,
+    uint32_t *fileidp,
     WT_ITEM *keyp);
 extern int __wt_logop_row_remove_print( WT_SESSION_IMPL *session,
     const uint8_t **pp,

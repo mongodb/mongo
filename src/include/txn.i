@@ -37,7 +37,7 @@ __wt_txn_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_UPDATE *upd)
 		WT_RET(__wt_row_key_get(cbt, &op->key));
 	op->ins = cbt->ins;
 	op->upd = upd;
-	op->uri = session->dhandle->name;
+	op->fileid = S2BT(session)->id;
 	upd->txnid = session->txn.id;
 	return (0);
 }

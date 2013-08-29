@@ -56,9 +56,7 @@ struct __wt_txn_op {
 	WT_UPDATE *upd;
 	WT_ITEM key;
 	WT_REF *ref;
-
-	/* XXX temporary: need file IDs. */
-	const char *uri;
+	uint32_t fileid;
 };
 
 /*

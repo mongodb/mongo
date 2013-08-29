@@ -252,6 +252,8 @@ file_meta = file_config + [
 		the file checkpoint entries'''),
 	Config('checkpoint_lsn', '', r'''
 		LSN of the last checkpoint'''),
+	Config('id', '', r'''
+		the file's ID number'''),
 	Config('version', '(major=0,minor=0)', r'''
 		the file version'''),
 ]

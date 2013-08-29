@@ -32,17 +32,17 @@ __txn_op_log(WT_SESSION_IMPL *session, WT_ITEM *logrec, WT_TXN_OP *op)
 
 		if (WT_UPDATE_DELETED_ISSET(op->upd))
 			WT_RET(__wt_logop_col_remove_pack(
-			    session, logrec, op->uri, recno));
+			    session, logrec, op->fileid, recno));
 		else
 			WT_RET(__wt_logop_col_put_pack(
-			    session, logrec, op->uri, recno, &value));
+			    session, logrec, op->fileid, recno, &value));
 	} else {
 		if (WT_UPDATE_DELETED_ISSET(op->upd))
 			WT_RET(__wt_logop_row_remove_pack(
-			    session, logrec, op->uri, &op->key));
+			    session, logrec, op->fileid, &op->key));
 		else
 			WT_RET(__wt_logop_row_put_pack(
-			    session, logrec, op->uri, &op->key, &value));
+			    session, logrec, op->fileid, &op->key, &value));
 	}
 
 	return (0);
@@ -68,19 +68,62 @@ __txn_commit_printlog(WT_SESSION_IMPL *session, WT_ITEM *logrec, FILE *out)
 	return (0);
 }
 
+/* Recovery state. */
+typedef struct {
+	WT_SESSION_IMPL *session;
+
+	struct {
+		const char *uri;
+		WT_CURSOR *c;
+		WT_LSN ckpt_lsn;
+	} *files;
+
+	size_t file_alloc;
+	u_int nfiles;
+
+	int metadata_only;
+} WT_RECOVERY;
+
 static int
-__txn_op_apply(WT_SESSION_IMPL *session,
-    const uint8_t **pp, const uint8_t *end, int metadata)
+__recovery_cursor(WT_SESSION_IMPL *session, WT_RECOVERY *r,
+    WT_LSN *lsnp, u_int id, WT_CURSOR **cp)
+{
+	WT_CURSOR *c;
+	const char *cfg[] = { WT_CONFIG_BASE(session, session_open_cursor),
+	    "overwrite", NULL };
+
+	if (id >= r->nfiles || r->files[id].uri == NULL)
+		WT_RET_MSG(session, ENOENT, "No file found with ID %u", id);
+
+	/*
+	 * Only apply operations in the correct metadata phase, and if the LSN
+	 * is more recent than th last checkpoint.
+	 */
+	if (r->metadata_only != (id == 0) ||
+	    LOG_CMP(lsnp, &r->files[id].ckpt_lsn) < 0)
+		c = NULL;
+	else if ((c = r->files[id].c) == NULL) {
+		WT_RET(__wt_open_cursor(
+		    session, r->files[id].uri, NULL, cfg, &c));
+		r->files[id].c = c;
+	}
+
+	*cp = c;
+	return (0);
+}
+
+static int
+__txn_op_apply(
+    WT_RECOVERY *r, WT_LSN *lsnp, const uint8_t **pp, const uint8_t *end)
 {
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
 	WT_ITEM key, value;
-	const char *uri;
-	const char *cfg[] = { WT_CONFIG_BASE(session, session_open_cursor),
-	    "overwrite", NULL };
+	WT_SESSION_IMPL *session;
 	uint64_t recno;
-	uint32_t optype, opsize;
-	int is_metadata;
+	uint32_t fileid, optype, opsize;
+
+	session = r->session;
 
 	/* Peek at the size and the type. */
 	WT_RET(__wt_logop_read(session, pp, end, &optype, &opsize));
@@ -89,52 +132,44 @@ __txn_op_apply(WT_SESSION_IMPL *session,
 	switch (optype) {
 	case WT_LOGOP_COL_PUT:
 		WT_RET(__wt_logop_col_put_unpack(session, pp, end,
-		    &uri, &recno, &value));
-		is_metadata = (strcmp(uri, WT_METADATA_URI) == 0);
-		if (metadata != is_metadata)
+		    &fileid, &recno, &value));
+		WT_RET(__recovery_cursor(session, r, lsnp, fileid, &cursor));
+		if (cursor == NULL)
 			break;
-		WT_RET(__wt_open_cursor(session, uri, NULL, cfg, &cursor));
 		cursor->set_key(cursor, recno);
 		__wt_cursor_set_raw_value(cursor, &value);
 		WT_TRET(cursor->insert(cursor));
-		WT_TRET(cursor->close(cursor));
 		break;
 
 	case WT_LOGOP_COL_REMOVE:
 		WT_RET(__wt_logop_col_remove_unpack(session, pp, end,
-		    &uri, &recno));
-		is_metadata = (strcmp(uri, WT_METADATA_URI) == 0);
-		if (metadata != is_metadata)
+		    &fileid, &recno));
+		WT_RET(__recovery_cursor(session, r, lsnp, fileid, &cursor));
+		if (cursor == NULL)
 			break;
-		WT_RET(__wt_open_cursor(session, uri, NULL, cfg, &cursor));
 		cursor->set_key(cursor, recno);
 		WT_TRET(cursor->remove(cursor));
-		WT_TRET(cursor->close(cursor));
 		break;
 
 	case WT_LOGOP_ROW_PUT:
 		WT_RET(__wt_logop_row_put_unpack(session, pp, end,
-		    &uri, &key, &value));
-		is_metadata = (strcmp(uri, WT_METADATA_URI) == 0);
-		if (metadata != is_metadata)
+		    &fileid, &key, &value));
+		WT_RET(__recovery_cursor(session, r, lsnp, fileid, &cursor));
+		if (cursor == NULL)
 			break;
-		WT_RET(__wt_open_cursor(session, uri, NULL, cfg, &cursor));
 		__wt_cursor_set_raw_key(cursor, &key);
 		__wt_cursor_set_raw_value(cursor, &value);
 		WT_TRET(cursor->insert(cursor));
-		WT_TRET(cursor->close(cursor));
 		break;
 
 	case WT_LOGOP_ROW_REMOVE:
 		WT_RET(__wt_logop_row_remove_unpack(session, pp, end,
-		    &uri, &key));
-		is_metadata = (strcmp(uri, WT_METADATA_URI) == 0);
-		if (metadata != is_metadata)
+		    &fileid, &key));
+		WT_RET(__recovery_cursor(session, r, lsnp, fileid, &cursor));
+		if (cursor == NULL)
 			break;
-		WT_RET(__wt_open_cursor(session, uri, NULL, cfg, &cursor));
 		__wt_cursor_set_raw_key(cursor, &key);
 		WT_TRET(cursor->remove(cursor));
-		WT_TRET(cursor->close(cursor));
 		break;
 
 	WT_ILLEGAL_VALUE(session);
@@ -147,14 +182,14 @@ __txn_op_apply(WT_SESSION_IMPL *session,
 }
 
 static int
-__txn_commit_apply(WT_SESSION_IMPL *session,
-    WT_LSN *lsnp, const uint8_t **pp, const uint8_t *end, int metadata)
+__txn_commit_apply(
+    WT_RECOVERY *r, WT_LSN *lsnp, const uint8_t **pp, const uint8_t *end)
 {
 	WT_UNUSED(lsnp);
 
 	/* The logging subsystem zero-pads records. */
 	while (*pp < end && **pp)
-		WT_RET(__txn_op_apply(session, pp, end, metadata));
+		WT_RET(__txn_op_apply(r, lsnp, pp, end));
 
 	return (0);
 }
@@ -272,9 +307,7 @@ __txn_log_recover(
 {
 	const uint8_t *end, *p;
 	uint32_t rectype;
-	int metadata;
 
-	metadata = *(int *)cookie;
 	p = (const uint8_t *)logrec->data + offsetof(WT_LOG_RECORD, record);
 	end = (const uint8_t *)logrec->data + logrec->size;
 
@@ -283,11 +316,104 @@ __txn_log_recover(
 
 	switch (rectype) {
 	case WT_LOGREC_COMMIT:
-		WT_RET(__txn_commit_apply(session, lsnp, &p, end, metadata));
+		WT_RET(__txn_commit_apply(cookie, lsnp, &p, end));
 		break;
 	}
 
 	return (0);
+}
+
+/*
+ * __recovery_setup_slot --
+ *	Set up the recovery slot for a file.
+ */
+static int
+__recovery_setup_file(WT_RECOVERY *r,
+    const char *uri, const char *config, WT_LSN *start_lsnp)
+{
+	WT_CONFIG_ITEM cval;
+	WT_LSN lsn;
+	uint32_t fileid;
+
+	WT_RET(__wt_config_getones(r->session, config, "id", &cval));
+	fileid = (uint32_t)cval.val;
+
+	if (r->nfiles <= fileid) {
+		WT_RET(__wt_realloc_def(
+		    r->session, &r->file_alloc, fileid + 1, &r->files));
+		r->nfiles = fileid + 1;
+	}
+
+	WT_RET(__wt_strdup(r->session, uri, &r->files[fileid].uri));
+	WT_RET(
+	    __wt_config_getones(r->session, config, "checkpoint_lsn", &cval));
+	if (cval.type != WT_CONFIG_ITEM_STRUCT)
+		MAX_LSN(&lsn);
+	else if (sscanf(cval.str, "(%" PRIu32 ",%" PRIuMAX ")",
+	    &lsn.file, &lsn.offset) != 2)
+		WT_RET_MSG(r->session, EINVAL,
+		    "Failed to parse checkpoint LSN '%.*s'",
+		    (int)cval.len, cval.str);
+
+	r->files[fileid].ckpt_lsn = lsn;
+	if (LOG_CMP(&lsn, start_lsnp) < 0)
+		*start_lsnp = lsn;
+	return (0);
+
+}
+
+/*
+ * __recovery_free --
+ *	Free the recovery state.
+ */
+static int
+__recovery_free(WT_RECOVERY *r)
+{
+	WT_CURSOR *c;
+	WT_DECL_RET;
+	WT_SESSION_IMPL *session;
+	u_int i;
+
+	session = r->session;
+	for (i = 0; i < r->nfiles; i++) {
+		__wt_free(session, r->files[i].uri);
+		if ((c = r->files[i].c) != NULL)
+			WT_TRET(c->close(c));
+	}
+
+	__wt_free(session, r->files);
+	return (ret);
+}
+
+/*
+ * __recovery_file_scan --
+ *	Scan the files referenced from the metadata and gather information
+ *	about them for recovery.
+ */
+static int
+__recovery_file_scan(WT_RECOVERY *r, WT_LSN *start_lsnp)
+{
+	WT_DECL_RET;
+	WT_CURSOR *c;
+	const char *uri, *config;
+	int cmp;
+
+	/* Scan through all files in the metadata. */
+	c = r->files[0].c;
+	c->set_key(c, "file:");
+	cmp = 0;
+	WT_ERR_NOTFOUND_OK(c->search_near(c, &cmp));
+	if (cmp < 0)
+		WT_ERR_NOTFOUND_OK(c->next(c));
+	while ((ret = c->next(c)) == 0) {
+		WT_ERR(c->get_key(c, &uri));
+		if (!WT_PREFIX_MATCH(uri, "file:"))
+			break;
+		WT_ERR(c->get_value(c, &config));
+		WT_ERR(__recovery_setup_file(r, uri, config, start_lsnp));
+	}
+	WT_ERR_NOTFOUND_OK(ret);
+err:	return (ret);
 }
 
 /*
@@ -299,27 +425,40 @@ __wt_txn_recover(WT_SESSION_IMPL *default_session)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
-	WT_SESSION_IMPL *rec_session;
-	int metadata;
+	WT_LSN start_lsn;
+	WT_RECOVERY r;
+	WT_SESSION_IMPL *session;
+	const char *config;
 
 	conn = S2C(default_session);
+	WT_CLEAR(r);
+
 	/* We need a real session for recovery. */
-	rec_session = NULL;
-	WT_ERR(__wt_open_session(conn, 0, NULL, NULL, &rec_session));
-	F_SET(rec_session, WT_SESSION_NO_LOGGING);
+	WT_RET(__wt_open_session(conn, 0, NULL, NULL, &session));
+	F_SET(session, WT_SESSION_NO_LOGGING);
+	r.session = session;
 
-	metadata = 1;
-	WT_ERR(__wt_log_scan(rec_session,
+	WT_ERR(__wt_metadata_search(session, WT_METADATA_URI, &config));
+	MAX_LSN(&start_lsn);
+	WT_ERR(__recovery_setup_file(&r, WT_METADATA_URI, config, &start_lsn));
+	WT_ERR(__wt_metadata_cursor(session, NULL, &r.files[0].c));
+
+	/* First, recover the metadata, starting from the checkpoint's LSN. */
+	r.metadata_only = 1;
+	WT_ERR(__wt_log_scan(session, &start_lsn, WT_LOGSCAN_RECOVER,
+	    __txn_log_recover, &r));
+
+	WT_ERR(__recovery_file_scan(&r, &start_lsn));
+
+	/* Now, recover all the files apart from the metadata. */
+	r.metadata_only = 0;
+	WT_ERR(__wt_log_scan(session,
 	    NULL, WT_LOGSCAN_FIRST | WT_LOGSCAN_RECOVER,
-	    __txn_log_recover, &metadata));
+	    __txn_log_recover, &r));
 
-	metadata = 0;
-	WT_ERR(__wt_log_scan(rec_session,
-	    NULL, WT_LOGSCAN_FIRST | WT_LOGSCAN_RECOVER,
-	    __txn_log_recover, &metadata));
-
-err:	if (rec_session != NULL)
-		WT_TRET(rec_session->iface.close(&rec_session->iface, NULL));
+err:	__recovery_free(&r);
+	__wt_free(session, config);
+	WT_TRET(session->iface.close(&session->iface, NULL));
 
 	return (ret);
 }

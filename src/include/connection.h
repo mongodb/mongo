@@ -119,7 +119,7 @@ struct __wt_connection_impl {
 	TAILQ_HEAD(__wt_block_qh, __wt_block) blockqh;
 
 	u_int open_btree_count;		/* Locked: open writable btree count */
-	u_int next_file_id;		/* Locked: file ID counter */
+	uint32_t next_file_id;		/* Locked: file ID counter */
 
 	/*
 	 * WiredTiger allocates space for 50 simultaneous sessions (threads of

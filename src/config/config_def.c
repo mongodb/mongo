@@ -65,6 +65,7 @@ static const WT_CONFIG_CHECK confchk_file_meta[] = {
 	{ "format", "string", "choices=[\"btree\"]", NULL},
 	{ "huffman_key", "string", NULL, NULL},
 	{ "huffman_value", "string", NULL, NULL},
+	{ "id", "string", NULL, NULL},
 	{ "internal_item_max", "int", "min=0", NULL},
 	{ "internal_key_truncate", "boolean", NULL, NULL},
 	{ "internal_page_max", "int", "min=512B,max=512MB", NULL},
@@ -312,7 +313,7 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	{ "file.meta",
 	  "allocation_size=4KB,block_compressor=,cache_resident=0,checkpoint=,"
 	  "checkpoint_lsn=,checksum=uncompressed,collator=,columns=,"
-	  "dictionary=0,format=btree,huffman_key=,huffman_value=,"
+	  "dictionary=0,format=btree,huffman_key=,huffman_value=,id=,"
 	  "internal_item_max=0,internal_key_truncate=,internal_page_max=4KB,"
 	  "key_format=u,key_gap=10,leaf_item_max=0,leaf_page_max=1MB,"
 	  "memory_page_max=5MB,os_cache_dirty_max=0,os_cache_max=0,"

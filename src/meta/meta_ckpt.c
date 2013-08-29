@@ -445,7 +445,7 @@ __wt_meta_ckptlist_set(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_buf_catfmt(session, buf, ")"));
 	if (ckptlsn != NULL)
 		WT_ERR(__wt_buf_catfmt(session, buf,
-		    ",checkpoint_lsn=(%" PRIu32 ", %" PRIuMAX ")",
+		    ",checkpoint_lsn=(%" PRIu32 ",%" PRIuMAX ")",
 		    ckptlsn->file, (uintmax_t)ckptlsn->offset));
 	WT_ERR(__ckpt_set(session, fname, buf->mem));
 

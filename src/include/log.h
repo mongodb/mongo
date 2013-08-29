@@ -21,6 +21,11 @@ struct __wt_lsn {
 	(l)->offset = 0;						\
 } while (0)
 
+#define	MAX_LSN(l)	do {						\
+	(l)->file = UINT32_MAX;						\
+	(l)->offset = INT64_MAX;					\
+} while (0)
+
 /*
  * Compare 2 LSNs, return -1 if lsn0 < lsn1, 0 if lsn0 == lsn1
  * and 1 if lsn0 > lsn1.

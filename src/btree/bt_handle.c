@@ -195,6 +195,10 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 		    "%" PRIu64 ".%" PRIu64, maj_version, min_version);
 	}
 
+	/* Get the file ID. */
+	WT_RET(__wt_config_gets(session, cfg, "id", &cval));
+	btree->id = (uint32_t)cval.val;
+
 	/* Validate file types and check the data format plan. */
 	WT_RET(__wt_config_gets(session, cfg, "key_format", &cval));
 	WT_RET(__wt_struct_check(session, cval.str, cval.len, NULL, NULL));

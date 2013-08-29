@@ -27,7 +27,7 @@ __metadata_config(WT_SESSION_IMPL *session, const char **metaconfp)
 	/* Create a turtle file with default values. */
 	WT_RET(__wt_scr_alloc(session, 0, &buf));
 	WT_ERR(__wt_buf_fmt(session, buf,
-	    "key_format=S,value_format=S,version=(major=%d,minor=%d)",
+	    "key_format=S,value_format=S,id=0,version=(major=%d,minor=%d)",
 	    WT_BTREE_MAJOR_VERSION_MAX, WT_BTREE_MINOR_VERSION_MAX));
 	cfg[1] = buf->data;
 	WT_ERR(__wt_config_collapse(session, cfg, &metaconf));

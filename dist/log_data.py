@@ -19,7 +19,7 @@ class LogRecordType:
 
 rectypes = [
 	LogRecordType('invalid', []),
-	LogRecordType('checkpoint', [('string', 'uri'), ('int', 'start')]),
+	LogRecordType('checkpoint', [('uint32', 'fileid'), ('int', 'start')]),
 	LogRecordType('commit', [('uint64', 'txnid')]),
 	LogRecordType('debug', [('string', 'message')]),
 ]
@@ -35,11 +35,11 @@ class LogOperationType:
 optypes = [
 	LogRecordType('invalid', []),
 	LogOperationType('col_put',
-		[('string', 'uri'), ('recno', 'recno'), ('item', 'value')]),
+		[('uint32', 'fileid'), ('recno', 'recno'), ('item', 'value')]),
 	LogOperationType('col_remove',
-		[('string', 'uri'), ('recno', 'recno')]),
+		[('uint32', 'fileid'), ('recno', 'recno')]),
 	LogOperationType('row_put',
-		[('string', 'uri'), ('item', 'key'), ('item', 'value')]),
+		[('uint32', 'fileid'), ('item', 'key'), ('item', 'value')]),
 	LogOperationType('row_remove',
-		[('string', 'uri'), ('item', 'key')]),
+		[('uint32', 'fileid'), ('item', 'key')]),
 ]

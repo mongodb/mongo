@@ -84,13 +84,15 @@ __create_file(WT_SESSION_IMPL *session,
 		WT_ERR(__wt_meta_track_fileop(session, NULL, uri));
 
 	/*
-	 * If creating an ordinary file, append the current version numbers to
-	 * the passed-in configuration and insert the resulting configuration
-	 * into the metadata.
+	 * If creating an ordinary file, append the file ID and current version
+	 * numbers to the passed-in configuration and insert the resulting
+	 * configuration into the metadata.
 	 */
 	if (!is_metadata) {
 		WT_ERR(__wt_scr_alloc(session, 0, &val));
-		WT_ERR(__wt_buf_fmt(session, val, "version=(major=%d,minor=%d)",
+		WT_ERR(__wt_buf_fmt(session, val,
+		    "id=%" PRIu32 ",version=(major=%d,minor=%d)",
+		    ++S2C(session)->next_file_id,
 		    WT_BTREE_MAJOR_VERSION_MAX, WT_BTREE_MINOR_VERSION_MAX));
 		for (p = filecfg; *p != NULL; ++p)
 			;

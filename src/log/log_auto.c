@@ -46,22 +46,22 @@ __wt_logop_read(WT_SESSION_IMPL *session,
 int
 __wt_logop_col_put_pack(
     WT_SESSION_IMPL *session, WT_ITEM *logrec,
-    const char *uri, uint64_t recno, WT_ITEM *value)
+    uint32_t fileid, uint64_t recno, WT_ITEM *value)
 {
-	const char *fmt = WT_UNCHECKED_STRING(IISru);
+	const char *fmt = WT_UNCHECKED_STRING(IIIru);
 	size_t size;
 	uint32_t optype, recsize;
 
 	optype = WT_LOGOP_COL_PUT;
 	WT_RET(__wt_struct_size(session, &size, fmt,
-	    optype, 0, uri, recno, value));
+	    optype, 0, fileid, recno, value));
 
 	size += __wt_vsize_uint(size) - 1;
 	WT_RET(__wt_buf_extend(session, logrec, logrec->size + size));
 	recsize = (uint32_t)size;
 	WT_RET(__wt_struct_pack(session,
 	    (uint8_t *)logrec->data + logrec->size, size, fmt,
-	    optype, recsize, uri, recno, value));
+	    optype, recsize, fileid, recno, value));
 
 	logrec->size += size;
 	return (0);
@@ -70,13 +70,13 @@ __wt_logop_col_put_pack(
 int
 __wt_logop_col_put_unpack(
     WT_SESSION_IMPL *session, const uint8_t **pp, const uint8_t *end,
-    const char **urip, uint64_t *recnop, WT_ITEM *valuep)
+    uint32_t *fileidp, uint64_t *recnop, WT_ITEM *valuep)
 {
-	const char *fmt = WT_UNCHECKED_STRING(IISru);
+	const char *fmt = WT_UNCHECKED_STRING(IIIru);
 	uint32_t optype, size;
 
 	WT_RET(__wt_struct_unpack(session, *pp, WT_PTRDIFF(end, *pp), fmt,
-	    &optype, &size, urip, recnop, valuep));
+	    &optype, &size, fileidp, recnop, valuep));
 	WT_ASSERT(session, optype == WT_LOGOP_COL_PUT);
 
 	*pp += size;
@@ -87,14 +87,14 @@ int
 __wt_logop_col_put_print(
     WT_SESSION_IMPL *session, const uint8_t **pp, const uint8_t *end, FILE *out)
 {
-	const char *uri;
+	uint32_t fileid;
 	uint64_t recno;
 	WT_ITEM value;
 
 	WT_RET(__wt_logop_col_put_unpack(
-	    session, pp, end, &uri, &recno, &value));
+	    session, pp, end, &fileid, &recno, &value));
 
-	fprintf(out, "\t" "uri: %s\n", uri);
+	fprintf(out, "\t" "fileid: %" PRIu32 "\n", fileid);
 	fprintf(out, "\t" "recno: %" PRIu64 "\n", recno);
 	fprintf(out, "\t" "value: %.*s\n",
 	    (int)value.size, (const char *)value.data);
@@ -104,22 +104,22 @@ __wt_logop_col_put_print(
 int
 __wt_logop_col_remove_pack(
     WT_SESSION_IMPL *session, WT_ITEM *logrec,
-    const char *uri, uint64_t recno)
+    uint32_t fileid, uint64_t recno)
 {
-	const char *fmt = WT_UNCHECKED_STRING(IISr);
+	const char *fmt = WT_UNCHECKED_STRING(IIIr);
 	size_t size;
 	uint32_t optype, recsize;
 
 	optype = WT_LOGOP_COL_REMOVE;
 	WT_RET(__wt_struct_size(session, &size, fmt,
-	    optype, 0, uri, recno));
+	    optype, 0, fileid, recno));
 
 	size += __wt_vsize_uint(size) - 1;
 	WT_RET(__wt_buf_extend(session, logrec, logrec->size + size));
 	recsize = (uint32_t)size;
 	WT_RET(__wt_struct_pack(session,
 	    (uint8_t *)logrec->data + logrec->size, size, fmt,
-	    optype, recsize, uri, recno));
+	    optype, recsize, fileid, recno));
 
 	logrec->size += size;
 	return (0);
@@ -128,13 +128,13 @@ __wt_logop_col_remove_pack(
 int
 __wt_logop_col_remove_unpack(
     WT_SESSION_IMPL *session, const uint8_t **pp, const uint8_t *end,
-    const char **urip, uint64_t *recnop)
+    uint32_t *fileidp, uint64_t *recnop)
 {
-	const char *fmt = WT_UNCHECKED_STRING(IISr);
+	const char *fmt = WT_UNCHECKED_STRING(IIIr);
 	uint32_t optype, size;
 
 	WT_RET(__wt_struct_unpack(session, *pp, WT_PTRDIFF(end, *pp), fmt,
-	    &optype, &size, urip, recnop));
+	    &optype, &size, fileidp, recnop));
 	WT_ASSERT(session, optype == WT_LOGOP_COL_REMOVE);
 
 	*pp += size;
@@ -145,13 +145,13 @@ int
 __wt_logop_col_remove_print(
     WT_SESSION_IMPL *session, const uint8_t **pp, const uint8_t *end, FILE *out)
 {
-	const char *uri;
+	uint32_t fileid;
 	uint64_t recno;
 
 	WT_RET(__wt_logop_col_remove_unpack(
-	    session, pp, end, &uri, &recno));
+	    session, pp, end, &fileid, &recno));
 
-	fprintf(out, "\t" "uri: %s\n", uri);
+	fprintf(out, "\t" "fileid: %" PRIu32 "\n", fileid);
 	fprintf(out, "\t" "recno: %" PRIu64 "\n", recno);
 	return (0);
 }
@@ -159,22 +159,22 @@ __wt_logop_col_remove_print(
 int
 __wt_logop_row_put_pack(
     WT_SESSION_IMPL *session, WT_ITEM *logrec,
-    const char *uri, WT_ITEM *key, WT_ITEM *value)
+    uint32_t fileid, WT_ITEM *key, WT_ITEM *value)
 {
-	const char *fmt = WT_UNCHECKED_STRING(IISuu);
+	const char *fmt = WT_UNCHECKED_STRING(IIIuu);
 	size_t size;
 	uint32_t optype, recsize;
 
 	optype = WT_LOGOP_ROW_PUT;
 	WT_RET(__wt_struct_size(session, &size, fmt,
-	    optype, 0, uri, key, value));
+	    optype, 0, fileid, key, value));
 
 	size += __wt_vsize_uint(size) - 1;
 	WT_RET(__wt_buf_extend(session, logrec, logrec->size + size));
 	recsize = (uint32_t)size;
 	WT_RET(__wt_struct_pack(session,
 	    (uint8_t *)logrec->data + logrec->size, size, fmt,
-	    optype, recsize, uri, key, value));
+	    optype, recsize, fileid, key, value));
 
 	logrec->size += size;
 	return (0);
@@ -183,13 +183,13 @@ __wt_logop_row_put_pack(
 int
 __wt_logop_row_put_unpack(
     WT_SESSION_IMPL *session, const uint8_t **pp, const uint8_t *end,
-    const char **urip, WT_ITEM *keyp, WT_ITEM *valuep)
+    uint32_t *fileidp, WT_ITEM *keyp, WT_ITEM *valuep)
 {
-	const char *fmt = WT_UNCHECKED_STRING(IISuu);
+	const char *fmt = WT_UNCHECKED_STRING(IIIuu);
 	uint32_t optype, size;
 
 	WT_RET(__wt_struct_unpack(session, *pp, WT_PTRDIFF(end, *pp), fmt,
-	    &optype, &size, urip, keyp, valuep));
+	    &optype, &size, fileidp, keyp, valuep));
 	WT_ASSERT(session, optype == WT_LOGOP_ROW_PUT);
 
 	*pp += size;
@@ -200,14 +200,14 @@ int
 __wt_logop_row_put_print(
     WT_SESSION_IMPL *session, const uint8_t **pp, const uint8_t *end, FILE *out)
 {
-	const char *uri;
+	uint32_t fileid;
 	WT_ITEM key;
 	WT_ITEM value;
 
 	WT_RET(__wt_logop_row_put_unpack(
-	    session, pp, end, &uri, &key, &value));
+	    session, pp, end, &fileid, &key, &value));
 
-	fprintf(out, "\t" "uri: %s\n", uri);
+	fprintf(out, "\t" "fileid: %" PRIu32 "\n", fileid);
 	fprintf(out, "\t" "key: %.*s\n",
 	    (int)key.size, (const char *)key.data);
 	fprintf(out, "\t" "value: %.*s\n",
@@ -218,22 +218,22 @@ __wt_logop_row_put_print(
 int
 __wt_logop_row_remove_pack(
     WT_SESSION_IMPL *session, WT_ITEM *logrec,
-    const char *uri, WT_ITEM *key)
+    uint32_t fileid, WT_ITEM *key)
 {
-	const char *fmt = WT_UNCHECKED_STRING(IISu);
+	const char *fmt = WT_UNCHECKED_STRING(IIIu);
 	size_t size;
 	uint32_t optype, recsize;
 
 	optype = WT_LOGOP_ROW_REMOVE;
 	WT_RET(__wt_struct_size(session, &size, fmt,
-	    optype, 0, uri, key));
+	    optype, 0, fileid, key));
 
 	size += __wt_vsize_uint(size) - 1;
 	WT_RET(__wt_buf_extend(session, logrec, logrec->size + size));
 	recsize = (uint32_t)size;
 	WT_RET(__wt_struct_pack(session,
 	    (uint8_t *)logrec->data + logrec->size, size, fmt,
-	    optype, recsize, uri, key));
+	    optype, recsize, fileid, key));
 
 	logrec->size += size;
 	return (0);
@@ -242,13 +242,13 @@ __wt_logop_row_remove_pack(
 int
 __wt_logop_row_remove_unpack(
     WT_SESSION_IMPL *session, const uint8_t **pp, const uint8_t *end,
-    const char **urip, WT_ITEM *keyp)
+    uint32_t *fileidp, WT_ITEM *keyp)
 {
-	const char *fmt = WT_UNCHECKED_STRING(IISu);
+	const char *fmt = WT_UNCHECKED_STRING(IIIu);
 	uint32_t optype, size;
 
 	WT_RET(__wt_struct_unpack(session, *pp, WT_PTRDIFF(end, *pp), fmt,
-	    &optype, &size, urip, keyp));
+	    &optype, &size, fileidp, keyp));
 	WT_ASSERT(session, optype == WT_LOGOP_ROW_REMOVE);
 
 	*pp += size;
@@ -259,13 +259,13 @@ int
 __wt_logop_row_remove_print(
     WT_SESSION_IMPL *session, const uint8_t **pp, const uint8_t *end, FILE *out)
 {
-	const char *uri;
+	uint32_t fileid;
 	WT_ITEM key;
 
 	WT_RET(__wt_logop_row_remove_unpack(
-	    session, pp, end, &uri, &key));
+	    session, pp, end, &fileid, &key));
 
-	fprintf(out, "\t" "uri: %s\n", uri);
+	fprintf(out, "\t" "fileid: %" PRIu32 "\n", fileid);
 	fprintf(out, "\t" "key: %.*s\n",
 	    (int)key.size, (const char *)key.data);
 	return (0);
