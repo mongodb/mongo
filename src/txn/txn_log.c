@@ -79,7 +79,7 @@ typedef struct {
 	} *files;
 
 	size_t file_alloc;
-	u_int nfiles;
+	u_int max_fileid, nfiles;
 
 	int metadata_only;
 } WT_RECOVERY;
@@ -94,13 +94,17 @@ __recovery_cursor(WT_SESSION_IMPL *session, WT_RECOVERY *r,
 
 	/*
 	 * Only apply operations in the correct metadata phase, and if the LSN
-	 * is more recent than th last checkpoint.
+	 * is more recent than th last checkpoint.  If there is no entry for a
+	 * file, assume it was dropped.
 	 */
 	if (r->metadata_only != (id == 0) ||
 	    LOG_CMP(lsnp, &r->files[id].ckpt_lsn) < 0)
 		c = NULL;
+	else if (id > r->max_fileid)
+		r->max_fileid = id;
 	else if (id >= r->nfiles || r->files[id].uri == NULL)
-		WT_RET_MSG(session, ENOENT, "No file found with ID %u (max %u)", id, r->nfiles);
+		WT_RET_MSG(session, ENOENT,
+		    "No file found with ID %u (max %u)", id, r->nfiles);
 	else if ((c = r->files[id].c) == NULL) {
 		WT_RET(__wt_open_cursor(
 		    session, r->files[id].uri, NULL, cfg, &c));
@@ -417,7 +421,9 @@ __recovery_file_scan(WT_RECOVERY *r, WT_LSN *start_lsnp)
 		WT_ERR(__recovery_setup_file(r, uri, config, start_lsnp));
 	}
 	WT_ERR_NOTFOUND_OK(ret);
-err:	return (ret);
+
+err:	r->max_fileid = r->nfiles;
+	return (ret);
 }
 
 /*
@@ -463,6 +469,8 @@ __wt_txn_recover(WT_SESSION_IMPL *default_session)
 	else
 		WT_ERR(__wt_log_scan(session, &start_lsn,
 		    WT_LOGSCAN_RECOVER, __txn_log_recover, &r));
+
+	conn->next_file_id = r.max_fileid;
 
 err:	__recovery_free(&r);
 	__wt_free(session, config);

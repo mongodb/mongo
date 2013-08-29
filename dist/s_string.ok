@@ -444,6 +444,7 @@ ffs
 fgetln
 fh
 filefrag
+fileid
 filename
 filenames
 fileops
