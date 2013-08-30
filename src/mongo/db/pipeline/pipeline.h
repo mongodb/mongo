@@ -126,19 +126,6 @@ namespace mongo {
         void run(BSONObjBuilder& result);
 
         /**
-          Debugging:  should the processing pipeline be split within
-          mongod, simulating the real mongos/mongod split?  This is determined
-          by setting the splitMongodPipeline field in an "aggregate"
-          command.
-
-          The split itself is handled by the caller, which is currently
-          pipeline_command.cpp.
-
-          @returns true if the pipeline is to be split
-         */
-        bool getSplitMongodPipeline() const;
-
-        /**
            Ask if this is for an explain request.
 
            @returns true if this is an explain
@@ -174,7 +161,6 @@ namespace mongo {
         static const char pipelineName[];
         static const char explainName[];
         static const char fromRouterName[];
-        static const char splitMongodPipelineName[];
         static const char serverPipelineName[];
         static const char mongosPipelineName[];
 
@@ -218,7 +204,6 @@ namespace mongo {
         SourceContainer sources;
         bool explain;
 
-        bool splitMongodPipeline;
         boost::intrusive_ptr<ExpressionContext> pCtx;
     };
 
@@ -231,13 +216,6 @@ namespace mongo {
 
     inline string Pipeline::getCollectionName() const {
         return collectionName;
-    }
-
-    inline bool Pipeline::getSplitMongodPipeline() const {
-        if (!DEBUG_BUILD)
-            return false;
-
-        return splitMongodPipeline;
     }
 
     inline bool  Pipeline::isExplain() const {
