@@ -346,8 +346,7 @@ __wt_ovfl_reuse_srch(WT_SESSION_IMPL *session, WT_PAGE *page,
 	/*
 	 * The search function returns the first matching record in the list,
 	 * which may be the first of many, overflow records may be identical.
-	 * Look for one without the the in-use flag set, and put it back into
-	 * service.
+	 * Find one without the in-use flag set and put it back into service.
 	 */
 	if ((reuse = __ovfl_reuse_skip_search(head, value, value_size)) == NULL)
 		return (0);
