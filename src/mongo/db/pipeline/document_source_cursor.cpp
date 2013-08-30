@@ -43,6 +43,10 @@ namespace mongo {
         dispose();
     }
 
+    const char *DocumentSourceCursor::getSourceName() const {
+        return "$cursor";
+    }
+
     boost::optional<Document> DocumentSourceCursor::getNext() {
         pExpCtx->checkForInterrupt();
 
@@ -68,7 +72,7 @@ namespace mongo {
         _currentBatch.clear();
     }
 
-    bool DocumentSourceCursor::canUseCoveredIndex(ClientCursor* cursor) {
+    bool DocumentSourceCursor::canUseCoveredIndex(ClientCursor* cursor) const {
         // We can't use a covered index when we have collection metadata because we
         // need to examine the object to see if it belongs on this shard
         return (!_collMetadata &&
@@ -203,43 +207,29 @@ namespace mongo {
     }
 
     Value DocumentSourceCursor::serialize(bool explain) const {
-        // we never parse a documentSourceCursor, so we do not serialize it
-        if (explain) {
-            MutableDocument result;
-            
-            result.setField("query", Value(_query));
+        // we never parse a documentSourceCursor, so we only serialize for explain
+        if (!explain)
+            return Value();
 
-            if (!_sort.isEmpty()) {
-                result.setField("sort", Value(_sort));
-            }
+        Lock::DBRead lk(ns);
+        Client::Context ctx(ns, dbpath, /*doVersion=*/false);
 
-            if (_limit) {
-                result.setField("limit", Value(_limit->getLimit()));
-            }
+        ClientCursorPin pin(_cursorId);
+        ClientCursor* cursor = pin.c();
 
-            BSONObj projectionSpec;
-            if (_projection) {
-                projectionSpec = _projection->getSpec();
-                result.setField("projection", Value(projectionSpec));
-            }
+        uassert(17135, "Cursor deleted. Was the collection or database dropped?",
+                cursor);
 
-            // construct query for explain
-            BSONObjBuilder queryBuilder;
-            queryBuilder.append("$query", _query);
-            if (!_sort.isEmpty())
-                queryBuilder.append("$orderby", _sort);
-            queryBuilder.append("$explain", 1);
-            Query query(queryBuilder.obj());
+        cursor->c()->recoverFromYield();
 
-            DBDirectClient directClient;
-            BSONObj explainResult(directClient.findOne(ns, query, _projection
-                                                                  ? &projectionSpec
-                                                                  : NULL));
-
-            result.setField("cursor", Value(explainResult));
-            return result.freezeToValue();
-        }
-        return Value();
+        return Value(DOC(getSourceName() <<
+            DOC("query" << Value(_query)
+             << "sort" << (!_sort.isEmpty() ? Value(_sort) : Value())
+             << "limit" << (_limit ? Value(_limit->getLimit()) : Value())
+             << "fields" << (_projection ? Value(_projection->getSpec()) : Value())
+             << "coveredIndex" << canUseCoveredIndex(cursor)
+             << "cursorType" << cursor->c()->toString()
+        ))); // TODO get more plan information
     }
 
     DocumentSourceCursor::DocumentSourceCursor(const string& ns,

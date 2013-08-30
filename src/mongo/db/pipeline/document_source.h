@@ -372,6 +372,7 @@ namespace mongo {
         // virtuals from DocumentSource
         virtual ~DocumentSourceCursor();
         virtual boost::optional<Document> getNext();
+        virtual const char *getSourceName() const;
         virtual Value serialize(bool explain = false) const;
         virtual void setSource(DocumentSource *pSource);
         virtual bool coalesce(const intrusive_ptr<DocumentSource>& nextSource);
@@ -462,7 +463,7 @@ namespace mongo {
         CursorId _cursorId;
         CollectionMetadataPtr _collMetadata;
 
-        bool canUseCoveredIndex(ClientCursor* cursor);
+        bool canUseCoveredIndex(ClientCursor* cursor) const;
 
         /*
           Yield the cursor sometimes.
