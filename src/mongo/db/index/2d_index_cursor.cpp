@@ -1910,7 +1910,8 @@ namespace mongo {
                             maxDistance = e.numberDouble();
                             uassert(16989, "$maxDistance must be non-negative", maxDistance >= 0);
                             if (twod_internal::GEO_SPHERE == type) {
-                                uassert(17088, "$maxDistance too large", maxDistance <= M_PI);
+                                uassert(17088, "$maxDistance too large",
+                                        maxDistance <= nextafter(M_PI, DBL_MAX));
                             }
                         }
                     }

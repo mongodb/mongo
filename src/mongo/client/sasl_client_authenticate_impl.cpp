@@ -27,6 +27,7 @@
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/util/bson_extract.h"
+#include "mongo/client/auth_helpers.h"
 #include "mongo/client/sasl_client_authenticate.h"
 #include "mongo/client/sasl_client_session.h"
 #include "mongo/platform/cstdint.h"
@@ -57,15 +58,14 @@ namespace {
      * Gets the password data from "saslParameters" and stores it to "outPassword".
      *
      * If "digestPassword" indicates that the password needs to be "digested" via
-     * DBClientWithCommands::createPasswordDigest(), this method takes care of that.
+     * auth::createPasswordDigest(), this method takes care of that.
      * On success, the value of "*outPassword" is always the correct value to set
      * as the password on the SaslClientSession.
      *
      * Returns Status::OK() on success, and ErrorCodes::NoSuchKey if the password data is not
      * present in "saslParameters".  Other ErrorCodes returned indicate other errors.
      */
-    Status extractPassword(DBClientWithCommands* client,
-                           const BSONObj& saslParameters,
+    Status extractPassword(const BSONObj& saslParameters,
                            bool digestPassword,
                            std::string* outPassword) {
 
@@ -84,7 +84,7 @@ namespace {
             if (!status.isOK())
                 return status;
 
-            *outPassword = client->createPasswordDigest(user, rawPassword);
+            *outPassword = auth::createPasswordDigest(user, rawPassword);
         }
         else {
             *outPassword = rawPassword;
@@ -148,7 +148,7 @@ namespace {
         if (!status.isOK())
             return status;
 
-        status = extractPassword(client, saslParameters, digestPassword, &value);
+        status = extractPassword(saslParameters, digestPassword, &value);
         if (status.isOK()) {
             session->setParameter(SaslClientSession::parameterPassword, value);
         }

@@ -1814,8 +1814,14 @@ namespace mongo {
             // could be different from conn->getServerAddress() for connections that map to
             // multiple servers such as for replica sets. These also take care of registering
             // returned cursors with mongos's cursorCache.
-            BSONObj aggRunCommand(DBClientBase* conn, const string& db, BSONObj cmd);
-            bool aggPassthrough(DBConfigPtr conf, BSONObj cmd, BSONObjBuilder& result);
+            BSONObj aggRunCommand(DBClientBase* conn,
+                                  const string& db,
+                                  BSONObj cmd,
+                                  int queryOptions);
+            bool aggPassthrough(DBConfigPtr conf,
+                                BSONObj cmd,
+                                BSONObjBuilder& result,
+                                int queryOptions);
 
         };
 
@@ -1857,7 +1863,7 @@ namespace mongo {
             massert(17015, "getDBConfig shouldn't return NULL",
                     conf);
             if (!conf->isShardingEnabled() || !conf->isSharded(fullns))
-                return aggPassthrough(conf, cmdObj, result);
+                return aggPassthrough(conf, cmdObj, result, options);
 
             /* split the pipeline into pieces for mongods and this mongos */
             intrusive_ptr<Pipeline> pShardPipeline(pPipeline->splitForSharded());
@@ -1908,7 +1914,10 @@ namespace mongo {
             // that the merging mongod is sent the config servers on connection init.
             const string mergeServer = conf->getPrimary().getConnString();
             ShardConnection conn(mergeServer, outputNsOrEmpty);
-            BSONObj mergedResults = aggRunCommand(conn.get(), dbName, mergeCmd.freeze().toBson());
+            BSONObj mergedResults = aggRunCommand(conn.get(),
+                                                  dbName,
+                                                  mergeCmd.freeze().toBson(),
+                                                  options);
             bool ok = mergedResults["ok"].trueValue();
             conn.done();
 
@@ -2069,13 +2078,21 @@ namespace mongo {
             }
         }
 
-        BSONObj PipelineCommand::aggRunCommand(DBClientBase* conn, const string& db,  BSONObj cmd) {
+        BSONObj PipelineCommand::aggRunCommand(DBClientBase* conn,
+                                               const string& db,
+                                               BSONObj cmd,
+                                               int queryOptions) {
             // Temporary hack. See comment on declaration for details.
 
             massert(17016, "should only be running an aggregate command here",
                     str::equals(cmd.firstElementFieldName(), "aggregate"));
 
-            scoped_ptr<DBClientCursor> cursor(conn->query(db + ".$cmd", cmd, -1));
+            scoped_ptr<DBClientCursor> cursor(conn->query(db + ".$cmd",
+                                                          cmd,
+                                                          -1, // nToReturn
+                                                          0, // nToSkip
+                                                          NULL, // fieldsToReturn
+                                                          queryOptions));
             massert(17014, "aggregate command didn't return results",
                     cursor->more());
 
@@ -2084,11 +2101,14 @@ namespace mongo {
             return result;
         }
 
-        bool PipelineCommand::aggPassthrough(DBConfigPtr conf, BSONObj cmd, BSONObjBuilder& out) {
+        bool PipelineCommand::aggPassthrough(DBConfigPtr conf,
+                                             BSONObj cmd,
+                                             BSONObjBuilder& out,
+                                             int queryOptions) {
             // Temporary hack. See comment on declaration for details.
 
             ShardConnection conn( conf->getPrimary() , "" );
-            BSONObj result = aggRunCommand(conn.get(), conf->getName(), cmd);
+            BSONObj result = aggRunCommand(conn.get(), conf->getName(), cmd, queryOptions);
             conn.done();
 
             bool ok = result["ok"].trueValue();

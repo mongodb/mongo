@@ -17,7 +17,11 @@
 
 #pragma once
 
-#include "md5.h"
+#include "mongo/util/md5.h"
+
+#include <sstream>
+#include <string>
+#include <string.h>
 
 namespace mongo {
 
@@ -36,7 +40,7 @@ namespace mongo {
     
     inline std::string digestToString( md5digest digest ){
         static const char * letters = "0123456789abcdef";
-        stringstream ss;
+        std::stringstream ss;
         for ( int i=0; i<16; i++){
             unsigned char c = digest[i];
             ss << letters[ ( c >> 4 ) & 0xf ] << letters[ c & 0xf ];
