@@ -326,6 +326,8 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 {
 	WT_DECL_RET;
 	WT_TXN *txn;
+	WT_TXN_OP *op;
+	u_int i;
 
 	WT_UNUSED(cfg);
 
@@ -347,6 +349,10 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 		WT_TRET(__wt_txn_rollback(session, cfg));
 		return (ret);
 	}
+
+	/* Free memory associated with updates. */
+	for (i = 0, op = txn->mod; i < txn->mod_count; i++, op++)
+		__wt_txn_op_free(session, op);
 
 	/*
 	 * Auto-commit transactions need a new transaction snapshot so that the
@@ -386,7 +392,7 @@ __wt_txn_rollback(WT_SESSION_IMPL *session, const char *cfg[])
 		    txn->id, 0));
 
 	/* Rollback updates. */
-	for (i = 0, op = txn->mod; i < txn->mod_count; i++, op++)
+	for (i = 0, op = txn->mod; i < txn->mod_count; i++, op++) {
 		switch (op->type) {
 		case TXN_OP_BASIC:
 		case TXN_OP_INMEM:
@@ -405,6 +411,10 @@ __wt_txn_rollback(WT_SESSION_IMPL *session, const char *cfg[])
 			 */
 			break;
 		}
+
+		/* Free any memory allocated for the operation. */
+		__wt_txn_op_free(session, op);
+	}
 
 	__wt_txn_release(session);
 	return (ret);

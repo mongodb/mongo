@@ -1463,6 +1463,7 @@ extern uint64_t __wt_ext_transaction_oldest(WT_EXTENSION_API *wt_api);
 extern int __wt_ext_transaction_visible( WT_EXTENSION_API *wt_api,
     WT_SESSION *wt_session,
     uint64_t transaction_id);
+extern void __wt_txn_op_free(WT_SESSION_IMPL *session, WT_TXN_OP *op);
 extern int __wt_txn_log_commit(WT_SESSION_IMPL *session, const char *cfg[]);
 extern int __wt_txn_log_checkpoint(WT_SESSION_IMPL *session,
     int start,

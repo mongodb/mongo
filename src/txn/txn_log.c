@@ -69,6 +69,19 @@ __txn_commit_printlog(WT_SESSION_IMPL *session, WT_ITEM *logrec, FILE *out)
 }
 
 /*
+ * __wt_txn_op_free --
+ *	Free memory associated with a transactional operation.
+ */
+void
+__wt_txn_op_free(WT_SESSION_IMPL *session, WT_TXN_OP *op)
+{
+	if (op->type == TXN_OP_TRUNCATE_ROW) {
+		__wt_buf_free(session, &op->u.truncate_row.start);
+		__wt_buf_free(session, &op->u.truncate_row.stop);
+	}
+}
+
+/*
  * __wt_txn_log_commit --
  *	Write the operations of a transaction to the log at commit time.
  */
