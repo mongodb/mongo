@@ -15,6 +15,14 @@
 */
 
 #include "mongo/db/geo/geoquery.h"
+
+#ifdef _WIN32
+#include <float.h>
+#define nextafter _nextafter
+#else
+#include <cmath> // nextafter
+#endif
+
 #include "mongo/db/geo/geoconstants.h"
 
 namespace mongo {

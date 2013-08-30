@@ -16,6 +16,13 @@
 
 #include "mongo/db/index/2d_index_cursor.h"
 
+#ifdef _WIN32
+#include <float.h>
+#define nextafter _nextafter
+#else
+#include <cmath> // nextafter
+#endif
+
 #include "mongo/db/btreecursor.h"
 #include "mongo/db/index/2d_access_method.h"
 #include "mongo/db/index/btree_interface.h"
