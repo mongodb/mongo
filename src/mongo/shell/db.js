@@ -146,9 +146,27 @@ DB.prototype._createUserV1 = function(userObj, replicatedTo, timeout) {
     throw "couldn't add user: " + le.err;
 }
 
+function _extractUserNameFromUserCommand(cmdObj) {
+    if (cmdObj.hasOwnProperty("name") && cmdObj.hasOwnProperty("user")) {
+        throw Error("Cannot provide both 'name' and 'user' field to user management commands");
+    }
+
+    var name = "";
+    if (cmdObj.hasOwnProperty("name")) {
+        name = cmdObj["name"];
+    } else {
+        // For backwards compatibility
+        name = cmdObj["user"];
+    }
+    return name;
+}
+
 DB.prototype._createUser = function(userObj, replicatedTo, timeout) {
-    var cmdObj = {createUser:1};
+    var name = _extractUserNameFromUserCommand(userObj);
+    var cmdObj = {createUser:name};
     cmdObj = Object.extend(cmdObj, userObj);
+    delete cmdObj["name"];
+    delete cmdObj["user"];
 
     var res = this.runCommand(cmdObj);
 
@@ -181,24 +199,11 @@ function _hashPassword(username, password) {
     return hex_md5(username + ":mongo:" + password);
 }
 
-// For adding old-style user documents for backwards compatibily with pre-2.4 versions of MongoDB.
-DB.prototype._addUserV0 = function( username , pass, readOnly, replicatedTo, timeout ) {
-    if ( pass == null || pass.length == 0 )
-        throw "password can't be empty";
-
-    readOnly = readOnly || false;
-    var c = this.getCollection( "system.users" );
-    var u = { user : username, readOnly : readOnly, pwd : pass };
-
-    this._createUser(u, replicatedTo, timeout);
-}
-
-DB.prototype._addUser = function(userObj, replicatedTo, timeout) {
-    // To prevent creating old-style privilege documents
-    if (userObj['roles'] == null) {
-        throw Error("'roles' field must be provided");
+DB.prototype._addUserExplicitArgs = function(username, password, roles, replicatedTo, timeout) {
+    if (password == null || password.length == 0) {
+        throw Error("password can't be empty");
     }
-
+    var userObj = { name: arguments[0], pwd: arguments[1], roles: arguments[2] };
     this._createUser(userObj, replicatedTo, timeout);
 }
 
@@ -206,26 +211,35 @@ DB.prototype.addUser = function() {
     if (arguments.length == 0) {
         throw Error("No arguments provided to addUser");
     }
+
     if (typeof arguments[0] == "object") {
-        this._addUser.apply(this, arguments);
+        this._createUser.apply(this, arguments);
+    } else if (Array.isArray(arguments[2])) {
+        this._addUserExplicitArgs.apply(this, arguments);
     } else {
-        this._addUserV0.apply(this, arguments);
+        throw Error("Invalid arguments to addUser.  addUser must either be run with a full user " +
+                    "object or with a username, password, and roles array");
+
     }
 }
 
 /**
- * Used for updating users' passwords/extraData in systems with V1 style user information
+ * Used for updating users in systems with V1 style user information
  * (ie MongoDB v2.4 and prior)
  */
-DB.prototype._updateUserV1 = function(updateObject) {
+DB.prototype._updateUserV1 = function(name, updateObject) {
     var setObj = {};
     if (updateObject.pwd) {
-        setObj["pwd"] = _hashPassword(updateObject.user, updateObject.pwd);
+        setObj["pwd"] = _hashPassword(name, updateObject.pwd);
     }
     if (updateObject.extraData) {
         setObj["extraData"] = updateObject.extraData;
     }
-    db.system.users.update({user : updateObject.user, userSource : null},
+    if (updateObject.roles) {
+        setObj["roles"] = updateObject.roles;
+    }
+
+    db.system.users.update({user : name, userSource : null},
                            {$set : setObj});
     var err = db.getLastError();
     if (err) {
@@ -233,8 +247,8 @@ DB.prototype._updateUserV1 = function(updateObject) {
     }
 };
 
-DB.prototype.updateUser = function(updateObject) {
-    var cmdObj = {updateUser:1};
+DB.prototype.updateUser = function(name, updateObject) {
+    var cmdObj = {updateUser:name};
     cmdObj = Object.extend(cmdObj, updateObject);
     var res = this.runCommand(cmdObj);
     if (res.ok) {
@@ -242,7 +256,7 @@ DB.prototype.updateUser = function(updateObject) {
     }
 
     if (res.errmsg == "no such cmd: updateUser") {
-        this._updateUserV1(updateObject);
+        this._updateUserV1(name, updateObject);
         return;
     }
 
@@ -255,8 +269,7 @@ DB.prototype.updateUser = function(updateObject) {
 };
 
 DB.prototype.changeUserPassword = function(username, password) {
-    var updateObject = { user: username, pwd: password};
-    this.updateUser(updateObject);
+    this.updateUser(username, {pwd:password});
 };
 
 DB.prototype.logout = function(){
@@ -264,7 +277,7 @@ DB.prototype.logout = function(){
 };
 
 DB.prototype.removeUser = function( username ){
-    var res = this.runCommand({removeUsers:1, user: username});
+    var res = this.runCommand({removeUser: username});
 
     if (res.ok) {
         return true;
@@ -298,14 +311,14 @@ DB.prototype._removeUserV1 = function(username) {
 }
 
 DB.prototype.removeAllUsers = function() {
-    var res = this.runCommand({removeUsers:1});
+    var res = this.runCommand({removeUsersFromDatabase:1});
+
+    if (res.n == 0) {
+        return false;
+    }
 
     if (res.ok) {
         return true;
-    }
-
-    if (res.errmsg.startsWith("No users found on database")) {
-        return false;
     }
 
     throw "Couldn't remove users: " + res.errmsg;
