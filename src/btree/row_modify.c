@@ -277,7 +277,7 @@ __wt_update_alloc(WT_SESSION_IMPL *session,
 WT_UPDATE *
 __wt_update_obsolete_check(WT_SESSION_IMPL *session, WT_UPDATE *upd)
 {
-	WT_UPDATE *next;
+	WT_UPDATE *first, *next;
 
 	/*
 	 * This function identifies obsolete updates, and truncates them from
@@ -285,27 +285,27 @@ __wt_update_obsolete_check(WT_SESSION_IMPL *session, WT_UPDATE *upd)
 	 * a serialization function, the caller has responsibility for actually
 	 * freeing the memory.
 	 *
-	 * Walk the list of updates, looking for obsolete updates.  If we find
-	 * an update no session will ever move past, we can discard any updates
-	 * that appear after it.
+	 * Walk the list of updates, looking for obsolete updates at the end.
 	 */
-	for (; upd != NULL; upd = upd->next)
+	for (first = next = NULL; upd != NULL; upd = upd->next)
 		if (__wt_txn_visible_all(session, upd->txnid)) {
-			/*
-			 * We cannot discard this WT_UPDATE structure, we can
-			 * only discard WT_UPDATE structures subsequent to it,
-			 * other threads of control will terminate their walk
-			 * in this element.  Save a reference to the list we
-			 * will discard, and terminate the list.
-			 */
-			if ((next = upd->next) == NULL)
-				return (NULL);
-			if (!WT_ATOMIC_CAS(upd->next, next, NULL))
-				return (NULL);
+			if (first == NULL)
+				first = upd;
+		} else if (upd->txnid != WT_TXN_ABORTED)
+			first = NULL;
 
-			return (next);
-		}
-	return (NULL);
+	/*
+	 * We cannot discard this WT_UPDATE structure, we can only discard
+	 * WT_UPDATE structures subsequent to it, other threads of control will
+	 * terminate their walk in this element.  Save a reference to the list
+	 * we will discard, and terminate the list.
+	 */
+	if (first != NULL &&
+	    (next = first->next) != NULL &&
+	    !WT_ATOMIC_CAS(first->next, next, NULL))
+		return (NULL);
+
+	return (next);
 }
 
 /*
