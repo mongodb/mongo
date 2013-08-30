@@ -275,13 +275,18 @@ __wt_ovfl_onpage_add(WT_SESSION_IMPL *session,
 	/*
 	 * Allocate the WT_OVFL_ONPAGE structure, next pointers for the skip
 	 * list, room for the address, then copy everything into place.
+	 *
+	 * To minimize the WT_OVFL_ONPAGE structure size, the address offset
+	 * and size are single bytes: that's safe because the address follows
+	 * the structure (which can't be more than about 100B), and address
+	 * cookies are limited to 255B.
 	 */
 	size = sizeof(WT_OVFL_ONPAGE) +
 	    skipdepth * sizeof(WT_OVFL_ONPAGE *) + addr_size;
 	WT_RET(__wt_calloc(session, 1, size, &onpage));
 	p = (uint8_t *)onpage +
 	    sizeof(WT_OVFL_ONPAGE) + skipdepth * sizeof(WT_OVFL_ONPAGE *);
-	onpage->addr_offset = WT_PTRDIFF32(p, onpage);
+	onpage->addr_offset = WT_PTRDIFF(p, onpage);
 	onpage->addr_size = addr_size;
 	memcpy(p, addr, addr_size);
 	F_SET(onpage, WT_OVFL_ONPAGE_JUST_ADDED);
@@ -631,13 +636,18 @@ __wt_ovfl_reuse_add(WT_SESSION_IMPL *session, WT_PAGE *page,
 	 * Allocate the WT_OVFL_REUSE structure, next pointers for the skip
 	 * list, room for the address and value, then copy everything into
 	 * place.
+	 *
+	 * To minimize the WT_OVFL_REUSE structure size, the address offset
+	 * and size are single bytes: that's safe because the address follows
+	 * the structure (which can't be more than about 100B), and address
+	 * cookies are limited to 255B.
 	 */
 	size = sizeof(WT_OVFL_REUSE) +
 	    skipdepth * sizeof(WT_OVFL_REUSE *) + addr_size + value_size;
 	WT_RET(__wt_calloc(session, 1, size, &reuse));
 	p = (uint8_t *)reuse +
 	    sizeof(WT_OVFL_REUSE) + skipdepth * sizeof(WT_OVFL_REUSE *);
-	reuse->addr_offset = WT_PTRDIFF32(p, reuse);
+	reuse->addr_offset = WT_PTRDIFF(p, reuse);
 	reuse->addr_size = addr_size;
 	memcpy(p, addr, addr_size);
 	p += addr_size;
@@ -838,13 +848,18 @@ __wt_ovfl_txnc_add(WT_SESSION_IMPL *session, WT_PAGE *page,
 	 * Allocate the WT_OVFL_TXNC structure, next pointers for the skip
 	 * list, room for the address and value, then copy everything into
 	 * place.
+	 *
+	 * To minimize the WT_OVFL_TXNC structure size, the address offset
+	 * and size are single bytes: that's safe because the address follows
+	 * the structure (which can't be more than about 100B), and address
+	 * cookies are limited to 255B.
 	 */
 	size = sizeof(WT_OVFL_TXNC) +
 	    skipdepth * sizeof(WT_OVFL_TXNC *) + addr_size + value_size;
 	WT_RET(__wt_calloc(session, 1, size, &txnc));
 	p = (uint8_t *)txnc +
 	    sizeof(WT_OVFL_TXNC) + skipdepth * sizeof(WT_OVFL_TXNC *);
-	txnc->addr_offset = WT_PTRDIFF32(p, txnc);
+	txnc->addr_offset = WT_PTRDIFF(p, txnc);
 	txnc->addr_size = addr_size;
 	memcpy(p, addr, addr_size);
 	p += addr_size;

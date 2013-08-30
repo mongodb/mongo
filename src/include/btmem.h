@@ -88,8 +88,8 @@ struct __wt_addr {
  * never discard the underlying blocks more than once.
  */
 struct __wt_ovfl_onpage {
-	uint32_t addr_offset;		/* Overflow addr offset */
-	uint32_t addr_size;		/* Overflow addr size */
+	uint8_t addr_offset;		/* Overflow addr offset */
+	uint8_t addr_size;		/* Overflow addr size */
 
 	/*
 	 * On each page reconciliation, set the just-added flag for each newly
@@ -98,7 +98,7 @@ struct __wt_ovfl_onpage {
 	 * the added records are discarded.
 	 */
 #define	WT_OVFL_ONPAGE_JUST_ADDED	0x01
-	uint8_t	 flags;
+	uint8_t flags;
 
 	/*
 	 * The untyped address immediately follows the WT_OVFL_ONPAGE structure.
@@ -120,10 +120,10 @@ struct __wt_ovfl_onpage {
  * the "key".
  */
 struct __wt_ovfl_reuse {
-	uint32_t addr_offset;		/* Overflow addr offset */
-	uint32_t addr_size;		/* Overflow addr size */
 	uint32_t value_offset;		/* Overflow value offset */
 	uint32_t value_size;		/* Overflow value size */
+	uint8_t  addr_offset;		/* Overflow addr offset */
+	uint8_t  addr_size;		/* Overflow addr size */
 
 	/*
 	 * On each page reconciliation, we clear the entry's in-use flag, and
@@ -158,10 +158,10 @@ struct __wt_ovfl_reuse {
  * to cache the old value until no running transaction needs it.
  */
 struct __wt_ovfl_txnc {
-	uint32_t addr_offset;		/* Overflow addr offset */
-	uint32_t addr_size;		/* Overflow addr size */
 	uint32_t value_offset;		/* Overflow value offset */
 	uint32_t value_size;		/* Overflow value size */
+	uint8_t  addr_offset;		/* Overflow addr offset */
+	uint8_t  addr_size;		/* Overflow addr size */
 
 	/*
 	 * The untyped address immediately follows the WT_OVFL_TXNC
