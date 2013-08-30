@@ -33,7 +33,7 @@ err:	__wt_scr_free(&tmp);
 	return (ret);
 }
 
-#if 1
+#if 0
 /*
  * __ovfl_onpage_dump --
  *	Debugging information.
@@ -313,7 +313,7 @@ err:	__wt_scr_free(&tmp);
 	return (ret);
 }
 
-#if 1
+#if 0
 /*
  * __ovfl_reuse_dump --
  *	Debugging information.
