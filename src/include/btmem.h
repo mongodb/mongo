@@ -260,9 +260,11 @@ struct __wt_page_modify {
 	WT_INSERT_HEAD **update;	/* Updated items */
 
 	/* Overflow record tracking. */
-	WT_OVFL_ONPAGE	*ovfl_onpage[WT_SKIP_MAXDEPTH];
-	WT_OVFL_REUSE	*ovfl_reuse[WT_SKIP_MAXDEPTH];
-	WT_OVFL_TXNC	*ovfl_txnc[WT_SKIP_MAXDEPTH];
+	struct __wt_ovfl_track {
+		WT_OVFL_ONPAGE	*ovfl_onpage[WT_SKIP_MAXDEPTH];
+		WT_OVFL_REUSE	*ovfl_reuse[WT_SKIP_MAXDEPTH];
+		WT_OVFL_TXNC	*ovfl_txnc[WT_SKIP_MAXDEPTH];
+	} *ovfl_track;
 
 #define	WT_PM_REC_EMPTY		0x01	/* Reconciliation: page empty */
 #define	WT_PM_REC_REPLACE	0x02	/* Reconciliation: page replaced */

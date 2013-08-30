@@ -8,6 +8,16 @@
 #include "wt_internal.h"
 
 /*
+ * __ovfl_track_init --
+ *	Initialize the overflow tracking structure.
+ */
+static int
+__ovfl_track_init(WT_SESSION_IMPL *session, WT_PAGE *page)
+{
+	return (__wt_calloc_def(session, 1, &page->modify->ovfl_track));
+}
+
+/*
  * __ovfl_onpage_verbose --
  *	Dump information about a onpage overflow record.
  */
@@ -43,7 +53,7 @@ __ovfl_onpage_dump(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_OVFL_ONPAGE **head, *onpage;
 
-	head = page->modify->ovfl_onpage;
+	head = page->modify->ovfl_track->ovfl_onpage;
 
 	for (onpage = head[0]; onpage != NULL; onpage = onpage->next[0])
 		(void)__ovfl_onpage_verbose(session, page, onpage, "dump");
@@ -146,7 +156,7 @@ __ovfl_onpage_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 	size_t incr;
 
 	bm = S2BT(session)->bm;
-	head = page->modify->ovfl_onpage;
+	head = page->modify->ovfl_track->ovfl_onpage;
 
 	/*
 	 * Free the underlying blocks for any newly added overflow records.
@@ -188,7 +198,7 @@ __ovfl_onpage_wrapup_err(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_OVFL_ONPAGE **e, **head, *onpage;
 	int i;
 
-	head = page->modify->ovfl_onpage;
+	head = page->modify->ovfl_track->ovfl_onpage;
 
 	/*
 	 * Discard any overflow records that were just added.
@@ -227,7 +237,10 @@ __wt_ovfl_onpage_search(WT_PAGE *page, const uint8_t *addr, uint32_t addr_size)
 {
 	WT_OVFL_ONPAGE **head;
 
-	head = page->modify->ovfl_onpage;
+	if (page->modify->ovfl_track == NULL)
+		return (0);
+
+	head = page->modify->ovfl_track->ovfl_onpage;
 
 	return (
 	    __ovfl_onpage_skip_search(head, addr, addr_size) == NULL ? 0 : 1);
@@ -247,7 +260,10 @@ __wt_ovfl_onpage_add(WT_SESSION_IMPL *session,
 	u_int i, skipdepth;
 	uint8_t *p;
 
-	head = page->modify->ovfl_onpage;
+	if (page->modify->ovfl_track == NULL)
+		WT_RET(__ovfl_track_init(session, page));
+
+	head = page->modify->ovfl_track->ovfl_onpage;
 
 	/* Check if the record already appears in the list. */
 	if (__wt_ovfl_onpage_search(page, addr, addr_size))
@@ -323,7 +339,7 @@ __ovfl_reuse_dump(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_OVFL_REUSE **head, *reuse;
 
-	head = page->modify->ovfl_reuse;
+	head = page->modify->ovfl_track->ovfl_reuse;
 
 	for (reuse = head[0]; reuse != NULL; reuse = reuse->next[0])
 		(void)__ovfl_reuse_verbose(session, page, reuse, "dump");
@@ -427,7 +443,7 @@ __ovfl_reuse_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 	int i;
 
 	bm = S2BT(session)->bm;
-	head = page->modify->ovfl_reuse;
+	head = page->modify->ovfl_track->ovfl_reuse;
 
 	/*
 	 * Discard any overflow records that aren't in-use, freeing underlying
@@ -504,7 +520,7 @@ __ovfl_reuse_wrapup_err(WT_SESSION_IMPL *session, WT_PAGE *page)
 	int i;
 
 	bm = S2BT(session)->bm;
-	head = page->modify->ovfl_reuse;
+	head = page->modify->ovfl_track->ovfl_reuse;
 
 	/*
 	 * Discard any overflow records that were just added, freeing underlying
@@ -558,7 +574,10 @@ __wt_ovfl_reuse_search(WT_SESSION_IMPL *session, WT_PAGE *page,
 	*addrp = NULL;
 	*addr_sizep = 0;
 
-	head = page->modify->ovfl_reuse;
+	if (page->modify->ovfl_track == NULL)
+		return (0);
+
+	head = page->modify->ovfl_track->ovfl_reuse;
 
 	/*
 	 * The search function returns the first matching record in the list,
@@ -600,7 +619,10 @@ __wt_ovfl_reuse_add(WT_SESSION_IMPL *session, WT_PAGE *page,
 	u_int i, skipdepth;
 	uint8_t *p;
 
-	head = page->modify->ovfl_reuse;
+	if (page->modify->ovfl_track == NULL)
+		WT_RET(__ovfl_track_init(session, page));
+
+	head = page->modify->ovfl_track->ovfl_reuse;
 
 	/* Choose a skiplist depth for this insert. */
 	skipdepth = __wt_skip_choose_depth();
@@ -663,7 +685,7 @@ err:	__wt_scr_free(&tmp);
 	return (ret);
 }
 
-#if 1
+#if 0
 /*
  * __ovfl_txnc_dump --
  *	Debugging information.
@@ -673,7 +695,7 @@ __ovfl_txnc_dump(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_OVFL_TXNC **head, *txnc;
 
-	head = page->modify->ovfl_txnc;
+	head = page->modify->ovfl_track->ovfl_txnc;
 
 	for (txnc = head[0]; txnc != NULL; txnc = txnc->next[0])
 		(void)__ovfl_txnc_verbose(session, page, txnc, "dump");
@@ -776,7 +798,10 @@ __wt_ovfl_txnc_search(
 {
 	WT_OVFL_TXNC **head, *txnc;
 
-	head = page->modify->ovfl_txnc;
+	if (page->modify->ovfl_track == NULL)
+		return (WT_NOTFOUND);
+
+	head = page->modify->ovfl_track->ovfl_txnc;
 
 	if ((txnc = __ovfl_txnc_skip_search(head, addr, addr_size)) == NULL)
 		return (WT_NOTFOUND);
@@ -801,7 +826,10 @@ __wt_ovfl_txnc_add(WT_SESSION_IMPL *session, WT_PAGE *page,
 	u_int i, skipdepth;
 	uint8_t *p;
 
-	head = page->modify->ovfl_txnc;
+	if (page->modify->ovfl_track == NULL)
+		WT_RET(__ovfl_track_init(session, page));
+
+	head = page->modify->ovfl_track->ovfl_txnc;
 
 	/* Choose a skiplist depth for this insert. */
 	skipdepth = __wt_skip_choose_depth();
@@ -847,8 +875,10 @@ __wt_ovfl_txnc_add(WT_SESSION_IMPL *session, WT_PAGE *page,
 int
 __wt_ovfl_track_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
-	WT_RET(__ovfl_onpage_wrapup(session, page));
-	WT_RET(__ovfl_reuse_wrapup(session, page));
+	if (page->modify->ovfl_track != NULL) {
+		WT_RET(__ovfl_onpage_wrapup(session, page));
+		WT_RET(__ovfl_reuse_wrapup(session, page));
+	}
 	return (0);
 }
 
@@ -859,7 +889,9 @@ __wt_ovfl_track_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 int
 __wt_ovfl_track_wrapup_err(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
-	WT_RET(__ovfl_onpage_wrapup_err(session, page));
-	WT_RET(__ovfl_reuse_wrapup_err(session, page));
+	if (page->modify->ovfl_track != NULL) {
+		WT_RET(__ovfl_onpage_wrapup_err(session, page));
+		WT_RET(__ovfl_reuse_wrapup_err(session, page));
+	}
 	return (0);
 }

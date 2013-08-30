@@ -135,22 +135,24 @@ __free_page_modify(WT_SESSION_IMPL *session, WT_PAGE *page)
 		    page->type == WT_PAGE_COL_FIX ? 1 : page->entries);
 
 	/* Free the overflow on-page, reuse and transaction-cache skiplists. */
-	if (mod->ovfl_onpage != NULL)
-		for (onpage =
-		    mod->ovfl_onpage[0]; onpage != NULL; onpage = next) {
+	if (mod->ovfl_track != NULL) {
+		for (onpage = mod->ovfl_track->ovfl_onpage[0];
+		    onpage != NULL; onpage = next) {
 			next = onpage->next[0];
 			__wt_free(session, onpage);
 		}
-	if (mod->ovfl_reuse != NULL)
-		for (reuse = mod->ovfl_reuse[0]; reuse != NULL; reuse = next) {
+		for (reuse = mod->ovfl_track->ovfl_reuse[0];
+		    reuse != NULL; reuse = next) {
 			next = reuse->next[0];
 			__wt_free(session, reuse);
 		}
-	if (mod->ovfl_txnc != NULL)
-		for (txnc = mod->ovfl_txnc[0]; txnc != NULL; txnc = next) {
+		for (txnc = mod->ovfl_track->ovfl_txnc[0];
+		    txnc != NULL; txnc = next) {
 			next = txnc->next[0];
 			__wt_free(session, txnc);
 		}
+	}
+	__wt_free(session, page->modify->ovfl_track);
 
 	__wt_free(session, page->modify);
 }
