@@ -449,6 +449,12 @@ namespace mongo {
             }
         }
 
+        // Record in changelog
+        BSONObjBuilder shardDetails;
+        shardDetails.append("name", *name);
+        shardDetails.append("host", servers.toString());
+        configServer.logChange("addShard", "", shardDetails.obj());
+
         return true;
     }
 

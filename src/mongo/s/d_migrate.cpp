@@ -1401,7 +1401,11 @@ namespace mongo {
                 migrateFromStatus.setInCriticalSection( false );
 
                 // 5.d
-                configServer.logChange( "moveChunk.commit" , ns , chunkInfo );
+                BSONObjBuilder commitInfo;
+                commitInfo.appendElements( chunkInfo );
+                if ( res["counts"].type() == Object )
+                    commitInfo.appendElements( res["counts"].Obj() );
+                configServer.logChange( "moveChunk.commit" , ns , commitInfo.obj() );
             }
 
             migrateFromStatus.done();
