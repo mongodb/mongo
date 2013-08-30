@@ -233,11 +233,6 @@ namespace mongo {
             if (!pPipeline.get())
                 return false;
 
-            if (pPipeline->getSplitMongodPipeline()) {
-                // This is only used in testing
-                return executeSplitPipeline(result, errmsg, ns, db, pPipeline, pCtx);
-            }
-
 #if _DEBUG
             // This is outside of the if block to keep the object alive until the pipeline is finished.
             BSONObj parsed;
@@ -275,84 +270,6 @@ namespace mongo {
             }
 
             return true;
-        }
-
-    private:
-        /*
-          Execute the pipeline for the explain.  This is common to both the
-          locked and unlocked code path.  However, the results are different.
-          For an explain, with no lock, it really outputs the pipeline
-          chain rather than fetching the data.
-         */
-        bool executeSplitPipeline(BSONObjBuilder& result, string& errmsg,
-                                  const string& ns, const string& db,
-                                  intrusive_ptr<Pipeline>& pPipeline,
-                                  intrusive_ptr<ExpressionContext>& pCtx) {
-            /* setup as if we're in the router */
-            pCtx->inRouter = true;
-
-            /*
-            Here, we'll split the pipeline in the same way we would for sharding,
-            for testing purposes.
-
-            Run the shard pipeline first, then feed the results into the remains
-            of the existing pipeline.
-
-            Start by splitting the pipeline.
-            */
-            intrusive_ptr<Pipeline> pShardSplit = pPipeline->splitForSharded();
-
-            // Write the split pipeline as we would in order to transmit it to the shard servers.
-            Document shardCmd = pShardSplit->serialize();
-
-            DEV log() << "\n---- shardDescription\n" << shardCmd.toString() << "\n----\n";
-
-            // for debugging purposes, show what the pipeline now looks like
-            DEV log() << "\n---- pipelineDescription\n" << pPipeline->serialize() << "\n----\n";
-
-            /* on the shard servers, create the local pipeline */
-            intrusive_ptr<ExpressionContext> pShardCtx =
-                new ExpressionContext(InterruptStatusMongod::status, NamespaceString(ns));
-            BSONObj shardObj = shardCmd.toBson();
-            intrusive_ptr<Pipeline> pShardPipeline(
-                Pipeline::parseCommand(errmsg, shardObj, pShardCtx));
-            if (!pShardPipeline.get()) {
-                return false;
-            }
-
-            PipelineD::prepareCursorSource(pShardPipeline, nsToDatabase(ns), pCtx);
-
-            /* run the shard pipeline */
-            BSONObjBuilder shardResultBuilder;
-            string shardErrmsg;
-            pShardPipeline->stitch();
-            pShardPipeline->run(shardResultBuilder);
-            BSONObj shardResult(shardResultBuilder.done());
-
-            /* pick out the shard result, and prepare to read it */
-            intrusive_ptr<DocumentSourceBsonArray> pShardSource;
-            BSONObjIterator shardIter(shardResult);
-            while(shardIter.more()) {
-                BSONElement shardElement(shardIter.next());
-                const char *pFieldName = shardElement.fieldName();
-
-                if ((strcmp(pFieldName, "result") == 0) ||
-                    (strcmp(pFieldName, "serverPipeline") == 0)) {
-                    pPipeline->addInitialSource(DocumentSourceBsonArray::create(&shardElement, pCtx));
-                    pPipeline->stitch();
-
-                    /*
-                    Connect the output of the shard pipeline with the mongos
-                    pipeline that will merge the results.
-                    */
-                    pPipeline->run(result);
-                    return true;
-                }
-            }
-
-            /* NOTREACHED */
-            verify(false);
-            return false;
         }
     } cmdPipeline;
 

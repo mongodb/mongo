@@ -46,14 +46,12 @@ namespace mongo {
     const char Pipeline::pipelineName[] = "pipeline";
     const char Pipeline::explainName[] = "explain";
     const char Pipeline::fromRouterName[] = "fromRouter";
-    const char Pipeline::splitMongodPipelineName[] = "splitMongodPipeline";
     const char Pipeline::serverPipelineName[] = "serverPipeline";
     const char Pipeline::mongosPipelineName[] = "mongosPipeline";
 
     Pipeline::Pipeline(const intrusive_ptr<ExpressionContext> &pTheCtx):
         collectionName(),
         explain(false),
-        splitMongodPipeline(false),
         pCtx(pTheCtx) {
     }
 
@@ -140,12 +138,6 @@ namespace mongo {
             /* if the request came from the router, we're in a shard */
             if (!strcmp(pFieldName, fromRouterName)) {
                 pCtx->inShard = cmdElement.Bool();
-                continue;
-            }
-
-            /* check for debug options */
-            if (!strcmp(pFieldName, splitMongodPipelineName)) {
-                pPipeline->splitMongodPipeline = true;
                 continue;
             }
 
@@ -435,11 +427,6 @@ namespace mongo {
 
         if (pCtx->extSortAllowed) {
             serialized.setField("allowDiskUsage", Value(true));
-        }
-
-        bool btemp;
-        if ((btemp = getSplitMongodPipeline())) {
-            serialized.setField(splitMongodPipelineName, Value(btemp));
         }
 
         return serialized.freeze();
