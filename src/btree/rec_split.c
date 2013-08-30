@@ -95,8 +95,8 @@ __split_row_page_inmem(WT_SESSION_IMPL *session, WT_PAGE *orig)
 	    ins_depth++)
 		;
 	for (i = 0; i < ins_depth; i++) {
-		right_child->u.row.ins[0]->tail[i] = ins_head->tail[i];
-		right_child->u.row.ins[0]->head[i] = ins_head->tail[i];
+		right_child->u.row.ins[0]->tail[i] = ins;
+		right_child->u.row.ins[0]->head[i] = ins;
 	}
 
 	/* Setup the ref in the new parent to point to the original parent. */
@@ -112,7 +112,7 @@ __split_row_page_inmem(WT_SESSION_IMPL *session, WT_PAGE *orig)
 	 * Copy the key we moved onto the right child into the WT_REF
 	 * structure that is linked into the new parent page.
 	 */
-	WT_ERR(__wt_row_ikey_incr(session, new_parent, ins->u.key.offset,
+	WT_ERR(__wt_row_ikey_incr(session, new_parent, 0,
 	    WT_INSERT_KEY(ins), ins->u.key.size, &newref->key.ikey));
 
 	/*
