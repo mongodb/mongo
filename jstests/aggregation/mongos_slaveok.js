@@ -8,9 +8,6 @@ var NODES = 2;
 var doTest = function(st, doSharded) {
 var testDB = st.s.getDB('test');
 
-testDB.adminCommand({ enableSharding: 'test' });
-testDB.adminCommand({ shardCollection: 'test.user', key: { x: 1 }});
-
 if (doSharded) {
     testDB.adminCommand({ enableSharding: 'test' });
     testDB.adminCommand({ shardCollection: 'test.user', key: { x: 1 }});
@@ -24,7 +21,7 @@ var secNode = st.rs0.getSecondary();
 secNode.getDB('test').setProfilingLevel(2);
 
 var res = testDB.runCommand({ aggregate: 'user', pipeline: [{ $project: { x: 1 }}]});
-assert(res.ok);
+assert(res.ok, 'aggregate command failed: ' + tojson(res));
 
 var profileQuery = { op: 'command', ns: 'test.$cmd', 'command.aggregate': 'user' };
 var profileDoc = secNode.getDB('test').system.profile.findOne(profileQuery);
