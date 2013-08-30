@@ -275,10 +275,6 @@ namespace {
             sources.pop_front();
         }
 
-        // If we are in an explain, we won't actually use the created cursor so release it.
-        if (pPipeline->isExplain())
-            pSource->dispose();
-
         pPipeline->addInitialSource(pSource);
     }
 

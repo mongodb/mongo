@@ -1888,6 +1888,20 @@ namespace mongo {
             vector<Strategy::CommandResult> shardResults;
             SHARDED->commandOp(dbName, shardedCommand, options, fullns, shardQuery, &shardResults);
 
+            if (pPipeline->isExplain()) {
+                result << "splitPipeline" << DOC("shardsPart" << pShardPipeline->writeExplainOps()
+                                              << "mergerPart" << pPipeline->writeExplainOps());
+
+                BSONObjBuilder shardExplains(result.subobjStart("shards"));
+                for (size_t i = 0; i < shardResults.size(); i++) {
+                    shardExplains.append(shardResults[i].shardTarget.getName(),
+                                         BSON("host" << shardResults[i].target.toString()
+                                           << "stages" << shardResults[i].result["stages"]));
+                }
+                        
+                return true;
+            }
+
             if (doAnyShardsNotSupportCursors(shardResults)) {
                 killAllCursors(shardResults);
                 noCursorFallback(
