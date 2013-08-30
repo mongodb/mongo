@@ -389,7 +389,7 @@ namespace mongo {
                 }
                 else {
                     if ( micros == -1 ) {
-                        micros = Client::recommendedYieldMicros();
+                        sleepmicros(Client::recommendedYieldMicros());
                     }
                     else if ( micros == 0 ) {
                         yieldOrSleepFor1Microsecond();
