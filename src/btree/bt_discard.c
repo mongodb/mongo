@@ -97,6 +97,7 @@ __free_page_modify(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_INSERT_HEAD *append;
 	WT_OVFL_ONPAGE *onpage;
 	WT_OVFL_REUSE *reuse;
+	WT_OVFL_TXNC *txnc;
 	WT_PAGE_MODIFY *mod;
 	void *next;
 
@@ -133,7 +134,7 @@ __free_page_modify(WT_SESSION_IMPL *session, WT_PAGE *page)
 		__free_skip_array(session, mod->update,
 		    page->type == WT_PAGE_COL_FIX ? 1 : page->entries);
 
-	/* Free the overflow on-page and reuse skiplists. */
+	/* Free the overflow on-page, reuse and transaction-cache skiplists. */
 	if (mod->ovfl_onpage != NULL)
 		for (onpage =
 		    mod->ovfl_onpage[0]; onpage != NULL; onpage = next) {
@@ -145,10 +146,12 @@ __free_page_modify(WT_SESSION_IMPL *session, WT_PAGE *page)
 			next = reuse->next[0];
 			__wt_free(session, reuse);
 		}
+	if (mod->ovfl_txnc != NULL)
+		for (txnc = mod->ovfl_txnc[0]; txnc != NULL; txnc = next) {
+			next = txnc->next[0];
+			__wt_free(session, txnc);
+		}
 
-	/* Discard any objects the page was tracking plus associated memory. */
-	__wt_rec_track_discard(session, page);
-	__wt_free(session, mod->track);
 	__wt_free(session, page->modify);
 }
 

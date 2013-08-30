@@ -152,6 +152,30 @@ struct __wt_ovfl_reuse {
 };
 
 /*
+ * Overflow tracking for cached values: When a page is reconciled, we write new
+ * K/V overflow items, and discard previous underlying blocks.  If there's a
+ * transaction in the system that needs to be read the previous value, we have
+ * to cache the old value until no running transaction needs it.
+ */
+struct __wt_ovfl_txnc {
+	uint32_t addr_offset;		/* Overflow addr offset */
+	uint32_t addr_size;		/* Overflow addr size */
+	uint32_t value_offset;		/* Overflow value offset */
+	uint32_t value_size;		/* Overflow value size */
+
+	/*
+	 * The untyped address immediately follows the WT_OVFL_TXNC
+	 * structure, the untyped value immediately follows the address.
+	 */
+#define	WT_OVFL_TXNC_ADDR(p)						\
+	((void *)((uint8_t *)(p) + (p)->addr_offset))
+#define	WT_OVFL_TXNC_VALUE(p)						\
+	((void *)((uint8_t *)(p) + (p)->value_offset))
+
+	WT_OVFL_TXNC *next[0];		/* Forward-linked skip list */
+};
+
+/*
  * WT_PAGE_MODIFY --
  *	When a page is modified, there's additional information maintained as it
  * is written to disk.
@@ -236,24 +260,9 @@ struct __wt_page_modify {
 	WT_INSERT_HEAD **update;	/* Updated items */
 
 	/* Overflow record tracking. */
-	WT_OVFL_ONPAGE *ovfl_onpage[WT_SKIP_MAXDEPTH];
-	WT_OVFL_REUSE  *ovfl_reuse[WT_SKIP_MAXDEPTH];
-
-	struct __wt_page_track {
-		WT_ADDR  addr;		/* Overflow or block location */
-
-		uint8_t *data;		/* Overflow data reference */
-		uint32_t size;		/* Overflow data length */
-
-#define	WT_TRK_CACHE_DEL	0x001	/* Cached deleted overflow value */
-#define	WT_TRK_DISCARD		0x002	/* Object was discarded */
-#define	WT_TRK_INUSE		0x004	/* Object is currently in-use */
-#define	WT_TRK_JUST_ADDED	0x008	/* Object added this reconciliation */
-#define	WT_TRK_OBJECT		0x010	/* Slot set (not empty) */
-#define	WT_TRK_ONPAGE		0x020	/* Object was referenced from a page */
-		uint8_t  flags;
-	} *track;			/* Array of tracked objects */
-	uint32_t track_entries;		/* Total track slots */
+	WT_OVFL_ONPAGE	*ovfl_onpage[WT_SKIP_MAXDEPTH];
+	WT_OVFL_REUSE	*ovfl_reuse[WT_SKIP_MAXDEPTH];
+	WT_OVFL_TXNC	*ovfl_txnc[WT_SKIP_MAXDEPTH];
 
 #define	WT_PM_REC_EMPTY		0x01	/* Reconciliation: page empty */
 #define	WT_PM_REC_REPLACE	0x02	/* Reconciliation: page replaced */

@@ -305,9 +305,6 @@ __wt_rec_write(WT_SESSION_IMPL *session,
 	WT_RET(__rec_write_init(session, page, flags, &session->reconcile));
 	r = session->reconcile;
 
-	/* Initialize the tracking subsystem for each new run. */
-	WT_RET(__wt_rec_track_init(session, page));
-
 	/* Reconcile the page. */
 	switch (page->type) {
 	case WT_PAGE_COL_FIX:
@@ -3061,7 +3058,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		 * key.  If there's no tracking entry, use the original blocks.
 		 */
 		if (onpage_ovfl &&
-		    __wt_ovfl_onpage_srch(page, kpack->data, kpack->size))
+		    __wt_ovfl_onpage_search(page, kpack->data, kpack->size))
 			onpage_ovfl = 0;
 
 		/*
@@ -3429,7 +3426,7 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 		__wt_cell_unpack(cell, unpack);
 		onpage_ovfl = unpack->ovfl;
 		if (onpage_ovfl &&
-		    __wt_ovfl_onpage_srch(page, unpack->data, unpack->size)) {
+		    __wt_ovfl_onpage_search(page, unpack->data, unpack->size)) {
 			onpage_ovfl = 0;
 			WT_ASSERT(session, ikey != NULL);
 		}
@@ -3667,7 +3664,7 @@ __rec_split_discard(WT_SESSION_IMPL *session, WT_PAGE *page)
 		WT_RET(bm->free(bm, session,
 		    ((WT_ADDR *)ref->addr)->addr,
 		    ((WT_ADDR *)ref->addr)->size));
-	WT_RET(__wt_rec_track_wrapup(session, page));
+	WT_RET(__wt_ovfl_track_wrapup(session, page));
 
 	if ((mod = page->modify) != NULL)
 		switch (F_ISSET(mod, WT_PM_REC_MASK)) {
@@ -3796,7 +3793,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	 * list of allocated/free/whatever blocks that are associated with the
 	 * checkpoint).
 	 */
-	WT_RET(__wt_rec_track_wrapup(session, page));
+	WT_RET(__wt_ovfl_track_wrapup(session, page));
 
 	switch (r->bnd_next) {
 	case 0:						/* Page delete */
@@ -3966,7 +3963,7 @@ __rec_write_wrapup_err(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	 * tree.  This is not a question of correctness, we're avoiding block
 	 * leaks.
 	 */
-	WT_TRET(__wt_rec_track_wrapup_err(session, page));
+	WT_TRET(__wt_ovfl_track_wrapup_err(session, page));
 	for (bnd = r->bnd, i = 0; i < r->bnd_next; ++bnd, ++i)
 		if (bnd->addr.addr != NULL) {
 			WT_TRET(bm->free(
@@ -4397,7 +4394,7 @@ __rec_cell_build_ovfl(WT_SESSION_IMPL *session,
 	 * See if this overflow record has already been written and reuse it if
 	 * possible.  Else, write a new overflow record.
 	 */
-	if (!__wt_ovfl_reuse_srch(session, page,
+	if (!__wt_ovfl_reuse_search(session, page,
 	    &addr, &size, kv->buf.data, kv->buf.size)) {
 		/* Allocate a buffer big enough to write the overflow record. */
 		alloc_size = kv->buf.size;
