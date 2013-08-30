@@ -4455,19 +4455,25 @@ __rec_dictionary_skip_search(WT_DICTIONARY **head, uint64_t hash)
 	 * Start at the highest skip level, then go as far as possible at each
 	 * level before stepping down to the next.
 	 */
-	for (i = WT_SKIP_MAXDEPTH - 1, e = &head[i]; i >= 0;)
-		if (*e == NULL) {
+	for (i = WT_SKIP_MAXDEPTH - 1, e = &head[i]; i >= 0;) {
+		if (*e == NULL) {		/* Empty levels */
 			--i;
 			--e;
-		} else {
-			if ((*e)->hash == hash)
-				return (*e);
-			if ((*e)->hash > hash)
-				return (NULL);
-			e = &(*e)->next[i];
+			continue;
 		}
 
-	/* NOTREACHED */
+		/*
+		 * Return any exact matches: we don't care in what search level
+		 * we found a match.
+		 */
+		if ((*e)->hash == hash)		/* Exact match */
+			return (*e);
+		if ((*e)->hash > hash) {	/* Drop down a level */
+			--i;
+			--e;
+		} else				/* Keep going at this level */
+			e = &(*e)->next[i];
+	}
 	return (NULL);
 }
 
@@ -4487,10 +4493,10 @@ __rec_dictionary_skip_search_stack(
 	 * level before stepping down to the next.
 	 */
 	for (i = WT_SKIP_MAXDEPTH - 1, e = &head[i]; i >= 0;)
-		if (*e == NULL || (*e)->hash >= hash)
-			stack[i--] = e--;
+		if (*e == NULL || (*e)->hash > hash)
+			stack[i--] = e--;	/* Drop down a level */
 		else
-			e = &(*e)->next[i];
+			e = &(*e)->next[i];	/* Keep going at this level */
 }
 
 /*
