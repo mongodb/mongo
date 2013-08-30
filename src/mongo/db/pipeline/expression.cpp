@@ -798,6 +798,234 @@ namespace {
     const char *ExpressionConstant::getOpName() const {
         return "$const";
     }
+    
+    /* ------------------------- ExpressionDateAdd ----------------------------- */
+
+    Value ExpressionDateAdd::evaluateInternal(const Variables& vars) const {
+
+        /*
+          We'll try to return the narrowest possible result value.  To do that
+          without creating intermediate Values, do the arithmetic for double
+          and integral types in parallel, tracking the current narrowest
+          type.
+         */
+        double doubleTotal = 0;
+        long long longTotal = 0;
+        
+        struct tm * timeInfo = NULL;
+        BSONType totalType = NumberInt;
+        unsigned int refDateIndex = 0;
+        const size_t n = vpOperand.size();
+        uassert(17106, "$dateAdd takes at least 2 arguments, and one has to be a date", (n >= 2));
+        for (size_t i = 0; i < n; i++){
+            Value val = vpOperand[i]->evaluateInternal(vars);
+            // Find the reference date
+            if(val.getType() == Date){
+                timeInfo = new tm();
+                // Fill the tm instance
+                time_t_to_Struct(val.coerceToTimeT(), timeInfo, true);
+                refDateIndex = (int)i;
+                break;
+            }
+        }
+        if(timeInfo == NULL){
+            delete timeInfo;
+            timeInfo = NULL;
+            uassert(17095, "$dateAdd needs a date.", false);
+        }
+        for (size_t i = 0; i < n; ++i) {
+            if(i == refDateIndex){
+                continue;
+            }
+            Value val = vpOperand[i]->evaluateInternal(vars);
+            if (val.numeric()) {
+                totalType = Value::getWidestNumeric(totalType, val.getType());
+
+                doubleTotal += val.coerceToDouble();
+                longTotal += val.coerceToLong();
+            }
+            else if (val.nullish()) {
+                delete timeInfo;
+                timeInfo = NULL;
+                return Value(BSONNULL);
+            }
+            else if (val.getType() == Date){
+                uassert(17092, "$dateAdd only supports one date element", false);
+            }
+            else if (val.getType() == Array) {
+                uassert(17104, "The array should have just a value and a unit.", (val.getArray().size() == 2));
+                uassert(17090, "The first element of the array should be a number", (val[0].numeric()));
+                uassert(17093, "The second element of the array should be a string", (val[1].getType() == String));
+                long long dateValue = val[0].coerceToLong();
+                string dateUnit = val[1].getString();
+                if(dateUnit == "milliseconds"){
+                    doubleTotal += dateValue;
+                    longTotal += dateValue;
+                }
+                else if(dateUnit == "seconds"){
+                    doubleTotal += dateValue * 1000;
+                    longTotal += dateValue * 1000;
+                }
+                else if(dateUnit == "minutes"){
+                    doubleTotal += dateValue * 1000*60;
+                    longTotal += dateValue * 1000*60;
+                }
+                else if(dateUnit == "hours"){
+                    doubleTotal += dateValue * 1000*60*60;
+                    longTotal += dateValue * 1000*60*60;
+                }
+                else if(dateUnit == "days"){
+                    doubleTotal += dateValue * 1000*60*60*24;
+                    longTotal += dateValue * 1000*60*60*24;
+                }
+                else if(dateUnit == "months"){
+                    timeInfo->tm_mon += dateValue;
+                }
+                else if(dateUnit == "years"){
+                    timeInfo->tm_year += dateValue;
+                }
+                else {
+                    uasserted(17091, str::stream() << "$dateAdd unit not supported.");
+                }
+            }
+            else {
+                delete timeInfo;
+                timeInfo = NULL;
+                uasserted(17094, str::stream() << "$dateAdd only supports numeric, date types, or Arrays, not "
+                                               << typeName(val.getType()));
+            }
+        }
+        
+        if (totalType == NumberDouble)
+            longTotal = static_cast<long long>(doubleTotal);
+        if(timeInfo != NULL){
+            time_t dateTotal = mktime(timeInfo);
+            longTotal += dateTotal * 1000;
+        }
+        // Clean pointer just in case
+        delete timeInfo;
+        timeInfo = NULL;
+        return Value(Date_t(longTotal));
+    }
+
+    REGISTER_EXPRESSION("$dateAdd", ExpressionDateAdd::parse);
+    const char *ExpressionDateAdd::getOpName() const {
+        return "$dateAdd";
+    }
+    
+    /* ------------------------- ExpressionDateSub ----------------------------- */
+
+    Value ExpressionDateSub::evaluateInternal(const Variables& vars) const {
+
+        /*
+          We'll try to return the narrowest possible result value.  To do that
+          without creating intermediate Values, do the arithmetic for double
+          and integral types in parallel, tracking the current narrowest
+          type.
+         */
+        double doubleTotal = 0;
+        long long longTotal = 0;
+        
+        struct tm * timeInfo = NULL;
+        BSONType totalType = NumberInt;
+        unsigned int refDateIndex = 0;
+        const size_t n = vpOperand.size();
+        uassert(17105, "$dateSub takes at least 2 arguments, and one has to be a date", (n >= 2));
+        for (size_t i = 0; i < n; i++){
+            Value val = vpOperand[i]->evaluateInternal(vars);
+            // Find the reference date
+            if(val.getType() == Date){
+                timeInfo = new tm();
+                // Fill the tm instance
+                time_t_to_Struct(val.coerceToTimeT(), timeInfo, true);
+                refDateIndex = (int)i;
+                break;
+            }
+        }
+        if(timeInfo == NULL){
+            delete timeInfo;
+            timeInfo = NULL;
+            uassert(17096, "$dateSub needs a date.", false);
+        }
+        for (size_t i = 0; i < n; ++i) {
+            if(i == refDateIndex){
+                continue;
+            }
+            Value val = vpOperand[i]->evaluateInternal(vars);
+            if (val.numeric()) {
+                totalType = Value::getWidestNumeric(totalType, val.getType());
+
+                doubleTotal += val.coerceToDouble();
+                longTotal += val.coerceToLong();
+            }
+            else if (val.nullish()) {
+                delete timeInfo;
+                timeInfo = NULL;
+                return Value(BSONNULL);
+            }
+            else if (val.getType() == Date){
+                uassert(17102, "$dateSub only supports one date element", false);
+            }
+            else if (val.getType() == Array) {
+                uassert(17103, "The array should have a value and a unit.", (val.getArray().size() == 2));
+                uassert(17098, "The first element of the array should be a number", (val[0].numeric()));
+                uassert(17099, "The second element of the array should be a string", (val[1].getType() == String));
+                long long dateValue = val[0].coerceToLong();
+                string dateUnit = val[1].getString();
+                if(dateUnit == "milliseconds"){
+                    doubleTotal += dateValue;
+                    longTotal += dateValue;
+                }
+                else if(dateUnit == "seconds"){
+                    doubleTotal += dateValue * 1000;
+                    longTotal += dateValue * 1000;
+                }
+                else if(dateUnit == "minutes"){
+                    doubleTotal += dateValue * 1000*60;
+                    longTotal += dateValue * 1000*60;
+                }
+                else if(dateUnit == "hours"){
+                    doubleTotal += dateValue * 1000*60*60;
+                    longTotal += dateValue * 1000*60*60;
+                }
+                else if(dateUnit == "days"){
+                    doubleTotal += dateValue * 1000*60*60*24;
+                    longTotal += dateValue * 1000*60*60*24;
+                }
+                else if(dateUnit == "months"){
+                    timeInfo->tm_mon -= dateValue;
+                }
+                else if(dateUnit == "years"){
+                    timeInfo->tm_year -= dateValue;
+                }
+                else {
+                    uasserted(17100, str::stream() << "$dateSub unit not supported.");
+                }
+            }
+            else {
+                delete timeInfo;
+                timeInfo = NULL;
+                uasserted(17101, str::stream() << "$dateSub only supports numeric, date types, or Arrays, not "
+                                               << typeName(val.getType()));
+            }
+        }
+        
+        if (totalType == NumberDouble)
+            longTotal = static_cast<long long>(doubleTotal);
+        if(timeInfo != NULL){
+            time_t dateTotal = mktime(timeInfo);
+            longTotal = (dateTotal * 1000) - longTotal;
+        }
+        // Clean pointer just in case
+        delete timeInfo;
+        timeInfo = NULL;
+        return Value(Date_t(longTotal));
+    }
+
+    REGISTER_EXPRESSION("$dateSub", ExpressionDateSub::parse);
+    const char *ExpressionDateSub::getOpName() const {
+        return "$dateSub";
+    }
 
     /* ---------------------- ExpressionDayOfMonth ------------------------- */
 

@@ -950,6 +950,446 @@ namespace ExpressionTests {
         };
 
     } // namespace Constant
+    
+    namespace DateAdd {
+
+        class ExpectedResultBase {
+        public:
+            virtual ~ExpectedResultBase() {}
+            void run() {
+                intrusive_ptr<ExpressionNary> expression = new ExpressionDateAdd();
+                populateOperands( expression );
+                ASSERT_EQUALS( expectedResult(),
+                               toBson( expression->evaluate( Document() ) ) );
+            }
+        protected:
+            virtual void populateOperands( intrusive_ptr<ExpressionNary>& expression ) = 0;
+            virtual BSONObj expectedResult() = 0;
+        };
+
+        /** $add with a NULL Document pointer, as called by ExpressionNary::optimize(). */
+        class NullDocument {
+        public:
+            void run() {
+                intrusive_ptr<ExpressionNary> expression = new ExpressionDateAdd();
+                expression->addOperand( ExpressionConstant::create( Value( 2 ) ) );
+                ASSERT_THROWS( expression->evaluate( Document() ), UserException );
+            }
+        };
+
+        /** $add without operands. */
+        class NoOperands {
+        public:
+            void run() {
+                intrusive_ptr<ExpressionNary> expression = new ExpressionDateAdd();
+                ASSERT_THROWS( expression->evaluate( Document() ), UserException );
+            }
+        };
+
+        /** String type unsupported. */
+        class String {
+        public:
+            void run() {
+                intrusive_ptr<ExpressionNary> expression = new ExpressionDateAdd();
+                expression->addOperand( ExpressionConstant::create( Value( "a" ) ) );
+                ASSERT_THROWS( expression->evaluate( Document() ), UserException );
+            }
+        };
+
+        /** Bool type unsupported. */
+        class Bool {
+        public:
+            void run() {
+                intrusive_ptr<ExpressionNary> expression = new ExpressionDateAdd();
+                expression->addOperand( ExpressionConstant::create( Value(true) ) );
+                ASSERT_THROWS( expression->evaluate( Document() ), UserException );
+            }            
+        };
+
+        class SingleOperand {
+        public:
+            void run() {
+                intrusive_ptr<ExpressionNary> expression = new ExpressionDateAdd();
+                expression->addOperand( ExpressionConstant::create( Value(true) ) );
+                ASSERT_THROWS( expression->evaluate( Document() ), UserException );
+            }            
+        };
+        
+        class TwoDates {
+        public:
+            void run() {
+                intrusive_ptr<ExpressionNary> expression = new ExpressionDateAdd();
+                expression->addOperand( ExpressionConstant::create( Value(Date_t(1377815610LL * 1000)) ) );
+                expression->addOperand( ExpressionConstant::create( Value(Date_t(1377815610LL * 1000)) ) );
+                ASSERT_THROWS( expression->evaluate( Document() ), UserException );
+            }            
+        };
+
+        class TwoOperandBase : public ExpectedResultBase {
+        public:
+            TwoOperandBase() :
+                _reverse() {
+            }
+            void run() {
+                ExpectedResultBase::run();
+                // Now add the operands in the reverse direction.
+                _reverse = true;
+                ExpectedResultBase::run();
+            }
+        protected:
+            void populateOperands( intrusive_ptr<ExpressionNary>& expression ) {
+                expression->addOperand( ExpressionConstant::create
+                                        ( valueFromBson( _reverse ? operand2() : operand1() ) ) );
+                expression->addOperand( ExpressionConstant::create
+                                        ( valueFromBson( _reverse ? operand1() : operand2() ) ) );
+            }
+            virtual BSONObj operand1() = 0;
+            virtual BSONObj operand2() = 0;
+        private:
+            bool _reverse;
+        };
+
+        /** Add an int and a Date. */
+        class DateInt : public TwoOperandBase {
+            
+            // Date Thu, 29 Aug 2013 22:33:30 GMT
+            BSONObj operand1() { return BSON( "" << Date_t(1377815610LL * 1000) ); }
+            // Add 10 seconds
+            BSONObj operand2() { return BSON( "" << 10000 ); }
+            BSONObj expectedResult() { return BSON( "" << Date_t(1377815620LL * 1000) ); }
+        };
+
+        /** Adding a Date and a Long value. */
+        class DateLong : public TwoOperandBase {
+            // Date Thu, 29 Aug 2013 22:33:30 GMT
+            BSONObj operand1() { return BSON( "" << Date_t(1377815610LL * 1000) ); }
+            // Add 10 seconds as a Long
+            BSONObj operand2() { return BSON( "" << 10000LL ); }
+            BSONObj expectedResult() { return BSON( "" << Date_t(1377815620LL * 1000) ); }
+        };
+        
+        /** Adding a Date and an array with milliseconds. */
+        class DateArrayMilliseconds : public TwoOperandBase {
+            // Date Thu, 29 Aug 2013 22:33:30 GMT
+            BSONObj operand1() { return BSON( "" << Date_t(1377815610LL * 1000) ); }
+            // Add 1 second as an array expressed in milliseconds
+            BSONObj operand2() { return BSON( "" << BSON_ARRAY( 1000 << "milliseconds" ) ); }
+            // Date Thu, 29 Aug 2013 22:33:31 GMT
+            BSONObj expectedResult() { return BSON( "" << Date_t(1377815611LL * 1000) ); }
+        };
+        
+        /** Adding a Date and an array with seconds. */
+        class DateArraySeconds : public TwoOperandBase {
+            // Date Thu, 29 Aug 2013 22:33:30 GMT
+            BSONObj operand1() { return BSON( "" << Date_t(1377815610LL * 1000) ); }
+            // Add 10 seconds as an array
+            BSONObj operand2() { return BSON( "" << BSON_ARRAY( 10 << "seconds" ) ); }
+            // Date Thu, 29 Aug 2013 22:33:40 GMT
+            BSONObj expectedResult() { return BSON( "" << Date_t(1377815620LL * 1000) ); }
+        };
+        
+        /** Adding a Date and an array with hours. */
+        class DateArrayMinutes : public TwoOperandBase {
+            // Date Thu, 29 Aug 2013 22:33:30 GMT
+            BSONObj operand1() { return BSON( "" << Date_t(1377815610LL * 1000) ); }
+            // Add 45 minutes as an array
+            BSONObj operand2() { return BSON( "" << BSON_ARRAY( 45 << "minutes" ) ); }
+            // Date Thu, 29 Aug 2013 23:18:30 GMT
+            BSONObj expectedResult() { return BSON( "" << Date_t(1377818310LL * 1000) ); }
+        };
+        
+        /** Adding a Date and an array with hours. */
+        class DateArrayHours : public TwoOperandBase {
+            // Date Thu, 29 Aug 2013 22:33:30 GMT
+            BSONObj operand1() { return BSON( "" << Date_t(1377815610LL * 1000) ); }
+            // Add 5 hours as an arrays expressed in milliseconds
+            BSONObj operand2() { return BSON( "" << BSON_ARRAY( 5 << "hours" ) ); }
+            // Fri, 30 Aug 2013 03:33:30 GMT
+            BSONObj expectedResult() { return BSON( "" << Date_t(1377833610LL * 1000) ); }
+        };
+        
+        /** Adding a Date and an array with days. */
+        class DateArrayDays : public TwoOperandBase {
+            // Date Thu, 29 Aug 2013 22:33:30 GMT
+            BSONObj operand1() { return BSON( "" << Date_t(1377815610LL * 1000) ); }
+            // Add 4 days as an arrays expressed in milliseconds
+            BSONObj operand2() { return BSON( "" << BSON_ARRAY( 4 << "days" ) ); }
+            // Date Mon, 02 Sep 2013 22:33:30 GMT
+            BSONObj expectedResult() { return BSON( "" << Date_t(1378161210LL * 1000) ); }
+        };
+        
+        /** Adding a Date and an array with days. */
+        class DateArrayMonths : public TwoOperandBase {
+            // Date Thu, 29 Aug 2013 22:33:30 GMT
+            BSONObj operand1() { return BSON( "" << Date_t(1377815610LL * 1000) ); }
+            // Add 8 months as an array
+            BSONObj operand2() { return BSON( "" << BSON_ARRAY( 8 << "months" ) ); }
+            // Date Tue, 29 Apr 2014 22:33:30 GMT
+            BSONObj expectedResult() { return BSON( "" << Date_t(1398810810LL * 1000) ); }
+        };
+        
+        /** Adding a Date and an array with days. */
+        class DateArrayYears : public TwoOperandBase {
+            // Date Thu, 29 Aug 2013 22:33:30 GMT
+            BSONObj operand1() { return BSON( "" << Date_t(1377815610LL * 1000) ); }
+            // Add 6 years as an array
+            BSONObj operand2() { return BSON( "" << BSON_ARRAY( 6 << "years" ) ); }
+            // Date Thu, 29 Aug 2019 22:33:30 GMT
+            BSONObj expectedResult() { return BSON( "" << Date_t(1567118010LL * 1000) ); }
+        };
+
+        /** Adding an date and null. */
+        class DateNull : public TwoOperandBase {
+            BSONObj operand1() { return BSON( "" << Date_t(1377815610LL * 1000) ); }
+            BSONObj operand2() { return BSON( "" << BSONNULL ); }
+            BSONObj expectedResult() { return BSON( "" << BSONNULL ); }
+        };
+        
+        /** Adding a date and undefined. */
+        class DateUndefined : public TwoOperandBase {
+            BSONObj operand1() { return BSON( "" << Date_t(1377815610LL * 1000) ); }
+            BSONObj operand2() { return fromjson( "{'':undefined}" ); }
+            BSONObj expectedResult() { return BSON( "" << BSONNULL ); }
+        };
+        
+        class DatePlusThreeArray {
+        public:
+            void run() {
+                intrusive_ptr<ExpressionNary> expression = new ExpressionDateAdd();
+                // Add date Thu, 29 Aug 2013 22:33:30 GMT
+                expression->addOperand( ExpressionConstant::create( Value(Date_t(1377815610LL * 1000)) ) );
+                BSONObj array1 = BSON("" << BSON_ARRAY( 5 << "months" ) );
+                expression->addOperand( ExpressionConstant::create( valueFromBson( array1 ) ) );
+                BSONObj array2 = BSON("" << BSON_ARRAY( 2 << "years" ) );
+                expression->addOperand( ExpressionConstant::create( valueFromBson( array2 ) ) );
+                BSONObj array3 = BSON("" << BSON_ARRAY( 10 << "days" ) );
+                expression->addOperand( ExpressionConstant::create( valueFromBson( array3 ) ) );
+                BSONObj res = BSON( "" << Date_t(1454970810LL * 1000) );
+                ASSERT_EQUALS( toBson( expression->evaluate( Document() )), res );
+            }            
+        };
+        
+    } // namespace DateAdd
+    
+    namespace DateSub {
+
+        class ExpectedResultBase {
+        public:
+            virtual ~ExpectedResultBase() {}
+            void run() {
+                intrusive_ptr<ExpressionNary> expression = new ExpressionDateSub();
+                populateOperands( expression );
+                ASSERT_EQUALS( expectedResult(),
+                               toBson( expression->evaluate( Document() ) ) );
+            }
+        protected:
+            virtual void populateOperands( intrusive_ptr<ExpressionNary>& expression ) = 0;
+            virtual BSONObj expectedResult() = 0;
+        };
+
+        /** $dateSub with a NULL Document pointer, as called by ExpressionNary::optimize(). */
+        class NullDocument {
+        public:
+            void run() {
+                intrusive_ptr<ExpressionNary> expression = new ExpressionDateSub();
+                expression->addOperand( ExpressionConstant::create( Value( 2 ) ) );
+                ASSERT_THROWS( expression->evaluate( Document() ), UserException );
+            }
+        };
+
+        /** $dateSub without operands. */
+        class NoOperands {
+        public:
+            void run() {
+                intrusive_ptr<ExpressionNary> expression = new ExpressionDateSub();
+                ASSERT_THROWS( expression->evaluate( Document() ), UserException );
+            }
+        };
+
+        /** String type unsupported. */
+        class String {
+        public:
+            void run() {
+                intrusive_ptr<ExpressionNary> expression = new ExpressionDateSub();
+                expression->addOperand( ExpressionConstant::create( Value( "a" ) ) );
+                ASSERT_THROWS( expression->evaluate( Document() ), UserException );
+            }
+        };
+
+        /** Bool type unsupported. */
+        class Bool {
+        public:
+            void run() {
+                intrusive_ptr<ExpressionNary> expression = new ExpressionDateSub();
+                expression->addOperand( ExpressionConstant::create( Value(true) ) );
+                ASSERT_THROWS( expression->evaluate( Document() ), UserException );
+            }            
+        };
+
+        class SingleOperand {
+        public:
+            void run() {
+                intrusive_ptr<ExpressionNary> expression = new ExpressionDateSub();
+                expression->addOperand( ExpressionConstant::create( Value(true) ) );
+                ASSERT_THROWS( expression->evaluate( Document() ), UserException );
+            }            
+        };
+        
+        class TwoDates {
+        public:
+            void run() {
+                intrusive_ptr<ExpressionNary> expression = new ExpressionDateSub();
+                expression->addOperand( ExpressionConstant::create( Value(Date_t(1377815610LL * 1000)) ) );
+                expression->addOperand( ExpressionConstant::create( Value(Date_t(1377815610LL * 1000)) ) );
+                ASSERT_THROWS( expression->evaluate( Document() ), UserException );
+            }            
+        };
+
+        class TwoOperandBase : public ExpectedResultBase {
+        public:
+            TwoOperandBase() :
+                _reverse() {
+            }
+            void run() {
+                ExpectedResultBase::run();
+                // Now add the operands in the reverse direction.
+                _reverse = true;
+                ExpectedResultBase::run();
+            }
+        protected:
+            void populateOperands( intrusive_ptr<ExpressionNary>& expression ) {
+                expression->addOperand( ExpressionConstant::create
+                                        ( valueFromBson( _reverse ? operand2() : operand1() ) ) );
+                expression->addOperand( ExpressionConstant::create
+                                        ( valueFromBson( _reverse ? operand1() : operand2() ) ) );
+            }
+            virtual BSONObj operand1() = 0;
+            virtual BSONObj operand2() = 0;
+        private:
+            bool _reverse;
+        };
+
+        /** Subtract an int and a Date. */
+        class DateInt : public TwoOperandBase {
+            
+            // Date Thu, 29 Aug 2013 22:33:30 GMT
+            BSONObj operand1() { return BSON( "" << Date_t(1377815610LL * 1000) ); }
+            // Subtract 10 seconds
+            BSONObj operand2() { return BSON( "" << 10000 ); }
+            BSONObj expectedResult() { return BSON( "" << Date_t(1377815600LL * 1000) ); }
+        };
+
+        /** Subtract a Date and a Long value. */
+        class DateLong : public TwoOperandBase {
+            // Date Thu, 29 Aug 2013 22:33:30 GMT
+            BSONObj operand1() { return BSON( "" << Date_t(1377815610LL * 1000) ); }
+            // Subtract 10 seconds as a Long
+            BSONObj operand2() { return BSON( "" << 10000LL ); }
+            BSONObj expectedResult() { return BSON( "" << Date_t(1377815600LL * 1000) ); }
+        };
+        
+        /** Subtract a Date and an array with milliseconds. */
+        class DateArrayMilliseconds : public TwoOperandBase {
+            // Date Thu, 29 Aug 2013 22:33:30 GMT
+            BSONObj operand1() { return BSON( "" << Date_t(1377815610LL * 1000) ); }
+            // Subtract 1 second as an array expressed in milliseconds
+            BSONObj operand2() { return BSON( "" << BSON_ARRAY( 1000 << "milliseconds" ) ); }
+            // Date Thu, 29 Aug 2013 22:33:29 GMT
+            BSONObj expectedResult() { return BSON( "" << Date_t(1377815609LL * 1000) ); }
+        };
+        
+        /** Subtract a Date and an array with seconds. */
+        class DateArraySeconds : public TwoOperandBase {
+            // Date Thu, 29 Aug 2013 22:33:30 GMT
+            BSONObj operand1() { return BSON( "" << Date_t(1377815610LL * 1000) ); }
+            // Subtract 10 seconds as an array
+            BSONObj operand2() { return BSON( "" << BSON_ARRAY( 10 << "seconds" ) ); }
+            // Date Thu, 29 Aug 2013 22:33:20 GMT
+            BSONObj expectedResult() { return BSON( "" << Date_t(1377815600LL * 1000) ); }
+        };
+        
+        /** Subtract a Date and an array with hours. */
+        class DateArrayMinutes : public TwoOperandBase {
+            // Date Thu, 29 Aug 2013 22:33:30 GMT
+            BSONObj operand1() { return BSON( "" << Date_t(1377815610LL * 1000) ); }
+            // Subtract 45 minutes as an array
+            BSONObj operand2() { return BSON( "" << BSON_ARRAY( 45 << "minutes" ) ); }
+            // Date Thu, 29 Aug 2013 21:48:30 GMT
+            BSONObj expectedResult() { return BSON( "" << Date_t(1377812910LL * 1000) ); }
+        };
+        
+        /** Subtract a Date and an array with hours. */
+        class DateArrayHours : public TwoOperandBase {
+            // Date Thu, 29 Aug 2013 22:33:30 GMT
+            BSONObj operand1() { return BSON( "" << Date_t(1377815610LL * 1000) ); }
+            // Subtract 5 hours as an arrays expressed in milliseconds
+            BSONObj operand2() { return BSON( "" << BSON_ARRAY( 5 << "hours" ) ); }
+            // Date Thu, 29 Aug 2013 17:33:30 GMT
+            BSONObj expectedResult() { return BSON( "" << Date_t(1377797610LL * 1000) ); }
+        };
+        
+        /** Subtract a Date and an array with days. */
+        class DateArrayDays : public TwoOperandBase {
+            // Date Thu, 29 Aug 2013 22:33:30 GMT
+            BSONObj operand1() { return BSON( "" << Date_t(1377815610LL * 1000) ); }
+            // Subtract 4 days as an arrays expressed in milliseconds
+            BSONObj operand2() { return BSON( "" << BSON_ARRAY( 4 << "days" ) ); }
+            // Date Sun, 25 Aug 2013 22:33:30 GMT
+            BSONObj expectedResult() { return BSON( "" << Date_t(1377470010LL * 1000) ); }
+        };
+        
+        /** Subtract a Date and an array with days. */
+        class DateArrayMonths : public TwoOperandBase {
+            // Date Thu, 29 Aug 2013 22:33:30 GMT
+            BSONObj operand1() { return BSON( "" << Date_t(1377815610LL * 1000) ); }
+            // Subtract 8 months as an array
+            BSONObj operand2() { return BSON( "" << BSON_ARRAY( 8 << "months" ) ); }
+            // Date Sat, 29 Dec 2012 22:33:30 GMT
+            BSONObj expectedResult() { return BSON( "" << Date_t(1356820410LL * 1000) ); }
+        };
+        
+        /** Subtract a Date and an array with days. */
+        class DateArrayYears : public TwoOperandBase {
+            // Date Thu, 29 Aug 2013 22:33:30 GMT
+            BSONObj operand1() { return BSON( "" << Date_t(1377815610LL * 1000) ); }
+            // Subtract 6 years as an array
+            BSONObj operand2() { return BSON( "" << BSON_ARRAY( 6 << "years" ) ); }
+            // Date Wed, 29 Aug 2007 22:33:30 GMT
+            BSONObj expectedResult() { return BSON( "" << Date_t(1188426810LL * 1000) ); }
+        };
+
+        /** Subtract an date and null. */
+        class DateNull : public TwoOperandBase {
+            BSONObj operand1() { return BSON( "" << Date_t(1377815610LL * 1000) ); }
+            BSONObj operand2() { return BSON( "" << BSONNULL ); }
+            BSONObj expectedResult() { return BSON( "" << BSONNULL ); }
+        };
+        
+        /** Subtract a date and undefined. */
+        class DateUndefined : public TwoOperandBase {
+            BSONObj operand1() { return BSON( "" << Date_t(1377815610LL * 1000) ); }
+            BSONObj operand2() { return fromjson( "{'':undefined}" ); }
+            BSONObj expectedResult() { return BSON( "" << BSONNULL ); }
+        };
+        
+        class DateMinusThreeArray {
+        public:
+            void run() {
+                intrusive_ptr<ExpressionNary> expression = new ExpressionDateSub();
+                // Add date Thu, 29 Aug 2013 22:33:30 GMT
+                expression->addOperand( ExpressionConstant::create( Value(Date_t(1377815610LL * 1000)) ) );
+                BSONObj array1 = BSON("" << BSON_ARRAY( 5 << "months" ) );
+                expression->addOperand( ExpressionConstant::create( valueFromBson( array1 ) ) );
+                BSONObj array2 = BSON("" << BSON_ARRAY( 2 << "years" ) );
+                expression->addOperand( ExpressionConstant::create( valueFromBson( array2 ) ) );
+                BSONObj array3 = BSON("" << BSON_ARRAY( 10 << "days" ) );
+                expression->addOperand( ExpressionConstant::create( valueFromBson( array3 ) ) );
+                BSONObj res = BSON( "" << Date_t(1300574010LL * 1000) );
+                ASSERT_EQUALS( toBson( expression->evaluate( Document() )), res );
+            }            
+        };
+        
+    } // namespace DateSub
 
     namespace FieldPath {
 
@@ -3648,6 +4088,40 @@ namespace ExpressionTests {
             add<Constant::Dependencies>();
             add<Constant::AddToBsonObj>();
             add<Constant::AddToBsonArray>();
+            
+            add<DateAdd::NullDocument>();
+            add<DateAdd::NoOperands>();
+            add<DateAdd::SingleOperand>();
+            add<DateAdd::TwoDates>();
+            add<DateAdd::DateInt>();
+            add<DateAdd::DateLong>();
+            add<DateAdd::DateArrayMilliseconds>();
+            add<DateAdd::DateArraySeconds>();
+            add<DateAdd::DateArrayMinutes>();
+            add<DateAdd::DateArrayHours>();
+            add<DateAdd::DateArrayDays>();
+            add<DateAdd::DateArrayMonths>();
+            add<DateAdd::DateArrayYears>();
+            add<DateAdd::DateNull>();
+            add<DateAdd::DateUndefined>();
+            add<DateAdd::DatePlusThreeArray>();
+            
+            add<DateSub::NullDocument>();
+            add<DateSub::NoOperands>();
+            add<DateSub::SingleOperand>();
+            add<DateSub::TwoDates>();
+            add<DateSub::DateInt>();
+            add<DateSub::DateLong>();
+            add<DateSub::DateArrayMilliseconds>();
+            add<DateSub::DateArraySeconds>();
+            add<DateSub::DateArrayMinutes>();
+            add<DateSub::DateArrayHours>();
+            add<DateSub::DateArrayDays>();
+            add<DateSub::DateArrayMonths>();
+            add<DateSub::DateArrayYears>();
+            add<DateSub::DateNull>();
+            add<DateSub::DateUndefined>();
+            add<DateSub::DateMinusThreeArray>();
 
             add<FieldPath::Invalid>();
             add<FieldPath::Optimize>();

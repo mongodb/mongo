@@ -401,6 +401,22 @@ namespace mongo {
 
         Value pValue;
     };
+    
+    class ExpressionDateAdd : public ExpressionVariadic<ExpressionDateAdd> {
+    public:
+        // virtuals from Expression
+        virtual Value evaluateInternal(const Variables& vars) const;
+        virtual const char *getOpName() const;
+        virtual bool isAssociativeAndCommutative() const { return false; }
+    };
+    
+    class ExpressionDateSub : public ExpressionVariadic<ExpressionDateSub> {
+    public:
+        // virtuals from Expression
+        virtual Value evaluateInternal(const Variables& vars) const;
+        virtual const char *getOpName() const;
+        virtual bool isAssociativeAndCommutative() const { return false; }
+    };
 
 
     class ExpressionDayOfMonth : public ExpressionFixedArity<ExpressionDayOfMonth, 1> {
