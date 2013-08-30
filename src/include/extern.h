@@ -378,16 +378,23 @@ extern int __wt_rec_evict(WT_SESSION_IMPL *session,
     int exclusive);
 extern int __wt_merge_tree(WT_SESSION_IMPL *session, WT_PAGE *top);
 extern int __wt_split_page_inmem(WT_SESSION_IMPL *session, WT_PAGE *page);
-extern int __wt_ovfl_reuse_add(WT_SESSION_IMPL *session,
+extern int __wt_ovfl_onpage_srch(WT_PAGE *page,
+    const uint8_t *addr,
+    uint32_t addr_size);
+extern int __wt_ovfl_onpage_add(WT_SESSION_IMPL *session,
     WT_PAGE *page,
     const uint8_t *addr,
-    uint32_t addr_size,
-    const void *value,
-    uint32_t value_size);
+    uint32_t addr_size);
 extern int __wt_ovfl_reuse_srch(WT_SESSION_IMPL *session,
     WT_PAGE *page,
     uint8_t **addrp,
     uint32_t *addr_sizep,
+    const void *value,
+    uint32_t value_size);
+extern int __wt_ovfl_reuse_add(WT_SESSION_IMPL *session,
+    WT_PAGE *page,
+    const uint8_t *addr,
+    uint32_t addr_size,
     const void *value,
     uint32_t value_size);
 extern int __wt_rec_track(WT_SESSION_IMPL *session,

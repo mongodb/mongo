@@ -95,8 +95,10 @@ static void
 __free_page_modify(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_INSERT_HEAD *append;
-	WT_OVFL_REUSE *next, *reuse;
+	WT_OVFL_ONPAGE *onpage;
+	WT_OVFL_REUSE *reuse;
 	WT_PAGE_MODIFY *mod;
+	void *next;
 
 	mod = page->modify;
 
@@ -131,7 +133,13 @@ __free_page_modify(WT_SESSION_IMPL *session, WT_PAGE *page)
 		__free_skip_array(session, mod->update,
 		    page->type == WT_PAGE_COL_FIX ? 1 : page->entries);
 
-	/* Free the overflow reuse skiplist. */
+	/* Free the overflow on-page and reuse skiplists. */
+	if (mod->ovfl_onpage != NULL)
+		for (onpage =
+		    mod->ovfl_onpage[0]; onpage != NULL; onpage = next) {
+			next = onpage->next[0];
+			__wt_free(session, onpage);
+		}
 	if (mod->ovfl_reuse != NULL)
 		for (reuse = mod->ovfl_reuse[0]; reuse != NULL; reuse = next) {
 			next = reuse->next[0];

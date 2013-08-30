@@ -82,10 +82,42 @@ struct __wt_addr {
 };
 
 /*
- * Overflow tracking for reuse: If pages are reconciled multiple times, overflow
- * records could be written repeatedly.  Track overflow records written for the
- * page so we only write them once.   We store the values in a skiplist with the
- * value as the "key", that's what we search on.
+ * Overflow tracking of on-page key/value items: As pages are reconciled,
+ * overflow key/value records referenced from the original page are discarded
+ * as they are updated or removed.  We track such overflow items to ensure we
+ * never discard the underlying blocks more than once.
+ */
+struct __wt_ovfl_onpage {
+	uint32_t addr_offset;		/* Overflow addr offset */
+	uint32_t addr_size;		/* Overflow addr size */
+
+	/*
+	 * On each page reconciliation, set the just-added flag for each newly
+	 * added skiplist entry.  If reconciliation succeeds, the underlying
+	 * blocks are then discarded, if reconciliation fails for any reason,
+	 * the added records are discarded.
+	 */
+#define	WT_OVFL_ONPAGE_JUST_ADDED	0x01
+	uint8_t	 flags;
+
+	/*
+	 * The untyped address immediately follows the WT_OVFL_ONPAGE structure.
+	 */
+#define	WT_OVFL_ONPAGE_ADDR(p)						\
+	((void *)((uint8_t *)(p) + (p)->addr_offset))
+
+	WT_OVFL_ONPAGE *next[0];	/* Forward-linked skip list */
+};
+
+/*
+ * Overflow tracking for reuse: When a page is reconciled, we write new K/V
+ * overflow items.  If pages are reconciled multiple times, we need to know
+ * if we've already written a particular overflow record (so we don't write
+ * it again), as well as if we've modified an overflow record previously
+ * written (in which case we want to write a new record and discard blocks
+ * used by the previously written record).  Track overflow records written
+ * for the page, storing the values in a skiplist with the record's value as
+ * the "key".
  */
 struct __wt_ovfl_reuse {
 	uint32_t addr_offset;		/* Overflow addr offset */
@@ -94,9 +126,14 @@ struct __wt_ovfl_reuse {
 	uint32_t value_size;		/* Overflow value size */
 
 	/*
-	 * On each page reconciliation, we clear the "in-use" flag, and then set
-	 * it as each overflow record is used.  At the end of reconciliation, if
-	 * a value wasn't used, it's discarded and its underlying blocks freed.
+	 * On each page reconciliation, we clear the entry's in-use flag, and
+	 * reset it as the overflow record is re-used.  After reconciliation
+	 * completes, unused skiplist entries are discarded, along with their
+	 * underlying blocks.
+	 *
+	 * On each page reconciliation, set the just-added flag for each new
+	 * skiplist entry; if reconciliation fails for any reason, discard the
+	 * newly added skiplist entries, along with their underlying blocks.
 	 */
 #define	WT_OVFL_REUSE_INUSE		0x01
 #define	WT_OVFL_REUSE_JUST_ADDED	0x02
@@ -113,14 +150,6 @@ struct __wt_ovfl_reuse {
 
 	WT_OVFL_REUSE *next[0];		/* Forward-linked skip list */
 };
-
-/*
- * Overflow tracking for discard: As pages are reconciled, overflow key/value
- * records and their underlying blocks are discarded as they are updated or
- * removed.  If an overflow record's blocks were discarded and reconciliation
- * failed, the in-memory tree would be corrupted, so we track overflow objects
- * to discard when reconciliation has succeeded.
- */
 
 /*
  * WT_PAGE_MODIFY --
@@ -207,7 +236,8 @@ struct __wt_page_modify {
 	WT_INSERT_HEAD **update;	/* Updated items */
 
 	/* Overflow record tracking. */
-	WT_OVFL_REUSE *ovfl_reuse[WT_SKIP_MAXDEPTH];
+	WT_OVFL_ONPAGE *ovfl_onpage[WT_SKIP_MAXDEPTH];
+	WT_OVFL_REUSE  *ovfl_reuse[WT_SKIP_MAXDEPTH];
 
 	struct __wt_page_track {
 		WT_ADDR  addr;		/* Overflow or block location */
