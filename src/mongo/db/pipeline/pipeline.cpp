@@ -446,84 +446,35 @@ namespace mongo {
     }
 
     void Pipeline::run(BSONObjBuilder& result) {
-        /*
-          Iterate through the resulting documents, and add them to the result.
-          We do this even if we're doing an explain, in order to capture
-          the document counts and other stats.  However, we don't capture
-          the result documents for explain.
-        */
-        if (explain) {
-            if (!pCtx->inRouter)
-                writeExplainShard(result);
-            else {
-                writeExplainMongos(result);
-            }
-        }
-        else {
-            // the array in which the aggregation results reside
-            // cant use subArrayStart() due to error handling
-            BSONArrayBuilder resultArray;
-            DocumentSource* finalSource = sources.back().get();
-            while (boost::optional<Document> next = finalSource->getNext()) {
-                /* add the document to the result set */
-                BSONObjBuilder documentBuilder (resultArray.subobjStart());
-                next->toBson(&documentBuilder);
-                documentBuilder.doneFast();
-                // object will be too large, assert. the extra 1KB is for headers
-                uassert(16389,
-                        str::stream() << "aggregation result exceeds maximum document size ("
-                                      << BSONObjMaxUserSize / (1024 * 1024) << "MB)",
-                        resultArray.len() < BSONObjMaxUserSize - 1024);
-            }
+        // should not get here in the explain case
+        verify(!explain);
 
-            resultArray.done();
-            result.appendArray("result", resultArray.arr());
+        // the array in which the aggregation results reside
+        // cant use subArrayStart() due to error handling
+        BSONArrayBuilder resultArray;
+        DocumentSource* finalSource = sources.back().get();
+        while (boost::optional<Document> next = finalSource->getNext()) {
+            // add the document to the result set
+            BSONObjBuilder documentBuilder (resultArray.subobjStart());
+            next->toBson(&documentBuilder);
+            documentBuilder.doneFast();
+            // object will be too large, assert. the extra 1KB is for headers
+            uassert(16389,
+                    str::stream() << "aggregation result exceeds maximum document size ("
+                                  << BSONObjMaxUserSize / (1024 * 1024) << "MB)",
+                    resultArray.len() < BSONObjMaxUserSize - 1024);
         }
+
+        resultArray.done();
+        result.appendArray("result", resultArray.arr());
     }
 
     vector<Value> Pipeline::writeExplainOps() const {
         vector<Value> array;
-        for(SourceContainer::const_iterator iter(sources.begin()),
-                                            listEnd(sources.end());
-                                        iter != listEnd;
-                                        ++iter) {
-            intrusive_ptr<DocumentSource> pSource(*iter);
-
-            // handled in writeExplainMongos
-            if (dynamic_cast<DocumentSourceBsonArray*>(pSource.get()))
-                continue;
-
-            pSource->serializeToArray(array, true);
+        for(SourceContainer::const_iterator it = sources.begin(); it != sources.end(); ++it) {
+            (*it)->serializeToArray(array, /*explain=*/true);
         }
         return array;
-    }
-
-    void Pipeline::writeExplainShard(BSONObjBuilder &result) const {
-        result << serverPipelineName << Value(writeExplainOps());
-    }
-
-    void Pipeline::writeExplainMongos(BSONObjBuilder &result) const {
-
-        /*
-          For now, this should be a BSON source array.
-          In future, we might have a more clever way of getting this, when
-          we have more interleaved fetching between shards.  The DocumentSource
-          interface will have to change to accommodate that.
-         */
-        DocumentSourceBsonArray *pSourceBsonArray =
-            dynamic_cast<DocumentSourceBsonArray *>(sources.front().get());
-        verify(pSourceBsonArray);
-
-        BSONArrayBuilder shardOpArray; // where we'll put the pipeline ops
-        while (boost::optional<Document> next = pSourceBsonArray->getNext()) {
-            BSONObjBuilder opBuilder(shardOpArray.subobjStart());
-            next->toBson(&opBuilder);
-            opBuilder.doneFast();
-        }
-
-        // now we combine the shard pipelines with the one here
-        result.append(serverPipelineName, shardOpArray.arr());
-        result << mongosPipelineName << Value(writeExplainOps());
     }
 
     void Pipeline::addInitialSource(intrusive_ptr<DocumentSource> source) {
@@ -532,6 +483,9 @@ namespace mongo {
 
     bool Pipeline::canRunInMongos() const {
         if (pCtx->extSortAllowed)
+            return false;
+
+        if (explain)
             return false;
 
         if (dynamic_cast<DocumentSourceNeedsMongod*>(sources.back().get()))

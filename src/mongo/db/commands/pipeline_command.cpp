@@ -252,6 +252,11 @@ namespace mongo {
             PipelineD::prepareCursorSource(pPipeline, pCtx);
             pPipeline->stitch();
 
+            if (pPipeline->isExplain()) {
+                result << "stages" << Value(pPipeline->writeExplainOps());
+                return true; // don't do any actual execution
+            }
+
             if (isCursorCommand(cmdObj)) {
                 CursorId id;
                 {

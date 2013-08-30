@@ -118,12 +118,7 @@ namespace mongo {
         */
         void run(BSONObjBuilder& result);
 
-        /**
-           Ask if this is for an explain request.
-
-           @returns true if this is an explain
-         */
-        bool isExplain() const;
+        bool isExplain() const { return explain; }
 
         /// The initial source is special since it varies between mongos and mongod.
         void addInitialSource(intrusive_ptr<DocumentSource> source);
@@ -133,6 +128,12 @@ namespace mongo {
 
         /// Returns true if this pipeline only uses features that work in mongos.
         bool canRunInMongos() const;
+
+        /**
+         * Write the pipeline's operators to a vector<Value>, with the
+         * explain flag true (for DocumentSource::serializeToArray()).
+         */
+        vector<Value> writeExplainOps() const;
 
         /**
           The aggregation command name.
@@ -159,39 +160,6 @@ namespace mongo {
 
         Pipeline(const intrusive_ptr<ExpressionContext> &pCtx);
 
-        /**
-         * Write the pipeline's operators to a vector<Value>, with the
-         * explain flag true (for DocumentSource::serializeToArray()).
-         */
-        vector<Value> writeExplainOps() const;
-
-        /*
-          Write the pipeline's operators to the given result document,
-          for a shard server (or regular server, in an unsharded setup).
-
-          This uses writeExplainOps() and adds that array to the result
-          with the serverPipelineName.  That will be preceded by explain
-          information for the input source.
-
-          @param result the object to add the explain information to
-         */
-        void writeExplainShard(BSONObjBuilder &result) const;
-
-        /*
-          Write the pipeline's operators to the given result document,
-          for a mongos instance.
-
-          This first adds the serverPipeline obtained from the input
-          source.
-
-          Then this uses writeExplainOps() and adds that array to the result
-          with the serverPipelineName.  That will be preceded by explain
-          information for the input source.
-
-          @param result the object to add the explain information to
-         */
-        void writeExplainMongos(BSONObjBuilder &result) const;
-
         typedef std::deque<boost::intrusive_ptr<DocumentSource> > SourceContainer;
         SourceContainer sources;
         bool explain;
@@ -200,16 +168,3 @@ namespace mongo {
     };
 
 } // namespace mongo
-
-
-/* ======================= INLINED IMPLEMENTATIONS ========================== */
-
-namespace mongo {
-
-    inline bool  Pipeline::isExplain() const {
-        return explain;
-    }
-
-} // namespace mongo
-
-
