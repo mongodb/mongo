@@ -253,6 +253,13 @@ namespace mongo {
                 set<string> shardedColls;
                 config->getAllShardedCollections( shardedColls );
 
+                // Record start in changelog
+                BSONObj moveStartDetails = buildMoveEntry( dbname,
+                                                           config->getPrimary().toString(),
+                                                           s.toString(),
+                                                           shardedColls );
+                configServer.logChange( "movePrimary.start", dbname, moveStartDetails );
+
                 BSONArrayBuilder barr;
                 barr.append( shardedColls );
 
@@ -326,7 +333,32 @@ namespace mongo {
 
                 result << "primary " << s.toString();
 
+                // Record finish in changelog
+                BSONObj moveFinishDetails = buildMoveEntry( dbname,
+                                                            oldPrimary,
+                                                            s.toString(),
+                                                            shardedColls );
+                configServer.logChange( "movePrimary", dbname, moveFinishDetails );
+
                 return true;
+            }
+        private:
+            BSONObj buildMoveEntry( const string db,
+                                    const string from,
+                                    const string to,
+                                    set<string> shardedColls ) {
+                BSONObjBuilder details;
+                details.append( "database", db );
+                details.append( "from", from );
+                details.append( "to", to );
+                BSONArrayBuilder collB( details.subarrayStart( "shardedCollections" ) );
+                set<string>::iterator it;
+                for ( it = shardedColls.begin(); it != shardedColls.end(); ++it ) {
+                    collB.append( *it );
+                }
+                collB.done();
+
+                return details.obj();
             }
         } movePrimary;
 
@@ -1238,6 +1270,12 @@ namespace mongo {
                     result.append( "shard" , s.getName() );
                     result.appendElements(dbInfo);
                     conn.done();
+
+                    // Record start in changelog
+                    configServer.logChange( "removeShard.start",
+                                            "",
+                                            buildRemoveLogEntry( s, true ) );
+
                     return true;
                 }
 
@@ -1266,6 +1304,10 @@ namespace mongo {
                     result.append( "state" , "completed" );
                     result.append( "shard" , s.getName() );
                     conn.done();
+
+                    // Record finish in changelog
+                    configServer.logChange( "removeShard", "", buildRemoveLogEntry( s, false ) );
+
                     return true;
                 }
 
@@ -1281,6 +1323,14 @@ namespace mongo {
 
                 conn.done();
                 return true;
+            }
+        private:
+            BSONObj buildRemoveLogEntry( Shard s, const bool isDraining ) {
+                BSONObjBuilder details;
+                details.append("shard", s.getName());
+                details.append("isDraining", isDraining);
+
+                return details.obj();
             }
         } removeShardCmd;
 

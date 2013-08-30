@@ -188,6 +188,25 @@ namespace mongo {
 
             log() << "enable sharding on: " << ns << " with shard key: " << fieldsAndOrder << endl;
 
+            // Record start in changelog
+            BSONObjBuilder collectionDetail;
+            collectionDetail.append("shardKey", fieldsAndOrder.key());
+            collectionDetail.append("collection", ns);
+            collectionDetail.append("primary", getPrimary().toString());
+            BSONArray a;
+            if (initShards == NULL)
+                a = BSONArray();
+            else {
+                BSONArrayBuilder b;
+                for (unsigned i = 0; i < initShards->size(); i++) {
+                    b.append((*initShards)[i].getName());
+                }
+                a = b.arr();
+            }
+            collectionDetail.append("initShards", a);
+            collectionDetail.append("numChunks", (int)(initPoints->size() + 1));
+            configServer.logChange("shardCollection.start", ns, collectionDetail.obj());
+
             ChunkManager* cm = new ChunkManager( ns, fieldsAndOrder, unique );
             cm->createFirstChunks( configServer.getPrimary().getConnString(),
                                    getPrimary(), initPoints, initShards );
@@ -220,6 +239,11 @@ namespace mongo {
             }
             sleepsecs( i );
         }
+
+        // Record finish in changelog
+        BSONObjBuilder finishDetail;
+        finishDetail.append("version", manager->getVersion().toString());
+        configServer.logChange("shardCollection", ns, finishDetail.obj());
 
         return manager;
     }
