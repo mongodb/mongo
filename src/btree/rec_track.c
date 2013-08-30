@@ -6,6 +6,369 @@
  */
 
 #include "wt_internal.h"
+
+/*
+ * __ovfl_reuse_verbose --
+ *	Dump information about a reuse overflow record.
+ */
+static int
+__ovfl_reuse_verbose(WT_SESSION_IMPL *session,
+    WT_PAGE *page, WT_OVFL_REUSE *reuse, const char *tag)
+{
+	WT_DECL_ITEM(tmp);
+	WT_DECL_RET;
+
+	WT_RET(__wt_scr_alloc(session, 64, &tmp));
+
+	WT_VERBOSE_ERR(session, overflow,
+	    "%s%s%p %s %s%s%s%s%s {%.*s}",
+	    tag == NULL ? "" : tag,
+	    tag == NULL ? "" : ": ",
+	    page,
+	    __wt_addr_string(
+		session, tmp, WT_OVFL_REUSE_ADDR(reuse), reuse->addr_size),
+	    F_ISSET(reuse, WT_OVFL_REUSE_INUSE) &&
+	    F_ISSET(reuse, WT_OVFL_REUSE_JUST_ADDED) ? "(" : "",
+	    F_ISSET(reuse, WT_OVFL_REUSE_INUSE) ? "inuse" : "",
+	    F_ISSET(reuse, WT_OVFL_REUSE_INUSE) &&
+	    F_ISSET(reuse, WT_OVFL_REUSE_JUST_ADDED) ? ", " : "",
+	    F_ISSET(reuse, WT_OVFL_REUSE_JUST_ADDED) ? "added" : "",
+	    F_ISSET(reuse, WT_OVFL_REUSE_INUSE) &&
+	    F_ISSET(reuse, WT_OVFL_REUSE_JUST_ADDED) ? ")" : "",
+	    WT_MIN(reuse->value_size, 40), (char *)WT_OVFL_REUSE_VALUE(reuse));
+
+err:	__wt_scr_free(&tmp);
+	return (ret);
+}
+
+#if 0
+/*
+ * __ovfl_reuse_dump --
+ *	Debugging information.
+ */
+static void
+__ovfl_reuse_dump(WT_SESSION_IMPL *session, WT_PAGE *page)
+{
+	WT_OVFL_REUSE *reuse;
+
+	for (reuse =
+	    page->modify->ovfl_reuse[0]; reuse != NULL; reuse = reuse->next[0])
+		(void)__ovfl_reuse_verbose(session, page, reuse, "dump");
+}
+#endif
+
+/*
+ * __ovfl_reuse_skip_search --
+ *	Return the first matching value in the overflow reuse list.
+ */
+static WT_OVFL_REUSE *
+__ovfl_reuse_skip_search(
+    WT_OVFL_REUSE **head, const void *value, uint32_t value_size)
+{
+	WT_OVFL_REUSE **e;
+	size_t len;
+	int cmp, i;
+
+	/*
+	 * Start at the highest skip level, then go as far as possible at each
+	 * level before stepping down to the next.
+	 */
+	for (i = WT_SKIP_MAXDEPTH - 1, e = &head[i]; i >= 0;) {
+		if (*e == NULL) {		/* Empty levels */
+			--i;
+			--e;
+			continue;
+		}
+
+		/*
+		 * Return any exact matches: we don't care in what search level
+		 * we found a match.
+		 */
+		len = WT_MIN((*e)->value_size, value_size);
+		cmp = memcmp(WT_OVFL_REUSE_VALUE(*e), value, len);
+		if (cmp == 0 && (*e)->value_size == value_size)
+			return (*e);
+
+		/*
+		 * If the skiplist value is larger than the search value, or
+		 * they compare equally and the skiplist value is longer than
+		 * the search value, drop down a level, otherwise continue on
+		 * this level.
+		 */
+		if (cmp > 0 || (cmp == 0 && (*e)->value_size > value_size)) {
+			--i;			/* Drop down a level */
+			--e;
+		} else				/* Keep going at this level */
+			e = &(*e)->next[i];
+	}
+	return (NULL);
+}
+
+/*
+ * __ovfl_reuse_skip_search_stack --
+ *	 Search an overflow reuse skiplist, returning an insert/remove stack.
+ */
+static void
+__ovfl_reuse_skip_search_stack(WT_OVFL_REUSE **head,
+    WT_OVFL_REUSE ***stack, const void *value, uint32_t value_size)
+{
+	WT_OVFL_REUSE **e;
+	size_t len;
+	int cmp, i;
+
+	/*
+	 * Start at the highest skip level, then go as far as possible at each
+	 * level before stepping down to the next.
+	 */
+	for (i = WT_SKIP_MAXDEPTH - 1, e = &head[i]; i >= 0;) {
+		if (*e == NULL) {		/* Empty levels */
+			stack[i--] = e--;
+			continue;
+		}
+
+		/*
+		 * If the skiplist value is larger than the search value, or
+		 * they compare equally and the skiplist value is longer than
+		 * the search value, drop down a level, otherwise continue on
+		 * this level.
+		 */
+		len = WT_MIN((*e)->value_size, value_size);
+		cmp = memcmp(WT_OVFL_REUSE_VALUE(*e), value, len);
+		if (cmp > 0 || (cmp == 0 && (*e)->value_size > value_size))
+			stack[i--] = e--;	/* Drop down a level */
+		else
+			e = &(*e)->next[i];	/* Keep going at this level */
+	}
+}
+
+/*
+ * __ovfl_reuse_wrapup --
+ *	Resolve the page's overflow reuse list after a page is written.
+ */
+static int
+__ovfl_reuse_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
+{
+	WT_BM *bm;
+	WT_OVFL_REUSE **e, **head, *reuse;
+	size_t incr, decr;
+	int i;
+
+	bm = S2BT(session)->bm;
+	head = page->modify->ovfl_reuse;
+
+	/*
+	 * Discard any overflow records that aren't in-use, freeing underlying
+	 * blocks.
+	 *
+	 * First, walk the overflow reuse lists (except for the lowest one),
+	 * fixing up skiplist links.
+	 */
+	for (i = WT_SKIP_MAXDEPTH - 1; i > 0; --i)
+		for (e = &head[i]; *e != NULL;) {
+			if (F_ISSET(*e, WT_OVFL_REUSE_INUSE)) {
+				e = &(*e)->next[i];
+				continue;
+			}
+			*e = (*e)->next[i];
+		}
+
+	/*
+	 * Second, discard any overflow record without an in-use flag, clear
+	 * the flags for the next run.
+	 *
+	 * As part of the pass through the lowest level, figure out how much
+	 * space we added/subtracted from the page, and update its footprint.
+	 * We don't get it exactly correct because we don't know the depth of
+	 * the skiplist here, but it's close enough, and figuring out the
+	 * memory footprint change in the reconciliation wrapup code means
+	 * fewer atomic updates and less code overall.
+	 */
+	incr = decr = 0;
+	for (e = &head[0]; *e != NULL;) {
+		if (F_ISSET(*e, WT_OVFL_REUSE_INUSE)) {
+			if (F_ISSET(*e, WT_OVFL_REUSE_JUST_ADDED))
+				incr += sizeof(WT_OVFL_REUSE) +
+				    2 * sizeof(WT_OVFL_REUSE *) +
+				    (*e)->addr_size + (*e)->value_size;
+
+			F_CLR(*e,
+			    WT_OVFL_REUSE_INUSE | WT_OVFL_REUSE_JUST_ADDED);
+			e = &(*e)->next[0];
+			continue;
+		}
+
+		WT_ASSERT(session, !F_ISSET(*e, WT_OVFL_REUSE_JUST_ADDED));
+		decr += sizeof(WT_OVFL_REUSE) +
+		    2 * sizeof(WT_OVFL_REUSE *) +
+		    (*e)->addr_size + (*e)->value_size;
+
+		reuse = *e;
+		*e = (*e)->next[0];
+
+		if (WT_VERBOSE_ISSET(session, overflow))
+			WT_RET(__ovfl_reuse_verbose(
+			    session, page, reuse, "discard"));
+		WT_RET(bm->free(
+		    bm, session, WT_OVFL_REUSE_ADDR(reuse), reuse->addr_size));
+		__wt_free(session, reuse);
+	}
+
+	if (incr > decr)
+		__wt_cache_page_inmem_incr(session, page, incr - decr);
+	if (decr > incr)
+		__wt_cache_page_inmem_decr(session, page, decr - incr);
+	return (0);
+}
+
+/*
+ * __ovfl_reuse_wrapup_err --
+ *	Resolve the page's overflow reuse list after an error occurs.
+ */
+static int
+__ovfl_reuse_wrapup_err(WT_SESSION_IMPL *session, WT_PAGE *page)
+{
+	WT_BM *bm;
+	WT_DECL_RET;
+	WT_OVFL_REUSE **e, **head, *reuse;
+	int i;
+
+	bm = S2BT(session)->bm;
+	head = page->modify->ovfl_reuse;
+
+	/*
+	 * Discard any overflow records that were just added, freeing underlying
+	 * blocks.
+	 *
+	 * First, walk the overflow reuse lists (except for the lowest one),
+	 * fixing up skiplist links.
+	 */
+	for (i = WT_SKIP_MAXDEPTH - 1; i > 0; --i)
+		for (e = &head[i]; *e != NULL;) {
+			if (!F_ISSET(*e, WT_OVFL_REUSE_JUST_ADDED)) {
+				e = &(*e)->next[i];
+				continue;
+			}
+			*e = (*e)->next[i];
+		}
+
+	/*
+	 * Second, discard any overflow record with a just-added flag, clear the
+	 * flags for the next run.
+	 */
+	for (e = &head[0]; *e != NULL;) {
+		if (!F_ISSET(*e, WT_OVFL_REUSE_JUST_ADDED)) {
+			F_CLR(*e, WT_OVFL_REUSE_INUSE);
+			e = &(*e)->next[0];
+			continue;
+		}
+		reuse = *e;
+		*e = (*e)->next[0];
+
+		if (WT_VERBOSE_ISSET(session, overflow))
+			WT_RET(__ovfl_reuse_verbose(
+			    session, page, reuse, "discard"));
+		WT_TRET(bm->free(
+		    bm, session, WT_OVFL_REUSE_ADDR(reuse), reuse->addr_size));
+		__wt_free(session, reuse);
+	}
+	return (0);
+}
+
+/*
+ * __wt_ovfl_reuse_add --
+ *	Add a new entry to the page's list of overflow records tracked for
+ * reuse.
+ */
+int
+__wt_ovfl_reuse_add(WT_SESSION_IMPL *session, WT_PAGE *page,
+    const uint8_t *addr, uint32_t addr_size,
+    const void *value, uint32_t value_size)
+{
+	WT_OVFL_REUSE **head, *reuse, **stack[WT_SKIP_MAXDEPTH];
+	size_t size;
+	u_int i, skipdepth;
+	uint8_t *p;
+
+	head = page->modify->ovfl_reuse;
+
+	/* Choose a skiplist depth for this insert. */
+	skipdepth = __wt_skip_choose_depth();
+
+	/*
+	 * Allocate the WT_OVFL_REUSE structure, next pointers for the skip
+	 * list, room for the address and value, then copy everything into
+	 * place.
+	 */
+	size = sizeof(WT_OVFL_REUSE) +
+	    skipdepth * sizeof(WT_OVFL_REUSE *) + addr_size + value_size;
+	WT_RET(__wt_calloc(session, 1, size, &reuse));
+	p = (uint8_t *)reuse +
+	    sizeof(WT_OVFL_REUSE) + skipdepth * sizeof(WT_OVFL_REUSE *);
+	reuse->addr_offset = WT_PTRDIFF32(p, reuse);
+	reuse->addr_size = addr_size;
+	memcpy(p, addr, addr_size);
+	p += addr_size;
+	reuse->value_offset = WT_PTRDIFF32(p, reuse);
+	reuse->value_size = value_size;
+	memcpy(p, value, value_size);
+	F_SET(reuse, WT_OVFL_REUSE_INUSE | WT_OVFL_REUSE_JUST_ADDED);
+
+	/* Insert the new entry into the skiplist. */
+	__ovfl_reuse_skip_search_stack(head, stack, value, value_size);
+	for (i = 0; i < skipdepth; ++i) {
+		reuse->next[i] = *stack[i];
+		*stack[i] = reuse;
+	}
+
+	if (WT_VERBOSE_ISSET(session, overflow))
+		WT_RET(__ovfl_reuse_verbose(session, page, reuse, "add"));
+
+	return (0);
+}
+
+/*
+ * __wt_ovfl_reuse_srch --
+ *	Search the page's list of overflow records tracked for a matching,
+ * unused record, and return the address.
+ */
+int
+__wt_ovfl_reuse_srch(WT_SESSION_IMPL *session, WT_PAGE *page,
+    uint8_t **addrp, uint32_t *addr_sizep,
+    const void *value, uint32_t value_size)
+{
+	WT_OVFL_REUSE **head, *reuse;
+
+	*addrp = NULL;
+	*addr_sizep = 0;
+
+	head = page->modify->ovfl_reuse;
+
+	/*
+	 * The search function returns the first matching record in the list,
+	 * which may be the first of many, overflow records may be identical.
+	 * Look for one without the the in-use flag set, and put it back into
+	 * service.
+	 */
+	if ((reuse = __ovfl_reuse_skip_search(head, value, value_size)) == NULL)
+		return (0);
+	do {
+		if (!F_ISSET(reuse, WT_OVFL_REUSE_INUSE)) {
+			*addrp = WT_OVFL_REUSE_ADDR(reuse);
+			*addr_sizep = reuse->addr_size;
+			F_SET(reuse, WT_OVFL_REUSE_INUSE);
+
+			if (WT_VERBOSE_ISSET(session, overflow))
+				WT_RET(__ovfl_reuse_verbose(
+				    session, page, reuse, "reclaim"));
+			return (1);
+		}
+	} while ((reuse = reuse->next[0]) != NULL &&
+	    reuse->value_size == value_size &&
+	    memcmp(WT_OVFL_REUSE_VALUE(reuse), value, value_size) == 0);
+
+	return (0);
+}
+
 /*
  * An in-memory page has a list of tracked overflow records, where each record
  * has status information:
@@ -251,66 +614,6 @@ __wt_rec_track_add(WT_SESSION_IMPL *session,
 }
 
 /*
- * __wt_rec_track_reuse --
- *	Search for a matching overflow record and reactivate it.
- */
-int
-__wt_rec_track_reuse(WT_SESSION_IMPL *session, WT_PAGE *page,
-    const void *data, uint32_t data_size,
-    uint8_t **addrp, uint32_t *addr_sizep, int *foundp)
-{
-	WT_PAGE_MODIFY *mod;
-	WT_PAGE_TRACK *track;
-	uint32_t i;
-
-	*foundp = 0;
-
-	mod = page->modify;
-	for (track = mod->track, i = 0; i < mod->track_entries; ++track, ++i) {
-		/* Ignore empty slots */
-		if (!F_ISSET(track, WT_TRK_OBJECT))
-			continue;
-
-		/*
-		 * Ignore discarded objects, objects already in-use, or cached
-		 * overflow values.  We don't care about whether or not the
-		 * object came from a page, we can re-use objects from the page
-		 * or objects created in a previous reconciliation.
-		 */
-		if (F_ISSET(track,
-		    WT_TRK_CACHE_DEL | WT_TRK_DISCARD | WT_TRK_INUSE))
-			continue;
-
-		/*
-		 * Ignore objects without data (must be block objects).  This is
-		 * not really necessary (presumably, our caller is matching on a
-		 * non-zero-length data item), but paranoia is healthy.
-		 */
-		if (track->data == NULL)
-			continue;
-
-		/* Check to see if the data matches. */
-		if (track->size != data_size ||
-		    memcmp(data, track->data, data_size) != 0)
-			continue;
-
-		/*
-		 * Reactivate the record.
-		 * Return the block addr/size pair to our caller.
-		 */
-		F_SET(track, WT_TRK_INUSE);
-		*addrp = track->addr.addr;
-		*addr_sizep = track->addr.size;
-		*foundp = 1;
-		if (WT_VERBOSE_ISSET(session, reconcile))
-			WT_RET(__track_msg(
-			    session, page, "reactivate overflow", track));
-		return (0);
-	}
-	return (0);
-}
-
-/*
  * __wt_rec_track_init --
  *	Initialize the page's list of tracked objects when reconciliation
  * starts.
@@ -336,6 +639,8 @@ __wt_rec_track_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 	uint32_t i;
 
 	bm = S2BT(session)->bm;
+
+	WT_RET(__ovfl_reuse_wrapup(session, page));
 
 	if (WT_VERBOSE_ISSET(session, reconcile))
 		WT_RET(__track_dump(session, page, "reconcile wrapup"));
@@ -419,6 +724,8 @@ __wt_rec_track_wrapup_err(WT_SESSION_IMPL *session, WT_PAGE *page)
 	uint32_t i;
 
 	bm = S2BT(session)->bm;
+
+	ret = __ovfl_reuse_wrapup_err(session, page);
 
 	/*
 	 * After a failed reconciliation of a page, discard entries added in the

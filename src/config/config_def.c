@@ -42,10 +42,10 @@ static const WT_CONFIG_CHECK confchk_connection_reconfigure[] = {
 	    ,
 	{ "statistics", "boolean", NULL, NULL},
 	{ "verbose", "list",
-	    "choices=[\"block\",\"shared_cache\",\"ckpt\",\"evict\","
-	    "\"evictserver\",\"fileops\",\"hazard\",\"log\",\"lsm\",\"mutex\","
-	    "\"read\",\"readserver\",\"reconcile\",\"salvage\",\"verify\","
-	    "\"version\",\"write\"]",
+	    "choices=[\"block\",\"ckpt\",\"evict\",\"evictserver\",\"fileops\","
+	    "\"hazard\",\"log\",\"lsm\",\"mutex\",\"overflow\",\"read\","
+	    "\"readserver\",\"reconcile\",\"salvage\",\"shared_cache\",\"verify\""
+	    ",\"version\",\"write\"]",
 	    NULL},
 	{ NULL, NULL, NULL, NULL }
 };
@@ -256,10 +256,10 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open[] = {
 	    NULL},
 	{ "use_environment_priv", "boolean", NULL, NULL},
 	{ "verbose", "list",
-	    "choices=[\"block\",\"shared_cache\",\"ckpt\",\"evict\","
-	    "\"evictserver\",\"fileops\",\"hazard\",\"log\",\"lsm\",\"mutex\","
-	    "\"read\",\"readserver\",\"reconcile\",\"salvage\",\"verify\","
-	    "\"version\",\"write\"]",
+	    "choices=[\"block\",\"ckpt\",\"evict\",\"evictserver\",\"fileops\","
+	    "\"hazard\",\"log\",\"lsm\",\"mutex\",\"overflow\",\"read\","
+	    "\"readserver\",\"reconcile\",\"salvage\",\"shared_cache\",\"verify\""
+	    ",\"version\",\"write\"]",
 	    NULL},
 	{ NULL, NULL, NULL, NULL }
 };

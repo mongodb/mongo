@@ -82,6 +82,47 @@ struct __wt_addr {
 };
 
 /*
+ * Overflow tracking for reuse: If pages are reconciled multiple times, overflow
+ * records could be written repeatedly.  Track overflow records written for the
+ * page so we only write them once.   We store the values in a skiplist with the
+ * value as the "key", that's what we search on.
+ */
+struct __wt_ovfl_reuse {
+	uint32_t addr_offset;		/* Overflow addr offset */
+	uint32_t addr_size;		/* Overflow addr size */
+	uint32_t value_offset;		/* Overflow value offset */
+	uint32_t value_size;		/* Overflow value size */
+
+	/*
+	 * On each page reconciliation, we clear the "in-use" flag, and then set
+	 * it as each overflow record is used.  At the end of reconciliation, if
+	 * a value wasn't used, it's discarded and its underlying blocks freed.
+	 */
+#define	WT_OVFL_REUSE_INUSE		0x01
+#define	WT_OVFL_REUSE_JUST_ADDED	0x02
+	uint8_t	 flags;
+
+	/*
+	 * The untyped address immediately follows the WT_OVFL_REUSE structure,
+	 * the untyped value immediately follows the address.
+	 */
+#define	WT_OVFL_REUSE_ADDR(p)						\
+	((void *)((uint8_t *)(p) + (p)->addr_offset))
+#define	WT_OVFL_REUSE_VALUE(p)						\
+	((void *)((uint8_t *)(p) + (p)->value_offset))
+
+	WT_OVFL_REUSE *next[0];		/* Forward-linked skip list */
+};
+
+/*
+ * Overflow tracking for discard: As pages are reconciled, overflow key/value
+ * records and their underlying blocks are discarded as they are updated or
+ * removed.  If an overflow record's blocks were discarded and reconciliation
+ * failed, the in-memory tree would be corrupted, so we track overflow objects
+ * to discard when reconciliation has succeeded.
+ */
+
+/*
  * WT_PAGE_MODIFY --
  *	When a page is modified, there's additional information maintained as it
  * is written to disk.
@@ -165,21 +206,9 @@ struct __wt_page_modify {
 	 */
 	WT_INSERT_HEAD **update;	/* Updated items */
 
-	/*
-	 * Track blocks, pages to discard: as pages are reconciled, overflow
-	 * K/V items are discarded along with their underlying blocks, and as
-	 * pages are evicted, split and emptied pages are merged into their
-	 * parents and discarded.  If an overflow item was discarded and page
-	 * reconciliation then failed, the in-memory tree would be corrupted.
-	 * To keep the tree correct until we're sure page reconciliation has
-	 * succeeded, we track the objects we'll discard when the reconciled
-	 * page is evicted.
-	 *
-	 * Track overflow objects: if pages are reconciled more than once, an
-	 * overflow item might be written repeatedly.  Instead, when overflow
-	 * items are written we save a copy and resulting location so we only
-	 * write them once.
-	 */
+	/* Overflow record tracking. */
+	WT_OVFL_REUSE *ovfl_reuse[WT_SKIP_MAXDEPTH];
+
 	struct __wt_page_track {
 		WT_ADDR  addr;		/* Overflow or block location */
 

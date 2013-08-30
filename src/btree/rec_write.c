@@ -4384,7 +4384,6 @@ __rec_cell_build_ovfl(WT_SESSION_IMPL *session,
 	WT_PAGE_HEADER *dsk;
 	size_t alloc_size;
 	uint32_t size;
-	int found;
 	uint8_t *addr, buf[WT_BTREE_MAX_ADDR_COOKIE];
 
 	btree = S2BT(session);
@@ -4398,9 +4397,8 @@ __rec_cell_build_ovfl(WT_SESSION_IMPL *session,
 	 * See if this overflow record has already been written and reuse it if
 	 * possible.  Else, write a new overflow record.
 	 */
-	WT_RET(__wt_rec_track_reuse(
-	    session, page, kv->buf.data, kv->buf.size, &addr, &size, &found));
-	if (!found) {
+	if (!__wt_ovfl_reuse_srch(session, page,
+	    &addr, &size, kv->buf.data, kv->buf.size)) {
 		/* Allocate a buffer big enough to write the overflow record. */
 		alloc_size = kv->buf.size;
 		WT_RET(bm->write_size(bm, session, &alloc_size));
@@ -4422,8 +4420,8 @@ __rec_cell_build_ovfl(WT_SESSION_IMPL *session,
 		WT_ERR(__wt_bt_write(session, tmp, addr, &size, 0, 0));
 
 		/* Track the overflow record. */
-		WT_ERR(__wt_rec_track(session, page,
-		    addr, size, kv->buf.data, kv->buf.size, WT_TRK_INUSE));
+		WT_ERR(__wt_ovfl_reuse_add(session, page,
+		    addr, size, kv->buf.data, kv->buf.size));
 	}
 
 	/* Set the callers K/V to reference the overflow record's address. */
