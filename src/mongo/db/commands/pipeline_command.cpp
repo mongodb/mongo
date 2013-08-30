@@ -249,7 +249,7 @@ namespace mongo {
 #endif
 
             // This does the mongod-specific stuff like creating a cursor
-            PipelineD::prepareCursorSource(pPipeline, nsToDatabase(ns), pCtx);
+            PipelineD::prepareCursorSource(pPipeline, pCtx);
             pPipeline->stitch();
 
             if (isCursorCommand(cmdObj)) {

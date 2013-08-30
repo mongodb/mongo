@@ -50,7 +50,6 @@ namespace mongo {
     const char Pipeline::mongosPipelineName[] = "mongosPipeline";
 
     Pipeline::Pipeline(const intrusive_ptr<ExpressionContext> &pTheCtx):
-        collectionName(),
         explain(false),
         pCtx(pTheCtx) {
     }
@@ -119,7 +118,6 @@ namespace mongo {
 
             /* look for the aggregation command */
             if (!strcmp(pFieldName, commandName)) {
-                pPipeline->collectionName = cmdElement.String();
                 continue;
             }
 
@@ -352,7 +350,6 @@ namespace mongo {
     intrusive_ptr<Pipeline> Pipeline::splitForSharded() {
         /* create an initialize the shard spec we'll return */
         intrusive_ptr<Pipeline> pShardPipeline(new Pipeline(pCtx));
-        pShardPipeline->collectionName = collectionName;
         pShardPipeline->explain = explain;
 
         /*
@@ -418,7 +415,7 @@ namespace mongo {
         }
 
         // add the top-level items to the command
-        serialized.setField(commandName, Value(getCollectionName()));
+        serialized.setField(commandName, Value(pCtx->ns.coll()));
         serialized.setField(pipelineName, Value(array));
 
         if (explain) {

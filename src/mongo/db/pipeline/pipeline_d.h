@@ -48,25 +48,23 @@ namespace mongo {
     public:
 
         /**
-           Create a Cursor wrapped in a DocumentSourceCursor, which is suitable
-           to be the first source for a pipeline to begin with.  This source
-           will feed the execution of the pipeline.
-
-           This method looks for early pipeline stages that can be folded into
-           the underlying cursor, and when a cursor can absorb those, they
-           are removed from the head of the pipeline.  For example, an
-           early match can be removed and replaced with a Cursor that will
-           do an index scan.
-
-           The cursor is added to the front of the pipeline's sources.
-
-           @param pPipeline the logical "this" for this operation
-           @param dbName the name of the database
-           @param pExpCtx the expression context for this pipeline
+         * Create a Cursor wrapped in a DocumentSourceCursor, which is suitable
+         * to be the first source for a pipeline to begin with.  This source
+         * will feed the execution of the pipeline.
+         *
+         * This method looks for early pipeline stages that can be folded into
+         * the underlying cursor, and when a cursor can absorb those, they
+         * are removed from the head of the pipeline.  For example, an
+         * early match can be removed and replaced with a Cursor that will
+         * do an index scan.
+         *
+         * The cursor is added to the front of the pipeline's sources.
+         *
+         * @param pPipeline the logical "this" for this operation
+         * @param pExpCtx the expression context for this pipeline
          */
         static void prepareCursorSource(
             const intrusive_ptr<Pipeline> &pPipeline,
-            const string &dbName,
             const intrusive_ptr<ExpressionContext> &pExpCtx);
 
     private:

@@ -60,7 +60,6 @@ namespace {
 
     void PipelineD::prepareCursorSource(
         const intrusive_ptr<Pipeline> &pPipeline,
-        const string &dbName,
         const intrusive_ptr<ExpressionContext> &pExpCtx) {
 
         // We will be modifying the source vector as we go
@@ -150,7 +149,7 @@ namespace {
         }
 
         // get the full "namespace" name
-        string fullName(dbName + "." + pPipeline->getCollectionName());
+        const string& fullName = pExpCtx->ns.ns();
 
         // for debugging purposes, show what the query and sort are
         DEV {

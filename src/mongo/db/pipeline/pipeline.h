@@ -70,13 +70,6 @@ namespace mongo {
                                           BSONObj cmdObj,
                                           vector<Privilege>* out);
 
-        /**
-          Get the collection name from the command.
-
-          @returns the collection name
-        */
-        string getCollectionName() const;
-
         intrusive_ptr<ExpressionContext> getContext() const { return pCtx; }
 
         /**
@@ -199,7 +192,6 @@ namespace mongo {
          */
         void writeExplainMongos(BSONObjBuilder &result) const;
 
-        string collectionName;
         typedef std::deque<boost::intrusive_ptr<DocumentSource> > SourceContainer;
         SourceContainer sources;
         bool explain;
@@ -213,10 +205,6 @@ namespace mongo {
 /* ======================= INLINED IMPLEMENTATIONS ========================== */
 
 namespace mongo {
-
-    inline string Pipeline::getCollectionName() const {
-        return collectionName;
-    }
 
     inline bool  Pipeline::isExplain() const {
         return explain;
