@@ -947,13 +947,15 @@ __debug_cell_data(WT_DBG *ds, int type, const char *tag, WT_CELL_UNPACK *unpack)
 	case WT_CELL_DEL:
 deleted:	__debug_item(ds, tag, "deleted", strlen("deleted"));
 		break;
+	case WT_CELL_VALUE_OVFL_RM:
+		__debug_item(ds, tag, "overflow/rm", strlen("overflow/rm"));
+		break;
 	case WT_CELL_KEY:
 	case WT_CELL_KEY_OVFL:
 	case WT_CELL_KEY_SHORT:
 	case WT_CELL_VALUE:
 	case WT_CELL_VALUE_COPY:
 	case WT_CELL_VALUE_OVFL:
-	case WT_CELL_VALUE_OVFL_RM:
 	case WT_CELL_VALUE_SHORT:
 		WT_RET(__wt_scr_alloc(session, 256, &buf));
 		if ((ret =
