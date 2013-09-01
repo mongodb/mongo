@@ -127,7 +127,7 @@ namespace optionenvironment {
                            << ": option name must be in the format \"option,o\" or \"option\", "
                            << "where \"option\" is the long name and \"o\" is the optional one "
                            << "character short alias";
-                        return Status(ErrorCodes::InternalError, sb.str());
+                        return Status(ErrorCodes::BadValue, sb.str());
                     }
                     long_name = iterator->_singleName.substr(0, commaOffset);
                 } else {
@@ -173,7 +173,7 @@ namespace optionenvironment {
             }
             StringBuilder sb;
             sb << "Unrecognized option: " << key;
-            return Status(ErrorCodes::InternalError, sb.str());
+            return Status(ErrorCodes::BadValue, sb.str());
         }
 
         // Convert a BSONElement to a Value.  See comments at the beginning of this section.
@@ -206,7 +206,7 @@ namespace optionenvironment {
                             else {
                                 StringBuilder sb;
                                 sb << "Arrays can only contain strings in JSON Config File";
-                                return Status(ErrorCodes::InternalError, sb.str());
+                                return Status(ErrorCodes::BadValue, sb.str());
                             }
                         }
                         *value = Value(valueStrings);
@@ -271,7 +271,7 @@ namespace optionenvironment {
                     if (environment->get(dottedName, &dummyVal).isOK()) {
                         StringBuilder sb;
                         sb << "Error parsing JSON config: duplcate key: " << dottedName;
-                        return Status(ErrorCodes::InternalError, sb.str());
+                        return Status(ErrorCodes::BadValue, sb.str());
                     }
 
                     ret = environment->set(dottedName, optionValue);
@@ -465,7 +465,7 @@ namespace optionenvironment {
         catch (po::error& e) {
             StringBuilder sb;
             sb << "Error parsing command line: " << e.what();
-            return Status(ErrorCodes::InternalError, sb.str());
+            return Status(ErrorCodes::BadValue, sb.str());
         }
         return Status::OK();
     }
@@ -499,7 +499,7 @@ namespace optionenvironment {
         catch (po::error& e) {
             StringBuilder sb;
             sb << "Error parsing INI config file: " << e.what();
-            return Status(ErrorCodes::InternalError, sb.str());
+            return Status(ErrorCodes::BadValue, sb.str());
         }
         return Status::OK();
     }
@@ -530,7 +530,7 @@ namespace optionenvironment {
         } catch ( MsgAssertionException& e ) {
             StringBuilder sb;
             sb << "Error parsing JSON config file: " << e.what();
-            return Status(ErrorCodes::InternalError, sb.str());
+            return Status(ErrorCodes::BadValue, sb.str());
         }
         return Status::OK();
     }
