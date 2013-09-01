@@ -131,3 +131,68 @@ env.CppUnitTest('metadata_loader_test',
                          '$BUILD_DIR/mongo/db/common'],
                 NO_CRUTCH=True);
 
+#
+# Write Operations
+#
+
+env.StaticLibrary(
+    target='write_ops',
+    source=[
+        'batched_command_response.cpp',
+        'batched_delete_request.cpp',
+        'batched_delete_document.cpp',
+        'batched_error_detail.cpp',
+        'batched_insert_request.cpp',
+        'batched_update_request.cpp',
+        'batched_update_document.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base/base',
+        '$BUILD_DIR/mongo/bson',
+    ],
+)
+
+env.CppUnitTest(
+    target='batched_command_response_test',
+    source=[
+        'batched_command_response_test.cpp',
+    ],
+    LIBDEPS=[
+        'write_ops',
+        '$BUILD_DIR/mongo/db/common',
+    ]
+)
+
+env.CppUnitTest(
+    target='batched_delete_request_test',
+    source=[
+        'batched_delete_request_test.cpp',
+    ],
+    LIBDEPS=[
+        'write_ops',
+        '$BUILD_DIR/mongo/db/common',
+    ]
+)
+
+env.CppUnitTest(
+    target='batched_insert_request_test',
+    source=[
+        'batched_insert_request_test.cpp',
+    ],
+    LIBDEPS=[
+        'write_ops',
+        '$BUILD_DIR/mongo/db/common',
+    ]
+)
+
+env.CppUnitTest(
+    target='batched_update_request_test',
+    source=[
+        'batched_update_request_test.cpp',
+    ],
+    LIBDEPS=[
+        'write_ops',
+        '$BUILD_DIR/mongo/db/common',
+    ]
+)
+

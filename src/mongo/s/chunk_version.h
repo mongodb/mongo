@@ -29,13 +29,17 @@
 #pragma once
 
 #include "mongo/db/jsobj.h"
+#include "mongo/s/bson_serializable.h"
 
 namespace mongo {
 
-    //
-    // ChunkVersions consist of a major/minor version scoped to a version epoch
-    //
-    struct ChunkVersion {
+    /**
+     * ChunkVersions consist of a major/minor version scoped to a version epoch
+     *
+     * TODO: This is a "manual type" but, even so, still needs to comform to what's
+     * expected from types.
+     */
+    struct ChunkVersion : public BSONSerializable {
         union {
             struct {
                 int _minor;
@@ -347,7 +351,7 @@ namespace mongo {
         // versions that know nothing about epochs.
         //
 
-        BSONObj toBSON( const string& prefixIn="" ) const {
+        BSONObj toBSONWithPrefix( const string& prefixIn ) const {
             BSONObjBuilder b;
 
             string prefix = prefixIn;
@@ -359,11 +363,59 @@ namespace mongo {
         }
 
         void addToBSON( BSONObjBuilder& b, const string& prefix="" ) const {
-            b.appendElements( toBSON( prefix ) );
+            b.appendElements( toBSONWithPrefix( prefix ) );
         }
 
         void addEpochToBSON( BSONObjBuilder& b, const string& prefix="" ) const {
             b.append( prefix + "Epoch", _epoch );
+        }
+
+        //
+        // bson serializable interface implementation
+        // (toBSON and toString were implemented above)
+        //
+
+        virtual bool isValid(std::string* errMsg) const {
+            // TODO is there any check we want to do here?
+            return true;
+        }
+
+        virtual BSONObj toBSON() const {
+            // ChunkVersion wants to be an array.
+            BSONArrayBuilder b;
+            b.appendTimestamp(_combined);
+            b.append(_epoch);
+            return b.arr();
+        }
+
+        virtual bool parseBSON(const BSONObj& source, std::string* errMsg) {
+            // ChunkVersion wants to be an array.
+            BSONArray arrSource = static_cast<BSONArray>(source);
+
+            bool canParse;
+            ChunkVersion version = fromBSON(arrSource, &canParse);
+            if (!canParse) {
+                *errMsg = "Could not parse version structure";
+                return false;
+            }
+
+            _minor = version._minor;
+            _major = version._major;
+            _epoch = version._epoch;
+            return true;
+        }
+
+        virtual void clear() {
+            _minor = 0;
+            _major = 0;
+            _epoch = OID();
+        }
+
+        void cloneTo(ChunkVersion* other) const {
+            other->clear();
+            other->_minor = _minor;
+            other->_major = _major;
+            other->_epoch = _epoch;
         }
 
     };

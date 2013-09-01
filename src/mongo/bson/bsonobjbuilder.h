@@ -803,6 +803,11 @@ namespace mongo {
             return *this;
         }
 
+        BSONArrayBuilder& appendTimestamp(unsigned long long ts) {
+            _b.appendTimestamp(num(), ts);
+            return *this;
+        }
+
         BSONArrayBuilder& append(const StringData& s) {
             _b.append(num(), s);
             return *this;
