@@ -78,7 +78,7 @@ namespace mongo {
             : _name(name), _defaultSet(false) {}
 
         BSONField(const std::string& name, const T& defaultVal)
-            : _name(name), _default(defaultVal), _defaultSet(true) {}
+            : _name(name), _default(defaultVal) , _defaultSet(true) {}
 
         BSONFieldValue<T> make(const T& t) const {
             return BSONFieldValue<T>(_name, t);
@@ -93,6 +93,7 @@ namespace mongo {
         }
 
         const T& getDefault() const {
+            dassert(_defaultSet);
             return _default;
         }
 

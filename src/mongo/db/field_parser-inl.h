@@ -33,6 +33,71 @@ namespace mongo {
 
     using mongoutils::str::stream;
 
+    template<typename T>
+    FieldParser::FieldState FieldParser::extract(BSONObj doc,
+                       const BSONField<T>& field,
+                       T* out,
+                       string* errMsg)
+    {
+        BSONElement elem = doc[field.name()];
+        if (elem.eoo()) {
+            if (field.hasDefault()) {
+                field.getDefault().cloneTo(out);
+                return FIELD_DEFAULT;
+            }
+            else {
+                return FIELD_NONE;
+            }
+        }
+
+        if (elem.type() != Object && elem.type() != Array) {
+            _genFieldErrMsg(doc, field, "Object/Array", errMsg);
+            return FIELD_INVALID;
+        }
+
+        if (!out->parseBSON(elem.embeddedObject(), errMsg)) {
+            return FIELD_INVALID;
+        }
+
+        return FIELD_SET;
+    }
+
+    template<typename T>
+    FieldParser::FieldState FieldParser::extract(BSONObj doc,
+                       const BSONField<T>& field,
+                       T** out,
+                       string* errMsg)
+    {
+        BSONElement elem = doc[field.name()];
+        if (elem.eoo()) {
+            if (field.hasDefault()) {
+                *out = new T;
+                field.getDefault().cloneTo(*out);
+                return FIELD_DEFAULT;
+            }
+            else {
+                return FIELD_NONE;
+            }
+        }
+
+        if (elem.type() != Object && elem.type() != Array) {
+            if (errMsg) {
+                *errMsg = stream() << "wrong type for '" << field() << "' field, expected "
+                                   << "vector or array" << ", found "
+                                   << doc[field.name()].toString();
+            }
+            return FIELD_INVALID;
+        }
+
+        auto_ptr<T> temp(new T);
+        if (!temp->parseBSON(elem.embeddedObject(), errMsg)) {
+            return FIELD_INVALID;
+        }
+
+        *out = temp.release();
+        return FIELD_SET;
+    }
+
     // Extracts an array into a vector
     template<typename T>
     FieldParser::FieldState FieldParser::extract(BSONObj doc,
@@ -87,6 +152,109 @@ namespace mongo {
                                << "vector array" << ", found " << doc[field.name()].toString();
         }
         return FIELD_INVALID;
+    }
+
+    template<typename T>
+    FieldParser::FieldState FieldParser::extract(BSONObj doc,
+                                                 const BSONField<vector<T*> >& field,
+                                                 vector<T*>* out,
+                                                 string* errMsg) {
+        dassert(!field.hasDefault());
+
+        BSONElement elem = doc[field.name()];
+        if (elem.eoo()) {
+                return FIELD_NONE;
+        }
+
+        if (elem.type() != Array) {
+            if (errMsg) {
+                *errMsg = stream() << "wrong type for '" << field() << "' field, expected "
+                                   << "vector array" << ", found " << doc[field.name()].toString();
+            }
+            return FIELD_INVALID;
+        }
+
+        BSONArray arr = BSONArray(elem.embeddedObject());
+        BSONObjIterator objIt(arr);
+        while (objIt.more()) {
+
+            BSONElement next = objIt.next();
+
+            if (next.type() != Object) {
+                if (errMsg) {
+                    *errMsg = stream() << "wrong type for '" << field() << "' field contents, "
+                                       << "expected object, found " << elem.type();
+                }
+                return FIELD_INVALID;
+            }
+
+            auto_ptr<T> toInsert(new T);
+
+            if (!toInsert->parseBSON(next.embeddedObject(), errMsg)) {
+                return FIELD_INVALID;
+            }
+
+            out->push_back(toInsert.release());
+        }
+
+        return FIELD_SET;
+    }
+
+    template<typename T>
+    void FieldParser::clearOwnedVector(vector<T*>* vec) {
+        for (typename vector<T*>::iterator it = vec->begin(); it != vec->end(); ++it) {
+            delete (*it);
+        }
+    }
+
+    template<typename T>
+    FieldParser::FieldState FieldParser::extract(BSONObj doc,
+                                                 const BSONField<vector<T*> >& field,
+                                                 vector<T*>** out,
+                                                 string* errMsg) {
+        dassert(!field.hasDefault());
+
+        BSONElement elem = doc[field.name()];
+        if (elem.eoo()) {
+                return FIELD_NONE;
+        }
+
+        if (elem.type() != Array) {
+            if (errMsg) {
+                *errMsg = stream() << "wrong type for '" << field() << "' field, expected "
+                                   << "vector array" << ", found " << doc[field.name()].toString();
+            }
+            return FIELD_INVALID;
+        }
+
+        auto_ptr<vector<T*> > tempVector(new vector<T*>);
+
+        BSONArray arr = BSONArray(elem.embeddedObject());
+        BSONObjIterator objIt(arr);
+        while (objIt.more()) {
+
+            BSONElement next = objIt.next();
+
+            if (next.type() != Object) {
+                if (errMsg) {
+                    *errMsg = stream() << "wrong type for '" << field() << "' field contents, "
+                                       << "expected object, found " << elem.type();
+                }
+                clearOwnedVector(tempVector.get());
+                return FIELD_INVALID;
+            }
+
+            auto_ptr<T> toInsert(new T);
+            if (!toInsert->parseBSON(next.embeddedObject(), errMsg)) {
+                clearOwnedVector(tempVector.get());
+                return FIELD_INVALID;
+            }
+
+            tempVector->push_back(toInsert.release());
+        }
+
+        *out = tempVector.release();
+        return FIELD_SET;
     }
 
     // Extracts an object into a map

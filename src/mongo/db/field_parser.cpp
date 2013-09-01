@@ -220,9 +220,9 @@ namespace mongo {
     }
 
     FieldParser::FieldState FieldParser::extractNumber(BSONObj doc,
-                                    const BSONField<int>& field,
-                                    int* out,
-                                    string* errMsg)
+                              const BSONField<int>& field,
+                              int* out,
+                              string* errMsg)
     {
         BSONElement elem = doc[field.name()];
         if (elem.eoo()) {
