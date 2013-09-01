@@ -36,6 +36,7 @@
 #include "mongo/db/lasterror.h"
 #include "mongo/db/taskqueue.h"
 #include "mongo/dbtests/dbtests.h"
+#include "mongo/dbtests/framework_options.h"
 #include "mongo/util/checksum.h"
 #include "mongo/util/compress.h"
 #include "mongo/util/concurrency/qlock.h"
@@ -49,15 +50,7 @@
 
 using namespace bson;
 
-namespace mongo {
-    namespace dbtests {
-        extern unsigned perfHist;
-    }
-}
-
 namespace PerfTests {
-
-    using mongo::dbtests::perfHist;
 
     const bool profiling = false;
 
@@ -228,7 +221,7 @@ namespace PerfTests {
 
             if( conn && !conn->isFailed() ) {
                 const char *ns = "perf.pstats";
-                if( perfHist ) {
+                if(frameworkGlobalParams.perfHist) {
                     static bool needver = true;
                     try {
                         // try to report rps from last time */
@@ -248,7 +241,7 @@ namespace PerfTests {
                         }
                         BSONObj fields = BSON( "rps" << 1 << "info" << 1 );
                         vector<BSONObj> v;
-                        conn->findN(v, ns, q, perfHist, 0, &fields);
+                        conn->findN(v, ns, q, frameworkGlobalParams.perfHist, 0, &fields);
                         for( vector<BSONObj>::iterator i = v.begin(); i != v.end(); i++ ) {
                             BSONObj o = *i;
                             double lastrps = o["rps"].Number();

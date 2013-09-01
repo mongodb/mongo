@@ -834,7 +834,7 @@ env.Library("clientandshell", ["client/clientAndShell.cpp"],
 env.Library("allclient", "client/clientOnly.cpp", LIBDEPS=["clientandshell"])
 
 # dbtests test binary
-env.StaticLibrary('testframework', ['dbtests/framework.cpp'],
+env.StaticLibrary('testframework', ['dbtests/framework.cpp', 'dbtests/framework_options.cpp'],
                   LIBDEPS=['unittest/unittest',
                   '$BUILD_DIR/mongo/util/options_parser/options_parser',
                   ])
@@ -851,7 +851,9 @@ env.StaticLibrary('mocklib', [
 test = testEnv.Install(
     '#/',
     testEnv.Program("test",
-                    [ f for f in Glob("dbtests/*.cpp") if not str(f).endswith('framework.cpp') ],
+                    [ f for f in Glob("dbtests/*.cpp")
+                      if not str(f).endswith('framework.cpp') and
+                         not str(f).endswith('framework_options.cpp') ],
                     LIBDEPS = [
                        "mutable_bson_test_utils",
                        "mongocommon",
