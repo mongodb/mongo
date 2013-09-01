@@ -393,16 +393,18 @@ namespace mongo {
                                     << " info: " << h->versionMinor << ' ' << h->fileLength);
                 }
 
-                log() << "****" << endl;
-                log() << "****" << endl;
-                log() << "need to upgrade database " << dbName << " "
-                      << "with pdfile version " << h->version << "." << h->versionMinor << ", "
-                      << "new version: "
-                      << PDFILE_VERSION << "." << PDFILE_VERSION_MINOR_22_AND_OLDER
-                      << endl;
+                if ( !h->isCurrentVersion() ) {
+                    log() << "****" << endl;
+                    log() << "****" << endl;
+                    log() << "need to upgrade database " << dbName << " "
+                          << "with pdfile version " << h->version << "." << h->versionMinor << ", "
+                          << "new version: "
+                          << PDFILE_VERSION << "." << PDFILE_VERSION_MINOR_22_AND_OLDER
+                          << endl;
+                }
+
                 if ( shouldRepairDatabases ) {
                     // QUESTION: Repair even if file format is higher version than code?
-                    log() << "\t starting upgrade" << endl;
                     string errmsg;
                     verify( doDBUpgrade( dbName , errmsg , h ) );
                 }
