@@ -33,7 +33,7 @@ __split_row_page_inmem(WT_SESSION_IMPL *session, WT_PAGE *orig)
 	new_parent = right_child = NULL;
 	new_ins_head_list = NULL;
 	new_ins_head = NULL;
-	current_ins = ins = NULL;
+	ins = NULL;
 
 	/*
 	 * Only split a page once, otherwise workloads that update in the
@@ -161,52 +161,37 @@ __split_row_page_inmem(WT_SESSION_IMPL *session, WT_PAGE *orig)
 	 *   If there were an f2, we'd be looking for: e0, d1, d2, NULL
 	 *
 	 *   The algorithm does:
-	 *   1) Start at the tail of level zero, walk up the tail pointers
+	 *   1) Start at the head of level zero, walk up the tail pointers
 	 *      until it sees an element other than the one being removed -
 	 *      in the above diagram that is element d2.
-	 *   2) Step down a level in the skip list - in the above diagram to d1.
-	 *   3) Follow the next pointers on that level tracking previous items
+	 *   2) Follow the next pointers on that level tracking previous items
 	 *      until we find the item prior to the tail pointer.
-	 *   4) Update the tail pointer with the previous item.
-	 *   5) Step down a level in the skip list.
-	 *   6) Go to step 3 until at level 0.
+	 *   3) Update the tail pointer with the previous item.
+	 *   4) Step down a level in the skip list.
+	 *   5) Go to step 3 until at level 0.
 	 */
-
-	/*
-	 * This should only happen is if there is only a single element and
-	 * we have checked for that above.
-	 */
-	WT_ASSERT(session, ins_head->head[0] != ins);
-
-	/*
-	 * If the item we are removing is the highest depth item in the stack
-	 * trim it down until we have a different head.
-	 */
-	for (i = ins_depth - 1; ins_head->head[i] == ins; i--)
-		ins_head->head[i] = ins_head->tail[i] = NULL;
-
-	/*
-	 * Start at the tail pointer one level above the last element, if it
-	 * exists (that is, if there was some element in the list higher than
-	 * ins).  Otherwise, start at the head.
-	 */
-	if (i + 1 < WT_SKIP_MAXDEPTH && ins_head->tail[i + 1] != NULL) {
-		prev_ins = ins_head->tail[i + 1];
-		insp = &prev_ins->next[i + 1];
-	} else {
-		prev_ins = NULL;
-		insp = &ins_head->head[i];
-	}
-
-	for (insp--; i >= 0; i--, insp--) {
+	prev_ins = NULL;
+	for (i = WT_SKIP_MAXDEPTH - 1, insp = &ins_head->head[i];
+	    i >= 0;
+	    i--, insp--) {
 		for (current_ins = *insp;
-		    current_ins != ins;
+		    current_ins != NULL && current_ins != ins;
 		    current_ins = current_ins->next[i])
 			prev_ins = current_ins;
-		WT_ASSERT(session, prev_ins != NULL && current_ins == ins);
-		insp = &prev_ins->next[i];
-		*insp = NULL;
-		ins_head->tail[i] = prev_ins;
+		/* Is the level empty, or doesn't contain ins? */
+		if (current_ins != ins)
+			continue;
+		else if (prev_ins == NULL) { /* Just one element. */
+			WT_ASSERT(session, ins_head->head[i] == ins);
+			WT_ASSERT(session, ins_head->tail[i] == ins);
+			ins_head->head[i] = ins_head->tail[i] = NULL;
+		} else {
+			WT_ASSERT(session, ins_head->head[i] != ins);
+			WT_ASSERT(session, prev_ins->next[i] == ins);
+			insp = &prev_ins->next[i];
+			*insp = NULL;
+			ins_head->tail[i] = prev_ins;
+		}
 	}
 
 	/*
