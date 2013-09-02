@@ -91,8 +91,9 @@ list_print(WT_SESSION *session, const char *name, int cflag, int vflag)
 	}
 
 	/* Open the metadata file. */
+	uri = "metadata:";
 	if ((ret = session->open_cursor(
-	    session, WT_METADATA_URI, NULL, NULL, &cursor)) != 0) {
+	    session, uri, NULL, NULL, &cursor)) != 0) {
 		/*
 		 * If there is no metadata (yet), this will return ENOENT.
 		 * Treat that the same as an empty metadata.
@@ -101,7 +102,7 @@ list_print(WT_SESSION *session, const char *name, int cflag, int vflag)
 			return (0);
 
 		fprintf(stderr, "%s: %s: session.open_cursor: %s\n",
-		    progname, WT_METADATA_URI, wiredtiger_strerror(ret));
+		    progname, uri, wiredtiger_strerror(ret));
 		return (1);
 	}
 

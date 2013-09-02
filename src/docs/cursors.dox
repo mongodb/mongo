@@ -55,12 +55,14 @@ The following are some of the common builtin cursor types:
 
 <table>
   @hrow{URI, Type, Notes}
-   @row{<tt>backup:</tt>,
+  @row{<tt>backup:</tt>,
 hot backup cursor, See also: @ref hot_backup}
-   @row{<tt>colgroup:\<table name\>:\<column group name\></tt>,
+  @row{<tt>colgroup:\<table name\>:\<column group name\></tt>,
 column group cursor,}
   @row{<tt>index:\<table name\>:\<index name\></tt>,
 index cursor (key=index key\, value=table value),}
+  @row{<tt>metadata:</tt>,
+metadata cursor, See also: @ref metadata}
   @row{<tt>statistics:[\<data source URI\>]</tt>,
 database or file statistics (key=(int)\,
 value=(string)description\, (string)value\, (uint64_t)value),}
