@@ -286,8 +286,8 @@ __wt_ovfl_onpage_add(WT_SESSION_IMPL *session,
 	WT_RET(__wt_calloc(session, 1, size, &onpage));
 	p = (uint8_t *)onpage +
 	    sizeof(WT_OVFL_ONPAGE) + skipdepth * sizeof(WT_OVFL_ONPAGE *);
-	onpage->addr_offset = WT_PTRDIFF(p, onpage);
-	onpage->addr_size = addr_size;
+	onpage->addr_offset = (uint8_t)WT_PTRDIFF(p, onpage);
+	onpage->addr_size = (uint8_t)addr_size;
 	memcpy(p, addr, addr_size);
 	F_SET(onpage, WT_OVFL_ONPAGE_JUST_ADDED);
 
@@ -647,8 +647,8 @@ __wt_ovfl_reuse_add(WT_SESSION_IMPL *session, WT_PAGE *page,
 	WT_RET(__wt_calloc(session, 1, size, &reuse));
 	p = (uint8_t *)reuse +
 	    sizeof(WT_OVFL_REUSE) + skipdepth * sizeof(WT_OVFL_REUSE *);
-	reuse->addr_offset = WT_PTRDIFF(p, reuse);
-	reuse->addr_size = addr_size;
+	reuse->addr_offset = (uint8_t)WT_PTRDIFF(p, reuse);
+	reuse->addr_size = (uint8_t)addr_size;
 	memcpy(p, addr, addr_size);
 	p += addr_size;
 	reuse->value_offset = WT_PTRDIFF32(p, reuse);
@@ -859,8 +859,8 @@ __wt_ovfl_txnc_add(WT_SESSION_IMPL *session, WT_PAGE *page,
 	WT_RET(__wt_calloc(session, 1, size, &txnc));
 	p = (uint8_t *)txnc +
 	    sizeof(WT_OVFL_TXNC) + skipdepth * sizeof(WT_OVFL_TXNC *);
-	txnc->addr_offset = WT_PTRDIFF(p, txnc);
-	txnc->addr_size = addr_size;
+	txnc->addr_offset = (uint8_t)WT_PTRDIFF(p, txnc);
+	txnc->addr_size = (uint8_t)addr_size;
 	memcpy(p, addr, addr_size);
 	p += addr_size;
 	txnc->value_offset = WT_PTRDIFF32(p, txnc);
