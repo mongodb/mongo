@@ -225,6 +225,7 @@ TOOSMALL
 TORTIOUS
 TRK
 TXN
+TXNC
 TXNID
 Timestamp
 TxnID
@@ -823,6 +824,7 @@ tverify
 twiredtiger
 twrite
 txn
+txnc
 txnid
 txnidp
 txnmin

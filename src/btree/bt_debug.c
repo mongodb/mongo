@@ -500,10 +500,7 @@ static int
 __debug_page_modify(WT_DBG *ds, WT_PAGE *page)
 {
 	WT_PAGE_MODIFY *mod;
-	WT_PAGE_TRACK *track;
 	WT_SESSION_IMPL *session;
-	uint32_t i;
-	char buf[64];
 
 	session = ds->session;
 
@@ -534,16 +531,6 @@ __debug_page_modify(WT_DBG *ds, WT_PAGE *page)
 		break;
 	WT_ILLEGAL_VALUE(session);
 	}
-
-	if (mod->track_entries != 0)
-		__dmsg(ds, "\t" "tracking list:\n");
-	for (track = mod->track, i = 0; i < mod->track_entries; ++track, ++i)
-		if (F_ISSET(track, WT_TRK_OBJECT)) {
-			__dmsg(ds, "\t\t%s %s\n",
-			    __wt_track_string(track, buf, sizeof(buf)),
-			    __wt_addr_string(session,
-			    ds->tmp, track->addr.addr, track->addr.size));
-		}
 
 	return (0);
 }

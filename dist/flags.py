@@ -58,6 +58,7 @@ flags = {
 		'VERB_log',
 		'VERB_lsm',
 		'VERB_mutex',
+		'VERB_overflow',
 		'VERB_read',
 		'VERB_reconcile',
 		'VERB_salvage',

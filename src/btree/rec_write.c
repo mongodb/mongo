@@ -305,9 +305,6 @@ __wt_rec_write(WT_SESSION_IMPL *session,
 	WT_RET(__rec_write_init(session, page, flags, &session->reconcile));
 	r = session->reconcile;
 
-	/* Initialize the tracking subsystem for each new run. */
-	WT_RET(__wt_rec_track_init(session, page));
-
 	/* Reconcile the page. */
 	switch (page->type) {
 	case WT_PAGE_COL_FIX:
@@ -2818,7 +2815,7 @@ compare:		/*
 		 * might read the original value.
 		 */
 		if (ovfl_state == OVFL_UNUSED) {
-			WT_ERR(__wt_rec_track_onpage_addr(
+			WT_ERR(__wt_ovfl_onpage_add(
 			    session, page, unpack->data, unpack->size));
 			WT_ERR(__wt_val_ovfl_cache(session, page, upd, unpack));
 		}
@@ -2972,7 +2969,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 			 * reusing this key in this reconciliation is unlikely.
 			 */
 			if (onpage_ovfl)
-				WT_RET(__wt_rec_track_onpage_addr(
+				WT_RET(__wt_ovfl_onpage_add(
 				    session, page, kpack->data, kpack->size));
 			continue;
 		}
@@ -2998,7 +2995,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 				 * reconciliation is unlikely.
 				 */
 				if (onpage_ovfl)
-					WT_RET(__wt_rec_track_onpage_addr(
+					WT_RET(__wt_ovfl_onpage_add(
 					    session, page,
 					    kpack->data, kpack->size));
 				continue;
@@ -3021,7 +3018,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 				 * reconciliation is unlikely.
 				 */
 				if (onpage_ovfl)
-					WT_RET(__wt_rec_track_onpage_addr(
+					WT_RET(__wt_ovfl_onpage_add(
 					    session, page,
 					    kpack->data, kpack->size));
 
@@ -3061,7 +3058,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		 * key.  If there's no tracking entry, use the original blocks.
 		 */
 		if (onpage_ovfl &&
-		    __wt_rec_track_onpage_srch(page, kpack->data, kpack->size))
+		    __wt_ovfl_onpage_search(page, kpack->data, kpack->size))
 			onpage_ovfl = 0;
 
 		/*
@@ -3362,7 +3359,7 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 			 * might read the original value.
 			 */
 			if (val_cell != NULL && unpack->ovfl) {
-				WT_ERR(__wt_rec_track_onpage_addr(
+				WT_ERR(__wt_ovfl_onpage_add(
 				    session, page, unpack->data, unpack->size));
 				WT_ERR(__wt_val_ovfl_cache(
 				    session, page, rip, unpack));
@@ -3388,7 +3385,7 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 						WT_ERR(__wt_row_leaf_key_work(
 						    session,
 						    page, rip, NULL, 1));
-					WT_ERR(__wt_rec_track_onpage_addr(
+					WT_ERR(__wt_ovfl_onpage_add(
 					    session, page,
 					    unpack->data, unpack->size));
 				}
@@ -3429,8 +3426,7 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 		__wt_cell_unpack(cell, unpack);
 		onpage_ovfl = unpack->ovfl;
 		if (onpage_ovfl &&
-		    __wt_rec_track_onpage_srch(
-		    page, unpack->data, unpack->size)) {
+		    __wt_ovfl_onpage_search(page, unpack->data, unpack->size)) {
 			onpage_ovfl = 0;
 			WT_ASSERT(session, ikey != NULL);
 		}
@@ -3647,28 +3643,28 @@ __rec_row_leaf_insert(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins)
 static int
 __rec_split_discard(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
+	WT_BM *bm;
 	WT_PAGE_MODIFY *mod;
 	WT_REF *ref;
 	uint32_t i;
 
+	bm = S2BT(session)->bm;
+
 	/*
 	 * A page that split is being reconciled for the second, or subsequent
-	 * time; discard any the underlying block space or overflow items used
-	 * in the previous reconciliation.
+	 * time; discard the underlying block space and overflow items used in
+	 * the previous reconciliation.
 	 *
 	 * This routine would be trivial, and only walk a single page freeing
 	 * any blocks that were written to support the split -- the problem is
 	 * root splits.  In the case of root splits, we potentially have to
-	 * cope with the underlying blocks of multiple pages, but also there
-	 * may be overflow items that we have to resolve.
-	 *
-	 * These pages are discarded -- add them to the object tracking list.
+	 * cope with the underlying sets of multiple pages.
 	 */
 	WT_REF_FOREACH(page, ref, i)
-		WT_RET(__wt_rec_track(session, page,
+		WT_RET(bm->free(bm, session,
 		    ((WT_ADDR *)ref->addr)->addr,
-		    ((WT_ADDR *)ref->addr)->size, NULL, 0, 0));
-	WT_RET(__wt_rec_track_wrapup(session, page));
+		    ((WT_ADDR *)ref->addr)->size));
+	WT_RET(__wt_ovfl_track_wrapup(session, page));
 
 	if ((mod = page->modify) != NULL)
 		switch (F_ISSET(mod, WT_PM_REC_MASK)) {
@@ -3744,12 +3740,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		if (ref->addr != NULL) {
 			/*
 			 * Free the page and clear the address (so we don't free
-			 * it twice).  Logically, this is the same as adding the
-			 * address to the reconciliation tracking information
-			 * and freeing it when reconciliation ends as part of
-			 * cleaning up the track information, but that is going
-			 * to happen right at the end of this switch statement,
-			 * might as well save the work.
+			 * it twice).
 			 */
 			__wt_get_addr(page->parent, ref, &addr, &size);
 			WT_RET(bm->free(bm, session, addr, size));
@@ -3771,9 +3762,8 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		 * are checkpoints, and must be explicitly dropped.
 		 */
 		if (!WT_PAGE_IS_ROOT(page))
-			WT_RET(__wt_rec_track(session, page,
-			    mod->u.replace.addr, mod->u.replace.size,
-			    NULL, 0, 0));
+			WT_RET(bm->free(bm, session,
+			    mod->u.replace.addr, mod->u.replace.size));
 
 		/* Discard the replacement page's address. */
 		__wt_free(session, mod->u.replace.addr);
@@ -3797,13 +3787,13 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	F_CLR(mod, WT_PM_REC_MASK);
 
 	/*
-	 * Wrap up discarded block and overflow tracking.  If we are about to
-	 * create a checkpoint, the system must be entirely consistent at that
-	 * point, the underlying block manager is presumably going to do some
-	 * action to resolve the list of allocated/free/whatever blocks that
-	 * are associated with the checkpoint.
+	 * Wrap up overflow tracking.  If we are about to create a checkpoint,
+	 * the system must be entirely consistent at that point (the underlying
+	 * block manager is presumably going to do some action to resolve the
+	 * list of allocated/free/whatever blocks that are associated with the
+	 * checkpoint).
 	 */
-	WT_RET(__wt_rec_track_wrapup(session, page));
+	WT_RET(__wt_ovfl_track_wrapup(session, page));
 
 	switch (r->bnd_next) {
 	case 0:						/* Page delete */
@@ -3973,7 +3963,7 @@ __rec_write_wrapup_err(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	 * tree.  This is not a question of correctness, we're avoiding block
 	 * leaks.
 	 */
-	WT_TRET(__wt_rec_track_wrapup_err(session, page));
+	WT_TRET(__wt_ovfl_track_wrapup_err(session, page));
 	for (bnd = r->bnd, i = 0; i < r->bnd_next; ++bnd, ++i)
 		if (bnd->addr.addr != NULL) {
 			WT_TRET(bm->free(
@@ -4391,7 +4381,6 @@ __rec_cell_build_ovfl(WT_SESSION_IMPL *session,
 	WT_PAGE_HEADER *dsk;
 	size_t alloc_size;
 	uint32_t size;
-	int found;
 	uint8_t *addr, buf[WT_BTREE_MAX_ADDR_COOKIE];
 
 	btree = S2BT(session);
@@ -4405,9 +4394,8 @@ __rec_cell_build_ovfl(WT_SESSION_IMPL *session,
 	 * See if this overflow record has already been written and reuse it if
 	 * possible.  Else, write a new overflow record.
 	 */
-	WT_RET(__wt_rec_track_ovfl_reuse(
-	    session, page, kv->buf.data, kv->buf.size, &addr, &size, &found));
-	if (!found) {
+	if (!__wt_ovfl_reuse_search(session, page,
+	    &addr, &size, kv->buf.data, kv->buf.size)) {
 		/* Allocate a buffer big enough to write the overflow record. */
 		alloc_size = kv->buf.size;
 		WT_RET(bm->write_size(bm, session, &alloc_size));
@@ -4429,8 +4417,8 @@ __rec_cell_build_ovfl(WT_SESSION_IMPL *session,
 		WT_ERR(__wt_bt_write(session, tmp, addr, &size, 0, 0));
 
 		/* Track the overflow record. */
-		WT_ERR(__wt_rec_track(session, page,
-		    addr, size, kv->buf.data, kv->buf.size, WT_TRK_INUSE));
+		WT_ERR(__wt_ovfl_reuse_add(session, page,
+		    addr, size, kv->buf.data, kv->buf.size));
 	}
 
 	/* Set the callers K/V to reference the overflow record's address. */
@@ -4467,19 +4455,25 @@ __rec_dictionary_skip_search(WT_DICTIONARY **head, uint64_t hash)
 	 * Start at the highest skip level, then go as far as possible at each
 	 * level before stepping down to the next.
 	 */
-	for (i = WT_SKIP_MAXDEPTH - 1, e = &head[i]; i >= 0;)
-		if (*e == NULL) {
+	for (i = WT_SKIP_MAXDEPTH - 1, e = &head[i]; i >= 0;) {
+		if (*e == NULL) {		/* Empty levels */
 			--i;
 			--e;
-		} else {
-			if ((*e)->hash == hash)
-				return (*e);
-			if ((*e)->hash > hash)
-				return (NULL);
-			e = &(*e)->next[i];
+			continue;
 		}
 
-	/* NOTREACHED */
+		/*
+		 * Return any exact matches: we don't care in what search level
+		 * we found a match.
+		 */
+		if ((*e)->hash == hash)		/* Exact match */
+			return (*e);
+		if ((*e)->hash > hash) {	/* Drop down a level */
+			--i;
+			--e;
+		} else				/* Keep going at this level */
+			e = &(*e)->next[i];
+	}
 	return (NULL);
 }
 
@@ -4499,10 +4493,10 @@ __rec_dictionary_skip_search_stack(
 	 * level before stepping down to the next.
 	 */
 	for (i = WT_SKIP_MAXDEPTH - 1, e = &head[i]; i >= 0;)
-		if (*e == NULL || (*e)->hash >= hash)
-			stack[i--] = e--;
+		if (*e == NULL || (*e)->hash > hash)
+			stack[i--] = e--;	/* Drop down a level */
 		else
-			e = &(*e)->next[i];
+			e = &(*e)->next[i];	/* Keep going at this level */
 }
 
 /*
