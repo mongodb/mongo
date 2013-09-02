@@ -13,18 +13,41 @@
  *    limitations under the License.
  */
 
-
 #ifdef MONGO_SSL
 
 #pragma once
 
 #include <string>
 #include "mongo/base/disallow_copying.h"
+#include "mongo/util/net/sock.h"
 
 #include <openssl/err.h>
 #include <openssl/ssl.h>
 
+#endif
+
 namespace mongo {
+    /*
+     * @return the SSL version string prefixed with prefix and suffixed with suffix
+     */
+    const std::string getSSLVersion(const std::string &prefix, const std::string &suffix); 
+}
+
+#ifdef MONGO_SSL
+namespace mongo {
+
+    class SSLConnection {
+    public:
+        SSL* ssl;
+        BIO* networkBIO;
+        BIO* internalBIO;
+        Socket* socket;
+
+        SSLConnection(SSL_CTX* ctx, Socket* sock); 
+
+        ~SSLConnection();
+    };
+
     class SSLManagerInterface {
     public:
         virtual ~SSLManagerInterface();
@@ -32,23 +55,23 @@ namespace mongo {
         /**
          * Initiates a TLS connection.
          * Throws SocketException on failure.
-         * @return a pointer to an SSL context; caller must SSL_free it.
+         * @return a pointer to an SSLConnection. Resources are freed in SSLConnection's destructor
          */
-        virtual SSL* connect(int fd) = 0;
+        virtual SSLConnection* connect(Socket* socket) = 0;
 
         /**
          * Waits for the other side to initiate a TLS connection.
          * Throws SocketException on failure.
-         * @return a pointer to an SSL context; caller must SSL_free it.
+         * @return a pointer to an SSLConnection. Resources are freed in SSLConnection's destructor
          */
-        virtual SSL* accept(int fd) = 0;
+        virtual SSLConnection* accept(Socket* socket) = 0;
 
         /**
          * Fetches a peer certificate and validates it if it exists
          * Throws SocketException on failure
          * @return a std::string containing the certificate's subject name.
          */
-        virtual std::string validatePeerCertificate(const SSL* ssl) = 0;
+        virtual std::string validatePeerCertificate(const SSLConnection* conn) = 0;
 
         /**
          * Cleans up SSL thread local memory; use at thread exit
@@ -70,21 +93,26 @@ namespace mongo {
         virtual std::string getClientSubjectName() = 0;
 
         /**
-         * ssl.h shims
+        * Fetches the error text for an error code, in a thread-safe manner.
+        */
+        virtual std::string getSSLErrorMessage(int code) = 0;
+ 
+        /**
+         * ssl.h wrappers 
          */
-        virtual int SSL_read(SSL* ssl, void* buf, int num) = 0;
+        virtual int SSL_read(SSLConnection* conn, void* buf, int num) = 0;
 
-        virtual int SSL_write(SSL* ssl, const void* buf, int num) = 0;
+        virtual int SSL_write(SSLConnection* conn, const void* buf, int num) = 0;
 
         virtual unsigned long ERR_get_error() = 0;
 
         virtual char* ERR_error_string(unsigned long e, char* buf) = 0;
 
-        virtual int SSL_get_error(const SSL* ssl, int ret) = 0;
+        virtual int SSL_get_error(const SSLConnection* conn, int ret) = 0;
 
-        virtual int SSL_shutdown(SSL* ssl) = 0;
+        virtual int SSL_shutdown(SSLConnection* conn) = 0;
 
-        virtual void SSL_free(SSL* ssl) = 0;
+        virtual void SSL_free(SSLConnection* conn) = 0;
     };
 
     // Access SSL functions through this instance.
@@ -92,4 +120,4 @@ namespace mongo {
 
     extern bool isSSLServer;
 }
-#endif
+#endif // #ifdef MONGO_SSL

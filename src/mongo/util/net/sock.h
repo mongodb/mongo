@@ -33,10 +33,7 @@
 
 #endif // not _WIN32
 
-#ifdef MONGO_SSL
-#include <openssl/ssl.h>
-#endif
-
+#include <boost/scoped_ptr.hpp>
 #include <string>
 #include <utility>
 #include <vector>
@@ -49,7 +46,13 @@
 
 namespace mongo {
 
+#ifdef MONGO_SSL
     class SSLManagerInterface;
+    class SSLConnection;
+#endif
+
+    extern const int portSendFlags;
+    extern const int portRecvFlags;
 
     const int SOCK_FAMILY_UNKNOWN_ERROR=13078;
 
@@ -221,7 +224,8 @@ namespace mongo {
         void clearCounters() { _bytesIn = 0; _bytesOut = 0; }
         long long getBytesIn() const { return _bytesIn; }
         long long getBytesOut() const { return _bytesOut; }
-        
+        int rawFD() const { return _fd; }
+
         void setTimeout( double secs );
         bool isStillConnected();
 
@@ -248,20 +252,20 @@ namespace mongo {
             return _fdCreationMicroSec;
         }
 
+        void handleRecvError(int ret, int len);
+        MONGO_COMPILER_NORETURN void handleSendError(int ret, const char* context);
+
     private:
         void _init();
 
         /** sends dumbly, just each buffer at a time */
         void _send( const std::vector< std::pair< char *, int > > &data, const char *context );
 
-        /** raw send, same semantics as ::send */
-        int _send( const char * data , int len );
+        /** raw send, same semantics as ::send with an additional context parameter */
+        int _send( const char * data , int len , const char * context );
 
         /** raw recv, same semantics as ::recv */
         int _recv( char * buf , int max );
-
-        void _handleRecvError(int ret, int len, int* retries);
-        MONGO_COMPILER_NORETURN void _handleSendError(int ret, const char* context);
 
         int _fd;
         uint64_t _fdCreationMicroSec;
@@ -274,7 +278,7 @@ namespace mongo {
         time_t _lastValidityCheckAtSecs;
 
 #ifdef MONGO_SSL
-        SSL* _ssl;
+        boost::scoped_ptr<SSLConnection> _sslConnection;
         SSLManagerInterface* _sslManager;
 #endif
         logger::LogSeverity _logLevel; // passed to log() when logging errors

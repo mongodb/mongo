@@ -30,6 +30,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/pdfile_version.h"
 #include "mongo/util/file.h"
+#include "mongo/util/net/ssl_manager.h" 
 #include "mongo/util/processinfo.h"
 #include "mongo/util/ramlog.h"
 #include "mongo/util/startup_test.h"
@@ -124,11 +125,7 @@ namespace mongo {
     void printGitVersion() { log() << "git version: " << gitVersion() << endl; }
 
     const std::string openSSLVersion(const std::string &prefix, const std::string &suffix) {
-#ifdef MONGO_SSL
-        return prefix + SSLeay_version(SSLEAY_VERSION) + suffix;
-#else
-        return "";
-#endif
+        return getSSLVersion(prefix, suffix);
     }
 
     void printOpenSSLVersion() {
