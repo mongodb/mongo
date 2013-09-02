@@ -191,9 +191,8 @@ __split_row_page_inmem(WT_SESSION_IMPL *session, WT_PAGE *orig)
 	 * ins).  Otherwise, start at the head.
 	 */
 	if (i + 1 < WT_SKIP_MAXDEPTH && ins_head->tail[i + 1] != NULL) {
-		++i;
-		prev_ins = ins_head->tail[i];
-		insp = &prev_ins->next[i];
+		prev_ins = ins_head->tail[i + 1];
+		insp = &prev_ins->next[i + 1];
 	} else {
 		prev_ins = NULL;
 		insp = &ins_head->head[i];
