@@ -170,18 +170,13 @@ __split_row_page_inmem(WT_SESSION_IMPL *session, WT_PAGE *orig)
 	 *   4) Update the tail pointer with the previous item.
 	 *   5) Step down a level in the skip list.
 	 *   6) Go to step 3 until at level 0.
-	 */
-	for (i = 0; i < WT_SKIP_MAXDEPTH && ins_head->tail[i] == ins; ++i)
-		;
-	WT_ASSERT(session, ins_head->head[i] != NULL);
-	/*
+	 *
 	 * If the item we are removing is the highest depth item in the stack
-	 * trim it down until it isn't.
+	 * trim it down until we have a different head.
 	 */
-	while (ins_head->head[i] == ins) {
+	for (i = ins_depth - 1; ins_head->head[i] == ins; i--)
 		ins_head->head[i] = ins_head->tail[i] = NULL;
-		i--;
-	}
+
 	/*
 	 * This should only happen is if there is only a single element and
 	 * we have checked for that above.
@@ -189,18 +184,19 @@ __split_row_page_inmem(WT_SESSION_IMPL *session, WT_PAGE *orig)
 	WT_ASSERT(session, i >= 0);
 
 	/*
-	 * Start at the head if the last element has a full height stack, or
-	 * if the element we are removing was the deepest in the skip list.
+	 * Start at the tail pointer one level above the last element, if it
+	 * exists (that is, if there was some element in the list higher than
+	 * ins).  Otherwise, start at the head.
 	 */
-	if (i == WT_SKIP_MAXDEPTH || ins_head->tail[i] == ins) {
+	if (i + 1 < WT_SKIP_MAXDEPTH && ins_head->tail[i + 1] != NULL) {
+		prev_ins = ins_head->tail[i + 1];
+		insp = &prev_ins->next[i + 1];
+	} else {
 		prev_ins = NULL;
 		insp = &ins_head->head[i];
-	} else {
-		prev_ins = ins_head->tail[i];
-		insp = &prev_ins->next[i];
 	}
 
-	for (i--, insp--; i >= 0; i--, insp--) {
+	for (insp--; i >= 0; i--, insp--) {
 		for (current_ins = *insp;
 		    current_ins != ins;
 		    current_ins = current_ins->next[i])
