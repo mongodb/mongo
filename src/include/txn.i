@@ -97,7 +97,7 @@ __wt_txn_visible(WT_SESSION_IMPL *session, uint64_t id)
 	 * schema and metadata locks) to protect access to in-flight updates.
 	 */
 	if (txn->isolation == TXN_ISO_READ_UNCOMMITTED ||
-	    S2BT(session) == session->metafile)
+	    S2BT_SAFE(session) == session->metafile)
 		return (1);
 
 	/*
