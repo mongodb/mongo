@@ -570,7 +570,8 @@ namespace mongo {
                                                    &user));
  
             uassert(ErrorCodes::AuthenticationFailed,
-                    "Username does not match the provided client certificate",
+                    "Username \"" + user + "\" does not match the provided client certificate user \"" +
+                    getSSLManager()->getClientSubjectName() + "\"",
                     user ==  getSSLManager()->getClientSubjectName());
  
             std::string errmsg;

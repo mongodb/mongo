@@ -13,8 +13,6 @@
  *    limitations under the License.
  */
 
-#ifdef MONGO_SSL
-
 #include "mongo/pch.h"
 
 #include "mongo/util/net/ssl_manager.h"
@@ -32,9 +30,19 @@
 #include "mongo/util/net/sock.h"
 #include "mongo/util/scopeguard.h"
 
+#ifdef MONGO_SSL
 #include <openssl/evp.h>
+#endif
 
 namespace mongo {
+#ifndef MONGO_SSL   
+    const std::string getSSLVersion(const std::string &prefix, const std::string &suffix) {
+        return "";
+    }
+#else
+    const std::string getSSLVersion(const std::string &prefix, const std::string &suffix) {
+        return prefix + SSLeay_version(SSLEAY_VERSION) + suffix;
+    }
 
     namespace {
 
@@ -117,6 +125,7 @@ namespace mongo {
 
         SimpleMutex sslManagerMtx("SSL Manager");
         SSLManagerInterface* theSSLManager = NULL;
+        static const int BUFFER_SIZE = 8*1024;
 
         struct Params {
             Params(const std::string& pemfile,
@@ -152,11 +161,11 @@ namespace mongo {
 
             virtual ~SSLManager();
 
-            virtual SSL* connect(int fd);
+            virtual SSLConnection* connect(Socket* socket);
 
-            virtual SSL* accept(int fd);
+            virtual SSLConnection* accept(Socket* socket);
 
-            virtual std::string validatePeerCertificate(const SSL* ssl);
+            virtual std::string validatePeerCertificate(const SSLConnection* conn);
 
             virtual void cleanupThreadLocals();
 
@@ -168,19 +177,21 @@ namespace mongo {
                 return _clientSubjectName;
             }
 
-            virtual int SSL_read(SSL* ssl, void* buf, int num);
+            virtual std::string getSSLErrorMessage(int code);
 
-            virtual int SSL_write(SSL* ssl, const void* buf, int num);
+            virtual int SSL_read(SSLConnection* conn, void* buf, int num);
+
+            virtual int SSL_write(SSLConnection* conn, const void* buf, int num);
 
             virtual unsigned long ERR_get_error();
 
             virtual char* ERR_error_string(unsigned long e, char* buf);
 
-            virtual int SSL_get_error(const SSL* ssl, int ret);
+            virtual int SSL_get_error(const SSLConnection* conn, int ret);
 
-            virtual int SSL_shutdown(SSL* ssl);
+            virtual int SSL_shutdown(SSLConnection* conn);
 
-            virtual void SSL_free(SSL* ssl);
+            virtual void SSL_free(SSLConnection* conn);
 
         private:
             SSL_CTX* _serverContext;  // SSL context for incoming connections
@@ -198,15 +209,10 @@ namespace mongo {
             SSL* _secure(SSL_CTX* context, int fd);
 
             /**
-             * Fetches the error text for an error code, in a thread-safe manner.
-             */
-            std::string _getSSLErrorMessage(int code);
-
-            /**
              * Given an error code from an SSL-type IO function, logs an
              * appropriate message and throws a SocketException
              */
-            void _handleSSLError(int code);
+            MONGO_COMPILER_NORETURN void _handleSSLError(int code);
 
             /*
              * Init the SSL context using parameters provided in params.
@@ -241,10 +247,14 @@ namespace mongo {
             void _setupFIPS();
 
             /*
-             * Wrapper for SSL_Connect() that handles SSL_ERROR_WANT_READ,
-             * see SERVER-7940
+             * sub function for checking the result of an SSL operation
              */
-            int _ssl_connect(SSL* ssl);
+            bool _doneWithSSLOp(SSLConnection* conn, int status);
+
+            /*
+             * Send and receive network data
+             */
+            void _flushNetworkBIO(SSLConnection* conn);
 
             /**
              * Callbacks for SSL functions
@@ -304,6 +314,30 @@ namespace mongo {
         }
 
         return result;
+    }
+
+    SSLConnection::SSLConnection(SSL_CTX* context, Socket* sock) : socket(sock) {
+        // This just ensures that SSL multithreading support is set up for this thread,
+        // if it's not already.
+        SSLThreadInfo::get();
+
+        ssl = SSL_new(context);
+ 
+        std::string sslErr = NULL != getSSLManager() ? 
+            getSSLManager()->getSSLErrorMessage(ERR_get_error()) : "";
+        massert(15861, "Error creating new SSL object " + sslErr, ssl);
+
+        BIO_new_bio_pair(&internalBIO, BUFFER_SIZE, &networkBIO, BUFFER_SIZE);
+        SSL_set_bio(ssl, internalBIO, internalBIO);
+    }
+
+    SSLConnection::~SSLConnection() {
+        if (ssl) {   // The internalBIO is automatically freed as part of SSL_free
+            SSL_free(ssl);
+        }
+        if (networkBIO) {
+            BIO_free(networkBIO);
+        }
     }
 
     SSLManagerInterface::~SSLManagerInterface() {}
@@ -387,12 +421,26 @@ namespace mongo {
 	return 1; // always succeed; we will catch the error in our get_verify_result() call
     }
 
-    int SSLManager::SSL_read(SSL* ssl, void* buf, int num) {
-        return ::SSL_read(ssl, buf, num);
+    int SSLManager::SSL_read(SSLConnection* conn, void* buf, int num) {
+        int status;
+        do {
+            status = ::SSL_read(conn->ssl, buf, num);
+        } while(!_doneWithSSLOp(conn, status)); 
+ 
+        if (status <= 0)
+            _handleSSLError(SSL_get_error(conn, status));
+        return status;
     }
 
-    int SSLManager::SSL_write(SSL* ssl, const void* buf, int num) {
-        return ::SSL_write(ssl, buf, num);
+    int SSLManager::SSL_write(SSLConnection* conn, const void* buf, int num) {
+        int status;
+        do {
+            status = ::SSL_write(conn->ssl, buf, num);
+        } while(!_doneWithSSLOp(conn, status));
+ 
+        if (status <= 0)
+            _handleSSLError(SSL_get_error(conn, status));
+        return status;
     }
 
     unsigned long SSLManager::ERR_get_error() {
@@ -403,16 +451,23 @@ namespace mongo {
         return ::ERR_error_string(e, buf);
     }
 
-    int SSLManager::SSL_get_error(const SSL* ssl, int ret) {
-        return ::SSL_get_error(ssl, ret);
+    int SSLManager::SSL_get_error(const SSLConnection* conn, int ret) {
+        return ::SSL_get_error(conn->ssl, ret);
     }
 
-    int SSLManager::SSL_shutdown(SSL* ssl) {
-        return ::SSL_shutdown(ssl);
+    int SSLManager::SSL_shutdown(SSLConnection* conn) {
+        int status;
+        do {
+            status = ::SSL_shutdown(conn->ssl);
+        } while(!_doneWithSSLOp(conn, status));
+ 
+        if (status < 0)
+            _handleSSLError(SSL_get_error(conn, status));
+        return status;
     }
 
-    void SSLManager::SSL_free(SSL* ssl) {
-        return ::SSL_free(ssl);
+    void SSLManager::SSL_free(SSLConnection* conn) {
+        return ::SSL_free(conn->ssl);
     }
 
     void SSLManager::_setupFIPS() {
@@ -421,7 +476,7 @@ namespace mongo {
         int status = FIPS_mode_set(1);
         if (!status) {
             error() << "can't activate FIPS mode: " << 
-                _getSSLErrorMessage(ERR_get_error()) << endl;
+                getSSLErrorMessage(ERR_get_error()) << endl;
             fassertFailed(16703);
         }
         log() << "FIPS 140-2 mode activated" << endl;
@@ -435,7 +490,7 @@ namespace mongo {
         *context = SSL_CTX_new(SSLv23_method());
         massert(15864,
                 mongoutils::str::stream() << "can't create SSL Context: " <<
-                _getSSLErrorMessage(ERR_get_error()),
+                getSSLErrorMessage(ERR_get_error()),
                 context);
 
         // SSL_OP_ALL - Activate all bug workaround options, to support buggy client SSL's.
@@ -454,7 +509,7 @@ namespace mongo {
  
         if (!status) {
             error() << "failed to set session id context: " << 
-                _getSSLErrorMessage(ERR_get_error()) << endl;
+                getSSLErrorMessage(ERR_get_error()) << endl;
             return false;
         }
 
@@ -494,21 +549,21 @@ namespace mongo {
         BIO *in = BIO_new(BIO_s_file_internal());
         if (NULL == in){
             error() << "failed to allocate BIO object: " << 
-                _getSSLErrorMessage(ERR_get_error()) << endl;
+                getSSLErrorMessage(ERR_get_error()) << endl;
             return false;
         }
         ON_BLOCK_EXIT(BIO_free, in);
 
         if (BIO_read_filename(in, keyFile.c_str()) <= 0){
             error() << "cannot read key file when setting subject name: " << keyFile << ' ' <<
-                _getSSLErrorMessage(ERR_get_error()) << endl;
+                getSSLErrorMessage(ERR_get_error()) << endl;
             return false;
         }
 
         X509* x509 = PEM_read_bio_X509(in, NULL, &SSLManager::password_cb, this);
         if (NULL == x509) {
             error() << "cannot retreive certificate from keyfile: " << keyFile << ' ' <<
-                _getSSLErrorMessage(ERR_get_error()) << endl; 
+                getSSLErrorMessage(ERR_get_error()) << endl; 
             return false;
         }
         ON_BLOCK_EXIT(X509_free, x509);
@@ -524,7 +579,7 @@ namespace mongo {
  
         if ( SSL_CTX_use_certificate_chain_file( context , keyFile.c_str() ) != 1 ) {
             error() << "cannot read certificate file: " << keyFile << ' ' <<
-                _getSSLErrorMessage(ERR_get_error()) << endl;
+                getSSLErrorMessage(ERR_get_error()) << endl;
             return false;
         }
 
@@ -537,13 +592,13 @@ namespace mongo {
  
         if ( SSL_CTX_use_PrivateKey_file( context , keyFile.c_str() , SSL_FILETYPE_PEM ) != 1 ) {
             error() << "cannot read PEM key file: " << keyFile << ' ' <<
-                _getSSLErrorMessage(ERR_get_error()) << endl;
+                getSSLErrorMessage(ERR_get_error()) << endl;
             return false;
         }
  
         // Verify that the certificate and the key go together.
         if (SSL_CTX_check_private_key(context) != 1) {
-            error() << "SSL certificate validation: " << _getSSLErrorMessage(ERR_get_error()) 
+            error() << "SSL certificate validation: " << getSSLErrorMessage(ERR_get_error()) 
                     << endl;
             return false;
         }
@@ -555,7 +610,7 @@ namespace mongo {
         // Load trusted CA
         if (SSL_CTX_load_verify_locations(context, caFile.c_str(), NULL) != 1) {
             error() << "cannot read certificate authority file: " << caFile << " " <<
-                _getSSLErrorMessage(ERR_get_error()) << endl;
+                getSSLErrorMessage(ERR_get_error()) << endl;
             return false;
         }
         // Set SSL to require peer (client) certificate verification
@@ -576,7 +631,7 @@ namespace mongo {
         int status = X509_load_crl_file(lookup, crlFile.c_str(), X509_FILETYPE_PEM);
         if (status == 0) {
             error() << "cannot read CRL file: " << crlFile << ' ' <<
-                _getSSLErrorMessage(ERR_get_error()) << endl;
+                getSSLErrorMessage(ERR_get_error()) << endl;
             return false;
         }
         log() << "ssl imported " << status << " revoked certificate" << 
@@ -585,64 +640,111 @@ namespace mongo {
         return true;
     }
 
-    SSL* SSLManager::_secure(SSL_CTX* context, int fd) {
-        // This just ensures that SSL multithreading support is set up for this thread,
-        // if it's not already.
-        SSLThreadInfo::get();
+    /* 
+    * The interface layer between network and BIO-pair. The BIO-pair buffers
+    * the data to/from the TLS layer.
+    */
+    void SSLManager::_flushNetworkBIO(SSLConnection* conn){
+        char buffer[BUFFER_SIZE];
+        int wantWrite;
 
-        SSL * ssl = SSL_new(context);
-        
-        massert(15861,
-                _getSSLErrorMessage(ERR_get_error()),
-                ssl);
+        /* 
+        * Write the complete contents of the buffer. Leaving the buffer
+        * unflushed could cause a deadlock. 
+        */
+        while ((wantWrite = BIO_ctrl_pending(conn->networkBIO)) > 0) {
+            if (wantWrite > BUFFER_SIZE) {
+                wantWrite = BUFFER_SIZE;
+            }
+            int fromBIO = BIO_read(conn->networkBIO, buffer, wantWrite);
 
-        int status = SSL_set_fd( ssl , fd );
-        massert(16510,
-                _getSSLErrorMessage(ERR_get_error()), 
-                status == 1);
-
-        return ssl;
-    }
-
-    int SSLManager::_ssl_connect(SSL* ssl) {
-        int ret = 0;
-        for (int i=0; i<3; ++i) {
-            ret = SSL_connect(ssl);
-            if (ret == 1) 
-                return ret;
-            int code = SSL_get_error(ssl, ret);
-            // Call SSL_connect again if we get SSL_ERROR_WANT_READ;
-            // otherwise return error to caller.
-            if (code != SSL_ERROR_WANT_READ)
-                return ret;
+            int writePos = 0;
+            do {
+                int numWrite = fromBIO - writePos;
+                numWrite = send(conn->socket->rawFD(), buffer + writePos, numWrite, portSendFlags); 
+                if (numWrite < 0) {
+                    conn->socket->handleSendError(numWrite, "");
+                }
+                writePos += numWrite;
+            } while (writePos < fromBIO);
         }
-        // Give up and return connection-failure error to user
-        return ret;
-    }
-    SSL* SSLManager::connect(int fd) {
-        SSL* ssl = _secure(_clientContext, fd);
-        ScopeGuard guard = MakeGuard(::SSL_free, ssl);
-        int ret = _ssl_connect(ssl);
-        if (ret != 1)
-            _handleSSLError(SSL_get_error(ssl, ret));
-        guard.Dismiss();
-        return ssl;
+
+        int wantRead;
+        while ((wantRead = BIO_ctrl_get_read_request(conn->networkBIO)) > 0)
+        {
+            if (wantRead > BUFFER_SIZE) {
+                wantRead = BUFFER_SIZE;
+            }
+
+            int numRead = recv(conn->socket->rawFD(), buffer, wantRead, portRecvFlags);
+            if (numRead <= 0) {
+                conn->socket->handleRecvError(numRead, wantRead);
+                continue;
+            }
+
+            int toBIO = BIO_write(conn->networkBIO, buffer, numRead);
+            if (toBIO != numRead) {
+                LOG(3) << "Failed to write network data to the SSL BIO layer";
+                throw SocketException(SocketException::RECV_ERROR , conn->socket->remoteString());
+            }
+        } 
     }
 
-    SSL* SSLManager::accept(int fd) {
-        SSL* ssl = _secure(_serverContext, fd);
-        ScopeGuard guard = MakeGuard(::SSL_free, ssl);
-        int ret = SSL_accept(ssl);
-        if (ret != 1)
-            _handleSSLError(SSL_get_error(ssl, ret));
-        guard.Dismiss();
-        return ssl;
+    bool SSLManager::_doneWithSSLOp(SSLConnection* conn, int status) {
+        int sslErr = SSL_get_error(conn, status);
+        switch (sslErr) {
+            case SSL_ERROR_NONE:
+                _flushNetworkBIO(conn);     // success, flush network BIO before leaving
+                return true;
+            case SSL_ERROR_WANT_WRITE:
+            case SSL_ERROR_WANT_READ:
+                _flushNetworkBIO(conn);     // not ready, flush network BIO and try again
+                return false;
+            default:
+                return true;
+        }
     }
 
-    std::string SSLManager::validatePeerCertificate(const SSL* ssl) {
+    SSLConnection* SSLManager::connect(Socket* socket) {
+        SSLConnection* sslConn = new SSLConnection(_clientContext, socket);
+        ScopeGuard sslGuard = MakeGuard(::SSL_free, sslConn->ssl);
+        ScopeGuard bioGuard = MakeGuard(::BIO_free, sslConn->networkBIO);
+ 
+        int ret;
+        do {
+            ret = ::SSL_connect(sslConn->ssl);
+        } while(!_doneWithSSLOp(sslConn, ret));
+ 
+        if (ret != 1)
+            _handleSSLError(SSL_get_error(sslConn, ret));
+ 
+        sslGuard.Dismiss();
+        bioGuard.Dismiss();
+        return sslConn;
+    }
+
+    SSLConnection* SSLManager::accept(Socket* socket) {
+        SSLConnection* sslConn = new SSLConnection(_serverContext, socket);
+        ScopeGuard sslGuard = MakeGuard(::SSL_free, sslConn->ssl);
+        ScopeGuard bioGuard = MakeGuard(::BIO_free, sslConn->networkBIO);
+ 
+        int ret;
+        do {
+            ret = ::SSL_accept(sslConn->ssl);
+        } while(!_doneWithSSLOp(sslConn, ret));
+ 
+        if (ret != 1)
+            _handleSSLError(SSL_get_error(sslConn, ret));
+ 
+        sslGuard.Dismiss();
+        bioGuard.Dismiss();
+        return sslConn;
+    }
+
+    std::string SSLManager::validatePeerCertificate(const SSLConnection* conn) {
         if (!_validateCertificates) return "";
 
-        X509* peerCert = SSL_get_peer_certificate(ssl);
+        X509* peerCert = SSL_get_peer_certificate(conn->ssl);
 
         if (NULL == peerCert) { // no certificate presented by peer
             if (_weakValidation) {
@@ -656,7 +758,7 @@ namespace mongo {
         }
         ON_BLOCK_EXIT(X509_free, peerCert);
 
-        long result = SSL_get_verify_result(ssl);
+        long result = SSL_get_verify_result(conn->ssl);
 
         if (result != X509_V_OK) {
             error() << "SSL peer certificate validation failed:" << 
@@ -672,7 +774,7 @@ namespace mongo {
         ERR_remove_state(0);
     }
 
-    std::string SSLManager::_getSSLErrorMessage(int code) {
+    std::string SSLManager::getSSLErrorMessage(int code) {
         // 120 from the SSL documentation for ERR_error_string
         static const size_t msglen = 120;
 
@@ -704,7 +806,7 @@ namespace mongo {
         case SSL_ERROR_SSL:
         {
             int ret = ERR_get_error();
-            error() << _getSSLErrorMessage(ret) << endl;
+            error() << getSSLErrorMessage(ret) << endl;
             break;
         }
         case SSL_ERROR_ZERO_RETURN:
@@ -717,7 +819,5 @@ namespace mongo {
         }
         throw SocketException(SocketException::CONNECT_ERROR, "");
     }
+#endif // #ifdef MONGO_SSL
 }
-
-#endif
-        
