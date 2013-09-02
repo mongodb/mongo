@@ -207,11 +207,14 @@ namespace mongo {
         //template<typename U> ptr& operator= (const auto_ptr<U>& p) { _p = p.get(); return *this; }
 
         // use
-        T* operator->() const { return _p; }
-        T& operator*() const { return *_p; }
+        const T* operator->() const { return _p; }
+        const T& operator*() const { return *_p; }
+        T* operator->() { return _p; }
+        T& operator*() { return *_p; }
 
         // convert from ptr<T>
-        operator T* () const { return _p; }
+        operator T* () { return _p; }
+        operator const T* () const { return _p; }
 
     private:
         T* _p;
