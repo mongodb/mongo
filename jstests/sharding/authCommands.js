@@ -1,6 +1,7 @@
 /**
  * This tests using DB commands with authentication enabled when sharded.
  */
+var doTest = function() {
 
 var rsOpts = { oplogSize: 10, verbose : 2, useHostname : false };
 var st = new ShardingTest({ keyFile : 'jstests/libs/key1', shards : 2, chunksize : 1, config : 3,
@@ -311,3 +312,8 @@ adminDB.printShardingStatus();
 
 
 st.stop();
+}
+
+if (0) { // SERVER-10668
+    doTest();
+}
