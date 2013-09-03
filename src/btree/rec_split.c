@@ -214,14 +214,15 @@ __split_row_page_inmem(WT_SESSION_IMPL *session, WT_PAGE *orig)
 	for (i = 0; i < ins_depth; i++)
 		new_ins_head->head[i] = new_ins_head->tail[i] = ins;
 
+	/* Make it likely we evict the page we just split. */
+	orig->read_gen = WT_READ_GEN_OLDEST;
+
 	/*
-	 * Swap the new top-level page into place.
+	 * Swap the new top-level page into place.  This must come last: once
+	 * the parent is unlocked, it isn't safe to touch any of these pages.
 	 */
 	WT_LINK_PAGE(new_parent->parent, new_parent->ref, new_parent);
 	WT_PUBLISH(new_parent->ref->state, WT_REF_MEM);
-
-	/* Make it likely we evict the page we just split. */
-	orig->read_gen = WT_READ_GEN_OLDEST;
 
 err:	if (ret != 0) {
 		if (new_parent != NULL)
