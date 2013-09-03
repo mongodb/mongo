@@ -74,97 +74,6 @@ namespace {
         return Status::OK();
     }
 
-    Status V1PrivilegeDocumentParser::checkValidPrivilegeDocument(const StringData& dbname,
-                                                                  const BSONObj& doc) const {
-        BSONElement userElement = doc[AuthorizationManager::V1_USER_NAME_FIELD_NAME];
-        BSONElement userSourceElement = doc[AuthorizationManager::V1_USER_SOURCE_FIELD_NAME];
-        BSONElement passwordElement = doc[AuthorizationManager::PASSWORD_FIELD_NAME];
-        BSONElement rolesElement = doc[ROLES_FIELD_NAME];
-        BSONElement otherDBRolesElement = doc[OTHER_DB_ROLES_FIELD_NAME];
-        BSONElement readOnlyElement = doc[READONLY_FIELD_NAME];
-
-        // Validate the "user" element.
-        if (userElement.type() != String)
-            return _badValue("system.users entry needs 'user' field to be a string", 14051);
-        if (makeStringDataFromBSONElement(userElement).empty())
-            return _badValue("system.users entry needs 'user' field to be non-empty", 14053);
-
-        // Must set exactly one of "userSource" and "pwd" fields.
-        if (userSourceElement.eoo() == passwordElement.eoo()) {
-            return _badValue("system.users entry must have either a 'pwd' field or a 'userSource' "
-                             "field, but not both", 0);
-        }
-
-        if (!AuthorizationManager::getSupportOldStylePrivilegeDocuments() && rolesElement.eoo()) {
-            return _oldPrivilegeFormatNotSupported();
-        }
-
-        // Cannot have both "roles" and "readOnly" elements.
-        if (!rolesElement.eoo() && !readOnlyElement.eoo()) {
-            return _badValue("system.users entry must not have both 'roles' and 'readOnly' fields",
-                             0);
-        }
-
-        // Validate the "pwd" element, if present.
-        if (!passwordElement.eoo()) {
-            if (passwordElement.type() != String)
-                return _badValue("system.users entry needs 'pwd' field to be a string", 14052);
-            if (makeStringDataFromBSONElement(passwordElement).empty())
-                return _badValue("system.users entry needs 'pwd' field to be non-empty", 14054);
-        }
-
-        // Validate the "userSource" element, if present.
-        if (!userSourceElement.eoo()) {
-            if (userSourceElement.type() != String ||
-                makeStringDataFromBSONElement(userSourceElement).empty()) {
-
-                return _badValue("system.users entry needs 'userSource' field to be a non-empty "
-                                 "string, if present", 0);
-            }
-            if (userSourceElement.str() == dbname) {
-                return _badValue(mongoutils::str::stream() << "'" << dbname <<
-                                 "' is not a valid value for the userSource field in " <<
-                                 dbname << ".system.users entries",
-                                 0);
-            }
-            if (rolesElement.eoo()) {
-                return _badValue("system.users entry needs 'roles' field if 'userSource' field "
-                                 "is present.", 0);
-            }
-        }
-
-        // Validate the "roles" element.
-        if (!rolesElement.eoo()) {
-            Status status = _checkV1RolesArray(rolesElement);
-            if (!status.isOK())
-                return status;
-        }
-
-        if (!otherDBRolesElement.eoo()) {
-            if (dbname != ADMIN_DBNAME) {
-                return _badValue("Only admin.system.users entries may contain 'otherDBRoles' "
-                                 "fields", 0);
-            }
-            if (rolesElement.eoo()) {
-                return _badValue("system.users entries with 'otherDBRoles' fields must contain "
-                                 "'roles' fields", 0);
-            }
-            if (otherDBRolesElement.type() != Object) {
-                return _badValue("'otherDBRoles' field must be an object when present in "
-                                 "system.users entries", 0);
-            }
-            for (BSONObjIterator iter(otherDBRolesElement.embeddedObject());
-                 iter.more(); iter.next()) {
-
-                Status status = _checkV1RolesArray(*iter);
-                if (!status.isOK())
-                    return status;
-            }
-        }
-
-        return Status::OK();
-    }
-
     std::string V1PrivilegeDocumentParser::extractUserNameFromPrivilegeDocument(
             const BSONObj& doc) const {
         return doc[AuthorizationManager::V1_USER_NAME_FIELD_NAME].str();
@@ -347,8 +256,7 @@ namespace {
         return Status::OK();
     }
 
-    Status V2PrivilegeDocumentParser::checkValidPrivilegeDocument(const StringData& dbname,
-                                                                  const BSONObj& doc) const {
+    Status V2PrivilegeDocumentParser::checkValidPrivilegeDocument(const BSONObj& doc) const {
         BSONElement userElement = doc[AuthorizationManager::USER_NAME_FIELD_NAME];
         BSONElement userSourceElement = doc[AuthorizationManager::USER_SOURCE_FIELD_NAME];
         BSONElement credentialsElement = doc[CREDENTIALS_FIELD_NAME];
@@ -370,10 +278,6 @@ namespace {
             return _badValue(mongoutils::str::stream() << "'" << userSourceStr <<
                                      "' is not a valid value for the userSource field.",
                              0);
-        }
-        if (userSourceStr != dbname) {
-            return _badValue(mongoutils::str::stream() << "userSource '" << userSourceStr <<
-                                     "' does not match database '" << dbname << "'", 0);
         }
 
         // Validate the "credentials" element
