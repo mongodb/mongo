@@ -151,14 +151,6 @@ src/mongo/client/gridfs.cpp
 * 9008 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/client/gridfs.cpp#L141) filemd5 failed
 
 
-src/mongo/client/model.cpp
-----
-* 10016 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/client/model.cpp#L39) _id isn't set - needed for remove()" , _id["_id
-* 13121 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/client/model.cpp#L81) 
-* 9002 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/client/model.cpp#L51) error on Model::remove: 
-* 9003 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/client/model.cpp#L123) error on Model::save: 
-
-
 src/mongo/client/parallel.cpp
 ----
 * 10017 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/client/parallel.cpp#L101) cursor already done

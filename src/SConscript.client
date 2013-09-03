@@ -45,7 +45,6 @@ clientSourceBasic = [
     'mongo/client/dbclient_rs.cpp',
     'mongo/client/dbclientcursor.cpp',
     'mongo/client/gridfs.cpp',
-    'mongo/client/model.cpp',
     'mongo/client/sasl_client_authenticate.cpp',
     'mongo/client/syncclusterconnection.cpp',
     'mongo/db/jsobj.cpp',

@@ -286,9 +286,6 @@
     <ClInclude Include="..\client\dbclient.h">
       <Filter>client</Filter>
     </ClInclude>
-    <ClInclude Include="..\client\model.h">
-      <Filter>client</Filter>
-    </ClInclude>
     <ClInclude Include="..\util\concurrency\list.h">
       <Filter>util\concurrency</Filter>
     </ClInclude>
@@ -3398,9 +3395,6 @@
     </ClCompile>
     <ClCompile Include="..\db\repl\manager.cpp">
       <Filter>db\repl</Filter>
-    </ClCompile>
-    <ClCompile Include="..\client\model.cpp">
-      <Filter>client</Filter>
     </ClCompile>
     <ClCompile Include="..\util\net\listen.cpp">
       <Filter>util\net</Filter>

@@ -266,9 +266,6 @@
     <ClCompile Include="..\client\dbclientcursor.cpp">
       <Filter>client</Filter>
     </ClCompile>
-    <ClCompile Include="..\client\model.cpp">
-      <Filter>client</Filter>
-    </ClCompile>
     <ClCompile Include="shardconnection.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -297,9 +294,6 @@
       <Filter>client</Filter>
     </ClInclude>
     <ClInclude Include="..\client\dbclient.h">
-      <Filter>client</Filter>
-    </ClInclude>
-    <ClInclude Include="..\client\model.h">
       <Filter>client</Filter>
     </ClInclude>
     <ClCompile Include="interrupt_status_mongos.cpp">

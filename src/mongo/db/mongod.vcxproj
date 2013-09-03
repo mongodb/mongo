@@ -2090,7 +2090,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="..\client\dbclient_rs.cpp" />
     <ClCompile Include="..\client\distlock.cpp" />
     <ClCompile Include="..\client\distlock_test.cpp" />
-    <ClCompile Include="..\client\model.cpp" />
     <ClCompile Include="..\client\sasl_client_authenticate.cpp" />
     <ClCompile Include="..\logger\console.cpp" />
     <ClCompile Include="..\logger\logger.cpp" />
@@ -4872,7 +4871,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="stats\top.h" />
     <ClInclude Include="..\client\connpool.h" />
     <ClInclude Include="..\client\dbclient.h" />
-    <ClInclude Include="..\client\model.h" />
     <ClInclude Include="..\client\redef_macros.h" />
     <ClInclude Include="..\client\syncclusterconnection.h" />
     <ClInclude Include="..\client\undef_macros.h" />

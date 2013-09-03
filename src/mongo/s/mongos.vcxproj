@@ -3264,7 +3264,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="..\..\third_party\pcre-8.30\pcre_xclass.c" />
     <ClCompile Include="..\..\third_party\pcre-8.30\pcreposix.c" />
     <ClCompile Include="..\client\dbclient.cpp" />
-    <ClCompile Include="..\client\model.cpp" />
     <ClCompile Include="..\util\assert_util.cpp" />
     <ClCompile Include="..\util\background.cpp" />
     <ClCompile Include="..\util\base64.cpp" />
@@ -4068,7 +4067,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\..\third_party\pcre-8.30\pcre.h" />
     <ClInclude Include="..\client\connpool.h" />
     <ClInclude Include="..\client\dbclient.h" />
-    <ClInclude Include="..\client\model.h" />
     <ClInclude Include="type_changelog.h" />
     <ClInclude Include="type_chunk.h" />
     <ClInclude Include="type_collection.h" />

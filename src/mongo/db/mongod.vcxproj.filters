@@ -404,9 +404,6 @@
     <ClCompile Include="..\client\distlock.cpp">
       <Filter>client\Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\client\model.cpp">
-      <Filter>client\Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="repl\rs.cpp">
       <Filter>db\repl</Filter>
     </ClCompile>
@@ -2724,9 +2721,6 @@
       <Filter>client\Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\client\gridfs.h">
-      <Filter>client\Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\client\model.h">
       <Filter>client\Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\client\parallel.h">
