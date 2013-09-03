@@ -132,7 +132,7 @@ __split_row_page_inmem(WT_SESSION_IMPL *session, WT_PAGE *orig)
 
 	/*
 	 * Figure out how deep the skip list stack is for the element we are
-	 * removing and install the element on the new child page.
+	 * removing.
 	 */
 	for (ins_depth = 0;
 	    ins_depth < WT_SKIP_MAXDEPTH && ins_head->tail[ins_depth] == ins;
@@ -213,6 +213,7 @@ __split_row_page_inmem(WT_SESSION_IMPL *session, WT_PAGE *orig)
 		}
 	}
 
+	/* Install the item on the new child page. */
 	for (i = 0; i < ins_depth; i++)
 		new_ins_head->head[i] = new_ins_head->tail[i] = ins;
 
