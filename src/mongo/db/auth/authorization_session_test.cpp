@@ -204,7 +204,7 @@ namespace {
                                          "userSource" << "test" <<
                                          "roles" << BSON_ARRAY("clusterAdmin") <<
                                          "otherDBRoles" << BSON("test3" << BSON_ARRAY("dbAdmin"))));
-        ASSERT_OK(authzManager->initializeAllV1UserData());
+        ASSERT_OK(authzManager->initialize());
 
         ASSERT(!authzSession->checkAuthorization("test.foo", ActionType::find));
         ASSERT(!authzSession->checkAuthorization("test.foo", ActionType::insert));

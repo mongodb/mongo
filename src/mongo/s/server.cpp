@@ -355,12 +355,11 @@ static bool runMongosServer( bool doUpgrade ) {
     if ( cmdLine.isHttpInterfaceEnabled )
         boost::thread web( boost::bind(&webServerThread, new NoAdminAccess() /* takes ownership */) );
 
-    if (getGlobalAuthorizationManager()->isAuthEnabled()) {
-        // TODO(spencer): This should only be done if we haven't yet upgraded to the new V2 user
-        // data format.  Fix this as part of SERVER-9516.
-        Status status = getGlobalAuthorizationManager()->initializeAllV1UserData();
+    AuthorizationManager* authzManager = getGlobalAuthorizationManager();
+    if (authzManager->isAuthEnabled()) {
+        Status status = getGlobalAuthorizationManager()->initialize();
         if (!status.isOK()) {
-            log() << "Initializing user data failed: " << status.toString() << endl;
+            log() << "Initializing authorization data failed: " << status.toString() << endl;
             return false;
         }
     }

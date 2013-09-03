@@ -449,7 +449,7 @@ namespace {
                                "userSource" << "test" <<
                                "roles" << BSON_ARRAY("readWrite"))));
 
-        Status status = authzManager->initializeAllV1UserData();
+        Status status = authzManager->initialize();
         ASSERT_OK(status);
 
         User* readOnly;
@@ -633,7 +633,7 @@ namespace {
                                    "userSource" << "test" <<
                                    "roles" << BSON_ARRAY("readWrite"))));
 
-            ASSERT_OK(authzManager->initializeAllV1UserData());
+            ASSERT_OK(authzManager->initialize());
         }
 
         void validateV1AdminUserData(const NamespaceString& collectionName) {
