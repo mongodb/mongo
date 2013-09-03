@@ -575,14 +575,18 @@ struct __wt_session {
 	 *	table cursor,
 	 *	table key\, table value(s) with optional projection of columns}
 	 *  </table>
-	 *  Advanced applications may also open the following low-level cursor
-	 *  types:
+	 *  Advanced applications may also choose to open the following
+	 *  additional cursor types:
 	 *  <table>
 	 *  @row{<tt>file:\<file name\></tt>,
 	 *	file cursor,
-	 *	file key\, file value(s)}
+	 *	file key\, file value}
 	 *  @row{<tt>lsm:\<name\></tt>,
-	 *	LSM cursor (key=LSM key\, value=LSM value), See also: @ref lsm}
+	 *	LSM cursor,
+	 *	LSM key\, LSM value: see @ref lsm}
+	 *  @row{<tt>metadata:</tt>,
+	 *	metadata cursor,
+	 *	metadata key\, metadata value: see @ref metadata}
 	 *  </table>
 	 * @param to_dup a cursor to duplicate
 	 * @configstart{session.open_cursor, see dist/api_data.py}
