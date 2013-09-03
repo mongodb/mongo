@@ -35,8 +35,6 @@ __split_row_page_inmem(WT_SESSION_IMPL *session, WT_PAGE *orig)
 	new_ins_head = NULL;
 	ins = NULL;
 
-	WT_ASSERT(session, __wt_page_is_modified(orig));
-
 	/*
 	 * Only split a page once, otherwise workloads that update in the
 	 * middle of the page could continually split without any benefit.
@@ -217,11 +215,10 @@ __split_row_page_inmem(WT_SESSION_IMPL *session, WT_PAGE *orig)
 		new_ins_head->head[i] = new_ins_head->tail[i] = ins;
 
 	/*
-	 * Set up the new top-level page as a split so that it will be swapped
-	 * into place by our caller.
+	 * Swap the new top-level page into place.
 	 */
-	orig->modify->flags = WT_PM_REC_SPLIT;
-	orig->modify->u.split = new_parent;
+	WT_LINK_PAGE(new_parent->parent, new_parent->ref, new_parent);
+	WT_PUBLISH(new_parent->ref->state, WT_REF_MEM);
 
 	/* Make it likely we evict the page we just split. */
 	orig->read_gen = WT_READ_GEN_OLDEST;
