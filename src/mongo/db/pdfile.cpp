@@ -795,8 +795,8 @@ namespace mongo {
 
         NamespaceString nsstring(ns);
         if (nsstring.coll() == "system.users") {
-            V1PrivilegeDocumentParser parser;
-            uassertStatusOK(parser.checkValidPrivilegeDocument(nsstring.db(), objNew));
+            V2PrivilegeDocumentParser parser;
+            uassertStatusOK(parser.checkValidPrivilegeDocument(objNew));
         }
 
         uassert( 13596 , str::stream() << "cannot change _id of a document old:" << objOld << " new:" << objNew,
@@ -1012,11 +1012,11 @@ namespace mongo {
             if (nsToCollectionSubstring(ns) == "system.indexes")
                 wouldAddIndex = true;
             else if ( legalClientSystemNS( ns , true ) ) {
-                if ( obuf && strstr( ns , ".system.users" ) ) {
+                if ( obuf &&
+                        StringData(ns) == StringData(".system.users", StringData::LiteralTag()) ) {
                     BSONObj t( reinterpret_cast<const char *>( obuf ) );
-                    V1PrivilegeDocumentParser parser;
-                    uassertStatusOK(parser.checkValidPrivilegeDocument(nsToDatabaseSubstring(ns),
-                                                                       t));
+                    V2PrivilegeDocumentParser parser;
+                    uassertStatusOK(parser.checkValidPrivilegeDocument(t));
                 }
             }
             else if ( !god ) {

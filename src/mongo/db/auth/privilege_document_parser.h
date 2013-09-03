@@ -34,13 +34,6 @@ namespace mongo {
         virtual ~PrivilegeDocumentParser() {};
 
         /**
-         * Returns Status::OK() if the given privilege document is valid to be inserted for a user
-         * in the given database, returns a non-OK status otherwise.
-         */
-        virtual Status checkValidPrivilegeDocument(const StringData& dbname,
-                                                   const BSONObj& doc) const = 0;
-
-        /**
          * Returns the name of the user in the given privilege document.
          */
         virtual std::string extractUserNameFromPrivilegeDocument(const BSONObj& doc) const = 0;
@@ -68,9 +61,6 @@ namespace mongo {
         V1PrivilegeDocumentParser() {}
         virtual ~V1PrivilegeDocumentParser() {}
 
-        virtual Status checkValidPrivilegeDocument(const StringData& dbname,
-                                                   const BSONObj& doc) const;
-
         virtual std::string extractUserNameFromPrivilegeDocument(const BSONObj& doc) const;
 
         virtual Status initializeUserCredentialsFromPrivilegeDocument(User* user,
@@ -87,8 +77,7 @@ namespace mongo {
         V2PrivilegeDocumentParser() {}
         virtual ~V2PrivilegeDocumentParser() {}
 
-        virtual Status checkValidPrivilegeDocument(const StringData& dbname,
-                                                   const BSONObj& doc) const;
+        Status checkValidPrivilegeDocument(const BSONObj& doc) const;
 
         /**
          * Returns Status::OK() iff the given BSONObj describes a valid element from a roles array.

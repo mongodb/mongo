@@ -187,7 +187,7 @@ namespace auth {
 
         // Make sure document to insert is valid
         V2PrivilegeDocumentParser parser;
-        status = parser.checkValidPrivilegeDocument(dbname, *parsedUserObj);
+        status = parser.checkValidPrivilegeDocument(*parsedUserObj);
         if (!status.isOK()) {
             return status;
         }
