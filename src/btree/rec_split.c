@@ -161,34 +161,41 @@ __split_row_page_inmem(WT_SESSION_IMPL *session, WT_PAGE *orig)
 	 *   If there were an f2, we'd be looking for: e0, d1, d2, NULL
 	 *
 	 *   The algorithm does:
-	 *   1) Start at the head of level zero, walk up the tail pointers
-	 *      until it sees an element other than the one being removed -
-	 *      in the above diagram that is element d2.
-	 *   2) Follow the next pointers on that level tracking previous items
-	 *      until we find the item prior to the tail pointer.
-	 *   3) Update the tail pointer with the previous item.
-	 *   4) Step down a level in the skip list.
-	 *   5) Go to step 3 until at level 0.
+	 *   1) Start at the top of the head list.
+	 *   2) Step down until we find a level that contains more than one
+	 *      element.
+	 *   3) Step across until we reach the tail of the level.
+	 *   4) If the tail is the item being moved, remove it.
+	 *   5) Drop down a level, and go to step 3 until at level 0.
 	 */
 	prev_ins = NULL;
 	for (i = WT_SKIP_MAXDEPTH - 1, insp = &ins_head->head[i];
 	    i >= 0;
 	    i--, insp--) {
+		/* Level empty, or a single element. */
+		if (ins_head->head[i] == NULL ||
+		     ins_head->head[i] == ins_head->tail[i]) {
+			/* Remove if it is the element being moved. */
+			if (ins_head->head[i] == ins)
+				ins_head->head[i] = ins_head->tail[i] = NULL;
+			continue;
+		}
+
 		for (current_ins = *insp;
-		    current_ins != NULL && current_ins != ins;
+		    current_ins != ins_head->tail[i];
 		    current_ins = current_ins->next[i])
 			prev_ins = current_ins;
-		/* Is the level empty, or doesn't contain ins? */
-		if (current_ins != ins)
-			continue;
-		else if (prev_ins == NULL) { /* Just one element. */
-			WT_ASSERT(session, ins_head->head[i] == ins);
-			WT_ASSERT(session, ins_head->tail[i] == ins);
-			ins_head->head[i] = ins_head->tail[i] = NULL;
-		} else {
+
+		/*
+		 * Update the stack head so that we step down as far to the
+ 		 * the right as possible. We know that prev_ins is valid
+ 		 * since levels must contain at least two items to be here.
+ 		 */
+		insp = &prev_ins->next[i];
+		if (current_ins == ins) {
+			/* Remove the item being moved. */
 			WT_ASSERT(session, ins_head->head[i] != ins);
 			WT_ASSERT(session, prev_ins->next[i] == ins);
-			insp = &prev_ins->next[i];
 			*insp = NULL;
 			ins_head->tail[i] = prev_ins;
 		}
