@@ -1,0 +1,15 @@
+/*! @page metadata Metadata
+
+WiredTiger cursors provide access to data from a variety of sources.
+One of these sources is the list of objects in the database.
+
+To retrieve the list of database objects, open a cursor on the uri
+\c metadata:.  Each returned key will be a database object and each
+returned value will be the information stored in the metadata for
+object named by the key.
+
+For example:
+
+@snippet ex_all.c Open a cursor on the metadata
+
+*/
