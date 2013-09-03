@@ -230,7 +230,6 @@ commonFiles = [ "pch.cpp",
                 "client/dbclient.cpp",
                 "client/dbclient_rs.cpp",
                 "client/dbclientcursor.cpp",
-                "client/model.cpp",
                 'client/sasl_client_authenticate.cpp',
                 "client/syncclusterconnection.cpp",
                 "db/dbmessage.cpp"
