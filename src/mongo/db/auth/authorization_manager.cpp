@@ -704,7 +704,7 @@ namespace {
         if (!lkUpgrade.tryLock()) {
             return Status(ErrorCodes::LockBusy, "Could not lock auth data upgrade process lock.");
         }
-        int durableVersion;
+        int durableVersion = 0;
         Status status = readAuthzVersion(_externalState.get(), &durableVersion);
         if (!status.isOK())
             return status;
