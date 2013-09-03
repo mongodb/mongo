@@ -35,7 +35,7 @@ __split_row_page_inmem(WT_SESSION_IMPL *session, WT_PAGE *orig)
 	new_parent = right_child = NULL;
 	new_ins_head_list = NULL;
 	new_ins_head = NULL;
-	current_ins = ins = NULL;
+	ins = NULL;
 
 	/*
 	 * Only split a page once, otherwise workloads that update in the
@@ -176,54 +176,44 @@ __split_row_page_inmem(WT_SESSION_IMPL *session, WT_PAGE *orig)
 	 *   If there were an f2, we'd be looking for: e0, d1, d2, NULL
 	 *
 	 *   The algorithm does:
-	 *   1) Start at the tail of level zero, walk up the tail pointers
-	 *      until it sees an element other than the one being removed -
-	 *      in the above diagram that is element d2.
-	 *   2) Step down a level in the skip list - in the above diagram to d1.
-	 *   3) Follow the next pointers on that level tracking previous items
-	 *      until we find the item prior to the tail pointer.
-	 *   4) Update the tail pointer with the previous item.
-	 *   5) Step down a level in the skip list.
-	 *   6) Go to step 3 until at level 0.
+	 *   1) Start at the top of the head list.
+	 *   2) Step down until we find a level that contains more than one
+	 *      element.
+	 *   3) Step across until we reach the tail of the level.
+	 *   4) If the tail is the item being moved, remove it.
+	 *   5) Drop down a level, and go to step 3 until at level 0.
 	 */
-	for (i = 0; i < WT_SKIP_MAXDEPTH && ins_head->tail[i] == ins; ++i)
-		;
-	WT_ASSERT(session, ins_head->head[i] != NULL);
-	/*
-	 * If the item we are removing is the highest depth item in the stack
-	 * trim it down until it isn't.
-	 */
-	while (ins_head->head[i] == ins) {
-		ins_head->head[i] = ins_head->tail[i] = NULL;
-		i--;
-	}
-	/*
-	 * This should only happen is if there is only a single element and
-	 * we have checked for that above.
-	 */
-	WT_ASSERT(session, i >= 0);
+	prev_ins = NULL;
+	for (i = WT_SKIP_MAXDEPTH - 1, insp = &ins_head->head[i];
+	    i >= 0;
+	    i--, insp--) {
+		/* Level empty, or a single element. */
+		if (ins_head->head[i] == NULL ||
+		     ins_head->head[i] == ins_head->tail[i]) {
+			/* Remove if it is the element being moved. */
+			if (ins_head->head[i] == ins)
+				ins_head->head[i] = ins_head->tail[i] = NULL;
+			continue;
+		}
 
-	/*
-	 * Start at the head if the last element has a full height stack, or
-	 * if the element we are removing was the deepest in the skip list.
-	 */
-	if (i == WT_SKIP_MAXDEPTH || ins_head->tail[i] == ins) {
-		prev_ins = NULL;
-		insp = &ins_head->head[i];
-	} else {
-		prev_ins = ins_head->tail[i];
-		insp = &prev_ins->next[i];
-	}
-
-	for (i--, insp--; i >= 0; i--, insp--) {
 		for (current_ins = *insp;
-		    current_ins != ins;
+		    current_ins != ins_head->tail[i];
 		    current_ins = current_ins->next[i])
 			prev_ins = current_ins;
-		WT_ASSERT(session, prev_ins != NULL && current_ins == ins);
+
+		/*
+		 * Update the stack head so that we step down as far to the
+ 		 * the right as possible. We know that prev_ins is valid
+ 		 * since levels must contain at least two items to be here.
+ 		 */
 		insp = &prev_ins->next[i];
-		*insp = NULL;
-		ins_head->tail[i] = prev_ins;
+		if (current_ins == ins) {
+			/* Remove the item being moved. */
+			WT_ASSERT(session, ins_head->head[i] != ins);
+			WT_ASSERT(session, prev_ins->next[i] == ins);
+			*insp = NULL;
+			ins_head->tail[i] = prev_ins;
+		}
 	}
 
 	/*
