@@ -106,7 +106,7 @@ namespace mongo {
 
             // We go from right to left building these indexes, so that indexBuildInProgress-- has
             // the correct effect of "popping" an index off the list.
-            std::string dbName = it->substr(it->find('.'));
+            std::string dbName = it->substr(0, it->find('.'));
             while ( nsd->getTotalIndexCount() > nsd->getCompletedIndexCount() ) {
                 retryIndexBuild(dbName, nsd);
             }
