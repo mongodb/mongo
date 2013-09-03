@@ -66,11 +66,15 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, int exclusive)
 	if (merge)
 		WT_ERR(__wt_merge_tree(session, page));
 
-	/* Try to split the page in memory. */
+	/*
+	 * Try to split the page in memory.  If the split succeeds, it swaps
+	 * the new pages into place: there is no need for further cleanup.
+	 */
 	if (inmem_split) {
 		WT_ERR(__wt_split_page_inmem(session, page));
 		WT_CSTAT_INCR(session, cache_inmem_split);
 		WT_DSTAT_INCR(session, cache_inmem_split);
+		goto done;
 	}
 
 	/*
@@ -98,7 +102,6 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, int exclusive)
 		else
 			__rec_page_clean_update(session, parent_ref);
 
-		WT_ASSERT(session, !inmem_split);
 		/* Discard the page. */
 		__wt_page_out(session, &page);
 
@@ -111,13 +114,11 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, int exclusive)
 			WT_ERR(__rec_page_dirty_update(
 			    session, parent_ref, page));
 
-		if (!inmem_split) {
-			/* Discard the tree rooted in this page. */
-			__rec_discard_tree(session, page, exclusive);
+		/* Discard the tree rooted in this page. */
+		__rec_discard_tree(session, page, exclusive);
 
-			WT_CSTAT_INCR(session, cache_eviction_dirty);
-			WT_DSTAT_INCR(session, cache_eviction_dirty);
-		}
+		WT_CSTAT_INCR(session, cache_eviction_dirty);
+		WT_DSTAT_INCR(session, cache_eviction_dirty);
 	}
 	if (0) {
 err:		/*
@@ -129,7 +130,7 @@ err:		/*
 		WT_CSTAT_INCR(session, cache_eviction_fail);
 		WT_DSTAT_INCR(session, cache_eviction_fail);
 	}
-	session->excl_next = 0;
+done:	session->excl_next = 0;
 
 	return (ret);
 }
