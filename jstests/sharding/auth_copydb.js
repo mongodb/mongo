@@ -1,4 +1,5 @@
 // Tests the copydb command on mongos with auth
+var runTest = function() {
 
 
 var st = new ShardingTest({ shards : 1,
@@ -38,3 +39,9 @@ assert.eq(1, destTestDB.foo.count());
 assert.eq(1, destTestDB.foo.findOne().a);
 
 st.stop();
+
+}
+
+if (0) { // SERVER-8213
+    runTest();
+}

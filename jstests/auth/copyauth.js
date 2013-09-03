@@ -1,4 +1,5 @@
 // Test copyDatabase command with various combinations of authed/unauthed source and dest.
+var runTest = function() {
 
 ports = allocatePorts( 2 );
 
@@ -57,3 +58,9 @@ assert.eq(0, target.getDB(baseName)[baseName].count());
 assert.commandWorked(target.getDB(baseName).copyDatabase(baseName, baseName, source.host));
 assert.eq(1, target.getDB(baseName)[baseName].count());
 assert.eq(1, target.getDB(baseName)[baseName].findOne().i);
+
+}
+
+if (0) { // SERVER-8213
+    runTest();
+}
