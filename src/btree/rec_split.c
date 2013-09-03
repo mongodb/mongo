@@ -105,18 +105,15 @@ __split_row_page_inmem(WT_SESSION_IMPL *session, WT_PAGE *orig)
 
 	/*
 	 * Copy the first key from the original page into first ref in the new
-	 * parent.  Then update the original ref to point to the new parent
+	 * parent.  Pages created in memory always have a "smallest" insert
+	 * list, so look there first.  If we don't find one, get the first key
+	 * from the disk image.
 	 */
 	if ((orig_ins_head = WT_ROW_INSERT_SMALLEST(orig)) != NULL &&
 	    (first_ins = WT_SKIP_FIRST(orig_ins_head)) != NULL) {
 		key.data = WT_INSERT_KEY(first_ins);
 		key.size = WT_INSERT_KEY_SIZE(first_ins);
 	} else {
-		/*
-		 * Pages created in memory always have a "smallest" insert
-		 * list, so if we didn't find one, get the first key from the
-		 * disk image.
-		 */
 		WT_ASSERT(session, orig->dsk != NULL && orig->entries != 0);
 		WT_ERR(
 		    __wt_row_leaf_key(session, orig, orig->u.row.d, &key, 1));
@@ -124,6 +121,11 @@ __split_row_page_inmem(WT_SESSION_IMPL *session, WT_PAGE *orig)
 	newref = &new_parent->u.intl.t[0];
 	WT_ERR(__wt_row_ikey_incr(session, new_parent, 0,
 	    key.data, key.size, &newref->key.ikey));
+
+	/*
+	 * !!! All operations that can fail have now completely successfully.
+	 * Link the original page into the new parent.
+	 */
 	WT_LINK_PAGE(new_parent, newref, orig);
 	newref->state = WT_REF_MEM;
 
