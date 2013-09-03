@@ -133,11 +133,15 @@ namespace mongo {
         if ( result )
             sb << buf;
 
-        while ( ( got = sock.unsafe_recv( buf , 4096 ) ) > 0) {
-            buf[got] = 0;
-            if ( result )
-                sb << buf;
-        }
+        // SERVER-8864, unsafe_recv will throw when recv returns 0 indicating closed socket.
+        try {
+            while ( ( got = sock.unsafe_recv( buf , 4096 ) ) > 0) {
+                buf[got] = 0;
+                if ( result )
+                    sb << buf;
+            }
+        } catch (const SocketException& se) {}
+
 
         if ( result ) {
             result->_init( rc , sb.str() );

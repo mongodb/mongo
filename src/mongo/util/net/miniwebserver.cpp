@@ -122,8 +122,10 @@ namespace mongo {
                 int left = sizeof(buf) - 1 - len;
                 if( left == 0 )
                     break;
-                int x = psock->unsafe_recv( buf + len , left );
-                if ( x <= 0 ) {
+                int x;
+                try {
+                    x = psock->unsafe_recv( buf + len , left );
+                } catch (const SocketException& se) {
                     psock->close();
                     return;
                 }
