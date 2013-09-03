@@ -550,7 +550,7 @@ namespace mongo {
                     if( old ) {
                         nfound++;
                         verify( (int) old->id() == m._id );
-                        if( old->config() != m ) {
+                        if (!old->config().isSameExceptTags(m)) {
                             additive = false;
                         }
                     }

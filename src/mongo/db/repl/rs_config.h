@@ -91,6 +91,11 @@ namespace mongo {
                     (*it)->updateLast(last);
                 }
             }
+            bool isSameExceptTags(const MemberCfg& r) const {
+                return _id == r._id && votes == r.votes && h == r.h && priority == r.priority &&
+                       arbiterOnly == r.arbiterOnly && slaveDelay == r.slaveDelay &&
+                       hidden == r.hidden && buildIndexes == r.buildIndexes;
+            }
             bool operator==(const MemberCfg& r) const {
                 if (!tags.empty() || !r.tags.empty()) {
                     if (tags.size() != r.tags.size()) {
