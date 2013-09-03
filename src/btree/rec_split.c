@@ -21,16 +21,14 @@ static int
 __split_row_page_inmem(WT_SESSION_IMPL *session, WT_PAGE *orig)
 {
 	WT_DECL_RET;
-	WT_IKEY *ikey;
-	WT_INSERT *current_ins, *ins, **insp, *prev_ins;
-	WT_INSERT_HEAD *ins_head, **new_ins_head_list, *new_ins_head;
+	WT_INSERT *current_ins, *first_ins, *ins, **insp, *prev_ins;
+	WT_INSERT_HEAD **new_ins_head_list;
+	WT_INSERT_HEAD *ins_head, *new_ins_head, *orig_ins_head;
 	WT_ITEM key;
 	WT_PAGE *new_parent, *right_child;
 	WT_REF *newref;
 	int i, ins_depth;
 	size_t transfer_size;
-	const void *p;
-	uint32_t size;
 
 	new_parent = right_child = NULL;
 	new_ins_head_list = NULL;
@@ -103,17 +101,16 @@ __split_row_page_inmem(WT_SESSION_IMPL *session, WT_PAGE *orig)
 	 * structure that is linked into the new parent page.
 	 */
 	WT_ERR(__wt_row_ikey_incr(session, new_parent, 0,
-	    WT_INSERT_KEY(ins), ins->u.key.size, &newref->key.ikey));
+	    WT_INSERT_KEY(ins), WT_INSERT_KEY_SIZE(ins), &newref->key.ikey));
 
 	/*
-	 * Create a copy of the key for the left child in the new parent - do
-	 * this first, since we copy it out of the original ref. Then update
-	 * the original ref to point to the new parent
+	 * Copy the first key from the original page into first ref in the new
+	 * parent.  Then update the original ref to point to the new parent
 	 */
-	newref = &new_parent->u.intl.t[0];
-	if ((ikey = __wt_ref_key_instantiated(orig->ref)) != NULL) {
-		p = WT_IKEY_DATA(ikey);
-		size = ikey->size;
+	if ((orig_ins_head = WT_ROW_INSERT_SMALLEST(orig)) != NULL &&
+	    (first_ins = WT_SKIP_FIRST(orig_ins_head)) != NULL) {
+		key.data = WT_INSERT_KEY(first_ins);
+		key.size = WT_INSERT_KEY_SIZE(first_ins);
 	} else {
 		/*
 		 * The page's key is on disk in the parent, so the page must
@@ -122,11 +119,10 @@ __split_row_page_inmem(WT_SESSION_IMPL *session, WT_PAGE *orig)
 		WT_ASSERT(session, orig->entries != 0);
 		WT_ERR(
 		    __wt_row_leaf_key(session, orig, orig->u.row.d, &key, 1));
-		p = key.data;
-		size = key.size;
 	}
+	newref = &new_parent->u.intl.t[0];
 	WT_ERR(__wt_row_ikey_incr(session, new_parent, 0,
-	    p, size, &newref->key.ikey));
+	    key.data, key.size, &newref->key.ikey));
 	WT_LINK_PAGE(new_parent, newref, orig);
 	newref->state = WT_REF_MEM;
 
