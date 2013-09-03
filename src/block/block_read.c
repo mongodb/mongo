@@ -113,7 +113,8 @@ __wt_bm_read(WT_BM *bm, WT_SESSION_IMPL *session,
 		block->os_cache = 0;
 		/* Ignore EINVAL - some file systems don't support the flag. */
 		if ((ret = posix_fadvise(block->fh->fd,
-		    (off_t)0, (off_t)0, POSIX_FADV_DONTNEED)) != 0 && ret != EINVAL)
+		    (off_t)0, (off_t)0, POSIX_FADV_DONTNEED)) != 0 &&
+		    ret != EINVAL)
 			WT_RET_MSG(
 			    session, ret, "%s: posix_fadvise", block->name);
 	}
