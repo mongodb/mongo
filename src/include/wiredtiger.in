@@ -1518,6 +1518,9 @@ struct __wt_event_handler {
 	 * non-zero, the error may cause the WiredTiger function posting the
 	 * event to fail, and may even cause operation or library failure.
 	 *
+	 * @param session the WiredTiger session handle in use when the error
+	 * was generated. The handle may have been created by the application
+	 * or automatically by WiredTiger.
 	 * @param error a WiredTiger, C99 or POSIX error code, which can
 	 * be converted to a string using ::wiredtiger_strerror
 	 * @param message an error string
@@ -1533,6 +1536,9 @@ struct __wt_event_handler {
 	 * non-zero, the error may cause the WiredTiger function posting the
 	 * event to fail, and may even cause operation or library failure.
 	 *
+	 * @param session the WiredTiger session handle in use when the message
+	 * was generated. The handle may have been created by the application
+	 * or automatically by WiredTiger.
 	 * @param message an informational string
 	 */
 	int (*handle_message)(WT_EVENT_HANDLER *handler,
@@ -1546,6 +1552,9 @@ struct __wt_event_handler {
 	 * non-zero, the error may cause the WiredTiger function posting the
 	 * event to fail, and may even cause operation or library failure.
 	 *
+	 * @param session the WiredTiger session handle in use when the
+	 * progress message was generated. The handle may have been created by
+	 * the application or automatically by WiredTiger.
 	 * @param operation a string representation of the operation
 	 * @param progress a counter
 	 */
