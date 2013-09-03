@@ -21,13 +21,15 @@ static int
 __split_row_page_inmem(WT_SESSION_IMPL *session, WT_PAGE *orig)
 {
 	WT_DECL_RET;
+	WT_IKEY *ikey;
 	WT_INSERT *current_ins, *ins, **insp, *prev_ins;
 	WT_INSERT_HEAD *ins_head, **new_ins_head_list, *new_ins_head;
+	WT_ITEM key;
 	WT_PAGE *new_parent, *right_child;
 	WT_REF *newref;
 	int i, ins_depth;
 	size_t transfer_size;
-	void *p;
+	const void *p;
 	uint32_t size;
 
 	new_parent = right_child = NULL;
@@ -57,7 +59,7 @@ __split_row_page_inmem(WT_SESSION_IMPL *session, WT_PAGE *orig)
 	 * a good heuristic for that) - it's likely that the page isn't
 	 * part of an append workload.
 	 */
-#define	WT_MIN_SPLIT_SKIPLIST_DEPTH	WT_MIN(5, WT_SKIP_MAXDEPTH -1)
+#define	WT_MIN_SPLIT_SKIPLIST_DEPTH	WT_MIN(5, WT_SKIP_MAXDEPTH - 1)
 	if (ins == NULL || ins_head->head[0] == ins_head->tail[0] ||
 	    ins_head->head[WT_MIN_SPLIT_SKIPLIST_DEPTH] == NULL)
 		return (EBUSY);
@@ -121,9 +123,22 @@ __split_row_page_inmem(WT_SESSION_IMPL *session, WT_PAGE *orig)
 	 * the original ref to point to the new parent
 	 */
 	newref = &new_parent->u.intl.t[0];
-	__wt_ref_key(orig->parent, orig->ref, &p, &size);
-	WT_ERR (__wt_row_ikey_incr(
-	    session, new_parent, 0, p, size, &newref->key.ikey));
+	if ((ikey = __wt_ref_key_instantiated(orig->ref)) != NULL) {
+		p = WT_IKEY_DATA(ikey);
+		size = ikey->size;
+	} else {
+		/*
+		 * The ikey is on disk, so the page must have been
+		 * instantiated.
+		 */
+		WT_ASSERT(session, orig->entries != 0);
+		WT_ERR(
+		    __wt_row_leaf_key(session, orig, orig->u.row.d, &key, 1));
+		p = key.data;
+		size = key.size;
+	}
+	WT_ERR (__wt_row_ikey_incr(session, new_parent, 0,
+	    p, size, &newref->key.ikey));
 	WT_LINK_PAGE(new_parent, newref, orig);
 	newref->state = WT_REF_MEM;
 
