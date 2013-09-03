@@ -102,6 +102,11 @@ namespace mongo {
          */
         Status setAuthorizationVersion(int version);
 
+        /**
+         * Returns the version number of the authorization system.
+         */
+        int getAuthorizationVersion();
+
         // Returns true if there exists at least one privilege document in the system.
         bool hasAnyPrivilegeDocuments() const;
 
@@ -174,17 +179,11 @@ namespace mongo {
         bool roleExists(const RoleName& role) const;
 
         /**
-         * Initializes the user cache with User objects for every v0 and v1 user document in the
-         * system, by reading the system.users collection of every database.  If this function
-         * returns a non-ok Status, the _userCache should be considered corrupt and must be
-         * discarded.  This function should be called once at startup (only if the system hasn't yet
-         * been upgraded to V2 user data format) and never again after that.
-         * TODO(spencer): This function will temporarily be called every time user data is changed
-         * as part of the transition period to the new User data structures.  This should be changed
-         * once we have all the code necessary to upgrade to the V2 user data format, as at that
-         * point we'll only be able to user V1 user data as read-only.
+         * Initializes the authorization manager.  Depending on what version the authorization
+         * system is at, this may involve building up the user cache and/or the roles graph.
+         * This function should be called once at startup and never again after that.
          */
-        Status initializeAllV1UserData();
+        Status initialize();
 
         /**
          * Invalidates all of the contents of the user cache.
@@ -232,6 +231,15 @@ namespace mongo {
          * should be removed.
          */
         void _invalidateUserCache_inlock();
+
+        /**
+         * Initializes the user cache with User objects for every v0 and v1 user document in the
+         * system, by reading the system.users collection of every database.  If this function
+         * returns a non-ok Status, the _userCache should be considered corrupt and must be
+         * discarded.  This function should be called once at startup (only if the system hasn't yet
+         * been upgraded to V2 user data format) and never again after that.
+         */
+        Status _initializeAllV1UserData();
 
 
         static bool _doesSupportOldStylePrivileges;

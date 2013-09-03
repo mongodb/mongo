@@ -294,6 +294,11 @@ namespace {
         return Status::OK();
     }
 
+    int AuthorizationManager::getAuthorizationVersion() {
+        boost::lock_guard<boost::mutex> lk(_lock);
+        return _getVersion_inlock();
+    }
+
     void AuthorizationManager::setSupportOldStylePrivilegeDocuments(bool enabled) {
         _doesSupportOldStylePrivileges = enabled;
     }
@@ -625,7 +630,16 @@ namespace {
         _userCache.insert(make_pair(internalSecurity.user->getName(), internalSecurity.user));
     }
 
-    Status AuthorizationManager::initializeAllV1UserData() {
+    Status AuthorizationManager::initialize() {
+        if (getAuthorizationVersion() < 2) {
+            // If we are not yet upgraded to the V2 authorization format, build up a read-only
+            // view of the V1 style authorization data.
+            return _initializeAllV1UserData();
+        }
+        return Status::OK();
+    }
+
+    Status AuthorizationManager::_initializeAllV1UserData() {
         boost::lock_guard<boost::mutex> lk(_lock);
         _invalidateUserCache_inlock();
         V1PrivilegeDocumentParser parser;
