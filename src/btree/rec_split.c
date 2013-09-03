@@ -113,10 +113,11 @@ __split_row_page_inmem(WT_SESSION_IMPL *session, WT_PAGE *orig)
 		key.size = WT_INSERT_KEY_SIZE(first_ins);
 	} else {
 		/*
-		 * The page's key is on disk in the parent, so the page must
-		 * have been instantiated.
+		 * Pages created in memory always have a "smallest" insert
+		 * list, so if we didn't find one, get the first key from the
+		 * disk image.
 		 */
-		WT_ASSERT(session, orig->entries != 0);
+		WT_ASSERT(session, orig->dsk != NULL && orig->entries != 0);
 		WT_ERR(
 		    __wt_row_leaf_key(session, orig, orig->u.row.d, &key, 1));
 	}
