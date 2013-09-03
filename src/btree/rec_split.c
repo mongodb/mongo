@@ -128,8 +128,8 @@ __split_row_page_inmem(WT_SESSION_IMPL *session, WT_PAGE *orig)
 		size = ikey->size;
 	} else {
 		/*
-		 * The ikey is on disk, so the page must have been
-		 * instantiated.
+		 * The page's key is on disk in the parent, so the page must
+		 * have been instantiated.
 		 */
 		WT_ASSERT(session, orig->entries != 0);
 		WT_ERR(
