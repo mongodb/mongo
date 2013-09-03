@@ -23,6 +23,7 @@ __wt_bm_preload(WT_BM *bm,
 
 	WT_UNUSED(addr_size);
 	block = bm->block;
+	ret = EINVAL; /* Play games due to conditional compilation */
 
 	/* Crack the cookie. */
 	WT_RET(__wt_block_buffer_to_addr(block, addr, &offset, &size, &cksum));
@@ -34,18 +35,17 @@ __wt_bm_preload(WT_BM *bm,
 		    session, (uint8_t *)bm->map + offset, size));
 	else {
 #ifdef HAVE_POSIX_FADVISE
-		if ((ret = posix_fadvise(block->fh->fd,
-		    (off_t)offset, (off_t)size, POSIX_FADV_WILLNEED)) != 0)
-			WT_RET_MSG(
-			    session, ret, "%s: posix_fadvise", block->name);
-#else
-		WT_DECL_ITEM(tmp);
-		WT_RET(__wt_scr_alloc(session, size, &tmp));
-		ret = __wt_block_read_off(
-		    session, block, tmp, offset, size, cksum);
-		__wt_scr_free(&tmp);
-		WT_RET(ret);
+		ret = posix_fadvise(block->fh->fd,
+		    (off_t)offset, (off_t)size, POSIX_FADV_WILLNEED);
 #endif
+		if (ret != 0) {
+			WT_DECL_ITEM(tmp);
+			WT_RET(__wt_scr_alloc(session, size, &tmp));
+			ret = __wt_block_read_off(
+			    session, block, tmp, offset, size, cksum);
+			__wt_scr_free(&tmp);
+			WT_RET(ret);
+		}
 	}
 
 	WT_CSTAT_INCR(session, block_preload);
@@ -111,8 +111,9 @@ __wt_bm_read(WT_BM *bm, WT_SESSION_IMPL *session,
 		WT_DECL_RET;
 
 		block->os_cache = 0;
+		/* Ignore EINVAL - some file systems don't support the flag. */
 		if ((ret = posix_fadvise(block->fh->fd,
-		    (off_t)0, (off_t)0, POSIX_FADV_DONTNEED)) != 0)
+		    (off_t)0, (off_t)0, POSIX_FADV_DONTNEED)) != 0 && ret != EINVAL)
 			WT_RET_MSG(
 			    session, ret, "%s: posix_fadvise", block->name);
 	}
