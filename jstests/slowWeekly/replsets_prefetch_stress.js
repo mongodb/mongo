@@ -26,7 +26,7 @@ for( i = 0; i < 1000; ++i ) {
     c.insert( { a:multikeyValues } );
 }
 master.getDB( 'd' ).getLastError();
-replTest.awaitReplication();
+replTest.awaitReplication(90000);
 
 // Check document counts on all nodes.  On error a node might go down or fail to sync all data, see
 // SERVER-6538.
