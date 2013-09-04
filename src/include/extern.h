@@ -675,6 +675,7 @@ extern int __wt_curtable_open(WT_SESSION_IMPL *session,
     const char *uri,
     const char *cfg[],
     WT_CURSOR **cursorp);
+extern int __wt_log_ckpt(WT_SESSION_IMPL *session, WT_LSN ckp_lsn);
 extern int __wt_log_getfiles(WT_SESSION_IMPL *session,
     char ***files,
     u_int *count);

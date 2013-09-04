@@ -26,7 +26,6 @@ flags = {
 		'LOGSCAN_RECOVER'
         ],
         'log_write' : [
-		'LOG_CKPT',
 		'LOG_DSYNC',
 		'LOG_FSYNC'
         ],

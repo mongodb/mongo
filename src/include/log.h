@@ -115,6 +115,7 @@ typedef struct {
 	WT_LSN		ckpt_lsn;	/* Last checkpoint LSN */
 	WT_LSN		first_lsn;	/* First LSN */
 	WT_LSN		sync_lsn;	/* LSN of the last sync */
+	WT_LSN		trunc_lsn;	/* End LSN for recovery truncation */
 	WT_LSN		write_lsn;	/* Last LSN written to log file */
 
 	/*

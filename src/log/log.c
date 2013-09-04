@@ -8,6 +8,25 @@
 #include "wt_internal.h"
 
 /*
+ * __wt_log_ckpt --
+ *	Record the given LSN as the checkpoint LSN and signal the archive
+ *	thread as needed.
+ */
+int
+__wt_log_ckpt(WT_SESSION_IMPL *session, WT_LSN ckp_lsn)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_LOG *log;
+
+	conn = S2C(session);
+	log = conn->log;
+	log->ckpt_lsn = ckp_lsn;
+	if (conn->arch_cond != NULL)
+		WT_RET(__wt_cond_signal(session, conn->arch_cond));
+	return (0);
+}
+
+/*
  * __wt_log_getfiles --
  *	Retrieve the list of all existing log files.
  */
@@ -161,8 +180,11 @@ __wt_log_open(WT_SESSION_IMPL *session)
 	 * If there were log files, run recovery.
 	 * XXX belongs at a higher level than this.
 	 */
-	if (logcount > 0)
+	if (logcount > 0) {
+		log->trunc_lsn.file = log->alloc_lsn.file;
+		log->trunc_lsn.offset = 0;
 		WT_ERR(__wt_txn_recover(session));
+	}
 
 err:	__wt_log_files_free(session, logfiles, logcount);
 	return (ret);
@@ -237,27 +259,59 @@ __log_size_fit(WT_SESSION_IMPL *session, WT_LSN *lsn, uint64_t recsize)
 
 /*
  * __log_truncate --
- *	Truncate the log to the given LSN.  In addition to setting the
- *	given LSN as the new end of log file, it will remove any later
- *	log files that may exist.  This function assumes we are in recovery
- *	or other dedicated time and not during live running.
+ *	Truncate the log to the given LSN.  If this_log is set, it will only
+ *	truncate the log file indicated in the given LSN.  If not set,
+ *	it will truncate between the given LSN and the trunc_lsn.  That is,
+ *	since we pre-allocate log files, it will free that space and allow the
+ *	log to be traversed.  We use the trunc_lsn because logging has already
+ *	opened the new/next log file before recovery ran.  This function assumes
+ *	we are in recovery or other dedicated time and not during live running.
  */
 static int
-__log_truncate(WT_SESSION_IMPL *session, WT_LSN *lsn)
+__log_truncate(WT_SESSION_IMPL *session, WT_LSN *lsn, uint32_t this_log)
 {
+	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
+	WT_FH *log_fh;
+	WT_LOG *log;
 	uint32_t lognum;
 	u_int i, logcount;
 	char **logfiles;
 
+	conn = S2C(session);
+	log = conn->log;
+	log_fh = NULL;
+	logfiles = NULL;
+
+	/*
+	 * Truncate the log file to the given LSN.
+	 */
+	WT_ERR(__log_openfile(session, 0, &log_fh, lsn->file));
+	WT_ERR(__wt_ftruncate(session, log_fh, lsn->offset));
+	/*
+	 * If we just want to truncate the current log, return and skip
+	 * looking for intervening logs.
+	 */
+	if (this_log)
+		goto err;
 	WT_RET(__wt_log_getfiles(session, &logfiles, &logcount));
 	for (i = 0; i < logcount; i++) {
 		WT_ERR(__wt_log_extract_lognum(session, logfiles[i], &lognum));
-		if (lognum > lsn->file)
-			WT_ERR(__wt_log_remove(session, lognum));
+		if (lognum > lsn->file && lognum < log->trunc_lsn.file) {
+			WT_ERR(__log_openfile(session, 0, &log_fh, lognum));
+			/*
+			 * If there are intervening files pre-allocated,
+			 * truncate them to the end of the log file header.
+			 */
+			WT_ERR(__wt_ftruncate(session,
+			    log_fh, LOG_FIRST_RECORD));
+			WT_ERR(__wt_close(session, log_fh));
+		}
 	}
-
-err:	__wt_log_files_free(session, logfiles, logcount);
+err:	if (log_fh != NULL)
+		WT_TRET(__wt_close(session, log_fh));
+	if (logfiles != NULL)
+		__wt_log_files_free(session, logfiles, logcount);
 	return (ret);
 }
 
@@ -598,6 +652,11 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 			 */
 			WT_ERR(__wt_close(session, log_fh));
 			log_fh = NULL;
+			/*
+			 * Truncate this log file before we move to the next.
+			 */
+			if (LF_ISSET(WT_LOGSCAN_RECOVER))
+				WT_ERR(__log_truncate(session, &rd_lsn, 0));
 			rd_lsn.file++;
 			rd_lsn.offset = 0;
 			/*
@@ -637,7 +696,7 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 			 * otherwise, just stop.
 			 */
 			if (LF_ISSET(WT_LOGSCAN_RECOVER))
-				WT_ERR(__log_truncate(session, &rd_lsn));
+				WT_ERR(__log_truncate(session, &rd_lsn, 0));
 			break;
 		}
 		rdup_len = __wt_rduppo2(reclen, log->allocsize);
@@ -780,11 +839,6 @@ err:
 	 */
 	if (LF_ISSET(WT_LOG_DSYNC | WT_LOG_FSYNC) && ret == 0)
 		ret = myslot.slot->slot_error;
-	if (LF_ISSET(WT_LOG_CKPT) && ret == 0) {
-		log->ckpt_lsn = tmp_lsn;
-		if (conn->arch_cond != NULL)
-			WT_ERR(__wt_cond_signal(session, conn->arch_cond));
-	}
 	return (ret);
 }
 
