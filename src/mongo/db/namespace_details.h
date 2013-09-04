@@ -637,9 +637,4 @@ namespace mongo {
     extern string dbpath; // --dbpath parm
     extern bool directoryperdb;
 
-    // Rename a namespace within current 'client' db.
-    // (Arguments should include db name)
-    void renameNamespace( const char *from, const char *to, bool stayTemp);
-
-
 } // namespace mongo
