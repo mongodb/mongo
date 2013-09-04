@@ -1611,11 +1611,11 @@ ws_source_name(WT_DATA_SOURCE *wtds,
 {
 	DATA_SOURCE *ds;
 	WT_EXTENSION_API *wtext;
+	size_t len;
 	const char *p;
 
 	ds = (DATA_SOURCE *)wtds;
 	wtext = ds->wtext;
-	size_t len;
 
 	/*
 	 * Create the store's name.  Application URIs are "memrata:device/XXX";
@@ -3175,7 +3175,7 @@ kvs_namespace_list(void *cookie, const char *name)
 
 	names = cookie;
 
-	/* Ignore any files without a WiredTiger prefix.
+	/* Ignore any files without a WiredTiger prefix. */
 	if (strncmp(name, WT_NAME_PREFIX, sizeof(WT_NAME_PREFIX) - 1) != 0)
 		return (0);
 

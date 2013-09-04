@@ -754,6 +754,7 @@ strerror
 strftime
 strget
 stringin
+strncmp
 strncpy
 strndup
 strsep
