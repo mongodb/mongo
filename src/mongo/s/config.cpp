@@ -106,7 +106,7 @@ namespace mongo {
 
         BSONObjBuilder val;
         val.append(CollectionType::ns(), ns);
-        val.appendDate(CollectionType::DEPRECATED_lastmod(), time(0));
+        val.appendDate(CollectionType::DEPRECATED_lastmod(), jsTime());
         val.appendBool(CollectionType::dropped(), _dropped);
         if ( _cm )
             _cm->getInfo( val );
