@@ -62,9 +62,6 @@ struct __wt_txn {
 	uint64_t *snapshot;
 	uint32_t snapshot_count;
 
-	/* Saved global state, to avoid repeating scans. */
-	uint64_t last_id;
-
 	/*
 	 * Arrays of txn IDs in WT_UPDATE or WT_REF structures created or
 	 * modified by this transaction.

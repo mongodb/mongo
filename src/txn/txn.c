@@ -111,24 +111,13 @@ __wt_txn_refresh(WT_SESSION_IMPL *session, uint64_t max_id, int get_snapshot)
 	txn_global = &conn->txn_global;
 	txn_state = &txn_global->states[session->id];
 
-	/* For pure read-only workloads, use the last cached snapshot. */
-	if (get_snapshot &&
-	    txn->id == max_id &&
-	    txn->snapshot_count == 0 &&
-	    txn->snap_min == txn_global->current + 1) {
-		/* If nothing has changed since last time, we're done. */
-		txn_state->snap_min = txn->snap_min;
-		return;
-	}
-
 	/*
 	 * We're going to scan.  Increment the count of scanners to prevent the
 	 * oldest ID from moving forwards.  Spin if the count is negative,
 	 * which indicates that some thread is moving the oldest ID forwards.
 	 */
 	do {
-		count = txn_global->scan_count;
-		if (count < 0)
+		if ((count = txn_global->scan_count) < 0)
 			WT_PAUSE();
 	} while (count < 0 ||
 	    !WT_ATOMIC_CAS(txn_global->scan_count, count, count + 1));
@@ -138,10 +127,22 @@ __wt_txn_refresh(WT_SESSION_IMPL *session, uint64_t max_id, int get_snapshot)
 	current_id = txn_global->current;
 	snap_min = current_id + 1;
 
+	/* For pure read-only workloads, use the last cached snapshot. */
+	if (get_snapshot &&
+	    txn->id == max_id &&
+	    txn->snapshot_count == 0 &&
+	    txn->snap_min == snap_min &&
+	    TXNID_LE(prev_oldest_id, snap_min)) {
+		/* If nothing has changed since last time, we're done. */
+		txn_state->snap_min = txn->snap_min;
+		(void)WT_ATOMIC_SUB(txn_global->scan_count, 1);
+		return;
+	}
+
 	/* If the maximum ID is constrained, so is the oldest. */
 	oldest_id = (max_id != WT_TXN_NONE) ? max_id : snap_min;
 
-	/* Copy the array of concurrent transactions. */
+	/* Walk the array of concurrent transactions. */
 	WT_ORDERED_READ(session_cnt, conn->session_cnt);
 	for (i = n = 0, s = txn_global->states; i < session_cnt; i++, s++) {
 		/*
@@ -169,6 +170,7 @@ __wt_txn_refresh(WT_SESSION_IMPL *session, uint64_t max_id, int get_snapshot)
 
 	if (get_snapshot) {
 		WT_ASSERT(session, TXNID_LE(prev_oldest_id, snap_min));
+		WT_ASSERT(session, prev_oldest_id == txn_global->oldest_id);
 		txn_state->snap_min = snap_min;
 	}
 
