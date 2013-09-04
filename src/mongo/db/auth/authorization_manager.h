@@ -171,6 +171,11 @@ namespace mongo {
         Status initializeAllV1UserData();
 
         /**
+         * Invalidates all of the contents of the user cache.
+         */
+        void invalidateUserCache();
+
+        /**
          * Parses privDoc and fully initializes the user object (credentials, roles, and privileges)
          * with the information extracted from the privilege document.
          * This should never be called from outside the AuthorizationManager - the only reason it's
