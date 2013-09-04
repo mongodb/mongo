@@ -27,6 +27,7 @@ __split_row_page_inmem(WT_SESSION_IMPL *session, WT_PAGE *orig)
 	WT_ITEM key;
 	WT_PAGE *new_parent, *right_child;
 	WT_REF *newref;
+	WT_UPDATE *next_upd;
 	int i, ins_depth;
 	size_t transfer_size;
 
@@ -141,8 +142,11 @@ __split_row_page_inmem(WT_SESSION_IMPL *session, WT_PAGE *orig)
 	 * updating the original page.
 	 */
 	transfer_size =
-	    sizeof(WT_INSERT) + ((size_t)ins_depth * sizeof(WT_INSERT *)) +
-	    WT_INSERT_KEY_SIZE(ins);
+	    ((size_t)(ins_depth - 1) * sizeof(WT_INSERT *)) +
+	    sizeof(WT_INSERT) + WT_INSERT_KEY_SIZE(ins) + ins->upd->size;
+	for (next_upd = ins->upd->next;
+	    next_upd != NULL; next_upd = next_upd->next)
+		transfer_size += next_upd->size;
 	__wt_cache_page_inmem_incr(session, right_child, transfer_size);
 	__wt_cache_page_inmem_decr(session, orig, transfer_size);
 
