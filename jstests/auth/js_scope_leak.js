@@ -7,15 +7,15 @@
 //
 //       These transitions are tested for dbEval, $where, MapReduce and $group
 
-var conn = MongoRunner.runMongod({ auth: "", smallfiles: ""});
+var conn = MongoRunner.runMongod({ smallfiles: ""});
 var test = conn.getDB("test");
 
 // insert a single document and add two test users
 test.foo.insert({a:1});
 test.getLastError();
 assert.eq(1, test.foo.findOne().a);
-test.addUser('a', 'a');
-test.addUser('b', 'b');
+test.addUser('a', 'a', jsTest.basicUserRoles);
+test.addUser('b', 'b', jsTest.basicUserRoles);
 
 function missingOrEquals(string) {
     return 'function() { '

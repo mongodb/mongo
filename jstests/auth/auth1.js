@@ -18,9 +18,11 @@ tRO = dbRO[ baseName ];
 
 db.removeAllUsers();
 
-db.addUser( "eliot" , "eliot" );
-db.addUser( "guest" , "guest", true );
-db.getSisterDB( "admin" ).addUser( "super", "super" );
+db.getSisterDB( "admin" ).addUser( "super", "super", jsTest.adminUserRoles );
+db.getSisterDB("admin").auth("super", "super");
+db.addUser( "eliot" , "eliot", jsTest.basicUserRoles );
+db.addUser( "guest" , "guest", jsTest.readOnlyUserRoles );
+db.getSisterDB("admin").logout();
 
 assert.throws( function() { t.findOne() }, [], "read without login" );
 
@@ -66,14 +68,6 @@ assert( !dbRO.getLastError() , "B4" );
 tRO.save( {} ); // fail
 assert( dbRO.getLastError() , "B5: " + tojson( dbRO.getLastErrorObj() ) );
 assert.eq( 1000, tRO.count() , "B6" );
-
-// SERVER-4692 read-only users can't read system.users collection
-assert.throws(function(){dbRO.system.users.findOne()});
-assert.throws(function(){dbRO.system.users.count()});
-
-assert.eq( 2, db.system.users.count() , "B7" ); // rw connection
-assert.throws(function(){dbRO.addUser( "a", "b" )});
-assert.eq( 2, db.system.users.count() , "B8"); // rw connection
 
 assert.eq( 1000, tRO.group( p ).length , "C1" );
 

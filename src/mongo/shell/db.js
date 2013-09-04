@@ -283,7 +283,8 @@ DB.prototype.removeUser = function( username ){
         return true;
     }
 
-    if (res.errmsg.startsWith("No users found on database")) {
+    var notFoundErrmsg = "User '" + username + "@" + this.getName() + "' not found";
+    if (res.errmsg == notFoundErrmsg) {
         return false;
     }
 

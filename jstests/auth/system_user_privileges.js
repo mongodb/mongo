@@ -35,7 +35,7 @@
     //
     // Preliminary set up.
     //
-    admin.addUser('admin', 'a');
+    admin.addUser('admin', 'a', jsTest.adminUserRoles);
     admin.auth('admin', 'a');
 
     //
@@ -86,7 +86,7 @@
     assertCountUnauthorized(conn, "test", "foo");
 
     //
-    // Validate that __system@test is not shadowed by the keyfile __system user.
+    // Validate that __system@admin is not shadowed by the keyfile __system user.
     //
     admin.auth('__system', 'a');
     assertCountUnauthorized(conn, "admin", "foo");

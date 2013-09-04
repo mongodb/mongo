@@ -3,7 +3,7 @@ db.removeAllUsers();
 pass = "a" + Math.random();
 //print( "password [" + pass + "]" );
 
-db.addUser( "eliot" , pass, false, 1 );
+db.addUser( "eliot" , pass, jsTest.basicUserRoles, 1 );
 
 assert( db.auth( "eliot" , pass ) , "auth failed" );
 assert( ! db.auth( "eliot" , pass + "a" ) , "auth should have failed" );
@@ -22,30 +22,30 @@ assert( ! db.auth( "eliot" , pass2 ) , "didn't remove user" );
 var a = db.getMongo().getDB( "admin" );
 a.removeAllUsers();
 pass = "c" + Math.random();
-a.addUser( "super", pass, false, 1 );
+a.addUser( "super", pass, jsTest.adminUserRoles, 1 );
 assert( a.auth( "super" , pass ) , "auth failed" );
 assert( !a.auth( "super" , pass + "a" ) , "auth should have failed" );
 
 db.removeAllUsers();
 pass = "a" + Math.random();
 
-db.addUser( "eliot" , pass, false, 1 );
+db.addUser( "eliot" , pass, jsTest.basicUserRoles, 1 );
 
 assert.commandFailed( db.runCommand( { authenticate: 1, user: "eliot", nonce: "foo", key: "bar" } ) );
 
 // check sanity check SERVER-3003
 
-before = db.system.users.count()
+before = a.system.users.count()
 
 assert.throws( function(){
-    db.addUser( "" , "abc", false, 1 )
+    db.addUser( "" , "abc", jsTest.basicUserRoles, 1 )
 } , null , "C1" )
 assert.throws( function(){
-    db.addUser( "abc" , "", false, 1 )
+    db.addUser( "abc" , "", jsTest.basicUserRoles, 1 )
 } , null , "C2" )
 
 
-after = db.system.users.count()
+after = a.system.users.count()
 assert( before > 0 , "C3" )
 assert.eq( before , after , "C4" )
 

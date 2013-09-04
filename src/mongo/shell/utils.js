@@ -205,6 +205,8 @@ if ( typeof _threadInject != "undefined" ){
                                    "jstests/extent.js",
                                    "jstests/indexb.js",
                                    "jstests/profile1.js",
+                                   "jstests/profile3.js",
+                                   "jstests/profile4.js",
                                    "jstests/mr3.js",
                                    "jstests/indexh.js",
                                    "jstests/apitest_db.js",
@@ -229,7 +231,11 @@ if ( typeof _threadInject != "undefined" ){
                                   ] );
         
         // some tests can't be run in parallel with each other
-        var serialTestsArr = [ "jstests/fsync.js"
+        var serialTestsArr = [ "jstests/fsync.js",
+                               "jstests/auth1.js",
+                               "jstests/auth_copydb2.js",
+                               "jstests/connection_status.js",
+                               "jstests/validate_user_documents.js"
 //                              ,"jstests/fsync2.js" // SERVER-4243
                               ];
         var serialTests = makeKeys( serialTestsArr );
@@ -396,6 +402,12 @@ jsTest.path = jsTestPath
 jsTest.options = jsTestOptions
 jsTest.setOption = setJsTestOption
 jsTest.log = jsTestLog
+jsTest.readOnlyUserRoles = ["read"]
+jsTest.basicUserRoles = ["readWrite", "dbAdmin", "userAdmin"]
+jsTest.adminUserRoles = ["clusterAdmin",
+                         "userAdminAnyDatabase",
+                         "dbAdminAnyDatabase",
+                         "readWriteAnyDatabase"]
 
 jsTest.dir = function(){
     return jsTest.path().replace( /\/[^\/]+$/, "/" )
@@ -424,7 +436,7 @@ jsTest.addAuth = function(conn) {
     }
     print ("Adding admin user on connection: " + localconn);
     return localconn.getDB('admin').addUser(jsTestOptions().adminUser, jsTestOptions().adminPassword,
-                                            false, 'majority', 60000);
+                                            jsTest.adminUserRoles, 'majority', 60000);
 }
 
 jsTest.authenticate = function(conn) {

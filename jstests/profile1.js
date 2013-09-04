@@ -17,7 +17,7 @@ var db = db.getSisterDB("profile1");
 try {
 
     username = "jstests_profile1_user";
-    db.addUser( username, "password", false, 1 );
+    db.addUser( username, "password", jsTest.basicUserRoles, 1 );
     db.auth( username, "password" );
 
     function profileCursor( query ) {

@@ -85,10 +85,18 @@ namespace {
                       authzSession->addAndAuthorizeUser(UserName("spencer", "test")));
 
         // Add a user with readWrite and dbAdmin on the test DB
-        ASSERT_OK(managerState->insertPrivilegeDocument("test",
-                BSON("user" << "spencer" <<
-                     "pwd" << "a" <<
-                     "roles" << BSON_ARRAY("readWrite" << "dbAdmin"))));
+        ASSERT_OK(managerState->insertPrivilegeDocument("admin",
+                BSON("name" << "spencer" <<
+                     "source" << "test" <<
+                     "credentials" << BSON("MONGODB-CR" << "a") <<
+                     "roles" << BSON_ARRAY(BSON("name" << "readWrite" <<
+                                                "source" << "test" <<
+                                                "hasRole" << true <<
+                                                "canDelegate" << false) <<
+                                           BSON("name" << "dbAdmin" <<
+                                                "source" << "test" <<
+                                                "hasRole" << true <<
+                                                "canDelegate" << false)))));
         ASSERT_OK(authzSession->addAndAuthorizeUser(UserName("spencer", "test")));
 
         ASSERT_TRUE(authzSession->checkAuthorization("test", ActionType::insert));
@@ -99,9 +107,13 @@ namespace {
 
         // Add an admin user with readWriteAnyDatabase
         ASSERT_OK(managerState->insertPrivilegeDocument("admin",
-                BSON("user" << "admin" <<
-                     "pwd" << "a" <<
-                     "roles" << BSON_ARRAY("readWriteAnyDatabase"))));
+                BSON("name" << "admin" <<
+                     "source" << "admin" <<
+                     "credentials" << BSON("MONGODB-CR" << "a") <<
+                     "roles" << BSON_ARRAY(BSON("name" << "readWriteAnyDatabase" <<
+                                                "source" << "admin" <<
+                                                "hasRole" << true <<
+                                                "canDelegate" << false)))));
         ASSERT_OK(authzSession->addAndAuthorizeUser(UserName("admin", "admin")));
 
         ASSERT_TRUE(authzSession->checkAuthorization("*", ActionType::insert));
@@ -123,10 +135,14 @@ namespace {
 
     TEST_F(AuthorizationSessionTest, InvalidateUser) {
         // Add a readWrite user
-        ASSERT_OK(managerState->insertPrivilegeDocument("test",
-                BSON("user" << "spencer" <<
-                     "pwd" << "a" <<
-                     "roles" << BSON_ARRAY("readWrite"))));
+        ASSERT_OK(managerState->insertPrivilegeDocument("admin",
+                BSON("name" << "spencer" <<
+                     "source" << "test" <<
+                     "credentials" << BSON("MONGODB-CR" << "a") <<
+                     "roles" << BSON_ARRAY(BSON("name" << "readWrite" <<
+                                                "source" << "test" <<
+                                                "hasRole" << true <<
+                                                "canDelegate" << false)))));
         ASSERT_OK(authzSession->addAndAuthorizeUser(UserName("spencer", "test")));
 
         ASSERT_TRUE(authzSession->checkAuthorization("test", ActionType::find));
@@ -137,10 +153,14 @@ namespace {
 
         // Change the user to be read-only
         managerState->clearPrivilegeDocuments();
-        ASSERT_OK(managerState->insertPrivilegeDocument("test",
-                BSON("user" << "spencer" <<
-                     "pwd" << "a" <<
-                     "roles" << BSON_ARRAY("read"))));
+        ASSERT_OK(managerState->insertPrivilegeDocument("admin",
+                BSON("name" << "spencer" <<
+                     "source" << "test" <<
+                     "credentials" << BSON("MONGODB-CR" << "a") <<
+                     "roles" << BSON_ARRAY(BSON("name" << "read" <<
+                                                "source" << "test" <<
+                                                "hasRole" << true <<
+                                                "canDelegate" << false)))));
 
         // Make sure that invalidating the user causes the session to reload its privileges.
         authzManager->invalidateUser(user);
@@ -161,10 +181,14 @@ namespace {
 
     TEST_F(AuthorizationSessionTest, UseOldUserInfoInFaceOfConnectivityProblems) {
         // Add a readWrite user
-        ASSERT_OK(managerState->insertPrivilegeDocument("test",
-                BSON("user" << "spencer" <<
-                     "pwd" << "a" <<
-                     "roles" << BSON_ARRAY("readWrite"))));
+        ASSERT_OK(managerState->insertPrivilegeDocument("admin",
+                BSON("name" << "spencer" <<
+                     "source" << "test" <<
+                     "credentials" << BSON("MONGODB-CR" << "a") <<
+                     "roles" << BSON_ARRAY(BSON("name" << "readWrite" <<
+                                                "source" << "test" <<
+                                                "hasRole" << true <<
+                                                "canDelegate" << false)))));
         ASSERT_OK(authzSession->addAndAuthorizeUser(UserName("spencer", "test")));
 
         ASSERT_TRUE(authzSession->checkAuthorization("test", ActionType::find));
@@ -176,10 +200,14 @@ namespace {
         // Change the user to be read-only
         managerState->setFindsShouldFail(true);
         managerState->clearPrivilegeDocuments();
-        ASSERT_OK(managerState->insertPrivilegeDocument("test",
-                BSON("user" << "spencer" <<
-                     "pwd" << "a" <<
-                     "roles" << BSON_ARRAY("read"))));
+        ASSERT_OK(managerState->insertPrivilegeDocument("admin",
+                BSON("name" << "spencer" <<
+                     "source" << "test" <<
+                     "credentials" << BSON("MONGODB-CR" << "a") <<
+                     "roles" << BSON_ARRAY(BSON("name" << "read" <<
+                                                "source" << "test" <<
+                                                "hasRole" << true <<
+                                                "canDelegate" << false)))));
 
         // Even though the user's privileges have been reduced, since we've configured user
         // document lookup to fail, the authz session should continue to use its known out-of-date
@@ -191,15 +219,17 @@ namespace {
 
 
     TEST_F(AuthorizationSessionTest, ImplicitAcquireFromSomeDatabasesWithV1Users) {
-        managerState->insertPrivilegeDocument("test",
+        authzManager->setAuthorizationVersion(1);
+
+        managerState->insert(NamespaceString("test.system.users"),
                                     BSON("user" << "andy" <<
                                          "pwd" << "a" <<
                                          "roles" << BSON_ARRAY("readWrite")));
-        managerState->insertPrivilegeDocument("test2",
+        managerState->insert(NamespaceString("test2.system.users"),
                                     BSON("user" << "andy" <<
                                          "userSource" << "test" <<
                                          "roles" <<  BSON_ARRAY("read")));
-        managerState->insertPrivilegeDocument("admin",
+        managerState->insert(NamespaceString("admin.system.users"),
                                     BSON("user" << "andy" <<
                                          "userSource" << "test" <<
                                          "roles" << BSON_ARRAY("clusterAdmin") <<

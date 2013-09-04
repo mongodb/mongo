@@ -84,7 +84,7 @@ var rs = setupReplSet();
 var master = rs.getMaster();
 
 print("add an admin user");
-master.getDB("admin").addUser("foo","bar",false,3);
+master.getDB("admin").addUser("foo","bar",jsTest.adminUserRoles,3);
 m = rs.nodes[0];
 
 print("starting 1 and 2 with key file");

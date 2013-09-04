@@ -5,7 +5,7 @@ var myDB = db.getSiblingDB(dbName);
 myDB.removeAllUsers();
 
 function test(userName) {
-    myDB.addUser(userName, "weak password");
+    myDB.addUser(userName, "weak password", jsTest.basicUserRoles);
     myDB.auth(userName, "weak password");
 
     var output = myDB.runCommand("connectionStatus");
