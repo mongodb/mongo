@@ -555,6 +555,7 @@ namespace mongo {
         Client::initThread("websvr");
         const int p = cmdLine.port + 1000;
         DbWebServer mini(cmdLine.bind_ip, p, adminAccessPtr.get());
+        mini.setupSockets();
         mini.initAndListen();
         cc().shutdown();
     }
