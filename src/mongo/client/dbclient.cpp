@@ -799,7 +799,7 @@ namespace mongo {
         string ns = db + ".system.namespaces";
         auto_ptr<DBClientCursor> c = query( ns.c_str() , BSONObj() );
         while ( c->more() ) {
-            string name = c->next()["name"].valuestr();
+            string name = c->nextSafe()["name"].valuestr();
             if ( name.find( "$" ) != string::npos )
                 continue;
             names.push_back( name );
