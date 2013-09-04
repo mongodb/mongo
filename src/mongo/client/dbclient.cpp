@@ -800,6 +800,9 @@ namespace mongo {
         auto_ptr<DBClientCursor> c = query( ns.c_str() , BSONObj() );
         while ( c->more() ) {
             string name = c->next()["name"].valuestr();
+            /* if auth is enable, unauth client will return error object */
+            if ( name.empty() )
+                continue;
             if ( name.find( "$" ) != string::npos )
                 continue;
             names.push_back( name );
