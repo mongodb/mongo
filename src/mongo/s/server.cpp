@@ -257,6 +257,7 @@ namespace mongo {
         ShardedMessageHandler handler;
         MessageServer * server = createServer( opts , &handler );
         server->setAsTimeTracker();
+        server->setupSockets();
         server->run();
     }
 

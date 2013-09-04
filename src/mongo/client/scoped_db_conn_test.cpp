@@ -178,6 +178,7 @@ namespace mongo_test {
          * Helper method for running the server on a separate thread.
          */
         static void runServer(mongo::MessageServer* server) {
+            server->setupSockets();
             server->run();
         }
 
@@ -273,6 +274,7 @@ namespace mongo_test {
 
     private:
         static void runServer(mongo::MessageServer* server) {
+            server->setupSockets();
             server->run();
         }
 
