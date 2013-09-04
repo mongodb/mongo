@@ -126,6 +126,10 @@ namespace mongo {
             Listener::setAsTimeTracker();
         }
 
+        virtual void setupSockets() {
+            Listener::setupSockets();
+        }
+
         void run() {
             initAndListen();
         }

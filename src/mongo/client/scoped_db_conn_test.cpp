@@ -139,6 +139,7 @@ namespace mongo_test {
             }
 
             _server = mongo::createServer(options, messsageHandler);
+            _server->setupSockets();
             _serverThread = boost::thread(runServer, _server);
         }
 
