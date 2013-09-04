@@ -299,6 +299,9 @@ namespace mongo {
 
         MessageServer * server = createServer( options , new MyMessageHandler() );
         server->setAsTimeTracker();
+        // we must setupSockets prior to logStartup() to avoid getting too high
+        // a file descriptor for our calls to select()
+        server->setupSockets();
 
         logStartup();
         startReplication();
