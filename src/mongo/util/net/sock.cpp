@@ -401,7 +401,11 @@ namespace mongo {
     static SockAddr getLocalAddrForBoundSocketFd(int fd) {
         SockAddr result;
         int rc = getsockname(fd, result.raw(), &result.addressSize);
-        massert(16975, getAddrInfoStrError(socketGetLastError()), 0 == rc);
+        if (rc != 0) {
+            warning() << "Could not resolve local address for socket with fd " << fd << ": " <<
+                getAddrInfoStrError(socketGetLastError());
+            result = SockAddr();
+        }
         return result;
     }
 
