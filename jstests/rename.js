@@ -23,6 +23,7 @@ assert.eq( 2, b.find().count() );
 assert( db.system.namespaces.findOne( {name:"test.jstests_rename_b" } ) );
 assert( !db.system.namespaces.findOne( {name:"test.jstests_rename_a" } ) );
 assert.eq( 3, db.system.indexes.find( {ns:"test.jstests_rename_b"} ).count() );
+assert.eq( 0, db.system.indexes.find( {ns:"test.jstests_rename_a"} ).count() );
 assert( b.find( {a:1} ).explain().cursor.match( /^BtreeCursor/ ) );
 
 // now try renaming a capped collection

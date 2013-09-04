@@ -30,6 +30,7 @@
 #include "mongo/db/introspect.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/db/query/internal_plans.h"
+#include "mongo/db/ops/delete.h"
 
 namespace mongo {
 
@@ -89,6 +90,7 @@ namespace mongo {
           _namespaceIndex( _path, _name ),
           _extentManager( _name, _path, directoryperdb /* this is a global right now */ ),
           _profileName(_name + ".system.profile"),
+          _namespacesName(_name + ".system.namespaces"),
           _collectionLock( "Database::_collectionLock" )
     {
         Status status = validateDBName( _name );
@@ -296,6 +298,145 @@ namespace mongo {
         CollectionTemp* c = new CollectionTemp( ns, details, this );
         _collections[myns] = c;
         return c;
+    }
+
+
+
+    void addNewNamespaceToCatalog(const char *ns, const BSONObj *options = 0); // XXX
+
+    Status Database::renameCollection( const StringData& fromNS, const StringData& toNS,
+                                       bool stayTemp ) {
+
+        // move data namespace
+        Status s = _renameSingleNamespace( fromNS, toNS, stayTemp );
+        if ( !s.isOK() )
+            return s;
+
+        NamespaceDetails* details = _namespaceIndex.details( toNS );
+        verify( details );
+
+        // move index namespaces
+        string indexName = _name + ".system.indexes";
+        BSONObj oldIndexSpec;
+        while( Helpers::findOne( indexName, BSON( "ns" << fromNS ), oldIndexSpec ) ) {
+            oldIndexSpec = oldIndexSpec.getOwned();
+
+            BSONObj newIndexSpec;
+            {
+                BSONObjBuilder b;
+                BSONObjIterator i( oldIndexSpec );
+                while( i.more() ) {
+                    BSONElement e = i.next();
+                    if ( strcmp( e.fieldName(), "ns" ) != 0 )
+                        b.append( e );
+                    else
+                        b << "ns" << toNS;
+                }
+                newIndexSpec = b.obj();
+            }
+
+            DiskLoc newIndexSpecLoc = theDataFileMgr.insert( indexName.c_str(),
+                                                             newIndexSpec.objdata(),
+                                                             newIndexSpec.objsize(),
+                                                             false,
+                                                             true,
+                                                             false );
+            int indexI = details->findIndexByName( oldIndexSpec.getStringField( "name" ) );
+            IndexDetails &indexDetails = details->idx(indexI);
+            string oldIndexNs = indexDetails.indexNamespace();
+            indexDetails.info = newIndexSpecLoc;
+            string newIndexNs = indexDetails.indexNamespace();
+
+            Status s = _renameSingleNamespace( oldIndexNs, newIndexNs, false );
+            if ( !s.isOK() )
+                return s;
+
+            deleteObjects( indexName.c_str(), oldIndexSpec, true, false, true );
+        }
+
+        Top::global.collectionDropped( fromNS.toString() );
+
+        return Status::OK();
+    }
+
+    Status Database::_renameSingleNamespace( const StringData& fromNS, const StringData& toNS,
+                                             bool stayTemp ) {
+
+        // TODO: make it so we dont't need to do this
+        string fromNSString = fromNS.toString();
+        string toNSString = toNS.toString();
+
+        // some sanity checking
+        NamespaceDetails* fromDetails = _namespaceIndex.details( fromNS );
+        if ( !fromDetails )
+            return Status( ErrorCodes::BadValue, "from namespace doesn't exist" );
+
+        if ( _namespaceIndex.details( toNS ) )
+            return Status( ErrorCodes::BadValue, "to namespace already exists" );
+
+        // remove anything cached
+        {
+            scoped_lock lk( _collectionLock );
+            _collections.erase( fromNSString );
+            _collections.erase( toNSString );
+        }
+
+        ClientCursor::invalidate( fromNSString.c_str() );
+        ClientCursor::invalidate( toNSString.c_str() );
+        NamespaceDetailsTransient::eraseCollection( fromNSString ); // XXX
+        NamespaceDetailsTransient::eraseCollection( toNSString ); // XXX
+
+        // at this point, we haven't done anything destructive yet
+
+        // ----
+        // actually start moving
+        // ----
+
+        // this could throw, but if it does we're ok
+        _namespaceIndex.add_ns( toNS, fromDetails );
+        NamespaceDetails* toDetails = _namespaceIndex.details( toNS );
+
+        try {
+            toDetails->copyingFrom(toNSString.c_str(), fromDetails); // fixes extraOffset
+        }
+        catch( DBException& ) {
+            // could end up here if .ns is full - if so try to clean up / roll back a little
+            _namespaceIndex.kill_ns(toNSString.c_str());
+            throw;
+        }
+
+        // at this point, code .ns stuff moved
+
+        _namespaceIndex.kill_ns( fromNSString.c_str() );
+        fromDetails = NULL;
+
+        // fix system.namespaces
+        BSONObj newSpec;
+        {
+
+            BSONObj oldSpec;
+            if ( !Helpers::findOne( _namespacesName, BSON( "name" << fromNS ), oldSpec ) )
+                return Status( ErrorCodes::InternalError, "can't find system.namespaces entry" );
+
+            BSONObjBuilder b;
+            BSONObjIterator i( oldSpec.getObjectField( "options" ) );
+            while( i.more() ) {
+                BSONElement e = i.next();
+                if ( strcmp( e.fieldName(), "create" ) != 0 ) {
+                    if (stayTemp || (strcmp(e.fieldName(), "temp") != 0))
+                        b.append( e );
+                }
+                else {
+                    b << "create" << toNS;
+                }
+            }
+            newSpec = b.obj();
+        }
+        addNewNamespaceToCatalog( toNSString.c_str(), newSpec.isEmpty() ? 0 : &newSpec );
+
+        deleteObjects( _namespacesName.c_str(), BSON( "name" << fromNS ), false, false, true );
+
+        return Status::OK();
     }
 
 } // namespace mongo

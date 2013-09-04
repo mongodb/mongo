@@ -136,9 +136,11 @@ namespace mongo {
             // rename the namespace and we're done.
             {
                 if ( sourceDB == targetDB ) {
-                    renameNamespace( source.c_str(), target.c_str(), cmdObj["stayTemp"].trueValue() );
-                    // make sure we drop counters etc
-                    Top::global.collectionDropped( source );
+                    Status s = ctx.db()->renameCollection( source, target, cmdObj["stayTemp"].trueValue() );
+                    if ( !s.isOK() ) {
+                        errmsg = s.toString();
+                        return false;
+                    }
                     return true;
                 }
             }

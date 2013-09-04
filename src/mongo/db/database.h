@@ -123,6 +123,8 @@ namespace mongo {
          */
         CollectionTemp* getCollectionTemp( const StringData& ns );
 
+        Status renameCollection( const StringData& fromNS, const StringData& toNS, bool stayTemp );
+
         /**
          * @return name of an existing database with same text name but different
          * casing, if one exists.  Otherwise the empty string is returned.  If
@@ -144,12 +146,8 @@ namespace mongo {
 
         void openAllFiles();
 
-        /**
-         * throws exception if error encounted
-         * @return true if the file was opened
-         *         false if no errors, but file doesn't exist
-         */
-        bool openExistingFile( int n );
+        Status _renameSingleNamespace( const StringData& fromNS, const StringData& toNS,
+                                       bool stayTemp );
 
         const string _name; // "alleyinsider"
         const string _path; // "/data/db"
@@ -158,6 +156,7 @@ namespace mongo {
         ExtentManager _extentManager;
 
         const string _profileName; // "alleyinsider.system.profile"
+        const string _namespacesName; // "alleyinsider.system.namespaces"
 
         CCByLoc _ccByLoc; // use by ClientCursor
 
