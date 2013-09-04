@@ -359,7 +359,7 @@ __wt_evict_page(WT_SESSION_IMPL *session, WT_PAGE *page)
 		    txn->snapshot != saved_txn.snapshot);
 		__wt_txn_destroy(session);
 	} else
-		__wt_txn_release_snapshot(session);
+		__wt_txn_release_evict_snapshot(session);
 
 	*txn = saved_txn;
 	return (ret);
