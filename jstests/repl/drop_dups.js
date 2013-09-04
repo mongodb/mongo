@@ -45,10 +45,11 @@ function run( createInBackground ) {
     am[collName].ensureIndex( { x : 1 } , { unique : true , dropDups : true , background : createInBackground  } );
     am.blah.insert( { x : 1 } )
     block();
-
     assert.eq( 2 , am[collName].getIndexKeys().length , "A1 : " + createInBackground )
-    assert.eq( 2 , as[collName].getIndexKeys().length , "A2 : " + createInBackground )
-    
+    if (!createInBackground) {
+        assert.eq( 2 , as[collName].getIndexKeys().length , "A2 : " + createInBackground )
+    }
+
     assert.eq( am[collName].find().sort( { _id : 1 } ).map(mymap) , 
                as[collName].find().sort( { _id : 1 } ).map(mymap) , "different things dropped on master and slave" );
     
