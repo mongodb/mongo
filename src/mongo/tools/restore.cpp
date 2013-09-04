@@ -341,11 +341,11 @@ public:
                 conn().dropCollection( ns );
             } else {
                 // Create map of the users currently in the DB
-                BSONObj fields = BSON("user" << 1);
+                BSONObj fields = BSON("name" << 1);
                 scoped_ptr<DBClientCursor> cursor(conn().query(ns, Query(), 0, 0, &fields));
                 while (cursor->more()) {
                     BSONObj user = cursor->next();
-                    _users.insert(user["user"].String());
+                    _users.insert(user["name"].String());
                 }
             }
         }
@@ -389,7 +389,7 @@ public:
         if (_drop && root.leaf() == "system.users.bson") {
             // Delete any users that used to exist but weren't in the dump file
             for (set<string>::iterator it = _users.begin(); it != _users.end(); ++it) {
-                BSONObj userMatch = BSON("user" << *it);
+                BSONObj userMatch = BSON("name" << *it);
                 conn().remove(ns, Query(userMatch));
             }
             _users.clear();
@@ -435,12 +435,12 @@ public:
         }
         else if (_drop &&
                  nsToCollectionSubstring(_curns) == ".system.users" &&
-                 _users.count(obj["user"].String())) {
+                 _users.count(obj["name"].String())) {
             // Since system collections can't be dropped, we have to manually
             // replace the contents of the system.users collection
-            BSONObj userMatch = BSON("user" << obj["user"].String());
+            BSONObj userMatch = BSON("name" << obj["name"].String());
             conn().update(_curns, Query(userMatch), obj);
-            _users.erase(obj["user"].String());
+            _users.erase(obj["name"].String());
         }
         else {
             conn().insert( _curns , obj );
