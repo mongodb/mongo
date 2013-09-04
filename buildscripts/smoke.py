@@ -167,9 +167,12 @@ class mongod(object):
 
     def setup_admin_user(self, port=mongod_port):
         try:
-            Connection( "localhost" , int(port) ).admin.command("createUser",
-                                                                user="admin",
-                                                                pwd="password")
+            Connection( "localhost" , int(port) ).admin.command("createUser", "admin",
+                                                                pwd="password",
+                                                                roles=["readWriteAnyDatabase",
+                                                                       "dbAdminAnyDatabase",
+                                                                       "userAdminAnyDatabase",
+                                                                       "clusterAdmin"])
         except OperationFailure, e:
             if e.message == 'need to login':
                 pass # SERVER-4225

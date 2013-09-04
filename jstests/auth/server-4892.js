@@ -49,13 +49,15 @@ with_mongod( ['--noauth'], function setupTest( mongod ) {
     conn = new Mongo( mongod.host );
     admin = conn.getDB( 'admin' );
     somedb = conn.getDB( 'somedb' );
-    admin.addUser( 'admin', 'admin' );
-    somedb.addUser( 'frim', 'fram' );
+    admin.addUser( 'admin', 'admin', jsTest.adminUserRoles );
+    admin.auth('admin', 'admin');
+    somedb.addUser( 'frim', 'fram', jsTest.basicUserRoles );
     somedb.data.drop();
     for (var i = 0; i < 10; ++i) {
         somedb.data.insert( { val: i } );
         assert ( ! somedb.getLastError() );
     }
+    admin.logout();
 } );
 
 with_mongod( ['--auth'], function runTest( mongod ) {

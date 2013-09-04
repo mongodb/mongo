@@ -53,9 +53,9 @@ namespace {
         AuthzManagerExternalStateMock* externalState;
     };
 
-    class PrivilegeDocumentParsing : public AuthorizationManagerTest {
+    class V1PrivilegeDocumentParsing : public AuthorizationManagerTest {
     public:
-        PrivilegeDocumentParsing() {}
+        V1PrivilegeDocumentParsing() {}
 
         scoped_ptr<User> user;
         scoped_ptr<User> adminUser;
@@ -64,10 +64,11 @@ namespace {
             AuthorizationManagerTest::setUp();
             user.reset(new User(UserName("spencer", "test")));
             adminUser.reset(new User(UserName("admin", "admin")));
+            authzManager->setAuthorizationVersion(1);
         }
     };
 
-    TEST_F(PrivilegeDocumentParsing, testParsingV0PrivilegeDocuments) {
+    TEST_F(V1PrivilegeDocumentParsing, testParsingV0PrivilegeDocuments) {
         User user(UserName("Spencer", "test"));
         User adminUser(UserName("Spencer", "admin"));
         BSONObj invalid;
@@ -101,21 +102,21 @@ namespace {
         ASSERT(adminUser.getActionsForResource("*").contains(ActionType::insert));
     }
 
-    TEST_F(PrivilegeDocumentParsing, VerifyRolesFieldMustBeAnArray) {
+    TEST_F(V1PrivilegeDocumentParsing, VerifyRolesFieldMustBeAnArray) {
         ASSERT_NOT_OK(authzManager->_initializeUserFromPrivilegeDocument(
                 user.get(),
                 BSON("user" << "spencer" << "pwd" << "" << "roles" << "read")));
         ASSERT(user->getActionsForResource("test").empty());
     }
 
-    TEST_F(PrivilegeDocumentParsing, VerifyInvalidRoleGrantsNoPrivileges) {
+    TEST_F(V1PrivilegeDocumentParsing, VerifyInvalidRoleGrantsNoPrivileges) {
         ASSERT_OK(authzManager->_initializeUserFromPrivilegeDocument(
                 user.get(),
                 BSON("user" << "spencer" << "pwd" << "" << "roles" << BSON_ARRAY("frim"))));
         ASSERT(user->getActionsForResource("test").empty());
     }
 
-    TEST_F(PrivilegeDocumentParsing, VerifyInvalidRoleStillAllowsOtherRoles) {
+    TEST_F(V1PrivilegeDocumentParsing, VerifyInvalidRoleStillAllowsOtherRoles) {
         ASSERT_OK(authzManager->_initializeUserFromPrivilegeDocument(
                 user.get(),
                 BSON("user" << "spencer" <<
@@ -124,7 +125,7 @@ namespace {
         ASSERT(user->getActionsForResource("test").contains(ActionType::find));
     }
 
-    TEST_F(PrivilegeDocumentParsing, VerifyCannotGrantClusterAdminRoleFromNonAdminDatabase) {
+    TEST_F(V1PrivilegeDocumentParsing, VerifyCannotGrantClusterAdminRoleFromNonAdminDatabase) {
         ASSERT_OK(authzManager->_initializeUserFromPrivilegeDocument(
                 user.get(),
                 BSON("user" << "spencer" <<
@@ -135,7 +136,7 @@ namespace {
         ASSERT(!user->getActionsForResource("test").contains(ActionType::dropDatabase));
     }
 
-    TEST_F(PrivilegeDocumentParsing, VerifyCannotGrantClusterReadFromNonAdminDatabase) {
+    TEST_F(V1PrivilegeDocumentParsing, VerifyCannotGrantClusterReadFromNonAdminDatabase) {
         ASSERT_OK(authzManager->_initializeUserFromPrivilegeDocument(
                 user.get(),
                 BSON("user" << "spencer" <<
@@ -145,7 +146,7 @@ namespace {
         ASSERT(!user->getActionsForResource("test2").contains(ActionType::find));
     }
 
-    TEST_F(PrivilegeDocumentParsing, VerifyCannotGrantClusterReadWriteFromNonAdminDatabase) {
+    TEST_F(V1PrivilegeDocumentParsing, VerifyCannotGrantClusterReadWriteFromNonAdminDatabase) {
         ASSERT_OK(authzManager->_initializeUserFromPrivilegeDocument(
                 user.get(),
                 BSON("user" << "spencer" <<
@@ -156,7 +157,7 @@ namespace {
         ASSERT(!user->getActionsForResource("test2").contains(ActionType::insert));
     }
 
-    TEST_F(PrivilegeDocumentParsing, VerifyCannotGrantClusterUserAdminFromNonAdminDatabase) {
+    TEST_F(V1PrivilegeDocumentParsing, VerifyCannotGrantClusterUserAdminFromNonAdminDatabase) {
         ASSERT_OK(authzManager->_initializeUserFromPrivilegeDocument(
                 user.get(),
                 BSON("user" << "spencer" <<
@@ -167,7 +168,7 @@ namespace {
         ASSERT(!user->getActionsForResource("test2").contains(ActionType::userAdmin));
     }
 
-    TEST_F(PrivilegeDocumentParsing, VerifyCannotGrantClusterDBAdminFromNonAdminDatabase) {
+    TEST_F(V1PrivilegeDocumentParsing, VerifyCannotGrantClusterDBAdminFromNonAdminDatabase) {
         ASSERT_OK(authzManager->_initializeUserFromPrivilegeDocument(
                 user.get(),
                 BSON("user" << "spencer" <<
@@ -178,7 +179,7 @@ namespace {
         ASSERT(!user->getActionsForResource("test2").contains(ActionType::clean));
     }
 
-    TEST_F(PrivilegeDocumentParsing, VerifyOtherDBRolesMustBeAnObjectOfArraysOfStrings) {
+    TEST_F(V1PrivilegeDocumentParsing, VerifyOtherDBRolesMustBeAnObjectOfArraysOfStrings) {
         ASSERT_NOT_OK(authzManager->_initializeUserFromPrivilegeDocument(
                 adminUser.get(),
                 BSON("user" << "admin" <<
@@ -200,7 +201,7 @@ namespace {
         ASSERT(!adminUser->getActionsForResource("admin").contains(ActionType::find));
     }
 
-    TEST_F(PrivilegeDocumentParsing, VerifyCannotGrantPrivilegesOnOtherDatabasesNormally) {
+    TEST_F(V1PrivilegeDocumentParsing, VerifyCannotGrantPrivilegesOnOtherDatabasesNormally) {
         // Cannot grant privileges on other databases, except from admin database.
         ASSERT_NOT_OK(authzManager->_initializeUserFromPrivilegeDocument(
                 user.get(),
@@ -213,7 +214,7 @@ namespace {
         ASSERT(!user->getActionsForResource("admin").contains(ActionType::find));
     }
 
-    TEST_F(PrivilegeDocumentParsing, SuccessfulSimpleReadGrant) {
+    TEST_F(V1PrivilegeDocumentParsing, SuccessfulSimpleReadGrant) {
         // Grant read on test.
         ASSERT_OK(authzManager->_initializeUserFromPrivilegeDocument(
                 user.get(),
@@ -225,7 +226,7 @@ namespace {
         ASSERT(!user->getActionsForResource("admin").contains(ActionType::find));
     }
 
-    TEST_F(PrivilegeDocumentParsing, SuccessfulSimpleUserAdminTest) {
+    TEST_F(V1PrivilegeDocumentParsing, SuccessfulSimpleUserAdminTest) {
         // Grant userAdmin on "test" database.
         ASSERT_OK(authzManager->_initializeUserFromPrivilegeDocument(
                 user.get(),
@@ -237,7 +238,7 @@ namespace {
         ASSERT(!user->getActionsForResource("admin").contains(ActionType::userAdmin));
     }
 
-    TEST_F(PrivilegeDocumentParsing, GrantUserAdminOnAdmin) {
+    TEST_F(V1PrivilegeDocumentParsing, GrantUserAdminOnAdmin) {
         // Grant userAdmin on admin.
         ASSERT_OK(authzManager->_initializeUserFromPrivilegeDocument(
                 adminUser.get(),
@@ -249,7 +250,7 @@ namespace {
         ASSERT(adminUser->getActionsForResource("admin").contains(ActionType::userAdmin));
     }
 
-    TEST_F(PrivilegeDocumentParsing, GrantUserAdminOnTestViaAdmin) {
+    TEST_F(V1PrivilegeDocumentParsing, GrantUserAdminOnTestViaAdmin) {
         // Grant userAdmin on test via admin.
         ASSERT_OK(authzManager->_initializeUserFromPrivilegeDocument(
                 adminUser.get(),
@@ -262,7 +263,7 @@ namespace {
         ASSERT(!adminUser->getActionsForResource("admin").contains(ActionType::userAdmin));
     }
 
-    TEST_F(PrivilegeDocumentParsing, SuccessfulClusterAdminTest) {
+    TEST_F(V1PrivilegeDocumentParsing, SuccessfulClusterAdminTest) {
         // Grant userAdminAnyDatabase.
         ASSERT_OK(authzManager->_initializeUserFromPrivilegeDocument(
                 adminUser.get(),
@@ -273,7 +274,7 @@ namespace {
     }
 
 
-    TEST_F(PrivilegeDocumentParsing, GrantClusterReadWrite) {
+    TEST_F(V1PrivilegeDocumentParsing, GrantClusterReadWrite) {
         // Grant readWrite on everything via the admin database.
         ASSERT_OK(authzManager->_initializeUserFromPrivilegeDocument(
                 adminUser.get(),
@@ -284,7 +285,7 @@ namespace {
         ASSERT(adminUser->getActionsForResource("*").contains(ActionType::insert));
     }
 
-    TEST_F(PrivilegeDocumentParsing, ProhibitGrantOnWildcard) {
+    TEST_F(V1PrivilegeDocumentParsing, ProhibitGrantOnWildcard) {
         // Cannot grant readWrite to everything using "otherDBRoles".
         ASSERT_NOT_OK(authzManager->_initializeUserFromPrivilegeDocument(
                 adminUser.get(),
@@ -300,7 +301,7 @@ namespace {
         ASSERT(!adminUser->getActionsForResource("admin").contains(ActionType::insert));
     }
 
-    TEST_F(PrivilegeDocumentParsing, GrantClusterAdmin) {
+    TEST_F(V1PrivilegeDocumentParsing, GrantClusterAdmin) {
         // Grant cluster admin
         ASSERT_OK(authzManager->_initializeUserFromPrivilegeDocument(
                 adminUser.get(),
@@ -312,7 +313,7 @@ namespace {
         ASSERT(adminUser->getActionsForResource("*").contains(ActionType::moveChunk));
     }
 
-    TEST_F(PrivilegeDocumentParsing, GetPrivilegesFromPrivilegeDocumentInvalid) {
+    TEST_F(V1PrivilegeDocumentParsing, GetPrivilegesFromPrivilegeDocumentInvalid) {
         // Try to mix fields from V0 and V1 privilege documents and make sure it fails.
         ASSERT_NOT_OK(authzManager->_initializeUserFromPrivilegeDocument(
                 user.get(),
@@ -326,12 +327,14 @@ namespace {
 
 
     TEST_F(AuthorizationManagerTest, testAquireV0User) {
-        ASSERT_OK(externalState->insertPrivilegeDocument(
-                          "test",
-                          BSON("user" << "v0RW" << "pwd" << "password")));
-        ASSERT_OK(externalState->insertPrivilegeDocument(
-                          "admin",
-                          BSON("user" << "v0AdminRO" << "pwd" << "password" << "readOnly" << true)));
+        authzManager->setAuthorizationVersion(1);
+
+        ASSERT_OK(externalState->insert(NamespaceString("test.system.users"),
+                                        BSON("user" << "v0RW" << "pwd" << "password")));
+        ASSERT_OK(externalState->insert(NamespaceString("admin.system.users"),
+                                        BSON("user" << "v0AdminRO" <<
+                                             "pwd" << "password" <<
+                                             "readOnly" << true)));
 
         User* v0RW;
         ASSERT_OK(authzManager->acquireUser(UserName("v0RW", "test"), &v0RW));
@@ -376,16 +379,16 @@ namespace {
     }
 
     TEST_F(AuthorizationManagerTest, testAquireV1User) {
-        ASSERT_OK(externalState->insertPrivilegeDocument(
-                          "test",
-                          BSON("user" << "v1read" <<
-                               "pwd" << "password" <<
-                               "roles" << BSON_ARRAY("read"))));
-        ASSERT_OK(externalState->insertPrivilegeDocument(
-                          "admin",
-                          BSON("user" << "v1cluster" <<
-                               "pwd" << "password" <<
-                               "roles" << BSON_ARRAY("clusterAdmin"))));
+        authzManager->setAuthorizationVersion(1);
+
+        ASSERT_OK(externalState->insert(NamespaceString("test.system.users"),
+                                        BSON("user" << "v1read" <<
+                                             "pwd" << "password" <<
+                                             "roles" << BSON_ARRAY("read"))));
+        ASSERT_OK(externalState->insert(NamespaceString("admin.system.users"),
+                                        BSON("user" << "v1cluster" <<
+                                             "pwd" << "password" <<
+                                             "roles" << BSON_ARRAY("clusterAdmin"))));
 
         User* v1read;
         ASSERT_OK(authzManager->acquireUser(UserName("v1read", "test"), &v1read));
@@ -428,26 +431,24 @@ namespace {
     }
 
     TEST_F(AuthorizationManagerTest, initializeAllV1UserData) {
-        ASSERT_OK(externalState->insertPrivilegeDocument(
-                          "test",
-                          BSON("user" << "readOnly" <<
-                               "pwd" << "password" <<
-                               "roles" << BSON_ARRAY("read"))));
-        ASSERT_OK(externalState->insertPrivilegeDocument(
-                          "admin",
-                          BSON("user" << "clusterAdmin" <<
-                               "userSource" << "$external" <<
-                               "roles" << BSON_ARRAY("clusterAdmin"))));
-        ASSERT_OK(externalState->insertPrivilegeDocument(
-                          "test",
-                          BSON("user" << "readWriteMultiDB" <<
-                               "pwd" << "password" <<
-                               "roles" << BSON_ARRAY("readWrite"))));
-        ASSERT_OK(externalState->insertPrivilegeDocument(
-                          "test2",
-                          BSON("user" << "readWriteMultiDB" <<
-                               "userSource" << "test" <<
-                               "roles" << BSON_ARRAY("readWrite"))));
+        authzManager->setAuthorizationVersion(1);
+
+        ASSERT_OK(externalState->insert(NamespaceString("test.system.users"),
+                                        BSON("user" << "readOnly" <<
+                                             "pwd" << "password" <<
+                                             "roles" << BSON_ARRAY("read"))));
+        ASSERT_OK(externalState->insert(NamespaceString("admin.system.users"),
+                                        BSON("user" << "clusterAdmin" <<
+                                             "userSource" << "$external" <<
+                                             "roles" << BSON_ARRAY("clusterAdmin"))));
+        ASSERT_OK(externalState->insert(NamespaceString("test.system.users"),
+                                        BSON("user" << "readWriteMultiDB" <<
+                                             "pwd" << "password" <<
+                                             "roles" << BSON_ARRAY("readWrite"))));
+        ASSERT_OK(externalState->insert(NamespaceString("test2.system.users"),
+                                        BSON("user" << "readWriteMultiDB" <<
+                                             "userSource" << "test" <<
+                                             "roles" << BSON_ARRAY("readWrite"))));
 
         Status status = authzManager->initialize();
         ASSERT_OK(status);
@@ -612,23 +613,19 @@ namespace {
         static const NamespaceString newUsersCollectioName;
 
         void setUpV1UserData() {
-            ASSERT_OK(externalState->insertPrivilegeDocument(
-                              "test",
+            ASSERT_OK(externalState->insert(NamespaceString("test.system.users"),
                               BSON("user" << "readOnly" <<
                                    "pwd" << "password" <<
                                    "roles" << BSON_ARRAY("read"))));
-            ASSERT_OK(externalState->insertPrivilegeDocument(
-                              "admin",
+            ASSERT_OK(externalState->insert(NamespaceString("admin.system.users"),
                               BSON("user" << "clusterAdmin" <<
                                    "userSource" << "$external" <<
                                    "roles" << BSON_ARRAY("clusterAdmin"))));
-            ASSERT_OK(externalState->insertPrivilegeDocument(
-                              "test",
+            ASSERT_OK(externalState->insert(NamespaceString("test.system.users"),
                               BSON("user" << "readWriteMultiDB" <<
                                    "pwd" << "password" <<
                                    "roles" << BSON_ARRAY("readWrite"))));
-            ASSERT_OK(externalState->insertPrivilegeDocument(
-                              "test2",
+            ASSERT_OK(externalState->insert(NamespaceString("test2.system.users"),
                               BSON("user" << "readWriteMultiDB" <<
                                    "userSource" << "test" <<
                                    "roles" << BSON_ARRAY("readWrite"))));
@@ -700,6 +697,7 @@ namespace {
     const NamespaceString AuthzUpgradeTest::newUsersCollectioName("admin._newusers");
 
     TEST_F(AuthzUpgradeTest, upgradeUserDataFromV1ToV2Clean) {
+        authzManager->setAuthorizationVersion(1);
         setUpV1UserData();
         ASSERT_OK(authzManager->upgradeAuthCollections());
 
@@ -708,6 +706,7 @@ namespace {
     }
 
     TEST_F(AuthzUpgradeTest, upgradeUserDataFromV1ToV2WithSysVerDoc) {
+        authzManager->setAuthorizationVersion(1);
         setUpV1UserData();
         ASSERT_OK(externalState->insert(versionCollectionName,
                                         BSON("_id" << 1 << "currentVersion" << 1)));
@@ -718,6 +717,7 @@ namespace {
     }
 
     TEST_F(AuthzUpgradeTest, upgradeUserDataFromV1ToV2FailsWithBadInitialVersionDoc) {
+        authzManager->setAuthorizationVersion(1);
         setUpV1UserData();
         ASSERT_OK(externalState->insert(versionCollectionName,
                                         BSON("_id" << 1 << "currentVersion" << 3)));
@@ -730,6 +730,7 @@ namespace {
     }
 
     TEST_F(AuthzUpgradeTest, upgradeUserDataFromV1ToV2FailsWithVersionDocMispatch) {
+        authzManager->setAuthorizationVersion(1);
         setUpV1UserData();
         ASSERT_OK(externalState->insert(versionCollectionName,
                                         BSON("_id" << 1 << "currentVersion" << 2)));

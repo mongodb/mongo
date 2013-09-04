@@ -3,10 +3,12 @@ b = db.getSisterDB( "copydb2-test-b" );
 
 a.dropDatabase();
 b.dropDatabase();
+a.removeAllUsers();
+b.removeAllUsers();
 
 a.foo.save( { a : 1 } );
 
-a.addUser( "chevy" , "chase", false, 1 );
+a.addUser( "chevy" , "chase", jsTest.basicUserRoles, 1 );
 
 assert.eq( 1 , a.foo.count() , "A" );
 assert.eq( 0 , b.foo.count() , "B" );

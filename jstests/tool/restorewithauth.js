@@ -52,7 +52,7 @@ conn = startMongod( "--auth", "--port", port, "--dbpath", "/data/db/" + baseName
 
 // admin user
 var admin = conn.getDB( "admin" )
-admin.addUser( "admin" , "admin" );
+admin.addUser( "admin" , "admin", jsTest.adminUserRoles );
 admin.auth( "admin" , "admin" );
 
 var foo = conn.getDB( "foo" )
@@ -92,7 +92,7 @@ foo.dropDatabase();
 assert.eq(foo.system.namespaces.count({name: "foo.bar"}), 0);
 assert.eq(foo.system.namespaces.count({name: "foo.baz"}), 0);
 
-foo.addUser('user', 'password');
+foo.addUser('user', 'password', jsTest.basicUserRoles);
 
 // now try to restore dump with foo database credentials
 x = runMongoProgram("mongorestore",
@@ -108,6 +108,6 @@ assert.eq(foo.system.namespaces.count({name: "foo.bar"}), 1);
 assert.eq(foo.system.namespaces.count({name: "foo.baz"}), 1);
 assert.eq(foo.bar.count(), 4);
 assert.eq(foo.baz.count(), 4);
-assert.eq(foo.system.indexes.count(), 5); // _id on foo, _id on bar, x on foo, _id + 1 on system.users
+assert.eq(foo.system.indexes.count(), 3); // _id on foo, _id on bar, x on foo
 
 stopMongod( port );

@@ -7,46 +7,44 @@ var passwordHash = function(username, password) {
 var conn = MongoRunner.runMongod({smallfiles: ""});
 
 var db = conn.getDB('addUser');
+var admin = conn.getDB('admin');
 db.dropDatabase();
+admin.dropDatabase();
 
-jsTest.log("Testing creating backwards-compatible user objects using old form of db.addUser");
-db.addUser('spencer', 'password');
-assert.eq(1, db.system.users.count());
-var userObj = db.system.users.findOne();
-assert.eq('spencer', userObj['user']);
-assert.eq(passwordHash('spencer', 'password'), userObj['pwd']);
-
-// Test re-adding the same user fails
-assert.throws(function() { db.addUser("spencer", "password2"); });
-
-// test changing password
-db.changeUserPassword('spencer', 'newpassword');
-assert.eq(1, db.system.users.count());
-userObj = db.system.users.findOne();
-assert.eq('spencer', userObj['user']);
-assert.eq(passwordHash('spencer', 'newpassword'), userObj['pwd']);
-
-
-jsTest.log("Testing new form of addUser");
-
+// Can't use old-form of addUser helper to make v0 users
+assert.throws(function() {db.addUser('spencer', 'password'); });
 // Can't create old-style entries with new addUser helper.
 assert.throws(function() {db.addUser({user:'noroles', pwd:'password'});});
-// Should fail because user already exists
-assert.throws(function() {db.addUser({user:'spencer', pwd:'password', roles:'read'});});
 
-// Create valid extended form user
-db.addUser({user:'andy', pwd:'password', roles:['read']});
-assert.eq(2, db.system.users.count());
-userObj = db.system.users.findOne({user:'andy'});
-assert.eq('andy', userObj['user']);
-assert.eq(passwordHash('andy', 'password'), userObj['pwd']);
-assert.eq('read', userObj['roles'][0]);
+// Create valid V2 format user
+db.addUser({name:'andy', pwd:'password', roles:['read']});
+assert.eq(1, admin.system.users.count());
+userObj = admin.system.users.findOne({name:'andy'});
+assert.eq('andy', userObj['name']);
+assert.eq(passwordHash('andy', 'password'), userObj['credentials']['MONGODB-CR']);
+
+// test changing password
+db.changeUserPassword('andy', 'newpassword');
+assert.eq(1, admin.system.users.count());
+userObj = admin.system.users.findOne();
+assert.eq('andy', userObj['name']);
+assert.eq(passwordHash('andy', 'newpassword'), userObj['credentials']['MONGODB-CR']);
+
+// Should fail because user already exists
+assert.throws(function() {db.addUser({user:'andy', pwd:'password', roles:['read']});});
 
 // Create valid extended form external user
-db.addUser({user:'andy', userSource:'$sasl', roles:['readWrite']});
-assert.eq(3, db.system.users.count());
-userObj = db.system.users.findOne({user:'andy', userSource:'$sasl'});
-assert.eq('andy', userObj['user']);
-assert.eq('$sasl', userObj['userSource']);
-assert.eq('readWrite', userObj['roles'][0]);
-assert(!userObj['pwd']);
+db.getSiblingDB("$external").addUser({user:'spencer', roles:['readWrite']});
+assert.eq(2, admin.system.users.count());
+userObj = admin.system.users.findOne({name:'spencer', source:'$external'});
+assert.eq('spencer', userObj['name']);
+assert.eq('$external', userObj['source']);
+assert(!userObj['credentials']);
+
+
+// Create valid V2 format user using new helper format
+db.addUser('bob', 'password', ['read']);
+assert.eq(3, admin.system.users.count());
+userObj = admin.system.users.findOne({name:'bob'});
+assert.eq('bob', userObj['name']);
+assert.eq(passwordHash('bob', 'password'), userObj['credentials']['MONGODB-CR']);

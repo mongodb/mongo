@@ -191,7 +191,7 @@ var testOps = function(db, allowedActions) {
     });
 
     checkErr(allowedActions.hasOwnProperty('user_w'), function() {
-        db.addUser('a', 'a');
+        db.addUser('a', 'a', jsTest.basicUserRoles);
         db.removeUser('a');
     }, db);
 

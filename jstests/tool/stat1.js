@@ -11,7 +11,7 @@ t.drop();
 
 db.removeAllUsers();
 
-db.addUser( "eliot" , "eliot" );
+db.addUser( "eliot" , "eliot", jsTest.adminUserRoles );
 
 assert( db.auth( "eliot" , "eliot" ) , "auth failed" );
 

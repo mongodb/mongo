@@ -47,10 +47,15 @@ int main( int argc, const char **argv ) {
         return EXIT_FAILURE;
     }
 
+    BSONObj ret;
     // clean up old data from any previous tests
-    conn->remove( "test.system.users" , BSONObj() );
+    conn->runCommand( "test", BSON("removeUsersFromDatabase" << 1), ret );
 
-    conn->insert( "test.system.users" , BSON( "user" << "eliot" << "pwd" << conn->createPasswordDigest( "eliot" , "bar" ) ) );
+    conn->runCommand( "test",
+                      BSON( "createUser" << "eliot" <<
+                            "pwd" << "bar" <<
+                            "roles" << BSON_ARRAY("readWrite")),
+                      ret);
 
     errmsg.clear();
     conn->auth(BSON("user" << "eliot" <<

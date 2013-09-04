@@ -27,7 +27,7 @@ var admin = conn.getDB('admin');
 
 var testedSomething = false;
 
-admin.addUser('andy', 'a');
+admin.addUser('andy', 'a', jsTest.adminUserRoles);
 
 // If the server supports them MONGODB-CR, try all the ways to call db.auth that use MONGODB-CR.
 if (hasMongoCR) {

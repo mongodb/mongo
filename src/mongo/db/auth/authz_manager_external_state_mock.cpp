@@ -43,7 +43,7 @@ namespace mongo {
 
     Status AuthzManagerExternalStateMock::insertPrivilegeDocument(const std::string& dbname,
                                                                   const BSONObj& userObj) {
-        NamespaceString usersCollection(dbname + ".system.users");
+        NamespaceString usersCollection("admin.system.users");
         return insert(usersCollection, userObj);
     }
 

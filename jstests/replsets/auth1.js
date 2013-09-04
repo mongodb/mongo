@@ -36,8 +36,8 @@ run("chmod", "600", path+"key2");
 
 print("add a user to server0: foo");
 m = startMongodTest( port[0], name+"-0", 0 );
-m.getDB("admin").addUser("foo", "bar");
-m.getDB("test").addUser("bar", "baz");
+m.getDB("admin").addUser("foo", "bar", jsTest.adminUserRoles);
+m.getDB("test").addUser("bar", "baz", jsTest.basicUserRoles);
 print("make sure user is written before shutting down");
 m.getDB("test").getLastError();
 stopMongod(port[0]);
