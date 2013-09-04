@@ -522,6 +522,11 @@ namespace {
         _userCache.insert(make_pair(user->getName(), user));
     }
 
+    void AuthorizationManager::invalidateUserCache() {
+        boost::lock_guard<boost::mutex> lk(_lock);
+        _invalidateUserCache_inlock();
+    }
+
     void AuthorizationManager::_invalidateUserCache_inlock() {
         for (unordered_map<UserName, User*>::iterator it = _userCache.begin();
                 it != _userCache.end(); ++it) {

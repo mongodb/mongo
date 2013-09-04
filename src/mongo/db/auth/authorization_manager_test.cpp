@@ -37,8 +37,10 @@ namespace {
 
     class AuthorizationManagerTest : public ::mongo::unittest::Test {
     public:
-        scoped_ptr<AuthorizationManager> authzManager;
-        AuthzManagerExternalStateMock* externalState;
+        virtual ~AuthorizationManagerTest() {
+            authzManager->invalidateUserCache();
+        }
+
         void setUp() {
             externalState = new AuthzManagerExternalStateMock();
             authzManager.reset(new AuthorizationManager(externalState));
@@ -46,6 +48,9 @@ namespace {
             // startup via a MONGO_INITIALIZER
             authzManager->addInternalUser(internalSecurity.user);
         }
+
+        scoped_ptr<AuthorizationManager> authzManager;
+        AuthzManagerExternalStateMock* externalState;
     };
 
     class PrivilegeDocumentParsing : public AuthorizationManagerTest {
