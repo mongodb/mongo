@@ -43,7 +43,6 @@ namespace mongo {
         void timeTrackerSetup() {
             TestListener listener;
             listener.setAsTimeTracker();
-            listener.setupSockets();
             listener.initAndListen();
         }
 

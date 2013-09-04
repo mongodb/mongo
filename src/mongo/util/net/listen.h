@@ -52,12 +52,6 @@ namespace mongo {
          */
         long long getMyElapsedTimeMillis() const { return _elapsedTime; }
 
-        /**
-         * Allocate sockets for the listener and set _setupSocketsSuccessful to true
-         * iff the process was successful.
-         */
-        void setupSockets();
-
         void setAsTimeTracker() {
             _timeTracker = this;
         }
@@ -75,17 +69,19 @@ namespace mongo {
         }
 
     private:
-        std::vector<SockAddr> _mine;
-        std::vector<SOCKET> _socks;
         std::string _name;
         std::string _ip;
-        bool _setupSocketsSuccessful;
         bool _logConnect;
         long long _elapsedTime;
         
 #ifdef MONGO_SSL
         SSLManagerInterface* _ssl;
 #endif
+        
+        /**
+         * @return true iff everything went ok
+         */
+        bool _setupSockets( const std::vector<SockAddr>& mine , std::vector<SOCKET>& socks );
         
         void _logListen( int port , bool ssl );
 
