@@ -20,6 +20,7 @@
 #include <fstream>
 #include <iostream>
 #include <pcrecpp.h>
+#include <stdio.h>
 
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/client/gridfs.h"
@@ -32,10 +33,14 @@ namespace po = boost::program_options;
 class Files : public Tool {
 public:
     Files() : Tool( "files" ) {
+        // Default collection for GridFS
+        _coll = "fs";
+
         add_options()
         ( "local,l", po::value<string>(), "local filename for put|get (default is to use the same name as 'gridfs filename')")
         ( "type,t", po::value<string>(), "MIME type for put (default is to omit)")
         ( "replace,r", "Remove other files with same name after PUT")
+        ( "chunk-size,s", po::value<int>(), "Chunk size for storing files (bytes)")
         ;
         add_hidden_options()
         ( "command" , po::value<string>() , "command (list|search|put|get)" )
@@ -57,6 +62,7 @@ public:
         out << "  put - add a file with filename 'gridfs filename'" << endl;
         out << "  get - get a file with filename 'gridfs filename'" << endl;
         out << "  delete - delete all files with filename 'gridfs filename'" << endl;
+        out << "  re-chunk - change chunk size for file" << endl;
     }
 
     void display( GridFS * grid , BSONObj obj ) {
@@ -78,7 +84,7 @@ public:
             return -1;
         }
 
-        GridFS g( conn() , _db );
+        GridFS g( conn() , _db, _coll );
 
         string filename = getParam( "file" );
 
@@ -126,15 +132,30 @@ public:
             const string& infile = getParam("local", filename);
             const string& type = getParam("type", "");
 
+            if (hasParam("chunk-size")) {
+                int chunk_size = getParam("chunk-size", 0);
+                if (chunk_size < 0) {
+                    cerr << "ERROR: Chunk size cannot be negative" << endl;
+                    return -3;
+                } else if (chunk_size > (BSONObjMaxUserSize - (16 * 1024))) {
+                    cerr << "ERROR: Chunk size beyond maximum document size" << endl;
+                    return -3;
+                } else if (chunk_size > 0) {
+                    g.setChunkSize(chunk_size);
+                }
+            }
+
             BSONObj file = g.storeFile(infile, filename, type);
             cout << "added file: " << file << endl;
 
-            if (hasParam("replace")) {
-                auto_ptr<DBClientCursor> cursor = conn().query(_db+".fs.files", BSON("filename" << filename << "_id" << NE << file["_id"] ));
-                while (cursor->more()) {
+            if (hasParam("replace")){
+                auto_ptr<DBClientCursor> cursor =
+                  conn().query(_db + "." + _coll + ".files",
+                               BSON("filename" << filename << "_id" << NE << file["_id"] ));
+                while (cursor->more()){
                     BSONObj o = cursor->nextSafe();
-                    conn().remove(_db+".fs.files", BSON("_id" << o["_id"]));
-                    conn().remove(_db+".fs.chunks", BSON("_id" << o["_id"]));
+                    conn().remove(_db + "." + _coll + ".files", BSON("_id" << o["_id"]));
+                    conn().remove(_db + "." + _coll + ".chunks", BSON("files_id" << o["_id"]));
                     cout << "removed file: " << o << endl;
                 }
 
@@ -151,6 +172,52 @@ public:
             cout << "done!" << endl;
             return 0;
         }
+
+        if ( cmd == "re-chunk" ) {
+            GridFile f = g.findFile( filename );
+            const string& type = getParam("type", "");
+
+            if ( ! f.exists() ) {
+                cerr << "ERROR: file not found" << endl;
+                return -2;
+            }
+
+            if (hasParam("chunk-size")) {
+                int chunk_size = getParam("chunk-size", 0);
+                if (chunk_size < 0) {
+                    cerr << "ERROR: Chunk size cannot be negative" << endl;
+                    return -3;
+                } else if (chunk_size > (BSONObjMaxUserSize - (16 * 1024))) {
+                    cerr << "ERROR: Chunk size beyond maximum document size" << endl;
+                    return -3;
+                } else if (chunk_size > 0) {
+                    g.setChunkSize(chunk_size);
+                }
+            }
+
+            if ((unsigned int)f.getChunkSize() != g.getChunkSize()) {
+                string out = getParam("local", tempnam(NULL, f.getFilename().c_str()));
+                f.write( out );
+
+                BSONObj file = g.storeFile(out, filename, type);
+                remove(out.c_str());
+
+                auto_ptr<DBClientCursor> cursor =
+                conn().query(_db+"."+_coll+".files",
+                             BSON("filename" << filename << "_id" << NE << file["_id"] ));
+                while (cursor->more()) {
+                    BSONObj o = cursor->nextSafe();
+                    conn().remove(_db+"."+_coll+".files", BSON("_id" << o["_id"]));
+                    conn().remove(_db+"."+_coll+".chunks", BSON("files_id" << o["_id"]));
+                }
+
+                conn().getLastError();
+            } else {
+                cout << "Skipping file " << filename << " (already desired chunk size)" << endl;
+            }
+            return 0;
+        }
+
 
         cerr << "ERROR: unknown command '" << cmd << "'" << endl << endl;
         printHelp(cout);
