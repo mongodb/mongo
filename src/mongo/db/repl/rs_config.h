@@ -91,7 +91,7 @@ namespace mongo {
                     (*it)->updateLast(last);
                 }
             }
-            bool isSameExceptTags(const MemberCfg& r) const {
+            bool isSameIgnoringTags(const MemberCfg& r) const {
                 return _id == r._id && votes == r.votes && h == r.h && priority == r.priority &&
                        arbiterOnly == r.arbiterOnly && slaveDelay == r.slaveDelay &&
                        hidden == r.hidden && buildIndexes == r.buildIndexes;
@@ -113,9 +113,7 @@ namespace mongo {
                     }
                 }
 
-                return _id==r._id && votes == r.votes && h == r.h && priority == r.priority &&
-                       arbiterOnly == r.arbiterOnly && slaveDelay == r.slaveDelay && hidden == r.hidden &&
-                       buildIndexes == r.buildIndexes;
+                return isSameIgnoringTags(r);
             }
             bool operator!=(const MemberCfg& r) const { return !(*this == r); }
         };
