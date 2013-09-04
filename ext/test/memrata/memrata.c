@@ -3220,10 +3220,6 @@ kvs_source_recover(WT_DATA_SOURCE *wtds, KVS_SOURCE *ks, WT_CONFIG_ARG *config)
 
 	memset(&names, 0, sizeof(names));
 
-	/* Find and open the database transaction store. */
-	if ((ret = kvs_source_open_txn(ds)) != 0)
-		return (ret);
-
 	/* Get a list of the cache/primary object pairs in the KVS source. */
 	if ((ret = kvs_namespaces(
 	    ks->kvs_device, kvs_namespace_list, &names)) != 0)
@@ -3376,6 +3372,10 @@ wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 		EMSG_ERR(wtext, NULL, ret,
 		    "WT_EXTENSION_API.config_scan_end: config: %s",
 		    wtext->strerror(ret));
+
+	/* Find and open the database transaction store. */
+	if ((ret = kvs_source_open_txn(ds)) != 0)
+		return (ret);
 
 	/* Recover each KVS source. */
 	for (ks = ds->kvs_head; ks != NULL; ks = ks->next)
