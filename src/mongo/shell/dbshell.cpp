@@ -914,12 +914,12 @@ int _main( int argc, char* argv[], char **envp ) {
         script = params["eval"].as<string>();
     }
 
-    if (params.count("username,u")) {
-        username = params["username,u"].as<string>();
+    if (params.count("username")) {
+        username = params["username"].as<string>();
     }
 
-    if (params.count("password,p")) {
-        password = params["password,p"].as<string>();
+    if (params.count("password")) {
+        password = params["password"].as<string>();
     }
 
     if (params.count("authenticationDatabase")) {
