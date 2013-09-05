@@ -25,8 +25,6 @@
 
 namespace mongo {
 
-    using std::string;
-
     /* in the mongo source code, "client" means "database". */
 
     const size_t MaxDatabaseNameLen = 128; // max str len for the db name, including null char
@@ -37,15 +35,16 @@ namespace mongo {
     */
     class NamespaceString {
     public:
+        NamespaceString();
         NamespaceString( const StringData& ns );
 
         StringData db() const;
         StringData coll() const;
 
-        const string& ns() const { return _ns; }
+        const std::string& ns() const { return _ns; }
 
-        operator string() const { return _ns; }
-        string toString() const { return _ns; }
+        operator std::string() const { return _ns; }
+        std::string toString() const { return _ns; }
 
         size_t size() const { return _ns.size(); }
 
@@ -60,20 +59,20 @@ namespace mongo {
          */
         bool isValid() const { return validDBName( db() ) && !coll().empty(); }
 
-        bool operator==( const string& nsIn ) const { return nsIn == _ns; }
+        bool operator==( const std::string& nsIn ) const { return nsIn == _ns; }
         bool operator==( const NamespaceString& nsIn ) const { return nsIn._ns == _ns; }
 
-        bool operator!=( const string& nsIn ) const { return nsIn != _ns; }
+        bool operator!=( const std::string& nsIn ) const { return nsIn != _ns; }
         bool operator!=( const NamespaceString& nsIn ) const { return nsIn._ns != _ns; }
 
         bool operator<( const NamespaceString& rhs ) const { return _ns < rhs._ns; }
 
         /** ( foo.bar ).getSisterNS( "blah" ) == foo.blah
          */
-        string getSisterNS( const StringData& local ) const;
+        std::string getSisterNS( const StringData& local ) const;
 
         // @return db() + ".system.indexes"
-        string getSystemIndexesCollection() const;
+        std::string getSystemIndexesCollection() const;
 
         /**
          * @return true if ns is 'normal'.  A "$" is used for namespaces holding index data,
@@ -118,7 +117,7 @@ namespace mongo {
 
     private:
 
-        string _ns;
+        std::string _ns;
         size_t _dotIndex;
     };
 
@@ -126,7 +125,7 @@ namespace mongo {
     // "database.a.b.c" -> "database"
     inline StringData nsToDatabaseSubstring( const StringData& ns ) {
         size_t i = ns.find( '.' );
-        if ( i == string::npos ) {
+        if ( i == std::string::npos ) {
             massert(10078, "nsToDatabase: ns too long", ns.size() < MaxDatabaseNameLen );
             return ns;
         }
@@ -141,14 +140,14 @@ namespace mongo {
     }
 
     // TODO: make this return a StringData
-    inline string nsToDatabase(const StringData& ns) {
+    inline std::string nsToDatabase(const StringData& ns) {
         return nsToDatabaseSubstring( ns ).toString();
     }
 
     // "database.a.b.c" -> "a.b.c"
     inline StringData nsToCollectionSubstring( const StringData& ns ) {
         size_t i = ns.find( '.' );
-        massert(16886, "nsToCollectionSubstring: no .", i != string::npos );
+        massert(16886, "nsToCollectionSubstring: no .", i != std::string::npos );
         return ns.substr( i + 1 );
     }
 
@@ -163,18 +162,18 @@ namespace mongo {
     /**
      * this can change, do not store on disk
      */
-    int nsDBHash( const string& ns );
+    int nsDBHash( const std::string& ns );
 
-    bool nsDBEquals( const string& a, const string& b );
+    bool nsDBEquals( const std::string& a, const std::string& b );
 
     struct NamespaceDBHash {
-        int operator()( const string& ns ) const {
+        int operator()( const std::string& ns ) const {
             return nsDBHash( ns );
         }
     };
 
     struct NamespaceDBEquals {
-        bool operator()( const string& a, const string& b ) const {
+        bool operator()( const std::string& a, const std::string& b ) const {
             return nsDBEquals( a, b );
         }
     };
