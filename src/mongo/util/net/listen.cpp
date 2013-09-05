@@ -252,9 +252,13 @@ namespace mongo {
                 int s = accept(*it, from.raw(), &from.addressSize);
                 if ( s < 0 ) {
                     int x = errno; // so no global issues
-                    if ( x == ECONNABORTED || x == EBADF ) {
-                        log() << "Listener on port " << _port << " aborted" << endl;
+                    if (x == EBADF) {
+                        log() << "Port " << _port << " is no longer valid" << endl;
                         return;
+                    }
+                    else if (x == ECONNABORTED) {
+                        log() << "Connection on port " << _port << " aborted" << endl;
+                        continue;
                     }
                     if ( x == 0 && inShutdown() ) {
                         return;   // socket closed
@@ -451,9 +455,13 @@ namespace mongo {
             int s = accept(socks[eventIndex], from.raw(), &from.addressSize);
             if ( s < 0 ) {
                 int x = errno; // so no global issues
-                if ( x == ECONNABORTED || x == EBADF ) {
+                if (x == EBADF) {
+                    log() << "Port " << _port << " is no longer valid" << endl;
+                    continue;
+                }
+                else if (x == ECONNABORTED) {
                     log() << "Listener on port " << _port << " aborted" << endl;
-                    return;
+                    continue;
                 }
                 if ( x == 0 && inShutdown() ) {
                     return;   // socket closed
