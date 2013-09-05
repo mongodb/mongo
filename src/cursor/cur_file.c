@@ -394,9 +394,10 @@ __wt_curfile_open(WT_SESSION_IMPL *session, const char *uri,
 {
 	WT_CONFIG_ITEM cval;
 	WT_DECL_RET;
-	int bitmap, bulk;
+	int bitmap, bulk, meta;
 	uint32_t flags;
 
+	meta = 0;
 	flags = 0;
 
 	WT_RET(__wt_config_gets_def(session, cfg, "bulk", 0, &cval));
@@ -415,6 +416,16 @@ __wt_curfile_open(WT_SESSION_IMPL *session, const char *uri,
 	if (bulk)
 		LF_SET(WT_BTREE_BULK | WT_DHANDLE_EXCLUSIVE);
 
+	/* 
+	 * The metadata cursor is a read-only handle on the metadata file; we
+	 * don't make the metadata URI itself read-only, that would prevent
+	 * WiredTiger itself from opening the metadata file for writing.
+	 */
+	if (WT_STRING_MATCH(uri, "metadata:", strlen("metadata:"))) {
+		meta = 1;
+		uri = WT_METADATA_URI;
+	}
+
 	/* Get the handle and lock it while the cursor is using it. */
 	if (WT_PREFIX_MATCH(uri, "file:"))
 		WT_RET(__wt_session_get_btree_ckpt(session, uri, cfg, flags));
@@ -422,6 +433,13 @@ __wt_curfile_open(WT_SESSION_IMPL *session, const char *uri,
 		WT_RET(__wt_bad_object_type(session, uri));
 
 	WT_ERR(__wt_curfile_create(session, owner, cfg, bulk, bitmap, cursorp));
+
+	/* Metadata cursors are read-only. */
+	if (meta) {
+		(*cursorp)->insert = __wt_cursor_notsup;
+		(*cursorp)->update = __wt_cursor_notsup;
+		(*cursorp)->remove = __wt_cursor_notsup;
+	}
 	return (0);
 
 err:	/* If the cursor could not be opened, release the handle. */

@@ -68,6 +68,11 @@ cursor_ops(WT_SESSION *session)
 	    session, "table:mytable", NULL, NULL, &cursor);
 	/*! [Open a cursor] */
 
+	/*! [Open a cursor on the metadata] */
+	ret = session->open_cursor(
+	    session, "metadata:", NULL, NULL, &cursor);
+	/*! [Open a cursor on the metadata] */
+
 	{
 	WT_CURSOR *duplicate;
 	const char *key = "some key";

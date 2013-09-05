@@ -148,10 +148,9 @@ dump_config(WT_SESSION *session, const char *uri, int hex)
 	if (WT_PREFIX_MATCH(uri, "table:")) {
 		/* Open a metadata cursor. */
 		if ((ret = session->open_cursor(
-		    session, WT_METADATA_URI, NULL, NULL, &cursor)) != 0) {
+		    session, "metadata:", NULL, NULL, &cursor)) != 0) {
 			fprintf(stderr, "%s: %s: session.open_cursor: %s\n",
-			    progname,
-			    WT_METADATA_URI, wiredtiger_strerror(ret));
+			    progname, "metadata:", wiredtiger_strerror(ret));
 			return (1);
 		}
 		/*

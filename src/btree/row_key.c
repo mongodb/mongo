@@ -111,7 +111,7 @@ __wt_row_leaf_key_copy(
 	WT_RET(__wt_row_leaf_key_work(session, page, rip_arg, retb, 0));
 
 	/* The return buffer may only hold a reference to a key, copy it. */
-	if (retb->data != retb->mem)
+	if (!WT_DATA_IN_ITEM(retb))
 		WT_RET(__wt_buf_set(session, retb, retb->data, retb->size));
 
 	return (0);

@@ -27,7 +27,7 @@ __wt_txnid_cmp(const void *v1, const void *v2)
  *	Sort a snapshot for faster searching and set the min/max bounds.
  */
 static void
-__txn_sort_snapshot(WT_SESSION_IMPL *session, uint32_t n, uint64_t id)
+__txn_sort_snapshot(WT_SESSION_IMPL *session, uint32_t n, uint64_t snap_max)
 {
 	WT_TXN *txn;
 
@@ -36,10 +36,23 @@ __txn_sort_snapshot(WT_SESSION_IMPL *session, uint32_t n, uint64_t id)
 	if (n > 1)
 		qsort(txn->snapshot, n, sizeof(uint64_t), __wt_txnid_cmp);
 	txn->snapshot_count = n;
-	txn->snap_max = id;
-	txn->snap_min = (n == 0 || TXNID_LT(id, txn->snapshot[0])) ?
-	    id : txn->snapshot[0];
+	txn->snap_max = snap_max;
+	txn->snap_min = (n > 0 && TXNID_LE(txn->snapshot[0], snap_max)) ?
+	    txn->snapshot[0] : snap_max;
 	WT_ASSERT(session, n == 0 || txn->snap_min != WT_TXN_NONE);
+}
+
+/*
+ * __wt_txn_release_evict_snapshot --
+ *	Release the snapshot in the current transaction without sanity checks.
+ */
+void
+__wt_txn_release_evict_snapshot(WT_SESSION_IMPL *session)
+{
+	WT_TXN_STATE *txn_state;
+
+	txn_state = &S2C(session)->txn_global.states[session->id];
+	txn_state->snap_min = WT_TXN_NONE;
 }
 
 /*
@@ -52,6 +65,8 @@ __wt_txn_release_snapshot(WT_SESSION_IMPL *session)
 	WT_TXN_STATE *txn_state;
 
 	txn_state = &S2C(session)->txn_global.states[session->id];
+	WT_ASSERT(session, txn_state->snap_min == WT_TXN_NONE ||
+	    !__wt_txn_visible_all(session, txn_state->snap_min));
 	txn_state->snap_min = WT_TXN_NONE;
 }
 
@@ -87,97 +102,104 @@ __wt_txn_refresh(WT_SESSION_IMPL *session, uint64_t max_id, int get_snapshot)
 	WT_TXN *txn;
 	WT_TXN_GLOBAL *txn_global;
 	WT_TXN_STATE *s, *txn_state;
-	uint64_t current_id, id, snap_min, oldest_id;
+	uint64_t current_id, id, snap_min, oldest_id, prev_oldest_id;
 	uint32_t i, n, session_cnt;
+	int32_t count;
 
 	conn = S2C(session);
 	txn = &session->txn;
 	txn_global = &conn->txn_global;
 	txn_state = &txn_global->states[session->id];
 
+	/*
+	 * We're going to scan.  Increment the count of scanners to prevent the
+	 * oldest ID from moving forwards.  Spin if the count is negative,
+	 * which indicates that some thread is moving the oldest ID forwards.
+	 */
+	do {
+		if ((count = txn_global->scan_count) < 0)
+			WT_PAUSE();
+	} while (count < 0 ||
+	    !WT_ATOMIC_CAS(txn_global->scan_count, count, count + 1));
+
+	/* The oldest ID cannot change until the scan count goes to zero. */
+	prev_oldest_id = txn_global->oldest_id;
+	current_id = snap_min = txn_global->current;
+
+	/* For pure read-only workloads, use the last cached snapshot. */
 	if (get_snapshot &&
 	    txn->id == max_id &&
-	    txn->last_id == txn_global->current &&
-	    txn->last_gen == txn_global->gen &&
-	    TXNID_LE(txn_global->oldest_id, txn->snap_min)) {
+	    txn->snapshot_count == 0 &&
+	    txn->snap_min == snap_min &&
+	    TXNID_LE(prev_oldest_id, snap_min)) {
 		/* If nothing has changed since last time, we're done. */
 		txn_state->snap_min = txn->snap_min;
+		(void)WT_ATOMIC_SUB(txn_global->scan_count, 1);
 		return;
 	}
 
-	do {
-		/* Take a copy of the current generation numbers. */
-		txn->last_scan_gen = txn_global->scan_gen;
-		txn->last_gen = txn_global->gen;
-		txn->last_id = current_id = txn_global->current;
-		snap_min = current_id + 1;
+	/* If the maximum ID is constrained, so is the oldest. */
+	oldest_id = (max_id != WT_TXN_NONE) ? max_id : snap_min;
 
+	/* Walk the array of concurrent transactions. */
+	WT_ORDERED_READ(session_cnt, conn->session_cnt);
+	for (i = n = 0, s = txn_global->states; i < session_cnt; i++, s++) {
 		/*
-		 * Constrain the oldest ID we calculate to be less than the
-		 * specified value.
+		 * Ignore the ID if we are committing (indicated by max_id
+		 * being set): it is about to be released.
 		 */
-		oldest_id = (max_id != WT_TXN_NONE) ? max_id : snap_min;
+		if ((id = s->id) != WT_TXN_NONE && id + 1 != max_id) {
+			txn->snapshot[n++] = id;
+			if (TXNID_LT(id, snap_min))
+				snap_min = id;
+		}
+		/*
+		 * Ignore the session's own snap_min if we are in the process
+		 * of updating it.
+		 */
+		if (get_snapshot && s == txn_state)
+			continue;
+		if ((id = s->snap_min) != WT_TXN_NONE &&
+		    TXNID_LT(id, oldest_id))
+			oldest_id = id;
+	}
 
-		/* Copy the array of concurrent transactions. */
+	if (TXNID_LT(snap_min, oldest_id))
+		oldest_id = snap_min;
+
+	if (get_snapshot) {
+		WT_ASSERT(session, TXNID_LE(prev_oldest_id, snap_min));
+		WT_ASSERT(session, prev_oldest_id == txn_global->oldest_id);
+		txn_state->snap_min = snap_min;
+	}
+
+	/*
+	 * Update the oldest ID if we have a newer ID and we can get exclusive
+	 * access.  Once we get exclusive access, do another pass to make sure
+	 * nobody else is using an earlier ID.
+	 */
+	if (max_id == WT_TXN_NONE &&
+	    TXNID_LT(prev_oldest_id, oldest_id) &&
+	    WT_ATOMIC_CAS(txn_global->scan_count, 1, -1)) {
 		WT_ORDERED_READ(session_cnt, conn->session_cnt);
-		for (i = n = 0, s = txn_global->states;
-		    i < session_cnt;
-		    i++, s++) {
-			/*
-			 * Ignore the ID if we are committing (indicated by
-			 * max_id being set): it is about to be released.
-			 */
-			if ((id = s->id) != WT_TXN_NONE && id + 1 != max_id) {
-				txn->snapshot[n++] = id;
-				if (TXNID_LT(id, snap_min))
-					snap_min = id;
-			}
-			/*
-			 * Ignore the session's own snap_min if we are in the
-			 * process of updating it.
-			 */
-			if (get_snapshot && s == txn_state)
-				continue;
+		for (i = 0, s = txn_global->states; i < session_cnt; i++, s++) {
+			if ((id = s->id) != WT_TXN_NONE &&
+			    TXNID_LT(id, oldest_id))
+				oldest_id = id;
 			if ((id = s->snap_min) != WT_TXN_NONE &&
 			    TXNID_LT(id, oldest_id))
 				oldest_id = id;
 		}
-
-		if (TXNID_LT(snap_min, oldest_id))
-			oldest_id = snap_min;
-
-		/*
-		 * Ensure the snapshot reads are scheduled before re-checking
-		 * the global generation.
-		 */
-		WT_READ_BARRIER();
-
-		/*
-		 * When getting an ordinary snapshot, it is sufficient to
-		 * unconditionally bump the scan generation.  Otherwise, we're
-		 * trying to update the oldest ID, so require that the scan
-		 * generation has not changed while we have been scanning.
-		 */
-		if (get_snapshot) {
-			txn_state->snap_min = snap_min;
-			WT_ATOMIC_ADD(txn_global->scan_gen, 1);
-		}
-	} while (TXNID_LT(snap_min, txn_global->oldest_id) ||
-	    (!get_snapshot && !WT_ATOMIC_CAS(txn_global->scan_gen,
-		txn->last_scan_gen, txn->last_scan_gen + 1)));
-
-	++txn->last_scan_gen;
-
-	/* Update the oldest ID if another thread hasn't beat us to it. */
-	do {
-		id = txn_global->oldest_id;
-	} while ((!get_snapshot ||
-	    txn->last_scan_gen == txn_global->scan_gen) &&
-	    TXNID_LT(id, oldest_id) &&
-	    !WT_ATOMIC_CAS(txn_global->oldest_id, id, oldest_id));
+		if (TXNID_LT(txn_global->oldest_id, oldest_id))
+			txn_global->oldest_id = oldest_id;
+		txn_global->scan_count = 0;
+	} else {
+		WT_ASSERT(session, txn_global->scan_count > 0);
+		(void)WT_ATOMIC_SUB(txn_global->scan_count, 1);
+	}
 
 	if (get_snapshot)
-		__txn_sort_snapshot(session, n, current_id + 1);
+		__txn_sort_snapshot(session, n, current_id);
 }
 
 /*
@@ -220,7 +242,6 @@ __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_TXN *txn;
 	WT_TXN_GLOBAL *txn_global;
 	WT_TXN_STATE *txn_state;
-	uint64_t current_id;
 
 	conn = S2C(session);
 	txn = &session->txn;
@@ -258,14 +279,12 @@ __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
 	 * path latch free.
 	 */
 	do {
-		current_id = txn_global->current;
-		txn_state->id = txn->id = current_id + 1;
+		txn_state->id = txn->id = txn_global->current;
 	} while (
-	    !WT_ATOMIC_CAS(txn_global->current, current_id, txn->id) ||
-	    txn->id == WT_TXN_NONE);
+	    !WT_ATOMIC_CAS(txn_global->current, txn->id, txn->id + 1));
 
 	/*
-	 * If we have use 64-bits of transaction IDs, there is nothing
+	 * If we have used 64-bits of transaction IDs, there is nothing
 	 * more we can do.
 	 */
 	if (txn->id == WT_TXN_ABORTED)
@@ -312,9 +331,6 @@ __wt_txn_release(WT_SESSION_IMPL *session)
 	txn->isolation = session->isolation;
 	txn->force_evict_attempts = 0;
 	F_CLR(txn, TXN_ERROR | TXN_OLDEST | TXN_RUNNING);
-
-	/* Update the global generation number. */
-	++txn_global->gen;
 }
 
 /*

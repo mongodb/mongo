@@ -379,36 +379,37 @@ extern int __wt_rec_evict(WT_SESSION_IMPL *session,
     int exclusive);
 extern int __wt_merge_tree(WT_SESSION_IMPL *session, WT_PAGE *top);
 extern int __wt_split_page_inmem(WT_SESSION_IMPL *session, WT_PAGE *page);
-extern int __wt_rec_track(WT_SESSION_IMPL *session,
-    WT_PAGE *page,
-    const uint8_t *addr,
-    uint32_t addr_size,
-    const void *data,
-    uint32_t data_size,
-    uint32_t flags);
-extern int __wt_rec_track_ovfl_srch( WT_PAGE *page,
-    const uint8_t *addr,
-    uint32_t addr_size,
-    WT_ITEM *data);
-extern int __wt_rec_track_onpage_srch( WT_PAGE *page,
+extern int __wt_ovfl_onpage_search(WT_PAGE *page,
     const uint8_t *addr,
     uint32_t addr_size);
-extern int __wt_rec_track_onpage_addr(WT_SESSION_IMPL *session,
+extern int __wt_ovfl_onpage_add(WT_SESSION_IMPL *session,
     WT_PAGE *page,
     const uint8_t *addr,
     uint32_t addr_size);
-extern int __wt_rec_track_ovfl_reuse( WT_SESSION_IMPL *session,
+extern int __wt_ovfl_reuse_search(WT_SESSION_IMPL *session,
     WT_PAGE *page,
-    const void *data,
-    uint32_t data_size,
     uint8_t **addrp,
     uint32_t *addr_sizep,
-    int *foundp);
-extern int __wt_rec_track_init(WT_SESSION_IMPL *session, WT_PAGE *page);
-extern int __wt_rec_track_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page);
-extern int __wt_rec_track_wrapup_err(WT_SESSION_IMPL *session, WT_PAGE *page);
-extern void __wt_rec_track_discard(WT_SESSION_IMPL *session, WT_PAGE *page);
-extern char *__wt_track_string(WT_PAGE_TRACK *track, char *buf, size_t len);
+    const void *value,
+    uint32_t value_size);
+extern int __wt_ovfl_reuse_add(WT_SESSION_IMPL *session,
+    WT_PAGE *page,
+    const uint8_t *addr,
+    uint32_t addr_size,
+    const void *value,
+    uint32_t value_size);
+extern int __wt_ovfl_txnc_search( WT_PAGE *page,
+    const uint8_t *addr,
+    uint32_t addr_size,
+    WT_ITEM *store);
+extern int __wt_ovfl_txnc_add(WT_SESSION_IMPL *session,
+    WT_PAGE *page,
+    const uint8_t *addr,
+    uint32_t addr_size,
+    const void *value,
+    uint32_t value_size);
+extern int __wt_ovfl_track_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page);
+extern int __wt_ovfl_track_wrapup_err(WT_SESSION_IMPL *session, WT_PAGE *page);
 extern int __wt_rec_write(WT_SESSION_IMPL *session,
     WT_PAGE *page,
     WT_SALVAGE_COOKIE *salvage,
@@ -1433,6 +1434,7 @@ extern void __wt_stat_aggregate_dsrc_stats(void *child, void *parent);
 extern void __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats);
 extern void __wt_stat_clear_connection_stats(void *stats_arg);
 extern int __wt_txnid_cmp(const void *v1, const void *v2);
+extern void __wt_txn_release_evict_snapshot(WT_SESSION_IMPL *session);
 extern void __wt_txn_release_snapshot(WT_SESSION_IMPL *session);
 extern void __wt_txn_refresh_force(WT_SESSION_IMPL *session);
 extern void __wt_txn_refresh(WT_SESSION_IMPL *session,

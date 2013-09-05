@@ -21,19 +21,20 @@ static int
 __split_row_page_inmem(WT_SESSION_IMPL *session, WT_PAGE *orig)
 {
 	WT_DECL_RET;
-	WT_INSERT *current_ins, *ins, **insp, *prev_ins;
-	WT_INSERT_HEAD *ins_head, **new_ins_head_list, *new_ins_head;
+	WT_INSERT *current_ins, *first_ins, *ins, **insp, *prev_ins;
+	WT_INSERT_HEAD **new_ins_head_list;
+	WT_INSERT_HEAD *ins_head, *new_ins_head, *orig_ins_head;
+	WT_ITEM key;
 	WT_PAGE *new_parent, *right_child;
 	WT_REF *newref;
+	WT_UPDATE *next_upd;
 	int i, ins_depth;
 	size_t transfer_size;
-	void *p;
-	uint32_t size;
 
 	new_parent = right_child = NULL;
 	new_ins_head_list = NULL;
 	new_ins_head = NULL;
-	current_ins = ins = NULL;
+	ins = NULL;
 
 	/*
 	 * Only split a page once, otherwise workloads that update in the
@@ -57,7 +58,7 @@ __split_row_page_inmem(WT_SESSION_IMPL *session, WT_PAGE *orig)
 	 * a good heuristic for that) - it's likely that the page isn't
 	 * part of an append workload.
 	 */
-#define	WT_MIN_SPLIT_SKIPLIST_DEPTH	WT_MIN(5, WT_SKIP_MAXDEPTH -1)
+#define	WT_MIN_SPLIT_SKIPLIST_DEPTH	WT_MIN(5, WT_SKIP_MAXDEPTH - 1)
 	if (ins == NULL || ins_head->head[0] == ins_head->tail[0] ||
 	    ins_head->head[WT_MIN_SPLIT_SKIPLIST_DEPTH] == NULL)
 		return (EBUSY);
@@ -71,7 +72,6 @@ __split_row_page_inmem(WT_SESSION_IMPL *session, WT_PAGE *orig)
 	 * We will move the last key/value pair from the original page onto
 	 * the new leaf page.
 	 */
-
 	WT_RET(__wt_btree_new_modified_page(
 	    session, WT_PAGE_ROW_INT, 2, 1, &new_parent));
 
@@ -80,24 +80,11 @@ __split_row_page_inmem(WT_SESSION_IMPL *session, WT_PAGE *orig)
 
 	/* Add the entry onto the right_child page, as a skip list. */
 	WT_ERR(__wt_calloc_def(session, 1, &new_ins_head_list));
-	WT_ERR(__wt_calloc_def(session, 1, &new_ins_head));
 	right_child->u.row.ins = new_ins_head_list;
+	WT_ERR(__wt_calloc_def(session, 1, &new_ins_head));
 	right_child->u.row.ins[0] = new_ins_head;
 	__wt_cache_page_inmem_incr(session,
 	    right_child, sizeof(WT_INSERT_HEAD) + sizeof(WT_INSERT_HEAD *));
-
-	/*
-	 * Figure out how deep the skip list stack is for the element we are
-	 * removing and install the element on the new child page.
-	 */
-	for (ins_depth = 0;
-	    ins_depth < WT_SKIP_MAXDEPTH && ins_head->tail[ins_depth] == ins;
-	    ins_depth++)
-		;
-	for (i = 0; i < ins_depth; i++) {
-		right_child->u.row.ins[0]->tail[i] = ins_head->tail[i];
-		right_child->u.row.ins[0]->head[i] = ins_head->tail[i];
-	}
 
 	/* Setup the ref in the new parent to point to the original parent. */
 	new_parent->parent = orig->parent;
@@ -112,28 +99,54 @@ __split_row_page_inmem(WT_SESSION_IMPL *session, WT_PAGE *orig)
 	 * Copy the key we moved onto the right child into the WT_REF
 	 * structure that is linked into the new parent page.
 	 */
-	WT_ERR(__wt_row_ikey_incr(session, new_parent, ins->u.key.offset,
-	    WT_INSERT_KEY(ins), ins->u.key.size, &newref->key.ikey));
+	WT_ERR(__wt_row_ikey_incr(session, new_parent, 0,
+	    WT_INSERT_KEY(ins), WT_INSERT_KEY_SIZE(ins), &newref->key.ikey));
 
 	/*
-	 * Create a copy of the key for the left child in the new parent - do
-	 * this first, since we copy it out of the original ref. Then update
-	 * the original ref to point to the new parent
+	 * Copy the first key from the original page into first ref in the new
+	 * parent.  Pages created in memory always have a "smallest" insert
+	 * list, so look there first.  If we don't find one, get the first key
+	 * from the disk image.
 	 */
+	if ((orig_ins_head = WT_ROW_INSERT_SMALLEST(orig)) != NULL &&
+	    (first_ins = WT_SKIP_FIRST(orig_ins_head)) != NULL) {
+		key.data = WT_INSERT_KEY(first_ins);
+		key.size = WT_INSERT_KEY_SIZE(first_ins);
+	} else {
+		WT_ASSERT(session, orig->dsk != NULL && orig->entries != 0);
+		WT_ERR(
+		    __wt_row_leaf_key(session, orig, orig->u.row.d, &key, 1));
+	}
 	newref = &new_parent->u.intl.t[0];
-	__wt_ref_key(orig->parent, orig->ref, &p, &size);
-	WT_ERR (__wt_row_ikey_incr(
-	    session, new_parent, 0, p, size, &newref->key.ikey));
+	WT_ERR(__wt_row_ikey_incr(session, new_parent, 0,
+	    key.data, key.size, &newref->key.ikey));
+
+	/*
+	 * !!! All operations that can fail have now completely successfully.
+	 * Link the original page into the new parent.
+	 */
 	WT_LINK_PAGE(new_parent, newref, orig);
 	newref->state = WT_REF_MEM;
+
+	/*
+	 * Figure out how deep the skip list stack is for the element we are
+	 * removing.
+	 */
+	for (ins_depth = 0;
+	    ins_depth < WT_SKIP_MAXDEPTH && ins_head->tail[ins_depth] == ins;
+	    ins_depth++)
+		;
 
 	/*
 	 * Now that all operations that could fail have completed, we start
 	 * updating the original page.
 	 */
 	transfer_size =
-	    sizeof(WT_INSERT) + ((size_t)ins_depth * sizeof(WT_INSERT *)) +
-	    WT_INSERT_KEY_SIZE(ins);
+	    ((size_t)(ins_depth - 1) * sizeof(WT_INSERT *)) +
+	    sizeof(WT_INSERT) + WT_INSERT_KEY_SIZE(ins) + ins->upd->size;
+	for (next_upd = ins->upd->next;
+	    next_upd != NULL; next_upd = next_upd->next)
+		transfer_size += next_upd->size;
 	__wt_cache_page_inmem_incr(session, right_child, transfer_size);
 	__wt_cache_page_inmem_decr(session, orig, transfer_size);
 
@@ -161,69 +174,61 @@ __split_row_page_inmem(WT_SESSION_IMPL *session, WT_PAGE *orig)
 	 *   If there were an f2, we'd be looking for: e0, d1, d2, NULL
 	 *
 	 *   The algorithm does:
-	 *   1) Start at the tail of level zero, walk up the tail pointers
-	 *      until it sees an element other than the one being removed -
-	 *      in the above diagram that is element d2.
-	 *   2) Step down a level in the skip list - in the above diagram to d1.
-	 *   3) Follow the next pointers on that level tracking previous items
-	 *      until we find the item prior to the tail pointer.
-	 *   4) Update the tail pointer with the previous item.
-	 *   5) Step down a level in the skip list.
-	 *   6) Go to step 3 until at level 0.
+	 *   1) Start at the top of the head list.
+	 *   2) Step down until we find a level that contains more than one
+	 *      element.
+	 *   3) Step across until we reach the tail of the level.
+	 *   4) If the tail is the item being moved, remove it.
+	 *   5) Drop down a level, and go to step 3 until at level 0.
 	 */
-	for (i = 0; i < WT_SKIP_MAXDEPTH && ins_head->tail[i] == ins; ++i)
-		;
-	WT_ASSERT(session, ins_head->head[i] != NULL);
-	/*
-	 * If the item we are removing is the highest depth item in the stack
-	 * trim it down until it isn't.
-	 */
-	while (ins_head->head[i] == ins) {
-		ins_head->head[i] = ins_head->tail[i] = NULL;
-		i--;
-	}
-	/*
-	 * This should only happen is if there is only a single element and
-	 * we have checked for that above.
-	 */
-	WT_ASSERT(session, i >= 0);
+	prev_ins = NULL;
+	for (i = WT_SKIP_MAXDEPTH - 1, insp = &ins_head->head[i];
+	    i >= 0;
+	    i--, insp--) {
+		/* Level empty, or a single element. */
+		if (ins_head->head[i] == NULL ||
+		     ins_head->head[i] == ins_head->tail[i]) {
+			/* Remove if it is the element being moved. */
+			if (ins_head->head[i] == ins)
+				ins_head->head[i] = ins_head->tail[i] = NULL;
+			continue;
+		}
 
-	/*
-	 * Start at the head if the last element has a full height stack, or
-	 * if the element we are removing was the deepest in the skip list.
-	 */
-	if (i == WT_SKIP_MAXDEPTH || ins_head->tail[i] == ins) {
-		prev_ins = NULL;
-		insp = &ins_head->head[i];
-	} else {
-		prev_ins = ins_head->tail[i];
-		insp = &prev_ins->next[i];
-	}
-
-	for (i--, insp--; i >= 0; i--, insp--) {
 		for (current_ins = *insp;
-		    current_ins != ins;
+		    current_ins != ins_head->tail[i];
 		    current_ins = current_ins->next[i])
 			prev_ins = current_ins;
-		WT_ASSERT(session, prev_ins != NULL && current_ins == ins);
+
+		/*
+		 * Update the stack head so that we step down as far to the
+		 * the right as possible. We know that prev_ins is valid
+		 * since levels must contain at least two items to be here.
+		 */
 		insp = &prev_ins->next[i];
-		*insp = NULL;
-		ins_head->tail[i] = prev_ins;
+		if (current_ins == ins) {
+			/* Remove the item being moved. */
+			WT_ASSERT(session, ins_head->head[i] != ins);
+			WT_ASSERT(session, prev_ins->next[i] == ins);
+			*insp = NULL;
+			ins_head->tail[i] = prev_ins;
+		}
 	}
 
-	/*
-	 * Set up the new top-level page as a split so that it will be swapped
-	 * into place by our caller.
-	 */
-	orig->modify->flags = WT_PM_REC_SPLIT;
-	orig->modify->u.split = new_parent;
+	/* Install the item on the new child page. */
+	for (i = 0; i < ins_depth; i++)
+		new_ins_head->head[i] = new_ins_head->tail[i] = ins;
 
 	/* Make it likely we evict the page we just split. */
 	orig->read_gen = WT_READ_GEN_OLDEST;
 
+	/*
+	 * Swap the new top-level page into place.  This must come last: once
+	 * the parent is unlocked, it isn't safe to touch any of these pages.
+	 */
+	WT_LINK_PAGE(new_parent->parent, new_parent->ref, new_parent);
+	WT_PUBLISH(new_parent->ref->state, WT_REF_MEM);
+
 err:	if (ret != 0) {
-		__wt_free(session, new_ins_head_list);
-		__wt_free(session, new_ins_head);
 		if (new_parent != NULL)
 			__wt_page_out(session, &new_parent);
 		if (right_child != NULL)

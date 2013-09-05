@@ -194,7 +194,7 @@ __txn_op_apply(
 			WT_TRET(stop->close(stop));
 		WT_ERR(ret);
 		break;
-	
+
 	WT_ILLEGAL_VALUE(session);
 	}
 

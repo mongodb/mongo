@@ -575,14 +575,18 @@ struct __wt_session {
 	 *	table cursor,
 	 *	table key\, table value(s) with optional projection of columns}
 	 *  </table>
-	 *  Advanced applications may also open the following low-level cursor
-	 *  types:
+	 *  Advanced applications may also choose to open the following
+	 *  additional cursor types:
 	 *  <table>
 	 *  @row{<tt>file:\<file name\></tt>,
 	 *	file cursor,
-	 *	file key\, file value(s)}
+	 *	file key\, file value}
 	 *  @row{<tt>lsm:\<name\></tt>,
-	 *	LSM cursor (key=LSM key\, value=LSM value), See also: @ref lsm}
+	 *	LSM cursor,
+	 *	LSM key\, LSM value: see @ref lsm}
+	 *  @row{<tt>metadata:</tt>,
+	 *	metadata cursor,
+	 *	metadata key\, metadata value: see @ref metadata}
 	 *  </table>
 	 * @param to_dup a cursor to duplicate
 	 * @configstart{session.open_cursor, see dist/api_data.py}
@@ -1148,11 +1152,11 @@ struct __wt_connection {
 	 * @config{verbose, enable messages for various events.  Options are
 	 * given as a list\, such as
 	 * <code>"verbose=[evictserver\,read]"</code>., a list\, with values
-	 * chosen from the following options: \c "block"\, \c "shared_cache"\,
-	 * \c "ckpt"\, \c "evict"\, \c "evictserver"\, \c "fileops"\, \c
-	 * "hazard"\, \c "log"\, \c "lsm"\, \c "mutex"\, \c "read"\, \c
-	 * "readserver"\, \c "reconcile"\, \c "recovery"\, \c "salvage"\, \c
-	 * "verify"\, \c "version"\, \c "write"; default empty.}
+	 * chosen from the following options: \c "block"\, \c "ckpt"\, \c
+	 * "evict"\, \c "evictserver"\, \c "fileops"\, \c "hazard"\, \c "log"\,
+	 * \c "lsm"\, \c "mutex"\, \c "overflow"\, \c "read"\, \c "readserver"\,
+	 * \c "reconcile"\, \c "recovery"\, \c "salvage"\, \c "shared_cache"\,
+	 * \c "verify"\, \c "version"\, \c "write"; default empty.}
 	 * @configend
 	 * @errors
 	 */
@@ -1475,11 +1479,11 @@ struct __wt_connection {
  * information., a boolean flag; default \c false.}
  * @config{verbose, enable messages for various events.  Options are given as a
  * list\, such as <code>"verbose=[evictserver\,read]"</code>., a list\, with
- * values chosen from the following options: \c "block"\, \c "shared_cache"\, \c
- * "ckpt"\, \c "evict"\, \c "evictserver"\, \c "fileops"\, \c "hazard"\, \c
- * "log"\, \c "lsm"\, \c "mutex"\, \c "read"\, \c "readserver"\, \c
- * "reconcile"\, \c "recovery"\, \c "salvage"\, \c "verify"\, \c "version"\, \c
- * "write"; default empty.}
+ * values chosen from the following options: \c "block"\, \c "ckpt"\, \c
+ * "evict"\, \c "evictserver"\, \c "fileops"\, \c "hazard"\, \c "log"\, \c
+ * "lsm"\, \c "mutex"\, \c "overflow"\, \c "read"\, \c "readserver"\, \c
+ * "reconcile"\, \c "recovery"\, \c "salvage"\, \c "shared_cache"\, \c
+ * "verify"\, \c "version"\, \c "write"; default empty.}
  * @configend
  * Additionally, if a file named \c WiredTiger.config appears in the WiredTiger
  * home directory, it is read for configuration values (see @ref config_file

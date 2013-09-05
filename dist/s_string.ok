@@ -226,6 +226,7 @@ TOOSMALL
 TORTIOUS
 TRK
 TXN
+TXNC
 TXNID
 Timestamp
 TxnID
@@ -755,6 +756,7 @@ strerror
 strftime
 strget
 stringin
+strncmp
 strncpy
 strndup
 strsep
@@ -825,6 +827,7 @@ tverify
 twiredtiger
 twrite
 txn
+txnc
 txnid
 txnidp
 txnmin
