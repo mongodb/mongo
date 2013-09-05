@@ -760,17 +760,15 @@ cache_value_visible(WT_CURSOR *wtcursor, CACHE_RECORD **cpp)
  *	Return if a cache entry has no updates that aren't globally visible.
  */
 static int
-cache_value_visible_all(WT_CURSOR *wtcursor, uint64_t oldest, int final)
+cache_value_visible_all(WT_CURSOR *wtcursor, uint64_t oldest)
 {
 	CACHE_RECORD *cp;
 	CURSOR *cursor;
-	WT_EXTENSION_API *wtext;
 	WT_SESSION *session;
 	u_int i;
 
 	session = wtcursor->session;
 	cursor = (CURSOR *)wtcursor;
-	wtext = cursor->wtext;
 
 	/*
 	 * Compare the update's transaction ID and the oldest transaction ID
@@ -782,18 +780,8 @@ cache_value_visible_all(WT_CURSOR *wtcursor, uint64_t oldest, int final)
 	 */
 	for (i = 0, cp = cursor->cache; i < cursor->cache_entries; ++i, ++cp)
 		if (cp->txnid >= oldest)
-			break;
-	if (i == cursor->cache_entries)
-		return (1);
-
-	/*
-	 * If this is the final pass when shutting down the KVS store, there
-	 * should not be any entries that aren't globally visible.
-	 */
-	if (final)
-		ERET(wtext, session, 0,
-		    "cleaner: closing with unresolved updates in the cache");
-	return (0);
+			return (0);
+	return (1);
 }
 
 /*
@@ -2618,8 +2606,8 @@ kvs_source_close(WT_EXTENSION_API *wtext, WT_SESSION *session, KVS_SOURCE *ks)
  *	Migrate information from the cache to the primary store.
  */
 static int
-cache_cleaner(WT_EXTENSION_API *wtext, WT_CURSOR *wtcursor,
-    uint64_t oldest, int final, uint64_t *txnminp)
+cache_cleaner(WT_EXTENSION_API *wtext,
+    WT_CURSOR *wtcursor, uint64_t oldest, uint64_t *txnminp)
 {
 	struct kvs_record *r;
 	CACHE_RECORD *cp;
@@ -2664,7 +2652,7 @@ cache_cleaner(WT_EXTENSION_API *wtext, WT_CURSOR *wtcursor,
 		 */
 		if ((ret = cache_value_unmarshall(wtcursor)) != 0)
 			goto err;
-		if (!recovery && !cache_value_visible_all(wtcursor, oldest, 0))
+		if (!recovery && !cache_value_visible_all(wtcursor, oldest))
 			continue;
 		if (recovery)
 			cache_value_last_committed(wtcursor, &cp);
@@ -2738,7 +2726,7 @@ cache_cleaner(WT_EXTENSION_API *wtext, WT_CURSOR *wtcursor,
 		 */
 		if ((ret = cache_value_unmarshall(wtcursor)) != 0)
 			goto err;
-		if (cache_value_visible_all(wtcursor, oldest, final)) {
+		if (cache_value_visible_all(wtcursor, oldest)) {
 			if ((ret = kvs_del(ws->kvscache, r)) != 0)
 				EMSG_ERR(wtext, NULL, WT_ERROR,
 				    "kvs_del: %s", kvs_strerror(ret));
@@ -2918,8 +2906,8 @@ kvs_cleaner(void *arg)
 		txnmin = UINT64_MAX;
 		for (ws = ks->ws_head; ws != NULL; ws = ws->next) {
 			cursor->ws = ws;
-			if ((ret = cache_cleaner(wtext, wtcursor,
-			    oldest, cleaner_stop, &txntmp)) != 0)
+			if ((ret = cache_cleaner(
+			    wtext, wtcursor, oldest, &txntmp)) != 0)
 				goto err;
 			if (txntmp < txnmin)
 				txnmin = txntmp;
@@ -3140,7 +3128,7 @@ kvs_source_recover_namespace(WT_DATA_SOURCE *wtds,
 	cursor->ws = ws;
 
 	/* Process, then clear, the cache. */
-	if ((ret = cache_cleaner(wtext, wtcursor, 0, 0, NULL)) != 0)
+	if ((ret = cache_cleaner(wtext, wtcursor, 0, NULL)) != 0)
 		goto err;
 	if ((ret = kvs_truncate(ws->kvscache)) != 0)
 		EMSG_ERR(wtext, NULL, WT_ERROR,
