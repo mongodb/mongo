@@ -3,6 +3,7 @@ import sys
 import os, os.path
 import utils
 import time
+import exceptions
 from optparse import OptionParser
 
 # set cwd to the root mongo dir, one level up from this
@@ -14,7 +15,6 @@ if os.path.basename(cwd) == 'buildscripts':
 print( "cwd [" + cwd + "]" )
 
 def shouldKill( c ):
-    
     if "smoke.py" in c:
         return False
 
@@ -36,7 +36,6 @@ def shouldKill( c ):
     return False
 
 def killprocs( signal="" ):
-
     killed = 0
 
     if sys.platform == 'win32':
@@ -55,7 +54,7 @@ def killprocs( signal="" ):
         x = x.lstrip()
         if not shouldKill( x ):
             continue
-        
+
         pid = x.split( " " )[0]
         print( "killing: " + x )
         utils.execsys( "/bin/kill " + signal + " " +  pid )
@@ -65,7 +64,6 @@ def killprocs( signal="" ):
 
 
 def cleanup( root , nokill ):
-    
     if nokill:
         print "nokill requested, not killing anybody"
     else:
@@ -76,11 +74,18 @@ def cleanup( root , nokill ):
     # delete all regular files, directories can stay
     # NOTE: if we delete directories later, we can't delete diskfulltest
     for ( dirpath , dirnames , filenames ) in os.walk( root , topdown=False ):
-        for x in filenames: 
+        for x in filenames:
             foo = dirpath + "/" + x
             print( "removing: " + foo )
-            os.remove( foo )
-
+            try:
+                os.remove(foo)
+            except exceptions.OSError, e:
+                # SERVER-10462 compensate for Windows file locking race
+                # We want to catch WindowsError but can't use that name on other platforms
+                print(repr(e))
+                print("os.remove(%s) failed, retrying once." % foo)
+                time.sleep(1)
+                os.remove(foo)
 
 if __name__ == "__main__":
     parser = OptionParser(usage="read the script")
@@ -90,5 +95,5 @@ if __name__ == "__main__":
     root = "/data/db/"
     if len(args) > 0:
         root = args[0]
-        
+
     cleanup( root , options.nokill )
