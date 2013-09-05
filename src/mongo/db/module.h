@@ -18,9 +18,11 @@
 
 #pragma once
 
-#include <boost/program_options.hpp>
 #include <list>
 #include <string>
+
+#include "mongo/util/options_parser/environment.h"
+#include "mongo/util/options_parser/option_section.h"
 
 namespace mongo {
 
@@ -35,14 +37,15 @@ namespace mongo {
         Module( const std::string& name );
         virtual ~Module();
 
-        boost::program_options::options_description_easy_init add_options() {
-            return _options.add_options();
-        }
+        /**
+         * add options to command line
+         */
+        virtual void addOptions(optionenvironment::OptionSection* options) = 0;
 
         /**
          * read config from command line
          */
-        virtual void config( boost::program_options::variables_map& params ) = 0;
+        virtual void config(optionenvironment::Environment& params) = 0;
 
         /**
          * called after configuration when the server is ready start
@@ -58,13 +61,12 @@ namespace mongo {
 
         // --- static things
 
-        static void addOptions( boost::program_options::options_description& options );
-        static void configAll( boost::program_options::variables_map& params );
+        static void addAllOptions(optionenvironment::OptionSection* options);
+        static void configAll(optionenvironment::Environment& params);
         static void initAll();
 
     private:
         static std::list<Module*> * _all;
         std::string _name;
-        boost::program_options::options_description _options;
     };
 }

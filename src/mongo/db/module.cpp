@@ -17,14 +17,18 @@
 
 #include "mongo/pch.h"
 
+#include "mongo/util/options_parser/option_section.h"
+
 #include "mongo/db/module.h"
 
 namespace mongo {
 
+    namespace moe = mongo::optionenvironment;
+
     std::list<Module*> * Module::_all;
 
     Module::Module( const string& name )
-        : _name( name ) , _options( (string)"Module " + name + " options" ) {
+        : _name( name ) {
         if ( ! _all )
             _all = new list<Module*>();
         _all->push_back( this );
@@ -32,17 +36,17 @@ namespace mongo {
 
     Module::~Module() {}
 
-    void Module::addOptions( boost::program_options::options_description& options ) {
+    void Module::addAllOptions(moe::OptionSection* options) {
         if ( ! _all ) {
             return;
         }
         for ( list<Module*>::iterator i=_all->begin(); i!=_all->end(); i++ ) {
             Module* m = *i;
-            options.add( m->_options );
+            m->addOptions(options);
         }
     }
 
-    void Module::configAll( boost::program_options::variables_map& params ) {
+    void Module::configAll(moe::Environment& params) {
         if ( ! _all ) {
             return;
         }
