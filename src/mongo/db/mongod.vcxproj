@@ -4516,6 +4516,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="matcher_covered.h" />
     <ClInclude Include="memconcept.h" />
     <ClInclude Include="minilex.h" />
+    <ClInclude Include="module.h" />
     <ClInclude Include="namespace_details-inl.h" />
     <ClInclude Include="namespace_details.h" />
     <ClInclude Include="field_ref.h" />
@@ -4572,6 +4573,7 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="lasterror.cpp" />
     <ClCompile Include="matcher_covered.cpp" />
     <ClCompile Include="..\util\mmap_win.cpp" />
+    <ClCompile Include="module.cpp" />
     <ClCompile Include="..\client\parallel.cpp" />
     <ClCompile Include="pdfile.cpp" />
     <ClCompile Include="scanandorder.cpp" />

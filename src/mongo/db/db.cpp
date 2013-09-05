@@ -45,6 +45,7 @@
 #include "mongo/db/introspect.h"
 #include "mongo/db/json.h"
 #include "mongo/db/kill_current_op.h"
+#include "mongo/db/module.h"
 #include "mongo/db/mongod_options.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/db/query/internal_plans.h"
@@ -699,6 +700,8 @@ namespace mongo {
             log() << startupWarningsLog;
         }
 
+        Module::initAll();
+
         if ( scriptingEnabled ) {
             ScriptEngine::setup();
             globalScriptEngine->setCheckInterruptCallback( jsInterruptCallback );
@@ -1213,6 +1216,8 @@ static void startupConfigActions(const std::vector<std::string>& argv) {
             ::_exit(EXIT_FAILURE);
         }
     }
+
+    Module::configAll(params);
 
 #ifdef _WIN32
     ntservice::configureService(initService,
