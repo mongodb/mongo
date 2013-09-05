@@ -81,13 +81,13 @@ namespace {
         }
 
         std::string buffer(mongoutils::str::stream() << "SSPI: " << msg << ": " << err);
-        utils->seterror(utils->conn, 0, buffer.c_str());
+        utils->seterror(utils->conn, 0, "%s", buffer.c_str());
         LocalFree(err);
     }
 
     int sspiClientMechNew(void *glob_context,
                           sasl_client_params_t *cparams,
-                          void **conn_context) {
+                          void **conn_context) throw() {
         // Prepare auth identity to pass to AcquireCredentialsHandle        
         SEC_WINNT_AUTH_IDENTITY authIdentity;
         authIdentity.Flags = SEC_WINNT_AUTH_IDENTITY_UNICODE;
@@ -352,7 +352,7 @@ namespace {
                            sasl_interact_t **prompt_need,
                            const char **clientout,
                            unsigned *clientoutlen,
-                           sasl_out_params_t *oparams) {
+                           sasl_out_params_t *oparams) throw() {
         SspiConnContext* pcctx = static_cast<SspiConnContext*>(conn_context);
         *clientout = NULL;
         *clientoutlen = 0;
