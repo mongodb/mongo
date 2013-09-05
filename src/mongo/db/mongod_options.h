@@ -27,4 +27,6 @@ namespace mongo {
     namespace moe = mongo::optionenvironment;
 
     Status addMongodOptions(moe::OptionSection* options);
+
+    Status addModuleOptions(moe::OptionSection* options);
 }
