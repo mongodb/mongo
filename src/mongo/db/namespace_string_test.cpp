@@ -47,6 +47,8 @@ namespace mongo {
         ASSERT( NamespaceString::special( "a.$.b" ) );
         ASSERT( NamespaceString::special( "a.system.foo" ) );
         ASSERT( !NamespaceString::special( "a.foo" ) );
+        ASSERT( !NamespaceString::special( "a.foo.system.bar" ) );
+        ASSERT( !NamespaceString::special( "a.systemfoo" ) );
     }
 
     TEST( NamespaceStringTest, DatabaseValidNames ) {
@@ -54,6 +56,17 @@ namespace mongo {
         ASSERT( !NamespaceString::validDBName( "foo/bar" ) );
         ASSERT( !NamespaceString::validDBName( "foo bar" ) );
         ASSERT( !NamespaceString::validDBName( "foo.bar" ) );
+        ASSERT( !NamespaceString::validDBName( "foo.bar" ) );
+        ASSERT( !NamespaceString::validDBName( "foo\\bar" ) );
+        ASSERT( !NamespaceString::validDBName( "foo\"bar" ) );
+#ifdef _WIN32
+        ASSERT( !NamespaceString::validDBName( "foo*bar" ) );
+        ASSERT( !NamespaceString::validDBName( "foo<bar" ) );
+        ASSERT( !NamespaceString::validDBName( "foo>bar" ) );
+        ASSERT( !NamespaceString::validDBName( "foo:bar" ) );
+        ASSERT( !NamespaceString::validDBName( "foo|bar" ) );
+        ASSERT( !NamespaceString::validDBName( "foo?bar" ) );
+#endif
 
         ASSERT( NamespaceString::normal( "asdads" ) );
         ASSERT( !NamespaceString::normal( "asda$ds" ) );
