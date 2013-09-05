@@ -27,7 +27,7 @@ __wt_txnid_cmp(const void *v1, const void *v2)
  *	Sort a snapshot for faster searching and set the min/max bounds.
  */
 static void
-__txn_sort_snapshot(WT_SESSION_IMPL *session, uint32_t n, uint64_t id)
+__txn_sort_snapshot(WT_SESSION_IMPL *session, uint32_t n, uint64_t snap_max)
 {
 	WT_TXN *txn;
 
@@ -36,9 +36,9 @@ __txn_sort_snapshot(WT_SESSION_IMPL *session, uint32_t n, uint64_t id)
 	if (n > 1)
 		qsort(txn->snapshot, n, sizeof(uint64_t), __wt_txnid_cmp);
 	txn->snapshot_count = n;
-	txn->snap_max = id;
-	txn->snap_min = (n == 0 || TXNID_LT(id, txn->snapshot[0])) ?
-	    id : txn->snapshot[0];
+	txn->snap_max = snap_max;
+	txn->snap_min = (n > 0 && TXNID_LE(txn->snapshot[0], snap_max)) ?
+	    txn->snapshot[0] : snap_max;
 	WT_ASSERT(session, n == 0 || txn->snap_min != WT_TXN_NONE);
 }
 
@@ -124,8 +124,7 @@ __wt_txn_refresh(WT_SESSION_IMPL *session, uint64_t max_id, int get_snapshot)
 
 	/* The oldest ID cannot change until the scan count goes to zero. */
 	prev_oldest_id = txn_global->oldest_id;
-	current_id = txn_global->current;
-	snap_min = current_id + 1;
+	current_id = snap_min = txn_global->current;
 
 	/* For pure read-only workloads, use the last cached snapshot. */
 	if (get_snapshot &&
@@ -200,7 +199,7 @@ __wt_txn_refresh(WT_SESSION_IMPL *session, uint64_t max_id, int get_snapshot)
 	}
 
 	if (get_snapshot)
-		__txn_sort_snapshot(session, n, current_id + 1);
+		__txn_sort_snapshot(session, n, current_id);
 }
 
 /*
@@ -243,7 +242,6 @@ __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_TXN *txn;
 	WT_TXN_GLOBAL *txn_global;
 	WT_TXN_STATE *txn_state;
-	uint64_t current_id;
 
 	conn = S2C(session);
 	txn = &session->txn;
@@ -281,14 +279,12 @@ __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
 	 * path latch free.
 	 */
 	do {
-		current_id = txn_global->current;
-		txn_state->id = txn->id = current_id + 1;
+		txn_state->id = txn->id = txn_global->current;
 	} while (
-	    !WT_ATOMIC_CAS(txn_global->current, current_id, txn->id) ||
-	    txn->id == WT_TXN_NONE);
+	    !WT_ATOMIC_CAS(txn_global->current, txn->id, txn->id + 1));
 
 	/*
-	 * If we have use 64-bits of transaction IDs, there is nothing
+	 * If we have used 64-bits of transaction IDs, there is nothing
 	 * more we can do.
 	 */
 	if (txn->id == WT_TXN_ABORTED)
