@@ -854,13 +854,15 @@ namespace replset {
         rwlock lk( _lock , false );
         MAP::iterator i = _ghostCache.find( rid );
         if ( i == _ghostCache.end() ) {
-            OCCASIONALLY warning() << "couldn't update slave " << rid << " no entry" << rsLog;
+            OCCASIONALLY warning() << "couldn't update position of the secondary with replSet _id '"
+                                   << rid << "' because we have no entry for it" << rsLog;
             return;
         }
 
         GhostSlave& slave = *(i->second);
         if (!slave.init) {
-            OCCASIONALLY log() << "couldn't update slave " << rid << " not init" << rsLog;
+            OCCASIONALLY log() << "couldn't update position of the secondary with replSet _id '"
+                               << rid << "' because it has not been initialized" << rsLog;
             return;
         }
 
