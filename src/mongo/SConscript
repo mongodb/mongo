@@ -691,7 +691,8 @@ serverOnlyFiles += [ "s/d_logic.cpp",
                      "s/d_state.cpp",
                      "s/d_split.cpp",
                      "s/d_merge.cpp",
-                     "client/distlock_test.cpp" ]
+                     "client/distlock_test.cpp",
+                     "db/module.cpp" ]
 
 env.StaticLibrary("defaultversion", "s/default_version.cpp")
 

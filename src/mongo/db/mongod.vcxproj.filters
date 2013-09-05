@@ -623,6 +623,9 @@
     <ClCompile Include="memconcept.cpp">
       <Filter>db\Source Files\e to n</Filter>
     </ClCompile>
+    <ClCompile Include="module.cpp">
+      <Filter>db\Source Files\e to n</Filter>
+    </ClCompile>
     <ClCompile Include="namespace_details.cpp">
       <Filter>db\Source Files\e to n</Filter>
     </ClCompile>
@@ -3924,6 +3927,9 @@
       <Filter>db\Header Files\e to n</Filter>
     </ClInclude>
     <ClInclude Include="minilex.h">
+      <Filter>db\Header Files\e to n</Filter>
+    </ClInclude>
+    <ClInclude Include="module.h">
       <Filter>db\Header Files\e to n</Filter>
     </ClInclude>
     <ClInclude Include="cloner.h">
