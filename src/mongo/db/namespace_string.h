@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <algorithm>
 #include <string>
 
 #include "mongo/base/string_data.h"
@@ -35,8 +36,21 @@ namespace mongo {
     */
     class NamespaceString {
     public:
+        /**
+         * Constructs an empty NamespaceString.
+         */
         NamespaceString();
+
+        /**
+         * Constructs a NamespaceString from the fully qualified namespace named in "ns".
+         */
         NamespaceString( const StringData& ns );
+
+        /**
+         * Constructs a NamespaceString for the given database and collection names.
+         * "dbName" must not contain a ".", and "collectionName" must not start with one.
+         */
+        NamespaceString( const StringData& dbName, const StringData& collectionName );
 
         StringData db() const;
         StringData coll() const;

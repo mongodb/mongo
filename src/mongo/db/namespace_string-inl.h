@@ -92,6 +92,22 @@ namespace mongo {
         _dotIndex = _ns.find( '.' );
     }
 
+    inline NamespaceString::NamespaceString( const StringData& dbName,
+                                             const StringData& collectionName )
+        : _ns(dbName.size() + collectionName.size() + 1, '\0') {
+
+        dassert(dbName.find('.') == std::string::npos);
+        dassert(collectionName.empty() || collectionName[0] != '.');
+        std::string::iterator it = std::copy(dbName.begin(), dbName.end(), _ns.begin());
+        *it = '.';
+        ++it;
+        it = std::copy(collectionName.begin(), collectionName.end(), it);
+        _dotIndex = dbName.size();
+        dassert(it == _ns.end());
+        dassert(_ns[_dotIndex] == '.');
+        dassert(_ns.find('\0') == std::string::npos);
+    }
+
     inline int nsDBHash( const std::string& ns ) {
         int hash = 7;
         for ( size_t i = 0; i < ns.size(); i++ ) {
