@@ -60,13 +60,19 @@ namespace mongo {
         void swap(RoleGraph& other);
 
         /**
+         * Returns an ActionSet of all actions that can be be granted to users.  This does not
+         * include internal-only actions.
+         */
+        static ActionSet getAllUserActions();
+
+        /**
          * Returns an iterator that can be used to get a list of the members of the given role.
          * Members of a role are roles that have been granted this role directly (roles that are
          * members transitively through another role are not included).  These are the "parents" of
          * this node in the graph. The iterator is valid until the next call to addRole or
          * removeRole.
          */
-        RoleNameIterator getDirectMembers(const RoleName& role) const;
+        RoleNameIterator getDirectMembers(const RoleName& role);
 
         /**
          * Returns an iterator that can be used to get a list of "subordinate" roles of the given
@@ -75,26 +81,27 @@ namespace mongo {
          * the "children" of this node in the graph. The iterator is valid until the next call to
          * addRole or removeRole.
          */
-        RoleNameIterator getDirectSubordinates(const RoleName& role) const;
+        RoleNameIterator getDirectSubordinates(const RoleName& role);
 
         /**
          * Returns a vector of the privileges that the given role has been directly granted.
          * Privileges that have been granted transitively through this role's subordinate roles are
          * not included.
          */
-        const PrivilegeVector& getDirectPrivileges(const RoleName& role) const;
+        const PrivilegeVector& getDirectPrivileges(const RoleName& role);
 
         /**
          * Returns a vector of all privileges that the given role contains.  This includes both the
          * privileges that have been granted to this role directly, as well as any privileges
          * inherited from the role's subordinate roles.
          */
-        const PrivilegeVector& getAllPrivileges(const RoleName& role) const;
+        const PrivilegeVector& getAllPrivileges(const RoleName& role);
 
         /**
-         * Returns whether or not the given role exists in the role graph.
+         * Returns whether or not the given role exists in the role graph.  Will implicitly
+         * add the role to the graph if it is a built-in role and isn't already in the graph.
          */
-        bool roleExists(const RoleName& role) const;
+        bool roleExists(const RoleName& role);
 
         // Mutation functions
 
@@ -108,6 +115,7 @@ namespace mongo {
          * Deletes the given role by first removing it from the members/subordinates arrays for
          * all other roles, and then by removing its own entries in the 4 member maps.
          * Returns RoleNotFound if the role doesn't exist.
+         * Returns InvalidRoleModification if "role" is a built-in role.
          */
         Status deleteRole(const RoleName& role);
 
@@ -116,6 +124,7 @@ namespace mongo {
          * as a subordinate of "recipient".
          * Returns RoleNotFound if either of "role" or "recipient" doesn't exist in
          * the RoleGraph.
+         * Returns InvalidRoleModification if "recipient" is a built-in role.
          */
         Status addRoleToRole(const RoleName& recipient, const RoleName& role);
 
@@ -124,18 +133,21 @@ namespace mongo {
          * Returns RoleNotFound if either of "role" or "recipient" doesn't exist in
          * the RoleGraph.  Returns RolesNotRelated if "recipient" is not currently a
          * member of "role".
+         * Returns InvalidRoleModification if "role" is a built-in role.
          */
         Status removeRoleFromRole(const RoleName& recipient, const RoleName& role);
 
         /**
          * Grants "privilegeToAdd" to "role".
          * Returns RoleNotFound if "role" doesn't exist in the role graph.
+         * Returns InvalidRoleModification if "role" is a built-in role.
          */
         Status addPrivilegeToRole(const RoleName& role, const Privilege& privilegeToAdd);
 
         /**
          * Grants Privileges from "privilegesToAdd" to "role".
          * Returns RoleNotFound if "role" doesn't exist in the role graph.
+         * Returns InvalidRoleModification if "role" is a built-in role.
          */
         Status addPrivilegesToRole(const RoleName& role, const PrivilegeVector& privilegesToAdd);
 
@@ -143,6 +155,7 @@ namespace mongo {
          * Removes "privilegeToRemove" from "role".
          * Returns RoleNotFound if "role" doesn't exist in the role graph.
          * Returns PrivilegeNotFound if "role" doesn't contain the full privilege being removed.
+         * Returns InvalidRoleModification if "role" is a built-in role.
          */
         Status removePrivilegeFromRole(const RoleName& role,
                                        const Privilege& privilegeToRemove);
@@ -150,6 +163,7 @@ namespace mongo {
         /**
          * Removes all privileges in the "privilegesToRemove" vector from "role".
          * Returns RoleNotFound if "role" doesn't exist in the role graph.
+         * Returns InvalidRoleModification if "role" is a built-in role.
          * Returns PrivilegeNotFound if "role" is missing any of the privileges being removed.  If
          * PrivilegeNotFound is returned then the graph may be in an inconsistent state and needs to
          * be abandoned.
@@ -160,6 +174,7 @@ namespace mongo {
         /**
          * Removes all privileges from "role".
          * Returns RoleNotFound if "role" doesn't exist in the role graph.
+         * Returns InvalidRoleModification if "role" is a built-in role.
          */
         Status removeAllPrivilegesFromRole(const RoleName& role);
 
@@ -180,6 +195,36 @@ namespace mongo {
         Status _recomputePrivilegeDataHelper(const RoleName& currentRole,
                                              std::vector<RoleName>& inProgressRoles,
                                              unordered_set<RoleName>& visitedRoles);
+
+        /**
+         * If the role name given is not a built-in role, or it is but it's already in the role
+         * graph, then this does nothing.  If it *is* a built-in role and this is the first time
+         * this function has been called for this role, it will add the role into the role graph.
+         */
+        void _createBuiltinRoleIfNeeded(const RoleName& role);
+
+        /**
+         * Returns whether or not the given role exists strictly within the role graph.
+         */
+        bool _roleExistsDontCreateBuiltin(const RoleName& role);
+
+        /**
+         * Returns whether the given role corresponds to a built-in role.
+         */
+        bool _isBuiltinRole(const RoleName& role);
+
+        /**
+         * Just creates the role in the role graph, without checking whether or not the role already
+         * exists.
+         */
+        void _createRoleDontCheckIfRoleExists(const RoleName& role);
+
+        /**
+         * Grants "privilegeToAdd" to "role".
+         * Doesn't do any checking as to whether the role exists or is a built-in role.
+         */
+        void _addPrivilegeToRoleNoChecks(const RoleName& role, const Privilege& privilegeToAdd);
+
 
         // Represents all the outgoing edges to other roles from any given role.
         typedef unordered_map<RoleName, unordered_set<RoleName> > EdgeSet;
