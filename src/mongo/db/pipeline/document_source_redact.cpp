@@ -83,6 +83,9 @@ namespace mongo {
                         newArr.push_back(toAdd);
                     }
                 }
+                else {
+                    newArr.push_back(arr[i]);
+                }
             }
             return Value::consume(newArr);
         }

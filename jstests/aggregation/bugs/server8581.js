@@ -74,7 +74,9 @@ a3result = [{ _id: 1,
               b: { level: 3,
                    c: 5,
                    d: [ {level: 1, e: 4},
-                        {f: 6} ]
+                        {f: 6},
+                        "NOT AN OBJECT!!11!"
+                      ]
                  },
               h: { level: 2,
                  },
@@ -92,7 +94,9 @@ a4result = [{ _id: 1,
               b: { level: 3,
                    c: 5,
                    d: [ {level: 1, e: 4},
-                        {f: 6} ]
+                        {f: 6},
+                        "NOT AN OBJECT!!11!"
+                      ]
                  },
               h: { level: 2,
                    i: { level: 4,
@@ -119,7 +123,8 @@ a5result = [{ _id: 1,
                    c: 5,
                    d: [ {level: 1, e: 4},
                         {f: 6},
-                        {level: 5, g: 9}
+                        {level: 5, g: 9},
+                        "NOT AN OBJECT!!11!"
                       ]
                  },
               h: { level: 2,
