@@ -16,7 +16,10 @@ t.save({ _id: 1,
               d: [ {level: 1, e: 4},
                    {f: 6},
                    {level: 5, g: 9},
-                   "NOT AN OBJECT!!11!" // always included when b is included
+                   "NOT AN OBJECT!!11!", // always included when b is included
+                   [2, 3, 4, {level: 1, r: 11}, {level: 5, s: 99}]
+                   // nested array should always be included once b is
+                   // but the second object should only show up at level 5
                  ]
             },
          // the contents of h test that in order to see a subdocument (j) we must be able to see all
@@ -75,7 +78,8 @@ a3result = [{ _id: 1,
                    c: 5,
                    d: [ {level: 1, e: 4},
                         {f: 6},
-                        "NOT AN OBJECT!!11!"
+                        "NOT AN OBJECT!!11!",
+                        [2, 3, 4, {level: 1, r: 11}]
                       ]
                  },
               h: { level: 2,
@@ -95,7 +99,8 @@ a4result = [{ _id: 1,
                    c: 5,
                    d: [ {level: 1, e: 4},
                         {f: 6},
-                        "NOT AN OBJECT!!11!"
+                        "NOT AN OBJECT!!11!",
+                        [2, 3, 4, {level: 1, r: 11}]
                       ]
                  },
               h: { level: 2,
@@ -124,7 +129,8 @@ a5result = [{ _id: 1,
                    d: [ {level: 1, e: 4},
                         {f: 6},
                         {level: 5, g: 9},
-                        "NOT AN OBJECT!!11!"
+                        "NOT AN OBJECT!!11!",
+                        [2, 3, 4, {level: 1, r: 11}, {level: 5, s: 99}]
                       ]
                  },
               h: { level: 2,
