@@ -101,7 +101,15 @@ namespace mongo {
                      */
             if( theReplSet ) {
                 if( !(theReplSet->lastOpTimeWritten<ts) ) {
-                    log() << "replSet error possible failover clock skew issue? " << theReplSet->lastOpTimeWritten.toString() << ' ' << endl;
+                    log() << "replication oplog stream went back in time. previous timestamp: "
+                          << theReplSet->lastOpTimeWritten << " newest timestamp: " << ts
+                          << ". attempting to sync directly from primary." << endl;
+                    std::string errmsg;
+                    BSONObjBuilder result;
+                    if (!theReplSet->forceSyncFrom(theReplSet->box.getPrimary()->fullName(),
+                                                   errmsg, result)) {
+                        log() << "Can't sync from primary: " << errmsg << endl;
+                    }
                 }
                 theReplSet->lastOpTimeWritten = ts;
                 theReplSet->lastH = h;
@@ -230,8 +238,15 @@ namespace mongo {
                      */
             if( theReplSet ) {
                 if( !(theReplSet->lastOpTimeWritten<ts) ) {
-                    log() << "replSet ERROR possible failover clock skew issue? " << theReplSet->lastOpTimeWritten << ' ' << ts << rsLog;
-                    log() << "replSet " << theReplSet->isPrimary() << rsLog;
+                    log() << "replication oplog stream went back in time. previous timestamp: "
+                          << theReplSet->lastOpTimeWritten << " newest timestamp: " << ts
+                          << ". attempting to sync directly from primary." << endl;
+                    std::string errmsg;
+                    BSONObjBuilder result;
+                    if (!theReplSet->forceSyncFrom(theReplSet->box.getPrimary()->fullName(),
+                                                   errmsg, result)) {
+                        log() << "Can't sync from primary: " << errmsg << endl;
+                    }
                 }
                 theReplSet->lastOpTimeWritten = ts;
                 theReplSet->lastH = hashNew;
