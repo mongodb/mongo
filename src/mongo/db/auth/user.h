@@ -63,6 +63,16 @@ namespace mongo {
         const RoleNameIterator getRoles() const;
 
         /**
+         * Returns an iterator that can be used to get the list of roles this user can delegate.
+         */
+        const RoleNameIterator getDelegatableRoles() const;
+
+        /**
+         * Returns whether or not this user is allowed to delegate the given role.
+         */
+        bool canDelegateRole(const RoleName& role) const;
+
+        /**
          * Returns the CredentialData for this user.
          */
         const CredentialData& getCredentials() const;
@@ -109,6 +119,16 @@ namespace mongo {
         void addRoles(const std::vector<RoleName>& roles);
 
         /**
+         * Adds the given role name to the list of roles that this user is allowed to delegate.
+         */
+        void addDelegatableRole(const RoleName& role);
+
+        /**
+         * Adds the given role names to the list of roles that this user is allowed to delegate.
+         */
+        void addDelegatableRoles(const std::vector<RoleName>& roles);
+
+        /**
          * Adds the given privilege to the list of privileges this user is authorized for.
          */
         void addPrivilege(const Privilege& privilege);
@@ -153,7 +173,8 @@ namespace mongo {
         // Maps resource name to privilege on that resource
         ResourcePrivilegeMap _privileges;
 
-        unordered_set<RoleName> _roles;
+        unordered_set<RoleName> _roles; // Roles the user actually has privileges from
+        unordered_set<RoleName> _delegatableRoles; // Roles the user is allowed to delegate
 
         CredentialData _credentials;
 

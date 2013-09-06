@@ -39,6 +39,15 @@ namespace mongo {
         return RoleNameIterator(new RoleNameSetIterator(_roles.begin(), _roles.end()));
     }
 
+    const RoleNameIterator User::getDelegatableRoles() const {
+        return RoleNameIterator(new RoleNameSetIterator(_delegatableRoles.begin(),
+                                                        _delegatableRoles.end()));
+    }
+
+    bool User::canDelegateRole(const RoleName& role) const {
+        return _delegatableRoles.count(role);
+    }
+
     const User::CredentialData& User::getCredentials() const {
         return _credentials;
     }
@@ -79,6 +88,16 @@ namespace mongo {
     void User::addRoles(const std::vector<RoleName>& roles) {
         for (std::vector<RoleName>::const_iterator it = roles.begin(); it != roles.end(); ++it) {
             _roles.insert(*it);
+        }
+    }
+
+    void User::addDelegatableRole(const RoleName& role) {
+        _delegatableRoles.insert(role);
+    }
+
+    void User::addDelegatableRoles(const std::vector<RoleName>& roles) {
+        for (std::vector<RoleName>::const_iterator it = roles.begin(); it != roles.end(); ++it) {
+            _delegatableRoles.insert(*it);
         }
     }
 
