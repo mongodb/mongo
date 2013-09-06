@@ -47,7 +47,7 @@ namespace auth {
      */
     Status parseAndValidateCreateUserCommand(const BSONObj& cmdObj,
                                              const std::string& dbname,
-                                             const AuthorizationManager* authzManager,
+                                             AuthorizationManager* authzManager,
                                              BSONObj* parsedUserObj);
 
     /**
@@ -59,7 +59,7 @@ namespace auth {
      */
     Status parseAndValidateUpdateUserCommand(const BSONObj& cmdObj,
                                              const std::string& dbname,
-                                             const AuthorizationManager* authzManager,
+                                             AuthorizationManager* authzManager,
                                              BSONObj* parsedUpdateObj,
                                              UserName* parsedUserName);
 

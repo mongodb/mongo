@@ -36,6 +36,7 @@
 #include "mongo/base/status.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/authz_manager_external_state.h"
+#include "mongo/db/auth/role_graph.h"
 #include "mongo/db/auth/user.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/auth/user_name_hash.h"
@@ -144,7 +145,7 @@ namespace mongo {
 
         // Returns an ActionSet of all actions that can be be granted to users.  This does not
         // include internal-only actions.
-        ActionSet getAllUserActions() const;
+        ActionSet getAllUserActions();
 
         /**
          *  Returns the User object for the given userName in the out parameter "acquiredUser".
@@ -188,7 +189,7 @@ namespace mongo {
         /**
          * Returns true if the role name given refers to a valid system or user defined role.
          */
-        bool roleExists(const RoleName& role) const;
+        bool roleExists(const RoleName& role);
 
         /**
          * Initializes the authorization manager.  Depending on what version the authorization
@@ -208,8 +209,7 @@ namespace mongo {
          * This should never be called from outside the AuthorizationManager - the only reason it's
          * public instead of private is so it can be unit tested.
          */
-        Status _initializeUserFromPrivilegeDocument(User* user,
-                                                    const BSONObj& privDoc) const;
+        Status _initializeUserFromPrivilegeDocument(User* user, const BSONObj& privDoc);
 
         /**
          * Upgrades authorization data stored in collections from the v1 form (one system.users
@@ -234,6 +234,12 @@ namespace mongo {
          * when holding _lock.
          */
         int _getVersion_inlock() const { return _version; }
+
+        /**
+         * Modifies the given User object by inspecting its roles and giving it the relevant
+         * privileges from those roles.
+         */
+        void _initializeUserPrivilegesFromRoles_inlock(User* user);
 
         /**
          * Invalidates all User objects in the cache and removes them from the cache.
@@ -284,7 +290,12 @@ namespace mongo {
         unordered_map<UserName, User*> _userCache;
 
         /**
-         * Protects _userCache, _version, and _parser.
+         * Stores a full representation of all roles in the system (both user-defined and built-in)
+         */
+        RoleGraph _roleGraph;
+
+        /**
+         * Protects _userCache, _roleGraph, _version, and _parser.
          */
         boost::mutex _lock;
     };

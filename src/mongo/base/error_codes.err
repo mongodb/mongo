@@ -48,5 +48,6 @@ error_code("UserDataInconsistent", 45)
 error_code("LockBusy", 46)
 error_code("NoMatchingDocument", 47)
 error_code("NamespaceExists", 48)
+error_code("InvalidRoleModification", 49)
 
 error_class("NetworkError", ["HostUnreachable", "HostNotFound"])

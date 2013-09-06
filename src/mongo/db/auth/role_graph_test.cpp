@@ -45,13 +45,12 @@ namespace {
         RoleName roleA("roleA", "dbA");
         RoleName roleB("roleB", "dbB");
         RoleName roleC("roleC", "dbC");
-        RoleName roleD("roleD", "dbD");
+        RoleName roleD("readWrite", "dbD"); // built-in role
 
         RoleGraph graph;
         ASSERT_OK(graph.createRole(roleA));
         ASSERT_OK(graph.createRole(roleB));
         ASSERT_OK(graph.createRole(roleC));
-        ASSERT_OK(graph.createRole(roleD));
 
         RoleNameIterator it;
         it = graph.getDirectSubordinates(roleA);
@@ -274,7 +273,7 @@ namespace {
         RoleName roleA("roleA", "dbA");
         RoleName roleB("roleB", "dbB");
         RoleName roleC("roleC", "dbC");
-        RoleName roleD("roleD", "dbD");
+        RoleName roleD("readWrite", "dbD"); // built-in role
 
         ActionSet actions;
         actions.addAllActions();
@@ -283,12 +282,10 @@ namespace {
         ASSERT_OK(graph.createRole(roleA));
         ASSERT_OK(graph.createRole(roleB));
         ASSERT_OK(graph.createRole(roleC));
-        ASSERT_OK(graph.createRole(roleD));
 
         ASSERT_OK(graph.addPrivilegeToRole(roleA, Privilege("dbA", actions)));
         ASSERT_OK(graph.addPrivilegeToRole(roleB, Privilege("dbB", actions)));
         ASSERT_OK(graph.addPrivilegeToRole(roleC, Privilege("dbC", actions)));
-        ASSERT_OK(graph.addPrivilegeToRole(roleD, Privilege("dbD", actions)));
 
         ASSERT_OK(graph.recomputePrivilegeData());
 
@@ -564,6 +561,51 @@ namespace {
         // Now add only 1 back and this time removing both should fail
         ASSERT_OK(graph.addPrivilegeToRole(roleA, privilege1));
         ASSERT_NOT_OK(graph.removePrivilegesFromRole(roleA, privileges));
+    }
+
+
+    TEST(RoleGraphTest, BuiltinRoles) {
+        RoleName userRole("userDefined", "dbA");
+        RoleName builtinRole("read", "dbA");
+
+        ActionSet actions;
+        actions.addAction(ActionType::insert);
+        Privilege privilege("dbA", actions);
+
+        RoleGraph graph;
+
+        ASSERT(graph.roleExists(builtinRole));
+        ASSERT_NOT_OK(graph.createRole(builtinRole));
+        ASSERT_NOT_OK(graph.deleteRole(builtinRole));
+        ASSERT(graph.roleExists(builtinRole));
+        ASSERT(!graph.roleExists(userRole));
+        ASSERT_OK(graph.createRole(userRole));
+        ASSERT(graph.roleExists(userRole));
+
+        ASSERT_NOT_OK(graph.addPrivilegeToRole(builtinRole, privilege));
+        ASSERT_NOT_OK(graph.removePrivilegeFromRole(builtinRole, privilege));
+        ASSERT_NOT_OK(graph.addRoleToRole(builtinRole, userRole));
+        ASSERT_NOT_OK(graph.removeRoleFromRole(builtinRole, userRole));
+
+        ASSERT_OK(graph.addPrivilegeToRole(userRole, privilege));
+        ASSERT_OK(graph.addRoleToRole(userRole, builtinRole));
+        ASSERT_OK(graph.recomputePrivilegeData());
+
+        PrivilegeVector privileges = graph.getDirectPrivileges(userRole);
+        ASSERT_EQUALS(1U, privileges.size());
+        ASSERT(privileges[0].getActions().equals(actions));
+        ASSERT(!privileges[0].getActions().contains(ActionType::find));
+        ASSERT_EQUALS("dbA", privileges[0].getResource());
+
+        privileges = graph.getAllPrivileges(userRole);
+        ASSERT_EQUALS(1U, privileges.size());
+        ASSERT(privileges[0].getActions().isSupersetOf(actions));
+        ASSERT(privileges[0].getActions().contains(ActionType::insert));
+        ASSERT(privileges[0].getActions().contains(ActionType::find));
+        ASSERT_EQUALS("dbA", privileges[0].getResource());
+
+        ASSERT_OK(graph.deleteRole(userRole));
+        ASSERT(!graph.roleExists(userRole));
     }
 
 }  // namespace
