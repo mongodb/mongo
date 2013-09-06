@@ -222,7 +222,15 @@ namespace mongo {
             std::string absoluteLogpath = boost::filesystem::absolute(
                     cmdLine.logpath, cmdLine.cwd).string();
 
-            const bool exists = boost::filesystem::exists(absoluteLogpath);
+            bool exists;
+
+            try{
+                exists = boost::filesystem::exists(absoluteLogpath);
+            } catch(boost::filesystem::filesystem_error& e) {
+                return Status(ErrorCodes::FileNotOpen, mongoutils::str::stream() <<
+                        "Failed probe for \"" << absoluteLogpath << "\": " <<
+                        e.code().message());
+            }
 
             if (exists) {
                 if (boost::filesystem::is_directory(absoluteLogpath)) {
