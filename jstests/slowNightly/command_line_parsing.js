@@ -32,7 +32,7 @@ var m3 = startMongod("--port", port+4, "--dbpath", "/data/db/" + baseName +"4",
 var m3expected = {
     "parsed" : {
         "config" : "jstests/libs/testconfig",
-        "dbpath" : "/data/db/jstests_slowNightly_command_line_parsing2",
+        "dbpath" : "/data/db/jstests_slowNightly_command_line_parsing4",
         "fastsync" : true,
         "port" : 31004,
     }
