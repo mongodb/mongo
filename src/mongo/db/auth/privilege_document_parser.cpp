@@ -428,7 +428,8 @@ namespace {
                 user->addRole(RoleName(roleNameElement.String(), roleSourceElement.String()));
             }
             if (canDelegateElement.Bool()) {
-                // TODO(spencer): record the fact that this user can delegate this role
+                user->addDelegatableRole(RoleName(roleNameElement.String(),
+                                                  roleSourceElement.String()));
             }
         }
         return Status::OK();

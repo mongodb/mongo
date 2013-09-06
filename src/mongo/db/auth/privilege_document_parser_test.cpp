@@ -269,6 +269,10 @@ namespace {
                 "test"));
         RoleNameIterator nameIt = user->getRoles();
         ASSERT(!nameIt.more());
+        nameIt = user->getDelegatableRoles();
+        ASSERT(nameIt.more());
+        ASSERT(nameIt.next() == RoleName("roleA", "dbA"));
+        ASSERT(!nameIt.more());
 
         // Valid role names are extracted successfully
         ASSERT_OK(v2parser.initializeUserRolesFromPrivilegeDocument(
@@ -283,6 +287,10 @@ namespace {
         ASSERT(nameIt.more());
         ASSERT(nameIt.next() == RoleName("roleA", "dbA"));
         ASSERT(!nameIt.more());
+        nameIt = user->getDelegatableRoles();
+        ASSERT(nameIt.more());
+        ASSERT(nameIt.next() == RoleName("roleA", "dbA"));
+        ASSERT(!nameIt.more());
 
         // Multiple roles OK
         ASSERT_OK(v2parser.initializeUserRolesFromPrivilegeDocument(
@@ -294,7 +302,7 @@ namespace {
                                                 "hasRole" << true) <<
                                            BSON("name" << "roleB" <<
                                                 "source" << "dbB" <<
-                                                "canDelegate" << true <<
+                                                "canDelegate" << false <<
                                                 "hasRole" << true))),
                 "test"));
         nameIt = user->getRoles();
@@ -310,6 +318,12 @@ namespace {
             ASSERT(false);
         }
         ASSERT(!nameIt.more());
+        nameIt = user->getDelegatableRoles();
+        ASSERT(nameIt.more());
+        ASSERT(nameIt.next() == RoleName("roleA", "dbA"));
+        ASSERT(!nameIt.more());
+        ASSERT(user->canDelegateRole(RoleName("roleA", "dbA")));
+        ASSERT(!user->canDelegateRole(RoleName("roleB", "dbB")));
     }
 
 }  // namespace

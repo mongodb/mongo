@@ -771,7 +771,7 @@ namespace {
                 BSONObjBuilder roleBuilder(rolesArray.subobjStart());
                 roleBuilder.append("name", roleName.getRole());
                 roleBuilder.append("source", roleName.getDB());
-                roleBuilder.appendBool("canDelegate", false);
+                roleBuilder.appendBool("canDelegate", user.canDelegateRole(roleName));
                 roleBuilder.appendBool("hasRole", true);
                 roleBuilder.doneFast();
             }

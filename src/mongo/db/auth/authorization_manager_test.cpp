@@ -562,7 +562,7 @@ namespace {
                      "credentials" << BSON("MONGODB-CR" << "password") <<
                      "roles" << BSON_ARRAY(BSON("name" << "clusterAdmin" <<
                                                 "source" << "admin" <<
-                                                "canDelegate" << false <<
+                                                "canDelegate" << true <<
                                                 "hasRole" << true)))));
 
         User* v2read;
@@ -576,6 +576,7 @@ namespace {
         ASSERT_EQUALS("test", roleName.getDB());
         ASSERT_EQUALS("read", roleName.getRole());
         ASSERT_FALSE(it.more());
+        ASSERT(!v2read->canDelegateRole(roleName));
         ActionSet actions = v2read->getActionsForResource("test");
         ASSERT(actions.contains(ActionType::find));
         ASSERT_FALSE(actions.contains(ActionType::insert));
@@ -597,6 +598,13 @@ namespace {
         ASSERT_EQUALS("admin", roleName.getDB());
         ASSERT_EQUALS("clusterAdmin", roleName.getRole());
         ASSERT_FALSE(it.more());
+        it = v2cluster->getDelegatableRoles();
+        ASSERT(it.more());
+        roleName = it.next();
+        ASSERT_EQUALS("admin", roleName.getDB());
+        ASSERT_EQUALS("clusterAdmin", roleName.getRole());
+        ASSERT_FALSE(it.more());
+        ASSERT(v2cluster->canDelegateRole(roleName));
         actions = v2cluster->getActionsForResource("*");
         ASSERT(actions.contains(ActionType::listDatabases));
         ASSERT(actions.contains(ActionType::dropDatabase));
