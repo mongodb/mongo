@@ -26,7 +26,7 @@ delete m2result.parsed.setParameter
 assert.docEq( m2expected.parsed, m2result.parsed );
 
 // test JSON config file
-var m3 = startMongod("--port", port+4, "--dbpath", "/data/db/" + baseName +"2",
+var m3 = startMongod("--port", port+4, "--dbpath", "/data/db/" + baseName +"4",
                      "--config", "jstests/libs/testconfig");
 
 var m3expected = {
