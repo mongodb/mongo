@@ -40,6 +40,8 @@
 #include <stddef.h>
 #include <ctype.h>
 #include <limits.h>
+#include <dirent.h>
+#include <sys/stat.h>
 
 #include <wiredtiger.h>
 #include <wiredtiger_ext.h>
@@ -127,6 +129,8 @@ int lprintf(CONFIG *cfg, int err, uint32_t level, const char *fmt, ...)
 void *populate_thread(void *);
 void print_config(CONFIG *);
 void *read_thread(void *);
+int remove_all(const char *, int);
+int remove_dir(const char *);
 int setup_log_file(CONFIG *);
 int start_threads(CONFIG *, u_int, pthread_t **, void *(*func)(void *));
 void *stat_worker(void *);
@@ -142,6 +146,8 @@ uint64_t wtperf_value_range(CONFIG *);
 #define	DEFAULT_LSM_CONFIG						\
 	"key_format=S,value_format=S,type=lsm,exclusive=true,"		\
 	"leaf_page_max=4kb,internal_page_max=64kb,allocation_size=4kb,"
+
+const char *wtperftmp_subdir = "/wtperftmp";
 
 /* Worker thread types. */
 #define WORKER_READ		0x01
@@ -866,7 +872,7 @@ int main(int argc, char **argv)
 	int ch, checkpoint_created, ret, stat_created;
 	const char *user_cconfig, *user_tconfig;
 	const char *opts = "C:O:T:h:o:SML";
-	char *cc_buf, *tc_buf;
+	char *cc_buf, *tc_buf, *opt_home;
 
 	/* Setup the default configuration values. */
 	memset(&cfg, 0, sizeof(cfg));
@@ -892,14 +898,26 @@ int main(int argc, char **argv)
 			return (EINVAL);
 		}
 
+	opt_home = malloc(strlen(cfg.home) + strlen(wtperftmp_subdir) + 1);
+	strcpy(opt_home, cfg.home);
+	strcat(opt_home, wtperftmp_subdir);
+	if ((ret = remove_all(opt_home, 0)) != 0)
+		goto err;
+
+	if ((ret = mkdir(opt_home, 0777)) != 0) {
+		fprintf(stderr, "wtperf: mkdir %s: %s\n", opt_home,
+		    strerror(errno));
+		goto err;
+	}
+
 	/*
-	 * We do the open now, since we'll need a connection and
+	 * We do an open now, since we'll need a connection and
 	 * session to use the extension config parser.  We will
 	 * reconfigure later as needed.
 	 */
 	if ((ret = wiredtiger_open(
-	    cfg.home, NULL, "create", &conn)) != 0) {
-		lprintf(&cfg, ret, 0, "Error connecting to %s", cfg.home);
+	    opt_home, NULL, "create", &conn)) != 0) {
+		lprintf(&cfg, ret, 0, "Error connecting to %s", opt_home);
 		goto err;
 	}
 
@@ -1015,17 +1033,25 @@ int main(int argc, char **argv)
 
 	parse_session->close(parse_session, NULL);
 	parse_session = NULL;
+	if ((ret = conn->close(conn, NULL)) != 0) {
+		fprintf(stderr,
+		    "Error closing connection to %s: %s",
+		    opt_home, wiredtiger_strerror(ret));
+		goto err;
+	}
+
+	if ((ret = remove_all(opt_home, 1)) != 0)
+		goto err;
 
 	if (cfg.verbose > 1)
 		print_config(&cfg);
 
-	/* Reconfigure our connection to the database. */
-	if ((ret = connection_reconfigure(conn, cfg.conn_config)) != 0) {
-		lprintf(&cfg, ret, 0, "Error configuring using %s",
-		    cfg.conn_config);
+	/* Now open the real connection. */
+	if ((ret = wiredtiger_open(
+	    cfg.home, NULL, cfg.conn_config, &conn)) != 0) {
+		lprintf(&cfg, ret, 0, "Error connecting to %s", cfg.home);
 		goto err;
 	}
-
 	cfg.conn = conn;
 
 	g_util_running = 1;
@@ -1264,7 +1290,7 @@ config_opt_file(CONFIG *cfg, WT_SESSION *parse_session, const char *filename)
 
 	if ((fp = fopen(filename, "r")) == NULL) {
 		fprintf(stderr, "wtperf: %s: %s\n", filename, strerror(errno));
-		return errno;
+		return (errno);
 	}
 
 	ret = 0;
@@ -1434,6 +1460,73 @@ config_opt_usage(void)
 }
 
 int
+remove_all(const char *name, int report)
+{
+	int ret;
+	struct stat statbuf;
+
+	ret = 0;
+	if (stat(name, &statbuf) == 0) {
+		if ((statbuf.st_mode & S_IFMT) == S_IFDIR) {
+			ret = remove_dir(name);
+		} else if (unlink(name) != 0) {
+			fprintf(stderr, "wtperf: unlink %s: %s\n",
+			    name, strerror(errno));
+			ret = errno;
+		}
+	} else if (report || errno != ENOENT) {
+		fprintf(stderr, "wtperf: stat %s: %s\n", name, strerror(errno));
+		ret = errno;
+	}
+	return (ret);
+}
+
+int
+remove_dir(const char *name)
+{
+	int ret, t_ret;
+	char *newname;
+	DIR *dirp;
+	struct dirent *dp;
+
+	ret = 0;
+	if ((dirp = opendir(name)) == NULL) {
+		fprintf(stderr, "wtperf: opendir %s: %s\n",
+		    name, strerror(errno));
+		ret = errno;
+	}
+	else {
+		while ((dp = readdir(dirp)) != NULL) {
+			if (dp->d_name[0] == '.' &&
+			    (strcmp(dp->d_name, ".") == 0 ||
+			    strcmp(dp->d_name, "..") == 0))
+				continue;
+			if ((newname = calloc(
+			    strlen(name) + dp->d_namlen + 1, 1)) == NULL) {
+				fprintf(stderr, "wtperf: remove: no memory\n");
+				if (ret == 0)
+					ret = ENOMEM;
+			} else {
+				sprintf(newname, "%s/%*s",
+				    name, dp->d_namlen, dp->d_name);
+				if ((t_ret = remove_all(newname, 1) != 0) &&
+				    ret == 0)
+					ret = t_ret;
+				free(newname);
+			}
+		}
+		(void)closedir(dirp);
+		if (rmdir(name) != 0) {
+			fprintf(stderr, "wtperf: rmdir %s: %s\n",
+			    name, strerror(errno));
+			if (ret == 0)
+				ret = errno;
+		}
+	}
+	return (ret);
+}
+
+int
 start_threads(
     CONFIG *cfg, u_int num, pthread_t **threadsp, void *(*func)(void *))
 {
@@ -1571,7 +1664,7 @@ uint64_t wtperf_rand(CONFIG *cfg) {
 	}
 	/* Avoid zero - LSM doesn't like it. */
 	rval = (rval % wtperf_value_range(cfg)) + 1;
-	return rval;
+	return (rval);
 }
 
 void indent_lines(const char *lines, const char *indent)
