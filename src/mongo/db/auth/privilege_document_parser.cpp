@@ -54,12 +54,6 @@ namespace {
     const std::string MONGODB_CR_CREDENTIAL_FIELD_NAME = "MONGODB-CR";
 }  // namespace
 
-    static inline Status _oldPrivilegeFormatNotSupported() {
-        return Status(ErrorCodes::UnsupportedFormat,
-                      "Support for compatibility-form privilege documents disabled; "
-                      "All system.users entries must contain a 'roles' field");
-    }
-
     static inline Status _badValue(const char* reason, int location) {
         return Status(ErrorCodes::BadValue, reason, location);
     }
