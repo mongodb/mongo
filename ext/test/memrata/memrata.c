@@ -3324,9 +3324,9 @@ wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 	wtext = connection->get_extension_api(connection);
 
 						/* Check the library version */
-#if KVS_VERSION_MAJOR != 4 || KVS_VERSION_MINOR != 11
+#if KVS_VERSION_MAJOR != 4 || KVS_VERSION_MINOR != 13
 	ERET(wtext, NULL, EINVAL,
-	    "unsupported KVS library version %d.%d, expected version 4.11",
+	    "unsupported KVS library version %d.%d, expected version 4.13",
 	    KVS_VERSION_MAJOR, KVS_VERSION_MINOR);
 #endif
 
