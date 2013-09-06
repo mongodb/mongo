@@ -300,7 +300,13 @@ class Import : public Tool {
     }
 
 public:
-    Import() : Tool( "import" ) { }
+    Import() : Tool( "import" ) {
+        _type = JSON;
+        _ignoreBlanks = false;
+        _headerLine = false;
+        _upsert = false;
+        _doimport = true;
+    }
 
     virtual void printHelp( ostream & out ) {
         printMongoImportHelp(options, &out);

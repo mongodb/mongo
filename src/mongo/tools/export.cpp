@@ -58,7 +58,9 @@ namespace mongo {
 
 class Export : public Tool {
 public:
-    Export() : Tool( "export" ) { }
+    Export() : Tool( "export" ) {
+        _usesstdout = false;
+    }
 
     virtual void preSetup() {
         if ( hasParam("out") ) {
