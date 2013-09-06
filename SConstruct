@@ -163,6 +163,7 @@ add_option( "release" , "release build" , 0 , True )
 add_option( "static" , "fully static build" , 0 , False )
 add_option( "static-libstdc++" , "statically link libstdc++" , 0 , False )
 add_option( "lto", "enable link time optimizations (experimental, except with MSVC)" , 0 , True )
+add_option( "dynamic-windows", "dynamically link on Windows", 0, True)
 
 # base compile flags
 add_option( "64" , "whether to force 64 bit" , 0 , True , "force64" )
@@ -618,7 +619,8 @@ elif os.sys.platform.startswith( "openbsd" ):
 
 elif "win32" == os.sys.platform:
     windows = True
-
+    dynamicCRT = has_option("dynamic-windows")
+    
     env['DIST_ARCHIVE_SUFFIX'] = '.zip'
 
     win_version_min_choices = {
@@ -682,29 +684,35 @@ elif "win32" == os.sys.platform:
     if release:
         # /O2:  optimize for speed (as opposed to size)
         # /Oy-: disable frame pointer optimization (overrides /O2, only affects 32-bit)
-        # /MT:  use the multithreaded, static version of the run-time library (LIBCMT.lib)
-        env.Append( CCFLAGS= ["/O2", "/Oy-", "/MT"] )
+        env.Append( CCFLAGS= ["/O2", "/Oy-"] )
 
         # /DEBUG will tell the linker to create a .pdb file
         # which WinDbg and Visual Studio will use to resolve
         # symbols if you want to debug a release-mode image.
         # Note that this means we can't do parallel links in the build.
         env.Append( LINKFLAGS=" /DEBUG " )
+
+        # /MD:  use the multithreaded, DLL version of the run-time library (MSVCRT.lib/MSVCR###.DLL)
+        # /MT:  use the multithreaded, static version of the run-time library (LIBCMT.lib)
+        if dynamicCRT:
+            env.Append( CCFLAGS= ["/MD"] )
+        else:
+            env.Append( CCFLAGS= ["/MT"] )
     else:
         # /RTC1: - Enable Stack Frame Run-Time Error Checking; Reports when a variable is used without having been initialized
         #        (implies /Od: no optimizations)
-        # /MTd: Defines _DEBUG, _MT, and causes your application to use the
-        #       debug multithread version of the run-time library (LIBCMTD.lib)
-        env.Append( CCFLAGS=["/RTC1", "/Od", "/MTd"] )
+        env.Append( CCFLAGS=["/RTC1", "/Od"] )
         if debugBuild:
             # If you build without --d, no debug PDB will be generated, and 
             # linking will be faster. However, you won't be able to debug your code with the debugger.
             env.Append( LINKFLAGS=" /debug " )
-        #if debugLogging:
-            # This is already implicit from /MDd...
-            #env.Append( CPPDEFINES=[ "_DEBUG" ] )
-            # This means --dd is always on unless you say --release
-
+        # /MDd: Defines _DEBUG, _MT, _DLL, and uses MSVCRTD.lib/MSVCRD###.DLL
+        # /MTd: Defines _DEBUG, _MT, and causes your application to use the
+        #       debug multithread version of the run-time library (LIBCMTD.lib)
+        if dynamicCRT:
+            env.Append( CCFLAGS= ["/MDd"] )
+        else:
+            env.Append( CCFLAGS= ["/MTd"] )
     # This gives 32-bit programs 4 GB of user address space in WOW64, ignored in 64-bit builds
     env.Append( LINKFLAGS=" /LARGEADDRESSAWARE " )
 
