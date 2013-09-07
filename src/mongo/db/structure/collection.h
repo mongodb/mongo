@@ -35,6 +35,8 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/diskloc.h"
 #include "mongo/db/exec/collection_scan_common.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/structure/record_store.h"
 
 namespace mongo {
 
@@ -60,10 +62,17 @@ namespace mongo {
 
         bool ok() const { return _magic == 1357924; }
 
-        StringData ns() const { return _ns; }
+        const NamespaceString& ns() const { return _ns; }
+
+        BSONObj docFor( const DiskLoc& loc );
 
         CollectionIterator* getIterator( const DiskLoc& start, bool tailable,
                                          const CollectionScanParams::Direction& dir) const;
+
+        void deleteDocument( const DiskLoc& loc,
+                             bool cappedOK = false,
+                             bool noWarn = false,
+                             BSONObj* deletedId = 0 );
 
     private:
 
@@ -72,13 +81,15 @@ namespace mongo {
 
         int _magic;
 
-        std::string _ns;
+        NamespaceString _ns;
         NamespaceDetails* _details;
         Database* _database;
+        RecordStore _recordStore;
 
         friend class Database;
         friend class FlatIterator;
         friend class CappedIterator;
+        friend class RecordStore;
     };
 
 }

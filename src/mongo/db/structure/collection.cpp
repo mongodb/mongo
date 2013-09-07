@@ -30,20 +30,25 @@
 
 #include "mongo/db/structure/collection.h"
 
+#include "mongo/db/clientcursor.h"
 #include "mongo/db/database.h"
 #include "mongo/db/namespace_details.h"
 #include "mongo/db/storage/extent.h"
 #include "mongo/db/storage/extent_manager.h"
 #include "mongo/db/structure/collection_iterator.h"
 
+#include "mongo/db/pdfile.h" // XXX-ERH
+#include "mongo/db/index_update.h" // XXX-ERH
+
 namespace mongo {
 
     CollectionTemp::CollectionTemp( const StringData& fullNS,
                                     NamespaceDetails* details,
-                                    Database* database ) {
-        _ns = fullNS.toString();
+                                    Database* database )
+        : _ns( fullNS ) {
         _details = details;
         _database = database;
+        _recordStore.init( this );
         _magic = 1357924;
     }
 
@@ -58,6 +63,40 @@ namespace mongo {
         if ( _details->isCapped() )
             return new CappedIterator( this, start, tailable, dir );
         return new FlatIterator( this, start, dir );
+    }
+
+    BSONObj CollectionTemp::docFor( const DiskLoc& loc ) {
+        Record* rec = getExtentManager()->recordFor( loc );
+        return BSONObj::make( rec->accessed() );
+    }
+
+    void CollectionTemp::deleteDocument( const DiskLoc& loc, bool cappedOK, bool noWarn,
+                                         BSONObj* deletedId ) {
+        if ( _details->isCapped() && !cappedOK ) {
+            log() << "failing remove on a capped ns " << _ns << endl;
+            uasserted( 17115,  "cannot remove from a capped collection" ); // XXX 10089
+            return;
+        }
+
+        if ( deletedId ) {
+            BSONObj doc = docFor( loc );
+            BSONElement e = doc["_id"];
+            if ( e.type() ) {
+                *deletedId = e.wrap();
+            }
+        }
+
+        /* check if any cursors point to us.  if so, advance them. */
+        ClientCursor::aboutToDelete(_ns.ns(), _details, loc);
+
+        Record* rec = getExtentManager()->recordFor( loc );
+
+        unindexRecord(_details, rec, loc, noWarn);
+
+        _recordStore.deallocRecord( loc, rec );
+
+        NamespaceDetailsTransient::get( _ns.ns().c_str() ).notifyOfWriteOp();
+
     }
 
 

@@ -43,6 +43,7 @@
 #include "mongo/db/pdfile.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/ops/delete.h"
+#include "mongo/db/structure/collection.h"
 
 namespace mongo {
 

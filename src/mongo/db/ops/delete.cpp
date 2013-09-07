@@ -40,6 +40,7 @@
 #include "mongo/db/query_optimizer.h"
 #include "mongo/db/queryutil.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/structure/collection.h"
 #include "mongo/util/stacktrace.h"
 
 namespace mongo {
@@ -148,7 +149,9 @@ namespace mongo {
                 }
             }
 
-            theDataFileMgr.deleteRecord(ns, rloc.rec(), rloc);
+            //theDataFileMgr.deleteRecord(ns, rloc.rec(), rloc);
+            currentClient.get()->database()->getCollectionTemp( ns )->deleteDocument( rloc );
+
             nDeleted++;
             if ( foundAllResults ) {
                 break;

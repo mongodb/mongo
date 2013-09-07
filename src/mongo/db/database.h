@@ -35,10 +35,10 @@
 #include "mongo/db/namespace_details.h"
 #include "mongo/db/storage/record.h"
 #include "mongo/db/storage/extent_manager.h"
-#include "mongo/db/structure/collection.h"
 
 namespace mongo {
 
+    class CollectionTemp;
     class Extent;
     class DataFile;
 
