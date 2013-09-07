@@ -44,12 +44,12 @@
 #include "mongo/db/ops/update_request.h"
 #include "mongo/db/ops/update_result.h"
 #include "mongo/db/pagefault.h"
-#include "mongo/db/pdfile.h"
 #include "mongo/db/query_optimizer.h"
 #include "mongo/db/query_runner.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/write_concern.h"
+#include "mongo/db/structure/collection.h"
 #include "mongo/s/d_logic.h"
 
 namespace mongo {
@@ -389,12 +389,12 @@ namespace mongo {
                         break;
                     }
                 }
-                
+
                 if ( callback )
                     callback->goingToDelete( obj );
-                
+
                 logOp("d", ns.c_str(), obj["_id"].wrap(), 0, 0, fromMigrate);
-                theDataFileMgr.deleteRecord(ns.c_str() , rloc.rec(), rloc);
+                c.database()->getCollectionTemp( ns )->deleteDocument( rloc );
                 numDeleted++;
             }
 
