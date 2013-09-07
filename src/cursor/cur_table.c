@@ -356,38 +356,50 @@ __curtable_insert(WT_CURSOR *cursor)
 	WT_CURSOR_TABLE *ctable;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
+	uint32_t size;
 	u_int i;
+	const void *data;
 
 	ctable = (WT_CURSOR_TABLE *)cursor;
 	CURSOR_UPDATE_API_CALL(cursor, session, insert, NULL);
 	cp = ctable->cg_cursors;
 
 	/*
-	 * Split out the first insert, it may be allocating a recno, and this
-	 * is also the point at which we discover whether this is an overwrite.
+	 * If configured for overwriting, there are indices and the row exists,
+	 * call update, which removes the indices previous rows.
 	 */
 	primary = *cp++;
-	if ((ret = primary->insert(primary)) != 0) {
-		if (ret == WT_DUPLICATE_KEY &&
-		    F_ISSET(cursor, WT_CURSTD_OVERWRITE)) {
-			/*
-			 * !!! The insert failure clears these flags, but does
-			 * not touch the items.  We could make a copy every time
-			 * for overwrite cursors, but for now we just reset the
-			 * flags.
-			 */
-			F_SET(primary, WT_CURSTD_KEY_EXT | WT_CURSTD_VALUE_EXT);
-			ret = __curtable_update(cursor);
+	if (ctable->table->nindices != 0 &&
+	    F_ISSET(cursor, WT_CURSTD_OVERWRITE)) {
+		/*
+		 * !!!
+		 * A search success resets the cursor's value, a search failure
+		 * clears the ext flags.
+		 */
+		data = primary->value.data;
+		size = primary->value.size;
+		ret = primary->search(primary);
+		primary->value.data = data;
+		primary->value.size = size;
+		F_SET(primary, WT_CURSTD_KEY_EXT | WT_CURSTD_VALUE_EXT);
+
+		if (ret == 0)
+			WT_ERR(__curtable_update(cursor));
+		else {
+			WT_ERR_NOTFOUND_OK(ret);
+			goto insert;
 		}
-		goto err;
-	}
+	} else {
+insert:		/* Split out the first insert, it may be allocating a recno. */
+		WT_ERR(primary->insert(primary));
 
-	for (i = 1; i < WT_COLGROUPS(ctable->table); i++, cp++) {
-		(*cp)->recno = primary->recno;
-		WT_ERR((*cp)->insert(*cp));
-	}
+		for (i = 1; i < WT_COLGROUPS(ctable->table); i++, cp++) {
+			(*cp)->recno = primary->recno;
+			WT_ERR((*cp)->insert(*cp));
+		}
 
-	APPLY_IDX(ctable, insert);
+		APPLY_IDX(ctable, insert);
+	}
 
 err:	CURSOR_UPDATE_API_END(session, ret);
 	return (ret);
@@ -596,11 +608,11 @@ __curtable_open_colgroups(WT_CURSOR_TABLE *ctable, const char *cfg_arg[])
 	WT_TABLE *table;
 	WT_CURSOR **cp;
 	/*
-	 * Underlying column groups are always opened without dump or
-	 * overwrite, and only the primary is opened with next_random.
+	 * Underlying column groups are always opened without dump, and only
+	 * the primary is opened with next_random.
 	 */
 	const char *cfg[] = {
-		cfg_arg[0], cfg_arg[1], "dump=\"\",overwrite=false", NULL, NULL
+		cfg_arg[0], cfg_arg[1], "dump=\"\"", NULL, NULL
 	};
 	u_int i;
 
