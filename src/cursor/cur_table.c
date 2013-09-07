@@ -356,50 +356,45 @@ __curtable_insert(WT_CURSOR *cursor)
 	WT_CURSOR_TABLE *ctable;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	uint32_t size;
+	uint32_t flag_orig;
 	u_int i;
-	const void *data;
 
 	ctable = (WT_CURSOR_TABLE *)cursor;
 	CURSOR_UPDATE_API_CALL(cursor, session, insert, NULL);
 	cp = ctable->cg_cursors;
 
 	/*
-	 * If configured for overwriting, there are indices and the row exists,
-	 * call update, which removes the indices previous rows.
+	 * Split out the first insert, it may be allocating a recno, and this
+	 * is when we discover if this is an overwrite (configure the primary
+	 * cursor for no-overwrite, and see if the insert returns a duplicate
+	 * key exists error).
 	 */
 	primary = *cp++;
-	if (ctable->table->nindices != 0 &&
-	    F_ISSET(cursor, WT_CURSTD_OVERWRITE)) {
+
+	flag_orig = F_ISSET(primary, WT_CURSTD_OVERWRITE);
+	F_CLR(primary, WT_CURSTD_OVERWRITE);
+	ret = primary->insert(primary);
+	F_SET(primary, flag_orig);
+
+	if (ret == WT_DUPLICATE_KEY && F_ISSET(cursor, WT_CURSTD_OVERWRITE)) {
 		/*
 		 * !!!
-		 * A search success resets the cursor's value, a search failure
-		 * clears the ext flags.
+		 * The insert failure clears these flags, but does not touch the
+		 * items.  We could make a copy each time for overwrite cursors,
+		 * but for now we just reset the flags.
 		 */
-		data = primary->value.data;
-		size = primary->value.size;
-		ret = primary->search(primary);
-		primary->value.data = data;
-		primary->value.size = size;
 		F_SET(primary, WT_CURSTD_KEY_EXT | WT_CURSTD_VALUE_EXT);
-
-		if (ret == 0)
-			WT_ERR(__curtable_update(cursor));
-		else {
-			WT_ERR_NOTFOUND_OK(ret);
-			goto insert;
-		}
-	} else {
-insert:		/* Split out the first insert, it may be allocating a recno. */
-		WT_ERR(primary->insert(primary));
-
-		for (i = 1; i < WT_COLGROUPS(ctable->table); i++, cp++) {
-			(*cp)->recno = primary->recno;
-			WT_ERR((*cp)->insert(*cp));
-		}
-
-		APPLY_IDX(ctable, insert);
+		ret = __curtable_update(cursor);
+		goto err;
 	}
+	WT_ERR(ret);
+
+	for (i = 1; i < WT_COLGROUPS(ctable->table); i++, cp++) {
+		(*cp)->recno = primary->recno;
+		WT_ERR((*cp)->insert(*cp));
+	}
+
+	APPLY_IDX(ctable, insert);
 
 err:	CURSOR_UPDATE_API_END(session, ret);
 	return (ret);
