@@ -621,8 +621,8 @@ struct __wt_session {
 	 * @config{next_random, configure the cursor to return a pseudo-random
 	 * record from the object; valid only for row-store cursors.  Cursors
 	 * configured with \c next_random=true only support the WT_CURSOR::next
-	 * and WT_CURSOR::close methods.  See @ref cursor_random for details.,
-	 * a boolean flag; default \c false.}
+	 * and WT_CURSOR::close methods.  See @ref cursor_random for details., a
+	 * boolean flag; default \c false.}
 	 * @config{overwrite, configures whether the cursor's insert\, update
 	 * and remove methods check the existing state of the record.  If \c
 	 * overwrite is \c false\, WT_CURSOR::insert fails with
