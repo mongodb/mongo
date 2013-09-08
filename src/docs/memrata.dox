@@ -123,13 +123,7 @@ cursors for bulk load has no effect.
 
 @section memrata_limitations Memrata limitations
 
-The Memrata device support is not yet complete; currently:
-
 - WiredTiger transactions cannot include operations on both Memrata devices
 and other stores.
-- Memrata devices cannot be recovered, and must be shut down cleanly to be
-used again.
-
-These limitations will be removed shortly.
 
 */
