@@ -28,20 +28,41 @@
 
 #include "mongo/db/query/index_bounds.h"
 
-namespace {
-
-    // Return a value in the set {-1, 0, 1} to represent the sign of parameter i.
-    int sgn(int i) {
-        if (i == 0)
-            return 0;
-        return i > 0 ? 1 : -1;
-    }
-
-}  // namespace
-
 namespace mongo {
 
+    namespace {
+
+        // Return a value in the set {-1, 0, 1} to represent the sign of parameter i.
+        int sgn(int i) {
+            if (i == 0)
+                return 0;
+            return i > 0 ? 1 : -1;
+        }
+
+    }  // namespace
+
     // For debugging.
+    size_t IndexBounds::size() const {
+        return fields.size();
+    }
+
+    string IndexBounds::getFieldName(size_t i) const {
+        return i < size() ? fields[i].name : "";
+    }
+
+    size_t IndexBounds::getNumIntervals(size_t i) const {
+        return i < size() ? fields[i].intervals.size() : 0;
+    }
+
+    Interval IndexBounds::getInterval(size_t i, size_t j) const {
+        if (i < size() && j < fields[i].intervals.size()) {
+            return fields[i].intervals[j];
+        }
+        else {
+            return Interval();
+        }
+    }
+
     string IndexBounds::toString() const {
         stringstream ss;
         for (size_t i = 0; i < fields.size(); ++i) {

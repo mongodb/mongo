@@ -56,12 +56,18 @@ namespace mongo {
         virtual MatchExpression* shallowClone() const {
             WhereMatchExpression* e = new WhereMatchExpression();
             e->init(_ns, _code, _userScope);
+            if ( getTag() ) {
+                e->setTag(getTag()->clone());
+            }
             return e;
         }
 
         virtual void debugString( StringBuilder& debug, int level = 0 ) const;
 
         virtual bool equivalent( const MatchExpression* other ) const ;
+
+        virtual void resetTag() { setTag(NULL); }
+
     private:
         string _ns;
         string _code;

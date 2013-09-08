@@ -487,6 +487,9 @@ namespace mongo {
     LeafMatchExpression* InMatchExpression::shallowClone() const {
         InMatchExpression* next = new InMatchExpression();
         copyTo( next );
+        if ( getTag() ) {
+            next->setTag(getTag()->clone());
+        }
         return next;
     }
 

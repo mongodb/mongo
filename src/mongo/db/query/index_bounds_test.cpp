@@ -40,24 +40,13 @@ using namespace mongo;
 
 namespace {
 
-    Interval makeInterval(const BSONObj& obj, bool startInclusive, bool endInclusive) {
-        Interval i;
-        i._intervalData = obj.getOwned();
-        BSONObjIterator it(i._intervalData);
-        i.start = it.next();
-        i.end = it.next();
-        i.startInclusive = startInclusive;
-        i.endInclusive = endInclusive;
-        return i;
-    }
-
     //
     // Validation
     //
 
     TEST(IndexBoundsTest, ValidBasic) {
         OrderedIntervalList list("foo");
-        list.intervals.push_back(makeInterval(BSON("" << 7 << "" << 20), true, true));
+        list.intervals.push_back(Interval(BSON("" << 7 << "" << 20), true, true));
         IndexBounds bounds;
         bounds.fields.push_back(list);
 
@@ -75,13 +64,13 @@ namespace {
 
     TEST(IndexBoundsTest, ValidTwoFields) {
         OrderedIntervalList list("foo");
-        list.intervals.push_back(makeInterval(BSON("" << 7 << "" << 20), true, true));
+        list.intervals.push_back(Interval(BSON("" << 7 << "" << 20), true, true));
         IndexBounds bounds;
         bounds.fields.push_back(list);
 
         // Let's add another field
         OrderedIntervalList otherList("bar");
-        otherList.intervals.push_back(makeInterval(BSON("" << 0 << "" << 3), true, true));
+        otherList.intervals.push_back(Interval(BSON("" << 0 << "" << 3), true, true));
         bounds.fields.push_back(otherList);
 
         // These are OK.
@@ -100,8 +89,8 @@ namespace {
     TEST(IndexBoundsTest, ValidIntervalsInOrder) {
         OrderedIntervalList list("foo");
         // Whether navigated forward or backward, there's no valid ordering for these two intervals.
-        list.intervals.push_back(makeInterval(BSON("" << 7 << "" << 20), true, true));
-        list.intervals.push_back(makeInterval(BSON("" << 0 << "" << 5), true, true));
+        list.intervals.push_back(Interval(BSON("" << 7 << "" << 20), true, true));
+        list.intervals.push_back(Interval(BSON("" << 0 << "" << 5), true, true));
         IndexBounds bounds;
         bounds.fields.push_back(list);
         ASSERT_FALSE(bounds.isValidFor(BSON("foo" << 1), 1));
@@ -113,8 +102,8 @@ namespace {
     TEST(IndexBoundsTest, ValidNoOverlappingIntervals) {
         OrderedIntervalList list("foo");
         // overlapping intervals not allowed.
-        list.intervals.push_back(makeInterval(BSON("" << 7 << "" << 20), true, true));
-        list.intervals.push_back(makeInterval(BSON("" << 19 << "" << 25), true, true));
+        list.intervals.push_back(Interval(BSON("" << 7 << "" << 20), true, true));
+        list.intervals.push_back(Interval(BSON("" << 19 << "" << 25), true, true));
         IndexBounds bounds;
         bounds.fields.push_back(list);
         ASSERT_FALSE(bounds.isValidFor(BSON("foo" << 1), 1));
@@ -122,8 +111,8 @@ namespace {
 
     TEST(IndexBoundsTest, ValidOverlapOnlyWhenBothOpen) {
         OrderedIntervalList list("foo");
-        list.intervals.push_back(makeInterval(BSON("" << 7 << "" << 20), true, false));
-        list.intervals.push_back(makeInterval(BSON("" << 20 << "" << 25), false, true));
+        list.intervals.push_back(Interval(BSON("" << 7 << "" << 20), true, false));
+        list.intervals.push_back(Interval(BSON("" << 20 << "" << 25), false, true));
         IndexBounds bounds;
         bounds.fields.push_back(list);
         ASSERT(bounds.isValidFor(BSON("foo" << 1), 1));
@@ -135,10 +124,10 @@ namespace {
 
     TEST(IndexBoundsCheckerTest, StartKey) {
         OrderedIntervalList fooList("foo");
-        fooList.intervals.push_back(makeInterval(BSON("" << 7 << "" << 20), true, true));
+        fooList.intervals.push_back(Interval(BSON("" << 7 << "" << 20), true, true));
 
         OrderedIntervalList barList("bar");
-        barList.intervals.push_back(makeInterval(BSON("" << 0 << "" << 5), false, false));
+        barList.intervals.push_back(Interval(BSON("" << 0 << "" << 5), false, false));
 
         IndexBounds bounds;
         bounds.fields.push_back(fooList);
@@ -158,11 +147,11 @@ namespace {
 
     TEST(IndexBoundsCheckerTest, CheckEnd) {
         OrderedIntervalList fooList("foo");
-        fooList.intervals.push_back(makeInterval(BSON("" << 7 << "" << 20), true, true));
-        fooList.intervals.push_back(makeInterval(BSON("" << 21 << "" << 30), true, false));
+        fooList.intervals.push_back(Interval(BSON("" << 7 << "" << 20), true, true));
+        fooList.intervals.push_back(Interval(BSON("" << 21 << "" << 30), true, false));
 
         OrderedIntervalList barList("bar");
-        barList.intervals.push_back(makeInterval(BSON("" << 0 << "" << 5), false, false));
+        barList.intervals.push_back(Interval(BSON("" << 0 << "" << 5), false, false));
 
         IndexBounds bounds;
         bounds.fields.push_back(fooList);
@@ -219,11 +208,11 @@ namespace {
 
     TEST(IndexBoundsCheckerTest, MoveIntervalForwardToNextInterval) {
         OrderedIntervalList fooList("foo");
-        fooList.intervals.push_back(makeInterval(BSON("" << 7 << "" << 20), true, true));
-        fooList.intervals.push_back(makeInterval(BSON("" << 21 << "" << 30), true, false));
+        fooList.intervals.push_back(Interval(BSON("" << 7 << "" << 20), true, true));
+        fooList.intervals.push_back(Interval(BSON("" << 21 << "" << 30), true, false));
 
         OrderedIntervalList barList("bar");
-        barList.intervals.push_back(makeInterval(BSON("" << 0 << "" << 5), false, false));
+        barList.intervals.push_back(Interval(BSON("" << 0 << "" << 5), false, false));
 
         IndexBounds bounds;
         bounds.fields.push_back(fooList);
@@ -263,10 +252,10 @@ namespace {
 
     TEST(IndexBoundsCheckerTest, MoveIntervalForwardManyIntervals) {
         OrderedIntervalList fooList("foo");
-        fooList.intervals.push_back(makeInterval(BSON("" << 7 << "" << 20), true, true));
-        fooList.intervals.push_back(makeInterval(BSON("" << 21 << "" << 30), true, false));
-        fooList.intervals.push_back(makeInterval(BSON("" << 31 << "" << 40), true, false));
-        fooList.intervals.push_back(makeInterval(BSON("" << 41 << "" << 50), true, false));
+        fooList.intervals.push_back(Interval(BSON("" << 7 << "" << 20), true, true));
+        fooList.intervals.push_back(Interval(BSON("" << 21 << "" << 30), true, false));
+        fooList.intervals.push_back(Interval(BSON("" << 31 << "" << 40), true, false));
+        fooList.intervals.push_back(Interval(BSON("" << 41 << "" << 50), true, false));
 
         IndexBounds bounds;
         bounds.fields.push_back(fooList);
@@ -298,10 +287,10 @@ namespace {
 
     TEST(IndexBoundsCheckerTest, SimpleCheckKey) {
         OrderedIntervalList fooList("foo");
-        fooList.intervals.push_back(makeInterval(BSON("" << 7 << "" << 20), true, true));
+        fooList.intervals.push_back(Interval(BSON("" << 7 << "" << 20), true, true));
 
         OrderedIntervalList barList("bar");
-        barList.intervals.push_back(makeInterval(BSON("" << 0 << "" << 5), false, true));
+        barList.intervals.push_back(Interval(BSON("" << 0 << "" << 5), false, true));
 
         IndexBounds bounds;
         bounds.fields.push_back(fooList);
@@ -365,11 +354,11 @@ namespace {
 
     TEST(IndexBoundsCheckerTest, FirstKeyMovedIsOKSecondKeyMustMove) {
         OrderedIntervalList fooList("foo");
-        fooList.intervals.push_back(makeInterval(BSON("" << 0 << "" << 9), true, true));
-        fooList.intervals.push_back(makeInterval(BSON("" << 10 << "" << 20), true, true));
+        fooList.intervals.push_back(Interval(BSON("" << 0 << "" << 9), true, true));
+        fooList.intervals.push_back(Interval(BSON("" << 10 << "" << 20), true, true));
 
         OrderedIntervalList barList("bar");
-        barList.intervals.push_back(makeInterval(BSON("" << 0 << "" << 5), false, true));
+        barList.intervals.push_back(Interval(BSON("" << 0 << "" << 5), false, true));
 
         IndexBounds bounds;
         bounds.fields.push_back(fooList);
@@ -406,10 +395,10 @@ namespace {
 
     TEST(IndexBoundsCheckerTest, SimpleCheckKeyBackwards) {
         OrderedIntervalList fooList("foo");
-        fooList.intervals.push_back(makeInterval(BSON("" << 20 << "" << 7), true, true));
+        fooList.intervals.push_back(Interval(BSON("" << 20 << "" << 7), true, true));
 
         OrderedIntervalList barList("bar");
-        barList.intervals.push_back(makeInterval(BSON("" << 5 << "" << 0), true, false));
+        barList.intervals.push_back(Interval(BSON("" << 5 << "" << 0), true, false));
 
         IndexBounds bounds;
         bounds.fields.push_back(fooList);
@@ -476,11 +465,11 @@ namespace {
 
     TEST(IndexBoundsCheckerTest, CheckEndBackwards) {
         OrderedIntervalList fooList("foo");
-        fooList.intervals.push_back(makeInterval(BSON("" << 30 << "" << 21), true, true));
-        fooList.intervals.push_back(makeInterval(BSON("" << 20 << "" << 7), true, false));
+        fooList.intervals.push_back(Interval(BSON("" << 30 << "" << 21), true, true));
+        fooList.intervals.push_back(Interval(BSON("" << 20 << "" << 7), true, false));
 
         OrderedIntervalList barList("bar");
-        barList.intervals.push_back(makeInterval(BSON("" << 0 << "" << 5), false, false));
+        barList.intervals.push_back(Interval(BSON("" << 0 << "" << 5), false, false));
 
         IndexBounds bounds;
         bounds.fields.push_back(fooList);

@@ -93,7 +93,7 @@ namespace mongo {
 
     // -------
 
-    Status ElemMatchObjectMatchExpression::init( const StringData& path, const MatchExpression* sub ) {
+    Status ElemMatchObjectMatchExpression::init( const StringData& path, MatchExpression* sub ) {
         _sub.reset( sub );
         return initPath( path );
     }
@@ -129,7 +129,7 @@ namespace mongo {
         _subs.clear();
     }
 
-    Status ElemMatchValueMatchExpression::init( const StringData& path, const MatchExpression* sub ) {
+    Status ElemMatchValueMatchExpression::init( const StringData& path, MatchExpression* sub ) {
         init( path );
         add( sub );
         return Status::OK();
@@ -140,7 +140,7 @@ namespace mongo {
     }
 
 
-    void ElemMatchValueMatchExpression::add( const MatchExpression* sub ) {
+    void ElemMatchValueMatchExpression::add( MatchExpression* sub ) {
         verify( sub );
         _subs.push_back( sub );
     }
@@ -192,7 +192,7 @@ namespace mongo {
         return s;
     }
 
-    void AllElemMatchOp::add( const ArrayMatchingMatchExpression* expr ) {
+    void AllElemMatchOp::add( ArrayMatchingMatchExpression* expr ) {
         verify( expr );
         _list.push_back( expr );
     }

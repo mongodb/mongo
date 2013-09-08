@@ -28,72 +28,41 @@
 
 #include "mongo/db/query/query_planner.h"
 
+#include <map>
+#include <set>
+#include <stack>
+#include <vector>
+
 // For QueryOption_foobar
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/matcher/expression_array.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/index_bounds_builder.h"
+#include "mongo/db/query/index_tag.h"
+#include "mongo/db/query/plan_enumerator.h"
+#include "mongo/db/query/predicate_map.h"
 #include "mongo/db/query/query_solution.h"
 
 namespace mongo {
 
     /**
-     * Describes an index that could be used to answer a predicate.
-     */
-    struct RelevantIndex {
-        enum Relevance {
-            // Is the index prefixed by the predicate's field?  If so it can be used.
-            FIRST,
-
-            // Is the predicate's field in the index but not as a prefix?  If so, the index might be
-            // able to be used, if there is another predicate that prefixes the index.
-            NOT_FIRST,
-        };
-
-        RelevantIndex(int i, Relevance r) : index(i), relevance(r) { }
-
-        // What index is relevant?
-        int index;
-
-        // How useful is it?
-        Relevance relevance;
-
-        // To allow insertion into a set and sorting by something.
-        bool operator<(const RelevantIndex& other) const {
-            // We're only ever comparing these inside of a predicate.  A predicate should only be
-            // tagged for an index once.  This of course assumes that values are only indexed once
-            // in an index.
-            verify(other.index != index);
-            return index < other.index;
-        }
-    };
-
-    /**
-     * Caches information about the predicates we're trying to plan for.
-     */
-    struct PredicateInfo {
-        PredicateInfo(MatchExpression::MatchType t) : type(t) { }
-
-        // The type of the predicate.  See db/matcher/expression.h
-        MatchExpression::MatchType type;
-
-        // Any relevant indices.  Ordered by index no.
-        set<RelevantIndex> relevant;
-    };
-
-    // This is a multimap because the same field name can easily appear more than once in a query.
-    typedef multimap<string, PredicateInfo> PredicateMap;
-
-    /**
      * Scan the parse tree, adding all predicates to the provided map.
      */
-    void makePredicateMap(const MatchExpression* node, PredicateMap* out) {
+    void makePredicateMap(MatchExpression* node, PredicateMap* out) {
         StringData path = node->path();
 
+        // If we've seen this path before, link 'node' into that bunch.
+        // Otherwise, create a new entry <path, node> in the predicate map.
         if (!path.empty()) {
-            // XXX: make sure the (path, pred) pair isn't in there already?
-            out->insert(std::make_pair(path.toString(), PredicateInfo(node->matchType())));
+            PredicateMap::iterator it = out->lower_bound(path.toString());
+            if (it != out->end()) {
+                vector<MatchExpression*>& nodes = it->second.nodes;
+                nodes.push_back(node);
+            }
+            else {
+                out->insert(std::make_pair(path.toString(), node));
+            }
         }
 
         // XXX XXX XXX XXX
@@ -150,8 +119,15 @@ namespace mongo {
     }
 
     bool hasPredicate(const PredicateMap& pm, MatchExpression::MatchType type) {
-        for (PredicateMap::const_iterator i = pm.begin(); i != pm.end(); ++i) {
-            if (i->second.type == type) { return true; }
+        for (PredicateMap::const_iterator itMap = pm.begin(); itMap != pm.end(); ++itMap) {
+            const vector<MatchExpression*>& nodes = itMap->second.nodes;
+            for (vector<MatchExpression*>::const_iterator itVec = nodes.begin();
+                 itVec != nodes.end();
+                 ++itVec) {
+                if ((*itVec)->matchType() == type) {
+                    return true;
+                }
+            }
         }
         return false;
     }
@@ -181,147 +157,98 @@ namespace mongo {
         return soln.release();
     }
 
-    /**
-     * Provides elements from the power set of possible indices to use.  Uses the available
-     * predicate information to make better decisions about what indices are best.
-     *
-     * TODO: Use stats about indices.
-     * TODO: Use predicate information.
-     */
-    class PlanEnumerator {
-    public:
-        class OutputTag : public MatchExpression::TagData {
-        public:
-            OutputTag(size_t i) : index(i) { }
-            virtual ~OutputTag() { }
-            virtual void debugString(StringBuilder* builder) const {
-                *builder << " || Selected Index #" << index;
-            }
-            // What index should we try to use for this leaf?
-            size_t index;
-        };
-
-        /**
-         * Internal tag used to explore what indices to use for a leaf node.
-         */
-        class EnumeratorTag : public MatchExpression::TagData {
-        public:
-            EnumeratorTag(const PredicateInfo* p) : pred(p), nextIndexToUse(0) { }
-
-            virtual ~EnumeratorTag() { }
-
-            virtual void debugString(StringBuilder* builder) const {
-                *builder << " || Relevant Indices:";
-
-                for (set<RelevantIndex>::const_iterator it = pred->relevant.begin();
-                     it != pred->relevant.end(); ++it) {
-
-                    *builder << " #" << it->index << " ";
-                    if (RelevantIndex::FIRST == it->relevance) {
-                        *builder << "[prefix]";
-                    }
-                    else {
-                        verify(RelevantIndex::NOT_FIRST == it->relevance);
-                        *builder << "[not-prefix]";
-                    }
-                }
-            }
-
-            // Not owned here.
-            const PredicateInfo* pred;
-            size_t nextIndexToUse;
-        };
-
-        // TODO: This is inefficient.  We could create the tagged tree as part of the PredicateMap
-        // construction.
-        void tag(MatchExpression* node) {
-            StringData path = node->path();
-
-            if (!path.empty()) {
-
-                for (PredicateMap::const_iterator it = _pm.find(path.toString()); _pm.end() != it;
-                     ++it) {
-
-                    if (it->second.type == node->matchType()) {
-                        EnumeratorTag* td = new EnumeratorTag(&it->second);
-                        node->setTag(td);
-                        _taggedLeaves.push_back(node);
-                        break;
-                    }
-                }
-            }
-
-            // XXX XXX XXX XXX
-            // XXX Do we do this if the node is logical, or if it's array, or both?
-            // XXX XXX XXX XXX
-            for (size_t i = 0; i < node->numChildren(); ++i) {
-                tag(const_cast<MatchExpression*>(node->getChild(i)));
-            }
-        }
-
-        vector<MatchExpression*> _taggedLeaves;
-
-        /**
-         * Does not take ownership of any arguments.  They must outlive any calls to getNext(...).
-         */
-        PlanEnumerator(const CanonicalQuery* cq, const PredicateMap* pm,
-                       const vector<BSONObj>* indices)
-            : _cq(*cq), _pm(*pm), _indices(*indices) {
-
-            // Copy the query tree.
-            // TODO: have a MatchExpression::copy function(?)
-            StatusWithMatchExpression swme = MatchExpressionParser::parse(cq->getQueryObj());
-            verify(swme.isOK());
-            _taggedTree.reset(swme.getValue());
-
-            // Walk the query tree and tag with possible indices
-            tag(_taggedTree.get());
-
-            for (size_t i = 0; i < indices->size(); ++i) {
-                cout << "Index #" << i << ": " << (*indices)[i].toString() << endl;
-            }
-
-            cout << "Tagged tree: " << _taggedTree->toString() << endl;
-        }
-
-        /**
-         * Outputs a possible plan.  Leaves in the plan are tagged with an index to use.
-         * Returns true if a plan was outputted, false if no more plans will be outputted.
-         *
-         * 'tree' is set to point to the query tree.  A QuerySolution is built from this tree.
-         * Caller owns the pointer.  Note that 'tree' itself points into data owned by the provided
-         * CanonicalQuery.
-         *
-         * Nodes in 'tree' are tagged with indices that should be used to answer the tagged nodes.
-         * Only nodes that have a field name (isLogical() == false) will be tagged.
-         */
-        bool getNext(MatchExpression** tree) {
-            // TODO: ALBERTO
-
-            // Clone tree
-            // MatchExpression* ret = _taggedTree->shallowClone();
-
-            // Walk over cloned tree and tagged tree.  Select indices out of tagged tree and mark
-            // the cloned tree.
-
-            // *tree = ret;
-            // return true;
-
-            return false;
-        }
-
-    private:
-        // Not owned by us.
-        const CanonicalQuery& _cq;
-
-        // Not owned by us.
-        const PredicateMap& _pm;
-
-        // Not owned by us.
-        const vector<BSONObj>& _indices;
-
-        scoped_ptr<MatchExpression> _taggedTree;
+    // TODO: Document when this settles
+    struct FilterInfo {
+        MatchExpression* filterNode;
+        size_t currChild;
+        FilterInfo(MatchExpression* f, int c) : filterNode(f), currChild(c) {}
     };
+
+    // TODO: Document when this settles
+    QuerySolution* makeIndexedPath(const CanonicalQuery& query,
+                                   const vector<BSONObj>& indexKeyPatterns,
+                                   MatchExpression* filter) {
+
+        auto_ptr<QuerySolution> soln(new QuerySolution());
+
+        // We'll build a tree of solutions nodes as we traverse the filter. For
+        // now, we're not generating multi-index solutions, so we can hold on to a
+        // single node here.
+        IndexScanNode* isn = new IndexScanNode();
+
+        // We'll do a post order traversal of the filter, which is a n-ary tree. We descend the
+        // tree keeping track of which child is next to visit.
+        std::stack<FilterInfo> filterNodes;
+        FilterInfo rootFilter(filter, 0);
+        filterNodes.push(rootFilter);
+
+        while (!filterNodes.empty()) {
+
+            FilterInfo& fi = filterNodes.top();
+            MatchExpression* filterNode = fi.filterNode;
+            size_t& currChild = fi.currChild;
+            if (filterNode->numChildren() == currChild) {
+
+                // Visit leaf or node. If we find an index tag, we compute the bounds and
+                // fill up the index information on the current IXScan node.
+                IndexTag* indexTag = static_cast<IndexTag*>(filterNode->getTag());
+                bool exactBounds = false;
+                if (indexTag != NULL) {
+
+                    isn->indexKeyPattern = indexKeyPatterns[indexTag->index];
+
+                    // We assume that this is in the same direction of the index. We may later
+                    // change our minds if the query requires sorting in the opposite
+                    // direction. But, right now, the direction of traversal is not in
+                    // question.
+                    isn->direction = 1;
+
+                    // TODO: handle combining oils if this is not the first predicate we'eve
+                    // seen for this field.
+                    // TODO: handle compound indexes
+                    OrderedIntervalList oil(filterNode->path().toString());
+                    IndexBoundsBuilder::translate(
+                        static_cast<LeafMatchExpression*>(filterNode),
+                        isn->indexKeyPattern.firstElement(),
+                        &oil,
+                        &exactBounds);
+
+                    // TODO: union or intersect oils
+                    // It can be the case that this is not the first "oil" for a given
+                    // field. That is, there are several predicates agains a same field which
+                    // happens to have a useful index. In that case, we may need to combine
+                    // oils in a "larger" bound to accomodate all the predicates.
+                    vector<OrderedIntervalList>& fields = isn->bounds.fields;
+                    fields.push_back(oil);
+                }
+
+                // TODO: possibly trim redundant MatchExpressions nodes
+                // It can be the case that the bounds for a query will only return exact
+                // results (as opposed to just limiting the index range in which the results
+                // lie). When results are exact, we don't need to retest them and thus such
+                // nodes can be eliminated from the filter.  Note that some non-leaf nodes
+                // (e.g. and's, or's) may be left with single children and can therefore be
+                // eliminated as well.
+                isn->filter = filterNode;
+
+                // TODO: Multiple IXScans nodes in a solution
+                // If this is not the first index tag found, then we add another IXScan node to
+                // the queryNodes stack and start using $or and $ands in the filter expession
+                // to tie the IXScan together into a tree of QuerySolutionNode's.
+
+                filterNodes.pop();
+            }
+            else {
+                // Continue the traversal.
+                FilterInfo fiChild(filterNode->getChild(currChild), 0);
+                filterNodes.push(fiChild);
+                currChild++;
+            }
+        }
+
+        soln->root.reset(isn);
+        return soln.release();
+    }
 
     // static
     void QueryPlanner::plan(const CanonicalQuery& query, const vector<BSONObj>& indexKeyPatterns,
@@ -367,8 +294,11 @@ namespace mongo {
         vector<BSONObj> relevantIndices;
         findRelevantIndices(predicates, indexKeyPatterns, &relevantIndices);
 
-        // No indices, no work to do.
-        if (0 == relevantIndices.size()) { return; }
+        // No indices, no work to do other than emitting the collection scan plan.
+        if (0 == relevantIndices.size()) {
+            out->push_back(makeCollectionScan(query, false));
+            return;
+        }
 
         // Figure out how useful each index is to each predicate.
         rateIndices(relevantIndices, &predicates);
@@ -377,22 +307,24 @@ namespace mongo {
         // Planner Section 2: Use predicate/index data to output sets of indices that we can use.
         //
 
-        PlanEnumerator isp(&query, &predicates, &relevantIndices);
+        PlanEnumerator isp(query.root(), &predicates, &relevantIndices);
+        isp.init();
 
         MatchExpression* rawTree;
         while (isp.getNext(&rawTree)) {
-            QuerySolutionNode* solutionRoot = NULL;
 
             //
             // Planner Section 3: Logical Rewrite.  Use the index selection and the tree structure
             // to try to rewrite the tree.  TODO: Do this for real.  We treat the tree as static.
             //
 
+            QuerySolution* soln = makeIndexedPath(query, indexKeyPatterns, rawTree);
 
             //
             // Planner Section 4: Covering.  If we're projecting, See if we get any covering from
             // this plan.  If not, add a fetch.
             //
+
             if (!query.getParsed().getProj().isEmpty()) {
                 warning() << "Can't deal with proj yet" << endl;
             }
@@ -401,9 +333,10 @@ namespace mongo {
             }
 
             //
-            // Planner Section 5: Sort.  If we're sorting, see if the plan gives us a sort for free.
-            // If not, add a sort.
+            // Planner Section 5: Sort.  If we're sorting, see if the plan gives us a sort for
+            // free.  If not, add a sort.
             //
+
             if (!query.getParsed().getSort().isEmpty()) {
             }
             else {
@@ -416,10 +349,8 @@ namespace mongo {
             // TODO: Validate.
             //
 
-            if (NULL != solutionRoot) {
-                QuerySolution* qs = new QuerySolution();
-                qs->root.reset(solutionRoot);
-                out->push_back(qs);
+            if (NULL != soln) {
+                out->push_back(soln);
             }
         }
 
