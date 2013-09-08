@@ -32,26 +32,9 @@
 #include <vector>
 
 #include "mongo/db/jsobj.h"
+#include "mongo/db/query/interval.h"
 
 namespace mongo {
-
-    /**
-     * A range of values for one field.
-     */
-    struct Interval {
-        // Start and End must be ordered according to the index order.
-        BSONElement start;
-        bool startInclusive;
-
-        BSONElement end;
-        bool endInclusive;
-
-        // No BSONValue means we have to keep a BSONObj and pointers (BSONElement) into it.
-        // 'start' may not point at the first field in _intervalData.
-        // 'end' may not point at the last field in _intervalData.
-        // 'start' and 'end' may point at the same field.
-        BSONObj _intervalData;
-    };
 
     /**
      * An ordered list of intervals for one field.
@@ -74,8 +57,6 @@ namespace mongo {
         // For each indexed field, the values that the field is allowed to take on.
         vector<OrderedIntervalList> fields;
 
-        string toString() const;
-
         // Debugging check.
         // We must have as many fields the key pattern does.
         // The fields must be oriented in the direction we'd encounter them given the indexing
@@ -86,6 +67,13 @@ namespace mongo {
         // We can traverse this forward if indexed ascending
         // We can traverse this backwards if indexed descending.
         bool isValidFor(const BSONObj& keyPattern, int direction);
+
+        // Methods below used for debugging purpose only. Do not use outside testing code.
+        size_t size() const;
+        std::string getFieldName(size_t i) const;
+        size_t getNumIntervals(size_t i) const;
+        Interval getInterval(size_t i, size_t j) const;
+        std::string toString() const;
 
         // TODO: KILL THIS?
         // We need this for legacy non-index indices (2d/2dsphere) that take a BSONObj and don't

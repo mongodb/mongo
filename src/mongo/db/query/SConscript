@@ -3,15 +3,16 @@
 Import("env")
 
 env.StaticLibrary(
-    target = 'query_planner',
-    source = [
+    target='query_planner',
+    source=[
         "canonical_query.cpp",
         "index_bounds_builder.cpp",
         "lite_parsed_query.cpp",
+        "plan_enumerator.cpp",
         "query_planner.cpp",
         # "query_projection.cpp",
     ],
-    LIBDEPS = [
+    LIBDEPS=[
         "index_bounds",
         "$BUILD_DIR/mongo/bson",
         "$BUILD_DIR/mongo/expressions",
@@ -20,45 +21,66 @@ env.StaticLibrary(
 )
 
 env.StaticLibrary(
-    target = 'query',
-    source = [
+    target='query',
+    source=[
         "multi_plan_runner.cpp",
         "new_find.cpp",
         "plan_ranker.cpp",
         "stage_builder.cpp",
     ],
-    LIBDEPS = [
+    LIBDEPS=[
         "query_planner",
         "$BUILD_DIR/mongo/db/exec/exec"
     ],
 )
 
 env.StaticLibrary(
-    target = "index_bounds",
-    source = [
+    target="index_bounds",
+    source=[
         "index_bounds.cpp",
+        "interval.cpp",
     ],
-    LIBDEPS = [
+    LIBDEPS=[
         "$BUILD_DIR/mongo/bson",
     ],
 )
 
 env.CppUnitTest(
-    target = "index_bounds_test",
-    source = [
+    target="index_bounds_test",
+    source=[
         "index_bounds_test.cpp"
     ],
-    LIBDEPS = [
+    LIBDEPS=[
         "index_bounds",
     ],
 )
 
 env.CppUnitTest(
-    target = "query_planner_test",
-    source = [
+    target="interval_test",
+    source=[
+        "interval_test.cpp"
+    ],
+    LIBDEPS=[
+        "index_bounds",
+    ],
+)
+
+env.CppUnitTest(
+    target="query_planner_test",
+    source=[
         "query_planner_test.cpp"
     ],
-    LIBDEPS = [
+    LIBDEPS=[
+        "query_planner",
+    ],
+)
+
+env.CppUnitTest(
+    target="plan_enumerator_test",
+    source=[
+        "plan_enumerator_test.cpp"
+    ],
+    LIBDEPS=[
         "query_planner",
     ],
 )

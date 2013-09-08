@@ -62,6 +62,9 @@ namespace mongo {
         bool equivalent( const MatchExpression* other ) const;
 
         const StringData path() const { return _path; }
+
+        virtual void resetTag() { setTag(NULL); }
+
     private:
         StringData _path;
         ElementPath _elementPath;
@@ -70,7 +73,7 @@ namespace mongo {
     class ElemMatchObjectMatchExpression : public ArrayMatchingMatchExpression {
     public:
         ElemMatchObjectMatchExpression() : ArrayMatchingMatchExpression( ELEM_MATCH_OBJECT ){}
-        Status init( const StringData& path, const MatchExpression* sub );
+        Status init( const StringData& path, MatchExpression* sub );
 
         bool matchesArray( const BSONObj& anArray, MatchDetails* details ) const;
 
@@ -83,10 +86,10 @@ namespace mongo {
         virtual void debugString( StringBuilder& debug, int level ) const;
 
         virtual size_t numChildren() const { return 1; }
-        virtual const MatchExpression* getChild( size_t i ) const { return _sub.get(); }
+        virtual MatchExpression* getChild( size_t i ) const { return _sub.get(); }
 
     private:
-        boost::scoped_ptr<const MatchExpression> _sub;
+        boost::scoped_ptr<MatchExpression> _sub;
     };
 
     class ElemMatchValueMatchExpression : public ArrayMatchingMatchExpression {
@@ -95,8 +98,8 @@ namespace mongo {
         virtual ~ElemMatchValueMatchExpression();
 
         Status init( const StringData& path );
-        Status init( const StringData& path, const MatchExpression* sub );
-        void add( const MatchExpression* sub );
+        Status init( const StringData& path, MatchExpression* sub );
+        void add( MatchExpression* sub );
 
         bool matchesArray( const BSONObj& anArray, MatchDetails* details ) const;
 
@@ -112,12 +115,12 @@ namespace mongo {
         virtual void debugString( StringBuilder& debug, int level ) const;
 
         virtual size_t numChildren() const { return _subs.size(); }
-        virtual const MatchExpression* getChild( size_t i ) const { return _subs[i]; }
+        virtual MatchExpression* getChild( size_t i ) const { return _subs[i]; }
 
     private:
         bool _arrayElementMatchesAll( const BSONElement& e ) const;
 
-        std::vector< const MatchExpression* > _subs;
+        std::vector<MatchExpression*> _subs;
     };
 
     class SizeMatchExpression : public ArrayMatchingMatchExpression {
@@ -152,13 +155,13 @@ namespace mongo {
         virtual ~AllElemMatchOp();
 
         Status init( const StringData& path );
-        void add( const ArrayMatchingMatchExpression* expr );
+        void add( ArrayMatchingMatchExpression* expr );
 
         virtual MatchExpression* shallowClone() const {
             AllElemMatchOp* e = new AllElemMatchOp();
             e->init(path());
             for (size_t i = 0; i < _list.size(); ++i) {
-                e->add(reinterpret_cast<const ArrayMatchingMatchExpression*>(
+                e->add(reinterpret_cast<ArrayMatchingMatchExpression*>(
                     _list[i]->shallowClone()));
             }
             return e;
@@ -176,16 +179,18 @@ namespace mongo {
         virtual bool equivalent( const MatchExpression* other ) const;
 
         virtual size_t numChildren() const { return _list.size(); }
-        virtual const ArrayMatchingMatchExpression* getChild( size_t i ) const { return _list[i]; }
+        virtual ArrayMatchingMatchExpression* getChild( size_t i ) const { return _list[i]; }
 
         const StringData path() const { return _path; }
+
+        virtual void resetTag() { setTag(NULL); }
 
     private:
         bool _allMatch( const BSONObj& anArray ) const;
 
         StringData _path;
         ElementPath _elementPath;
-        std::vector< const ArrayMatchingMatchExpression* > _list;
+        std::vector<ArrayMatchingMatchExpression*> _list;
     };
 
 }
