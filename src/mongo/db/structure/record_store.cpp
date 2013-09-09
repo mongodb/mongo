@@ -38,30 +38,31 @@
 namespace mongo {
 
     RecordStore::RecordStore() {
-        _collection = NULL;
+        _extentManager = NULL;
         _details = NULL;
     }
 
-    void RecordStore::init( CollectionTemp* collection) {
-        _collection = collection;
-        _details = _collection->_details;
-        _isSystemIndexes = _collection->ns().coll() == "system.indexes";
+    void RecordStore::init( NamespaceDetails* details,
+                            ExtentManager* em,
+                            bool isSystemIndexes ) {
+        _details = details;
+        _extentManager = em;
+        _isSystemIndexes = isSystemIndexes;
     }
 
     void RecordStore::deallocRecord( const DiskLoc& dl, Record* todelete ) {
-        ExtentManager* em = _collection->getExtentManager();
 
         /* remove ourself from the record next/prev chain */
         {
             if ( todelete->prevOfs() != DiskLoc::NullOfs ) {
-                DiskLoc prev = em->getPrevRecordInExtent( dl );
-                Record* prevRecord = em->recordFor( prev );
+                DiskLoc prev = _extentManager->getPrevRecordInExtent( dl );
+                Record* prevRecord = _extentManager->recordFor( prev );
                 getDur().writingInt( prevRecord->nextOfs() ) = todelete->nextOfs();
             }
 
             if ( todelete->nextOfs() != DiskLoc::NullOfs ) {
-                DiskLoc next = em->getNextRecord( dl );
-                Record* nextRecord = em->recordFor( next );
+                DiskLoc next = _extentManager->getNextRecord( dl );
+                Record* nextRecord = _extentManager->recordFor( next );
                 getDur().writingInt( nextRecord->prevOfs() ) = todelete->prevOfs();
             }
         }

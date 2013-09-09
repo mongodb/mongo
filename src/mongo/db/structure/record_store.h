@@ -30,23 +30,27 @@
 
 #pragma once
 
-#include "mongo/db/namespace_details.h"
+#include "mongo/db/diskloc.h"
 
 namespace mongo {
 
-    class CollectionTemp;
+    class ExtentManager;
+    class NamespaceDetails;
+    class Record;
 
     class RecordStore {
     public:
         RecordStore();
 
-        void init( CollectionTemp* collection );
+        void init( NamespaceDetails* details,
+                   ExtentManager* em,
+                   bool isSystemIndexes );
 
         void deallocRecord( const DiskLoc& dl, Record* todelete );
 
     private:
-        CollectionTemp* _collection;
         NamespaceDetails* _details;
+        ExtentManager* _extentManager;
         bool _isSystemIndexes;
     };
 
