@@ -23,7 +23,6 @@ static int __curtable_update(WT_CURSOR *cursor);
 	WT_INDEX *idx;							\
 	WT_CURSOR **__cp;						\
 	u_int __i;							\
-	WT_ERR(__curtable_open_indices(ctable));			\
 	__cp = (ctable)->idx_cursors;					\
 	for (__i = 0; __i < ctable->table->nindices; __i++, __cp++) {	\
 		idx = ctable->table->indices[__i];			\
@@ -225,8 +224,8 @@ err:	API_END(session);
 
 /*
  * __curtable_next_random --
- *	WT_CURSOR->insert method for the table cursor type when configured with
- * next_random.
+ *	WT_CURSOR->next method for the table cursor type when configured with
+ *	next_random.
  */
 static int
 __curtable_next_random(WT_CURSOR *cursor)
@@ -361,18 +360,23 @@ __curtable_insert(WT_CURSOR *cursor)
 
 	ctable = (WT_CURSOR_TABLE *)cursor;
 	CURSOR_UPDATE_API_CALL(cursor, session, insert, NULL);
-	cp = ctable->cg_cursors;
+	WT_ERR(__curtable_open_indices(ctable));
 
 	/*
-	 * Split out the first insert, it may be allocating a recno, and this
-	 * is when we discover if this is an overwrite (configure the primary
-	 * cursor for no-overwrite, and see if the insert returns a duplicate
-	 * key exists error).
+	 * Split out the first insert, it may be allocating a recno.
+	 *
+	 * If the table has indices, we also need to know whether this record
+	 * is replacing an existing record so that the existing index entries
+	 * can be removed.  We discover if this is an overwrite by configuring
+	 * the primary cursor for no-overwrite, and checking if the insert
+	 * returns a duplicate key exists error.  
 	 */
+	cp = ctable->cg_cursors;
 	primary = *cp++;
 
 	flag_orig = F_ISSET(primary, WT_CURSTD_OVERWRITE);
-	F_CLR(primary, WT_CURSTD_OVERWRITE);
+	if (ctable->table->nindices > 0)
+		F_CLR(primary, WT_CURSTD_OVERWRITE);
 	ret = primary->insert(primary);
 	F_SET(primary, flag_orig);
 
@@ -414,13 +418,14 @@ __curtable_update(WT_CURSOR *cursor)
 	ctable = (WT_CURSOR_TABLE *)cursor;
 	CURSOR_UPDATE_API_CALL(cursor, session, update, NULL);
 	WT_ERR(__curtable_open_indices(ctable));
+
 	/*
 	 * If the table has indices, first delete any old index keys, then
 	 * update the primary, then insert the new index keys.  This is
 	 * complicated by the fact that we need the old value to generate the
 	 * old index keys, so we make a temporary copy of the new value.
 	 */
-	if (ctable->idx_cursors != NULL) {
+	if (ctable->table->nindices > 0) {
 		WT_ERR(__wt_schema_project_merge(session,
 		    ctable->cg_cursors, ctable->plan,
 		    cursor->value_format, &cursor->value));
@@ -453,9 +458,9 @@ __curtable_remove(WT_CURSOR *cursor)
 
 	ctable = (WT_CURSOR_TABLE *)cursor;
 	CURSOR_UPDATE_API_CALL(cursor, session, remove, NULL);
+	WT_ERR(__curtable_open_indices(ctable));
 
 	/* Find the old record so it can be removed from indices */
-	WT_ERR(__curtable_open_indices(ctable));
 	if (ctable->table->nindices > 0) {
 		APPLY_CG(ctable, search);
 		WT_ERR(ret);
