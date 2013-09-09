@@ -1512,6 +1512,10 @@ lprintf(CONFIG *cfg, int err, uint32_t level, const char *fmt, ...)
 		fprintf(cfg->logf, " Error: %s\n", wiredtiger_strerror(err));
 	}
 
+	/* Never attempt to continue if we got a panic from WiredTiger. */
+	if (err == WT_PANIC)
+		exit(1);
+
 	return (0);
 }
 
