@@ -56,6 +56,12 @@ namespace mongo {
         RoleGraph(const RoleGraph& other);
         ~RoleGraph();
 
+        // System roles for backwards compatibility with 2.2 and prior
+        static const std::string SYSTEM_ROLE_V0_READ;
+        static const std::string SYSTEM_ROLE_V0_READ_WRITE;
+        static const std::string SYSTEM_ROLE_V0_ADMIN_READ;
+        static const std::string SYSTEM_ROLE_V0_ADMIN_READ_WRITE;
+
         // Swaps the contents of this RoleGraph with those of "other"
         void swap(RoleGraph& other);
 

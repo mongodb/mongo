@@ -78,12 +78,6 @@ namespace mongo {
         static const std::string V1_USER_NAME_FIELD_NAME;
         static const std::string V1_USER_SOURCE_FIELD_NAME;
 
-        // System roles for backwards compatibility with 2.2 and prior
-        static const std::string SYSTEM_ROLE_V0_READ;
-        static const std::string SYSTEM_ROLE_V0_READ_WRITE;
-        static const std::string SYSTEM_ROLE_V0_ADMIN_READ;
-        static const std::string SYSTEM_ROLE_V0_ADMIN_READ_WRITE;
-
         // TODO: Make the following functions no longer static.
 
         /**
