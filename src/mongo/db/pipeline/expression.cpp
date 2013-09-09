@@ -2182,10 +2182,10 @@ namespace {
         }
 
         uassert(17048, str::stream() << "both operands of $setDifference must be arrays. First "
-                                     << "argument is of type: " << lhs.getType(),
+                                     << "argument is of type: " << typeName(lhs.getType()),
                 lhs.getType() == Array);
         uassert(17049, str::stream() << "both operands of $setDifference must be arrays. Second "
-                                     << "argument is of type: " << rhs.getType(),
+                                     << "argument is of type: " << typeName(rhs.getType()),
                 rhs.getType() == Array);
 
         ValueSet rhsSet = arrayToSet(rhs);
@@ -2222,7 +2222,8 @@ namespace {
         for (size_t i = 0; i < n; i++) {
             const Value nextEntry = vpOperand[i]->evaluateInternal(vars);
             uassert(17044, str::stream() << "All operands of $setEquals must be arrays. One "
-                                         << "argument is of type: " << nextEntry.getType(),
+                                         << "argument is of type: "
+                                         << typeName(nextEntry.getType()),
                     nextEntry.getType() == Array);
 
             if (i == 0) {
@@ -2254,7 +2255,8 @@ namespace {
                 return Value(BSONNULL);
             }
             uassert(17047, str::stream() << "All operands of $setIntersection must be arrays. One "
-                                         << "argument is of type: " << nextEntry.getType(),
+                                         << "argument is of type: "
+                                         << typeName(nextEntry.getType()),
                     nextEntry.getType() == Array);
 
             if (i == 0) {
@@ -2300,10 +2302,10 @@ namespace {
         const Value rhs = vpOperand[1]->evaluateInternal(vars);
 
         uassert(17046, str::stream() << "both operands of $setIsSubset must be arrays. First "
-                                     << "argument is of type: " << lhs.getType(),
+                                     << "argument is of type: " << typeName(lhs.getType()),
                 lhs.getType() == Array);
         uassert(17042, str::stream() << "both operands of $setIsSubset must be arrays. Second "
-                                     << "argument is of type: " << rhs.getType(),
+                                     << "argument is of type: " << typeName(rhs.getType()),
                 rhs.getType() == Array);
 
         const vector<Value>& potentialSubset = lhs.getArray();
@@ -2336,7 +2338,7 @@ namespace {
                 return Value(BSONNULL);
             }
             uassert(17043, str::stream() << "All operands of $setUnion must be arrays. One argument"
-                                         << " is of type: " << newEntries.getType(),
+                                         << " is of type: " << typeName(newEntries.getType()),
                     newEntries.getType() == Array);
 
             unionedSet.insert(newEntries.getArray().begin(), newEntries.getArray().end());
