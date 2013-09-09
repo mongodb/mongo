@@ -89,7 +89,6 @@ namespace mongo {
         friend class Database;
         friend class FlatIterator;
         friend class CappedIterator;
-        friend class RecordStore;
     };
 
 }

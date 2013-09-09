@@ -48,7 +48,9 @@ namespace mongo {
         : _ns( fullNS ) {
         _details = details;
         _database = database;
-        _recordStore.init( this );
+        _recordStore.init( _details,
+                           &database->getExtentManager(),
+                           _ns.coll() == "system.indexes" );
         _magic = 1357924;
     }
 
