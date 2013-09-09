@@ -2350,6 +2350,22 @@ namespace {
         return "$setUnion";
     }
 
+    /* ----------------------- ExpressionSize ---------------------------- */
+
+    Value ExpressionSize::evaluateInternal(const Variables& vars) const {
+        Value array = vpOperand[0]->evaluateInternal(vars);
+
+        uassert(17124, str::stream() << "The argument to $size must be an Array, but was of type: "
+                                     << typeName(array.getType()),
+                array.getType() == Array);
+        return Value::createIntOrLong(array.getArray().size());
+    }
+
+    REGISTER_EXPRESSION("$size", ExpressionSize::parse);
+    const char *ExpressionSize::getOpName() const {
+        return "$size";
+    }
+
     /* ----------------------- ExpressionStrcasecmp ---------------------------- */
 
     Value ExpressionStrcasecmp::evaluateInternal(const Variables& vars) const {
