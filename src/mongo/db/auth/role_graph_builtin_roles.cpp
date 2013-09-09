@@ -24,6 +24,11 @@
 
 namespace mongo {
 
+    const std::string RoleGraph::SYSTEM_ROLE_V0_READ = "oldRead";
+    const std::string RoleGraph::SYSTEM_ROLE_V0_READ_WRITE= "oldReadWrite";
+    const std::string RoleGraph::SYSTEM_ROLE_V0_ADMIN_READ = "oldAdminRead";
+    const std::string RoleGraph::SYSTEM_ROLE_V0_ADMIN_READ_WRITE= "oldAdminReadWrite";
+
 namespace {
     const std::string ADMIN_DBNAME = "admin";
 
@@ -226,10 +231,10 @@ namespace {
         if (roleName.getRole() == SYSTEM_ROLE_DB_ADMIN) {
             return Privilege(roleName.getDB().toString(), dbAdminRoleActions);
         }
-        if (roleName.getRole() == AuthorizationManager::SYSTEM_ROLE_V0_READ) {
+        if (roleName.getRole() == RoleGraph::SYSTEM_ROLE_V0_READ) {
             return Privilege(roleName.getDB().toString(), compatibilityReadOnlyActions);
         }
-        if (roleName.getRole() == AuthorizationManager::SYSTEM_ROLE_V0_READ_WRITE) {
+        if (roleName.getRole() == RoleGraph::SYSTEM_ROLE_V0_READ_WRITE) {
             return Privilege(roleName.getDB().toString(), compatibilityReadWriteActions);
         }
         if (isAdminDB && roleName.getRole() == SYSTEM_ROLE_READ_ANY_DB) {
@@ -247,12 +252,11 @@ namespace {
         if (isAdminDB && roleName.getRole() == SYSTEM_ROLE_CLUSTER_ADMIN) {
             return Privilege(AuthorizationManager::WILDCARD_RESOURCE_NAME, clusterAdminRoleActions);
         }
-        if (isAdminDB && roleName.getRole() == AuthorizationManager::SYSTEM_ROLE_V0_ADMIN_READ) {
+        if (isAdminDB && roleName.getRole() == RoleGraph::SYSTEM_ROLE_V0_ADMIN_READ) {
             return Privilege(AuthorizationManager::WILDCARD_RESOURCE_NAME,
                              compatibilityReadOnlyAdminActions);
         }
-        if (isAdminDB &&
-                roleName.getRole() == AuthorizationManager::SYSTEM_ROLE_V0_ADMIN_READ_WRITE) {
+        if (isAdminDB && roleName.getRole() == RoleGraph::SYSTEM_ROLE_V0_ADMIN_READ_WRITE) {
             return Privilege(AuthorizationManager::WILDCARD_RESOURCE_NAME,
                              compatibilityReadWriteAdminActions);
         }
@@ -287,10 +291,10 @@ namespace {
         else if (role.getRole() == SYSTEM_ROLE_DB_ADMIN) {
             return true;
         }
-        else if (role.getRole() == AuthorizationManager::SYSTEM_ROLE_V0_READ) {
+        else if (role.getRole() == SYSTEM_ROLE_V0_READ) {
             return true;
         }
-        else if (role.getRole() == AuthorizationManager::SYSTEM_ROLE_V0_READ_WRITE) {
+        else if (role.getRole() == SYSTEM_ROLE_V0_READ_WRITE) {
             return true;
         }
         else if (isAdminDB && role.getRole() == SYSTEM_ROLE_READ_ANY_DB) {
@@ -308,11 +312,10 @@ namespace {
         else if (isAdminDB && role.getRole() == SYSTEM_ROLE_CLUSTER_ADMIN) {
             return true;
         }
-        else if (isAdminDB && role.getRole() == AuthorizationManager::SYSTEM_ROLE_V0_ADMIN_READ) {
+        else if (isAdminDB && role.getRole() == SYSTEM_ROLE_V0_ADMIN_READ) {
             return true;
         }
-        else if (isAdminDB &&
-                role.getRole() == AuthorizationManager::SYSTEM_ROLE_V0_ADMIN_READ_WRITE) {
+        else if (isAdminDB && role.getRole() == SYSTEM_ROLE_V0_ADMIN_READ_WRITE) {
             return true;
         }
 

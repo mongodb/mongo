@@ -115,16 +115,15 @@ namespace {
         bool readOnly = privDoc["readOnly"].trueValue();
         if (dbname == "admin") {
             if (readOnly) {
-                user->addRole(RoleName(AuthorizationManager::SYSTEM_ROLE_V0_ADMIN_READ, "admin"));
+                user->addRole(RoleName(RoleGraph::SYSTEM_ROLE_V0_ADMIN_READ, "admin"));
             } else {
-                user->addRole(RoleName(AuthorizationManager::SYSTEM_ROLE_V0_ADMIN_READ_WRITE,
-                                       "admin"));
+                user->addRole(RoleName(RoleGraph::SYSTEM_ROLE_V0_ADMIN_READ_WRITE, "admin"));
             }
         } else {
             if (readOnly) {
-                user->addRole(RoleName(AuthorizationManager::SYSTEM_ROLE_V0_READ, dbname));
+                user->addRole(RoleName(RoleGraph::SYSTEM_ROLE_V0_READ, dbname));
             } else {
-                user->addRole(RoleName(AuthorizationManager::SYSTEM_ROLE_V0_READ_WRITE, dbname));
+                user->addRole(RoleName(RoleGraph::SYSTEM_ROLE_V0_READ_WRITE, dbname));
             }
         }
     }
