@@ -52,7 +52,8 @@ namespace {
     AuthzManagerExternalStateMongod::~AuthzManagerExternalStateMongod() {}
 
     Status AuthzManagerExternalStateMongod::insertPrivilegeDocument(const string& dbname,
-                                                                    const BSONObj& userObj) {
+                                                                    const BSONObj& userObj,
+                                                                    const BSONObj& writeConcern) {
         try {
             const std::string userNS = "admin.system.users";
             DBDirectClient client;
@@ -66,8 +67,12 @@ namespace {
                 client.insert(userNS, userObj);
             }
 
-            // 30 second timeout for w:majority
-            BSONObj res = client.getLastErrorDetailed(false, false, -1, 30*1000);
+            // Handle write concern
+            BSONObjBuilder gleBuilder;
+            gleBuilder.append("getLastError", 1);
+            gleBuilder.appendElements(writeConcern);
+            BSONObj res;
+            client.runCommand("admin", gleBuilder.done(), res);
             string errstr = client.getLastErrorString(res);
             if (errstr.empty()) {
                 return Status::OK();
@@ -86,7 +91,7 @@ namespace {
     }
 
     Status AuthzManagerExternalStateMongod::updatePrivilegeDocument(
-            const UserName& user, const BSONObj& updateObj) {
+            const UserName& user, const BSONObj& updateObj, const BSONObj& writeConcern) {
         try {
             const std::string userNS = "admin.system.users";
             DBDirectClient client;
@@ -103,8 +108,12 @@ namespace {
                               updateObj);
             }
 
-            // 30 second timeout for w:majority
-            BSONObj res = client.getLastErrorDetailed(false, false, -1, 30*1000);
+            // Handle write concern
+            BSONObjBuilder gleBuilder;
+            gleBuilder.append("getLastError", 1);
+            gleBuilder.appendElements(writeConcern);
+            BSONObj res;
+            client.runCommand("admin", gleBuilder.done(), res);
             string err = client.getLastErrorString(res);
             if (!err.empty()) {
                 return Status(ErrorCodes::UserModificationFailed, err);
@@ -125,6 +134,7 @@ namespace {
     }
 
     Status AuthzManagerExternalStateMongod::removePrivilegeDocuments(const BSONObj& query,
+                                                                     const BSONObj& writeConcern,
                                                                      int* numRemoved) {
         try {
             const std::string userNS = "admin.system.users";
@@ -139,8 +149,12 @@ namespace {
                 client.remove(userNS, query);
             }
 
-            // 30 second timeout for w:majority
-            BSONObj res = client.getLastErrorDetailed(false, false, -1, 30*1000);
+            // Handle write concern
+            BSONObjBuilder gleBuilder;
+            gleBuilder.append("getLastError", 1);
+            gleBuilder.appendElements(writeConcern);
+            BSONObj res;
+            client.runCommand("admin", gleBuilder.done(), res);
             string errstr = client.getLastErrorString(res);
             if (!errstr.empty()) {
                 return Status(ErrorCodes::UserModificationFailed, errstr);
@@ -192,7 +206,8 @@ namespace {
 
     Status AuthzManagerExternalStateMongod::insert(
             const NamespaceString& collectionName,
-            const BSONObj& document) {
+            const BSONObj& document,
+            const BSONObj& writeConcern) {
         fassertFailed(17092);
     }
 
@@ -200,37 +215,43 @@ namespace {
             const NamespaceString& collectionName,
             const BSONObj& query,
             const BSONObj& updatePattern,
-            bool upsert) {
+            bool upsert,
+            const BSONObj& writeConcern) {
         fassertFailed(17093);
     }
 
     Status AuthzManagerExternalStateMongod::remove(
             const NamespaceString& collectionName,
-            const BSONObj& query) {
+            const BSONObj& query,
+            const BSONObj& writeConcern) {
         fassertFailed(17094);
     }
 
     Status AuthzManagerExternalStateMongod::createIndex(
             const NamespaceString& collectionName,
             const BSONObj& pattern,
-            bool unique) {
+            bool unique,
+            const BSONObj& writeConcern) {
         fassertFailed(17095);
     }
 
     Status AuthzManagerExternalStateMongod::dropCollection(
-            const NamespaceString& collectionName) {
+            const NamespaceString& collectionName,
+            const BSONObj& writeConcern) {
         fassertFailed(17096);
     }
 
     Status AuthzManagerExternalStateMongod::renameCollection(
             const NamespaceString& oldName,
-            const NamespaceString& newName) {
+            const NamespaceString& newName,
+            const BSONObj& writeConcern) {
         fassertFailed(17097);
     }
 
     Status AuthzManagerExternalStateMongod::copyCollection(
             const NamespaceString& fromName,
-            const NamespaceString& toName) {
+            const NamespaceString& toName,
+            const BSONObj& writeConcern) {
         fassertFailed(17098);
     }
 

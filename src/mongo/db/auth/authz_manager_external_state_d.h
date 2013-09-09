@@ -49,12 +49,16 @@ namespace mongo {
         virtual ~AuthzManagerExternalStateMongod();
 
         virtual Status insertPrivilegeDocument(const std::string& dbname,
-                                               const BSONObj& userObj);
+                                               const BSONObj& userObj,
+                                               const BSONObj& writeConcern);
 
         virtual Status updatePrivilegeDocument(const UserName& user,
-                                               const BSONObj& updateObj);
+                                               const BSONObj& updateObj,
+                                               const BSONObj& writeConcern);
 
-        virtual Status removePrivilegeDocuments(const BSONObj& query, int* numRemoved);
+        virtual Status removePrivilegeDocuments(const BSONObj& query,
+                                                const BSONObj& writeConcern,
+                                                int* numRemoved);
 
         virtual Status getAllDatabaseNames(std::vector<std::string>* dbnames);
 
@@ -65,21 +69,28 @@ namespace mongo {
                                const BSONObj& query,
                                BSONObj* result);
         virtual Status insert(const NamespaceString& collectionName,
-                              const BSONObj& document);
+                              const BSONObj& document,
+                              const BSONObj& writeConcern);
         virtual Status updateOne(const NamespaceString& collectionName,
                                  const BSONObj& query,
                                  const BSONObj& updatePattern,
-                                 bool upsert);
+                                 bool upsert,
+                                 const BSONObj& writeConcern);
         virtual Status remove(const NamespaceString& collectionName,
-                              const BSONObj& query);
+                              const BSONObj& query,
+                              const BSONObj& writeConcern);
         virtual Status createIndex(const NamespaceString& collectionName,
                                    const BSONObj& pattern,
-                                   bool unique);
-        virtual Status dropCollection(const NamespaceString& collectionName);
+                                   bool unique,
+                                   const BSONObj& writeConcern);
+        virtual Status dropCollection(const NamespaceString& collectionName,
+                                      const BSONObj& writeConcern);
         virtual Status renameCollection(const NamespaceString& oldName,
-                                        const NamespaceString& newName);
+                                        const NamespaceString& newName,
+                                        const BSONObj& writeConcern);
         virtual Status copyCollection(const NamespaceString& fromName,
-                                      const NamespaceString& toName);
+                                      const NamespaceString& toName,
+                                      const BSONObj& writeConcern);
         virtual bool tryAcquireAuthzUpdateLock(const StringData& why);
         virtual void releaseAuthzUpdateLock();
 

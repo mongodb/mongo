@@ -44,19 +44,22 @@
 namespace mongo {
 
     Status AuthzManagerExternalStateMock::updatePrivilegeDocument(const UserName& user,
-                                                                  const BSONObj& updateObj) {
+                                                                  const BSONObj& updateObj,
+                                                                  const BSONObj&) {
         return Status(ErrorCodes::InternalError, "Not implemented in mock.");
     }
 
     Status AuthzManagerExternalStateMock::removePrivilegeDocuments(const BSONObj& query,
+                                                                   const BSONObj&,
                                                                    int* numRemoved) {
         return Status(ErrorCodes::InternalError, "Not implemented in mock.");
     }
 
     Status AuthzManagerExternalStateMock::insertPrivilegeDocument(const std::string& dbname,
-                                                                  const BSONObj& userObj) {
+                                                                  const BSONObj& userObj,
+                                                                  const BSONObj& writeConcern) {
         NamespaceString usersCollection("admin.system.users");
-        return insert(usersCollection, userObj);
+        return insert(usersCollection, userObj, writeConcern);
     }
 
     void AuthzManagerExternalStateMock::clearPrivilegeDocuments() {
@@ -112,7 +115,8 @@ namespace mongo {
 
     Status AuthzManagerExternalStateMock::insert(
             const NamespaceString& collectionName,
-            const BSONObj& document) {
+            const BSONObj& document,
+            const BSONObj&) {
         _documents[collectionName].push_back(document.copy());
         return Status::OK();
     }
@@ -121,7 +125,8 @@ namespace mongo {
             const NamespaceString& collectionName,
             const BSONObj& query,
             const BSONObj& updatePattern,
-            bool upsert) {
+            bool upsert,
+            const BSONObj& writeConcern) {
 
         namespace mmb = mutablebson;
         UpdateDriver::Options updateOptions;
@@ -154,7 +159,7 @@ namespace mongo {
             if (!status.isOK()) {
                 return status;
             }
-            return insert(collectionName, document.getObject());
+            return insert(collectionName, document.getObject(), writeConcern);
         }
         else {
             return status;
@@ -163,7 +168,8 @@ namespace mongo {
 
     Status AuthzManagerExternalStateMock::remove(
             const NamespaceString& collectionName,
-            const BSONObj& query) {
+            const BSONObj& query,
+            const BSONObj&) {
         BSONObjCollection::iterator iter;
         while (_findOneIter(collectionName, query, &iter).isOK()) {
             _documents[collectionName].erase(iter);
@@ -174,27 +180,31 @@ namespace mongo {
     Status AuthzManagerExternalStateMock::createIndex(
             const NamespaceString& collectionName,
             const BSONObj& pattern,
-            bool unique) {
+            bool unique,
+            const BSONObj&) {
         return Status::OK();
     }
 
-    Status AuthzManagerExternalStateMock::dropCollection(const NamespaceString& collectionName) {
+    Status AuthzManagerExternalStateMock::dropCollection(const NamespaceString& collectionName,
+                                                         const BSONObj&) {
         _documents.erase(collectionName);
         return Status::OK();
     }
 
     Status AuthzManagerExternalStateMock::renameCollection(const NamespaceString& oldName,
-                                                           const NamespaceString& newName) {
+                                                           const NamespaceString& newName,
+                                                           const BSONObj& writeConcern) {
         if (_documents.count(oldName) == 0) {
             return Status(ErrorCodes::NamespaceNotFound,
                           "No collection to rename named " + oldName.ns());
         }
         std::swap(_documents[newName], _documents[oldName]);
-        return dropCollection(oldName);
+        return dropCollection(oldName, writeConcern);
     }
 
     Status AuthzManagerExternalStateMock::copyCollection(const NamespaceString& fromName,
-                                                         const NamespaceString& toName) {
+                                                         const NamespaceString& toName,
+                                                         const BSONObj&) {
         if (_documents.count(fromName) == 0) {
             return Status(ErrorCodes::NamespaceNotFound,
                           "No collection to copy named " + fromName.ns());

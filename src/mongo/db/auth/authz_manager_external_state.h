@@ -67,15 +67,19 @@ namespace mongo {
         // Creates the given user object in the given database.
         // TODO(spencer): remove dbname argument once users are only written into the admin db
         virtual Status insertPrivilegeDocument(const std::string& dbname,
-                                               const BSONObj& userObj) = 0;
+                                               const BSONObj& userObj,
+                                               const BSONObj& writeConcern) = 0;
 
         // Updates the given user object with the given update modifier.
         virtual Status updatePrivilegeDocument(const UserName& user,
-                                               const BSONObj& updateObj) = 0;
+                                               const BSONObj& updateObj,
+                                               const BSONObj& writeConcern) = 0;
 
         // Removes users for the given database matching the given query.
         // Writes into *numRemoved the number of user documents that were modified.
-        virtual Status removePrivilegeDocuments(const BSONObj& query, int* numRemoved) = 0;
+        virtual Status removePrivilegeDocuments(const BSONObj& query,
+                                                const BSONObj& writeConcern,
+                                                int* numRemoved) = 0;
 
         /**
          * Puts into the *dbnames vector the name of every database in the cluster.
@@ -104,7 +108,8 @@ namespace mongo {
          * Inserts "document" into "collectionName".
          */
         virtual Status insert(const NamespaceString& collectionName,
-                              const BSONObj& document) = 0;
+                              const BSONObj& document,
+                              const BSONObj& writeConcern) = 0;
 
         /**
          * Update one document matching "query" according to "updatePattern" in "collectionName".
@@ -115,39 +120,45 @@ namespace mongo {
         virtual Status updateOne(const NamespaceString& collectionName,
                                  const BSONObj& query,
                                  const BSONObj& updatePattern,
-                                 bool upsert) = 0;
+                                 bool upsert,
+                                 const BSONObj& writeConcern) = 0;
 
         /**
          * Removes all documents matching "query" from "collectionName".
          */
         virtual Status remove(const NamespaceString& collectionName,
-                              const BSONObj& query) = 0;
+                              const BSONObj& query,
+                              const BSONObj& writeConcern) = 0;
 
         /**
          * Creates an index with the given pattern on "collectionName".
          */
         virtual Status createIndex(const NamespaceString& collectionName,
                                    const BSONObj& pattern,
-                                   bool unique) = 0;
+                                   bool unique,
+                                   const BSONObj& writeConcern) = 0;
 
         /**
          * Drops the named collection.
          */
-        virtual Status dropCollection(const NamespaceString& collectionName) = 0;
+        virtual Status dropCollection(const NamespaceString& collectionName,
+                                      const BSONObj& writeConcern) = 0;
 
         /**
          * Renames collection "oldName" to "newName", possibly dropping the previous
          * collection named "newName".
          */
         virtual Status renameCollection(const NamespaceString& oldName,
-                                        const NamespaceString& newName) = 0;
+                                        const NamespaceString& newName,
+                                        const BSONObj& writeConcern) = 0;
 
         /**
          * Copies the contents of collection "fromName" into "toName".  Fails
          * if "toName" is already a collection.
          */
         virtual Status copyCollection(const NamespaceString& fromName,
-                                      const NamespaceString& toName) = 0;
+                                      const NamespaceString& toName,
+                                      const BSONObj& writeConcern) = 0;
 
         /**
          * Tries to acquire the global lock guarding modifications to all persistent data related

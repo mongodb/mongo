@@ -84,15 +84,20 @@ namespace {
     }
 
     Status AuthzManagerExternalStateMongos::insertPrivilegeDocument(const string& dbname,
-                                                                    const BSONObj& userObj) {
+                                                                    const BSONObj& userObj,
+                                                                    const BSONObj& writeConcern) {
         try {
             const std::string userNS = "admin.system.users";
             scoped_ptr<ScopedDbConnection> conn(getConnectionForUsersCollection(userNS));
 
             conn->get()->insert(userNS, userObj);
 
-            // 30 second timeout for w:majority
-            BSONObj res = conn->get()->getLastErrorDetailed(false, false, -1, 30*1000);
+            // Handle write concern
+            BSONObjBuilder gleBuilder;
+            gleBuilder.append("getLastError", 1);
+            gleBuilder.appendElements(writeConcern);
+            BSONObj res;
+            conn->get()->runCommand("admin", gleBuilder.done(), res);
             string errstr = conn->get()->getLastErrorString(res);
             conn->done();
 
@@ -113,7 +118,7 @@ namespace {
     }
 
     Status AuthzManagerExternalStateMongos::updatePrivilegeDocument(
-            const UserName& user, const BSONObj& updateObj) {
+            const UserName& user, const BSONObj& updateObj, const BSONObj& writeConcern) {
         try {
             const std::string userNS = "admin.system.users";
             scoped_ptr<ScopedDbConnection> conn(getConnectionForUsersCollection(userNS));
@@ -124,8 +129,12 @@ namespace {
                           AuthorizationManager::USER_SOURCE_FIELD_NAME << user.getDB()),
                     updateObj);
 
-            // 30 second timeout for w:majority
-            BSONObj res = conn->get()->getLastErrorDetailed(false, false, -1, 30*1000);
+            // Handle write concern
+            BSONObjBuilder gleBuilder;
+            gleBuilder.append("getLastError", 1);
+            gleBuilder.appendElements(writeConcern);
+            BSONObj res;
+            conn->get()->runCommand("admin", gleBuilder.done(), res);
             string err = conn->get()->getLastErrorString(res);
             conn->done();
 
@@ -148,6 +157,7 @@ namespace {
     }
 
     Status AuthzManagerExternalStateMongos::removePrivilegeDocuments(const BSONObj& query,
+                                                                     const BSONObj& writeConcern,
                                                                      int* numRemoved) {
         try {
             string userNS = "admin.system.users";
@@ -155,8 +165,12 @@ namespace {
 
             conn->get()->remove(userNS, query);
 
-            // 30 second timeout for w:majority
-            BSONObj res = conn->get()->getLastErrorDetailed(false, false, -1, 30*1000);
+            // Handle write concern
+            BSONObjBuilder gleBuilder;
+            gleBuilder.append("getLastError", 1);
+            gleBuilder.appendElements(writeConcern);
+            BSONObj res;
+            conn->get()->runCommand("admin", gleBuilder.done(), res);
             string err = conn->get()->getLastErrorString(res);
             conn->done();
 
@@ -220,7 +234,8 @@ namespace {
 
     Status AuthzManagerExternalStateMongos::insert(
             const NamespaceString& collectionName,
-            const BSONObj& document) {
+            const BSONObj& document,
+            const BSONObj& writeConcern) {
         fassertFailed(17102);
     }
 
@@ -228,37 +243,42 @@ namespace {
             const NamespaceString& collectionName,
             const BSONObj& query,
             const BSONObj& updatePattern,
-            bool upsert) {
+            bool upsert,
+            const BSONObj& writeConcern) {
         fassertFailed(17103);
     }
 
     Status AuthzManagerExternalStateMongos::remove(
             const NamespaceString& collectionName,
-            const BSONObj& query) {
+            const BSONObj& query,
+            const BSONObj& writeConcern) {
         fassertFailed(17104);
     }
 
     Status AuthzManagerExternalStateMongos::createIndex(
             const NamespaceString& collectionName,
             const BSONObj& pattern,
-            bool unique) {
+            bool unique,
+            const BSONObj& writeConcern) {
         fassertFailed(17105);
     }
 
     Status AuthzManagerExternalStateMongos::dropCollection(
-            const NamespaceString& collectionName) {
+            const NamespaceString& collectionName, const BSONObj& writeConcern) {
         fassertFailed(17106);
     }
 
     Status AuthzManagerExternalStateMongos::renameCollection(
             const NamespaceString& oldName,
-            const NamespaceString& newName) {
+            const NamespaceString& newName,
+            const BSONObj& writeConcern) {
         fassertFailed(17107);
     }
 
     Status AuthzManagerExternalStateMongos::copyCollection(
             const NamespaceString& fromName,
-            const NamespaceString& toName) {
+            const NamespaceString& toName,
+            const BSONObj& writeConcern) {
         fassertFailed(17108);
     }
 
