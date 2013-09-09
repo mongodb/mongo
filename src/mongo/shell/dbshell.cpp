@@ -33,6 +33,7 @@
 #include "mongo/logger/message_event_utf8_encoder.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/shell/linenoise.h"
+#include "mongo/shell/shell_options.h"
 #include "mongo/shell/shell_utils.h"
 #include "mongo/shell/shell_utils_launcher.h"
 #include "mongo/util/file.h"
@@ -62,7 +63,6 @@ string historyFile;
 bool gotInterrupted = false;
 bool inMultiLine = false;
 static volatile bool atPrompt = false; // can eval before getting to prompt
-bool autoKillOp = false;
 
 #if !defined(__freebsd__) && !defined(__openbsd__) && !defined(_WIN32)
 // this is for ctrl-c handling
@@ -165,7 +165,8 @@ void killOps() {
 
     sleepmillis(10); // give current op a chance to finish
 
-    mongo::shell_utils::connectionRegistry.killOperationsOnAllConnections( !autoKillOp );
+    mongo::shell_utils::connectionRegistry.
+        killOperationsOnAllConnections(!shellGlobalParams.autoKillOp);
 }
 
 void quitNicely( int sig ) {
@@ -479,40 +480,6 @@ string finishCode( string code ) {
 
 namespace mongo {
     namespace moe = mongo::optionenvironment;
-}
-
-moe::OptionSection options;
-moe::Environment params;
-
-std::string get_help_string(const StringData& name, const moe::OptionSection& options) {
-    StringBuilder sb;
-    sb << "MongoDB shell version: " << mongo::versionString << "\n";
-    sb << "usage: " << name << " [options] [db address] [file names (ending in .js)]\n"
-       << "db address can be:\n"
-       << "  foo                   foo database on local machine\n"
-       << "  192.169.0.5/foo       foo database on 192.168.0.5 machine\n"
-       << "  192.169.0.5:9999/foo  foo database on 192.168.0.5 machine on port 9999\n"
-       << options.helpString() << "\n"
-       << "file names: a list of files to run. files have to end in .js and will exit after "
-       << "unless --shell is specified";
-    return sb.str();
-}
-
-bool fileExists(const std::string& file) {
-    try {
-#ifdef _WIN32
-        boost::filesystem::path p(toWideString(file.c_str()));
-#else
-        boost::filesystem::path p(file);
-#endif
-        return boost::filesystem::exists(p);
-    }
-    catch ( ... ) {
-        return false;
-    }
-}
-
-namespace mongo {
     extern bool isShell;
 }
 
@@ -596,7 +563,7 @@ static void edit( const string& whatToEdit ) {
         sb << "/tmp/mongo_edit" << time( 0 ) + i << ".js";
 #endif
         filename = sb.str();
-        if ( ! fileExists( filename ) )
+        if (!::mongo::shell_utils::fileExists(filename))
             break;
     }
     if ( i == maxAttempts ) {
@@ -675,162 +642,41 @@ static void edit( const string& whatToEdit ) {
     }
 }
 
-Status addMongoShellOptions(moe::OptionSection* options) {
-
-    typedef moe::OptionDescription OD;
-    typedef moe::PositionalOptionDescription POD;
-
-    Status ret = options->addOption(OD("shell", "shell", moe::Switch,
-                "run the shell after executing files", true));
-    if (!ret.isOK()) {
-        return ret;
-    }
-    ret = options->addOption(OD("nodb", "nodb", moe::Switch,
-                "don't connect to mongod on startup - no 'db address' arg expected", true));
-    if (!ret.isOK()) {
-        return ret;
-    }
-    ret = options->addOption(OD("norc", "norc", moe::Switch,
-                "will not run the \".mongorc.js\" file on start up", true));
-    if (!ret.isOK()) {
-        return ret;
-    }
-    ret = options->addOption(OD("quiet", "quiet", moe::Switch, "be less chatty", true));
-    if (!ret.isOK()) {
-        return ret;
-    }
-    ret = options->addOption(OD("port", "port", moe::String, "port to connect to" , true));
-    if (!ret.isOK()) {
-        return ret;
-    }
-    ret = options->addOption(OD("host", "host", moe::String, "server to connect to" , true));
-    if (!ret.isOK()) {
-        return ret;
-    }
-    ret = options->addOption(OD("eval", "eval", moe::String, "evaluate javascript" , true));
-    if (!ret.isOK()) {
-        return ret;
-    }
-    ret = options->addOption(OD("username", "username,u", moe::String,
-                "username for authentication" , true));
-    if (!ret.isOK()) {
-        return ret;
-    }
-    ret = options->addOption(OD("password", "password,p", moe::String,
-                "password for authentication" , true, moe::Value(), moe::Value(std::string(""))));
-    if (!ret.isOK()) {
-        return ret;
-    }
-    ret = options->addOption(OD("authenticationDatabase", "authenticationDatabase", moe::String,
-                "user source (defaults to dbname)" , true, moe::Value(std::string(""))));
-    if (!ret.isOK()) {
-        return ret;
-    }
-    ret = options->addOption(OD("authenticationMechanism", "authenticationMechanism", moe::String,
-                "authentication mechanism", true, moe::Value(std::string("MONGODB-CR"))));
-    if (!ret.isOK()) {
-        return ret;
-    }
-    ret = options->addOption(OD("help", "help,h", moe::Switch, "show this usage information",
-                true));
-    if (!ret.isOK()) {
-        return ret;
-    }
-    ret = options->addOption(OD("version", "version", moe::Switch, "show version information",
-                true));
-    if (!ret.isOK()) {
-        return ret;
-    }
-    ret = options->addOption(OD("verbose", "verbose", moe::Switch, "increase verbosity", true));
-    if (!ret.isOK()) {
-        return ret;
-    }
-    ret = options->addOption(OD("ipv6", "ipv6", moe::Switch,
-                "enable IPv6 support (disabled by default)", true));
-    if (!ret.isOK()) {
-        return ret;
-    }
-#ifdef MONGO_SSL
-    ret = addSSLClientOptions(options);
-    if (!ret.isOK()) {
-        return ret;
-    }
-#endif
-
-    ret = options->addOption(OD("dbaddress", "dbaddress", moe::String, "dbaddress" , false));
-    if (!ret.isOK()) {
-        return ret;
-    }
-    ret = options->addOption(OD("files", "files", moe::StringVector, "files" , false));
-    if (!ret.isOK()) {
-        return ret;
-    }
-    // for testing, kill op will also be disabled automatically if the tests starts a mongo program
-    ret = options->addOption(OD("nokillop", "nokillop", moe::Switch, "nokillop", false));
-    if (!ret.isOK()) {
-        return ret;
-    }
-    // for testing, will kill op without prompting
-    ret = options->addOption(OD("autokillop", "autokillop", moe::Switch, "autokillop", false));
-    if (!ret.isOK()) {
-        return ret;
-    }
-
-    ret = options->addPositionalOption(POD("dbaddress", moe::String, 1));
-    if (!ret.isOK()) {
-        return ret;
-    }
-    ret = options->addPositionalOption(POD("files", moe::String, -1));
-    if (!ret.isOK()) {
-        return ret;
-    }
-
-    return Status::OK();
-}
-
-Status storeMongoShellOptions() {
-    if ( params.count( "quiet" ) ) {
-        mongo::serverGlobalParams.quiet = true;
-    }
-#ifdef MONGO_SSL
-    Status ret = storeSSLClientOptions(params);
-    if (!ret.isOK()) {
-        return ret;
-    }
-#endif
-    if ( params.count( "ipv6" ) ) {
-        mongo::enableIPv6();
-    }
-    if ( params.count( "verbose" ) ) {
-        logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogSeverity::Debug(1));
-    }
-    return Status::OK();
-}
-
 MONGO_INITIALIZER_GENERAL(ParseStartupConfiguration,
                             ("GlobalLogManager"),
                             ("default", "completedStartupConfig"))(InitializerContext* context) {
 
-    options = moe::OptionSection("options");
+    mongoShellOptions = moe::OptionSection("options");
     moe::OptionsParser parser;
 
-    Status retStatus = addMongoShellOptions(&options);
+    Status retStatus = addMongoShellOptions(&mongoShellOptions);
     if (!retStatus.isOK()) {
         return retStatus;
     }
 
-    retStatus = parser.run(options, context->args(), context->env(), &params);
+    retStatus = parser.run(mongoShellOptions, context->args(), context->env(),
+                           &mongoShellParsedOptions);
     if (!retStatus.isOK()) {
         StringBuilder sb;
         sb << "Error parsing options: " << retStatus.toString() << "\n";
-        sb << get_help_string(context->args()[0], options);
+        sb << getMongoShellHelp(context->args()[0], mongoShellOptions);
         return Status(ErrorCodes::FailedToParse, sb.str());
     }
 
-    // Handle storage in globals that may be needed in other MONGO_INITIALIZERS
-    retStatus = storeMongoShellOptions();
+    retStatus = handlePrevalidationMongoShellOptions(mongoShellParsedOptions, context->args());
     if (!retStatus.isOK()) {
         return retStatus;
+    }
+
+    retStatus = mongoShellParsedOptions.validate();
+    if (!retStatus.isOK()) {
+        return retStatus;
+    }
+
+    retStatus = storeMongoShellOptions(mongoShellParsedOptions, context->args());
+    if (!retStatus.isOK()) {
+        std::cerr << "Failed to store mongo shell options: " << retStatus.toString() << std::endl;
+        ::_exit(EXIT_BADOPTIONS);
     }
 
     return Status::OK();
@@ -842,56 +688,9 @@ int _main( int argc, char* argv[], char **envp ) {
 
     mongo::shell_utils::RecordMyLocation( argv[ 0 ] );
 
-    string url = "test";
-    string dbhost;
-    string port;
-    vector<string> files;
-
-    string username;
-    string password;
-    string authenticationMechanism;
-    string authenticationDatabase;
-
-    std::string sslPEMKeyFile;
-    std::string sslPEMKeyPassword;
-    std::string sslCAFile;
-    std::string sslCRLFile;
-
-    bool runShell = false;
-    bool nodb = false;
-    bool norc = false;
-
-    string script;
+    shellGlobalParams.url = "test";
 
     mongo::runGlobalInitializersOrDie(argc, argv, envp);
-
-    if (params.count("port")) {
-        port = params["port"].as<string>();
-    }
-
-    if (params.count("host")) {
-        dbhost = params["host"].as<string>();
-    }
-
-    if (params.count("eval")) {
-        script = params["eval"].as<string>();
-    }
-
-    if (params.count("username")) {
-        username = params["username"].as<string>();
-    }
-
-    if (params.count("password")) {
-        password = params["password"].as<string>();
-    }
-
-    if (params.count("authenticationDatabase")) {
-        authenticationDatabase = params["authenticationDatabase"].as<string>();
-    }
-
-    if (params.count("authenticationMechanism")) {
-        authenticationMechanism = params["authenticationMechanism"].as<string>();
-    }
 
     // hide password from ps output
     for ( int i = 0; i < (argc-1); ++i ) {
@@ -901,63 +700,6 @@ int _main( int argc, char* argv[], char **envp ) {
                 *arg++ = 'x';
             }
         }
-    }
-
-    if ( params.count( "shell" ) ) {
-        runShell = true;
-    }
-    if ( params.count( "nodb" ) ) {
-        nodb = true;
-    }
-    if ( params.count( "norc" ) ) {
-        norc = true;
-    }
-    if ( params.count( "help" ) ) {
-        std::cout << get_help_string(argv[0], options) << std::endl;
-        return mongo::EXIT_CLEAN;
-    }
-    if ( params.count( "files" ) ) {
-        files = params["files"].as< vector<string> >();
-    }
-    if ( params.count( "version" ) ) {
-        cout << "MongoDB shell version: " << mongo::versionString << endl;
-        return mongo::EXIT_CLEAN;
-    }
-    if ( params.count( "nokillop" ) ) {
-        mongo::shell_utils::_nokillop = true;
-    }
-    if ( params.count( "autokillop" ) ) {
-        autoKillOp = true;
-    }
-
-    /* This is a bit confusing, here are the rules:
-     *
-     * if nodb is set then all positional parameters are files
-     * otherwise the first positional parameter might be a dbaddress, but
-     * only if one of these conditions is met:
-     *   - it contains no '.' after the last appearance of '\' or '/'
-     *   - it doesn't end in '.js' and it doesn't specify a path to an existing file */
-    if ( params.count( "dbaddress" ) ) {
-        string dbaddress = params["dbaddress"].as<string>();
-        if (nodb) {
-            files.insert( files.begin(), dbaddress );
-        }
-        else {
-            string basename = dbaddress.substr( dbaddress.find_last_of( "/\\" ) + 1 );
-            if (basename.find_first_of( '.' ) == string::npos ||
-                    ( basename.find( ".js", basename.size() - 3 ) == string::npos && !fileExists( dbaddress ) ) ) {
-                url = dbaddress;
-            }
-            else {
-                files.insert( files.begin(), dbaddress );
-            }
-        }
-    }
-
-    if ( url == "*" ) {
-        std::cerr << "ERROR: " << "\"*\" is an invalid db address" << std::endl;
-        std::cerr << get_help_string(argv[0], options) << std::endl;
-        return mongo::EXIT_BADOPTIONS;
     }
 
     if (!mongo::serverGlobalParams.quiet)
@@ -970,16 +712,19 @@ int _main( int argc, char* argv[], char **envp ) {
                     new logger::ConsoleAppender<logger::MessageEventEphemeral>(
                             new logger::MessageEventUnadornedEncoder)));
 
-    if ( !nodb ) { // connect to db
+    if (!shellGlobalParams.nodb) { // connect to db
         stringstream ss;
         if (mongo::serverGlobalParams.quiet)
             ss << "__quiet = true;";
-        ss << "db = connect( \"" << fixHost( url , dbhost , port ) << "\")";
+        ss << "db = connect( \""
+           << fixHost(shellGlobalParams.url, shellGlobalParams.dbhost, shellGlobalParams.port)
+           << "\")";
 
         mongo::shell_utils::_dbConnect = ss.str();
 
-        if ( params.count( "password" ) && password.empty() )
-            password = mongo::askPassword();
+        if (shellGlobalParams.usingPassword && shellGlobalParams.password.empty()) {
+            shellGlobalParams.password = mongo::askPassword();
+        }
     }
 
     // Construct the authentication-related code to execute on shell startup.
@@ -994,20 +739,20 @@ int _main( int argc, char* argv[], char **envp ) {
     //  }())
     stringstream authStringStream;
     authStringStream << "(function() { " << endl;
-    if ( !authenticationMechanism.empty() ) {
+    if ( !shellGlobalParams.authenticationMechanism.empty() ) {
         authStringStream << "DB.prototype._defaultAuthenticationMechanism = \"" <<
-            authenticationMechanism << "\";" << endl;
+            shellGlobalParams.authenticationMechanism << "\";" << endl;
     }
 
-    if (!nodb && username.size()) {
-        authStringStream << "var username = \"" << username << "\";" << endl;
-        authStringStream << "var password = \"" << password << "\";" << endl;
-        if (authenticationDatabase.empty()) {
+    if (!shellGlobalParams.nodb && shellGlobalParams.username.size()) {
+        authStringStream << "var username = \"" << shellGlobalParams.username << "\";" << endl;
+        authStringStream << "var password = \"" << shellGlobalParams.password << "\";" << endl;
+        if (shellGlobalParams.authenticationDatabase.empty()) {
             authStringStream << "var authDb = db;" << endl;
         }
         else {
-            authStringStream << "var authDb = db.getSiblingDB(\"" << authenticationDatabase <<
-                "\");" << endl;
+            authStringStream << "var authDb = db.getSiblingDB(\""
+                             << shellGlobalParams.authenticationDatabase << "\");" << endl;
         }
         authStringStream << "authDb._authOrThrow({ " <<
             saslCommandUserFieldName << ": username, " <<
@@ -1023,7 +768,7 @@ int _main( int argc, char* argv[], char **envp ) {
     auto_ptr< mongo::Scope > scope( mongo::globalScriptEngine->newScope() );
     shellMainScope = scope.get();
 
-    if( runShell )
+    if( shellGlobalParams.runShell )
         cout << "type \"help\" for help" << endl;
    
     // Load and execute /etc/mongorc.js before starting shell
@@ -1041,39 +786,40 @@ int _main( int argc, char* argv[], char **envp ) {
                                          << "\\MongoDB\\mongorc.js";
     }
 #endif   
-    if ( !rcGlobalLocation.empty() && fileExists(rcGlobalLocation) ) {
+    if ( !rcGlobalLocation.empty() && ::mongo::shell_utils::fileExists(rcGlobalLocation) ) {
         if ( ! scope->execFile( rcGlobalLocation , false , true ) ) {
             cout << "The \"" << rcGlobalLocation << "\" file could not be executed" << endl;
         }
     }
 
-    if ( !script.empty() ) {
+    if ( !shellGlobalParams.script.empty() ) {
         mongo::shell_utils::MongoProgramScope s;
-        if ( ! scope->exec( script , "(shell eval)" , true , true , false ) )
+        if ( ! scope->exec( shellGlobalParams.script , "(shell eval)" , true , true , false ) )
             return -4;
     }
 
-    for (size_t i = 0; i < files.size(); ++i) {
+    for (size_t i = 0; i < shellGlobalParams.files.size(); ++i) {
         mongo::shell_utils::MongoProgramScope s;
 
-        if ( files.size() > 1 )
-            cout << "loading file: " << files[i] << endl;
+        if ( shellGlobalParams.files.size() > 1 )
+            cout << "loading file: " << shellGlobalParams.files[i] << endl;
 
-        if ( ! scope->execFile( files[i] , false , true ) ) {
-            cout << "failed to load: " << files[i] << endl;
+        if ( ! scope->execFile( shellGlobalParams.files[i] , false , true ) ) {
+            cout << "failed to load: " << shellGlobalParams.files[i] << endl;
             return -3;
         }
     }
 
-    if ( files.size() == 0 && script.empty() )
-        runShell = true;
+    if ( shellGlobalParams.files.size() == 0 && shellGlobalParams.script.empty() )
+        shellGlobalParams.runShell = true;
 
-    if ( runShell ) {
+    if ( shellGlobalParams.runShell ) {
 
         mongo::shell_utils::MongoProgramScope s;
-        bool hasMongoRC = norc; // If they specify norc, assume it's not their first time
+        // If they specify norc, assume it's not their first time
+        bool hasMongoRC = shellGlobalParams.norc;
         string rcLocation;
-        if ( !norc ) {
+        if ( !shellGlobalParams.norc ) {
 #ifndef _WIN32
             if ( getenv( "HOME" ) != NULL )
                 rcLocation = str::stream() << getenv( "HOME" ) << "/.mongorc.js" ;
@@ -1083,7 +829,7 @@ int _main( int argc, char* argv[], char **envp ) {
                                            << toUtf8String(_wgetenv(L"HOMEPATH"))
                                            << "\\.mongorc.js";
 #endif
-            if ( !rcLocation.empty() && fileExists(rcLocation) ) {
+            if ( !rcLocation.empty() && ::mongo::shell_utils::fileExists(rcLocation) ) {
                 hasMongoRC = true;
                 if ( ! scope->execFile( rcLocation , false , true ) ) {
                     cout << "The \".mongorc.js\" file located in your home folder could not be executed" << endl;
@@ -1101,7 +847,7 @@ int _main( int argc, char* argv[], char **envp ) {
             f.open(rcLocation.c_str(), false);  // Create empty .mongorc.js file
         }
 
-        if (!nodb && !mongo::serverGlobalParams.quiet && isatty(fileno(stdin))) {
+        if (!shellGlobalParams.nodb && !mongo::serverGlobalParams.quiet && isatty(fileno(stdin))) {
             scope->exec( "shellHelper( 'show', 'startupWarnings' )", "(shellwarnings", false, true, false );
         }
 
