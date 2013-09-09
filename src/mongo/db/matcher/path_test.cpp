@@ -42,7 +42,7 @@ namespace mongo {
 
         BSONObj doc = BSON( "x" << 4 << "a" << 5 );
 
-        BSONElementIterator cursor( p, doc );
+        BSONElementIterator cursor( &p, doc );
         ASSERT( cursor.more() );
         ElementIterator::Context e = cursor.next();
         ASSERT_EQUALS( (string)"a", e.element().fieldName() );
@@ -56,7 +56,7 @@ namespace mongo {
 
         BSONObj doc = BSON( "x" << 4 << "a" << BSON_ARRAY( 5 << 6 ) );
 
-        BSONElementIterator cursor( p, doc );
+        BSONElementIterator cursor( &p, doc );
 
         ASSERT( cursor.more() );
         BSONElementIterator::Context e = cursor.next();
@@ -80,7 +80,7 @@ namespace mongo {
 
         BSONObj doc = BSON( "x" << 4 << "a" << BSON_ARRAY( 5 << 6 ) );
 
-        BSONElementIterator cursor( p, doc );
+        BSONElementIterator cursor( &p, doc );
 
         ASSERT( cursor.more() );
         BSONElementIterator::Context e = cursor.next();
@@ -99,7 +99,7 @@ namespace mongo {
                                                BSON( "b" << BSON_ARRAY( 9 << 11 ) ) <<
                                                BSON( "b" << 7 ) ) );
 
-        BSONElementIterator cursor( p, doc );
+        BSONElementIterator cursor( &p, doc );
 
         ASSERT( cursor.more() );
         BSONElementIterator::Context e = cursor.next();
@@ -147,7 +147,7 @@ namespace mongo {
                                                BSON( "b" << BSON_ARRAY( 9 << 11 ) ) <<
                                                BSON( "b" << 7 ) ) );
 
-        BSONElementIterator cursor( p, doc );
+        BSONElementIterator cursor( &p, doc );
 
         ASSERT( cursor.more() );
         BSONElementIterator::Context e = cursor.next();
@@ -181,7 +181,7 @@ namespace mongo {
 
         BSONObj doc = BSON( "a" << BSON_ARRAY( 5 << 7 << 3 ) );
 
-        BSONElementIterator cursor( p, doc );
+        BSONElementIterator cursor( &p, doc );
 
         ASSERT( cursor.more() );
         BSONElementIterator::Context e = cursor.next();
@@ -196,7 +196,7 @@ namespace mongo {
 
         BSONObj doc = BSON( "a" << BSON_ARRAY( 5 << BSON_ARRAY( 2 << 4 ) << 3 ) );
 
-        BSONElementIterator cursor( p, doc );
+        BSONElementIterator cursor( &p, doc );
 
         ASSERT( cursor.more() );
         BSONElementIterator::Context e = cursor.next();
@@ -211,7 +211,7 @@ namespace mongo {
 
         BSONObj doc = BSON( "a" << BSON_ARRAY( 5 << BSON( "1" << 4 ) << 3 ) );
 
-        BSONElementIterator cursor( p, doc );
+        BSONElementIterator cursor( &p, doc );
 
         ASSERT( cursor.more() );
         BSONElementIterator::Context e = cursor.next();
@@ -230,7 +230,7 @@ namespace mongo {
 
         BSONObj doc = BSON( "a" << BSON_ARRAY( 5 << BSON( "b" << 4 ) << 3 ) );
 
-        BSONElementIterator cursor( p, doc );
+        BSONElementIterator cursor( &p, doc );
 
         ASSERT( cursor.more() );
         BSONElementIterator::Context e = cursor.next();
@@ -250,7 +250,7 @@ namespace mongo {
 
         BSONObj doc = BSON( "a" << BSON_ARRAY( 5 << BSON_ARRAY( BSON( "b" << 4 ) ) << 3 ) );
 
-        BSONElementIterator cursor( p, doc );
+        BSONElementIterator cursor( &p, doc );
 
         ASSERT( cursor.more() );
         BSONElementIterator::Context e = cursor.next();
