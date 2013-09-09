@@ -36,6 +36,13 @@ string "checkpoint" with the name "WiredTigerCheckpoint" to the
 WT_SESSION::open_cursor method:
 @snippet ex_all.c open the default checkpoint
 
+@subsection tuning_bulk_load Bulk load
+
+When loading a large amount of data into a new object, using a cursor
+with the \c bulk configuration string enabled and loading the data in
+sorted order will be much faster than doing out-of-order inserts.  See
+@ref bulk_load for more information.
+
 @subsection tuning_cache_resident Cache resident objects
 
 Cache resident objects (objects never considered for the purposes of

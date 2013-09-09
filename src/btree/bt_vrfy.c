@@ -361,8 +361,7 @@ recno_chk:	if (recno != vs->record_total + 1)
 			 * reviewed to this point.
 			 */
 			++entry;
-			if (ref->u.recno != vs->record_total + 1) {
-				__wt_cell_unpack(ref->addr, unpack);
+			if (ref->key.recno != vs->record_total + 1) {
 				WT_RET_MSG(session, WT_ERROR,
 				    "the starting record number in entry %"
 				    PRIu32 " of the column internal page at "
@@ -371,7 +370,7 @@ recno_chk:	if (recno != vs->record_total + 1)
 				    entry,
 				    __wt_page_addr_string(
 				    session, vs->tmp1, page),
-				    ref->u.recno,
+				    ref->key.recno,
 				    vs->record_total + 1);
 			}
 
@@ -428,7 +427,6 @@ __verify_row_int_key_order(WT_SESSION_IMPL *session,
     WT_PAGE *page, WT_REF *ref, uint32_t entry, WT_VSTUFF *vs)
 {
 	WT_BTREE *btree;
-	WT_IKEY *ikey;
 	WT_ITEM item;
 	int cmp;
 
@@ -437,13 +435,11 @@ __verify_row_int_key_order(WT_SESSION_IMPL *session,
 	/* The maximum key is set, we updated it from a leaf page first. */
 	WT_ASSERT(session, vs->max_addr->size != 0);
 
-	/* Set up the key structure. */
-	ikey = ref->u.key;
-	item.data = WT_IKEY_DATA(ikey);
-	item.size = ikey->size;
+	/* Get the current key. */
+	__wt_ref_key(page, ref, &item.data, &item.size);
 
 	/* Compare the key against the largest key we've seen so far. */
-	WT_RET(WT_BTREE_CMP(session, btree, &item, vs->max_key, cmp));
+	WT_RET(WT_LEX_CMP(session, btree->collator, &item, vs->max_key, cmp));
 	if (cmp <= 0)
 		WT_RET_MSG(session, WT_ERROR,
 		    "the internal key in entry %" PRIu32 " on the page at %s "
@@ -487,8 +483,8 @@ __verify_row_leaf_key_order(
 	 * are all empty entries).
 	 */
 	if (vs->max_addr->size != 0) {
-		WT_RET(
-		    __wt_row_key_copy(session, page, page->u.row.d, vs->tmp1));
+		WT_RET(__wt_row_leaf_key_copy(
+		    session, page, page->u.row.d, vs->tmp1));
 
 		/*
 		 * Compare the key against the largest key we've seen so far.
@@ -500,8 +496,8 @@ __verify_row_leaf_key_order(
 		 * we've seen was a key from a previous leaf page, and it's not
 		 * OK to compare equally in that case.
 		 */
-		WT_RET(WT_BTREE_CMP(session,
-		    btree, vs->tmp1, (WT_ITEM *)vs->max_key, cmp));
+		WT_RET(WT_LEX_CMP(session,
+		    btree->collator, vs->tmp1, (WT_ITEM *)vs->max_key, cmp));
 		if (cmp < 0)
 			WT_RET_MSG(session, WT_ERROR,
 			    "the first key on the page at %s sorts equal to or "
@@ -512,7 +508,7 @@ __verify_row_leaf_key_order(
 	}
 
 	/* Update the largest key we've seen to the last key on this page. */
-	WT_RET(__wt_row_key_copy(session,
+	WT_RET(__wt_row_leaf_key_copy(session,
 	    page, page->u.row.d + (page->entries - 1), vs->max_key));
 	(void)__wt_page_addr_string(session, vs->max_addr, page);
 

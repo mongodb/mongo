@@ -12,11 +12,10 @@
  *	Search a column-store tree for a specific record-based key.
  */
 int
-__wt_col_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
+__wt_col_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 {
 	WT_BTREE *btree;
 	WT_COL *cip;
-	WT_DECL_RET;
 	WT_INSERT *ins;
 	WT_INSERT_HEAD *ins_head;
 	WT_PAGE *page;
@@ -36,12 +35,12 @@ __wt_col_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 	for (depth = 2,
 	    page = btree->root_page; page->type == WT_PAGE_COL_INT; ++depth) {
 		WT_ASSERT(session, ref == NULL ||
-		    ref->u.recno == page->u.intl.recno);
+		    ref->key.recno == page->u.intl.recno);
 
 		/* Fast path appends. */
 		base = page->entries;
 		ref = &page->u.intl.t[base - 1];
-		if (recno >= ref->u.recno)
+		if (recno >= ref->key.recno)
 			goto descend;
 
 		/* Binary search of internal pages. */
@@ -50,9 +49,9 @@ __wt_col_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 			indx = base + (limit >> 1);
 			ref = page->u.intl.t + indx;
 
-			if (recno == ref->u.recno)
+			if (recno == ref->key.recno)
 				break;
-			if (recno < ref->u.recno)
+			if (recno < ref->key.recno)
 				continue;
 			base = indx + 1;
 			--limit;
@@ -67,7 +66,7 @@ descend:	WT_ASSERT(session, ref != NULL);
 		 * (last + 1) index.  The slot for descent is the one before
 		 * base.
 		 */
-		if (recno != ref->u.recno) {
+		if (recno != ref->key.recno) {
 			/*
 			 * We don't have to correct for base == 0 because the
 			 * only way for base to be 0 is if recno is the page's
@@ -91,18 +90,6 @@ descend:	WT_ASSERT(session, ref != NULL);
 	 */
 	if (depth > btree->maximum_depth)
 		btree->maximum_depth = depth;
-
-	/*
-	 * Copy the leaf page's write generation value before reading the page.
-	 * Use a read memory barrier to ensure we read the value before we read
-	 * any of the page's contents.
-	 */
-	if (is_modify) {
-		/* Initialize the page's modification information */
-		WT_ERR(__wt_page_modify_init(session, page));
-
-		WT_ORDERED_READ(cbt->write_gen, page->modify->write_gen);
-	}
 
 	cbt->page = page;
 	cbt->recno = recno;
@@ -152,10 +139,18 @@ past_end:
 	 * This is a rarely used path: we normally find exact matches, because
 	 * column-store files are dense, but in this case the caller searched
 	 * past the end of the table.
+	 *
+	 * Don't bother searching if the caller is appending a new record where
+	 * we'll allocate the record number; we're not going to find a match by
+	 * definition, and we're going to repeat the search when we do the work.
 	 */
 	cbt->ins_head = WT_COL_APPEND(page);
-	if ((cbt->ins = __col_insert_search(
-	    cbt->ins_head, cbt->ins_stack, cbt->next_stack, recno)) == NULL)
+	if (recno == UINT64_MAX)
+		cbt->ins = NULL;
+	else
+		cbt->ins = __col_insert_search(
+		    cbt->ins_head, cbt->ins_stack, cbt->next_stack, recno);
+	if (cbt->ins == NULL)
 		cbt->compare = -1;
 	else {
 		cbt->recno = WT_INSERT_RECNO(cbt->ins);
@@ -176,7 +171,4 @@ past_end:
 	if (cbt->compare == -1)
 		F_SET(cbt, WT_CBT_MAX_RECORD);
 	return (0);
-
-err:	WT_TRET(__wt_page_release(session, page));
-	return (ret);
 }

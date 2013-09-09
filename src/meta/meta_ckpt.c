@@ -501,11 +501,21 @@ __ckpt_version_chk(
 	WT_RET(__wt_config_subgets(session, &v, "minor", &a));
 	minorv = (int)a.val;
 
-	if (majorv > WT_BTREE_MAJOR_VERSION ||
-	    (majorv == WT_BTREE_MAJOR_VERSION &&
-	    minorv > WT_BTREE_MINOR_VERSION))
+	if (majorv < WT_BTREE_MAJOR_VERSION_MIN ||
+	    majorv > WT_BTREE_MAJOR_VERSION_MAX ||
+	    (majorv == WT_BTREE_MAJOR_VERSION_MIN &&
+	    minorv < WT_BTREE_MINOR_VERSION_MIN) ||
+	    (majorv == WT_BTREE_MAJOR_VERSION_MAX &&
+	    minorv > WT_BTREE_MINOR_VERSION_MAX))
 		WT_RET_MSG(session, EACCES,
-		    "%s is an unsupported version of a WiredTiger file",
-		    fname);
+		    "%s is an unsupported WiredTiger source file version %d.%d"
+		    "; this WiredTiger build only supports versions from %d.%d "
+		    "to %d.%d",
+		    fname,
+		    majorv, minorv,
+		    WT_BTREE_MAJOR_VERSION_MIN,
+		    WT_BTREE_MINOR_VERSION_MIN,
+		    WT_BTREE_MAJOR_VERSION_MAX,
+		    WT_BTREE_MINOR_VERSION_MAX);
 	return (0);
 }

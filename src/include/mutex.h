@@ -31,8 +31,8 @@
  * a type guaranteed to be written atomically in a single cycle, without writing
  * an adjacent memory location.
  *
- * WiredTiger doesn't require atomic writes for any 64-bit memory locations and
- * can run on machines with a 32-bit memory bus.
+ * WiredTiger additionally requires atomic writes for 64-bit memory locations,
+ * and so cannot run on machines with a 32-bit memory bus.
  *
  * We don't depend on writes across cache lines being atomic, and to make sure
  * that never happens, we check address alignment: we know of no architectures
@@ -70,19 +70,26 @@
  * (compare and swap) operations.
  */
 #if defined(_lint)
-#define	WT_ATOMIC_ADD(v, val)	((v) += (val), (v))
-#define	WT_ATOMIC_CAS(v, oldv, newv)					\
-	((v) == (oldv) && (v) = (newv) ? 1 : 0)
-#define	WT_ATOMIC_SUB(v, val)	((v) -= (val), (v))
+#define	WT_ATOMIC_ADD(v, val)			((v) += (val), (v))
+#define	WT_ATOMIC_CAS(v, oldv, newv)		(1)
+#define	WT_ATOMIC_CAS_VAL(v, oldv, newv)	(1)
+#define	WT_ATOMIC_STORE(v, val)			((v) = (val))
+#define	WT_ATOMIC_SUB(v, val)			((v) -= (val), (v))
 #define	WT_FULL_BARRIER()
 #define	WT_READ_BARRIER()
 #define	WT_WRITE_BARRIER()
 #define	HAVE_ATOMICS 1
+
 #elif defined(__GNUC__)
+
 #define	WT_ATOMIC_ADD(v, val)						\
 	__sync_add_and_fetch(&(v), val)
 #define	WT_ATOMIC_CAS(v, oldv, newv)					\
 	__sync_bool_compare_and_swap(&(v), oldv, newv)
+#define	WT_ATOMIC_CAS_VAL(v, oldv, newv)				\
+	__sync_val_compare_and_swap(&(v), oldv, newv)
+#define	WT_ATOMIC_STORE(v, val)						\
+	__sync_lock_test_and_set(&(v), val)
 #define	WT_ATOMIC_SUB(v, val)						\
 	__sync_sub_and_fetch(&(v), val)
 
@@ -97,12 +104,13 @@
 	asm volatile ("sfence" ::: "memory");				\
 } while (0)
 #define	HAVE_ATOMICS 1
+
 #elif defined(i386) || defined(__i386__)
 #define	WT_FULL_BARRIER() do {						\
 	asm volatile ("lock; addl $0, 0(%%esp)" ::: "memory");		\
 } while (0);
-#define	WT_READ_BARRIER() WT_FULL_BARRIER()
-#define	WT_WRITE_BARRIER() WT_FULL_BARRIER()
+#define	WT_READ_BARRIER()	WT_FULL_BARRIER()
+#define	WT_WRITE_BARRIER()	WT_FULL_BARRIER()
 #define	HAVE_ATOMICS 1
 #endif
 #endif
@@ -133,6 +141,11 @@
  * Atomic versions of F_ISSET, F_SET and F_CLR.
  * Spin until the new value can be swapped into place.
  */
+#if defined(_lint)
+#define	F_ISSET_ATOMIC(p, mask)	((p)->flags_atomic & ((uint32_t)(mask)))
+#define	F_SET_ATOMIC(p, mask)	((p)->flags_atomic |= ((uint32_t)(mask)))
+#define	F_CLR_ATOMIC(p, mask)	((p)->flags_atomic &= ~((uint32_t)(mask)))
+#else
 #define	F_ISSET_ATOMIC(p, mask)	((p)->flags_atomic & (uint32_t)(mask))
 
 #define	F_SET_ATOMIC(p, mask)	do {					\
@@ -150,6 +163,7 @@
 	} while (!WT_ATOMIC_CAS((p)->flags_atomic,			\
 	    __orig, __orig & ~(uint32_t)(mask)));			\
 } while (0)
+#endif
 
 /*
  * Condition variables:

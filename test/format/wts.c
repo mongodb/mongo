@@ -78,14 +78,15 @@ wts_open(const char *home, int set_api, WT_CONNECTION **connp)
 	 */
 	(void)snprintf(config, sizeof(config),
 	    "create,"
-	    "sync=false,cache_size=%" PRIu32 "MB,"
+	    "checkpoint_sync=false,cache_size=%" PRIu32 "MB,"
 	    "buffer_alignment=512,error_prefix=\"%s\","
-	    "%s,"
+	    "%s,%s,"
 	    "extensions="
-	    "[\"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\"],"
+	    "[\"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\"],"
 	    "%s,%s",
 	    g.c_cache,
 	    g.progname,
+	    g.c_statistics ? "statistics=true," : "",
 	    g.c_data_extend ? "file_extend=(data=8MB)," : "",
 	    g.c_reverse ? REVERSE_PATH : "",
 	    access(BZIP_PATH, R_OK) == 0 ? BZIP_PATH : "",
@@ -94,7 +95,6 @@ wts_open(const char *home, int set_api, WT_CONNECTION **connp)
 	    access(BZIP_PATH, R_OK) == 0) ? RAW_PATH : "",
 	    access(SNAPPY_PATH, R_OK) == 0 ? SNAPPY_PATH : "",
 	    DATASOURCE("kvsbdb") ? KVS_BDB_PATH : "",
-	    DATASOURCE("memrata") ? MEMRATA_PATH : "",
 	    g.c_config_open == NULL ? "" : g.c_config_open,
 	    g.config_open == NULL ? "" : g.config_open);
 
@@ -114,6 +114,19 @@ wts_open(const char *home, int set_api, WT_CONNECTION **connp)
 
 	if (set_api)
 		g.wt_api = conn->get_extension_api(conn);
+
+	/*
+	 * Load the Memrata shared library: it would be possible to do this as
+	 * part of the extensions configured for wiredtiger_open, there's no
+	 * difference, I am doing it here because it's easier to work with the
+	 * configuration strings.
+	 */
+	if (DATASOURCE("memrata") &&
+	    (ret = conn->load_extension(conn, MEMRATA_PATH,
+	    "entry=wiredtiger_extension_init,config=["
+	    "dev1=[kvs_devices=[/dev/loop0,/dev/loop1],kvs_open_o_truncate=1],"
+	    "dev2=[kvs_devices=[/dev/loop2],kvs_open_o_truncate=1]]")) != 0)
+		die(ret, "WT_CONNECTION.load_extension: %s", MEMRATA_PATH);
 
 	*connp = conn;
 }
@@ -135,25 +148,31 @@ wts_create(void)
 
 	/*
 	 * Create the underlying store.
-	 *
-	 * Make sure at least 2 internal page per thread can fit in cache.
 	 */
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
 		die(ret, "connection.open_session");
 
+	/*
+	 * Ensure that we can service at least one operation per-thread
+	 * concurrently without filling the cache with pinned pages. We
+	 * choose a multiplier of three because the max configurations control
+	 * on disk size and in memory pages are often significantly larger
+	 * than their disk counterparts.
+	 */
 	maxintlpage = 1U << g.c_intl_page_max;
-	while (maxintlpage > 512 &&
-	    2 * g.c_threads * maxintlpage > g.c_cache << 20)
-		maxintlpage >>= 1;
+	maxleafpage = 1U << g.c_leaf_page_max;
+	while (3 * g.c_threads * (maxintlpage + maxleafpage) >
+	    g.c_cache << 20) {
+		if (maxleafpage <= 512 && maxintlpage <= 512)
+			break;
+		if (maxintlpage > 512)
+			maxintlpage >>= 1;
+		if (maxleafpage > 512)
+			maxleafpage >>= 1;
+	}
 	maxintlitem = MMRAND(maxintlpage / 50, maxintlpage / 40);
 	if (maxintlitem < 40)
 		maxintlitem = 40;
-
-	/* Make sure at least two leaf pages per thread can fit in cache. */
-	maxleafpage = 1U << g.c_leaf_page_max;
-	while (maxleafpage > 512 &&
-	    2 * g.c_threads * (maxintlpage + maxleafpage) > g.c_cache << 20)
-		maxleafpage >>= 1;
 	maxleafitem = MMRAND(maxleafpage / 50, maxleafpage / 40);
 	if (maxleafitem < 40)
 		maxleafitem = 40;
@@ -248,9 +267,8 @@ wts_create(void)
 		p += snprintf(p, (size_t)(end - p), ",type=lsm");
 
 	if (DATASOURCE("memrata"))
-		p += snprintf(
-		    p, (size_t)(end - p),
-		    ",type=memrata,kvs_open_o_truncate=1,%s", MEMRATA_DEVICE);
+		p += snprintf(p, (size_t)(end - p),
+		    ",type=memrata,kvs_open_o_truncate=1");
 
 	if ((ret = session->create(session, g.uri, config)) != 0)
 		die(ret, "session.create: %s", g.uri);
@@ -389,6 +407,10 @@ wts_stats(void)
 
 	/* Data-sources that don't support statistics. */
 	if (DATASOURCE("kvsbdb") || DATASOURCE("memrata"))
+		return;
+
+	/* Ignore statistics if they're not configured. */
+	if (g.c_statistics == 0)
 		return;
 
 	conn = g.wts_conn;

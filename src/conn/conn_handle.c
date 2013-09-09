@@ -36,6 +36,7 @@ __wt_connection_init(WT_CONNECTION_IMPL *conn)
 	/* Locks. */
 	__wt_spin_init(session, &conn->api_lock);
 	__wt_spin_init(session, &conn->checkpoint_lock);
+	__wt_spin_init(session, &conn->dhandle_lock);
 	__wt_spin_init(session, &conn->fh_lock);
 	__wt_spin_init(session, &conn->hot_backup_lock);
 	__wt_spin_init(session, &conn->schema_lock);
@@ -76,9 +77,6 @@ __wt_connection_destroy(WT_CONNECTION_IMPL *conn)
 	 */
 	if (conn->lock_fh != NULL)
 		WT_TRET(__wt_close(session, conn->lock_fh));
-
-	if (conn->log_fh != NULL)
-		WT_TRET(__wt_close(session, conn->log_fh));
 
 	/* Remove from the list of connections. */
 	__wt_spin_lock(session, &__wt_process.spinlock);

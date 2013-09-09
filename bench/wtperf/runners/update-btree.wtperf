@@ -1,0 +1,12 @@
+# wtperf options file: btree with inserts/updates, in memory
+conn_config="cache_size=1G"
+table_config="type=file"
+icount=5000000
+report_interval=5
+stat_interval=4
+run_time=120
+populate_threads=1
+read_threads=2
+insert_threads=2
+update_threads=2
+verbose=1

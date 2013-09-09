@@ -18,7 +18,10 @@ FreeBSD
 GCC
 Gawlick
 GitHub
+Google
+Google's
 IEC
+JavaScript
 LDFLAGS
 LIBS
 LSB
@@ -26,6 +29,7 @@ LSM
 MERCHANTABILITY
 MVCC's
 Makefiles
+Memrata
 Mewhort
 NOTFOUND
 NoSQL
@@ -61,6 +65,7 @@ boolean
 booleans
 br
 btree
+bufs
 builtin
 bzip
 cachesize
@@ -100,6 +105,7 @@ del
 desc
 destructor
 destructors
+dev
 distclean
 dl
 dlp
@@ -170,9 +176,11 @@ lastname
 len
 li
 libdir
+libkvs
 libtool
 libwiredtiger
 lmin
+ln
 loadtext
 logc
 lookup
@@ -194,6 +202,7 @@ maxleafpage
 memalloc
 memfree
 memp
+memrata
 metadata
 minkey
 mkdir
@@ -238,6 +247,7 @@ os
 ovfl
 pcoll
 pdf
+petabyte
 pget
 php
 png
@@ -272,6 +282,7 @@ rpc
 rwlock
 rx
 sHQ
+sHq
 scalable
 scanf
 schemas
@@ -282,6 +293,7 @@ spinlock
 spinlocks
 sql
 src
+ssd
 startsync
 statlog
 str
@@ -316,6 +328,7 @@ umask
 unallocated
 unencoded
 unescaped
+uninstall
 untyped
 uri
 useconds

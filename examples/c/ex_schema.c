@@ -135,6 +135,28 @@ main(void)
 	}
 	ret = cursor->close(cursor);
 
+	/*! [List the records in the table using raw mode.] */
+	/* List the records in the table using raw mode. */
+	ret = session->open_cursor(session,
+	    "table:poptable", NULL, "raw", &cursor);
+	while ((ret = cursor->next(cursor)) == 0) {
+		WT_ITEM key, value;
+
+		ret = cursor->get_key(cursor, &key);
+		ret = wiredtiger_struct_unpack(session,
+		    key.data, key.size, "r", &recno);
+		printf("ID %" PRIu64, recno);
+
+		ret = cursor->get_value(cursor, &value);
+		ret = wiredtiger_struct_unpack(session,
+		    value.data, value.size,
+		    "5sHQ", &country, &year, &population);
+		printf(": country %s, year %u, population %" PRIu64 "\n",
+		    country, year, population);
+	}
+	/*! [List the records in the table using raw mode.] */
+	ret = cursor->close(cursor);
+
 	/*! [Read population from the primary column group] */
 	/*
 	 * Open a cursor on the main column group, and return the information
@@ -190,22 +212,59 @@ main(void)
 	/*! [Search in a composite index] */
 	ret = cursor->close(cursor);
 
+	/*! [Return a subset of values from the table] */
+	/*
+	 * Use a projection to return just the table's country and year
+	 * columns.
+	 */
+	ret = session->open_cursor(session,
+	    "table:poptable(country,year)", NULL, NULL, &cursor);
+	while ((ret = cursor->next(cursor)) == 0) {
+		ret = cursor->get_value(cursor, &country, &year);
+		printf("country %s, year %u\n", country, year);
+	}
+	/*! [Return a subset of values from the table] */
+	ret = cursor->close(cursor);
+
+	/*! [Return a subset of values from the table using raw mode] */
+	/*
+	 * Use a projection to return just the table's country and year
+	 * columns, using raw mode.
+	 */
+	ret = session->open_cursor(session,
+	    "table:poptable(country,year)", NULL, "raw", &cursor);
+	while ((ret = cursor->next(cursor)) == 0) {
+		WT_ITEM value;
+
+		ret = cursor->get_value(cursor, &value);
+		ret = wiredtiger_struct_unpack(
+		    session, value.data, value.size, "5sH", &country, &year);
+		printf("country %s, year %u\n", country, year);
+	}
+	/*! [Return a subset of values from the table using raw mode] */
+	ret = cursor->close(cursor);
+
 	/*! [Return the table's record number key using an index] */
-	/* Return the table's record number key using an index. */
+	/*
+	 * Use a projection to return just the table's record number key
+	 * from an index.
+	 */
 	ret = session->open_cursor(session,
 	    "index:poptable:country_plus_year(id)", NULL, NULL, &cursor);
 	while ((ret = cursor->next(cursor)) == 0) {
 		ret = cursor->get_key(cursor, &country, &year);
 		ret = cursor->get_value(cursor, &recno);
-		printf(
-		    "row ID %" PRIu64 ": country %s, year %u\n",
+		printf("row ID %" PRIu64 ": country %s, year %u\n",
 		    recno, country, year);
 	}
 	/*! [Return the table's record number key using an index] */
 	ret = cursor->close(cursor);
 
 	/*! [Return a subset of the value columns from an index] */
-	/* Return just the population column using an index. */
+	/*
+	 * Use a projection to return just the population column from an
+	 * index.
+	 */
 	ret = session->open_cursor(session,
 	    "index:poptable:country_plus_year(population)",
 	    NULL, NULL, &cursor);
@@ -220,8 +279,8 @@ main(void)
 
 	/*! [Access only the index] */
 	/*
-	 * Avoid accessing any other column groups when using an index: supply
-	 * an empty list of value columns.
+	 * Use a projection to avoid accessing any other column groups when
+	 * using an index: supply an empty list of value columns.
 	 */
 	ret = session->open_cursor(session,
 	    "index:poptable:country_plus_year()", NULL, NULL, &cursor);
@@ -231,7 +290,6 @@ main(void)
 	}
 	/*! [Access only the index] */
 	ret = cursor->close(cursor);
-	/*! [schema complete] */
 
 	ret = conn->close(conn, NULL);
 

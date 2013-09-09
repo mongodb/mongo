@@ -197,7 +197,7 @@ file_config = format_meta + [
 		the maximum gap between instantiated keys in a Btree leaf page,
 		constraining the number of keys processed to instantiate a
 		random Btree leaf page key''',
-		min='0'),
+		min='0', undoc=True),
 	Config('leaf_page_max', '1MB', r'''
 		the maximum page size for leaf nodes, in bytes; the size must
 		be a multiple of the allocation size, and is significant for
@@ -232,8 +232,12 @@ file_config = format_meta + [
 		written into the buffer cache''',
 		min=0),
 	Config('prefix_compression', 'true', r'''
-		configure row-store format key prefix compression''',
+		configure prefix compression on row-store leaf pages''',
 		type='boolean'),
+	Config('prefix_compression_min', '4', r'''
+		minimum gain before prefix compression will be used on row-store
+		leaf pages''',
+		min=0),
 	Config('split_pct', '75', r'''
 		the Btree page split size as a percentage of the maximum Btree
 		page size, that is, when a Btree page is split, it will be
@@ -317,18 +321,20 @@ connection_runtime_config = [
 		list, such as <code>"verbose=[evictserver,read]"</code>''',
 		type='list', choices=[
 		    'block',
-		    'shared_cache',
 		    'ckpt',
 		    'evict',
 		    'evictserver',
 		    'fileops',
 		    'hazard',
+		    'log',
 		    'lsm',
 		    'mutex',
+		    'overflow',
 		    'read',
 		    'readserver',
 		    'reconcile',
 		    'salvage',
+		    'shared_cache',
 		    'verify',
 		    'version',
 		    'write']),
@@ -416,9 +422,9 @@ methods = {
 	Config('next_random', 'false', r'''
 		configure the cursor to return a pseudo-random record from
 		the object; valid only for row-store cursors.  Cursors
-		configured with \c next_random only support the WT_CURSOR::next
-		and WT_CURSOR::close methods.  See @ref cursor_random for
-		details''',
+		configured with \c next_random=true only support the
+		WT_CURSOR::next and WT_CURSOR::close methods.  See @ref
+		cursor_random for details''',
 		type='boolean'),
 	Config('overwrite', 'true', r'''
 		configures whether the cursor's insert, update and remove
@@ -480,9 +486,6 @@ methods = {
 		priority of the transaction for resolving conflicts.
 		Transactions with higher values are less likely to abort''',
 		min='-100', max='100'),
-	Config('sync', 'full', r'''
-		how to sync log records when the transaction commits''',
-		choices=['full', 'flush', 'write', 'none']),
 ]),
 
 'session.commit_transaction' : Method([]),
@@ -518,17 +521,18 @@ methods = {
 'connection.reconfigure' : Method(connection_runtime_config),
 
 'connection.load_extension' : Method([
+	Config('config', '', r'''
+		configuration string passed to the entry point of the
+		extension as its WT_CONFIG_ARG argument'''),
 	Config('entry', 'wiredtiger_extension_init', r'''
-		the entry point of the extension, called to initialize the extension
-		when it is loaded.  The signature of the function must match
-		::wiredtiger_extension_init'''),
-	Config('prefix', '', r'''
-		a prefix for all names registered by this extension (e.g., to
-		make namespaces distinct or during upgrades'''),
+		the entry point of the extension, called to initialize the
+		extension when it is loaded.  The signature of the function
+		must match ::wiredtiger_extension_init'''),
 	Config('terminate', 'wiredtiger_extension_terminate', r'''
-		a optional function in the extension that is called before the
-		extension is unloaded during WT_CONNECTION::close.  The signature of
-		the function must match ::wiredtiger_extension_terminate'''),
+		an optional function in the extension that is called before
+		the extension is unloaded during WT_CONNECTION::close.  The
+		signature of the function must match
+		::wiredtiger_extension_terminate'''),
 ]),
 
 'connection.open_session' : Method(session_config),
@@ -551,6 +555,10 @@ methods = {
 		configures periodic checkpoints''',
 		min='1', max='100000'),
 		]),
+	Config('checkpoint_sync', 'true', r'''
+		flush files to stable storage when closing or writing
+		checkpoints''',
+		type='boolean'),
 	Config('create', 'false', r'''
 		create the database if it does not exist''',
 		type='boolean'),
@@ -562,9 +570,10 @@ methods = {
 		type='list', choices=['data', 'log']),
 	Config('extensions', '', r'''
 		list of shared library extensions to load (using dlopen).
-		Optional values are passed as the \c config parameter to
-		WT_CONNECTION::load_extension.  For example,
-		<code>extensions=(/path/ext.so={entry=my_entry})</code>''',
+		Any values specified to an library extension are passed to
+		WT_CONNECTION::load_extension as the \c config parameter
+		(for example,
+		<code>extensions=(/path/ext.so={entry=my_entry})</code>)''',
 		type='list'),
 	Config('file_extend', '', r'''
 		file extension configuration.  If set, extend files of the set
@@ -576,9 +585,23 @@ methods = {
 		maximum number of simultaneous hazard pointers per session
 		handle''',
 		min='15'),
-	Config('logging', 'false', r'''
+	Config('log', '', r'''
 		enable logging''',
+		type='category', subconfig=[
+		Config('archive', 'true', r'''
+		automatically archive unneeded log files''',
 		type='boolean'),
+		Config('enabled', 'true', r'''
+		enable logging subsystem''',
+		type='boolean'),
+		Config('file_max', '100MB', r'''
+		the maximum size of the log file''',
+		min='1MB', max='2GB'),
+		Config('path', '""', r'''
+		the path to a directory into which the log files are written.
+		If the value is not an absolute path name, the files are created
+		relative to the database home'''),
+		]),
 	Config('lsm_merge', 'true', r'''
 		merge LSM chunks where possible''',
 		type='boolean'),
@@ -624,13 +647,9 @@ methods = {
 		this value configures \c statistics and statistics logging''',
 		min='1', max='100000'),
 		]),
-	Config('sync', 'true', r'''
-		flush files to stable storage when closing or writing
-		checkpoints''',
-		type='boolean'),
-	Config('transactional', 'true', r'''
-		support transactional semantics''',
-		type='boolean'),
+	Config('transaction_sync', 'dsync', r'''
+		how to sync log records when the transaction commits''',
+		choices=['dsync', 'fsync', 'none']),
 	Config('use_environment_priv', 'false', r'''
 		use the \c WIREDTIGER_CONFIG and \c WIREDTIGER_HOME environment
 		variables regardless of whether or not the process is running

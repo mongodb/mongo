@@ -10,9 +10,10 @@
 static int  __hazard_exclusive(WT_SESSION_IMPL *, WT_REF *, int);
 static void __rec_discard_tree(WT_SESSION_IMPL *, WT_PAGE *, int);
 static void __rec_excl_clear(WT_SESSION_IMPL *);
-static void __rec_page_clean_update(WT_SESSION_IMPL *, WT_PAGE *);
-static int  __rec_page_dirty_update(WT_SESSION_IMPL *, WT_PAGE *);
-static int  __rec_review(WT_SESSION_IMPL *, WT_REF *, WT_PAGE *, int, int, int);
+static void __rec_page_clean_update(WT_SESSION_IMPL *, WT_REF *);
+static int  __rec_page_dirty_update(WT_SESSION_IMPL *, WT_REF *, WT_PAGE *);
+static int  __rec_review(
+    WT_SESSION_IMPL *, WT_REF *, WT_PAGE *, int, int, int, int *);
 static void __rec_root_update(WT_SESSION_IMPL *);
 
 /*
@@ -24,12 +25,14 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, int exclusive)
 {
 	WT_DECL_RET;
 	WT_PAGE_MODIFY *mod;
-	int merge;
+	WT_REF *parent_ref;
+	int merge, inmem_split;
 
 	WT_VERBOSE_RET(session, evict,
 	    "page %p (%s)", page, __wt_page_type_string(page->type));
 
 	WT_ASSERT(session, session->excl_next == 0);
+	inmem_split = 0;
 
 	/*
 	 * If we get a split-merge page during normal eviction, try to collapse
@@ -55,11 +58,24 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, int exclusive)
 	 * or during salvage).  That's OK if exclusive is set: we won't check
 	 * hazard pointers in that case.
 	 */
-	WT_ERR(__rec_review(session, page->ref, page, exclusive, merge, 1));
+	parent_ref = page->ref;
+	WT_ERR(__rec_review(
+	    session, parent_ref, page, exclusive, merge, 1, &inmem_split));
 
 	/* Try to merge internal pages. */
 	if (merge)
 		WT_ERR(__wt_merge_tree(session, page));
+
+	/*
+	 * Try to split the page in memory.  If the split succeeds, it swaps
+	 * the new pages into place: there is no need for further cleanup.
+	 */
+	if (inmem_split) {
+		WT_ERR(__wt_split_page_inmem(session, page));
+		WT_CSTAT_INCR(session, cache_inmem_split);
+		WT_DSTAT_INCR(session, cache_inmem_split);
+		goto done;
+	}
 
 	/*
 	 * Update the page's modification reference, reconciliation might have
@@ -79,12 +95,12 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, int exclusive)
 	 */
 	if (mod == NULL || !F_ISSET(mod, WT_PM_REC_MASK)) {
 		WT_ASSERT(session,
-		    exclusive || page->ref->state == WT_REF_LOCKED);
+		    exclusive || parent_ref->state == WT_REF_LOCKED);
 
 		if (WT_PAGE_IS_ROOT(page))
 			__rec_root_update(session);
 		else
-			__rec_page_clean_update(session, page);
+			__rec_page_clean_update(session, parent_ref);
 
 		/* Discard the page. */
 		__wt_page_out(session, &page);
@@ -95,7 +111,8 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, int exclusive)
 		if (WT_PAGE_IS_ROOT(page))
 			__rec_root_update(session);
 		else
-			WT_ERR(__rec_page_dirty_update(session, page));
+			WT_ERR(__rec_page_dirty_update(
+			    session, parent_ref, page));
 
 		/* Discard the tree rooted in this page. */
 		__rec_discard_tree(session, page, exclusive);
@@ -113,7 +130,7 @@ err:		/*
 		WT_CSTAT_INCR(session, cache_eviction_fail);
 		WT_DSTAT_INCR(session, cache_eviction_fail);
 	}
-	session->excl_next = 0;
+done:	session->excl_next = 0;
 
 	return (ret);
 }
@@ -133,20 +150,17 @@ __rec_root_update(WT_SESSION_IMPL *session)
  *	Update a clean page's reference on eviction.
  */
 static void
-__rec_page_clean_update(WT_SESSION_IMPL *session, WT_PAGE *page)
+__rec_page_clean_update(WT_SESSION_IMPL *session, WT_REF *parent_ref)
 {
-	WT_REF *ref;
-
-	ref = page->ref;
-
 	/*
-	 * Update the page's WT_REF structure.  If the page has an address, it's
-	 * a disk page; if it has no address, it must be a deleted page that was
-	 * re-instantiated (for example, by searching) and never written.
+	 * Update the WT_REF structure in the parent.  If the page has an
+	 * address, it's a disk page; if it has no address, it must be a
+	 * deleted page that was re-instantiated (for example, by searching)
+	 * and never written.
 	 */
-	ref->page = NULL;
-	WT_PUBLISH(ref->state,
-	    ref->addr == NULL ? WT_REF_DELETED : WT_REF_DISK);
+	parent_ref->page = NULL;
+	WT_PUBLISH(parent_ref->state,
+	    parent_ref->addr == NULL ? WT_REF_DELETED : WT_REF_DISK);
 
 	WT_UNUSED(session);
 }
@@ -156,15 +170,13 @@ __rec_page_clean_update(WT_SESSION_IMPL *session, WT_PAGE *page)
  *	Update a dirty page's reference on eviction.
  */
 static int
-__rec_page_dirty_update(WT_SESSION_IMPL *session, WT_PAGE *page)
+__rec_page_dirty_update(
+    WT_SESSION_IMPL *session, WT_REF *parent_ref, WT_PAGE *page)
 {
 	WT_ADDR *addr;
 	WT_PAGE_MODIFY *mod;
-	WT_REF *parent_ref;
 
 	mod = page->modify;
-	parent_ref = page->ref;
-
 	switch (F_ISSET(mod, WT_PM_REC_MASK)) {
 	case WT_PM_REC_EMPTY:				/* Page is empty */
 		if (parent_ref->addr != NULL &&
@@ -222,7 +234,7 @@ __rec_page_dirty_update(WT_SESSION_IMPL *session, WT_PAGE *page)
 		parent_ref->page = mod->u.split;
 		WT_PUBLISH(parent_ref->state, WT_REF_MEM);
 
-		/* Clear the reference else discarding the page will free it. */
+		/* Clear the page else discarding the page will free it. */
 		mod->u.split = NULL;
 		F_CLR(mod, WT_PM_REC_SPLIT);
 		break;
@@ -274,8 +286,8 @@ __rec_discard_tree(WT_SESSION_IMPL *session, WT_PAGE *page, int exclusive)
  *	hazard pointer.
  */
 static int
-__rec_review(WT_SESSION_IMPL *session,
-    WT_REF *ref, WT_PAGE *page, int exclusive, int merge, int top)
+__rec_review(WT_SESSION_IMPL *session, WT_REF *ref,
+    WT_PAGE *page, int exclusive, int merge, int top, int *inmem_split)
 {
 	WT_BTREE *btree;
 	WT_DECL_RET;
@@ -284,6 +296,7 @@ __rec_review(WT_SESSION_IMPL *session,
 	uint32_t i;
 
 	btree = S2BT(session);
+	*inmem_split = 0;
 
 	/*
 	 * Get exclusive access to the page if our caller doesn't have the tree
@@ -314,8 +327,9 @@ __rec_review(WT_SESSION_IMPL *session,
 			case WT_REF_DELETED:		/* On-disk, deleted */
 				break;
 			case WT_REF_MEM:		/* In-memory */
-				WT_RET(__rec_review(session,
-				    ref, ref->page, exclusive, merge, 0));
+				WT_RET(__rec_review(
+				    session, ref, ref->page,
+				    exclusive, merge, 0, inmem_split));
 				break;
 			case WT_REF_EVICT_WALK:		/* Walk point */
 			case WT_REF_LOCKED:		/* Being evicted */
@@ -431,10 +445,23 @@ ckpt:		WT_CSTAT_INCR(session, cache_eviction_checkpoint);
 		 */
 		mod = page->modify;
 
-		/* If there are unwritten changes on the page, give up. */
+		/*
+		 * If reconciliation failed due to active modifications and
+		 * the page is a lot larger than the maximum allowed, it is
+		 * likely that we are having trouble reconciling it due to
+		 * contention. Attempt to split the page in memory.
+		 */
+		if (ret == EBUSY &&
+		    page->type == WT_PAGE_ROW_LEAF &&
+		    __wt_eviction_page_force(session, page)) {
+			*inmem_split = 1;
+			return (0);
+		}
 		if (ret == EBUSY) {
+			/* Give up if there are unwritten changes */
 			WT_VERBOSE_RET(session, evict,
-			    "eviction failed, reconciled page not clean");
+			    "eviction failed, reconciled page"
+			    " contained active updates");
 
 			/* 
 			 * We may be able to discard any "update" memory the
@@ -471,6 +498,7 @@ ckpt:		WT_CSTAT_INCR(session, cache_eviction_checkpoint);
 	if (!top && (mod == NULL || !F_ISSET(mod,
 	    WT_PM_REC_EMPTY | WT_PM_REC_SPLIT | WT_PM_REC_SPLIT_MERGE)))
 		return (EBUSY);
+
 	return (0);
 }
 

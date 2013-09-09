@@ -35,8 +35,8 @@ struct __wt_txn_global {
 	 */
 	volatile uint64_t oldest_id;
 
-	volatile uint32_t gen;		/* Completed transaction generation */
-	volatile uint32_t scan_gen;	/* Snapshot scan generation */
+	/* Count of scanning threads, or -1 for exclusive access. */
+	volatile int32_t scan_count;
 
 	WT_TXN_STATE *states;		/* Per-session transaction states */
 };
@@ -62,11 +62,6 @@ struct __wt_txn {
 	uint64_t *snapshot;
 	uint32_t snapshot_count;
 
-	/* Saved global state, to avoid repeating scans. */
-	uint64_t last_id;
-	uint32_t last_gen;
-	uint32_t last_scan_gen;
-
 	/*
 	 * Arrays of txn IDs in WT_UPDATE or WT_REF structures created or
 	 * modified by this transaction.
@@ -79,10 +74,17 @@ struct __wt_txn {
 	size_t		modref_alloc;
 	u_int		modref_count;
 
+	uint32_t	force_evict_attempts;
+
+	/* Requested notification when transactions are resolved. */
+	WT_TXN_NOTIFY *notify;
+
 #define	TXN_AUTOCOMMIT	0x01
 #define	TXN_ERROR	0x02
-#define	TXN_FORCE_EVICT	0x04
-#define	TXN_OLDEST	0x08
-#define	TXN_RUNNING	0x10
+#define	TXN_OLDEST	0x04
+#define	TXN_RUNNING	0x08
 	uint32_t flags;
 };
+
+#define	WT_TXN_ACTIVE(txn)						\
+	(F_ISSET((txn), TXN_RUNNING) && (txn)->mod_count > 0)

@@ -44,6 +44,8 @@ __wt_curconfig_open(WT_SESSION_IMPL *session,
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
 
+	STATIC_ASSERT(offsetof(WT_CURSOR_CONFIG, iface) == 0);
+
 	WT_UNUSED(uri);
 
 	WT_RET(__wt_calloc_def(session, 1, &cconfig));
@@ -54,7 +56,6 @@ __wt_curconfig_open(WT_SESSION_IMPL *session,
 	cursor->key_format = cursor->value_format = "S";
 
 	/* __wt_cursor_init is last so we don't have to clean up on error. */
-	STATIC_ASSERT(offsetof(WT_CURSOR_CONFIG, iface) == 0);
 	WT_ERR(__wt_cursor_init(cursor, uri, NULL, cfg, cursorp));
 
 	if (0) {

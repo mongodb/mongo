@@ -22,8 +22,7 @@ __cache_read_row_deleted(
 	btree = S2BT(session);
 
 	/*
-	 * Give the page a modify structure and set the transaction ID for the
-	 * first update to the page.
+	 * Give the page a modify structure.
 	 *
 	 * If the tree is already dirty and so will be written, mark the page
 	 * dirty.  (We'd like to free the deleted pages, but if the handle is
@@ -31,7 +30,6 @@ __cache_read_row_deleted(
 	 * able to do so.)
 	 */
 	WT_RET(__wt_page_modify_init(session, page));
-	page->modify->first_id = ref->txnid;
 	if (btree->modified)
 		__wt_page_modify_set(session, page);
 
@@ -99,14 +97,15 @@ __wt_cache_read(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_REF *ref)
 	if (addr == NULL) {
 		WT_ASSERT(session, previous_state == WT_REF_DELETED);
 
-		WT_ERR(__wt_btree_leaf_create(session, parent, ref, &page));
+		WT_ERR(__wt_btree_new_leaf_page(session, parent, ref, &page));
 	} else {
 		/* Read the backing disk page. */
 		WT_ERR(__wt_bt_read(session, &tmp, addr, size));
 
 		/* Build the in-memory version of the page. */
-		WT_ERR(__wt_page_inmem(session, parent, ref,
-		    tmp.mem, F_ISSET(&tmp, WT_ITEM_MAPPED) ? 1 : 0, &page));
+		WT_ERR(__wt_page_inmem(session, parent, ref, tmp.mem,
+		    F_ISSET(&tmp, WT_ITEM_MAPPED) ?
+		    WT_PAGE_DISK_MAPPED : WT_PAGE_DISK_ALLOC, &page));
 
 		/* If the page was deleted, instantiate that information. */
 		if (previous_state == WT_REF_DELETED)

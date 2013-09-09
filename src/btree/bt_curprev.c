@@ -365,8 +365,8 @@ new_page:	if (cbt->recno < cbt->page->u.col_var.recno)
 			 * the page's reconciliation structures, and that's as
 			 * easy here as higher up the stack.
 			 */
-			if ((ret = __wt_cell_unpack_ref(
-			    session, &unpack, &cbt->tmp)) == WT_RESTART)
+			if ((ret = __wt_cell_unpack_ref(session,
+			    WT_PAGE_COL_VAR, &unpack, &cbt->tmp)) == WT_RESTART)
 				ret = __wt_ovfl_cache_col_restart(
 				    session, cbt->page, &unpack, &cbt->tmp);
 			WT_RET(ret);
@@ -501,7 +501,6 @@ __wt_btcur_prev(WT_CURSOR_BTREE *cbt, int discard)
 		LF_SET(WT_TREE_DISCARD);
 
 retry:	WT_RET(__cursor_func_init(cbt, 0));
-	__cursor_position_clear(cbt);
 
 	/*
 	 * If we aren't already iterating in the right direction, there's
@@ -510,15 +509,7 @@ retry:	WT_RET(__cursor_func_init(cbt, 0));
 	if (!F_ISSET(cbt, WT_CBT_ITERATE_PREV))
 		__wt_btcur_iterate_setup(cbt, 0);
 
-	/*
-	 * If this is a modification, we're about to read information from the
-	 * page, save the write generation.
-	 */
 	page = cbt->page;
-	if (discard && page != NULL) {
-		WT_ERR(__wt_page_modify_init(session, page));
-		WT_ORDERED_READ(cbt->write_gen, page->modify->write_gen);
-	}
 
 	/*
 	 * Walk any page we're holding until the underlying call returns not-
@@ -568,13 +559,6 @@ retry:	WT_RET(__cursor_func_init(cbt, 0));
 		    page->type != WT_PAGE_ROW_INT);
 		cbt->page = page;
 
-		/* Initialize the page's modification information */
-		if (discard) {
-			WT_ERR(__wt_page_modify_init(session, page));
-			WT_ORDERED_READ(
-			    cbt->write_gen, page->modify->write_gen);
-		}
-
 		/*
 		 * The last page in a column-store has appended entries.
 		 * We handle it separately from the usual cursor code:
@@ -587,6 +571,7 @@ retry:	WT_RET(__cursor_func_init(cbt, 0));
 
 err:	if (ret == WT_RESTART)
 		goto retry;
-	WT_TRET(__cursor_func_resolve(cbt, ret));
+	if (ret != 0)
+		WT_TRET(__cursor_error_resolve(cbt));
 	return (ret);
 }

@@ -68,6 +68,11 @@ cursor_ops(WT_SESSION *session)
 	    session, "table:mytable", NULL, NULL, &cursor);
 	/*! [Open a cursor] */
 
+	/*! [Open a cursor on the metadata] */
+	ret = session->open_cursor(
+	    session, "metadata:", NULL, NULL, &cursor);
+	/*! [Open a cursor on the metadata] */
+
 	{
 	WT_CURSOR *duplicate;
 	const char *key = "some key";
@@ -240,25 +245,27 @@ cursor_ops(WT_SESSION *session)
 	cursor_search_near(cursor);
 
 	{
-	/*! [Insert a new record] */
-	/* Insert a new record. */
+	/*! [Insert a new record or overwrite an existing record] */
+	/* Insert a new record or overwrite an existing record. */
 	const char *key = "some key", *value = "some value";
+	ret = session->open_cursor(
+	    session, "table:mytable", NULL, NULL, &cursor);
 	cursor->set_key(cursor, key);
 	cursor->set_value(cursor, value);
 	ret = cursor->insert(cursor);
-	/*! [Insert a new record] */
+	/*! [Insert a new record or overwrite an existing record] */
 	}
 
 	{
+	/*! [Insert a new record and fail if the record exists] */
+	/* Insert a new record and fail if the record exists. */
 	const char *key = "some key", *value = "some value";
-	/*! [Insert a new record or overwrite an existing record] */
-	/* Insert a new record or overwrite an existing record. */
 	ret = session->open_cursor(
-	    session, "table:mytable", NULL, "overwrite", &cursor);
+	    session, "table:mytable", NULL, "overwrite=false", &cursor);
 	cursor->set_key(cursor, key);
 	cursor->set_value(cursor, value);
 	ret = cursor->insert(cursor);
-	/*! [Insert a new record or overwrite an existing record] */
+	/*! [Insert a new record and fail if the record exists] */
 	}
 
 	{
@@ -276,20 +283,45 @@ cursor_ops(WT_SESSION *session)
 	}
 
 	{
-	/*! [Update an existing record] */
+	/*! [Update an existing record or insert a new record] */
 	const char *key = "some key", *value = "some value";
+	ret = session->open_cursor(
+	    session, "table:mytable", NULL, NULL, &cursor);
 	cursor->set_key(cursor, key);
 	cursor->set_value(cursor, value);
 	ret = cursor->update(cursor);
-	/*! [Update an existing record] */
+	/*! [Update an existing record or insert a new record] */
+	}
+
+	{
+	/*! [Update an existing record and fail if DNE] */
+	const char *key = "some key", *value = "some value";
+	ret = session->open_cursor(
+	    session, "table:mytable", NULL, "overwrite=false", &cursor);
+	cursor->set_key(cursor, key);
+	cursor->set_value(cursor, value);
+	ret = cursor->update(cursor);
+	/*! [Update an existing record and fail if DNE] */
 	}
 
 	{
 	/*! [Remove a record] */
 	const char *key = "some key";
+	ret = session->open_cursor(
+	    session, "table:mytable", NULL, NULL, &cursor);
 	cursor->set_key(cursor, key);
 	ret = cursor->remove(cursor);
 	/*! [Remove a record] */
+	}
+
+	{
+	/*! [Remove a record and fail if DNE] */
+	const char *key = "some key";
+	ret = session->open_cursor(
+	    session, "table:mytable", NULL, "overwrite=false", &cursor);
+	cursor->set_key(cursor, key);
+	ret = cursor->remove(cursor);
+	/*! [Remove a record and fail if DNE] */
 	}
 
 	{
@@ -720,6 +752,10 @@ connection_ops(WT_CONNECTION *conn)
 #ifdef MIGHT_NOT_RUN
 	/*! [Load an extension] */
 	ret = conn->load_extension(conn, "my_extension.dll", NULL);
+
+	ret = conn->load_extension(conn,
+	    "datasource/libdatasource.so",
+	    "config=[device=/dev/sd1,alignment=64]");
 	/*! [Load an extension] */
 #endif
 
@@ -902,8 +938,8 @@ main(void)
 #endif
 
 	/*! [Configure file_extend] */
-	ret = wiredtiger_open(home, NULL,
-	    "create,file_extend=(type=[data],size=16MB)", &conn);
+	ret = wiredtiger_open(
+	    home, NULL, "create,file_extend=(data=16MB)", &conn);
 	/*! [Configure file_extend] */
 	if (ret == 0)
 		(void)conn->close(conn, NULL);

@@ -19,6 +19,17 @@ flags = {
 		'FILE_TYPE_DATA',
 		'FILE_TYPE_LOG'
 	],
+        'log_scan' : [
+		'LOGSCAN_FIRST',
+		'LOGSCAN_FROM_CKP',
+		'LOGSCAN_ONE',
+		'LOGSCAN_RECOVER'
+        ],
+        'log_write' : [
+		'LOG_CKPT',
+		'LOG_DSYNC',
+		'LOG_FSYNC'
+        ],
 	'rec_write' : [
 		'EVICTION_SERVER_LOCKED',
 		'SKIP_UPDATE_ERR',
@@ -44,8 +55,10 @@ flags = {
 		'VERB_evictserver',
 		'VERB_fileops',
 		'VERB_hazard',
+		'VERB_log',
 		'VERB_lsm',
 		'VERB_mutex',
+		'VERB_overflow',
 		'VERB_read',
 		'VERB_reconcile',
 		'VERB_salvage',
@@ -60,12 +73,11 @@ flags = {
 ###################################################
 	'conn' : [
 		'CONN_CACHE_POOL',
+		'CONN_CKPT_SYNC',
 		'CONN_EVICTION_RUN',
 		'CONN_LSM_MERGE',
 		'CONN_PANIC',
 		'CONN_SERVER_RUN',
-		'CONN_SYNC',
-		'CONN_TRANSACTIONAL',
 	],
 	'session' : [
 		'SESSION_INTERNAL',

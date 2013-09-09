@@ -168,12 +168,13 @@ class test_config04(wttest.WiredTigerTestCase):
         # TODO: how do we verify that it was set?
 
     def test_logging(self):
-        # Note: this will have functional tests in the future.
-        self.common_test('logging')
+        self.common_test('log=(enabled=true)')
+        # TODO: how do we verify that it was set?  For this we could look
+        # for the existence of the log file in the home dir.
 
     def test_transactional(self):
         # Note: this will have functional tests in the future.
-        self.common_test('transactional')
+        self.common_test('')
 
 if __name__ == '__main__':
     wttest.run()

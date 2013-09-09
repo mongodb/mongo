@@ -100,25 +100,26 @@ static int
 __val_ovfl_cache_col(
     WT_SESSION_IMPL *session, WT_PAGE *page, WT_CELL_UNPACK *unpack)
 {
+	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
-	WT_ITEM value;
 	const uint8_t *addr;
 	uint32_t addr_size;
 
-	WT_CLEAR(value);
 	addr = unpack->data;
 	addr_size = unpack->size;
+
+	WT_RET(__wt_scr_alloc(session, 1024, &tmp));
 
 	/*
 	 * Because column-store values potentially match some number of records,
 	 * there's no single WT_UPDATE chain we can use to cache the value, so
 	 * we enter the value into the reconciliation tracking system.
 	 */
-	WT_ERR(__ovfl_read(session, &value, addr, addr_size));
-	WT_ERR(__wt_rec_track(session, page, addr, addr_size,
-	    value.data, value.size, WT_TRK_ONPAGE | WT_TRK_OVFL_VALUE));
+	WT_ERR(__ovfl_read(session, tmp, addr, addr_size));
+	WT_ERR(__wt_ovfl_txnc_add(
+	    session, page, addr, addr_size, tmp->data, tmp->size));
 
-err:	__wt_buf_free(session, &value);
+err:	__wt_scr_free(&tmp);
 	return (ret);
 }
 
@@ -130,7 +131,7 @@ int
 __wt_ovfl_cache_col_restart(WT_SESSION_IMPL *session,
     WT_PAGE *page, WT_CELL_UNPACK *unpack, WT_ITEM *store)
 {
-	int found;
+	WT_DECL_RET;
 
 	/*
 	 * A variable-length column-store overflow read returned restart: check
@@ -141,16 +142,14 @@ __wt_ovfl_cache_col_restart(WT_SESSION_IMPL *session,
 	if (__wt_cell_type_raw(unpack->cell) != WT_CELL_VALUE_OVFL_RM)
 		return (WT_RESTART);
 
-	found =
-	    __wt_rec_track_ovfl_srch(page, unpack->data, unpack->size, store);
-	WT_ASSERT(session, found == 1);
-	WT_ASSERT(session, store->size != 0);
-
 	/*
-	 * We handle the case where the record isn't found, but that should
-	 * never happen, it indicates a fatal problem if it does.
+	 * We only search for a record if we previously stored one -- assert
+	 * that fact.
 	 */
-	return (found ? 0 : WT_NOTFOUND);
+	ret = __wt_ovfl_txnc_search(page, unpack->data, unpack->size, store);
+	WT_ASSERT(session, ret == 0);
+
+	return (ret);
 }
 
 /*
@@ -291,9 +290,9 @@ __wt_val_ovfl_cache(WT_SESSION_IMPL *session,
 	 * Pages are repeatedly reconciled and we don't want to lock out readers
 	 * every time we reconcile an overflow item on a page.  Check if we've
 	 * already cached this overflow value, and if work appears required,
-	 * lock and check the again.  (Locking is required, it's possible we
-	 * have cached information about what's in the on-page cell and it has
-	 * changed.  Vanishingly unlikely, but I think it's possible.)
+	 * lock and check again.  (Locking is required, it's possible we have
+	 * cached information about what's in the on-page cell and it's changed.
+	 * Vanishingly unlikely, but I think it's possible.)
 	 */
 	if (unpack->raw == WT_CELL_VALUE_OVFL_RM)
 		return (0);

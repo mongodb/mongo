@@ -22,6 +22,42 @@ extern "C" {
  */
 
 /*!
+ * Read-committed isolation level, returned by
+ * WT_EXTENSION_API::transaction_isolation_level.
+ */
+#define	WT_TXN_ISO_READ_COMMITTED       1
+/*!
+ * Read-uncommitted isolation level, returned by
+ * WT_EXTENSION_API::transaction_isolation_level.
+ */
+#define	WT_TXN_ISO_READ_UNCOMMITTED     2
+/*!
+ * Snapshot isolation level, returned by
+ * WT_EXTENSION_API::transaction_isolation_level.
+ */
+#define	WT_TXN_ISO_SNAPSHOT             3
+
+typedef struct __wt_txn_notify WT_TXN_NOTIFY;
+/*!
+ * Snapshot isolation level, returned by
+ * WT_EXTENSION_API::transaction_isolation_level.
+ */
+struct __wt_txn_notify {
+	/*!
+	 * A method called when the session's current transaction is committed
+	 * or rolled back.
+	 *
+	 * @param notify a pointer to the event handler
+	 * @param session the current session handle
+	 * @param txnid the transaction ID
+	 * @param committed an integer value which is non-zero if the
+	 * transaction is being committed.
+	 */
+	int (*notify)(WT_TXN_NOTIFY *notify, WT_SESSION *session,
+	    uint64_t txnid, int committed);
+};
+
+/*!
  * Table of WiredTiger extension methods.
  *
  * This structure is used to provide a set of WiredTiger methods to extension
@@ -52,6 +88,8 @@ struct __wt_extension_api {
 	 * Private fields.
 	 */
 	WT_CONNECTION *conn;		/* Enclosing connection */
+
+	WT_COLLATOR *collator;		/* Collation function */
 #endif
 	/*!
 	 * Insert an error message into the WiredTiger error stream.
@@ -114,6 +152,36 @@ struct __wt_extension_api {
 	 * @snippet ex_data_source.c WT_EXTENSION_API scr_free
 	 */
 	void (*scr_free)(WT_EXTENSION_API *, WT_SESSION *session, void *ref);
+
+	/*!
+	 * Configure the extension collator method.
+	 *
+	 * @param wt_api the extension handle
+	 * @param session the session handle (or NULL if none available)
+	 * @param config the configuration information passed to an application
+	 * @errors
+	 *
+	 * @snippet ex_data_source.c WT_EXTENSION collator config
+	 */
+	int (*collator_config)(WT_EXTENSION_API *wt_api, WT_SESSION *session,
+	    WT_CONFIG_ARG *config);
+
+	/*!
+	 * The extension collator method.
+	 *
+	 * @param wt_api the extension handle
+	 * @param session the session handle (or NULL if none available)
+	 * @param first first item
+	 * @param second second item
+	 * @param[out] cmp set less than 0 if \c first collates less than
+	 * \c second, set equal to 0 if \c first collates equally to \c second,
+	 * set greater than 0 if \c first collates greater than \c second
+	 * @errors
+	 *
+	 * @snippet ex_data_source.c WT_EXTENSION collate
+	 */
+	int (*collate)(WT_EXTENSION_API *wt_api, WT_SESSION *session,
+	    WT_ITEM *first, WT_ITEM *second, int *cmp);
 
 	/*!
 	 * Return the value of a configuration string.
@@ -296,13 +364,56 @@ struct __wt_extension_api {
 	 *
 	 * @param wt_api the extension handle
 	 * @param session the session handle
-	 * @param [out] transaction_id the transaction ID
-	 * @errors
+	 * @returns the current transaction ID.
 	 *
 	 * @snippet ex_data_source.c WT_EXTENSION transaction ID
 	 */
-	int (*transaction_id)(WT_EXTENSION_API *wt_api,
-	    WT_SESSION *session, uint64_t *transaction_idp);
+	uint64_t (*transaction_id)(WT_EXTENSION_API *wt_api,
+	    WT_SESSION *session);
+
+	/*!
+	 * Return the current transaction's isolation level; returns one of
+	 * ::WT_TXN_ISO_READ_COMMITTED, ::WT_TXN_ISO_READ_UNCOMMITTED, or
+	 * ::WT_TXN_ISO_SNAPSHOT.
+	 *
+	 * @param wt_api the extension handle
+	 * @param session the session handle
+	 * @returns the current transaction's isolation level.
+	 *
+	 * @snippet ex_data_source.c WT_EXTENSION transaction isolation level
+	 */
+	int (*transaction_isolation_level)(WT_EXTENSION_API *wt_api,
+	    WT_SESSION *session);
+
+	/*!
+	 * Request notification of transaction resolution by specifying a
+	 * function to be called when the session's current transaction is
+	 * either committed or rolled back.  If the transaction is being
+	 * committed, but the notification function returns an error, the
+	 * transaction will be rolled back.
+	 *
+	 * @param wt_api the extension handle
+	 * @param session the session handle
+	 * @param notify a handler for commit or rollback events
+	 * @errors
+	 *
+	 * @snippet ex_data_source.c WT_EXTENSION transaction notify
+	 */
+	int (*transaction_notify)(WT_EXTENSION_API *wt_api,
+	    WT_SESSION *session, WT_TXN_NOTIFY *notify);
+
+	/*!
+	 * Return the oldest transaction ID not yet visible to a running
+	 * transaction.
+	 *
+	 * @param wt_api the extension handle
+	 * @param session the session handle
+	 * @returns the oldest transaction ID not yet visible to a running
+	 * transaction.
+	 *
+	 * @snippet ex_data_source.c WT_EXTENSION transaction oldest
+	 */
+	uint64_t (*transaction_oldest)(WT_EXTENSION_API *wt_api);
 
 	/*!
 	 * Return if the current transaction can see the given transaction ID.

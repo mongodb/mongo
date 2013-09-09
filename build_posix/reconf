@@ -3,6 +3,11 @@
 t=/tmp/__configure.$$
 trap 'rm -f $t; exit 0' 0 1 2 3 13 15
 
+# Insulate against IFS from the user's env
+IFS=' ''	''
+'
+export IFS
+
 # Allow this script to be run from anywhere
 cd "`dirname \"$0\"`"
 

@@ -10,6 +10,83 @@
 static int __conn_verbose_config(WT_SESSION_IMPL *, const char *[]);
 
 /*
+ * ext_collate --
+ *	Call the collation function (external API version).
+ */
+static int
+ext_collate(WT_EXTENSION_API *wt_api,
+    WT_SESSION *wt_session, WT_ITEM *first, WT_ITEM *second, int *cmpp)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_SESSION_IMPL *session;
+
+	conn = (WT_CONNECTION_IMPL *)wt_api->conn;
+	if ((session = (WT_SESSION_IMPL *)wt_session) == NULL)
+		session = conn->default_session;
+
+	WT_RET(WT_LEX_CMP(session, wt_api->collator, first, second, *cmpp));
+
+	return (0);
+}
+
+/*
+ * ext_collator_config --
+ *	Given a configuration, configure the collator (external API version).
+ */
+static int
+ext_collator_config(
+    WT_EXTENSION_API *wt_api, WT_SESSION *wt_session, WT_CONFIG_ARG *cfg_arg)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_SESSION_IMPL *session;
+	const char **cfg;
+
+	conn = (WT_CONNECTION_IMPL *)wt_api->conn;
+	if ((session = (WT_SESSION_IMPL *)wt_session) == NULL)
+		session = conn->default_session;
+
+	/* The default is a standard lexicographic comparison. */
+	if ((cfg = (const char **)cfg_arg) == NULL)
+		return (0);
+
+	return (__wt_collator_config(session, cfg, &wt_api->collator));
+}
+
+/*
+ * __wt_collator_config --
+ *	Given a configuration, configure the collator.
+ */
+int
+__wt_collator_config(
+    WT_SESSION_IMPL *session, const char **cfg, WT_COLLATOR **collatorp)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_CONFIG_ITEM cval;
+	WT_DECL_RET;
+	WT_NAMED_COLLATOR *ncoll;
+
+	*collatorp = NULL;
+
+	conn = S2C(session);
+
+	if ((ret = __wt_config_gets(session, cfg, "collator", &cval)) != 0)
+		return (ret == WT_NOTFOUND ? 0 : ret);
+
+	if (cval.len > 0) {
+		TAILQ_FOREACH(ncoll, &conn->collqh, q)
+			if (WT_STRING_MATCH(
+			    ncoll->name, cval.str, cval.len)) {
+				*collatorp = ncoll->collator;
+				return (0);
+			}
+
+		WT_RET_MSG(session, EINVAL,
+		    "unknown collator '%.*s'", (int)cval.len, cval.str);
+	}
+	return (0);
+}
+
+/*
  * __conn_get_extension_api --
  *	WT_CONNECTION.get_extension_api method.
  */
@@ -26,6 +103,8 @@ __conn_get_extension_api(WT_CONNECTION *wt_conn)
 	conn->extension_api.strerror = wiredtiger_strerror;
 	conn->extension_api.scr_alloc = __wt_ext_scr_alloc;
 	conn->extension_api.scr_free = __wt_ext_scr_free;
+	conn->extension_api.collator_config = ext_collator_config;
+	conn->extension_api.collate = ext_collate;
 	conn->extension_api.config_get = __wt_ext_config_get;
 	conn->extension_api.config_strget = __wt_ext_config_strget;
 	conn->extension_api.config_scan_begin = __wt_ext_config_scan_begin;
@@ -39,6 +118,10 @@ __conn_get_extension_api(WT_CONNECTION *wt_conn)
 	conn->extension_api.struct_size = __wt_ext_struct_size;
 	conn->extension_api.struct_unpack = __wt_ext_struct_unpack;
 	conn->extension_api.transaction_id = __wt_ext_transaction_id;
+	conn->extension_api.transaction_isolation_level =
+	    __wt_ext_transaction_isolation_level;
+	conn->extension_api.transaction_notify = __wt_ext_transaction_notify;
+	conn->extension_api.transaction_oldest = __wt_ext_transaction_oldest;
 	conn->extension_api.transaction_visible = __wt_ext_transaction_visible;
 
 	return (&conn->extension_api);
@@ -66,26 +149,29 @@ __conn_load_extension(
 	conn = (WT_CONNECTION_IMPL *)wt_conn;
 	CONNECTION_API_CALL(conn, session, load_extension, config, cfg);
 
-	WT_ERR(__wt_config_gets(session, cfg, "entry", &cval));
-	WT_ERR(__wt_strndup(session, cval.str, cval.len, &init_name));
-
 	/*
 	 * This assumes the underlying shared libraries are reference counted,
 	 * that is, that re-opening a shared library simply increments a ref
 	 * count, and closing it simply decrements the ref count, and the last
 	 * close discards the reference entirely -- in other words, we do not
 	 * check to see if we've already opened this shared library.
-	 *
-	 * Fill in the extension structure and call the load function.
 	 */
 	WT_ERR(__wt_dlopen(session, path, &dlh));
-	WT_ERR(__wt_dlsym(session, dlh, init_name, 1, &load));
-	WT_ERR(load(wt_conn, (WT_CONFIG_ARG *)cfg));
 
-	/* Remember the unload function for when we close. */
+	/*
+	 * Find the load function, remember the unload function for when we
+	 * close.
+	 */
+	WT_ERR(__wt_config_gets(session, cfg, "entry", &cval));
+	WT_ERR(__wt_strndup(session, cval.str, cval.len, &init_name));
+	WT_ERR(__wt_dlsym(session, dlh, init_name, 1, &load));
+
 	WT_ERR(__wt_config_gets(session, cfg, "terminate", &cval));
 	WT_ERR(__wt_strndup(session, cval.str, cval.len, &terminate_name));
 	WT_ERR(__wt_dlsym(session, dlh, terminate_name, 0, &dlh->terminate));
+
+	/* Call the load function last, it simplifies error handling. */
+	WT_ERR(load(wt_conn, (WT_CONFIG_ARG *)cfg));
 
 	/* Link onto the environment's list of open libraries. */
 	__wt_spin_lock(session, &conn->api_lock);
@@ -99,6 +185,46 @@ err:	if (dlh != NULL)
 	__wt_free(session, terminate_name);
 
 	API_END_NOTFOUND_MAP(session, ret);
+}
+
+/*
+ * __conn_load_extensions --
+ *	Load the list of application-configured extensions.
+ */
+static int
+__conn_load_extensions(WT_SESSION_IMPL *session, const char *cfg[])
+{
+	WT_CONFIG_ITEM cval, skey, sval;
+	WT_CONFIG subconfig;
+	WT_CONNECTION_IMPL *conn;
+	WT_DECL_ITEM(exconfig);
+	WT_DECL_ITEM(expath);
+	WT_DECL_RET;
+
+	conn = S2C(session);
+
+	WT_ERR(__wt_config_gets(session, cfg, "extensions", &cval));
+	WT_ERR(__wt_config_subinit(session, &subconfig, &cval));
+	while ((ret = __wt_config_next(&subconfig, &skey, &sval)) == 0) {
+		if (expath == NULL)
+			WT_ERR(__wt_scr_alloc(session, 0, &expath));
+		WT_ERR(__wt_buf_fmt(
+		    session, expath, "%.*s", (int)skey.len, skey.str));
+		if (sval.len > 0) {
+			if (exconfig == NULL)
+				WT_ERR(__wt_scr_alloc(session, 0, &exconfig));
+			WT_ERR(__wt_buf_fmt(session,
+			    exconfig, "%.*s", (int)sval.len, sval.str));
+		}
+		WT_ERR(conn->iface.load_extension(&conn->iface,
+		    expath->data, (sval.len > 0) ? exconfig->data : NULL));
+	}
+	WT_ERR_NOTFOUND_OK(ret);
+
+err:	__wt_scr_free(&expath);
+	__wt_scr_free(&exconfig);
+
+	return (ret);
 }
 
 /*
@@ -266,9 +392,8 @@ err:	if (ndsrc != NULL) {
 }
 
 /*
- * __wt_conn_remove_compressor --
- *	remove compressor added by WT_CONNECTION->add_compressor,
- *	only used internally.
+ * __wt_conn_remove_data_source --
+ *	Remove data source added by WT_CONNECTION->add_data_source.
  */
 int
 __wt_conn_remove_data_source(
@@ -457,6 +582,8 @@ __conn_open_session(WT_CONNECTION *wt_conn,
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session, *session_ret;
+
+	*wt_sessionp = NULL;
 
 	conn = (WT_CONNECTION_IMPL *)wt_conn;
 	session_ret = NULL;
@@ -782,21 +909,23 @@ __conn_verbose_config(WT_SESSION_IMPL *session, const char *cfg[])
 		const char *name;
 		uint32_t flag;
 	} *ft, verbtypes[] = {
-		{ "block",	WT_VERB_block },
-		{ "shared_cache",WT_VERB_shared_cache },
-		{ "ckpt",	WT_VERB_ckpt },
-		{ "evict",	WT_VERB_evict },
-		{ "evictserver",WT_VERB_evictserver },
-		{ "fileops",	WT_VERB_fileops },
-		{ "hazard",	WT_VERB_hazard },
-		{ "lsm",	WT_VERB_lsm },
-		{ "mutex",	WT_VERB_mutex },
-		{ "read",	WT_VERB_read },
-		{ "reconcile",	WT_VERB_reconcile },
-		{ "salvage",	WT_VERB_salvage },
-		{ "verify",	WT_VERB_verify },
-		{ "version",	WT_VERB_version },
-		{ "write",	WT_VERB_write },
+		{ "block",		WT_VERB_block },
+		{ "ckpt",		WT_VERB_ckpt },
+		{ "evict",		WT_VERB_evict },
+		{ "evictserver",	WT_VERB_evictserver },
+		{ "fileops",		WT_VERB_fileops },
+		{ "hazard",		WT_VERB_hazard },
+		{ "log",		WT_VERB_log },
+		{ "lsm",		WT_VERB_lsm },
+		{ "mutex",		WT_VERB_mutex },
+		{ "overflow",		WT_VERB_overflow },
+		{ "read",		WT_VERB_read },
+		{ "reconcile",		WT_VERB_reconcile },
+		{ "salvage",		WT_VERB_salvage },
+		{ "shared_cache",	WT_VERB_shared_cache },
+		{ "verify",		WT_VERB_verify },
+		{ "version",		WT_VERB_version },
+		{ "write",		WT_VERB_write },
 		{ NULL, 0 }
 	};
 
@@ -847,19 +976,16 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 		{ "log",	WT_FILE_TYPE_LOG },
 		{ NULL, 0 }
 	};
-	WT_CONFIG subconfig;
-	WT_CONFIG_ITEM cval, skey, sval;
+	WT_CONFIG_ITEM cval, sval;
 	WT_CONNECTION_IMPL *conn;
+	WT_DECL_ITEM(cbuf);
 	WT_DECL_RET;
-	WT_ITEM *cbuf, expath, exconfig;
 	WT_SESSION_IMPL *session;
 	const char *cfg[5], **cfgend;
 
 	*wt_connp = NULL;
+
 	session = NULL;
-	cbuf = NULL;
-	WT_CLEAR(expath);
-	WT_CLEAR(exconfig);
 
 	WT_RET(__wt_library_init());
 
@@ -937,22 +1063,13 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	if (cval.val)
 		F_SET(conn, WT_CONN_LSM_MERGE);
 
-	WT_ERR(__wt_config_gets(session, cfg, "sync", &cval));
+	WT_ERR(__wt_config_gets(session, cfg, "checkpoint_sync", &cval));
 	if (cval.val)
-		F_SET(conn, WT_CONN_SYNC);
-
-	WT_ERR(__wt_config_gets(session, cfg, "transactional", &cval));
-	if (cval.val)
-		F_SET(conn, WT_CONN_TRANSACTIONAL);
+		F_SET(conn, WT_CONN_CKPT_SYNC);
 
 	WT_ERR(__conn_verbose_config(session, cfg));
 
 	WT_ERR(__wt_conn_cache_pool_config(session, cfg));
-
-	WT_ERR(__wt_config_gets(session, cfg, "logging", &cval));
-	if (cval.val != 0)
-		WT_ERR(__wt_open(
-		   session, WT_LOG_FILENAME, 1, 0, 0, &conn->log_fh));
 
 	WT_ERR(__wt_config_gets(session, cfg, "buffer_alignment", &cval));
 	if (cval.val == -1)
@@ -997,28 +1114,14 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	WT_ERR(__wt_config_gets(session, cfg, "statistics", &cval));
 	conn->statistics = cval.val == 0 ? 0 : 1;
 
-	/* Load any extensions referenced in the config. */
-	WT_ERR(__wt_config_gets(session, cfg, "extensions", &cval));
-	WT_ERR(__wt_config_subinit(session, &subconfig, &cval));
-	while ((ret = __wt_config_next(&subconfig, &skey, &sval)) == 0) {
-		WT_ERR(__wt_buf_fmt(
-		    session, &expath, "%.*s", (int)skey.len, skey.str));
-		if (sval.len > 0)
-			WT_ERR(__wt_buf_fmt(session, &exconfig,
-			    "entry=%.*s\n", (int)sval.len, sval.str));
-		WT_ERR(conn->iface.load_extension(&conn->iface,
-		    expath.data, (sval.len > 0) ? exconfig.data : NULL));
-	}
-	WT_ERR_NOTFOUND_OK(ret);
-
 	/* Now that we know if verbose is configured, output the version. */
 	WT_VERBOSE_ERR(session, version, "%s", WIREDTIGER_VERSION_STRING);
 
-	/* Open the connection. */
+	/*
+	 * Open the connection, then reset the local session as the real one
+	 * was allocated in __wt_connection_open.
+	 */
 	WT_ERR(__wt_connection_open(conn, cfg));
-
-	/* Open the default session. */
-	WT_ERR(__wt_open_session(conn, 1, NULL, NULL, &conn->default_session));
 	session = conn->default_session;
 
 	/*
@@ -1029,6 +1132,18 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	WT_ERR(__wt_turtle_init(session));
 	WT_ERR(__wt_metadata_open(session));
 
+	/*
+	 * Load the extensions after initialization completes; extensions expect
+	 * everything else to be in place, and the extensions call back into the
+	 * library.
+	 */
+	WT_ERR(__conn_load_extensions(session, cfg));
+
+	/*
+	 * Start the worker threads last.
+	 */
+	WT_ERR(__wt_connection_workers(session, cfg));
+
 	STATIC_ASSERT(offsetof(WT_CONNECTION_IMPL, iface) == 0);
 	*wt_connp = &conn->iface;
 
@@ -1038,15 +1153,9 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	 */
 err:	if (cbuf != NULL)
 		__wt_buf_free(session, cbuf);
-	__wt_buf_free(session, &expath);
-	__wt_buf_free(session, &exconfig);
 
 	if (ret != 0 && conn != NULL)
 		WT_TRET(__wt_connection_close(conn));
-
-	/* Let the server threads proceed. */
-	if (ret == 0)
-		conn->connection_initialized = 1;
 
 	return (ret);
 }

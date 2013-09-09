@@ -58,6 +58,8 @@ __wt_stat_init_dsrc_stats(WT_DSRC_STATS *stats)
 	    "cache: internal page merge attempts that could not complete";
 	stats->cache_eviction_merge_levels.desc =
 	    "cache: internal levels merged";
+	stats->cache_inmem_split.desc =
+	    "pages split because they were unable to be evicted";
 	stats->cache_overflow_value.desc = "overflow values cached in memory";
 	stats->cache_read.desc = "pages read into cache";
 	stats->cache_read_overflow.desc = "overflow pages read into cache";
@@ -92,8 +94,12 @@ __wt_stat_init_dsrc_stats(WT_DSRC_STATS *stats)
 	stats->lsm_lookup_no_bloom.desc =
 	    "queries that could have benefited from a Bloom filter that did not exist";
 	stats->rec_dictionary.desc = "reconciliation dictionary matches";
-	stats->rec_ovfl_key.desc = "reconciliation overflow keys written";
-	stats->rec_ovfl_value.desc = "reconciliation overflow values written";
+	stats->rec_overflow_key_internal.desc =
+	    "reconciliation internal-page overflow keys";
+	stats->rec_overflow_key_leaf.desc =
+	    "reconciliation leaf-page overflow keys";
+	stats->rec_overflow_value.desc =
+	    "reconciliation overflow values written";
 	stats->rec_page_delete.desc = "reconciliation pages deleted";
 	stats->rec_page_merge.desc = "reconciliation pages merged";
 	stats->rec_pages.desc = "page reconciliation calls";
@@ -101,14 +107,13 @@ __wt_stat_init_dsrc_stats(WT_DSRC_STATS *stats)
 	    "page reconciliation calls for eviction";
 	stats->rec_skipped_update.desc =
 	    "reconciliation failed because an update could not be included";
-	stats->rec_split_intl.desc = "reconciliation internal pages split";
+	stats->rec_split_internal.desc = "reconciliation internal pages split";
 	stats->rec_split_leaf.desc = "reconciliation leaf pages split";
 	stats->rec_split_max.desc =
 	    "reconciliation maximum number of splits created for a page";
 	stats->session_compact.desc = "object compaction";
 	stats->session_cursor_open.desc = "open cursor count";
 	stats->txn_update_conflict.desc = "update conflicts";
-	stats->txn_write_conflict.desc = "write generation conflicts";
 }
 
 void
@@ -159,6 +164,7 @@ __wt_stat_clear_dsrc_stats(void *stats_arg)
 	stats->cache_eviction_merge.v = 0;
 	stats->cache_eviction_merge_fail.v = 0;
 	stats->cache_eviction_merge_levels.v = 0;
+	stats->cache_inmem_split.v = 0;
 	stats->cache_overflow_value.v = 0;
 	stats->cache_read.v = 0;
 	stats->cache_read_overflow.v = 0;
@@ -187,19 +193,19 @@ __wt_stat_clear_dsrc_stats(void *stats_arg)
 	stats->lsm_generation_max.v = 0;
 	stats->lsm_lookup_no_bloom.v = 0;
 	stats->rec_dictionary.v = 0;
-	stats->rec_ovfl_key.v = 0;
-	stats->rec_ovfl_value.v = 0;
+	stats->rec_overflow_key_internal.v = 0;
+	stats->rec_overflow_key_leaf.v = 0;
+	stats->rec_overflow_value.v = 0;
 	stats->rec_page_delete.v = 0;
 	stats->rec_page_merge.v = 0;
 	stats->rec_pages.v = 0;
 	stats->rec_pages_eviction.v = 0;
 	stats->rec_skipped_update.v = 0;
-	stats->rec_split_intl.v = 0;
+	stats->rec_split_internal.v = 0;
 	stats->rec_split_leaf.v = 0;
 	stats->rec_split_max.v = 0;
 	stats->session_compact.v = 0;
 	stats->txn_update_conflict.v = 0;
-	stats->txn_write_conflict.v = 0;
 }
 
 void
@@ -243,6 +249,7 @@ __wt_stat_aggregate_dsrc_stats(void *child, void *parent)
 	p->cache_eviction_merge.v += c->cache_eviction_merge.v;
 	p->cache_eviction_merge_fail.v += c->cache_eviction_merge_fail.v;
 	p->cache_eviction_merge_levels.v += c->cache_eviction_merge_levels.v;
+	p->cache_inmem_split.v += c->cache_inmem_split.v;
 	p->cache_overflow_value.v += c->cache_overflow_value.v;
 	p->cache_read.v += c->cache_read.v;
 	p->cache_read_overflow.v += c->cache_read_overflow.v;
@@ -271,21 +278,21 @@ __wt_stat_aggregate_dsrc_stats(void *child, void *parent)
 	    p->lsm_generation_max.v = c->lsm_generation_max.v;
 	p->lsm_lookup_no_bloom.v += c->lsm_lookup_no_bloom.v;
 	p->rec_dictionary.v += c->rec_dictionary.v;
-	p->rec_ovfl_key.v += c->rec_ovfl_key.v;
-	p->rec_ovfl_value.v += c->rec_ovfl_value.v;
+	p->rec_overflow_key_internal.v += c->rec_overflow_key_internal.v;
+	p->rec_overflow_key_leaf.v += c->rec_overflow_key_leaf.v;
+	p->rec_overflow_value.v += c->rec_overflow_value.v;
 	p->rec_page_delete.v += c->rec_page_delete.v;
 	p->rec_page_merge.v += c->rec_page_merge.v;
 	p->rec_pages.v += c->rec_pages.v;
 	p->rec_pages_eviction.v += c->rec_pages_eviction.v;
 	p->rec_skipped_update.v += c->rec_skipped_update.v;
-	p->rec_split_intl.v += c->rec_split_intl.v;
+	p->rec_split_internal.v += c->rec_split_internal.v;
 	p->rec_split_leaf.v += c->rec_split_leaf.v;
 	if (c->rec_split_max.v > p->rec_split_max.v)
 	    p->rec_split_max.v = c->rec_split_max.v;
 	p->session_compact.v += c->session_compact.v;
 	p->session_cursor_open.v += c->session_cursor_open.v;
 	p->txn_update_conflict.v += c->txn_update_conflict.v;
-	p->txn_write_conflict.v += c->txn_write_conflict.v;
 }
 
 void
@@ -323,6 +330,8 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	stats->cache_eviction_slow.desc =
 	    "cache: eviction server unable to reach eviction goal";
 	stats->cache_eviction_walk.desc = "cache: pages walked for eviction";
+	stats->cache_inmem_split.desc =
+	    "pages split because they were unable to be evicted";
 	stats->cache_pages_dirty.desc =
 	    "cache: tracked dirty pages in the cache";
 	stats->cache_pages_inuse.desc =
@@ -339,7 +348,32 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	stats->cursor_search.desc = "Btree cursor search calls";
 	stats->cursor_search_near.desc = "Btree cursor search near calls";
 	stats->cursor_update.desc = "Btree cursor update calls";
+	stats->dh_conn_handles.desc = "dhandle: connection dhandles swept";
+	stats->dh_evict_locks.desc = "dhandle: locked by eviction";
+	stats->dh_session_handles.desc = "dhandle: session dhandles swept";
+	stats->dh_sweep_evict.desc = "dhandle: sweeps conflicting with evict";
+	stats->dh_sweeps.desc = "dhandle: number of sweep attempts";
 	stats->file_open.desc = "files currently open";
+	stats->log_bytes_user.desc =
+	    "log: total user provided log bytes written";
+	stats->log_bytes_written.desc = "log: total log bytes written";
+	stats->log_max_filesize.desc = "log: maximum log file size";
+	stats->log_reads.desc = "log: total log read operations";
+	stats->log_scan_records.desc =
+	    "log: total records processed by log scan";
+	stats->log_scan_rereads.desc =
+	    "log: log scan records requiring two reads";
+	stats->log_scans.desc = "log: total log scan operations";
+	stats->log_slot_closes.desc = "log: total consolidated slot closures";
+	stats->log_slot_consolidated.desc =
+	    "log: total logging bytes consolidated";
+	stats->log_slot_joins.desc = "log: total consolidated slot joins";
+	stats->log_slot_races.desc = "log: total consolidated slot join races";
+	stats->log_slot_toobig.desc = "log: record size exceeded maximum";
+	stats->log_slot_transitions.desc =
+	    "log: total consolidated slot join transitions";
+	stats->log_sync.desc = "log: total log sync operations";
+	stats->log_writes.desc = "log: total log write operations";
 	stats->lsm_rows_merged.desc = "rows merged in an LSM tree";
 	stats->memory_allocation.desc = "total heap memory allocations";
 	stats->memory_free.desc = "total heap memory frees";
@@ -390,6 +424,7 @@ __wt_stat_clear_connection_stats(void *stats_arg)
 	stats->cache_eviction_merge_levels.v = 0;
 	stats->cache_eviction_slow.v = 0;
 	stats->cache_eviction_walk.v = 0;
+	stats->cache_inmem_split.v = 0;
 	stats->cache_pages_dirty.v = 0;
 	stats->cache_read.v = 0;
 	stats->cache_write.v = 0;
@@ -403,6 +438,25 @@ __wt_stat_clear_connection_stats(void *stats_arg)
 	stats->cursor_search.v = 0;
 	stats->cursor_search_near.v = 0;
 	stats->cursor_update.v = 0;
+	stats->dh_conn_handles.v = 0;
+	stats->dh_evict_locks.v = 0;
+	stats->dh_session_handles.v = 0;
+	stats->dh_sweep_evict.v = 0;
+	stats->dh_sweeps.v = 0;
+	stats->log_bytes_user.v = 0;
+	stats->log_bytes_written.v = 0;
+	stats->log_reads.v = 0;
+	stats->log_scan_records.v = 0;
+	stats->log_scan_rereads.v = 0;
+	stats->log_scans.v = 0;
+	stats->log_slot_closes.v = 0;
+	stats->log_slot_consolidated.v = 0;
+	stats->log_slot_joins.v = 0;
+	stats->log_slot_races.v = 0;
+	stats->log_slot_toobig.v = 0;
+	stats->log_slot_transitions.v = 0;
+	stats->log_sync.v = 0;
+	stats->log_writes.v = 0;
 	stats->lsm_rows_merged.v = 0;
 	stats->memory_allocation.v = 0;
 	stats->memory_free.v = 0;

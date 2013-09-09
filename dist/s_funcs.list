@@ -2,9 +2,11 @@
 WT_CURDUMP_PASS
 __bit_ffs
 __bit_nclr
+__ovfl_onpage_dump
+__ovfl_reuse_dump
+__ovfl_txnc_dump
 __wt_bloom_drop
 __wt_bloom_get
-__wt_btree_lex_compare
 __wt_cache_dump
 __wt_config_getone
 __wt_debug_addr
@@ -12,7 +14,10 @@ __wt_debug_offset
 __wt_debug_tree
 __wt_debug_tree_all
 __wt_fsync
-__wt_log_printf
+__wt_lex_compare
+__wt_lex_compare_skip
+__wt_log_read
+__wt_log_scan
 __wt_nlpo2
 __wt_nlpo2_round
 __wt_print_huffman_code

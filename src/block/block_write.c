@@ -149,15 +149,7 @@ __wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	    (offset + fh->extend_len <= fh->extend_size &&
 	    offset + fh->extend_len + align_size >= fh->extend_size))) {
 		fh->extend_size = offset + fh->extend_len * 2;
-#if defined(HAVE_POSIX_FALLOCATE)
-		if ((ret =
-		    posix_fallocate(fh->fd, offset, fh->extend_len * 2)) != 0)
-			WT_RET_MSG(
-			    session, ret, "%s: posix_fallocate", fh->name);
-#elif defined(HAVE_FTRUNCATE)
-		if ((ret = ftruncate(fh->fd, fh->extend_size)) != 0)
-			WT_RET_MSG(session, ret, "%s: ftruncate", fh->name);
-#endif
+		WT_RET(__wt_fallocate(session, fh, offset, fh->extend_len * 2));
 	}
 #endif
 	if ((ret =

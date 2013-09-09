@@ -102,15 +102,17 @@ config_setup(void)
 	 * our configuration, LSM or KVS devices are "tables", but files are
 	 * tested as well.
 	 */
-	if ((g.uri = malloc(strlen("table:") + strlen(WT_NAME) + 1)) == NULL)
+	if ((g.uri = malloc(256)) == NULL)
 		syserr("malloc");
 	strcpy(g.uri, DATASOURCE("file") ? "file:" : "table:");
+	if (DATASOURCE("memrata"))
+		strcat(g.uri, "dev1/");
 	strcat(g.uri, WT_NAME);
 
-	/* Default single-threaded half of the time. */
+	/* Default single-threaded 25% of the time. */
 	cp = config_find("threads", strlen("threads"));
 	if (!(cp->flags & C_PERM))
-		*cp->v = MMRAND(0, 1) ? 1: CONF_RAND(cp);
+		*cp->v = MMRAND(0, 3) == 0 ? 1: CONF_RAND(cp);
 
 	/* Fill in random values for the rest of the run. */
 	for (cp = c; cp->name != NULL; ++cp) {
@@ -379,10 +381,10 @@ config_single(const char *s, int perm)
 			    g.progname, s);
 			exit(EXIT_FAILURE);
 		}
-	} else if (*cp->v < cp->min || *cp->v > cp->max) {
+	} else if (*cp->v < cp->min || *cp->v > cp->maxset) {
 		fprintf(stderr, "%s: %s: value of %" PRIu32
 		    " outside min/max values of %" PRIu32 "-%" PRIu32 "\n",
-		    g.progname, s, *cp->v, cp->min, cp->max);
+		    g.progname, s, *cp->v, cp->min, cp->maxset);
 		exit(EXIT_FAILURE);
 	}
 }

@@ -79,12 +79,44 @@ connection_stats = [
 	Stat('cache_eviction_slow',
 	    'cache: eviction server unable to reach eviction goal'),
 	Stat('cache_eviction_walk', 'cache: pages walked for eviction'),
+	Stat('cache_inmem_split',
+	    'pages split because they were unable to be evicted'),
 	Stat('cache_pages_dirty',
 	    'cache: tracked dirty pages in the cache', 'no_scale'),
 	Stat('cache_pages_inuse',
 	    'cache: pages currently held in the cache', 'no_clear,no_scale'),
 	Stat('cache_read', 'cache: pages read into cache'),
 	Stat('cache_write', 'cache: pages written from cache'),
+
+	##########################################
+	# Dhandle statistics
+	##########################################
+	Stat('dh_conn_handles', 'dhandle: connection dhandles swept'),
+	Stat('dh_evict_locks', 'dhandle: locked by eviction'),
+	Stat('dh_session_handles', 'dhandle: session dhandles swept'),
+	Stat('dh_sweep_evict', 'dhandle: sweeps conflicting with evict'),
+	Stat('dh_sweeps', 'dhandle: number of sweep attempts'),
+
+	##########################################
+	# Logging statistics
+	##########################################
+	Stat('log_bytes_user', 'log: total user provided log bytes written'),
+	Stat('log_bytes_written', 'log: total log bytes written'),
+	Stat('log_max_filesize', 'log: maximum log file size', 'no_clear'),
+	Stat('log_reads', 'log: total log read operations'),
+	Stat('log_scan_records', 'log: total records processed by log scan'),
+	Stat('log_scan_rereads', 'log: log scan records requiring two reads'),
+	Stat('log_scans', 'log: total log scan operations'),
+	Stat('log_sync', 'log: total log sync operations'),
+	Stat('log_writes', 'log: total log write operations'),
+
+	Stat('log_slot_consolidated', 'log: total logging bytes consolidated'),
+	Stat('log_slot_closes', 'log: total consolidated slot closures'),
+	Stat('log_slot_joins', 'log: total consolidated slot joins'),
+	Stat('log_slot_races', 'log: total consolidated slot join races'),
+	Stat('log_slot_toobig', 'log: record size exceeded maximum'),
+	Stat('log_slot_transitions',
+            'log: total consolidated slot join transitions'),
 
 	##########################################
 	# Reconciliation statistics
@@ -241,6 +273,8 @@ dsrc_stats = [
 	Stat('cache_eviction_merge_fail',
 	    'cache: internal page merge attempts that could not complete'),
 	Stat('cache_eviction_merge_levels', 'cache: internal levels merged'),
+	Stat('cache_inmem_split',
+	    'pages split because they were unable to be evicted'),
 	Stat('cache_overflow_value',
 	    'overflow values cached in memory', 'no_scale'),
 	Stat('cache_read', 'pages read into cache'),
@@ -265,16 +299,19 @@ dsrc_stats = [
 	# Reconciliation statistics
 	##########################################
 	Stat('rec_dictionary', 'reconciliation dictionary matches'),
-	Stat('rec_ovfl_key', 'reconciliation overflow keys written'),
-	Stat('rec_ovfl_value', 'reconciliation overflow values written'),
+	Stat('rec_overflow_key_internal',
+	    'reconciliation internal-page overflow keys'),
+	Stat('rec_overflow_key_leaf', 'reconciliation leaf-page overflow keys'),
+	Stat('rec_overflow_value', 'reconciliation overflow values written'),
 	Stat('rec_page_delete', 'reconciliation pages deleted'),
 	Stat('rec_page_merge', 'reconciliation pages merged'),
 	Stat('rec_pages', 'page reconciliation calls'),
 	Stat('rec_pages_eviction', 'page reconciliation calls for eviction'),
 	Stat('rec_skipped_update',
 	    'reconciliation failed because an update could not be included'),
-	Stat('rec_split_intl', 'reconciliation internal pages split'),
+	Stat('rec_split_internal', 'reconciliation internal pages split'),
 	Stat('rec_split_leaf', 'reconciliation leaf pages split'),
+
 	Stat('rec_split_max',
 	    'reconciliation maximum number of splits created for a page',
 	    'max_aggregate,no_scale'),
@@ -283,7 +320,6 @@ dsrc_stats = [
 	# Transaction statistics
 	##########################################
 	Stat('txn_update_conflict', 'update conflicts'),
-	Stat('txn_write_conflict', 'write generation conflicts'),
 ]
 
 dsrc_stats = sorted(dsrc_stats, key=attrgetter('name'))

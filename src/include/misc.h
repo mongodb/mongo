@@ -16,6 +16,19 @@
 #define	WT_PETABYTE	((uint64_t)1125899906842624)
 
 /*
+ * Size to build an entry prefix with a pathname.
+ */
+#define	ENTRY_SIZE	128
+
+/*
+ * Number of directory entries can grow dynamically.
+ */
+#define	WT_DIR_ENTRY	32
+
+#define	WT_DIRLIST_EXCLUDE	0x1	/* Exclude files matching prefix */
+#define	WT_DIRLIST_INCLUDE	0x2	/* Include files matching prefix */
+
+/*
  * Sizes that cannot be larger than 2**32 are stored in uint32_t fields in
  * common structures to save space.  To minimize conversions from size_t to
  * uint32_t through the code, we use the following macros.
@@ -46,7 +59,7 @@
 /* Elements in an array. */
 #define	WT_ELEMENTS(a)	(sizeof(a) / sizeof(a[0]))
 
-/* 10 level skip lists, 1/2 have a link to the next element. */
+/* 10 level skip lists, 1/4 have a link to the next element. */
 #define	WT_SKIP_MAXDEPTH	10
 #define	WT_SKIP_PROBABILITY	(UINT32_MAX >> 2)
 
@@ -103,8 +116,13 @@
 	memset(p, WT_DEBUG_BYTE, sizeof(*(p)));				\
 	__wt_free(session, p);						\
 } while (0)
+#define	__wt_overwrite_and_free_len(session, p, len) do {		\
+	memset(p, WT_DEBUG_BYTE, len);					\
+	__wt_free(session, p);						\
+} while (0)
 #else
-#define	__wt_overwrite_and_free(session, p)	__wt_free(session, p)
+#define	__wt_overwrite_and_free(session, p)		__wt_free(session, p)
+#define	__wt_overwrite_and_free_len(session, p, len)	__wt_free(session, p)
 #endif
 
 /*
@@ -169,6 +187,11 @@
 /* Function return value and scratch buffer declaration and initialization. */
 #define	WT_DECL_ITEM(i)	WT_ITEM *i = NULL
 #define	WT_DECL_RET	int ret = 0
+
+/* If a WT_ITEM data field points somewhere in its allocated memory. */
+#define	WT_DATA_IN_ITEM(i)						\
+	((i)->mem != NULL && (i)->data >= (i)->mem &&			\
+	    WT_PTRDIFF((i)->data, (i)->mem) < (i)->memsize)
 
 /*
  * In diagnostic mode we track the locations from which hazard pointers and

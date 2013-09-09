@@ -43,25 +43,33 @@ dictionary compression, Huffman encoding and block compression.
 
 - Key prefix compression reduces the size requirement of both in-memory
 and on-disk objects by storing any identical key prefix only once per
-page.  The cost is minor additional CPU and memory use when reading
-pages into memory, when searching the in-memory tree and when writing
-pages to disk.
+page.
 
-  Key prefix compression is configured by default.  Applications
-where performance is more important than memory and disk size may choose
-to turn off key prefix compression using the WT_SESSION::create method's
-\c prefix_compression configuration string.  Applications wanting to
-minimize disk size but maximize performance at the cost of memory size,
-or which have poor cache locality of reference, may choose to
-instantiate more or less keys in memory using the WT_SESSION::create
-method's \c key_gap configuration string.
+  The cost is minor additional CPU and some additional memory use when
+operating on the in-memory tree.  Specifically, sequential cursor
+movement through prefix-compressed page in reverse (but not forward)
+order, or the random lookup of a key/value pair will allocate sufficient
+memory to hold some number of uncompressed keys.  So, for example, if
+key prefix compression only saves a small number of bytes per key, the
+additional memory cost of instantiating the uncompressed key may mean
+prefix compression is not worthwhile.  Further, in cases where the
+on-disk cost is the primary concern, block compression may mean prefix
+compression is less useful.
+
+  Applications may limit the use of prefix compression by configuring the
+minimum number of bytes that must be gained before prefix compression is
+used with the WT_SESSION::create method's \c prefix_compression_min
+configuration string, or turn off key prefix compression entirely using
+the WT_SESSION::create method's \c prefix_compression configuration string.
+
+  Key prefix compression is enabled by default.
 
 - Dictionary compression reduces the size requirement of both the
 in-memory and on-disk objects by storing any identical value only once
-per page.  The cost is minor additional CPU and memory use when
-returning values from the in-memory tree and when writing pages to disk.
+per page.  The cost is minor additional CPU and memory use when writing
+pages to disk.
 
-  Dictionary compression is not configured by default.
+  Dictionary compression is disabled by default.
 
 - Huffman encoding reduces the size requirement of both the in-memory
 and on-disk objects by compressing individual key/value items, and can
@@ -72,7 +80,7 @@ from the in-memory tree and when writing pages to disk.  Note the
 additional CPU cost of Huffman encoding can be high, and should be
 considered.  (See @subpage huffman for details.)
 
-  Huffman encoding is not configured by default.
+  Huffman encoding is disabled by default.
 
 - Block compression reduces the size requirement of on-disk objects by
 compressing blocks of the backing object's file.  The cost is additional
@@ -80,7 +88,7 @@ CPU and memory use when reading and writing pages to disk.  Note the
 additional CPU cost of block compression can be high, and should be
 considered.   (See @ref compression for details.)
 
-  Block compression is not configured by default.
+  Block compression is disabled by default.
 
 Column-stores with variable-length byte string values support four
 types of compression: run-length encoding, dictionary compression,
@@ -92,14 +100,14 @@ only a single time (with an associated count).  The cost is minor
 additional CPU and memory use when returning values from the in-memory
 tree and when writing pages to disk.
 
-  Run-length encoding is always configured and cannot be turned off.
+  Run-length encoding is always enabled and cannot be turned off.
 
 - Dictionary compression reduces the size requirement of both the
 in-memory and on-disk objects by storing any identical value only once
 per page.  The cost is minor additional CPU and memory use when
 returning values from the in-memory tree and when writing pages to disk.
 
-  Dictionary compression is not configured by default.
+  Dictionary compression is disabled by default.
 
 - Huffman encoding reduces the size requirement of both the in-memory
 and on-disk objects by compressing individual value items.  The cost is
@@ -108,7 +116,7 @@ tree and when writing pages to disk.  Note the additional CPU cost of
 Huffman encoding can be high, and should be considered.
 (See @ref huffman for details.)
 
-  Huffman encoding is not configured by default.
+  Huffman encoding is disabled by default.
 
 - Block compression reduces the size requirement of on-disk objects by
 compressing blocks of the backing object's file.  The cost is additional
@@ -116,7 +124,7 @@ CPU and memory use when reading and writing pages to disk.  Note the
 additional CPU cost of block compression can be high, and should be
 considered.   (See @ref compression for details.)
 
-  Block compression is not configured by default.
+  Block compression is disabled by default.
 
 Column-stores with fixed-length byte values support a single type of
 compression: block compression.
@@ -127,6 +135,6 @@ CPU and memory use when reading and writing pages to disk.  Note the
 additional CPU cost of block compression can be high, and should be
 considered.   (See @ref compression for details.)
 
-  Block compression is not configured by default.
+  Block compression is disabled by default.
 
 */

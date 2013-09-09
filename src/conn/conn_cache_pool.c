@@ -42,7 +42,7 @@ __wt_conn_cache_pool_config(WT_SESSION_IMPL *session, const char **cfg)
 	created = reconfiguring = 0;
 	pool_name = NULL;
 	cp = NULL;
-	chunk = reserve = size = 0;
+	reserve = size = 0;
 
 	if (F_ISSET(conn, WT_CONN_CACHE_POOL))
 		reconfiguring = 1;
@@ -425,7 +425,7 @@ __cache_pool_adjust(uint64_t highest, uint64_t bump_threshold)
 
 	cp = __wt_process.cache_pool;
 	session = cp->session;
-	adjusted = reserved = read_pressure = 0;
+	reserved = read_pressure = 0;
 	grew = 0;
 	force = (cp->currently_used > cp->size);
 	if (WT_VERBOSE_ISSET(session, shared_cache)) {

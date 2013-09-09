@@ -1,15 +1,16 @@
 /*! @page license WiredTiger license
 
 The complete WiredTiger software package is Open Source software: you
-are welcome to modify and redistribute it under the terms of version 3
-of the
+are welcome to modify and redistribute it under the terms of
+<a href="http://www.gnu.org/licenses/gpl-2.0-standalone.html">
+<b>version 2</b></a> or
 <a href="http://www.gnu.org/licenses/gpl-3.0-standalone.html">
+<b>version 3</b></a> of the
 <b>GNU General Public License</b></a>
 as published by the Free Software Foundation. This program is
 distributed in the hope that it will be useful, but WITHOUT ANY
 WARRANTY; without even the implied warranty of MERCHANTABILITY or
 FITNESS FOR A PARTICULAR PURPOSE.  See the
-<a href="http://www.gnu.org/licenses/gpl-3.0-standalone.html">
 <b>GNU General Public License</b></a> for details.
 
 For a license to use the WiredTiger software under conditions other than
@@ -19,17 +20,14 @@ contact WiredTiger, Inc. at
 
 @section library 3rd party software included in the WiredTiger library binary
 
-The WiredTiger library binary includes software copyrighted under the
-terms of the
+The WiredTiger library binary includes the following 3rd party software,
+distributed under the terms of the
 <a href="http://www.opensource.org/licenses/BSD-3-Clause">
 <b>University of California, Berkeley (BSD) 3-Clause License</b></a>
 and the
 <a href="http://www.opensource.org/licenses/MIT">
 <b>MIT License</b></a>.  Any redistribution should comply with these
 copyrights.
-
-The WiredTiger library binary includes the following 3rd party software,
-distributed under the following licenses:
 
 <table>
 @hrow{Distribution File, License}
@@ -54,7 +52,8 @@ redistribution.
 
 @section public_domain Public domain software
 
-Portions of this program are public domain software.  Public domain files have
-notices releasing the software into the public domain and may be freely used.
+Many portions of this program are public domain software.  Public domain
+files have notices releasing the software into the public domain and may
+be freely used and redistributed.
 
 */

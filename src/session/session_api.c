@@ -155,17 +155,12 @@ __session_reconfigure(WT_SESSION *wt_session, const char *config)
 	WT_TRET(__session_reset_cursors(session));
 
 	WT_ERR(__wt_config_gets_def(session, cfg, "isolation", 0, &cval));
-	if (cval.len != 0) {
-		if (!F_ISSET(S2C(session), WT_CONN_TRANSACTIONAL))
-			WT_ERR_MSG(session, EINVAL,
-			    "Database not configured for transactions");
-
+	if (cval.len != 0)
 		session->isolation = session->txn.isolation =
 		    WT_STRING_MATCH("snapshot", cval.str, cval.len) ?
 		    TXN_ISO_SNAPSHOT :
 		    WT_STRING_MATCH("read-uncommitted", cval.str, cval.len) ?
 		    TXN_ISO_READ_UNCOMMITTED : TXN_ISO_READ_COMMITTED;
-	}
 
 err:	API_END_NOTFOUND_MAP(session, ret);
 }
@@ -198,6 +193,8 @@ __wt_open_cursor(WT_SESSION_IMPL *session,
 		ret = __wt_curfile_open(session, uri, owner, cfg, cursorp);
 	else if (WT_PREFIX_MATCH(uri, "lsm:"))
 		ret = __wt_clsm_open(session, uri, owner, cfg, cursorp);
+	else if (WT_PREFIX_MATCH(uri, "metadata:"))
+		ret = __wt_curfile_open(session, uri, owner, cfg, cursorp);
 	else if (WT_PREFIX_MATCH(uri, "index:"))
 		ret = __wt_curindex_open(session, uri, owner, cfg, cursorp);
 	else if (WT_PREFIX_MATCH(uri, "statistics:"))
@@ -207,7 +204,7 @@ __wt_open_cursor(WT_SESSION_IMPL *session,
 	else if ((dsrc = __wt_schema_get_source(session, uri)) != NULL)
 		ret = dsrc->open_cursor == NULL ?
 		    __wt_object_unsupported(session, uri) :
-		    __wt_curds_create(session, uri, cfg, dsrc, cursorp);
+		    __wt_curds_create(session, uri, owner, cfg, dsrc, cursorp);
 	else
 		ret = __wt_bad_object_type(session, uri);
 
@@ -222,8 +219,11 @@ static int
 __session_open_cursor(WT_SESSION *wt_session,
     const char *uri, WT_CURSOR *to_dup, const char *config, WT_CURSOR **cursorp)
 {
+	WT_CURSOR *cursor;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
+
+	cursor = *cursorp = NULL;
 
 	session = (WT_SESSION_IMPL *)wt_session;
 	SESSION_API_CALL(session, open_cursor, config, cfg);
@@ -235,18 +235,27 @@ __session_open_cursor(WT_SESSION *wt_session,
 
 	if (to_dup != NULL) {
 		uri = to_dup->uri;
-		if (WT_PREFIX_MATCH(uri, "colgroup:") ||
-		    WT_PREFIX_MATCH(uri, "index:") ||
-		    WT_PREFIX_MATCH(uri, "file:") ||
-		    WT_PREFIX_MATCH(uri, "lsm:") ||
-		    WT_PREFIX_MATCH(uri, "table:"))
-			ret = __wt_cursor_dup(session, to_dup, cfg, cursorp);
-		else
-			ret = __wt_bad_object_type(session, uri);
-	} else
-		ret = __wt_open_cursor(session, uri, NULL, cfg, cursorp);
+		if (!WT_PREFIX_MATCH(uri, "colgroup:") &&
+		    !WT_PREFIX_MATCH(uri, "index:") &&
+		    !WT_PREFIX_MATCH(uri, "file:") &&
+		    !WT_PREFIX_MATCH(uri, "lsm:") &&
+		    !WT_PREFIX_MATCH(uri, "table:") &&
+		    __wt_schema_get_source(session, uri) == NULL)
+			WT_ERR(__wt_bad_object_type(session, uri));
+	}
 
-err:	API_END_NOTFOUND_MAP(session, ret);
+	WT_ERR(__wt_open_cursor(session, uri, NULL, cfg, &cursor));
+	if (to_dup != NULL)
+		WT_ERR(__wt_cursor_dup_position(to_dup, cursor));
+
+	*cursorp = cursor;
+
+	if (0) {
+err:		if (cursor != NULL)
+			WT_TRET(cursor->close(cursor));
+	}
+
+	API_END_NOTFOUND_MAP(session, ret);
 }
 
 /*
@@ -314,6 +323,27 @@ err:	API_END_NOTFOUND_MAP(session, ret);
 }
 
 /*
+ * __session_log_printf --
+ *	WT_SESSION->log_printf method.
+ */
+static int
+__session_log_printf(WT_SESSION *wt_session, const char *fmt, ...)
+    WT_GCC_FUNC_ATTRIBUTE((format (printf, 2, 3)))
+{
+	WT_SESSION_IMPL *session;
+	WT_DECL_RET;
+	va_list ap;
+
+	session = (WT_SESSION_IMPL *)wt_session;
+
+	va_start(ap, fmt);
+	ret =__wt_log_vprintf(session, fmt, ap);
+	va_end(ap);
+
+	return (ret);
+}
+
+/*
  * __session_rename --
  *	WT_SESSION->rename method.
  */
@@ -364,11 +394,13 @@ err:	API_END_NOTFOUND_MAP(session, ret);
 static int
 __session_compact(WT_SESSION *wt_session, const char *uri, const char *config)
 {
+	WT_DECL_ITEM(t);
 	WT_DECL_RET;
-	WT_ITEM *t;
 	WT_SESSION_IMPL *session;
+	WT_TXN *txn;
 
 	session = (WT_SESSION_IMPL *)wt_session;
+	txn = &session->txn;
 
 	/* Disallow objects in the WiredTiger name space. */
 	WT_RET(__wt_schema_name_check(session, uri));
@@ -381,6 +413,14 @@ __session_compact(WT_SESSION *wt_session, const char *uri, const char *config)
 	    !WT_PREFIX_MATCH(uri, "index:") &&
 	    !WT_PREFIX_MATCH(uri, "table:"))
 		return (__wt_bad_object_type(session, uri));
+
+	/*
+	 * Compaction requires checkpoints, which will fail in a transactional
+	 * context.  Check now so the error message isn't confusing.
+	 */
+	if (F_ISSET(txn, TXN_RUNNING))
+		WT_RET_MSG(session, EINVAL,
+		    "Compaction not permitted in a transaction");
 
 	/*
 	 * Compaction requires 2, and possibly 3 checkpoints, how many is block
@@ -514,10 +554,12 @@ __session_truncate(WT_SESSION *wt_session,
 		goto done;
 	}
 
-	/* Cursor truncate is only supported for file and table objects. */
+	/*
+	 * Cursor truncate is only supported for some objects, check for the
+	 * supporting methods we need, range_truncate and compare.
+	 */
 	cursor = start == NULL ? stop : start;
-	if (!WT_PREFIX_MATCH(cursor->uri, "file:") &&
-	    !WT_PREFIX_MATCH(cursor->uri, "table:"))
+	if (cursor->compare == NULL)
 		WT_ERR(__wt_bad_object_type(session, cursor->uri));
 
 	/*
@@ -567,10 +609,7 @@ __session_truncate(WT_SESSION *wt_session,
 		}
 	}
 
-	if (WT_PREFIX_MATCH(cursor->uri, "file:"))
-		WT_ERR(__wt_curfile_truncate(session, start, stop));
-	else
-		WT_ERR(__wt_curtable_truncate(session, start, stop));
+	WT_ERR(__wt_schema_range_truncate(session, start, stop));
 
 done:
 err:	TXN_API_END_NOTFOUND_MAP(session, ret);
@@ -630,9 +669,6 @@ __session_begin_transaction(WT_SESSION *wt_session, const char *config)
 	SESSION_API_CALL(session, begin_transaction, config, cfg);
 	WT_CSTAT_INCR(session, txn_begin);
 
-	if (!F_ISSET(S2C(session), WT_CONN_TRANSACTIONAL))
-		WT_ERR_MSG(session, EINVAL,
-		    "Database not configured for transactions");
 	if (F_ISSET(&session->txn, TXN_RUNNING))
 		WT_ERR_MSG(session, EINVAL, "Transaction already running");
 
@@ -772,6 +808,7 @@ __wt_open_session(WT_CONNECTION_IMPL *conn, int internal,
 		__session_create,
 		__session_compact,
 		__session_drop,
+		__session_log_printf,
 		__session_rename,
 		__session_salvage,
 		__session_truncate,
@@ -785,6 +822,8 @@ __wt_open_session(WT_CONNECTION_IMPL *conn, int internal,
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session, *session_ret;
 	uint32_t i;
+
+	*sessionp = NULL;
 
 	session = conn->default_session;
 	session_ret = NULL;

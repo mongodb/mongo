@@ -77,13 +77,12 @@ __wt_page_out(WT_SESSION_IMPL *session, WT_PAGE **pagep)
 		break;
 	}
 
-	/* Free any allocated disk image. */
-	if (F_ISSET_ATOMIC(page, WT_PAGE_DISK_NOT_ALLOC)) {
-		if (page->dsk != NULL)
-			__wt_mmap_discard(
-			    session, page->dsk, page->dsk->mem_size);
-	} else
-		__wt_free(session, page->dsk);
+	/* Discard any disk image. */
+	if (F_ISSET_ATOMIC(page, WT_PAGE_DISK_ALLOC))
+		__wt_overwrite_and_free_len(
+		    session, page->dsk, page->dsk->mem_size);
+	if (F_ISSET_ATOMIC(page, WT_PAGE_DISK_MAPPED))
+		__wt_mmap_discard(session, page->dsk, page->dsk->mem_size);
 
 	__wt_overwrite_and_free(session, page);
 }
@@ -96,7 +95,11 @@ static void
 __free_page_modify(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_INSERT_HEAD *append;
+	WT_OVFL_ONPAGE *onpage;
+	WT_OVFL_REUSE *reuse;
+	WT_OVFL_TXNC *txnc;
 	WT_PAGE_MODIFY *mod;
+	void *next;
 
 	mod = page->modify;
 
@@ -131,9 +134,26 @@ __free_page_modify(WT_SESSION_IMPL *session, WT_PAGE *page)
 		__free_skip_array(session, mod->update,
 		    page->type == WT_PAGE_COL_FIX ? 1 : page->entries);
 
-	/* Discard any objects the page was tracking plus associated memory. */
-	__wt_rec_track_discard(session, page);
-	__wt_free(session, mod->track);
+	/* Free the overflow on-page, reuse and transaction-cache skiplists. */
+	if (mod->ovfl_track != NULL) {
+		for (onpage = mod->ovfl_track->ovfl_onpage[0];
+		    onpage != NULL; onpage = next) {
+			next = onpage->next[0];
+			__wt_free(session, onpage);
+		}
+		for (reuse = mod->ovfl_track->ovfl_reuse[0];
+		    reuse != NULL; reuse = next) {
+			next = reuse->next[0];
+			__wt_free(session, reuse);
+		}
+		for (txnc = mod->ovfl_track->ovfl_txnc[0];
+		    txnc != NULL; txnc = next) {
+			next = txnc->next[0];
+			__wt_free(session, txnc);
+		}
+	}
+	__wt_free(session, page->modify->ovfl_track);
+
 	__wt_free(session, page->modify);
 }
 
@@ -188,7 +208,7 @@ __free_page_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * so, free it.
 	 */
 	WT_REF_FOREACH(page, ref, i) {
-		if ((ikey = ref->u.key) != NULL)
+		if ((ikey = __wt_ref_key_instantiated(ref)) != NULL)
 			__wt_free(session, ikey);
 		if (ref->addr != NULL &&
 		    __wt_off_page(page, ref->addr)) {
@@ -271,12 +291,11 @@ __free_skip_list(WT_SESSION_IMPL *session, WT_INSERT *ins)
 {
 	WT_INSERT *next;
 
-	do {
+	for (; ins != NULL; ins = next) {
 		__free_update_list(session, ins->upd);
-
 		next = WT_SKIP_NEXT(ins);
 		__wt_free(session, ins);
-	} while ((ins = next) != NULL);
+	}
 }
 
 /*

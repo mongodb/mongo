@@ -223,8 +223,10 @@ typedef struct {
 
 static void __rec_cell_build_addr(
 		WT_RECONCILE *, const void *, uint32_t, u_int, uint64_t);
-static int  __rec_cell_build_key(WT_SESSION_IMPL *,
-		WT_RECONCILE *, const void *, uint32_t, int, int *);
+static int  __rec_cell_build_int_key(WT_SESSION_IMPL *,
+		WT_RECONCILE *, const void *, uint32_t, int *);
+static int  __rec_cell_build_leaf_key(WT_SESSION_IMPL *,
+		WT_RECONCILE *, const void *, uint32_t, int *);
 static int  __rec_cell_build_ovfl(WT_SESSION_IMPL *,
 		WT_RECONCILE *, WT_KV *, uint8_t, uint64_t);
 static int  __rec_cell_build_val(WT_SESSION_IMPL *,
@@ -302,9 +304,6 @@ __wt_rec_write(WT_SESSION_IMPL *session,
 	/* Initialize the reconciliation structure for each new run. */
 	WT_RET(__rec_write_init(session, page, flags, &session->reconcile));
 	r = session->reconcile;
-
-	/* Initialize the tracking subsystem for each new run. */
-	WT_RET(__wt_rec_track_init(session, page));
 
 	/* Reconcile the page. */
 	switch (page->type) {
@@ -491,9 +490,12 @@ __rec_write_init(
 	    btree->internal_key_truncate && !r->raw_compression)
 		r->key_sfx_compress_conf = 1;
 
-	/* Prefix compression discards key's repeated prefix bytes. */
+	/*
+	 * Prefix compression discards repeated prefix bytes from row-store leaf
+	 * page keys.
+	 */
 	r->key_pfx_compress_conf = 0;
-	if (btree->prefix_compression)
+	if (btree->prefix_compression && page->type == WT_PAGE_ROW_LEAF)
 		r->key_pfx_compress_conf = 1;
 
 	/*
@@ -1196,7 +1198,7 @@ __rec_split_row_promote_cell(
 	WT_ASSERT(session,
 	    unpack->prefix == 0 && unpack->raw != WT_CELL_VALUE_COPY);
 
-	WT_RET(__wt_cell_unpack_copy(session, unpack, copy));
+	WT_RET(__wt_cell_unpack_copy(session, dsk->type, unpack, copy));
 	return (0);
 }
 
@@ -2018,8 +2020,8 @@ __wt_rec_row_bulk_insert(WT_CURSOR_BULK *cbulk)
 	cursor = &cbulk->cbt.iface;
 	key = &r->k;
 	val = &r->v;
-	WT_RET(__rec_cell_build_key(session, r,		/* Build key cell */
-	    cursor->key.data, cursor->key.size, 0, &ovfl_key));
+	WT_RET(__rec_cell_build_leaf_key(session, r,	/* Build key cell */
+	    cursor->key.data, cursor->key.size, &ovfl_key));
 	WT_RET(__rec_cell_build_val(session, r,		/* Build value cell */
 	    cursor->value.data, cursor->value.size, (uint64_t)0));
 
@@ -2041,8 +2043,8 @@ __wt_rec_row_bulk_insert(WT_CURSOR_BULK *cbulk)
 			if (r->key_pfx_compress_conf) {
 				r->key_pfx_compress = 0;
 				if (!ovfl_key)
-					WT_RET(__rec_cell_build_key(
-					    session, r, NULL, 0, 0, &ovfl_key));
+					WT_RET(__rec_cell_build_leaf_key(
+					    session, r, NULL, 0, &ovfl_key));
 			}
 		}
 
@@ -2231,7 +2233,7 @@ __rec_col_merge(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	/* For each entry in the page... */
 	WT_REF_FOREACH(page, ref, i) {
 		/* Update the starting record number in case we split. */
-		r->recno = ref->u.recno;
+		r->recno = ref->key.recno;
 
 		/*
 		 * The page may be emptied or internally created during a split.
@@ -2286,7 +2288,7 @@ __rec_col_merge(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 			    addr->addr, addr->size,
 			    addr->leaf_no_overflow ?
 			    WT_CELL_ADDR_LNO : WT_CELL_ADDR,
-			    ref->u.recno);
+			    ref->key.recno);
 
 		/* Boundary: split or write the page. */
 		while (val->len > r->space_avail)
@@ -2601,7 +2603,7 @@ __rec_col_var(WT_SESSION_IMPL *session,
 
 	/* For each entry in the in-memory page... */
 	rle = 0;
-	deleted = last_deleted = 0;
+	last_deleted = 0;
 	WT_COL_FOREACH(page, cip, i) {
 		ovfl_state = OVFL_IGNORE;
 		if ((cell = WT_COL_PTR(page, cip)) == NULL) {
@@ -2650,7 +2652,8 @@ __rec_col_var(WT_SESSION_IMPL *session,
 			 * where the new value happens (?) to match a Huffman-
 			 * encoded value in a previous or next record.
 			 */
-			WT_ERR(__wt_cell_unpack_ref(session, unpack, orig));
+			WT_ERR(__wt_cell_unpack_ref(
+			    session, WT_PAGE_COL_VAR, unpack, orig));
 		}
 
 record_loop:	/*
@@ -2736,8 +2739,8 @@ record_loop:	/*
 					 * it for a key and now we need another
 					 * copy; read it into memory.
 					 */
-					WT_ERR(__wt_cell_unpack_ref(
-					    session, unpack, orig));
+					WT_ERR(__wt_cell_unpack_ref(session,
+					    WT_PAGE_COL_VAR, unpack, orig));
 
 					ovfl_state = OVFL_IGNORE;
 					/* FALLTHROUGH */
@@ -2812,7 +2815,7 @@ compare:		/*
 		 * might read the original value.
 		 */
 		if (ovfl_state == OVFL_UNUSED) {
-			WT_ERR(__wt_rec_track_onpage_addr(
+			WT_ERR(__wt_ovfl_onpage_add(
 			    session, page, unpack->data, unpack->size));
 			WT_ERR(__wt_val_ovfl_cache(session, page, upd, unpack));
 		}
@@ -2933,24 +2936,23 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	/* For each entry in the in-memory page... */
 	WT_REF_FOREACH(page, ref, i) {
 		/*
-		 * Keys are always instantiated for row-store internal pages,
-		 * set the WT_IKEY reference, and unpack the cell if the key
-		 * references one.
+		 * There are different paths if the key is an overflow item vs.
+		 * a straight-forward on-page value.   If an overflow item, we
+		 * would have instantiated it, and we can use that fact to set
+		 * things up.
+		 *
+		 * Note the cell reference and unpacked key cell are available
+		 * only in the case of an instantiated, off-page key.
 		 */
-		ikey = ref->u.key;
-		if (ikey->cell_offset == 0)
+		ikey = __wt_ref_key_instantiated(ref);
+		if (ikey == NULL || ikey->cell_offset == 0) {
 			cell = NULL;
-		else {
+			onpage_ovfl = 0;
+		} else {
 			cell = WT_PAGE_REF_OFFSET(page, ikey->cell_offset);
 			__wt_cell_unpack(cell, kpack);
+			onpage_ovfl = kpack->ovfl == 1 ? 1 : 0;
 		}
-
-		/*
-		 * We need to know if we're using on-page overflow key cell in
-		 * a few places below, initialize the unpacked cell's overflow
-		 * value so there's an easy test.
-		 */
-		onpage_ovfl = cell != NULL && kpack->ovfl == 1 ? 1 : 0;
 
 		vtype = 0;
 		addr = ref->addr;
@@ -2967,7 +2969,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 			 * reusing this key in this reconciliation is unlikely.
 			 */
 			if (onpage_ovfl)
-				WT_RET(__wt_rec_track_onpage_addr(
+				WT_RET(__wt_ovfl_onpage_add(
 				    session, page, kpack->data, kpack->size));
 			continue;
 		}
@@ -2993,7 +2995,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 				 * reconciliation is unlikely.
 				 */
 				if (onpage_ovfl)
-					WT_RET(__wt_rec_track_onpage_addr(
+					WT_RET(__wt_ovfl_onpage_add(
 					    session, page,
 					    kpack->data, kpack->size));
 				continue;
@@ -3016,7 +3018,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 				 * reconciliation is unlikely.
 				 */
 				if (onpage_ovfl)
-					WT_RET(__wt_rec_track_onpage_addr(
+					WT_RET(__wt_ovfl_onpage_add(
 					    session, page,
 					    kpack->data, kpack->size));
 
@@ -3056,7 +3058,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		 * key.  If there's no tracking entry, use the original blocks.
 		 */
 		if (onpage_ovfl &&
-		    __wt_rec_track_onpage_srch(page, kpack->data, kpack->size))
+		    __wt_ovfl_onpage_search(page, kpack->data, kpack->size))
 			onpage_ovfl = 0;
 
 		/*
@@ -3069,10 +3071,11 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 			key->cell_len = 0;
 			key->len = key->buf.size;
 			ovfl_key = 1;
-		} else
-			WT_RET(__rec_cell_build_key(session, r,
-			    WT_IKEY_DATA(ikey), r->cell_zero ? 1 : ikey->size,
-			    1, &ovfl_key));
+		} else {
+			__wt_ref_key(page, ref, &p, &size);
+			WT_RET(__rec_cell_build_int_key(session, r,
+			    p, r->cell_zero ? 1 : size, &ovfl_key));
+		}
 		r->cell_zero = 0;
 
 		/*
@@ -3096,19 +3099,6 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 				onpage_ovfl = 0;
 			}
 			WT_RET(__rec_split(session, r));
-
-			/*
-			 * Turn off prefix compression until a full key written
-			 * to the new page, and (unless we're already working
-			 * with an overflow key), rebuild the key without prefix
-			 * compression.
-			 */
-			if (r->key_pfx_compress_conf) {
-				r->key_pfx_compress = 0;
-				if (!ovfl_key)
-					WT_RET(__rec_cell_build_key(
-					    session, r, NULL, 0, 1, &ovfl_key));
-			}
 		}
 
 		/* Copy the key and value onto the page. */
@@ -3132,7 +3122,6 @@ __rec_row_merge(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 {
 	WT_ADDR *addr;
 	WT_CELL_UNPACK *vpack, _vpack;
-	WT_IKEY *ikey;
 	WT_KV *key, *val;
 	WT_PAGE *rp;
 	WT_REF *ref;
@@ -3213,9 +3202,9 @@ __rec_row_merge(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		 * Build the key cell.
 		 * Truncate any 0th key, internal pages don't need 0th keys.
 		 */
-		ikey = ref->u.key;
-		WT_RET(__rec_cell_build_key(session, r, WT_IKEY_DATA(ikey),
-		    r->cell_zero ? 1 : ikey->size, 1, &ovfl_key));
+		__wt_ref_key(page, ref, &p, &size);
+		WT_RET(__rec_cell_build_int_key(session, r,
+		    p, r->cell_zero ? 1 : size, &ovfl_key));
 		r->cell_zero = 0;
 
 		/*
@@ -3227,19 +3216,6 @@ __rec_row_merge(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 				continue;
 			}
 			WT_RET(__rec_split(session, r));
-
-			/*
-			 * Turn off prefix compression until a full key written
-			 * to the new page, and (unless we're already working
-			 * with an overflow key), rebuild the key without prefix
-			 * compression.
-			 */
-			if (r->key_pfx_compress_conf) {
-				r->key_pfx_compress = 0;
-				if (!ovfl_key)
-					WT_RET(__rec_cell_build_key(
-					    session, r, NULL, 0, 1, &ovfl_key));
-			}
 		}
 
 		/* Copy the key and value onto the page. */
@@ -3383,7 +3359,7 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 			 * might read the original value.
 			 */
 			if (val_cell != NULL && unpack->ovfl) {
-				WT_ERR(__wt_rec_track_onpage_addr(
+				WT_ERR(__wt_ovfl_onpage_add(
 				    session, page, unpack->data, unpack->size));
 				WT_ERR(__wt_val_ovfl_cache(
 				    session, page, rip, unpack));
@@ -3406,9 +3382,10 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 				__wt_cell_unpack(cell, unpack);
 				if (unpack->ovfl) {
 					if (ikey == NULL)
-						WT_ERR(__wt_row_key_copy(
-						    session, page, rip, NULL));
-					WT_ERR(__wt_rec_track_onpage_addr(
+						WT_ERR(__wt_row_leaf_key_work(
+						    session,
+						    page, rip, NULL, 1));
+					WT_ERR(__wt_ovfl_onpage_add(
 					    session, page,
 					    unpack->data, unpack->size));
 				}
@@ -3449,8 +3426,7 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 		__wt_cell_unpack(cell, unpack);
 		onpage_ovfl = unpack->ovfl;
 		if (onpage_ovfl &&
-		    __wt_rec_track_onpage_srch(
-		    page, unpack->data, unpack->size)) {
+		    __wt_ovfl_onpage_search(page, unpack->data, unpack->size)) {
 			onpage_ovfl = 0;
 			WT_ASSERT(session, ikey != NULL);
 		}
@@ -3523,11 +3499,11 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 				    unpack->data, unpack->size);
 				tmpkey->size = unpack->prefix + unpack->size;
 			} else
-				WT_ERR(__wt_row_key_copy(
+				WT_ERR(__wt_row_leaf_key_copy(
 				    session, page, rip, tmpkey));
 
-			WT_ERR(__rec_cell_build_key(session, r,
-			    tmpkey->data, tmpkey->size, 0, &ovfl_key));
+			WT_ERR(__rec_cell_build_leaf_key(session, r,
+			    tmpkey->data, tmpkey->size, &ovfl_key));
 		}
 
 		/*
@@ -3547,7 +3523,7 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 			 */
 			if (onpage_ovfl) {
 				WT_ERR(__wt_cell_unpack_copy(
-				    session, unpack, r->cur));
+				    session, WT_PAGE_ROW_LEAF, unpack, r->cur));
 				onpage_ovfl = 0;
 			}
 			WT_ERR(__rec_split(session, r));
@@ -3561,8 +3537,8 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 			if (r->key_pfx_compress_conf) {
 				r->key_pfx_compress = 0;
 				if (!ovfl_key)
-					WT_ERR(__rec_cell_build_key(
-					    session, r, NULL, 0, 0, &ovfl_key));
+					WT_ERR(__rec_cell_build_leaf_key(
+					    session, r, NULL, 0, &ovfl_key));
 			}
 		}
 
@@ -3617,8 +3593,9 @@ __rec_row_leaf_insert(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins)
 			WT_RET(__rec_cell_build_val(session, r,
 			    WT_UPDATE_DATA(upd), upd->size, (uint64_t)0));
 
-		WT_RET(__rec_cell_build_key(session, r,	/* Build key cell. */
-		    WT_INSERT_KEY(ins), WT_INSERT_KEY_SIZE(ins), 0, &ovfl_key));
+							/* Build key cell. */
+		WT_RET(__rec_cell_build_leaf_key(session, r,
+		    WT_INSERT_KEY(ins), WT_INSERT_KEY_SIZE(ins), &ovfl_key));
 
 		/*
 		 * Boundary: split or write the page.
@@ -3639,8 +3616,8 @@ __rec_row_leaf_insert(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins)
 			if (r->key_pfx_compress_conf) {
 				r->key_pfx_compress = 0;
 				if (!ovfl_key)
-					WT_RET(__rec_cell_build_key(
-					    session, r, NULL, 0, 0, &ovfl_key));
+					WT_RET(__rec_cell_build_leaf_key(
+					    session, r, NULL, 0, &ovfl_key));
 			}
 		}
 
@@ -3666,28 +3643,28 @@ __rec_row_leaf_insert(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins)
 static int
 __rec_split_discard(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
+	WT_BM *bm;
 	WT_PAGE_MODIFY *mod;
 	WT_REF *ref;
 	uint32_t i;
 
+	bm = S2BT(session)->bm;
+
 	/*
 	 * A page that split is being reconciled for the second, or subsequent
-	 * time; discard any the underlying block space or overflow items used
-	 * in the previous reconciliation.
+	 * time; discard the underlying block space and overflow items used in
+	 * the previous reconciliation.
 	 *
 	 * This routine would be trivial, and only walk a single page freeing
 	 * any blocks that were written to support the split -- the problem is
 	 * root splits.  In the case of root splits, we potentially have to
-	 * cope with the underlying blocks of multiple pages, but also there
-	 * may be overflow items that we have to resolve.
-	 *
-	 * These pages are discarded -- add them to the object tracking list.
+	 * cope with the underlying sets of multiple pages.
 	 */
 	WT_REF_FOREACH(page, ref, i)
-		WT_RET(__wt_rec_track(session, page,
+		WT_RET(bm->free(bm, session,
 		    ((WT_ADDR *)ref->addr)->addr,
-		    ((WT_ADDR *)ref->addr)->size, NULL, 0, 0));
-	WT_RET(__wt_rec_track_wrapup(session, page));
+		    ((WT_ADDR *)ref->addr)->size));
+	WT_RET(__wt_ovfl_track_wrapup(session, page));
 
 	if ((mod = page->modify) != NULL)
 		switch (F_ISSET(mod, WT_PM_REC_MASK)) {
@@ -3763,12 +3740,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		if (ref->addr != NULL) {
 			/*
 			 * Free the page and clear the address (so we don't free
-			 * it twice).  Logically, this is the same as adding the
-			 * address to the reconciliation tracking information
-			 * and freeing it when reconciliation ends as part of
-			 * cleaning up the track information, but that is going
-			 * to happen right at the end of this switch statement,
-			 * might as well save the work.
+			 * it twice).
 			 */
 			__wt_get_addr(page->parent, ref, &addr, &size);
 			WT_RET(bm->free(bm, session, addr, size));
@@ -3790,9 +3762,8 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		 * are checkpoints, and must be explicitly dropped.
 		 */
 		if (!WT_PAGE_IS_ROOT(page))
-			WT_RET(__wt_rec_track(session, page,
-			    mod->u.replace.addr, mod->u.replace.size,
-			    NULL, 0, 0));
+			WT_RET(bm->free(bm, session,
+			    mod->u.replace.addr, mod->u.replace.size));
 
 		/* Discard the replacement page's address. */
 		__wt_free(session, mod->u.replace.addr);
@@ -3816,13 +3787,13 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	F_CLR(mod, WT_PM_REC_MASK);
 
 	/*
-	 * Wrap up discarded block and overflow tracking.  If we are about to
-	 * create a checkpoint, the system must be entirely consistent at that
-	 * point, the underlying block manager is presumably going to do some
-	 * action to resolve the list of allocated/free/whatever blocks that
-	 * are associated with the checkpoint.
+	 * Wrap up overflow tracking.  If we are about to create a checkpoint,
+	 * the system must be entirely consistent at that point (the underlying
+	 * block manager is presumably going to do some action to resolve the
+	 * list of allocated/free/whatever blocks that are associated with the
+	 * checkpoint).
 	 */
-	WT_RET(__wt_rec_track_wrapup(session, page));
+	WT_RET(__wt_ovfl_track_wrapup(session, page));
 
 	switch (r->bnd_next) {
 	case 0:						/* Page delete */
@@ -3872,7 +3843,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		switch (page->type) {
 		case WT_PAGE_COL_INT:
 		case WT_PAGE_ROW_INT:
-			WT_DSTAT_INCR(session, rec_split_intl);
+			WT_DSTAT_INCR(session, rec_split_internal);
 			break;
 		case WT_PAGE_COL_FIX:
 		case WT_PAGE_COL_VAR:
@@ -3924,14 +3895,14 @@ err:			__wt_scr_free(&tkey);
 		switch (page->type) {
 		case WT_PAGE_ROW_INT:
 		case WT_PAGE_ROW_LEAF:
-			WT_RET(
-			    __rec_split_row(session, r, page, &mod->u.split));
+			WT_RET(__rec_split_row(
+			    session, r, page, &mod->u.split));
 			break;
 		case WT_PAGE_COL_INT:
 		case WT_PAGE_COL_FIX:
 		case WT_PAGE_COL_VAR:
-			WT_RET(
-			    __rec_split_col(session, r, page, &mod->u.split));
+			WT_RET(__rec_split_col(
+			    session, r, page, &mod->u.split));
 			break;
 		WT_ILLEGAL_VALUE(session);
 		}
@@ -3992,7 +3963,7 @@ __rec_write_wrapup_err(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	 * tree.  This is not a question of correctness, we're avoiding block
 	 * leaks.
 	 */
-	WT_TRET(__wt_rec_track_wrapup_err(session, page));
+	WT_TRET(__wt_ovfl_track_wrapup_err(session, page));
 	for (bnd = r->bnd, i = 0; i < r->bnd_next; ++bnd, ++i)
 		if (bnd->addr.addr != NULL) {
 			WT_TRET(bm->free(
@@ -4026,7 +3997,6 @@ __rec_split_merge_new(WT_SESSION_IMPL *session,
 		page->u.intl.recno = r->bnd[0].recno;
 	page->read_gen = WT_READ_GEN_NOTSET;
 	page->entries = r->bnd_next;
-	page->flags_atomic = WT_PAGE_DISK_NOT_ALLOC;
 
 	/*
 	 * We don't re-write parent pages when child pages split, which means
@@ -4064,11 +4034,11 @@ __rec_split_row(
 	WT_ADDR *addr;
 	WT_BOUNDARY *bnd;
 	WT_DECL_RET;
-	WT_IKEY *ikey;
 	WT_PAGE *page;
 	WT_REF *ref;
 	size_t size;
-	uint32_t i;
+	uint32_t i, ksize;
+	void *p;
 
 	/* Allocate a split-merge page. */
 	WT_ERR(__rec_split_merge_new(session, r, orig, &page, WT_PAGE_ROW_INT));
@@ -4112,9 +4082,8 @@ __rec_split_row(
 	if (WT_PAGE_IS_ROOT(orig))
 		WT_ERR(__wt_buf_set(session, &r->bnd[0].key, "", 1));
 	else {
-		ikey = orig->ref->u.key;
-		WT_ERR(__wt_buf_set(
-		    session, &r->bnd[0].key, WT_IKEY_DATA(ikey), ikey->size));
+		__wt_ref_key(orig->parent, orig->ref, &p, &ksize);
+		WT_ERR(__wt_buf_set(session, &r->bnd[0].key, p, ksize));
 	}
 
 	/* Enter each split child page into the new internal page. */
@@ -4128,7 +4097,7 @@ __rec_split_row(
 
 		ref->page = NULL;
 		WT_ERR(__wt_row_ikey(session, 0,
-		    bnd->key.data, bnd->key.size, &ref->u.key));
+		    bnd->key.data, bnd->key.size, &ref->key.ikey));
 		size += sizeof(WT_IKEY) + bnd->key.size;
 		ref->addr = addr;
 		ref->state = WT_REF_DISK;
@@ -4170,7 +4139,7 @@ __rec_split_col(
 		bnd->addr.addr = NULL;
 
 		ref->page = NULL;
-		ref->u.recno = bnd->recno;
+		ref->key.recno = bnd->recno;
 		ref->addr = addr;
 		ref->state = WT_REF_DISK;
 	}
@@ -4186,13 +4155,49 @@ err:	if (page != NULL)
 }
 
 /*
- * __rec_cell_build_key --
+ * __rec_cell_build_int_key --
  *	Process a key and return a WT_CELL structure and byte string to be
- * stored on the page.
+ * stored on a row-store internal page.
  */
 static int
-__rec_cell_build_key(WT_SESSION_IMPL *session, WT_RECONCILE *r,
-    const void *data, uint32_t size, int is_internal, int *is_ovflp)
+__rec_cell_build_int_key(WT_SESSION_IMPL *session,
+    WT_RECONCILE *r, const void *data, uint32_t size, int *is_ovflp)
+{
+	WT_BTREE *btree;
+	WT_KV *key;
+
+	*is_ovflp = 0;
+
+	btree = S2BT(session);
+	key = &r->k;
+
+	/* Copy the bytes into the "current" and key buffers. */
+	WT_RET(__wt_buf_set(session, r->cur, data, size));
+	WT_RET(__wt_buf_set(session, &key->buf, data, size));
+
+	/* Create an overflow object if the data won't fit. */
+	if (size > btree->maxintlitem) {
+		WT_DSTAT_INCR(session, rec_overflow_key_internal);
+
+		*is_ovflp = 1;
+		return (__rec_cell_build_ovfl(
+		    session, r, key, WT_CELL_KEY_OVFL, (uint64_t)0));
+	}
+
+	key->cell_len = __wt_cell_pack_int_key(&key->cell, key->buf.size);
+	key->len = key->cell_len + key->buf.size;
+
+	return (0);
+}
+
+/*
+ * __rec_cell_build_leaf_key --
+ *	Process a key and return a WT_CELL structure and byte string to be
+ * stored on a row-store leaf page.
+ */
+static int
+__rec_cell_build_leaf_key(WT_SESSION_IMPL *session,
+    WT_RECONCILE *r, const void *data, uint32_t size, int *is_ovflp)
 {
 	WT_BTREE *btree;
 	WT_KV *key;
@@ -4225,10 +4230,13 @@ __rec_cell_build_key(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 		 * Do prefix compression on the key.  We know by definition the
 		 * previous key sorts before the current key, which means the
 		 * keys must differ and we just need to compare up to the
-		 * shorter of the two keys.   Also, we can't compress out more
-		 * than 256 bytes, limit the comparison to that.
+		 * shorter of the two keys.
 		 */
 		if (r->key_pfx_compress) {
+			/*
+			 * We can't compress out more than 256 bytes, limit the
+			 * comparison to that.
+			 */
 			pfx_max = UINT8_MAX;
 			if (size < pfx_max)
 				pfx_max = size;
@@ -4237,6 +4245,14 @@ __rec_cell_build_key(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 			for (a = data, b = r->last->data; pfx < pfx_max; ++pfx)
 				if (*a++ != *b++)
 					break;
+
+			/*
+			 * Prefix compression may cost us CPU and memory when
+			 * the page is re-loaded, don't do it unless there's
+			 * reasonable gain.
+			 */
+			if (pfx < btree->prefix_compression_min)
+				pfx = 0;
 		}
 
 		/* Copy the non-prefix bytes into the key buffer. */
@@ -4244,30 +4260,29 @@ __rec_cell_build_key(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 		    session, &key->buf, (uint8_t *)data + pfx, size - pfx));
 	}
 
-	/* Optionally compress the value using the Huffman engine. */
+	/* Optionally compress the key using the Huffman engine. */
 	if (btree->huffman_key != NULL)
 		WT_RET(__wt_huffman_encode(session, btree->huffman_key,
 		    key->buf.data, key->buf.size, &key->buf));
 
 	/* Create an overflow object if the data won't fit. */
-	if (key->buf.size >
-	    (is_internal ? btree->maxintlitem : btree->maxleafitem)) {
+	if (key->buf.size > btree->maxleafitem) {
 		/*
 		 * Overflow objects aren't prefix compressed -- rebuild any
 		 * object that was prefix compressed.
 		 */
 		if (pfx == 0) {
-			WT_DSTAT_INCR(session, rec_ovfl_key);
+			WT_DSTAT_INCR(session, rec_overflow_key_leaf);
 
 			*is_ovflp = 1;
 			return (__rec_cell_build_ovfl(
 			    session, r, key, WT_CELL_KEY_OVFL, (uint64_t)0));
 		}
-		return (__rec_cell_build_key(
-		    session, r, NULL, 0, is_internal, is_ovflp));
+		return (
+		    __rec_cell_build_leaf_key(session, r, NULL, 0, is_ovflp));
 	}
 
-	key->cell_len = __wt_cell_pack_key(&key->cell, pfx, key->buf.size);
+	key->cell_len = __wt_cell_pack_leaf_key(&key->cell, pfx, key->buf.size);
 	key->len = key->cell_len + key->buf.size;
 
 	return (0);
@@ -4338,7 +4353,7 @@ __rec_cell_build_val(WT_SESSION_IMPL *session,
 
 		/* Create an overflow object if the data won't fit. */
 		if (val->buf.size > btree->maxleafitem) {
-			WT_DSTAT_INCR(session, rec_ovfl_value);
+			WT_DSTAT_INCR(session, rec_overflow_value);
 
 			return (__rec_cell_build_ovfl(
 			    session, r, val, WT_CELL_VALUE_OVFL, rle));
@@ -4366,7 +4381,6 @@ __rec_cell_build_ovfl(WT_SESSION_IMPL *session,
 	WT_PAGE_HEADER *dsk;
 	size_t alloc_size;
 	uint32_t size;
-	int found;
 	uint8_t *addr, buf[WT_BTREE_MAX_ADDR_COOKIE];
 
 	btree = S2BT(session);
@@ -4380,9 +4394,8 @@ __rec_cell_build_ovfl(WT_SESSION_IMPL *session,
 	 * See if this overflow record has already been written and reuse it if
 	 * possible.  Else, write a new overflow record.
 	 */
-	WT_RET(__wt_rec_track_ovfl_reuse(
-	    session, page, kv->buf.data, kv->buf.size, &addr, &size, &found));
-	if (!found) {
+	if (!__wt_ovfl_reuse_search(session, page,
+	    &addr, &size, kv->buf.data, kv->buf.size)) {
 		/* Allocate a buffer big enough to write the overflow record. */
 		alloc_size = kv->buf.size;
 		WT_RET(bm->write_size(bm, session, &alloc_size));
@@ -4404,8 +4417,8 @@ __rec_cell_build_ovfl(WT_SESSION_IMPL *session,
 		WT_ERR(__wt_bt_write(session, tmp, addr, &size, 0, 0));
 
 		/* Track the overflow record. */
-		WT_ERR(__wt_rec_track(session, page,
-		    addr, size, kv->buf.data, kv->buf.size, WT_TRK_INUSE));
+		WT_ERR(__wt_ovfl_reuse_add(session, page,
+		    addr, size, kv->buf.data, kv->buf.size));
 	}
 
 	/* Set the callers K/V to reference the overflow record's address. */
@@ -4442,19 +4455,25 @@ __rec_dictionary_skip_search(WT_DICTIONARY **head, uint64_t hash)
 	 * Start at the highest skip level, then go as far as possible at each
 	 * level before stepping down to the next.
 	 */
-	for (i = WT_SKIP_MAXDEPTH - 1, e = &head[i]; i >= 0;)
-		if (*e == NULL) {
+	for (i = WT_SKIP_MAXDEPTH - 1, e = &head[i]; i >= 0;) {
+		if (*e == NULL) {		/* Empty levels */
 			--i;
 			--e;
-		} else {
-			if ((*e)->hash == hash)
-				return (*e);
-			if ((*e)->hash > hash)
-				return (NULL);
-			e = &(*e)->next[i];
+			continue;
 		}
 
-	/* NOTREACHED */
+		/*
+		 * Return any exact matches: we don't care in what search level
+		 * we found a match.
+		 */
+		if ((*e)->hash == hash)		/* Exact match */
+			return (*e);
+		if ((*e)->hash > hash) {	/* Drop down a level */
+			--i;
+			--e;
+		} else				/* Keep going at this level */
+			e = &(*e)->next[i];
+	}
 	return (NULL);
 }
 
@@ -4474,10 +4493,10 @@ __rec_dictionary_skip_search_stack(
 	 * level before stepping down to the next.
 	 */
 	for (i = WT_SKIP_MAXDEPTH - 1, e = &head[i]; i >= 0;)
-		if (*e == NULL || (*e)->hash >= hash)
-			stack[i--] = e--;
+		if (*e == NULL || (*e)->hash > hash)
+			stack[i--] = e--;	/* Drop down a level */
 		else
-			e = &(*e)->next[i];
+			e = &(*e)->next[i];	/* Keep going at this level */
 }
 
 /*

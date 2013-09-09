@@ -68,8 +68,6 @@ extern WT_EXTENSION_API *wt_api;
 #define	LZO_PATH	".libs/lzo_compress.so"
 #define	RAW_PATH	".libs/raw_compress.so"
 
-#define	MEMRATA_DEVICE	"kvs_devices=[/dev/loop0]"
-
 #define	M(v)		((v) * 1000000)		/* Million */
 #define	UNUSED(var)	(void)(var)		/* Quiet unused var warnings */
 
@@ -109,7 +107,16 @@ typedef struct {
 	int threads_finished;			/* Operations completed */
 
 	pthread_rwlock_t backup_lock;		/* Hot backup running */
-	pthread_rwlock_t table_extend_lock;	/* Updating last record */
+
+	/*
+	 * We have a list of records that are appended, but not yet "resolved",
+	 * that is, we haven't yet incremented the g.rows value to reflect the
+	 * new records.
+	 */
+	uint64_t *append;			/* Appended records */
+	size_t    append_max;			/* Maximum unresolved records */
+	size_t	  append_cnt;			/* Current unresolved records */
+	pthread_rwlock_t append_lock;		/* Single-thread resolution */
 
 	char *uri;				/* Object name */
 
@@ -153,6 +160,7 @@ typedef struct {
 	u_int c_rows;
 	u_int c_runs;
 	u_int c_split_pct;
+	u_int c_statistics;
 	u_int c_threads;
 	u_int c_value_max;
 	u_int c_value_min;
@@ -161,30 +169,27 @@ typedef struct {
 	uint64_t key_cnt;			/* Keys loaded so far */
 	uint64_t rows;				/* Total rows */
 
-	/*
-	 * We don't want to get to far past the end of the original bulk
-	 * load, we can run out of space to track the added records.
-	 */
-#define	MAX_EXTEND	(g.c_threads * 3)
-	uint32_t extend;			/* Total extended slots */
-
 	uint16_t key_rand_len[1031];		/* Key lengths */
 } GLOBAL;
 extern GLOBAL g;
 
 typedef struct {
-	uint64_t search;
+	uint64_t search;			/* operations */
 	uint64_t insert;
 	uint64_t update;
 	uint64_t remove;
 
-	int       id;					/* simple thread ID */
-	pthread_t tid;					/* thread ID */
+	uint64_t commit;			/* transaction resolution */
+	uint64_t rollback;
+	uint64_t deadlock;
 
-#define	TINFO_RUNNING	1				/* Running */
-#define	TINFO_COMPLETE	2				/* Finished */
-#define	TINFO_JOINED	3				/* Resolved */
-	volatile int state;				/* state */
+	int       id;				/* simple thread ID */
+	pthread_t tid;				/* thread ID */
+
+#define	TINFO_RUNNING	1			/* Running */
+#define	TINFO_COMPLETE	2			/* Finished */
+#define	TINFO_JOINED	3			/* Resolved */
+	volatile int state;			/* state */
 } TINFO;
 
 void	 bdb_close(void);
@@ -206,7 +211,6 @@ void	*hot_backup(void *);
 void	 key_len_setup(void);
 void	 key_gen_setup(uint8_t **);
 void	 key_gen(uint8_t *, uint32_t *, uint64_t, int);
-char	*oc_conf(char *, size_t, const char *);
 void	 syserr(const char *);
 void	 track(const char *, uint64_t, TINFO *);
 void	 val_gen_setup(uint8_t **);

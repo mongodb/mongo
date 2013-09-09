@@ -1,5 +1,28 @@
 /*! @page upgrading Upgrading WiredTiger applications
 
+@section version_164 Upgrading to Version 1.6.4
+<dl>
+
+<dt>File format changes</dt>
+<dd>
+The underlying file formats changed in the 1.6.4 release; tables and files
+should be dumped and re-loaded into a new database.
+</dd>
+
+<dt>wt utility load command</dt>
+<dd>
+The default behavior of the \c wt utility's \c load command has been
+changed to overwrite existing data, by default, and the \c -o flag to
+the \c load command (overwrite existing data) has been replaced with the
+\c -n flag (do not overwrite existing data).   Applications requiring
+the previous default behavior of not overwriting existing data should
+add the \c -n option to their command line configuration; applications
+previously using the \c -o option on their command line configurations
+should remove it.
+</dd>
+
+</dl>
+<hr>
 @section version_163 Upgrading to Version 1.6.3
 <dl>
 
@@ -28,6 +51,13 @@ previously exist.
 <b>This is a potentially serious API change that will not be detected by
 compilation.</b>  Application cursors should be reviewed to confirm they are
 configured for the desired behavior.
+</dd>
+
+<dt>::wiredtiger_open no longer accepts a \c transactional configuration</dt>
+<dd>
+The \c transactional configuration key has been removed from
+::wiredtiger_open.  Any application setting it should simply remove it,
+no change in application behavior is needed.
 </dd>
 
 </dl>

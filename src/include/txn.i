@@ -17,9 +17,6 @@ __wt_txn_modify(WT_SESSION_IMPL *session, uint64_t *id)
 {
 	WT_TXN *txn;
 
-	if (!F_ISSET(S2C(session), WT_CONN_TRANSACTIONAL))
-		return (0);
-
 	txn = &session->txn;
 	WT_ASSERT(session, F_ISSET(txn, TXN_RUNNING));
 	WT_RET(__wt_realloc_def(
@@ -38,9 +35,6 @@ static inline int
 __wt_txn_modify_ref(WT_SESSION_IMPL *session, WT_REF *ref)
 {
 	WT_TXN *txn;
-
-	if (!F_ISSET(S2C(session), WT_CONN_TRANSACTIONAL))
-		return (0);
 
 	txn = &session->txn;
 	WT_ASSERT(session, F_ISSET(txn, TXN_RUNNING));
@@ -62,9 +56,6 @@ static inline void
 __wt_txn_unmodify(WT_SESSION_IMPL *session)
 {
 	WT_TXN *txn;
-
-	if (!F_ISSET(S2C(session), WT_CONN_TRANSACTIONAL))
-		return;
 
 	txn = &session->txn;
 	if (F_ISSET(txn, TXN_RUNNING)) {
@@ -106,7 +97,7 @@ __wt_txn_visible(WT_SESSION_IMPL *session, uint64_t id)
 	 * schema and metadata locks) to protect access to in-flight updates.
 	 */
 	if (txn->isolation == TXN_ISO_READ_UNCOMMITTED ||
-	    S2BT(session) == session->metafile)
+	    S2BT_SAFE(session) == session->metafile)
 		return (1);
 
 	/*

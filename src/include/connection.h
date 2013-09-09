@@ -60,6 +60,11 @@ struct __wt_named_data_source {
 #define	WT_NUM_INTERNAL_SESSIONS	2
 
 /*
+ * Periodically clear out unused dhandles from the connection list.
+ */
+#define	CONN_DHANDLE_SWEEP_TRIGGER	10
+
+/*
  * WT_CONNECTION_IMPL --
  *	Implementation of WT_CONNECTION
  */
@@ -85,8 +90,6 @@ struct __wt_connection_impl {
 	const char *error_prefix;	/* Database error prefix */
 	int is_new;			/* Connection created database */
 
-	int connection_initialized;	/* Connection is initialized */
-
 	WT_EXTENSION_API extension_api;	/* Extension API */
 
 					/* Configuration */
@@ -101,6 +104,8 @@ struct __wt_connection_impl {
 	pthread_t cache_evict_tid;	/* Eviction server thread ID */
 	int	  cache_evict_tid_set;	/* Eviction server thread ID set */
 
+	int32_t	dhandle_dead;		/* Not locked: dead dhandles seen */
+	WT_SPINLOCK dhandle_lock;	/* Locked: dhandle sweep */
 					/* Locked: data handle list */
 	TAILQ_HEAD(__wt_dhandle_qh, __wt_data_handle) dhqh;
 					/* Locked: LSM handle list. */
@@ -167,7 +172,16 @@ struct __wt_connection_impl {
 	const char	*stat_stamp;	/* Statistics log entry timestamp */
 	long		 stat_usecs;	/* Statistics log period */
 
-	WT_FH	   *log_fh;		/* Logging file handle */
+	int		 logging;	/* Global logging configuration */
+	int		 archive;	/* Global archive configuration */
+	WT_CONDVAR	*arch_cond;	/* Log archive wait mutex */
+	WT_SESSION_IMPL *arch_session;	/* Log archive session */
+	pthread_t	 arch_tid;	/* Log archive thread */
+	int		 arch_tid_set;	/* Log archive thread set */
+	WT_LOG		*log;		/* Logging structure */
+	off_t		log_file_max;	/* Log file max size */
+	const char	*log_path;	/* Logging path format */
+	uint32_t	txn_logsync;	/* Log sync configuration */
 
 					/* Locked: collator list */
 	TAILQ_HEAD(__wt_coll_qh, __wt_named_collator) collqh;

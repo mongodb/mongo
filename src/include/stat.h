@@ -148,6 +148,7 @@ struct __wt_dsrc_stats {
 	WT_STATS cache_eviction_merge;
 	WT_STATS cache_eviction_merge_fail;
 	WT_STATS cache_eviction_merge_levels;
+	WT_STATS cache_inmem_split;
 	WT_STATS cache_overflow_value;
 	WT_STATS cache_read;
 	WT_STATS cache_read_overflow;
@@ -176,20 +177,20 @@ struct __wt_dsrc_stats {
 	WT_STATS lsm_generation_max;
 	WT_STATS lsm_lookup_no_bloom;
 	WT_STATS rec_dictionary;
-	WT_STATS rec_ovfl_key;
-	WT_STATS rec_ovfl_value;
+	WT_STATS rec_overflow_key_internal;
+	WT_STATS rec_overflow_key_leaf;
+	WT_STATS rec_overflow_value;
 	WT_STATS rec_page_delete;
 	WT_STATS rec_page_merge;
 	WT_STATS rec_pages;
 	WT_STATS rec_pages_eviction;
 	WT_STATS rec_skipped_update;
-	WT_STATS rec_split_intl;
+	WT_STATS rec_split_internal;
 	WT_STATS rec_split_leaf;
 	WT_STATS rec_split_max;
 	WT_STATS session_compact;
 	WT_STATS session_cursor_open;
 	WT_STATS txn_update_conflict;
-	WT_STATS txn_write_conflict;
 };
 
 /*
@@ -219,6 +220,7 @@ struct __wt_connection_stats {
 	WT_STATS cache_eviction_merge_levels;
 	WT_STATS cache_eviction_slow;
 	WT_STATS cache_eviction_walk;
+	WT_STATS cache_inmem_split;
 	WT_STATS cache_pages_dirty;
 	WT_STATS cache_pages_inuse;
 	WT_STATS cache_read;
@@ -233,7 +235,27 @@ struct __wt_connection_stats {
 	WT_STATS cursor_search;
 	WT_STATS cursor_search_near;
 	WT_STATS cursor_update;
+	WT_STATS dh_conn_handles;
+	WT_STATS dh_evict_locks;
+	WT_STATS dh_session_handles;
+	WT_STATS dh_sweep_evict;
+	WT_STATS dh_sweeps;
 	WT_STATS file_open;
+	WT_STATS log_bytes_user;
+	WT_STATS log_bytes_written;
+	WT_STATS log_max_filesize;
+	WT_STATS log_reads;
+	WT_STATS log_scan_records;
+	WT_STATS log_scan_rereads;
+	WT_STATS log_scans;
+	WT_STATS log_slot_closes;
+	WT_STATS log_slot_consolidated;
+	WT_STATS log_slot_joins;
+	WT_STATS log_slot_races;
+	WT_STATS log_slot_toobig;
+	WT_STATS log_slot_transitions;
+	WT_STATS log_sync;
+	WT_STATS log_writes;
 	WT_STATS lsm_rows_merged;
 	WT_STATS memory_allocation;
 	WT_STATS memory_free;

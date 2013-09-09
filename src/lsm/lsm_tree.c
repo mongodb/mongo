@@ -619,6 +619,7 @@ __wt_lsm_tree_switch(
 
 	WT_ERR(__wt_calloc_def(session, 1, &chunk));
 	chunk->id = new_id;
+	chunk->txnid_max = WT_TXN_NONE;
 	lsm_tree->chunk[lsm_tree->nchunks++] = chunk;
 	WT_ERR(__wt_lsm_tree_setup_chunk(session, lsm_tree, chunk));
 

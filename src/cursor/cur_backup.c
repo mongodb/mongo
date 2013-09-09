@@ -41,7 +41,7 @@ __curbackup_next(WT_CURSOR *cursor)
 	cb->iface.key.size = WT_STORE_SIZE(strlen(cb->list[cb->next].name) + 1);
 	++cb->next;
 
-	F_SET(cursor, WT_CURSTD_KEY_RET);
+	F_SET(cursor, WT_CURSTD_KEY_INT);
 
 err:	API_END(session);
 	return (ret);
@@ -135,6 +135,8 @@ __wt_curbackup_open(WT_SESSION_IMPL *session,
 	WT_CURSOR_BACKUP *cb;
 	WT_DECL_RET;
 
+	STATIC_ASSERT(offsetof(WT_CURSOR_BACKUP, iface) == 0);
+
 	cb = NULL;
 
 	WT_RET(__wt_calloc_def(session, 1, &cb));
@@ -148,13 +150,12 @@ __wt_curbackup_open(WT_SESSION_IMPL *session,
 
 	/*
 	 * Start the backup and fill in the cursor's list.  Acquire the schema
-	 * lock, we need a consistent view when reading creating a copy.
+	 * lock, we need a consistent view when creating a copy.
 	 */
 	WT_WITH_SCHEMA_LOCK(session, ret = __backup_start(session, cb, cfg));
 	WT_ERR(ret);
 
 	/* __wt_cursor_init is last so we don't have to clean up on error. */
-	STATIC_ASSERT(offsetof(WT_CURSOR_BACKUP, iface) == 0);
 	WT_ERR(__wt_cursor_init(cursor, uri, NULL, cfg, cursorp));
 
 	if (0) {
@@ -174,12 +175,16 @@ __backup_start(
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
+	u_int i, logcount;
 	int target_list;
+	char **logfiles;
 
 	conn = S2C(session);
 
 	cb->next = 0;
 	cb->list = NULL;
+	logfiles = NULL;
+	logcount = 0;
 
 	/*
 	 * Single thread hot backups: we're holding the schema lock, so we
@@ -220,6 +225,13 @@ __backup_start(
 	WT_ERR(__backup_list_append(session, cb, WT_METADATA_BACKUP));
 	WT_ERR(__backup_list_append(session, cb, WT_SINGLETHREAD));
 
+	/* Add log files if logging is on. */
+	if (conn->log) {
+		WT_ERR(__wt_log_getfiles(session, &logfiles, &logcount));
+		for (i = 0; i < logcount; i++)
+			WT_ERR(__backup_list_append(session, cb, logfiles[i]));
+	}
+
 	/* Close the hot backup file. */
 	ret = fclose(cb->bfp);
 	cb->bfp = NULL;
@@ -227,6 +239,8 @@ __backup_start(
 
 err:	if (cb->bfp != NULL)
 		WT_TRET(fclose(cb->bfp) == 0 ? 0 : __wt_errno());
+	if (logfiles != NULL)
+		__wt_log_files_free(session, logfiles, logcount);
 
 	if (ret != 0)
 		WT_TRET(__backup_stop(session));

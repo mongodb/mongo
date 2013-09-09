@@ -359,7 +359,7 @@ __wt_evict_page(WT_SESSION_IMPL *session, WT_PAGE *page)
 		    txn->snapshot != saved_txn.snapshot);
 		__wt_txn_destroy(session);
 	} else
-		__wt_txn_release_snapshot(session);
+		__wt_txn_release_evict_snapshot(session);
 
 	*txn = saved_txn;
 	return (ret);
@@ -711,6 +711,12 @@ __evict_walk(WT_SESSION_IMPL *session, u_int *entriesp, int clean)
 	 */
 	i = cache->evict_entries;
 	max_entries = i + WT_EVICT_WALK_INCR;
+	/*
+	 * Lock the dhandle list so sweeping cannot change the pointers out
+	 * from under us.
+	 */
+	__wt_spin_lock(session, &conn->dhandle_lock);
+	WT_CSTAT_INCR(session, dh_evict_locks);
 retry:	file_count = 0;
 	TAILQ_FOREACH(dhandle, &conn->dhqh, q) {
 		if (!WT_PREFIX_MATCH(dhandle->name, "file:") ||
@@ -754,6 +760,7 @@ retry:	file_count = 0;
 	/* Walk the files a few times if we don't find enough pages. */
 	if (ret == 0 && i < cache->evict_slots && retries++ < 10)
 		goto retry;
+	__wt_spin_unlock(session, &conn->dhandle_lock);
 
 	*entriesp = i;
 	return (ret);

@@ -43,8 +43,14 @@ main(int argc, char *argv[])
 	else
 		++g.progname;
 
+#if 0
+	/* Configure the GNU malloc for debugging. */
+	(void)setenv("MALLOC_CHECK_", "2", 1);
+#endif
+#if 0
 	/* Configure the FreeBSD malloc for debugging. */
-	(void)setenv("MALLOC_OPTIONS", "AJZ", 1);
+	(void)setenv("MALLOC_OPTIONS", "AJ", 1);
+#endif
 
 	/* Set values from the "CONFIG" file, if it exists. */
 	if (access("CONFIG", R_OK) == 0)
@@ -99,10 +105,10 @@ main(int argc, char *argv[])
 	 * Initialize locks to single-thread named checkpoints and hot backups
 	 * and to single-thread last-record updates.
 	 */
+	if ((ret = pthread_rwlock_init(&g.append_lock, NULL)) != 0)
+		die(ret, "pthread_rwlock_init: append lock");
 	if ((ret = pthread_rwlock_init(&g.backup_lock, NULL)) != 0)
 		die(ret, "pthread_rwlock_init: hot-backup lock");
-	if ((ret = pthread_rwlock_init(&g.table_extend_lock, NULL)) != 0)
-		die(ret, "pthread_rwlock_destroy: table_extend lock");
 
 	/* Clean up on signal. */
 	(void)signal(SIGINT, onint);
@@ -196,6 +202,12 @@ main(int argc, char *argv[])
 		(void)fclose(g.rand_log);
 
 	config_print(0);
+
+	if ((ret = pthread_rwlock_destroy(&g.append_lock)) != 0)
+		die(ret, "pthread_rwlock_destroy: append lock");
+	if ((ret = pthread_rwlock_destroy(&g.backup_lock)) != 0)
+		die(ret, "pthread_rwlock_destroy: hot-backup lock");
+
 	config_clear();
 
 	return (EXIT_SUCCESS);
