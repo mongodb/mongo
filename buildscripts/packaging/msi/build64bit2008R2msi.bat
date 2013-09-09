@@ -4,7 +4,7 @@ SET BINDIR=..\..\..\build\win32\64\mongo
 SET CLIENTLIBDIR=..\..\..\build\win32\64\client_build
 SET LICENSEDIR=..\..\..\distsrc
 SET EDITION=Standard
-SET FLAVOR=2008
+SET FLAVOR=2008R2Plus
 :loop
 IF NOT "%1"=="" (
     IF "%1"=="-version" (

@@ -1,26 +1,33 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
-  <Product Id="8F757837-F5C4-4A3F-91BC-63AB57C4AFD6" 
+  <Product Id="$(var.ProductId)" 
            Name="!(wix.ProductName)" 
            Language="1033" 
            Version="$(var.MongoDBVersion)" 
            Manufacturer="MongoDB" 
-           UpgradeCode="14BECF68-7026-4AAB-8E16-7678ABC6B5F7">
+           UpgradeCode="$(var.UpgradeCode)">
 
-    <?if $(var.Platform) = x64 ?>
-  		<Package InstallerVersion="200" Compressed="yes" Platform="x64"/>
-      <WixVariable Id="ProductName" Value="MongoDB $(var.MongoDBVersion) (64 bit)" />
+    <Package InstallerVersion="200" Compressed="yes" Platform="x64"/>
+    <WixVariable Id="InstallFolder" Value="MongoDB $(var.MongoDBVersion) $(var.Edition)"/>
+      
+    <?if $(var.Edition) = Enterprise ?>
+      <?if $(var.Flavor) = 2008R2Plus?>
+        <WixVariable Id="ProductName" Value="MongoDB $(var.MongoDBVersion) $(var.Flavor) Enterprise (64 bit)" />
+      <?else?>
+        <WixVariable Id="ProductName" Value="MongoDB $(var.MongoDBVersion) Enterprise (64 bit)" />
+      <?endif?>
     <?else?>
-  		<Package InstallerVersion="200" Compressed="yes" />
-      <WixVariable Id="ProductName" Value="MongoDB $(var.MongoDBVersion)" />
+      <?if $(var.Flavor) = 2008R2Plus?>
+        <WixVariable Id="ProductName" Value="MongoDB $(var.MongoDBVersion) $(var.Flavor) (64 bit)" />
+      <?else?>
+        <WixVariable Id="ProductName" Value="MongoDB $(var.MongoDBVersion) (64 bit)" />
+      <?endif?>
     <?endif?>
 	
-	<Directory Id="TARGETDIR" Name="SourceDir">
+	  <Directory Id="TARGETDIR" Name="SourceDir">
       <Directory Id="ProgramFiles64Folder">
-        <Directory Id="MONGODB" Name="MongoDB">
-          <Directory Id="INSTALLLOCATION" Name="$(var.MongoDBVersion)">
-            <Directory Id="BIN" Name="bin" />
-          </Directory>
+        <Directory Id="INSTALLLOCATION" Name="!(wix.InstallFolder)">
+          <Directory Id="BIN" Name="bin" />
         </Directory>
       </Directory>
     </Directory>

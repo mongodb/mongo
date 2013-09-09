@@ -161,3 +161,7 @@ src/third_party/v8/src/libraries.cc
 src/mongo/buildinfo.cpp
 buildinfo.cpp
 /.settings/
+
+*.msi
+*.wixobj
+*.wixpdb

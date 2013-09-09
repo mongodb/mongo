@@ -13,12 +13,18 @@
                  Level ="1">
           <ComponentRef Id="c_mongod"/>
           <ComponentRef Id="c_mongodPdb"/>
+          <?if $(var.Edition) = Enterprise ?>
+            <ComponentGroupRef Id="cg_EnterpriseServer" />
+          <?endif ?>
         </Feature>
         <Feature Id="Client"
                  Title ="Client"
                  Description="The MongoDB client/shell (mongo)"
                  Level ="1">
           <ComponentRef Id="c_mongo"/>
+          <?if $(var.Edition) = Enterprise ?>
+            <ComponentGroupRef Id="cg_EnterpriseBase" />
+          <?endif ?>
         </Feature>
         <Feature Id="MonitoringTools"
                  Title ="Monitoring Tools"
@@ -26,6 +32,9 @@
                  Level ="1">
           <ComponentRef Id="c_mongostat"/>
           <ComponentRef Id="c_mongotop"/>
+          <?if $(var.Edition) = Enterprise ?>
+            <ComponentGroupRef Id="cg_EnterpriseBase" />
+          <?endif ?>
         </Feature>
         <Feature Id="ImportExportTools"
                  Title ="Import/Export Tools"
@@ -35,6 +44,9 @@
           <ComponentRef Id="c_mongorestore"/>
           <ComponentRef Id="c_mongoexport"/>
           <ComponentRef Id="c_mongoimport"/>
+          <?if $(var.Edition) = Enterprise ?>
+            <ComponentGroupRef Id="cg_EnterpriseBase" />
+          <?endif ?>
         </Feature>
         <Feature Id="Router"
                  Title ="Router"
@@ -42,6 +54,9 @@
                  Level ="1000">
           <ComponentRef Id="c_mongos"/>
           <ComponentRef Id="c_mongosPdb"/>
+          <?if $(var.Edition) = Enterprise ?>
+            <ComponentGroupRef Id="cg_EnterpriseBase" />
+          <?endif ?>
         </Feature>     
         <Feature Id="MiscellaneousTools"
                 Title ="Miscellaneous Tools"
@@ -51,6 +66,21 @@
           <ComponentRef Id="c_mongofiles"/>
           <ComponentRef Id="c_mongooplog"/>
           <ComponentRef Id="c_mongoperf"/>
+          <?if $(var.Edition) = Enterprise ?>
+            <ComponentGroupRef Id="cg_EnterpriseBase" />
+          <?endif ?>
+        </Feature>
+        <Feature Id="CPlusPlusDriver"
+                Title ="C++ Driver"
+                Description="MongoDB C++ Driver"
+                Level ="1000">
+          <ComponentRef Id="c_mongoclientlib"/>
+          <ComponentRef Id="c_mongoclientdll"/>
+          <ComponentRef Id="c_mongoclientpdb"/>
+          <ComponentRef Id="c_mongoclientexp"/>
+          <?if $(var.Edition) = Enterprise ?>
+           <ComponentGroupRef Id="cg_EnterpriseBase" />
+          <?endif ?>
         </Feature>
       </Feature>
     </FeatureGroup>

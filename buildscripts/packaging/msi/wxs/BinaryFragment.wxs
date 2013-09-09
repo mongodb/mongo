@@ -62,6 +62,66 @@
         <File Id="f_mongotop" Name="mongotop.exe" Source="$(var.BinarySource)\mongotop.exe"
               DiskId ="1" KeyPath="yes"/>
       </Component>
+      <?if $(var.Edition) = Enterprise ?>
+        <Component Id="c_sasl" Guid="6632B1B8-9F0C-452C-9101-BE6044471CAC">
+          <File Id="f_sasl" Name="libsasl.dll" Source="$(var.SaslSource)\libsasl.dll"
+                DiskId="1" KeyPath="yes" />
+        </Component>
+        <Component Id="c_saslPdb" Guid="84DE7D8C-A6D6-4A23-935F-F0FFE3BBC52B">
+          <File Id="f_saslPdb" Name="libsasl.pdb" Source="$(var.SaslSource)\libsasl.pdb"
+                DiskId="1" KeyPath="yes" />
+        </Component>
+        <Component Id="c_ssleay" Guid="8879033A-F4F7-4879-A7F8-4D81355A47E3">
+          <File Id="f_ssleay" Name="ssleay32.dll" Source="$(var.SslSource)\ssleay32.dll"
+                DiskId="1" KeyPath="yes" />
+        </Component>
+      <Component Id="c_libeay" Guid="E6CC6AA5-AC71-45EC-803C-71F816E33135">
+        <File Id="f_libeay" Name="libeay32.dll" Source="$(var.SslSource)\libeay32.dll"
+              DiskId="1" KeyPath="yes" />
+      </Component>
+        <Component Id="c_snmp" Guid="F5E5A889-FC9F-4B9A-BEFD-C8ABC9A92D8D">
+          <File Id="f_ssnmp" Name="netsnmp.dll" Source="$(var.SnmpSource)\netsnmp.dll"
+                DiskId="1" KeyPath="yes" />
+        </Component>
+        <Component Id="c_snmpPdb" Guid="6AAB0ACE-C354-4D3A-B490-2AA235647AB3">
+          <File Id="f_snmpPdb" Name="netsnmp.pdb" Source="$(var.SnmpSource)\netsnmp.pdb"
+                DiskId="1" KeyPath="yes" />
+        </Component>
+      <?endif ?>
+      <Directory Id="Driver" Name="Driver">
+        <Component Id="c_mongoclientlib" Guid="B0AF30BE-924F-47C7-A2B9-AE22E0BFCEC1">
+          <File Id="f_mongoclientlib" Name="mongoclient.lib" Source="$(var.ClientSource)\mongoclient.lib"
+                DiskId="1" KeyPath="yes" />
+        </Component>
+        <Component Id="c_mongoclientdll" Guid="0B202F31-C173-4D59-A31E-1DD87C16EDC6">
+          <File Id="f_mongoclientdll" Name="mongoclient.dll" Source="$(var.ClientSource)\mongoclient.dll"
+                DiskId="1" KeyPath="yes" />
+        </Component>
+        <Component Id="c_mongoclientpdb" Guid="C1AA694E-FC9B-4540-8C73-638BDC2CD7A5">
+          <File Id="f_mongoclientpdb" Name="mongoclient.pdb" Source="$(var.ClientSource)\mongoclient.pdb"
+                DiskId="1" KeyPath="yes" />
+        </Component>
+        <Component Id="c_mongoclientexp" Guid="E95F4011-1E88-4A53-807F-F43175864EAF">
+          <File Id="f_mongoclientexp" Name="mongoclient.exp" Source="$(var.ClientSource)\mongoclient.exp"
+                DiskId="1" KeyPath="yes" />
+        </Component>
+      </Directory>
     </DirectoryRef>
+
+    <?if $(var.Edition) = Enterprise ?>
+      <ComponentGroup Id="cg_EnterpriseBase">
+        <ComponentRef Id="c_sasl" />
+        <ComponentRef Id="c_saslPdb" />
+        <ComponentRef Id="c_ssleay" />
+        <ComponentRef Id="c_libeay" />
+        <ComponentRef Id="c_snmp" />
+        <ComponentRef Id="c_snmpPdb" />
+      </ComponentGroup>
+    <ComponentGroup Id="cg_EnterpriseServer">
+      <ComponentGroupRef Id="cg_EnterpriseBase" />
+      <ComponentRef Id="c_snmp" />
+      <ComponentRef Id="c_snmpPdb" />
+    </ComponentGroup>
+    <?endif ?>
   </Fragment>
 </Wix>
