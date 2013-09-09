@@ -53,8 +53,8 @@ __wt_schema_worker(WT_SESSION_IMPL *session,
 		    file_func, name_func, cfg, open_flags));
 	} else if (WT_PREFIX_MATCH(uri, "lsm:")) {
 		if (file_func != __wt_compact)
-			WT_ERR(__wt_lsm_tree_worker(
-			    session, uri, file_func, name_func, cfg, open_flags));
+			WT_ERR(__wt_lsm_tree_worker(session,
+			    uri, file_func, name_func, cfg, open_flags));
 	} else if (WT_PREFIX_SKIP(tablename, "table:")) {
 		WT_ERR(__wt_schema_get_table(session,
 		    tablename, strlen(tablename), 0, &table));
