@@ -28,10 +28,9 @@
 *    it in the license file.
 */
 
-#include "mongo/db/structure/record_store.h"
+#include "mongo/db/storage/record_store.h"
 
 #include "mongo/db/storage/extent.h"
-#include "mongo/db/structure/collection.h"
 
 #include "mongo/db/pdfile.h" // XXX-ERH
 
