@@ -242,8 +242,10 @@ __wt_lsm_checkpoint_worker(void *arg)
 				if (F_ISSET(chunk, WT_LSM_CHUNK_EVICTED))
 					continue;
 
-				if ((ret = __lsm_discard_handle(
-				    session, chunk->uri, NULL)) == 0)
+				__wt_spin_lock(session, &S2C(session)->checkpoint_lock);
+				ret = __lsm_discard_handle(session, chunk->uri, NULL);
+				__wt_spin_unlock(session, &S2C(session)->checkpoint_lock);
+				if (ret == 0)
 					F_SET(chunk, WT_LSM_CHUNK_EVICTED);
 				else if (ret == EBUSY)
 					ret = 0;
