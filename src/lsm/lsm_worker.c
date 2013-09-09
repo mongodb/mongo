@@ -257,13 +257,16 @@ __wt_lsm_checkpoint_worker(void *arg)
 			     "LSM worker flushing %u", i);
 
 			/*
-			 * Flush the file before checkpointing: this is the
-			 * expensive part in terms of I/O: do it without
-			 * holding the schema lock.
+			 * Flush the file before checkpointing: this is the expensive
+			 * part in terms of I/O: do it without holding the schema lock.
+			 * We need to hold the checkpoint lock, otherwise this sync
+			 * can interfere with an application checkpoint.
 			 */
 			WT_ERR(__wt_session_get_btree(
 			    session, chunk->uri, NULL, NULL, 0));
+			__wt_spin_lock(session, &S2C(session)->checkpoint_lock);
 			ret = __wt_sync_file(session, WT_SYNC_WRITE_LEAVES);
+			__wt_spin_unlock(session, &S2C(session)->checkpoint_lock);
 
 			/*
 			 * Clear the "cache resident" flag so the primary can
