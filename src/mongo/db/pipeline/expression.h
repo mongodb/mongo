@@ -861,6 +861,14 @@ namespace mongo {
     };
 
 
+    class ExpressionSize : public ExpressionFixedArity<ExpressionSize, 1> {
+    public:
+        // virtuals from ExpressionNary
+        virtual Value evaluateInternal(const Variables& vars) const;
+        virtual const char *getOpName() const;
+    };
+
+
     class ExpressionStrcasecmp : public ExpressionFixedArity<ExpressionStrcasecmp, 2> {
     public:
         // virtuals from ExpressionNary
