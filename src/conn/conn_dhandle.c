@@ -143,7 +143,7 @@ err:	if (dhandle->rwlock != NULL)
 		WT_TRET(__wt_rwlock_destroy(session, &dhandle->rwlock));
 	__wt_free(session, dhandle->name);
 	__wt_free(session, dhandle->checkpoint);
-	__wt_free(session, dhandle->handle);
+	__wt_free(session, dhandle->handle);		/* btree free */
 	__wt_overwrite_and_free(session, dhandle);
 
 	return (ret);
