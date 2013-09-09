@@ -85,8 +85,11 @@ namespace mongo {
 
 
     // ------
+    BSONElementIterator::BSONElementIterator() {
+        _path = NULL;
+    }
 
-    BSONElementIterator::BSONElementIterator( const ElementPath& path, const BSONObj& context )
+    BSONElementIterator::BSONElementIterator( const ElementPath* path, const BSONObj& context )
         : _path( path ), _context( context ) {
         _state = BEGIN;
         //log() << "path: " << path.fieldRef().dottedField() << " context: " << context << endl;
@@ -94,6 +97,17 @@ namespace mongo {
 
     BSONElementIterator::~BSONElementIterator() {
     }
+
+    void BSONElementIterator::reset( const ElementPath* path, const BSONObj& context ) {
+        _path = path;
+        _context = context;
+        _state = BEGIN;
+        _next.reset();
+
+        _subCursor.reset();
+        _subCursorPath.reset();
+    }
+
 
     void BSONElementIterator::ArrayIterationState::reset( const FieldRef& ref, int start ) {
         restOfPath = ref.dottedField( start );
@@ -146,8 +160,8 @@ namespace mongo {
 
                 _subCursorPath.reset( new ElementPath() );
                 _subCursorPath->init( _arrayIterationState.restOfPath.substr( _arrayIterationState.nextPieceOfPath.size() + 1 ) );
-                _subCursorPath->setTraverseLeafArray( _path.shouldTraverseLeafArray() );
-                _subCursor.reset( new BSONElementIterator( *_subCursorPath, _arrayIterationState._current.Obj() ) );
+                _subCursorPath->setTraverseLeafArray( _path->shouldTraverseLeafArray() );
+                _subCursor.reset( new BSONElementIterator( _subCursorPath.get(), _arrayIterationState._current.Obj() ) );
                 _arrayIterationState._current = BSONElement();
                 return more();
             }
@@ -163,7 +177,7 @@ namespace mongo {
 
         if ( _state == BEGIN ) {
             size_t idxPath = 0;
-            BSONElement e = getFieldDottedOrArray( _context, _path.fieldRef(), &idxPath );
+            BSONElement e = getFieldDottedOrArray( _context, _path->fieldRef(), &idxPath );
 
             if ( e.type() != Array ) {
                 _next.reset( e, BSONElement(), false );
@@ -173,9 +187,9 @@ namespace mongo {
 
             // its an array
 
-            _arrayIterationState.reset( _path.fieldRef(), idxPath + 1 );
+            _arrayIterationState.reset( _path->fieldRef(), idxPath + 1 );
 
-            if ( !_arrayIterationState.hasMore && !_path.shouldTraverseLeafArray() ) {
+            if ( !_arrayIterationState.hasMore && !_path->shouldTraverseLeafArray() ) {
                 _next.reset( e, BSONElement(), true );
                 _state = DONE;
                 return true;
@@ -201,9 +215,9 @@ namespace mongo {
                 if ( x.type() == Object ) {
                     _subCursorPath.reset( new ElementPath() );
                     _subCursorPath->init( _arrayIterationState.restOfPath );
-                    _subCursorPath->setTraverseLeafArray( _path.shouldTraverseLeafArray() );
+                    _subCursorPath->setTraverseLeafArray( _path->shouldTraverseLeafArray() );
 
-                    _subCursor.reset( new BSONElementIterator( *_subCursorPath, x.Obj() ) );
+                    _subCursor.reset( new BSONElementIterator( _subCursorPath.get(), x.Obj() ) );
                     return more();
                 }
 
@@ -218,8 +232,8 @@ namespace mongo {
                     if ( x.isABSONObj() ) {
                         _subCursorPath.reset( new ElementPath() );
                         _subCursorPath->init( _arrayIterationState.restOfPath.substr( _arrayIterationState.nextPieceOfPath.size() + 1 ) );
-                        _subCursorPath->setTraverseLeafArray( _path.shouldTraverseLeafArray() );
-                        BSONElementIterator* real = new BSONElementIterator( *_subCursorPath, _arrayIterationState._current.Obj() );
+                        _subCursorPath->setTraverseLeafArray( _path->shouldTraverseLeafArray() );
+                        BSONElementIterator* real = new BSONElementIterator( _subCursorPath.get(), _arrayIterationState._current.Obj() );
                         _subCursor.reset( real );
                         real->_arrayIterationState.reset( _subCursorPath->fieldRef(), 0 );
                         real->_arrayIterationState.startIterator( x );

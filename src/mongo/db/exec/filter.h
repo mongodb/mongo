@@ -50,7 +50,7 @@ namespace mongo {
             return _wsm->obj;
         }
 
-        virtual ElementIterator* getIterator(const ElementPath& path) const {
+        virtual ElementIterator* allocateIterator(const ElementPath* path) const {
             // BSONElementIterator does some interesting things with arrays that I don't think
             // SimpleArrayElementIterator does.
             if (_wsm->hasObj()) {
@@ -70,7 +70,7 @@ namespace mongo {
                     verify(keyDataIt.more());
                     BSONElement keyDataElt = keyDataIt.next();
 
-                    if (path.fieldRef().equalsDottedField(keyPatternElt.fieldName())) {
+                    if (path->fieldRef().equalsDottedField(keyPatternElt.fieldName())) {
                         if (Array == keyDataElt.type()) {
                             return new SimpleArrayElementIterator(keyDataElt, true);
                         }
@@ -82,10 +82,14 @@ namespace mongo {
             }
 
             // This should not happen.
-            massert(16920, "trying to match on unknown field: " + path.fieldRef().dottedField(),
+            massert(16920, "trying to match on unknown field: " + path->fieldRef().dottedField(),
                     0);
 
             return new SingleElementElementIterator(BSONElement());
+        }
+
+        virtual void releaseIterator( ElementIterator* iterator ) const {
+            delete iterator;
         }
 
     private:

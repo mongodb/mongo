@@ -42,8 +42,33 @@ namespace mongo {
 
         virtual BSONObj toBSON() const = 0;
 
-        virtual ElementIterator* getIterator( const ElementPath& path ) const = 0;
+        /**
+         * The neewly returned ElementIterator is allowed to keep a pointer to path.
+         * So the caller of this function should make sure path is in scope until 
+         * the ElementIterator is deallocated
+        */
+        virtual ElementIterator* allocateIterator( const ElementPath* path ) const = 0;
 
+        virtual void releaseIterator( ElementIterator* iterator ) const = 0;
+
+        class IteratorHolder {
+        public:
+            IteratorHolder( const MatchableDocument* doc, const ElementPath* path ) {
+                _doc = doc;
+                _iterator = _doc->allocateIterator( path );
+            }
+
+            ~IteratorHolder() {
+                _doc->releaseIterator( _iterator );
+            }
+
+            ElementIterator* operator->() const {
+                return _iterator;
+            }
+        private:
+            const MatchableDocument* _doc;
+            ElementIterator* _iterator;
+        };
     };
 
     class BSONMatchableDocument : public MatchableDocument {
@@ -53,11 +78,26 @@ namespace mongo {
 
         virtual BSONObj toBSON() const { return _obj; }
 
-        virtual ElementIterator* getIterator( const ElementPath& path ) const {
-            return new BSONElementIterator( path, _obj );
+        virtual ElementIterator* allocateIterator( const ElementPath* path ) const {
+            if ( _iteratorUsed )
+                return new BSONElementIterator( path, _obj );
+            _iteratorUsed = true;
+            _iterator.reset( path, _obj );
+            return &_iterator;
+        }
+
+        virtual void releaseIterator( ElementIterator* iterator ) const {
+            if ( iterator == &_iterator ) {
+                _iteratorUsed = false;
+            }
+            else {
+                delete iterator;
+            }
         }
 
     private:
         BSONObj _obj;
+        mutable BSONElementIterator _iterator;
+        mutable bool _iteratorUsed;
     };
 }
