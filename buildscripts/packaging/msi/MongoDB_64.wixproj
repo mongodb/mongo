@@ -3,31 +3,35 @@
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">x64</Platform>
-    <Version Condition=" '$(Version)' == '' ">2.4.0</Version>
-    <License Condition=" '$(License)' == '' ">..\..\..\distsrc</License>
-    <Source Condition=" '$(Source)' == '' ">..\..\..\build\win32\64\mongo</Source>
     <ProductVersion>3.5</ProductVersion>
     <ProjectGuid>{fa9df7fc-a283-4eb8-b0c6-f9fa31e22cbc}</ProjectGuid>
     <SchemaVersion>2.0</SchemaVersion>
-    <OutputName>MongoDB_$(Version)_x64</OutputName>
+    <OutputName>MongoDB_$(Version)_x64_$(Flavor)_$(Edition)</OutputName>
     <OutputType>Package</OutputType>
     <DefineSolutionProperties>false</DefineSolutionProperties>
     <WixTargetsPath Condition=" '$(WixTargetsPath)' == '' AND '$(MSBuildExtensionsPath32)' != '' ">$(MSBuildExtensionsPath32)\Microsoft\WiX\v3.x\Wix.targets</WixTargetsPath>
     <WixTargetsPath Condition=" '$(WixTargetsPath)' == '' ">$(MSBuildExtensionsPath)\Microsoft\WiX\v3.x\Wix.targets</WixTargetsPath>
     <Name>MongoDB</Name>
+    <OutputPath>bin\$(Configuration)\$(Platform)\$(Flavor)\$(Edition)\</OutputPath>
+    <IntermediateOutputPath>obj\$(Configuration)\$(Platform)\$(Flavor)\$(Edition)\</IntermediateOutputPath>
+    <TreatWarningsAsErrors>True</TreatWarningsAsErrors>
+    <ProductId Condition=" '$(ProductId)' == '' ">*</ProductId>
+    <UpgradeCode Condition=" '$(UpgradeCode)' == '' ">FCF901F6-E963-40B1-9A17-978242068587</UpgradeCode>
+  </PropertyGroup>
+  <PropertyGroup>
+    <ClientSource Condition=" '$(Source)' == '' ">..\..\..\build\win32\64\client_build</ClientSource>
+    <Edition Condition=" '$(Edition)' == '' ">Standard</Edition>
+    <Flavor Condition=" '$(Flavor)' == '' ">2008R2Plus</Flavor>
+    <License Condition=" '$(License)' == '' ">..\..\..\distsrc</License>
+    <SaslSource Condition=" '$(SaslSource)' == '' ">..\..\..\build\win32\64\mongo</SaslSource>
+    <SnmpSource Condition=" '$(SnmpSource)' == '' ">..\..\..\build\win32\64\mongo</SnmpSource>
+    <Source Condition=" '$(Source)' == '' ">..\..\..\build\win32\64\mongo</Source>
+    <SslSource Condition=" '$(SslSource)' == '' ">..\..\..\build\win32\64\mongo</SslSource>
+    <Version Condition=" '$(Version)' == '' ">2.4.0</Version>
+    <DefineConstants>MongoDBVersion=$(Version);LicenseSource=$(License);BinarySource=$(Source);Edition=$(Edition);SaslSource=$(SaslSource);SslSource=$(SslSource);SnmpSource=$(SnmpSource);ProductId=$(ProductId);UpgradeCode=$(UpgradeCode);Flavor=$(Flavor);ClientSource=$(ClientSource)</DefineConstants>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|x64' ">
-    <OutputPath>bin\$(Configuration)\$(Platform)\</OutputPath>
-    <IntermediateOutputPath>obj\$(Configuration)\$(Platform)\</IntermediateOutputPath>
-    <DefineConstants>MongoDBVersion=$(Version);LicenseSource=$(License);BinarySource=$(Source)</DefineConstants>
-    <TreatWarningsAsErrors>True</TreatWarningsAsErrors>
     <VerboseOutput>True</VerboseOutput>
-  </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|x64' ">
-    <OutputPath>bin\$(Configuration)\$(Platform)\</OutputPath>
-    <IntermediateOutputPath>obj\$(Configuration)\$(Platform)\</IntermediateOutputPath>
-    <DefineConstants>MongoDBVersion=$(Version);LicenseSource=$(License);BinarySource=$(Source)</DefineConstants>
-    <TreatWarningsAsErrors>True</TreatWarningsAsErrors>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="wxs\BinaryFragment.wxs" />
