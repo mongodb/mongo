@@ -54,7 +54,11 @@ namespace mongo {
             return _doc.replaceFieldNames( _pattern );
         }
 
-        virtual ElementIterator* getIterator( const ElementPath& path ) const;
+        virtual ElementIterator* allocateIterator( const ElementPath* path ) const;
+
+        virtual void releaseIterator( ElementIterator* iterator ) const {
+            delete iterator;
+        }
 
     private:
 
@@ -64,8 +68,8 @@ namespace mongo {
         BSONObj _doc;
     };
 
-    ElementIterator* IndexKeyMatchableDocument::getIterator( const ElementPath& path ) const {
-        BSONElement e = _getElement( path.fieldRef() );
+    ElementIterator* IndexKeyMatchableDocument::allocateIterator( const ElementPath* path ) const {
+        BSONElement e = _getElement( path->fieldRef() );
         if ( e.type() == Array )
             return new SimpleArrayElementIterator( e, true );
         return new SingleElementElementIterator( e );

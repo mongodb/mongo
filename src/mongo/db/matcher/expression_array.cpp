@@ -44,8 +44,7 @@ namespace mongo {
     }
 
     bool ArrayMatchingMatchExpression::matches( const MatchableDocument* doc, MatchDetails* details ) const {
-
-        boost::scoped_ptr<ElementIterator> cursor( doc->getIterator( _elementPath ) );
+        MatchableDocument::IteratorHolder cursor( doc, &_elementPath );
 
         while ( cursor->more() ) {
             ElementIterator::Context e = cursor->next();
@@ -199,7 +198,7 @@ namespace mongo {
     }
 
     bool AllElemMatchOp::matches( const MatchableDocument* doc, MatchDetails* details ) const {
-        boost::scoped_ptr<ElementIterator> cursor( doc->getIterator( _elementPath ) );
+        MatchableDocument::IteratorHolder cursor( doc, &_elementPath );
         while ( cursor->more() ) {
             ElementIterator::Context e = cursor->next();
             if ( e.element().type() != Array )

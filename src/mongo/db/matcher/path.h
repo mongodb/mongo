@@ -115,14 +115,18 @@ namespace mongo {
 
     class BSONElementIterator : public ElementIterator {
     public:
-        BSONElementIterator( const ElementPath& path, const BSONObj& context );
+        BSONElementIterator();
+        BSONElementIterator( const ElementPath* path, const BSONObj& context );
+
         virtual ~BSONElementIterator();
+
+        void reset( const ElementPath* path, const BSONObj& context );
 
         bool more();
         Context next();
 
     private:
-        const ElementPath& _path;
+        const ElementPath* _path;
         BSONObj _context;
 
         enum State { BEGIN, IN_ARRAY, DONE } _state;

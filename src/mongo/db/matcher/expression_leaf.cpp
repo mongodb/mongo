@@ -47,7 +47,7 @@ namespace mongo {
 
 
     bool LeafMatchExpression::matches( const MatchableDocument* doc, MatchDetails* details ) const {
-        boost::scoped_ptr<ElementIterator> cursor( doc->getIterator( _elementPath ) );
+        MatchableDocument::IteratorHolder cursor( doc, &_elementPath );
         while ( cursor->more() ) {
             ElementIterator::Context e = cursor->next();
             if ( !matchesSingleElement( e.element() ) )
@@ -328,7 +328,7 @@ namespace mongo {
     }
 
     bool TypeMatchExpression::matches( const MatchableDocument* doc, MatchDetails* details ) const {
-        boost::scoped_ptr<ElementIterator> cursor( doc->getIterator( _elementPath ) );
+        MatchableDocument::IteratorHolder cursor( doc, &_elementPath );
         while ( cursor->more() ) {
             ElementIterator::Context e = cursor->next();
             if ( e.outerArray() )
