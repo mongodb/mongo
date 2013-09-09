@@ -420,6 +420,7 @@ __lsm_discard_handle(
 	 */
 	WT_RET(__wt_session_get_btree(session, uri, checkpoint, NULL,
 	    WT_DHANDLE_EXCLUSIVE | WT_DHANDLE_LOCK_ONLY));
+	WT_ASSERT(session, S2BT(session)->modified == 0);
 	F_SET(session->dhandle, WT_DHANDLE_DISCARD);
 	WT_RET(__wt_session_release_btree(session));
 
