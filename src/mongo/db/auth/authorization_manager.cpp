@@ -143,18 +143,21 @@ namespace mongo {
     }
 
     Status AuthorizationManager::insertPrivilegeDocument(const std::string& dbname,
-                                                         const BSONObj& userObj) const {
-        return _externalState->insertPrivilegeDocument(dbname, userObj);
+                                                         const BSONObj& userObj,
+                                                         const BSONObj& writeConcern) const {
+        return _externalState->insertPrivilegeDocument(dbname, userObj, writeConcern);
     }
 
     Status AuthorizationManager::updatePrivilegeDocument(const UserName& user,
-                                                         const BSONObj& updateObj) const {
-        return _externalState->updatePrivilegeDocument(user, updateObj);
+                                                         const BSONObj& updateObj,
+                                                         const BSONObj& writeConcern) const {
+        return _externalState->updatePrivilegeDocument(user, updateObj, writeConcern);
     }
 
     Status AuthorizationManager::removePrivilegeDocuments(const BSONObj& query,
+                                                          const BSONObj& writeConcern,
                                                           int* numRemoved) const {
-        return _externalState->removePrivilegeDocuments(query, numRemoved);
+        return _externalState->removePrivilegeDocuments(query, writeConcern, numRemoved);
     }
 
     ActionSet AuthorizationManager::getAllUserActions() {
@@ -561,17 +564,21 @@ namespace mongo {
                               durableVersion);
         }
 
+        BSONObj writeConcern;
         // Upgrade from v1 to v2.
-        status = _externalState->copyCollection(usersCollectionName, backupUsersCollectionName);
+        status = _externalState->copyCollection(usersCollectionName,
+                                                backupUsersCollectionName,
+                                                writeConcern);
         if (!status.isOK())
             return status;
-        status = _externalState->dropCollection(newusersCollectionName);
+        status = _externalState->dropCollection(newusersCollectionName, writeConcern);
         if (!status.isOK())
             return status;
         status = _externalState->createIndex(
                 newusersCollectionName,
                 BSON(USER_NAME_FIELD_NAME << 1 << USER_SOURCE_FIELD_NAME << 1),
-                true // unique
+                true, // unique
+                writeConcern
                 );
         if (!status.isOK())
             return status;
@@ -583,18 +590,22 @@ namespace mongo {
                 continue;
 
             status = _externalState->insert(
-                    newusersCollectionName, userAsV2PrivilegeDocument(*iter->second));
+                    newusersCollectionName, userAsV2PrivilegeDocument(*iter->second),
+                    writeConcern);
             if (!status.isOK())
                 return status;
         }
-        status = _externalState->renameCollection(newusersCollectionName, usersCollectionName);
+        status = _externalState->renameCollection(newusersCollectionName,
+                                                  usersCollectionName,
+                                                  writeConcern);
         if (!status.isOK())
             return status;
         status = _externalState->updateOne(
                 versionCollectionName,
                 versionDocumentQuery,
                 BSON("$set" << BSON("currentVersion" << 2)),
-                true);
+                true,
+                writeConcern);
         if (!status.isOK())
             return status;
         _version = 2;

@@ -120,15 +120,34 @@ namespace mongo {
         // Returns true if there exists at least one privilege document in the system.
         bool hasAnyPrivilegeDocuments() const;
 
-        // Creates the given user object in the given database.
-        Status insertPrivilegeDocument(const std::string& dbname, const BSONObj& userObj) const;
+        /**
+         * Creates the given user object in the given database.
+         * 'writeConcern' contains the arguments to be passed to getLastError to block for
+         * successful completion of the write.
+         */
+        Status insertPrivilegeDocument(const std::string& dbname,
+                                       const BSONObj& userObj,
+                                       const BSONObj& writeConcern) const;
 
-        // Updates the given user object with the given update modifier.
-        Status updatePrivilegeDocument(const UserName& user, const BSONObj& updateObj) const;
+        /**
+         * Updates the given user object with the given update modifier.
+         * 'writeConcern' contains the arguments to be passed to getLastError to block for
+         * successful completion of the write.
+         */
+        Status updatePrivilegeDocument(const UserName& user,
+                                       const BSONObj& updateObj,
+                                       const BSONObj& writeConcern) const;
 
-        // Removes users for the given database matching the given query.
-        // Writes into *numRemoved the number of user documents that were modified.
-        Status removePrivilegeDocuments(const BSONObj& query, int* numRemoved) const;
+        /*
+         * Removes users for the given database matching the given query.
+         * Writes into *numRemoved the number of user documents that were modified.
+         * 'writeConcern' contains the arguments to be passed to getLastError to block for
+         * successful completion of the write.
+         */
+        //
+        Status removePrivilegeDocuments(const BSONObj& query,
+                                        const BSONObj& writeConcern,
+                                        int* numRemoved) const;
 
         // Checks to see if "doc" is a valid privilege document, assuming it is stored in the
         // "system.users" collection of database "dbname".

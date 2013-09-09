@@ -168,6 +168,10 @@ DB.prototype._createUser = function(userObj, replicatedTo, timeout) {
     delete cmdObj["name"];
     delete cmdObj["user"];
 
+    replicatedTo = replicatedTo != undefined && replicatedTo != null ? replicatedTo : "majority"
+    timeout = timeout || 30 * 1000;
+    cmdObj["writeConcern"] = { w: replicatedTo, wtimeout: timeout }
+
     var res = this.runCommand(cmdObj);
 
     if (res.ok) {

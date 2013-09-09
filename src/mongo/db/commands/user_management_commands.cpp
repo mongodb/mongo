@@ -67,6 +67,20 @@ namespace mongo {
         }
     }
 
+    static Status extractWriteConcern(const BSONObj cmdObj, BSONObj* writeConcern) {
+        BSONElement writeConcernElement;
+        Status status = bsonExtractTypedField(cmdObj, "writeConcern", Object, &writeConcernElement);
+        if (!status.isOK()) {
+            if (status.code() == ErrorCodes::NoSuchKey) {
+                *writeConcern = BSONObj();
+                return Status::OK();
+            }
+            return status;
+        }
+        *writeConcern = writeConcernElement.Obj();
+        return Status::OK();
+    }
+
     class CmdCreateUser : public Command {
     public:
 
@@ -114,7 +128,14 @@ namespace mongo {
                 return false;
             }
 
-            status = authzManager->insertPrivilegeDocument(dbname, userObj);
+            BSONObj writeConcern;
+            status = extractWriteConcern(cmdObj, &writeConcern);
+            if (!status.isOK()) {
+                addStatus(status, result);
+                return false;
+            }
+
+            status = authzManager->insertPrivilegeDocument(dbname, userObj, writeConcern);
             if (!status.isOK()) {
                 addStatus(status, result);
                 return false;
@@ -177,7 +198,14 @@ namespace mongo {
                 return false;
             }
 
-            status = authzManager->updatePrivilegeDocument(userName, updateObj);
+            BSONObj writeConcern;
+            status = extractWriteConcern(cmdObj, &writeConcern);
+            if (!status.isOK()) {
+                addStatus(status, result);
+                return false;
+            }
+
+            status = authzManager->updatePrivilegeDocument(userName, updateObj, writeConcern);
             if (!status.isOK()) {
                 addStatus(status, result);
                 return false;
@@ -237,11 +265,19 @@ namespace mongo {
                 return false;
             }
 
+            BSONObj writeConcern;
+            status = extractWriteConcern(cmdObj, &writeConcern);
+            if (!status.isOK()) {
+                addStatus(status, result);
+                return false;
+            }
+
             int numUpdated;
             AuthorizationManager* authzManager = getGlobalAuthorizationManager();
             status = authzManager->removePrivilegeDocuments(
                     BSON(AuthorizationManager::USER_NAME_FIELD_NAME << user <<
                          AuthorizationManager::USER_SOURCE_FIELD_NAME << dbname),
+                    writeConcern,
                     &numUpdated);
             if (!status.isOK()) {
                 addStatus(status, result);
@@ -298,10 +334,18 @@ namespace mongo {
                  string& errmsg,
                  BSONObjBuilder& result,
                  bool fromRepl) {
+            BSONObj writeConcern;
+            Status status = extractWriteConcern(cmdObj, &writeConcern);
+            if (!status.isOK()) {
+                addStatus(status, result);
+                return false;
+            }
+
             int numRemoved;
             AuthorizationManager* authzManager = getGlobalAuthorizationManager();
-            Status status = authzManager->removePrivilegeDocuments(
+            status = authzManager->removePrivilegeDocuments(
                     BSON(AuthorizationManager::USER_SOURCE_FIELD_NAME << dbname),
+                    writeConcern,
                     &numRemoved);
             if (!status.isOK()) {
                 addStatus(status, result);

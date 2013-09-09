@@ -96,7 +96,8 @@ namespace {
                                            BSON("name" << "dbAdmin" <<
                                                 "source" << "test" <<
                                                 "hasRole" << true <<
-                                                "canDelegate" << false)))));
+                                                "canDelegate" << false))),
+                BSONObj()));
         ASSERT_OK(authzSession->addAndAuthorizeUser(UserName("spencer", "test")));
 
         ASSERT_TRUE(authzSession->checkAuthorization("test", ActionType::insert));
@@ -113,7 +114,8 @@ namespace {
                      "roles" << BSON_ARRAY(BSON("name" << "readWriteAnyDatabase" <<
                                                 "source" << "admin" <<
                                                 "hasRole" << true <<
-                                                "canDelegate" << false)))));
+                                                "canDelegate" << false))),
+                BSONObj()));
         ASSERT_OK(authzSession->addAndAuthorizeUser(UserName("admin", "admin")));
 
         ASSERT_TRUE(authzSession->checkAuthorization("*", ActionType::insert));
@@ -142,7 +144,8 @@ namespace {
                      "roles" << BSON_ARRAY(BSON("name" << "readWrite" <<
                                                 "source" << "test" <<
                                                 "hasRole" << true <<
-                                                "canDelegate" << false)))));
+                                                "canDelegate" << false))),
+                BSONObj()));
         ASSERT_OK(authzSession->addAndAuthorizeUser(UserName("spencer", "test")));
 
         ASSERT_TRUE(authzSession->checkAuthorization("test", ActionType::find));
@@ -160,7 +163,8 @@ namespace {
                      "roles" << BSON_ARRAY(BSON("name" << "read" <<
                                                 "source" << "test" <<
                                                 "hasRole" << true <<
-                                                "canDelegate" << false)))));
+                                                "canDelegate" << false))),
+                BSONObj()));
 
         // Make sure that invalidating the user causes the session to reload its privileges.
         authzManager->invalidateUser(user);
@@ -188,7 +192,8 @@ namespace {
                      "roles" << BSON_ARRAY(BSON("name" << "readWrite" <<
                                                 "source" << "test" <<
                                                 "hasRole" << true <<
-                                                "canDelegate" << false)))));
+                                                "canDelegate" << false))),
+                BSONObj()));
         ASSERT_OK(authzSession->addAndAuthorizeUser(UserName("spencer", "test")));
 
         ASSERT_TRUE(authzSession->checkAuthorization("test", ActionType::find));
@@ -207,7 +212,8 @@ namespace {
                      "roles" << BSON_ARRAY(BSON("name" << "read" <<
                                                 "source" << "test" <<
                                                 "hasRole" << true <<
-                                                "canDelegate" << false)))));
+                                                "canDelegate" << false))),
+                BSONObj()));
 
         // Even though the user's privileges have been reduced, since we've configured user
         // document lookup to fail, the authz session should continue to use its known out-of-date
@@ -224,16 +230,19 @@ namespace {
         managerState->insert(NamespaceString("test.system.users"),
                                     BSON("user" << "andy" <<
                                          "pwd" << "a" <<
-                                         "roles" << BSON_ARRAY("readWrite")));
+                                         "roles" << BSON_ARRAY("readWrite")),
+                                    BSONObj());
         managerState->insert(NamespaceString("test2.system.users"),
                                     BSON("user" << "andy" <<
                                          "userSource" << "test" <<
-                                         "roles" <<  BSON_ARRAY("read")));
+                                         "roles" <<  BSON_ARRAY("read")),
+                                    BSONObj());
         managerState->insert(NamespaceString("admin.system.users"),
                                     BSON("user" << "andy" <<
                                          "userSource" << "test" <<
                                          "roles" << BSON_ARRAY("clusterAdmin") <<
-                                         "otherDBRoles" << BSON("test3" << BSON_ARRAY("dbAdmin"))));
+                                         "otherDBRoles" << BSON("test3" << BSON_ARRAY("dbAdmin"))),
+                                    BSONObj());
         ASSERT_OK(authzManager->initialize());
 
         ASSERT(!authzSession->checkAuthorization("test.foo", ActionType::find));

@@ -330,11 +330,13 @@ namespace {
         authzManager->setAuthorizationVersion(1);
 
         ASSERT_OK(externalState->insert(NamespaceString("test.system.users"),
-                                        BSON("user" << "v0RW" << "pwd" << "password")));
+                                        BSON("user" << "v0RW" << "pwd" << "password"),
+                                        BSONObj()));
         ASSERT_OK(externalState->insert(NamespaceString("admin.system.users"),
                                         BSON("user" << "v0AdminRO" <<
                                              "pwd" << "password" <<
-                                             "readOnly" << true)));
+                                             "readOnly" << true),
+                                        BSONObj()));
 
         User* v0RW;
         ASSERT_OK(authzManager->acquireUser(UserName("v0RW", "test"), &v0RW));
@@ -384,11 +386,13 @@ namespace {
         ASSERT_OK(externalState->insert(NamespaceString("test.system.users"),
                                         BSON("user" << "v1read" <<
                                              "pwd" << "password" <<
-                                             "roles" << BSON_ARRAY("read"))));
+                                             "roles" << BSON_ARRAY("read")),
+                                        BSONObj()));
         ASSERT_OK(externalState->insert(NamespaceString("admin.system.users"),
                                         BSON("user" << "v1cluster" <<
                                              "pwd" << "password" <<
-                                             "roles" << BSON_ARRAY("clusterAdmin"))));
+                                             "roles" << BSON_ARRAY("clusterAdmin")),
+                                        BSONObj()));
 
         User* v1read;
         ASSERT_OK(authzManager->acquireUser(UserName("v1read", "test"), &v1read));
@@ -436,19 +440,23 @@ namespace {
         ASSERT_OK(externalState->insert(NamespaceString("test.system.users"),
                                         BSON("user" << "readOnly" <<
                                              "pwd" << "password" <<
-                                             "roles" << BSON_ARRAY("read"))));
+                                             "roles" << BSON_ARRAY("read")),
+                                        BSONObj()));
         ASSERT_OK(externalState->insert(NamespaceString("admin.system.users"),
                                         BSON("user" << "clusterAdmin" <<
                                              "userSource" << "$external" <<
-                                             "roles" << BSON_ARRAY("clusterAdmin"))));
+                                             "roles" << BSON_ARRAY("clusterAdmin")),
+                                        BSONObj()));
         ASSERT_OK(externalState->insert(NamespaceString("test.system.users"),
                                         BSON("user" << "readWriteMultiDB" <<
                                              "pwd" << "password" <<
-                                             "roles" << BSON_ARRAY("readWrite"))));
+                                             "roles" << BSON_ARRAY("readWrite")),
+                                        BSONObj()));
         ASSERT_OK(externalState->insert(NamespaceString("test2.system.users"),
                                         BSON("user" << "readWriteMultiDB" <<
                                              "userSource" << "test" <<
-                                             "roles" << BSON_ARRAY("readWrite"))));
+                                             "roles" << BSON_ARRAY("readWrite")),
+                                        BSONObj()));
 
         Status status = authzManager->initialize();
         ASSERT_OK(status);
@@ -554,7 +562,8 @@ namespace {
                      "roles" << BSON_ARRAY(BSON("name" << "read" <<
                                                 "source" << "test" <<
                                                 "canDelegate" << false <<
-                                                "hasRole" << true)))));
+                                                "hasRole" << true))),
+                BSONObj()));
         ASSERT_OK(externalState->insertPrivilegeDocument(
                 "admin",
                 BSON("name" << "v2cluster" <<
@@ -563,7 +572,8 @@ namespace {
                      "roles" << BSON_ARRAY(BSON("name" << "clusterAdmin" <<
                                                 "source" << "admin" <<
                                                 "canDelegate" << true <<
-                                                "hasRole" << true)))));
+                                                "hasRole" << true))),
+                BSONObj()));
 
         User* v2read;
         ASSERT_OK(authzManager->acquireUser(UserName("v2read", "test"), &v2read));
@@ -624,19 +634,23 @@ namespace {
             ASSERT_OK(externalState->insert(NamespaceString("test.system.users"),
                               BSON("user" << "readOnly" <<
                                    "pwd" << "password" <<
-                                   "roles" << BSON_ARRAY("read"))));
+                                   "roles" << BSON_ARRAY("read")),
+                              BSONObj()));
             ASSERT_OK(externalState->insert(NamespaceString("admin.system.users"),
                               BSON("user" << "clusterAdmin" <<
                                    "userSource" << "$external" <<
-                                   "roles" << BSON_ARRAY("clusterAdmin"))));
+                                   "roles" << BSON_ARRAY("clusterAdmin")),
+                              BSONObj()));
             ASSERT_OK(externalState->insert(NamespaceString("test.system.users"),
                               BSON("user" << "readWriteMultiDB" <<
                                    "pwd" << "password" <<
-                                   "roles" << BSON_ARRAY("readWrite"))));
+                                   "roles" << BSON_ARRAY("readWrite")),
+                              BSONObj()));
             ASSERT_OK(externalState->insert(NamespaceString("test2.system.users"),
                               BSON("user" << "readWriteMultiDB" <<
                                    "userSource" << "test" <<
-                                   "roles" << BSON_ARRAY("readWrite"))));
+                                   "roles" << BSON_ARRAY("readWrite")),
+                              BSONObj()));
 
             ASSERT_OK(authzManager->initialize());
         }
@@ -717,7 +731,8 @@ namespace {
         authzManager->setAuthorizationVersion(1);
         setUpV1UserData();
         ASSERT_OK(externalState->insert(versionCollectionName,
-                                        BSON("_id" << 1 << "currentVersion" << 1)));
+                                        BSON("_id" << 1 << "currentVersion" << 1),
+                                        BSONObj()));
         ASSERT_OK(authzManager->upgradeAuthCollections());
 
         validateV1AdminUserData(backupUsersCollectionName);
@@ -728,10 +743,11 @@ namespace {
         authzManager->setAuthorizationVersion(1);
         setUpV1UserData();
         ASSERT_OK(externalState->insert(versionCollectionName,
-                                        BSON("_id" << 1 << "currentVersion" << 3)));
+                                        BSON("_id" << 1 << "currentVersion" << 3),
+                                        BSONObj()));
         ASSERT_NOT_OK(authzManager->upgradeAuthCollections());
         validateV1AdminUserData(usersCollectionName);
-        ASSERT_OK(externalState->remove(versionCollectionName, BSONObj()));
+        ASSERT_OK(externalState->remove(versionCollectionName, BSONObj(), BSONObj()));
         ASSERT_OK(authzManager->upgradeAuthCollections());
         validateV1AdminUserData(backupUsersCollectionName);
         validateV2UserData();
@@ -741,7 +757,8 @@ namespace {
         authzManager->setAuthorizationVersion(1);
         setUpV1UserData();
         ASSERT_OK(externalState->insert(versionCollectionName,
-                                        BSON("_id" << 1 << "currentVersion" << 2)));
+                                        BSON("_id" << 1 << "currentVersion" << 2),
+                                        BSONObj()));
         ASSERT_NOT_OK(authzManager->upgradeAuthCollections());
         validateV1AdminUserData(usersCollectionName);
     }
