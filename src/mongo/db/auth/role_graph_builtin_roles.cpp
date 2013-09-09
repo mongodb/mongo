@@ -24,26 +24,26 @@
 
 namespace mongo {
 
-    const std::string RoleGraph::SYSTEM_ROLE_V0_READ = "oldRead";
-    const std::string RoleGraph::SYSTEM_ROLE_V0_READ_WRITE= "oldReadWrite";
-    const std::string RoleGraph::SYSTEM_ROLE_V0_ADMIN_READ = "oldAdminRead";
-    const std::string RoleGraph::SYSTEM_ROLE_V0_ADMIN_READ_WRITE= "oldAdminReadWrite";
+    const std::string RoleGraph::BUILTIN_ROLE_V0_READ = "oldRead";
+    const std::string RoleGraph::BUILTIN_ROLE_V0_READ_WRITE= "oldReadWrite";
+    const std::string RoleGraph::BUILTIN_ROLE_V0_ADMIN_READ = "oldAdminRead";
+    const std::string RoleGraph::BUILTIN_ROLE_V0_ADMIN_READ_WRITE= "oldAdminReadWrite";
 
 namespace {
     const std::string ADMIN_DBNAME = "admin";
 
-    const std::string SYSTEM_ROLE_READ = "read";
-    const std::string SYSTEM_ROLE_READ_WRITE = "readWrite";
-    const std::string SYSTEM_ROLE_USER_ADMIN = "userAdmin";
-    const std::string SYSTEM_ROLE_DB_ADMIN = "dbAdmin";
-    const std::string SYSTEM_ROLE_CLUSTER_ADMIN = "clusterAdmin";
-    const std::string SYSTEM_ROLE_READ_ANY_DB = "readAnyDatabase";
-    const std::string SYSTEM_ROLE_READ_WRITE_ANY_DB = "readWriteAnyDatabase";
-    const std::string SYSTEM_ROLE_USER_ADMIN_ANY_DB = "userAdminAnyDatabase";
-    const std::string SYSTEM_ROLE_DB_ADMIN_ANY_DB = "dbAdminAnyDatabase";
+    const std::string BUILTIN_ROLE_READ = "read";
+    const std::string BUILTIN_ROLE_READ_WRITE = "readWrite";
+    const std::string BUILTIN_ROLE_USER_ADMIN = "userAdmin";
+    const std::string BUILTIN_ROLE_DB_ADMIN = "dbAdmin";
+    const std::string BUILTIN_ROLE_CLUSTER_ADMIN = "clusterAdmin";
+    const std::string BUILTIN_ROLE_READ_ANY_DB = "readAnyDatabase";
+    const std::string BUILTIN_ROLE_READ_WRITE_ANY_DB = "readWriteAnyDatabase";
+    const std::string BUILTIN_ROLE_USER_ADMIN_ANY_DB = "userAdminAnyDatabase";
+    const std::string BUILTIN_ROLE_DB_ADMIN_ANY_DB = "dbAdminAnyDatabase";
 
-    // ActionSets for the various system roles.  These ActionSets contain all the actions that
-    // a user of each system role is granted.
+    // ActionSets for the various built-in roles.  These ActionSets contain all the actions that
+    // a user of each built-in role is granted.
     ActionSet readRoleActions;
     ActionSet readWriteRoleActions;
     ActionSet userAdminRoleActions;
@@ -60,9 +60,9 @@ namespace {
     ActionSet compatibilityReadWriteAdminActions;
 
 
-    // This sets up the system role ActionSets.  This is what determines what actions each role
+    // This sets up the built-in role ActionSets.  This is what determines what actions each role
     // is authorized to perform
-    MONGO_INITIALIZER(AuthorizationSystemRoles)(InitializerContext* context) {
+    MONGO_INITIALIZER(AuthorizationBuiltinRoles)(InitializerContext* context) {
         // Read role
         readRoleActions.addAction(ActionType::cloneCollectionLocalSource);
         readRoleActions.addAction(ActionType::collStats);
@@ -219,44 +219,44 @@ namespace {
     Privilege getPrivilegeForBuiltinRole(const RoleName& roleName) {
         const bool isAdminDB = (roleName.getDB() == ADMIN_DBNAME);
 
-        if (roleName.getRole() == SYSTEM_ROLE_READ) {
+        if (roleName.getRole() == BUILTIN_ROLE_READ) {
             return Privilege(roleName.getDB().toString(), readRoleActions);
         }
-        if (roleName.getRole() == SYSTEM_ROLE_READ_WRITE) {
+        if (roleName.getRole() == BUILTIN_ROLE_READ_WRITE) {
             return Privilege(roleName.getDB().toString(), readWriteRoleActions);
         }
-        if (roleName.getRole() == SYSTEM_ROLE_USER_ADMIN) {
+        if (roleName.getRole() == BUILTIN_ROLE_USER_ADMIN) {
             return Privilege(roleName.getDB().toString(), userAdminRoleActions);
         }
-        if (roleName.getRole() == SYSTEM_ROLE_DB_ADMIN) {
+        if (roleName.getRole() == BUILTIN_ROLE_DB_ADMIN) {
             return Privilege(roleName.getDB().toString(), dbAdminRoleActions);
         }
-        if (roleName.getRole() == RoleGraph::SYSTEM_ROLE_V0_READ) {
+        if (roleName.getRole() == RoleGraph::BUILTIN_ROLE_V0_READ) {
             return Privilege(roleName.getDB().toString(), compatibilityReadOnlyActions);
         }
-        if (roleName.getRole() == RoleGraph::SYSTEM_ROLE_V0_READ_WRITE) {
+        if (roleName.getRole() == RoleGraph::BUILTIN_ROLE_V0_READ_WRITE) {
             return Privilege(roleName.getDB().toString(), compatibilityReadWriteActions);
         }
-        if (isAdminDB && roleName.getRole() == SYSTEM_ROLE_READ_ANY_DB) {
+        if (isAdminDB && roleName.getRole() == BUILTIN_ROLE_READ_ANY_DB) {
             return Privilege(AuthorizationManager::WILDCARD_RESOURCE_NAME, readRoleActions);
         }
-        if (isAdminDB && roleName.getRole() == SYSTEM_ROLE_READ_WRITE_ANY_DB) {
+        if (isAdminDB && roleName.getRole() == BUILTIN_ROLE_READ_WRITE_ANY_DB) {
             return Privilege(AuthorizationManager::WILDCARD_RESOURCE_NAME, readWriteRoleActions);
         }
-        if (isAdminDB && roleName.getRole() == SYSTEM_ROLE_USER_ADMIN_ANY_DB) {
+        if (isAdminDB && roleName.getRole() == BUILTIN_ROLE_USER_ADMIN_ANY_DB) {
             return Privilege(AuthorizationManager::WILDCARD_RESOURCE_NAME, userAdminRoleActions);
         }
-        if (isAdminDB && roleName.getRole() == SYSTEM_ROLE_DB_ADMIN_ANY_DB) {
+        if (isAdminDB && roleName.getRole() == BUILTIN_ROLE_DB_ADMIN_ANY_DB) {
             return Privilege(AuthorizationManager::WILDCARD_RESOURCE_NAME, dbAdminRoleActions);
         }
-        if (isAdminDB && roleName.getRole() == SYSTEM_ROLE_CLUSTER_ADMIN) {
+        if (isAdminDB && roleName.getRole() == BUILTIN_ROLE_CLUSTER_ADMIN) {
             return Privilege(AuthorizationManager::WILDCARD_RESOURCE_NAME, clusterAdminRoleActions);
         }
-        if (isAdminDB && roleName.getRole() == RoleGraph::SYSTEM_ROLE_V0_ADMIN_READ) {
+        if (isAdminDB && roleName.getRole() == RoleGraph::BUILTIN_ROLE_V0_ADMIN_READ) {
             return Privilege(AuthorizationManager::WILDCARD_RESOURCE_NAME,
                              compatibilityReadOnlyAdminActions);
         }
-        if (isAdminDB && roleName.getRole() == RoleGraph::SYSTEM_ROLE_V0_ADMIN_READ_WRITE) {
+        if (isAdminDB && roleName.getRole() == RoleGraph::BUILTIN_ROLE_V0_ADMIN_READ_WRITE) {
             return Privilege(AuthorizationManager::WILDCARD_RESOURCE_NAME,
                              compatibilityReadWriteAdminActions);
         }
@@ -279,43 +279,43 @@ namespace {
     bool RoleGraph::_isBuiltinRole(const RoleName& role) {
         bool isAdminDB = role.getDB() == "admin";
 
-        if (role.getRole() == SYSTEM_ROLE_READ) {
+        if (role.getRole() == BUILTIN_ROLE_READ) {
             return true;
         }
-        else if (role.getRole() == SYSTEM_ROLE_READ_WRITE) {
+        else if (role.getRole() == BUILTIN_ROLE_READ_WRITE) {
             return true;
         }
-        else if (role.getRole() == SYSTEM_ROLE_USER_ADMIN) {
+        else if (role.getRole() == BUILTIN_ROLE_USER_ADMIN) {
             return true;
         }
-        else if (role.getRole() == SYSTEM_ROLE_DB_ADMIN) {
+        else if (role.getRole() == BUILTIN_ROLE_DB_ADMIN) {
             return true;
         }
-        else if (role.getRole() == SYSTEM_ROLE_V0_READ) {
+        else if (role.getRole() == BUILTIN_ROLE_V0_READ) {
             return true;
         }
-        else if (role.getRole() == SYSTEM_ROLE_V0_READ_WRITE) {
+        else if (role.getRole() == BUILTIN_ROLE_V0_READ_WRITE) {
             return true;
         }
-        else if (isAdminDB && role.getRole() == SYSTEM_ROLE_READ_ANY_DB) {
+        else if (isAdminDB && role.getRole() == BUILTIN_ROLE_READ_ANY_DB) {
             return true;
         }
-        else if (isAdminDB && role.getRole() == SYSTEM_ROLE_READ_WRITE_ANY_DB) {
+        else if (isAdminDB && role.getRole() == BUILTIN_ROLE_READ_WRITE_ANY_DB) {
             return true;
         }
-        else if (isAdminDB && role.getRole() == SYSTEM_ROLE_USER_ADMIN_ANY_DB) {
+        else if (isAdminDB && role.getRole() == BUILTIN_ROLE_USER_ADMIN_ANY_DB) {
             return true;
         }
-        else if (isAdminDB && role.getRole() == SYSTEM_ROLE_DB_ADMIN_ANY_DB) {
+        else if (isAdminDB && role.getRole() == BUILTIN_ROLE_DB_ADMIN_ANY_DB) {
             return true;
         }
-        else if (isAdminDB && role.getRole() == SYSTEM_ROLE_CLUSTER_ADMIN) {
+        else if (isAdminDB && role.getRole() == BUILTIN_ROLE_CLUSTER_ADMIN) {
             return true;
         }
-        else if (isAdminDB && role.getRole() == SYSTEM_ROLE_V0_ADMIN_READ) {
+        else if (isAdminDB && role.getRole() == BUILTIN_ROLE_V0_ADMIN_READ) {
             return true;
         }
-        else if (isAdminDB && role.getRole() == SYSTEM_ROLE_V0_ADMIN_READ_WRITE) {
+        else if (isAdminDB && role.getRole() == BUILTIN_ROLE_V0_ADMIN_READ_WRITE) {
             return true;
         }
 
