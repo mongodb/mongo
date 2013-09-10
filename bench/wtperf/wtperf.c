@@ -114,7 +114,6 @@ int config_opt_int(CONFIG *, WT_SESSION *, const char *, const char *);
 int config_opt_line(CONFIG *, WT_SESSION *, const char *);
 int config_opt_str(CONFIG *, WT_SESSION *, const char *, const char *);
 void config_opt_usage(void);
-int connection_reconfigure(WT_CONNECTION *, const char *);
 int execute_populate(CONFIG *);
 int execute_workload(CONFIG *);
 int find_table_count(CONFIG *);
@@ -135,7 +134,6 @@ int setup_log_file(CONFIG *);
 int start_threads(CONFIG *, u_int, pthread_t **, void *(*func)(void *));
 void *stat_worker(void *);
 int stop_threads(CONFIG *, u_int, pthread_t *);
-char *strstr_right(const char *str, const char *match, const char **rightp);
 void *update_thread(void *);
 void usage(void);
 void worker(CONFIG *, uint32_t);
@@ -816,52 +814,6 @@ err:	session->close(session, NULL);
 	return (ret);
 }
 
-/* Same as strstr, but also returns the right boundary of the match if found */
-char *strstr_right(const char *str, const char *match, const char **rightp)
-{
-	char *result;
-
-	if ((result = strstr(str, match)) != NULL)
-		*rightp = result + strlen(match);
-	else
-		*rightp = NULL;
-	return result;
-}
-
-/* Strip out any create parameter before reconfiguring */
-int connection_reconfigure(WT_CONNECTION *conn, const char *orig)
-{
-	char *alloced;
-	const char *config, *left, *right;
-	int ret;
-	size_t alloclen, leftlen;
-
-	alloced = NULL;
-
-	if (strcmp(orig, "create") == 0)
-		return (0);
-
-	if ((left = strstr_right(orig, ",create,", &right)) != NULL ||
-	    (left = strstr_right(orig, "create,", &right)) == orig ||
-	    ((left = strstr_right(orig, ",create", &right)) != NULL &&
-	    right == &orig[strlen(orig)])) {
-
-		leftlen = (size_t)(left - orig);
-		alloclen = leftlen + strlen(right) + 1;
-		alloced = malloc(alloclen);
-		strncpy(alloced, orig, leftlen);
-		strncpy(&alloced[leftlen], right, alloclen - leftlen);
-		config = alloced;
-	} else
-		config = orig;
-
-	ret = conn->reconfigure(conn, config);
-	if (alloced != NULL)
-		free(alloced);
-	return (ret);
-}
-
-
 int main(int argc, char **argv)
 {
 	CONFIG cfg;
@@ -1501,14 +1453,14 @@ remove_dir(const char *name)
 			    (strcmp(dp->d_name, ".") == 0 ||
 			    strcmp(dp->d_name, "..") == 0))
 				continue;
-			if ((newname = calloc(
-			    strlen(name) + dp->d_namlen + 1, 1)) == NULL) {
+			if ((newname = calloc(strlen(name) +
+			    strlen(dp->d_name) + 1, 1)) == NULL) {
 				fprintf(stderr, "wtperf: remove: no memory\n");
 				if (ret == 0)
 					ret = ENOMEM;
 			} else {
-				sprintf(newname, "%s/%*s",
-				    name, dp->d_namlen, dp->d_name);
+				sprintf(newname, "%s/%s",
+				    name, dp->d_name);
 				if ((t_ret = remove_all(newname, 1) != 0) &&
 				    ret == 0)
 					ret = t_ret;
