@@ -156,7 +156,7 @@ namespace mongo {
          * documents, but does not impact readers.
          * This can only be called when already in the AuthorizationManager's _lock.
          */
-        virtual bool tryAcquireAuthzUpdateLock() = 0;
+        virtual bool tryAcquireAuthzUpdateLock(const StringData& why) = 0;
 
         /**
          * Releases the lock guarding modifications to persistent authorization data, which must

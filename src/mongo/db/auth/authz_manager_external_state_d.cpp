@@ -28,8 +28,8 @@
 
 #include "mongo/db/auth/authz_manager_external_state_d.h"
 
-#include <string>
 #include <boost/thread/mutex.hpp>
+#include <string>
 
 #include "mongo/base/status.h"
 #include "mongo/db/auth/authorization_manager.h"
@@ -234,7 +234,8 @@ namespace {
         fassertFailed(17098);
     }
 
-    bool AuthzManagerExternalStateMongod::tryAcquireAuthzUpdateLock() {
+    bool AuthzManagerExternalStateMongod::tryAcquireAuthzUpdateLock(const StringData& why) {
+        log() << "Attempting to lock user data for: " << why << endl;
         return _authzDataUpdateLock.try_lock();
     }
 

@@ -262,12 +262,13 @@ namespace {
         fassertFailed(17108);
     }
 
-    bool AuthzManagerExternalStateMongos::tryAcquireAuthzUpdateLock() {
+    bool AuthzManagerExternalStateMongos::tryAcquireAuthzUpdateLock(const StringData& why) {
         if (_authzDataUpdateLock.get()) {
             return false;
         }
         _authzDataUpdateLock.reset(new ScopedDistributedLock(
                 configServer.getConnectionString(), "authorizationData"));
+        _authzDataUpdateLock->setLockMessage(why.toString());
 
         std::string errmsg;
         if (!_authzDataUpdateLock->tryAcquire(&errmsg)) {

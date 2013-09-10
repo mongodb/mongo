@@ -342,7 +342,7 @@ namespace mongo {
          * documents, but does not impact readers.
          * The AuthorizationManager's _lock must be held before this is called.
          */
-        bool tryAcquireAuthzUpdateLock();
+        bool tryAcquireAuthzUpdateLock(const StringData& why);
 
         /**
          * Releases the lock guarding modifications to persistent authorization data, which must
