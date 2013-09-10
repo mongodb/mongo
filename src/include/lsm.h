@@ -56,10 +56,11 @@ struct __wt_lsm_chunk {
 	uint64_t txnid_max;		/* Newest transactional update */
 
 #define	WT_LSM_CHUNK_BLOOM	0x01
-#define	WT_LSM_CHUNK_EVICTED	0x02
-#define	WT_LSM_CHUNK_MERGING	0x04
-#define	WT_LSM_CHUNK_ONDISK	0x08
-#define	WT_LSM_CHUNK_STABLE	0x10
+#define	WT_LSM_CHUNK_EMPTY	0x02
+#define	WT_LSM_CHUNK_EVICTED	0x04
+#define	WT_LSM_CHUNK_MERGING	0x08
+#define	WT_LSM_CHUNK_ONDISK	0x10
+#define	WT_LSM_CHUNK_STABLE	0x20
 	uint32_t flags;
 };
 
