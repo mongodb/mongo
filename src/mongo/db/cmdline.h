@@ -144,17 +144,6 @@ namespace mongo {
         ProcessId parentProc;      // --fork pid of initial process
         ProcessId leaderProc;      // --fork pid of leader process
 #endif
-#ifdef MONGO_SSL
-        bool sslOnNormalPorts;      // --sslOnNormalPorts
-        std::string sslPEMKeyFile;       // --sslPEMKeyFile
-        std::string sslPEMKeyPassword;   // --sslPEMKeyPassword
-        std::string sslClusterFile;       // --sslInternalKeyFile
-        std::string sslClusterPassword;   // --sslInternalKeyPassword
-        std::string sslCAFile;      // --sslCAFile
-        std::string sslCRLFile;     // --sslCRLFile
-        bool sslWeakCertificateValidation; // --sslWeakCertificateValidation
-        bool sslFIPSMode; // --sslFIPSMode
-#endif
 
         /**
          * Switches to enable experimental (unsupported) features.
@@ -215,10 +204,6 @@ namespace mongo {
             dur = true;
 #if defined(_DURABLEDEFAULTOFF)
         dur = false;
-#endif
-
-#ifdef MONGO_SSL
-        sslOnNormalPorts = false;
 #endif
     }
 

@@ -47,7 +47,7 @@ void play( string url ) {
 int main( int argc, const char **argv, char **envp) {
 
 #ifdef MONGO_SSL
-    cmdLine.sslOnNormalPorts = true;
+    sslGlobalParams.sslOnNormalPorts = true;
     runGlobalInitializersOrDie(argc, argv, envp);
 #endif
 
