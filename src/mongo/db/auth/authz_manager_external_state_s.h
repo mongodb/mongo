@@ -28,10 +28,12 @@
 
 #pragma once
 
+#include <boost/scoped_ptr.hpp>
 #include <string>
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
+#include "mongo/client/distlock.h"
 #include "mongo/db/auth/authz_manager_external_state.h"
 #include "mongo/db/auth/user_name.h"
 
@@ -86,6 +88,9 @@ namespace mongo {
         virtual Status _findUser(const string& usersNamespace,
                                  const BSONObj& query,
                                  BSONObj* result);
+
+    private:
+        scoped_ptr<ScopedDistributedLock> _authzDataUpdateLock;
     };
 
 } // namespace mongo

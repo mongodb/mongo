@@ -154,12 +154,14 @@ namespace mongo {
          * to authorization, namely the admin.system.users, admin.system.roles, and
          * admin.system.version collections.  This serializes all writers to the authorization
          * documents, but does not impact readers.
+         * This can only be called when already in the AuthorizationManager's _lock.
          */
         virtual bool tryAcquireAuthzUpdateLock() = 0;
 
         /**
          * Releases the lock guarding modifications to persistent authorization data, which must
          * already be held.
+         * This can only be called when already in the AuthorizationManager's _lock.
          */
         virtual void releaseAuthzUpdateLock() = 0;
 
