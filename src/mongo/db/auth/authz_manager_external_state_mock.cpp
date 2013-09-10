@@ -208,11 +208,11 @@ namespace mongo {
         return Status::OK();
     }
 
-    bool AuthzManagerExternalStateMock::tryLockUpgradeProcess() {
+    bool AuthzManagerExternalStateMock::tryAcquireAuthzUpdateLock() {
         return true;
     }
 
-    void AuthzManagerExternalStateMock::unlockUpgradeProcess() {}
+    void AuthzManagerExternalStateMock::releaseAuthzUpdateLock() {}
 
     std::vector<BSONObj> AuthzManagerExternalStateMock::getCollectionContents(
             const NamespaceString& collectionName) {

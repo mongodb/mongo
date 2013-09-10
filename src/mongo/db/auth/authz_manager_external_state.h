@@ -150,14 +150,18 @@ namespace mongo {
                                       const NamespaceString& toName) = 0;
 
         /**
-         * Tries to acquire the global lock guarding the upgrade process.
+         * Tries to acquire the global lock guarding modifications to all persistent data related
+         * to authorization, namely the admin.system.users, admin.system.roles, and
+         * admin.system.version collections.  This serializes all writers to the authorization
+         * documents, but does not impact readers.
          */
-        virtual bool tryLockUpgradeProcess() = 0;
+        virtual bool tryAcquireAuthzUpdateLock() = 0;
 
         /**
-         * Releases the lock guarding the upgrade process, which must already be held.
+         * Releases the lock guarding modifications to persistent authorization data, which must
+         * already be held.
          */
-        virtual void unlockUpgradeProcess() = 0;
+        virtual void releaseAuthzUpdateLock() = 0;
 
     protected:
         AuthzManagerExternalState(); // This class should never be instantiated directly.

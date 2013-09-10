@@ -94,8 +94,8 @@ namespace mongo {
                                         const NamespaceString& newName);
         virtual Status copyCollection(const NamespaceString& fromName,
                                       const NamespaceString& toName);
-        virtual bool tryLockUpgradeProcess();
-        virtual void unlockUpgradeProcess();
+        virtual bool tryAcquireAuthzUpdateLock();
+        virtual void releaseAuthzUpdateLock();
 
         std::vector<BSONObj> getCollectionContents(const NamespaceString& collectionName);
 

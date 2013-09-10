@@ -203,6 +203,11 @@ namespace mongo {
 
     Status AuthorizationManager::acquireUser(const UserName& userName, User** acquiredUser) {
         boost::lock_guard<boost::mutex> lk(_lock);
+        return _acquireUser_inlock(userName, acquiredUser);
+    }
+
+    Status AuthorizationManager::_acquireUser_inlock(const UserName& userName,
+                                                     User** acquiredUser) {
         unordered_map<UserName, User*>::iterator it = _userCache.find(userName);
         if (it != _userCache.end()) {
             fassert(16914, it->second);
@@ -410,35 +415,51 @@ namespace mongo {
         return Status::OK();
     }
 
+
+    AuthorizationManager::Guard::Guard(AuthorizationManager* authzManager)
+        : _authzManager(authzManager),
+          _lockedForUpdate(false),
+          _authzManagerLock(authzManager->_lock) {}
+
+    AuthorizationManager::Guard::~Guard() {
+        if (_lockedForUpdate) {
+            if (!_authzManagerLock.owns_lock()) {
+                _authzManagerLock.lock();
+            }
+            releaseAuthzUpdateLock();
+        }
+    }
+
+    bool AuthorizationManager::Guard::tryAcquireAuthzUpdateLock() {
+        fassert(17111, !_lockedForUpdate);
+        fassert(17126, _authzManagerLock.owns_lock());
+        _lockedForUpdate = _authzManager->_externalState->tryAcquireAuthzUpdateLock();
+        return _lockedForUpdate;
+    }
+
+    void AuthorizationManager::Guard::releaseAuthzUpdateLock() {
+        fassert(17112, _lockedForUpdate);
+        fassert(17127, _authzManagerLock.owns_lock());
+        _authzManager->_externalState->releaseAuthzUpdateLock();
+        _lockedForUpdate = false;
+    }
+
+    void AuthorizationManager::Guard::acquireAuthorizationManagerLock() {
+        fassert(17129, !_authzManagerLock.owns_lock());
+        _authzManagerLock.lock();
+    }
+
+    void AuthorizationManager::Guard::releaseAuthorizationManagerLock() {
+        fassert(17128, _authzManagerLock.owns_lock());
+        _authzManagerLock.unlock();
+    }
+
+    Status AuthorizationManager::Guard::acquireUser(const UserName& userName, User** acquiredUser) {
+        fassert(17130, _authzManagerLock.owns_lock());
+        return _authzManager->_acquireUser_inlock(userName, acquiredUser);
+    }
+
     namespace {
-        class AuthzUpgradeLockGuard {
-            MONGO_DISALLOW_COPYING(AuthzUpgradeLockGuard);
-        public:
-            explicit AuthzUpgradeLockGuard(AuthzManagerExternalState* externalState)
-                : _externalState(externalState), _locked(false) {
-            }
-
-            ~AuthzUpgradeLockGuard() {
-                if (_locked)
-                    unlock();
-            }
-
-            bool tryLock() {
-                fassert(17111, !_locked);
-                _locked = _externalState->tryLockUpgradeProcess();
-                return _locked;
-            }
-
-            void unlock() {
-                fassert(17112, _locked);
-                _externalState->unlockUpgradeProcess();
-                _locked = false;
-            }
-        private:
-            AuthzManagerExternalState* _externalState;
-            bool _locked;
-        };
-
         BSONObj userAsV2PrivilegeDocument(const User& user) {
             BSONObjBuilder builder;
 
@@ -495,9 +516,8 @@ namespace mongo {
     }  // namespace
 
     Status AuthorizationManager::upgradeAuthCollections() {
-        boost::lock_guard<boost::mutex> lkLocal(_lock);
-        AuthzUpgradeLockGuard lkUpgrade(_externalState.get());
-        if (!lkUpgrade.tryLock()) {
+        AuthorizationManager::Guard lkUpgrade(this);
+        if (!lkUpgrade.tryAcquireAuthzUpdateLock()) {
             return Status(ErrorCodes::LockBusy, "Could not lock auth data upgrade process lock.");
         }
         int durableVersion = 0;
