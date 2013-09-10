@@ -369,7 +369,7 @@ __curtable_insert(WT_CURSOR *cursor)
 	 * is replacing an existing record so that the existing index entries
 	 * can be removed.  We discover if this is an overwrite by configuring
 	 * the primary cursor for no-overwrite, and checking if the insert
-	 * returns a duplicate key exists error.  
+	 * detects a duplicate key.
 	 */
 	cp = ctable->cg_cursors;
 	primary = *cp++;
