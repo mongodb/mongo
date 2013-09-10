@@ -364,11 +364,6 @@ cursor_search_near(WT_CURSOR *cursor)
 	/*! [Search for an exact or adjacent match] */
 
 	/*! [Forward scan greater than or equal] */
-	/*
-	 * An example of a forward scan through the table, where all keys
-	 * greater than or equal to a specified prefix are included in the
-	 * scan.
-	 */
 	cursor->set_key(cursor, key);
 	ret = cursor->search_near(cursor, &exact);
 	if (ret == 0 && exact >= 0) {
@@ -381,10 +376,6 @@ cursor_search_near(WT_CURSOR *cursor)
 	/*! [Forward scan greater than or equal] */
 
 	/*! [Backward scan less than] */
-	/*
-	 * An example of a backward scan through the table, where all keys
-	 * less than a specified prefix are included in the scan.
-	 */
 	cursor->set_key(cursor, key);
 	ret = cursor->search_near(cursor, &exact);
 	if (ret == 0 && exact < 0) {

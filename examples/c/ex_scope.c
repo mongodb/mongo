@@ -74,12 +74,14 @@ cursor_scope_ops(WT_CURSOR *cursor)
 		}
 
 		/*
-		 * Now the cursor has been positioned, it no longer references
-		 * application memory.  The application's buffers can be safely
-		 * overwritten.
+		 * Except for WT_CURSOR::insert, the cursor has been positioned
+		 * and no longer references application memory, so application
+		 * buffers can be safely overwritten.
 		 */
-		strcpy(keybuf, "no key");
-		strcpy(valuebuf, "no value");
+		if (op->apply != cursor->insert) {
+			strcpy(keybuf, "no key");
+			strcpy(valuebuf, "no value");
+		}
 
 		/*
 		 * Check that get_key/value behave as expected after the
@@ -94,23 +96,25 @@ cursor_scope_ops(WT_CURSOR *cursor)
 		}
 
 		/*
-		 * The application now has pointers to memory that is owned by
-		 * the cursor.  Modifying the memory referenced by either key
-		 * or value is not permitted.
+		 * Except for WT_CURSOR::insert (which does not position the
+		 * cursor), the application now has pointers to memory owned
+		 * by the cursor.  Modifying the memory referenced by either
+		 * key or value is not permitted.
 		 */
 
 		/* Check that the cursor's key and value are what we expect. */
-		if (key == keybuf ||
-		    (op->apply != cursor->remove &&
-		    value == valuebuf)) {
+		if ((key == keybuf && op->apply != cursor->insert) ||
+		    (value == valuebuf &&
+		    op->apply != cursor->insert &&
+		    op->apply != cursor->remove)) {
 			fprintf(stderr,
 			    "Cursor points at application memory!\n");
 			return (EINVAL);
 		}
 
 		if (strcmp(key, op->key) != 0 ||
-		    (op->apply != cursor->remove &&
-		    strcmp(value, op->value) != 0)) {
+		    (strcmp(value, op->value) != 0 &&
+		    op->apply != cursor->remove)) {
 			fprintf(stderr, "Unexpected key / value!\n");
 			return (EINVAL);
 		}

@@ -964,7 +964,7 @@ err:	API_END(session);
  */
 static inline int
 __clsm_put(WT_SESSION_IMPL *session,
-    WT_CURSOR_LSM *clsm, const WT_ITEM *key, const WT_ITEM *value)
+    WT_CURSOR_LSM *clsm, const WT_ITEM *key, const WT_ITEM *value, int insert)
 {
 	WT_CURSOR *c, *primary;
 	WT_DECL_RET;
@@ -995,7 +995,7 @@ __clsm_put(WT_SESSION_IMPL *session,
 		c = clsm->cursors[(clsm->nchunks - i) - 1];
 		c->set_key(c, key);
 		c->set_value(c, value);
-		WT_RET(c->insert(c));
+		WT_RET(insert ? c->insert(c) : c->update(c));
 	}
 
 	/*
@@ -1082,7 +1082,7 @@ __clsm_insert(WT_CURSOR *cursor)
 		return (ret);
 	}
 
-	ret = __clsm_put(session, clsm, &cursor->key, &cursor->value);
+	ret = __clsm_put(session, clsm, &cursor->key, &cursor->value, 1);
 
 err:	WT_LSM_UPDATE_LEAVE(clsm, session, ret);
 	return (ret);
@@ -1105,7 +1105,8 @@ __clsm_update(WT_CURSOR *cursor)
 
 	if (F_ISSET(cursor, WT_CURSTD_OVERWRITE) ||
 	    (ret = __clsm_search(cursor)) == 0)
-		ret = __clsm_put(session, clsm, &cursor->key, &cursor->value);
+		ret = __clsm_put(
+		    session, clsm, &cursor->key, &cursor->value, 0);
 
 err:	WT_LSM_UPDATE_LEAVE(clsm, session, ret);
 	return (ret);
@@ -1127,7 +1128,8 @@ __clsm_remove(WT_CURSOR *cursor)
 
 	if (F_ISSET(cursor, WT_CURSTD_OVERWRITE) ||
 	    (ret = __clsm_search(cursor)) == 0)
-		ret = __clsm_put(session, clsm, &cursor->key, &__lsm_tombstone);
+		ret = __clsm_put(
+		    session, clsm, &cursor->key, &__lsm_tombstone, 0);
 
 err:	WT_LSM_UPDATE_LEAVE(clsm, session, ret);
 	return (ret);
