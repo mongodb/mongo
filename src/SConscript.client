@@ -186,17 +186,22 @@ if usingSasl:
 mongoClientInstalls = []
 mongoClientPrefixInstalls = []
 
-if windows and buildShared:
-    print("Building the client driver as a DLL is not supported, see SERVER-5650")
-    Exit(1)
-
 staticLibEnv = env.Clone()
 staticLibEnv.AppendUnique(
     LIBDEPS=mongoClientLibDeps,
     SYSLIBDEPS=mongoClientSysLibDeps)
 
+if windows:
+    # On Windows, we need to have the static library target and the
+    # import library target have different names, so that they aren't
+    # ambiguous to scons.  Boost names the static library libxxxx.lib and
+    # the import library xxxx.lib, so we shall follow their lead.
+    staticLibName = 'libmongoclient'
+else:
+    staticLibName = 'mongoclient'
+
 mongoClientStaticLib = staticLibEnv.StaticLibrary(
-    'mongoclient', clientObjects),
+    staticLibName, clientObjects),
 mongoClientInstalls.append(staticLibEnv.Install('#/', mongoClientStaticLib))
 
 if installSetup.libraries:
@@ -222,6 +227,16 @@ if buildShared:
     if linux:
         sharedLibEnv.AppendUnique(SHLINKFLAGS=["-Wl,--as-needed", "-Wl,-zdefs"])
 
+    if windows:
+        # Ignore warning LNK4102, which complains about exposing deleting destructors.
+        sharedLibEnv.AppendUnique(SHLINKFLAGS=["/IGNORE:4102"])
+        env.Command(['mongoclient.def'],
+                    ['#buildscripts/generate_def.py', mongoClientStaticLib],
+            '$PYTHON ${SOURCES[0]} $TARGETS ${SOURCES[1:]}')
+        # SCons automatically looks for this file in the source list and passes the proper
+        # parameter to MS-LINK automatically.
+        clientObjects.append('mongoclient.def')
+    
     mongoClientSharedLib = sharedLibEnv.SharedLibrary('mongoclient', clientObjects)
 
     mongoClientSharedLibInstall = sharedLibEnv.Install(
@@ -281,10 +296,12 @@ clientTests = staticClientEnv.Install("#/", staticClientPrograms)
 if buildShared:
     sharedClientEnv = clientEnv.Clone()
 
-    # Arrange for the tests to link against the mongoclient in the #/sharedclient directory.
+    # Arrange for the tests to link against the mongoclient in the #/sharedclient directory,
+    # and against boost explicitly rather than picking up the symbols through mongoclient.
     sharedClientEnv.PrependUnique(
         LIBS=['mongoclient'],
-        LIBPATH=["#/sharedclient"]
+        LIBPATH=["#/sharedclient"],
+        LIBDEPS=['$BUILD_DIR/third_party/shim_boost']
     )
 
     # Deal with the different lookup models between regular UNIX and Darwin. For regular unix,
