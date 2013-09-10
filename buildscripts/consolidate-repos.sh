@@ -52,7 +52,7 @@ echo
 for debian_dir in "$repodir"/ubuntu-* "$repodir"/debian-* 
 do
   cd "$debian_dir" 
-  for arch_dir in dists/dist/10gen/*   
+  for arch_dir in dists/dist/mongodb/*   
   do
     echo "Generating Packages file under $debian_dir/$arch_dir"
     dpkg-scanpackages --multiversion "$arch_dir"   > "$arch_dir"/Packages
