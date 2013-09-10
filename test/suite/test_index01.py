@@ -91,9 +91,17 @@ class test_index01(wttest.WiredTigerTestCase):
         self.assertEqual(cursor.insert(), 0)
         cursor.close()
 
+    def insert_duplicate(self, *cols):
+        self.pr('insert')
+        cursor = self.cursor(config='overwrite=false')
+        cursor.set_key(*cols[:2])
+        cursor.set_value(*cols[2:])
+        self.assertRaises(wiredtiger.WiredTigerError, lambda: cursor.insert())
+        cursor.close()
+
     def insert_overwrite(self, *cols):
         self.pr('insert')
-        cursor = self.cursor(config='overwrite')
+        cursor = self.cursor(config='overwrite=true')
         cursor.set_key(*cols[:2])
         cursor.set_value(*cols[2:])
         self.assertEqual(cursor.insert(), 0)
@@ -180,6 +188,7 @@ class test_index01(wttest.WiredTigerTestCase):
         self.insert_overwrite('jones', 2, 'IT', 'sysadmin', 50000, 1980)
         self.check_exists('smith', 1, 0)
         self.check_exists('jones', 2, 0)
+        self.insert_duplicate('smith', 1, 'HR', 'manager', 100000, 1970)
         result = ''
         for i in xrange(self.NUM_INDICES):
             result += '\n'.join(repr(cols)
