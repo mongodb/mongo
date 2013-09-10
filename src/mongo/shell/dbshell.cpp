@@ -37,6 +37,7 @@
 #include "mongo/shell/shell_utils.h"
 #include "mongo/shell/shell_utils_launcher.h"
 #include "mongo/util/file.h"
+#include "mongo/util/net/ssl_options.h"
 #include "mongo/util/options_parser/environment.h"
 #include "mongo/util/options_parser/option_section.h"
 #include "mongo/util/options_parser/options_parser.h"
@@ -751,32 +752,7 @@ Status addMongoShellOptions(moe::OptionSection* options) {
         return ret;
     }
 #ifdef MONGO_SSL
-    ret = options->addOption(OD("ssl", "ssl", moe::Switch, "use SSL for all connections", true));
-    if (!ret.isOK()) {
-        return ret;
-    }
-    ret = options->addOption(OD("ssl.CAFile", "sslCAFile", moe::String,
-                "Certificate Authority for SSL" , true));
-    if (!ret.isOK()) {
-        return ret;
-    }
-    ret = options->addOption(OD("ssl.PEMKeyFile", "sslPEMKeyFile", moe::String,
-                "PEM certificate/key file for SSL" , true));
-    if (!ret.isOK()) {
-        return ret;
-    }
-    ret = options->addOption(OD("ssl.PEMKeyPassword", "sslPEMKeyPassword", moe::String,
-                "password for key in PEM file for SSL" , true));
-    if (!ret.isOK()) {
-        return ret;
-    }
-    ret = options->addOption(OD("ssl.CRLFile", "sslCRLFile", moe::String,
-                "Certificate Revocation List file for SSL", true));
-    if (!ret.isOK()) {
-        return ret;
-    }
-    ret = options->addOption(OD("ssl.FIPSMode", "sslFIPSMode", moe::Switch,
-                "activate FIPS 140-2 mode at startup", true));
+    ret = addSSLClientOptions(options);
     if (!ret.isOK()) {
         return ret;
     }
@@ -818,23 +794,9 @@ Status storeMongoShellOptions() {
         mongo::cmdLine.quiet = true;
     }
 #ifdef MONGO_SSL
-    if ( params.count( "ssl" ) ) {
-        mongo::cmdLine.sslOnNormalPorts = true;
-    }
-    if (params.count("ssl.PEMKeyFile")) {
-        mongo::cmdLine.sslPEMKeyFile = params["ssl.PEMKeyFile"].as<std::string>();
-    }
-    if (params.count("ssl.PEMKeyPassword")) {
-        mongo::cmdLine.sslPEMKeyPassword = params["ssl.PEMKeyPassword"].as<std::string>();
-    }
-    if (params.count("ssl.CAFile")) {
-        mongo::cmdLine.sslCAFile = params["ssl.CAFile"].as<std::string>();
-    }
-    if (params.count("ssl.CRLFile")) {
-        mongo::cmdLine.sslCRLFile = params["ssl.CRLFile"].as<std::string>();
-    }
-    if (params.count( "ssl.FIPSMode")) {
-        mongo::cmdLine.sslFIPSMode = true;
+    Status ret = storeSSLClientOptions(params);
+    if (!ret.isOK()) {
+        return ret;
     }
 #endif
     if ( params.count( "ipv6" ) ) {

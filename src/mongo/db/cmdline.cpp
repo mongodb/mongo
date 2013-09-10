@@ -42,6 +42,7 @@
 #include "mongo/util/map_util.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/listen.h"
+#include "mongo/util/net/ssl_options.h"
 #include "mongo/util/options_parser/environment.h"
 #include "mongo/util/options_parser/option_section.h"
 #include "mongo/util/options_parser/options_parser.h"
@@ -464,78 +465,9 @@ namespace {
         }
 
 #ifdef MONGO_SSL
-
-        if (params.count("ssl.PEMKeyFile")) {
-            cmdLine.sslPEMKeyFile = boost::filesystem::absolute(
-                                        params["ssl.PEMKeyFile"].as<string>()).generic_string();
-        }
-
-        if (params.count("ssl.PEMKeyPassword")) {
-            cmdLine.sslPEMKeyPassword = params["ssl.PEMKeyPassword"].as<string>();
-        }
-
-        if (params.count("ssl.clusterFile")) {
-            cmdLine.sslClusterFile = boost::filesystem::absolute(
-                                         params["ssl.clusterFile"].as<string>()).generic_string();
-        }
-
-        if (params.count("ssl.clusterPassword")) {
-            cmdLine.sslClusterPassword = params["ssl.clusterPassword"].as<string>();
-        }
-
-        if (params.count("ssl.CAFile")) {
-            cmdLine.sslCAFile = boost::filesystem::absolute(
-                                         params["ssl.CAFile"].as<std::string>()).generic_string();
-        }
-
-        if (params.count("ssl.CRLFile")) {
-            cmdLine.sslCRLFile = boost::filesystem::absolute(
-                                         params["ssl.CRLFile"].as<std::string>()).generic_string();
-        }
-
-        if (params.count("ssl.weakCertificateValidation")) {
-            cmdLine.sslWeakCertificateValidation = true;
-        }
-        if (params.count("ssl.sslOnNormalPorts")) {
-            cmdLine.sslOnNormalPorts = true;
-            if ( cmdLine.sslPEMKeyFile.size() == 0 ) {
-                return Status(ErrorCodes::BadValue,
-                              "need sslPEMKeyFile with sslOnNormalPorts");
-            }
-            if (cmdLine.sslWeakCertificateValidation &&
-                cmdLine.sslCAFile.empty()) {
-                return Status(ErrorCodes::BadValue,
-                              "need sslCAFile with sslWeakCertificateValidation");
-            }
-            if (!cmdLine.sslCRLFile.empty() &&
-                cmdLine.sslCAFile.empty()) {
-                return Status(ErrorCodes::BadValue, "need sslCAFile with sslCRLFile");
-            }
-            if (params.count("ssl.FIPSMode")) {
-                cmdLine.sslFIPSMode = true;
-            }
-        }
-        else if (cmdLine.sslPEMKeyFile.size() || 
-                 cmdLine.sslPEMKeyPassword.size() ||
-                 cmdLine.sslClusterFile.size() ||
-                 cmdLine.sslClusterPassword.size() ||
-                 cmdLine.sslCAFile.size() ||
-                 cmdLine.sslCRLFile.size() ||
-                 cmdLine.sslWeakCertificateValidation ||
-                 cmdLine.sslFIPSMode) {
-            return Status(ErrorCodes::BadValue, "need to enable sslOnNormalPorts");
-        }
-        if (cmdLine.clusterAuthMode == "sendKeyfile" || 
-            cmdLine.clusterAuthMode == "sendX509" || 
-            cmdLine.clusterAuthMode == "x509") {
-            if (!cmdLine.sslOnNormalPorts){
-                return Status(ErrorCodes::BadValue, "need to enable sslOnNormalPorts");
-            }
-        }
-        else if (params.count("clusterAuthMode") && cmdLine.clusterAuthMode != "keyfile") {
-            StringBuilder sb;
-            sb << "unsupported value for clusterAuthMode " << cmdLine.clusterAuthMode;
-            return Status(ErrorCodes::BadValue, sb.str());
+        ret = storeSSLServerOptions(params);
+        if (!ret.isOK()) {
+            return ret;
         }
 #else // ifdef MONGO_SSL
         // Keyfile is currently the only supported value if not using SSL 

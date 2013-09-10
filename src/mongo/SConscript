@@ -221,6 +221,7 @@ commonFiles = [ "pch.cpp",
                 "util/stack_introspect.cpp",
                 "util/net/sock.cpp",
                 "util/net/ssl_manager.cpp",
+                "util/net/ssl_options.cpp",
                 "util/net/httpclient.cpp",
                 "util/net/message.cpp",
                 "util/net/message_port.cpp",
@@ -299,7 +300,9 @@ env.StaticLibrary('mongocommon', commonFiles,
                            'util/concurrency/thread_name',
                            '$BUILD_DIR/third_party/shim_pcrecpp',
                            '$BUILD_DIR/third_party/murmurhash3/murmurhash3',
-                           '$BUILD_DIR/third_party/shim_boost'] +
+                           '$BUILD_DIR/third_party/shim_boost',
+                           '$BUILD_DIR/mongo/util/options_parser/options_parser',
+                           ] +
                            extraCommonLibdeps)
 
 env.StaticLibrary("coredb", [

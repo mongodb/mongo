@@ -24,10 +24,10 @@
 
 #include "mongo/base/init.h"
 #include "mongo/bson/util/atomic_int.h"
-#include "mongo/db/cmdline.h"
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/sock.h"
+#include "mongo/util/net/ssl_options.h"
 #include "mongo/util/scopeguard.h"
 
 #ifdef MONGO_SSL
@@ -35,6 +35,9 @@
 #endif
 
 namespace mongo {
+
+    SSLGlobalParams sslGlobalParams;
+
 #ifndef MONGO_SSL   
     const std::string getSSLVersion(const std::string &prefix, const std::string &suffix) {
         return "";
@@ -271,16 +274,16 @@ namespace mongo {
     
     MONGO_INITIALIZER(SSLManager)(InitializerContext* context) {
         SimpleMutex::scoped_lock lck(sslManagerMtx);
-        if (cmdLine.sslOnNormalPorts) {
+        if (sslGlobalParams.sslOnNormalPorts) {
             const Params params(
-                cmdLine.sslPEMKeyFile,
-                cmdLine.sslPEMKeyPassword,
-                cmdLine.sslClusterFile,
-                cmdLine.sslClusterPassword,
-                cmdLine.sslCAFile,
-                cmdLine.sslCRLFile,
-                cmdLine.sslWeakCertificateValidation,
-                cmdLine.sslFIPSMode);
+                sslGlobalParams.sslPEMKeyFile,
+                sslGlobalParams.sslPEMKeyPassword,
+                sslGlobalParams.sslClusterFile,
+                sslGlobalParams.sslClusterPassword,
+                sslGlobalParams.sslCAFile,
+                sslGlobalParams.sslCRLFile,
+                sslGlobalParams.sslWeakCertificateValidation,
+                sslGlobalParams.sslFIPSMode);
             theSSLManager = new SSLManager(params, isSSLServer);
         }
         return Status::OK();
