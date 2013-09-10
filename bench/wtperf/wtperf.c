@@ -357,6 +357,11 @@ worker(CONFIG *cfg, uint32_t worker_type)
 			if (op_ret == WT_NOTFOUND && cfg->insert_threads > 0 &&
 			    (worker_type == WORKER_READ ||
 			    worker_type == WORKER_UPDATE)) {
+				if (next_val < cfg->icount)
+					lprintf(cfg, WT_PANIC, 0,
+					    "%s not found for: %s. Value was"
+					    " inserted during populate",
+					    op_name, key_buf);
 				if (next_val * 1.1 > wtperf_value_range(cfg))
 					continue;
 				lprintf(cfg, op_ret, 1,
@@ -1511,6 +1516,10 @@ lprintf(CONFIG *cfg, int err, uint32_t level, const char *fmt, ...)
 		va_end(ap);
 		fprintf(cfg->logf, " Error: %s\n", wiredtiger_strerror(err));
 	}
+
+	/* Never attempt to continue if we got a panic from WiredTiger. */
+	if (err == WT_PANIC)
+		exit(1);
 
 	return (0);
 }

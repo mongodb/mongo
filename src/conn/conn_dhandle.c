@@ -75,11 +75,8 @@ __conn_dhandle_open_lock(
 
 /*
  * __conn_dhandle_get --
- *	Find an open btree file handle, otherwise create a new one and link it
- *	into the connection's list.  If successful, it returns with either
- *	(a) an open handle, read locked (if WT_DHANDLE_EXCLUSIVE is set); or
- *	(b) an open handle, write locked (if WT_DHANDLE_EXCLUSIVE is set), or
- *	(c) a closed handle, write locked.
+ *	Find an open btree file handle, otherwise create a new one, lock it
+ * exclusively, and return it linked into the connection's list.
  */
 static int
 __conn_dhandle_get(WT_SESSION_IMPL *session,
@@ -112,44 +109,42 @@ __conn_dhandle_get(WT_SESSION_IMPL *session,
 		}
 
 	/*
-	 * Allocate the WT_BTREE structure, its lock, and set the name so we
-	 * can add the handle to the list.  Lock the handle before inserting
-	 * it in the list.
+	 * Allocate the data source handle and underlying btree handle, then
+	 * initialize the data source handle.  Exclusively lock the data
+	 * source handle before inserting it in the list.
 	 */
-	btree = NULL;
 	WT_RET(__wt_calloc_def(session, 1, &dhandle));
-	WT_RET(__wt_calloc_def(session, 1, &btree));
+
+	WT_ERR(__wt_rwlock_alloc(session, "btree handle", &dhandle->rwlock));
+	dhandle->refcnt = 1;
+
+	dhandle->name_hash = hash;
+	WT_ERR(__wt_strdup(session, name, &dhandle->name));
+	if (ckpt != NULL)
+		WT_ERR(__wt_strdup(session, ckpt, &dhandle->checkpoint));
+
+	WT_ERR(__wt_calloc_def(session, 1, &btree));
 	dhandle->handle = btree;
 	btree->dhandle = dhandle;
-	if ((ret = __wt_rwlock_alloc(
-		session, "btree handle", &dhandle->rwlock)) == 0 &&
-	    (ret = __wt_strdup(session, name, &dhandle->name)) == 0 &&
-	    (ckpt == NULL ||
-	    (ret = __wt_strdup(session, ckpt, &dhandle->checkpoint)) == 0) &&
-	    (ret = __wt_writelock(session, dhandle->rwlock)) == 0) {
-		F_SET(dhandle, WT_DHANDLE_EXCLUSIVE);
 
-		dhandle->name_hash = hash;
-		/*
-		 * Add the handle to the connection list.
-		 *
-		 * Put it at the beginning on the basis that we're likely to
-		 * need new files again soon until they are cached by all
-		 * sessions.
-		 */
-		dhandle->refcnt = 1;
-		TAILQ_INSERT_HEAD(&conn->dhqh, dhandle, q);
-	}
+	F_SET(dhandle, WT_DHANDLE_EXCLUSIVE);
+	WT_ERR(__wt_writelock(session, dhandle->rwlock));
 
-	if (ret == 0)
-		session->dhandle = dhandle;
-	else {
-		if (dhandle->rwlock != NULL)
-			WT_TRET(__wt_rwlock_destroy(session, &dhandle->rwlock));
-		__wt_free(session, dhandle->name);
-		__wt_free(session, dhandle->checkpoint);
-		__wt_overwrite_and_free(session, dhandle);
-	}
+	/*
+	 * Prepend the handle to the connection list, assuming we're likely to
+	 * need new files again soon, until they are cached by all sessions.
+	 */
+	TAILQ_INSERT_HEAD(&conn->dhqh, dhandle, q);
+
+	session->dhandle = dhandle;
+	return (0);
+
+err:	if (dhandle->rwlock != NULL)
+		WT_TRET(__wt_rwlock_destroy(session, &dhandle->rwlock));
+	__wt_free(session, dhandle->name);
+	__wt_free(session, dhandle->checkpoint);
+	__wt_free(session, dhandle->handle);		/* btree free */
+	__wt_overwrite_and_free(session, dhandle);
 
 	return (ret);
 }

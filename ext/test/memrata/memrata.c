@@ -278,7 +278,8 @@ lock_init(
 	int ret = 0;
 
 	if ((ret = pthread_rwlock_init(lockp, NULL)) != 0)
-		ERET(wtext, session, WT_PANIC, "lock init: %s", strerror(ret));
+		ERET(wtext, session, WT_PANIC,
+		    "pthread_rwlock_init: %s", strerror(ret));
 	return (0);
 }
 
@@ -293,8 +294,8 @@ lock_destroy(
 	int ret = 0;
 
 	if ((ret = pthread_rwlock_destroy(lockp)) != 0)
-		ERET(wtext,
-		    session, WT_PANIC, "lock destroy: %s", strerror(ret));
+		ERET(wtext, session, WT_PANIC,
+		    "pthread_rwlock_destroy: %s", strerror(ret));
 	return (0);
 }
 
@@ -309,8 +310,8 @@ writelock(
 	int ret = 0;
 
 	if ((ret = pthread_rwlock_wrlock(lockp)) != 0)
-		ERET(wtext,
-		    session, WT_PANIC, "write-lock: %s", strerror(ret));
+		ERET(wtext, session, WT_PANIC,
+		    "pthread_rwlock_wrlock: %s", strerror(ret));
 	return (0);
 }
 
@@ -324,7 +325,8 @@ unlock(WT_EXTENSION_API *wtext, WT_SESSION *session, pthread_rwlock_t *lockp)
 	int ret = 0;
 
 	if ((ret = pthread_rwlock_unlock(lockp)) != 0)
-		ERET(wtext, session, WT_PANIC, "unlock: %s", strerror(ret));
+		ERET(wtext, session, WT_PANIC,
+		    "pthread_rwlock_unlock: %s", strerror(ret));
 	return (0);
 }
 
@@ -758,17 +760,15 @@ cache_value_visible(WT_CURSOR *wtcursor, CACHE_RECORD **cpp)
  *	Return if a cache entry has no updates that aren't globally visible.
  */
 static int
-cache_value_visible_all(WT_CURSOR *wtcursor, uint64_t oldest, int final)
+cache_value_visible_all(WT_CURSOR *wtcursor, uint64_t oldest)
 {
 	CACHE_RECORD *cp;
 	CURSOR *cursor;
-	WT_EXTENSION_API *wtext;
 	WT_SESSION *session;
 	u_int i;
 
 	session = wtcursor->session;
 	cursor = (CURSOR *)wtcursor;
-	wtext = cursor->wtext;
 
 	/*
 	 * Compare the update's transaction ID and the oldest transaction ID
@@ -780,18 +780,8 @@ cache_value_visible_all(WT_CURSOR *wtcursor, uint64_t oldest, int final)
 	 */
 	for (i = 0, cp = cursor->cache; i < cursor->cache_entries; ++i, ++cp)
 		if (cp->txnid >= oldest)
-			break;
-	if (i == cursor->cache_entries)
-		return (1);
-
-	/*
-	 * If this is the final pass when shutting down the KVS store, there
-	 * should not be any entries that aren't globally visible.
-	 */
-	if (final)
-		ERET(wtext, session, 0,
-		    "cleaner: closing with unresolved updates in the cache");
-	return (0);
+			return (0);
+	return (1);
 }
 
 /*
@@ -1207,7 +1197,7 @@ cache_clean:
 
 /*
  * kvs_cursor_next --
- *	WT_CURSOR::next method.
+ *	WT_CURSOR.next method.
  */
 static int
 kvs_cursor_next(WT_CURSOR *wtcursor)
@@ -1217,7 +1207,7 @@ kvs_cursor_next(WT_CURSOR *wtcursor)
 
 /*
  * kvs_cursor_prev --
- *	WT_CURSOR::prev method.
+ *	WT_CURSOR.prev method.
  */
 static int
 kvs_cursor_prev(WT_CURSOR *wtcursor)
@@ -1227,7 +1217,7 @@ kvs_cursor_prev(WT_CURSOR *wtcursor)
 
 /*
  * kvs_cursor_reset --
- *	WT_CURSOR::reset method.
+ *	WT_CURSOR.reset method.
  */
 static int
 kvs_cursor_reset(WT_CURSOR *wtcursor)
@@ -1248,7 +1238,7 @@ kvs_cursor_reset(WT_CURSOR *wtcursor)
 
 /*
  * kvs_cursor_search --
- *	WT_CURSOR::search method.
+ *	WT_CURSOR.search method.
  */
 static int
 kvs_cursor_search(WT_CURSOR *wtcursor)
@@ -1287,7 +1277,7 @@ kvs_cursor_search(WT_CURSOR *wtcursor)
 
 /*
  * kvs_cursor_search_near --
- *	WT_CURSOR::search_near method.
+ *	WT_CURSOR.search_near method.
  */
 static int
 kvs_cursor_search_near(WT_CURSOR *wtcursor, int *exact)
@@ -1330,7 +1320,7 @@ kvs_cursor_search_near(WT_CURSOR *wtcursor, int *exact)
 
 /*
  * kvs_cursor_insert --
- *	WT_CURSOR::insert method.
+ *	WT_CURSOR.insert method.
  */
 static int
 kvs_cursor_insert(WT_CURSOR *wtcursor)
@@ -1541,7 +1531,7 @@ err:	ESET(unlock(wtext, session, &ws->lock));
 
 /*
  * kvs_cursor_update --
- *	WT_CURSOR::update method.
+ *	WT_CURSOR.update method.
  */
 static int
 kvs_cursor_update(WT_CURSOR *wtcursor)
@@ -1551,7 +1541,7 @@ kvs_cursor_update(WT_CURSOR *wtcursor)
 
 /*
  * kvs_cursor_remove --
- *	WT_CURSOR::remove method.
+ *	WT_CURSOR.remove method.
  */
 static int
 kvs_cursor_remove(WT_CURSOR *wtcursor)
@@ -1576,7 +1566,7 @@ kvs_cursor_remove(WT_CURSOR *wtcursor)
 
 /*
  * kvs_cursor_close --
- *	WT_CURSOR::close method.
+ *	WT_CURSOR.close method.
  */
 static int
 kvs_cursor_close(WT_CURSOR *wtcursor)
@@ -1715,7 +1705,7 @@ ws_source_close(WT_EXTENSION_API *wtext, WT_SESSION *session, WT_SOURCE *ws)
 	ws->kvs = NULL;
 	if (ws->kvscache != NULL && (ret = kvs_close(ws->kvscache)) != 0)
 		EMSG(wtext, session, WT_ERROR,
-		    "kvs_close: %s.cache: %s", ws->uri, kvs_strerror(ret));
+		    "kvs_close: %s(cache): %s", ws->uri, kvs_strerror(ret));
 	ws->kvscache = NULL;
 
 	if (ws->lockinit)
@@ -2043,7 +2033,7 @@ master_uri_set(WT_DATA_SOURCE *wtds,
 
 /*
  * kvs_session_open_cursor --
- *	WT_SESSION::open_cursor method.
+ *	WT_SESSION.open_cursor method.
  */
 static int
 kvs_session_open_cursor(WT_DATA_SOURCE *wtds, WT_SESSION *session,
@@ -2172,7 +2162,7 @@ err:		if (ws != NULL && locked)
 
 /*
  * kvs_session_create --
- *	WT_SESSION::create method.
+ *	WT_SESSION.create method.
  */
 static int
 kvs_session_create(WT_DATA_SOURCE *wtds,
@@ -2210,7 +2200,7 @@ kvs_session_create(WT_DATA_SOURCE *wtds,
 
 /*
  * kvs_session_drop --
- *	WT_SESSION::drop method.
+ *	WT_SESSION.drop method.
  */
 static int
 kvs_session_drop(WT_DATA_SOURCE *wtds,
@@ -2273,7 +2263,7 @@ kvs_session_drop(WT_DATA_SOURCE *wtds,
 
 /*
  * kvs_session_rename --
- *	WT_SESSION::rename method.
+ *	WT_SESSION.rename method.
  */
 static int
 kvs_session_rename(WT_DATA_SOURCE *wtds, WT_SESSION *session,
@@ -2336,7 +2326,7 @@ err:	ESET(unlock(wtext, session, &ds->global_lock));
 
 /*
  * kvs_session_truncate --
- *	WT_SESSION::truncate method.
+ *	WT_SESSION.truncate method.
  */
 static int
 kvs_session_truncate(WT_DATA_SOURCE *wtds,
@@ -2369,7 +2359,7 @@ kvs_session_truncate(WT_DATA_SOURCE *wtds,
 
 /*
  * kvs_session_verify --
- *	WT_SESSION::verify method.
+ *	WT_SESSION.verify method.
  */
 static int
 kvs_session_verify(WT_DATA_SOURCE *wtds,
@@ -2389,7 +2379,7 @@ kvs_session_verify(WT_DATA_SOURCE *wtds,
 
 /*
  * kvs_session_checkpoint --
- *	WT_SESSION::checkpoint method.
+ *	WT_SESSION.checkpoint method.
  */
 static int
 kvs_session_checkpoint(
@@ -2441,7 +2431,7 @@ kvs_config_devices(
 	if ((ret = wtext->config_scan_begin(
 	    wtext, NULL, orig->str, orig->len, &scan)) != 0)
 		EMSG_ERR(wtext, NULL, ret,
-		    "WT_EXTENSION_API::config_scan_begin: %s",
+		    "WT_EXTENSION_API.config_scan_begin: %s",
 		    wtext->strerror(ret));
 
 	for (cnt = slots = 0; (ret = wtext->
@@ -2465,11 +2455,11 @@ kvs_config_devices(
 	}
 	if (ret != WT_NOTFOUND)
 		EMSG_ERR(wtext, NULL, ret,
-		    "WT_EXTENSION_API::config_scan_next: %s",
+		    "WT_EXTENSION_API.config_scan_next: %s",
 		    wtext->strerror(ret));
 	if ((ret = wtext->config_scan_end(wtext, scan)) != 0)
 		EMSG_ERR(wtext, NULL, ret,
-		    "WT_EXTENSION_API::config_scan_end: %s",
+		    "WT_EXTENSION_API.config_scan_end: %s",
 		    wtext->strerror(ret));
 
 	*devices = argv;
@@ -2504,7 +2494,7 @@ kvs_config_read(WT_EXTENSION_API *wtext, WT_CONFIG_ITEM *config,
 	if ((ret = wtext->config_scan_begin(
 	    wtext, NULL, config->str, config->len, &scan)) != 0)
 		ERET(wtext, NULL, ret,
-		    "WT_EXTENSION_API::config_scan_begin: %s",
+		    "WT_EXTENSION_API.config_scan_begin: %s",
 		    wtext->strerror(ret));
 	while ((ret = wtext->config_scan_next(wtext, scan, &k, &v)) == 0) {
 		if (STRING_MATCH("kvs_devices", k.str, k.len)) {
@@ -2550,12 +2540,12 @@ kvs_config_read(WT_EXTENSION_API *wtext, WT_CONFIG_ITEM *config,
 		ret = 0;
 	if (ret != 0)
 		EMSG_ERR(wtext, NULL, ret,
-		    "WT_EXTENSION_API::config_scan_next: %s",
+		    "WT_EXTENSION_API.config_scan_next: %s",
 		    wtext->strerror(ret));
 
 err:	if ((tret = wtext->config_scan_end(wtext, scan)) != 0)
 		EMSG(wtext, NULL, tret,
-		    "WT_EXTENSION_API::config_scan_end: %s",
+		    "WT_EXTENSION_API.config_scan_end: %s",
 		    wtext->strerror(ret));
 
 	return (ret);
@@ -2577,7 +2567,7 @@ kvs_source_close(WT_EXTENSION_API *wtext, WT_SESSION *session, KVS_SOURCE *ks)
 
 		if ((tret = pthread_join(ks->cleaner_id, NULL)) != 0)
 			EMSG(wtext, session, tret,
-			    "pthread_join: %s", kvs_strerror(tret));
+			    "pthread_join: %s", strerror(tret));
 		ks->cleaner_id = 0;
 	}
 
@@ -2596,8 +2586,8 @@ kvs_source_close(WT_EXTENSION_API *wtext, WT_SESSION *session, KVS_SOURCE *ks)
 		/* If the owner, close the database transaction store. */
 		if (ks->kvsowner && (tret = kvs_close(ks->kvstxn)) != 0)
 			EMSG(wtext, session, tret,
-			    "kvs_close: %s.txn: %s",
-			    ks->name, kvs_strerror(tret));
+			    "kvs_close: %s: %s",
+			    WT_NAME_TXN, kvs_strerror(tret));
 
 		if ((tret = kvs_close(ks->kvs_device)) != 0)
 			EMSG(wtext, session, WT_ERROR,
@@ -2616,8 +2606,8 @@ kvs_source_close(WT_EXTENSION_API *wtext, WT_SESSION *session, KVS_SOURCE *ks)
  *	Migrate information from the cache to the primary store.
  */
 static int
-cache_cleaner(WT_EXTENSION_API *wtext, WT_CURSOR *wtcursor,
-    uint64_t oldest, int final, uint64_t *txnminp)
+cache_cleaner(WT_EXTENSION_API *wtext,
+    WT_CURSOR *wtcursor, uint64_t oldest, uint64_t *txnminp)
 {
 	struct kvs_record *r;
 	CACHE_RECORD *cp;
@@ -2662,7 +2652,7 @@ cache_cleaner(WT_EXTENSION_API *wtext, WT_CURSOR *wtcursor,
 		 */
 		if ((ret = cache_value_unmarshall(wtcursor)) != 0)
 			goto err;
-		if (!recovery && !cache_value_visible_all(wtcursor, oldest, 0))
+		if (!recovery && !cache_value_visible_all(wtcursor, oldest))
 			continue;
 		if (recovery)
 			cache_value_last_committed(wtcursor, &cp);
@@ -2736,7 +2726,7 @@ cache_cleaner(WT_EXTENSION_API *wtext, WT_CURSOR *wtcursor,
 		 */
 		if ((ret = cache_value_unmarshall(wtcursor)) != 0)
 			goto err;
-		if (cache_value_visible_all(wtcursor, oldest, final)) {
+		if (cache_value_visible_all(wtcursor, oldest)) {
 			if ((ret = kvs_del(ws->kvscache, r)) != 0)
 				EMSG_ERR(wtext, NULL, WT_ERROR,
 				    "kvs_del: %s", kvs_strerror(ret));
@@ -2797,7 +2787,7 @@ txn_cleaner(WT_CURSOR *wtcursor, kvs_t kvstxn, uint64_t txnmin)
 		memcpy(&txnid, r->key, sizeof(txnid));
 		if (txnid < txnmin && (ret = kvs_del(kvstxn, r)) != 0)
 			ERET(wtext, NULL, WT_ERROR,
-			    "kvs_del: transaction: %s", kvs_strerror(ret));
+			    "kvs_del: %s", kvs_strerror(ret));
 	}
 	if (ret == WT_NOTFOUND)
 		ret = 0;
@@ -2916,8 +2906,8 @@ kvs_cleaner(void *arg)
 		txnmin = UINT64_MAX;
 		for (ws = ks->ws_head; ws != NULL; ws = ws->next) {
 			cursor->ws = ws;
-			if ((ret = cache_cleaner(wtext, wtcursor,
-			    oldest, cleaner_stop, &txntmp)) != 0)
+			if ((ret = cache_cleaner(
+			    wtext, wtcursor, oldest, &txntmp)) != 0)
 				goto err;
 			if (txntmp < txnmin)
 				txnmin = txntmp;
@@ -3065,8 +3055,8 @@ kvs_source_open_txn(DATA_SOURCE *ds)
 		if ((kvstxn = kvs_open_namespace(
 		    ks->kvs_device, WT_NAME_TXN, KVS_O_CREATE)) == NULL)
 			ERET(wtext, NULL, WT_ERROR,
-			    "kvs_open_namespace: %s.txn: %s",
-			    ks->name, kvs_strerror(os_errno()));
+			    "kvs_open_namespace: %s: %s",
+			    WT_NAME_TXN, kvs_strerror(os_errno()));
 
 		/* Push the change. */
 		if ((ret = kvs_commit(ks->kvs_device)) != 0)
@@ -3138,11 +3128,11 @@ kvs_source_recover_namespace(WT_DATA_SOURCE *wtds,
 	cursor->ws = ws;
 
 	/* Process, then clear, the cache. */
-	if ((ret = cache_cleaner(wtext, wtcursor, 0, 0, NULL)) != 0)
+	if ((ret = cache_cleaner(wtext, wtcursor, 0, NULL)) != 0)
 		goto err;
 	if ((ret = kvs_truncate(ws->kvscache)) != 0)
 		EMSG_ERR(wtext, NULL, WT_ERROR,
-		    "kvs_truncate: %s.cache: %s", ws->uri, kvs_strerror(ret));
+		    "kvs_truncate: %s(cache): %s", ws->uri, kvs_strerror(ret));
 
 	/* Close the underlying WiredTiger sources. */
 err:	while ((ws = ks->ws_head) != NULL) {
@@ -3235,7 +3225,7 @@ kvs_source_recover(WT_DATA_SOURCE *wtds, KVS_SOURCE *ks, WT_CONFIG_ARG *config)
 	/* Clear the transaction store. */
 	if ((ret = kvs_truncate(ks->kvstxn)) != 0)
 		EMSG_ERR(wtext, NULL, WT_ERROR,
-		    "kvs_truncate: %s.txn: %s", ks->name, kvs_strerror(ret));
+		    "kvs_truncate: %s: %s", WT_NAME_TXN, kvs_strerror(ret));
 
 err:	for (i = 0; i < names.list_cnt; ++i)
 		free(names.list[i]);
@@ -3334,9 +3324,9 @@ wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 	wtext = connection->get_extension_api(connection);
 
 						/* Check the library version */
-#if KVS_VERSION_MAJOR != 4 || KVS_VERSION_MINOR != 9
+#if KVS_VERSION_MAJOR != 4 || KVS_VERSION_MINOR != 13
 	ERET(wtext, NULL, EINVAL,
-	    "unsupported KVS library version %d.%d, expected version 4.9",
+	    "unsupported KVS library version %d.%d, expected version 4.13",
 	    KVS_VERSION_MAJOR, KVS_VERSION_MINOR);
 #endif
 
@@ -3388,7 +3378,7 @@ wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 		    &ks->cleaner_id, NULL, kvs_cleaner, ks)) != 0)
 			EMSG_ERR(wtext, NULL, ret,
 			    "%s: pthread_create: cleaner thread: %s",
-			    ks->name, wtext->strerror(ret));
+			    ks->name, strerror(ret));
 
 	/* Add KVS-specific configuration options.  */
 	for (p = session_create_opts; *p != NULL; ++p)

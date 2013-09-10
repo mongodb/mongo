@@ -23,7 +23,6 @@ static int __curtable_update(WT_CURSOR *cursor);
 	WT_INDEX *idx;							\
 	WT_CURSOR **__cp;						\
 	u_int __i;							\
-	WT_ERR(__curtable_open_indices(ctable));			\
 	__cp = (ctable)->idx_cursors;					\
 	for (__i = 0; __i < ctable->table->nindices; __i++, __cp++) {	\
 		idx = ctable->table->indices[__i];			\
@@ -226,8 +225,8 @@ err:	API_END(session);
 
 /*
  * __curtable_next_random --
- *	WT_CURSOR->insert method for the table cursor type when configured with
- * next_random.
+ *	WT_CURSOR->next method for the table cursor type when configured with
+ *	next_random.
  */
 static int
 __curtable_next_random(WT_CURSOR *cursor)
@@ -357,31 +356,43 @@ __curtable_insert(WT_CURSOR *cursor)
 	WT_CURSOR_TABLE *ctable;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
+	uint32_t flag_orig;
 	u_int i;
 
 	ctable = (WT_CURSOR_TABLE *)cursor;
 	CURSOR_UPDATE_API_CALL(cursor, session, insert, NULL);
-	cp = ctable->cg_cursors;
+	WT_ERR(__curtable_open_indices(ctable));
 
 	/*
-	 * Split out the first insert, it may be allocating a recno, and this
-	 * is also the point at which we discover whether this is an overwrite.
+	 * Split out the first insert, it may be allocating a recno.
+	 *
+	 * If the table has indices, we also need to know whether this record
+	 * is replacing an existing record so that the existing index entries
+	 * can be removed.  We discover if this is an overwrite by configuring
+	 * the primary cursor for no-overwrite, and checking if the insert
+	 * detects a duplicate key.
 	 */
+	cp = ctable->cg_cursors;
 	primary = *cp++;
-	if ((ret = primary->insert(primary)) != 0) {
-		if (ret == WT_DUPLICATE_KEY &&
-		    F_ISSET(cursor, WT_CURSTD_OVERWRITE)) {
-			/*
-			 * !!! The insert failure clears these flags, but does
-			 * not touch the items.  We could make a copy every time
-			 * for overwrite cursors, but for now we just reset the
-			 * flags.
-			 */
-			F_SET(primary, WT_CURSTD_KEY_EXT | WT_CURSTD_VALUE_EXT);
-			ret = __curtable_update(cursor);
-		}
+
+	flag_orig = F_ISSET(primary, WT_CURSTD_OVERWRITE);
+	if (ctable->table->nindices > 0)
+		F_CLR(primary, WT_CURSTD_OVERWRITE);
+	ret = primary->insert(primary);
+	F_SET(primary, flag_orig);
+
+	if (ret == WT_DUPLICATE_KEY && F_ISSET(cursor, WT_CURSTD_OVERWRITE)) {
+		/*
+		 * !!!
+		 * The insert failure clears these flags, but does not touch the
+		 * items.  We could make a copy each time for overwrite cursors,
+		 * but for now we just reset the flags.
+		 */
+		F_SET(primary, WT_CURSTD_KEY_EXT | WT_CURSTD_VALUE_EXT);
+		ret = __curtable_update(cursor);
 		goto err;
 	}
+	WT_ERR(ret);
 
 	for (i = 1; i < WT_COLGROUPS(ctable->table); i++, cp++) {
 		(*cp)->recno = primary->recno;
@@ -408,13 +419,14 @@ __curtable_update(WT_CURSOR *cursor)
 	ctable = (WT_CURSOR_TABLE *)cursor;
 	CURSOR_UPDATE_API_CALL(cursor, session, update, NULL);
 	WT_ERR(__curtable_open_indices(ctable));
+
 	/*
 	 * If the table has indices, first delete any old index keys, then
 	 * update the primary, then insert the new index keys.  This is
 	 * complicated by the fact that we need the old value to generate the
 	 * old index keys, so we make a temporary copy of the new value.
 	 */
-	if (ctable->idx_cursors != NULL) {
+	if (ctable->table->nindices > 0) {
 		WT_ERR(__wt_schema_project_merge(session,
 		    ctable->cg_cursors, ctable->plan,
 		    cursor->value_format, &cursor->value));
@@ -447,9 +459,9 @@ __curtable_remove(WT_CURSOR *cursor)
 
 	ctable = (WT_CURSOR_TABLE *)cursor;
 	CURSOR_UPDATE_API_CALL(cursor, session, remove, NULL);
+	WT_ERR(__curtable_open_indices(ctable));
 
 	/* Find the old record so it can be removed from indices */
-	WT_ERR(__curtable_open_indices(ctable));
 	if (ctable->table->nindices > 0) {
 		APPLY_CG(ctable, search);
 		WT_ERR(ret);
@@ -597,11 +609,11 @@ __curtable_open_colgroups(WT_CURSOR_TABLE *ctable, const char *cfg_arg[])
 	WT_TABLE *table;
 	WT_CURSOR **cp;
 	/*
-	 * Underlying column groups are always opened without dump or
-	 * overwrite, and only the primary is opened with next_random.
+	 * Underlying column groups are always opened without dump, and only
+	 * the primary is opened with next_random.
 	 */
 	const char *cfg[] = {
-		cfg_arg[0], cfg_arg[1], "dump=\"\",overwrite=false", NULL, NULL
+		cfg_arg[0], cfg_arg[1], "dump=\"\"", NULL, NULL
 	};
 	u_int i;
 
