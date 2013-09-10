@@ -54,8 +54,6 @@ namespace mongo {
             // non numerics should have returned above so we should never get here
             verify(false);
         }
-
-        count++;
     }
 
     intrusive_ptr<Accumulator> AccumulatorSum::create() {
@@ -81,7 +79,6 @@ namespace mongo {
         : totalType(NumberInt)
         , longTotal(0)
         , doubleTotal(0)
-        , count(0)
     {
         // This is a fixed size Accumulator so we never need to update this
         _memUsageBytes = sizeof(*this);
@@ -91,7 +88,6 @@ namespace mongo {
         totalType = NumberInt;
         longTotal = 0;
         doubleTotal = 0;
-        count = 0;
     }
 
     const char *AccumulatorSum::getOpName() const {

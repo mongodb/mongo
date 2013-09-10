@@ -42,20 +42,19 @@ namespace {
 
     void AccumulatorAvg::processInternal(const Value& input, bool merging) {
         if (!merging) {
-            Super::processInternal(input, merging);
+            // non numeric types have no impact on average
+            if (!input.numeric())
+                return;
+
+            _total += input.getDouble();
+            _count += 1;
         }
         else {
             // We expect an object that contains both a subtotal and a count.
             // This is what getValue(true) produced below.
             verify(input.getType() == Object);
-
-            Value subTotal = input[subTotalName];
-            verify(!subTotal.missing());
-            doubleTotal += subTotal.getDouble();
-                
-            Value subCount = input[countName];
-            verify(!subCount.missing());
-            count += subCount.getLong();
+            _total += input[subTotalName].getDouble();
+            _count += input[countName].getLong();
         }
     }
 
@@ -65,31 +64,29 @@ namespace {
 
     Value AccumulatorAvg::getValue(bool toBeMerged) const {
         if (!toBeMerged) {
-            double avg = 0;
-            if (count)
-                avg = doubleTotal / static_cast<double>(count);
+            if (_count == 0)
+                return Value(0.0);
 
-            return Value(avg);
+            return Value(_total / static_cast<double>(_count));
         }
         else {
-            MutableDocument out;
-            out.addField(subTotalName, Value(doubleTotal));
-            out.addField(countName, Value(count));
-
-            return Value(out.freeze());
+            return Value(DOC(subTotalName << _total
+                          << countName << _count));
         }
     }
 
-    AccumulatorAvg::AccumulatorAvg() {
+    AccumulatorAvg::AccumulatorAvg()
+        : _total(0)
+        , _count(0)
+    {
         // This is a fixed size Accumulator so we never need to update this
         _memUsageBytes = sizeof(*this);
     }
 
     void AccumulatorAvg::reset() {
-        // All state is in parent
-        Super::reset();
+        _total = 0;
+        _count = 0;
     }
-
 
     const char *AccumulatorAvg::getOpName() const {
         return "$avg";

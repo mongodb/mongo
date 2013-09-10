@@ -129,14 +129,12 @@ namespace mongo {
 
         static intrusive_ptr<Accumulator> create();
 
-    protected: /* reused by AccumulatorAvg */
+    private:
         AccumulatorSum();
 
         BSONType totalType;
         long long longTotal;
         double doubleTotal;
-        // count is only used by AccumulatorAvg, but lives here to avoid counting non-numeric values
-        long long count;
     };
 
 
@@ -174,8 +172,7 @@ namespace mongo {
     };
 
 
-    class AccumulatorAvg : public AccumulatorSum {
-        typedef AccumulatorSum Super;
+    class AccumulatorAvg : public Accumulator {
     public:
         virtual void processInternal(const Value& input, bool merging);
         virtual Value getValue(bool toBeMerged) const;
@@ -186,5 +183,8 @@ namespace mongo {
 
     private:
         AccumulatorAvg();
+
+        double _total;
+        long long _count;
     };
 }
