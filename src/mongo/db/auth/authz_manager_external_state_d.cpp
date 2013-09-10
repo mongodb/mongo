@@ -231,11 +231,11 @@ namespace {
         fassertFailed(17098);
     }
 
-    bool AuthzManagerExternalStateMongod::tryLockUpgradeProcess() {
+    bool AuthzManagerExternalStateMongod::tryAcquireAuthzUpdateLock() {
         fassertFailed(17099);
     }
 
-    void AuthzManagerExternalStateMongod::unlockUpgradeProcess() {
+    void AuthzManagerExternalStateMongod::releaseAuthzUpdateLock() {
         fassertFailed(17100);
     }
 

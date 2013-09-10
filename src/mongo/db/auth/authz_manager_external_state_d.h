@@ -79,8 +79,8 @@ namespace mongo {
                                         const NamespaceString& newName);
         virtual Status copyCollection(const NamespaceString& fromName,
                                       const NamespaceString& toName);
-        virtual bool tryLockUpgradeProcess();
-        virtual void unlockUpgradeProcess();
+        virtual bool tryAcquireAuthzUpdateLock();
+        virtual void releaseAuthzUpdateLock();
 
     protected:
         virtual Status _findUser(const string& usersNamespace,
