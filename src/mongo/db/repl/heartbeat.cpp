@@ -295,11 +295,13 @@ namespace mongo {
                     down(mem, info.getStringField("errmsg"));
                 }
             }
-            catch(DBException& e) {
+            catch (const DBException& e) {
+                log() << "replSet health poll task caught a DBException: " << e.what();
                 down(mem, e.what());
             }
-            catch(...) {
-                down(mem, "replSet unexpected exception in ReplSetHealthPollTask");
+            catch (const std::exception& e) {
+                log() << "replSet health poll task caught an exception: " << e.what();
+                down(mem, e.what());
             }
             m = mem;
 
