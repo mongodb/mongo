@@ -883,10 +883,22 @@ namespace mongo {
 
                         indUpdate = indDB->findOne( LocksType::ConfigNS, BSON( LocksType::name(_name) ) );
 
-                        // Our lock should now be set until forcing.
-                        // It's possible another lock has won entirely by now, so state could be 1 or 2 here
-                        verify( indUpdate[LocksType::state()].numberInt() > 0 );
+                        // The tournament was interfered and it is not safe to proceed further.
+                        // One case this could happen is when the LockPinger processes old
+                        // entries from addUnlockOID. See SERVER-10688 for more detailed
+                        // description of race.
+                        if ( indUpdate[LocksType::state()].numberInt() <= 0 ) {
+                            LOG( logLvl - 1 ) << "lock tournament interrupted, "
+                                              << "so no lock was taken; "
+                                              << "new state of lock: " << indUpdate << endl;
 
+                            // We now break and set our currLock lockID value to zero, so that
+                            // we know that we did not acquire the lock below. Later code will
+                            // cleanup failed entries.
+                            currLock = BSON(LocksType::lockID(OID()));
+                            indDB.done();
+                            break;
+                        }
                     }
                     // else our lock is the same, in which case we're safe, or it's a bigger lock,
                     // in which case we won't need to protect anything since we won't have the lock.
