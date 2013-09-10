@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include <boost/thread/mutex.hpp>
 #include <string>
 
 #include "mongo/base/disallow_copying.h"
@@ -86,6 +87,9 @@ namespace mongo {
         virtual Status _findUser(const string& usersNamespace,
                                  const BSONObj& query,
                                  BSONObj* result);
+
+    private:
+        boost::mutex _authzDataUpdateLock;
     };
 
 } // namespace mongo
