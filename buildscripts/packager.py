@@ -44,7 +44,7 @@ import urlparse
 # web server will look for repositories.
 REPOPATH="/var/www/repo"
 
-# The 10gen names for the architectures we support.
+# The MongoDB names for the architectures we support.
 ARCHES=["i686", "x86_64"]
 
 # Made up names for the flavors of distribution we package for.
@@ -86,7 +86,7 @@ class Spec(object):
         elif "suffix" in self.params:
             return self.params["suffix"]
         else:
-            return "-10gen" if int(self.ver.split(".")[1])%2==0 else "-10gen-unstable"
+            return "-org" if int(self.ver.split(".")[1])%2==0 else "-org-unstable"
 
 
     def pversion(self, distro):
@@ -132,7 +132,7 @@ class Distro(object):
         layout (as distinct from where that distro's packaging building
         tools place the package files)."""
         if re.search("^(debian|ubuntu)", self.n):
-            return "repo/%s/dists/dist/10gen/binary-%s/" % (self.n, self.archname(arch))
+            return "repo/%s/dists/dist/mongodb/binary-%s/" % (self.n, self.archname(arch))
         elif re.search("(redhat|fedora|centos)", self.n):
             return "repo/%s/os/%s/RPMS/" % (self.n, self.archname(arch))
         else:
@@ -271,7 +271,7 @@ def setupdir(distro, arch, spec):
     # distro's packaging tools (e.g., package metadata files, init
     # scripts, etc), along with the already-built binaries).  In case
     # the following format string is unclear, an example setupdir
-    # would be dst/x86_64/debian-sysvinit/mongodb-10gen-unstable/
+    # would be dst/x86_64/debian-sysvinit/mongodb-org-unstable/
     return "dst/%s/%s/%s%s-%s/" % (arch, distro.name(), distro.pkgbase(), spec.suffix(), spec.pversion(distro))
 
 def httpget(url, filename):
@@ -419,14 +419,14 @@ def make_deb_repo(repo):
     # and must be created after all the Packages.gz files have been
     # done.
     s="""
-Origin: 10gen
-Label: 10gen
-Suite: 10gen
+Origin: mongodb
+Label: mongodb
+Suite: mongodb
 Codename: %s
 Version: %s
 Architectures: i386 amd64
-Components: 10gen
-Description: 10gen packages
+Components: mongodb
+Description: mongodb packages
 """ % ("dist", "dist")
     if os.path.exists(repo+"../../Release"):
         os.unlink(repo+"../../Release")
