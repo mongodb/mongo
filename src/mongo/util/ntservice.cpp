@@ -71,7 +71,7 @@ namespace {
 
         int badOption = -1;
         for (size_t i = 0; i < disallowedOptions.size(); ++i) {
-            if (params.count(disallowedOptions[i]) > 0) {
+            if (params.count(disallowedOptions[i])) {
                 badOption = i;
                 break;
             }
