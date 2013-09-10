@@ -1101,7 +1101,7 @@ static Status processCommandLineOptions(const std::vector<std::string>& argv) {
             std::cerr << "--cacheSize option not currently supported" << std::endl;
             ::_exit(EXIT_BADOPTIONS);
         }
-        if (params.count("port") == 0 ) {
+        if (!params.count("port")) {
             if( params.count("configsvr") ) {
                 cmdLine.port = CmdLine::ConfigServerPort;
             }
@@ -1127,12 +1127,12 @@ static Status processCommandLineOptions(const std::vector<std::string>& argv) {
                 std::cerr << "replication should not be enabled on a config server" << std::endl;
                 ::_exit(EXIT_BADOPTIONS);
             }
-            if ( params.count( "nodur" ) == 0 && params.count( "nojournal" ) == 0 )
+            if (!params.count("nodur") && !params.count("nojournal"))
                 cmdLine.dur = true;
-            if ( params.count( "dbpath" ) == 0 )
+            if (!params.count("dbpath"))
                 dbpath = "/data/configdb";
             replSettings.master = true;
-            if ( params.count( "oplogSize" ) == 0 )
+            if (!params.count("oplogSize"))
                 cmdLine.oplogSize = 5 * 1024 * 1024;
         }
         if ( params.count( "profile" ) ) {
@@ -1142,7 +1142,7 @@ static Status processCommandLineOptions(const std::vector<std::string>& argv) {
             enableIPv6();
         }
 
-        if (params.count("noMoveParanoia") > 0 && params.count("moveParanoia") > 0) {
+        if (params.count("noMoveParanoia") && params.count("moveParanoia")) {
             std::cerr << "The moveParanoia and noMoveParanoia flags cannot both be set; "
                       << "please use only one of them." << std::endl;
             ::_exit(EXIT_BADOPTIONS);
