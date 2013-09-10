@@ -208,7 +208,7 @@ namespace mongo {
         return Status::OK();
     }
 
-    bool AuthzManagerExternalStateMock::tryAcquireAuthzUpdateLock() {
+    bool AuthzManagerExternalStateMock::tryAcquireAuthzUpdateLock(const StringData&) {
         return true;
     }
 

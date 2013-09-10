@@ -430,10 +430,10 @@ namespace mongo {
         }
     }
 
-    bool AuthorizationManager::Guard::tryAcquireAuthzUpdateLock() {
+    bool AuthorizationManager::Guard::tryAcquireAuthzUpdateLock(const StringData& why) {
         fassert(17111, !_lockedForUpdate);
         fassert(17126, _authzManagerLock.owns_lock());
-        _lockedForUpdate = _authzManager->_externalState->tryAcquireAuthzUpdateLock();
+        _lockedForUpdate = _authzManager->_externalState->tryAcquireAuthzUpdateLock(why);
         return _lockedForUpdate;
     }
 
@@ -517,7 +517,7 @@ namespace mongo {
 
     Status AuthorizationManager::upgradeAuthCollections() {
         AuthorizationManager::Guard lkUpgrade(this);
-        if (!lkUpgrade.tryAcquireAuthzUpdateLock()) {
+        if (!lkUpgrade.tryAcquireAuthzUpdateLock("Upgrade authorization data")) {
             return Status(ErrorCodes::LockBusy, "Could not lock auth data upgrade process lock.");
         }
         int durableVersion = 0;
