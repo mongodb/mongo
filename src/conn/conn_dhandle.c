@@ -462,15 +462,13 @@ __wt_conn_btree_apply(WT_SESSION_IMPL *session,
 				else
 					WT_TRET(__wt_session_release_btree(
 					    session));
-			} else if (ret == EBUSY) {
-				ret = 0;
-				WT_RET(__wt_conn_btree_apply_single(
-				    session, dhandle->name, func, cfg));
-			}
+			} else if (ret == EBUSY)
+				ret = __wt_conn_btree_apply_single(
+				    session, dhandle->name, func, cfg);
 			WT_RET(ret);
 		}
 
-	return (ret);
+	return (0);
 }
 
 /*
