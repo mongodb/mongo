@@ -987,7 +987,7 @@ __clsm_put(WT_SESSION_IMPL *session,
 
 	/*
 	 * Update the primary, plus any older chunks needed to detect
-	 * write-write conflicts across chunk boundaries.  
+	 * write-write conflicts across chunk boundaries.
 	 */
 	for (i = 0; i < clsm->nupdates; i++) {
 		c = clsm->cursors[(clsm->nchunks - i) - 1];
