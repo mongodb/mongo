@@ -16,6 +16,8 @@
 #define	WT_IS_METADATA(dh)						\
 	(strcmp((dh)->name, WT_METADATA_URI) == 0)
 
+#define	WT_METADATA_MAXLINE	(5 * 1024)		/* Metadata line */
+
 #define	WT_METADATA_VERSION	"WiredTiger version"	/* Version keys */
 #define	WT_METADATA_VERSION_STR	"WiredTiger version string"
 

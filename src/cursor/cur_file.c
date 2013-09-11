@@ -222,6 +222,22 @@ __curfile_insert(WT_CURSOR *cursor)
 
 	WT_BTREE_CURSOR_SAVE_AND_RESTORE(cursor, __wt_btcur_insert(cbt), ret);
 
+	/*
+	 * Insert is the one cursor operation that doesn't end with the cursor
+	 * pointing to an on-page item.   The standard macro handles errors
+	 * correctly, but we need to leave the application cursor unchanged in
+	 * the case of success, except for column-store appends, where we are
+	 * returning a key.
+	 */
+	if (ret == 0) {
+		if (!F_ISSET(cursor, WT_CURSTD_APPEND)) {
+			F_SET(cursor, WT_CURSTD_KEY_EXT);
+			F_CLR(cursor, WT_CURSTD_KEY_INT);
+		}
+		F_SET(cursor, WT_CURSTD_VALUE_EXT);
+		F_CLR(cursor, WT_CURSTD_VALUE_INT);
+	}
+
 err:	CURSOR_UPDATE_API_END(session, ret);
 	return (ret);
 }

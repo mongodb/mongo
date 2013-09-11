@@ -33,6 +33,13 @@ __wt_meta_btree_apply(WT_SESSION_IMPL *session,
 			break;
 		else if (strcmp(uri, WT_METADATA_URI) == 0)
 			continue;
+
+		/*
+		 * We need to pull the handle into the session handle cache
+		 * and make sure it's referenced to stop other internal code
+		 * dropping the handle (e.g in LSM when cleaning up obsolete
+		 * chunks).  Holding the metadata lock isn't enough.
+		 */
 		ret = __wt_session_get_btree(session, uri, NULL, NULL, 0);
 		if (ret == 0) {
 			ret = func(session, cfg);
@@ -41,11 +48,9 @@ __wt_meta_btree_apply(WT_SESSION_IMPL *session,
 				    __wt_meta_track_handle_lock(session, 0));
 			else
 				WT_TRET(__wt_session_release_btree(session));
-		} else if (ret == EBUSY) {
-			ret = 0;
-			WT_ERR(__wt_conn_btree_apply_single(
-			    session, uri, func, cfg));
-		}
+		} else if (ret == EBUSY)
+			ret = __wt_conn_btree_apply_single(
+			    session, uri, func, cfg);
 		WT_ERR(ret);
 	}
 

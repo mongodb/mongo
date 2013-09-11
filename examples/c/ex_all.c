@@ -364,11 +364,6 @@ cursor_search_near(WT_CURSOR *cursor)
 	/*! [Search for an exact or adjacent match] */
 
 	/*! [Forward scan greater than or equal] */
-	/*
-	 * An example of a forward scan through the table, where all keys
-	 * greater than or equal to a specified prefix are included in the
-	 * scan.
-	 */
 	cursor->set_key(cursor, key);
 	ret = cursor->search_near(cursor, &exact);
 	if (ret == 0 && exact >= 0) {
@@ -381,10 +376,6 @@ cursor_search_near(WT_CURSOR *cursor)
 	/*! [Forward scan greater than or equal] */
 
 	/*! [Backward scan less than] */
-	/*
-	 * An example of a backward scan through the table, where all keys
-	 * less than a specified prefix are included in the scan.
-	 */
 	cursor->set_key(cursor, key);
 	ret = cursor->search_near(cursor, &exact);
 	if (ret == 0 && exact < 0) {
@@ -578,6 +569,21 @@ session_ops(WT_SESSION *session)
 	/*! [Truncate a table] */
 
 	{
+	/*
+	 * Insert a pair of keys so we can truncate a range.
+	 */
+	WT_CURSOR *cursor;
+	ret = session->open_cursor(
+	    session, "table:mytable", NULL, NULL, &cursor);
+	cursor->set_key(cursor, "June01");
+	cursor->set_value(cursor, "value");
+	ret = cursor->update(cursor);
+	cursor->set_key(cursor, "June30");
+	cursor->set_value(cursor, "value");
+	ret = cursor->update(cursor);
+	cursor->close(cursor);
+
+	{
 	/*! [Truncate a range] */
 	WT_CURSOR *start, *stop;
 
@@ -593,6 +599,7 @@ session_ops(WT_SESSION *session)
 
 	ret = session->truncate(session, NULL, start, stop, NULL);
 	/*! [Truncate a range] */
+	}
 	}
 
 	/*! [Upgrade a table] */

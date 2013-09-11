@@ -293,9 +293,14 @@ struct __wt_cursor {
 	int __F(reset)(WT_CURSOR *cursor);
 
 	/*!
-	 * Move to the record matching the key. The key must first be set.
+	 * Return the record matching the key. The key must first be set.
 	 *
 	 * @snippet ex_all.c Search for an exact match
+	 *
+	 * On success, the cursor ends positioned at the returned record; to
+	 * minimize cursor resources, the WT_CURSOR::reset method should be
+	 * called as soon as the record has been retrieved and the cursor no
+	 * longer needs that position.
 	 *
 	 * @param cursor the cursor handle
 	 * @errors
@@ -303,16 +308,32 @@ struct __wt_cursor {
 	int __F(search)(WT_CURSOR *cursor);
 
 	/*!
-	 * Move to the record matching the key if it exists, or a record that
-	 * would be adjacent.  Either the smallest record larger than the key
-	 * or the largest record smaller than the key (in other words, a
-	 * logically adjacent key).  The key must first be set.
+	 * Return the record matching the key if it exists, or an adjacent
+	 * record.  An adjacent record is either the smallest record larger
+	 * than the key or the largest record smaller than the key (in other
+	 * words, a logically adjacent key).
+	 *
+	 * The key must first be set.
+	 *
+	 * An example of a search for an exact or adjacent match:
 	 *
 	 * @snippet ex_all.c Search for an exact or adjacent match
 	 *
+	 * An example of a forward scan through the table, where all keys
+	 * greater than or equal to a specified prefix are included in the
+	 * scan:
+	 *
 	 * @snippet ex_all.c Forward scan greater than or equal
 	 *
+	 * An example of a backward scan through the table, where all keys
+	 * less than a specified prefix are included in the scan:
+	 *
 	 * @snippet ex_all.c Backward scan less than
+	 *
+	 * On success, the cursor ends positioned at the returned record; to
+	 * minimize cursor resources, the WT_CURSOR::reset method should be
+	 * called as soon as the record has been retrieved and the cursor no
+	 * longer needs that position.
 	 *
 	 * @param cursor the cursor handle
 	 * @param exactp the status of the search: 0 if an exact match is
@@ -349,6 +370,10 @@ struct __wt_cursor {
 	 *
 	 * @snippet ex_all.c Insert a new record and assign a record number
 	 *
+	 * The cursor ends with no position, and a subsequent call to the
+	 * WT_CURSOR::next (WT_CURSOR::prev) method will iterate from the
+	 * beginning (end) of the table.
+	 *
 	 * Inserting a new record after the current maximum record in a
 	 * fixed-length bit field column-store (that is, a store with an
 	 * 'r' type key and 't' type value) may implicitly create the missing
@@ -381,6 +406,10 @@ struct __wt_cursor {
 	 *
 	 * @snippet ex_all.c Update an existing record and fail if DNE
 	 *
+	 * On success, the cursor ends positioned at the modified record; to
+	 * minimize cursor resources, the WT_CURSOR::reset method should be
+	 * called as soon as the cursor no longer needs that position.
+	 *
 	 * @param cursor the cursor handle
 	 * @errors
 	 * In particular, if \c overwrite is not configured and no record with
@@ -405,6 +434,10 @@ struct __wt_cursor {
 	 * Removing a record in a fixed-length bit field column-store
 	 * (that is, a store with an 'r' type key and 't' type value) is
 	 * identical to setting the record's value to 0.
+	 *
+	 * On success, the cursor ends positioned at the removed record; to
+	 * minimize cursor resources, the WT_CURSOR::reset method should be
+	 * called as soon as the cursor no longer needs that position.
 	 *
 	 * @param cursor the cursor handle
 	 * @errors

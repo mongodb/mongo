@@ -281,8 +281,7 @@ __backup_all(WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb)
 	WT_CONFIG_ITEM cval;
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
-	int cmp;
-	const char *key, *uri, *value;
+	const char *key, *value;
 
 	cursor = NULL;
 
@@ -324,18 +323,8 @@ __backup_all(WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb)
 	WT_ERR_NOTFOUND_OK(ret);
 
 	/* Build a list of the file objects that need to be copied. */
-	cursor->set_key(cursor, "file:");
-	if ((ret = cursor->search_near(cursor, &cmp)) == 0 && cmp < 0)
-		ret = cursor->next(cursor);
-	for (; ret == 0; ret = cursor->next(cursor)) {
-		WT_ERR(cursor->get_key(cursor, &uri));
-		if (!WT_PREFIX_MATCH(uri, "file:"))
-			break;
-		if (strcmp(uri, WT_METADATA_URI) == 0)
-			continue;
-		WT_ERR(__backup_list_append(session, cb, uri));
-	}
-	WT_ERR_NOTFOUND_OK(ret);
+	WT_ERR(
+	    __wt_meta_btree_apply(session, __wt_backup_list_all_append, NULL));
 
 err:	if (cursor != NULL)
 		WT_TRET(cursor->close(cursor));
@@ -381,7 +370,7 @@ __backup_uri(WT_SESSION_IMPL *session,
 			    uri);
 
 		WT_ERR(__wt_schema_worker(
-		    session, uri, NULL, __wt_backup_list_append, cfg, 0));
+		    session, uri, NULL, __wt_backup_list_uri_append, cfg, 0));
 	}
 	WT_ERR_NOTFOUND_OK(ret);
 
@@ -418,12 +407,12 @@ __backup_file_remove(WT_SESSION_IMPL *session)
 }
 
 /*
- * __wt_backup_list_append --
+ * __wt_backup_list_uri_append --
  *	Append a new file name to the list, allocate space as necessary.
  *	Called via the schema_worker function.
  */
 int
-__wt_backup_list_append(WT_SESSION_IMPL *session, const char *name)
+__wt_backup_list_uri_append(WT_SESSION_IMPL *session, const char *name)
 {
 	WT_CURSOR_BACKUP *cb;
 	const char *value;
@@ -441,6 +430,28 @@ __wt_backup_list_append(WT_SESSION_IMPL *session, const char *name)
 		WT_RET(__backup_list_append(session, cb, name));
 
 	return (0);
+}
+
+/*
+ * __wt_backup_list_all_append --
+ *	Append a new file name to the list, allocate space as necessary.
+ *	Called via the __wt_meta_btree_apply function.
+ */
+int
+__wt_backup_list_all_append(WT_SESSION_IMPL *session, const char *cfg[])
+{
+	WT_CURSOR_BACKUP *cb;
+
+	WT_UNUSED(cfg);
+
+	cb = session->bkp_cursor;
+
+	/* Ignore files in the process of being bulk-loaded. */
+	if (F_ISSET(S2BT(session), WT_BTREE_SPECIAL_FLAGS) == WT_BTREE_BULK)
+		return (0);
+
+	/* Add the file to the list of files to be copied. */
+	return (__backup_list_append(session, cb, session->dhandle->name));
 }
 
 /*

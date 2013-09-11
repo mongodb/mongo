@@ -327,9 +327,9 @@ retry:	WT_RET(__cursor_func_init(cbt, 1));
 
 err:	if (ret == WT_RESTART)
 		goto retry;
-	/* If successful, point the cursor at internal copies of the data. */
+	/* Insert doesn't maintain a position across calls, clear resources. */
 	if (ret == 0)
-		ret = __wt_kv_return(session, cbt);
+		WT_TRET(__cursor_leave(cbt));
 	if (ret != 0)
 		WT_TRET(__cursor_error_resolve(cbt));
 	return (ret);
