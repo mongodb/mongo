@@ -26,63 +26,35 @@
 #include "mongo/db/json.h"
 #include "mongo/s/type_shard.h"
 #include "mongo/tools/stat_util.h"
+#include "mongo/tools/mongostat_options.h"
 #include "mongo/tools/tool.h"
-#include "mongo/tools/tool_options.h"
 #include "mongo/util/net/httpclient.h"
 #include "mongo/util/options_parser/option_section.h"
-#include "mongo/util/options_parser/options_parser.h"
 #include "mongo/util/text.h"
-
-namespace mongo {
-    MONGO_INITIALIZER_GENERAL(ParseStartupConfiguration,
-                              MONGO_NO_PREREQUISITES,
-                              ("default"))(InitializerContext* context) {
-
-        options = moe::OptionSection( "options" );
-        moe::OptionsParser parser;
-
-        Status retStatus = addMongoStatOptions(&options);
-        if (!retStatus.isOK()) {
-            return retStatus;
-        }
-
-        retStatus = parser.run(options, context->args(), context->env(), &_params);
-        if (!retStatus.isOK()) {
-            std::ostringstream oss;
-            oss << retStatus.toString() << "\n";
-            printMongoStatHelp(options, &oss);
-            return Status(ErrorCodes::FailedToParse, oss.str());
-        }
-
-        return Status::OK();
-    }
-} // namespace mongo
 
 namespace mongo {
 
     class Stat : public Tool {
     public:
 
-        Stat() : Tool( "stat" , "admin" ) {
-            _http = false;
-            _many = false;
+        Stat() : Tool() {
             _autoreconnect = true;
         }
 
         virtual void printHelp( ostream & out ) {
-            printMongoStatHelp(options, &out);
+            printMongoStatHelp(toolsOptions, &out);
         }
 
         BSONObj stats() {
-            if ( _http ) {
+            if (mongoStatGlobalParams.http) {
                 HttpClient c;
                 HttpClient::Result r;
 
                 string url;
                 {
                     stringstream ss;
-                    ss << "http://" << _host;
-                    if ( _host.find( ":" ) == string::npos )
+                    ss << "http://" << toolGlobalParams.connectionString;
+                    if (toolGlobalParams.connectionString.find( ":" ) == string::npos)
                         ss << ":28017";
                     ss << "/_status";
                     url = ss.str();
@@ -102,7 +74,7 @@ namespace mongo {
                 return e.embeddedObjectUserCheck();
             }
             BSONObj out;
-            if ( ! conn().simpleCommand( _db , &out , "serverStatus" ) ) {
+            if (!conn().simpleCommand(toolGlobalParams.db, &out, "serverStatus")) {
                 cout << "error: " << out << endl;
                 return BSONObj();
             }
@@ -111,26 +83,12 @@ namespace mongo {
 
 
         virtual void preSetup() {
-            if ( hasParam( "http" ) ) {
-                _http = true;
-                _noconnection = true;
-            }
-
-            if ( hasParam( "host" ) &&
-                    getParam( "host" ).find( ',' ) != string::npos ) {
-                _noconnection = true;
-                _many = true;
-            }
-
-            if ( hasParam( "discover" ) ) {
-                _many = true;
-            }
         }
 
         int run() {
-            _statUtil.setSeconds( getParam( "sleep" , 1 ) );
-            _statUtil.setAll( hasParam( "all" ) );
-            if ( _many )
+            _statUtil.setSeconds(mongoStatGlobalParams.allFields);
+            _statUtil.setAll(mongoStatGlobalParams.sleep);
+            if (mongoStatGlobalParams.many)
                 return runMany();
             return runNormal();
         }
@@ -177,8 +135,6 @@ namespace mongo {
         }
 
         int runNormal() {
-            bool showHeaders = ! hasParam( "noheaders" );
-            int rowCount = getParam( "rowcount" , 0 );
             int rowNum = 0;
 
             BSONObj prev = stats();
@@ -187,7 +143,8 @@ namespace mongo {
 
             int maxLockedDbWidth = 0;
 
-            while ( rowCount == 0 || rowNum < rowCount ) {
+            while (mongoStatGlobalParams.rowCount == 0 ||
+                   rowNum < mongoStatGlobalParams.rowCount) {
                 sleepsecs((int)ceil(_statUtil.getSeconds()));
                 BSONObj now;
                 try {
@@ -207,7 +164,7 @@ namespace mongo {
 
                     // adjust width up as longer 'locked db' values appear
                     setMaxLockedDbWidth( &out, &maxLockedDbWidth ); 
-                    if ( showHeaders && rowNum % 10 == 0 ) {
+                    if (mongoStatGlobalParams.showHeaders && rowNum % 10 == 0) {
                         printHeaders( out );
                     }
 
@@ -340,10 +297,10 @@ namespace mongo {
             state->thr.reset( new boost::thread( boost::bind( serverThread,
                                                               state,
                                                               (int)ceil(_statUtil.getSeconds()) ) ) );
-            state->authParams = BSON( "user" << _username <<
-                                      "pwd" << _password <<
+            state->authParams = BSON( "user" << toolGlobalParams.username <<
+                                      "pwd" << toolGlobalParams.password <<
                                       "userSource" << getAuthenticationDatabase() <<
-                                      "mechanism" << _authenticationMechanism );
+                                      "mechanism" << toolGlobalParams.authenticationMechanism );
             return true;
         }
 
@@ -402,12 +359,13 @@ namespace mongo {
             StateMap threads;
 
             {
-                string orig = getParam( "host" );
+                string orig = "localhost";
                 bool showPorts = false;
-                if ( orig == "" )
-                    orig = "localhost";
+                if (toolGlobalParams.hostSet) {
+                    orig = toolGlobalParams.host;
+                }
 
-                if ( orig.find( ":" ) != string::npos || hasParam( "port" ) )
+                if (orig.find(":") != string::npos || toolGlobalParams.portSet)
                     showPorts = true;
 
                 StringSplitter ss( orig.c_str() , "," );
@@ -415,8 +373,8 @@ namespace mongo {
                     string host = ss.next();
                     if ( showPorts && host.find( ":" ) == string::npos) {
                         // port supplied, but not for this host.  use default.
-                        if ( hasParam( "port" ) )
-                            host += ":" + _params["port"].as<string>();
+                        if (toolGlobalParams.portSet)
+                            host += ":" + toolGlobalParams.port;
                         else
                             host += ":27017";
                     }
@@ -427,8 +385,6 @@ namespace mongo {
             sleepsecs(1);
 
             int row = 0;
-            bool discover = hasParam( "discover" );
-            bool showHeaders = ! hasParam( "noheaders" );
             int maxLockedDbWidth = 0;
 
             while ( 1 ) {
@@ -450,7 +406,7 @@ namespace mongo {
                         rows.push_back( Row( i->first , out ) );
                     }
 
-                    if ( discover && ! i->second->now.isEmpty() ) {
+                    if (mongoStatGlobalParams.discover && ! i->second->now.isEmpty()) {
                         if ( _discover( threads , i->first , i->second ) )
                             break;
                     }
@@ -511,7 +467,7 @@ namespace mongo {
                 cout << endl;
 
                 //    header
-                if ( row++ % 5 == 0 && showHeaders && ! biggest.isEmpty() ) {
+                if (row++ % 5 == 0 && mongoStatGlobalParams.showHeaders && !biggest.isEmpty()) {
                     cout << setw( longestHost ) << "" << "\t";
                     printHeaders( biggest );
                 }
@@ -533,8 +489,6 @@ namespace mongo {
         }
 
         StatUtil _statUtil;
-        bool _http;
-        bool _many;
 
         struct Row {
             Row( string h , string e ) {

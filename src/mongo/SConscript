@@ -806,13 +806,14 @@ env.StaticLibrary("alltools",
 normalTools = [ "dump", "restore", "export", "import", "stat", "top", "oplog" ]
 env.Alias( "tools", [ "#/${PROGPREFIX}mongo" + x + "${PROGSUFFIX}" for x in normalTools ] )
 for x in normalTools:
-    env.Install( '#/', env.Program( "mongo" + x, [ "tools/" + x + ".cpp" ],
-                                    LIBDEPS=["alltools"]) )
+    env.Install( '#/', env.Program("mongo" + x,
+                                   ["tools/" + x + ".cpp", "tools/mongo" + x + "_options.cpp"],
+                                   LIBDEPS=["alltools"]) )
 
 #some special tools
 env.Install( '#/', [
-        env.Program( "mongofiles", "tools/files.cpp", LIBDEPS=["alltools", "gridfs"] ),
-        env.Program( "bsondump", "tools/bsondump.cpp", LIBDEPS=["alltools"]),
+        env.Program( "mongofiles", ["tools/files.cpp", "tools/mongofiles_options.cpp"], LIBDEPS=["alltools", "gridfs"] ),
+        env.Program( "bsondump", ["tools/bsondump.cpp", "tools/bsondump_options.cpp"], LIBDEPS=["alltools"]),
         env.Program( "mongobridge", "tools/bridge.cpp",
                      LIBDEPS=["serveronly", "coreserver", "coredb"] ),
         env.Program( "mongoperf", "client/examples/mongoperf.cpp",

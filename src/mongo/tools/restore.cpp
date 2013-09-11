@@ -24,15 +24,13 @@
 #include <fstream>
 #include <set>
 
-#include "mongo/base/init.h"
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/db/json.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/tools/mongorestore_options.h"
 #include "mongo/tools/tool.h"
-#include "mongo/tools/tool_options.h"
 #include "mongo/util/mmap.h"
 #include "mongo/util/options_parser/option_section.h"
-#include "mongo/util/options_parser/options_parser.h"
 #include "mongo/util/stringutils.h"
 
 using namespace mongo;
@@ -41,39 +39,9 @@ namespace {
     const char* OPLOG_SENTINEL = "$oplog";  // compare by ptr not strcmp
 }
 
-namespace mongo {
-    MONGO_INITIALIZER_GENERAL(ParseStartupConfiguration,
-                              MONGO_NO_PREREQUISITES,
-                              ("default"))(InitializerContext* context) {
-
-        options = moe::OptionSection( "options" );
-        moe::OptionsParser parser;
-
-        Status retStatus = addMongoRestoreOptions(&options);
-        if (!retStatus.isOK()) {
-            return retStatus;
-        }
-
-        retStatus = parser.run(options, context->args(), context->env(), &_params);
-        if (!retStatus.isOK()) {
-            std::ostringstream oss;
-            oss << retStatus.toString() << "\n";
-            printMongoRestoreHelp(options, &oss);
-            return Status(ErrorCodes::FailedToParse, oss.str());
-        }
-
-        return Status::OK();
-    }
-} // namespace mongo
-
 class Restore : public BSONTool {
 public:
 
-    bool _drop;
-    bool _keepIndexVersion;
-    bool _restoreOptions;
-    bool _restoreIndexes;
-    int _w;
     string _curns;
     string _curdb;
     string _curcoll;
@@ -82,39 +50,30 @@ public:
     scoped_ptr<OpTime> _oplogLimitTS; // for oplog replay (limit)
     int _oplogEntrySkips; // oplog entries skipped
     int _oplogEntryApplies; // oplog entries applied
-    Restore() : BSONTool( "restore" ) , _drop(false) { }
+    Restore() : BSONTool() { }
 
     virtual void printHelp(ostream& out) {
-        printMongoRestoreHelp(options, &out);
+        printMongoRestoreHelp(toolsOptions, &out);
     }
 
     virtual int doRun() {
 
-        boost::filesystem::path root = getParam("dir");
+        boost::filesystem::path root = mongoRestoreGlobalParams.restoreDirectory;
 
         // check if we're actually talking to a machine that can write
         if (!isMaster()) {
             return -1;
         }
 
-        if (isMongos() && _db == "" && exists(root / "config")) {
+        if (isMongos() && toolGlobalParams.db == "" && exists(root / "config")) {
             log() << "Cannot do a full restore on a sharded system" << endl;
             return -1;
         }
 
-        _drop = hasParam( "drop" );
-        _keepIndexVersion = hasParam("keepIndexVersion");
-        _restoreOptions = !hasParam("noOptionsRestore");
-        _restoreIndexes = !hasParam("noIndexRestore");
-        // Make sure default value set here stays in sync with the one set in the constructor above.
-        _w = getParam( "w" , 0 );
-
-        bool doOplog = hasParam( "oplogReplay" );
-
-        if (doOplog) {
+        if (mongoRestoreGlobalParams.oplogReplay) {
             // fail early if errors
 
-            if (_db != "") {
+            if (toolGlobalParams.db != "") {
                 log() << "Can only replay oplog on full restore" << endl;
                 return -1;
             }
@@ -137,31 +96,32 @@ public:
                 return -1;
             }
 
-            string oplogLimit = getParam( "oplogLimit", "" );
             string oplogInc = "0";
 
-            if(!oplogLimit.empty()) {
-                size_t i = oplogLimit.find_first_of(':');
+            if(!mongoRestoreGlobalParams.oplogLimit.empty()) {
+                size_t i = mongoRestoreGlobalParams.oplogLimit.find_first_of(':');
                 if ( i != string::npos ) {
-                    if ( i + 1 < oplogLimit.length() ) {
-                        oplogInc = oplogLimit.substr(i + 1);
+                    if (i + 1 < mongoRestoreGlobalParams.oplogLimit.length()) {
+                        oplogInc = mongoRestoreGlobalParams.oplogLimit.substr(i + 1);
                     }
 
-                    oplogLimit = oplogLimit.substr(0, i);
+                    mongoRestoreGlobalParams.oplogLimit =
+                        mongoRestoreGlobalParams.oplogLimit.substr(0, i);
                 }
 
                 try {
                     _oplogLimitTS.reset(new OpTime(
-                        boost::lexical_cast<unsigned long>(oplogLimit.c_str()),
+                        boost::lexical_cast<unsigned long>(
+                            mongoRestoreGlobalParams.oplogLimit.c_str()),
                         boost::lexical_cast<unsigned long>(oplogInc.c_str())));
                 } catch( const boost::bad_lexical_cast& error) {
                     log() << "Could not parse oplogLimit into Timestamp from values ( "
-                          << oplogLimit << " , " << oplogInc << " )"
+                          << mongoRestoreGlobalParams.oplogLimit << " , " << oplogInc << " )"
                           << endl;
                     return -1;
                 }
 
-                if (!oplogLimit.empty()) {
+                if (!mongoRestoreGlobalParams.oplogLimit.empty()) {
                     // Only for a replica set as master will have no-op entries so we would need to
                     // skip them all to find the real op
                     scoped_ptr<DBClientCursor> cursor(
@@ -197,7 +157,7 @@ public:
             }
         }
 
-        /* If _db is not "" then the user specified a db name to restore as.
+        /* If toolGlobalParams.db is not "" then the user specified a db name to restore as.
          *
          * In that case we better be given either a root directory that
          * contains only .bson files or a single .bson file  (a db).
@@ -206,15 +166,16 @@ public:
          * given either a root directory that contains only a single
          * .bson file, or a single .bson file itself (a collection).
          */
-        drillDown(root, _db != "", _coll != "", !(_oplogLimitTS.get() == NULL), true);
+        drillDown(root, toolGlobalParams.db != "", toolGlobalParams.coll != "",
+                  !(_oplogLimitTS.get() == NULL), true);
 
         // should this happen for oplog replay as well?
-        string err = conn().getLastError(_db == "" ? "admin" : _db);
+        string err = conn().getLastError(toolGlobalParams.db == "" ? "admin" : toolGlobalParams.db);
         if (!err.empty()) {
             error() << err;
         }
 
-        if (doOplog) {
+        if (mongoRestoreGlobalParams.oplogReplay) {
             log() << "\t Replaying oplog" << endl;
             _curns = OPLOG_SENTINEL;
             processFile( root / "oplog.bson" );
@@ -307,7 +268,7 @@ public:
 
         string ns;
         if (use_db) {
-            ns += _db;
+            ns += toolGlobalParams.db;
         }
         else {
             ns = root.parent_path().filename().string();
@@ -320,7 +281,7 @@ public:
         string oldCollName = root.leaf().string(); // Name of the collection that was dumped from
         oldCollName = oldCollName.substr( 0 , oldCollName.find_last_of( "." ) );
         if (use_coll) {
-            ns += "." + _coll;
+            ns += "." + toolGlobalParams.coll;
         }
         else {
             ns += "." + oldCollName;
@@ -335,7 +296,7 @@ public:
 
         log() << "\tgoing into namespace [" << ns << "]" << endl;
 
-        if ( _drop ) {
+        if (mongoRestoreGlobalParams.drop) {
             if (root.leaf() != "system.users.bson" ) {
                 log() << "\t dropping" << endl;
                 conn().dropCollection( ns );
@@ -351,7 +312,7 @@ public:
         }
 
         BSONObj metadataObject;
-        if (_restoreOptions || _restoreIndexes) {
+        if (mongoRestoreGlobalParams.restoreOptions || mongoRestoreGlobalParams.restoreIndexes) {
             boost::filesystem::path metadataFile = (root.branch_path() / (oldCollName + ".metadata.json"));
             if (!boost::filesystem::exists(metadataFile.string())) {
                 // This is fine because dumps from before 2.1 won't have a metadata file, just print a warning.
@@ -369,7 +330,7 @@ public:
         _curcoll = nsToCollectionSubstring(_curns).toString();
 
         // If drop is not used, warn if the collection exists.
-         if (!_drop) {
+         if (!mongoRestoreGlobalParams.drop) {
              scoped_ptr<DBClientCursor> cursor(conn().query(_curdb + ".system.namespaces",
                                                              Query(BSON("name" << ns))));
              if (cursor->more()) {
@@ -380,13 +341,13 @@ public:
              }
          }
 
-        if (_restoreOptions && metadataObject.hasField("options")) {
+        if (mongoRestoreGlobalParams.restoreOptions && metadataObject.hasField("options")) {
             // Try to create collection with given options
             createCollectionWithOptions(metadataObject["options"].Obj());
         }
 
         processFile( root );
-        if (_drop && root.leaf() == "system.users.bson") {
+        if (mongoRestoreGlobalParams.drop && root.leaf() == "system.users.bson") {
             // Delete any users that used to exist but weren't in the dump file
             for (set<string>::iterator it = _users.begin(); it != _users.end(); ++it) {
                 BSONObj userMatch = BSON("name" << *it);
@@ -395,7 +356,7 @@ public:
             _users.clear();
         }
 
-        if (_restoreIndexes && metadataObject.hasField("indexes")) {
+        if (mongoRestoreGlobalParams.restoreIndexes && metadataObject.hasField("indexes")) {
             vector<BSONElement> indexes = metadataObject["indexes"].Array();
             for (vector<BSONElement>::iterator it = indexes.begin(); it != indexes.end(); ++it) {
                 createIndex((*it).Obj(), false);
@@ -423,8 +384,8 @@ public:
             _oplogEntryApplies++;
 
             // wait for ops to propagate to "w" nodes (doesn't warn if w used without replset)
-            if ( _w > 0 ) {
-                string err = conn().getLastError(db, false, false, _w);
+            if (mongoRestoreGlobalParams.w > 0) {
+                string err = conn().getLastError(db, false, false, mongoRestoreGlobalParams.w);
                 if (!err.empty()) {
                     error() << "Error while replaying oplog: " << err;
                 }
@@ -433,7 +394,7 @@ public:
         else if (nsToCollectionSubstring(_curns) == "system.indexes") {
             createIndex(obj, true);
         }
-        else if (_drop &&
+        else if (mongoRestoreGlobalParams.drop &&
                  nsToCollectionSubstring(_curns) == ".system.users" &&
                  _users.count(obj["name"].String())) {
             // Since system collections can't be dropped, we have to manually
@@ -446,8 +407,8 @@ public:
             conn().insert( _curns , obj );
 
             // wait for insert to propagate to "w" nodes (doesn't warn if w used without replset)
-            if ( _w > 0 ) {
-                string err = conn().getLastError(_curdb, false, false, _w);
+            if (mongoRestoreGlobalParams.w > 0) {
+                string err = conn().getLastError(_curdb, false, false, mongoRestoreGlobalParams.w);
                 if (!err.empty()) {
                     error() << err;
                 }
@@ -557,7 +518,8 @@ private:
                 string s = _curdb + "." + (keepCollName ? n.coll().toString() : _curcoll);
                 bo.append("ns", s);
             }
-            else if (strcmp(e.fieldName(), "v") != 0 || _keepIndexVersion) { // Remove index version number
+            // Remove index version number
+            else if (strcmp(e.fieldName(), "v") != 0 || mongoRestoreGlobalParams.keepIndexVersion) {
                 bo.append(e);
             }
         }
@@ -566,10 +528,10 @@ private:
         conn().insert( _curdb + ".system.indexes" ,  o );
 
         // We're stricter about errors for indexes than for regular data
-        BSONObj err = conn().getLastErrorDetailed(_curdb, false, false, _w);
+        BSONObj err = conn().getLastErrorDetailed(_curdb, false, false, mongoRestoreGlobalParams.w);
 
         if (err.hasField("err") && !err["err"].isNull()) {
-            if (err["err"].str() == "norepl" && _w > 1) {
+            if (err["err"].str() == "norepl" && mongoRestoreGlobalParams.w > 1) {
                 error() << "Cannot specify write concern for non-replicas" << endl;
             }
             else {
