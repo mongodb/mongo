@@ -129,7 +129,7 @@ namespace mongo {
         if (c.curop()->maxTimeHasExpired()) {
             c.curop()->kill();
             notifyAllWaiters();
-            uasserted(16986, "operation exceeded time limit");
+            uasserted(ErrorCodes::ExceededTimeLimit, "operation exceeded time limit");
         }
         if (c.curop()->killPending()) {
             notifyAllWaiters();
