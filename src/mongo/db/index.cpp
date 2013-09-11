@@ -54,7 +54,7 @@ namespace mongo {
     // What's the default version of our indices?
     const int DefaultIndexVersionNumber = 1;
 
-    int removeFromSysIndexes(const char *ns, const char *idxName) {
+    int removeFromSysIndexes(const StringData& ns, const StringData& idxName) {
         string system_indexes = cc().database()->name() + ".system.indexes";
         BSONObjBuilder b;
         b.append("ns", ns);
@@ -67,8 +67,8 @@ namespace mongo {
        call. repair database is the clean solution, but this gives one a lighter weight
        partial option.  see dropIndexes()
     */
-    int assureSysIndexesEmptied(const char *ns, IndexDetails *idIndex) {
-        string system_indexes = cc().database()->name() + ".system.indexes";
+    int assureSysIndexesEmptied(const StringData& ns, IndexDetails *idIndex) {
+        string system_indexes = cc().database()->name() + ".system.indexes"; // TODO
         BSONObjBuilder b;
         b.append("ns", ns);
         if( idIndex ) {
@@ -120,7 +120,7 @@ namespace mongo {
             info.setInvalid();
 
             // clean up in system.indexes.  we do this last on purpose.
-            int n = removeFromSysIndexes(pns.c_str(), name.c_str());
+            int n = removeFromSysIndexes(pns, name);
             wassert( n == 1 );
 
         }

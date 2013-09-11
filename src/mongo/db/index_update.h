@@ -52,7 +52,7 @@ namespace mongo {
     // add index keys for a newly inserted record 
     void indexRecord(const char *ns, NamespaceDetails *d, const BSONObj& obj, const DiskLoc &loc);
 
-    bool dropIndexes(NamespaceDetails *d, const char *ns, const char *name, string &errmsg,
+    bool dropIndexes(NamespaceDetails *d, const StringData& ns, const StringData& name, string &errmsg,
                      BSONObjBuilder &anObjBuilder, bool maydeleteIdIndex );
 
     /**
