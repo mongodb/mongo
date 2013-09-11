@@ -259,11 +259,16 @@ __wt_lsm_checkpoint_worker(void *arg)
 			/*
 			 * Flush the file before checkpointing: this is the
 			 * expensive part in terms of I/O: do it without
-			 * holding the schema lock.
+			 * holding the schema lock.  We need to hold the
+			 * checkpoint lock, otherwise this sync can interfere
+			 * with an application checkpoint.
 			 */
 			WT_ERR(__wt_session_get_btree(
 			    session, chunk->uri, NULL, NULL, 0));
+			__wt_spin_lock(session, &S2C(session)->checkpoint_lock);
 			ret = __wt_sync_file(session, WT_SYNC_WRITE_LEAVES);
+			__wt_spin_unlock(
+			   session, &S2C(session)->checkpoint_lock);
 
 			/*
 			 * Clear the "cache resident" flag so the primary can
@@ -413,18 +418,37 @@ static int
 __lsm_discard_handle(
     WT_SESSION_IMPL *session, const char *uri, const char *checkpoint)
 {
+	WT_DECL_RET;
+	int locked;
+
 	/*
 	 * We need to grab the schema lock to drop the file, so first try to
-	 * make sure there is minimal work to freeing space in the cache.
+	 * discard the handle so there is minimal work to do while holding the
+	 * schema lock.
+	 *
 	 * This will fail with EBUSY if the file is still in use.
 	 */
 	WT_RET(__wt_session_get_btree(session, uri, checkpoint, NULL,
 	    WT_DHANDLE_EXCLUSIVE | WT_DHANDLE_LOCK_ONLY));
-	WT_ASSERT(session, S2BT(session)->modified == 0);
-	F_SET(session->dhandle, WT_DHANDLE_DISCARD);
-	WT_RET(__wt_session_release_btree(session));
 
-	return (0);
+	WT_ASSERT(session, S2BT(session)->modified == 0);
+
+	/*
+	 * We need the checkpoint lock here: if a checkpoint is in progress, it
+	 * may already know about this handle.  We *can't* get the checkpoint
+	 * lock earlier or it will deadlock with the schema lock.
+	 */
+	locked = 0;
+	if ((ret =
+	    __wt_spin_trylock(session, &S2C(session)->checkpoint_lock)) == 0) {
+		locked = 1;
+		F_SET(session->dhandle, WT_DHANDLE_DISCARD);
+	}
+	WT_TRET(__wt_session_release_btree(session));
+	if (locked)
+		__wt_spin_unlock(session, &S2C(session)->checkpoint_lock);
+
+	return (ret);
 }
 
 /*

@@ -578,6 +578,21 @@ session_ops(WT_SESSION *session)
 	/*! [Truncate a table] */
 
 	{
+	/*
+	 * Insert a pair of keys so we can truncate a range.
+	 */
+	WT_CURSOR *cursor;
+	ret = session->open_cursor(
+	    session, "table:mytable", NULL, NULL, &cursor);
+	cursor->set_key(cursor, "June01");
+	cursor->set_value(cursor, "value");
+	ret = cursor->update(cursor);
+	cursor->set_key(cursor, "June30");
+	cursor->set_value(cursor, "value");
+	ret = cursor->update(cursor);
+	cursor->close(cursor);
+
+	{
 	/*! [Truncate a range] */
 	WT_CURSOR *start, *stop;
 
@@ -593,6 +608,7 @@ session_ops(WT_SESSION *session)
 
 	ret = session->truncate(session, NULL, start, stop, NULL);
 	/*! [Truncate a range] */
+	}
 	}
 
 	/*! [Upgrade a table] */

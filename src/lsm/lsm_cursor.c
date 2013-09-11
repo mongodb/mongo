@@ -121,7 +121,7 @@ __clsm_deleted(WT_CURSOR_LSM *clsm, WT_ITEM *item)
 
 /*
  * __clsm_close_cursors --
- *	Close all of the btree cursors currently open.
+ *	Close any btree cursors that are not needed.
  */
 static int
 __clsm_close_cursors(WT_CURSOR_LSM *clsm, u_int ngood)
@@ -130,20 +130,24 @@ __clsm_close_cursors(WT_CURSOR_LSM *clsm, u_int ngood)
 	WT_CURSOR *c;
 	u_int i;
 
-	if (clsm->cursors == NULL)
+	if (clsm->cursors == NULL || clsm->nchunks == 0)
 		return (0);
 
-	if (ngood < clsm->nchunks)
-		WT_FORALL_CURSORS(clsm, c, i) {
+	/*
+	 * Walk the cursors, closing any we don't need.  Note that the exit
+	 * condition here is special, don't use WT_FORALL_CURSORS, and be
+	 * careful with unsigned integer wrapping.
+	 */
+	for (i = clsm->nchunks; i > ngood; ) {
+		if ((c = (clsm)->cursors[--i]) != NULL) {
 			clsm->cursors[i] = NULL;
 			WT_RET(c->close(c));
-			if ((bloom = clsm->blooms[i]) != NULL) {
-				clsm->blooms[i] = NULL;
-				WT_RET(__wt_bloom_close(bloom));
-			}
-			if (i == ngood)
-				break;
 		}
+		if ((bloom = clsm->blooms[i]) != NULL) {
+			clsm->blooms[i] = NULL;
+			WT_RET(__wt_bloom_close(bloom));
+		}
+	}
 
 	return (0);
 }
@@ -156,7 +160,7 @@ static int
 __clsm_open_cursors(
     WT_CURSOR_LSM *clsm, int update, u_int start_chunk, uint32_t start_id)
 {
-	WT_CURSOR *c, **cp;
+	WT_CURSOR *c, **cp, *primary;
 	WT_DECL_RET;
 	WT_LSM_CHUNK *chunk;
 	WT_LSM_TREE *lsm_tree;
@@ -167,10 +171,10 @@ __clsm_open_cursors(
 	u_int i, nchunks, ngood;
 	int locked;
 
-	session = (WT_SESSION_IMPL *)clsm->iface.session;
+	c = &clsm->iface;
+	session = (WT_SESSION_IMPL *)c->session;
 	txn = &session->txn;
 	lsm_tree = clsm->lsm_tree;
-	c = &clsm->iface;
 	chunk = NULL;
 
 	ckpt_cfg[0] = WT_CONFIG_BASE(session, session_open_cursor);
@@ -178,7 +182,7 @@ __clsm_open_cursors(
 	ckpt_cfg[2] = NULL;
 
 	/* Copy the key, so we don't lose the cursor position. */
-	if (F_ISSET(c, WT_CURSTD_KEY_INT) && c->key.data != c->key.mem)
+	if (F_ISSET(c, WT_CURSTD_KEY_INT) && !WT_DATA_IN_ITEM(&c->key))
 		WT_RET(__wt_buf_set(
 		    session, &c->key, c->key.data, c->key.size));
 
@@ -264,15 +268,20 @@ retry:
 		    cp++, ngood++) {
 			chunk = lsm_tree->chunk[ngood];
 
+			/* If the cursor isn't open yet, we're done. */
+			if (*cp == NULL)
+				break;
+
 			/* Easy case: the URIs don't match. */
-			if (*cp == NULL || strcmp((*cp)->uri, chunk->uri) != 0)
+			if (strcmp((*cp)->uri, chunk->uri) != 0)
 				break;
 
 			/* Make sure the checkpoint config matches. */
 			checkpoint = ((WT_CURSOR_BTREE *)*cp)->
 			    btree->dhandle->checkpoint;
 			if (checkpoint == NULL &&
-			    F_ISSET(chunk, WT_LSM_CHUNK_ONDISK))
+			    F_ISSET(chunk, WT_LSM_CHUNK_ONDISK) &&
+			    !F_ISSET(chunk, WT_LSM_CHUNK_EMPTY))
 				break;
 
 			/* Make sure the Bloom config matches. */
@@ -328,18 +337,21 @@ retry:
 		 * Read from the checkpoint if the file has been written.
 		 * Once all cursors switch, the in-memory tree can be evicted.
 		 */
-		ret = __wt_open_cursor(session,
-		    chunk->uri, &clsm->iface,
-		    !F_ISSET(chunk, WT_LSM_CHUNK_ONDISK) ? NULL : ckpt_cfg, cp);
+		ret = __wt_open_cursor(session, chunk->uri, c,
+		    (F_ISSET(chunk, WT_LSM_CHUNK_ONDISK) &&
+		    !F_ISSET(chunk, WT_LSM_CHUNK_EMPTY)) ? ckpt_cfg : NULL, cp);
 
 		/*
 		 * XXX kludge: we may have an empty chunk where no checkpoint
 		 * was written.  If so, try to open the ordinary handle on that
 		 * chunk instead.
 		 */
-		if (ret == WT_NOTFOUND && F_ISSET(chunk, WT_LSM_CHUNK_ONDISK))
-			ret = __wt_open_cursor(session,
-			    chunk->uri, &clsm->iface, NULL, cp);
+		if (ret == WT_NOTFOUND && F_ISSET(chunk, WT_LSM_CHUNK_ONDISK)) {
+			ret = __wt_open_cursor(session, chunk->uri, c,
+			    NULL, cp);
+			if (ret == 0)
+				F_SET(chunk, WT_LSM_CHUNK_EMPTY);
+		}
 		WT_ERR(ret);
 
 		if (F_ISSET(chunk, WT_LSM_CHUNK_BLOOM) &&
@@ -356,13 +368,39 @@ retry:
 	/* The last chunk is our new primary. */
 	if (chunk != NULL && !F_ISSET(chunk, WT_LSM_CHUNK_ONDISK)) {
 		clsm->primary_chunk = chunk;
-		c = clsm->cursors[clsm->nchunks - 1];
-		WT_WITH_BTREE(session, ((WT_CURSOR_BTREE *)(c))->btree,
+		primary = clsm->cursors[clsm->nchunks - 1];
+		WT_WITH_BTREE(session, ((WT_CURSOR_BTREE *)(primary))->btree,
 		    __wt_btree_evictable(session, 0));
 	}
 
 	clsm->dsk_gen = lsm_tree->dsk_gen;
 err:	F_CLR(session, WT_SESSION_NO_CACHE_CHECK);
+#ifdef HAVE_DIAGNOSTIC
+	/* Check that all cursors are open as expected. */
+	if (ret == 0 && F_ISSET(clsm, WT_CLSM_OPEN_READ)) {
+		for (i = 0, cp = clsm->cursors; i != nchunks; cp++, i++) {
+			chunk = lsm_tree->chunk[i + start_chunk];
+
+			/* Make sure the cursor is open. */
+			WT_ASSERT(session, *cp != NULL);
+
+			/* Easy case: the URIs should match. */
+			WT_ASSERT(session, strcmp((*cp)->uri, chunk->uri) == 0);
+
+			/* Make sure the checkpoint config matches. */
+			checkpoint = ((WT_CURSOR_BTREE *)*cp)->
+			    btree->dhandle->checkpoint;
+			WT_ASSERT(session,
+			    (F_ISSET(chunk, WT_LSM_CHUNK_ONDISK) &&
+			    !F_ISSET(chunk, WT_LSM_CHUNK_EMPTY)) ?
+			    checkpoint != NULL : checkpoint == NULL);
+
+			/* Make sure the Bloom config matches. */
+			WT_ASSERT(session, F_ISSET(chunk, WT_LSM_CHUNK_BLOOM) ?
+			    clsm->blooms[i] != NULL : clsm->blooms[i] == NULL);
+		}
+	}
+#endif
 	if (locked)
 		WT_TRET(__wt_rwunlock(session, lsm_tree->rwlock));
 	return (ret);
