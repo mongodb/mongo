@@ -84,8 +84,8 @@ __metadata_load_hot_backup(WT_SESSION_IMPL *session)
 		return (0);
 
 	/* Read line pairs and load them into the metadata file. */
-	WT_ERR(__wt_scr_alloc(session, 512, &key));
-	WT_ERR(__wt_scr_alloc(session, 512, &value));
+	WT_ERR(__wt_scr_alloc(session, WT_METADATA_MAXLINE, &key));
+	WT_ERR(__wt_scr_alloc(session, WT_METADATA_MAXLINE, &value));
 	for (;;) {
 		WT_ERR(__wt_getline(session, key, fp));
 		if (key->size == 0)
@@ -100,6 +100,67 @@ err:	if (fp != NULL)
 		WT_TRET(fclose(fp) == 0 ? 0 : __wt_errno());
 	__wt_scr_free(&key);
 	__wt_scr_free(&value);
+	return (ret);
+}
+
+/*
+ * __metadata_load_bulk --
+ *	Create any bulk-loaded file stubs.
+ */
+static int
+__metadata_load_bulk(WT_SESSION_IMPL *session)
+{
+	WT_CONFIG ckptconf;
+	WT_CONFIG_ITEM a, k, v;
+	WT_CURSOR *cursor;
+	WT_DECL_RET;
+	uint32_t allocsize;
+	int valid_addr;
+	const char *filecfg[] = { WT_CONFIG_BASE(session, file_meta), NULL };
+	const char *key, *value;
+
+	/*
+	 * If a file was being bulk-loaded during the hot backup, it will appear
+	 * in the metadata file, but the file won't exist.  Create on demand.
+	 */
+	WT_ERR(__wt_metadata_cursor(session, NULL, &cursor));
+	while ((ret = cursor->next(cursor)) == 0) {
+		WT_ERR(cursor->get_key(cursor, &key));
+		if (!WT_PREFIX_MATCH(key, "file:"))
+			continue;
+
+		/*
+		 * See if the value has a valid checkpoint: if so, we're done,
+		 * otherwise, it's a bulk-loaded file and needs to be created.
+		 */
+		WT_ERR(cursor->get_value(cursor, &value));
+		WT_ERR(__wt_config_getones(session, value, "checkpoint", &v));
+		WT_ERR(__wt_config_subinit(session, &ckptconf, &v));
+		valid_addr = 0;
+		while (__wt_config_next(&ckptconf, &k, &v) == 0) {
+			WT_ERR(__wt_config_subgets(session, &v, "addr", &a));
+			if (a.len != 0) {
+				valid_addr = 1;
+				break;
+			}
+		}
+		if (valid_addr)
+			continue;
+
+		/*
+		 * If we don't find a valid checkpoint address, retrieve the
+		 * allocation size and re-create the file.
+		 */
+		WT_ERR(__wt_direct_io_size_check(
+		    session, filecfg, "allocation_size", &allocsize));
+		WT_ERR(__wt_block_manager_create(
+		    session, strchr(key, ':') + 1, allocsize));
+	}
+	WT_ERR_NOTFOUND_OK(ret);
+
+err:	if (cursor != NULL)
+		WT_TRET(cursor->close(cursor));
+
 	return (ret);
 }
 
@@ -144,6 +205,9 @@ __wt_turtle_init(WT_SESSION_IMPL *session)
 
 	/* Load any hot-backup information. */
 	WT_RET(__metadata_load_hot_backup(session));
+
+	/* Create any bulk-loaded file stubs. */
+	WT_RET(__metadata_load_bulk(session));
 
 	/* Create the turtle file. */
 	WT_RET(__metadata_config(session, &metaconf));

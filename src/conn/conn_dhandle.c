@@ -444,17 +444,17 @@ __wt_conn_btree_apply(WT_SESSION_IMPL *session,
 	TAILQ_FOREACH(dhandle, &conn->dhqh, q)
 		if (F_ISSET(dhandle, WT_DHANDLE_OPEN) &&
 		    WT_PREFIX_MATCH(dhandle->name, "file:") &&
-		    !WT_IS_METADATA(dhandle)) {
+		    !WT_IS_METADATA(dhandle))
 			/*
 			 * We need to pull the handle into the session handle
 			 * cache and make sure it's referenced to stop other
 			 * internal code dropping the handle (e.g in LSM when
-			 * cleaning up obsolete chunks). Holding the metadata
+			 * cleaning up obsolete chunks).  Holding the metadata
 			 * lock isn't enough.
 			 */
-			ret = __wt_session_get_btree(
-			    session, dhandle->name, NULL, NULL, 0);
-			if (ret == 0) {
+			switch (ret = __wt_session_get_btree(
+			    session, dhandle->name, NULL, NULL, 0)) {
+			case 0:
 				ret = func(session, cfg);
 				if (WT_META_TRACKING(session))
 					WT_TRET(__wt_meta_track_handle_lock(
@@ -462,25 +462,38 @@ __wt_conn_btree_apply(WT_SESSION_IMPL *session,
 				else
 					WT_TRET(__wt_session_release_btree(
 					    session));
-			} else if (ret == EBUSY) {
+				WT_RET(ret);
+				break;
+			case EBUSY:
+				/*
+				 * We're holding the schema lock, and currently
+				 * we only see an EBUSY return if there's a
+				 * bulk-load handle in the list.  All of our
+				 * current callers want the bulk-load handles
+				 * passed in as well, call a support function to
+				 * find the handle and pass it along.
+				 */
 				ret = 0;
-				WT_RET(__wt_conn_btree_apply_single(
+				WT_RET(__wt_conn_btree_apply_bulk(
 				    session, dhandle->name, func, cfg));
+				break;
+			default:
+				WT_RET(ret);
+				break;
 			}
-			WT_RET(ret);
-		}
 
 	return (ret);
 }
 
 /*
- * __wt_conn_btree_apply_single --
- *	Apply a function to a single btree handle.
+ * __wt_conn_btree_apply_bulk --
+ *	Apply a function to a single bulk-load handle.
  */
 int
-__wt_conn_btree_apply_single(WT_SESSION_IMPL *session, const char *uri,
+__wt_conn_btree_apply_bulk(WT_SESSION_IMPL *session, const char *uri,
     int (*func)(WT_SESSION_IMPL *, const char *[]), const char *cfg[])
 {
+	WT_BTREE *btree;
 	WT_CONNECTION_IMPL *conn;
 	WT_DATA_HANDLE *dhandle, *saved_dhandle;
 	WT_DECL_RET;
@@ -495,11 +508,20 @@ __wt_conn_btree_apply_single(WT_SESSION_IMPL *session, const char *uri,
 			/*
 			 * We have the schema lock, which prevents handles being
 			 * opened or closed, so there is no need for additional
-			 * handle locking here, or pulling every tree into this
-			 * session's handle cache.
+			 * handle locking here.
 			 */
 			session->dhandle = dhandle;
-			WT_ERR(func(session, cfg));
+
+			/*
+			 * If this is a bulk-loaded file, that's fine, otherwise
+			 * something has gone terribly wrong.
+			 */
+			btree = S2BT(session);
+			if (F_ISSET(
+			    btree, WT_BTREE_SPECIAL_FLAGS) == WT_BTREE_BULK)
+				WT_ERR(func(session, cfg));
+			else
+				WT_ERR(EBUSY);
 		}
 
 err:	session->dhandle = saved_dhandle;

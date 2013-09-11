@@ -31,22 +31,42 @@ __wt_meta_btree_apply(WT_SESSION_IMPL *session,
 		WT_ERR(cursor->get_key(cursor, &uri));
 		if (!WT_PREFIX_MATCH(uri, "file:"))
 			break;
-		else if (strcmp(uri, WT_METADATA_URI) == 0)
+		if (strcmp(uri, WT_METADATA_URI) == 0)
 			continue;
-		ret = __wt_session_get_btree(session, uri, NULL, NULL, 0);
-		if (ret == 0) {
+
+		/*
+		 * We need to pull the handle into the session handle cache
+		 * and make sure it's referenced to stop other internal code
+		 * dropping the handle (e.g in LSM when cleaning up obsolete
+		 * chunks).  Holding the metadata lock isn't enough.
+		 */
+		switch (ret =
+		    __wt_session_get_btree(session, uri, NULL, NULL, 0)) {
+		case 0:
 			ret = func(session, cfg);
 			if (WT_META_TRACKING(session))
 				WT_TRET(
 				    __wt_meta_track_handle_lock(session, 0));
 			else
 				WT_TRET(__wt_session_release_btree(session));
-		} else if (ret == EBUSY) {
+			WT_ERR(ret);
+			break;
+		case EBUSY:
+			/*
+			 * We're holding the schema lock, and currently we only
+			 * see an EBUSY return if there's a bulk-load handle in
+			 * the list.  All of our current callers want the bulk-
+			 * load handles passed in as well, call a support
+			 * function to find the handle and pass it along.
+			 */
 			ret = 0;
-			WT_ERR(__wt_conn_btree_apply_single(
+			WT_ERR(__wt_conn_btree_apply_bulk(
 			    session, uri, func, cfg));
+			break;
+		default:
+			WT_ERR(ret);
+			break;
 		}
-		WT_ERR(ret);
 	}
 
 	if (tret != WT_NOTFOUND)

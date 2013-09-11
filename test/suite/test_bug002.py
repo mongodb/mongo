@@ -28,25 +28,24 @@
 # test_bug002.py
 #       Regression tests.
 
-import os
-import shutil
-from helper import compare_files, key_populate, value_populate
+import shutil, os
+from helper import confirm_empty, key_populate, value_populate
 from suite_subprocess import suite_subprocess
 from wtscenario import multiply_scenarios, number_scenarios
 import wiredtiger, wttest
 
 # Regression tests.
-class test_bug002(wttest.WiredTigerTestCase, suite_subprocess):
+class test_bulk_load_checkpoint(wttest.WiredTigerTestCase, suite_subprocess):
     types = [
         ('file', dict(uri='file:data')),
         ('table', dict(uri='table:data')),
     ]
-    name = [
-        ('no', dict(name=0)),
-        ('yes', dict(name=1)),
+    ckpt_type = [
+        ('named', dict(ckpt_type='named')),
+        ('unnamed', dict(ckpt_type='unnamed')),
     ]
 
-    scenarios = number_scenarios(multiply_scenarios('.', types, name))
+    scenarios = number_scenarios(multiply_scenarios('.', types, ckpt_type))
 
     # Bulk-load handles return EBUSY to the checkpoint code, causing the
     # checkpoint call to find a handle anyway, and create fake checkpoint.
@@ -62,28 +61,46 @@ class test_bug002(wttest.WiredTigerTestCase, suite_subprocess):
 
         # Checkpoint a few times (to test the drop code).
         for i in range(1, 5):
-            if self.name == 0:
-                self.session.checkpoint()
-            else:
+            if self.ckpt_type == 'named':
                 self.session.checkpoint('name=myckpt')
+            else:
+                self.session.checkpoint()
 
         # Close the bulk cursor.
         cursor.close()
 
         # In the case of named checkpoints, verify they're still there,
         # reflecting an empty file.
-        if self.name == 1:
+        if self.ckpt_type == 'named':
             cursor = self.session.open_cursor(
                 self.uri, None, 'checkpoint=myckpt')
             self.assertEquals(cursor.next(), wiredtiger.WT_NOTFOUND)
             cursor.close()
 
+
+class test_backup_bulk(wttest.WiredTigerTestCase, suite_subprocess):
+    types = [
+        ('file', dict(uri='file:data')),
+        ('table', dict(uri='table:data')),
+    ]
+    ckpt_type = [
+        ('named', dict(ckpt_type='named')),
+        ('none', dict(ckpt_type='none')),
+        ('unnamed', dict(ckpt_type='unnamed')),
+    ]
+    session_type = [
+        ('different', dict(session_type='different')),
+        ('same', dict(session_type='same')),
+    ]
+    scenarios = number_scenarios(
+        multiply_scenarios('.', types, ckpt_type, session_type))
+
     # Backup a set of chosen tables/files using the wt backup command.
-    def backup_table_cursor(self, session):
-        # Remove any previous backup directories.
-        targetdir = 'backup.dir'
-        shutil.rmtree(targetdir, True)
-        os.mkdir(targetdir)
+    # The only files are bulk-load files, so they shouldn't be copied.
+    def backup(self, session):
+        # Create a backup directory.
+        backupdir = 'backup.dir'
+        os.mkdir(backupdir)
 
         # Open up the backup cursor, and copy the files.
         cursor = session.open_cursor('backup:', None, None)
@@ -91,17 +108,18 @@ class test_bug002(wttest.WiredTigerTestCase, suite_subprocess):
             ret = cursor.next()
             if ret != 0:
                 break
-            #print 'Copy from: ' + cursor.get_key() + ' to ' + targetdir
-            shutil.copy(cursor.get_key(), targetdir)
+            shutil.copy(cursor.get_key(), backupdir)
         self.assertEqual(ret, wiredtiger.WT_NOTFOUND)
         cursor.close()
 
-        # Confirm the object we backed up exist, with correct contents.
-        self.runWt(['dump', self.uri], outfilename='orig')
-        self.runWt(['-h', targetdir, 'dump', self.uri], outfilename='backup')
-        compare_files(self, 'orig', 'backup')
+        # Open the target directory, and confirm the object has no contents.
+        conn = wiredtiger.wiredtiger_open(backupdir)
+        session = conn.open_session()
+        cursor = session.open_cursor(self.uri, None, None)
+        self.assertEqual(cursor.next(), wiredtiger.WT_NOTFOUND)
+        conn.close()
 
-    def test_bulk_load_backup(self):
+    def test_backup_bulk(self):
         # Open a bulk cursor and insert a few records.
         self.session.create(self.uri, 'key_format=S,value_format=S')
         cursor = self.session.open_cursor(self.uri, None, 'bulk')
@@ -110,13 +128,20 @@ class test_bug002(wttest.WiredTigerTestCase, suite_subprocess):
             cursor.set_value(value_populate(cursor, i))
             cursor.insert()
 
+        # Test without a checkpoint, with an unnamed checkpoint, with a named
+        # checkpoint.
+        if self.ckpt_type == 'named':
+            self.session.checkpoint('name=myckpt')
+        elif self.ckpt_type == 'unnamed':
+            self.session.checkpoint()
+
         # Test with the same and different sessions than the bulk-get call,
         # test both the database handle and session handle caches.
-        self.backup_table_cursor(self.session)
-        self.backup_table_cursor(self.conn.open_session())
+        if self.session_type == 'same':
+            self.backup(self.session)
+        else:
+            self.backup(self.conn.open_session())
 
-        # Close the bulk cursor.
-        cursor.close()
 
 if __name__ == '__main__':
     wttest.run()
