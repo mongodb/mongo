@@ -44,13 +44,12 @@
 #include "mongo/db/kill_current_op.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/oplogreader.h"
 #include "mongo/db/pdfile.h"
 
 namespace mongo {
 
     BSONElement getErrField(const BSONObj& o);
-
-    bool replAuthenticate(DBClientBase *, bool);
 
     /** Selectively release the mutex based on a parameter. */
     class dbtempreleaseif {
@@ -272,7 +271,7 @@ namespace mongo {
         DBClientConnection *tmpConn = new DBClientConnection();
         // cloner owns _conn in auto_ptr
         cloner.setConnection(tmpConn);
-        uassert(15908, errmsg, tmpConn->connect(host, errmsg) && replAuthenticate(tmpConn, false));
+        uassert(15908, errmsg, tmpConn->connect(host, errmsg) && replAuthenticate(tmpConn));
 
         return cloner.copyCollection(ns, BSONObj(), errmsg, true, false, true, false);
     }
@@ -359,7 +358,7 @@ namespace mongo {
                 auto_ptr<DBClientBase> con( cs.connect( errmsg ));
                 if ( !con.get() )
                     return false;
-                if( !replAuthenticate(con.get(), false) )
+                if( !replAuthenticate(con.get()))
                     return false;
                 
                 _conn = con;

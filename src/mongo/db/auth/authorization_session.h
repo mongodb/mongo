@@ -92,9 +92,6 @@ namespace mongo {
         // Used to grant internal threads full access.
         void grantInternalAuthorization();
 
-        // Checks if this connection has been authenticated as an internal user.
-        bool hasInternalAuthorization();
-
         // Checks if this connection has the privileges required to perform the given action
         // on the given resource.  Contains all the authorization logic including handling things
         // like the localhost exception.  Returns true if the action may proceed on the resource.

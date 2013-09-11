@@ -37,6 +37,13 @@
 
 namespace mongo {
 
+    /**
+     * Authenticates conn using the server's cluster-membership credentials.
+     *
+     * Returns true on successful authentication.
+     */
+    bool replAuthenticate(DBClientBase* conn);
+
     /* started abstracting out the querying of the primary/master's oplog
        still fairly awkward but a start.
     */
