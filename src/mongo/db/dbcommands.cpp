@@ -1824,17 +1824,30 @@ namespace mongo {
         CmdSleep() : Command("sleep") { }
         bool run(const string& ns, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             log() << "test only command sleep invoked" << endl;
-            int secs = 100;
-            if ( cmdObj["secs"].isNumber() )
-                secs = cmdObj["secs"].numberInt();
-            if( cmdObj.getBoolField("w") ) {
+            long long millis = 10 * 1000;
+
+            if (cmdObj["secs"].isNumber() && cmdObj["millis"].isNumber()) {
+                millis = cmdObj["secs"].numberLong() * 1000 + cmdObj["millis"].numberLong();
+            }
+            else if (cmdObj["secs"].isNumber()) {
+                millis = cmdObj["secs"].numberLong() * 1000;
+            }
+            else if (cmdObj["millis"].isNumber()) {
+                millis = cmdObj["millis"].numberLong();
+            }
+
+            if(cmdObj.getBoolField("w")) {
                 Lock::GlobalWrite lk;
-                sleepsecs(secs);
+                sleepmillis(millis);
             }
             else {
                 Lock::GlobalRead lk;
-                sleepsecs(secs);
+                sleepmillis(millis);
             }
+
+            // Interrupt point for testing (e.g. maxTimeMS).
+            killCurrentOp.checkForInterrupt();
+
             return true;
         }
     };
