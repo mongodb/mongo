@@ -1,5 +1,19 @@
 /*! @page upgrading Upgrading WiredTiger applications
 
+@section version_165 Upgrading to Version 1.6.5
+<dl>
+
+<dt>WT_CURSOR::insert behavior</dt>
+<dd>
+In previous releases, the WT_CURSOR::insert ended positioned at the inserted
+record.  To minimize the cursor resources held by applications inserting many
+records, the WT_CURSOR::insert method has been changed to end without any
+position.  Application insert cursors should be reviewed to confirm they do
+not attempt to iterate after an insert.
+</dd>
+
+</dl>
+<hr>
 @section version_164 Upgrading to Version 1.6.4
 <dl>
 

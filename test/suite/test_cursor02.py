@@ -140,7 +140,6 @@ class test_cursor02(TestCursorTracker):
         """
         cursor = self.create_session_and_cursor(0)
         self.cur_insert(cursor, 1, 0)
-        self.cur_check_forward(cursor, -1)
         self.cur_first(cursor)
         self.cur_check_forward(cursor, -1)
         self.cur_check_backward(cursor, -1)

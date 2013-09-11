@@ -35,8 +35,9 @@ static int   notfound_chk(const char *, int, int, uint64_t);
 static void *ops(void *);
 static void  print_item(const char *, WT_ITEM *);
 static int   read_row(WT_CURSOR *, WT_ITEM *, uint64_t);
+static int   row_insert(WT_CURSOR *, WT_ITEM *, WT_ITEM *, uint64_t);
 static int   row_remove(WT_CURSOR *, WT_ITEM *, uint64_t, int *);
-static int   row_update(WT_CURSOR *, WT_ITEM *, WT_ITEM *, uint64_t, int);
+static int   row_update(WT_CURSOR *, WT_ITEM *, WT_ITEM *, uint64_t);
 static void  table_append_init(void);
 
 /*
@@ -317,8 +318,9 @@ ops(void *arg)
 			++tinfo->insert;
 			switch (g.type) {
 			case ROW:
-				if (row_update(cursor, &key, &value, keyno, 1))
+				if (row_insert(cursor, &key, &value, keyno))
 					goto deadlock;
+				insert = 1;
 				break;
 			case FIX:
 			case VAR:
@@ -336,9 +338,15 @@ ops(void *arg)
 				 */
 				if ((ret = cursor->reset(cursor)) != 0)
 					die(ret, "cursor.reset");
+
+				/* Insert, then reset the insert cursor. */
 				if (col_insert(
 				    cursor_insert, &key, &value, &keyno))
 					goto deadlock;
+				if ((ret =
+				    cursor_insert->reset(cursor_insert)) != 0)
+					die(ret, "cursor.reset");
+
 				insert = 1;
 				break;
 			}
@@ -347,7 +355,7 @@ ops(void *arg)
 			++tinfo->update;
 			switch (g.type) {
 			case ROW:
-				if (row_update(cursor, &key, &value, keyno, 0))
+				if (row_update(cursor, &key, &value, keyno))
 					goto deadlock;
 				break;
 			case FIX:
@@ -364,21 +372,19 @@ skip_insert:			if (col_update(cursor, &key, &value, keyno))
 		}
 
 		/*
-		 * If we did any operation, we've set the cursor, do a small
-		 * number of next/prev cursor operations in a random direction.
+		 * The cursor is positioned if we did any operation other than
+		 * insert, do a small number of next/prev cursor operations in
+		 * a random direction.
 		 */
-		dir = (int)MMRAND(0, 1);
-		for (np = 0; np < MMRAND(1, 8); ++np) {
-			if (notfound)
-				break;
-			if (nextprev(
-			    insert ? cursor_insert : cursor, dir, &notfound))
-				goto deadlock;
+		if (!insert) {
+			dir = (int)MMRAND(0, 1);
+			for (np = 0; np < MMRAND(1, 8); ++np) {
+				if (notfound)
+					break;
+				if (nextprev(cursor, dir, &notfound))
+					goto deadlock;
+			}
 		}
-
-		/* Reset the insert cursor. */
-		if (insert && (ret = cursor_insert->reset(cursor_insert)) != 0)
-			die(ret, "cursor.reset");
 
 		/* Read the value we modified to confirm the operation. */
 		if (read_row(cursor, &key, keyno))
@@ -661,34 +667,30 @@ nextprev(WT_CURSOR *cursor, int next, int *notfoundp)
  */
 static int
 row_update(
-    WT_CURSOR *cursor, WT_ITEM *key, WT_ITEM *value, uint64_t keyno, int insert)
+    WT_CURSOR *cursor, WT_ITEM *key, WT_ITEM *value, uint64_t keyno)
 {
 	WT_SESSION *session;
 	int notfound, ret;
 
 	session = cursor->session;
 
-	key_gen((uint8_t *)key->data, &key->size, keyno, insert);
+	key_gen((uint8_t *)key->data, &key->size, keyno, 0);
 	value_gen((uint8_t *)value->data, &value->size, keyno);
 
 	/* Log the operation */
 	if (g.logging == LOG_OPS)
 		(void)g.wt_api->msg_printf(g.wt_api, session,
 		    "%-10s{%.*s}\n%-10s{%.*s}",
-		    insert ? "insertK" : "putK",
-		    (int)key->size, (char *)key->data,
-		    insert ? "insertV" : "putV",
-		    (int)value->size, (char *)value->data);
+		    "putK", (int)key->size, (char *)key->data,
+		    "putV", (int)value->size, (char *)value->data);
 
 	cursor->set_key(cursor, key);
 	cursor->set_value(cursor, value);
-	ret = cursor->insert(cursor);
+	ret = cursor->update(cursor);
 	if (ret == WT_DEADLOCK)
 		return (WT_DEADLOCK);
 	if (ret != 0 && ret != WT_NOTFOUND)
-		die(ret,
-		    "row_update: %s row %" PRIu64 " by key",
-		    insert ? "insert" : "update", keyno);
+		die(ret, "row_update: update row %" PRIu64 " by key", keyno);
 
 	if (!SINGLETHREADED)
 		return (0);
@@ -849,6 +851,45 @@ table_append(uint64_t keyno)
 			break;
 		sleep(1);
 	}
+}
+
+/*
+ * row_insert --
+ *	Insert a row in a row-store file.
+ */
+static int
+row_insert(
+    WT_CURSOR *cursor, WT_ITEM *key, WT_ITEM *value, uint64_t keyno)
+{
+	WT_SESSION *session;
+	int notfound, ret;
+
+	session = cursor->session;
+
+	key_gen((uint8_t *)key->data, &key->size, keyno, 1);
+	value_gen((uint8_t *)value->data, &value->size, keyno);
+
+	/* Log the operation */
+	if (g.logging == LOG_OPS)
+		(void)g.wt_api->msg_printf(g.wt_api, session,
+		    "%-10s{%.*s}\n%-10s{%.*s}",
+		    "insertK", (int)key->size, (char *)key->data,
+		    "insertV", (int)value->size, (char *)value->data);
+
+	cursor->set_key(cursor, key);
+	cursor->set_value(cursor, value);
+	ret = cursor->insert(cursor);
+	if (ret == WT_DEADLOCK)
+		return (WT_DEADLOCK);
+	if (ret != 0 && ret != WT_NOTFOUND)
+		die(ret, "row_insert: insert row %" PRIu64 " by key", keyno);
+
+	if (!SINGLETHREADED)
+		return (0);
+
+	bdb_update(key->data, key->size, value->data, value->size, &notfound);
+	(void)notfound_chk("row_insert", ret, notfound, keyno);
+	return (0);
 }
 
 /*
