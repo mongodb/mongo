@@ -35,7 +35,7 @@ from wtscenario import multiply_scenarios, number_scenarios
 import wiredtiger, wttest
 
 # test_bulkload_checkpoint
-#	Test bulk-load with checkpoints.
+#       Test bulk-load with checkpoints.
 class test_bulkload_checkpoint(wttest.WiredTigerTestCase, suite_subprocess):
     types = [
         ('file', dict(uri='file:data')),
@@ -80,7 +80,7 @@ class test_bulkload_checkpoint(wttest.WiredTigerTestCase, suite_subprocess):
 
 
 # test_bulkload_backup
-#	Test bulk-load with hot-backup.
+#       Test bulk-load with hot-backup.
 class test_bulkload_backup(wttest.WiredTigerTestCase, suite_subprocess):
     types = [
         ('file', dict(uri='file:data')),
