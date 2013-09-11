@@ -351,7 +351,7 @@ namespace mongo {
         }
 
         // @return offset in indexes[]
-        int findIndexByName(const char *name, bool includeBackgroundInProgress = false);
+        int findIndexByName(const StringData& name, bool includeBackgroundInProgress = false);
 
         // @return offset in indexes[]
         int findIndexByKeyPattern(const BSONObj& keyPattern, 

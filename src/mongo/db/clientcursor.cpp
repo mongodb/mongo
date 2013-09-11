@@ -144,18 +144,18 @@ namespace mongo {
         }
     }
 
-    void ClientCursor::invalidate(const char *ns) {
+    void ClientCursor::invalidate(const StringData& ns) {
         Lock::assertWriteLocked(ns);
-        int len = strlen(ns);
-        const char* dot = strchr(ns, '.');
-        verify(len > 0 && dot);
+
+        size_t dot = ns.find( '.' );
+        verify( dot != string::npos );
 
         // first (and only) dot is the last char
-        bool isDB = (dot == &ns[len-1]);
+        bool isDB = dot == ns.size() - 1;
 
         Database *db = cc().database();
         verify(db);
-        verify(str::startsWith(ns, db->name()));
+        verify(ns.startsWith(db->name()));
 
         // Look at all active non-cached Runners.  These are the runners that are in auto-yield mode
         // that are not attached to the the client cursor. For example, all internal runners don't
@@ -165,7 +165,7 @@ namespace mongo {
 
             Runner* runner = *it;
             const string& runnerNS = runner->ns();
-            if ((isDB && str::startsWith(runnerNS, ns)) || (str::equals(runnerNS.c_str(), ns))) {
+            if ( ( isDB && StringData(runnerNS).startsWith(ns) ) || ns == runnerNS ) {
                 runner->kill();
             }
         }
@@ -206,11 +206,11 @@ namespace mongo {
 
                 if (isDB) {
                     // already checked that db matched above
-                    dassert(str::startsWith(cc->_ns.c_str(), ns));
+                    dassert( StringData(cc->_ns).startsWith( ns ) );
                     shouldDelete = true;
                 }
                 else {
-                    if (str::equals(cc->_ns.c_str(), ns)) {
+                    if ( ns == cc->_ns ) {
                         shouldDelete = true;
                     }
                 }

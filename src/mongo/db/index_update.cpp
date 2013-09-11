@@ -325,14 +325,14 @@ namespace mongo {
         theDataFileMgr.insert(system_indexes.c_str(), o.objdata(), o.objsize(), mayInterrupt, true);
     }
 
-    bool dropIndexes(NamespaceDetails *d, const char *ns, const char *name, string &errmsg, BSONObjBuilder &anObjBuilder, bool mayDeleteIdIndex) {
+    bool dropIndexes(NamespaceDetails *d, const StringData& ns, const StringData& name, string &errmsg, BSONObjBuilder &anObjBuilder, bool mayDeleteIdIndex) {
         BackgroundOperation::assertNoBgOpInProgForNs(ns);
 
         /* there may be pointers pointing at keys in the btree(s).  kill them. */
         ClientCursor::invalidate(ns);
 
         // delete a specific index or all?
-        if ( *name == '*' && name[1] == 0 ) {
+        if ( name == "*" ) {
             // this should be covered by assertNoBgOpInProgForNs above, but being paranoid
             verify( d->getCompletedIndexCount() == d->getTotalIndexCount() );
 

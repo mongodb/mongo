@@ -96,11 +96,11 @@ namespace mongo {
     }
 
     // @return offset in indexes[]
-    inline int NamespaceDetails::findIndexByName(const char *name,
+    inline int NamespaceDetails::findIndexByName(const StringData& name,
                                                  bool includeBackgroundInProgress) {
         IndexIterator i = ii(includeBackgroundInProgress);
         while( i.more() ) {
-            if ( strcmp(i.next().info.obj().getStringField("name"),name) == 0 )
+            if ( name == i.next().info.obj().getStringField("name") )
                 return i.pos()-1;
         }
         return -1;
