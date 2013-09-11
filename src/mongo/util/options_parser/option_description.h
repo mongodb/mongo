@@ -45,8 +45,8 @@ namespace optionenvironment {
      */
     class OptionDescription {
     public:
-        OptionDescription(const std::string& dottedName, // Used for JSON config and in Environment
-                const std::string& singleName, // Used for boost command line and INI
+        OptionDescription(const std::string& dottedName,
+                const std::string& singleName,
                 const OptionType type,
                 const std::string& description,
                 const bool isVisible = true,
@@ -62,14 +62,15 @@ namespace optionenvironment {
             _implicit(implicitValue),
             _isComposing(isComposing) { }
 
-        std::string _dottedName;
-        std::string _singleName;
-        OptionType _type;
-        std::string _description;
-        bool _isVisible;
-        Value _default;
-        Value _implicit;
-        bool _isComposing;
+        std::string _dottedName; // Used for JSON config and in Environment
+        std::string _singleName; // Used for boost command line and INI
+        OptionType _type; // Storage type of the argument value, or switch type (bool)
+                          // (required by boost)
+        std::string _description; // Description of option printed in help output
+        bool _isVisible; // Visible in help output
+        Value _default; // Value if option is not specified
+        Value _implicit; // Value if option is specified with no argument
+        bool _isComposing; // Aggregate values from different sources instead of overriding
     };
 
     class PositionalOptionDescription {
@@ -81,9 +82,9 @@ namespace optionenvironment {
                 _type(type),
                 _count(count) { }
 
-        std::string _name;
-        OptionType _type;
-        int _count; // Max number of times this option could be specified.  -1 = unlimited
+        std::string _name; // Name used to access the value of this option after parsing
+        OptionType _type; // Storage type of the positional argument (required by boost)
+        int _count; // Max number of times this option can be specified.  -1 = unlimited
     };
 
 } // namespace optionenvironment

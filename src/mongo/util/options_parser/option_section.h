@@ -31,6 +31,9 @@ namespace optionenvironment {
      *  supported to be passed in to an OptionsParser.  Has utility functions to support the various
      *  formats needed by the parsing process
      *
+     *  The sections and section names only matter in the help string.  For sections in a JSON
+     *  config, look at the dots in the dottedName of the relevant OptionDescription
+     *
      *  Usage:
      *
      *  namespace moe = mongo::optionenvironment;
