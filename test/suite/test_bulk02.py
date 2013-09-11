@@ -25,8 +25,8 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_bug002.py
-#       Regression tests.
+# test_bulk02.py
+#       Bulk-load testing.
 
 import shutil, os
 from helper import confirm_empty, key_populate, value_populate
@@ -34,8 +34,9 @@ from suite_subprocess import suite_subprocess
 from wtscenario import multiply_scenarios, number_scenarios
 import wiredtiger, wttest
 
-# Regression tests.
-class test_bulk_load_checkpoint(wttest.WiredTigerTestCase, suite_subprocess):
+# test_bulkload_checkpoint
+#	Test bulk-load with checkpoints.
+class test_bulkload_checkpoint(wttest.WiredTigerTestCase, suite_subprocess):
     types = [
         ('file', dict(uri='file:data')),
         ('table', dict(uri='table:data')),
@@ -50,7 +51,7 @@ class test_bulk_load_checkpoint(wttest.WiredTigerTestCase, suite_subprocess):
     # Bulk-load handles return EBUSY to the checkpoint code, causing the
     # checkpoint call to find a handle anyway, and create fake checkpoint.
     # Named and unnamed checkpoint versions.
-    def test_bulk_load_checkpoint(self):
+    def test_bulkload_checkpoint(self):
         # Open a bulk cursor and insert a few records.
         self.session.create(self.uri, 'key_format=S,value_format=S')
         cursor = self.session.open_cursor(self.uri, None, 'bulk')
@@ -78,7 +79,9 @@ class test_bulk_load_checkpoint(wttest.WiredTigerTestCase, suite_subprocess):
             cursor.close()
 
 
-class test_backup_bulk(wttest.WiredTigerTestCase, suite_subprocess):
+# test_bulkload_backup
+#	Test bulk-load with hot-backup.
+class test_bulkload_backup(wttest.WiredTigerTestCase, suite_subprocess):
     types = [
         ('file', dict(uri='file:data')),
         ('table', dict(uri='table:data')),
@@ -119,7 +122,7 @@ class test_backup_bulk(wttest.WiredTigerTestCase, suite_subprocess):
         self.assertEqual(cursor.next(), wiredtiger.WT_NOTFOUND)
         conn.close()
 
-    def test_backup_bulk(self):
+    def test_bulk_backup(self):
         # Open a bulk cursor and insert a few records.
         self.session.create(self.uri, 'key_format=S,value_format=S')
         cursor = self.session.open_cursor(self.uri, None, 'bulk')
