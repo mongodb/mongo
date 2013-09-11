@@ -84,8 +84,8 @@ __metadata_load_hot_backup(WT_SESSION_IMPL *session)
 		return (0);
 
 	/* Read line pairs and load them into the metadata file. */
-	WT_ERR(__wt_scr_alloc(session, WT_METADATA_MAXLINE, &key));
-	WT_ERR(__wt_scr_alloc(session, WT_METADATA_MAXLINE, &value));
+	WT_ERR(__wt_scr_alloc(session, 512, &key));
+	WT_ERR(__wt_scr_alloc(session, 512, &value));
 	for (;;) {
 		WT_ERR(__wt_getline(session, key, fp));
 		if (key->size == 0)
