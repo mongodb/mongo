@@ -19,55 +19,23 @@
 #include <fstream>
 #include <iostream>
 
-#include "mongo/base/init.h"
 #include "mongo/db/json.h"
 #include "mongo/db/repl/oplogreader.h"
+#include "mongo/tools/mongooplog_options.h"
 #include "mongo/tools/tool.h"
-#include "mongo/tools/tool_options.h"
 #include "mongo/util/options_parser/option_section.h"
-#include "mongo/util/options_parser/options_parser.h"
 
 using namespace mongo;
 
-namespace mongo {
-    MONGO_INITIALIZER_GENERAL(ParseStartupConfiguration,
-                              MONGO_NO_PREREQUISITES,
-                              ("default"))(InitializerContext* context) {
-
-        options = moe::OptionSection( "options" );
-        moe::OptionsParser parser;
-
-        Status retStatus = addMongoOplogOptions(&options);
-        if (!retStatus.isOK()) {
-            return retStatus;
-        }
-
-        retStatus = parser.run(options, context->args(), context->env(), &_params);
-        if (!retStatus.isOK()) {
-            std::ostringstream oss;
-            oss << retStatus.toString() << "\n";
-            printMongoOplogHelp(options, &oss);
-            return Status(ErrorCodes::FailedToParse, oss.str());
-        }
-
-        return Status::OK();
-    }
-} // namespace mongo
-
 class OplogTool : public Tool {
 public:
-    OplogTool() : Tool( "oplog" ) { }
+    OplogTool() : Tool() { }
 
     virtual void printHelp( ostream & out ) {
-        printMongoOplogHelp(options, &out);
+        printMongoOplogHelp(toolsOptions, &out);
     }
 
     int run() {
-
-        if ( ! hasParam( "from" ) ) {
-            log() << "need to specify --from" << endl;
-            return -1;
-        }
 
         Client::initThread( "oplogreplay" );
 
@@ -75,15 +43,14 @@ public:
         
         OplogReader r;
         r.setTailingQueryOptions( QueryOption_SlaveOk | QueryOption_AwaitData );
-        r.connect( getParam( "from" ) );
+        r.connect(mongoOplogGlobalParams.from);
 
         log() << "connected" << endl;
 
-        OpTime start( time(0) - getParam( "seconds" , 86400 ) , 0 );
+        OpTime start(time(0) - mongoOplogGlobalParams.seconds, 0);
         log() << "starting from " << start.toStringPretty() << endl;
 
-        string ns = getParam( "oplogns" );
-        r.tailingQueryGTE( ns.c_str() , start );
+        r.tailingQueryGTE(mongoOplogGlobalParams.ns.c_str(), start);
 
         int num = 0;
         while ( r.more() ) {

@@ -16,12 +16,28 @@
 
 #include "mongo/tools/tool_options.h"
 
+#include <boost/filesystem/operations.hpp>
+#include <fstream>
+#include "pcrecpp.h"
+
 #include "mongo/base/status.h"
+#include "mongo/db/storage_options.h"
+#include "mongo/util/log.h"
+#include "mongo/util/net/sock.h"
+#include "mongo/util/net/ssl_options.h"
+#include "mongo/util/options_parser/environment.h"
 #include "mongo/util/options_parser/option_description.h"
 #include "mongo/util/options_parser/option_section.h"
 #include "mongo/util/password.h"
+#include "mongo/util/text.h"
+#include "mongo/util/version.h"
 
 namespace mongo {
+
+    moe::OptionSection toolsOptions;
+    moe::Environment toolsParsedOptions;
+    ToolGlobalParams toolGlobalParams;
+    BSONToolGlobalParams bsonToolGlobalParams;
 
     typedef moe::OptionDescription OD;
     typedef moe::PositionalOptionDescription POD;
@@ -192,576 +208,218 @@ namespace mongo {
         return Status::OK();
     }
 
-    Status addMongoDumpOptions(moe::OptionSection* options) {
-        Status ret = addGeneralToolOptions(options);
-        if (!ret.isOK()) {
-            return ret;
+    std::string getParam(std::string name, std::string def) {
+        if (toolsParsedOptions.count(name)) {
+            return toolsParsedOptions[name.c_str()].as<string>();
+        }
+        return def;
+    }
+    int getParam(std::string name, int def) {
+        if (toolsParsedOptions.count(name)) {
+            return toolsParsedOptions[name.c_str()].as<int>();
+        }
+        return def;
+    }
+    bool hasParam(std::string name) {
+        return toolsParsedOptions.count(name);
+    }
+
+    void printToolVersionString(std::ostream &out) {
+        out << toolGlobalParams.name << " version " << mongo::versionString;
+        if (mongo::versionString[strlen(mongo::versionString)-1] == '-')
+            out << " (commit " << mongo::gitVersion() << ")";
+        out << std::endl;
+    }
+
+    Status handlePreValidationGeneralToolOptions(const moe::Environment& params) {
+        if (toolsParsedOptions.count("version")) {
+            printToolVersionString(std::cout);
+            ::_exit(0);
+        }
+        return Status::OK();
+    }
+
+    extern bool directoryperdb;
+
+    Status storeGeneralToolOptions(const moe::Environment& params,
+                                   const std::vector<std::string>& args) {
+
+        toolGlobalParams.name = args[0];
+
+        storageGlobalParams.prealloc = false;
+
+        // The default value may vary depending on compile options, but for tools
+        // we want durability to be disabled.
+        storageGlobalParams.dur = false;
+
+        // Set authentication parameters
+        if ( toolsParsedOptions.count( "authenticationDatabase" ) ) {
+            toolGlobalParams.authenticationDatabase =
+                toolsParsedOptions["authenticationDatabase"].as<string>();
         }
 
-        ret = addRemoteServerToolOptions(options);
-        if (!ret.isOK()) {
-            return ret;
+        if ( toolsParsedOptions.count( "authenticationMechanism" ) ) {
+            toolGlobalParams.authenticationMechanism =
+                toolsParsedOptions["authenticationMechanism"].as<string>();
         }
 
-        ret = addLocalServerToolOptions(options);
-        if (!ret.isOK()) {
-            return ret;
+        if (toolsParsedOptions.count("verbose")) {
+            logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogSeverity::Debug(1));
         }
 
-        ret = addSpecifyDBCollectionToolOptions(options);
-        if (!ret.isOK()) {
-            return ret;
+        for (string s = "vv"; s.length() <= 12; s.append("v")) {
+            if (toolsParsedOptions.count(s)) {
+                logger::globalLogDomain()->setMinimumLoggedSeverity(
+                        logger::LogSeverity::Debug(s.length()));
+            }
         }
 
-        ret = options->addOption(OD("out", "out,o", moe::String,
-                    "output directory or \"-\" for stdout", true,
-                    moe::Value(std::string("dump"))));
-        if(!ret.isOK()) {
-            return ret;
+        if ( hasParam("quiet") ) {
+            toolGlobalParams.quiet = true;
         }
-        ret = options->addOption(OD("query", "query,q", moe::String , "json query", true));
-        if(!ret.isOK()) {
-            return ret;
+
+#ifdef MONGO_SSL
+        if (toolsParsedOptions.count("ssl")) {
+            sslGlobalParams.sslOnNormalPorts = true;
         }
-        ret = options->addOption(OD("oplog", "oplog", moe::Switch,
-                    "Use oplog for point-in-time snapshotting", true));
-        if(!ret.isOK()) {
-            return ret;
+#endif
+
+        if (args.empty()) {
+            return Status(ErrorCodes::InternalError, "Cannot get binary name: argv array is empty");
         }
-        ret = options->addOption(OD("repair", "repair", moe::Switch,
-                    "try to recover a crashed database", true));
-        if(!ret.isOK()) {
-            return ret;
+
+        // setup binary name
+        toolGlobalParams.name = args[0];
+        size_t i = toolGlobalParams.name.rfind('/');
+        if (i != string::npos) {
+            toolGlobalParams.name = toolGlobalParams.name.substr(i + 1);
         }
-        ret = options->addOption(OD("forceTableScan", "forceTableScan", moe::Switch,
-                    "force a table scan (do not use $snapshot)"));
-        if(!ret.isOK()) {
-            return ret;
+        toolGlobalParams.db = "test";
+        toolGlobalParams.coll = "";
+        toolGlobalParams.quiet = false;
+        toolGlobalParams.noconnection = false;
+
+        if (toolsParsedOptions.count("db"))
+            toolGlobalParams.db = toolsParsedOptions["db"].as<string>();
+
+        if (toolsParsedOptions.count("collection"))
+            toolGlobalParams.coll = toolsParsedOptions["collection"].as<string>();
+
+        if (toolsParsedOptions.count("username"))
+            toolGlobalParams.username = toolsParsedOptions["username"].as<string>();
+
+        if (toolsParsedOptions.count("password")) {
+            toolGlobalParams.password = toolsParsedOptions["password"].as<string>();
+            if (toolGlobalParams.password.empty()) {
+                toolGlobalParams.password = askPassword();
+            }
+        }
+
+        if (toolsParsedOptions.count("ipv6")) {
+            enableIPv6();
+        }
+
+        toolGlobalParams.dbpath = getParam("dbpath");
+        toolGlobalParams.useDirectClient = hasParam("dbpath");
+        if (toolGlobalParams.useDirectClient && toolsParsedOptions.count("journal")) {
+            storageGlobalParams.dur = true;
+        }
+
+        if (!toolGlobalParams.useDirectClient) {
+            toolGlobalParams.connectionString = "127.0.0.1";
+            if (toolsParsedOptions.count("host")) {
+                toolGlobalParams.hostSet = true;
+                toolGlobalParams.host = toolsParsedOptions["host"].as<string>();
+                toolGlobalParams.connectionString = toolsParsedOptions["host"].as<string>();
+            }
+
+            if (toolsParsedOptions.count("port")) {
+                toolGlobalParams.portSet = true;
+                toolGlobalParams.port = toolsParsedOptions["port"].as<string>();
+                toolGlobalParams.connectionString += ':' + toolsParsedOptions["port"].as<string>();
+            }
+        }
+        else {
+            if (toolsParsedOptions.count("directoryperdb")) {
+                storageGlobalParams.directoryperdb = true;
+            }
+
+            toolGlobalParams.connectionString = "DIRECT";
         }
 
         return Status::OK();
     }
 
-    Status addMongoRestoreOptions(moe::OptionSection* options) {
-        Status ret = addGeneralToolOptions(options);
-        if (!ret.isOK()) {
-            return ret;
+    Status storeFieldOptions(const moe::Environment& params,
+                             const std::vector<std::string>& args) {
+
+        toolGlobalParams.fieldsSpecified = false;
+
+        if (hasParam("fields")) {
+            toolGlobalParams.fieldsSpecified = true;
+
+            string fields_arg = getParam("fields");
+            pcrecpp::StringPiece input(fields_arg);
+
+            string f;
+            pcrecpp::RE re("([#\\w\\.\\s\\-]+),?" );
+            while ( re.Consume( &input, &f ) ) {
+                toolGlobalParams.fields.push_back( f );
+            }
+            return Status::OK();
         }
 
-        ret = addRemoteServerToolOptions(options);
-        if (!ret.isOK()) {
-            return ret;
-        }
+        if (hasParam("fieldFile")) {
+            toolGlobalParams.fieldsSpecified = true;
 
-        ret = addLocalServerToolOptions(options);
-        if (!ret.isOK()) {
-            return ret;
-        }
+            string fn = getParam("fieldFile");
+            if (!boost::filesystem::exists(fn)) {
+                StringBuilder sb;
+                sb << "file: " << fn << " doesn't exist";
+                return Status(ErrorCodes::InternalError, sb.str());
+            }
 
-        ret = addSpecifyDBCollectionToolOptions(options);
-        if (!ret.isOK()) {
-            return ret;
-        }
+            const int BUF_SIZE = 1024;
+            char line[1024 + 128];
+            std::ifstream file(fn.c_str());
 
-        ret = addBSONToolOptions(options);
-        if (!ret.isOK()) {
-            return ret;
-        }
+            while (file.rdstate() == std::ios_base::goodbit) {
+                file.getline(line, BUF_SIZE);
+                const char * cur = line;
+                while (isspace(cur[0])) cur++;
+                if (cur[0] == '\0')
+                    continue;
 
-        ret = options->addOption(OD("drop", "drop", moe::Switch,
-                    "drop each collection before import", true));
-        if(!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("oplogReplay", "oplogReplay", moe::Switch,
-                    "replay oplog for point-in-time restore", true));
-        if(!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("oplogLimit", "oplogLimit", moe::String,
-                    "include oplog entries before the provided Timestamp "
-                    "(seconds[:ordinal]) during the oplog replay; "
-                    "the ordinal value is optional", true));
-        if(!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("keepIndexVersion", "keepIndexVersion", moe::Switch,
-                    "don't upgrade indexes to newest version", true));
-        if(!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("noOptionsRestore", "noOptionsRestore", moe::Switch,
-                    "don't restore collection options", true));
-        if(!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("noIndexRestore", "noIndexRestore", moe::Switch,
-                    "don't restore indexes", true));
-        if(!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("w", "w", moe::Int ,
-                    "minimum number of replicas per write" , true, moe::Value(0)));
-        if(!ret.isOK()) {
-            return ret;
-        }
-
-        // left in for backwards compatibility
-        ret = options->addOption(OD("indexesLast", "indexesLast", moe::Switch,
-                    "wait to add indexes (now default)", false));
-        if(!ret.isOK()) {
-            return ret;
-        }
-
-        ret = options->addPositionalOption(POD( "dir", moe::String, 1 ));
-        if(!ret.isOK()) {
-            return ret;
+                toolGlobalParams.fields.push_back(cur);
+            }
+            return Status::OK();
         }
 
         return Status::OK();
     }
 
-    Status addMongoExportOptions(moe::OptionSection* options) {
-        Status ret = addGeneralToolOptions(options);
-        if (!ret.isOK()) {
-            return ret;
+
+    Status storeBSONToolOptions(const moe::Environment& params,
+                                const std::vector<std::string>& args) {
+
+        bsonToolGlobalParams.objcheck = true;
+
+        if (hasParam("objcheck") && hasParam("noobjcheck")) {
+            return Status(ErrorCodes::BadValue, "can't have both --objcheck and --noobjcheck");
         }
 
-        ret = addRemoteServerToolOptions(options);
-        if (!ret.isOK()) {
-            return ret;
+        if (hasParam("objcheck")) {
+            bsonToolGlobalParams.objcheck = true;
+        }
+        else if (hasParam("noobjcheck")) {
+            bsonToolGlobalParams.objcheck = false;
         }
 
-        ret = addLocalServerToolOptions(options);
-        if (!ret.isOK()) {
-            return ret;
-        }
-
-        ret = addSpecifyDBCollectionToolOptions(options);
-        if (!ret.isOK()) {
-            return ret;
-        }
-
-        ret = addFieldOptions(options);
-        if (!ret.isOK()) {
-            return ret;
-        }
-
-        ret = options->addOption(OD("query", "query,q", moe::String ,
-                    "query filter, as a JSON string", true));
-        if(!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("csv", "csv", moe::Switch,
-                    "export to csv instead of json", true));
-        if(!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("out", "out,o", moe::String,
-                    "output file; if not specified, stdout is used", true));
-        if(!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("jsonArray", "jsonArray", moe::Switch,
-                    "output to a json array rather than one object per line", true));
-        if(!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("slaveOk", "slaveOk,k", moe::Bool ,
-                    "use secondaries for export if available, default true", true,
-                    moe::Value(true)));
-        if(!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("forceTableScan", "forceTableScan", moe::Switch,
-                    "force a table scan (do not use $snapshot)", true));
-        if(!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("skip", "skip", moe::Int,
-                    "documents to skip, default 0", true, moe::Value(0)));
-        if(!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("limit", "limit", moe::Int,
-                    "limit the numbers of documents returned, default all", true,
-                    moe::Value(0)));
-        if(!ret.isOK()) {
-            return ret;
+        if (hasParam("filter")) {
+            bsonToolGlobalParams.hasFilter = true;
+            bsonToolGlobalParams.filter = getParam("filter");
         }
 
         return Status::OK();
-    }
-
-    Status addMongoImportOptions(moe::OptionSection* options) {
-        Status ret = addGeneralToolOptions(options);
-        if (!ret.isOK()) {
-            return ret;
-        }
-
-        ret = addRemoteServerToolOptions(options);
-        if (!ret.isOK()) {
-            return ret;
-        }
-
-        ret = addLocalServerToolOptions(options);
-        if (!ret.isOK()) {
-            return ret;
-        }
-
-        ret = addSpecifyDBCollectionToolOptions(options);
-        if (!ret.isOK()) {
-            return ret;
-        }
-
-        ret = addFieldOptions(options);
-        if (!ret.isOK()) {
-            return ret;
-        }
-
-        ret = options->addOption(OD("ignoreBlanks", "ignoreBlanks", moe::Switch,
-                    "if given, empty fields in csv and tsv will be ignored", true));
-        if(!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("type", "type",moe::String,
-                    "type of file to import.  default: json (json,csv,tsv)", true));
-        if(!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("file", "file",moe::String,
-                    "file to import from; if not specified stdin is used", true));
-        if(!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("drop", "drop", moe::Switch, "drop collection first ", true));
-        if(!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("headerline", "headerline", moe::Switch,
-                    "first line in input file is a header (CSV and TSV only)", true));
-        if(!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("upsert", "upsert", moe::Switch,
-                    "insert or update objects that already exist", true));
-        if(!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("upsertFields", "upsertFields", moe::String,
-                    "comma-separated fields for the query part of the upsert. "
-                    "You should make sure this is indexed", true));
-        if(!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("stopOnError", "stopOnError", moe::Switch,
-                    "stop importing at first error rather than continuing", true));
-        if(!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("jsonArray", "jsonArray", moe::Switch,
-                    "load a json array, not one item per line. "
-                    "Currently limited to 16MB.", true));
-        if(!ret.isOK()) {
-            return ret;
-        }
-
-        ret = options->addOption(OD("noimport", "noimport", moe::Switch,
-                    "don't actually import. useful for benchmarking parser", false));
-        if(!ret.isOK()) {
-            return ret;
-        }
-
-        ret = options->addPositionalOption(POD( "file", moe::String, 1 ));
-        if(!ret.isOK()) {
-            return ret;
-        }
-
-        return Status::OK();
-    }
-
-    Status addMongoFilesOptions(moe::OptionSection* options) {
-        Status ret = addGeneralToolOptions(options);
-        if (!ret.isOK()) {
-            return ret;
-        }
-
-        ret = addRemoteServerToolOptions(options);
-        if (!ret.isOK()) {
-            return ret;
-        }
-
-        ret = addLocalServerToolOptions(options);
-        if (!ret.isOK()) {
-            return ret;
-        }
-
-        ret = addSpecifyDBCollectionToolOptions(options);
-        if (!ret.isOK()) {
-            return ret;
-        }
-
-        ret = options->addOption(OD("local", "local,l", moe::String,
-                    "local filename for put|get (default is to use the same name as "
-                    "'gridfs filename')", true));
-        if(!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("type", "type,t", moe::String,
-                    "MIME type for put (default is to omit)", true));
-        if(!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("replace", "replace,r", moe::Switch,
-                    "Remove other files with same name after PUT", true));
-        if(!ret.isOK()) {
-            return ret;
-        }
-
-        ret = options->addPositionalOption(POD( "command", moe::String, 1 ));
-        if(!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addPositionalOption(POD( "file", moe::String, 2 ));
-        if(!ret.isOK()) {
-            return ret;
-        }
-
-        return Status::OK();
-    }
-
-    Status addMongoOplogOptions(moe::OptionSection* options) {
-        Status ret = addGeneralToolOptions(options);
-        if (!ret.isOK()) {
-            return ret;
-        }
-
-        ret = addRemoteServerToolOptions(options);
-        if (!ret.isOK()) {
-            return ret;
-        }
-
-        ret = addLocalServerToolOptions(options);
-        if (!ret.isOK()) {
-            return ret;
-        }
-
-        ret = addSpecifyDBCollectionToolOptions(options);
-        if (!ret.isOK()) {
-            return ret;
-        }
-
-        ret = options->addOption(OD("seconds", "seconds,s", moe::Int ,
-                    "seconds to go back default:86400", true));
-        if(!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("from", "from", moe::String , "host to pull from", true));
-        if(!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("oplogns", "oplogns", moe::String ,
-                    "ns to pull from" , true, moe::Value(std::string("local.oplog.rs"))));
-        if(!ret.isOK()) {
-            return ret;
-        }
-
-        return Status::OK();
-    }
-
-    Status addMongoStatOptions(moe::OptionSection* options) {
-        Status ret = addGeneralToolOptions(options);
-        if (!ret.isOK()) {
-            return ret;
-        }
-
-        ret = addRemoteServerToolOptions(options);
-        if (!ret.isOK()) {
-            return ret;
-        }
-
-        ret = options->addOption(OD("noheaders", "noheaders", moe::Switch,
-                    "don't output column names", true));
-        if(!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("rowcount", "rowcount,n", moe::Int,
-                    "number of stats lines to print (0 for indefinite)", true,
-                    moe::Value(0)));
-        if(!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("http", "http", moe::Switch,
-                    "use http instead of raw db connection", true));
-        if(!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("discover", "discover", moe::Switch,
-                    "discover nodes and display stats for all", true));
-        if(!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("all", "all", moe::Switch,
-                    "all optional fields", true));
-        if(!ret.isOK()) {
-            return ret;
-        }
-
-        ret = options->addPositionalOption(POD( "sleep", moe::Int, 1 ));
-        if(!ret.isOK()) {
-            return ret;
-        }
-
-        return Status::OK();
-    }
-
-    Status addMongoTopOptions(moe::OptionSection* options) {
-        Status ret = addGeneralToolOptions(options);
-        if (!ret.isOK()) {
-            return ret;
-        }
-
-        ret = addRemoteServerToolOptions(options);
-        if (!ret.isOK()) {
-            return ret;
-        }
-
-        ret = options->addOption(OD("locks", "locks", moe::Switch,
-                    "use db lock info instead of top", true));
-        if(!ret.isOK()) {
-            return ret;
-        }
-
-        ret = options->addPositionalOption(POD( "sleep", moe::Int, 1 ));
-        if(!ret.isOK()) {
-            return ret;
-        }
-
-        return Status::OK();
-    }
-
-    Status addBSONDumpOptions(moe::OptionSection* options) {
-        Status ret = addGeneralToolOptions(options);
-        if (!ret.isOK()) {
-            return ret;
-        }
-
-        ret = addBSONToolOptions(options);
-        if (!ret.isOK()) {
-            return ret;
-        }
-
-        ret = options->addOption(OD("type", "type", moe::String ,
-                    "type of output: json,debug", true, moe::Value(std::string("json"))));
-        if(!ret.isOK()) {
-            return ret;
-        }
-
-        ret = options->addPositionalOption(POD( "file", moe::String, 1 ));
-        if(!ret.isOK()) {
-            return ret;
-        }
-
-        return Status::OK();
-    }
-
-    void printMongoDumpHelp(const moe::OptionSection options, std::ostream* out) {
-        *out << "Export MongoDB data to BSON files.\n" << std::endl;
-        *out << options.helpString();
-        *out << std::flush;
-    }
-
-    void printMongoRestoreHelp(const moe::OptionSection options, std::ostream* out) {
-        *out << "Import BSON files into MongoDB.\n" << std::endl;
-        *out << "usage: mongorestore [options] [directory or filename to restore from]"
-             << std::endl;
-        *out << options.helpString();
-        *out << std::flush;
-    }
-
-    void printMongoExportHelp(const moe::OptionSection options, std::ostream* out) {
-        *out << "Export MongoDB data to CSV, TSV or JSON files.\n" << std::endl;
-        *out << options.helpString();
-        *out << std::flush;
-    }
-
-    void printMongoImportHelp(const moe::OptionSection options, std::ostream* out) {
-        *out << "Import CSV, TSV or JSON data into MongoDB.\n" << std::endl;
-        *out << "When importing JSON documents, each document must be a separate line of the input file.\n";
-        *out << "\nExample:\n";
-        *out << "  mongoimport --host myhost --db my_cms --collection docs < mydocfile.json\n" << std::endl;
-        *out << options.helpString();
-        *out << std::flush;
-    }
-
-    void printMongoFilesHelp(const moe::OptionSection options, std::ostream* out) {
-        *out << "Browse and modify a GridFS filesystem.\n" << std::endl;
-        *out << "usage: mongofiles [options] command [gridfs filename]" << std::endl;
-        *out << "command:" << std::endl;
-        *out << "  one of (list|search|put|get)" << std::endl;
-        *out << "  list - list all files.  'gridfs filename' is an optional prefix " << std::endl;
-        *out << "         which listed filenames must begin with." << std::endl;
-        *out << "  search - search all files. 'gridfs filename' is a substring " << std::endl;
-        *out << "           which listed filenames must contain." << std::endl;
-        *out << "  put - add a file with filename 'gridfs filename'" << std::endl;
-        *out << "  get - get a file with filename 'gridfs filename'" << std::endl;
-        *out << "  delete - delete all files with filename 'gridfs filename'" << std::endl;
-        *out << options.helpString();
-        *out << std::flush;
-    }
-
-    void printMongoOplogHelp(const moe::OptionSection options, std::ostream* out) {
-        *out << "Pull and replay a remote MongoDB oplog.\n" << std::endl;
-        *out << options.helpString();
-        *out << std::flush;
-    }
-
-    void printMongoStatHelp(const moe::OptionSection options, std::ostream* out) {
-        *out << "View live MongoDB performance statistics.\n" << std::endl;
-        *out << "usage: mongostat [options] [sleep time]" << std::endl;
-        *out << "sleep time: time to wait (in seconds) between calls" << std::endl;
-        *out << options.helpString();
-        *out << "\n";
-        *out << " Fields\n";
-        *out << "   inserts  \t- # of inserts per second (* means replicated op)\n";
-        *out << "   query    \t- # of queries per second\n";
-        *out << "   update   \t- # of updates per second\n";
-        *out << "   delete   \t- # of deletes per second\n";
-        *out << "   getmore  \t- # of get mores (cursor batch) per second\n";
-        *out << "   command  \t- # of commands per second, on a slave its local|replicated\n";
-        *out << "   flushes  \t- # of fsync flushes per second\n";
-        *out << "   mapped   \t- amount of data mmaped (total data size) megabytes\n";
-        *out << "   vsize    \t- virtual size of process in megabytes\n";
-        *out << "   res      \t- resident size of process in megabytes\n";
-        *out << "   faults   \t- # of pages faults per sec\n";
-        *out << "   locked   \t- name of and percent time for most locked database\n";
-        *out << "   idx miss \t- percent of btree page misses (sampled)\n";
-        *out << "   qr|qw    \t- queue lengths for clients waiting (read|write)\n";
-        *out << "   ar|aw    \t- active clients (read|write)\n";
-        *out << "   netIn    \t- network traffic in - bytes\n";
-        *out << "   netOut   \t- network traffic out - bytes\n";
-        *out << "   conn     \t- number of open connections\n";
-        *out << "   set      \t- replica set name\n";
-        *out << "   repl     \t- replication type \n";
-        *out << "            \t    PRI - primary (master)\n";
-        *out << "            \t    SEC - secondary\n";
-        *out << "            \t    REC - recovering\n";
-        *out << "            \t    UNK - unknown\n";
-        *out << "            \t    SLV - slave\n";
-        *out << "            \t    RTR - mongos process (\"router\")\n";
-        *out << std::flush;
-    }
-
-    void printMongoTopHelp(const moe::OptionSection options, std::ostream* out) {
-        *out << "View live MongoDB collection statistics.\n" << std::endl;
-        *out << options.helpString();
-        *out << std::flush;
-    }
-
-    void printBSONDumpHelp(const moe::OptionSection options, std::ostream* out) {
-        *out << "Display BSON objects in a data file.\n" << std::endl;
-        *out << "usage: bsondump [options] <bson filename>" << std::endl;
-        *out << options.helpString();
-        *out << std::flush;
     }
 }

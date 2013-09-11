@@ -18,41 +18,14 @@
 
 #include <fcntl.h>
 
-#include "mongo/base/init.h"
 #include "mongo/client/dbclientcursor.h"
+#include "mongo/tools/bsondump_options.h"
 #include "mongo/tools/tool.h"
-#include "mongo/tools/tool_options.h"
 #include "mongo/util/mmap.h"
 #include "mongo/util/options_parser/option_section.h"
-#include "mongo/util/options_parser/options_parser.h"
 #include "mongo/util/text.h"
 
 using namespace mongo;
-
-namespace mongo {
-    MONGO_INITIALIZER_GENERAL(ParseStartupConfiguration,
-                              MONGO_NO_PREREQUISITES,
-                              ("default"))(InitializerContext* context) {
-
-        options = moe::OptionSection( "options" );
-        moe::OptionsParser parser;
-
-        Status retStatus = addBSONDumpOptions(&options);
-        if (!retStatus.isOK()) {
-            return retStatus;
-        }
-
-        retStatus = parser.run(options, context->args(), context->env(), &_params);
-        if (!retStatus.isOK()) {
-            std::ostringstream oss;
-            oss << retStatus.toString() << "\n";
-            printBSONDumpHelp(options, &oss);
-            return Status(ErrorCodes::FailedToParse, oss.str());
-        }
-
-        return Status::OK();
-    }
-} // namespace mongo
 
 class BSONDump : public BSONTool {
 
@@ -60,31 +33,27 @@ class BSONDump : public BSONTool {
 
 public:
 
-    BSONDump() : BSONTool( "bsondump" ) {
-        _noconnection = true;
-    }
+    BSONDump() : BSONTool() { }
 
     virtual void printHelp(ostream& out) {
-        printBSONDumpHelp(options, &out);
+        printBSONDumpHelp(toolsOptions, &out);
     }
 
     virtual int doRun() {
         {
-            string t = getParam( "type" );
-            if ( t == "json" )
+            if (bsonDumpGlobalParams.type == "json")
                 _type = JSON;
-            else if ( t == "debug" )
+            else if (bsonDumpGlobalParams.type == "debug")
                 _type = DEBUG;
             else {
-                cerr << "bad type: " << t << endl;
+                cerr << "bad type: " << bsonDumpGlobalParams.type << endl;
                 return 1;
             }
         }
 
-        boost::filesystem::path root = getParam( "file" );
+        boost::filesystem::path root = bsonDumpGlobalParams.file;
         if ( root == "" ) {
-            std::cout << "Display BSON objects in a data file.\n" << std::endl;
-            std::cout << "usage: " << _name << " [options] <bson filename>" << std::endl;
+            printBSONDumpHelp(toolsOptions, &std::cout);
             return 1;
         }
 

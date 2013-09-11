@@ -22,8 +22,6 @@
 #include <fstream>
 #include <iostream>
 
-#include "pcrecpp.h"
-
 #include "mongo/base/initializer.h"
 #include "mongo/client/dbclient_rs.h"
 #include "mongo/client/sasl_client_authenticate.h"
@@ -46,50 +44,20 @@ using namespace mongo;
 
 namespace mongo {
 
-
-    moe::OptionSection options("options");
-    moe::Environment _params;
-
-    Tool::Tool( string name , string defaultDB ,
-                string defaultCollection , bool usesstdout , bool quiet) :
-        _name( name ) , _db( defaultDB ) , _coll( defaultCollection ) ,
-        _usesstdout(usesstdout) , _quiet(quiet) , _noconnection(false) ,
-        _autoreconnect(false) , _conn(0) , _slaveConn(0) , _paired(false) { }
+    Tool::Tool(bool usesstdout) :
+        _usesstdout(usesstdout), _autoreconnect(false), _conn(0), _slaveConn(0) { }
 
     Tool::~Tool() {
         if ( _conn )
             delete _conn;
     }
 
-    void Tool::printVersion(ostream &out) {
-        out << _name << " version " << mongo::versionString;
-        if (mongo::versionString[strlen(mongo::versionString)-1] == '-')
-            out << " (commit " << mongo::gitVersion() << ")";
-        out << endl;
-    }
     int Tool::main( int argc , char ** argv, char ** envp ) {
         static StaticObserver staticObserver;
 
         setGlobalAuthorizationManager(new AuthorizationManager(new AuthzManagerExternalStateMock()));
 
-        storageGlobalParams.prealloc = false;
-
-        // The default value may vary depending on compile options, but for tools
-        // we want durability to be disabled.
-        storageGlobalParams.dur = false;
-
-        _name = argv[0];
-
         mongo::runGlobalInitializersOrDie(argc, argv, envp);
-
-        // Set authentication parameters
-        if ( _params.count( "authenticationDatabase" ) ) {
-            _authenticationDatabase = _params["authenticationDatabase"].as<string>();
-        }
-
-        if ( _params.count( "authenticationMechanism" ) ) {
-            _authenticationMechanism = _params["authenticationMechanism"].as<string>();
-        }
 
         // hide password from ps output
         for (int i=0; i < (argc-1); ++i) {
@@ -101,105 +69,44 @@ namespace mongo {
             }
         }
 
-        if ( _params.count( "help" ) ) {
-            printHelp(cout);
-            ::_exit(0);
-        }
-
-        if ( _params.count( "version" ) ) {
-            printVersion(cout);
-            ::_exit(0);
-        }
-
-        if (_params.count("verbose")) {
-            logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogSeverity::Debug(1));
-        }
-
-        for (string s = "vv"; s.length() <= 12; s.append("v")) {
-            if (_params.count(s)) {
-                logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogSeverity::Debug(s.length()));
-            }
-        }
-
-        if ( hasParam("quiet") ) {
-            _quiet = true;
-        }
-
-#ifdef MONGO_SSL
-        if (_params.count("ssl")) {
-            sslGlobalParams.sslOnNormalPorts = true;
-        }
-#endif
-
-        if ( _params.count( "db" ) )
-            _db = _params["db"].as<string>();
-
-        if ( _params.count( "collection" ) )
-            _coll = _params["collection"].as<string>();
-
-        if ( _params.count( "username" ) )
-            _username = _params["username"].as<string>();
-
-        if ( _params.count( "password" ) ) {
-            _password = _params["password"].as<string>();
-            if ( _password.empty() ) {
-                _password = askPassword();
-            }
-        }
-
-        if (_params.count("ipv6"))
-            enableIPv6();
-
-        bool useDirectClient = hasParam( "dbpath" );
-        if ( useDirectClient && _params.count("journal")){
-            storageGlobalParams.dur = true;
-        }
-
         preSetup();
 
-        if ( ! useDirectClient ) {
-            _host = "127.0.0.1";
-            if ( _params.count( "host" ) )
-                _host = _params["host"].as<string>();
-
-            if ( _params.count( "port" ) )
-                _host += ':' + _params["port"].as<string>();
-
-            if ( _noconnection ) {
+        if (!toolGlobalParams.useDirectClient) {
+            if (toolGlobalParams.noconnection) {
                 // do nothing
             }
             else {
                 string errmsg;
 
-                ConnectionString cs = ConnectionString::parse( _host , errmsg );
+                ConnectionString cs = ConnectionString::parse(toolGlobalParams.connectionString,
+                                                              errmsg);
                 if ( ! cs.isValid() ) {
-                    cerr << "invalid hostname [" << _host << "] " << errmsg << endl;
+                    cerr << "invalid hostname [" << toolGlobalParams.connectionString << "] "
+                         << errmsg << endl;
                     ::_exit(-1);
                 }
 
                 _conn = cs.connect( errmsg );
                 if ( ! _conn ) {
-                    cerr << "couldn't connect to [" << _host << "] " << errmsg << endl;
+                    std::cerr << "couldn't connect to [" << toolGlobalParams.connectionString
+                              << "] " << errmsg << std::endl;
                     ::_exit(-1);
                 }
 
-                if (!_quiet) {
-                    (_usesstdout ? cout : cerr ) << "connected to: " << _host << endl;
+                if (!toolGlobalParams.quiet) {
+                    (_usesstdout ? std::cout : std::cerr ) << "connected to: "
+                                                           << toolGlobalParams.connectionString
+                                                           << std::endl;
                 }
             }
 
         }
         else {
-            if ( _params.count( "directoryperdb" ) ) {
-                storageGlobalParams.directoryperdb = true;
-            }
             verify( lastError.get( true ) );
 
             Client::initThread("tools");
             _conn = new DBDirectClient();
-            _host = "DIRECT";
-            static string myDbpath = getParam( "dbpath" );
-            storageGlobalParams.dbpath = myDbpath.c_str();
+            storageGlobalParams.dbpath = toolGlobalParams.dbpath;
             try {
                 acquirePathLock();
             }
@@ -218,7 +125,7 @@ namespace mongo {
 
         int ret = -1;
         try {
-            if (!useDirectClient && !_noconnection)
+            if (!toolGlobalParams.useDirectClient && !toolGlobalParams.noconnection)
                 auth();
             ret = run();
         }
@@ -257,7 +164,7 @@ namespace mongo {
         if ( currentClient.get() )
             currentClient.get()->shutdown();
 
-        if ( useDirectClient )
+        if (toolGlobalParams.useDirectClient)
             dbexit( EXIT_CLEAN );
 
         fflush(stdout);
@@ -277,7 +184,7 @@ namespace mongo {
     }
 
     bool Tool::isMaster() {
-        if ( hasParam("dbpath") ) {
+        if (toolGlobalParams.useDirectClient) {
             return true;
         }
 
@@ -301,59 +208,13 @@ namespace mongo {
         return isdbgrid["isdbgrid"].trueValue();
     }
 
-    void Tool::needFields() {
-
-        if ( hasParam( "fields" ) ) {
-            BSONObjBuilder b;
-
-            string fields_arg = getParam("fields");
-            pcrecpp::StringPiece input(fields_arg);
-
-            string f;
-            pcrecpp::RE re("([#\\w\\.\\s\\-]+),?" );
-            while ( re.Consume( &input, &f ) ) {
-                _fields.push_back( f );
-                b.append( f , 1 );
-            }
-
-            _fieldsObj = b.obj();
-            return;
-        }
-
-        if ( hasParam( "fieldFile" ) ) {
-            string fn = getParam( "fieldFile" );
-            if ( ! boost::filesystem::exists( fn ) )
-                throw UserException( 9999 , ((string)"file: " + fn ) + " doesn't exist" );
-
-            const int BUF_SIZE = 1024;
-            char line[ 1024 + 128];
-            ifstream file( fn.c_str() );
-
-            BSONObjBuilder b;
-            while ( file.rdstate() == ios_base::goodbit ) {
-                file.getline( line , BUF_SIZE );
-                const char * cur = line;
-                while ( isspace( cur[0] ) ) cur++;
-                if ( cur[0] == '\0' )
-                    continue;
-
-                _fields.push_back( cur );
-                b.append( cur , 1 );
-            }
-            _fieldsObj = b.obj();
-            return;
-        }
-
-        throw UserException( 9998 , "you need to specify fields" );
-    }
-
     std::string Tool::getAuthenticationDatabase() {
-        if (!_authenticationDatabase.empty()) {
-            return _authenticationDatabase;
+        if (!toolGlobalParams.authenticationDatabase.empty()) {
+            return toolGlobalParams.authenticationDatabase;
         }
 
-        if (!_db.empty()) {
-            return _db;
+        if (!toolGlobalParams.db.empty()) {
+            return toolGlobalParams.db;
         }
 
         return "admin";
@@ -364,10 +225,10 @@ namespace mongo {
      */
     void Tool::auth() {
 
-        if ( _username.empty() ) {
+        if (toolGlobalParams.username.empty()) {
             // Make sure that we don't need authentication to connect to this db
             // findOne throws an AssertionException if it's not authenticated.
-            if (_coll.size() > 0) {
+            if (toolGlobalParams.coll.size() > 0) {
                 // BSONTools don't have a collection
                 conn().findOne(getNS(), Query("{}"), 0, QueryOption_SlaveOk);
             }
@@ -375,44 +236,40 @@ namespace mongo {
             return;
         }
 
-        _conn->auth( BSON( saslCommandUserSourceFieldName << getAuthenticationDatabase() <<
-                           saslCommandUserFieldName << _username <<
-                           saslCommandPasswordFieldName << _password  <<
-                           saslCommandMechanismFieldName << _authenticationMechanism ) );
+        _conn->auth(BSON(saslCommandUserSourceFieldName << getAuthenticationDatabase() <<
+                         saslCommandUserFieldName << toolGlobalParams.username <<
+                         saslCommandPasswordFieldName << toolGlobalParams.password  <<
+                         saslCommandMechanismFieldName <<
+                         toolGlobalParams.authenticationMechanism));
     }
 
-    BSONTool::BSONTool( const char * name, bool objcheck )
-        : Tool( name , "" , "" , false ) , _objcheck( objcheck ) { }
-
+    BSONTool::BSONTool() : Tool(false/*usesstdout*/) { }
 
     int BSONTool::run() {
-        if ( hasParam( "objcheck" ) )
-            _objcheck = true;
-        else if ( hasParam( "noobjcheck" ) )
-            _objcheck = false;
 
-        if ( hasParam( "filter" ) )
-            _matcher.reset( new Matcher( fromjson( getParam( "filter" ) ) ) );
+        if (bsonToolGlobalParams.hasFilter) {
+            _matcher.reset(new Matcher(fromjson(bsonToolGlobalParams.filter)));
+        }
 
         return doRun();
     }
 
     long long BSONTool::processFile( const boost::filesystem::path& root ) {
-        _fileName = root.string();
+        std::string fileName = root.string();
 
         unsigned long long fileLength = file_size( root );
 
         if ( fileLength == 0 ) {
-            if (!_quiet) {
-                (_usesstdout ? cout : cerr ) << "file " << _fileName << " empty, skipping" << endl;
+            if (!toolGlobalParams.quiet) {
+                (_usesstdout ? cout : cerr ) << "file " << fileName << " empty, skipping" << endl;
             }
             return 0;
         }
 
 
-        FILE* file = fopen( _fileName.c_str() , "rb" );
+        FILE* file = fopen( fileName.c_str() , "rb" );
         if ( ! file ) {
-            cerr << "error opening file: " << _fileName << " " << errnoWithDescription() << endl;
+            cerr << "error opening file: " << fileName << " " << errnoWithDescription() << endl;
             return 0;
         }
 
@@ -420,7 +277,8 @@ namespace mongo {
         posix_fadvise(fileno(file), 0, fileLength, POSIX_FADV_SEQUENTIAL);
 #endif
 
-        if (!_quiet && logger::globalLogDomain()->shouldLog(logger::LogSeverity::Debug(1))) {
+        if (!toolGlobalParams.quiet &&
+            logger::globalLogDomain()->shouldLog(logger::LogSeverity::Debug(1))) {
             (_usesstdout ? cout : cerr ) << "\t file size: " << fileLength << endl;
         }
 
@@ -446,7 +304,7 @@ namespace mongo {
             verify( amt == (size_t)( size - 4 ) );
 
             BSONObj o( buf );
-            if ( _objcheck && ! o.valid() ) {
+            if (bsonToolGlobalParams.objcheck && !o.valid()) {
                 cerr << "INVALID OBJECT - going to try and print out " << endl;
                 cerr << "size: " << size << endl;
                 BSONObjIterator i(o);
@@ -463,7 +321,7 @@ namespace mongo {
                 }
             }
 
-            if ( _matcher.get() == 0 || _matcher->matches( o ) ) {
+            if (!bsonToolGlobalParams.hasFilter || _matcher->matches(o)) {
                 gotObject( o );
                 processed++;
             }
@@ -477,9 +335,9 @@ namespace mongo {
         fclose( file );
 
         uassert( 10265 ,  "counts don't match" , m.done() == fileLength );
-        if (!_quiet) {
+        if (!toolGlobalParams.quiet) {
             (_usesstdout ? cout : cerr ) << m.hits() << " objects found" << endl;
-            if ( _matcher.get() )
+            if (bsonToolGlobalParams.hasFilter)
                 (_usesstdout ? cout : cerr ) << processed << " objects processed" << endl;
         }
         return processed;

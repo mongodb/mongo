@@ -21,51 +21,21 @@
 #include <fstream>
 #include <iostream>
 
-#include "mongo/base/init.h"
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/db/json.h"
+#include "mongo/tools/mongoexport_options.h"
 #include "mongo/tools/tool.h"
-#include "mongo/tools/tool_options.h"
 #include "mongo/util/options_parser/option_section.h"
-#include "mongo/util/options_parser/options_parser.h"
 
 using namespace mongo;
 
-namespace mongo {
-    MONGO_INITIALIZER_GENERAL(ParseStartupConfiguration,
-                              MONGO_NO_PREREQUISITES,
-                              ("default"))(InitializerContext* context) {
-
-        options = moe::OptionSection( "options" );
-        moe::OptionsParser parser;
-
-        Status retStatus = addMongoExportOptions(&options);
-        if (!retStatus.isOK()) {
-            return retStatus;
-        }
-
-        retStatus = parser.run(options, context->args(), context->env(), &_params);
-        if (!retStatus.isOK()) {
-            std::ostringstream oss;
-            oss << retStatus.toString() << "\n";
-            printMongoExportHelp(options, &oss);
-            return Status(ErrorCodes::FailedToParse, oss.str());
-        }
-
-        return Status::OK();
-    }
-} // namespace mongo
-
 class Export : public Tool {
 public:
-    Export() : Tool( "export" ) {
-        _usesstdout = false;
-    }
+    Export() : Tool(false/*usesstdout*/) { }
 
     virtual void preSetup() {
-        if ( hasParam("out") ) {
-            string out = getParam("out");
-            if ( out != "-" ) {
+        if (mongoExportGlobalParams.outputFileSpecified) {
+            if (mongoExportGlobalParams.outputFile != "-") {
                 // we write output to standard error by default to avoid
                 // mangling output, but we don't need to do this if an output
                 // file was specified
@@ -75,7 +45,7 @@ public:
     }
 
     virtual void printHelp( ostream & out ) {
-        printMongoExportHelp(options, &out);
+        printMongoExportHelp(toolsOptions, &out);
     }
 
     // Turn every double quote character into two double quote characters
@@ -147,22 +117,19 @@ public:
 
     int run() {
         string ns;
-        const bool csv = hasParam( "csv" );
-        const bool jsonArray = hasParam( "jsonArray" );
         ostream *outPtr = &cout;
-        string outfile = getParam( "out" );
         auto_ptr<ofstream> fileStream;
-        if ( hasParam( "out" ) && outfile != "-" ) {
-            size_t idx = outfile.rfind( "/" );
+        if (mongoExportGlobalParams.outputFileSpecified && mongoExportGlobalParams.outputFile != "-") {
+            size_t idx = mongoExportGlobalParams.outputFile.rfind("/");
             if ( idx != string::npos ) {
-                string dir = outfile.substr( 0 , idx + 1 );
+                string dir = mongoExportGlobalParams.outputFile.substr( 0 , idx + 1 );
                 boost::filesystem::create_directories( dir );
             }
-            ofstream * s = new ofstream( outfile.c_str() , ios_base::out );
+            ofstream * s = new ofstream(mongoExportGlobalParams.outputFile.c_str(), ios_base::out);
             fileStream.reset( s );
             outPtr = s;
             if ( ! s->good() ) {
-                cerr << "couldn't open [" << outfile << "]" << endl;
+                cerr << "couldn't open [" << mongoExportGlobalParams.outputFile << "]" << endl;
                 return -1;
             }
         }
@@ -179,18 +146,17 @@ public:
             return 1;
         }
 
-        if ( hasParam( "fields" ) || csv ) {
-            needFields();
+        if (toolGlobalParams.fieldsSpecified || mongoExportGlobalParams.csv) {
             
-            // we can't use just _fieldsObj since we support everything getFieldDotted does
+            // we can't use just toolGlobalParams.fields since we support everything getFieldDotted
+            // does
             
             set<string> seen;
             BSONObjBuilder b;
             
-            BSONObjIterator i( _fieldsObj );
-            while ( i.more() ){
-                BSONElement e = i.next();
-                string f = str::before( e.fieldName() , '.' );
+            for (std::vector<std::string>::iterator i = toolGlobalParams.fields.begin();
+                 i != toolGlobalParams.fields.end(); i++) {
+                std::string f = str::before(*i, '.');
                 if ( seen.insert( f ).second )
                     b.append( f , 1 );
             }
@@ -200,38 +166,43 @@ public:
         }
         
         
-        if ( csv && _fields.size() == 0 ) {
+        if (mongoExportGlobalParams.csv && !toolGlobalParams.fieldsSpecified) {
             cerr << "csv mode requires a field list" << endl;
             return -1;
         }
 
-        Query q( getParam( "query" , "" ) );
-        if ( q.getFilter().isEmpty() && !hasParam("dbpath") && !hasParam("forceTableScan") )
+        Query q(mongoExportGlobalParams.query);
+
+        if (mongoExportGlobalParams.snapShotQuery) {
             q.snapshot();
+        }
 
-        bool slaveOk = _params["slaveOk"].as<bool>();
+        auto_ptr<DBClientCursor> cursor = conn().query(ns.c_str(), q,
+                mongoExportGlobalParams.limit, mongoExportGlobalParams.skip, fieldsToReturn,
+                (mongoExportGlobalParams.slaveOk ? QueryOption_SlaveOk : 0) |
+                QueryOption_NoCursorTimeout);
 
-        auto_ptr<DBClientCursor> cursor = conn().query( ns.c_str() , q , getParam("limit", 0), getParam("skip", 0) , fieldsToReturn , ( slaveOk ? QueryOption_SlaveOk : 0 ) | QueryOption_NoCursorTimeout );
-
-        if ( csv ) {
-            for ( vector<string>::iterator i=_fields.begin(); i != _fields.end(); i++ ) {
-                if ( i != _fields.begin() )
+        if (mongoExportGlobalParams.csv) {
+            for (std::vector<std::string>::iterator i = toolGlobalParams.fields.begin();
+                 i != toolGlobalParams.fields.end(); i++) {
+                if (i != toolGlobalParams.fields.begin())
                     out << ",";
                 out << *i;
             }
             out << endl;
         }
 
-        if (jsonArray)
+        if (mongoExportGlobalParams.jsonArray)
             out << '[';
 
         long long num = 0;
         while ( cursor->more() ) {
             num++;
             BSONObj obj = cursor->next();
-            if ( csv ) {
-                for ( vector<string>::iterator i=_fields.begin(); i != _fields.end(); i++ ) {
-                    if ( i != _fields.begin() )
+            if (mongoExportGlobalParams.csv) {
+                for (std::vector<std::string>::iterator i = toolGlobalParams.fields.begin();
+                     i != toolGlobalParams.fields.end(); i++) {
+                    if (i != toolGlobalParams.fields.begin())
                         out << ",";
                     const BSONElement & e = obj.getFieldDotted(i->c_str());
                     if ( ! e.eoo() ) {
@@ -241,20 +212,20 @@ public:
                 out << endl;
             }
             else {
-                if (jsonArray && num != 1)
+                if (mongoExportGlobalParams.jsonArray && num != 1)
                     out << ',';
 
                 out << obj.jsonString();
 
-                if (!jsonArray)
+                if (!mongoExportGlobalParams.jsonArray)
                     out << endl;
             }
         }
 
-        if (jsonArray)
+        if (mongoExportGlobalParams.jsonArray)
             out << ']' << endl;
 
-        if (!_quiet) {
+        if (!toolGlobalParams.quiet) {
             (_usesstdout ? cout : cerr ) << "exported " << num << " records" << endl;
         }
 
