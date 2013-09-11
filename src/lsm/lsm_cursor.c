@@ -396,7 +396,9 @@ err:	F_CLR(session, WT_SESSION_NO_CACHE_CHECK);
 			    checkpoint != NULL : checkpoint == NULL);
 
 			/* Make sure the Bloom config matches. */
-			WT_ASSERT(session, F_ISSET(chunk, WT_LSM_CHUNK_BLOOM) ?
+			WT_ASSERT(session,
+			    (F_ISSET(chunk, WT_LSM_CHUNK_BLOOM) &&
+			    !F_ISSET(clsm, WT_CLSM_MERGE)) ?
 			    clsm->blooms[i] != NULL : clsm->blooms[i] == NULL);
 		}
 	}
