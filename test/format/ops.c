@@ -733,7 +733,7 @@ col_update(WT_CURSOR *cursor, WT_ITEM *key, WT_ITEM *value, uint64_t keyno)
 		cursor->set_value(cursor, *(uint8_t *)value->data);
 	else
 		cursor->set_value(cursor, value);
-	ret = cursor->insert(cursor);
+	ret = cursor->update(cursor);
 	if (ret == WT_DEADLOCK)
 		return (WT_DEADLOCK);
 	if (ret != 0 && ret != WT_NOTFOUND)
