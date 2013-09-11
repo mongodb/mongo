@@ -49,44 +49,13 @@ namespace mongo {
         _cond.notify_all();
     }
 
-    bool SyncSourceFeedback::replAuthenticate(bool skipAuthCheck) {
-
-        if (!AuthorizationManager::isAuthEnabled()) {
+    bool SyncSourceFeedback::replAuthenticate() {
+        if (!AuthorizationManager::isAuthEnabled())
             return true;
-        }
-        if (!skipAuthCheck && !cc().getAuthorizationSession()->hasInternalAuthorization()) {
-            log() << "replauthenticate: requires internal authorization, failing" << endl;
+
+        if (!isInternalAuthSet())
             return false;
-        }
-
-        if (isInternalAuthSet()) { 
-            return authenticateInternalUser(_connection.get()); 
-        }
-
-        BSONObj user;
-        {
-            Client::ReadContext ctxt("local.");
-            if(!Helpers::findOne("local.system.users", userReplQuery, user) ||
-                    // try the first user in local
-                    !Helpers::getSingleton("local.system.users", user)) {
-                log() << "replauthenticate: no user in local.system.users to use"
-                        << "for authentication" << endl;
-                return false;
-            }
-        }
-        std::string u = user.getStringField("user");
-        std::string p = user.getStringField("pwd");
-        massert(16889, "bad user object? [1]", !u.empty());
-        massert(16887, "bad user object? [2]", !p.empty());
-
-        std::string err;
-
-        if( !_connection->auth("local", u.c_str(), p.c_str(), err, false) ) {
-            log() << "replauthenticate: can't authenticate to master server, user:" << u << endl;
-            return false;
-        }
-
-        return true;
+        return authenticateInternalUser(_connection.get());
     }
 
     void SyncSourceFeedback::ensureMe() {
@@ -181,7 +150,7 @@ namespace mongo {
         _connection.reset(new DBClientConnection(false, 0, OplogReader::tcp_timeout));
         string errmsg;
         if (!_connection->connect(hostName.c_str(), errmsg) ||
-                (AuthorizationManager::isAuthEnabled() && !replAuthenticate(true))) {
+                (AuthorizationManager::isAuthEnabled() && !replAuthenticate())) {
             resetConnection();
             log() << "repl: " << errmsg << endl;
             return false;

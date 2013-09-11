@@ -38,6 +38,7 @@
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repl/is_master.h"
 #include "mongo/db/repl/master_slave.h"
+#include "mongo/db/repl/oplogreader.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/wire_version.h"
 
@@ -50,8 +51,6 @@ namespace mongo {
     bool anyReplEnabled() {
         return replSettings.slave || replSettings.master || theReplSet;
     }
-
-    bool replAuthenticate(DBClientBase *conn, bool skipAuthCheck);
 
     void appendReplicationInfo(BSONObjBuilder& result, int level) {
         if ( replSet ) {
@@ -115,7 +114,7 @@ namespace mongo {
                     ScopedDbConnection conn(s["host"].valuestr());
                     
                     DBClientConnection *cliConn = dynamic_cast< DBClientConnection* >( &conn.conn() );
-                    if ( cliConn && replAuthenticate(cliConn, false) ) {
+                    if ( cliConn && replAuthenticate(cliConn) ) {
                         BSONObj first = conn->findOne( (string)"local.oplog.$" + sourcename,
                                                               Query().sort( BSON( "$natural" << 1 ) ) );
                         BSONObj last = conn->findOne( (string)"local.oplog.$" + sourcename,

@@ -133,14 +133,12 @@ namespace mongo {
         }
 
     private:
-        /* Generally replAuthenticate will only be called within system threads to fully
-         * authenticate connections to other nodes in the cluster that will be used as part of
-         * internal operations. If a user-initiated action results in needing to call
-         * replAuthenticate, you can call it with skipAuthCheck set to false. Only do this if you
-         * are certain that the proper auth checks have already run to ensure that the user is
-         * authorized to do everything that this connection will be used for!
+        /**
+         * Authenticates _connection using the server's cluster-membership credentials.
+         *
+         * Returns true on successful authentication.
          */
-        bool replAuthenticate(bool skipAuthCheck);
+        bool replAuthenticate();
 
         /* Sends initialization information to our sync target, also determines whether or not they
          * support the updater command.
