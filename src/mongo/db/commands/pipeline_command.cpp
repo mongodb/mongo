@@ -208,7 +208,8 @@ namespace mongo {
 
         // Locks are managed manually, in particular by DocumentSourceCursor.
         virtual LockType locktype() const { return NONE; }
-        virtual bool slaveOk() const { return true; }
+        virtual bool slaveOk() const { return false; }
+        virtual bool slaveOverrideOk() const { return true; }
         virtual void help(stringstream &help) const {
             help << "{ pipeline : [ { <data-pipe-op>: {...}}, ... ] }";
         }

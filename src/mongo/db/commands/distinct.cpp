@@ -47,7 +47,8 @@ namespace mongo {
     class DistinctCommand : public Command {
     public:
         DistinctCommand() : Command("distinct") {}
-        virtual bool slaveOk() const { return true; }
+        virtual bool slaveOk() const { return false; }
+        virtual bool slaveOverrideOk() const { return true; }
         virtual LockType locktype() const { return READ; }
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
