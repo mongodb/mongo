@@ -402,6 +402,7 @@ __wt_lsm_tree_create(WT_SESSION_IMPL *session,
 	lsm_tree->chunk_size = (uint32_t)cval.val;
 	WT_ERR(__wt_config_gets(session, cfg, "lsm_merge_max", &cval));
 	lsm_tree->merge_max = (uint32_t)cval.val;
+	lsm_tree->merge_min = lsm_tree->merge_max / 2;
 	WT_ERR(__wt_config_gets(session, cfg, "lsm_merge_threads", &cval));
 	lsm_tree->merge_threads = (uint32_t)cval.val;
 	/* Sanity check that api_data.py is in sync with lsm.h */
@@ -554,23 +555,18 @@ __wt_lsm_tree_release(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 }
 
 /*
- * __wt_lsm_tree_switch --
- *	Switch to a new in-memory tree.
+ * __lsm_tree_throttle --
+ *	Calculate whether LSM updates need to be throttled.
  */
-int
-__wt_lsm_tree_switch(
+static void
+__lsm_tree_throttle(
     WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 {
-	WT_DECL_RET;
 	WT_LSM_CHUNK *chunk, **cp;
 	uint64_t cache_sz, cache_used, record_count;
-	uint32_t in_memory, new_id;
+	uint32_t in_memory;
 
 	cache_sz = S2C(session)->cache_size;
-	new_id = WT_ATOMIC_ADD(lsm_tree->last, 1);
-
-	WT_ERR(__wt_realloc_def(session, &lsm_tree->chunk_alloc,
-	    lsm_tree->nchunks + 1, &lsm_tree->chunk));
 
 	/*
 	 * In the steady state, we expect that the checkpoint worker thread
@@ -583,6 +579,9 @@ __wt_lsm_tree_switch(
 	    in_memory < lsm_tree->nchunks && !F_ISSET(*cp, WT_LSM_CHUNK_ONDISK);
 	    ++in_memory, --cp)
 		record_count += (*cp)->count;
+
+	chunk = lsm_tree->chunk[lsm_tree->nchunks - 1];
+
 	if (!F_ISSET(lsm_tree, WT_LSM_TREE_THROTTLE) || in_memory <= 3)
 		lsm_tree->throttle_sleep = 0;
 	else if (in_memory == lsm_tree->nchunks ||
@@ -594,10 +593,10 @@ __wt_lsm_tree_switch(
 		lsm_tree->throttle_sleep =
 		    WT_MAX(20, 2 * lsm_tree->throttle_sleep);
 	} else {
-		chunk = lsm_tree->chunk[lsm_tree->nchunks - 1];
 		lsm_tree->throttle_sleep = (long)((in_memory - 2) *
 		    WT_TIMEDIFF(chunk->create_ts, (*cp)->create_ts) /
 		    (20 * record_count));
+
 		/*
 		 * Get more aggressive as the number of in memory chunks
 		 * consumes a large proportion of the cache. In memory chunks
@@ -608,11 +607,40 @@ __wt_lsm_tree_switch(
 		 * multipliers.
 		 */
 		cache_used = in_memory * lsm_tree->chunk_size * 2;
-		if (cache_used > cache_sz)
-			lsm_tree->throttle_sleep *= 8;
-		else if (cache_used > cache_sz * 0.8)
-			lsm_tree->throttle_sleep *= 4;
+		if (cache_used > cache_sz * 0.8)
+			lsm_tree->throttle_sleep *= 5;
 	}
+
+	/*
+	 * Update our estimate of how long each in-memory chunk stays active.
+	 * Filter out some noise by keeping a weighted history of the
+	 * calculated value.
+	 */
+	if (in_memory > 1)
+		lsm_tree->chunk_fill_ms = (3 * lsm_tree->chunk_fill_ms +
+		    (long)(WT_TIMEDIFF(chunk->create_ts, (*cp)->create_ts) /
+			(uint64_t)1000000)) / (3 + in_memory - 1);
+}
+
+/*
+ * __wt_lsm_tree_switch --
+ *	Switch to a new in-memory tree.
+ */
+int
+__wt_lsm_tree_switch(
+    WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
+{
+	WT_DECL_RET;
+	WT_LSM_CHUNK *chunk;
+	uint32_t new_id;
+
+	new_id = WT_ATOMIC_ADD(lsm_tree->last, 1);
+
+	if (lsm_tree->nchunks > 0)
+		__lsm_tree_throttle(session, lsm_tree);
+
+	WT_ERR(__wt_realloc_def(session, &lsm_tree->chunk_alloc,
+	    lsm_tree->nchunks + 1, &lsm_tree->chunk));
 
 	WT_VERBOSE_ERR(session, lsm, "Tree switch to: %d, throttle %d",
 	    new_id, (int)lsm_tree->throttle_sleep);

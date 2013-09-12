@@ -67,15 +67,17 @@ __wt_lsm_merge_worker(void *vargs)
 	WT_LSM_WORKER_ARGS *args;
 	WT_LSM_TREE *lsm_tree;
 	WT_SESSION_IMPL *session;
+	uint64_t saved_gen;
 	u_int id;
-	int progress, stallms;
+	int aggressive, passive, progress, stallms;
 
 	args = vargs;
 	lsm_tree = args->lsm_tree;
 	id = args->id;
 	session = lsm_tree->worker_sessions[id];
 	__wt_free(session, args);
-	stallms = 0;
+	aggressive = stallms = 0;
+	saved_gen = lsm_tree->dsk_gen;
 
 	while (F_ISSET(lsm_tree, WT_LSM_TREE_WORKING)) {
 		progress = 0;
@@ -83,8 +85,7 @@ __wt_lsm_merge_worker(void *vargs)
 		/* Clear any state from previous worker thread iterations. */
 		session->dhandle = NULL;
 
-		/* Report stalls to merge in seconds. */
-		if (__wt_lsm_merge(session, lsm_tree, id, stallms / 1000) == 0)
+		if (__wt_lsm_merge(session, lsm_tree, id, aggressive) == 0)
 			progress = 1;
 
 		/* Clear any state from previous worker thread iterations. */
@@ -99,9 +100,10 @@ __wt_lsm_merge_worker(void *vargs)
 		    __lsm_free_chunks(session, lsm_tree) == 0)
 			progress = 1;
 
-		if (progress)
-			stallms = 0;
-		else if (F_ISSET(lsm_tree, WT_LSM_TREE_WORKING)) {
+		if (progress || saved_gen != lsm_tree->dsk_gen) {
+			aggressive = stallms = 0;
+			saved_gen = lsm_tree->dsk_gen;
+		} else if (F_ISSET(lsm_tree, WT_LSM_TREE_WORKING)) {
 			/*
 			 * The "main" thread polls 10 times per second,
 			 * secondary threads once per second.
@@ -110,6 +112,23 @@ __wt_lsm_merge_worker(void *vargs)
 			    session, lsm_tree->work_cond,
 			    id == 0 ? 100000 : 1000000));
 			stallms += (id == 0) ? 100 : 1000;
+
+			/*
+			 * Get aggressive if more than enough chunks for a
+			 * merge should have been created while we waited.
+			 * Use 30 seconds as a default if we don't have an
+			 * estimate.
+			 */
+			passive = !aggressive;
+			aggressive = (stallms >
+			    (lsm_tree->chunk_fill_ms == 0 ? 30000 :
+			    lsm_tree->merge_min * lsm_tree->chunk_fill_ms));
+
+			if (passive && aggressive)
+				WT_VERBOSE_ERR(session, lsm,
+				     "LSM merge got aggressive, "
+				     "%d / %" PRIu64,
+				     stallms, lsm_tree->chunk_fill_ms);
 		}
 	}
 
@@ -265,10 +284,13 @@ __wt_lsm_checkpoint_worker(void *arg)
 			 */
 			WT_ERR(__wt_session_get_btree(
 			    session, chunk->uri, NULL, NULL, 0));
-			__wt_spin_lock(session, &S2C(session)->checkpoint_lock);
-			ret = __wt_sync_file(session, WT_SYNC_WRITE_LEAVES);
-			__wt_spin_unlock(
-			   session, &S2C(session)->checkpoint_lock);
+			if (__wt_spin_trylock(
+			    session, &S2C(session)->checkpoint_lock) == 0) {
+				ret = __wt_sync_file(
+				    session, WT_SYNC_WRITE_LEAVES);
+				__wt_spin_unlock(
+				   session, &S2C(session)->checkpoint_lock);
+			}
 
 			/*
 			 * Clear the "cache resident" flag so the primary can
