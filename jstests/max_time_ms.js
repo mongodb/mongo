@@ -119,31 +119,82 @@ assert.doesNotThrow(function() { cursor.itcount(); },
                     "expected find() to not hit the time limit");
 
 //
+// Simple positive test for commands: a ~300ms command with a 100ms time limit should be aborted.
+//
+
+t.drop();
+assert.eq(0, t.getDB().runCommand({eval: function() { sleep(300); }, maxTimeMS: 100}).ok);
+
+//
+// Simple negative test for commands: a ~300ms command with a 10s time limit should not hit the
+// time limit.
+//
+
+t.drop();
+assert.eq(1, t.getDB().runCommand({eval: function() { sleep(300); }, maxTimeMS: 10*1000}).ok);
+
+//
 // Tests for input validation.
 //
 
 t.drop();
 t.insert({});
 
-// Verify lower boundary for acceptable input.
+// Verify lower boundary for acceptable input (0 is acceptable, 1 isn't).
+
 assert.doesNotThrow.automsg(function() { t.find().maxTimeMS(0).itcount(); });
 assert.doesNotThrow.automsg(function() { t.find().maxTimeMS(NumberInt(0)).itcount(); });
 assert.doesNotThrow.automsg(function() { t.find().maxTimeMS(NumberLong(0)).itcount(); });
+assert.eq(1, t.getDB().runCommand({ping: 1, maxTimeMS: 0}).ok);
+assert.eq(1, t.getDB().runCommand({ping: 1, maxTimeMS: NumberInt(0)}).ok);
+assert.eq(1, t.getDB().runCommand({ping: 1, maxTimeMS: NumberLong(0)}).ok);
+
 assert.throws.automsg(function() { t.find().maxTimeMS(-1).itcount(); });
 assert.throws.automsg(function() { t.find().maxTimeMS(NumberInt(-1)).itcount(); });
 assert.throws.automsg(function() { t.find().maxTimeMS(NumberLong(-1)).itcount(); });
+assert.eq(0, t.getDB().runCommand({ping: 1, maxTimeMS: -1}).ok);
+assert.eq(0, t.getDB().runCommand({ping: 1, maxTimeMS: NumberInt(-1)}).ok);
+assert.eq(0, t.getDB().runCommand({ping: 1, maxTimeMS: NumberLong(-1)}).ok);
 
-// Verify upper boundary for acceptable input.
+// Verify upper boundary for acceptable input (2^31-1 is acceptable, 2^31 isn't).
+
 var maxValue = Math.pow(2,31)-1;
+
 assert.doesNotThrow.automsg(function() { t.find().maxTimeMS(maxValue).itcount(); });
 assert.doesNotThrow.automsg(function() { t.find().maxTimeMS(NumberInt(maxValue)).itcount(); });
 assert.doesNotThrow.automsg(function() { t.find().maxTimeMS(NumberLong(maxValue)).itcount(); });
+assert.eq(1, t.getDB().runCommand({ping: 1, maxTimeMS: maxValue}).ok);
+assert.eq(1, t.getDB().runCommand({ping: 1, maxTimeMS: NumberInt(maxValue)}).ok);
+assert.eq(1, t.getDB().runCommand({ping: 1, maxTimeMS: NumberLong(maxValue)}).ok);
+
 assert.throws.automsg(function() { t.find().maxTimeMS(maxValue+1).itcount(); });
 assert.throws.automsg(function() { t.find().maxTimeMS(NumberInt(maxValue+1)).itcount(); });
 assert.throws.automsg(function() { t.find().maxTimeMS(NumberLong(maxValue+1)).itcount(); });
+assert.eq(0, t.getDB().runCommand({ping: 1, maxTimeMS: maxValue+1}).ok);
+assert.eq(0, t.getDB().runCommand({ping: 1, maxTimeMS: NumberInt(maxValue+1)}).ok);
+assert.eq(0, t.getDB().runCommand({ping: 1, maxTimeMS: NumberLong(maxValue+1)}).ok);
 
 // Verify invalid types are rejected.
 assert.throws.automsg(function() { t.find().maxTimeMS().itcount(); });
 assert.throws.automsg(function() { t.find().maxTimeMS("").itcount(); });
 assert.throws.automsg(function() { t.find().maxTimeMS(true).itcount(); });
 assert.throws.automsg(function() { t.find().maxTimeMS({}).itcount(); });
+assert.eq(0, t.getDB().runCommand({ping: 1, maxTimeMS: undefined}).ok);
+assert.eq(0, t.getDB().runCommand({ping: 1, maxTimeMS: ""}).ok);
+assert.eq(0, t.getDB().runCommand({ping: 1, maxTimeMS: true}).ok);
+assert.eq(0, t.getDB().runCommand({ping: 1, maxTimeMS: {}}).ok);
+
+// Verify that the maxTimeMS command argument can be sent with $query-wrapped commands.
+cursor = t.getDB().$cmd.find({ping: 1, maxTimeMS: 0}).limit(-1);
+cursor._ensureSpecial();
+assert.eq(1, cursor.next().ok);
+
+// Verify that the server rejects invalid command argument $maxTimeMS.
+cursor = t.getDB().$cmd.find({ping: 1, $maxTimeMS: 0}).limit(-1);
+cursor._ensureSpecial();
+assert.eq(0, cursor.next().ok);
+
+// Verify that the $maxTimeMS query option can't be sent with $query-wrapped commands.
+cursor = t.getDB().$cmd.find({ping: 1}).limit(-1).maxTimeMS(0);
+cursor._ensureSpecial();
+assert.eq(0, cursor.next().ok);

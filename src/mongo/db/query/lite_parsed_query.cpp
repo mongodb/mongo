@@ -43,8 +43,27 @@ namespace mongo {
         return status;
     }
 
+    // static
+    StatusWith<int> LiteParsedQuery::parseMaxTimeMS(const BSONElement& maxTimeMSElt) {
+        if (!maxTimeMSElt.eoo() && !maxTimeMSElt.isNumber()) {
+            return StatusWith<int>(ErrorCodes::BadValue,
+                                   (StringBuilder()
+                                       << maxTimeMSElt.fieldNameStringData()
+                                       << " must be a number").str());
+        }
+        long long maxTimeMSLongLong = maxTimeMSElt.safeNumberLong(); // returns 0 on EOO
+        if (maxTimeMSLongLong < 0 || maxTimeMSLongLong > INT_MAX) {
+            return StatusWith<int>(ErrorCodes::BadValue,
+                                   (StringBuilder()
+                                       << maxTimeMSElt.fieldNameStringData()
+                                       << " is out of range").str());
+        }
+        return StatusWith<int>(static_cast<int>(maxTimeMSLongLong));
+    }
+
     LiteParsedQuery::LiteParsedQuery() : _wantMore(true), _explain(false), _snapshot(false),
-                                         _returnKey(false), _showDiskLoc(false), _maxScan(0) { }
+                                         _returnKey(false), _showDiskLoc(false), _maxScan(0),
+                                         _maxTimeMS(0) { }
 
     Status LiteParsedQuery::init(const string& ns, int ntoskip, int ntoreturn, int queryOptions,
                                  const BSONObj& queryObj, const BSONObj& proj,
@@ -84,26 +103,7 @@ namespace mongo {
             _filter = queryObj.getOwned();
         }
 
-        //
-        // Parse options that are valid for both queries and commands
-        //
-
-        // $readPreference
         _hasReadPref = queryObj.hasField("$readPreference");
-
-        // $maxTimeMS
-        BSONElement maxTimeMSElt = queryObj.getField("$maxTimeMS");
-        if (!maxTimeMSElt.eoo() && !maxTimeMSElt.isNumber()) {
-            return Status(ErrorCodes::BadValue, "$maxTimeMS must be a number");
-        }
-
-        // If $maxTimeMS was not specified, _maxTimeMS is set to 0 (special value for "allow to
-        // run indefinitely").
-        long long maxTimeMSLongLong = maxTimeMSElt.safeNumberLong();
-        if (maxTimeMSLongLong < 0 || maxTimeMSLongLong > INT_MAX) {
-            return Status(ErrorCodes::BadValue, "$maxTimeMS is out of range");
-        }
-        _maxTimeMS = static_cast<int>(maxTimeMSLongLong);
 
         return Status::OK();
     }
@@ -193,6 +193,13 @@ namespace mongo {
                 else if (str::equals("showDiskLoc", name)) {
                     // Won't throw.
                     _showDiskLoc = e.trueValue();
+                }
+                else if (str::equals("maxTimeMS", name)) {
+                    StatusWith<int> maxTimeMS = parseMaxTimeMS(e);
+                    if (!maxTimeMS.isOK()) {
+                        return maxTimeMS.getStatus();
+                    }
+                    _maxTimeMS = maxTimeMS.getValue();
                 }
             }
         }

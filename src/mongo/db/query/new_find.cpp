@@ -370,6 +370,9 @@ namespace mongo {
             warning() << "haven't implemented findingstartcursor yet\n";
         }
 
+        // Handle query option $maxTimeMS (not used with commands).
+        curop.setMaxTimeMicros(static_cast<unsigned long long>(pq.getMaxTimeMS()) * 1000);
+
         // uassert if we are not on a primary, and not a secondary with SlaveOk query parameter set.
         replVerifyReadsOk(&pq);
 
