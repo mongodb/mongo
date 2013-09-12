@@ -50,7 +50,7 @@ __wt_meta_btree_apply(WT_SESSION_IMPL *session,
 				WT_TRET(__wt_session_release_btree(session));
 		} else if (ret == EBUSY)
 			ret = __wt_conn_btree_apply_single(
-			    session, uri, func, cfg);
+			    session, uri, NULL, func, cfg);
 		WT_ERR(ret);
 	}
 

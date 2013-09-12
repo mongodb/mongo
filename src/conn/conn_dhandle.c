@@ -452,8 +452,8 @@ __wt_conn_btree_apply(WT_SESSION_IMPL *session,
 			 * cleaning up obsolete chunks). Holding the metadata
 			 * lock isn't enough.
 			 */
-			ret = __wt_session_get_btree(
-			    session, dhandle->name, NULL, NULL, 0);
+			ret = __wt_session_get_btree(session,
+			    dhandle->name, dhandle->checkpoint, NULL, 0);
 			if (ret == 0) {
 				ret = func(session, cfg);
 				if (WT_META_TRACKING(session))
@@ -464,7 +464,8 @@ __wt_conn_btree_apply(WT_SESSION_IMPL *session,
 					    session));
 			} else if (ret == EBUSY)
 				ret = __wt_conn_btree_apply_single(
-				    session, dhandle->name, func, cfg);
+				    session, dhandle->name,
+				    dhandle->checkpoint, func, cfg);
 			WT_RET(ret);
 		}
 
@@ -473,10 +474,11 @@ __wt_conn_btree_apply(WT_SESSION_IMPL *session,
 
 /*
  * __wt_conn_btree_apply_single --
- *	Apply a function to a single btree handle.
+ *	Apply a function to a single btree handle that's being bulk-loaded.
  */
 int
-__wt_conn_btree_apply_single(WT_SESSION_IMPL *session, const char *uri,
+__wt_conn_btree_apply_single(WT_SESSION_IMPL *session,
+    const char *uri, const char *checkpoint,
     int (*func)(WT_SESSION_IMPL *, const char *[]), const char *cfg[])
 {
 	WT_CONNECTION_IMPL *conn;
@@ -489,15 +491,41 @@ __wt_conn_btree_apply_single(WT_SESSION_IMPL *session, const char *uri,
 	WT_ASSERT(session, F_ISSET(session, WT_SESSION_SCHEMA_LOCKED));
 
 	TAILQ_FOREACH(dhandle, &conn->dhqh, q)
-		if (strcmp(dhandle->name, uri) == 0) {
+		if (strcmp(dhandle->name, uri) == 0 &&
+		    ((dhandle->checkpoint == NULL && checkpoint == NULL) ||
+		    (dhandle->checkpoint != NULL && checkpoint != NULL &&
+		    strcmp(dhandle->checkpoint, checkpoint) == 0))) {
 			/*
 			 * We have the schema lock, which prevents handles being
 			 * opened or closed, so there is no need for additional
 			 * handle locking here, or pulling every tree into this
 			 * session's handle cache.
+			 *
+			 * XXX
+			 * THIS IS NOT CORRECT.  This is safe for checkpoints
+			 * because LSM (which closes handles without holding
+			 * the schema lock), does hold the checkpoint lock as
+			 * it discards those handles.  This isn't safe for
+			 * hot-backup (or other callers of this function) as
+			 * they are only holding the schema lock.  The problem
+			 * is vanishingly unlikely to happen, but it needs to
+			 * be fixed.
+			 *
+			 * We're holding the schema lock, which means the only
+			 * files we are going to be asked for are bulk-load
+			 * files.  Other code that might cause an EBUSY return
+			 * to our caller (for example, WT_SESSION.verify or
+			 * drop), will itself be holding the schema lock, and
+			 * will serialize with our caller.  In summary, if the
+			 * handle requested wasn't for a bulk-load file, it's
+			 * all gone pear-shaped.
 			 */
-			session->dhandle = dhandle;
-			WT_ERR(func(session, cfg));
+			if (F_ISSET(S2BT(session),
+			    WT_BTREE_SPECIAL_FLAGS) == WT_BTREE_BULK) {
+				session->dhandle = dhandle;
+				WT_ERR(func(session, cfg));
+			} else
+				WT_ERR(EBUSY);
 		}
 
 err:	session->dhandle = saved_dhandle;
