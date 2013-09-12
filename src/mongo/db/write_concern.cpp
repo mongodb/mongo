@@ -53,6 +53,11 @@ namespace mongo {
             if( !getDur().awaitCommit() ) {
                 // --journal is off
                 result->append("jnote", "journaling not enabled on this server");
+                // Set the err field, if the result document doesn't already have it set.
+                if ( !err ) {
+                    result->append( "err", "nojournal" );
+                }
+                return true;
             }
             if( cmdObj["fsync"].trueValue() ) {
                 *errmsg = "fsync and j options are not used together";
