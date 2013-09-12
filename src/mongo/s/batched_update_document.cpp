@@ -202,4 +202,4 @@ namespace mongo {
         return _upsert;
     }
 
- } // namespace mongo
+} // namespace mongo

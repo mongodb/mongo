@@ -320,4 +320,4 @@ namespace mongo {
         return _session;
     }
 
- } // namespace mongo
+} // namespace mongo
