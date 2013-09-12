@@ -1240,23 +1240,11 @@ namespace JsobjTests {
         public:
             void run() {
                 OID oid;
+                const Date_t base( ::time( 0 ) );
+                oid.init( base );
 
-                {
-                    time_t before = ::time(0);
-                    oid.init();
-                    time_t after = ::time(0);
-                    ASSERT( oid.asTimeT() >= before );
-                    ASSERT( oid.asTimeT() <= after );
-                }
-
-                {
-                    Date_t before = jsTime();
-                    sleepsecs(1);
-                    oid.init();
-                    Date_t after = jsTime();
-                    ASSERT( oid.asDateT() >= before );
-                    ASSERT( oid.asDateT() <= after );
-                }
+                ASSERT_EQUALS( base.millis / 1000, oid.asDateT().millis / 1000 );
+                ASSERT_EQUALS( base.toTimeT(), oid.asTimeT() );
             }
         };
 
