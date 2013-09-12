@@ -23,6 +23,7 @@
 #include "mongo/db/auth/user_name.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util.h"
+#include "db/auth/role_name.h"
 
 namespace mongo {
 
@@ -35,17 +36,8 @@ namespace mongo {
         return _name;
     }
 
-    const RoleNameIterator User::getRoles() const {
-        return RoleNameIterator(new RoleNameSetIterator(_roles.begin(), _roles.end()));
-    }
-
-    const RoleNameIterator User::getDelegatableRoles() const {
-        return RoleNameIterator(new RoleNameSetIterator(_delegatableRoles.begin(),
-                                                        _delegatableRoles.end()));
-    }
-
-    bool User::canDelegateRole(const RoleName& role) const {
-        return _delegatableRoles.count(role);
+    const User::RoleDataMap& User::getRoles() const {
+        return _roles;
     }
 
     const User::CredentialData& User::getCredentials() const {
@@ -81,23 +73,31 @@ namespace mongo {
         _credentials = credentials;
     }
 
-    void User::addRole(const RoleName& role) {
-        _roles.insert(role);
+    void User::addRole(const RoleName& roleName) {
+        RoleData& role = _roles[roleName];
+        if (role.name.empty()) {
+            role.name = roleName;
+        }
+        role.hasRole = true;
     }
 
     void User::addRoles(const std::vector<RoleName>& roles) {
         for (std::vector<RoleName>::const_iterator it = roles.begin(); it != roles.end(); ++it) {
-            _roles.insert(*it);
+            addRole(*it);
         }
     }
 
-    void User::addDelegatableRole(const RoleName& role) {
-        _delegatableRoles.insert(role);
+    void User::addDelegatableRole(const RoleName& roleName) {
+        RoleData& role = _roles[roleName];
+        if (role.name.empty()) {
+            role.name = roleName;
+        }
+        role.canDelegate = true;
     }
 
     void User::addDelegatableRoles(const std::vector<RoleName>& roles) {
         for (std::vector<RoleName>::const_iterator it = roles.begin(); it != roles.end(); ++it) {
-            _delegatableRoles.insert(*it);
+            addDelegatableRole(*it);
         }
     }
 

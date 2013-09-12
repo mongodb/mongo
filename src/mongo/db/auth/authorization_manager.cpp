@@ -170,10 +170,11 @@ namespace mongo {
     }
 
     void AuthorizationManager::_initializeUserPrivilegesFromRoles_inlock(User* user) {
-        RoleNameIterator it = user->getRoles();
-        while (it.more()) {
-            const RoleName& roleName = it.next();
-            user->addPrivileges(_roleGraph.getAllPrivileges(roleName));
+        const User::RoleDataMap& roles = user->getRoles();
+        for (User::RoleDataMap::const_iterator it = roles.begin(); it != roles.end(); ++it) {
+            const User::RoleData& role= it->second;
+            if (role.hasRole)
+                user->addPrivileges(_roleGraph.getAllPrivileges(role.name));
         }
     }
 
@@ -478,13 +479,14 @@ namespace mongo {
             }
 
             BSONArrayBuilder rolesArray(builder.subarrayStart("roles"));
-            for (RoleNameIterator roles = user.getRoles(); roles.more(); roles.next()) {
-                const RoleName& roleName = roles.get();
+            const User::RoleDataMap& roles = user.getRoles();
+            for (User::RoleDataMap::const_iterator it = roles.begin(); it != roles.end(); ++it) {
+                const User::RoleData& role = it->second;
                 BSONObjBuilder roleBuilder(rolesArray.subobjStart());
-                roleBuilder.append("name", roleName.getRole());
-                roleBuilder.append("source", roleName.getDB());
-                roleBuilder.appendBool("canDelegate", user.canDelegateRole(roleName));
-                roleBuilder.appendBool("hasRole", true);
+                roleBuilder.append("name", role.name.getRole());
+                roleBuilder.append("source", role.name.getDB());
+                roleBuilder.appendBool("canDelegate", role.canDelegate);
+                roleBuilder.appendBool("hasRole", role.hasRole);
                 roleBuilder.doneFast();
             }
             rolesArray.doneFast();

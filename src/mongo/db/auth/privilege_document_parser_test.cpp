@@ -267,12 +267,12 @@ namespace {
                                                 "canDelegate" << true <<
                                                 "hasRole" << false))),
                 "test"));
-        RoleNameIterator nameIt = user->getRoles();
-        ASSERT(!nameIt.more());
-        nameIt = user->getDelegatableRoles();
-        ASSERT(nameIt.more());
-        ASSERT(nameIt.next() == RoleName("roleA", "dbA"));
-        ASSERT(!nameIt.more());
+        const User::RoleDataMap& roles = user->getRoles();
+        ASSERT_EQUALS(1U, roles.size());
+        User::RoleData role = roles.begin()->second;
+        ASSERT_EQUALS(RoleName("roleA", "dbA"), role.name);
+        ASSERT(!role.hasRole);
+        ASSERT(role.canDelegate);
 
         // Valid role names are extracted successfully
         ASSERT_OK(v2parser.initializeUserRolesFromPrivilegeDocument(
@@ -283,14 +283,12 @@ namespace {
                                                 "canDelegate" << true <<
                                                 "hasRole" << true))),
                 "test"));
-        nameIt = user->getRoles();
-        ASSERT(nameIt.more());
-        ASSERT(nameIt.next() == RoleName("roleA", "dbA"));
-        ASSERT(!nameIt.more());
-        nameIt = user->getDelegatableRoles();
-        ASSERT(nameIt.more());
-        ASSERT(nameIt.next() == RoleName("roleA", "dbA"));
-        ASSERT(!nameIt.more());
+        const User::RoleDataMap& roles2 = user->getRoles();
+        ASSERT_EQUALS(1U, roles2.size());
+        role = roles2.begin()->second;
+        ASSERT_EQUALS(RoleName("roleA", "dbA"), role.name);
+        ASSERT(role.hasRole);
+        ASSERT(role.canDelegate);
 
         // Multiple roles OK
         ASSERT_OK(v2parser.initializeUserRolesFromPrivilegeDocument(
@@ -305,25 +303,16 @@ namespace {
                                                 "canDelegate" << false <<
                                                 "hasRole" << true))),
                 "test"));
-        nameIt = user->getRoles();
-        ASSERT(nameIt.more());
-        RoleName firstRole = nameIt.next();
-        if (firstRole == RoleName("roleA", "dbA")) {
-            ASSERT(nameIt.more());
-            ASSERT(nameIt.next() == RoleName("roleB", "dbB"));
-        } else if (firstRole == RoleName("roleB", "dbB")) {
-            ASSERT(nameIt.more());
-            ASSERT(nameIt.next() == RoleName("roleA", "dbA"));
-        } else {
-            ASSERT(false);
-        }
-        ASSERT(!nameIt.more());
-        nameIt = user->getDelegatableRoles();
-        ASSERT(nameIt.more());
-        ASSERT(nameIt.next() == RoleName("roleA", "dbA"));
-        ASSERT(!nameIt.more());
-        ASSERT(user->canDelegateRole(RoleName("roleA", "dbA")));
-        ASSERT(!user->canDelegateRole(RoleName("roleB", "dbB")));
+        const User::RoleDataMap& roles3 = user->getRoles();
+        ASSERT_EQUALS(2U, roles3.size());
+        role = roles3.find(RoleName("roleA", "dbA"))->second;
+        ASSERT_EQUALS(RoleName("roleA", "dbA"), role.name);
+        ASSERT(role.hasRole);
+        ASSERT(role.canDelegate);
+        role = roles3.find(RoleName("roleB", "dbB"))->second;
+        ASSERT_EQUALS(RoleName("roleB", "dbB"), role.name);
+        ASSERT(role.hasRole);
+        ASSERT(!role.canDelegate);
     }
 
 }  // namespace
