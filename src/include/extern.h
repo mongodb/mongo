@@ -570,6 +570,7 @@ extern int __wt_conn_btree_apply(WT_SESSION_IMPL *session,
     const char *cfg[]);
 extern int __wt_conn_btree_apply_single(WT_SESSION_IMPL *session,
     const char *uri,
+    const char *checkpoint,
     int (*func)(WT_SESSION_IMPL *,
     const char *[]),
     const char *cfg[]);
