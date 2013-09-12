@@ -192,6 +192,11 @@ __clsm_open_cursors(
 		/*
 		 * If this is the first update in this cursor, check if a new
 		 * in-memory chunk is needed.
+		 *
+		 * !!!
+		 * It is exceeding unlikely that we get here at all, but
+		 * there is a transaction in progress and it could roll back,
+		 * leaving the metadata inconsistent.
 		 */
 		if (clsm->primary_chunk == NULL) {
 			WT_RET(__wt_writelock(session, lsm_tree->rwlock));
@@ -980,7 +985,6 @@ __clsm_put(WT_SESSION_IMPL *session,
     WT_CURSOR_LSM *clsm, const WT_ITEM *key, const WT_ITEM *value, int position)
 {
 	WT_CURSOR *c, *primary;
-	WT_DECL_RET;
 	WT_LSM_TREE *lsm_tree;
 	u_int i;
 	int need_signal, ovfl;
@@ -1064,14 +1068,18 @@ __clsm_put(WT_SESSION_IMPL *session,
 		    ovfl = __wt_btree_size_overflow(
 		    session, 2 * lsm_tree->chunk_size));
 
-	if (ovfl) {
-		WT_RET(__wt_writelock(session, lsm_tree->rwlock));
-		if (clsm->dsk_gen == lsm_tree->dsk_gen)
-			WT_WITH_SCHEMA_LOCK(session,
-			    ret = __wt_lsm_tree_switch(session, lsm_tree));
-		WT_TRET(__wt_rwunlock(session, lsm_tree->rwlock));
-		WT_RET(ret);
-	}
+	/*
+	 * If the primary chunk has really overflowed, which either means a
+	 * worker thread has fallen behind or there has just been a user-level
+	 * checkpoint, wait until the tree changes.
+	 *
+	 * We used to switch chunks in the application thread if we got to
+	 * here, but that is problematic because there is a transaction in
+	 * progress and it could roll back, leaving the metadata inconsistent.
+	 */
+	if (ovfl)
+		while (clsm->dsk_gen == lsm_tree->dsk_gen)
+			__wt_sleep(0, 10);
 
 	return (0);
 }
