@@ -380,4 +380,4 @@ namespace mongo {
         return _errDetails->at(pos);
     }
 
- } // namespace mongo
+} // namespace mongo
