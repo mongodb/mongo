@@ -84,9 +84,9 @@ namespace mongo {
         void addToDeletes(BatchedDeleteDocument* deletes);
         void unsetDeletes();
         bool isDeletesSet() const;
-        size_t sizeDeletes() const;
+        std::size_t sizeDeletes() const;
         const std::vector<BatchedDeleteDocument*>& getDeletes() const;
-        const BatchedDeleteDocument* getDeletesAt(size_t pos) const;
+        const BatchedDeleteDocument* getDeletesAt(std::size_t pos) const;
 
         void setWriteConcern(const BSONObj& writeConcern);
         void unsetWriteConcern();

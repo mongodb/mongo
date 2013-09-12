@@ -84,9 +84,9 @@ namespace mongo {
         void addToUpdates(BatchedUpdateDocument* updates);
         void unsetUpdates();
         bool isUpdatesSet() const;
-        size_t sizeUpdates() const;
+        std::size_t sizeUpdates() const;
         const std::vector<BatchedUpdateDocument*>& getUpdates() const;
-        const BatchedUpdateDocument* getUpdatesAt(size_t pos) const;
+        const BatchedUpdateDocument* getUpdatesAt(std::size_t pos) const;
 
         void setWriteConcern(const BSONObj& writeConcern);
         void unsetWriteConcern();

@@ -111,9 +111,9 @@ namespace mongo {
         void addToErrDetails(BatchedErrorDetail* errDetails);
         void unsetErrDetails();
         bool isErrDetailsSet() const;
-        size_t sizeErrDetails() const;
+        std::size_t sizeErrDetails() const;
         const std::vector<BatchedErrorDetail*>& getErrDetails() const;
-        const BatchedErrorDetail* getErrDetailsAt(size_t pos) const;
+        const BatchedErrorDetail* getErrDetailsAt(std::size_t pos) const;
 
     private:
         // Convention: (M)andatory, (O)ptional
