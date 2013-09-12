@@ -64,9 +64,6 @@ namespace mongo {
         MONGO_DISALLOW_COPYING(AuthorizationManager);
     public:
 
-        // Locks the AuthorizationManager and guards access to its members
-        class Guard;
-
         // The newly constructed AuthorizationManager takes ownership of "externalState"
         explicit AuthorizationManager(AuthzManagerExternalState* externalState);
 
@@ -239,6 +236,20 @@ namespace mongo {
         Status _initializeUserFromPrivilegeDocument(User* user, const BSONObj& privDoc);
 
         /**
+         * Tries to acquire the global lock guarding modifications to all persistent data related
+         * to authorization, namely the admin.system.users, admin.system.roles, and
+         * admin.system.version collections.  This serializes all writers to the authorization
+         * documents, but does not impact readers.
+         */
+        bool tryAcquireAuthzUpdateLock(const StringData& why);
+
+        /**
+         * Releases the lock guarding modifications to persistent authorization data, which must
+         * already be held.
+         */
+        void releaseAuthzUpdateLock();
+
+        /**
          * Upgrades authorization data stored in collections from the v1 form (one system.users
          * collection per database) to the v2 form (a single admin.system.users collection).
          *
@@ -327,81 +338,6 @@ namespace mongo {
          * Protects _userCache, _roleGraph, _version, and _parser.
          */
         boost::mutex _lock;
-
-        friend class AuthorizationManager::Guard;
-    };
-
-
-    /*
-     * Guard object for locking an AuthorizationManager.
-     * There are two different locks that this object interacts with: the AuthorizationManager's
-     * _lock (henceforth called the AM::_lock), and the authzUpdateLock.  The AM::_lock protects
-     * reading and writing the in-memory data structures managed by the AuthorizationManager.  The
-     * authzUpdateLock is the lock that serializes all writes to the persistent authorization
-     * documents (admin.system.users, admin.system.roles, admin.system.version).
-     * When the guard is constructed it initially locks the AM::_lock.  The guard's destructor will
-     * always release the AM::_lock if it is held.
-     * The guard then provides some public methods that allow interaction with the
-     * AuthorizationManager while inside the AM::_lock.
-     * If modifications to the authorization documents in persistent storage is required, then
-     * consumers of the guard can call tryAcquireAuthzUpdateLock() to lock the authzUpdateLock.
-     * If that is successful, consumers can then call releaseAuthorizationManagerLock to unlock the
-     * AM::_lock, while keeping the authzUpdateLock locked.  This allows
-     * modifications to the authorization documents to occur without the AM::_lock needing to be
-     * held the whole time (which prevents authentication and access control
-     * checks).
-     * Since changing the state of the authzUpdateLock requires the AM::_lock to
-     * be held, if the guard's destructor is called when the authzUpdateLock is held but the
-     * AM::_lock is not, it will first acquire the AM::_lock, then release the authzUpdateLock,
-     * then finally release the AM::_lock.
-     *
-     * Note: This locking semantics only works because we never block to acquire the
-     * authzUpdateLock.  If a blocking acquireAuthzUpdateLock were introduced, it could introduce
-     * deadlocks.
-     */
-    class AuthorizationManager::Guard {
-        MONGO_DISALLOW_COPYING(Guard);
-    public:
-        explicit Guard(AuthorizationManager* authzManager);
-        ~Guard();
-
-        /**
-         * Tries to acquire the global lock guarding modifications to all persistent data related
-         * to authorization, namely the admin.system.users, admin.system.roles, and
-         * admin.system.version collections.  This serializes all writers to the authorization
-         * documents, but does not impact readers.
-         * The AuthorizationManager's _lock must be held before this is called.
-         */
-        bool tryAcquireAuthzUpdateLock(const StringData& why);
-
-        /**
-         * Releases the lock guarding modifications to persistent authorization data, which must
-         * already be held.
-         * The AuthorizationManager's _lock must be held before this is called.
-         */
-        void releaseAuthzUpdateLock();
-
-        /**
-         * Releases the AuthorizationManager's _lock.
-         */
-        void releaseAuthorizationManagerLock();
-
-        /**
-         * Acquires the AuthorizationManager's _lock.
-         */
-        void acquireAuthorizationManagerLock();
-
-        /**
-         * Delegates to AuthorizationManager's _acquireUser_inlock method.
-         */
-        Status acquireUser(const UserName& userName, User** acquiredUser);
-
-    private:
-        AuthorizationManager* _authzManager;
-        // True if the Guard has locked the lock that guards modifications to authz documents.
-        bool _lockedForUpdate;
-        // For locking the AuthorizationManager's _lock
-        boost::unique_lock<boost::mutex> _authzManagerLock;
     };
 
 } // namespace mongo

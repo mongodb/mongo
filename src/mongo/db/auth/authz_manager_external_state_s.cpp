@@ -28,6 +28,7 @@
 
 #include "mongo/db/auth/authz_manager_external_state_s.h"
 
+#include <boost/thread/mutex.hpp>
 #include <boost/scoped_ptr.hpp>
 #include <string>
 
@@ -297,25 +298,30 @@ namespace {
     }
 
     bool AuthzManagerExternalStateMongos::tryAcquireAuthzUpdateLock(const StringData& why) {
+        boost::lock_guard<boost::mutex> lkLocal(_distLockGuard);
         if (_authzDataUpdateLock.get()) {
             return false;
         }
-        _authzDataUpdateLock.reset(new ScopedDistributedLock(
+
+        // Temporarily put into an auto_ptr just in case there is an exception thrown during
+        // lock acquisition.
+        std::auto_ptr<ScopedDistributedLock> lockHolder(new ScopedDistributedLock(
                 configServer.getConnectionString(), "authorizationData"));
-        _authzDataUpdateLock->setLockMessage(why.toString());
+        lockHolder->setLockMessage(why.toString());
 
         std::string errmsg;
-        if (!_authzDataUpdateLock->tryAcquire(&errmsg)) {
+        if (!lockHolder->tryAcquire(&errmsg)) {
             warning() <<
                     "Error while attempting to acquire distributed lock for user modification: " <<
                     errmsg << endl;
-            _authzDataUpdateLock.reset();
             return false;
         }
+        _authzDataUpdateLock.reset(lockHolder.release());
         return true;
     }
 
     void AuthzManagerExternalStateMongos::releaseAuthzUpdateLock() {
+        boost::lock_guard<boost::mutex> lkLocal(_distLockGuard);
         _authzDataUpdateLock.reset();
     }
 
