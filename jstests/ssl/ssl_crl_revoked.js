@@ -13,7 +13,7 @@ var md = startMongod( "--port", port, "--dbpath", "/data/db/" + baseName, "--ssl
 
 
 var mongo = runMongoProgram("mongo", "--port", port, "--ssl", 
-                            "--sslPEMKeyFile", "jstests/libs/client.pem",
+                            "--sslPEMKeyFile", "jstests/libs/client_revoked.pem",
                             "--eval", ";");
 
 // 1 is the exit code for the shell failing to connect, which is what we want
