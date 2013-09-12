@@ -83,9 +83,9 @@ namespace mongo {
         void addToDocuments(const BSONObj& documents);
         void unsetDocuments();
         bool isDocumentsSet() const;
-        size_t sizeDocuments() const;
+        std::size_t sizeDocuments() const;
         const std::vector<BSONObj>& getDocuments() const;
-        const BSONObj& getDocumentsAt(size_t pos) const;
+        const BSONObj& getDocumentsAt(std::size_t pos) const;
 
         void setWriteConcern(const BSONObj& writeConcern);
         void unsetWriteConcern();
