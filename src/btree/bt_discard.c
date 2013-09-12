@@ -51,6 +51,7 @@ __wt_page_out(WT_SESSION_IMPL *session, WT_PAGE **pagep)
 		__wt_errx(session,
 		    "discarded page has hazard pointer: (%p: %s, line %d)",
 		    hp->page, hp->file, hp->line);
+	WT_ASSERT(session, hp == NULL);
 	}
 #endif
 	/* Update the cache's information. */
