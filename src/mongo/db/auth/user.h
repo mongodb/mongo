@@ -23,7 +23,6 @@
 #include "mongo/db/auth/user_name.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/unordered_map.h"
-#include "mongo/platform/unordered_set.h"
 
 namespace mongo {
 
@@ -49,6 +48,15 @@ namespace mongo {
             bool isExternal;
         };
 
+        struct RoleData {
+            RoleName name;
+            bool hasRole;
+            bool canDelegate;
+            RoleData() : hasRole(false), canDelegate(false) {}
+        };
+
+        typedef unordered_map<RoleName, RoleData> RoleDataMap;
+
         explicit User(const UserName& name);
         ~User();
 
@@ -60,17 +68,7 @@ namespace mongo {
         /**
          * Returns an iterator that can be used to get the list of roles this user belongs to.
          */
-        const RoleNameIterator getRoles() const;
-
-        /**
-         * Returns an iterator that can be used to get the list of roles this user can delegate.
-         */
-        const RoleNameIterator getDelegatableRoles() const;
-
-        /**
-         * Returns whether or not this user is allowed to delegate the given role.
-         */
-        bool canDelegateRole(const RoleName& role) const;
+        const RoleDataMap& getRoles() const;
 
         /**
          * Returns the CredentialData for this user.
@@ -173,8 +171,8 @@ namespace mongo {
         // Maps resource name to privilege on that resource
         ResourcePrivilegeMap _privileges;
 
-        unordered_set<RoleName> _roles; // Roles the user actually has privileges from
-        unordered_set<RoleName> _delegatableRoles; // Roles the user is allowed to delegate
+        // Roles the user has privileges from and/or can delegate
+        RoleDataMap _roles;
 
         CredentialData _credentials;
 

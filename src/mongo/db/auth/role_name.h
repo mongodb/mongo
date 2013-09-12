@@ -61,6 +61,8 @@ namespace mongo {
          */
         StringData getDB() const { return StringData(_fullName).substr(_splitPoint + 1); }
 
+        bool empty() const { return _fullName.empty(); }
+
         /**
          * Gets the full name of a role as a string, formatted as "role@db".
          *
