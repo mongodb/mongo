@@ -824,7 +824,7 @@ int main(int argc, char **argv)
 	CONFIG cfg;
 	WT_CONNECTION *conn;
 	WT_SESSION *parse_session;
-	pthread_t checkpoint, stat;
+	pthread_t checkpoint_thread, stat_thread;
 	uint64_t req_len;
 	int ch, checkpoint_created, ret, stat_created;
 	const char *user_cconfig, *user_tconfig;
@@ -1014,7 +1014,7 @@ int main(int argc, char **argv)
 	g_util_running = 1;
 	if (cfg.stat_interval != 0) {
 		if ((ret = pthread_create(
-		    &stat, NULL, stat_worker, &cfg)) != 0) {
+		    &stat_thread, NULL, stat_worker, &cfg)) != 0) {
 			lprintf(&cfg, ret, 0,
 			    "Error creating statistics thread.");
 			goto err;
@@ -1023,7 +1023,7 @@ int main(int argc, char **argv)
 	}
 	if (cfg.checkpoint_interval != 0) {
 		if ((ret = pthread_create(
-		    &checkpoint, NULL, checkpoint_worker, &cfg)) != 0) {
+		    &checkpoint_thread, NULL, checkpoint_worker, &cfg)) != 0) {
 			lprintf(&cfg, ret, 0,
 			    "Error creating checkpoint thread.");
 			goto err;
@@ -1062,9 +1062,9 @@ err:	g_util_running = 0;
 	if (parse_session != NULL)
 		parse_session->close(parse_session, NULL);
 	if (checkpoint_created != 0 &&
-	    (ret = pthread_join(checkpoint, NULL)) != 0)
+	    (ret = pthread_join(checkpoint_thread, NULL)) != 0)
 		lprintf(&cfg, ret, 0, "Error joining checkpoint thread.");
-	if (stat_created != 0 && (ret = pthread_join(stat, NULL)) != 0)
+	if (stat_created != 0 && (ret = pthread_join(stat_thread, NULL)) != 0)
 		lprintf(&cfg, ret, 0, "Error joining stat thread.");
 	if (conn != NULL && (ret = conn->close(conn, NULL)) != 0)
 		lprintf(&cfg, ret, 0,
