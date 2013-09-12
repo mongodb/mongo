@@ -177,22 +177,30 @@ namespace mongo {
             
             if( *name == '$' ) {
                 name++;
-                if ( strcmp( "explain" , name ) == 0 )
+                if ( strcmp( "explain" , name ) == 0 ) {
                     _explain = e.trueValue();
-                else if ( strcmp( "snapshot" , name ) == 0 )
+                }
+                else if ( strcmp( "snapshot" , name ) == 0 ) {
                     _snapshot = e.trueValue();
-                else if ( strcmp( "min" , name ) == 0 )
+                }
+                else if ( strcmp( "min" , name ) == 0 ) {
                     _min = e.embeddedObject();
-                else if ( strcmp( "max" , name ) == 0 )
+                }
+                else if ( strcmp( "max" , name ) == 0 ) {
                     _max = e.embeddedObject();
-                else if ( strcmp( "hint" , name ) == 0 )
+                }
+                else if ( strcmp( "hint" , name ) == 0 ) {
                     _hint = e.wrap();
-                else if ( strcmp( "returnKey" , name ) == 0 )
+                }
+                else if ( strcmp( "returnKey" , name ) == 0 ) {
                     _returnKey = e.trueValue();
-                else if ( strcmp( "maxScan" , name ) == 0 )
+                }
+                else if ( strcmp( "maxScan" , name ) == 0 ) {
                     _maxScan = e.numberInt();
-                else if ( strcmp( "showDiskLoc" , name ) == 0 )
+                }
+                else if ( strcmp( "showDiskLoc" , name ) == 0 ) {
                     _showDiskLoc = e.trueValue();
+                }
                 else if ( strcmp( "comment" , name ) == 0 ) {
                     ; // no-op
                 }
