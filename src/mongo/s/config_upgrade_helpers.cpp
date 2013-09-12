@@ -29,13 +29,18 @@
 #include "mongo/s/config_upgrade_helpers.h"
 
 #include "mongo/client/connpool.h"
+#include "mongo/db/field_parser.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/s/cluster_client_internal.h"
+#include "mongo/s/type_config_version.h"
 #include "mongo/util/timer.h"
 
 namespace mongo {
 
     using mongoutils::str::stream;
+
+    // Custom field used in upgrade state to determine if/where we failed on last upgrade
+    const BSONField<bool> inCriticalSectionField("inCriticalSection", false);
 
     Status checkIdsTheSame(const ConnectionString& configLoc, const string& nsA, const string& nsB)
     {
@@ -369,4 +374,37 @@ namespace mongo {
     string genBackupSuffix(const OID& lastUpgradeId) {
         return "-backup-" + lastUpgradeId.toString();
     }
+
+    Status preUpgradeCheck(const ConnectionString& configServer,
+                           const VersionType& lastVersionInfo,
+                           string minMongosVersion) {
+        if (lastVersionInfo.isUpgradeIdSet() && lastVersionInfo.getUpgradeId().isSet()) {
+            //
+            // Another upgrade failed, so cleanup may be necessary
+            //
+
+            BSONObj lastUpgradeState = lastVersionInfo.getUpgradeState();
+
+            bool inCriticalSection;
+            string errMsg;
+            if (!FieldParser::extract(lastUpgradeState,
+                                      inCriticalSectionField,
+                                      &inCriticalSection,
+                                      &errMsg)) {
+                return Status(ErrorCodes::FailedToParse, causedBy(errMsg));
+            }
+
+            if (inCriticalSection) {
+                // Note: custom message must be supplied by caller
+                return Status(ErrorCodes::ManualInterventionRequired, "");
+            }
+        }
+
+        //
+        // Check the versions of other mongo processes in the cluster before upgrade.
+        // We can't upgrade if there are active pre-v2.4 processes in the cluster
+        //
+        return checkClusterMongoVersions(configServer, string(minMongosVersion));
+    }
+
 }

@@ -95,7 +95,30 @@ namespace mongo {
          * + Mongos pings include a "configVersion" field indicating the current config version
          * + Mongos explicitly ignores any collection with a "primary" field
          */
-        UpgradeHistory_MandatoryEpochVersion = 4
+        UpgradeHistory_MandatoryEpochVersion = 4,
+
+        /**
+         * Version upgrade with the following changes:
+         *
+         * Semantic changes:
+         * + Dropping a collection from mongos now waits for the chunks to be removed from the
+         *   config server before contacting each shard.
+         * + Version epoch comparison is now strict. OID(000...) is no longer a "wildcard" that
+         *   matches everything. (TODO)
+         * + config.collections lastmod now displays the timestamp correctly.
+         * + initShardVersion can now return isMaster output, which contains remote version
+         *   information. (TODO)
+         *
+         * Syntax:
+         * + Replaced lastModEpoch with epoch in config.collections. (TODO)
+         * + Deprecated version field in config.versions. (TODO)
+         * + Deprecated "name" and "sharded" fields in config.databases. (TODO)
+         * + Added additional info to changelog entries for migration.
+         * + Added an optional "draining" field to config.databases and config.collections. (TODO)
+         * + Added "host" field to config.locks.
+         * + Added an optional "pending" to config.chunks.
+         */
+        UpgradeHistory_StrictEpochVersion = 5
     };
 
     //
@@ -104,10 +127,10 @@ namespace mongo {
     //
 
     // Earliest version we're compatible with
-    const int MIN_COMPATIBLE_CONFIG_VERSION = UpgradeHistory_NoEpochVersion;
+    const int MIN_COMPATIBLE_CONFIG_VERSION = UpgradeHistory_MandatoryEpochVersion;
 
     // Latest version we know how to communicate with
-    const int CURRENT_CONFIG_VERSION = UpgradeHistory_MandatoryEpochVersion;
+    const int CURRENT_CONFIG_VERSION = UpgradeHistory_StrictEpochVersion;
 
     //
     // DECLARATION OF UPGRADE FUNCTIONALITY
@@ -115,11 +138,11 @@ namespace mongo {
     // config_upgrade.cpp::createRegistry()
     //
 
-    bool doUpgradeV0ToV4(const ConnectionString& configLoc,
+    bool doUpgradeV0ToV5(const ConnectionString& configLoc,
                          const VersionType& lastVersionInfo,
                          string* errMsg);
 
-    bool doUpgradeV3ToV4(const ConnectionString& configLoc,
+    bool doUpgradeV4ToV5(const ConnectionString& configLoc,
                          const VersionType& lastVersionInfo,
                          string* errMsg);
 

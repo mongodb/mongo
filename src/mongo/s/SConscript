@@ -89,8 +89,8 @@ env.CppUnitTest('type_tags_test', 'type_tags_test.cpp',
 env.Library('upgrade', ['cluster_client_internal.cpp',
                         'config_upgrade.cpp',
                         'config_upgrade_helpers.cpp',
-                        'config_upgrade_v0_to_v4.cpp',
-                        'config_upgrade_v3_to_v4.cpp'],
+                        'config_upgrade_v0_to_v5.cpp',
+                        'config_upgrade_v4_to_v5.cpp'],
             LIBDEPS=['base',
                      '$BUILD_DIR/mongo/mongocommon'])
 

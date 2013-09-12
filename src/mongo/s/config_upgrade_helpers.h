@@ -39,6 +39,8 @@
 
 namespace mongo {
 
+    class VersionType;
+
     /**
      * Verifies that two collections contain documents with the same _ids.
      *
@@ -89,5 +91,17 @@ namespace mongo {
      * Creates a suffix for an upgrade's backup collection
      */
     string genBackupSuffix(const OID& lastUpgradeId);
+
+    /**
+     * Checks whether an unsuccessful upgrade was performed last time and also checks whether
+     * the mongos in the current cluster have the mimimum version required. Returns not ok if
+     * the check failed and the upgrade should not proceed.
+     *
+     * Note: There is also a special case for ManualInterventionRequired error where the
+     * message will be empty.
+     */
+    Status preUpgradeCheck(const ConnectionString& configServer,
+                           const VersionType& lastVersionInfo,
+                           std::string minMongosVersion);
 
 }
