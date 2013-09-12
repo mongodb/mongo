@@ -110,10 +110,15 @@ __cursor_enter(WT_CURSOR_BTREE *cbt)
 static inline int
 __cursor_func_init(WT_CURSOR_BTREE *cbt, int reenter)
 {
+	WT_SESSION_IMPL *session;
+
+	session = (WT_SESSION_IMPL *)cbt->iface.session;
+
 	if (reenter)
 		WT_RET(__cursor_leave(cbt));
 	if (!F_ISSET(cbt, WT_CBT_ACTIVE))
 		__cursor_enter(cbt);
+	__wt_txn_cursor_op(session);
 	return (0);
 }
 
