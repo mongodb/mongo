@@ -86,7 +86,7 @@ struct __wt_lsm_tree {
 	uint64_t dsk_gen;
 
 	long throttle_sleep;		/* Rate limiting */
-	long chunk_fill_ms;		/* Estimate of time to fill a chunk */
+	uint64_t chunk_fill_ms;		/* Estimate of time to fill a chunk */
 
 	/* Configuration parameters */
 	uint32_t bloom_bit_count;

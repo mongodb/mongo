@@ -68,16 +68,18 @@ __wt_lsm_merge_worker(void *vargs)
 	WT_LSM_TREE *lsm_tree;
 	WT_SESSION_IMPL *session;
 	uint64_t saved_gen;
-	u_int id;
-	int aggressive, passive, progress, stallms;
+	u_int id, stallms;
+	int aggressive, passive, progress;
 
 	args = vargs;
 	lsm_tree = args->lsm_tree;
 	id = args->id;
 	session = lsm_tree->worker_sessions[id];
 	__wt_free(session, args);
-	aggressive = stallms = 0;
+
 	saved_gen = lsm_tree->dsk_gen;
+	aggressive = 0;
+	stallms = 0;
 
 	while (F_ISSET(lsm_tree, WT_LSM_TREE_WORKING)) {
 		progress = 0;
@@ -101,7 +103,8 @@ __wt_lsm_merge_worker(void *vargs)
 			progress = 1;
 
 		if (progress || saved_gen != lsm_tree->dsk_gen) {
-			aggressive = stallms = 0;
+			aggressive = 0;
+			stallms = 0;
 			saved_gen = lsm_tree->dsk_gen;
 		} else if (F_ISSET(lsm_tree, WT_LSM_TREE_WORKING)) {
 			/*
@@ -127,7 +130,7 @@ __wt_lsm_merge_worker(void *vargs)
 			if (passive && aggressive)
 				WT_VERBOSE_ERR(session, lsm,
 				     "LSM merge got aggressive, "
-				     "%d / %" PRIu64,
+				     "%u / %" PRIu64,
 				     stallms, lsm_tree->chunk_fill_ms);
 		}
 	}

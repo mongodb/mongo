@@ -618,8 +618,8 @@ __lsm_tree_throttle(
 	 */
 	if (in_memory > 1)
 		lsm_tree->chunk_fill_ms = (3 * lsm_tree->chunk_fill_ms +
-		    (long)(WT_TIMEDIFF(chunk->create_ts, (*cp)->create_ts) /
-			(uint64_t)1000000)) / (3 + in_memory - 1);
+		    WT_TIMEDIFF(chunk->create_ts, (*cp)->create_ts) / 1000000) /
+		    (3 + in_memory - 1);
 }
 
 /*
