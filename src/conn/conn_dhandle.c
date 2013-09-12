@@ -520,7 +520,7 @@ __wt_conn_btree_apply_single(WT_SESSION_IMPL *session,
 			 * handle requested wasn't for a bulk-load file, it's
 			 * all gone pear-shaped.
 			 */
-			if (F_ISSET(S2BT(session),
+			if (F_ISSET((WT_BTREE *)(dhandle->handle),
 			    WT_BTREE_SPECIAL_FLAGS) == WT_BTREE_BULK) {
 				session->dhandle = dhandle;
 				WT_ERR(func(session, cfg));
