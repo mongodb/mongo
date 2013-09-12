@@ -29,6 +29,7 @@
 #pragma once
 
 #include <boost/function.hpp>
+#include <boost/thread/mutex.hpp>
 #include <boost/scoped_ptr.hpp>
 #include <string>
 
@@ -105,6 +106,7 @@ namespace mongo {
                                  BSONObj* result);
 
     private:
+        boost::mutex _distLockGuard; // Guards access to _authzDataUpdateLock
         scoped_ptr<ScopedDistributedLock> _authzDataUpdateLock;
     };
 

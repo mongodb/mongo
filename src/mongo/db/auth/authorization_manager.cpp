@@ -38,6 +38,7 @@
 #include "mongo/base/init.h"
 #include "mongo/base/status.h"
 #include "mongo/db/auth/action_set.h"
+#include "mongo/db/auth/authz_documents_update_guard.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/privilege_document_parser.h"
 #include "mongo/db/auth/role_graph.h"
@@ -426,48 +427,12 @@ namespace mongo {
         return Status::OK();
     }
 
-
-    AuthorizationManager::Guard::Guard(AuthorizationManager* authzManager)
-        : _authzManager(authzManager),
-          _lockedForUpdate(false),
-          _authzManagerLock(authzManager->_lock) {}
-
-    AuthorizationManager::Guard::~Guard() {
-        if (_lockedForUpdate) {
-            if (!_authzManagerLock.owns_lock()) {
-                _authzManagerLock.lock();
-            }
-            releaseAuthzUpdateLock();
-        }
+    bool AuthorizationManager::tryAcquireAuthzUpdateLock(const StringData& why) {
+        return _externalState->tryAcquireAuthzUpdateLock(why);
     }
 
-    bool AuthorizationManager::Guard::tryAcquireAuthzUpdateLock(const StringData& why) {
-        fassert(17111, !_lockedForUpdate);
-        fassert(17126, _authzManagerLock.owns_lock());
-        _lockedForUpdate = _authzManager->_externalState->tryAcquireAuthzUpdateLock(why);
-        return _lockedForUpdate;
-    }
-
-    void AuthorizationManager::Guard::releaseAuthzUpdateLock() {
-        fassert(17112, _lockedForUpdate);
-        fassert(17127, _authzManagerLock.owns_lock());
-        _authzManager->_externalState->releaseAuthzUpdateLock();
-        _lockedForUpdate = false;
-    }
-
-    void AuthorizationManager::Guard::acquireAuthorizationManagerLock() {
-        fassert(17129, !_authzManagerLock.owns_lock());
-        _authzManagerLock.lock();
-    }
-
-    void AuthorizationManager::Guard::releaseAuthorizationManagerLock() {
-        fassert(17128, _authzManagerLock.owns_lock());
-        _authzManagerLock.unlock();
-    }
-
-    Status AuthorizationManager::Guard::acquireUser(const UserName& userName, User** acquiredUser) {
-        fassert(17130, _authzManagerLock.owns_lock());
-        return _authzManager->_acquireUser_inlock(userName, acquiredUser);
+    void AuthorizationManager::releaseAuthzUpdateLock() {
+        return _externalState->releaseAuthzUpdateLock();
     }
 
     namespace {
@@ -528,8 +493,8 @@ namespace mongo {
     }  // namespace
 
     Status AuthorizationManager::upgradeAuthCollections() {
-        AuthorizationManager::Guard lkUpgrade(this);
-        if (!lkUpgrade.tryAcquireAuthzUpdateLock("Upgrade authorization data")) {
+        AuthzDocumentsUpdateGuard lkUpgrade(this);
+        if (!lkUpgrade.tryLock("Upgrade authorization data")) {
             return Status(ErrorCodes::LockBusy, "Could not lock auth data upgrade process lock.");
         }
         int durableVersion = 0;
@@ -591,6 +556,8 @@ namespace mongo {
                 );
         if (!status.isOK())
             return status;
+
+        boost::lock_guard<boost::mutex> lkLocal(_lock);
         for (unordered_map<UserName, User*>::const_iterator iter = _userCache.begin();
              iter != _userCache.end(); ++iter) {
 
