@@ -49,6 +49,13 @@ namespace mongo {
                            const BSONObj& sort,
                            LiteParsedQuery** out);
 
+        /**
+         * Helper function to parse a "maxTimeMS" BSONElement.  Returns the contained value, or an
+         * error on parsing fail.  When passed an EOO-type element, returns 0 (special value for
+         * "allow to run indefinitely").
+         */
+        static StatusWith<int> parseMaxTimeMS(const BSONElement& maxTimeMSElt);
+
         const string& ns() const { return _ns; }
         bool isLocalDB() const { return _ns.compare(0, 6, "local.") == 0; }
 

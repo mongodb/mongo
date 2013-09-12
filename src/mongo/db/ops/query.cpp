@@ -1024,7 +1024,6 @@ namespace mongo {
         curop.debug().ntoreturn = pq.getNumToReturn();
         curop.debug().query = jsobj;
         curop.setQuery(jsobj);
-        curop.setMaxTimeMicros(static_cast<unsigned long long>(pq.getMaxTimeMS()) * 1000);
 
         const NamespaceString nsString( ns );
         uassert( 16256, str::stream() << "Invalid ns [" << ns << "]", nsString.isValid() );
@@ -1082,6 +1081,9 @@ namespace mongo {
             // TODO: Copy prequel curop debugging into runNewQuery
             return newRunQuery(m, q, curop, result);
         }
+
+        // Handle query option $maxTimeMS (not used with commands).
+        curop.setMaxTimeMicros(static_cast<unsigned long long>(pq.getMaxTimeMS()) * 1000);
 
         // Run a simple id query.
         if ( ! (explain || pq.showDiskLoc()) && isSimpleIdQuery( query ) && !pq.hasOption( QueryOption_CursorTailable ) ) {
