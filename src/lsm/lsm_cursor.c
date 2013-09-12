@@ -680,17 +680,28 @@ err:	API_END(session);
 /*
  * __clsm_reset_cursors --
  *	Reset any positioned chunk cursors.
+ *
+ *	If the skip parameter is non-NULL, that cursor is about to be used, so
+ *	there is no need to reset it.
  */
 static int
-__clsm_reset_cursors(WT_CURSOR_LSM *clsm)
+__clsm_reset_cursors(WT_CURSOR_LSM *clsm, WT_CURSOR *skip)
 {
 	WT_CURSOR *c;
 	WT_DECL_RET;
 	u_int i;
 
-	WT_FORALL_CURSORS(clsm, c, i)
+	/* Fast path if the cursor is not positioned. */
+	if ((clsm->current == NULL || clsm->current == skip) &&
+	    !F_ISSET(clsm, WT_CLSM_ITERATE_NEXT | WT_CLSM_ITERATE_PREV))
+		return (0);
+
+	WT_FORALL_CURSORS(clsm, c, i) {
+		if (c == skip)
+			continue;
 		if (F_ISSET(c, WT_CURSTD_KEY_SET))
 			WT_TRET(c->reset(c));
+	}
 
 	clsm->current = NULL;
 	F_CLR(clsm, WT_CLSM_ITERATE_NEXT | WT_CLSM_ITERATE_PREV);
@@ -715,7 +726,7 @@ __clsm_reset(WT_CURSOR *cursor)
 	 */
 	clsm = (WT_CURSOR_LSM *)cursor;
 	CURSOR_API_CALL(cursor, session, reset, NULL);
-	ret = __clsm_reset_cursors(clsm);
+	ret = __clsm_reset_cursors(clsm, NULL);
 	F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 
 err:	API_END(session);
@@ -745,7 +756,7 @@ __clsm_search(WT_CURSOR *cursor)
 	F_CLR(clsm, WT_CLSM_ITERATE_NEXT | WT_CLSM_ITERATE_PREV);
 
 	/* Reset any positioned cursor(s) to release pinned resources. */
-	WT_ERR(__clsm_reset_cursors(clsm));
+	WT_ERR(__clsm_reset_cursors(clsm, NULL));
 
 	WT_FORALL_CURSORS(clsm, c, i) {
 		/* If there is a Bloom filter, see if we can skip the read. */
@@ -822,7 +833,7 @@ __clsm_search_near(WT_CURSOR *cursor, int *exactp)
 	F_CLR(clsm, WT_CLSM_ITERATE_NEXT | WT_CLSM_ITERATE_PREV);
 
 	/* Reset any positioned cursor(s) to release pinned resources. */
-	WT_ERR(__clsm_reset_cursors(clsm));
+	WT_ERR(__clsm_reset_cursors(clsm, NULL));
 
 	/*
 	 * search_near is somewhat fiddly: we can't just return a nearby key
@@ -981,9 +992,14 @@ __clsm_put(WT_SESSION_IMPL *session,
 	WT_ASSERT(session,
 	    TXNID_LE(session->txn.id, clsm->primary_chunk->txnid_max));
 
-	/* If necessary, set the position for future scans. */
-	WT_RET(__clsm_reset_cursors(clsm));
+	/*
+	 * Clear the existing cursor position.  Don't clear the primary cursor:
+	 * we're about to use it anyway.
+	 */
 	primary = clsm->cursors[clsm->nchunks - 1];
+	WT_RET(__clsm_reset_cursors(clsm, primary));
+
+	/* If necessary, set the position for future scans. */
 	if (position)
 		clsm->current = primary;
 
