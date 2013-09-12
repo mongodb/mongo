@@ -394,10 +394,8 @@ err:	if (ret != 0)
 		++g_threads_quit;
 	if (session != NULL)
 		session->close(session, NULL);
-	if (data_buf != NULL)
-		free(data_buf);
-	if (key_buf != NULL)
-		free(key_buf);
+	free(data_buf);
+	free(key_buf);
 }
 
 /* Retrieve an ID for the next insert operation. */
@@ -489,10 +487,8 @@ err:	if (ret != 0) {
 	}
 	if (session != NULL)
 		session->close(session, NULL);
-	if (data_buf)
-		free(data_buf);
-	if (key_buf)
-		free(key_buf);
+	free(data_buf);
+	free(key_buf);
 	return (arg);
 }
 
@@ -593,8 +589,7 @@ stat_worker(void *arg)
 	}
 err:	if (session != NULL)
 		session->close(session, NULL);
-	if (stat_uri != NULL)
-		free(stat_uri);
+	free(stat_uri);
 	return (arg);
 }
 
@@ -834,7 +829,7 @@ int main(int argc, char **argv)
 	/* Setup the default configuration values. */
 	memset(&cfg, 0, sizeof(cfg));
 	config_assign(&cfg, &default_cfg);
-	cc_buf = tc_buf = NULL;
+	cc_buf = opt_home = tc_buf = NULL;
 	user_cconfig = user_tconfig = NULL;
 	conn = NULL;
 	checkpoint_created = stat_created = 0;
@@ -1069,10 +1064,9 @@ err:	g_util_running = 0;
 	if (conn != NULL && (ret = conn->close(conn, NULL)) != 0)
 		lprintf(&cfg, ret, 0,
 		    "Error closing connection to %s", cfg.home);
-	if (cc_buf != NULL)
-		free(cc_buf);
-	if (tc_buf != NULL)
-		free(tc_buf);
+	free(cc_buf);
+	free(opt_home);
+	free(tc_buf);
 	if (cfg.logf != NULL) {
 		fflush(cfg.logf);
 		fclose(cfg.logf);
@@ -1195,8 +1189,7 @@ config_opt(CONFIG *cfg, WT_CONFIG_ITEM *k, WT_CONFIG_ITEM *v)
 			snprintf(newstr, newlen,
 			    "%s,%*s", *strp, (int)v->len, v->str);
 			/* Free the old value now we've copied it. */
-			if (*strp != NULL)
-				free(*strp);
+			free(*strp);
 		}
 		*strp = newstr;
 	} else if (popt->type == STRING_TYPE) {
@@ -1207,8 +1200,7 @@ config_opt(CONFIG *cfg, WT_CONFIG_ITEM *k, WT_CONFIG_ITEM *v)
 			return (EINVAL);
 		}
 		strp = (char **)valueloc;
-		if (*strp != NULL)
-			free(*strp);
+		free(*strp);
 		newstr = malloc(v->len + 1);
 		strncpy(newstr, v->str, v->len);
 		newstr[v->len] = '\0';
@@ -1459,7 +1451,7 @@ remove_dir(const char *name)
 			    strcmp(dp->d_name, "..") == 0))
 				continue;
 			if ((newname = calloc(strlen(name) +
-			    strlen(dp->d_name) + 1, 1)) == NULL) {
+			    strlen(dp->d_name) + 2, 1)) == NULL) {
 				fprintf(stderr, "wtperf: remove: no memory\n");
 				if (ret == 0)
 					ret = ENOMEM;
@@ -1589,8 +1581,7 @@ int setup_log_file(CONFIG *cfg)
 	}
 	/* Use line buffering for the log file. */
 	(void)setvbuf(cfg->logf, NULL, _IOLBF, 0);
-	if (fname != NULL)
-		free(fname);
+	free(fname);
 	return (0);
 }
 
