@@ -29,6 +29,7 @@
 #include "mongo/db/commands/user_management_commands_parser.h"
 
 #include <string>
+#include <vector>
 
 #include "mongo/base/status.h"
 #include "mongo/bson/util/bson_extract.h"
@@ -42,6 +43,109 @@
 
 namespace mongo {
 namespace auth {
+
+    Status extractWriteConcern(const BSONObj& cmdObj, BSONObj* writeConcern) {
+        BSONElement writeConcernElement;
+        Status status = bsonExtractTypedField(cmdObj, "writeConcern", Object, &writeConcernElement);
+        if (!status.isOK()) {
+            if (status.code() == ErrorCodes::NoSuchKey) {
+                *writeConcern = BSONObj();
+                return Status::OK();
+            }
+            return status;
+        }
+        *writeConcern = writeConcernElement.Obj();
+        return Status::OK();
+    }
+
+    /**
+     * Takes a BSONArray of name,source pair documents, parses that array and returns (via the
+     * output param parsedRoleNames) a list of the role names in the input array.
+     * Also validates the input array and returns a non-OK status if there is anything wrong.
+     */
+    Status _extractRoleNamesFromBSONArray(const BSONArray rolesArray,
+                                         const std::string& dbname,
+                                         AuthorizationManager* authzManager,
+                                         std::vector<RoleName>* parsedRoleNames) {
+        for (BSONObjIterator it(rolesArray); it.more(); it.next()) {
+            BSONElement element = *it;
+            if (element.type() == String) {
+                RoleName roleName(element.String(), dbname);
+                if (!authzManager->roleExists(roleName)) {
+                    return Status(ErrorCodes::RoleNotFound,
+                                  mongoutils::str::stream() << roleName.getFullName() <<
+                                          " does not name an existing role");
+                }
+                parsedRoleNames->push_back(roleName);
+            } else if (element.type() == Object) {
+                BSONObj roleObj = element.Obj();
+
+                std::string roleNameString;
+                std::string roleSource;
+                Status status = bsonExtractStringField(roleObj, "name", &roleNameString);
+                if (!status.isOK()) {
+                    return status;
+                }
+                status = bsonExtractStringField(roleObj, "source", &roleSource);
+                if (!status.isOK()) {
+                    return status;
+                }
+
+                RoleName roleName(roleNameString, roleSource);
+                if (!authzManager->roleExists(roleName)) {
+                    return Status(ErrorCodes::RoleNotFound,
+                                  mongoutils::str::stream() << roleName.getFullName() <<
+                                          " does not name an existing role");
+                }
+                parsedRoleNames->push_back(roleName);
+            } else {
+                return Status(ErrorCodes::UnsupportedFormat,
+                              "Values in 'roles' array must be sub-documents or strings");
+            }
+        }
+        return Status::OK();
+    }
+
+    Status parseUserRoleManipulationCommand(const BSONObj& cmdObj,
+                                            const StringData& cmdName,
+                                            const std::string& dbname,
+                                            AuthorizationManager* authzManager,
+                                            UserName* parsedUserName,
+                                            vector<RoleName>* parsedRoleNames,
+                                            BSONObj* parsedWriteConcern) {
+        Status status = extractWriteConcern(cmdObj, parsedWriteConcern);
+        if (!status.isOK()) {
+            return status;
+        }
+
+        std::string userNameStr;
+        status = bsonExtractStringField(cmdObj, cmdName, &userNameStr);
+        if (!status.isOK()) {
+            return status;
+        }
+        *parsedUserName = UserName(userNameStr, dbname);
+
+        BSONElement rolesElement;
+        status = bsonExtractTypedField(cmdObj, "roles", Array, &rolesElement);
+        if (!status.isOK()) {
+            return status;
+        }
+
+        status = _extractRoleNamesFromBSONArray(BSONArray(rolesElement.Obj()),
+                                                dbname,
+                                                authzManager,
+                                                parsedRoleNames);
+        if (!status.isOK()) {
+            return status;
+        }
+
+        if (!parsedRoleNames->size()) {
+            return Status(ErrorCodes::BadValue,
+                          mongoutils::str::stream() << cmdName << " command requires a non-empty" <<
+                                  " roles array");
+        }
+        return Status::OK();
+    }
 
     /**
      * Validates that the roles array described by rolesElement is valid.

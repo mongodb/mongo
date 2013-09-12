@@ -48,6 +48,20 @@ namespace {
         }
     };
 
+    TEST_F(UserManagementCommandsParserTest, WriteConcernParsing) {
+        BSONObj writeConcern;
+        // Test no write concern provided
+        ASSERT_OK(auth::extractWriteConcern(BSONObj(), &writeConcern));
+        ASSERT(writeConcern.isEmpty());
+
+        ASSERT_OK(auth::extractWriteConcern(BSON("writeConcern" << BSON("w" << "majority" <<
+                                                                        "j" << true)),
+                                            &writeConcern));
+
+        ASSERT_EQUALS("majority", writeConcern["w"].str());
+        ASSERT_EQUALS(true, writeConcern["j"].Bool());
+    }
+
     TEST_F(UserManagementCommandsParserTest, CreateUserCommandParsing) {
         BSONArray emptyArray = BSONArrayBuilder().arr();
         BSONObj parsedUserObj;
@@ -406,6 +420,63 @@ namespace {
         ASSERT_EQUALS("admin", rolesArray[1].Obj()["source"].String());
         ASSERT_EQUALS(false, rolesArray[1].Obj()["hasRole"].Bool());
         ASSERT_EQUALS(true, rolesArray[1].Obj()["canDelegate"].Bool());
+    }
+
+    TEST_F(UserManagementCommandsParserTest, UserRoleManipulationCommandsParsing) {
+        UserName userName;
+        std::vector<RoleName> roles;
+        BSONObj writeConcern;
+
+        // Command name must match
+        ASSERT_NOT_OK(auth::parseUserRoleManipulationCommand(
+                BSON("grantRolesToUser" << "spencer" <<
+                     "roles" << BSON_ARRAY("read")),
+                "revokeRolesFromUser",
+                "test",
+                authzManager.get(),
+                &userName,
+                &roles,
+                &writeConcern));
+
+        // Roles array can't be empty
+        ASSERT_NOT_OK(auth::parseUserRoleManipulationCommand(
+                BSON("grantRolesToUser" << "spencer" <<
+                     "roles" << BSONArray()),
+                "grantRolesToUser",
+                "test",
+                authzManager.get(),
+                &userName,
+                &roles,
+                &writeConcern));
+
+        // Roles must exist
+        ASSERT_NOT_OK(auth::parseUserRoleManipulationCommand(
+                BSON("grantRolesToUser" << "spencer" <<
+                     "roles" << BSON_ARRAY("fakeRole")),
+                "grantRolesToUser",
+                "test",
+                authzManager.get(),
+                &userName,
+                &roles,
+                &writeConcern));
+
+        ASSERT_OK(auth::parseUserRoleManipulationCommand(
+                BSON("grantRolesToUser" << "spencer" <<
+                     "roles" << BSON_ARRAY("readWrite" << BSON("name" << "dbAdmin" <<
+                                                               "source" << "test2")) <<
+                     "writeConcern" << BSON("w" << 1)),
+                "grantRolesToUser",
+                "test",
+                authzManager.get(),
+                &userName,
+                &roles,
+                &writeConcern));
+
+        ASSERT_EQUALS(UserName("spencer", "test"), userName);
+        ASSERT_EQUALS(1, writeConcern["w"].numberInt());
+        ASSERT_EQUALS(2U, roles.size());
+        ASSERT_EQUALS(RoleName("readWrite", "test"), roles[0]);
+        ASSERT_EQUALS(RoleName("dbAdmin", "test2"), roles[1]);
     }
 
 }  // namespace

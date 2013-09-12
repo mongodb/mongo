@@ -27,9 +27,12 @@
 */
 
 #include <string>
+#include <vector>
 
 #include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
 #include "mongo/base/disallow_copying.h"
+#include "mongo/db/auth/role_name.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/jsobj.h"
 
@@ -38,6 +41,13 @@ namespace mongo {
     class AuthorizationManager;
 
 namespace auth {
+
+    /**
+     * Writes into *writeConcern a BSONObj describing the parameters to getLastError to use for
+     * the write confirmation.
+     * Returned *writeConcern is valid only as long as cmdObj is.
+     */
+    Status extractWriteConcern(const BSONObj& cmdObj, BSONObj* writeConcern);
 
     /**
      * Takes a command object describing an invocation of the "createUser" command on the database
@@ -62,6 +72,21 @@ namespace auth {
                                              AuthorizationManager* authzManager,
                                              BSONObj* parsedUpdateObj,
                                              UserName* parsedUserName);
+
+    /**
+     * Takes a command object describing an invocation of one of "grantRolesToUser",
+     * "revokeRolesFromUser", "grantDelegateRolesToUser", and "revokeDelegateRolesFromUser" (which
+     * command it is is specified in the "cmdName" argument), and parses out the user name of the
+     * user being modified, the roles being granted or revoked, and the write concern to use.
+     * After a successful call to this function *parsedWriteConcern is valid as long as cmdObj is.
+     */
+    Status parseUserRoleManipulationCommand(const BSONObj& cmdObj,
+                                            const StringData& cmdName,
+                                            const std::string& dbname,
+                                            AuthorizationManager* authzManager,
+                                            UserName* parsedUserName,
+                                            vector<RoleName>* parsedRoleNames,
+                                            BSONObj* parsedWriteConcern);
 
 } // namespace auth
 } // namespace mongo
