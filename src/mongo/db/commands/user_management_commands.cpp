@@ -67,6 +67,7 @@ namespace mongo {
         }
     }
 
+    // Returned *writeConcern is valid only as long as cmdObj is.
     static Status extractWriteConcern(const BSONObj cmdObj, BSONObj* writeConcern) {
         BSONElement writeConcernElement;
         Status status = bsonExtractTypedField(cmdObj, "writeConcern", Object, &writeConcernElement);
