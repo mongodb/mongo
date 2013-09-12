@@ -270,8 +270,10 @@ namespace mongo {
             // Handle internal cluster member auth, only applies to server-server connections 
             if (srvClusterId == peerClusterId) {
                 if (cmdLine.clusterAuthMode.empty() || cmdLine.clusterAuthMode == "keyfile") {
-                    return Status(ErrorCodes::AuthenticationFailed,
-                                  "X509 authentication is not allowed for cluster authentication");
+                    return Status(ErrorCodes::AuthenticationFailed, "The provided certificate " 
+                                  "can only be used for cluster authentication, not client " 
+                                  "authentication. The current configuration does not allow " 
+                                  "x.509 cluster authentication, check the --clusterAuthMode flag");
                 }
                 authorizationSession->grantInternalAuthorization();
             }
