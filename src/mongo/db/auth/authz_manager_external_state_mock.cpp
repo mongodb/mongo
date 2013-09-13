@@ -113,6 +113,22 @@ namespace mongo {
         return Status::OK();
     }
 
+    Status AuthzManagerExternalStateMock::query(
+            const NamespaceString& collectionName,
+            const BSONObj& query,
+            const boost::function<void(const BSONObj&)>& resultProcessor) {
+        std::vector<BSONObjCollection::iterator> iterVector;
+        Status status = _queryVector(collectionName, query, &iterVector);
+        if (!status.isOK()) {
+            return status;
+        }
+        for (std::vector<BSONObjCollection::iterator>::iterator it = iterVector.begin();
+                it != iterVector.end(); ++it) {
+            resultProcessor(**it);
+        }
+        return Status::OK();
+    }
+
     Status AuthzManagerExternalStateMock::insert(
             const NamespaceString& collectionName,
             const BSONObj& document,
@@ -233,6 +249,22 @@ namespace mongo {
             const NamespaceString& collectionName,
             const BSONObj& query,
             BSONObjCollection::iterator* result) {
+        std::vector<BSONObjCollection::iterator> iterVector;
+        Status status = _queryVector(collectionName, query, &iterVector);
+        if (!status.isOK()) {
+            return status;
+        }
+        if (!iterVector.size()) {
+            return Status(ErrorCodes::NoMatchingDocument, "No matching document");
+        }
+        *result = iterVector.front();
+        return Status::OK();
+    }
+
+    Status AuthzManagerExternalStateMock::_queryVector(
+            const NamespaceString& collectionName,
+            const BSONObj& query,
+            std::vector<BSONObjCollection::iterator>* result) {
 
         StatusWithMatchExpression parseResult = MatchExpressionParser::parse(query);
         if (!parseResult.isOK()) {
@@ -250,11 +282,10 @@ namespace mongo {
              ++vecIt) {
 
             if (matcher->matchesBSON(*vecIt)) {
-                *result = vecIt;
-                return Status::OK();
+                result->push_back(vecIt);
             }
         }
-        return Status(ErrorCodes::NoMatchingDocument, "No matching document");
+        return Status::OK();
     }
 
 } // namespace mongo
