@@ -179,6 +179,20 @@ namespace {
         return Status::OK();
     }
 
+    Status AuthzManagerExternalStateMongod::query(
+            const NamespaceString& collectionName,
+            const BSONObj& query,
+            const boost::function<void(const BSONObj&)>& resultProcessor) {
+        try {
+            DBDirectClient client;
+            Client::GodScope gs;
+            client.query(resultProcessor, collectionName.ns(), query);
+            return Status::OK();
+        } catch (const DBException& e) {
+            return e.toStatus();
+        }
+    }
+
     Status AuthzManagerExternalStateMongod::getAllDatabaseNames(
             std::vector<std::string>* dbnames) {
         Lock::GlobalWrite lk;

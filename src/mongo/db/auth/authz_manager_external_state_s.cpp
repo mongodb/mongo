@@ -53,7 +53,7 @@ namespace {
     AuthzManagerExternalStateMongos::~AuthzManagerExternalStateMongos() {}
 
     namespace {
-        ScopedDbConnection* getConnectionForUsersCollection(const std::string& ns) {
+        ScopedDbConnection* getConnectionForAuthzCollection(const std::string& ns) {
             //
             // Note: The connection mechanism here is *not* ideal, and should not be used elsewhere.
             // If the primary for the collection moves, this approach may throw rather than handle
@@ -71,7 +71,7 @@ namespace {
                                                       const BSONObj& query,
                                                       BSONObj* result) {
         try {
-            scoped_ptr<ScopedDbConnection> conn(getConnectionForUsersCollection(usersNamespace));
+            scoped_ptr<ScopedDbConnection> conn(getConnectionForAuthzCollection(usersNamespace));
             *result = conn->get()->findOne(usersNamespace, query).getOwned();
             conn->done();
             if (result->isEmpty()) {
@@ -83,12 +83,26 @@ namespace {
         }
     }
 
+    Status AuthzManagerExternalStateMongos::query(
+            const NamespaceString& collectionName,
+            const BSONObj& query,
+            const boost::function<void(const BSONObj&)>& resultProcessor) {
+        try {
+            scoped_ptr<ScopedDbConnection> conn(
+                    getConnectionForAuthzCollection(collectionName.ns()));
+            conn->get()->query(resultProcessor, collectionName.ns(), query);
+            return Status::OK();
+        } catch (const DBException& e) {
+            return e.toStatus();
+        }
+    }
+
     Status AuthzManagerExternalStateMongos::insertPrivilegeDocument(const string& dbname,
                                                                     const BSONObj& userObj,
                                                                     const BSONObj& writeConcern) {
         try {
             const std::string userNS = "admin.system.users";
-            scoped_ptr<ScopedDbConnection> conn(getConnectionForUsersCollection(userNS));
+            scoped_ptr<ScopedDbConnection> conn(getConnectionForAuthzCollection(userNS));
 
             conn->get()->insert(userNS, userObj);
 
@@ -121,7 +135,7 @@ namespace {
             const UserName& user, const BSONObj& updateObj, const BSONObj& writeConcern) {
         try {
             const std::string userNS = "admin.system.users";
-            scoped_ptr<ScopedDbConnection> conn(getConnectionForUsersCollection(userNS));
+            scoped_ptr<ScopedDbConnection> conn(getConnectionForAuthzCollection(userNS));
 
             conn->get()->update(
                     userNS,
@@ -161,7 +175,7 @@ namespace {
                                                                      int* numRemoved) {
         try {
             string userNS = "admin.system.users";
-            scoped_ptr<ScopedDbConnection> conn(getConnectionForUsersCollection(userNS));
+            scoped_ptr<ScopedDbConnection> conn(getConnectionForAuthzCollection(userNS));
 
             conn->get()->remove(userNS, query);
 
@@ -189,7 +203,7 @@ namespace {
             std::vector<std::string>* dbnames) {
         try {
             scoped_ptr<ScopedDbConnection> conn(
-                    getConnectionForUsersCollection(DatabaseType::ConfigNS));
+                    getConnectionForAuthzCollection(DatabaseType::ConfigNS));
             auto_ptr<DBClientCursor> c = conn->get()->query(DatabaseType::ConfigNS, Query());
 
             while (c->more()) {
@@ -212,7 +226,7 @@ namespace {
             const std::string& dbname, std::vector<BSONObj>* privDocs) {
         try {
             std::string usersNamespace = dbname + ".system.users";
-            scoped_ptr<ScopedDbConnection> conn(getConnectionForUsersCollection(usersNamespace));
+            scoped_ptr<ScopedDbConnection> conn(getConnectionForAuthzCollection(usersNamespace));
             auto_ptr<DBClientCursor> c = conn->get()->query(usersNamespace, Query());
 
             while (c->more()) {

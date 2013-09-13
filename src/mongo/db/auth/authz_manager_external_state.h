@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include <boost/function.hpp>
 #include <string>
 #include <vector>
 
@@ -103,6 +104,14 @@ namespace mongo {
         virtual Status findOne(const NamespaceString& collectionName,
                                const BSONObj& query,
                                BSONObj* result) = 0;
+
+        /**
+         * Finds all documents matching "query" in "collectionName".  For each document returned,
+         * calls the function resultProcessor on it.
+         */
+        virtual Status query(const NamespaceString& collectionName,
+                             const BSONObj& query,
+                             const boost::function<void(const BSONObj&)>& resultProcessor) = 0;
 
         /**
          * Inserts "document" into "collectionName".
