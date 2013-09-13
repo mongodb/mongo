@@ -37,8 +37,8 @@ def compare_files(self, filename1, filename2):
     bufsize = 4096
     if os.path.getsize(filename1) != os.path.getsize(filename2):
         print 'file comparison failed: ' + filename1 + ' size ' +\
-	    str(os.path.getsize(filename1)) + ' != ' + filename2 +\
-	    ' size ' + str(os.path.getsize(filename2))
+            str(os.path.getsize(filename1)) + ' != ' + filename2 +\
+            ' size ' + str(os.path.getsize(filename2))
         return False
     with open(filename1, "rb") as fp1:
         with open(filename2, "rb") as fp2:

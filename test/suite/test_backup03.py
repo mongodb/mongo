@@ -55,7 +55,7 @@ class test_backup_target(wttest.WiredTigerTestCase, suite_subprocess):
         ('table:' + pfx + '.4', complex_populate_lsm, 3),
     ]
     list = [
-        #('1', dict(big=0,list=[0])),           # Target objects individually
+        ('1', dict(big=0,list=[0])),           # Target objects individually
         #('2', dict(big=1,list=[1])),
         #('3', dict(big=2,list=[2])),
         #('4', dict(big=3,list=[3])),
