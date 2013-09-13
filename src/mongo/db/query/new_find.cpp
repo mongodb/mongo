@@ -403,6 +403,9 @@ namespace mongo {
         }
 
         // Run the query.
+        // bb is used to hold query results
+        // this buffer should contain either requested documents per query or
+        // explain information, but not both
         BufBuilder bb(32768);
         bb.skip(sizeof(QueryResult));
 
@@ -423,6 +426,10 @@ namespace mongo {
         BSONObj obj;
         Runner::RunnerState state;
 
+        // set this outside loop. we will need to use this both within loop and when deciding
+        // to fill in explain information
+        const bool isExplain = pq.isExplain();
+
         while (Runner::RUNNER_ADVANCED == (state = runner->getNext(&obj, NULL))) {
             // If we're sharded make sure that we don't return any data that hasn't been migrated
             // off of our shared yet.
@@ -434,8 +441,10 @@ namespace mongo {
                 if (!collMetadata->keyBelongsToMe(kp.extractSingleKey(obj))) { continue; }
             }
 
-            // Add result to output buffer.
-            bb.appendBuf((void*)obj.objdata(), obj.objsize());
+            // Add result to output buffer. This is unnecessary if explain info is requested
+            if (!isExplain) {
+                bb.appendBuf((void*)obj.objdata(), obj.objsize());
+            }
 
             // Count the result.
             ++numResults;
@@ -451,9 +460,10 @@ namespace mongo {
             // TODO: only one type of 2d search doesn't support this.  We need a way to pull it out
             // of CanonicalQuery. :(
             const bool supportsGetMore = true;
-            const bool isExplain = pq.isExplain();
-            if (isExplain && enoughForExplain(pq, numResults)) {
-                break;
+            if (isExplain) {
+                if (enoughForExplain(pq, numResults)) {
+                    break;
+                }
             }
             else if (!supportsGetMore && (enough(pq, numResults)
                                           || bb.len() >= MaxBytesToReturnToClientAtOnce)) {
@@ -528,6 +538,12 @@ namespace mongo {
             // If the query had a time limit, remaining time is "rolled over" to the cursor (for
             // use by future getmore ops).
             cc->setLeftoverMaxTimeMicros(curop.getRemainingMaxTimeMicros());
+        }
+
+        // append explain information to query results
+        if (isExplain) {
+            mongo::BSONObj obj = BSON("n" << numResults);
+            bb.appendBuf((void*)obj.objdata(), obj.objsize());
         }
 
         // Add the results from the query into the output buffer.
