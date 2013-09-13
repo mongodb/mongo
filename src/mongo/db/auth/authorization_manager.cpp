@@ -160,6 +160,13 @@ namespace mongo {
         return _externalState->removePrivilegeDocuments(query, writeConcern, numRemoved);
     }
 
+    Status AuthorizationManager::queryAuthzDocument(
+            const NamespaceString& collectionName,
+            const BSONObj& query,
+            const boost::function<void(const BSONObj&)>& resultProcessor) {
+        return _externalState->query(collectionName, query, resultProcessor);
+    }
+
     ActionSet AuthorizationManager::getAllUserActions() {
         return RoleGraph::getAllUserActions();
     }
