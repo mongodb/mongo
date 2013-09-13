@@ -33,7 +33,7 @@ class LogOperationType:
 		return 'WT_LOGOP_%s' % self.name.upper()
 
 optypes = [
-	LogRecordType('invalid', []),
+	LogOperationType('invalid', []),
 	LogOperationType('col_put',
 		[('uint32', 'fileid'), ('recno', 'recno'), ('item', 'value')]),
 	LogOperationType('col_remove',

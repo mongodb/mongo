@@ -376,17 +376,12 @@ __wt_txn_recover(WT_SESSION_IMPL *default_session)
 	WT_ERR(__wt_metadata_cursor(session, NULL, &r.files[0].c));
 
 	/*
-	 * XXX I want to pass WT_LOGSCAN_RECOVER so that old logs get
-	 * truncated, but we need a log file open to write checkpoints.  The
-	 * log manager rightly makes sure that no open files are being removed
-	 * during the truncate, so we either need to truncate the log before
-	 * running recovery, or we need a way to only truncate up to the first
-	 * file created by the log manager.
+	 * First, recover the metadata, starting from the checkpoint's LSN.
+	 * Pass WT_LOGSCAN_RECOVER so that old logs get truncated.
 	 */
-
-	/* First, recover the metadata, starting from the checkpoint's LSN. */
 	r.metadata_only = 1;
-	WT_ERR(__wt_log_scan(session, &start_lsn, 0, __txn_log_recover, &r));
+	WT_ERR(__wt_log_scan(
+	    session, &start_lsn, WT_LOGSCAN_RECOVER, __txn_log_recover, &r));
 
 	WT_ERR(__recovery_file_scan(&r, &start_lsn));
 
