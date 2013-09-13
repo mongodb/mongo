@@ -503,7 +503,7 @@ namespace mongo {
     /** Typically one uses the QUERY(...) macro to construct a Query object.
         Example: QUERY( "age" << 33 << "school" << "UCLA" )
     */
-#define QUERY(x) mongo::Query( BSON(x) )
+#define QUERY(x) ::mongo::Query( BSON(x) )
 
     // Useful utilities for namespaces
     /** @return the database name portion of an ns string */

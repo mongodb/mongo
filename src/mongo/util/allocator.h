@@ -36,8 +36,8 @@ namespace mongo {
         return x;
     }
 
-#define MONGO_malloc mongo::ourmalloc
-#define MONGO_realloc mongo::ourrealloc
+#define MONGO_malloc ::mongo::ourmalloc
+#define MONGO_realloc ::mongo::ourrealloc
 
 // this redefines 'malloc' to 'MONGO_malloc', etc
 #include "mongo/client/redef_macros.h"
