@@ -1,6 +1,6 @@
 # wtperf options file: medium lsm configuration
 conn_config="cache_size=1G"
-table_config="lsm_chunk_size=20MB,type=lsm"
+table_config="lsm_chunk_size=100MB,lsm_bloom_newest,type=lsm"
 icount=50000000
 report_interval=5
 stat_interval=4
