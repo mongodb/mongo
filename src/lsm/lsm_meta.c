@@ -80,9 +80,10 @@ __wt_lsm_meta_read(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 			lsm_tree->bloom_hash_count = (uint32_t)cv.val;
 		else if (WT_STRING_MATCH("lsm_chunk_size", ck.str, ck.len))
 			lsm_tree->chunk_size = (uint32_t)cv.val;
-		else if (WT_STRING_MATCH("lsm_merge_max", ck.str, ck.len))
+		else if (WT_STRING_MATCH("lsm_merge_max", ck.str, ck.len)) {
 			lsm_tree->merge_max = (uint32_t)cv.val;
-		else if (WT_STRING_MATCH("lsm_merge_threads", ck.str, ck.len))
+			lsm_tree->merge_min = lsm_tree->merge_max / 2;
+		} else if (WT_STRING_MATCH("lsm_merge_threads", ck.str, ck.len))
 			lsm_tree->merge_threads = (uint32_t)cv.val;
 		else if (WT_STRING_MATCH("last", ck.str, ck.len))
 			lsm_tree->last = (u_int)cv.val;

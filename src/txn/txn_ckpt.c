@@ -447,9 +447,11 @@ __checkpoint_worker(
 	 * the cache without bothering to write any dirty pages.
 	 */
 	if ((ret = __wt_meta_ckptlist_get(
-	    session, dhandle->name, &ckptbase)) == WT_NOTFOUND)
+	    session, dhandle->name, &ckptbase)) == WT_NOTFOUND) {
+		WT_ASSERT(session, session->dhandle->refcnt == 0);
 		return (__wt_bt_cache_op(
 		    session, NULL, WT_SYNC_DISCARD_NOWRITE));
+	}
 	WT_ERR(ret);
 
 	/* This may be a named checkpoint, check the configuration. */

@@ -86,12 +86,13 @@ struct __wt_lsm_tree {
 	uint64_t dsk_gen;
 
 	long throttle_sleep;		/* Rate limiting */
+	uint64_t chunk_fill_ms;		/* Estimate of time to fill a chunk */
 
 	/* Configuration parameters */
 	uint32_t bloom_bit_count;
 	uint32_t bloom_hash_count;
 	uint32_t chunk_size;
-	u_int merge_max;
+	u_int merge_min, merge_max;
 	u_int merge_threads;
 
 #define	WT_LSM_BLOOM_MERGED				0x00000001

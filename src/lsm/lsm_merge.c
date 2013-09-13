@@ -63,7 +63,7 @@ __wt_lsm_merge_update_tree(WT_SESSION_IMPL *session,
  */
 int
 __wt_lsm_merge(
-    WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, u_int id, int stalls)
+    WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, u_int id, int aggressive)
 {
 	WT_BLOOM *bloom;
 	WT_CURSOR *src, *dest;
@@ -73,13 +73,15 @@ __wt_lsm_merge(
 	WT_LSM_CHUNK *chunk, *youngest;
 	uint32_t generation, start_id;
 	uint64_t insert_count, record_count;
-	u_int dest_id, end_chunk, i, max_chunks, nchunks, start_chunk;
+	u_int dest_id, end_chunk, i, nchunks, start_chunk;
+	u_int max_chunks, min_chunks;
 	int create_bloom;
 	const char *cfg[3];
 
 	src = dest = NULL;
 	bloom = NULL;
 	max_chunks = lsm_tree->merge_max;
+	min_chunks = lsm_tree->merge_min;
 	create_bloom = 0;
 
 	/*
@@ -132,25 +134,21 @@ __wt_lsm_merge(
 		if (F_ISSET(chunk, WT_LSM_CHUNK_MERGING))
 			break;
 
-		/* Don't merge across more than 2 generations. */
-		if (chunk->generation >= youngest->generation + 2)
+		/*
+		 * Stay in the youngest generation in the first thread if there
+		 * are multiple threads.  If there is a single thread, wait
+		 * looking for small merges before trying a big one.
+		 */
+		if (id == 0 && chunk->generation > 0 &&
+		    (!aggressive || lsm_tree->merge_threads > 1))
 			break;
 
 		/*
-		 * If the next chunk is more than double the average size of
-		 * the chunks we have so far, stop.
+		 * If we have enough chunks for a merge and the next chunk is
+		 * in a different generation, stop.
 		 */
-		if (nchunks > 1 && chunk->count > 2 * record_count / nchunks)
-			break;
-
-		/*
-		 * Never merges across generations in the first thread if there
-		 * are multiple threads.  If there is a single thread, wait for
-		 * 30 seconds looking for small merges before trying a big one.
-		 */
-		if (id == 0 && nchunks > 0 &&
-		    chunk->generation > youngest->generation &&
-		    (lsm_tree->merge_threads > 1 || stalls < 30))
+		if (nchunks >= (id == 0 ? min_chunks : 2) &&
+		    chunk->generation > youngest->generation)
 			break;
 
 		F_SET(chunk, WT_LSM_CHUNK_MERGING);
@@ -164,11 +162,14 @@ __wt_lsm_merge(
 		}
 	}
 
+	chunk = lsm_tree->chunk[start_chunk];
+	youngest = lsm_tree->chunk[end_chunk];
 	nchunks = (end_chunk - start_chunk) + 1;
 	WT_ASSERT(session, nchunks <= max_chunks);
 
-	/* Don't do small merges. */
-	if (nchunks <= 1 || (id == 0 && nchunks < max_chunks / 2)) {
+	/* Don't do small merges or merge across more than 2 generations. */
+	if (nchunks < (id == 0 ? min_chunks : 2) ||
+	    chunk->generation > youngest->generation + 1) {
 		for (i = 0; i < nchunks; i++)
 			F_CLR(lsm_tree->chunk[start_chunk + i],
 			    WT_LSM_CHUNK_MERGING);

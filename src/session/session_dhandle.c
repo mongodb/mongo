@@ -38,9 +38,11 @@ __wt_session_lock_btree(WT_SESSION_IMPL *session, uint32_t flags)
 	WT_BTREE *btree;
 	WT_DATA_HANDLE *dhandle;
 	uint32_t special_flags;
+	int locked;
 
 	btree = S2BT(session);
 	dhandle = session->dhandle;
+	locked = 0;
 
 	/*
 	 * Special operation flags will cause the handle to be reopened.
@@ -65,11 +67,14 @@ __wt_session_lock_btree(WT_SESSION_IMPL *session, uint32_t flags)
 		if (LF_ISSET(WT_DHANDLE_LOCK_ONLY) || special_flags == 0) {
 			WT_RET(__wt_try_writelock(session, dhandle->rwlock));
 			F_SET(dhandle, WT_DHANDLE_EXCLUSIVE);
+			locked = 1;
 		}
 	} else if (F_ISSET(btree, WT_BTREE_SPECIAL_FLAGS))
 		return (EBUSY);
-	else
+	else {
 		WT_RET(__wt_readlock(session, dhandle->rwlock));
+		locked = 1;
+	}
 
 	/*
 	 * At this point, we have the requested lock -- if that is all that was
@@ -84,7 +89,7 @@ __wt_session_lock_btree(WT_SESSION_IMPL *session, uint32_t flags)
 	 * The handle needs to be opened.  If we locked the handle above,
 	 * unlock it before returning.
 	 */
-	if (!LF_ISSET(WT_DHANDLE_EXCLUSIVE) || special_flags == 0) {
+	if (locked) {
 		F_CLR(dhandle, WT_DHANDLE_EXCLUSIVE);
 		WT_RET(__wt_rwunlock(session, dhandle->rwlock));
 	}
@@ -219,7 +224,7 @@ __session_dhandle_sweep(WT_SESSION_IMPL *session)
 	while (dhandle_cache != NULL) {
 		dhandle_cache_next = TAILQ_NEXT(dhandle_cache, q);
 		dhandle = dhandle_cache->dhandle;
-		if (!F_ISSET(dhandle, WT_DHANDLE_OPEN)) {
+		if (!F_ISSET(dhandle, WT_DHANDLE_EXCLUSIVE|WT_DHANDLE_OPEN)) {
 			WT_CSTAT_INCR(session, dh_session_handles);
 			WT_TRET(__wt_session_discard_btree(
 			    session, dhandle_cache));
@@ -269,10 +274,15 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 	hash = __wt_hash_city64(uri, strlen(uri));
 	TAILQ_FOREACH(dhandle_cache, &session->dhandles, q) {
 		dhandle = dhandle_cache->dhandle;
+		/*
+		 * We check the local flag WT_DHANDLE_LOCK_ONLY in addition
+		 * to the dhandle flags.  A common caller with the flag
+		 * is from the path to discard the handle, so we ignore the
+		 * optimization to sweep in that case.
+		 */
 		if (!LF_ISSET(WT_DHANDLE_LOCK_ONLY) &&
-		    !F_ISSET(dhandle, WT_DHANDLE_EXCLUSIVE|WT_DHANDLE_OPEN) &&
-		    dead == 0)
-			dead++;
+		    !F_ISSET(dhandle, WT_DHANDLE_EXCLUSIVE|WT_DHANDLE_OPEN))
+			dead = 1;
 		if (hash != dhandle->name_hash ||
 		    strcmp(uri, dhandle->name) != 0)
 			continue;
