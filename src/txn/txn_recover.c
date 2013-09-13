@@ -383,7 +383,7 @@ __wt_txn_recover(WT_SESSION_IMPL *default_session)
 	 *
 	 * TODO: extract the snapshot from the checkpoint log record, set
 	 * up txn->snapshot and set isolation == TXN_ISO_SNAPSHOT.
-	 * 
+	 *
 	 * TODO: add a visibility check before applying commits.
 	 */
 
@@ -392,8 +392,12 @@ __wt_txn_recover(WT_SESSION_IMPL *default_session)
 	 * Pass WT_LOGSCAN_RECOVER so that old logs get truncated.
 	 */
 	r.metadata_only = 1;
+#if 0
 	WT_ERR(__wt_log_scan(
 	    session, &start_lsn, WT_LOGSCAN_RECOVER, __txn_log_recover, &r));
+#else
+	WT_ERR(__wt_log_scan(session, &start_lsn, 0, __txn_log_recover, &r));
+#endif
 
 	WT_ERR(__recovery_file_scan(&r, &start_lsn));
 
