@@ -59,7 +59,19 @@ namespace mongo {
                 continue;
             }
 
-            appendPart(StringData(&*beg, cur - beg));
+            // If cur != beg then we advanced cur in the loop above, so we have a real sequence
+            // of characters to add as a new part. Otherwise, we may be parsing something odd,
+            // like "..", and we need to add an empty StringData piece to represent the "part"
+            // in-between the dots. This also handles the case where 'beg' and 'cur' are both
+            // at 'end', which can happen if we are parsing anything with a terminal "."
+            // character. In that case, we still need to add an empty part, but we will break
+            // out of the loop below since we will not execute the guarded 'continue' and will
+            // instead reach the break statement.
+
+            if (cur != beg)
+                appendPart(StringData(&*beg, cur - beg));
+            else
+                appendPart(StringData());
 
             if (cur != end) {
                 beg = ++cur;
