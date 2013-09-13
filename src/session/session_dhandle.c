@@ -38,9 +38,11 @@ __wt_session_lock_btree(WT_SESSION_IMPL *session, uint32_t flags)
 	WT_BTREE *btree;
 	WT_DATA_HANDLE *dhandle;
 	uint32_t special_flags;
+	int locked;
 
 	btree = S2BT(session);
 	dhandle = session->dhandle;
+	locked = 0;
 
 	/*
 	 * Special operation flags will cause the handle to be reopened.
@@ -65,11 +67,14 @@ __wt_session_lock_btree(WT_SESSION_IMPL *session, uint32_t flags)
 		if (LF_ISSET(WT_DHANDLE_LOCK_ONLY) || special_flags == 0) {
 			WT_RET(__wt_try_writelock(session, dhandle->rwlock));
 			F_SET(dhandle, WT_DHANDLE_EXCLUSIVE);
+			locked = 1;
 		}
 	} else if (F_ISSET(btree, WT_BTREE_SPECIAL_FLAGS))
 		return (EBUSY);
-	else
+	else {
 		WT_RET(__wt_readlock(session, dhandle->rwlock));
+		locked = 1;
+	}
 
 	/*
 	 * At this point, we have the requested lock -- if that is all that was
@@ -84,7 +89,7 @@ __wt_session_lock_btree(WT_SESSION_IMPL *session, uint32_t flags)
 	 * The handle needs to be opened.  If we locked the handle above,
 	 * unlock it before returning.
 	 */
-	if (!LF_ISSET(WT_DHANDLE_EXCLUSIVE) || special_flags == 0) {
+	if (locked) {
 		F_CLR(dhandle, WT_DHANDLE_EXCLUSIVE);
 		WT_RET(__wt_rwunlock(session, dhandle->rwlock));
 	}
