@@ -497,6 +497,12 @@ namespace mongo {
         // SSL_OP_NO_SSLv2 - Disable SSL v2 support 
         SSL_CTX_set_options(*context, SSL_OP_ALL|SSL_OP_NO_SSLv2);
 
+        // HIGH - Enable strong ciphers
+        // !EXPORT - Disable export ciphers (40/56 bit) 
+        // !aNULL - Disable anonymous auth ciphers
+        // @STRENGTH - Sort ciphers based on strength 
+        SSL_CTX_set_cipher_list(*context, "HIGH:!EXPORT:!aNULL@STRENGTH");
+
         // If renegotiation is needed, don't return from recv() or send() until it's successful.
         // Note: this is for blocking sockets only.
         SSL_CTX_set_mode(*context, SSL_MODE_AUTO_RETRY);
