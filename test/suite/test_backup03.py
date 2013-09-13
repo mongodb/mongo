@@ -48,18 +48,18 @@ class test_backup_target(wttest.WiredTigerTestCase, suite_subprocess):
     # we do a hot backup of one or more of the objects and compare the original
     # to the backup to confirm the backup is correct.
     pfx = 'test_backup'
-    objs = [				# Objects
+    objs = [                            # Objects
         ('table:' + pfx + '.1',  simple_populate, 0),
         (  'lsm:' + pfx + '.2',  simple_populate, 1),
         ('table:' + pfx + '.3', complex_populate, 2),
         ('table:' + pfx + '.4', complex_populate_lsm, 3),
     ]
     list = [
-        #('1', dict(big=0,list=[0])),		# Target objects individually
+        #('1', dict(big=0,list=[0])),           # Target objects individually
         #('2', dict(big=1,list=[1])),
         #('3', dict(big=2,list=[2])),
         #('4', dict(big=3,list=[3])),
-        #('5a', dict(big=0,list=[0,2])),	# Target groups of objects
+        #('5a', dict(big=0,list=[0,2])),        # Target groups of objects
         #('5b', dict(big=2,list=[0,2])),
         #('6a', dict(big=1,list=[1,3])),
         #('6b', dict(big=3,list=[1,3])),
@@ -77,10 +77,10 @@ class test_backup_target(wttest.WiredTigerTestCase, suite_subprocess):
     # Populate a set of objects.
     def populate(self):
         for i in self.objs:
-	    if self.big == i[2]:
-		rows = 500000		# Big object
-	    else:
-		rows = 1000		# Small object
+            if self.big == i[2]:
+                rows = 500000           # Big object
+            else:
+                rows = 1000             # Small object
             i[1](self, i[0], 'key_format=S', rows)
         # Backup needs a checkpoint
         self.session.checkpoint(None)
@@ -89,7 +89,7 @@ class test_backup_target(wttest.WiredTigerTestCase, suite_subprocess):
     def compare(self, uri):
         self.runWt(['dump', uri], outfilename='orig')
         self.runWt(['-h', self.dir, 'dump', uri], outfilename='backup')
-        compare_files(self, 'orig', 'backup')
+        self.assertEqual(True, compare_files(self, 'orig', 'backup'))
 
     # Check that a URI doesn't exist, both the meta-data and the file names.
     def confirmPathDoesNotExist(self, uri):
