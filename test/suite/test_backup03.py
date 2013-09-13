@@ -25,11 +25,9 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import glob
-import os
-import shutil
-import string
+import glob, os, shutil, string
 from suite_subprocess import suite_subprocess
+from wtscenario import multiply_scenarios, number_scenarios
 import wiredtiger, wttest
 from helper import compare_files,\
     complex_populate, complex_populate_lsm, simple_populate
@@ -37,16 +35,28 @@ from helper import compare_files,\
 # test_backup03.py
 #    Utilities: wt backup
 # Test cursor backup with target URIs
-class test_backup(wttest.WiredTigerTestCase, suite_subprocess):
-    dir='backup.dir'            # Backup directory name
+class test_backup_target(wttest.WiredTigerTestCase, suite_subprocess):
+    dir='backup.dir'                    # Backup directory name
 
     pfx = 'test_backup'
     objs = [
-        ('table:' + pfx + '.1',  simple_populate, 100),
-        ('lsm:' + pfx + '.2',  simple_populate, 50000),
+        ('table:' + pfx + '.1',  simple_populate, 1000),
+        (  'lsm:' + pfx + '.2',  simple_populate, 50000),
         ('table:' + pfx + '.3', complex_populate, 100),
-        ('table:' + pfx + '.4', complex_populate_lsm, 100),
+        ('table:' + pfx + '.4', complex_populate_lsm, 50000),
     ]
+    list = [
+        ('1', dict(list=[0])),          # Target each object individually
+        ('2', dict(list=[1])),
+        ('3', dict(list=[2])),
+        ('4', dict(list=[3])),
+        ('5', dict(list=[0,2])),        # Target groups of objects
+        ('6', dict(list=[1,3])),
+        ('7', dict(list=[0,1,2])),
+        ('8', dict(list=[0,1,2,3]))
+    ]
+
+    scenarios = number_scenarios(multiply_scenarios('.', list))
 
     # Populate a set of objects.
     def populate(self):
@@ -74,10 +84,9 @@ class test_backup(wttest.WiredTigerTestCase, suite_subprocess):
             'confirmPathDoesNotExist: URI exists, file name matching \"' +
             uri.split(":")[1] + '\" found')
 
-    # Backup a set of chosen tables/files using the wt backup command.
+    # Backup a set of target tables using a backup cursor.
     def backup_table_cursor(self, l):
-        # Remove any previous backup directories.
-        shutil.rmtree(self.dir, True)
+        # Create the backup directory.
         os.mkdir(self.dir)
 
         # Build the target list.
@@ -108,20 +117,10 @@ class test_backup(wttest.WiredTigerTestCase, suite_subprocess):
             if i not in l:
                 self.confirmPathDoesNotExist(self.objs[i][0])
 
-    # Test backup with targets
-    def test_targets_groups(self):
+    # Test backup with targets.
+    def test_backup_target(self):
         self.populate()
-        self.backup_table_cursor([0,2])
-        self.backup_table_cursor([1,3])
-        self.backup_table_cursor([0,1,2])
-        self.backup_table_cursor([0,1,2,3])
-
-    def test_target_individual(self):
-        self.populate()
-        self.backup_table_cursor([0])
-        self.backup_table_cursor([1])
-        self.backup_table_cursor([2])
-        self.backup_table_cursor([3])
+        self.backup_table_cursor(self.list)
 
 
 if __name__ == '__main__':
