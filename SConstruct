@@ -1213,6 +1213,7 @@ def doConfigure(myenv):
             print( "can't find boost headers" )
             Exit(1)
 
+        conf.env.Append(CPPDEFINES=[("BOOST_THREAD_VERSION", "2")])
         for b in boostLibs:
             l = "boost_" + b
             conf.FindSysLibDep(l,
