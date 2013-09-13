@@ -130,6 +130,7 @@ Kounavis
 LEX
 LF
 LNO
+LOGSCAN
 LRU
 LSB
 LSM
@@ -814,6 +815,7 @@ treplacement
 trk
 trk's
 troot
+trunc
 trywrlock
 tsalvage
 tsplit

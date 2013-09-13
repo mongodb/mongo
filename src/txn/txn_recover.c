@@ -121,7 +121,7 @@ __txn_op_apply(
 			    session, r, lsnp, fileid, 1, &stop));
 			break;
 
-		WT_ILLEGAL_VALUE(session);
+		WT_ILLEGAL_VALUE_ERR(session);
 		}
 
 		/* Set the keys. */
@@ -179,7 +179,7 @@ __txn_op_apply(
 			    session, r, lsnp, fileid, 1, &stop));
 			break;
 
-		WT_ILLEGAL_VALUE(session);
+		WT_ILLEGAL_VALUE_ERR(session);
 		}
 
 		/* Set the keys. */
@@ -195,7 +195,7 @@ __txn_op_apply(
 		WT_ERR(ret);
 		break;
 
-	WT_ILLEGAL_VALUE(session);
+	WT_ILLEGAL_VALUE_ERR(session);
 	}
 
 err:	if (ret != 0)

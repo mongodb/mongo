@@ -294,7 +294,7 @@ __log_truncate(WT_SESSION_IMPL *session, WT_LSN *lsn, uint32_t this_log)
 	 */
 	if (this_log)
 		goto err;
-	WT_RET(__wt_log_getfiles(session, &logfiles, &logcount));
+	WT_ERR(__wt_log_getfiles(session, &logfiles, &logcount));
 	for (i = 0; i < logcount; i++) {
 		WT_ERR(__wt_log_extract_lognum(session, logfiles[i], &lognum));
 		if (lognum > lsn->file && lognum < log->trunc_lsn.file) {
