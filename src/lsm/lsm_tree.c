@@ -870,6 +870,10 @@ __wt_lsm_tree_worker(WT_SESSION_IMPL *session,
 			continue;
 		WT_ERR(__wt_schema_worker(session, chunk->uri,
 		    file_func, name_func, cfg, open_flags));
+		if (name_func == __wt_backup_list_uri_append &&
+		    chunk->bloom_uri != NULL)
+			WT_ERR(__wt_schema_worker(session, chunk->bloom_uri,
+			    file_func, name_func, cfg, open_flags));
 	}
 err:	__wt_lsm_tree_release(session, lsm_tree);
 	return (ret);
