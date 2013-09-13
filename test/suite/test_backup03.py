@@ -38,22 +38,38 @@ from helper import compare_files,\
 class test_backup_target(wttest.WiredTigerTestCase, suite_subprocess):
     dir='backup.dir'                    # Backup directory name
 
+    # This test is written to test LSM hot backups: we test a simple LSM object
+    # and a complex LSM object, but we can't test them both at the same time
+    # because we need to load fast enough the merge threads catch up, and so we
+    # test the real database, not what the database might look like after the
+    # merging settles down.
+    #
+    # The way it works is we create 4 objects, only one of which is large, then
+    # we do a hot backup of one or more of the objects and compare the original
+    # to the backup to confirm the backup is correct.
     pfx = 'test_backup'
-    objs = [
-        ('table:' + pfx + '.1',  simple_populate, 1000),
-        (  'lsm:' + pfx + '.2',  simple_populate, 500000),
-        ('table:' + pfx + '.3', complex_populate, 100),
-        ('table:' + pfx + '.4', complex_populate_lsm, 500000),
+    objs = [				# Objects
+        ('table:' + pfx + '.1',  simple_populate, 0),
+        (  'lsm:' + pfx + '.2',  simple_populate, 1),
+        ('table:' + pfx + '.3', complex_populate, 2),
+        ('table:' + pfx + '.4', complex_populate_lsm, 3),
     ]
     list = [
-        ('1', dict(list=[0])),          # Target each object individually
-        ('2', dict(list=[1])),
-        ('3', dict(list=[2])),
-        ('4', dict(list=[3])),
-        ('5', dict(list=[0,2])),        # Target groups of objects
-        ('6', dict(list=[1,3])),
-        ('7', dict(list=[0,1,2])),
-        ('8', dict(list=[0,1,2,3]))
+        #('1', dict(big=0,list=[0])),		# Target objects individually
+        #('2', dict(big=1,list=[1])),
+        #('3', dict(big=2,list=[2])),
+        #('4', dict(big=3,list=[3])),
+        #('5a', dict(big=0,list=[0,2])),	# Target groups of objects
+        #('5b', dict(big=2,list=[0,2])),
+        #('6a', dict(big=1,list=[1,3])),
+        #('6b', dict(big=3,list=[1,3])),
+        #('7a', dict(big=0,list=[0,1,2])),
+        #('7b', dict(big=1,list=[0,1,2])),
+        #('7c', dict(big=2,list=[0,1,2])),
+        #('8a', dict(big=0,list=[0,1,2,3]))
+        #('8b', dict(big=1,list=[0,1,2,3]))
+        #('8c', dict(big=2,list=[0,1,2,3]))
+        #('8d', dict(big=3,list=[0,1,2,3]))
     ]
 
     scenarios = number_scenarios(multiply_scenarios('.', list))
@@ -61,7 +77,11 @@ class test_backup_target(wttest.WiredTigerTestCase, suite_subprocess):
     # Populate a set of objects.
     def populate(self):
         for i in self.objs:
-            i[1](self, i[0], 'key_format=S', i[2])
+	    if self.big == i[2]:
+		rows = 500000		# Big object
+	    else:
+		rows = 1000		# Small object
+            i[1](self, i[0], 'key_format=S', rows)
         # Backup needs a checkpoint
         self.session.checkpoint(None)
 
