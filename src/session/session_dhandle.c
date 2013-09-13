@@ -219,7 +219,7 @@ __session_dhandle_sweep(WT_SESSION_IMPL *session)
 	while (dhandle_cache != NULL) {
 		dhandle_cache_next = TAILQ_NEXT(dhandle_cache, q);
 		dhandle = dhandle_cache->dhandle;
-		if (!F_ISSET(dhandle, WT_DHANDLE_OPEN)) {
+		if (!F_ISSET(dhandle, WT_DHANDLE_EXCLUSIVE|WT_DHANDLE_OPEN)) {
 			WT_CSTAT_INCR(session, dh_session_handles);
 			WT_TRET(__wt_session_discard_btree(
 			    session, dhandle_cache));
@@ -269,10 +269,15 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 	hash = __wt_hash_city64(uri, strlen(uri));
 	TAILQ_FOREACH(dhandle_cache, &session->dhandles, q) {
 		dhandle = dhandle_cache->dhandle;
+		/*
+		 * We check the local flag WT_DHANDLE_LOCK_ONLY in addition
+		 * to the dhandle flags.  A common caller with the flag
+		 * is from the path to discard the handle, so we ignore the
+		 * optimization to sweep in that case.
+		 */
 		if (!LF_ISSET(WT_DHANDLE_LOCK_ONLY) &&
-		    !F_ISSET(dhandle, WT_DHANDLE_EXCLUSIVE|WT_DHANDLE_OPEN) &&
-		    dead == 0)
-			dead++;
+		    !F_ISSET(dhandle, WT_DHANDLE_EXCLUSIVE|WT_DHANDLE_OPEN))
+			dead = 1;
 		if (hash != dhandle->name_hash ||
 		    strcmp(uri, dhandle->name) != 0)
 			continue;
