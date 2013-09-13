@@ -115,6 +115,12 @@ struct __wt_txn {
 	/* Requested notification when transactions are resolved. */
 	WT_TXN_NOTIFY *notify;
 
+	/* Checkpoint status. */
+	WT_LSN		ckpt_lsn;
+	int		full_ckpt;
+	uint32_t	ckpt_nsnapshot;
+	WT_ITEM		*ckpt_snapshot;
+
 #define	TXN_AUTOCOMMIT	0x01
 #define	TXN_ERROR	0x02
 #define	TXN_OLDEST	0x04

@@ -79,7 +79,7 @@ int
 __wt_txn_log_commit(WT_SESSION_IMPL *session, const char *cfg[])
 {
 	WT_DECL_RET;
-	WT_ITEM *logrec;
+	WT_DECL_ITEM(logrec);
 	WT_TXN *txn;
 	WT_TXN_OP *op;
 	const char *fmt = "I";
@@ -128,20 +128,22 @@ err:	__wt_logrec_free(session, &logrec);
 }
 
 /*
- * __wt_txn_log_checkpoint --
- *	Write a log record for a checkpoint operation.
+ * __txn_log_file_sync --
+ *	Write a log record for a file sync.
  */
-int
-__wt_txn_log_checkpoint(WT_SESSION_IMPL *session, int start, WT_LSN *lsnp)
+static int
+__txn_log_file_sync(WT_SESSION_IMPL *session, uint32_t flags, WT_LSN *lsnp)
 {
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
-	WT_ITEM *logrec;
+	WT_DECL_ITEM(logrec);
 	const char *fmt = WT_UNCHECKED_STRING(ISI);
 	size_t header_size;
-	uint32_t rectype = WT_LOGREC_CHECKPOINT;
+	uint32_t rectype = WT_LOGREC_FILE_SYNC;
+	int start;
 
 	dhandle = session->dhandle;
+	start = LF_ISSET(WT_TXN_LOG_CKPT_START);
 
 	WT_RET(__wt_struct_size(
 	    session, &header_size, fmt, rectype, dhandle->name, start));
@@ -153,6 +155,92 @@ __wt_txn_log_checkpoint(WT_SESSION_IMPL *session, int start, WT_LSN *lsnp)
 	logrec->size += (uint32_t)header_size;
 
 	WT_ERR(__wt_log_write(session, logrec, lsnp, 0));
+err:	__wt_logrec_free(session, &logrec);
+	return (ret);
+}
+
+/*
+ * __wt_txn_log_checkpoint --
+ *	Write a log record for a checkpoint operation.
+ */
+int
+__wt_txn_log_checkpoint(
+    WT_SESSION_IMPL *session, int full, uint32_t flags, WT_LSN *lsnp)
+{
+	WT_DECL_RET;
+	WT_DECL_ITEM(logrec);
+	WT_LSN *ckpt_lsn;
+	WT_TXN *txn;
+	const char *fmt = WT_UNCHECKED_STRING(IIQIu);
+	uint8_t *end, *p;
+	size_t recsize;
+	uint32_t i, rectype = WT_LOGREC_CHECKPOINT;
+
+	txn = &session->txn;
+	ckpt_lsn = &txn->ckpt_lsn;
+
+	/*
+	 * If this is a file sync, log it unless there is a full checkpoint in
+	 * progress.
+	 */
+	if (!full) {
+		if (txn->full_ckpt) {
+			if (lsnp != NULL)
+				*lsnp = *ckpt_lsn;
+			return (0);
+		} else
+			return (__txn_log_file_sync(session, flags, lsnp));
+	}
+
+	switch (flags) {
+	case WT_TXN_LOG_CKPT_PREPARE:
+		txn->full_ckpt = 1;
+		*ckpt_lsn = S2C(session)->log->alloc_lsn;
+		break;
+
+	case WT_TXN_LOG_CKPT_START:
+		/* Take a copy of the transaction snapshot. */
+		txn->ckpt_nsnapshot = txn->snapshot_count;
+		recsize = txn->ckpt_nsnapshot * WT_INTPACK64_MAXSIZE;
+		WT_ERR(__wt_scr_alloc(session, recsize, &txn->ckpt_snapshot));
+		p = txn->ckpt_snapshot->mem;
+		end = p + recsize;
+		for (i = 0; i < txn->snapshot_count; i++)
+			WT_ERR(__wt_vpack_uint(
+			    &p, WT_PTRDIFF(end, p), txn->snapshot[i]));
+		break;
+
+	case WT_TXN_LOG_CKPT_STOP:
+		/*
+		 * Write the checkpoint log record and tell the logging
+		 * subsystem the checkpoint LSN.
+		 */
+		WT_ERR(__wt_struct_size(session, &recsize, fmt,
+		    rectype, ckpt_lsn->file, ckpt_lsn->offset,
+		    txn->ckpt_nsnapshot, txn->ckpt_snapshot));
+		WT_ERR(__wt_logrec_alloc(session, recsize, &logrec));
+
+		WT_ERR(__wt_struct_pack(session,
+		    (uint8_t *)logrec->data + logrec->size, recsize, fmt,
+		    rectype, ckpt_lsn->file, ckpt_lsn->offset,
+		    txn->ckpt_nsnapshot, txn->ckpt_snapshot));
+		logrec->size += (uint32_t)recsize;
+		WT_ERR(__wt_log_write(session, logrec, lsnp, 0));
+
+#if 0
+		WT_ERR(__wt_log_ckpt(session, ckpt_lsn));
+#endif
+
+		/* FALLTHROUGH */
+	case WT_TXN_LOG_CKPT_FAIL:
+		/* Cleanup any allocated resources */
+		INIT_LSN(ckpt_lsn);
+		txn->ckpt_nsnapshot = 0;
+		__wt_scr_free(&txn->ckpt_snapshot);
+		txn->full_ckpt = 0;
+		break;
+	}
+
 err:	__wt_logrec_free(session, &logrec);
 	return (ret);
 }
@@ -185,7 +273,6 @@ __wt_txn_truncate_log(
 			WT_RET(__wt_cursor_get_raw_key(&start->iface, item));
 			WT_RET(__wt_buf_set(
 			    session, item, item->data, item->size));
-			/* TODO: free this memory! */
 		}
 		if (stop != NULL) {
 			op->u.truncate_row.mode |= 0x1;
@@ -193,7 +280,6 @@ __wt_txn_truncate_log(
 			WT_RET(__wt_cursor_get_raw_key(&stop->iface, item));
 			WT_RET(__wt_buf_set(
 			    session, item, item->data, item->size));
-			/* TODO: free this memory! */
 		}
 	} else {
 		op->type = TXN_OP_TRUNCATE_COL;

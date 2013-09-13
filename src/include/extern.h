@@ -680,7 +680,7 @@ extern int __wt_curtable_open(WT_SESSION_IMPL *session,
     const char *uri,
     const char *cfg[],
     WT_CURSOR **cursorp);
-extern int __wt_log_ckpt(WT_SESSION_IMPL *session, WT_LSN ckp_lsn);
+extern int __wt_log_ckpt(WT_SESSION_IMPL *session, WT_LSN *ckp_lsn);
 extern int __wt_log_getfiles(WT_SESSION_IMPL *session,
     char ***files,
     u_int *count);
@@ -1476,8 +1476,9 @@ extern int __wt_ext_transaction_visible( WT_EXTENSION_API *wt_api,
     uint64_t transaction_id);
 extern void __wt_txn_op_free(WT_SESSION_IMPL *session, WT_TXN_OP *op);
 extern int __wt_txn_log_commit(WT_SESSION_IMPL *session, const char *cfg[]);
-extern int __wt_txn_log_checkpoint(WT_SESSION_IMPL *session,
-    int start,
+extern int __wt_txn_log_checkpoint( WT_SESSION_IMPL *session,
+    int full,
+    uint32_t flags,
     WT_LSN *lsnp);
 extern int __wt_txn_truncate_log( WT_SESSION_IMPL *session,
     WT_CURSOR_BTREE *start,

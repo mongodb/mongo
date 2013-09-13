@@ -13,14 +13,14 @@
  *	thread as needed.
  */
 int
-__wt_log_ckpt(WT_SESSION_IMPL *session, WT_LSN ckp_lsn)
+__wt_log_ckpt(WT_SESSION_IMPL *session, WT_LSN *ckp_lsn)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_LOG *log;
 
 	conn = S2C(session);
 	log = conn->log;
-	log->ckpt_lsn = ckp_lsn;
+	log->ckpt_lsn = *ckp_lsn;
 	if (conn->arch_cond != NULL)
 		WT_RET(__wt_cond_signal(session, conn->arch_cond));
 	return (0);

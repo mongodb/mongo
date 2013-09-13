@@ -19,7 +19,8 @@ class LogRecordType:
 
 rectypes = [
 	LogRecordType('invalid', []),
-	LogRecordType('checkpoint', [('uint32', 'fileid'), ('int', 'start')]),
+	LogRecordType('file_sync', [('uint32', 'fileid'), ('int', 'start')]),
+	LogRecordType('checkpoint', [('WT_LSN', 'ckpt_lsn'), ('uint32', 'nsnapshot'), ('item', 'snapshot')]),
 	LogRecordType('commit', [('uint64', 'txnid')]),
 	LogRecordType('debug', [('string', 'message')]),
 ]

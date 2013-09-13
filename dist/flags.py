@@ -19,16 +19,16 @@ flags = {
 		'FILE_TYPE_DATA',
 		'FILE_TYPE_LOG'
 	],
-        'log_scan' : [
+	'log_scan' : [
 		'LOGSCAN_FIRST',
 		'LOGSCAN_FROM_CKP',
 		'LOGSCAN_ONE',
 		'LOGSCAN_RECOVER'
-        ],
-        'log_write' : [
+	],
+	'log_write' : [
 		'LOG_DSYNC',
 		'LOG_FSYNC'
-        ],
+	],
 	'rec_write' : [
 		'EVICTION_SERVER_LOCKED',
 		'SKIP_UPDATE_ERR',
@@ -46,6 +46,12 @@ flags = {
 		'TREE_SKIP_INTL',
 		'TREE_SKIP_LEAF',
 		'TREE_WAIT',
+	],
+	'txn_log_checkpoint' : [
+		'TXN_LOG_CKPT_FAIL',
+		'TXN_LOG_CKPT_PREPARE',
+		'TXN_LOG_CKPT_START',
+		'TXN_LOG_CKPT_STOP',
 	],
 	'verbose' : [
 		'VERB_block',
