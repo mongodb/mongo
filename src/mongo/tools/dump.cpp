@@ -243,9 +243,6 @@ public:
               continue;
             }
             
-            if ( _coll != "" && db + "." + _coll != name && _coll != name )
-              continue;
-            
             collections.push_back(name);
         }
         
