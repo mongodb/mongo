@@ -706,9 +706,11 @@ inline double drem(double x, double y) {
 #define safe_vsnprintf _vsnprintf
 #define snprintf _snprintf
 
+#if _MSC_VER < 1800
 inline void va_copy(va_list& a, va_list& b) {
   a = b;
 }
+#endif
 using namespace std;
 #define isnan _isnan
 #define snprintf _snprintf

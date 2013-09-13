@@ -37,6 +37,7 @@
 #error Wrong environment, expected MSVC.
 #endif  // _MSC_VER
 
+#if _MSC_VER < 1800
 enum {
   FP_NAN,
   FP_INFINITE,
@@ -44,6 +45,7 @@ enum {
   FP_SUBNORMAL,
   FP_NORMAL
 };
+#endif // _MSC_VER < 1800
 
 namespace v8 {
 
@@ -55,7 +57,9 @@ int isnan(double x);
 int isinf(double x);
 int isless(double x, double y);
 int isgreater(double x, double y);
+#if _MSC_VER < 1800
 int fpclassify(double x);
 int signbit(double x);
+#endif // _MSC_VER < 1800
 
 #endif  // V8_WIN32_MATH_H_

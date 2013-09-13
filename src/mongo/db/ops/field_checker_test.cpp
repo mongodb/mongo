@@ -47,17 +47,17 @@ namespace {
         fieldRef.parse("");
         ASSERT_NOT_OK(isUpdatable(fieldRef));
 
-        FieldRef fieldRefDot;
-        fieldRefDot.parse(".");
-        ASSERT_NOT_OK(isUpdatable(fieldRefDot));
+//        FieldRef fieldRefDot;
+//        fieldRefDot.parse(".");
+//        ASSERT_NOT_OK(isUpdatable(fieldRefDot));
 
         FieldRef fieldRefDollar;
         fieldRefDollar.parse("$");
         ASSERT_NOT_OK(isUpdatable(fieldRefDollar));
 
-        FieldRef fieldRefADot;
-        fieldRefADot.parse("a.");
-        ASSERT_NOT_OK(isUpdatable(fieldRefADot));
+//        FieldRef fieldRefADot;
+//        fieldRefADot.parse("a.");
+//        ASSERT_NOT_OK(isUpdatable(fieldRefADot));
 
         FieldRef fieldRefDotB;
         fieldRefDotB.parse(".b");
