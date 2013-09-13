@@ -41,9 +41,9 @@ class test_backup_target(wttest.WiredTigerTestCase, suite_subprocess):
     pfx = 'test_backup'
     objs = [
         ('table:' + pfx + '.1',  simple_populate, 1000),
-        (  'lsm:' + pfx + '.2',  simple_populate, 50000),
+        (  'lsm:' + pfx + '.2',  simple_populate, 500000),
         ('table:' + pfx + '.3', complex_populate, 100),
-        ('table:' + pfx + '.4', complex_populate_lsm, 50000),
+        ('table:' + pfx + '.4', complex_populate_lsm, 500000),
     ]
     list = [
         ('1', dict(list=[0])),          # Target each object individually
