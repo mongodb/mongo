@@ -41,6 +41,9 @@ namespace mongo {
         // See "navigation state" assumptions on this class's header.
         const set<RelevantIndex>& indexes = _pm.begin()->second.relevant;
         const vector<MatchExpression*>& nodes = _pm.begin()->second.nodes;
+
+        verify(indexes.size());
+
         IndexInfo indexInfo;
         indexInfo.index = indexes.begin()->index;
         indexInfo.node = *nodes.begin();
