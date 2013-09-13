@@ -46,6 +46,17 @@ namespace {
         ASSERT_EQUALS(fieldRef.dottedField(), field);
     }
 
+    TEST(Empty, NoFieldNames2) {
+        string field = "..";
+        FieldRef fieldRef;
+        fieldRef.parse(field);
+        ASSERT_EQUALS(fieldRef.numParts(), 3U);
+        ASSERT_EQUALS(fieldRef.getPart(0), "");
+        ASSERT_EQUALS(fieldRef.getPart(1), "");
+        ASSERT_EQUALS(fieldRef.getPart(2), "");
+        ASSERT_EQUALS(fieldRef.dottedField(), field);
+    }
+
     TEST(Empty, EmptyFieldName) {
         string field = ".b.";
         FieldRef fieldRef;
