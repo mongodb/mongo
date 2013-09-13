@@ -95,6 +95,8 @@ namespace mongo {
     class CmdCreateUser : public Command {
     public:
 
+        CmdCreateUser() : Command("createUser") {}
+
         virtual bool logTheOp() {
             return false;
         }
@@ -106,8 +108,6 @@ namespace mongo {
         virtual LockType locktype() const {
             return NONE;
         }
-
-        CmdCreateUser() : Command("createUser") {}
 
         virtual void help(stringstream& ss) const {
             ss << "Adds a user to the system" << endl;
@@ -163,6 +163,8 @@ namespace mongo {
     class CmdUpdateUser : public Command {
     public:
 
+        CmdUpdateUser() : Command("updateUser") {}
+
         virtual bool logTheOp() {
             return false;
         }
@@ -174,8 +176,6 @@ namespace mongo {
         virtual LockType locktype() const {
             return NONE;
         }
-
-        CmdUpdateUser() : Command("updateUser") {}
 
         virtual void help(stringstream& ss) const {
             ss << "Used to update a user, for example to change its password" << endl;
@@ -235,6 +235,8 @@ namespace mongo {
     class CmdRemoveUser : public Command {
     public:
 
+        CmdRemoveUser() : Command("removeUser") {}
+
         virtual bool logTheOp() {
             return false;
         }
@@ -246,8 +248,6 @@ namespace mongo {
         virtual LockType locktype() const {
             return NONE;
         }
-
-        CmdRemoveUser() : Command("removeUser") {}
 
         virtual void help(stringstream& ss) const {
             ss << "Removes a single user." << endl;
@@ -312,6 +312,8 @@ namespace mongo {
     class CmdRemoveUsersFromDatabase : public Command {
     public:
 
+        CmdRemoveUsersFromDatabase() : Command("removeUsersFromDatabase") {}
+
         virtual bool logTheOp() {
             return false;
         }
@@ -323,8 +325,6 @@ namespace mongo {
         virtual LockType locktype() const {
             return NONE;
         }
-
-        CmdRemoveUsersFromDatabase() : Command("removeUsersFromDatabase") {}
 
         virtual void help(stringstream& ss) const {
             ss << "Removes all users for a single database." << endl;
@@ -374,6 +374,8 @@ namespace mongo {
     class CmdGrantRolesToUser: public Command {
     public:
 
+        CmdGrantRolesToUser() : Command("grantRolesToUser") {}
+
         virtual bool logTheOp() {
             return false;
         }
@@ -385,8 +387,6 @@ namespace mongo {
         virtual LockType locktype() const {
             return NONE;
         }
-
-        CmdGrantRolesToUser() : Command("grantRolesToUser") {}
 
         virtual void help(stringstream& ss) const {
             ss << "Grants roles to a user." << endl;
@@ -452,4 +452,266 @@ namespace mongo {
         }
 
     } CmdGrantRolesToUser;
+
+    class CmdRevokeRolesFromUser: public Command {
+    public:
+
+        CmdRevokeRolesFromUser() : Command("revokeRolesFromUser") {}
+
+        virtual bool logTheOp() {
+            return false;
+        }
+
+        virtual bool slaveOk() const {
+            return false;
+        }
+
+        virtual LockType locktype() const {
+            return NONE;
+        }
+
+        virtual void help(stringstream& ss) const {
+            ss << "Revokes roles from a user." << endl;
+        }
+
+        virtual void addRequiredPrivileges(const std::string& dbname,
+                                           const BSONObj& cmdObj,
+                                           std::vector<Privilege>* out) {
+            // TODO: update this with the new rules around user creation in 2.6.
+            ActionSet actions;
+            actions.addAction(ActionType::userAdmin);
+            out->push_back(Privilege(dbname, actions));
+        }
+
+        bool run(const string& dbname,
+                 BSONObj& cmdObj,
+                 int options,
+                 string& errmsg,
+                 BSONObjBuilder& result,
+                 bool fromRepl) {
+            UserName userName;
+            std::vector<RoleName> roles;
+            BSONObj writeConcern;
+            AuthorizationManager* authzManager = getGlobalAuthorizationManager();
+            Status status = auth::parseUserRoleManipulationCommand(cmdObj,
+                                                                   "revokeRolesFromUser",
+                                                                   dbname,
+                                                                   authzManager,
+                                                                   &userName,
+                                                                   &roles,
+                                                                   &writeConcern);
+            if (!status.isOK()) {
+                addStatus(status, result);
+                return false;
+            }
+
+            User::RoleDataMap userRoles;
+            status = getCurrentUserRoles(authzManager, userName, &userRoles);
+            if (!status.isOK()) {
+                addStatus(status, result);
+                return false;
+            }
+
+            for (vector<RoleName>::iterator it = roles.begin(); it != roles.end(); ++it) {
+                RoleName& roleName = *it;
+                User::RoleDataMap::iterator roleDataIt = userRoles.find(roleName);
+                if (roleDataIt == userRoles.end()) {
+                    continue; // User already doesn't have the role, nothing to do
+                }
+                User::RoleData& role = roleDataIt->second;
+                if (role.canDelegate) {
+                    // If the user can still delegate the role, need to leave it in the roles array
+                    role.hasRole = false;
+                } else {
+                    // If the user can't delegate the role, and now doesn't have it either, remove
+                    // the role from that user's roles array entirely
+                    userRoles.erase(roleDataIt);
+                }
+            }
+
+            BSONArray newRolesBSONArray = rolesToBSONArray(userRoles);
+            status = authzManager->updatePrivilegeDocument(
+                    userName, BSON("$set" << BSON("roles" << newRolesBSONArray)), writeConcern);
+            if (!status.isOK()) {
+                addStatus(status, result);
+                return false;
+            }
+
+            authzManager->invalidateUserByName(userName);
+            return true;
+        }
+
+    } CmdRevokeRolesFromUser;
+
+    class CmdGrantDelegateRolesToUser: public Command {
+    public:
+
+        CmdGrantDelegateRolesToUser() : Command("grantDelegateRolesToUser") {}
+
+        virtual bool logTheOp() {
+            return false;
+        }
+
+        virtual bool slaveOk() const {
+            return false;
+        }
+
+        virtual LockType locktype() const {
+            return NONE;
+        }
+
+        virtual void help(stringstream& ss) const {
+            ss << "Grants the right to delegate roles to a user." << endl;
+        }
+
+        virtual void addRequiredPrivileges(const std::string& dbname,
+                                           const BSONObj& cmdObj,
+                                           std::vector<Privilege>* out) {
+            // TODO: update this with the new rules around user creation in 2.6.
+            ActionSet actions;
+            actions.addAction(ActionType::userAdmin);
+            out->push_back(Privilege(dbname, actions));
+        }
+
+        bool run(const string& dbname,
+                 BSONObj& cmdObj,
+                 int options,
+                 string& errmsg,
+                 BSONObjBuilder& result,
+                 bool fromRepl) {
+            UserName userName;
+            std::vector<RoleName> roles;
+            BSONObj writeConcern;
+            AuthorizationManager* authzManager = getGlobalAuthorizationManager();
+            Status status = auth::parseUserRoleManipulationCommand(cmdObj,
+                                                                   "grantDelegateRolesToUser",
+                                                                   dbname,
+                                                                   authzManager,
+                                                                   &userName,
+                                                                   &roles,
+                                                                   &writeConcern);
+            if (!status.isOK()) {
+                addStatus(status, result);
+                return false;
+            }
+
+            User::RoleDataMap userRoles;
+            status = getCurrentUserRoles(authzManager, userName, &userRoles);
+            if (!status.isOK()) {
+                addStatus(status, result);
+                return false;
+            }
+
+            for (vector<RoleName>::iterator it = roles.begin(); it != roles.end(); ++it) {
+                RoleName& roleName = *it;
+                User::RoleData& role = userRoles[roleName];
+                if (role.name.empty()) {
+                    role.name = roleName;
+                }
+                role.canDelegate = true;
+            }
+
+            BSONArray newRolesBSONArray = rolesToBSONArray(userRoles);
+            status = authzManager->updatePrivilegeDocument(
+                    userName, BSON("$set" << BSON("roles" << newRolesBSONArray)), writeConcern);
+            if (!status.isOK()) {
+                addStatus(status, result);
+                return false;
+            }
+
+            authzManager->invalidateUserByName(userName);
+            return true;
+        }
+
+    } CmdGrantDelegateRolesToUser;
+
+    class CmdRevokeDelegateRolesFromUser: public Command {
+    public:
+
+        CmdRevokeDelegateRolesFromUser() : Command("revokeDelegateRolesFromUser") {}
+
+        virtual bool logTheOp() {
+            return false;
+        }
+
+        virtual bool slaveOk() const {
+            return false;
+        }
+
+        virtual LockType locktype() const {
+            return NONE;
+        }
+
+        virtual void help(stringstream& ss) const {
+            ss << "Revokes the right to delegate roles from a user." << endl;
+        }
+
+        virtual void addRequiredPrivileges(const std::string& dbname,
+                                           const BSONObj& cmdObj,
+                                           std::vector<Privilege>* out) {
+            // TODO: update this with the new rules around user creation in 2.6.
+            ActionSet actions;
+            actions.addAction(ActionType::userAdmin);
+            out->push_back(Privilege(dbname, actions));
+        }
+
+        bool run(const string& dbname,
+                 BSONObj& cmdObj,
+                 int options,
+                 string& errmsg,
+                 BSONObjBuilder& result,
+                 bool fromRepl) {
+            UserName userName;
+            std::vector<RoleName> roles;
+            BSONObj writeConcern;
+            AuthorizationManager* authzManager = getGlobalAuthorizationManager();
+            Status status = auth::parseUserRoleManipulationCommand(cmdObj,
+                                                                   "revokeDelegateRolesFromUser",
+                                                                   dbname,
+                                                                   authzManager,
+                                                                   &userName,
+                                                                   &roles,
+                                                                   &writeConcern);
+            if (!status.isOK()) {
+                addStatus(status, result);
+                return false;
+            }
+
+            User::RoleDataMap userRoles;
+            status = getCurrentUserRoles(authzManager, userName, &userRoles);
+            if (!status.isOK()) {
+                addStatus(status, result);
+                return false;
+            }
+
+            for (vector<RoleName>::iterator it = roles.begin(); it != roles.end(); ++it) {
+                RoleName& roleName = *it;
+                User::RoleDataMap::iterator roleDataIt = userRoles.find(roleName);
+                if (roleDataIt == userRoles.end()) {
+                    continue; // User already doesn't have the role, nothing to do
+                }
+                User::RoleData& role = roleDataIt->second;
+                if (role.hasRole) {
+                    // If the user still has the role, need to leave it in the roles array
+                    role.canDelegate = false;
+                } else {
+                    // If the user doesn't have the role, and now can't delegate it either, remove
+                    // the role from that user's roles array entirely
+                    userRoles.erase(roleDataIt);
+                }
+            }
+
+            BSONArray newRolesBSONArray = rolesToBSONArray(userRoles);
+            status = authzManager->updatePrivilegeDocument(
+                    userName, BSON("$set" << BSON("roles" << newRolesBSONArray)), writeConcern);
+            if (!status.isOK()) {
+                addStatus(status, result);
+                return false;
+            }
+
+            authzManager->invalidateUserByName(userName);
+            return true;
+        }
+
+    } CmdRevokeDelegateRolesFromUser;
 }
