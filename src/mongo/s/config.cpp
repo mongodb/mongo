@@ -108,8 +108,14 @@ namespace mongo {
         val.append(CollectionType::ns(), ns);
         val.appendDate(CollectionType::DEPRECATED_lastmod(), jsTime());
         val.appendBool(CollectionType::dropped(), _dropped);
-        if ( _cm )
+        if ( _cm ) {
+            // This also appends the lastmodEpoch.
             _cm->getInfo( val );
+        }
+        else {
+            // lastmodEpoch is a required field so we also need to do it here.
+            val.append(CollectionType::DEPRECATED_lastmodEpoch(), ChunkVersion::DROPPED.epoch());
+        }
 
         conn->update(CollectionType::ConfigNS, key, val.obj(), true);
         string err = conn->getLastError();

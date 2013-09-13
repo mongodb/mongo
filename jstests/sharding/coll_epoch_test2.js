@@ -71,6 +71,13 @@ jsTest.log( "Rebuilding sharded collection with different split..." )
 
 coll.drop()
 
+var droppedCollDoc = config.collections.findOne({ _id: coll.getFullName() });
+assert(droppedCollDoc != null);
+assert.eq(true, droppedCollDoc.dropped);
+assert(droppedCollDoc.lastmodEpoch != null);
+assert(droppedCollDoc.lastmodEpoch.equals(new ObjectId("000000000000000000000000")),
+       "epoch not zero: " + droppedCollDoc.lastmodEpoch);
+
 admin.runCommand({ enableSharding : coll.getDB() + "" })
 admin.runCommand({ shardCollection : coll  + "", key : { _id : 1 } })
 
