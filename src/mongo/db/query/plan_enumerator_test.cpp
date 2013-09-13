@@ -17,6 +17,7 @@
 #include "mongo/db/query/plan_enumerator.h"
 
 #include <boost/scoped_ptr.hpp>
+#include <set>
 #include <vector>
 
 #include "mongo/db/jsobj.h"
@@ -40,6 +41,7 @@ namespace {
     using mongo::PredicateMap;
     using mongo::RelevantIndex;
     using mongo::StatusWithMatchExpression;
+    using std::set;
     using std::vector;
 
     /**
@@ -67,9 +69,12 @@ namespace {
         // Build a predicate map where an index {a:1} is relevant for the node 'a' EQ 99.
         vector<BSONObj> indexKeyPatterns;
         indexKeyPatterns.push_back(fromjson("{a:1}"));
+
         scoped_ptr<PredicateMap> pm (new PredicateMap);
-        RelevantIndex ri(0, RelevantIndex::FIRST);
         PredicateInfo pred(root);
+        std::set<RelevantIndex>& relevantIndices = pred.relevant;
+        RelevantIndex ri(0, RelevantIndex::FIRST);
+        relevantIndices.insert(ri);
         pm->insert(std::make_pair("a", pred));
 
         // Check that the enumerator takes a single predicate predicate map.
