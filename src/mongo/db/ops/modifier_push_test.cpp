@@ -303,7 +303,7 @@ namespace {
         ASSERT_NOT_OK(mod.init(modObj["$push"].embeddedObject().firstElement(),
                                ModifierInterface::Options::normal()));
     }
-
+/*
     TEST(Init, PushEachWithEmptyDottedSortField) {
         const char* c = "{$push: {x: {$each: [{a:1},{a:2}], $slice: -2.0, $sort: {'.':1}}}}";
         BSONObj modObj = fromjson(c);
@@ -319,7 +319,7 @@ namespace {
         ASSERT_NOT_OK(mod.init(modObj["$push"].embeddedObject().firstElement(),
                                ModifierInterface::Options::normal()));
     }
-
+*/
     TEST(Init, PushEachWithMissingSortFieldPreffix) {
         const char* c = "{$push: {x: {$each: [{a:1},{a:2}], $slice: -2.0, $sort: {'.b':1}}}}";
         BSONObj modObj = fromjson(c);

@@ -74,6 +74,7 @@ int isgreater(double x, double y) {
   return isnan(x) || isnan(y) ? 0 : x > y;
 }
 
+#if _MSC_VER < 1800
 
 // Classify floating point number - usually defined in math.h
 int fpclassify(double x) {
@@ -103,4 +104,5 @@ int signbit(double x) {
     return x < 0;
 }
 
+#endif  // _MSC_VER < 1800
 #endif  // _MSC_VER
