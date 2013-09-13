@@ -49,22 +49,12 @@ __txn_op_log(WT_SESSION_IMPL *session, WT_ITEM *logrec, WT_TXN_OP *op)
 }
 
 static int
-__txn_op_printlog(WT_SESSION_IMPL *session, WT_ITEM *logrec, FILE *out)
+__txn_commit_printlog(
+    WT_SESSION_IMPL *session, const uint8_t **pp, const uint8_t *end, FILE *out)
 {
-	WT_UNUSED(session);
-
-	if (fprintf(out, "%.*s%s\n",
-	    (int)WT_MIN(logrec->size, 40), (const char *)logrec->data,
-	    (logrec->size > 40) ? "..."  : "") < 0)
-		return (errno);
-
-	return (0);
-}
-
-static int
-__txn_commit_printlog(WT_SESSION_IMPL *session, WT_ITEM *logrec, FILE *out)
-{
-	WT_RET(__txn_op_printlog(session, logrec, out));
+	/* The logging subsystem zero-pads records. */
+	while (*pp < end && **pp)
+		WT_RET(__wt_txn_op_printlog(session, pp, end, out));
 	return (0);
 }
 
@@ -230,34 +220,60 @@ __wt_txn_truncate_end(WT_SESSION_IMPL *session)
 }
 
 /*
- * __wt_txn_printlog --
- *	Print the log in a human-readable format.
+ * __txn_printlog --
+ *	Print a log record in a human-readable format.
  */
-int
-__wt_txn_printlog(
+static int
+__txn_printlog(
     WT_SESSION_IMPL *session, WT_ITEM *logrec, WT_LSN *lsnp, void *cookie)
 {
 	FILE *out;
 	const uint8_t *end, *p;
-	uint64_t rectype;
+	uint32_t rectype;
 
 	out = cookie;
 
 	p = (const uint8_t *)logrec->data + offsetof(WT_LOG_RECORD, record);
 	end = (const uint8_t *)logrec->data + logrec->size;
 
-	/* Every log record must start with the type. */
-	WT_RET(__wt_vunpack_uint(&p, WT_PTRDIFF(end, p), &rectype));
+	/* First, peek at the log record type. */
+	WT_RET(__wt_logrec_read(session, &p, end, &rectype));
 
-	if (fprintf(out, "[%" PRIu32 "/%" PRId64 "] type %d\n",
-	    lsnp->file, lsnp->offset, (int)rectype))
+	if (fprintf(out, "  { \"lsn\" : [%" PRIu32 ",%" PRId64 "],\n",
+	    lsnp->file, lsnp->offset) < 0 ||
+	    fprintf(out, "    \"type\" : %d,\n", (int)rectype) < 0)
 		return (errno);
 
 	switch (rectype) {
 	case WT_LOGREC_COMMIT:
-		WT_RET(__txn_commit_printlog(session, logrec, out));
+		WT_RET(__txn_commit_printlog(session, &p, end, out));
 		break;
 	}
 
+	if (fprintf(out, "  },\n") < 0)
+		return (errno);
+
 	return (0);
 }
+
+/*
+ * __wt_txn_printlog --
+ *	Print the log in a human-readable format.
+ */
+int
+__wt_txn_printlog(WT_SESSION *wt_session, FILE *out)
+{
+	WT_SESSION_IMPL *session;
+
+	session = (WT_SESSION_IMPL *)wt_session;
+
+	if (fprintf(out, "[\n") < 0)
+		return (errno);
+	WT_RET(__wt_log_scan(
+	    session, NULL, WT_LOGSCAN_FIRST, __txn_printlog, out));
+	if (fprintf(out, "]\n") < 0)
+		return (errno);
+
+	return (0);
+}
+

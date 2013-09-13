@@ -817,6 +817,10 @@ extern int __wt_logop_row_truncate_print( WT_SESSION_IMPL *session,
     const uint8_t **pp,
     const uint8_t *end,
     FILE *out);
+extern int __wt_txn_op_printlog( WT_SESSION_IMPL *session,
+    const uint8_t **pp,
+    const uint8_t *end,
+    FILE *out);
 extern int __wt_log_slot_init(WT_SESSION_IMPL *session);
 extern int __wt_log_slot_join(WT_SESSION_IMPL *session,
     uint64_t mysize,
@@ -1479,8 +1483,5 @@ extern int __wt_txn_truncate_log( WT_SESSION_IMPL *session,
     WT_CURSOR_BTREE *start,
     WT_CURSOR_BTREE *stop);
 extern int __wt_txn_truncate_end(WT_SESSION_IMPL *session);
-extern int __wt_txn_printlog( WT_SESSION_IMPL *session,
-    WT_ITEM *logrec,
-    WT_LSN *lsnp,
-    void *cookie);
+extern int __wt_txn_printlog(WT_SESSION *wt_session, FILE *out);
 extern int __wt_txn_recover(WT_SESSION_IMPL *default_session);

@@ -207,8 +207,43 @@ __wt_logop_%(name)s_print(
 	'name' : optype.name,
 	'arg_decls' : '\n\t'.join('%s%s%s;' % (clocaltype(f), '' if clocaltype(f)[-1] == '*' else ' ', f[1]) for f in optype.fields),
 	'arg_addrs' : ''.join(', &%s' % f[1] for f in optype.fields),
-	'print_args' : '\n\t'.join('fprintf(out, "\\t" "%s: %s\\n",%s);' % (f[1], printf_fmt(f), printf_arg(f)) for f in optype.fields),
+	'print_args' : '\n\t'.join('fprintf(out, "    \\"%s\\": \\"%s\\",\\n",%s);' % (f[1], printf_fmt(f), printf_arg(f)) for f in optype.fields),
 })
+
+# Emit the printlog entry point
+tfile.write('''
+int
+__wt_txn_op_printlog(
+    WT_SESSION_IMPL *session, const uint8_t **pp, const uint8_t *end, FILE *out)
+{
+	uint32_t optype, opsize;
+
+	/* Peek at the size and the type. */
+	WT_RET(__wt_logop_read(session, pp, end, &optype, &opsize));
+	end = *pp + opsize;
+
+	switch (optype) {''')
+
+for optype in log_data.optypes:
+	if not optype.fields:
+		continue
+
+	tfile.write('''
+	case %(macro)s:
+		WT_RET(%(print_func)s(session, pp, end, out));
+		break;
+''' % {
+	'macro' : optype.macro_name(),
+	'print_func' : '__wt_logop_' + optype.name + '_print',
+})
+
+tfile.write('''
+	WT_ILLEGAL_VALUE(session);
+	}
+
+	return (0);
+}
+''')
 
 tfile.close()
 compare_srcfile(tmp_file, f)
