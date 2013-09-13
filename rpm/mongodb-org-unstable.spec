@@ -1,12 +1,12 @@
-Name: mongo-10gen-unstable
-Conflicts: mongo, mongo-10gen, mongo-10gen-enterprise
+Name: mongodb-org-unstable
+Conflicts: mongo, mongo-10gen, mongo-10gen-enterprise, mongodb, mongodb-org, mongodb-org-enterprise
 Version: 2.4.3
 Release: mongodb_1%{?dist}
 Summary: MongoDB server, shell, sharding server and tools
 License: AGPL 3.0
 URL: http://www.mongodb.org
 Group: Applications/Databases
-Requires: mongo-10gen-unstable-server, mongo-10gen-unstable-shell, mongo-10gen-unstable-mongos, mongo-10gen-unstable-tools
+Requires: mongodb-org-unstable-server, mongodb-org-unstable-shell, mongodb-org-unstable-mongos, mongodb-org-unstable-tools
 
 Source0: %{name}-%{version}.tar.gz
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root

@@ -115,8 +115,9 @@ class Distro(object):
 
     def pkgbase(self):
         # pkgbase is the first part of the package's name on
-        # this distro.
-        return "mongo" if re.search("(redhat|fedora|centos)", self.n) else "mongodb"
+        # this distro (pre-2.5.3 was "mongo" for redhat and 
+        # "mongodb" for debian"
+        return "mongodb"
 
     def archname(self, arch):
         if re.search("^(debian|ubuntu)", self.n):
@@ -553,7 +554,7 @@ def make_rpm(distro, arch, spec, srcdir):
     # Create the specfile.
     suffix=spec.suffix()
     sdir=setupdir(distro, arch, spec)
-    specfile=srcdir+"rpm/mongo%s.spec" % suffix
+    specfile=srcdir+"rpm/mongodb%s.spec" % suffix
     topdir=ensure_dir(os.getcwd()+'/rpmbuild/')
     for subdir in ["BUILD", "RPMS", "SOURCES", "SPECS", "SRPMS"]:
         ensure_dir("%s/%s/" % (topdir, subdir))
@@ -595,11 +596,11 @@ def make_rpm(distro, arch, spec, srcdir):
     oldcwd=os.getcwd()
     os.chdir(sdir+"/../")
     try:
-        sysassert(["tar", "-cpzf", topdir+"SOURCES/mongo%s-%s.tar.gz" % (suffix, spec.pversion(distro)), os.path.basename(os.path.dirname(sdir))])
+        sysassert(["tar", "-cpzf", topdir+"SOURCES/mongodb%s-%s.tar.gz" % (suffix, spec.pversion(distro)), os.path.basename(os.path.dirname(sdir))])
     finally:
         os.chdir(oldcwd)
     # Do the build.
-    sysassert(["rpmbuild", "-ba", "--target", distro_arch] + flags + ["%s/SPECS/mongo%s.spec" % (topdir, suffix)])
+    sysassert(["rpmbuild", "-ba", "--target", distro_arch] + flags + ["%s/SPECS/mongodb%s.spec" % (topdir, suffix)])
     r=distro.repodir(arch)
     ensure_dir(r)
     # FIXME: see if some combination of shutil.copy<hoohah> and glob
