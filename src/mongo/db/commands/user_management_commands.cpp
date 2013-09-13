@@ -26,6 +26,8 @@
 *    it in the license file.
 */
 
+#include <boost/bind.hpp>
+#include <boost/function.hpp>
 #include <string>
 #include <vector>
 
@@ -451,7 +453,7 @@ namespace mongo {
             return true;
         }
 
-    } CmdGrantRolesToUser;
+    } cmdGrantRolesToUser;
 
     class CmdRevokeRolesFromUser: public Command {
     public:
@@ -541,7 +543,7 @@ namespace mongo {
             return true;
         }
 
-    } CmdRevokeRolesFromUser;
+    } cmdRevokeRolesFromUser;
 
     class CmdGrantDelegateRolesToUser: public Command {
     public:
@@ -623,7 +625,7 @@ namespace mongo {
             return true;
         }
 
-    } CmdGrantDelegateRolesToUser;
+    } cmdGrantDelegateRolesToUser;
 
     class CmdRevokeDelegateRolesFromUser: public Command {
     public:
@@ -713,5 +715,87 @@ namespace mongo {
             return true;
         }
 
-    } CmdRevokeDelegateRolesFromUser;
+    } cmdRevokeDelegateRolesFromUser;
+
+    class CmdUsersInfo: public Command {
+    public:
+
+        virtual bool logTheOp() {
+            return false;
+        }
+
+        virtual bool slaveOk() const {
+            return false;
+        }
+
+        virtual LockType locktype() const {
+            return NONE;
+        }
+
+        CmdUsersInfo() : Command("usersInfo") {}
+
+        virtual void help(stringstream& ss) const {
+            ss << "Returns information about users." << endl;
+        }
+
+        virtual void addRequiredPrivileges(const std::string& dbname,
+                                           const BSONObj& cmdObj,
+                                           std::vector<Privilege>* out) {
+            // TODO: update this with the new rules around user creation in 2.6.
+            ActionSet actions;
+            actions.addAction(ActionType::userAdmin);
+            out->push_back(Privilege(dbname, actions));
+        }
+
+        bool run(const string& dbname,
+                 BSONObj& cmdObj,
+                 int options,
+                 string& errmsg,
+                 BSONObjBuilder& result,
+                 bool fromRepl) {
+            if (cmdObj["usersInfo"].type() != String && cmdObj["usersInfo"].type() != RegEx) {
+                addStatus(Status(ErrorCodes::BadValue,
+                                 "Argument to userInfo command must be either a string or a regex"),
+                          result);
+                return false;
+            }
+
+            bool anyDB = false;
+            if (cmdObj.hasField("anyDB")) {
+                if (dbname == "admin") {
+                    Status status = bsonExtractBooleanField(cmdObj, "anyDB", &anyDB);
+                    if (!status.isOK()) {
+                        addStatus(status, result);
+                        return false;
+                    }
+                } else {
+                    addStatus(Status(ErrorCodes::BadValue,
+                                     "\"anyDB\" argument to usersInfo command is only valid when "
+                                     "run on the \"admin\" database"),
+                              result);
+                    return false;
+                }
+            }
+
+            BSONObjBuilder queryBuilder;
+            queryBuilder.appendAs(cmdObj["usersInfo"], "name");
+            if (!anyDB) {
+                queryBuilder.append("source", dbname);
+            }
+
+            BSONArrayBuilder usersArrayBuilder;
+            BSONArrayBuilder& (BSONArrayBuilder::* appendBSONObj) (const BSONObj&) =
+                    &BSONArrayBuilder::append<BSONObj>;
+            const boost::function<void(const BSONObj&)> function =
+                    boost::bind(appendBSONObj, &usersArrayBuilder, _1);
+            AuthorizationManager* authzManager = getGlobalAuthorizationManager();
+            authzManager->queryAuthzDocument(NamespaceString("admin.system.users"),
+                                             queryBuilder.done(),
+                                             function);
+
+            result.append("users", usersArrayBuilder.arr());
+            return true;
+        }
+
+    } cmdUsersInfo;
 }
