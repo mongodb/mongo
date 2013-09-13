@@ -162,10 +162,13 @@ __wt_lsm_merge(
 		}
 	}
 
-	chunk = lsm_tree->chunk[start_chunk];
-	youngest = lsm_tree->chunk[end_chunk];
 	nchunks = (end_chunk - start_chunk) + 1;
 	WT_ASSERT(session, nchunks <= max_chunks);
+	if (nchunks > 0) {
+		chunk = lsm_tree->chunk[start_chunk];
+		start_id = chunk->id;
+		youngest = lsm_tree->chunk[end_chunk];
+	}
 
 	/* Don't do small merges or merge across more than 2 generations. */
 	if (nchunks < (id == 0 ? min_chunks : 2) ||
@@ -181,7 +184,6 @@ __wt_lsm_merge(
 		generation = WT_MAX(generation,
 		    lsm_tree->chunk[start_chunk + i]->generation + 1);
 
-	start_id = lsm_tree->chunk[start_chunk]->id;
 	WT_RET(__wt_rwunlock(session, lsm_tree->rwlock));
 
 	if (nchunks == 0)
