@@ -20,6 +20,7 @@
 #include "mongo/shell/shell_utils.h"
 
 #include "mongo/client/dbclientinterface.h"
+#include "mongo/client/dbclient_rs.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/shell/shell_utils_extended.h"
 #include "mongo/shell/shell_utils_launcher.h"
@@ -133,6 +134,20 @@ namespace mongo {
             return BSON( "" << b.done() );
         }
 
+        BSONObj replMonitorStats(const BSONObj& a, void* data) {
+            uassert(17134, "replMonitorStats requires a single string argument (the ReplSet name)",
+                    a.nFields() == 1 && a.firstElement().type() == String);
+
+            ReplicaSetMonitorPtr rsm = ReplicaSetMonitor::get(a.firstElement().valuestrsafe(),true);
+            if (!rsm) {
+                return BSON("" << "no ReplSetMonitor exists by that name");
+            }
+            BSONObjBuilder result;
+            rsm->appendInfo(result);
+            return result.obj();
+        }
+
+
         BSONObj interpreterVersion(const BSONObj& a, void* data) {
             uassert( 16453, "interpreterVersion accepts no arguments", a.nFields() == 0 );
             return BSON( "" << globalScriptEngine->getInterpreterVersionString() );
@@ -141,6 +156,7 @@ namespace mongo {
         void installShellUtils( Scope& scope ) {
             scope.injectNative( "quit", Quit );
             scope.injectNative( "getMemInfo" , JSGetMemInfo );
+            scope.injectNative( "_replMonitorStats" , replMonitorStats );
             scope.injectNative( "_srand" , JSSrand );
             scope.injectNative( "_rand" , JSRand );
             scope.injectNative( "_isWindows" , isWindows );
