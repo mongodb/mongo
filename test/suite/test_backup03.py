@@ -55,30 +55,37 @@ class test_backup_target(wttest.WiredTigerTestCase, suite_subprocess):
         ('table:' + pfx + '.4', complex_populate_lsm, 3),
     ]
     list = [
-        ('1', dict(big=0,list=[0])),           # Target objects individually
-        #('2', dict(big=1,list=[1])),
-        #('3', dict(big=2,list=[2])),
-        #('4', dict(big=3,list=[3])),
-        #('5a', dict(big=0,list=[0,2])),        # Target groups of objects
-        #('5b', dict(big=2,list=[0,2])),
-        #('6a', dict(big=1,list=[1,3])),
-        #('6b', dict(big=3,list=[1,3])),
-        #('7a', dict(big=0,list=[0,1,2])),
-        #('7b', dict(big=1,list=[0,1,2])),
-        #('7c', dict(big=2,list=[0,1,2])),
-        #('8a', dict(big=0,list=[0,1,2,3]))
-        #('8b', dict(big=1,list=[0,1,2,3]))
-        #('8c', dict(big=2,list=[0,1,2,3]))
-        #('8d', dict(big=3,list=[0,1,2,3]))
+        ( '1', dict(big=0,list=[0])),           # Target objects individually
+        ( '2', dict(big=1,list=[1])),
+        ( '3', dict(big=2,list=[2])),
+        ( '4', dict(big=3,list=[3])),
+        ('5a', dict(big=0,list=[0,2])),        # Target groups of objects
+        ('5b', dict(big=2,list=[0,2])),
+        ('6a', dict(big=1,list=[1,3])),
+        ('6b', dict(big=3,list=[1,3])),
+        ('7a', dict(big=0,list=[0,1,2])),
+        ('7b', dict(big=1,list=[0,1,2])),
+        ('7c', dict(big=2,list=[0,1,2])),
+        ('8a', dict(big=0,list=[0,1,2,3])),
+        ('8b', dict(big=1,list=[0,1,2,3])),
+        ('8c', dict(big=2,list=[0,1,2,3])),
+        ('8d', dict(big=3,list=[0,1,2,3]))
     ]
 
     scenarios = number_scenarios(multiply_scenarios('.', list))
+
+    # Create a large cache, otherwise this test runs quite slowly.
+    def setUpConnectionOpen(self, dir):
+        wtopen_args = 'create,cache_size=1G'
+        conn = wiredtiger.wiredtiger_open(dir, wtopen_args)
+        self.pr(`conn`)
+        return conn
 
     # Populate a set of objects.
     def populate(self):
         for i in self.objs:
             if self.big == i[2]:
-                rows = 500000           # Big object
+                rows = 200000           # Big object
             else:
                 rows = 1000             # Small object
             i[1](self, i[0], 'key_format=S', rows)
