@@ -1,3 +1,5 @@
+if (0) { // Disable temporarily until SERVER-8678 completes the version upgrade
+
 //
 // Tests initialization of an empty cluster with multiple mongoses.
 // Starts a bunch of mongoses in parallel, and ensures that there's only a single config 
@@ -106,4 +108,6 @@ MongoRunner.stopMongod(configSvrB);
 MongoRunner.stopMongod(configSvrC);
 
 jsTest.log("DONE!");
+
+}
 
