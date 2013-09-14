@@ -36,10 +36,19 @@ namespace mongo {
     /**
      * ChunkVersions consist of a major/minor version scoped to a version epoch
      *
+     * Version configurations (format: major version, epoch):
+     *
+     * 1. (0, 0) - collection is dropped.
+     * 2. (0, n), n > 0 - applicable only to shardVersion; shard has no chunk.
+     * 3. (n, 0), n > 0 - invalid configuration.
+     * 4. (n, m), n > 0, m > 0 - normal sharded collection version.
+     *
      * TODO: This is a "manual type" but, even so, still needs to comform to what's
      * expected from types.
      */
     struct ChunkVersion : public BSONSerializable {
+        static const ChunkVersion DROPPED;
+
         union {
             struct {
                 int _minor;

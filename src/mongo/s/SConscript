@@ -6,7 +6,7 @@ Import("env")
 # Schema and backward compatibility code for "config" collections.
 #
 
-env.StaticLibrary('base', [#'chunk_version.cpp',
+env.StaticLibrary('base', ['chunk_version.cpp',
                            'mongo_version_range.cpp',
                            'range_arithmetic.cpp',
                            'type_changelog.cpp',
