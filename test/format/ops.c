@@ -387,6 +387,7 @@ skip_insert:			if (col_update(cursor, &key, &value, keyno))
 		}
 
 		/* Read the value we modified to confirm the operation. */
+		++tinfo->search;
 		if (read_row(cursor, &key, keyno))
 			goto deadlock;
 
