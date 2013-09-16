@@ -110,14 +110,12 @@ err:	if (fp != NULL)
 static int
 __metadata_load_bulk(WT_SESSION_IMPL *session)
 {
-	WT_CONFIG ckptconf;
-	WT_CONFIG_ITEM a, k, v;
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
 	uint32_t allocsize;
-	int valid_addr;
+	int exist;
 	const char *filecfg[] = { WT_CONFIG_BASE(session, file_meta), NULL };
-	const char *key, *value;
+	const char *key;
 
 	/*
 	 * If a file was being bulk-loaded during the hot backup, it will appear
@@ -126,35 +124,21 @@ __metadata_load_bulk(WT_SESSION_IMPL *session)
 	WT_ERR(__wt_metadata_cursor(session, NULL, &cursor));
 	while ((ret = cursor->next(cursor)) == 0) {
 		WT_ERR(cursor->get_key(cursor, &key));
-		if (!WT_PREFIX_MATCH(key, "file:"))
+		if (!WT_PREFIX_SKIP(key, "file:"))
+			continue;
+
+		/* If the file exists, it's all good. */
+		WT_ERR(__wt_exist(session, key, &exist));
+		if (exist)
 			continue;
 
 		/*
-		 * See if the value has a valid checkpoint: if so, we're done,
-		 * otherwise, it's a bulk-loaded file and needs to be created.
-		 */
-		WT_ERR(cursor->get_value(cursor, &value));
-		WT_ERR(__wt_config_getones(session, value, "checkpoint", &v));
-		WT_ERR(__wt_config_subinit(session, &ckptconf, &v));
-		valid_addr = 0;
-		while (__wt_config_next(&ckptconf, &k, &v) == 0) {
-			WT_ERR(__wt_config_subgets(session, &v, "addr", &a));
-			if (a.len != 0) {
-				valid_addr = 1;
-				break;
-			}
-		}
-		if (valid_addr)
-			continue;
-
-		/*
-		 * If we don't find a valid checkpoint address, retrieve the
-		 * allocation size and re-create the file.
+		 * If the file doesn't exist, assume it's a bulk-loaded file;
+		 * retrieve the allocation size and re-create the file.
 		 */
 		WT_ERR(__wt_direct_io_size_check(
 		    session, filecfg, "allocation_size", &allocsize));
-		WT_ERR(__wt_block_manager_create(
-		    session, strchr(key, ':') + 1, allocsize));
+		WT_ERR(__wt_block_manager_create(session, key, allocsize));
 	}
 	WT_ERR_NOTFOUND_OK(ret);
 
