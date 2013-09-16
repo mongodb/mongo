@@ -12,19 +12,26 @@ replTest.awaitReplication();
 
 // do a second write to do gle tests on
 mdb.foo.insert({ _id: "2" });
-var gle = master.getDB("test").runCommand({getLastError : 1, j : true, wtimeout : 60000});
 
-print('Trying j=true, 60000ms timeout');
+var gle = master.getDB("test").runCommand({getLastError : 1, j : true});
+print('Trying j=true');
 printjson(gle);
-assert.eq(gle.err, null);
-assert.eq(gle.writtenTo, null);
-assert.eq(gle.waited, null);
-assert.eq(gle.wtime, null);
-assert.eq(gle.wtimeout, null);
+assert.eq(gle.ok, 1);
+if (gle.err === null) {
+    assert.eq(gle.writtenTo, null);
+    assert.eq(gle.waited, null);
+    assert.eq(gle.wtime, null);
+    assert.eq(gle.wtimeout, null);
+}
+else {
+    // "nojournal" is a permissible error here, if journaling is disabled.
+    assert.eq(gle.err, "nojournal");
+}
 
 gle = mdb.getLastErrorObj(1, 10);
 print('Trying w=1, 10ms timeout');
 printjson(gle);
+assert.eq(gle.ok, 1);
 assert.eq(gle.err, null);
 assert.eq(gle.writtenTo, null);
 assert.eq(gle.wtime, null);
@@ -34,6 +41,7 @@ assert.eq(gle.wtimeout, null);
 gle = mdb.getLastErrorObj(2, 2000);
 print('Trying w=2, 2000ms timeout.');
 printjson(gle);
+assert.eq(gle.ok, 1);
 assert.eq(gle.err, null);
 assert.eq(gle.writtenTo.length, 2);
 assert.gte(gle.wtime, 0);
@@ -44,6 +52,7 @@ assert.eq(gle.wtimeout, null);
 gle = mdb.getLastErrorObj(3, 5);
 print('Trying w=3, 5ms timeout.  Should timeout.');
 printjson(gle);
+assert.eq(gle.ok, 1);
 assert.eq(gle.err, "timeout");
 assert.eq(gle.writtenTo.length, 2);
 assert.eq(gle.wtime, null);
@@ -53,6 +62,7 @@ assert.eq(gle.wtimeout, true);
 gle = mdb.getLastErrorObj("majority", 5);
 print('Trying w=majority, 5ms timeout.');
 printjson(gle);
+assert.eq(gle.ok, 1);
 assert.eq(gle.err, null);
 assert.eq(gle.writtenTo.length, 2);
 assert.eq(gle.wtime, 0);
@@ -74,6 +84,7 @@ sdb.foo.insert({ _id: "1" });
 gle = sdb.getLastErrorObj(1);
 print('Trying standalone server with w=1.');
 printjson(gle);
+assert.eq(gle.ok, 1);
 assert.eq(gle.err, null);
 assert.eq(gle.writtenTo, null);
 assert.eq(gle.wtime, null);
@@ -83,6 +94,7 @@ assert.eq(gle.wtimeout, null);
 gle = sdb.getLastErrorObj(2, 10);
 print('Trying standalone server with w=2 and 10ms timeout.');
 printjson(gle);
+assert.eq(gle.ok, 1);
 assert.eq(gle.err, "norepl");
 assert.eq(gle.writtenTo, null);
 assert.eq(gle.wtime, null);
