@@ -54,7 +54,7 @@ namespace auth {
             }
             return status;
         }
-        *writeConcern = writeConcernElement.Obj();
+        *writeConcern = writeConcernElement.Obj().getOwned();;
         return Status::OK();
     }
 
