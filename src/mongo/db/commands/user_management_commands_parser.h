@@ -45,7 +45,6 @@ namespace auth {
     /**
      * Writes into *writeConcern a BSONObj describing the parameters to getLastError to use for
      * the write confirmation.
-     * Returned *writeConcern is valid only as long as cmdObj is.
      */
     Status extractWriteConcern(const BSONObj& cmdObj, BSONObj* writeConcern);
 
@@ -78,7 +77,6 @@ namespace auth {
      * "revokeRolesFromUser", "grantDelegateRolesToUser", and "revokeDelegateRolesFromUser" (which
      * command it is is specified in the "cmdName" argument), and parses out the user name of the
      * user being modified, the roles being granted or revoked, and the write concern to use.
-     * After a successful call to this function *parsedWriteConcern is valid as long as cmdObj is.
      */
     Status parseUserRoleManipulationCommand(const BSONObj& cmdObj,
                                             const StringData& cmdName,
