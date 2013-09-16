@@ -119,11 +119,10 @@ namespace mongo {
 
     }
 
-    void Top::collectionDropped( const string& ns ) {
-        //cout << "collectionDropped: " << ns << endl;
+    void Top::collectionDropped( const StringData& ns ) {
         SimpleMutex::scoped_lock lk(_lock);
         _usage.erase(ns);
-        _lastDropped = ns;
+        _lastDropped = ns.toString();
     }
 
     void Top::cloneMap(Top::UsageMap& out) const {
