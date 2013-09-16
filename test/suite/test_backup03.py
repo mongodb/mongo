@@ -59,7 +59,7 @@ class test_backup_target(wttest.WiredTigerTestCase, suite_subprocess):
         ( '2', dict(big=1,list=[1])),
         ( '3', dict(big=2,list=[2])),
         ( '4', dict(big=3,list=[3])),
-        ('5a', dict(big=0,list=[0,2])),        # Target groups of objects
+        ('5a', dict(big=0,list=[0,2])),         # Target groups of objects
         ('5b', dict(big=2,list=[0,2])),
         ('6a', dict(big=1,list=[1,3])),
         ('6b', dict(big=3,list=[1,3])),
@@ -69,7 +69,8 @@ class test_backup_target(wttest.WiredTigerTestCase, suite_subprocess):
         ('8a', dict(big=0,list=[0,1,2,3])),
         ('8b', dict(big=1,list=[0,1,2,3])),
         ('8c', dict(big=2,list=[0,1,2,3])),
-        ('8d', dict(big=3,list=[0,1,2,3]))
+        ('8d', dict(big=3,list=[0,1,2,3])),
+        ( '9', dict(big=3,list=[])),            # Backup everything
     ]
 
     scenarios = number_scenarios(multiply_scenarios('.', list))
@@ -117,11 +118,13 @@ class test_backup_target(wttest.WiredTigerTestCase, suite_subprocess):
         os.mkdir(self.dir)
 
         # Build the target list.
-        config = 'target=('
-        for i in range(0, len(self.objs)):
-            if i in l:
-                config += '"' + self.objs[i][0] + '",'
-        config += ')'
+        config = ""
+        if l:
+                config = 'target=('
+                for i in range(0, len(self.objs)):
+                    if i in l:
+                        config += '"' + self.objs[i][0] + '",'
+                config += ')'
 
         # Open up the backup cursor, and copy the files.
         cursor = self.session.open_cursor('backup:', None, config)
@@ -136,13 +139,14 @@ class test_backup_target(wttest.WiredTigerTestCase, suite_subprocess):
 
         # Confirm the objects we backed up exist, with correct contents.
         for i in range(0, len(self.objs)):
-            if i in l:
+            if not l or i in l:
                 self.compare(self.objs[i][0])
 
         # Confirm the other objects don't exist.
-        for i in range(0, len(self.objs)):
-            if i not in l:
-                self.confirmPathDoesNotExist(self.objs[i][0])
+        if l:
+            for i in range(0, len(self.objs)):
+                if i not in l:
+                    self.confirmPathDoesNotExist(self.objs[i][0])
 
     # Test backup with targets.
     def test_backup_target(self):
