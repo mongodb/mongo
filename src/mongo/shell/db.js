@@ -63,323 +63,6 @@ DB.prototype.adminCommand = function( obj ){
 
 DB.prototype._adminCommand = DB.prototype.adminCommand; // alias old name
 
-function printUserObj(userObj) {
-    var pwd = userObj.pwd;
-    delete userObj.pwd;
-    print(tojson(userObj));
-    userObj.pwd = pwd;
-}
-
-/**
- * Used for creating users in systems with v1 style user information (ie MongoDB v2.4 and prior)
- */
-DB.prototype._createUserV1 = function(userObj, replicatedTo, timeout) {
-    var c = this.getCollection( "system.users" );
-    var oldPwd;
-    if (userObj.pwd != null) {
-        oldPwd = userObj.pwd;
-        userObj.pwd = _hashPassword(userObj.user, userObj.pwd);
-    }
-    try {
-        c.save(userObj);
-    } catch (e) {
-        // SyncClusterConnections call GLE automatically after every write and will throw an
-        // exception if the insert failed.
-        if ( tojson(e).indexOf( "login" ) >= 0 ){
-            // TODO: this check is a hack
-            print( "Creating user seems to have succeeded but threw an exception because we no " +
-                   "longer have auth." );
-        } else {
-            throw "Could not insert into system.users: " + tojson(e);
-        }
-    } finally {
-        if (userObj.pwd != null)
-            userObj.pwd = oldPwd;
-    }
-    printUserObj(userObj);
-
-    //
-    // When saving users to replica sets, the shell user will want to know if the user hasn't
-    // been fully replicated everywhere, since this will impact security.  By default, replicate to
-    // majority of nodes with wtimeout 15 secs, though user can override
-    //
-    
-    replicatedTo = replicatedTo != undefined && replicatedTo != null ? replicatedTo : "majority"
-    
-    // in mongod version 2.1.0-, this worked
-    var le = {};
-    try {        
-        le = this.getLastErrorObj( replicatedTo, timeout || 30 * 1000 );
-        // printjson( le )
-    }
-    catch (e) {
-        errjson = tojson(e);
-        if ( errjson.indexOf( "login" ) >= 0 || errjson.indexOf( "unauthorized" ) >= 0 ) {
-            // TODO: this check is a hack
-            print( "addUser succeeded, but cannot wait for replication since we no longer have auth" );
-            return "";
-        }
-        print( "could not find getLastError object : " + tojson( e ) )
-    }
-
-    if (!le.err) {
-        return;
-    }
-
-    // We can't detect replica set shards via mongos, so we'll sometimes get this error
-    // In this case though, we've already checked the local error before returning norepl, so
-    // the user has been written and we're happy
-    if (le.err == "norepl" || le.err == "noreplset") {
-        // nothing we can do
-        return;
-    }
-
-    if (le.err == "timeout") {
-        throw "timed out while waiting for user authentication to replicate - " +
-              "database will not be fully secured until replication finishes"
-    }
-
-    if (le.err.startsWith("E11000 duplicate key error")) {
-        throw "User already exists with that username/userSource combination";
-    }
-
-    throw "couldn't add user: " + le.err;
-}
-
-function _extractUserNameFromUserCommand(cmdObj) {
-    if (cmdObj.hasOwnProperty("name") && cmdObj.hasOwnProperty("user")) {
-        throw Error("Cannot provide both 'name' and 'user' field to user management commands");
-    }
-
-    var name = "";
-    if (cmdObj.hasOwnProperty("name")) {
-        name = cmdObj["name"];
-    } else {
-        // For backwards compatibility
-        name = cmdObj["user"];
-    }
-    return name;
-}
-
-DB.prototype._createUser = function(userObj, replicatedTo, timeout) {
-    var name = _extractUserNameFromUserCommand(userObj);
-    var cmdObj = {createUser:name};
-    cmdObj = Object.extend(cmdObj, userObj);
-    delete cmdObj["name"];
-    delete cmdObj["user"];
-
-    replicatedTo = replicatedTo != null ? replicatedTo : "majority";
-    timeout = timeout || 30 * 1000;
-    cmdObj["writeConcern"] = { w: replicatedTo, wtimeout: timeout };
-
-    var res = this.runCommand(cmdObj);
-
-    if (res.ok) {
-        printUserObj(userObj);
-        return;
-    }
-
-    if (res.errmsg == "no such cmd: createUser") {
-        return this._createUserV1(userObj, replicatedTo, timeout);
-    }
-
-    // We can't detect replica set shards via mongos, so we'll sometimes get this error
-    // In this case though, we've already checked the local error before returning norepl, so
-    // the user has been written and we're happy
-    if (res.errmsg == "norepl" || res.errmsg == "noreplset") {
-        // nothing we can do
-        return;
-    }
-
-    if (res.errmsg == "timeout") {
-        throw "timed out while waiting for user authentication to replicate - " +
-              "database will not be fully secured until replication finishes"
-    }
-
-    throw "couldn't add user: " + res.errmsg;
-}
-
-function _hashPassword(username, password) {
-    return hex_md5(username + ":mongo:" + password);
-}
-
-DB.prototype._addUserExplicitArgs = function(username, password, roles, replicatedTo, timeout) {
-    if (password == null || password.length == 0) {
-        throw Error("password can't be empty");
-    }
-    var userObj = { name: arguments[0], pwd: arguments[1], roles: arguments[2] };
-    this._createUser(userObj, replicatedTo, timeout);
-}
-
-DB.prototype.addUser = function() {
-    if (arguments.length == 0) {
-        throw Error("No arguments provided to addUser");
-    }
-
-    if (typeof arguments[0] == "object") {
-        this._createUser.apply(this, arguments);
-    } else if (Array.isArray(arguments[2])) {
-        this._addUserExplicitArgs.apply(this, arguments);
-    } else {
-        throw Error("Invalid arguments to addUser.  addUser must either be run with a full user " +
-                    "object or with a username, password, and roles array");
-
-    }
-}
-
-/**
- * Used for updating users in systems with V1 style user information
- * (ie MongoDB v2.4 and prior)
- */
-DB.prototype._updateUserV1 = function(name, updateObject) {
-    var setObj = {};
-    if (updateObject.pwd) {
-        setObj["pwd"] = _hashPassword(name, updateObject.pwd);
-    }
-    if (updateObject.extraData) {
-        setObj["extraData"] = updateObject.extraData;
-    }
-    if (updateObject.roles) {
-        setObj["roles"] = updateObject.roles;
-    }
-
-    db.system.users.update({user : name, userSource : null},
-                           {$set : setObj});
-    var err = db.getLastError();
-    if (err) {
-        throw Error("Updating user failed: " + err);
-    }
-};
-
-DB.prototype.updateUser = function(name, updateObject) {
-    var cmdObj = {updateUser:name};
-    cmdObj = Object.extend(cmdObj, updateObject);
-    var res = this.runCommand(cmdObj);
-    if (res.ok) {
-        return;
-    }
-
-    if (res.errmsg == "no such cmd: updateUser") {
-        this._updateUserV1(name, updateObject);
-        return;
-    }
-
-    if (res.errmsg == "noreplset") {
-        // nothing we can do
-        return;
-    }
-
-    throw Error("Updating user failed: " + res.errmsg);
-};
-
-DB.prototype.changeUserPassword = function(username, password) {
-    this.updateUser(username, {pwd:password});
-};
-
-DB.prototype.logout = function(){
-    return this.getMongo().logout(this.getName());
-};
-
-DB.prototype.removeUser = function( username ){
-    var res = this.runCommand({removeUser: username});
-
-    if (res.ok) {
-        return true;
-    }
-
-    var notFoundErrmsg = "User '" + username + "@" + this.getName() + "' not found";
-    if (res.errmsg == notFoundErrmsg) {
-        return false;
-    }
-
-    if (res.errmsg == "no such cmd: removeUsers") {
-        return this._removeUserV1(username);
-    }
-
-    throw "Couldn't remove user: " + res.errmsg;
-}
-
-DB.prototype._removeUserV1 = function(username) {
-    this.getCollection( "system.users" ).remove( { user : username } );
-
-    var le = db.getLastErrorObj();
-
-    if (le.err) {
-        throw "Couldn't remove user: " + le.err;
-    }
-
-    if (le.n == 1) {
-        return true;
-    } else {
-        return false;
-    }
-}
-
-DB.prototype.removeAllUsers = function() {
-    var res = this.runCommand({removeUsersFromDatabase:1});
-
-    if (res.n == 0) {
-        return false;
-    }
-
-    if (res.ok) {
-        return true;
-    }
-
-    throw "Couldn't remove users: " + res.errmsg;
-}
-
-DB.prototype.__pwHash = function( nonce, username, pass ) {
-    return hex_md5(nonce + username + _hashPassword(username, pass));
-}
-
-DB.prototype._defaultAuthenticationMechanism = "MONGODB-CR";
-
-DB.prototype._authOrThrow = function () {
-    var params;
-    if (arguments.length == 2) {
-        params = { user: arguments[0], pwd: arguments[1] };
-    }
-    else if (arguments.length == 1) {
-        if (typeof(arguments[0]) != "object")
-            throw Error("Single-argument form of auth expects a parameter object");
-        params = arguments[0];
-    }
-    else {
-        throw Error(
-            "auth expects either (username, password) or ({ user: username, pwd: password })");
-    }
-
-    if (params.mechanism === undefined)
-        params.mechanism = this._defaultAuthenticationMechanism;
-
-    if (params.userSource !== undefined) {
-        throw Error("Do not override userSource field on db.auth().  " +
-                    "Use getMongo().auth(), instead.");
-    }
-
-    params.userSource = this.getName();
-    var good = this.getMongo().auth(params);
-    if (good) {
-        // auth enabled, and should try to use isMaster and replSetGetStatus to build prompt
-        this.getMongo().authStatus = {authRequired:true, isMaster:true, replSetGetStatus:true};
-    }
-
-    return good;
-}
-
-
-DB.prototype.auth = function() {
-    var ex;
-    try {
-        this._authOrThrow.apply(this, arguments);
-    } catch (ex) {
-        print(ex);
-        return 0;
-    }
-    return 1;
-}
-
 /**
   Create a new collection in the database.  Normally, collection creation is automatic.  You would
    use this function if you wish to specify special options on creation.
@@ -1162,5 +845,328 @@ DB.prototype.getSlaveOk = function() {
 DB.prototype.loadServerScripts = function(){
     this.system.js.find().forEach(function(u){eval(u._id + " = " + u.value);});
 }
+
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////// Security shell helpers below //////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+function printUserObj(userObj) {
+    var pwd = userObj.pwd;
+    delete userObj.pwd;
+    print(tojson(userObj));
+    userObj.pwd = pwd;
+}
+
+/**
+ * Used for creating users in systems with v1 style user information (ie MongoDB v2.4 and prior)
+ */
+DB.prototype._createUserV1 = function(userObj, replicatedTo, timeout) {
+    var c = this.getCollection( "system.users" );
+    var oldPwd;
+    if (userObj.pwd != null) {
+        oldPwd = userObj.pwd;
+        userObj.pwd = _hashPassword(userObj.user, userObj.pwd);
+    }
+    try {
+        c.save(userObj);
+    } catch (e) {
+        // SyncClusterConnections call GLE automatically after every write and will throw an
+        // exception if the insert failed.
+        if ( tojson(e).indexOf( "login" ) >= 0 ){
+            // TODO: this check is a hack
+            print( "Creating user seems to have succeeded but threw an exception because we no " +
+                   "longer have auth." );
+        } else {
+            throw "Could not insert into system.users: " + tojson(e);
+        }
+    } finally {
+        if (userObj.pwd != null)
+            userObj.pwd = oldPwd;
+    }
+    printUserObj(userObj);
+
+    //
+    // When saving users to replica sets, the shell user will want to know if the user hasn't
+    // been fully replicated everywhere, since this will impact security.  By default, replicate to
+    // majority of nodes with wtimeout 15 secs, though user can override
+    //
+    
+    replicatedTo = replicatedTo != undefined && replicatedTo != null ? replicatedTo : "majority"
+    
+    // in mongod version 2.1.0-, this worked
+    var le = {};
+    try {        
+        le = this.getLastErrorObj( replicatedTo, timeout || 30 * 1000 );
+        // printjson( le )
+    }
+    catch (e) {
+        errjson = tojson(e);
+        if ( errjson.indexOf( "login" ) >= 0 || errjson.indexOf( "unauthorized" ) >= 0 ) {
+            // TODO: this check is a hack
+            print( "addUser succeeded, but cannot wait for replication since we no longer have auth" );
+            return "";
+        }
+        print( "could not find getLastError object : " + tojson( e ) )
+    }
+
+    if (!le.err) {
+        return;
+    }
+
+    // We can't detect replica set shards via mongos, so we'll sometimes get this error
+    // In this case though, we've already checked the local error before returning norepl, so
+    // the user has been written and we're happy
+    if (le.err == "norepl" || le.err == "noreplset") {
+        // nothing we can do
+        return;
+    }
+
+    if (le.err == "timeout") {
+        throw "timed out while waiting for user authentication to replicate - " +
+              "database will not be fully secured until replication finishes"
+    }
+
+    if (le.err.startsWith("E11000 duplicate key error")) {
+        throw "User already exists with that username/userSource combination";
+    }
+
+    throw "couldn't add user: " + le.err;
+}
+
+function _extractUserNameFromUserCommand(cmdObj) {
+    if (cmdObj.hasOwnProperty("name") && cmdObj.hasOwnProperty("user")) {
+        throw Error("Cannot provide both 'name' and 'user' field to user management commands");
+    }
+
+    var name = "";
+    if (cmdObj.hasOwnProperty("name")) {
+        name = cmdObj["name"];
+    } else {
+        // For backwards compatibility
+        name = cmdObj["user"];
+    }
+    return name;
+}
+
+DB.prototype._createUser = function(userObj, replicatedTo, timeout) {
+    var name = _extractUserNameFromUserCommand(userObj);
+    var cmdObj = {createUser:name};
+    cmdObj = Object.extend(cmdObj, userObj);
+    delete cmdObj["name"];
+    delete cmdObj["user"];
+
+    replicatedTo = replicatedTo != null ? replicatedTo : "majority";
+    timeout = timeout || 30 * 1000;
+    cmdObj["writeConcern"] = { w: replicatedTo, wtimeout: timeout };
+
+    var res = this.runCommand(cmdObj);
+
+    if (res.ok) {
+        printUserObj(userObj);
+        return;
+    }
+
+    if (res.errmsg == "no such cmd: createUser") {
+        return this._createUserV1(userObj, replicatedTo, timeout);
+    }
+
+    // We can't detect replica set shards via mongos, so we'll sometimes get this error
+    // In this case though, we've already checked the local error before returning norepl, so
+    // the user has been written and we're happy
+    if (res.errmsg == "norepl" || res.errmsg == "noreplset") {
+        // nothing we can do
+        return;
+    }
+
+    if (res.errmsg == "timeout") {
+        throw "timed out while waiting for user authentication to replicate - " +
+              "database will not be fully secured until replication finishes"
+    }
+
+    throw "couldn't add user: " + res.errmsg;
+}
+
+function _hashPassword(username, password) {
+    return hex_md5(username + ":mongo:" + password);
+}
+
+DB.prototype._addUserExplicitArgs = function(username, password, roles, replicatedTo, timeout) {
+    if (password == null || password.length == 0) {
+        throw Error("password can't be empty");
+    }
+    var userObj = { name: arguments[0], pwd: arguments[1], roles: arguments[2] };
+    this._createUser(userObj, replicatedTo, timeout);
+}
+
+DB.prototype.addUser = function() {
+    if (arguments.length == 0) {
+        throw Error("No arguments provided to addUser");
+    }
+
+    if (typeof arguments[0] == "object") {
+        this._createUser.apply(this, arguments);
+    } else if (Array.isArray(arguments[2])) {
+        this._addUserExplicitArgs.apply(this, arguments);
+    } else {
+        throw Error("Invalid arguments to addUser.  addUser must either be run with a full user " +
+                    "object or with a username, password, and roles array");
+
+    }
+}
+
+/**
+ * Used for updating users in systems with V1 style user information
+ * (ie MongoDB v2.4 and prior)
+ */
+DB.prototype._updateUserV1 = function(name, updateObject) {
+    var setObj = {};
+    if (updateObject.pwd) {
+        setObj["pwd"] = _hashPassword(name, updateObject.pwd);
+    }
+    if (updateObject.extraData) {
+        setObj["extraData"] = updateObject.extraData;
+    }
+    if (updateObject.roles) {
+        setObj["roles"] = updateObject.roles;
+    }
+
+    db.system.users.update({user : name, userSource : null},
+                           {$set : setObj});
+    var err = db.getLastError();
+    if (err) {
+        throw Error("Updating user failed: " + err);
+    }
+};
+
+DB.prototype.updateUser = function(name, updateObject) {
+    var cmdObj = {updateUser:name};
+    cmdObj = Object.extend(cmdObj, updateObject);
+    var res = this.runCommand(cmdObj);
+    if (res.ok) {
+        return;
+    }
+
+    if (res.errmsg == "no such cmd: updateUser") {
+        this._updateUserV1(name, updateObject);
+        return;
+    }
+
+    if (res.errmsg == "noreplset") {
+        // nothing we can do
+        return;
+    }
+
+    throw Error("Updating user failed: " + res.errmsg);
+};
+
+DB.prototype.changeUserPassword = function(username, password) {
+    this.updateUser(username, {pwd:password});
+};
+
+DB.prototype.logout = function(){
+    return this.getMongo().logout(this.getName());
+};
+
+DB.prototype.removeUser = function( username ){
+    var res = this.runCommand({removeUser: username});
+
+    if (res.ok) {
+        return true;
+    }
+
+    var notFoundErrmsg = "User '" + username + "@" + this.getName() + "' not found";
+    if (res.errmsg == notFoundErrmsg) {
+        return false;
+    }
+
+    if (res.errmsg == "no such cmd: removeUsers") {
+        return this._removeUserV1(username);
+    }
+
+    throw "Couldn't remove user: " + res.errmsg;
+}
+
+DB.prototype._removeUserV1 = function(username) {
+    this.getCollection( "system.users" ).remove( { user : username } );
+
+    var le = db.getLastErrorObj();
+
+    if (le.err) {
+        throw "Couldn't remove user: " + le.err;
+    }
+
+    if (le.n == 1) {
+        return true;
+    } else {
+        return false;
+    }
+}
+
+DB.prototype.removeAllUsers = function() {
+    var res = this.runCommand({removeUsersFromDatabase:1});
+
+    if (res.n == 0) {
+        return false;
+    }
+
+    if (res.ok) {
+        return true;
+    }
+
+    throw "Couldn't remove users: " + res.errmsg;
+}
+
+DB.prototype.__pwHash = function( nonce, username, pass ) {
+    return hex_md5(nonce + username + _hashPassword(username, pass));
+}
+
+DB.prototype._defaultAuthenticationMechanism = "MONGODB-CR";
+
+DB.prototype._authOrThrow = function () {
+    var params;
+    if (arguments.length == 2) {
+        params = { user: arguments[0], pwd: arguments[1] };
+    }
+    else if (arguments.length == 1) {
+        if (typeof(arguments[0]) != "object")
+            throw Error("Single-argument form of auth expects a parameter object");
+        params = arguments[0];
+    }
+    else {
+        throw Error(
+            "auth expects either (username, password) or ({ user: username, pwd: password })");
+    }
+
+    if (params.mechanism === undefined)
+        params.mechanism = this._defaultAuthenticationMechanism;
+
+    if (params.userSource !== undefined) {
+        throw Error("Do not override userSource field on db.auth().  " +
+                    "Use getMongo().auth(), instead.");
+    }
+
+    params.userSource = this.getName();
+    var good = this.getMongo().auth(params);
+    if (good) {
+        // auth enabled, and should try to use isMaster and replSetGetStatus to build prompt
+        this.getMongo().authStatus = {authRequired:true, isMaster:true, replSetGetStatus:true};
+    }
+
+    return good;
+}
+
+
+DB.prototype.auth = function() {
+    var ex;
+    try {
+        this._authOrThrow.apply(this, arguments);
+    } catch (ex) {
+        print(ex);
+        return 0;
+    }
+    return 1;
+}
+
 
 }());
