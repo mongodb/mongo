@@ -528,10 +528,10 @@ __lsm_free_chunks(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	 * doing I/O or waiting on the schema lock.
 	 *
 	 * This is safe because only one thread will be in this function at a
-	 * time because there is only one LSM worker thread.  Merges may
-	 * complete concurrently, and the old_chunks array may be extended, but
-	 * we shuffle down the old chunks each time we free one, so we are
-	 * always looking at the first entry in the array.
+	 * time (the first merge thread).  Merges may complete concurrently,
+	 * and the old_chunks array may be extended, but we shuffle down the
+	 * pointers each time we free one to keep the non-NULL slots at the
+	 * beginning of the array.
 	 */
 	WT_CLEAR(cookie);
 	WT_RET(__lsm_copy_chunks(session, lsm_tree, &cookie, 1));
@@ -575,10 +575,16 @@ __lsm_free_chunks(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 
 		/* Lock the tree to clear out the old chunk information. */
 		WT_ERR(__wt_writelock(session, lsm_tree->rwlock));
+
+		/*
+		 * The chunk we are looking at should be the first one in the
+		 * tree that we haven't already skipped over.
+		 */
 		WT_ASSERT(session, lsm_tree->old_chunks[skipped] == chunk);
 		__wt_free(session, chunk->bloom_uri);
 		__wt_free(session, chunk->uri);
 		__wt_free(session, lsm_tree->old_chunks[skipped]);
+
 		/* Shuffle down to keep all occupied slots at the beginning. */
 		if (--lsm_tree->nold_chunks > skipped) {
 			memmove(lsm_tree->old_chunks + skipped,
