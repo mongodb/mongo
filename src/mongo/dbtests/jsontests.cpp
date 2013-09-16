@@ -905,6 +905,21 @@ namespace JsonTests {
             }
         };
 
+        class DBRefConstructorDbName : public Base {
+            virtual BSONObj bson() const {
+                BSONObjBuilder b;
+                BSONObjBuilder subBuilder(b.subobjStart("a"));
+                subBuilder.append("$ref", "ns");
+                subBuilder.append("$id", "000000000000000000000000");
+                subBuilder.append("$db", "dbname");
+                subBuilder.done();
+                return b.obj();
+            }
+            virtual string json() const {
+                return "{ \"a\" : Dbref( \"ns\", \"000000000000000000000000\", \"dbname\" ) }";
+            }
+        };
+
         class DBRefConstructorNumber : public Base {
             virtual BSONObj bson() const {
                 BSONObjBuilder b;
@@ -919,6 +934,22 @@ namespace JsonTests {
             }
         };
 
+        class DBRefConstructorObject : public Base {
+            virtual BSONObj bson() const {
+                BSONObjBuilder b;
+                BSONObjBuilder subBuilder(b.subobjStart("a"));
+                subBuilder.append("$ref", "ns");
+                BSONObjBuilder idSubBuilder(subBuilder.subobjStart("$id"));
+                idSubBuilder.append("b", true);
+                idSubBuilder.done();
+                subBuilder.done();
+                return b.obj();
+            }
+            virtual string json() const {
+                return "{ \"a\" : Dbref( \"ns\", { \"b\" : true } ) }";
+            }
+        };
+
         class DBRefNumberId : public Base {
             virtual BSONObj bson() const {
                 BSONObjBuilder b;
@@ -930,6 +961,22 @@ namespace JsonTests {
             }
             virtual string json() const {
                 return "{ \"a\" : { \"$ref\" : \"ns\", \"$id\" : 1 } }";
+            }
+        };
+
+        class DBRefObjectAsId : public Base {
+            virtual BSONObj bson() const {
+                BSONObjBuilder b;
+                BSONObjBuilder subBuilder(b.subobjStart("a"));
+                subBuilder.append("$ref", "ns");
+                BSONObjBuilder idSubBuilder(subBuilder.subobjStart("$id"));
+                idSubBuilder.append("b", true);
+                idSubBuilder.done();
+                subBuilder.done();
+                return b.obj();
+            }
+            virtual string json() const {
+                return "{ \"a\" : { \"$ref\" : \"ns\", \"$id\" : { \"b\" : true } } }";
             }
         };
 
@@ -976,6 +1023,22 @@ namespace JsonTests {
             }
             virtual string json() const {
                 return "{ \"a\" : { \"$ref\" : \"ns\", \"$id\" : ObjectId( \"000000000000000000000000\" ) } }";
+            }
+        };
+
+        class DBRefDbName : public Base {
+            virtual BSONObj bson() const {
+                BSONObjBuilder b;
+                BSONObjBuilder subBuilder(b.subobjStart("a"));
+                subBuilder.append("$ref", "ns");
+                subBuilder.append("$id", "000000000000000000000000");
+                subBuilder.append("$db", "dbname");
+                subBuilder.done();
+                return b.obj();
+            }
+            virtual string json() const {
+                return "{ \"a\" : { \"$ref\" : \"ns\", \"$id\" : \"000000000000000000000000\""
+                       ", \"$db\" : \"dbname\" } }";
             }
         };
 
@@ -2342,10 +2405,15 @@ namespace JsonTests {
             add< FromJsonTests::Utf8TooShort >();
             add< FromJsonTests::DBRefConstructor >();
             add< FromJsonTests::DBRefConstructorCapitals >();
+            add< FromJsonTests::DBRefConstructorDbName >();
+            add< FromJsonTests::DBRefConstructorNumber >();
+            add< FromJsonTests::DBRefConstructorObject >();
             add< FromJsonTests::DBRefNumberId >();
+            add< FromJsonTests::DBRefObjectAsId >();
             add< FromJsonTests::DBRefStringId >();
             add< FromJsonTests::DBRefObjectIDObject >();
             add< FromJsonTests::DBRefObjectIDConstructor >();
+            add< FromJsonTests::DBRefDbName >();
             add< FromJsonTests::Oid >();
             add< FromJsonTests::Oid2 >();
             add< FromJsonTests::OidTooLong >();

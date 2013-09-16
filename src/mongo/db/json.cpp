@@ -45,7 +45,8 @@ namespace mongo {
         STRINGVAL_RESERVE_SIZE = 4096,
         BINDATA_RESERVE_SIZE = 4096,
         BINDATATYPE_RESERVE_SIZE = 4096,
-        NS_RESERVE_SIZE = 64
+        NS_RESERVE_SIZE = 64,
+        DB_RESERVE_SIZE = 64
     };
 
     static const char* LBRACE = "{",
@@ -496,6 +497,22 @@ namespace mongo {
             return valueRet;
         }
 
+        if (accept(COMMA)) {
+            if (!acceptField("$db")) {
+                return parseError("DBRef: Expected field name: \"$db\" in \"$ref\" object");
+            }
+            if (!accept(COLON)) {
+                return parseError("DBRef: Expecting ':'");
+            }
+            std::string db;
+            db.reserve(DB_RESERVE_SIZE);
+            ret = quotedString(&db);
+            if (ret != Status::OK()) {
+                return ret;
+            }
+            subBuilder.append("$db", db);
+        }
+
         subBuilder.done();
         return Status::OK();
     }
@@ -658,6 +675,16 @@ namespace mongo {
         Status valueRet = value("$id", subBuilder);
         if (valueRet != Status::OK()) {
             return valueRet;
+        }
+
+        if (accept(COMMA)) {
+            std::string db;
+            db.reserve(DB_RESERVE_SIZE);
+            Status dbRet = quotedString(&db);
+            if (dbRet != Status::OK()) {
+                return dbRet;
+            }
+            subBuilder.append("$db", db);
         }
 
         if (!accept(RPAREN)) {
