@@ -89,7 +89,7 @@ class test_backup(wttest.WiredTigerTestCase, suite_subprocess):
         self.runWt(['list'], outfilename='outfile.orig')
         self.runWt(['-h', self.dir, 'list'], outfilename='outfile.backup')
         self.assertEqual(
-	    True, compare_files(self, 'outfile.orig', 'outfile.backup'))
+            True, compare_files(self, 'outfile.orig', 'outfile.backup'))
 
         # And that the contents are the same.
         for i in self.objs:
