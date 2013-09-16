@@ -21,11 +21,9 @@ __wt_lsm_meta_read(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	WT_LSM_CHUNK *chunk;
 	WT_NAMED_COLLATOR *ncoll;
 	const char *lsmconfig;
-	size_t chunk_sz;
 	u_int nchunks;
 
 	WT_CLEAR(buf);
-	chunk_sz = sizeof(WT_LSM_CHUNK);
 
 	WT_RET(__wt_metadata_search(session, lsm_tree->name, &lsmconfig));
 	WT_ERR(__wt_config_init(session, &cparser, lsmconfig));
@@ -139,15 +137,11 @@ __wt_lsm_meta_read(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 				WT_ERR(__wt_realloc_def(session,
 				    &lsm_tree->old_alloc, nchunks + 1,
 				    &lsm_tree->old_chunks));
-				lsm_tree->nold_chunks =
-				    (u_int)(lsm_tree->old_alloc / chunk_sz);
 				WT_ERR(__wt_calloc_def(session, 1, &chunk));
 				lsm_tree->old_chunks[nchunks++] = chunk;
 				WT_ERR(__wt_strndup(session,
 				    lk.str, lk.len, &chunk->uri));
 				F_SET(chunk, WT_LSM_CHUNK_ONDISK);
-				lsm_tree->old_avail =
-				    lsm_tree->nold_chunks - nchunks;
 			}
 			WT_ERR_NOTFOUND_OK(ret);
 			lsm_tree->nold_chunks = nchunks;
@@ -211,8 +205,7 @@ __wt_lsm_meta_write(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	first = 1;
 	for (i = 0; i < lsm_tree->nold_chunks; i++) {
 		chunk = lsm_tree->old_chunks[i];
-		if (chunk == NULL)
-			continue;
+		WT_ASSERT(session, chunk != NULL);
 		if (first)
 			first = 0;
 		else

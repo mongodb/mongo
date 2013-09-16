@@ -17,32 +17,19 @@ __wt_lsm_merge_update_tree(WT_SESSION_IMPL *session,
     WT_LSM_TREE *lsm_tree, u_int start_chunk, u_int nchunks,
     WT_LSM_CHUNK *chunk)
 {
-	size_t chunk_sz, chunks_after_merge;
-	u_int i, j;
+	size_t chunks_after_merge;
+	u_int i;
 
 	WT_ASSERT(session, start_chunk + nchunks <= lsm_tree->nchunks);
 
 	/* Setup the array of obsolete chunks. */
-	if (nchunks > lsm_tree->old_avail) {
-		chunk_sz = sizeof(*lsm_tree->old_chunks);
-		WT_RET(__wt_realloc_def(session, &lsm_tree->old_alloc,
-		    (lsm_tree->nold_chunks - lsm_tree->old_avail) + nchunks,
-		    &lsm_tree->old_chunks));
-		lsm_tree->old_avail += (u_int)(lsm_tree->old_alloc / chunk_sz) -
-		    lsm_tree->nold_chunks;
-		lsm_tree->nold_chunks = (u_int)(lsm_tree->old_alloc / chunk_sz);
-	}
-	/* Copy entries one at a time, so we can reuse gaps in the list. */
-	for (i = j = 0; j < nchunks && i < lsm_tree->nold_chunks; i++) {
-		if (lsm_tree->old_chunks[i] == NULL) {
-			lsm_tree->old_chunks[i] =
-			    lsm_tree->chunk[start_chunk + j];
-			++j;
-			--lsm_tree->old_avail;
-		}
-	}
+	WT_RET(__wt_realloc_def(session, &lsm_tree->old_alloc,
+	    lsm_tree->nold_chunks + nchunks, &lsm_tree->old_chunks));
 
-	WT_ASSERT(session, j == nchunks);
+	/* Copy entries one at a time, so we can reuse gaps in the list. */
+	for (i = 0; i < nchunks; i++)
+		lsm_tree->old_chunks[lsm_tree->nold_chunks++] =
+		    lsm_tree->chunk[start_chunk + i];
 
 	/* Update the current chunk list. */
 	chunks_after_merge = lsm_tree->nchunks - (nchunks + start_chunk);
@@ -66,7 +53,7 @@ __wt_lsm_merge(
     WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, u_int id, int aggressive)
 {
 	WT_BLOOM *bloom;
-	WT_CURSOR *src, *dest;
+	WT_CURSOR *dest, *src;
 	WT_DECL_ITEM(bbuf);
 	WT_DECL_RET;
 	WT_ITEM buf, key, value;
@@ -78,11 +65,12 @@ __wt_lsm_merge(
 	int create_bloom;
 	const char *cfg[3];
 
-	src = dest = NULL;
 	bloom = NULL;
-	max_chunks = lsm_tree->merge_max;
-	min_chunks = lsm_tree->merge_min;
 	create_bloom = 0;
+	dest = src = NULL;
+	max_chunks = lsm_tree->merge_max;
+	min_chunks = (id == 0) ? lsm_tree->merge_min : 2;
+	start_id = 0;
 
 	/*
 	 * If there aren't any chunks to merge, or some of the chunks aren't
@@ -128,7 +116,7 @@ __wt_lsm_merge(
 	    start_chunk > 0; ) {
 		chunk = lsm_tree->chunk[start_chunk - 1];
 		youngest = lsm_tree->chunk[end_chunk];
-		nchunks = (end_chunk - start_chunk) + 1;
+		nchunks = (end_chunk + 1) - start_chunk;
 
 		/* If the chunk is already involved in a merge, stop. */
 		if (F_ISSET(chunk, WT_LSM_CHUNK_MERGING))
@@ -147,7 +135,7 @@ __wt_lsm_merge(
 		 * If we have enough chunks for a merge and the next chunk is
 		 * in a different generation, stop.
 		 */
-		if (nchunks >= (id == 0 ? min_chunks : 2) &&
+		if (nchunks >= min_chunks &&
 		    chunk->generation > youngest->generation)
 			break;
 
@@ -162,18 +150,25 @@ __wt_lsm_merge(
 		}
 	}
 
-	chunk = lsm_tree->chunk[start_chunk];
-	youngest = lsm_tree->chunk[end_chunk];
-	nchunks = (end_chunk - start_chunk) + 1;
+	nchunks = (end_chunk + 1) - start_chunk;
 	WT_ASSERT(session, nchunks <= max_chunks);
 
-	/* Don't do small merges or merge across more than 2 generations. */
-	if (nchunks < (id == 0 ? min_chunks : 2) ||
-	    chunk->generation > youngest->generation + 1) {
-		for (i = 0; i < nchunks; i++)
-			F_CLR(lsm_tree->chunk[start_chunk + i],
-			    WT_LSM_CHUNK_MERGING);
-		nchunks = 0;
+	if (nchunks > 0) {
+		chunk = lsm_tree->chunk[start_chunk];
+		start_id = chunk->id;
+		youngest = lsm_tree->chunk[end_chunk];
+
+		/*
+		 * Don't do small merges or merge across more than 2
+		 * generations.
+		 */
+		if (nchunks < min_chunks ||
+		    chunk->generation > youngest->generation + 1) {
+			for (i = 0; i < nchunks; i++)
+				F_CLR(lsm_tree->chunk[start_chunk + i],
+				    WT_LSM_CHUNK_MERGING);
+			nchunks = 0;
+		}
 	}
 
 	/* Find the merge generation. */
@@ -181,7 +176,6 @@ __wt_lsm_merge(
 		generation = WT_MAX(generation,
 		    lsm_tree->chunk[start_chunk + i]->generation + 1);
 
-	start_id = lsm_tree->chunk[start_chunk]->id;
 	WT_RET(__wt_rwunlock(session, lsm_tree->rwlock));
 
 	if (nchunks == 0)

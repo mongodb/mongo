@@ -797,7 +797,7 @@ struct __wt_session {
 	 * @config{lsm_bloom_hash_count, the number of hash values per item used
 	 * for LSM bloom filters., an integer between 2 and 100; default \c 4.}
 	 * @config{lsm_bloom_newest, create a bloom filter on an LSM tree chunk
-	 * before it's first merge.  Only supported if bloom filters are
+	 * before its first merge.  Only supported if bloom filters are
 	 * enabled., a boolean flag; default \c false.}
 	 * @config{lsm_bloom_oldest, create a bloom filter on the oldest LSM
 	 * tree chunk.  Only supported if bloom filters are enabled., a boolean

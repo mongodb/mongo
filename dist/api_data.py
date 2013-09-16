@@ -111,7 +111,7 @@ lsm_config = [
 		filters''',
 		min='2', max='100'),
 	Config('lsm_bloom_newest', 'false', r'''
-		create a bloom filter on an LSM tree chunk before it's first
+		create a bloom filter on an LSM tree chunk before its first
 		merge.  Only supported if bloom filters are enabled''',
 		type='boolean'),
 	Config('lsm_bloom_oldest', 'false', r'''

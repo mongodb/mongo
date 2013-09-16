@@ -49,8 +49,8 @@ __lsm_tree_discard(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	__wt_free(session, lsm_tree->chunk);
 
 	for (i = 0; i < lsm_tree->nold_chunks; i++) {
-		if ((chunk = lsm_tree->old_chunks[i]) == NULL)
-			continue;
+		chunk = lsm_tree->old_chunks[i];
+		WT_ASSERT(session, chunk != NULL);
 
 		__wt_free(session, chunk->bloom_uri);
 		__wt_free(session, chunk->uri);
@@ -693,6 +693,7 @@ __wt_lsm_tree_drop(
 			WT_ERR(
 			    __wt_schema_drop(session, chunk->bloom_uri, cfg));
 	}
+
 	/* Drop any chunks on the obsolete list. */
 	for (i = 0; i < lsm_tree->nold_chunks; i++) {
 		if ((chunk = lsm_tree->old_chunks[i]) == NULL)
@@ -870,6 +871,10 @@ __wt_lsm_tree_worker(WT_SESSION_IMPL *session,
 			continue;
 		WT_ERR(__wt_schema_worker(session, chunk->uri,
 		    file_func, name_func, cfg, open_flags));
+		if (name_func == __wt_backup_list_uri_append &&
+		    chunk->bloom_uri != NULL)
+			WT_ERR(__wt_schema_worker(session, chunk->bloom_uri,
+			    file_func, name_func, cfg, open_flags));
 	}
 err:	__wt_lsm_tree_release(session, lsm_tree);
 	return (ret);
