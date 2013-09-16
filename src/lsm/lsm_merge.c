@@ -66,7 +66,7 @@ __wt_lsm_merge(
     WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, u_int id, int aggressive)
 {
 	WT_BLOOM *bloom;
-	WT_CURSOR *src, *dest;
+	WT_CURSOR *dest, *src;
 	WT_DECL_ITEM(bbuf);
 	WT_DECL_RET;
 	WT_ITEM buf, key, value;
@@ -78,11 +78,12 @@ __wt_lsm_merge(
 	int create_bloom;
 	const char *cfg[3];
 
-	src = dest = NULL;
 	bloom = NULL;
+	create_bloom = 0;
+	dest = src = NULL;
 	max_chunks = lsm_tree->merge_max;
 	min_chunks = (id == 0) ? lsm_tree->merge_min : 2;
-	create_bloom = 0;
+	start_id = 0;
 
 	/*
 	 * If there aren't any chunks to merge, or some of the chunks aren't
