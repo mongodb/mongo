@@ -1,29 +1,30 @@
 // Tests query/command option $maxTimeMS.
 
 var t = db.max_time_ms;
+var exceededTimeLimit = 50; // ErrorCodes::ExceededTimeLimit
 var cursor;
+var res;
 
 //
 // Tests for maxTimeAlwaysTimeOut fail point.
 //
-
-var res;
 
 // Fail point positive test for command.
 t.drop();
 assert.eq(1, t.getDB().adminCommand({configureFailPoint: "maxTimeAlwaysTimeOut",
                                      mode: "alwaysOn"}).ok);
 res = t.runCommand({ping:1, maxTimeMS:10*1000});
-assert(res.ok == 0 && res.code == 50,
+assert(res.ok == 0 && res.code == exceededTimeLimit,
        "expected command to trigger maxTimeAlwaysTimeOut fail point, ok=" + res.ok + ", code="
-       + res.code);
+           + res.code);
 
 // Fail point negative test for command.
 t.drop();
 assert.eq(1, t.getDB().adminCommand({configureFailPoint: "maxTimeAlwaysTimeOut", mode: "off"}).ok);
 res = t.runCommand({ping:1, maxTimeMS:10*1000});
 assert(res.ok == 1,
-       "expected command to not trigger maxTimeAlwaysTimeOut fail point");
+       "expected command to not trigger maxTimeAlwaysTimeOut fail point, ok=" + res.ok
+           + ", code=" + res.code);
 
 // Fail point positive test for query.
 t.drop();
@@ -182,7 +183,9 @@ assert.doesNotThrow(function() { cursor.itcount(); },
 //
 
 t.drop();
-assert.eq(0, t.getDB().runCommand({eval: function() { sleep(300); }, maxTimeMS: 100}).ok);
+res = t.getDB().adminCommand({sleep: 1, millis: 300, maxTimeMS: 100});
+assert(res.ok == 0 && res.code == exceededTimeLimit,
+       "expected sleep command to abort due to time limit, ok=" + res.ok + ", code=" + res.code);
 
 //
 // Simple negative test for commands: a ~300ms command with a 10s time limit should not hit the
@@ -190,7 +193,9 @@ assert.eq(0, t.getDB().runCommand({eval: function() { sleep(300); }, maxTimeMS: 
 //
 
 t.drop();
-assert.eq(1, t.getDB().runCommand({eval: function() { sleep(300); }, maxTimeMS: 10*1000}).ok);
+res = t.getDB().adminCommand({sleep: 1, millis: 300, maxTimeMS: 10*1000});
+assert(res.ok == 1,
+       "expected sleep command to not hit the time limit, ok=" + res.ok + ", code=" + res.code);
 
 //
 // Tests for input validation.
