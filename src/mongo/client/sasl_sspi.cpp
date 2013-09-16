@@ -31,6 +31,18 @@
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/text.h"
 
+extern "C" int plain_client_plug_init(const sasl_utils_t *utils,
+                                      int maxversion,
+                                      int *out_version,
+                                      sasl_client_plug_t **pluglist,
+                                      int *plugcount);
+
+extern "C" int crammd5_client_plug_init(const sasl_utils_t *utils,
+                                        int maxversion,
+                                        int *out_version,
+                                        sasl_client_plug_t **pluglist,
+                                        int *plugcount);
+
 namespace mongo {
 namespace {
     /*
@@ -490,6 +502,35 @@ namespace {
         if (SASL_OK != ret) {
             return Status(ErrorCodes::UnknownError,
                           mongoutils::str::stream() << "could not add SASL Client SSPI plugin "
+                          << sspiPluginName << ": " << sasl_errstring(ret, NULL, NULL));
+        }
+
+        return Status::OK();
+    }
+    MONGO_INITIALIZER_WITH_PREREQUISITES(SaslCramClientPlugin, 
+                                         ("CyrusSaslAllocatorsAndMutexes", 
+                                          "SaslClientContext"))
+        (InitializerContext*) {
+        int ret = sasl_client_add_plugin("CRAMMD5",
+                                         crammd5_client_plug_init);
+        if (SASL_OK != ret) {
+            return Status(ErrorCodes::UnknownError,
+                          mongoutils::str::stream() << "Could not add SASL Client CRAM-MD5 plugin "
+                          << sspiPluginName << ": " << sasl_errstring(ret, NULL, NULL));
+        }
+
+        return Status::OK();
+    }
+
+    MONGO_INITIALIZER_WITH_PREREQUISITES(SaslPlainClientPlugin, 
+                                         ("CyrusSaslAllocatorsAndMutexes", 
+                                          "SaslClientContext"))
+        (InitializerContext*) {
+        int ret = sasl_client_add_plugin("PLAIN",
+                                         plain_client_plug_init);
+        if (SASL_OK != ret) {
+            return Status(ErrorCodes::UnknownError,
+                          mongoutils::str::stream() << "Could not add SASL Client PLAIN plugin "
                           << sspiPluginName << ": " << sasl_errstring(ret, NULL, NULL));
         }
 
