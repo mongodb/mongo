@@ -55,6 +55,6 @@ namespace mongo {
     /**
      * Called from the runQuery entry point in ops/query.cpp.
      */
-    string newRunQuery(Message& m, QueryMessage& q, CurOp& curop, Message &result);
+    std::string newRunQuery(Message& m, QueryMessage& q, CurOp& curop, Message &result);
 
 }  // namespace mongo

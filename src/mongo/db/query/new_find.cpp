@@ -51,6 +51,7 @@
 
 namespace {
 
+    using std::string;
     using mongo::LiteParsedQuery;
 
     // Copied from db/ops/query.cpp.  Quote:
