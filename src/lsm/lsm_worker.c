@@ -418,11 +418,10 @@ __lsm_bloom_create(
 	    "Expected %" PRIu64 " items, got %" PRIu64,
 	    chunk->bloom_uri, chunk->count, insert_count);
 
-	F_SET(chunk, WT_LSM_CHUNK_BLOOM);
-
 	/* Ensure the bloom filter is in the metadata. */
 	WT_ERR(__wt_writelock(session, lsm_tree->rwlock));
 	ret = __wt_lsm_meta_write(session, lsm_tree);
+	F_SET(chunk, WT_LSM_CHUNK_BLOOM);
 	++lsm_tree->dsk_gen;
 	WT_TRET(__wt_rwunlock(session, lsm_tree->rwlock));
 
