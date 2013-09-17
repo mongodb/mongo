@@ -27,11 +27,13 @@
  */
 
 #include "mongo/db/ops/log_builder.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
     using mutablebson::Document;
     using mutablebson::Element;
+    namespace str = mongoutils::str;
 
     namespace {
         const char kSet[] = "$set";
@@ -87,8 +89,75 @@ namespace mongo {
         return addToSection(elt, &_setAccumulator, kSet);
     }
 
+    Status LogBuilder::addToSetsWithNewFieldName(const StringData& name,
+                                                 const mutablebson::Element val) {
+        mutablebson::Element elemToSet =
+                _logRoot.getDocument().makeElementWithNewFieldName(name, val);
+        if (!elemToSet.ok())
+            return Status(ErrorCodes::InternalError,
+                          str::stream() << "Could not create new '"
+                                        << name << "' element from existing element '"
+                                        << val.getFieldName() << "' of type "
+                                        << typeName(val.getType()));
+
+        return addToSets(elemToSet);
+    }
+
+    Status LogBuilder::addToSetsWithNewFieldName(const StringData& name,
+                                                 const BSONElement& val){
+        mutablebson::Element elemToSet =
+                _logRoot.getDocument().makeElementWithNewFieldName(name, val);
+        if (!elemToSet.ok())
+            return Status(ErrorCodes::InternalError,
+                          str::stream() << "Could not create new '"
+                                        << name << "' element from existing element '"
+                                        << val.fieldName() << "' of type "
+                                        << typeName(val.type()));
+
+        return addToSets(elemToSet);
+    }
+
+    Status LogBuilder::addToSets(const StringData& name, const SafeNum& val){
+        mutablebson::Element elemToSet = _logRoot.getDocument().makeElementSafeNum(name, val);
+        if (!elemToSet.ok())
+            return Status(ErrorCodes::InternalError,
+                          str::stream() << "Could not create new '"
+                                        << name << "' SafeNum from "
+                                        << val.debugString());
+
+        return addToSets(elemToSet);
+    }
+
     Status LogBuilder::addToUnsets(Element elt) {
         return addToSection(elt, &_unsetAccumulator, kUnset);
+    }
+
+    Status LogBuilder::addToUnsetsWithNewFieldName(const StringData& name,
+                                                 const mutablebson::Element val) {
+        mutablebson::Element elemToSet =
+                _logRoot.getDocument().makeElementWithNewFieldName(name, val);
+        if (!elemToSet.ok())
+            return Status(ErrorCodes::InternalError,
+                          str::stream() << "Could not create new '"
+                                        << name << "' element from existing element '"
+                                        << val.getFieldName() << "' of type "
+                                        << typeName(val.getType()));
+
+        return addToUnsets(elemToSet);
+    }
+
+    Status LogBuilder::addToUnsetsWithNewFieldName(const StringData& name,
+                                                 const BSONElement& val){
+        mutablebson::Element elemToSet =
+                _logRoot.getDocument().makeElementWithNewFieldName(name, val);
+        if (!elemToSet.ok())
+            return Status(ErrorCodes::InternalError,
+                          str::stream() << "Could not create new '"
+                                        << name << "' element from existing element '"
+                                        << val.fieldName() << "' of type "
+                                        << typeName(val.type()));
+
+        return addToUnsets(elemToSet);
     }
 
     Status LogBuilder::getReplacementObject(Element* outElt) {

@@ -20,6 +20,7 @@
 #include "mongo/bson/mutable/mutable_bson_test_utils.h"
 #include "mongo/db/json.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/safe_num.h"
 
 namespace {
 
@@ -43,6 +44,39 @@ namespace {
         ASSERT_EQUALS(mongo::fromjson("{ $set : { 'a.b' : 1 } }"), doc);
     }
 
+    TEST(LogBuilder, AddElementToSet) {
+        mmb::Document doc;
+        LogBuilder lb(doc.root());
+
+        const mmb::Element elt_ab = doc.makeElementInt("", 1);
+        ASSERT_TRUE(elt_ab.ok());
+        ASSERT_OK(lb.addToSetsWithNewFieldName("a.b", elt_ab));
+
+        ASSERT_EQUALS(mongo::fromjson("{ $set : { 'a.b' : 1 } }"), doc);
+    }
+
+    TEST(LogBuilder, AddBSONElementToSet) {
+        mmb::Document doc;
+        LogBuilder lb(doc.root());
+
+        mongo::BSONObj obj = mongo::fromjson("{'':1}");
+
+        ASSERT_OK(lb.addToSetsWithNewFieldName("a.b", obj.firstElement()));
+
+        ASSERT_EQUALS(mongo::fromjson("{ $set : { 'a.b' : 1 } }"), doc);
+    }
+
+    TEST(LogBuilder, AddSafeNumToSet) {
+        mmb::Document doc;
+        LogBuilder lb(doc.root());
+
+        mongo::BSONObj obj = mongo::fromjson("{'':1}");
+
+        ASSERT_OK(lb.addToSets("a.b", mongo::SafeNum(1)));
+
+        ASSERT_EQUALS(mongo::fromjson("{ $set : { 'a.b' : 1 } }"), doc);
+    }
+
     TEST(LogBuilder, AddOneToUnset) {
         mmb::Document doc;
         LogBuilder lb(doc.root());
@@ -52,6 +86,28 @@ namespace {
         ASSERT_OK(lb.addToUnsets(elt_xy));
 
         ASSERT_EQUALS(mongo::fromjson("{ $unset : { 'x.y' : 1 } }"), doc);
+    }
+
+    TEST(LogBuilder, AddElementToUnset) {
+        mmb::Document doc;
+        LogBuilder lb(doc.root());
+
+        const mmb::Element elt_ab = doc.makeElementInt("", 1);
+        ASSERT_TRUE(elt_ab.ok());
+        ASSERT_OK(lb.addToUnsetsWithNewFieldName("a.b", elt_ab));
+
+        ASSERT_EQUALS(mongo::fromjson("{ $unset : { 'a.b' : 1 } }"), doc);
+    }
+
+    TEST(LogBuilder, AddBSONElementToUnset) {
+        mmb::Document doc;
+        LogBuilder lb(doc.root());
+
+        mongo::BSONObj obj = mongo::fromjson("{'':1}");
+
+        ASSERT_OK(lb.addToUnsetsWithNewFieldName("a.b", obj.firstElement()));
+
+        ASSERT_EQUALS(mongo::fromjson("{ $unset : { 'a.b' : 1 } }"), doc);
     }
 
     TEST(LogBuilder, AddOneToEach) {
