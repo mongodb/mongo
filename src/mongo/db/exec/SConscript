@@ -71,6 +71,7 @@ env.StaticLibrary(
         "working_set_common.cpp",
     ],
     LIBDEPS = [
+        "plan_stats",
         "$BUILD_DIR/mongo/bson"
     ],
 )
