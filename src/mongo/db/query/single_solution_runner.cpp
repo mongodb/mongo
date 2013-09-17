@@ -36,6 +36,10 @@ namespace mongo {
         }
         bob->append("runner", "SingleSolutionRunner");
         bob->append("nSolutions", 1);
+        {
+            BSONObjBuilder subBuilder(bob->subobjStart("exec"));
+            _exec->writeExplainTo(&subBuilder);
+        }
     }
 
 } // namespace mongo
