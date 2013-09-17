@@ -37,6 +37,7 @@ namespace mongo {
         if (NULL == bob) {
             return;
         }
+        // potential overflow because original counters are unsigned 64-bit values
         bob->append("works", static_cast<long long>(works));
         bob->append("advanced", static_cast<long long>(advanced));
     }
