@@ -999,7 +999,7 @@ namespace ThreadedTests {
 
 
             add< RWLockTest1 >();
-            //add< RWLockTest2 >(); // SERVER-2996
+            add< RWLockTest2 >();
             add< RWLockTest3 >();
             add< RWLockTest4 >();
 
