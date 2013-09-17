@@ -31,6 +31,9 @@
 namespace mongo {
 
     void SingleSolutionRunner::writeExplainTo(BSONObjBuilder * bob) {
+        if (NULL == bob) {
+            return;
+        }
         bob->append("runner", "SingleSolutionRunner");
         bob->append("nSolutions", 1);
     }
