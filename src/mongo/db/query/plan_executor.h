@@ -202,7 +202,10 @@ namespace mongo {
             if (NULL == bob) {
                 return;
             }
-            // TODO: invoke plan stats writeExplainTo()
+            // XXX: getStats() is not const
+            PlanExecutor * exec = const_cast<PlanExecutor *>(this);
+            PlanStageStats * stats = exec->getStats();
+            stats->writeExplainTo(bob);
         }
     private:
         scoped_ptr<WorkingSet> _workingSet;
