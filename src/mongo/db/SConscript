@@ -436,6 +436,7 @@ coredbEnv.Library(
         "pipeline/accumulator_last.cpp",
         "pipeline/accumulator_min_max.cpp",
         "pipeline/accumulator_push.cpp",
+        "pipeline/accumulator_std_dev.cpp",
         "pipeline/accumulator_sum.cpp",
         "pipeline/dependencies.cpp",
         "pipeline/document_source.cpp",

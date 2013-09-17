@@ -241,6 +241,8 @@ namespace mongo {
         {"$max", AccumulatorMinMax::createMax},
         {"$min", AccumulatorMinMax::createMin},
         {"$push", AccumulatorPush::create},
+        {"$stdDevPop", AccumulatorStdDev::createPop},
+        {"$stdDevSamp", AccumulatorStdDev::createSamp},
         {"$sum", AccumulatorSum::create},
     };
 

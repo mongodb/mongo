@@ -204,6 +204,22 @@ testSortLimit(10, -1);
 testSortLimit(100,  1);
 testSortLimit(100, -1);
 
+function testAvgStdDev() {
+    jsTestLog('testing $avg and $stdDevPop in sharded $group');
+    var res = aggregateOrdered(db.ts1, [{$group: {_id: null,
+                                                  avg: {$avg: '$counter'},
+                                                  stdDevPop: {$stdDevPop: '$counter'},
+                                                 }}]);
+    // http://en.wikipedia.org/wiki/Arithmetic_progression#Sum
+    var avg = (1 + nItems) / 2
+    assert.close(res[0].avg, avg, '', 10 /*decimal places*/);
+
+    // http://en.wikipedia.org/wiki/Arithmetic_progression#Standard_deviation
+    var stdDev = Math.sqrt(((nItems - 1) * (nItems + 1)) / 12);
+    assert.close(res[0].stdDevPop, stdDev, '', 10 /*decimal places*/);
+}
+testAvgStdDev();
+
 jsTestLog('test $out by copying source collection verbatim to output');
 var outCollection = db.ts1_out;
 var res = aggregateOrdered(db.ts1, [{$out: outCollection.getName()}]);
