@@ -100,7 +100,7 @@ smoke_db_prefix = ''
 small_oplog = False
 small_oplog_rs = False
 
-all_test_results = []
+test_report = { "results": [] }
 report_file = None
 
 # This class just implements the with statement API, for a sneaky
@@ -631,8 +631,9 @@ def run_tests(tests):
                     winners.append(test)
 
                     test_result["end"] = time.time()
+                    test_result["elapsed"] = test_result["end"] - test_result["start"]
                     test_result["status"] = "pass"
-                    all_test_results.append( test_result )
+                    test_report["results"].append( test_result )
 
                     if small_oplog or small_oplog_rs:
                         master.wait_for_repl()
@@ -651,9 +652,10 @@ def run_tests(tests):
 
                 except TestFailure, f:
                     test_result["end"] = time.time()
+                    test_result["elapsed"] = test_result["end"] - test_result["start"]
                     test_result["error"] = str(f)
                     test_result["status"] = "fail"
-                    all_test_results.append( test_result )
+                    test_report["results"].append( test_result )
                     try:
                         print f
                         # Record the failing test and re-raise.
@@ -1072,14 +1074,18 @@ def main():
         dbroot = os.path.join(options.smoke_db_prefix, 'data', 'db')
         call([utils.find_python(), "buildscripts/cleanbb.py", "--nokill", dbroot])
 
+    test_report["start"] = time.time()
     try:
         run_tests(tests)
     finally:
         add_to_failfile(fails, options)
 
+        test_report["end"] = time.time()
+        test_report["elapsed"] = test_report["end"] - test_report["start"]
+        test_report["failures"] = len(losers.keys())
         if report_file:
             f = open( report_file, "wb" )
-            f.write( json.dumps( { "results" : all_test_results } ) )
+            f.write( json.dumps( test_report ) )
             f.close()
 
         report()
