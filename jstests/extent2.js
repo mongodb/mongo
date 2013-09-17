@@ -27,5 +27,9 @@ end = e.stats();
 
 printjson( start );
 printjson( end )
-assert.eq( 4 , start.numExtents );
-assert.eq( 4 , end.numExtents );
+assert.eq( start.numExtents, end.numExtents )
+
+// 3: 1 data, 1 _id idx, 1 x idx
+// used to be 4, but we no longer waste an extent for the $freelist collection
+assert.eq( 3, start.numExtents );
+assert.eq( 3, end.numExtents );

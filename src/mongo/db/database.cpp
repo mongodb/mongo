@@ -101,9 +101,10 @@ namespace mongo {
     Database::Database(const char *nm, bool& newDb, const string& path )
         : _name(nm), _path(path),
           _namespaceIndex( _path, _name ),
-          _extentManager( _name, _path, directoryperdb /* this is a global right now */ ),
+          _extentManager( _name, _path, 0, directoryperdb /* this is a global right now */ ),
           _profileName(_name + ".system.profile"),
           _namespacesName(_name + ".system.namespaces"),
+          _extentFreelistName( _name + ".$freelist" ),
           _collectionLock( "Database::_collectionLock" )
     {
         Status status = validateDBName( _name );
@@ -121,6 +122,7 @@ namespace mongo {
             // there's a write, then open.
             if (!newDb) {
                 _namespaceIndex.init();
+                _extentManager.init( _namespaceIndex.details( _extentFreelistName ) );
                 openAllFiles();
             }
             _magic = 781231;
@@ -243,7 +245,7 @@ namespace mongo {
 
     Extent* Database::allocExtent( const char *ns, int size, bool capped, bool enforceQuota ) {
         bool fromFreeList = true;
-        Extent *e = DataFileMgr::allocFromFreeList( ns, size, capped );
+        Extent *e = _extentManager.allocFromFreeList( ns, size, capped );
         if( e == 0 ) {
             fromFreeList = false;
             e = _extentManager.createExtent( ns, size, capped, enforceQuota );
@@ -450,6 +452,18 @@ namespace mongo {
         deleteObjects( _namespacesName.c_str(), BSON( "name" << fromNS ), false, false, true );
 
         return Status::OK();
+    }
+
+    void Database::_initExtentFreeList() {
+        NamespaceDetails* details = _namespaceIndex.details( _extentFreelistName );
+        if ( !details ) {
+            _namespaceIndex.add_ns( _extentFreelistName, DiskLoc(), false );
+            details = _namespaceIndex.details( _extentFreelistName );
+            verify( details );
+        }
+        _extentManager.init( details );
+        verify( _extentManager.hasFreeList() );
+        log() << "have free list for " << _extentFreelistName << endl;
     }
 
 } // namespace mongo

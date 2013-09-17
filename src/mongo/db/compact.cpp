@@ -55,8 +55,6 @@
 
 namespace mongo {
 
-    void freeExtents(DiskLoc firstExt, DiskLoc lastExt);
-
     /* this should be done in alloc record not here, but doing here for now. 
        really dumb; it's a start.
     */
@@ -166,7 +164,7 @@ namespace mongo {
             d->firstExtent().writing() = newFirst;
             newFirst.ext()->xprev.writing().Null();
             getDur().writing(e)->markEmpty();
-            freeExtents( diskloc, diskloc );
+            cc().database()->getExtentManager().freeExtents( diskloc, diskloc );
 
             // update datasize/record count for this namespace's extent
             d->incrementStats( datasize, nrecords );

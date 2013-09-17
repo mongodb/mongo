@@ -52,6 +52,13 @@ namespace mongo {
         // you probably need to be in dbHolderMutex when constructing this
         Database(const char *nm, /*out*/ bool& newDb, const string& path = dbpath);
 
+        void initForWrites() {
+            _namespaceIndex.init();
+            if ( !_extentManager.hasFreeList() ) {
+                _initExtentFreeList();
+            }
+        }
+
         /* you must use this to close - there is essential code in this method that is not in the ~Database destructor.
            thus the destructor is private.  this could be cleaned up one day...
         */
@@ -80,11 +87,12 @@ namespace mongo {
          * return file n.  if it doesn't exist, create it
          */
         DataFile* getFile( int n, int sizeNeeded = 0, bool preallocateOnly = false ) {
-            _namespaceIndex.init();
+            initForWrites();
             return _extentManager.getFile( n, sizeNeeded, preallocateOnly );
         }
 
         DataFile* addAFile( int sizeNeeded, bool preallocateNextFile ) {
+            initForWrites();
             return _extentManager.addAFile( sizeNeeded, preallocateNextFile );
         }
 
@@ -150,6 +158,8 @@ namespace mongo {
 
         ~Database(); // closes files and other cleanup see below.
 
+        void _initExtentFreeList();
+
         /**
          * @throws DatabaseDifferCaseCode if the name is a duplicate based on
          * case insensitive matching.
@@ -169,6 +179,7 @@ namespace mongo {
 
         const string _profileName; // "alleyinsider.system.profile"
         const string _namespacesName; // "alleyinsider.system.namespaces"
+        const string _extentFreelistName;
 
         CCByLoc _ccByLoc; // use by ClientCursor
 

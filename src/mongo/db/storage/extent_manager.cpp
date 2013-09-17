@@ -44,9 +44,11 @@ namespace mongo {
 
     ExtentManager::ExtentManager( const StringData& dbname,
                                   const StringData& path,
+                                  NamespaceDetails* freeListDetails,
                                   bool directoryPerDB )
         : _dbname( dbname.toString() ),
           _path( path.toString() ),
+          _freeListDetails( freeListDetails ),
           _directoryPerDB( directoryPerDB ) {
     }
 
@@ -401,5 +403,156 @@ namespace mongo {
         // callers don't check for null return code, so assert
         msgasserted(14810, "couldn't allocate space for a new extent" );
     }
+
+    void ExtentManager::init( NamespaceDetails* freeListDetails ) {
+        if ( !_freeListDetails ) {
+            _freeListDetails = freeListDetails;
+        }
+        else {
+            verify( _freeListDetails == freeListDetails );
+        }
+    }
+
+    Extent* ExtentManager::allocFromFreeList( const char *ns, int approxSize, bool capped ) {
+        if ( !_freeListDetails ) {
+            return NULL;
+        }
+
+        // setup extent constraints
+
+        int low, high;
+        if ( capped ) {
+            // be strict about the size
+            low = approxSize;
+            if ( low > 2048 ) low -= 256;
+            high = (int) (approxSize * 1.05) + 256;
+        }
+        else {
+            low = (int) (approxSize * 0.8);
+            high = (int) (approxSize * 1.4);
+        }
+        if ( high <= 0 ) {
+            // overflowed
+            high = max(approxSize, Extent::maxSize());
+        }
+        if ( high <= Extent::minSize() ) {
+            // the minimum extent size is 4097
+            high = Extent::minSize() + 1;
+        }
+
+        // scan free list looking for something suitable
+
+        int n = 0;
+        Extent *best = 0;
+        int bestDiff = 0x7fffffff;
+        {
+            Timer t;
+            DiskLoc L = _freeListDetails->firstExtent();
+            while( !L.isNull() ) {
+                Extent * e = L.ext();
+                if ( e->length >= low && e->length <= high ) {
+                    int diff = abs(e->length - approxSize);
+                    if ( diff < bestDiff ) {
+                        bestDiff = diff;
+                        best = e;
+                        if ( ((double) diff) / approxSize < 0.1 ) {
+                            // close enough
+                            break;
+                        }
+                        if ( t.seconds() >= 2 ) {
+                            // have spent lots of time in write lock, and we are in [low,high], so close enough
+                            // could come into play if extent freelist is very long
+                            break;
+                        }
+                    }
+                    else {
+                        OCCASIONALLY {
+                            if ( high < 64 * 1024 && t.seconds() >= 2 ) {
+                                // be less picky if it is taking a long time
+                                high = 64 * 1024;
+                            }
+                        }
+                    }
+                }
+                L = e->xnext;
+                ++n;
+            }
+            if ( t.seconds() >= 10 ) {
+                log() << "warning: slow scan in allocFromFreeList (in write lock)" << endl;
+            }
+        }
+
+        if ( n > 128 ) { LOG( n < 512 ? 1 : 0 ) << "warning: newExtent " << n << " scanned\n"; }
+
+        if ( !best )
+            return NULL;
+
+        // remove from the free list
+        if ( !best->xprev.isNull() )
+            getExtent( best->xprev )->xnext.writing() = best->xnext;
+        if ( !best->xnext.isNull() )
+            getExtent( best->xnext )->xprev.writing() = best->xprev;
+        if ( _freeListDetails->firstExtent() == best->myLoc )
+            _freeListDetails->setFirstExtent( best->xnext );
+        if ( _freeListDetails->lastExtent() == best->myLoc )
+            _freeListDetails->setLastExtent( best->xprev );
+
+        DiskLoc emptyLoc = best->reuse(ns, capped);
+        addNewExtentToNamespace(ns, best, best->myLoc, emptyLoc, capped);
+        return best;
+    }
+
+    void ExtentManager::freeExtents(DiskLoc firstExt, DiskLoc lastExt) {
+
+        if ( firstExt.isNull() && lastExt.isNull() )
+            return;
+
+        {
+            verify( !firstExt.isNull() && !lastExt.isNull() );
+            Extent *f = getExtent( firstExt );
+            Extent *l = getExtent( lastExt );
+            verify( f->xprev.isNull() );
+            verify( l->xnext.isNull() );
+            verify( f==l || !f->xnext.isNull() );
+            verify( f==l || !l->xprev.isNull() );
+        }
+
+        verify( _freeListDetails );
+
+        if( _freeListDetails->firstExtent().isNull() ) {
+            _freeListDetails->setFirstExtent( firstExt );
+            _freeListDetails->setLastExtent( lastExt );
+        }
+        else {
+            DiskLoc a = _freeListDetails->firstExtent();
+            verify( getExtent( a )->xprev.isNull() );
+            getDur().writingDiskLoc( getExtent( a )->xprev ) = lastExt;
+            getDur().writingDiskLoc( getExtent( lastExt )->xnext ) = a;
+            _freeListDetails->setFirstExtent( firstExt );
+        }
+
+    }
+
+
+    void ExtentManager::printFreeList() const {
+        log() << "dump freelist " << _dbname << endl;
+
+        if ( _freeListDetails == NULL ) {
+            log() << "  _freeListDetails is null" << endl;
+            return;
+        }
+
+        DiskLoc a = _freeListDetails->firstExtent();
+        while( !a.isNull() ) {
+            Extent *e = getExtent( a );
+            log() << "  extent " << a.toString()
+                  << " len:" << e->length
+                  << " prev:" << e->xprev.toString() << endl;
+            a = e->xnext;
+        }
+
+        log() << "end freelist" << endl;
+    }
+
 
 }

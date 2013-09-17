@@ -369,94 +369,6 @@ namespace mongo {
         details->addDeletedRec(emptyLoc.drec(), emptyLoc);
     }
 
-    Extent* DataFileMgr::allocFromFreeList(const char *ns, int approxSize, bool capped) {
-        string s = cc().database()->name() + FREELIST_NS;
-        NamespaceDetails *f = nsdetails(s);
-        if( f ) {
-            int low, high;
-            if( capped ) {
-                // be strict about the size
-                low = approxSize;
-                if( low > 2048 ) low -= 256;
-                high = (int) (approxSize * 1.05) + 256;
-            }
-            else {
-                low = (int) (approxSize * 0.8);
-                high = (int) (approxSize * 1.4);
-            }
-            if( high <= 0 ) {
-                // overflowed
-                high = max(approxSize, Extent::maxSize());
-            }
-            if ( high <= Extent::minSize() ) {
-                // the minimum extent size is 4097
-                high = Extent::minSize() + 1;
-            }
-            int n = 0;
-            Extent *best = 0;
-            int bestDiff = 0x7fffffff;
-            {
-                Timer t;
-                DiskLoc L = f->firstExtent();
-                while( !L.isNull() ) {
-                    Extent * e = L.ext();
-                    if( e->length >= low && e->length <= high ) {
-                        int diff = abs(e->length - approxSize);
-                        if( diff < bestDiff ) {
-                            bestDiff = diff;
-                            best = e;
-                            if( ((double) diff) / approxSize < 0.1 ) { 
-                                // close enough
-                                break;
-                            }
-                            if( t.seconds() >= 2 ) { 
-                                // have spent lots of time in write lock, and we are in [low,high], so close enough
-                                // could come into play if extent freelist is very long
-                                break;
-                            }
-                        }
-                        else { 
-                            OCCASIONALLY {
-                                if( high < 64 * 1024 && t.seconds() >= 2 ) {
-                                    // be less picky if it is taking a long time
-                                    high = 64 * 1024;
-                                }
-                            }
-                        }
-                    }
-                    L = e->xnext;
-                    ++n;
-                }
-                if( t.seconds() >= 10 ) {
-                    log() << "warning: slow scan in allocFromFreeList (in write lock)" << endl;
-                }
-            }
-
-            if( n > 128 ) { LOG( n < 512 ? 1 : 0 ) << "warning: newExtent " << n << " scanned\n"; }
-
-            if( best ) {
-                Extent *e = best;
-                // remove from the free list
-                if( !e->xprev.isNull() )
-                    e->xprev.ext()->xnext.writing() = e->xnext;
-                if( !e->xnext.isNull() )
-                    e->xnext.ext()->xprev.writing() = e->xprev;
-                if( f->firstExtent() == e->myLoc )
-                    f->setFirstExtent( e->xnext );
-                if( f->lastExtent() == e->myLoc )
-                    f->setLastExtent( e->xprev );
-
-                // use it
-                OCCASIONALLY if( n > 512 ) log() << "warning: newExtent " << n << " scanned" << endl;
-                DiskLoc emptyLoc = e->reuse(ns, capped);
-                addNewExtentToNamespace(ns, e, e->myLoc, emptyLoc, capped);
-                return e;
-            }
-        }
-
-        return 0;
-        //        return createExtent(ns, approxSize, capped);
-    }
 
     /*---------------------------------------------------------------------*/
 
@@ -563,61 +475,6 @@ namespace mongo {
         }
     }
 
-    void printFreeList() {
-        string s = cc().database()->name() + FREELIST_NS;
-        log() << "dump freelist " << s << endl;
-        NamespaceDetails *freeExtents = nsdetails(s);
-        if( freeExtents == 0 ) {
-            log() << "  freeExtents==0" << endl;
-            return;
-        }
-        DiskLoc a = freeExtents->firstExtent();
-        while( !a.isNull() ) {
-            Extent *e = a.ext();
-            log() << "  extent " << a.toString() << " len:" << e->length << " prev:" << e->xprev.toString() << endl;
-            a = e->xnext;
-        }
-
-        log() << "end freelist" << endl;
-    }
-
-    /** free a list of extents that are no longer in use.  this is a double linked list of extents 
-        (could be just one in the list)
-    */
-    void freeExtents(DiskLoc firstExt, DiskLoc lastExt) {
-        {
-            verify( !firstExt.isNull() && !lastExt.isNull() );
-            Extent *f = firstExt.ext();
-            Extent *l = lastExt.ext();
-            verify( f->xprev.isNull() );
-            verify( l->xnext.isNull() );
-            verify( f==l || !f->xnext.isNull() );
-            verify( f==l || !l->xprev.isNull() );
-        }
-
-        string s = cc().database()->name() + FREELIST_NS;
-        NamespaceDetails *freeExtents = nsdetails(s);
-        if( freeExtents == 0 ) {
-            string err;
-            _userCreateNS(s.c_str(), BSONObj(), err, 0); // todo: this actually allocates an extent, which is bad!
-            freeExtents = nsdetails(s);
-            massert( 10361 , "can't create .$freelist", freeExtents);
-        }
-        if( freeExtents->firstExtent().isNull() ) {
-            freeExtents->setFirstExtent( firstExt );
-            freeExtents->setLastExtent( lastExt );
-        }
-        else {
-            DiskLoc a = freeExtents->firstExtent();
-            verify( a.ext()->xprev.isNull() );
-            getDur().writingDiskLoc( a.ext()->xprev ) = lastExt;
-            getDur().writingDiskLoc( lastExt.ext()->xnext ) = a;
-            freeExtents->setFirstExtent( firstExt );
-        }
-
-        //printFreeList();
-    }
-
     /* drop a collection/namespace */
     void dropNS(const string& nsToDrop) {
         NamespaceDetails* d = nsdetails(nsToDrop);
@@ -648,7 +505,7 @@ namespace mongo {
 
         // free extents
         if( !d->firstExtent().isNull() ) {
-            freeExtents(d->firstExtent(), d->lastExtent());
+            cc().database()->getExtentManager().freeExtents(d->firstExtent(), d->lastExtent());
             d->setFirstExtentInvalid();
             d->setLastExtentInvalid();
         }
@@ -662,6 +519,8 @@ namespace mongo {
         NamespaceDetails *d = nsdetails(name);
         if( d == 0 )
             return;
+
+        cc().database()->initForWrites(); // XXX
 
         BackgroundOperation::assertNoBgOpInProgForNs(name.c_str());
 
