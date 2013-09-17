@@ -1168,5 +1168,53 @@ DB.prototype.auth = function() {
     return 1;
 }
 
+DB.prototype.grantRolesToUser = function(username, roles) {
+    var res = this.runCommand({grantRolesToUser: username, roles: roles});
+    if (!res.ok) {
+        throw Error(res.errmsg);
+    }
+}
+
+DB.prototype.grantDelegateRolesToUser = function(username, roles) {
+    var res = this.runCommand({grantDelegateRolesToUser: username, roles: roles});
+    if (!res.ok) {
+        throw Error(res.errmsg);
+    }
+}
+
+DB.prototype.revokeRolesFromUser = function(username, roles) {
+    var res = this.runCommand({revokeRolesFromUser: username, roles: roles});
+    if (!res.ok) {
+        throw Error(res.errmsg);
+    }
+}
+
+DB.prototype.revokeDelegateRolesFromUser = function(username, roles) {
+    var res = this.runCommand({revokeDelegateRolesFromUser: username, roles: roles});
+    if (!res.ok) {
+        throw Error(res.errmsg);
+    }
+}
+
+DB.prototype.getUser = function(username) {
+    if (typeof username != "string") {
+        throw Error("User name for getUser shell helper must be a string");
+    }
+    var res = this.runCommand({usersInfo: username});
+    if (!res.ok) {
+        throw Error(res.errmsg);
+    }
+
+    return res.users[0];
+}
+
+DB.prototype.getUsers = function() {
+    var res = this.runCommand({usersInfo: /.*/});
+    if (!res.ok) {
+        throw Error(res.errmsg);
+    }
+
+    return res.users;
+}
 
 }());
