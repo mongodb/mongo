@@ -108,7 +108,7 @@ install: build
 	cp -v $(CURDIR)/BINARIES/usr/bin/mongotop $(CURDIR)/debian/mongodb-org-unstable-tools/usr/bin
 
 	mkdir -p $(CURDIR)/debian/mongodb-org-unstable-server/etc
-	cp $(CURDIR)/debian/mongodb.conf $(CURDIR)/debian/mongodb-org-unstable-server/etc/mongodb.conf 
+	cp $(CURDIR)/debian/mongod.conf $(CURDIR)/debian/mongodb-org-unstable-server/etc/mongod.conf 
 
 	mkdir -p $(CURDIR)/debian/mongodb-org-unstable-shell/usr/share/lintian/overrides/
 	mkdir -p $(CURDIR)/debian/mongodb-org-unstable-server/usr/share/lintian/overrides/

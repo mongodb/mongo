@@ -54,7 +54,7 @@ NAME=mongodb
 # Defaults.  Can be overridden by the /etc/default/$NAME
 # Other configuration options are located in $CONF file. See here for more:
 # http://dochub.mongodb.org/core/configurationoptions
-CONF=/etc/mongodb.conf
+CONF=/etc/mongod.conf
 PIDFILE=/var/run/$NAME.pid
 ENABLE_MONGODB=yes
 
