@@ -280,7 +280,7 @@ namespace mongo {
          *          -- unless it is a dbref ($ref/$id/[$db]/...)
          */
         inline bool okForStorage() const {
-            return _okForStorage(false);
+            return _okForStorage(false).isOK();
         }
 
         /** Same as above with the following extra restrictions
@@ -290,6 +290,26 @@ namespace mongo {
          *          -- Array
          */
         inline bool okForStorageAsRoot() const {
+            return _okForStorage(true).isOK();
+        }
+
+        /**
+         * Validates that this can be stored as an embedded document
+         * See details above in okForStorage
+         *
+         * If not valid a user readable status message is returned.
+         */
+        inline Status storageValidEmbedded() const {
+            return _okForStorage(false);
+        }
+
+        /**
+         * Validates that this can be stored as a document (in a collection)
+         * See details above in okForStorageAsRoot
+         *
+         * If not valid a user readable status message is returned.
+         */
+        inline Status storageValid() const {
             return _okForStorage(true);
         }
 
@@ -543,7 +563,7 @@ namespace mongo {
                 _assertInvalid();
         }
 
-        bool _okForStorage(bool root) const;
+        Status _okForStorage(bool root) const;
     };
 
     std::ostream& operator<<( std::ostream &s, const BSONObj &o );
