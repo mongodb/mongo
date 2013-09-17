@@ -84,9 +84,6 @@ namespace mongo {
         DataFileMgr();
         void init(const string& path );
 
-        /* see if we can find an extent of the right size in the freelist. */
-        static Extent* allocFromFreeList(const char *ns, int approxSize, bool capped = false);
-
         /** @return DiskLoc where item ends up */
         // changedId should be initialized to false
         const DiskLoc updateRecord(

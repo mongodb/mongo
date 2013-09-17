@@ -57,7 +57,7 @@ namespace mongo {
                 _init();
         }
 
-        void add_ns( const StringData& ns, DiskLoc& loc, bool capped);
+        void add_ns( const StringData& ns, const DiskLoc& loc, bool capped);
         void add_ns( const StringData& ns, const NamespaceDetails* details );
         void add_ns( const Namespace& ns, const NamespaceDetails* details );
 

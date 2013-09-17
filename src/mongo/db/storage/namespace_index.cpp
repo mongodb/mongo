@@ -53,7 +53,7 @@ namespace mongo {
         return d;
     }
 
-    void NamespaceIndex::add_ns(const StringData& ns, DiskLoc& loc, bool capped) {
+    void NamespaceIndex::add_ns(const StringData& ns, const DiskLoc& loc, bool capped) {
         NamespaceDetails details( loc, capped );
         add_ns( ns, &details );
     }

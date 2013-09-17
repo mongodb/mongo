@@ -42,6 +42,7 @@
 namespace mongo {
 
     class DataFile;
+    class NamespaceDetails;
 
     /**
      * ExtentManager basics
@@ -61,13 +62,26 @@ namespace mongo {
         MONGO_DISALLOW_COPYING( ExtentManager );
 
     public:
-        ExtentManager( const StringData& dbname, const StringData& path, bool directoryPerDB );
+        /**
+         * @param freeListDetails this is a reference into the .ns file
+         *        while a bit odd, this is not a layer violation as extents
+         *        are a peer to the .ns file, without any layering
+         */
+        ExtentManager( const StringData& dbname, const StringData& path,
+                       NamespaceDetails* freeListDetails,
+                       bool directoryPerDB );
+
         ~ExtentManager();
 
         /**
          * deletes all state and puts back to original state
          */
         void reset();
+
+        /**
+         * can only be called once
+         */
+        void init( NamespaceDetails* freeListDetails );
 
         /**
          * opens all current files
@@ -85,10 +99,25 @@ namespace mongo {
 
         void flushFiles( bool sync );
 
-        /* allocate a new Extent
+        /* allocate a new Extent, does not check free list
            @param capped - true if capped collection
         */
         Extent* createExtent( const char *ns, int approxSize, bool newCapped, bool enforceQuota );
+
+        /**
+         * will return NULL if nothing suitable in free list
+         */
+        Extent* allocFromFreeList( const char *ns, int approxSize, bool capped = false);
+
+
+        /**
+         * firstExt has to be == lastExt or a chain
+         */
+        void freeExtents( DiskLoc firstExt, DiskLoc lastExt );
+
+        void printFreeList() const;
+
+        bool hasFreeList() const { return _freeListDetails != NULL; }
 
         /**
          * @param loc - has to be for a specific Record
@@ -141,6 +170,7 @@ namespace mongo {
 
         std::string _dbname; // i.e. "test"
         std::string _path; // i.e. "/data/db"
+        NamespaceDetails* _freeListDetails;
         bool _directoryPerDB;
 
         // must be in the dbLock when touching this (and write locked when writing to of course)
