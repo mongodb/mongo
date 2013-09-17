@@ -31,7 +31,7 @@
 namespace mongo {
 
     // TODO: remove when all runners implement this function
-    void Runner::writeExplainTo(BSONObjBuilder * bob) {
+    void Runner::writeExplainTo(BSONObjBuilder * bob) const {
     }
 
 } // namespace mongo

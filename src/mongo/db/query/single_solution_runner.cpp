@@ -30,7 +30,7 @@
 
 namespace mongo {
 
-    void SingleSolutionRunner::writeExplainTo(BSONObjBuilder * bob) {
+    void SingleSolutionRunner::writeExplainTo(BSONObjBuilder * bob) const {
         if (NULL == bob) {
             return;
         }

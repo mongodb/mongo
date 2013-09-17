@@ -172,7 +172,7 @@ namespace mongo {
          * TODO: Provide default no-op implementation to minimize impact on affected
          *       implementations. Convert to pure virtual eventually.
          */
-        virtual void writeExplainTo(BSONObjBuilder * bob); // = 0;
+        virtual void writeExplainTo(BSONObjBuilder * bob) const; // = 0;
     };
 
 }  // namespace mongo

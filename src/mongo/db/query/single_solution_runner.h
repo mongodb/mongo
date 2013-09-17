@@ -76,7 +76,7 @@ namespace mongo {
 
         virtual void kill() { _exec->kill(); }
 
-        virtual void writeExplainTo(BSONObjBuilder * bob);
+        virtual void writeExplainTo(BSONObjBuilder * bob) const;
     private:
         scoped_ptr<CanonicalQuery> _canonicalQuery;
         scoped_ptr<QuerySolution> _solution;
