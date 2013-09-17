@@ -36,6 +36,7 @@
 #include "mongo/db/ops/log_builder.h"
 #include "mongo/db/ops/path_support.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
@@ -163,7 +164,8 @@ namespace mongo {
             : doc(*targetDoc)
             , idxFound(0)
             , elemFound(doc.end())
-            , boundDollar("") {
+            , boundDollar("")
+            , arraySize(0) {
         }
 
         // Document that is going to be changed.
@@ -177,6 +179,8 @@ namespace mongo {
 
         // Value to bind to a $-positional field, if one is provided.
         std::string boundDollar;
+
+        size_t arraySize;
 
     };
 
@@ -477,6 +481,10 @@ namespace mongo {
 
         }
 
+        // Get count for oplog logging
+        // This is the count of the array before we change it, or 0 if missing from the doc.
+        _preparedState->arraySize = countChildren(_preparedState->elemFound);
+
         // 2. Concatenate the two arrays together, either by going over the $each array or by
         // appending the (old style $push) element. Note that if we're the latter case, we
         // won't need to proceed to the $sort and $slice phases of the apply.
@@ -496,7 +504,7 @@ namespace mongo {
             if (!elem.ok()) {
                 return Status(ErrorCodes::InternalError, "can't wrap element being $push-ed");
             }
-            return  _preparedState->elemFound.pushBack(elem);
+            return _preparedState->elemFound.pushBack(elem);
         }
 
         // 3. Sort the resulting array, if $sort was requested.
@@ -528,23 +536,48 @@ namespace mongo {
     }
 
     Status ModifierPush::log(LogBuilder* logBuilder) const {
-        // TODO We can log just a positional set in several cases. For now, let's just log the
-        // full resulting array.
 
-        // We'd like to create an entry such as {$set: {<fieldname>: [<resulting aray>]}} under
-        // 'logRoot'.  We start by creating the {$set: ...} Element.
-        mutablebson::Document& doc = logBuilder->getDocument();
+        // The start position to use for positional (ordinal) updates to the array
+        // (We will increment as we append elements to the oplog entry so can't be const)
+        size_t position = _preparedState->arraySize;
 
-        // value for the logElement ("field.path.name": <value>)
-        mutablebson::Element logElement = doc.makeElementWithNewFieldName(
-            _fieldRef.dottedField(),
-            _preparedState->elemFound);
+        // NOTE: Idempotence Requirement
+        // In the case that the document does't have an array or it is empty we need to make sure
+        // that the first time the field gets filled with items that it is a full set of the array.
 
-        if (!logElement.ok()) {
-            return Status(ErrorCodes::InternalError, "cannot create details for $push mod");
+        // If we sorted, sliced, or added the first items to the array, make a full array copy.
+        const bool doFullCopy = _slicePresent || _sortPresent || (position == 0);
+
+        if (doFullCopy) {
+            return logBuilder->addToSetsWithNewFieldName(_fieldRef.dottedField(),
+                                                         _preparedState->elemFound);
         }
+        else {
+            // Set only the positional elements appended
+            if (_eachMode || _pushMode == PUSH_ALL) {
+                // For each input element log it as a posisional $set
+                BSONObjIterator itEach(_eachElem.embeddedObject());
+                while (itEach.more()) {
+                    BSONElement eachItem = itEach.next();
+                    // value for the logElement ("field.path.name.N": <value>)
+                    const std::string positionalName =
+                        mongoutils::str::stream() << _fieldRef.dottedField() << "." << position++;
 
-        return logBuilder->addToSets(logElement);
+                    Status s = logBuilder->addToSetsWithNewFieldName(positionalName, eachItem);
+                    if (!s.isOK())
+                        return s;
+                }
+
+                return Status::OK();
+            }
+            else {
+               // single value for the logElement ("field.path.name.N": <value>)
+               const std::string positionalName =
+                   mongoutils::str::stream() << _fieldRef.dottedField() << "." << position++;
+
+               return logBuilder->addToSetsWithNewFieldName(positionalName, _val);
+            }
+        }
     }
 
 } // namespace mongo
