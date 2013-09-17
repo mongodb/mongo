@@ -64,12 +64,52 @@ namespace mongo {
          */
         Status addToSets(mutablebson::Element elt);
 
+        /**
+         * Convenience method which calls addToSets after
+         * creating a new Element to wrap the SafeNum value.
+         *
+         * If any problem occurs then the operation will stop and return that error Status.
+         */
+        Status addToSets(const StringData& name, const SafeNum& val);
+
+        /**
+         * Convenience method which calls addToSets after
+         * creating a new Element to wrap the old one.
+         *
+         * If any problem occurs then the operation will stop and return that error Status.
+         */
+        Status addToSetsWithNewFieldName(const StringData& name, const mutablebson::Element val);
+
+        /**
+         * Convenience method which calls addToSets after
+         * creating a new Element to wrap the old one.
+         *
+         * If any problem occurs then the operation will stop and return that error Status.
+         */
+        Status addToSetsWithNewFieldName(const StringData& name, const BSONElement& val);
+
         /** Add the given Element as a new entry in the '$unset' section of the log. If an
          *  '$unset' section does not yet exist, it will be created. If this LogBuilder is
          *  currently configured to contain an object replacement, the request to add to the
          *  $unset section will return an Error.
          */
         Status addToUnsets(mutablebson::Element elt);
+
+        /**
+         * Convenience method which calls addToUnsets after
+         * creating a new Element to wrap the old one.
+         *
+         * If any problem occurs then the operation will stop and return that error Status.
+         */
+        Status addToUnsetsWithNewFieldName(const StringData& name, const mutablebson::Element val);
+
+        /**
+         * Convenience method which calls addToUnsets after
+         * creating a new Element to wrap the old one.
+         *
+         * If any problem occurs then the operation will stop and return that error Status.
+         */
+        Status addToUnsetsWithNewFieldName(const StringData& name, const BSONElement& val);
 
         /** Obtain, via the out parameter 'outElt', a pointer to the mongo::Object type Element
          *  to which the components of an object replacement should be recorded. It is an error
