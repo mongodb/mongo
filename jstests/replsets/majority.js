@@ -18,12 +18,12 @@ var port = replTest.ports;
 var config = {_id : name, members :
         [
          {_id:0, host : host+":"+port[0], priority : 2},
-         {_id:1, host : host+":"+port[1], votes : 3},
+         {_id:1, host : host+":"+port[1]},
          {_id:2, host : host+":"+port[2]},
-         {_id:3, host : host+":"+port[3], arbiterOnly : true},
-         {_id:4, host : host+":"+port[4], arbiterOnly : true},
-         {_id:5, host : host+":"+port[5], arbiterOnly : true},
-         {_id:6, host : host+":"+port[6], arbiterOnly : true},
+         {_id:3, host : host+":"+port[3], arbiterOnly : true, votes: 0},
+         {_id:4, host : host+":"+port[4], arbiterOnly : true, votes: 0},
+         {_id:5, host : host+":"+port[5], arbiterOnly : true, votes: 0},
+         {_id:6, host : host+":"+port[6], arbiterOnly : true, votes: 0},
         ],
              };
 replTest.initiate(config);
