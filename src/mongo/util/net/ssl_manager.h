@@ -43,7 +43,7 @@ namespace mongo {
         BIO* internalBIO;
         Socket* socket;
 
-        SSLConnection(SSL_CTX* ctx, Socket* sock); 
+        SSLConnection(SSL_CTX* ctx, Socket* sock, const char* initialBytes, int len); 
 
         ~SSLConnection();
     };
@@ -64,7 +64,7 @@ namespace mongo {
          * Throws SocketException on failure.
          * @return a pointer to an SSLConnection. Resources are freed in SSLConnection's destructor
          */
-        virtual SSLConnection* accept(Socket* socket) = 0;
+        virtual SSLConnection* accept(Socket* socket, const char* initialBytes, int len) = 0;
 
         /**
          * Fetches a peer certificate and validates it if it exists

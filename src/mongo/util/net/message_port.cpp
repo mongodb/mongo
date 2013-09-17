@@ -27,6 +27,7 @@
 #include "mongo/util/goodies.h"
 #include "mongo/util/net/listen.h"
 #include "mongo/util/net/message.h"
+#include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/time_support.h"
 
@@ -153,51 +154,64 @@ namespace mongo {
         shutdown();
         ports.erase(this);
     }
-
+    
     bool MessagingPort::recv(Message& m) {
         try {
 again:
             //mmm( log() << "*  recv() sock:" << this->sock << endl; )
-            int len = -1;
-
-            char *lenbuf = (char *) &len;
-            int lft = 4;
-            psock->recv( lenbuf, lft );
-
-            if ( len < 16 || len > MaxMessageSizeBytes ) { // messages must be large enough for headers
-                if ( len == -1 ) {
-                    // Endian check from the client, after connecting, to see what mode server is running in.
-                    unsigned foo = 0x10203040;
-                    send( (char *) &foo, 4, "endian" );
-                    goto again;
-                }
-
-                if ( len == 542393671 ) {
-                    // an http GET
-                    string msg = "It looks like you are trying to access MongoDB over HTTP on the native driver port.\n";
-                    LOG( psock->getLogLevel() ) << msg << endl;
-                    stringstream ss;
-                    ss << "HTTP/1.0 200 OK\r\nConnection: close\r\nContent-Type: text/plain\r\nContent-Length: " << msg.size() << "\r\n\r\n" << msg;
-                    string s = ss.str();
-                    send( s.c_str(), s.size(), "http" );
-                    return false;
-                }
-                LOG(0) << "recv(): message len " << len << " is too large. "
-                       << "Max is " << MaxMessageSizeBytes << endl;
+            MSGHEADER header;
+            int headerLen = sizeof(MSGHEADER);
+            psock->recv( (char *)&header, headerLen );
+            int len = header.messageLength; 
+ 
+            if ( len == 542393671 ) {
+                // an http GET
+                string msg = "It looks like you are trying to access MongoDB over HTTP on the native driver port.\n";
+                LOG( psock->getLogLevel() ) << msg << endl;
+                stringstream ss;
+                ss << "HTTP/1.0 200 OK\r\nConnection: close\r\nContent-Type: text/plain\r\nContent-Length: " << msg.size() << "\r\n\r\n" << msg;
+                string s = ss.str();
+                send( s.c_str(), s.size(), "http" );
                 return false;
             }
-
+            else if ( len == -1 ) {
+                // Endian check from the client, after connecting, to see what mode server is running in.
+                unsigned foo = 0x10203040;
+                send( (char *) &foo, 4, "endian" );
+                psock->setHandshakeReceived();
+                goto again;
+            }
+            // If responseTo is not 0 or -1 for first packet assume SSL
+            else if (psock->isAwaitingHandshake() && 
+                     header.responseTo != 0 && header.responseTo != -1) {
+#ifdef MONGO_SSL
+                uassert(17132, "SSL handshake received but server is started without SSL support",
+                        NULL != getSSLManager());
+                psock->setHandshakeReceived();
+                setX509SubjectName(psock->doSSLHandshake(
+                                   reinterpret_cast<const char*>(&header), sizeof(header)));
+                goto again;
+#else 
+                uasserted(17133, "SSL handshake requested, SSL feature not available in this build");  
+#endif // MONGO_SSL
+            }
+            else if ( len < static_cast<int>(sizeof(MSGHEADER)) || len > MaxMessageSizeBytes ) {
+                LOG(0) << "recv(): message len " << len << " is invalid. "
+                       << "Min " << sizeof(MSGHEADER) << " Max: " << MaxMessageSizeBytes << endl;
+                return false;
+            }
+ 
+            psock->setHandshakeReceived();
             int z = (len+1023)&0xfffffc00;
             verify(z>=len);
             MsgData *md = (MsgData *) malloc(z);
             ScopeGuard guard = MakeGuard(free, md);
             verify(md);
-            md->len = len;
 
-            char *p = (char *) &md->id;
-            int left = len -4;
+            memcpy(md, &header, headerLen);
+            int left = len - headerLen;
 
-            psock->recv( p, left );
+            psock->recv( (char *)&md->_data, left );
 
             guard.Dismiss();
             m.setData(md, true);

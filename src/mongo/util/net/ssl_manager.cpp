@@ -163,7 +163,7 @@ namespace mongo {
 
             virtual SSLConnection* connect(Socket* socket);
 
-            virtual SSLConnection* accept(Socket* socket);
+            virtual SSLConnection* accept(Socket* socket, const char* initialBytes, int len);
 
             virtual std::string validatePeerCertificate(const SSLConnection* conn);
 
@@ -316,7 +316,10 @@ namespace mongo {
         return result;
     }
 
-    SSLConnection::SSLConnection(SSL_CTX* context, Socket* sock) : socket(sock) {
+    SSLConnection::SSLConnection(SSL_CTX* context, 
+                                 Socket* sock, 
+                                 const char* initialBytes, 
+                                 int len) : socket(sock) {
         // This just ensures that SSL multithreading support is set up for this thread,
         // if it's not already.
         SSLThreadInfo::get();
@@ -329,6 +332,14 @@ namespace mongo {
 
         BIO_new_bio_pair(&internalBIO, BUFFER_SIZE, &networkBIO, BUFFER_SIZE);
         SSL_set_bio(ssl, internalBIO, internalBIO);
+
+        if (len > 0) {
+            int toBIO = BIO_write(networkBIO, initialBytes, len);
+            if (toBIO != len) {
+                LOG(3) << "Failed to write initial network data to the SSL BIO layer";
+                throw SocketException(SocketException::RECV_ERROR , socket->remoteString());
+            }
+        }
     }
 
     SSLConnection::~SSLConnection() {
@@ -712,7 +723,7 @@ namespace mongo {
     }
 
     SSLConnection* SSLManager::connect(Socket* socket) {
-        SSLConnection* sslConn = new SSLConnection(_clientContext, socket);
+        SSLConnection* sslConn = new SSLConnection(_clientContext, socket, NULL, 0);
         ScopeGuard sslGuard = MakeGuard(::SSL_free, sslConn->ssl);
         ScopeGuard bioGuard = MakeGuard(::BIO_free, sslConn->networkBIO);
  
@@ -729,8 +740,8 @@ namespace mongo {
         return sslConn;
     }
 
-    SSLConnection* SSLManager::accept(Socket* socket) {
-        SSLConnection* sslConn = new SSLConnection(_serverContext, socket);
+    SSLConnection* SSLManager::accept(Socket* socket, const char* initialBytes, int len) {
+        SSLConnection* sslConn = new SSLConnection(_serverContext, socket, initialBytes, len);
         ScopeGuard sslGuard = MakeGuard(::SSL_free, sslConn->ssl);
         ScopeGuard bioGuard = MakeGuard(::BIO_free, sslConn->networkBIO);
  
