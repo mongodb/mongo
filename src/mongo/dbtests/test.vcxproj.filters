@@ -973,9 +973,6 @@
     <ClInclude Include="..\util\stringutils.h">
       <Filter>util\Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\util\systeminfo.h">
-      <Filter>util\Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="..\util\text.h">
       <Filter>util\Header Files</Filter>
     </ClInclude>
@@ -3800,9 +3797,6 @@
     </ClCompile>
     <ClCompile Include="..\db\interrupt_status_mongod.cpp">
       <Filter>db\Source Files\e to n</Filter>
-    </ClCompile>
-    <ClCompile Include="..\util\systeminfo_win32.cpp">
-      <Filter>util\Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\base\string_data.cpp">
       <Filter>base</Filter>

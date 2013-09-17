@@ -534,9 +534,6 @@
     <ClCompile Include="..\util\stringutils.cpp">
       <Filter>util\Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\util\systeminfo_win32.cpp">
-      <Filter>util\Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\util\text.cpp">
       <Filter>util\Source Files</Filter>
     </ClCompile>
@@ -2014,9 +2011,6 @@
       <Filter>util\Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\util\stacktrace.h">
-      <Filter>util\Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\util\systeminfo.h">
       <Filter>util\Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\util\timer-win32-inl.h">

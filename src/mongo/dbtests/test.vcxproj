@@ -1102,7 +1102,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClInclude Include="..\util\stringutils.h" />
     <ClInclude Include="..\util\string_map.h" />
     <ClInclude Include="..\util\string_map_internal.h" />
-    <ClInclude Include="..\util\systeminfo.h" />
     <ClInclude Include="..\util\text.h" />
     <ClInclude Include="..\util\timer-inl.h" />
     <ClInclude Include="..\util\timer-win32-inl.h" />
@@ -3857,7 +3856,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="..\util\stack_introspect.cpp" />
     <ClCompile Include="..\util\startup_test.cpp" />
     <ClCompile Include="..\util\stringutils.cpp" />
-    <ClCompile Include="..\util\systeminfo_win32.cpp" />
     <ClCompile Include="..\util\text.cpp" />
     <ClCompile Include="..\util\timer.cpp" />
     <ClCompile Include="..\util\time_support.cpp" />
