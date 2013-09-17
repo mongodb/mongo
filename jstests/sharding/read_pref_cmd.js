@@ -1,4 +1,3 @@
-if (0) { // SERVER-10429, SERVER-7533
 load("jstests/replsets/rslib.js");
 
 var NODE_COUNT = 2;
@@ -320,28 +319,15 @@ jsTest.log('got rsconf ' + tojson(rsConfig));
 
 var replConn = new Mongo(st.rs0.getURL());
 
-// TODO: use api in SERVER-7533 once available.
-// Make sure replica set connection is ready by repeatedly performing a dummy query
-// against the secondary until it succeeds. This hack is needed because awaitRSClientHosts
-// won't work on the shell's instance of the ReplicaSetMonitor.
-assert.soon(function() {
-    try {
-        replConn.getDB('test').user.find().readPref('secondary').hasNext();
-        return true;
-    }
-    catch (x) {
-        // Intentionally caused an error that forces the monitor to refresh.
-        print('Caught exception while doing dummy query: ' + tojson(x));
-        return false;
-    }
-});
+// Make sure replica set connection is ready
+_awaitRSHostViaRSMonitor(st.rs0.nodeList()[0], {ok: true}, "test-rs0");
+_awaitRSHostViaRSMonitor(st.rs0.nodeList()[1], {ok: true}, "test-rs0");
 
-testAllModes(replConn, st.rs0.nodes, false);
+//TODO: fix and reenable the testAllModes portions of this test
+//testAllModes(replConn, st.rs0.nodes, false);
 
 jsTest.log('Starting test for mongos connection');
 
-testAllModes(st.s, st.rs0.nodes, true);
+//testAllModes(st.s, st.rs0.nodes, true);
 
 st.stop();
-
-}

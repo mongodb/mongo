@@ -1083,6 +1083,60 @@ Geo.sphereDistance = function( a , b ){
 
 rs = function () { return "try rs.help()"; }
 
+/**
+ * This method is intended to aid in the writing of tests. It takes a host's address, desired state,
+ * and replicaset and waits either timeout milliseconds or until that reaches the desired state.
+ *
+ * It should be used instead of awaitRSClientHost when there is no MongoS with a connection to the
+ * replica set.
+ */
+_awaitRSHostViaRSMonitor = function(hostAddr, desiredState, rsName, timeout) {
+    timeout = timeout || 60 * 1000;
+
+    if (desiredState == undefined) {
+        desiredState = {ok: true};
+    }
+
+    print("Awaiting " + hostAddr + " to be " + tojson(desiredState) + " in " + " rs " + rsName)
+
+    var tests = 0;
+    assert.soon(function() {
+        var stats = _replMonitorStats(rsName);
+        if (tests++ % 10 == 0) {
+            printjson(stats);
+        }
+
+        for (var i=0; i<stats.length; i++) {
+            var node = stats[i]
+            printjson(node);
+            if (node["addr"] !== hostAddr)
+                continue;
+
+            // Check that *all* hostAddr properties match desiredState properties
+            var stateReached = true;
+            for(var prop in desiredState) {
+                if (isObject(desiredState[prop])) {
+                    if (!friendlyEqual(desiredState[prop], node[prop])) {
+                        stateReached = false;
+                        break;
+                    }
+                }
+                else if (node[prop] !== desiredState[prop]) {
+                    stateReached = false;
+                    break;
+                }
+            }
+            if (stateReached) {
+                printjson(stats);
+                return true;
+            }
+        }
+        return false;
+    }, "timed out waiting for replica set member: " + hostAddr + " to reach state: " +
+            tojson(desiredState),
+    timeout);
+}
+
 rs.help = function () {
     print("\trs.status()                     { replSetGetStatus : 1 } checks repl set status");
     print("\trs.initiate()                   { replSetInitiate : null } initiates set with default settings");
