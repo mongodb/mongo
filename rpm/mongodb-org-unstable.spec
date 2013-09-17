@@ -1,6 +1,6 @@
 Name: mongodb-org-unstable
 Conflicts: mongo, mongo-10gen, mongo-10gen-enterprise, mongodb, mongodb-org, mongodb-org-enterprise
-Version: 2.4.3
+Version: 2.5.2
 Release: mongodb_1%{?dist}
 Summary: MongoDB server, shell, sharding server and tools
 License: AGPL 3.0
