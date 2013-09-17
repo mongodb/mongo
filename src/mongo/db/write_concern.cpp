@@ -60,7 +60,7 @@ namespace mongo {
                 return true;
             }
             if( cmdObj["fsync"].trueValue() ) {
-                *errmsg = "fsync and j options are not used together";
+                *errmsg = "fsync and j options cannot be used together";
                 return false;
             }
         }
