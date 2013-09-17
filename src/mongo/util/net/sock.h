@@ -204,7 +204,6 @@ namespace mongo {
 
         bool connect(SockAddr& farEnd);
         void close();
-        
         void send( const char * data , int len, const char *context );
         void send( const std::vector< std::pair< char *, int > > &data, const char *context );
 
@@ -229,6 +228,14 @@ namespace mongo {
         void setTimeout( double secs );
         bool isStillConnected();
 
+        void setHandshakeReceived() {
+            _awaitingHandshake = false;
+        }
+
+        bool isAwaitingHandshake() {
+            return _awaitingHandshake;
+        }
+
 #ifdef MONGO_SSL
         /** secures inline */
         void secure( SSLManagerInterface* ssl );
@@ -241,9 +248,13 @@ namespace mongo {
          * are desired. SSL_accept() waits until the remote host calls
          * SSL_connect(). The return value is the subject name of any
          * client certificate provided during the handshake.
+         *
+         * @firstBytes is the first bytes received on the socket used
+         * to detect the connection SSL, @len is the number of bytes
+         *
          * This function may throw SocketException.
          */
-        std::string doSSLHandshake();
+        std::string doSSLHandshake(const char* firstBytes = NULL, int len = 0);
         
         /**
          * @return the time when the socket was opened.
@@ -282,6 +293,9 @@ namespace mongo {
         SSLManagerInterface* _sslManager;
 #endif
         logger::LogSeverity _logLevel; // passed to log() when logging errors
+ 
+        /** true until the first packet has been received or an outgoing connect has been made */
+        bool _awaitingHandshake;
 
     };
 

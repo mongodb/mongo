@@ -191,10 +191,6 @@ namespace mongo {
 
                 otherSide = p->psock->remoteString();
 
-#ifdef MONGO_SSL
-                std::string x509SubjectName = p->psock->doSSLHandshake();
-                inPort->setX509SubjectName(x509SubjectName);
-#endif 
                 handler->connected( p.get() );
 
                 while ( ! inShutdown() ) {
