@@ -82,9 +82,9 @@ mkdir -p $RPM_BUILD_ROOT/etc
 cp -v rpm/mongod.conf $RPM_BUILD_ROOT/etc/mongod.conf
 mkdir -p $RPM_BUILD_ROOT/etc/sysconfig
 cp -v rpm/mongod.sysconfig $RPM_BUILD_ROOT/etc/sysconfig/mongod
-mkdir -p $RPM_BUILD_ROOT/var/lib/mongo
-mkdir -p $RPM_BUILD_ROOT/var/log/mongo
-touch $RPM_BUILD_ROOT/var/log/mongo/mongod.log
+mkdir -p $RPM_BUILD_ROOT/var/lib/mongodb
+mkdir -p $RPM_BUILD_ROOT/var/log/mongodb
+touch $RPM_BUILD_ROOT/var/log/mongodb/mongod.log
 
 %clean
 rm -rf $RPM_BUILD_ROOT
@@ -94,7 +94,7 @@ if ! /usr/bin/id -g mongod &>/dev/null; then
     /usr/sbin/groupadd -r mongod
 fi
 if ! /usr/bin/id mongod &>/dev/null; then
-    /usr/sbin/useradd -M -r -g mongod -d /var/lib/mongo -s /bin/false 	-c mongod mongod > /dev/null 2>&1
+    /usr/sbin/useradd -M -r -g mongod -d /var/lib/mongodb -s /bin/false 	-c mongod mongod > /dev/null 2>&1
 fi
 
 %post server
@@ -124,9 +124,9 @@ fi
 %{_mandir}/man1/mongod.1*
 /etc/rc.d/init.d/mongod
 /etc/sysconfig/mongod
-%attr(0755,mongod,mongod) %dir /var/lib/mongo
-%attr(0755,mongod,mongod) %dir /var/log/mongo
-%attr(0640,mongod,mongod) %config(noreplace) %verify(not md5 size mtime) /var/log/mongo/mongod.log
+%attr(0755,mongod,mongod) %dir /var/lib/mongodb
+%attr(0755,mongod,mongod) %dir /var/log/mongodb
+%attr(0640,mongod,mongod) %config(noreplace) %verify(not md5 size mtime) /var/log/mongodb/mongod.log
 
 %files shell
 %defattr(-,root,root,-)

@@ -27,11 +27,11 @@ case "$1" in
 		adduser mongodb mongodb
         fi
 
-	# create db -- note: this should agree with dbpath in mongodb.conf
+	# create db -- note: this should agree with dbpath in mongod.conf
 	mkdir -p /var/lib/mongodb
 	chown -R mongodb:mongodb /var/lib/mongodb
 
-	# create logdir -- note: this should agree with logpath in mongodb.conf
+	# create logdir -- note: this should agree with logpath in mongod.conf
 	mkdir -p /var/log/mongodb
 	chown -R mongodb:mongodb /var/log/mongodb
     ;;
