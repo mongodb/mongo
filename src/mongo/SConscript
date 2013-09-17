@@ -411,15 +411,6 @@ if has_option( "mm" ):
 else:
     mmapFiles += [ "util/mmap_${OS_FAMILY}.cpp" ]
 
-# handle systeminfo*
-systemInfoPlatformFile = env.File( "util/systeminfo_${PYSYSPLATFORM}.cpp" )
-# NOTE( schwerin ): This is a very un-scons-y way to make this decision, and prevents one from using
-# code generation to produce util/systeminfo_$PYSYSPLATFORM.cpp.
-if not os.path.exists( str( systemInfoPlatformFile ) ):
-    systemInfoPlatformFile = env.File( "util/systeminfo_none.cpp" )
-
-coreServerFiles.append( systemInfoPlatformFile )
-
 if has_option( "asio" ):
     coreServerFiles += [ "util/net/message_server_asio.cpp" ]
 

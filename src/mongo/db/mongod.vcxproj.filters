@@ -458,9 +458,6 @@
     <ClCompile Include="..\util\stringutils.cpp">
       <Filter>util\Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\util\systeminfo_win32.cpp">
-      <Filter>util\Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\client\syncclusterconnection.cpp">
       <Filter>client\Source Files</Filter>
     </ClCompile>
@@ -2123,12 +2120,6 @@
     <ClCompile Include="..\util\processinfo_test.cpp">
       <Filter>util\Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\util\systeminfo_linux2.cpp">
-      <Filter>util\Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\util\systeminfo_none.cpp">
-      <Filter>util\Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\util\text_startuptest.cpp">
       <Filter>util\Source Files</Filter>
     </ClCompile>
@@ -2752,9 +2743,6 @@
     </ClInclude>
     <ClInclude Include="..\util\concurrency\task.h">
       <Filter>util\concurrency</Filter>
-    </ClInclude>
-    <ClInclude Include="..\util\systeminfo.h">
-      <Filter>util\Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\client\syncclusterconnection.h">
       <Filter>client\Header Files</Filter>
