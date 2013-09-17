@@ -198,7 +198,7 @@ namespace mongo {
          * to PlanStageStats. In future, information specific to the PlanExecutor
          * may be added to this result.
          */
-        void writeExplainTo(BSONObjBuilder * bob) {
+        void writeExplainTo(BSONObjBuilder * bob) const {
             if (NULL == bob) {
                 return;
             }
