@@ -192,6 +192,18 @@ namespace mongo {
             }
         }
 
+        /**
+         * Fills in explain BSONObjectBuilder with any information that
+         * is relevant to the executed query. Initially forwards writeExplainTo()
+         * to PlanStageStats. In future, information specific to the PlanExecutor
+         * may be added to this result.
+         */
+        void writeExplainTo(BSONObjBuilder * bob) {
+            if (NULL == bob) {
+                return;
+            }
+            // TODO: invoke plan stats writeExplainTo()
+        }
     private:
         scoped_ptr<WorkingSet> _workingSet;
         scoped_ptr<PlanStage> _root;
