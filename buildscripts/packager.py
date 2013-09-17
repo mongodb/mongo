@@ -369,10 +369,12 @@ def make_deb(distro, arch, spec, srcdir):
     distro_arch=distro.archname(arch)
     sysassert(["cp", "-v", srcdir+"debian/control", sdir+"debian/"])
     sysassert(["cp", "-v", srcdir+"debian/rules", sdir+"debian/"])
-    sysassert(["cp", "-v", srcdir+"debian/rules", sdir+"debian/"])
+
+    
     # old non-server-package postinst will be hanging around for old versions
     #
-    os.unlink(sdir+"debian/postinst")
+    if os.path.exists(sdir+"debian/postinst"): 
+      os.unlink(sdir+"debian/postinst")
 
     # copy our postinst files
     #
