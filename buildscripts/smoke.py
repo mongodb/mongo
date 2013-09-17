@@ -520,7 +520,7 @@ def runTest(test, result):
 
     proc = Popen(buildlogger(argv), cwd=test_path, stdout=PIPE)
     first_line = proc.stdout.readline() # Get suppressed output URL
-    m = re.search(r"\s*\(output suppressed; see (?P<url>.*)\)$", first_line)
+    m = re.search(r"\s*\(output suppressed; see (?P<url>.*)\)" + os.linesep, first_line)
     if m:
         result["url"] = m.group("url")
     sys.stdout.write(first_line)
