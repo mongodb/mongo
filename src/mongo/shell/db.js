@@ -851,6 +851,8 @@ DB.prototype.loadServerScripts = function(){
 //////////////////////////// Security shell helpers below //////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+var _defaultWriteConcern = { w: 'majority', wtimeout: 30 * 1000 }
+
 function printUserObj(userObj) {
     var pwd = userObj.pwd;
     delete userObj.pwd;
@@ -999,6 +1001,7 @@ DB.prototype._addUserExplicitArgs = function(username, password, roles, replicat
     this._createUser(userObj, replicatedTo, timeout);
 }
 
+// TODO(spencer): properly handle write concern objects in addUser
 DB.prototype.addUser = function() {
     if (arguments.length == 0) {
         throw Error("No arguments provided to addUser");
@@ -1019,7 +1022,7 @@ DB.prototype.addUser = function() {
  * Used for updating users in systems with V1 style user information
  * (ie MongoDB v2.4 and prior)
  */
-DB.prototype._updateUserV1 = function(name, updateObject) {
+DB.prototype._updateUserV1 = function(name, updateObject, writeConcern) {
     var setObj = {};
     if (updateObject.pwd) {
         setObj["pwd"] = _hashPassword(name, updateObject.pwd);
@@ -1033,22 +1036,23 @@ DB.prototype._updateUserV1 = function(name, updateObject) {
 
     db.system.users.update({user : name, userSource : null},
                            {$set : setObj});
-    var err = db.getLastError();
+    var err = db.getLastError(writeConcern['w'], writeConcern['wtimeout']);
     if (err) {
         throw Error("Updating user failed: " + err);
     }
 };
 
-DB.prototype.updateUser = function(name, updateObject) {
+DB.prototype.updateUser = function(name, updateObject, writeConcern) {
     var cmdObj = {updateUser:name};
     cmdObj = Object.extend(cmdObj, updateObject);
+    cmdObj['writeConcern'] =  writeConcern ? writeConcern : _defaultWriteConcern;
     var res = this.runCommand(cmdObj);
     if (res.ok) {
         return;
     }
 
     if (res.errmsg == "no such cmd: updateUser") {
-        this._updateUserV1(name, updateObject);
+        this._updateUserV1(name, updateObject, cmdObj['writeConcern']);
         return;
     }
 
@@ -1060,16 +1064,18 @@ DB.prototype.updateUser = function(name, updateObject) {
     throw Error("Updating user failed: " + res.errmsg);
 };
 
-DB.prototype.changeUserPassword = function(username, password) {
-    this.updateUser(username, {pwd:password});
+DB.prototype.changeUserPassword = function(username, password, writeConcern) {
+    this.updateUser(username, {pwd:password}, writeConcern);
 };
 
 DB.prototype.logout = function(){
     return this.getMongo().logout(this.getName());
 };
 
-DB.prototype.removeUser = function( username ){
-    var res = this.runCommand({removeUser: username});
+DB.prototype.removeUser = function( username, writeConcern ){
+    var cmdObj = {removeUser: username,
+                  writeConcern: writeConcern ? writeConcern : _defaultWriteConcern};
+    var res = this.runCommand(cmdObj);
 
     if (res.ok) {
         return true;
@@ -1081,16 +1087,16 @@ DB.prototype.removeUser = function( username ){
     }
 
     if (res.errmsg == "no such cmd: removeUsers") {
-        return this._removeUserV1(username);
+        return this._removeUserV1(username, cmdObj['writeConcern']);
     }
 
     throw "Couldn't remove user: " + res.errmsg;
 }
 
-DB.prototype._removeUserV1 = function(username) {
+DB.prototype._removeUserV1 = function(username, writeConcern) {
     this.getCollection( "system.users" ).remove( { user : username } );
 
-    var le = db.getLastErrorObj();
+    var le = db.getLastErrorObj(writeConcern['w'], writeConcern['wtimeout']);
 
     if (le.err) {
         throw "Couldn't remove user: " + le.err;
@@ -1103,8 +1109,9 @@ DB.prototype._removeUserV1 = function(username) {
     }
 }
 
-DB.prototype.removeAllUsers = function() {
-    var res = this.runCommand({removeUsersFromDatabase:1});
+DB.prototype.removeAllUsers = function(writeConcern) {
+    var res = this.runCommand({removeUsersFromDatabase:1,
+                               writeConcern: writeConcern ? writeConcern : _defaultWriteConcern});
 
     if (res.n == 0) {
         return false;
@@ -1168,29 +1175,41 @@ DB.prototype.auth = function() {
     return 1;
 }
 
-DB.prototype.grantRolesToUser = function(username, roles) {
-    var res = this.runCommand({grantRolesToUser: username, roles: roles});
+DB.prototype.grantRolesToUser = function(username, roles, writeConcern) {
+    var cmdObj = {grantRolesToUser: username,
+                  roles: roles,
+                  writeConcern: writeConcern ? writeConcern : _defaultWriteConcern};
+    var res = this.runCommand(cmdObj);
     if (!res.ok) {
         throw Error(res.errmsg);
     }
 }
 
-DB.prototype.grantDelegateRolesToUser = function(username, roles) {
-    var res = this.runCommand({grantDelegateRolesToUser: username, roles: roles});
+DB.prototype.grantDelegateRolesToUser = function(username, roles, writeConcern) {
+    var cmdObj = {grantDelegateRolesToUser: username,
+                  roles: roles,
+                  writeConcern: writeConcern ? writeConcern : _defaultWriteConcern};
+    var res = this.runCommand(cmdObj);
     if (!res.ok) {
         throw Error(res.errmsg);
     }
 }
 
-DB.prototype.revokeRolesFromUser = function(username, roles) {
-    var res = this.runCommand({revokeRolesFromUser: username, roles: roles});
+DB.prototype.revokeRolesFromUser = function(username, roles, writeConcern) {
+    var cmdObj = {revokeRolesFromUser: username,
+                  roles: roles,
+                  writeConcern: writeConcern ? writeConcern : _defaultWriteConcern};
+    var res = this.runCommand(cmdObj);
     if (!res.ok) {
         throw Error(res.errmsg);
     }
 }
 
-DB.prototype.revokeDelegateRolesFromUser = function(username, roles) {
-    var res = this.runCommand({revokeDelegateRolesFromUser: username, roles: roles});
+DB.prototype.revokeDelegateRolesFromUser = function(username, roles, writeConcern) {
+    var cmdObj = {revokeDelegateRolesFromUser: username,
+                  roles: roles,
+                  writeConcern: writeConcern ? writeConcern : _defaultWriteConcern};
+    var res = this.runCommand(cmdObj);
     if (!res.ok) {
         throw Error(res.errmsg);
     }
