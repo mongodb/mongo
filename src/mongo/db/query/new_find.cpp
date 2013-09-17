@@ -543,9 +543,9 @@ namespace mongo {
 
         // append explain information to query results
         if (isExplain) {
-            BSONObjBuilder objBuilder;
-            objBuilder.append("n", numResults);
-            BSONObj obj = objBuilder.done();
+            BSONObjBuilder bob;
+            bob.append("n", numResults);
+            BSONObj obj = bob.done();
             bb.appendBuf((void*)obj.objdata(), obj.objsize());
         }
 
