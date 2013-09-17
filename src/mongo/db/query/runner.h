@@ -32,6 +32,8 @@
 
 namespace mongo {
 
+    class DiskLoc;
+
     /**
      * A runner runs a query.
      */
@@ -163,6 +165,14 @@ namespace mongo {
          */
         virtual const string& ns() = 0;
 
+
+        /**
+         * Fill in explain information
+         * This may include data on set of solutions considered and executed query
+         * TODO: Provide default no-op implementation to minimize impact on affected
+         *       implementations. Convert to pure virtual eventually.
+         */
+        virtual void writeExplainTo(BSONObjBuilder * bob); // = 0;
     };
 
 }  // namespace mongo
