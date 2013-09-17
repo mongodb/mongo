@@ -543,7 +543,9 @@ namespace mongo {
 
         // append explain information to query results
         if (isExplain) {
-            mongo::BSONObj obj = BSON("n" << numResults);
+            BSONObjBuilder objBuilder;
+            objBuilder.append("n", numResults);
+            BSONObj obj = objBuilder.done();
             bb.appendBuf((void*)obj.objdata(), obj.objsize());
         }
 
