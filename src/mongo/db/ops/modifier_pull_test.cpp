@@ -544,4 +544,33 @@ namespace {
         ASSERT_EQUALS(fromjson(strings[3]), logDoc);
     }
 
+    TEST(MatchingRegressions, SERVER_3988) {
+        const char* const strings[] = {
+            "{ x: 1, y: [ 2, 3, 4, 'abc', 'xyz' ] }",
+
+            "{ $pull: { y: /yz/ } }",
+
+            "{ x: 1, y: [ 2, 3, 4, 'abc' ] }",
+
+            "{ $set : { y: [ 2, 3, 4, 'abc' ] } }",
+        };
+
+        Document doc(fromjson(strings[0]));
+        Mod mod(fromjson(strings[1]));
+
+        ModifierInterface::ExecInfo execInfo;
+        ASSERT_OK(mod.prepare(doc.root(), "", &execInfo));
+        ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "y");
+        ASSERT_FALSE(execInfo.noOp);
+
+        ASSERT_OK(mod.apply());
+        ASSERT_FALSE(doc.isInPlaceModeEnabled());
+        ASSERT_EQUALS(fromjson(strings[2]), doc);
+
+        Document logDoc;
+        LogBuilder logBuilder(logDoc.root());
+        ASSERT_OK(mod.log(&logBuilder));
+        ASSERT_EQUALS(fromjson(strings[3]), logDoc);
+    }
+
 } // namespace
