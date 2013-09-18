@@ -6,7 +6,7 @@
                Title="!(wix.ProductName)"
                Description="!(wix.ProductName)"
                Level="1">
-        <ComponentRef Id="c_License" />
+        <ComponentGroupRef Id="cg_License" />
         <Feature Id="Server"
                  Title ="Server"
                  Description="The MongoDB server (mongod)"
