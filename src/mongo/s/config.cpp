@@ -34,7 +34,6 @@
 
 #include "mongo/client/connpool.h"
 #include "mongo/client/dbclientcursor.h"
-#include "mongo/db/cmdline.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/s/chunk.h"
 #include "mongo/s/chunk_version.h"
@@ -1066,7 +1065,7 @@ namespace mongo {
 
         if ( withPort ) {
             stringstream ss;
-            ss << name << ":" << CmdLine::ConfigServerPort;
+            ss << name << ":" << ServerGlobalParams::ConfigServerPort;
             return ss.str();
         }
 

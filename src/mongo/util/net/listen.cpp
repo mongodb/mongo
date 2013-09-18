@@ -115,7 +115,8 @@ namespace mongo {
         checkTicketNumbers();
 
 #if !defined(_WIN32)
-        _mine = ipToAddrs(_ip.c_str(), _port, (!cmdLine.noUnixSocket && useUnixSockets()));
+        _mine = ipToAddrs(_ip.c_str(), _port, (!serverGlobalParams.noUnixSocket &&
+                                               useUnixSockets()));
 #else
         _mine = ipToAddrs(_ip.c_str(), _port, false);
 #endif
@@ -289,7 +290,7 @@ namespace mongo {
 
                 long long myConnectionNumber = globalConnectionNumber.addAndFetch(1);
 
-                if ( _logConnect && ! cmdLine.quiet ){
+                if (_logConnect && !serverGlobalParams.quiet) {
                     int conns = globalTicketHolder.used()+1;
                     const char* word = (conns == 1 ? " connection" : " connections");
                     log() << "connection accepted from " << from.toString() << " #" << myConnectionNumber << " (" << conns << word << " now open)" << endl;
@@ -483,7 +484,7 @@ namespace mongo {
 
             long long myConnectionNumber = globalConnectionNumber.addAndFetch(1);
 
-            if ( _logConnect && ! cmdLine.quiet ){
+            if (_logConnect && !serverGlobalParams.quiet) {
                 int conns = globalTicketHolder.used()+1;
                 const char* word = (conns == 1 ? " connection" : " connections");
                 log() << "connection accepted from " << from.toString() << " #" << myConnectionNumber << " (" << conns << word << " now open)" << endl;

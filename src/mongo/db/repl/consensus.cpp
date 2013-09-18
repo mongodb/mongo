@@ -28,7 +28,6 @@
 
 #include "mongo/pch.h"
 
-#include "mongo/db/cmdline.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/repl/multicmd.h"
 #include "mongo/db/repl/rs.h"
@@ -385,7 +384,7 @@ namespace mongo {
 
         rs.sethbmsg("",9);
 
-        if( !allUp && time(0) - cmdLine.started < 60 * 5 ) {
+        if (!allUp && time(0) - serverGlobalParams.started < 60 * 5) {
             /* the idea here is that if a bunch of nodes bounce all at once, we don't want to drop data
                if we don't have to -- we'd rather be offline and wait a little longer instead
                todo: make this configurable.

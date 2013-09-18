@@ -319,11 +319,11 @@ namespace PdfileTests {
     public:
         struct SmallFilesControl {
             SmallFilesControl() {
-                old = cmdLine.smallfiles;
-                cmdLine.smallfiles = false;
+                old = storageGlobalParams.smallfiles;
+                storageGlobalParams.smallfiles = false;
             }
             ~SmallFilesControl() {
-                cmdLine.smallfiles = old;
+                storageGlobalParams.smallfiles = old;
             }
             bool old;
         };

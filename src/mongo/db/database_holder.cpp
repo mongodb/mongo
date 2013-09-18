@@ -56,7 +56,9 @@ namespace mongo {
             bool cant = !Lock::isWriteLocked(ns);
             if( logger::globalLogDomain()->shouldLog(logger::LogSeverity::Debug(1)) ||
                 m.size() > 40 || cant || DEBUG_BUILD ) {
-                log() << "opening db: " << (path==dbpath?"":path) << ' ' << dbname << endl;
+                log() << "opening db: "
+                      << (path == storageGlobalParams.dbpath ? "" : path) << ' ' << dbname
+                      << endl;
             }
             massert(15927, "can't open database in a read lock. if db was just closed, consider retrying the query. might otherwise indicate an internal error", !cant);
         }

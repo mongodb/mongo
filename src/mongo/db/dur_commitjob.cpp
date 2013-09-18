@@ -179,7 +179,7 @@ namespace mongo {
 
         /** note an operation other than a "basic write" */
         void CommitJob::noteOp(shared_ptr<DurOp> p) {
-            dassert( cmdLine.dur );
+            dassert(storageGlobalParams.dur);
             // DurOp's are rare so it is ok to have the lock cost here
             SimpleMutex::scoped_lock lk(groupCommitMutex);
             cc().writeHappened();

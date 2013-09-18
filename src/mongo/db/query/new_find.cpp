@@ -45,7 +45,9 @@
 #include "mongo/db/query/stage_builder.h"
 #include "mongo/db/query/type_explain.h"
 #include "mongo/db/repl/repl_reads_ok.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/server_parameters.h"
+#include "mongo/db/storage_options.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/d_logic.h"
 #include "mongo/s/stale_exception.h"
@@ -166,7 +168,7 @@ namespace mongo {
 
         vector<QuerySolution*> solutions;
         size_t options = QueryPlanner::DEFAULT;
-        if (cmdLine.noTableScan) {
+        if (storageGlobalParams.noTableScan) {
             const string& ns = canonicalQuery->ns();
             // There are certain cases where we ignore this restriction:
             bool ignore = canonicalQuery->getQueryObj().isEmpty()
@@ -386,7 +388,7 @@ namespace mongo {
      */
     std::string newRunQuery(Message& m, QueryMessage& q, CurOp& curop, Message &result) {
         // This is a read lock.
-        Client::ReadContext ctx(q.ns, dbpath);
+        Client::ReadContext ctx(q.ns, storageGlobalParams.dbpath);
 
         // Parse, canonicalize, plan, transcribe, and get a runner.
         Runner* rawRunner;
@@ -560,7 +562,7 @@ namespace mongo {
                 // Fill in the missing run-time fields in explain, starting with propeties of
                 // the process running the query.
                 std::string server = mongoutils::str::stream()
-                    << getHostNameCached() << ":" << cmdLine.port;
+                    << getHostNameCached() << ":" << serverGlobalParams.port;
                 explain->setServer(server);
 
                 // Fill in the number of documents consummed that were involved in an ongoing

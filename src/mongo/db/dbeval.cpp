@@ -36,7 +36,6 @@
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/cmdline.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/introspect.h"
 #include "mongo/db/jsobj.h"
@@ -100,9 +99,9 @@ namespace mongo {
         int res;
         {
             Timer t;
-            res = s->invoke(f, &args, 0, cmdLine.quota ? 10 * 60 * 1000 : 0 );
+            res = s->invoke(f, &args, 0, storageGlobalParams.quota ? 10 * 60 * 1000 : 0);
             int m = t.millis();
-            if ( m > cmdLine.slowMS ) {
+            if (m > serverGlobalParams.slowMS) {
                 out() << "dbeval slow, time: " << dec << m << "ms " << dbName << endl;
                 if ( m >= 1000 ) log() << code << endl;
                 else OCCASIONALLY log() << code << endl;

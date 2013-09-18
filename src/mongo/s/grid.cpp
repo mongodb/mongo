@@ -39,6 +39,7 @@
 #include "mongo/db/json.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/mongos_options.h"
 #include "mongo/s/shard.h"
 #include "mongo/s/type_collection.h"
 #include "mongo/s/type_database.h"
@@ -304,7 +305,7 @@ namespace mongo {
                 vector<HostAndPort> hosts = servers.getServers();
                 for ( size_t i = 0 ; i < hosts.size() ; i++ ) {
                     if (!hosts[i].hasPort()) {
-                        hosts[i].setPort(CmdLine::DefaultDBPort);
+                        hosts[i].setPort(ServerGlobalParams::DefaultDBPort);
                     }
                     string host = hosts[i].toString(); // host:port
                     if ( hostSet.find( host ) == hostSet.end() ) {
@@ -614,7 +615,7 @@ namespace mongo {
     public:
         void run() {
             
-            if ( ! cmdLine.isMongos() )
+            if (!isMongos())
                 return;
 
             // T0 < T1 < now < T2 < T3 and Error

@@ -78,29 +78,44 @@ namespace {
         ASSERT_EQUALS(number, 5);
     }
 
-    TEST(Environment, DefaultValueIterateExplicit) {
+    TEST(ToBSONTests, NormalValues) {
         moe::Environment environment;
-        ASSERT_OK(environment.setDefault(moe::Key("val1"), moe::Value(5)));
-        ASSERT_OK(environment.setDefault(moe::Key("val2"), moe::Value(5)));
         ASSERT_OK(environment.set(moe::Key("val1"), moe::Value(6)));
-        int val1;
-        ASSERT_OK(environment.get(moe::Key("val1"), &val1));
-        ASSERT_EQUALS(val1, 6);
-        int val2;
-        ASSERT_OK(environment.get(moe::Key("val2"), &val2));
-        ASSERT_EQUALS(val2, 5);
-
-        const std::map<moe::Key, moe::Value> values = environment.getExplicitlySet();
-        ASSERT_EQUALS((static_cast<std::map<moe::Key, moe::Value>::size_type>(1)), values.size());
-
-        typedef std::map<moe::Key, moe::Value>::const_iterator it_type;
-        for(it_type iterator = values.begin();
-            iterator != values.end(); iterator++) {
-            ASSERT_EQUALS(moe::Key("val1"), iterator->first);
-            int val1;
-            ASSERT_OK(iterator->second.get(&val1));
-            ASSERT_EQUALS(6, val1);
-        }
+        ASSERT_OK(environment.set(moe::Key("val2"), moe::Value(std::string("string"))));
+        mongo::BSONObj obj = BSON( "val1" << 6 << "val2" << "string" );
+        // TODO: Put a comparison here that doesn't depend on the field order.  Right now it is
+        // based on the sort order of keys in a std::map.
+        ASSERT_EQUALS(obj, environment.toBSON());
     }
 
+    TEST(ToBSONTests, DottedValues) {
+        moe::Environment environment;
+        ASSERT_OK(environment.set(moe::Key("val1.dotted1"), moe::Value(6)));
+        ASSERT_OK(environment.set(moe::Key("val2"), moe::Value(true)));
+        ASSERT_OK(environment.set(moe::Key("val1.dotted2"), moe::Value(std::string("string"))));
+        mongo::BSONObj obj = BSON("val1" << BSON( "dotted1" << 6 << "dotted2" << "string") <<
+                                  "val2" << true );
+        // TODO: Put a comparison here that doesn't depend on the field order.  Right now it is
+        // based on the sort order of keys in a std::map.
+        ASSERT_EQUALS(obj, environment.toBSON());
+    }
+
+    TEST(ToBSONTests, DeepDottedValues) {
+        moe::Environment environment;
+        ASSERT_OK(environment.set(moe::Key("val1.first1.second1.third1"), moe::Value(6)));
+        ASSERT_OK(environment.set(moe::Key("val1.first1.second2.third1"), moe::Value(false)));
+        ASSERT_OK(environment.set(moe::Key("val1.first2"), moe::Value(std::string("string"))));
+        ASSERT_OK(environment.set(moe::Key("val1.first1.second1.third2"), moe::Value(true)));
+        ASSERT_OK(environment.set(moe::Key("val2"), moe::Value(6.0)));
+        mongo::BSONObj obj = BSON("val1" << BSON("first1" <<
+                                                 BSON("second1" <<
+                                                      BSON("third1" << 6 << "third2" << true) <<
+                                                      "second2" <<
+                                                 BSON("third1" << false)) <<
+                                                 "first2" << "string") <<
+                                  "val2" << 6.0);
+        // TODO: Put a comparison here that doesn't depend on the field order.  Right now it is
+        // based on the sort order of keys in a std::map.
+        ASSERT_EQUALS(obj, environment.toBSON());
+    }
 } // unnamed namespace

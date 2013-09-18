@@ -31,7 +31,6 @@
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/clientcursor.h"
-#include "mongo/db/cmdline.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/repl/write_concern.h"
@@ -85,7 +84,7 @@ namespace mongo {
                                                       keyPattern),
                                              false, /*maxInclusive*/
                                              replSet? secondaryThrottle : false,
-                                             cmdLine.moveParanoia ? &removeSaver : NULL,
+                                             serverGlobalParams.moveParanoia ? &removeSaver : NULL,
                                              true, /*fromMigrate*/
                                              true); /*onlyRemoveOrphans*/
 

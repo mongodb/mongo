@@ -22,7 +22,6 @@
 #endif
 
 #if defined(USE_GDBSERVER)
-#include "mongo/db/cmdline.h"
 #include "mongo/db/jsobj.h"
 #endif  // defined(USE_GDBSERVER)
 
@@ -53,13 +52,13 @@ namespace mongo {
      * Assumptions:
      *  1) gdbserver is on your path
      *  2) You have run "handle SIGSTOP noprint" in gdb
-     *  3) cmdLine.port + 2000 is free
+     *  3) serverGlobalParams.port + 2000 is free
      */
     void launchGDB(int) {
         // Don't come back here
         signal(SIGTRAP, SIG_IGN);
 
-        int newPort = cmdLine.port + 2000;
+        int newPort = serverGlobalParams.port + 2000;
         string newPortStr = "localhost:" + BSONObjBuilder::numStr(newPort);
         string pidToDebug = BSONObjBuilder::numStr(getpid());
 

@@ -280,7 +280,7 @@ namespace mongo {
             if( *replInfo )
                 ss << "\nreplInfo:  " << replInfo << "\n\n";
             if( replSet ) {
-                ss << a("", "see replSetGetStatus link top of page") << "--replSet </a>" << cmdLine._replSet;
+                ss << a("", "see replSetGetStatus link top of page") << "--replSet </a>" << replSettings.replSet;
             }
             if ( replAllDead )
                 ss << "\n<b>replication replAllDead=" << replAllDead << "</b>\n";

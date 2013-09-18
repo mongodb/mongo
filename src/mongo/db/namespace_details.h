@@ -645,8 +645,4 @@ namespace mongo {
         }
         return make_inlock(ns);
     }
-
-    extern string dbpath; // --dbpath parm
-    extern bool directoryperdb;
-
 } // namespace mongo

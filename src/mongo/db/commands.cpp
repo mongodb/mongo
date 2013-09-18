@@ -242,7 +242,7 @@ namespace mongo {
 
     void Command::logIfSlow( const Timer& timer, const string& msg ) {
         int ms = timer.millis();
-        if ( ms > cmdLine.slowMS ) {
+        if (ms > serverGlobalParams.slowMS) {
             out() << msg << " took " << ms << " ms." << endl;
         }
     }

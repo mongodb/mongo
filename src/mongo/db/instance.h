@@ -33,9 +33,9 @@
 
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/client.h"
-#include "mongo/db/cmdline.h"
 #include "mongo/db/curop-inl.h"
 #include "mongo/db/dbmessage.h"
+#include "mongo/db/storage_options.h"
 
 namespace mongo {
 
@@ -69,7 +69,8 @@ namespace mongo {
 
     void assembleResponse( Message &m, DbResponse &dbresponse, const HostAndPort &client );
 
-    void getDatabaseNames( vector< string > &names , const string& usePath = dbpath );
+    void getDatabaseNames(vector<std::string> &names,
+                          const std::string& usePath = storageGlobalParams.dbpath);
 
     /* returns true if there is no data on this server.  useful when starting replication.
        local database does NOT count.

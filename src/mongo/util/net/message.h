@@ -17,7 +17,10 @@
 
 #pragma once
 
+#include <vector>
+
 #include "mongo/bson/util/atomic_int.h"
+#include "mongo/util/goodies.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/net/sock.h"
 
@@ -201,12 +204,14 @@ namespace mongo {
 
             verify( _freeIt );
             int totalSize = 0;
-            for( vector< pair< char *, int > >::const_iterator i = _data.begin(); i != _data.end(); ++i ) {
+            for (std::vector< std::pair< char *, int > >::const_iterator i = _data.begin();
+                 i != _data.end(); ++i) {
                 totalSize += i->second;
             }
             char *buf = (char*)malloc( totalSize );
             char *p = buf;
-            for( vector< pair< char *, int > >::const_iterator i = _data.begin(); i != _data.end(); ++i ) {
+            for (std::vector< std::pair< char *, int > >::const_iterator i = _data.begin();
+                 i != _data.end(); ++i) {
                 memcpy( p, i->first, i->second );
                 p += i->second;
             }
@@ -233,7 +238,8 @@ namespace mongo {
                 if ( _buf ) {
                     free( _buf );
                 }
-                for( vector< pair< char *, int > >::const_iterator i = _data.begin(); i != _data.end(); ++i ) {
+                for (std::vector< std::pair< char *, int > >::const_iterator i = _data.begin();
+                     i != _data.end(); ++i) {
                     free(i->first);
                 }
             }
@@ -256,10 +262,10 @@ namespace mongo {
             }
             verify( _freeIt );
             if ( _buf ) {
-                _data.push_back( make_pair( (char*)_buf, _buf->len ) );
+                _data.push_back(std::make_pair((char*)_buf, _buf->len));
                 _buf = 0;
             }
-            _data.push_back( make_pair( d, size ) );
+            _data.push_back(std::make_pair(d, size));
             header()->len += size;
         }
 
@@ -297,7 +303,7 @@ namespace mongo {
         // if just one buffer, keep it in _buf, otherwise keep a sequence of buffers in _data
         MsgData * _buf;
         // byte buffer(s) - the first must contain at least a full MsgData unless using _buf for storage instead
-        typedef vector< pair< char*, int > > MsgVec;
+        typedef std::vector< std::pair< char*, int > > MsgVec;
         MsgVec _data;
         bool _freeIt;
     };

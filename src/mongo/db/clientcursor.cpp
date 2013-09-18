@@ -942,7 +942,7 @@ namespace mongo {
         static Mem mlast;
         try {
             ProcessInfo p;
-            if ( !cmdLine.quiet && p.supported() ) {
+            if (!serverGlobalParams.quiet && p.supported()) {
                 Mem m;
                 m.res = p.getResidentSize();
                 m.virt = p.getVirtualMemorySize();
@@ -951,7 +951,7 @@ namespace mongo {
                 if( now - last >= 300 || m.grew(mlast) ) { 
                     log() << "mem (MB) res:" << m.res << " virt:" << m.virt;
                     long long totalMapped = m.mapped;
-                    if (cmdLine.dur) {
+                    if (storageGlobalParams.dur) {
                         totalMapped *= 2;
                         log() << " mapped (incl journal view):" << totalMapped;
                     }

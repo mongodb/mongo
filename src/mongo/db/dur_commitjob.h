@@ -30,7 +30,6 @@
 
 #pragma once
 
-#include "mongo/db/cmdline.h"
 #include "mongo/db/d_concurrency.h"
 #include "mongo/db/dur.h"
 #include "mongo/db/durop.h"

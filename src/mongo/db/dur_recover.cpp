@@ -36,7 +36,6 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 
-#include "mongo/db/cmdline.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/database.h"
 #include "mongo/db/db.h"
@@ -49,6 +48,7 @@
 #include "mongo/db/kill_current_op.h"
 #include "mongo/db/storage/durable_mapped_file.h"
 #include "mongo/db/pdfile.h"
+#include "mongo/db/storage_options.h"
 #include "mongo/util/bufreader.h"
 #include "mongo/util/checksum.h"
 #include "mongo/util/compress.h"
@@ -206,7 +206,7 @@ namespace mongo {
                 ss << fileNo;
 
             // relative name -> full path name
-            boost::filesystem::path full(dbpath);
+            boost::filesystem::path full(storageGlobalParams.dbpath);
             full /= ss.str();
             return full.string();
         }
@@ -349,8 +349,10 @@ namespace mongo {
         }
 
         void RecoveryJob::applyEntries(const vector<ParsedJournalEntry> &entries) {
-            bool apply = (cmdLine.durOptions & CmdLine::DurScanOnly) == 0;
-            bool dump = cmdLine.durOptions & CmdLine::DurDumpJournal;
+            bool apply = (storageGlobalParams.durOptions &
+                          StorageGlobalParams::DurScanOnly) == 0;
+            bool dump = storageGlobalParams.durOptions &
+                        StorageGlobalParams::DurDumpJournal;
             if( dump )
                 log() << "BEGIN section" << endl;
 
@@ -457,7 +459,8 @@ namespace mongo {
                         uasserted(13536, str::stream() << "journal version number mismatch " << h._version);
                     }
                     fileId = h.fileId;
-                    if(cmdLine.durOptions & CmdLine::DurDumpJournal) { 
+                    if (storageGlobalParams.durOptions &
+                        StorageGlobalParams::DurDumpJournal) {
                         log() << "JHeader::fileId=" << fileId << endl;
                     }
                 }
@@ -467,7 +470,8 @@ namespace mongo {
                     JSectHeader h;
                     br.peek(h);
                     if( h.fileId != fileId ) {
-                        if( debug || (cmdLine.durOptions & CmdLine::DurDumpJournal) ) {
+                        if (debug || (storageGlobalParams.durOptions &
+                                      StorageGlobalParams::DurDumpJournal)) {
                             log() << "Ending processFileBuffer at differing fileId want:" << fileId << " got:" << h.fileId << endl;
                             log() << "  sect len:" << h.sectionLen() << " seqnum:" << h.seqNumber << endl;
                         }
@@ -485,7 +489,7 @@ namespace mongo {
                 }
             }
             catch( BufReader::eof& ) {
-                if( cmdLine.durOptions & CmdLine::DurDumpJournal )
+                if (storageGlobalParams.durOptions & StorageGlobalParams::DurDumpJournal)
                     log() << "ABRUPT END" << endl;
                 return true; // abrupt end
             }
@@ -534,8 +538,10 @@ namespace mongo {
 
             close();
 
-            if( cmdLine.durOptions & CmdLine::DurScanOnly ) {
-                uasserted(13545, str::stream() << "--durOptions " << (int) CmdLine::DurScanOnly << " (scan only) specified");
+            if (storageGlobalParams.durOptions & StorageGlobalParams::DurScanOnly) {
+                uasserted(13545, str::stream() << "--durOptions "
+                                               << (int) StorageGlobalParams::DurScanOnly
+                                               << " (scan only) specified");
             }
 
             log() << "recover cleaning up" << endl;
@@ -546,7 +552,7 @@ namespace mongo {
         }
 
         void _recover() {
-            verify( cmdLine.dur );
+            verify(storageGlobalParams.dur);
 
             boost::filesystem::path p = getJournalDir();
             if( !exists(p) ) {

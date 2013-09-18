@@ -37,11 +37,11 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/privilege.h"
-#include "mongo/db/cmdline.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/repl/health.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/replication_server_status.h"  // replSettings
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/repl/rs_config.h"
 #include "mongo/util/mmap.h"
@@ -78,7 +78,7 @@ namespace mongo {
         if( me != 1 ) {
             stringstream ss;
             ss << "can't find self in the replset config";
-            if( !cmdLine.isDefaultPort() ) ss << " my port: " << cmdLine.port;
+            if (!serverGlobalParams.isDefaultPort()) ss << " my port: " << serverGlobalParams.port;
             if( me != 0 ) ss << " found: " << me;
             uasserted(13279, ss.str());
         }
@@ -218,7 +218,7 @@ namespace mongo {
             if( ReplSet::startupStatus != ReplSet::EMPTYCONFIG ) {
                 result.append("startupStatus", ReplSet::startupStatus);
                 errmsg = "all members and seeds must be reachable to initiate set";
-                result.append("info", cmdLine._replSet);
+                result.append("info", replSettings.replSet);
                 return false;
             }
 
@@ -231,7 +231,7 @@ namespace mongo {
                 string name;
                 vector<HostAndPort> seeds;
                 set<HostAndPort> seedSet;
-                parseReplsetCmdLine(cmdLine._replSet, name, seeds, seedSet); // may throw...
+                parseReplsetCmdLine(replSettings.replSet, name, seeds, seedSet); // may throw...
 
                 bob b;
                 b.append("_id", name);

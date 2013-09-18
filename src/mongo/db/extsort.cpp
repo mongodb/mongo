@@ -44,6 +44,7 @@
 #include <sys/types.h>
 
 #include "mongo/db/kill_current_op.h"
+#include "mongo/db/storage_options.h"
 #include "mongo/platform/posix_fadvise.h"
 #include "mongo/util/file.h"
 
@@ -79,7 +80,7 @@ namespace mongo {
                                                  long maxFileSize)
         : _mayInterrupt(boost::make_shared<bool>(false))
         , _sorter(Sorter<BSONObj, DiskLoc>::make(
-                    SortOptions().TempDir(dbpath + "/_tmp")
+                    SortOptions().TempDir(storageGlobalParams.dbpath + "/_tmp")
                                  .ExtSortAllowed()
                                  .MaxMemoryUsageBytes(maxFileSize),
                     OldExtSortComparator(comp, _mayInterrupt)))
@@ -126,8 +127,8 @@ namespace mongo {
           _sorted(0) {
 
         stringstream rootpath;
-        rootpath << dbpath;
-        if ( dbpath[dbpath.size()-1] != '/' )
+        rootpath << storageGlobalParams.dbpath;
+        if (storageGlobalParams.dbpath[storageGlobalParams.dbpath.size()-1] != '/')
             rootpath << "/";
 
         unsigned long long thisUniqueNumber;

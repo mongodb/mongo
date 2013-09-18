@@ -43,6 +43,7 @@
 #include "mongo/db/lasterror.h"
 #include "mongo/db/lockstate.h"
 #include "mongo/db/stats/top.h"
+#include "mongo/db/storage_options.h"
 #include "mongo/util/concurrency/rwlock.h"
 #include "mongo/util/concurrency/threadlocal.h"
 #include "mongo/util/paths.h"
@@ -160,14 +161,12 @@ namespace mongo {
             ~GodScope();
         };
 
-        //static void assureDatabaseIsOpen(const string& ns, string path=dbpath);
-        
         /** "read lock, and set my context, all in one operation" 
          *  This handles (if not recursively locked) opening an unopened database.
          */
         class ReadContext : boost::noncopyable { 
         public:
-            ReadContext(const std::string& ns, const std::string& path=dbpath);
+            ReadContext(const std::string& ns, const std::string& path=storageGlobalParams.dbpath);
             Context& ctx() { return *c.get(); }
         private:
             scoped_ptr<Lock::DBRead> lk;
@@ -180,7 +179,8 @@ namespace mongo {
         class Context : boost::noncopyable {
         public:
             /** this is probably what you want */
-            Context(const string& ns, const std::string& path=dbpath, bool doVersion=true);
+            Context(const string& ns, const std::string& path=storageGlobalParams.dbpath,
+                    bool doVersion=true);
 
             /** note: this does not call finishInit -- i.e., does not call 
                       shardVersionOk() for example. 
@@ -195,13 +195,15 @@ namespace mongo {
             Client* getClient() const { return _client; }
             Database* db() const { return _db; }
             const char * ns() const { return _ns.c_str(); }
-            bool equals( const string& ns , const string& path=dbpath ) const { return _ns == ns && _path == path; }
+            bool equals(const string& ns, const string& path=storageGlobalParams.dbpath) const {
+                return _ns == ns && _path == path;
+            }
 
             /** @return if the db was created by this Context */
             bool justCreated() const { return _justCreated; }
 
             /** @return true iff the current Context is using db/path */
-            bool inDB( const string& db , const string& path=dbpath ) const;
+            bool inDB(const string& db, const string& path=storageGlobalParams.dbpath) const;
 
             void _clear() { // this is sort of an "early destruct" indication, _ns can never be uncleared
                 const_cast<string&>(_ns).clear();
@@ -235,7 +237,7 @@ namespace mongo {
 
         class WriteContext : boost::noncopyable {
         public:
-            WriteContext(const string& ns, const std::string& path=dbpath);
+            WriteContext(const string& ns, const std::string& path=storageGlobalParams.dbpath);
             Context& ctx() { return _c; }
         private:
             Lock::DBWrite _lk;

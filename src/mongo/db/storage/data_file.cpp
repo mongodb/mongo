@@ -34,7 +34,6 @@
 
 #include <boost/filesystem/operations.hpp>
 
-#include "mongo/db/cmdline.h"
 #include "mongo/db/d_concurrency.h"
 #include "mongo/db/dur.h"
 #include "mongo/db/lockstate.h"
@@ -54,7 +53,7 @@ namespace mongo {
         if ( sizeof( int* ) == 4 ) {
             return 512 * 1024 * 1024;
         }
-        else if ( cmdLine.smallfiles ) {
+        else if (storageGlobalParams.smallfiles) {
             return 0x7ff00000 >> 2;
         }
         else {
@@ -80,7 +79,7 @@ namespace mongo {
             size = (64*1024*1024) << fileNo;
         else
             size = 0x7ff00000;
-        if ( cmdLine.smallfiles ) {
+        if (storageGlobalParams.smallfiles) {
             size = size >> 2;
         }
         return size;
@@ -100,9 +99,10 @@ namespace mongo {
         unsigned long long sz = mmf.length();
         verify( sz <= 0x7fffffff );
         verify( sz % 4096 == 0 );
-        if( sz < 64*1024*1024 && !cmdLine.smallfiles ) {
+        if (sz < 64*1024*1024 && !storageGlobalParams.smallfiles) {
             if( sz >= 16*1024*1024 && sz % (1024*1024) == 0 ) {
-                log() << "info openExisting file size " << sz << " but cmdLine.smallfiles=false: "
+                log() << "info openExisting file size " << sz
+                      << " but storageGlobalParams.smallfiles=false: "
                       << filename << endl;
             }
             else {
@@ -128,11 +128,11 @@ namespace mongo {
         if ( size > maxSize() )
             size = maxSize();
 
-        verify( size >= 64*1024*1024 || cmdLine.smallfiles );
+        verify(size >= 64*1024*1024 || storageGlobalParams.smallfiles);
         verify( size % 4096 == 0 );
 
         if ( preallocateOnly ) {
-            if ( cmdLine.prealloc ) {
+            if (storageGlobalParams.prealloc) {
                 FileAllocator::get()->requestAllocation( filename, size );
             }
             return;

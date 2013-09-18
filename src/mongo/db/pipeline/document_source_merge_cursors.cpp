@@ -30,7 +30,6 @@
 
 #include "mongo/db/pipeline/document_source.h"
 
-#include "mongo/db/cmdline.h"
 
 namespace mongo {
 

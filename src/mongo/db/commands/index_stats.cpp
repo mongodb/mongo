@@ -500,7 +500,7 @@ namespace mongo {
 
             string ns = dbname + "." + cmdObj.firstElement().valuestrsafe();
             const NamespaceDetails* nsd = nsdetails(ns);
-            if (!cmdLine.quiet) {
+            if (!serverGlobalParams.quiet) {
                 MONGO_TLOG(0) << "CMD: indexStats " << ns << endl;
             }
             if (!nsd) {
@@ -544,7 +544,7 @@ namespace mongo {
     };
 
     MONGO_INITIALIZER(IndexStatsCmd)(InitializerContext* context) {
-        if (cmdLine.experimental.indexStatsCmdEnabled) {
+        if (serverGlobalParams.experimental.indexStatsCmdEnabled) {
             // Leaked intentionally: a Command registers itself when constructed.
             new IndexStatsCmd();
         }

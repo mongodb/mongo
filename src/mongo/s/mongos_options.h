@@ -17,6 +17,7 @@
 #pragma once
 
 #include "mongo/base/status.h"
+#include "mongo/db/server_options.h"
 
 namespace mongo {
 
@@ -26,5 +27,25 @@ namespace mongo {
 
     namespace moe = mongo::optionenvironment;
 
+    struct MongosGlobalParams {
+        std::vector<std::string> configdbs;
+        bool upgrade;
+
+        MongosGlobalParams() :
+            upgrade(false)
+        { }
+    };
+
+    extern MongosGlobalParams mongosGlobalParams;
+
     Status addMongosOptions(moe::OptionSection* options);
+
+    void printMongosHelp(const moe::OptionSection& options);
+
+    Status handlePreValidationMongosOptions(const moe::Environment& params,
+                                            const std::vector<std::string>& args);
+
+    Status storeMongosOptions(const moe::Environment& params, const std::vector<std::string>& args);
+
+    bool isMongos();
 }

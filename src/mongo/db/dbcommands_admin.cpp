@@ -47,7 +47,6 @@
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/privilege.h"
-#include "mongo/db/cmdline.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/curop-inl.h"
 #include "mongo/db/index/catalog_hack.h"
@@ -57,6 +56,7 @@
 #include "mongo/db/kill_current_op.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/db/query/internal_plans.h"
+#include "mongo/db/storage_options.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/util/alignedbuilder.h"
 #include "mongo/util/background.h"
@@ -136,7 +136,8 @@ namespace mongo {
             catch(...) { }
 
             try {
-                result.append("onSamePartition", onSamePartition(dur::getJournalDir().string(), dbpath));
+                result.append("onSamePartition", onSamePartition(dur::getJournalDir().string(),
+                                                                 storageGlobalParams.dbpath));
             }
             catch(...) { }
 
@@ -175,7 +176,7 @@ namespace mongo {
         bool run(const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
             string ns = dbname + "." + cmdObj.firstElement().valuestrsafe();
             NamespaceDetails * d = nsdetails( ns );
-            if ( !cmdLine.quiet ) {
+            if (!serverGlobalParams.quiet) {
                 MONGO_TLOG(0) << "CMD: validate " << ns << endl;
             }
 

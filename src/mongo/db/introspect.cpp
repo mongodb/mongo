@@ -39,6 +39,7 @@
 #include "mongo/db/introspect.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/pdfile.h"
+#include "mongo/db/storage_options.h"
 #include "mongo/util/goodies.h"
 
 namespace {
@@ -134,8 +135,8 @@ namespace {
 
         try {
             Lock::DBWrite lk( currentOp.getNS() );
-            if ( dbHolder()._isLoaded( nsToDatabase( currentOp.getNS() ) , dbpath ) ) {
-                Client::Context cx(currentOp.getNS(), dbpath);
+            if (dbHolder()._isLoaded(nsToDatabase(currentOp.getNS()), storageGlobalParams.dbpath)) {
+                Client::Context cx(currentOp.getNS(), storageGlobalParams.dbpath);
                 _profile(c, currentOp, profileBufBuilder);
             }
             else {
@@ -154,7 +155,7 @@ namespace {
         fassert(16372, db);
         const char* profileName = db->getProfilingNS();
         NamespaceDetails* details = db->namespaceIndex().details(profileName);
-        if (!details && (cmdLine.defaultProfile || force)) {
+        if (!details && (serverGlobalParams.defaultProfile || force)) {
             // system.profile namespace doesn't exist; create it
             log() << "creating profile collection: " << profileName << endl;
             string myerrmsg;

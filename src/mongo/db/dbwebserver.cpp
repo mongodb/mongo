@@ -46,7 +46,6 @@
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/auth/user.h"
 #include "mongo/db/background.h"
-#include "mongo/db/cmdline.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/db.h"
 #include "mongo/db/instance.h"
@@ -89,7 +88,7 @@ namespace mongo {
             ss << "git hash: " << gitVersion() << '\n';
             ss << openSSLVersion("OpenSSL version: ", "\n");
             ss << "sys info: " << sysInfo() << '\n';
-            ss << "uptime: " << time(0)-cmdLine.started << " seconds\n";
+            ss << "uptime: " << time(0)-serverGlobalParams.started << " seconds\n";
             ss << "</pre>";
         }
 
@@ -199,12 +198,13 @@ namespace mongo {
 
                     DbWebHandler * handler = DbWebHandler::findHandler( url );
                     if ( handler ) {
-                        if ( handler->requiresREST( url ) && ! cmdLine.rest ) {
+                        if (handler->requiresREST(url) && !serverGlobalParams.rest) {
                             _rejectREST( responseMsg , responseCode , headers );
                         }
                         else {
                             string callback = params.getStringField("jsonp");
-                            uassert(13453, "server not started with --jsonp", callback.empty() || cmdLine.jsonp);
+                            uassert(13453, "server not started with --jsonp",
+                                    callback.empty() || serverGlobalParams.jsonp);
 
                             handler->handle( rq , url , params , responseMsg , responseCode , headers , from );
 
@@ -217,7 +217,7 @@ namespace mongo {
                 }
 
 
-                if ( ! cmdLine.rest ) {
+                if (!serverGlobalParams.rest) {
                     _rejectREST( responseMsg , responseCode , headers );
                     return;
                 }
@@ -242,7 +242,7 @@ namespace mongo {
             string dbname;
             {
                 stringstream z;
-                z << cmdLine.binaryName << ' ' << prettyHostName();
+                z << serverGlobalParams.binaryName << ' ' << prettyHostName();
                 dbname = z.str();
             }
             ss << start(dbname) << h2(dbname);
@@ -359,7 +359,7 @@ namespace mongo {
     };
 
     MONGO_INITIALIZER(WebStatusLogPlugin)(InitializerContext*) {
-        if (cmdLine.isHttpInterfaceEnabled) {
+        if (serverGlobalParams.isHttpInterfaceEnabled) {
             new LogPlugin;
         }
         return Status::OK();
@@ -565,8 +565,8 @@ namespace mongo {
     void webServerThread(const AdminAccess* adminAccess) {
         boost::scoped_ptr<const AdminAccess> adminAccessPtr(adminAccess); // adminAccess is owned here
         Client::initThread("websvr");
-        const int p = cmdLine.port + 1000;
-        DbWebServer mini(cmdLine.bind_ip, p, adminAccessPtr.get());
+        const int p = serverGlobalParams.port + 1000;
+        DbWebServer mini(serverGlobalParams.bind_ip, p, adminAccessPtr.get());
         mini.setupSockets();
         mini.initAndListen();
         cc().shutdown();

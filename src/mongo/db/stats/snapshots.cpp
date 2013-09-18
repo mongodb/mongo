@@ -127,7 +127,7 @@ namespace mongo {
             try {
                 const SnapshotData* s = statsSnapshots.takeSnapshot();
 
-                if ( prev && cmdLine.cpu ) {
+                if (prev && serverGlobalParams.cpu) {
                     unsigned long long elapsed = s->_created - prev->_created;
                     SnapshotDelta d( *prev , *s );
                     log() << "cpu: elapsed:" << (elapsed/1000) <<"  writelock: " << (int)(100*d.percentWriteLocked()) << "%" << endl;

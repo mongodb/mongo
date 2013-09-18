@@ -124,9 +124,10 @@ namespace mongo {
             }
             {
                 string s = string(cmdObj.getStringField("replSetHeartbeat"));
-                if( cmdLine.ourSetName() != s ) {
+                if (replSettings.ourSetName() != s) {
                     errmsg = "repl set names do not match";
-                    log() << "replSet set names do not match, our cmdline: " << cmdLine._replSet << rsLog;
+                    log() << "replSet set names do not match, our cmdline: " << replSettings.replSet
+                          << rsLog;
                     log() << "replSet s: " << s << rsLog;
                     result.append("mismatch", true);
                     return false;

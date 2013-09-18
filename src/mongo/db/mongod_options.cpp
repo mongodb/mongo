@@ -31,20 +31,30 @@
 #include <string>
 #include <vector>
 
+#include "mongo/base/init.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/util/builder.h"
+#include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/instance.h"
 #include "mongo/db/module.h"
+#include "mongo/db/pdfile.h"
+#include "mongo/db/repl/replication_server_status.h"
 #include "mongo/db/server_options.h"
+#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/ssl_options.h"
 #include "mongo/util/options_parser/option_description.h"
 #include "mongo/util/options_parser/option_section.h"
+#include "mongo/util/options_parser/options_parser.h"
+#include "mongo/util/version.h"
 
 namespace mongo {
 
     typedef moe::OptionDescription OD;
     typedef moe::PositionalOptionDescription POD;
 
-    extern std::string dbpath;
+    MongodGlobalParams mongodGlobalParams;
+
+    extern DiagLog _diaglog;
 
     Status addMongodOptions(moe::OptionSection* options) {
 
@@ -78,9 +88,6 @@ namespace mongo {
         moe::OptionSection replication_options("Replication options");
         moe::OptionSection sharding_options("Sharding options");
 
-        StringBuilder dbpathBuilder;
-        dbpathBuilder << "directory for datafiles - defaults to " << dbpath;
-
         ret = general_options.addOption(OD("auth", "auth", moe::Switch, "run with security", true));
         if (!ret.isOK()) {
             return ret;
@@ -90,8 +97,15 @@ namespace mongo {
         if (!ret.isOK()) {
             return ret;
         }
+#ifdef _WIN32
         ret = general_options.addOption(OD("dbpath", "dbpath", moe::String,
-                    dbpathBuilder.str().c_str(), true));
+                    "directory for datafiles - defaults to \\data\\db\\",
+                    true, moe::Value(std::string("\\data\\db\\"))));
+#else
+        ret = general_options.addOption(OD("dbpath", "dbpath", moe::String,
+                    "directory for datafiles - defaults to /data/db/",
+                    true, moe::Value(std::string("/data/db"))));
+#endif
         if (!ret.isOK()) {
             return ret;
         }
@@ -376,6 +390,426 @@ namespace mongo {
         }
 
         ret = addModuleOptions(options);
+        if (!ret.isOK()) {
+            return ret;
+        }
+
+        return Status::OK();
+    }
+
+    void printMongodHelp(const moe::OptionSection& options) {
+        std::cout << options.helpString() << std::endl;
+    };
+
+    namespace {
+        void sysRuntimeInfo() {
+            out() << "sysinfo:" << endl;
+#if defined(_SC_PAGE_SIZE)
+            out() << "  page size: " << (int) sysconf(_SC_PAGE_SIZE) << endl;
+#endif
+#if defined(_SC_PHYS_PAGES)
+            out() << "  _SC_PHYS_PAGES: " << sysconf(_SC_PHYS_PAGES) << endl;
+#endif
+#if defined(_SC_AVPHYS_PAGES)
+            out() << "  _SC_AVPHYS_PAGES: " << sysconf(_SC_AVPHYS_PAGES) << endl;
+#endif
+        }
+    } // namespace
+
+    Status handlePreValidationMongodOptions(const moe::Environment& params,
+                                            const std::vector<std::string>& args) {
+        if (params.count("help")) {
+            printMongodHelp(serverOptions);
+            ::_exit(EXIT_SUCCESS);
+        }
+        if (params.count("version")) {
+            cout << mongodVersion() << endl;
+            printGitVersion();
+            printOpenSSLVersion();
+            ::_exit(EXIT_SUCCESS);
+        }
+        if (params.count("sysinfo")) {
+            sysRuntimeInfo();
+            ::_exit(EXIT_SUCCESS);
+        }
+
+        return Status::OK();
+    }
+
+    Status storeMongodOptions(const moe::Environment& params,
+                              const std::vector<std::string>& args) {
+
+        Status ret = storeServerOptions(params, args);
+        if (!ret.isOK()) {
+            std::cerr << "Error storing command line: " << ret.toString() << std::endl;
+            ::_exit(EXIT_BADOPTIONS);
+        }
+
+        if (params.count("dbpath")) {
+            storageGlobalParams.dbpath = params["dbpath"].as<string>();
+            if (params.count("fork") && storageGlobalParams.dbpath[0] != '/') {
+                // we need to change dbpath if we fork since we change
+                // cwd to "/"
+                // fork only exists on *nix
+                // so '/' is safe
+                storageGlobalParams.dbpath = serverGlobalParams.cwd + "/" +
+                                                 storageGlobalParams.dbpath;
+            }
+        }
+#ifdef _WIN32
+        if (storageGlobalParams.dbpath.size() > 1 &&
+            storageGlobalParams.dbpath[storageGlobalParams.dbpath.size()-1] == '/') {
+            // size() check is for the unlikely possibility of --dbpath "/"
+            storageGlobalParams.dbpath =
+                storageGlobalParams.dbpath.erase(storageGlobalParams.dbpath.size()-1);
+        }
+#endif
+        if ( params.count("slowms")) {
+            serverGlobalParams.slowMS = params["slowms"].as<int>();
+        }
+
+        if ( params.count("syncdelay")) {
+            storageGlobalParams.syncdelay = params["syncdelay"].as<double>();
+        }
+
+        if (params.count("directoryperdb")) {
+            storageGlobalParams.directoryperdb = true;
+        }
+        if (params.count("cpu")) {
+            serverGlobalParams.cpu = true;
+        }
+        if (params.count("noauth")) {
+            AuthorizationManager::setAuthEnabled(false);
+        }
+        if (params.count("auth")) {
+            AuthorizationManager::setAuthEnabled(true);
+        }
+        if (params.count("quota")) {
+            storageGlobalParams.quota = true;
+        }
+        if (params.count("quotaFiles")) {
+            storageGlobalParams.quota = true;
+            storageGlobalParams.quotaFiles = params["quotaFiles"].as<int>() - 1;
+        }
+        if ((params.count("nodur") || params.count("nojournal")) &&
+            (params.count("dur") || params.count("journal"))) {
+            std::cerr << "Can't specify both --journal and --nojournal options." << std::endl;
+            ::_exit(EXIT_BADOPTIONS);
+        }
+
+        if (params.count("nodur") || params.count("nojournal")) {
+            storageGlobalParams.dur = false;
+        }
+
+        if (params.count("dur") || params.count("journal")) {
+            storageGlobalParams.dur = true;
+        }
+
+        if (params.count("durOptions")) {
+            storageGlobalParams.durOptions = params["durOptions"].as<int>();
+        }
+        if( params.count("journalCommitInterval") ) {
+            // don't check if dur is false here as many will just use the default, and will default
+            // to off on win32.  ie no point making life a little more complex by giving an error on
+            // a dev environment.
+            storageGlobalParams.journalCommitInterval =
+                params["journalCommitInterval"].as<unsigned>();
+            if (storageGlobalParams.journalCommitInterval <= 1 ||
+                storageGlobalParams.journalCommitInterval > 300) {
+                std::cerr << "--journalCommitInterval out of allowed range (0-300ms)" << std::endl;
+                ::_exit(EXIT_BADOPTIONS);
+            }
+        }
+        if (params.count("journalOptions")) {
+            storageGlobalParams.durOptions = params["journalOptions"].as<int>();
+        }
+        if (params.count("nohints")) {
+            storageGlobalParams.useHints = false;
+        }
+        if (params.count("nopreallocj")) {
+            storageGlobalParams.preallocj = false;
+        }
+        if (params.count("httpinterface")) {
+            if (params.count("nohttpinterface")) {
+                std::cerr << "can't have both --httpinterface and --nohttpinterface" << std::endl;
+                ::_exit(EXIT_BADOPTIONS);
+            }
+            serverGlobalParams.isHttpInterfaceEnabled = true;
+        }
+        // SERVER-10019 Enabling rest/jsonp without --httpinterface should break in the future
+        if (params.count("rest")) {
+            if (params.count("nohttpinterface")) {
+                log() << "** WARNING: Should not specify both --rest and --nohttpinterface" <<
+                    startupWarningsLog;
+            }
+            else if (!params.count("httpinterface")) {
+                log() << "** WARNING: --rest is specified without --httpinterface," <<
+                    startupWarningsLog;
+                log() << "**          enabling http interface" << startupWarningsLog;
+                serverGlobalParams.isHttpInterfaceEnabled = true;
+            }
+            serverGlobalParams.rest = true;
+        }
+        if (params.count("jsonp")) {
+            if (params.count("nohttpinterface")) {
+                log() << "** WARNING: Should not specify both --jsonp and --nohttpinterface" <<
+                    startupWarningsLog;
+            }
+            else if (!params.count("httpinterface")) {
+                log() << "** WARNING --jsonp is specified without --httpinterface," <<
+                    startupWarningsLog;
+                log() << "**         enabling http interface" << startupWarningsLog;
+                serverGlobalParams.isHttpInterfaceEnabled = true;
+            }
+            serverGlobalParams.jsonp = true;
+        }
+        if (params.count("noscripting")) {
+            mongodGlobalParams.scriptingEnabled = false;
+        }
+        if (params.count("noprealloc")) {
+            storageGlobalParams.prealloc = false;
+            cout << "note: noprealloc may hurt performance in many applications" << endl;
+        }
+        if (params.count("smallfiles")) {
+            storageGlobalParams.smallfiles = true;
+        }
+        if (params.count("diaglog")) {
+            int x = params["diaglog"].as<int>();
+            if ( x < 0 || x > 7 ) {
+                std::cerr << "can't interpret --diaglog setting" << std::endl;
+                ::_exit(EXIT_BADOPTIONS);
+            }
+            _diaglog.setLevel(x);
+        }
+
+        if ((params.count("dur") || params.count("journal")) && params.count("repair")) {
+            std::cerr << "Can't specify both --journal and --repair options." << std::endl;
+            ::_exit(EXIT_BADOPTIONS);
+        }
+
+        if (params.count("repair")) {
+            Record::MemoryTrackingEnabled = false;
+            mongodGlobalParams.upgrade = 1; // --repair implies --upgrade
+            mongodGlobalParams.repair = 1;
+            storageGlobalParams.dur = false;
+        }
+        if (params.count("upgrade")) {
+            Record::MemoryTrackingEnabled = false;
+            mongodGlobalParams.upgrade = 1;
+        }
+        if (params.count("notablescan")) {
+            storageGlobalParams.noTableScan = true;
+        }
+        if (params.count("master")) {
+            replSettings.master = true;
+        }
+        if (params.count("slave")) {
+            replSettings.slave = SimpleSlave;
+        }
+        if (params.count("slavedelay")) {
+            replSettings.slavedelay = params["slavedelay"].as<int>();
+        }
+        if (params.count("fastsync")) {
+            replSettings.fastsync = true;
+        }
+        if (params.count("autoresync")) {
+            replSettings.autoresync = true;
+            if( params.count("replSet") ) {
+                std::cerr << "--autoresync is not used with --replSet\nsee "
+                    << "http://dochub.mongodb.org/core/resyncingaverystalereplicasetmember"
+                    << std::endl;
+                ::_exit(EXIT_BADOPTIONS);
+            }
+        }
+        if (params.count("source")) {
+            /* specifies what the source in local.sources should be */
+            replSettings.source = params["source"].as<string>().c_str();
+        }
+        if( params.count("pretouch") ) {
+            replSettings.pretouch = params["pretouch"].as<int>();
+        }
+        if (params.count("replSet")) {
+            if (params.count("slavedelay")) {
+                std::cerr << "--slavedelay cannot be used with --replSet" << std::endl;
+                ::_exit(EXIT_BADOPTIONS);
+            }
+            else if (params.count("only")) {
+                std::cerr << "--only cannot be used with --replSet" << std::endl;
+                ::_exit(EXIT_BADOPTIONS);
+            }
+            /* seed list of hosts for the repl set */
+            replSettings.replSet = params["replSet"].as<string>().c_str();
+        }
+        if (params.count("replIndexPrefetch")) {
+            replSettings.rsIndexPrefetch = params["replIndexPrefetch"].as<std::string>();
+        }
+        if (params.count("noIndexBuildRetry")) {
+            serverGlobalParams.indexBuildRetry = false;
+        }
+        if (params.count("only")) {
+            replSettings.only = params["only"].as<string>().c_str();
+        }
+        if( params.count("nssize") ) {
+            int x = params["nssize"].as<int>();
+            if (x <= 0 || x > (0x7fffffff/1024/1024)) {
+                std::cerr << "bad --nssize arg" << std::endl;
+                ::_exit(EXIT_BADOPTIONS);
+            }
+            storageGlobalParams.lenForNewNsFiles = x * 1024 * 1024;
+            verify(storageGlobalParams.lenForNewNsFiles > 0);
+        }
+        if (params.count("oplogSize")) {
+            long long x = params["oplogSize"].as<int>();
+            if (x <= 0) {
+                std::cerr << "bad --oplogSize arg" << std::endl;
+                ::_exit(EXIT_BADOPTIONS);
+            }
+            // note a small size such as x==1 is ok for an arbiter.
+            if( x > 1000 && sizeof(void*) == 4 ) {
+                StringBuilder sb;
+                std::cerr << "--oplogSize of " << x
+                    << "MB is too big for 32 bit version. Use 64 bit build instead."
+                    << std::endl;
+                ::_exit(EXIT_BADOPTIONS);
+            }
+            replSettings.oplogSize = x * 1024 * 1024;
+            verify(replSettings.oplogSize > 0);
+        }
+        if (params.count("cacheSize")) {
+            long x = params["cacheSize"].as<long>();
+            if (x <= 0) {
+                std::cerr << "bad --cacheSize arg" << std::endl;
+                ::_exit(EXIT_BADOPTIONS);
+            }
+            std::cerr << "--cacheSize option not currently supported" << std::endl;
+            ::_exit(EXIT_BADOPTIONS);
+        }
+        if (!params.count("port")) {
+            if( params.count("configsvr") ) {
+                serverGlobalParams.port = ServerGlobalParams::ConfigServerPort;
+            }
+            if( params.count("shardsvr") ) {
+                if( params.count("configsvr") ) {
+                    std::cerr << "can't do --shardsvr and --configsvr at the same time"
+                              << std::endl;
+                    ::_exit(EXIT_BADOPTIONS);
+                }
+                serverGlobalParams.port = ServerGlobalParams::ShardServerPort;
+            }
+        }
+        else {
+            if (serverGlobalParams.port <= 0 || serverGlobalParams.port > 65535) {
+                std::cerr << "bad --port number" << std::endl;
+                ::_exit(EXIT_BADOPTIONS);
+            }
+        }
+        if ( params.count("configsvr" ) ) {
+            serverGlobalParams.configsvr = true;
+            storageGlobalParams.smallfiles = true; // config server implies small files
+            if (replSettings.usingReplSets() || replSettings.master || replSettings.slave) {
+                std::cerr << "replication should not be enabled on a config server" << std::endl;
+                ::_exit(EXIT_BADOPTIONS);
+            }
+            if (!params.count("nodur") && !params.count("nojournal"))
+                storageGlobalParams.dur = true;
+            if (!params.count("dbpath"))
+                storageGlobalParams.dbpath = "/data/configdb";
+            replSettings.master = true;
+            if (!params.count("oplogSize"))
+                replSettings.oplogSize = 5 * 1024 * 1024;
+        }
+        if ( params.count( "profile" ) ) {
+            serverGlobalParams.defaultProfile = params["profile"].as<int>();
+        }
+        if (params.count("ipv6")) {
+            enableIPv6();
+        }
+
+        if (params.count("noMoveParanoia") && params.count("moveParanoia")) {
+            std::cerr << "The moveParanoia and noMoveParanoia flags cannot both be set; "
+                << "please use only one of them." << std::endl;
+            ::_exit(EXIT_BADOPTIONS);
+        }
+
+        if (params.count("noMoveParanoia"))
+            serverGlobalParams.moveParanoia = false;
+
+        if (params.count("moveParanoia"))
+            serverGlobalParams.moveParanoia = true;
+
+        if (params.count("pairwith") || params.count("arbiter") || params.count("opIdMem")) {
+            std::cerr << "****\n"
+                << "Replica Pairs have been deprecated. Invalid options: --pairwith, "
+                << "--arbiter, and/or --opIdMem\n"
+                << "<http://dochub.mongodb.org/core/replicapairs>\n"
+                << "****" << std::endl;
+            ::_exit(EXIT_BADOPTIONS);
+        }
+
+        // needs to be after things like --configsvr parsing, thus here.
+        if (params.count("repairpath")) {
+            storageGlobalParams.repairpath = params["repairpath"].as<string>();
+            if (!storageGlobalParams.repairpath.size()) {
+                std::cerr << "repairpath is empty" << std::endl;
+                ::_exit(EXIT_BADOPTIONS);
+            }
+
+            if (storageGlobalParams.dur &&
+                !str::startsWith(storageGlobalParams.repairpath,
+                                 storageGlobalParams.dbpath)) {
+                std::cerr << "You must use a --repairpath that is a subdirectory of "
+                    << "--dbpath when using journaling" << std::endl;
+                ::_exit(EXIT_BADOPTIONS);
+            }
+        }
+        else {
+            storageGlobalParams.repairpath = storageGlobalParams.dbpath;
+        }
+
+        if (replSettings.pretouch)
+            log() << "--pretouch " << replSettings.pretouch << endl;
+
+        if (sizeof(void*) == 4 && !(params.count("nodur") || params.count("nojournal") ||
+                                    params.count("dur") || params.count("journal"))) {
+            // trying to make this stand out more like startup warnings
+            log() << endl;
+            warning() << "32-bit servers don't have journaling enabled by default. "
+                      << "Please use --journal if you want durability." << endl;
+            log() << endl;
+        }
+
+        return Status::OK();
+    }
+
+    MONGO_INITIALIZER_GENERAL(ParseStartupConfiguration,
+            ("GlobalLogManager"),
+            ("default", "completedStartupConfig"))(InitializerContext* context) {
+
+        serverOptions = moe::OptionSection("Allowed options");
+        Status ret = addMongodOptions(&serverOptions);
+        if (!ret.isOK()) {
+            return ret;
+        }
+
+        moe::OptionsParser parser;
+        ret = parser.run(serverOptions, context->args(), context->env(), &serverParsedOptions);
+        if (!ret.isOK()) {
+            std::cerr << "Error parsing command line: " << ret.toString() << std::endl;
+            std::cerr << "use --help for help" << std::endl;
+            ::_exit(EXIT_BADOPTIONS);
+        }
+
+        ret = handlePreValidationMongodOptions(serverParsedOptions, context->args());
+        if (!ret.isOK()) {
+            return ret;
+        }
+
+        ret = serverParsedOptions.validate();
+        if (!ret.isOK()) {
+            return ret;
+        }
+
+        ret = storeMongodOptions(serverParsedOptions, context->args());
         if (!ret.isOK()) {
             return ret;
         }

@@ -30,10 +30,11 @@
 #include "mongo/base/init.h"
 #include "mongo/base/status.h"
 #include "mongo/db/client.h"
-#include "mongo/db/cmdline.h"
 #include "mongo/db/dur.h"
 #include "mongo/db/ops/update.h"
 #include "mongo/db/query/new_find.h"
+#include "mongo/db/repl/replication_server_status.h"  // replSettings
+#include "mongo/db/storage_options.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/util/background.h"
 #include "mongo/util/concurrency/mutex.h"
@@ -47,7 +48,6 @@ namespace moe = mongo::optionenvironment;
 
 namespace mongo {
 
-    CmdLine cmdLine;
     moe::OptionSection options;
     moe::Environment params;
 
@@ -249,14 +249,14 @@ MONGO_INITIALIZER_GENERAL(ParseStartupConfiguration,
             bool nodur = false;
             if( params.count("nodur") ) {
                 nodur = true;
-                cmdLine.dur = false;
+                storageGlobalParams.dur = false;
             }
-            if( params.count("dur") || cmdLine.dur ) {
-                cmdLine.dur = true;
+            if (params.count("dur") || storageGlobalParams.dur) {
+                storageGlobalParams.dur = true;
             }
 
             if( params.count("nopreallocj") ) {
-                cmdLine.preallocj = false;
+                storageGlobalParams.preallocj = false;
             }
 
             if (params.count("debug") || params.count("verbose") ) {
@@ -294,17 +294,17 @@ MONGO_INITIALIZER_GENERAL(ParseStartupConfiguration,
             }
 
             string dbpathString = p.string();
-            dbpath = dbpathString.c_str();
+            storageGlobalParams.dbpath = dbpathString.c_str();
 
-            cmdLine.prealloc = false;
+            storageGlobalParams.prealloc = false;
 
             // dbtest defaults to smallfiles
-            cmdLine.smallfiles = true;
+            storageGlobalParams.smallfiles = true;
             if( params.count("bigfiles") ) {
-                cmdLine.dur = true;
+                storageGlobalParams.dur = true;
             }
 
-            cmdLine.oplogSize = 10 * 1024 * 1024;
+            replSettings.oplogSize = 10 * 1024 * 1024;
             Client::initThread("testsuite");
             acquirePathLock();
 
@@ -319,8 +319,8 @@ MONGO_INITIALIZER_GENERAL(ParseStartupConfiguration,
             log() << "random seed: " << seed << endl;
 
             if( time(0) % 3 == 0 && !nodur ) {
-                if( !cmdLine.dur ) {
-                    cmdLine.dur = true;
+                if (!storageGlobalParams.dur) {
+                    storageGlobalParams.dur = true;
                     log() << "****************" << endl;
                     log() << "running with journaling enabled to test that. dbtests will do this occasionally even if --dur is not specified." << endl;
                     log() << "****************" << endl;
@@ -341,10 +341,10 @@ MONGO_INITIALIZER_GENERAL(ParseStartupConfiguration,
 
             dur::startup();
 
-            if( debug && cmdLine.dur ) {
-                log() << "_DEBUG: automatically enabling cmdLine.durOptions=8 (DurParanoid)" << endl;
+            if (debug && storageGlobalParams.dur) {
+                log() << "_DEBUG: automatically enabling storageGlobalParams.durOptions=8 (DurParanoid)" << endl;
                 // this was commented out.  why too slow or something? : 
-                cmdLine.durOptions |= 8;
+                storageGlobalParams.durOptions |= 8;
             }
 
             TestWatchDog twd;

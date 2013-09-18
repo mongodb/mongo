@@ -195,8 +195,9 @@ namespace mongo {
                 opDebug.recordStats();
 
                 // Log operation if running with at least "-v", or if exceeds slow threshold.
-                if ( logger::globalLogDomain()->shouldLog( logger::LogSeverity::Debug( 1 ) )
-                     || opDebug.executionTime > cmdLine.slowMS + childOp.getExpectedLatencyMs() ) {
+                if (logger::globalLogDomain()->shouldLog(logger::LogSeverity::Debug(1))
+                     || opDebug.executionTime >
+                        serverGlobalParams.slowMS + childOp.getExpectedLatencyMs()) {
 
                     MONGO_TLOG(1) << opDebug.report( childOp ) << endl;
                 }

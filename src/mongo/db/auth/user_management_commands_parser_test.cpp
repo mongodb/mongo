@@ -23,15 +23,15 @@
 #include "mongo/client/auth_helpers.h"
 #include "mongo/db/auth/authz_manager_external_state_mock.h"
 #include "mongo/db/auth/authorization_manager.h"
-#include "mongo/db/cmdline.h"
 #include "mongo/db/auth/user_management_commands_parser.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/server_options.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
 
     // Crutches to make the test compile
-    CmdLine cmdLine;
+    ServerGlobalParams serverGlobalParams;
     bool inShutdown() {
         return false;
     }

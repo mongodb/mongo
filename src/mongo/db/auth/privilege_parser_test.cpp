@@ -32,13 +32,13 @@
 
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/privilege_parser.h"
-#include "mongo/db/cmdline.h"
+#include "mongo/db/server_options.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
 
     // Crutches to make the test compile
-    CmdLine cmdLine;
+    ServerGlobalParams serverGlobalParams;
     bool inShutdown() {
         return false;
     }

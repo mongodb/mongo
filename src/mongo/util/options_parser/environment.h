@@ -20,6 +20,7 @@
 #include <vector>
 
 #include "mongo/base/status.h"
+#include "mongo/db/jsobj.h"
 #include "mongo/util/options_parser/value.h"
 
 namespace mongo {
@@ -161,13 +162,36 @@ namespace optionenvironment {
             Value operator[](const Key& key) const;
 
             /**
-             * Get all values that we have set explicitly as a map in case we need to iterate or
-             * move to another structure, as is currently the use case for the parsed command line
-             * options structure that we present to the user.
+             * Gets the BSON representation of this Environment.  This will collapse dotted fields
+             * into sub objects.
+             *
+             * Example:
+             *
+             * The following Environment values map:
+             *  "a.b.c" -> true
+             *  "a.b.d" -> false
+             *  "a.e.f" -> 0
+             *  "a.e.g" -> 1
+             *  "a.h" -> "foo"
+             *
+             * Has a BSON represation of (shown as JSON):
+             *  { "a" : {
+             *           "b" : {
+             *                  "c" : true,
+             *                  "d" : false
+             *                 },
+             *           "e" : {
+             *                  "f" : 0,
+             *                  "g" : 1
+             *                 },
+             *           "h" : "foo"
+             *          }
+             *  }
+             *
+             * Note that the BSON representation only includes fields that were explicitly set using
+             * setAll or set, and not defaults that were specified using setDefault.
              */
-            const std::map<Key, Value>& getExplicitlySet() const {
-                return values;
-            }
+            BSONObj toBSON() const;
 
             /* Debugging */
             void dump();

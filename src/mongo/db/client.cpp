@@ -56,6 +56,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/pagefault.h"
 #include "mongo/db/repl/rs.h"
+#include "mongo/db/storage_options.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/d_logic.h"
 #include "mongo/s/stale_exception.h" // for SendStaleConfigException
@@ -252,7 +253,8 @@ namespace mongo {
     Client::Context::Context(const std::string& ns , Database * db) :
         _client( currentClient.get() ), 
         _oldContext( _client->_context ),
-        _path( mongo::dbpath ), // is this right? could be a different db? may need a dassert for this
+        _path(storageGlobalParams.dbpath), // is this right? could be a different db?
+                                               // may need a dassert for this
         _justCreated(false),
         _doVersion( true ),
         _ns( ns ), 

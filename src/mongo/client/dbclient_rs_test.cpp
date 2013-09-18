@@ -35,7 +35,6 @@
 
 namespace mongo {
     // Symbols defined to build the binary correctly.
-    CmdLine cmdLine;
 
     bool inShutdown() {
         return false;

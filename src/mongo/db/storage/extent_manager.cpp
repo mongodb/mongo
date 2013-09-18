@@ -315,8 +315,8 @@ namespace mongo {
 
     bool fileIndexExceedsQuota( const char *ns, int fileIndex ) {
         return
-            cmdLine.quota &&
-            fileIndex >= cmdLine.quotaFiles &&
+            storageGlobalParams.quota &&
+            fileIndex >= storageGlobalParams.quotaFiles &&
             // we don't enforce the quota on "special" namespaces as that could lead to problems -- e.g.
             // rejecting an index insert after inserting the main record.
             !NamespaceString::special( ns ) &&

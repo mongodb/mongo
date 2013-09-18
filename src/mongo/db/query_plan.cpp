@@ -29,7 +29,6 @@
 #include "mongo/db/query_plan.h"
 
 #include "mongo/db/btreecursor.h"
-#include "mongo/db/cmdline.h"
 #include "mongo/db/index_selection.h"
 #include "mongo/db/index/catalog_hack.h"
 #include "mongo/db/index/emulated_cursor.h"
@@ -370,7 +369,7 @@ doneCheckOrder:
     }
     
     void QueryPlan::checkTableScanAllowed() const {
-        if ( likely( !cmdLine.noTableScan ) )
+        if (likely(!storageGlobalParams.noTableScan))
             return;
 
         // TODO - is this desirable?  See SERVER-2222.
@@ -386,7 +385,8 @@ doneCheckOrder:
         if ( !nsdetails( ns() ) )
             return;
 
-        uassert( 10111, (string)"table scans not allowed:" + ns(), !cmdLine.noTableScan );
+        uassert(10111, (string)"table scans not allowed:" + ns(),
+                !storageGlobalParams.noTableScan);
     }
 
     int QueryPlan::independentRangesSingleIntervalLimit() const {

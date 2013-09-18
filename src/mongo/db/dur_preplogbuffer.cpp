@@ -38,7 +38,6 @@
 
 #include "mongo/pch.h"
 
-#include "mongo/db/cmdline.h"
 #include "mongo/db/dur.h"
 #include "mongo/db/dur_commitjob.h"
 #include "mongo/db/dur_journal.h"
@@ -174,7 +173,7 @@ namespace mongo {
             @return partially populated sectheader and _ab set
         */
         static void _PREPLOGBUFFER(JSectHeader& h, AlignedBuilder& bb) {
-            verify( cmdLine.dur );
+            verify(storageGlobalParams.dur);
             assertLockedForCommitting();
 
             resetLogBuffer(h, bb); // adds JSectHeader

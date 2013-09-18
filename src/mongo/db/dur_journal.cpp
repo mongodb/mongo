@@ -36,10 +36,12 @@
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/operations.hpp>
 
+#include "mongo/base/init.h"
 #include "mongo/db/client.h"
 #include "mongo/db/dur_journalformat.h"
 #include "mongo/db/dur_journalimpl.h"
 #include "mongo/db/dur_stats.h"
+#include "mongo/db/storage_options.h"
 #include "mongo/platform/random.h"
 #include "mongo/server.h"
 #include "mongo/util/alignedbuilder.h"
@@ -77,6 +79,14 @@ namespace mongo {
         unsigned long long DataLimitPerJournalFile = (sizeof(void*)==4) ? 256 * 1024 * 1024 : 1 * 1024 * 1024 * 1024;
 #endif
 
+        MONGO_INITIALIZER(InitializeJournalingParams)(InitializerContext* context) {
+            if (storageGlobalParams.smallfiles == true) {
+                verify(dur::DataLimitPerJournalFile >= 128 * 1024 * 1024);
+                dur::DataLimitPerJournalFile = 128 * 1024 * 1024;
+            }
+            return Status::OK();
+        }
+
         BOOST_STATIC_ASSERT( sizeof(Checksum) == 16 );
         BOOST_STATIC_ASSERT( sizeof(JHeader) == 8192 );
         BOOST_STATIC_ASSERT( sizeof(JSectHeader) == 20 );
@@ -89,7 +99,7 @@ namespace mongo {
         void removeOldJournalFile(boost::filesystem::path p);
 
         boost::filesystem::path getJournalDir() {
-            boost::filesystem::path p(dbpath);
+            boost::filesystem::path p(storageGlobalParams.dbpath);
             p /= "journal";
             return p;
         }
@@ -405,12 +415,12 @@ namespace mongo {
         }
 
         void preallocateFiles() {
-            if (! (cmdLine.durOptions & CmdLine::DurNoCheckSpace))
+            if (!(storageGlobalParams.durOptions & StorageGlobalParams::DurNoCheckSpace))
                 checkFreeSpace();
 
             if( exists(preallocPath(0)) || // if enabled previously, keep using
                 exists(preallocPath(1)) ||
-                ( cmdLine.preallocj && preallocateIsFaster() ) ) {
+                (storageGlobalParams.preallocj && preallocateIsFaster()) ) {
                     usingPreallocate = true;
                     try {
                         _preallocateFiles();

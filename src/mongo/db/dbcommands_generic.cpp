@@ -51,9 +51,10 @@
 #include "mongo/db/pdfile.h"
 #include "mongo/db/repl/multicmd.h"
 #include "mongo/db/repl/write_concern.h"
-#include "mongo/server.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/scripting/engine.h"
+#include "mongo/server.h"
 #include "mongo/util/lruishmap.h"
 #include "mongo/util/md5.hpp"
 #include "mongo/util/processinfo.h"
@@ -404,8 +405,8 @@ namespace mongo {
             out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
         }
         virtual bool run(const string&, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            result.append("argv", CmdLine::getArgvArray());
-            result.append("parsed", CmdLine::getParsedOpts());
+            result.append("argv", serverGlobalParams.argvArray);
+            result.append("parsed", serverGlobalParams.parsedOpts);
             return true;
         }
 

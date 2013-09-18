@@ -451,7 +451,8 @@ namespace mongo {
         : _lock( "ReplicaSetMonitor instance" ),
           _checkConnectionLock( "ReplicaSetMonitor check connection lock" ),
           _name( name ), _master(-1),
-          _nextSlave(0), _failedChecks(0), _localThresholdMillis(cmdLine.defaultLocalThresholdMillis) {
+          _nextSlave(0), _failedChecks(0),
+          _localThresholdMillis(serverGlobalParams.defaultLocalThresholdMillis) {
 
         uassert( 13642 , "need at least 1 node for a replica set" , servers.size() > 0 );
 

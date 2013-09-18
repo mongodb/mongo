@@ -32,8 +32,6 @@
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
-    extern string dbpath;
-
     // This specifies default dbpath for our testing framework
     const std::string default_test_dbpath = "/data/db/perftest";
 } // namespace mongo
