@@ -100,13 +100,27 @@ namespace mongo {
         }
 
         _exprElt = modExpr;
-        if (_exprElt.type() == Object) {
 
-            _exprObj = _exprElt.embeddedObject();
-            _matcherOnPrimitive = (_exprObj.firstElement().getGtLtOp() != 0);
-            if (_matcherOnPrimitive)
-                _exprObj = BSON( "" << _exprObj );
+        // If the element in the mod is actually an object or a regular expression, we need to
+        // build a matcher, instead of just doing an equality comparision.
+        if ((_exprElt.type() == mongo::Object) || (_exprElt.type() == mongo::RegEx)) {
+            if (_exprElt.type() == Object) {
+                _exprObj = _exprElt.embeddedObject();
 
+                // If not is not a query operator, then it is a primitive.
+                _matcherOnPrimitive = (_exprObj.firstElement().getGtLtOp() != 0);
+
+                // If the object is primitive then wrap it up into an object.
+                if (_matcherOnPrimitive)
+                    _exprObj = BSON( "" << _exprObj );
+            }
+            else {
+                // For a regex, we also need to wrap and treat like a primitive.
+                _matcherOnPrimitive = true;
+                _exprObj = _exprElt.wrap("");
+            }
+
+            // Build the matcher around the object we built above.
             StatusWithMatchExpression parseResult = MatchExpressionParser::parse(_exprObj);
             if (!parseResult.isOK())
                 return parseResult.getStatus();
