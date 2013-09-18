@@ -1171,6 +1171,10 @@ def doConfigure(myenv):
         # As of clang-3.4, this warning appears in v8, and gets escalated to an error.
         AddToCCFLAGSIfSupported(myenv, "-Wno-tautological-constant-out-of-range-compare")
 
+        # New in clang-3.4, trips up things mostly in third_party, but in a few places in the
+        # primary mongo sources as well.
+        AddToCCFLAGSIfSupported(myenv, "-Wno-unused-const-variable")
+
     if has_option('c++11'):
         # The Microsoft compiler does not need a switch to enable C++11. Again we should be
         # checking for MSVC, not windows. In theory, we might be using clang or icc on windows.
