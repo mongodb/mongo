@@ -9,7 +9,7 @@ output.drop();
 function test(pipeline, expected) {
     pipeline.push({$out: output.getName()});
     var result = input.aggregate(pipeline);
-    assert.eq(result, {result: [], outputNs: output.getFullName(), ok: 1});
+    assert.eq(result, {result: [], ok: 1});
 
     assert.eq(output.find().toArray(), expected);
 }
