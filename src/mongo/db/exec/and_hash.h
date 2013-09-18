@@ -67,8 +67,8 @@ namespace mongo {
         virtual PlanStageStats* getStats();
 
     private:
-        StageState readFirstChild();
-        StageState hashOtherChildren();
+        StageState readFirstChild(WorkingSetID* out);
+        StageState hashOtherChildren(WorkingSetID* out);
 
         // Not owned by us.
         WorkingSet* _ws;

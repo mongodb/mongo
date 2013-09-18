@@ -97,6 +97,13 @@ namespace mongo {
             for (;;) {
                 WorkingSetID id;
                 PlanStage::StageState code = _root->work(&id);
+                /*
+                cout << "gotNext state " << PlanStage::stateStr(code);
+                if (PlanStage::ADVANCED == code || PlanStage::NEED_FETCH == code) {
+                    cout << " wsid " << id;
+                }
+                cout << endl;
+                */
 
                 if (PlanStage::ADVANCED == code) {
                     WorkingSetMember* member = _workingSet->get(id);

@@ -7,6 +7,7 @@ env.StaticLibrary(
     source=[
         "canonical_query.cpp",
         "index_bounds_builder.cpp",
+        "index_tag.cpp",
         "lite_parsed_query.cpp",
         "plan_enumerator.cpp",
         "query_planner.cpp",

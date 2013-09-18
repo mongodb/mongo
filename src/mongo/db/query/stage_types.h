@@ -41,6 +41,7 @@ namespace mongo {
         STAGE_IXSCAN,
         STAGE_LIMIT,
         STAGE_OR,
+        STAGE_PROJECTION,
         STAGE_SKIP,
         STAGE_SORT,
         STAGE_SORT_MERGE,

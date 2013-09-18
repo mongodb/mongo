@@ -36,7 +36,7 @@
 namespace mongo {
 
     MultiPlanRunner::MultiPlanRunner(CanonicalQuery* query)
-        : _failure(false), _policy(Runner::YIELD_MANUAL) { }
+        : _failure(false), _policy(Runner::YIELD_MANUAL), _query(query) { }
 
     MultiPlanRunner::~MultiPlanRunner() {
         for (size_t i = 0; i < _candidates.size(); ++i) {
@@ -186,9 +186,11 @@ namespace mongo {
                                          _candidates[bestChild].root));
         _bestPlan->setYieldPolicy(_policy);
         _alreadyProduced = _candidates[bestChild].results;
-        // TODO: Normally we'd hand this to the cache, who would own it.
-        delete _candidates[bestChild].solution;
+        _bestSolution.reset(_candidates[bestChild].solution);
+        // XXX
+        // cout << "Winning solution:\n" << _bestSolution->toString() << endl;
 
+        // TODO:
         // Store the choice we just made in the cache.
         // QueryPlanCache* cache = PlanCache::get(somenamespace);
         // cache->add(_query, *_candidates[bestChild]->solution, decision->bestPlanStats);
@@ -238,7 +240,7 @@ namespace mongo {
                 if (NULL != _yieldPolicy.get()) {
                     saveState();
                     _yieldPolicy->yield(record);
-                    if (_failure) { return Runner::RUNNER_DEAD; }
+                    if (_failure) { return false; }
                     restoreState();
                 }
                 else {

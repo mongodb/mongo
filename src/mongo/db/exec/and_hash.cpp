@@ -59,12 +59,12 @@ namespace mongo {
 
         // We read the first child into our hash table.
         if (_shouldScanChildren && (0 == _currentChild)) {
-            return readFirstChild();
+            return readFirstChild(out);
         }
 
         // Probing into our hash table with other children.
         if (_shouldScanChildren) {
-            return hashOtherChildren();
+            return hashOtherChildren(out);
         }
 
         // Returning results.
@@ -93,7 +93,7 @@ namespace mongo {
         }
     }
 
-    PlanStage::StageState AndHashStage::readFirstChild() {
+    PlanStage::StageState AndHashStage::readFirstChild(WorkingSetID* out) {
         verify(_currentChild == 0);
 
         WorkingSetID id;
@@ -126,6 +126,7 @@ namespace mongo {
         }
         else {
             if (PlanStage::NEED_FETCH == childStatus) {
+                *out = id;
                 ++_commonStats.needFetch;
             }
             else if (PlanStage::NEED_TIME == childStatus) {
@@ -136,7 +137,7 @@ namespace mongo {
         }
     }
 
-    PlanStage::StageState AndHashStage::hashOtherChildren() {
+    PlanStage::StageState AndHashStage::hashOtherChildren(WorkingSetID* out) {
         verify(_currentChild > 0);
 
         WorkingSetID id;
@@ -197,6 +198,7 @@ namespace mongo {
         }
         else {
             if (PlanStage::NEED_FETCH == childStatus) {
+                *out = id;
                 ++_commonStats.needFetch;
             }
             else if (PlanStage::NEED_TIME == childStatus) {

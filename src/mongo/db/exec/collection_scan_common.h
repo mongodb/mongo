@@ -34,8 +34,8 @@ namespace mongo {
 
     struct CollectionScanParams {
         enum Direction {
-            FORWARD,
-            BACKWARD,
+            FORWARD = 1,
+            BACKWARD = -1,
         };
 
         CollectionScanParams() : start(DiskLoc()),

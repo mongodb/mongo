@@ -54,8 +54,28 @@ namespace mongo {
      * interpret.  Previously known as FieldRangeVector.
      */
     struct IndexBounds {
+        IndexBounds() : isSimpleRange(false) { }
+
         // For each indexed field, the values that the field is allowed to take on.
         vector<OrderedIntervalList> fields;
+
+        /**
+         * The provided oil is AND-related to the bounds.  If we have an existing oil over the
+         * field, intersect.  Otherwise, add it to the right location in 'fields'.
+         */
+        void joinAnd(const OrderedIntervalList& oil, const BSONObj& keyPattern) {
+            // XXX XXX
+            verify(0);
+        }
+
+        /**
+         * The provided oil is OR-related to the bounds.  If we have an existing oil over the
+         * field, find the union.  Otherwise, add it to the right location in 'fields'.
+         */
+        void joinOr(const OrderedIntervalList& oil, const BSONObj& keyPattern) {
+            // XXX XXX
+            verify(0);
+        }
 
         // Debugging check.
         // We must have as many fields the key pattern does.

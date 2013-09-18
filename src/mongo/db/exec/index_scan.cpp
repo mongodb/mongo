@@ -104,12 +104,15 @@ namespace mongo {
                 _checker.reset(new IndexBoundsChecker(&_params.bounds,
                                                       _descriptor->keyPattern(),
                                                       _params.direction));
+
+                int nFields = _descriptor->keyPattern().nFields();
                 vector<const BSONElement*> key;
                 vector<bool> inc;
+                key.resize(nFields);
+                inc.resize(nFields);
                 _checker->getStartKey(&key, &inc);
                 _btreeCursor->seek(key, inc);
 
-                int nFields = _descriptor->keyPattern().nFields();
                 _keyElts.resize(nFields);
                 _keyEltsInc.resize(nFields);
             }
@@ -121,8 +124,12 @@ namespace mongo {
             // Note that we're not calling next() here.
         }
         else {
-            _indexCursor->next();
-            checkEnd();
+            // You're allowed to call work() even if the stage is EOF, but we can't call
+            // _indexCursor->next() if we're EOF.
+            if (!isEOF()) {
+                _indexCursor->next();
+                checkEnd();
+            }
         }
 
         if (isEOF()) { return PlanStage::IS_EOF; }

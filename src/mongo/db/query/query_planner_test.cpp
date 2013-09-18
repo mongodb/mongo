@@ -147,8 +147,10 @@ namespace {
         // TODO check filter
 
         QuerySolution* indexedSolution;
-        getPlanByType(STAGE_IXSCAN, &indexedSolution);
-        IndexScanNode* ixNode = static_cast<IndexScanNode*>(indexedSolution->root.get());
+        getPlanByType(STAGE_FETCH, &indexedSolution);
+        FetchNode* fn = static_cast<FetchNode*>(indexedSolution->root.get());
+        IndexScanNode* ixNode = static_cast<IndexScanNode*>(fn->child.get());
+
         boundsEqual(fromjson("{x: [ [5, 5, true, true] ] }"), ixNode->bounds);
         // TODO check filter
     }
@@ -162,10 +164,14 @@ namespace {
         getPlanByType(STAGE_COLLSCAN, &collScanSolution);
         // TODO check filter
 
-        QuerySolution* indexedSolution;
-        getPlanByType(STAGE_IXSCAN, &indexedSolution);
-        IndexScanNode* ixNode = static_cast<IndexScanNode*>(indexedSolution->root.get());
-        boundsEqual(fromjson("{x: [ [5, 5, true, true] ] }"), ixNode->bounds);
+        //QuerySolution* indexedSolution;
+        //getPlanByType(STAGE_FETCH, &indexedSolution);
+        //FetchNode* fn = static_cast<FetchNode*>(indexedSolution->root.get());
+        //IndexScanNode* ixNode = static_cast<IndexScanNode*>(fn->child.get());
+
+        // XXX: this boundsEqual check is bogus, need bounds on y.
+        // boundsEqual(fromjson("{x: [ [5, 5, true, true] ] }"), ixNode->bounds);
+
         // TODO check filter
     }
 
@@ -186,8 +192,10 @@ namespace {
         // TODO check filter
 
         QuerySolution* indexedSolution;
-        getPlanByType(STAGE_IXSCAN, &indexedSolution);
-        IndexScanNode* ixNode = static_cast<IndexScanNode*>(indexedSolution->root.get());
+        getPlanByType(STAGE_FETCH, &indexedSolution);
+        FetchNode* fn = static_cast<FetchNode*>(indexedSolution->root.get());
+        IndexScanNode* ixNode = static_cast<IndexScanNode*>(fn->child.get());
+
         BSONObj bounds = BSON("x" << BSON_ARRAY(BSON_ARRAY(MINKEY << 5 << true << false)));
         boundsEqual(bounds, ixNode->bounds);
         // todo check filter
@@ -207,8 +215,10 @@ namespace {
         // TODO check filter
 
         QuerySolution* indexedSolution;
-        getPlanByType(STAGE_IXSCAN, &indexedSolution);
-        IndexScanNode* ixNode = static_cast<IndexScanNode*>(indexedSolution->root.get());
+        getPlanByType(STAGE_FETCH, &indexedSolution);
+        FetchNode* fn = static_cast<FetchNode*>(indexedSolution->root.get());
+        IndexScanNode* ixNode = static_cast<IndexScanNode*>(fn->child.get());
+
         BSONObj bounds = BSON("x" << BSON_ARRAY(BSON_ARRAY(MINKEY << 5 << true << true)));
         boundsEqual(bounds, ixNode->bounds);
         // todo check filter
@@ -228,8 +238,9 @@ namespace {
         // TODO check filter
 
         QuerySolution* indexedSolution;
-        getPlanByType(STAGE_IXSCAN, &indexedSolution);
-        IndexScanNode* ixNode = static_cast<IndexScanNode*>(indexedSolution->root.get());
+        getPlanByType(STAGE_FETCH, &indexedSolution);
+        FetchNode* fn = static_cast<FetchNode*>(indexedSolution->root.get());
+        IndexScanNode* ixNode = static_cast<IndexScanNode*>(fn->child.get());
         BSONObj bounds = BSON("x" << BSON_ARRAY(BSON_ARRAY(5 << MAXKEY << false << true)));
         boundsEqual(bounds, ixNode->bounds);
         // todo check filter
@@ -249,8 +260,9 @@ namespace {
         // TODO check filter
 
         QuerySolution* indexedSolution;
-        getPlanByType(STAGE_IXSCAN, &indexedSolution);
-        IndexScanNode* ixNode = static_cast<IndexScanNode*>(indexedSolution->root.get());
+        getPlanByType(STAGE_FETCH, &indexedSolution);
+        FetchNode* fn = static_cast<FetchNode*>(indexedSolution->root.get());
+        IndexScanNode* ixNode = static_cast<IndexScanNode*>(fn->child.get());
         BSONObj bounds = BSON("x" << BSON_ARRAY(BSON_ARRAY(5 << MAXKEY << true << true)));
         boundsEqual(bounds, ixNode->bounds);
         // todo check filter
@@ -260,26 +272,76 @@ namespace {
     // tree operations
     //
 
+    TEST_F(SingleIndexTest, TwoPredicatesAnding) {
+        setIndex(BSON("x" << 1));
+        runQuery(fromjson("{$and: [ {x: {$gt: 1}}, {x: {$lt: 3}} ] }"));
+        ASSERT_EQUALS(getNumSolutions(), 2U);
+
+        QuerySolution* collScanSolution;
+        getPlanByType(STAGE_COLLSCAN, &collScanSolution);
+        // TODO check filter
+
+        QuerySolution* indexedSolution;
+        // This is a fetch not an ixscan because our index tagging isn't good so far and we don't
+        // know that the index is used for the second predicate.
+        getPlanByType(STAGE_FETCH, &indexedSolution);
+        FetchNode* fn = static_cast<FetchNode*>(indexedSolution->root.get());
+        IndexScanNode* ixNode = static_cast<IndexScanNode*>(fn->child.get());
+        boundsEqual(BSON("x" << BSON_ARRAY(BSON_ARRAY(1 << MAXKEY << false << true))), ixNode->bounds);
+        // TODO: use this when we tag both indices.
+        // boundsEqual(fromjson("{x: [ [1, 3, false, false] ] }"), ixNode->bounds);
+        // TODO check filter
+    }
+
+    TEST_F(SingleIndexTest, SimpleOr) {
+        setIndex(BSON("a" << 1));
+        runQuery(fromjson("{$or: [ {a: 20}, {a: 21}]}"));
+        ASSERT_EQUALS(getNumSolutions(), 2U);
+        QuerySolution* indexedSolution = NULL;
+        getPlanByType(STAGE_FETCH, &indexedSolution);
+        cout << indexedSolution->toString() << endl;
+    }
+
+    TEST_F(SingleIndexTest, OrWithAndChild) {
+        setIndex(BSON("a" << 1));
+        runQuery(fromjson("{$or: [ {a: 20}, {$and: [{a:1}, {b:7}]}]}"));
+        ASSERT_EQUALS(getNumSolutions(), 2U);
+        QuerySolution* indexedSolution = NULL;
+        getPlanByType(STAGE_FETCH, &indexedSolution);
+        cout << indexedSolution->toString() << endl;
+    }
+
+    //
+    // Tree operations that require simple tree rewriting.
+    //
+
+    TEST_F(SingleIndexTest, AndOfAnd) {
+        setIndex(BSON("x" << 1));
+        runQuery(fromjson("{$and: [ {$and: [ {x: 2.5}]}, {x: {$gt: 1}}, {x: {$lt: 3}} ] }"));
+        ASSERT_EQUALS(getNumSolutions(), 2U);
+
+        QuerySolution* collScanSolution;
+        getPlanByType(STAGE_COLLSCAN, &collScanSolution);
+        // TODO check filter
+
+        QuerySolution* indexedSolution;
+        // This is a fetch not an ixscan because our index tagging isn't good so far and we don't
+        // know that the index is used for the second predicate.
+        getPlanByType(STAGE_FETCH, &indexedSolution);
+        cout << indexedSolution->toString() << endl;
+
+        //FetchNode* fn = static_cast<FetchNode*>(indexedSolution->root.get());
+        //IndexScanNode* ixNode = static_cast<IndexScanNode*>(fn->child.get());
+        //boundsEqual(BSON("x" << BSON_ARRAY(BSON_ARRAY(1 << MAXKEY << false << true))), ixNode->bounds);
+        // TODO: use this when we tag both indices.
+        // boundsEqual(fromjson("{x: [ [1, 3, false, false] ] }"), ixNode->bounds);
+        // TODO check filter
+    }
+
+
     // STOPPED HERE - need to hook up machinery for multiple indexed predicates
-    //                first test is segfaulting
     //                second is not working (until the machinery is in place)
     //
-    // TEST_F(SingleIndexTest, TwoPredicatesAnding) {
-    //     setIndex(BSON("x" << 1));
-    //     runQuery(fromjson("{$and: [ {$gt: 1}, {$lt: 3} ] }"));
-    //     ASSERT_EQUALS(getNumSolutions(), 2U);
-
-    //     QuerySolution* collScanSolution;
-    //     getPlanByType(STAGE_COLLSCAN, &collScanSolution);
-    //     // TODO check filter
-
-    //     QuerySolution* indexedSolution;
-    //     getPlanByType(STAGE_IXSCAN, &indexedSolution);
-    //     IndexScanNode* ixNode = static_cast<IndexScanNode*>(indexedSolution->root.get());
-    //     boundsEqual(fromjson("{x: [ [1, 3, false, false] ] }"), ixNode->bounds);
-    //     // TODO check filter
-    // }
-
     // TEST_F(SingleIndexTest, TwoPredicatesOring) {
     //     setIndex(BSON("x" << 1));
     //     runQuery(fromjson("{$or: [ {a: 1}, {a: 2} ] }"));

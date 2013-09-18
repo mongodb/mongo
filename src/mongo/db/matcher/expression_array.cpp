@@ -220,7 +220,8 @@ namespace mongo {
         if ( _list.size() == 0 )
             return false;
         for ( unsigned i = 0; i < _list.size(); i++ ) {
-            if ( !_list[i]->matchesArray( anArray, NULL ) )
+            if ( !static_cast<ArrayMatchingMatchExpression*>(_list[i])->matchesArray(
+                     anArray, NULL ) )
                 return false;
         }
         return true;

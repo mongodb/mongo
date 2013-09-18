@@ -66,6 +66,11 @@ namespace mongo {
         bool getNext(MatchExpression** tree);
 
     private:
+
+        //
+        // Data used by all enumeration strategies
+        //
+
         // Match expression we're planning for. Not owned by us.
         MatchExpression* _root;
 
@@ -77,29 +82,38 @@ namespace mongo {
         const std::vector<BSONObj>& _indices;
 
         //
-        // navigation state (work in progress)
-        //
-        // We intend to enumerate, initially, solely based on the distinct index access
-        // patterns that a query would accept. The enumeration state, below, will change as we
-        // progress toward that goal. For now, we simplify by imposing the following
-        // assumptions
-        //
-        // + Each index can help only one predicate in a query
-        // + There is only one index that can help a query
-        //
-        // TODO: Relax the above
+        // Enumeration Strategies
         //
 
-        // List of all the useful indices and which node in the match expression each of them
-        // applies to.
-        struct IndexInfo{
-            int index;
-            MatchExpression* node;
-        };
-        vector<IndexInfo> _indexes;
+        //
+        // Legacy strategy.
+        //
+        // The legacy strategy assigns the absolute fewest number of indices require to satisfy a
+        // query.  Some predicates require an index (GEO_NEAR and TEXT).  Each branch of an OR requires
+        // an index.
+        //
 
-        // Iterator over _indices. Points to the next index to be used when getNext is called.
-        size_t _iter;
+        // Which leaves require an index?
+        vector<MatchExpression*> _leavesRequireIndex;
+
+        // For each leaf, a counter of which index we've assigned so far.
+        vector<size_t> _assignedCounter;
+
+        // Are we done with the legacy strategy?
+        bool _done;
+
+        /**
+         * Fill out _leavesRequireIndex such that each OR clause and each index-requiring leaf has
+         * an index.  If there are no OR clauses, we use only one index.
+         */
+        bool prepLegacyStrategy(MatchExpression* root);
+
+        /**
+         * Does the provided node have any indices that can be used to answer it?
+         */
+        bool hasIndexAvailable(MatchExpression* node);
+
+        // XXX TODO: Add a dump() or toString() for legacy strategy.
     };
 
 } // namespace mongo

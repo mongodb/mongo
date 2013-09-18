@@ -273,7 +273,7 @@ namespace mongo {
                 break;
             // entire extent could be empty, keep looking
         }
-        return e->firstRecord;
+        return e->lastRecord;
     }
 
     Extent* ExtentManager::getNextExtent( Extent* e ) const {

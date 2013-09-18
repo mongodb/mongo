@@ -61,6 +61,7 @@ namespace mongo {
         }
         else {
             if (PlanStage::NEED_FETCH == status) {
+                *out = id;
                 ++_commonStats.needFetch;
             }
             else if (PlanStage::NEED_TIME == status) {

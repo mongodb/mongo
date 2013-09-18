@@ -100,8 +100,8 @@ namespace mongo {
 
             // We're looking at the first element in the index.  We can definitely use any index
             // prefixed by the predicate's field to answer that predicate.
-            for (PredicateMap::iterator it = predicates->find(elt.fieldName());
-                 it != predicates->end(); ++it) {
+            PredicateMap::iterator it = predicates->find(elt.fieldName());
+            if (it != predicates->end()) {
                 it->second.relevant.insert(RelevantIndex(i, RelevantIndex::FIRST));
             }
 
@@ -110,8 +110,8 @@ namespace mongo {
             // later.
             while (kpIt.more()) {
                 elt = kpIt.next();
-                for (PredicateMap::iterator it = predicates->find(elt.fieldName());
-                     it != predicates->end(); ++it) {
+                PredicateMap::iterator it = predicates->find(elt.fieldName());
+                if (it != predicates->end()) {
                     it->second.relevant.insert(RelevantIndex(i, RelevantIndex::NOT_FIRST));
                 }
             }
@@ -137,6 +137,8 @@ namespace mongo {
         soln->filter.reset(query.root()->shallowClone());
         // BSONValue, where are you?
         soln->filterData = query.getQueryObj();
+        verify(soln->filterData.isOwned());
+        soln->ns = query.ns();
 
         // Make the (only) node, a collection scan.
         CollectionScanNode* csn = new CollectionScanNode();
@@ -145,15 +147,40 @@ namespace mongo {
         csn->tailable = tailable;
 
         const BSONObj& sortObj = query.getParsed().getSort();
+
+        QuerySolutionNode* solnRoot = csn;
+
         // TODO: We need better checking for this.  Should be done in CanonicalQuery and we should
         // be able to assume it's correct.
         if (!sortObj.isEmpty()) {
             BSONElement natural = sortObj.getFieldDotted("$natural");
-            csn->direction = natural.numberInt() >= 0 ? 1 : -1;
+            if (!natural.eoo()) {
+                csn->direction = natural.numberInt() >= 0 ? 1 : -1;
+            }
+            else {
+                SortNode* sort = new SortNode();
+                sort->pattern = sortObj;
+                sort->child.reset(csn);
+                solnRoot = sort;
+            }
         }
 
-        // Add this solution to the list of solutions.
-        soln->root.reset(csn);
+        if (!query.getParsed().getProj().isEmpty()) {
+            ProjectionNode* proj = new ProjectionNode();
+            proj->projection = query.getParsed().getProj();
+            proj->child.reset(solnRoot);
+            solnRoot = proj;
+        }
+
+        if (0 != query.getParsed().getSkip()) {
+            SkipNode* skip = new SkipNode();
+            skip->skip = query.getParsed().getSkip();
+            skip->child.reset(solnRoot);
+            solnRoot = skip;
+        }
+
+        soln->root.reset(solnRoot);
+        // cout << "Outputting collscan " << soln->toString() << endl;
         return soln.release();
     }
 
@@ -164,90 +191,468 @@ namespace mongo {
         FilterInfo(MatchExpression* f, int c) : filterNode(f), currChild(c) {}
     };
 
-    // TODO: Document when this settles
-    QuerySolution* makeIndexedPath(const CanonicalQuery& query,
-                                   const vector<BSONObj>& indexKeyPatterns,
-                                   MatchExpression* filter) {
-
-        auto_ptr<QuerySolution> soln(new QuerySolution());
-
-        // We'll build a tree of solutions nodes as we traverse the filter. For
-        // now, we're not generating multi-index solutions, so we can hold on to a
-        // single node here.
+    IndexScanNode* makeIndexScan(const BSONObj& indexKeyPattern, MatchExpression* expr, bool* exact) {
         IndexScanNode* isn = new IndexScanNode();
+        isn->indexKeyPattern = indexKeyPattern;
 
-        // We'll do a post order traversal of the filter, which is a n-ary tree. We descend the
-        // tree keeping track of which child is next to visit.
-        std::stack<FilterInfo> filterNodes;
-        FilterInfo rootFilter(filter, 0);
-        filterNodes.push(rootFilter);
-
-        while (!filterNodes.empty()) {
-
-            FilterInfo& fi = filterNodes.top();
-            MatchExpression* filterNode = fi.filterNode;
-            size_t& currChild = fi.currChild;
-            if (filterNode->numChildren() == currChild) {
-
-                // Visit leaf or node. If we find an index tag, we compute the bounds and
-                // fill up the index information on the current IXScan node.
-                IndexTag* indexTag = static_cast<IndexTag*>(filterNode->getTag());
-                bool exactBounds = false;
-                if (indexTag != NULL) {
-
-                    isn->indexKeyPattern = indexKeyPatterns[indexTag->index];
-
-                    // We assume that this is in the same direction of the index. We may later
-                    // change our minds if the query requires sorting in the opposite
-                    // direction. But, right now, the direction of traversal is not in
-                    // question.
-                    isn->direction = 1;
-
-                    // TODO: handle combining oils if this is not the first predicate we'eve
-                    // seen for this field.
-                    // TODO: handle compound indexes
-                    OrderedIntervalList oil(filterNode->path().toString());
-                    IndexBoundsBuilder::translate(
-                        static_cast<LeafMatchExpression*>(filterNode),
-                        isn->indexKeyPattern.firstElement(),
-                        &oil,
-                        &exactBounds);
-
-                    // TODO: union or intersect oils
-                    // It can be the case that this is not the first "oil" for a given
-                    // field. That is, there are several predicates agains a same field which
-                    // happens to have a useful index. In that case, we may need to combine
-                    // oils in a "larger" bound to accomodate all the predicates.
-                    vector<OrderedIntervalList>& fields = isn->bounds.fields;
-                    fields.push_back(oil);
-                }
-
-                // TODO: possibly trim redundant MatchExpressions nodes
-                // It can be the case that the bounds for a query will only return exact
-                // results (as opposed to just limiting the index range in which the results
-                // lie). When results are exact, we don't need to retest them and thus such
-                // nodes can be eliminated from the filter.  Note that some non-leaf nodes
-                // (e.g. and's, or's) may be left with single children and can therefore be
-                // eliminated as well.
-                isn->filter = filterNode;
-
-                // TODO: Multiple IXScans nodes in a solution
-                // If this is not the first index tag found, then we add another IXScan node to
-                // the queryNodes stack and start using $or and $ands in the filter expession
-                // to tie the IXScan together into a tree of QuerySolutionNode's.
-
-                filterNodes.pop();
-            }
-            else {
-                // Continue the traversal.
-                FilterInfo fiChild(filterNode->getChild(currChild), 0);
-                filterNodes.push(fiChild);
-                currChild++;
-            }
+        if (indexKeyPattern.firstElement().fieldName() != expr->path().toString()) {
+            // cout << "indexkp fn is " << indexKeyPattern.firstElement().fieldName() << " path is " << expr->path().toString() << endl;
+            verify(0);
         }
 
-        soln->root.reset(isn);
+        BSONObjIterator it(isn->indexKeyPattern);
+        BSONElement elt = it.next();
+
+        OrderedIntervalList oil(expr->path().toString());
+        int direction = (elt.numberInt() >= 0) ? 1 : -1;
+        IndexBoundsBuilder::translate(expr, direction, &oil, exact);
+        // TODO(opt): this is a surplus copy, could build right in the original
+        isn->bounds.fields.push_back(oil);
+        return isn;
+    }
+
+    QuerySolutionNode* buildSolutionTree(MatchExpression* root, const vector<BSONObj>& indexKeyPatterns) {
+        if (root->isLogical()) {
+            // The children of AND and OR nodes are sorted by the index that the subtree rooted at
+            // that node uses.  Child nodes that use the same index are adjacent to one another to
+            // facilitate grouping of index scans.
+            //
+            // See tagForSort and sortUsingTags in index_tag.h
+            if (MatchExpression::AND == root->matchType()) {
+                auto_ptr<AndHashNode> theAnd(new AndHashNode());
+
+                // Process all IXSCANs, possibly combining them.
+                auto_ptr<IndexScanNode> currentScan;
+                size_t currentIndexNumber = IndexTag::kNoIndex;
+                size_t curChild = 0;
+                while (curChild < root->numChildren()) {
+                    MatchExpression* child = root->getChild(curChild);
+
+                    // No tag, it's not an IXSCAN.  We've sorted our children such that the tagged
+                    // children are first, so we stop now.
+                    if (NULL == child->getTag()) { break; }
+
+                    IndexTag* ixtag = static_cast<IndexTag*>(child->getTag());
+                    // If there's a tag it must be valid.
+                    verify(IndexTag::kNoIndex != ixtag->index);
+
+                    // TODO(opt): If the child is logical, it could collapse into an ixscan.  We
+                    // ignore this for now.
+                    if (child->isLogical()) {
+                        QuerySolutionNode* childSolution = buildSolutionTree(child, indexKeyPatterns);
+                        if (NULL == childSolution) { return NULL; }
+                        theAnd->children.push_back(childSolution);
+                        // The logical sub-tree is responsible for fully evaluating itself.  Any
+                        // required filters or fetches are already hung on it.  As such, we remove
+                        // the filter branch from our tree.
+                        // XXX: Verify this is the right policy.
+                        root->getChildVector()->erase(root->getChildVector()->begin() + curChild);
+                        // XXX: Do we delete the curChild-th child??
+                        continue;
+                    }
+
+                    // We now know that 'child' can use an index and that it's a predicate over a
+                    // field (leaf).  There is no current index scan, make the current scan this
+                    // child.
+                    if (NULL == currentScan.get()) {
+                        verify(IndexTag::kNoIndex == currentIndexNumber);
+                        currentIndexNumber = ixtag->index;
+
+                        bool exact = false;
+                        currentScan.reset(makeIndexScan(indexKeyPatterns[currentIndexNumber], child, &exact));
+
+                        if (exact) {
+                            // The bounds answer the predicate, and we can remove the expression from the root.
+                            // TODO(opt): Erasing entry 0, 1, 2, ... could be kind of n^2, maybe optimize later.
+                            root->getChildVector()->erase(root->getChildVector()->begin() + curChild);
+                            // Don't increment curChild.
+                            // XXX: Do we delete the curChild-th child??
+                        }
+                        else {
+                            // We keep curChild in the AND for affixing later.
+                            ++curChild;
+                        }
+                        continue;
+                    }
+
+                    // If the child uses a different index than the current index scan, and there is
+                    // a valid current index scan, add the current index scan as a child to the AND,
+                    // as we're done with it.
+                    //
+                    // The child then becomes our new current index scan.
+
+                    // XXX temporary until we can merge bounds.
+                    bool childUsesNewIndex = true;
+
+                    // XXX: uncomment when we can combine ixscans via bounds merging.
+                    // bool childUsesNewIndex = (currentIndexNumber != ixtag->index);
+
+                    if (childUsesNewIndex) {
+                        verify(NULL != currentScan.get());
+                        theAnd->children.push_back(currentScan.release());
+                        currentIndexNumber = ixtag->index;
+
+                        bool exact = false;
+                        currentScan.reset(makeIndexScan(indexKeyPatterns[currentIndexNumber], child, &exact));
+
+                        if (exact) {
+                            // The bounds answer the predicate.
+                            // TODO(opt): Erasing entry 0, 1, 2, ... could be kind of n^2, maybe optimize later.
+                            root->getChildVector()->erase(root->getChildVector()->begin() + curChild);
+                            // XXX: Do we delete the curChild-th child??
+                        }
+                        else {
+                            // We keep curChild in the AND for affixing later.
+                            ++curChild;
+                        }
+                        continue;
+                    }
+                    else {
+                        // The child uses the same index we're currently building a scan for.  Merge the
+                        // bounds and filters.
+                        verify(currentIndexNumber == ixtag->index);
+
+                        // First, make the bounds.
+                        OrderedIntervalList oil(child->path().toString());
+
+                        // TODO(opt): We can cache this as part of the index rating process
+                        BSONObjIterator kpIt(indexKeyPatterns[currentIndexNumber]);
+                        BSONElement elt = kpIt.next();
+                        while (elt.fieldName() != oil.name) {
+                            verify(kpIt.more());
+                            elt = kpIt.next();
+                        }
+                        verify(!elt.eoo());
+                        int direction = (elt.numberInt() >= 0) ? 1 : -1;
+                        bool exact = false;
+                        IndexBoundsBuilder::translate(child, direction, &oil, &exact);
+
+                        // Merge the bounds with the existing.
+                        currentScan->bounds.joinAnd(oil, indexKeyPatterns[currentIndexNumber]);
+
+                        if (exact) {
+                            // The bounds answer the predicate.
+                            // TODO(opt): Erasing entry 0, 1, 2, ... could be kind of n^2, maybe optimize later.
+                            root->getChildVector()->erase(root->getChildVector()->begin() + curChild);
+                            // XXX: Do we delete the curChild-th child??
+                        }
+                        else {
+                            // We keep curChild in the AND for affixing later.
+                            ++curChild;
+                        }
+                    }
+                }
+
+                // Output the scan we're done with.
+                if (NULL != currentScan.get()) {
+                    theAnd->children.push_back(currentScan.release());
+                }
+
+                //
+                // Process all non-indexed predicates.  We hang these above the AND with a fetch and
+                // filter.
+                //
+
+                // This is the node we're about to return.
+                QuerySolutionNode* andResult;
+
+                // Short-circuit: an AND of one child is just the child.
+                verify(theAnd->children.size() > 0);
+                if (theAnd->children.size() == 1) {
+                    andResult = theAnd->children[0];
+                    theAnd->children.clear();
+                    // Deletes theAnd but we cleared the children.
+                    theAnd.reset();
+                }
+                else {
+                    andResult = theAnd.release();
+                }
+
+                // If there are any nodes still attached to the AND, we can't answer them using the
+                // index, so we put a fetch with filter.
+                if (root->numChildren() > 0) {
+                    FetchNode* fetch = new FetchNode();
+                    fetch->filter = root;
+                    // takes ownership
+                    fetch->child.reset(andResult);
+                    andResult = fetch;
+                }
+                else {
+                    // XXX: If root has no children, who deletes it/owns it?  What happens?
+                }
+
+                return andResult;
+            }
+            else if (MatchExpression::OR == root->matchType()) {
+                auto_ptr<OrNode> theOr(new OrNode());
+
+                // Process all IXSCANs, possibly combining them.
+                auto_ptr<IndexScanNode> currentScan;
+                size_t currentIndexNumber = IndexTag::kNoIndex;
+                size_t curChild = 0;
+                while (curChild < root->numChildren()) {
+                    MatchExpression* child = root->getChild(curChild);
+
+                    // No tag, it's not an IXSCAN.
+                    if (NULL == child->getTag()) { break; }
+
+                    IndexTag* ixtag = static_cast<IndexTag*>(child->getTag());
+                    // If there's a tag it must be valid.
+                    verify(IndexTag::kNoIndex != ixtag->index);
+
+                    // TODO(opt): If the child is logical, it could collapse into an ixscan.  We
+                    // ignore this for now.
+                    if (child->isLogical()) {
+                        QuerySolutionNode* childSolution = buildSolutionTree(child, indexKeyPatterns);
+                        if (NULL == childSolution) { return NULL; }
+                        theOr->children.push_back(childSolution);
+                        // The logical sub-tree is responsible for fully evaluating itself.  Any
+                        // required filters or fetches are already hung on it.  As such, we remove
+                        // the filter branch from our tree.
+                        // XXX: Verify this is the right policy.
+                        // XXX: Do we delete the curChild-th child??
+                        root->getChildVector()->erase(root->getChildVector()->begin() + curChild);
+                        continue;
+                    }
+
+                    // We now know that 'child' can use an index and that it's a predicate over a
+                    // field.  There is no current index scan, make the current scan this child.
+                    if (NULL == currentScan.get()) {
+                        verify(IndexTag::kNoIndex == currentIndexNumber);
+                        currentIndexNumber = ixtag->index;
+
+                        bool exact = false;
+                        currentScan.reset(makeIndexScan(indexKeyPatterns[currentIndexNumber], child, &exact));
+
+                        if (exact) {
+                            // The bounds answer the predicate, and we can remove the expression from the root.
+                            // TODO(opt): Erasing entry 0, 1, 2, ... could be kind of n^2, maybe optimize later.
+                            root->getChildVector()->erase(root->getChildVector()->begin() + curChild);
+                            // Don't increment curChild.
+                            // XXX: Do we delete the curChild-th child??
+                        }
+                        else {
+                            // We keep curChild in the AND for affixing later.
+                            ++curChild;
+                        }
+                        continue;
+                    }
+
+                    // If the child uses a different index than the current index scan, and there is
+                    // a valid current index scan, add the current index scan as a child to the AND,
+                    // as we're done with it.
+                    //
+                    // The child then becomes our new current index scan.
+
+                    // XXX temporary until we can merge bounds.
+                    bool childUsesNewIndex = true;
+
+                    // XXX: uncomment when we can combine ixscans via bounds merging.
+                    // bool childUsesNewIndex = (currentIndexNumber != ixtag->index);
+
+                    if (childUsesNewIndex) {
+                        verify(NULL != currentScan.get());
+                        theOr->children.push_back(currentScan.release());
+                        currentIndexNumber = ixtag->index;
+
+                        bool exact = false;
+                        currentScan.reset(makeIndexScan(indexKeyPatterns[currentIndexNumber], child, &exact));
+
+                        if (exact) {
+                            // The bounds answer the predicate.
+                            // TODO(opt): Erasing entry 0, 1, 2, ... could be kind of n^2, maybe optimize later.
+                            root->getChildVector()->erase(root->getChildVector()->begin() + curChild);
+                            // XXX: Do we delete the curChild-th child??
+                        }
+                        else {
+                            // We keep curChild in the AND for affixing later.
+                            ++curChild;
+                        }
+                        continue;
+                    }
+                    else {
+                        // The child uses the same index we're currently building a scan for.  Merge the
+                        // bounds and filters.
+                        verify(currentIndexNumber == ixtag->index);
+
+                        // First, make the bounds.
+                        OrderedIntervalList oil(child->path().toString());
+
+                        // TODO(opt): We can cache this as part of the index rating process
+                        BSONObjIterator kpIt(indexKeyPatterns[currentIndexNumber]);
+                        BSONElement elt = kpIt.next();
+                        while (elt.fieldName() != oil.name) {
+                            verify(kpIt.more());
+                            elt = kpIt.next();
+                        }
+                        verify(!elt.eoo());
+                        int direction = (elt.numberInt() >= 0) ? 1 : -1;
+                        bool exact = false;
+                        IndexBoundsBuilder::translate(child, direction, &oil, &exact);
+
+                        // Merge the bounds with the existing.
+                        currentScan->bounds.joinOr(oil, indexKeyPatterns[currentIndexNumber]);
+
+                        if (exact) {
+                            // The bounds answer the predicate.
+                            // TODO(opt): Erasing entry 0, 1, 2, ... could be kind of n^2, maybe optimize later.
+                            root->getChildVector()->erase(root->getChildVector()->begin() + curChild);
+
+                            // XXX: Do we delete the curChild-th child??
+                        }
+                        else {
+                            // We keep curChild in the AND for affixing later.
+                            ++curChild;
+                        }
+                    }
+                }
+
+                // Output the scan we're done with.
+                if (NULL != currentScan.get()) {
+                    theOr->children.push_back(currentScan.release());
+                }
+
+                // Unlike an AND, an OR cannot have filters hanging off of it.
+                // TODO: Should we verify?
+                if (root->numChildren() > 0) {
+                    warning() << "planner OR error, non-indexed branch.";
+                    verify(0);
+                    return NULL;
+                }
+
+                // Short-circuit: the OR of one child is just the child.
+                if (1 == theOr->children.size()) {
+                    QuerySolutionNode* child = theOr->children[0];
+                    theOr->children.clear();
+                    return child;
+                }
+
+                return theOr.release();
+            }
+            else {
+                // NOT or NOR, can't do anything.
+                return NULL;
+            }
+        }
+        else {
+            // isArray or isLeaf is true.  Either way, it's over one field, and the bounds builder
+            // deals with it.
+            if (NULL == root->getTag()) {
+                // No index to use here, not in the context of logical operator, so we're SOL.
+                return NULL;
+            }
+            else {
+                // Make an index scan over the tagged index #.
+                IndexTag* tag = static_cast<IndexTag*>(root->getTag());
+
+                bool exact = false;
+                auto_ptr<IndexScanNode> isn(makeIndexScan(indexKeyPatterns[tag->index], root, &exact));
+
+                BSONObjIterator it(isn->indexKeyPattern);
+                // Skip first field, as we've filled out the bounds in makeIndexScan.
+                it.next();
+
+                // The rest is filler for any trailing fields.
+                while (it.more()) {
+                    isn->bounds.fields.push_back(IndexBoundsBuilder::allValuesForField(it.next()));
+                }
+
+                // If the bounds are exact, the set of documents that satisfy the predicate is exactly
+                // equal to the set of documents that the scan provides.
+                //
+                // If the bounds are not exact, the set of documents returned from the scan is a
+                // superset of documents that satisfy the predicate, and we must check the
+                // predicate.
+                if (!exact) {
+                    FetchNode* fetch = new FetchNode();
+                    fetch->filter = root;
+                    fetch->child.reset(isn.release());
+                    return fetch;
+                }
+
+                return isn.release();
+            }
+        }
+        return NULL;
+    }
+
+    QuerySolution* makeSolution(const CanonicalQuery& query, MatchExpression* taggedRoot,
+                                const vector<BSONObj>& indexKeyPatterns) {
+        QuerySolutionNode* solnRoot = buildSolutionTree(taggedRoot, indexKeyPatterns);
+        if (NULL == solnRoot) { return NULL; }
+
+        // TODO XXX: Solutions need properties, need to use those properties to see when things
+        // covered, sorts provided, etc.
+
+        // Fetch before proj
+        bool addFetch = (STAGE_FETCH != solnRoot->getType());
+        if (addFetch) {
+            FetchNode* fetch = new FetchNode();
+            fetch->child.reset(solnRoot);
+            solnRoot = fetch;
+        }
+
+        if (!query.getParsed().getProj().isEmpty()) {
+            ProjectionNode* proj = new ProjectionNode();
+            proj->projection = query.getParsed().getProj();
+            proj->child.reset(solnRoot);
+            solnRoot = proj;
+        }
+
+        if (!query.getParsed().getSort().isEmpty()) {
+            SortNode* sort = new SortNode();
+            sort->pattern = query.getParsed().getSort();
+            sort->child.reset(solnRoot);
+            solnRoot = sort;
+        }
+
+        if (0 != query.getParsed().getSkip()) {
+            SkipNode* skip = new SkipNode();
+            skip->skip = query.getParsed().getSkip();
+            skip->child.reset(solnRoot);
+            solnRoot = skip;
+        }
+
+        auto_ptr<QuerySolution> soln(new QuerySolution());
+        soln->filter.reset(taggedRoot);
+        soln->filterData = query.getQueryObj();
+        verify(soln->filterData.isOwned());
+        soln->root.reset(solnRoot);
+        soln->ns = query.ns();
         return soln.release();
+    }
+
+    void dumpPredMap(const PredicateMap& predicates) {
+        for (PredicateMap::const_iterator it = predicates.begin(); it != predicates.end(); ++it) {
+            cout << "field " << it->first << endl;
+            const PredicateInfo& pi = it->second;
+            cout << "\tRelevant indices:\n";
+            for (set<RelevantIndex>::iterator si = pi.relevant.begin(); si != pi.relevant.end(); ++si) {
+                cout << "\t\tidx #" << si->index << " relevance: ";
+                if (RelevantIndex::FIRST == si->relevance) {
+                    cout << "first";
+                }
+                else {
+                    cout << "second";
+                }
+            }
+            cout << "\n\tNodes:\n";
+            for (size_t i = 0; i < pi.nodes.size(); ++i) {
+                cout << "\t\t" << pi.nodes[i]->toString();
+            }
+        }
+    }
+
+    bool hasNode(MatchExpression* root, MatchExpression::MatchType type) {
+        if (type == root->matchType()) {
+            return true;
+        }
+        for (size_t i = 0; i < root->numChildren(); ++i) {
+            if (hasNode(root->getChild(i), type)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     // static
@@ -277,8 +682,8 @@ namespace mongo {
 
         // NOR and NOT we can't handle well with indices.  If we see them here, they weren't
         // rewritten.  Just output a collscan for those.
-        if (hasPredicate(predicates, MatchExpression::NOT)
-            || hasPredicate(predicates, MatchExpression::NOR)) {
+        if (hasNode(query.root(), MatchExpression::NOT)
+            || hasNode(query.root(), MatchExpression::NOR)) {
 
             // If there's a near predicate, we can't handle this.
             // TODO: Should canonicalized query detect this?
@@ -300,8 +705,15 @@ namespace mongo {
             return;
         }
 
+        /*
+        for (size_t i = 0; i < relevantIndices.size(); ++i) {
+            cout << "relevant idx " << i << " is " << relevantIndices[i].toString() << endl;
+        }
+        */
+
         // Figure out how useful each index is to each predicate.
         rateIndices(relevantIndices, &predicates);
+        // dumpPredMap(predicates);
 
         //
         // Planner Section 2: Use predicate/index data to output sets of indices that we can use.
@@ -318,7 +730,8 @@ namespace mongo {
             // to try to rewrite the tree.  TODO: Do this for real.  We treat the tree as static.
             //
 
-            QuerySolution* soln = makeIndexedPath(query, indexKeyPatterns, rawTree);
+            QuerySolution* soln = makeSolution(query, rawTree, relevantIndices);
+            if (NULL == soln) { continue; }
 
             //
             // Planner Section 4: Covering.  If we're projecting, See if we get any covering from
@@ -350,13 +763,16 @@ namespace mongo {
             //
 
             if (NULL != soln) {
+                // cout << "Adding solution:\n" << soln->toString() << endl;
                 out->push_back(soln);
             }
         }
 
         // TODO: Do we always want to offer a collscan solution?
         if (!hasPredicate(predicates, MatchExpression::GEO_NEAR)) {
-            out->push_back(makeCollectionScan(query, false));
+            QuerySolution* collscan = makeCollectionScan(query, false);
+            // cout << "default collscan = " << collscan->toString() << endl;
+            out->push_back(collscan);
         }
     }
 

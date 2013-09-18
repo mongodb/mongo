@@ -112,6 +112,8 @@ namespace mongo {
         scoped_ptr<PlanExecutor> _bestPlan;
         // ...and any results it produced while working toward winning.
         std::queue<WorkingSetID> _alreadyProduced;
+        // ...and the solution, for caching.
+        scoped_ptr<QuerySolution> _bestSolution;
 
         // Candidate plans.
         vector<CandidatePlan> _candidates;

@@ -28,78 +28,44 @@
 
 #pragma once
 
-#include <queue>
-#include <vector>
-
 #include "mongo/db/diskloc.h"
 #include "mongo/db/exec/plan_stage.h"
+#include "mongo/db/exec/query_projection.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression.h"
-#include "mongo/platform/unordered_set.h"
 
 namespace mongo {
 
     /**
-     * Reads from N children, each of which must have a valid DiskLoc.  Assumes each child produces
-     * DiskLocs in sorted order.  Outputs the intersection of the DiskLocs outputted by the
-     * children.
-     *
-     * Preconditions: Valid DiskLoc.  More than one child.
-     *
-     * Any DiskLoc that we keep a reference to that is invalidated before we are able to return it
-     * is fetched and added to the WorkingSet as "flagged for further review."  Because this stage
-     * operates with DiskLocs, we are unable to evaluate the AND for the invalidated DiskLoc, and it
-     * must be fully matched later.
+     * This stage computes a projection.
      */
-    class AndSortedStage : public PlanStage {
+    class ProjectionStage : public PlanStage {
     public:
-        AndSortedStage(WorkingSet* ws, const MatchExpression* filter);
-        virtual ~AndSortedStage();
+        ProjectionStage(QueryProjection* projection, WorkingSet* ws, PlanStage* child,
+                        const MatchExpression* filter);
+        virtual ~ProjectionStage();
 
-        void addChild(PlanStage* child);
-
-        virtual StageState work(WorkingSetID* out);
         virtual bool isEOF();
+        virtual StageState work(WorkingSetID* out);
 
         virtual void prepareToYield();
         virtual void recoverFromYield();
         virtual void invalidate(const DiskLoc& dl);
 
-        virtual PlanStageStats* getStats();
+        PlanStageStats* getStats();
 
     private:
-        // Find a node to AND against.
-        PlanStage::StageState getTargetLoc(WorkingSetID* out);
+        scoped_ptr<QueryProjection> _projection;
 
-        // Move a child which hasn't advanced to the target node forward.
-        // Returns the target node in 'out' if all children successfully advance to it.
-        PlanStage::StageState moveTowardTargetLoc(WorkingSetID* out);
-
-        // Not owned by us.
+        // _ws is not owned by us.
         WorkingSet* _ws;
+        scoped_ptr<PlanStage> _child;
 
-        // Not owned by us.
+        // The filter is not owned by us.
         const MatchExpression* _filter;
-
-        // Owned by us.
-        vector<PlanStage*> _children;
-
-        // The current node we're AND-ing against.
-        size_t _targetNode;
-        DiskLoc _targetLoc;
-        WorkingSetID _targetId;
-
-        // Nodes we're moving forward until they hit the element we're AND-ing.
-        // Everything in here has not advanced to _targetLoc yet.
-        // These are indices into _children.
-        std::queue<size_t> _workingTowardRep;
-
-        // If any child hits EOF or if we have any errors, we're EOF.
-        bool _isEOF;
 
         // Stats
         CommonStats _commonStats;
-        AndSortedStats _specificStats;
     };
 
 }  // namespace mongo

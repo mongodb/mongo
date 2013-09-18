@@ -166,6 +166,9 @@ namespace mongo {
 
     void IndexBoundsChecker::getStartKey(vector<const BSONElement*>* valueOut,
                                           vector<bool>* inclusiveOut) {
+        verify(valueOut->size() == _bounds->fields.size());
+        verify(inclusiveOut->size() == _bounds->fields.size());
+
         for (size_t i = 0; i < _bounds->fields.size(); ++i) {
             (*valueOut)[i] = &_bounds->fields[i].intervals[0].start;
             (*inclusiveOut)[i] = _bounds->fields[i].intervals[0].startInclusive;

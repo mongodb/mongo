@@ -86,6 +86,7 @@ namespace mongo {
         virtual void debugString( StringBuilder& debug, int level ) const;
 
         virtual size_t numChildren() const { return 1; }
+
         virtual MatchExpression* getChild( size_t i ) const { return _sub.get(); }
 
     private:
@@ -115,6 +116,7 @@ namespace mongo {
         virtual void debugString( StringBuilder& debug, int level ) const;
 
         virtual size_t numChildren() const { return _subs.size(); }
+
         virtual MatchExpression* getChild( size_t i ) const { return _subs[i]; }
 
     private:
@@ -179,7 +181,10 @@ namespace mongo {
         virtual bool equivalent( const MatchExpression* other ) const;
 
         virtual size_t numChildren() const { return _list.size(); }
-        virtual ArrayMatchingMatchExpression* getChild( size_t i ) const { return _list[i]; }
+
+        virtual MatchExpression* getChild( size_t i ) const { return _list[i]; }
+
+        virtual std::vector<MatchExpression*>* getChildVector() { return &_list; }
 
         const StringData path() const { return _path; }
 
@@ -190,7 +195,7 @@ namespace mongo {
 
         StringData _path;
         ElementPath _elementPath;
-        std::vector<ArrayMatchingMatchExpression*> _list;
+        std::vector<MatchExpression*> _list;
     };
 
 }
