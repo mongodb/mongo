@@ -688,7 +688,7 @@ __wt_conn_dhandle_discard_single(
 }
 
 /*
- * __wt_conn_btree_discard --
+ * __wt_conn_dhandle_discard --
  *	Discard the btree file handle structures.
  */
 int
