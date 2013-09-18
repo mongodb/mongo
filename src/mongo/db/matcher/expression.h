@@ -90,6 +90,11 @@ namespace mongo {
         virtual MatchExpression* getChild( size_t i ) const { return NULL; }
 
         /**
+         * Get all the children of a node
+         */
+        virtual std::vector<MatchExpression*>* getChildVector() { return NULL; }
+
+        /**
          * Get the path of the leaf.  Returns StringData() if there is no path (node is logical).
          */
         virtual const StringData path() const { return StringData(); }

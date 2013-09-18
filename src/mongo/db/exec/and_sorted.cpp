@@ -60,7 +60,7 @@ namespace mongo {
         // If we don't have any nodes that we're work()-ing until they hit a certain DiskLoc...
         if (0 == _workingTowardRep.size()) {
             // Get a target DiskLoc.
-            return getTargetLoc();
+            return getTargetLoc(out);
         }
 
         // Move nodes toward the target DiskLoc.
@@ -69,7 +69,7 @@ namespace mongo {
         return moveTowardTargetLoc(out);
     }
 
-    PlanStage::StageState AndSortedStage::getTargetLoc() {
+    PlanStage::StageState AndSortedStage::getTargetLoc(WorkingSetID* out) {
         verify(numeric_limits<size_t>::max() == _targetNode);
         verify(WorkingSet::INVALID_ID == _targetId);
         verify(DiskLoc() == _targetLoc);
@@ -104,6 +104,7 @@ namespace mongo {
         }
         else {
             if (PlanStage::NEED_FETCH == state) {
+                *out = id;
                 ++_commonStats.needFetch;
             }
             else if (PlanStage::NEED_TIME == state) {
@@ -200,6 +201,7 @@ namespace mongo {
         }
         else {
             if (PlanStage::NEED_FETCH == state) {
+                *out = id;
                 ++_commonStats.needFetch;
             }
             else if (PlanStage::NEED_TIME == state) {

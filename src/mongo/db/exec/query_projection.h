@@ -42,9 +42,9 @@ namespace mongo {
         virtual ~QueryProjection() { }
 
         /**
-         * Compute the projection over the WSM.  Place the output in 'out'.
+         * Compute the projection over the WSM.  Place the output in the provided WSM.
          */
-        virtual Status project(const WorkingSetMember& wsm, BSONObj* out) = 0;
+        virtual Status project(WorkingSetMember* wsm) = 0;
 
         /**
          * This projection handles the inclusion/exclusion syntax of the .find() command.

@@ -26,7 +26,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/query_projection.h"
+#include "mongo/db/exec/query_projection.h"
 
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/jsobj.h"
@@ -43,11 +43,11 @@ namespace mongo {
     public:
         virtual ~InclExclProjection() { }
 
-        Status project(const WorkingSetMember& wsm, BSONObj* out) {
+        Status project(WorkingSetMember* wsm) {
             BSONObjBuilder bob;
             if (_includeID) {
                 BSONElement elt;
-                if (!wsm.getFieldDotted("_id", &elt)) {
+                if (!wsm->getFieldDotted("_id", &elt)) {
                     return Status(ErrorCodes::BadValue, "Couldn't get _id field in proj");
                 }
                 bob.append(elt);
@@ -58,7 +58,8 @@ namespace mongo {
                 for (unordered_set<string>::const_iterator it = _fields.begin();
                      it != _fields.end(); ++it) {
                     BSONElement elt;
-                    if (!wsm.getFieldDotted(*it, &elt)) {
+                    if (!wsm->getFieldDotted(*it, &elt)) {
+                        // XXX: needs to be propagated better
                         return Status(ErrorCodes::BadValue, "no field " + *it + " in wsm to proj");
                     }
                     bob.append(elt);
@@ -66,20 +67,25 @@ namespace mongo {
             }
             else {
                 // We want stuff NOT in _fields.  This can't be covered, so we expect an obj.
-                if (!wsm.hasObj()) {
+                if (!wsm->hasObj()) {
                     return Status(ErrorCodes::BadValue,
                                   "exclusion specified for projection but no obj to iter over");
                 }
-                BSONObjIterator it(wsm.obj);
+                BSONObjIterator it(wsm->obj);
                 while (it.more()) {
                     BSONElement elt = it.next();
-                    if (_fields.end() == _fields.find(elt.fieldName())) {
-                        bob.append(elt);
+                    if (!mongoutils::str::equals("_id", elt.fieldName())) {
+                        if (_fields.end() == _fields.find(elt.fieldName())) {
+                            bob.append(elt);
+                        }
                     }
                 }
             }
 
-            *out = bob.obj();
+            wsm->state = WorkingSetMember::OWNED_OBJ;
+            wsm->obj = bob.obj();
+            wsm->keyData.clear();
+            wsm->loc = DiskLoc();
             return Status::OK();
         }
 

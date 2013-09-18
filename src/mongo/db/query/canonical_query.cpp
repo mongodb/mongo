@@ -64,6 +64,40 @@ namespace mongo {
         return Status::OK();
     }
 
+    void normalizeTree(MatchExpression* root) {
+        // root->isLogical() is true now.  We care about AND and OR.  Negations currently scare us.
+        if (MatchExpression::AND == root->matchType() || MatchExpression::OR == root->matchType()) {
+            // If any of our children are of the same logical operator that we are, we remove the
+            // child's children and append them to ourselves after we examine all children.
+            vector<MatchExpression*> absorbedChildren;
+
+            for (size_t i = 0; i < root->numChildren();) {
+                MatchExpression* child = root->getChild(i);
+                if (child->matchType() == root->matchType()) {
+                    // AND of an AND or OR of an OR.  Absorb child's children into ourself.
+                    for (size_t j = 0; j < child->numChildren(); ++j) {
+                        absorbedChildren.push_back(child->getChild(j));
+                    }
+                    child->getChildVector()->clear();
+                    // TODO(opt): this is possibly n^2-ish
+                    root->getChildVector()->erase(root->getChildVector()->begin() + i);
+                    delete child;
+                    // Don't increment 'i' as the current child 'i' used to be child 'i+1'
+                }
+                else {
+                    ++i;
+                }
+            }
+
+            root->getChildVector()->insert(root->getChildVector()->end(), absorbedChildren.begin(), absorbedChildren.end());
+
+            for (size_t i = 0; i < root->numChildren(); ++i) {
+                normalizeTree(root->getChild(i));
+            }
+        }
+    }
+
+
     Status CanonicalQuery::init(LiteParsedQuery* lpq) {
         _pq.reset(lpq);
 
@@ -71,7 +105,10 @@ namespace mongo {
         StatusWithMatchExpression swme = MatchExpressionParser::parse(_pq->getFilter());
         if (!swme.isOK()) { return swme.getStatus(); }
 
-        _root.reset(swme.getValue());
+        MatchExpression* root = swme.getValue();
+        normalizeTree(root);
+        _root.reset(root);
+
         return Status::OK();
     }
 

@@ -136,6 +136,26 @@ namespace mongo {
             NEED_FETCH,
         };
 
+        static string stateStr(const StageState& state) {
+            if (ADVANCED == state) {
+                return "ADVANCED";
+            }
+            else if (IS_EOF == state) {
+                return "IS_EOF";
+            }
+            else if (NEED_TIME == state) {
+                return "NEED_TIME";
+            }
+            else if (NEED_FETCH == state) {
+                return "NEED_FETCH";
+            }
+            else {
+                verify(FAILURE == state);
+                return "FAILURE";
+            }
+        }
+
+
         /**
          * Perform a unit of work on the query.  Ask the stage to produce the next unit of output.
          * Stage returns StageState::ADVANCED if *out is set to the next unit of output.  Otherwise,

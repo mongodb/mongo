@@ -46,10 +46,13 @@ namespace mongo {
         static OrderedIntervalList allValuesForField(const BSONElement& elt);
 
         /**
-         * Turn the LeafMatchExpression in 'expr' into a set of index bounds.  The field that 'expr'
-         * is concerned with is indexed according to 'idxElt'.
+         * Turn the MatchExpression in 'expr' into a set of index bounds.  The field that 'expr'
+         * is concerned with is indexed in the direction 'direction'.
+         *
+         * The expression must be a predicate over one field.  That is, expr->isLeaf() or
+         * expr->isArray() must be true, and expr->isLogical() must be false.  
          */
-        static void translate(const LeafMatchExpression* expr, const BSONElement& idxElt,
+        static void translate(const MatchExpression* expr, int direction,
                               OrderedIntervalList* oilOut, bool* exactOut);
 
     private:
@@ -79,6 +82,8 @@ namespace mongo {
          * Swap start/end in the provided interval.
          */
         static void reverseInterval(Interval* ival);
+
+        static Interval allValues();
     };
 
 }  // namespace mongo

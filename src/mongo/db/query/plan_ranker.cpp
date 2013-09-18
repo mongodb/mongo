@@ -85,7 +85,10 @@ namespace mongo {
         }
         else {
             // This is a placeholder for better ranking logic.
-            return static_cast<double>(stats.common.advanced)
+            //
+            // We start all scores at 1.  Our "no plan selected" score is 0 and we want all plans to
+            // be greater than that.
+            return 1 + static_cast<double>(stats.common.advanced)
                    / static_cast<double>(stats.common.works);
         }
     }

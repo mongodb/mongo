@@ -26,60 +26,58 @@
  *    it in the license file.
  */
 
-#include "mongo/db/exec/limit.h"
+#include "mongo/db/diskloc.h"
+#include "mongo/db/exec/plan_stage.h"
+#include "mongo/db/exec/projection.h"
+#include "mongo/db/jsobj.h"
+#include "mongo/db/matcher/expression.h"
 
 namespace mongo {
 
-    LimitStage::LimitStage(int limit, WorkingSet* ws, PlanStage* child)
-        : _ws(ws), _child(child), _numToReturn(limit) { }
+    ProjectionStage::ProjectionStage(QueryProjection* projection, WorkingSet* ws, PlanStage* child,
+                    const MatchExpression* filter)
+        : _projection(projection), _ws(ws), _child(child), _filter(filter) { }
 
-    LimitStage::~LimitStage() { }
+    ProjectionStage::~ProjectionStage() { }
 
-    bool LimitStage::isEOF() { return (0 == _numToReturn) || _child->isEOF(); }
+    bool ProjectionStage::isEOF() { return _child->isEOF(); }
 
-    PlanStage::StageState LimitStage::work(WorkingSetID* out) {
+    PlanStage::StageState ProjectionStage::work(WorkingSetID* out) {
         ++_commonStats.works;
 
-        // If we've returned as many results as we're limited to, isEOF will be true.
         if (isEOF()) { return PlanStage::IS_EOF; }
-
         WorkingSetID id;
         StageState status = _child->work(&id);
 
         if (PlanStage::ADVANCED == status) {
+            WorkingSetMember* member = _ws->get(id);
+            Status status = _projection->project(member);
+            if (!status.isOK()) { return PlanStage::FAILURE; }
             *out = id;
-            --_numToReturn;
-            ++_commonStats.advanced;
-            return PlanStage::ADVANCED;
         }
-        else {
-            if (PlanStage::NEED_FETCH == status) {
-                *out = id;
-                ++_commonStats.needFetch;
-            }
-            else if (PlanStage::NEED_TIME == status) {
-                ++_commonStats.needTime;
-            }
-            return status;
+        else if (PlanStage::NEED_FETCH == status) {
+            *out = id;
         }
+
+        return status;
     }
 
-    void LimitStage::prepareToYield() {
+    void ProjectionStage::prepareToYield() {
         ++_commonStats.yields;
         _child->prepareToYield();
     }
 
-    void LimitStage::recoverFromYield() {
+    void ProjectionStage::recoverFromYield() {
         ++_commonStats.unyields;
         _child->recoverFromYield();
     }
 
-    void LimitStage::invalidate(const DiskLoc& dl) {
+    void ProjectionStage::invalidate(const DiskLoc& dl) {
         ++_commonStats.invalidates;
         _child->invalidate(dl);
     }
 
-    PlanStageStats* LimitStage::getStats() {
+    PlanStageStats* ProjectionStage::getStats() {
         _commonStats.isEOF = isEOF();
         auto_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats));
         ret->children.push_back(_child->getStats());

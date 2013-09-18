@@ -57,7 +57,10 @@ namespace mongo {
         void clearAndRelease() { _expressions.clear(); }
 
         virtual size_t numChildren() const { return _expressions.size(); }
+
         virtual MatchExpression* getChild( size_t i ) const { return _expressions[i]; }
+
+        virtual std::vector<MatchExpression*>* getChildVector() { return &_expressions; }
 
         bool equivalent( const MatchExpression* other ) const;
 
@@ -190,6 +193,7 @@ namespace mongo {
         bool equivalent( const MatchExpression* other ) const;
 
         virtual size_t numChildren() const { return 1; }
+
         virtual MatchExpression* getChild( size_t i ) const { return _exp.get(); }
 
         virtual void resetTag() {

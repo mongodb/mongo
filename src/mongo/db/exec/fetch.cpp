@@ -73,6 +73,7 @@ namespace mongo {
 
         // If we asked our parent for a page-in last time work(...) was called, finish the fetch.
         if (WorkingSet::INVALID_ID != _idBeingPagedIn) {
+            cout << "fetch completed, id being paged on " << _idBeingPagedIn << endl;
             return fetchCompleted(out);
         }
 
@@ -115,6 +116,7 @@ namespace mongo {
         }
         else {
             if (PlanStage::NEED_FETCH == status) {
+                *out = id;
                 ++_commonStats.needFetch;
             }
             else if (PlanStage::NEED_TIME == status) {

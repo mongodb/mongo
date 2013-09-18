@@ -109,6 +109,7 @@ namespace mongo {
         }
         else {
             if (PlanStage::NEED_FETCH == childStatus) {
+                *out = id;
                 ++_commonStats.needFetch;
             }
             else if (PlanStage::NEED_TIME == childStatus) {

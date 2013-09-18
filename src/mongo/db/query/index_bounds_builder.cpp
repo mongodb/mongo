@@ -50,70 +50,94 @@ namespace mongo {
         return oil;
     }
 
+    Interval IndexBoundsBuilder::allValues() {
+        BSONObjBuilder bob;
+        bob.appendMinKey("");
+        bob.appendMaxKey("");
+        return makeRangeInterval(bob.obj(), true, true);
+    }
+
     // static
-    void IndexBoundsBuilder::translate(const LeafMatchExpression* expr, const BSONElement& idxElt,
+    void IndexBoundsBuilder::translate(const MatchExpression* expr, int direction,
                                        OrderedIntervalList* oilOut, bool* exactOut) {
         Interval interval;
         bool exact = false;
 
-        if (MatchExpression::EQ == expr->matchType()) {
-            const EqualityMatchExpression* node = static_cast<const EqualityMatchExpression*>(expr);
-            // We have to copy the data out of the parse tree and stuff it into the index bounds.
-            // BSONValue will be useful here.
-            // XXX: This is wrong when idxElt is an array.
-            // XXX: equality with arrays is weird, see queryutil.cpp:203
-            BSONObj dataObj = objFromElement(node->getData());
-            verify(dataObj.isOwned());
-            interval = makePointInterval(dataObj);
-            // TODO ALBERTO
-            // XXX: This is false when idxElt is an array.
-            exact = true;
-        }
-        else if (MatchExpression::LTE == expr->matchType()) {
-            const LTEMatchExpression* node = static_cast<const LTEMatchExpression*>(expr);
-            BSONObjBuilder bob;
-            bob.appendMinKey("");
-            bob.append(node->getData());
-            BSONObj dataObj = bob.obj();
-            verify(dataObj.isOwned());
-            interval = makeRangeInterval(dataObj, true, true);
-            exact = true;
-        }
-        else if (MatchExpression::LT == expr->matchType()) {
-            const LTMatchExpression* node = static_cast<const LTMatchExpression*>(expr);
-            BSONObjBuilder bob;
-            bob.appendMinKey("");
-            bob.append(node->getData());
-            BSONObj dataObj = bob.obj();
-            verify(dataObj.isOwned());
-            interval = makeRangeInterval(dataObj, true, false);
-            exact = true;
-        }
-        else if (MatchExpression::GT == expr->matchType()) {
-            const GTMatchExpression* node = static_cast<const GTMatchExpression*>(expr);
-            BSONObjBuilder bob;
-            bob.append(node->getData());
-            bob.appendMaxKey("");
-            BSONObj dataObj = bob.obj();
-            verify(dataObj.isOwned());
-            interval = makeRangeInterval(dataObj, false, true);
-            exact = true;
-        }
-        else if (MatchExpression::GTE == expr->matchType()) {
-            const GTEMatchExpression* node = static_cast<const GTEMatchExpression*>(expr);
-            BSONObjBuilder bob;
-            bob.append(node->getData());
-            bob.appendMaxKey("");
-            BSONObj dataObj = bob.obj();
-            verify(dataObj.isOwned());
-            interval = makeRangeInterval(dataObj, true, true);
-            exact = true;
+        if (expr->isLeaf()) {
+            if (MatchExpression::EQ == expr->matchType()) {
+                const EqualityMatchExpression* node = static_cast<const EqualityMatchExpression*>(expr);
+                // We have to copy the data out of the parse tree and stuff it into the index bounds.
+                // BSONValue will be useful here.
+                BSONObj dataObj = objFromElement(node->getData());
+
+                if (dataObj.couldBeArray()) {
+                    // XXX: build better bounds
+                    warning() << "building lazy bounds for " << expr->toString() << endl;
+                    interval = allValues();
+                    exact = false;
+                }
+                else {
+                    verify(dataObj.isOwned());
+                    interval = makePointInterval(dataObj);
+                    exact = true;
+                }
+            }
+            else if (MatchExpression::LTE == expr->matchType()) {
+                const LTEMatchExpression* node = static_cast<const LTEMatchExpression*>(expr);
+                BSONObjBuilder bob;
+                bob.appendMinKey("");
+                bob.append(node->getData());
+                BSONObj dataObj = bob.obj();
+                verify(dataObj.isOwned());
+                interval = makeRangeInterval(dataObj, true, true);
+                exact = true;
+            }
+            else if (MatchExpression::LT == expr->matchType()) {
+                const LTMatchExpression* node = static_cast<const LTMatchExpression*>(expr);
+                BSONObjBuilder bob;
+                bob.appendMinKey("");
+                bob.append(node->getData());
+                BSONObj dataObj = bob.obj();
+                verify(dataObj.isOwned());
+                interval = makeRangeInterval(dataObj, true, false);
+                exact = true;
+            }
+            else if (MatchExpression::GT == expr->matchType()) {
+                const GTMatchExpression* node = static_cast<const GTMatchExpression*>(expr);
+                BSONObjBuilder bob;
+                bob.append(node->getData());
+                bob.appendMaxKey("");
+                BSONObj dataObj = bob.obj();
+                verify(dataObj.isOwned());
+                interval = makeRangeInterval(dataObj, false, true);
+                exact = true;
+            }
+            else if (MatchExpression::GTE == expr->matchType()) {
+                const GTEMatchExpression* node = static_cast<const GTEMatchExpression*>(expr);
+                BSONObjBuilder bob;
+                bob.append(node->getData());
+                bob.appendMaxKey("");
+                BSONObj dataObj = bob.obj();
+                verify(dataObj.isOwned());
+                interval = makeRangeInterval(dataObj, true, true);
+                exact = true;
+            }
+            else {
+                // XXX: build better bounds
+                warning() << "building lazy bounds for " << expr->toString() << endl;
+                interval = allValues();
+                exact = false;
+            }
         }
         else {
-            verify(0);
+            // XXX: build better bounds
+            verify(expr->isArray());
+            warning() << "building lazy bounds for " << expr->toString() << endl;
+            interval = allValues();
+            exact = false;
         }
 
-        if (-1 == idxElt.number()) {
+        if (-1 == direction) {
             reverseInterval(&interval);
         }
 
