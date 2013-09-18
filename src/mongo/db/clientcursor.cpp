@@ -805,27 +805,6 @@ namespace mongo {
 
         updateLocation();
 
-        {
-            /* a quick test that our temprelease is safe.
-             todo: make a YieldingCursor class
-             and then make the following code part of a unit test.
-             */
-            const int test = 0;
-            static bool inEmpty = false;
-            if( test && !inEmpty ) {
-                inEmpty = true;
-                log() << "TEST: manipulate collection during cc:yield" << endl;
-                if( test == 1 )
-                    Helpers::emptyCollection(_ns.c_str());
-                else if( test == 2 ) {
-                    BSONObjBuilder b; string m;
-                    dropCollection(_ns.c_str(), m, b);
-                }
-                else {
-                    dropDatabase(_ns.c_str());
-                }
-            }
-        }
         return true;
     }
 
