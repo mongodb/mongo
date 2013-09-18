@@ -27,7 +27,6 @@
 #include "mongo/base/status.h"
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/client/sasl_client_authenticate.h"
-#include "mongo/db/cmdline.h"
 #include "mongo/db/repl/rs_member.h"
 #include "mongo/logger/console_appender.h"
 #include "mongo/logger/logger.h"
@@ -791,7 +790,7 @@ Status addMongoShellOptions(moe::OptionSection* options) {
 
 Status storeMongoShellOptions() {
     if ( params.count( "quiet" ) ) {
-        mongo::cmdLine.quiet = true;
+        mongo::serverGlobalParams.quiet = true;
     }
 #ifdef MONGO_SSL
     Status ret = storeSSLClientOptions(params);
@@ -961,7 +960,7 @@ int _main( int argc, char* argv[], char **envp ) {
         return mongo::EXIT_BADOPTIONS;
     }
 
-    if ( ! mongo::cmdLine.quiet )
+    if (!mongo::serverGlobalParams.quiet)
         cout << "MongoDB shell version: " << mongo::versionString << endl;
 
     mongo::StartupTest::runTests();
@@ -972,10 +971,8 @@ int _main( int argc, char* argv[], char **envp ) {
                             new logger::MessageEventUnadornedEncoder)));
 
     if ( !nodb ) { // connect to db
-        //if ( ! mongo::cmdLine.quiet ) cout << "url: " << url << endl;
-
         stringstream ss;
-        if ( mongo::cmdLine.quiet )
+        if (mongo::serverGlobalParams.quiet)
             ss << "__quiet = true;";
         ss << "db = connect( \"" << fixHost( url , dbhost , port ) << "\")";
 
@@ -1104,7 +1101,7 @@ int _main( int argc, char* argv[], char **envp ) {
             f.open(rcLocation.c_str(), false);  // Create empty .mongorc.js file
         }
 
-        if ( !nodb && !mongo::cmdLine.quiet && isatty(fileno(stdin)) ) {
+        if (!nodb && !mongo::serverGlobalParams.quiet && isatty(fileno(stdin))) {
             scope->exec( "shellHelper( 'show', 'startupWarnings' )", "(shellwarnings", false, true, false );
         }
 
@@ -1146,7 +1143,7 @@ int _main( int argc, char* argv[], char **envp ) {
             }
 
             if ( ! linePtr || ( strlen( linePtr ) == 4 && strstr( linePtr , "exit" ) ) ) {
-                if ( ! mongo::cmdLine.quiet )
+                if (!mongo::serverGlobalParams.quiet)
                     cout << "bye" << endl;
                 if ( line )
                     free( line );

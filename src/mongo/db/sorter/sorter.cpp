@@ -52,9 +52,11 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/util/atomic_int.h"
-#include "mongo/db/cmdline.h"
+#include "mongo/db/jsobj.h"
+#include "mongo/db/storage_options.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/bufreader.h"
+#include "mongo/util/goodies.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -156,7 +158,7 @@ namespace mongo {
 
             FileIterator(const string& fileName,
                          const Settings& settings,
-                         shared_ptr<FileDeleter> fileDeleter)
+                         boost::shared_ptr<FileDeleter> fileDeleter)
                 : _settings(settings)
                 , _done(false)
                 , _fileName(fileName)
@@ -253,7 +255,7 @@ namespace mongo {
             boost::scoped_ptr<BufReader> _reader;
             string _fileName;
             boost::shared_ptr<FileDeleter> _fileDeleter; // Must outlive _file
-            ifstream _file;
+            std::ifstream _file;
         };
 
         /** Merge-sorts results from 0 or more FileIterators */
@@ -264,7 +266,7 @@ namespace mongo {
             typedef std::pair<Key, Value> Data;
 
 
-            MergeIterator(const vector<shared_ptr<Input> >& iters,
+            MergeIterator(const std::vector<boost::shared_ptr<Input> >& iters,
                           const SortOptions& opts,
                           const Comparator& comp)
                 : _opts(opts)
@@ -770,7 +772,7 @@ namespace mongo {
 
         // This should be checked by consumers, but if we get here don't allow writes.
         massert(16946, "Attempting to use external sort from mongos. This is not allowed.",
-                !cmdLine.isMongos());
+                !isMongos());
 
         massert(17148, "Attempting to use external sort without setting SortOptions::tempDir",
                 !opts.tempDir.empty());
@@ -783,7 +785,7 @@ namespace mongo {
 
         boost::filesystem::create_directories(opts.tempDir);
 
-        _file.open(_fileName.c_str(), ios::binary | ios::out);
+        _file.open(_fileName.c_str(), std::ios::binary | std::ios::out);
         massert(16818, str::stream() << "error opening file \"" << _fileName << "\": "
                                      << sorter::myErrnoWithDescription(),
                 _file.good());
@@ -791,7 +793,7 @@ namespace mongo {
         _fileDeleter = boost::make_shared<sorter::FileDeleter>(_fileName);
 
         // throw on failure
-        _file.exceptions(ios::failbit | ios::badbit | ios::eofbit);
+        _file.exceptions(std::ios::failbit | std::ios::badbit | std::ios::eofbit);
     }
 
     template <typename Key, typename Value>
@@ -860,7 +862,7 @@ namespace mongo {
 
         // This should be checked by consumers, but if it isn't try to fail early.
         massert(16947, "Attempting to use external sort from mongos. This is not allowed.",
-                !(cmdLine.isMongos() && opts.extSortAllowed));
+                !(isMongos() && opts.extSortAllowed));
 
         massert(17149, "Attempting to use external sort without setting SortOptions::tempDir",
                 !(opts.extSortAllowed && opts.tempDir.empty()));

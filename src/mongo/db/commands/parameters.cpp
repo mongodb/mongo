@@ -33,8 +33,8 @@
 #include "mongo/client/dbclient_rs.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/cmdline.h"
 #include "mongo/db/server_parameters.h"
+#include "mongo/db/storage_options.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
@@ -75,9 +75,10 @@ namespace mongo {
 
             // TODO: convert to ServerParameters -- SERVER-10515
 
-            if( cmdLine.dur && (all || cmdObj.hasElement("journalCommitInterval")) ) {
+            if (isJournalingEnabled() && (all || cmdObj.hasElement("journalCommitInterval")) &&
+                !isMongos()) {
                 result.append("journalCommitInterval",
-                              cmdLine.journalCommitInterval);
+                              getJournalCommitInterval());
             }
             if( all || cmdObj.hasElement( "traceExceptions" ) ) {
                 result.append("traceExceptions",
@@ -128,13 +129,17 @@ namespace mongo {
             // TODO: convert to ServerParameters -- SERVER-10515
 
             if( cmdObj.hasElement("journalCommitInterval") ) {
-                if( !cmdLine.dur ) {
+                if (isMongos()) {
+                    errmsg = "cannot set journalCommitInterval on a mongos";
+                    return false;
+                }
+                if(!isJournalingEnabled()) {
                     errmsg = "journaling is off";
                     return false;
                 }
                 int x = (int) cmdObj["journalCommitInterval"].Number();
                 verify( x > 1 && x < 500 );
-                cmdLine.journalCommitInterval = x;
+                setJournalCommitInterval(x);
                 log() << "setParameter journalCommitInterval=" << x << endl;
                 s++;
             }
@@ -226,23 +231,11 @@ namespace mongo {
             }
         } logLevelSetting;
 
-        ExportedServerParameter<bool> NoTableScanSetting( ServerParameterSet::getGlobal(),
-                                                          "notablescan",
-                                                          &cmdLine.noTableScan,
-                                                          true,
-                                                          true );
-
         ExportedServerParameter<bool> QuietSetting( ServerParameterSet::getGlobal(),
                                                     "quiet",
-                                                    &cmdLine.quiet,
+                                                    &serverGlobalParams.quiet,
                                                     true,
                                                     true );
-
-        ExportedServerParameter<double> SyncdelaySetting( ServerParameterSet::getGlobal(),
-                                                          "syncdelay",
-                                                          &cmdLine.syncdelay,
-                                                          true,
-                                                          true );
     }
 
 }

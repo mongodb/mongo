@@ -36,7 +36,6 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/client_basic.h"
-#include "mongo/db/cmdline.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/stats/counters.h"
@@ -103,9 +102,9 @@ namespace mongo {
 
             result.append("host", prettyHostName() );
             result.append("version", versionString);
-            result.append("process",cmdLine.binaryName);
+            result.append("process", serverGlobalParams.binaryName);
             result.append("pid", ProcessId::getCurrent().asLongLong());
-            result.append("uptime",(double) (time(0)-cmdLine.started));
+            result.append("uptime", (double) (time(0) - serverGlobalParams.started));
             result.append("uptimeMillis", (long long)(curTimeMillis64()-_started));
             result.append("uptimeEstimate",(double) (start/1000));
             result.appendDate( "localTime" , jsTime() );

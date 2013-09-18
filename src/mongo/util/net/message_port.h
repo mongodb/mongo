@@ -17,6 +17,8 @@
 
 #pragma once
 
+#include <vector>
+
 #include "mongo/util/net/message.h"
 #include "mongo/util/net/sock.h"
 
@@ -112,7 +114,7 @@ namespace mongo {
         void send( const char * data , int len, const char *context ) {
             psock->send( data, len, context );
         }
-        void send( const vector< pair< char *, int > > &data, const char *context ) {
+        void send(const std::vector< std::pair< char *, int > > &data, const char *context) {
             psock->send( data, context );
         }
         bool connect(SockAddr& farEnd) {

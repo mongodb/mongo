@@ -33,7 +33,6 @@
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/client.h"
-#include "mongo/db/cmdline.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/repl/bgsync.h"
@@ -440,7 +439,7 @@ namespace mongo {
         }
 
         // Figure out indexPrefetch setting
-        std::string& prefetch = cmdLine.rsIndexPrefetch;
+        std::string& prefetch = replSettings.rsIndexPrefetch;
         if (!prefetch.empty()) {
             IndexPrefetchConfig prefetchConfig = PREFETCH_ALL;
             if (prefetch == "none")

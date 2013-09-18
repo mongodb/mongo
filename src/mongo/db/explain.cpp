@@ -17,9 +17,9 @@
 
 #include "mongo/db/explain.h"
 
-#include "mongo/db/cmdline.h"
-#include "mongo/util/net/sock.h"
+#include "mongo/db/server_options.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/net/sock.h"
 
 namespace mongo {
     
@@ -263,7 +263,7 @@ namespace mongo {
     }
     
     string ExplainQueryInfo::server() {
-        return mongoutils::str::stream() << getHostNameCached() << ":" << cmdLine.port;
+        return mongoutils::str::stream() << getHostNameCached() << ":" << serverGlobalParams.port;
     }
 
     ExplainSinglePlanQueryInfo::ExplainSinglePlanQueryInfo() :

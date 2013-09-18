@@ -49,6 +49,7 @@
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/write_concern.h"
+#include "mongo/db/storage_options.h"
 #include "mongo/db/structure/collection.h"
 #include "mongo/s/d_logic.h"
 
@@ -174,7 +175,7 @@ namespace mongo {
     }
 
     bool Helpers::isEmpty(const char *ns) {
-        Client::Context context(ns, dbpath);
+        Client::Context context(ns, storageGlobalParams.dbpath);
         auto_ptr<Runner> runner(InternalPlanner::collectionScan(ns));
         return Runner::RUNNER_EOF == runner->getNext(NULL, NULL);
     }
@@ -521,7 +522,7 @@ namespace mongo {
         : _out(0) {
         static int NUM = 0;
 
-        _root = dbpath;
+        _root = storageGlobalParams.dbpath;
         if ( a.size() )
             _root /= a;
         if ( b.size() )

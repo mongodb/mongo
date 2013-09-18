@@ -52,6 +52,7 @@
 #include "mongo/db/repl/replication_server_status.h"  // replSettings
 #include "mongo/db/repl/rs.h" // replLocalAuth()
 #include "mongo/db/server_parameters.h"
+#include "mongo/db/storage_options.h"
 
 namespace mongo {
 
@@ -103,7 +104,7 @@ namespace mongo {
         void help(stringstream&h) const { h << "resync (from scratch) an out of date replica slave.\nhttp://dochub.mongodb.org/core/masterslave"; }
         CmdResync() : Command("resync") { }
         virtual bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            if( cmdLine.usingReplSets() ) {
+            if (replSettings.usingReplSets()) {
                 errmsg = "resync command not currently supported with replica sets.  See RS102 info in the mongodb documentations";
                 result.append("info", "http://dochub.mongodb.org/core/resyncingaverystalereplicasetmember");
                 return false;
@@ -295,7 +296,7 @@ namespace mongo {
         SourceVector old = v;
         v.clear();
 
-        if ( !cmdLine.source.empty() ) {
+        if (!replSettings.source.empty()) {
             // --source <host> specified.
             // check that no items are in sources other than that
             // add if missing
@@ -306,16 +307,18 @@ namespace mongo {
             while (Runner::RUNNER_ADVANCED == (state = runner->getNext(&obj, NULL))) {
                 n++;
                 ReplSource tmp(obj);
-                if ( tmp.hostName != cmdLine.source ) {
-                    log() << "repl: --source " << cmdLine.source << " != " << tmp.hostName << " from local.sources collection" << endl;
+                if (tmp.hostName != replSettings.source) {
+                    log() << "repl: --source " << replSettings.source << " != " << tmp.hostName
+                          << " from local.sources collection" << endl;
                     log() << "repl: for instructions on changing this slave's source, see:" << endl;
                     log() << "http://dochub.mongodb.org/core/masterslave" << endl;
                     log() << "repl: terminating mongod after 30 seconds" << endl;
                     sleepsecs(30);
                     dbexit( EXIT_REPLICATION_ERROR );
                 }
-                if ( tmp.only != cmdLine.only ) {
-                    log() << "--only " << cmdLine.only << " != " << tmp.only << " from local.sources collection" << endl;
+                if (tmp.only != replSettings.only) {
+                    log() << "--only " << replSettings.only << " != " << tmp.only
+                          << " from local.sources collection" << endl;
                     log() << "terminating after 30 seconds" << endl;
                     sleepsecs(30);
                     dbexit( EXIT_REPLICATION_ERROR );
@@ -326,14 +329,14 @@ namespace mongo {
             if ( n == 0 ) {
                 // source missing.  add.
                 ReplSource s;
-                s.hostName = cmdLine.source;
-                s.only = cmdLine.only;
+                s.hostName = replSettings.source;
+                s.only = replSettings.only;
                 s.save();
             }
         }
         else {
             try {
-                massert( 10384 , "--only requires use of --source", cmdLine.only.empty());
+                massert(10384 , "--only requires use of --source", replSettings.only.empty());
             }
             catch ( ... ) {
                 dbexit( EXIT_BADOPTIONS );
@@ -470,7 +473,7 @@ namespace mongo {
     }
 
     bool ReplSource::handleDuplicateDbName( const BSONObj &op, const char *ns, const char *db ) {
-        if ( dbHolder()._isLoaded( ns, dbpath ) ) {
+        if (dbHolder()._isLoaded(ns, storageGlobalParams.dbpath)) {
             // Database is already present.
             return true;   
         }
@@ -480,7 +483,7 @@ namespace mongo {
             // missing from master after optime "ts".
             return false;   
         }
-        if ( Database::duplicateUncasedName( false, db, dbpath ).empty() ) {
+        if (Database::duplicateUncasedName(false, db, storageGlobalParams.dbpath).empty()) {
             // No duplicate database names are present.
             return true;
         }
@@ -533,7 +536,7 @@ namespace mongo {
         
         // Check for duplicates again, since we released the lock above.
         set< string > duplicates;
-        Database::duplicateUncasedName( false, db, dbpath, &duplicates );
+        Database::duplicateUncasedName(false, db, storageGlobalParams.dbpath, &duplicates);
         
         // The database is present on the master and no conflicting databases
         // are present on the master.  Drop any local conflicts.
@@ -546,7 +549,7 @@ namespace mongo {
         }
         
         massert( 14034, "Duplicate database names present after attempting to delete duplicates",
-                Database::duplicateUncasedName( false, db, dbpath ).empty() );
+                Database::duplicateUncasedName(false, db, storageGlobalParams.dbpath).empty() );
         return true;
     }
 
@@ -603,8 +606,9 @@ namespace mongo {
         if ( !only.empty() && only != clientName )
             return;
 
-        if( cmdLine.pretouch && !alreadyLocked/*doesn't make sense if in write lock already*/ ) {
-            if( cmdLine.pretouch > 1 ) {
+        if (replSettings.pretouch &&
+            !alreadyLocked/*doesn't make sense if in write lock already*/) {
+            if (replSettings.pretouch > 1) {
                 /* note: this is bad - should be put in ReplSource.  but this is first test... */
                 static int countdown;
                 verify( countdown >= 0 );
@@ -614,12 +618,12 @@ namespace mongo {
                 else {
                     const int m = 4;
                     if( tp.get() == 0 ) {
-                        int nthr = min(8, cmdLine.pretouch);
+                        int nthr = min(8, replSettings.pretouch);
                         nthr = max(nthr, 1);
                         tp.reset( new ThreadPool(nthr) );
                     }
                     vector<BSONObj> v;
-                    oplogReader.peek(v, cmdLine.pretouch);
+                    oplogReader.peek(v, replSettings.pretouch);
                     unsigned a = 0;
                     while( 1 ) {
                         if( a >= v.size() ) break;
@@ -1021,7 +1025,7 @@ namespace mongo {
     int ReplSource::sync(int& nApplied) {
         _sleepAdviceTime = 0;
         ReplInfo r("sync");
-        if ( !cmdLine.quiet ) {
+        if (!serverGlobalParams.quiet) {
             LogstreamBuilder l = log();
             l << "repl: syncing from ";
             if( sourceName() != "main" ) {
@@ -1032,7 +1036,8 @@ namespace mongo {
         nClonedThisPass = 0;
 
         // FIXME Handle cases where this db isn't on default port, or default port is spec'd in hostName.
-        if ( (string("localhost") == hostName || string("127.0.0.1") == hostName) && cmdLine.port == CmdLine::DefaultDBPort ) {
+        if ((string("localhost") == hostName || string("127.0.0.1") == hostName) &&
+            serverGlobalParams.port == ServerGlobalParams::DefaultDBPort) {
             log() << "repl:   can't sync from self (localhost). sources configuration may be wrong." << endl;
             sleepsecs(5);
             return -1;
@@ -1172,7 +1177,7 @@ namespace mongo {
                 stringstream ss;
                 ss << "repl: sleep " << s << " sec before next pass";
                 string msg = ss.str();
-                if ( ! cmdLine.quiet )
+                if (!serverGlobalParams.quiet)
                     log() << msg << endl;
                 ReplInfo r(msg.c_str());
                 sleepsecs(s);

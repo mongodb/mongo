@@ -30,14 +30,13 @@
 #include <string>
 #include <vector>
 
-#include "mongo/db/cmdline.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/cmdline_utils/censor_cmdline.h"
 #include "mongo/util/options_parser/environment.h"
 
 namespace mongo {
 
-    CmdLine cmdLine;
 
 #ifdef MONGO_SSL
         Status storeSSLServerOptions(const optionenvironment::Environment& params) {
@@ -61,7 +60,7 @@ namespace {
 
         char** argv = &*arrayStandin.begin();
 
-        CmdLine::censor(elementCount, argv);
+        cmdline_utils::censorArgvArray(elementCount, argv);
 
         for (int i = 0; i < elementCount; ++i) {
             ASSERT_EQUALS(std::string(expected[i]), std::string(argv[i]));
@@ -74,7 +73,7 @@ namespace {
 
         std::vector<std::string> actual(toCensor, toCensor + elementCount);
 
-        CmdLine::censor(&actual);
+        cmdline_utils::censorArgsVector(&actual);
 
         for (int i = 0; i < elementCount; ++i) {
             ASSERT_EQUALS(std::string(expected[i]), actual[i]);
@@ -243,49 +242,98 @@ namespace {
         testCensoringVector(expected, argv, argc);
     }
 
-    TEST(ParsedOptsTests, NormalValues) {
-        moe::Environment environment;
-        ASSERT_OK(environment.set(moe::Key("val1"), moe::Value(6)));
-        ASSERT_OK(environment.set(moe::Key("val2"), moe::Value(std::string("string"))));
-        ASSERT_OK(CmdLine::setParsedOpts(environment));
-        BSONObj obj = BSON( "val1" << 6 << "val2" << "string" );
-        // TODO: Put a comparison here that doesn't depend on the field order.  Right now it is
-        // based on the sort order of keys in a std::map.
-        ASSERT_EQUALS(obj, CmdLine::getParsedOpts());
+    TEST(BSONObjCensorTests, Strings) {
+        BSONObj obj = BSON("firstarg" << "not a password" <<
+                           "sslPEMKeyPassword" << "this password should be censored" <<
+                           "middlearg" << "also not a password" <<
+                           "servicePassword" << "this password should also be censored" <<
+                           "lastarg" << false <<
+                           "servicePassword" << true);
+
+        BSONObj res = BSON("firstarg" << "not a password" <<
+                           "sslPEMKeyPassword" << "<password>" <<
+                           "middlearg" << "also not a password" <<
+                           "servicePassword" << "<password>" <<
+                           "lastarg" << false <<
+                           "servicePassword" << true);
+
+        cmdline_utils::censorBSONObj(&obj);
+        ASSERT_EQUALS(res, obj);
     }
 
-    TEST(ParsedOptsTests, DottedValues) {
-        moe::Environment environment;
-        ASSERT_OK(environment.set(moe::Key("val1.dotted1"), moe::Value(6)));
-        ASSERT_OK(environment.set(moe::Key("val2"), moe::Value(true)));
-        ASSERT_OK(environment.set(moe::Key("val1.dotted2"), moe::Value(std::string("string"))));
-        ASSERT_OK(CmdLine::setParsedOpts(environment));
-        BSONObj obj = BSON( "val1" << BSON( "dotted1" << 6 << "dotted2" << "string" )
-                         << "val2" << true );
-        // TODO: Put a comparison here that doesn't depend on the field order.  Right now it is
-        // based on the sort order of keys in a std::map.
-        ASSERT_EQUALS(obj, CmdLine::getParsedOpts());
+    TEST(BSONObjCensorTests, Arrays) {
+        BSONObj obj = BSON("firstarg" << "not a password" <<
+                           "sslPEMKeyPassword" << BSON_ARRAY("first censored password" <<
+                                                             "next censored password") <<
+                           "middlearg" << "also not a password" <<
+                           "servicePassword" << BSON_ARRAY("first censored password" <<
+                                                           "next censored password") <<
+                           "lastarg" << false <<
+                           "servicePassword" << true);
+
+        BSONObj res = BSON("firstarg" << "not a password" <<
+                           "sslPEMKeyPassword" << BSON_ARRAY("<password>" <<
+                                                             "<password>") <<
+                           "middlearg" << "also not a password" <<
+                           "servicePassword" << BSON_ARRAY("<password>" <<
+                                                           "<password>") <<
+                           "lastarg" << false <<
+                           "servicePassword" << true);
+
+        cmdline_utils::censorBSONObj(&obj);
+        ASSERT_EQUALS(res, obj);
     }
 
-    TEST(ParsedOptsTests, DeepDottedValues) {
-        moe::Environment environment;
-        ASSERT_OK(environment.set(moe::Key("val1.first1.second1.third1"), moe::Value(6)));
-        ASSERT_OK(environment.set(moe::Key("val1.first1.second2.third1"), moe::Value(false)));
-        ASSERT_OK(environment.set(moe::Key("val1.first2"), moe::Value(std::string("string"))));
-        ASSERT_OK(environment.set(moe::Key("val1.first1.second1.third2"), moe::Value(true)));
-        ASSERT_OK(environment.set(moe::Key("val2"), moe::Value(6.0)));
-        ASSERT_OK(CmdLine::setParsedOpts(environment));
-        BSONObj obj = BSON( "val1" << BSON( "first1" <<
-                                            BSON( "second1" <<
-                                                  BSON( "third1" << 6 << "third2" << true ) <<
-                                                  "second2" <<
-                                                  BSON( "third1" << false ) ) <<
-                                            "first2" << "string" ) <<
-                            "val2" << 6.0 );
-        // TODO: Put a comparison here that doesn't depend on the field order.  Right now it is
-        // based on the sort order of keys in a std::map.
-        ASSERT_EQUALS(obj, CmdLine::getParsedOpts());
+    TEST(BSONObjCensorTests, SubObjects) {
+        BSONObj obj = BSON("firstarg" << "not a password" <<
+                           "ssl" << BSON("PEMKeyPassword" << BSON_ARRAY("first censored password" <<
+                                                                        "next censored password") <<
+                                         "PEMKeyPassword" << "should be censored too") <<
+                           "lastarg" << false <<
+                           "servicePassword" << true);
+
+        BSONObj res = BSON("firstarg" << "not a password" <<
+                           "ssl" << BSON("PEMKeyPassword" << BSON_ARRAY("<password>" <<
+                                                                        "<password>") <<
+                                         "PEMKeyPassword" << "<password>") <<
+                           "lastarg" << false <<
+                           "servicePassword" << true);
+
+        cmdline_utils::censorBSONObj(&obj);
+        ASSERT_EQUALS(res, obj);
     }
 
+    TEST(BSONObjCensorTests, Full) {
+        BSONObj obj = BSON("firstarg" << "not a password" <<
+                           "sslPEMKeyPassword" << "this password should be censored" <<
+                           "sslPEMKeyPassword" << BSON_ARRAY("first censored password" <<
+                                                             "next censored password") <<
+                           "middlearg" << "also not a password" <<
+                           "servicePassword" << "this password should also be censored" <<
+                           "servicePassword" << BSON_ARRAY("first censored password" <<
+                                                           "next censored password") <<
+                           "ssl" << BSON("PEMKeyPassword" << BSON_ARRAY("first censored password" <<
+                                                                        "next censored password") <<
+                                         "PEMKeyPassword" << "should be censored too") <<
+                           "lastarg" << false <<
+                           "servicePassword" << true);
+
+        BSONObj res = BSON("firstarg" << "not a password" <<
+                           "sslPEMKeyPassword" << "<password>" <<
+                           "sslPEMKeyPassword" << BSON_ARRAY("<password>" <<
+                                                             "<password>") <<
+                           "middlearg" << "also not a password" <<
+                           "servicePassword" << "<password>" <<
+                           "servicePassword" << BSON_ARRAY("<password>" <<
+                                                           "<password>") <<
+                           "ssl" << BSON("PEMKeyPassword" << BSON_ARRAY("<password>" <<
+                                                                        "<password>") <<
+                                         "PEMKeyPassword" << "<password>") <<
+                           "lastarg" << false <<
+                           "servicePassword" << true);
+
+        cmdline_utils::censorBSONObj(&obj);
+        ASSERT_EQUALS(res, obj);
+    }
 }  // namespace
 }  // namespace mongo

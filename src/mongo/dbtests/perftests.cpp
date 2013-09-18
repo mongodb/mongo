@@ -235,7 +235,9 @@ namespace PerfTests {
                         Query q;
                         {
                             BSONObjBuilder b;
-                            b.append("host",_perfhostname).append("test",s).append("dur",cmdLine.dur);
+                            b.append("host", _perfhostname);
+                            b.append("test", s);
+                            b.append("dur", storageGlobalParams.dur);
                             DEV { b.append("info.DEBUG",true); }
                             else b.appendNull("info.DEBUG");
                             if( sizeof(int*) == 4 )
@@ -270,8 +272,8 @@ namespace PerfTests {
                     b.append("test", s);
                     b.append("rps", (int) rps);
                     b.append("millis", ms);
-                    b.appendBool("dur", cmdLine.dur);
-                    if( showDurStats() && cmdLine.dur )
+                    b.appendBool("dur", storageGlobalParams.dur);
+                    if (showDurStats() && storageGlobalParams.dur)
                         b.append("durStats", dur::stats.curr->_asObj());
                     {
                         bob inf;
@@ -1225,7 +1227,7 @@ namespace PerfTests {
                 // write something to the private view as a test
                 strcpy(p, "hello");
             }
-            if( cmdLine.dur ) {
+            if (storageGlobalParams.dur) {
                 char *w = (char *) f.view_write();
                 strcpy(w + 6, "world");
             }

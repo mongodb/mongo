@@ -51,7 +51,6 @@ namespace {
 
 namespace mongo {
     // Symbols defined to build the binary correctly.
-    CmdLine cmdLine;
 
     bool inShutdown() {
         scoped_lock sl(shutDownMutex);

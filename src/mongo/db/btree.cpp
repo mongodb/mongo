@@ -106,7 +106,7 @@ namespace mongo {
 
     template< class V >
     void BucketBasics<V>::assertWritable() {
-        if( cmdLine.dur )
+        if (storageGlobalParams.dur)
             dur::assertAlreadyDeclared(this, V::BucketSize);
     }
 

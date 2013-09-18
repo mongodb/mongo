@@ -34,6 +34,7 @@
 #include "mongo/db/instance.h"
 #include "mongo/db/ops/query.h"
 #include "mongo/db/pipeline/document.h"
+#include "mongo/db/storage_options.h"
 #include "mongo/s/d_logic.h"
 #include "mongo/s/stale_exception.h" // for SendStaleConfigException
 
@@ -106,7 +107,7 @@ namespace mongo {
         // We have already validated the sharding version when we constructed the cursor
         // so we shouldn't check it again.
         Lock::DBRead lk(ns);
-        Client::Context ctx(ns, dbpath, /*doVersion=*/false);
+        Client::Context ctx(ns, storageGlobalParams.dbpath, /*doVersion=*/false);
 
         ClientCursorPin pin(_cursorId);
         ClientCursor* cursor = pin.c();
@@ -212,7 +213,7 @@ namespace mongo {
             return Value();
 
         Lock::DBRead lk(ns);
-        Client::Context ctx(ns, dbpath, /*doVersion=*/false);
+        Client::Context ctx(ns, storageGlobalParams.dbpath, /*doVersion=*/false);
 
         ClientCursorPin pin(_cursorId);
         ClientCursor* cursor = pin.c();

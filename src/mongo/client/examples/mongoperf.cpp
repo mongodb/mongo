@@ -33,7 +33,6 @@
 #include <boost/thread/thread.hpp>
 
 #include "mongo/bson/util/atomic_int.h"
-#include "mongo/db/cmdline.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
 #include "mongo/util/logfile.h"
@@ -56,9 +55,6 @@ bo options;
 unsigned long long len; // file len
 const unsigned PG = 4096;
 unsigned nThreadsRunning = 0;
-namespace mongo {
-    CmdLine cmdLine;
-}
 
 // as this is incremented A LOT, at some point this becomes a bottleneck if very high ops/second (in cache) things are happening.
 AtomicUInt iops;

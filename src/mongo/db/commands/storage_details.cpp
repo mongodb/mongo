@@ -328,7 +328,7 @@ namespace {
     };
 
     MONGO_INITIALIZER(StorageDetailsCmd)(InitializerContext* context) {
-        if (cmdLine.experimental.storageDetailsCmdEnabled) {
+        if (serverGlobalParams.experimental.storageDetailsCmdEnabled) {
             // Leaked intentionally: a Command registers itself when constructed.
             new StorageDetailsCmd();
         }
@@ -779,7 +779,7 @@ namespace {
 
         const string ns = dbname + "." + cmdObj.firstElement().valuestrsafe();
         const NamespaceDetails* nsd = nsdetails(ns);
-        if (!cmdLine.quiet) {
+        if (!serverGlobalParams.quiet) {
             MONGO_TLOG(0) << "CMD: storageDetails " << ns << ", analyze " << subCommandStr << endl;
         }
         if (!nsd) {

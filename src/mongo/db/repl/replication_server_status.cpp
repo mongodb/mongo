@@ -40,6 +40,7 @@
 #include "mongo/db/repl/master_slave.h"
 #include "mongo/db/repl/oplogreader.h"
 #include "mongo/db/repl/rs.h"
+#include "mongo/db/storage_options.h"
 #include "mongo/db/wire_version.h"
 
 namespace mongo {
@@ -84,7 +85,7 @@ namespace mongo {
             int n = 0;
             list<BSONObj> src;
             {
-                Client::ReadContext ctx("local.sources", dbpath);
+                Client::ReadContext ctx("local.sources", storageGlobalParams.dbpath);
                 auto_ptr<Runner> runner(InternalPlanner::collectionScan("local.sources"));
                 BSONObj obj;
                 Runner::RunnerState state;

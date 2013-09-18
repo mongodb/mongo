@@ -461,7 +461,7 @@ namespace {
         ASSERT_EQUALS(port, 6);
     }
 
-    TEST(Parsing, DefaultValueIterateExplicit) {
+    TEST(Parsing, DefaultValuesNotInBSON) {
         moe::OptionsParser parser;
         moe::Environment environment;
 
@@ -480,23 +480,8 @@ namespace {
 
         ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
 
-        const std::map<moe::Key, moe::Value> values = environment.getExplicitlySet();
-        ASSERT_EQUALS((static_cast<std::map<moe::Key, moe::Value>::size_type>(1)), values.size());
-
-        typedef std::map<moe::Key, moe::Value>::const_iterator it_type;
-        for(it_type iterator = values.begin();
-            iterator != values.end(); iterator++) {
-            ASSERT_EQUALS(moe::Key("val1"), iterator->first);
-            int val1;
-            ASSERT_OK(iterator->second.get(&val1));
-            ASSERT_EQUALS(6, val1);
-        }
-
-        moe::Value value;
-        ASSERT_OK(environment.get(moe::Key("val2"), &value));
-        int val2;
-        ASSERT_OK(value.get(&val2));
-        ASSERT_EQUALS(val2, 5);
+        mongo::BSONObj expected = BSON("val1" << 6);
+        ASSERT_EQUALS(expected, environment.toBSON());
     }
 
     TEST(Parsing, ImplicitValue) {

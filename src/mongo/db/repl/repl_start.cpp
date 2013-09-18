@@ -32,7 +32,6 @@
 #include <boost/thread.hpp>
 #include <iostream>
 
-#include "mongo/db/cmdline.h"
 #include "mongo/db/repl/master_slave.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replication_server_status.h"
@@ -43,7 +42,7 @@ namespace mongo {
 
     void startReplication() {
         /* if we are going to be a replica set, we aren't doing other forms of replication. */
-        if( !cmdLine._replSet.empty() ) {
+        if (!replSettings.replSet.empty()) {
             if( replSettings.slave || replSettings.master ) {
                 log() << "***" << endl;
                 log() << "ERROR: can't use --slave or --master replication options with --replSet" << endl;
@@ -52,7 +51,7 @@ namespace mongo {
             newRepl();
 
             replSet = true;
-            ReplSetCmdline *replSetCmdline = new ReplSetCmdline(cmdLine._replSet);
+            ReplSetCmdline *replSetCmdline = new ReplSetCmdline(replSettings.replSet);
             boost::thread t( boost::bind( &startReplSets, replSetCmdline) );
 
             return;

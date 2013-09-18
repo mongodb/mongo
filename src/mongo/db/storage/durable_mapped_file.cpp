@@ -36,7 +36,6 @@
 
 #include "mongo/db/storage/durable_mapped_file.h"
 
-#include "mongo/db/cmdline.h"
 
 #include "mongo/db/d_concurrency.h"
 #include "mongo/db/dur.h"
@@ -49,7 +48,7 @@ using namespace mongoutils;
 namespace mongo {
 
     void DurableMappedFile::remapThePrivateView() {
-        verify( cmdLine.dur );
+        verify(storageGlobalParams.dur);
 
         // todo 1.9 : it turns out we require that we always remap to the same address.
         // so the remove / add isn't necessary and can be removed?
@@ -125,8 +124,6 @@ namespace mongo {
 
     PointerToDurableMappedFile privateViews;
 
-    extern string dbpath;
-
     // here so that it is precomputed...
     void DurableMappedFile::setPath(const std::string& f) {
         string suffix;
@@ -158,7 +155,7 @@ namespace mongo {
     bool DurableMappedFile::finishOpening() {
         LOG(3) << "mmf finishOpening " << (void*) _view_write << ' ' << filename() << " len:" << length() << endl;
         if( _view_write ) {
-            if( cmdLine.dur ) {
+            if (storageGlobalParams.dur) {
                 _view_private = createPrivateMap();
                 if( _view_private == 0 ) {
                     msgasserted(13636, str::stream() << "file " << filename() << " open/create failed in createPrivateMap (look in log for more information)");
@@ -192,7 +189,7 @@ namespace mongo {
         LOG(3) << "mmf close " << filename() << endl;
 
         if( view_write() /*actually was opened*/ ) {
-            if( cmdLine.dur ) {
+            if (storageGlobalParams.dur) {
                 dur::closingFileNotification();
             }
             /* todo: is it ok to close files if we are not globally locked exclusively?

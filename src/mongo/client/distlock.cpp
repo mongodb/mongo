@@ -50,7 +50,7 @@ namespace mongo {
 
         // cache process string
         stringstream ss;
-        ss << getHostName() << ":" << cmdLine.port << ":" << time(0) << ":" << rand();
+        ss << getHostName() << ":" << serverGlobalParams.port << ":" << time(0) << ":" << rand();
         _cachedProcessString = new string( ss.str() );
     }
 

@@ -57,6 +57,25 @@ namespace mongo {
 
         int slavedelay;
 
+        long long oplogSize;   // --oplogSize
+
+        // for master/slave replication
+        std::string source;    // --source
+        std::string only;      // --only
+        int pretouch;          // --pretouch for replication application (experimental)
+
+        std::string replSet;       // --replSet[/<seedlist>]
+        std::string ourSetName() const {
+            std::string setname;
+            size_t sl = replSet.find('/');
+            if( sl == std::string::npos )
+                return replSet;
+            return replSet.substr(0, sl);
+        }
+        bool usingReplSets() const { return !replSet.empty(); }
+
+        std::string rsIndexPrefetch;// --indexPrefetch
+
         std::set<std::string> discoveredSeeds;
         mutex discoveredSeeds_mx;
 
@@ -68,6 +87,8 @@ namespace mongo {
             fastsync(),
             autoresync(false),
             slavedelay(),
+            oplogSize(0),
+            pretouch(0),
             discoveredSeeds(),
             discoveredSeeds_mx("ReplSettings::discoveredSeeds") {
         }

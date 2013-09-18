@@ -49,7 +49,7 @@ namespace mongo {
 
         /** Call during startup so durability module can initialize
             Throws if fatal error
-            Does nothing if cmdLine.dur is false
+            Does nothing if storageGlobalParams.dur is false
          */
         void startup();
 

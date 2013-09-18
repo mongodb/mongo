@@ -18,7 +18,7 @@
 #include <boost/filesystem/operations.hpp>
 
 #include "mongo/base/status.h"
-#include "mongo/db/cmdline.h"
+#include "mongo/db/server_options.h"
 #include "mongo/util/options_parser/environment.h"
 #include "mongo/util/options_parser/option_description.h"
 #include "mongo/util/options_parser/option_section.h"
@@ -176,16 +176,17 @@ namespace mongo {
                  sslGlobalParams.sslFIPSMode) {
             return Status(ErrorCodes::BadValue, "need to enable sslOnNormalPorts");
         }
-        if (cmdLine.clusterAuthMode == "sendKeyfile" ||
-            cmdLine.clusterAuthMode == "sendX509" ||
-            cmdLine.clusterAuthMode == "x509") {
+        if (serverGlobalParams.clusterAuthMode == "sendKeyfile" ||
+            serverGlobalParams.clusterAuthMode == "sendX509" ||
+            serverGlobalParams.clusterAuthMode == "x509") {
             if (!sslGlobalParams.sslOnNormalPorts){
                 return Status(ErrorCodes::BadValue, "need to enable sslOnNormalPorts");
             }
         }
-        else if (params.count("clusterAuthMode") && cmdLine.clusterAuthMode != "keyfile") {
+        else if (params.count("clusterAuthMode") &&
+                 serverGlobalParams.clusterAuthMode != "keyfile") {
             StringBuilder sb;
-            sb << "unsupported value for clusterAuthMode " << cmdLine.clusterAuthMode;
+            sb << "unsupported value for clusterAuthMode " << serverGlobalParams.clusterAuthMode;
             return Status(ErrorCodes::BadValue, sb.str());
         }
 

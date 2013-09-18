@@ -50,6 +50,7 @@
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/repl/write_concern.h"
 #include "mongo/db/stats/counters.h"
+#include "mongo/db/storage_options.h"
 #include "mongo/s/d_logic.h"
 #include "mongo/util/elapsed_tracker.h"
 #include "mongo/util/file.h"
@@ -85,7 +86,7 @@ namespace mongo {
         {
             const char *logns = rsoplog;
             if ( rsOplogDetails == 0 ) {
-                Client::Context ctx(logns , dbpath);
+                Client::Context ctx(logns, storageGlobalParams.dbpath);
                 localDB = ctx.db();
                 verify( localDB );
                 rsOplogDetails = nsdetails(logns);
@@ -226,7 +227,7 @@ namespace mongo {
         {
             const char *logns = rsoplog;
             if ( rsOplogDetails == 0 ) {
-                Client::Context ctx(logns , dbpath);
+                Client::Context ctx(logns, storageGlobalParams.dbpath);
                 localDB = ctx.db();
                 verify( localDB );
                 rsOplogDetails = nsdetails(logns);
@@ -300,7 +301,7 @@ namespace mongo {
         if( logNS == 0 ) {
             logNS = "local.oplog.$main";
             if ( localOplogMainDetails == 0 ) {
-                Client::Context ctx(logNS , dbpath);
+                Client::Context ctx(logNS, storageGlobalParams.dbpath);
                 localDB = ctx.db();
                 verify( localDB );
                 localOplogMainDetails = nsdetails(logNS);
@@ -310,7 +311,7 @@ namespace mongo {
             r = theDataFileMgr.fast_oplog_insert(localOplogMainDetails, logNS, len);
         }
         else {
-            Client::Context ctx(logNS, dbpath);
+            Client::Context ctx(logNS, storageGlobalParams.dbpath);
             verify( nsdetails( logNS ) );
             // first we allocate the space, then we fill it below.
             r = theDataFileMgr.fast_oplog_insert( nsdetails( logNS ), logNS, len);
@@ -371,7 +372,7 @@ namespace mongo {
 
         const char * ns = "local.oplog.$main";
 
-        bool rs = !cmdLine._replSet.empty();
+        bool rs = !replSettings.replSet.empty();
         if( rs )
             ns = rsoplog;
 
@@ -381,9 +382,9 @@ namespace mongo {
 
         if ( nsd ) {
 
-            if ( cmdLine.oplogSize != 0 ) {
+            if (replSettings.oplogSize != 0) {
                 int o = (int)(nsd->storageSize() / ( 1024 * 1024 ) );
-                int n = (int)(cmdLine.oplogSize / ( 1024 * 1024 ) );
+                int n = (int)(replSettings.oplogSize / (1024 * 1024));
                 if ( n != o ) {
                     stringstream ss;
                     ss << "cmdline oplogsize (" << n << ") different than existing (" << o << ") see: http://dochub.mongodb.org/core/increase-oplog";
@@ -405,8 +406,8 @@ namespace mongo {
         /* create an oplog collection, if it doesn't yet exist. */
         BSONObjBuilder b;
         double sz;
-        if ( cmdLine.oplogSize != 0 )
-            sz = (double)cmdLine.oplogSize;
+        if (replSettings.oplogSize != 0)
+            sz = (double)replSettings.oplogSize;
         else {
             /* not specified. pick a default size */
             sz = 50.0 * 1024 * 1024;
@@ -416,7 +417,8 @@ namespace mongo {
                 sz = (256-64) * 1024 * 1024;
 #else
                 sz = 990.0 * 1024 * 1024;
-                boost::intmax_t free = File::freeSpace(dbpath); //-1 if call not supported.
+                boost::intmax_t free =
+                    File::freeSpace(storageGlobalParams.dbpath); //-1 if call not supported.
                 double fivePct = free * 0.05;
                 if ( fivePct > sz )
                     sz = fivePct;

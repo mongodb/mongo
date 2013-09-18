@@ -37,8 +37,6 @@
 
 namespace mongo {
 
-    unsigned lenForNewNsFiles = 16 * 1024 * 1024;
-
     NamespaceDetails* NamespaceIndex::details(const StringData& ns) {
         Namespace n(ns);
         return details(n);
@@ -93,7 +91,7 @@ namespace mongo {
 
     boost::filesystem::path NamespaceIndex::path() const {
         boost::filesystem::path ret( _dir );
-        if ( directoryperdb )
+        if (storageGlobalParams.directoryperdb)
             ret /= _database;
         ret /= ( _database + ".ns" );
         return ret;
@@ -114,7 +112,7 @@ namespace mongo {
     }
 
     void NamespaceIndex::maybeMkdir() const {
-        if ( !directoryperdb )
+        if (!storageGlobalParams.directoryperdb)
             return;
         boost::filesystem::path dir( _dir );
         dir /= _database;
@@ -153,14 +151,15 @@ namespace mongo {
             }
         }
         else {
-            // use lenForNewNsFiles, we are making a new database
-            massert( 10343, "bad lenForNewNsFiles", lenForNewNsFiles >= 1024*1024 );
+            // use storageGlobalParams.lenForNewNsFiles, we are making a new database
+            massert(10343, "bad storageGlobalParams.lenForNewNsFiles",
+                    storageGlobalParams.lenForNewNsFiles >= 1024*1024);
             maybeMkdir();
-            unsigned long long l = lenForNewNsFiles;
+            unsigned long long l = storageGlobalParams.lenForNewNsFiles;
             if ( _f.create(pathString, l, true) ) {
                 getDur().createdFile(pathString, l); // always a new file
                 len = l;
-                verify( len == lenForNewNsFiles );
+                verify(len == storageGlobalParams.lenForNewNsFiles);
                 p = _f.getView();
             }
         }

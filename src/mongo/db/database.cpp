@@ -46,6 +46,7 @@
 #include "mongo/db/pdfile.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/ops/delete.h"
+#include "mongo/db/storage_options.h"
 #include "mongo/db/structure/collection.h"
 
 namespace mongo {
@@ -104,7 +105,7 @@ namespace mongo {
     Database::Database(const char *nm, bool& newDb, const string& path )
         : _name(nm), _path(path),
           _namespaceIndex( _path, _name ),
-          _extentManager( _name, _path, 0, directoryperdb /* this is a global right now */ ),
+          _extentManager(_name, _path, 0, storageGlobalParams.directoryperdb),
           _profileName(_name + ".system.profile"),
           _namespacesName(_name + ".system.namespaces"),
           _extentFreelistName( _name + ".$freelist" ),
@@ -118,7 +119,7 @@ namespace mongo {
 
         try {
             newDb = _namespaceIndex.exists();
-            _profile = cmdLine.defaultProfile;
+            _profile = serverGlobalParams.defaultProfile;
             checkDuplicateUncasedNames(true);
 
             // If already exists, open.  Otherwise behave as if empty until

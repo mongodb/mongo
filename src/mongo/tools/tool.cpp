@@ -32,6 +32,7 @@
 #include "mongo/db/auth/authz_manager_external_state_mock.h"
 #include "mongo/db/json.h"
 #include "mongo/db/namespace_details.h"
+#include "mongo/db/storage_options.h"
 #include "mongo/platform/posix_fadvise.h"
 #include "mongo/util/file_allocator.h"
 #include "mongo/util/options_parser/option_section.h"
@@ -45,7 +46,6 @@ using namespace mongo;
 
 namespace mongo {
 
-    CmdLine cmdLine;
 
     moe::OptionSection options("options");
     moe::Environment _params;
@@ -72,11 +72,11 @@ namespace mongo {
 
         setGlobalAuthorizationManager(new AuthorizationManager(new AuthzManagerExternalStateMock()));
 
-        cmdLine.prealloc = false;
+        storageGlobalParams.prealloc = false;
 
         // The default value may vary depending on compile options, but for tools
         // we want durability to be disabled.
-        cmdLine.dur = false;
+        storageGlobalParams.dur = false;
 
         _name = argv[0];
 
@@ -152,7 +152,7 @@ namespace mongo {
 
         bool useDirectClient = hasParam( "dbpath" );
         if ( useDirectClient && _params.count("journal")){
-            cmdLine.dur = true;
+            storageGlobalParams.dur = true;
         }
 
         preSetup();
@@ -191,7 +191,7 @@ namespace mongo {
         }
         else {
             if ( _params.count( "directoryperdb" ) ) {
-                directoryperdb = true;
+                storageGlobalParams.directoryperdb = true;
             }
             verify( lastError.get( true ) );
 
@@ -199,7 +199,7 @@ namespace mongo {
             _conn = new DBDirectClient();
             _host = "DIRECT";
             static string myDbpath = getParam( "dbpath" );
-            dbpath = myDbpath.c_str();
+            storageGlobalParams.dbpath = myDbpath.c_str();
             try {
                 acquirePathLock();
             }

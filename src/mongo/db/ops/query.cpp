@@ -49,6 +49,7 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/repl_reads_ok.h"
 #include "mongo/db/scanandorder.h"
+#include "mongo/db/storage_options.h"
 #include "mongo/s/d_logic.h"
 #include "mongo/s/stale_exception.h"  // for SendStaleConfigException
 #include "mongo/server.h"
@@ -949,7 +950,7 @@ namespace mongo {
                     
                     BSONObj resObject; // put inside since we don't own the memory
                     
-                    Client::ReadContext ctx( ns , dbpath ); // read locks
+                    Client::ReadContext ctx(ns, storageGlobalParams.dbpath); // read locks
                     replVerifyReadsOk(&pq);
                     
                     bool found = Helpers::findById( currentClient, ns, query, resObject, &nsFound, &indexFound );
@@ -1116,7 +1117,7 @@ namespace mongo {
             }
                 
             try {
-                Client::ReadContext ctx( ns , dbpath ); // read locks
+                Client::ReadContext ctx(ns, storageGlobalParams.dbpath); // read locks
                 const ChunkVersion shardingVersionAtStart = shardingState.getVersion( ns );
                 
                 replVerifyReadsOk(&pq);

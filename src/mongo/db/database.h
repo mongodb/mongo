@@ -31,10 +31,10 @@
 #pragma once
 
 #include "mongo/db/cc_by_loc.h"
-#include "mongo/db/cmdline.h"
 #include "mongo/db/namespace_details.h"
-#include "mongo/db/storage/record.h"
 #include "mongo/db/storage/extent_manager.h"
+#include "mongo/db/storage/record.h"
+#include "mongo/db/storage_options.h"
 
 namespace mongo {
 
@@ -50,7 +50,8 @@ namespace mongo {
     class Database {
     public:
         // you probably need to be in dbHolderMutex when constructing this
-        Database(const char *nm, /*out*/ bool& newDb, const string& path = dbpath);
+        Database(const char *nm, /*out*/ bool& newDb,
+                 const string& path = storageGlobalParams.dbpath);
 
         /* you must use this to close - there is essential code in this method that is not in the ~Database destructor.
            thus the destructor is private.  this could be cleaned up one day...

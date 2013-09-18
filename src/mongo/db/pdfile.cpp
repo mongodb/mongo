@@ -73,6 +73,7 @@ _ disallow system* manipulations from the database.
 #include "mongo/db/repl/is_master.h"
 #include "mongo/db/sort_phase_one.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/storage_options.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/file.h"
 #include "mongo/util/file_allocator.h"
@@ -124,8 +125,6 @@ namespace mongo {
 
     /* ----------------------------------------- */
     const char FREELIST_NS[] = ".$freelist";
-    bool directoryperdb = false;
-    string repairpath;
     string pidfilepath;
 
     DataFileMgr theDataFileMgr;
@@ -180,12 +179,16 @@ namespace mongo {
         virtual const char * op() const = 0;
     };
 
-    void _applyOpToDataFiles( const char *database, FileOp &fo, bool afterAllocator = false, const string& path = dbpath );
+    void _applyOpToDataFiles(const char *database, FileOp &fo, bool afterAllocator = false,
+                             const string& path = storageGlobalParams.dbpath);
 
     void _deleteDataFiles(const char *database) {
-        if ( directoryperdb ) {
+        if (storageGlobalParams.directoryperdb) {
             FileAllocator::get()->waitUntilFinished();
-            MONGO_ASSERT_ON_EXCEPTION_WITH_MSG( boost::filesystem::remove_all( boost::filesystem::path( dbpath ) / database ), "delete data files with a directoryperdb" );
+            MONGO_ASSERT_ON_EXCEPTION_WITH_MSG(
+                    boost::filesystem::remove_all(
+                        boost::filesystem::path(storageGlobalParams.dbpath) / database),
+                                                "delete data files with a directoryperdb");
             return;
         }
         class : public FileOp {
@@ -200,7 +203,7 @@ namespace mongo {
     }
 
     void checkConfigNS(const char *ns) {
-        if ( cmdLine.configsvr &&
+        if ( serverGlobalParams.configsvr &&
              !( str::startsWith( ns, "config." ) ||
                 str::startsWith( ns, "local." ) ||
                 str::startsWith( ns, "admin." ) ) ) {
@@ -1273,7 +1276,7 @@ namespace mongo {
     // back up original database files to 'temp' dir
     void _renameForBackup( const char *database, const Path &reservedPath ) {
         Path newPath( reservedPath );
-        if ( directoryperdb )
+        if (storageGlobalParams.directoryperdb)
             newPath /= database;
         class Renamer : public FileOp {
         public:
@@ -1295,8 +1298,8 @@ namespace mongo {
 
     // move temp files to standard data dir
     void _replaceWithRecovered( const char *database, const char *reservedPathString ) {
-        Path newPath( dbpath );
-        if ( directoryperdb )
+        Path newPath(storageGlobalParams.dbpath);
+        if (storageGlobalParams.directoryperdb)
             newPath /= database;
         class Replacer : public FileOp {
         public:
@@ -1318,7 +1321,7 @@ namespace mongo {
 
     // generate a directory name for storing temp data files
     Path uniqueReservedPath( const char *prefix ) {
-        Path repairPath = Path( repairpath );
+        Path repairPath = Path(storageGlobalParams.repairpath);
         Path reservedPath;
         int i = 0;
         bool exists = false;
@@ -1363,19 +1366,19 @@ namespace mongo {
         const char * dbName = dbNameS.c_str();
 
         stringstream ss;
-        ss << "localhost:" << cmdLine.port;
+        ss << "localhost:" << serverGlobalParams.port;
         string localhost = ss.str();
 
         problem() << "repairDatabase " << dbName << endl;
         verify( cc().database()->name() == dbName );
-        verify( cc().database()->path() == dbpath );
+        verify(cc().database()->path() == storageGlobalParams.dbpath);
 
         BackgroundOperation::assertNoBgOpInProgForDb(dbName);
 
         getDur().syncDataAndTruncateJournal(); // Must be done before and after repair
 
         boost::intmax_t totalSize = dbSize( dbName );
-        boost::intmax_t freeSize = File::freeSpace(repairpath);
+        boost::intmax_t freeSize = File::freeSpace(storageGlobalParams.repairpath);
         if ( freeSize > -1 && freeSize < totalSize ) {
             stringstream ss;
             ss << "Cannot repair database " << dbName << " having size: " << totalSize
@@ -1421,14 +1424,15 @@ namespace mongo {
         }
 
         Client::Context ctx( dbName );
-        Database::closeDatabase( dbName, dbpath );
+        Database::closeDatabase(dbName, storageGlobalParams.dbpath);
 
         if ( backupOriginalFiles ) {
             _renameForBackup( dbName, reservedPath );
         }
         else {
             _deleteDataFiles( dbName );
-            MONGO_ASSERT_ON_EXCEPTION( boost::filesystem::create_directory( Path( dbpath ) / dbName ) );
+            MONGO_ASSERT_ON_EXCEPTION(
+                    boost::filesystem::create_directory(Path(storageGlobalParams.dbpath) / dbName));
         }
 
         _replaceWithRecovered( dbName, reservedPathString.c_str() );
@@ -1445,7 +1449,7 @@ namespace mongo {
         string c = database;
         c += '.';
         boost::filesystem::path p(path);
-        if ( directoryperdb )
+        if (storageGlobalParams.directoryperdb)
             p /= database;
         boost::filesystem::path q;
         q = p / (c+"ns");

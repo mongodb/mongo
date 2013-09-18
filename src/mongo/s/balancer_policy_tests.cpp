@@ -22,7 +22,6 @@
 namespace mongo {
 
     // these are all crutch and hopefully will eventually go away
-    CmdLine cmdLine;
     bool inShutdown() { return false; }
     DBClientBase *createDirectClient() { return 0; }
     void dbexit( ExitCode rc, const char *why ){
@@ -32,7 +31,6 @@ namespace mongo {
     bool haveLocalShardingInfo( const string& ns ) {
         return false;
     }
-
     namespace {
         
         TEST( BalancerPolicyTests , SizeMaxedShardTest ) {

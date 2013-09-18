@@ -298,7 +298,7 @@ namespace mongo {
         CmdDropDatabase() : Command("dropDatabase") {}
         bool run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             // disallow dropping the config database
-            if ( cmdLine.configsvr && ( dbname == "config" ) ) {
+            if (serverGlobalParams.configsvr && (dbname == "config")) {
                 errmsg = "Cannot drop 'config' database if mongod started with --configsvr";
                 return false;
             }
@@ -399,7 +399,7 @@ namespace mongo {
         bool run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             BSONElement e = cmdObj.firstElement();
             result.append("was", cc().database()->getProfilingLevel());
-            result.append("slowms", cmdLine.slowMS );
+            result.append("slowms", serverGlobalParams.slowMS);
 
             int p = (int) e.number();
             bool ok = false;
@@ -412,7 +412,7 @@ namespace mongo {
 
             BSONElement slow = cmdObj["slowms"];
             if ( slow.isNumber() )
-                cmdLine.slowMS = slow.numberInt();
+                serverGlobalParams.slowMS = slow.numberInt();
 
             return ok;
         }
@@ -468,7 +468,7 @@ namespace mongo {
         bool run(const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
             int was = _diaglog.setLevel( cmdObj.firstElement().numberInt() );
             _diaglog.flush();
-            if ( !cmdLine.quiet ) {
+            if (!serverGlobalParams.quiet) {
                 MONGO_TLOG(0) << "CMD: diagLogging set to " << _diaglog.getLevel() << " from: " << was << endl;
             }
             result.append( "was" , was );
@@ -512,7 +512,7 @@ namespace mongo {
 
         virtual bool run(const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
             string nsToDrop = dbname + '.' + cmdObj.firstElement().valuestr();
-            if ( !cmdLine.quiet ) {
+            if (!serverGlobalParams.quiet) {
                 MONGO_TLOG(0) << "CMD: drop " << nsToDrop << endl;
             }
 
@@ -700,7 +700,7 @@ namespace mongo {
             BSONElement e = jsobj.firstElement();
             string toDeleteNs = dbname + '.' + e.valuestr();
             NamespaceDetails *d = nsdetails(toDeleteNs);
-            if ( !cmdLine.quiet ) {
+            if (!serverGlobalParams.quiet) {
                 MONGO_TLOG(0) << "CMD: dropIndexes " << toDeleteNs << endl;
             }
             if ( d ) {
@@ -855,7 +855,8 @@ namespace mongo {
                 seen.insert( i->c_str() );
             }
 
-            // TODO: erh 1/1/2010 I think this is broken where path != dbpath ??
+            // TODO: erh 1/1/2010 I think this is broken where
+            // path != storageGlobalParams.dbpath ??
             set<string> allShortNames;
             {
                 Lock::GlobalRead lk;
@@ -907,7 +908,7 @@ namespace mongo {
         bool run(const string& dbname , BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool /*fromRepl*/) {
             bool ok;
             try {
-                ok = dbHolderW().closeAll( dbpath , result, false );
+                ok = dbHolderW().closeAll(storageGlobalParams.dbpath, result, false);
             }
             catch(DBException&) { 
                 throw;
@@ -1986,7 +1987,7 @@ namespace mongo {
             scoped_ptr<Lock::GlobalRead> lk;
             if( c->lockGlobally() )
                 lk.reset( new Lock::GlobalRead() );
-            Client::ReadContext ctx(ns , dbpath); // read locks
+            Client::ReadContext ctx(ns, storageGlobalParams.dbpath); // read locks
             client.curop()->ensureStarted();
             retval = _execCommand(c, dbname, cmdObj, queryOptions, errmsg, result, fromRepl);
         }
@@ -2006,7 +2007,7 @@ namespace mongo {
                                              static_cast<Lock::ScopedLock*>( new Lock::GlobalWrite() ) :
                                              static_cast<Lock::ScopedLock*>( new Lock::DBWrite( dbname ) ) );
             client.curop()->ensureStarted();
-            Client::Context ctx(dbname, dbpath);
+            Client::Context ctx(dbname, storageGlobalParams.dbpath);
             retval = _execCommand(c, dbname, cmdObj, queryOptions, errmsg, result, fromRepl);
             if ( retval && c->logTheOp() && ! fromRepl ) {
                 logOp("c", cmdns, cmdObj);

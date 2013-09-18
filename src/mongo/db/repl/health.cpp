@@ -31,7 +31,6 @@
 #include "mongo/db/repl/health.h"
 
 #include "mongo/client/connpool.h"
-#include "mongo/db/cmdline.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/repl/bgsync.h"
@@ -320,7 +319,7 @@ namespace mongo {
             s << tr() << td(_self->fullName() + " (me)") <<
               td(_self->id()) <<
               td("1") <<  //up
-              td(ago(cmdLine.started)) <<
+              td(ago(serverGlobalParams.started)) <<
               td("") << // last heartbeat
               td(ToString(_self->config().votes)) <<
               td(ToString(_self->config().priority)) <<
@@ -433,7 +432,7 @@ namespace mongo {
             bb.append("health", 1.0);
             bb.append("state", (int)myState.s);
             bb.append("stateStr", myState.toString());
-            bb.append("uptime", (unsigned)(time(0) - cmdLine.started));
+            bb.append("uptime", (unsigned)(time(0) - serverGlobalParams.started));
             if (!_self->config().arbiterOnly) {
                 bb.appendTimestamp("optime", lastOpTimeWritten.asDate());
                 bb.appendDate("optimeDate", lastOpTimeWritten.getSecs() * 1000LL);

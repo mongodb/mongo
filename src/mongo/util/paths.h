@@ -26,11 +26,11 @@
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
+#include "mongo/db/storage_options.h"
+
 namespace mongo {
     
     using namespace mongoutils;
-
-    extern string dbpath;
 
     /** this is very much like a boost::path.  however, we define a new type to get some type
         checking.  if you want to say 'my param MUST be a relative path", use this.
@@ -48,7 +48,7 @@ namespace mongo {
         
         /** from a full path */
         static RelativePath fromFullPath(boost::filesystem::path f) {
-            boost::filesystem::path dbp(dbpath); // normalizes / and backslash
+            boost::filesystem::path dbp(storageGlobalParams.dbpath); // normalizes / and backslash
             string fullpath = f.string();
             string relative = str::after(fullpath, dbp.string());
             if( relative.empty() ) {
@@ -57,9 +57,6 @@ namespace mongo {
                 rp._p = fullpath;
                 return rp;
             }
-            /*uassert(13600,
-                    str::stream() << "file path is not under the db path? " << fullpath << ' ' << dbpath,
-                    relative != fullpath);*/
             if( str::startsWith(relative, "/") || str::startsWith(relative, "\\") ) {
                 relative.erase(0, 1);
             }
@@ -75,7 +72,7 @@ namespace mongo {
         bool operator<(const RelativePath& r) const { return _p < r._p; }
 
         string asFullPath() const {
-            boost::filesystem::path x(dbpath);
+            boost::filesystem::path x(storageGlobalParams.dbpath);
             x /= _p;
             return x.string();
         }

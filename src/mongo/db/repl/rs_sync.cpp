@@ -43,6 +43,7 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/repl/rs_sync.h"
+#include "mongo/db/storage_options.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/stats/timer_stats.h"
@@ -116,7 +117,7 @@ namespace replset {
             lk.reset(new Lock::DBWrite(ns)); 
         }
 
-        Client::Context ctx(ns, dbpath);
+        Client::Context ctx(ns, storageGlobalParams.dbpath);
         ctx.getClient()->curop()->reset();
         // For non-initial-sync, we convert updates to upserts
         // to suppress errors when replaying oplog entries.

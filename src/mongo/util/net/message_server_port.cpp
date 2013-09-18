@@ -22,7 +22,6 @@
 #ifndef USE_ASIO
 
 
-#include "mongo/db/cmdline.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/util/concurrency/ticketholder.h"
@@ -198,7 +197,7 @@ namespace mongo {
                     p->psock->clearCounters();
 
                     if ( ! p->recv(m) ) {
-                        if( !cmdLine.quiet ){
+                        if (!serverGlobalParams.quiet) {
                             int conns = Listener::globalTicketHolder.used()-1;
                             const char* word = (conns == 1 ? " connection" : " connections");
                             log() << "end connection " << otherSide << " (" << conns << word << " now open)" << endl;

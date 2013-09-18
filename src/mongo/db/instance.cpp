@@ -47,7 +47,6 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/background.h"
 #include "mongo/db/clientcursor.h"
-#include "mongo/db/cmdline.h"
 #include "mongo/db/commands/fsync.h"
 #include "mongo/db/d_concurrency.h"
 #include "mongo/db/db.h"
@@ -60,6 +59,7 @@
 #include "mongo/db/json.h"
 #include "mongo/db/kill_current_op.h"
 #include "mongo/db/lasterror.h"
+#include "mongo/db/mongod_options.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/ops/count.h"
 #include "mongo/db/ops/delete.h"
@@ -70,6 +70,7 @@
 #include "mongo/db/repl/is_master.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/stats/counters.h"
+#include "mongo/db/storage_options.h"
 #include "mongo/platform/process_id.h"
 #include "mongo/s/d_logic.h"
 #include "mongo/s/stale_exception.h" // for SendStaleConfigException
@@ -96,8 +97,6 @@ namespace mongo {
 #define LOGWITHRATELIMIT if( ++nloggedsome < 1000 || nloggedsome % 100 == 0 )
 
     string dbExecCommand;
-
-    bool useHints = true;
 
     KillCurrentOp killCurrentOp;
 
@@ -435,7 +434,7 @@ namespace mongo {
         OpDebug& debug = currentOp.debug();
         debug.op = op;
 
-        long long logThreshold = cmdLine.slowMS;
+        long long logThreshold = serverGlobalParams.slowMS;
         bool shouldLog = logger::globalLogDomain()->shouldLog(logger::LogSeverity::Debug(1));
 
         if ( op == dbQuery ) {
@@ -961,7 +960,7 @@ namespace mongo {
         boost::filesystem::path path( usePath );
         for ( boost::filesystem::directory_iterator i( path );
                 i != boost::filesystem::directory_iterator(); ++i ) {
-            if ( directoryperdb ) {
+            if (storageGlobalParams.directoryperdb) {
                 boost::filesystem::path p = *i;
                 string dbName = p.leaf().string();
                 p /= ( dbName + ".ns" );
@@ -1102,7 +1101,7 @@ namespace mongo {
         log() << "shutdown: waiting for fs preallocator..." << endl;
         FileAllocator::get()->waitUntilFinished();
 
-        if( cmdLine.dur ) {
+        if (storageGlobalParams.dur) {
             log() << "shutdown: lock for final commit..." << endl;
             {
                 int n = 10;
@@ -1130,7 +1129,7 @@ namespace mongo {
         MemoryMappedFile::closeAllFiles( ss3 );
         log() << ss3.str() << endl;
 
-        if( cmdLine.dur ) {
+        if (storageGlobalParams.dur) {
             dur::journalCleanup(true);
         }
 
@@ -1239,7 +1238,7 @@ namespace mongo {
     }
 
     void acquirePathLock(bool doingRepair) {
-        string name = ( boost::filesystem::path( dbpath ) / "mongod.lock" ).string();
+        string name = (boost::filesystem::path(storageGlobalParams.dbpath) / "mongod.lock").string();
 
         bool oldFile = false;
 
@@ -1288,7 +1287,7 @@ namespace mongo {
                          "run with --repair again.\n"
                          "**************";
             }
-            else if (cmdLine.dur) {
+            else if (storageGlobalParams.dur) {
                 if (!dur::haveJournalFiles(/*anyFiles=*/true)) {
                     // Passing anyFiles=true as we are trying to protect against starting in an
                     // unclean state with the journal directory unmounted. If there are any files,
@@ -1342,7 +1341,7 @@ namespace mongo {
         }
 
         // Not related to lock file, but this is where we handle unclean shutdown
-        if( !cmdLine.dur && dur::haveJournalFiles() ) {
+        if (!storageGlobalParams.dur && dur::haveJournalFiles()) {
             cout << "**************" << endl;
             cout << "Error: journal files are present in journal directory, yet starting without journaling enabled." << endl;
             cout << "It is recommended that you start with journaling enabled so that recovery may occur." << endl;
@@ -1366,7 +1365,7 @@ namespace mongo {
         // TODO - this is very bad that the code above not running here.
 
         // Not related to lock file, but this is where we handle unclean shutdown
-        if( !cmdLine.dur && dur::haveJournalFiles() ) {
+        if (!storageGlobalParams.dur && dur::haveJournalFiles()) {
             cout << "**************" << endl;
             cout << "Error: journal files are present in journal directory, yet starting without --journal enabled." << endl;
             cout << "It is recommended that you start with journaling enabled so that recovery may occur." << endl;
@@ -1384,7 +1383,7 @@ namespace mongo {
     void DiagLog::openFile() {
         verify( f == 0 );
         stringstream ss;
-        ss << dbpath << "/diaglog." << hex << time(0);
+        ss << storageGlobalParams.dbpath << "/diaglog." << hex << time(0);
         string name = ss.str();
         f = new ofstream(name.c_str(), ios::out | ios::binary);
         if ( ! f->good() ) {

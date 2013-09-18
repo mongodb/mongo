@@ -32,7 +32,8 @@
 
 #include "mongo/db/log_process_details.h"
 
-#include "mongo/db/cmdline.h"
+#include "mongo/db/server_options.h"
+#include "mongo/util/net/sock.h"
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/version.h"
@@ -54,7 +55,7 @@ namespace mongo {
 
     void logProcessDetailsForLogRotate() {
         log() << "pid=" <<  ProcessId::getCurrent()
-            << " port=" << cmdLine.port
+            << " port=" << serverGlobalParams.port
             << ( is32bit() ? " 32" : " 64" ) << "-bit "
             << "host=" << getHostNameCached();
 

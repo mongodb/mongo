@@ -21,7 +21,6 @@
 
 #include <boost/filesystem/operations.hpp>
 
-#include "mongo/db/cmdline.h"
 #include "mongo/util/concurrency/rwlock.h"
 #include "mongo/util/map_util.h"
 #include "mongo/util/mongoutils/str.h"

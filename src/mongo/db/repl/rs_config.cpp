@@ -36,6 +36,7 @@
 #include "mongo/db/instance.h"
 #include "mongo/db/repl/connections.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/replication_server_status.h"  // replSettings
 #include "mongo/db/repl/rs.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/text.h"
@@ -350,8 +351,9 @@ namespace mongo {
 
     void ReplSetConfig::checkRsConfig() const {
         uassert(13132,
-                str::stream() << "nonmatching repl set name in _id field: " << _id << " vs. " << cmdLine.ourSetName(),
-                _id == cmdLine.ourSetName());
+                str::stream() << "nonmatching repl set name in _id field: " << _id << " vs. "
+                              << replSettings.ourSetName(),
+                _id == replSettings.ourSetName());
         uassert(13308, "replSet bad config version #", version > 0);
         uassert(13133, "replSet bad config no members", members.size() >= 1);
         uassert(13309, "replSet bad config maximum number of members is 12", members.size() <= 12);
@@ -690,7 +692,7 @@ namespace mongo {
             }
             else {
                 /* first, make sure other node is configured to be a replset. just to be safe. */
-                string setname = cmdLine.ourSetName();
+                string setname = replSettings.ourSetName();
                 BSONObj cmd = BSON( "replSetHeartbeat" << setname );
                 int theirVersion;
                 BSONObj info;

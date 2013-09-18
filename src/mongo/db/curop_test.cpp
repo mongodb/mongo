@@ -34,8 +34,6 @@
 
 namespace mongo {
 
-    CmdLine cmdLine; // needed to satisfy reference in curop.h (and elsewhere)
-
     namespace {
 
         const long long intervalLong = 2000 * 1000; // 2s in micros

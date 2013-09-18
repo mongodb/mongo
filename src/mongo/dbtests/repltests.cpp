@@ -48,8 +48,8 @@ namespace ReplTests {
     public:
         Base() : _context( ns() ) {
             oldRepl();
-            cmdLine._replSet = "";
-            cmdLine.oplogSize = 5 * 1024 * 1024;
+            replSettings.replSet = "";
+            replSettings.oplogSize = 5 * 1024 * 1024;
             replSettings.master = true;
             createOplog();
             ensureHaveIdIndex( ns(), false );

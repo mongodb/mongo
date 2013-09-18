@@ -43,6 +43,7 @@
 #include "mongo/db/pipeline/pipeline_d.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/ops/query.h"
+#include "mongo/db/storage_options.h"
 
 namespace mongo {
 
@@ -227,7 +228,7 @@ namespace mongo {
 
             intrusive_ptr<ExpressionContext> pCtx =
                 new ExpressionContext(InterruptStatusMongod::status, NamespaceString(ns));
-            pCtx->tempDir = dbpath + "/_tmp";
+            pCtx->tempDir = storageGlobalParams.dbpath + "/_tmp";
 
             /* try to parse the command; if this fails, then we didn't run */
             intrusive_ptr<Pipeline> pPipeline = Pipeline::parseCommand(errmsg, cmdObj, pCtx);

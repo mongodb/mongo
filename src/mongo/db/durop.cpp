@@ -45,8 +45,6 @@ using namespace mongoutils;
 
 namespace mongo {
 
-    extern string dbpath; // --dbpath parm
-
     void _deleteDataFiles(const char *);
 
     namespace dur {

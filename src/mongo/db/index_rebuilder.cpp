@@ -109,7 +109,7 @@ namespace mongo {
             }
 
             // If the indexBuildRetry flag isn't set, just clear the inProg flag
-            if (!cmdLine.indexBuildRetry) {
+            if (!serverGlobalParams.indexBuildRetry) {
                 // If we crash between unsetting the inProg flag and cleaning up the index, the
                 // index space will be lost.
                 nsd->blowAwayInProgressIndexEntries();

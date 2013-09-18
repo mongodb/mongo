@@ -40,7 +40,6 @@
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/message.h"
 #include "mongo/util/net/ssl_manager.h"
-#include "mongo/db/cmdline.h"
 
 namespace mongo {
     MONGO_FP_DECLARE(throwSockExcep);
@@ -316,7 +315,8 @@ namespace mongo {
     SockAddr unknownAddress( "0.0.0.0", 0 );
 
     string makeUnixSockPath(int port) {
-        return mongoutils::str::stream() << cmdLine.socket << "/mongodb-" << port << ".sock";
+        return mongoutils::str::stream() << serverGlobalParams.socket << "/mongodb-" << port
+                                         << ".sock";
     }
 
 
@@ -357,8 +357,8 @@ namespace mongo {
     string prettyHostName() {
         StringBuilder s;
         s << getHostNameCached();
-        if( cmdLine.port != CmdLine::DefaultDBPort )
-            s << ':' << mongo::cmdLine.port;
+        if (serverGlobalParams.port != ServerGlobalParams::DefaultDBPort)
+            s << ':' << mongo::serverGlobalParams.port;
         return s.str();
     }
 

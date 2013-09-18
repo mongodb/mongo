@@ -23,6 +23,7 @@
 
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/goodies.h"
 #include "mongo/util/mongoutils/str.h"
 
 // Need access to internal classes
@@ -32,7 +33,11 @@ namespace mongo {
     using namespace mongo::sorter;
     using boost::make_shared;
 
-    CmdLine cmdLine;
+    // Stub to avoid including the server_options library
+    // TODO: This should go away once we can do these checks at compile time
+    bool isMongos() {
+        return false;
+    }
 
     //
     // Sorter framework testing utilities
@@ -139,7 +144,7 @@ namespace mongo {
 
         } catch (...) {
             mongo::unittest::log() <<
-                "Failure from line " << line << " on iteration " << iteration << endl;
+                "Failure from line " << line << " on iteration " << iteration << std::endl;
             throw;
         }
     }
@@ -147,7 +152,7 @@ namespace mongo {
 
     template <int N>
     boost::shared_ptr<IWIterator> makeInMemIterator(const int (&array)[N]) {
-        vector<IWPair> vec;
+        std::vector<IWPair> vec;
         for (int i=0; i<N; i++)
             vec.push_back(IWPair(array[i], -array[i]));
         return boost::make_shared<sorter::InMemIterator<IntWrapper, IntWrapper> >(vec);
@@ -157,7 +162,7 @@ namespace mongo {
     boost::shared_ptr<IWIterator> mergeIterators(IteratorPtr (&array)[N],
                                                  Direction Dir=ASC,
                                                  const SortOptions& opts=SortOptions()) {
-        vector<boost::shared_ptr<IWIterator> > vec;
+        std::vector<boost::shared_ptr<IWIterator> > vec;
         for (int i=0; i<N; i++)
             vec.push_back(boost::shared_ptr<IWIterator>(array[i]));
         return boost::shared_ptr<IWIterator>(IWIterator::merge(vec, opts, IWComparator(Dir)));
@@ -235,7 +240,7 @@ namespace mongo {
     public:
         void run() {
             { // test empty (no inputs)
-                vector<boost::shared_ptr<IWIterator> > vec;
+                std::vector<boost::shared_ptr<IWIterator> > vec;
                 boost::shared_ptr<IWIterator> mergeIter (IWIterator::merge(vec,
                                                                            SortOptions(),
                                                                            IWComparator()));

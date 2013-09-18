@@ -165,7 +165,8 @@ namespace mongo {
 
     Status CmdAuthenticate::_authenticateCR(const UserName& user, const BSONObj& cmdObj) {
 
-        if (user == internalSecurity.user->getName() && cmdLine.clusterAuthMode == "x509") {
+        if (user == internalSecurity.user->getName() &&
+            serverGlobalParams.clusterAuthMode == "x509") {
             return Status(ErrorCodes::AuthenticationFailed,
                           "Mechanism x509 is required for internal cluster authentication");
         }
@@ -273,7 +274,8 @@ namespace mongo {
 
             // Handle internal cluster member auth, only applies to server-server connections 
             if (srvClusterId == peerClusterId) {
-                if (cmdLine.clusterAuthMode.empty() || cmdLine.clusterAuthMode == "keyfile") {
+                if (serverGlobalParams.clusterAuthMode.empty() ||
+                    serverGlobalParams.clusterAuthMode == "keyfile") {
                     return Status(ErrorCodes::AuthenticationFailed, "The provided certificate " 
                                   "can only be used for cluster authentication, not client " 
                                   "authentication. The current configuration does not allow " 

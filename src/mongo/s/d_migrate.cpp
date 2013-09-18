@@ -51,7 +51,6 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/clientcursor.h"
-#include "mongo/db/cmdline.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/dur.h"
@@ -1585,7 +1584,8 @@ namespace mongo {
                 long long num = Helpers::removeRange( range,
                                                       false, /*maxInclusive*/
                                                       secondaryThrottle, /* secondaryThrottle */
-                                                      cmdLine.moveParanoia ? &rs : 0, /*callback*/
+                                                      /*callback*/
+                                                      serverGlobalParams.moveParanoia ? &rs : 0,
                                                       true ); /* flag fromMigrate in oplog */
 
                 if (num < 0) {
@@ -1864,7 +1864,7 @@ namespace mongo {
                     Helpers::removeRange( range ,
                                           true , /*maxInclusive*/
                                           false , /* secondaryThrottle */
-                                          cmdLine.moveParanoia ? &rs : 0 , /*callback*/
+                                          serverGlobalParams.moveParanoia ? &rs : 0 , /*callback*/
                                           true ); /*fromMigrate*/
 
                     *lastOpApplied = cx.ctx().getClient()->getLastOp().asDate();

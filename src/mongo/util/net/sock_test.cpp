@@ -38,14 +38,14 @@
 #include <sys/types.h>
 #endif
 
-#include "mongo/db/cmdline.h"
+#include "mongo/db/server_options.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/concurrency/synchronization.h"
 #include "mongo/util/fail_point_service.h"
 
 namespace mongo {
 
-    CmdLine cmdLine;
+    ServerGlobalParams serverGlobalParams;
 
     bool inShutdown() {
         return false;

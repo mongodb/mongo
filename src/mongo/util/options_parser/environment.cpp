@@ -19,6 +19,8 @@
 #include <iostream>
 
 #include "mongo/bson/util/builder.h"
+#include "mongo/bson/bsonobjiterator.h"
+#include "mongo/db/jsobj.h"
 #include "mongo/util/options_parser/constraints.h"
 
 namespace mongo {
@@ -189,6 +191,148 @@ namespace optionenvironment {
                       << iter->second.toString()
                       << "'" << std::endl;
         }
+    }
+
+namespace {
+
+    // Converts a map of values with dotted key names to a BSONObj with sub objects.
+    // 1. Check for dotted field names and call valueMapToBSON recursively.
+    // 2. Append the actual value to our builder if we did not find a dot in our key name.
+    Status valueMapToBSON(const std::map<Key, Value>& params,
+                          BSONObjBuilder* builder,
+                          const std::string& prefix = std::string()) {
+        for (std::map<Key, Value>::const_iterator it(params.begin());
+                it != params.end(); it++) {
+            Key key = it->first;
+            Value value = it->second;
+
+            // 1. Check for dotted field names and call valueMapToBSON recursively.
+            // NOTE: this code depends on the fact that std::map is sorted
+            //
+            // EXAMPLE:
+            // The map:
+            // {
+            //     "var1.dotted1" : false,
+            //     "var2" : true,
+            //     "var1.dotted2" : 6
+            // }
+            //
+            // Gets sorted by keys as:
+            // {
+            //     "var1.dotted1" : false,
+            //     "var1.dotted2" : 6,
+            //     "var2" : true
+            // }
+            //
+            // Which means when we see the "var1" prefix, we can iterate until we see either a name
+            // without a dot or without "var1" as a prefix, aggregating its fields in a new map as
+            // we go.  Because the map is sorted, once we see a name without a dot or a "var1"
+            // prefix we know that we've seen everything with "var1" as a prefix and can recursively
+            // build the entire sub object at once using our new map (which is the only way to make
+            // a single coherent BSON sub object using this append only builder).
+            //
+            // The result of this function for this example should be a BSON object of the form:
+            // {
+            //     "var1" : {
+            //         "dotted1" : false,
+            //         "dotted2" : 6
+            //     },
+            //     "var2" : true
+            // }
+
+            // Check to see if this key name is dotted
+            std::string::size_type dotOffset = key.find('.');
+            if (dotOffset != string::npos) {
+
+                // Get the name of the "section" that we are currently iterating.  This will be
+                // the name of our sub object.
+                std::string sectionName = key.substr(0, dotOffset);
+
+                // Build a map of the "section" that we are iterating to be passed in a
+                // recursive call.
+                std::map<Key, Value> sectionMap;
+
+                std::string beforeDot = key.substr(0, dotOffset);
+                std::string afterDot = key.substr(dotOffset + 1, key.size() - dotOffset - 1);
+                std::map<Key, Value>::const_iterator it_next = it;
+
+                do {
+                    // Here we know that the key at it_next has a dot and has the prefix we are
+                    // currently creating a sub object for.  Since that means we will definitely
+                    // process that element in this loop, advance the outer for loop iterator here.
+                    it = it_next;
+
+                    // Add the value to our section map with a key of whatever is after the dot
+                    // since the section name itself will be part of our sub object builder.
+                    sectionMap[afterDot] = value;
+
+                    // Peek at the next value for our iterator and check to see if we've finished.
+                    if (++it_next == params.end()) {
+                        break;
+                    }
+                    key = it_next->first;
+                    value = it_next->second;
+
+                    // Look for a dot for our next iteration.
+                    dotOffset = key.find('.');
+
+                    beforeDot = key.substr(0, dotOffset);
+                    afterDot = key.substr(dotOffset + 1, key.size() - dotOffset - 1);
+                }
+                while (dotOffset != string::npos && beforeDot == sectionName);
+
+                // Use the section name in our object builder, and recursively call
+                // valueMapToBSON with our sub map with keys that have the section name removed.
+                BSONObjBuilder sectionObjBuilder(builder->subobjStart(sectionName));
+                valueMapToBSON(sectionMap, &sectionObjBuilder, sectionName);
+                sectionObjBuilder.done();
+
+                // Our iterator is currently on the last field that matched our dot and prefix, so
+                // continue to the next loop iteration.
+                continue;
+            }
+
+            // 2. Append the actual value to our builder if we did not find a dot in our key name.
+            const type_info& type = value.type();
+
+            if (type == typeid(string)){
+                if (value.as<string>().empty()) {
+                    // boost po uses empty string for flags like --quiet
+                    // TODO: Remove this when we remove boost::program_options
+                    builder->appendBool(key, true);
+                }
+                else {
+                    builder->append(key, value.as<string>());
+                }
+            }
+            else if (type == typeid(int))
+                builder->append(key, value.as<int>());
+            else if (type == typeid(double))
+                builder->append(key, value.as<double>());
+            else if (type == typeid(bool))
+                builder->appendBool(key, value.as<bool>());
+            else if (type == typeid(long))
+                builder->appendNumber(key, (long long)value.as<long>());
+            else if (type == typeid(unsigned))
+                builder->appendNumber(key, (long long)value.as<unsigned>());
+            else if (type == typeid(unsigned long long))
+                builder->appendNumber(key, (long long)value.as<unsigned long long>());
+            else if (type == typeid(vector<string>))
+                builder->append(key, value.as<vector<string> >());
+            else
+                builder->append(key, "UNKNOWN TYPE: " + demangleName(type));
+        }
+        return Status::OK();
+    }
+} // namespace
+
+    BSONObj Environment::toBSON() const {
+        BSONObjBuilder builder;
+        Status ret = valueMapToBSON(values, &builder);
+        if (!ret.isOK()) {
+            return BSONObj();
+        }
+        return builder.obj();
     }
 
 } // namespace optionenvironment

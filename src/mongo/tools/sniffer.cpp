@@ -67,8 +67,6 @@ using mongo::DBClientConnection;
 using mongo::QueryResult;
 using mongo::MemoryMappedFile;
 
-mongo::CmdLine mongo::cmdLine;
-
 #define SNAP_LEN 65535
 
 int captureHeaderSize;

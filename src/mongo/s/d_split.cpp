@@ -440,7 +440,7 @@ namespace mongo {
                 // Remove the sentinel at the beginning before returning
                 splitKeys.erase( splitKeys.begin() );
                 
-                if ( timer.millis() > cmdLine.slowMS ) {
+                if (timer.millis() > serverGlobalParams.slowMS) {
                     warning() << "Finding the split vector for " <<  ns << " over "<< keyPattern
                               << " keyCount: " << keyCount << " numSplits: " << splitKeys.size() 
                               << " lookedAt: " << currCount << " took " << timer.millis() << "ms"

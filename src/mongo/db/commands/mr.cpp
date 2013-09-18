@@ -43,6 +43,7 @@
 #include "mongo/db/matcher.h"
 #include "mongo/db/query_optimizer.h"
 #include "mongo/db/repl/is_master.h"
+#include "mongo/db/storage_options.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/s/collection_metadata.h"
 #include "mongo/s/d_logic.h"
@@ -1215,7 +1216,7 @@ namespace mongo {
                         Lock::DBRead lock( config.ns );
                         // This context does no version check, safe b/c we checked earlier and have an
                         // open cursor
-                        Client::Context ctx(config.ns, dbpath, false);
+                        Client::Context ctx(config.ns, storageGlobalParams.dbpath, false);
 
                         // obtain full cursor on data to apply mr to
                         shared_ptr<Cursor> temp = getOptimizedCursor( config.ns.c_str(),

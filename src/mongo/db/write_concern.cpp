@@ -86,7 +86,7 @@ namespace mongo {
         BSONElement e = cmdObj["w"];
         if ( e.ok() ) {
 
-            if ( cmdLine.configsvr && (!e.isNumber() || e.numberInt() > 1) ) {
+            if (serverGlobalParams.configsvr && (!e.isNumber() || e.numberInt() > 1)) {
                 // w:1 on config servers should still work, but anything greater than that
                 // should not.
                 result->append( "wnote", "can't use w on config servers" );
