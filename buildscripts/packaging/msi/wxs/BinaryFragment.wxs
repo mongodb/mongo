@@ -105,6 +105,32 @@
           <File Id="f_mongoclientexp" Name="mongoclient.exp" Source="$(var.ClientSource)\mongoclient.exp"
                 DiskId="1" KeyPath="yes" />
         </Component>
+        <?if $(var.Edition) = Enterprise ?>
+          <Component Id="c_driversasl" Guid="E51F24ED-3464-4B01-B825-C9F1219181A0">
+            <File Id="f_driversasl" Name="libsasl.dll" Source="$(var.SaslSource)\libsasl.dll"
+                  DiskId="1" KeyPath="yes" />
+          </Component>
+          <Component Id="c_driversaslPdb" Guid="1D6BF915-8E12-47FA-A582-64BF9D77EBC5">
+            <File Id="f_driversaslPdb" Name="libsasl.pdb" Source="$(var.SaslSource)\libsasl.pdb"
+                  DiskId="1" KeyPath="yes" />
+          </Component>
+          <Component Id="c_driverssleay" Guid="B2C36398-A79C-4ADE-BA72-7E3DF85B2D28">
+            <File Id="f_driverssleay" Name="ssleay32.dll" Source="$(var.SslSource)\ssleay32.dll"
+                  DiskId="1" KeyPath="yes" />
+          </Component>
+          <Component Id="c_driverlibeay" Guid="B7E3243C-25F4-4358-A420-2BFFA0BAABED">
+            <File Id="f_driverlibeay" Name="libeay32.dll" Source="$(var.SslSource)\libeay32.dll"
+                  DiskId="1" KeyPath="yes" />
+          </Component>
+          <Component Id="c_driversnmp" Guid="57DB53E1-C7B1-4E9C-816E-A7C920DCF393">
+            <File Id="f_driverssnmp" Name="netsnmp.dll" Source="$(var.SnmpSource)\netsnmp.dll"
+                  DiskId="1" KeyPath="yes" />
+          </Component>
+          <Component Id="c_driversnmpPdb" Guid="CACC153D-8167-4C9D-B47B-764F254A6BDF">
+            <File Id="f_driversnmpPdb" Name="netsnmp.pdb" Source="$(var.SnmpSource)\netsnmp.pdb"
+                  DiskId="1" KeyPath="yes" />
+          </Component>
+        <?endif ?>
       </Directory>
     </DirectoryRef>
 
@@ -117,10 +143,18 @@
         <ComponentRef Id="c_snmp" />
         <ComponentRef Id="c_snmpPdb" />
       </ComponentGroup>
-    <ComponentGroup Id="cg_EnterpriseServer">
-      <ComponentGroupRef Id="cg_EnterpriseBase" />
-      <ComponentRef Id="c_snmp" />
-      <ComponentRef Id="c_snmpPdb" />
+      <ComponentGroup Id="cg_EnterpriseServer">
+        <ComponentGroupRef Id="cg_EnterpriseBase" />
+        <ComponentRef Id="c_snmp" />
+        <ComponentRef Id="c_snmpPdb" />
+      </ComponentGroup>
+    <ComponentGroup Id="cg_DriverEnterprise">
+      <ComponentRef Id="c_driversasl" />
+      <ComponentRef Id="c_driversaslPdb" />
+      <ComponentRef Id="c_driverssleay" />
+      <ComponentRef Id="c_driverlibeay" />
+      <ComponentRef Id="c_driversnmp" />
+      <ComponentRef Id="c_driversnmpPdb" />
     </ComponentGroup>
     <?endif ?>
   </Fragment>

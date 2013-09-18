@@ -79,7 +79,7 @@
           <ComponentRef Id="c_mongoclientpdb"/>
           <ComponentRef Id="c_mongoclientexp"/>
           <?if $(var.Edition) = Enterprise ?>
-           <ComponentGroupRef Id="cg_EnterpriseBase" />
+           <ComponentGroupRef Id="cg_DriverEnterprise" />
           <?endif ?>
         </Feature>
       </Feature>
