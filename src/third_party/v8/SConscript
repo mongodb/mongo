@@ -46,10 +46,7 @@ LIBRARY_FLAGS = {
   },
   'gcc': {
     'all': {
-      'CCFLAGS':      ['-Wall',
-                       '-Werror',
-                       '-W',
-                       '-Wno-unused-parameter',
+      'CCFLAGS':      ['-Wno-unused-parameter',
                        '-Woverloaded-virtual',
                        '-Wnon-virtual-dtor']
     },
@@ -367,6 +364,18 @@ env.Append(CCFLAGS=ccflags)
 cppdefines = get_flags('CPPDEFINES', toolchain, options)
 cppdefines = filter(lambda f : f not in env['CPPDEFINES'], cppdefines)
 env.Append(CPPDEFINES=cppdefines)
+
+# NOTE: Suppress attempts to enable warnings in v8. Trying to individually suppress with -Wno-
+# results in a game of whack-a-mole between various versions of clang and gcc as they add new
+# warnings. We won't be changing the v8 sources, so the warnings aren't helpful.
+def removeIfPresent(lst, item):
+    try:
+        lst.remove(item)
+    except ValueError:
+        pass
+
+for to_remove in ['-Werror', '-Wall', '-W']:
+    removeIfPresent(env['CCFLAGS'], to_remove)
 
 # specify rules for building libraries.cc and experimental-libraries.cc
 env['BUILDERS']['JS2C'] = Builder(action=js2c.JS2C)
