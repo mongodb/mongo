@@ -92,6 +92,7 @@ namespace mongo {
 
         virtual void kill();
 
+        virtual void writeExplainTo(BSONObjBuilder* bob) const;
     private:
         /**
          * Have all our candidate plans do something.

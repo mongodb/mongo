@@ -93,6 +93,7 @@ namespace mongo {
 
         virtual void kill() { _exec->kill(); }
 
+        virtual void writeExplainTo(BSONObjBuilder* bob) const { }
     private:
         string _ns;
 
