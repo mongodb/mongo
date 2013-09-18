@@ -62,7 +62,7 @@ namespace mongo {
          * NOTE: Debatable if this level of detail is desired. CommonStats info may be too
          * low-level for end users
          */
-        void writeExplainTo(BSONObjBuilder * bob) const;
+        void writeExplainTo(BSONObjBuilder* bob) const;
 
         // Count calls into the stage.
         uint64_t works;
@@ -111,7 +111,7 @@ namespace mongo {
         }
 
         // Fill in explain info using common and specific stats data
-        void writeExplainTo(BSONObjBuilder * bob) const;
+        void writeExplainTo(BSONObjBuilder* bob) const;
 
         // The stats of the node's children.
         vector<PlanStageStats*> children;
