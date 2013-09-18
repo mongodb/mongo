@@ -31,7 +31,7 @@
 
 namespace mongo {
 
-    void CommonStats::writeExplainTo(BSONObjBuilder * bob) const {
+    void CommonStats::writeExplainTo(BSONObjBuilder* bob) const {
         if (NULL == bob) {
             return;
         }
@@ -42,7 +42,7 @@ namespace mongo {
 
     // forward to CommonStats for now
     // TODO: fill in specific stats
-    void PlanStageStats::writeExplainTo(BSONObjBuilder * bob) const {
+    void PlanStageStats::writeExplainTo(BSONObjBuilder* bob) const {
         common.writeExplainTo(bob);
     }
 
