@@ -714,7 +714,6 @@ __wt_conn_dhandle_discard(WT_CONNECTION_IMPL *conn)
 	 * have the dhandle lock because the eviction thread is still
 	 * running and may walk the dhandle list.
 	 */
-	F_SET(session, WT_SESSION_SCHEMA_LOCKED);
 	__wt_spin_lock(session, &conn->schema_lock);
 	__wt_spin_lock(session, &conn->dhandle_lock);
 
