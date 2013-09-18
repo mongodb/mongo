@@ -38,7 +38,9 @@ using namespace mongo;
 
 namespace {
 
-    // basic test on field initializers
+    /**
+     * Basic test on field initializers
+     */
     TEST(CommonStatsTest, defaultValues) {
         CommonStats stats;
         ASSERT_EQUALS(stats.works, static_cast<uint64_t>(0));
@@ -50,34 +52,33 @@ namespace {
         ASSERT_FALSE(stats.isEOF);
     }
 
-    // shared code for writeExplainTo test cases between CommonStats and PlanStageStats
-    // because we are using same test data and base stats object
-    struct CommonStatsWriteExplainTo { void operator()(BSONObjBuilder * bob, const CommonStats & stats) { stats.writeExplainTo(bob); } };
-    struct PlanStageStatsWriteExplainTo { void operator()(BSONObjBuilder * bob, const CommonStats & stats) {
-        PlanStageStats pss(stats);
-        pss.writeExplainTo(bob);
-    } };
-
-    // attempting to write to null bson builder should result in no-op
-    template <typename F> void _testWriteExplainToNullBuilder(F f) {
-        CommonStats stats;
-        f(NULL, stats);
-    }
-
+    /**
+     * Verifies null argument check in CommonStats::writeExplainTo
+     */
     TEST(CommonStatsTest, writeExplainToNullBuilder) {
-        _testWriteExplainToNullBuilder(CommonStatsWriteExplainTo());
+        CommonStats stats;
+        stats.writeExplainTo(NULL);
     }
 
+    /**
+     * Verifies null argument check in PlanStageStats::writeExplainTo
+     */
     TEST(PlanStageStatsTest, writeExplainToNullBuilder) {
-        _testWriteExplainToNullBuilder(PlanStageStatsWriteExplainTo());
+        CommonStats stats;
+        PlanStageStats pss(stats);
+        pss.writeExplainTo(NULL);
     }
 
-    template <typename F> void _testWriteExplainToSimple(F f) {
+    /**
+     * Checks BSON output of CommonStats::writeExplainTo to ensure it contains
+     * correct values for CommonStats fields
+     */
+    TEST(CommonStatsTest, writeExplainTo) {
         CommonStats stats;
         stats.works = static_cast<uint64_t>(2);
         stats.advanced = static_cast<uint64_t>(3);
         BSONObjBuilder bob;
-        f(&bob, stats);
+        stats.writeExplainTo(&bob);
         BSONObj obj = bob.done();
         ASSERT_TRUE(obj.hasField("works"));
         ASSERT_EQUALS(obj.getIntField("works"), 2);
@@ -85,12 +86,22 @@ namespace {
         ASSERT_EQUALS(obj.getIntField("advanced"), 3);
     }
 
-    TEST(CommonStatsTest, writeExplainTo) {
-        _testWriteExplainToSimple(CommonStatsWriteExplainTo());
-    }
-
+    /**
+     * Checks BSON output of PlanStageStats::writeExplainTo to ensure it contains
+     * correct values for CommonStats fields
+     */
     TEST(PlanStageStatsTest, writeExplainTo) {
-        _testWriteExplainToSimple(PlanStageStatsWriteExplainTo());
+        CommonStats stats;
+        stats.works = static_cast<uint64_t>(2);
+        stats.advanced = static_cast<uint64_t>(3);
+        BSONObjBuilder bob;
+        PlanStageStats pss(stats);
+        pss.writeExplainTo(&bob);
+        BSONObj obj = bob.done();
+        ASSERT_TRUE(obj.hasField("works"));
+        ASSERT_EQUALS(obj.getIntField("works"), 2);
+        ASSERT_TRUE(obj.hasField("advanced"));
+        ASSERT_EQUALS(obj.getIntField("advanced"), 3);
     }
 
 }  // namespace
