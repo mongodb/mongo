@@ -198,13 +198,13 @@ namespace mongo {
          * to PlanStageStats. In future, information specific to the PlanExecutor
          * may be added to this result.
          */
-        void writeExplainTo(BSONObjBuilder * bob) const {
+        void writeExplainTo(BSONObjBuilder* bob) const {
             if (NULL == bob) {
                 return;
             }
             // XXX: getStats() is not const
-            PlanExecutor * exec = const_cast<PlanExecutor *>(this);
-            PlanStageStats * stats = exec->getStats();
+            PlanExecutor* exec = const_cast<PlanExecutor*>(this);
+            PlanStageStats* stats = exec->getStats();
             stats->writeExplainTo(bob);
         }
     private:
