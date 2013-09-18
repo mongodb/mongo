@@ -18,7 +18,7 @@ __wt_connection_init(WT_CONNECTION_IMPL *conn)
 
 	session = conn->default_session;
 
-	TAILQ_INIT(&conn->dhqh);		/* Data handle list */
+	SLIST_INIT(&conn->dhlh);		/* Data handle list */
 	TAILQ_INIT(&conn->dlhqh);		/* Library list */
 	TAILQ_INIT(&conn->dsrcqh);		/* Data source list */
 	TAILQ_INIT(&conn->fhqh);		/* File list */
@@ -91,6 +91,7 @@ __wt_connection_destroy(WT_CONNECTION_IMPL *conn)
 	__wt_spin_destroy(session, &conn->api_lock);
 	__wt_spin_destroy(session, &conn->block_lock);
 	__wt_spin_destroy(session, &conn->checkpoint_lock);
+	__wt_spin_destroy(session, &conn->dhandle_lock);
 	__wt_spin_destroy(session, &conn->fh_lock);
 	__wt_spin_destroy(session, &conn->hot_backup_lock);
 	__wt_spin_destroy(session, &conn->schema_lock);
