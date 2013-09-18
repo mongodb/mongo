@@ -117,6 +117,9 @@ namespace mongo {
         if (NULL != _bestPlan) { _bestPlan->kill(); }
     }
 
+    void MultiPlanRunner::writeExplainTo(BSONObjBuilder* bob) const {
+    }
+
     Runner::RunnerState MultiPlanRunner::getNext(BSONObj* objOut, DiskLoc* dlOut) {
         if (_failure) { return Runner::RUNNER_DEAD; }
 

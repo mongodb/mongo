@@ -179,7 +179,7 @@ namespace mongo {
          *       implementations. Convert to pure virtual eventually.
          *       Document fully the structure of the output.
          */
-        virtual void writeExplainTo(BSONObjBuilder * bob) const; // = 0;
+        virtual void writeExplainTo(BSONObjBuilder* bob) const = 0;
     };
 
 }  // namespace mongo

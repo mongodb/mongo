@@ -67,6 +67,7 @@ namespace mongo {
 
         virtual void kill() { }
 
+        virtual void writeExplainTo(BSONObjBuilder* bob) const { }
     private:
         scoped_ptr<CanonicalQuery> _cq;
         string _ns;
