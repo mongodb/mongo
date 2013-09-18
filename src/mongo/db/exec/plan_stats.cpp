@@ -31,8 +31,6 @@
 
 namespace mongo {
 
-    // adding just the fields "works" and "advanced" for now
-    // may rename fields in future
     void CommonStats::writeExplainTo(BSONObjBuilder * bob) const {
         if (NULL == bob) {
             return;
