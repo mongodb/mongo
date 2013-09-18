@@ -274,10 +274,6 @@ namespace mongo {
                 pPipeline->run(result);
             }
 
-            if (DocumentSourceOut* out = dynamic_cast<DocumentSourceOut*>(pPipeline->output())) {
-                result.append("outputNs", out->getOutputNs());
-            }
-
             return true;
         }
 

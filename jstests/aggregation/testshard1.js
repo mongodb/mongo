@@ -197,7 +197,7 @@ testSortLimit(100, -1);
 // test $out by copying source collection verbatim to output
 var outCollection = db.ts1_out;
 var res = db.ts1.aggregate({$out: outCollection.getName()});
-assert.eq(res, {result: [], outputNs: outCollection.getFullName(), ok: 1});
+assert.eq(res, {result: [], ok: 1});
 assert.eq(db.ts1.find().itcount(), outCollection.find().itcount());
 assert.eq(db.ts1.find().sort({_id:1}).toArray(),
           outCollection.find().sort({_id:1}).toArray());
