@@ -949,7 +949,7 @@ namespace mongo {
                     break;
                 case CodeWScope:
                     {
-                        Status s = e.embeddedObject()._okForStorage(false);
+                        Status s = e.codeWScopeObject()._okForStorage(false);
                         // TODO: combine field names for better error messages
                         if ( ! s.isOK() )
                             return s;
