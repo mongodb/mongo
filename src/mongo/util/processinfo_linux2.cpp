@@ -436,8 +436,19 @@ namespace mongo {
     * Determine if the process is running with (cc)NUMA
     */
     bool ProcessInfo::checkNumaEnabled() {
-        if ( boost::filesystem::exists( "/sys/devices/system/node/node1" ) && 
-             boost::filesystem::exists( "/proc/self/numa_maps" ) ) {
+        bool hasMultipleNodes = false;
+        bool hasNumaMaps = false;
+
+        try {
+            hasMultipleNodes = boost::filesystem::exists("/sys/devices/system/node/node1");
+            hasNumaMaps = boost::filesystem::exists("/proc/self/numa_maps");
+        } catch(boost::filesystem::filesystem_error& e) {
+            log() << "WARNING: Cannot detect if NUMA interleaving is enabled. " <<
+                     "Failed to probe \"" << e.path1().string() << "\": " << e.code().message();
+            return false;
+        }
+
+        if ( hasMultipleNodes && hasNumaMaps ) {
             // proc is populated with numa entries
 
             // read the second column of first line to determine numa state
