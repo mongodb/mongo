@@ -35,7 +35,7 @@ __session_close_cache(WT_SESSION_IMPL *session)
 	WT_DATA_HANDLE_CACHE *dhandle_cache;
 	WT_DECL_RET;
 
-	while ((dhandle_cache = TAILQ_FIRST(&session->dhandles)) != NULL)
+	while ((dhandle_cache = SLIST_FIRST(&session->dhandles)) != NULL)
 		WT_TRET(__wt_session_discard_btree(session, dhandle_cache));
 
 	__wt_schema_close_tables(session);
@@ -858,7 +858,7 @@ __wt_open_session(WT_CONNECTION_IMPL *conn, int internal,
 	    event_handler == NULL ? session->event_handler : event_handler);
 
 	TAILQ_INIT(&session_ret->cursors);
-	TAILQ_INIT(&session_ret->dhandles);
+	SLIST_INIT(&session_ret->dhandles);
 
 	/* Initialize transaction support: default to read-committed. */
 	session_ret->isolation = TXN_ISO_READ_COMMITTED;
