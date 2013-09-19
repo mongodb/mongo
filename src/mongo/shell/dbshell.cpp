@@ -83,7 +83,9 @@ void generateCompletions( const string& prefix , vector<string>& all ) {
 
     try {
         BSONObj args = BSON( "0" << prefix );
-        shellMainScope->invokeSafe( "function callShellAutocomplete(x) {shellAutocomplete(x)}", &args, 0, 1000 );
+        shellMainScope->invokeSafe("function callShellAutocomplete(x) {shellAutocomplete(x)}",
+                                   &args,
+                                   NULL);
         BSONObjBuilder b;
         shellMainScope->append( b , "" , "__autocomplete__" );
         BSONObj res = b.obj();
