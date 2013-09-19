@@ -44,13 +44,7 @@ namespace mongo {
 namespace {
 
     using boost::shared_ptr;
-    
-    void dropCollection( const char *ns ) {
-     	string errmsg;
-        BSONObjBuilder result;
-        dropCollection( ns, errmsg, result );
-    }
-    
+
     namespace QueryPlanTests {
 
         class ToString {
@@ -74,7 +68,7 @@ namespace {
             ~Base() {
                 if ( !nsd() )
                     return;
-                dropCollection( ns() );
+                cc().database()->dropCollection( ns() );
             }
         protected:
             static const char *ns() { return "unittests.QueryPlanTests"; }

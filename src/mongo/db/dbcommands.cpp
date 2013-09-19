@@ -514,21 +514,32 @@ namespace mongo {
 
         virtual bool run(const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
             string nsToDrop = dbname + '.' + cmdObj.firstElement().valuestr();
-            NamespaceDetails *d = nsdetails(nsToDrop);
             if ( !cmdLine.quiet ) {
                 MONGO_TLOG(0) << "CMD: drop " << nsToDrop << endl;
             }
+
+            NamespaceDetails *d = nsdetails(nsToDrop);
             if ( d == 0 ) {
                 errmsg = "ns not found";
                 return false;
             }
 
-            uassert(10039, "can't drop collection with reserved $ character in name",
-                    strchr(nsToDrop.c_str(), '$') == 0);
+            int numIndexes = d->getTotalIndexCount();
+
+            if ( nsToDrop.find( '$' ) != string::npos ) {
+                errmsg = "can't drop collection with reserved $ character in name";
+                return false;
+            }
 
             stopIndexBuilds(dbname, cmdObj);
 
-            dropCollection( nsToDrop, errmsg, result );
+            result.append( "ns", nsToDrop );
+            result.append( "nIndexesWas", numIndexes );
+
+            d = NULL;
+
+            cc().database()->dropCollection( nsToDrop );
+
             return true;
         }
     } cmdDrop;

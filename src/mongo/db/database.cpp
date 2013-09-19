@@ -36,8 +36,11 @@
 #include <boost/filesystem/operations.hpp>
 
 #include "mongo/db/auth/auth_index_d.h"
+#include "mongo/db/background.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/database_holder.h"
+#include "mongo/db/index.h"
+#include "mongo/db/index_update.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/introspect.h"
 #include "mongo/db/pdfile.h"
@@ -230,16 +233,10 @@ namespace mongo {
         }
 
         for (size_t i=0; i < toDelete.size(); i++) {
-            const string& ns = toDelete[i];
-
-            string errmsg;
-            BSONObjBuilder result;
-            mongo::dropCollection(ns, errmsg, result); // XXX-ERH
-
-            if ( errmsg.size() > 0 ) {
-                warning() << "could not delete temp collection: " << ns
-                          << " because of: " << errmsg << endl;
-            }
+            Status s = dropCollection( toDelete[i] );
+            if ( !s.isOK() )
+                warning() << "could not drop temp collection: " << toDelete[i]
+                          << " because of " << s << endl;
         }
     }
 
@@ -278,12 +275,50 @@ namespace mongo {
         return true;
     }
 
-    void Database::dropCollection( const StringData& fullns ) {
-        // TODO: XXX-ERH
-        // move impl from pdfile.cpp here
+    Status Database::dropCollection( const StringData& fullns ) {
+        LOG(1) << "dropCollection: " << fullns << endl;
+
+        CollectionTemp* collection = getCollectionTemp( fullns );
+        if ( !collection ) {
+            // collection doesn't exist
+            return Status::OK();
+        }
+
+        _initForWrites();
+
+        BackgroundOperation::assertNoBgOpInProgForNs( fullns );
+
+        if ( collection->_details->getTotalIndexCount() > 0 ) {
+            try {
+                string errmsg;
+                BSONObjBuilder result;
+
+                if ( !dropIndexes( collection->_details, fullns, "*", errmsg, result, true) ) {
+                    warning() << "could not drop collection: " << fullns
+                              << " because of " << errmsg << endl;
+                    return Status( ErrorCodes::InternalError, errmsg );
+                }
+            }
+            catch( DBException& e ) {
+                stringstream ss;
+                ss << "drop: dropIndexes for collection failed - consider trying repair ";
+                ss << " cause: " << e.what();
+                warning() << ss.str() << endl;
+                return Status( ErrorCodes::InternalError, ss.str() );
+            }
+            verify( collection->_details->getTotalIndexCount() == 0 );
+        }
+        LOG(1) << "\t dropIndexes done" << endl;
+
+        ClientCursor::invalidate( fullns );
+        Top::global.collectionDropped( fullns );
+        NamespaceDetailsTransient::eraseCollection( fullns.toString() );
+        dropNS( fullns.toString() );
 
         scoped_lock lk( _collectionLock );
         _collections.erase( fullns.toString() );
+
+        return Status::OK();
     }
 
     CollectionTemp* Database::getCollectionTemp( const StringData& ns ) {
@@ -297,10 +332,10 @@ namespace mongo {
         CollectionMap::const_iterator it = _collections.find( myns );
         if ( it != _collections.end() ) {
             if ( it->second ) {
-                //DEV {
+                DEV {
                     NamespaceDetails* details = _namespaceIndex.details( ns );
                     verify( details == it->second->_details );
-                    //}
+                }
                 return it->second;
             }
         }
