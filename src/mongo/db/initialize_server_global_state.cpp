@@ -300,7 +300,10 @@ namespace mongo {
 #endif
 
         if (!cmdLine.pidFile.empty()) {
-            writePidFile(cmdLine.pidFile);
+            if (!writePidFile(cmdLine.pidFile)) {
+                // error message logged in writePidFile
+                return false;
+            }
         }
 
         if (!cmdLine.keyFile.empty() && cmdLine.clusterAuthMode != "x509") {
@@ -309,7 +312,7 @@ namespace mongo {
                 return false;
             }
         }
- 
+
         // Auto-enable auth except if clusterAuthMode is not set.
         // clusterAuthMode is automatically set if a --keyfile parameter is provided.
         if (!cmdLine.clusterAuthMode.empty()) {
