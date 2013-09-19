@@ -31,9 +31,134 @@
 namespace mongo {
 namespace {
 
-    class PrivilegeDocumentParsing : public ::mongo::unittest::Test {
+    class V1PrivilegeDocumentParsing : public ::mongo::unittest::Test {
     public:
-        PrivilegeDocumentParsing() {}
+        V1PrivilegeDocumentParsing() {}
+
+        scoped_ptr<User> user;
+        scoped_ptr<User> adminUser;
+        V1PrivilegeDocumentParser v1parser;
+
+        void setUp() {
+            resetUsers();
+        }
+
+        void resetUsers() {
+            user.reset(new User(UserName("spencer", "test")));
+            adminUser.reset(new User(UserName("admin", "admin")));
+        }
+    };
+
+    TEST_F(V1PrivilegeDocumentParsing, testParsingV0PrivilegeDocuments) {
+        BSONObj readWrite = BSON("user" << "spencer" << "pwd" << "passwordHash");
+        BSONObj readOnly = BSON("user" << "spencer" << "pwd" << "passwordHash" <<
+                                "readOnly" << true);
+        BSONObj readWriteAdmin = BSON("user" << "admin" << "pwd" << "passwordHash");
+        BSONObj readOnlyAdmin = BSON("user" << "admin" << "pwd" << "passwordHash" <<
+                                     "readOnly" << true);
+
+        ASSERT_OK(v1parser.initializeUserRolesFromPrivilegeDocument(
+                          user.get(), readOnly, "test"));
+        ASSERT_EQUALS(1U, user->getRoles().size());
+        ASSERT_EQUALS(1U, user->getRoles().count(RoleName("oldRead", "test")));
+
+        resetUsers();
+        ASSERT_OK(v1parser.initializeUserRolesFromPrivilegeDocument(
+                          user.get(), readWrite, "test"));
+        ASSERT_EQUALS(1U, user->getRoles().size());
+        ASSERT_EQUALS(1U, user->getRoles().count(RoleName("oldReadWrite", "test")));
+
+        resetUsers();
+        ASSERT_OK(v1parser.initializeUserRolesFromPrivilegeDocument(
+                          adminUser.get(), readOnlyAdmin, "admin"));
+        ASSERT_EQUALS(1U, adminUser->getRoles().size());
+        ASSERT_EQUALS(1U, adminUser->getRoles().count(RoleName("oldAdminRead", "admin")));
+
+        resetUsers();
+        ASSERT_OK(v1parser.initializeUserRolesFromPrivilegeDocument(
+                          adminUser.get(), readWriteAdmin, "admin"));
+        ASSERT_EQUALS(1U, adminUser->getRoles().size());
+        ASSERT_EQUALS(1U, adminUser->getRoles().count(RoleName("oldAdminReadWrite", "admin")));
+    }
+
+    TEST_F(V1PrivilegeDocumentParsing, VerifyRolesFieldMustBeAnArray) {
+        ASSERT_NOT_OK(v1parser.initializeUserRolesFromPrivilegeDocument(
+                user.get(),
+                BSON("user" << "spencer" << "pwd" << "" << "roles" << "read"),
+                "test"));
+        ASSERT_EQUALS(0U, user->getRoles().size());
+    }
+
+    TEST_F(V1PrivilegeDocumentParsing, VerifySemanticallyInvalidRolesStillParse) {
+        ASSERT_OK(v1parser.initializeUserRolesFromPrivilegeDocument(
+                user.get(),
+                BSON("user" << "spencer" <<
+                     "pwd" << "" <<
+                     "roles" << BSON_ARRAY("read" << "frim")),
+                "test"));
+        ASSERT_EQUALS(2U, user->getRoles().size());
+        ASSERT_EQUALS(1U, user->getRoles().count(RoleName("read", "test")));
+        ASSERT_EQUALS(1U, user->getRoles().count(RoleName("frim", "test")));
+    }
+
+    TEST_F(V1PrivilegeDocumentParsing, VerifyOtherDBRolesMustBeAnObjectOfArraysOfStrings) {
+        ASSERT_NOT_OK(v1parser.initializeUserRolesFromPrivilegeDocument(
+                adminUser.get(),
+                BSON("user" << "admin" <<
+                     "pwd" << "" <<
+                     "roles" << BSON_ARRAY("read") <<
+                     "otherDBRoles" << BSON_ARRAY("read")),
+                "admin"));
+
+        ASSERT_NOT_OK(v1parser.initializeUserRolesFromPrivilegeDocument(
+                adminUser.get(),
+                BSON("user" << "admin" <<
+                     "pwd" << "" <<
+                     "roles" << BSON_ARRAY("read") <<
+                     "otherDBRoles" << BSON("test2" << "read")),
+                "admin"));
+    }
+
+    TEST_F(V1PrivilegeDocumentParsing, VerifyCannotGrantPrivilegesOnOtherDatabasesNormally) {
+        // Cannot grant roles on other databases, except from admin database.
+        ASSERT_NOT_OK(v1parser.initializeUserRolesFromPrivilegeDocument(
+                user.get(),
+                BSON("user" << "spencer" <<
+                     "pwd" << "" <<
+                     "roles" << BSONArrayBuilder().arr() <<
+                     "otherDBRoles" << BSON("test2" << BSON_ARRAY("read"))),
+                "test"));
+        ASSERT_EQUALS(0U, user->getRoles().size());
+    }
+
+    TEST_F(V1PrivilegeDocumentParsing, GrantUserAdminOnTestViaAdmin) {
+        // Grant userAdmin on test via admin.
+        ASSERT_OK(v1parser.initializeUserRolesFromPrivilegeDocument(
+                adminUser.get(),
+                BSON("user" << "admin" <<
+                     "pwd" << "" <<
+                     "roles" << BSONArrayBuilder().arr() <<
+                     "otherDBRoles" << BSON("test" << BSON_ARRAY("userAdmin"))),
+                "admin"));
+        ASSERT_EQUALS(1U, adminUser->getRoles().size());
+        ASSERT_EQUALS(1U, adminUser->getRoles().count(RoleName("userAdmin", "test")));
+    }
+
+    TEST_F(V1PrivilegeDocumentParsing, MixedV0V1PrivilegeDocumentsAreInvalid) {
+        // Try to mix fields from V0 and V1 privilege documents and make sure it fails.
+        ASSERT_NOT_OK(v1parser.initializeUserRolesFromPrivilegeDocument(
+                user.get(),
+                BSON("user" << "spencer" <<
+                     "pwd" << "passwordHash" <<
+                     "readOnly" << false <<
+                     "roles" << BSON_ARRAY("read")),
+                "test"));
+        ASSERT_EQUALS(0U, user->getRoles().size());
+    }
+
+    class V2PrivilegeDocumentParsing : public ::mongo::unittest::Test {
+    public:
+        V2PrivilegeDocumentParsing() {}
 
         scoped_ptr<User> user;
         scoped_ptr<User> adminUser;
@@ -46,7 +171,7 @@ namespace {
     };
 
 
-    TEST_F(PrivilegeDocumentParsing, V2DocumentValidation) {
+    TEST_F(V2PrivilegeDocumentParsing, V2DocumentValidation) {
         BSONArray emptyArray = BSONArrayBuilder().arr();
 
         // V1 documents don't work
@@ -171,7 +296,7 @@ namespace {
                                                 "hasRole" << true)))));
     }
 
-    TEST_F(PrivilegeDocumentParsing, V2CredentialExtraction) {
+    TEST_F(V2PrivilegeDocumentParsing, V2CredentialExtraction) {
         // Old "pwd" field not valid
         ASSERT_NOT_OK(v2parser.initializeUserCredentialsFromPrivilegeDocument(
                 user.get(),
@@ -218,7 +343,7 @@ namespace {
 
     }
 
-    TEST_F(PrivilegeDocumentParsing, V2RoleExtraction) {
+    TEST_F(V2PrivilegeDocumentParsing, V2RoleExtraction) {
         // "roles" field must be provided
         ASSERT_NOT_OK(v2parser.initializeUserRolesFromPrivilegeDocument(
                 user.get(),
