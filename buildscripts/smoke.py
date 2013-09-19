@@ -169,10 +169,7 @@ class mongod(object):
         try:
             Connection( "localhost" , int(port) ).admin.command("createUser", "admin",
                                                                 pwd="password",
-                                                                roles=["readWriteAnyDatabase",
-                                                                       "dbAdminAnyDatabase",
-                                                                       "userAdminAnyDatabase",
-                                                                       "clusterAdmin"])
+                                                                roles=["__system"])
         except OperationFailure, e:
             if e.message == 'need to login':
                 pass # SERVER-4225

@@ -69,7 +69,6 @@ env.CppUnitTest('authorization_manager_test', 'authorization_manager_test.cpp',
                 LIBDEPS=['authcore', 'authmocks'])
 env.CppUnitTest('authorization_session_test', 'authorization_session_test.cpp',
                 LIBDEPS=['authcore', 'authmocks'])
-env.CppUnitTest('resource_pattern_test', 'resource_pattern_test.cpp', LIBDEPS=['authcore'])
 env.CppUnitTest('user_management_commands_parser_test', 'user_management_commands_parser_test.cpp',
                 LIBDEPS=['usercommandsparser', 'authmocks'],
                 NO_CRUTCH=True)

@@ -61,8 +61,9 @@ namespace mongo {
         user->incrementRefCount(); // Pin this user so the ref count never drops below 1.
         ActionSet allActions;
         allActions.addAllActions();
-        user->addPrivilege(Privilege(ResourcePattern::forAnyResource(), allActions));
-
+        PrivilegeVector privileges;
+        RoleGraph::generateUniversalPrivileges(&privileges);
+        user->addPrivileges(privileges);
         internalSecurity.user = user;
 
         return Status::OK();
@@ -189,10 +190,6 @@ namespace mongo {
             const BSONObj& query,
             const boost::function<void(const BSONObj&)>& resultProcessor) {
         return _externalState->query(collectionName, query, resultProcessor);
-    }
-
-    ActionSet AuthorizationManager::getAllUserActions() {
-        return RoleGraph::getAllUserActions();
     }
 
     bool AuthorizationManager::roleExists(const RoleName& role) {

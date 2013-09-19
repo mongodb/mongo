@@ -24,11 +24,23 @@
 
 namespace mongo {
 
+    class Privilege;
+    typedef std::vector<Privilege> PrivilegeVector;
+
     /**
      * A representation of the permission to perform a set of actions on a resource.
      */
     class Privilege {
     public:
+        /**
+         * Adds "privilegeToAdd" to "privileges", de-duping "privilegeToAdd" if the vector already
+         * contains a privilege on the same resource.
+         *
+         * This method is the preferred way to add privileges to  privilege vectors.
+         */
+        static void addPrivilegeToPrivilegeVector(PrivilegeVector* privileges,
+                                                  const Privilege& privilegeToAdd);
+
 
         Privilege() {};
         Privilege(const ResourcePattern& resource, const ActionType& action);
@@ -52,7 +64,5 @@ namespace mongo {
         ResourcePattern _resource;
         ActionSet _actions; // bitmask of actions this privilege grants
     };
-
-    typedef std::vector<Privilege> PrivilegeVector;
 
 } // namespace mongo

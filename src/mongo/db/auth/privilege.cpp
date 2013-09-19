@@ -20,6 +20,18 @@
 
 namespace mongo {
 
+    void Privilege::addPrivilegeToPrivilegeVector(PrivilegeVector* privileges,
+                                                  const Privilege& privilegeToAdd) {
+        for (PrivilegeVector::iterator it = privileges->begin(); it != privileges->end(); ++it) {
+            if (it->getResourcePattern() == privilegeToAdd.getResourcePattern()) {
+                it->addActions(privilegeToAdd.getActions());
+                return;
+            }
+        }
+        // No privilege exists yet for this resource
+        privileges->push_back(privilegeToAdd);
+    }
+
     Privilege::Privilege(const ResourcePattern& resource, const ActionType& action) :
         _resource(resource) {
 

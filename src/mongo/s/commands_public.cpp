@@ -1724,8 +1724,7 @@ namespace mongo {
                                                const BSONObj& cmdObj,
                                                std::vector<Privilege>* out) {
                 // applyOps can do pretty much anything, so require all privileges.
-                out->push_back(Privilege(ResourcePattern::forAnyResource(),
-                                         getGlobalAuthorizationManager()->getAllUserActions()));
+                RoleGraph::generateUniversalPrivileges(out);
             }
             virtual bool run(const string& dbName , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
                 errmsg = "applyOps not allowed through mongos";
@@ -1757,8 +1756,7 @@ namespace mongo {
                                                const BSONObj& cmdObj,
                                                std::vector<Privilege>* out) {
                 // $eval can do pretty much anything, so require all privileges.
-                out->push_back(Privilege(ResourcePattern::forAnyResource(),
-                                         getGlobalAuthorizationManager()->getAllUserActions()));
+                RoleGraph::generateUniversalPrivileges(out);
             }
             virtual bool run(const string& dbName,
                              BSONObj& cmdObj,

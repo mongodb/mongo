@@ -18,7 +18,7 @@ tRO = dbRO[ baseName ];
 
 db.removeAllUsers();
 
-db.getSisterDB( "admin" ).addUser( "super", "super", jsTest.adminUserRoles );
+db.getSisterDB( "admin" ).addUser( "super", "super", ["__system"] );
 db.getSisterDB("admin").auth("super", "super");
 db.addUser( "eliot" , "eliot", jsTest.basicUserRoles );
 db.addUser( "guest" , "guest", jsTest.readOnlyUserRoles );
@@ -86,6 +86,5 @@ db.getSiblingDB('admin').auth('super', 'super');
 assert.eq( 1000, db.eval( function() { return db[ "jstests_auth_auth1" ].count(); } ) , "D1" );
 db.eval( function() { db[ "jstests_auth_auth1" ].save( {i:1000} ) } );
 assert.eq( 1001, db.eval( function() { return db[ "jstests_auth_auth1" ].count(); } ) , "D2" );
-
 
 print("SUCCESS auth1.js");

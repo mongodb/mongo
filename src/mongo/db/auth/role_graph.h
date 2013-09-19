@@ -66,10 +66,9 @@ namespace mongo {
         void swap(RoleGraph& other);
 
         /**
-         * Returns an ActionSet of all actions that can be be granted to users.  This does not
-         * include internal-only actions.
+         * Adds to "privileges" the necessary privileges to do absolutely anything on the system.
          */
-        static ActionSet getAllUserActions();
+        static void generateUniversalPrivileges(PrivilegeVector* privileges);
 
         /**
          * Returns an iterator that can be used to get a list of the members of the given role.

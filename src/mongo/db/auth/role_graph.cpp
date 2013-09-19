@@ -223,24 +223,6 @@ namespace {
         return Status::OK();
     }
 
-namespace {
-    // Helper function for adding a privilege to a privilege vector, de-duping the privilege if
-    // the vector already contains a privilege on the same resource.
-    void addPrivilegeToPrivilegeVector(PrivilegeVector& currentPrivileges,
-                                       const Privilege& privilegeToAdd) {
-        for (PrivilegeVector::iterator it = currentPrivileges.begin();
-                it != currentPrivileges.end(); ++it) {
-            Privilege& curPrivilege = *it;
-            if (curPrivilege.getResourcePattern() == privilegeToAdd.getResourcePattern()) {
-                curPrivilege.addActions(privilegeToAdd.getActions());
-                return;
-            }
-        }
-        // No privilege exists yet for this resource
-        currentPrivileges.push_back(privilegeToAdd);
-    }
-} // namespace
-
     Status RoleGraph::addPrivilegeToRole(const RoleName& role, const Privilege& privilegeToAdd) {
         if (!roleExists(role)) {
             return Status(ErrorCodes::RoleNotFound,
@@ -261,7 +243,7 @@ namespace {
 
     void RoleGraph::_addPrivilegeToRoleNoChecks(const RoleName& role,
                                                 const Privilege& privilegeToAdd) {
-        addPrivilegeToPrivilegeVector(_directPrivilegesForRole[role], privilegeToAdd);
+        Privilege::addPrivilegeToPrivilegeVector(&_directPrivilegesForRole[role], privilegeToAdd);
     }
 
     // NOTE: Current runtime of this is O(n*m) where n is the size of the current PrivilegeVector
@@ -444,7 +426,7 @@ namespace {
             const PrivilegeVector& childsPrivileges = _allPrivilegesForRole[childRole];
             for (PrivilegeVector::const_iterator privIt = childsPrivileges.begin();
                     privIt != childsPrivileges.end(); ++privIt) {
-                addPrivilegeToPrivilegeVector(currentRoleAllPrivileges, *privIt);
+                Privilege::addPrivilegeToPrivilegeVector(&currentRoleAllPrivileges, *privIt);
             }
         }
 

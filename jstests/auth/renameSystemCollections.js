@@ -7,17 +7,21 @@ var testDB2 = conn.getDB("testdb2");
 
 var CodeUnauthorized = 13;
 
-adminDB.addUser({user:'userAdmin',
+var backdoorUserDoc = { name: 'backdoor', source: 'admin', pwd: 'hashed', roles: ['root'] }
+
+adminDB.addUser({name:'userAdmin',
                  pwd:'password',
                  roles:['userAdminAnyDatabase']});
 
 adminDB.auth('userAdmin', 'password');
-adminDB.addUser({user:'readWriteAdmin',
+adminDB.addUser({name:'readWriteAdmin',
                  pwd:'password',
                  roles:['readWriteAnyDatabase']});
-adminDB.addUser({user:'readWriteAndUserAdmin',
+adminDB.addUser({name:'readWriteAndUserAdmin',
                  pwd:'password',
                  roles:['readWriteAnyDatabase', 'userAdminAnyDatabase']});
+adminDB.addUser({name: 'root', pwd: 'password', roles: ['root']});
+adminDB.addUser({name: 'rootier', pwd: 'password', roles: ['__system']});
 adminDB.logout();
 
 
@@ -36,9 +40,7 @@ assert.eq(0, adminDB.users.count());
 
 
 jsTestLog("Test that a readWrite user can't use renameCollection to override system.users");
-adminDB.users.insert({user:'backdoor',
-                     pwd:'hashedpassword',
-                     roles:'userAdmin'});
+adminDB.users.insert(backdoorUserDoc);
 res = adminDB.users.renameCollection("system.users", true);
 assert.eq(0, res.ok);
 assert.eq(CodeUnauthorized, res.code);
@@ -50,21 +52,58 @@ adminDB.auth('userAdmin', 'password');
 var res = adminDB.system.users.renameCollection("users");
 assert.eq(0, res.ok);
 assert.eq(CodeUnauthorized, res.code);
-assert.eq(3, adminDB.system.users.count());
+assert.eq(5, adminDB.system.users.count());
 
 adminDB.auth('readWriteAndUserAdmin', 'password');
 assert.eq(0, adminDB.users.count());
 
-jsTestLog("Test that with userAdmin AND dbAdmin you CAN rename to/from system.users");
+jsTestLog("Test that even with userAdmin AND dbAdmin you CANNOT rename to/from system.users");
 var res = adminDB.system.users.renameCollection("users");
-assert.eq(1, res.ok);
-assert.eq(3, adminDB.users.count());
+assert.eq(0, res.ok);
+assert.eq(CodeUnauthorized, res.code);
+assert.eq(5, adminDB.system.users.count());
 
 adminDB.users.drop();
-adminDB.users.insert({user:'newUser',
-                      pwd:'hashedPassword',
-                      roles:['readWrite']});
+adminDB.users.insert(backdoorUserDoc);
 var res = adminDB.users.renameCollection("system.users");
+assert.eq(0, res.ok);
+assert.eq(CodeUnauthorized, res.code);
+
+assert.eq(null, adminDB.system.users.findOne({name: backdoorUserDoc.name}));
+assert.neq(null, adminDB.system.users.findOne({name:'userAdmin'}));
+
+adminDB.auth('root', 'password');
+adminDB.users.drop();
+adminDB.users.insert(backdoorUserDoc);
+
+jsTestLog("Test that with root you CANNOT rename to/from system.users");
+var res = adminDB.system.users.renameCollection("users");
+assert.eq(0, res.ok);
+assert.eq(CodeUnauthorized, res.code);
+assert.eq(5, adminDB.system.users.count());
+
+adminDB.users.drop();
+adminDB.users.insert(backdoorUserDoc);
+var res = adminDB.users.renameCollection("system.users");
+assert.eq(0, res.ok);
+assert.eq(CodeUnauthorized, res.code);
+
+assert.eq(null, adminDB.system.users.findOne({name: backdoorUserDoc.name}));
+assert.neq(null, adminDB.system.users.findOne({name:'userAdmin'}));
+
+adminDB.auth('rootier', 'password');
+
+jsTestLog("Test that with __system you CAN rename to/from system.users");
+var res = adminDB.system.users.renameCollection("users", true);
+assert.eq(1, res.ok, tojson(res));
+assert.eq(0, adminDB.system.users.count());
+assert.eq(5, adminDB.users.count());
+
+adminDB.users.drop();
+adminDB.users.insert(backdoorUserDoc);
+var res = adminDB.users.renameCollection("system.users", true);
 assert.eq(1, res.ok);
-assert.neq(null, adminDB.system.users.findOne({user:'newUser'}));
-assert.eq(null, adminDB.system.users.findOne({user:'userAdmin'}));
+assert.neq(null, adminDB.system.users.findOne({name: backdoorUserDoc.name}));
+assert.eq(null, adminDB.system.users.findOne({name:'userAdmin'}));
+
+

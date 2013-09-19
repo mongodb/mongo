@@ -73,7 +73,7 @@ namespace {
         const User::RoleDataMap& roles = v0RW->getRoles();
         ASSERT_EQUALS(1U, roles.size());
         User::RoleData role = roles.begin()->second;
-        ASSERT_EQUALS(RoleName("oldReadWrite", "test"), role.name);
+        ASSERT_EQUALS(RoleName("dbOwner", "test"), role.name);
         ASSERT(role.hasRole);
         ASSERT(!role.canDelegate);
         // Make sure user's refCount is 0 at the end of the test to avoid an assertion failure
@@ -87,7 +87,7 @@ namespace {
         const User::RoleDataMap& adminRoles = v0AdminRO->getRoles();
         ASSERT_EQUALS(1U, adminRoles.size());
         role = adminRoles.begin()->second;
-        ASSERT_EQUALS(RoleName("oldAdminRead", "admin"), role.name);
+        ASSERT_EQUALS(RoleName("readAnyDatabase", "admin"), role.name);
         ASSERT(role.hasRole);
         ASSERT(!role.canDelegate);
         // Make sure user's refCount is 0 at the end of the test to avoid an assertion failure

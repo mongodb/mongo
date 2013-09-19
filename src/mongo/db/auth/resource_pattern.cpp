@@ -24,43 +24,6 @@
 
 namespace mongo {
 
-    bool ResourcePattern::matchesDatabaseName(const StringData& dbName) const {
-        switch (_matchType) {
-        case matchAnyResource: return true;
-        case matchAnyNormalResource: return true;
-        case matchDatabaseName: return dbName == _ns.db();
-        default: return false;
-        }
-    }
-
-    bool ResourcePattern::matchesNamespaceString(const NamespaceString& ns) const {
-        switch (_matchType) {
-        case matchAnyResource: return true;
-        case matchAnyNormalResource: return !ns.isSystem();
-        case matchDatabaseName: return ns.db() == _ns.db() && !ns.isSystem();
-        case matchCollectionName: return ns.coll() == _ns.coll();
-        case matchExactNamespace: return ns == _ns;
-        default: return false;
-        }
-    }
-
-    bool ResourcePattern::matchesResourcePattern(const ResourcePattern& target) const {
-        switch (target._matchType) {
-        case matchAnyResource:
-            return matchesEverything();
-        case matchClusterResource:
-            return matchesClusterResource();
-        case matchDatabaseName:
-            return matchesDatabaseName(target._ns.db());
-        case matchExactNamespace:
-            return matchesNamespaceString(target._ns);
-        default:
-            error() << "Programming error: target of matchesResourcePattern() must be a specific "
-                "resource or ResourcePattern::forAnyResource(); not a wildcard";
-            fassertFailed(17136);
-        }
-    }
-
     std::string ResourcePattern::toString() const {
         switch (_matchType) {
         case matchNever:
