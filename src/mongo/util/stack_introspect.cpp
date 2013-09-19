@@ -30,7 +30,7 @@
 
 #include "mongo/util/stack_introspect.h"
 
-#if !defined(_WIN32)
+#if !defined(_WIN32) && !defined(MONGO_OPTIMIZED_BUILD)
 
 #include <cstdlib>
 #include <cxxabi.h>
@@ -205,4 +205,4 @@ namespace mongo {
     bool inConstructorChainSupported() { return false; }
 }
 
-#endif  // #if !defined(_WIN32)
+#endif  // #if !defined(_WIN32) && !defined(MONGO_OPTIMIZED_BUILD)

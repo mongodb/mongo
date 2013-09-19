@@ -104,7 +104,9 @@ namespace StackTests {
 
         void setupTests() {
             if ( inConstructorChainSupported() ) {
+#if defined(_DEBUG) && !defined(MONGO_OPTIMIZED_BUILD)
                 DEV add< InCons >(); 
+#endif
             }
         }
         
