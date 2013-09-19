@@ -17,6 +17,7 @@ env.StaticLibrary('authcore', ['action_set.cpp',
                                'authz_session_external_state.cpp',
                                'privilege.cpp',
                                'privilege_document_parser.cpp',
+                               'resource_pattern.cpp',
                                'role_graph.cpp',
                                'role_name.cpp',
                                'role_graph_builtin_roles.cpp',
@@ -59,3 +60,5 @@ env.CppUnitTest('authorization_manager_test', 'authorization_manager_test.cpp',
                 LIBDEPS=['authcore', 'authmocks'])
 env.CppUnitTest('authorization_session_test', 'authorization_session_test.cpp',
                 LIBDEPS=['authcore', 'authmocks'])
+env.CppUnitTest('resource_pattern_test', 'resource_pattern_test.cpp',
+                LIBDEPS=['authcore'])
