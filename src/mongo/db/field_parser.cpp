@@ -33,17 +33,6 @@ namespace mongo {
 
     using mongoutils::str::stream;
 
-    template<class T>
-    void _genFieldErrMsg(const BSONObj& doc,
-                         const BSONField<T>& field,
-                         const string expected,
-                         string* errMsg)
-    {
-        if (!errMsg) return;
-        *errMsg = stream() << "wrong type for '" << field() << "' field, expected " << expected
-                           << ", found " << doc[field.name()].toString();
-    }
-
     FieldParser::FieldState FieldParser::extract(BSONObj doc,
                               const BSONField<bool>& field,
                               bool* out,
