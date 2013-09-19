@@ -226,7 +226,7 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 		WT_ERR(__checkpoint_apply(session, cfg, __wt_checkpoint_sync));
 
 	/* Checkpoint the metadata file. */
-	TAILQ_FOREACH(dhandle, &conn->dhqh, q) {
+	SLIST_FOREACH(dhandle, &conn->dhlh, l) {
 		if (WT_IS_METADATA(dhandle) ||
 		    !WT_PREFIX_MATCH(dhandle->name, "file:"))
 			break;
