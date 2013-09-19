@@ -26,10 +26,14 @@
 namespace mongo {
 
     /**
-     * Representation of patterns that match various kinds of resources used in access control
-     * checks.
+     * Representation of names of various kinds of resources targetable by the access control
+     * system.
      *
-     * The resources are databases, collections and the the cluster itself.
+     * Three of the types of name, "forDatabaseName", "forExactNamespace" and "forClusterResource",
+     * can represent concrete resources targeted for manipulation by database operations.  All of
+     * the types also act as patterns, useful for matching against groups of concrete resources as
+     * part of the access control system.  See buildResourceSearchList() in
+     * authorization_session.cpp for details.
      */
     class ResourcePattern {
     public:
@@ -117,57 +121,6 @@ namespace mongo {
         bool isAnyNormalResourcePattern() const {
             return _matchType == matchAnyNormalResource;
         }
-
-        /**
-         * Returns true if this pattern matches nothing at all.
-         */
-        bool matchesNothing() const { return matchNever == _matchType; }
-
-        /**
-         * Returns true if this pattern matches every possible resource.
-         */
-        bool matchesEverything() const { return matchAnyResource == _matchType; }
-
-        /**
-         * Returns true if this pattern matches every resource except the cluster resource and
-         * system collections.
-         */
-        bool matchesAnyNormalResource() const {
-            return matchesEverything() || matchAnyNormalResource == _matchType;
-        }
-
-        /**
-         * Returns true if this pattern matches the system resource.
-         */
-        bool matchesClusterResource() const {
-            return matchesEverything() || _matchType == matchClusterResource;
-        }
-
-        /**
-         * Returns true if this pattern matches the named database.
-         */
-        bool matchesDatabaseName(const StringData& dbName) const;
-
-        /**
-         * Returns true if this pattern matches the given NamespaceString.
-         */
-        bool matchesNamespaceString(const NamespaceString& ns) const;
-
-        /**
-         * Returns true if this pattern matches the target.
-         *
-         * The target must be a pattern matching some specific instance of a resource, rather than a
-         * wildcard of some sort.  That is, it must be a database name pattern, an exact match
-         * pattern, or a cluster resource pattern.
-         *
-         * As a special exception, the target may also be ResourcePattern::forAnyResource(), since
-         * this is the target used for providing access control on applyOps and db.eval.  If the
-         * target type is ResourcePattern::forAnyResource(), this method only returns true if this
-         * instance is ResourcePattern::forAnyResource().
-         *
-         * Behavior for other patterns is undefined.
-         */
-        bool matchesResourcePattern(const ResourcePattern& target) const;
 
         /**
          * Returns the namespace that this pattern matches.

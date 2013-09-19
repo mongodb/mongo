@@ -37,6 +37,7 @@
 #include "mongo/base/status.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/authz_manager_external_state.h"
+#include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/auth/role_graph.h"
 #include "mongo/db/auth/user.h"
 #include "mongo/db/auth/user_name.h"
@@ -175,10 +176,6 @@ namespace mongo {
         // Given a database name and a readOnly flag return an ActionSet describing all the actions
         // that an old-style user with those attributes should be given.
         ActionSet getActionsForOldStyleUser(const std::string& dbname, bool readOnly) const;
-
-        // Returns an ActionSet of all actions that can be be granted to users.  This does not
-        // include internal-only actions.
-        ActionSet getAllUserActions();
 
         /**
          *  Returns the User object for the given userName in the out parameter "acquiredUser".

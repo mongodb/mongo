@@ -60,25 +60,25 @@ namespace {
         ASSERT_OK(v1parser.initializeUserRolesFromUserDocument(
                           user.get(), readOnly, "test"));
         ASSERT_EQUALS(1U, user->getRoles().size());
-        ASSERT_EQUALS(1U, user->getRoles().count(RoleName("oldRead", "test")));
+        ASSERT_EQUALS(1U, user->getRoles().count(RoleName("read", "test")));
 
         resetUsers();
         ASSERT_OK(v1parser.initializeUserRolesFromUserDocument(
                           user.get(), readWrite, "test"));
         ASSERT_EQUALS(1U, user->getRoles().size());
-        ASSERT_EQUALS(1U, user->getRoles().count(RoleName("oldReadWrite", "test")));
+        ASSERT_EQUALS(1U, user->getRoles().count(RoleName("dbOwner", "test")));
 
         resetUsers();
         ASSERT_OK(v1parser.initializeUserRolesFromUserDocument(
                           adminUser.get(), readOnlyAdmin, "admin"));
         ASSERT_EQUALS(1U, adminUser->getRoles().size());
-        ASSERT_EQUALS(1U, adminUser->getRoles().count(RoleName("oldAdminRead", "admin")));
+        ASSERT_EQUALS(1U, adminUser->getRoles().count(RoleName("readAnyDatabase", "admin")));
 
         resetUsers();
         ASSERT_OK(v1parser.initializeUserRolesFromUserDocument(
                           adminUser.get(), readWriteAdmin, "admin"));
         ASSERT_EQUALS(1U, adminUser->getRoles().size());
-        ASSERT_EQUALS(1U, adminUser->getRoles().count(RoleName("oldAdminReadWrite", "admin")));
+        ASSERT_EQUALS(1U, adminUser->getRoles().count(RoleName("root", "admin")));
     }
 
     TEST_F(V1UserDocumentParsing, VerifyRolesFieldMustBeAnArray) {

@@ -153,7 +153,9 @@ namespace {
         ASSERT_OK(authzSession->addAndAuthorizeUser(UserName("admin", "admin")));
 
         ASSERT_TRUE(authzSession->isAuthorizedForActionsOnResource(
-                            ResourcePattern::forAnyResource(), ActionType::insert));
+                            ResourcePattern::forExactNamespace(
+                                    NamespaceString("anydb.somecollection")),
+                            ActionType::insert));
         ASSERT_TRUE(authzSession->isAuthorizedForActionsOnResource(
                             otherDBResource, ActionType::insert));
         ASSERT_TRUE(authzSession->isAuthorizedForActionsOnResource(
@@ -289,7 +291,7 @@ namespace {
         ASSERT_OK(authzSession->addAndAuthorizeUser(UserName("useradmin", "test")));
         ASSERT_FALSE(authzSession->isAuthorizedForActionsOnResource(
                              testUsersCollResource, ActionType::insert));
-        ASSERT_TRUE(authzSession->isAuthorizedForActionsOnResource(
+        ASSERT_FALSE(authzSession->isAuthorizedForActionsOnResource(
                              testUsersCollResource, ActionType::find));
         ASSERT_FALSE(authzSession->isAuthorizedForActionsOnResource(
                              otherUsersCollResource, ActionType::insert));

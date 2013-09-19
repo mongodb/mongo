@@ -15,8 +15,7 @@ var AUTH_INFO = {
     admin: {
         root: {
             pwd: 'root',
-            roles: [ 'readWriteAnyDatabase', 'userAdminAnyDatabase',
-                'dbAdminAnyDatabase', 'clusterAdmin' ]
+            roles: [ 'root' ]
         },
         cluster: {
             pwd: 'cluster',
@@ -187,7 +186,10 @@ var testOps = function(db, allowedActions) {
     }, db);
 
     checkErr(allowedActions.hasOwnProperty('user_r'), function() {
-        db.system.users.findOne();
+        var result = db.runCommand({usersInfo: /.*/});
+        if (!result.ok) {
+            throw new Error(tojson(result));
+        }
     });
 
     checkErr(allowedActions.hasOwnProperty('user_w'), function() {
@@ -524,6 +526,7 @@ var runTests = function(conn) {
             testFunc.test(newConn);
         } catch (x) {
             failures.push(testFunc.name);
+            jsTestLog(x);
         }
     });
 

@@ -238,60 +238,62 @@ namespace {
         return isAuthorizedForPrivilege(Privilege(ResourcePattern::forExactNamespace(ns), actions));
     }
 
-    static const ResourcePattern anyUsersCollectionPattern = ResourcePattern::forCollectionName(
-            "system.users");
-    static const ResourcePattern anyProfileCollectionPattern = ResourcePattern::forCollectionName(
-            "system.profile");
-    static const ResourcePattern anyIndexesCollectionPattern = ResourcePattern::forCollectionName(
-            "system.indexes");
+    static const int resourceSearchListCapacity = 5;
+    /**
+     * Builds from "target" an exhaustive list of all ResourcePatterns that match "target".
+     *
+     * Stores the resulting list into resourceSearchList, and returns the length.
+     *
+     * The seach lists are as follows, depending on the type of "target":
+     *
+     * target is ResourcePattern::forAnyResource():
+     *   searchList = { ResourcePattern::forAnyResource(), ResourcePattern::forAnyResource() }
+     * target is the ResourcePattern::forClusterResource():
+     *   searchList = { ResourcePattern::forAnyResource(), ResourcePattern::forClusterResource() }
+     * target is a database, db:
+     *   searchList = { ResourcePattern::forAnyResource(),
+     *                  ResourcePattern::forAnyNormalResource(),
+     *                  db }
+     * target is a non-system collection, db.coll:
+     *   searchList = { ResourcePattern::forAnyResource(),
+     *                  ResourcePattern::forAnyNormalResource(),
+     *                  db,
+     *                  coll,
+     *                  db.coll }
+     * target is a system collection, db.system.coll:
+     *   searchList = { ResourcePattern::forAnyResource(),
+     *                  system.coll,
+     *                  db.system.coll }
+     */
+    static int buildResourceSearchList(
+            const ResourcePattern& target,
+            ResourcePattern resourceSearchList[resourceSearchListCapacity]) {
 
-    // Returns a new privilege that has replaced the actions needed to handle special casing
-    // certain namespaces like system.users and system.profile.  Note that the special handling
-    // of system.indexes takes place in checkAuthForInsert, not here.
-    static Privilege _modifyPrivilegeForSpecialCases(Privilege privilege) {
-        ActionSet newActions(privilege.getActions());
-        const ResourcePattern& target(privilege.getResourcePattern());
-        if (anyUsersCollectionPattern.matchesResourcePattern(target)) {
-            if (newActions.contains(ActionType::insert) ||
-                    newActions.contains(ActionType::update) ||
-                    newActions.contains(ActionType::remove)) {
-                // End users can't modify system.users directly, only the system can.
-                newActions.addAction(ActionType::userAdminV1);
-            } else {
-                newActions.addAction(ActionType::userAdmin);
+        int size = 0;
+        resourceSearchList[size++] = ResourcePattern::forAnyResource();
+        if (target.isExactNamespacePattern()) {
+            if (!target.ns().isSystem()) {
+                resourceSearchList[size++] = ResourcePattern::forAnyNormalResource();
+                resourceSearchList[size++] = ResourcePattern::forDatabaseName(target.ns().db());
             }
-            newActions.removeAction(ActionType::find);
-            newActions.removeAction(ActionType::insert);
-            newActions.removeAction(ActionType::update);
-            newActions.removeAction(ActionType::remove);
-        } else if (anyProfileCollectionPattern.matchesResourcePattern(target)) {
-            newActions.removeAction(ActionType::find);
-            newActions.addAction(ActionType::profileRead);
-        } else if (anyIndexesCollectionPattern.matchesResourcePattern(target)
-                   && newActions.contains(ActionType::find)) {
-            newActions.removeAction(ActionType::find);
-            newActions.addAction(ActionType::indexRead);
+            resourceSearchList[size++] = ResourcePattern::forCollectionName(target.ns().coll());
         }
-
-        return Privilege(privilege.getResourcePattern(), newActions);
+        else if (target.isDatabasePattern()) {
+                resourceSearchList[size++] = ResourcePattern::forAnyNormalResource();
+        }
+        resourceSearchList[size++] = target;
+        dassert(size <= resourceSearchListCapacity);
+        return size;
     }
 
     bool AuthorizationSession::_isAuthorizedForPrivilege(const Privilege& privilege) {
         AuthorizationManager& authMan = getAuthorizationManager();
-        Privilege modifiedPrivilege = _modifyPrivilegeForSpecialCases(privilege);
+        const ResourcePattern& target(privilege.getResourcePattern());
 
-        // Need to check not just the resource of the privilege, but also just the database
-        // component and the "*" resource.
-        ResourcePattern resourceSearchList[3];
-        resourceSearchList[0] = ResourcePattern::forAnyResource();
-        resourceSearchList[1] = modifiedPrivilege.getResourcePattern();
-        if (modifiedPrivilege.getResourcePattern().isExactNamespacePattern()) {
-            resourceSearchList[2] =
-                ResourcePattern::forDatabaseName(modifiedPrivilege.getResourcePattern().ns().db());
-        }
+        ResourcePattern resourceSearchList[resourceSearchListCapacity];
+        const int resourceSearchListLength = buildResourceSearchList(target, resourceSearchList);
 
-
-        ActionSet unmetRequirements = modifiedPrivilege.getActions();
+        ActionSet unmetRequirements = privilege.getActions();
         UserSet::iterator it = _authenticatedUsers.begin();
         while (it != _authenticatedUsers.end()) {
             User* user = *it;
@@ -329,7 +331,7 @@ namespace {
                 }
             }
 
-            for (int i = 0; i < static_cast<int>(boost::size(resourceSearchList)); ++i) {
+            for (int i = 0; i < resourceSearchListLength; ++i) {
                 ActionSet userActions = user->getActionsForResource(resourceSearchList[i]);
                 unmetRequirements.removeAllActionsFromSet(userActions);
 

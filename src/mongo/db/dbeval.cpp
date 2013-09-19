@@ -137,8 +137,7 @@ namespace mongo {
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {
 
-            out->push_back(Privilege(ResourcePattern::forAnyResource(),
-                                     getGlobalAuthorizationManager()->getAllUserActions()));
+            RoleGraph::generateUniversalPrivileges(out);
         }
         CmdEval() : Command("eval", false, "$eval") { }
         bool run(const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
