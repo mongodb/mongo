@@ -1552,10 +1552,7 @@ namespace NamespaceTests {
             virtual ~Base() {
                 if ( !nsd() )
                     return;
-                string s( ns() );
-                string errmsg;
-                BSONObjBuilder result;
-                dropCollection( s, errmsg, result );
+                cc().database()->dropCollection( ns() );
             }
         protected:
             void create() {

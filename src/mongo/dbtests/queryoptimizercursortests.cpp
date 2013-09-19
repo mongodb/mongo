@@ -42,13 +42,7 @@ namespace mongo {
 } // namespace mongo
 
 namespace QueryOptimizerCursorTests {
-    
-    void dropCollection( const char *ns ) {
-     	string errmsg;
-        BSONObjBuilder result;
-        dropCollection( ns, errmsg, result );
-    }
-        
+
     using boost::shared_ptr;
     
     namespace CachedMatchCounter {
@@ -209,7 +203,7 @@ namespace QueryOptimizerCursorTests {
             Client::Context ctx( ns() );
             string err;
             userCreateNS( ns(), BSONObj(), err, false );
-            dropCollection( ns() );
+            ctx.db()->dropCollection( ns() );
         }
         ~Base() {
             cc().curop()->reset();

@@ -151,7 +151,7 @@ namespace ReplSetTests {
                 return;
             }
 
-            dropCollection( string(ns()), errmsg, result );
+            c.ctx().db()->dropCollection( ns() );
         }
         static void setup() {
             cmdLine._replSet = "foo";
@@ -888,7 +888,7 @@ namespace ReplSetTests {
             if (nsdetails(_cappedNs) != NULL) {
                 string errmsg;
                 BSONObjBuilder result;
-                dropCollection( string(_cappedNs), errmsg, result );
+                c.db()->dropCollection( _cappedNs );
             }
         }
 

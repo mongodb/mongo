@@ -390,10 +390,9 @@ namespace mongo {
 
                 Client::Context c(ns);
                 {
-                    bob res;
-                    string errmsg;
-                    dropCollection(ns, errmsg, res);
+                    c.db()->dropCollection(ns);
                     {
+                        string errmsg;
                         dbtemprelease r;
                         bool ok = Cloner::copyCollectionFromRemote(them->getServerAddress(), ns, errmsg);
                         uassert(15909, str::stream() << "replSet rollback error resyncing collection " << ns << ' ' << errmsg, ok);
@@ -441,10 +440,8 @@ namespace mongo {
         for( set<string>::iterator i = h.toDrop.begin(); i != h.toDrop.end(); i++ ) {
             Client::Context c(*i);
             try {
-                bob res;
-                string errmsg;
                 log() << "replSet rollback drop: " << *i << rsLog;
-                dropCollection(*i, errmsg, res);
+                c.db()->dropCollection(*i);
             }
             catch(...) {
                 log() << "replset rollback error dropping collection " << *i << rsLog;
@@ -542,9 +539,7 @@ namespace mongo {
                                 if( o.isEmpty() ) {
                                     // we should drop
                                     try {
-                                        bob res;
-                                        string errmsg;
-                                        dropCollection(d.ns, errmsg, res);
+                                        cc().database()->dropCollection(d.ns);
                                     }
                                     catch(...) {
                                         log() << "replset error rolling back collection " << d.ns << rsLog;

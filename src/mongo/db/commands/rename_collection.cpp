@@ -136,11 +136,13 @@ namespace mongo {
 
             if ( nsdetails( target ) ) {
                 uassert( 10027 ,  "target namespace exists", cmdObj["dropTarget"].trueValue() );
-                BSONObjBuilder bb( result.subobjStart( "dropTarget" ) );
-                dropCollection( target , errmsg , bb );
-                bb.done();
-                if ( errmsg.size() > 0 )
+
+                Status s = cc().database()->dropCollection( target );
+                if ( !s.isOK() ) {
+                    errmsg = s.toString();
                     return false;
+                }
+
             }
 
 
@@ -212,7 +214,11 @@ namespace mongo {
 
             {
                 Client::Context ctx( source );
-                dropCollection( source, errmsg, result );
+                Status s = ctx.db()->dropCollection( source );
+                if ( !s.isOK() ) {
+                    errmsg = s.toString();
+                    return false;
+                }
                 IndexBuilder::restoreIndexes(targetIndexes, indexesInProg);
             }
             return true;

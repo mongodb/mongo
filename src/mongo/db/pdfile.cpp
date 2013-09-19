@@ -514,38 +514,6 @@ namespace mongo {
         cc().database()->namespaceIndex().kill_ns(nsToDrop.c_str());
     }
 
-    void dropCollection( const string &name, string &errmsg, BSONObjBuilder &result ) {
-        LOG(1) << "dropCollection: " << name << endl;
-        NamespaceDetails *d = nsdetails(name);
-        if( d == 0 )
-            return;
-
-        cc().database()->initForWrites(); // XXX
-
-        BackgroundOperation::assertNoBgOpInProgForNs(name.c_str());
-
-        if ( d->getTotalIndexCount() > 0 ) {
-            try {
-                verify( dropIndexes(d, name.c_str(), "*", errmsg, result, true) );
-            }
-            catch( DBException& e ) {
-                stringstream ss;
-                ss << "drop: dropIndexes for collection failed - consider trying repair ";
-                ss << " cause: " << e.what();
-                uasserted(12503,ss.str());
-            }
-            verify( d->getTotalIndexCount() == 0 );
-        }
-        LOG(1) << "\t dropIndexes done" << endl;
-        result.append("ns", name.c_str());
-        ClientCursor::invalidate(name.c_str());
-        Top::global.collectionDropped( name );
-        NamespaceDetailsTransient::eraseCollection( name );
-        dropNS(name);
-
-        cc().database()->dropCollection( name );
-    }
-
     /* deletes a record, just the pdfile portion -- no index cleanup, no cursor cleanup, etc.
        caller must check if capped
     */

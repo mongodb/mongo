@@ -35,13 +35,7 @@ namespace mongo {
 namespace {
 
     using boost::shared_ptr;
-    
-    void dropCollection( const char *ns ) {
-     	string errmsg;
-        BSONObjBuilder result;
-        dropCollection( ns, errmsg, result );
-    }
-    
+
     namespace QueryPlanSetTests {
 
         class Base {
@@ -54,7 +48,7 @@ namespace {
                 if ( !nsd() )
                     return;
                 NamespaceDetailsTransient::get_inlock( ns() ).clearQueryCache();
-                dropCollection( ns() );
+                cc().database()->dropCollection( ns() );
             }
         protected:
             static void assembleRequest( const string &ns, BSONObj query, int nToReturn, int nToSkip, BSONObj *fieldsToReturn, int queryOptions, Message &toSend ) {
@@ -612,7 +606,7 @@ namespace {
             if ( !nsd() )
                 return;
             string s( ns() );
-            dropCollection( ns() );
+            cc().database()->dropCollection( ns() );
         }
     protected:
         static const char *ns() { return "unittests.QueryOptimizerTests"; }
