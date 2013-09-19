@@ -3,7 +3,8 @@
 Import("env")
 
 env.StaticLibrary('usercommandsparser',
-                  ['user_management_commands_parser.cpp'],
+                  ['user_management_commands_parser.cpp',
+                   'privilege_parser.cpp'],
                   LIBDEPS=['$BUILD_DIR/mongo/db/auth/authcore',
                            '$BUILD_DIR/mongo/bson'])
 
