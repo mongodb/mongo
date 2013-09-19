@@ -81,7 +81,7 @@ namespace mongo {
 
     TSP_DEFINE(Client, currentClient)
 
-#if defined(_DEBUG) && !XSAN_ENABLED
+#if defined(_DEBUG) && !defined(MONGO_OPTIMIZED_BUILD) && !XSAN_ENABLED
     struct StackChecker;
     ThreadLocalValue<StackChecker *> checker;
 
@@ -134,7 +134,7 @@ namespace mongo {
        call this when your thread starts.
     */
     Client& Client::initThread(const char *desc, AbstractMessagingPort *mp) {
-#if defined(_DEBUG) && !XSAN_ENABLED
+#if defined(_DEBUG) && !defined(MONGO_OPTIMIZED_BUILD) && !XSAN_ENABLED
         {
             if( sizeof(void*) == 8 ) {
                 StackChecker sc;
@@ -230,7 +230,7 @@ namespace mongo {
     }
 
     bool Client::shutdown() {
-#if defined(_DEBUG) && !XSAN_ENABLED
+#if defined(_DEBUG) && !defined(MONGO_OPTIMIZED_BUILD) && !XSAN_ENABLED
         {
             if( sizeof(void*) == 8 ) {
                 StackChecker::check( desc() );

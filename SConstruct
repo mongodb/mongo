@@ -475,6 +475,8 @@ if "sunos5" == os.sys.platform:
     #  http://four.pairlist.net/pipermail/scons-users/2013-June/001486.html
     env.Tool('gnulink')
 
+if optBuild:
+    env.Append( CPPDEFINES=["MONGO_OPTIMIZED_BUILD"] )
 
 if has_option("propagate-shell-environment"):
     env['ENV'] = dict(os.environ);
