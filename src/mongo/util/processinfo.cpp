@@ -34,18 +34,23 @@ namespace mongo {
             out.close();
         }
 
-        void write( const string& p ) {
+        bool write( const string& p ) {
             path = p;
             ofstream out( path.c_str() , ios_base::out );
             out << ProcessId::getCurrent() << endl;
-            out.close();
+            return out;
         }
 
         string path;
     } pidFileWiper;
 
-    void writePidFile( const string& path ) {
-        pidFileWiper.write( path );
+    bool writePidFile( const string& path ) {
+        bool e = pidFileWiper.write( path );
+        if (!e) {
+            log() << "ERROR: Cannot write pid file to " << path
+                  << ": "<< strerror(errno);
+        }
+        return e;
     }
 
     ProcessInfo::SystemInfo* ProcessInfo::systemInfo = NULL;
