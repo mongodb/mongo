@@ -1125,7 +1125,7 @@ namespace mongo {
             virtual void addRequiredPrivileges(const std::string& dbname,
                                                const BSONObj& cmdObj,
                                                std::vector<Privilege>* out) {
-                addPrivilegesRequiredForMapReduce(dbname, cmdObj, out);
+                addPrivilegesRequiredForMapReduce(this, dbname, cmdObj, out);
             }
 
             bool run(const string& dbname , BSONObj& cmd, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
@@ -1365,7 +1365,7 @@ namespace mongo {
                                                std::vector<Privilege>* out) {
                 ActionSet actions;
                 actions.addAction(ActionType::mapReduceShardedFinish);
-                out->push_back(Privilege(dbname, actions));
+                out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
             }
             bool run(const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
                 ShardedConnectionInfo::addHook();

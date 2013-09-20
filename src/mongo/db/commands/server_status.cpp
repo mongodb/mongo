@@ -87,7 +87,7 @@ namespace mongo {
                                            std::vector<Privilege>* out) {
             ActionSet actions;
             actions.addAction(ActionType::serverStatus);
-            out->push_back(Privilege(AuthorizationManager::SERVER_RESOURCE_NAME, actions));
+            out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
         }
         bool run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             
@@ -119,7 +119,7 @@ namespace mongo {
                 
                 std::vector<Privilege> requiredPrivileges;
                 section->addRequiredPrivileges(&requiredPrivileges);
-                if (!authSession->checkAuthForPrivileges(requiredPrivileges).isOK())
+                if (!authSession->isAuthorizedForPrivileges(requiredPrivileges))
                     continue;
 
                 bool include = section->includeByDefault();

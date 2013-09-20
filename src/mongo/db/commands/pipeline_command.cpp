@@ -217,7 +217,7 @@ namespace mongo {
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {
-            Pipeline::addRequiredPrivileges(dbname, cmdObj, out);
+            Pipeline::addRequiredPrivileges(this, dbname, cmdObj, out);
         }
 
         virtual bool run(const string &db, BSONObj &cmdObj, int options, string &errmsg,

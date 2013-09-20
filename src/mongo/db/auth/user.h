@@ -15,10 +15,12 @@
 
 #pragma once
 
+#include <string>
 #include <vector>
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/auth/privilege.h"
+#include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/auth/role_name.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/platform/atomic_word.h"
@@ -78,7 +80,7 @@ namespace mongo {
         /**
          * Gets the set of actions this user is allowed to perform on the given resource.
          */
-        const ActionSet getActionsForResource(const std::string& resource) const;
+        const ActionSet getActionsForResource(const ResourcePattern& resource) const;
 
         /**
          * Returns true if this copy of information about this user is still valid. If this returns
@@ -166,7 +168,7 @@ namespace mongo {
 
         UserName _name;
 
-        typedef unordered_map<std::string, Privilege> ResourcePrivilegeMap;
+        typedef unordered_map<ResourcePattern, Privilege> ResourcePrivilegeMap;
 
         // Maps resource name to privilege on that resource
         ResourcePrivilegeMap _privileges;

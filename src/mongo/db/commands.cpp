@@ -84,6 +84,16 @@ namespace mongo {
         return dbname + '.' + coll;
     }
 
+    ResourcePattern Command::parseResourcePattern(const std::string& dbname,
+                                                  const BSONObj& cmdObj) const {
+        std::string ns = parseNs(dbname, cmdObj);
+        if (ns.find('.') == std::string::npos) {
+            return ResourcePattern::forDatabaseName(ns);
+        }
+        return ResourcePattern::forExactNamespace(NamespaceString(ns));
+    }
+
+
     void Command::htmlHelp(stringstream& ss) const {
         string helpStr;
         {
@@ -215,7 +225,9 @@ namespace mongo {
                                         const BSONObj& cmdObj) {
         std::vector<Privilege> privileges;
         this->addRequiredPrivileges(dbname, cmdObj, &privileges);
-        return client->getAuthorizationSession()->checkAuthForPrivileges(privileges);
+        if (client->getAuthorizationSession()->isAuthorizedForPrivileges(privileges))
+            return Status::OK();
+        return Status(ErrorCodes::Unauthorized, "unauthorized");
     }
 
     void Command::redactForLogging(mutablebson::Document* cmdObj) {}
@@ -304,8 +316,9 @@ namespace mongo {
                                            std::vector<Privilege>* out) {
             ActionSet actions;
             actions.addAction(ActionType::connPoolSync);
-            out->push_back(Privilege(AuthorizationManager::SERVER_RESOURCE_NAME, actions));
+            out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
         }
+
         virtual bool run(const string&, mongo::BSONObj&, int, std::string&, mongo::BSONObjBuilder& result, bool) {
             pool.flush();
             return true;
@@ -326,7 +339,7 @@ namespace mongo {
                                            std::vector<Privilege>* out) {
             ActionSet actions;
             actions.addAction(ActionType::connPoolStats);
-            out->push_back(Privilege(AuthorizationManager::SERVER_RESOURCE_NAME, actions));
+            out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
         }
         virtual bool run(const string&, mongo::BSONObj&, int, std::string&, mongo::BSONObjBuilder& result, bool) {
             pool.appendInfo( result );

@@ -40,15 +40,19 @@
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/auth/user_set.h"
+#include "mongo/db/namespace_string.h"
 
 namespace mongo {
 
     /**
      * Contains all the authorization logic for a single client connection.  It contains a set of
-     * the principals which have been authenticated, as well as a set of privileges that have been
-     * granted by those principals to perform various actions.
-     * An AuthorizationSession object is present within every mongo::Client object, therefore there
-     * is one per thread that corresponds to an incoming client connection.
+     * the users which have been authenticated, as well as a set of privileges that have been
+     * granted to those users to perform various actions.
+     *
+     * An AuthorizationSession object is present within every mongo::ClientBasic object.
+     *
+     * Predicate methods for checking authorization may in the worst case acquire read locks
+     * on the admin database.
      */
     class AuthorizationSession {
         MONGO_DISALLOW_COPYING(AuthorizationSession);
@@ -92,27 +96,17 @@ namespace mongo {
         // Used to grant internal threads full access.
         void grantInternalAuthorization();
 
-        // Checks if this connection has the privileges required to perform the given action
-        // on the given resource.  Contains all the authorization logic including handling things
-        // like the localhost exception.  Returns true if the action may proceed on the resource.
-        // Note: this may acquire a database read lock (for automatic privilege acquisition).
-        bool checkAuthorization(const std::string& resource, ActionType action);
-
-        // Same as above but takes an ActionSet instead of a single ActionType.  Returns true if
-        // all of the actions may proceed on the resource.
-        bool checkAuthorization(const std::string& resource, ActionSet actions);
-
         // Checks if this connection has the privileges necessary to perform the given query on the
         // given namespace.
-        Status checkAuthForQuery(const std::string& ns, const BSONObj& query);
+        Status checkAuthForQuery(const NamespaceString& ns, const BSONObj& query);
 
         // Checks if this connection has the privileges necessary to perform a getMore on the given
         // cursor in the given namespace.
-        Status checkAuthForGetMore(const std::string& ns, long long cursorID);
+        Status checkAuthForGetMore(const NamespaceString& ns, long long cursorID);
 
         // Checks if this connection has the privileges necessary to perform the given update on the
         // given namespace.
-        Status checkAuthForUpdate(const std::string& ns,
+        Status checkAuthForUpdate(const NamespaceString& ns,
                                   const BSONObj& query,
                                   const BSONObj& update,
                                   bool upsert);
@@ -120,29 +114,43 @@ namespace mongo {
         // Checks if this connection has the privileges necessary to insert the given document
         // to the given namespace.  Correctly interprets inserts to system.indexes and performs
         // the proper auth checks for index building.
-        Status checkAuthForInsert(const std::string& ns, const BSONObj& document);
+        Status checkAuthForInsert(const NamespaceString& ns, const BSONObj& document);
 
         // Checks if this connection has the privileges necessary to perform a delete on the given
         // namespace.
-        Status checkAuthForDelete(const std::string& ns, const BSONObj& query);
+        Status checkAuthForDelete(const NamespaceString& ns, const BSONObj& query);
 
-        // Checks if this connection is authorized for the given Privilege.
-        Status checkAuthForPrivilege(const Privilege& privilege);
+        // Returns true if this session is authorized for the given Privilege.
+        //
+        // Contains all the authorization logic including handling things like the localhost
+        // exception.
+        bool isAuthorizedForPrivilege(const Privilege& privilege);
 
-        // Checks if this connection is authorized for all the given Privileges.
-        Status checkAuthForPrivileges(const vector<Privilege>& privileges);
+        // Like isAuthorizedForPrivilege, above, except returns true if the session is authorized
+        // for all of the listed privileges.
+        bool isAuthorizedForPrivileges(const vector<Privilege>& privileges);
+
+        // Utility function for isAuthorizedForPrivilege(Privilege(resource, action)).
+        bool isAuthorizedForActionsOnResource(const ResourcePattern& resource, ActionType action);
+
+        // Utility function for isAuthorizedForPrivilege(Privilege(resource, actions)).
+        bool isAuthorizedForActionsOnResource(const ResourcePattern& resource,
+                                              const ActionSet& actions);
+
+        // Utility function for
+        // isAuthorizedForActionsOnResource(ResourcePattern::forExactNamespace(ns), action).
+        bool isAuthorizedForActionsOnNamespace(const NamespaceString& ns, ActionType action);
+
+        // Utility function for
+        // isAuthorizedForActionsOnResource(ResourcePattern::forExactNamespace(ns), actions).
+        bool isAuthorizedForActionsOnNamespace(const NamespaceString& ns, const ActionSet& actions);
 
     private:
 
         // Checks if this connection is authorized for the given Privilege, ignoring whether or not
-        // we should even be doing authorization checks in general.
-        Status _checkAuthForPrivilegeHelper(const Privilege& privilege);
-
-        // Returns a new privilege that has replaced the actions needed to handle special casing
-        // certain namespaces like system.users and system.profile.  Note that the special handling
-        // of system.indexes takes place in checkAuthForInsert, not here.
-        Privilege _modifyPrivilegeForSpecialCases(const Privilege& privilege);
-
+        // we should even be doing authorization checks in general.  Note: this may acquire a read
+        // lock on the admin database (to update out-of-date user privilege information).
+        bool _isAuthorizedForPrivilege(const Privilege& privilege);
 
         scoped_ptr<AuthzSessionExternalState> _externalState;
 

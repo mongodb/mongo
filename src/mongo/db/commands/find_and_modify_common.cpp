@@ -36,12 +36,15 @@
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/privilege.h"
+#include "mongo/db/auth/resource_pattern.h"
+#include "mongo/db/commands.h"
 #include "mongo/db/jsobj.h"
 
 namespace mongo {
 namespace find_and_modify {
 
-        void addPrivilegesRequiredForFindAndModify(const std::string& dbname,
+        void addPrivilegesRequiredForFindAndModify(Command* commandTemplate,
+                                                   const std::string& dbname,
                                                    const BSONObj& cmdObj,
                                                    std::vector<Privilege>* out) {
             bool update = cmdObj["update"].trueValue();
@@ -59,8 +62,10 @@ namespace find_and_modify {
             if (remove) {
                 actions.addAction(ActionType::remove);
             }
-            std::string ns = dbname + '.' + cmdObj.firstElement().valuestr();
-            out->push_back(Privilege(ns, actions));
+            ResourcePattern resource(commandTemplate->parseResourcePattern(dbname, cmdObj));
+            uassert(17137, "Invalid target namespace " + resource.toString(),
+                    resource.isExactNamespacePattern());
+            out->push_back(Privilege(resource, actions));
         }
 
 } // namespace find_and_modify

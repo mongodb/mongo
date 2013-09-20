@@ -231,7 +231,7 @@ namespace {
         for (PrivilegeVector::iterator it = currentPrivileges.begin();
                 it != currentPrivileges.end(); ++it) {
             Privilege& curPrivilege = *it;
-            if (curPrivilege.getResource() == privilegeToAdd.getResource()) {
+            if (curPrivilege.getResourcePattern() == privilegeToAdd.getResourcePattern()) {
                 curPrivilege.addActions(privilegeToAdd.getActions());
                 return;
             }
@@ -300,7 +300,7 @@ namespace {
                 it != currentPrivileges.end(); ++it) {
 
             Privilege& curPrivilege = *it;
-            if (curPrivilege.getResource() == privilegeToRemove.getResource()) {
+            if (curPrivilege.getResourcePattern() == privilegeToRemove.getResourcePattern()) {
                 ActionSet curActions = curPrivilege.getActions();
 
                 if (!curActions.isSupersetOf(privilegeToRemove.getActions())) {
@@ -308,7 +308,8 @@ namespace {
                     return Status(ErrorCodes::PrivilegeNotFound,
                                   mongoutils::str::stream() << "Role: " << role.getFullName() <<
                                           " does not contain a privilege on " <<
-                                          privilegeToRemove.getResource() << " with actions: " <<
+                                          privilegeToRemove.getResourcePattern().toString() <<
+                                          " with actions: " <<
                                           privilegeToRemove.getActions().toString(),
                                   0);
                 }
@@ -322,7 +323,8 @@ namespace {
         }
         return Status(ErrorCodes::PrivilegeNotFound,
                       mongoutils::str::stream() << "Role: " << role.getFullName() << " does not "
-                             "contain any privileges on " << privilegeToRemove.getResource(),
+                      "contain any privileges on " <<
+                      privilegeToRemove.getResourcePattern().toString(),
                       0);
     }
 

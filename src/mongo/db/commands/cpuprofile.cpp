@@ -79,7 +79,7 @@ namespace mongo {
                                                std::vector<Privilege>* out) {
                 ActionSet actions;
                 actions.addAction(ActionType::cpuProfiler);
-                out->push_back(Privilege(AuthorizationManager::SERVER_RESOURCE_NAME, actions));
+                out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
             }
 
             // This is an abuse of the global dbmutex.  We only really need to

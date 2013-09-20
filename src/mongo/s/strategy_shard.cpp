@@ -67,10 +67,11 @@ namespace mongo {
 
             QueryMessage q( r.d() );
 
+            NamespaceString ns(q.ns);
             ClientBasic* client = ClientBasic::getCurrent();
             AuthorizationSession* authSession = client->getAuthorizationSession();
-            Status status = authSession->checkAuthForQuery(q.ns, q.query);
-            audit::logQueryAuthzCheck(client, NamespaceString(q.ns), q.query, status.code());
+            Status status = authSession->checkAuthForQuery(ns, q.query);
+            audit::logQueryAuthzCheck(client, ns, q.query, status.code());
             uassertStatusOK(status);
 
             LOG(3) << "shard query: " << q.ns << "  " << q.query << endl;
@@ -215,9 +216,10 @@ namespace mongo {
                      NULL == cursorCache.get( id ).get() || host.empty() );
 
             ClientBasic* client = ClientBasic::getCurrent();
+            NamespaceString nsString(ns);
             AuthorizationSession* authSession = client->getAuthorizationSession();
-            Status status = authSession->checkAuthForGetMore( ns, id );
-            audit::logGetMoreAuthzCheck( client, NamespaceString(ns), id, status.code() );
+            Status status = authSession->checkAuthForGetMore( nsString, id );
+            audit::logGetMoreAuthzCheck( client, nsString, id, status.code() );
             uassertStatusOK(status);
 
             if( !host.empty() ){
@@ -577,12 +579,13 @@ namespace mongo {
                 // We should always have a shard if we have any inserts
                 verify(group.inserts.size() == 0 || group.shard.get());
 
+                NamespaceString nsString(ns);
                 for (vector<BSONObj>::iterator it = group.inserts.begin();
                         it != group.inserts.end(); ++it) {
                     ClientBasic* client = ClientBasic::getCurrent();
                     AuthorizationSession* authSession = client->getAuthorizationSession();
-                    Status status = authSession->checkAuthForInsert(ns, *it);
-                    audit::logInsertAuthzCheck(client, NamespaceString(ns), *it, status.code());
+                    Status status = authSession->checkAuthForInsert(nsString, *it);
+                    audit::logInsertAuthzCheck(client, nsString, *it, status.code());
                     uassertStatusOK(status);
                 }
 
@@ -1033,12 +1036,13 @@ namespace mongo {
 
             const BSONObj toUpdate = d.nextJsObj();
 
+            NamespaceString nsString(ns);
             ClientBasic* client = ClientBasic::getCurrent();
             AuthorizationSession* authzSession = client->getAuthorizationSession();
-            Status status = authzSession->checkAuthForUpdate(ns, query, toUpdate, upsert);
+            Status status = authzSession->checkAuthForUpdate(nsString, query, toUpdate, upsert);
             audit::logUpdateAuthzCheck(
                     client,
-                    NamespaceString(ns),
+                    nsString,
                     query,
                     toUpdate,
                     upsert,
@@ -1202,10 +1206,11 @@ namespace mongo {
 
             const BSONObj query = d.nextJsObj();
 
+            NamespaceString nsString(ns);
             ClientBasic* client = ClientBasic::getCurrent();
             AuthorizationSession* authSession = client->getAuthorizationSession();
-            Status status = authSession->checkAuthForDelete(ns, query);
-            audit::logDeleteAuthzCheck(client, NamespaceString(ns), query, status.code());
+            Status status = authSession->checkAuthForDelete(nsString, query);
+            audit::logDeleteAuthzCheck(client, nsString, query, status.code());
             uassertStatusOK(status);
 
             if( d.reservedField() & Reserved_FromWriteback ){
@@ -1275,7 +1280,7 @@ namespace mongo {
                     while (d.moreJSObjs()) {
                         BSONObj toInsert = d.nextJsObj();
                         Status status = authSession->checkAuthForInsert(
-                                ns,
+                                nsAsNs,
                                 toInsert);
                         audit::logInsertAuthzCheck(
                                 client,

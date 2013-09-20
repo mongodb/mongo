@@ -315,7 +315,7 @@ namespace {
                                            std::vector<Privilege>* out) {
             ActionSet actions;
             actions.addAction(ActionType::storageDetails);
-            out->push_back(Privilege(parseNs(dbname, cmdObj), actions));
+            out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
         }
 
     private:

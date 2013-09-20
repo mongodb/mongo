@@ -347,7 +347,8 @@ namespace mongo {
         BSONObj fast_emit( const BSONObj& args, void* data );
         BSONObj _bailFromJS( const BSONObj& args, void* data );
 
-        void addPrivilegesRequiredForMapReduce(const std::string& dbname,
+        void addPrivilegesRequiredForMapReduce(Command* commandTemplate,
+                                               const std::string& dbname,
                                                const BSONObj& cmdObj,
                                                std::vector<Privilege>* out);
     } // end mr namespace

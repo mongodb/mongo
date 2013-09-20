@@ -40,6 +40,7 @@ namespace mongo {
     class BSONObj;
     class BSONObjBuilder;
     class BSONArrayBuilder;
+    class Command;
     class DocumentSource;
     class DocumentSourceProject;
     class Expression;
@@ -66,7 +67,8 @@ namespace mongo {
             const intrusive_ptr<ExpressionContext> &pCtx);
 
         /// Helper to implement Command::addRequiredPrivileges
-        static void addRequiredPrivileges(const string& inputNs,
+        static void addRequiredPrivileges(Command* commandTemplate,
+                                          const string& dbname,
                                           BSONObj cmdObj,
                                           vector<Privilege>* out);
 

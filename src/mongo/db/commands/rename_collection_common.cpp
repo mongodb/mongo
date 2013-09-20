@@ -44,6 +44,8 @@ namespace rename_collection {
                                                   std::vector<Privilege>* out) {
         NamespaceString sourceNS = NamespaceString(cmdObj.getStringField("renameCollection"));
         NamespaceString targetNS = NamespaceString(cmdObj.getStringField("to"));
+        uassert(17140, "Invalid source namespace " + sourceNS.ns(), sourceNS.isValid());
+        uassert(17141, "Invalid target namespace " + targetNS.ns(), targetNS.isValid());
         ActionSet sourceActions;
         ActionSet targetActions;
 
@@ -58,8 +60,8 @@ namespace rename_collection {
             targetActions.addAction(ActionType::ensureIndex);
         }
 
-        out->push_back(Privilege(sourceNS.ns(), sourceActions));
-        out->push_back(Privilege(targetNS.ns(), targetActions));
+        out->push_back(Privilege(ResourcePattern::forExactNamespace(sourceNS), sourceActions));
+        out->push_back(Privilege(ResourcePattern::forExactNamespace(targetNS), targetActions));
     }
 
 } // namespace rename_collection

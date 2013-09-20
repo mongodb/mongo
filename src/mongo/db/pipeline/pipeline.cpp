@@ -32,12 +32,13 @@
 
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/privilege.h"
+#include "mongo/db/commands.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/document_source.h"
-#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
@@ -311,16 +312,20 @@ namespace mongo {
         return pPipeline;
     }
 
-    void Pipeline::addRequiredPrivileges(const string& db,
+    void Pipeline::addRequiredPrivileges(Command* commandTemplate,
+                                         const string& db,
                                          BSONObj cmdObj,
                                          vector<Privilege>* out) {
-        ActionSet actions;
-        actions.addAction(ActionType::find);
-        out->push_back(Privilege(db + '.' + cmdObj.firstElement().str(), actions));
+        ResourcePattern inputResource(commandTemplate->parseResourcePattern(db, cmdObj));
+        uassert(17138,
+                mongoutils::str::stream() << "Invalid input resource, " << inputResource.toString(),
+                inputResource.isExactNamespacePattern());
 
         if (false && cmdObj["allowDiskUsage"].trueValue()) {
             // TODO no privilege for this yet.
         }
+
+        out->push_back(Privilege(inputResource, ActionType::find));
 
         BSONObj pipeline = cmdObj.getObjectField("pipeline");
         BSONForEach(stageElem, pipeline) {
@@ -328,13 +333,16 @@ namespace mongo {
             if (str::equals(stage.firstElementFieldName(), "$out")) {
                 // TODO Figure out how to handle temp collection privileges. For now, using the
                 // output ns is ok since we only do db-level privilege checks.
-                const string outputNs = db + '.' + stage.firstElement().str();
+                NamespaceString outputNs(db, stage.firstElement().str());
+                uassert(17139,
+                        mongoutils::str::stream() << "Invalid $out target namespace, " <<
+                        outputNs.ns(),
+                        outputNs.isValid());
 
                 ActionSet actions;
                 // logically on output ns
                 actions.addAction(ActionType::remove);
                 actions.addAction(ActionType::insert);
-                actions.addAction(ActionType::indexRead);
 
                 // on temp ns due to implementation, but not logically on output ns
                 actions.addAction(ActionType::createCollection);
@@ -342,7 +350,10 @@ namespace mongo {
                 actions.addAction(ActionType::dropCollection);
                 actions.addAction(ActionType::renameCollectionSameDB);
 
-                out->push_back(Privilege(outputNs, actions));
+                out->push_back(Privilege(ResourcePattern::forExactNamespace(outputNs), actions));
+                out->push_back(Privilege(ResourcePattern::forExactNamespace(
+                                                 NamespaceString(db, "system.indexes")),
+                                         ActionType::find));
             }
         }
     }

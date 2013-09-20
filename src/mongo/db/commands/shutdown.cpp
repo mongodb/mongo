@@ -45,7 +45,7 @@ namespace mongo {
                                             std::vector<Privilege>* out) {
         ActionSet actions;
         actions.addAction(ActionType::shutdown);
-        out->push_back(Privilege(AuthorizationManager::SERVER_RESOURCE_NAME, actions));
+        out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
     }
 
 }  // namespace mongo

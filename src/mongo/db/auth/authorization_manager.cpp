@@ -61,7 +61,7 @@ namespace mongo {
         user->incrementRefCount(); // Pin this user so the ref count never drops below 1.
         ActionSet allActions;
         allActions.addAllActions();
-        user->addPrivilege(Privilege(AuthorizationManager::WILDCARD_RESOURCE_NAME, allActions));
+        user->addPrivilege(Privilege(ResourcePattern::forAnyResource(), allActions));
 
         internalSecurity.user = user;
 

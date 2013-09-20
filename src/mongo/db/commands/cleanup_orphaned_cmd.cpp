@@ -159,9 +159,12 @@ namespace mongo {
         virtual Status checkAuthForCommand( ClientBasic* client,
                                             const std::string& dbname,
                                             const BSONObj& cmdObj ) {
-            return client->getAuthorizationSession()->checkAuthForPrivilege(
-                Privilege( AuthorizationManager::CLUSTER_RESOURCE_NAME,
-                           ActionType::cleanupOrphaned ) );
+            if (!client->getAuthorizationSession()->isAuthorizedForActionsOnResource(
+                        ResourcePattern::forClusterResource(), ActionType::cleanupOrphaned)) {
+                return Status(ErrorCodes::Unauthorized,
+                              "Not authorized for cleanupOrphaned command.");
+            }
+            return Status::OK();
         }
 
         virtual LockType locktype() const { return NONE; }
