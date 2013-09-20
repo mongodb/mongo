@@ -479,5 +479,266 @@ namespace {
         ASSERT_EQUALS(RoleName("dbAdmin", "test2"), roles[1]);
     }
 
+    TEST_F(UserManagementCommandsParserTest, CreateRoleCommandParsing) {
+        BSONObj parsedRoleObj;
+        BSONObj parsedWriteConcern;
+
+
+        // Must have roles array
+        ASSERT_NOT_OK(auth::parseAndValidateCreateRoleCommand(BSON("createRole" << "myRole" <<
+                                                                   "privileges" << BSONArray()),
+                                                              "test",
+                                                              authzManager.get(),
+                                                              &parsedRoleObj,
+                                                              &parsedWriteConcern));
+
+        // Must have privileges array
+        ASSERT_NOT_OK(auth::parseAndValidateCreateRoleCommand(BSON("createRole" << "myRole" <<
+                                                                   "roles" << BSONArray()),
+                                                              "test",
+                                                              authzManager.get(),
+                                                              &parsedRoleObj,
+                                                              &parsedWriteConcern));
+
+        // Cannot create roles in the local db
+        ASSERT_NOT_OK(auth::parseAndValidateCreateRoleCommand(BSON("createRole" << "myRole" <<
+                                                                   "privileges" << BSONArray() <<
+                                                                   "roles" << BSONArray()),
+                                                              "local",
+                                                              authzManager.get(),
+                                                              &parsedRoleObj,
+                                                              &parsedWriteConcern));
+
+        // Cannot have extra fields
+        ASSERT_NOT_OK(auth::parseAndValidateCreateRoleCommand(BSON("createRole" << "myRole" <<
+                                                                   "privileges" << BSONArray() <<
+                                                                   "roles" << BSONArray() <<
+                                                                   "anotherField" << true),
+                                                              "test",
+                                                              authzManager.get(),
+                                                              &parsedRoleObj,
+                                                              &parsedWriteConcern));
+
+        // Role must exist (string role)
+        ASSERT_NOT_OK(auth::parseAndValidateCreateRoleCommand(
+                BSON("createRole" << "myRole" <<
+                     "privileges" << BSONArray() <<
+                     "roles" << BSON_ARRAY("fakeRole")),
+                "test",
+                authzManager.get(),
+                &parsedRoleObj,
+                &parsedWriteConcern));
+
+        // Role must exist (object role)
+        ASSERT_NOT_OK(auth::parseAndValidateCreateRoleCommand(
+                BSON("createRole" << "myRole" <<
+                     "privileges" << BSONArray() <<
+                     "roles" << BSON_ARRAY("name" << "fakeRole" << "source" << "test")),
+                "test",
+                authzManager.get(),
+                &parsedRoleObj,
+                &parsedWriteConcern));
+
+        // Role must have name
+        ASSERT_NOT_OK(auth::parseAndValidateCreateRoleCommand(
+                BSON("createRole" << "myRole" <<
+                     "privileges" << BSONArray() <<
+                     "roles" << BSON_ARRAY("source" << "test")),
+                "test",
+                authzManager.get(),
+                &parsedRoleObj,
+                &parsedWriteConcern));
+
+        // Role must have source
+        ASSERT_NOT_OK(auth::parseAndValidateCreateRoleCommand(
+                BSON("createRole" << "myRole" <<
+                     "privileges" << BSONArray() <<
+                     "roles" << BSON_ARRAY("name" << "readWrite")),
+                "test",
+                authzManager.get(),
+                &parsedRoleObj,
+                &parsedWriteConcern));
+
+        // Role must not have have canDelegate or hasRole
+        ASSERT_NOT_OK(auth::parseAndValidateCreateRoleCommand(
+                BSON("createRole" << "myRole" <<
+                     "privileges" << BSONArray() <<
+                     "roles" << BSON_ARRAY("name" << "readWrite" <<
+                                           "source" << "test" <<
+                                           "hasRole" << true <<
+                                           "canDelegate" << false)),
+                "test",
+                authzManager.get(),
+                &parsedRoleObj,
+                &parsedWriteConcern));
+
+        // Privilege must have resource
+        ASSERT_NOT_OK(auth::parseAndValidateCreateRoleCommand(
+                BSON("createRole" << "myRole" <<
+                     "privileges" << BSON_ARRAY(BSON("actions" << BSON_ARRAY("find"))) <<
+                     "roles" << BSONArray()),
+                "test",
+                authzManager.get(),
+                &parsedRoleObj,
+                &parsedWriteConcern));
+
+        // Privilege must have actions
+        ASSERT_NOT_OK(auth::parseAndValidateCreateRoleCommand(
+                BSON("createRole" << "myRole" <<
+                     "privileges" << BSON_ARRAY(BSON("resource" << BSON("cluster" << true))) <<
+                     "roles" << BSONArray()),
+                "test",
+                authzManager.get(),
+                &parsedRoleObj,
+                &parsedWriteConcern));
+
+        // Action must exist
+        ASSERT_NOT_OK(auth::parseAndValidateCreateRoleCommand(
+                BSON("createRole" << "myRole" <<
+                     "privileges" << BSON_ARRAY(BSON("resource" << BSON("cluster" << true) <<
+                                                     "actions" << BSON_ARRAY("fakeAction"))) <<
+                     "roles" << BSONArray()),
+                "test",
+                authzManager.get(),
+                &parsedRoleObj,
+                &parsedWriteConcern));
+
+        // Resource can't be on cluster AND normal resources
+        ASSERT_NOT_OK(auth::parseAndValidateCreateRoleCommand(
+                BSON("createRole" << "myRole" <<
+                     "privileges" << BSON_ARRAY(BSON("resource" << BSON("cluster" << true <<
+                                                                        "db" << "" <<
+                                                                        "collection" << "") <<
+                                                     "actions" << BSONArray())) <<
+                     "roles" << BSONArray()),
+                "test",
+                authzManager.get(),
+                &parsedRoleObj,
+                &parsedWriteConcern));
+
+        // Resource can't have db without collection
+        ASSERT_NOT_OK(auth::parseAndValidateCreateRoleCommand(
+                BSON("createRole" << "myRole" <<
+                     "privileges" << BSON_ARRAY(BSON("resource" << BSON("db" << "" ) <<
+                                                     "actions" << BSONArray())) <<
+                     "roles" << BSONArray()),
+                "test",
+                authzManager.get(),
+                &parsedRoleObj,
+                &parsedWriteConcern));
+
+        // Resource can't have collection without db
+        ASSERT_NOT_OK(auth::parseAndValidateCreateRoleCommand(
+                BSON("createRole" << "myRole" <<
+                     "privileges" << BSON_ARRAY(BSON("resource" << BSON("collection" << "" ) <<
+                                                     "actions" << BSONArray())) <<
+                     "roles" << BSONArray()),
+                "test",
+                authzManager.get(),
+                &parsedRoleObj,
+                &parsedWriteConcern));
+
+        // Empty roles and privileges arrays OK
+        ASSERT_OK(auth::parseAndValidateCreateRoleCommand(
+                BSON("createRole" << "myRole" <<
+                     "privileges" << BSONArray() <<
+                     "roles" << BSONArray()),
+                "test",
+                authzManager.get(),
+                &parsedRoleObj,
+                &parsedWriteConcern));
+
+        ASSERT_EQUALS("myRole", parsedRoleObj["name"].String());
+        ASSERT_EQUALS("test", parsedRoleObj["source"].String());
+        ASSERT_EQUALS(0U, parsedRoleObj["privileges"].Array().size());
+        ASSERT_EQUALS(0U, parsedRoleObj["roles"].Array().size());
+
+        // Empty db and collection for privilege is OK.
+        ASSERT_OK(auth::parseAndValidateCreateRoleCommand(
+                BSON("createRole" << "myRole" <<
+                     "privileges" << BSON_ARRAY(BSON("resource" << BSON("db" << "" <<
+                                                                        "collection" << "" ) <<
+                                                     "actions" << BSON_ARRAY("find"))) <<
+                     "roles" << BSONArray()),
+                "test",
+                authzManager.get(),
+                &parsedRoleObj,
+                &parsedWriteConcern));
+
+        std::vector<BSONElement> privileges = parsedRoleObj["privileges"].Array();
+        ASSERT_EQUALS(1U, privileges.size());
+        ASSERT_EQUALS("", privileges[0].Obj()["resource"].Obj()["db"].String());
+        ASSERT_EQUALS("", privileges[0].Obj()["resource"].Obj()["collection"].String());
+        ASSERT_EQUALS(1U, privileges[0].Obj()["actions"].Array().size());
+        ASSERT_EQUALS("find", privileges[0].Obj()["actions"].Array()[0].String());
+
+        // Explicit collection name resource OK
+        ASSERT_OK(auth::parseAndValidateCreateRoleCommand(
+                BSON("createRole" << "myRole" <<
+                     "privileges" << BSON_ARRAY(BSON("resource" << BSON("db" << "test" <<
+                                                                        "collection" << "foo" ) <<
+                                                     "actions" << BSON_ARRAY("find"))) <<
+                     "roles" << BSONArray()),
+                "test",
+                authzManager.get(),
+                &parsedRoleObj,
+                &parsedWriteConcern));
+
+        privileges = parsedRoleObj["privileges"].Array();
+        ASSERT_EQUALS(1U, privileges.size());
+        ASSERT_EQUALS("test", privileges[0].Obj()["resource"].Obj()["db"].String());
+        ASSERT_EQUALS("foo", privileges[0].Obj()["resource"].Obj()["collection"].String());
+
+        // Cluster resource OK
+        ASSERT_OK(auth::parseAndValidateCreateRoleCommand(
+                BSON("createRole" << "myRole" <<
+                     "privileges" << BSON_ARRAY(BSON("resource" << BSON("cluster" << true) <<
+                                                     "actions" << BSON_ARRAY("find"))) <<
+                     "roles" << BSONArray()),
+                "test",
+                authzManager.get(),
+                &parsedRoleObj,
+                &parsedWriteConcern));
+
+        privileges = parsedRoleObj["privileges"].Array();
+        ASSERT_EQUALS(1U, privileges.size());
+        ASSERT_EQUALS(true, privileges[0].Obj()["resource"].Obj()["cluster"].Bool());
+
+        // String role names OK
+        ASSERT_OK(auth::parseAndValidateCreateRoleCommand(
+                BSON("createRole" << "myRole" <<
+                     "privileges" << BSONArray() <<
+                     "roles" << BSON_ARRAY("read" << "dbAdmin")),
+                "test",
+                authzManager.get(),
+                &parsedRoleObj,
+                &parsedWriteConcern));
+
+        std::vector<BSONElement> rolesArray = parsedRoleObj["roles"].Array();
+        ASSERT_EQUALS((size_t)2, rolesArray.size());
+        ASSERT_EQUALS("read", rolesArray[0].Obj()["name"].String());
+        ASSERT_EQUALS("test", rolesArray[0].Obj()["source"].String());
+        ASSERT_EQUALS("dbAdmin", rolesArray[1].Obj()["name"].String());
+        ASSERT_EQUALS("test", rolesArray[1].Obj()["source"].String());
+
+        // Object roles OK
+        ASSERT_OK(auth::parseAndValidateCreateRoleCommand(
+                BSON("createRole" << "myRole" <<
+                     "privileges" << BSONArray() <<
+                     "roles" << BSON_ARRAY(BSON("name" << "read" << "source" << "test") <<
+                                           BSON("name" << "dbAdmin" << "source" << "test"))),
+                "test",
+                authzManager.get(),
+                &parsedRoleObj,
+                &parsedWriteConcern));
+
+        rolesArray = parsedRoleObj["roles"].Array();
+        ASSERT_EQUALS((size_t)2, rolesArray.size());
+        ASSERT_EQUALS("read", rolesArray[0].Obj()["name"].String());
+        ASSERT_EQUALS("test", rolesArray[0].Obj()["source"].String());
+        ASSERT_EQUALS("dbAdmin", rolesArray[1].Obj()["name"].String());
+        ASSERT_EQUALS("test", rolesArray[1].Obj()["source"].String());
+    }
+
 }  // namespace
 }  // namespace mongo
