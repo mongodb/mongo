@@ -547,6 +547,7 @@ namespace mongo {
         // node/nodes and nothing else is changing, this is additive. If it's
         // not a reconfig, we're not adding anything
         bool additive = reconf;
+        bool updateConfigs = false;
         {
             unsigned nfound = 0;
             int me = 0;
@@ -564,6 +565,9 @@ namespace mongo {
                         verify( (int) old->id() == m._id );
                         if (!old->config().isSameIgnoringTags(m)) {
                             additive = false;
+                        }
+                        if (!updateConfigs && old->config() != m) {
+                            updateConfigs = true;
                         }
                     }
                     else {
@@ -631,6 +635,32 @@ namespace mongo {
 
                 _members.push(mi);
                 startHealthTaskFor(mi);
+            }
+
+            if (updateConfigs) {
+                // for logging
+                string members = "";
+
+                // not setting _self to 0 as other threads use _self w/o locking
+                int me = 0;
+                for(vector<ReplSetConfig::MemberCfg>::const_iterator i = config().members.begin();
+                    i != config().members.end(); i++) {
+                    const ReplSetConfig::MemberCfg& m = *i;
+                    Member *mi;
+                    members += (members == "" ? "" : ", ") + m.h.toString();
+                    if (m.h.isSelf()) {
+                        verify(me++ == 0);
+                        mi = new Member(m.h, m._id, &m, true);
+                        if (!reconf) {
+                            log() << "replSet I am " << m.h.toString() << rsLog;
+                        }
+                        setSelfTo(mi);
+                    }
+                    else {
+                        mi = new Member(m.h, m._id, &m, false);
+                        _members.push(mi);
+                    }
+                }
             }
 
             // if we aren't creating new members, we may have to update the
