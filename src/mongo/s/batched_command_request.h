@@ -75,6 +75,9 @@ namespace mongo {
         //
 
         BatchType getBatchType() const;
+        BatchedInsertRequest* getInsertRequest() const;
+        BatchedUpdateRequest* getUpdateRequest() const;
+        BatchedDeleteRequest* getDeleteRequest() const;
 
         void setNS( const StringData& collName );
         void unsetNS();
@@ -89,6 +92,7 @@ namespace mongo {
         void setWriteOps( const std::vector<BSONObj>& writeOps );
         void unsetWriteOps();
         bool isWriteOpsSet() const;
+        std::size_t sizeWriteOps() const;
         std::vector<BSONObj> getWriteOps() const;
 
         void setWriteConcern( const BSONObj& writeConcern );

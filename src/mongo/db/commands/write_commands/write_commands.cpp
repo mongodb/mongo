@@ -39,25 +39,21 @@ namespace mongo {
 
     namespace {
 
-        // Write commands are only registered if the following ServerParameter is set.
-        MONGO_EXPORT_STARTUP_SERVER_PARAMETER(enableExperimentalWriteCommands, bool, false);
-
         MONGO_INITIALIZER(RegisterWriteCommands)(InitializerContext* context) {
-            if (enableExperimentalWriteCommands) {
-                // Leaked intentionally: a Command registers itself when constructed.
-                new CmdInsert();
-                new CmdUpdate();
-                new CmdDelete();
-            }
+            // Leaked intentionally: a Command registers itself when constructed.
+            new CmdInsert();
+            new CmdUpdate();
+            new CmdDelete();
             return Status::OK();
         }
 
     } // namespace
 
-    WriteCmd::WriteCmd(const StringData& name, WriteBatch::WriteType writeType, ActionType action)
-        : Command(name)
-        , _action(action)
-        , _writeType(writeType) {}
+    WriteCmd::WriteCmd( const StringData& name,
+                        BatchedCommandRequest::BatchType writeType,
+                        ActionType action ) :
+            Command( name ), _action( action ), _writeType( writeType ) {
+    }
 
     // Write commands are fanned out in oplog as single writes.
     bool WriteCmd::logTheOp() { return false; }
@@ -85,16 +81,21 @@ namespace mongo {
                        string& errMsg,
                        BSONObjBuilder& result,
                        bool fromRepl) {
-        verify(!fromRepl); // Can't be run on secondaries (logTheOp() == false, slaveOk() == false).
 
-        if (cmdObj.firstElementType() != mongo::String) {
-            errMsg = "expected string type for collection name";
-            return false;
-        }
-        string ns = parseNs(dbName, cmdObj);
-        if (!NamespaceString(ns).isValid()) {
-            errMsg = mongoutils::str::stream() << "invalid namespace: \"" << ns << "\"";
-            return false;
+        // Can't be run on secondaries (logTheOp() == false, slaveOk() == false).
+        dassert( !fromRepl );
+
+        BatchedCommandRequest request( _writeType );
+        BatchedCommandResponse response;
+
+        // TODO: if we do namespace parsing, push this to the type
+        if ( !request.parseBSON( cmdObj, &errMsg ) || !request.isValid( &errMsg ) ) {
+            // Batch parse failure
+            response.setOk( false );
+            response.setErrCode( 99999 );
+            response.setErrMessage( errMsg );
+            result.appendElements( response.toBSON() );
+            return response.getOk();
         }
 
         {
@@ -105,29 +106,39 @@ namespace mongo {
             // objects and operate on them).
             //
             // Acquire ReadContext momentarily, for satisfying this purpose.
-            Client::ReadContext ctx(dbName + ".$cmd");
-        }
-
-        WriteBatch writeBatch(ns, _writeType);
-
-        if (!writeBatch.parse(cmdObj, &errMsg)) {
-            return false;
+            Client::ReadContext ctx( dbName + ".$cmd" );
         }
 
         WriteBatchExecutor writeBatchExecutor(&cc(), &globalOpCounters, lastError.get());
-        return writeBatchExecutor.executeBatch(writeBatch, &errMsg, &result);
+
+        writeBatchExecutor.executeBatch( request, &response );
+
+        result.appendElements( response.toBSON() );
+        return response.getOk();
     }
 
-    CmdInsert::CmdInsert() : WriteCmd("insert", WriteBatch::WRITE_INSERT, ActionType::insert) {}
+    CmdInsert::CmdInsert() :
+            WriteCmd( "insert", BatchedCommandRequest::BatchType_Insert, ActionType::insert ) {
+    }
 
-    void CmdInsert::help(stringstream& help) const { help << "insert documents"; }
+    void CmdInsert::help( stringstream& help ) const {
+        help << "insert documents";
+    }
 
-    CmdUpdate::CmdUpdate() : WriteCmd("update", WriteBatch::WRITE_UPDATE, ActionType::update) {}
+    CmdUpdate::CmdUpdate() :
+            WriteCmd( "update", BatchedCommandRequest::BatchType_Update, ActionType::update ) {
+    }
 
-    void CmdUpdate::help(stringstream& help) const { help << "update documents"; }
+    void CmdUpdate::help( stringstream& help ) const {
+        help << "update documents";
+    }
 
-    CmdDelete::CmdDelete() : WriteCmd("delete", WriteBatch::WRITE_DELETE, ActionType::remove) {}
+    CmdDelete::CmdDelete() :
+            WriteCmd( "delete", BatchedCommandRequest::BatchType_Delete, ActionType::remove ) {
+    }
 
-    void CmdDelete::help(stringstream& help) const { help << "delete documents"; }
+    void CmdDelete::help( stringstream& help ) const {
+        help << "delete documents";
+    }
 
 } // namespace mongo

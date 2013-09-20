@@ -724,14 +724,6 @@ env.CppUnitTest('range_deleter_stat_test',
                 [ 'db/range_deleter_stat_test.cpp' ],
                 LIBDEPS = [ 'range_deleter', 'db/common' ]);
 
-env.StaticLibrary("writebatch",
-                  ["db/commands/write_commands/batch.cpp"],
-                  LIBDEPS=["db/common"])
-
-env.CppUnitTest("batch_test",
-                ["db/commands/write_commands/batch_test.cpp"],
-                LIBDEPS=["writebatch"])
-
 env.StaticLibrary("serveronly", serverOnlyFiles,
                   LIBDEPS=["coreshard",
                            "db/auth/authmongod",
@@ -745,8 +737,8 @@ env.StaticLibrary("serveronly", serverOnlyFiles,
                            "index_set",
                            'range_deleter',
                            's/metadata',
+                           's/batched_write_ops',
                            "db/exec/working_set",
-                           "writebatch",
                            "db/exec/exec",
                            "db/query/query",
                            '$BUILD_DIR/third_party/shim_snappy'])

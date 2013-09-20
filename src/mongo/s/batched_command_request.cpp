@@ -52,6 +52,18 @@ namespace mongo {
         return _batchType;
     }
 
+    BatchedInsertRequest* BatchedCommandRequest::getInsertRequest() const {
+        return _insertReq.get();
+    }
+
+    BatchedUpdateRequest* BatchedCommandRequest::getUpdateRequest() const {
+        return _updateReq.get();
+    }
+
+    BatchedDeleteRequest* BatchedCommandRequest::getDeleteRequest() const {
+        return _deleteReq.get();
+    }
+
     void BatchedCommandRequest::cloneTo( BatchedCommandRequest* other ) const {
         other->_insertReq.reset();
         other->_updateReq.reset();
@@ -123,7 +135,7 @@ namespace mongo {
                 auto_ptr<BatchedUpdateDocument> updateDoc( new BatchedUpdateDocument );
                 string errMsg;
                 bool parsed = updateDoc->parseBSON( *it, &errMsg ) && updateDoc->isValid( &errMsg );
-                (void)parsed; // Suppress warning in non-debug
+                (void) parsed; // Suppress warning in non-debug
                 dassert( parsed );
                 _updateReq->addToUpdates( updateDoc.release() );
             }
@@ -148,7 +160,7 @@ namespace mongo {
         switch ( getBatchType() ) {
         case BatchedCommandRequest::BatchType_Insert:
             _insertReq->unsetDocuments();
-             return;
+            return;
         case BatchedCommandRequest::BatchType_Update:
             _updateReq->unsetUpdates();
             return;
@@ -170,6 +182,17 @@ namespace mongo {
         }
     }
 
+    std::size_t BatchedCommandRequest::sizeWriteOps() const {
+        switch ( getBatchType() ) {
+        case BatchedCommandRequest::BatchType_Insert:
+            return _insertReq->sizeDocuments();
+        case BatchedCommandRequest::BatchType_Update:
+            return _updateReq->sizeUpdates();
+        default:
+            return _deleteReq->sizeDeletes();
+        }
+    }
+
     std::vector<BSONObj> BatchedCommandRequest::getWriteOps() const {
         vector<BSONObj> writeOps;
         switch ( getBatchType() ) {
@@ -177,8 +200,7 @@ namespace mongo {
             return _insertReq->getDocuments();
         case BatchedCommandRequest::BatchType_Update:
             for ( std::vector<BatchedUpdateDocument*>::const_iterator it = _updateReq->getUpdates()
-                    .begin(); it != _updateReq->getUpdates().end();
-                    ++it ) {
+                    .begin(); it != _updateReq->getUpdates().end(); ++it ) {
                 writeOps.push_back( ( *it )->toBSON() );
             }
             return writeOps;
