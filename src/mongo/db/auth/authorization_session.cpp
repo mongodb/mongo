@@ -118,99 +118,140 @@ namespace {
         _authenticatedUsers.add(internalSecurity.user);
     }
 
-    bool AuthorizationSession::checkAuthorization(const std::string& resource,
-                                                  ActionType action) {
-        return checkAuthForPrivilege(Privilege(resource, action)).isOK();
-    }
-
-    bool AuthorizationSession::checkAuthorization(const std::string& resource,
-                                                  ActionSet actions) {
-        return checkAuthForPrivilege(Privilege(resource, actions)).isOK();
-    }
-
-    Status AuthorizationSession::checkAuthForQuery(const std::string& ns, const BSONObj& query) {
-        NamespaceString namespaceString(ns);
-        verify(!namespaceString.isCommand());
-        if (!checkAuthorization(ns, ActionType::find)) {
+    Status AuthorizationSession::checkAuthForQuery(const NamespaceString& ns,
+                                                   const BSONObj& query) {
+        if (MONGO_unlikely(ns.isCommand())) {
+            return Status(ErrorCodes::InternalError, mongoutils::str::stream() <<
+                          "Checking query auth on command namespace " << ns.ns());
+        }
+        if (!isAuthorizedForActionsOnNamespace(ns, ActionType::find)) {
             return Status(ErrorCodes::Unauthorized,
-                          mongoutils::str::stream() << "not authorized for query on " << ns,
-                          0);
+                          mongoutils::str::stream() << "not authorized for query on " << ns.ns());
         }
         return Status::OK();
     }
 
-    Status AuthorizationSession::checkAuthForGetMore(const std::string& ns, long long cursorID) {
-        if (!checkAuthorization(ns, ActionType::find)) {
+    Status AuthorizationSession::checkAuthForGetMore(const NamespaceString& ns,
+                                                     long long cursorID) {
+        if (!isAuthorizedForActionsOnNamespace(ns, ActionType::find)) {
             return Status(ErrorCodes::Unauthorized,
-                          mongoutils::str::stream() << "not authorized for getmore on " << ns,
-                          0);
+                          mongoutils::str::stream() << "not authorized for getmore on " << ns.ns());
         }
         return Status::OK();
     }
 
-    Status AuthorizationSession::checkAuthForInsert(const std::string& ns,
+    Status AuthorizationSession::checkAuthForInsert(const NamespaceString& ns,
                                                     const BSONObj& document) {
-        NamespaceString namespaceString(ns);
-        if (namespaceString.coll() == StringData("system.indexes", StringData::LiteralTag())) {
-            std::string indexNS = document["ns"].String();
-            if (!checkAuthorization(indexNS, ActionType::ensureIndex)) {
+        if (ns.coll() == StringData("system.indexes", StringData::LiteralTag())) {
+            BSONElement nsElement = document["ns"];
+            if (nsElement.type() != String) {
+                return Status(ErrorCodes::Unauthorized, "Cannot authorize inserting into "
+                              "system.indexes documents without a string-typed \"ns\" field.");
+            }
+            NamespaceString indexNS(nsElement.str());
+            if (!isAuthorizedForActionsOnNamespace(indexNS, ActionType::ensureIndex)) {
                 return Status(ErrorCodes::Unauthorized,
                               mongoutils::str::stream() << "not authorized to create index on " <<
-                                      indexNS,
-                              0);
+                              indexNS.ns());
             }
         } else {
-            if (!checkAuthorization(ns, ActionType::insert)) {
+            if (!isAuthorizedForActionsOnNamespace(ns, ActionType::insert)) {
                 return Status(ErrorCodes::Unauthorized,
-                              mongoutils::str::stream() << "not authorized for insert on " << ns,
-                              0);
+                              mongoutils::str::stream() << "not authorized for insert on " <<
+                              ns.ns());
             }
         }
 
         return Status::OK();
     }
 
-    Status AuthorizationSession::checkAuthForUpdate(const std::string& ns,
+    Status AuthorizationSession::checkAuthForUpdate(const NamespaceString& ns,
                                                     const BSONObj& query,
                                                     const BSONObj& update,
                                                     bool upsert) {
-        NamespaceString namespaceString(ns);
         if (!upsert) {
-            if (!checkAuthorization(ns, ActionType::update)) {
+            if (!isAuthorizedForActionsOnNamespace(ns, ActionType::update)) {
                 return Status(ErrorCodes::Unauthorized,
-                              mongoutils::str::stream() << "not authorized for update on " << ns,
-                              0);
+                              mongoutils::str::stream() << "not authorized for update on " <<
+                              ns.ns());
             }
         }
         else {
             ActionSet required;
             required.addAction(ActionType::update);
             required.addAction(ActionType::insert);
-            if (!checkAuthorization(ns, required)) {
+            if (!isAuthorizedForActionsOnNamespace(ns, required)) {
                 return Status(ErrorCodes::Unauthorized,
-                              mongoutils::str::stream() << "not authorized for upsert on " << ns,
-                              0);
+                              mongoutils::str::stream() << "not authorized for upsert on " <<
+                              ns.ns());
             }
         }
         return Status::OK();
     }
 
-    Status AuthorizationSession::checkAuthForDelete(const std::string& ns, const BSONObj& query) {
-        NamespaceString namespaceString(ns);
-        if (!checkAuthorization(ns, ActionType::remove)) {
+    Status AuthorizationSession::checkAuthForDelete(const NamespaceString& ns,
+                                                    const BSONObj& query) {
+        if (!isAuthorizedForActionsOnNamespace(ns, ActionType::remove)) {
             return Status(ErrorCodes::Unauthorized,
-                          mongoutils::str::stream() << "not authorized to remove from " << ns,
-                          0);
+                          mongoutils::str::stream() << "not authorized to remove from " << ns.ns());
         }
         return Status::OK();
     }
 
-    Privilege AuthorizationSession::_modifyPrivilegeForSpecialCases(const Privilege& privilege) {
-        ActionSet newActions;
-        newActions.addAllActionsFromSet(privilege.getActions());
-        NamespaceString ns( privilege.getResource() );
 
-        if (ns.coll() == "system.users") {
+    bool AuthorizationSession::isAuthorizedForPrivilege(const Privilege& privilege) {
+        if (_externalState->shouldIgnoreAuthChecks())
+            return true;
+
+        return _isAuthorizedForPrivilege(privilege);
+    }
+
+    bool AuthorizationSession::isAuthorizedForPrivileges(const vector<Privilege>& privileges) {
+        if (_externalState->shouldIgnoreAuthChecks())
+            return true;
+
+        for (size_t i = 0; i < privileges.size(); ++i) {
+            if (!_isAuthorizedForPrivilege(privileges[i]))
+                return false;
+        }
+
+        return true;
+    }
+
+    bool AuthorizationSession::isAuthorizedForActionsOnResource(const ResourcePattern& resource,
+                                                                ActionType action) {
+        return isAuthorizedForPrivilege(Privilege(resource, action));
+    }
+
+    bool AuthorizationSession::isAuthorizedForActionsOnResource(const ResourcePattern& resource,
+                                                                const ActionSet& actions) {
+        return isAuthorizedForPrivilege(Privilege(resource, actions));
+    }
+
+    bool AuthorizationSession::isAuthorizedForActionsOnNamespace(const NamespaceString& ns,
+                                                                 ActionType action) {
+        return isAuthorizedForPrivilege(Privilege(ResourcePattern::forExactNamespace(ns), action));
+    }
+
+    bool AuthorizationSession::isAuthorizedForActionsOnNamespace(const NamespaceString& ns,
+                                                                const ActionSet& actions) {
+        return isAuthorizedForPrivilege(Privilege(ResourcePattern::forExactNamespace(ns), actions));
+    }
+
+    static const ResourcePattern anyUsersCollectionPattern = ResourcePattern::forCollectionName(
+            "system.users");
+    static const ResourcePattern anyProfileCollectionPattern = ResourcePattern::forCollectionName(
+            "system.profile");
+    static const ResourcePattern anyIndexesCollectionPattern = ResourcePattern::forCollectionName(
+            "system.indexes");
+
+    // Returns a new privilege that has replaced the actions needed to handle special casing
+    // certain namespaces like system.users and system.profile.  Note that the special handling
+    // of system.indexes takes place in checkAuthForInsert, not here.
+    static Privilege _modifyPrivilegeForSpecialCases(Privilege privilege) {
+        ActionSet newActions(privilege.getActions());
+        const ResourcePattern& target(privilege.getResourcePattern());
+        if (anyUsersCollectionPattern.matchesResourcePattern(target)) {
             if (newActions.contains(ActionType::insert) ||
                     newActions.contains(ActionType::update) ||
                     newActions.contains(ActionType::remove)) {
@@ -223,47 +264,31 @@ namespace {
             newActions.removeAction(ActionType::insert);
             newActions.removeAction(ActionType::update);
             newActions.removeAction(ActionType::remove);
-        } else if (ns.coll() == "system.profile") {
+        } else if (anyProfileCollectionPattern.matchesResourcePattern(target)) {
             newActions.removeAction(ActionType::find);
             newActions.addAction(ActionType::profileRead);
-        } else if (ns.coll() == "system.indexes" && newActions.contains(ActionType::find)) {
+        } else if (anyIndexesCollectionPattern.matchesResourcePattern(target)
+                   && newActions.contains(ActionType::find)) {
             newActions.removeAction(ActionType::find);
             newActions.addAction(ActionType::indexRead);
         }
 
-        return Privilege(privilege.getResource(), newActions);
+        return Privilege(privilege.getResourcePattern(), newActions);
     }
 
-    Status AuthorizationSession::checkAuthForPrivilege(const Privilege& privilege) {
-        if (_externalState->shouldIgnoreAuthChecks())
-            return Status::OK();
-
-        return _checkAuthForPrivilegeHelper(privilege);
-    }
-
-    Status AuthorizationSession::checkAuthForPrivileges(const vector<Privilege>& privileges) {
-        if (_externalState->shouldIgnoreAuthChecks())
-            return Status::OK();
-
-        for (size_t i = 0; i < privileges.size(); ++i) {
-            Status status = _checkAuthForPrivilegeHelper(privileges[i]);
-            if (!status.isOK())
-                return status;
-        }
-
-        return Status::OK();
-    }
-
-    Status AuthorizationSession::_checkAuthForPrivilegeHelper(const Privilege& privilege) {
+    bool AuthorizationSession::_isAuthorizedForPrivilege(const Privilege& privilege) {
         AuthorizationManager& authMan = getAuthorizationManager();
         Privilege modifiedPrivilege = _modifyPrivilegeForSpecialCases(privilege);
 
         // Need to check not just the resource of the privilege, but also just the database
         // component and the "*" resource.
-        std::string resourceSearchList[3];
-        resourceSearchList[0] = AuthorizationManager::WILDCARD_RESOURCE_NAME;
-        resourceSearchList[1] = nsToDatabase(modifiedPrivilege.getResource());
-        resourceSearchList[2] = modifiedPrivilege.getResource();
+        ResourcePattern resourceSearchList[3];
+        resourceSearchList[0] = ResourcePattern::forAnyResource();
+        resourceSearchList[1] = modifiedPrivilege.getResourcePattern();
+        if (modifiedPrivilege.getResourcePattern().isExactNamespacePattern()) {
+            resourceSearchList[2] =
+                ResourcePattern::forDatabaseName(modifiedPrivilege.getResourcePattern().ns().db());
+        }
 
 
         ActionSet unmetRequirements = modifiedPrivilege.getActions();
@@ -309,12 +334,12 @@ namespace {
                 unmetRequirements.removeAllActionsFromSet(userActions);
 
                 if (unmetRequirements.empty())
-                    return Status::OK();
+                    return true;
             }
             ++it;
         }
 
-        return Status(ErrorCodes::Unauthorized, "unauthorized");
+        return false;
     }
 
 } // namespace mongo

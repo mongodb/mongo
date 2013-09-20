@@ -314,8 +314,8 @@ namespace mongo {
 
                 MapSharded::iterator i = _cursors.find( id );
                 if ( i != _cursors.end() ) {
-                    const bool isAuthorized = authSession->checkAuthorization(
-                            i->second->getNS(), ActionType::killCursors);
+                    const bool isAuthorized = authSession->isAuthorizedForActionsOnNamespace(
+                            NamespaceString(i->second->getNS()), ActionType::killCursors);
                     audit::logKillCursorsAuthzCheck(
                             client,
                             NamespaceString(i->second->getNS()),
@@ -334,8 +334,8 @@ namespace mongo {
                     continue;
                 }
                 verify(refsNSIt != _refsNS.end());
-                const bool isAuthorized = authSession->checkAuthorization(
-                        refsNSIt->second, ActionType::killCursors);
+                const bool isAuthorized = authSession->isAuthorizedForActionsOnNamespace(
+                        NamespaceString(refsNSIt->second), ActionType::killCursors);
                 audit::logKillCursorsAuthzCheck(
                         client,
                         NamespaceString(refsNSIt->second),
@@ -411,7 +411,7 @@ namespace mongo {
                                            std::vector<Privilege>* out) {
             ActionSet actions;
             actions.addAction(ActionType::cursorInfo);
-            out->push_back(Privilege(AuthorizationManager::SERVER_RESOURCE_NAME, actions));
+            out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
         }
         virtual LockType locktype() const { return NONE; }
         bool run(const string&, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {

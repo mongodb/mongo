@@ -88,7 +88,7 @@ namespace mongo {
                                            std::vector<Privilege>* out) {
             ActionSet actions;
             actions.addAction(ActionType::find);
-            out->push_back(Privilege(parseNs(dbname, cmdObj), actions));
+            out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
         }
         bool run(const string& dbname, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
 
@@ -222,7 +222,7 @@ namespace mongo {
                                            std::vector<Privilege>* out) {
             ActionSet actions;
             actions.addAction(ActionType::splitVector);
-            out->push_back(Privilege(AuthorizationManager::CLUSTER_RESOURCE_NAME, actions));
+            out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
         }
 
         bool run(const string& dbname, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
@@ -507,7 +507,7 @@ namespace mongo {
                                            std::vector<Privilege>* out) {
             ActionSet actions;
             actions.addAction(ActionType::splitChunk);
-            out->push_back(Privilege(AuthorizationManager::CLUSTER_RESOURCE_NAME, actions));
+            out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
         }
         bool run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
 

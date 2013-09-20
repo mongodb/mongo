@@ -145,8 +145,8 @@ namespace mongo {
             ClientBasic* client = ClientBasic::getCurrent();
             AuthorizationSession* authSession = client->getAuthorizationSession();
             if ( strcmp( ns , "inprog" ) == 0 ) {
-                const bool isAuthorized = authSession->checkAuthorization(
-                        AuthorizationManager::SERVER_RESOURCE_NAME, ActionType::inprog);
+                const bool isAuthorized = authSession->isAuthorizedForActionsOnResource(
+                        ResourcePattern::forClusterResource(), ActionType::inprog);
                 audit::logInProgAuthzCheck(
                         client, q.query, isAuthorized ? ErrorCodes::OK : ErrorCodes::Unauthorized);
                 uassert(ErrorCodes::Unauthorized, "not authorized to run inprog", isAuthorized);
@@ -188,8 +188,8 @@ namespace mongo {
                 arr.done();
             }
             else if ( strcmp( ns , "killop" ) == 0 ) {
-                const bool isAuthorized = authSession->checkAuthorization(
-                        AuthorizationManager::SERVER_RESOURCE_NAME, ActionType::killop);
+                const bool isAuthorized = authSession->isAuthorizedForActionsOnResource(
+                        ResourcePattern::forClusterResource(), ActionType::killop);
                 audit::logKillOpAuthzCheck(
                         client,
                         q.query,

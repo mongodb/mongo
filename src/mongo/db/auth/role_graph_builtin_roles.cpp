@@ -220,44 +220,49 @@ namespace {
         const bool isAdminDB = (roleName.getDB() == ADMIN_DBNAME);
 
         if (roleName.getRole() == BUILTIN_ROLE_READ) {
-            return Privilege(roleName.getDB().toString(), readRoleActions);
+            return Privilege(ResourcePattern::forDatabaseName(roleName.getDB()), readRoleActions);
         }
         if (roleName.getRole() == BUILTIN_ROLE_READ_WRITE) {
-            return Privilege(roleName.getDB().toString(), readWriteRoleActions);
+            return Privilege(ResourcePattern::forDatabaseName(roleName.getDB()),
+                             readWriteRoleActions);
         }
         if (roleName.getRole() == BUILTIN_ROLE_USER_ADMIN) {
-            return Privilege(roleName.getDB().toString(), userAdminRoleActions);
+            return Privilege(ResourcePattern::forDatabaseName(roleName.getDB()),
+                             userAdminRoleActions);
         }
         if (roleName.getRole() == BUILTIN_ROLE_DB_ADMIN) {
-            return Privilege(roleName.getDB().toString(), dbAdminRoleActions);
+            return Privilege(ResourcePattern::forDatabaseName(roleName.getDB()),
+                             dbAdminRoleActions);
         }
         if (roleName.getRole() == RoleGraph::BUILTIN_ROLE_V0_READ) {
-            return Privilege(roleName.getDB().toString(), compatibilityReadOnlyActions);
+            return Privilege(ResourcePattern::forDatabaseName(roleName.getDB()),
+                             compatibilityReadOnlyActions);
         }
         if (roleName.getRole() == RoleGraph::BUILTIN_ROLE_V0_READ_WRITE) {
-            return Privilege(roleName.getDB().toString(), compatibilityReadWriteActions);
+            return Privilege(ResourcePattern::forDatabaseName(roleName.getDB()),
+                             compatibilityReadWriteActions);
         }
         if (isAdminDB && roleName.getRole() == BUILTIN_ROLE_READ_ANY_DB) {
-            return Privilege(AuthorizationManager::WILDCARD_RESOURCE_NAME, readRoleActions);
+            return Privilege(ResourcePattern::forAnyResource(), readRoleActions);
         }
         if (isAdminDB && roleName.getRole() == BUILTIN_ROLE_READ_WRITE_ANY_DB) {
-            return Privilege(AuthorizationManager::WILDCARD_RESOURCE_NAME, readWriteRoleActions);
+            return Privilege(ResourcePattern::forAnyResource(), readWriteRoleActions);
         }
         if (isAdminDB && roleName.getRole() == BUILTIN_ROLE_USER_ADMIN_ANY_DB) {
-            return Privilege(AuthorizationManager::WILDCARD_RESOURCE_NAME, userAdminRoleActions);
+            return Privilege(ResourcePattern::forAnyResource(), userAdminRoleActions);
         }
         if (isAdminDB && roleName.getRole() == BUILTIN_ROLE_DB_ADMIN_ANY_DB) {
-            return Privilege(AuthorizationManager::WILDCARD_RESOURCE_NAME, dbAdminRoleActions);
+            return Privilege(ResourcePattern::forAnyResource(), dbAdminRoleActions);
         }
         if (isAdminDB && roleName.getRole() == BUILTIN_ROLE_CLUSTER_ADMIN) {
-            return Privilege(AuthorizationManager::WILDCARD_RESOURCE_NAME, clusterAdminRoleActions);
+            return Privilege(ResourcePattern::forAnyResource(), clusterAdminRoleActions);
         }
         if (isAdminDB && roleName.getRole() == RoleGraph::BUILTIN_ROLE_V0_ADMIN_READ) {
-            return Privilege(AuthorizationManager::WILDCARD_RESOURCE_NAME,
+            return Privilege(ResourcePattern::forAnyResource(),
                              compatibilityReadOnlyAdminActions);
         }
         if (isAdminDB && roleName.getRole() == RoleGraph::BUILTIN_ROLE_V0_ADMIN_READ_WRITE) {
-            return Privilege(AuthorizationManager::WILDCARD_RESOURCE_NAME,
+            return Privilege(ResourcePattern::forAnyResource(),
                              compatibilityReadWriteAdminActions);
         }
 

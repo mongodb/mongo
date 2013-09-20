@@ -231,7 +231,7 @@ namespace mongo {
                                                std::vector<Privilege>* out) {
                 ActionSet actions;
                 actions.addAction(ActionType::dropIndexes);
-                out->push_back(Privilege(parseNs(dbname, cmdObj), actions));
+                out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
             }
         } dropIndexesCmd;
 
@@ -243,7 +243,7 @@ namespace mongo {
                                                std::vector<Privilege>* out) {
                 ActionSet actions;
                 actions.addAction(ActionType::reIndex);
-                out->push_back(Privilege(parseNs(dbname, cmdObj), actions));
+                out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
             }
         } reIndexCmd;
 
@@ -255,7 +255,7 @@ namespace mongo {
                                                std::vector<Privilege>* out) {
                 ActionSet actions;
                 actions.addAction(ActionType::collMod);
-                out->push_back(Privilege(parseNs(dbname, cmdObj), actions));
+                out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
             }
         } collectionModCmd;
 
@@ -271,7 +271,7 @@ namespace mongo {
                                                std::vector<Privilege>* out) {
                 ActionSet actions;
                 actions.addAction(ActionType::profileEnable);
-                out->push_back(Privilege(dbname, actions));
+                out->push_back(Privilege(ResourcePattern::forDatabaseName(dbname), actions));
             }
         } profileCmd;
         
@@ -284,8 +284,7 @@ namespace mongo {
                                                std::vector<Privilege>* out) {
                 ActionSet actions;
                 actions.addAction(ActionType::validate);
-                // TODO: should the resource needed be the collection name instead of the db name?
-                out->push_back(Privilege(dbname, actions));
+                out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
             }
             virtual void aggregateResults(const vector<BSONObj>& results, BSONObjBuilder& output) {
                 for (vector<BSONObj>::const_iterator it(results.begin()), end(results.end()); it!=end; it++){
@@ -319,7 +318,7 @@ namespace mongo {
                                                std::vector<Privilege>* out) {
                 ActionSet actions;
                 actions.addAction(ActionType::repairDatabase);
-                out->push_back(Privilege(dbname, actions));
+                out->push_back(Privilege(ResourcePattern::forDatabaseName(dbname), actions));
             }
         } repairDatabaseCmd;
 
@@ -331,7 +330,7 @@ namespace mongo {
                                                std::vector<Privilege>* out) {
                 ActionSet actions;
                 actions.addAction(ActionType::dbStats);
-                out->push_back(Privilege(dbname, actions));
+                out->push_back(Privilege(ResourcePattern::forDatabaseName(dbname), actions));
             }
 
             virtual void aggregateResults(const vector<BSONObj>& results, BSONObjBuilder& output) {
@@ -379,7 +378,7 @@ namespace mongo {
                                                std::vector<Privilege>* out) {
                 ActionSet actions;
                 actions.addAction(ActionType::createCollection);
-                out->push_back(Privilege(dbname, actions));
+                out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
             }
             bool run(const string& dbName,
                      BSONObj& cmdObj,
@@ -400,7 +399,7 @@ namespace mongo {
                                                std::vector<Privilege>* out) {
                 ActionSet actions;
                 actions.addAction(ActionType::dropCollection);
-                out->push_back(Privilege(parseNs(dbname, cmdObj), actions));
+                out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
             }
             bool run(const string& dbName , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
                 string collection = cmdObj.firstElement().valuestrsafe();
@@ -448,7 +447,7 @@ namespace mongo {
                                                std::vector<Privilege>* out) {
                 ActionSet actions;
                 actions.addAction(ActionType::dropDatabase);
-                out->push_back(Privilege(dbname, actions));
+                out->push_back(Privilege(ResourcePattern::forDatabaseName(dbname), actions));
             }
             bool run(const string& dbName , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
                 // disallow dropping the config database from mongos
@@ -552,7 +551,8 @@ namespace mongo {
                 // read from the source DB.
                 ActionSet actions;
                 actions.addAction(ActionType::copyDBTarget);
-                out->push_back(Privilege(dbname, actions)); // NOTE: dbname is always admin
+                out->push_back(Privilege(ResourcePattern::forDatabaseName(cmdObj["todb"].str()),
+                                         actions));
             }
             bool run(const string& dbName, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
                 string todb = cmdObj.getStringField("todb");
@@ -602,7 +602,7 @@ namespace mongo {
                                                std::vector<Privilege>* out) {
                 ActionSet actions;
                 actions.addAction(ActionType::find);
-                out->push_back(Privilege(parseNs(dbname, cmdObj), actions));
+                out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
             }
             bool run( const string& dbName,
                     BSONObj& cmdObj,
@@ -699,7 +699,7 @@ namespace mongo {
                                                std::vector<Privilege>* out) {
                 ActionSet actions;
                 actions.addAction(ActionType::collStats);
-                out->push_back(Privilege(parseNs(dbname, cmdObj), actions));
+                out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
             }
             bool run(const string& dbName , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
                 string collection = cmdObj.firstElement().valuestrsafe();
@@ -831,7 +831,7 @@ namespace mongo {
             virtual void addRequiredPrivileges(const std::string& dbname,
                                                const BSONObj& cmdObj,
                                                std::vector<Privilege>* out) {
-                find_and_modify::addPrivilegesRequiredForFindAndModify(dbname, cmdObj, out);
+                find_and_modify::addPrivilegesRequiredForFindAndModify(this, dbname, cmdObj, out);
             }
             bool run(const string& dbName, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
                 string collection = cmdObj.firstElement().valuestrsafe();
@@ -882,7 +882,7 @@ namespace mongo {
                                                std::vector<Privilege>* out) {
                 ActionSet actions;
                 actions.addAction(ActionType::find);
-                out->push_back(Privilege(parseNs(dbname, cmdObj), actions));
+                out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
             }
             bool run(const string& dbName, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
                 string fullns = cmdObj.firstElement().String();
@@ -947,7 +947,7 @@ namespace mongo {
                                                std::vector<Privilege>* out) {
                 ActionSet actions;
                 actions.addAction(ActionType::convertToCapped);
-                out->push_back(Privilege(parseNs(dbname, cmdObj), actions));
+                out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
             }
 
             virtual string getFullNS( const string& dbName , const BSONObj& cmdObj ) {
@@ -965,7 +965,7 @@ namespace mongo {
                                                std::vector<Privilege>* out) {
                 ActionSet actions;
                 actions.addAction(ActionType::find);
-                out->push_back(Privilege(parseNs(dbname, cmdObj), actions));
+                out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
             }
             virtual bool passOptions() const { return true; }
             virtual string getFullNS( const string& dbName , const BSONObj& cmdObj ) {
@@ -983,7 +983,7 @@ namespace mongo {
                                                std::vector<Privilege>* out) {
                 ActionSet actions;
                 actions.addAction(ActionType::splitVector);
-                out->push_back(Privilege(AuthorizationManager::CLUSTER_RESOURCE_NAME, actions));
+                out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
             }
             virtual bool run(const string& dbName , BSONObj& cmdObj, int options, string& errmsg, BSONObjBuilder& result, bool) {
                 string x = cmdObj.firstElement().valuestrsafe();
@@ -1012,7 +1012,7 @@ namespace mongo {
                                                std::vector<Privilege>* out) {
                 ActionSet actions;
                 actions.addAction(ActionType::find);
-                out->push_back(Privilege(parseNs(dbname, cmdObj), actions));
+                out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
             }
             bool run(const string& dbName , BSONObj& cmdObj, int options, string& errmsg, BSONObjBuilder& result, bool) {
                 string collection = cmdObj.firstElement().valuestrsafe();
@@ -1072,24 +1072,23 @@ namespace mongo {
             virtual void help( stringstream &help ) const {
                 help << " example: { filemd5 : ObjectId(aaaaaaa) , root : \"fs\" }";
             }
+
+            virtual std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const {
+                std::string collectionName = cmdObj.getStringField("root");
+                if (collectionName.empty())
+                    collectionName = "fs";
+                collectionName += ".chunks";
+                return NamespaceString(dbname, collectionName).ns();
+            }
+
             virtual void addRequiredPrivileges(const std::string& dbname,
                                                const BSONObj& cmdObj,
                                                std::vector<Privilege>* out) {
-                ActionSet actions;
-                actions.addAction(ActionType::find);
-                out->push_back(Privilege(parseNs(dbname, cmdObj), actions));
+                out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), ActionType::find));
             }
-            bool run(const string& dbName , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
-                string fullns = dbName;
-                fullns += ".";
-                {
-                    string root = cmdObj.getStringField( "root" );
-                    if ( root.size() == 0 )
-                        root = "fs";
-                    fullns += root;
-                }
-                fullns += ".chunks";
 
+            bool run(const string& dbName , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
+                const std::string fullns = parseNs(dbName, cmdObj);
                 DBConfigPtr conf = grid.getDBConfig( dbName , false );
 
                 if ( ! conf || ! conf->isShardingEnabled() || ! conf->isSharded( fullns ) ) {
@@ -1199,7 +1198,7 @@ namespace mongo {
                                                std::vector<Privilege>* out) {
                 ActionSet actions;
                 actions.addAction(ActionType::find);
-                out->push_back(Privilege(parseNs(dbname, cmdObj), actions));
+                out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
             }
             bool run(const string& dbName , BSONObj& cmdObj, int options, string& errmsg, BSONObjBuilder& result, bool) {
                 string collection = cmdObj.firstElement().valuestrsafe();
@@ -1305,7 +1304,7 @@ namespace mongo {
             virtual void addRequiredPrivileges(const std::string& dbname,
                                                const BSONObj& cmdObj,
                                                std::vector<Privilege>* out) {
-                mr::addPrivilegesRequiredForMapReduce(dbname, cmdObj, out);
+                mr::addPrivilegesRequiredForMapReduce(this, dbname, cmdObj, out);
             }
 
             string getTmpName( const string& coll ) {
@@ -1725,7 +1724,7 @@ namespace mongo {
                                                const BSONObj& cmdObj,
                                                std::vector<Privilege>* out) {
                 // applyOps can do pretty much anything, so require all privileges.
-                out->push_back(Privilege(AuthorizationManager::WILDCARD_RESOURCE_NAME,
+                out->push_back(Privilege(ResourcePattern::forAnyResource(),
                                          getGlobalAuthorizationManager()->getAllUserActions()));
             }
             virtual bool run(const string& dbName , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
@@ -1743,7 +1742,7 @@ namespace mongo {
                                                std::vector<Privilege>* out) {
                 ActionSet actions;
                 actions.addAction(ActionType::compact);
-                out->push_back(Privilege(parseNs(dbname, cmdObj), actions));
+                out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
             }
             virtual bool run(const string& dbName , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
                 errmsg = "compact not allowed through mongos";
@@ -1758,7 +1757,7 @@ namespace mongo {
                                                const BSONObj& cmdObj,
                                                std::vector<Privilege>* out) {
                 // $eval can do pretty much anything, so require all privileges.
-                out->push_back(Privilege(AuthorizationManager::WILDCARD_RESOURCE_NAME,
+                out->push_back(Privilege(ResourcePattern::forAnyResource(),
                                          getGlobalAuthorizationManager()->getAllUserActions()));
             }
             virtual bool run(const string& dbName,
@@ -1837,7 +1836,7 @@ namespace mongo {
         void PipelineCommand::addRequiredPrivileges(const std::string& dbname,
                                                     const BSONObj& cmdObj,
                                                     std::vector<Privilege>* out) {
-            Pipeline::addRequiredPrivileges(dbname, cmdObj, out);
+            Pipeline::addRequiredPrivileges(this, dbname, cmdObj, out);
         }
 
         bool PipelineCommand::run(const string &dbName , BSONObj &cmdObj,

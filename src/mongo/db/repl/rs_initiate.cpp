@@ -174,7 +174,7 @@ namespace mongo {
                                            std::vector<Privilege>* out) {
             ActionSet actions;
             actions.addAction(ActionType::replSetInitiate);
-            out->push_back(Privilege(AuthorizationManager::SERVER_RESOURCE_NAME, actions));
+            out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
         }
         virtual bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             log() << "replSet replSetInitiate admin command received from client" << rsLog;

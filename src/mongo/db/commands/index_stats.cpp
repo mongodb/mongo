@@ -492,7 +492,7 @@ namespace mongo {
                                            std::vector<Privilege>* out) {
             ActionSet actions;
             actions.addAction(ActionType::indexStats);
-            out->push_back(Privilege(parseNs(dbname, cmdObj), actions));
+            out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
         }
 
         bool run(const string& dbname, BSONObj& cmdObj, int, string& errmsg,

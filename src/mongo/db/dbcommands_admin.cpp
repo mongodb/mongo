@@ -168,7 +168,7 @@ namespace mongo {
                                            std::vector<Privilege>* out) {
             ActionSet actions;
             actions.addAction(ActionType::validate);
-            out->push_back(Privilege(parseNs(dbname, cmdObj), actions));
+            out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
         }
         //{ validate: "collectionnamewithoutthedbpart" [, scandata: <bool>] [, full: <bool> } */
 

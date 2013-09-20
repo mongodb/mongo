@@ -60,7 +60,7 @@ namespace mongo {
                                            std::vector<Privilege>* out) {
             ActionSet actions;
             actions.addAction(ActionType::getParameter);
-            out->push_back(Privilege(AuthorizationManager::SERVER_RESOURCE_NAME, actions));
+            out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
         }
         virtual void help( stringstream &help ) const {
             help << "get administrative option(s)\nexample:\n";
@@ -114,7 +114,7 @@ namespace mongo {
                                            std::vector<Privilege>* out) {
             ActionSet actions;
             actions.addAction(ActionType::setParameter);
-            out->push_back(Privilege(AuthorizationManager::SERVER_RESOURCE_NAME, actions));
+            out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
         }
         virtual void help( stringstream &help ) const {
             help << "set administrative option(s)\n";

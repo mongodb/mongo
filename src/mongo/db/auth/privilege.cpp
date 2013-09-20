@@ -15,19 +15,17 @@
 
 #include "mongo/db/auth/privilege.h"
 
-#include <string>
-
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 
 namespace mongo {
 
-    Privilege::Privilege(const std::string& resource, const ActionType& action) :
+    Privilege::Privilege(const ResourcePattern& resource, const ActionType& action) :
         _resource(resource) {
 
         _actions.addAction(action);
     }
-    Privilege::Privilege(const std::string& resource, const ActionSet& actions) :
+    Privilege::Privilege(const ResourcePattern& resource, const ActionSet& actions) :
             _resource(resource), _actions(actions) {}
 
     void Privilege::addActions(const ActionSet& actionsToAdd) {

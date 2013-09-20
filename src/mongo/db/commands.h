@@ -17,10 +17,12 @@
 
 #pragma once
 
+#include <string>
 #include <vector>
 
 #include "mongo/base/status.h"
 #include "mongo/db/auth/privilege.h"
+#include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/client_basic.h"
 #include "mongo/db/jsobj.h"
 
@@ -50,6 +52,13 @@ namespace mutablebson {
         // appended to 'dbname' after a '.' character. If the first field is not of type
         // mongo::String, then 'dbname' is returned unmodified.
         virtual string parseNs(const string& dbname, const BSONObj& cmdObj) const;
+
+        // Utility that returns a ResourcePattern for the namespace returned from
+        // parseNs(dbname, cmdObj).  This will be either an exact namespace resource pattern
+        // or a database resource pattern, depending on whether parseNs returns a fully qualifed
+        // collection name or just a database name.
+        ResourcePattern parseResourcePattern(const std::string& dbname,
+                                             const BSONObj& cmdObj) const;
 
         // warning: isAuthorized uses the lockType() return values, and values are being passed 
         // around as ints so be careful as it isn't really typesafe and will need cleanup later

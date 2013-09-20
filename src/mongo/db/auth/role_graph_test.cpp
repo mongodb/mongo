@@ -178,20 +178,20 @@ namespace {
         // Test adding a single privilege
         ActionSet actions;
         actions.addAction(ActionType::find);
-        ASSERT_OK(graph.addPrivilegeToRole(roleA, Privilege("dbA", actions)));
+        ASSERT_OK(graph.addPrivilegeToRole(roleA, Privilege(ResourcePattern::forDatabaseName("dbA"), actions)));
 
         PrivilegeVector privileges = graph.getDirectPrivileges(roleA);
         ASSERT_EQUALS(static_cast<size_t>(1), privileges.size());
-        ASSERT_EQUALS("dbA", privileges[0].getResource());
+        ASSERT_EQUALS(ResourcePattern::forDatabaseName("dbA"), privileges[0].getResourcePattern());
         ASSERT_EQUALS(actions.toString(), privileges[0].getActions().toString());
 
         // Add a privilege on a different resource
-        ASSERT_OK(graph.addPrivilegeToRole(roleA, Privilege("dbA.foo", actions)));
+        ASSERT_OK(graph.addPrivilegeToRole(roleA, Privilege(ResourcePattern::forExactNamespace(NamespaceString("dbA.foo")), actions)));
         privileges = graph.getDirectPrivileges(roleA);
         ASSERT_EQUALS(static_cast<size_t>(2), privileges.size());
-        ASSERT_EQUALS("dbA", privileges[0].getResource());
+        ASSERT_EQUALS(ResourcePattern::forDatabaseName("dbA"), privileges[0].getResourcePattern());
         ASSERT_EQUALS(actions.toString(), privileges[0].getActions().toString());
-        ASSERT_EQUALS("dbA.foo", privileges[1].getResource());
+        ASSERT_EQUALS(ResourcePattern::forExactNamespace(NamespaceString("dbA.foo")), privileges[1].getResourcePattern());
         ASSERT_EQUALS(actions.toString(), privileges[1].getActions().toString());
 
 
@@ -200,24 +200,24 @@ namespace {
         actions.addAction(ActionType::insert);
 
         PrivilegeVector privilegesToAdd;
-        privilegesToAdd.push_back(Privilege("dbA", actions));
+        privilegesToAdd.push_back(Privilege(ResourcePattern::forDatabaseName("dbA"), actions));
 
         actions.removeAllActions();
         actions.addAction(ActionType::update);
-        privilegesToAdd.push_back(Privilege("dbA", actions));
+        privilegesToAdd.push_back(Privilege(ResourcePattern::forDatabaseName("dbA"), actions));
 
         ASSERT_OK(graph.addPrivilegesToRole(roleA, privilegesToAdd));
 
         privileges = graph.getDirectPrivileges(roleA);
         ASSERT_EQUALS(static_cast<size_t>(2), privileges.size());
-        ASSERT_EQUALS("dbA", privileges[0].getResource());
+        ASSERT_EQUALS(ResourcePattern::forDatabaseName("dbA"), privileges[0].getResourcePattern());
         ASSERT_NOT_EQUALS(actions.toString(), privileges[0].getActions().toString());
         actions.addAction(ActionType::find);
         actions.addAction(ActionType::insert);
         ASSERT_EQUALS(actions.toString(), privileges[0].getActions().toString());
         actions.removeAction(ActionType::insert);
         actions.removeAction(ActionType::update);
-        ASSERT_EQUALS("dbA.foo", privileges[1].getResource());
+        ASSERT_EQUALS(ResourcePattern::forExactNamespace(NamespaceString("dbA.foo")), privileges[1].getResourcePattern());
         ASSERT_EQUALS(actions.toString(), privileges[1].getActions().toString());
     }
 
@@ -283,15 +283,15 @@ namespace {
         ASSERT_OK(graph.createRole(roleB));
         ASSERT_OK(graph.createRole(roleC));
 
-        ASSERT_OK(graph.addPrivilegeToRole(roleA, Privilege("dbA", actions)));
-        ASSERT_OK(graph.addPrivilegeToRole(roleB, Privilege("dbB", actions)));
-        ASSERT_OK(graph.addPrivilegeToRole(roleC, Privilege("dbC", actions)));
+        ASSERT_OK(graph.addPrivilegeToRole(roleA, Privilege(ResourcePattern::forDatabaseName("dbA"), actions)));
+        ASSERT_OK(graph.addPrivilegeToRole(roleB, Privilege(ResourcePattern::forDatabaseName("dbB"), actions)));
+        ASSERT_OK(graph.addPrivilegeToRole(roleC, Privilege(ResourcePattern::forDatabaseName("dbC"), actions)));
 
         ASSERT_OK(graph.recomputePrivilegeData());
 
         PrivilegeVector privileges = graph.getAllPrivileges(roleA);
         ASSERT_EQUALS(static_cast<size_t>(1), privileges.size());
-        ASSERT_EQUALS("dbA", privileges[0].getResource());
+        ASSERT_EQUALS(ResourcePattern::forDatabaseName("dbA"), privileges[0].getResourcePattern());
 
         // At this point we have all 4 roles set up, each with their own privilege, but no
         // roles have been granted to each other.
@@ -301,8 +301,8 @@ namespace {
         ASSERT_OK(graph.recomputePrivilegeData());
         privileges = graph.getAllPrivileges(roleA);
         ASSERT_EQUALS(static_cast<size_t>(2), privileges.size());
-        ASSERT_EQUALS("dbA", privileges[0].getResource());
-        ASSERT_EQUALS("dbB", privileges[1].getResource());
+        ASSERT_EQUALS(ResourcePattern::forDatabaseName("dbA"), privileges[0].getResourcePattern());
+        ASSERT_EQUALS(ResourcePattern::forDatabaseName("dbB"), privileges[1].getResourcePattern());
 
         // Add's roleC's privileges to roleB and make sure roleA gets them as well.
         ASSERT_OK(graph.addRoleToRole(roleB, roleC));
@@ -310,13 +310,13 @@ namespace {
         ASSERT_OK(graph.recomputePrivilegeData());
         privileges = graph.getAllPrivileges(roleA);
         ASSERT_EQUALS(static_cast<size_t>(3), privileges.size());
-        ASSERT_EQUALS("dbA", privileges[0].getResource());
-        ASSERT_EQUALS("dbB", privileges[1].getResource());
-        ASSERT_EQUALS("dbC", privileges[2].getResource());
+        ASSERT_EQUALS(ResourcePattern::forDatabaseName("dbA"), privileges[0].getResourcePattern());
+        ASSERT_EQUALS(ResourcePattern::forDatabaseName("dbB"), privileges[1].getResourcePattern());
+        ASSERT_EQUALS(ResourcePattern::forDatabaseName("dbC"), privileges[2].getResourcePattern());
         privileges = graph.getAllPrivileges(roleB);
         ASSERT_EQUALS(static_cast<size_t>(2), privileges.size());
-        ASSERT_EQUALS("dbB", privileges[0].getResource());
-        ASSERT_EQUALS("dbC", privileges[1].getResource());
+        ASSERT_EQUALS(ResourcePattern::forDatabaseName("dbB"), privileges[0].getResourcePattern());
+        ASSERT_EQUALS(ResourcePattern::forDatabaseName("dbC"), privileges[1].getResourcePattern());
 
         // Add's roleD's privileges to roleC and make sure that roleA and roleB get them as well.
         ASSERT_OK(graph.addRoleToRole(roleC, roleD));
@@ -324,22 +324,22 @@ namespace {
         ASSERT_OK(graph.recomputePrivilegeData());
         privileges = graph.getAllPrivileges(roleA);
         ASSERT_EQUALS(static_cast<size_t>(4), privileges.size());
-        ASSERT_EQUALS("dbA", privileges[0].getResource());
-        ASSERT_EQUALS("dbB", privileges[1].getResource());
-        ASSERT_EQUALS("dbC", privileges[2].getResource());
-        ASSERT_EQUALS("dbD", privileges[3].getResource());
+        ASSERT_EQUALS(ResourcePattern::forDatabaseName("dbA"), privileges[0].getResourcePattern());
+        ASSERT_EQUALS(ResourcePattern::forDatabaseName("dbB"), privileges[1].getResourcePattern());
+        ASSERT_EQUALS(ResourcePattern::forDatabaseName("dbC"), privileges[2].getResourcePattern());
+        ASSERT_EQUALS(ResourcePattern::forDatabaseName("dbD"), privileges[3].getResourcePattern());
         privileges = graph.getAllPrivileges(roleB);
         ASSERT_EQUALS(static_cast<size_t>(3), privileges.size());
-        ASSERT_EQUALS("dbB", privileges[0].getResource());
-        ASSERT_EQUALS("dbC", privileges[1].getResource());
-        ASSERT_EQUALS("dbD", privileges[2].getResource());
+        ASSERT_EQUALS(ResourcePattern::forDatabaseName("dbB"), privileges[0].getResourcePattern());
+        ASSERT_EQUALS(ResourcePattern::forDatabaseName("dbC"), privileges[1].getResourcePattern());
+        ASSERT_EQUALS(ResourcePattern::forDatabaseName("dbD"), privileges[2].getResourcePattern());
         privileges = graph.getAllPrivileges(roleC);
         ASSERT_EQUALS(static_cast<size_t>(2), privileges.size());
-        ASSERT_EQUALS("dbC", privileges[0].getResource());
-        ASSERT_EQUALS("dbD", privileges[1].getResource());
+        ASSERT_EQUALS(ResourcePattern::forDatabaseName("dbC"), privileges[0].getResourcePattern());
+        ASSERT_EQUALS(ResourcePattern::forDatabaseName("dbD"), privileges[1].getResourcePattern());
         privileges = graph.getAllPrivileges(roleD);
         ASSERT_EQUALS(static_cast<size_t>(1), privileges.size());
-        ASSERT_EQUALS("dbD", privileges[0].getResource());
+        ASSERT_EQUALS(ResourcePattern::forDatabaseName("dbD"), privileges[0].getResourcePattern());
 
         // Remove roleC from roleB, make sure that roleA then loses both roleC's and roleD's
         // privileges
@@ -348,32 +348,32 @@ namespace {
         ASSERT_OK(graph.recomputePrivilegeData());
         privileges = graph.getAllPrivileges(roleA);
         ASSERT_EQUALS(static_cast<size_t>(2), privileges.size());
-        ASSERT_EQUALS("dbA", privileges[0].getResource());
-        ASSERT_EQUALS("dbB", privileges[1].getResource());
+        ASSERT_EQUALS(ResourcePattern::forDatabaseName("dbA"), privileges[0].getResourcePattern());
+        ASSERT_EQUALS(ResourcePattern::forDatabaseName("dbB"), privileges[1].getResourcePattern());
         privileges = graph.getAllPrivileges(roleB);
         ASSERT_EQUALS(static_cast<size_t>(1), privileges.size());
-        ASSERT_EQUALS("dbB", privileges[0].getResource());
+        ASSERT_EQUALS(ResourcePattern::forDatabaseName("dbB"), privileges[0].getResourcePattern());
         privileges = graph.getAllPrivileges(roleC);
         ASSERT_EQUALS(static_cast<size_t>(2), privileges.size());
-        ASSERT_EQUALS("dbC", privileges[0].getResource());
-        ASSERT_EQUALS("dbD", privileges[1].getResource());
+        ASSERT_EQUALS(ResourcePattern::forDatabaseName("dbC"), privileges[0].getResourcePattern());
+        ASSERT_EQUALS(ResourcePattern::forDatabaseName("dbD"), privileges[1].getResourcePattern());
         privileges = graph.getAllPrivileges(roleD);
         ASSERT_EQUALS(static_cast<size_t>(1), privileges.size());
-        ASSERT_EQUALS("dbD", privileges[0].getResource());
+        ASSERT_EQUALS(ResourcePattern::forDatabaseName("dbD"), privileges[0].getResourcePattern());
 
         // Make sure direct privileges were untouched
         privileges = graph.getDirectPrivileges(roleA);
         ASSERT_EQUALS(static_cast<size_t>(1), privileges.size());
-        ASSERT_EQUALS("dbA", privileges[0].getResource());
+        ASSERT_EQUALS(ResourcePattern::forDatabaseName("dbA"), privileges[0].getResourcePattern());
         privileges = graph.getDirectPrivileges(roleB);
         ASSERT_EQUALS(static_cast<size_t>(1), privileges.size());
-        ASSERT_EQUALS("dbB", privileges[0].getResource());
+        ASSERT_EQUALS(ResourcePattern::forDatabaseName("dbB"), privileges[0].getResourcePattern());
         privileges = graph.getDirectPrivileges(roleC);
         ASSERT_EQUALS(static_cast<size_t>(1), privileges.size());
-        ASSERT_EQUALS("dbC", privileges[0].getResource());
+        ASSERT_EQUALS(ResourcePattern::forDatabaseName("dbC"), privileges[0].getResourcePattern());
         privileges = graph.getDirectPrivileges(roleD);
         ASSERT_EQUALS(static_cast<size_t>(1), privileges.size());
-        ASSERT_EQUALS("dbD", privileges[0].getResource());
+        ASSERT_EQUALS(ResourcePattern::forDatabaseName("dbD"), privileges[0].getResourcePattern());
     }
 
     // Test that if you grant 1 role to another, then remove it and change it's privileges, then
@@ -393,9 +393,9 @@ namespace {
         ASSERT_OK(graph.createRole(roleB));
         ASSERT_OK(graph.createRole(roleC));
 
-        ASSERT_OK(graph.addPrivilegeToRole(roleA, Privilege("db", actionsA)));
-        ASSERT_OK(graph.addPrivilegeToRole(roleB, Privilege("db", actionsB)));
-        ASSERT_OK(graph.addPrivilegeToRole(roleC, Privilege("db", actionsC)));
+        ASSERT_OK(graph.addPrivilegeToRole(roleA, Privilege(ResourcePattern::forDatabaseName("db"), actionsA)));
+        ASSERT_OK(graph.addPrivilegeToRole(roleB, Privilege(ResourcePattern::forDatabaseName("db"), actionsB)));
+        ASSERT_OK(graph.addPrivilegeToRole(roleC, Privilege(ResourcePattern::forDatabaseName("db"), actionsC)));
 
         ASSERT_OK(graph.addRoleToRole(roleA, roleB));
         ASSERT_OK(graph.addRoleToRole(roleB, roleC)); // graph: A <- B <- C
@@ -425,7 +425,7 @@ namespace {
         ASSERT_OK(graph.removeAllPrivilegesFromRole(roleB));
         ActionSet newActionsB;
         newActionsB.addAction(ActionType::remove);
-        ASSERT_OK(graph.addPrivilegeToRole(roleB, Privilege("db", newActionsB)));
+        ASSERT_OK(graph.addPrivilegeToRole(roleB, Privilege(ResourcePattern::forDatabaseName("db"), newActionsB)));
 
         // Grant roleB back to roleA, make sure roleA has roleB's new privilege but not its old one.
         ASSERT_OK(graph.addRoleToRole(roleA, roleB));
@@ -456,7 +456,7 @@ namespace {
         ASSERT_OK(graph.createRole(roleB));
         actionsB.removeAllActions();
         actionsB.addAction(ActionType::shutdown);
-        ASSERT_OK(graph.addPrivilegeToRole(roleB, Privilege("db", actionsB)));
+        ASSERT_OK(graph.addPrivilegeToRole(roleB, Privilege(ResourcePattern::forDatabaseName("db"), actionsB)));
         ASSERT_OK(graph.addRoleToRole(roleA, roleB));
         ASSERT_OK(graph.recomputePrivilegeData());
 
@@ -482,9 +482,9 @@ namespace {
 
         ActionSet actions;
         actions.addAction(ActionType::find);
-        ASSERT_OK(graph.addPrivilegeToRole(roleA, Privilege("dbA", actions)));
-        ASSERT_OK(graph.addPrivilegeToRole(roleB, Privilege("dbB", actions)));
-        ASSERT_OK(graph.addPrivilegeToRole(roleC, Privilege("dbC", actions)));
+        ASSERT_OK(graph.addPrivilegeToRole(roleA, Privilege(ResourcePattern::forDatabaseName("dbA"), actions)));
+        ASSERT_OK(graph.addPrivilegeToRole(roleB, Privilege(ResourcePattern::forDatabaseName("dbB"), actions)));
+        ASSERT_OK(graph.addPrivilegeToRole(roleC, Privilege(ResourcePattern::forDatabaseName("dbC"), actions)));
 
         ASSERT_OK(graph.addRoleToRole(roleA, roleB));
 
@@ -505,9 +505,9 @@ namespace {
         graph.getAllPrivileges(roleA); // should have privileges from roleB *and* role C
         PrivilegeVector privileges = graph.getAllPrivileges(roleA);
         ASSERT_EQUALS(static_cast<size_t>(3), privileges.size());
-        ASSERT_EQUALS("dbA", privileges[0].getResource());
-        ASSERT_EQUALS("dbB", privileges[1].getResource());
-        ASSERT_EQUALS("dbC", privileges[2].getResource());
+        ASSERT_EQUALS(ResourcePattern::forDatabaseName("dbA"), privileges[0].getResourcePattern());
+        ASSERT_EQUALS(ResourcePattern::forDatabaseName("dbB"), privileges[1].getResourcePattern());
+        ASSERT_EQUALS(ResourcePattern::forDatabaseName("dbC"), privileges[2].getResourcePattern());
     }
 
     // Tests error handling
@@ -518,8 +518,8 @@ namespace {
 
         ActionSet actions;
         actions.addAction(ActionType::find);
-        Privilege privilege1("db1", actions);
-        Privilege privilege2("db2", actions);
+        Privilege privilege1(ResourcePattern::forDatabaseName("db1"), actions);
+        Privilege privilege2(ResourcePattern::forDatabaseName("db2"), actions);
         PrivilegeVector privileges;
         privileges.push_back(privilege1);
         privileges.push_back(privilege2);
@@ -570,7 +570,7 @@ namespace {
 
         ActionSet actions;
         actions.addAction(ActionType::insert);
-        Privilege privilege("dbA", actions);
+        Privilege privilege(ResourcePattern::forDatabaseName("dbA"), actions);
 
         RoleGraph graph;
 
@@ -595,14 +595,14 @@ namespace {
         ASSERT_EQUALS(1U, privileges.size());
         ASSERT(privileges[0].getActions().equals(actions));
         ASSERT(!privileges[0].getActions().contains(ActionType::find));
-        ASSERT_EQUALS("dbA", privileges[0].getResource());
+        ASSERT_EQUALS(ResourcePattern::forDatabaseName("dbA"), privileges[0].getResourcePattern());
 
         privileges = graph.getAllPrivileges(userRole);
         ASSERT_EQUALS(1U, privileges.size());
         ASSERT(privileges[0].getActions().isSupersetOf(actions));
         ASSERT(privileges[0].getActions().contains(ActionType::insert));
         ASSERT(privileges[0].getActions().contains(ActionType::find));
-        ASSERT_EQUALS("dbA", privileges[0].getResource());
+        ASSERT_EQUALS(ResourcePattern::forDatabaseName("dbA"), privileges[0].getResourcePattern());
 
         ASSERT_OK(graph.deleteRole(userRole));
         ASSERT(!graph.roleExists(userRole));

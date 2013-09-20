@@ -55,9 +55,11 @@ namespace mongo {
         virtual Status checkAuthForCommand( ClientBasic* client,
                                             const std::string& dbname,
                                             const BSONObj& cmdObj ) {
-            return client->getAuthorizationSession()->checkAuthForPrivilege(
-                Privilege( AuthorizationManager::CLUSTER_RESOURCE_NAME,
-                           ActionType::mergeChunks ) );
+            if (!client->getAuthorizationSession()->isAuthorizedForActionsOnResource(
+                        ResourcePattern::forClusterResource(), ActionType::mergeChunks)) {
+                return Status(ErrorCodes::Unauthorized, "Not authorized for mergeChunks.");
+            }
+            return Status::OK();
         }
 
         virtual bool slaveOk() const { return false; }

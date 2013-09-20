@@ -147,8 +147,8 @@ namespace mongo {
         QueryMessage q(d);
         BSONObjBuilder b;
 
-        const bool isAuthorized = cc().getAuthorizationSession()->checkAuthorization(
-                AuthorizationManager::SERVER_RESOURCE_NAME, ActionType::inprog);
+        const bool isAuthorized = cc().getAuthorizationSession()->isAuthorizedForActionsOnResource(
+                ResourcePattern::forClusterResource(), ActionType::inprog);
 
         audit::logInProgAuthzCheck(
                 &cc(), q.query, isAuthorized ? ErrorCodes::OK : ErrorCodes::Unauthorized);
@@ -206,8 +206,8 @@ namespace mongo {
         DbMessage d(m);
         QueryMessage q(d);
         BSONObj obj;
-        const bool isAuthorized = cc().getAuthorizationSession()->checkAuthorization(
-                AuthorizationManager::SERVER_RESOURCE_NAME, ActionType::killop);
+        const bool isAuthorized = cc().getAuthorizationSession()->isAuthorizedForActionsOnResource(
+                ResourcePattern::forClusterResource(), ActionType::killop);
         audit::logKillOpAuthzCheck(&cc(),
                                    q.query,
                                    isAuthorized ? ErrorCodes::OK : ErrorCodes::Unauthorized);
@@ -234,8 +234,8 @@ namespace mongo {
     bool _unlockFsync();
     void unlockFsync(const char *ns, Message& m, DbResponse &dbresponse) {
         BSONObj obj;
-        const bool isAuthorized = cc().getAuthorizationSession()->checkAuthorization(
-                AuthorizationManager::SERVER_RESOURCE_NAME, ActionType::unlock);
+        const bool isAuthorized = cc().getAuthorizationSession()->isAuthorizedForActionsOnResource(
+                ResourcePattern::forClusterResource(), ActionType::unlock);
         audit::logFsyncUnlockAuthzCheck(
                 &cc(), isAuthorized ? ErrorCodes::OK : ErrorCodes::Unauthorized);
         if (!isAuthorized) {
@@ -269,13 +269,12 @@ namespace mongo {
         shared_ptr<AssertionException> ex;
 
         try {
-            if (!NamespaceString(d.getns()).isCommand()) {
+            NamespaceString ns(d.getns());
+            if (!ns.isCommand()) {
                 // Auth checking for Commands happens later.
                 Client* client = &cc();
-                Status status = client->getAuthorizationSession()->checkAuthForQuery(d.getns(),
-                                                                                     q.query);
-                audit::logQueryAuthzCheck(
-                        client, NamespaceString(d.getns()), q.query, status.code());
+                Status status = client->getAuthorizationSession()->checkAuthForQuery(ns, q.query);
+                audit::logQueryAuthzCheck(client, ns, q.query, status.code());
                 uassertStatusOK(status);
             }
             dbresponse.exhaustNS = runQuery(m, q, op, *resp);
@@ -588,8 +587,8 @@ namespace mongo {
 
     void receivedUpdate(Message& m, CurOp& op) {
         DbMessage d(m);
-        const char *ns = d.getns();
-        op.debug().ns = ns;
+        NamespaceString ns(d.getns());
+        op.debug().ns = ns.ns();
         int flags = d.pullInt();
         BSONObj query = d.nextJsObj();
 
@@ -607,8 +606,7 @@ namespace mongo {
                                                                            query,
                                                                            toupdate,
                                                                            upsert);
-        audit::logUpdateAuthzCheck(
-                &cc(), NamespaceString(ns), query, toupdate, upsert, multi, status.code());
+        audit::logUpdateAuthzCheck(&cc(), ns, query, toupdate, upsert, multi, status.code());
         uassertStatusOK(status);
 
         op.debug().query = query;
@@ -646,11 +644,11 @@ namespace mongo {
         PageFaultRetryableSection s;
         while ( 1 ) {
             try {
-                Lock::DBWrite lk(ns);
+                Lock::DBWrite lk(ns.ns());
 
                 // void ReplSetImpl::relinquish() uses big write lock so this is thus
                 // synchronized given our lock above.
-                uassert( 17010 ,  "not master", isMasterNs( ns ) );
+                uassert( 17010 ,  "not master", isMasterNs( ns.ns().c_str() ) );
 
                 // if this ever moves to outside of lock, need to adjust check
                 // Client::Context::_finishInit
@@ -682,9 +680,9 @@ namespace mongo {
 
     void receivedDelete(Message& m, CurOp& op) {
         DbMessage d(m);
-        const char *ns = d.getns();
+        NamespaceString ns(d.getns());
 
-        op.debug().ns = ns;
+        op.debug().ns = ns.ns();
         int flags = d.pullInt();
         bool justOne = flags & RemoveOption_JustOne;
         bool broadcast = flags & RemoveOption_Broadcast;
@@ -692,7 +690,7 @@ namespace mongo {
         BSONObj pattern = d.nextJsObj();
 
         Status status = cc().getAuthorizationSession()->checkAuthForDelete(ns, pattern);
-        audit::logDeleteAuthzCheck(&cc(), NamespaceString(ns), pattern, status.code());
+        audit::logDeleteAuthzCheck(&cc(), ns, pattern, status.code());
         uassertStatusOK(status);
 
         op.debug().query = pattern;
@@ -701,10 +699,10 @@ namespace mongo {
         PageFaultRetryableSection s;
         while ( 1 ) {
             try {
-                Lock::DBWrite lk(ns);
+                Lock::DBWrite lk(ns.ns());
                 
                 // writelock is used to synchronize stepdowns w/ writes
-                uassert( 10056 ,  "not master", isMasterNs( ns ) );
+                uassert( 10056 ,  "not master", isMasterNs( ns.ns().c_str() ) );
                 
                 // if this ever moves to outside of lock, need to adjust check Client::Context::_finishInit
                 if ( ! broadcast && handlePossibleShardedMessage( m , 0 ) )
@@ -712,7 +710,7 @@ namespace mongo {
                 
                 Client::Context ctx(ns);
                 
-                long long n = deleteObjects(ns, pattern, justOne, true);
+                long long n = deleteObjects(ns.ns().c_str(), pattern, justOne, true);
                 lastError.getSafe()->recordDelete( n );
                 op.debug().ndeleted = n;
                 break;
@@ -751,8 +749,9 @@ namespace mongo {
                 const NamespaceString nsString( ns );
                 uassert( 16258, str::stream() << "Invalid ns [" << ns << "]", nsString.isValid() );
 
-                Status status = cc().getAuthorizationSession()->checkAuthForGetMore(ns, cursorid);
-                audit::logGetMoreAuthzCheck(&cc(), NamespaceString(ns), cursorid, status.code());
+                Status status = cc().getAuthorizationSession()->checkAuthForGetMore(
+                        nsString, cursorid);
+                audit::logGetMoreAuthzCheck(&cc(), nsString, cursorid, status.code());
                 uassertStatusOK(status);
 
                 if (str::startsWith(ns, "local.oplog.")){
@@ -910,8 +909,9 @@ namespace mongo {
 
             // Check auth for insert (also handles checking if this is an index build and checks
             // for the proper privileges in that case).
-            Status status = cc().getAuthorizationSession()->checkAuthForInsert(ns, obj);
-            audit::logInsertAuthzCheck(&cc(), NamespaceString(ns), obj, status.code());
+            const NamespaceString nsString(ns);
+            Status status = cc().getAuthorizationSession()->checkAuthForInsert(nsString, obj);
+            audit::logInsertAuthzCheck(&cc(), nsString, obj, status.code());
             uassertStatusOK(status);
         }
 

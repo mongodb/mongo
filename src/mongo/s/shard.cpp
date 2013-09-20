@@ -288,7 +288,7 @@ namespace mongo {
                                            std::vector<Privilege>* out) {
             ActionSet actions;
             actions.addAction(ActionType::getShardMap);
-            out->push_back(Privilege(AuthorizationManager::CLUSTER_RESOURCE_NAME, actions));
+            out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
         }
         virtual bool run(const string&, mongo::BSONObj&, int, std::string& errmsg , mongo::BSONObjBuilder& result, bool) {
             return staticShardInfo.getShardMap( result , errmsg );

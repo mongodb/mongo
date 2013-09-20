@@ -19,11 +19,11 @@
 #include <vector>
 
 #include "mongo/db/auth/privilege.h"
+#include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/auth/role_name.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util.h"
-#include "db/auth/role_name.h"
 
 namespace mongo {
 
@@ -52,8 +52,8 @@ namespace mongo {
         return _refCount;
     }
 
-    const ActionSet User::getActionsForResource(const std::string& resource) const {
-        unordered_map<string, Privilege>::const_iterator it = _privileges.find(resource);
+    const ActionSet User::getActionsForResource(const ResourcePattern& resource) const {
+        unordered_map<ResourcePattern, Privilege>::const_iterator it = _privileges.find(resource);
         if (it == _privileges.end()) {
             return ActionSet();
         }
@@ -102,12 +102,12 @@ namespace mongo {
     }
 
     void User::addPrivilege(const Privilege& privilegeToAdd) {
-        ResourcePrivilegeMap::iterator it = _privileges.find(privilegeToAdd.getResource());
+        ResourcePrivilegeMap::iterator it = _privileges.find(privilegeToAdd.getResourcePattern());
         if (it == _privileges.end()) {
             // No privilege exists yet for this resource
-            _privileges.insert(std::make_pair(privilegeToAdd.getResource(), privilegeToAdd));
+            _privileges.insert(std::make_pair(privilegeToAdd.getResourcePattern(), privilegeToAdd));
         } else {
-            dassert(it->first == privilegeToAdd.getResource());
+            dassert(it->first == privilegeToAdd.getResourcePattern());
             it->second.addActions(privilegeToAdd.getActions());
         }
     }

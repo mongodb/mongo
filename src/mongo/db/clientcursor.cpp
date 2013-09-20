@@ -629,27 +629,27 @@ namespace mongo {
     }
 
     bool ClientCursor::eraseIfAuthorized(CursorId id) {
-        std::string ns;
+        NamespaceString ns;
         {
             recursive_scoped_lock lock(ccmutex);
             ClientCursor* cursor = find_inlock(id);
             if (!cursor) {
                 audit::logKillCursorsAuthzCheck(
                         &cc(),
-                        NamespaceString(""),
+                        NamespaceString(),
                         id,
                         ErrorCodes::CursorNotFound);
                 return false;
             }
-            ns = cursor->ns();
+            ns = NamespaceString(cursor->ns());
         }
 
         // Can't be in a lock when checking authorization
-        const bool isAuthorized = cc().getAuthorizationSession()->checkAuthorization(
+        const bool isAuthorized = cc().getAuthorizationSession()->isAuthorizedForActionsOnNamespace(
                 ns, ActionType::killCursors);
         audit::logKillCursorsAuthzCheck(
                 &cc(),
-                NamespaceString(ns),
+                ns,
                 id,
                 isAuthorized ? ErrorCodes::OK : ErrorCodes::Unauthorized);
         if (!isAuthorized) {
@@ -665,7 +665,7 @@ namespace mongo {
             // Cursor was deleted in another thread since we found it earlier in this function.
             return false;
         }
-        if (cursor->ns() != ns) {
+        if (ns != cursor->ns()) {
             warning() << "Cursor namespace changed. Previous ns: " << ns << ", current ns: "
                     << cursor->ns() << endl;
             return false;
@@ -1009,7 +1009,7 @@ namespace mongo {
                                            std::vector<Privilege>* out) {
             ActionSet actions;
             actions.addAction(ActionType::cursorInfo);
-            out->push_back(Privilege(AuthorizationManager::SERVER_RESOURCE_NAME, actions));
+            out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
         }
         bool run(const string& dbname, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result,
                  bool fromRepl ) {

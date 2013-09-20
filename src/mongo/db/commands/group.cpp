@@ -59,7 +59,7 @@ namespace mongo {
                                            std::vector<Privilege>* out) {
             ActionSet actions;
             actions.addAction(ActionType::find);
-            out->push_back(Privilege(parseNs(dbname, cmdObj), actions));
+            out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
         }
         BSONObj getKey( const BSONObj& obj , const BSONObj& keyPattern , ScriptingFunction func , double avgSize , Scope * s ) {
             if ( func ) {

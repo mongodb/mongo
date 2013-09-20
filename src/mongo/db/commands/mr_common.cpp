@@ -34,6 +34,7 @@
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/privilege.h"
+#include "mongo/db/commands.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -101,17 +102,20 @@ namespace mongo {
             return outputOptions;
         }
 
-        void addPrivilegesRequiredForMapReduce(const std::string& dbname,
+        void addPrivilegesRequiredForMapReduce(Command* commandTemplate,
+                                               const std::string& dbname,
                                                const BSONObj& cmdObj,
                                                std::vector<Privilege>* out) {
             Config::OutputOptions outputOptions = Config::parseOutputOptions(dbname, cmdObj);
-            ActionSet inputActions, outputActions;
 
-            inputActions.addAction(ActionType::find);
-            std::string inputNs = dbname + '.' + cmdObj.firstElement().valuestr();
-            out->push_back(Privilege(inputNs, inputActions));
+            ResourcePattern inputResource(commandTemplate->parseResourcePattern(dbname, cmdObj));
+            uassert(17142, mongoutils::str::stream() <<
+                    "Invalid input resource " << inputResource.toString(),
+                    inputResource.isExactNamespacePattern());
+            out->push_back(Privilege(inputResource, ActionType::find));
 
             if (outputOptions.outType != Config::INMEMORY) {
+                ActionSet outputActions;
                 outputActions.addAction(ActionType::insert);
                 if (outputOptions.outType == Config::REPLACE) {
                     outputActions.addAction(ActionType::remove);
@@ -120,9 +124,15 @@ namespace mongo {
                     outputActions.addAction(ActionType::update);
                 }
 
-                std::string outputNs = outputOptions.finalNamespace;
+                ResourcePattern outputResource(
+                        ResourcePattern::forExactNamespace(
+                                NamespaceString(outputOptions.finalNamespace)));
+                uassert(17143, mongoutils::str::stream() << "Invalid target namespace " <<
+                        outputResource.ns().ns(),
+                        outputResource.ns().isValid());
+
                 // TODO: check if outputNs exists and add createCollection privilege if not
-                out->push_back(Privilege(outputNs, outputActions));
+                out->push_back(Privilege(outputResource, outputActions));
             }
         }
     }
