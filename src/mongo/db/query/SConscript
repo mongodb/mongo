@@ -27,7 +27,6 @@ env.StaticLibrary(
         "multi_plan_runner.cpp",
         "new_find.cpp",
         "plan_ranker.cpp",
-        "single_solution_runner.cpp",
         "stage_builder.cpp",
     ],
     LIBDEPS=[

@@ -42,7 +42,6 @@ namespace mongo {
     using std::size_t;
     using std::vector;
 
-    class BSONObjBuilder;
     struct SpecificStats;
 
     // Every stage has CommonStats.
@@ -55,14 +54,6 @@ namespace mongo {
                         needTime(0),
                         needFetch(0),
                         isEOF(false) { }
-
-        /**
-         * Fill in explain info.
-         * Adding just the fields "works" and "advanced" for now. May rename fields in future.
-         * NOTE: Debatable if this level of detail is desired. CommonStats info may be too
-         * low-level for end users
-         */
-        void writeExplainTo(BSONObjBuilder* bob) const;
 
         // Count calls into the stage.
         uint64_t works;
@@ -109,9 +100,6 @@ namespace mongo {
         template <typename T> const T& getSpecific() const {
             return *static_cast<T*>(specific.get());
         }
-
-        // Fill in explain info using common and specific stats data
-        void writeExplainTo(BSONObjBuilder* bob) const;
 
         // The stats of the node's children.
         vector<PlanStageStats*> children;

@@ -81,7 +81,6 @@ namespace mongo {
 
         virtual void kill() { _exec->kill(); }
 
-        virtual void writeExplainTo(BSONObjBuilder* bob) const { }
     private:
         void updateCache() {
             _updatedCache = true;
