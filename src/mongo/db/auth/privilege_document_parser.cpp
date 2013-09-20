@@ -362,7 +362,7 @@ namespace {
     }
 
     Status V2PrivilegeDocumentParser::checkValidRoleObject(
-            const BSONObj& roleObject) const {
+            const BSONObj& roleObject, bool hasPossessionBools) const {
         BSONElement roleNameElement = roleObject[ROLE_NAME_FIELD_NAME];
         BSONElement roleSourceElement = roleObject[ROLE_SOURCE_FIELD_NAME];
         BSONElement canDelegateElement = roleObject[ROLE_CAN_DELEGATE_FIELD_NAME];
@@ -378,19 +378,30 @@ namespace {
             return Status(ErrorCodes::UnsupportedFormat,
                           "Role source must be non-empty strings");
         }
-        if (canDelegateElement.type() != Bool) {
-            return Status(ErrorCodes::UnsupportedFormat,
-                          "Entries in 'roles' array need a 'canDelegate' boolean field");
-        }
-        if (hasRoleElement.type() != Bool) {
-            return Status(ErrorCodes::UnsupportedFormat,
-                          "Entries in 'roles' array need a 'hasRole' boolean field");
-        }
+        if (hasPossessionBools) {
+            if (canDelegateElement.type() != Bool) {
+                return Status(ErrorCodes::UnsupportedFormat,
+                              "Entries in 'roles' array need a 'canDelegate' boolean field");
+            }
+            if (hasRoleElement.type() != Bool) {
+                return Status(ErrorCodes::UnsupportedFormat,
+                              "Entries in 'roles' array need a 'hasRole' boolean field");
+            }
 
-        if (!hasRoleElement.Bool() && !canDelegateElement.Bool()) {
-            return Status(ErrorCodes::UnsupportedFormat,
-                          "At least one of 'canDelegate' and 'hasRole' must be true for "
-                          "every role in the 'roles' array");
+            if (!hasRoleElement.Bool() && !canDelegateElement.Bool()) {
+                return Status(ErrorCodes::UnsupportedFormat,
+                              "At least one of 'canDelegate' and 'hasRole' must be true for "
+                              "every role in the 'roles' array");
+            }
+        } else {
+            if (canDelegateElement.type() != EOO) {
+                return Status(ErrorCodes::UnsupportedFormat,
+                              "Invalid field 'canDelegate' found in role object");
+            }
+            if (hasRoleElement.type() != EOO) {
+                return Status(ErrorCodes::UnsupportedFormat,
+                              "Invalid field 'hasRole' found in role object");
+            }
         }
 
         return Status::OK();
@@ -413,7 +424,7 @@ namespace {
             }
             BSONObj roleObject = (*it).Obj();
 
-            Status status = checkValidRoleObject(roleObject);
+            Status status = checkValidRoleObject(roleObject, true);
             if (!status.isOK()) {
                 return status;
             }

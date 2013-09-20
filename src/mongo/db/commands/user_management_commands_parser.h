@@ -86,5 +86,17 @@ namespace auth {
                                             vector<RoleName>* parsedRoleNames,
                                             BSONObj* parsedWriteConcern);
 
+    /**
+     * Takes a command object describing an invocation of the "createRole" command on the database
+     * "dbname", and returns (via the output param "parsedRoleObj") a role object that can be
+     * inserted into admin.system.roles to create the role as described by the command object.
+     * Also validates the input and returns a non-ok Status if there is anything wrong.
+     */
+    Status parseAndValidateCreateRoleCommand(const BSONObj& cmdObj,
+                                             const std::string& dbname,
+                                             AuthorizationManager* authzManager,
+                                             BSONObj* parsedRoleObj,
+                                             BSONObj* parsedWriteConcern);
+
 } // namespace auth
 } // namespace mongo

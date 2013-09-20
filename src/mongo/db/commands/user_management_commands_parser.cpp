@@ -34,9 +34,11 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/auth_helpers.h"
+#include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/privilege_document_parser.h"
 #include "mongo/db/auth/user_name.h"
+#include "mongo/db/commands/privilege_parser.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/platform/unordered_set.h"
 #include "mongo/util/mongoutils/str.h"
@@ -151,10 +153,14 @@ namespace auth {
      * Validates that the roles array described by rolesElement is valid.
      * Also returns a new roles array (via the modifiedRolesArray output param) where any roles
      * from the input array that were listed as strings have been expanded to a full role document.
+     * If includePossessionBools is true then the expanded roles documents will have "hasRole"
+     * and "canDelegate" boolean fields (in addition to the "name" and "source" fields which are
+     * there either way).
      */
     Status _validateAndModifyRolesArray(const BSONElement& rolesElement,
                                         const std::string& dbname,
                                         AuthorizationManager* authzManager,
+                                        bool includePossessionBools,
                                         BSONArray* modifiedRolesArray) {
         BSONArrayBuilder rolesBuilder;
 
@@ -168,15 +174,20 @@ namespace auth {
                                   " does not name an existing role");
                 }
 
-                rolesBuilder.append(BSON("name" << element.String() <<
-                                         "source" << dbname <<
-                                         "hasRole" << true <<
-                                         "canDelegate" << false));
+                if (includePossessionBools) {
+                    rolesBuilder.append(BSON("name" << element.String() <<
+                                             "source" << dbname <<
+                                             "hasRole" << true <<
+                                             "canDelegate" << false));
+                } else {
+                    rolesBuilder.append(BSON("name" << element.String() <<
+                                             "source" << dbname));
+                }
             } else if (element.type() == Object) {
                 // Check that the role object is valid
                 V2PrivilegeDocumentParser parser;
                 BSONObj roleObj = element.Obj();
-                Status status = parser.checkValidRoleObject(roleObj);
+                Status status = parser.checkValidRoleObject(roleObj, includePossessionBools);
                 if (!status.isOK()) {
                     return status;
                 }
@@ -292,6 +303,7 @@ namespace auth {
             status = _validateAndModifyRolesArray(rolesElement,
                                                   dbname,
                                                   authzManager,
+                                                  true,
                                                   &modifiedRolesArray);
             if (!status.isOK()) {
                 return status;
@@ -381,6 +393,7 @@ namespace auth {
             status = _validateAndModifyRolesArray(rolesElement,
                                                   dbname,
                                                   authzManager,
+                                                  true,
                                                   &modifiedRolesObj);
             if (!status.isOK()) {
                 return status;
@@ -396,6 +409,108 @@ namespace auth {
         }
 
         *parsedUpdateObj = BSON("$set" << updateSet);
+        return Status::OK();
+    }
+
+    Status parseAndValidateCreateRoleCommand(const BSONObj& cmdObj,
+                                             const std::string& dbname,
+                                             AuthorizationManager* authzManager,
+                                             BSONObj* parsedRoleObj,
+                                             BSONObj* parsedWriteConcern) {
+        unordered_set<std::string> validFieldNames;
+        validFieldNames.insert("createRole");
+        validFieldNames.insert("privileges");
+        validFieldNames.insert("roles");
+        validFieldNames.insert("writeConcern");
+
+        // Iterate through all fields in command object and make sure there are no unexpected
+        // ones.
+        for (BSONObjIterator iter(cmdObj); iter.more(); iter.next()) {
+            StringData fieldName = (*iter).fieldNameStringData();
+            if (!validFieldNames.count(fieldName.toString())) {
+                return Status(ErrorCodes::BadValue,
+                              mongoutils::str::stream() << "\"" << fieldName << "\" is not "
+                                      "a valid argument to createRole");
+            }
+        }
+
+        Status status = extractWriteConcern(cmdObj, parsedWriteConcern);
+        if (!status.isOK()) {
+            return status;
+        }
+
+        BSONObjBuilder roleObjBuilder;
+        roleObjBuilder.append("_id", OID::gen());
+
+        // Parse user name
+        std::string roleName;
+        status = bsonExtractStringField(cmdObj, "createRole", &roleName);
+        if (!status.isOK()) {
+            return status;
+        }
+
+        // Prevent creating roles in the local database
+        if (dbname == "local") {
+            return Status(ErrorCodes::BadValue, "Cannot create roles in the local database");
+        }
+
+        roleObjBuilder.append(AuthorizationManager::ROLE_NAME_FIELD_NAME, roleName);
+        roleObjBuilder.append(AuthorizationManager::ROLE_SOURCE_FIELD_NAME, dbname);
+
+        // Parse privileges
+        BSONElement privilegesElement;
+        status = bsonExtractTypedField(cmdObj, "privileges", Array, &privilegesElement);
+        if (!status.isOK()) {
+            return status;
+        }
+
+        for (BSONObjIterator it(privilegesElement.Obj()); it.more(); it.next()) {
+            BSONElement element = *it;
+            if (element.type() != Object) {
+                return Status(ErrorCodes::FailedToParse,
+                              "Elements in privilege arrays must be objects");
+            }
+
+            ParsedPrivilege privilege;
+            std::string errmsg;
+            if (!privilege.parseBSON(element.Obj(), &errmsg)) {
+                return Status(ErrorCodes::FailedToParse, errmsg);
+            }
+            if (!privilege.isValid(&errmsg)) {
+                return Status(ErrorCodes::FailedToParse, errmsg);
+            }
+
+            // Make sure the actions actually exist.
+            const std::vector<std::string>& actions = privilege.getActions();
+            for (std::vector<std::string>::const_iterator it = actions.begin();
+                    it != actions.end(); ++it) {
+                ActionType action;
+                status = ActionType::parseActionFromString(*it, &action);
+                if (!status.isOK()) {
+                    return status;
+                }
+            }
+        }
+        roleObjBuilder.append(privilegesElement);
+
+        // Parse roles
+        BSONElement rolesElement;
+        status = bsonExtractTypedField(cmdObj, "roles", Array, &rolesElement);
+        if (!status.isOK()) {
+            return status;
+        }
+        BSONArray modifiedRolesArray;
+        status = _validateAndModifyRolesArray(rolesElement,
+                                              dbname,
+                                              authzManager,
+                                              false,
+                                              &modifiedRolesArray);
+        if (!status.isOK()) {
+            return status;
+        }
+        roleObjBuilder.append("roles", modifiedRolesArray);
+
+        *parsedRoleObj = roleObjBuilder.obj();
         return Status::OK();
     }
 

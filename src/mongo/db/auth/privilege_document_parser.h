@@ -93,8 +93,10 @@ namespace mongo {
 
         /**
          * Returns Status::OK() iff the given BSONObj describes a valid element from a roles array.
+         * If hasPossessionBools is true then the role object must have "hasRole" and
+         * "canDelegate" booleans, if false then they must be missing.
          */
-        Status checkValidRoleObject(const BSONObj& roleObject) const;
+        Status checkValidRoleObject(const BSONObj& roleObject, bool hasPossessionBools) const;
 
         virtual std::string extractUserNameFromPrivilegeDocument(const BSONObj& doc) const;
 
