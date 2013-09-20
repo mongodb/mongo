@@ -219,6 +219,7 @@ namespace mongo {
             //
             // See tagForSort and sortUsingTags in index_tag.h
             if (MatchExpression::AND == root->matchType()) {
+                // XXX: If all children are sortedByDiskLoc() this should be AndSortedNode.
                 auto_ptr<AndHashNode> theAnd(new AndHashNode());
 
                 // Process all IXSCANs, possibly combining them.
@@ -384,6 +385,7 @@ namespace mongo {
                 return andResult;
             }
             else if (MatchExpression::OR == root->matchType()) {
+                // XXX: If all children have the same getSort() this should be MergeSortNode
                 auto_ptr<OrNode> theOr(new OrNode());
 
                 // Process all IXSCANs, possibly combining them.

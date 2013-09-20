@@ -54,6 +54,54 @@ namespace mongo {
          */
         virtual void appendToString(stringstream* ss, int indent) const = 0;
 
+        /**
+         * If true, one of these are true:
+         *          1. All outputs are already fetched, or
+         *          2. There is a projection in place and a fetch is not required.
+         *
+         * If false, a fetch needs to be placed above the root in order to provide results.
+         *
+         * Usage: To determine if every possible result that might reach the root
+         * will be fully-fetched or not.  We don't want any surplus fetches.
+         */
+        virtual bool fetched() const = 0;
+
+        /**
+         * Returns true if the tree rooted at this node provides data with the field name 'field'.
+         * This data can come from any of the types of the WSM.
+         *
+         * Usage: If an index-only plan has all the fields we're interested in, we don't
+         * have to fetch to show results with those fields.
+         *
+         * XXX TODO: Cover issues resulting from covered and multikey.  Multikey prohibits
+         * covering, but allows sort (double check!)
+         *
+         * TODO: 'field' is probably more appropriate as a FieldRef or string.
+         */
+        virtual bool hasField(const string& field) const = 0;
+
+        /**
+         * Returns true if the tree rooted at this node provides data that is sorted by the
+         * its location on disk.
+         *
+         * Usage: If all the children of an STAGE_AND_HASH have this property, we can compute the
+         * AND faster by replacing the STAGE_AND_HASH with STAGE_AND_SORTED.
+         */
+        virtual bool sortedByDiskLoc() const = 0;
+
+        /**
+         * Return a BSONObj representing the sort order of the data stream from this node.  If the data
+         * is not sorted in any particular fashion, returns BSONObj().
+         *
+         * TODO: Is BSONObj really the best way to represent this?
+         *
+         * Usage:
+         * 1. If our plan gives us a sort order, we don't have to add a sort stage.
+         * 2. If all the children of an OR have the same sort order, we can maintain that
+         *    sort order with a STAGE_SORT_MERGE instead of STAGE_OR.
+         */
+        virtual BSONObj getSort() const = 0;
+
     protected:
         static void addIndent(stringstream* ss, int level) {
             for (int i = 0; i < level; ++i) {
@@ -102,20 +150,17 @@ namespace mongo {
     };
 
     struct CollectionScanNode : public QuerySolutionNode {
-        CollectionScanNode() : tailable(false), direction(1), filter(NULL) { }
+        CollectionScanNode();
+        virtual ~CollectionScanNode() { }
 
         virtual StageType getType() const { return STAGE_COLLSCAN; }
 
-        virtual void appendToString(stringstream* ss, int indent) const {
-            addIndent(ss, indent);
-            *ss << "COLLSCAN";
-            addIndent(ss, indent + 1);
-            *ss <<  "ns = " << name;
-            if (NULL != filter) {
-                addIndent(ss, indent + 1);
-                *ss << " filter = " << filter->toString() << endl;
-            }
-        }
+        virtual void appendToString(stringstream* ss, int indent) const;
+
+        bool fetched() const { return true; }
+        bool hasField(const string& field) const { return true; }
+        bool sortedByDiskLoc() const { return false; }
+        BSONObj getSort() const { return BSONObj(); }
 
         // Name of the namespace.
         string name;
@@ -132,96 +177,73 @@ namespace mongo {
     };
 
     struct AndHashNode : public QuerySolutionNode {
-        AndHashNode() : filter(NULL) { }
-        ~AndHashNode() {
-            for (size_t i = 0; i < children.size(); ++i) {
-                delete children[i];
-            }
-        }
+        AndHashNode();
+        virtual ~AndHashNode();
+
         virtual StageType getType() const { return STAGE_AND_HASH; }
-        virtual void appendToString(stringstream* ss, int indent) const {
-            addIndent(ss, indent);
-            *ss << "AND_HASH";
-            if (NULL != filter) {
-                addIndent(ss, indent + 1);
-                *ss << " filter = " << filter->toString() << endl;
-            }
-            for (size_t i = 0; i < children.size(); ++i) {
-                *ss << "Child " << i << ": ";
-                children[i]->appendToString(ss, indent + 1);
-            }
-        }
+
+        virtual void appendToString(stringstream* ss, int indent) const;
+
+        bool fetched() const;
+        bool hasField(const string& field) const;
+        bool sortedByDiskLoc() const { return false; }
+        BSONObj getSort() const { return BSONObj(); }
+
         MatchExpression* filter;
         vector<QuerySolutionNode*> children;
     };
 
     struct OrNode : public QuerySolutionNode {
-        OrNode() : dedup(true), filter(NULL) { }
-        ~OrNode() {
-            for (size_t i = 0; i < children.size(); ++i) {
-                delete children[i];
-            }
-        }
+        OrNode();
+        virtual ~OrNode();
+
         virtual StageType getType() const { return STAGE_OR; }
-        virtual void appendToString(stringstream* ss, int indent) const {
-            addIndent(ss, indent);
-            *ss << "OR\n";
-            if (NULL != filter) {
-                addIndent(ss, indent + 1);
-                *ss << " filter = " << filter->toString() << endl;
-            }
-            for (size_t i = 0; i < children.size(); ++i) {
-                addIndent(ss, indent + 1);
-                *ss << "Child " << i << ":\n";
-                children[i]->appendToString(ss, indent + 2);
-                *ss << endl;
-            }
+
+        virtual void appendToString(stringstream* ss, int indent) const;
+
+        bool fetched() const;
+        bool hasField(const string& field) const;
+        bool sortedByDiskLoc() const {
+            // Even if our children are sorted by their diskloc or other fields, we don't maintain any
+            // order on the output.
+            return false;
         }
+        BSONObj getSort() const { return BSONObj(); }
+
         bool dedup;
         MatchExpression* filter;
         vector<QuerySolutionNode*> children;
     };
 
     struct FetchNode : public QuerySolutionNode {
-        FetchNode() : filter(NULL) { }
+        FetchNode();
+        virtual ~FetchNode() { }
+
         virtual StageType getType() const { return STAGE_FETCH; }
-        virtual void appendToString(stringstream* ss, int indent) const {
-            addIndent(ss, indent);
-            *ss << "FETCH\n";
-            if (NULL != filter) {
-                addIndent(ss, indent + 1);
-                StringBuilder sb;
-                *ss << "filter:\n";
-                filter->debugString(sb, indent + 2);
-                *ss << sb.str();
-            }
-            addIndent(ss, indent + 1);
-            *ss << "Child:" << endl;
-            child->appendToString(ss, indent + 2);
-        }
+
+        virtual void appendToString(stringstream* ss, int indent) const;
+
+        bool fetched() const { return true; }
+        bool hasField(const string& field) const { return true; }
+        bool sortedByDiskLoc() const { return child->sortedByDiskLoc(); }
+        BSONObj getSort() const { return child->getSort(); }
+
         MatchExpression* filter;
         scoped_ptr<QuerySolutionNode> child;
     };
 
     struct IndexScanNode : public QuerySolutionNode {
-        IndexScanNode() : filter(NULL), limit(0), direction(1) { }
+        IndexScanNode();
+        virtual ~IndexScanNode() { }
 
         virtual StageType getType() const { return STAGE_IXSCAN; }
 
-        virtual void appendToString(stringstream* ss, int indent) const {
-            addIndent(ss, indent);
-            *ss << "IXSCAN\n";
-            addIndent(ss, indent + 1);
-            *ss << "keyPattern = " << indexKeyPattern << endl;
-            if (NULL != filter) {
-                addIndent(ss, indent + 1);
-                *ss << " filter= " << filter->toString() << endl;
-            }
-            addIndent(ss, indent + 1);
-            *ss << "dir = " << direction << endl;
-            addIndent(ss, indent + 1);
-            *ss << "bounds = " << bounds.toString();
-        }
+        virtual void appendToString(stringstream* ss, int indent) const;
+
+        bool fetched() const { return false; }
+        bool hasField(const string& field) const;
+        bool sortedByDiskLoc() const;
+        BSONObj getSort() const { return indexKeyPattern; }
 
         BSONObj indexKeyPattern;
 
@@ -240,16 +262,36 @@ namespace mongo {
 
     struct ProjectionNode : public QuerySolutionNode {
         ProjectionNode() { }
+        virtual ~ProjectionNode() { }
+
         virtual StageType getType() const { return STAGE_PROJECTION; }
 
-        virtual void appendToString(stringstream* ss, int indent) const {
-            addIndent(ss, indent);
-            *ss << "PROJ\n";
-            addIndent(ss, indent + 1);
-            *ss << "proj = " << projection.toString() << endl;
-            addIndent(ss, indent + 1);
-            *ss << "Child:" << endl;
-            child->appendToString(ss, indent + 2);
+        virtual void appendToString(stringstream* ss, int indent) const;
+
+        /**
+         * This node changes the type to OWNED_OBJ.  There's no fetching possible after this.
+         */
+        bool fetched() const { return true; }
+
+        bool hasField(const string& field) const {
+            // XXX XXX: perhaps have the QueryProjection pre-allocated and defer to it?  we don't
+            // know what we're dropping.  Until we push projection down this doesn't matter.
+            return false;
+        }
+
+        bool sortedByDiskLoc() const {
+            // Projections destroy the DiskLoc.  By returning true here, this kind of implies that a
+            // fetch could still be done upstream.
+            //
+            // Perhaps this should be false to not imply that there *is* a DiskLoc?  Kind of a
+            // corner case.
+            return child->sortedByDiskLoc();
+        }
+
+        BSONObj getSort() const {
+            // TODO: If we're applying a projection that maintains sort order, the prefix of the
+            // sort order we project is the sort order.
+            return BSONObj();
         }
 
         BSONObj projection;
@@ -259,17 +301,16 @@ namespace mongo {
 
     struct SortNode : public QuerySolutionNode {
         SortNode() { }
+        virtual ~SortNode() { }
+
         virtual StageType getType() const { return STAGE_SORT; }
 
-        virtual void appendToString(stringstream* ss, int indent) const {
-            addIndent(ss, indent);
-            *ss << "SORT\n";
-            addIndent(ss, indent + 1);
-            *ss << "pattern = " << pattern.toString() << endl;
-            addIndent(ss, indent + 1);
-            *ss << "Child:" << endl;
-            child->appendToString(ss, indent + 2);
-        }
+        virtual void appendToString(stringstream* ss, int indent) const;
+        
+        bool fetched() const { return child->fetched(); }
+        bool hasField(const string& field) const { return child->hasField(field); }
+        bool sortedByDiskLoc() const { return false; }
+        BSONObj getSort() const { return pattern; }
 
         BSONObj pattern;
         scoped_ptr<QuerySolutionNode> child;
@@ -278,17 +319,16 @@ namespace mongo {
 
     struct LimitNode : public QuerySolutionNode {
         LimitNode() { }
+        virtual ~LimitNode() { }
+
         virtual StageType getType() const { return STAGE_LIMIT; }
 
-        virtual void appendToString(stringstream* ss, int indent) const {
-            addIndent(ss, indent);
-            *ss << "LIMIT\n";
-            addIndent(ss, indent + 1);
-            *ss << "limit = " << limit << endl;
-            addIndent(ss, indent + 1);
-            *ss << "Child:" << endl;
-            child->appendToString(ss, indent + 2);
-        }
+        virtual void appendToString(stringstream* ss, int indent) const;
+
+        bool fetched() const { return child->fetched(); }
+        bool hasField(const string& field) const { return child->hasField(field); }
+        bool sortedByDiskLoc() const { return child->sortedByDiskLoc(); }
+        BSONObj getSort() const { return child->getSort(); }
 
         int limit;
         scoped_ptr<QuerySolutionNode> child;
@@ -296,17 +336,16 @@ namespace mongo {
 
     struct SkipNode : public QuerySolutionNode {
         SkipNode() { }
+        virtual ~SkipNode() { }
+
         virtual StageType getType() const { return STAGE_SKIP; }
 
-        virtual void appendToString(stringstream* ss, int indent) const {
-            addIndent(ss, indent);
-            *ss << "SKIP\n";
-            addIndent(ss, indent + 1);
-            *ss << "skip= " << skip << endl;
-            addIndent(ss, indent + 1);
-            *ss << "Child:" << endl;
-            child->appendToString(ss, indent + 2);
-        }
+        virtual void appendToString(stringstream* ss, int indent) const;
+
+        bool fetched() const { return child->fetched(); }
+        bool hasField(const string& field) const { return child->hasField(field); }
+        bool sortedByDiskLoc() const { return child->sortedByDiskLoc(); }
+        BSONObj getSort() const { return child->getSort(); }
 
         int skip;
         scoped_ptr<QuerySolutionNode> child;
