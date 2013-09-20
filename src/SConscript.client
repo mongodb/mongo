@@ -95,6 +95,7 @@ clientSourceBasic = [
     'mongo/util/net/sock.cpp',
     'mongo/util/net/ssl_manager.cpp',
     'mongo/util/password.cpp',
+    'mongo/util/paths.cpp',
     'mongo/util/processinfo.cpp',
     'mongo/util/signal_handlers.cpp',
     'mongo/util/stringutils.cpp',
