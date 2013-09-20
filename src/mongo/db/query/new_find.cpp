@@ -547,6 +547,8 @@ namespace mongo {
             bob.append("n", numResults);
             BSONObj obj = bob.done();
             bb.appendBuf((void*)obj.objdata(), obj.objsize());
+            // The explain output is actually a result.
+            numResults = 1;
         }
 
         // Add the results from the query into the output buffer.

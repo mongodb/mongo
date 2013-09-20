@@ -70,7 +70,8 @@ namespace mongo {
                 // BSONValue will be useful here.
                 BSONObj dataObj = objFromElement(node->getData());
 
-                if (dataObj.couldBeArray()) {
+                // UNITTEST 11738048
+                if (Array == dataObj.firstElement().type()) {
                     // XXX: build better bounds
                     warning() << "building lazy bounds for " << expr->toString() << endl;
                     interval = allValues();

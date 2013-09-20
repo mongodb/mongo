@@ -80,6 +80,9 @@ namespace mongo {
         virtual ElemMatchObjectMatchExpression* shallowClone() const {
             ElemMatchObjectMatchExpression* e = new ElemMatchObjectMatchExpression();
             e->init(path(), _sub->shallowClone());
+            if ( getTag() ) {
+                e->setTag(getTag()->clone());
+            }
             return e;
         }
 
@@ -110,6 +113,9 @@ namespace mongo {
             for (size_t i = 0; i < _subs.size(); ++i) {
                 e->add(_subs[i]->shallowClone());
             }
+            if ( getTag() ) {
+                e->setTag(getTag()->clone());
+            }
             return e;
         }
 
@@ -133,6 +139,9 @@ namespace mongo {
         virtual SizeMatchExpression* shallowClone() const {
             SizeMatchExpression* e = new SizeMatchExpression();
             e->init(path(), _size);
+            if ( getTag() ) {
+                e->setTag(getTag()->clone());
+            }
             return e;
         }
 
@@ -165,6 +174,9 @@ namespace mongo {
             for (size_t i = 0; i < _list.size(); ++i) {
                 e->add(reinterpret_cast<ArrayMatchingMatchExpression*>(
                     _list[i]->shallowClone()));
+            }
+            if ( getTag() ) {
+                e->setTag(getTag()->clone());
             }
             return e;
         }
