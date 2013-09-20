@@ -335,23 +335,26 @@ namespace mongo {
             BSONObj newObj;
             const char* source = NULL;
             bool inPlace = doc.getInPlaceUpdates(&damages, &source);
-            if ( inPlace && !damages.empty() && !driver->modsAffectIndices() ) {
-                nsDetails->paddingFits();
+            if ( inPlace && !driver->modsAffectIndices() ) {
+                // If a set of modifiers were all no-ops, we are still 'in place', but there is
+                // no work to do, in which case we want to consider the object unchanged.
+                if (!damages.empty() ) {
+                    nsDetails->paddingFits();
 
-                // All updates were in place. Apply them via durability and writing pointer.
-                mutablebson::DamageVector::const_iterator where = damages.begin();
-                const mutablebson::DamageVector::const_iterator end = damages.end();
-                for( ; where != end; ++where ) {
-                    const char* sourcePtr = source + where->sourceOffset;
-                    void* targetPtr = getDur().writingPtr(
-                        const_cast<char*>(oldObj.objdata()) + where->targetOffset,
-                        where->size);
-                    std::memcpy(targetPtr, sourcePtr, where->size);
+                    // All updates were in place. Apply them via durability and writing pointer.
+                    mutablebson::DamageVector::const_iterator where = damages.begin();
+                    const mutablebson::DamageVector::const_iterator end = damages.end();
+                    for( ; where != end; ++where ) {
+                        const char* sourcePtr = source + where->sourceOffset;
+                        void* targetPtr = getDur().writingPtr(
+                            const_cast<char*>(oldObj.objdata()) + where->targetOffset,
+                            where->size);
+                        std::memcpy(targetPtr, sourcePtr, where->size);
+                    }
+                    objectWasChanged = true;
+                    opDebug->fastmod = true;
                 }
                 newObj = oldObj;
-                opDebug->fastmod = true;
-
-                objectWasChanged = true;
             }
             else {
 
