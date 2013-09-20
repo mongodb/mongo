@@ -452,4 +452,73 @@ namespace {
         ASSERT_EQUALS(fromjson("{ $set : { 'a.b' : 6 } }"), logDoc);
     }
 
+    TEST(Multiplication, ApplyAndLogMissingElement) {
+        Document doc(fromjson("{ a : 0 }"));
+        Mod incMod(fromjson("{ $mul : { b : 3 } }"));
+
+        ModifierInterface::ExecInfo execInfo;
+        ASSERT_OK(incMod.prepare(doc.root(), "", &execInfo));
+        ASSERT_FALSE(execInfo.noOp);
+
+        ASSERT_OK(incMod.apply());
+        ASSERT_FALSE(doc.isInPlaceModeEnabled());
+        ASSERT_EQUALS(fromjson("{ a : 0, b : 0 }"), doc);
+
+        Document logDoc;
+        LogBuilder logBuilder(logDoc.root());
+        ASSERT_OK(incMod.log(&logBuilder));
+        ASSERT_EQUALS(fromjson("{ $set : { b : 0 } }"), logDoc);
+    }
+
+    TEST(Multiplication, ApplyMissingElementInt) {
+        const int int_zero = 0;
+        const int int_three = 3;
+
+        Document doc(BSON("a" << int_zero));
+        Mod incMod(BSON("$mul" << BSON("b" << int_three)));
+
+        ModifierInterface::ExecInfo execInfo;
+        ASSERT_OK(incMod.prepare(doc.root(), "", &execInfo));
+        ASSERT_FALSE(execInfo.noOp);
+
+        ASSERT_OK(incMod.apply());
+        ASSERT_FALSE(doc.isInPlaceModeEnabled());
+        ASSERT_EQUALS(BSON("a" << int_zero << "b" << int_zero), doc);
+        ASSERT_EQUALS(mongo::NumberInt, doc.root().rightChild().getType());
+    }
+
+    TEST(Multiplication, ApplyMissingElementInt64) {
+        const int64_t int64_zero = 0;
+        const int64_t int64_three = 3;
+
+        Document doc(BSON("a" << int64_zero));
+        Mod incMod(BSON("$mul" << BSON("b" << int64_three)));
+
+        ModifierInterface::ExecInfo execInfo;
+        ASSERT_OK(incMod.prepare(doc.root(), "", &execInfo));
+        ASSERT_FALSE(execInfo.noOp);
+
+        ASSERT_OK(incMod.apply());
+        ASSERT_FALSE(doc.isInPlaceModeEnabled());
+        ASSERT_EQUALS(BSON("a" << int64_zero << "b" << int64_zero), doc);
+        ASSERT_EQUALS(mongo::NumberLong, doc.root().rightChild().getType());
+    }
+
+    TEST(Multiplication, ApplyMissingElementDouble) {
+        const double double_zero = 0;
+        const double double_three = 3;
+
+        Document doc(BSON("a" << double_zero));
+        Mod incMod(BSON("$mul" << BSON("b" << double_three)));
+
+        ModifierInterface::ExecInfo execInfo;
+        ASSERT_OK(incMod.prepare(doc.root(), "", &execInfo));
+        ASSERT_FALSE(execInfo.noOp);
+
+        ASSERT_OK(incMod.apply());
+        ASSERT_FALSE(doc.isInPlaceModeEnabled());
+        ASSERT_EQUALS(BSON("a" << double_zero << "b" << 0), doc);
+        ASSERT_EQUALS(mongo::NumberDouble, doc.root().rightChild().getType());
+    }
+
 } // namespace

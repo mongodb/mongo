@@ -167,6 +167,14 @@ namespace mongo {
         // noOp.
         if (!_preparedState->elemFound.ok() ||
             _preparedState->idxFound < (_fieldRef.numParts() - 1)) {
+
+            // For multiplication, we treat ops against missing as yielding zero. We take
+            // advantage here of the promotion rules for SafeNum; the expression below will
+            // always yield a zero of the same type of operand that the user provided
+            // (e.g. double).
+            if (_mode == MODE_MUL)
+                _preparedState->newValue *= SafeNum(static_cast<int>(0));
+
             return Status::OK();
         }
 
