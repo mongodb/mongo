@@ -110,7 +110,11 @@ namespace mongo {
         class FileDeleter {
         public:
             FileDeleter(const string& fileName) :_fileName(fileName) {}
-            ~FileDeleter() { boost::filesystem::remove(_fileName); }
+            ~FileDeleter() {
+                DESTRUCTOR_GUARD(
+                    boost::filesystem::remove(_fileName);
+                )
+            }
         private:
             const std::string _fileName;
         };
