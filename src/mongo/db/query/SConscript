@@ -11,7 +11,7 @@ env.StaticLibrary(
         "lite_parsed_query.cpp",
         "plan_enumerator.cpp",
         "query_planner.cpp",
-        # "query_projection.cpp",
+        "query_solution.cpp",
     ],
     LIBDEPS=[
         "index_bounds",
