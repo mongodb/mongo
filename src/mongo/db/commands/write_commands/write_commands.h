@@ -31,7 +31,7 @@
 #include <string>
 
 #include "mongo/db/commands.h"
-#include "mongo/db/commands/write_commands/batch.h"
+#include "mongo/s/batched_command_request.h"
 
 namespace mongo {
 
@@ -49,11 +49,14 @@ namespace mongo {
         virtual ~WriteCmd() {}
 
     protected:
+
         /**
          * Instantiates a command that can be invoked by "name", which will be capable of issuing
          * write batches of type "writeType", and will require privilege "action" to run.
          */
-        WriteCmd(const StringData& name, WriteBatch::WriteType writeType, ActionType action);
+        WriteCmd( const StringData& name,
+                  BatchedCommandRequest::BatchType writeType,
+                  ActionType action );
 
     private:
         virtual bool logTheOp();
@@ -80,7 +83,7 @@ namespace mongo {
         ActionType _action;
 
         // Type of batch (e.g. insert).
-        WriteBatch::WriteType _writeType;
+        BatchedCommandRequest::BatchType _writeType;
     };
 
     class CmdInsert : public WriteCmd {

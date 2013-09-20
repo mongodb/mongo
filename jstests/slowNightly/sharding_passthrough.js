@@ -116,6 +116,7 @@ files.forEach(function(x) {
         'indexStatsCommand|' +
         'reversecursor|' +
         'block_check_supported|' +
+        'batch_write_protocol|' +
         'stages.*|' +
         'stats' + // tests db.stats().dataFileVersion, which doesn't appear in sharded db.stats()
         ')\.js$');

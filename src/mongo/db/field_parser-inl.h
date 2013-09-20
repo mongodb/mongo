@@ -201,7 +201,8 @@ namespace mongo {
 
             auto_ptr<T> toInsert(new T);
 
-            if (!toInsert->parseBSON(next.embeddedObject(), errMsg)) {
+            if ( !toInsert->parseBSON( next.embeddedObject(), errMsg )
+                 || !toInsert->isValid( errMsg ) ) {
                 return FIELD_INVALID;
             }
 

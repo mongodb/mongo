@@ -24,7 +24,7 @@ namespace mongo {
     using mongoutils::str::stream;
 
     const std::string BatchedDeleteRequest::BATCHED_DELETE_REQUEST = "delete";
-        const BSONField<std::string> BatchedDeleteRequest::collName("insert");
+        const BSONField<std::string> BatchedDeleteRequest::collName("delete");
         const BSONField<std::vector<BatchedDeleteDocument*> > BatchedDeleteRequest::deletes("deletes");
         const BSONField<BSONObj> BatchedDeleteRequest::writeConcern("writeConcern");
         const BSONField<bool> BatchedDeleteRequest::continueOnError("continueOnError", false);

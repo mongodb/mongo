@@ -24,7 +24,7 @@ namespace mongo {
     using mongoutils::str::stream;
 
     const std::string BatchedUpdateRequest::BATCHED_UPDATE_REQUEST = "update";
-        const BSONField<std::string> BatchedUpdateRequest::collName("insert");
+        const BSONField<std::string> BatchedUpdateRequest::collName("update");
         const BSONField<std::vector<BatchedUpdateDocument*> > BatchedUpdateRequest::updates("updates");
         const BSONField<BSONObj> BatchedUpdateRequest::writeConcern("writeConcern");
         const BSONField<bool> BatchedUpdateRequest::continueOnError("continueOnError", false);
