@@ -192,21 +192,6 @@ namespace mongo {
             }
         }
 
-        /**
-         * Fills in explain BSONObjectBuilder with any information that
-         * is relevant to the executed query. Initially forwards writeExplainTo()
-         * to PlanStageStats. In future, information specific to the PlanExecutor
-         * may be added to this result.
-         */
-        void writeExplainTo(BSONObjBuilder* bob) const {
-            if (NULL == bob) {
-                return;
-            }
-            // XXX: getStats() is not const
-            PlanExecutor* exec = const_cast<PlanExecutor*>(this);
-            PlanStageStats* stats = exec->getStats();
-            stats->writeExplainTo(bob);
-        }
     private:
         scoped_ptr<WorkingSet> _workingSet;
         scoped_ptr<PlanStage> _root;

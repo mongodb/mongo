@@ -164,22 +164,6 @@ namespace mongo {
          * Return the NS that the query is running over.
          */
         virtual const string& ns() = 0;
-
-
-        /**
-         * Fill in explain information
-         *
-         * Output BSON (still in flux):
-         *     runner: name of this runner
-         *     nSolutions: number of candidate solutions referenced by this runner
-         *     exec: sub-document containing plan executor information
-         *
-         * This may include data on set of solutions considered and executed query
-         * TODO: Provide default no-op implementation to minimize impact on affected
-         *       implementations. Convert to pure virtual eventually.
-         *       Document fully the structure of the output.
-         */
-        virtual void writeExplainTo(BSONObjBuilder* bob) const = 0;
     };
 
 }  // namespace mongo

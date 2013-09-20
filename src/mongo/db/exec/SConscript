@@ -3,26 +3,6 @@
 Import("env")
 
 env.StaticLibrary(
-    target = "plan_stats",
-    source = [
-        "plan_stats.cpp",
-    ],
-    LIBDEPS = [
-        "$BUILD_DIR/mongo/bson",
-    ],
-)
-
-env.CppUnitTest(
-    target = "plan_stats_test",
-    source = [
-        "plan_stats_test.cpp"
-    ],
-    LIBDEPS = [
-        "plan_stats",
-    ],
-)
-
-env.StaticLibrary(
     target = "working_set",
     source = [
         "working_set.cpp",
@@ -71,7 +51,6 @@ env.StaticLibrary(
         "working_set_common.cpp",
     ],
     LIBDEPS = [
-        "plan_stats",
         "$BUILD_DIR/mongo/bson"
     ],
 )
