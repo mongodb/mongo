@@ -130,16 +130,31 @@ namespace mongo {
         static bool validDBName( const StringData& dbin );
 
         /**
+         * Takes a fully qualified namespace (ie dbname.collectionName), and returns true if
+         * the collection name component of the namespace is valid.
          * samples:
          *   good:
          *      foo.bar
          *   bad:
          *      foo.
          *
-         * @param ns - a full namesapce (a.b)
+         * @param ns - a full namespace (a.b)
          * @return if db.coll is an allowed collection name
          */
-        static bool validCollectionName(const StringData& ns);
+        static bool validCollectionComponent(const StringData& ns);
+
+        /**
+         * Takes a collection name and returns true if it is a valid collection name.
+         * samples:
+         *   good:
+         *     foo
+         *     system.indexes
+         *   bad:
+         *     $foo
+         * @param coll - a collection name component of a namespace
+         * @return if the input is a valid collection name
+         */
+        static bool validCollectionName(const StringData& coll);
 
     private:
 

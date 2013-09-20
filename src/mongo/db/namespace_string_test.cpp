@@ -73,11 +73,21 @@ namespace mongo {
         ASSERT( NamespaceString::normal( "local.oplog.$main" ) );
     }
 
+    TEST( NamespaceStringTest, CollectionComponentValidNames ) {
+        ASSERT( NamespaceString::validCollectionComponent( "a.b" ) );
+        ASSERT( NamespaceString::validCollectionComponent( "a.b" ) );
+        ASSERT( !NamespaceString::validCollectionComponent( "a." ) );
+        ASSERT( NamespaceString::validCollectionComponent( "a.b." ) ); // TODO: should this change?
+    }
+
     TEST( NamespaceStringTest, CollectionValidNames ) {
+        ASSERT( NamespaceString::validCollectionName( "a" ) );
         ASSERT( NamespaceString::validCollectionName( "a.b" ) );
-        ASSERT( NamespaceString::validCollectionName( "a.b" ) );
-        ASSERT( !NamespaceString::validCollectionName( "a." ) );
+        ASSERT( NamespaceString::validCollectionName( "a." ) ); // TODO: should this change?
         ASSERT( NamespaceString::validCollectionName( "a.b." ) ); // TODO: should this change?
+        ASSERT( !NamespaceString::validCollectionName( "$a" ) );
+        ASSERT( !NamespaceString::validCollectionName( "a$b" ) );
+        ASSERT( !NamespaceString::validCollectionName( "" ) );
     }
 
     TEST( NamespaceStringTest, DBHash ) {
