@@ -43,7 +43,7 @@ namespace mongo {
         //
 
         _done = false;
-        // cout << "enumerator received root: " << _root->toString() << endl;
+        cout << "enumerator received root: " << _root->toString() << endl;
 
         // If we fail to prepare, there's some OR clause or other index-requiring predicate that
         // doesn't have an index.
@@ -54,6 +54,8 @@ namespace mongo {
             // We increment this from the beginning and roll forward.
             _assignedCounter.resize(_leavesRequireIndex.size(), 0);
         }
+
+        cout << "prepped enum base tree " << _root->toString() << endl;
 
         //
         // Final initialization
@@ -73,7 +75,7 @@ namespace mongo {
         // each getNext.
 
         for (size_t i = 0; i < _leavesRequireIndex.size(); ++i) {
-            // cout << "Leaf requires index: " << _leavesRequireIndex[i]->toString();
+            cout << "Leaf requires index: " << _leavesRequireIndex[i]->toString();
 
             // XXX: this is a slow lookup due to str stuff
             PredicateMap::const_iterator pmit = _pm.find(_leavesRequireIndex[i]->path().toString());
@@ -99,6 +101,8 @@ namespace mongo {
             IndexTag* tag = new IndexTag(it->index);
             _leavesRequireIndex[i]->setTag(tag);
         }
+
+        cout << "enum tag iter tree " << _root->toString() << endl;
 
         // Move to next index.
         size_t carry = 1;

@@ -118,6 +118,12 @@ namespace mongo {
         _debugAddSpace( debug, level );
         debug << path() << " $elemMatch\n";
         _sub->debugString( debug, level + 1 );
+
+        MatchExpression::TagData* td = getTag();
+        if (NULL != td) {
+            debug << " ";
+            td->debugString(&debug);
+        }
     }
 
 
@@ -173,6 +179,12 @@ namespace mongo {
         debug << path() << " $elemMatch\n";
         for ( unsigned i = 0; i < _subs.size(); i++ ) {
             _subs[i]->debugString( debug, level + 1 );
+        }
+
+        MatchExpression::TagData* td = getTag();
+        if (NULL != td) {
+            debug << " ";
+            td->debugString(&debug);
         }
     }
 
@@ -234,6 +246,12 @@ namespace mongo {
         for ( size_t i = 0; i < _list.size(); i++ ) {
             _list[i]->debugString( debug, level + 1);
         }
+
+        MatchExpression::TagData* td = getTag();
+        if (NULL != td) {
+            debug << " ";
+            td->debugString(&debug);
+        }
     }
 
     bool AllElemMatchOp::equivalent( const MatchExpression* other ) const {
@@ -271,6 +289,12 @@ namespace mongo {
     void SizeMatchExpression::debugString( StringBuilder& debug, int level ) const {
         _debugAddSpace( debug, level );
         debug << path() << " $size : " << _size << "\n";
+
+        MatchExpression::TagData* td = getTag();
+        if (NULL != td) {
+            debug << " ";
+            td->debugString(&debug);
+        }
     }
 
     bool SizeMatchExpression::equivalent( const MatchExpression* other ) const {

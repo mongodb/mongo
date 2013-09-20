@@ -55,14 +55,14 @@ namespace mongo {
 
             if (_fieldsInclusive) {
                 // We only want stuff in _fields.
-                for (unordered_set<string>::const_iterator it = _fields.begin();
-                     it != _fields.end(); ++it) {
+                for (vector<string>::const_iterator it = _includedFields.begin();
+                     it != _includedFields.end(); ++it) {
                     BSONElement elt;
-                    if (!wsm->getFieldDotted(*it, &elt)) {
-                        // XXX: needs to be propagated better
-                        return Status(ErrorCodes::BadValue, "no field " + *it + " in wsm to proj");
+                    // We can project a field that doesn't exist.  We just ignore it.
+                    // UNITTEST 11738048
+                    if (wsm->getFieldDotted(*it, &elt) && !elt.eoo()) {
+                        bob.append(elt);
                     }
-                    bob.append(elt);
                 }
             }
             else {
@@ -75,7 +75,7 @@ namespace mongo {
                 while (it.more()) {
                     BSONElement elt = it.next();
                     if (!mongoutils::str::equals("_id", elt.fieldName())) {
-                        if (_fields.end() == _fields.find(elt.fieldName())) {
+                        if (_excludedFields.end() == _excludedFields.find(elt.fieldName())) {
                             bob.append(elt);
                         }
                     }
@@ -95,9 +95,13 @@ namespace mongo {
         // _id can be included/excluded separately and is by default included.
         bool _includeID;
 
-        // Either we include all of _fields or we exclude all of _fields.
+        // Either we include all of _includedFields or we exclude all of _excludedFields.
         bool _fieldsInclusive;
-        unordered_set<string> _fields;
+        unordered_set<string> _excludedFields;
+
+        // Fields can be ordered if they're included.
+        // UNITTEST 11738048
+        vector<string> _includedFields;
     };
 
     // static
@@ -118,14 +122,21 @@ namespace mongo {
             }
             else {
                 bool newFieldValue = elt.trueValue();
-                if (qp->_fields.size() > 0) {
+                if (qp->_includedFields.size() > 0 || qp->_excludedFields.size() > 0) {
                     // make sure we're all true or all false otherwise error
                     if (newFieldValue != lastNonIDValue) {
                         return Status(ErrorCodes::BadValue, "Inconsistent projection specs");
                     }
                 }
                 lastNonIDValue = newFieldValue;
-                qp->_fields.insert(elt.fieldName());
+                if (lastNonIDValue) {
+                    // inclusive
+                    qp->_includedFields.push_back(elt.fieldName());
+                }
+                else {
+                    // exclusive
+                    qp->_excludedFields.insert(elt.fieldName());
+                }
             }
         }
 

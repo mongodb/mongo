@@ -67,6 +67,13 @@ namespace mongo {
     void normalizeTree(MatchExpression* root) {
         // root->isLogical() is true now.  We care about AND and OR.  Negations currently scare us.
         if (MatchExpression::AND == root->matchType() || MatchExpression::OR == root->matchType()) {
+            // We could have AND of AND of AND.  Make sure we clean up our children before merging
+            // them.
+            // UNITTEST 11738048
+            for (size_t i = 0; i < root->numChildren(); ++i) {
+                normalizeTree(root->getChild(i));
+            }
+
             // If any of our children are of the same logical operator that we are, we remove the
             // child's children and append them to ourselves after we examine all children.
             vector<MatchExpression*> absorbedChildren;
@@ -78,9 +85,10 @@ namespace mongo {
                     for (size_t j = 0; j < child->numChildren(); ++j) {
                         absorbedChildren.push_back(child->getChild(j));
                     }
-                    child->getChildVector()->clear();
                     // TODO(opt): this is possibly n^2-ish
                     root->getChildVector()->erase(root->getChildVector()->begin() + i);
+                    child->getChildVector()->clear();
+                    // Note that this only works because we cleared the child's children
                     delete child;
                     // Don't increment 'i' as the current child 'i' used to be child 'i+1'
                 }
@@ -90,10 +98,6 @@ namespace mongo {
             }
 
             root->getChildVector()->insert(root->getChildVector()->end(), absorbedChildren.begin(), absorbedChildren.end());
-
-            for (size_t i = 0; i < root->numChildren(); ++i) {
-                normalizeTree(root->getChild(i));
-            }
         }
     }
 

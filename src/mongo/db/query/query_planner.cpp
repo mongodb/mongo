@@ -208,6 +208,12 @@ namespace mongo {
         IndexBoundsBuilder::translate(expr, direction, &oil, exact);
         // TODO(opt): this is a surplus copy, could build right in the original
         isn->bounds.fields.push_back(oil);
+
+        // Pad the remaining fields if it's a compound index.
+        while (it.more()) {
+            isn->bounds.fields.push_back(IndexBoundsBuilder::allValuesForField(it.next()));
+        }
+
         return isn;
     }
 
@@ -357,8 +363,10 @@ namespace mongo {
                 // This is the node we're about to return.
                 QuerySolutionNode* andResult;
 
+                // We must use an index for at least one child of the AND.
+                verify(theAnd->children.size() >= 1);
+
                 // Short-circuit: an AND of one child is just the child.
-                verify(theAnd->children.size() > 0);
                 if (theAnd->children.size() == 1) {
                     andResult = theAnd->children[0];
                     theAnd->children.clear();
@@ -434,7 +442,7 @@ namespace mongo {
                             // XXX: Do we delete the curChild-th child??
                         }
                         else {
-                            // We keep curChild in the AND for affixing later.
+                            // We keep curChild in the OR for affixing later as a filter.
                             ++curChild;
                         }
                         continue;
@@ -503,7 +511,7 @@ namespace mongo {
                             // XXX: Do we delete the curChild-th child??
                         }
                         else {
-                            // We keep curChild in the AND for affixing later.
+                            // We keep curChild in the OR for affixing later.
                             ++curChild;
                         }
                     }
@@ -514,22 +522,28 @@ namespace mongo {
                     theOr->children.push_back(currentScan.release());
                 }
 
-                // Unlike an AND, an OR cannot have filters hanging off of it.
-                // TODO: Should we verify?
-                if (root->numChildren() > 0) {
+                // Unlike an AND, an OR cannot have filters hanging off of it.  We stop processing
+                // when any of our children lack index tags.  If a node lacks an index tag it cannot
+                // be answered via an index.
+                if (curChild != root->numChildren()) {
                     warning() << "planner OR error, non-indexed branch.";
+                    // XXX: don't verify in prod environment but good for debugging now.
                     verify(0);
                     return NULL;
                 }
 
-                // Short-circuit: the OR of one child is just the child.
-                if (1 == theOr->children.size()) {
-                    QuerySolutionNode* child = theOr->children[0];
-                    theOr->children.clear();
-                    return child;
+                // If there are any nodes still attached to the OR, we can't answer them using the
+                // index, so we put a fetch with filter.
+                if (root->numChildren() > 0) {
+                    FetchNode* fetch = new FetchNode();
+                    fetch->filter = root;
+                    // takes ownership
+                    fetch->child.reset(theOr.release());
+                    return fetch;
                 }
-
-                return theOr.release();
+                else {
+                    return theOr.release();
+                }
             }
             else {
                 // NOT or NOR, can't do anything.
@@ -549,15 +563,6 @@ namespace mongo {
 
                 bool exact = false;
                 auto_ptr<IndexScanNode> isn(makeIndexScan(indexKeyPatterns[tag->index], root, &exact));
-
-                BSONObjIterator it(isn->indexKeyPattern);
-                // Skip first field, as we've filled out the bounds in makeIndexScan.
-                it.next();
-
-                // The rest is filler for any trailing fields.
-                while (it.more()) {
-                    isn->bounds.fields.push_back(IndexBoundsBuilder::allValuesForField(it.next()));
-                }
 
                 // If the bounds are exact, the set of documents that satisfy the predicate is exactly
                 // equal to the set of documents that the scan provides.
@@ -580,6 +585,7 @@ namespace mongo {
 
     QuerySolution* makeSolution(const CanonicalQuery& query, MatchExpression* taggedRoot,
                                 const vector<BSONObj>& indexKeyPatterns) {
+        cout << "about to build solntree from tagged tree:\n" << taggedRoot->toString() << endl;
         QuerySolutionNode* solnRoot = buildSolutionTree(taggedRoot, indexKeyPatterns);
         if (NULL == solnRoot) { return NULL; }
 
@@ -715,7 +721,7 @@ namespace mongo {
 
         // Figure out how useful each index is to each predicate.
         rateIndices(relevantIndices, &predicates);
-        // dumpPredMap(predicates);
+        dumpPredMap(predicates);
 
         //
         // Planner Section 2: Use predicate/index data to output sets of indices that we can use.
@@ -740,24 +746,10 @@ namespace mongo {
             // this plan.  If not, add a fetch.
             //
 
-            if (!query.getParsed().getProj().isEmpty()) {
-                warning() << "Can't deal with proj yet" << endl;
-            }
-            else {
-                // Note that we need a fetch, possibly tack on to end?
-            }
-
             //
             // Planner Section 5: Sort.  If we're sorting, see if the plan gives us a sort for
             // free.  If not, add a sort.
             //
-
-            if (!query.getParsed().getSort().isEmpty()) {
-            }
-            else {
-                // Note that we need a sort, possibly tack on to end?  may want to see if sort is
-                // covered and then tack fetch on after the covered sort...
-            }
 
             //
             // Planner Section 6: Final check.  Make sure that we build a valid solution.
@@ -765,7 +757,7 @@ namespace mongo {
             //
 
             if (NULL != soln) {
-                // cout << "Adding solution:\n" << soln->toString() << endl;
+                cout << "Adding solution:\n" << soln->toString() << endl;
                 out->push_back(soln);
             }
         }
