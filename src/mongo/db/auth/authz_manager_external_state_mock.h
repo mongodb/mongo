@@ -97,7 +97,8 @@ namespace mongo {
                                  const BSONObj& writeConcern);
         virtual Status remove(const NamespaceString& collectionName,
                               const BSONObj& query,
-                              const BSONObj& writeConcern);
+                              const BSONObj& writeConcern,
+                              int* numRemoved);
         virtual Status createIndex(const NamespaceString& collectionName,
                                    const BSONObj& pattern,
                                    bool unique,

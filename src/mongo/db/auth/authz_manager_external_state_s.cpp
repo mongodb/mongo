@@ -98,108 +98,6 @@ namespace {
         }
     }
 
-    Status AuthzManagerExternalStateMongos::insertPrivilegeDocument(const string& dbname,
-                                                                    const BSONObj& userObj,
-                                                                    const BSONObj& writeConcern) {
-        try {
-            const std::string userNS = "admin.system.users";
-            scoped_ptr<ScopedDbConnection> conn(getConnectionForAuthzCollection(userNS));
-
-            conn->get()->insert(userNS, userObj);
-
-            // Handle write concern
-            BSONObjBuilder gleBuilder;
-            gleBuilder.append("getLastError", 1);
-            gleBuilder.appendElements(writeConcern);
-            BSONObj res;
-            conn->get()->runCommand("admin", gleBuilder.done(), res);
-            string errstr = conn->get()->getLastErrorString(res);
-            conn->done();
-
-            if (errstr.empty()) {
-                return Status::OK();
-            }
-            if (res.hasField("code") && res["code"].Int() == ASSERT_ID_DUPKEY) {
-                std::string name = userObj[AuthorizationManager::USER_NAME_FIELD_NAME].String();
-                std::string source = userObj[AuthorizationManager::USER_SOURCE_FIELD_NAME].String();
-                return Status(ErrorCodes::DuplicateKey,
-                              mongoutils::str::stream() << "User \"" << name << "@" << source <<
-                                      "\" already exists");
-            }
-            return Status(ErrorCodes::UserModificationFailed, errstr);
-        } catch (const DBException& e) {
-            return e.toStatus();
-        }
-    }
-
-    Status AuthzManagerExternalStateMongos::updatePrivilegeDocument(
-            const UserName& user, const BSONObj& updateObj, const BSONObj& writeConcern) {
-        try {
-            const std::string userNS = "admin.system.users";
-            scoped_ptr<ScopedDbConnection> conn(getConnectionForAuthzCollection(userNS));
-
-            conn->get()->update(
-                    userNS,
-                    QUERY(AuthorizationManager::USER_NAME_FIELD_NAME << user.getUser() <<
-                          AuthorizationManager::USER_SOURCE_FIELD_NAME << user.getDB()),
-                    updateObj);
-
-            // Handle write concern
-            BSONObjBuilder gleBuilder;
-            gleBuilder.append("getLastError", 1);
-            gleBuilder.appendElements(writeConcern);
-            BSONObj res;
-            conn->get()->runCommand("admin", gleBuilder.done(), res);
-            string err = conn->get()->getLastErrorString(res);
-            conn->done();
-
-            if (!err.empty()) {
-                return Status(ErrorCodes::UserModificationFailed, err);
-            }
-
-            int numUpdated = res["n"].numberInt();
-            dassert(numUpdated <= 1 && numUpdated >= 0);
-            if (numUpdated == 0) {
-                return Status(ErrorCodes::UserNotFound,
-                              mongoutils::str::stream() << "User " << user.getFullName() <<
-                                      " not found");
-            }
-
-            return Status::OK();
-        } catch (const DBException& e) {
-            return e.toStatus();
-        }
-    }
-
-    Status AuthzManagerExternalStateMongos::removePrivilegeDocuments(const BSONObj& query,
-                                                                     const BSONObj& writeConcern,
-                                                                     int* numRemoved) {
-        try {
-            string userNS = "admin.system.users";
-            scoped_ptr<ScopedDbConnection> conn(getConnectionForAuthzCollection(userNS));
-
-            conn->get()->remove(userNS, query);
-
-            // Handle write concern
-            BSONObjBuilder gleBuilder;
-            gleBuilder.append("getLastError", 1);
-            gleBuilder.appendElements(writeConcern);
-            BSONObj res;
-            conn->get()->runCommand("admin", gleBuilder.done(), res);
-            string err = conn->get()->getLastErrorString(res);
-            conn->done();
-
-            if (!err.empty()) {
-                return Status(ErrorCodes::UserModificationFailed, err);
-            }
-
-            *numRemoved = res["n"].numberInt();
-            return Status::OK();
-        } catch (const DBException& e) {
-            return e.toStatus();
-        }
-    }
-
     Status AuthzManagerExternalStateMongos::getAllDatabaseNames(
             std::vector<std::string>* dbnames) {
         try {
@@ -251,7 +149,30 @@ namespace {
             const NamespaceString& collectionName,
             const BSONObj& document,
             const BSONObj& writeConcern) {
-        fassertFailed(17102);
+        try {
+            scoped_ptr<ScopedDbConnection> conn(getConnectionForAuthzCollection(collectionName));
+
+            conn->get()->insert(collectionName, document);
+
+            // Handle write concern
+            BSONObjBuilder gleBuilder;
+            gleBuilder.append("getLastError", 1);
+            gleBuilder.appendElements(writeConcern);
+            BSONObj res;
+            conn->get()->runCommand("admin", gleBuilder.done(), res);
+            string errstr = conn->get()->getLastErrorString(res);
+            conn->done();
+
+            if (errstr.empty()) {
+                return Status::OK();
+            }
+            if (res.hasField("code") && res["code"].Int() == ASSERT_ID_DUPKEY) {
+                return Status(ErrorCodes::DuplicateKey, errstr);
+            }
+            return Status(ErrorCodes::UnknownError, errstr);
+        } catch (const DBException& e) {
+            return e.toStatus();
+        }
     }
 
     Status AuthzManagerExternalStateMongos::updateOne(
@@ -260,14 +181,64 @@ namespace {
             const BSONObj& updatePattern,
             bool upsert,
             const BSONObj& writeConcern) {
-        fassertFailed(17103);
+        try {
+            scoped_ptr<ScopedDbConnection> conn(getConnectionForAuthzCollection(collectionName));
+
+            conn->get()->update(collectionName, query, updatePattern, upsert);
+
+            // Handle write concern
+            BSONObjBuilder gleBuilder;
+            gleBuilder.append("getLastError", 1);
+            gleBuilder.appendElements(writeConcern);
+            BSONObj res;
+            conn->get()->runCommand("admin", gleBuilder.done(), res);
+            string err = conn->get()->getLastErrorString(res);
+            conn->done();
+
+            if (!err.empty()) {
+                return Status(ErrorCodes::UnknownError, err);
+            }
+
+            int numUpdated = res["n"].numberInt();
+            dassert(numUpdated <= 1 && numUpdated >= 0);
+            if (numUpdated == 0) {
+                return Status(ErrorCodes::NoMatchingDocument, "No document found");
+            }
+
+            return Status::OK();
+        } catch (const DBException& e) {
+            return e.toStatus();
+        }
     }
 
     Status AuthzManagerExternalStateMongos::remove(
             const NamespaceString& collectionName,
             const BSONObj& query,
-            const BSONObj& writeConcern) {
-        fassertFailed(17104);
+            const BSONObj& writeConcern,
+            int* numRemoved) {
+        try {
+            scoped_ptr<ScopedDbConnection> conn(getConnectionForAuthzCollection(collectionName));
+
+            conn->get()->remove(collectionName, query);
+
+            // Handle write concern
+            BSONObjBuilder gleBuilder;
+            gleBuilder.append("getLastError", 1);
+            gleBuilder.appendElements(writeConcern);
+            BSONObj res;
+            conn->get()->runCommand("admin", gleBuilder.done(), res);
+            string err = conn->get()->getLastErrorString(res);
+            conn->done();
+
+            if (!err.empty()) {
+                return Status(ErrorCodes::UnknownError, err);
+            }
+
+            *numRemoved = res["n"].numberInt();
+            return Status::OK();
+        } catch (const DBException& e) {
+            return e.toStatus();
+        }
     }
 
     Status AuthzManagerExternalStateMongos::createIndex(

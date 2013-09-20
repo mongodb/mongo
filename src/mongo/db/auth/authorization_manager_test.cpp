@@ -403,7 +403,8 @@ namespace {
                                         BSONObj()));
         ASSERT_NOT_OK(authzManager->upgradeAuthCollections());
         validateV1AdminUserData(usersCollectionName);
-        ASSERT_OK(externalState->remove(versionCollectionName, BSONObj(), BSONObj()));
+        int numRemoved;
+        ASSERT_OK(externalState->remove(versionCollectionName, BSONObj(), BSONObj(), &numRemoved));
         ASSERT_OK(authzManager->upgradeAuthCollections());
         validateV1AdminUserData(backupUsersCollectionName);
         validateV2UserData();

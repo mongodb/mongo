@@ -185,11 +185,15 @@ namespace mongo {
     Status AuthzManagerExternalStateMock::remove(
             const NamespaceString& collectionName,
             const BSONObj& query,
-            const BSONObj&) {
+            const BSONObj&,
+            int* numRemoved) {
+        int n = 0;
         BSONObjCollection::iterator iter;
         while (_findOneIter(collectionName, query, &iter).isOK()) {
             _documents[collectionName].erase(iter);
+            ++n;
         }
+        *numRemoved = n;
         return Status::OK();
     }
 

@@ -49,18 +49,6 @@ namespace mongo {
         AuthzManagerExternalStateMongod();
         virtual ~AuthzManagerExternalStateMongod();
 
-        virtual Status insertPrivilegeDocument(const std::string& dbname,
-                                               const BSONObj& userObj,
-                                               const BSONObj& writeConcern);
-
-        virtual Status updatePrivilegeDocument(const UserName& user,
-                                               const BSONObj& updateObj,
-                                               const BSONObj& writeConcern);
-
-        virtual Status removePrivilegeDocuments(const BSONObj& query,
-                                                const BSONObj& writeConcern,
-                                                int* numRemoved);
-
         virtual Status getAllDatabaseNames(std::vector<std::string>* dbnames);
 
         virtual Status getAllV1PrivilegeDocsForDB(const std::string& dbname,
@@ -82,7 +70,8 @@ namespace mongo {
                                  const BSONObj& writeConcern);
         virtual Status remove(const NamespaceString& collectionName,
                               const BSONObj& query,
-                              const BSONObj& writeConcern);
+                              const BSONObj& writeConcern,
+                              int* numRemoved);
         virtual Status createIndex(const NamespaceString& collectionName,
                                    const BSONObj& pattern,
                                    bool unique,

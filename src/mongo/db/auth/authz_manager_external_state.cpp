@@ -108,4 +108,62 @@ namespace mongo {
         return _findUser(usersNamespace, query, &userBSONObj).isOK();
     }
 
+
+    Status AuthzManagerExternalState::insertPrivilegeDocument(const string& dbname,
+                                                              const BSONObj& userObj,
+                                                              const BSONObj& writeConcern) {
+        Status status = insert(NamespaceString("admin.system.users"), userObj, writeConcern);
+        if (status.isOK()) {
+            return status;
+        }
+        if (status.code() == ErrorCodes::DuplicateKey) {
+            std::string name = userObj[AuthorizationManager::USER_NAME_FIELD_NAME].String();
+            std::string source = userObj[AuthorizationManager::USER_SOURCE_FIELD_NAME].String();
+            return Status(ErrorCodes::DuplicateKey,
+                          mongoutils::str::stream() << "User \"" << name << "@" << source <<
+                                  "\" already exists");
+        }
+        if (status.code() == ErrorCodes::UnknownError) {
+            return Status(ErrorCodes::UserModificationFailed, status.reason());
+        }
+        return status;
+    }
+
+    Status AuthzManagerExternalState::updatePrivilegeDocument(
+            const UserName& user, const BSONObj& updateObj, const BSONObj& writeConcern) {
+        Status status = updateOne(
+                NamespaceString("admin.system.users"),
+                BSON(AuthorizationManager::USER_NAME_FIELD_NAME << user.getUser() <<
+                     AuthorizationManager::USER_SOURCE_FIELD_NAME << user.getDB()),
+                updateObj,
+                false,
+                writeConcern);
+        if (status.isOK()) {
+            return status;
+        }
+        if (status.code() == ErrorCodes::NoMatchingDocument) {
+            return Status(ErrorCodes::UserNotFound,
+                          mongoutils::str::stream() << "User " << user.getFullName() <<
+                                  " not found");
+        }
+        if (status.code() == ErrorCodes::UnknownError) {
+            return Status(ErrorCodes::UserModificationFailed, status.reason());
+        }
+        return status;
+    }
+
+    Status AuthzManagerExternalState::removePrivilegeDocuments(const BSONObj& query,
+                                                               const BSONObj& writeConcern,
+                                                               int* numRemoved) {
+        Status status = remove(NamespaceString("admin.system.users"),
+                               query,
+                               writeConcern,
+                               numRemoved);
+        if (status.code() == ErrorCodes::UnknownError) {
+            return Status(ErrorCodes::UserModificationFailed, status.reason());
+        }
+        return status;
+    }
+
+
 }  // namespace mongo

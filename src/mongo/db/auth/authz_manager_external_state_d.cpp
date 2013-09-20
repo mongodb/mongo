@@ -51,122 +51,6 @@ namespace {
     AuthzManagerExternalStateMongod::AuthzManagerExternalStateMongod() {}
     AuthzManagerExternalStateMongod::~AuthzManagerExternalStateMongod() {}
 
-    Status AuthzManagerExternalStateMongod::insertPrivilegeDocument(const string& dbname,
-                                                                    const BSONObj& userObj,
-                                                                    const BSONObj& writeConcern) {
-        try {
-            const std::string userNS = "admin.system.users";
-            DBDirectClient client;
-            {
-                Client::GodScope gs;
-                // TODO(spencer): Once we're no longer fully rebuilding the user cache on every
-                // change to user data we should remove the global lock and uncomment the
-                // WriteContext below
-                Lock::GlobalWrite w;
-                // Client::WriteContext ctx(userNS);
-                client.insert(userNS, userObj);
-            }
-
-            // Handle write concern
-            BSONObjBuilder gleBuilder;
-            gleBuilder.append("getLastError", 1);
-            gleBuilder.appendElements(writeConcern);
-            BSONObj res;
-            client.runCommand("admin", gleBuilder.done(), res);
-            string errstr = client.getLastErrorString(res);
-            if (errstr.empty()) {
-                return Status::OK();
-            }
-            if (res.hasField("code") && res["code"].Int() == ASSERT_ID_DUPKEY) {
-                std::string name = userObj[AuthorizationManager::USER_NAME_FIELD_NAME].String();
-                std::string source = userObj[AuthorizationManager::USER_SOURCE_FIELD_NAME].String();
-                return Status(ErrorCodes::DuplicateKey,
-                              mongoutils::str::stream() << "User \"" << name << "@" << source <<
-                                      "\" already exists");
-            }
-            return Status(ErrorCodes::UserModificationFailed, errstr);
-        } catch (const DBException& e) {
-            return e.toStatus();
-        }
-    }
-
-    Status AuthzManagerExternalStateMongod::updatePrivilegeDocument(
-            const UserName& user, const BSONObj& updateObj, const BSONObj& writeConcern) {
-        try {
-            const std::string userNS = "admin.system.users";
-            DBDirectClient client;
-            {
-                Client::GodScope gs;
-                // TODO(spencer): Once we're no longer fully rebuilding the user cache on every
-                // change to user data we should remove the global lock and uncomment the
-                // WriteContext below
-                Lock::GlobalWrite w;
-                // Client::WriteContext ctx(userNS);
-                client.update(userNS,
-                              QUERY(AuthorizationManager::USER_NAME_FIELD_NAME << user.getUser() <<
-                                    AuthorizationManager::USER_SOURCE_FIELD_NAME << user.getDB()),
-                              updateObj);
-            }
-
-            // Handle write concern
-            BSONObjBuilder gleBuilder;
-            gleBuilder.append("getLastError", 1);
-            gleBuilder.appendElements(writeConcern);
-            BSONObj res;
-            client.runCommand("admin", gleBuilder.done(), res);
-            string err = client.getLastErrorString(res);
-            if (!err.empty()) {
-                return Status(ErrorCodes::UserModificationFailed, err);
-            }
-
-            int numUpdated = res["n"].numberInt();
-            dassert(numUpdated <= 1 && numUpdated >= 0);
-            if (numUpdated == 0) {
-                return Status(ErrorCodes::UserNotFound,
-                              mongoutils::str::stream() << "User " << user.getFullName() <<
-                                      " not found");
-            }
-
-            return Status::OK();
-        } catch (const DBException& e) {
-            return e.toStatus();
-        }
-    }
-
-    Status AuthzManagerExternalStateMongod::removePrivilegeDocuments(const BSONObj& query,
-                                                                     const BSONObj& writeConcern,
-                                                                     int* numRemoved) {
-        try {
-            const std::string userNS = "admin.system.users";
-            DBDirectClient client;
-            {
-                Client::GodScope gs;
-                // TODO(spencer): Once we're no longer fully rebuilding the user cache on every
-                // change to user data we should remove the global lock and uncomment the
-                // WriteContext below
-                Lock::GlobalWrite w;
-                // Client::WriteContext ctx(userNS);
-                client.remove(userNS, query);
-            }
-
-            // Handle write concern
-            BSONObjBuilder gleBuilder;
-            gleBuilder.append("getLastError", 1);
-            gleBuilder.appendElements(writeConcern);
-            BSONObj res;
-            client.runCommand("admin", gleBuilder.done(), res);
-            string errstr = client.getLastErrorString(res);
-            if (!errstr.empty()) {
-                return Status(ErrorCodes::UserModificationFailed, errstr);
-            }
-
-            *numRemoved = res["n"].numberInt();
-            return Status::OK();
-        } catch (const DBException& e) {
-            return e.toStatus();
-        }
-    }
-
     Status AuthzManagerExternalStateMongod::_findUser(const string& usersNamespace,
                                                       const BSONObj& query,
                                                       BSONObj* result) {
@@ -222,7 +106,35 @@ namespace {
             const NamespaceString& collectionName,
             const BSONObj& document,
             const BSONObj& writeConcern) {
-        fassertFailed(17092);
+        try {
+            DBDirectClient client;
+            {
+                Client::GodScope gs;
+                // TODO(spencer): Once we're no longer fully rebuilding the user cache on every
+                // change to user data we should remove the global lock and uncomment the
+                // WriteContext below
+                Lock::GlobalWrite w;
+                // Client::WriteContext ctx(userNS);
+                client.insert(collectionName, document);
+            }
+
+            // Handle write concern
+            BSONObjBuilder gleBuilder;
+            gleBuilder.append("getLastError", 1);
+            gleBuilder.appendElements(writeConcern);
+            BSONObj res;
+            client.runCommand("admin", gleBuilder.done(), res);
+            string errstr = client.getLastErrorString(res);
+            if (errstr.empty()) {
+                return Status::OK();
+            }
+            if (res.hasField("code") && res["code"].Int() == ASSERT_ID_DUPKEY) {
+                return Status(ErrorCodes::DuplicateKey, errstr);
+            }
+            return Status(ErrorCodes::UnknownError, errstr);
+        } catch (const DBException& e) {
+            return e.toStatus();
+        }
     }
 
     Status AuthzManagerExternalStateMongod::updateOne(
@@ -231,14 +143,74 @@ namespace {
             const BSONObj& updatePattern,
             bool upsert,
             const BSONObj& writeConcern) {
-        fassertFailed(17093);
+        try {
+            DBDirectClient client;
+            {
+                Client::GodScope gs;
+                // TODO(spencer): Once we're no longer fully rebuilding the user cache on every
+                // change to user data we should remove the global lock and uncomment the
+                // WriteContext below
+                Lock::GlobalWrite w;
+                // Client::WriteContext ctx(userNS);
+                client.update(collectionName, query, updatePattern, upsert);
+            }
+
+            // Handle write concern
+            BSONObjBuilder gleBuilder;
+            gleBuilder.append("getLastError", 1);
+            gleBuilder.appendElements(writeConcern);
+            BSONObj res;
+            client.runCommand("admin", gleBuilder.done(), res);
+            string err = client.getLastErrorString(res);
+            if (!err.empty()) {
+                return Status(ErrorCodes::UnknownError, err);
+            }
+
+            int numUpdated = res["n"].numberInt();
+            dassert(numUpdated <= 1 && numUpdated >= 0);
+            if (numUpdated == 0) {
+                return Status(ErrorCodes::NoMatchingDocument, "No document found");
+            }
+
+            return Status::OK();
+        } catch (const DBException& e) {
+            return e.toStatus();
+        }
     }
 
     Status AuthzManagerExternalStateMongod::remove(
             const NamespaceString& collectionName,
             const BSONObj& query,
-            const BSONObj& writeConcern) {
-        fassertFailed(17094);
+            const BSONObj& writeConcern,
+            int* numRemoved) {
+        try {
+            DBDirectClient client;
+            {
+                Client::GodScope gs;
+                // TODO(spencer): Once we're no longer fully rebuilding the user cache on every
+                // change to user data we should remove the global lock and uncomment the
+                // WriteContext below
+                Lock::GlobalWrite w;
+                // Client::WriteContext ctx(userNS);
+                client.remove(collectionName, query);
+            }
+
+            // Handle write concern
+            BSONObjBuilder gleBuilder;
+            gleBuilder.append("getLastError", 1);
+            gleBuilder.appendElements(writeConcern);
+            BSONObj res;
+            client.runCommand("admin", gleBuilder.done(), res);
+            string errstr = client.getLastErrorString(res);
+            if (!errstr.empty()) {
+                return Status(ErrorCodes::UnknownError, errstr);
+            }
+
+            *numRemoved = res["n"].numberInt();
+            return Status::OK();
+        } catch (const DBException& e) {
+            return e.toStatus();
+        }
     }
 
     Status AuthzManagerExternalStateMongod::createIndex(
