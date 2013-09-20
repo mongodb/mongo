@@ -487,12 +487,12 @@ namespace {
         ASSERT_EQUALS(mongo::NumberInt, doc.root().rightChild().getType());
     }
 
-    TEST(Multiplication, ApplyMissingElementInt64) {
-        const int64_t int64_zero = 0;
-        const int64_t int64_three = 3;
+    TEST(Multiplication, ApplyMissingElementLongLong) {
+        const long long ll_zero = 0;
+        const long long ll_three = 3;
 
-        Document doc(BSON("a" << int64_zero));
-        Mod incMod(BSON("$mul" << BSON("b" << int64_three)));
+        Document doc(BSON("a" << ll_zero));
+        Mod incMod(BSON("$mul" << BSON("b" << ll_three)));
 
         ModifierInterface::ExecInfo execInfo;
         ASSERT_OK(incMod.prepare(doc.root(), "", &execInfo));
@@ -500,7 +500,7 @@ namespace {
 
         ASSERT_OK(incMod.apply());
         ASSERT_FALSE(doc.isInPlaceModeEnabled());
-        ASSERT_EQUALS(BSON("a" << int64_zero << "b" << int64_zero), doc);
+        ASSERT_EQUALS(BSON("a" << ll_zero << "b" << ll_zero), doc);
         ASSERT_EQUALS(mongo::NumberLong, doc.root().rightChild().getType());
     }
 
