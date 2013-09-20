@@ -87,15 +87,20 @@ namespace mongo {
         return true;
     }
 
-    inline bool NamespaceString::validCollectionName(const StringData& ns){
+    inline bool NamespaceString::validCollectionComponent(const StringData& ns){
         size_t idx = ns.find( '.' );
         if ( idx == std::string::npos )
             return false;
 
-        if ( idx + 1 >= ns.size() )
+        return validCollectionName(ns.substr(idx + 1)) || oplog(ns);
+    }
+
+    inline bool NamespaceString::validCollectionName(const StringData& coll){
+        if (coll.empty())
             return false;
 
-        return normal( ns );
+        return coll.find('$') == std::string::npos;
+
     }
 
     inline NamespaceString::NamespaceString() : _ns(), _dotIndex(0) {}

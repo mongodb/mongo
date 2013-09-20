@@ -90,7 +90,9 @@ namespace mongo {
         virtual bool run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             string source = cmdObj.getStringField( name.c_str() );
             string target = cmdObj.getStringField( "to" );
-            uassert(15967,"invalid collection name: " + target, NamespaceString::validCollectionName(target.c_str()));
+            uassert(15967,
+                    "invalid collection name: " + target,
+                    NamespaceString::validCollectionComponent(target.c_str()));
             if ( source.empty() || target.empty() ) {
                 errmsg = "invalid command syntax";
                 return false;
