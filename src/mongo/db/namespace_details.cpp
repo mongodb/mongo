@@ -944,6 +944,8 @@ namespace mongo {
         if ( ns.find( ".system.users" ) != string::npos )
             return true;
 
+        if ( ns == "admin.system.roles" ) return true;
+
         if ( ns.find( ".system.js" ) != string::npos ) {
             if ( write )
                 Scope::storedFuncMod();

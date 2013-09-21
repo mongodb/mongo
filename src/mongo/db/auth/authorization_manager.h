@@ -150,6 +150,13 @@ namespace mongo {
                                         int* numRemoved) const;
 
         /**
+         * Creates the given role object in the given database.
+         * 'writeConcern' contains the arguments to be passed to getLastError to block for
+         * successful completion of the write.
+         */
+        Status insertRoleDocument(const BSONObj& roleObj, const BSONObj& writeConcern) const;
+
+        /**
          * Finds all documents matching "query" in "collectionName".  For each document returned,
          * calls the function resultProcessor on it.
          * Should only be called on collections with authorization documents in them
