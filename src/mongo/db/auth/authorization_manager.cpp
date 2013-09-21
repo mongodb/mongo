@@ -163,6 +163,27 @@ namespace mongo {
         return _externalState->removePrivilegeDocuments(query, writeConcern, numRemoved);
     }
 
+    Status AuthorizationManager::insertRoleDocument(const BSONObj& roleObj,
+                                                    const BSONObj& writeConcern) const {
+        Status status = _externalState->insert(NamespaceString("admin.system.roles"),
+                                               roleObj,
+                                               writeConcern);
+        if (status.isOK()) {
+            return status;
+        }
+        if (status.code() == ErrorCodes::DuplicateKey) {
+            std::string name = roleObj[AuthorizationManager::ROLE_NAME_FIELD_NAME].String();
+            std::string source = roleObj[AuthorizationManager::ROLE_SOURCE_FIELD_NAME].String();
+            return Status(ErrorCodes::DuplicateKey,
+                          mongoutils::str::stream() << "Role \"" << name << "@" << source <<
+                                  "\" already exists");
+        }
+        if (status.code() == ErrorCodes::UnknownError) {
+            return Status(ErrorCodes::RoleModificationFailed, status.reason());
+        }
+        return status;
+    }
+
     Status AuthorizationManager::queryAuthzDocument(
             const NamespaceString& collectionName,
             const BSONObj& query,

@@ -854,4 +854,70 @@ namespace mongo {
         }
 
     } cmdUsersInfo;
+
+    class CmdCreateRole: public Command {
+    public:
+
+        CmdCreateRole() : Command("createRole") {}
+
+        virtual bool logTheOp() {
+            return false;
+        }
+
+        virtual bool slaveOk() const {
+            return false;
+        }
+
+        virtual LockType locktype() const {
+            return NONE;
+        }
+
+        virtual void help(stringstream& ss) const {
+            ss << "Adds a role to the system" << endl;
+        }
+
+        virtual void addRequiredPrivileges(const std::string& dbname,
+                                           const BSONObj& cmdObj,
+                                           std::vector<Privilege>* out) {
+            // TODO: update this with the new rules around user creation in 2.6.
+            ActionSet actions;
+            actions.addAction(ActionType::userAdmin);
+            out->push_back(Privilege(ResourcePattern::forDatabaseName(dbname), actions));
+        }
+
+        bool run(const string& dbname,
+                 BSONObj& cmdObj,
+                 int options,
+                 string& errmsg,
+                 BSONObjBuilder& result,
+                 bool fromRepl) {
+            AuthorizationManager* authzManager = getGlobalAuthorizationManager();
+            AuthzDocumentsUpdateGuard updateGuard(authzManager);
+            if (!updateGuard.tryLock("Create role")) {
+                addStatus(Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."),
+                          result);
+                return false;
+            }
+
+            BSONObj roleObj;
+            BSONObj writeConcern;
+            Status status = auth::parseAndValidateCreateRoleCommand(cmdObj,
+                                                                    dbname,
+                                                                    authzManager,
+                                                                    &roleObj,
+                                                                    &writeConcern);
+            if (!status.isOK()) {
+                addStatus(status, result);
+                return false;
+            }
+
+            status = authzManager->insertRoleDocument(roleObj, writeConcern);
+            if (!status.isOK()) {
+                addStatus(status, result);
+                return false;
+            }
+            return true;
+        }
+
+    } cmdCreateRole;
 }

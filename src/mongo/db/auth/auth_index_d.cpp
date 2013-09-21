@@ -45,7 +45,9 @@ namespace {
     BSONObj v0SystemUsersKeyPattern;
     BSONObj v1SystemUsersKeyPattern;
     BSONObj v2SystemUsersKeyPattern;
+    BSONObj v2SystemRolesKeyPattern;
     std::string v2SystemUsersIndexName;
+    std::string v2SystemRolesIndexName;
 
     MONGO_INITIALIZER(AuthIndexKeyPatterns)(InitializerContext*) {
         v0SystemUsersKeyPattern = BSON(AuthorizationManager::V1_USER_NAME_FIELD_NAME << 1);
@@ -53,10 +55,16 @@ namespace {
                                        AuthorizationManager::V1_USER_SOURCE_FIELD_NAME << 1);
         v2SystemUsersKeyPattern = BSON(AuthorizationManager::USER_NAME_FIELD_NAME << 1 <<
                                        AuthorizationManager::USER_SOURCE_FIELD_NAME << 1);
+        v2SystemRolesKeyPattern = BSON(AuthorizationManager::ROLE_NAME_FIELD_NAME << 1 <<
+                                       AuthorizationManager::ROLE_SOURCE_FIELD_NAME << 1);
         v2SystemUsersIndexName = std::string(
                 str::stream() <<
                         AuthorizationManager::USER_NAME_FIELD_NAME << "_1_" <<
                         AuthorizationManager::USER_SOURCE_FIELD_NAME << "_1");
+        v2SystemRolesIndexName = std::string(
+                str::stream() <<
+                        AuthorizationManager::ROLE_NAME_FIELD_NAME << "_1_" <<
+                        AuthorizationManager::ROLE_SOURCE_FIELD_NAME << "_1");
         return Status::OK();
     }
 
@@ -98,10 +106,19 @@ namespace {
             }
         }
     }
+
+    void configureSystemRolesIndexes(const StringData& dbname) {
+        std::string systemRoles = dbname.toString() + ".system.roles";
+        Client::WriteContext wctx(systemRoles);
+
+        NamespaceString systemRolesNS( systemRoles );
+        createSystemIndexes(systemRolesNS);
+    }
 }  // namespace
 
     void configureSystemIndexes(const StringData& dbname) {
         configureSystemUsersIndexes(dbname);
+        configureSystemRolesIndexes(dbname);
     }
 
     void createSystemIndexes(const NamespaceString& ns) {
@@ -114,7 +131,21 @@ namespace {
             } catch (const DBException& e) {
                 if (e.getCode() == ASSERT_ID_DUPKEY) {
                     log() << "Duplicate key exception while trying to build unique index on " <<
-                            ns << ".  This is likely due to upgrade process shenanigans" << endl;
+                            ns << ".  This is likely due to problems during the upgrade process " <<
+                            endl;
+                }
+                throw;
+            }
+        } else if (ns.coll() == "system.roles") {
+            try {
+                Helpers::ensureIndex(ns.ns().c_str(),
+                                     v2SystemRolesKeyPattern,
+                                     true,  // unique
+                                     v2SystemRolesIndexName.c_str());
+            } catch (const DBException& e) {
+                if (e.getCode() == ASSERT_ID_DUPKEY) {
+                    log() << "Duplicate key exception while trying to build unique index on " <<
+                            ns << "." << endl;
                 }
                 throw;
             }
