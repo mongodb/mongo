@@ -29,7 +29,10 @@ coll.update({ _id : 12345 }, { $set : { baz : 'biz' } });
 coll.update({ sk : 67890 }, { $set : { baz : 'boz' } });
 assert.eq( null, coll.getDB().getLastError() );
 
-assert( admin.runCommand({ moveChunk : coll + "", find : { sk : 0 }, to : shards[1]._id }).ok );
+assert( admin.runCommand({ moveChunk : coll + "", 
+                           find : { sk : 0 }, 
+                           to : shards[1]._id,
+                           _waitForDelete : true }).ok );
 
 st.printShardingStatus();
 
