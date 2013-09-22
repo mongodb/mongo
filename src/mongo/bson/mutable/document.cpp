@@ -492,23 +492,6 @@ namespace mutablebson {
             return offset;
         }
 
-        // For ElementRep to be a POD it can't have a constructor, so this will have to do.
-        ElementRep makeRep() {
-            ElementRep rep;
-            rep.objIdx = kInvalidObjIdx;
-            rep.serialized = false;
-            rep.array = false;
-            rep.reserved = 0;
-            rep.offset = 0;
-            rep.sibling.left = Element::kInvalidRepIdx;
-            rep.sibling.right = Element::kInvalidRepIdx;
-            rep.child.left = Element::kInvalidRepIdx;
-            rep.child.right = Element::kInvalidRepIdx;
-            rep.parent = Element::kInvalidRepIdx;
-            rep.pad = 0;
-            return rep;
-        }
-
         // Returns true if this ElementRep is 'detached' from all other elements and can be
         // added as a child, which helps ensure that we maintain a tree rather than a graph
         // when adding new elements to the tree. The root element is never considered to be
@@ -615,28 +598,44 @@ namespace mutablebson {
                 return _slowElements[id - kFastReps];
         }
 
-        // Insert the given ElementRep and return an ID for it.
-        Element::RepIdx insertElement(const ElementRep& rep) {
-            const Element::RepIdx id = _numElements++;
-            verify(id <= Element::kMaxRepIdx);
+        // Construct and return a new default initialized ElementRep. The RepIdx identifying
+        // the new rep is returned in the out parameter.
+        ElementRep& makeNewRep(Element::RepIdx* newIdx) {
+
+            const ElementRep defaultRep = {
+                kInvalidObjIdx,
+                false, false, 0,
+                0,
+                { Element::kInvalidRepIdx, Element::kInvalidRepIdx },
+                { Element::kInvalidRepIdx, Element::kInvalidRepIdx },
+                Element::kInvalidRepIdx,
+                0
+            };
+
+            const Element::RepIdx id = *newIdx = _numElements++;
+
             if (id < kFastReps) {
-                _fastElements[id] = rep;
+                return _fastElements[id] = defaultRep;
             }
             else {
-                _slowElements.push_back(rep);
+                verify(id <= Element::kMaxRepIdx);
+
                 if (debug && paranoid) {
                     // Force all reps to new addresses to help catch invalid rep usage.
                     std::vector<ElementRep> newSlowElements(_slowElements);
                     _slowElements.swap(newSlowElements);
                 }
+
+                return *_slowElements.insert(_slowElements.end(), defaultRep);
             }
-            return id;
         }
 
         // Insert a new ElementRep for a leaf element at the given offset and return its ID.
         Element::RepIdx insertLeafElement(int offset) {
             // BufBuilder hands back sizes in 'int's.
-            ElementRep rep = makeRep();
+            Element::RepIdx inserted;
+            ElementRep& rep = makeNewRep(&inserted);
+
             rep.objIdx = kLeafObjIdx;
             rep.serialized = true;
             dassert(offset >= 0);
@@ -644,7 +643,7 @@ namespace mutablebson {
             dassert(static_cast<unsigned int>(offset) < std::numeric_limits<uint32_t>::max());
             rep.offset = offset;
             _objects[kLeafObjIdx] = _leafBuilder.asTempObj();
-            return insertElement(rep);
+            return inserted;
         }
 
         // Obtain the object builder for the leaves.
@@ -766,7 +765,12 @@ namespace mutablebson {
                 getObject(rep->objIdx)).firstElement();
 
             if (!childElt.eoo()) {
-                ElementRep newRep = makeRep();
+                Element::RepIdx inserted;
+                ElementRep& newRep = makeNewRep(&inserted);
+                // Calling makeNewRep invalidates rep since it may cause a reallocation of
+                // the element vector. After calling insertElement, we reacquire rep.
+                rep = &getElementRep(index);
+
                 newRep.serialized = true;
                 newRep.objIdx = rep->objIdx;
                 newRep.offset =
@@ -778,11 +782,6 @@ namespace mutablebson {
                     newRep.child.left = Element::kOpaqueRepIdx;
                     newRep.child.right = Element::kOpaqueRepIdx;
                 }
-                // Calling insertElement invalidates rep since insertElement may cause a
-                // reallocation of the element vector. After calling insertElement, we
-                // reacquire rep.
-                const Element::RepIdx inserted = insertElement(newRep);
-                rep = &getElementRep(index);
                 rep->child.left = inserted;
             } else {
                 rep->child.left = Element::kInvalidRepIdx;
@@ -833,7 +832,12 @@ namespace mutablebson {
             BSONElement rightElt(elt.rawdata() + elt.size());
 
             if (!rightElt.eoo()) {
-                ElementRep newRep = makeRep();
+                Element::RepIdx inserted;
+                ElementRep& newRep = makeNewRep(&inserted);
+                // Calling makeNewRep invalidates rep since it may cause a reallocation of
+                // the element vector. After calling insertElement, we reacquire rep.
+                rep = &getElementRep(index);
+
                 newRep.serialized = true;
                 newRep.objIdx = rep->objIdx;
                 newRep.offset =
@@ -846,11 +850,6 @@ namespace mutablebson {
                     newRep.child.left = Element::kOpaqueRepIdx;
                     newRep.child.right = Element::kOpaqueRepIdx;
                 }
-                // Calling insertElement invalidates rep since insertElement may cause a
-                // reallocation of the element vector. After calling insertElement, we
-                // reacquire rep.
-                const Element::RepIdx inserted = insertElement(newRep);
-                rep = &getElementRep(index);
                 rep->sibling.right = inserted;
             } else {
                 rep->sibling.right = Element::kInvalidRepIdx;
@@ -1938,7 +1937,7 @@ namespace mutablebson {
         thisRep = valueRep;
 
         // Be nice and clear out the source rep to make debugging easier.
-        valueRep = makeRep();
+        valueRep = ElementRep();
 
         impl.deserialize(thisRep.parent);
         return Status::OK();
@@ -2108,9 +2107,10 @@ namespace mutablebson {
         Impl& impl = getImpl();
         dassert(impl.doesNotAlias(fieldName));
 
-        ElementRep newElt = makeRep();
+        Element::RepIdx newEltIdx;
+        ElementRep& newElt = impl.makeNewRep(&newEltIdx);
         impl.insertFieldName(newElt, fieldName);
-        return Element(this, impl.insertElement(newElt));
+        return Element(this, newEltIdx);
     }
 
     Element Document::makeElementObject(const StringData& fieldName, const BSONObj& value) {
@@ -2119,29 +2119,34 @@ namespace mutablebson {
         dassert(impl.doesNotAlias(value));
 
         Element::RepIdx newEltIdx = Element::kInvalidRepIdx;
+        ElementRep* newElt = NULL;
+
         // A cheap hack to detect that this Object Element is for the root.
         if (fieldName.rawData() == &kRootFieldName[0]) {
-            ElementRep newElt = makeRep();
+
+            newElt = &impl.makeNewRep(&newEltIdx);
+
             // A BSONObj provided for the root Element is stored in _objects rather than being
             // copied like all other BSONObjs.
-            newElt.objIdx = impl.insertObject(value);
-            impl.insertFieldName(newElt, fieldName);
+            newElt->objIdx = impl.insertObject(value);
+            impl.insertFieldName(*newElt, fieldName);
             // Strictly, the following is a lie: the root isn't serialized, because it doesn't
             // have a contiguous fieldname. However, it is a useful fiction to pretend that it
             // is, so we can easily check if we have a 'pristine' document state by checking if
             // the root is marked as serialized.
-            newElt.serialized = true;
-            newEltIdx = impl.insertElement(newElt);
+            newElt->serialized = true;
         } else {
             // Copy the provided values into the leaf builder.
             BSONObjBuilder& builder = impl.leafBuilder();
             const int leafRef = builder.len();
             builder.append(fieldName, value);
             newEltIdx = impl.insertLeafElement(leafRef);
+            newElt = &impl.getElementRep(newEltIdx);
         }
-        ElementRep& newElt = impl.getElementRep(newEltIdx);
-        newElt.child.left = Element::kOpaqueRepIdx;
-        newElt.child.right = Element::kOpaqueRepIdx;
+
+        newElt->child.left = Element::kOpaqueRepIdx;
+        newElt->child.right = Element::kOpaqueRepIdx;
+
         return Element(this, newEltIdx);
     }
 
@@ -2149,10 +2154,11 @@ namespace mutablebson {
         Impl& impl = getImpl();
         dassert(impl.doesNotAlias(fieldName));
 
-        ElementRep newElt = makeRep();
+        Element::RepIdx newEltIdx;
+        ElementRep& newElt = impl.makeNewRep(&newEltIdx);
         newElt.array = true;
         impl.insertFieldName(newElt, fieldName);
-        return Element(this, impl.insertElement(newElt));
+        return Element(this, newEltIdx);
     }
 
     Element Document::makeElementArray(const StringData& fieldName, const BSONObj& value) {
