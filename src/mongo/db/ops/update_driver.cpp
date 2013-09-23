@@ -226,13 +226,15 @@ namespace mongo {
                     break;
                 }
 
-                const FieldRef* other;
-                if (!targetFields.insert(execInfo.fieldRef[i], &other)) {
-                    return Status(ErrorCodes::ConflictingUpdateOperators,
-                                  mongoutils::str::stream()
+                if (!targetFields.empty() || _mods.size() > 1) {
+                    const FieldRef* other;
+                    if (!targetFields.insert(execInfo.fieldRef[i], &other)) {
+                        return Status(ErrorCodes::ConflictingUpdateOperators,
+                                      mongoutils::str::stream()
                                       << "Cannot update '" << other->dottedField()
                                       << "' and '" << execInfo.fieldRef[i]->dottedField()
                                       << "' at the same time");
+                    }
                 }
 
                 // We start with the expectation that a mod will be in-place. But if the mod

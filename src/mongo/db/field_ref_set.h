@@ -56,6 +56,11 @@ namespace mongo {
          */
         bool insert(const FieldRef* toInsert, const FieldRef** conflict);
 
+        /** Returns 'true' if the set is empty */
+        bool empty() const {
+            return _fieldSet.empty();
+        }
+
     private:
         struct FieldRefPtrLessThan {
             bool operator()(const FieldRef* lhs, const FieldRef* rhs) const;
