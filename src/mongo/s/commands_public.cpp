@@ -2159,6 +2159,7 @@ namespace mongo {
             Command::appendCommandStatus(anObjBuilder,
                                          false,
                                          str::stream() << "no such cmd: " << commandName);
+            anObjBuilder.append("code", ErrorCodes::CommandNotFound);
             return;
         }
         ClientInfo *client = ClientInfo::get();

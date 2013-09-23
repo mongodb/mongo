@@ -58,5 +58,6 @@ error_code("InvalidDBRef", 55)
 error_code("EmptyFieldName", 56)
 error_code("DottedFieldName", 57)
 error_code("RoleModificationFailed", 58)
+error_code("CommandNotFound", 59)
 
 error_class("NetworkError", ["HostUnreachable", "HostNotFound"])
