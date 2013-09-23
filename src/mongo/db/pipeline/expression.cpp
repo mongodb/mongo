@@ -1220,7 +1220,11 @@ namespace {
     void ExpressionFieldPath::addDependencies(set<string>& deps, vector<string>* path) const {
         // TODO consider state of variables
         if (_baseVar == ROOT || _baseVar == CURRENT) {
-            deps.insert(_fieldPath.tail().getPath(false));
+            if (_fieldPath.getPathLength() == 1) {
+                deps.insert(""); // need full doc if just "$$ROOT" or "$$CURRENT"
+            } else {
+                deps.insert(_fieldPath.tail().getPath(false));
+            }
         }
     }
 

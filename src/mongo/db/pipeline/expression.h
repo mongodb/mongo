@@ -89,16 +89,17 @@ namespace mongo {
         virtual intrusive_ptr<Expression> optimize() = 0;
 
         /**
-           Add this expression's field dependencies to the set
-
-           Expressions are trees, so this is often recursive.
-
-           @param deps output parameter
-           @param path path to self if all ancestors are ExpressionObjects.
-                       Top-level ExpressionObject gets pointer to empty vector.
-                       If any other Expression is an ancestor, or in other cases
-                       where {a:1} inclusion objects aren't allowed, they get
-                       NULL.
+         * Add this expression's field dependencies to the set
+         *
+         * Expressions are trees, so this is often recursive.
+         *
+         * @param deps Fully qualified paths to depended-on fields are added to this set.
+         *             Empty string means need full document.
+         * @param path path to self if all ancestors are ExpressionObjects.
+         *             Top-level ExpressionObject gets pointer to empty vector.
+         *             If any other Expression is an ancestor, or in other cases
+         *             where {a:1} inclusion objects aren't allowed, they get
+         *             NULL.
          */
         virtual void addDependencies(set<string>& deps, vector<string>* path=NULL) const = 0;
 
