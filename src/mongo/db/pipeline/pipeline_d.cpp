@@ -120,6 +120,8 @@ namespace {
             DocumentSource::GetDepsReturn status = DocumentSource::SEE_NEXT;
             for (size_t i=0; i < sources.size() && status == DocumentSource::SEE_NEXT; i++) {
                 status = sources[i]->getDependencies(deps);
+                if (deps.count(string())) // empty string means we need the full doc
+                    status = DocumentSource::NOT_SUPPORTED;
             }
 
             if (status == DocumentSource::EXHAUSTIVE) {

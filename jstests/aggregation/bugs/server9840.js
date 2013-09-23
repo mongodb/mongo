@@ -47,6 +47,9 @@ test({$let: {vars: {CURRENT: '$nested'}, // same as last
 test({$let: {vars: {CURRENT: {$const:{ten: 10}}}, // "artificial" object
              in: {$multiply:['$ten', '$$ROOT.two']}}},
      20);
+test({$let: {vars: {CURRENT: '$three'}, // sets current to the number 3 (not an object)
+             in: {$multiply:['$$CURRENT', '$$ROOT.two']}}},
+     6);
 
 // swapping with $let (ensures there is no ordering dependency in vars)
 test({$let: {vars: {x: 6, y: 10},
@@ -57,6 +60,18 @@ test({$let: {vars: {x: 6, y: 10},
 
 // unicode is allowed
 test({$let: {vars: {'日本語': 10}, in: '$$日本語'}}, 10) // Japanese for "Japanese language"
+
+// Can use ROOT and CURRENT directly with no subfield (SERVER-5916)
+t.drop();
+t.insert({_id: 'obj'});
+assert.eq(t.aggregate({$project: {_id:0, obj: '$$ROOT'}}).result,
+          [{obj: {_id: 'obj'}}]);
+assert.eq(t.aggregate({$project: {_id:0, obj: '$$CURRENT'}}).result,
+          [{obj: {_id: 'obj'}}]);
+assert.eq(t.aggregate({$group: {_id:0, objs: {$push: '$$ROOT'}}}).result,
+          [{_id: 0, objs: [{_id: 'obj'}]}]);
+assert.eq(t.aggregate({$group: {_id:0, objs: {$push: '$$CURRENT'}}}).result,
+          [{_id: 0, objs: [{_id: 'obj'}]}]);
 
 // check name validity checks
 assertErrorCode(t, {$project: {a: {$let:{vars: {ROOT: 1}, in: '$$ROOT'}}}}, 16867);

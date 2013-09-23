@@ -144,13 +144,14 @@ namespace mongo {
         virtual void optimize();
 
         enum GetDepsReturn {
-            NOT_SUPPORTED, // This means the set should be ignored
+            NOT_SUPPORTED, // This means the set should be ignored and the full object is required.
             EXHAUSTIVE, // This means that everything needed should be in the set
             SEE_NEXT, // Add the next Source's deps to the set
         };
 
         /** Get the fields this operation needs to do its job.
          *  Deps should be in "a.b.c" notation
+         *  An empty string in deps means the whole document is needed.
          *
          *  @param deps results are added here. NOT CLEARED
          */
