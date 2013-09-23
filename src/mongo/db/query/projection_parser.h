@@ -28,45 +28,21 @@
 
 #pragma once
 
-#include "mongo/db/diskloc.h"
-#include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/matcher/expression.h"
 #include "mongo/db/query/parsed_projection.h"
 
 namespace mongo {
 
     /**
-     * This stage computes a projection.
+     * Parses each of the various projection syntaxes that exist.
      */
-    class ProjectionStage : public PlanStage {
+    class ProjectionParser {
     public:
-        ProjectionStage(ParsedProjection* projection, WorkingSet* ws, PlanStage* child,
-                        const MatchExpression* filter);
-        virtual ~ProjectionStage();
-
-        virtual bool isEOF();
-        virtual StageState work(WorkingSetID* out);
-
-        virtual void prepareToYield();
-        virtual void recoverFromYield();
-        virtual void invalidate(const DiskLoc& dl);
-
-        PlanStageStats* getStats();
-
-    private:
-        // Not owned by us.
-        ParsedProjection* _projection;
-
-        // _ws is not owned by us.
-        WorkingSet* _ws;
-        scoped_ptr<PlanStage> _child;
-
-        // The filter is not owned by us.
-        const MatchExpression* _filter;
-
-        // Stats
-        CommonStats _commonStats;
+        /**
+         * This projection handles the inclusion/exclusion syntax of the .find() command.
+         * For details, see http://docs.mongodb.org/manual/reference/method/db.collection.find/
+         */
+        static Status parseFindSyntax(const BSONObj& inclExcl, ParsedProjection** out);
     };
 
 }  // namespace mongo

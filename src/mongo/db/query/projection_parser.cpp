@@ -26,31 +26,51 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/db/query/projection_parser.h"
 
-#include "mongo/db/exec/working_set.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
-    /**
-     * An interface for projecting (modifying) a WSM.
-     * TODO: Add unit test.
-     */
-    class QueryProjection {
-    public:
-        virtual ~QueryProjection() { }
+    // static
+    Status ProjectionParser::parseFindSyntax(const BSONObj& obj, ParsedProjection** out) {
+        auto_ptr<FindProjection> qp(new FindProjection());
 
-        /**
-         * Compute the projection over the WSM.  Place the output in the provided WSM.
-         */
-        virtual Status project(WorkingSetMember* wsm) = 0;
+        // Include _id by default.
+        qp->_includeID = true;
 
-        /**
-         * This projection handles the inclusion/exclusion syntax of the .find() command.
-         * For details, see http://docs.mongodb.org/manual/reference/method/db.collection.find/
-         */
-        static Status newInclusionExclusion(const BSONObj& inclExcl, QueryProjection** out);
-    };
+        // By default include everything.
+        bool lastNonIDValue = false;
+
+        BSONObjIterator it(obj);
+        while (it.more()) {
+            BSONElement elt = it.next();
+            if (mongoutils::str::equals("_id", elt.fieldName())) {
+                qp->_includeID = elt.trueValue();
+            }
+            else {
+                bool newFieldValue = elt.trueValue();
+                if (qp->_excludedFields.size() + qp->_includedFields.size() > 0) {
+                    // make sure we're all true or all false otherwise error
+                    if (newFieldValue != lastNonIDValue) {
+                        return Status(ErrorCodes::BadValue, "Inconsistent projection specs");
+                    }
+                }
+                lastNonIDValue = newFieldValue;
+                if (lastNonIDValue) {
+                    // inclusive
+                    qp->_includedFields.push_back(elt.fieldName());
+                }
+                else {
+                    // exclusive
+                    qp->_excludedFields.insert(elt.fieldName());
+                }
+            }
+        }
+
+        *out = qp.release();
+        return Status::OK();
+    }
 
 }  // namespace mongo

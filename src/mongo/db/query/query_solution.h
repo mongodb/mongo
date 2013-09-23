@@ -30,6 +30,7 @@
 
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/query/index_bounds.h"
+#include "mongo/db/query/projection_parser.h"
 #include "mongo/db/query/stage_types.h"
 
 namespace mongo {
@@ -261,7 +262,7 @@ namespace mongo {
     };
 
     struct ProjectionNode : public QuerySolutionNode {
-        ProjectionNode() { }
+        ProjectionNode() : projection(NULL) { }
         virtual ~ProjectionNode() { }
 
         virtual StageType getType() const { return STAGE_PROJECTION; }
@@ -294,8 +295,11 @@ namespace mongo {
             return BSONObj();
         }
 
-        BSONObj projection;
+        // Points into the CanonicalQuery.
+        ParsedProjection* projection;
+
         scoped_ptr<QuerySolutionNode> child;
+
         // TODO: Filter
     };
 

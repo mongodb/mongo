@@ -165,9 +165,9 @@ namespace mongo {
             }
         }
 
-        if (!query.getParsed().getProj().isEmpty()) {
+        if (NULL != query.getProj()) {
             ProjectionNode* proj = new ProjectionNode();
-            proj->projection = query.getParsed().getProj();
+            proj->projection = query.getProj();
             proj->child.reset(solnRoot);
             solnRoot = proj;
         }
@@ -583,35 +583,93 @@ namespace mongo {
         return NULL;
     }
 
+    /**
+     * Order of what happens:
+     * find results
+     * sort results
+     * project results
+     */
+
     QuerySolution* makeSolution(const CanonicalQuery& query, MatchExpression* taggedRoot,
                                 const vector<BSONObj>& indexKeyPatterns) {
         cout << "about to build solntree from tagged tree:\n" << taggedRoot->toString() << endl;
+
         QuerySolutionNode* solnRoot = buildSolutionTree(taggedRoot, indexKeyPatterns);
         if (NULL == solnRoot) { return NULL; }
 
-        // TODO XXX: Solutions need properties, need to use those properties to see when things
-        // covered, sorts provided, etc.
+        // solnRoot finds all our results.
 
-        // Fetch before proj
-        bool addFetch = (STAGE_FETCH != solnRoot->getType());
-        if (addFetch) {
-            FetchNode* fetch = new FetchNode();
-            fetch->child.reset(solnRoot);
-            solnRoot = fetch;
-        }
-
-        if (!query.getParsed().getProj().isEmpty()) {
-            ProjectionNode* proj = new ProjectionNode();
-            proj->projection = query.getParsed().getProj();
-            proj->child.reset(solnRoot);
-            solnRoot = proj;
-        }
-
+        // Sort the results.
         if (!query.getParsed().getSort().isEmpty()) {
-            SortNode* sort = new SortNode();
-            sort->pattern = query.getParsed().getSort();
-            sort->child.reset(solnRoot);
-            solnRoot = sort;
+            // See if solnRoot gives us the sort.  If so, we're done.
+            if (0 == query.getParsed().getSort().woCompare(solnRoot->getSort())) {
+                // Sort is already provided!
+            }
+            else {
+                // If solnRoot isn't already sorted, let's see if it has the fields we're sorting
+                // on.  If it's fetched, it has all the fields by definition.  If it's not, we check
+                // sort field by sort field.
+                if (!solnRoot->fetched()) {
+                    bool sortCovered = true;
+                    BSONObjIterator it(query.getParsed().getSort());
+                    while (it.more()) {
+                        if (!solnRoot->hasField(it.next().fieldName())) {
+                            sortCovered = false;
+                            break;
+                        }
+                    }
+
+                    if (!sortCovered) {
+                        FetchNode* fetch = new FetchNode();
+                        fetch->child.reset(solnRoot);
+                        solnRoot = fetch;
+                    }
+                }
+
+                SortNode* sort = new SortNode();
+                sort->pattern = query.getParsed().getSort();
+                sort->child.reset(solnRoot);
+                solnRoot = sort;
+            }
+        }
+
+        // Project the results.
+        if (NULL != query.getProj()) {
+            if (query.getProj()->requiresDocument()) {
+                if (!solnRoot->fetched()) {
+                    FetchNode* fetch = new FetchNode();
+                    fetch->child.reset(solnRoot);
+                    solnRoot = fetch;
+                }
+            }
+            else {
+                const vector<string>& fields = query.getProj()->requiredFields();
+                bool covered = true;
+                for (size_t i = 0; i < fields.size(); ++i) {
+                    if (!solnRoot->hasField(fields[i])) {
+                        covered = false;
+                        break;
+                    }
+                }
+                if (!covered) {
+                    FetchNode* fetch = new FetchNode();
+                    fetch->child.reset(solnRoot);
+                    solnRoot = fetch;
+                }
+            }
+
+            // We now know we have whatever data is required for the projection.
+            ProjectionNode* projNode = new ProjectionNode();
+            projNode->projection = query.getProj();
+            projNode->child.reset(solnRoot);
+            solnRoot = projNode;
+        }
+        else {
+            if (!solnRoot->fetched()) {
+                FetchNode* fetch = new FetchNode();
+                fetch->child.reset(solnRoot);
+                solnRoot = fetch;
+            }
         }
 
         if (0 != query.getParsed().getSkip()) {
@@ -732,7 +790,6 @@ namespace mongo {
 
         MatchExpression* rawTree;
         while (isp.getNext(&rawTree)) {
-
             //
             // Planner Section 3: Logical Rewrite.  Use the index selection and the tree structure
             // to try to rewrite the tree.  TODO: Do this for real.  We treat the tree as static.
@@ -760,6 +817,12 @@ namespace mongo {
                 cout << "Adding solution:\n" << soln->toString() << endl;
                 out->push_back(soln);
             }
+        }
+
+        if (0 == out->size() && !query.getParsed().getSort().isEmpty()) {
+            // There are no indexed plans outputted, but there's a requested sort.  See if we have
+            // an index that is the same as the sort pattern.
+            // XXX: we may want to do this even if an indexed plan is outputted...detect that.
         }
 
         // TODO: Do we always want to offer a collscan solution?

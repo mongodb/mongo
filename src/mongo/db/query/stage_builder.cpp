@@ -95,16 +95,9 @@ namespace mongo {
         }
         else if (STAGE_PROJECTION == root->getType()) {
             const ProjectionNode* pn = static_cast<const ProjectionNode*>(root);
-            QueryProjection* proj;
-            if (!QueryProjection::newInclusionExclusion(pn->projection, &proj).isOK()) {
-                return NULL;
-            }
             PlanStage* childStage = buildStages(ns, pn->child.get(), ws);
-            if (NULL == childStage) {
-                delete proj;
-                return NULL;
-            }
-            return new ProjectionStage(proj, ws, childStage, NULL);
+            if (NULL == childStage) { return NULL; }
+            return new ProjectionStage(pn->projection, ws, childStage, NULL);
         }
         else if (STAGE_LIMIT == root->getType()) {
             const LimitNode* ln = static_cast<const LimitNode*>(root);
@@ -146,7 +139,7 @@ namespace mongo {
         }
     }
 
-    //static
+    // static
     bool StageBuilder::build(const QuerySolution& solution, PlanStage** rootOut,
                              WorkingSet** wsOut) {
         QuerySolutionNode* root = solution.root.get();

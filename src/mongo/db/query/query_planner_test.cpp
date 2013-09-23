@@ -73,6 +73,12 @@ namespace {
             ASSERT_GREATER_THAN(solns.size(), 0U);;
         }
 
+        void runDetailedQuery(const BSONObj& query, const BSONObj& sort, const BSONObj& proj) {
+            ASSERT_OK(CanonicalQuery::canonicalize(ns, query, sort, proj, &cq));
+            QueryPlanner::plan(*cq, keyPatterns, &solns);
+            ASSERT_GREATER_THAN(solns.size(), 0U);;
+        }
+
         //
         // Introspect solutions.
         //
@@ -91,7 +97,26 @@ namespace {
                     found++;
                 }
             }
+            if (1 != found) {
+                cout << "Can't find requested stage type " << stageType
+                     << ", dump of all solutions:\n";
+                for (vector<QuerySolution*>::const_iterator it = solns.begin();
+                        it != solns.end();
+                        ++it) {
+                    cout << (*it)->toString() << endl;
+                }
+            }
             ASSERT_EQUALS(found, 1U);
+        }
+
+        void getAllPlans(StageType stageType, vector<QuerySolution*>* out) const {
+            for (vector<QuerySolution*>::const_iterator it = solns.begin();
+                 it != solns.end();
+                 ++it) {
+                if ((*it)->root->getType() == stageType) {
+                    out->push_back(*it);
+                }
+            }
         }
 
         // { 'field': [ [min, max, startInclusive, endInclusive], ... ], 'field': ... }
@@ -338,6 +363,43 @@ namespace {
         // TODO check filter
     }
 
+    //
+    // Basic covering
+    //
+
+    TEST_F(SingleIndexTest, BasicCovering) {
+        setIndex(BSON("x" << 1));
+        // query, sort, proj
+        runDetailedQuery(fromjson("{ x : {$gt: 1}}"), BSONObj(), fromjson("{x: 1}"));
+        ASSERT_EQUALS(getNumSolutions(), 2U);
+
+        vector<QuerySolution*> solns;
+        getAllPlans(STAGE_PROJECTION, &solns);
+        ASSERT_EQUALS(solns.size(), 2U);
+
+        for (size_t i = 0; i < solns.size(); ++i) {
+            // cout << solns[i]->toString();
+            ProjectionNode* pn = static_cast<ProjectionNode*>(solns[i]->root.get());
+            ASSERT(STAGE_COLLSCAN == pn->child->getType() || STAGE_IXSCAN == pn->child->getType());
+        }
+    }
+
+    //
+    // Basic sort elimination
+    //
+
+    TEST_F(SingleIndexTest, BasicSortElim) {
+        setIndex(BSON("x" << 1));
+        // query, sort, proj
+        runDetailedQuery(fromjson("{ x : {$gt: 1}}"), fromjson("{x: 1}"), BSONObj());
+        ASSERT_EQUALS(getNumSolutions(), 2U);
+
+        QuerySolution* collScanSolution;
+        getPlanByType(STAGE_SORT, &collScanSolution);
+
+        QuerySolution* indexedSolution;
+        getPlanByType(STAGE_FETCH, &indexedSolution);
+    }
 
     // STOPPED HERE - need to hook up machinery for multiple indexed predicates
     //                second is not working (until the machinery is in place)
