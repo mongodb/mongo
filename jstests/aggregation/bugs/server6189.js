@@ -16,7 +16,12 @@ function test(date, testSynthetics) {
                                 , hour:{ $hour: '$date' }
                                 , minute:{ $minute: '$date' }
                                 , second:{ $second: '$date' }
-                                , millisecond:{ $millisecond: '$date' } // server-6666
+
+                                // server-6666
+                                , millisecond:{ $millisecond: '$date' }
+
+                                // server-9289
+                                , millisecondPlusTen:{ $millisecond: {$add: ['$date', 10]}}
 
                                 // $substr will call coerceToString
                                 , string: {$substr: ['$date', 0,1000]}
@@ -41,7 +46,8 @@ function test(date, testSynthetics) {
                              , hour: date.getUTCHours()
                              , minute: date.getUTCMinutes()
                              , second: date.getUTCSeconds()
-                             , millisecond: date.getUTCMilliseconds() // server-6666
+                             , millisecond: date.getUTCMilliseconds()
+                             , millisecondPlusTen: ((date.getUTCMilliseconds() + 10) % 1000)
                              , string: date.tojson().slice(9,28)
                              } );
 
