@@ -79,7 +79,7 @@ namespace {
 
     Status AuthzManagerExternalStateMongod::getAllDatabaseNames(
             std::vector<std::string>* dbnames) {
-        Lock::GlobalWrite lk;
+        Lock::GlobalRead lk;
         getDatabaseNames(*dbnames);
         return Status::OK();
     }
