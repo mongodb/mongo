@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
@@ -19,7 +19,7 @@
     <UpgradeCode Condition=" '$(UpgradeCode)' == '' ">FCF901F6-E963-40B1-9A17-978242068587</UpgradeCode>
   </PropertyGroup>
   <PropertyGroup>
-    <ClientSource Condition=" '$(Source)' == '' ">..\..\..\build\win32\64\client_build</ClientSource>
+    <ClientSource Condition=" '$(ClientSource)' == '' ">..\..\..\build\win32\64\client_build</ClientSource>
     <Edition Condition=" '$(Edition)' == '' ">Standard</Edition>
     <Flavor Condition=" '$(Flavor)' == '' ">2008R2Plus</Flavor>
     <License Condition=" '$(License)' == '' ">..\..\..\distsrc</License>
@@ -29,7 +29,8 @@
     <Source Condition=" '$(Source)' == '' ">..\..\..\build\win32\64\mongo</Source>
     <SslSource Condition=" '$(SslSource)' == '' ">..\..\..\build\win32\64\mongo</SslSource>
     <Version Condition=" '$(Version)' == '' ">2.4.0</Version>
-    <DefineConstants>MongoDBVersion=$(Version);LicenseSource=$(License);BinarySource=$(Source);Edition=$(Edition);SaslSource=$(SaslSource);SslSource=$(SslSource);SnmpSource=$(SnmpSource);ProductId=$(ProductId);UpgradeCode=$(UpgradeCode);Flavor=$(Flavor);ClientSource=$(ClientSource);EnterpriseLicenseSource=$(EnterpriseLicense)</DefineConstants>
+    <ClientHeaderSource Condition=" '$(ClientHeaderSource)' == '' ">..\..\..\build\win32\normal\clientlib\include</ClientHeaderSource>
+    <DefineConstants>MongoDBVersion=$(Version);LicenseSource=$(License);BinarySource=$(Source);Edition=$(Edition);SaslSource=$(SaslSource);SslSource=$(SslSource);SnmpSource=$(SnmpSource);ProductId=$(ProductId);UpgradeCode=$(UpgradeCode);Flavor=$(Flavor);ClientSource=$(ClientSource);EnterpriseLicenseSource=$(EnterpriseLicense);ClientHeaderSource=$(ClientHeaderSource)</DefineConstants>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|x64' ">
     <VerboseOutput>True</VerboseOutput>
@@ -39,6 +40,7 @@
     <Compile Include="wxs\FeatureFragment.wxs" />
     <Compile Include="wxs\Installer_64.wxs" />
     <Compile Include="wxs\LicensingFragment.wxs" />
+    <Compile Include="$(OutputPath)DriverInclude.wxs" />
   </ItemGroup>
   <ItemGroup>
     <WixExtension Include="WixUIExtension">
@@ -50,6 +52,9 @@
     <Folder Include="wxs\" />
   </ItemGroup>
   <Import Project="$(WixTargetsPath)" />
+  <PropertyGroup>
+    <PreBuildEvent>"%WIX%\bin\heat.exe" dir $(ClientHeaderSource) -gg -g1 -frag -cg cg_DriverHeaders -nologo -directoryid -out DriverInclude.wxs -dr Header -srd -var var.ClientHeaderSource</PreBuildEvent>
+  </PropertyGroup>
   <!--
 	To modify your build process, add your task inside one of the targets below and uncomment it.
 	Other similar extension points exist, see Wix.targets.
