@@ -165,3 +165,4 @@ buildinfo.cpp
 *.msi
 *.wixobj
 *.wixpdb
+DriverInclude.wxs

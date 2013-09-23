@@ -22,17 +22,19 @@
     <VerboseOutput>True</VerboseOutput>
   </PropertyGroup>
   <PropertyGroup>
-    <ClientSource Condition=" '$(Source)' == '' ">..\..\..\build\win32\normal\clientlib</ClientSource>
+    <ClientSource Condition=" '$(ClientSource)' == '' ">..\..\..\build\win32\normal\clientlib</ClientSource>
     <License Condition=" '$(License)' == '' ">..\..\..\distsrc</License>
     <Source Condition=" '$(Source)' == '' ">..\..\..\build\win32\normal\mongo</Source>
     <Version Condition=" '$(Version)' == '' ">2.4.0</Version>
-    <DefineConstants>MongoDBVersion=$(Version);LicenseSource=$(License);BinarySource=$(Source);Edition=Standard;ProductId=$(ProductId);UpgradeCode=$(UpgradeCode);ClientSource=$(ClientSource)</DefineConstants>
+    <ClientHeaderSource Condition=" '$(ClientHeaderSource)' == '' ">..\..\..\build\win32\normal\clientlib\include</ClientHeaderSource>
+    <DefineConstants>MongoDBVersion=$(Version);LicenseSource=$(License);BinarySource=$(Source);Edition=Standard;ProductId=$(ProductId);UpgradeCode=$(UpgradeCode);ClientSource=$(ClientSource);ClientHeaderSource=$(ClientHeaderSource)</DefineConstants>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="wxs\BinaryFragment.wxs" />
     <Compile Include="wxs\FeatureFragment.wxs" />
     <Compile Include="wxs\LicensingFragment.wxs" />
     <Compile Include="wxs\Installer.wxs" />
+    <Compile Include="$(OutputPath)DriverInclude.wxs" />
   </ItemGroup>
   <ItemGroup>
     <WixExtension Include="WixUIExtension">
@@ -44,6 +46,9 @@
     <Folder Include="wxs\" />
   </ItemGroup>
   <Import Project="$(WixTargetsPath)" />
+  <PropertyGroup>
+    <PreBuildEvent>"%WIX%\bin\heat.exe" dir $(ClientHeaderSource) -gg -g1 -frag -cg cg_DriverHeaders -nologo -directoryid -out DriverInclude.wxs -dr Header -srd -var var.ClientHeaderSource</PreBuildEvent>
+  </PropertyGroup>
   <!--
 	To modify your build process, add your task inside one of the targets below and uncomment it.
 	Other similar extension points exist, see Wix.targets.

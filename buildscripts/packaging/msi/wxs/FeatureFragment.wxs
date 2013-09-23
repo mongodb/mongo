@@ -82,6 +82,7 @@
           <?if $(var.Edition) = Enterprise ?>
            <ComponentGroupRef Id="cg_DriverEnterprise" />
           <?endif ?>
+          <ComponentGroupRef Id="cg_DriverHeaders"/>
         </Feature>
       </Feature>
     </FeatureGroup>

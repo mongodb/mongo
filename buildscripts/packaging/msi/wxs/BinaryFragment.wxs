@@ -131,6 +131,7 @@
                   DiskId="1" KeyPath="yes" />
           </Component>
         <?endif ?>
+        <Directory Id="Header" Name="Header" />
       </Directory>
     </DirectoryRef>
 
