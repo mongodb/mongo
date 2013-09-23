@@ -834,6 +834,12 @@ namespace mongo {
 
         verify( todo.size() );
 
+        if(todo.size() == 1){
+            LOG( pc ) << "only one shard is used! reset manager and primary " << endl;                                                                                                                                                  
+            manager.reset();
+            primary.reset( new Shard( *todo.begin() ) );
+        }
+
         LOG( pc ) << "initializing over " << todo.size()
             << " shards required by " << vinfo << endl;
 
