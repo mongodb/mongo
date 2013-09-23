@@ -137,6 +137,8 @@ namespace mongo {
         double doubleTotal;
         // count is only used by AccumulatorAvg, but lives here to avoid counting non-numeric values
         long long count;
+        // diff is only used by AccumulatorStdDev
+        double diff;
     };
 
 
@@ -187,4 +189,30 @@ namespace mongo {
     private:
         AccumulatorAvg();
     };
+
+    /** Standard deviation and variance calculations
+     *  $stdDev - calculate standard deviation of sample
+     *  $var    - calculate variance of sample
+     *  $stdDevPop - calculate standard deviation of population
+     *  $var       - calculate variance of population
+     */
+    class AccumulatorStdDev : public AccumulatorSum {
+        typedef AccumulatorSum Super;
+    public:
+        // virtuals from Accumulator
+        virtual void processInternal(const Value& input, bool merging);
+        virtual Value getValue(bool toBeMerged) const;
+        virtual const char *getOpName() const;
+        virtual void reset();
+
+        static intrusive_ptr<Accumulator> createStdDev();
+        static intrusive_ptr<Accumulator> createStdDevPop();
+        static intrusive_ptr<Accumulator> createVar();
+        static intrusive_ptr<Accumulator> createVarPop();
+
+        enum StdDevOp { STDDEV, STDDEV_POP, VAR, VAR_POP};
+     private:
+        StdDevOp _op;
+        AccumulatorStdDev(StdDevOp op);
+     };
 }

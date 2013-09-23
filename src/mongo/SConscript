@@ -329,6 +329,7 @@ env.StaticLibrary("coredb", [
         "db/pipeline/accumulator_last.cpp",
         "db/pipeline/accumulator_min_max.cpp",
         "db/pipeline/accumulator_push.cpp",
+        "db/pipeline/accumulator_std_dev.cpp",
         "db/pipeline/accumulator_sum.cpp",
         "db/pipeline/document.cpp",
         "db/pipeline/document_source.cpp",
@@ -586,7 +587,7 @@ env.Library('coreshard', ['client/distlock.cpp',
                           's/shard.cpp',
                           's/shardkey.cpp'],
             LIBDEPS=['s/base']);
-    
+
 mongosLibraryFiles = [
     "s/interrupt_status_mongos.cpp",
     "s/strategy.cpp",

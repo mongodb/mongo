@@ -43,11 +43,11 @@ namespace AccumulatorTests {
         }
     private:
         intrusive_ptr<ExpressionContext> _shard;
-        intrusive_ptr<ExpressionContext> _router;        
+        intrusive_ptr<ExpressionContext> _router;
     };
 
     namespace Avg {
-        
+
         class Base : public AccumulatorTests::Base {
         public:
             virtual ~Base() {
@@ -61,7 +61,7 @@ namespace AccumulatorTests {
         private:
             intrusive_ptr<Accumulator> _accumulator;
         };
-        
+
         /** No documents evaluated. */
         class None : public Base {
         public:
@@ -70,7 +70,7 @@ namespace AccumulatorTests {
                 ASSERT_EQUALS( 0, accumulator()->getValue(false).getDouble() );
             }
         };
-        
+
         /** One int value is converted to double. */
         class OneInt : public Base {
         public:
@@ -80,7 +80,7 @@ namespace AccumulatorTests {
                 ASSERT_EQUALS( 3, accumulator()->getValue(false).getDouble() );
             }
         };
-        
+
         /** One long value is converted to double. */
         class OneLong : public Base {
         public:
@@ -90,7 +90,7 @@ namespace AccumulatorTests {
                 ASSERT_EQUALS( -4, accumulator()->getValue(false).getDouble() );
             }
         };
-        
+
         /** One double value. */
         class OneDouble : public Base {
         public:
@@ -100,7 +100,7 @@ namespace AccumulatorTests {
                 ASSERT_EQUALS( 22.6, accumulator()->getValue(false).getDouble() );
             }
         };
-        
+
         /** The average of two ints is an int, even if inexact. */
         class IntInt : public Base {
         public:
@@ -110,8 +110,8 @@ namespace AccumulatorTests {
                 accumulator()->process(Value(11), false);
                 ASSERT_EQUALS( 10.5, accumulator()->getValue(false).getDouble() );
             }
-        };        
-        
+        };
+
         /** The average of an int and a double is calculated as a double. */
         class IntDouble : public Base {
         public:
@@ -121,8 +121,8 @@ namespace AccumulatorTests {
                 accumulator()->process(Value(11.0), false);
                 ASSERT_EQUALS( 10.5, accumulator()->getValue(false).getDouble() );
             }
-        };        
-        
+        };
+
         /** Unlike $sum, two ints do not overflow in the 'total' portion of the average. */
         class IntIntNoOverflow : public Base {
         public:
@@ -133,8 +133,8 @@ namespace AccumulatorTests {
                 ASSERT_EQUALS(numeric_limits<int>::max(),
                               accumulator()->getValue(false).getDouble());
             }
-        };        
-        
+        };
+
         /** Two longs do overflow in the 'total' portion of the average. */
         class LongLongOverflow : public Base {
         public:
@@ -167,13 +167,13 @@ namespace AccumulatorTests {
                 Value operand() { return Value(3); }
                 BSONObj expectedResult() { return BSON( "subTotal" << 3.0 << "count" << 1LL ); }
             };
-            
+
             /** Shard result for one long. */
             class Long : public SingleOperandBase {
                 Value operand() { return Value(5LL); }
                 BSONObj expectedResult() { return BSON( "subTotal" << 5.0 << "count" << 1LL ); }
             };
-            
+
             /** Shard result for one double. */
             class Double : public SingleOperandBase {
                 Value operand() { return Value(116.0); }
@@ -215,14 +215,14 @@ namespace AccumulatorTests {
                 Value operand2() { return Value(3LL); }
                 BSONObj expectedResult() { return BSON( "subTotal" << 8.0 << "count" << 2LL ); }
             };
-            
+
             /** Shard avg an int and a double. */
             class IntDouble : public TwoOperandBase {
                 Value operand1() { return Value(5); }
                 Value operand2() { return Value(6.2); }
                 BSONObj expectedResult() { return BSON( "subTotal" << 11.2 << "count" << 2LL ); }
             };
-            
+
             /** Shard avg a long and a double. */
             class LongDouble : public TwoOperandBase {
                 Value operand1() { return Value(5LL); }
@@ -256,7 +256,7 @@ namespace AccumulatorTests {
                                        fromValue( accumulator()->getValue(false) ) );
                 }
             };
-            
+
             /** Router result from two shards. */
             class TwoShards : public Base {
             public:
@@ -270,8 +270,289 @@ namespace AccumulatorTests {
             };
 
         } // namespace Router
-        
+
     } // namespace Avg
+
+    namespace StdDev{
+
+        class Base : public AccumulatorTests::Base {
+        public:
+            virtual ~Base() {
+            }
+        protected:
+            void createStdDevAcc() {
+                _stdDev    = AccumulatorStdDev::createStdDev();
+                _stdDevPop = AccumulatorStdDev::createStdDevPop();
+                _var       = AccumulatorStdDev::createVar();
+                _varPop    = AccumulatorStdDev::createVarPop();
+
+                ASSERT_EQUALS(string("$stdDev"), _stdDev->getOpName());
+                ASSERT_EQUALS(string("$stdDevPop"), _stdDevPop->getOpName());
+                ASSERT_EQUALS(string("$var"), _var->getOpName());
+                ASSERT_EQUALS(string("$varPop"), _varPop->getOpName());
+            }
+            Accumulator* accumulator_stdDev() { return _stdDev.get(); }
+            Accumulator* accumulator_stdDevPop() { return _stdDevPop.get(); }
+            Accumulator* accumulator_var() { return _var.get(); }
+            Accumulator* accumulator_varPop() { return _varPop.get(); }
+        private:
+            intrusive_ptr<Accumulator> _stdDev;
+            intrusive_ptr<Accumulator> _stdDevPop;
+            intrusive_ptr<Accumulator> _var;
+            intrusive_ptr<Accumulator> _varPop;
+        };
+
+        /** No documents evaluated. */
+        class None : public Base {
+        public:
+            void run() {
+                createStdDevAcc();
+                ASSERT_EQUALS( 0, accumulator_stdDev()->getValue(false).getDouble() );
+                ASSERT_EQUALS( 0, accumulator_stdDevPop()->getValue(false).getDouble() );
+            }
+        };
+
+        /** One int value. */
+        class OneInt : public Base {
+        public:
+            void run() {
+                createStdDevAcc();
+                accumulator_stdDev()->process(Value(3), false);
+                ASSERT_EQUALS( 0, accumulator_stdDev()->getValue(false).getDouble() );
+
+                accumulator_stdDevPop()->process(Value(3), false);
+                ASSERT_EQUALS( 0, accumulator_stdDevPop()->getValue(false).getDouble() );
+            }
+        };
+
+        /** One double value. */
+        class OneDouble : public Base {
+        public:
+            void run() {
+                createStdDevAcc();
+                accumulator_stdDev()->process(Value(22.3), false);
+                ASSERT_EQUALS( 0, accumulator_stdDev()->getValue(false).getDouble() );
+
+                accumulator_stdDevPop()->process(Value(22.3), false);
+                ASSERT_EQUALS( 0, accumulator_stdDevPop()->getValue(false).getDouble() );
+            }
+        };
+
+        /** The stdev of an int and a double. */
+        class TwoValues : public Base {
+        public:
+            void run() {
+                createStdDevAcc();
+                accumulator_stdDev()->process(Value(10), false);
+                accumulator_stdDev()->process(Value(20.0), false);
+                ASSERT_EQUALS( 5 * sqrt(2), accumulator_stdDev()->getValue(false).getDouble() );
+
+                accumulator_stdDevPop()->process(Value(10), false);
+                accumulator_stdDevPop()->process(Value(20.0), false);
+                ASSERT_EQUALS( 5, accumulator_stdDevPop()->getValue(false).getDouble() );
+            }
+        };
+
+        namespace Shard {
+            class SingleOperandBase : public Base {
+            public:
+                void run() {
+                    createStdDevAcc();
+                    accumulator_stdDev()->process(operand(), false);
+                    assertBinaryEqual(
+                        expectedResultStdDev(),
+                        fromDocument(accumulator_stdDev()->getValue(true).getDocument())
+                    );
+
+                    accumulator_stdDevPop()->process(operand(), false);
+                    assertBinaryEqual(
+                        expectedResultStdDevPop(),
+                        fromDocument(accumulator_stdDevPop()->getValue(true).getDocument())
+                    );
+                }
+            protected:
+                virtual Value operand() = 0;
+                virtual BSONObj expectedResultStdDev() = 0;
+                virtual BSONObj expectedResultStdDevPop() = 0;
+            };
+
+            /** Shard result for one integer. */
+            class Int : public SingleOperandBase {
+                Value operand() { return Value(3); }
+                BSONObj expectedResultStdDev() {
+                    return BSON( "subTotal" << 3.0 << "count" << 1LL << "diff" << 0.0);
+                }
+                BSONObj expectedResultStdDevPop() {
+                    return BSON( "subTotal" << 3.0 << "count" << 1LL << "diff" << 0.0);
+                }
+            };
+
+            /** Shard result for one long. */
+            class Long : public SingleOperandBase {
+                Value operand() { return Value(5LL); }
+                BSONObj expectedResultStdDev() {
+                    return BSON( "subTotal" << 5.0 << "count" << 1LL << "diff" << 0.0);
+                }
+                BSONObj expectedResultStdDevPop() {
+                    return BSON( "subTotal" << 5.0 << "count" << 1LL << "diff" << 0.0);
+                }
+            };
+
+            /** Shard result for one double. */
+            class Double : public SingleOperandBase {
+                Value operand() { return Value(116.0); }
+                BSONObj expectedResultStdDev() {
+                    return BSON( "subTotal" << 116.0 << "count" << 1LL << "diff" << 0.0);
+                }
+                BSONObj expectedResultStdDevPop() {
+                    return BSON( "subTotal" << 116.0 << "count" << 1LL << "diff" << 0.0);
+                }
+            };
+
+            class TwoOperandBase : public Base {
+            public:
+                void run() {
+                    checkStdDev( operand1(), operand2() );
+                    checkStdDev( operand2(), operand1() );
+                }
+            protected:
+                virtual Value operand1() = 0;
+                virtual Value operand2() = 0;
+                virtual BSONObj expectedResultStdDev() = 0;
+                virtual BSONObj expectedResultStdDevPop() = 0;
+            private:
+                void checkStdDev( const Value& a, const Value& b ) {
+                    createStdDevAcc();
+                    accumulator_stdDev()->process(a, false);
+                    accumulator_stdDev()->process(b, false);
+                    assertBinaryEqual(expectedResultStdDev(),
+                            fromDocument(accumulator_stdDev()->getValue(true).getDocument()));
+
+                    accumulator_stdDevPop()->process(a, false);
+                    accumulator_stdDevPop()->process(b, false);
+                    assertBinaryEqual(expectedResultStdDevPop(),
+                            fromDocument(accumulator_stdDevPop()->getValue(true).getDocument()));
+                }
+            };
+
+            /** Shard two ints. */
+            class IntInt : public TwoOperandBase {
+                Value operand1() { return Value(10); }
+                Value operand2() { return Value(20); }
+                BSONObj expectedResultStdDev() {
+                    return BSON( "subTotal" << 30.0 << "count" << 2LL << "diff" << 50.0);
+                }
+
+                BSONObj expectedResultStdDevPop() {
+                    return BSON( "subTotal" << 30.0 << "count" << 2LL << "diff" << 50.0);
+                }
+            };
+
+            /** Shard avg an int, long, and double. */
+            class IntLongDouble : public Base {
+            public:
+                void run() {
+                    createStdDevAcc();
+                    accumulator_stdDev()->process(Value(10), false);
+                    accumulator_stdDev()->process(Value(20LL), false);
+                    accumulator_stdDev()->process(Value(30.0), false);
+                    assertBinaryEqual(
+                        BSON( "subTotal" << 60.0 << "count" << 3LL << "diff" << 200.0),
+                        fromDocument(accumulator_stdDev()->getValue(true).getDocument())
+                    );
+
+                    accumulator_stdDevPop()->process(Value(10), false);
+                    accumulator_stdDevPop()->process(Value(20LL), false);
+                    accumulator_stdDevPop()->process(Value(30.0), false);
+                    assertBinaryEqual(
+                        BSON( "subTotal" << 60.0 << "count" << 3LL << "diff" << 200.0),
+                        fromDocument(accumulator_stdDev()->getValue(true).getDocument())
+                    );
+                }
+            };
+
+        } // namespace Shard
+
+        namespace Router {
+            /** Router result from one shard. */
+            class OneShard : public Base {
+            public:
+                void run() {
+                    createStdDevAcc();
+                    /** Using 10.0 and 20.0 as root values**/
+                    accumulator_stdDev()->process(
+                        Value(DOC("subTotal" << 30.0 << "count" << 2LL << "diff" << 50.0)), true
+                    );
+                    assertBinaryEqual( BSON( "" << 5.0 * sqrt(2) ),
+                                       fromValue( accumulator_stdDev()->getValue(false) ) );
+
+                    accumulator_var()->process(
+                        Value(DOC("subTotal" << 30.0 << "count" << 2LL << "diff" << 50.0)), true
+                    );
+                    assertBinaryEqual( BSON( "" << 50.0 ),
+                                       fromValue( accumulator_var()->getValue(false) ) );
+
+                    accumulator_stdDevPop()->process(
+                        Value(DOC("subTotal" << 30.0 << "count" << 2LL << "diff" << 50.0)), true
+                    );
+                    assertBinaryEqual( BSON( "" << 5.0 ),
+                                       fromValue( accumulator_stdDevPop()->getValue(false) ) );
+
+                    accumulator_varPop()->process(
+                        Value(DOC("subTotal" << 30.0 << "count" << 2LL << "diff" << 50.0)), true
+                    );
+                    assertBinaryEqual( BSON( "" << 25.0 ),
+                                       fromValue( accumulator_varPop()->getValue(false) ) );
+                }
+            };
+
+            /** Router result from two shards. */
+            class TwoShards : public Base {
+            public:
+                void run() {
+                    createStdDevAcc();
+                    /** Using 10.0, 20.0 and 30.0 with (10,20) coming from one shard **/
+                    accumulator_stdDev()->process(
+                        Value(DOC("subTotal" << 30.0 << "count" << 2LL << "diff" << 50.0)), true
+                    );
+                    accumulator_stdDev()->process(
+                        Value(DOC("subTotal" << 30.0 << "count" << 1LL << "diff" << 0.0)), true
+                    );
+                    assertBinaryEqual( BSON( "" << 10.0 ),
+                                       fromValue( accumulator_stdDev()->getValue(false) ) );
+
+                    accumulator_var()->process(
+                        Value(DOC("subTotal" << 30.0 << "count" << 2LL << "diff" << 50.0)), true
+                    );
+                    accumulator_var()->process(
+                        Value(DOC("subTotal" << 30.0 << "count" << 1LL << "diff" << 0.0)), true
+                    );
+                    assertBinaryEqual( BSON( "" << 100.0 ),
+                                       fromValue( accumulator_var()->getValue(false) ) );
+
+                    accumulator_stdDevPop()->process(
+                        Value(DOC("subTotal" << 30.0 << "count" << 2LL << "diff" << 50.0)), true
+                    );
+                    accumulator_stdDevPop()->process(
+                        Value(DOC("subTotal" << 30.0 << "count" << 1LL << "diff" << 0.0)), true
+                    );
+                    assertBinaryEqual( BSON( "" << 10.0 * sqrt(6) / 3),
+                                       fromValue( accumulator_stdDevPop()->getValue(false) ) );
+
+                    accumulator_varPop()->process(
+                        Value(DOC("subTotal" << 30.0 << "count" << 2LL << "diff" << 50.0)), true
+                    );
+                    accumulator_varPop()->process(
+                        Value(DOC("subTotal" << 30.0 << "count" << 1LL << "diff" << 0.0)), true
+                    );
+                    assertBinaryEqual( BSON( "" << 200.0 / 3.0 ),
+                                       fromValue( accumulator_varPop()->getValue(false) ) );
+                }
+            };
+
+        } // namespace Router
+
+    } // namespace StdDev
 
     namespace First {
 
@@ -305,7 +586,7 @@ namespace AccumulatorTests {
                 ASSERT_EQUALS( 5, accumulator()->getValue(false).getInt() );
             }
         };
-        
+
         /* The accumulator evaluates one document with the field missing, returns missing value. */
         class Missing : public Base {
         public:
@@ -315,7 +596,7 @@ namespace AccumulatorTests {
                 ASSERT_EQUALS( EOO, accumulator()->getValue(false).getType() );
             }
         };
-        
+
         /* The accumulator evaluates two documents and retains the value in the first. */
         class Two : public Base {
         public:
@@ -326,7 +607,7 @@ namespace AccumulatorTests {
                 ASSERT_EQUALS( 5, accumulator()->getValue(false).getInt() );
             }
         };
-        
+
         /* The accumulator evaluates two documents and retains the missing value in the first. */
         class FirstMissing : public Base {
         public:
@@ -337,11 +618,11 @@ namespace AccumulatorTests {
                 ASSERT_EQUALS( EOO, accumulator()->getValue(false).getType() );
             }
         };
-        
+
     } // namespace First
 
     namespace Last {
-        
+
         class Base : public AccumulatorTests::Base {
         protected:
             void createAccumulator() {
@@ -352,7 +633,7 @@ namespace AccumulatorTests {
         private:
             intrusive_ptr<Accumulator> _accumulator;
         };
-        
+
         /** The accumulator evaluates no documents. */
         class None : public Base {
         public:
@@ -362,7 +643,7 @@ namespace AccumulatorTests {
                 ASSERT( accumulator()->getValue(false).missing() );
             }
         };
-        
+
         /* The accumulator evaluates one document and retains its value. */
         class One : public Base {
         public:
@@ -372,7 +653,7 @@ namespace AccumulatorTests {
                 ASSERT_EQUALS( 5, accumulator()->getValue(false).getInt() );
             }
         };
-        
+
         /* The accumulator evaluates one document with the field missing retains undefined. */
         class Missing : public Base {
         public:
@@ -382,7 +663,7 @@ namespace AccumulatorTests {
                 ASSERT_EQUALS( EOO , accumulator()->getValue(false).getType() );
             }
         };
-        
+
         /* The accumulator evaluates two documents and retains the value in the last. */
         class Two : public Base {
         public:
@@ -393,7 +674,7 @@ namespace AccumulatorTests {
                 ASSERT_EQUALS( 7, accumulator()->getValue(false).getInt() );
             }
         };
-        
+
         /* The accumulator evaluates two documents and retains the undefined value in the last. */
         class LastMissing : public Base {
         public:
@@ -404,11 +685,11 @@ namespace AccumulatorTests {
                 ASSERT_EQUALS( EOO , accumulator()->getValue(false).getType() );
             }
         };
-        
+
     } // namespace Last
-    
+
     namespace Min {
-        
+
         class Base : public AccumulatorTests::Base {
         protected:
             void createAccumulator() {
@@ -419,7 +700,7 @@ namespace AccumulatorTests {
         private:
             intrusive_ptr<Accumulator> _accumulator;
         };
-        
+
         /** The accumulator evaluates no documents. */
         class None : public Base {
         public:
@@ -429,7 +710,7 @@ namespace AccumulatorTests {
                 ASSERT( accumulator()->getValue(false).missing() );
             }
         };
-        
+
         /* The accumulator evaluates one document and retains its value. */
         class One : public Base {
         public:
@@ -439,7 +720,7 @@ namespace AccumulatorTests {
                 ASSERT_EQUALS( 5, accumulator()->getValue(false).getInt() );
             }
         };
-        
+
         /* The accumulator evaluates one document with the field missing retains undefined. */
         class Missing : public Base {
         public:
@@ -449,7 +730,7 @@ namespace AccumulatorTests {
                 ASSERT_EQUALS( EOO , accumulator()->getValue(false).getType() );
             }
         };
-        
+
         /* The accumulator evaluates two documents and retains the minimum value. */
         class Two : public Base {
         public:
@@ -460,7 +741,7 @@ namespace AccumulatorTests {
                 ASSERT_EQUALS( 5, accumulator()->getValue(false).getInt() );
             }
         };
-        
+
         /* The accumulator evaluates two documents and retains the undefined value. */
         class LastMissing : public Base {
         public:
@@ -471,11 +752,11 @@ namespace AccumulatorTests {
                 ASSERT_EQUALS( 7 , accumulator()->getValue(false).getInt() );
             }
         };
-        
+
     } // namespace Min
-    
+
     namespace Max {
-        
+
         class Base : public AccumulatorTests::Base {
         protected:
             void createAccumulator() {
@@ -486,7 +767,7 @@ namespace AccumulatorTests {
         private:
             intrusive_ptr<Accumulator> _accumulator;
         };
-        
+
         /** The accumulator evaluates no documents. */
         class None : public Base {
         public:
@@ -496,7 +777,7 @@ namespace AccumulatorTests {
                 ASSERT( accumulator()->getValue(false).missing() );
             }
         };
-        
+
         /* The accumulator evaluates one document and retains its value. */
         class One : public Base {
         public:
@@ -506,7 +787,7 @@ namespace AccumulatorTests {
                 ASSERT_EQUALS( 5, accumulator()->getValue(false).getInt() );
             }
         };
-        
+
         /* The accumulator evaluates one document with the field missing retains undefined. */
         class Missing : public Base {
         public:
@@ -516,7 +797,7 @@ namespace AccumulatorTests {
                 ASSERT_EQUALS( EOO, accumulator()->getValue(false).getType() );
             }
         };
-        
+
         /* The accumulator evaluates two documents and retains the maximum value. */
         class Two : public Base {
         public:
@@ -527,7 +808,7 @@ namespace AccumulatorTests {
                 ASSERT_EQUALS( 7, accumulator()->getValue(false).getInt() );
             }
         };
-        
+
         /* The accumulator evaluates two documents and retains the defined value. */
         class LastMissing : public Base {
         public:
@@ -538,7 +819,7 @@ namespace AccumulatorTests {
                 ASSERT_EQUALS( 7, accumulator()->getValue(false).getInt() );
             }
         };
-        
+
     } // namespace Max
 
     namespace Sum {
@@ -582,7 +863,7 @@ namespace AccumulatorTests {
                 ASSERT_EQUALS( 6, accumulator()->getValue(false).getLong() );
             }
         };
-        
+
         /** A long that cannot be expressed as an int. */
         class OneLageLong : public Base {
         public:
@@ -592,7 +873,7 @@ namespace AccumulatorTests {
                 ASSERT_EQUALS( 60000000000LL, accumulator()->getValue(false).getLong() );
             }
         };
-        
+
         /** A double. */
         class OneDouble : public Base {
         public:
@@ -624,7 +905,7 @@ namespace AccumulatorTests {
                                    accumulator()->getValue(false).getDouble() );
             }
         };
-        
+
         class TypeConversionBase : public Base {
         public:
             virtual ~TypeConversionBase() {
@@ -645,7 +926,7 @@ namespace AccumulatorTests {
             }
             void checkSum() {
                 Value result = accumulator()->getValue(false);
-                ASSERT_EQUALS( expectedSum(), result );                
+                ASSERT_EQUALS( expectedSum(), result );
                 ASSERT_EQUALS( expectedSum().getType(), result.getType() );
             }
         };
@@ -670,21 +951,21 @@ namespace AccumulatorTests {
             Value summand2() { return Value(-10); }
             Value expectedSum() { return Value(-numeric_limits<int>::max() + -10LL); }
         };
-        
+
         /** An int and a long are summed. */
         class IntLong : public TypeConversionBase {
             Value summand1() { return Value(4); }
             Value summand2() { return Value(5LL); }
             Value expectedSum() { return Value(9LL); }
         };
-        
+
         /** An int and a long do not trigger an int overflow. */
         class IntLongNoIntOverflow : public TypeConversionBase {
             Value summand1() { return Value(numeric_limits<int>::max()); }
             Value summand2() { return Value(1LL); }
             Value expectedSum() { return Value((long long)numeric_limits<int>::max() + 1); }
         };
-        
+
         /** An int and a long overflow. */
         class IntLongLongOverflow : public TypeConversionBase {
             Value summand1() { return Value(1); }
@@ -696,9 +977,9 @@ namespace AccumulatorTests {
         class LongLong : public TypeConversionBase {
             Value summand1() { return Value(4LL); }
             Value summand2() { return Value(5LL); }
-            Value expectedSum() { return Value(9LL); }            
+            Value expectedSum() { return Value(9LL); }
         };
-        
+
         /** Two longs overflow. */
         class LongLongOverflow : public TypeConversionBase {
             Value summand1() { return Value(numeric_limits<long long>::max()); }
@@ -708,14 +989,14 @@ namespace AccumulatorTests {
                            + numeric_limits<long long>::max());
             }
         };
-        
+
         /** An int and a double are summed. */
         class IntDouble : public TypeConversionBase {
             Value summand1() { return Value(4); }
             Value summand2() { return Value(5.5); }
             Value expectedSum() { return Value(9.5); }
         };
-        
+
         /** An int and a NaN double are summed. */
         class IntNanDouble : public TypeConversionBase {
             Value summand1() { return Value(4); }
@@ -725,7 +1006,7 @@ namespace AccumulatorTests {
                 return Value(numeric_limits<double>::quiet_NaN());
             }
         };
-        
+
         /** An int and a NaN sum to NaN. */
         class IntDoubleNoIntOverflow : public TypeConversionBase {
             Value summand1() { return Value(numeric_limits<int>::max()); }
@@ -734,14 +1015,14 @@ namespace AccumulatorTests {
                 return Value((long long)numeric_limits<int>::max() + 1.0);
             }
         };
-        
+
         /** A long and a double are summed. */
         class LongDouble : public TypeConversionBase {
             Value summand1() { return Value(4LL); }
             Value summand2() { return Value(5.5); }
             Value expectedSum() { return Value(9.5); }
         };
-        
+
         /** A long and a double do not trigger a long overflow. */
         class LongDoubleNoLongOverflow : public TypeConversionBase {
             Value summand1() { return Value(numeric_limits<long long>::max()); }
@@ -792,7 +1073,7 @@ namespace AccumulatorTests {
             Value summand2() { return Value(-6); }
             Value expectedSum() { return Value(-1LL); }
         };
-        
+
         /** A null value is summed as zero. */
         class IntNull : public TypeConversionBase {
             Value summand1() { return Value(5); }
@@ -823,7 +1104,7 @@ namespace AccumulatorTests {
                            + (double)numeric_limits<long long>::max());
             }
         };
-        
+
     } // namespace Sum
 
     class All : public Suite {
@@ -849,6 +1130,18 @@ namespace AccumulatorTests {
             add<Avg::Shard::IntLongDouble>();
             add<Avg::Router::OneShard>();
             add<Avg::Router::TwoShards>();
+
+            add<StdDev::None>();
+            add<StdDev::OneInt>();
+            add<StdDev::OneDouble>();
+            add<StdDev::TwoValues>();
+            add<StdDev::Shard::Int>();
+            add<StdDev::Shard::Long>();
+            add<StdDev::Shard::Double>();
+            add<StdDev::Shard::IntInt>();
+            add<StdDev::Shard::IntLongDouble>();
+            add<StdDev::Router::OneShard>();
+            add<StdDev::Router::TwoShards>();
 
             add<First::None>();
             add<First::One>();

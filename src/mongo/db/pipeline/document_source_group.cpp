@@ -205,7 +205,11 @@ namespace mongo {
         {"$max", AccumulatorMinMax::createMax},
         {"$min", AccumulatorMinMax::createMin},
         {"$push", AccumulatorPush::create},
+        {"$stdDev", AccumulatorStdDev::createStdDev},
+        {"$stdDevPop", AccumulatorStdDev::createStdDevPop},
         {"$sum", AccumulatorSum::create},
+        {"$var", AccumulatorStdDev::createVar},
+        {"$varPop", AccumulatorStdDev::createVarPop},
     };
 
     static const size_t NGroupOp = sizeof(GroupOpTable)/sizeof(GroupOpTable[0]);

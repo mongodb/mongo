@@ -43,11 +43,27 @@ namespace mongo {
 
         if (totalType == NumberInt || totalType == NumberLong) {
             long long v = input.coerceToLong();
+
+            double meanA = 0;
+            if (count)
+                meanA = doubleTotal / static_cast<double>(count);
+            double delta = meanA - v;
+            double weight = count / static_cast<double>(count + 1);
+            diff += delta * delta * weight;
+
             longTotal += v;
             doubleTotal += v;
         }
         else if (totalType == NumberDouble) {
             double v = input.coerceToDouble();
+
+            double meanA = 0;
+            if (count)
+                meanA = doubleTotal / static_cast<double>(count);
+            double delta = meanA - v;
+            double weight = count / static_cast<double>(count + 1);
+            diff += delta * delta * weight;
+
             doubleTotal += v;
         }
         else {
@@ -82,6 +98,7 @@ namespace mongo {
         , longTotal(0)
         , doubleTotal(0)
         , count(0)
+        , diff(0)
     {
         // This is a fixed size Accumulator so we never need to update this
         _memUsageBytes = sizeof(*this);
@@ -92,6 +109,8 @@ namespace mongo {
         longTotal = 0;
         doubleTotal = 0;
         count = 0;
+        diff = 0;
+
     }
 
     const char *AccumulatorSum::getOpName() const {
