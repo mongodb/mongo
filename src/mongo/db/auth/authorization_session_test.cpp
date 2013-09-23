@@ -153,7 +153,7 @@ namespace {
         ASSERT_OK(authzSession->addAndAuthorizeUser(UserName("admin", "admin")));
 
         ASSERT_TRUE(authzSession->isAuthorizedForActionsOnResource(
-                            ResourcePattern::forAnyNormalResource(), ActionType::insert));
+                            ResourcePattern::forAnyResource(), ActionType::insert));
         ASSERT_TRUE(authzSession->isAuthorizedForActionsOnResource(
                             otherDBResource, ActionType::insert));
         ASSERT_TRUE(authzSession->isAuthorizedForActionsOnResource(
