@@ -777,7 +777,7 @@ namespace mongo {
         }
 
         virtual bool slaveOk() const {
-            return false;
+            return true;
         }
 
         virtual LockType locktype() const {
