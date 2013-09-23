@@ -33,6 +33,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/query/lite_parsed_query.h"
+#include "mongo/db/query/parsed_projection.h"
 
 namespace mongo {
 
@@ -40,8 +41,10 @@ namespace mongo {
     public:
         static Status canonicalize(const QueryMessage& qm, CanonicalQuery** out);
 
-        // This is for testing, when we don't have a QueryMessage.
+        // These are for testing, when we don't have a QueryMessage.
         static Status canonicalize(const string& ns, const BSONObj& query, CanonicalQuery** out);
+        static Status canonicalize(const string& ns, const BSONObj& query, const BSONObj& sort,
+                                   const BSONObj& proj, CanonicalQuery** out);
 
         // What namespace is this query over?
         const string& ns() const { return _pq->ns(); }
@@ -52,6 +55,7 @@ namespace mongo {
         MatchExpression* root() const { return _root.get(); }
         BSONObj getQueryObj() const { return _pq->getFilter(); }
         const LiteParsedQuery& getParsed() const { return *_pq; }
+        ParsedProjection* getProj() const { return _proj.get(); }
 
         string toString() const;
 
@@ -63,6 +67,8 @@ namespace mongo {
         Status init(LiteParsedQuery* lpq);
 
         scoped_ptr<LiteParsedQuery> _pq;
+
+        scoped_ptr<ParsedProjection> _proj;
 
         // _root points into _pq->getFilter()
         scoped_ptr<MatchExpression> _root;

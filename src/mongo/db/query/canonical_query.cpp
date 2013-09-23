@@ -30,6 +30,7 @@
 
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression_parser.h"
+#include "mongo/db/query/projection_parser.h"
 
 namespace mongo {
 
@@ -54,6 +55,24 @@ namespace mongo {
         // Pass empty sort and projection.
         BSONObj emptyObj;
         Status parseStatus = LiteParsedQuery::make(ns, 0, 0, 0, query, emptyObj, emptyObj, &lpq);
+        if (!parseStatus.isOK()) { return parseStatus; }
+
+        auto_ptr<CanonicalQuery> cq(new CanonicalQuery());
+        Status initStatus = cq->init(lpq);
+        if (!initStatus.isOK()) { return initStatus; }
+
+        *out = cq.release();
+        return Status::OK();
+    }
+
+    // static
+    Status CanonicalQuery::canonicalize(const string& ns, const BSONObj& query,
+                                        const BSONObj& sort, const BSONObj& proj,
+                                        CanonicalQuery** out) {
+        LiteParsedQuery* lpq;
+        // Pass empty sort and projection.
+        BSONObj emptyObj;
+        Status parseStatus = LiteParsedQuery::make(ns, 0, 0, 0, query, proj, sort, &lpq);
         if (!parseStatus.isOK()) { return parseStatus; }
 
         auto_ptr<CanonicalQuery> cq(new CanonicalQuery());
@@ -112,6 +131,15 @@ namespace mongo {
         MatchExpression* root = swme.getValue();
         normalizeTree(root);
         _root.reset(root);
+
+        if (!_pq->getProj().isEmpty()) {
+            ParsedProjection* proj;
+            Status projStatus = ProjectionParser::parseFindSyntax(_pq->getProj(), &proj);
+            if (!projStatus.isOK()) {
+                return projStatus;
+            }
+            _proj.reset(proj);
+        }
 
         return Status::OK();
     }

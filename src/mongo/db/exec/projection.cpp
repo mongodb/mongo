@@ -26,16 +26,18 @@
  *    it in the license file.
  */
 
+#include "mongo/db/exec/projection.h"
+
 #include "mongo/db/diskloc.h"
 #include "mongo/db/exec/plan_stage.h"
-#include "mongo/db/exec/projection.h"
+#include "mongo/db/exec/projection_executor.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression.h"
 
 namespace mongo {
 
-    ProjectionStage::ProjectionStage(QueryProjection* projection, WorkingSet* ws, PlanStage* child,
-                    const MatchExpression* filter)
+    ProjectionStage::ProjectionStage(ParsedProjection* projection, WorkingSet* ws, PlanStage* child,
+                                     const MatchExpression* filter)
         : _projection(projection), _ws(ws), _child(child), _filter(filter) { }
 
     ProjectionStage::~ProjectionStage() { }
@@ -51,7 +53,7 @@ namespace mongo {
 
         if (PlanStage::ADVANCED == status) {
             WorkingSetMember* member = _ws->get(id);
-            Status status = _projection->project(member);
+            Status status = ProjectionExecutor::apply(_projection, member);
             if (!status.isOK()) { return PlanStage::FAILURE; }
             *out = id;
         }

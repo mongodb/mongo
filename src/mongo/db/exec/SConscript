@@ -44,13 +44,13 @@ env.StaticLibrary(
         "merge_sort.cpp",
         "or.cpp",
         "projection.cpp",
-        "query_projection.cpp",
+        "projection_executor.cpp",
         "skip.cpp",
         "sort.cpp",
         "stagedebug_cmd.cpp",
         "working_set_common.cpp",
     ],
     LIBDEPS = [
-        "$BUILD_DIR/mongo/bson"
+        "$BUILD_DIR/mongo/bson",
     ],
 )

@@ -38,12 +38,12 @@ namespace mongo {
 
     void CollectionScanNode::appendToString(stringstream* ss, int indent) const {
         addIndent(ss, indent);
-        *ss << "COLLSCAN";
+        *ss << "COLLSCAN\n";
         addIndent(ss, indent + 1);
-        *ss <<  "ns = " << name;
+        *ss <<  "ns = " << name << endl;
         if (NULL != filter) {
             addIndent(ss, indent + 1);
-            *ss << " filter = " << filter->toString() << endl;
+            *ss << " filter = " << filter->toString();
         }
         addIndent(ss, indent + 1);
         *ss << "fetched = " << fetched() << endl;
@@ -262,8 +262,9 @@ namespace mongo {
     void ProjectionNode::appendToString(stringstream* ss, int indent) const {
         addIndent(ss, indent);
         *ss << "PROJ\n";
+        verify(NULL != projection);
         addIndent(ss, indent + 1);
-        *ss << "proj = " << projection.toString() << endl;
+        *ss << "proj = " << projection->toString() << endl;
         addIndent(ss, indent + 1);
         *ss << "fetched = " << fetched() << endl;
         addIndent(ss, indent + 1);
