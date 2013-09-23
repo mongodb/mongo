@@ -330,4 +330,4 @@ namespace mongo {
         return _resource;
     }
 
- } // namespace mongo
+} // namespace mongo
