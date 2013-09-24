@@ -65,7 +65,7 @@ namespace mongo {
      */
     struct CandidatePlan {
         CandidatePlan(QuerySolution* s, PlanStage* r, WorkingSet* w)
-            : solution(s), root(r), ws(w) { }
+            : solution(s), root(r), ws(w), failed(false) { }
 
         QuerySolution* solution;
         PlanStage* root;
@@ -73,6 +73,8 @@ namespace mongo {
 
         // Any results produced during the plan's execution prior to ranking are retained here.
         std::queue<WorkingSetID> results;
+
+        bool failed;
     };
 
     /**

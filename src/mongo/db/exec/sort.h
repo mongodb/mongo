@@ -88,6 +88,8 @@ namespace mongo {
         // Stats
         CommonStats _commonStats;
         SortStats _specificStats;
+
+        size_t _memUsage;
     };
 
     // Parameters that must be provided to a SortStage
