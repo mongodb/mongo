@@ -234,12 +234,13 @@ namespace mongo {
             }
 
             status = authzManager->updatePrivilegeDocument(userName, updateObj, writeConcern);
+            // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
+            authzManager->invalidateUserByName(userName);
             if (!status.isOK()) {
                 addStatus(status, result);
                 return false;
             }
 
-            authzManager->invalidateUserByName(userName);
             return true;
         }
 
@@ -313,6 +314,8 @@ namespace mongo {
                          AuthorizationManager::USER_SOURCE_FIELD_NAME << dbname),
                     writeConcern,
                     &numUpdated);
+            // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
+            authzManager->invalidateUserByName(UserName(user, dbname));
             if (!status.isOK()) {
                 addStatus(status, result);
                 return false;
@@ -326,7 +329,6 @@ namespace mongo {
                 return false;
             }
 
-            authzManager->invalidateUserByName(UserName(user, dbname));
             return true;
         }
 
@@ -388,14 +390,14 @@ namespace mongo {
                     BSON(AuthorizationManager::USER_SOURCE_FIELD_NAME << dbname),
                     writeConcern,
                     &numRemoved);
+            // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
+            authzManager->invalidateUsersFromDB(dbname);
             if (!status.isOK()) {
                 addStatus(status, result);
                 return false;
             }
 
             result.append("n", numRemoved);
-
-            authzManager->invalidateUsersFromDB(dbname);
             return true;
         }
 
@@ -479,12 +481,13 @@ namespace mongo {
             BSONArray newRolesBSONArray = rolesToBSONArray(userRoles);
             status = authzManager->updatePrivilegeDocument(
                     userName, BSON("$set" << BSON("roles" << newRolesBSONArray)), writeConcern);
+            // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
+            authzManager->invalidateUserByName(userName);
             if (!status.isOK()) {
                 addStatus(status, result);
                 return false;
             }
 
-            authzManager->invalidateUserByName(userName);
             return true;
         }
 
@@ -576,12 +579,13 @@ namespace mongo {
             BSONArray newRolesBSONArray = rolesToBSONArray(userRoles);
             status = authzManager->updatePrivilegeDocument(
                     userName, BSON("$set" << BSON("roles" << newRolesBSONArray)), writeConcern);
+            // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
+            authzManager->invalidateUserByName(userName);
             if (!status.isOK()) {
                 addStatus(status, result);
                 return false;
             }
 
-            authzManager->invalidateUserByName(userName);
             return true;
         }
 
@@ -665,12 +669,13 @@ namespace mongo {
             BSONArray newRolesBSONArray = rolesToBSONArray(userRoles);
             status = authzManager->updatePrivilegeDocument(
                     userName, BSON("$set" << BSON("roles" << newRolesBSONArray)), writeConcern);
+            // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
+            authzManager->invalidateUserByName(userName);
             if (!status.isOK()) {
                 addStatus(status, result);
                 return false;
             }
 
-            authzManager->invalidateUserByName(userName);
             return true;
         }
 
@@ -762,12 +767,13 @@ namespace mongo {
             BSONArray newRolesBSONArray = rolesToBSONArray(userRoles);
             status = authzManager->updatePrivilegeDocument(
                     userName, BSON("$set" << BSON("roles" << newRolesBSONArray)), writeConcern);
+            // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
+            authzManager->invalidateUserByName(userName);
             if (!status.isOK()) {
                 addStatus(status, result);
                 return false;
             }
 
-            authzManager->invalidateUserByName(userName);
             return true;
         }
 
