@@ -46,7 +46,11 @@
 namespace mongo {
 namespace auth {
 
-    Status extractWriteConcern(const BSONObj& cmdObj, BSONObj* writeConcern) {
+    /**
+     * Writes into *writeConcern a BSONObj describing the parameters to getLastError to use for
+     * the write confirmation.
+     */
+    Status _extractWriteConcern(const BSONObj& cmdObj, BSONObj* writeConcern) {
         BSONElement writeConcernElement;
         Status status = bsonExtractTypedField(cmdObj, "writeConcern", Object, &writeConcernElement);
         if (!status.isOK()) {
@@ -57,6 +61,22 @@ namespace auth {
             return status;
         }
         *writeConcern = writeConcernElement.Obj().getOwned();;
+        return Status::OK();
+    }
+
+    Status _checkNoExtraFields(const BSONObj& cmdObj,
+                              const StringData& cmdName,
+                              const unordered_set<std::string>& validFieldNames) {
+        // Iterate through all fields in command object and make sure there are no unexpected
+        // ones.
+        for (BSONObjIterator iter(cmdObj); iter.more(); iter.next()) {
+            StringData fieldName = (*iter).fieldNameStringData();
+            if (!validFieldNames.count(fieldName.toString())) {
+                return Status(ErrorCodes::BadValue,
+                              mongoutils::str::stream() << "\"" << fieldName << "\" is not "
+                                      "a valid argument to " << cmdName);
+            }
+        }
         return Status::OK();
     }
 
@@ -115,7 +135,17 @@ namespace auth {
                                             UserName* parsedUserName,
                                             vector<RoleName>* parsedRoleNames,
                                             BSONObj* parsedWriteConcern) {
-        Status status = extractWriteConcern(cmdObj, parsedWriteConcern);
+        unordered_set<std::string> validFieldNames;
+        validFieldNames.insert(cmdName.toString());
+        validFieldNames.insert("roles");
+        validFieldNames.insert("writeConcern");
+
+        Status status = _checkNoExtraFields(cmdObj, cmdName, validFieldNames);
+        if (!status.isOK()) {
+            return status;
+        }
+
+        status = _extractWriteConcern(cmdObj, parsedWriteConcern);
         if (!status.isOK()) {
             return status;
         }
@@ -225,7 +255,8 @@ namespace auth {
     Status parseAndValidateCreateUserCommand(const BSONObj& cmdObj,
                                              const std::string& dbname,
                                              AuthorizationManager* authzManager,
-                                             BSONObj* parsedUserObj) {
+                                             BSONObj* parsedUserObj,
+                                             BSONObj* parsedWriteConcern) {
         unordered_set<std::string> validFieldNames;
         validFieldNames.insert("createUser");
         validFieldNames.insert("customData");
@@ -233,15 +264,14 @@ namespace auth {
         validFieldNames.insert("roles");
         validFieldNames.insert("writeConcern");
 
-        // Iterate through all fields in command object and make sure there are no unexpected
-        // ones.
-        for (BSONObjIterator iter(cmdObj); iter.more(); iter.next()) {
-            StringData fieldName = (*iter).fieldNameStringData();
-            if (!validFieldNames.count(fieldName.toString())) {
-                return Status(ErrorCodes::BadValue,
-                              mongoutils::str::stream() << "\"" << fieldName << "\" is not "
-                                      "a valid argument to createUser");
-            }
+        Status status = _checkNoExtraFields(cmdObj, "createUser", validFieldNames);
+        if (!status.isOK()) {
+            return status;
+        }
+
+        status = _extractWriteConcern(cmdObj, parsedWriteConcern);
+        if (!status.isOK()) {
+            return status;
         }
 
         BSONObjBuilder userObjBuilder;
@@ -249,7 +279,7 @@ namespace auth {
 
         // Parse user name
         std::string userName;
-        Status status = bsonExtractStringField(cmdObj, "createUser", &userName);
+        status = bsonExtractStringField(cmdObj, "createUser", &userName);
         if (!status.isOK()) {
             return status;
         }
@@ -329,7 +359,8 @@ namespace auth {
                                              const std::string& dbname,
                                              AuthorizationManager* authzManager,
                                              BSONObj* parsedUpdateObj,
-                                             UserName* parsedUserName) {
+                                             UserName* parsedUserName,
+                                             BSONObj* parsedWriteConcern) {
         unordered_set<std::string> validFieldNames;
         validFieldNames.insert("updateUser");
         validFieldNames.insert("customData");
@@ -337,22 +368,21 @@ namespace auth {
         validFieldNames.insert("roles");
         validFieldNames.insert("writeConcern");
 
-        // Iterate through all fields in command object and make sure there are no unexpected
-        // ones.
-        for (BSONObjIterator iter(cmdObj); iter.more(); iter.next()) {
-            StringData fieldName = (*iter).fieldNameStringData();
-            if (!validFieldNames.count(fieldName.toString())) {
-                return Status(ErrorCodes::BadValue,
-                              mongoutils::str::stream() << "\"" << fieldName << "\" is not "
-                                      "a valid argument to createUser");
-            }
+        Status status = _checkNoExtraFields(cmdObj, "updateUser", validFieldNames);
+        if (!status.isOK()) {
+            return status;
+        }
+
+        status = _extractWriteConcern(cmdObj, parsedWriteConcern);
+        if (!status.isOK()) {
+            return status;
         }
 
         BSONObjBuilder updateSetBuilder;
 
         // Parse user name
         std::string userName;
-        Status status = bsonExtractStringField(cmdObj, "updateUser", &userName);
+        status = bsonExtractStringField(cmdObj, "updateUser", &userName);
         if (!status.isOK()) {
             return status;
         }
@@ -412,6 +442,93 @@ namespace auth {
         return Status::OK();
     }
 
+    Status parseAndValidateRemoveUserCommand(const BSONObj& cmdObj,
+                                             const std::string& dbname,
+                                             UserName* parsedUserName,
+                                             BSONObj* parsedWriteConcern) {
+        unordered_set<std::string> validFieldNames;
+        validFieldNames.insert("removeUser");
+        validFieldNames.insert("writeConcern");
+
+        Status status = _checkNoExtraFields(cmdObj, "removeUser", validFieldNames);
+        if (!status.isOK()) {
+            return status;
+        }
+
+        std::string user;
+        status = bsonExtractStringField(cmdObj, "removeUser", &user);
+        if (!status.isOK()) {
+            return status;
+        }
+
+        status = _extractWriteConcern(cmdObj, parsedWriteConcern);
+        if (!status.isOK()) {
+            return status;
+        }
+
+        *parsedUserName = UserName(user, dbname);
+        return Status::OK();
+    }
+
+    Status parseAndValidateRemoveUsersFromDatabaseCommand(const BSONObj& cmdObj,
+                                                          const std::string& dbname,
+                                                          BSONObj* parsedWriteConcern) {
+        unordered_set<std::string> validFieldNames;
+        validFieldNames.insert("removeUsersFromDatabase");
+        validFieldNames.insert("writeConcern");
+
+        Status status = _checkNoExtraFields(cmdObj, "removeUsersFromDatabase", validFieldNames);
+        if (!status.isOK()) {
+            return status;
+        }
+
+        status = _extractWriteConcern(cmdObj, parsedWriteConcern);
+        if (!status.isOK()) {
+            return status;
+        }
+
+        return Status::OK();
+    }
+
+    Status parseAndValidateUsersInfoCommand(const BSONObj& cmdObj,
+                                            const std::string& dbname,
+                                            bool* parsedAnyDB,
+                                            BSONElement* parsedUsersFilter) {
+        unordered_set<std::string> validFieldNames;
+        validFieldNames.insert("usersInfo");
+        validFieldNames.insert("anyDB");
+        validFieldNames.insert("writeConcern");
+
+        Status status = _checkNoExtraFields(cmdObj, "usersInfo", validFieldNames);
+        if (!status.isOK()) {
+            return status;
+        }
+
+        if (cmdObj["usersInfo"].type() != String && cmdObj["usersInfo"].type() != RegEx) {
+            return Status(ErrorCodes::BadValue,
+                          "Argument to userInfo command must be either a string or a regex");
+        }
+        *parsedUsersFilter = cmdObj["usersInfo"];
+
+
+        bool anyDB = false;
+        if (cmdObj.hasField("anyDB")) {
+            if (dbname == "admin") {
+                Status status = bsonExtractBooleanField(cmdObj, "anyDB", &anyDB);
+                if (!status.isOK()) {
+                    return status;
+                }
+            } else {
+                return Status(ErrorCodes::BadValue,
+                              "\"anyDB\" argument to usersInfo command is only valid when "
+                                      "run on the \"admin\" database");
+            }
+        }
+        *parsedAnyDB = anyDB;
+
+        return Status::OK();
+    }
+
     Status parseAndValidateCreateRoleCommand(const BSONObj& cmdObj,
                                              const std::string& dbname,
                                              AuthorizationManager* authzManager,
@@ -423,18 +540,12 @@ namespace auth {
         validFieldNames.insert("roles");
         validFieldNames.insert("writeConcern");
 
-        // Iterate through all fields in command object and make sure there are no unexpected
-        // ones.
-        for (BSONObjIterator iter(cmdObj); iter.more(); iter.next()) {
-            StringData fieldName = (*iter).fieldNameStringData();
-            if (!validFieldNames.count(fieldName.toString())) {
-                return Status(ErrorCodes::BadValue,
-                              mongoutils::str::stream() << "\"" << fieldName << "\" is not "
-                                      "a valid argument to createRole");
-            }
+        Status status = _checkNoExtraFields(cmdObj, "createRole", validFieldNames);
+        if (!status.isOK()) {
+            return status;
         }
 
-        Status status = extractWriteConcern(cmdObj, parsedWriteConcern);
+        status = _extractWriteConcern(cmdObj, parsedWriteConcern);
         if (!status.isOK()) {
             return status;
         }

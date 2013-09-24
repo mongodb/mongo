@@ -43,12 +43,6 @@ namespace mongo {
 namespace auth {
 
     /**
-     * Writes into *writeConcern a BSONObj describing the parameters to getLastError to use for
-     * the write confirmation.
-     */
-    Status extractWriteConcern(const BSONObj& cmdObj, BSONObj* writeConcern);
-
-    /**
      * Takes a command object describing an invocation of the "createUser" command on the database
      * "dbname", and returns (via the output param "parsedUserObj") a user object that can be
      * inserted into admin.system.users to create the user as described by the command object.
@@ -57,7 +51,8 @@ namespace auth {
     Status parseAndValidateCreateUserCommand(const BSONObj& cmdObj,
                                              const std::string& dbname,
                                              AuthorizationManager* authzManager,
-                                             BSONObj* parsedUserObj);
+                                             BSONObj* parsedUserObj,
+                                             BSONObj* parsedWriteConcern);
 
     /**
      * Takes a command object describing an invocation of the "updateUser" command on the database
@@ -70,7 +65,8 @@ namespace auth {
                                              const std::string& dbname,
                                              AuthorizationManager* authzManager,
                                              BSONObj* parsedUpdateObj,
-                                             UserName* parsedUserName);
+                                             UserName* parsedUserName,
+                                             BSONObj* parsedWriteConcern);
 
     /**
      * Takes a command object describing an invocation of one of "grantRolesToUser",
@@ -86,6 +82,34 @@ namespace auth {
                                             vector<RoleName>* parsedRoleNames,
                                             BSONObj* parsedWriteConcern);
 
+    /**
+     * Takes a command object describing an invocation of the "removeUser" command and parses out
+     * the userName of the user to be removed and the writeConcern.
+     * Also validates the input and returns a non-ok Status if there is anything wrong.
+     */
+    Status parseAndValidateRemoveUserCommand(const BSONObj& cmdObj,
+                                             const std::string& dbname,
+                                             UserName* parsedUserName,
+                                             BSONObj* parsedWriteConcern);
+
+    /**
+     * Takes a command object describing an invocation of the "removeUsersFromDatabase" command and
+     * parses out the write concern.
+     * Also validates the input and returns a non-ok Status if there is anything wrong.
+     */
+    Status parseAndValidateRemoveUsersFromDatabaseCommand(const BSONObj& cmdObj,
+                                                          const std::string& dbname,
+                                                          BSONObj* parsedWriteConcern);
+
+    /**
+     * Takes a command object describing an invocation of the "usersInfo" command and parses out
+     * a BSONElement with the user name filter to be applied, as well as the anyDB boolean.
+     * Also validates the input and returns a non-ok Status if there is anything wrong.
+     */
+    Status parseAndValidateUsersInfoCommand(const BSONObj& cmdObj,
+                                            const std::string& dbname,
+                                            bool* parsedAnyDb,
+                                            BSONElement* parsedUserNameFilter);
     /**
      * Takes a command object describing an invocation of the "createRole" command on the database
      * "dbname", and returns (via the output param "parsedRoleObj") a role object that can be
