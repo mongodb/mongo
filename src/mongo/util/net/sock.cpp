@@ -34,10 +34,6 @@
 # endif
 #endif
 
-#ifdef MONGO_SSL
-#include "mongo/util/net/ssl_manager.h"
-#endif
-
 #include "mongo/util/background.h"
 #include "mongo/util/concurrency/value.h"
 #include "mongo/util/fail_point_service.h"
@@ -428,11 +424,6 @@ namespace mongo {
 
     Socket::~Socket() {
         close();
-#ifdef MONGO_SSL
-        if (_sslConnection.get()) {
-            _sslManager->SSL_shutdown( _sslConnection.get() );
-        }
-#endif
     }
     
     void Socket::_init() {
@@ -446,6 +437,15 @@ namespace mongo {
 
     void Socket::close() {
         if ( _fd >= 0 ) {
+#ifdef MONGO_SSL
+            if (_sslConnection.get()) {
+                try {
+                    _sslManager->SSL_shutdown( _sslConnection.get() );
+                }
+                catch (const SocketException& se) { // SSL_shutdown may throw if the connection fails
+                }  
+            }
+#endif
             // Stop any blocking reads/writes, and prevent new reads/writes
 #if defined(_WIN32)
             shutdown( _fd, SD_BOTH );
