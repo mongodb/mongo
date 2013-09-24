@@ -399,6 +399,9 @@ namespace mutablebson {
         // The designated field name for the root element.
         const char kRootFieldName[] = "";
 
+        // How many reps do we cache before we spill to heap. Use a power of two.
+        const size_t kFastReps = 128;
+
         // An ElementRep contains the information necessary to locate the data for an Element,
         // and the topology information for how the Element is related to other Elements in the
         // document.
@@ -555,7 +558,8 @@ namespace mutablebson {
 
     public:
         Impl(Document::InPlaceMode inPlaceMode)
-            : _elements()
+            : _numElements(0)
+            , _slowElements()
             , _objects()
             , _fieldNames()
             , _leafBuf()
@@ -577,7 +581,9 @@ namespace mutablebson {
 
         void reset(Document::InPlaceMode inPlaceMode) {
             // Clear out the state in the vectors.
-            _elements.clear();
+            _slowElements.clear();
+            _numElements = 0;
+
             _objects.clear();
             _fieldNames.clear();
 
@@ -597,25 +603,32 @@ namespace mutablebson {
 
         // Obtain the ElementRep for the given rep id.
         ElementRep& getElementRep(Element::RepIdx id) {
-            dassert(id < _elements.size());
-            return _elements[id];
+            return const_cast<ElementRep&>(const_cast<const Impl*>(this)->getElementRep(id));
         }
 
         // Obtain the ElementRep for the given rep id.
         const ElementRep& getElementRep(Element::RepIdx id) const {
-            dassert(id < _elements.size());
-            return _elements[id];
+            dassert(id < _numElements);
+            if (id < kFastReps)
+                return _fastElements[id];
+            else
+                return _slowElements[id - kFastReps];
         }
 
         // Insert the given ElementRep and return an ID for it.
         Element::RepIdx insertElement(const ElementRep& rep) {
-            const Element::RepIdx id = _elements.size();
+            const Element::RepIdx id = _numElements++;
             verify(id <= Element::kMaxRepIdx);
-            _elements.push_back(rep);
-            if (debug && paranoid) {
-                // Force all reps to new addresses to help catch invalid rep usage.
-                std::vector<ElementRep> new_elements(_elements);
-                _elements.swap(new_elements);
+            if (id < kFastReps) {
+                _fastElements[id] = rep;
+            }
+            else {
+                _slowElements.push_back(rep);
+                if (debug && paranoid) {
+                    // Force all reps to new addresses to help catch invalid rep usage.
+                    std::vector<ElementRep> newSlowElements(_slowElements);
+                    _slowElements.swap(newSlowElements);
+                }
             }
             return id;
         }
@@ -680,7 +693,7 @@ namespace mutablebson {
         // Retrieve the fieldName, given a rep.
         StringData getFieldName(const ElementRep& rep) const {
             // The root element has no field name.
-            if (&rep == &_elements[kRootRepIdx])
+            if (&rep == &getElementRep(kRootRepIdx))
                 return StringData();
 
             if (rep.serialized || (rep.objIdx != kInvalidObjIdx))
@@ -701,7 +714,7 @@ namespace mutablebson {
         // Retrieve the type, given a rep.
         BSONType getType(const ElementRep& rep) const {
             // The root element is always an Object.
-            if (&rep == &_elements[kRootRepIdx])
+            if (&rep == &getElementRep(kRootRepIdx))
                 return mongo::Object;
 
             if (rep.serialized || (rep.objIdx != kInvalidObjIdx))
@@ -727,7 +740,7 @@ namespace mutablebson {
         bool hasValue(const ElementRep& rep) const {
             // The root element may be marked serialized, but it doesn't have a BSONElement
             // representation.
-            if (&rep == &_elements[kRootRepIdx])
+            if (&rep == &getElementRep(kRootRepIdx))
                 return false;
 
             return rep.serialized;
@@ -1006,7 +1019,10 @@ namespace mutablebson {
             return &_fieldNames[fieldNameId];
         }
 
-        std::vector<ElementRep> _elements;
+        size_t _numElements;
+        ElementRep _fastElements[kFastReps];
+        std::vector<ElementRep> _slowElements;
+
         std::vector<BSONObj> _objects;
         std::vector<char> _fieldNames;
 
