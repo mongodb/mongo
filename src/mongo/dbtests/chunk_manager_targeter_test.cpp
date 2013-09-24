@@ -26,18 +26,18 @@
  *    it in the license file.
  */
 
-#include "mongo/s/write_op.h"
+#include "mongo/s/chunk_manager_targeter.h"
 
-#include "mongo/s/batched_command_request.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/unittest/unittest.h"
 
 namespace {
 
     using namespace mongo;
 
-    TEST(WriteOpTests, Basic) {
-        WriteOp( BatchItemRef( NULL, 0 ) );
+    TEST(CMTargeterTests, Basic) {
+        ChunkManagerTargeter();
         ASSERT( true );
     }
 
-} // unnamed namespace
+} // end namespace
