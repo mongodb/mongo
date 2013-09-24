@@ -188,16 +188,18 @@ namespace mongo {
             if (NULL != cc->_runner.get()) {
                 verify(NULL == cc->c());
 
-                // If there is a pinValue >= 100, somebody is actively using the CC and we do not
-                // delete it.  Instead we notify the holder that we killed it.  The holder will then
-                // delete the CC.
-                if (cc->_pinValue >= 100) {
-                    cc->_runner->kill();
-                }
-                else {
-                    // pinvalue is <100, so there is nobody actively holding the CC.  We can safely
-                    // delete it as nobody is holding the CC.
-                    shouldDelete = true;
+                if (isDB || cc->_runner->ns() == ns) {
+                    // If there is a pinValue >= 100, somebody is actively using the CC and we do
+                    // not delete it.  Instead we notify the holder that we killed it.  The holder
+                    // will then delete the CC.
+                    if (cc->_pinValue >= 100) {
+                        cc->_runner->kill();
+                    }
+                    else {
+                        // pinvalue is <100, so there is nobody actively holding the CC.  We can
+                        // safely delete it as nobody is holding the CC.
+                        shouldDelete = true;
+                    }
                 }
             }
             // Begin cursor-only DEPRECATED

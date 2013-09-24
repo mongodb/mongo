@@ -132,6 +132,14 @@ namespace mongo {
         verify(_resultIterator != _data.end());
         verify(_sorted);
         *out = *_resultIterator++;
+
+        // If we're returning something, take it out of our DL -> WSID map so that future
+        // calls to invalidate don't cause us to take action for a DL we're done with.
+        WorkingSetMember* member = _ws->get(*out);
+        if (member->hasLoc()) {
+            _wsidByDiskLoc.erase(member->loc);
+        }
+
         ++_commonStats.advanced;
         return PlanStage::ADVANCED;
     }
