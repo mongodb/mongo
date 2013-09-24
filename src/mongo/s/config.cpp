@@ -114,7 +114,7 @@ namespace mongo {
         }
         else {
             // lastmodEpoch is a required field so we also need to do it here.
-            val.append(CollectionType::DEPRECATED_lastmodEpoch(), ChunkVersion::DROPPED.epoch());
+            val.append(CollectionType::DEPRECATED_lastmodEpoch(), ChunkVersion::DROPPED().epoch());
         }
 
         conn->update(CollectionType::ConfigNS, key, val.obj(), true);

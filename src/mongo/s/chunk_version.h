@@ -47,7 +47,6 @@ namespace mongo {
      * expected from types.
      */
     struct ChunkVersion : public BSONSerializable {
-        static const ChunkVersion DROPPED;
 
         union {
             struct {
@@ -71,6 +70,35 @@ namespace mongo {
 
         ChunkVersion( unsigned long long ll, const OID& epoch )
             : _combined( ll ), _epoch(epoch) {
+        }
+
+        static ChunkVersion DROPPED() {
+            return ChunkVersion( 0, 0, OID() ); // dropped OID is zero time, zero machineId/inc
+        }
+
+        static ChunkVersion UNSHARDED() {
+            // TODO: Distinguish between these cases
+            return DROPPED();
+        }
+
+        static ChunkVersion IGNORED() {
+            ChunkVersion version = ChunkVersion();
+            version._epoch.init( 0, true ); // ignored OID is zero time, max machineId/inc
+            return version;
+        }
+
+        static bool isDroppedVersion( const ChunkVersion& version ) {
+            return version.majorVersion() == 0 && version.minorVersion() == 0
+                   && version.epoch() == DROPPED().epoch();
+        }
+
+        static bool isUnshardedVersion( const ChunkVersion& version ) {
+            return isDroppedVersion( version );
+        }
+
+        static bool isIgnoredVersion( const ChunkVersion& version ) {
+            return version.majorVersion() == 0 && version.minorVersion() == 0
+                   && version.epoch() == IGNORED().epoch();
         }
 
         void inc( bool major ) {
