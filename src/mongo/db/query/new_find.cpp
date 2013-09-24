@@ -520,7 +520,7 @@ namespace mongo {
         // Caller expects exceptions thrown in certain cases:
         // * in-memory sort using too much RAM.
         if (Runner::RUNNER_ERROR == state) {
-            uasserted(17144, "Runner error, TODO: be more descriptive?");
+            uasserted(17144, "Runner error, memory limit for sort probably exceeded");
         }
 
         // Why save a dead runner?

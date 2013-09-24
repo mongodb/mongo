@@ -177,8 +177,14 @@ namespace mongo {
                     _max = e.embeddedObject();
                 }
                 else if (str::equals("hint", name)) {
-                    // Hint can be specified as an object or as a string.  Wrap takes care of it.
-                    _hint = e.wrap();
+                    if (e.isABSONObj()) {
+                        _hint = e.embeddedObject();
+                    }
+                    else {
+                        // Hint can be specified as an object or as a string.  Wrap takes care of
+                        // it.
+                        _hint = e.wrap();
+                    }
                 }
                 else if (str::equals("returnKey", name)) {
                     // Won't throw.
