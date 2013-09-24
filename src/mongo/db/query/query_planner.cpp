@@ -150,6 +150,8 @@ namespace mongo {
 
         QuerySolutionNode* solnRoot = csn;
 
+        // XXX: call analyzeDataAccess to do the work below once $natural is dealt with better.
+
         // TODO: We need better checking for this.  Should be done in CanonicalQuery and we should
         // be able to assume it's correct.
         if (!sortObj.isEmpty()) {
@@ -191,12 +193,16 @@ namespace mongo {
         FilterInfo(MatchExpression* f, int c) : filterNode(f), currChild(c) {}
     };
 
-    IndexScanNode* makeIndexScan(const BSONObj& indexKeyPattern, MatchExpression* expr, bool* exact) {
+    IndexScanNode* makeIndexScan(const BSONObj& indexKeyPattern, MatchExpression* expr,
+                                 bool* exact) {
+
         IndexScanNode* isn = new IndexScanNode();
         isn->indexKeyPattern = indexKeyPattern;
 
         if (indexKeyPattern.firstElement().fieldName() != expr->path().toString()) {
-            // cout << "indexkp fn is " << indexKeyPattern.firstElement().fieldName() << " path is " << expr->path().toString() << endl;
+            cout << "trying to build index w/bad prefix, indexkp fn is "
+                 << indexKeyPattern.firstElement().fieldName()
+                 << " path is " << expr->path().toString() << endl;
             verify(0);
         }
 
@@ -217,7 +223,8 @@ namespace mongo {
         return isn;
     }
 
-    QuerySolutionNode* buildSolutionTree(MatchExpression* root, const vector<BSONObj>& indexKeyPatterns) {
+    QuerySolutionNode* buildIndexedDataAccess(MatchExpression* root,
+                                              const vector<BSONObj>& indexKeyPatterns) {
         if (root->isLogical()) {
             // The children of AND and OR nodes are sorted by the index that the subtree rooted at
             // that node uses.  Child nodes that use the same index are adjacent to one another to
@@ -246,7 +253,8 @@ namespace mongo {
                     // TODO(opt): If the child is logical, it could collapse into an ixscan.  We
                     // ignore this for now.
                     if (child->isLogical()) {
-                        QuerySolutionNode* childSolution = buildSolutionTree(child, indexKeyPatterns);
+                        QuerySolutionNode* childSolution = buildIndexedDataAccess(child,
+                                                                                  indexKeyPatterns);
                         if (NULL == childSolution) { return NULL; }
                         theAnd->children.push_back(childSolution);
                         // The logical sub-tree is responsible for fully evaluating itself.  Any
@@ -413,7 +421,8 @@ namespace mongo {
                     // TODO(opt): If the child is logical, it could collapse into an ixscan.  We
                     // ignore this for now.
                     if (child->isLogical()) {
-                        QuerySolutionNode* childSolution = buildSolutionTree(child, indexKeyPatterns);
+                        QuerySolutionNode* childSolution = buildIndexedDataAccess(child,
+                                                                                  indexKeyPatterns);
                         if (NULL == childSolution) { return NULL; }
                         theOr->children.push_back(childSolution);
                         // The logical sub-tree is responsible for fully evaluating itself.  Any
@@ -583,20 +592,8 @@ namespace mongo {
         return NULL;
     }
 
-    /**
-     * Order of what happens:
-     * find results
-     * sort results
-     * project results
-     */
-
-    QuerySolution* makeSolution(const CanonicalQuery& query, MatchExpression* taggedRoot,
-                                const vector<BSONObj>& indexKeyPatterns) {
-        cout << "about to build solntree from tagged tree:\n" << taggedRoot->toString() << endl;
-
-        QuerySolutionNode* solnRoot = buildSolutionTree(taggedRoot, indexKeyPatterns);
-        if (NULL == solnRoot) { return NULL; }
-
+    QuerySolution* analyzeDataAccess(const CanonicalQuery& query, MatchExpression* taggedRoot,
+                                     QuerySolutionNode* solnRoot) {
         // solnRoot finds all our results.
 
         // Sort the results.
@@ -765,70 +762,67 @@ namespace mongo {
         vector<BSONObj> relevantIndices;
         findRelevantIndices(predicates, indexKeyPatterns, &relevantIndices);
 
-        // No indices, no work to do other than emitting the collection scan plan.
-        if (0 == relevantIndices.size()) {
-            out->push_back(makeCollectionScan(query, false));
-            return;
-        }
+        if (0 < relevantIndices.size()) {
+            for (size_t i = 0; i < relevantIndices.size(); ++i) {
+                cout << "relevant idx " << i << " is " << relevantIndices[i].toString() << endl;
+            }
 
-        /*
-        for (size_t i = 0; i < relevantIndices.size(); ++i) {
-            cout << "relevant idx " << i << " is " << relevantIndices[i].toString() << endl;
-        }
-        */
-
-        // Figure out how useful each index is to each predicate.
-        rateIndices(relevantIndices, &predicates);
-        dumpPredMap(predicates);
-
-        //
-        // Planner Section 2: Use predicate/index data to output sets of indices that we can use.
-        //
-
-        PlanEnumerator isp(query.root(), &predicates, &relevantIndices);
-        isp.init();
-
-        MatchExpression* rawTree;
-        while (isp.getNext(&rawTree)) {
-            //
-            // Planner Section 3: Logical Rewrite.  Use the index selection and the tree structure
-            // to try to rewrite the tree.  TODO: Do this for real.  We treat the tree as static.
-            //
-
-            QuerySolution* soln = makeSolution(query, rawTree, relevantIndices);
-            if (NULL == soln) { continue; }
+            // Figure out how useful each index is to each predicate.
+            rateIndices(relevantIndices, &predicates);
+            dumpPredMap(predicates);
 
             //
-            // Planner Section 4: Covering.  If we're projecting, See if we get any covering from
-            // this plan.  If not, add a fetch.
+            // Planner Section 2: Use predicate/index data to output sets of indices that we can
+            // use.
             //
 
-            //
-            // Planner Section 5: Sort.  If we're sorting, see if the plan gives us a sort for
-            // free.  If not, add a sort.
-            //
+            PlanEnumerator isp(query.root(), &predicates, &relevantIndices);
+            isp.init();
 
-            //
-            // Planner Section 6: Final check.  Make sure that we build a valid solution.
-            // TODO: Validate.
-            //
+            MatchExpression* rawTree;
+            while (isp.getNext(&rawTree)) {
+                cout << "about to build solntree from tagged tree:\n" << rawTree->toString()
+                     << endl;
 
-            if (NULL != soln) {
+                QuerySolutionNode* solnRoot = buildIndexedDataAccess(rawTree, relevantIndices);
+                if (NULL == solnRoot) { continue; }
+                QuerySolution* soln = analyzeDataAccess(query, rawTree, solnRoot);
+                verify(NULL != soln);
+
                 cout << "Adding solution:\n" << soln->toString() << endl;
                 out->push_back(soln);
             }
         }
 
-        if (0 == out->size() && !query.getParsed().getSort().isEmpty()) {
-            // There are no indexed plans outputted, but there's a requested sort.  See if we have
-            // an index that is the same as the sort pattern.
-            // XXX: we may want to do this even if an indexed plan is outputted...detect that.
+        if (!query.getParsed().getSort().isEmpty()) {
+            // TODO: We may not always want to do this?  Though current enumeration will
+            // only use an index to answer a pred, not a sort.
+            for (size_t i = 0; i < indexKeyPatterns.size(); ++i) {
+                const BSONObj& kp = indexKeyPatterns[i];
+                if (0 == kp.woCompare(query.getParsed().getSort())) {
+                    IndexScanNode* isn = new IndexScanNode();
+                    isn->indexKeyPattern = kp;
+
+                    // XXX: use simple bounds for ixscan once builder supports them
+                    BSONObjIterator it(isn->indexKeyPattern);
+                    while (it.more()) {
+                        isn->bounds.fields.push_back(
+                            IndexBoundsBuilder::allValuesForField(it.next()));
+                    }
+
+                    QuerySolution* soln = analyzeDataAccess(query, query.root()->shallowClone(),
+                                                            isn);
+                    verify(NULL != soln);
+                    out->push_back(soln);
+                    cout << "using index to provide sort, soln = " << soln->toString() << endl;
+                    break;
+                }
+            }
         }
 
         // TODO: Do we always want to offer a collscan solution?
         if (!hasPredicate(predicates, MatchExpression::GEO_NEAR)) {
             QuerySolution* collscan = makeCollectionScan(query, false);
-            // cout << "default collscan = " << collscan->toString() << endl;
             out->push_back(collscan);
         }
     }

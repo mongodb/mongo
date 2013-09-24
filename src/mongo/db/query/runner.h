@@ -51,8 +51,8 @@ namespace mongo {
             // We were killed or had an error.
             RUNNER_DEAD,
 
-            // getNext was asked for data it cannot provide.  This is an internal error and should
-            // not occur.
+            // getNext was asked for data it cannot provide, or the underlying PlanStage had an
+            // unrecoverable error.
             RUNNER_ERROR,
         };
 

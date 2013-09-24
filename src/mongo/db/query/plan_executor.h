@@ -179,7 +179,7 @@ namespace mongo {
                 }
                 else {
                     verify(PlanStage::FAILURE == code);
-                    return Runner::RUNNER_DEAD;
+                    return Runner::RUNNER_ERROR;
                 }
 
                 // Yield, if we can yield ourselves.

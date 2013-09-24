@@ -35,6 +35,8 @@
 
 namespace mongo {
 
+    const size_t kMaxBytes = 32 * 1024 * 1024;
+
     // Used in STL sort.
     struct WorkingSetComparison {
         WorkingSetComparison(WorkingSet* ws, BSONObj pattern) : _ws(ws), _pattern(pattern) { }
@@ -72,7 +74,7 @@ namespace mongo {
 
     SortStage::SortStage(const SortStageParams& params, WorkingSet* ws, PlanStage* child)
         : _ws(ws), _child(child), _pattern(params.pattern), _sorted(false),
-          _resultIterator(_data.end()) { }
+          _resultIterator(_data.end()), _memUsage(0) { }
 
     SortStage::~SortStage() { }
 
@@ -84,6 +86,10 @@ namespace mongo {
 
     PlanStage::StageState SortStage::work(WorkingSetID* out) {
         ++_commonStats.works;
+
+        if (_memUsage > kMaxBytes) {
+            return PlanStage::FAILURE;
+        }
 
         if (isEOF()) { return PlanStage::IS_EOF; }
 
@@ -102,6 +108,15 @@ namespace mongo {
                 WorkingSetMember* member = _ws->get(id);
                 if (member->hasLoc()) {
                     _wsidByDiskLoc[member->loc] = id;
+                }
+
+                // Do some accounting to make sure we're not using too much memory.
+                if (member->hasLoc()) {
+                    _memUsage += sizeof(DiskLoc);
+                }
+
+                if (member->hasObj()) {
+                    _memUsage += member->obj.objsize();
                 }
 
                 ++_commonStats.needTime;

@@ -120,15 +120,17 @@ namespace mongo {
         // Try to look up a cached solution for the query.
         // TODO: Can the cache have negative data about a solution?
         PlanCache* localCache = PlanCache::get(canonicalQuery->ns());
-        CachedSolution* cs = localCache->get(*canonicalQuery);
-        if (NULL != cs) {
-            // We have a cached solution.  Hand the canonical query and cached solution off to the
-            // cached plan runner, which takes ownership of both.
-            WorkingSet* ws;
-            PlanStage* root;
-            verify(StageBuilder::build(*cs->solution, &root, &ws));
-            *out = new CachedPlanRunner(canonicalQuery.release(), cs, root, ws);
-            return Status::OK();
+        if (NULL != localCache) {
+            CachedSolution* cs = localCache->get(*canonicalQuery);
+            if (NULL != cs) {
+                // We have a cached solution.  Hand the canonical query and cached solution off to
+                // the cached plan runner, which takes ownership of both.
+                WorkingSet* ws;
+                PlanStage* root;
+                verify(StageBuilder::build(*cs->solution, &root, &ws));
+                *out = new CachedPlanRunner(canonicalQuery.release(), cs, root, ws);
+                return Status::OK();
+            }
         }
 
         // No entry in cache for the query.  We have to solve the query ourself.
@@ -170,6 +172,12 @@ namespace mongo {
 
         vector<QuerySolution*> solutions;
         QueryPlanner::plan(*canonicalQuery, indices, &solutions);
+
+        /*
+        for (size_t i = 0; i < solutions.size(); ++i) {
+            cout << "solution " << i << " is " << solutions[i]->toString() << endl;
+        }
+        */
 
         // We cannot figure out how to answer the query.  Should this ever happen?
         if (0 == solutions.size()) {
@@ -508,6 +516,12 @@ namespace mongo {
         //
         // So, no matter what, deregister the runner.
         safety.reset();
+
+        // Caller expects exceptions thrown in certain cases:
+        // * in-memory sort using too much RAM.
+        if (Runner::RUNNER_ERROR == state) {
+            uasserted(17144, "Runner error, TODO: be more descriptive?");
+        }
 
         // Why save a dead runner?
         if (Runner::RUNNER_DEAD == state) {

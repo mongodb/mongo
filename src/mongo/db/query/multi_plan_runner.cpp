@@ -36,7 +36,8 @@
 namespace mongo {
 
     MultiPlanRunner::MultiPlanRunner(CanonicalQuery* query)
-        : _failure(false), _policy(Runner::YIELD_MANUAL), _query(query) { }
+        : _killed(false), _failure(false), _failureCount(0), _policy(Runner::YIELD_MANUAL),
+          _query(query) { }
 
     MultiPlanRunner::~MultiPlanRunner() {
         for (size_t i = 0; i < _candidates.size(); ++i) {
@@ -52,7 +53,7 @@ namespace mongo {
     }
 
     void MultiPlanRunner::setYieldPolicy(Runner::YieldPolicy policy) {
-        if (_failure) { return; }
+        if (_failure || _killed) { return; }
 
         _policy = policy;
 
@@ -70,7 +71,7 @@ namespace mongo {
     }
 
     void MultiPlanRunner::saveState() {
-        if (_failure) { return; }
+        if (_failure || _killed) { return; }
 
         if (NULL != _bestPlan) {
             _bestPlan->saveState();
@@ -81,7 +82,7 @@ namespace mongo {
     }
 
     bool MultiPlanRunner::restoreState() {
-        if (_failure) { return false; }
+        if (_failure || _killed) { return false; }
 
         if (NULL != _bestPlan) {
             return _bestPlan->restoreState();
@@ -93,7 +94,7 @@ namespace mongo {
     }
 
     void MultiPlanRunner::invalidate(const DiskLoc& dl) {
-        if (_failure) { return; }
+        if (_failure || _killed) { return; }
 
         if (NULL != _bestPlan) {
             _bestPlan->invalidate(dl);
@@ -106,25 +107,27 @@ namespace mongo {
     }
 
     bool MultiPlanRunner::isEOF() {
-        if (_failure) { return true; }
+        if (_failure || _killed) { return true; }
         // If _bestPlan is not NULL, you haven't picked the best plan yet, so you're not EOF.
         if (NULL == _bestPlan) { return false; }
         return _bestPlan->isEOF();
     }
 
     void MultiPlanRunner::kill() {
-        _failure = true;
+        _killed = true;
         if (NULL != _bestPlan) { _bestPlan->kill(); }
     }
 
     Runner::RunnerState MultiPlanRunner::getNext(BSONObj* objOut, DiskLoc* dlOut) {
-        if (_failure) { return Runner::RUNNER_DEAD; }
+        if (_killed) { return Runner::RUNNER_DEAD; }
+        if (_failure) { return Runner::RUNNER_ERROR; }
 
         // If we haven't picked the best plan yet...
         if (NULL == _bestPlan) {
             if (!pickBestPlan(NULL)) {
-                verify(_failure);
-                return Runner::RUNNER_DEAD;
+                verify(_failure || _killed);
+                if (_killed) { return Runner::RUNNER_DEAD; }
+                if (_failure) { return Runner::RUNNER_ERROR; }
             }
         }
 
@@ -177,7 +180,7 @@ namespace mongo {
             if (!moreToDo) { break; }
         }
 
-        if (_failure) { return false; }
+        if (_failure || _killed) { return false; }
 
         size_t bestChild = PlanRanker::pickBestPlan(_candidates, NULL);
 
@@ -213,6 +216,7 @@ namespace mongo {
     bool MultiPlanRunner::workAllPlans() {
         for (size_t i = 0; i < _candidates.size(); ++i) {
             CandidatePlan& candidate = _candidates[i];
+            if (candidate.failed) { continue; }
 
             WorkingSetID id;
             PlanStage::StageState state = candidate.root->work(&id);
@@ -240,7 +244,7 @@ namespace mongo {
                 if (NULL != _yieldPolicy.get()) {
                     saveState();
                     _yieldPolicy->yield(record);
-                    if (_failure) { return false; }
+                    if (_failure || _killed) { return false; }
                     restoreState();
                 }
                 else {
@@ -266,15 +270,21 @@ namespace mongo {
             else {
                 // FAILURE.  Do we want to just tank that plan and try the rest?  We probably want
                 // to fail globally as this shouldn't happen anyway.
-                _failure = true;
-                return false;
+
+                candidate.failed = true;
+                ++_failureCount;
+
+                if (_failureCount == _candidates.size()) {
+                    _failure = true;
+                    return false;
+                }
             }
 
             // Yield, if we can yield ourselves.
             if (NULL != _yieldPolicy.get() && _yieldPolicy->shouldYield()) {
                 saveState();
                 _yieldPolicy->yield();
-                if (_failure) { return false; }
+                if (_failure || _killed) { return false; }
                 restoreState();
             }
         }

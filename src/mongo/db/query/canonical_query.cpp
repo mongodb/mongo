@@ -145,7 +145,9 @@ namespace mongo {
     }
 
     string CanonicalQuery::toString() const {
-        return "ns = " + _pq->ns() + " Tree: " + _root->toString();
+        return "ns = " + _pq->ns()
+               + "\nTree: " + _root->toString()
+               + "\nSort: " + _pq->getSort().toString();
     }
 
 }  // namespace mongo

@@ -100,9 +100,20 @@ namespace mongo {
         void allPlansSaveState();
         void allPlansRestoreState();
 
-        // Did some plan fail while we were running it to compare against other plans?  Just give up
-        // if so.  Also set if we were killed during a yield.
+        // Were we killed by an invalidate?
+        bool _killed;
+
+        // Did all plans fail while we were running them?  Note that one plan can fail
+        // during normal execution of the plan competition.  Here is an example:
+        //
+        // Plan 1: collection scan with sort.  Sort runs out of memory.
+        // Plan 2: ixscan that provides sort.  Won't run out of memory.
+        //
+        // We want to choose plan 2 even if plan 1 fails.
         bool _failure;
+
+        // If everything fails during the plan competition, we can't pick one.
+        size_t _failureCount;
 
         // We need to cache this so that when we switch from running our candidates to using a
         // PlanExecutor, we can set the right yielding policy on it.
