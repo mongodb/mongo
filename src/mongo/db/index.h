@@ -118,6 +118,7 @@ namespace mongo {
             return io.getStringField("name");
         }
 
+        // TODO: Move elsewhere.  Currently also lives in db/query/query_planner.cpp.
         static bool isIdIndexPattern( const BSONObj &pattern ) {
             BSONObjIterator i(pattern);
             BSONElement e = i.next();

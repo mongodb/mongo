@@ -160,6 +160,7 @@ namespace mongo {
                 csn->direction = natural.numberInt() >= 0 ? 1 : -1;
             }
             else {
+                soln->hasSortStage = true;
                 SortNode* sort = new SortNode();
                 sort->pattern = sortObj;
                 sort->child.reset(csn);
@@ -594,6 +595,12 @@ namespace mongo {
 
     QuerySolution* analyzeDataAccess(const CanonicalQuery& query, MatchExpression* taggedRoot,
                                      QuerySolutionNode* solnRoot) {
+        auto_ptr<QuerySolution> soln(new QuerySolution());
+        soln->filter.reset(taggedRoot);
+        soln->filterData = query.getQueryObj();
+        verify(soln->filterData.isOwned());
+        soln->ns = query.ns();
+
         // solnRoot finds all our results.
 
         // Sort the results.
@@ -623,6 +630,7 @@ namespace mongo {
                     }
                 }
 
+                soln->hasSortStage = true;
                 SortNode* sort = new SortNode();
                 sort->pattern = query.getParsed().getSort();
                 sort->child.reset(solnRoot);
@@ -675,13 +683,7 @@ namespace mongo {
             skip->child.reset(solnRoot);
             solnRoot = skip;
         }
-
-        auto_ptr<QuerySolution> soln(new QuerySolution());
-        soln->filter.reset(taggedRoot);
-        soln->filterData = query.getQueryObj();
-        verify(soln->filterData.isOwned());
         soln->root.reset(solnRoot);
-        soln->ns = query.ns();
         return soln.release();
     }
 
@@ -716,6 +718,19 @@ namespace mongo {
             }
         }
         return false;
+    }
+
+    // Copied from db/index.h
+    static bool isIdIndex( const BSONObj &pattern ) {
+        BSONObjIterator i(pattern);
+        BSONElement e = i.next();
+        //_id index must have form exactly {_id : 1} or {_id : -1}.
+        //Allows an index of form {_id : "hashed"} to exist but
+        //do not consider it to be the primary _id index
+        if(! ( strcmp(e.fieldName(), "_id") == 0
+                && (e.numberInt() == 1 || e.numberInt() == -1)))
+            return false;
+        return i.next().eoo();
     }
 
     // static
@@ -760,7 +775,31 @@ namespace mongo {
 
         // Filter our indices so we only look at indices that are over our predicates.
         vector<BSONObj> relevantIndices;
-        findRelevantIndices(predicates, indexKeyPatterns, &relevantIndices);
+
+        // Hints require us to only consider the hinted index.
+        BSONObj hintIndex = query.getParsed().getHint();
+
+        // Snapshot is a form of a hint.
+        if (query.getParsed().isSnapshot()) {
+            // Snapshot is equivalent to:
+            // 1. Try to use _id index to make a real plan.  If that fails, just scan
+            // the _id index.
+            // Find the ID index in indexKeyPatterns.
+            for (size_t i = 0; i < indexKeyPatterns.size(); ++i) {
+                if (isIdIndex(indexKeyPatterns[i])) {
+                    hintIndex = indexKeyPatterns[i];
+                    break;
+                }
+            }
+        }
+
+        if (!hintIndex.isEmpty()) {
+            relevantIndices.push_back(hintIndex);
+            cout << "hint specified, restricting indices to " << hintIndex.toString() << endl;
+        }
+        else {
+            findRelevantIndices(predicates, indexKeyPatterns, &relevantIndices);
+        }
 
         if (0 < relevantIndices.size()) {
             for (size_t i = 0; i < relevantIndices.size(); ++i) {
@@ -794,28 +833,60 @@ namespace mongo {
             }
         }
 
+        // An index was hinted.  If there are any solutions, they use the hinted index.  If not,
+        // we scan the entire index to provide results and output that as our plan.
+        if (!hintIndex.isEmpty() && (0 == out->size())) {
+            // Build an ixscan over the id index, use it, and return it.
+            IndexScanNode* isn = new IndexScanNode();
+            isn->indexKeyPattern = hintIndex;
+
+            // XXX: use simple bounds for ixscan once builder supports them
+            BSONObjIterator it(isn->indexKeyPattern);
+            while (it.more()) {
+                isn->bounds.fields.push_back(
+                        IndexBoundsBuilder::allValuesForField(it.next()));
+            }
+
+            QuerySolution* soln = analyzeDataAccess(query, query.root()->shallowClone(),
+                    isn);
+            verify(NULL != soln);
+            out->push_back(soln);
+            cout << "using hinted index as scan, soln = " << soln->toString() << endl;
+            return;
+        }
+
         if (!query.getParsed().getSort().isEmpty()) {
-            // TODO: We may not always want to do this?  Though current enumeration will
-            // only use an index to answer a pred, not a sort.
-            for (size_t i = 0; i < indexKeyPatterns.size(); ++i) {
-                const BSONObj& kp = indexKeyPatterns[i];
-                if (0 == kp.woCompare(query.getParsed().getSort())) {
-                    IndexScanNode* isn = new IndexScanNode();
-                    isn->indexKeyPattern = kp;
-
-                    // XXX: use simple bounds for ixscan once builder supports them
-                    BSONObjIterator it(isn->indexKeyPattern);
-                    while (it.more()) {
-                        isn->bounds.fields.push_back(
-                            IndexBoundsBuilder::allValuesForField(it.next()));
-                    }
-
-                    QuerySolution* soln = analyzeDataAccess(query, query.root()->shallowClone(),
-                                                            isn);
-                    verify(NULL != soln);
-                    out->push_back(soln);
-                    cout << "using index to provide sort, soln = " << soln->toString() << endl;
+            // See if we have a sort provided from an index already.
+            bool usingIndexToSort = false;
+            for (size_t i = 0; i < out->size(); ++i) {
+                QuerySolution* soln = (*out)[i];
+                if (!soln->hasSortStage) {
+                    usingIndexToSort = true;
                     break;
+                }
+            }
+
+            if (!usingIndexToSort) {
+                for (size_t i = 0; i < indexKeyPatterns.size(); ++i) {
+                    const BSONObj& kp = indexKeyPatterns[i];
+                    if (0 == kp.woCompare(query.getParsed().getSort())) {
+                        IndexScanNode* isn = new IndexScanNode();
+                        isn->indexKeyPattern = kp;
+
+                        // XXX: use simple bounds for ixscan once builder supports them
+                        BSONObjIterator it(isn->indexKeyPattern);
+                        while (it.more()) {
+                            isn->bounds.fields.push_back(
+                                    IndexBoundsBuilder::allValuesForField(it.next()));
+                        }
+
+                        QuerySolution* soln = analyzeDataAccess(query, query.root()->shallowClone(),
+                                isn);
+                        verify(NULL != soln);
+                        out->push_back(soln);
+                        cout << "using index to provide sort, soln = " << soln->toString() << endl;
+                        break;
+                    }
                 }
             }
         }

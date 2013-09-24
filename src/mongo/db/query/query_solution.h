@@ -121,7 +121,7 @@ namespace mongo {
      * of stages.
      */
     struct QuerySolution {
-        QuerySolution() { }
+        QuerySolution() : hasSortStage(false) { }
 
         // Owned here.
         scoped_ptr<QuerySolutionNode> root;
@@ -133,6 +133,10 @@ namespace mongo {
         BSONObj filterData;
 
         string ns;
+
+        // XXX temporary: if it has a sort stage the sort wasn't provided by an index,
+        // so we use that index (if it exists) to provide a sort.
+        bool hasSortStage;
 
         /**
          * Output a human-readable string representing the plan.
@@ -205,8 +209,8 @@ namespace mongo {
         bool fetched() const;
         bool hasField(const string& field) const;
         bool sortedByDiskLoc() const {
-            // Even if our children are sorted by their diskloc or other fields, we don't maintain any
-            // order on the output.
+            // Even if our children are sorted by their diskloc or other fields, we don't maintain
+            // any order on the output.
             return false;
         }
         BSONObj getSort() const { return BSONObj(); }
