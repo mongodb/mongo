@@ -5,7 +5,8 @@
       <Feature Id="ProductFeature"
                Title="!(wix.ProductName)"
                Description="!(wix.ProductName)"
-               Level="1">
+               Level="1"
+               ConfigurableDirectory="INSTALLLOCATION">
         <ComponentGroupRef Id="cg_License" />
         <Feature Id="Server"
                  Title ="Server"
