@@ -136,8 +136,6 @@ namespace mongo {
             return false;
         }
 
-        LOG(1) << "security key: " << str << endl;
-
         User::CredentialData credentials;
         credentials.password = DBClientWithCommands::createPasswordDigest(
                 internalSecurity.user->getName().getUser().toString(), str);
