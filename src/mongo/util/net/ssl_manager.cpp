@@ -518,18 +518,9 @@ namespace mongo {
         // Note: this is for blocking sockets only.
         SSL_CTX_set_mode(*context, SSL_MODE_AUTO_RETRY);
 
-        // Set context within which session can be reused
-        int status = SSL_CTX_set_session_id_context(
-            *context,
-            static_cast<unsigned char*>(static_cast<void*>(context)),
-            sizeof(*context));
+        // Disable session caching (see SERVER-10261)
+        SSL_CTX_set_session_cache_mode(*context, SSL_SESS_CACHE_OFF);
  
-        if (!status) {
-            error() << "failed to set session id context: " << 
-                getSSLErrorMessage(ERR_get_error()) << endl;
-            return false;
-        }
-
         // Use the clusterfile for internal outgoing SSL connections if specified 
         if (context == &_clientContext && !params.clusterfile.empty()) {
             EVP_set_pw_prompt("Enter cluster certificate passphrase");
