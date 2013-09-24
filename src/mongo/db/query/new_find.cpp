@@ -309,7 +309,8 @@ namespace mongo {
 
             if (Runner::RUNNER_EOF == state
                 && 0 == numResults
-                && (queryOptions & QueryOption_CursorTailable) && (queryOptions & QueryOption_AwaitData)
+                && (queryOptions & QueryOption_CursorTailable)
+                && (queryOptions & QueryOption_AwaitData)
                 && (pass < 1000)) {
                 // If the cursor is tailable we don't kill it if it's eof.  We let it try to get
                 // data some # of times first.
@@ -349,6 +350,25 @@ namespace mongo {
         bb.decouple();
         return qr;
     }
+
+    /**
+     * RAII approach to ensuring that runners are deregistered in newRunQuery.
+     *
+     * While retrieving the first bach of results, newRunQuery manually registers the runner with
+     * ClientCursor.  Certain query execution paths, namely $where, can throw an exception.  If we
+     * fail to deregister the runner, we will call invalidate/kill on the
+     * still-registered-yet-deleted runner.
+     *
+     * For any subsequent calls to getMore, the runner is already registered with ClientCursor
+     * by virtue of being cached, so this exception-proofing is not required.
+     */
+    struct DeregisterEvenIfUnderlyingCodeThrows {
+        DeregisterEvenIfUnderlyingCodeThrows(Runner* runner) : _runner(runner) { }
+        ~DeregisterEvenIfUnderlyingCodeThrows() {
+            ClientCursor::deregisterRunner(_runner);
+        }
+        Runner* _runner;
+    };
 
     /**
      * This is called by db/ops/query.cpp.  This is the entry point for answering a query.
@@ -419,10 +439,12 @@ namespace mongo {
         // Do we save the Runner in a ClientCursor for getMore calls later?
         bool saveClientCursor = false;
 
-        // We turn on auto-yielding for the runner here, so we must register it with the active
-        // runners list in ClientCursor.
+        // We turn on auto-yielding for the runner here.  The runner registers itself with the
+        // active runners list in ClientCursor.
         ClientCursor::registerRunner(runner.get());
         runner->setYieldPolicy(Runner::YIELD_AUTO);
+        auto_ptr<DeregisterEvenIfUnderlyingCodeThrows> safety(
+            new DeregisterEvenIfUnderlyingCodeThrows(runner.get()));
 
         BSONObj obj;
         Runner::RunnerState state;
@@ -485,7 +507,7 @@ namespace mongo {
         // If we don't cache the runner later, we are deleting it, so it must be deregistered.
         //
         // So, no matter what, deregister the runner.
-        ClientCursor::deregisterRunner(runner.get());
+        safety.reset();
 
         // Why save a dead runner?
         if (Runner::RUNNER_DEAD == state) {
