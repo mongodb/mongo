@@ -140,17 +140,12 @@ namespace mongo {
             }
 
             BSONObj userObj;
+            BSONObj writeConcern;
             Status status = auth::parseAndValidateCreateUserCommand(cmdObj,
                                                                     dbname,
                                                                     authzManager,
-                                                                    &userObj);
-            if (!status.isOK()) {
-                addStatus(status, result);
-                return false;
-            }
-
-            BSONObj writeConcern;
-            status = auth::extractWriteConcern(cmdObj, &writeConcern);
+                                                                    &userObj,
+                                                                    &writeConcern);
             if (!status.isOK()) {
                 addStatus(status, result);
                 return false;
@@ -216,18 +211,13 @@ namespace mongo {
 
             BSONObj updateObj;
             UserName userName;
+            BSONObj writeConcern;
             Status status = auth::parseAndValidateUpdateUserCommand(cmdObj,
                                                                     dbname,
                                                                     authzManager,
                                                                     &updateObj,
-                                                                    &userName);
-            if (!status.isOK()) {
-                addStatus(status, result);
-                return false;
-            }
-
-            BSONObj writeConcern;
-            status = auth::extractWriteConcern(cmdObj, &writeConcern);
+                                                                    &userName,
+                                                                    &writeConcern);
             if (!status.isOK()) {
                 addStatus(status, result);
                 return false;
@@ -294,15 +284,13 @@ namespace mongo {
                 return false;
             }
 
-            std::string user;
-            Status status = bsonExtractStringField(cmdObj, "removeUser", &user);
-            if (!status.isOK()) {
-                addStatus(status, result);
-                return false;
-            }
-
+            UserName userName;
             BSONObj writeConcern;
-            status = auth::extractWriteConcern(cmdObj, &writeConcern);
+
+            Status status = auth::parseAndValidateRemoveUserCommand(cmdObj,
+                                                                    dbname,
+                                                                    &userName,
+                                                                    &writeConcern);
             if (!status.isOK()) {
                 addStatus(status, result);
                 return false;
@@ -310,12 +298,12 @@ namespace mongo {
 
             int numUpdated;
             status = authzManager->removePrivilegeDocuments(
-                    BSON(AuthorizationManager::USER_NAME_FIELD_NAME << user <<
-                         AuthorizationManager::USER_SOURCE_FIELD_NAME << dbname),
+                    BSON(AuthorizationManager::USER_NAME_FIELD_NAME << userName.getUser() <<
+                         AuthorizationManager::USER_SOURCE_FIELD_NAME << userName.getDB()),
                     writeConcern,
                     &numUpdated);
             // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
-            authzManager->invalidateUserByName(UserName(user, dbname));
+            authzManager->invalidateUserByName(userName);
             if (!status.isOK()) {
                 addStatus(status, result);
                 return false;
@@ -323,8 +311,8 @@ namespace mongo {
 
             if (numUpdated == 0) {
                 addStatus(Status(ErrorCodes::UserNotFound,
-                                 mongoutils::str::stream() << "User '" << user << "@" <<
-                                         dbname << "' not found"),
+                                 mongoutils::str::stream() << "User '" << userName.getFullName() <<
+                                         "' not found"),
                           result);
                 return false;
             }
@@ -379,7 +367,9 @@ namespace mongo {
             }
 
             BSONObj writeConcern;
-            Status status = auth::extractWriteConcern(cmdObj, &writeConcern);
+            Status status = auth::parseAndValidateRemoveUsersFromDatabaseCommand(cmdObj,
+                                                                                 dbname,
+                                                                                 &writeConcern);
             if (!status.isOK()) {
                 addStatus(status, result);
                 return false;
@@ -815,32 +805,20 @@ namespace mongo {
                  string& errmsg,
                  BSONObjBuilder& result,
                  bool fromRepl) {
-            if (cmdObj["usersInfo"].type() != String && cmdObj["usersInfo"].type() != RegEx) {
-                addStatus(Status(ErrorCodes::BadValue,
-                                 "Argument to userInfo command must be either a string or a regex"),
-                          result);
+
+            bool anyDB = false;
+            BSONElement usersFilter;
+            Status status = auth::parseAndValidateUsersInfoCommand(cmdObj,
+                                                                   dbname,
+                                                                   &anyDB,
+                                                                   &usersFilter);
+            if (!status.isOK()) {
+                addStatus(status, result);
                 return false;
             }
 
-            bool anyDB = false;
-            if (cmdObj.hasField("anyDB")) {
-                if (dbname == "admin") {
-                    Status status = bsonExtractBooleanField(cmdObj, "anyDB", &anyDB);
-                    if (!status.isOK()) {
-                        addStatus(status, result);
-                        return false;
-                    }
-                } else {
-                    addStatus(Status(ErrorCodes::BadValue,
-                                     "\"anyDB\" argument to usersInfo command is only valid when "
-                                     "run on the \"admin\" database"),
-                              result);
-                    return false;
-                }
-            }
-
             BSONObjBuilder queryBuilder;
-            queryBuilder.appendAs(cmdObj["usersInfo"], "name");
+            queryBuilder.appendAs(usersFilter, "name");
             if (!anyDB) {
                 queryBuilder.append("source", dbname);
             }

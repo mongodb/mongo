@@ -50,13 +50,26 @@ namespace {
 
     TEST_F(UserManagementCommandsParserTest, WriteConcernParsing) {
         BSONObj writeConcern;
+        BSONObj parsedUserObj;
         // Test no write concern provided
-        ASSERT_OK(auth::extractWriteConcern(BSONObj(), &writeConcern));
+        ASSERT_OK(auth::parseAndValidateCreateUserCommand(BSON("createUser" << "spencer" <<
+                                                               "pwd" << "abc" <<
+                                                               "roles" << BSONArray()),
+                                                          "test",
+                                                          authzManager.get(),
+                                                          &parsedUserObj,
+                                                          &writeConcern));
         ASSERT(writeConcern.isEmpty());
 
-        ASSERT_OK(auth::extractWriteConcern(BSON("writeConcern" << BSON("w" << "majority" <<
-                                                                        "j" << true)),
-                                            &writeConcern));
+        ASSERT_OK(auth::parseAndValidateCreateUserCommand(
+                BSON("createUser" << "spencer" <<
+                     "pwd" << "abc" <<
+                     "roles" << BSONArray() <<
+                     "writeConcern" << BSON("w" << "majority" << "j" << true)),
+                "test",
+                authzManager.get(),
+                &parsedUserObj,
+                &writeConcern));
 
         ASSERT_EQUALS("majority", writeConcern["w"].str());
         ASSERT_EQUALS(true, writeConcern["j"].Bool());
@@ -65,20 +78,23 @@ namespace {
     TEST_F(UserManagementCommandsParserTest, CreateUserCommandParsing) {
         BSONArray emptyArray = BSONArrayBuilder().arr();
         BSONObj parsedUserObj;
+        BSONObj writeConcern;
 
         // Must have password
         ASSERT_NOT_OK(auth::parseAndValidateCreateUserCommand(BSON("createUser" << "spencer" <<
                                                                    "roles" << emptyArray),
                                                               "test",
                                                               authzManager.get(),
-                                                              &parsedUserObj));
+                                                              &parsedUserObj,
+                                                              &writeConcern));
 
         // Must have roles array
         ASSERT_NOT_OK(auth::parseAndValidateCreateUserCommand(BSON("createUser" << "spencer" <<
                                                                    "pwd" << "password"),
                                                               "test",
                                                               authzManager.get(),
-                                                              &parsedUserObj));
+                                                              &parsedUserObj,
+                                                              &writeConcern));
 
         // Cannot create users in the local db
         ASSERT_NOT_OK(auth::parseAndValidateCreateUserCommand(BSON("createUser" << "spencer" <<
@@ -86,7 +102,8 @@ namespace {
                                                                    "roles" << emptyArray),
                                                               "local",
                                                               authzManager.get(),
-                                                              &parsedUserObj));
+                                                              &parsedUserObj,
+                                                              &writeConcern));
 
         // Cannot have extra fields
         ASSERT_NOT_OK(auth::parseAndValidateCreateUserCommand(BSON("createUser" << "spencer" <<
@@ -95,7 +112,8 @@ namespace {
                                                                    "anotherField" << "garbage"),
                                                               "test",
                                                               authzManager.get(),
-                                                              &parsedUserObj));
+                                                              &parsedUserObj,
+                                                              &writeConcern));
 
         // Role must exist (string role)
         ASSERT_NOT_OK(auth::parseAndValidateCreateUserCommand(
@@ -104,7 +122,8 @@ namespace {
                      "roles" << BSON_ARRAY("fakeRole")),
                 "test",
                 authzManager.get(),
-                &parsedUserObj));
+                &parsedUserObj,
+                &writeConcern));
 
         // Role must exist (object role)
         ASSERT_NOT_OK(auth::parseAndValidateCreateUserCommand(
@@ -116,7 +135,8 @@ namespace {
                                                 "canDelegate" << true))),
                 "test",
                 authzManager.get(),
-                &parsedUserObj));
+                &parsedUserObj,
+                &writeConcern));
 
         // Role must have name
         ASSERT_NOT_OK(auth::parseAndValidateCreateUserCommand(
@@ -127,7 +147,8 @@ namespace {
                                                 "canDelegate" << true))),
                 "test",
                 authzManager.get(),
-                &parsedUserObj));
+                &parsedUserObj,
+                &writeConcern));
 
         // Role must have source
         ASSERT_NOT_OK(auth::parseAndValidateCreateUserCommand(
@@ -138,7 +159,8 @@ namespace {
                                                 "canDelegate" << true))),
                 "test",
                 authzManager.get(),
-                &parsedUserObj));
+                &parsedUserObj,
+                &writeConcern));
 
         // Role must have hasRole
         ASSERT_NOT_OK(auth::parseAndValidateCreateUserCommand(
@@ -149,7 +171,8 @@ namespace {
                                                 "canDelegate" << true))),
                 "test",
                 authzManager.get(),
-                &parsedUserObj));
+                &parsedUserObj,
+                &writeConcern));
 
         // Role must have canDelegate
         ASSERT_NOT_OK(auth::parseAndValidateCreateUserCommand(
@@ -160,7 +183,8 @@ namespace {
                                                 "hasRole" << true))),
                 "test",
                 authzManager.get(),
-                &parsedUserObj));
+                &parsedUserObj,
+                &writeConcern));
 
         // canDelegate and hasRole can't both be false
         ASSERT_NOT_OK(auth::parseAndValidateCreateUserCommand(
@@ -172,7 +196,8 @@ namespace {
                                                 "canDelegate" << false))),
                 "test",
                 authzManager.get(),
-                &parsedUserObj));
+                &parsedUserObj,
+                &writeConcern));
 
         // Empty roles array OK
         ASSERT_OK(auth::parseAndValidateCreateUserCommand(BSON("createUser" << "spencer" <<
@@ -180,7 +205,8 @@ namespace {
                                                                "roles" << emptyArray),
                                                           "test",
                                                           authzManager.get(),
-                                                          &parsedUserObj));
+                                                          &parsedUserObj,
+                                                          &writeConcern));
 
 
         // Missing password OK if source is $external
@@ -188,7 +214,8 @@ namespace {
                                                                "roles" << emptyArray),
                                                           "$external",
                                                           authzManager.get(),
-                                                          &parsedUserObj));
+                                                          &parsedUserObj,
+                                                          &writeConcern));
 
         // String role names OK
         ASSERT_OK(auth::parseAndValidateCreateUserCommand(
@@ -197,7 +224,8 @@ namespace {
                      "roles" << BSON_ARRAY("read" << "dbAdmin")),
                 "test",
                 authzManager.get(),
-                &parsedUserObj));
+                &parsedUserObj,
+                &writeConcern));
 
         ASSERT_EQUALS("spencer", parsedUserObj["name"].String());
         ASSERT_EQUALS("test", parsedUserObj["source"].String());
@@ -230,7 +258,8 @@ namespace {
                      "customData" << BSON("foo" << "bar")),
                 "test",
                 authzManager.get(),
-                &parsedUserObj));
+                &parsedUserObj,
+                &writeConcern));
 
         ASSERT_EQUALS("spencer", parsedUserObj["name"].String());
         ASSERT_EQUALS("test", parsedUserObj["source"].String());
@@ -254,6 +283,7 @@ namespace {
     TEST_F(UserManagementCommandsParserTest, UpdateUserCommandParsing) {
         BSONArray emptyArray = BSONArrayBuilder().arr();
         BSONObj parsedUpdateObj;
+        BSONObj writeConcern;
         UserName parsedUserName;
 
         // Cannot have extra fields
@@ -264,7 +294,8 @@ namespace {
                                                               "test",
                                                               authzManager.get(),
                                                               &parsedUpdateObj,
-                                                              &parsedUserName));
+                                                              &parsedUserName,
+                                                              &writeConcern));
 
         // Role must exist (string role)
         ASSERT_NOT_OK(auth::parseAndValidateUpdateUserCommand(
@@ -274,7 +305,8 @@ namespace {
                 "test",
                 authzManager.get(),
                 &parsedUpdateObj,
-                &parsedUserName));
+                &parsedUserName,
+                &writeConcern));
 
         // Role must exist (object role)
         ASSERT_NOT_OK(auth::parseAndValidateUpdateUserCommand(
@@ -287,7 +319,8 @@ namespace {
                 "test",
                 authzManager.get(),
                 &parsedUpdateObj,
-                &parsedUserName));
+                &parsedUserName,
+                &writeConcern));
 
         // Role must have name
         ASSERT_NOT_OK(auth::parseAndValidateUpdateUserCommand(
@@ -299,7 +332,8 @@ namespace {
                 "test",
                 authzManager.get(),
                 &parsedUpdateObj,
-                &parsedUserName));
+                &parsedUserName,
+                &writeConcern));
 
         // Role must have source
         ASSERT_NOT_OK(auth::parseAndValidateUpdateUserCommand(
@@ -311,7 +345,8 @@ namespace {
                 "test",
                 authzManager.get(),
                 &parsedUpdateObj,
-                &parsedUserName));
+                &parsedUserName,
+                &writeConcern));
 
         // Role must have hasRole
         ASSERT_NOT_OK(auth::parseAndValidateUpdateUserCommand(
@@ -323,7 +358,8 @@ namespace {
                 "test",
                 authzManager.get(),
                 &parsedUpdateObj,
-                &parsedUserName));
+                &parsedUserName,
+                &writeConcern));
 
         // Role must have canDelegate
         ASSERT_NOT_OK(auth::parseAndValidateUpdateUserCommand(
@@ -335,7 +371,8 @@ namespace {
                 "test",
                 authzManager.get(),
                 &parsedUpdateObj,
-                &parsedUserName));
+                &parsedUserName,
+                &writeConcern));
 
         // canDelegate and hasRole can't both be false
         ASSERT_NOT_OK(auth::parseAndValidateUpdateUserCommand(
@@ -348,7 +385,8 @@ namespace {
                 "test",
                 authzManager.get(),
                 &parsedUpdateObj,
-                &parsedUserName));
+                &parsedUserName,
+                &writeConcern));
 
         // Empty roles array OK
         ASSERT_OK(auth::parseAndValidateUpdateUserCommand(BSON("updateUser" << "spencer" <<
@@ -357,7 +395,8 @@ namespace {
                                                           "test",
                                                           authzManager.get(),
                                                           &parsedUpdateObj,
-                                                          &parsedUserName));
+                                                          &parsedUserName,
+                                                          &writeConcern));
 
         // String role names OK
         ASSERT_OK(auth::parseAndValidateUpdateUserCommand(
@@ -367,7 +406,8 @@ namespace {
                 "test",
                 authzManager.get(),
                 &parsedUpdateObj,
-                &parsedUserName));
+                &parsedUserName,
+                &writeConcern));
 
         BSONObj setObj = parsedUpdateObj["$set"].Obj();
 
@@ -402,7 +442,8 @@ namespace {
                 "test",
                 authzManager.get(),
                 &parsedUpdateObj,
-                &parsedUserName));
+                &parsedUserName,
+                &writeConcern));
 
         setObj = parsedUpdateObj["$set"].Obj();
 
