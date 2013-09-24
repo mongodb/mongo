@@ -24,9 +24,9 @@
     <WixVariable Id="WixUIBannerBmp" Value="Banner.bmp" />
     <WixVariable Id="WixUIInfoIco" Value="Installer_Icon_32x32.ico" />
     <WixVariable Id="WixUIExclamationIco" Value="Installer_Icon_32x32.ico" />
+    <!--
     <WixVariable Id="WixUINewIco" Value="Installer_Icon_16x16.ico" />
     <WixVariable Id="WixUIUpIco" Value="Installer_Icon_16x16.ico" />
-    <!--
   More information can be found at http://wix.tramontana.co.hu/tutorial/user-interface/ui-wizardry
     -->
 
@@ -34,6 +34,6 @@
     
     <UIRef Id="WixUI_Mondo" />
     <UIRef Id="WixUI_ErrorProgressText" />
-    <Property Id="WIXUI_INSTALLDIR" Value="INSTALLDIR" />
+    <Property Id="WIXUI_INSTALLDIR" Value="INSTALLLOCATION" />
   </Product>
 </Wix>
