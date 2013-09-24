@@ -166,7 +166,13 @@ namespace mongo {
         // deduping logic in here, too -- for now.
         unordered_set<DiskLoc, DiskLoc::Hasher> seenLocs;
         int numMatched = 0;
+
+        // Reset these counters on each call. We might re-enter this function to retry this
+        // update if we throw a page fault exception below, and we rely on these counters
+        // reflecting only the actions taken locally. In particlar, we must have the no-op
+        // counter reset so that we can meaningfully comapre it with numMatched above.
         opDebug->nscanned = 0;
+        opDebug->nupdateNoops = 0;
 
         Client& client = cc();
 
@@ -185,8 +191,13 @@ namespace mongo {
                  client.allowedToThrowPageFaultException() &&
                  !cursor->currLoc().isNull() &&
                  !cursor->currLoc().rec()->likelyInPhysicalMemory() ) {
-                // We should never throw a PFE if we have already updated items.
+
+                // We should never throw a PFE if we have already updated items. The numMatched
+                // variable includes no-ops, which do not prevent us from raising a PFE, so if
+                // numMatched is non-zero, we are still OK to throw as long all matched items
+                // resulted in a no-op.
                 dassert((numMatched == 0) || (numMatched == opDebug->nupdateNoops));
+
                 throw PageFaultException( cursor->currLoc().rec() );
             }
 
