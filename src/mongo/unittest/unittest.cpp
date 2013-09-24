@@ -28,6 +28,7 @@
 #include "mongo/logger/message_log_domain.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
+#include "mongo/util/timer.h"
 
 namespace mongo {
 
@@ -61,13 +62,16 @@ namespace mongo {
 
         class Result {
         public:
-            Result( const std::string& name ) : _name( name ) , _rc(0) , _tests(0) , _fails(0) , _asserts(0) {}
+            Result( const std::string& name )
+                : _name( name ) , _rc(0) , _tests(0) , _fails(0) , _asserts(0), _millis(0) {}
 
             std::string toString() {
                 std::stringstream ss;
 
                 char result[128];
-                sprintf(result, "%-20s | tests: %4d | fails: %4d | assert calls: %6d\n", _name.c_str(), _tests, _fails, _asserts);
+                sprintf(result,
+                        "%-30s | tests: %4d | fails: %4d | assert calls: %10d | time secs: %6.3f\n",
+                        _name.c_str(), _tests, _fails, _asserts, _millis/1000.0 );
                 ss << result;
 
                 for ( std::vector<std::string>::iterator i=_messages.begin(); i!=_messages.end(); i++ ) {
@@ -87,6 +91,7 @@ namespace mongo {
             int _tests;
             int _fails;
             int _asserts;
+            int _millis;
             std::vector<std::string> _messages;
 
             static Result * cur;
@@ -138,6 +143,7 @@ namespace mongo {
             setupTests();
             LOG(1) << "\t done setupTests" << std::endl;
 
+            Timer timer;
             Result * r = new Result( _name );
             Result::cur = r;
 
@@ -185,6 +191,7 @@ namespace mongo {
             if ( r->_fails )
                 r->_rc = 17;
 
+            r->_millis = timer.millis();
 
             onCurrentTestNameChange( "" );
 
@@ -235,6 +242,7 @@ namespace mongo {
             int tests = 0;
             int fails = 0;
             int asserts = 0;
+            int millis = 0;
 
             for ( std::vector<Result*>::iterator i=results.begin(); i!=results.end(); i++ ) {
                 Result* r = *i;
@@ -245,12 +253,14 @@ namespace mongo {
                 tests += r->_tests;
                 fails += r->_fails;
                 asserts += r->_asserts;
+                millis += r->_millis;
             }
 
             Result totals ("TOTALS");
             totals._tests = tests;
             totals._fails = fails;
             totals._asserts = asserts;
+            totals._millis = millis;
 
             log() << totals.toString(); // includes endl
 
