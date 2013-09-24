@@ -26,18 +26,54 @@
  *    it in the license file.
  */
 
-#include "mongo/s/write_op.h"
+#pragma once
 
-#include "mongo/s/batched_command_request.h"
-#include "mongo/unittest/unittest.h"
+#include <deque>
 
-namespace {
+#include "mongo/bson/bsonobj.h"
+#include "mongo/s/multi_command_dispatch.h"
 
-    using namespace mongo;
+namespace mongo {
 
-    TEST(WriteOpTests, Basic) {
-        WriteOp( BatchItemRef( NULL, 0 ) );
-        ASSERT( true );
-    }
+    /**
+     * A DBClientMultiCommand uses the client driver (DBClientConnections) to send and recv
+     * commands to different hosts in parallel.
+     *
+     * See MultiCommandDispatch for more details.
+     */
+    class DBClientMultiCommand : public MultiCommandDispatch {
+    public:
 
-} // unnamed namespace
+        ~DBClientMultiCommand();
+
+        void addCommand( const ConnectionString& endpoint, const BSONSerializable& request );
+
+        void sendAll();
+
+        int numPending() const;
+
+        Status recvAny( ConnectionString* endpoint, BSONSerializable* response );
+
+    private:
+
+        // All info associated with an pre- or in-flight command
+        struct PendingCommand {
+
+            PendingCommand( const ConnectionString& endpoint, const BSONObj& cmdObj );
+
+            // What to send
+            const ConnectionString& endpoint;
+            BSONObj cmdObj;
+
+            // Where to send it
+            DBClientBase* conn;
+
+            // If anything goes wrong
+            Status status;
+        };
+
+        typedef std::deque<PendingCommand*> PendingQueue;
+        PendingQueue _pendingCommands;
+    };
+
+}

@@ -817,7 +817,7 @@ env.Install( '#/', [
 mongos = env.Program(
     "mongos", [ "s/server.cpp", "s/mongos_options.cpp" ] ,
     LIBDEPS=["mongoscore", "coreserver", "coredb", "mongocommon", "coreshard", "dbcmdline", "ntservice",
-             "mongodandmongos", "s/upgrade"])
+             "mongodandmongos", "s/upgrade", "s/write_ops", "s/write_op_impl"])
 env.Install( '#/', mongos )
 
 env.Library("clientandshell", ["client/clientAndShell.cpp"],
@@ -854,6 +854,7 @@ test = testEnv.Install(
                        "testframework",
                        "gridfs",
                        "s/upgrade",
+                       "s/write_op_impl",
                        "mocklib",
                        "db/exec/mock_stage",
                        "$BUILD_DIR/mongo/db/auth/authmocks"]))

@@ -1,17 +1,29 @@
 /**
- * Copyright (C) 2013 10gen Inc.
+ *    Copyright (C) 2013 MongoDB Inc.
  *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
+ *    This program is free software: you can redistribute it and/or  modify
+ *    it under the terms of the GNU Affero General Public License, version 3,
+ *    as published by the Free Software Foundation.
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ *    You should have received a copy of the GNU Affero General Public License
+ *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the GNU Affero General Public License in all respects for
+ *    all of the code used other than as permitted herein. If you modify file(s)
+ *    with this exception, you may extend this exception to your version of the
+ *    file(s), but you are not obligated to do so. If you do not wish to do so,
+ *    delete this exception statement from your version. If you delete this
+ *    exception statement from all source files in the program, then also delete
+ *    it in the license file.
  */
 
 #pragma once
@@ -19,6 +31,7 @@
 #include <boost/scoped_ptr.hpp>
 #include <vector>
 
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/s/batched_error_detail.h"
 #include "mongo/s/batched_command_request.h"
@@ -39,10 +52,14 @@ namespace mongo {
         WriteOpState_Pending,
 
         // Op was successful, write completed
+        // We assume all states higher than this one are *final*
         WriteOpState_Completed,
 
         // Op failed with some error
         WriteOpState_Error,
+
+        // Op was cancelled before sending (only child write ops can be cancelled)
+        WriteOpState_Cancelled,
 
         // Catch-all error state.
         WriteOpState_Unknown
@@ -56,11 +73,12 @@ namespace mongo {
      *   0. Begins at _Ready,
      *
      *   1a. Targeted, and a ChildWriteOp created to track the state of each returned TargetedWrite.
-     *      The state is changed to _Pending.
+     *       The state is changed to _Pending.
      *   1b. If the op cannot be targeted, the error is set directly (_Error), and the write op is
      *       completed.
      *
-     *   2.  TargetedWrites finish successfully and unsuccessfully.
+     *   2a.  The current TargetedWrites are cancelled, and the op state is reset to _Ready
+     *   2b.  TargetedWrites finish successfully and unsuccessfully.
      *
      *   On the last error arriving...
      *
@@ -105,6 +123,14 @@ namespace mongo {
          */
         Status targetWrites( const NSTargeter& targeter,
                              std::vector<TargetedWrite*>* targetedWrites );
+
+        /**
+         * Resets the state of this write op to _Ready and stops waiting for any outstanding
+         * TargetedWrites.  Optional error can be provided for reporting.
+         *
+         * Can only be called when state is _Pending and no TargetedWrites have been noted.
+         */
+        void cancelWrites( const BatchedErrorDetail* why );
 
         /**
          * Marks the targeted write as finished for this write op.
@@ -175,7 +201,7 @@ namespace mongo {
         // filled when state > _Pending
         scoped_ptr<ShardEndpoint> endpoint;
 
-        // filled when state == _Error
+        // filled when state == _Error or (optionally) when state == _Cancelled
         scoped_ptr<BatchedErrorDetail> error;
     };
 

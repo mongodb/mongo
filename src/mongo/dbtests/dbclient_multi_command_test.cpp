@@ -26,18 +26,17 @@
  *    it in the license file.
  */
 
-#include "mongo/s/write_op.h"
+#include "mongo/s/dbclient_multi_command.h"
 
-#include "mongo/s/batched_command_request.h"
 #include "mongo/unittest/unittest.h"
 
 namespace {
 
     using namespace mongo;
 
-    TEST(WriteOpTests, Basic) {
-        WriteOp( BatchItemRef( NULL, 0 ) );
+    TEST(DBClientMultiCommandTest, Basic) {
+        DBClientMultiCommand();
         ASSERT( true );
     }
 
-} // unnamed namespace
+} // end namespace

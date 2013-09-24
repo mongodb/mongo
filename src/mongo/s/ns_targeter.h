@@ -1,17 +1,29 @@
 /**
- * Copyright (C) 2013 10gen Inc.
+ *    Copyright (C) 2013 MongoDB Inc.
  *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License, version 3,
- * as published by the Free Software Foundation.
+ *    This program is free software: you can redistribute it and/or  modify
+ *    it under the terms of the GNU Affero General Public License, version 3,
+ *    as published by the Free Software Foundation.
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU Affero General Public License
- * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ *    You should have received a copy of the GNU Affero General Public License
+ *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the GNU Affero General Public License in all respects for
+ *    all of the code used other than as permitted herein. If you modify file(s)
+ *    with this exception, you may extend this exception to your version of the
+ *    file(s), but you are not obligated to do so. If you do not wish to do so,
+ *    delete this exception statement from your version. If you delete this
+ *    exception statement from all source files in the program, then also delete
+ *    it in the license file.
  */
 
 #pragma once
@@ -33,11 +45,14 @@ namespace mongo {
      * to a particular collection.
      *
      * The lifecyle of a NSTargeter is:
-     *   0. refreshIfNeeded() to get targeting information (this must be the *first* call to the
-     *      targeter, since we may need to load initial information)
-     *   1. targetDoc/targetQuery as many times as is required
-     *   1a. On targeting failure, we may need to refresh, note this and goto 0.
-     *   2. On stale config from a child write operation, note the error
+     *
+     *   0. targetDoc/targetQuery as many times as is required
+     *
+     *   1a. On targeting failure we may need to refresh, note that it happened.
+     *   1b. On stale config from a child write operation we may need to refresh, note the error.
+     *
+     *   2. RefreshIfNeeded() to get newer targeting information
+     *
      *   3. Goto 0.
      *
      * The refreshIfNeeded() operation must make progress against noted targeting or stale config
@@ -62,6 +77,39 @@ namespace mongo {
         virtual const NamespaceString& getNS() const = 0;
 
         /**
+         * Returns a ShardEndpoint for a single document write.
+         *
+         * Returns ShardKeyNotFound if document does not have a full shard key.
+         * Returns !OK with message if document could not be targeted for other reasons.
+         */
+        virtual Status targetDoc( const BSONObj& doc, ShardEndpoint** endpoint ) const = 0;
+
+        /**
+         * Returns a vector of ShardEndpoints for a potentially multi-shard query.
+         *
+         * Returns !OK with message if query could not be targeted.
+         */
+        virtual Status targetQuery( const BSONObj& query,
+                                    std::vector<ShardEndpoint*>* endpoints ) const = 0;
+
+        /**
+         * Informs the targeter that a targeting failure occurred during one of the last targeting
+         * operations.  If this is noted, we cannot note stale responses.
+         */
+        virtual void noteCouldNotTarget() = 0;
+
+        /**
+         * Informs the targeter of stale config responses for this namespace from an endpoint, with
+         * further information available in the returned staleInfo.
+         *
+         * Any stale responses noted here will be taken into account on the next refresh.
+         *
+         * If stale responses are is noted, we must not have noted that we cannot target.
+         */
+        virtual void noteStaleResponse( const ShardEndpoint& endpoint,
+                                        const BSONObj& staleInfo ) = 0;
+
+        /**
          * Refreshes the targeting metadata for the namespace if needed, based on previously-noted
          * stale responses and targeting failures.
          *
@@ -73,37 +121,6 @@ namespace mongo {
          * Returns !OK with message if could not refresh
          */
         virtual Status refreshIfNeeded() = 0;
-
-        /**
-         * Returns a ShardEndpoint for a single document write.
-         *
-         * Returns ShardKeyNotFound if document does not have a full shard key.
-         * Returns !OK with message if document could not be targeted for other reasons.
-         */
-        virtual Status targetDoc( const BSONObj& doc,
-                                  ShardEndpoint** endpoint ) const = 0;
-
-        /**
-         * Returns a vector of ShardEndpoints for a potentially multi-shard query.
-         *
-         * Returns !OK with message if query could not be targeted.
-         */
-        virtual Status targetQuery( const BSONObj& query,
-                                    std::vector<ShardEndpoint*>* endpoints ) const = 0;
-
-        /**
-         * Informs the targeter of stale config responses for this namespace from an endpoint, with
-         * further information available in the returned staleInfo.
-         *
-         * Any stale responses noted here will be taken into account on the next refresh.
-         */
-        virtual void noteStaleResponse( const ShardEndpoint& endpoint,
-                                        const BSONObj& staleInfo ) = 0;
-
-        /**
-         * Informs the targeter that a remote refresh is needed on the next refresh.
-         */
-        virtual void noteNeedsRefresh() = 0;
 
     };
 
@@ -117,15 +134,15 @@ namespace mongo {
         }
 
         ShardEndpoint( const ShardEndpoint& other ) :
-                shardName( other.shardName ),
-                shardVersion( other.shardVersion ),
-                shardHost( other.shardHost ) {
+            shardName( other.shardName ),
+            shardVersion( other.shardVersion ),
+            shardHost( other.shardHost ) {
         }
 
         ShardEndpoint( const string& shardName,
                        const ChunkVersion& shardVersion,
                        const ConnectionString& shardHost ) :
-                shardName( shardName ), shardVersion( shardVersion ), shardHost( shardHost ) {
+            shardName( shardName ), shardVersion( shardVersion ), shardHost( shardHost ) {
         }
 
         const std::string shardName;
