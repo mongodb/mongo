@@ -269,8 +269,11 @@ __wt_txn_cursor_op(WT_SESSION_IMPL *session)
 
 	/*
 	 * If there is no transaction running (so we don't have an ID), and no
-	 * snapshot allocated, put an ID in the global table to prevents any
+	 * snapshot allocated, put an ID in the global table to prevent any
 	 * update that we are reading from being trimmed to save memory.
+	 * NOTE:  We're accessing the global table unprotected, so the oldest_id
+	 * may, in fact, be larger/younger than this value.  But putting this
+	 * value in the table preserves the oldest_id, whatever value it is.
 	 */
 	if (txn->isolation == TXN_ISO_READ_UNCOMMITTED &&
 	    !F_ISSET(txn, TXN_RUNNING))

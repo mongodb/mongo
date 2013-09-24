@@ -62,10 +62,13 @@ __wt_txn_release_evict_snapshot(WT_SESSION_IMPL *session)
 void
 __wt_txn_release_snapshot(WT_SESSION_IMPL *session)
 {
+	WT_TXN *txn;
 	WT_TXN_STATE *txn_state;
 
+	txn = &session->txn;
 	txn_state = &S2C(session)->txn_global.states[session->id];
-	WT_ASSERT(session, txn_state->snap_min == WT_TXN_NONE ||
+	WT_ASSERT(session, txn->isolation == TXN_ISO_READ_UNCOMMITTED ||
+	    txn_state->snap_min == WT_TXN_NONE ||
 	    !__wt_txn_visible_all(session, txn_state->snap_min));
 	txn_state->snap_min = WT_TXN_NONE;
 }
