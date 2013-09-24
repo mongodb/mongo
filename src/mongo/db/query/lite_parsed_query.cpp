@@ -177,10 +177,8 @@ namespace mongo {
                     _max = e.embeddedObject();
                 }
                 else if (str::equals("hint", name)) {
-                    if (!e.isABSONObj()) {
-                        return Status(ErrorCodes::BadValue, "$hint must be a BSONObj");
-                    }
-                    _hint = e.embeddedObject();
+                    // Hint can be specified as an object or as a string.  Wrap takes care of it.
+                    _hint = e.wrap();
                 }
                 else if (str::equals("returnKey", name)) {
                     // Won't throw.

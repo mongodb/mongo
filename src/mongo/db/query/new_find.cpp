@@ -354,8 +354,6 @@ namespace mongo {
      * This is called by db/ops/query.cpp.  This is the entry point for answering a query.
      */
     string newRunQuery(Message& m, QueryMessage& q, CurOp& curop, Message &result) {
-        log() << "Running query on new system: " << q.query.toString() << endl;
-
         // This is a read lock.
         Client::ReadContext ctx(q.ns, dbpath);
 
@@ -369,6 +367,8 @@ namespace mongo {
         }
         verify(NULL != rawRunner);
         auto_ptr<Runner> runner(rawRunner);
+
+        log() << "Running query on new system: " << cq->toString();
 
         // We freak out later if this changes before we're done with the query.
         const ChunkVersion shardingVersionAtStart = shardingState.getVersion(q.ns);
@@ -517,7 +517,8 @@ namespace mongo {
                                                 cq->getParsed().getFilter());
             ccId = cc->cursorid();
 
-            log() << "caching runner with cursorid " << ccId << endl;
+            log() << "caching runner with cursorid " << ccId
+                  << " after returning " << numResults << " results" << endl;
 
             // ClientCursor takes ownership of runner.  Release to make sure it's not deleted.
             runner.release();
