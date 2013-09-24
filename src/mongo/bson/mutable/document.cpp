@@ -449,10 +449,8 @@ namespace mutablebson {
             // The index of our parent in the Document.
             Element::RepIdx parent;
 
-            // Pad this object out to 32 bytes.
-            //
-            // TODO: Cache element size here?
-            uint32_t pad;
+            // The cached field name size of this element, or -1 if unknown.
+            int32_t fieldNameSize;
         };
 #pragma pack(pop)
 
@@ -609,7 +607,7 @@ namespace mutablebson {
                 { Element::kInvalidRepIdx, Element::kInvalidRepIdx },
                 { Element::kInvalidRepIdx, Element::kInvalidRepIdx },
                 Element::kInvalidRepIdx,
-                0
+                -1
             };
 
             const Element::RepIdx id = *newIdx = _numElements++;
@@ -679,7 +677,10 @@ namespace mutablebson {
         // Given a RepIdx, return the BSONElement that it represents.
         BSONElement getSerializedElement(const ElementRep& rep) const {
             const BSONObj& object = getObject(rep.objIdx);
-            return BSONElement(object.objdata() + rep.offset);
+            return BSONElement(
+                object.objdata() + rep.offset,
+                rep.fieldNameSize,
+                BSONElement::FieldNameSizeTag());
         }
 
         // A helper method that either inserts the field name into the field name heap and
@@ -765,6 +766,11 @@ namespace mutablebson {
                 getObject(rep->objIdx)).firstElement();
 
             if (!childElt.eoo()) {
+
+                // Do this now before other writes so compiler can exploit knowing
+                // that we are not eoo.
+                const int32_t fieldNameSize = childElt.fieldNameSize();
+
                 Element::RepIdx inserted;
                 ElementRep& newRep = makeNewRep(&inserted);
                 // Calling makeNewRep invalidates rep since it may cause a reallocation of
@@ -782,6 +788,7 @@ namespace mutablebson {
                     newRep.child.left = Element::kOpaqueRepIdx;
                     newRep.child.right = Element::kOpaqueRepIdx;
                 }
+                newRep.fieldNameSize = fieldNameSize;
                 rep->child.left = inserted;
             } else {
                 rep->child.left = Element::kInvalidRepIdx;
@@ -832,6 +839,11 @@ namespace mutablebson {
             BSONElement rightElt(elt.rawdata() + elt.size());
 
             if (!rightElt.eoo()) {
+
+                // Do this now before other writes so compiler can exploit knowing
+                // that we are not eoo.
+                const int32_t fieldNameSize = rightElt.fieldNameSize();
+
                 Element::RepIdx inserted;
                 ElementRep& newRep = makeNewRep(&inserted);
                 // Calling makeNewRep invalidates rep since it may cause a reallocation of
@@ -850,6 +862,7 @@ namespace mutablebson {
                     newRep.child.left = Element::kOpaqueRepIdx;
                     newRep.child.right = Element::kOpaqueRepIdx;
                 }
+                newRep.fieldNameSize = fieldNameSize;
                 rep->sibling.right = inserted;
             } else {
                 rep->sibling.right = Element::kInvalidRepIdx;

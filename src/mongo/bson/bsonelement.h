@@ -455,6 +455,19 @@ namespace mongo {
             }
         }
 
+        struct FieldNameSizeTag {}; // For disambiguation with ctor taking 'maxLen' above.
+
+        /** Construct a BSONElement where you already know the length of the name. The value
+         *  passed here includes the null terminator. The data pointed to by 'd' must not
+         *  represent an EOO. You may pass -1 to indicate that you don't actually know the
+         *  size.
+         */
+        BSONElement(const char* d, int fieldNameSize, FieldNameSizeTag)
+            : data(d)
+            , fieldNameSize_(fieldNameSize) // internal size includes null terminator
+            , totalSize(-1) {
+        }
+
         std::string _asCode() const;
         OpTime _opTime() const;
 
