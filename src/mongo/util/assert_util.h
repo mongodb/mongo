@@ -142,7 +142,8 @@ namespace mongo {
 
         /* true if an interrupted exception - see KillCurrentOp */
         bool interrupted() {
-            return _ei.code == 11600 || _ei.code == 11601;
+            return _ei.code == 11600 || _ei.code == 11601 ||
+                   _ei.code == ErrorCodes::ExceededTimeLimit;
         }
     };
 
