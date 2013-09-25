@@ -36,6 +36,7 @@
 #include "mongo/client/auth_helpers.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/privilege_parser.h"
 #include "mongo/db/auth/user_document_parser.h"
 #include "mongo/db/auth/user_name.h"
@@ -529,6 +530,40 @@ namespace auth {
         return Status::OK();
     }
 
+    /*
+     * Validates that the given privilege BSONArray is valid.
+     * If parsedPrivileges is not NULL, adds to it the privileges parsed out of the input BSONArray.
+     */
+    Status _parseAndValidatePrivilegeArray(const BSONArray& privileges,
+                                           PrivilegeVector* parsedPrivileges) {
+        for (BSONObjIterator it(privileges); it.more(); it.next()) {
+            BSONElement element = *it;
+            if (element.type() != Object) {
+                return Status(ErrorCodes::FailedToParse,
+                              "Elements in privilege arrays must be objects");
+            }
+
+            ParsedPrivilege parsedPrivilege;
+            std::string errmsg;
+            if (!parsedPrivilege.parseBSON(element.Obj(), &errmsg)) {
+                return Status(ErrorCodes::FailedToParse, errmsg);
+            }
+            if (!parsedPrivilege.isValid(&errmsg)) {
+                return Status(ErrorCodes::FailedToParse, errmsg);
+            }
+
+            Privilege privilege;
+            if (!ParsedPrivilege::buildPrivilege(parsedPrivilege, &privilege, &errmsg)) {
+                return Status(ErrorCodes::FailedToParse, errmsg);
+            }
+
+            if (parsedPrivileges) {
+                parsedPrivileges->push_back(privilege);
+            }
+        }
+        return Status::OK();
+    }
+
     Status parseAndValidateCreateRoleCommand(const BSONObj& cmdObj,
                                              const std::string& dbname,
                                              AuthorizationManager* authzManager,
@@ -552,7 +587,7 @@ namespace auth {
 
         BSONObjBuilder roleObjBuilder;
 
-        // Parse user name
+        // Parse role name
         std::string roleName;
         status = bsonExtractStringField(cmdObj, "createRole", &roleName);
         if (!status.isOK()) {
@@ -574,33 +609,9 @@ namespace auth {
         if (!status.isOK()) {
             return status;
         }
-
-        for (BSONObjIterator it(privilegesElement.Obj()); it.more(); it.next()) {
-            BSONElement element = *it;
-            if (element.type() != Object) {
-                return Status(ErrorCodes::FailedToParse,
-                              "Elements in privilege arrays must be objects");
-            }
-
-            ParsedPrivilege privilege;
-            std::string errmsg;
-            if (!privilege.parseBSON(element.Obj(), &errmsg)) {
-                return Status(ErrorCodes::FailedToParse, errmsg);
-            }
-            if (!privilege.isValid(&errmsg)) {
-                return Status(ErrorCodes::FailedToParse, errmsg);
-            }
-
-            // Make sure the actions actually exist.
-            const std::vector<std::string>& actions = privilege.getActions();
-            for (std::vector<std::string>::const_iterator it = actions.begin();
-                    it != actions.end(); ++it) {
-                ActionType action;
-                status = ActionType::parseActionFromString(*it, &action);
-                if (!status.isOK()) {
-                    return status;
-                }
-            }
+        status = _parseAndValidatePrivilegeArray(BSONArray(privilegesElement.Obj()), NULL);
+        if (!status.isOK()) {
+            return status;
         }
         roleObjBuilder.append(privilegesElement);
 
@@ -625,5 +636,50 @@ namespace auth {
         return Status::OK();
     }
 
+    Status parseAndValidateRolePrivilegeManipulationCommands(const BSONObj& cmdObj,
+                                                             const StringData& cmdName,
+                                                             const std::string& dbname,
+                                                             RoleName* parsedRoleName,
+                                                             PrivilegeVector* parsedPrivileges,
+                                                             BSONObj* parsedWriteConcern) {
+        unordered_set<std::string> validFieldNames;
+        validFieldNames.insert(cmdName.toString());
+        validFieldNames.insert("privileges");
+        validFieldNames.insert("writeConcern");
+
+        Status status = _checkNoExtraFields(cmdObj, cmdName, validFieldNames);
+        if (!status.isOK()) {
+            return status;
+        }
+
+        status = _extractWriteConcern(cmdObj, parsedWriteConcern);
+        if (!status.isOK()) {
+            return status;
+        }
+
+        BSONObjBuilder roleObjBuilder;
+
+        // Parse role name
+        std::string roleName;
+        status = bsonExtractStringField(cmdObj, cmdName, &roleName);
+        if (!status.isOK()) {
+            return status;
+        }
+        *parsedRoleName = RoleName(roleName, dbname);
+
+        // Parse privileges
+        BSONElement privilegesElement;
+        status = bsonExtractTypedField(cmdObj, "privileges", Array, &privilegesElement);
+        if (!status.isOK()) {
+            return status;
+        }
+        status = _parseAndValidatePrivilegeArray(BSONArray(privilegesElement.Obj()),
+                                                 parsedPrivileges);
+        if (!status.isOK()) {
+            return status;
+        }
+
+        return Status::OK();
+    }
 } // namespace auth
 } // namespace mongo
