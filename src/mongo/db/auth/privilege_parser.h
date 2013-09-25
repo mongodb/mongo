@@ -25,6 +25,7 @@
 
 namespace mongo {
 
+    class Privilege;
 
     /**
      * This class is used to parse documents describing resources as they are represented as part
@@ -117,6 +118,13 @@ namespace mongo {
 
         ParsedPrivilege();
         ~ParsedPrivilege();
+
+        /**
+         * Takes a parsedPrivilege and turns it into a true Privilege object.
+         */
+        static bool buildPrivilege(const ParsedPrivilege& parsedPrivilege,
+                                   Privilege* result,
+                                   std::string* errmsg);
 
         /** Copies all the fields present in 'this' to 'other'. */
         void cloneTo(ParsedPrivilege* other) const;

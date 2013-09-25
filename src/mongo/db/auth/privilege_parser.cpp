@@ -16,6 +16,9 @@
 
 #include "mongo/db/auth/privilege_parser.h"
 
+#include <string>
+
+#include "mongo/db/auth/privilege.h"
 #include "mongo/db/field_parser.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/util/mongoutils/str.h"
@@ -330,4 +333,51 @@ namespace mongo {
         return _resource;
     }
 
+    bool ParsedPrivilege::buildPrivilege(const ParsedPrivilege& parsedPrivilege,
+                                         Privilege* result,
+                                         std::string* errmsg) {
+        if (!parsedPrivilege.isValid(errmsg)) {
+            return false;
+        }
+
+        // Build actions
+        ActionSet actions;
+        const vector<std::string>& parsedActions = parsedPrivilege.getActions();
+        for (std::vector<std::string>::const_iterator it = parsedActions.begin();
+                it != parsedActions.end(); ++it) {
+            ActionType action;
+            Status status = ActionType::parseActionFromString(*it, &action);
+            if (!status.isOK()) {
+                *errmsg = status.reason();
+                return false;
+            }
+            actions.addAction(action);
+        }
+
+        // Build resource
+        ResourcePattern resource;
+        const ParsedResource& parsedResource = parsedPrivilege.getResource();
+        if (parsedResource.isClusterSet() && parsedResource.getCluster()) {
+            resource = ResourcePattern::forClusterResource();
+        } else {
+            if (parsedResource.isDbSet() && !parsedResource.getDb().empty()) {
+                if (parsedResource.isCollectionSet() && !parsedResource.getCollection().empty()) {
+                    resource = ResourcePattern::forExactNamespace(
+                            NamespaceString(parsedResource.getDb(),
+                                            parsedResource.getCollection()));
+                } else {
+                    resource = ResourcePattern::forDatabaseName(parsedResource.getDb());
+                }
+            } else {
+                if (parsedResource.isCollectionSet() && !parsedResource.getCollection().empty()) {
+                    resource = ResourcePattern::forCollectionName(parsedResource.getCollection());
+                } else {
+                    resource = ResourcePattern::forAnyNormalResource();
+                }
+            }
+        }
+
+        *result = Privilege(resource, actions);
+        return true;
+    }
 } // namespace mongo
