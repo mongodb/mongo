@@ -34,6 +34,7 @@
 #include "mongo/db/index/catalog_hack.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/keypattern.h"
+#include "mongo/db/kill_current_op.h"
 #include "mongo/db/query/cached_plan_runner.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/eof_runner.h"
@@ -47,7 +48,6 @@
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/d_logic.h"
 #include "mongo/s/stale_exception.h"
-#include "mongo/util/fail_point_service.h"
 
 namespace {
 
@@ -99,11 +99,6 @@ namespace mongo {
 
     bool isNewQueryFrameworkEnabled() { return newQueryFrameworkEnabled; }
     void enableNewQueryFramework() { newQueryFrameworkEnabled = true; }
-
-    // Enabling the maxTimeAlwaysTimeOut fail point will cause any query or command run with a
-    // valid non-zero max time to fail immediately.  Any getmore operation on a cursor already
-    // created with a valid non-zero max time will also fail immediately.
-    MONGO_FP_DECLARE(maxTimeAlwaysTimeOut);
 
     /**
      * For a given query, get a runner.  The runner could be a SingleSolutionRunner, a
@@ -259,10 +254,8 @@ namespace mongo {
             // If the operation that spawned this cursor had a time limit set, apply leftover
             // time to this getmore.
             curop.setMaxTimeMicros(cc->getLeftoverMaxTimeMicros());
-            if (MONGO_FAIL_POINT(maxTimeAlwaysTimeOut) && cc->getLeftoverMaxTimeMicros() != 0) {
-                uasserted(ErrorCodes::ExceededTimeLimit,
-                          "operation exceeded time limit [maxTimeAlwaysTimeOut]");
-            }
+            killCurrentOp.checkForInterrupt(); // May trigger maxTimeAlwaysTimeOut fail point.
+
             // TODO:
             // curop.debug().query = BSONForQuery
             // curop.setQuery(curop.debug().query);
@@ -411,10 +404,7 @@ namespace mongo {
 
         // Handle query option $maxTimeMS (not used with commands).
         curop.setMaxTimeMicros(static_cast<unsigned long long>(pq.getMaxTimeMS()) * 1000);
-        if (MONGO_FAIL_POINT(maxTimeAlwaysTimeOut) && pq.getMaxTimeMS() != 0) {
-            uasserted(ErrorCodes::ExceededTimeLimit,
-                      "operation exceeded time limit [maxTimeAlwaysTimeOut]");
-        }
+        killCurrentOp.checkForInterrupt(); // May trigger maxTimeAlwaysTimeOut fail point.
 
         // uassert if we are not on a primary, and not a secondary with SlaveOk query parameter set.
         replVerifyReadsOk(&pq);
