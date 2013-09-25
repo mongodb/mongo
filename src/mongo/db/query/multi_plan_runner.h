@@ -29,7 +29,7 @@
 #pragma once
 
 #include <boost/scoped_ptr.hpp>
-#include <queue>
+#include <deque>
 #include <vector>
 
 #include "mongo/db/exec/working_set.h"
@@ -44,7 +44,7 @@
 
 namespace mongo {
 
-    using std::queue;
+    using std::deque;
     using std::size_t;
     using std::vector;
 
@@ -122,7 +122,7 @@ namespace mongo {
         // The winner of the plan competition...
         scoped_ptr<PlanExecutor> _bestPlan;
         // ...and any results it produced while working toward winning.
-        std::queue<WorkingSetID> _alreadyProduced;
+        std::deque<WorkingSetID> _alreadyProduced;
         // ...and the solution, for caching.
         scoped_ptr<QuerySolution> _bestSolution;
 

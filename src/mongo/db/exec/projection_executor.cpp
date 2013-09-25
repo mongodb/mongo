@@ -64,11 +64,12 @@ namespace mongo {
                 // We can project a field that doesn't exist.  We just ignore it.
                 // UNITTEST 11738048
                 if (wsm->getFieldDotted(fields[i], &elt) && !elt.eoo()) {
-                    bob.append(elt);
+                    // TODO: This fails utterly for dotted fields.  Fix.
+                    bob.appendAs(elt, fields[i]);
                 }
             }
         }
-        else {
+        else if (proj->_excludedFields.size() > 0) {
             // We want stuff NOT in _fields.  This can't be covered, so we expect an obj.
             if (!wsm->hasObj()) {
                 return Status(ErrorCodes::BadValue,

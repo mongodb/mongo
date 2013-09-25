@@ -26,13 +26,13 @@ namespace mongo {
         : _root(root), _indices(indices) { }
 
     PlanEnumerator::~PlanEnumerator() {
-        for (map<size_t, NodeSolution*>::iterator it = memo.begin(); it != memo.end(); ++it) {
+        for (map<size_t, NodeSolution*>::iterator it = _memo.begin(); it != _memo.end(); ++it) {
             delete it->second;
         }
     }
 
     Status PlanEnumerator::init() {
-        inOrderCount = 0;
+        _inOrderCount = 0;
         _done = false;
 
         cout << "enumerator received root: " << _root->toString() << endl;
@@ -45,19 +45,75 @@ namespace mongo {
         // cout << "root post-memo: " << _root->toString() << endl;
 
         cout << "memo dump:\n";
-        for (size_t i = 0; i < inOrderCount; ++i) {
-            cout << "Node #" << i << ": " << memo[i]->toString() << endl;
+        for (size_t i = 0; i < _inOrderCount; ++i) {
+            cout << "Node #" << i << ": " << _memo[i]->toString() << endl;
         }
 
         if (!_done) {
             // Tag with our first solution.
-            tagMemo(nodeToId[_root]);
+            tagMemo(_nodeToId[_root]);
             checkCompound(_root);
         }
 
         return Status::OK();
     }
 
+    bool PlanEnumerator::isCompound(size_t idx) {
+        return (*_indices)[idx].nFields() > 1;
+    }
+
+    string PlanEnumerator::NodeSolution::toString() const {
+        if (NULL != pred) {
+            stringstream ss;
+            ss << "predicate, first indices: [";
+            for (size_t i = 0; i < pred->first.size(); ++i) {
+                ss << pred->first[i];
+                if (i < pred->first.size() - 1)
+                    ss << ", ";
+            }
+            ss << "], notFirst indices: [";
+            for (size_t i = 0; i < pred->notFirst.size(); ++i) {
+                ss << pred->notFirst[i];
+                if (i < pred->notFirst.size() - 1)
+                    ss << ", ";
+            }
+            ss << "], pred: " << pred->expr->toString();
+            return ss.str();
+        }
+        else if (NULL != andSolution) {
+            stringstream ss;
+            ss << "ONE OF: [";
+            for (size_t i = 0; i < andSolution->subnodes.size(); ++i) {
+                const vector<size_t>& sn = andSolution->subnodes[i];
+                ss << "[";
+                for (size_t j = 0; j < sn.size(); ++j) {
+                    ss << sn[j];
+                    if (j < sn.size() - 1)
+                        ss << ", ";
+                }
+                ss << "]";
+                if (i < andSolution->subnodes.size() - 1)
+                    ss << ", ";
+            }
+            ss << "]";
+            return ss.str();
+        }
+        else {
+            verify(NULL != orSolution);
+            stringstream ss;
+            ss << "ALL OF: [";
+            for (size_t i = 0; i < orSolution->subnodes.size(); ++i) {
+                ss << " " << orSolution->subnodes[i];
+            }
+            ss << "]";
+            return ss.str();
+        }
+    }
+
+    /**
+     * This is very expensive if the involved indices/predicates are numerous but
+     * I suspect that's rare.  TODO: revisit on perf pass.
+     */
     void PlanEnumerator::checkCompound(MatchExpression* node) {
         if (MatchExpression::AND == node->matchType()) {
             // Step 1: Find all compound indices.
@@ -67,8 +123,8 @@ namespace mongo {
             for (size_t i = 0; i < node->numChildren(); ++i) {
                 MatchExpression* child = node->getChild(i);
                 if (child->isArray() || child->isLeaf()) {
-                    verify(NULL != memo[nodeToId[child]]);
-                    verify(NULL != memo[nodeToId[child]]->pred);
+                    verify(NULL != _memo[_nodeToId[child]]);
+                    verify(NULL != _memo[_nodeToId[child]]->pred);
                     if (NULL == child->getTag()) {
                         // Not assigned an index.
                         unassigned.push_back(child);
@@ -113,7 +169,7 @@ namespace mongo {
                         }
                         // Index no. childTag->index, the compound index, must be
                         // a member of the notFirst
-                        NodeSolution* soln = memo[nodeToId[unassigned[j]]];
+                        NodeSolution* soln = _memo[_nodeToId[unassigned[j]]];
                         verify(NULL != soln);
                         verify(NULL != soln->pred);
                         verify(unassigned[j] == soln->pred->expr);
@@ -153,26 +209,25 @@ namespace mongo {
 
         _root->resetTag();
         _done = true;
-        //if (nextMemo(_root)) { _done = true; }
         return true;
     }
 
     bool PlanEnumerator::prepMemo(MatchExpression* node) {
         if (node->isLeaf() || node->isArray()) {
             // TODO: This is done for everything, maybe have NodeSolution* newMemo(node)?
-            size_t myID = inOrderCount++;
-            nodeToId[node] = myID;
+            size_t myID = _inOrderCount++;
+            _nodeToId[node] = myID;
             NodeSolution* soln = new NodeSolution();
-            memo[nodeToId[node]] = soln;
+            _memo[_nodeToId[node]] = soln;
 
-            curEnum[myID] = 0;
+            _curEnum[myID] = 0;
 
             // Fill out the NodeSolution.
             soln->pred.reset(new PredicateSolution());
             if (NULL != node->getTag()) {
                 RelevantTag* rt = static_cast<RelevantTag*>(node->getTag());
-                soln->pred->first = rt->first;
-                soln->pred->notFirst = rt->notFirst;
+                soln->pred->first.swap(rt->first);
+                soln->pred->notFirst.swap(rt->notFirst);
             }
             soln->pred->expr = node;
             // There's no guarantee that we can use any of the notFirst indices, so we only claim to
@@ -189,14 +244,14 @@ namespace mongo {
                     }
                 }
 
-                size_t myID = inOrderCount++;
-                nodeToId[node] = myID;
+                size_t myID = _inOrderCount++;
+                _nodeToId[node] = myID;
                 NodeSolution* soln = new NodeSolution();
-                memo[nodeToId[node]] = soln;
+                _memo[_nodeToId[node]] = soln;
 
                 OrSolution* orSolution = new OrSolution();
                 for (size_t i = 0; i < node->numChildren(); ++i) {
-                    orSolution->subnodes.push_back(nodeToId[node->getChild(i)]);
+                    orSolution->subnodes.push_back(_nodeToId[node->getChild(i)]);
                 }
                 soln->orSolution.reset(orSolution);
                 return indexed;
@@ -213,18 +268,18 @@ namespace mongo {
                     // If AND requires an index it can only piggyback on the children that have indices.
                     if (prepMemo(node->getChild(i))) {
                         vector<size_t> option;
-                        option.push_back(nodeToId[node->getChild(i)]);
+                        option.push_back(_nodeToId[node->getChild(i)]);
                         andSolution->subnodes.push_back(option);
                     }
                 }
 
-                size_t myID = inOrderCount++;
-                nodeToId[node] = myID;
+                size_t myID = _inOrderCount++;
+                _nodeToId[node] = myID;
                 NodeSolution* soln = new NodeSolution();
-                memo[nodeToId[node]] = soln;
+                _memo[_nodeToId[node]] = soln;
 
                 verify(MatchExpression::AND == node->matchType());
-                curEnum[myID] = 0;
+                _curEnum[myID] = 0;
 
                 // Takes ownership.
                 soln->andSolution.reset(andSolution);
@@ -234,7 +289,7 @@ namespace mongo {
     }
 
     void PlanEnumerator::tagMemo(size_t id) {
-        NodeSolution* soln = memo[id];
+        NodeSolution* soln = _memo[id];
         verify(NULL != soln);
 
         if (NULL != soln->pred) {
@@ -244,8 +299,8 @@ namespace mongo {
                 // We only assign indices that can be used without any other predicate.
                 // Compound is dealt with in the AND processing; there must be an AND to use
                 // a notFirst index..
-                verify(curEnum[id] < soln->pred->first.size());
-                soln->pred->expr->setTag(new IndexTag(soln->pred->first[curEnum[id]]));
+                verify(_curEnum[id] < soln->pred->first.size());
+                soln->pred->expr->setTag(new IndexTag(soln->pred->first[_curEnum[id]]));
             }
         }
         else if (NULL != soln->orSolution) {
@@ -257,8 +312,8 @@ namespace mongo {
         }
         else {
             verify(NULL != soln->andSolution);
-            verify(curEnum[id] < soln->andSolution->subnodes.size());
-            vector<size_t> &cur = soln->andSolution->subnodes[curEnum[id]];
+            verify(_curEnum[id] < soln->andSolution->subnodes.size());
+            vector<size_t> &cur = soln->andSolution->subnodes[_curEnum[id]];
 
             for (size_t i = 0; i < cur.size(); ++i) {
                 // Tag the child.

@@ -71,21 +71,51 @@ namespace mongo {
         // Match expression we're planning for. Not owned by us.
         MatchExpression* _root;
 
+        // Indices we're allowed to enumerate with.
         const vector<BSONObj>* _indices;
 
         //
         // Memoization strategy
         //
 
-        bool isCompound(size_t idx) {
-            return (*_indices)[idx].nFields() > 1;
-        }
+        /**
+         * Traverses the match expression and generates the memo structure from it.
+         * Returns true if the provided node uses an index, false otherwise.
+         */
+        bool prepMemo(MatchExpression* node);
 
+        /**
+         * Returns true if index #idx is compound, false otherwise.
+         */
+        bool isCompound(size_t idx);
+
+        /**
+         * When we assign indices to nodes, we only assign indices to predicates that are 'first'
+         * indices (the predicate is over the first field in the index).
+         *
+         * If an assigned index is compound, checkCompound looks for predicates that are over fields
+         * in the compound index.
+         */
         void checkCompound(MatchExpression* node);
 
-        // Returns true if node uses an index.
-        bool prepMemo(MatchExpression* node);
+        /**
+         * Traverses the memo structure and annotates the tree with IndexTags for the chosen
+         * indices.
+         */
         void tagMemo(size_t id);
+
+        /**
+         * Move to the next enumeration state.  Enumeration state is stored in curEnum.
+         *
+         * Returns true if the memo subtree with root 'node' has no further enumeration states.  In this
+         * case, that subtree restarts its enumeration at the beginning state.  This implies that
+         * the parent of node should move to the next state.  If 'node' is the root of the tree,
+         * we are done with enumeration.
+         *
+         * Returns false if the memo subtree has moved to the next state.
+         *
+         * XXX implement.
+         */
         bool nextMemo(size_t id);
 
         struct PredicateSolution {
@@ -109,80 +139,29 @@ namespace mongo {
             scoped_ptr<PredicateSolution> pred;
             scoped_ptr<AndSolution> andSolution;
             scoped_ptr<OrSolution> orSolution;
-
-            string toString() const {
-                if (NULL != pred) {
-                    stringstream ss;
-                    ss << "predicate, first indices: [";
-                    for (size_t i = 0; i < pred->first.size(); ++i) {
-                        ss << pred->first[i];
-                        if (i < pred->first.size() - 1)
-                            ss << ", ";
-                    }
-                    ss << "], notFirst indices: [";
-                    for (size_t i = 0; i < pred->notFirst.size(); ++i) {
-                        ss << pred->notFirst[i];
-                        if (i < pred->notFirst.size() - 1)
-                            ss << ", ";
-                    }
-                    ss << "], pred: " << pred->expr->toString();
-                    return ss.str();
-                }
-                else if (NULL != andSolution) {
-                    stringstream ss;
-                    ss << "ONE OF: [";
-                    for (size_t i = 0; i < andSolution->subnodes.size(); ++i) {
-                        const vector<size_t>& sn = andSolution->subnodes[i];
-                        ss << "[";
-                        for (size_t j = 0; j < sn.size(); ++j) {
-                            ss << sn[j];
-                            if (j < sn.size() - 1)
-                                ss << ", ";
-                        }
-                        ss << "]";
-                        if (i < andSolution->subnodes.size() - 1)
-                            ss << ", ";
-                    }
-                    ss << "]";
-                    return ss.str();
-                }
-                else {
-                    verify(NULL != orSolution);
-                    stringstream ss;
-                    ss << "ALL OF: [";
-                    for (size_t i = 0; i < orSolution->subnodes.size(); ++i) {
-                        ss << " " << orSolution->subnodes[i];
-                    }
-                    ss << "]";
-                    return ss.str();
-                }
-            }
+            string toString() const;
         };
 
         // Memoization
 
         // Used to label nodes in the order in which we visit in a post-order traversal.
-        size_t inOrderCount;
+        size_t _inOrderCount;
 
         // Map from node to its order/ID.
-        map<MatchExpression*, size_t> nodeToId;
+        map<MatchExpression*, size_t> _nodeToId;
 
         // Map from order/ID to a memoized solution.
-        map<size_t, NodeSolution*> memo;
+        map<size_t, NodeSolution*> _memo;
 
         // Enumeration
 
         // ANDs count through clauses, PREDs count through indices.
         // Index is order/ID.
         // Value is whatever counter that node needs.
-        map<size_t, size_t> curEnum;
+        map<size_t, size_t> _curEnum;
 
-        // return true if hit the end of the subtree rooted at 'node'.
-        //
-        // implies either that the next node in parent must increment (if internal node), or if
-        // root, that enum is done.
-        bool nextEnum(MatchExpression* node);
-
+        // If true, there are no further enumeration states, and getNext should return false.
+        // We could be _done immediately after init if we're unable to output an indexed plan.
         bool _done;
     };
 

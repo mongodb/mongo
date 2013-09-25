@@ -81,14 +81,20 @@ namespace mongo {
                 else {
                     verify(dataObj.isOwned());
                     interval = makePointInterval(dataObj);
-                    exact = true;
+                    if (dataObj.firstElement().isNull()) {
+                        exact = false;
+                    }
+                    else {
+                        exact = true;
+                    }
                 }
             }
             else if (MatchExpression::LTE == expr->matchType()) {
                 const LTEMatchExpression* node = static_cast<const LTEMatchExpression*>(expr);
+                BSONElement dataElt = node->getData();
                 BSONObjBuilder bob;
-                bob.appendMinKey("");
-                bob.append(node->getData());
+                bob.appendMinForType("", dataElt.type());
+                bob.append(dataElt);
                 BSONObj dataObj = bob.obj();
                 verify(dataObj.isOwned());
                 interval = makeRangeInterval(dataObj, true, true);
@@ -96,9 +102,10 @@ namespace mongo {
             }
             else if (MatchExpression::LT == expr->matchType()) {
                 const LTMatchExpression* node = static_cast<const LTMatchExpression*>(expr);
+                BSONElement dataElt = node->getData();
                 BSONObjBuilder bob;
-                bob.appendMinKey("");
-                bob.append(node->getData());
+                bob.appendMinForType("", dataElt.type());
+                bob.append(dataElt);
                 BSONObj dataObj = bob.obj();
                 verify(dataObj.isOwned());
                 interval = makeRangeInterval(dataObj, true, false);
@@ -106,9 +113,10 @@ namespace mongo {
             }
             else if (MatchExpression::GT == expr->matchType()) {
                 const GTMatchExpression* node = static_cast<const GTMatchExpression*>(expr);
+                BSONElement dataElt = node->getData();
                 BSONObjBuilder bob;
                 bob.append(node->getData());
-                bob.appendMaxKey("");
+                bob.appendMaxForType("", dataElt.type());
                 BSONObj dataObj = bob.obj();
                 verify(dataObj.isOwned());
                 interval = makeRangeInterval(dataObj, false, true);
@@ -116,9 +124,11 @@ namespace mongo {
             }
             else if (MatchExpression::GTE == expr->matchType()) {
                 const GTEMatchExpression* node = static_cast<const GTEMatchExpression*>(expr);
+                BSONElement dataElt = node->getData();
+
                 BSONObjBuilder bob;
-                bob.append(node->getData());
-                bob.appendMaxKey("");
+                bob.append(dataElt);
+                bob.appendMaxForType("", dataElt.type());
                 BSONObj dataObj = bob.obj();
                 verify(dataObj.isOwned());
                 interval = makeRangeInterval(dataObj, true, true);
