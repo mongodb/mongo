@@ -63,6 +63,7 @@ namespace mongo {
 
     std::string sysInfo();
     void printSysInfo();
+    void printTargetMinOS();
     void printAllocator();
 
     void show_warnings();
