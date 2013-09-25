@@ -275,7 +275,6 @@ namespace auth {
         }
 
         BSONObjBuilder userObjBuilder;
-        userObjBuilder.append("_id", OID::gen());
 
         // Parse user name
         std::string userName;
@@ -289,6 +288,7 @@ namespace auth {
             return Status(ErrorCodes::BadValue, "Cannot create users in the local database");
         }
 
+        userObjBuilder.append("_id", dbname + "." + userName);
         userObjBuilder.append(AuthorizationManager::USER_NAME_FIELD_NAME, userName);
         userObjBuilder.append(AuthorizationManager::USER_SOURCE_FIELD_NAME, dbname);
 
@@ -551,7 +551,6 @@ namespace auth {
         }
 
         BSONObjBuilder roleObjBuilder;
-        roleObjBuilder.append("_id", OID::gen());
 
         // Parse user name
         std::string roleName;
@@ -565,6 +564,7 @@ namespace auth {
             return Status(ErrorCodes::BadValue, "Cannot create roles in the local database");
         }
 
+        roleObjBuilder.append("_id", dbname + "." + roleName);
         roleObjBuilder.append(AuthorizationManager::ROLE_NAME_FIELD_NAME, roleName);
         roleObjBuilder.append(AuthorizationManager::ROLE_SOURCE_FIELD_NAME, dbname);
 
