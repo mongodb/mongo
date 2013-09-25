@@ -227,6 +227,7 @@ namespace mongo {
 
             intrusive_ptr<ExpressionContext> pCtx =
                 new ExpressionContext(InterruptStatusMongod::status, NamespaceString(ns));
+            pCtx->tempDir = dbpath + "/_tmp";
 
             /* try to parse the command; if this fails, then we didn't run */
             intrusive_ptr<Pipeline> pPipeline = Pipeline::parseCommand(errmsg, cmdObj, pCtx);

@@ -57,7 +57,6 @@
 #include "mongo/util/bufreader.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
-#include "mongo/util/paths.h"
 
 namespace mongo {
     namespace sorter {
@@ -455,7 +454,7 @@ namespace mongo {
 
                 sort();
 
-                SortedFileWriter<Key, Value> writer(_settings);
+                SortedFileWriter<Key, Value> writer(_opts, _settings);
                 for ( ; !_data.empty(); _data.pop_front()) {
                     writer.addAlreadySorted(_data.front().first, _data.front().second);
                 }
@@ -721,7 +720,7 @@ namespace mongo {
                 sort();
                 updateCutoff();
 
-                SortedFileWriter<Key, Value> writer(_settings);
+                SortedFileWriter<Key, Value> writer(_opts, _settings);
                 for (size_t i=0; i<_data.size(); i++) {
                     writer.addAlreadySorted(_data[i].first, _data[i].second);
                 }
@@ -763,21 +762,24 @@ namespace mongo {
 
 
     template <typename Key, typename Value>
-    SortedFileWriter<Key, Value>::SortedFileWriter(const Settings& settings)
+    SortedFileWriter<Key, Value>::SortedFileWriter(const SortOptions& opts,
+                                                   const Settings& settings)
         : _settings(settings)
     {
         // This should be checked by consumers, but if we get here don't allow writes.
         massert(16946, "Attempting to use external sort from mongos. This is not allowed.",
                 !cmdLine.isMongos());
 
+        massert(17148, "Attempting to use external sort without setting SortOptions::tempDir",
+                !opts.tempDir.empty());
+
         {
             StringBuilder sb;
-            // TODO use tmpPath rather than dbpath/_tmp
-            sb << dbpath << "/_tmp" << "/extsort." << sorter::nextFileNumber();
+            sb << opts.tempDir << "/extsort." << sorter::nextFileNumber();
             _fileName = sb.str();
         }
 
-        boost::filesystem::create_directories(dbpath + "/_tmp/");
+        boost::filesystem::create_directories(opts.tempDir);
 
         _file.open(_fileName.c_str(), ios::binary | ios::out);
         massert(16818, str::stream() << "error opening file \"" << _fileName << "\": "
@@ -855,6 +857,9 @@ namespace mongo {
         // This should be checked by consumers, but if it isn't try to fail early.
         massert(16947, "Attempting to use external sort from mongos. This is not allowed.",
                 !(cmdLine.isMongos() && opts.extSortAllowed));
+
+        massert(17149, "Attempting to use external sort without setting SortOptions::tempDir",
+                !(opts.extSortAllowed && opts.tempDir.empty()));
 
         switch (opts.limit) {
             case 0:  return new sorter::NoLimitSorter<Key, Value, Comparator>(opts, comp, settings);

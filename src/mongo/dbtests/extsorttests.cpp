@@ -24,6 +24,7 @@
 #include "mongo/db/sorter/sorter.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/platform/cstdint.h"
+#include "mongo/unittest/temp_dir.h"
 
 // Need access to internal classes
 #include "mongo/db/sorter/sorter.cpp"
@@ -554,8 +555,10 @@ namespace ExtSortTests {
     class SortedFileWriterAndFileIteratorTests {
     public:
         void run() {
+            unittest::TempDir tempDir("sortedFileWriterTests");
+            const SortOptions opts = SortOptions().TempDir(tempDir.path());
             { // small
-                SortedFileWriter<IntWrapper, IntWrapper> sorter;
+                SortedFileWriter<IntWrapper, IntWrapper> sorter(opts);
                 sorter.addAlreadySorted(0,0);
                 sorter.addAlreadySorted(1,-1);
                 sorter.addAlreadySorted(2,-2);
@@ -565,13 +568,15 @@ namespace ExtSortTests {
                                             make_shared<IntIterator>(0,5));
             }
             { // big
-                SortedFileWriter<IntWrapper, IntWrapper> sorter;
+                SortedFileWriter<IntWrapper, IntWrapper> sorter(opts);
                 for (int i=0; i< 10*1000*1000; i++)
                     sorter.addAlreadySorted(i,-i);
 
                 ASSERT_ITERATORS_EQUIVALENT(boost::shared_ptr<IWIterator>(sorter.done()),
                                             make_shared<IntIterator>(0,10*1000*1000));
             }
+
+            ASSERT(boost::filesystem::is_empty(tempDir.path()));
         }
     };
 
@@ -639,28 +644,29 @@ namespace ExtSortTests {
             virtual ~Basic() {}
 
             void run() {
+                unittest::TempDir tempDir("sorterTests");
+                const SortOptions opts = SortOptions().TempDir(tempDir.path());
+
                 { // test empty (no limit)
-                    ASSERT_ITERATORS_EQUIVALENT(done(makeSorter()),
+                    ASSERT_ITERATORS_EQUIVALENT(done(makeSorter(opts)),
                                                 make_shared<EmptyIterator>());
                 }
                 { // test empty (limit 1)
-                    ASSERT_ITERATORS_EQUIVALENT(done(makeSorter(SortOptions().Limit(1))),
+                    ASSERT_ITERATORS_EQUIVALENT(done(makeSorter(SortOptions(opts).Limit(1))),
                                                 make_shared<EmptyIterator>());
                 }
                 { // test empty (limit 10)
-                    ASSERT_ITERATORS_EQUIVALENT(done(makeSorter(SortOptions().Limit(10))),
+                    ASSERT_ITERATORS_EQUIVALENT(done(makeSorter(SortOptions(opts).Limit(10))),
                                                 make_shared<EmptyIterator>());
                 }
 
                 { // test all data ASC
-                    boost::shared_ptr<IWSorter> sorter = makeSorter(SortOptions(),
-                                                                    IWComparator(ASC));
+                    boost::shared_ptr<IWSorter> sorter = makeSorter(opts, IWComparator(ASC));
                     addData(sorter);
                     ASSERT_ITERATORS_EQUIVALENT(done(sorter), correct());
                 }
                 { // test all data DESC
-                    boost::shared_ptr<IWSorter> sorter = makeSorter(SortOptions(),
-                                                                    IWComparator(DESC));
+                    boost::shared_ptr<IWSorter> sorter = makeSorter(opts, IWComparator(DESC));
                     addData(sorter);
                     ASSERT_ITERATORS_EQUIVALENT(done(sorter), correctReverse());
                 }
@@ -670,8 +676,8 @@ namespace ExtSortTests {
 #if !(defined(_MSC_VER) && defined(_DEBUG))
                 { // merge all data ASC
                     boost::shared_ptr<IWSorter> sorters[] = {
-                        makeSorter(SortOptions(), IWComparator(ASC)),
-                        makeSorter(SortOptions(), IWComparator(ASC))
+                        makeSorter(opts, IWComparator(ASC)),
+                        makeSorter(opts, IWComparator(ASC))
                     };
 
                     addData(sorters[0]);
@@ -684,8 +690,8 @@ namespace ExtSortTests {
                 }
                 { // merge all data DESC and use multiple threads to insert
                     boost::shared_ptr<IWSorter> sorters[] = {
-                        makeSorter(SortOptions(), IWComparator(DESC)),
-                        makeSorter(SortOptions(), IWComparator(DESC))
+                        makeSorter(opts, IWComparator(DESC)),
+                        makeSorter(opts, IWComparator(DESC))
                     };
 
                     boost::thread inBackground(&Basic::addData, this, sorters[0]);
@@ -698,6 +704,7 @@ namespace ExtSortTests {
                                                 mergeIterators(iters2, DESC));
                 }
 #endif
+                ASSERT(boost::filesystem::is_empty(tempDir.path()));
             }
 
             // add data to the sorter
@@ -727,7 +734,7 @@ namespace ExtSortTests {
         private:
 
             // Make a new sorter with desired opts and comp. Opts may be ignored but not comp
-            boost::shared_ptr<IWSorter> makeSorter(SortOptions opts=SortOptions(),
+            boost::shared_ptr<IWSorter> makeSorter(SortOptions opts,
                                                    IWComparator comp=IWComparator(ASC)) {
                 return boost::shared_ptr<IWSorter>(IWSorter::make(adjustSortOptions(opts), comp));
             }

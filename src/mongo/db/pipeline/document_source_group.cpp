@@ -457,7 +457,7 @@ namespace mongo {
 
         stable_sort(ptrs.begin(), ptrs.end(), SpillSTLComparator());
 
-        SortedFileWriter<Value, Value> writer;
+        SortedFileWriter<Value, Value> writer(SortOptions().TempDir(pExpCtx->tempDir));
         switch (vpAccumulatorFactory.size()) { // same as ptrs[i]->second.size() for all i.
         case 0: // no values, essentially a distinct
             for (size_t i=0; i < ptrs.size(); i++) {

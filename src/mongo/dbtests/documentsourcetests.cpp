@@ -105,7 +105,7 @@ namespace DocumentSourceTests {
         public:
             Base()
                 : _ctx(new ExpressionContext(InterruptStatusMongod::status, NamespaceString(ns)))
-            {}
+            { _ctx->tempDir = dbpath + "/_tmp"; }
         protected:
             void createSource() {
                 Client::ReadContext ctx (ns);
@@ -411,6 +411,7 @@ namespace DocumentSourceTests {
                 intrusive_ptr<ExpressionContext> expressionContext =
                         new ExpressionContext(InterruptStatusMongod::status, NamespaceString(ns));
                 expressionContext->inShard = inShard;
+                expressionContext->tempDir = dbpath + "/_tmp";
 
                 _group = DocumentSourceGroup::createFromBson( &specElement, expressionContext );
                 assertRoundTrips( _group );
