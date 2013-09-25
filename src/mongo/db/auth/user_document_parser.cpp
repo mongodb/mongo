@@ -26,7 +26,7 @@
 *    it in the license file.
 */
 
-#include "mongo/db/auth/privilege_document_parser.h"
+#include "mongo/db/auth/user_document_parser.h"
 
 #include <string>
 
@@ -80,12 +80,12 @@ namespace {
         return Status::OK();
     }
 
-    std::string V1PrivilegeDocumentParser::extractUserNameFromPrivilegeDocument(
+    std::string V1UserDocumentParser::extractUserNameFromUserDocument(
             const BSONObj& doc) const {
         return doc[AuthorizationManager::V1_USER_NAME_FIELD_NAME].str();
     }
 
-    Status V1PrivilegeDocumentParser::initializeUserCredentialsFromPrivilegeDocument(
+    Status V1UserDocumentParser::initializeUserCredentialsFromUserDocument(
             User* user, const BSONObj& privDoc) const {
         User::CredentialData credentials;
         if (privDoc.hasField(AuthorizationManager::PASSWORD_FIELD_NAME)) {
@@ -110,7 +110,7 @@ namespace {
         return Status::OK();
     }
 
-    void _initializeUserRolesFromV0PrivilegeDocument(
+    void _initializeUserRolesFromV0UserDocument(
             User* user, const BSONObj& privDoc, const StringData& dbname) {
         bool readOnly = privDoc["readOnly"].trueValue();
         if (dbname == "admin") {
@@ -153,12 +153,12 @@ namespace {
         return Status::OK();
     }
 
-    Status _initializeUserRolesFromV1PrivilegeDocument(
+    Status _initializeUserRolesFromV1UserDocument(
                 User* user, const BSONObj& privDoc, const StringData& dbname) {
 
         if (!privDoc[READONLY_FIELD_NAME].eoo()) {
             return Status(ErrorCodes::UnsupportedFormat,
-                          "Privilege documents may not contain both \"readonly\" and "
+                          "User documents may not contain both \"readonly\" and "
                           "\"roles\" fields");
         }
 
@@ -202,14 +202,14 @@ namespace {
         return Status::OK();
     }
 
-    Status V1PrivilegeDocumentParser::initializeUserRolesFromPrivilegeDocument(
+    Status V1UserDocumentParser::initializeUserRolesFromUserDocument(
             User* user, const BSONObj& privDoc, const StringData& dbname) const {
         if (!privDoc.hasField("roles")) {
-            _initializeUserRolesFromV0PrivilegeDocument(user, privDoc, dbname);
+            _initializeUserRolesFromV0UserDocument(user, privDoc, dbname);
         } else {
-            return _initializeUserRolesFromV1PrivilegeDocument(user, privDoc, dbname);
+            return _initializeUserRolesFromV1UserDocument(user, privDoc, dbname);
         }
-        // TODO(spencer): dassert that if you have a V0 or V1 privilege document that the _version
+        // TODO(spencer): dassert that if you have a V0 or V1 user document that the _version
         // of the system is 1.
         return Status::OK();
     }
@@ -261,7 +261,7 @@ namespace {
         return Status::OK();
     }
 
-    Status V2PrivilegeDocumentParser::checkValidPrivilegeDocument(const BSONObj& doc) const {
+    Status V2UserDocumentParser::checkValidUserDocument(const BSONObj& doc) const {
         BSONElement userElement = doc[AuthorizationManager::USER_NAME_FIELD_NAME];
         BSONElement userSourceElement = doc[AuthorizationManager::USER_SOURCE_FIELD_NAME];
         BSONElement credentialsElement = doc[CREDENTIALS_FIELD_NAME];
@@ -317,12 +317,12 @@ namespace {
         return Status::OK();
     }
 
-    std::string V2PrivilegeDocumentParser::extractUserNameFromPrivilegeDocument(
+    std::string V2UserDocumentParser::extractUserNameFromUserDocument(
             const BSONObj& doc) const {
         return doc[AuthorizationManager::USER_NAME_FIELD_NAME].str();
     }
 
-    Status V2PrivilegeDocumentParser::initializeUserCredentialsFromPrivilegeDocument(
+    Status V2UserDocumentParser::initializeUserCredentialsFromUserDocument(
             User* user, const BSONObj& privDoc) const {
         User::CredentialData credentials;
         std::string userSource = privDoc[AuthorizationManager::USER_SOURCE_FIELD_NAME].String();
@@ -330,7 +330,7 @@ namespace {
         if (!credentialsElement.eoo()) {
             if (credentialsElement.type() != Object) {
                 return Status(ErrorCodes::UnsupportedFormat,
-                              "'credentials' field in privilege documents must be an object");
+                              "'credentials' field in user documents must be an object");
             }
             BSONElement mongoCRCredentialElement =
                     credentialsElement.Obj()[MONGODB_CR_CREDENTIAL_FIELD_NAME];
@@ -345,7 +345,7 @@ namespace {
                 }
             } else {
                 return Status(ErrorCodes::UnsupportedFormat,
-                              "Privilege documents must provide credentials for MONGODB-CR"
+                              "User documents must provide credentials for MONGODB-CR"
                               " authentication");
             }
         }
@@ -361,7 +361,7 @@ namespace {
         return Status::OK();
     }
 
-    Status V2PrivilegeDocumentParser::checkValidRoleObject(
+    Status V2UserDocumentParser::checkValidRoleObject(
             const BSONObj& roleObject, bool hasPossessionBools) const {
         BSONElement roleNameElement = roleObject[ROLE_NAME_FIELD_NAME];
         BSONElement roleSourceElement = roleObject[ROLE_SOURCE_FIELD_NAME];
@@ -407,7 +407,7 @@ namespace {
         return Status::OK();
     }
 
-    Status V2PrivilegeDocumentParser::initializeUserRolesFromPrivilegeDocument(
+    Status V2UserDocumentParser::initializeUserRolesFromUserDocument(
             User* user, const BSONObj& privDoc, const StringData&) const {
 
         BSONElement rolesElement = privDoc[ROLES_FIELD_NAME];

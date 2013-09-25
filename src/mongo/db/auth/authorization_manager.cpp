@@ -40,9 +40,9 @@
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/authz_documents_update_guard.h"
 #include "mongo/db/auth/privilege.h"
-#include "mongo/db/auth/privilege_document_parser.h"
 #include "mongo/db/auth/role_graph.h"
 #include "mongo/db/auth/user.h"
+#include "mongo/db/auth/user_document_parser.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/auth/user_name_hash.h"
 #include "mongo/db/jsobj.h"
@@ -106,9 +106,9 @@ namespace mongo {
         boost::lock_guard<boost::mutex> lk(_lock);
 
         if (version == 1) {
-            _parser.reset(new V1PrivilegeDocumentParser());
+            _parser.reset(new V1UserDocumentParser());
         } else if (version == 2) {
-            _parser.reset(new V2PrivilegeDocumentParser());
+            _parser.reset(new V2UserDocumentParser());
         } else {
             return Status(ErrorCodes::UnsupportedFormat,
                           mongoutils::str::stream() <<
@@ -211,7 +211,7 @@ namespace mongo {
 
     Status AuthorizationManager::_initializeUserFromPrivilegeDocument(
             User* user, const BSONObj& privDoc) {
-        std::string userName = _parser->extractUserNameFromPrivilegeDocument(privDoc);
+        std::string userName = _parser->extractUserNameFromUserDocument(privDoc);
         if (userName != user->getName().getUser()) {
             return Status(ErrorCodes::BadValue,
                           mongoutils::str::stream() << "User name from privilege document \""
@@ -222,11 +222,11 @@ namespace mongo {
                           0);
         }
 
-        Status status = _parser->initializeUserCredentialsFromPrivilegeDocument(user, privDoc);
+        Status status = _parser->initializeUserCredentialsFromUserDocument(user, privDoc);
         if (!status.isOK()) {
             return status;
         }
-        status = _parser->initializeUserRolesFromPrivilegeDocument(user,
+        status = _parser->initializeUserRolesFromUserDocument(user,
                                                                  privDoc,
                                                                  user->getName().getDB());
         if (!status.isOK()) {
@@ -382,7 +382,7 @@ namespace mongo {
     Status AuthorizationManager::_initializeAllV1UserData() {
         boost::lock_guard<boost::mutex> lk(_lock);
         _invalidateUserCache_inlock();
-        V1PrivilegeDocumentParser parser;
+        V1UserDocumentParser parser;
 
         try {
             std::vector<std::string> dbNames;
@@ -428,13 +428,13 @@ namespace mongo {
                     }
 
                     if (source == dbname || source == "$external") {
-                        status = parser.initializeUserCredentialsFromPrivilegeDocument(user,
-                                                                                       privDoc);
+                        status = parser.initializeUserCredentialsFromUserDocument(user,
+                                                                                  privDoc);
                         if (!status.isOK()) {
                             return status;
                         }
                     }
-                    status = parser.initializeUserRolesFromPrivilegeDocument(user, privDoc, dbname);
+                    status = parser.initializeUserRolesFromUserDocument(user, privDoc, dbname);
                     if (!status.isOK()) {
                         return status;
                     }

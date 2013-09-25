@@ -26,7 +26,7 @@
 *    it in the license file.
 */
 
-#include "mongo/db/commands/user_management_commands_parser.h"
+#include "mongo/db/auth/user_management_commands_parser.h"
 
 #include <string>
 #include <vector>
@@ -36,9 +36,9 @@
 #include "mongo/client/auth_helpers.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
-#include "mongo/db/auth/privilege_document_parser.h"
+#include "mongo/db/auth/privilege_parser.h"
+#include "mongo/db/auth/user_document_parser.h"
 #include "mongo/db/auth/user_name.h"
-#include "mongo/db/commands/privilege_parser.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/platform/unordered_set.h"
 #include "mongo/util/mongoutils/str.h"
@@ -215,7 +215,7 @@ namespace auth {
                 }
             } else if (element.type() == Object) {
                 // Check that the role object is valid
-                V2PrivilegeDocumentParser parser;
+                V2UserDocumentParser parser;
                 BSONObj roleObj = element.Obj();
                 Status status = parser.checkValidRoleObject(roleObj, includePossessionBools);
                 if (!status.isOK()) {
@@ -345,8 +345,8 @@ namespace auth {
         *parsedUserObj = userObjBuilder.obj();
 
         // Make sure document to insert is valid
-        V2PrivilegeDocumentParser parser;
-        status = parser.checkValidPrivilegeDocument(*parsedUserObj);
+        V2UserDocumentParser parser;
+        status = parser.checkValidUserDocument(*parsedUserObj);
         if (!status.isOK()) {
             return status;
         }

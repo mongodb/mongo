@@ -24,7 +24,7 @@
 #include "mongo/db/auth/authz_manager_external_state_mock.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/cmdline.h"
-#include "mongo/db/commands/user_management_commands_parser.h"
+#include "mongo/db/auth/user_management_commands_parser.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/unittest/unittest.h"
 
