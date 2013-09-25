@@ -46,7 +46,7 @@
 
 namespace mongo {
 
-    class PrivilegeDocumentParser;
+    class UserDocumentParser;
 
     /**
      * Internal secret key info.
@@ -326,7 +326,7 @@ namespace mongo {
         /**
          * Used for parsing privilege documents.  Set whenever _version is set.  Guarded by _lock.
          */
-        scoped_ptr<PrivilegeDocumentParser> _parser;
+        scoped_ptr<UserDocumentParser> _parser;
 
         scoped_ptr<AuthzManagerExternalState> _externalState;
 

@@ -37,59 +37,59 @@
 namespace mongo {
 
     /**
-     * Interface for class used to initialize User objects from their privilege documents.
+     * Interface for class used to initialize User objects from their system.users documents.
      */
-    class PrivilegeDocumentParser {
-        MONGO_DISALLOW_COPYING(PrivilegeDocumentParser);
+    class UserDocumentParser {
+        MONGO_DISALLOW_COPYING(UserDocumentParser);
     public:
-        PrivilegeDocumentParser() {};
-        virtual ~PrivilegeDocumentParser() {};
+        UserDocumentParser() {};
+        virtual ~UserDocumentParser() {};
 
         /**
-         * Returns the name of the user in the given privilege document.
+         * Returns the name of the user in the given user document.
          */
-        virtual std::string extractUserNameFromPrivilegeDocument(const BSONObj& doc) const = 0;
+        virtual std::string extractUserNameFromUserDocument(const BSONObj& doc) const = 0;
 
         /**
          * Parses privDoc and initializes the user's "credentials" field with the credential
-         * information extracted from the privilege document.
+         * information extracted from the user document.
          */
-        virtual Status initializeUserCredentialsFromPrivilegeDocument(
+        virtual Status initializeUserCredentialsFromUserDocument(
                 User* user, const BSONObj& privDoc) const = 0;
 
         /**
          * Parses privDoc and initializes the user's "roles" field with the role list extracted
-         * from the privilege document.
+         * from the user document.
          */
-        virtual Status initializeUserRolesFromPrivilegeDocument(
+        virtual Status initializeUserRolesFromUserDocument(
                 User* user, const BSONObj& privDoc, const StringData& dbname) const = 0;
 
     };
 
-    class V1PrivilegeDocumentParser : public PrivilegeDocumentParser {
-        MONGO_DISALLOW_COPYING(V1PrivilegeDocumentParser);
+    class V1UserDocumentParser : public UserDocumentParser {
+        MONGO_DISALLOW_COPYING(V1UserDocumentParser);
     public:
 
-        V1PrivilegeDocumentParser() {}
-        virtual ~V1PrivilegeDocumentParser() {}
+        V1UserDocumentParser() {}
+        virtual ~V1UserDocumentParser() {}
 
-        virtual std::string extractUserNameFromPrivilegeDocument(const BSONObj& doc) const;
+        virtual std::string extractUserNameFromUserDocument(const BSONObj& doc) const;
 
-        virtual Status initializeUserCredentialsFromPrivilegeDocument(User* user,
-                                                                      const BSONObj& privDoc) const;
+        virtual Status initializeUserCredentialsFromUserDocument(User* user,
+                                                                 const BSONObj& privDoc) const;
 
-        virtual Status initializeUserRolesFromPrivilegeDocument(
+        virtual Status initializeUserRolesFromUserDocument(
                         User* user, const BSONObj& privDoc, const StringData& dbname) const;
     };
 
-    class V2PrivilegeDocumentParser : public PrivilegeDocumentParser {
-        MONGO_DISALLOW_COPYING(V2PrivilegeDocumentParser);
+    class V2UserDocumentParser : public UserDocumentParser {
+        MONGO_DISALLOW_COPYING(V2UserDocumentParser);
     public:
 
-        V2PrivilegeDocumentParser() {}
-        virtual ~V2PrivilegeDocumentParser() {}
+        V2UserDocumentParser() {}
+        virtual ~V2UserDocumentParser() {}
 
-        Status checkValidPrivilegeDocument(const BSONObj& doc) const;
+        Status checkValidUserDocument(const BSONObj& doc) const;
 
         /**
          * Returns Status::OK() iff the given BSONObj describes a valid element from a roles array.
@@ -98,12 +98,12 @@ namespace mongo {
          */
         Status checkValidRoleObject(const BSONObj& roleObject, bool hasPossessionBools) const;
 
-        virtual std::string extractUserNameFromPrivilegeDocument(const BSONObj& doc) const;
+        virtual std::string extractUserNameFromUserDocument(const BSONObj& doc) const;
 
-        virtual Status initializeUserCredentialsFromPrivilegeDocument(User* user,
-                                                                      const BSONObj& privDoc) const;
+        virtual Status initializeUserCredentialsFromUserDocument(User* user,
+                                                                 const BSONObj& privDoc) const;
 
-        virtual Status initializeUserRolesFromPrivilegeDocument(
+        virtual Status initializeUserRolesFromUserDocument(
                         User* user, const BSONObj& privDoc, const StringData& unused) const;
     };
 

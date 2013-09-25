@@ -14,7 +14,7 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "mongo/db/commands/privilege_parser.h"
+#include "mongo/db/auth/privilege_parser.h"
 
 #include "mongo/db/field_parser.h"
 #include "mongo/db/namespace_string.h"
