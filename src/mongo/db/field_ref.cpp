@@ -128,11 +128,17 @@ namespace mongo {
 
         // Fixup the parts to refer to the new string
         std::string::const_iterator where = _dotted.begin();
+        const std::string::const_iterator end = _dotted.end();
         for (size_t i = 0; i != _size; ++i) {
             StringData& part = (i < kReserveAhead) ? _fixed[i] : _variable[getIndex(i)];
             const size_t size = part.size();
             part = StringData(&*where, size);
-            where += (size + 1); // account for '.'
+            where += size;
+            // skip over '.' unless we are at the end.
+            if (where != end) {
+                dassert(*where == '.');
+                ++where;
+            }
         }
 
         // Drop any replacements
