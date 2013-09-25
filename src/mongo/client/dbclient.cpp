@@ -568,9 +568,15 @@ namespace mongo {
             uassertStatusOK(bsonExtractStringField(params,
                                                    saslCommandUserFieldName,
                                                    &user));
- 
+
             uassert(ErrorCodes::AuthenticationFailed,
-                    "Username \"" + user + "\" does not match the provided client certificate user \"" +
+                    "Please enable SSL on the client-side to use the MONGODB-X509 "
+                    "authentication mechanism.",
+                    getSSLManager() != NULL);
+
+            uassert(ErrorCodes::AuthenticationFailed,
+                    "Username \"" + user + 
+                    "\" does not match the provided client certificate user \"" +
                     getSSLManager()->getClientSubjectName() + "\"",
                     user ==  getSSLManager()->getClientSubjectName());
  
