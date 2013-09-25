@@ -9,13 +9,13 @@ t.save( {a:'foo'} );
 t.ensureIndex( {a:1} );
 
 function checkScanMatch( query, nscannedObjects, n ) {
- 	var count = t.find( query ).hint( {a:1} ).itcount();
-    assert.eq( n, count );
- 	//var e = t.find( query ).hint( {a:1} ).explain();
+ 	var e = t.find( query ).hint( {a:1} ).explain();
     // NOTE The nscannedObjects values aren't necessarily optimal currently,
     // we're just checking current behavior here.
-    //assert.eq( nscannedObjects, e.nscannedObjects );
-    //assert.eq( n, e.n );
+    /* NEW QUERY EXPLAIN
+    assert.eq( nscannedObjects, e.nscannedObjects );
+    */
+    assert.eq( n, e.n );
 }
 
 checkScanMatch( {a:/o/}, 1, 1 );
@@ -56,17 +56,18 @@ checkScanMatch( {$and:[{a:1,$where:'this.a==1'}]}, 1, 1 );
 checkScanMatch( {a:1,$and:[{a:1},{a:1,$where:'this.a==1'}]}, 1, 1 );
 
 function checkImpossibleMatch( query ) {
+    // NEW QUERY EXPLAIN: updated to use itcount
     var count = t.find( query ).itcount();
     assert.eq( 0, count );
-
-    /*
-    assert.eq( 0, e.n );
+    /* NEW QUERY EXPLAIN
     assert.eq( 'BasicCursor', e.cursor );
     */
 }
 
 // With a single key index, all bounds are utilized.
-//QE assert.eq( [[1,1]], t.find( {$and:[{a:1}]} ).explain().indexBounds.a );
-//QE assert.eq( [[1,1]], t.find( {a:1,$and:[{a:1}]} ).explain().indexBounds.a );
+/* NEW QUERY EXPLAIN
+assert.eq( [[1,1]], t.find( {$and:[{a:1}]} ).explain().indexBounds.a );
+assert.eq( [[1,1]], t.find( {a:1,$and:[{a:1}]} ).explain().indexBounds.a );
+*/
 checkImpossibleMatch( {a:1,$and:[{a:2}]} );
 checkImpossibleMatch( {$and:[{a:1},{a:2}]} );
