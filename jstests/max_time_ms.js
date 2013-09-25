@@ -6,64 +6,6 @@ var cursor;
 var res;
 
 //
-// Tests for maxTimeAlwaysTimeOut fail point.
-//
-
-// Fail point positive test for command.
-t.drop();
-assert.eq(1, t.getDB().adminCommand({configureFailPoint: "maxTimeAlwaysTimeOut",
-                                     mode: "alwaysOn"}).ok);
-res = t.runCommand({ping:1, maxTimeMS:10*1000});
-assert(res.ok == 0 && res.code == exceededTimeLimit,
-       "expected command to trigger maxTimeAlwaysTimeOut fail point, ok=" + res.ok + ", code="
-           + res.code);
-
-// Fail point negative test for command.
-t.drop();
-assert.eq(1, t.getDB().adminCommand({configureFailPoint: "maxTimeAlwaysTimeOut", mode: "off"}).ok);
-res = t.runCommand({ping:1, maxTimeMS:10*1000});
-assert(res.ok == 1,
-       "expected command to not trigger maxTimeAlwaysTimeOut fail point, ok=" + res.ok
-           + ", code=" + res.code);
-
-// Fail point positive test for query.
-t.drop();
-assert.eq(1, t.getDB().adminCommand({configureFailPoint: "maxTimeAlwaysTimeOut",
-                                     mode: "alwaysOn"}).ok);
-assert.throws(function() { t.find().maxTimeMS(10*1000).itcount(); },
-              [],
-              "expected query to trigger maxTimeAlwaysTimeOut fail point");
-
-// Fail point negative test for query.
-t.drop();
-assert.eq(1, t.getDB().adminCommand({configureFailPoint: "maxTimeAlwaysTimeOut", mode: "off"}).ok);
-assert.doesNotThrow(function() { t.find().maxTimeMS(10*1000).itcount(); },
-                    [],
-                    "expected query to not trigger maxTimeAlwaysTimeOut fail point");
-
-// Fail point positive test for getmore.
-t.drop();
-t.insert([{},{},{}]);
-assert.eq(1, t.getDB().adminCommand({configureFailPoint: "maxTimeAlwaysTimeOut", mode: "off"}).ok);
-cursor = t.find().maxTimeMS(10*1000).batchSize(2);
-assert.doesNotThrow.automsg(function() { cursor.next(); cursor.next(); });
-assert.eq(1, t.getDB().adminCommand({configureFailPoint: "maxTimeAlwaysTimeOut",
-                                     mode: "alwaysOn"}).ok);
-assert.throws(function() { cursor.next(); },
-              [],
-              "expected getmore to trigger maxTimeAlwaysTimeOut fail point");
-
-// Fail point negative test for getmore.
-t.drop();
-t.insert([{},{},{}]);
-assert.eq(1, t.getDB().adminCommand({configureFailPoint: "maxTimeAlwaysTimeOut", mode: "off"}).ok);
-cursor = t.find().maxTimeMS(10*1000).batchSize(2);
-assert.doesNotThrow.automsg(function() { cursor.next(); cursor.next(); });
-assert.doesNotThrow(function() { cursor.next(); },
-                    [],
-                    "expected getmore to not trigger maxTimeAlwaysTimeOut fail point");
-
-//
 // Simple positive test for query: a ~300ms query with a 100ms time limit should be aborted.
 //
 
@@ -262,3 +204,82 @@ assert.eq(0, cursor.next().ok);
 cursor = t.getDB().$cmd.find({ping: 1}).limit(-1).maxTimeMS(0);
 cursor._ensureSpecial();
 assert.eq(0, cursor.next().ok);
+
+//
+// Tests for fail points maxTimeAlwaysTimeOut and maxTimeNeverTimeOut.
+//
+
+// maxTimeAlwaysTimeOut positive test for command.
+t.drop();
+assert.eq(1, t.getDB().adminCommand({configureFailPoint: "maxTimeAlwaysTimeOut",
+                                     mode: "alwaysOn"}).ok);
+res = t.getDB().runCommand({ping: 1, maxTimeMS: 10*1000});
+assert(res.ok == 0 && res.code == exceededTimeLimit,
+       "expected command to trigger maxTimeAlwaysTimeOut fail point, ok=" + res.ok + ", code="
+           + res.code);
+assert.eq(1, t.getDB().adminCommand({configureFailPoint: "maxTimeAlwaysTimeOut", mode: "off"}).ok);
+
+// maxTimeNeverTimeOut positive test for command.
+t.drop();
+assert.eq(1, t.getDB().adminCommand({configureFailPoint: "maxTimeNeverTimeOut",
+                                     mode: "alwaysOn"}).ok);
+res = t.getDB().adminCommand({sleep: 1, millis: 300, maxTimeMS: 100});
+assert(res.ok == 1,
+       "expected command to trigger maxTimeNeverTimeOut fail point, ok=" + res.ok + ", code="
+           + res.code);
+assert.eq(1, t.getDB().adminCommand({configureFailPoint: "maxTimeNeverTimeOut", mode: "off"}).ok);
+
+// maxTimeAlwaysTimeOut positive test for query.
+t.drop();
+assert.eq(1, t.getDB().adminCommand({configureFailPoint: "maxTimeAlwaysTimeOut",
+                                     mode: "alwaysOn"}).ok);
+assert.throws(function() { t.find().maxTimeMS(10*1000).itcount(); },
+              [],
+              "expected query to trigger maxTimeAlwaysTimeOut fail point");
+assert.eq(1, t.getDB().adminCommand({configureFailPoint: "maxTimeAlwaysTimeOut", mode: "off"}).ok);
+
+// maxTimeNeverTimeOut positive test for query.
+assert.eq(1, t.getDB().adminCommand({configureFailPoint: "maxTimeNeverTimeOut",
+                                     mode: "alwaysOn"}).ok);
+t.drop();
+t.insert([{},{},{}]);
+cursor = t.find({$where: function() { sleep(100); return true; }});
+cursor.maxTimeMS(100);
+assert.doesNotThrow(function() { cursor.itcount(); },
+                    [],
+                    "expected query to trigger maxTimeNeverTimeOut fail point");
+assert.eq(1, t.getDB().adminCommand({configureFailPoint: "maxTimeNeverTimeOut", mode: "off"}).ok);
+
+// maxTimeAlwaysTimeOut positive test for getmore.
+t.drop();
+t.insert([{},{},{}]);
+cursor = t.find().maxTimeMS(10*1000).batchSize(2);
+assert.doesNotThrow.automsg(function() { cursor.next(); cursor.next(); });
+assert.eq(1, t.getDB().adminCommand({configureFailPoint: "maxTimeAlwaysTimeOut",
+                                     mode: "alwaysOn"}).ok);
+assert.throws(function() { cursor.next(); },
+              [],
+              "expected getmore to trigger maxTimeAlwaysTimeOut fail point");
+assert.eq(1, t.getDB().adminCommand({configureFailPoint: "maxTimeAlwaysTimeOut", mode: "off"}).ok);
+
+// maxTimeNeverTimeOut positive test for getmore.
+t.drop();
+t.insert([{},{},{}]); // fast batch
+t.insert([{slow: true},{slow: true},{slow: true}]); // slow batch
+cursor = t.find({$where: function() {
+    if (this.slow) {
+        sleep(2*1000);
+    }
+    return true;
+}});
+cursor.batchSize(3);
+cursor.maxTimeMS(2*1000);
+assert.doesNotThrow(function() { cursor.next(); cursor.next(); cursor.next(); },
+                    [],
+                    "expected batch 1 (query) to not hit the time limit");
+assert.eq(1, t.getDB().adminCommand({configureFailPoint: "maxTimeNeverTimeOut",
+                                     mode: "alwaysOn"}).ok);
+assert.doesNotThrow(function() { cursor.next(); cursor.next(); cursor.next(); },
+                    [],
+                    "expected batch 2 (getmore) to trigger maxTimeNeverTimeOut fail point");
+assert.eq(1, t.getDB().adminCommand({configureFailPoint: "maxTimeNeverTimeOut", mode: "off"}).ok);

@@ -351,6 +351,9 @@ namespace mongo {
             /** Disables the time limit. */
             void reset();
 
+            /** Returns whether or not the time limit is enabled. */
+            bool isEnabled() { return _enabled; }
+
             /**
              * Enables the time limit to be "durationMicros" microseconds from "startEpochMicros"
              * (units of microseconds since the epoch).

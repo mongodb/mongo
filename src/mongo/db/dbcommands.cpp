@@ -77,8 +77,6 @@
 
 namespace mongo {
 
-    extern FailPoint maxTimeAlwaysTimeOut;
-
     /* reset any errors so that getlasterror comes back clean.
 
        useful before performing a long series of operations where we want to
@@ -2080,11 +2078,11 @@ namespace mongo {
 
         client.curop()->setMaxTimeMicros(static_cast<unsigned long long>(maxTimeMS.getValue())
                                          * 1000);
-        if (MONGO_FAIL_POINT(maxTimeAlwaysTimeOut) && maxTimeMS.getValue() != 0) {
-            appendCommandStatus(result, Status(ErrorCodes::ExceededTimeLimit,
-                                               "exception: operation exceeded time limit "
-                                                   "[maxTimeAlwaysTimeOut]",
-                                               0));
+        try {
+            killCurrentOp.checkForInterrupt(); // May trigger maxTimeAlwaysTimeOut fail point.
+        }
+        catch (UserException& e) {
+            appendCommandStatus(result, e.toStatus());
             return;
         }
 

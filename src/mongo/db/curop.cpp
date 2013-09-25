@@ -33,8 +33,22 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/database.h"
 #include "mongo/db/kill_current_op.h"
+#include "mongo/util/fail_point_service.h"
 
 namespace mongo {
+
+    // Enabling the maxTimeAlwaysTimeOut fail point will cause any query or command run with a valid
+    // non-zero max time to fail immediately.  Any getmore operation on a cursor already created
+    // with a valid non-zero max time will also fail immediately.
+    //
+    // This fail point cannot be used with the maxTimeNeverTimeOut fail point.
+    MONGO_FP_DECLARE(maxTimeAlwaysTimeOut);
+
+    // Enabling the maxTimeNeverTimeOut fail point will cause the server to never time out any
+    // query, command, or getmore operation, regardless of whether a max time is set.
+    //
+    // This fail point cannot be used with the maxTimeAlwaysTimeOut fail point.
+    MONGO_FP_DECLARE(maxTimeNeverTimeOut);
 
     // todo : move more here
 
@@ -280,6 +294,12 @@ namespace mongo {
     }
 
     bool CurOp::maxTimeHasExpired() {
+        if (MONGO_FAIL_POINT(maxTimeNeverTimeOut)) {
+            return false;
+        }
+        if (_maxTimeTracker.isEnabled() && MONGO_FAIL_POINT(maxTimeAlwaysTimeOut)) {
+            return true;
+        }
         return _maxTimeTracker.checkTimeLimit();
     }
 
