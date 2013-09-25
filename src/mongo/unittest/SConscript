@@ -2,7 +2,7 @@
 
 Import("env")
 
-env.StaticLibrary("unittest", ['unittest.cpp'],
+env.StaticLibrary("unittest", ['unittest.cpp', 'temp_dir.cpp'],
                   LIBDEPS=['$BUILD_DIR/mongo/foundation'])
 
 env.StaticLibrary("unittest_main", ['unittest_main.cpp'],
@@ -14,3 +14,4 @@ env.StaticLibrary("unittest_crutch", ['crutch.cpp'])
 
 env.CppUnitTest('unittest_test', 'unittest_test.cpp')
 env.CppUnitTest('fixture_test', 'fixture_test.cpp')
+env.CppUnitTest('temp_dir_test', 'temp_dir_test.cpp')
