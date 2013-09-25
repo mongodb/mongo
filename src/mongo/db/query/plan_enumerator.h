@@ -21,15 +21,13 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
 #include "mongo/db/query/canonical_query.h"
-#include "mongo/db/query/predicate_map.h"
+#include "mongo/db/query/index_tag.h"
 
 namespace mongo {
 
     /**
      * Provides elements from the power set of possible indices to use.  Uses the available
      * predicate information to make better decisions about what indices are best.
-     *
-     * TODO: Use stats about indices.
      */
     class PlanEnumerator {
         MONGO_DISALLOW_COPYING(PlanEnumerator);
@@ -41,9 +39,8 @@ namespace mongo {
          *
          * Does not take ownership of any arguments.  They must outlive any calls to getNext(...).
          */
-        PlanEnumerator(MatchExpression* root,
-                       const PredicateMap* pm,
-                       const vector<BSONObj>* indices);
+        PlanEnumerator(MatchExpression* root, const vector<BSONObj>* indices);
+        ~PlanEnumerator();
 
         /**
          * Returns OK and performs a sanity check on the input parameters and prepares the
@@ -74,46 +71,119 @@ namespace mongo {
         // Match expression we're planning for. Not owned by us.
         MatchExpression* _root;
 
-        // A map from a field name into the nodes of the match expression that can be solved
-        // using indices (and which ones). Not owned by us.
-        const PredicateMap& _pm;
-
-        // Index pattern of the indices mentined in '_pm'. Not owned by us.
-        const std::vector<BSONObj>& _indices;
+        const vector<BSONObj>* _indices;
 
         //
-        // Enumeration Strategies
+        // Memoization strategy
         //
 
-        //
-        // Legacy strategy.
-        //
-        // The legacy strategy assigns the absolute fewest number of indices require to satisfy a
-        // query.  Some predicates require an index (GEO_NEAR and TEXT).  Each branch of an OR requires
-        // an index.
-        //
+        bool isCompound(size_t idx) {
+            return (*_indices)[idx].nFields() > 1;
+        }
 
-        // Which leaves require an index?
-        vector<MatchExpression*> _leavesRequireIndex;
+        void checkCompound(MatchExpression* node);
 
-        // For each leaf, a counter of which index we've assigned so far.
-        vector<size_t> _assignedCounter;
+        // Returns true if node uses an index.
+        bool prepMemo(MatchExpression* node);
+        void tagMemo(size_t id);
+        bool nextMemo(size_t id);
 
-        // Are we done with the legacy strategy?
+        struct PredicateSolution {
+            vector<size_t> first;
+            vector<size_t> notFirst;
+            // Not owned here.
+            MatchExpression* expr;
+        };
+
+        struct AndSolution {
+            // Must use one of the elements of subnodes.
+            vector<vector<size_t> > subnodes;
+        };
+
+        struct OrSolution {
+            // Must use all of subnodes.
+            vector<size_t> subnodes;
+        };
+
+        struct NodeSolution {
+            scoped_ptr<PredicateSolution> pred;
+            scoped_ptr<AndSolution> andSolution;
+            scoped_ptr<OrSolution> orSolution;
+
+            string toString() const {
+                if (NULL != pred) {
+                    stringstream ss;
+                    ss << "predicate, first indices: [";
+                    for (size_t i = 0; i < pred->first.size(); ++i) {
+                        ss << pred->first[i];
+                        if (i < pred->first.size() - 1)
+                            ss << ", ";
+                    }
+                    ss << "], notFirst indices: [";
+                    for (size_t i = 0; i < pred->notFirst.size(); ++i) {
+                        ss << pred->notFirst[i];
+                        if (i < pred->notFirst.size() - 1)
+                            ss << ", ";
+                    }
+                    ss << "], pred: " << pred->expr->toString();
+                    return ss.str();
+                }
+                else if (NULL != andSolution) {
+                    stringstream ss;
+                    ss << "ONE OF: [";
+                    for (size_t i = 0; i < andSolution->subnodes.size(); ++i) {
+                        const vector<size_t>& sn = andSolution->subnodes[i];
+                        ss << "[";
+                        for (size_t j = 0; j < sn.size(); ++j) {
+                            ss << sn[j];
+                            if (j < sn.size() - 1)
+                                ss << ", ";
+                        }
+                        ss << "]";
+                        if (i < andSolution->subnodes.size() - 1)
+                            ss << ", ";
+                    }
+                    ss << "]";
+                    return ss.str();
+                }
+                else {
+                    verify(NULL != orSolution);
+                    stringstream ss;
+                    ss << "ALL OF: [";
+                    for (size_t i = 0; i < orSolution->subnodes.size(); ++i) {
+                        ss << " " << orSolution->subnodes[i];
+                    }
+                    ss << "]";
+                    return ss.str();
+                }
+            }
+        };
+
+        // Memoization
+
+        // Used to label nodes in the order in which we visit in a post-order traversal.
+        size_t inOrderCount;
+
+        // Map from node to its order/ID.
+        map<MatchExpression*, size_t> nodeToId;
+
+        // Map from order/ID to a memoized solution.
+        map<size_t, NodeSolution*> memo;
+
+        // Enumeration
+
+        // ANDs count through clauses, PREDs count through indices.
+        // Index is order/ID.
+        // Value is whatever counter that node needs.
+        map<size_t, size_t> curEnum;
+
+        // return true if hit the end of the subtree rooted at 'node'.
+        //
+        // implies either that the next node in parent must increment (if internal node), or if
+        // root, that enum is done.
+        bool nextEnum(MatchExpression* node);
+
         bool _done;
-
-        /**
-         * Fill out _leavesRequireIndex such that each OR clause and each index-requiring leaf has
-         * an index.  If there are no OR clauses, we use only one index.
-         */
-        bool prepLegacyStrategy(MatchExpression* root);
-
-        /**
-         * Does the provided node have any indices that can be used to answer it?
-         */
-        bool hasIndexAvailable(MatchExpression* node);
-
-        // XXX TODO: Add a dump() or toString() for legacy strategy.
     };
 
 } // namespace mongo

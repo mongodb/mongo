@@ -16,12 +16,15 @@
 
 #pragma once
 
+#include <vector>
+
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/matcher/expression.h"
 
+
 namespace mongo {
 
-    // XXX
+    // output from enumerator to query planner
     class IndexTag : public MatchExpression::TagData {
     public:
         static const size_t kNoIndex;
@@ -41,6 +44,33 @@ namespace mongo {
 
         // What index should we try to use for this leaf?
         size_t index;
+    };
+
+    // used internally
+    class RelevantTag : public MatchExpression::TagData {
+    public:
+        RelevantTag() { }
+
+        std::vector<size_t> first;
+        std::vector<size_t> notFirst;
+
+        virtual void debugString(StringBuilder* builder) const {
+            *builder << "First: ";
+            for (size_t i = 0; i < first.size(); ++i) {
+                *builder << first[i] << " ";
+            }
+            *builder << "notFirst: ";
+            for (size_t i = 0; i < notFirst.size(); ++i) {
+                *builder << notFirst[i] << " ";
+            }
+        }
+
+        virtual MatchExpression::TagData* clone() const {
+            RelevantTag* ret = new RelevantTag();
+            ret->first = first;
+            ret->notFirst = first;
+            return ret;
+        }
     };
 
     /**

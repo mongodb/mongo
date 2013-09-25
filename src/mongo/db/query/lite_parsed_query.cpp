@@ -185,6 +185,16 @@ namespace mongo {
                         // it.
                         _hint = e.wrap();
                     }
+
+                    // Sigh, you can hint {$natural:1} and it really means that you want to sort
+                    // like that.
+                    if (!_hint.isEmpty()) {
+                        BSONElement elt = _hint.firstElement();
+                        if (str::equals("$natural", elt.fieldName())) {
+                            _sort = _hint;
+                        }
+                        _hint = BSONObj();
+                    }
                 }
                 else if (str::equals("returnKey", name)) {
                     // Won't throw.

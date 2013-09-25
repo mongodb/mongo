@@ -40,6 +40,7 @@ namespace mongo {
      * An ordered list of intervals for one field.
      */
     struct OrderedIntervalList {
+        OrderedIntervalList() { }
         OrderedIntervalList(const string& n) : name(n) { }
 
         // Must be ordered according to the index order.
@@ -64,8 +65,28 @@ namespace mongo {
          * field, intersect.  Otherwise, add it to the right location in 'fields'.
          */
         void joinAnd(const OrderedIntervalList& oil, const BSONObj& keyPattern) {
-            // XXX XXX
-            verify(0);
+            // cout << "merging oil " << oil.name << " with bounds: " << toString() << endl;
+            // Only disjoint OILs are handled right now.
+            for (size_t i = 0; i < fields.size(); ++i) {
+                if (oil.name == fields[i].name) {
+                    warning() << "Have not implemented OIL-OIL merging yet.";
+                    verify(0);
+                }
+            }
+
+            // Figure out our position in 'fields' from 'keyPattern'
+            size_t pos = 0;
+            BSONObjIterator it(keyPattern);
+            while (it.more() && it.next().fieldName() != oil.name) ++pos;
+            if (pos > fields.size()) {
+                fields.resize(pos);
+            }
+            else {
+                verify("" == fields[pos].name);
+            }
+
+            // XXX: must check later that we fill out adjacent fields.
+            fields[pos] = oil;
         }
 
         /**

@@ -327,6 +327,15 @@ namespace {
         cout << indexedSolution->toString() << endl;
     }
 
+    TEST_F(SingleIndexTest, OrWithoutEnoughIndices) {
+        setIndex(BSON("a" << 1));
+        runQuery(fromjson("{$or: [ {a: 20}, {b: 21}]}"));
+        ASSERT_EQUALS(getNumSolutions(), 1U);
+        QuerySolution* collScanSolution;
+        getPlanByType(STAGE_COLLSCAN, &collScanSolution);
+        cout << collScanSolution->toString() << endl;
+    }
+
     TEST_F(SingleIndexTest, OrWithAndChild) {
         setIndex(BSON("a" << 1));
         runQuery(fromjson("{$or: [ {a: 20}, {$and: [{a:1}, {b:7}]}]}"));
@@ -399,6 +408,34 @@ namespace {
 
         QuerySolution* indexedSolution;
         getPlanByType(STAGE_FETCH, &indexedSolution);
+    }
+
+    //
+    // Basic compound
+    //
+
+    TEST_F(SingleIndexTest, BasicCompound) {
+        setIndex(BSON("x" << 1 << "y" << 1));
+        runQuery(fromjson("{ x : 5, y: 10}"));
+        ASSERT_EQUALS(getNumSolutions(), 2U);
+
+        QuerySolution* collScanSolution;
+        getPlanByType(STAGE_COLLSCAN, &collScanSolution);
+
+        QuerySolution* indexedSolution;
+        getPlanByType(STAGE_FETCH, &indexedSolution);
+    }
+
+    TEST_F(SingleIndexTest, CompoundMissingField) {
+        setIndex(BSON("x" << 1 << "y" << 1 << "z" << 1));
+        runQuery(fromjson("{ x : 5, z: 10}"));
+        ASSERT_EQUALS(getNumSolutions(), 2U);
+    }
+
+    TEST_F(SingleIndexTest, CompoundFieldsOrder) {
+        setIndex(BSON("x" << 1 << "y" << 1 << "z" << 1));
+        runQuery(fromjson("{ x : 5, z: 10, y:1}"));
+        ASSERT_EQUALS(getNumSolutions(), 2U);
     }
 
     // STOPPED HERE - need to hook up machinery for multiple indexed predicates

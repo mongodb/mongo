@@ -76,13 +76,3 @@ env.CppUnitTest(
         "query_planner",
     ],
 )
-
-env.CppUnitTest(
-    target="plan_enumerator_test",
-    source=[
-        "plan_enumerator_test.cpp"
-    ],
-    LIBDEPS=[
-        "query_planner",
-    ],
-)
