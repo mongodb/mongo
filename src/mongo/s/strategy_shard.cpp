@@ -126,21 +126,34 @@ namespace mongo {
                 throw;
             }
 
-            if( cursor->isSharded() ){
-                ShardedClientCursorPtr cc (new ShardedClientCursor( q , cursor ));
+            set<Shard> shards;
+            cursor->getQueryShards( shards );
 
-                BufBuilder buffer( ShardedClientCursor::INIT_REPLY_BUFFER_SIZE );
-                int docCount = 0;
-                const int startFrom = cc->getTotalSent();
-                bool hasMore = cc->sendNextBatch( r, q.ntoreturn, buffer, docCount );
+            if( cursor->isSharded()){
+                if(shards.size() == 1) { // only one shard is used, this logic is same as what we dit for unsharded collection
+                    LOG(5) << "only one shard is used for sharded collection " << endl;
+                    scoped_ptr<ParallelSortClusteredCursor> cursorDeleter( cursor );
+                    DBClientCursorPtr shardCursor = cursor->getShardCursor( *shards.begin() );
+                    r.reply( *(shardCursor->getMessage()) , shardCursor->originalHost() );
+                    shardCursor->decouple();
 
-                if ( hasMore ) {
-                    LOG(5) << "storing cursor : " << cc->getId() << endl;
-                    cursorCache.store( cc );
+                }else { //more than one shard is used
+                    ShardedClientCursorPtr cc (new ShardedClientCursor( q , cursor ));
+
+                    BufBuilder buffer( ShardedClientCursor::INIT_REPLY_BUFFER_SIZE );
+                    int docCount = 0;
+                    const int startFrom = cc->getTotalSent();
+                    bool hasMore = cc->sendNextBatch( r, q.ntoreturn, buffer, docCount );
+
+                    if ( hasMore ) {                                                                                                                                                                            
+                        LOG(5) << "storing cursor : " << cc->getId() << endl;
+                        cursorCache.store( cc );
+                    }
+
+                    replyToQuery( 0, r.p(), r.m(), buffer.buf(), buffer.len(), docCount,
+                            startFrom, hasMore ? cc->getId() : 0 );
+
                 }
-
-                replyToQuery( 0, r.p(), r.m(), buffer.buf(), buffer.len(), docCount,
-                        startFrom, hasMore ? cc->getId() : 0 );
             }
             else{
                 // Remote cursors are stored remotely, we shouldn't need this around.

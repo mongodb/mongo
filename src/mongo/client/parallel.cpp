@@ -834,12 +834,6 @@ namespace mongo {
 
         verify( todo.size() );
 
-        if(todo.size() == 1){
-            LOG( pc ) << "only one shard is used! reset manager and primary " << endl;                                                                                                                                                  
-            manager.reset();
-            primary.reset( new Shard( *todo.begin() ) );
-        }
-
         LOG( pc ) << "initializing over " << todo.size()
             << " shards required by " << vinfo << endl;
 
@@ -909,7 +903,7 @@ namespace mongo {
 
                     // Do a sharded query if this is not a primary shard *and* this is a versioned query,
                     // or if the number of shards to query is > 1
-                    if( ( isVersioned() && ! primary ) || _qShards.size() > 1 ){
+                    if( ( isVersioned() && !primary && todo.size() > 1) || _qShards.size() > 1 ){
 
                         state->cursor.reset( new DBClientCursor( state->conn->get(), ns, _qSpec.query(),
                                                                  isCommand() ? 1 : 0, // nToReturn (0 if query indicates multi)
