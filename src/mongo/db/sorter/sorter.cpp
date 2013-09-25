@@ -766,6 +766,8 @@ namespace mongo {
                                                    const Settings& settings)
         : _settings(settings)
     {
+        namespace str = mongoutils::str;
+
         // This should be checked by consumers, but if we get here don't allow writes.
         massert(16946, "Attempting to use external sort from mongos. This is not allowed.",
                 !cmdLine.isMongos());
@@ -803,6 +805,8 @@ namespace mongo {
 
     template <typename Key, typename Value>
     void SortedFileWriter<Key, Value>::spill() {
+        namespace str = mongoutils::str;
+
         if (_buffer.len() == 0)
             return;
 
