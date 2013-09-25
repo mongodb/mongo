@@ -32,6 +32,7 @@
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/base/disallow_copying.h"
+#include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/role_name.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/jsobj.h"
@@ -121,6 +122,18 @@ namespace auth {
                                              AuthorizationManager* authzManager,
                                              BSONObj* parsedRoleObj,
                                              BSONObj* parsedWriteConcern);
+
+    /**
+     * Takes a command object describing an invocation of the "grantPrivilegesToRole" or
+     * "revokePrivilegesFromRole" commands, and parses out the role name of the
+     * role being modified, the privileges being granted or revoked, and the write concern to use.
+     */
+    Status parseAndValidateRolePrivilegeManipulationCommands(const BSONObj& cmdObj,
+                                                             const StringData& cmdName,
+                                                             const std::string& dbname,
+                                                             RoleName* parsedRoleName,
+                                                             PrivilegeVector* parsedPrivileges,
+                                                             BSONObj* parsedWriteConcern);
 
 } // namespace auth
 } // namespace mongo
