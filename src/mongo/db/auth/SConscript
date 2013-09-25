@@ -30,7 +30,9 @@ env.StaticLibrary('authcore', ['action_set.cpp',
 
 env.StaticLibrary('usercommandsparser', ['user_management_commands_parser.cpp',
                                          'privilege_parser.cpp'],
-                  LIBDEPS=['authcore', '$BUILD_DIR/mongo/mongocommon'])
+                  LIBDEPS=['authcore',
+                           '$BUILD_DIR/mongo/mongocommon',
+                           '$BUILD_DIR/mongo/db/common'])
 
 
 env.StaticLibrary('authservercommon',
@@ -57,6 +59,9 @@ env.StaticLibrary('authmocks',
                            '$BUILD_DIR/mongo/expressions'])
 
 env.CppUnitTest('action_set_test', 'action_set_test.cpp', LIBDEPS=['authcore'])
+env.CppUnitTest('privilege_parser_test', 'privilege_parser_test.cpp',
+                LIBDEPS=['usercommandsparser'],
+                NO_CRUTCH=True)
 env.CppUnitTest('role_graph_test', 'role_graph_test.cpp', LIBDEPS=['authcore'])
 env.CppUnitTest('user_document_parser_test', 'user_document_parser_test.cpp', LIBDEPS=['authcore'])
 env.CppUnitTest('user_set_test', 'user_set_test.cpp', LIBDEPS=['authcore'])
