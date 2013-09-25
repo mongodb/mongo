@@ -22,218 +22,253 @@
 
 namespace mongo {
 
-    PlanEnumerator::PlanEnumerator(MatchExpression* root,
-                                   const PredicateMap* pm,
-                                   const vector<BSONObj>* indices)
-        : _root(root)
-        , _pm(*pm)
-        , _indices(*indices) {}
+    PlanEnumerator::PlanEnumerator(MatchExpression* root, const vector<BSONObj>* indices)
+        : _root(root), _indices(indices) { }
+
+    PlanEnumerator::~PlanEnumerator() {
+        for (map<size_t, NodeSolution*>::iterator it = memo.begin(); it != memo.end(); ++it) {
+            delete it->second;
+        }
+    }
 
     Status PlanEnumerator::init() {
-        if (_pm.size() == 0) {
-            return Status(ErrorCodes::BadValue, "Cannot enumerate query without predicates map");
-        }
-
-        if (_indices.size() == 0) {
-            return Status(ErrorCodes::BadValue, "Cannot enumerate indexed plans with no indices");
-        }
-
-        //
-        // Legacy Strategy initialization
-        //
-
+        inOrderCount = 0;
         _done = false;
+
         cout << "enumerator received root: " << _root->toString() << endl;
 
-        // If we fail to prepare, there's some OR clause or other index-requiring predicate that
-        // doesn't have an index.
-        if (!prepLegacyStrategy(_root)) {
-            _done = true;
-        }
-        else {
-            // We increment this from the beginning and roll forward.
-            _assignedCounter.resize(_leavesRequireIndex.size(), 0);
+        // Fill out our memo structure from the tagged _root.
+        _done = !prepMemo(_root);
+        // Dump the tags.  We replace them with IndexTag instances.
+        _root->resetTag();
+
+        // cout << "root post-memo: " << _root->toString() << endl;
+
+        cout << "memo dump:\n";
+        for (size_t i = 0; i < inOrderCount; ++i) {
+            cout << "Node #" << i << ": " << memo[i]->toString() << endl;
         }
 
-        cout << "prepped enum base tree " << _root->toString() << endl;
-
-        //
-        // Final initialization
-        //
+        if (!_done) {
+            // Tag with our first solution.
+            tagMemo(nodeToId[_root]);
+            checkCompound(_root);
+        }
 
         return Status::OK();
     }
 
+    void PlanEnumerator::checkCompound(MatchExpression* node) {
+        if (MatchExpression::AND == node->matchType()) {
+            // Step 1: Find all compound indices.
+            vector<MatchExpression*> assignedCompound;
+            vector<MatchExpression*> unassigned;
+
+            for (size_t i = 0; i < node->numChildren(); ++i) {
+                MatchExpression* child = node->getChild(i);
+                if (child->isArray() || child->isLeaf()) {
+                    verify(NULL != memo[nodeToId[child]]);
+                    verify(NULL != memo[nodeToId[child]]->pred);
+                    if (NULL == child->getTag()) {
+                        // Not assigned an index.
+                        unassigned.push_back(child);
+                    }
+                    else {
+                        IndexTag* childTag = static_cast<IndexTag*>(child->getTag());
+                        if (isCompound(childTag->index)) {
+                            assignedCompound.push_back(child);
+                        }
+                    }
+                }
+            }
+
+            for (size_t i = 0; i < assignedCompound.size(); ++i) {
+                cout << "assigned compound: " << assignedCompound[i]->toString();
+            }
+            for (size_t i = 0; i < unassigned.size(); ++i) {
+                cout << "unassigned : " << unassigned[i]->toString();
+            }
+
+            // Step 2: Iterate over the other fields of the compound indices
+            // TODO: This could be optimized a lot.
+            for (size_t i = 0; i < assignedCompound.size(); ++i) {
+                IndexTag* childTag = static_cast<IndexTag*>(assignedCompound[i]->getTag());
+                BSONObj kp = (*_indices)[childTag->index];
+                BSONObjIterator it(kp);
+                it.next();
+                // we know isCompound is true so this should be true.
+                verify(it.more());
+                while (it.more()) {
+                    BSONElement kpElt = it.next();
+                    bool assignedField = false;
+                    // Trying to pick an unassigned M.E.
+                    for (size_t j = 0; j < unassigned.size(); ++j) {
+                        if (unassigned[j]->path() != kpElt.fieldName()) {
+                            // We need to find a predicate over kpElt.fieldName().
+                            continue;
+                        }
+                        // Another compound index was assigned.
+                        if (NULL != unassigned[j]->getTag()) {
+                            continue;
+                        }
+                        // Index no. childTag->index, the compound index, must be
+                        // a member of the notFirst
+                        NodeSolution* soln = memo[nodeToId[unassigned[j]]];
+                        verify(NULL != soln);
+                        verify(NULL != soln->pred);
+                        verify(unassigned[j] == soln->pred->expr);
+                        if (std::find(soln->pred->notFirst.begin(), soln->pred->notFirst.end(), childTag->index) != soln->pred->notFirst.end()) {
+                            cout << "compound-ing " << kp.toString() << " with node " << unassigned[j]->toString() << endl;
+                            assignedField = true;
+                            unassigned[j]->setTag(new IndexTag(childTag->index));
+                            // We've picked something for this (index, field) tuple.  Don't pick anything else.
+                            break;
+                        }
+                    }
+
+                    // We must assign fields in compound indices contiguously.
+                    if (!assignedField) {
+                        cout << "Failed to assign to compound field " << kpElt.toString() << endl;
+                        break;
+                    }
+                }
+            }
+        }
+
+        // Don't think the traversal order here matters.
+        for (size_t i = 0; i < node->numChildren(); ++i) {
+            checkCompound(node->getChild(i));
+        }
+    }
+
     bool PlanEnumerator::getNext(MatchExpression** tree) {
         if (_done) { return false; }
+        *tree = _root->shallowClone();
 
-        //
-        // Legacy Strategy
-        //
+        // Adds tags to internal nodes indicating whether or not they are indexed.
+        tagForSort(*tree);
 
-        // _assignedCounter is the next selection of indies to try.  We increment after
-        // each getNext.
+        // Sorts nodes by tags, grouping similar tags together.
+        sortUsingTags(*tree);
 
-        for (size_t i = 0; i < _leavesRequireIndex.size(); ++i) {
-            cout << "Leaf requires index: " << _leavesRequireIndex[i]->toString();
-
-            // XXX: this is a slow lookup due to str stuff
-            PredicateMap::const_iterator pmit = _pm.find(_leavesRequireIndex[i]->path().toString());
-            verify(pmit != _pm.end());
-            const PredicateInfo& pi = pmit->second;
-            verify(!pi.relevant.empty());
-
-            // XXX: relevant indices should be array
-            set<RelevantIndex>::const_iterator it = pi.relevant.begin();
-            for (size_t j = 0; j < _assignedCounter[i]; ++j) {
-                ++it;
-            }
-
-            // it now points to which idx to assign
-
-            // XXX: ignoring compound indices entirely for now.  can only choose a NOT_FIRST index
-            // if we chose a FIRST index for a node and-related to us.  We know what nodes are
-            // directly AND-related when we create _leavesRequireIndex.  Cache there somehow.
-            // use map of MatchExpression -> some # that represents the and, perhaps the parent.
-            // Only need for leaves.
-            verify(RelevantIndex::FIRST == it->relevance);
-
-            IndexTag* tag = new IndexTag(it->index);
-            _leavesRequireIndex[i]->setTag(tag);
-        }
-
-        cout << "enum tag iter tree " << _root->toString() << endl;
-
-        // Move to next index.
-        size_t carry = 1;
-        for (size_t i = 0; i < _assignedCounter.size(); ++i) {
-            if (!carry) break;
-
-            _assignedCounter[i] += carry;
-
-            // The max value is the size of the relevant index set
-            PredicateMap::const_iterator it = _pm.find(_leavesRequireIndex[i]->path().toString());
-            verify(it != _pm.end());
-            const PredicateInfo& pi = it->second;
-
-            if (_assignedCounter[i] >= pi.relevant.size()) {
-                _assignedCounter[i] = 0;
-                carry = 1;
-            }
-        }
-
-        if (carry > 0) { _done = true; }
-
-        //
-        // _root is now tagged with the indices we use, selected by a strategy above
-        //
-
-        // tags are cloned w/the tree clone.
-        MatchExpression* ret = _root->shallowClone();
-        // clear out copy of tags from tree we walk
         _root->resetTag();
-
-        // TODO: Document thoroughly and/or move up into the planner.
-        tagForSort(ret);
-        sortUsingTags(ret);
-
-        *tree = ret;
+        _done = true;
+        //if (nextMemo(_root)) { _done = true; }
         return true;
     }
 
-    //
-    // Legacy strategy.  Each OR clause has one index.
-    //
+    bool PlanEnumerator::prepMemo(MatchExpression* node) {
+        if (node->isLeaf() || node->isArray()) {
+            // TODO: This is done for everything, maybe have NodeSolution* newMemo(node)?
+            size_t myID = inOrderCount++;
+            nodeToId[node] = myID;
+            NodeSolution* soln = new NodeSolution();
+            memo[nodeToId[node]] = soln;
 
-    bool PlanEnumerator::hasIndexAvailable(MatchExpression* node) {
-        PredicateMap::const_iterator it = _pm.find(node->path().toString());
-        if (it == _pm.end()) {
-            return false;
-        }
-        // XXX XXX: Check to see if we have any entries that are FIRST.  Will not work with compound
-        // right now.
-        return it->second.relevant.size() > 0;
-    }
+            curEnum[myID] = 0;
 
-    bool PlanEnumerator::prepLegacyStrategy(MatchExpression* root) {
-        if (root->isLeaf() || root->isArray()) {
-            if (!hasIndexAvailable(root)) { return false; }
-            _leavesRequireIndex.push_back(root);
-            return true;
+            // Fill out the NodeSolution.
+            soln->pred.reset(new PredicateSolution());
+            if (NULL != node->getTag()) {
+                RelevantTag* rt = static_cast<RelevantTag*>(node->getTag());
+                soln->pred->first = rt->first;
+                soln->pred->notFirst = rt->notFirst;
+            }
+            soln->pred->expr = node;
+            // There's no guarantee that we can use any of the notFirst indices, so we only claim to
+            // be indexed when there are 'first' indices.
+            return soln->pred->first.size() > 0;
         }
         else {
-            verify(root->isLogical());
-            if (MatchExpression::OR == root->matchType()) {
-                for (size_t i = 0; i < root->numChildren(); ++i) {
-                    MatchExpression* child = root->getChild(i);
-                    bool willHaveIndex = prepLegacyStrategy(root->getChild(i));
-                    if (!willHaveIndex) {
-                        warning() << "OR child " << child->toString() << " won't have idx";
-                        return false;
-                    }
-                }
-                // Each of our children has an index so we'll have an index.
-                return true;
-            }
-            else if (MatchExpression::AND == root->matchType()) {
-                MatchExpression* expressionToIndex = NULL;
-                bool indexAssignedToAtLeastOneChild = false;
-
-                // XXX: is this non-deterministic depending on the order of clauses of the and?  I
-                // think it is.  if we see an OR clause first as a child, those have an index
-                // assigned, and we hang any further preds off as a filter.  if we see a filter
-                // first, we create an ixscan and AND it with any subsequent OR children.
-                //
-                // A solution here is to sort the children in the desired order, so the ORs are
-                // first, if we're really trying to minimize indices.
-
-                for (size_t i = 0; i < root->numChildren(); ++i) {
-                    MatchExpression* child = root->getChild(i);
-
-                    // If the child requires an index, use an index.
-                    // TODO: Text goes here.
-                    if (MatchExpression::GEO_NEAR == child->matchType()) {
-                        // We must use an index in this case.
-                        if (!prepLegacyStrategy(child)) {
-                            return false;
-                        }
-                        indexAssignedToAtLeastOneChild = true;
-                    }
-                    else if (child->isLogical()) {
-                        // We must use an index in this case as well.
-
-                        // We've squashed AND-AND and OR-OR into AND/OR respectively, so this should
-                        // be an OR.
-                        verify(MatchExpression::OR == child->matchType());
-                        if (!prepLegacyStrategy(child)) {
-                            return false;
-                        }
-                        indexAssignedToAtLeastOneChild = true;
-                    }
-                    else {
-                        verify(child->isArray() || child->isLeaf());
-
-                        if (!indexAssignedToAtLeastOneChild && hasIndexAvailable(child)) {
-                            verify(NULL == expressionToIndex);
-                            expressionToIndex = child;
-                            indexAssignedToAtLeastOneChild = true;
-                        }
+            if (MatchExpression::OR == node->matchType()) {
+                // For an OR to be indexed all its children must be indexed.
+                bool indexed = true;
+                for (size_t i = 0; i < node->numChildren(); ++i) {
+                    if (!prepMemo(node->getChild(i))) {
+                        indexed = false;
                     }
                 }
 
-                // We've only filled out expressionToIndex if it has an index available.
-                if (NULL != expressionToIndex) {
-                    verify(prepLegacyStrategy(expressionToIndex));
-                }
+                size_t myID = inOrderCount++;
+                nodeToId[node] = myID;
+                NodeSolution* soln = new NodeSolution();
+                memo[nodeToId[node]] = soln;
 
-                return indexAssignedToAtLeastOneChild;
+                OrSolution* orSolution = new OrSolution();
+                for (size_t i = 0; i < node->numChildren(); ++i) {
+                    orSolution->subnodes.push_back(nodeToId[node->getChild(i)]);
+                }
+                soln->orSolution.reset(orSolution);
+                return indexed;
             }
             else {
-                warning() << "Can't deal w/logical node in enum: " << root->toString();
-                verify(0);
-                return false;
+                // To be exhaustive, we would compute all solutions of size 1, 2, ...,
+                // node->numChildren().  Each of these solutions would get a place in the
+                // memo structure.
+                
+                // For efficiency concerns, we don't explore any more than the size-1 members
+                // of the power set.  That is, we will only use one index at a time.
+                AndSolution* andSolution = new AndSolution();
+                for (size_t i = 0; i < node->numChildren(); ++i) {
+                    // If AND requires an index it can only piggyback on the children that have indices.
+                    if (prepMemo(node->getChild(i))) {
+                        vector<size_t> option;
+                        option.push_back(nodeToId[node->getChild(i)]);
+                        andSolution->subnodes.push_back(option);
+                    }
+                }
+
+                size_t myID = inOrderCount++;
+                nodeToId[node] = myID;
+                NodeSolution* soln = new NodeSolution();
+                memo[nodeToId[node]] = soln;
+
+                verify(MatchExpression::AND == node->matchType());
+                curEnum[myID] = 0;
+
+                // Takes ownership.
+                soln->andSolution.reset(andSolution);
+                return andSolution->subnodes.size() > 0;
             }
         }
+    }
+
+    void PlanEnumerator::tagMemo(size_t id) {
+        NodeSolution* soln = memo[id];
+        verify(NULL != soln);
+
+        if (NULL != soln->pred) {
+            verify(NULL == soln->pred->expr->getTag());
+            // There may be no indices assignable.  That's OK.
+            if (0 != soln->pred->first.size()) {
+                // We only assign indices that can be used without any other predicate.
+                // Compound is dealt with in the AND processing; there must be an AND to use
+                // a notFirst index..
+                verify(curEnum[id] < soln->pred->first.size());
+                soln->pred->expr->setTag(new IndexTag(soln->pred->first[curEnum[id]]));
+            }
+        }
+        else if (NULL != soln->orSolution) {
+            for (size_t i = 0; i < soln->orSolution->subnodes.size(); ++i) {
+                tagMemo(soln->orSolution->subnodes[i]);
+            }
+            // TODO: Who checks to make sure that we tag all nodes of an OR?  We should
+            // know this early.
+        }
+        else {
+            verify(NULL != soln->andSolution);
+            verify(curEnum[id] < soln->andSolution->subnodes.size());
+            vector<size_t> &cur = soln->andSolution->subnodes[curEnum[id]];
+
+            for (size_t i = 0; i < cur.size(); ++i) {
+                // Tag the child.
+                tagMemo(cur[i]);
+            }
+        }
+    }
+
+    bool PlanEnumerator::nextMemo(size_t id) {
+        return false;
     }
 
 } // namespace mongo

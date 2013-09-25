@@ -41,35 +41,19 @@
 #include "mongo/db/query/index_bounds_builder.h"
 #include "mongo/db/query/index_tag.h"
 #include "mongo/db/query/plan_enumerator.h"
-#include "mongo/db/query/predicate_map.h"
 #include "mongo/db/query/query_solution.h"
 
 namespace mongo {
 
-    /**
-     * Scan the parse tree, adding all predicates to the provided map.
-     */
-    void makePredicateMap(MatchExpression* node, PredicateMap* out) {
+    void getFields(MatchExpression* node, unordered_set<string>* out) {
         StringData path = node->path();
-
-        // If we've seen this path before, link 'node' into that bunch.
-        // Otherwise, create a new entry <path, node> in the predicate map.
         if (!path.empty()) {
-            PredicateMap::iterator it = out->lower_bound(path.toString());
-            if (it != out->end()) {
-                vector<MatchExpression*>& nodes = it->second.nodes;
-                nodes.push_back(node);
-            }
-            else {
-                out->insert(std::make_pair(path.toString(), node));
-            }
+            out->insert(path.toString());
         }
 
-        // XXX XXX XXX XXX
         // XXX Do we do this if the node is logical, or if it's array, or both?
-        // XXX XXX XXX XXX
         for (size_t i = 0; i < node->numChildren(); ++i) {
-            makePredicateMap(node->getChild(i), out);
+            getFields(node->getChild(i), out);
         }
     }
 
@@ -77,59 +61,91 @@ namespace mongo {
      * Find all indices prefixed by fields we have predicates over.  Only these indices are useful
      * in answering the query.
      */
-    void findRelevantIndices(const PredicateMap& pm, const vector<BSONObj>& allIndices,
+    void findRelevantIndices(const unordered_set<string>& fields, const vector<BSONObj>& allIndices,
                              vector<BSONObj>* out) {
         for (size_t i = 0; i < allIndices.size(); ++i) {
             BSONObjIterator it(allIndices[i]);
             verify(it.more());
             BSONElement elt = it.next();
-            if (pm.end() != pm.find(elt.fieldName())) {
+            if (fields.end() != fields.find(elt.fieldName())) {
                 out->push_back(allIndices[i]);
             }
         }
     }
 
-    /**
-     * Given the set of relevant indices, annotate predicates with any applicable indices.  Also
-     * mark how applicable the indices are (see RelevantIndex::Relevance).
-     */
-    void rateIndices(const vector<BSONObj>& indices, PredicateMap* predicates) {
-        for (size_t i = 0; i < indices.size(); ++i) {
-            BSONObjIterator kpIt(indices[i]);
-            BSONElement elt = kpIt.next();
+    bool compatible(const BSONElement& elt, MatchExpression* node) {
+        // XXX: CatalogHack::getAccessMethodName: do we have to worry about this?  when?
+        string ixtype;
+        if (String != elt.type()) {
+            ixtype = "";
+        }
+        else {
+            ixtype = elt.String();
+        }
 
-            // We're looking at the first element in the index.  We can definitely use any index
-            // prefixed by the predicate's field to answer that predicate.
-            PredicateMap::iterator it = predicates->find(elt.fieldName());
-            if (it != predicates->end()) {
-                it->second.relevant.insert(RelevantIndex(i, RelevantIndex::FIRST));
-            }
+        // we know elt.fieldname() == node->path()
 
-            // We're now looking at the subsequent elements of the index.  We can only use these if
-            // we have a restriction of all the previous fields.  We won't figure that out until
-            // later.
-            while (kpIt.more()) {
-                elt = kpIt.next();
-                PredicateMap::iterator it = predicates->find(elt.fieldName());
-                if (it != predicates->end()) {
-                    it->second.relevant.insert(RelevantIndex(i, RelevantIndex::NOT_FIRST));
-                }
-            }
+        MatchExpression::MatchType exprtype = node->matchType();
+
+        // XXX use IndexNames
+
+        if ("" == ixtype) {
+            // TODO: MatchExpression::TEXT, when it exists.
+            return exprtype != MatchExpression::GEO && exprtype != MatchExpression::GEO_NEAR;
+        }
+        else if ("hashed" == ixtype) {
+            // TODO: Any others?
+            return exprtype == MatchExpression::MATCH_IN || exprtype == MatchExpression::EQ;
+        }
+        else if ("2dsphere" == ixtype) {
+            // XXX Geo issues: Parsing is very well encapsulated in GeoQuery for 2dsphere right now
+            // but for 2d it's not really parsed in the tree.  Needs auditing.
+            return false;
+        }
+        else if ("2d" == ixtype) {
+            // XXX: Geo issues: see db/index_selection.cpp.  I don't think 2d is parsed.  Perhaps we
+            // can parse it as a blob with the verification done ala index_selection.cpp?  Really,
+            // we should fully validate the syntax.
+            return false;
+        }
+        else if ("text" == ixtype || "_fts" == ixtype || "geoHaystack" == ixtype) {
+            return false;
+        }
+        else {
+            warning() << "Unknown indexing for for node " << node->toString()
+                      << " and field " << elt.toString() << endl;
+            verify(0);
         }
     }
 
-    bool hasPredicate(const PredicateMap& pm, MatchExpression::MatchType type) {
-        for (PredicateMap::const_iterator itMap = pm.begin(); itMap != pm.end(); ++itMap) {
-            const vector<MatchExpression*>& nodes = itMap->second.nodes;
-            for (vector<MatchExpression*>::const_iterator itVec = nodes.begin();
-                 itVec != nodes.end();
-                 ++itVec) {
-                if ((*itVec)->matchType() == type) {
-                    return true;
+    void rateIndices(MatchExpression* node, const vector<BSONObj>& indices) {
+        if (node->isArray() || node->isLeaf()) {
+            string path = node->path().toString();
+            if (!path.empty()) {
+                verify(NULL == node->getTag());
+                RelevantTag* rt = new RelevantTag();
+                node->setTag(rt);
+
+                // TODO: This is slow, with all the string compares.
+                for (size_t i = 0; i < indices.size(); ++i) {
+                    BSONObjIterator it(indices[i]);
+                    BSONElement elt = it.next();
+                    if (elt.fieldName() == path && compatible(elt, node)) {
+                        rt->first.push_back(i);
+                    }
+                    while (it.more()) {
+                        elt = it.next();
+                        if (elt.fieldName() == path && compatible(elt, node)) {
+                            rt->notFirst.push_back(i);
+                        }
+                    }
                 }
             }
         }
-        return false;
+
+        for (size_t i = 0; i < node->numChildren(); ++i) {
+            rateIndices(node->getChild(i), indices);
+        }
     }
 
     QuerySolution* makeCollectionScan(const CanonicalQuery& query, bool tailable) {
@@ -187,16 +203,8 @@ namespace mongo {
         return soln.release();
     }
 
-    // TODO: Document when this settles
-    struct FilterInfo {
-        MatchExpression* filterNode;
-        size_t currChild;
-        FilterInfo(MatchExpression* f, int c) : filterNode(f), currChild(c) {}
-    };
-
     IndexScanNode* makeIndexScan(const BSONObj& indexKeyPattern, MatchExpression* expr,
                                  bool* exact) {
-
         IndexScanNode* isn = new IndexScanNode();
         isn->indexKeyPattern = indexKeyPattern;
 
@@ -210,18 +218,35 @@ namespace mongo {
         BSONObjIterator it(isn->indexKeyPattern);
         BSONElement elt = it.next();
 
-        OrderedIntervalList oil(expr->path().toString());
-        int direction = (elt.numberInt() >= 0) ? 1 : -1;
-        IndexBoundsBuilder::translate(expr, direction, &oil, exact);
-        // TODO(opt): this is a surplus copy, could build right in the original
-        isn->bounds.fields.push_back(oil);
+        isn->bounds.fields.resize(indexKeyPattern.nFields());
 
-        // Pad the remaining fields if it's a compound index.
-        while (it.more()) {
-            isn->bounds.fields.push_back(IndexBoundsBuilder::allValuesForField(it.next()));
+        int direction = (elt.numberInt() >= 0) ? 1 : -1;
+        IndexBoundsBuilder::translate(expr, direction, &isn->bounds.fields[0], exact);
+        return isn;
+    }
+
+    void finishIndexScan(IndexScanNode* scan, const BSONObj& indexKeyPattern) {
+        cout << "bounds pre-finishing " << scan->bounds.toString() << endl;
+        size_t firstEmptyField = 0;
+        for (firstEmptyField = 0; firstEmptyField < scan->bounds.fields.size(); ++firstEmptyField) {
+            if ("" == scan->bounds.fields[firstEmptyField].name) {
+                break;
+            }
+        }
+        if (firstEmptyField == scan->bounds.fields.size()) {
+            cout << "bounds post-finishing " << scan->bounds.toString() << endl;
+            return;
         }
 
-        return isn;
+        BSONObjIterator it(indexKeyPattern);
+        for (size_t i = 0; i < firstEmptyField; ++i) {
+            it.next();
+        }
+        while (it.more()) {
+            // TODO: surplus copy
+            scan->bounds.fields[firstEmptyField++] = IndexBoundsBuilder::allValuesForField(it.next());
+        }
+        cout << "bounds post-finishing " << scan->bounds.toString() << endl;
     }
 
     QuerySolutionNode* buildIndexedDataAccess(MatchExpression* root,
@@ -297,14 +322,11 @@ namespace mongo {
                     //
                     // The child then becomes our new current index scan.
 
-                    // XXX temporary until we can merge bounds.
-                    bool childUsesNewIndex = true;
-
-                    // XXX: uncomment when we can combine ixscans via bounds merging.
-                    // bool childUsesNewIndex = (currentIndexNumber != ixtag->index);
+                    bool childUsesNewIndex = (currentIndexNumber != ixtag->index);
 
                     if (childUsesNewIndex) {
                         verify(NULL != currentScan.get());
+                        finishIndexScan(currentScan.get(), indexKeyPatterns[currentIndexNumber]);
                         theAnd->children.push_back(currentScan.release());
                         currentIndexNumber = ixtag->index;
 
@@ -343,6 +365,10 @@ namespace mongo {
                         bool exact = false;
                         IndexBoundsBuilder::translate(child, direction, &oil, &exact);
 
+                        //cout << "current bounds are " << currentScan->bounds.toString() << endl;
+                        //cout << "node merging in " << child->toString() << endl;
+                        //cout << "taking advantage of compound index " << indexKeyPatterns[currentIndexNumber].toString() << endl;
+
                         // Merge the bounds with the existing.
                         currentScan->bounds.joinAnd(oil, indexKeyPatterns[currentIndexNumber]);
 
@@ -361,6 +387,7 @@ namespace mongo {
 
                 // Output the scan we're done with.
                 if (NULL != currentScan.get()) {
+                    finishIndexScan(currentScan.get(), indexKeyPatterns[currentIndexNumber]);
                     theAnd->children.push_back(currentScan.release());
                 }
 
@@ -472,6 +499,7 @@ namespace mongo {
 
                     if (childUsesNewIndex) {
                         verify(NULL != currentScan.get());
+                        finishIndexScan(currentScan.get(), indexKeyPatterns[currentIndexNumber]);
                         theOr->children.push_back(currentScan.release());
                         currentIndexNumber = ixtag->index;
 
@@ -529,6 +557,7 @@ namespace mongo {
 
                 // Output the scan we're done with.
                 if (NULL != currentScan.get()) {
+                    finishIndexScan(currentScan.get(), indexKeyPatterns[currentIndexNumber]);
                     theOr->children.push_back(currentScan.release());
                 }
 
@@ -536,9 +565,7 @@ namespace mongo {
                 // when any of our children lack index tags.  If a node lacks an index tag it cannot
                 // be answered via an index.
                 if (curChild != root->numChildren()) {
-                    warning() << "planner OR error, non-indexed branch.";
-                    // XXX: don't verify in prod environment but good for debugging now.
-                    verify(0);
+                    warning() << "planner OR error, non-indexed child of OR.";
                     return NULL;
                 }
 
@@ -573,6 +600,7 @@ namespace mongo {
 
                 bool exact = false;
                 auto_ptr<IndexScanNode> isn(makeIndexScan(indexKeyPatterns[tag->index], root, &exact));
+                finishIndexScan(isn.get(), indexKeyPatterns[tag->index]);
 
                 // If the bounds are exact, the set of documents that satisfy the predicate is exactly
                 // equal to the set of documents that the scan provides.
@@ -687,27 +715,6 @@ namespace mongo {
         return soln.release();
     }
 
-    void dumpPredMap(const PredicateMap& predicates) {
-        for (PredicateMap::const_iterator it = predicates.begin(); it != predicates.end(); ++it) {
-            cout << "field " << it->first << endl;
-            const PredicateInfo& pi = it->second;
-            cout << "\tRelevant indices:\n";
-            for (set<RelevantIndex>::iterator si = pi.relevant.begin(); si != pi.relevant.end(); ++si) {
-                cout << "\t\tidx #" << si->index << " relevance: ";
-                if (RelevantIndex::FIRST == si->relevance) {
-                    cout << "first";
-                }
-                else {
-                    cout << "second";
-                }
-            }
-            cout << "\n\tNodes:\n";
-            for (size_t i = 0; i < pi.nodes.size(); ++i) {
-                cout << "\t\t" << pi.nodes[i]->toString();
-            }
-        }
-    }
-
     bool hasNode(MatchExpression* root, MatchExpression::MatchType type) {
         if (type == root->matchType()) {
             return true;
@@ -739,20 +746,12 @@ namespace mongo {
         // XXX: If pq.hasOption(QueryOption_OplogReplay) use FindingStartCursor equivalent which
         // must be translated into stages.
 
-        //
-        // Planner Section 1: Calculate predicate/index data.
-        //
-
-        // Get all the predicates (and their fields).
-        PredicateMap predicates;
-        makePredicateMap(query.root(), &predicates);
-
         // If the query requests a tailable cursor, the only solution is a collscan + filter with
         // tailable set on the collscan.  TODO: This is a policy departure.  Previously I think you
         // could ask for a tailable cursor and it just tried to give you one.  Now, we fail if we
         // can't provide one.  Is this what we want?
         if (query.getParsed().hasOption(QueryOption_CursorTailable)) {
-            if (!hasPredicate(predicates, MatchExpression::GEO_NEAR)) {
+            if (!hasNode(query.root(), MatchExpression::GEO_NEAR)) {
                 out->push_back(makeCollectionScan(query, true));
             }
             return;
@@ -765,7 +764,7 @@ namespace mongo {
 
             // If there's a near predicate, we can't handle this.
             // TODO: Should canonicalized query detect this?
-            if (hasPredicate(predicates, MatchExpression::GEO_NEAR)) {
+            if (hasNode(query.root(), MatchExpression::GEO_NEAR)) {
                 warning() << "Can't handle NOT/NOR with GEO_NEAR";
                 return;
             }
@@ -773,18 +772,20 @@ namespace mongo {
             return;
         }
 
+        // Figure out what fields we care about.
+        unordered_set<string> fields;
+        getFields(query.root(), &fields);
+
         // Filter our indices so we only look at indices that are over our predicates.
         vector<BSONObj> relevantIndices;
 
         // Hints require us to only consider the hinted index.
         BSONObj hintIndex = query.getParsed().getHint();
 
-        // Snapshot is a form of a hint.
+        // Snapshot is a form of a hint.  If snapshot is set, try to use _id index to make a real
+        // plan.  If that fails, just scan the _id index.
         if (query.getParsed().isSnapshot()) {
-            // Snapshot is equivalent to:
-            // 1. Try to use _id index to make a real plan.  If that fails, just scan
-            // the _id index.
-            // Find the ID index in indexKeyPatterns.
+            // Find the ID index in indexKeyPatterns.  It's our hint.
             for (size_t i = 0; i < indexKeyPatterns.size(); ++i) {
                 if (isIdIndex(indexKeyPatterns[i])) {
                     hintIndex = indexKeyPatterns[i];
@@ -795,27 +796,25 @@ namespace mongo {
 
         if (!hintIndex.isEmpty()) {
             relevantIndices.push_back(hintIndex);
-            cout << "hint specified, restricting indices to " << hintIndex.toString() << endl;
+            // cout << "hint specified, restricting indices to " << hintIndex.toString() << endl;
         }
         else {
-            findRelevantIndices(predicates, indexKeyPatterns, &relevantIndices);
+            findRelevantIndices(fields, indexKeyPatterns, &relevantIndices);
         }
 
+        // Figure out how useful each index is to each predicate.
+        rateIndices(query.root(), relevantIndices);
+
+        // If we have any relevant indices, we try to create indexed plans.
         if (0 < relevantIndices.size()) {
+            /*
             for (size_t i = 0; i < relevantIndices.size(); ++i) {
                 cout << "relevant idx " << i << " is " << relevantIndices[i].toString() << endl;
             }
+            */
 
-            // Figure out how useful each index is to each predicate.
-            rateIndices(relevantIndices, &predicates);
-            dumpPredMap(predicates);
-
-            //
-            // Planner Section 2: Use predicate/index data to output sets of indices that we can
-            // use.
-            //
-
-            PlanEnumerator isp(query.root(), &predicates, &relevantIndices);
+            // The enumerator spits out trees tagged with IndexTag(s).
+            PlanEnumerator isp(query.root(), &relevantIndices);
             isp.init();
 
             MatchExpression* rawTree;
@@ -823,8 +822,11 @@ namespace mongo {
                 cout << "about to build solntree from tagged tree:\n" << rawTree->toString()
                      << endl;
 
+                // This can fail if enumeration makes a mistake.
                 QuerySolutionNode* solnRoot = buildIndexedDataAccess(rawTree, relevantIndices);
                 if (NULL == solnRoot) { continue; }
+
+                // This shouldn't ever fail.
                 QuerySolution* soln = analyzeDataAccess(query, rawTree, solnRoot);
                 verify(NULL != soln);
 
@@ -848,7 +850,7 @@ namespace mongo {
             }
 
             QuerySolution* soln = analyzeDataAccess(query, query.root()->shallowClone(),
-                    isn);
+                                                    isn);
             verify(NULL != soln);
             out->push_back(soln);
             cout << "using hinted index as scan, soln = " << soln->toString() << endl;
@@ -892,7 +894,7 @@ namespace mongo {
         }
 
         // TODO: Do we always want to offer a collscan solution?
-        if (!hasPredicate(predicates, MatchExpression::GEO_NEAR)) {
+        if (!hasNode(query.root(), MatchExpression::GEO_NEAR)) {
             QuerySolution* collscan = makeCollectionScan(query, false);
             out->push_back(collscan);
         }

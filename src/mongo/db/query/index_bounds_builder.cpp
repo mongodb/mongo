@@ -62,6 +62,7 @@ namespace mongo {
                                        OrderedIntervalList* oilOut, bool* exactOut) {
         Interval interval;
         bool exact = false;
+        oilOut->name = expr->path().toString();
 
         if (expr->isLeaf()) {
             if (MatchExpression::EQ == expr->matchType()) {
