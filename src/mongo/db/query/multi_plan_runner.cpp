@@ -98,10 +98,24 @@ namespace mongo {
 
         if (NULL != _bestPlan) {
             _bestPlan->invalidate(dl);
+            for (deque<WorkingSetID>::iterator it = _alreadyProduced.begin();
+                 it != _alreadyProduced.end(); ++it) {
+                WorkingSetMember* member = _bestPlan->getWorkingSet()->get(*it);
+                if (member->hasLoc() && member->loc == dl) {
+                    WorkingSetCommon::fetchAndInvalidateLoc(member);
+                }
+            }
         }
         else {
             for (size_t i = 0; i < _candidates.size(); ++i) {
                 _candidates[i].root->invalidate(dl);
+                for (deque<WorkingSetID>::iterator it = _candidates[i].results.begin();
+                     it != _candidates[i].results.end(); ++it) {
+                    WorkingSetMember* member = _candidates[i].ws->get(*it);
+                    if (member->hasLoc() && member->loc == dl) {
+                        WorkingSetCommon::fetchAndInvalidateLoc(member);
+                    }
+                }
             }
         }
     }
@@ -133,7 +147,7 @@ namespace mongo {
 
         if (!_alreadyProduced.empty()) {
             WorkingSetID id = _alreadyProduced.front();
-            _alreadyProduced.pop();
+            _alreadyProduced.pop_front();
 
             WorkingSetMember* member = _bestPlan->getWorkingSet()->get(id);
             // Note that this copies code from PlanExecutor.
@@ -223,7 +237,7 @@ namespace mongo {
 
             if (PlanStage::ADVANCED == state) {
                 // Save result for later.
-                candidate.results.push(id);
+                candidate.results.push_back(id);
             }
             else if (PlanStage::NEED_TIME == state) {
                 // Fall through to yield check at end of large conditional.

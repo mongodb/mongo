@@ -267,6 +267,12 @@ namespace mongo {
                 _btreeCursor->skip(_indexCursor->getKey(), _keyEltsToUse, _movePastKeyElts,
                                    _keyElts, _keyEltsInc);
 
+                // Must check underlying cursor EOF after every cursor movement.
+                if (_btreeCursor->isEOF()) {
+                    _hitEnd = true;
+                    break;
+                }
+
                 // TODO: Can we do too much scanning here?  Old BtreeCursor stops scanning after a
                 // while and relies on a Matcher to make sure the result is ok.
             }

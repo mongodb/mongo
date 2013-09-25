@@ -162,14 +162,14 @@ namespace mongo {
         csn->filter = soln->filter.get();
         csn->tailable = tailable;
 
-        const BSONObj& sortObj = query.getParsed().getSort();
-
         QuerySolutionNode* solnRoot = csn;
 
         // XXX: call analyzeDataAccess to do the work below once $natural is dealt with better.
 
         // TODO: We need better checking for this.  Should be done in CanonicalQuery and we should
         // be able to assume it's correct.
+        const BSONObj& sortObj = query.getParsed().getSort();
+
         if (!sortObj.isEmpty()) {
             BSONElement natural = sortObj.getFieldDotted("$natural");
             if (!natural.eoo()) {
@@ -181,6 +181,14 @@ namespace mongo {
                 sort->pattern = sortObj;
                 sort->child.reset(csn);
                 solnRoot = sort;
+            }
+        }
+
+        // The hint can specify $natural as well.  Check there to see if the direction is provided.
+        if (!query.getParsed().getHint().isEmpty()) {
+            BSONElement natural = query.getParsed().getHint().getFieldDotted("$natural");
+            if (!natural.eoo()) {
+                csn->direction = natural.numberInt() >= 0 ? 1 : -1;
             }
         }
 
@@ -225,6 +233,9 @@ namespace mongo {
         return isn;
     }
 
+    /**
+     * Fill in any bounds that are missing in 'scan' with the "all values for this field" interval.
+     */
     void finishIndexScan(IndexScanNode* scan, const BSONObj& indexKeyPattern) {
         cout << "bounds pre-finishing " << scan->bounds.toString() << endl;
         size_t firstEmptyField = 0;
@@ -243,7 +254,8 @@ namespace mongo {
             it.next();
         }
         while (it.more()) {
-            // TODO: surplus copy
+            verify("" == scan->bounds.fields[firstEmptyField].name);
+            // TODO: this is a surplus copy
             scan->bounds.fields[firstEmptyField++] = IndexBoundsBuilder::allValuesForField(it.next());
         }
         cout << "bounds post-finishing " << scan->bounds.toString() << endl;
@@ -743,6 +755,7 @@ namespace mongo {
     // static
     void QueryPlanner::plan(const CanonicalQuery& query, const vector<BSONObj>& indexKeyPatterns,
                             vector<QuerySolution*>* out) {
+        cout << "Begin planning.\nquery = " << query.toString() << endl;
         // XXX: If pq.hasOption(QueryOption_OplogReplay) use FindingStartCursor equivalent which
         // must be translated into stages.
 
@@ -755,6 +768,17 @@ namespace mongo {
                 out->push_back(makeCollectionScan(query, true));
             }
             return;
+        }
+
+        // The hint can be $natural: 1.  If this happens, output a collscan.  It's a weird way of
+        // saying "table scan for two, please."
+        if (!query.getParsed().getHint().isEmpty()) {
+            BSONElement natural = query.getParsed().getHint().getFieldDotted("$natural");
+            if (!natural.eoo()) {
+                cout << "forcing a table scan due to hinted $natural\n";
+                out->push_back(makeCollectionScan(query, false));
+                return;
+            }
         }
 
         // NOR and NOT we can't handle well with indices.  If we see them here, they weren't
@@ -795,7 +819,10 @@ namespace mongo {
         }
 
         if (!hintIndex.isEmpty()) {
+            // TODO: make sure hintIndex exists in relevantIndices
+            relevantIndices.clear();
             relevantIndices.push_back(hintIndex);
+
             // cout << "hint specified, restricting indices to " << hintIndex.toString() << endl;
         }
         else {
@@ -803,6 +830,7 @@ namespace mongo {
         }
 
         // Figure out how useful each index is to each predicate.
+        // query.root() is now annotated with RelevantTag(s).
         rateIndices(query.root(), relevantIndices);
 
         // If we have any relevant indices, we try to create indexed plans.
@@ -835,28 +863,37 @@ namespace mongo {
             }
         }
 
-        // An index was hinted.  If there are any solutions, they use the hinted index.  If not,
-        // we scan the entire index to provide results and output that as our plan.
+        // An index was hinted.  If there are any solutions, they use the hinted index.  If not, we
+        // scan the entire index to provide results and output that as our plan.  This is the
+        // desired behavior when an index is hinted that is not relevant to the query.
         if (!hintIndex.isEmpty() && (0 == out->size())) {
             // Build an ixscan over the id index, use it, and return it.
             IndexScanNode* isn = new IndexScanNode();
             isn->indexKeyPattern = hintIndex;
 
-            // XXX: use simple bounds for ixscan once builder supports them
+            // TODO: use simple bounds for ixscan once builder supports them
             BSONObjIterator it(isn->indexKeyPattern);
             while (it.more()) {
                 isn->bounds.fields.push_back(
                         IndexBoundsBuilder::allValuesForField(it.next()));
             }
 
-            QuerySolution* soln = analyzeDataAccess(query, query.root()->shallowClone(),
-                                                    isn);
+            // TODO: We may not need to do the fetch if the predicates in root are covered.  But
+            // for now it's safe (though *maybe* slower).
+            FetchNode* fetch = new FetchNode();
+            fetch->filter = query.root()->shallowClone();
+            fetch->child.reset(isn);
+
+            QuerySolution* soln = analyzeDataAccess(query, fetch->filter, fetch);
+
             verify(NULL != soln);
             out->push_back(soln);
             cout << "using hinted index as scan, soln = " << soln->toString() << endl;
             return;
         }
 
+        // If a sort order is requested, there may be an index that provides it, even if that
+        // index is not over any predicates in the query.
         if (!query.getParsed().getSort().isEmpty()) {
             // See if we have a sort provided from an index already.
             bool usingIndexToSort = false;
@@ -875,15 +912,20 @@ namespace mongo {
                         IndexScanNode* isn = new IndexScanNode();
                         isn->indexKeyPattern = kp;
 
-                        // XXX: use simple bounds for ixscan once builder supports them
+                        // TODO: use simple bounds for ixscan once builder supports them
                         BSONObjIterator it(isn->indexKeyPattern);
                         while (it.more()) {
                             isn->bounds.fields.push_back(
                                     IndexBoundsBuilder::allValuesForField(it.next()));
                         }
 
-                        QuerySolution* soln = analyzeDataAccess(query, query.root()->shallowClone(),
-                                isn);
+                        // TODO: We may not need to do the fetch if the predicates in root are covered.  But
+                        // for now it's safe (though *maybe* slower).
+                        FetchNode* fetch = new FetchNode();
+                        fetch->filter = query.root()->shallowClone();
+                        fetch->child.reset(isn);
+
+                        QuerySolution* soln = analyzeDataAccess(query, fetch->filter, fetch);
                         verify(NULL != soln);
                         out->push_back(soln);
                         cout << "using index to provide sort, soln = " << soln->toString() << endl;
@@ -897,6 +939,7 @@ namespace mongo {
         if (!hasNode(query.root(), MatchExpression::GEO_NEAR)) {
             QuerySolution* collscan = makeCollectionScan(query, false);
             out->push_back(collscan);
+            cout << "Outputting a collscan\n";
         }
     }
 
