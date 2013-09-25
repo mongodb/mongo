@@ -381,7 +381,9 @@ jsTestOptions = function(){
                               authPassword : TestData.keyFileData,
                               authMechanism : TestData.authMechanism,
                               adminUser : TestData.adminUser || "admin",
-                              adminPassword : TestData.adminPassword || "password" });
+                              adminPassword : TestData.adminPassword || "password",
+                              useSSL : TestData.useSSL,
+                              useX509 : TestData.useX509});
     }
     return _jsTestOptions;
 }
@@ -437,7 +439,7 @@ jsTest.addAuth = function(conn) {
 }
 
 jsTest.authenticate = function(conn) {
-    if (!jsTest.options().auth && !jsTest.options().keyFile) {
+    if (!jsTest.options().auth && !jsTest.options().keyFile && !jsTest.options().useX509) {
         conn.authenticated = true;
         return true;
     }

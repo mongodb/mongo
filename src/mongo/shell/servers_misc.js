@@ -163,6 +163,19 @@ ReplTest.prototype.getOptions = function( master , extra , putBinaryFirst, norep
         a.push( jsTestOptions().keyFile )
     }
 
+    if( jsTestOptions().useSSL ) {
+        a.push( "--sslOnNormalPorts" )
+        a.push( "--sslPEMKeyFile" )
+        a.push( "jstests/libs/server.pem" )
+        a.push( "--sslCAFile" )
+        a.push( "jstests/libs/ca.pem" )
+        a.push( "--sslWeakCertificateValidation" )
+    }
+    if( jsTestOptions().useX509 ) {
+        a.push( "--clusterAuthMode" )
+        a.push( "x509" )
+    }
+
     if ( !norepl ) {
         if ( master ){
             a.push( "--master" );
@@ -190,12 +203,11 @@ ReplTest.prototype.start = function( master , options , restart, norepl ){
     removeFile( lockFile );
     var o = this.getOptions( master , options , restart, norepl );
 
-
     if (restart) {
         return startMongoProgram.apply(null, o);
     } else {
         var conn = startMongod.apply(null, o);
-        if (jsTestOptions().keyFile || jsTestOptions().auth) {
+        if (jsTestOptions().keyFile || jsTestOptions().auth || jsTestOptions().useX509) {
             if (master) {
                 jsTest.addAuth(conn);
             }
@@ -288,6 +300,14 @@ function startParallelShell( jsCode, port ){
 
     if (typeof db == "object") {
         args.push(db.getMongo().host);
+    }
+
+    if( jsTestOptions().useSSL ) {
+        args.push( "--ssl" )
+        args.push( "--sslPEMKeyFile" )
+        args.push( "jstests/libs/client.pem" )
+        args.push( "--sslCAFile" )
+        args.push( "jstests/libs/ca.pem" )
     }
 
     x = startMongoProgramNoConnect.apply(null, args);

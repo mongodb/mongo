@@ -53,7 +53,7 @@ doTest = function( signal ) {
     repset.stopSet( signal )
 }
 
-if (jsTest.options().keyFile) {
+if (jsTest.options().keyFile || jsTest.options().useX509) {
     print("Skipping test because clone command doesn't work with authentication enabled: SERVER-4245")
 } else {
     doTest( 15 );

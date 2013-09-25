@@ -221,12 +221,13 @@ class mongod(object):
             if authMechanism != 'MONGODB-CR':
                 argv += ['--setParameter', 'authenticationMechanisms=' + authMechanism]
             self.auth = True
-        if self.kwargs.get('use_ssl'):
+        if self.kwargs.get('use_ssl') or self.kwargs.get('use_x509'):
             argv += ['--sslOnNormalPorts',
                      '--sslPEMKeyFile', 'jstests/libs/server.pem',
                      '--sslCAFile', 'jstests/libs/ca.pem',
                      '--sslWeakCertificateValidation']
-
+        if self.kwargs.get('use_x509'):
+            argv += ['--clusterAuthMode','x509'];
         print "running " + " ".join(argv)
         self.proc = self._start(buildlogger(argv, is_global=True))
 
@@ -384,9 +385,19 @@ def skipTest(path):
     if small_oplog: # For tests running in parallel
         if basename in ["cursor8.js", "indexh.js", "dropdb.js", "connections_opened.js", "opcounters.js"]:
             return True
-    if auth or keyFile: # For tests running with auth
+    if use_ssl: 
+        # Skip tests using mongobridge since it does not support SSL
+        # TODO: Remove when SERVER-10910 has been resolved.  
+        if basename in ["gridfs.js", "initial_sync3.js", "majority.js", "no_chaining.js",
+                        "rollback4.js", "slavedelay3.js", "sync2.js", "tags.js"]:
+            return True
+        # TODO: For now skip tests using MongodRunner, remove when SERVER-10909 has been resolved
+        if basename in ["fastsync.js", "index_retry.js", "ttl_repl_maintenance.js", 
+                        "unix_socket1.js"]:
+            return True;
+    if auth or keyFile or use_x509: # For tests running with auth
         # Skip any tests that run with auth explicitly
-        if parentDir == "auth" or "auth" in basename:
+        if parentDir.lower() == "auth" or "auth" in basename.lower():
             return True
         if parentPath == mongo_repo: # Skip client tests
             return True
@@ -492,7 +503,10 @@ def runTest(test, result):
                      'TestData.auth = ' + ternary( auth ) + ";" + \
                      'TestData.keyFile = ' + ternary( keyFile , '"' + str(keyFile) + '"' , 'null' ) + ";" + \
                      'TestData.keyFileData = ' + ternary( keyFile , '"' + str(keyFileData) + '"' , 'null' ) + ";" + \
-                     'TestData.authMechanism = ' + ternary( authMechanism, '"' + str(authMechanism) + '"', 'null') + ";"
+                     'TestData.authMechanism = ' + ternary( authMechanism,
+                                               '"' + str(authMechanism) + '"', 'null') + ";" + \
+                     'TestData.useSSL = ' + ternary( use_ssl ) + ";" + \
+                     'TestData.useX509 = ' + ternary( use_x509 ) + ";"
         if os.sys.platform == "win32":
             # double quotes in the evalString on windows; this
             # prevents the backslashes from being removed when
@@ -552,6 +566,7 @@ def runTest(test, result):
 
     if start_mongod:
         try:
+            # The purpose of this Connection is to verify that the smoke.py mongod is still up  
             c = Connection(host="127.0.0.1", port=int(mongod_port), ssl=use_ssl)
         except Exception,e:
             print "Exception from pymongo: ", e
@@ -576,7 +591,8 @@ def run_tests(tests):
                         no_preallocj=no_preallocj,
                         auth=auth,
                         authMechanism=authMechanism,
-                        use_ssl=use_ssl).__enter__()
+                        use_ssl=use_ssl,
+                        use_x509=use_x509).__enter__()
     else:
         master = Nothing()
     try:
@@ -592,7 +608,8 @@ def run_tests(tests):
                            no_preallocj=no_preallocj,
                            auth=auth,
                            authMechanism=authMechanism,
-                           use_ssl=use_ssl).__enter__()
+                           use_ssl=use_ssl,
+                           use_x509=use_x509).__enter__()
             primary = Connection(port=master.port, slave_okay=True);
 
             primary.admin.command({'replSetInitiate' : {'_id' : 'foo', 'members' : [
@@ -645,7 +662,8 @@ def run_tests(tests):
                                             no_preallocj=no_preallocj,
                                             auth=auth,
                                             authMechanism=authMechanism,
-                                            use_ssl=use_ssl).__enter__()
+                                            use_ssl=use_ssl,
+                                            use_x509=use_x509).__enter__()
 
                 except TestFailure, f:
                     test_result["end"] = time.time()
@@ -807,12 +825,15 @@ def add_exe(e):
 def set_globals(options, tests):
     global mongod_executable, mongod_port, shell_executable, continue_on_failure, small_oplog, small_oplog_rs
     global no_journal, set_parameters, no_preallocj, auth, authMechanism, keyFile, smoke_db_prefix, test_path, start_mongod
-    global use_ssl
+    global use_ssl, use_x509
     global file_of_commands_mode
     global report_file
     start_mongod = options.start_mongod
     if hasattr(options, 'use_ssl'):
         use_ssl = options.use_ssl
+    if hasattr(options, 'use_x509'):
+        use_x509 = options.use_x509
+        use_ssl = use_ssl or use_x509
     #Careful, this can be called multiple times
     test_path = options.test_path
 
@@ -975,6 +996,9 @@ def main():
     parser.add_option('--auth', dest='auth', default=False,
                       action="store_true",
                       help='Run standalone mongods in tests with authentication enabled')
+    parser.add_option('--use-x509', dest='use_x509', default=False,
+                      action="store_true",
+                      help='Use x509 auth for internal cluster authentication')
     parser.add_option('--authMechanism', dest='authMechanism', default='MONGODB-CR',
                       help='Use the given authentication mechanism, when --auth is used.')
     parser.add_option('--keyFile', dest='keyFile', default=None,
