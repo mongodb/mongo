@@ -1845,6 +1845,7 @@ namespace mongo {
             intrusive_ptr<ExpressionContext> pExpCtx =
                 new ExpressionContext(InterruptStatusMongos::status, NamespaceString(fullns));
             pExpCtx->inRouter = true;
+            // explicitly *not* setting pExpCtx->tempDir
 
             /* parse the pipeline specification */
             intrusive_ptr<Pipeline> pPipeline(

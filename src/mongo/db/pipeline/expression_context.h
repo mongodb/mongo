@@ -28,6 +28,8 @@
 
 #pragma once
 
+#include <string>
+
 #include "mongo/db/interrupt_status.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/util/intrusive_counter.h"
@@ -56,5 +58,6 @@ namespace mongo {
         bool extSortAllowed;
         const InterruptStatus& interruptStatus;
         NamespaceString ns;
+        std::string tempDir; // Defaults to empty to prevent external sorting in mongos.
     };
 }

@@ -79,7 +79,9 @@ namespace mongo {
                                                  long maxFileSize)
         : _mayInterrupt(boost::make_shared<bool>(false))
         , _sorter(Sorter<BSONObj, DiskLoc>::make(
-                    SortOptions().ExtSortAllowed().MaxMemoryUsageBytes(maxFileSize),
+                    SortOptions().TempDir(dbpath + "/_tmp")
+                                 .ExtSortAllowed()
+                                 .MaxMemoryUsageBytes(maxFileSize),
                     OldExtSortComparator(comp, _mayInterrupt)))
     {}
 }

@@ -35,7 +35,7 @@
 #include <utility>
 #include <vector>
 
-#include <mongo/base/disallow_copying.h>
+#include "mongo/base/disallow_copying.h"
 
 /**
  * This is the public API for the Sorter (both in-memory and external)
@@ -95,6 +95,8 @@ namespace mongo {
         unsigned long long limit; /// number of KV pairs to be returned. 0 for no limit.
         size_t maxMemoryUsageBytes; /// Approximate.
         bool extSortAllowed; /// If false, uassert if more mem needed than allowed.
+        std::string tempDir; /// Directory to directly place files in.
+                             /// Must be explicitly set if extSortAllowed is true.
 
         SortOptions()
             : limit(0)
@@ -116,6 +118,11 @@ namespace mongo {
 
         SortOptions& ExtSortAllowed(bool newExtSortAllowed=true) {
             extSortAllowed = newExtSortAllowed;
+            return *this;
+        }
+
+        SortOptions& TempDir(const std::string& newTempDir) {
+            tempDir = newTempDir;
             return *this;
         }
     };
@@ -183,7 +190,8 @@ namespace mongo {
                          ,typename Value::SorterDeserializeSettings
                          > Settings;
 
-        explicit SortedFileWriter(const Settings& settings = Settings());
+        explicit SortedFileWriter(const SortOptions& opts,
+                                  const Settings& settings = Settings());
 
         void addAlreadySorted(const Key&, const Value&);
         Iterator* done(); /// Can't add more data after calling done()
