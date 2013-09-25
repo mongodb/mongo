@@ -124,4 +124,51 @@ namespace mongo {
 
     };
 
+    /**
+     * Similar to above, this class wraps the write items of a command request into a generically
+     * usable type.  Very thin wrapper, does not own the write item itself.
+     *
+     * TODO: Use in BatchedCommandRequest above
+     */
+    class BatchItemRef {
+    public:
+
+        explicit BatchItemRef( const BatchItemRef& itemRef ) :
+            _request( itemRef._request ), _itemIndex( itemRef._itemIndex ) {
+        }
+
+        BatchItemRef( const BatchedCommandRequest* request, int itemIndex ) :
+            _request( request ), _itemIndex( itemIndex ) {
+        }
+
+        const BatchedCommandRequest* getRequest() const {
+            return _request;
+        }
+
+        int getItemIndex() const {
+            return _itemIndex;
+        }
+
+        BatchedCommandRequest::BatchType getOpType() const {
+            return _request->getBatchType();
+        }
+
+        BSONObj getDocument() const {
+            return _request->getInsertRequest()->getDocumentsAt( _itemIndex );
+        }
+
+        const BatchedUpdateDocument* getUpdate() const {
+            return _request->getUpdateRequest()->getUpdatesAt( _itemIndex );
+        }
+
+        const BatchedDeleteDocument* getDelete() const {
+            return _request->getDeleteRequest()->getDeletesAt( _itemIndex );
+        }
+
+    private:
+
+        const BatchedCommandRequest* _request;
+        const int _itemIndex;
+    };
+
 } // namespace mongo
