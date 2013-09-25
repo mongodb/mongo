@@ -247,6 +247,10 @@ namespace mongo {
 
 #ifdef MONGO_SSL
     Status CmdAuthenticate::_authenticateX509(const UserName& user, const BSONObj& cmdObj) {
+        if (!getSSLManager()) {
+            return Status(ErrorCodes::ProtocolError,
+                          "SSL support is required for the MONGODB-X509 mechanism.");
+        }
         if(user.getDB() != "$external") {
             return Status(ErrorCodes::ProtocolError,
                           "X.509 authentication must always use the $external database.");
