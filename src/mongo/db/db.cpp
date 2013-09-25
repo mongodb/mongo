@@ -666,6 +666,9 @@ namespace mongo {
         DEV log() << "_DEBUG build (which is slower)" << endl;
         show_warnings();
         log() << mongodVersion() << endl;
+#if defined(_WIN32)
+        printTargetMinOS();
+#endif
         printGitVersion();
         printOpenSSLVersion();
         printSysInfo();

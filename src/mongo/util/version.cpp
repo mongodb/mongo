@@ -153,6 +153,26 @@ namespace mongo {
 #endif
 #endif
 
+#if defined(_WIN32)
+    std::string targetMinOS() {
+        stringstream ss;
+#if (NTDDI_VERSION >= 0x06010000)
+        ss << "Windows 7/Windows Server 2008 R2";
+#elif (NTDDI_VERSION >= 0x05020200)
+        ss << "Windows Server 2003 SP2";
+#elif (NTDDI_VERSION >= 0x05010300)
+        ss << "Windows XP SP3";
+#else
+#error This targetted Windows version is not supported
+#endif // NTDDI_VERSION
+       return ss.str();
+    }
+
+    void printTargetMinOS() {
+        log() << "targetMinOS: " << targetMinOS();
+    }
+#endif // _WIN32
+
     void printSysInfo() {
         log() << "build info: " << sysInfo() << endl;
     }
@@ -164,6 +184,9 @@ namespace mongo {
     void appendBuildInfo(BSONObjBuilder& result) {
        result << "version" << versionString
               << "gitVersion" << gitVersion()
+#if defined(_WIN32)
+              << "targetMinOS" << targetMinOS()
+#endif
               << "OpenSSLVersion" << openSSLVersion()
               << "sysInfo" << sysInfo()
               << "loaderFlags" << loaderFlags()
