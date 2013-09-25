@@ -413,6 +413,17 @@ MongoRunner.mongoOptions = function( opts ){
     // Default for waitForConnect is true
     if (waitForConnect == undefined || waitForConnect == null) opts.waitForConnect = true;
     
+    if( jsTestOptions().useSSL ) {
+        opts.sslOnNormalPorts = "";
+        opts.sslPEMKeyFile = "jstests/libs/server.pem";
+        opts.sslCAFile = "jstests/libs/ca.pem";
+        opts.sslWeakCertificateValidation = "";
+    }
+
+    if ( jsTestOptions().useX509 ) {
+        opts.clusterAuthMode = "x509";
+    }
+    
     opts.port = opts.port || MongoRunner.nextOpenPort()
     MongoRunner.usedPortMap[ "" + parseInt( opts.port ) ] = true
     
@@ -466,6 +477,17 @@ MongoRunner.mongodOptions = function( opts ){
         opts.keyFile = jsTestOptions().keyFile
     }
 
+    if( jsTestOptions().useSSL ) {
+        opts.sslOnNormalPorts = "";
+        opts.sslPEMKeyFile = "jstests/libs/server.pem";
+        opts.sslCAFile = "jstests/libs/ca.pem";
+        opts.sslWeakCertificateValidation = "";
+    }
+
+    if ( jsTestOptions().useX509 ) {
+        opts.clusterAuthMode = "x509";
+    }
+
     if( opts.noReplSet ) opts.replSet = null
     if( opts.arbiter ) opts.oplogSize = 1
             
@@ -473,7 +495,7 @@ MongoRunner.mongodOptions = function( opts ){
 }
 
 MongoRunner.mongosOptions = function( opts ){
-    
+
     opts = MongoRunner.mongoOptions( opts )
     
     // Normalize configdb option to be host string if currently a host
@@ -673,7 +695,6 @@ startMongodTest = function (port, dirname, restart, extraOptions ) {
          useHostname = extraOptions.useHostname;
          delete extraOptions.useHostname;
     }
-
     
     var options = 
         {
@@ -690,6 +711,17 @@ startMongodTest = function (port, dirname, restart, extraOptions ) {
     if( jsTestOptions().auth ) options["auth"] = ""
     if( jsTestOptions().keyFile && (!extraOptions || !extraOptions['keyFile']) ) options['keyFile'] = jsTestOptions().keyFile
 
+    if( jsTestOptions().useSSL ) {
+        options["sslOnNormalPorts"] = "";
+        options["sslPEMKeyFile"] = "jstests/libs/server.pem";
+        options["sslCAFile"] = "jstests/libs/ca.pem";
+        options["sslWeakCertificateValidation"] = "";
+    }
+
+    if ( jsTestOptions().useX509 ) {
+        options["clusterAuthMode"] = "x509";
+    }
+
     if ( extraOptions )
         Object.extend( options , extraOptions );
     
@@ -697,7 +729,7 @@ startMongodTest = function (port, dirname, restart, extraOptions ) {
 
     conn.name = (useHostname ? getHostName() : "localhost") + ":" + port;
 
-    if (jsTestOptions().auth || jsTestOptions().keyFile) {
+    if (jsTestOptions().auth || jsTestOptions().keyFile || jsTestOptions().useX509) {
         if (!this.shardsvr && !options.replSet && !options.hasOwnProperty("slave") && !restart) {
             jsTest.addAuth(conn);
         }

@@ -34,7 +34,8 @@ Mongo.prototype.getSlaveOk = function() {
 }
 
 Mongo.prototype.getDB = function( name ){
-    if (jsTest.options().keyFile && ((typeof this.authenticated == 'undefined') || !this.authenticated)) {
+    if ((jsTest.options().keyFile || jsTest.options().useX509) && 
+         ((typeof this.authenticated == 'undefined') || !this.authenticated)) {
         jsTest.authenticate(this)
     }
     return new DB( this , name );

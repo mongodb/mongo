@@ -16,9 +16,13 @@
 load("jstests/replsets/rslib.js");
 var basename = "jstests_initsync1";
 
-
 print("1. Bring up set");
-var replTest = new ReplSetTest( {name: basename, nodes: 2} );
+// SERVER-7455, this test is called from ssl/auth_x509.js
+var x509_options1;
+var x509_options2;
+var replTest = new ReplSetTest({name: basename, 
+                                nodes : {node0 : x509_options1, node1 : x509_options2}});
+
 var conns = replTest.startSet();
 replTest.initiate();
 
