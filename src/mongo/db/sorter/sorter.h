@@ -36,6 +36,7 @@
 #include <vector>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/bson/util/builder.h"
 
 /**
  * This is the public API for the Sorter (both in-memory and external)

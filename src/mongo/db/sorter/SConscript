@@ -1,0 +1,3 @@
+Import("env")
+
+env.CppUnitTest('sorter_test', 'sorter_test.cpp', LIBDEPS=['$BUILD_DIR/third_party/shim_snappy'])
