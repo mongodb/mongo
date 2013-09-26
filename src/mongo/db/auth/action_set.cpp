@@ -94,4 +94,15 @@ namespace mongo {
         return str.str();
     }
 
+    std::vector<std::string> ActionSet::getActionsAsStrings() const {
+        std::vector<std::string> result;
+        for (int i = 0; i < ActionType::actionTypeEndValue; i++) {
+            ActionType action(i);
+            if (contains(action)) {
+                result.push_back(ActionType::actionToString(action));
+            }
+        }
+        return result;
+    }
+
 } // namespace mongo

@@ -98,6 +98,27 @@ namespace mongo {
         }
 
         /**
+         * Returns true if this pattern matches on the collection name only.
+         */
+        bool isCollectionPattern() const {
+            return _matchType == matchCollectionName;
+        }
+
+        /**
+         * Returns true if this pattern matches the cluster resource only.
+         */
+        bool isClusterResourcePattern() const {
+            return _matchType == matchClusterResource;
+        }
+
+        /**
+         * Returns true if this pattern matches only any normal resource.
+         */
+        bool isAnyNormalResourcePattern() const {
+            return _matchType == matchAnyNormalResource;
+        }
+
+        /**
          * Returns true if this pattern matches nothing at all.
          */
         bool matchesNothing() const { return matchNever == _matchType; }
@@ -154,6 +175,22 @@ namespace mongo {
          * Behavior is undefined unless isExactNamespacePattern() is true.
          */
         const NamespaceString& ns() const { return _ns; }
+
+        /**
+         * Returns the database that this pattern matches.
+         *
+         * Behavior is undefined unless the pattern is of type matchDatabaseName or
+         * matchExactNamespace
+         */
+        StringData databaseToMatch() const { return _ns.db(); }
+
+        /**
+         * Returns the collection that this pattern matches.
+         *
+         * Behavior is undefined unless the pattern is of type matchCollectionName or
+         * matchExactNamespace
+         */
+        StringData collectionToMatch() const { return _ns.coll(); }
 
         std::string toString() const;
 
