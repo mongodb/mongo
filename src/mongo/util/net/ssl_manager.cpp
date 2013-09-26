@@ -150,14 +150,8 @@ namespace mongo {
         // Note: this is for blocking sockets only.
         SSL_CTX_set_mode(_context, SSL_MODE_AUTO_RETRY);
 
-        // Set context within which session can be reused
-        int status = SSL_CTX_set_session_id_context(
-            _context,
-            static_cast<unsigned char*>(static_cast<void*>(&_context)),
-            sizeof(_context));
-        if (!status) {
-            uasserted(16768,"ssl initialization problem");
-        }
+        // Disable session caching (see SERVER-10261)
+        SSL_CTX_set_session_cache_mode(_context, SSL_SESS_CACHE_OFF);
 
         SSLThreadInfo::init();
         SSLThreadInfo::get();
