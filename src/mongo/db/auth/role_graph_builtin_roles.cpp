@@ -412,7 +412,7 @@ namespace {
             addInternalRolePrivileges(&result);
         }
         else {
-            fassertFailed(0);
+            fassertFailed(17145);
         }
         return result;
     }
