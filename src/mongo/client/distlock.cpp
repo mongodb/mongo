@@ -1011,6 +1011,9 @@ namespace mongo {
     // Unlock now takes an optional pointer to the lock, so you can be specific about which
     // particular lock you want to unlock.  This is required when the config server is down,
     // and so cannot tell you what lock ts you should try later.
+    //
+    // This function *must not* throw exceptions, since it can be used in destructors - failure
+    // results in queuing and trying again later.
     void DistributedLock::unlock( BSONObj* oldLockPtr ) {
 
         verify( _name != "" );
@@ -1025,9 +1028,13 @@ namespace mongo {
 
         while ( ++attempted <= maxAttempts ) {
 
-            ScopedDbConnection conn(_conn.toString());
+            // Awkward, but necessary since the constructor itself throws exceptions
+            scoped_ptr<ScopedDbConnection> connPtr;
 
             try {
+
+                connPtr.reset( new ScopedDbConnection( _conn.toString() ) );
+                ScopedDbConnection& conn = *connPtr;
 
                 if( oldLock.isEmpty() )
                     oldLock = conn->findOne( LocksType::ConfigNS, BSON( LocksType::name(_name) ) );
@@ -1063,14 +1070,14 @@ namespace mongo {
             }
             catch( UpdateNotTheSame& ) {
                 LOG( logLvl - 1 ) << "distributed lock '" << lockName << "' unlocked (messily). " << endl;
-                conn.done();
+                // This isn't a connection problem, so don't throw away the conn
+                connPtr->done();
                 break;
             }
             catch ( std::exception& e) {
                 warning() << "distributed lock '" << lockName << "' failed unlock attempt."
                           << causedBy( e ) <<  endl;
 
-                conn.done();
                 // TODO:  If our lock timeout is small, sleeping this long may be unsafe.
                 if( attempted != maxAttempts) sleepsecs(1 << attempted);
             }
