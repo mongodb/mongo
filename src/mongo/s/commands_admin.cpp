@@ -830,7 +830,7 @@ namespace mongo {
                         << " { split : 'alleyinsider.blog.posts' , find : { ts : 1 } }\n"
                         << " example: - split the shard that contains the key with this as the middle \n"
                         << " { split : 'alleyinsider.blog.posts' , middle : { ts : 1 } }\n"
-                        << " NOTE: this does not move move the chunks, it merely creates a logical separation \n"
+                        << " NOTE: this does not move the chunks, it merely creates a logical separation \n"
                         ;
             }
             virtual void addRequiredPrivileges(const std::string& dbname,
