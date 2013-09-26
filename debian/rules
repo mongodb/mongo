@@ -137,7 +137,7 @@ binary-arch: build install
 #	dh_installemacsen
 #	dh_installpam
 #	dh_installmime
-	dh_installinit -pmongodb-org-unstable-server --name=mongodb
+	dh_installinit -pmongodb-org-unstable-server --name=mongod
 #	dh_installinfo
 	dh_installman
 	dh_link

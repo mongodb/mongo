@@ -20,7 +20,7 @@
 # Suite 330, Boston, MA 02111-1307 USA
 #
 ### BEGIN INIT INFO
-# Provides:          mongodb
+# Provides:          mongod
 # Required-Start:    $network $local_fs $remote_fs
 # Required-Stop:     $network $local_fs $remote_fs
 # Should-Start:      $named
@@ -50,7 +50,7 @@ PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
 DAEMON=/usr/bin/mongod
 DESC=database
 
-NAME=mongodb
+NAME=mongod
 # Defaults.  Can be overridden by the /etc/default/$NAME
 # Other configuration options are located in $CONF file. See here for more:
 # http://dochub.mongodb.org/core/configurationoptions
@@ -80,7 +80,7 @@ if test ! -x $DAEMON; then
     exit 0
 fi
 
-if test "x$ENABLE_MONGODB" != "xyes"; then
+if test "x$ENABLE_MONGOD" != "xyes"; then
     exit 0
 fi
 
