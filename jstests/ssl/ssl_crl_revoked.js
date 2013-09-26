@@ -6,7 +6,7 @@ port = allocatePorts( 1 )[ 0 ];
 var baseName = "jstests_ssl_ssl_crl_revoked";
 
 
-var md = startMongod( "--port", port, "--dbpath", "/data/db/" + baseName,
+var md = startMongod( "--port", port, "--dbpath", MongoRunner.dataPath + baseName,
                     "--sslMode","sslOnly",
                     "--sslPEMKeyFile", "jstests/libs/server.pem",
                     "--sslCAFile", "jstests/libs/ca.pem",

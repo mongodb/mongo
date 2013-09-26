@@ -4,8 +4,8 @@
 // does not return error statuses to indicate an error.
 port = allocatePorts( 1 )[ 0 ];
 var baseName = "jstests_ssl_ssl_cert_password";
-var dbpath = "/data/db/" + baseName;
-var external_scratch_dir = "/data/db/" + baseName + "/external/";
+var dbpath = MongoRunner.dataPath + baseName;
+var external_scratch_dir = MongoRunner.dataPath + baseName + "/external/";
 resetDbpath(dbpath);
 mkdir(external_scratch_dir);
 

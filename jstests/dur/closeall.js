@@ -2,8 +2,8 @@
 // this is also a test of recoverFromYield() as that will get exercised by the update
 
 function f(variant, quickCommits, paranoid) {
-    var path = "/data/db/closeall";
-    var path2 = "/data/db/closeall_slave";
+    var path = MongoRunner.dataDir + "/closeall";
+    var path2 = MongoRunner.dataDir + "/closeall_slave";
     var ourdb = "closealltest";
 
     print("closeall.js start mongod variant:" + variant + "." + quickCommits + "." + paranoid);

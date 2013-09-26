@@ -5,7 +5,7 @@ print("START auth1.js");
 port = allocatePorts( 1 )[ 0 ];
 baseName = "jstests_auth_auth1";
 
-m = startMongod( "--auth", "--port", port, "--dbpath", "/data/db/" + baseName, "--nohttpinterface", "--bind_ip", "127.0.0.1" );
+m = startMongod( "--auth", "--port", port, "--dbpath", MongoRunner.dataPath + baseName, "--nohttpinterface", "--bind_ip", "127.0.0.1" );
 db = m.getDB( "test" );
 
 t = db[ baseName ];

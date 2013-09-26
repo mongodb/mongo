@@ -3,7 +3,7 @@
 // tunables
 STRING_SIZE = 1024*1024;
 NUM_TO_INSERT = 2.5*1024;
-PATH = "/data/db/dur_remove_old_journals";
+PATH = MongoRunner.dataDir + "/dur_remove_old_journals";
 SYNC_DELAY = 5; // must be a number
 
 conn = startMongodEmpty("--port", 30001, "--dbpath", PATH, "--dur", "--smallfiles", "--syncdelay", ''+SYNC_DELAY);

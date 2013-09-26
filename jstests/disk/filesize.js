@@ -4,7 +4,7 @@ var baseName = "filesize";
 
 // Start mongod with --smallfiles
 var m = startMongod(
-    "--port", port, "--dbpath", "/data/db/" + baseName, "--nohttpinterface",
+    "--port", port, "--dbpath", MongoRunner.dataPath + baseName, "--nohttpinterface",
     "--bind_ip", "127.0.0.1" , "--nojournal" , "--smallfiles" );
 
 var db = m.getDB( baseName );
@@ -16,7 +16,7 @@ if (db.serverBuildInfo().bits == 32) {
     // Restart mongod without --smallFiles
     stopMongod( port );
     m = startMongodNoReset(
-        "--port", port, "--dbpath", "/data/db/" + baseName,
+        "--port", port, "--dbpath", MongoRunner.dataPath + baseName,
         "--nohttpinterface", "--bind_ip", "127.0.0.1" , "--nojournal" );
 
     db = m.getDB( baseName );

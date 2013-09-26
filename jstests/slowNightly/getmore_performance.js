@@ -33,7 +33,7 @@ var doTest = function() {
     // Create the test collection
     //
     var baseName = 'getmore_performance';
-    var dbpath = '/data/db/sconsTests/' + baseName
+    var dbpath = MongoRunner.dataDir + '/sconsTests/' + baseName
     var port = allocatePorts( 1 )[ 0 ];
     var mongod = startMongod( '--port', port, '--dbpath', dbpath );
     sleep(50);

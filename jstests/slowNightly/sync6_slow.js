@@ -11,7 +11,7 @@ test = new SyncCCTest("sync6", {logpath: bitbucket, logappend: ""});
 // Startup another process to handle our commands to the cluster, mostly so it's
 // easier to read.
 var commandConn = startMongodTest( 30000 + 4, "syncCommander", false, {}); //{ logpath : bitbucket } )//{verbose : ""} )
-// { logpath : "/data/db/syncCommander/mongod.log" } );
+// { logpath : MongoRunner.dataDir + "/syncCommander/mongod.log" } );
 
 if ( !_isWindows() ) { //SERVER-7411
 // Up the log level for this test

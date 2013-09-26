@@ -17,7 +17,7 @@ master = replTest.getMaster();
 db = master.getDB( "test" );
 printjson( rs.status() );
 
-var config = startMongodEmpty("--configsvr", "--port", 29999, "--dbpath", "/data/db/" + name + "_config" );
+var config = startMongodEmpty("--configsvr", "--port", 29999, "--dbpath", MongoRunner.dataPath + name + "_config" );
 
 var mongos = startMongos({ port : 30000, configdb : getHostName() + ":29999" })
 var admin = mongos.getDB("admin")

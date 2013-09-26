@@ -464,6 +464,10 @@ def runTest(test, result):
         # Blech.
         if os.path.basename(path) in ["test", "test.exe", "perftest", "perftest.exe"]:
             argv = [path]
+            # default data directory for test and perftest is /tmp/unittest
+            if smoke_db_prefix:
+                dir_name = smoke_db_prefix + '/unittests'
+                argv.extend(["--dbpath", dir_name] )
         # more blech
         elif os.path.basename(path) in ['mongos', 'mongos.exe']:
             argv = [path, "--test"]
@@ -508,6 +512,9 @@ def runTest(test, result):
                                                '"' + str(authMechanism) + '"', 'null') + ";" + \
                      'TestData.useSSL = ' + ternary( use_ssl ) + ";" + \
                      'TestData.useX509 = ' + ternary( use_x509 ) + ";"
+        # this updates the default data directory for mongod processes started through shell (src/mongo/shell/servers.js)
+        evalString += 'MongoRunner.dataDir = "' + os.path.abspath(smoke_db_prefix + '/data/db') + '";'
+        evalString += 'MongoRunner.dataPath = MongoRunner.dataDir + "/";'
         if os.sys.platform == "win32":
             # double quotes in the evalString on windows; this
             # prevents the backslashes from being removed when

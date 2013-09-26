@@ -25,7 +25,7 @@ replTest.awaitReplication();
 
 print("4. Bring up a new node");
 ports = allocatePorts( 3 );
-basePath = "/data/db/" + basename;
+basePath = MongoRunner.dataPath + basename;
 hostname = getHostName();
 
 s = startMongodTest (ports[2], basename, false, {replSet : basename, oplogSize : 2} );

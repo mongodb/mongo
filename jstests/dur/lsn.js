@@ -72,7 +72,7 @@ if( debugging ) {
 }
 
 // directories
-var path2 = "/data/db/" + testname+"dur";
+var path2 = MongoRunner.dataPath + testname+"dur";
 
 // run mongod with a short --syncdelay to make LSN writing sooner
 log("run mongod --dur and a short --syncdelay");

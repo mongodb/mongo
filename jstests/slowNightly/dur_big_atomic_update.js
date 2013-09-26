@@ -2,7 +2,7 @@
 //
 // this tests writing 1GB in an atomic update to make sure we commit periodically
 
-var path = "/data/db/dur_big_atomic_update";
+var path = MongoRunner.dataDir + "/dur_big_atomic_update";
 
 conn = startMongodEmpty("--port", 30001, "--dbpath", path, "--dur", "--durOptions", 8);
 d = conn.getDB("test");

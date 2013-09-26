@@ -1,10 +1,10 @@
 /** Test running out of disk space with durability enabled */
 
-startPath = "/data/db/diskfulltest";
-recoverPath = "/data/db/dur_diskfull";
+startPath = MongoRunner.dataDir + "/diskfulltest";
+recoverPath = MongoRunner.dataDir + "/dur_diskfull";
 
 doIt = false;
-files = listFiles( "/data/db" );
+files = listFiles( MongoRunner.dataDir );
 for ( i in files ) {
     if ( files[ i ].name == startPath ) {
         doIt = true;

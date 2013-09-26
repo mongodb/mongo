@@ -13,7 +13,7 @@ ports = allocatePorts( 2 );
 // make sure writing is allowed when started without --auth enabled
 
 port = ports[ 0 ];
-dbms = startMongod( "--port", port, "--dbpath", "/data/db/" + baseName, "--nohttpinterface", "--bind_ip", "127.0.0.1" );
+dbms = startMongod( "--port", port, "--dbpath", MongoRunner.dataPath + baseName, "--nohttpinterface", "--bind_ip", "127.0.0.1" );
 var d = dbms.getDB( dbName );
 var t = d[ baseName ];
 
@@ -41,7 +41,7 @@ stopMongod( port );
 // In --auth mode, read-only user should not be able to write to existing or temporary collection, thus only can execute inline mode
 
 port = ports[ 1 ];
-dbms = startMongodNoReset( "--auth", "--port", port, "--dbpath", "/data/db/" + baseName, "--nohttpinterface", "--bind_ip", "127.0.0.1" );
+dbms = startMongodNoReset( "--auth", "--port", port, "--dbpath", MongoRunner.dataPath + baseName, "--nohttpinterface", "--bind_ip", "127.0.0.1" );
 d = dbms.getDB( dbName );
 t = d[ baseName ];
 

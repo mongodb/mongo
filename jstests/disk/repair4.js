@@ -1,11 +1,11 @@
 // test that disk space check happens on --repairpath partition
 
 var baseName = "jstests_disk_repair4";
-var smallbase = "/data/db/repairpartitiontest"
+var smallbase = MongoRunner.dataDir + "/repairpartitiontest"
 var smallpath = smallbase + "/dir"
 
 doIt = false;
-files = listFiles( "/data/db" );
+files = listFiles( MongoRunner.dataDir );
 for ( i in files ) {
     if ( files[ i ].name == smallbase ) {
         doIt = true;
@@ -20,7 +20,7 @@ if ( !doIt ) {
 if ( doIt ) {
 
     port = allocatePorts( 1 )[ 0 ];
-    repairpath = "/data/db/" + baseName + "/";
+    repairpath = MongoRunner.dataPath + baseName + "/";
     
     resetDbpath( smallpath );
     resetDbpath( repairpath );

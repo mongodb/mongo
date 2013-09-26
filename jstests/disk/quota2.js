@@ -5,9 +5,9 @@ if ( 0 ) { // SERVER-3420
 port = allocatePorts( 1 )[ 0 ];
 
 baseName = "jstests_disk_quota2";
-dbpath = "/data/db/" + baseName;
+dbpath = MongoRunner.dataPath + baseName;
 
-m = startMongod( "--port", port, "--dbpath", "/data/db/" + baseName, "--quotaFiles", "2", "--smallfiles" );
+m = startMongod( "--port", port, "--dbpath", MongoRunner.dataPath + baseName, "--quotaFiles", "2", "--smallfiles" );
 db = m.getDB( baseName );
 
 big = new Array( 10000 ).toString();

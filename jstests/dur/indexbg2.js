@@ -1,4 +1,4 @@
-path = '/data/db/indexbg2_dur';
+path = MongoRunner.dataDir + '/indexbg2_dur';
 
 m = startMongodEmpty( '--port', 30001, '--dbpath', path, '--journal', '--smallfiles' );
 

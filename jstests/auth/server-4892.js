@@ -6,7 +6,7 @@
  */
 
 var baseName = 'jstests_auth_server4892';
-var dbpath = '/data/db/' + baseName;
+var dbpath = MongoRunner.dataPath + baseName;
 var port = allocatePorts( 1 )[ 0 ];
 var mongod_common_args = [
     '--port', port, '--dbpath', dbpath, '--bind_ip', '127.0.0.1', '--nohttpinterface' ];

@@ -541,7 +541,7 @@ ShardingTest.prototype.stop = function(){
     }
     if ( this._alldbpaths ){
         for( i=0; i<this._alldbpaths.length; i++ ){
-            resetDbpath( "/data/db/" + this._alldbpaths[i] );
+            resetDbpath( MongoRunner.dataPath + this._alldbpaths[i] );
         }
     }
 

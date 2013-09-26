@@ -3,7 +3,7 @@
 var port = allocatePorts( 1 )[ 0 ];
 var baseName = "jstests_show_log_auth";
 
-var m = startMongod( "--auth", "--port", port, "--dbpath", "/data/db/" + baseName, "--nohttpinterface", "--bind_ip", "127.0.0.1" , "--nojournal" , "--smallfiles" );
+var m = startMongod( "--auth", "--port", port, "--dbpath", MongoRunner.dataPath + baseName, "--nohttpinterface", "--bind_ip", "127.0.0.1" , "--nojournal" , "--smallfiles" );
 var db = m.getDB( "admin" );
 
 db.addUser({user: "admin" , pwd: "pass", roles: jsTest.adminUserRoles});

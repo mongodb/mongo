@@ -24,8 +24,8 @@ function checkNoJournalFiles(path, pass) {
 }
 
 // directories
-var path1 = "/data/db/quicknodur";
-var path2 = "/data/db/quickdur";
+var path1 = MongoRunner.dataDir + "/quicknodur";
+var path2 = MongoRunner.dataDir + "/quickdur";
 
 // non-durable version
 tst.log("start mongod without dur");

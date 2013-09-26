@@ -159,7 +159,7 @@ ReplSetTest.prototype.getPath = function( n ){
     if( n.host )
         n = this.getNodeId( n )
 
-    var p = "/data/db/" + this.name + "-"+n;
+    var p = MongoRunner.dataPath + this.name + "-"+n;
     if ( ! this._alldbpaths )
         this._alldbpaths = [ p ];
     else

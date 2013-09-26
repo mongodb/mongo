@@ -107,8 +107,8 @@ if (debugging) {
 }
 
 // directories
-var path1 = "/data/db/" + testname + "nodur";
-var path2 = "/data/db/" + testname + "dur";
+var path1 = MongoRunner.dataPath + testname + "nodur";
+var path2 = MongoRunner.dataPath + testname + "dur";
 
 // non-durable version
 log("mongod nodur");

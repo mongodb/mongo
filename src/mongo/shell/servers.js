@@ -699,7 +699,7 @@ startMongodTest = function (port, dirname, restart, extraOptions ) {
     var options = 
         {
             port: port,
-            dbpath: "/data/db/" + dirname,
+            dbpath: MongoRunner.dataPath + dirname,
             noprealloc: "",
             smallfiles: "",
             oplogSize: "40",

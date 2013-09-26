@@ -1,11 +1,11 @@
 // test --repairpath on another partition
 
 var baseName = "jstests_disk_repair3";
-var repairbase = "/data/db/repairpartitiontest"
+var repairbase = MongoRunner.dataDir + "/repairpartitiontest"
 var repairpath = repairbase + "/dir"
 
 doIt = false;
-files = listFiles( "/data/db" );
+files = listFiles( MongoRunner.dataDir );
 for ( i in files ) {
     if ( files[ i ].name == repairbase ) {
         doIt = true;
@@ -20,7 +20,7 @@ if ( !doIt ) {
 if ( doIt ) {
 
     port = allocatePorts( 1 )[ 0 ];
-    dbpath = "/data/db/" + baseName + "/";
+    dbpath = MongoRunner.dataPath + baseName + "/";
 
     resetDbpath( dbpath );
     resetDbpath( repairpath );

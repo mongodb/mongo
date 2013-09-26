@@ -65,7 +65,7 @@ if( debugging ) {
 }
 
 // directories
-var path = "/data/db/" + testname+"dur";
+var path = MongoRunner.dataPath + testname+"dur";
 
 log("run mongod with --dur");
 conn = startMongodEmpty("--port", 30001, "--dbpath", path, "--dur", "--smallfiles", "--durOptions", /*DurParanoid*/8, "--master", "--oplogSize", 64);

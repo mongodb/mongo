@@ -8,8 +8,8 @@ ports = allocatePorts( 2 );
 var baseName = "jstests_clone_copyauth";
 
 // test copyDatabase from an auth enabled source, with an unauthed dest.
-var source = startMongod( "--auth", "--port", ports[ 0 ], "--dbpath", "/data/db/" + baseName + "_source", "--nohttpinterface", "--bind_ip", "127.0.0.1", "--smallfiles" );
-var target = startMongod( "--port", ports[ 1 ], "--dbpath", "/data/db/" + baseName + "_target", "--nohttpinterface", "--bind_ip", "127.0.0.1", "--smallfiles" );
+var source = startMongod( "--auth", "--port", ports[ 0 ], "--dbpath", MongoRunner.dataPath + baseName + "_source", "--nohttpinterface", "--bind_ip", "127.0.0.1", "--smallfiles" );
+var target = startMongod( "--port", ports[ 1 ], "--dbpath", MongoRunner.dataPath + baseName + "_target", "--nohttpinterface", "--bind_ip", "127.0.0.1", "--smallfiles" );
 
 source.getDB( "admin" ).addUser( "super", "super" );
 source.getDB( "admin" ).auth( "super", "super" );
@@ -29,7 +29,7 @@ assert.eq( 1, target.getDB( baseName )[ baseName ].findOne().i );
 
 // Test with auth-enabled source and dest
 stopMongod( ports[ 1 ] );
-var target = startMongod( "--auth", "--port", ports[ 1 ], "--dbpath", "/data/db/" + baseName + "_target", "--nohttpinterface", "--bind_ip", "127.0.0.1", "--smallfiles" );
+var target = startMongod( "--auth", "--port", ports[ 1 ], "--dbpath", MongoRunner.dataPath + baseName + "_target", "--nohttpinterface", "--bind_ip", "127.0.0.1", "--smallfiles" );
 
 target.getDB( "admin" ).addUser( "super1", "super1" );
 assert.throws( function() { source.getDB( baseName )[ baseName ].findOne(); } );
@@ -48,7 +48,7 @@ assert.eq( 1, target.getDB( baseName )[ baseName ].findOne().i );
 // Test with auth-enabled dest, but un-authed source
 stopMongod(ports[0]);
 var source = startMongod( "--port", ports[ 0 ],
-                          "--dbpath", "/data/db/" + baseName + "_source",
+                          "--dbpath", MongoRunner.dataPath + baseName + "_source",
                           "--nohttpinterface",
                           "--bind_ip", "127.0.0.1",
                           "--smallfiles" );

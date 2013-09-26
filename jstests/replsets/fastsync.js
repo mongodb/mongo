@@ -36,7 +36,7 @@ var reconnect = function(a) {
 ports = allocatePorts( 4 );
 
 var basename = "jstests_fastsync";
-var basePath = "/data/db/" + basename;
+var basePath = MongoRunner.dataPath + basename;
 var hostname = getHostName();
 
 var pargs = new MongodRunner( ports[ 0 ], basePath + "-p", false, false,

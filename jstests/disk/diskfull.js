@@ -1,7 +1,7 @@
 doIt = false;
-dbpath = "/data/db/diskfulltest";
+dbpath = MongoRunner.dataDir + "/diskfulltest";
 
-files = listFiles( "/data/db" );
+files = listFiles( MongoRunner.dataDir );
 for ( i in files ) {
     if ( files[ i ].name == dbpath ) {
         doIt = true;

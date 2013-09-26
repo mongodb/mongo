@@ -1,7 +1,7 @@
 // Check index rebuild when MongoDB is killed
 
 var ports = allocatePorts(1);
-mongod = new MongodRunner(ports[0], "/data/db/index_retry", null, null, ["--journal"]);
+mongod = new MongodRunner(ports[0], MongoRunner.dataDir + "/index_retry", null, null, ["--journal"]);
 var conn = mongod.start();
 
 var test = conn.getDB("test");

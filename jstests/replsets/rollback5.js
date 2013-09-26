@@ -23,8 +23,8 @@ var A = a_conn.getDB("test");
 var B = b_conn.getDB("test");
 var AID = replTest.getNodeId(a_conn);
 var BID = replTest.getNodeId(b_conn);
-var Apath = "/data/db/rollback5-0/";
-var Bpath = "/data/db/rollback5-1/";
+var Apath = MongoRunner.dataDir + "/rollback5-0/";
+var Bpath = MongoRunner.dataDir + "/rollback5-1/";
 assert(master == conns[0], "conns[0] assumed to be master");
 assert(a_conn.host == master.host);
 

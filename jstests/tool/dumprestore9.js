@@ -36,7 +36,7 @@ assert.eq(numDocs, coll.count(), "Documents weren't inserted correctly");
 
 step("dump cluster");
 
-dumpdir = "/data/db/dumprestore9-dump1/";
+dumpdir = MongoRunner.dataDir + "/dumprestore9-dump1/";
 resetDbpath(dumpdir);
 runMongoProgram( "mongodump", "--host", s._mongos[0].host, "--out", dumpdir );
 

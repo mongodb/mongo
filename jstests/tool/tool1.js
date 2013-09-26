@@ -1,8 +1,8 @@
 // mongo tool tests, very basic to start with
 
 baseName = "jstests_tool_tool1";
-dbPath = "/data/db/" + baseName + "/";
-externalPath = "/data/db/" + baseName + "_external/";
+dbPath = MongoRunner.dataPath + baseName + "/";
+externalPath = MongoRunner.dataPath + baseName + "_external/";
 externalFile = externalPath + "export.json";
 
 function fileSize(){

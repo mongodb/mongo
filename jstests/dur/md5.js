@@ -49,7 +49,7 @@ if( debugging ) {
 
 log();
 
-var path = "/data/db/" + testname+"dur";
+var path = MongoRunner.dataPath + testname+"dur";
 
 log();
 conn = startMongodEmpty("--port", 30001, "--dbpath", path, "--dur", "--smallfiles", "--durOptions", 8);

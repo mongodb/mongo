@@ -4,7 +4,7 @@ port = allocatePorts( 1 )[ 0 ];
 
 var baseName = "jstests_preallocate2";
 
-var m = startMongod( "--port", port, "--dbpath", "/data/db/" + baseName );
+var m = startMongod( "--port", port, "--dbpath", MongoRunner.dataPath + baseName );
 
 m.getDB( baseName )[ baseName ].save( {i:1} );
 

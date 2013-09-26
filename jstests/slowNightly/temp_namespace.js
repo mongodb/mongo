@@ -1,7 +1,7 @@
 // this is to make sure that temp collections get cleaned up on restart
 
 testname = 'temp_namespace_sw'
-path = '/data/db/'+testname
+path = MongoRunner.dataPath+testname
 
 conn = startMongodEmpty("--port", 30000, "--dbpath", path, "--smallfiles", "--noprealloc", "--nopreallocj");
 d = conn.getDB('test')

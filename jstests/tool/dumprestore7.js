@@ -42,7 +42,7 @@ var master = replTest.getMaster();
 
 step("try mongodump with $timestamp");
 
-var data = "/data/db/dumprestore7-dump1/";
+var data = MongoRunner.dataDir + "/dumprestore7-dump1/";
 var query = "{\"ts\":{\"$gt\":{\"$timestamp\" : {\"t\":"+ time.ts.t + ",\"i\":" + time.ts.i +" }}}}";
 
 runMongoProgram( "mongodump", "--host", "127.0.0.1:"+replTest.ports[0], "--db", "local", "--collection", "oplog.rs", "--query", query, "--out", data );

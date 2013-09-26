@@ -4,7 +4,7 @@ port = allocatePorts( 1 )[ 0 ];
 
 var baseName = "jstests_preallocate";
 
-var m = startMongod( "--port", port, "--dbpath", "/data/db/" + baseName );
+var m = startMongod( "--port", port, "--dbpath", MongoRunner.dataPath + baseName );
 
 var getTotalNonLocalSize = function() {
     var totalNonLocalDBSize = 0;
@@ -35,7 +35,7 @@ assert.soon(function() { return getTotalNonLocalSize() >= expectedMB * 1024 * 10
 
 stopMongod( port );
 
-var m = startMongoProgram( "mongod", "--port", port, "--dbpath", "/data/db/" + baseName );
+var m = startMongoProgram( "mongod", "--port", port, "--dbpath", MongoRunner.dataPath + baseName );
 
 size = getTotalNonLocalSize();
 

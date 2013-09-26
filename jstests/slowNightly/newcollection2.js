@@ -2,7 +2,7 @@
 
 port = allocatePorts( 1 )[ 0 ]
 var baseName = "jstests_disk_newcollection2";
-var m = startMongod( "--noprealloc", "--smallfiles", "--port", port, "--dbpath", "/data/db/" + baseName );
+var m = startMongod( "--noprealloc", "--smallfiles", "--port", port, "--dbpath", MongoRunner.dataPath + baseName );
 db = m.getDB( "test" );
 
 db.createCollection( baseName, {size:0x1FFC0000-0x10-8192} );

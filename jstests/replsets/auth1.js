@@ -8,7 +8,7 @@ var path = "jstests/libs/";
 
 
 print("try starting mongod with auth");
-var m = MongoRunner.runMongod({auth : "", port : port[4], dbpath : "/data/db/wrong-auth"});
+var m = MongoRunner.runMongod({auth : "", port : port[4], dbpath : MongoRunner.dataDir + "/wrong-auth"});
 
 assert.eq(m.getDB("local").auth("__system", ""), 0);
 
@@ -21,7 +21,7 @@ run("chmod", "644", path+"key2");
 
 
 print("try starting mongod");
-m = runMongoProgram( "mongod", "--keyFile", path+"key1", "--port", port[0], "--dbpath", "/data/db/" + name);
+m = runMongoProgram( "mongod", "--keyFile", path+"key1", "--port", port[0], "--dbpath", MongoRunner.dataPath + name);
 
 
 print("should fail with wrong permissions");
@@ -158,7 +158,7 @@ master.runCommand({getlasterror:1, w:3, wtimeout:60000});
 
 
 print("add member with wrong key");
-var conn = new MongodRunner(port[3], "/data/db/"+name+"-3", null, null, ["--replSet","rs_auth1","--rest","--oplogSize","2", "--keyFile", path+"key2"], {no_bind : true});
+var conn = new MongodRunner(port[3], MongoRunner.dataPath+name+"-3", null, null, ["--replSet","rs_auth1","--rest","--oplogSize","2", "--keyFile", path+"key2"], {no_bind : true});
 conn.start();
 
 
@@ -191,7 +191,7 @@ stopMongod(port[3]);
 
 
 print("start back up with correct key");
-conn = new MongodRunner(port[3], "/data/db/"+name+"-3", null, null, ["--replSet","rs_auth1","--rest","--oplogSize","2", "--keyFile", path+"key1"], {no_bind : true});
+conn = new MongodRunner(port[3], MongoRunner.dataPath+name+"-3", null, null, ["--replSet","rs_auth1","--rest","--oplogSize","2", "--keyFile", path+"key1"], {no_bind : true});
 conn.start();
 
 wait(function() {

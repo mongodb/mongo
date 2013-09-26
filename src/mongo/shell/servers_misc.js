@@ -60,7 +60,7 @@ ToolTest = function( name, extraOptions ){
     this.options = extraOptions;
     this.port = allocatePorts(1)[0];
     this.baseName = "jstests_tool_" + name;
-    this.root = "/data/db/" + this.baseName;
+    this.root = MongoRunner.dataPath + this.baseName;
     this.dbpath = this.root + "/";
     this.ext = this.root + "_external/";
     this.extFile = this.root + "_external/a";
@@ -129,7 +129,7 @@ ReplTest.prototype.getPort = function( master ){
 }
 
 ReplTest.prototype.getPath = function( master ){
-    var p = "/data/db/" + this.name + "-";
+    var p = MongoRunner.dataPath + this.name + "-";
     if ( master )
         p += "master";
     else

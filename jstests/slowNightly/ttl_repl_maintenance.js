@@ -10,7 +10,7 @@ var conn;
 
 var primeSystemReplset = function() {
     var port = allocatePorts(1)[0];
-    runner = new MongodRunner(port, "/data/db/jstests_slowNightly-ttl");
+    runner = new MongodRunner(port, MongoRunner.dataDir + "/jstests_slowNightly-ttl");
     conn = runner.start();
     var localDB = conn.getDB("local");
     localDB.system.replset.insert({x:1});

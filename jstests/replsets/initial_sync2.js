@@ -51,7 +51,7 @@ admin_s1.runCommand({replSetFreeze:999999});
 
 print("6. Bring up #3");
 var ports = allocatePorts( 3 );
-var basePath = "/data/db/" + basename;
+var basePath = MongoRunner.dataPath + basename;
 var hostname = getHostName();
 
 var slave2 = startMongodTest (ports[2], basename, false, {replSet : basename, oplogSize : 2} )

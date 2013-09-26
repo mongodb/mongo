@@ -36,7 +36,7 @@ Server.prototype.begin = function() {
 Server.prototype.end = function() {
     print('Stopping mongod on port ' + this.args.port)
     stopMongod (this.args.port)
-    resetDbpath ('/data/db/' + this.dirname)
+    resetDbpath (MongoRunner.dataPath + this.dirname)
 }
 
 // Cut server from network so it is unreachable (but still alive)

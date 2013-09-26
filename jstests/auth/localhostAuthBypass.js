@@ -4,7 +4,7 @@
 //mongod whether it is hosted with "localhost" or a hostname.
 
 var baseName = "auth_server-6591";
-var dbpath = "/data/db/" + baseName;
+var dbpath = MongoRunner.dataPath + baseName;
 var username = "foo";
 var password = "bar";
 var port = allocatePorts(1)[0];

@@ -8,7 +8,7 @@ var baseName = "preallocate_directoryperdb"
 var baseName2 = "preallocate_directoryperdb2"
 var baseName3 = "preallocate_directoryperdb3"
 port = allocatePorts( 1 )[ 0 ];
-dbpath = "/data/db/" + baseDir + "/";
+dbpath = MongoRunner.dataPath + baseDir + "/";
 
 function checkDb2DirAbsent() {
     files = listFiles( dbpath );

@@ -8,7 +8,7 @@ var baseName = "jstests_ssl_ssl_weak";
 
 // Test that connecting with no client certificate and --sslWeakCertificateValidation connects
 // successfully.
-var md = startMongod( "--port", ports[0], "--dbpath", "/data/db/" + baseName + "1",
+var md = startMongod( "--port", ports[0], "--dbpath", MongoRunner.dataPath + baseName + "1",
                       "--sslMode", "sslOnly",
                       "--sslPEMKeyFile", "jstests/libs/server.pem",
                       "--sslCAFile", "jstests/libs/ca.pem",
@@ -32,7 +32,7 @@ assert(mongo==0);
 
 // Test that connecting with no client certificate and no --sslWeakCertificateValidation fails to
 // connect.
-var md2 = startMongod( "--port", ports[1], "--dbpath", "/data/db/" + baseName + "2",
+var md2 = startMongod( "--port", ports[1], "--dbpath", MongoRunner.dataPath + baseName + "2",
                        "--sslMode", "sslOnly",
                        "--sslPEMKeyFile", "jstests/libs/server.pem",
                        "--sslCAFile", "jstests/libs/ca.pem");

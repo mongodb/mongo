@@ -3,7 +3,7 @@
 var baseName = "jstests_disk_repair5";
 
 port = allocatePorts( 1 )[ 0 ];
-dbpath = "/data/db/" + baseName + "/";
+dbpath = MongoRunner.dataPath + baseName + "/";
 repairpath = dbpath + "repairDir/"
 
 resetDbpath( dbpath );
