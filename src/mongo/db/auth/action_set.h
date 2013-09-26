@@ -16,6 +16,7 @@
 #pragma once
 
 #include <bitset>
+#include <vector>
 
 #include "mongo/base/status.h"
 #include "mongo/db/auth/action_type.h"
@@ -51,6 +52,9 @@ namespace mongo {
 
         // Returns the string representation of this ActionSet
         std::string toString() const;
+
+        // Returns a vector of strings representing the actions in the ActionSet.
+        std::vector<std::string> getActionsAsStrings() const;
 
         // Takes a comma-separated string of action type string representations and returns
         // an int bitmask of the actions.

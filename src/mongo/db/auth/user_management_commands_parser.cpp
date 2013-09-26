@@ -553,7 +553,7 @@ namespace auth {
             }
 
             Privilege privilege;
-            if (!ParsedPrivilege::buildPrivilege(parsedPrivilege, &privilege, &errmsg)) {
+            if (!ParsedPrivilege::parsedPrivilegeToPrivilege(parsedPrivilege, &privilege, &errmsg)) {
                 return Status(ErrorCodes::FailedToParse, errmsg);
             }
 

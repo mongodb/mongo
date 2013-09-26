@@ -97,20 +97,33 @@ namespace {
         ASSERT(parsedPrivilege.isValid(&errmsg));
     }
 
-    TEST(PrivilegeParserTest, BuildPrivilegeTest) {
+    TEST(PrivilegeParserTest, ConvertBetweenPrivilegeTest) {
         ParsedPrivilege parsedPrivilege;
         Privilege privilege;
         std::string errmsg;
+        std::vector<std::string> actionsVector;
+        actionsVector.push_back("find");
 
         // Works with wildcard db and resource
         parsedPrivilege.parseBSON(BSON("resource" << BSON("db" << "" << "collection" << "") <<
                                        "actions" << BSON_ARRAY("find")),
                                   &errmsg);
         ASSERT(parsedPrivilege.isValid(&errmsg));
-        ASSERT(ParsedPrivilege::buildPrivilege(parsedPrivilege, &privilege, &errmsg));
+        ASSERT(ParsedPrivilege::parsedPrivilegeToPrivilege(parsedPrivilege, &privilege, &errmsg));
         ASSERT(privilege.getActions().contains(ActionType::find));
         ASSERT(!privilege.getActions().contains(ActionType::insert));
         ASSERT_EQUALS(privilege.getResourcePattern(), ResourcePattern::forAnyNormalResource());
+
+        ASSERT(ParsedPrivilege::privilegeToParsedPrivilege(privilege, &parsedPrivilege, &errmsg));
+        ASSERT(parsedPrivilege.isValid(&errmsg));
+        ASSERT(parsedPrivilege.isResourceSet());
+        ASSERT_FALSE(parsedPrivilege.getResource().isClusterSet());
+        ASSERT(parsedPrivilege.getResource().isDbSet());
+        ASSERT(parsedPrivilege.getResource().isCollectionSet());
+        ASSERT_EQUALS("", parsedPrivilege.getResource().getDb());
+        ASSERT_EQUALS("", parsedPrivilege.getResource().getCollection());
+        ASSERT(parsedPrivilege.isActionsSet());
+        ASSERT(actionsVector == parsedPrivilege.getActions());
 
         // Works with exact namespaces
         parsedPrivilege.parseBSON(BSON("resource" << BSON("db" << "test" <<
@@ -118,11 +131,22 @@ namespace {
                                        "actions" << BSON_ARRAY("find")),
                                   &errmsg);
         ASSERT(parsedPrivilege.isValid(&errmsg));
-        ASSERT(ParsedPrivilege::buildPrivilege(parsedPrivilege, &privilege, &errmsg));
+        ASSERT(ParsedPrivilege::parsedPrivilegeToPrivilege(parsedPrivilege, &privilege, &errmsg));
         ASSERT(privilege.getActions().contains(ActionType::find));
         ASSERT(!privilege.getActions().contains(ActionType::insert));
         ASSERT_EQUALS(privilege.getResourcePattern(),
                       ResourcePattern::forExactNamespace(NamespaceString("test.foo")));
+
+        ASSERT(ParsedPrivilege::privilegeToParsedPrivilege(privilege, &parsedPrivilege, &errmsg));
+        ASSERT(parsedPrivilege.isValid(&errmsg));
+        ASSERT(parsedPrivilege.isResourceSet());
+        ASSERT_FALSE(parsedPrivilege.getResource().isClusterSet());
+        ASSERT(parsedPrivilege.getResource().isDbSet());
+        ASSERT(parsedPrivilege.getResource().isCollectionSet());
+        ASSERT_EQUALS("test", parsedPrivilege.getResource().getDb());
+        ASSERT_EQUALS("foo", parsedPrivilege.getResource().getCollection());
+        ASSERT(parsedPrivilege.isActionsSet());
+        ASSERT(actionsVector == parsedPrivilege.getActions());
 
         // Works with database resource
         parsedPrivilege.parseBSON(BSON("resource" << BSON("db" << "test" <<
@@ -130,10 +154,21 @@ namespace {
                                        "actions" << BSON_ARRAY("find")),
                                   &errmsg);
         ASSERT(parsedPrivilege.isValid(&errmsg));
-        ASSERT(ParsedPrivilege::buildPrivilege(parsedPrivilege, &privilege, &errmsg));
+        ASSERT(ParsedPrivilege::parsedPrivilegeToPrivilege(parsedPrivilege, &privilege, &errmsg));
         ASSERT(privilege.getActions().contains(ActionType::find));
         ASSERT(!privilege.getActions().contains(ActionType::insert));
         ASSERT_EQUALS(privilege.getResourcePattern(), ResourcePattern::forDatabaseName("test"));
+
+        ASSERT(ParsedPrivilege::privilegeToParsedPrivilege(privilege, &parsedPrivilege, &errmsg));
+        ASSERT(parsedPrivilege.isValid(&errmsg));
+        ASSERT(parsedPrivilege.isResourceSet());
+        ASSERT_FALSE(parsedPrivilege.getResource().isClusterSet());
+        ASSERT(parsedPrivilege.getResource().isDbSet());
+        ASSERT(parsedPrivilege.getResource().isCollectionSet());
+        ASSERT_EQUALS("test", parsedPrivilege.getResource().getDb());
+        ASSERT_EQUALS("", parsedPrivilege.getResource().getCollection());
+        ASSERT(parsedPrivilege.isActionsSet());
+        ASSERT(actionsVector == parsedPrivilege.getActions());
 
         // Works with collection resource
         parsedPrivilege.parseBSON(BSON("resource" << BSON("db" << "" <<
@@ -141,20 +176,41 @@ namespace {
                                        "actions" << BSON_ARRAY("find")),
                                   &errmsg);
         ASSERT(parsedPrivilege.isValid(&errmsg));
-        ASSERT(ParsedPrivilege::buildPrivilege(parsedPrivilege, &privilege, &errmsg));
+        ASSERT(ParsedPrivilege::parsedPrivilegeToPrivilege(parsedPrivilege, &privilege, &errmsg));
         ASSERT(privilege.getActions().contains(ActionType::find));
         ASSERT(!privilege.getActions().contains(ActionType::insert));
         ASSERT_EQUALS(privilege.getResourcePattern(), ResourcePattern::forCollectionName("foo"));
+
+        ASSERT(ParsedPrivilege::privilegeToParsedPrivilege(privilege, &parsedPrivilege, &errmsg));
+        ASSERT(parsedPrivilege.isValid(&errmsg));
+        ASSERT(parsedPrivilege.isResourceSet());
+        ASSERT_FALSE(parsedPrivilege.getResource().isClusterSet());
+        ASSERT(parsedPrivilege.getResource().isDbSet());
+        ASSERT(parsedPrivilege.getResource().isCollectionSet());
+        ASSERT_EQUALS("", parsedPrivilege.getResource().getDb());
+        ASSERT_EQUALS("foo", parsedPrivilege.getResource().getCollection());
+        ASSERT(parsedPrivilege.isActionsSet());
+        ASSERT(actionsVector == parsedPrivilege.getActions());
 
         // Works with cluster resource
         parsedPrivilege.parseBSON(BSON("resource" << BSON("cluster" << true) <<
                                        "actions" << BSON_ARRAY("find")),
                                   &errmsg);
         ASSERT(parsedPrivilege.isValid(&errmsg));
-        ASSERT(ParsedPrivilege::buildPrivilege(parsedPrivilege, &privilege, &errmsg));
+        ASSERT(ParsedPrivilege::parsedPrivilegeToPrivilege(parsedPrivilege, &privilege, &errmsg));
         ASSERT(privilege.getActions().contains(ActionType::find));
         ASSERT(!privilege.getActions().contains(ActionType::insert));
         ASSERT_EQUALS(privilege.getResourcePattern(), ResourcePattern::forClusterResource());
+
+        ASSERT(ParsedPrivilege::privilegeToParsedPrivilege(privilege, &parsedPrivilege, &errmsg));
+        ASSERT(parsedPrivilege.isValid(&errmsg));
+        ASSERT(parsedPrivilege.isResourceSet());
+        ASSERT(parsedPrivilege.getResource().isClusterSet());
+        ASSERT(parsedPrivilege.getResource().getCluster());
+        ASSERT_FALSE(parsedPrivilege.getResource().isDbSet());
+        ASSERT_FALSE(parsedPrivilege.getResource().isCollectionSet());
+        ASSERT(parsedPrivilege.isActionsSet());
+        ASSERT(actionsVector == parsedPrivilege.getActions());
     }
 
 }  // namespace

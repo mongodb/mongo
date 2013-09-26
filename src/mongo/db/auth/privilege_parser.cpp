@@ -333,9 +333,9 @@ namespace mongo {
         return _resource;
     }
 
-    bool ParsedPrivilege::buildPrivilege(const ParsedPrivilege& parsedPrivilege,
-                                         Privilege* result,
-                                         std::string* errmsg) {
+    bool ParsedPrivilege::parsedPrivilegeToPrivilege(const ParsedPrivilege& parsedPrivilege,
+                                                     Privilege* result,
+                                                     std::string* errmsg) {
         if (!parsedPrivilege.isValid(errmsg)) {
             return false;
         }
@@ -379,5 +379,35 @@ namespace mongo {
 
         *result = Privilege(resource, actions);
         return true;
+    }
+
+    bool ParsedPrivilege::privilegeToParsedPrivilege(const Privilege& privilege,
+                                                     ParsedPrivilege* result,
+                                                     std::string* errmsg) {
+        ParsedResource parsedResource;
+        if (privilege.getResourcePattern().isExactNamespacePattern()) {
+            parsedResource.setDb(privilege.getResourcePattern().databaseToMatch());
+            parsedResource.setCollection(privilege.getResourcePattern().collectionToMatch());
+        } else if (privilege.getResourcePattern().isDatabasePattern()) {
+            parsedResource.setDb(privilege.getResourcePattern().databaseToMatch());
+            parsedResource.setCollection("");
+        } else if (privilege.getResourcePattern().isCollectionPattern()) {
+            parsedResource.setDb("");
+            parsedResource.setCollection(privilege.getResourcePattern().collectionToMatch());
+        } else if (privilege.getResourcePattern().isAnyNormalResourcePattern()) {
+            parsedResource.setDb("");
+            parsedResource.setCollection("");
+        } else if (privilege.getResourcePattern().isClusterResourcePattern()) {
+            parsedResource.setCluster(true);
+        } else {
+            *errmsg = stream() << privilege.getResourcePattern().toString() <<
+                    " is not a valid user-grantable resource pattern";
+            return false;
+        }
+
+        result->clear();
+        result->setResource(parsedResource);
+        result->setActions(privilege.getActions().getActionsAsStrings());
+        return result->isValid(errmsg);
     }
 } // namespace mongo

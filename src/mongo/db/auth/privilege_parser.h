@@ -122,9 +122,15 @@ namespace mongo {
         /**
          * Takes a parsedPrivilege and turns it into a true Privilege object.
          */
-        static bool buildPrivilege(const ParsedPrivilege& parsedPrivilege,
-                                   Privilege* result,
-                                   std::string* errmsg);
+        static bool parsedPrivilegeToPrivilege(const ParsedPrivilege& parsedPrivilege,
+                                               Privilege* result,
+                                               std::string* errmsg);
+        /**
+         * Takes a Privilege object and turns it into a ParsedPrivilege.
+         */
+        static bool privilegeToParsedPrivilege(const Privilege& privilege,
+                                               ParsedPrivilege* result,
+                                               std::string* errmsg);
 
         /** Copies all the fields present in 'this' to 'other'. */
         void cloneTo(ParsedPrivilege* other) const;
