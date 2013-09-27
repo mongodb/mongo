@@ -354,7 +354,7 @@ __wt_rec_write(WT_SESSION_IMPL *session,
 				break;
 		}
 		WT_RET(__wt_page_modify_init(session, page));
-		__wt_page_only_modify_set(session, page, 0);
+		__wt_page_only_modify_set(session, page);
 
 		return (0);
 	}
@@ -406,7 +406,7 @@ __wt_rec_write(WT_SESSION_IMPL *session,
 	WT_VERBOSE_RET(session, reconcile,
 	    "root page split %p -> %p", page, page->modify->u.split);
 	page = page->modify->u.split;
-	__wt_page_only_modify_set(session, page, 0);
+	__wt_page_only_modify_set(session, page);
 	F_CLR(page->modify, WT_PM_REC_SPLIT_MERGE);
 
 	WT_RET(__wt_rec_write(session, page, NULL, flags));
@@ -530,7 +530,7 @@ __rec_write_init(
 	/* Remember the flags. */
 	r->flags = flags;
 
-	/* Read the disk generation before we read anything from the page. */
+	/* Save the page's write generation before reading the page. */
 	r->page = page;
 	WT_ORDERED_READ(r->orig_write_gen, page->modify->write_gen);
 
@@ -1997,7 +1997,7 @@ __wt_rec_bulk_wrapup(WT_CURSOR_BULK *cbulk)
 
 	/* Mark the page's parent dirty. */
 	WT_RET(__wt_page_modify_init(session, page->parent));
-	__wt_page_modify_set(session, page->parent, 0);
+	__wt_page_modify_set(session, page->parent);
 
 	__wt_rec_destroy(session, &cbulk->reconcile);
 
@@ -3713,7 +3713,6 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	WT_PAGE_MODIFY *mod;
 	WT_REF *ref;
 	uint32_t size;
-	int was_modified;
 	const uint8_t *addr;
 
 	btree = S2BT(session);
@@ -3930,16 +3929,19 @@ err:			__wt_scr_free(&tkey);
 		WT_PUBLISH(btree->modified, 1);
 
 	/*
-	 * If modifications were not skipped, the page might be clean; update
-	 * the disk generation to the write generation as of when reconciliation
-	 * started.
+	 * If modifications were not skipped, the page might be clean; if the
+	 * write generation is unchanged, clear it and update cache information.
 	 */
 	if (!r->upd_skipped) {
-		was_modified = __wt_page_is_modified(page);
-		WT_ORDERED_READ(size, page->memory_footprint);
-		mod->disk_gen = r->orig_write_gen;
 		mod->disk_txn = r->max_txn;
-		if (was_modified && !__wt_page_is_modified(page))
+
+		/*
+		 * We depend on atomic compare-and-swap being a read barrier,
+		 * the read of the memory footprint must precede the update of
+		 * the page's write generation.
+		 */
+		size = page->memory_footprint;
+		if (WT_ATOMIC_CAS(mod->write_gen, r->orig_write_gen, 0))
 			__wt_cache_dirty_decr(session, size);
 	}
 

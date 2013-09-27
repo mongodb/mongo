@@ -12,8 +12,7 @@
 static inline int
 __wt_page_is_modified(WT_PAGE *page)
 {
-	return (page->modify != NULL &&
-	    page->modify->write_gen != page->modify->disk_gen ? 1 : 0);
+	return (page->modify != NULL && page->modify->write_gen != 0 ? 1 : 0);
 }
 
 /*
@@ -253,20 +252,18 @@ __wt_page_modify_init(WT_SESSION_IMPL *session, WT_PAGE *page)
  *	Mark the page (but only the page) dirty.
  */
 static inline void
-__wt_page_only_modify_set(
-    WT_SESSION_IMPL *session, WT_PAGE *page, int serial_held)
+__wt_page_only_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	/*
-	 * Update the cache and transaction information the first time the page
-	 * is marked dirty.
+	 * We depend on atomic-add being a write barrier, that is, a barrier to
+	 * ensure all changes to the page are flushed before updating the page
+	 * write generation and/or marking the tree dirty, otherwise checkpoints
+	 * and/or page reconciliation might be looking at a clean page/tree.
 	 *
-	 * If we're not called already holding the serial lock, acquire it,
-	 * else we could race incrementing the cache information.
+	 * Every time the page transitions from clean to dirty, update the cache
+	 * and transactional information.
 	 */
-	if (!serial_held)
-		__wt_spin_lock(session, &S2C(session)->serial_lock);
-
-	if (!__wt_page_is_modified(page)) {
+	if (WT_ATOMIC_ADD(page->modify->write_gen, 1) == 0) {
 		(void)WT_ATOMIC_ADD(S2C(session)->cache->pages_dirty, 1);
 		(void)WT_ATOMIC_ADD(
 		    S2C(session)->cache->bytes_dirty, page->memory_footprint);
@@ -278,20 +275,6 @@ __wt_page_only_modify_set(
 		if (F_ISSET(&session->txn, TXN_RUNNING))
 			page->modify->disk_snap_min = session->txn.snap_min;
 	}
-
-	if (!serial_held)
-		__wt_spin_unlock(session, &S2C(session)->serial_lock);
-
-	/*
-	 * Publish: a barrier to ensure all changes to the page are flushed
-	 * before we update the page's write generation and/or mark the tree
-	 * dirty, otherwise checkpoints and/or page reconciliation might be
-	 * reading a clean page.
-	 */
-	WT_WRITE_BARRIER();
-
-	/* The page is dirty if the disk and write generations differ. */
-	++page->modify->write_gen;
 }
 
 /*
@@ -299,9 +282,9 @@ __wt_page_only_modify_set(
  *	Mark the page and tree dirty.
  */
 static inline void
-__wt_page_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page, int serial_held)
+__wt_page_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
-	__wt_page_only_modify_set(session, page, serial_held);
+	__wt_page_only_modify_set(session, page);
 
 	/*
 	 * Mark the tree dirty (even if the page is already marked dirty, newly
@@ -324,16 +307,12 @@ __wt_page_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page, int serial_held)
 static inline int
 __wt_page_write_gen_wrapped_check(WT_PAGE *page)
 {
-	WT_PAGE_MODIFY *mod;
-
-	mod = page->modify;
-
 	/* 
-	 * If the page's write generation has wrapped and caught up with the
-	 * disk generation (wildly unlikely but technically possible as it
-	 * implies 4B updates between page reconciliations), fail the update.
+	 * Check to see if the page's write generation is about to wrap (wildly
+	 * unlikely as it implies 4B updates between clean page reconciliations,
+	 * but technically possible), and fail the update.
 	 */
-	return (mod->write_gen + 1 == mod->disk_gen ? WT_RESTART : 0);
+	return (page->modify->write_gen > UINT32_MAX - 100 ? WT_RESTART : 0);
 }
 
 /*

@@ -182,22 +182,6 @@ struct __wt_ovfl_txnc {
  */
 struct __wt_page_modify {
 	/*
-	 * The disk generation tracks page versions written to disk.  When a
-	 * page is reconciled and written to disk, the thread doing that work
-	 * is just another reader of the page, and other readers and writers
-	 * can access the page at the same time.  For this reason, the thread
-	 * reconciling the page tracks the write generation of the page it read.
-	 *
-	 * The write generation is incremented when a page is modified.
-	 *
-	 * !!!
-	 * 4B values are probably larger than required, but I'm more confident
-	 * 4B types will always be backed by atomic writes to memory.
-	 */
-	uint32_t disk_gen;
-	uint32_t write_gen;
-
-	/*
 	 * Track the highest transaction ID at which the page was written to
 	 * disk.  This can be used to avoid trying to write the page multiple
 	 * times if a snapshot is keeping old versions pinned (e.g., in a
@@ -208,6 +192,10 @@ struct __wt_page_modify {
 	/* The largest transaction ID written to disk, for clean pages. */
 	uint64_t disk_txn;
 
+	/*
+	 * When pages are reconciled, the result can be a replacement page or a
+	 * split page.
+	 */
 	union {
 		WT_PAGE *split;		/* Resulting split page */
 		WT_ADDR	 replace;	/* Resulting replacement */
@@ -235,6 +223,16 @@ struct __wt_page_modify {
 		WT_OVFL_REUSE	*ovfl_reuse[WT_SKIP_MAXDEPTH];
 		WT_OVFL_TXNC	*ovfl_txnc[WT_SKIP_MAXDEPTH];
 	} *ovfl_track;
+
+	/*
+	 * The write generation is incremented when a page is modified, a page
+	 * is clean if the write generation is 0.
+	 *
+	 * !!!
+	 * 4B values are probably larger than required, but I'm more confident
+	 * 4B types will always be backed by atomic writes to memory.
+	 */
+	uint32_t write_gen;
 
 #define	WT_PM_REC_EMPTY		0x01	/* Reconciliation: page empty */
 #define	WT_PM_REC_REPLACE	0x02	/* Reconciliation: page replaced */

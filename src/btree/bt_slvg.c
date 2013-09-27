@@ -1055,7 +1055,7 @@ static int
 __slvg_modify_init(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_RET(__wt_page_modify_init(session, page));
-	__wt_page_modify_set(session, page, 0);
+	__wt_page_modify_set(session, page);
 
 	return (0);
 }

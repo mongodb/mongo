@@ -22,7 +22,7 @@ __wt_bt_cache_force_write(WT_SESSION_IMPL *session)
 
 	/* Dirty the root page to ensure a write. */
 	WT_RET(__wt_page_modify_init(session, page));
-	__wt_page_modify_set(session, page, 0);
+	__wt_page_modify_set(session, page);
 
 	return (0);
 }

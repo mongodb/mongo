@@ -62,7 +62,7 @@ __wt_compact(WT_SESSION_IMPL *session, const char *cfg[])
 			WT_TRET(__wt_page_release(session, page));
 			WT_RET(ret);
 		}
-		__wt_page_modify_set(session, page, 0);
+		__wt_page_modify_set(session, page);
 
 		WT_DSTAT_INCR(session, btree_compact_rewrite);
 	}
@@ -179,7 +179,7 @@ disk:		__wt_get_addr(page->parent, page->ref, &addr, &addr_size);
 
 	/* Mark the page and tree dirty, we want to write this page. */
 	WT_RET(__wt_page_modify_init(session, page));
-	__wt_page_modify_set(session, page, 0);
+	__wt_page_modify_set(session, page);
 
 	WT_DSTAT_INCR(session, btree_compact_rewrite);
 	return (0);
