@@ -1,5 +1,5 @@
 /**
- *    Copyright 2013 MongoDB Inc.
+ *    Copyright (C) 2013 10gen Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -26,7 +26,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/single_solution_runner.h"
+#include "mongo/db/query/cached_plan_runner.h"
 
 #include "mongo/db/diskloc.h"
 #include "mongo/db/jsobj.h"
@@ -34,61 +34,62 @@
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/explain_plan.h"
-#include "mongo/db/query/type_explain.h"
+#include "mongo/db/query/plan_cache.h"
 #include "mongo/db/query/plan_executor.h"
-#include "mongo/db/query/query_solution.h"
+#include "mongo/db/query/type_explain.h"
 
 namespace mongo {
 
-    SingleSolutionRunner::SingleSolutionRunner(CanonicalQuery* canonicalQuery,
-                                               QuerySolution* soln,
-                                               PlanStage* root,
-                                               WorkingSet* ws)
+    CachedPlanRunner::CachedPlanRunner(CanonicalQuery* canonicalQuery,
+                                       CachedSolution* cached,
+                                       PlanStage* root,
+                                       WorkingSet* ws)
         : _canonicalQuery(canonicalQuery),
-          _solution(soln),
-          _exec(new PlanExecutor(ws, root)) {
+          _cachedQuery(cached),
+          _exec(new PlanExecutor(ws, root)),
+          _updatedCache(false) {
     }
 
-    SingleSolutionRunner::~SingleSolutionRunner() {
+    CachedPlanRunner::~CachedPlanRunner() {
     }
 
-    Runner::RunnerState SingleSolutionRunner::getNext(BSONObj* objOut, DiskLoc* dlOut) {
-        return _exec->getNext(objOut, dlOut);
-        // TODO: I'm not convinced we want to cache this run.  What if it's a collscan solution
-        // and the user adds an index later?  We don't want to reach for this.  But if solving
-        // the query is v. hard, we do want to cache it.  Maybe we can remove single solution
-        // cache entries when we build an index?
+    Runner::RunnerState CachedPlanRunner::getNext(BSONObj* objOut, DiskLoc* dlOut) {
+        Runner::RunnerState state = _exec->getNext(objOut, dlOut);
+        if (Runner::RUNNER_EOF == state && !_updatedCache) {
+            updateCache();
+        }
+        return state;
     }
 
-    bool SingleSolutionRunner::isEOF() {
+    bool CachedPlanRunner::isEOF() {
         return _exec->isEOF();
     }
 
-    void SingleSolutionRunner::saveState() {
+    void CachedPlanRunner::saveState() {
         _exec->saveState();
     }
 
-    bool SingleSolutionRunner::restoreState() {
+    bool CachedPlanRunner::restoreState() {
         return _exec->restoreState();
     }
 
-    void SingleSolutionRunner::setYieldPolicy(Runner::YieldPolicy policy) {
-        _exec->setYieldPolicy(policy);
-    }
-
-    void SingleSolutionRunner::invalidate(const DiskLoc& dl) {
+    void CachedPlanRunner::invalidate(const DiskLoc& dl) {
         _exec->invalidate(dl);
     }
 
-    const std::string& SingleSolutionRunner::ns() {
+    void CachedPlanRunner::setYieldPolicy(Runner::YieldPolicy policy) {
+        _exec->setYieldPolicy(policy);
+    }
+
+    const std::string& CachedPlanRunner::ns() {
         return _canonicalQuery->getParsed().ns();
     }
 
-    void SingleSolutionRunner::kill() {
+    void CachedPlanRunner::kill() {
         _exec->kill();
     }
 
-    Status SingleSolutionRunner::getExplainPlan(TypeExplain** explain) const {
+    Status CachedPlanRunner::getExplainPlan(TypeExplain** explain) const {
         dassert(_exec.get());
 
         scoped_ptr<PlanStageStats> stats(_exec->getStats());
@@ -111,6 +112,32 @@ namespace mongo {
         (*explain)->setNScannedAllPlans((*explain)->getNScanned());
 
         return Status::OK();
+    }
+
+    void CachedPlanRunner::updateCache() {
+        _updatedCache = true;
+
+        // We're done.  Update the cache.
+        PlanCache* cache = PlanCache::get(_canonicalQuery->ns());
+
+        // TODO: Is this an error?
+        if (NULL == cache) { return; }
+
+        // TODO: How do we decide this?
+        bool shouldRemovePlan = false;
+
+        if (shouldRemovePlan) {
+            if (!cache->remove(*_canonicalQuery, *_cachedQuery->solution)) {
+                warning() << "Cached plan runner couldn't remove plan from cache.  Maybe"
+                    " somebody else did already?";
+                return;
+            }
+        }
+
+        // We're done running.  Update cache.
+        auto_ptr<CachedSolutionFeedback> feedback(new CachedSolutionFeedback());
+        feedback->stats = _exec->getStats();
+        cache->feedback(*_canonicalQuery, *_cachedQuery->solution, feedback.release());
     }
 
 } // namespace mongo

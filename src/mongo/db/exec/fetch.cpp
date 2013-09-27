@@ -212,8 +212,8 @@ namespace mongo {
     PlanStageStats* FetchStage::getStats() {
         _commonStats.isEOF = isEOF();
 
-        auto_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats));
-        ret->setSpecific<FetchStats>(_specificStats);
+        auto_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_FETCH));
+        ret->specific.reset(new FetchStats(_specificStats));
         ret->children.push_back(_child->getStats());
         return ret.release();
     }

@@ -47,7 +47,10 @@ function checkFields( matches, sort, limit ) {
 }
 
 checkFields( 0, false );
-checkFields( 0, true );
+
+// If there's nothing in the collection, there's no point in verifying that a sort
+// is done.
+// checkFields( 0, true );
 
 t.save( {} );
 checkFields( 1, false );

@@ -26,16 +26,21 @@
  *    it in the license file.
  */
 
-#include "mongo/db/exec/plan_stage.h"
-#include "mongo/db/exec/working_set.h"
-#include "mongo/db/exec/working_set_common.h"
-#include "mongo/db/query/runner.h"
-#include "mongo/db/query/runner_yield_policy.h"
-#include "mongo/db/pdfile.h"
-
 #pragma once
 
+#include <boost/scoped_ptr.hpp>
+
+#include "mongo/base/status.h"
+#include "mongo/db/query/runner.h"
+#include "mongo/db/query/runner_yield_policy.h"
+
 namespace mongo {
+
+    class BSONObj;
+    class DiskLoc;
+    struct PlanStage;
+    struct PlanStageStats;
+    class WorkingSet;
 
     /**
      * A PlanExecutor is the abstraction that knows how to crank a tree of stages into execution.
@@ -47,158 +52,59 @@ namespace mongo {
      */
     class PlanExecutor {
     public:
-        PlanExecutor(WorkingSet* ws, PlanStage* rt)
-            : _workingSet(ws), _root(rt), _killed(false) { }
+        PlanExecutor(WorkingSet* ws, PlanStage* rt);
+        ~PlanExecutor();
 
-        WorkingSet* getWorkingSet() { return _workingSet.get(); }
+        //
+        // Accessors
+        //
 
-        /**
-         * Methods that just pass down to the PlanStage tree.
-         */
-        void saveState() {
-            if (!_killed) { _root->prepareToYield(); }
-        }
+        /** TODO document me */
+        WorkingSet* getWorkingSet();
 
-        bool restoreState() {
-            if (!_killed) {
-                _root->recoverFromYield();
-            }
-            return !_killed;
-        }
+        /** This is OK even if we were killed */
+        PlanStageStats* getStats() const;
 
-        void invalidate(const DiskLoc& dl) {
-            if (!_killed) { _root->invalidate(dl); }
-        }
+        //
+        // Methods that just pass down to the PlanStage tree.
+        //
+
+        /** TODO document me */
+        void saveState();
+
+        /** TODO document me */
+        bool restoreState();
+
+        /** TODO document me */
+        void invalidate(const DiskLoc& dl);
+
+        //
+        // Running Support
+        //
+
+        /** TODO document me */
+        void setYieldPolicy(Runner::YieldPolicy policy);
+
+        /** TODO document me */
+        Runner::RunnerState getNext(BSONObj* objOut, DiskLoc* dlOut);
+
+        /** TOOD document me */
+        bool isEOF();
 
         /**
          * During the yield, the database we're operating over or any collection we're relying on
          * may be dropped.  When this happens all cursors and runners on that database and
          * collection are killed or deleted in some fashion. (This is how the _killed gets set.)
          */
-        void kill() { _killed = true; }
-
-        // This is OK even if we were killed.
-        PlanStageStats* getStats() { return _root->getStats(); }
-
-        void setYieldPolicy(Runner::YieldPolicy policy) {
-            if (Runner::YIELD_MANUAL == policy) {
-                _yieldPolicy.reset();
-            }
-            else {
-                _yieldPolicy.reset(new RunnerYieldPolicy());
-            }
-        }
-
-        bool isEOF() { return _killed || _root->isEOF(); }
-
-        Runner::RunnerState getNext(BSONObj* objOut, DiskLoc* dlOut) {
-            if (_killed) { return Runner::RUNNER_DEAD; }
-
-            for (;;) {
-                WorkingSetID id;
-                PlanStage::StageState code = _root->work(&id);
-                /*
-                cout << "gotNext state " << PlanStage::stateStr(code);
-                if (PlanStage::ADVANCED == code || PlanStage::NEED_FETCH == code) {
-                    cout << " wsid " << id;
-                }
-                cout << endl;
-                */
-
-                if (PlanStage::ADVANCED == code) {
-                    WorkingSetMember* member = _workingSet->get(id);
-
-                    if (NULL != objOut) {
-                        if (WorkingSetMember::LOC_AND_IDX == member->state) {
-                            if (1 != member->keyData.size()) {
-                                _workingSet->free(id);
-                                return Runner::RUNNER_ERROR;
-                            }
-                            *objOut = member->keyData[0].keyData;
-                        }
-                        else if (member->hasObj()) {
-                            *objOut = member->obj;
-                        }
-                        else {
-                            _workingSet->free(id);
-                            return Runner::RUNNER_ERROR;
-                        }
-                    }
-
-                    if (NULL != dlOut) {
-                        if (member->hasLoc()) {
-                            *dlOut = member->loc;
-                        }
-                        else {
-                            _workingSet->free(id);
-                            return Runner::RUNNER_ERROR;
-                        }
-                    }
-                    _workingSet->free(id);
-                    return Runner::RUNNER_ADVANCED;
-                }
-                else if (PlanStage::NEED_TIME == code) {
-                    // Fall through to yield check at end of large conditional.
-                }
-                else if (PlanStage::NEED_FETCH == code) {
-                    // id has a loc and refers to an obj we need to fetch.
-                    WorkingSetMember* member = _workingSet->get(id);
-
-                    // This must be true for somebody to request a fetch and can only change when an
-                    // invalidation happens, which is when we give up a lock.  Don't give up the
-                    // lock between receiving the NEED_FETCH and actually fetching(?).
-                    verify(member->hasLoc());
-
-                    // Actually bring record into memory.
-                    Record* record = member->loc.rec();
-
-                    // If we're allowed to, go to disk outside of the lock.
-                    if (NULL != _yieldPolicy.get()) {
-                        saveState();
-                        _yieldPolicy->yield(record);
-                        if (_killed) { return Runner::RUNNER_DEAD; }
-                        restoreState();
-                    }
-                    else {
-                        // We're set to manually yield.  We go to disk in the lock.
-                        record->touch();
-                    }
-
-                    // Record should be in memory now.  Log if it's not.
-                    if (!Record::likelyInPhysicalMemory(record->dataNoThrowing())) {
-                        OCCASIONALLY {
-                            warning() << "Record wasn't in memory immediately after fetch: "
-                                      << member->loc.toString() << endl;
-                        }
-                    }
-
-                    // Note that we're not freeing id.  Fetch semantics say that we shouldn't.
-                }
-                else if (PlanStage::IS_EOF == code) {
-                    return Runner::RUNNER_EOF;
-                }
-                else {
-                    verify(PlanStage::FAILURE == code);
-                    return Runner::RUNNER_ERROR;
-                }
-
-                // Yield, if we can yield ourselves.
-                if (NULL != _yieldPolicy.get() && _yieldPolicy->shouldYield()) {
-                    saveState();
-                    _yieldPolicy->yield();
-                    if (_killed) { return Runner::RUNNER_DEAD; }
-                    restoreState();
-                }
-            }
-        }
+        void kill();
 
     private:
-        scoped_ptr<WorkingSet> _workingSet;
-        scoped_ptr<PlanStage> _root;
-        scoped_ptr<RunnerYieldPolicy> _yieldPolicy;
+        boost::scoped_ptr<WorkingSet> _workingSet;
+        boost::scoped_ptr<PlanStage> _root;
+        boost::scoped_ptr<RunnerYieldPolicy> _yieldPolicy;
 
-        // Did somebody drop an index we care about or the namespace we're looking at?  If so, we'll
-        // be killed.
+        // Did somebody drop an index we care about or the namespace we're looking at?  If so,
+        // we'll be killed.
         bool _killed;
     };
 

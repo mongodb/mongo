@@ -26,10 +26,17 @@ env.StaticLibrary(
 env.StaticLibrary(
     target='query',
     source=[
+        "cached_plan_runner.cpp",
+        "eof_runner.cpp",
+        "explain_plan.cpp",
+        "internal_runner.cpp",
         "multi_plan_runner.cpp",
         "new_find.cpp",
+        "plan_executor.cpp",
         "plan_ranker.cpp",
+        "single_solution_runner.cpp",
         "stage_builder.cpp",
+        "type_explain.cpp",
     ],
     LIBDEPS=[
         "query_planner",

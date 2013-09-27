@@ -28,10 +28,15 @@
 
 #include "mongo/db/query/multi_plan_runner.h"
 
-#include "mongo/db/clientcursor.h"
+#include "mongo/db/diskloc.h"
+#include "mongo/db/jsobj.h"
+#include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/working_set_common.h"
-#include "mongo/db/query/plan_ranker.h"
-#include "mongo/db/pdfile.h"
+#include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/explain_plan.h"
+#include "mongo/db/query/plan_executor.h"
+#include "mongo/db/query/query_solution.h"
+#include "mongo/db/query/type_explain.h"
 
 namespace mongo {
 
@@ -45,6 +50,12 @@ namespace mongo {
             delete _candidates[i].root;
             // ws must die after the root.
             delete _candidates[i].ws;
+        }
+
+        for (vector<PlanStageStats*>::iterator it = _candidateStats.begin();
+             it != _candidateStats.end();
+             ++it) {
+            delete *it;
         }
     }
 
@@ -125,6 +136,10 @@ namespace mongo {
         // If _bestPlan is not NULL, you haven't picked the best plan yet, so you're not EOF.
         if (NULL == _bestPlan) { return false; }
         return _bestPlan->isEOF();
+    }
+
+    const std::string& MultiPlanRunner::ns() {
+        return _query->getParsed().ns();
     }
 
     void MultiPlanRunner::kill() {
@@ -213,11 +228,20 @@ namespace mongo {
         // cache->add(_query, *_candidates[bestChild]->solution, decision->bestPlanStats);
         // delete decision;
 
-        // Clear out the candidate plans as we're all done w/them.
+        // Clear out the candidate plans, leaving only stats as we're all done w/them.
         for (size_t i = 0; i < _candidates.size(); ++i) {
             if (i == bestChild) { continue; }
             delete _candidates[i].solution;
+
+            // Remember the stats for the candidate plan because we always show it on an
+            // explain. (The {verbose:false} in explain() is client-side trick; we always
+            // generate a "verbose" explain.)
+            PlanStageStats* stats = _candidates[i].root->getStats();
+            if (stats) {
+                _candidateStats.push_back(stats);
+            }
             delete _candidates[i].root;
+
             // ws must die after the root.
             delete _candidates[i].ws;
         }
@@ -316,6 +340,64 @@ namespace mongo {
         for (size_t i = 0; i < _candidates.size(); ++i) {
             _candidates[i].root->recoverFromYield();
         }
+    }
+
+    Status MultiPlanRunner::getExplainPlan(TypeExplain** explain) const {
+        dassert(_bestPlan.get());
+
+        //
+        // Explain for the winner plan
+        //
+
+        scoped_ptr<PlanStageStats> stats(_bestPlan->getStats());
+        if (NULL == stats.get()) {
+            return Status(ErrorCodes::InternalError, "no stats available to explain plan");
+        }
+
+        Status status = explainPlan(*stats, explain, true /* full details */);
+        if (!status.isOK()) {
+            return status;
+        }
+
+        // TODO Hook the cached plan if there was one.
+        // (*explain)->setOldPlan(???);
+
+        //
+        // Alternative plans' explains
+        //
+        // We get information about all the plans considered and hook them up the the main
+        // explain structure. If we fail to get any of them, we still return the main explain.
+        // Make sure we initialize the "*AllPlans" fields with the plan that was chose.
+        //
+
+        TypeExplain* chosenPlan = NULL;
+        explainPlan(*stats, &chosenPlan, false /* no full details */);
+        if (chosenPlan) {
+            (*explain)->addToAllPlans(chosenPlan);
+        }
+        (*explain)->setNScannedObjectsAllPlans((*explain)->getNScannedObjects());
+        (*explain)->setNScannedAllPlans((*explain)->getNScanned());
+
+        for (std::vector<PlanStageStats*>::const_iterator it = _candidateStats.begin();
+             it != _candidateStats.end();
+             ++it) {
+
+            TypeExplain* candidateExplain;
+            if (explainPlan(**it, &candidateExplain, false /* no full details */) != Status::OK()) {
+                continue;
+            }
+
+            // TODO: we only need this in "explain({verbose:true}) mode.
+            (*explain)->addToAllPlans(candidateExplain); // ownership xfer
+
+            (*explain)->setNScannedObjectsAllPlans((*explain)->getNScannedObjectsAllPlans() +
+                                                   candidateExplain->getNScannedObjects());
+
+            (*explain)->setNScannedAllPlans((*explain)->getNScannedAllPlans() +
+                                            candidateExplain->getNScanned());
+        }
+
+        return Status::OK();
     }
 
 }  // namespace mongo

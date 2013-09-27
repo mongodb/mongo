@@ -95,6 +95,29 @@ namespace mongo {
         return ss.str();
     }
 
+    BSONObj IndexBounds::toBSON() const {
+        BSONObjBuilder builder;
+        if (isSimpleRange) {
+            // TODO
+        }
+        else {
+            for (vector<OrderedIntervalList>::const_iterator itField = fields.begin();
+                 itField != fields.end();
+                 ++itField) {
+                BSONArrayBuilder fieldBuilder(builder.subarrayStart(itField->name));
+                for (vector<Interval>::const_iterator itInterval = itField->intervals.begin();
+                     itInterval != itField->intervals.end();
+                     ++itInterval) {
+                    BSONArrayBuilder intervalBuilder;
+                    intervalBuilder.append(itInterval->start);
+                    intervalBuilder.append(itInterval->end);
+                    fieldBuilder.append(intervalBuilder.arr());
+                }
+            }
+        }
+        return builder.obj();
+    }
+
     //
     // Validity checking for bounds
     //

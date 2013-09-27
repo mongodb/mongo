@@ -30,17 +30,15 @@
 
 #include <boost/scoped_ptr.hpp>
 #include <cstdlib>
+#include <string>
 #include <vector>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/db/jsobj.h"
 #include "mongo/db/query/stage_types.h"
 #include "mongo/platform/cstdint.h"
 
 namespace mongo {
-
-    using boost::scoped_ptr;
-    using std::size_t;
-    using std::vector;
 
     struct SpecificStats;
 
@@ -79,7 +77,7 @@ namespace mongo {
 
     // The universal container for a stage's stats.
     struct PlanStageStats {
-        PlanStageStats(const CommonStats& c) : common(c) { }
+        PlanStageStats(const CommonStats& c, StageType t) : stageType(t), common(c) { }
 
         ~PlanStageStats() {
             for (size_t i = 0; i < children.size(); ++i) {
@@ -87,22 +85,17 @@ namespace mongo {
             }
         }
 
+        // See query/stage_type.h
+        StageType stageType;
+
         // Stats exported by implementing the PlanStage interface.
         CommonStats common;
 
         // Per-stage place to stash additional information
-        scoped_ptr<SpecificStats> specific;
-
-        template <typename T> void setSpecific(const T& statData) {
-            specific.reset(new T(statData));
-        }
-
-        template <typename T> const T& getSpecific() const {
-            return *static_cast<T*>(specific.get());
-        }
+        boost::scoped_ptr<SpecificStats> specific;
 
         // The stats of the node's children.
-        vector<PlanStageStats*> children;
+        std::vector<PlanStageStats*> children;
 
     private:
         MONGO_DISALLOW_COPYING(PlanStageStats);
@@ -113,7 +106,6 @@ namespace mongo {
      */
     struct SpecificStats {
         virtual ~SpecificStats() { }
-        virtual StageType getType() = 0;
     };
 
     struct AndHashStats : public SpecificStats {
@@ -121,7 +113,6 @@ namespace mongo {
                          flaggedInProgress(0) { }
 
         virtual ~AndHashStats() { }
-        StageType getType() { return STAGE_AND_HASH; }
 
         // Invalidation counters.
         // How many results had the AND fully evaluated but were invalidated?
@@ -133,7 +124,7 @@ namespace mongo {
         // How many entries are in the map after each child?
         // child 'i' produced children[i].common.advanced DiskLocs, of which mapAfterChild[i] were
         // intersections.
-        vector<uint64_t> mapAfterChild;
+        std::vector<uint64_t> mapAfterChild;
 
         // mapAfterChild[mapAfterChild.size() - 1] WSMswere match tested.
         // commonstats.advanced is how many passed.
@@ -144,10 +135,9 @@ namespace mongo {
                            matchTested(0) { }
 
         virtual ~AndSortedStats() { }
-        StageType getType() { return STAGE_AND_SORTED; }
 
         // How many results from each child did not pass the AND?
-        vector<uint64_t> failedAnd;
+        std::vector<uint64_t> failedAnd;
 
         // How many results were flagged via invalidation?
         uint64_t flagged;
@@ -162,7 +152,6 @@ namespace mongo {
                        matchTested(0) { }
 
         virtual ~FetchStats() { }
-        StageType getType() { return STAGE_FETCH; }
 
         // Have we seen anything that already had an object?
         uint64_t alreadyHasObj;
@@ -179,14 +168,28 @@ namespace mongo {
     };
 
     struct IndexScanStats : public SpecificStats {
-        IndexScanStats() : yieldMovedCursor(0),
+        IndexScanStats() : isMultiKey(false),
+                           yieldMovedCursor(0),
                            dupsTested(0),
                            dupsDropped(0),
                            seenInvalidated(0),
-                           matchTested(0) { }
+                           matchTested(0),
+                           keysExamined(0) { }
 
         virtual ~IndexScanStats() { }
-        StageType getType() { return STAGE_IXSCAN; }
+
+        // Index type being used.
+        std::string indexType;
+
+        // name of the index being used
+        std::string indexName;
+
+        // A BSON (opaque, ie. hands off other than toString() it) representation of the bounds
+        // used.
+        BSONObj indexBounds;
+
+        // Whether this index is over a field that contain array values.
+        bool isMultiKey;
 
         uint64_t yieldMovedCursor;
         uint64_t dupsTested;
@@ -197,21 +200,10 @@ namespace mongo {
 
         // We know how many passed (it's the # of advanced) and therefore how many failed.
         uint64_t matchTested;
-    };
 
-    struct MergeSortStats : public SpecificStats {
-        MergeSortStats() : dupsTested(0),
-                           dupsDropped(0),
-                           forcedFetches(0) { }
+        // Number of entries retrieved from the index during the scan.
+        uint64_t keysExamined;
 
-        virtual ~MergeSortStats() { }
-        StageType getType() { return STAGE_SORT_MERGE; }
-
-        uint64_t dupsTested;
-        uint64_t dupsDropped;
-
-        // How many records were we forced to fetch as the result of an invalidation?
-        uint64_t forcedFetches;
     };
 
     struct OrStats : public SpecificStats {
@@ -220,7 +212,6 @@ namespace mongo {
                     locsForgotten(0) { }
 
         virtual ~OrStats() { }
-        StageType getType() { return STAGE_OR; }
 
         uint64_t dupsTested;
         uint64_t dupsDropped;
@@ -229,14 +220,27 @@ namespace mongo {
         uint64_t locsForgotten;
 
         // We know how many passed (it's the # of advanced) and therefore how many failed.
-        vector<uint64_t> matchTested;
+        std::vector<uint64_t> matchTested;
     };
 
     struct SortStats : public SpecificStats {
         SortStats() : forcedFetches(0) { }
 
         virtual ~SortStats() { }
-        StageType getType() { return STAGE_SORT; }
+
+        // How many records were we forced to fetch as the result of an invalidation?
+        uint64_t forcedFetches;
+    };
+
+    struct MergeSortStats : public SpecificStats {
+        MergeSortStats() : dupsTested(0),
+                           dupsDropped(0),
+                           forcedFetches(0) { }
+
+        virtual ~MergeSortStats() { }
+
+        uint64_t dupsTested;
+        uint64_t dupsDropped;
 
         // How many records were we forced to fetch as the result of an invalidation?
         uint64_t forcedFetches;

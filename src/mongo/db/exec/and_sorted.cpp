@@ -253,8 +253,8 @@ namespace mongo {
     PlanStageStats* AndSortedStage::getStats() {
         _commonStats.isEOF = isEOF();
 
-        auto_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats));
-        ret->setSpecific<AndSortedStats>(_specificStats);
+        auto_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_AND_SORTED));
+        ret->specific.reset(new AndSortedStats(_specificStats));
         for (size_t i = 0; i < _children.size(); ++i) {
             ret->children.push_back(_children[i]->getStats());
         }

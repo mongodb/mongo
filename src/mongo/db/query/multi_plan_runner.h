@@ -32,21 +32,22 @@
 #include <deque>
 #include <vector>
 
+#include "mongo/base/status.h"
 #include "mongo/db/exec/working_set.h"
-#include "mongo/db/exec/plan_stage.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/query/canonical_query.h"
-#include "mongo/db/query/lite_parsed_query.h"
-#include "mongo/db/query/plan_ranker.h"
-#include "mongo/db/query/plan_executor.h"
+#include "mongo/db/query/plan_ranker.h" // for CandidatePlan
 #include "mongo/db/query/runner.h"
-#include "mongo/platform/cstdint.h"
+#include "mongo/db/query/runner_yield_policy.h"
 
 namespace mongo {
 
-    using std::deque;
-    using std::size_t;
-    using std::vector;
+    class BSONObj;
+    class CanonicalQuery;
+    class DiskLoc;
+    class PlanExecutor;
+    class PlanStage;
+    class QuerySolution;
+    class TypeExplain;
+    class WorkingSet;
 
     /**
      * Runs several plans in parallel and picks the best one.  Caches the selection for future use.
@@ -88,9 +89,18 @@ namespace mongo {
 
         virtual void setYieldPolicy(Runner::YieldPolicy policy);
 
-        virtual const string& ns() { return _query->getParsed().ns(); }
+        virtual const std::string& ns();
 
         virtual void kill();
+
+        /**
+         * Returns OK, allocating and filling in '*explain' with details of the "winner"
+         * plan. Caller takes ownership of '*explain'. Otherwise, return a status describing
+         * the error.
+         *
+         * TOOD: fill in the explain of all candidate plans
+         */
+        virtual Status getExplainPlan(TypeExplain** explain) const;
 
     private:
         /**
@@ -120,19 +130,25 @@ namespace mongo {
         Runner::YieldPolicy _policy;
 
         // The winner of the plan competition...
-        scoped_ptr<PlanExecutor> _bestPlan;
+        boost::scoped_ptr<PlanExecutor> _bestPlan;
+
         // ...and any results it produced while working toward winning.
         std::deque<WorkingSetID> _alreadyProduced;
+
         // ...and the solution, for caching.
-        scoped_ptr<QuerySolution> _bestSolution;
+        boost::scoped_ptr<QuerySolution> _bestSolution;
 
         // Candidate plans.
-        vector<CandidatePlan> _candidates;
+        std::vector<CandidatePlan> _candidates;
+
+        // Candidate plans' stats. Owned here.
+        std::vector<PlanStageStats*> _candidateStats;
+
         // Yielding policy we use when we're running candidates.
-        scoped_ptr<RunnerYieldPolicy> _yieldPolicy;
+        boost::scoped_ptr<RunnerYieldPolicy> _yieldPolicy;
 
         // The query that we're trying to figure out the best solution to.
-        scoped_ptr<CanonicalQuery> _query;
+        boost::scoped_ptr<CanonicalQuery> _query;
     };
 
 }  // namespace mongo

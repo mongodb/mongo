@@ -28,14 +28,22 @@
 
 #pragma once
 
-#include "mongo/db/query/canonical_query.h"
-#include "mongo/db/query/lite_parsed_query.h"
-#include "mongo/db/query/plan_cache.h"
-#include "mongo/db/query/plan_executor.h"
+#include <boost/scoped_ptr.hpp>
+#include <string>
+
+#include "mongo/base/status.h"
 #include "mongo/db/query/runner.h"
-#include "mongo/db/query/stage_builder.h"
 
 namespace mongo {
+
+    class BSONObj;
+    class CachedSolution;
+    class CanonicalQuery;
+    class DiskLoc;
+    class PlanExecutor;
+    class PlanStage;
+    class TypeExplain;
+    class WorkingSet;
 
     /**
      * CachedPlanRunner runs a plan retrieved from the cache.
@@ -47,70 +55,42 @@ namespace mongo {
      */
     class CachedPlanRunner : public Runner {
     public:
-        /**
-         * Takes ownership of both arguments.
-         */
+
+        /**  Takes ownership of all arguments. */
         CachedPlanRunner(CanonicalQuery* canonicalQuery, CachedSolution* cached,
-                         PlanStage* root, WorkingSet* ws)
-            : _canonicalQuery(canonicalQuery), _cachedQuery(cached),
-              _exec(new PlanExecutor(ws, root)), _updatedCache(false) { }
+                         PlanStage* root, WorkingSet* ws);
 
-        Runner::RunnerState getNext(BSONObj* objOut, DiskLoc* dlOut) {
-            Runner::RunnerState state = _exec->getNext(objOut, dlOut);
+        virtual ~CachedPlanRunner();
 
-            if (Runner::RUNNER_EOF == state && !_updatedCache) {
-                updateCache();
-            }
+        Runner::RunnerState getNext(BSONObj* objOut, DiskLoc* dlOut);
 
-            return state;
-        }
+        virtual bool isEOF();
 
-        virtual bool isEOF() { return _exec->isEOF(); }
+        virtual void saveState();
 
-        virtual void saveState() { _exec->saveState(); }
+        virtual bool restoreState();
 
-        virtual bool restoreState() { return _exec->restoreState(); }
+        virtual void invalidate(const DiskLoc& dl);
 
-        virtual void invalidate(const DiskLoc& dl) { _exec->invalidate(dl); }
+        virtual void setYieldPolicy(Runner::YieldPolicy policy);
 
-        virtual void setYieldPolicy(Runner::YieldPolicy policy) {
-            _exec->setYieldPolicy(policy);
-        }
+        virtual const std::string& ns();
 
-        virtual const string& ns() { return _canonicalQuery->getParsed().ns(); }
+        virtual void kill();
 
-        virtual void kill() { _exec->kill(); }
+        /**
+         * Returns OK, allocating and filling in '*explain' with details of the cached
+         * plan. Caller takes ownership of '*explain'. Otherwise, return a status describing
+         * the error.
+         */
+        virtual Status getExplainPlan(TypeExplain** explain) const;
 
     private:
-        void updateCache() {
-            _updatedCache = true;
+        void updateCache();
 
-            // We're done.  Update the cache.
-            PlanCache* cache = PlanCache::get(_canonicalQuery->ns());
-
-            // TODO: Is this an error?
-            if (NULL == cache) { return; }
-
-            // TODO: How do we decide this?
-            bool shouldRemovePlan = false;
-
-            if (shouldRemovePlan) {
-                if (!cache->remove(*_canonicalQuery, *_cachedQuery->solution)) {
-                    warning() << "Cached plan runner couldn't remove plan from cache.  Maybe"
-                        " somebody else did already?";
-                    return;
-                }
-            }
-
-            // We're done running.  Update cache.
-            auto_ptr<CachedSolutionFeedback> feedback(new CachedSolutionFeedback());
-            feedback->stats = _exec->getStats();
-            cache->feedback(*_canonicalQuery, *_cachedQuery->solution, feedback.release());
-        }
-
-        scoped_ptr<CanonicalQuery> _canonicalQuery;
-        scoped_ptr<CachedSolution> _cachedQuery;
-        scoped_ptr<PlanExecutor> _exec;
+        boost::scoped_ptr<CanonicalQuery> _canonicalQuery;
+        boost::scoped_ptr<CachedSolution> _cachedQuery;
+        boost::scoped_ptr<PlanExecutor> _exec;
 
         // Have we updated the cache with our plan stats yet?
         bool _updatedCache;

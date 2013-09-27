@@ -133,7 +133,8 @@ namespace mongo {
 
     PlanStageStats* CollectionScan::getStats() {
         _commonStats.isEOF = isEOF();
-        return new PlanStageStats(_commonStats);
+        auto_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_COLLSCAN));
+        return ret.release();
     }
 
 }  // namespace mongo
