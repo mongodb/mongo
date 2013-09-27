@@ -307,7 +307,7 @@ __wt_page_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
 static inline int
 __wt_page_write_gen_wrapped_check(WT_PAGE *page)
 {
-	/* 
+	/*
 	 * Check to see if the page's write generation is about to wrap (wildly
 	 * unlikely as it implies 4B updates between clean page reconciliations,
 	 * but technically possible), and fail the update.
