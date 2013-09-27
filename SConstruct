@@ -864,6 +864,7 @@ if nix:
 
     if linux and has_option( "gcov" ):
         env.Append( CXXFLAGS=" -fprofile-arcs -ftest-coverage " )
+        env.Append( CPPDEFINES=["MONGO_GCOV"] )
         env.Append( LINKFLAGS=" -fprofile-arcs -ftest-coverage " )
 
     if optBuild:
