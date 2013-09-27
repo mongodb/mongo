@@ -263,7 +263,7 @@ __wt_page_only_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * Every time the page transitions from clean to dirty, update the cache
 	 * and transactional information.
 	 */
-	if (WT_ATOMIC_ADD(page->modify->write_gen, 1) == 0) {
+	if (WT_ATOMIC_ADD(page->modify->write_gen, 1) == 1) {
 		(void)WT_ATOMIC_ADD(S2C(session)->cache->pages_dirty, 1);
 		(void)WT_ATOMIC_ADD(
 		    S2C(session)->cache->bytes_dirty, page->memory_footprint);
