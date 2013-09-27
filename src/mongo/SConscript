@@ -240,7 +240,7 @@ extraCommonLibdeps = []
 if env['MONGO_BUILD_SASL_CLIENT']:
     saslLibs = ['sasl2']
     if env['PYSYSPLATFORM'] == "win32":
-        saslLibs.extend(["security"])
+        saslLibs.extend(["secur32"])
 
     env.StaticLibrary('sasl_client_session',
                       ['client/sasl_client_session.cpp',
