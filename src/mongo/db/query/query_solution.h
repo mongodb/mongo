@@ -262,6 +262,10 @@ namespace mongo {
 
         int direction;
 
+        // BIG NOTE:
+        // If you use simple bounds, we'll use whatever index access method the keypattern implies.
+        // If you use the complex bounds, we force Btree access.
+        // The complex bounds require Btree access.
         IndexBounds bounds;
     };
 

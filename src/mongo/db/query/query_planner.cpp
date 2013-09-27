@@ -225,11 +225,8 @@ namespace mongo {
 
         BSONObjIterator it(isn->indexKeyPattern);
         BSONElement elt = it.next();
-
         isn->bounds.fields.resize(indexKeyPattern.nFields());
-
-        int direction = (elt.numberInt() >= 0) ? 1 : -1;
-        IndexBoundsBuilder::translate(expr, direction, &isn->bounds.fields[0], exact);
+        IndexBoundsBuilder::translate(expr, elt, &isn->bounds.fields[0], exact);
         return isn;
     }
 
@@ -373,9 +370,8 @@ namespace mongo {
                             elt = kpIt.next();
                         }
                         verify(!elt.eoo());
-                        int direction = (elt.numberInt() >= 0) ? 1 : -1;
                         bool exact = false;
-                        IndexBoundsBuilder::translate(child, direction, &oil, &exact);
+                        IndexBoundsBuilder::translate(child, elt, &oil, &exact);
 
                         //cout << "current bounds are " << currentScan->bounds.toString() << endl;
                         //cout << "node merging in " << child->toString() << endl;
@@ -546,9 +542,8 @@ namespace mongo {
                             elt = kpIt.next();
                         }
                         verify(!elt.eoo());
-                        int direction = (elt.numberInt() >= 0) ? 1 : -1;
                         bool exact = false;
-                        IndexBoundsBuilder::translate(child, direction, &oil, &exact);
+                        IndexBoundsBuilder::translate(child, elt, &oil, &exact);
 
                         // Merge the bounds with the existing.
                         currentScan->bounds.joinOr(oil, indexKeyPatterns[currentIndexNumber]);
