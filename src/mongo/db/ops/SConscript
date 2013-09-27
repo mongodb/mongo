@@ -54,6 +54,7 @@ env.StaticLibrary(
         'modifier_add_to_set.cpp',
         'modifier_bit.cpp',
         'modifier_compare.cpp',
+        'modifier_current_date.cpp',
         'modifier_inc.cpp',
         'modifier_object_replace.cpp',
         'modifier_pop.cpp',
@@ -91,6 +92,15 @@ env.CppUnitTest(
 env.CppUnitTest(
     target='modifier_compare_test',
     source='modifier_compare_test.cpp',
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/mutable_bson_test_utils',
+        'update',
+    ],
+)
+
+env.CppUnitTest(
+    target='modifier_current_date_test',
+    source='modifier_current_date_test.cpp',
     LIBDEPS=[
         '$BUILD_DIR/mongo/mutable_bson_test_utils',
         'update',
