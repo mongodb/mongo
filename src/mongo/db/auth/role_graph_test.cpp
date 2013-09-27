@@ -82,6 +82,8 @@ namespace {
         ASSERT_OK(graph.addRoleToRole(roleA, roleC));
         ASSERT_OK(graph.addRoleToRole(roleB, roleC));
         ASSERT_OK(graph.addRoleToRole(roleB, roleD));
+        // Adding the same role twice should be a no-op, duplicate roles should be de-duped.
+        ASSERT_OK(graph.addRoleToRole(roleB, roleD));
 
         /*
          * Graph now looks like:

@@ -32,7 +32,9 @@
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/base/disallow_copying.h"
+#include "mongo/bson/mutable/element.h"
 #include "mongo/db/auth/privilege.h"
+#include "mongo/db/auth/role_graph.h"
 #include "mongo/db/auth/role_name.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/jsobj.h"
@@ -42,6 +44,16 @@ namespace mongo {
     class AuthorizationManager;
 
 namespace auth {
+
+    /**
+     * Takes a role name and a role graph and fills the output param "result" with a BSON
+     * representation of the role object.
+     * Note: The passed in RoleGraph can't be marked const because some of its accessors can
+     * actually modify it internally (to set up built-in roles).
+     */
+    Status getBSONForRole(/*const*/ RoleGraph* graph,
+                          const RoleName& roleName,
+                          mutablebson::Element result);
 
     /**
      * Takes a command object describing an invocation of the "createUser" command on the database

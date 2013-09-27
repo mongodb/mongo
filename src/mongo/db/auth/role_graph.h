@@ -29,7 +29,7 @@
 #pragma once
 
 #include <algorithm>
-#include <set>
+#include <vector>
 
 #include "mongo/base/status.h"
 #include "mongo/db/auth/privilege.h"
@@ -232,7 +232,7 @@ namespace mongo {
 
 
         // Represents all the outgoing edges to other roles from any given role.
-        typedef unordered_map<RoleName, unordered_set<RoleName> > EdgeSet;
+        typedef unordered_map<RoleName, vector<RoleName> > EdgeSet;
         // Maps a role name to a list of privileges associated with that role.
         typedef unordered_map<RoleName, PrivilegeVector> RolePrivilegeMap;
 

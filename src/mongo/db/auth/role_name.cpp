@@ -48,28 +48,28 @@ namespace mongo {
         _splitPoint = role.size();
     }
 
-    RoleNameSetIterator::RoleNameSetIterator(const unordered_set<RoleName>::const_iterator& begin,
-                                             const unordered_set<RoleName>::const_iterator& end) :
-                                                _begin(begin), _end(end) {}
+    RoleNameVectorIterator::RoleNameVectorIterator(
+            const std::vector<RoleName>::const_iterator& begin,
+            const std::vector<RoleName>::const_iterator& end) : _begin(begin), _end(end) {}
 
-    RoleNameSetIterator::~RoleNameSetIterator() {};
+    RoleNameVectorIterator::~RoleNameVectorIterator() {};
 
-    bool RoleNameSetIterator::more() const {
+    bool RoleNameVectorIterator::more() const {
         return _begin != _end;
     }
 
-    const RoleName& RoleNameSetIterator::next() {
+    const RoleName& RoleNameVectorIterator::next() {
         const RoleName& toReturn = get();
         ++_begin;
         return toReturn;
     }
 
-    const RoleName& RoleNameSetIterator::get() const {
+    const RoleName& RoleNameVectorIterator::get() const {
         return *_begin;
     }
 
-    RoleNameIterator::Impl* RoleNameSetIterator::doClone() const {
-        return new RoleNameSetIterator(_begin, _end);
+    RoleNameIterator::Impl* RoleNameVectorIterator::doClone() const {
+        return new RoleNameVectorIterator(_begin, _end);
     }
 
     std::ostream& operator<<(std::ostream& os, const RoleName& name) {

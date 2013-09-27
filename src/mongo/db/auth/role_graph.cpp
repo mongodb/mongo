@@ -29,6 +29,7 @@
 #include "mongo/db/auth/role_graph.h"
 
 #include <algorithm>
+#include <vector>
 
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/role_name.h"
@@ -121,13 +122,17 @@ namespace {
                           0);
         }
 
-        for (unordered_set<RoleName>::iterator it = _roleToSubordinates[role].begin();
+        for (std::vector<RoleName>::iterator it = _roleToSubordinates[role].begin();
                 it != _roleToSubordinates[role].end(); ++it) {
-            _roleToMembers[*it].erase(role);
+            _roleToMembers[*it].erase(std::find(_roleToMembers[*it].begin(),
+                                                _roleToMembers[*it].end(),
+                                                role));
         }
-        for (unordered_set<RoleName>::iterator it = _roleToMembers[role].begin();
+        for (std::vector<RoleName>::iterator it = _roleToMembers[role].begin();
                 it != _roleToMembers[role].end(); ++it) {
-            _roleToSubordinates[*it].erase(role);
+            _roleToSubordinates[*it].erase(std::find(_roleToSubordinates[*it].begin(),
+                                                     _roleToSubordinates[*it].end(),
+                                                     role));
         }
         _roleToSubordinates.erase(role);
         _roleToMembers.erase(role);
@@ -139,15 +144,15 @@ namespace {
     RoleNameIterator RoleGraph::getDirectSubordinates(const RoleName& role) {
         if (!roleExists(role))
             return RoleNameIterator(NULL);
-        const unordered_set<RoleName>& edges = _roleToSubordinates.find(role)->second;
-        return RoleNameIterator(new RoleNameSetIterator(edges.begin(), edges.end()));
+        const std::vector<RoleName>& edges = _roleToSubordinates.find(role)->second;
+        return RoleNameIterator(new RoleNameVectorIterator(edges.begin(), edges.end()));
     }
 
     RoleNameIterator RoleGraph::getDirectMembers(const RoleName& role) {
         if (!roleExists(role))
             return RoleNameIterator(NULL);
-        const unordered_set<RoleName>& edges = _roleToMembers.find(role)->second;
-        return RoleNameIterator(new RoleNameSetIterator(edges.begin(), edges.end()));
+        const std::vector<RoleName>& edges = _roleToMembers.find(role)->second;
+        return RoleNameIterator(new RoleNameVectorIterator(edges.begin(), edges.end()));
     }
 
     const PrivilegeVector& RoleGraph::getDirectPrivileges(const RoleName& role) {
@@ -182,8 +187,15 @@ namespace {
                           0);
         }
 
-        _roleToSubordinates[recipient].insert(role);
-        _roleToMembers[role].insert(recipient);
+        if (std::find(_roleToSubordinates[recipient].begin(),
+                      _roleToSubordinates[recipient].end(),
+                      role) ==
+                _roleToSubordinates[recipient].end()) {
+            // Only add role if it's not already present
+            _roleToSubordinates[recipient].push_back(role);
+            _roleToMembers[role].push_back(recipient);
+        }
+
         return Status::OK();
     }
 
@@ -207,19 +219,28 @@ namespace {
                           0);
         }
 
-        if (!_roleToMembers[role].erase(recipient)) {
+        std::vector<RoleName>::iterator itToRm = std::find(_roleToMembers[role].begin(),
+                                                           _roleToMembers[role].end(),
+                                                           recipient);
+        if (itToRm != _roleToMembers[role].end()) {
+            _roleToMembers[role].erase(itToRm);
+        } else {
             return Status(ErrorCodes::RolesNotRelated,
                           mongoutils::str::stream() << recipient.getFullName() << " is not a member"
                                   " of " << role.getFullName(),
                           0);
         }
 
+        itToRm = std::find(_roleToSubordinates[recipient].begin(),
+                           _roleToSubordinates[recipient].end(),
+                           role);
         massert(16827,
                 mongoutils::str::stream() << role.getFullName() << " is not a subordinate"
                         " of " << recipient.getFullName() << ", even though " <<
                         recipient.getFullName() << " is a member of " << role.getFullName() <<
                         ". This shouldn't be possible",
-                _roleToSubordinates[recipient].erase(role));
+                itToRm != _roleToSubordinates[recipient].end());
+        _roleToSubordinates[recipient].erase(itToRm);
         return Status::OK();
     }
 
@@ -412,8 +433,8 @@ namespace {
         }
 
         // Recursively add children's privileges to current role's "all privileges" vector.
-        const unordered_set<RoleName>& children = _roleToSubordinates[currentRole];
-        for (unordered_set<RoleName>::const_iterator roleIt = children.begin();
+        const std::vector<RoleName>& children = _roleToSubordinates[currentRole];
+        for (std::vector<RoleName>::const_iterator roleIt = children.begin();
                 roleIt != children.end(); ++roleIt) {
             const RoleName& childRole = *roleIt;
             Status status = _recomputePrivilegeDataHelper(childRole, inProgressRoles, visitedRoles);

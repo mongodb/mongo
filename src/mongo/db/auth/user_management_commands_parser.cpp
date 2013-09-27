@@ -33,11 +33,14 @@
 
 #include "mongo/base/status.h"
 #include "mongo/bson/util/bson_extract.h"
+#include "mongo/bson/mutable/document.h"
+#include "mongo/bson/mutable/element.h"
 #include "mongo/client/auth_helpers.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/privilege_parser.h"
+#include "mongo/db/auth/role_graph.h"
 #include "mongo/db/auth/user_document_parser.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/jsobj.h"
@@ -681,5 +684,47 @@ namespace auth {
 
         return Status::OK();
     }
+
+    Status getBSONForRole(RoleGraph* graph, const RoleName& roleName, mutablebson::Element result) {
+        if (!graph->roleExists(roleName)) {
+            return Status(ErrorCodes::RoleNotFound,
+                          mongoutils::str::stream() << roleName.getFullName() <<
+                                  "does not name an existing role");
+        }
+        std::string id = mongoutils::str::stream() << roleName.getDB() << "." << roleName.getRole();
+        result.appendString("_id", id);
+        result.appendString("name", roleName.getRole());
+        result.appendString("source", roleName.getDB());
+
+        // Build privileges array
+        mutablebson::Element privilegesArrayElement =
+                result.getDocument().makeElementArray("privileges");
+        result.pushBack(privilegesArrayElement);
+        const PrivilegeVector& privileges = graph->getDirectPrivileges(roleName);
+        for (PrivilegeVector::const_iterator it = privileges.begin();
+                it != privileges.end(); ++it) {
+            std::string errmsg;
+            ParsedPrivilege privilege;
+            if (!ParsedPrivilege::privilegeToParsedPrivilege(*it, &privilege, &errmsg)) {
+                return Status(ErrorCodes::BadValue, errmsg);
+            }
+            privilegesArrayElement.appendObject("privileges", privilege.toBSON());
+        }
+
+        // Build roles array
+        mutablebson::Element rolesArrayElement = result.getDocument().makeElementArray("roles");
+        result.pushBack(rolesArrayElement);
+        RoleNameIterator nameIt = graph->getDirectSubordinates(roleName);
+        while (nameIt.more()) {
+            const RoleName& subRole = nameIt.next();
+            mutablebson::Element roleObj = result.getDocument().makeElementObject("");
+            roleObj.appendString("name", subRole.getRole());
+            roleObj.appendString("source", subRole.getDB());
+            rolesArrayElement.pushBack(roleObj);
+        }
+
+        return Status::OK();
+    }
+
 } // namespace auth
 } // namespace mongo
