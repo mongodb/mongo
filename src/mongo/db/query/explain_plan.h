@@ -28,64 +28,28 @@
 
 #pragma once
 
-#include <boost/scoped_ptr.hpp>
-#include <string>
-
 #include "mongo/base/status.h"
-#include "mongo/db/query/runner.h"
+#include "mongo/db/exec/plan_stats.h"
 
 namespace mongo {
 
-    class BSONObj;
-    class CanonicalQuery;
-    class DiskLoc;
-    class PlanExecutor;
-    class PlanStage;
-    class QuerySolution;
     class TypeExplain;
-    class WorkingSet;
 
     /**
-     * SingleSolutionRunner runs a plan that was the only possible solution to a query.  It exists
-     * only to dump stats into the cache after running.
+     * Returns OK, allocating and filling in '*explain' describing the access paths used in
+     * the 'stats' tree of a given query solution. The caller has the ownership of
+     * '*explain', on success. Otherwise return and erros status describing the problem.
+     *
+     * If 'fullDetails' was requested, the explain will return all available information about
+     * the plan, otherwise, just a summary. The fields in the summary are: 'cursor', 'n',
+     * 'nscannedObjects', 'nscanned', and 'indexBounds'. The remaining fields are: 'isMultKey',
+     * 'nscannedObjectsAllPlans', 'nscannedAllPlans', 'scanAndOrder', 'indexOnly', 'nYields',
+     * 'nChunkSkips', 'millis', 'allPlans', and 'oldPlan'.
+     *
+     * All these fields are documented in type_explain.h
+     *
+     * TODO: Currently, only working for single-leaf plans.
      */
-    class SingleSolutionRunner : public Runner {
-    public:
+    Status explainPlan(const PlanStageStats& stats, TypeExplain** explain, bool fullDetails);
 
-        /** Takes ownership of all the arguments. */
-        SingleSolutionRunner(CanonicalQuery* canonicalQuery, QuerySolution* soln,
-                             PlanStage* root, WorkingSet* ws);
-
-        virtual ~SingleSolutionRunner();
-
-        Runner::RunnerState getNext(BSONObj* objOut, DiskLoc* dlOut);
-
-        virtual bool isEOF();
-
-        virtual void saveState();
-
-        virtual bool restoreState();
-
-        virtual void setYieldPolicy(Runner::YieldPolicy policy);
-
-        virtual void invalidate(const DiskLoc& dl);
-
-        virtual const std::string& ns();
-
-        virtual void kill();
-
-        /**
-         * Returns OK, allocating and filling in '*explain' with the details of the plan used
-         * by this runner. Caller takes ownership of '*explain'. Otherwise, return a status
-         * describing the error.
-         */
-        virtual Status getExplainPlan(TypeExplain** explain) const;
-
-    private:
-        boost::scoped_ptr<CanonicalQuery> _canonicalQuery;
-        boost::scoped_ptr<QuerySolution> _solution;
-        boost::scoped_ptr<PlanExecutor> _exec;
-    };
-
-}  // namespace mongo
-
+} // namespace mongo

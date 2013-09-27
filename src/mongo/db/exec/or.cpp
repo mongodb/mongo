@@ -158,8 +158,8 @@ namespace mongo {
     PlanStageStats* OrStage::getStats() {
         _commonStats.isEOF = isEOF();
 
-        auto_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats));
-        ret->setSpecific<OrStats>(_specificStats);
+        auto_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_OR));
+        ret->specific.reset(new OrStats(_specificStats));
         for (size_t i = 0; i < _children.size(); ++i) {
             ret->children.push_back(_children[i]->getStats());
         }

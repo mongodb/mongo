@@ -89,7 +89,7 @@ namespace mongo {
 
     PlanStageStats* SkipStage::getStats() {
         _commonStats.isEOF = isEOF();
-        auto_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats));
+        auto_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_SKIP));
         ret->children.push_back(_child->getStats());
         return ret.release();
     }

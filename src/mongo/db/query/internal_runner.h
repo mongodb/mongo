@@ -28,15 +28,22 @@
 
 #pragma once
 
-#include "mongo/db/clientcursor.h"
-#include "mongo/db/query/canonical_query.h"
-#include "mongo/db/query/lite_parsed_query.h"
-#include "mongo/db/query/plan_cache.h"
-#include "mongo/db/query/plan_executor.h"
+#include <boost/scoped_ptr.hpp>
+#include <string>
+
+#include "mongo/base/status.h"
 #include "mongo/db/query/runner.h"
-#include "mongo/db/query/stage_builder.h"
 
 namespace mongo {
+
+    class BSONObj;
+    class CanonicalQuery;
+    class DiskLoc;
+    class PlanExecutor;
+    class PlanStage;
+    class QuerySolution;
+    class TypeExplain;
+    class WorkingSet;
 
     /**
      * This is a runner that was requested by an internal client of the query system, as opposed to
@@ -48,55 +55,43 @@ namespace mongo {
      */
     class InternalRunner : public Runner {
     public:
+
+        /** Takes ownership of all arguments. */
+        InternalRunner(const string& ns, PlanStage* root, WorkingSet* ws);
+
+        virtual ~InternalRunner();
+
+        Runner::RunnerState getNext(BSONObj* objOut, DiskLoc* dlOut);
+
+        virtual bool isEOF();
+
+        virtual void saveState();
+
+        virtual bool restoreState();
+
+        virtual const std::string& ns();
+
+        virtual void invalidate(const DiskLoc& dl);
+
+        virtual void setYieldPolicy(Runner::YieldPolicy policy);
+
+        virtual void kill();
+
         /**
-         * Takes ownership of all arguments.
+         * Returns OK, allocating and filling in '*explain' with details of the plan used by
+         * this runner. Caller takes ownership of '*explain'. Otherwise, return a status
+         * describing the error.
+         *
+         * Strictly speaking, an InternalRunner's explain is never exposed, simply because an
+         * InternalRunner itself is not exposed. But we implement the explain here anyway so
+         * to help in debugging situations.
          */
-        InternalRunner(const string& ns, PlanStage* root, WorkingSet* ws)
-              : _ns(ns), _exec(new PlanExecutor(ws, root)), _policy(Runner::YIELD_MANUAL) { }
-
-        virtual ~InternalRunner() {
-            if (Runner::YIELD_AUTO == _policy) {
-                ClientCursor::deregisterRunner(this);
-            }
-        }
-
-        Runner::RunnerState getNext(BSONObj* objOut, DiskLoc* dlOut) {
-            return _exec->getNext(objOut, dlOut);
-        }
-
-        virtual bool isEOF() { return _exec->isEOF(); }
-
-        virtual void saveState() { _exec->saveState(); }
-
-        virtual bool restoreState() { return _exec->restoreState(); }
-
-        virtual const string& ns() { return _ns; }
-
-        virtual void invalidate(const DiskLoc& dl) { _exec->invalidate(dl); }
-
-        virtual void setYieldPolicy(Runner::YieldPolicy policy) {
-            // No-op.
-            if (_policy == policy) { return; }
-
-            if (Runner::YIELD_AUTO == policy) {
-                // Going from manual to auto.
-                ClientCursor::registerRunner(this);
-            }
-            else {
-                // Going from auto to manual.
-                ClientCursor::deregisterRunner(this);
-            }
-
-            _policy = policy;
-            _exec->setYieldPolicy(policy);
-        }
-
-        virtual void kill() { _exec->kill(); }
+        virtual Status getExplainPlan(TypeExplain** explain) const;
 
     private:
-        string _ns;
+        std::string _ns;
 
-        scoped_ptr<PlanExecutor> _exec;
+        boost::scoped_ptr<PlanExecutor> _exec;
         Runner::YieldPolicy _policy;
     };
 

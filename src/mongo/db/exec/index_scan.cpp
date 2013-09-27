@@ -71,6 +71,11 @@ namespace mongo {
             verify(_params.bounds.isSimpleRange);
             verify(_params.bounds.endKey.isEmpty());
         }
+
+        _specificStats.indexType = "BtreeCursor"; // TODO amName;
+        _specificStats.indexName = _descriptor->infoObj()["name"].String();
+        _specificStats.indexBounds = _params.bounds.toBSON();
+        _specificStats.isMultiKey = _descriptor->isMultikey();
     }
 
     PlanStage::StageState IndexScan::work(WorkingSetID* out) {
@@ -131,6 +136,7 @@ namespace mongo {
             // _indexCursor->next() if we're EOF.
             if (!isEOF()) {
                 _indexCursor->next();
+                ++_specificStats.keysExamined;
                 checkEnd();
             }
         }
@@ -284,8 +290,8 @@ namespace mongo {
 
     PlanStageStats* IndexScan::getStats() {
         _commonStats.isEOF = isEOF();
-        auto_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats));
-        ret->setSpecific<IndexScanStats>(_specificStats);
+        auto_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_IXSCAN));
+        ret->specific.reset(new IndexScanStats(_specificStats));
         return ret.release();
     }
 

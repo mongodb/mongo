@@ -224,8 +224,8 @@ namespace mongo {
     PlanStageStats* MergeSortStage::getStats() {
         _commonStats.isEOF = isEOF();
 
-        auto_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats));
-        ret->setSpecific<MergeSortStats>(_specificStats);
+        auto_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_SORT_MERGE));
+        ret->specific.reset(new MergeSortStats(_specificStats));
         for (size_t i = 0; i < _children.size(); ++i) {
             ret->children.push_back(_children[i]->getStats());
         }

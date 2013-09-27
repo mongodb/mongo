@@ -26,58 +26,65 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/db/query/eof_runner.h"
 
-#include <boost/scoped_ptr.hpp>
-#include <string>
-
-#include "mongo/base/status.h"
-#include "mongo/db/query/runner.h"
+#include "mongo/db/diskloc.h"
+#include "mongo/db/jsobj.h"
+#include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/type_explain.h"
 
 namespace mongo {
 
-    class BSONObj;
-    class CanonicalQuery;
-    class DiskLoc;
-    class TypeExplain;
+    EOFRunner::EOFRunner(CanonicalQuery* cq, const string& ns) : _cq(cq), _ns(ns) {
+    }
 
-    /**
-     * EOFRunner is EOF immediately and doesn't do anything except return EOF and possibly die
-     * during a yield.
-     */
-    class EOFRunner : public Runner {
-    public:
+    EOFRunner::~EOFRunner() {
+    }
 
-        /* Takes onwership */
-        EOFRunner(CanonicalQuery* cq, const std::string& ns);
+    Runner::RunnerState EOFRunner::getNext(BSONObj* objOut, DiskLoc* dlOut) {
+        return Runner::RUNNER_EOF;
+    }
 
-        virtual ~EOFRunner();
+    bool EOFRunner::isEOF() {
+        return true;
+    }
 
-        virtual Runner::RunnerState getNext(BSONObj* objOut, DiskLoc* dlOut);
+    void EOFRunner::saveState() {
+    }
 
-        virtual bool isEOF();
+    bool EOFRunner::restoreState() {
+        // TODO: Does this value matter?
+        return false;
+    }
 
-        virtual void saveState();
+    void EOFRunner::setYieldPolicy(Runner::YieldPolicy policy) {
+    }
 
-        virtual bool restoreState();
+    void EOFRunner::invalidate(const DiskLoc& dl) {
+    }
 
-        virtual void setYieldPolicy(Runner::YieldPolicy policy);
+    const std::string& EOFRunner::ns() {
+        return _ns;
+    }
 
-        virtual void invalidate(const DiskLoc& dl);
+    void EOFRunner::kill() {
+    }
 
-        virtual const std::string& ns();
+    Status EOFRunner::getExplainPlan(TypeExplain** explain) const {
+        *explain = new TypeExplain;
 
-        virtual void kill();
+        // Fill in all the main fields that don't have a default in the explain data structure.
+        (*explain)->setCursor("BasicCursor");
+        (*explain)->setScanAndOrder(false);
+        (*explain)->setIsMultiKey(false);
+        (*explain)->setIndexOnly(false);
+        (*explain)->setNYields(0);
 
-        /**
-         * Always returns OK, allocating and filling in '*explain' with a fake ("zeroed")
-         * collection scan plan. Caller owns '*explain', though.
-         */
-        virtual Status getExplainPlan(TypeExplain** explain) const;
+        TypeExplain* allPlans = new TypeExplain;
+        allPlans->setCursor("BasicCursor");
+        (*explain)->addToAllPlans(allPlans); // ownership xfer
 
-    private:
-        boost::scoped_ptr<CanonicalQuery> _cq;
-        std::string _ns;
-    };
+        return Status::OK();
+    }
 
-}  // namespace mongo
+} // namespace mongo

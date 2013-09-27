@@ -1,5 +1,5 @@
 /**
- *    Copyright 2013 MongoDB Inc.
+ *    Copyright (C) 2013 10gen Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -26,7 +26,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/single_solution_runner.h"
+#include "mongo/db/query/internal_runner.h"
 
 #include "mongo/db/diskloc.h"
 #include "mongo/db/jsobj.h"
@@ -34,61 +34,68 @@
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/explain_plan.h"
-#include "mongo/db/query/type_explain.h"
 #include "mongo/db/query/plan_executor.h"
-#include "mongo/db/query/query_solution.h"
+#include "mongo/db/query/type_explain.h"
 
 namespace mongo {
 
-    SingleSolutionRunner::SingleSolutionRunner(CanonicalQuery* canonicalQuery,
-                                               QuerySolution* soln,
-                                               PlanStage* root,
-                                               WorkingSet* ws)
-        : _canonicalQuery(canonicalQuery),
-          _solution(soln),
-          _exec(new PlanExecutor(ws, root)) {
+    /** Takes ownership of all arguments. */
+    InternalRunner::InternalRunner(const std::string& ns, PlanStage* root, WorkingSet* ws)
+        : _ns(ns), _exec(new PlanExecutor(ws, root)), _policy(Runner::YIELD_MANUAL) {
     }
 
-    SingleSolutionRunner::~SingleSolutionRunner() {
+    InternalRunner::~InternalRunner() {
+        if (Runner::YIELD_AUTO == _policy) {
+            ClientCursor::deregisterRunner(this);
+        }
     }
 
-    Runner::RunnerState SingleSolutionRunner::getNext(BSONObj* objOut, DiskLoc* dlOut) {
+    Runner::RunnerState InternalRunner::getNext(BSONObj* objOut, DiskLoc* dlOut) {
         return _exec->getNext(objOut, dlOut);
-        // TODO: I'm not convinced we want to cache this run.  What if it's a collscan solution
-        // and the user adds an index later?  We don't want to reach for this.  But if solving
-        // the query is v. hard, we do want to cache it.  Maybe we can remove single solution
-        // cache entries when we build an index?
     }
 
-    bool SingleSolutionRunner::isEOF() {
+    bool InternalRunner::isEOF() {
         return _exec->isEOF();
     }
 
-    void SingleSolutionRunner::saveState() {
+    void InternalRunner::saveState() {
         _exec->saveState();
     }
 
-    bool SingleSolutionRunner::restoreState() {
+    bool InternalRunner::restoreState() {
         return _exec->restoreState();
     }
 
-    void SingleSolutionRunner::setYieldPolicy(Runner::YieldPolicy policy) {
-        _exec->setYieldPolicy(policy);
+    const std::string& InternalRunner::ns() {
+        return _ns;
     }
 
-    void SingleSolutionRunner::invalidate(const DiskLoc& dl) {
+    void InternalRunner::invalidate(const DiskLoc& dl) {
         _exec->invalidate(dl);
     }
 
-    const std::string& SingleSolutionRunner::ns() {
-        return _canonicalQuery->getParsed().ns();
+    void InternalRunner::setYieldPolicy(Runner::YieldPolicy policy) {
+        // No-op.
+        if (_policy == policy) { return; }
+
+        if (Runner::YIELD_AUTO == policy) {
+            // Going from manual to auto.
+            ClientCursor::registerRunner(this);
+        }
+        else {
+            // Going from auto to manual.
+            ClientCursor::deregisterRunner(this);
+        }
+
+        _policy = policy;
+        _exec->setYieldPolicy(policy);
     }
 
-    void SingleSolutionRunner::kill() {
+    void InternalRunner::kill() {
         _exec->kill();
     }
 
-    Status SingleSolutionRunner::getExplainPlan(TypeExplain** explain) const {
+   Status InternalRunner::getExplainPlan(TypeExplain** explain) const {
         dassert(_exec.get());
 
         scoped_ptr<PlanStageStats> stats(_exec->getStats());
@@ -111,6 +118,6 @@ namespace mongo {
         (*explain)->setNScannedAllPlans((*explain)->getNScanned());
 
         return Status::OK();
-    }
+   }
 
 } // namespace mongo

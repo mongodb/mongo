@@ -28,11 +28,13 @@
 
 #pragma once
 
+#include "mongo/base/status.h"
 #include "mongo/db/query/canonical_query.h"
 
 namespace mongo {
 
     class DiskLoc;
+    class TypeExplain;
 
     /**
      * A runner runs a query.
@@ -164,6 +166,13 @@ namespace mongo {
          * Return the NS that the query is running over.
          */
         virtual const string& ns() = 0;
+
+        /**
+         * Returns OK, allocating and filling '*explain' with a description of the chosen plan.
+         * Caller takes onwership of '*explain'. Otherwise, returns false with a detailed error
+         * status.
+         */
+        virtual Status getExplainPlan(TypeExplain** explain) const = 0;
     };
 
 }  // namespace mongo

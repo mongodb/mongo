@@ -43,16 +43,15 @@
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/single_solution_runner.h"
 #include "mongo/db/query/stage_builder.h"
+#include "mongo/db/query/type_explain.h"
 #include "mongo/db/repl/repl_reads_ok.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/d_logic.h"
 #include "mongo/s/stale_exception.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace {
-
-    using std::string;
-    using mongo::LiteParsedQuery;
 
     // Copied from db/ops/query.cpp.  Quote:
     // We cut off further objects once we cross this threshold; thus, you might get
@@ -60,7 +59,7 @@ namespace {
     static const int32_t MaxBytesToReturnToClientAtOnce = 4 * 1024 * 1024;
 
     // TODO: Remove this or use it.
-    bool hasIndexSpecifier(const LiteParsedQuery& pq) {
+    bool hasIndexSpecifier(const mongo::LiteParsedQuery& pq) {
         return !pq.getHint().isEmpty() || !pq.getMin().isEmpty() || !pq.getMax().isEmpty();
     }
 
@@ -73,19 +72,19 @@ namespace {
      * The n limit (vs. size) is important when someone fetches only one small field from big
      * objects, which causes massive scanning server-side.
      */
-    bool enoughForFirstBatch(const LiteParsedQuery& pq, int n, int len) {
+    bool enoughForFirstBatch(const mongo::LiteParsedQuery& pq, int n, int len) {
         if (0 == pq.getNumToReturn()) {
             return (len > 1024 * 1024) || n >= 101;
         }
         return n >= pq.getNumToReturn() || len > MaxBytesToReturnToClientAtOnce;
     }
 
-    bool enough(const LiteParsedQuery& pq, int n) {
+    bool enough(const mongo::LiteParsedQuery& pq, int n) {
         if (0 == pq.getNumToReturn()) { return false; }
         return n >= pq.getNumToReturn();
     }
 
-    bool enoughForExplain(const LiteParsedQuery& pq, long long n) {
+    bool enoughForExplain(const mongo::LiteParsedQuery& pq, long long n) {
         if (pq.wantMore() || 0 == pq.getNumToReturn()) { return false; }
         return n >= pq.getNumToReturn();
     }
@@ -136,7 +135,7 @@ namespace mongo {
         // If this is NULL, there is no data but the query is valid.  You're allowed to query for
         // data on an empty collection and it's not an error.  There just isn't any data...
         if (NULL == nsd) {
-            const string& ns = canonicalQuery->ns();
+            const std::string& ns = canonicalQuery->ns();
             *out = new EOFRunner(canonicalQuery.release(), ns);
             return Status::OK();
         }
@@ -374,7 +373,7 @@ namespace mongo {
     /**
      * This is called by db/ops/query.cpp.  This is the entry point for answering a query.
      */
-    string newRunQuery(Message& m, QueryMessage& q, CurOp& curop, Message &result) {
+    std::string newRunQuery(Message& m, QueryMessage& q, CurOp& curop, Message &result) {
         // This is a read lock.
         Client::ReadContext ctx(q.ns, dbpath);
 
@@ -446,6 +445,7 @@ namespace mongo {
 
         BSONObj obj;
         Runner::RunnerState state;
+        uint64_t numMisplacedDocs = 0;
 
         // set this outside loop. we will need to use this both within loop and when deciding
         // to fill in explain information
@@ -459,7 +459,10 @@ namespace mongo {
                 // it if we yield.
                 KeyPattern kp(collMetadata->getKeyPattern());
                 // This performs excessive BSONObj creation but that's OK for now.
-                if (!collMetadata->keyBelongsToMe(kp.extractSingleKey(obj))) { continue; }
+                if (!collMetadata->keyBelongsToMe(kp.extractSingleKey(obj))) {
+                    ++numMisplacedDocs;
+                    continue;
+                }
             }
 
             // Add result to output buffer. This is unnecessary if explain info is requested
@@ -532,6 +535,38 @@ namespace mongo {
                                            shardingState.getVersion(pq.ns()));
         }
 
+        // Append explain information to query results by asking the runner to produce them.
+        if (isExplain) {
+            TypeExplain* bareExplain;
+            Status res = runner->getExplainPlan(&bareExplain);
+            if (!res.isOK()) {
+                error() << "could not produce explain of query '" << pq.getFilter()
+                        << "', error: " << res.reason();
+            }
+            else {
+                boost::scoped_ptr<TypeExplain> explain(bareExplain);
+
+                // Fill in the missing run-time fields in explain, starting with propeties of
+                // the process running the query.
+                std::string server = mongoutils::str::stream()
+                    << getHostNameCached() << ":" << cmdLine.port;
+                explain->setServer(server);
+
+                // Fill in the number of documents consummed that were involved in an ongoing
+                // (or aborted) migration.
+                explain->setNChunkSkips(numMisplacedDocs);
+
+                // Clock the whole operation.
+                explain->setMillis(curop.elapsedMillis());
+
+                BSONObj explainObj = explain->toBSON();
+                bb.appendBuf((void*)explainObj.objdata(), explainObj.objsize());
+
+                // The explain output is actually a result.
+                numResults = 1;
+            }
+        }
+
         long long ccId = 0;
         if (saveClientCursor) {
             // We won't use the runner until it's getMore'd.
@@ -566,16 +601,6 @@ namespace mongo {
             // If the query had a time limit, remaining time is "rolled over" to the cursor (for
             // use by future getmore ops).
             cc->setLeftoverMaxTimeMicros(curop.getRemainingMaxTimeMicros());
-        }
-
-        // append explain information to query results
-        if (isExplain) {
-            BSONObjBuilder bob;
-            bob.append("n", numResults);
-            BSONObj obj = bob.done();
-            bb.appendBuf((void*)obj.objdata(), obj.objsize());
-            // The explain output is actually a result.
-            numResults = 1;
         }
 
         // Add the results from the query into the output buffer.
