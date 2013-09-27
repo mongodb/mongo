@@ -35,6 +35,7 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
+#include "mongo/bson/mutable/element.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/authz_manager_external_state.h"
 #include "mongo/db/auth/resource_pattern.h"
@@ -104,6 +105,17 @@ namespace mongo {
          * Returns true if access control is enabled on this server.
          */
         static bool isAuthEnabled();
+
+        /**
+         * Takes a role name and a role graph and fills the output param "result" with a BSON
+         * representation of the role object.
+         * Note: The passed in RoleGraph can't be marked const because some of its accessors can
+         * actually modify it internally (to set up built-in roles).
+         */
+        static Status getBSONForRole(/*const*/ RoleGraph* graph,
+                                     const RoleName& roleName,
+                                     mutablebson::Element result);
+
 
         AuthzManagerExternalState* getExternalState() const;
 

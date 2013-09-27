@@ -16,6 +16,7 @@ env.StaticLibrary('authcore', ['action_set.cpp',
                                'authz_manager_external_state.cpp',
                                'authz_session_external_state.cpp',
                                'privilege.cpp',
+                               'privilege_parser.cpp',
                                'resource_pattern.cpp',
                                'role_graph.cpp',
                                'role_name.cpp',
@@ -26,13 +27,11 @@ env.StaticLibrary('authcore', ['action_set.cpp',
                                'user_set.cpp'],
                   LIBDEPS=['$BUILD_DIR/mongo/base/base',
                            '$BUILD_DIR/mongo/bson',
+                           '$BUILD_DIR/mongo/db/common',
                            '$BUILD_DIR/mongo/stringutils'])
 
-env.StaticLibrary('usercommandsparser', ['user_management_commands_parser.cpp',
-                                         'privilege_parser.cpp'],
-                  LIBDEPS=['authcore',
-                           '$BUILD_DIR/mongo/mongocommon',
-                           '$BUILD_DIR/mongo/db/common'])
+env.StaticLibrary('usercommandsparser', ['user_management_commands_parser.cpp'],
+                  LIBDEPS=['authcore', '$BUILD_DIR/mongo/mongocommon'])
 
 
 env.StaticLibrary('authservercommon',
