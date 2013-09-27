@@ -280,7 +280,7 @@ __wt_page_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	/*
 	 * Publish: a barrier to ensure all changes to the page are flushed
-	 * before we update the page's write generation and mark the tree
+	 * before we update the page's write generation and/or mark the tree
 	 * dirty, otherwise checkpoints and/or page reconciliation might be
 	 * reading a clean page.
 	 */
@@ -314,10 +314,10 @@ __wt_page_only_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
 		__wt_page_modify_first(session, page);
 
 	/*
-	 * Publish: there must be a barrier to ensure all changes to the page
-	 * are flushed before we update the page's write generation and mark
-	 * the tree dirty, otherwise checkpoints and/or page reconciliation
-	 * might be looking at a clean page.
+	 * Publish: a barrier to ensure all changes to the page are flushed
+	 * before we update the page's write generation and/or mark the tree
+	 * dirty, otherwise checkpoints and/or page reconciliation might be
+	 * reading a clean page.
 	 */
 	WT_WRITE_BARRIER();
 
