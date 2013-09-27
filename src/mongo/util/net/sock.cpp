@@ -485,23 +485,16 @@ namespace mongo {
 
     class ConnectBG : public BackgroundJob {
     public:
-        ConnectBG(int sock, SockAddr remote) : _sock(sock), _remote(remote),
-         _errno(0) { }
+        ConnectBG(int sock, SockAddr remote) : _sock(sock), _remote(remote) { }
 
-        void run() {
-            _res = ::connect(_sock, _remote.raw(), _remote.addressSize);
-            _errno = errno;
-        }
-
+        void run() { _res = ::connect(_sock, _remote.raw(), _remote.addressSize); }
         string name() const { return "ConnectBG"; }
-        int getErrno() const { return _errno; }
         int inError() const { return _res; }
 
     private:
         int _sock;
         int _res;
         SockAddr _remote;
-        int _errno;
     };
 
     bool Socket::connect(SockAddr& remote) {
@@ -521,8 +514,6 @@ namespace mongo {
         bg.go();
         if ( bg.wait(5000) ) {
             if ( bg.inError() ) {
-                warning() << "Failed to connect to " << _remote.getAddr()
-                          << ", reason: " << errnoWithDescription(bg.getErrno()) << endl;
                 close();
                 return false;
             }
