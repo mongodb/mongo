@@ -249,14 +249,17 @@ __wt_page_modify_init(WT_SESSION_IMPL *session, WT_PAGE *page)
 }
 
 /*
- * __wt_page_modify_first --
- *	Update the cache and transaction information the first time the page
- * is marked dirty.
+ * __wt_page_only_modify_set --
+ *	Mark the page (but only the page) dirty.
  */
 static inline void
-__wt_page_modify_first(WT_SESSION_IMPL *session, WT_PAGE *page, int serial_held)
+__wt_page_only_modify_set(
+    WT_SESSION_IMPL *session, WT_PAGE *page, int serial_held)
 {
 	/*
+	 * Update the cache and transaction information the first time the page
+	 * is marked dirty.
+	 *
 	 * If we're not called already holding the serial lock, acquire it,
 	 * else we could race incrementing the cache information.
 	 */
@@ -278,6 +281,17 @@ __wt_page_modify_first(WT_SESSION_IMPL *session, WT_PAGE *page, int serial_held)
 
 	if (!serial_held)
 		__wt_spin_unlock(session, &S2C(session)->serial_lock);
+
+	/*
+	 * Publish: a barrier to ensure all changes to the page are flushed
+	 * before we update the page's write generation and/or mark the tree
+	 * dirty, otherwise checkpoints and/or page reconciliation might be
+	 * reading a clean page.
+	 */
+	WT_WRITE_BARRIER();
+
+	/* The page is dirty if the disk and write generations differ. */
+	++page->modify->write_gen;
 }
 
 /*
@@ -287,15 +301,7 @@ __wt_page_modify_first(WT_SESSION_IMPL *session, WT_PAGE *page, int serial_held)
 static inline void
 __wt_page_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page, int serial_held)
 {
-	__wt_page_modify_first(session, page, serial_held);
-
-	/*
-	 * Publish: a barrier to ensure all changes to the page are flushed
-	 * before we update the page's write generation and/or mark the tree
-	 * dirty, otherwise checkpoints and/or page reconciliation might be
-	 * reading a clean page.
-	 */
-	WT_WRITE_BARRIER();
+	__wt_page_only_modify_set(session, page, serial_held);
 
 	/*
 	 * Mark the tree dirty (even if the page is already marked dirty, newly
@@ -309,31 +315,6 @@ __wt_page_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page, int serial_held)
 	 */
 	if (S2BT(session)->modified == 0)
 		S2BT(session)->modified = 1;
-
-	/* The page is dirty if the disk and write generations differ. */
-	++page->modify->write_gen;
-}
-
-/*
- * __wt_page_only_modify_set --
- *	Mark the page (but only the page) dirty.
- */
-static inline void
-__wt_page_only_modify_set(
-    WT_SESSION_IMPL *session, WT_PAGE *page, int serial_held)
-{
-	__wt_page_modify_first(session, page, serial_held);
-
-	/*
-	 * Publish: a barrier to ensure all changes to the page are flushed
-	 * before we update the page's write generation and/or mark the tree
-	 * dirty, otherwise checkpoints and/or page reconciliation might be
-	 * reading a clean page.
-	 */
-	WT_WRITE_BARRIER();
-
-	/* The page is dirty if the disk and write generations differ. */
-	++page->modify->write_gen;
 }
 
 /*
