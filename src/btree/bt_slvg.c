@@ -1054,14 +1054,6 @@ __slvg_col_range_missing(WT_SESSION_IMPL *session, WT_STUFF *ss)
 static int
 __slvg_modify_init(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
-	WT_BTREE *btree;
-
-	btree = S2BT(session);
-
-	/* The tree is dirty. */
-	btree->modified = 1;
-
-	/* The page is dirty. */
 	WT_RET(__wt_page_modify_init(session, page));
 	__wt_page_modify_set(session, page);
 

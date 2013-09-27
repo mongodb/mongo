@@ -341,6 +341,10 @@ __wt_rec_write(WT_SESSION_IMPL *session,
 	 * are always merged into their parent.  For that reason, we mark the
 	 * first non-split-merge parent we find dirty, not the split-merge page
 	 * itself, ensuring the chain of dirty pages up the tree isn't broken.
+	 *
+	 * Don't mark the tree dirty: if this reconciliation is in service of a
+	 * checkpoint, it's cleared the tree's dirty flag, and we don't want to
+	 * set it again as part of that walk.
 	 */
 	if (!WT_PAGE_IS_ROOT(page)) {
 		for (;;) {
@@ -350,7 +354,7 @@ __wt_rec_write(WT_SESSION_IMPL *session,
 				break;
 		}
 		WT_RET(__wt_page_modify_init(session, page));
-		__wt_page_modify_set(session, page);
+		__wt_page_only_modify_set(session, page);
 
 		return (0);
 	}
@@ -394,11 +398,15 @@ __wt_rec_write(WT_SESSION_IMPL *session,
 	 * pages we discard go on the next checkpoint's free list, it's safe to
 	 * do), but the code is simpler this way, and this operation should not
 	 * be common.
+	 *
+	 * Don't mark the tree dirty: if this reconciliation is in service of a
+	 * checkpoint, it's cleared the tree's dirty flag, and we don't want to
+	 * set it again as part of that walk.
 	 */
 	WT_VERBOSE_RET(session, reconcile,
 	    "root page split %p -> %p", page, page->modify->u.split);
 	page = page->modify->u.split;
-	__wt_page_modify_set(session, page);
+	__wt_page_only_modify_set(session, page);
 	F_CLR(page->modify, WT_PM_REC_SPLIT_MERGE);
 
 	WT_RET(__wt_rec_write(session, page, NULL, flags));
@@ -1986,9 +1994,6 @@ __wt_rec_bulk_wrapup(WT_CURSOR_BULK *cbulk)
 
 	WT_RET(__rec_split_finish(session, r));
 	WT_RET(__rec_write_wrapup(session, r, page));
-
-	/* Mark the tree dirty so close performs a checkpoint. */
-	btree->modified = 1;
 
 	/* Mark the page's parent dirty. */
 	WT_RET(__wt_page_modify_init(session, page->parent));

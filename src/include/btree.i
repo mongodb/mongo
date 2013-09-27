@@ -249,55 +249,80 @@ __wt_page_modify_init(WT_SESSION_IMPL *session, WT_PAGE *page)
 }
 
 /*
+ * __wt_page_modify_first --
+ *	Update the cache and transaction information the first time the page
+ * is marked dirty.
+ */
+static inline void
+__wt_page_modify_first(WT_SESSION_IMPL *session, WT_PAGE *page)
+{
+	(void)WT_ATOMIC_ADD(S2C(session)->cache->pages_dirty, 1);
+	(void)WT_ATOMIC_ADD(
+	    S2C(session)->cache->bytes_dirty, page->memory_footprint);
+
+	/*
+	 * The page can never end up with changes older than the oldest
+	 * running transaction.
+	 */
+	if (F_ISSET(&session->txn, TXN_RUNNING))
+		page->modify->disk_snap_min = session->txn.snap_min;
+}
+
+/*
  * __wt_page_modify_set --
- *	Mark the page dirty.
+ *	Mark the page and tree dirty.
  */
 static inline void
 __wt_page_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
-	if (!__wt_page_is_modified(page)) {
-		(void)WT_ATOMIC_ADD(S2C(session)->cache->pages_dirty, 1);
-		(void)WT_ATOMIC_ADD(
-		    S2C(session)->cache->bytes_dirty, page->memory_footprint);
-
-		/*
-		 * The page can never end up with changes older than the oldest
-		 * running transaction.
-		 */
-		if (F_ISSET(&session->txn, TXN_RUNNING))
-			page->modify->disk_snap_min = session->txn.snap_min;
-	}
+	if (!__wt_page_is_modified(page))
+		__wt_page_modify_first(session, page);
 
 	/*
-	 * Publish: there must be a barrier to ensure all changes to the page
-	 * are flushed before we update the page's write generation, otherwise
-	 * a thread searching the page might see the page's write generation
-	 * update before the changes to the page, which breaks the protocol.
+	 * Publish: a barrier to ensure all changes to the page are flushed
+	 * before we update the page's write generation and mark the tree
+	 * dirty, otherwise checkpoints and/or page reconciliation might be
+	 * reading a clean page.
 	 */
 	WT_WRITE_BARRIER();
+
+	/*
+	 * Mark the tree dirty (even if the page is already marked dirty, newly
+	 * created pages to support "empty" files are dirty, but the file isn't
+	 * marked dirty until there's a real change needing to be written. Test
+	 * before setting the dirty flag, it's a hot cache line.
+	 *
+	 * We shouldn't need an additional barrier: while technically possible
+	 * a tree is marked dirty but no dirty pages found, it shouldn't cause
+	 * problems.
+	 */
+	if (S2BT(session)->modified == 0)
+		S2BT(session)->modified = 1;
 
 	/* The page is dirty if the disk and write generations differ. */
 	++page->modify->write_gen;
 }
 
 /*
- * __wt_page_and_tree_modify_set --
- *	Mark both the page and tree dirty.
+ * __wt_page_only_modify_set --
+ *	Mark the page (but only the page) dirty.
  */
 static inline void
-__wt_page_and_tree_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
+__wt_page_only_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
-	WT_BTREE *btree;
-
-	btree = S2BT(session);
+	if (!__wt_page_is_modified(page))
+		__wt_page_modify_first(session, page);
 
 	/*
-	 * A memory barrier is required for setting the tree's modified value,
-	 * we depend on the barrier called in setting the page's modified value.
+	 * Publish: there must be a barrier to ensure all changes to the page
+	 * are flushed before we update the page's write generation and mark
+	 * the tree dirty, otherwise checkpoints and/or page reconciliation
+	 * might be looking at a clean page.
 	 */
-	btree->modified = 1;
+	WT_WRITE_BARRIER();
 
-	__wt_page_modify_set(session, page);
+	/* The page is dirty if the disk and write generations differ. */
+	++page->modify->write_gen;
 }
 
 /*
