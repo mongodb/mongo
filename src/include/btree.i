@@ -316,8 +316,7 @@ __wt_page_write_gen_wrapped_check(WT_PAGE *page)
 	 * disk generation (wildly unlikely but technically possible as it
 	 * implies 4B updates between page reconciliations), fail the update.
 	 */
-	return (mod != NULL &&
-	    mod->write_gen + 1 == mod->disk_gen ? WT_RESTART : 0);
+	return (mod->write_gen + 1 == mod->disk_gen ? WT_RESTART : 0);
 }
 
 /*
