@@ -354,7 +354,7 @@ __wt_rec_write(WT_SESSION_IMPL *session,
 				break;
 		}
 		WT_RET(__wt_page_modify_init(session, page));
-		__wt_page_only_modify_set(session, page);
+		__wt_page_only_modify_set(session, page, 0);
 
 		return (0);
 	}
@@ -406,7 +406,7 @@ __wt_rec_write(WT_SESSION_IMPL *session,
 	WT_VERBOSE_RET(session, reconcile,
 	    "root page split %p -> %p", page, page->modify->u.split);
 	page = page->modify->u.split;
-	__wt_page_only_modify_set(session, page);
+	__wt_page_only_modify_set(session, page, 0);
 	F_CLR(page->modify, WT_PM_REC_SPLIT_MERGE);
 
 	WT_RET(__wt_rec_write(session, page, NULL, flags));
@@ -1997,7 +1997,7 @@ __wt_rec_bulk_wrapup(WT_CURSOR_BULK *cbulk)
 
 	/* Mark the page's parent dirty. */
 	WT_RET(__wt_page_modify_init(session, page->parent));
-	__wt_page_modify_set(session, page->parent);
+	__wt_page_modify_set(session, page->parent, 0);
 
 	__wt_rec_destroy(session, &cbulk->reconcile);
 

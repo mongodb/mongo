@@ -31,7 +31,7 @@ __cache_read_row_deleted(
 	 */
 	WT_RET(__wt_page_modify_init(session, page));
 	if (btree->modified)
-		__wt_page_modify_set(session, page);
+		__wt_page_modify_set(session, page, 0);
 
 	/* Allocate the update array. */
 	WT_RET(__wt_calloc_def(session, page->entries, &upd_array));

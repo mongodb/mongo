@@ -433,7 +433,7 @@ __btree_tree_open_empty(WT_SESSION_IMPL *session, int creation)
 	 * or it's actually modified.
 	 */
 	WT_ERR(__wt_page_modify_init(session, leaf));
-	__wt_page_only_modify_set(session, leaf);
+	__wt_page_only_modify_set(session, leaf, 0);
 
 	btree->root_page = root;
 
@@ -467,7 +467,7 @@ __wt_btree_new_modified_page(WT_SESSION_IMPL *session,
 	if (merge)
 		F_SET(newpage->modify, WT_PM_REC_SPLIT_MERGE);
 	else
-		__wt_page_modify_set(session, newpage);
+		__wt_page_modify_set(session, newpage, 0);
 
 	*pagep = newpage;
 	return (0);

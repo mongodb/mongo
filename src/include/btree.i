@@ -254,18 +254,30 @@ __wt_page_modify_init(WT_SESSION_IMPL *session, WT_PAGE *page)
  * is marked dirty.
  */
 static inline void
-__wt_page_modify_first(WT_SESSION_IMPL *session, WT_PAGE *page)
+__wt_page_modify_first(WT_SESSION_IMPL *session, WT_PAGE *page, int serial_held)
 {
-	(void)WT_ATOMIC_ADD(S2C(session)->cache->pages_dirty, 1);
-	(void)WT_ATOMIC_ADD(
-	    S2C(session)->cache->bytes_dirty, page->memory_footprint);
-
 	/*
-	 * The page can never end up with changes older than the oldest
-	 * running transaction.
+	 * If we're not called already holding the serial lock, acquire it,
+	 * else we could race incrementing the cache information.
 	 */
-	if (F_ISSET(&session->txn, TXN_RUNNING))
-		page->modify->disk_snap_min = session->txn.snap_min;
+	if (!serial_held)
+		__wt_spin_lock(session, &S2C(session)->serial_lock);
+
+	if (!__wt_page_is_modified(page)) {
+		(void)WT_ATOMIC_ADD(S2C(session)->cache->pages_dirty, 1);
+		(void)WT_ATOMIC_ADD(
+		    S2C(session)->cache->bytes_dirty, page->memory_footprint);
+
+		/*
+		 * The page can never end up with changes older than the oldest
+		 * running transaction.
+		 */
+		if (F_ISSET(&session->txn, TXN_RUNNING))
+			page->modify->disk_snap_min = session->txn.snap_min;
+	}
+
+	if (!serial_held)
+		__wt_spin_unlock(session, &S2C(session)->serial_lock);
 }
 
 /*
@@ -273,10 +285,9 @@ __wt_page_modify_first(WT_SESSION_IMPL *session, WT_PAGE *page)
  *	Mark the page and tree dirty.
  */
 static inline void
-__wt_page_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
+__wt_page_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page, int serial_held)
 {
-	if (!__wt_page_is_modified(page))
-		__wt_page_modify_first(session, page);
+	__wt_page_modify_first(session, page, serial_held);
 
 	/*
 	 * Publish: a barrier to ensure all changes to the page are flushed
@@ -308,10 +319,10 @@ __wt_page_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
  *	Mark the page (but only the page) dirty.
  */
 static inline void
-__wt_page_only_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
+__wt_page_only_modify_set(
+    WT_SESSION_IMPL *session, WT_PAGE *page, int serial_held)
 {
-	if (!__wt_page_is_modified(page))
-		__wt_page_modify_first(session, page);
+	__wt_page_modify_first(session, page, serial_held);
 
 	/*
 	 * Publish: a barrier to ensure all changes to the page are flushed

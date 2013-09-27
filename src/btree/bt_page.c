@@ -517,7 +517,7 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *sizep)
 
 				WT_ERR(__wt_page_modify_init(session, page));
 				if (btree->modified)
-					__wt_page_modify_set(session, page);
+					__wt_page_modify_set(session, page, 0);
 			}
 
 			++ref;
