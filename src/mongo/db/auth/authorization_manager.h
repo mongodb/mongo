@@ -103,8 +103,17 @@ namespace mongo {
         static bool isAuthEnabled();
 
         /**
+         * Takes a vector of privileges and fills the output param "resultArray" with a BSON array
+         * representation of the privileges.
+         */
+        static Status getBSONForPrivileges(const PrivilegeVector& privileges,
+                                           mutablebson::Element resultArray);
+
+        /**
          * Takes a role name and a role graph and fills the output param "result" with a BSON
          * representation of the role object.
+         * This function does no locking - it is up to the caller to synchronize access to the
+         * role graph.
          * Note: The passed in RoleGraph can't be marked const because some of its accessors can
          * actually modify it internally (to set up built-in roles).
          */
@@ -153,7 +162,6 @@ namespace mongo {
          * 'writeConcern' contains the arguments to be passed to getLastError to block for
          * successful completion of the write.
          */
-        //
         Status removePrivilegeDocuments(const BSONObj& query,
                                         const BSONObj& writeConcern,
                                         int* numRemoved) const;
@@ -164,6 +172,15 @@ namespace mongo {
          * successful completion of the write.
          */
         Status insertRoleDocument(const BSONObj& roleObj, const BSONObj& writeConcern) const;
+
+        /**
+         * Updates the given role object with the given update modifier.
+         * 'writeConcern' contains the arguments to be passed to getLastError to block for
+         * successful completion of the write.
+         */
+        Status updateRoleDocument(const RoleName& role,
+                                  const BSONObj& updateObj,
+                                  const BSONObj& writeConcern) const;
 
         /**
          * Finds all documents matching "query" in "collectionName".  For each document returned,
@@ -225,9 +242,19 @@ namespace mongo {
         void addInternalUser(User* user);
 
         /**
-         * Returns true if the role name given refers to a valid system or user defined role.
+         * Returns true if the role name given refers to a valid built-in or user defined role.
          */
         bool roleExists(const RoleName& role);
+
+        /**
+         * Returns true if the role name given refers to a built-in role.
+         */
+        bool isBuiltinRole(const RoleName& role);
+
+        /**
+         * Returns the direct privileges for the given role.
+         */
+        PrivilegeVector getDirectPrivilegesForRole(const RoleName& role);
 
         /**
          * Initializes the authorization manager.  Depending on what version the authorization

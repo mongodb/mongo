@@ -115,7 +115,7 @@ namespace {
                                   " does not exist",
                           0);
         }
-        if (_isBuiltinRole(role)) {
+        if (isBuiltinRole(role)) {
             return Status(ErrorCodes::InvalidRoleModification,
                           mongoutils::str::stream() << "Cannot delete built-in role: " <<
                                   role.getFullName(),
@@ -174,7 +174,7 @@ namespace {
                                 " does not exist",
                           0);
         }
-        if (_isBuiltinRole(recipient)) {
+        if (isBuiltinRole(recipient)) {
             return Status(ErrorCodes::InvalidRoleModification,
                           mongoutils::str::stream() << "Cannot grant roles to built-in role: " <<
                                   role.getFullName(),
@@ -206,7 +206,7 @@ namespace {
                                 " does not exist",
                           0);
         }
-        if (_isBuiltinRole(recipient)) {
+        if (isBuiltinRole(recipient)) {
             return Status(ErrorCodes::InvalidRoleModification,
                           mongoutils::str::stream() << "Cannot remove roles from built-in role: " <<
                                   role.getFullName(),
@@ -251,7 +251,7 @@ namespace {
                                 " does not exist",
                           0);
         }
-        if (_isBuiltinRole(role)) {
+        if (isBuiltinRole(role)) {
             return Status(ErrorCodes::InvalidRoleModification,
                           mongoutils::str::stream() << "Cannot grant privileges to built-in role: "
                                   << role.getFullName(),
@@ -273,6 +273,19 @@ namespace {
     // could do this in O(n+m) instead.
     Status RoleGraph::addPrivilegesToRole(const RoleName& role,
                                           const PrivilegeVector& privilegesToAdd) {
+        if (!roleExists(role)) {
+            return Status(ErrorCodes::RoleNotFound,
+                          mongoutils::str::stream() << "Role: " << role.getFullName() <<
+                                " does not exist",
+                          0);
+        }
+        if (isBuiltinRole(role)) {
+            return Status(ErrorCodes::InvalidRoleModification,
+                          mongoutils::str::stream() << "Cannot grant privileges to built-in role: "
+                                  << role.getFullName(),
+                          0);
+        }
+
         for (PrivilegeVector::const_iterator it = privilegesToAdd.begin();
                 it != privilegesToAdd.end(); ++it) {
             Status status = addPrivilegeToRole(role, *it);
@@ -291,7 +304,7 @@ namespace {
                                 " does not exist",
                           0);
         }
-        if (_isBuiltinRole(role)) {
+        if (isBuiltinRole(role)) {
             return Status(
                     ErrorCodes::InvalidRoleModification,
                     mongoutils::str::stream() << "Cannot remove privileges from built-in role: " <<
@@ -350,7 +363,7 @@ namespace {
                                 " does not exist",
                           0);
         }
-        if (_isBuiltinRole(role)) {
+        if (isBuiltinRole(role)) {
             return Status(
                     ErrorCodes::InvalidRoleModification,
                     mongoutils::str::stream() << "Cannot remove privileges from built-in role: " <<

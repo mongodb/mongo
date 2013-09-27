@@ -425,7 +425,7 @@ namespace {
         privileges->push_back(Privilege(ResourcePattern::forAnyResource(), allActions));
     }
 
-    bool RoleGraph::_isBuiltinRole(const RoleName& role) {
+    bool RoleGraph::isBuiltinRole(const RoleName& role) {
         bool isAdminDB = role.getDB() == ADMIN_DBNAME;
 
         if (role.getRole() == BUILTIN_ROLE_READ) {
@@ -469,7 +469,7 @@ namespace {
     }
 
     void RoleGraph::_createBuiltinRoleIfNeeded(const RoleName& role) {
-        if (!_isBuiltinRole(role) || _roleExistsDontCreateBuiltin(role)) {
+        if (!isBuiltinRole(role) || _roleExistsDontCreateBuiltin(role)) {
             return;
         }
 

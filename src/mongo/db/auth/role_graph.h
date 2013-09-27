@@ -108,6 +108,11 @@ namespace mongo {
          */
         bool roleExists(const RoleName& role);
 
+        /**
+         * Returns whether the given role corresponds to a built-in role.
+         */
+        bool isBuiltinRole(const RoleName& role);
+
         // Mutation functions
 
         /**
@@ -212,11 +217,6 @@ namespace mongo {
          * Returns whether or not the given role exists strictly within the role graph.
          */
         bool _roleExistsDontCreateBuiltin(const RoleName& role);
-
-        /**
-         * Returns whether the given role corresponds to a built-in role.
-         */
-        bool _isBuiltinRole(const RoleName& role);
 
         /**
          * Just creates the role in the role graph, without checking whether or not the role already
