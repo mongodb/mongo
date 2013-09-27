@@ -850,16 +850,24 @@ namespace mongo {
 
     void checkAndInsert(const char *ns, /*modifies*/BSONObj& js) {
         uassert( 10059 , "object to insert too large", js.objsize() <= BSONObjMaxUserSize);
+        {
+            BSONObjIterator i( js );
+            while ( i.more() ) {
+                BSONElement e = i.next();
 
-        NamespaceString nsString(ns);
-        bool ok = nsString.isConfigDB() || nsString.isSystem() || js.okForStorageAsRoot();
-        if (!ok) {
-            LOG(1) << "ns: " << ns << ", not okForStorageAsRoot: " << js;
+                // No '$' prefixed field names allowed.
+                // NOTE: We only check top level (scanning deep would be too expensive).
+                uassert( 13511,
+                         str::stream() << "Document can't have $ prefixed field names: "
+                                       << e.fieldName(),
+                         e.fieldName()[0] != '$' );
+
+                // check no regexp for _id (SERVER-9502)
+                if (str::equals(e.fieldName(), "_id")) {
+                    uassert(16824, "can't use a regex for _id", e.type() != RegEx);
+                }
+            }
         }
-        uassert(17013,
-                "Cannot insert object with _id field of array/regex/undefined or "
-                "with any field name prefixed with $ or containing a dot. ",
-                ok);
 
         theDataFileMgr.insertWithObjMod(ns,
                                         // May be modified in the call to add an _id field.
