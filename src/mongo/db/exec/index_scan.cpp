@@ -55,7 +55,9 @@ namespace mongo {
 
         string amName;
 
-        if (params.forceBtreeAccessMethod) {
+        // If the query is using complex bounds, we must use a Btree access method, since that's the
+        // only one that handles complex bounds.
+        if (params.forceBtreeAccessMethod || !_params.bounds.isSimpleRange) {
             _iam.reset(CatalogHack::getBtreeIndex(_descriptor.get()));
             amName = "";
         }
@@ -99,6 +101,7 @@ namespace mongo {
                 _indexCursor->seek(_params.bounds.startKey);
             }
             else {
+                // XXX: must be actually a Btree
                 // "Fast" Btree-specific navigation.
                 _btreeCursor = static_cast<BtreeIndexCursor*>(_indexCursor.get());
                 _checker.reset(new IndexBoundsChecker(&_params.bounds,

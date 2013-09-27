@@ -27,6 +27,8 @@
  */
 
 #include "mongo/db/query/index_bounds_builder.h"
+#include "mongo/db/index/expression_index.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
@@ -58,18 +60,41 @@ namespace mongo {
     }
 
     // static
-    void IndexBoundsBuilder::translate(const MatchExpression* expr, int direction,
+    void IndexBoundsBuilder::translate(const MatchExpression* expr, const BSONElement& elt,
                                        OrderedIntervalList* oilOut, bool* exactOut) {
+        int direction = (elt.numberInt() >= 0) ? 1 : -1;
+
         Interval interval;
         bool exact = false;
         oilOut->name = expr->path().toString();
 
+        cout << "field is " << elt.toString() << endl;
+
+        bool isHashed = false;
+        if (mongoutils::str::equals("hashed", elt.valuestrsafe())) {
+            isHashed = true;
+        }
+
+        if (isHashed) {
+            verify(MatchExpression::EQ == expr->matchType()
+                   || MatchExpression::MATCH_IN == expr->matchType());
+        }
+
         if (expr->isLeaf()) {
             if (MatchExpression::EQ == expr->matchType()) {
-                const EqualityMatchExpression* node = static_cast<const EqualityMatchExpression*>(expr);
-                // We have to copy the data out of the parse tree and stuff it into the index bounds.
-                // BSONValue will be useful here.
-                BSONObj dataObj = objFromElement(node->getData());
+                const EqualityMatchExpression* node =
+                    static_cast<const EqualityMatchExpression*>(expr);
+
+                // We have to copy the data out of the parse tree and stuff it into the index
+                // bounds.  BSONValue will be useful here.
+                BSONObj dataObj;
+
+                if (isHashed) {
+                    dataObj = ExpressionMapping::hash(node->getData());
+                }
+                else {
+                    dataObj = objFromElement(node->getData());
+                }
 
                 // UNITTEST 11738048
                 if (Array == dataObj.firstElement().type()) {
@@ -82,6 +107,9 @@ namespace mongo {
                     verify(dataObj.isOwned());
                     interval = makePointInterval(dataObj);
                     if (dataObj.firstElement().isNull()) {
+                        exact = false;
+                    }
+                    else if (isHashed) {
                         exact = false;
                     }
                     else {
@@ -133,6 +161,13 @@ namespace mongo {
                 verify(dataObj.isOwned());
                 interval = makeRangeInterval(dataObj, true, true);
                 exact = true;
+            }
+            else if (MatchExpression::MATCH_IN == expr->matchType()) {
+                // XXX: the index type may be hashed.  If so we must hash the value.
+                // XXX: build better bounds
+                warning() << "building lazy bounds for " << expr->toString() << endl;
+                interval = allValues();
+                exact = false;
             }
             else {
                 // XXX: build better bounds

@@ -29,6 +29,7 @@
 #pragma once
 
 #include "mongo/db/jsobj.h"
+#include "mongo/db/hasher.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/query/index_bounds.h"
 
@@ -47,12 +48,12 @@ namespace mongo {
 
         /**
          * Turn the MatchExpression in 'expr' into a set of index bounds.  The field that 'expr'
-         * is concerned with is indexed in the direction 'direction'.
+         * is concerned with is indexed according to the keypattern element 'elt'.
          *
          * The expression must be a predicate over one field.  That is, expr->isLeaf() or
          * expr->isArray() must be true, and expr->isLogical() must be false.  
          */
-        static void translate(const MatchExpression* expr, int direction,
+        static void translate(const MatchExpression* expr, const BSONElement& elt,
                               OrderedIntervalList* oilOut, bool* exactOut);
 
     private:

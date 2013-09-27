@@ -17,6 +17,7 @@ env.StaticLibrary(
     LIBDEPS=[
         "index_bounds",
         "$BUILD_DIR/mongo/bson",
+        "$BUILD_DIR/mongo/mongohasher",
         "$BUILD_DIR/mongo/expressions",
         "$BUILD_DIR/mongo/expressions_geo",
     ],
