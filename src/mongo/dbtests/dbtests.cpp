@@ -27,6 +27,7 @@
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/dbtests/framework.h"
 #include "mongo/util/exception_filter_win32.h"
+#include "mongo/util/gcov.h"
 #include "mongo/util/startup_test.h"
 #include "mongo/util/text.h"
 
@@ -60,6 +61,7 @@ int wmain(int argc, wchar_t* argvW[], wchar_t* envpW[]) {
 #else
 int main(int argc, char* argv[], char** envp) {
     int exitCode = dbtestsMain(argc, argv, envp);
+    flushForGcov();
     ::_exit(exitCode);
 }
 #endif

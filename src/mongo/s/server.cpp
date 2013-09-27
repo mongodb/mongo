@@ -61,6 +61,7 @@
 #include "mongo/util/concurrency/task.h"
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/exception_filter_win32.h"
+#include "mongo/util/gcov.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/message.h"
 #include "mongo/util/net/message_server.h"
@@ -657,5 +658,6 @@ void mongo::dbexit( ExitCode rc, const char *why ) {
           << " rc:" << rc
           << " " << ( why ? why : "" )
           << endl;
+    flushForGcov();
     ::_exit(rc);
 }
