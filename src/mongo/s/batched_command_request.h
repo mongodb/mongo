@@ -133,10 +133,6 @@ namespace mongo {
     class BatchItemRef {
     public:
 
-        explicit BatchItemRef( const BatchItemRef& itemRef ) :
-            _request( itemRef._request ), _itemIndex( itemRef._itemIndex ) {
-        }
-
         BatchItemRef( const BatchedCommandRequest* request, int itemIndex ) :
             _request( request ), _itemIndex( itemIndex ) {
         }
