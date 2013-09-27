@@ -78,6 +78,10 @@
 #include "mongo/util/processinfo.h"
 #include "mongo/util/queue.h"
 #include "mongo/util/startup_test.h"
+#include "mongo/util/fail_point_service.h"
+
+// Pause while a fail point is enabled.
+#define MONGO_FP_PAUSE_WHILE(symbol) while (MONGO_FAIL_POINT(symbol)) { sleepmillis(100); }
 
 using namespace std;
 
@@ -695,6 +699,13 @@ namespace mongo {
         }
     } initialCloneCommand;
 
+    // Tests can pause / resume moveChunk's progress at each step by enabling / disabling each fail point.
+    MONGO_FP_DECLARE(moveChunkHangAtStep1);
+    MONGO_FP_DECLARE(moveChunkHangAtStep2);
+    MONGO_FP_DECLARE(moveChunkHangAtStep3);
+    MONGO_FP_DECLARE(moveChunkHangAtStep4);
+    MONGO_FP_DECLARE(moveChunkHangAtStep5);
+    MONGO_FP_DECLARE(moveChunkHangAtStep6);
 
     /**
      * this is the main entry for moveChunk
@@ -845,6 +856,7 @@ namespace mongo {
             log() << "received moveChunk request: " << cmdObj << migrateLog;
 
             timing.done(1);
+            MONGO_FP_PAUSE_WHILE(moveChunkHangAtStep1);
 
             // 2.
             
@@ -969,6 +981,7 @@ namespace mongo {
             }
 
             timing.done(2);
+            MONGO_FP_PAUSE_WHILE(moveChunkHangAtStep2);
 
             // 3.
 
@@ -1026,6 +1039,7 @@ namespace mongo {
 
             }
             timing.done( 3 );
+            MONGO_FP_PAUSE_WHILE(moveChunkHangAtStep3);
 
             // 4.
 
@@ -1102,6 +1116,7 @@ namespace mongo {
                 killCurrentOp.checkForInterrupt();
             }
             timing.done(4);
+            MONGO_FP_PAUSE_WHILE(moveChunkHangAtStep4);
 
             // 5.
 
@@ -1410,6 +1425,7 @@ namespace mongo {
 
             migrateFromStatus.done();
             timing.done(5);
+            MONGO_FP_PAUSE_WHILE(moveChunkHangAtStep5);
 
             // 6.
             // NOTE: It is important that the distributed collection lock be held for this step.
@@ -1444,6 +1460,7 @@ namespace mongo {
                 }
             }
             timing.done(6);
+            MONGO_FP_PAUSE_WHILE(moveChunkHangAtStep6);
 
             return true;
 
@@ -1471,6 +1488,14 @@ namespace mongo {
        command to get state
        commend to "commit"
     */
+
+    // Enabling / disabling these fail points pauses / resumes MigrateStatus::_go(), the thread
+    // that receives a chunk migration from the donor.
+    MONGO_FP_DECLARE(migrateThreadHangAtStep1);
+    MONGO_FP_DECLARE(migrateThreadHangAtStep2);
+    MONGO_FP_DECLARE(migrateThreadHangAtStep3);
+    MONGO_FP_DECLARE(migrateThreadHangAtStep4);
+    MONGO_FP_DECLARE(migrateThreadHangAtStep5);
 
     class MigrateStatus {
     public:
@@ -1576,6 +1601,7 @@ namespace mongo {
                 }
 
                 timing.done(1);
+                MONGO_FP_PAUSE_WHILE(migrateThreadHangAtStep1);
             }
 
             {
@@ -1610,6 +1636,7 @@ namespace mongo {
                     warning() << "moveChunkCmd deleted data already in chunk # objects: " << num << migrateLog;
 
                 timing.done(2);
+                MONGO_FP_PAUSE_WHILE(migrateThreadHangAtStep2);
             }
 
             if (state == FAIL || state == ABORT) {
@@ -1685,6 +1712,7 @@ namespace mongo {
                 }
 
                 timing.done(3);
+                MONGO_FP_PAUSE_WHILE(migrateThreadHangAtStep3);
             }
 
             // if running on a replicated system, we'll need to flush the docs we cloned to the secondaries
@@ -1736,6 +1764,7 @@ namespace mongo {
                 }
 
                 timing.done(4);
+                MONGO_FP_PAUSE_WHILE(migrateThreadHangAtStep4);
             }
 
             { 
@@ -1799,6 +1828,7 @@ namespace mongo {
                 }
 
                 timing.done(5);
+                MONGO_FP_PAUSE_WHILE(migrateThreadHangAtStep5);
             }
 
             state = DONE;
