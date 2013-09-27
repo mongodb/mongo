@@ -220,17 +220,19 @@ namespace mongo {
     BSONObj ParsedPrivilege::toBSON() const {
         BSONObjBuilder builder;
 
+        if (_isResourceSet) builder.append(resource(), _resource.toBSON());
+
         if (_isActionsSet) {
+            BSONArrayBuilder actionsBuilder(builder.subarrayStart(actions()));
             for (std::vector<string>::const_iterator it = _actions.begin();
                  it != _actions.end();
                  ++it) {
-                builder.append(actions(), (*it));
+                actionsBuilder.append(*it);
             }
+            actionsBuilder.doneFast();
         }
 
-        if (_isResourceSet) builder.append(resource(), _resource.toBSON());
-
-        return builder.obj();
+        return builder.obj().getOwned();
     }
 
     bool ParsedPrivilege::parseBSON(const BSONObj& source, string* errMsg) {

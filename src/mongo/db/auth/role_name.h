@@ -30,13 +30,13 @@
 
 #include <iosfwd>
 #include <string>
+#include <vector>
 
 #include <boost/scoped_ptr.hpp>
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/string_data.h"
 #include "mongo/platform/hash_namespace.h"
-#include "mongo/platform/unordered_set.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -150,14 +150,14 @@ MONGO_HASH_NAMESPACE_END
 namespace mongo {
 
     // RoleNameIterator for iterating over an unordered_set of RoleNames.
-    class RoleNameSetIterator : public RoleNameIterator::Impl {
-        MONGO_DISALLOW_COPYING(RoleNameSetIterator);
+    class RoleNameVectorIterator : public RoleNameIterator::Impl {
+        MONGO_DISALLOW_COPYING(RoleNameVectorIterator);
 
     public:
-        RoleNameSetIterator(const unordered_set<RoleName>::const_iterator& begin,
-                            const unordered_set<RoleName>::const_iterator& end);
+        RoleNameVectorIterator(const std::vector<RoleName>::const_iterator& begin,
+                               const std::vector<RoleName>::const_iterator& end);
 
-        virtual ~RoleNameSetIterator();
+        virtual ~RoleNameVectorIterator();
 
         virtual bool more() const;
 
@@ -168,8 +168,8 @@ namespace mongo {
     private:
         virtual Impl* doClone() const;
 
-        unordered_set<RoleName>::const_iterator _begin;
-        unordered_set<RoleName>::const_iterator _end;
+        std::vector<RoleName>::const_iterator _begin;
+        std::vector<RoleName>::const_iterator _end;
     };
 
 }  // namespace mongo
