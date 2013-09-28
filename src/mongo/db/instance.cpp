@@ -863,8 +863,11 @@ namespace mongo {
                          e.fieldName()[0] != '$' );
 
                 // check no regexp for _id (SERVER-9502)
+                // also, disallow undefined and arrays
                 if (str::equals(e.fieldName(), "_id")) {
                     uassert(16824, "can't use a regex for _id", e.type() != RegEx);
+                    uassert(17150, "can't use undefined for _id", e.type() != Undefined);
+                    uassert(17151, "can't use an array for _id", e.type() != Array);
                 }
             }
         }
