@@ -16,6 +16,8 @@
 
 #include "mongo/db/query/index_tag.h"
 
+#include "mongo/db/query/indexability.h"
+
 #include <algorithm>
 #include <limits>
 
@@ -24,7 +26,7 @@ namespace mongo {
     const size_t IndexTag::kNoIndex = std::numeric_limits<size_t>::max();
 
     void tagForSort(MatchExpression* tree) {
-        if (!tree->isLeaf()) {
+        if (!Indexability::nodeCanUseIndexOnOwnField(tree)) {
             size_t myTagValue = IndexTag::kNoIndex;
             for (size_t i = 0; i < tree->numChildren(); ++i) {
                 MatchExpression* child = tree->getChild(i);
@@ -45,7 +47,21 @@ namespace mongo {
         size_t lhsValue = (NULL == lhsTag) ? IndexTag::kNoIndex : lhsTag->index;
         IndexTag* rhsTag = static_cast<IndexTag*>(rhs->getTag());
         size_t rhsValue = (NULL == rhsTag) ? IndexTag::kNoIndex : rhsTag->index;
-        return lhsValue < rhsValue;
+
+        // First, order on indices.
+        if (lhsValue != rhsValue) {
+            // This relies on kNoIndex being larger than every other possible index.
+            return lhsValue < rhsValue;
+        }
+
+        // Next, order on fields.
+        int cmp = lhs->path().compare(rhs->path());
+        if (0 != cmp) {
+            return 0;
+        }
+
+        // Finally, order on expression type.
+        return lhs->matchType() < rhs->matchType();
     }
 
     void sortUsingTags(MatchExpression* tree) {

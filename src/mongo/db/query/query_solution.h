@@ -126,10 +126,7 @@ namespace mongo {
         // Owned here.
         scoped_ptr<QuerySolutionNode> root;
 
-        // Owned here.
-        scoped_ptr<MatchExpression> filter;
-
-        // Any filters in root or below point into this.  Must be owned.
+        // Any filters in root or below point into this object.  Must be owned.
         BSONObj filterData;
 
         string ns;
@@ -175,10 +172,7 @@ namespace mongo {
 
         int direction;
 
-        // Not owned.
-        // This is a sub-tree of the filter in the QuerySolution that owns us.
-        // TODO: This may change in the future.
-        MatchExpression* filter;
+        scoped_ptr<MatchExpression> filter;
     };
 
     struct AndHashNode : public QuerySolutionNode {
@@ -194,7 +188,24 @@ namespace mongo {
         bool sortedByDiskLoc() const { return false; }
         BSONObj getSort() const { return BSONObj(); }
 
-        MatchExpression* filter;
+        scoped_ptr<MatchExpression> filter;
+        vector<QuerySolutionNode*> children;
+    };
+
+    struct AndSortedNode : public QuerySolutionNode {
+        AndSortedNode();
+        virtual ~AndSortedNode();
+
+        virtual StageType getType() const { return STAGE_AND_SORTED; }
+
+        virtual void appendToString(stringstream* ss, int indent) const;
+
+        bool fetched() const;
+        bool hasField(const string& field) const;
+        bool sortedByDiskLoc() const { return true; }
+        BSONObj getSort() const { return BSONObj(); }
+
+        scoped_ptr<MatchExpression> filter;
         vector<QuerySolutionNode*> children;
     };
 
@@ -216,7 +227,28 @@ namespace mongo {
         BSONObj getSort() const { return BSONObj(); }
 
         bool dedup;
-        MatchExpression* filter;
+        // XXX why is this here
+        scoped_ptr<MatchExpression> filter;
+        vector<QuerySolutionNode*> children;
+    };
+
+    struct MergeSortNode : public QuerySolutionNode {
+        MergeSortNode();
+        virtual ~MergeSortNode();
+
+        virtual StageType getType() const { return STAGE_SORT_MERGE; }
+
+        virtual void appendToString(stringstream* ss, int indent) const;
+
+        bool fetched() const;
+        bool hasField(const string& field) const;
+        bool sortedByDiskLoc() const { return false; }
+        BSONObj getSort() const { return sort; }
+
+        BSONObj sort;
+        bool dedup;
+        // XXX why is this here
+        scoped_ptr<MatchExpression> filter;
         vector<QuerySolutionNode*> children;
     };
 
@@ -233,7 +265,7 @@ namespace mongo {
         bool sortedByDiskLoc() const { return child->sortedByDiskLoc(); }
         BSONObj getSort() const { return child->getSort(); }
 
-        MatchExpression* filter;
+        scoped_ptr<MatchExpression> filter;
         scoped_ptr<QuerySolutionNode> child;
     };
 
@@ -248,14 +280,23 @@ namespace mongo {
         bool fetched() const { return false; }
         bool hasField(const string& field) const;
         bool sortedByDiskLoc() const;
+
+        // XXX: We need a better way of dealing with sorting and equalities on a prefix of the key
+        // pattern.  If we are using the index {a:1, b:1} to answer the predicate {a: 10}, it's
+        // sorted both by the index key pattern and by the pattern {b: 1}.  How do we expose this?
+        // Perhaps migrate to sortedBy(...) instead of getSort().  In this case, the ixscan can
+        // return true for both of those sort orders.
+        //
+
+        // This doesn't work for detecting that we can use a merge sort, though.  Perhaps we should
+        // just pick one sort order and miss out on the other case?  For the golden query we want
+        // our sort order to be {b: 1}.
+
         BSONObj getSort() const { return indexKeyPattern; }
 
         BSONObj indexKeyPattern;
 
-        // Not owned.
-        // This is a sub-tree of the filter in the QuerySolution that owns us.
-        // TODO: This may change in the future.
-        MatchExpression* filter;
+        scoped_ptr<MatchExpression> filter;
 
         // Only set for 2d.
         int limit;

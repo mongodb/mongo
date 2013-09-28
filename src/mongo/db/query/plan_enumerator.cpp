@@ -18,6 +18,7 @@
 
 #include <set>
 
+#include "mongo/db/query/indexability.h"
 #include "mongo/db/query/index_tag.h"
 
 namespace mongo {
@@ -39,6 +40,7 @@ namespace mongo {
 
         // Fill out our memo structure from the tagged _root.
         _done = !prepMemo(_root);
+
         // Dump the tags.  We replace them with IndexTag instances.
         _root->resetTag();
 
@@ -113,6 +115,8 @@ namespace mongo {
     /**
      * This is very expensive if the involved indices/predicates are numerous but
      * I suspect that's rare.  TODO: revisit on perf pass.
+     *
+     * TODO: Do we care about compound and with arrays modifying the path?
      */
     void PlanEnumerator::checkCompound(MatchExpression* node) {
         if (MatchExpression::AND == node->matchType()) {
@@ -122,7 +126,7 @@ namespace mongo {
 
             for (size_t i = 0; i < node->numChildren(); ++i) {
                 MatchExpression* child = node->getChild(i);
-                if (child->isArray() || child->isLeaf()) {
+                if (Indexability::nodeCanUseIndexOnOwnField(child)) {
                     verify(NULL != _memo[_nodeToId[child]]);
                     verify(NULL != _memo[_nodeToId[child]]->pred);
                     if (NULL == child->getTag()) {
@@ -213,7 +217,32 @@ namespace mongo {
     }
 
     bool PlanEnumerator::prepMemo(MatchExpression* node) {
-        if (node->isLeaf() || node->isArray()) {
+        if (Indexability::arrayUsesIndexOnChildren(node)) {
+            // TODO: For 'node' to be indexed, do we require all children to be indexed or just one?
+            // Does this depend on the matchType?  Currently we're OK with just one, AND-style,
+            // because elemMatch is the case I'm thinking of.
+
+            AndSolution* andSolution = new AndSolution();
+            for (size_t i = 0; i < node->numChildren(); ++i) {
+                if (prepMemo(node->getChild(i))) {
+                    vector<size_t> option;
+                    option.push_back(_nodeToId[node->getChild(i)]);
+                    andSolution->subnodes.push_back(option);
+                }
+            }
+
+            size_t myID = _inOrderCount++;
+            _nodeToId[node] = myID;
+            NodeSolution* soln = new NodeSolution();
+            _memo[_nodeToId[node]] = soln;
+
+            _curEnum[myID] = 0;
+
+            // Takes ownership.
+            soln->andSolution.reset(andSolution);
+            return andSolution->subnodes.size() > 0;
+        }
+        else if (Indexability::nodeCanUseIndexOnOwnField(node)) {
             // TODO: This is done for everything, maybe have NodeSolution* newMemo(node)?
             size_t myID = _inOrderCount++;
             _nodeToId[node] = myID;
@@ -234,7 +263,7 @@ namespace mongo {
             // be indexed when there are 'first' indices.
             return soln->pred->first.size() > 0;
         }
-        else {
+        else if (node->isLogical()) {
             if (MatchExpression::OR == node->matchType()) {
                 // For an OR to be indexed all its children must be indexed.
                 bool indexed = true;
@@ -265,7 +294,8 @@ namespace mongo {
                 // of the power set.  That is, we will only use one index at a time.
                 AndSolution* andSolution = new AndSolution();
                 for (size_t i = 0; i < node->numChildren(); ++i) {
-                    // If AND requires an index it can only piggyback on the children that have indices.
+                    // If AND requires an index it can only piggyback on the children that have
+                    // indices.
                     if (prepMemo(node->getChild(i))) {
                         vector<size_t> option;
                         option.push_back(_nodeToId[node->getChild(i)]);
@@ -286,6 +316,7 @@ namespace mongo {
                 return andSolution->subnodes.size() > 0;
             }
         }
+        return false;
     }
 
     void PlanEnumerator::tagMemo(size_t id) {
