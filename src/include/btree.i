@@ -35,7 +35,7 @@ __wt_eviction_page_force(WT_SESSION_IMPL *session, WT_PAGE *page)
 	    page->type != WT_PAGE_COL_VAR && page->type != WT_PAGE_ROW_LEAF)
 		return (0);
 
-	/* Eviction may be turned off,  although that's rare. */
+	/* Eviction may be turned off, although that's rare. */
 	if (F_ISSET(btree, WT_BTREE_NO_EVICTION))
 		return (0);
 
@@ -55,7 +55,7 @@ __wt_eviction_page_force(WT_SESSION_IMPL *session, WT_PAGE *page)
  * that adds up to, but this is an estimate based on some measurements of heap
  * size versus bytes in use.
  */
-#define	WT_ALLOC_OVERHEAD      32
+#define	WT_ALLOC_OVERHEAD	32
 
 /*
  * __wt_cache_page_inmem_incr --
@@ -624,10 +624,9 @@ __wt_skip_choose_depth(void)
 
 /*
  * __wt_btree_size_overflow --
- *      Check if the size of an in-memory tree with a single leaf page is
- *      over a specified maximum.  If called on anything other than a simple
- *      tree with a single leaf page, returns true so the calling code will
- *      switch to a new tree.
+ *	Check if the size of an in-memory tree with a single leaf page is over
+ * a specified maximum.  If called on anything other than a simple tree with a
+ * single leaf page, returns true so the calling code will switch to a new tree.
  */
 static inline int
 __wt_btree_size_overflow(WT_SESSION_IMPL *session, uint32_t maxsize)
