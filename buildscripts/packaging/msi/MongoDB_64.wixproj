@@ -23,14 +23,14 @@
     <Edition Condition=" '$(Edition)' == '' ">Standard</Edition>
     <Flavor Condition=" '$(Flavor)' == '' ">2008R2Plus</Flavor>
     <License Condition=" '$(License)' == '' ">..\..\..\distsrc</License>
-    <EnterpriseLicense Condition=" '$(EnterpriseLicense)' == '' ">..\..\..\distsrc</EnterpriseLicense>
+    <EnterpriseBase Condition=" '$(EnterpriseBase)' == '' ">..\..\..\src\mongo\db\modules\subscription</EnterpriseBase>
     <SaslSource Condition=" '$(SaslSource)' == '' ">..\..\..\build\win32\64\mongo</SaslSource>
     <SnmpSource Condition=" '$(SnmpSource)' == '' ">..\..\..\build\win32\64\mongo</SnmpSource>
     <Source Condition=" '$(Source)' == '' ">..\..\..\build\win32\64\mongo</Source>
     <SslSource Condition=" '$(SslSource)' == '' ">..\..\..\build\win32\64\mongo</SslSource>
     <Version Condition=" '$(Version)' == '' ">2.4.0</Version>
     <ClientHeaderSource Condition=" '$(ClientHeaderSource)' == '' ">..\..\..\build\win32\normal\clientlib\include</ClientHeaderSource>
-    <DefineConstants>MongoDBVersion=$(Version);LicenseSource=$(License);BinarySource=$(Source);Edition=$(Edition);SaslSource=$(SaslSource);SslSource=$(SslSource);SnmpSource=$(SnmpSource);ProductId=$(ProductId);UpgradeCode=$(UpgradeCode);Flavor=$(Flavor);ClientSource=$(ClientSource);EnterpriseLicenseSource=$(EnterpriseLicense);ClientHeaderSource=$(ClientHeaderSource)</DefineConstants>
+    <DefineConstants>MongoDBVersion=$(Version);LicenseSource=$(License);BinarySource=$(Source);Edition=$(Edition);SaslSource=$(SaslSource);SslSource=$(SslSource);SnmpSource=$(SnmpSource);ProductId=$(ProductId);UpgradeCode=$(UpgradeCode);Flavor=$(Flavor);ClientSource=$(ClientSource);EnterpriseBase=$(EnterpriseBase);ClientHeaderSource=$(ClientHeaderSource)</DefineConstants>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|x64' ">
     <VerboseOutput>True</VerboseOutput>
