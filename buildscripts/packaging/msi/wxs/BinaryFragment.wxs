@@ -75,16 +75,24 @@
           <File Id="f_ssleay" Name="ssleay32.dll" Source="$(var.SslSource)\ssleay32.dll"
                 DiskId="1" KeyPath="yes" />
         </Component>
-      <Component Id="c_libeay" Guid="E6CC6AA5-AC71-45EC-803C-71F816E33135">
-        <File Id="f_libeay" Name="libeay32.dll" Source="$(var.SslSource)\libeay32.dll"
-              DiskId="1" KeyPath="yes" />
-      </Component>
+        <Component Id="c_libeay" Guid="E6CC6AA5-AC71-45EC-803C-71F816E33135">
+          <File Id="f_libeay" Name="libeay32.dll" Source="$(var.SslSource)\libeay32.dll"
+                DiskId="1" KeyPath="yes" />
+        </Component>
         <Component Id="c_snmp" Guid="F5E5A889-FC9F-4B9A-BEFD-C8ABC9A92D8D">
           <File Id="f_ssnmp" Name="netsnmp.dll" Source="$(var.SnmpSource)\netsnmp.dll"
                 DiskId="1" KeyPath="yes" />
         </Component>
         <Component Id="c_snmpPdb" Guid="6AAB0ACE-C354-4D3A-B490-2AA235647AB3">
           <File Id="f_snmpPdb" Name="netsnmp.pdb" Source="$(var.SnmpSource)\netsnmp.pdb"
+                DiskId="1" KeyPath="yes" />
+        </Component>
+        <Component Id="c_snmpConf" Guid="4DD0CAD3-97AB-4C11-987A-7ABCFF0D340C">
+          <File Id="f_snmpConf" Name="mongod.conf" Source="$(var.EnterpriseBase)\docs\mongod.conf"
+                DiskId="1" KeyPath="yes" />
+        </Component>
+        <Component Id="c_snmpMib" Guid="F3E98C6B-FE42-44E7-8A1F-E47BDDD0A3D7">
+          <File Id="f_snmpMib" Name="MONGO-MIB.txt" Source="$(var.EnterpriseBase)\docs\MONGO-MIB.txt"
                 DiskId="1" KeyPath="yes" />
         </Component>
       <?endif ?>
@@ -141,13 +149,13 @@
         <ComponentRef Id="c_saslPdb" />
         <ComponentRef Id="c_ssleay" />
         <ComponentRef Id="c_libeay" />
-        <ComponentRef Id="c_snmp" />
-        <ComponentRef Id="c_snmpPdb" />
       </ComponentGroup>
       <ComponentGroup Id="cg_EnterpriseServer">
         <ComponentGroupRef Id="cg_EnterpriseBase" />
         <ComponentRef Id="c_snmp" />
         <ComponentRef Id="c_snmpPdb" />
+        <ComponentRef Id="c_snmpConf" />
+        <ComponentRef Id="c_snmpMib" />
       </ComponentGroup>
     <ComponentGroup Id="cg_DriverEnterprise">
       <ComponentRef Id="c_driversasl" />
