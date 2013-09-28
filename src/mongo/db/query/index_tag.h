@@ -74,14 +74,17 @@ namespace mongo {
     };
 
     /**
-     * Tags each node of the tree with the lowest numbered indexed that the sub-tree
-     * rooted at that node uses.
+     * Tags each node of the tree with the lowest numbered index that the sub-tree rooted at that
+     * node uses.
+     *
+     * Nodes that satisfy Indexability::nodeCanUseIndexOnOwnField are already tagged if there
+     * exists an index that that node can use.
      */
     void tagForSort(MatchExpression* tree);
 
     /**
-     * Then sorts the tree using its IndexTag()s. The outcome is that nodes that use the same index
-     * are adjacent to one another.
+     * Sorts the tree using its IndexTag(s). Nodes that use the same index are adjacent to one
+     * another.
      */
     void sortUsingTags(MatchExpression* tree);
 

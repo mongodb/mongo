@@ -48,6 +48,157 @@ namespace mongo {
         static void plan(const CanonicalQuery& query,
                          const vector<BSONObj>& indexKeyPatterns,
                          vector<QuerySolution*>* out);
+    private:
+
+        //
+        // Index Selection methods.
+        //
+
+        /**
+         * Return all the fields in the tree rooted at 'node' that we can use an index on
+         * in order to answer the query.
+         *
+         * The 'prefix' argument is a path prefix to be prepended to any fields mentioned in
+         * predicates encountered.  Some array operators specify a path prefix.
+         */
+        static void getFields(MatchExpression* node, string prefix, unordered_set<string>* out);
+
+        /**
+         * Find all indices prefixed by fields we have predicates over.  Only these indices are
+         * useful in answering the query.
+         */
+        static void findRelevantIndices(const unordered_set<string>& fields,
+                                        const vector<BSONObj>& allIndices,
+                                        vector<BSONObj>* out);
+
+        /**
+         * Return true if the index key pattern field 'elt' can be used to answer the predicate
+         * 'node'.
+         *
+         * For example, {field: "hashed"} can only be used with sets of equalities.
+         *              {field: "2d"} can only be used with some geo predicates.
+         *              {field: "2dsphere"} can only be used with some other geo predicates.
+         */
+        static bool compatible(const BSONElement& elt, MatchExpression* node);
+
+        /**
+         * Determine how useful all of our relevant indices are to all predicates in the subtree
+         * rooted at 'node'.  Affixes a RelevantTag to all predicate nodes which can use an index.
+         *
+         * 'prefix' is a path prefix that should be prepended to any path (certain array operators
+         * imply a path prefix).
+         *
+         * For an index to be useful to a predicate, the index must be compatible (see above).
+         *
+         * If an index is prefixed by the predicate's path, it's always useful.
+         *
+         * If an index is compound but not prefixed by a predicate's path, it's only useful if
+         * there exists another predicate that 1. will use that index and 2. is related to the
+         * original predicate by having an AND as a parent.
+         */
+        static void rateIndices(MatchExpression* node, string prefix,
+                                const vector<BSONObj>& indices);
+
+        //
+        // Collection Scan Data Access method.
+        //
+
+        /**
+         * Return a CollectionScanNode that scans as requested in 'query'.
+         */
+        static QuerySolution* makeCollectionScan(const CanonicalQuery& query, bool tailable);
+
+        //
+        // Indexed Data Access methods.
+        //
+        // The inArrayOperator flag deserves some attention.  It is set when we're processing a child of
+        // a MatchExpression::ALL or MatchExpression::ELEM_MATCH_OBJECT.
+        //
+        // Behavior changes for all methods below that take it as an argument:
+        // 0. No deletion of MatchExpression(s).  In fact,
+        // 1. No mutation of the MatchExpression at all.  We need the tree as-is in order to perform
+        //    a filter on the entire tree.
+        // 2. No fetches performed.  There will be a final fetch by the caller of buildIndexedDataAccess
+        //    who set the value of inArrayOperator to true.
+        // 3. No compound indices are used and no bounds are combined.  These are incorrect in the context
+        //    of these operators.
+        //
+
+        /**
+         * If 'inArrayOperator' is false, takes ownership of 'root'.
+         */
+        static QuerySolutionNode* buildIndexedDataAccess(MatchExpression* root,
+                                                         bool inArrayOperator,
+                                                         const vector<BSONObj>& indexKeyPatterns);
+
+        /**
+         * Takes ownership of 'root'.
+         */
+        static QuerySolutionNode* buildIndexedAnd(MatchExpression* root,
+                                                  bool inArrayOperator,
+                                                  const vector<BSONObj>& indexKeyPatterns);
+
+        /**
+         * Takes ownership of 'root'.
+         */
+        static QuerySolutionNode* buildIndexedOr(MatchExpression* root,
+                                                 bool inArrayOperator,
+                                                 const vector<BSONObj>& indexKeyPatterns);
+
+        /**
+         * Helper used by buildIndexedAnd and buildIndexedOr.
+         *
+         * The children of AND and OR nodes are sorted by the index that the subtree rooted at
+         * that node uses.  Child nodes that use the same index are adjacent to one another to
+         * facilitate grouping of index scans.  As such, the processing for AND and OR is
+         * almost identical.
+         *
+         * See tagForSort and sortUsingTags in index_tag.h for details on ordering the children
+         * of OR and AND.
+         *
+         * Does not take ownership of 'root' but may remove children from it.
+         */
+        static bool processIndexScans(MatchExpression* root,
+                                      bool inArrayOperator,
+                                      const vector<BSONObj>& indexKeyPatterns,
+                                      vector<QuerySolutionNode*>* out);
+
+        //
+        // Helpers for creating an index scan.
+        //
+
+        /**
+         * Create a new IndexScanNode.  The bounds for 'expr' are computed and placed into the
+         * first field's OIL position.  The rest of the OILs are allocated but uninitialized.
+         */
+        static IndexScanNode* makeIndexScan(const BSONObj& indexKeyPattern, MatchExpression* expr,
+                                            bool* exact);
+        /**
+         * Fill in any bounds that are missing in 'scan' with the "all values for this field"
+         * interval.
+         */
+        static void finishIndexScan(IndexScanNode* scan, const BSONObj& indexKeyPattern);
+
+        //
+        // Analysis of Data Access
+        //
+
+        /**
+         * In brief: performs sort and covering analysis.
+         *
+         * The solution rooted at 'solnRoot' provides data for the query, whether through some
+         * configuration of indices or through a collection scan.  Additional stages may be required
+         * to perform sorting, projection, or other operations that are independent of the source
+         * of the data.  These stages are added atop 'solnRoot'.
+         *
+         * 'taggedRoot' is a copy of the parse tree.  Nodes in 'solnRoot' may point into it.
+         *
+         * Takes ownership of 'solnRoot' and 'taggedRoot'.
+         *
+         * Caller owns the returned QuerySolution.
+         */
+        static QuerySolution* analyzeDataAccess(const CanonicalQuery& query,
+                                                QuerySolutionNode* solnRoot);
     };
 
 }  // namespace mongo

@@ -63,8 +63,6 @@ namespace mongo {
 
         const StringData path() const { return _path; }
 
-        virtual void resetTag() { setTag(NULL); }
-
     private:
         StringData _path;
         ElementPath _elementPath;
@@ -199,8 +197,6 @@ namespace mongo {
         virtual std::vector<MatchExpression*>* getChildVector() { return &_list; }
 
         const StringData path() const { return _path; }
-
-        virtual void resetTag() { setTag(NULL); }
 
     private:
         bool _allMatch( const BSONObj& anArray ) const;

@@ -116,14 +116,15 @@ namespace mongo {
 
     void ElemMatchObjectMatchExpression::debugString( StringBuilder& debug, int level ) const {
         _debugAddSpace( debug, level );
-        debug << path() << " $elemMatch\n";
-        _sub->debugString( debug, level + 1 );
+        debug << path() << " $elemMatch (obj)";
 
         MatchExpression::TagData* td = getTag();
         if (NULL != td) {
             debug << " ";
             td->debugString(&debug);
         }
+        debug << "\n";
+        _sub->debugString( debug, level + 1 );
     }
 
 
@@ -176,15 +177,16 @@ namespace mongo {
 
     void ElemMatchValueMatchExpression::debugString( StringBuilder& debug, int level ) const {
         _debugAddSpace( debug, level );
-        debug << path() << " $elemMatch\n";
-        for ( unsigned i = 0; i < _subs.size(); i++ ) {
-            _subs[i]->debugString( debug, level + 1 );
-        }
+        debug << path() << " $elemMatch (value)";
 
         MatchExpression::TagData* td = getTag();
         if (NULL != td) {
             debug << " ";
             td->debugString(&debug);
+        }
+        debug << "\n";
+        for ( unsigned i = 0; i < _subs.size(); i++ ) {
+            _subs[i]->debugString( debug, level + 1 );
         }
     }
 
@@ -242,16 +244,17 @@ namespace mongo {
 
     void AllElemMatchOp::debugString( StringBuilder& debug, int level ) const {
         _debugAddSpace( debug, level );
-        debug << _path << " AllElemMatchOp: " << _path << "\n";
-        for ( size_t i = 0; i < _list.size(); i++ ) {
-            _list[i]->debugString( debug, level + 1);
-        }
-
+        debug << _path << " AllElemMatchOp:";
         MatchExpression::TagData* td = getTag();
         if (NULL != td) {
             debug << " ";
             td->debugString(&debug);
         }
+        debug << "\n";
+        for ( size_t i = 0; i < _list.size(); i++ ) {
+            _list[i]->debugString( debug, level + 1);
+        }
+
     }
 
     bool AllElemMatchOp::equivalent( const MatchExpression* other ) const {

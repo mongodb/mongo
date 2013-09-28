@@ -41,14 +41,16 @@ namespace mongo {
     class IndexBoundsBuilder {
     public:
         /**
-         * Return an O.I.L. with one interval goes from MinKey to MaxKey (or vice-versa depending on
-         * the index direction).
+         * Populate the provided O.I.L. with one interval goes from MinKey to MaxKey (or vice-versa
+         * depending on the index direction).
          */
-        static OrderedIntervalList allValuesForField(const BSONElement& elt);
+        static void allValuesForField(const BSONElement& elt, OrderedIntervalList* out);
 
         /**
          * Turn the MatchExpression in 'expr' into a set of index bounds.  The field that 'expr'
          * is concerned with is indexed according to the keypattern element 'elt'.
+         *
+         * If 'expr' is elemMatch, the index tag is affixed to a child.
          *
          * The expression must be a predicate over one field.  That is, expr->isLeaf() or
          * expr->isArray() must be true, and expr->isLogical() must be false.  

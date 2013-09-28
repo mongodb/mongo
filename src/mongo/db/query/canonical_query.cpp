@@ -116,10 +116,11 @@ namespace mongo {
                 }
             }
 
-            root->getChildVector()->insert(root->getChildVector()->end(), absorbedChildren.begin(), absorbedChildren.end());
+            root->getChildVector()->insert(root->getChildVector()->end(),
+                                           absorbedChildren.begin(),
+                                           absorbedChildren.end());
         }
     }
-
 
     Status CanonicalQuery::init(LiteParsedQuery* lpq) {
         _pq.reset(lpq);

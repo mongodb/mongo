@@ -91,13 +91,6 @@ namespace mongo {
         }
 
         virtual void debugString( StringBuilder& debug, int level = 0 ) const;
-
-        virtual void resetTag() {
-            setTag(NULL);
-            for (size_t i = 0; i < numChildren(); ++i) {
-                getChild(i)->resetTag();
-            }
-        }
     };
 
     class OrMatchExpression : public ListOfMatchExpression {
@@ -120,13 +113,6 @@ namespace mongo {
         }
 
         virtual void debugString( StringBuilder& debug, int level = 0 ) const;
-
-        virtual void resetTag() {
-            setTag(NULL);
-            for (size_t i = 0; i < numChildren(); ++i) {
-                getChild(i)->resetTag();
-            }
-        }
     };
 
     class NorMatchExpression : public ListOfMatchExpression {
@@ -149,13 +135,6 @@ namespace mongo {
         }
 
         virtual void debugString( StringBuilder& debug, int level = 0 ) const;
-
-        virtual void resetTag() {
-            setTag(NULL);
-            for (size_t i = 0; i < numChildren(); ++i) {
-                getChild(i)->resetTag();
-            }
-        }
     };
 
     class NotMatchExpression : public MatchExpression {
@@ -195,11 +174,6 @@ namespace mongo {
         virtual size_t numChildren() const { return 1; }
 
         virtual MatchExpression* getChild( size_t i ) const { return _exp.get(); }
-
-        virtual void resetTag() {
-            setTag( NULL );
-            _exp->resetTag();
-        }
 
     private:
         boost::scoped_ptr<MatchExpression> _exp;

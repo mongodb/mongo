@@ -107,6 +107,59 @@ namespace mongo {
     }
 
     //
+    // AndSortedNode
+    //
+
+    AndSortedNode::AndSortedNode() : filter(NULL) { }
+
+    AndSortedNode::~AndSortedNode() {
+        for (size_t i = 0; i < children.size(); ++i) {
+            delete children[i];
+        }
+    }
+
+    void AndSortedNode::appendToString(stringstream* ss, int indent) const {
+        addIndent(ss, indent);
+        *ss << "AND_SORTED";
+        if (NULL != filter) {
+            addIndent(ss, indent + 1);
+            *ss << " filter = " << filter->toString() << endl;
+        }
+        addIndent(ss, indent + 1);
+        *ss << "fetched = " << fetched() << endl;
+        addIndent(ss, indent + 1);
+        *ss << "sortedByDiskLoc = " << sortedByDiskLoc() << endl;
+        addIndent(ss, indent + 1);
+        *ss << "getSort = " << getSort().toString() << endl;
+        for (size_t i = 0; i < children.size(); ++i) {
+            *ss << "Child " << i << ": ";
+            children[i]->appendToString(ss, indent + 1);
+        }
+    }
+
+    bool AndSortedNode::fetched() const {
+        // Any WSM output from this stage came from all children stages.  If any child provides
+        // fetched data, we merge that fetched data into the WSM we output.
+        for (size_t i = 0; i < children.size(); ++i) {
+            if (children[i]->fetched()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    bool AndSortedNode::hasField(const string& field) const {
+        // Any WSM output from this stage came from all children stages.  Therefore we have all
+        // fields covered in our children.
+        for (size_t i = 0; i < children.size(); ++i) {
+            if (children[i]->hasField(field)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    //
     // OrNode
     //
 
@@ -157,6 +210,65 @@ namespace mongo {
      * have that field.
      */
     bool OrNode::hasField(const string& field) const {
+        for (size_t i = 0; i < children.size(); ++i) {
+            if (!children[i]->hasField(field)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    //
+    // MergeSortNode
+    //
+
+    MergeSortNode::MergeSortNode() : dedup(true), filter(NULL) { }
+
+    MergeSortNode::~MergeSortNode() {
+        for (size_t i = 0; i < children.size(); ++i) {
+            delete children[i];
+        }
+    }
+
+    void MergeSortNode::appendToString(stringstream* ss, int indent) const {
+        addIndent(ss, indent);
+        *ss << "MERGE_SORT\n";
+        if (NULL != filter) {
+            addIndent(ss, indent + 1);
+            *ss << " filter = " << filter->toString() << endl;
+        }
+        addIndent(ss, indent + 1);
+        *ss << "fetched = " << fetched() << endl;
+        addIndent(ss, indent + 1);
+        *ss << "sortedByDiskLoc = " << sortedByDiskLoc() << endl;
+        addIndent(ss, indent + 1);
+        *ss << "getSort = " << getSort().toString() << endl;
+        for (size_t i = 0; i < children.size(); ++i) {
+            addIndent(ss, indent + 1);
+            *ss << "Child " << i << ":\n";
+            children[i]->appendToString(ss, indent + 2);
+            *ss << endl;
+        }
+    }
+
+    bool MergeSortNode::fetched() const {
+        // Any WSM output from this stage came exactly one child stage.  Given that we don't know
+        // what child stage it came from, we require that all children provide fetched data in order
+        // to guarantee that our output is fetched.
+        for (size_t i = 0; i < children.size(); ++i) {
+            if (!children[i]->fetched()) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Any WSM output from this stage came from exactly one child stage.  Therefore, if
+     * we want to guarantee that any output has a certain field, all of our children must
+     * have that field.
+     */
+    bool MergeSortNode::hasField(const string& field) const {
         for (size_t i = 0; i < children.size(); ++i) {
             if (!children[i]->hasField(field)) {
                 return false;

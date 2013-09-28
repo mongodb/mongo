@@ -27,13 +27,14 @@
  */
 
 #include "mongo/db/query/index_bounds_builder.h"
+#include "mongo/db/query/indexability.h"
 #include "mongo/db/index/expression_index.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
     // static
-    OrderedIntervalList IndexBoundsBuilder::allValuesForField(const BSONElement& elt) {
+    void IndexBoundsBuilder::allValuesForField(const BSONElement& elt, OrderedIntervalList* out) {
         // ARGH, BSONValue would make this shorter.
         BSONObjBuilder bob;
         if (-1 == elt.number()) {
@@ -47,9 +48,8 @@ namespace mongo {
             bob.appendMaxKey("");
         }
 
-        OrderedIntervalList oil(elt.fieldName());
-        oil.intervals.push_back(makeRangeInterval(bob.obj(), true, true));
-        return oil;
+        out->name = elt.fieldName();
+        out->intervals.push_back(makeRangeInterval(bob.obj(), true, true));
     }
 
     Interval IndexBoundsBuilder::allValues() {
@@ -66,9 +66,7 @@ namespace mongo {
 
         Interval interval;
         bool exact = false;
-        oilOut->name = expr->path().toString();
-
-        cout << "field is " << elt.toString() << endl;
+        oilOut->name = elt.fieldName();
 
         bool isHashed = false;
         if (mongoutils::str::equals("hashed", elt.valuestrsafe())) {
@@ -80,108 +78,128 @@ namespace mongo {
                    || MatchExpression::MATCH_IN == expr->matchType());
         }
 
-        if (expr->isLeaf()) {
-            if (MatchExpression::EQ == expr->matchType()) {
-                const EqualityMatchExpression* node =
-                    static_cast<const EqualityMatchExpression*>(expr);
+        if (MatchExpression::EQ == expr->matchType()) {
+            const EqualityMatchExpression* node =
+                static_cast<const EqualityMatchExpression*>(expr);
 
-                // We have to copy the data out of the parse tree and stuff it into the index
-                // bounds.  BSONValue will be useful here.
-                BSONObj dataObj;
+            // We have to copy the data out of the parse tree and stuff it into the index
+            // bounds.  BSONValue will be useful here.
+            BSONObj dataObj;
 
-                if (isHashed) {
-                    dataObj = ExpressionMapping::hash(node->getData());
-                }
-                else {
-                    dataObj = objFromElement(node->getData());
-                }
+            if (isHashed) {
+                dataObj = ExpressionMapping::hash(node->getData());
+            }
+            else {
+                dataObj = objFromElement(node->getData());
+            }
 
-                // UNITTEST 11738048
-                if (Array == dataObj.firstElement().type()) {
-                    // XXX: build better bounds
-                    warning() << "building lazy bounds for " << expr->toString() << endl;
-                    interval = allValues();
-                    exact = false;
-                }
-                else {
-                    verify(dataObj.isOwned());
-                    interval = makePointInterval(dataObj);
-                    if (dataObj.firstElement().isNull()) {
-                        exact = false;
-                    }
-                    else if (isHashed) {
-                        exact = false;
-                    }
-                    else {
-                        exact = true;
-                    }
-                }
-            }
-            else if (MatchExpression::LTE == expr->matchType()) {
-                const LTEMatchExpression* node = static_cast<const LTEMatchExpression*>(expr);
-                BSONElement dataElt = node->getData();
-                BSONObjBuilder bob;
-                bob.appendMinForType("", dataElt.type());
-                bob.append(dataElt);
-                BSONObj dataObj = bob.obj();
-                verify(dataObj.isOwned());
-                interval = makeRangeInterval(dataObj, true, true);
-                exact = true;
-            }
-            else if (MatchExpression::LT == expr->matchType()) {
-                const LTMatchExpression* node = static_cast<const LTMatchExpression*>(expr);
-                BSONElement dataElt = node->getData();
-                BSONObjBuilder bob;
-                bob.appendMinForType("", dataElt.type());
-                bob.append(dataElt);
-                BSONObj dataObj = bob.obj();
-                verify(dataObj.isOwned());
-                interval = makeRangeInterval(dataObj, true, false);
-                exact = true;
-            }
-            else if (MatchExpression::GT == expr->matchType()) {
-                const GTMatchExpression* node = static_cast<const GTMatchExpression*>(expr);
-                BSONElement dataElt = node->getData();
-                BSONObjBuilder bob;
-                bob.append(node->getData());
-                bob.appendMaxForType("", dataElt.type());
-                BSONObj dataObj = bob.obj();
-                verify(dataObj.isOwned());
-                interval = makeRangeInterval(dataObj, false, true);
-                exact = true;
-            }
-            else if (MatchExpression::GTE == expr->matchType()) {
-                const GTEMatchExpression* node = static_cast<const GTEMatchExpression*>(expr);
-                BSONElement dataElt = node->getData();
-
-                BSONObjBuilder bob;
-                bob.append(dataElt);
-                bob.appendMaxForType("", dataElt.type());
-                BSONObj dataObj = bob.obj();
-                verify(dataObj.isOwned());
-                interval = makeRangeInterval(dataObj, true, true);
-                exact = true;
-            }
-            else if (MatchExpression::MATCH_IN == expr->matchType()) {
-                // XXX: the index type may be hashed.  If so we must hash the value.
+            // UNITTEST 11738048
+            if (Array == dataObj.firstElement().type()) {
                 // XXX: build better bounds
                 warning() << "building lazy bounds for " << expr->toString() << endl;
                 interval = allValues();
                 exact = false;
             }
             else {
-                // XXX: build better bounds
-                warning() << "building lazy bounds for " << expr->toString() << endl;
-                interval = allValues();
-                exact = false;
+                verify(dataObj.isOwned());
+                interval = makePointInterval(dataObj);
+                if (dataObj.firstElement().isNull()) {
+                    exact = false;
+                }
+                else if (isHashed) {
+                    exact = false;
+                }
+                else {
+                    exact = true;
+                }
             }
         }
-        else {
-            // XXX: build better bounds
-            verify(expr->isArray());
+        else if (MatchExpression::LTE == expr->matchType()) {
+            const LTEMatchExpression* node = static_cast<const LTEMatchExpression*>(expr);
+            BSONElement dataElt = node->getData();
+            BSONObjBuilder bob;
+            bob.appendMinForType("", dataElt.type());
+            bob.append(dataElt);
+            BSONObj dataObj = bob.obj();
+            verify(dataObj.isOwned());
+            interval = makeRangeInterval(dataObj, true, true);
+            // XXX: only exact if not (null or array)
+            exact = true;
+        }
+        else if (MatchExpression::LT == expr->matchType()) {
+            const LTMatchExpression* node = static_cast<const LTMatchExpression*>(expr);
+            BSONElement dataElt = node->getData();
+            BSONObjBuilder bob;
+            bob.appendMinForType("", dataElt.type());
+            bob.append(dataElt);
+            BSONObj dataObj = bob.obj();
+            verify(dataObj.isOwned());
+            interval = makeRangeInterval(dataObj, true, false);
+            // XXX: only exact if not (null or array)
+            exact = true;
+        }
+        else if (MatchExpression::GT == expr->matchType()) {
+            const GTMatchExpression* node = static_cast<const GTMatchExpression*>(expr);
+            BSONElement dataElt = node->getData();
+            BSONObjBuilder bob;
+            bob.append(node->getData());
+            bob.appendMaxForType("", dataElt.type());
+            BSONObj dataObj = bob.obj();
+            verify(dataObj.isOwned());
+            interval = makeRangeInterval(dataObj, false, true);
+            // XXX: only exact if not (null or array)
+            exact = true;
+        }
+        else if (MatchExpression::GTE == expr->matchType()) {
+            const GTEMatchExpression* node = static_cast<const GTEMatchExpression*>(expr);
+            BSONElement dataElt = node->getData();
+
+            BSONObjBuilder bob;
+            bob.append(dataElt);
+            bob.appendMaxForType("", dataElt.type());
+            BSONObj dataObj = bob.obj();
+            verify(dataObj.isOwned());
+            interval = makeRangeInterval(dataObj, true, true);
+            // XXX: only exact if not (null or array)
+            exact = true;
+        }
+        else if (MatchExpression::REGEX == expr->matchType()) {
             warning() << "building lazy bounds for " << expr->toString() << endl;
             interval = allValues();
             exact = false;
+        }
+        else if (MatchExpression::MOD == expr->matchType()) {
+            BSONObjBuilder bob;
+            bob.appendMinForType("", NumberDouble);
+            bob.appendMaxForType("", NumberDouble);
+            BSONObj dataObj = bob.obj();
+            verify(dataObj.isOwned());
+            interval = makeRangeInterval(dataObj, true, true);
+            exact = false;
+        }
+        else if (MatchExpression::MATCH_IN == expr->matchType()) {
+            warning() << "building lazy bounds for " << expr->toString() << endl;
+            interval = allValues();
+            exact = false;
+        }
+        else if (MatchExpression::TYPE_OPERATOR == expr->matchType()) {
+            const TypeMatchExpression* tme = static_cast<const TypeMatchExpression*>(expr);
+            BSONObjBuilder bob;
+            bob.appendMinForType("", tme->getData());
+            bob.appendMaxForType("", tme->getData());
+            BSONObj dataObj = bob.obj();
+            verify(dataObj.isOwned());
+            interval = makeRangeInterval(dataObj, true, true);
+            exact = false;
+        }
+        else if (MatchExpression::MATCH_IN == expr->matchType()) {
+            warning() << "building lazy bounds for " << expr->toString() << endl;
+            interval = allValues();
+            exact = false;
+        }
+        else {
+            warning() << "Planner error, trying to build bounds for expr " << expr->toString() << endl;
+            verify(0);
         }
 
         if (-1 == direction) {

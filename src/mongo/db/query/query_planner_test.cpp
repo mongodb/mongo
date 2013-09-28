@@ -87,6 +87,14 @@ namespace {
             return solns.size();
         }
 
+        void dumpSolutions() const {
+            for (vector<QuerySolution*>::const_iterator it = solns.begin();
+                    it != solns.end();
+                    ++it) {
+                cout << (*it)->toString() << endl;
+            }
+        }
+
         void getPlanByType(StageType stageType, QuerySolution** soln) const {
             size_t found = 0;
             for (vector<QuerySolution*>::const_iterator it = solns.begin();
@@ -460,6 +468,56 @@ namespace {
 
         QuerySolution* collScanSolution;
         getPlanByType(STAGE_COLLSCAN, &collScanSolution);
+    }
+
+    //
+    // Array operators
+    //
+
+    TEST_F(SingleIndexTest, ElemMatchOneField) {
+        setIndex(BSON("a.b" << 1));
+        runQuery(fromjson("{a : {$elemMatch: {b:1}}}"));
+        dumpSolutions();
+        ASSERT_EQUALS(getNumSolutions(), 2U);
+    }
+
+    TEST_F(SingleIndexTest, ElemMatchTwoFields) {
+        setIndex(BSON("a.b" << 1));
+        setIndex(BSON("a.c" << 1));
+        runQuery(fromjson("{a : {$elemMatch: {b:1, c:1}}}"));
+        dumpSolutions();
+        ASSERT_EQUALS(getNumSolutions(), 2U);
+    }
+
+    TEST_F(SingleIndexTest, BasicAllElemMatch) {
+        setIndex(BSON("foo.a" << 1));
+        setIndex(BSON("foo.b" << 1));
+        runQuery(fromjson("{foo: {$all: [ {$elemMatch: {a:1, b:1}}, {$elemMatch: {a:2, b:2}}]}}"));
+        dumpSolutions();
+        ASSERT_EQUALS(getNumSolutions(), 2U);
+    }
+
+    TEST_F(SingleIndexTest, ElemMatchValueMatch) {
+        setIndex(BSON("foo" << 1));
+        runQuery(fromjson("{foo: {$elemMatch: {$gt: 5, $lt: 10}}}"));
+        dumpSolutions();
+        ASSERT_EQUALS(getNumSolutions(), 2U);
+    }
+
+    TEST_F(SingleIndexTest, ElemMatchNested) {
+        setIndex(BSON("a.b.c" << 1));
+        runQuery(fromjson("{ a:{ $elemMatch:{ b:{ $elemMatch:{ c:{ $gte:1, $lte:1 } } } } }}"));
+        dumpSolutions();
+        ASSERT_EQUALS(getNumSolutions(), 2U);
+    }
+
+    TEST_F(SingleIndexTest, TwoElemMatchNested) {
+        setIndex(BSON("a.d.e" << 1));
+        setIndex(BSON("a.b.c" << 1));
+        runQuery(fromjson("  { a:{ $elemMatch:{ d:{ $elemMatch:{ e:{ $lte:1 } } },"
+                                               "b:{ $elemMatch:{ c:{ $gte:1 } } } } } }"));
+        dumpSolutions();
+        ASSERT_EQUALS(getNumSolutions(), 2U);
     }
 
     // STOPPED HERE - need to hook up machinery for multiple indexed predicates
