@@ -1280,6 +1280,31 @@ namespace mongo {
         return false;
     }
 
+    int ParallelSortClusteredCursor::getShardCount() {                                                                                                                                                          
+        return _cursorMap.size();
+    }
+
+    /**
+     * getOnlyShardOrPrimary
+     * if collection is not sharded, return primary
+     * if only shard is used, return this shard
+     */
+    ShardPtr ParallelSortClusteredCursor::getTheOnlyShard() {
+        if (!isVersioned()){
+            LOG(5) << "getTheOnlyShard : !isVersioned()" << endl;
+            return ShardPtr();
+        }
+        if (_cursorMap.size() > 1){
+            LOG(5) << "_cursorMap.size() > 1" << endl;
+            return ShardPtr();
+        }
+
+
+        map< Shard, PCMData >::iterator i = _cursorMap.begin();
+        LOG(5) << "return only shard: " << i->first.toString() << endl;
+        return ShardPtr( new Shard( i->first ) );
+    }
+
     ShardPtr ParallelSortClusteredCursor::getPrimary() {
         if( isSharded() || ! isVersioned() ) return ShardPtr();
         return _cursorMap.begin()->second.pcState->primary;

@@ -126,44 +126,31 @@ namespace mongo {
                 throw;
             }
 
-            set<Shard> shards;
-            cursor->getQueryShards( shards );
+            if( cursor->isSharded() && (cursor->getShardCount() > 1)){
+                ShardedClientCursorPtr cc (new ShardedClientCursor( q , cursor ));
 
-            if( cursor->isSharded()){
-                if(shards.size() == 1) { // only one shard is used, this logic is same as what we dit for unsharded collection
-                    LOG(5) << "only one shard is used for sharded collection " << endl;
-                    scoped_ptr<ParallelSortClusteredCursor> cursorDeleter( cursor );
-                    DBClientCursorPtr shardCursor = cursor->getShardCursor( *shards.begin() );
-                    r.reply( *(shardCursor->getMessage()) , shardCursor->originalHost() );
-                    shardCursor->decouple();
+                BufBuilder buffer( ShardedClientCursor::INIT_REPLY_BUFFER_SIZE );
+                int docCount = 0;
+                const int startFrom = cc->getTotalSent();
+                bool hasMore = cc->sendNextBatch( r, q.ntoreturn, buffer, docCount );
 
-                }else { //more than one shard is used
-                    ShardedClientCursorPtr cc (new ShardedClientCursor( q , cursor ));
-
-                    BufBuilder buffer( ShardedClientCursor::INIT_REPLY_BUFFER_SIZE );
-                    int docCount = 0;
-                    const int startFrom = cc->getTotalSent();
-                    bool hasMore = cc->sendNextBatch( r, q.ntoreturn, buffer, docCount );
-
-                    if ( hasMore ) {                                                                                                                                                                            
-                        LOG(5) << "storing cursor : " << cc->getId() << endl;
-                        cursorCache.store( cc );
-                    }
-
-                    replyToQuery( 0, r.p(), r.m(), buffer.buf(), buffer.len(), docCount,
-                            startFrom, hasMore ? cc->getId() : 0 );
-
+                if ( hasMore ) {
+                    LOG(5) << "storing cursor : " << cc->getId() << endl;
+                    cursorCache.store( cc );
                 }
+
+                replyToQuery( 0, r.p(), r.m(), buffer.buf(), buffer.len(), docCount,
+                        startFrom, hasMore ? cc->getId() : 0 );
             }
-            else{
+            else{ //not sharded or only one shard is used
                 // Remote cursors are stored remotely, we shouldn't need this around.
                 // TODO: we should probably just make cursor an auto_ptr
                 scoped_ptr<ParallelSortClusteredCursor> cursorDeleter( cursor );
 
                 // TODO:  Better merge this logic.  We potentially can now use the same cursor logic for everything.
-                ShardPtr primary = cursor->getPrimary();
-                verify( primary.get() );
-                DBClientCursorPtr shardCursor = cursor->getShardCursor( *primary );
+                ShardPtr shard = cursor->getTheOnlyShard();
+                verify( shard.get() );
+                DBClientCursorPtr shardCursor = cursor->getShardCursor( *shard );
 
                 // Implicitly stores the cursor in the cache
                 r.reply( *(shardCursor->getMessage()) , shardCursor->originalHost() );
