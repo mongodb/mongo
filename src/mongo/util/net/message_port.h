@@ -124,8 +124,8 @@ namespace mongo {
          * When this function returns, further communication on this
          * MessagingPort will be encrypted.
          */
-        void secure( SSLManagerInterface* ssl ) {
-            psock->secure( ssl );
+        bool secure( SSLManagerInterface* ssl ) {
+            return psock->secure( ssl );
         }
 #endif
 
