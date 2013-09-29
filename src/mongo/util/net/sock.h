@@ -238,7 +238,7 @@ namespace mongo {
 
 #ifdef MONGO_SSL
         /** secures inline */
-        void secure( SSLManagerInterface* ssl );
+        bool secure( SSLManagerInterface* ssl );
 
         void secureAccepted( SSLManagerInterface* ssl );
 #endif

@@ -458,12 +458,15 @@ namespace mongo {
     }
 
 #ifdef MONGO_SSL
-    void Socket::secure(SSLManagerInterface* mgr) {
+    bool Socket::secure(SSLManagerInterface* mgr) {
         fassert(16503, mgr);
-        fassert(16505, _fd >= 0);
+        if ( _fd < 0 ) { 
+            return false;
+        }
         _sslManager = mgr;
         _sslConnection.reset(_sslManager->connect(this));
         mgr->validatePeerCertificate(_sslConnection.get());
+        return true;
     }
 
     void Socket::secureAccepted( SSLManagerInterface* ssl ) { 
