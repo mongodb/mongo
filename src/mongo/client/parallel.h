@@ -356,8 +356,8 @@ namespace mongo {
         ShardPtr getPrimary();
         void getQueryShards( set<Shard>& shards );
 
-        int getShardCount() ;                                                                                                                                                                                   
-        ShardPtr getTheOnlyShard() ;
+        int getShardCount() ;
+        ShardPtr getTheOnlyShard();
 
         ChunkManagerPtr getChunkManager( const Shard& shard );
         DBClientCursorPtr getShardCursor( const Shard& shard );
