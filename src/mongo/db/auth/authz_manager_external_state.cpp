@@ -50,15 +50,6 @@ namespace mongo {
 
         StringData dbname = userName.getDB();
 
-        // Make sure the dbname is actually a database
-        if (dbname == StringData("$external", StringData::LiteralTag()) ||
-            dbname == AuthorizationManager::SERVER_RESOURCE_NAME ||
-            dbname == AuthorizationManager::CLUSTER_RESOURCE_NAME) {
-            return Status(ErrorCodes::UserNotFound,
-                          mongoutils::str::stream() << "No privilege documents stored in the " <<
-                          dbname << " user source.");
-        }
-
         if (!NamespaceString::validDBName(dbname)) {
             return Status(ErrorCodes::BadValue,
                           mongoutils::str::stream() << "Bad database name \"" << dbname << "\"");

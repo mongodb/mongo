@@ -283,7 +283,10 @@ namespace mongo {
             }
             // Handle normal client authentication, only applies to client-server connections
             else {
-                authorizationSession->addAndAuthorizeUser(user);
+                Status status = authorizationSession->addAndAuthorizeUser(user);
+                if (!status.isOK()) {
+                    return status;
+                }
             }
             return Status::OK();
         }
