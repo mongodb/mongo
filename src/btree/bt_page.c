@@ -515,9 +515,11 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *sizep)
 				ref->state = WT_REF_DELETED;
 				ref->txnid = WT_TXN_NONE;
 
-				WT_ERR(__wt_page_modify_init(session, page));
-				if (btree->modified)
+				if (btree->modified) {
+					WT_ERR(__wt_page_modify_init(
+					    session, page));
 					__wt_page_modify_set(session, page);
+				}
 			}
 
 			++ref;
