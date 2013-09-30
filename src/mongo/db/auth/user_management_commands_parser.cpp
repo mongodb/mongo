@@ -35,7 +35,6 @@
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/auth_helpers.h"
 #include "mongo/db/auth/action_type.h"
-#include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/privilege_parser.h"
 #include "mongo/db/auth/user_document_parser.h"
@@ -176,7 +175,7 @@ namespace auth {
                                                    BSONObj* parsedWriteConcern) {
         unordered_set<std::string> validFieldNames;
         validFieldNames.insert(cmdName.toString());
-        validFieldNames.insert("roles");
+        validFieldNames.insert(rolesFieldName.toString());
         validFieldNames.insert("writeConcern");
 
         Status status = _checkNoExtraFields(cmdObj, cmdName, validFieldNames);
@@ -189,15 +188,13 @@ namespace auth {
             return status;
         }
 
-        std::string userNameStr;
-        status = bsonExtractStringField(cmdObj, cmdName, &userNameStr);
+        status = bsonExtractStringField(cmdObj, cmdName, parsedName);
         if (!status.isOK()) {
             return status;
         }
-        *parsedName = userNameStr;
 
         BSONElement rolesElement;
-        status = bsonExtractTypedField(cmdObj, "roles", Array, &rolesElement);
+        status = bsonExtractTypedField(cmdObj, rolesFieldName, Array, &rolesElement);
         if (!status.isOK()) {
             return status;
         }
@@ -212,82 +209,9 @@ namespace auth {
 
         if (!parsedRoleNames->size()) {
             return Status(ErrorCodes::BadValue,
-                          mongoutils::str::stream() << cmdName << " command requires a non-empty" <<
-                                  " roles array");
+                          mongoutils::str::stream() << cmdName << " command requires a non-empty \""
+                                  << rolesFieldName << "\" array");
         }
-        return Status::OK();
-    }
-
-    /**
-     * Validates that the roles array described by rolesElement is valid.
-     * Also returns a new roles array (via the modifiedRolesArray output param) where any roles
-     * from the input array that were listed as strings have been expanded to a full role document.
-     * If includePossessionBools is true then the expanded roles documents will have "hasRole"
-     * and "canDelegate" boolean fields (in addition to the "name" and "source" fields which are
-     * there either way).
-     */
-    Status _validateAndModifyRolesArray(const BSONElement& rolesElement,
-                                        const std::string& dbname,
-                                        AuthorizationManager* authzManager,
-                                        bool includePossessionBools,
-                                        BSONArray* modifiedRolesArray) {
-        BSONArrayBuilder rolesBuilder;
-
-        for (BSONObjIterator it(rolesElement.Obj()); it.more(); it.next()) {
-            BSONElement element = *it;
-            if (element.type() == String) {
-                RoleName roleName(element.String(), dbname);
-                if (!authzManager->roleExists(roleName)) {
-                    return Status(ErrorCodes::RoleNotFound,
-                                  mongoutils::str::stream() << roleName.toString() <<
-                                  " does not name an existing role");
-                }
-
-                if (includePossessionBools) {
-                    rolesBuilder.append(BSON("name" << element.String() <<
-                                             "source" << dbname <<
-                                             "hasRole" << true <<
-                                             "canDelegate" << false));
-                } else {
-                    rolesBuilder.append(BSON("name" << element.String() <<
-                                             "source" << dbname));
-                }
-            } else if (element.type() == Object) {
-                // Check that the role object is valid
-                V2UserDocumentParser parser;
-                BSONObj roleObj = element.Obj();
-                Status status = parser.checkValidRoleObject(roleObj, includePossessionBools);
-                if (!status.isOK()) {
-                    return status;
-                }
-
-                // Check that the role actually exists
-                std::string roleNameString;
-                std::string roleSource;
-                status = bsonExtractStringField(roleObj, "name", &roleNameString);
-                if (!status.isOK()) {
-                    return status;
-                }
-                status = bsonExtractStringField(roleObj, "source", &roleSource);
-                if (!status.isOK()) {
-                    return status;
-                }
-
-                RoleName roleName(roleNameString, roleSource);
-                if (!authzManager->roleExists(roleName)) {
-                    return Status(ErrorCodes::RoleNotFound,
-                                  mongoutils::str::stream() << roleName.toString() <<
-                                  " does not name an existing role");
-                }
-
-                rolesBuilder.append(element);
-            } else {
-                return Status(ErrorCodes::UnsupportedFormat,
-                              "Values in 'roles' array must be sub-documents or strings");
-            }
-        }
-
-        *modifiedRolesArray = rolesBuilder.arr();
         return Status::OK();
     }
 
@@ -591,5 +515,52 @@ namespace auth {
         return Status::OK();
     }
 
+    Status parseRemoveRoleCommand(const BSONObj& cmdObj,
+                                  const std::string& dbname,
+                                  RoleName* parsedRoleName,
+                                  BSONObj* parsedWriteConcern) {
+        unordered_set<std::string> validFieldNames;
+        validFieldNames.insert("removeRole");
+        validFieldNames.insert("writeConcern");
+
+        Status status = _checkNoExtraFields(cmdObj, "removeRole", validFieldNames);
+        if (!status.isOK()) {
+            return status;
+        }
+
+        std::string user;
+        status = bsonExtractStringField(cmdObj, "removeRole", &user);
+        if (!status.isOK()) {
+            return status;
+        }
+
+        status = _extractWriteConcern(cmdObj, parsedWriteConcern);
+        if (!status.isOK()) {
+            return status;
+        }
+
+        *parsedRoleName = RoleName(user, dbname);
+        return Status::OK();
+    }
+
+    Status parseRemoveRolesFromDatabaseCommand(const BSONObj& cmdObj,
+                                               const std::string& dbname,
+                                               BSONObj* parsedWriteConcern) {
+        unordered_set<std::string> validFieldNames;
+        validFieldNames.insert("removeRolesFromDatabase");
+        validFieldNames.insert("writeConcern");
+
+        Status status = _checkNoExtraFields(cmdObj, "removeRolesFromDatabase", validFieldNames);
+        if (!status.isOK()) {
+            return status;
+        }
+
+        status = _extractWriteConcern(cmdObj, parsedWriteConcern);
+        if (!status.isOK()) {
+            return status;
+        }
+
+        return Status::OK();
+    }
 } // namespace auth
 } // namespace mongo

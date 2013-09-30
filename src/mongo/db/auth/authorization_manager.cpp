@@ -163,6 +163,19 @@ namespace mongo {
         return _externalState->removePrivilegeDocuments(query, writeConcern, numRemoved);
     }
 
+    Status AuthorizationManager::removeRoleDocuments(const BSONObj& query,
+                                                     const BSONObj& writeConcern,
+                                                     int* numRemoved) const {
+        Status status = _externalState->remove(NamespaceString("admin.system.roles"),
+                                               query,
+                                               writeConcern,
+                                               numRemoved);
+        if (status.code() == ErrorCodes::UnknownError) {
+            return Status(ErrorCodes::RoleModificationFailed, status.reason());
+        }
+        return status;
+    }
+
     Status AuthorizationManager::insertRoleDocument(const BSONObj& roleObj,
                                                     const BSONObj& writeConcern) const {
         Status status = _externalState->insert(NamespaceString("admin.system.roles"),
@@ -215,6 +228,22 @@ namespace mongo {
         return _externalState->query(collectionName, query, resultProcessor);
     }
 
+    Status AuthorizationManager::updateAuthzDocuments(const NamespaceString& collectionName,
+                                                      const BSONObj& query,
+                                                      const BSONObj& updatePattern,
+                                                      bool upsert,
+                                                      bool multi,
+                                                      const BSONObj& writeConcern,
+                                                      int* numUpdated) const {
+        return _externalState->update(collectionName,
+                                      query,
+                                      updatePattern,
+                                      upsert,
+                                      multi,
+                                      writeConcern,
+                                      numUpdated);
+    }
+
     bool AuthorizationManager::roleExists(const RoleName& role) {
         boost::lock_guard<boost::mutex> lk(_lock);
         return _roleGraph.roleExists(role);
@@ -228,6 +257,12 @@ namespace mongo {
     PrivilegeVector AuthorizationManager::getDirectPrivilegesForRole(const RoleName& role) {
         boost::lock_guard<boost::mutex> lk(_lock);
         return _roleGraph.getDirectPrivileges(role);
+    }
+
+    std::vector<RoleName> AuthorizationManager::getSubordinateRolesForRole(
+            const RoleName& role) {
+        boost::lock_guard<boost::mutex> lk(_lock);
+        return _roleGraph.getDirectSubordinates(role);
     }
 
     Status AuthorizationManager::getBSONForPrivileges(const PrivilegeVector& privileges,
@@ -270,9 +305,10 @@ namespace mongo {
         // Build roles array
         mutablebson::Element rolesArrayElement = result.getDocument().makeElementArray("roles");
         result.pushBack(rolesArrayElement);
-        RoleNameIterator nameIt = graph->getDirectSubordinates(roleName);
-        while (nameIt.more()) {
-            const RoleName& subRole = nameIt.next();
+        const std::vector<RoleName> roles = graph->getDirectSubordinates(roleName);
+        for (std::vector<RoleName>::const_iterator it = roles.begin();
+                it != roles.end(); ++it) {
+            const RoleName& subRole = *it;
             mutablebson::Element roleObj = result.getDocument().makeElementObject("");
             roleObj.appendString("name", subRole.getRole());
             roleObj.appendString("source", subRole.getDB());
