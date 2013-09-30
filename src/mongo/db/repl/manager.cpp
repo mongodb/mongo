@@ -203,9 +203,9 @@ namespace mongo {
             checkAuth();
 
             const Member *p = rs->box.getPrimary();
-            if( p && p != rs->_self ) {
-                if( !p->hbinfo().up() ||
-                        !p->hbinfo().hbstate.primary() ) {
+
+            if (p && p->id() != rs->_self->id()) {
+                if (!p->hbinfo().up() || !p->hbinfo().hbstate.primary()) {
                     p = 0;
                     rs->box.setOtherPrimary(0);
                 }
