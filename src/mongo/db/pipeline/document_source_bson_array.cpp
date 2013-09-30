@@ -49,22 +49,18 @@ namespace mongo {
     }
 
     DocumentSourceBsonArray::DocumentSourceBsonArray(
-            BSONElement *pBsonElement,
+            const BSONObj& array,
             const intrusive_ptr<ExpressionContext> &pExpCtx)
         : DocumentSource(pExpCtx)
-        , embeddedObject(pBsonElement->embeddedObject())
+        , embeddedObject(array)
         , arrayIterator(embeddedObject)
     {}
 
     intrusive_ptr<DocumentSourceBsonArray> DocumentSourceBsonArray::create(
-        BSONElement *pBsonElement,
-        const intrusive_ptr<ExpressionContext> &pExpCtx) {
+            const BSONObj& array,
+            const intrusive_ptr<ExpressionContext> &pExpCtx) {
 
-        verify(pBsonElement->type() == Array);
-        intrusive_ptr<DocumentSourceBsonArray> pSource(
-            new DocumentSourceBsonArray(pBsonElement, pExpCtx));
-
-        return pSource;
+        return new DocumentSourceBsonArray(array, pExpCtx);
     }
 
     Value DocumentSourceBsonArray::serialize(bool explain) const {

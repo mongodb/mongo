@@ -1245,7 +1245,7 @@ namespace ExpressionTests {
                 BSONObj spec = BSON( "" << BSON( "a" << "$x" << "q" << "$r" ) );
                 BSONElement specElement = spec.firstElement();
                 Expression::ObjectCtx ctx( Expression::ObjectCtx::DOCUMENT_OK );
-                testable->addOperand( Expression::parseObject( &specElement, &ctx ) );
+                testable->addOperand( Expression::parseObject( specElement.Obj(), &ctx ) );
                 assertDependencies( BSON_ARRAY( "ab.c" << "r" << "x" ), testable );
             }
         private:
@@ -2361,7 +2361,7 @@ namespace ExpressionTests {
                     BSONElement specElement = specObject.firstElement();
                     Expression::ObjectCtx context = objectCtx();
                     intrusive_ptr<Expression> expression =
-                            Expression::parseObject( &specElement, &context );
+                            Expression::parseObject( specElement.Obj(), &context );
                     ASSERT_EQUALS( expectedBson(), expressionToBson( expression ) );
                 }
             protected:
@@ -2379,7 +2379,7 @@ namespace ExpressionTests {
                     BSONObj specObject = BSON( "" << spec() );
                     BSONElement specElement = specObject.firstElement();
                     Expression::ObjectCtx context = objectCtx();
-                    ASSERT_THROWS( Expression::parseObject( &specElement, &context ),
+                    ASSERT_THROWS( Expression::parseObject( specElement.Obj(), &context ),
                                    UserException );
                 }
             protected:
@@ -2397,7 +2397,7 @@ namespace ExpressionTests {
                     BSONElement specElement = specObject.firstElement();
                     Expression::ObjectCtx context =
                             Expression::ObjectCtx( Expression::ObjectCtx::DOCUMENT_OK );
-                    ASSERT_THROWS( Expression::parseObject( &specElement, &context ),
+                    ASSERT_THROWS( Expression::parseObject( specElement.Obj(), &context ),
                                    UserException );                    
                 }
             };

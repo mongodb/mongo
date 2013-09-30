@@ -138,8 +138,7 @@ namespace mongo {
         return string(pPrefixedField + 1);
     }
 
-    intrusive_ptr<Expression> Expression::parseObject(
-        BSONElement *pBsonElement, ObjectCtx *pCtx) {
+    intrusive_ptr<Expression> Expression::parseObject(BSONObj obj, ObjectCtx *pCtx) {
         /*
           An object expression can take any of the following forms:
 
@@ -151,7 +150,6 @@ namespace mongo {
         intrusive_ptr<ExpressionObject> pExpressionObject; // alt result
         enum { UNKNOWN, NOTOPERATOR, OPERATOR } kind = UNKNOWN;
 
-        BSONObj obj(pBsonElement->Obj());
         if (obj.isEmpty())
             return ExpressionObject::create();
         BSONObjIterator iter(obj);
@@ -203,9 +201,9 @@ namespace mongo {
                         ObjectCtx oCtx(
                             (pCtx->documentOk() ? ObjectCtx::DOCUMENT_OK : 0)
                              | (pCtx->inclusionOk() ? ObjectCtx::INCLUSION_OK : 0));
-                        intrusive_ptr<Expression> pNested(
-                            parseObject(&fieldElement, &oCtx));
-                        pExpressionObject->addField(fieldName, pNested);
+                            
+                        pExpressionObject->addField(fieldName,
+                                                    parseObject(fieldElement.Obj(), &oCtx));
                         break;
                     }
                     case String: {
@@ -301,7 +299,7 @@ namespace {
         }
         else if (type == Object) {
             ObjectCtx oCtx(ObjectCtx::DOCUMENT_OK);
-            return Expression::parseObject(&exprElement, &oCtx);
+            return Expression::parseObject(exprElement.Obj(), &oCtx);
         }
         else {
             return ExpressionConstant::parse(exprElement);

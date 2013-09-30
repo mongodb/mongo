@@ -302,16 +302,17 @@ namespace mongo {
           elements that appear after these documents must not be read until
           this source is exhausted.
 
-          @param pBsonElement the BSON array to treat as a document source
+          @param array the BSON array to treat as a document source
           @param pExpCtx the expression context for the pipeline
           @returns the newly created document source
         */
         static intrusive_ptr<DocumentSourceBsonArray> create(
-            BSONElement *pBsonElement,
+            const BSONObj& array,
             const intrusive_ptr<ExpressionContext> &pExpCtx);
 
     private:
-        DocumentSourceBsonArray(BSONElement *pBsonElement,
+        DocumentSourceBsonArray(
+            const BSONObj& embeddedArray,
             const intrusive_ptr<ExpressionContext> &pExpCtx);
 
         BSONObj embeddedObject;
@@ -584,7 +585,7 @@ namespace mongo {
           @returns the grouping DocumentSource
          */
         static intrusive_ptr<DocumentSource> createFromBson(
-            BSONElement *pBsonElement,
+            BSONElement elem,
             const intrusive_ptr<ExpressionContext> &pExpCtx);
 
         // Virtuals for SplittableDocumentSource
@@ -666,7 +667,7 @@ namespace mongo {
           @returns the filter
          */
         static intrusive_ptr<DocumentSource> createFromBson(
-            BSONElement *pBsonElement,
+            BSONElement elem,
             const intrusive_ptr<ExpressionContext> &pCtx);
 
         /**
@@ -708,7 +709,7 @@ namespace mongo {
         virtual bool isValidInitialSource() const { return true; }
 
         static intrusive_ptr<DocumentSource> createFromBson(
-            BSONElement *pBsonElement,
+            BSONElement elem,
             const intrusive_ptr<ExpressionContext> &pExpCtx);
 
         static intrusive_ptr<DocumentSource> create(
@@ -768,7 +769,7 @@ namespace mongo {
           @returns the newly created document source
         */
         static intrusive_ptr<DocumentSource> createFromBson(
-            BSONElement *pBsonElement,
+            BSONElement elem,
             const intrusive_ptr<ExpressionContext> &pExpCtx);
 
         static const char outName[];
@@ -811,7 +812,7 @@ namespace mongo {
           @returns the created projection
          */
         static intrusive_ptr<DocumentSource> createFromBson(
-            BSONElement *pBsonElement,
+            BSONElement elem,
             const intrusive_ptr<ExpressionContext> &pExpCtx);
 
         static const char projectName[];
@@ -842,8 +843,9 @@ namespace mongo {
 
         static const char redactName[];
 
-        static intrusive_ptr<DocumentSource> createFromBson(BSONElement* bsonElement,
-                const intrusive_ptr<ExpressionContext>& expCtx);
+        static intrusive_ptr<DocumentSource> createFromBson(
+            BSONElement elem,
+            const intrusive_ptr<ExpressionContext>& expCtx);
 
         virtual Value serialize(bool explain = false) const;
 
@@ -902,7 +904,7 @@ namespace mongo {
           @returns the grouping DocumentSource
          */
         static intrusive_ptr<DocumentSource> createFromBson(
-            BSONElement *pBsonElement,
+            BSONElement elem,
             const intrusive_ptr<ExpressionContext> &pExpCtx);
 
         /// Create a DocumentSourceSort with a given sort and (optional) limit
@@ -1007,7 +1009,7 @@ namespace mongo {
           @returns the grouping DocumentSource
          */
         static intrusive_ptr<DocumentSource> createFromBson(
-            BSONElement *pBsonElement,
+            BSONElement elem,
             const intrusive_ptr<ExpressionContext> &pExpCtx);
 
         static const char limitName[];
@@ -1062,7 +1064,7 @@ namespace mongo {
           @returns the grouping DocumentSource
          */
         static intrusive_ptr<DocumentSource> createFromBson(
-            BSONElement *pBsonElement,
+            BSONElement elem,
             const intrusive_ptr<ExpressionContext> &pExpCtx);
 
         static const char skipName[];
@@ -1096,7 +1098,7 @@ namespace mongo {
           @returns the created projection
          */
         static intrusive_ptr<DocumentSource> createFromBson(
-            BSONElement *pBsonElement,
+            BSONElement elem,
             const intrusive_ptr<ExpressionContext> &pExpCtx);
 
         static const char unwindName[];
@@ -1131,7 +1133,7 @@ namespace mongo {
         virtual intrusive_ptr<DocumentSource> getRouterSource();
 
         static intrusive_ptr<DocumentSource> createFromBson(
-            BSONElement *pBsonElement,
+            BSONElement elem,
             const intrusive_ptr<ExpressionContext> &pCtx);
 
         static char geoNearName[];

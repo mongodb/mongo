@@ -99,13 +99,13 @@ namespace mongo {
     }
 
     intrusive_ptr<DocumentSource> DocumentSourceProject::createFromBson(
-            BSONElement *pBsonElement,
+            BSONElement elem,
             const intrusive_ptr<ExpressionContext> &pExpCtx) {
 
         /* validate */
         uassert(15969, str::stream() << projectName <<
                 " specification must be an object",
-                pBsonElement->type() == Object);
+                elem.type() == Object);
 
         Expression::ObjectCtx objectCtx(
               Expression::ObjectCtx::DOCUMENT_OK
@@ -113,14 +113,14 @@ namespace mongo {
             | Expression::ObjectCtx::INCLUSION_OK
             );
 
-        intrusive_ptr<Expression> parsed = Expression::parseObject(pBsonElement, &objectCtx);
+        intrusive_ptr<Expression> parsed = Expression::parseObject(elem.Obj(), &objectCtx);
         ExpressionObject* exprObj = dynamic_cast<ExpressionObject*>(parsed.get());
         massert(16402, "parseObject() returned wrong type of Expression", exprObj);
         uassert(16403, "$projection requires at least one output field", exprObj->getFieldCount());
 
         intrusive_ptr<DocumentSourceProject> pProject(new DocumentSourceProject(pExpCtx, exprObj));
 
-        BSONObj projectObj = pBsonElement->Obj();
+        BSONObj projectObj = elem.Obj();
         pProject->_raw = projectObj.getOwned(); // probably not necessary, but better to be safe
 
 #if defined(_DEBUG)

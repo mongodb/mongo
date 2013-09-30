@@ -97,7 +97,7 @@ namespace mongo {
                     continue;
                 }
 
-                pBsonSource = DocumentSourceBsonArray::create(&resultArray, pExpCtx);
+                pBsonSource = DocumentSourceBsonArray::create(resultArray.Obj(), pExpCtx);
             }
 
             if (boost::optional<Document> out = pBsonSource->getNext())

@@ -79,17 +79,14 @@ namespace mongo {
     }
 
     intrusive_ptr<DocumentSource> DocumentSourceMatch::createFromBson(
-        BSONElement *pBsonElement,
-        const intrusive_ptr<ExpressionContext> &pExpCtx) {
+            BSONElement elem,
+            const intrusive_ptr<ExpressionContext> &pExpCtx) {
         uassert(15959, "the match filter must be an expression in an object",
-                pBsonElement->type() == Object);
+                elem.type() == Object);
 
-        uassertNoDisallowedClauses(pBsonElement->Obj());
+        uassertNoDisallowedClauses(elem.Obj());
 
-        intrusive_ptr<DocumentSourceMatch> pMatcher(
-            new DocumentSourceMatch(pBsonElement->Obj(), pExpCtx));
-
-        return pMatcher;
+        return new DocumentSourceMatch(elem.Obj(), pExpCtx);
     }
 
     void DocumentSourceMatch::toMatcherBson(BSONObjBuilder *pBuilder) const {

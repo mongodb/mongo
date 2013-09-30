@@ -160,10 +160,10 @@ namespace mongo {
     }
 
     intrusive_ptr<DocumentSource> DocumentSourceGeoNear::createFromBson(
-            BSONElement *pBsonElement,
+            BSONElement elem,
             const intrusive_ptr<ExpressionContext> &pCtx) {
         intrusive_ptr<DocumentSourceGeoNear> out = new DocumentSourceGeoNear(pCtx);
-        out->parseOptions(pBsonElement->embeddedObjectUserCheck());
+        out->parseOptions(elem.embeddedObjectUserCheck());
         return out;
     }
 

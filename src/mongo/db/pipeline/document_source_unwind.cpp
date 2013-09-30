@@ -158,16 +158,16 @@ namespace mongo {
     }
 
     intrusive_ptr<DocumentSource> DocumentSourceUnwind::createFromBson(
-        BSONElement *pBsonElement,
-        const intrusive_ptr<ExpressionContext> &pExpCtx) {
+            BSONElement elem,
+            const intrusive_ptr<ExpressionContext> &pExpCtx) {
         /*
           The value of $unwind should just be a field path.
          */
         uassert(15981, str::stream() << "the " << unwindName <<
                 " field path must be specified as a string",
-                pBsonElement->type() == String);
+                elem.type() == String);
 
-        string prefixedPathString(pBsonElement->str());
+        string prefixedPathString(elem.str());
         string pathString(Expression::removeFieldPrefix(prefixedPathString));
         intrusive_ptr<DocumentSourceUnwind> pUnwind(new DocumentSourceUnwind(pExpCtx));
         pUnwind->unwindPath(FieldPath(pathString));

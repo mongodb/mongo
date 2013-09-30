@@ -59,14 +59,14 @@ namespace mongo {
     }
 
     intrusive_ptr<DocumentSource> DocumentSourceMergeCursors::createFromBson(
-            BSONElement* pBsonElement,
+            BSONElement elem,
             const intrusive_ptr<ExpressionContext>& pExpCtx) {
 
-        massert(17026, string("Expected an Array, but got a ") + typeName(pBsonElement->type()),
-                pBsonElement->type() == Array);
+        massert(17026, string("Expected an Array, but got a ") + typeName(elem.type()),
+                elem.type() == Array);
 
         CursorIds cursorIds;
-        BSONObj array = pBsonElement->embeddedObject();
+        BSONObj array = elem.embeddedObject();
         BSONForEach(cursor, array) {
             massert(17027, string("Expected an Object, but got a ") + typeName(cursor.type()),
                     cursor.type() == Object);

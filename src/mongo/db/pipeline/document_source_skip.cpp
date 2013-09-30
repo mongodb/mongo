@@ -89,16 +89,16 @@ namespace mongo {
     }
 
     intrusive_ptr<DocumentSource> DocumentSourceSkip::createFromBson(
-        BSONElement *pBsonElement,
-        const intrusive_ptr<ExpressionContext> &pExpCtx) {
+            BSONElement elem,
+            const intrusive_ptr<ExpressionContext> &pExpCtx) {
         uassert(15972, str::stream() << DocumentSourceSkip::skipName <<
                 ":  the value to skip must be a number",
-                pBsonElement->isNumber());
+                elem.isNumber());
 
         intrusive_ptr<DocumentSourceSkip> pSkip(
             DocumentSourceSkip::create(pExpCtx));
 
-        pSkip->_skip = pBsonElement->numberLong();
+        pSkip->_skip = elem.numberLong();
         uassert(15956, str::stream() << DocumentSourceSkip::skipName <<
                 ":  the number to skip cannot be negative",
                 pSkip->_skip >= 0);

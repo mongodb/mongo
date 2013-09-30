@@ -88,12 +88,12 @@ namespace mongo {
     }
 
     intrusive_ptr<DocumentSource> DocumentSourceLimit::createFromBson(
-        BSONElement *pBsonElement,
-        const intrusive_ptr<ExpressionContext> &pExpCtx) {
+            BSONElement elem,
+            const intrusive_ptr<ExpressionContext> &pExpCtx) {
         uassert(15957, "the limit must be specified as a number",
-                pBsonElement->isNumber());
+                elem.isNumber());
 
-        long long limit = pBsonElement->numberLong();
+        long long limit = elem.numberLong();
         return DocumentSourceLimit::create(pExpCtx, limit);
     }
 }

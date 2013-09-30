@@ -328,7 +328,7 @@ namespace DocumentSourceTests {
             void createLimit( int limit ) {
                 BSONObj spec = BSON( "$limit" << limit );
                 BSONElement specElement = spec.firstElement();
-                _limit = DocumentSourceLimit::createFromBson( &specElement, ctx() );
+                _limit = DocumentSourceLimit::createFromBson( specElement, ctx() );
             }
             DocumentSource* limit() { return _limit.get(); }
         private:
@@ -369,7 +369,7 @@ namespace DocumentSourceTests {
                 BSONObj spec = BSON( "$match" << BSON( "a" << 1 ) );
                 BSONElement specElement = spec.firstElement();
                 intrusive_ptr<DocumentSource> match =
-                        DocumentSourceMatch::createFromBson( &specElement, ctx() );
+                        DocumentSourceMatch::createFromBson( specElement, ctx() );
                 match->setSource( source() );
 
                 createLimit( 1 );
@@ -414,7 +414,7 @@ namespace DocumentSourceTests {
                 expressionContext->inShard = inShard;
                 expressionContext->tempDir = storageGlobalParams.dbpath + "/_tmp";
 
-                _group = DocumentSourceGroup::createFromBson( &specElement, expressionContext );
+                _group = DocumentSourceGroup::createFromBson( specElement, expressionContext );
                 assertRoundTrips( _group );
                 _group->setSource( source() );
             }
@@ -434,7 +434,7 @@ namespace DocumentSourceTests {
                 BSONObj spec = toBson(group);
                 BSONElement specElement = spec.firstElement();
                 intrusive_ptr<DocumentSource> generated =
-                        DocumentSourceGroup::createFromBson( &specElement, ctx() );
+                        DocumentSourceGroup::createFromBson( specElement, ctx() );
                 ASSERT_EQUALS( spec, toBson( generated ) );
             }
             intrusive_ptr<DocumentSource> _group;
@@ -486,7 +486,7 @@ namespace DocumentSourceTests {
             void run() {
                 BSONObj spec = BSON( "$group" << "foo" );
                 BSONElement specElement = spec.firstElement();
-                ASSERT_THROWS( DocumentSourceGroup::createFromBson( &specElement, ctx() ),
+                ASSERT_THROWS( DocumentSourceGroup::createFromBson( specElement, ctx() ),
                                UserException );
             }
         };
@@ -817,7 +817,7 @@ namespace DocumentSourceTests {
                 BSONElement sourceDataElement = sourceData.firstElement();
                 // Create a source with synthetic data.
                 intrusive_ptr<DocumentSourceBsonArray> source =
-                        DocumentSourceBsonArray::create( &sourceDataElement, ctx() );
+                        DocumentSourceBsonArray::create( sourceDataElement.Obj(), ctx() );
                 // Create a group source.
                 createGroup( BSON( "_id" << "$x" << "list" << BSON( "$push" << "$y" ) ) );
                 // Create a merger version of the source.
@@ -892,7 +892,7 @@ namespace DocumentSourceTests {
             void createProject( const BSONObj& projection = BSON( "a" << true ) ) {
                 BSONObj spec = BSON( "$project" << projection );
                 BSONElement specElement = spec.firstElement();
-                _project = DocumentSourceProject::createFromBson( &specElement, ctx() );
+                _project = DocumentSourceProject::createFromBson( specElement, ctx() );
                 checkBsonRepresentation( spec );
                 _project->setSource( source() );
             }
@@ -954,7 +954,7 @@ namespace DocumentSourceTests {
             void run() {
                 BSONObj spec = BSON( "$project" << "foo" );
                 BSONElement specElement = spec.firstElement();
-                ASSERT_THROWS( DocumentSourceProject::createFromBson( &specElement, ctx() ),
+                ASSERT_THROWS( DocumentSourceProject::createFromBson( specElement, ctx() ),
                                UserException );
             }
         };
@@ -1038,7 +1038,7 @@ namespace DocumentSourceTests {
             void createSort( const BSONObj& sortKey = BSON( "a" << 1 ) ) {
                 BSONObj spec = BSON( "$sort" << sortKey );
                 BSONElement specElement = spec.firstElement();
-                _sort = DocumentSourceSort::createFromBson( &specElement, ctx() );
+                _sort = DocumentSourceSort::createFromBson( specElement, ctx() );
                 checkBsonRepresentation( spec );
                 _sort->setSource( source() );
             }
@@ -1097,7 +1097,7 @@ namespace DocumentSourceTests {
             intrusive_ptr<DocumentSource> mkLimit(int limit) {
                 BSONObj obj = BSON("$limit" << limit);
                 BSONElement e = obj.firstElement();
-                return mongo::DocumentSourceLimit::createFromBson(&e, ctx());
+                return mongo::DocumentSourceLimit::createFromBson(e, ctx());
             }
         };
 
@@ -1199,7 +1199,7 @@ namespace DocumentSourceTests {
             void run() {
                 BSONObj spec = BSON( "$sort" << 1 );
                 BSONElement specElement = spec.firstElement();
-                ASSERT_THROWS( DocumentSourceSort::createFromBson( &specElement, ctx() ),
+                ASSERT_THROWS( DocumentSourceSort::createFromBson( specElement, ctx() ),
                                UserException );
             }
         };
@@ -1370,7 +1370,7 @@ namespace DocumentSourceTests {
             void createUnwind( const string& unwindFieldPath = "$a" ) {
                 BSONObj spec = BSON( "$unwind" << unwindFieldPath );
                 BSONElement specElement = spec.firstElement();
-                _unwind = DocumentSourceUnwind::createFromBson( &specElement, ctx() );
+                _unwind = DocumentSourceUnwind::createFromBson( specElement, ctx() );
                 checkBsonRepresentation( spec );
                 _unwind->setSource( source() );
             }

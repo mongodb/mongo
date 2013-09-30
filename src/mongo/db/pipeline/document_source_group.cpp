@@ -211,16 +211,16 @@ namespace mongo {
     static const size_t NGroupOp = sizeof(GroupOpTable)/sizeof(GroupOpTable[0]);
 
     intrusive_ptr<DocumentSource> DocumentSourceGroup::createFromBson(
-        BSONElement *pBsonElement,
-        const intrusive_ptr<ExpressionContext> &pExpCtx) {
+            BSONElement elem,
+            const intrusive_ptr<ExpressionContext> &pExpCtx) {
         uassert(15947, "a group's fields must be specified in an object",
-                pBsonElement->type() == Object);
+                elem.type() == Object);
 
         intrusive_ptr<DocumentSourceGroup> pGroup(
             DocumentSourceGroup::create(pExpCtx));
         bool idSet = false;
 
-        BSONObj groupObj(pBsonElement->Obj());
+        BSONObj groupObj(elem.Obj());
         BSONObjIterator groupIterator(groupObj);
         while(groupIterator.more()) {
             BSONElement groupField(groupIterator.next());
@@ -238,10 +238,7 @@ namespace mongo {
                       group-by key.
                     */
                     Expression::ObjectCtx oCtx(Expression::ObjectCtx::DOCUMENT_OK);
-                    intrusive_ptr<Expression> pId(
-                        Expression::parseObject(&groupField, &oCtx));
-
-                    pGroup->setIdExpression(pId);
+                    pGroup->setIdExpression(Expression::parseObject(groupField.Obj(), &oCtx));
                     idSet = true;
                 }
                 else if (groupType == String) {
@@ -305,10 +302,8 @@ namespace mongo {
 
                     BSONType elementType = subElement.type();
                     if (elementType == Object) {
-                        Expression::ObjectCtx oCtx(
-                            Expression::ObjectCtx::DOCUMENT_OK);
-                        pGroupExpr = Expression::parseObject(
-                            &subElement, &oCtx);
+                        Expression::ObjectCtx oCtx(Expression::ObjectCtx::DOCUMENT_OK);
+                        pGroupExpr = Expression::parseObject(subElement.Obj(), &oCtx);
                     }
                     else if (elementType == Array) {
                         uasserted(15953, str::stream()

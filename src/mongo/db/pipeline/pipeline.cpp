@@ -60,7 +60,7 @@ namespace mongo {
     struct StageDesc {
         const char *pName;
         intrusive_ptr<DocumentSource> (*pFactory)(
-            BSONElement *, const intrusive_ptr<ExpressionContext> &);
+            BSONElement, const intrusive_ptr<ExpressionContext> &);
     };
 
     /* this table must be in alphabetical order by name for bsearch() */
@@ -189,7 +189,7 @@ namespace mongo {
             uassert(16436,
                     str::stream() << "Unrecognized pipeline stage name: '" << stageName << "'",
                     pDesc);
-            intrusive_ptr<DocumentSource> stage = (*pDesc->pFactory)(&stageSpec, pCtx);
+            intrusive_ptr<DocumentSource> stage = pDesc->pFactory(stageSpec, pCtx);
             verify(stage);
             stage->setPipelineStep(iStep);
             sources.push_back(stage);

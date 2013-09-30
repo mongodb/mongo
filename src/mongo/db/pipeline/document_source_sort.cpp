@@ -126,13 +126,13 @@ namespace mongo {
 
 
     intrusive_ptr<DocumentSource> DocumentSourceSort::createFromBson(
-        BSONElement *pBsonElement,
-        const intrusive_ptr<ExpressionContext> &pExpCtx) {
+            BSONElement elem,
+            const intrusive_ptr<ExpressionContext> &pExpCtx) {
         uassert(15973, str::stream() << " the " <<
                 sortName << " key specification must be an object",
-                pBsonElement->type() == Object);
+                elem.type() == Object);
 
-        return create(pExpCtx, pBsonElement->embeddedObject());
+        return create(pExpCtx, elem.embeddedObject());
 
     }
 

@@ -164,13 +164,13 @@ namespace mongo {
     {}
 
     intrusive_ptr<DocumentSource> DocumentSourceOut::createFromBson(
-            BSONElement *pBsonElement,
+            BSONElement elem,
             const intrusive_ptr<ExpressionContext> &pExpCtx) {
         uassert(16990, str::stream() << "$out only supports a string argument, not "
-                                     << typeName(pBsonElement->type()),
-                pBsonElement->type() == String);
+                                     << typeName(elem.type()),
+                elem.type() == String);
         
-        NamespaceString outputNs(pExpCtx->ns.db().toString() + '.' + pBsonElement->str());
+        NamespaceString outputNs(pExpCtx->ns.db().toString() + '.' + elem.str());
         return new DocumentSourceOut(outputNs, pExpCtx);
     }
 

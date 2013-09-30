@@ -142,15 +142,14 @@ namespace mongo {
         };
 
         /*
-          Parse a BSONElement Object.  The object could represent a functional
+          Parse BSON Object.  The object could represent a functional
           expression or a Document expression.
 
-          @param pBsonElement the element representing the object
+          @param obj the object to parse
           @param pCtx a MiniCtx representing the options above
           @returns the parsed Expression
          */
-        static intrusive_ptr<Expression> parseObject(
-            BSONElement *pBsonElement, ObjectCtx *pCtx);
+        static intrusive_ptr<Expression> parseObject(BSONObj obj, ObjectCtx *pCtx);
 
         /*
           Parse a BSONElement Object which has already been determined to be

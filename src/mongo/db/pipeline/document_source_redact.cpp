@@ -144,14 +144,14 @@ namespace mongo {
     }
 
     intrusive_ptr<DocumentSource> DocumentSourceRedact::createFromBson(
-            BSONElement* bsonElement,
+            BSONElement elem,
             const intrusive_ptr<ExpressionContext>& expCtx) {
         uassert(17054, str::stream() << redactName << " specification must be an object",
-                bsonElement->type() == Object);
+                elem.type() == Object);
 
         Expression::ObjectCtx oCtx(0);
 
-        intrusive_ptr<Expression> expression = Expression::parseObject(bsonElement, &oCtx);
+        intrusive_ptr<Expression> expression = Expression::parseObject(elem.Obj(), &oCtx);
 
         return new DocumentSourceRedact(expCtx, expression);
     }
