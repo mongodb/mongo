@@ -53,7 +53,7 @@
 
 namespace mongo {
 
-    using mongoutils::str::stream;
+    namespace str = mongoutils::str;
 
     static void addStatus(const Status& status, BSONObjBuilder& builder) {
         builder.append("ok", status.isOK() ? 1.0: 0.0);
@@ -87,15 +87,15 @@ namespace mongo {
     }
 
     // Should only be called inside the AuthzUpdateLock
-    static Status getBSONForRoleVectorIfRolesExist(const std::vector<RoleName>& roles,
-                                                   AuthorizationManager* authzManager,
-                                                   BSONArray* result) {
+    static Status rolesVectorToBSONArrayIfRolesExist(const std::vector<RoleName>& roles,
+                                                     AuthorizationManager* authzManager,
+                                                     BSONArray* result) {
         BSONArrayBuilder rolesArrayBuilder;
         for (std::vector<RoleName>::const_iterator it = roles.begin(); it != roles.end(); ++it) {
             const RoleName& role = *it;
             if (!authzManager->roleExists(role)) {
                 return Status(ErrorCodes::RoleNotFound,
-                              mongoutils::str::stream() << role.getFullName() <<
+                              str::stream() << role.getFullName() <<
                                       " does not name an existing role");
             }
             rolesArrayBuilder.append(BSON("name" << role.getRole() << "source" << role.getDB()));
@@ -114,7 +114,7 @@ namespace mongo {
             const User::RoleData& role = *it;
             if (!authzManager->roleExists(role.name)) {
                 return Status(ErrorCodes::RoleNotFound,
-                              mongoutils::str::stream() << it->name.getFullName() <<
+                              str::stream() << it->name.getFullName() <<
                                       " does not name an existing role");
             }
             if (!role.hasRole && !role.canDelegate) {
@@ -234,7 +234,7 @@ namespace mongo {
 
             BSONObjBuilder userObjBuilder;
             userObjBuilder.append("_id",
-                                  stream() << args.userName.getDB() << "." <<
+                                  str::stream() << args.userName.getDB() << "." <<
                                           args.userName.getUser());
             userObjBuilder.append(AuthorizationManager::USER_NAME_FIELD_NAME,
                                   args.userName.getUser());
@@ -459,7 +459,7 @@ namespace mongo {
 
             if (numUpdated == 0) {
                 addStatus(Status(ErrorCodes::UserNotFound,
-                                 mongoutils::str::stream() << "User '" << userName.getFullName() <<
+                                 str::stream() << "User '" << userName.getFullName() <<
                                          "' not found"),
                           result);
                 return false;
@@ -612,7 +612,7 @@ namespace mongo {
                 RoleName& roleName = *it;
                 if (!authzManager->roleExists(roleName)) {
                     addStatus(Status(ErrorCodes::RoleNotFound,
-                                     mongoutils::str::stream() << roleName.getFullName() <<
+                                     str::stream() << roleName.getFullName() <<
                                              " does not name an existing role"),
                               result);
                     return false;
@@ -710,7 +710,7 @@ namespace mongo {
                 RoleName& roleName = *it;
                 if (!authzManager->roleExists(roleName)) {
                     addStatus(Status(ErrorCodes::RoleNotFound,
-                                     mongoutils::str::stream() << roleName.getFullName() <<
+                                     str::stream() << roleName.getFullName() <<
                                              " does not name an existing role"),
                               result);
                     return false;
@@ -816,7 +816,7 @@ namespace mongo {
                 RoleName& roleName = *it;
                 if (!authzManager->roleExists(roleName)) {
                     addStatus(Status(ErrorCodes::RoleNotFound,
-                                     mongoutils::str::stream() << roleName.getFullName() <<
+                                     str::stream() << roleName.getFullName() <<
                                              " does not name an existing role"),
                               result);
                     return false;
@@ -915,7 +915,7 @@ namespace mongo {
                 RoleName& roleName = *it;
                 if (!authzManager->roleExists(roleName)) {
                     addStatus(Status(ErrorCodes::RoleNotFound,
-                                     mongoutils::str::stream() << roleName.getFullName() <<
+                                     str::stream() << roleName.getFullName() <<
                                              " does not name an existing role"),
                               result);
                     return false;
@@ -1089,7 +1089,7 @@ namespace mongo {
 
             BSONObjBuilder roleObjBuilder;
 
-            roleObjBuilder.append("_id", stream() << args.roleName.getDB() << "." <<
+            roleObjBuilder.append("_id", str::stream() << args.roleName.getDB() << "." <<
                                           args.roleName.getRole());
             roleObjBuilder.append(AuthorizationManager::ROLE_NAME_FIELD_NAME,
                                   args.roleName.getRole());
@@ -1114,7 +1114,7 @@ namespace mongo {
 
             // Role existence has to be checked after acquiring the update lock
             BSONArray roles;
-            status = getBSONForRoleVectorIfRolesExist(args.roles, authzManager, &roles);
+            status = rolesVectorToBSONArrayIfRolesExist(args.roles, authzManager, &roles);
             if (!status.isOK()) {
                 addStatus(status, result);
                 return false;
@@ -1131,10 +1131,107 @@ namespace mongo {
 
     } cmdCreateRole;
 
-    class CmdGrantPrivilegeToRole: public Command {
+    class CmdUpdateRole: public Command {
     public:
 
-        CmdGrantPrivilegeToRole() : Command("grantPrivilegesToRole") {}
+        CmdUpdateRole() : Command("updateRole") {}
+
+        virtual bool logTheOp() {
+            return false;
+        }
+
+        virtual bool slaveOk() const {
+            return false;
+        }
+
+        virtual LockType locktype() const {
+            return NONE;
+        }
+
+        virtual void help(stringstream& ss) const {
+            ss << "Used to update a role" << endl;
+        }
+
+        virtual void addRequiredPrivileges(const std::string& dbname,
+                                           const BSONObj& cmdObj,
+                                           std::vector<Privilege>* out) {
+            // TODO: update this with the new rules around user creation in 2.6.
+            ActionSet actions;
+            actions.addAction(ActionType::userAdmin);
+            out->push_back(Privilege(ResourcePattern::forDatabaseName(dbname), actions));
+        }
+
+        bool run(const string& dbname,
+                 BSONObj& cmdObj,
+                 int options,
+                 string& errmsg,
+                 BSONObjBuilder& result,
+                 bool fromRepl) {
+            auth::CreateOrUpdateRoleArgs args;
+            Status status = auth::parseCreateOrUpdateRoleCommands(cmdObj,
+                                                                  "createRole",
+                                                                  dbname,
+                                                                  &args);
+            if (!status.isOK()) {
+                addStatus(status, result);
+                return false;
+            }
+
+            if (!args.hasPrivileges && !args.hasRoles) {
+                addStatus(Status(ErrorCodes::BadValue,
+                                 "Must specify at least one field to update in updateRole"),
+                          result);
+                return false;
+            }
+
+            BSONObjBuilder updateSetBuilder;
+
+            if (args.hasPrivileges) {
+                BSONArray privileges;
+                status = privilegeVectorToBSONArray(args.privileges, &privileges);
+                if (!status.isOK()) {
+                    addStatus(status, result);
+                    return false;
+                }
+                updateSetBuilder.append("privileges", privileges);
+            }
+
+            AuthorizationManager* authzManager = getGlobalAuthorizationManager();
+            AuthzDocumentsUpdateGuard updateGuard(authzManager);
+            if (!updateGuard.tryLock("Update role")) {
+                addStatus(Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."),
+                          result);
+                return false;
+            }
+
+            // Role existence has to be checked after acquiring the update lock
+            if (args.hasRoles) {
+                BSONArray roles;
+                status = rolesVectorToBSONArrayIfRolesExist(args.roles, authzManager, &roles);
+                if (!status.isOK()) {
+                    addStatus(status, result);
+                    return false;
+                }
+
+                updateSetBuilder.append("roles", roles);
+            }
+
+            status = authzManager->updateRoleDocument(args.roleName,
+                                                      BSON("$set" << updateSetBuilder.done()),
+                                                      args.writeConcern);
+            if (!status.isOK()) {
+                addStatus(status, result);
+                return false;
+            }
+
+            return true;
+        }
+    } cmdUpdateRole;
+
+    class CmdGrantPrivilegesToRole: public Command {
+    public:
+
+        CmdGrantPrivilegesToRole() : Command("grantPrivilegesToRole") {}
 
         virtual bool logTheOp() {
             return false;
@@ -1192,7 +1289,7 @@ namespace mongo {
 
             if (!authzManager->roleExists(roleName)) {
                 addStatus(Status(ErrorCodes::RoleNotFound,
-                                 mongoutils::str::stream() << roleName.getFullName() <<
+                                 str::stream() << roleName.getFullName() <<
                                          " does not name an existing role"),
                           result);
                 return false;
@@ -1200,7 +1297,7 @@ namespace mongo {
 
             if (authzManager->isBuiltinRole(roleName)) {
                 addStatus(Status(ErrorCodes::InvalidRoleModification,
-                                 mongoutils::str::stream() << roleName.getFullName() <<
+                                 str::stream() << roleName.getFullName() <<
                                          " is a built-in role and cannot be modified."),
                           result);
                 return false;
@@ -1247,6 +1344,501 @@ namespace mongo {
         }
 
     } cmdGrantPrivilegesToRole;
+
+    class CmdRevokePrivilegesFromRole: public Command {
+    public:
+
+        CmdRevokePrivilegesFromRole() : Command("revokePrivilegesFromRole") {}
+
+        virtual bool logTheOp() {
+            return false;
+        }
+
+        virtual bool slaveOk() const {
+            return false;
+        }
+
+        virtual LockType locktype() const {
+            return NONE;
+        }
+
+        virtual void help(stringstream& ss) const {
+            ss << "Revokes privileges from a role" << endl;
+        }
+
+        virtual void addRequiredPrivileges(const std::string& dbname,
+                                           const BSONObj& cmdObj,
+                                           std::vector<Privilege>* out) {
+            // TODO: update this with the new rules around user creation in 2.6.
+            ActionSet actions;
+            actions.addAction(ActionType::userAdmin);
+            out->push_back(Privilege(ResourcePattern::forDatabaseName(dbname), actions));
+        }
+
+        bool run(const string& dbname,
+                 BSONObj& cmdObj,
+                 int options,
+                 string& errmsg,
+                 BSONObjBuilder& result,
+                 bool fromRepl) {
+            AuthorizationManager* authzManager = getGlobalAuthorizationManager();
+            AuthzDocumentsUpdateGuard updateGuard(authzManager);
+            if (!updateGuard.tryLock("Revoke privileges from role")) {
+                addStatus(Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."),
+                          result);
+                return false;
+            }
+
+            RoleName roleName;
+            PrivilegeVector privilegesToRemove;
+            BSONObj writeConcern;
+            Status status = auth::parseAndValidateRolePrivilegeManipulationCommands(
+                    cmdObj,
+                    "revokePrivilegesFromRole",
+                    dbname,
+                    &roleName,
+                    &privilegesToRemove,
+                    &writeConcern);
+            if (!status.isOK()) {
+                addStatus(status, result);
+                return false;
+            }
+
+            if (!authzManager->roleExists(roleName)) {
+                addStatus(Status(ErrorCodes::RoleNotFound,
+                                 str::stream() << roleName.getFullName() <<
+                                         " does not name an existing role"),
+                          result);
+                return false;
+            }
+
+            if (authzManager->isBuiltinRole(roleName)) {
+                addStatus(Status(ErrorCodes::InvalidRoleModification,
+                                 str::stream() << roleName.getFullName() <<
+                                         " is a built-in role and cannot be modified."),
+                          result);
+                return false;
+            }
+
+            PrivilegeVector privileges = authzManager->getDirectPrivilegesForRole(roleName);
+            for (PrivilegeVector::iterator itToRm = privilegesToRemove.begin();
+                    itToRm != privilegesToRemove.end(); ++itToRm) {
+                for (PrivilegeVector::iterator curIt = privileges.begin();
+                        curIt != privileges.end(); ++curIt) {
+                    if (curIt->getResourcePattern() == itToRm->getResourcePattern()) {
+                        curIt->removeActions(itToRm->getActions());
+                        if (curIt->getActions().empty()) {
+                            privileges.erase(curIt);
+                        }
+                        break;
+                    }
+                }
+            }
+
+            // Build up update modifier object to $set privileges.
+            mutablebson::Document updateObj;
+            mutablebson::Element setElement = updateObj.makeElementObject("$set");
+            status = updateObj.root().pushBack(setElement);
+            if (!status.isOK()) {
+                addStatus(status, result);
+                return false;
+            }
+            mutablebson::Element privilegesElement = updateObj.makeElementArray("privileges");
+            status = setElement.pushBack(privilegesElement);
+            if (!status.isOK()) {
+                addStatus(status, result);
+                return false;
+            }
+            status = authzManager->getBSONForPrivileges(privileges, privilegesElement);
+            if (!status.isOK()) {
+                addStatus(status, result);
+                return false;
+            }
+
+            BSONObjBuilder updateBSONBuilder;
+            updateObj.writeTo(&updateBSONBuilder);
+            status = authzManager->updateRoleDocument(
+                    roleName,
+                    updateBSONBuilder.done(),
+                    writeConcern);
+            if (!status.isOK()) {
+                addStatus(status, result);
+                return false;
+            }
+
+            return true;
+        }
+
+    } cmdRevokePrivilegesFromRole;
+
+    class CmdGrantRolesToRole: public Command {
+    public:
+
+        CmdGrantRolesToRole() : Command("grantRolesToRole") {}
+
+        virtual bool logTheOp() {
+            return false;
+        }
+
+        virtual bool slaveOk() const {
+            return false;
+        }
+
+        virtual LockType locktype() const {
+            return NONE;
+        }
+
+        virtual void help(stringstream& ss) const {
+            ss << "Grants roles to another role." << endl;
+        }
+
+        virtual void addRequiredPrivileges(const std::string& dbname,
+                                           const BSONObj& cmdObj,
+                                           std::vector<Privilege>* out) {
+            // TODO: update this with the new rules around user creation in 2.6.
+            ActionSet actions;
+            actions.addAction(ActionType::userAdmin);
+            out->push_back(Privilege(ResourcePattern::forDatabaseName(dbname), actions));
+        }
+
+        bool run(const string& dbname,
+                 BSONObj& cmdObj,
+                 int options,
+                 string& errmsg,
+                 BSONObjBuilder& result,
+                 bool fromRepl) {
+            AuthorizationManager* authzManager = getGlobalAuthorizationManager();
+            AuthzDocumentsUpdateGuard updateGuard(authzManager);
+            if (!updateGuard.tryLock("Grant roles to role")) {
+                addStatus(Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."),
+                          result);
+                return false;
+            }
+
+            std::string roleNameString;
+            std::vector<RoleName> rolesToAdd;
+            BSONObj writeConcern;
+            Status status = auth::parseRolePossessionManipulationCommands(cmdObj,
+                                                                          "grantRolesToRole",
+                                                                          "grantedRoles",
+                                                                          dbname,
+                                                                          &roleNameString,
+                                                                          &rolesToAdd,
+                                                                          &writeConcern);
+            if (!status.isOK()) {
+                addStatus(status, result);
+                return false;
+            }
+
+            RoleName roleName(roleNameString, dbname);
+            if (!authzManager->roleExists(roleName)) {
+                addStatus(Status(ErrorCodes::RoleNotFound,
+                                 str::stream() << roleName.getFullName() <<
+                                         " does not name an existing role"),
+                          result);
+                return false;
+            }
+
+            if (authzManager->isBuiltinRole(roleName)) {
+                addStatus(Status(ErrorCodes::InvalidRoleModification,
+                                 str::stream() << roleName.getFullName() <<
+                                         " is a built-in role and cannot be modified."),
+                          result);
+                return false;
+            }
+
+            // TODO(spencer): Make sure that this update doesn't introduce a cycle
+            std::vector<RoleName> roles = authzManager->getSubordinateRolesForRole(roleName);
+            for (vector<RoleName>::iterator it = rolesToAdd.begin(); it != rolesToAdd.end(); ++it) {
+                RoleName& roleToAdd = *it;
+                if (std::find(roles.begin(), roles.end(), roleToAdd) == roles.end()) {
+                    // Only add role if it's not already present
+                    roles.push_back(roleToAdd);
+                }
+            }
+
+            BSONArray newRolesBSONArray;
+            status = rolesVectorToBSONArrayIfRolesExist(roles,
+                                                        authzManager,
+                                                        &newRolesBSONArray);
+            if (!status.isOK()) {
+                addStatus(status, result);
+                return false;
+            }
+            status = authzManager->updateRoleDocument(
+                    roleName, BSON("$set" << BSON("roles" << newRolesBSONArray)), writeConcern);
+            if (!status.isOK()) {
+                addStatus(status, result);
+                return false;
+            }
+            return true;
+        }
+
+    } cmdGrantRolesToRole;
+
+    class CmdRevokeRolesFromRole: public Command {
+    public:
+
+        CmdRevokeRolesFromRole() : Command("revokeRolesFromRole") {}
+
+        virtual bool logTheOp() {
+            return false;
+        }
+
+        virtual bool slaveOk() const {
+            return false;
+        }
+
+        virtual LockType locktype() const {
+            return NONE;
+        }
+
+        virtual void help(stringstream& ss) const {
+            ss << "Revokes roles from another role." << endl;
+        }
+
+        virtual void addRequiredPrivileges(const std::string& dbname,
+                                           const BSONObj& cmdObj,
+                                           std::vector<Privilege>* out) {
+            // TODO: update this with the new rules around user creation in 2.6.
+            ActionSet actions;
+            actions.addAction(ActionType::userAdmin);
+            out->push_back(Privilege(ResourcePattern::forDatabaseName(dbname), actions));
+        }
+
+        bool run(const string& dbname,
+                 BSONObj& cmdObj,
+                 int options,
+                 string& errmsg,
+                 BSONObjBuilder& result,
+                 bool fromRepl) {
+            AuthorizationManager* authzManager = getGlobalAuthorizationManager();
+            AuthzDocumentsUpdateGuard updateGuard(authzManager);
+            if (!updateGuard.tryLock("Revoke roles from role")) {
+                addStatus(Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."),
+                          result);
+                return false;
+            }
+
+            std::string roleNameString;
+            std::vector<RoleName> rolesToRemove;
+            BSONObj writeConcern;
+            Status status = auth::parseRolePossessionManipulationCommands(cmdObj,
+                                                                          "revokeRolesFromRole",
+                                                                          "revokedRoles",
+                                                                          dbname,
+                                                                          &roleNameString,
+                                                                          &rolesToRemove,
+                                                                          &writeConcern);
+            if (!status.isOK()) {
+                addStatus(status, result);
+                return false;
+            }
+
+            RoleName roleName(roleNameString, dbname);
+            if (!authzManager->roleExists(roleName)) {
+                addStatus(Status(ErrorCodes::RoleNotFound,
+                                 str::stream() << roleName.getFullName() <<
+                                         " does not name an existing role"),
+                          result);
+                return false;
+            }
+
+            if (authzManager->isBuiltinRole(roleName)) {
+                addStatus(Status(ErrorCodes::InvalidRoleModification,
+                                 str::stream() << roleName.getFullName() <<
+                                         " is a built-in role and cannot be modified."),
+                          result);
+                return false;
+            }
+
+            std::vector<RoleName> roles = authzManager->getSubordinateRolesForRole(roleName);
+            for (vector<RoleName>::iterator it = rolesToRemove.begin();
+                    it != rolesToRemove.end(); ++it) {
+                vector<RoleName>::iterator itToRm = std::find(roles.begin(), roles.end(), *it);
+                if (itToRm != roles.end()) {
+                    roles.erase(itToRm);
+                }
+            }
+
+            BSONArray newRolesBSONArray;
+            status = rolesVectorToBSONArrayIfRolesExist(roles,
+                                                        authzManager,
+                                                        &newRolesBSONArray);
+            if (!status.isOK()) {
+                addStatus(status, result);
+                return false;
+            }
+            status = authzManager->updateRoleDocument(
+                    roleName, BSON("$set" << BSON("roles" << newRolesBSONArray)), writeConcern);
+            if (!status.isOK()) {
+                addStatus(status, result);
+                return false;
+            }
+            return true;
+        }
+
+    } cmdRevokeRolesFromRole;
+
+    class CmdRemoveRole: public Command {
+    public:
+
+        CmdRemoveRole() : Command("removeRole") {}
+
+        virtual bool logTheOp() {
+            return false;
+        }
+
+        virtual bool slaveOk() const {
+            return false;
+        }
+
+        virtual LockType locktype() const {
+            return NONE;
+        }
+
+        virtual void help(stringstream& ss) const {
+            ss << "Removes a single role.  Before deleting the role completely it must remove it "
+                  "from any users or roles that reference it.  If any errors occur in the middle "
+                  "of that process it's possible to be left in a state where the role has been "
+                  "removed from some user/roles but otherwise still exists."<< endl;
+        }
+
+        virtual void addRequiredPrivileges(const std::string& dbname,
+                                           const BSONObj& cmdObj,
+                                           std::vector<Privilege>* out) {
+            // TODO: update this with the new rules around user creation in 2.6.
+            ActionSet actions;
+            actions.addAction(ActionType::userAdmin);
+            out->push_back(Privilege(ResourcePattern::forDatabaseName(dbname), actions));
+        }
+
+        bool run(const string& dbname,
+                 BSONObj& cmdObj,
+                 int options,
+                 string& errmsg,
+                 BSONObjBuilder& result,
+                 bool fromRepl) {
+            AuthorizationManager* authzManager = getGlobalAuthorizationManager();
+            AuthzDocumentsUpdateGuard updateGuard(authzManager);
+            if (!updateGuard.tryLock("Remove role")) {
+                addStatus(Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."),
+                          result);
+                return false;
+            }
+
+            RoleName roleName;
+            BSONObj writeConcern;
+
+            Status status = auth::parseRemoveRoleCommand(cmdObj,
+                                                         dbname,
+                                                         &roleName,
+                                                         &writeConcern);
+            if (!status.isOK()) {
+                addStatus(status, result);
+                return false;
+            }
+
+            if (!authzManager->roleExists(roleName)) {
+                addStatus(Status(ErrorCodes::RoleNotFound,
+                                 str::stream() << roleName.getFullName() <<
+                                         " does not name an existing role"),
+                          result);
+                return false;
+            }
+
+            if (authzManager->isBuiltinRole(roleName)) {
+                addStatus(Status(ErrorCodes::InvalidRoleModification,
+                                 str::stream() << roleName.getFullName() <<
+                                         " is a built-in role and cannot be modified."),
+                          result);
+                return false;
+            }
+
+            // Remove this role from all users
+            int numUpdated;
+            status = authzManager->updateAuthzDocuments(
+                    NamespaceString("admin.system.users"),
+                    BSON("roles" << BSON("$elemMatch" <<
+                                         BSON(AuthorizationManager::ROLE_NAME_FIELD_NAME <<
+                                              roleName.getRole() <<
+                                              AuthorizationManager::ROLE_SOURCE_FIELD_NAME <<
+                                              roleName.getDB()))),
+                    BSON("$pull" << BSON("roles" <<
+                                         BSON(AuthorizationManager::ROLE_NAME_FIELD_NAME <<
+                                              roleName.getRole() <<
+                                              AuthorizationManager::ROLE_SOURCE_FIELD_NAME <<
+                                              roleName.getDB()))),
+                    false,
+                    true,
+                    writeConcern,
+                    &numUpdated);
+            if (!status.isOK()) {
+                ErrorCodes::Error code = status.code() == ErrorCodes::UnknownError ?
+                        ErrorCodes::UserModificationFailed : status.code();
+                addStatus(Status(code,
+                                 str::stream() << "Failed to remove role " << roleName.getFullName()
+                                         << " from all users: " << status.reason()),
+                          result);
+                return false;
+            }
+
+            // Remove this role from all other roles
+            status = authzManager->updateAuthzDocuments(
+                    NamespaceString("admin.system.roles"),
+                    BSON("roles" << BSON("$elemMatch" <<
+                                         BSON(AuthorizationManager::ROLE_NAME_FIELD_NAME <<
+                                              roleName.getRole() <<
+                                              AuthorizationManager::ROLE_SOURCE_FIELD_NAME <<
+                                              roleName.getDB()))),
+                    BSON("$pull" << BSON("roles" <<
+                                         BSON(AuthorizationManager::ROLE_NAME_FIELD_NAME <<
+                                              roleName.getRole() <<
+                                              AuthorizationManager::ROLE_SOURCE_FIELD_NAME <<
+                                              roleName.getDB()))),
+                    false,
+                    true,
+                    writeConcern,
+                    &numUpdated);
+            if (!status.isOK()) {
+                ErrorCodes::Error code = status.code() == ErrorCodes::UnknownError ?
+                        ErrorCodes::RoleModificationFailed : status.code();
+                addStatus(Status(code,
+                                 str::stream() << "Removed role " << roleName.getFullName() <<
+                                         " from all users but failed to remove from all roles: " <<
+                                         status.reason()),
+                          result);
+                return false;
+            }
+
+            // Finally, remove the actual role document
+            status = authzManager->removeRoleDocuments(
+                    BSON(AuthorizationManager::ROLE_NAME_FIELD_NAME << roleName.getRole() <<
+                         AuthorizationManager::ROLE_SOURCE_FIELD_NAME << roleName.getDB()),
+                    writeConcern,
+                    &numUpdated);
+            if (!status.isOK()) {
+                addStatus(Status(status.code(),
+                                 str::stream() << "Removed role " << roleName.getFullName() <<
+                                         " from all users and roles but failed to actually delete"
+                                         " the role itself: " <<  status.reason()),
+                          result);
+                return false;
+            }
+
+            dassert(numUpdated == 0 || numUpdated == 1);
+            if (numUpdated == 0) {
+                addStatus(Status(ErrorCodes::RoleNotFound,
+                                 str::stream() << "Role '" << roleName.getFullName() <<
+                                         "' not found"),
+                          result);
+                return false;
+            }
+
+            return true;
+        }
+
+    } cmdRemoveRole;
 
     class CmdRolesInfo: public Command {
     public:

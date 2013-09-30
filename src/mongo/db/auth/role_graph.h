@@ -71,22 +71,20 @@ namespace mongo {
         static void generateUniversalPrivileges(PrivilegeVector* privileges);
 
         /**
-         * Returns an iterator that can be used to get a list of the members of the given role.
+         * Returns a vector of the RoleNames of the "members" of the given role.
          * Members of a role are roles that have been granted this role directly (roles that are
          * members transitively through another role are not included).  These are the "parents" of
-         * this node in the graph. The iterator is valid until the next call to addRole or
-         * removeRole.
+         * this node in the graph.
          */
-        RoleNameIterator getDirectMembers(const RoleName& role);
+        const std::vector<RoleName>& getDirectMembers(const RoleName& role);
 
         /**
-         * Returns an iterator that can be used to get a list of "subordinate" roles of the given
-         * role.  Subordinate roles are the roles that this role has been granted directly (roles
+         * Returns a vector of the RoleNames of the "subordninates" of the given role.
+         * Subordinate roles are the roles that this role has been granted directly (roles
          * that have been granted transitively through another role are not included).  These are
-         * the "children" of this node in the graph. The iterator is valid until the next call to
-         * addRole or removeRole.
+         * the "children" of this node in the graph.
          */
-        RoleNameIterator getDirectSubordinates(const RoleName& role);
+        const std::vector<RoleName>& getDirectSubordinates(const RoleName& role);
 
         /**
          * Returns an iterator that can be used to get a full list of roles that this role inherits

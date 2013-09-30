@@ -39,9 +39,6 @@
 #include "mongo/db/jsobj.h"
 
 namespace mongo {
-
-    class AuthorizationManager;
-
 namespace auth {
 
     struct CreateOrUpdateUserArgs {
@@ -69,9 +66,11 @@ namespace auth {
 
     /**
      * Takes a command object describing an invocation of one of "grantRolesToUser",
-     * "revokeRolesFromUser", "grantDelegateRolesToUser", and "revokeDelegateRolesFromUser" (which
-     * command it is is specified in the "cmdName" argument), and parses out the user name of the
-     * user being modified, the roles being granted or revoked, and the write concern to use.
+     * "revokeRolesFromUser", "grantDelegateRolesToUser", "revokeDelegateRolesFromUser",
+     * "grantRolesToRole", and "revokeRolesFromRoles" (which command it is is specified in the
+     * "cmdName" argument), and parses out (into the parsedName out param) the user/role name of
+     * the user/roles being modified, the roles being granted or revoked, and the write concern to
+     * use.
      */
     Status parseRolePossessionManipulationCommands(const BSONObj& cmdObj,
                                                    const StringData& cmdName,
@@ -83,7 +82,7 @@ namespace auth {
 
     /**
      * Takes a command object describing an invocation of the "removeUser" command and parses out
-     * the userName of the user to be removed and the writeConcern.
+     * the UserName of the user to be removed and the writeConcern.
      * Also validates the input and returns a non-ok Status if there is anything wrong.
      */
     Status parseAndValidateRemoveUserCommand(const BSONObj& cmdObj,
@@ -143,6 +142,23 @@ namespace auth {
                                                              RoleName* parsedRoleName,
                                                              PrivilegeVector* parsedPrivileges,
                                                              BSONObj* parsedWriteConcern);
+
+    /**
+     * Takes a command object describing an invocation of the "removeRole" command and parses out
+     * the RoleName of the role to be removed and the writeConcern.
+     */
+    Status parseRemoveRoleCommand(const BSONObj& cmdObj,
+                                  const std::string& dbname,
+                                  RoleName* parsedRoleName,
+                                  BSONObj* parsedWriteConcern);
+
+    /**
+     * Takes a command object describing an invocation of the "removeRolesFromDatabase" command and
+     * parses out the write concern.
+     */
+    Status parseRemoveRolesFromDatabaseCommand(const BSONObj& cmdObj,
+                                               const std::string& dbname,
+                                               BSONObj* parsedWriteConcern);
 
 } // namespace auth
 } // namespace mongo

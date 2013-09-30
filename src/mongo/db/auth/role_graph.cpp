@@ -40,6 +40,7 @@ namespace mongo {
 
 namespace {
     PrivilegeVector emptyPrivilegeVector;
+    std::vector<RoleName> emptyRoleVector;
 
     // RoleNameIterator for iterating over an unordered_set of RoleNames.
     class RoleNameSetIterator : public RoleNameIterator::Impl {
@@ -75,6 +76,7 @@ namespace {
         unordered_set<RoleName>::const_iterator _begin;
         unordered_set<RoleName>::const_iterator _end;
     };
+
 } // namespace
 
     RoleGraph::RoleGraph() {};
@@ -180,11 +182,10 @@ namespace {
         return Status::OK();
     }
 
-    RoleNameIterator RoleGraph::getDirectSubordinates(const RoleName& role) {
+    const std::vector<RoleName>& RoleGraph::getDirectSubordinates(const RoleName& role) {
         if (!roleExists(role))
-            return RoleNameIterator(NULL);
-        const std::vector<RoleName>& edges = _roleToSubordinates.find(role)->second;
-        return RoleNameIterator(new RoleNameVectorIterator(edges.begin(), edges.end()));
+            return emptyRoleVector;
+        return _roleToSubordinates.find(role)->second;
     }
 
     RoleNameIterator RoleGraph::getIndirectSubordinates(const RoleName& role) {
@@ -194,11 +195,10 @@ namespace {
         return RoleNameIterator(new RoleNameSetIterator(subs.begin(), subs.end()));
     }
 
-    RoleNameIterator RoleGraph::getDirectMembers(const RoleName& role) {
+    const std::vector<RoleName>& RoleGraph::getDirectMembers(const RoleName& role) {
         if (!roleExists(role))
-            return RoleNameIterator(NULL);
-        const std::vector<RoleName>& edges = _roleToMembers.find(role)->second;
-        return RoleNameIterator(new RoleNameVectorIterator(edges.begin(), edges.end()));
+            return emptyRoleVector;
+        return _roleToMembers.find(role)->second;
     }
 
     const PrivilegeVector& RoleGraph::getDirectPrivileges(const RoleName& role) {

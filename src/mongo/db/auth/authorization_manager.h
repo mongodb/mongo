@@ -183,6 +183,29 @@ namespace mongo {
                                   const BSONObj& writeConcern) const;
 
         /**
+         * Updates documents matching "query" according to "updatePattern" in "collectionName".
+         * Should only be called on collections with authorization documents in them
+         * (ie admin.system.users and admin.system.roles).
+         */
+        Status updateAuthzDocuments(const NamespaceString& collectionName,
+                                    const BSONObj& query,
+                                    const BSONObj& updatePattern,
+                                    bool upsert,
+                                    bool multi,
+                                    const BSONObj& writeConcern,
+                                    int* numUpdated) const;
+
+        /*
+         * Removes roles matching the given query.
+         * Writes into *numRemoved the number of role documents that were modified.
+         * 'writeConcern' contains the arguments to be passed to getLastError to block for
+         * successful completion of the write.
+         */
+        Status removeRoleDocuments(const BSONObj& query,
+                                   const BSONObj& writeConcern,
+                                   int* numRemoved) const;
+
+        /**
          * Finds all documents matching "query" in "collectionName".  For each document returned,
          * calls the function resultProcessor on it.
          * Should only be called on collections with authorization documents in them
@@ -255,6 +278,11 @@ namespace mongo {
          * Returns the direct privileges for the given role.
          */
         PrivilegeVector getDirectPrivilegesForRole(const RoleName& role);
+
+        /**
+         * Returns the direct subordinate roles of the given role.
+         */
+        std::vector<RoleName> getSubordinateRolesForRole(const RoleName& role);
 
         /**
          * Initializes the authorization manager.  Depending on what version the authorization
