@@ -33,10 +33,14 @@
 namespace mongo {
 namespace modifiertable {
 
+    // NOTE: Please update jstests/verify_update_mods.js or include a jstest for any new mods
     enum ModifierType {
         MOD_ADD_TO_SET,
         MOD_BIT,
+        MOD_CURRENTDATE,
         MOD_INC,
+        MOD_MAX,
+        MOD_MIN,
         MOD_MUL,
         MOD_POP,
         MOD_PULL,
