@@ -189,7 +189,7 @@ struct __wt_page_modify {
 	 */
 	uint64_t disk_snap_min;
 
-	/* The largest transaction ID written to disk, for clean pages. */
+	/* The largest transaction ID written to disk for the page. */
 	uint64_t disk_txn;
 
 	/*
@@ -233,6 +233,13 @@ struct __wt_page_modify {
 	 * 4B types will always be backed by atomic writes to memory.
 	 */
 	uint32_t write_gen;
+
+	/*
+	 * When a page transitions to/from clean/dirty, the cache's dirty-byte
+	 * count is updated.  This field tracks the last such value to ensure
+	 * the increment/decrement pairs match.
+	 */
+	uint32_t last_memory_footprint;
 
 #define	WT_PM_REC_EMPTY		0x01	/* Reconciliation: page empty */
 #define	WT_PM_REC_REPLACE	0x02	/* Reconciliation: page replaced */

@@ -3708,8 +3708,8 @@ static int
 __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 {
 	WT_BM *bm;
-	WT_BTREE *btree;
 	WT_BOUNDARY *bnd;
+	WT_BTREE *btree;
 	WT_PAGE_MODIFY *mod;
 	WT_REF *ref;
 	uint32_t size;
@@ -3914,6 +3914,16 @@ err:			__wt_scr_free(&tkey);
 		break;
 	}
 
+	/* Record the most recent transaction ID we have *not* written. */
+	mod->disk_snap_min = session->txn.snap_min;
+
+	/*
+	 * If modifications were not skipped, we have a new maximum transaction
+	 * written for the page (used to decide if a clean page can be evicted).
+	 */
+	if (!r->upd_skipped)
+		mod->disk_txn = r->max_txn;
+
 	/*
 	 * Success.
 	 *
@@ -3930,31 +3940,22 @@ err:			__wt_scr_free(&tkey);
 
 	/*
 	 * If modifications were not skipped, the page might be clean; if the
-	 * write generation is unchanged, clear it and update cache information.
+	 * write generation is unchanged, clear it.
+	 *
+	 * Update the cache's dirty-bytes information: every time a page goes
+	 * to/from clean/dirty, we increment/decrement the cache's dirty byte
+	 * count.  The actual page footprint isn't latched, so we have to save
+	 * a copy of the value by which we incremented/decremented so the same
+	 * amount is incremented/decremented as the page transitions.  However,
+	 * that means our increment/decrement count is potentially off by some
+	 * amount as the page size changes.  Update the increment/decrement as
+	 * part of reconciliation, regardless of the page becoming clean, so we
+	 * don't fall too far behind reality.
 	 */
-	if (!r->upd_skipped) {
-		mod->disk_txn = r->max_txn;
-
-		/*
-		 * !!!
-		 * This code has a bug: the idea is to read the memory footprint
-		 * before attempting to "clean" the page, which is safe because
-		 * the atomic compare-and-swap is a read barrier so the read of
-		 * the memory footprint precedes the update of the page's write
-		 * generation.   Since it is possible to decrement the footprint
-		 * of the page without making the page "dirty" (for example
-		 * when freeing an obsolete update list), the footprint could
-		 * be decremented between read and swap, and we might attempt to
-		 * decrement more than the bytes held by the page.   Unlikely,
-		 * but technically possible.
-		 */
-		size = page->memory_footprint;
-		if (WT_ATOMIC_CAS(mod->write_gen, r->orig_write_gen, 0))
-			__wt_cache_dirty_decr(session, size);
-	}
-
-	/* Record the most recent transaction ID we have *not* written. */
-	mod->disk_snap_min = session->txn.snap_min;
+	__wt_cache_dirty_decr(session, page);
+	if (r->upd_skipped ||
+	    !WT_ATOMIC_CAS(mod->write_gen, r->orig_write_gen, 0))
+		__wt_cache_dirty_incr(session, page);
 
 	return (0);
 }
