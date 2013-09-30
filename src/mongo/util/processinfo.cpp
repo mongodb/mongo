@@ -38,7 +38,7 @@ namespace mongo {
             path = p;
             ofstream out( path.c_str() , ios_base::out );
             out << ProcessId::getCurrent() << endl;
-            return out;
+            return out.good();
         }
 
         string path;
