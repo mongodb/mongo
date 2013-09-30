@@ -35,6 +35,8 @@
 #include "mongo/base/status.h"
 #include "mongo/db/ops/modifier_add_to_set.h"
 #include "mongo/db/ops/modifier_bit.h"
+#include "mongo/db/ops/modifier_compare.h"
+#include "mongo/db/ops/modifier_current_date.h"
 #include "mongo/db/ops/modifier_inc.h"
 #include "mongo/db/ops/modifier_pop.h"
 #include "mongo/db/ops/modifier_pull.h"
@@ -71,8 +73,17 @@ namespace modifiertable {
             ModifierEntry* entryBit = new ModifierEntry("$bit", MOD_BIT);
             nameMap->insert(make_pair(StringData(entryBit->name), entryBit));
 
+            ModifierEntry* entryCurrentDate = new ModifierEntry("$currentDate", MOD_CURRENTDATE);
+            nameMap->insert(make_pair(StringData(entryCurrentDate->name), entryCurrentDate));
+
             ModifierEntry* entryInc = new ModifierEntry("$inc", MOD_INC);
             nameMap->insert(make_pair(StringData(entryInc->name), entryInc));
+
+            ModifierEntry* entryMax = new ModifierEntry("$max", MOD_MAX);
+            nameMap->insert(make_pair(StringData(entryMax->name), entryMax));
+
+            ModifierEntry* entryMin = new ModifierEntry("$min", MOD_MIN);
+            nameMap->insert(make_pair(StringData(entryMin->name), entryMin));
 
             ModifierEntry* entryMul = new ModifierEntry("$mul", MOD_MUL);
             nameMap->insert(make_pair(StringData(entryMul->name), entryMul));
@@ -128,8 +139,14 @@ namespace modifiertable {
             return new ModifierAddToSet;
         case MOD_BIT:
             return new ModifierBit;
+        case MOD_CURRENTDATE:
+            return new ModifierCurrentDate;
         case MOD_INC:
             return new ModifierInc(ModifierInc::MODE_INC);
+        case MOD_MAX:
+            return new ModifierCompare(ModifierCompare::MAX);
+        case MOD_MIN:
+            return new ModifierCompare(ModifierCompare::MIN);
         case MOD_MUL:
             return new ModifierInc(ModifierInc::MODE_MUL);
         case MOD_POP:
