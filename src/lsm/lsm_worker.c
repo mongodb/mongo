@@ -27,7 +27,7 @@ __lsm_copy_chunks(WT_SESSION_IMPL *session,
 	/* Always return zero chunks on error. */
 	cookie->nchunks = 0;
 
-	WT_RET(__wt_readlock(session, lsm_tree->rwlock));
+	WT_RET(__wt_writelock(session, lsm_tree->rwlock));
 	if (!F_ISSET(lsm_tree, WT_LSM_TREE_WORKING))
 		return (__wt_rwunlock(session, lsm_tree->rwlock));
 
@@ -68,12 +68,14 @@ err:	WT_TRET(__wt_rwunlock(session, lsm_tree->rwlock));
  *	chunks to be considered for deletion.
  */
 static void
-__lsm_unpin_chunks(WT_LSM_WORKER_COOKIE *cookie)
+__lsm_unpin_chunks(WT_SESSION_IMPL *session, WT_LSM_WORKER_COOKIE *cookie)
 {
 	u_int i;
 
-	for (i = 0; i < cookie->nchunks; i++)
+	for (i = 0; i < cookie->nchunks; i++) {
+		WT_ASSERT(session, cookie->chunk_array[i] > 0);
 		cookie->chunk_array[i]->refcnt--;
+	}
 }
 
 /*
@@ -211,13 +213,17 @@ __wt_lsm_bloom_worker(void *arg)
 				break;
 			++j;
 		}
-		__lsm_unpin_chunks(&cookie);
+		WT_ERR(__wt_writelock(session, lsm_tree->rwlock));
+		__lsm_unpin_chunks(session, &cookie);
+		WT_TRET(__wt_rwunlock(session, lsm_tree->rwlock));
 		if (j == 0 && F_ISSET(lsm_tree, WT_LSM_TREE_WORKING))
 			WT_ERR(__wt_cond_wait(
 			    session, lsm_tree->work_cond, 100000));
 	}
 
-err:	__lsm_unpin_chunks(&cookie);
+err:	WT_TRET(__wt_writelock(session, lsm_tree->rwlock));
+	__lsm_unpin_chunks(session, &cookie);
+	WT_TRET(__wt_rwunlock(session, lsm_tree->rwlock));
 	__wt_free(session, cookie.chunk_array);
 	/*
 	 * The thread will only exit with failure if we run out of memory or
@@ -356,13 +362,17 @@ __wt_lsm_checkpoint_worker(void *arg)
 			WT_VERBOSE_ERR(session, lsm,
 			     "LSM worker checkpointed %u", i);
 		}
-		__lsm_unpin_chunks(&cookie);
+		WT_ERR(__wt_writelock(session, lsm_tree->rwlock));
+		__lsm_unpin_chunks(session, &cookie);
+		WT_ERR(__wt_rwunlock(session, lsm_tree->rwlock));
 		if (j == 0 && F_ISSET(lsm_tree, WT_LSM_TREE_WORKING) &&
 		    !F_ISSET(lsm_tree, WT_LSM_TREE_NEED_SWITCH))
 			WT_ERR(__wt_cond_wait(
 			    session, lsm_tree->work_cond, 100000));
 	}
-err:	__lsm_unpin_chunks(&cookie);
+err:	WT_ERR(__wt_writelock(session, lsm_tree->rwlock));
+	__lsm_unpin_chunks(session, &cookie);
+	WT_TRET(__wt_rwunlock(session, lsm_tree->rwlock));
 	__wt_free(session, cookie.chunk_array);
 	/*
 	 * The thread will only exit with failure if we run out of memory or
@@ -624,8 +634,10 @@ __lsm_free_chunks(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 		}
 		WT_ERR(__wt_rwunlock(session, lsm_tree->rwlock));
 	}
-
-err:	__lsm_unpin_chunks(&cookie);
+err:
+	WT_TRET(__wt_writelock(session, lsm_tree->rwlock));
+	__lsm_unpin_chunks(session, &cookie);
+	WT_TRET(__wt_rwunlock(session, lsm_tree->rwlock));
 	__wt_free(session, cookie.chunk_array);
 	if (progress)
 		WT_TRET(__wt_lsm_meta_write(session, lsm_tree));
