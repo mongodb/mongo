@@ -491,25 +491,27 @@ namespace auth {
         return Status::OK();
     }
 
-    Status parseAndValidateUsersInfoCommand(const BSONObj& cmdObj,
-                                            const std::string& dbname,
-                                            bool* parsedAnyDB,
-                                            BSONElement* parsedUsersFilter) {
+    Status parseAndValidateInfoCommands(const BSONObj& cmdObj,
+                                        const StringData& cmdName,
+                                        const std::string& dbname,
+                                        bool* parsedAnyDB,
+                                        BSONElement* parsedNameFilter) {
         unordered_set<std::string> validFieldNames;
-        validFieldNames.insert("usersInfo");
+        validFieldNames.insert(cmdName.toString());
         validFieldNames.insert("anyDB");
         validFieldNames.insert("writeConcern");
 
-        Status status = _checkNoExtraFields(cmdObj, "usersInfo", validFieldNames);
+        Status status = _checkNoExtraFields(cmdObj, cmdName, validFieldNames);
         if (!status.isOK()) {
             return status;
         }
 
-        if (cmdObj["usersInfo"].type() != String && cmdObj["usersInfo"].type() != RegEx) {
+        if (cmdObj[cmdName].type() != String && cmdObj[cmdName].type() != RegEx) {
             return Status(ErrorCodes::BadValue,
-                          "Argument to userInfo command must be either a string or a regex");
+                          mongoutils::str::stream() << "Argument to \"" << cmdName <<
+                                  "\"command must be either a string or a regex");
         }
-        *parsedUsersFilter = cmdObj["usersInfo"];
+        *parsedNameFilter = cmdObj[cmdName];
 
 
         bool anyDB = false;
@@ -521,8 +523,8 @@ namespace auth {
                 }
             } else {
                 return Status(ErrorCodes::BadValue,
-                              "\"anyDB\" argument to usersInfo command is only valid when "
-                                      "run on the \"admin\" database");
+                              mongoutils::str::stream() << "\"anyDB\" argument to \"" << cmdName <<
+                                      "\"command is only valid when run on the \"admin\" database");
             }
         }
         *parsedAnyDB = anyDB;

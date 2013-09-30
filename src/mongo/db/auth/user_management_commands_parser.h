@@ -103,14 +103,16 @@ namespace auth {
                                                           BSONObj* parsedWriteConcern);
 
     /**
-     * Takes a command object describing an invocation of the "usersInfo" command and parses out
-     * a BSONElement with the user name filter to be applied, as well as the anyDB boolean.
+     * Takes a command object describing an invocation of the "usersInfo" or "rolesInfo" commands
+     * (which command it is is specified in the "cmdName" argument) and parses out a BSONElement
+     * with the user/role name filter to be applied, as well as the anyDB boolean.
      * Also validates the input and returns a non-ok Status if there is anything wrong.
      */
-    Status parseAndValidateUsersInfoCommand(const BSONObj& cmdObj,
-                                            const std::string& dbname,
-                                            bool* parsedAnyDb,
-                                            BSONElement* parsedUserNameFilter);
+    Status parseAndValidateInfoCommands(const BSONObj& cmdObj,
+                                        const StringData& cmdName,
+                                        const std::string& dbname,
+                                        bool* parsedAnyDb,
+                                        BSONElement* parsedNameFilter);
     /**
      * Takes a command object describing an invocation of the "createRole" command on the database
      * "dbname", and returns (via the output param "parsedRoleObj") a role object that can be
