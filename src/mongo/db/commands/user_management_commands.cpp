@@ -809,10 +809,11 @@ namespace mongo {
 
             bool anyDB = false;
             BSONElement usersFilter;
-            Status status = auth::parseAndValidateUsersInfoCommand(cmdObj,
-                                                                   dbname,
-                                                                   &anyDB,
-                                                                   &usersFilter);
+            Status status = auth::parseAndValidateInfoCommands(cmdObj,
+                                                               "usersInfo",
+                                                               dbname,
+                                                               &anyDB,
+                                                               &usersFilter);
             if (!status.isOK()) {
                 addStatus(status, result);
                 return false;
@@ -1022,4 +1023,75 @@ namespace mongo {
         }
 
     } cmdGrantPrivilegeToRole;
+
+    class CmdRolesInfo: public Command {
+    public:
+
+        virtual bool logTheOp() {
+            return false;
+        }
+
+        virtual bool slaveOk() const {
+            return true;
+        }
+
+        virtual LockType locktype() const {
+            return NONE;
+        }
+
+        CmdRolesInfo() : Command("rolesInfo") {}
+
+        virtual void help(stringstream& ss) const {
+            ss << "Returns information about roles." << endl;
+        }
+
+        virtual void addRequiredPrivileges(const std::string& dbname,
+                                           const BSONObj& cmdObj,
+                                           std::vector<Privilege>* out) {
+            // TODO: update this with the new rules around user creation in 2.6.
+            ActionSet actions;
+            actions.addAction(ActionType::userAdmin);
+            out->push_back(Privilege(ResourcePattern::forDatabaseName(dbname), actions));
+        }
+
+        bool run(const string& dbname,
+                 BSONObj& cmdObj,
+                 int options,
+                 string& errmsg,
+                 BSONObjBuilder& result,
+                 bool fromRepl) {
+
+            bool anyDB = false;
+            BSONElement rolesFilter;
+            Status status = auth::parseAndValidateInfoCommands(cmdObj,
+                                                               "rolesInfo",
+                                                               dbname,
+                                                               &anyDB,
+                                                               &rolesFilter);
+            if (!status.isOK()) {
+                addStatus(status, result);
+                return false;
+            }
+
+            BSONObjBuilder queryBuilder;
+            queryBuilder.appendAs(rolesFilter, "name");
+            if (!anyDB) {
+                queryBuilder.append("source", dbname);
+            }
+
+            BSONArrayBuilder rolesArrayBuilder;
+            BSONArrayBuilder& (BSONArrayBuilder::* appendBSONObj) (const BSONObj&) =
+                    &BSONArrayBuilder::append<BSONObj>;
+            const boost::function<void(const BSONObj&)> function =
+                    boost::bind(appendBSONObj, &rolesArrayBuilder, _1);
+            AuthorizationManager* authzManager = getGlobalAuthorizationManager();
+            authzManager->queryAuthzDocument(NamespaceString("admin.system.roles"),
+                                             queryBuilder.done(),
+                                             function);
+
+            result.append("roles", rolesArrayBuilder.arr());
+            return true;
+        }
+
+    } cmdRolesInfo;
 }
