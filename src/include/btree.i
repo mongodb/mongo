@@ -167,17 +167,7 @@ __wt_cache_read_gen_set(WT_SESSION_IMPL *session)
 static inline uint64_t
 __wt_cache_pages_inuse(WT_CACHE *cache)
 {
-	uint64_t pages_in, pages_out;
-
-	/*
-	 * Reading 64-bit fields, potentially on 32-bit machines, and other
-	 * threads of control may be modifying them.  Check them for sanity
-	 * (although "interesting" corruption is vanishingly unlikely, these
-	 * values just increment over time).
-	 */
-	pages_in = cache->pages_inmem;
-	pages_out = cache->pages_evict;
-	return (pages_in > pages_out ? pages_in - pages_out : 0);
+	return (cache->pages_inmem - cache->pages_evict);
 }
 
 /*
@@ -187,37 +177,7 @@ __wt_cache_pages_inuse(WT_CACHE *cache)
 static inline uint64_t
 __wt_cache_bytes_inuse(WT_CACHE *cache)
 {
-	uint64_t bytes_in, bytes_out;
-
-	/*
-	 * Reading 64-bit fields, potentially on 32-bit machines, and other
-	 * threads of control may be modifying them.  Check them for sanity
-	 * (although "interesting" corruption is vanishingly unlikely, these
-	 * values just increment over time).
-	 */
-	bytes_in = cache->bytes_inmem;
-	bytes_out = cache->bytes_evict;
-	return (bytes_in > bytes_out ? bytes_in - bytes_out : 0);
-}
-
-/*
- * __wt_cache_bytes_dirty --
- *	Return the number of bytes in cache marked dirty.
- */
-static inline uint64_t
-__wt_cache_bytes_dirty(WT_CACHE *cache)
-{
-	return (cache->bytes_dirty);
-}
-
-/*
- * __wt_cache_pages_dirty --
- *	Return the number of pages in cache marked dirty.
- */
-static inline uint64_t
-__wt_cache_pages_dirty(WT_CACHE *cache)
-{
-	return (cache->pages_dirty);
+	return (cache->bytes_inmem - cache->bytes_evict);
 }
 
 /*
