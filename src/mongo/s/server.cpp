@@ -45,6 +45,7 @@
 #include "mongo/db/initialize_server_global_state.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/lasterror.h"
+#include "mongo/db/log_process_details.h"
 #include "mongo/platform/process_id.h"
 #include "mongo/s/balance.h"
 #include "mongo/s/chunk.h"
@@ -200,6 +201,7 @@ namespace mongo {
             case SIGUSR1:
                 // log rotate signal
                 fassert(16780, rotateLogs());
+                logProcessDetailsForLogRotate();
                 break;
             default:
                 // no one else should be here
@@ -283,10 +285,7 @@ namespace mongo {
                 ( sizeof( int* ) == 4 ? " 32" : " 64" ) << "-bit host=" << getHostNameCached() <<
                 " (--help for usage)" << endl;
             DEV log() << "_DEBUG build" << endl;
-            printGitVersion();
-            printOpenSSLVersion();
-            printSysInfo();
-            printCommandLineOpts();
+            logProcessDetails();
         }
     }
 

@@ -374,6 +374,7 @@ coreServerFiles = [ "db/client_basic.cpp",
                     "util/net/miniwebserver.cpp",
                     "db/stats/counters.cpp",
                     "db/stats/service_stats.cpp",
+                    "db/log_process_details.cpp",
                     ]
 
 env.StaticLibrary('ntservice', ['util/ntservice.cpp'],
