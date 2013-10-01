@@ -29,9 +29,10 @@ __cache_read_row_deleted(
 	 * read-only or if the application never modifies the tree, we're not
 	 * able to do so.)
 	 */
-	WT_RET(__wt_page_modify_init(session, page));
-	if (btree->modified)
+	if (btree->modified) {
+		WT_RET(__wt_page_modify_init(session, page));
 		__wt_page_modify_set(session, page);
+	}
 
 	/* Allocate the update array. */
 	WT_RET(__wt_calloc_def(session, page->entries, &upd_array));

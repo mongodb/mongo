@@ -12,8 +12,7 @@
 static inline int
 __wt_page_is_modified(WT_PAGE *page)
 {
-	return (page->modify != NULL &&
-	    page->modify->write_gen != page->modify->disk_gen ? 1 : 0);
+	return (page->modify != NULL && page->modify->write_gen != 0 ? 1 : 0);
 }
 
 /*
@@ -36,7 +35,7 @@ __wt_eviction_page_force(WT_SESSION_IMPL *session, WT_PAGE *page)
 	    page->type != WT_PAGE_COL_VAR && page->type != WT_PAGE_ROW_LEAF)
 		return (0);
 
-	/* Eviction may be turned off,  although that's rare. */
+	/* Eviction may be turned off, although that's rare. */
 	if (F_ISSET(btree, WT_BTREE_NO_EVICTION))
 		return (0);
 
@@ -56,7 +55,7 @@ __wt_eviction_page_force(WT_SESSION_IMPL *session, WT_PAGE *page)
  * that adds up to, but this is an estimate based on some measurements of heap
  * size versus bytes in use.
  */
-#define	WT_ALLOC_OVERHEAD      32
+#define	WT_ALLOC_OVERHEAD	32
 
 /*
  * __wt_cache_page_inmem_incr --
@@ -168,17 +167,7 @@ __wt_cache_read_gen_set(WT_SESSION_IMPL *session)
 static inline uint64_t
 __wt_cache_pages_inuse(WT_CACHE *cache)
 {
-	uint64_t pages_in, pages_out;
-
-	/*
-	 * Reading 64-bit fields, potentially on 32-bit machines, and other
-	 * threads of control may be modifying them.  Check them for sanity
-	 * (although "interesting" corruption is vanishingly unlikely, these
-	 * values just increment over time).
-	 */
-	pages_in = cache->pages_inmem;
-	pages_out = cache->pages_evict;
-	return (pages_in > pages_out ? pages_in - pages_out : 0);
+	return (cache->pages_inmem - cache->pages_evict);
 }
 
 /*
@@ -188,37 +177,7 @@ __wt_cache_pages_inuse(WT_CACHE *cache)
 static inline uint64_t
 __wt_cache_bytes_inuse(WT_CACHE *cache)
 {
-	uint64_t bytes_in, bytes_out;
-
-	/*
-	 * Reading 64-bit fields, potentially on 32-bit machines, and other
-	 * threads of control may be modifying them.  Check them for sanity
-	 * (although "interesting" corruption is vanishingly unlikely, these
-	 * values just increment over time).
-	 */
-	bytes_in = cache->bytes_inmem;
-	bytes_out = cache->bytes_evict;
-	return (bytes_in > bytes_out ? bytes_in - bytes_out : 0);
-}
-
-/*
- * __wt_cache_bytes_dirty --
- *	Return the number of bytes in cache marked dirty.
- */
-static inline uint64_t
-__wt_cache_bytes_dirty(WT_CACHE *cache)
-{
-	return (cache->bytes_dirty);
-}
-
-/*
- * __wt_cache_pages_dirty --
- *	Return the number of pages in cache marked dirty.
- */
-static inline uint64_t
-__wt_cache_pages_dirty(WT_CACHE *cache)
-{
-	return (cache->pages_dirty);
+	return (cache->bytes_inmem - cache->bytes_evict);
 }
 
 /*
@@ -249,13 +208,22 @@ __wt_page_modify_init(WT_SESSION_IMPL *session, WT_PAGE *page)
 }
 
 /*
- * __wt_page_modify_set --
- *	Mark the page dirty.
+ * __wt_page_only_modify_set --
+ *	Mark the page (but only the page) dirty.
  */
 static inline void
-__wt_page_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
+__wt_page_only_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
-	if (!__wt_page_is_modified(page)) {
+	/*
+	 * We depend on atomic-add being a write barrier, that is, a barrier to
+	 * ensure all changes to the page are flushed before updating the page
+	 * write generation and/or marking the tree dirty, otherwise checkpoints
+	 * and/or page reconciliation might be looking at a clean page/tree.
+	 *
+	 * Every time the page transitions from clean to dirty, update the cache
+	 * and transactional information.
+	 */
+	if (WT_ATOMIC_ADD(page->modify->write_gen, 1) == 1) {
 		(void)WT_ATOMIC_ADD(S2C(session)->cache->pages_dirty, 1);
 		(void)WT_ATOMIC_ADD(
 		    S2C(session)->cache->bytes_dirty, page->memory_footprint);
@@ -267,37 +235,29 @@ __wt_page_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
 		if (F_ISSET(&session->txn, TXN_RUNNING))
 			page->modify->disk_snap_min = session->txn.snap_min;
 	}
-
-	/*
-	 * Publish: there must be a barrier to ensure all changes to the page
-	 * are flushed before we update the page's write generation, otherwise
-	 * a thread searching the page might see the page's write generation
-	 * update before the changes to the page, which breaks the protocol.
-	 */
-	WT_WRITE_BARRIER();
-
-	/* The page is dirty if the disk and write generations differ. */
-	++page->modify->write_gen;
 }
 
 /*
- * __wt_page_and_tree_modify_set --
- *	Mark both the page and tree dirty.
+ * __wt_page_modify_set --
+ *	Mark the page and tree dirty.
  */
 static inline void
-__wt_page_and_tree_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
+__wt_page_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
-	WT_BTREE *btree;
-
-	btree = S2BT(session);
+	__wt_page_only_modify_set(session, page);
 
 	/*
-	 * A memory barrier is required for setting the tree's modified value,
-	 * we depend on the barrier called in setting the page's modified value.
+	 * Mark the tree dirty (even if the page is already marked dirty, newly
+	 * created pages to support "empty" files are dirty, but the file isn't
+	 * marked dirty until there's a real change needing to be written. Test
+	 * before setting the dirty flag, it's a hot cache line.
+	 *
+	 * We shouldn't need an additional barrier: while technically possible
+	 * a tree is marked dirty but no dirty pages found, it shouldn't cause
+	 * problems.
 	 */
-	btree->modified = 1;
-
-	__wt_page_modify_set(session, page);
+	if (S2BT(session)->modified == 0)
+		S2BT(session)->modified = 1;
 }
 
 /*
@@ -307,17 +267,12 @@ __wt_page_and_tree_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
 static inline int
 __wt_page_write_gen_wrapped_check(WT_PAGE *page)
 {
-	WT_PAGE_MODIFY *mod;
-
-	mod = page->modify;
-
-	/* 
-	 * If the page's write generation has wrapped and caught up with the
-	 * disk generation (wildly unlikely but technically possible as it
-	 * implies 4B updates between page reconciliations), fail the update.
+	/*
+	 * Check to see if the page's write generation is about to wrap (wildly
+	 * unlikely as it implies 4B updates between clean page reconciliations,
+	 * but technically possible), and fail the update.
 	 */
-	return (mod != NULL &&
-	    mod->write_gen + 1 == mod->disk_gen ? WT_RESTART : 0);
+	return (page->modify->write_gen > UINT32_MAX - 100 ? WT_RESTART : 0);
 }
 
 /*
@@ -629,10 +584,9 @@ __wt_skip_choose_depth(void)
 
 /*
  * __wt_btree_size_overflow --
- *      Check if the size of an in-memory tree with a single leaf page is
- *      over a specified maximum.  If called on anything other than a simple
- *      tree with a single leaf page, returns true so the calling code will
- *      switch to a new tree.
+ *	Check if the size of an in-memory tree with a single leaf page is over
+ * a specified maximum.  If called on anything other than a simple tree with a
+ * single leaf page, returns true so the calling code will switch to a new tree.
  */
 static inline int
 __wt_btree_size_overflow(WT_SESSION_IMPL *session, uint32_t maxsize)
