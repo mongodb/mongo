@@ -175,16 +175,17 @@ namespace {
         }
     }
 
-    Status AuthzManagerExternalStateMongos::updateOne(
-            const NamespaceString& collectionName,
-            const BSONObj& query,
-            const BSONObj& updatePattern,
-            bool upsert,
-            const BSONObj& writeConcern) {
+    Status AuthzManagerExternalStateMongos::update(const NamespaceString& collectionName,
+                                                   const BSONObj& query,
+                                                   const BSONObj& updatePattern,
+                                                   bool upsert,
+                                                   bool multi,
+                                                   const BSONObj& writeConcern,
+                                                   int* numUpdated) {
         try {
             scoped_ptr<ScopedDbConnection> conn(getConnectionForAuthzCollection(collectionName));
 
-            conn->get()->update(collectionName, query, updatePattern, upsert);
+            conn->get()->update(collectionName, query, updatePattern, upsert, multi);
 
             // Handle write concern
             BSONObjBuilder gleBuilder;
@@ -199,12 +200,7 @@ namespace {
                 return Status(ErrorCodes::UnknownError, err);
             }
 
-            int numUpdated = res["n"].numberInt();
-            dassert(numUpdated <= 1 && numUpdated >= 0);
-            if (numUpdated == 0) {
-                return Status(ErrorCodes::NoMatchingDocument, "No document found");
-            }
-
+            *numUpdated = res["n"].numberInt();
             return Status::OK();
         } catch (const DBException& e) {
             return e.toStatus();

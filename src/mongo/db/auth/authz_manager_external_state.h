@@ -135,7 +135,18 @@ namespace mongo {
                                  const BSONObj& query,
                                  const BSONObj& updatePattern,
                                  bool upsert,
-                                 const BSONObj& writeConcern) = 0;
+                                 const BSONObj& writeConcern);
+
+        /**
+         * Updates documents matching "query" according to "updatePattern" in "collectionName".
+         */
+        virtual Status update(const NamespaceString& collectionName,
+                              const BSONObj& query,
+                              const BSONObj& updatePattern,
+                              bool upsert,
+                              bool multi,
+                              const BSONObj& writeConcern,
+                              int* numUpdated) = 0;
 
         /**
          * Removes all documents matching "query" from "collectionName".
