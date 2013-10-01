@@ -34,6 +34,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
+#include "mongo/bson/ordering.h"
 #include "mongo/bson/mutable/algorithm.h"
 #include "mongo/bson/mutable/document.h"
 #include "mongo/bson/mutable/mutable_bson_test_utils.h"
@@ -54,6 +55,7 @@ namespace {
     using mongo::ModifierInterface;
     using mongo::ModifierPush;
     using mongo::NumberInt;
+    using mongo::Ordering;
     using mongo::Status;
     using mongo::StringData;
     using mongo::mutablebson::ConstElement;
@@ -68,21 +70,31 @@ namespace {
                     int32_t slice,
                     vector<int>* combined) {
 
-        // TODO: support positive slices, when $push does so.
-        ASSERT_LESS_THAN_OR_EQUALS(slice, 0);
-
+        using namespace std;
         combined->clear();
-        int32_t origSize = origVec.size();
-        int32_t modSize = modVec.size();
-        for (int32_t i = std::max(0, origSize + modSize + slice);
-             i < origSize;
-             i++) {
-            combined->push_back(origVec[i]);
+
+        // Slice 0 means the result is empty
+        if (slice == 0)
+            return;
+
+        // Combine both vectors
+        *combined = origVec;
+        combined->insert(combined->end(), modVec.begin(), modVec.end());
+
+        // Remove sliced items
+        bool removeFromFront = (slice < 0);
+
+        // if abs(slice) is larger than the size, nothing to do.
+        if (abs(slice) >= combined->size())
+            return;
+
+        if (removeFromFront) {
+            // Slice is negative.
+            int32_t removeCount = combined->size() + slice;
+            combined->erase(combined->begin(), combined->begin() + removeCount);
         }
-        for (int32_t i = std::max(0, modSize + slice);
-             i < modSize;
-             i++) {
-            combined->push_back(modVec[i]);
+        else {
+            combined->resize(std::min(combined->size(), size_t(slice)));
         }
     }
 
@@ -92,13 +104,22 @@ namespace {
      */
     struct ProjectKeyCmp {
         BSONObj sortPattern;
+        bool useWholeValue;
 
-        ProjectKeyCmp(BSONObj pattern) : sortPattern(pattern) {}
+        ProjectKeyCmp(BSONObj pattern) : sortPattern(pattern) {
+            useWholeValue = pattern.hasField("");
+        }
 
         int operator()(const BSONObj& left, const BSONObj& right) const {
-            BSONObj keyLeft = left.extractFields(sortPattern, true);
-            BSONObj keyRight = right.extractFields(sortPattern, true);
-            return keyLeft.woCompare(keyRight, sortPattern) < 0;
+            int ret = 0;
+            if (useWholeValue) {
+                ret = left.woCompare( right,  Ordering::make(sortPattern), false );
+            } else {
+                BSONObj lhsKey = left.extractFields(sortPattern, true);
+                BSONObj rhsKey = right.extractFields(sortPattern, true);
+                ret = lhsKey.woCompare(rhsKey, sortPattern);
+            }
+            return ret < 0;
         }
     };
 
@@ -108,18 +129,31 @@ namespace {
                            BSONObj sortOrder,
                            vector<BSONObj>* combined) {
 
-        // TODO: support positive slices, when $push does so.
-        ASSERT_LESS_THAN_OR_EQUALS(slice, 0);
-
         combined->clear();
+
+        // Slice 0 means the result is empty
+        if (slice == 0)
+            return;
+
         *combined = origVec;
         combined->insert(combined->end(), modVec.begin(), modVec.end());
 
         sort(combined->begin(), combined->end(), ProjectKeyCmp(sortOrder));
 
-        int size = combined->size();
-        for (int i = 0; i < size + slice; i++) {
-            combined->erase(combined->begin());
+        // Remove sliced items
+        bool removeFromFront = (slice < 0);
+
+        // if abs(slice) is larger than the size, nothing to do.
+        if (abs(slice) >= combined->size())
+            return;
+
+        if (removeFromFront) {
+            // Slice is negative.
+            int32_t removeCount = combined->size() + slice;
+            combined->erase(combined->begin(), combined->begin() + removeCount);
+        }
+        else {
+            combined->resize(std::min(combined->size(), size_t(slice)));
         }
     }
 
@@ -211,11 +245,18 @@ namespace {
     // If present, is the $slice clause valid?
     //
 
-    TEST(Init, PushEachWithSlice) {
+    TEST(Init, PushEachWithSliceBottom) {
         BSONObj modObj = fromjson("{$push: {x: {$each: [1, 2], $slice: -3}}}");
         ModifierPush mod;
         ASSERT_OK(mod.init(modObj["$push"].embeddedObject().firstElement(),
                            ModifierInterface::Options::normal()));
+    }
+
+    TEST(Init, PushEachWithSliceTop) {
+        BSONObj modObj = fromjson("{$push: {x: {$each: [1, 2], $slice: 3}}}");
+        ModifierPush mod;
+        ASSERT_OK(mod.init(modObj["$push"].embeddedObject().firstElement(),
+                               ModifierInterface::Options::normal()));
     }
 
     TEST(Init, PushEachWithInvalidSliceObject) {
@@ -239,13 +280,6 @@ namespace {
                            ModifierInterface::Options::normal()));
     }
 
-    TEST(Init, PushEachWithUnsupportedPositiveSlice) {
-        BSONObj modObj = fromjson("{$push: {x: {$each: [1, 2], $slice: 3}}}");
-        ModifierPush mod;
-        ASSERT_NOT_OK(mod.init(modObj["$push"].embeddedObject().firstElement(),
-                               ModifierInterface::Options::normal()));
-    }
-
     TEST(Init, PushEachWithUnsupportedFullSlice) {
         BSONObj modObj = fromjson("{$push: {x: {$each: [1, 2], $slice: [1,2]}}}");
         ModifierPush mod;
@@ -264,12 +298,20 @@ namespace {
     // If present, is the sort $sort clause valid?
     //
 
-    TEST(Init, PushEachWithSort) {
+    TEST(Init, PushEachWithObjectSort) {
         const char* c = "{$push: {x: {$each: [{a:1},{a:2}], $slice: -2.0, $sort: {a:1}}}}";
         BSONObj modObj = fromjson(c);
         ModifierPush mod;
         ASSERT_OK(mod.init(modObj["$push"].embeddedObject().firstElement(),
                            ModifierInterface::Options::normal()));
+    }
+
+    TEST(Init, PushEachWithNumbericSort) {
+        const char* c = "{$push: {x: {$each: [{a:1},{a:2}], $slice: -2.0, $sort:1 }}}";
+        BSONObj modObj = fromjson(c);
+        ModifierPush mod;
+        ASSERT_OK(mod.init(modObj["$push"].embeddedObject().firstElement(),
+                               ModifierInterface::Options::normal()));
     }
 
     TEST(Init, PushEachWithInvalidSortType) {
@@ -330,14 +372,6 @@ namespace {
 
     TEST(Init, PushEachWithMissingSortFieldMiddle) {
         const char* c = "{$push: {x: {$each: [{a:1},{a:2}], $slice: -2.0, $sort: {'a..b':1}}}}";
-        BSONObj modObj = fromjson(c);
-        ModifierPush mod;
-        ASSERT_NOT_OK(mod.init(modObj["$push"].embeddedObject().firstElement(),
-                               ModifierInterface::Options::normal()));
-    }
-
-    TEST(Init, PushEachWithUnsupportedSort) {
-        const char* c = "{$push: {x: {$each: [{a:1},{a:2}], $slice: -2.0, $sort:1 }}}";
         BSONObj modObj = fromjson(c);
         ModifierPush mod;
         ASSERT_NOT_OK(mod.init(modObj["$push"].embeddedObject().firstElement(),
@@ -406,7 +440,7 @@ namespace {
         const char* c = "{$push: {x: {$each: [{a:1},{a:2}], $sort:{a:1}}}}";
         BSONObj modObj = fromjson(c);
         ModifierPush mod;
-        ASSERT_NOT_OK(mod.init(modObj["$push"].embeddedObject().firstElement(),
+        ASSERT_OK(mod.init(modObj["$push"].embeddedObject().firstElement(),
                                ModifierInterface::Options::normal()));
     }
 
@@ -869,6 +903,141 @@ namespace {
     }
 
     /**
+     * Slice variants
+     */
+    TEST(SlicePushEach, TopOne) {
+        Document doc(fromjson("{a: [3]}"));
+        Mod pushMod(fromjson("{$push: {a: {$each: [2, -1], $slice:1}}}"));
+
+        ModifierInterface::ExecInfo execInfo;
+        ASSERT_OK(pushMod.prepare(doc.root(), "", &execInfo));
+
+        ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
+        ASSERT_FALSE(execInfo.noOp);
+
+        ASSERT_OK(pushMod.apply());
+        ASSERT_FALSE(doc.isInPlaceModeEnabled());
+        ASSERT_EQUALS(fromjson("{a: [3]}"), doc);
+
+        Document logDoc;
+        LogBuilder logBuilder(logDoc.root());
+        ASSERT_OK(pushMod.log(&logBuilder));
+        ASSERT_EQUALS(countChildren(logDoc.root()), 1u);
+        ASSERT_EQUALS(fromjson("{$set: {a: [3]}}"), logDoc);
+    }
+
+    /**
+     * Sort for scalar (whole) array elements
+     */
+    TEST(SortPushEach, NumberSort) {
+        Document doc(fromjson("{a: [3]}"));
+        Mod pushMod(fromjson("{$push: {a: {$each: [2, -1], $sort:1}}}"));
+
+        ModifierInterface::ExecInfo execInfo;
+        ASSERT_OK(pushMod.prepare(doc.root(), "", &execInfo));
+
+        ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
+        ASSERT_FALSE(execInfo.noOp);
+
+        ASSERT_OK(pushMod.apply());
+        ASSERT_FALSE(doc.isInPlaceModeEnabled());
+        ASSERT_EQUALS(fromjson("{a: [-1,2,3]}"), doc);
+
+        Document logDoc;
+        LogBuilder logBuilder(logDoc.root());
+        ASSERT_OK(pushMod.log(&logBuilder));
+        ASSERT_EQUALS(countChildren(logDoc.root()), 1u);
+        ASSERT_EQUALS(fromjson("{$set: {a: [-1, 2, 3]}}"), logDoc);
+    }
+
+    TEST(SortPushEach, NumberSortReverse) {
+        Document doc(fromjson("{a: [3]}"));
+        Mod pushMod(fromjson("{$push: {a: {$each: [4, -1], $sort:-1}}}"));
+
+        ModifierInterface::ExecInfo execInfo;
+        ASSERT_OK(pushMod.prepare(doc.root(), "", &execInfo));
+
+        ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
+        ASSERT_FALSE(execInfo.noOp);
+
+        ASSERT_OK(pushMod.apply());
+        ASSERT_FALSE(doc.isInPlaceModeEnabled());
+        ASSERT_EQUALS(fromjson("{a: [4,3,-1]}"), doc);
+
+        Document logDoc;
+        LogBuilder logBuilder(logDoc.root());
+        ASSERT_OK(pushMod.log(&logBuilder));
+        ASSERT_EQUALS(countChildren(logDoc.root()), 1u);
+        ASSERT_EQUALS(fromjson("{$set: {a: [4,3,-1]}}"), logDoc);
+    }
+
+    TEST(SortPushEach, MixedSortWhole) {
+        Document doc(fromjson("{a: [3, 't', {b:1}, {a:1}]}"));
+        Mod pushMod(fromjson("{$push: {a: {$each: [4, -1], $sort:1}}}"));
+        const BSONObj expectedObj = fromjson("{a: [-1,3,4,'t', {a:1}, {b:1}]}");
+
+        ModifierInterface::ExecInfo execInfo;
+        ASSERT_OK(pushMod.prepare(doc.root(), "", &execInfo));
+
+        ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
+        ASSERT_FALSE(execInfo.noOp);
+
+        ASSERT_OK(pushMod.apply());
+        ASSERT_FALSE(doc.isInPlaceModeEnabled());
+        ASSERT_EQUALS(expectedObj, doc);
+
+        Document logDoc;
+        LogBuilder logBuilder(logDoc.root());
+        ASSERT_OK(pushMod.log(&logBuilder));
+        ASSERT_EQUALS(countChildren(logDoc.root()), 1u);
+        ASSERT_EQUALS(BSON("$set" << expectedObj), logDoc);
+    }
+
+    TEST(SortPushEach, MixedSortWholeReverse) {
+        Document doc(fromjson("{a: [3, 't', {b:1}, {a:1}]}"));
+        Mod pushMod(fromjson("{$push: {a: {$each: [4, -1], $sort:-1}}}"));
+        const BSONObj expectedObj = fromjson("{a: [{b:1}, {a:1}, 't', 4, 3, -1]}");
+
+        ModifierInterface::ExecInfo execInfo;
+        ASSERT_OK(pushMod.prepare(doc.root(), "", &execInfo));
+
+        ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
+        ASSERT_FALSE(execInfo.noOp);
+
+        ASSERT_OK(pushMod.apply());
+        ASSERT_FALSE(doc.isInPlaceModeEnabled());
+        ASSERT_EQUALS(expectedObj, doc);
+
+        Document logDoc;
+        LogBuilder logBuilder(logDoc.root());
+        ASSERT_OK(pushMod.log(&logBuilder));
+        ASSERT_EQUALS(countChildren(logDoc.root()), 1u);
+        ASSERT_EQUALS(BSON("$set" << expectedObj), logDoc);
+    }
+
+    TEST(SortPushEach, MixedSortEmbeddedField) {
+        Document doc(fromjson("{a: [3, 't', {b:1}, {a:1}]}"));
+        Mod pushMod(fromjson("{$push: {a: {$each: [4, -1], $sort:{a:1}}}}"));
+        const BSONObj expectedObj = fromjson("{a: [3, 't', {b: 1}, 4, -1, {a: 1}]}");
+
+        ModifierInterface::ExecInfo execInfo;
+        ASSERT_OK(pushMod.prepare(doc.root(), "", &execInfo));
+
+        ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
+        ASSERT_FALSE(execInfo.noOp);
+
+        ASSERT_OK(pushMod.apply());
+        ASSERT_FALSE(doc.isInPlaceModeEnabled());
+        ASSERT_EQUALS(expectedObj, doc);
+
+        Document logDoc;
+        LogBuilder logBuilder(logDoc.root());
+        ASSERT_OK(pushMod.log(&logBuilder));
+        ASSERT_EQUALS(countChildren(logDoc.root()), 1u);
+        ASSERT_EQUALS(BSON("$set" << expectedObj), logDoc);
+    }
+
+    /**
      * This fixture supports building $push mods with parameterized $each arrays and $slices.
      * It always assume that the array being operated on is called 'a'. To build a mod, one
      * issues a set*Mod() call.
@@ -1040,7 +1209,7 @@ namespace {
         for (int32_t aOrB = 0; aOrB < 2 ; aOrB++) {
             for (int32_t sortA = 0; sortA < 2; sortA++) {
                 for (int32_t sortB = 0; sortB < 2; sortB++) {
-                    for (int32_t slice = -3; slice <= 0; slice++) {
+                    for (int32_t slice = -3; slice <= 3; slice++) {
 
                         BSONObj sortOrder;
                         if (aOrB == 0) {
@@ -1094,7 +1263,7 @@ namespace {
         for (int32_t aOrB = 0; aOrB < 2 ; aOrB++) {
             for (int32_t sortA = 0; sortA < 2; sortA++) {
                 for (int32_t sortB = 0; sortB < 2; sortB++) {
-                    for (int32_t slice = -4; slice <= 0; slice++) {
+                    for (int32_t slice = -4; slice <= 4; slice++) {
 
                         BSONObj sortOrder;
                         if (aOrB == 0) {

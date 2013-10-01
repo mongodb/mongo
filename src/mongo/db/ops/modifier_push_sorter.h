@@ -38,19 +38,39 @@ namespace mongo {
     // 'rhs'. We expect that both 'lhs' and 'rhs' be key patterns.
     struct PatternElementCmp {
         BSONObj sortPattern;
+        bool useWholeValue;
 
-        PatternElementCmp() : sortPattern(BSONObj()) {}
+        PatternElementCmp()
+            : sortPattern(BSONObj())
+            , useWholeValue(true)  {}
 
-        PatternElementCmp(const BSONObj& pattern) : sortPattern(pattern) {}
+        PatternElementCmp(const BSONObj& pattern)
+            : sortPattern(pattern)
+            , useWholeValue(pattern.hasField("")){
+        }
 
         bool operator()(const mutablebson::Element& lhs, const mutablebson::Element& rhs) const {
-            BSONObj lhsObj = lhs.getValueObject();
-            BSONObj rhsObj = rhs.getValueObject();
+            if (useWholeValue) {
+                const int comparedValue = lhs.compareWithElement( rhs, false );
 
-            BSONObj lhsKey = lhsObj.extractFields(sortPattern, true);
-            BSONObj rhsKey = rhsObj.extractFields(sortPattern, true);
+                const bool reversed = (sortPattern.firstElement().number() < 0 );
 
-            return lhsKey.woCompare(rhsKey, sortPattern) < 0;
+                return (reversed ? comparedValue > 0 : comparedValue < 0);
+            }
+            else {
+                //TODO: Push on to mutable in the future, and to support non-contiguous Elements.
+                BSONObj lhsObj = lhs.getType() == Object ?
+                                            lhs.getValueObject() :
+                                            lhs.getValue().wrap("");
+                BSONObj rhsObj = rhs.getType() == Object ?
+                                            rhs.getValueObject() :
+                                            rhs.getValue().wrap("");
+
+                BSONObj lhsKey = lhsObj.extractFields(sortPattern, true);
+                BSONObj rhsKey = rhsObj.extractFields(sortPattern, true);
+
+                return lhsKey.woCompare(rhsKey, sortPattern) < 0;
+            }
         }
     };
 
