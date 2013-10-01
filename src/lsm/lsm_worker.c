@@ -53,7 +53,7 @@ __lsm_copy_chunks(WT_SESSION_IMPL *session,
 	 * it's safe.
 	 */
 	for (i = 0; i < nchunks; i++)
-		WT_ATOMIC_ADD(cookie->chunk_array[i]->refcnt, 1);
+		(void)WT_ATOMIC_ADD(cookie->chunk_array[i]->refcnt, 1);
 
 err:	WT_TRET(__wt_rwunlock(session, lsm_tree->rwlock));
 
@@ -76,7 +76,7 @@ __lsm_unpin_chunks(WT_SESSION_IMPL *session, WT_LSM_WORKER_COOKIE *cookie)
 		if (cookie->chunk_array[i] == NULL)
 			continue;
 		WT_ASSERT(session, cookie->chunk_array[i]->refcnt > 0);
-		WT_ATOMIC_SUB(cookie->chunk_array[i]->refcnt, 1);
+		(void)WT_ATOMIC_SUB(cookie->chunk_array[i]->refcnt, 1);
 	}
 	/* Ensure subsequent calls don't double decrement. */
 	cookie->nchunks = 0;
