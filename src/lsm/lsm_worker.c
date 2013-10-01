@@ -68,7 +68,7 @@ err:	WT_TRET(__wt_rwunlock(session, lsm_tree->rwlock));
  *	chunks to be considered for deletion.
  */
 static void
-__lsm_unpin_chunks(WT_SESSION *session, WT_LSM_WORKER_COOKIE *cookie)
+__lsm_unpin_chunks(WT_SESSION_IMPL *session, WT_LSM_WORKER_COOKIE *cookie)
 {
 	u_int i;
 
@@ -78,6 +78,8 @@ __lsm_unpin_chunks(WT_SESSION *session, WT_LSM_WORKER_COOKIE *cookie)
 		WT_ASSERT(session, cookie->chunk_array[i]->refcnt > 0);
 		WT_ATOMIC_SUB(cookie->chunk_array[i]->refcnt, 1);
 	}
+	/* Ensure subsequent calls don't double decrement. */
+	cookie->nchunks = 0;
 }
 
 /*
@@ -549,7 +551,7 @@ __lsm_free_chunks(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	WT_LSM_CHUNK *chunk;
 	WT_LSM_WORKER_COOKIE cookie;
 	u_int i, skipped;
-	u_int drop_count;
+	int progress;
 
 	/*
 	 * Take a copy of the current state of the LSM tree and look for chunks
@@ -564,7 +566,7 @@ __lsm_free_chunks(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	 */
 	WT_CLEAR(cookie);
 	WT_RET(__lsm_copy_chunks(session, lsm_tree, &cookie, 1));
-	for (i = skipped = 0, drop_count = 0; i < cookie.nchunks; i++) {
+	for (i = skipped = 0, progress = 0; i < cookie.nchunks; i++) {
 		chunk = cookie.chunk_array[i];
 		WT_ASSERT(session, chunk != NULL);
 		/* Skip the chunk if another worker is using it. */
@@ -604,7 +606,7 @@ __lsm_free_chunks(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 				WT_ERR(ret);
 		}
 
-		drop_count++;
+		progress = 1;
 
 		/* Lock the tree to clear out the old chunk information. */
 		WT_ERR(__wt_writelock(session, lsm_tree->rwlock));
@@ -636,11 +638,11 @@ __lsm_free_chunks(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 
 err:	__lsm_unpin_chunks(session, &cookie);
 	__wt_free(session, cookie.chunk_array);
-	if (drop_count != 0)
+	if (progress)
 		WT_TRET(__wt_lsm_meta_write(session, lsm_tree));
 
 	/* Returning non-zero means there is no work to do. */
-	if (drop_count == 0)
+	if (!progress)
 		WT_TRET(WT_NOTFOUND);
 
 	return (ret);
