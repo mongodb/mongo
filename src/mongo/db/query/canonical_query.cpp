@@ -122,6 +122,32 @@ namespace mongo {
         }
     }
 
+    Status isValid(MatchExpression* root) {
+        // XXX: There can only be one NEAR.  If there is a NEAR, it must be either the root or the
+        // root must be an AND and its child must be a NEAR.
+
+        MatchExpression::MatchType type = root->matchType();
+
+        if (MatchExpression::GT == type || MatchExpression::GTE == type
+            || MatchExpression::LT == type || MatchExpression::LTE == type) {
+
+            ComparisonMatchExpression* cme = static_cast<ComparisonMatchExpression*>(root);
+            BSONElement data = cme->getData();
+            if (RegEx == data.type()) {
+                return Status(ErrorCodes::BadValue, "Can't have RegEx as arg to pred " + cme->toString());
+            }
+        }
+
+        for (size_t i = 0; i < root->numChildren(); ++i) {
+            Status s = isValid(root->getChild(i));
+            if (!s.isOK()) {
+                return s;
+            }
+        }
+
+        return Status::OK();
+    }
+
     Status CanonicalQuery::init(LiteParsedQuery* lpq) {
         _pq.reset(lpq);
 
@@ -131,6 +157,11 @@ namespace mongo {
 
         MatchExpression* root = swme.getValue();
         normalizeTree(root);
+        Status validStatus = isValid(root);
+        if (!validStatus.isOK()) {
+            return validStatus;
+        }
+
         _root.reset(root);
 
         if (!_pq->getProj().isEmpty()) {

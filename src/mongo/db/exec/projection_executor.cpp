@@ -60,6 +60,10 @@ namespace mongo {
             // We only want stuff in _fields.
             const vector<string>& fields = proj->_includedFields;
             for (size_t i = 0; i < fields.size(); ++i) {
+                if ("_id" == fields[i]) {
+                    continue;
+                }
+
                 BSONElement elt;
                 // We can project a field that doesn't exist.  We just ignore it.
                 // UNITTEST 11738048

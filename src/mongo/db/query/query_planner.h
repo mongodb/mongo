@@ -29,6 +29,7 @@
 #pragma once
 
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/index_entry.h"
 #include "mongo/db/query/query_solution.h"
 
 namespace mongo {
@@ -39,6 +40,15 @@ namespace mongo {
      */
     class QueryPlanner {
     public:
+        enum Options {
+            // You probably want to set this.
+            DEFAULT = 0,
+
+            // Set this if you don't want a table scan.
+            // See http://docs.mongodb.org/manual/reference/parameters/
+            NO_TABLE_SCAN = 1,
+        };
+
         /**
          * Outputs a series of possible solutions for the provided 'query' into 'out'.  Uses the
          * provided indices to generate a solution.
@@ -46,7 +56,8 @@ namespace mongo {
          * Caller owns pointers in *out.
          */
         static void plan(const CanonicalQuery& query,
-                         const vector<BSONObj>& indexKeyPatterns,
+                         const vector<IndexEntry>& indices,
+                         size_t options,
                          vector<QuerySolution*>* out);
     private:
 
@@ -68,21 +79,21 @@ namespace mongo {
          * useful in answering the query.
          */
         static void findRelevantIndices(const unordered_set<string>& fields,
-                                        const vector<BSONObj>& allIndices,
-                                        vector<BSONObj>* out);
+                                        const vector<IndexEntry>& indices,
+                                        vector<IndexEntry>* out);
 
         /**
-         * Return true if the index key pattern field 'elt' can be used to answer the predicate
-         * 'node'.
+         * Return true if the index key pattern field 'elt' (which belongs to 'index') can be used
+         * to answer the predicate 'node'.
          *
          * For example, {field: "hashed"} can only be used with sets of equalities.
          *              {field: "2d"} can only be used with some geo predicates.
          *              {field: "2dsphere"} can only be used with some other geo predicates.
          */
-        static bool compatible(const BSONElement& elt, MatchExpression* node);
+        static bool compatible(const BSONElement& elt, const IndexEntry& index, MatchExpression* node);
 
         /**
-         * Determine how useful all of our relevant indices are to all predicates in the subtree
+         * Determine how useful all of our relevant 'indices' are to all predicates in the subtree
          * rooted at 'node'.  Affixes a RelevantTag to all predicate nodes which can use an index.
          *
          * 'prefix' is a path prefix that should be prepended to any path (certain array operators
@@ -97,7 +108,7 @@ namespace mongo {
          * original predicate by having an AND as a parent.
          */
         static void rateIndices(MatchExpression* node, string prefix,
-                                const vector<BSONObj>& indices);
+                                const vector<IndexEntry>& indices);
 
         //
         // Collection Scan Data Access method.
@@ -114,7 +125,7 @@ namespace mongo {
         // The inArrayOperator flag deserves some attention.  It is set when we're processing a child of
         // a MatchExpression::ALL or MatchExpression::ELEM_MATCH_OBJECT.
         //
-        // Behavior changes for all methods below that take it as an argument:
+        // When true, the following behavior changes for all methods below that take it as an argument:
         // 0. No deletion of MatchExpression(s).  In fact,
         // 1. No mutation of the MatchExpression at all.  We need the tree as-is in order to perform
         //    a filter on the entire tree.
@@ -129,21 +140,21 @@ namespace mongo {
          */
         static QuerySolutionNode* buildIndexedDataAccess(MatchExpression* root,
                                                          bool inArrayOperator,
-                                                         const vector<BSONObj>& indexKeyPatterns);
+                                                         const vector<IndexEntry>& indices);
 
         /**
          * Takes ownership of 'root'.
          */
         static QuerySolutionNode* buildIndexedAnd(MatchExpression* root,
                                                   bool inArrayOperator,
-                                                  const vector<BSONObj>& indexKeyPatterns);
+                                                  const vector<IndexEntry>& indices);
 
         /**
          * Takes ownership of 'root'.
          */
         static QuerySolutionNode* buildIndexedOr(MatchExpression* root,
                                                  bool inArrayOperator,
-                                                 const vector<BSONObj>& indexKeyPatterns);
+                                                 const vector<IndexEntry>& indices);
 
         /**
          * Helper used by buildIndexedAnd and buildIndexedOr.
@@ -160,7 +171,7 @@ namespace mongo {
          */
         static bool processIndexScans(MatchExpression* root,
                                       bool inArrayOperator,
-                                      const vector<BSONObj>& indexKeyPatterns,
+                                      const vector<IndexEntry>& indices,
                                       vector<QuerySolutionNode*>* out);
 
         //

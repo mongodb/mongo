@@ -76,10 +76,10 @@ namespace mongo {
 
     // static
     void QueryPlanner::findRelevantIndices(const unordered_set<string>& fields,
-                                           const vector<BSONObj>& allIndices,
-                                           vector<BSONObj>* out) {
+                                           const vector<IndexEntry>& allIndices,
+                                           vector<IndexEntry>* out) {
         for (size_t i = 0; i < allIndices.size(); ++i) {
-            BSONObjIterator it(allIndices[i]);
+            BSONObjIterator it(allIndices[i].keyPattern);
             verify(it.more());
             BSONElement elt = it.next();
             if (fields.end() != fields.find(elt.fieldName())) {
@@ -89,7 +89,7 @@ namespace mongo {
     }
 
     // static
-    bool QueryPlanner::compatible(const BSONElement& elt, MatchExpression* node) {
+    bool QueryPlanner::compatible(const BSONElement& elt, const IndexEntry& index, MatchExpression* node) {
         // XXX: CatalogHack::getAccessMethodName: do we have to worry about this?  when?
         string ixtype;
         if (String != elt.type()) {
@@ -135,7 +135,7 @@ namespace mongo {
 
     // static
     void QueryPlanner::rateIndices(MatchExpression* node, string prefix,
-                                   const vector<BSONObj>& indices) {
+                                   const vector<IndexEntry>& indices) {
         if (Indexability::nodeCanUseIndexOnOwnField(node)) {
             string fullPath = prefix + node->path().toString();
             verify(NULL == node->getTag());
@@ -144,14 +144,14 @@ namespace mongo {
 
             // TODO: This is slow, with all the string compares.
             for (size_t i = 0; i < indices.size(); ++i) {
-                BSONObjIterator it(indices[i]);
+                BSONObjIterator it(indices[i].keyPattern);
                 BSONElement elt = it.next();
-                if (elt.fieldName() == fullPath && compatible(elt, node)) {
+                if (elt.fieldName() == fullPath && compatible(elt, indices[i], node)) {
                     rt->first.push_back(i);
                 }
                 while (it.more()) {
                     elt = it.next();
-                    if (elt.fieldName() == fullPath && compatible(elt, node)) {
+                    if (elt.fieldName() == fullPath && compatible(elt, indices[i], node)) {
                         rt->notFirst.push_back(i);
                     }
                 }
@@ -207,27 +207,29 @@ namespace mongo {
                                                MatchExpression* expr,
                                                bool* exact) {
         cout << "making ixscan for " << expr->toString() << endl;
-        if (MatchExpression::ELEM_MATCH_VALUE == expr->matchType()) {
-            // Root is tagged with an index.  We have predicates over root's path.  Pick one
-            // to define the bounds.
-
-            // TODO: We could/should merge the bounds (possibly subject to various multikey
-            // etc.  restrictions).  For now we don't bother.
-            expr = expr->getChild(0);
-        }
 
         // Note that indexKeyPattern.firstElement().fieldName() may not equal expr->path() because
         // expr might be inside an array operator that provides a path prefix.
         IndexScanNode* isn = new IndexScanNode();
         isn->indexKeyPattern = indexKeyPattern;
         isn->bounds.fields.resize(indexKeyPattern.nFields());
-        IndexBoundsBuilder::translate(expr, indexKeyPattern.firstElement(),
-                                      &isn->bounds.fields[0], exact);
-
-        // TODO: I think this is valid but double check.
         if (MatchExpression::ELEM_MATCH_VALUE == expr->matchType()) {
+            // Root is tagged with an index.  We have predicates over root's path.  Pick one
+            // to define the bounds.
+
+            // TODO: We could/should merge the bounds (possibly subject to various multikey
+            // etc.  restrictions).  For now we don't bother.
+            IndexBoundsBuilder::translate(expr->getChild(0), indexKeyPattern.firstElement(),
+                                          &isn->bounds.fields[0], exact);
+            // TODO: I think this is valid but double check.
             *exact = false;
         }
+        else {
+            IndexBoundsBuilder::translate(expr, indexKeyPattern.firstElement(),
+                                          &isn->bounds.fields[0], exact);
+        }
+
+        cout << "bounds are " << isn->bounds.toString() << " exact " << *exact << endl;
 
         return isn;
     }
@@ -270,7 +272,7 @@ namespace mongo {
     // static
     bool QueryPlanner::processIndexScans(MatchExpression* root,
                                          bool inArrayOperator,
-                                         const vector<BSONObj>& indexKeyPatterns,
+                                         const vector<IndexEntry>& indices,
                                          vector<QuerySolutionNode*>* out) {
 
         bool isAnd = MatchExpression::AND == root->matchType();
@@ -280,6 +282,7 @@ namespace mongo {
 
         auto_ptr<IndexScanNode> currentScan;
         size_t currentIndexNumber = IndexTag::kNoIndex;
+        size_t nextIndexPos = 0;
         size_t curChild = 0;
 
         // This 'while' processes all IXSCANs, possibly merging scans by combining the bounds.  We
@@ -315,9 +318,11 @@ namespace mongo {
                     ++curChild;
                 }
 
+                // If inArrayOperator: takes ownership of child, which is OK, since we detached
+                // child from root.
                 QuerySolutionNode* childSolution = buildIndexedDataAccess(child,
                                                                           inArrayOperator,
-                                                                          indexKeyPatterns);
+                                                                          indices);
                 if (NULL == childSolution) { return false; }
                 out->push_back(childSolution);
                 continue;
@@ -328,15 +333,72 @@ namespace mongo {
 
             // If the child we're looking at uses a different index than the current index scan, add
             // the current index scan to the output as we're done with it.  The index scan created
-            // by the child then becomes our new current index scan.
+            // by the child then becomes our new current index scan.  Note that the current scan
+            // could be NULL, in which case we don't output it.  The rest of the logic is identical.
             //
-            // Note that the current scan could be NULL, in which case we don't output it.  The rest
-            // of the logic is identical.
+            // If the child uses the same index as the current index scan, we may be able to merge
+            // the bounds for the two scans.  See the comments below for canMergeBounds and
+            // shouldMergeBounds.
+
+            // Is it remotely possible to merge the bounds?  We care about isAnd because bounds
+            // merging is currently totally unimplemented for ORs.
             //
-            // TODO: We don't to merge bounds for OR yet, so each child of an OR is a new ixscan.
-            if (NULL == currentScan.get() || !isAnd || inArrayOperator || (currentIndexNumber != ixtag->index)) {
+            // TODO: When more than one child of an AND clause can have an index, we'll have to fix
+            // the logic below to only merge when the merge is really filling out an additional
+            // field of a compound index.
+            //
+            // TODO: Implement union of OILs to allow merging bounds for OR.
+            // TODO: Implement intersection of OILs to allow merging of bounds for AND.
+            bool canMergeBounds = (NULL != currentScan.get()) && (currentIndexNumber == ixtag->index) && isAnd;
+
+            // Is it semantically correct to merge bounds?
+            //
+            // If the index is NOT multikey, it's always semantically correct.
+            //
+            // If the index is multikey, there are three issues:
+            //
+            // 1. We can't intersect bounds even if the bounds are not on a compound index.
+            //    Example:
+            //    Let's say we have the document {a: [5, 7]}.
+            //    This document satisfies the query {$or: [ {a: 5}, {a: 7} ] }
+            //    For the index {a:1} we have the keys {"": 5} and {"": 7}.
+            //    Each child of the OR is tagged with the index {a: 1}
+            //    The interval for the {a: 5} branch is [5, 5].
+            //    The interval for the {a: 7} branch is [7, 7].
+            //    The intersection of the intervals is {}, which yields no results.
+            //
+            // 2. If we're using a compound index, we can only specify bounds for the first field.
+            //    Example:
+            //    Let's say we have the document {a: [ {b: 3}, {c: 4} ] }
+            //    This document satisfies the query {'a.b': 3, 'a.c': 4}.
+            //    For the index {'a.b': 1, 'a.c': 1} we have the keys {"": 3, "": null} and
+            //                                                        {"": null, "": 4}.
+            //    Let's use the aforementioned index to answer the query.
+            //    The bounds for 'a.b' are [3,3], and the bounds for 'a.c' are [4,4].
+            //    If we combine the bounds, we would only look at keys {"": 3, "":4 }.
+            //    Therefore we wouldn't look at the document's keys in the index.
+            //    Therefore we don't combine bounds.
+            //
+            // 3. There is an exception to (2), and that is when we're evaluating an $elemMatch.
+            //    Example:
+            //    Our query is a: {$elemMatch: {b:3, c:4}}.
+            //    Let's say that we have the index {'a.b': 1, 'a.c': 1} as in (2).
+            //    $elemMatch requires if a.b==3 and a.c==4, the predicates must be satisfied from
+            //    the same array entry.
+            //    If those values are both present in the same array, the index key for the
+            //    aforementioned index will be {"":3, "":4}
+            //    Therefore we can intersect bounds.
+            //
+            //    XXX: There is more to it than this.  See index13.js.
+
+            bool shouldMergeBounds = !indices[currentIndexNumber].multikey;
+
+            // XXX: commented out until cases in index13.js are resolved.
+            // bool shouldMergeBounds = !indices[currentIndexNumber].multikey || inArrayOperator;
+
+            if (!canMergeBounds || !shouldMergeBounds) {
                 if (NULL != currentScan.get()) {
-                    finishIndexScan(currentScan.get(), indexKeyPatterns[currentIndexNumber]);
+                    finishIndexScan(currentScan.get(), indices[currentIndexNumber].keyPattern);
                     out->push_back(currentScan.release());
                 }
                 else {
@@ -344,10 +406,12 @@ namespace mongo {
                 }
 
                 currentIndexNumber = ixtag->index;
+                nextIndexPos = 1;
 
                 bool exact = false;
-                currentScan.reset(makeIndexScan(indexKeyPatterns[currentIndexNumber],
+                currentScan.reset(makeIndexScan(indices[currentIndexNumber].keyPattern,
                                                 child, &exact));
+
                 if (exact && !inArrayOperator) {
                     // The bounds answer the predicate, and we can remove the expression from the
                     // root.  NOTE(opt): Erasing entry 0, 1, 2, ... could be kind of n^2, maybe
@@ -365,56 +429,30 @@ namespace mongo {
             else {
                 // The child uses the same index we're currently building a scan for.  Merge
                 // the bounds and filters.
-
-                // XXX XXX XXX: I don't think we can combine bounds on a compound index when they're
-                // over a multikey index.  To quote queryutil.cpp:
-
-                // Given a multikey index { 'a.b':1, 'a.c':1 } and query { 'a.b':3, 'a.c':3 } only
-                // the index field 'a.b' is constrained to the range [3, 3], while the index
-                // field 'a.c' is just constrained to be within minkey and maxkey.  This
-                // implementation ensures that the document { a:[ { b:3 }, { c:3 } ] }, which
-                // generates index keys { 'a.b':3, 'a.c':null } and { 'a.b':null and 'a.c':3 } will
-                // be retrieved for the query.
-                //
-                // However, if the query is instead { a:{ $elemMatch:{ b:3, c:3 } } } then the
-                // document { a:[ { b:3 }, { c:3 } ] } should not match the query and both index
-                // fields 'a.b' and 'a.c' are constrained to the range [3, 3].
-
-                // XXX: This only works when the child doesn't have any predicates over the same
-                // field.  To deal with that case, our bounds/interval merging would have to
-                // actually be implemented.  Right now, we rely on enumeration to not supply us with
-                // two plans that use the same index but are not compound.
-
-                verify(!inArrayOperator);
                 verify(currentIndexNumber == ixtag->index);
+                verify(ixtag->pos == nextIndexPos);
 
-                // First, make the bounds.
-                OrderedIntervalList oil(child->path().toString());
-
-                // TODO(opt): We can cache this as part of the index rating process, this is
-                // slow.
-                BSONObjIterator kpIt(indexKeyPatterns[currentIndexNumber]);
-                BSONElement elt = kpIt.next();
-                while (elt.fieldName() != oil.name) {
-                    verify(kpIt.more());
-                    elt = kpIt.next();
+                // Get the ixtag->pos-th element of indexKeyPatterns[currentIndexNumber].
+                // TODO: cache this instead/with ixtag->pos?
+                BSONObjIterator it(indices[currentIndexNumber].keyPattern);
+                BSONElement keyElt = it.next();
+                for (size_t i = 0; i < ixtag->pos; ++i) {
+                    verify(it.more());
+                    keyElt = it.next();
                 }
-                verify(!elt.eoo());
+                verify(!keyElt.eoo());
                 bool exact = false;
-                IndexBoundsBuilder::translate(child, elt, &oil, &exact);
 
                 //cout << "current bounds are " << currentScan->bounds.toString() << endl;
                 //cout << "node merging in " << child->toString() << endl;
+                //cout << "merging with field " << keyElt.toString(true, true) << endl;
                 //cout << "taking advantage of compound index "
-                //     << indexKeyPatterns[currentIndexNumber].toString() << endl;
+                     //<< indices[currentIndexNumber].keyPattern.toString() << endl;
 
-                // Merge the bounds with the existing.
-                if (isAnd) {
-                    currentScan->bounds.joinAnd(oil, indexKeyPatterns[currentIndexNumber]);
-                }
-                else {
-                    currentScan->bounds.joinOr(oil, indexKeyPatterns[currentIndexNumber]);
-                }
+                // We know at this point that the only case where we do this is compound indices so
+                // just short-cut and dump the bounds there.
+                verify(currentScan->bounds.fields[ixtag->pos].name.empty());
+                IndexBoundsBuilder::translate(child, keyElt, &currentScan->bounds.fields[ixtag->pos], &exact);
 
                 if (exact) {
                     root->getChildVector()->erase(root->getChildVector()->begin()
@@ -425,12 +463,14 @@ namespace mongo {
                     // We keep curChild in the AND for affixing later.
                     ++curChild;
                 }
+
+                ++nextIndexPos;
             }
         }
 
         // Output the scan we're done with, if it exists.
         if (NULL != currentScan.get()) {
-            finishIndexScan(currentScan.get(), indexKeyPatterns[currentIndexNumber]);
+            finishIndexScan(currentScan.get(), indices[currentIndexNumber].keyPattern);
             out->push_back(currentScan.release());
         }
 
@@ -440,9 +480,14 @@ namespace mongo {
     // static
     QuerySolutionNode* QueryPlanner::buildIndexedAnd(MatchExpression* root,
                                                      bool inArrayOperator,
-                                                     const vector<BSONObj>& indexKeyPatterns) {
+                                                     const vector<IndexEntry>& indices) {
+        auto_ptr<MatchExpression> autoRoot;
+        if (!inArrayOperator) {
+            autoRoot.reset(root);
+        }
+
         vector<QuerySolutionNode*> ixscanNodes;
-        if (!processIndexScans(root, inArrayOperator, indexKeyPatterns, &ixscanNodes)) {
+        if (!processIndexScans(root, inArrayOperator, indices, &ixscanNodes)) {
             return NULL;
         }
 
@@ -492,14 +537,15 @@ namespace mongo {
         // index, so we put a fetch with filter.
         if (root->numChildren() > 0) {
             FetchNode* fetch = new FetchNode();
-            fetch->filter.reset(root);
+            verify(NULL != autoRoot.get());
+            // Takes ownership.
+            fetch->filter.reset(autoRoot.release());
             // takes ownership
             fetch->child.reset(andResult);
             andResult = fetch;
         }
         else {
-            // root has no children, just get rid of it.
-            delete root;
+            // root has no children, let autoRoot get rid of it when it goes out of scope.
         }
 
         return andResult;
@@ -508,13 +554,15 @@ namespace mongo {
     // static
     QuerySolutionNode* QueryPlanner::buildIndexedOr(MatchExpression* root,
                                                     bool inArrayOperator,
-                                                    const vector<BSONObj>& indexKeyPatterns) {
+                                                    const vector<IndexEntry>& indices) {
+        auto_ptr<MatchExpression> autoRoot;
+        if (!inArrayOperator) {
+            autoRoot.reset(root);
+        }
+
         size_t expectedNumberScans = root->numChildren();
         vector<QuerySolutionNode*> ixscanNodes;
-        if (!processIndexScans(root, inArrayOperator, indexKeyPatterns, &ixscanNodes)) {
-            if (!inArrayOperator) {
-                delete root;
-            }
+        if (!processIndexScans(root, inArrayOperator, indices, &ixscanNodes)) {
             return NULL;
         }
 
@@ -523,9 +571,9 @@ namespace mongo {
         // be answered via an index.
         if (ixscanNodes.size() != expectedNumberScans || (!inArrayOperator && 0 != root->numChildren())) {
             warning() << "planner OR error, non-indexed child of OR.";
-            if (!inArrayOperator) {
-                delete root;
-            }
+            // We won't enumerate an OR without indices for each child, so this isn't an issue, even
+            // if we have an AND with an OR child -- we won't get here unless the OR is fully
+            // indexed.
             return NULL;
         }
 
@@ -545,7 +593,7 @@ namespace mongo {
             else {
                 haveSameSort = true;
                 for (size_t i = 1; i < ixscanNodes.size(); ++i) {
-                    if (0 == ixscanNodes[0]->getSort().woCompare(ixscanNodes[i]->getSort())) {
+                    if (0 != ixscanNodes[0]->getSort().woCompare(ixscanNodes[i]->getSort())) {
                         haveSameSort = false;
                         break;
                     }
@@ -566,10 +614,8 @@ namespace mongo {
         }
 
         // OR must have an index for each child, so we should have detached all children from
-        // 'root', and there's nothing useful to do with an empty or MatchExpression.
-        if (!inArrayOperator) {
-            delete root;
-        }
+        // 'root', and there's nothing useful to do with an empty or MatchExpression.  We let it die
+        // via autoRoot.
 
         return orResult;
     }
@@ -577,32 +623,31 @@ namespace mongo {
     // static
     QuerySolutionNode* QueryPlanner::buildIndexedDataAccess(MatchExpression* root,
                                                             bool inArrayOperator,
-                                                            const vector<BSONObj>& indexKeyPatterns) {
+                                                            const vector<IndexEntry>& indices) {
         if (root->isLogical()) {
             if (MatchExpression::AND == root->matchType()) {
                 // Takes ownership of root.
-                return buildIndexedAnd(root, inArrayOperator, indexKeyPatterns);
+                return buildIndexedAnd(root, inArrayOperator, indices);
             }
             else if (MatchExpression::OR == root->matchType()) {
                 // Takes ownership of root.
-                return buildIndexedOr(root, inArrayOperator, indexKeyPatterns);
+                return buildIndexedOr(root, inArrayOperator, indices);
             }
             else {
                 // Can't do anything with negated logical nodes index-wise.
-                if (!inArrayOperator) {
-                    delete root;
-                }
                 return NULL;
             }
         }
         else {
+            auto_ptr<MatchExpression> autoRoot;
+            if (!inArrayOperator) {
+                autoRoot.reset(root);
+            }
+
             // isArray or isLeaf is true.  Either way, it's over one field, and the bounds builder
             // deals with it.
             if (NULL == root->getTag()) {
                 // No index to use here, not in the context of logical operator, so we're SOL.
-                if (!inArrayOperator) {
-                    delete root;
-                }
                 return NULL;
             }
             else if (Indexability::nodeCanUseIndexOnOwnField(root)) {
@@ -611,9 +656,9 @@ namespace mongo {
 
                 bool exact = false;
                 auto_ptr<IndexScanNode> isn;
-                isn.reset(makeIndexScan(indexKeyPatterns[tag->index], root, &exact));
+                isn.reset(makeIndexScan(indices[tag->index].keyPattern, root, &exact));
 
-                finishIndexScan(isn.get(), indexKeyPatterns[tag->index]);
+                finishIndexScan(isn.get(), indices[tag->index].keyPattern);
 
                 if (inArrayOperator) {
                     return isn.release();
@@ -627,12 +672,10 @@ namespace mongo {
                 // predicate.
                 if (!exact) {
                     FetchNode* fetch = new FetchNode();
-                    fetch->filter.reset(root);
+                    verify(NULL != autoRoot.get());
+                    fetch->filter.reset(autoRoot.release());
                     fetch->child.reset(isn.release());
                     return fetch;
-                }
-                else {
-                    delete root;
                 }
 
                 return isn.release();
@@ -645,7 +688,8 @@ namespace mongo {
                     auto_ptr<AndHashNode> ahn(new AndHashNode());
 
                     for (size_t i = 0; i < root->numChildren(); ++i) {
-                        QuerySolutionNode* node = buildIndexedDataAccess(root->getChild(i), true, indexKeyPatterns);
+                        QuerySolutionNode* node = buildIndexedDataAccess(root->getChild(i), true,
+                                                                         indices);
                         if (NULL != node) {
                             ahn->children.push_back(node);
                         }
@@ -669,7 +713,7 @@ namespace mongo {
                     verify(MatchExpression::ELEM_MATCH_OBJECT);
                     // The child is an AND.
                     verify(1 == root->numChildren());
-                    solution = buildIndexedDataAccess(root->getChild(0), true, indexKeyPatterns);
+                    solution = buildIndexedDataAccess(root->getChild(0), true, indices);
                     if (NULL == solution) { return NULL; }
                 }
 
@@ -677,14 +721,12 @@ namespace mongo {
                 if (inArrayOperator) { return solution; }
 
                 FetchNode* fetch = new FetchNode();
-                fetch->filter.reset(root);
+                // Takes ownership of 'root'.
+                verify(NULL != autoRoot.get());
+                fetch->filter.reset(autoRoot.release());
                 fetch->child.reset(solution);
                 return fetch;
             }
-        }
-
-        if (!inArrayOperator) {
-            delete root;
         }
 
         return NULL;
@@ -826,9 +868,11 @@ namespace mongo {
     }
 
     // static
-    void QueryPlanner::plan(const CanonicalQuery& query, const vector<BSONObj>& indexKeyPatterns,
-                            vector<QuerySolution*>* out) {
+    void QueryPlanner::plan(const CanonicalQuery& query, const vector<IndexEntry>& indices,
+                            size_t options, vector<QuerySolution*>* out) {
         cout << "Begin planning.\nquery = " << query.toString() << endl;
+
+        bool canTableScan = !(options & QueryPlanner::NO_TABLE_SCAN);
 
         // XXX: If pq.hasOption(QueryOption_OplogReplay) use FindingStartCursor equivalent which
         // must be translated into stages.
@@ -838,7 +882,7 @@ namespace mongo {
         // could ask for a tailable cursor and it just tried to give you one.  Now, we fail if we
         // can't provide one.  Is this what we want?
         if (query.getParsed().hasOption(QueryOption_CursorTailable)) {
-            if (!hasNode(query.root(), MatchExpression::GEO_NEAR)) {
+            if (!hasNode(query.root(), MatchExpression::GEO_NEAR) && canTableScan) {
                 out->push_back(makeCollectionScan(query, true));
             }
             return;
@@ -850,7 +894,9 @@ namespace mongo {
             BSONElement natural = query.getParsed().getHint().getFieldDotted("$natural");
             if (!natural.eoo()) {
                 cout << "forcing a table scan due to hinted $natural\n";
-                out->push_back(makeCollectionScan(query, false));
+                if (canTableScan) {
+                    out->push_back(makeCollectionScan(query, false));
+                }
                 return;
             }
         }
@@ -867,12 +913,11 @@ namespace mongo {
                 return;
             }
             cout << "NOT/NOR in plan, just outtping a collscan\n";
-            out->push_back(makeCollectionScan(query, false));
+            if (canTableScan) {
+                out->push_back(makeCollectionScan(query, false));
+            }
             return;
         }
-
-        // XXX: There can only be one NEAR.  If there is a NEAR, it must be either the root or the
-        // root must be an AND and its child must be a NEAR.
 
         // Figure out what fields we care about.
         unordered_set<string> fields;
@@ -884,7 +929,7 @@ namespace mongo {
         */
 
         // Filter our indices so we only look at indices that are over our predicates.
-        vector<BSONObj> relevantIndices;
+        vector<IndexEntry> relevantIndices;
 
         // Hints require us to only consider the hinted index.
         BSONObj hintIndex = query.getParsed().getHint();
@@ -893,9 +938,9 @@ namespace mongo {
         // plan.  If that fails, just scan the _id index.
         if (query.getParsed().isSnapshot()) {
             // Find the ID index in indexKeyPatterns.  It's our hint.
-            for (size_t i = 0; i < indexKeyPatterns.size(); ++i) {
-                if (isIdIndex(indexKeyPatterns[i])) {
-                    hintIndex = indexKeyPatterns[i];
+            for (size_t i = 0; i < indices.size(); ++i) {
+                if (isIdIndex(indices[i].keyPattern)) {
+                    hintIndex = indices[i].keyPattern;
                     break;
                 }
             }
@@ -903,10 +948,10 @@ namespace mongo {
 
         if (!hintIndex.isEmpty()) {
             bool hintValid = false;
-            for (size_t i = 0; i < indexKeyPatterns.size(); ++i) {
-                if (0 == indexKeyPatterns[i].woCompare(hintIndex)) {
+            for (size_t i = 0; i < indices.size(); ++i) {
+                if (0 == indices[i].keyPattern.woCompare(hintIndex)) {
                     relevantIndices.clear();
-                    relevantIndices.push_back(hintIndex);
+                    relevantIndices.push_back(indices[i]);
                     cout << "hint specified, restricting indices to " << hintIndex.toString() << endl;
                     hintValid = true;
                     break;
@@ -917,7 +962,7 @@ namespace mongo {
             }
         }
         else {
-            findRelevantIndices(fields, indexKeyPatterns, &relevantIndices);
+            findRelevantIndices(fields, indices, &relevantIndices);
         }
 
         // Figure out how useful each index is to each predicate.
@@ -987,6 +1032,8 @@ namespace mongo {
 
         // If a sort order is requested, there may be an index that provides it, even if that
         // index is not over any predicates in the query.
+        //
+        // XXX XXX: Can we do this even if the index is sparse?  Might we miss things?
         if (!query.getParsed().getSort().isEmpty()) {
             // See if we have a sort provided from an index already.
             bool usingIndexToSort = false;
@@ -999,8 +1046,8 @@ namespace mongo {
             }
 
             if (!usingIndexToSort) {
-                for (size_t i = 0; i < indexKeyPatterns.size(); ++i) {
-                    const BSONObj& kp = indexKeyPatterns[i];
+                for (size_t i = 0; i < indices.size(); ++i) {
+                    const BSONObj& kp = indices[i].keyPattern;
                     if (0 == kp.woCompare(query.getParsed().getSort())) {
                         IndexScanNode* isn = new IndexScanNode();
                         isn->indexKeyPattern = kp;
@@ -1031,7 +1078,8 @@ namespace mongo {
         }
 
         // TODO: Do we always want to offer a collscan solution?
-        if (!hasNode(query.root(), MatchExpression::GEO_NEAR)) {
+        // XXX: currently disabling the always-use-a-collscan in order to find more planner bugs.
+        if (!hasNode(query.root(), MatchExpression::GEO_NEAR) && 0 == out->size() && canTableScan) {
             QuerySolution* collscan = makeCollectionScan(query, false);
             out->push_back(collscan);
             cout << "Outputting a collscan\n";

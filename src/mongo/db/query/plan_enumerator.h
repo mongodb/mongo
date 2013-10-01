@@ -21,6 +21,7 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/index_entry.h"
 #include "mongo/db/query/index_tag.h"
 
 namespace mongo {
@@ -39,7 +40,7 @@ namespace mongo {
          *
          * Does not take ownership of any arguments.  They must outlive any calls to getNext(...).
          */
-        PlanEnumerator(MatchExpression* root, const vector<BSONObj>* indices);
+        PlanEnumerator(MatchExpression* root, const vector<IndexEntry>* indices);
         ~PlanEnumerator();
 
         /**
@@ -72,7 +73,7 @@ namespace mongo {
         MatchExpression* _root;
 
         // Indices we're allowed to enumerate with.
-        const vector<BSONObj>* _indices;
+        const vector<IndexEntry>* _indices;
 
         //
         // Memoization strategy
@@ -96,7 +97,7 @@ namespace mongo {
          * If an assigned index is compound, checkCompound looks for predicates that are over fields
          * in the compound index.
          */
-        void checkCompound(MatchExpression* node);
+        void checkCompound(string prefix, MatchExpression* node);
 
         /**
          * Traverses the memo structure and annotates the tree with IndexTags for the chosen

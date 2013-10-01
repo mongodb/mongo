@@ -54,7 +54,10 @@ namespace mongo {
         if (PlanStage::ADVANCED == status) {
             WorkingSetMember* member = _ws->get(id);
             Status status = ProjectionExecutor::apply(_projection, member);
-            if (!status.isOK()) { return PlanStage::FAILURE; }
+            if (!status.isOK()) {
+                warning() << "Couldn't execute projection: " << status.toString() << endl;
+                return PlanStage::FAILURE;
+            }
             *out = id;
         }
         else if (PlanStage::NEED_FETCH == status) {

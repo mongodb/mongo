@@ -59,7 +59,8 @@ namespace {
         //
 
         void setIndex(BSONObj keyPattern) {
-            keyPatterns.push_back(keyPattern);
+            // false means not multikey.
+            keyPatterns.push_back(IndexEntry(keyPattern, false));
         }
 
         //
@@ -162,7 +163,7 @@ namespace {
 
         BSONObj queryObj;
         CanonicalQuery* cq;
-        vector<BSONObj> keyPatterns;
+        vector<IndexEntry> keyPatterns;
         vector<QuerySolution*> solns;
     };
 
@@ -356,6 +357,26 @@ namespace {
         cout << indexedSolution->toString() << endl;
     }
 
+    TEST_F(SingleIndexTest, AndWithUnindexedOrChild) {
+        setIndex(BSON("a" << 1));
+        runQuery(fromjson("{a:20, $or: [{b:1}, {c:7}]}"));
+        ASSERT_EQUALS(getNumSolutions(), 2U);
+        QuerySolution* indexedSolution = NULL;
+        getPlanByType(STAGE_FETCH, &indexedSolution);
+        cout << indexedSolution->toString() << endl;
+    }
+
+
+    TEST_F(SingleIndexTest, AndWithOrWithOneIndex) {
+        setIndex(BSON("b" << 1));
+        setIndex(BSON("a" << 1));
+        runQuery(fromjson("{$or: [{b:1}, {c:7}], a:20}"));
+        ASSERT_EQUALS(getNumSolutions(), 2U);
+        QuerySolution* indexedSolution = NULL;
+        getPlanByType(STAGE_FETCH, &indexedSolution);
+        cout << indexedSolution->toString() << endl;
+    }
+
     //
     // Tree operations that require simple tree rewriting.
     //
@@ -516,6 +537,13 @@ namespace {
         setIndex(BSON("a.b.c" << 1));
         runQuery(fromjson("  { a:{ $elemMatch:{ d:{ $elemMatch:{ e:{ $lte:1 } } },"
                                                "b:{ $elemMatch:{ c:{ $gte:1 } } } } } }"));
+        dumpSolutions();
+        ASSERT_EQUALS(getNumSolutions(), 2U);
+    }
+
+    TEST_F(SingleIndexTest, ElemMatchCompoundTwoFields) {
+        setIndex(BSON("a.b" << 1 << "a.c" << 1));
+        runQuery(fromjson("{a : {$elemMatch: {b:1, c:1}}}"));
         dumpSolutions();
         ASSERT_EQUALS(getNumSolutions(), 2U);
     }
