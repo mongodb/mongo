@@ -71,9 +71,6 @@ namespace mongo {
         return Status::OK();
     }
 
-    const std::string AuthorizationManager::SERVER_RESOURCE_NAME = "$SERVER";
-    const std::string AuthorizationManager::CLUSTER_RESOURCE_NAME = "$CLUSTER";
-    const std::string AuthorizationManager::WILDCARD_RESOURCE_NAME = "*";
     const std::string AuthorizationManager::USER_NAME_FIELD_NAME = "name";
     const std::string AuthorizationManager::USER_SOURCE_FIELD_NAME = "source";
     const std::string AuthorizationManager::ROLE_NAME_FIELD_NAME = "name";
