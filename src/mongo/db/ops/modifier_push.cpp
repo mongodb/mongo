@@ -141,18 +141,6 @@ namespace mongo {
                 }
             }
 
-            if (seenSort) {
-                BSONObjIterator itEach(eachElem->embeddedObject());
-                while (itEach.more()) {
-                    BSONElement eachItem = itEach.next();
-                    if (eachItem.type() != Object) {
-                        return Status(
-                            ErrorCodes::BadValue,
-                            "$push like modifiers using $sort require all elements to be objects");
-                    }
-                }
-            }
-
             return Status::OK();
         }
 
@@ -305,9 +293,6 @@ namespace mongo {
             }
 
             _slice = sliceElem.numberLong();
-            if (_slice > 0) {
-                return Status(ErrorCodes::BadValue, "$slice in $push must be zero or negative");
-            }
             _slicePresent = true;
         }
 
@@ -317,44 +302,50 @@ namespace mongo {
                 return Status(ErrorCodes::BadValue, "cannot use $sort in $pushAll");
             }
 
-            if (!_slicePresent) {
-                return Status(ErrorCodes::BadValue, "$sort requires $slice to be present");
-            }
-            else if (sortElem.type() != Object) {
+            if (sortElem.type() != Object && !sortElem.isNumber()) {
                 return Status(ErrorCodes::BadValue, "invalid $sort clause");
             }
 
-            BSONObj sortObj = sortElem.embeddedObject();
-            if (sortObj.isEmpty()) {
-                return Status(ErrorCodes::BadValue, "sort parttern is empty");
-            }
-
-            // Check if the sort pattern is sound.
-            BSONObjIterator sortIter(sortObj);
-            while (sortIter.more()) {
-
-                BSONElement sortPatternElem = sortIter.next();
-
-                // We require either <field>: 1 or -1 for asc and desc.
-                if (!isPatternElement(sortPatternElem)) {
-                    return Status(ErrorCodes::BadValue, "$sort elements' must be either 1 or -1");
+            if (sortElem.isABSONObj()) {
+                BSONObj sortObj = sortElem.embeddedObject();
+                if (sortObj.isEmpty()) {
+                    return Status(ErrorCodes::BadValue, "sort pattern is empty");
                 }
 
-                // All fields parts must be valid.
-                FieldRef sortField;
-                sortField.parse(sortPatternElem.fieldName());
-                if (sortField.numParts() == 0) {
-                    return Status(ErrorCodes::BadValue, "$sort field cannot be empty");
-                }
+                // Check if the sort pattern is sound.
+                BSONObjIterator sortIter(sortObj);
+                while (sortIter.more()) {
 
-                for (size_t i = 0; i < sortField.numParts(); i++) {
-                    if (sortField.getPart(i).size() == 0) {
-                        return Status(ErrorCodes::BadValue, "empty field in dotted sort pattern");
+                    BSONElement sortPatternElem = sortIter.next();
+
+                    // We require either <field>: 1 or -1 for asc and desc.
+                    if (!isPatternElement(sortPatternElem)) {
+                        return Status(ErrorCodes::BadValue,
+                                      "$sort elements' must be either 1 or -1");
+                    }
+
+                    // All fields parts must be valid.
+                    FieldRef sortField;
+                    sortField.parse(sortPatternElem.fieldName());
+                    if (sortField.numParts() == 0) {
+                        return Status(ErrorCodes::BadValue,
+                                      "$sort field cannot be empty");
+                    }
+
+                    for (size_t i = 0; i < sortField.numParts(); i++) {
+                        if (sortField.getPart(i).size() == 0) {
+                            return Status(ErrorCodes::BadValue,
+                                          "empty field in dotted sort pattern");
+                        }
                     }
                 }
+
+                _sort = PatternElementCmp(sortElem.embeddedObject());
+            }
+            else {
+                _sort = PatternElementCmp(BSON("" << sortElem.number()));
             }
 
-            _sort = PatternElementCmp(sortElem.embeddedObject());
             _sortPresent = true;
         }
 
@@ -400,21 +391,6 @@ namespace mongo {
             if (destExists && _preparedState->elemFound.getType() != Array) {
                 return Status(ErrorCodes::BadValue, "can only $push into arrays");
             }
-
-            // If the $sort clause is being used, we require all the items in the array to be
-            // objects themselves (as opposed to base types). This is a temporary restriction
-            // that can be lifted once we support full sort semantics in $push.
-            if (_sortPresent && destExists) {
-                mutablebson::Element curr = _preparedState->elemFound.leftChild();
-                while (curr.ok()) {
-                    if (curr.getType() != Object) {
-                        return Status(ErrorCodes::BadValue,
-                                      "$push with sort requires object arrays");
-                    }
-                    curr = curr.rightSibling();
-                }
-            }
-
         }
         else {
             return status;
@@ -481,7 +457,6 @@ namespace mongo {
 
         }
 
-        // Get count for oplog logging
         // This is the count of the array before we change it, or 0 if missing from the doc.
         _preparedState->arraySize = countChildren(_preparedState->elemFound);
 
@@ -512,17 +487,31 @@ namespace mongo {
             sortChildren(_preparedState->elemFound, _sort);
         }
 
-        // 4. Trim the resulting array according to $slice, if present. We are assuming here
-        // that slices are negative. When we implement both sides slicing, this needs changing.
+        // 4. Trim the resulting array according to $slice, if present.
         if (_slicePresent) {
 
-            int64_t numChildren = mutablebson::countChildren(_preparedState->elemFound);
-            int64_t countRemoved = std::max(static_cast<int64_t>(0), numChildren + _slice);
+            // Slice 0 means to remove all
+            if (_slice == 0) {
+                while(_preparedState->elemFound.ok() &&
+                      _preparedState->elemFound.rightChild().ok()) {
+                    _preparedState->elemFound.rightChild().remove();
+                }
+            }
 
-            mutablebson::Element curr = _preparedState->elemFound.leftChild();
+            const int64_t numChildren = mutablebson::countChildren(_preparedState->elemFound);
+            int64_t countRemoved = std::max(static_cast<int64_t>(0), numChildren - abs(_slice));
+
+            // If _slice is negative, remove from the bottom, otherwise from the top
+            const bool removeFromEnd = (_slice > 0);
+
+            // Either start at right or left depending if we are taking from top or bottom
+            mutablebson::Element curr = removeFromEnd ?
+                                            _preparedState->elemFound.rightChild() :
+                                            _preparedState->elemFound.leftChild();
             while (curr.ok() && countRemoved > 0) {
                 mutablebson::Element toRemove = curr;
-                curr = curr.rightSibling();
+                // Either go right or left depending if we are taking from top or bottom
+                curr = removeFromEnd ? curr.leftSibling() : curr.rightSibling();
 
                 status = toRemove.remove();
                 if (!status.isOK()) {
