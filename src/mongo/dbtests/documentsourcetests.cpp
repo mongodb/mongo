@@ -1645,6 +1645,193 @@ namespace DocumentSourceTests {
         };
     } // namespace DocumentSourceGeoNear
 
+    namespace DocumentSourceMatch {
+        using mongo::DocumentSourceMatch;
+
+        class RedactSafePortion {
+        public:
+            void test(string input, string safePortion) {
+                try {
+                    intrusive_ptr<DocumentSource> matchWrongType =
+                        DocumentSourceMatch::createFromBson(
+                            BSON("$match" << fromjson(input)).firstElement(),
+                            NULL);
+
+                    DocumentSourceMatch* match =
+                        dynamic_cast<DocumentSourceMatch*>(matchWrongType.get());
+
+                    ASSERT_EQUALS(match->redactSafePortion(), fromjson(safePortion));
+                } catch(...) {
+                    unittest::log() << "Problem with redactSafePortion() of: " << input;
+                    throw;
+                }
+            }
+
+            void run() {
+                // Empty
+                test("{}",
+                     "{}");
+
+                // Basic allowed things
+                test("{a:1}",
+                     "{a:1}");
+
+                test("{a:'asdf'}",
+                     "{a:'asdf'}");
+
+                test("{a:/asdf/i}",
+                     "{a:/asdf/i}");
+
+                test("{a: {$regex: 'adsf'}}",
+                     "{a: {$regex: 'adsf'}}");
+
+                test("{a: {$regex: 'adsf', $options: 'i'}}",
+                     "{a: {$regex: 'adsf', $options: 'i'}}");
+
+                test("{a: {$mod: [1, 0]}}",
+                     "{a: {$mod: [1, 0]}}");
+
+                test("{a: {$type: 1}}",
+                     "{a: {$type: 1}}");
+
+                // Basic disallowed things
+                test("{a: null}",
+                     "{}");
+
+                test("{a: {}}",
+                     "{}");
+
+                test("{a: []}",
+                     "{}");
+
+                test("{'a.0': 1}",
+                     "{}");
+
+                test("{'a.0.b': 1}",
+                     "{}");
+
+                test("{a: {$ne: 1}}",
+                     "{}");
+
+                test("{a: {$nin: [1, 2, 3]}}",
+                     "{}");
+
+                test("{a: {$exists: true}}", // could be allowed but currently isn't
+                     "{}");
+
+                test("{a: {$exists: false}}", // can never be allowed
+                     "{}");
+
+                test("{a: {$size: 1}}",
+                     "{}");
+
+                test("{$nor: [{a:1}]}",
+                     "{}");
+
+                // Combinations
+                test("{a:1, b: 'asdf'}",
+                     "{a:1, b: 'asdf'}");
+
+                test("{a:1, b: null}",
+                     "{a:1}");
+
+                test("{a:null, b: null}",
+                     "{}");
+
+                // $elemMatch
+
+                test("{a: {$elemMatch: {b: 1}}}",
+                     "{a: {$elemMatch: {b: 1}}}");
+
+                test("{a: {$elemMatch: {b:null}}}",
+                     "{}");
+
+                test("{a: {$elemMatch: {b:null, c:1}}}",
+                     "{a: {$elemMatch: {c: 1}}}");
+
+                // explicit $and
+                test("{$and:[{a: 1}]}",
+                     "{$and:[{a: 1}]}");
+
+                test("{$and:[{a: 1}, {b: null}]}",
+                     "{$and:[{a: 1}]}");
+
+                test("{$and:[{a: 1}, {b: null, c:1}]}",
+                     "{$and:[{a: 1}, {c:1}]}");
+
+                test("{$and:[{a: null}, {b: null}]}",
+                     "{}");
+
+                // explicit $or
+                test("{$or:[{a: 1}]}",
+                     "{$or:[{a: 1}]}");
+
+                test("{$or:[{a: 1}, {b: null}]}",
+                     "{}");
+
+                test("{$or:[{a: 1}, {b: null, c:1}]}",
+                     "{$or:[{a: 1}, {c:1}]}");
+
+                test("{$or:[{a: null}, {b: null}]}",
+                     "{}");
+
+                test("{}",
+                     "{}");
+
+                // $all and $in
+                test("{a: {$all: [1, 0]}}",
+                     "{a: {$all: [1, 0]}}");
+
+                test("{a: {$all: [1, 0, null]}}",
+                     "{a: {$all: [1, 0]}}");
+
+                test("{a: {$all: [{$elemMatch: {b:1}}]}}", // could be allowed but currently isn't
+                     "{}");
+
+                test("{a: {$all: [1, 0, null]}}",
+                     "{a: {$all: [1, 0]}}");
+
+                test("{a: {$in: [1, 0]}}",
+                     "{a: {$in: [1, 0]}}");
+
+                test("{a: {$in: [1, 0, null]}}",
+                     "{}");
+
+                {
+                    const char* comparisonOps[] = { "$gt", "$lt" , "$gte", "$lte", NULL};
+                    for (int i = 0; comparisonOps[i]; i++) {
+                        const char* op = comparisonOps[i];
+                        test(string("{a: {") + op + ": 1}}",
+                             string("{a: {") + op + ": 1}}");
+
+                        // $elemMatch takes direct expressions ...
+                        test(string("{a: {$elemMatch: {") + op + ": 1}}}",
+                             string("{a: {$elemMatch: {") + op + ": 1}}}");
+
+                        // ... or top-level style full matches
+                        test(string("{a: {$elemMatch: {b: {") + op + ": 1}}}}",
+                             string("{a: {$elemMatch: {b: {") + op + ": 1}}}}");
+
+                        test(string("{a: {") + op + ": null}}",
+                             "{}");
+                        
+                        test(string("{a: {") + op + ": {}}}",
+                             "{}");
+
+                        test(string("{a: {") + op + ": []}}",
+                             "{}");
+
+                        test(string("{'a.0': {") + op + ": null}}",
+                             "{}");
+
+                        test(string("{'a.0.b': {") + op + ": null}}",
+                             "{}");
+                    }
+                }
+            }
+        };
+    } // namespace DocumentSourceGeoNear
+
     class All : public Suite {
     public:
         All() : Suite( "documentsource" ) {
@@ -1748,6 +1935,8 @@ namespace DocumentSourceTests {
             add<DocumentSourceUnwind::Dependencies>();
 
             add<DocumentSourceGeoNear::LimitCoalesce>();
+
+            add<DocumentSourceMatch::RedactSafePortion>();
         }
     } myall;
 

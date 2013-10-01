@@ -688,6 +688,18 @@ namespace mongo {
         // virtuals from DocumentSourceFilterBase
         virtual bool accept(const Document& pDocument) const;
 
+        /** Returns the portion of the match that can safely be promoted to before a $redact.
+         *  If this returns an empty BSONObj, no part of this match may safely be promoted.
+         *
+         *  To be safe to promote, removing a field from a document to be matched must not cause
+         *  that document to be accepted when it would otherwise be rejected. As an example,
+         *  {name: {$ne: "bob smith"}} accepts documents without a name field, which means that
+         *  running this filter before a redact that would remove the name field would leak
+         *  information. On the other hand, {age: {$gt:5}} is ok because it doesn't accept documents
+         *  that have had their age field removed.
+         */
+        BSONObj redactSafePortion() const;
+
     private:
         DocumentSourceMatch(const BSONObj &query,
             const intrusive_ptr<ExpressionContext> &pExpCtx);

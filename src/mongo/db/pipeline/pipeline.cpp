@@ -204,6 +204,9 @@ namespace mongo {
         if (sources.empty())
             return pPipeline;
 
+        // NOTE the rest of this function is all optimizations.
+        // TODO find a clean way to break these up into separate functions.
+
         /*
           Move filters up where possible.
 
@@ -307,6 +310,19 @@ namespace mongo {
             }
 
             (*iter)->optimize();
+        }
+
+        // Optimize [$redact, $match] to [$match, $redact, $match] if possible
+        if (sources.size() >= 2 && dynamic_cast<DocumentSourceRedact*>(sources[0].get())) {
+            if (DocumentSourceMatch* match = dynamic_cast<DocumentSourceMatch*>(sources[1].get())) {
+                const BSONObj redactSafePortion = match->redactSafePortion();
+                if (!redactSafePortion.isEmpty()) {
+                    sources.push_front(
+                        DocumentSourceMatch::createFromBson(
+                            BSON("$match" << redactSafePortion).firstElement(),
+                            pCtx));
+                }
+            }
         }
 
         return pPipeline;
