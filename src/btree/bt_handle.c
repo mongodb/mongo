@@ -437,7 +437,7 @@ __btree_tree_open_empty(WT_SESSION_IMPL *session, int creation)
 	 * or it's actually modified.
 	 */
 	WT_ERR(__wt_page_modify_init(session, leaf));
-	__wt_page_modify_set(session, leaf);
+	__wt_page_only_modify_set(session, leaf);
 
 	btree->root_page = root;
 

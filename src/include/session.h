@@ -13,7 +13,7 @@
 struct __wt_data_handle_cache {
 	WT_DATA_HANDLE *dhandle;
 
-	TAILQ_ENTRY(__wt_data_handle_cache) q;
+	SLIST_ENTRY(__wt_data_handle_cache) l;
 };
 
 /*
@@ -57,7 +57,7 @@ struct __wt_session_impl {
 	WT_EVENT_HANDLER *event_handler;/* Application's event handlers */
 
 	WT_DATA_HANDLE *dhandle;	/* Current data handle */
-	TAILQ_HEAD(__dhandles, __wt_data_handle_cache) dhandles;
+	SLIST_HEAD(__dhandles, __wt_data_handle_cache) dhandles;
 
 	WT_CURSOR *cursor;		/* Current cursor */
 					/* Cursors closed with the session */

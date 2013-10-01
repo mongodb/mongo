@@ -237,7 +237,7 @@ __wt_insert_serial_func(WT_SESSION_IMPL *session, void *args)
 
 	__wt_insert_new_ins_taken(args);
 
-	__wt_page_and_tree_modify_set(session, page);
+	__wt_page_modify_set(session, page);
 	return (0);
 }
 
@@ -395,8 +395,9 @@ __wt_update_serial_func(WT_SESSION_IMPL *session, void *args)
 	__wt_update_upd_taken(args);
 
 	/* Discard obsolete WT_UPDATE structures. */
-	*upd_obsolete = __wt_update_obsolete_check(session, upd->next);
+	*upd_obsolete = upd->next == NULL ?
+	    NULL : __wt_update_obsolete_check(session, upd->next);
 
-	__wt_page_and_tree_modify_set(session, page);
+	__wt_page_modify_set(session, page);
 	return (0);
 }

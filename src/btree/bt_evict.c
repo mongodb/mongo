@@ -718,7 +718,7 @@ __evict_walk(WT_SESSION_IMPL *session, u_int *entriesp, int clean)
 	__wt_spin_lock(session, &conn->dhandle_lock);
 	WT_CSTAT_INCR(session, dh_evict_locks);
 retry:	file_count = 0;
-	TAILQ_FOREACH(dhandle, &conn->dhqh, q) {
+	SLIST_FOREACH(dhandle, &conn->dhlh, l) {
 		if (!WT_PREFIX_MATCH(dhandle->name, "file:") ||
 		    !F_ISSET(dhandle, WT_DHANDLE_OPEN))
 			continue;
@@ -1096,7 +1096,7 @@ __wt_cache_dump(WT_SESSION_IMPL *session)
 	conn = S2C(session);
 	total_bytes = 0;
 
-	TAILQ_FOREACH(dhandle, &conn->dhqh, q) {
+	SLIST_FOREACH(dhandle, &conn->dhlh, l) {
 		if (!WT_PREFIX_MATCH(dhandle->name, "file:") ||
 		    !F_ISSET(dhandle, WT_DHANDLE_OPEN))
 			continue;

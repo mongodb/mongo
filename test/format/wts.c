@@ -263,8 +263,15 @@ wts_create(void)
 	if (DATASOURCE("kvsbdb"))
 		p += snprintf(p, (size_t)(end - p), ",type=kvsbdb");
 
-	if (DATASOURCE("lsm"))
+	if (DATASOURCE("lsm")) {
 		p += snprintf(p, (size_t)(end - p), ",type=lsm");
+		if (MMRAND(1, 10) <= 2)			/* 20% */
+			p += snprintf(
+			    p, (size_t)(end - p), ",lsm_bloom_newest=true");
+		if (MMRAND(1, 10) <= 2)			/* 20% */
+			p += snprintf(
+			    p, (size_t)(end - p), ",lsm_bloom_oldest=true");
+	}
 
 	if (DATASOURCE("memrata"))
 		p += snprintf(p, (size_t)(end - p),

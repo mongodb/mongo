@@ -34,7 +34,7 @@
 struct __wt_data_handle {
 	WT_RWLOCK *rwlock;		/* Lock for shared/exclusive ops */
 	uint32_t   refcnt;		/* Sessions using this handle */
-	TAILQ_ENTRY(__wt_data_handle) q;/* Linked list of handles */
+	SLIST_ENTRY(__wt_data_handle) l;/* Linked list of handles */
 
 	uint64_t name_hash;		/* Hash of name */
 	const char *name;		/* Object name as a URI */

@@ -256,6 +256,8 @@ struct __wt_update;
 #include "packing.i"
 #include "cell.i"
 
+#include "mutex.i"			/* required by btree.i */
+
 #include "btree.i"			/* required by cursor.i */
 #include "cache.i"			/* required by cursor.i */
 #include "txn.i"			/* required by cursor.i */
@@ -263,7 +265,6 @@ struct __wt_update;
 
 #include "bitstring.i"
 #include "column.i"
-#include "mutex.i"
 #include "serial_funcs.i"
 
 #if defined(__cplusplus)

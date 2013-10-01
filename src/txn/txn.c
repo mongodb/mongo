@@ -62,10 +62,13 @@ __wt_txn_release_evict_snapshot(WT_SESSION_IMPL *session)
 void
 __wt_txn_release_snapshot(WT_SESSION_IMPL *session)
 {
+	WT_TXN *txn;
 	WT_TXN_STATE *txn_state;
 
+	txn = &session->txn;
 	txn_state = &S2C(session)->txn_global.states[session->id];
-	WT_ASSERT(session, txn_state->snap_min == WT_TXN_NONE ||
+	WT_ASSERT(session, txn->isolation == TXN_ISO_READ_UNCOMMITTED ||
+	    txn_state->snap_min == WT_TXN_NONE ||
 	    !__wt_txn_visible_all(session, txn_state->snap_min));
 	txn_state->snap_min = WT_TXN_NONE;
 }
@@ -147,9 +150,16 @@ __wt_txn_refresh(WT_SESSION_IMPL *session, uint64_t max_id, int get_snapshot)
 		/*
 		 * Ignore the ID if we are committing (indicated by max_id
 		 * being set): it is about to be released.
+		 *
+		 * Also ignore the ID if it is older than the oldest ID we saw.
+		 * This can happen if we race with a thread that is allocating
+		 * an ID -- the ID will not be used because the thread will
+		 * keep spinning until it gets a valid one.
 		 */
-		if ((id = s->id) != WT_TXN_NONE && id + 1 != max_id) {
-			txn->snapshot[n++] = id;
+		if ((id = s->id) != WT_TXN_NONE && id + 1 != max_id &&
+		    TXNID_LE(prev_oldest_id, id)) {
+			if (get_snapshot)
+				txn->snapshot[n++] = id;
 			if (TXNID_LT(id, snap_min))
 				snap_min = id;
 		}

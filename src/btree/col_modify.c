@@ -270,7 +270,7 @@ __wt_col_append_serial_func(WT_SESSION_IMPL *session, void *args)
 	if (recno > btree->last_recno)
 		btree->last_recno = recno;
 
-	__wt_page_and_tree_modify_set(session, page);
+	__wt_page_modify_set(session, page);
 	return (0);
 }
 

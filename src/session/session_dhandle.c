@@ -20,7 +20,7 @@ __wt_session_add_btree(
 	WT_RET(__wt_calloc_def(session, 1, &dhandle_cache));
 	dhandle_cache->dhandle = session->dhandle;
 
-	TAILQ_INSERT_HEAD(&session->dhandles, dhandle_cache, q);
+	SLIST_INSERT_HEAD(&session->dhandles, dhandle_cache, l);
 
 	if (dhandle_cachep != NULL)
 		*dhandle_cachep = dhandle_cache;
@@ -220,9 +220,9 @@ __session_dhandle_sweep(WT_SESSION_IMPL *session)
 	WT_DATA_HANDLE_CACHE *dhandle_cache, *dhandle_cache_next;
 	WT_DECL_RET;
 
-	dhandle_cache = TAILQ_FIRST(&session->dhandles);
+	dhandle_cache = SLIST_FIRST(&session->dhandles);
 	while (dhandle_cache != NULL) {
-		dhandle_cache_next = TAILQ_NEXT(dhandle_cache, q);
+		dhandle_cache_next = SLIST_NEXT(dhandle_cache, l);
 		dhandle = dhandle_cache->dhandle;
 		if (!F_ISSET(dhandle, WT_DHANDLE_EXCLUSIVE|WT_DHANDLE_OPEN)) {
 			WT_CSTAT_INCR(session, dh_session_handles);
@@ -272,7 +272,7 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 	candidate = dead = 0;
 
 	hash = __wt_hash_city64(uri, strlen(uri));
-	TAILQ_FOREACH(dhandle_cache, &session->dhandles, q) {
+	SLIST_FOREACH(dhandle_cache, &session->dhandles, l) {
 		dhandle = dhandle_cache->dhandle;
 		/*
 		 * We check the local flag WT_DHANDLE_LOCK_ONLY in addition
@@ -375,7 +375,8 @@ __wt_session_discard_btree(
 	WT_DATA_HANDLE *saved_dhandle;
 	WT_DECL_RET;
 
-	TAILQ_REMOVE(&session->dhandles, dhandle_cache, q);
+	SLIST_REMOVE(
+	    &session->dhandles, dhandle_cache, __wt_data_handle_cache, l);
 
 	saved_dhandle = session->dhandle;
 	session->dhandle = dhandle_cache->dhandle;
