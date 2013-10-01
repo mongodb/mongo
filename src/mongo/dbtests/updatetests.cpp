@@ -1469,21 +1469,6 @@ namespace UpdateTests {
         }
     };
 
-    class PushSortInvalidBaseArray : public SetBase {
-    public:
-        void run() {
-            BSONObj expected = fromjson( "{'_id':0,x:[1,2]}" );
-            client().insert( ns(), expected );
-            // { $push : { x : { $each : [ {a:3} ], $slice:-2, $sort : {a:1} } } }
-            BSONObj pushObj = BSON( "$each" << BSON_ARRAY( BSON( "a" << 3 ) ) <<
-                                    "$slice" << -2 <<
-                                    "$sort" << BSON( "a" << 1 ) );
-            client().update( ns(), Query(), BSON( "$push" << BSON( "x" << pushObj ) ) );
-            BSONObj result = client().findOne( ns(), Query() );
-            ASSERT_EQUALS( result, expected );
-        }
-    };
-
     class PushSortInvalidSortType : public SetBase {
     public:
         void run() {
@@ -1598,21 +1583,6 @@ namespace UpdateTests {
             // { $push : { x : { $each : [ {a:2} ], $sort : {a:1}, $sort: {a:1} } } }
             BSONObj pushObj = BSON( "$each" << BSON_ARRAY( BSON( "a" << 2 ) ) <<
                                     "$sort" << BSON( "a" << 1 ) <<
-                                    "$sort" << BSON( "a" << 1 ) );
-            client().update( ns(), Query(), BSON( "$push" << BSON( "x" << pushObj ) ) );
-            BSONObj result = client().findOne( ns(), Query() );
-            ASSERT_EQUALS( result, expected );
-
-        }
-    };
-
-    class PushSortInvalidMissingSliceTo : public SetBase {
-    public:
-        void run() {
-            BSONObj expected = fromjson( "{'_id':0,x:[{a:1},{a:3}]}" );
-            client().insert( ns(), expected );
-            // { $push : { x : { $each : [ {a:2} ], $sort : {a:1} } } }
-            BSONObj pushObj = BSON( "$each" << BSON_ARRAY( BSON( "a" << 2 ) ) <<
                                     "$sort" << BSON( "a" << 1 ) );
             client().update( ns(), Query(), BSON( "$push" << BSON( "x" << pushObj ) ) );
             BSONObj result = client().findOne( ns(), Query() );
@@ -2022,7 +1992,6 @@ namespace UpdateTests {
             add< PushSortSortNestedFields >();
             add< PushSortInvalidSortPattern >();
             add< PushSortInvalidEachType >();
-            add< PushSortInvalidBaseArray >();
             add< PushSortInvalidSortType >();
             add< PushSortInvalidSortValue >();
             add< PushSortInvalidSortDouble >();
@@ -2031,7 +2000,6 @@ namespace UpdateTests {
             add< PushSortInvalidSortSortOrder >();
             add< PushSortInvertedSortAndSlice >();
             add< PushSortInvalidDuplicatedSort >();
-            add< PushSortInvalidMissingSliceTo >();
             add< CantIncParent >();
             add< DontDropEmpty >();
             add< InsertInEmpty >();
