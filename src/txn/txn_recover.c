@@ -35,7 +35,7 @@ __recovery_cursor(WT_SESSION_IMPL *session, WT_RECOVERY *r,
 
 	/*
 	 * Only apply operations in the correct metadata phase, and if the LSN
-	 * is more recent than th last checkpoint.  If there is no entry for a
+	 * is more recent than the last checkpoint.  If there is no entry for a
 	 * file, assume it was dropped.
 	 */
 	if (r->metadata_only != (id == 0) ||
