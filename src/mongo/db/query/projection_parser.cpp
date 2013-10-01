@@ -69,6 +69,10 @@ namespace mongo {
             }
         }
 
+        if (qp->_includedFields.size() > 0 && qp->_includeID) {
+            qp->_includedFields.push_back(string("_id"));
+        }
+
         *out = qp.release();
         return Status::OK();
     }

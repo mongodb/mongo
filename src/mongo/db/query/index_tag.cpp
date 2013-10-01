@@ -45,13 +45,21 @@ namespace mongo {
     bool TagComparison(const MatchExpression* lhs, const MatchExpression* rhs) {
         IndexTag* lhsTag = static_cast<IndexTag*>(lhs->getTag());
         size_t lhsValue = (NULL == lhsTag) ? IndexTag::kNoIndex : lhsTag->index;
+        size_t lhsPos = (NULL == lhsTag) ? IndexTag::kNoIndex : lhsTag->pos;
+
         IndexTag* rhsTag = static_cast<IndexTag*>(rhs->getTag());
         size_t rhsValue = (NULL == rhsTag) ? IndexTag::kNoIndex : rhsTag->index;
+        size_t rhsPos = (NULL == rhsTag) ? IndexTag::kNoIndex : rhsTag->pos;
 
         // First, order on indices.
         if (lhsValue != rhsValue) {
             // This relies on kNoIndex being larger than every other possible index.
             return lhsValue < rhsValue;
+        }
+
+        // Next, order so that the first field of a compound index appears first.
+        if (lhsPos != rhsPos) {
+            return lhsPos < rhsPos;
         }
 
         // Next, order on fields.

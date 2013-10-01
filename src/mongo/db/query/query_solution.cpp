@@ -67,7 +67,7 @@ namespace mongo {
 
     void AndHashNode::appendToString(stringstream* ss, int indent) const {
         addIndent(ss, indent);
-        *ss << "AND_HASH";
+        *ss << "AND_HASH\n";
         if (NULL != filter) {
             addIndent(ss, indent + 1);
             *ss << " filter = " << filter->toString() << endl;
@@ -79,7 +79,8 @@ namespace mongo {
         addIndent(ss, indent + 1);
         *ss << "getSort = " << getSort().toString() << endl;
         for (size_t i = 0; i < children.size(); ++i) {
-            *ss << "Child " << i << ": ";
+            addIndent(ss, indent + 1);
+            *ss << "Child " << i << ":\n";
             children[i]->appendToString(ss, indent + 1);
         }
     }

@@ -60,44 +60,6 @@ namespace mongo {
         // For each indexed field, the values that the field is allowed to take on.
         vector<OrderedIntervalList> fields;
 
-        /**
-         * The provided oil is AND-related to the bounds.  If we have an existing oil over the
-         * field, intersect.  Otherwise, add it to the right location in 'fields'.
-         */
-        void joinAnd(const OrderedIntervalList& oil, const BSONObj& keyPattern) {
-            // cout << "merging oil " << oil.name << " with bounds: " << toString() << endl;
-            // Only disjoint OILs are handled right now.
-            for (size_t i = 0; i < fields.size(); ++i) {
-                if (oil.name == fields[i].name) {
-                    warning() << "Have not implemented OIL-OIL merging yet.";
-                    verify(0);
-                }
-            }
-
-            // Figure out our position in 'fields' from 'keyPattern'
-            size_t pos = 0;
-            BSONObjIterator it(keyPattern);
-            while (it.more() && it.next().fieldName() != oil.name) ++pos;
-            if (pos > fields.size()) {
-                fields.resize(pos);
-            }
-            else {
-                verify("" == fields[pos].name);
-            }
-
-            // XXX: must check later that we fill out adjacent fields.
-            fields[pos] = oil;
-        }
-
-        /**
-         * The provided oil is OR-related to the bounds.  If we have an existing oil over the
-         * field, find the union.  Otherwise, add it to the right location in 'fields'.
-         */
-        void joinOr(const OrderedIntervalList& oil, const BSONObj& keyPattern) {
-            // XXX XXX
-            verify(0);
-        }
-
         // Debugging check.
         // We must have as many fields the key pattern does.
         // The fields must be oriented in the direction we'd encounter them given the indexing

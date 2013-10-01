@@ -23,7 +23,7 @@
 
 namespace mongo {
 
-    PlanEnumerator::PlanEnumerator(MatchExpression* root, const vector<BSONObj>* indices)
+    PlanEnumerator::PlanEnumerator(MatchExpression* root, const vector<IndexEntry>* indices)
         : _root(root), _indices(indices) { }
 
     PlanEnumerator::~PlanEnumerator() {
@@ -54,14 +54,14 @@ namespace mongo {
         if (!_done) {
             // Tag with our first solution.
             tagMemo(_nodeToId[_root]);
-            checkCompound(_root);
+            checkCompound("", _root);
         }
 
         return Status::OK();
     }
 
     bool PlanEnumerator::isCompound(size_t idx) {
-        return (*_indices)[idx].nFields() > 1;
+        return (*_indices)[idx].keyPattern.nFields() > 1;
     }
 
     string PlanEnumerator::NodeSolution::toString() const {
@@ -116,9 +116,10 @@ namespace mongo {
      * This is very expensive if the involved indices/predicates are numerous but
      * I suspect that's rare.  TODO: revisit on perf pass.
      *
-     * TODO: Do we care about compound and with arrays modifying the path?
+     * TODO: We can save time by not bothering to do this if the index is multiKey.
+     * TODO: Perhaps this should be done by the planner??
      */
-    void PlanEnumerator::checkCompound(MatchExpression* node) {
+    void PlanEnumerator::checkCompound(string prefix, MatchExpression* node) {
         if (MatchExpression::AND == node->matchType()) {
             // Step 1: Find all compound indices.
             vector<MatchExpression*> assignedCompound;
@@ -153,17 +154,33 @@ namespace mongo {
             // TODO: This could be optimized a lot.
             for (size_t i = 0; i < assignedCompound.size(); ++i) {
                 IndexTag* childTag = static_cast<IndexTag*>(assignedCompound[i]->getTag());
-                BSONObj kp = (*_indices)[childTag->index];
+
+                // XXX: If we assign a compound index and it's on a multikey index, the planner may
+                // not be able to use the multikey for it, and then it may create a new index scan,
+                // and that new scan will be bogus.  For now don't assign, should fix planner to be
+                // more resilient.  once we figure out fully in what cases array operators can use
+                // compound indices, change this to deal with that.
+                //
+                // That is, we can only safely assign compound indices if the planner uses them as
+                // compound indices whenever we assign them.
+                if ((*_indices)[i].multikey) { continue; }
+
+                const BSONObj& kp = (*_indices)[childTag->index].keyPattern;
                 BSONObjIterator it(kp);
                 it.next();
+
+                size_t posInIdx = 0;
                 // we know isCompound is true so this should be true.
                 verify(it.more());
                 while (it.more()) {
                     BSONElement kpElt = it.next();
+                    ++posInIdx;
                     bool assignedField = false;
                     // Trying to pick an unassigned M.E.
                     for (size_t j = 0; j < unassigned.size(); ++j) {
-                        if (unassigned[j]->path() != kpElt.fieldName()) {
+                        // TODO: is this really required?  This seems really like it's just a
+                        // reiteration of the tagging process.
+                        if (prefix + unassigned[j]->path().toString() != kpElt.fieldName()) {
                             // We need to find a predicate over kpElt.fieldName().
                             continue;
                         }
@@ -180,7 +197,8 @@ namespace mongo {
                         if (std::find(soln->pred->notFirst.begin(), soln->pred->notFirst.end(), childTag->index) != soln->pred->notFirst.end()) {
                             cout << "compound-ing " << kp.toString() << " with node " << unassigned[j]->toString() << endl;
                             assignedField = true;
-                            unassigned[j]->setTag(new IndexTag(childTag->index));
+                            cout << "setting pos to " << posInIdx << endl;
+                            unassigned[j]->setTag(new IndexTag(childTag->index, posInIdx));
                             // We've picked something for this (index, field) tuple.  Don't pick anything else.
                             break;
                         }
@@ -195,9 +213,15 @@ namespace mongo {
             }
         }
 
+        if (Indexability::arrayUsesIndexOnChildren(node)) {
+            if (!node->path().empty()) {
+                prefix += node->path().toString() + ".";
+            }
+        }
+
         // Don't think the traversal order here matters.
         for (size_t i = 0; i < node->numChildren(); ++i) {
-            checkCompound(node->getChild(i));
+            checkCompound(prefix, node->getChild(i));
         }
     }
 
@@ -218,10 +242,7 @@ namespace mongo {
 
     bool PlanEnumerator::prepMemo(MatchExpression* node) {
         if (Indexability::arrayUsesIndexOnChildren(node)) {
-            // TODO: For 'node' to be indexed, do we require all children to be indexed or just one?
-            // Does this depend on the matchType?  Currently we're OK with just one, AND-style,
-            // because elemMatch is the case I'm thinking of.
-
+            // TODO: Fold into logical->AND branch below?
             AndSolution* andSolution = new AndSolution();
             for (size_t i = 0; i < node->numChildren(); ++i) {
                 if (prepMemo(node->getChild(i))) {

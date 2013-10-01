@@ -27,6 +27,7 @@ namespace mongo {
     public:
         /**
          * Is an index over me->path() useful?
+         * This is the same thing as being sargable, if you have a RDBMS background.
          */
         static bool nodeCanUseIndexOnOwnField(const MatchExpression* me) {
             if (me->path().empty()) {
@@ -52,6 +53,8 @@ namespace mongo {
 
         /**
          * This array operator doesn't have any children with fields and can use an index.
+         *
+         * Example: a: {$elemMatch: {$gte: 1, $lte: 1}}.
          */
         static bool arrayUsesIndexOnOwnField(const MatchExpression* me) {
             return me->isArray() && MatchExpression::ELEM_MATCH_VALUE == me->matchType();
@@ -60,6 +63,8 @@ namespace mongo {
         /**
          * Certain array operators require that the field for that operator is prepended
          * to all fields in that operator's children.
+         *
+         * Example: a: {$elemMatch: {b:1, c:1}}.
          */
         static bool arrayUsesIndexOnChildren(const MatchExpression* me) {
             return me->isArray() && (MatchExpression::ELEM_MATCH_OBJECT == me->matchType()

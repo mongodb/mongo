@@ -103,6 +103,7 @@ namespace mongo {
             else {
                 verify(dataObj.isOwned());
                 interval = makePointInterval(dataObj);
+                // XXX: it's exact if the index isn't sparse
                 if (dataObj.firstElement().isNull()) {
                     exact = false;
                 }

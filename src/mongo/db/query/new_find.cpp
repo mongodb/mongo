@@ -158,14 +158,25 @@ namespace mongo {
         }
 
         // If it's not NULL, we may have indices.
-        vector<BSONObj> indices;
+        vector<IndexEntry> indices;
         for (int i = 0; i < nsd->getCompletedIndexCount(); ++i) {
             auto_ptr<IndexDescriptor> desc(CatalogHack::getDescriptor(nsd, i));
-            indices.push_back(desc->keyPattern());
+            indices.push_back(IndexEntry(desc->keyPattern(), desc->isMultikey(), desc->isSparse()));
         }
 
         vector<QuerySolution*> solutions;
-        QueryPlanner::plan(*canonicalQuery, indices, &solutions);
+        size_t options = QueryPlanner::DEFAULT;
+        if (cmdLine.noTableScan) {
+            const string& ns = canonicalQuery->ns();
+            // There are certain cases where we ignore this restriction:
+            bool ignore = canonicalQuery->getQueryObj().isEmpty()
+                          || (string::npos != ns.find(".system."))
+                          || (0 == ns.find("local."));
+            if (!ignore) {
+                options |= QueryPlanner::NO_TABLE_SCAN;
+            }
+        }
+        QueryPlanner::plan(*canonicalQuery, indices, options, &solutions);
 
         /*
         for (size_t i = 0; i < solutions.size(); ++i) {

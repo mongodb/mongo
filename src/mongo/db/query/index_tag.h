@@ -21,7 +21,6 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/matcher/expression.h"
 
-
 namespace mongo {
 
     // output from enumerator to query planner
@@ -29,21 +28,25 @@ namespace mongo {
     public:
         static const size_t kNoIndex;
 
-        IndexTag() : index(kNoIndex) {}
-        IndexTag(size_t i) : index(i) { }
+        IndexTag() : index(kNoIndex), pos(0) {}
+        IndexTag(size_t i) : index(i), pos(0) { }
+        IndexTag(size_t i, size_t p) : index(i), pos(p) { }
 
         virtual ~IndexTag() { }
 
         virtual void debugString(StringBuilder* builder) const {
-            *builder << " || Selected Index #" << index;
+            *builder << " || Selected Index #" << index << " pos " << pos;
         }
 
         virtual MatchExpression::TagData* clone() const {
-            return new IndexTag(index);
+            return new IndexTag(index, pos);
         }
 
         // What index should we try to use for this leaf?
         size_t index;
+
+        // What position are we in the index?  (Compound.)
+        size_t pos;
     };
 
     // used internally
