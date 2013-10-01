@@ -134,12 +134,6 @@ namespace {
         static const char privilegesTypeMismatchMessage[] =
                 "Roles in V1 user documents must be enumerated in an array of strings.";
 
-        if (dbname == AuthorizationManager::WILDCARD_RESOURCE_NAME) {
-            return Status(ErrorCodes::BadValue,
-                          AuthorizationManager::WILDCARD_RESOURCE_NAME +
-                                  " is an invalid database name.");
-        }
-
         if (rolesElement.type() != Array)
             return Status(ErrorCodes::TypeMismatch, privilegesTypeMismatchMessage);
 
