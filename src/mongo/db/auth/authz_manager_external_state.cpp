@@ -156,5 +156,28 @@ namespace mongo {
         return status;
     }
 
+    Status AuthzManagerExternalState::updateOne(
+            const NamespaceString& collectionName,
+            const BSONObj& query,
+            const BSONObj& updatePattern,
+            bool upsert,
+            const BSONObj& writeConcern) {
+        int numUpdated;
+        Status status = update(collectionName,
+                               query,
+                               updatePattern,
+                               upsert,
+                               false,
+                               writeConcern,
+                               &numUpdated);
+        if (!status.isOK()) {
+            return status;
+        }
+        dassert(numUpdated == 1 || numUpdated == 0);
+        if (numUpdated == 0) {
+            return Status(ErrorCodes::NoMatchingDocument, "No document found");
+        }
+        return Status::OK();
+    }
 
 }  // namespace mongo

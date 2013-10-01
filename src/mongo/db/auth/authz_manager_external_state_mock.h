@@ -95,6 +95,13 @@ namespace mongo {
                                  const BSONObj& updatePattern,
                                  bool upsert,
                                  const BSONObj& writeConcern);
+        virtual Status update(const NamespaceString& collectionName,
+                              const BSONObj& query,
+                              const BSONObj& updatePattern,
+                              bool upsert,
+                              bool multi,
+                              const BSONObj& writeConcern,
+                              int* numUpdated);
         virtual Status remove(const NamespaceString& collectionName,
                               const BSONObj& query,
                               const BSONObj& writeConcern,

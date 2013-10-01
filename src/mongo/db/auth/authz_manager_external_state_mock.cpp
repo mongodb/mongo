@@ -182,6 +182,17 @@ namespace mongo {
         }
     }
 
+    Status AuthzManagerExternalStateMock::update(const NamespaceString& collectionName,
+                                                 const BSONObj& query,
+                                                 const BSONObj& updatePattern,
+                                                 bool upsert,
+                                                 bool multi,
+                                                 const BSONObj& writeConcern,
+                                                 int* numUpdated) {
+        return Status(ErrorCodes::InternalError,
+                      "AuthzManagerExternalStateMock::update not implemented in mock.");
+    }
+
     Status AuthzManagerExternalStateMock::remove(
             const NamespaceString& collectionName,
             const BSONObj& query,

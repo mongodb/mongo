@@ -137,12 +137,13 @@ namespace {
         }
     }
 
-    Status AuthzManagerExternalStateMongod::updateOne(
-            const NamespaceString& collectionName,
-            const BSONObj& query,
-            const BSONObj& updatePattern,
-            bool upsert,
-            const BSONObj& writeConcern) {
+    Status AuthzManagerExternalStateMongod::update(const NamespaceString& collectionName,
+                                                   const BSONObj& query,
+                                                   const BSONObj& updatePattern,
+                                                   bool upsert,
+                                                   bool multi,
+                                                   const BSONObj& writeConcern,
+                                                   int* numUpdated) {
         try {
             DBDirectClient client;
             {
@@ -152,7 +153,7 @@ namespace {
                 // WriteContext below
                 Lock::GlobalWrite w;
                 // Client::WriteContext ctx(userNS);
-                client.update(collectionName, query, updatePattern, upsert);
+                client.update(collectionName, query, updatePattern, upsert, multi);
             }
 
             // Handle write concern
@@ -166,12 +167,7 @@ namespace {
                 return Status(ErrorCodes::UnknownError, err);
             }
 
-            int numUpdated = res["n"].numberInt();
-            dassert(numUpdated <= 1 && numUpdated >= 0);
-            if (numUpdated == 0) {
-                return Status(ErrorCodes::NoMatchingDocument, "No document found");
-            }
-
+            *numUpdated = res["n"].numberInt();
             return Status::OK();
         } catch (const DBException& e) {
             return e.toStatus();
