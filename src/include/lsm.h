@@ -52,6 +52,7 @@ struct __wt_lsm_chunk {
 	const char *bloom_uri;		/* URI of Bloom filter, if any */
 	uint64_t count;			/* Approximate count of records */
 	struct timespec create_ts;	/* Creation time (for rate limiting) */
+	uint32_t refcnt;		/* Number of worker thread references */
 
 	uint64_t txnid_max;		/* Newest transactional update */
 
