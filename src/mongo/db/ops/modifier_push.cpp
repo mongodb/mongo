@@ -343,6 +343,12 @@ namespace mongo {
                 _sort = PatternElementCmp(sortElem.embeddedObject());
             }
             else {
+                // Ensure the sortElem number is valid.
+                if (!isPatternElement(sortElem)) {
+                    return Status(ErrorCodes::BadValue,
+                                  "$sort elements' must be either 1 or -1");
+                }
+
                 _sort = PatternElementCmp(BSON("" << sortElem.number()));
             }
 
