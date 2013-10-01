@@ -42,9 +42,9 @@ function doIt( indexVersion ) {
 
     function check() {
         var v = t.validate();
-        if ( !t.valid ) {
-            printjson( t );
-            assert( t.valid );
+        if ( !v.valid ) {
+            printjson( v );
+            assert( v.valid );
         }
         var spec = {};
         for( var i = 0; i < n; ++i ) {
