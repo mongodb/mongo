@@ -472,7 +472,6 @@ namespace mongo {
     // delete ReplicaSetMonitors from ReplicaSetMonitor::remove.
     ReplicaSetMonitor::~ReplicaSetMonitor() {
         scoped_lock lk ( _lock );
-        log() << "deleting replica set monitor for: " << _getServerAddress_inlock() << endl;
         _cacheServerAddresses_inlock();
         pool.removeHost( _getServerAddress_inlock() );
         _nodes.clear();
