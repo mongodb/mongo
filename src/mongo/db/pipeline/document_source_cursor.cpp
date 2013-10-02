@@ -227,7 +227,7 @@ namespace mongo {
              << "sort" << (!_sort.isEmpty() ? Value(_sort) : Value())
              << "limit" << (_limit ? Value(_limit->getLimit()) : Value())
              << "fields" << (_projection ? Value(_projection->getSpec()) : Value())
-             << "coveredIndex" << canUseCoveredIndex(cursor)
+             << "indexOnly" << canUseCoveredIndex(cursor)
              << "cursorType" << cursor->c()->toString()
         ))); // TODO get more plan information
     }
