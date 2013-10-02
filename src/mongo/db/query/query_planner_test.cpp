@@ -59,8 +59,9 @@ namespace {
         //
 
         void setIndex(BSONObj keyPattern) {
-            // false means not multikey.
-            keyPatterns.push_back(IndexEntry(keyPattern, false));
+            // The first false means not multikey.
+            // The second false means not sparse.
+            keyPatterns.push_back(IndexEntry(keyPattern, false, false));
         }
 
         //
@@ -70,13 +71,13 @@ namespace {
         void runQuery(BSONObj query) {
             queryObj = query.getOwned();
             ASSERT_OK(CanonicalQuery::canonicalize(ns, queryObj, &cq));
-            QueryPlanner::plan(*cq, keyPatterns, &solns);
+            QueryPlanner::plan(*cq, keyPatterns, QueryPlanner::INCLUDE_COLLSCAN, &solns);
             ASSERT_GREATER_THAN(solns.size(), 0U);;
         }
 
         void runDetailedQuery(const BSONObj& query, const BSONObj& sort, const BSONObj& proj) {
             ASSERT_OK(CanonicalQuery::canonicalize(ns, query, sort, proj, &cq));
-            QueryPlanner::plan(*cq, keyPatterns, &solns);
+            QueryPlanner::plan(*cq, keyPatterns, QueryPlanner::INCLUDE_COLLSCAN, &solns);
             ASSERT_GREATER_THAN(solns.size(), 0U);;
         }
 
@@ -411,7 +412,7 @@ namespace {
     TEST_F(SingleIndexTest, BasicCovering) {
         setIndex(BSON("x" << 1));
         // query, sort, proj
-        runDetailedQuery(fromjson("{ x : {$gt: 1}}"), BSONObj(), fromjson("{x: 1}"));
+        runDetailedQuery(fromjson("{ x : {$gt: 1}}"), BSONObj(), fromjson("{_id: 0, x: 1}"));
         ASSERT_EQUALS(getNumSolutions(), 2U);
 
         vector<QuerySolution*> solns;

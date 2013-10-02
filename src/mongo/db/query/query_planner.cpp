@@ -1079,7 +1079,8 @@ namespace mongo {
 
         // TODO: Do we always want to offer a collscan solution?
         // XXX: currently disabling the always-use-a-collscan in order to find more planner bugs.
-        if (!hasNode(query.root(), MatchExpression::GEO_NEAR) && 0 == out->size() && canTableScan) {
+        if (!hasNode(query.root(), MatchExpression::GEO_NEAR)
+            && ((options & QueryPlanner::INCLUDE_COLLSCAN) || (0 == out->size() && canTableScan))) {
             QuerySolution* collscan = makeCollectionScan(query, false);
             out->push_back(collscan);
             cout << "Outputting a collscan\n";
