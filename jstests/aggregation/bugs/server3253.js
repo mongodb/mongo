@@ -1,5 +1,7 @@
 // server-3253 Unsharded support for $out
 
+load('jstests/aggregation/extras/utils.js');
+
 var input = db.server3253_in;
 var output = db.server3253_out;
 
@@ -32,6 +34,11 @@ assert.eq(output.getIndexes().length, 2);
 test([{$project: {a: {$multiply: ['$_id', '$_id']}}}],
      [{_id:1, a:1},{_id:2, a:4},{_id:3, a:9}]);
 assert.eq(output.getIndexes().length, 2);
+
+// test with capped collection
+output.drop();
+db.createCollection(output.getName(), {capped: true, size: 2});
+assertErrorCode(input, {$out: output.getName()}, 17152);
 
 // shoudn't leave temp collections laying around
 assert.eq([], db.system.namespaces.find({name: /tmp\.agg_out/}).toArray());

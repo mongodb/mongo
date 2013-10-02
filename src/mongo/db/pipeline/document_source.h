@@ -265,6 +265,8 @@ namespace mongo {
             // avoid false negatives.
             virtual bool isSharded(const NamespaceString& ns) = 0;
 
+            virtual bool isCapped(const NamespaceString& ns) = 0;
+
             // Add new methods as needed.
         };
 
