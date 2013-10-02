@@ -122,6 +122,7 @@ namespace mongo {
         }
     }
 
+    // TODO: Should this really live in the parsing?  Or elsewhere?
     Status isValid(MatchExpression* root) {
         // XXX: There can only be one NEAR.  If there is a NEAR, it must be either the root or the
         // root must be an AND and its child must be a NEAR.

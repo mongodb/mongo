@@ -308,9 +308,10 @@ namespace mongo {
             // ignore this for now.
             if (!Indexability::nodeCanUseIndexOnOwnField(child)) {
                 if (!inArrayOperator) {
-                    // The logical sub-tree is responsible for fully evaluating itself.  Any required
-                    // filters or fetches are already hung on it.  As such, we remove the filter branch
-                    // from our tree.  buildIndexedDataAccess takes ownership of the child.
+                    // The logical sub-tree is responsible for fully evaluating itself.  Any
+                    // required filters or fetches are already hung on it.  As such, we remove the
+                    // filter branch from our tree.  buildIndexedDataAccess takes ownership of the
+                    // child.
                     root->getChildVector()->erase(root->getChildVector()->begin() + curChild);
                     // The curChild of today is the curChild+1 of yesterday.
                 }
@@ -349,23 +350,32 @@ namespace mongo {
             //
             // TODO: Implement union of OILs to allow merging bounds for OR.
             // TODO: Implement intersection of OILs to allow merging of bounds for AND.
-            bool canMergeBounds = (NULL != currentScan.get()) && (currentIndexNumber == ixtag->index) && isAnd;
+
+            bool canMergeBounds = (NULL != currentScan.get())
+                                  && (currentIndexNumber == ixtag->index)
+                                  && isAnd;
 
             // Is it semantically correct to merge bounds?
             //
-            // If the index is NOT multikey, it's always semantically correct.
+            // Guiding principle: must the values we're testing come from the same array in the
+            // document?  If so, we can combine bounds (via intersection or compounding).  If not,
+            // we can't.
             //
-            // If the index is multikey, there are three issues:
+            // If the index is NOT multikey, it's always semantically correct to combine bounds,
+            // as there are no arrays to worry about.
+            //
+            // If the index is multikey, there are arrays of values.  There are three issues:
             //
             // 1. We can't intersect bounds even if the bounds are not on a compound index.
             //    Example:
             //    Let's say we have the document {a: [5, 7]}.
-            //    This document satisfies the query {$or: [ {a: 5}, {a: 7} ] }
+            //    This document satisfies the query {$and: [ {a: 5}, {a: 7} ] }
             //    For the index {a:1} we have the keys {"": 5} and {"": 7}.
-            //    Each child of the OR is tagged with the index {a: 1}
-            //    The interval for the {a: 5} branch is [5, 5].
-            //    The interval for the {a: 7} branch is [7, 7].
-            //    The intersection of the intervals is {}, which yields no results.
+            //    Each child of the AND is tagged with the index {a: 1}
+            //    The interval for the {a: 5} branch is [5, 5].  It is exact.
+            //    The interval for the {a: 7} branch is [7, 7].  It is exact.
+            //    The intersection of the intervals is {}.
+            //    If we scan over {}, the intersection of the intervals, we will retrieve nothing.
             //
             // 2. If we're using a compound index, we can only specify bounds for the first field.
             //    Example:
