@@ -39,8 +39,15 @@ namespace mongo {
     static const string GEOJSON_COORDINATES = "coordinates";
 
     //// Utility functions used by GeoParser functions below.
-    static S2Point coordToPoint(double p0, double p1) {
-        return S2LatLng::FromDegrees(p1, p0).Normalized().ToPoint();
+    static S2Point coordToPoint(double lng, double lat) {
+        // Note that it's (lat, lng) for S2 but (lng, lat) for MongoDB.
+        S2LatLng ll = S2LatLng::FromDegrees(lat, lng).Normalized();
+        if (!ll.is_valid()) {
+            stringstream ss;
+            ss << "coords invalid after normalization, lng = " << lng << " lat = " << lat << endl;
+            uasserted(17125, ss.str());
+        }
+        return ll.ToPoint();
     }
 
     static S2Point coordsToPoint(const vector<BSONElement>& coordElt) {
