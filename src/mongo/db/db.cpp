@@ -594,39 +594,39 @@ namespace mongo {
 #ifdef __linux__
         try
         {
-        const dev_t dev = getPartition(dir);
+            const dev_t dev = getPartition(dir);
 
-        // This path handles the case where the filesystem uses the whole device (including LVM)
-        string path = str::stream() <<
-            "/sys/dev/block/" << major(dev) << ':' << minor(dev) << "/queue/read_ahead_kb";
+            // This path handles the case where the filesystem uses the whole device (including LVM)
+            string path = str::stream() <<
+                "/sys/dev/block/" << major(dev) << ':' << minor(dev) << "/queue/read_ahead_kb";
 
-        if (!boost::filesystem::exists(path)){
-            // This path handles the case where the filesystem is on a partition.
-            path = str::stream()
-                << "/sys/dev/block/" << major(dev) << ':' << minor(dev) // this is a symlink
-                << "/.." // parent directory of a partition is for the whole device
-                << "/queue/read_ahead_kb";
-        }
+            if (!boost::filesystem::exists(path)){
+                // This path handles the case where the filesystem is on a partition.
+                path = str::stream()
+                    << "/sys/dev/block/" << major(dev) << ':' << minor(dev) // this is a symlink
+                    << "/.." // parent directory of a partition is for the whole device
+                    << "/queue/read_ahead_kb";
+            }
 
-        if (boost::filesystem::exists(path)) {
-            ifstream file (path.c_str());
-            if (file.is_open()) {
-                int kb;
-                file >> kb;
-                if (kb > 256) {
-                    log() << startupWarningsLog;
+            if (boost::filesystem::exists(path)) {
+                ifstream file (path.c_str());
+                if (file.is_open()) {
+                    int kb;
+                    file >> kb;
+                    if (kb > 256) {
+                        log() << startupWarningsLog;
 
-                    log() << "** WARNING: Readahead for " << dir << " is set to " << kb << "KB"
-                            << startupWarningsLog;
+                        log() << "** WARNING: Readahead for " << dir << " is set to " << kb << "KB"
+                                << startupWarningsLog;
 
-                    log() << "**          We suggest setting it to 256KB (512 sectors) or less"
-                            << startupWarningsLog;
+                        log() << "**          We suggest setting it to 256KB (512 sectors) or less"
+                                << startupWarningsLog;
 
-                    log() << "**          http://dochub.mongodb.org/core/readahead"
-                            << startupWarningsLog;
+                        log() << "**          http://dochub.mongodb.org/core/readahead"
+                                << startupWarningsLog;
+                    }
                 }
             }
-        }
         }
         catch (const boost::filesystem::filesystem_error& ex)
         {
