@@ -369,7 +369,7 @@ namespace mongo {
     }
 
     // ran at startup.
-    static void repairDatabasesAndCheckVersion() {
+    static void repairDatabasesAndCheckVersion(bool shouldClearNonLocalTmpCollections) {
         //        LastError * le = lastError.get( true );
         Client::GodScope gs;
         LOG(1) << "enter repairDatabases (to check pdfile version #)" << endl;
@@ -384,6 +384,10 @@ namespace mongo {
             DataFile *p = cc().database()->getFile( 0 );
             DataFileHeader *h = p->getHeader();
             checkForIdIndexes(dbName);
+
+            if (shouldClearNonLocalTmpCollections || dbName == "local")
+                cc().database()->clearTmpCollections();
+
             if (!h->isCurrentVersion() || mongodGlobalParams.repair) {
 
                 if( h->version <= 0 ) {
@@ -710,7 +714,13 @@ namespace mongo {
             globalScriptEngine->setGetCurrentOpIdCallback( jsGetCurrentOpIdCallback );
         }
 
-        repairDatabasesAndCheckVersion();
+        // On replica set members we only clear temp collections on DBs other than "local" during
+        // promotion to primary. On pure slaves, they are only cleared when the oplog tells them to.
+        // The local DB is special because it is not replicated.  See SERVER-10927 for more details.
+        const bool shouldClearNonLocalTmpCollections = !(missingRepl
+                                                         || replSettings.usingReplSets()
+                                                         || replSettings.slave == SimpleSlave);
+        repairDatabasesAndCheckVersion(shouldClearNonLocalTmpCollections);
 
         if (mongodGlobalParams.upgrade)
             return;

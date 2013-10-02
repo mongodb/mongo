@@ -112,6 +112,22 @@ namespace mongo {
         changeState(MemberState::RS_RECOVERING);
     }
 
+namespace {
+    void dropAllTempCollections() {
+        vector<string> dbNames;
+        getDatabaseNames(dbNames);
+        for (vector<string>::const_iterator it = dbNames.begin(); it != dbNames.end(); ++it) {
+            // The local db is special because it isn't replicated. It is cleared at startup even on
+            // replica set members.
+            if (*it == "local")
+                continue;
+
+            Client::Context ctx(*it);
+            cc().database()->clearTmpCollections();
+        }
+    }
+}
+
     void ReplSetImpl::assumePrimary() {
         LOG(2) << "replSet assuming primary" << endl;
         verify( iAmPotentiallyHot() );
@@ -131,6 +147,11 @@ namespace mongo {
         }
 
         changeState(MemberState::RS_PRIMARY);
+
+        // This must be done after becoming primary but before releasing the write lock. This adds
+        // the dropCollection entries for every temp collection to the opLog since we want it to be
+        // replicated to secondaries.
+        dropAllTempCollections();
     }
 
     void ReplSetImpl::changeState(MemberState s) { box.change(s, _self); }
