@@ -50,7 +50,7 @@ namespace mongo {
         static const BSONField<long long> millis;
         static const BSONField<BSONObj> indexBounds;
         static const BSONField<std::vector<TypeExplain*> > allPlans;
-        static const BSONField<TypeExplain> oldPlan;
+        static const BSONField<TypeExplain*> oldPlan;
         static const BSONField<std::string> server;
 
         //

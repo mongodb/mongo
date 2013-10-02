@@ -135,6 +135,12 @@ namespace mongo {
                             T* out,
                             string* errMsg = NULL);
 
+        template<typename T>
+        static FieldState extract(BSONObj doc,
+                            const BSONField<T*>& field,
+                            T** out,
+                            string* errMsg = NULL);
+
         /**
          * Similar to the mandatory 'extract' but on a optional field. '*out' would only be
          * allocated if the field is present. The ownership of '*out' would be transferred to

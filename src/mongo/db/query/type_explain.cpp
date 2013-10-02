@@ -38,7 +38,7 @@ namespace mongo {
     const BSONField<long long> TypeExplain::millis("millis");
     const BSONField<BSONObj> TypeExplain::indexBounds("indexBounds", BSONObj());
     const BSONField<std::vector<TypeExplain*> > TypeExplain::allPlans("allPlans");
-    const BSONField<TypeExplain> TypeExplain::oldPlan("oldPlan");
+    const BSONField<TypeExplain*> TypeExplain::oldPlan("oldPlan");
     const BSONField<std::string> TypeExplain::server("server");
 
     TypeExplain::TypeExplain() {
