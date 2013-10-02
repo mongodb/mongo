@@ -592,6 +592,8 @@ namespace mongo {
     /// warn if readahead > 256KB (gridfs chunk size)
     static void checkReadAhead(const string& dir) {
 #ifdef __linux__
+        try
+        {
         const dev_t dev = getPartition(dir);
 
         // This path handles the case where the filesystem uses the whole device (including LVM)
@@ -624,6 +626,11 @@ namespace mongo {
                             << startupWarningsLog;
                 }
             }
+        }
+        }
+        catch (const boost::filesystem::filesystem_error& ex)
+        {
+            log() << ex.what() << endl;
         }
 #endif // __linux__
     }
