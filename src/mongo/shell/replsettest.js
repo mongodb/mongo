@@ -741,7 +741,7 @@ ReplSetTest.prototype.restart = function( n , options, signal, wait ){
     this.stop( n, signal, wait && wait.toFixed ? wait : true, options )
     started = this.start( n , options , true, wait );
 
-    if (jsTestOptions().keyFile && !this.keyFile) {
+    if (jsTestOptions().keyFile || jsTestOptions().useX509) {
         if (started.length) {
              // if n was an array of conns, start will return an array of connections
             for (var i = 0; i < started.length; i++) {
