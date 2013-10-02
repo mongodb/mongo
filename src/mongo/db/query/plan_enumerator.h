@@ -34,9 +34,8 @@ namespace mongo {
         MONGO_DISALLOW_COPYING(PlanEnumerator);
     public:
         /**
-         * Constructs an enumerator for the query specified in 'root', given that the predicates
-         * that can be solved using indices are listed at 'pm', and the index patterns
-         * mentioned there are described by 'indices'.
+         * Constructs an enumerator for the query specified in 'root' which is tagged with
+         * RelevantTag(s).  The index patterns mentioned in the tags are described by 'indices'.
          *
          * Does not take ownership of any arguments.  They must outlive any calls to getNext(...).
          */
