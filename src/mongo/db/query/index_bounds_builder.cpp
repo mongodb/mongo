@@ -27,9 +27,16 @@
  */
 
 #include "mongo/db/query/index_bounds_builder.h"
-#include "mongo/db/query/indexability.h"
+
+#include "mongo/db/geo/geoconstants.h"
+#include "mongo/db/geo/s2common.h"
 #include "mongo/db/index/expression_index.h"
+#include "mongo/db/matcher/expression_geo.h"
+#include "mongo/db/query/indexability.h"
 #include "mongo/util/mongoutils/str.h"
+#include "third_party/s2/s2.h"
+#include "third_party/s2/s2cell.h"
+#include "third_party/s2/s2regioncoverer.h"
 
 namespace mongo {
 
@@ -198,8 +205,24 @@ namespace mongo {
             interval = allValues();
             exact = false;
         }
+        else if (MatchExpression::GEO == expr->matchType()) {
+            const GeoMatchExpression* gme = static_cast<const GeoMatchExpression*>(expr);
+            // Can only do this for 2dsphere.
+            if (!mongoutils::str::equals("2dsphere", elt.valuestrsafe())) {
+                warning() << "Planner error trying to build geo bounds for " << elt.toString()
+                          << " index element.";
+                verify(0);
+            }
+
+            const S2Region& region = gme->getGeoQuery().getRegion();
+            ExpressionMapping::cover2dsphere(region, oilOut);
+            *exactOut = false;
+            // XXX: restructure this method
+            return;
+        }
         else {
-            warning() << "Planner error, trying to build bounds for expr " << expr->toString() << endl;
+            warning() << "Planner error, trying to build bounds for expr "
+                      << expr->toString() << endl;
             verify(0);
         }
 
@@ -227,12 +250,28 @@ namespace mongo {
     }
 
     // static
+    Interval IndexBoundsBuilder::makeRangeInterval(const string& start, const string& end,
+                                                   bool startInclusive, bool endInclusive) {
+        BSONObjBuilder bob;
+        bob.append("", start);
+        bob.append("", end);
+        return makeRangeInterval(bob.obj(), startInclusive, endInclusive);
+    }
+
+    // static
     Interval IndexBoundsBuilder::makePointInterval(const BSONObj& obj) {
         Interval ret;
         ret._intervalData = obj;
         ret.startInclusive = ret.endInclusive = true;
         ret.start = ret.end = obj.firstElement();
         return ret;
+    }
+
+    // static
+    Interval IndexBoundsBuilder::makePointInterval(const string& str) {
+        BSONObjBuilder bob;
+        bob.append("", str);
+        return makePointInterval(bob.obj());
     }
 
     // static

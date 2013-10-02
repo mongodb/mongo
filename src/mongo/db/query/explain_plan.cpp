@@ -81,7 +81,9 @@ namespace mongo {
         //   number of keys that cursor retrieved, and into the stage's stats 'advanced' for
         //   nscannedObjects', which would be the number of keys that survived the IXSCAN
         //   filter. Those keys would have been FETCH-ed, if a fetch is present.
-        if (leaf->stageType == STAGE_COLLSCAN) {
+        //
+        // TODO: This is kind of a lie for STAGE_GEO_NEAR_2DSPHERE.
+        if (leaf->stageType == STAGE_COLLSCAN || leaf->stageType == STAGE_GEO_NEAR_2DSPHERE) {
             res->setCursor("BasicCursor");
             res->setNScanned(leaf->common.advanced);
             res->setNScannedObjects(leaf->common.advanced);

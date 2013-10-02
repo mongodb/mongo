@@ -42,23 +42,34 @@ namespace mongo {
                                                                int type,
                                                                const BSONObj& section ) {
         if (BSONObj::opWITHIN == type || BSONObj::opGEO_INTERSECTS == type) {
-            GeoQuery gq;
+            GeoQuery gq(name);
             if ( !gq.parseFrom( section ) )
                 return StatusWithMatchExpression( ErrorCodes::BadValue, "bad geo query" );
 
             auto_ptr<GeoMatchExpression> e( new GeoMatchExpression() );
-            Status s = e->init( name, gq );
+
+            // Until the index layer accepts non-BSON predicates, or special indices are moved into
+            // stages, we have to clean up the raw object so it can be passed down to the index
+            // layer.
+            BSONObjBuilder bob;
+            bob.append(name, section);
+            Status s = e->init( name, gq, bob.obj() );
             if ( !s.isOK() )
                 return StatusWithMatchExpression( s );
             return StatusWithMatchExpression( e.release() );
         }
         else {
-            NearQuery nq;
+            verify(BSONObj::opNEAR == type);
+            NearQuery nq(name);
             if ( !nq.parseFrom( section ) )
                 return StatusWithMatchExpression( ErrorCodes::BadValue, "bad geo near query" );
-
             auto_ptr<GeoNearMatchExpression> e( new GeoNearMatchExpression() );
-            Status s = e->init( name, nq );
+            // Until the index layer accepts non-BSON predicates, or special indices are moved into
+            // stages, we have to clean up the raw object so it can be passed down to the index
+            // layer.
+            BSONObjBuilder bob;
+            bob.append(name, section);
+            Status s = e->init( name, nq, bob.obj() );
             if ( !s.isOK() )
                 return StatusWithMatchExpression( s );
             return StatusWithMatchExpression( e.release() );

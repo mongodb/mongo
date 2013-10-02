@@ -37,6 +37,7 @@
 #include "mongo/db/exec/merge_sort.h"
 #include "mongo/db/exec/or.h"
 #include "mongo/db/exec/projection.h"
+#include "mongo/db/exec/s2near.h"
 #include "mongo/db/exec/sort.h"
 #include "mongo/db/exec/skip.h"
 #include "mongo/db/index/catalog_hack.h"
@@ -155,6 +156,38 @@ namespace mongo {
                 ret->addChild(childStage);
             }
             return ret.release();
+        }
+        else if (STAGE_GEO_2D == root->getType()) {
+            // XXX: placeholder for having a real stage
+            const Geo2DNode* node = static_cast<const Geo2DNode*>(root);
+            IndexScanParams params;
+            NamespaceDetails* nsd = nsdetails(ns.c_str());
+            if (NULL == nsd) { return NULL; }
+            int idxNo = nsd->findIndexByKeyPattern(node->indexKeyPattern);
+            if (-1 == idxNo) { return NULL; }
+            params.descriptor = CatalogHack::getDescriptor(nsd, idxNo);
+            params.bounds.isSimpleRange = true;
+            params.bounds.startKey = node->seek;
+            return new IndexScan(params, ws, NULL);
+        }
+        else if (STAGE_GEO_NEAR_2D == root->getType()) {
+            // XXX: placeholder for having a real stage
+            const GeoNear2DNode* node = static_cast<const GeoNear2DNode*>(root);
+            IndexScanParams params;
+            NamespaceDetails* nsd = nsdetails(ns.c_str());
+            if (NULL == nsd) { return NULL; }
+            int idxNo = nsd->findIndexByKeyPattern(node->indexKeyPattern);
+            if (-1 == idxNo) { return NULL; }
+            params.descriptor = CatalogHack::getDescriptor(nsd, idxNo);
+            params.bounds.isSimpleRange = true;
+            params.bounds.startKey = node->seek;
+            params.limit = node->numWanted;
+            return new IndexScan(params, ws, NULL);
+        }
+        else if (STAGE_GEO_NEAR_2DSPHERE == root->getType()) {
+            const GeoNear2DSphereNode* node = static_cast<const GeoNear2DSphereNode*>(root);
+            return new S2NearStage(ns, node->indexKeyPattern, node->nq, node->baseBounds,
+                                   node->filter.get(), ws);
         }
         else {
             stringstream ss;

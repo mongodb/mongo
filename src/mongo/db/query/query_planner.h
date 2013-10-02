@@ -182,16 +182,30 @@ namespace mongo {
         //
 
         /**
-         * Create a new IndexScanNode.  The bounds for 'expr' are computed and placed into the
+         * Create a new data access node.
+         *
+         * If the node is an index scan, the bounds for 'expr' are computed and placed into the
          * first field's OIL position.  The rest of the OILs are allocated but uninitialized.
+         *
+         * If the node is a geo node, XXX.
          */
-        static IndexScanNode* makeIndexScan(const BSONObj& indexKeyPattern, MatchExpression* expr,
-                                            bool* exact);
+        static QuerySolutionNode* makeLeafNode(const BSONObj& indexKeyPattern,
+                                               MatchExpression* expr,
+                                               bool* exact);
+
         /**
-         * Fill in any bounds that are missing in 'scan' with the "all values for this field"
-         * interval.
+         * Merge the predicate 'expr' with the leaf node 'node'.
          */
-        static void finishIndexScan(IndexScanNode* scan, const BSONObj& indexKeyPattern);
+        static void mergeWithLeafNode(MatchExpression* expr, const BSONObj& keyPattern,
+                                      size_t pos, bool* exactOut, QuerySolutionNode* node);
+
+        /**
+         * If index scan, fill in any bounds that are missing in 'node' with the "all values for
+         * this field" interval.
+         *
+         * If geo, XXX.
+         */
+        static void finishLeafNode(QuerySolutionNode* node, const BSONObj& indexKeyPattern);
 
         //
         // Analysis of Data Access

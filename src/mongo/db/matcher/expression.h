@@ -145,6 +145,9 @@ namespace mongo {
         // XXX: document
         virtual MatchExpression* shallowClone() const = 0;
 
+        // XXX document
+        virtual bool equivalent( const MatchExpression* other ) const = 0;
+
         //
         // Determine if a document satisfies the tree-predicate.
         //
@@ -188,7 +191,6 @@ namespace mongo {
         virtual string toString() const;
         virtual void debugString( StringBuilder& debug, int level = 0 ) const = 0;
 
-        virtual bool equivalent( const MatchExpression* other ) const = 0;
     protected:
         void _debugAddSpace( StringBuilder& debug, int level ) const;
 

@@ -28,6 +28,7 @@
 
 #include "mongo/db/geo/s2common.h"
 
+#include "mongo/db/geo/geoconstants.h"
 #include "mongo/db/geo/geoparser.h"
 #include "mongo/db/geo/geoquery.h"
 #include "third_party/s2/s2.h"
@@ -105,8 +106,7 @@ namespace mongo {
         return minDist;
     }
 
-    bool S2SearchUtil::distanceBetween(const S2Point& us, const BSONObj& them,
-                                       const S2IndexingParams &params, double *out) {
+    bool S2SearchUtil::distanceBetween(const S2Point& us, const BSONObj& them, double *out) {
         if (GeoParser::isGeometryCollection(them)) {
             GeometryCollection c;
             if (!GeoParser::parseGeometryCollection(them, &c)) { return false; }
@@ -150,37 +150,37 @@ namespace mongo {
                 }
             }
 
-            *out = params.radius * minDist;
+            *out = kRadiusOfEarthInMeters * minDist;
             return true;
         } else if (GeoParser::isMultiPoint(them)) {
             MultiPointWithCRS multiPoint;
             if (!GeoParser::parseMultiPoint(them, &multiPoint)) { return false; }
-            *out = dist(us, multiPoint) * params.radius;
+            *out = dist(us, multiPoint) * kRadiusOfEarthInMeters;
             return true;
         } else if (GeoParser::isMultiLine(them)) {
             MultiLineWithCRS multiLine;
             if (!GeoParser::parseMultiLine(them, &multiLine)) { return false; }
-            *out = dist(us, multiLine) * params.radius;
+            *out = dist(us, multiLine) * kRadiusOfEarthInMeters;
             return true;
         } else if (GeoParser::isMultiPolygon(them)) {
             MultiPolygonWithCRS multiPolygon;
             if (!GeoParser::parseMultiPolygon(them, &multiPolygon)) { return false; }
-            *out = dist(us, multiPolygon) * params.radius;
+            *out = dist(us, multiPolygon) * kRadiusOfEarthInMeters;
             return true;
         } else if (GeoParser::isPolygon(them)) {
             PolygonWithCRS poly;
             if (!GeoParser::parsePolygon(them, &poly)) { return false; }
-            *out = dist(us, poly.polygon) * params.radius;
+            *out = dist(us, poly.polygon) * kRadiusOfEarthInMeters;
             return true;
         } else if (GeoParser::isLine(them)) {
             LineWithCRS line;
             if (!GeoParser::parseLine(them, &line)) { return false; }
-            *out = dist(us, line.line) * params.radius;
+            *out = dist(us, line.line) * kRadiusOfEarthInMeters;
             return true;
         } else if (GeoParser::isPoint(them)) {
             PointWithCRS point;
             if (!GeoParser::parsePoint(them, &point)) { return false; }
-            *out = dist(us, point.point) * params.radius;
+            *out = dist(us, point.point) * kRadiusOfEarthInMeters;
             return true;
         } else {
             return false;

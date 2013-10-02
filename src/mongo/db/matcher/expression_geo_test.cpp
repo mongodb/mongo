@@ -67,7 +67,7 @@ namespace mongo {
         ASSERT(gne.init("a", nq).isOK());
 
         // We can't match the data but we can make sure it was parsed OK.
-        ASSERT_EQUALS(gne.getData().fromRadians, false);
+        ASSERT_EQUALS(gne.getData().centroid.crs, FLAT);
         ASSERT_EQUALS(gne.getData().minDistance, 0);
         ASSERT_EQUALS(gne.getData().maxDistance, 100);
     }

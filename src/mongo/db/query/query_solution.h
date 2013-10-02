@@ -29,6 +29,7 @@
 #pragma once
 
 #include "mongo/db/matcher/expression.h"
+#include "mongo/db/geo/geoquery.h"
 #include "mongo/db/query/index_bounds.h"
 #include "mongo/db/query/projection_parser.h"
 #include "mongo/db/query/stage_types.h"
@@ -392,7 +393,6 @@ namespace mongo {
         virtual ~SkipNode() { }
 
         virtual StageType getType() const { return STAGE_SKIP; }
-
         virtual void appendToString(stringstream* ss, int indent) const;
 
         bool fetched() const { return child->fetched(); }
@@ -403,5 +403,65 @@ namespace mongo {
         int skip;
         scoped_ptr<QuerySolutionNode> child;
     };
+
+    //
+    // Geo nodes.  A thin wrapper above an IXSCAN until we can yank functionality out of
+    // the IXSCAN layer into the stage layer.
+    //
+
+    struct GeoNear2DNode : public QuerySolutionNode {
+        GeoNear2DNode() : numWanted(100) { }
+        virtual ~GeoNear2DNode() { }
+
+        virtual StageType getType() const { return STAGE_GEO_NEAR_2D; }
+        virtual void appendToString(stringstream* ss, int indent) const;
+
+        bool fetched() const { return false; }
+        bool hasField(const string& field) const;
+        bool sortedByDiskLoc() const { return false; }
+        BSONObj getSort() const { return BSONObj(); }
+
+        int numWanted;
+        BSONObj indexKeyPattern;
+        BSONObj seek;
+    };
+
+    // TODO: This is probably an expression index.
+    struct Geo2DNode : public QuerySolutionNode {
+        Geo2DNode() { }
+        virtual ~Geo2DNode() { }
+
+        virtual StageType getType() const { return STAGE_GEO_2D; }
+        virtual void appendToString(stringstream* ss, int indent) const;
+
+        bool fetched() const { return false; }
+        bool hasField(const string& field) const;
+        bool sortedByDiskLoc() const { return false; }
+        BSONObj getSort() const { return BSONObj(); }
+
+        BSONObj indexKeyPattern;
+        BSONObj seek;
+    };
+
+    // This is actually its own standalone stage.
+    struct GeoNear2DSphereNode : public QuerySolutionNode {
+        GeoNear2DSphereNode() { }
+        virtual ~GeoNear2DSphereNode() { }
+
+        virtual StageType getType() const { return STAGE_GEO_NEAR_2DSPHERE; }
+        virtual void appendToString(stringstream* ss, int indent) const;
+
+        bool fetched() const { return true; }
+        bool hasField(const string& field) const { return true; }
+        bool sortedByDiskLoc() const { return false; }
+        BSONObj getSort() const { return BSONObj(); }
+
+        NearQuery nq;
+        IndexBounds baseBounds;
+
+        BSONObj indexKeyPattern;
+        scoped_ptr<MatchExpression> filter;
+    };
+
 
 }  // namespace mongo

@@ -1,3 +1,4 @@
+// DEPRECATED
 /**
 *    Copyright (C) 2013 10gen Inc.
 *
@@ -65,13 +66,17 @@ namespace mongo {
             BSONObj obj = e.Obj();
 
             if (nearQuery.parseFrom(obj)) {
+                if (nearQuery.centroid.crs == FLAT && !nearQuery.isNearSphere) {
+                    return Status(ErrorCodes::BadValue, "flat near query on spherical index");
+                }
                 if (isNearQuery) {
                     return Status(ErrorCodes::BadValue, "Only one $near clause allowed: " +
                                   position.toString(), 16685);
                 }
                 isNearQuery = true;
 
-                if (nearQuery.fromRadians) {
+                // FLAT implies the distances are in radians.  Convert to meters.
+                if (FLAT == nearQuery.centroid.crs) {
                     nearQuery.minDistance *= _params.radius;
                     nearQuery.maxDistance *= _params.radius;
                 }
@@ -90,6 +95,10 @@ namespace mongo {
                               16684);
             }
             regions.push_back(geoQueryField);
+        }
+
+        if (!isNearQuery && regions.size() == 0) {
+            return Status(ErrorCodes::BadValue, "None of index's fields present in seek " + position.toString());
         }
 
         // Remove all the indexed geo regions from the query.  The s2*cursor will

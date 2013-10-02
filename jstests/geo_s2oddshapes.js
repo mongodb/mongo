@@ -41,13 +41,15 @@ var tallPoly = {type: "Polygon",
     ]};
 //We expect that the testPoint (at the origin) will be within this poly.
 var result = t.find({geo: {$within: {$geometry: tallPoly}}});
-assert.eq(result.count(), 1);
+assert.eq(result.itcount(), 1);
+var result = t.find({geo: {$within: {$geometry: tallPoly}}});
 assert.eq(result[0].name, 'origin');
 
 //We expect that the testPoint, and the testHorizLine should geoIntersect
 //with this poly.
 result = t.find({geo: {$geoIntersects: {$geometry: tallPoly}}});
-assert.eq(result.count(), 2);
+assert.eq(result.itcount(), 2);
+result = t.find({geo: {$geoIntersects: {$geometry: tallPoly}}});
 assert.eq(result[0].name, 'horiz');
 assert.eq(result[1].name, 'origin');
 
@@ -60,9 +62,9 @@ var longPoly = {type: "Polygon",
 
 // Thanks to spherical geometry, this poly contains most of the hemisphere.
 result = t.find({geo: {$within: {$geometry: longPoly}}});
-assert.eq(result.count(), 3);
+assert.eq(result.itcount(), 3);
 result = t.find({geo: {$geoIntersects: {$geometry: longPoly}}});
-assert.eq(result.count(), 3);
+assert.eq(result.itcount(), 3);
 
 //Test a poly that is the size of half the earth.
 
@@ -96,7 +98,8 @@ var largePoly = {type: "Polygon",
     ]};
 
 result = t.find({geo: {$within: {$geometry: largePoly}}});
-assert.eq(result.count(), 1);
+assert.eq(result.itcount(), 1);
+result = t.find({geo: {$within: {$geometry: largePoly}}});
 var point = result[0]
 assert.eq(point.name, 'inside');
 
@@ -130,7 +133,8 @@ smallPoly = {type: "Polygon",
     ]};
 
 result = t.find({geo: {$within: {$geometry: smallPoly}}});
-assert.eq(result.count(), 1);
+assert.eq(result.itcount(), 1);
+result = t.find({geo: {$within: {$geometry: smallPoly}}});
 point = result[0]
 assert.eq(point.name, 'inside');
 

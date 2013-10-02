@@ -63,33 +63,41 @@ namespace mongo {
         }
     }
 
-    string IndexBounds::toString() const {
+    string OrderedIntervalList::toString() const {
         stringstream ss;
-        for (size_t i = 0; i < fields.size(); ++i) {
-            if (i > 0) {
+        ss << "['" << name << "']: ";
+        for (size_t j = 0; j < intervals.size(); ++j) {
+            ss << intervals[j].toString();
+            if (j < intervals.size() - 1) {
                 ss << ", ";
             }
-            const OrderedIntervalList& oil = fields[i];
-            ss << "field #" << i << "['" << oil.name << "']: ";
-            for (size_t j = 0; j < oil.intervals.size(); ++j) {
-                const Interval& iv = oil.intervals[j];
-                if (iv.startInclusive) {
-                    ss << "[";
-                }
-                else {
-                    ss << "(";
-                }
-                // false means omit the field name
-                ss << iv.start.toString(false);
-                ss << ", ";
-                ss << iv.end.toString(false);
-                if (iv.endInclusive) {
+        }
+        return ss.str();
+    }
+
+    string IndexBounds::toString() const {
+        stringstream ss;
+        if (isSimpleRange) {
+            ss << "[" << startKey.toString() << ", ";
+            if (endKey.isEmpty()) {
+                ss << "]";
+            }
+            else {
+                ss << endKey.toString();
+                if (endKeyInclusive) {
                     ss << "]";
                 }
                 else {
                     ss << ")";
                 }
             }
+            return ss.str();
+        }
+        for (size_t i = 0; i < fields.size(); ++i) {
+            if (i > 0) {
+                ss << ", ";
+            }
+            ss << "field #" << i << fields[i].toString();
         }
 
         return ss.str();
@@ -122,6 +130,37 @@ namespace mongo {
     // Validity checking for bounds
     //
 
+    bool OrderedIntervalList::isValidFor(int expectedOrientation) const {
+        // Make sure each interval's start is oriented correctly with respect to its end.
+        for (size_t j = 0; j < intervals.size(); ++j) {
+            // false means don't consider field name.
+            int cmp = sgn(intervals[j].end.woCompare(intervals[j].start, false));
+
+            if (cmp == 0 && intervals[j].startInclusive
+                    && intervals[j].endInclusive) { continue; }
+
+            if (cmp != expectedOrientation) {
+                log() << "interval " << intervals[j].toString() << " internally inconsistent";
+                return false;
+            }
+        }
+
+        // Make sure each interval is oriented correctly with respect to its neighbors.
+        for (size_t j = 1; j < intervals.size(); ++j) {
+            int cmp = sgn(intervals[j].start.woCompare(intervals[j - 1].end, false));
+
+            // TODO: We could care if the end of one interval is the start of another.  The bounds
+            // are still valid but they're a bit sloppy; they could have been combined to form one
+            // interval if either of them is inclusive.
+            if (0 == cmp) { continue; }
+            
+            if (cmp != expectedOrientation) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     bool IndexBounds::isValidFor(const BSONObj& keyPattern, int direction) {
         BSONObjIterator it(keyPattern);
 
@@ -139,33 +178,8 @@ namespace mongo {
             // not a number.  Special indices are strings, not numbers.
             int expectedOrientation = direction * ((elt.number() >= 0) ? 1 : -1);
 
-            // Make sure each interval's start is oriented correctly with respect to its end.
-            for (size_t j = 0; j < field.intervals.size(); ++j) {
-                // false means don't consider field name.
-                int cmp = sgn(field.intervals[j].end.woCompare(field.intervals[j].start, false));
-
-                if (cmp == 0 && field.intervals[j].startInclusive
-                    && field.intervals[j].endInclusive) { continue; }
-
-                if (cmp != expectedOrientation) { return false; }
-            }
-
-            // Make sure each interval is oriented correctly with respect to its neighbors.
-            for (size_t j = 1; j < field.intervals.size(); ++j) {
-                int cmp = sgn(field.intervals[j].start.woCompare(field.intervals[j - 1].end,
-                                                                 false));
-
-                if (cmp == 0) {
-                    // The end of one interval is the start of another.  This is only valid if
-                    // they're both open intervals.  Otherwise, it should have been combined to form
-                    // one interval.
-                    if (field.intervals[j].startInclusive || field.intervals[j - 1].endInclusive) {
-                        return false;
-                    }
-                }
-                else if (cmp != expectedOrientation) {
-                    return false;
-                }
+            if (!field.isValidFor(expectedOrientation)) {
+                return false;
             }
         }
 

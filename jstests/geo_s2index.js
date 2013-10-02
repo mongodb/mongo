@@ -38,29 +38,29 @@ t.ensureIndex( { geo : "2dsphere", nonGeo: 1 } )
 assert(!db.getLastError())
 
 res = t.find({ "geo" : { "$geoIntersects" : { "$geometry" : pointA} } });
-assert.eq(res.count(), 3);
+assert.eq(res.itcount(), 3);
 
 res = t.find({ "geo" : { "$geoIntersects" : { "$geometry" : pointB} } });
-assert.eq(res.count(), 4);
+assert.eq(res.itcount(), 4);
 
 res = t.find({ "geo" : { "$geoIntersects" : { "$geometry" : pointD} } });
-assert.eq(res.count(), 1);
+assert.eq(res.itcount(), 1);
 
 res = t.find({ "geo" : { "$geoIntersects" : { "$geometry" : someline} } })
-assert.eq(res.count(), 5);
+assert.eq(res.itcount(), 5);
 
 res = t.find({ "geo" : { "$geoIntersects" : { "$geometry" : somepoly} } })
-assert.eq(res.count(), 6);
+assert.eq(res.itcount(), 6);
 
 res = t.find({ "geo" : { "$within" : { "$geometry" : somepoly} } })
-assert.eq(res.count(), 6);
+assert.eq(res.itcount(), 6);
 
 res = t.find({ "geo" : { "$geoIntersects" : { "$geometry" : somepoly} } }).limit(1)
 assert.eq(res.itcount(), 1);
 
 res = t.find({ "nonGeo": "pointA",
                "geo" : { "$geoIntersects" : { "$geometry" : somepoly} } })
-assert.eq(res.count(), 1);
+assert.eq(res.itcount(), 1);
 
 // Don't crash mongod if we give it bad input.
 t.drop()

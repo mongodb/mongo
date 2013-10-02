@@ -167,7 +167,7 @@ validateOrdering({geo: {$geoNear: {$geometry: originGeo}}})
 print("Millis for uniform:")
 print(t.find(query).explain().millis)
 print("Total points:");
-print(t.find(query).count());
+print(t.find(query).itcount());
 
 t.drop()
 t.ensureIndex({geo: "2dsphere"})
@@ -179,7 +179,7 @@ validateOrdering({geo: {$geoNear: {$geometry: originGeo}}})
 print("Millis for uniform with gaps:")
 print(t.find(query).explain().millis)
 print("Total points:");
-print(t.find(query).count());
+print(t.find(query).itcount());
 
 t.drop()
 t.ensureIndex({geo: "2dsphere"})
@@ -192,7 +192,7 @@ validateOrdering({geo: {$geoNear: {$geometry: originGeo}}})
 print("Millis for uniform with clusters:");
 print(t.find(query).explain().millis);
 print("Total points:");
-print(t.find(query).count());
+print(t.find(query).itcount());
 
 t.drop()
 t.ensureIndex({geo: "2dsphere"})
@@ -211,7 +211,7 @@ validateOrdering({geo: {$geoNear: {$geometry: originGeo}}})
 
 print("Millis for uniform near pole:")
 print(t.find({geo: {$geoNear: {$geometry: originGeo}}}).explain().millis)
-assert.eq(t.find({geo: {$geoNear: {$geometry: originGeo}}}).count(), 50);
+assert.eq(t.find({geo: {$geoNear: {$geometry: originGeo}}}).itcount(), 50);
 
 t.drop()
 t.ensureIndex({geo: "2dsphere"})
@@ -228,7 +228,7 @@ validateOrdering({geo: {$geoNear: {$geometry: originGeo}}})
 
 print("Millis for uniform on meridian:")
 print(t.find({geo: {$near: {$geometry: originGeo}}}).explain().millis)
-assert.eq(t.find({geo: {$geoNear: {$geometry: originGeo}}}).count(), 50);
+assert.eq(t.find({geo: {$geoNear: {$geometry: originGeo}}}).itcount(), 50);
 
 t.drop()
 t.ensureIndex({geo: "2dsphere"})
@@ -245,7 +245,7 @@ validateOrdering({geo: {$near: {$geometry: originGeo}}})
 
 print("Millis for uniform on negative meridian:");
 print(t.find({geo: {$near: {$geometry: originGeo}}}).explain().millis);
-assert.eq(t.find({geo: {$near: {$geometry: originGeo}}}).count(), 50);
+assert.eq(t.find({geo: {$near: {$geometry: originGeo}}}).itcount(), 50);
 
 // Near search with points that are really far away.
 t.drop()
@@ -260,7 +260,8 @@ uniformPoints(origin, 10, 89, 90);
 
 cur = t.find({geo: {$near: {$geometry: originGeo}}})
 
-assert.eq(cur.count(), 10);
+assert.eq(cur.itcount(), 10);
+cur = t.find({geo: {$near: {$geometry: originGeo}}})
 
 print("Near search on very distant points:");
 print(t.find({geo: {$near: {$geometry: originGeo}}}).explain().millis);

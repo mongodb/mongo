@@ -11,7 +11,7 @@ t.insert({geo: { "type" : "LineString", "coordinates": [ [ 40.1, 5.1], [40.2, 5.
 t.insert({geo: { "type" : "LineString", "coordinates": [ [ 40.1, 5.1], [42, 7]]}})
 
 res = t.find({ "geo" : { "$within" : { "$geometry" : somepoly} } })
-assert.eq(res.count(), 1);
+assert.eq(res.itcount(), 1);
 
 t.drop()
 t.ensureIndex({geo: "2dsphere"})
@@ -21,16 +21,16 @@ somepoly = { "type" : "Polygon",
 
 t.insert({geo:{ "type" : "Point", "coordinates": [ 40, 5 ] }})
 res = t.find({ "geo" : { "$within" : { "$geometry" : somepoly} } })
-assert.eq(res.count(), 1);
+assert.eq(res.itcount(), 1);
 // In the hole.  Shouldn't find it.
 t.insert({geo:{ "type" : "Point", "coordinates": [ 41.1, 6.1 ] }})
 res = t.find({ "geo" : { "$within" : { "$geometry" : somepoly} } })
-assert.eq(res.count(), 1);
+assert.eq(res.itcount(), 1);
 // Also in the hole.
 t.insert({geo: { "type" : "LineString", "coordinates": [ [ 41.1, 6.1], [41.2, 6.2]]}})
 res = t.find({ "geo" : { "$within" : { "$geometry" : somepoly} } })
-assert.eq(res.count(), 1);
+assert.eq(res.itcount(), 1);
 // Half-hole, half-not.  Shouldn't be $within.
 t.insert({geo: { "type" : "LineString", "coordinates": [ [ 41.5, 6.5], [42.5, 7.5]]}})
 res = t.find({ "geo" : { "$within" : { "$geometry" : somepoly} } })
-assert.eq(res.count(), 1);
+assert.eq(res.itcount(), 1);

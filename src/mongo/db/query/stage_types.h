@@ -38,6 +38,14 @@ namespace mongo {
         STAGE_AND_SORTED,
         STAGE_COLLSCAN,
         STAGE_FETCH,
+
+        // TODO: This is probably an expression index, but would take even more time than
+        // STAGE_2DSPHERE to straighten out.
+        STAGE_GEO_2D,
+        // The two $geoNear impls imply a fetch+sort and as such are not IXSCANs.
+        STAGE_GEO_NEAR_2D,
+        STAGE_GEO_NEAR_2DSPHERE,
+
         STAGE_IXSCAN,
         STAGE_LIMIT,
         STAGE_OR,

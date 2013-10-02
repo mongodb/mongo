@@ -39,6 +39,27 @@ namespace mongo {
         /** Creates an empty interval */
         Interval();
 
+        string toString() const {
+            stringstream ss;
+            if (startInclusive) {
+                ss << "[";
+            }
+            else {
+                ss << "(";
+            }
+            // false means omit the field name
+            ss << start.toString(false);
+            ss << ", ";
+            ss << end.toString(false);
+            if (endInclusive) {
+                ss << "]";
+            }
+            else {
+                ss << ")";
+            }
+            return ss.str();
+        }
+
         /**
          * Creates an interval that starts at the first field of 'base' and ends at the second
          * field of 'base'. (In other words, 'base' is a bsonobj with at least two elements, of

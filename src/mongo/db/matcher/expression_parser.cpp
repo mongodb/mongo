@@ -217,9 +217,7 @@ namespace mongo {
 
         case BSONObj::opWITHIN:
         case BSONObj::opGEO_INTERSECTS:
-        case BSONObj::opNEAR:
             return expressionParserGeoCallback( name, x, context );
-
         }
 
         return StatusWithMatchExpression( ErrorCodes::BadValue,
@@ -334,6 +332,36 @@ namespace mongo {
     Status MatchExpressionParser::_parseSub( const char* name,
                                              const BSONObj& sub,
                                              AndMatchExpression* root ) {
+        // The one exception to {field : {fully contained argument} } is, of course, geo.  Example:
+        // sub == { field : {$near[Sphere]: [0,0], $maxDistance: 1000, $minDistance: 10 } }
+        // We peek inside of 'sub' to see if it's possibly a $near.  If so, we can't iterate over
+        // its subfields and parse them one at a time (there is no $maxDistance without $near), so
+        // we hand the entire object over to the geo parsing routines.
+
+        BSONObjIterator geoIt(sub);
+        if (geoIt.more()) {
+            BSONElement firstElt = geoIt.next();
+            if (firstElt.isABSONObj()) {
+                const char* fieldName = firstElt.fieldName();
+                // TODO: Having these $fields here isn't ideal but we don't want to pull in anything
+                // from db/geo at this point, since it may not actually be linked in...
+                if (mongoutils::str::equals(fieldName, "$near")
+                    || mongoutils::str::equals(fieldName, "$nearSphere")
+                    || mongoutils::str::equals(fieldName, "$geoNear")
+                    || mongoutils::str::equals(fieldName, "$maxDistance")
+                    || mongoutils::str::equals(fieldName, "$minDistance")) {
+
+                    StatusWithMatchExpression s = expressionParserGeoCallback(name,
+                                                                              firstElt.getGtLtOp(),
+                                                                              sub);
+                    if (s.isOK()) {
+                        root->add(s.getValue());
+                        return Status::OK();
+                    }
+                }
+            }
+        }
+
         BSONObjIterator j( sub );
         while ( j.more() ) {
             BSONElement deep = j.next();

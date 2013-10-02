@@ -83,17 +83,10 @@ namespace mongo {
 
         bool requiresDocument() const {
             // If you're excluding fields, you must have something to exclude them from.
-            if (_excludedFields.size() > 0) {
-                verify(0 == _includedFields.size());
-                return true;
-            }
-
-            // If you're including fields, they could come from an index.
-            return false;
+            return _excludedFields.size() > 0;
         }
 
         virtual const vector<string>& requiredFields() const {
-            verify(0 == _excludedFields.size());
             return _includedFields;
         }
 

@@ -14,7 +14,7 @@ t.ensureIndex({loc: "2dsphere"});
 
 var km = 1000,
     earthRadiusMeters = 6378.1 * km,
-    geoJSONPoint = {$geometry: {type: 'Point', coordinates: [0, 0]}},
+    geoJSONPoint = {type: 'Point', coordinates: [0, 0]},
     // One degree of longitude at the equator, about 111 km.
     degreeInMeters = 2 * Math.PI * earthRadiusMeters / 360,
     metersEpsilon = Number.MIN_VALUE;
@@ -29,27 +29,32 @@ while (degreeInMeters + metersEpsilon == degreeInMeters) { metersEpsilon *= 2; }
 // Test boundary conditions for $near and GeoJSON, in meters.
 //
 
+
+// minDistance must be within the args to $near, not on the side.
+assert.throws(function() { t.find({loc:{$near:{$geometry: geoJSONPoint},
+                                        $minDistance:0.1}}).itcount();});
+
 assert.eq(
     1, t.find({loc: {
-        $near: geoJSONPoint,
-        $minDistance: degreeInMeters
-    }}).count(),
+        $near: {$geometry: geoJSONPoint,
+                $minDistance: degreeInMeters
+    }}}).itcount(),
     "Expected to find (0, 1) within $minDistance 1 degree from origin"
 );
 
 assert.eq(
     1, t.find({loc: {
-        $near: geoJSONPoint,
-        $minDistance: degreeInMeters - metersEpsilon
-    }}).count(),
+        $near: {$geometry: geoJSONPoint,
+                $minDistance: degreeInMeters - metersEpsilon
+    }}}).itcount(),
     "Expected to find (0, 1) within $minDistance (1 degree - epsilon) from origin"
 );
 
 assert.eq(
     0, t.find({loc: {
-        $near: geoJSONPoint,
-        $minDistance: degreeInMeters + metersEpsilon
-    }}).count(),
+        $near: {$geometry: geoJSONPoint,
+                $minDistance: degreeInMeters + metersEpsilon
+    }}}).itcount(),
     "Expected *not* to find (0, 1) within $minDistance (1 degree + epsilon) from origin"
 );
 
@@ -59,9 +64,9 @@ assert.eq(
 
 assert.eq(
     1, t.find({loc: {
-        $nearSphere: geoJSONPoint,
-        $minDistance: degreeInMeters
-    }}).count(),
+        $nearSphere: {$geometry: geoJSONPoint,
+                      $minDistance: degreeInMeters
+    }}}).itcount(),
     "Expected to find (0, 1) within $minDistance 1 degree from origin"
 );
 
@@ -69,7 +74,7 @@ assert.eq(
     1, t.find({loc: {
         $nearSphere: geoJSONPoint,
         $minDistance: degreeInMeters - metersEpsilon
-    }}).count(),
+    }}).itcount(),
     "Expected to find (0, 1) within $minDistance (1 degree - epsilon) from origin"
 );
 
@@ -77,7 +82,7 @@ assert.eq(
     0, t.find({loc: {
         $nearSphere: geoJSONPoint,
         $minDistance: degreeInMeters + metersEpsilon
-    }}).count(),
+    }}).itcount(),
     "Expected *not* to find (0, 1) within $minDistance (1 degree + epsilon) from origin"
 );
 
@@ -98,7 +103,7 @@ assert.eq(
     1, t.find({loc: {
         $nearSphere: legacyPoint,
         $minDistance: degreeInRadians
-    }}).count(),
+    }}).itcount(),
     "Expected to find (0, 1) within $minDistance 1 degree from origin"
 );
 
@@ -106,7 +111,7 @@ assert.eq(
     1, t.find({loc: {
         $nearSphere: legacyPoint,
         $minDistance: degreeInRadians - radiansEpsilon
-    }}).count(),
+    }}).itcount(),
     "Expected to find (0, 1) within $minDistance (1 degree - epsilon) from origin"
 );
 
@@ -114,6 +119,6 @@ assert.eq(
     0, t.find({loc: {
         $nearSphere: legacyPoint,
         $minDistance: degreeInRadians + radiansEpsilon
-    }}).count(),
+    }}).itcount(),
     "Expected *not* to find (0, 1) within $minDistance (1 degree + epsilon) from origin"
 );

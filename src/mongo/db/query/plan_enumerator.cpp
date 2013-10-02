@@ -310,6 +310,14 @@ namespace mongo {
                 // To be exhaustive, we would compute all solutions of size 1, 2, ...,
                 // node->numChildren().  Each of these solutions would get a place in the
                 // memo structure.
+
+                // If there is a geoNear, we put it at the start of our options to ensure that, even
+                // if we enumerate one plan, we will index it.
+                //
+                // XXX: This is a crappy substitute for something smarter, namely always including
+                // geoNear in every possible selection inside of an AND.  Revisit when we enum
+                // more than one plan.
+                size_t geoNearChild = IndexTag::kNoIndex;
                 
                 // For efficiency concerns, we don't explore any more than the size-1 members
                 // of the power set.  That is, we will only use one index at a time.
@@ -319,9 +327,26 @@ namespace mongo {
                     // indices.
                     if (prepMemo(node->getChild(i))) {
                         vector<size_t> option;
-                        option.push_back(_nodeToId[node->getChild(i)]);
+                        size_t childID = _nodeToId[node->getChild(i)];
+                        option.push_back(childID);
                         andSolution->subnodes.push_back(option);
+
+                        // Fill out geoNearChild, possibly.
+                        // TODO: Actually rank enumeration aside from "always pick GEO_NEAR".
+                        if (NULL != _memo[childID]) {
+                            NodeSolution* ns = _memo[childID];
+                            if (NULL != ns->pred) {
+                                verify(NULL != ns->pred->expr);
+                                if (MatchExpression::GEO_NEAR == ns->pred->expr->matchType()) {
+                                    geoNearChild = andSolution->subnodes.size() - 1;
+                                }
+                            }
+                        }
                     }
+                }
+
+                if (IndexTag::kNoIndex != geoNearChild && (0 != geoNearChild)) {
+                    andSolution->subnodes[0].swap(andSolution->subnodes[geoNearChild]);
                 }
 
                 size_t myID = _inOrderCount++;

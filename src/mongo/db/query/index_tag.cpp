@@ -23,6 +23,8 @@
 
 namespace mongo {
 
+    // TODO: Move out of the enumerator and into the planner.
+
     const size_t IndexTag::kNoIndex = std::numeric_limits<size_t>::max();
 
     void tagForSort(MatchExpression* tree) {
@@ -55,6 +57,14 @@ namespace mongo {
         if (lhsValue != rhsValue) {
             // This relies on kNoIndex being larger than every other possible index.
             return lhsValue < rhsValue;
+        }
+
+        // Next, order so that if there's a GEO_NEAR it's first.
+        if (MatchExpression::GEO_NEAR == lhs->matchType()) {
+            return true;
+        }
+        else if (MatchExpression::GEO_NEAR == rhs->matchType()) {
+            return false;
         }
 
         // Next, order so that the first field of a compound index appears first.

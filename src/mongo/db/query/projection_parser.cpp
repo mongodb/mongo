@@ -69,7 +69,7 @@ namespace mongo {
             }
         }
 
-        if (qp->_includedFields.size() > 0 && qp->_includeID) {
+        if (qp->_includeID) {
             qp->_includedFields.push_back(string("_id"));
         }
 

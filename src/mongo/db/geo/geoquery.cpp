@@ -1,43 +1,38 @@
 /**
-*    Copyright (C) 2013 10gen Inc.
-*
-*    This program is free software: you can redistribute it and/or  modify
-*    it under the terms of the GNU Affero General Public License, version 3,
-*    as published by the Free Software Foundation.
-*
-*    This program is distributed in the hope that it will be useful,
-*    but WITHOUT ANY WARRANTY; without even the implied warranty of
-*    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-*    GNU Affero General Public License for more details.
-*
-*    You should have received a copy of the GNU Affero General Public License
-*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-*
-*    As a special exception, the copyright holders give permission to link the
-*    code of portions of this program with the OpenSSL library under certain
-*    conditions as described in each individual source file and distribute
-*    linked combinations including the program with the OpenSSL library. You
-*    must comply with the GNU Affero General Public License in all respects for
-*    all of the code used other than as permitted herein. If you modify file(s)
-*    with this exception, you may extend this exception to your version of the
-*    file(s), but you are not obligated to do so. If you do not wish to do so,
-*    delete this exception statement from your version. If you delete this
-*    exception statement from all source files in the program, then also delete
-*    it in the license file.
-*/
+ *    Copyright (C) 2013 MongoDB Inc.
+ *
+ *    This program is free software: you can redistribute it and/or  modify
+ *    it under the terms of the GNU Affero General Public License, version 3,
+ *    as published by the Free Software Foundation.
+ *
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU Affero General Public License for more details.
+ *
+ *    You should have received a copy of the GNU Affero General Public License
+ *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the GNU Affero General Public License in all respects for
+ *    all of the code used other than as permitted herein. If you modify file(s)
+ *    with this exception, you may extend this exception to your version of the
+ *    file(s), but you are not obligated to do so. If you do not wish to do so,
+ *    delete this exception statement from your version. If you delete this
+ *    exception statement from all source files in the program, then also delete
+ *    it in the license file.
+ */
 
 #include "mongo/db/geo/geoquery.h"
-
-#ifdef _WIN32
-#include <float.h>
-#define nextafter _nextafter
-#else
-#include <cmath> // nextafter
-#endif
 
 #include "mongo/db/geo/geoconstants.h"
 
 namespace mongo {
+
+    using mongoutils::str::equals;
 
     bool NearQuery::parseFromGeoNear(const BSONObj &obj, double radius) {
         if (obj["near"].eoo()) { return false; }
@@ -47,102 +42,79 @@ namespace mongo {
             return false;
         }
 
-        // The CRS for the legacy points dictates that distances are in radians.
-        fromRadians = (FLAT == centroid.crs);
-
         if (!obj["minDistance"].eoo()) {
             uassert(17035, "minDistance must be a number", obj["minDistance"].isNumber());
             double distArg = obj["minDistance"].number();
             uassert(16901, "minDistance must be non-negative", distArg >= 0.0);
-            if (fromRadians) {
-                minDistance = distArg * radius;
-            } else {
-                minDistance = distArg;
-            }
+            minDistance = distArg;
         }
 
         if (!obj["maxDistance"].eoo()) {
             uassert(17036, "maxDistance must be a number", obj["maxDistance"].isNumber());
             double distArg = obj["maxDistance"].number();
             uassert(16902, "maxDistance must be non-negative", distArg >= 0.0);
-            if (fromRadians) {
-                maxDistance = distArg * radius;
-            } else {
-                maxDistance = distArg;
-            }
-
-            uassert(17037, "maxDistance too large",
-                    maxDistance <= nextafter(M_PI * radius, DBL_MAX));
+            maxDistance = distArg;
         }
+
         return true;
     }
 
-    bool NearQuery::parseFrom(const BSONObj &obj) {
+    bool NearQuery::parseLegacyQuery(const BSONObj &obj) {
         bool hasGeometry = false;
-        bool hasMaxDistance = false;
 
         // First, try legacy near, e.g.:
         // t.find({ loc : { $nearSphere: [0,0], $minDistance: 1, $maxDistance: 3 }})
         // t.find({ loc : { $nearSphere: [0,0] }})
         // t.find({ loc : { $near: { someGeoJSONPoint}})
+        // t.find({ loc : { $geoNear: { someGeoJSONPoint}})
         BSONObjIterator it(obj);
         while (it.more()) {
             BSONElement e = it.next();
-            bool isNearSphere = mongoutils::str::equals(e.fieldName(), "$nearSphere");
-            bool isMinDistance = mongoutils::str::equals(e.fieldName(), "$minDistance");
-            bool isMaxDistance = mongoutils::str::equals(e.fieldName(), "$maxDistance");
-            bool isNear = mongoutils::str::equals(e.fieldName(), "$near")
-                          || mongoutils::str::equals(e.fieldName(), "$geoNear");
-            if (isNearSphere || isNear) {
+            if (equals(e.fieldName(), "$near") || equals(e.fieldName(), "$geoNear")
+                                               || equals(e.fieldName(), "$nearSphere")) {
                 if (!e.isABSONObj()) { return false; }
                 BSONObj embeddedObj = e.embeddedObject();
 
                 if (!GeoParser::isPoint(embeddedObj)) { continue; }
                 if (!GeoParser::parsePoint(embeddedObj, &centroid)) { return false; }
 
-                if (isNearSphere) {
-                    fromRadians = (centroid.crs == FLAT);
-                    hasGeometry = true;
-                } else if (isNear && (centroid.crs == SPHERE)) {
-                    // We don't accept $near : [oldstylepoint].
-                    hasGeometry = true;
-                }
-            } else if (isMinDistance) {
+                isNearSphere = equals(e.fieldName(), "$nearSphere");
+                hasGeometry = true;
+            } else if (equals(e.fieldName(), "$minDistance")) {
                 uassert(16893, "$minDistance must be a number", e.isNumber());
                 minDistance = e.Number();
                 uassert(16894, "$minDistance must be non-negative", minDistance >= 0.0);
-            } else if (isMaxDistance) {
+            } else if (equals(e.fieldName(), "$maxDistance")) {
                 uassert(16895, "$maxDistance must be a number", e.isNumber());
                 maxDistance = e.Number();
                 uassert(16896, "$maxDistance must be non-negative", maxDistance >= 0.0);
-                hasMaxDistance = true;
             }
         }
 
-        // Add fudge to maxValidDistance so we don't throw when the provided maxDistance
-        // is on the edge.
-        double maxValidDistance = nextafter(fromRadians ?
-                                            M_PI :
-                                            kRadiusOfEarthInMeters * M_PI, DBL_MAX);
+        return hasGeometry;
+    }
 
-        uassert(17038, "$minDistance too large", minDistance < maxValidDistance);
-        uassert(17039, "$maxDistance too large",
-                !hasMaxDistance || maxDistance <= maxValidDistance);
+    bool NearQuery::parseNewQuery(const BSONObj &obj) {
+        bool hasGeometry = false;
 
-        if (hasGeometry) { return true; }
+        BSONObjIterator objIt(obj);
+        if (!objIt.more()) { return false; }
+        BSONElement e = objIt.next();
+        // Just one arg. to $geoNear.
+        if (objIt.more()) { return false; }
 
-        // Next, try "new" near:
+        // Parse "new" near:
         // t.find({"geo" : {"$near" : {"$geometry": pointA, $minDistance: 1, $maxDistance: 3}}})
-        BSONElement e = obj.firstElement();
+        // t.find({"geo" : {"$geoNear" : {"$geometry": pointA, $minDistance: 1, $maxDistance: 3}}})
         if (!e.isABSONObj()) { return false; }
         BSONObj::MatchType matchType = static_cast<BSONObj::MatchType>(e.getGtLtOp());
         if (BSONObj::opNEAR != matchType) { return false; }
 
-        // Restart it.
-        it = BSONObjIterator(e.embeddedObject());
+        // Iterate over the argument.
+        BSONObjIterator it(e.embeddedObject());
         while (it.more()) {
             BSONElement e = it.next();
-            if (mongoutils::str::equals(e.fieldName(), "$geometry")) {
+            if (equals(e.fieldName(), "$geometry")) {
                 if (e.isABSONObj()) {
                     BSONObj embeddedObj = e.embeddedObject();
                     uassert(16885, "$near requires a point, given " + embeddedObj.toString(),
@@ -152,19 +124,30 @@ namespace mongo {
                             (SPHERE == centroid.crs));
                     hasGeometry = true;
                 }
-            } else if (mongoutils::str::equals(e.fieldName(), "$minDistance")) {
+            } else if (equals(e.fieldName(), "$minDistance")) {
                 uassert(16897, "$minDistance must be a number", e.isNumber());
                 minDistance = e.Number();
                 uassert(16898, "$minDistance must be non-negative", minDistance >= 0.0);
-                uassert(17084, "$minDistance too large", minDistance < maxValidDistance);
-            } else if (mongoutils::str::equals(e.fieldName(), "$maxDistance")) {
+            } else if (equals(e.fieldName(), "$maxDistance")) {
                 uassert(16899, "$maxDistance must be a number", e.isNumber());
                 maxDistance = e.Number();
                 uassert(16900, "$maxDistance must be non-negative", maxDistance >= 0.0);
-                uassert(16992, "$maxDistance too large", maxDistance <= maxValidDistance);
             }
         }
+
         return hasGeometry;
+    }
+
+
+    bool NearQuery::parseFrom(const BSONObj &obj) {
+        if (parseLegacyQuery(obj)) { return true; }
+        // Clear out any half-baked data.
+        minDistance = 0;
+        isNearSphere = false;
+        maxDistance = std::numeric_limits<double>::max();
+        centroid = PointWithCRS();
+        // And try parsing new format.
+        return parseNewQuery(obj);
     }
 
     bool GeoQuery::parseLegacyQuery(const BSONObj &obj) {
@@ -273,6 +256,12 @@ namespace mongo {
                || NULL != _multiLine
                || NULL != _multiPolygon
                || NULL != _geometryCollection;
+    }
+
+    bool GeometryContainer::hasFlatRegion() const {
+        return (NULL != _polygon && _polygon->crs == FLAT)
+               || NULL != _cap
+               || NULL != _box;
     }
 
     bool GeoQuery::satisfiesPredicate(const GeometryContainer &otherContainer) const {

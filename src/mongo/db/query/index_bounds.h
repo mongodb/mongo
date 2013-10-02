@@ -48,6 +48,9 @@ namespace mongo {
 
         // TODO: We could drop this.  Only used in IndexBounds::isValidFor.
         string name;
+
+        bool isValidFor(int expectedOrientation) const;
+        std::string toString() const;
     };
 
     /**
