@@ -38,7 +38,7 @@ namespace mongo {
 
     class BSONObj;
     class DiskLoc;
-    struct PlanStage;
+    class PlanStage;
     struct PlanStageStats;
     class WorkingSet;
 
