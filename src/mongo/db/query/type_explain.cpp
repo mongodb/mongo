@@ -741,4 +741,4 @@ namespace mongo {
         return _server;
     }
 
- } // namespace mongo
+} // namespace mongo
