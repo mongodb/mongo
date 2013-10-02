@@ -47,6 +47,9 @@ namespace mongo {
             // Set this if you don't want a table scan.
             // See http://docs.mongodb.org/manual/reference/parameters/
             NO_TABLE_SCAN = 1,
+
+            // Set this if you want a collscan outputted even if there's an ixscan.
+            INCLUDE_COLLSCAN = 2,
         };
 
         /**
