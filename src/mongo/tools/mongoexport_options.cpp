@@ -138,6 +138,15 @@ namespace mongo {
         mongoExportGlobalParams.limit = getParam("limit", 0);
         mongoExportGlobalParams.skip = getParam("skip", 0);
 
+        // we write output to standard error by default to avoid mangling output, but we don't need
+        // to do this if an output file was specified
+        toolGlobalParams.canUseStdout = false;
+        if (mongoExportGlobalParams.outputFileSpecified) {
+            if (mongoExportGlobalParams.outputFile != "-") {
+                toolGlobalParams.canUseStdout = true;
+            }
+        }
+
         return Status::OK();
     }
 

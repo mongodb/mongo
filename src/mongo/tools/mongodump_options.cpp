@@ -130,6 +130,12 @@ namespace mongo {
             toolGlobalParams.db = "";
         }
 
+        if (mongoDumpGlobalParams.outputFile == "-") {
+            // write output to standard error to avoid mangling output
+            // must happen early to avoid sending junk to stdout
+            toolGlobalParams.canUseStdout = false;
+        }
+
         return Status::OK();
     }
 

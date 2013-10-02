@@ -25,24 +25,14 @@
 #include "mongo/db/json.h"
 #include "mongo/tools/mongoexport_options.h"
 #include "mongo/tools/tool.h"
+#include "mongo/tools/tool_logger.h"
 #include "mongo/util/options_parser/option_section.h"
 
 using namespace mongo;
 
 class Export : public Tool {
 public:
-    Export() : Tool(false/*usesstdout*/) { }
-
-    virtual void preSetup() {
-        if (mongoExportGlobalParams.outputFileSpecified) {
-            if (mongoExportGlobalParams.outputFile != "-") {
-                // we write output to standard error by default to avoid
-                // mangling output, but we don't need to do this if an output
-                // file was specified
-                useStandardOutput(true);
-            }
-        }
-    }
+    Export() : Tool() { }
 
     virtual void printHelp( ostream & out ) {
         printMongoExportHelp(&out);
@@ -226,7 +216,7 @@ public:
             out << ']' << endl;
 
         if (!toolGlobalParams.quiet) {
-            (_usesstdout ? cout : cerr ) << "exported " << num << " records" << endl;
+            toolOutput() << "exported " << num << " records" << endl;
         }
 
         return 0;

@@ -30,7 +30,7 @@ namespace logger {
     /**
      * Appender for writing to the console (stdout).
      */
-    template <typename Event>
+    template <typename Event, typename ConsoleType = Console>
     class ConsoleAppender : public Appender<Event> {
         MONGO_DISALLOW_COPYING(ConsoleAppender);
 
@@ -39,7 +39,7 @@ namespace logger {
 
         explicit ConsoleAppender(EventEncoder* encoder) : _encoder(encoder) {}
         virtual Status append(const Event& event) {
-            Console console;
+            ConsoleType console;
             _encoder->encode(event, console.out()).flush();
             if (!console.out())
                 return Status(ErrorCodes::LogWriteFailed, "Error writing log message to console.");

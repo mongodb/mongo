@@ -41,15 +41,7 @@ class Dump : public Tool {
         FILE* _f;
     };
 public:
-    Dump() : Tool(true/*usesstdout*/) { }
-
-    virtual void preSetup() {
-        if (mongoDumpGlobalParams.outputFile == "-") {
-                // write output to standard error to avoid mangling output
-                // must happen early to avoid sending junk to stdout
-                useStandardOutput(false);
-        }
-    }
+    Dump() : Tool() { }
 
     virtual void printHelp(ostream& out) {
         printMongoDumpHelp(&out);

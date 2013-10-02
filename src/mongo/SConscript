@@ -806,7 +806,10 @@ mongod = env.Install(
 Default( mongod )
 
 # tools
-allToolFiles = [ "tools/tool.cpp", "tools/stat_util.cpp", "tools/tool_options.cpp" ]
+allToolFiles = ["tools/tool.cpp",
+                "tools/stat_util.cpp",
+                "tools/tool_options.cpp",
+                "tools/tool_logger.cpp"]
 env.StaticLibrary("alltools",
                   allToolFiles,
                   LIBDEPS=["serveronly",

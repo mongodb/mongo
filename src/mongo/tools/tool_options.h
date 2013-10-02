@@ -33,7 +33,7 @@ namespace mongo {
 
     struct ToolGlobalParams {
 
-        ToolGlobalParams() : hostSet(false), portSet(false) { }
+        ToolGlobalParams() : canUseStdout(true), hostSet(false), portSet(false) { }
         std::string name;
 
         std::string db;
@@ -45,6 +45,7 @@ namespace mongo {
         std::string authenticationMechanism;
 
         bool quiet;
+        bool canUseStdout;
         bool noconnection;
 
         std::vector<std::string> fields;

@@ -26,6 +26,7 @@
 
 #include "mongo/db/instance.h"
 #include "mongo/db/matcher.h"
+#include "mongo/tools/tool_logger.h"
 #include "mongo/tools/tool_options.h"
 #include "mongo/util/options_parser/environment.h"
 
@@ -35,7 +36,7 @@ namespace mongo {
 
     class Tool {
     public:
-        Tool(bool usesstdout=true);
+        Tool();
         virtual ~Tool();
 
         static auto_ptr<Tool> (*createInstance)();
@@ -52,14 +53,8 @@ namespace mongo {
 
         string getAuthenticationDatabase();
 
-        void useStandardOutput( bool mode ) {
-            _usesstdout = mode;
-        }
-
         bool isMaster();
         bool isMongos();
-        
-        virtual void preSetup() {}
 
         virtual int run() = 0;
 
@@ -69,7 +64,6 @@ namespace mongo {
 
         mongo::DBClientBase &conn( bool slaveIfPaired = false );
 
-        bool _usesstdout;
         bool _autoreconnect;
 
     protected:
