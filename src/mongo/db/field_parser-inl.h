@@ -75,6 +75,40 @@ namespace mongo {
 
     template<typename T>
     FieldParser::FieldState FieldParser::extract(BSONObj doc,
+                       const BSONField<T*>& field,
+                       T** out,
+                       string* errMsg)
+    {
+        BSONElement elem = doc[field.name()];
+        if (elem.eoo()) {
+            if (field.hasDefault()) {
+                auto_ptr<T> temp(new T);
+                field.getDefault()->cloneTo(temp.get());
+
+                *out = temp.release();
+                return FIELD_DEFAULT;
+            }
+            else {
+                return FIELD_NONE;
+            }
+        }
+
+        if (elem.type() != Object && elem.type() != Array) {
+            _genFieldErrMsg(doc, field, "Object/Array", errMsg);
+            return FIELD_INVALID;
+        }
+
+        auto_ptr<T> temp(new T);
+        if (!temp->parseBSON(elem.embeddedObject(), errMsg)) {
+            return FIELD_INVALID;
+        }
+
+        *out = temp.release();
+        return FIELD_SET;
+    }
+
+    template<typename T>
+    FieldParser::FieldState FieldParser::extract(BSONObj doc,
                        const BSONField<T>& field,
                        T** out,
                        string* errMsg)
