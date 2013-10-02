@@ -228,6 +228,7 @@ class mongod(object):
                      '--sslWeakCertificateValidation']
         if self.kwargs.get('use_x509'):
             argv += ['--clusterAuthMode','x509'];
+            self.auth = True
         print "running " + " ".join(argv)
         self.proc = self._start(buildlogger(argv, is_global=True))
 
