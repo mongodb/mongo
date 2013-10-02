@@ -234,10 +234,11 @@ namespace mongo {
         }
 
         for (size_t i=0; i < toDelete.size(); i++) {
-            Status s = dropCollection( toDelete[i] );
-            if ( !s.isOK() )
-                warning() << "could not drop temp collection: " << toDelete[i]
-                          << " because of " << s << endl;
+            BSONObj info;
+            // using DBDirectClient to ensure this ends up in opLog
+            bool ok = DBDirectClient().dropCollection(toDelete[i], &info);
+            if (!ok)
+                warning() << "could not drop temp collection '" << toDelete[i] << "': " << info;
         }
     }
 

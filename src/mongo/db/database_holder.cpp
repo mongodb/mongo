@@ -80,8 +80,6 @@ namespace mongo {
 
         authindex::configureSystemIndexes(dbname);
 
-        db->clearTmpCollections();
-
         return db;
     }
 }
