@@ -89,6 +89,13 @@ namespace mongo {
         RoleNameIterator getDirectSubordinates(const RoleName& role);
 
         /**
+         * Returns an iterator that can be used to get a full list of roles that this role inherits
+         * privileges from.  This includes its direct subordinate roles as well as the subordinates
+         * of its subordinates, and so on.
+         */
+        RoleNameIterator getIndirectSubordinates(const RoleName& role);
+
+        /**
          * Returns a vector of the privileges that the given role has been directly granted.
          * Privileges that have been granted transitively through this role's subordinate roles are
          * not included.
@@ -232,11 +239,12 @@ namespace mongo {
 
 
         // Represents all the outgoing edges to other roles from any given role.
-        typedef unordered_map<RoleName, vector<RoleName> > EdgeSet;
+        typedef unordered_map<RoleName, std::vector<RoleName> > EdgeSet;
         // Maps a role name to a list of privileges associated with that role.
         typedef unordered_map<RoleName, PrivilegeVector> RolePrivilegeMap;
 
         EdgeSet _roleToSubordinates;
+        unordered_map<RoleName, unordered_set<RoleName> > _roleToIndirectSubordinates;
         EdgeSet _roleToMembers;
         RolePrivilegeMap _directPrivilegesForRole;
         RolePrivilegeMap _allPrivilegesForRole;
