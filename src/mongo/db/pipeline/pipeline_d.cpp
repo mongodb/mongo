@@ -52,10 +52,15 @@ namespace {
             return !(shardingState.getVersion(ns.ns()).isWriteCompatibleWith(unsharded));
         }
 
+        bool isCapped(const NamespaceString& ns) {
+            Client::ReadContext ctx(ns.ns());
+            NamespaceDetails* nsd = nsdetails(ns.ns());
+            return nsd && nsd->isCapped();
+        }
+
     private:
         DBDirectClient _client;
     };
-
 }
 
     void PipelineD::prepareCursorSource(

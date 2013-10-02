@@ -59,6 +59,11 @@ namespace mongo {
                                      << "' is sharded so it can't be used for $out'",
                 !_mongod->isSharded(_outputNs));
 
+        // cannot $out to capped collection
+        uassert(17152, str::stream() << "namespace '" << _outputNs.ns()
+                                     << "' is capped so it can't be used for $out",
+                !_mongod->isCapped(_outputNs));
+
         _tempNs = StringData(str::stream() << _outputNs.db()
                                            << ".tmp.agg_out."
                                            << aggOutCounter.addAndFetch(1)
