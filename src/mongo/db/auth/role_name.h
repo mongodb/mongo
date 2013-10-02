@@ -149,7 +149,7 @@ MONGO_HASH_NAMESPACE_END
 
 namespace mongo {
 
-    // RoleNameIterator for iterating over an unordered_set of RoleNames.
+    // RoleNameIterator for iterating over a vector of RoleNames.
     class RoleNameVectorIterator : public RoleNameIterator::Impl {
         MONGO_DISALLOW_COPYING(RoleNameVectorIterator);
 

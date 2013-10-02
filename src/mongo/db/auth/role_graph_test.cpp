@@ -108,6 +108,30 @@ namespace {
         }
         ASSERT_FALSE(it.more());
 
+        it = graph.getIndirectSubordinates(roleA); // should have roleB, roleC and roleD
+        bool hasB = false;
+        bool hasC = false;
+        bool hasD = false;
+        int num = 0;
+        while (it.more()) {
+            ++num;
+            RoleName cur = it.next();
+            if (cur == roleB) {
+                hasB = true;
+            } else if (cur == roleC) {
+                hasC = true;
+            } else if (cur == roleD) {
+                hasD = true;
+            } else {
+                FAIL(mongoutils::str::stream() << "unexpected role returned: " <<
+                        cur.getFullName());
+            }
+        }
+        ASSERT_EQUALS(3, num);
+        ASSERT(hasB);
+        ASSERT(hasC);
+        ASSERT(hasD);
+
         it = graph.getDirectSubordinates(roleB); // should be roleC and roleD, order doesn't matter
         cur = it.next();
         if (cur == roleC) {

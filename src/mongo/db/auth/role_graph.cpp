@@ -40,6 +40,41 @@ namespace mongo {
 
 namespace {
     PrivilegeVector emptyPrivilegeVector;
+
+    // RoleNameIterator for iterating over an unordered_set of RoleNames.
+    class RoleNameSetIterator : public RoleNameIterator::Impl {
+        MONGO_DISALLOW_COPYING(RoleNameSetIterator);
+
+    public:
+        RoleNameSetIterator(const unordered_set<RoleName>::const_iterator& begin,
+                            const unordered_set<RoleName>::const_iterator& end) :
+                _begin(begin), _end(end) {}
+
+        virtual ~RoleNameSetIterator() {}
+
+        virtual bool more() const {
+            return _begin != _end;
+        }
+
+        virtual const RoleName& next() {
+            const RoleName& toReturn = get();
+            ++_begin;
+            return toReturn;
+        }
+
+
+        virtual const RoleName& get() const {
+            return *_begin;
+        }
+
+    private:
+        virtual Impl* doClone() const {
+            return new RoleNameSetIterator(_begin, _end);
+        }
+
+        unordered_set<RoleName>::const_iterator _begin;
+        unordered_set<RoleName>::const_iterator _end;
+    };
 } // namespace
 
     RoleGraph::RoleGraph() {};
@@ -148,6 +183,13 @@ namespace {
         return RoleNameIterator(new RoleNameVectorIterator(edges.begin(), edges.end()));
     }
 
+    RoleNameIterator RoleGraph::getIndirectSubordinates(const RoleName& role) {
+        if (!roleExists(role))
+            return RoleNameIterator(NULL);
+        const unordered_set<RoleName>& subs = _roleToIndirectSubordinates.find(role)->second;
+        return RoleNameIterator(new RoleNameSetIterator(subs.begin(), subs.end()));
+    }
+
     RoleNameIterator RoleGraph::getDirectMembers(const RoleName& role) {
         if (!roleExists(role))
             return RoleNameIterator(NULL);
@@ -171,20 +213,17 @@ namespace {
         if (!roleExists(recipient)) {
             return Status(ErrorCodes::RoleNotFound,
                           mongoutils::str::stream() << "Role: " << recipient.getFullName() <<
-                                " does not exist",
-                          0);
+                                " does not exist");
         }
         if (isBuiltinRole(recipient)) {
             return Status(ErrorCodes::InvalidRoleModification,
                           mongoutils::str::stream() << "Cannot grant roles to built-in role: " <<
-                                  role.getFullName(),
-                          0);
+                                  role.getFullName());
         }
         if (!roleExists(role)) {
             return Status(ErrorCodes::RoleNotFound,
                           mongoutils::str::stream() << "Role: " << role.getFullName() <<
-                                " does not exist",
-                          0);
+                                " does not exist");
         }
 
         if (std::find(_roleToSubordinates[recipient].begin(),
@@ -438,17 +477,22 @@ namespace {
         // Need to clear out the "all privileges" vector for the current role, and re-fill it with
         // just the direct privileges for this role.
         PrivilegeVector& currentRoleAllPrivileges = _allPrivilegesForRole[currentRole];
-        const PrivilegeVector& currentRoleDirectPrivileges = _directPrivilegesForRole[currentRole];
-        currentRoleAllPrivileges.clear();
-        for (PrivilegeVector::const_iterator it = currentRoleDirectPrivileges.begin();
-                it != currentRoleDirectPrivileges.end(); ++it) {
-            currentRoleAllPrivileges.push_back(*it);
+        currentRoleAllPrivileges = _directPrivilegesForRole[currentRole];
+
+        // Need to do the same thing for the indirect roles
+        unordered_set<RoleName>& currentRoleIndirectRoles =
+                _roleToIndirectSubordinates[currentRole];
+        currentRoleIndirectRoles.clear();
+        const std::vector<RoleName>& currentRoleDirectRoles = _roleToSubordinates[currentRole];
+        for (std::vector<RoleName>::const_iterator it = currentRoleDirectRoles.begin();
+                it != currentRoleDirectRoles.end(); ++it) {
+            currentRoleIndirectRoles.insert(*it);
         }
 
-        // Recursively add children's privileges to current role's "all privileges" vector.
-        const std::vector<RoleName>& children = _roleToSubordinates[currentRole];
-        for (std::vector<RoleName>::const_iterator roleIt = children.begin();
-                roleIt != children.end(); ++roleIt) {
+        // Recursively add children's privileges to current role's "all privileges" vector, and
+        // children's roles to current roles's "indirect roles" vector.
+        for (std::vector<RoleName>::const_iterator roleIt = currentRoleDirectRoles.begin();
+                roleIt != currentRoleDirectRoles.end(); ++roleIt) {
             const RoleName& childRole = *roleIt;
             Status status = _recomputePrivilegeDataHelper(childRole, inProgressRoles, visitedRoles);
             if (status != Status::OK()) {
@@ -461,6 +505,14 @@ namespace {
             for (PrivilegeVector::const_iterator privIt = childsPrivileges.begin();
                     privIt != childsPrivileges.end(); ++privIt) {
                 Privilege::addPrivilegeToPrivilegeVector(&currentRoleAllPrivileges, *privIt);
+            }
+
+            // We also know that the "indirect roles" for the child is also correct, so we can add
+            // those roles to our "indirect roles" set.
+            const unordered_set<RoleName>& childsRoles = _roleToIndirectSubordinates[childRole];
+            for (unordered_set<RoleName>::const_iterator childsRoleIt = childsRoles.begin();
+                    childsRoleIt != childsRoles.end(); ++childsRoleIt) {
+                currentRoleIndirectRoles.insert(*childsRoleIt);
             }
         }
 
