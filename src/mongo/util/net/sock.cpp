@@ -490,14 +490,20 @@ namespace mongo {
     public:
         ConnectBG(int sock, SockAddr remote) : _sock(sock), _remote(remote) { }
 
-        void run() { _res = ::connect(_sock, _remote.raw(), _remote.addressSize); }
-        string name() const { return "ConnectBG"; }
+        void run() {
+            _res = ::connect(_sock, _remote.raw(), _remote.addressSize);
+            _errnoWithDescription = errnoWithDescription();
+        }
+
+        std::string name() const { return "ConnectBG"; }
+        std::string getErrnoWithDescription() const { return _errnoWithDescription; }
         int inError() const { return _res; }
 
     private:
         int _sock;
         int _res;
         SockAddr _remote;
+        std::string _errnoWithDescription;
     };
 
     bool Socket::connect(SockAddr& remote) {
@@ -517,6 +523,8 @@ namespace mongo {
         bg.go();
         if ( bg.wait(5000) ) {
             if ( bg.inError() ) {
+                warning() << "Failed to connect to " << _remote.getAddr()
+                          << ", reason: " << bg.getErrnoWithDescription() << endl;
                 close();
                 return false;
             }
