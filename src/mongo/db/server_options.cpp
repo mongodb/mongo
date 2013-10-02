@@ -77,9 +77,39 @@ namespace mongo {
         if (!ret.isOK()) {
             return ret;
         }
-        ret = options->addOption(OD("verbose", "verbose,v", moe::Switch,
+        // The verbosity level can be set at startup in the following ways.  Note that if multiple
+        // methods for setting the verbosity are specified simultaneously, the verbosity will be set
+        // based on the whichever option specifies the highest level
+        //
+        // Command Line Option | Resulting Verbosity
+        // _________________________________________
+        // (none)              | 0
+        // --verbose ""        | 0
+        // --verbose           | 1
+        // --verbose v         | 1
+        // --verbose vv        | 2 (etc.)
+        // -v                  | 1
+        // -vv                 | 2 (etc.)
+        //
+        // INI Config Option   | Resulting Verbosity
+        // _________________________________________
+        // verbose=            | 0
+        // verbose=v           | 1
+        // verbose=vv          | 2 (etc.)
+        // v=true              | 1
+        // vv=true             | 2 (etc.)
+        //
+        // JSON Config Option  | Resulting Verbosity
+        // _________________________________________
+        // { "verbose" : "" }  | 0
+        // { "verbose" : "v" } | 1
+        // { "verbose" : "vv" }| 2 (etc.)
+        // { "v" : true }      | 1
+        // { "vv" : true }     | 2 (etc.)
+        ret = options->addOption(OD("verbose", "verbose,v", moe::String,
                     "be more verbose (include multiple times for more verbosity e.g. -vvvvv)",
-                    true));
+                    true, moe::Value(),
+                    moe::Value(std::string("v"))));
         if (!ret.isOK()) {
             return ret;
         }
@@ -341,13 +371,31 @@ namespace mongo {
         }
 
         if (params.count("verbose")) {
-            logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogSeverity::Debug(1));
+            std::string verbosity = params["verbose"].as<std::string>();
+            for (std::string::iterator iterator = verbosity.begin();
+                 iterator != verbosity.end(); iterator++) {
+                if (*iterator != 'v') {
+                    return Status(ErrorCodes::BadValue,
+                                  "The \"verbose\" option string cannot contain any characters "
+                                  "other than \"v\"");
+                }
+            }
         }
 
-        for (string s = "vv"; s.length() <= 12; s.append("v")) {
-            if (params.count(s)) {
+        // Handle both the "--verbose" string argument and the "-vvvv" arguments at the same time so
+        // that we ensure that we set the log level to the maximum of the options provided
+        for (string s = ""; s.length() <= 14; s.append("v")) {
+            if (!s.empty() && params.count(s)) {
                 logger::globalLogDomain()->setMinimumLoggedSeverity(
                         logger::LogSeverity::Debug(s.length()));
+            }
+
+            if (params.count("verbose")) {
+                std::string verbosity = params["verbose"].as<std::string>();
+                if (s == verbosity) {
+                    logger::globalLogDomain()->setMinimumLoggedSeverity(
+                            logger::LogSeverity::Debug(s.length()));
+                }
             }
         }
 

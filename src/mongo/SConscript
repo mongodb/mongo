@@ -577,6 +577,8 @@ env.Library("server_options", ["db/server_options.cpp"],
                     '$BUILD_DIR/mongo/util/cmdline_utils/cmdline_utils',
                     ])
 
+env.CppUnitTest('server_options_test', 'db/server_options_test.cpp', LIBDEPS=['server_options'])
+
 env.CppUnitTest('diskloc_test', 'db/diskloc_test.cpp', LIBDEPS=[])
 
 env.CppUnitTest('v8_deadline_monitor_test', 'scripting/v8_deadline_monitor_test.cpp', LIBDEPS=[])
