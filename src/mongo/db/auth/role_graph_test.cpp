@@ -108,6 +108,7 @@ namespace {
         }
         ASSERT_FALSE(it.more());
 
+        ASSERT_OK(graph.recomputePrivilegeData());
         it = graph.getIndirectSubordinates(roleA); // should have roleB, roleC and roleD
         bool hasB = false;
         bool hasC = false;

@@ -79,6 +79,7 @@ namespace {
 
     RoleGraph::RoleGraph() {};
     RoleGraph::RoleGraph(const RoleGraph& other) : _roleToSubordinates(other._roleToSubordinates),
+            _roleToIndirectSubordinates(other._roleToIndirectSubordinates),
             _roleToMembers(other._roleToMembers),
             _directPrivilegesForRole(other._directPrivilegesForRole),
             _allPrivilegesForRole(other._allPrivilegesForRole) {}
@@ -87,6 +88,7 @@ namespace {
     void RoleGraph::swap(RoleGraph& other) {
         using std::swap;
         swap(this->_roleToSubordinates, other._roleToSubordinates);
+        swap(this->_roleToIndirectSubordinates, other._roleToIndirectSubordinates);
         swap(this->_roleToMembers, other._roleToMembers);
         swap(this->_directPrivilegesForRole, other._directPrivilegesForRole);
         swap(this->_allPrivilegesForRole, other._allPrivilegesForRole);
@@ -138,6 +140,7 @@ namespace {
         // Just reference the role in all the maps so that an entry gets created with empty
         // containers for the value.
         _roleToSubordinates[role];
+        _roleToIndirectSubordinates[role];
         _roleToMembers[role];
         _directPrivilegesForRole[role];
         _allPrivilegesForRole[role];
@@ -170,6 +173,7 @@ namespace {
                                                      role));
         }
         _roleToSubordinates.erase(role);
+        _roleToIndirectSubordinates.erase(role);
         _roleToMembers.erase(role);
         _directPrivilegesForRole.erase(role);
         _allPrivilegesForRole.erase(role);
