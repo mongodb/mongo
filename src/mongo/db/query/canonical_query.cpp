@@ -123,10 +123,7 @@ namespace mongo {
     }
 
     // TODO: Should this really live in the parsing?  Or elsewhere?
-    Status isValid(MatchExpression* root) {
-        // XXX: There can only be one NEAR.  If there is a NEAR, it must be either the root or the
-        // root must be an AND and its child must be a NEAR.
-
+    Status argsValid(MatchExpression* root) {
         MatchExpression::MatchType type = root->matchType();
 
         if (MatchExpression::GT == type || MatchExpression::GTE == type
@@ -135,18 +132,66 @@ namespace mongo {
             ComparisonMatchExpression* cme = static_cast<ComparisonMatchExpression*>(root);
             BSONElement data = cme->getData();
             if (RegEx == data.type()) {
-                return Status(ErrorCodes::BadValue, "Can't have RegEx as arg to pred " + cme->toString());
+                return Status(ErrorCodes::BadValue,
+                              "Can't have RegEx as arg to pred " + cme->toString());
             }
         }
 
         for (size_t i = 0; i < root->numChildren(); ++i) {
-            Status s = isValid(root->getChild(i));
+            Status s = argsValid(root->getChild(i));
             if (!s.isOK()) {
                 return s;
             }
         }
 
         return Status::OK();
+    }
+
+    size_t countNodes(MatchExpression* root, MatchExpression::MatchType type) {
+        size_t sum = 0;
+        if (type == root->matchType()) {
+            sum = 1;
+        }
+        for (size_t i = 0; i < root->numChildren(); ++i) {
+            sum += countNodes(root->getChild(i), type);
+        }
+        return sum;
+    }
+
+    // TODO: Move this to query_validator.cpp
+    Status isValid(MatchExpression* root) {
+        // TODO: This should really be done as part of type checking in the parser.
+        Status argStatus = argsValid(root);
+        if (!argStatus.isOK()) {
+            return argStatus;
+        }
+
+        // Analysis below should be done after squashing the tree to make it clearer.
+
+        // There can only be one NEAR.  If there is a NEAR, it must be either the root or the root
+        // must be an AND and its child must be a NEAR.
+        size_t numGeoNear = countNodes(root, MatchExpression::GEO_NEAR);
+
+        if (0 == numGeoNear) {
+            return Status::OK();
+        }
+
+        if (numGeoNear > 1) {
+            return Status(ErrorCodes::BadValue, "Too many geoNear expressions");
+        }
+
+        if (MatchExpression::GEO_NEAR == root->matchType()) {
+            return Status::OK();
+        }
+        else if (MatchExpression::AND == root->matchType()) {
+            for (size_t i = 0; i < root->numChildren(); ++i) {
+                if (MatchExpression::GEO_NEAR == root->getChild(i)->matchType()) {
+                    return Status::OK();
+                }
+            }
+        }
+
+        return Status(ErrorCodes::BadValue, "geoNear must be top-level expr");
     }
 
     Status CanonicalQuery::init(LiteParsedQuery* lpq) {

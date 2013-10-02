@@ -37,8 +37,10 @@ namespace mongo {
     // Geo queries we don't need an index to answer: geoWithin and geoIntersects
     //
 
-    Status GeoMatchExpression::init( const StringData& path, const GeoQuery& query ) {
+    Status GeoMatchExpression::init( const StringData& path, const GeoQuery& query,
+                                     const BSONObj& rawObj ) {
         _query = query;
+        _rawObj = rawObj;
         return initPath( path );
     }
 
@@ -80,7 +82,10 @@ namespace mongo {
 
     LeafMatchExpression* GeoMatchExpression::shallowClone() const {
         GeoMatchExpression* next = new GeoMatchExpression();
-        next->init( path(), _query );
+        next->init( path(), _query, _rawObj);
+        if (getTag()) {
+            next->setTag(getTag()->clone());
+        }
         return next;
     }
 
@@ -88,8 +93,10 @@ namespace mongo {
     // Parse-only geo expressions: geoNear (formerly known as near).
     //
 
-    Status GeoNearMatchExpression::init( const StringData& path, const NearQuery& query ) {
+    Status GeoNearMatchExpression::init( const StringData& path, const NearQuery& query,
+                                         const BSONObj& rawObj ) {
         _query = query;
+        _rawObj = rawObj;
         return initPath( path );
     }
 
@@ -101,7 +108,7 @@ namespace mongo {
 
     void GeoNearMatchExpression::debugString( StringBuilder& debug, int level ) const {
         _debugAddSpace( debug, level );
-        debug << "GEONEAR";
+        debug << "GEONEAR raw = " << _rawObj.toString();
         MatchExpression::TagData* td = getTag();
         if (NULL != td) {
             debug << " ";
@@ -126,7 +133,10 @@ namespace mongo {
 
     LeafMatchExpression* GeoNearMatchExpression::shallowClone() const {
         GeoNearMatchExpression* next = new GeoNearMatchExpression();
-        next->init( path(), _query );
+        next->init( path(), _query, _rawObj );
+        if (getTag()) {
+            next->setTag(getTag()->clone());
+        }
         return next;
     }
 

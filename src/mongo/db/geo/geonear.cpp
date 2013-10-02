@@ -35,6 +35,7 @@
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/geo/geoconstants.h"
 #include "mongo/db/geo/s2common.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/index/2d_index_cursor.h"
@@ -197,6 +198,11 @@ namespace mongo {
             // we've geo-indexed any of the fields in it.
             vector<GeoQuery> regions;
 
+            if (FLAT == nearQuery.centroid.crs) {
+                nearQuery.maxDistance *= kRadiusOfEarthInMeters;
+                nearQuery.minDistance *= kRadiusOfEarthInMeters;
+            }
+
             nic->seek(parsedArgs.query, nearQuery, regions);
 
             // We do pass in the query above, but it's just so we can possibly use it in our index
@@ -218,7 +224,7 @@ namespace mongo {
 
                 double dist = nic->currentDistance();
                 // If we got the distance in radians, output it in radians too.
-                if (nearQuery.fromRadians) { dist /= params.radius; }
+                if (FLAT == nearQuery.centroid.crs) { dist /= params.radius; }
                 dist *= parsedArgs.distanceMultiplier;
                 totalDistance += dist;
                 if (dist > farthestDist) { farthestDist = dist; }

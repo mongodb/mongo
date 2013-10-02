@@ -552,9 +552,17 @@ namespace mongo {
         if (isExplain) {
             TypeExplain* bareExplain;
             Status res = runner->getExplainPlan(&bareExplain);
+
             if (!res.isOK()) {
                 error() << "could not produce explain of query '" << pq.getFilter()
                         << "', error: " << res.reason();
+                // If numResults and the data in bb don't correspond, we'll crash later when rooting
+                // through the reply msg.
+                BSONObj emptyObj;
+                bb.appendBuf((void*)emptyObj.objdata(), emptyObj.objsize());
+                // The explain output is actually a result.
+                numResults = 1;
+                // TODO: we can fill out millis etc. here just fine even if the plan screwed up.
             }
             else {
                 boost::scoped_ptr<TypeExplain> explain(bareExplain);

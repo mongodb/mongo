@@ -69,13 +69,14 @@ namespace {
         //
 
         void runQuery(BSONObj query) {
+            solns.clear();
             queryObj = query.getOwned();
             ASSERT_OK(CanonicalQuery::canonicalize(ns, queryObj, &cq));
             QueryPlanner::plan(*cq, keyPatterns, QueryPlanner::INCLUDE_COLLSCAN, &solns);
-            ASSERT_GREATER_THAN(solns.size(), 0U);;
         }
 
         void runDetailedQuery(const BSONObj& query, const BSONObj& sort, const BSONObj& proj) {
+            solns.clear();
             ASSERT_OK(CanonicalQuery::canonicalize(ns, query, sort, proj, &cq));
             QueryPlanner::plan(*cq, keyPatterns, QueryPlanner::INCLUDE_COLLSCAN, &solns);
             ASSERT_GREATER_THAN(solns.size(), 0U);;
@@ -420,7 +421,7 @@ namespace {
         ASSERT_EQUALS(solns.size(), 2U);
 
         for (size_t i = 0; i < solns.size(); ++i) {
-            // cout << solns[i]->toString();
+            cout << solns[i]->toString();
             ProjectionNode* pn = static_cast<ProjectionNode*>(solns[i]->root.get());
             ASSERT(STAGE_COLLSCAN == pn->child->getType() || STAGE_IXSCAN == pn->child->getType());
         }
@@ -545,6 +546,98 @@ namespace {
     TEST_F(SingleIndexTest, ElemMatchCompoundTwoFields) {
         setIndex(BSON("a.b" << 1 << "a.c" << 1));
         runQuery(fromjson("{a : {$elemMatch: {b:1, c:1}}}"));
+        dumpSolutions();
+        ASSERT_EQUALS(getNumSolutions(), 2U);
+    }
+
+    //
+    // Geo
+    // http://docs.mongodb.org/manual/reference/operator/query-geospatial/#geospatial-query-compatibility-chart
+    //
+
+    TEST_F(SingleIndexTest, Basic2DNonNear) {
+        // 2d can answer: within poly, within center, within centersphere, within box.
+        // And it can use an index (or not) for each of them.  As such, 2 solns expected.
+        setIndex(BSON("a" << "2d"));
+
+        // Polygon
+        runQuery(fromjson("{a : { $within: { $polygon : [[0,0], [2,0], [4,0]] } }}"));
+        dumpSolutions();
+        ASSERT_EQUALS(getNumSolutions(), 2U);
+
+        // Center
+        runQuery(fromjson("{a : { $within : { $center : [[ 5, 5 ], 7 ] } }}"));
+        dumpSolutions();
+        ASSERT_EQUALS(getNumSolutions(), 2U);
+
+        // Centersphere
+        runQuery(fromjson("{a : { $within : { $centerSphere : [[ 10, 20 ], 0.01 ] } }}"));
+        dumpSolutions();
+        ASSERT_EQUALS(getNumSolutions(), 2U);
+
+        // Within box.
+        runQuery(fromjson("{a : {$within: {$box : [[0,0],[9,9]]}}}"));
+        dumpSolutions();
+        ASSERT_EQUALS(getNumSolutions(), 2U);
+
+        // TODO: test that we *don't* annotate for things we shouldn't.
+    }
+
+    TEST_F(SingleIndexTest, Basic2DSphereNonNear) {
+        // 2dsphere can do: within+geometry, intersects+geometry
+        setIndex(BSON("a" << "2dsphere"));
+
+        runQuery(fromjson("{a: {$geoIntersects: {$geometry: {type: 'Point',"
+                                                           "coordinates: [10.0, 10.0]}}}}"));
+        dumpSolutions();
+        ASSERT_EQUALS(getNumSolutions(), 2U);
+
+        runQuery(fromjson("{a : { $geoWithin : { $centerSphere : [[ 10, 20 ], 0.01 ] } }}"));
+        dumpSolutions();
+        ASSERT_EQUALS(getNumSolutions(), 2U);
+
+        // TODO: test that we *don't* annotate for things we shouldn't.
+    }
+
+    TEST_F(SingleIndexTest, Basic2DGeoNear) {
+        // Can only do near + old point.
+        setIndex(BSON("a" << "2d"));
+        runQuery(fromjson("{a: {$near: [0,0], $maxDistance:0.3 }}"));
+        dumpSolutions();
+        ASSERT_EQUALS(getNumSolutions(), 1U);
+    }
+
+    TEST_F(SingleIndexTest, Basic2DSphereGeoNear) {
+        // Can do nearSphere + old point, near + new point.
+        setIndex(BSON("a" << "2dsphere"));
+
+        runQuery(fromjson("{a: {$nearSphere: [0,0], $maxDistance: 0.31 }}"));
+        dumpSolutions();
+        ASSERT_EQUALS(getNumSolutions(), 1U);
+
+        runQuery(fromjson("{a: {$geoNear: {$geometry: {type: 'Point', coordinates: [0,0]},"
+                                          "$maxDistance:100}}}"));
+        dumpSolutions();
+        ASSERT_EQUALS(getNumSolutions(), 1U);
+    }
+
+    TEST_F(SingleIndexTest, Basic2DSphereGeoNearReverseCompound) {
+        setIndex(BSON("x" << 1 << "a" << "2dsphere"));
+        runQuery(fromjson("{x:1, a: {$nearSphere: [0,0], $maxDistance: 0.31 }}"));
+        dumpSolutions();
+        ASSERT_EQUALS(getNumSolutions(), 1U);
+    }
+
+    TEST_F(SingleIndexTest, NearNoIndex) {
+        setIndex(BSON("x" << 1));
+        runQuery(fromjson("{x:1, a: {$nearSphere: [0,0], $maxDistance: 0.31 }}"));
+        dumpSolutions();
+        ASSERT_EQUALS(getNumSolutions(), 0U);
+    }
+
+    TEST_F(SingleIndexTest, TwoDSphereNoGeoPred) {
+        setIndex(BSON("x" << 1 << "a" << "2dsphere"));
+        runQuery(fromjson("{x:1}"));
         dumpSolutions();
         ASSERT_EQUALS(getNumSolutions(), 2U);
     }

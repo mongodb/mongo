@@ -17,7 +17,7 @@ var polygonWithNoHole = {"type" : "Polygon", "coordinates": [
 
 // Test 1: Sanity check.  Expect all three points.
 var sanityResult = t.find({geo: {$within: {$geometry: polygonWithNoHole}}});
-assert.eq(sanityResult.count(), 3);
+assert.eq(sanityResult.itcount(), 3);
 
 // Test 2: Polygon with a hole that isn't contained byt the poly shell.
 var polygonWithProtrudingHole = {"type" : "Polygon", "coordinates": [
@@ -32,7 +32,7 @@ assert(db.getLastError());
 
 // Can't search with bogus poly.
 assert.throws(function() {
-    return t.find({geo: {$within: {$geometry: polygonWithProtrudingHole}}}).count()
+    return t.find({geo: {$within: {$geometry: polygonWithProtrudingHole}}}).itcount()
 })
 
 // Test 3: This test will confirm that a polygon with overlapping holes throws

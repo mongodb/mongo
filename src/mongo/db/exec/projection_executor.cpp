@@ -56,7 +56,11 @@ namespace mongo {
             bob.append(elt);
         }
 
-        if (proj->_includedFields.size() > 0) {
+        // If _id is included it's inside _includedFields, and we want to ignore that when
+        // deciding whether to execute an inclusion or exclusion.
+        if (proj->_includedFields.size() > 0
+            || (proj->_includeID && proj->_includedFields.size() > 1)) {
+
             // We only want stuff in _fields.
             const vector<string>& fields = proj->_includedFields;
             for (size_t i = 0; i < fields.size(); ++i) {
@@ -73,7 +77,7 @@ namespace mongo {
                 }
             }
         }
-        else if (proj->_excludedFields.size() > 0) {
+        else {
             // We want stuff NOT in _fields.  This can't be covered, so we expect an obj.
             if (!wsm->hasObj()) {
                 return Status(ErrorCodes::BadValue,

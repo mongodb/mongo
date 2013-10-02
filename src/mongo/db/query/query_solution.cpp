@@ -333,7 +333,6 @@ namespace mongo {
     }
 
     bool IndexScanNode::hasField(const string& field) const {
-        // XXX XXX: multikey?  do we store that the index is multikey in the scan?
         BSONObjIterator it(indexKeyPattern);
         while (it.more()) {
             if (field == it.next().fieldName()) {
@@ -448,6 +447,87 @@ namespace mongo {
         addIndent(ss, indent + 1);
         *ss << "Child:" << endl;
         child->appendToString(ss, indent + 2);
+    }
+
+    //
+    // GeoNear2DNode
+    //
+
+    void GeoNear2DNode::appendToString(stringstream* ss, int indent) const {
+        addIndent(ss, indent);
+        *ss << "GEO_NEAR_2D\n";
+        addIndent(ss, indent + 1);
+        *ss << "numWanted = " << numWanted << endl;
+        addIndent(ss, indent + 1);
+        *ss << "keyPattern = " << indexKeyPattern.toString() << endl;
+        addIndent(ss, indent + 1);
+        *ss << "seek = " << seek.toString() << endl;
+        addIndent(ss, indent + 1);
+        *ss << "fetched = " << fetched() << endl;
+        addIndent(ss, indent + 1);
+        *ss << "sortedByDiskLoc = " << sortedByDiskLoc() << endl;
+        addIndent(ss, indent + 1);
+        *ss << "getSort = " << getSort().toString() << endl;
+    }
+
+    bool GeoNear2DNode::hasField(const string& field) const {
+        BSONObjIterator it(indexKeyPattern);
+        while (it.more()) {
+            if (field == it.next().fieldName()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    //
+    // GeoNear2DSphereNode
+    //
+
+    void GeoNear2DSphereNode::appendToString(stringstream* ss, int indent) const {
+        addIndent(ss, indent);
+        *ss << "GEO_NEAR_2DSPHERE\n";
+        addIndent(ss, indent + 1);
+        *ss << "keyPattern = " << indexKeyPattern.toString() << endl;
+        addIndent(ss, indent + 1);
+        *ss << "fetched = " << fetched() << endl;
+        addIndent(ss, indent + 1);
+        *ss << "sortedByDiskLoc = " << sortedByDiskLoc() << endl;
+        addIndent(ss, indent + 1);
+        *ss << "getSort = " << getSort().toString() << endl;
+        addIndent(ss, indent + 1);
+        *ss << "baseBounds = " << baseBounds.toString() << endl;
+        addIndent(ss, indent + 1);
+        *ss << "nearQuery = " << nq.toString() << endl;
+    }
+
+    //
+    // Geo2DNode
+    //
+
+    void Geo2DNode::appendToString(stringstream* ss, int indent) const {
+        addIndent(ss, indent);
+        *ss << "GEO_2D\n";
+        addIndent(ss, indent + 1);
+        *ss << "keyPattern = " << indexKeyPattern.toString() << endl;
+        addIndent(ss, indent + 1);
+        *ss << "seek = " << seek.toString() << endl;
+        addIndent(ss, indent + 1);
+        *ss << "fetched = " << fetched() << endl;
+        addIndent(ss, indent + 1);
+        *ss << "sortedByDiskLoc = " << sortedByDiskLoc() << endl;
+        addIndent(ss, indent + 1);
+        *ss << "getSort = " << getSort().toString() << endl;
+    }
+
+    bool Geo2DNode::hasField(const string& field) const {
+        BSONObjIterator it(indexKeyPattern);
+        while (it.more()) {
+            if (field == it.next().fieldName()) {
+                return true;
+            }
+        }
+        return false;
     }
 
 }  // namespace mongo

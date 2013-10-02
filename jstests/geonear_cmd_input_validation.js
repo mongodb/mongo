@@ -68,13 +68,6 @@ indexTypes.forEach(function(indexType) {
                 if (indexType == '2d') {
                     // maxDistance unlimited; no error.
                     db.runCommand(makeCommand(1e10));
-                } else if (isLegacy) {
-                    // Radians can't be more than pi.
-                    outOfRangeDistances.push(Math.PI + 0.1);
-                } else {
-                    // Meters can't be more than half circumference.
-                    var earthRadiusMeters = 6378.1 * 1000;
-                    outOfRangeDistances.push(Math.PI * earthRadiusMeters + 100);
                 }
 
                 // Try several bad values for min/maxDistance.

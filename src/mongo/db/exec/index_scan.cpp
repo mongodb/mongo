@@ -103,7 +103,12 @@ namespace mongo {
 
             if (_params.bounds.isSimpleRange) {
                 // Start at one key, end at another.
-                _indexCursor->seek(_params.bounds.startKey);
+                Status status = _indexCursor->seek(_params.bounds.startKey);
+                if (!status.isOK()) {
+                    warning() << "Seek failed: " << status.toString();
+                    _hitEnd = true;
+                    return PlanStage::FAILURE;
+                }
             }
             else {
                 // XXX: must be actually a Btree

@@ -40,5 +40,6 @@ longPoly = {type: "Polygon",
     ]};
 
 result = t.find({geo: {$geoWithin: {$geometry: longPoly}}});
-assert.eq(result.count(), 1);
+assert.eq(result.itcount(), 1);
+result = t.find({geo: {$geoWithin: {$geometry: longPoly}}});
 assert.eq("origin", result[0].name)

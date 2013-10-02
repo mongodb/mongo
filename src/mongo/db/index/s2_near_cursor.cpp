@@ -1,3 +1,4 @@
+// DEPRECATED
 /**
 *    Copyright (C) 2013 10gen Inc.
 *
@@ -313,7 +314,7 @@ namespace mongo {
                     BSONObj obj = oi->Obj();
                     double dist;
                     bool ret = S2SearchUtil::distanceBetween(_nearQuery.centroid.point,
-                                                             obj, _params, &dist);
+                                                             obj, &dist);
                     if (!ret) {
                         warning() << "unknown geometry: " << obj.toString();
                         dist = numeric_limits<double>::max();

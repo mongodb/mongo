@@ -59,6 +59,8 @@ namespace mongo {
                               OrderedIntervalList* oilOut, bool* exactOut);
 
     private:
+        friend class ExpressionMapping;
+
         /**
          * Make a range interval from the provided object.
          * The object must have exactly two fields.  The first field is the start, the second the
@@ -68,12 +70,15 @@ namespace mongo {
          */
         static Interval makeRangeInterval(const BSONObj& obj, bool startInclusive,
                                           bool endInclusive);
+        static Interval makeRangeInterval(const string& start, const string& end,
+                                          bool startInclusive, bool endInclusive);
 
         /**
          * Make a point interval from the provided object.
          * The object must have exactly one field which is the value of the point interval.
          */
         static Interval makePointInterval(const BSONObj& obj);
+        static Interval makePointInterval(const string& str);
 
         /**
          * Since we have no BSONValue we must make an object that's a copy of a piece of another

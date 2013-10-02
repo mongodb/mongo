@@ -19,9 +19,9 @@ var outerPoly = {type: "Polygon",
         [[-2.0, -2.0], [2.0, -2.0], [2.0, 2.0], [-2.0, 2.0], [-2.0, -2.0]]
     ]};
 var result = t.find({geo: {$within: {$geometry: outerPoly}}});
-assert.eq(result.count(), 1);
+assert.eq(result.itcount(), 1);
 result = t.find({geo: {$geoIntersects: {$geometry: outerPoly}}});
-assert.eq(result.count(), 1);
+assert.eq(result.itcount(), 1);
 
 
 // Test 2: If a poly that covers half of the canonPoly, we expect that it should
@@ -34,11 +34,11 @@ var partialPoly = {type: "Polygon",
 
 //Should not be within
 result = t.find({geo: {$within: {$geometry: partialPoly}}});
-assert.eq(result.count(), 0);
+assert.eq(result.itcount(), 0);
 
 //This should however count as a geoIntersect
 result = t.find({geo: {$geoIntersects: {$geometry: partialPoly}}});
-assert.eq(result.count(), 1);
+assert.eq(result.itcount(), 1);
 
 
 // Test 3: Polygons that intersect at a point or an edge have undefined 
@@ -54,7 +54,7 @@ var sharedPointPoly = {type: "Polygon",
     ]};
 
 result = t.find({geo: {$geoIntersects: {$geometry: sharedPointPoly}}});
-assert.eq(result.count(), 1);
+assert.eq(result.itcount(), 1);
 
 // Case (b): Polygons that intersect at one point (a vertex).
 // behaviour: not geoIntersect
@@ -65,7 +65,7 @@ var sharedVertexPoly = {type: "Polygon",
     ]};
 
 result = t.find({geo: {$geoIntersects: {$geometry: sharedVertexPoly}}});
-assert.eq(result.count(), 0);
+assert.eq(result.itcount(), 0);
 
 // Case (c): Polygons that intesersect at one point that is very close to a 
 // vertex should have the same behaviour as Case (b).
@@ -76,7 +76,7 @@ var almostSharedVertexPoly = {type: "Polygon",
     ]};
 
 result = t.find({geo: {$geoIntersects: {$geometry: almostSharedVertexPoly}}});
-assert.eq(result.count(), 0);
+assert.eq(result.itcount(), 0);
 
 
 // Case (d): Polygons that intesersect at one point that is not quite as close 
@@ -89,7 +89,7 @@ var notCloseEnoughSharedVertexPoly = {type: "Polygon",
     ]};
 
 result = t.find({geo: {$geoIntersects: {$geometry: notCloseEnoughSharedVertexPoly}}});
-assert.eq(result.count(), 1);
+assert.eq(result.itcount(), 1);
 
 // Case (e): Polygons that come very close to having a point intersection
 // on a non-vertex coordinate should intersect.
@@ -100,7 +100,7 @@ var almostSharedPointPoly = {type: "Polygon",
     ]};
 
 result = t.find({geo: {$geoIntersects: {$geometry: almostSharedPointPoly}}});
-assert.eq(result.count(), 1);
+assert.eq(result.itcount(), 1);
 
 
 // Case (f): If we increase the error a little, it should no longer act
@@ -114,7 +114,7 @@ var notCloseEnoughSharedPointPoly = {type: "Polygon",
     ]};
 
 result = t.find({geo: {$geoIntersects: {$geometry: notCloseEnoughSharedPointPoly}}});
-assert.eq(result.count(), 0);
+assert.eq(result.itcount(), 0);
 
 /* Test 3: Importantly, polygons with shared edges have undefined intersection 
  * under s2. Therefore these test serve more to make sure nothing changes than 
@@ -130,7 +130,7 @@ var fullyCoveredEdgePoly = {type: "Polygon",
     ]};
 
 result = t.find({geo: {$geoIntersects: {$geometry: fullyCoveredEdgePoly}}});
-assert.eq(result.count(), 0);
+assert.eq(result.itcount(), 0);
 
 // Case 2: A polygon who shares an edge with another polygon, where the searching
 //         polygon's edge fully covers the canon polygon's edge.
@@ -141,7 +141,7 @@ var coveringEdgePoly = {type: "Polygon",
     ]};
 
 result = t.find({geo: {$geoIntersects: {$geometry: coveringEdgePoly}}});
-assert.eq(result.count(), 1);
+assert.eq(result.itcount(), 1);
 
 // Case 2a: same as Case 2, except pulled slightly away from the polygon.
 // Result: Intersection.
@@ -152,7 +152,7 @@ var closebyCoveringEdgePoly = {type: "Polygon",
     ]};
 
 result = t.find({geo: {$geoIntersects: {$geometry: closebyCoveringEdgePoly}}});
-assert.eq(result.count(), 1);
+assert.eq(result.itcount(), 1);
 
 // Case 2b: same as Case 4, except pulled slightly away from the polygon, so that it's not intersecting.
 // Result: No Intersection.
@@ -163,7 +163,7 @@ var notCloseEnoughCoveringEdgePoly = {type: "Polygon",
     ]};
 
 result = t.find({geo: {$geoIntersects: {$geometry: notCloseEnoughCoveringEdgePoly}}});
-assert.eq(result.count(), 0);
+assert.eq(result.itcount(), 0);
 
 // Case 3: A polygon who shares an edge with another polygon, where the searching
 //         polygon's edge partially covers by the canon polygon's edge.
@@ -174,7 +174,7 @@ var partiallyCoveringEdgePoly = {type: "Polygon",
     ]};
 
 result = t.find({geo: {$geoIntersects: {$geometry: partiallyCoveringEdgePoly}}});
-assert.eq(result.count(), 0);
+assert.eq(result.itcount(), 0);
 
 
 //Polygons that intersect at three non-co-linear points should geoIntersect
@@ -184,7 +184,7 @@ var sharedPointsPoly = {type: "Polygon",
     ]};
 
 result = t.find({geo: {$geoIntersects: {$geometry: sharedPointsPoly}}});
-assert.eq(result.count(), 1);
+assert.eq(result.itcount(), 1);
 
 //If a polygon contains a hole, and another polygon is within that hole, it should not be within or intersect.
 
@@ -194,9 +194,9 @@ var bigHolePoly = {type: "Polygon",
         [[-2.0, -2.0], [2.0, -2.0], [2.0, 2.0], [-2.0, 2.0], [-2.0, -2.0]]
     ]};
 result = t.find({geo: {$within: {$geometry: bigHolePoly}}});
-assert.eq(result.count(), 0);
+assert.eq(result.itcount(), 0);
 result = t.find({geo: {$geoIntersects: {$geometry: bigHolePoly}}});
-assert.eq(result.count(), 0);
+assert.eq(result.itcount(), 0);
 
 // If a polygon has a hole, and another polygon is contained partially by that hole, it should be an intersection
 // but not a within.
@@ -208,6 +208,6 @@ var internalOverlapPoly = {type: "Polygon",
     ]};
 
 result = t.find({geo: {$geoIntersects: {$geometry: internalOverlapPoly}}});
-assert.eq(result.count(), 1);
+assert.eq(result.itcount(), 1);
 result = t.find({geo: {$within: {$geometry: internalOverlapPoly}}});
-assert.eq(result.count(), 0);
+assert.eq(result.itcount(), 0);

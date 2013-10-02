@@ -60,6 +60,7 @@ namespace mongo {
         bool supportsContains() const;
 
         bool hasS2Region() const;
+        bool hasFlatRegion() const;
 
         // Used by s2cursor only to generate a covering of the query object.
         // One region is not NULL and this returns it.
@@ -96,33 +97,49 @@ namespace mongo {
         shared_ptr<S2RegionUnion> _region;
     };
 
+    // TODO: Make a struct, turn parse stuff into something like
+    // static Status parseNearQuery(const BSONObj& obj, NearQuery** out);
     class NearQuery {
     public:
-        NearQuery() : minDistance(0), maxDistance(std::numeric_limits<double>::max()),
-                      fromRadians(false) {}
-        NearQuery(const string& f) : field(f), minDistance(0),
-                                     maxDistance(std::numeric_limits<double>::max()),
-                                     fromRadians(false) {}
+        NearQuery()
+            : minDistance(0),
+              maxDistance(std::numeric_limits<double>::max()),
+              isNearSphere(false) { }
 
-        /**
-         * If fromRadians is true after a parseFrom, minDistance and maxDistance are returned in
-         * radians, not meters.  The distances must be multiplied by the underlying index's radius
-         * to convert them to meters.
-         *
-         * This is annoying but useful when we don't know what index we're using at parse time.
-         */
+        NearQuery(const string& f)
+            : field(f),
+              minDistance(0),
+              maxDistance(std::numeric_limits<double>::max()),
+              isNearSphere(false) { }
+
         bool parseFrom(const BSONObj &obj);
         bool parseFromGeoNear(const BSONObj &obj, double radius);
 
+        // The name of the field that contains the geometry.
         string field;
+
+        // The starting point of the near search.
         PointWithCRS centroid;
 
-        // Min and max distance IN METERS from centroid that we're willing to search.
+        // Min and max distance from centroid that we're willing to search.
+        // Distance is in whatever units the centroid's CRS implies.
+        // If centroid.crs == FLAT these are radians.
+        // If centroid.crs == SPHERE these are meters.
         double minDistance;
         double maxDistance;
 
-        // Did we convert to this distance from radians?  (If so, we output distances in radians.)
-        bool fromRadians;
+        // It's either $near or $nearSphere.
+        bool isNearSphere;
+
+        string toString() const {
+            stringstream ss;
+            ss << " field=" << field;
+            return ss.str();
+        }
+
+    private:
+        bool parseLegacyQuery(const BSONObj &obj);
+        bool parseNewQuery(const BSONObj &obj);
     };
 
     // This represents either a $within or a $geoIntersects.
@@ -143,6 +160,10 @@ namespace mongo {
         bool hasS2Region() const;
         const S2Region& getRegion() const;
         string getField() const { return field; }
+
+        Predicate getPred() const { return predicate; }
+        const GeometryContainer& getGeometry() const { return geoContainer; }
+
     private:
         // Try to parse the provided object into the right place.
         bool parseLegacyQuery(const BSONObj &obj);

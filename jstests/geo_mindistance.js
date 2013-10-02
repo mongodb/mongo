@@ -47,7 +47,7 @@ for (var x = 0; x <= 10; x += 1) {
 t.ensureIndex({loc: "2dsphere"});
 
 var n_docs = t.count(),
-    geoJSONPoint = {$geometry: {type: 'Point', coordinates: [0, 0]}},
+    geoJSONPoint = {type: 'Point', coordinates: [0, 0]},
     legacyPoint = [0, 0];
 
 //
@@ -56,8 +56,8 @@ var n_docs = t.count(),
 //
 
 var n_min1400_count = t.find({loc: {
-    $near: geoJSONPoint, $minDistance: 1400 * km
-}}).count();
+    $near: {$geometry: geoJSONPoint, $minDistance: 1400 * km
+}}}).count();
 
 assert.eq(
     n_docs - n_docs_within(1400),
@@ -68,10 +68,10 @@ assert.eq(
 );
 
 var n_bw500_and_1000_count = t.find({loc: {
-    $near: geoJSONPoint,
-    $minDistance: 500 * km,
-    $maxDistance: 1000 * km
-}}).count();
+    $near: {$geometry: geoJSONPoint,
+            $minDistance: 500 * km,
+            $maxDistance: 1000 * km
+}}}).count();
 
 assert.eq(
     n_docs_within(1000) - n_docs_within(500),

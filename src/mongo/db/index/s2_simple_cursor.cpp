@@ -1,3 +1,4 @@
+// DEPRECATED
 /**
 *    Copyright (C) 2013 10gen Inc.
 *

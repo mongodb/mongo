@@ -26,7 +26,6 @@
 *    it in the license file.
 */
 
-#include "mongo/db/diskloc.h"
 #include "mongo/db/geo/geoparser.h"
 #include "mongo/db/geo/geoconstants.h"
 #include "third_party/s2/s2.h"
@@ -82,8 +81,7 @@ namespace mongo {
         static void setCoverLimitsBasedOnArea(double area, S2RegionCoverer *coverer, int coarsestIndexedLevel);
         static bool getKeysForObject(const BSONObj& obj, const S2IndexingParams& params,
                                      vector<string>* out);
-        static bool distanceBetween(const S2Point& us, const BSONObj& them,
-                                    const S2IndexingParams &params, double *out);
+        static bool distanceBetween(const S2Point& us, const BSONObj& them, double *out);
     };
 
 }  // namespace mongo
