@@ -95,7 +95,7 @@ namespace mongo {
         _exec->kill();
     }
 
-   Status InternalRunner::getExplainPlan(TypeExplain** explain) const {
+    Status InternalRunner::getExplainPlan(TypeExplain** explain) const {
         dassert(_exec.get());
 
         scoped_ptr<PlanStageStats> stats(_exec->getStats());
@@ -118,6 +118,6 @@ namespace mongo {
         (*explain)->setNScannedAllPlans((*explain)->getNScanned());
 
         return Status::OK();
-   }
+    }
 
 } // namespace mongo
