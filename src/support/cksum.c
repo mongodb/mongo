@@ -29,31 +29,30 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#define CRC_HARDWARE_UNKNOWN	0
-#define CRC_HARDWARE_PRESENT	1
-#define CRC_HARDWARE_ABSENT	2
+#define	CRC_HARDWARE_UNKNOWN	0
+#define	CRC_HARDWARE_PRESENT	1
+#define	CRC_HARDWARE_ABSENT	2
 
 /*
- * This file contains two ways of computing CRC: one that uses a
- * hardware CRC instruction (only on newer x86_64/amd64), and one that
- * uses a fast software algorithm.  __wt_cksum() provides a common
- * entry point that uses one of these two methods.
+ * This file contains two ways of computing CRC: one that uses a hardware CRC
+ * instruction (only on newer x86_64/amd64), and one that uses a fast software
+ * algorithm.  __wt_cksum() provides a common entry point that uses one of these
+ * two methods.
  *
- * To take advantage of the CRC hardware instruction, we detect it
- * using get_cpuid() on the first call to __wt_cksum().  Using runtime
- * detection with get_cpuid allows for single compatible binary that
- * can be used across all x86_64/amd64 processors, even those without
- * the CRC hardware.
+ * To take advantage of the CRC hardware instruction, we detect it using
+ * get_cpuid() on the first call to __wt_cksum().  Using runtime detection with
+ * get_cpuid allows for single compatible binary that can be used across all
+ * x86_64/amd64 processors, even those without the CRC hardware.
  *
- * If we do not have CPUID, or if the detection fails to find hardware
- * CRC, we'll use a software algorithm as a fallback.
+ * If we do not have CPUID, or if the detection fails to find hardware CRC,
+ * we'll use a software algorithm as a fallback.
  */
 #undef TEST_CRC_HARDWARE
 #if (defined(__amd64) || defined(__x86_64))
-#define CRC_HARDWARE_DEFAULT CRC_HARDWARE_UNKNOWN
-#define TEST_CRC_HARDWARE
+#define	CRC_HARDWARE_DEFAULT CRC_HARDWARE_UNKNOWN
+#define	TEST_CRC_HARDWARE
 #else
-#define CRC_HARDWARE_DEFAULT CRC_HARDWARE_ABSENT
+#define	CRC_HARDWARE_DEFAULT CRC_HARDWARE_ABSENT
 #endif
 
 static volatile int crc_hardware_check = CRC_HARDWARE_DEFAULT;
@@ -1230,7 +1229,7 @@ cksum_hw(const void *chunk, size_t len)
 	}
 
 	/* Checksum trailing bytes one byte at a time. */
-        p = (const uint8_t *)p64;
+	p = (const uint8_t *)p64;
 	for (len &= 0x7; len > 0; ++p, len--) {
 		__asm__ __volatile__(
 				     ".byte 0xF2, 0x0F, 0x38, 0xF0, 0xF1"
@@ -1245,7 +1244,8 @@ cksum_hw(const void *chunk, size_t len)
  *	Detect CRC hardware if possible, and return one of
  *	CRC_HARDWARE_PRESENT or CRC_HARDWARE_ABSENT.
  */
-static int detect_crc_hardware()
+static int
+detect_crc_hardware(void)
 {
 	unsigned int eax, ebx, ecx, edx;
 
@@ -1253,8 +1253,8 @@ static int detect_crc_hardware()
 			      "cpuid"
 			      : "=a" (eax), "=b" (ebx), "=c" (ecx), "=d" (edx)
 			      : "a" (1));
- 
-#define CPUID_ECX_HAS_SSE42	(1 << 20)
+
+#define	CPUID_ECX_HAS_SSE42	(1 << 20)
 
 	if (ecx & CPUID_ECX_HAS_SSE42)
 		return (CRC_HARDWARE_PRESENT);
