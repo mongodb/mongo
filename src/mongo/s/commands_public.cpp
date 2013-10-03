@@ -1771,6 +1771,8 @@ namespace mongo {
                              int options, string &errmsg,
                              BSONObjBuilder &result, bool fromRepl);
 
+            virtual bool passOptions() const { return true; }
+
         private:
             
         };
