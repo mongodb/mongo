@@ -857,7 +857,8 @@ test = testEnv.Install(
                        "s/write_op_impl",
                        "mocklib",
                        "db/exec/mock_stage",
-                       "$BUILD_DIR/mongo/db/auth/authmocks"]))
+                       "$BUILD_DIR/mongo/db/auth/authmocks",
+                       "$BUILD_DIR/mongo/db/query/query"]))
 
 if len(testEnv.subst('$PROGSUFFIX')):
     testEnv.Alias( "test", "#/${PROGPREFIX}test${PROGSUFFIX}" )
