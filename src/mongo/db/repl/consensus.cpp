@@ -75,7 +75,9 @@ namespace mongo {
                 return true;
             }
 
-            if (primary && primary->hbinfo().opTime >= hopeful->hbinfo().opTime) {
+            if (primary &&
+                    (hopeful->hbinfo().id() != primary->hbinfo().id()) &&
+                    (primary->hbinfo().opTime >= hopeful->hbinfo().opTime)) {
                 // other members might be aware of more up-to-date nodes
                 errmsg = str::stream() << hopeful->fullName() <<
                     " is trying to elect itself but " << primary->fullName() <<
