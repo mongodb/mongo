@@ -591,7 +591,7 @@ methods = {
 		Config('archive', 'true', r'''
 		automatically archive unneeded log files''',
 		type='boolean'),
-		Config('enabled', 'true', r'''
+		Config('enabled', 'false', r'''
 		enable logging subsystem''',
 		type='boolean'),
 		Config('file_max', '100MB', r'''
