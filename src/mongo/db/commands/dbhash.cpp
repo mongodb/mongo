@@ -28,6 +28,8 @@
 *    it in the license file.
 */
 
+#include "mongo/db/commands/dbhash.h"
+
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/database.h"
@@ -37,125 +39,181 @@
 
 namespace mongo {
 
-    class DBHashCmd : public Command {
-    public:
-        DBHashCmd() : Command( "dbHash", false, "dbhash" ) {}
-        virtual bool slaveOk() const { return true; }
-        virtual LockType locktype() const { return READ; }
-        virtual void addRequiredPrivileges(const std::string& dbname,
-                                           const BSONObj& cmdObj,
-                                           std::vector<Privilege>* out) {
-            ActionSet actions;
-            actions.addAction(ActionType::dbHash);
-            out->push_back(Privilege(ResourcePattern::forDatabaseName(dbname), actions));
-        }
-        virtual bool run(const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
-            Timer timer;
+    DBHashCmd dbhashCmd;
 
-            set<string> desiredCollections;
-            if ( cmdObj["collections"].type() == Array ) {
-                BSONObjIterator i( cmdObj["collections"].Obj() );
-                while ( i.more() ) {
-                    BSONElement e = i.next();
-                    if ( e.type() != String ) {
-                        errmsg = "collections entries have to be strings";
-                        return false;
-                    }
-                    desiredCollections.insert( e.String() );
-                }
+
+    void logOpForDbHash( const char* opstr,
+                         const char* ns,
+                         const BSONObj& obj,
+                         BSONObj* patt,
+                         const BSONObj* fullObj,
+                         bool forMigrateCleanup ) {
+        dbhashCmd.wipeCacheForCollection( ns );
+    }
+
+    // ----
+
+    DBHashCmd::DBHashCmd()
+        : Command( "dbHash", false, "dbhash" ),
+          _cachedHashedMutex( "_cachedHashedMutex" ){
+    }
+
+    void DBHashCmd::addRequiredPrivileges(const std::string& dbname,
+                                          const BSONObj& cmdObj,
+                                          std::vector<Privilege>* out) {
+        ActionSet actions;
+        actions.addAction(ActionType::dbHash);
+        out->push_back(Privilege(ResourcePattern::forDatabaseName(dbname), actions));
+    }
+
+    string DBHashCmd::hashCollection( const string& fullCollectionName, bool* fromCache ) {
+
+        scoped_ptr<scoped_lock> cachedHashedLock;
+
+        if ( isCachable( fullCollectionName ) ) {
+            cachedHashedLock.reset( new scoped_lock( _cachedHashedMutex ) );
+            string hash = _cachedHashed[fullCollectionName];
+            if ( hash.size() > 0 ) {
+                *fromCache = true;
+                return hash;
             }
-
-            list<string> colls;
-            Database* db = cc().database();
-            if ( db )
-                db->namespaceIndex().getNamespaces( colls );
-            colls.sort();
-
-            result.appendNumber( "numCollections" , (long long)colls.size() );
-            result.append( "host" , prettyHostName() );
-
-            md5_state_t globalState;
-            md5_init(&globalState);
-
-            BSONObjBuilder bb( result.subobjStart( "collections" ) );
-            for ( list<string>::iterator i=colls.begin(); i != colls.end(); i++ ) {
-                string fullCollectionName = *i;
-                string shortCollectionName = fullCollectionName.substr( dbname.size() + 1 );
-
-                if ( shortCollectionName.find( "system." ) == 0 )
-                    continue;
-
-                if ( desiredCollections.size() > 0 &&
-                     desiredCollections.count( shortCollectionName ) == 0 )
-                    continue;
-
-                NamespaceDetails * nsd = nsdetails( fullCollectionName );
-
-                // debug SERVER-761
-                NamespaceDetails::IndexIterator ii = nsd->ii();
-                while( ii.more() ) {
-                    const IndexDetails &idx = ii.next();
-                    if ( !idx.head.isValid() || !idx.info.isValid() ) {
-                        log() << "invalid index for ns: " << fullCollectionName << " " << idx.head << " " << idx.info;
-                        if ( idx.info.isValid() )
-                            log() << " " << idx.info.obj();
-                        log() << endl;
-                    }
-                }
-
-                auto_ptr<Runner> runner;
-                int idNum = nsd->findIdIndex();
-                if ( idNum >= 0 ) {
-                    runner.reset(InternalPlanner::indexScan(fullCollectionName,
-                                                            nsd,
-                                                            idNum,
-                                                            BSONObj(),
-                                                            BSONObj(),
-                                                            false,
-                                                            InternalPlanner::FORWARD,
-                                                            InternalPlanner::IXSCAN_FETCH));
-                }
-                else if ( nsd->isCapped() ) {
-                    runner.reset(InternalPlanner::collectionScan(fullCollectionName));
-                }
-                else {
-                    log() << "can't find _id index for: " << fullCollectionName << endl;
-                    continue;
-                }
-
-                md5_state_t st;
-                md5_init(&st);
-
-                long long n = 0;
-                Runner::RunnerState state;
-                BSONObj c;
-                verify(NULL != runner.get());
-                while (Runner::RUNNER_ADVANCED == (state = runner->getNext(&c, NULL))) {
-                    md5_append( &st , (const md5_byte_t*)c.objdata() , c.objsize() );
-                    n++;
-                }
-                if (Runner::RUNNER_EOF != state) {
-                    warning() << "error while hashing, db dropped? ns=" << fullCollectionName << endl;
-                }
-                md5digest d;
-                md5_finish(&st, d);
-                string hash = digestToString( d );
-
-                bb.append( shortCollectionName, hash );
-
-                md5_append( &globalState , (const md5_byte_t*)hash.c_str() , hash.size() );
-            }
-            bb.done();
-
-            md5digest d;
-            md5_finish(&globalState, d);
-            string hash = digestToString( d );
-
-            result.append( "md5" , hash );
-            result.appendNumber( "timeMillis", timer.millis() );
-            return 1;
         }
 
-    } dbhashCmd;
+        *fromCache = false;
+        NamespaceDetails * nsd = nsdetails( fullCollectionName );
+        verify( nsd );
+
+        // debug SERVER-761
+        NamespaceDetails::IndexIterator ii = nsd->ii();
+        while( ii.more() ) {
+            const IndexDetails &idx = ii.next();
+            if ( !idx.head.isValid() || !idx.info.isValid() ) {
+                log() << "invalid index for ns: " << fullCollectionName << " " << idx.head << " " << idx.info;
+                if ( idx.info.isValid() )
+                    log() << " " << idx.info.obj();
+                log() << endl;
+            }
+        }
+
+        auto_ptr<Runner> runner;
+        int idNum = nsd->findIdIndex();
+        if ( idNum >= 0 ) {
+            runner.reset(InternalPlanner::indexScan(fullCollectionName,
+                                                    nsd,
+                                                    idNum,
+                                                    BSONObj(),
+                                                    BSONObj(),
+                                                    false,
+                                                    InternalPlanner::FORWARD,
+                                                    InternalPlanner::IXSCAN_FETCH));
+        }
+        else if ( nsd->isCapped() ) {
+            runner.reset(InternalPlanner::collectionScan(fullCollectionName));
+        }
+        else {
+            log() << "can't find _id index for: " << fullCollectionName << endl;
+            return "no _id _index";
+        }
+
+        md5_state_t st;
+        md5_init(&st);
+
+        long long n = 0;
+        Runner::RunnerState state;
+        BSONObj c;
+        verify(NULL != runner.get());
+        while (Runner::RUNNER_ADVANCED == (state = runner->getNext(&c, NULL))) {
+            md5_append( &st , (const md5_byte_t*)c.objdata() , c.objsize() );
+            n++;
+        }
+        if (Runner::RUNNER_EOF != state) {
+            warning() << "error while hashing, db dropped? ns=" << fullCollectionName << endl;
+        }
+        md5digest d;
+        md5_finish(&st, d);
+        string hash = digestToString( d );
+
+        if ( cachedHashedLock.get() ) {
+            _cachedHashed[fullCollectionName] = hash;
+        }
+
+        return hash;
+    }
+
+    bool DBHashCmd::run(const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
+        Timer timer;
+
+        set<string> desiredCollections;
+        if ( cmdObj["collections"].type() == Array ) {
+            BSONObjIterator i( cmdObj["collections"].Obj() );
+            while ( i.more() ) {
+                BSONElement e = i.next();
+                if ( e.type() != String ) {
+                    errmsg = "collections entries have to be strings";
+                    return false;
+                }
+                desiredCollections.insert( e.String() );
+            }
+        }
+
+        list<string> colls;
+        Database* db = cc().database();
+        if ( db )
+            db->namespaceIndex().getNamespaces( colls );
+        colls.sort();
+
+        result.appendNumber( "numCollections" , (long long)colls.size() );
+        result.append( "host" , prettyHostName() );
+
+        md5_state_t globalState;
+        md5_init(&globalState);
+
+        vector<string> cached;
+
+        BSONObjBuilder bb( result.subobjStart( "collections" ) );
+        for ( list<string>::iterator i=colls.begin(); i != colls.end(); i++ ) {
+            string fullCollectionName = *i;
+            string shortCollectionName = fullCollectionName.substr( dbname.size() + 1 );
+
+            if ( shortCollectionName.find( "system." ) == 0 )
+                continue;
+
+            if ( desiredCollections.size() > 0 &&
+                 desiredCollections.count( shortCollectionName ) == 0 )
+                continue;
+
+            bool fromCache = false;
+            string hash = hashCollection( fullCollectionName, &fromCache );
+
+            bb.append( shortCollectionName, hash );
+
+            md5_append( &globalState , (const md5_byte_t*)hash.c_str() , hash.size() );
+            if ( fromCache )
+                cached.push_back( fullCollectionName );
+        }
+        bb.done();
+
+        md5digest d;
+        md5_finish(&globalState, d);
+        string hash = digestToString( d );
+
+        result.append( "md5" , hash );
+        result.appendNumber( "timeMillis", timer.millis() );
+
+        result.append( "fromCache", cached );
+
+        return 1;
+    }
+
+    void DBHashCmd::wipeCacheForCollection( const StringData& ns ) {
+        if ( !isCachable( ns ) )
+            return;
+        scoped_lock lk( _cachedHashedMutex );
+        _cachedHashed.erase( ns.toString() );
+    }
+
+    bool DBHashCmd::isCachable( const StringData& ns ) const {
+        return ns.startsWith( "config." );
+    }
 
 }

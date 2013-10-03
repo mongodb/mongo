@@ -38,6 +38,7 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/dbhash.h"
 #include "mongo/db/index_builder.h"
 #include "mongo/db/index_update.h"
 #include "mongo/db/instance.h"
@@ -362,6 +363,7 @@ namespace mongo {
         }
 
         logOpForSharding(opstr, ns, obj, patt, fullObj, fromMigrate);
+        logOpForDbHash(opstr, ns, obj, patt, fullObj, fromMigrate);
     }
 
     void createOplog() {
