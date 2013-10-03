@@ -2,6 +2,7 @@
 
 Import("env")
 Import("has_option")
+Import("debugBuild")
 
 files = [
     'src/base/dynamic_annotations.c',
@@ -56,7 +57,16 @@ conf.CheckMallocHookVolatile()
 env = conf.Finish()
 
 
-env.Append( CPPDEFINES=["NO_TCMALLOC_SAMPLES","NO_TCMALLOC_SAMPLES","NO_HEAP_CHECK"] )
+env.Append( CPPDEFINES=[ "NO_TCMALLOC_SAMPLES", "NO_HEAP_CHECK"] )
+
+# The build system doesn't define NDEBUG globally for historical reasons, however, TCMalloc
+# expects that NDEBUG is used to select between preferring the mmap or the sbrk allocator. For
+# non-debug builds, we want to prefer the sbrk allocator since this is TCMallocs preferred
+# production deployment configuration. See the use of NDEBUG and kDebugMode in
+# src/system-alloc.cc for more details.
+if not debugBuild:
+    env.AppendUnique( CPPDEFINES=["NDEBUG"] )
+
 env.Prepend( CPPPATH=["src/"] )
 
 my_SYSLIBDEPS = []
