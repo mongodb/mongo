@@ -44,6 +44,7 @@
 #include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/user.h"
+#include "mongo/db/auth/user_document_parser.h"
 #include "mongo/db/auth/user_management_commands_parser.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/jsobj.h"
@@ -51,6 +52,8 @@
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
+
+    using mongoutils::str::stream;
 
     static void addStatus(const Status& status, BSONObjBuilder& builder) {
         builder.append("ok", status.isOK() ? 1.0: 0.0);
@@ -71,7 +74,7 @@ namespace mongo {
         }
     }
 
-    static BSONArray rolesToBSONArray(const User::RoleDataMap& roles) {
+    static BSONArray roleDataMapToBSONArray(const User::RoleDataMap& roles) {
         BSONArrayBuilder arrBuilder;
         for (User::RoleDataMap::const_iterator it = roles.begin(); it != roles.end(); ++it) {
             const User::RoleData& role = it->second;
@@ -81,6 +84,72 @@ namespace mongo {
                                    "canDelegate" << role.canDelegate));
         }
         return arrBuilder.arr();
+    }
+
+    // Should only be called inside the AuthzUpdateLock
+    static Status getBSONForRoleVectorIfRolesExist(const std::vector<RoleName>& roles,
+                                                   AuthorizationManager* authzManager,
+                                                   BSONArray* result) {
+        BSONArrayBuilder rolesArrayBuilder;
+        for (std::vector<RoleName>::const_iterator it = roles.begin(); it != roles.end(); ++it) {
+            const RoleName& role = *it;
+            if (!authzManager->roleExists(role)) {
+                return Status(ErrorCodes::RoleNotFound,
+                              mongoutils::str::stream() << role.getFullName() <<
+                                      " does not name an existing role");
+            }
+            rolesArrayBuilder.append(BSON("name" << role.getRole() << "source" << role.getDB()));
+        }
+        *result = rolesArrayBuilder.arr();
+        return Status::OK();
+    }
+
+    // Should only be called inside the AuthzUpdateLock
+    static Status roleDataVectorToBSONArrayIfRolesExist(const std::vector<User::RoleData>& roles,
+                                                        AuthorizationManager* authzManager,
+                                                        BSONArray* result) {
+        BSONArrayBuilder rolesArrayBuilder;
+        for (std::vector<User::RoleData>::const_iterator it = roles.begin();
+                it != roles.end(); ++it) {
+            const User::RoleData& role = *it;
+            if (!authzManager->roleExists(role.name)) {
+                return Status(ErrorCodes::RoleNotFound,
+                              mongoutils::str::stream() << it->name.getFullName() <<
+                                      " does not name an existing role");
+            }
+            if (!role.hasRole && !role.canDelegate) {
+                return Status(ErrorCodes::BadValue, "At least one of \"hasRole\" and "
+                              "\"canDelegate\" must be true for every role object");
+            }
+            rolesArrayBuilder.append(BSON("name" << role.name.getRole() <<
+                                          "source" << role.name.getDB() <<
+                                          "hasRole" << role.hasRole <<
+                                          "canDelegate" << role.canDelegate));
+        }
+        *result = rolesArrayBuilder.arr();
+        return Status::OK();
+    }
+
+    static Status privilegeVectorToBSONArray(const PrivilegeVector& privileges, BSONArray* result) {
+        BSONArrayBuilder arrBuilder;
+        for (PrivilegeVector::const_iterator it = privileges.begin();
+                it != privileges.end(); ++it) {
+            const Privilege& privilege = *it;
+
+            ParsedPrivilege parsedPrivilege;
+            std::string errmsg;
+            if (!ParsedPrivilege::privilegeToParsedPrivilege(privilege,
+                                                             &parsedPrivilege,
+                                                             &errmsg)) {
+                return Status(ErrorCodes::FailedToParse, errmsg);
+            }
+            if (!parsedPrivilege.isValid(&errmsg)) {
+                return Status(ErrorCodes::FailedToParse, errmsg);
+            }
+            arrBuilder.append(parsedPrivilege.toBSON());
+        }
+        *result = arrBuilder.arr();
+        return Status::OK();
     }
 
     static Status getCurrentUserRoles(AuthorizationManager* authzManager,
@@ -132,6 +201,52 @@ namespace mongo {
                  string& errmsg,
                  BSONObjBuilder& result,
                  bool fromRepl) {
+            auth::CreateOrUpdateUserArgs args;
+            Status status = auth::parseCreateOrUpdateUserCommands(cmdObj,
+                                                                 "createUser",
+                                                                 dbname,
+                                                                 &args);
+            if (!status.isOK()) {
+                addStatus(status, result);
+                return false;
+            }
+
+            if (args.userName.getDB() == "local") {
+                addStatus(Status(ErrorCodes::BadValue, "Cannot create users in the local database"),
+                          result);
+                return false;
+            }
+
+            if (!args.hasHashedPassword && args.userName.getDB() != "$external") {
+                addStatus(Status(ErrorCodes::BadValue,
+                                 "Must provide a 'pwd' field for all user documents, except those"
+                                         " with '$external' as the user's source"),
+                          result);
+                return false;
+            }
+
+            if (!args.hasRoles) {
+                addStatus(Status(ErrorCodes::BadValue,
+                                 "\"createUser\" command requires a \"roles\" array"),
+                          result);
+                return false;
+            }
+
+            BSONObjBuilder userObjBuilder;
+            userObjBuilder.append("_id",
+                                  stream() << args.userName.getDB() << "." <<
+                                          args.userName.getUser());
+            userObjBuilder.append(AuthorizationManager::USER_NAME_FIELD_NAME,
+                                  args.userName.getUser());
+            userObjBuilder.append(AuthorizationManager::USER_SOURCE_FIELD_NAME,
+                                  args.userName.getDB());
+            if (args.hasHashedPassword) {
+                userObjBuilder.append("credentials", BSON("MONGODB-CR" << args.hashedPassword));
+            }
+            if (args.hasCustomData) {
+                userObjBuilder.append("customData", args.customData);
+            }
+
             AuthorizationManager* authzManager = getGlobalAuthorizationManager();
             AuthzDocumentsUpdateGuard updateGuard(authzManager);
             if (!updateGuard.tryLock("Create user")) {
@@ -140,19 +255,25 @@ namespace mongo {
                 return false;
             }
 
-            BSONObj userObj;
-            BSONObj writeConcern;
-            Status status = auth::parseAndValidateCreateUserCommand(cmdObj,
-                                                                    dbname,
-                                                                    authzManager,
-                                                                    &userObj,
-                                                                    &writeConcern);
+            // Role existence has to be checked after acquiring the update lock
+            BSONArray rolesArray;
+            status = roleDataVectorToBSONArrayIfRolesExist(args.roles, authzManager, &rolesArray);
             if (!status.isOK()) {
                 addStatus(status, result);
                 return false;
             }
+            userObjBuilder.append("roles", rolesArray);
 
-            status = authzManager->insertPrivilegeDocument(dbname, userObj, writeConcern);
+            BSONObj userObj = userObjBuilder.obj();
+            V2UserDocumentParser parser;
+            status = parser.checkValidUserDocument(userObj);
+            if (!status.isOK()) {
+                addStatus(status, result);
+                return false;
+            }
+            status = authzManager->insertPrivilegeDocument(dbname,
+                                                           userObj,
+                                                           args.writeConcern);
             if (!status.isOK()) {
                 addStatus(status, result);
                 return false;
@@ -202,6 +323,31 @@ namespace mongo {
                  string& errmsg,
                  BSONObjBuilder& result,
                  bool fromRepl) {
+            auth::CreateOrUpdateUserArgs args;
+            Status status = auth::parseCreateOrUpdateUserCommands(cmdObj,
+                                                                 "updateUser",
+                                                                 dbname,
+                                                                 &args);
+            if (!status.isOK()) {
+                addStatus(status, result);
+                return false;
+            }
+
+            if (!args.hasHashedPassword && !args.hasCustomData && !args.hasRoles) {
+                addStatus(Status(ErrorCodes::BadValue,
+                                 "Must specify at least one field to update in updateUser"),
+                          result);
+                return false;
+            }
+
+            BSONObjBuilder updateSetBuilder;
+            if (args.hasHashedPassword) {
+                updateSetBuilder.append("credentials.MONGODB-CR", args.hashedPassword);
+            }
+            if (args.hasCustomData) {
+                updateSetBuilder.append("customData", args.customData);
+            }
+
             AuthorizationManager* authzManager = getGlobalAuthorizationManager();
             AuthzDocumentsUpdateGuard updateGuard(authzManager);
             if (!updateGuard.tryLock("Update user")) {
@@ -210,23 +356,24 @@ namespace mongo {
                 return false;
             }
 
-            BSONObj updateObj;
-            UserName userName;
-            BSONObj writeConcern;
-            Status status = auth::parseAndValidateUpdateUserCommand(cmdObj,
-                                                                    dbname,
-                                                                    authzManager,
-                                                                    &updateObj,
-                                                                    &userName,
-                                                                    &writeConcern);
-            if (!status.isOK()) {
-                addStatus(status, result);
-                return false;
+            // Role existence has to be checked after acquiring the update lock
+            if (args.hasRoles) {
+                BSONArray rolesArray;
+                status = roleDataVectorToBSONArrayIfRolesExist(args.roles,
+                                                               authzManager,
+                                                               &rolesArray);
+                if (!status.isOK()) {
+                    addStatus(status, result);
+                    return false;
+                }
+                updateSetBuilder.append("roles", rolesArray);
             }
 
-            status = authzManager->updatePrivilegeDocument(userName, updateObj, writeConcern);
+            status = authzManager->updatePrivilegeDocument(args.userName,
+                                                           BSON("$set" << updateSetBuilder.done()),
+                                                           args.writeConcern);
             // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
-            authzManager->invalidateUserByName(userName);
+            authzManager->invalidateUserByName(args.userName);
             if (!status.isOK()) {
                 addStatus(status, result);
                 return false;
@@ -438,21 +585,22 @@ namespace mongo {
                 return false;
             }
 
-            UserName userName;
+            std::string userNameString;
             std::vector<RoleName> roles;
             BSONObj writeConcern;
-            Status status = auth::parseUserRoleManipulationCommand(cmdObj,
-                                                                   "grantRolesToUser",
-                                                                   dbname,
-                                                                   authzManager,
-                                                                   &userName,
-                                                                   &roles,
-                                                                   &writeConcern);
+            Status status = auth::parseRolePossessionManipulationCommands(cmdObj,
+                                                                          "grantRolesToUser",
+                                                                          "roles",
+                                                                          dbname,
+                                                                          &userNameString,
+                                                                          &roles,
+                                                                          &writeConcern);
             if (!status.isOK()) {
                 addStatus(status, result);
                 return false;
             }
 
+            UserName userName(userNameString, dbname);
             User::RoleDataMap userRoles;
             status = getCurrentUserRoles(authzManager, userName, &userRoles);
             if (!status.isOK()) {
@@ -462,6 +610,13 @@ namespace mongo {
 
             for (vector<RoleName>::iterator it = roles.begin(); it != roles.end(); ++it) {
                 RoleName& roleName = *it;
+                if (!authzManager->roleExists(roleName)) {
+                    addStatus(Status(ErrorCodes::RoleNotFound,
+                                     mongoutils::str::stream() << roleName.getFullName() <<
+                                             " does not name an existing role"),
+                              result);
+                    return false;
+                }
                 User::RoleData& role = userRoles[roleName];
                 if (role.name.empty()) {
                     role.name = roleName;
@@ -469,7 +624,7 @@ namespace mongo {
                 role.hasRole = true;
             }
 
-            BSONArray newRolesBSONArray = rolesToBSONArray(userRoles);
+            BSONArray newRolesBSONArray = roleDataMapToBSONArray(userRoles);
             status = authzManager->updatePrivilegeDocument(
                     userName, BSON("$set" << BSON("roles" << newRolesBSONArray)), writeConcern);
             // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
@@ -528,21 +683,22 @@ namespace mongo {
                 return false;
             }
 
-            UserName userName;
+            std::string userNameString;
             std::vector<RoleName> roles;
             BSONObj writeConcern;
-            Status status = auth::parseUserRoleManipulationCommand(cmdObj,
-                                                                   "revokeRolesFromUser",
-                                                                   dbname,
-                                                                   authzManager,
-                                                                   &userName,
-                                                                   &roles,
-                                                                   &writeConcern);
+            Status status = auth::parseRolePossessionManipulationCommands(cmdObj,
+                                                                          "revokeRolesFromUser",
+                                                                          "roles",
+                                                                          dbname,
+                                                                          &userNameString,
+                                                                          &roles,
+                                                                          &writeConcern);
             if (!status.isOK()) {
                 addStatus(status, result);
                 return false;
             }
 
+            UserName userName(userNameString, dbname);
             User::RoleDataMap userRoles;
             status = getCurrentUserRoles(authzManager, userName, &userRoles);
             if (!status.isOK()) {
@@ -552,6 +708,13 @@ namespace mongo {
 
             for (vector<RoleName>::iterator it = roles.begin(); it != roles.end(); ++it) {
                 RoleName& roleName = *it;
+                if (!authzManager->roleExists(roleName)) {
+                    addStatus(Status(ErrorCodes::RoleNotFound,
+                                     mongoutils::str::stream() << roleName.getFullName() <<
+                                             " does not name an existing role"),
+                              result);
+                    return false;
+                }
                 User::RoleDataMap::iterator roleDataIt = userRoles.find(roleName);
                 if (roleDataIt == userRoles.end()) {
                     continue; // User already doesn't have the role, nothing to do
@@ -567,7 +730,7 @@ namespace mongo {
                 }
             }
 
-            BSONArray newRolesBSONArray = rolesToBSONArray(userRoles);
+            BSONArray newRolesBSONArray = roleDataMapToBSONArray(userRoles);
             status = authzManager->updatePrivilegeDocument(
                     userName, BSON("$set" << BSON("roles" << newRolesBSONArray)), writeConcern);
             // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
@@ -626,21 +789,22 @@ namespace mongo {
                 return false;
             }
 
-            UserName userName;
+            std::string userNameString;
             std::vector<RoleName> roles;
             BSONObj writeConcern;
-            Status status = auth::parseUserRoleManipulationCommand(cmdObj,
-                                                                   "grantDelegateRolesToUser",
-                                                                   dbname,
-                                                                   authzManager,
-                                                                   &userName,
-                                                                   &roles,
-                                                                   &writeConcern);
+            Status status = auth::parseRolePossessionManipulationCommands(cmdObj,
+                                                                          "grantDelegateRolesToUser",
+                                                                          "roles",
+                                                                          dbname,
+                                                                          &userNameString,
+                                                                          &roles,
+                                                                          &writeConcern);
             if (!status.isOK()) {
                 addStatus(status, result);
                 return false;
             }
 
+            UserName userName(userNameString, dbname);
             User::RoleDataMap userRoles;
             status = getCurrentUserRoles(authzManager, userName, &userRoles);
             if (!status.isOK()) {
@@ -650,6 +814,13 @@ namespace mongo {
 
             for (vector<RoleName>::iterator it = roles.begin(); it != roles.end(); ++it) {
                 RoleName& roleName = *it;
+                if (!authzManager->roleExists(roleName)) {
+                    addStatus(Status(ErrorCodes::RoleNotFound,
+                                     mongoutils::str::stream() << roleName.getFullName() <<
+                                             " does not name an existing role"),
+                              result);
+                    return false;
+                }
                 User::RoleData& role = userRoles[roleName];
                 if (role.name.empty()) {
                     role.name = roleName;
@@ -657,7 +828,7 @@ namespace mongo {
                 role.canDelegate = true;
             }
 
-            BSONArray newRolesBSONArray = rolesToBSONArray(userRoles);
+            BSONArray newRolesBSONArray = roleDataMapToBSONArray(userRoles);
             status = authzManager->updatePrivilegeDocument(
                     userName, BSON("$set" << BSON("roles" << newRolesBSONArray)), writeConcern);
             // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
@@ -716,21 +887,23 @@ namespace mongo {
                 return false;
             }
 
-            UserName userName;
+            std::string userNameString;
             std::vector<RoleName> roles;
             BSONObj writeConcern;
-            Status status = auth::parseUserRoleManipulationCommand(cmdObj,
-                                                                   "revokeDelegateRolesFromUser",
-                                                                   dbname,
-                                                                   authzManager,
-                                                                   &userName,
-                                                                   &roles,
-                                                                   &writeConcern);
+            Status status =
+                    auth::parseRolePossessionManipulationCommands(cmdObj,
+                                                                  "revokeDelegateRolesFromUser",
+                                                                  "roles",
+                                                                  dbname,
+                                                                  &userNameString,
+                                                                  &roles,
+                                                                  &writeConcern);
             if (!status.isOK()) {
                 addStatus(status, result);
                 return false;
             }
 
+            UserName userName(userNameString, dbname);
             User::RoleDataMap userRoles;
             status = getCurrentUserRoles(authzManager, userName, &userRoles);
             if (!status.isOK()) {
@@ -740,6 +913,13 @@ namespace mongo {
 
             for (vector<RoleName>::iterator it = roles.begin(); it != roles.end(); ++it) {
                 RoleName& roleName = *it;
+                if (!authzManager->roleExists(roleName)) {
+                    addStatus(Status(ErrorCodes::RoleNotFound,
+                                     mongoutils::str::stream() << roleName.getFullName() <<
+                                             " does not name an existing role"),
+                              result);
+                    return false;
+                }
                 User::RoleDataMap::iterator roleDataIt = userRoles.find(roleName);
                 if (roleDataIt == userRoles.end()) {
                     continue; // User already doesn't have the role, nothing to do
@@ -755,7 +935,7 @@ namespace mongo {
                 }
             }
 
-            BSONArray newRolesBSONArray = rolesToBSONArray(userRoles);
+            BSONArray newRolesBSONArray = roleDataMapToBSONArray(userRoles);
             status = authzManager->updatePrivilegeDocument(
                     userName, BSON("$set" << BSON("roles" << newRolesBSONArray)), writeConcern);
             // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
@@ -877,6 +1057,53 @@ namespace mongo {
                  string& errmsg,
                  BSONObjBuilder& result,
                  bool fromRepl) {
+            auth::CreateOrUpdateRoleArgs args;
+            Status status = auth::parseCreateOrUpdateRoleCommands(cmdObj,
+                                                                  "createRole",
+                                                                  dbname,
+                                                                  &args);
+            if (!status.isOK()) {
+                addStatus(status, result);
+                return false;
+            }
+
+            if (args.roleName.getDB() == "local") {
+                addStatus(Status(ErrorCodes::BadValue, "Cannot create roles in the local database"),
+                          result);
+                return false;
+            }
+
+            if (!args.hasRoles) {
+                addStatus(Status(ErrorCodes::BadValue,
+                                 "\"createRole\" command requires a \"roles\" array"),
+                          result);
+                return false;
+            }
+
+            if (!args.hasPrivileges) {
+                addStatus(Status(ErrorCodes::BadValue,
+                                 "\"createRole\" command requires a \"privileges\" array"),
+                          result);
+                return false;
+            }
+
+            BSONObjBuilder roleObjBuilder;
+
+            roleObjBuilder.append("_id", stream() << args.roleName.getDB() << "." <<
+                                          args.roleName.getRole());
+            roleObjBuilder.append(AuthorizationManager::ROLE_NAME_FIELD_NAME,
+                                  args.roleName.getRole());
+            roleObjBuilder.append(AuthorizationManager::ROLE_SOURCE_FIELD_NAME,
+                                  args.roleName.getDB());
+
+            BSONArray privileges;
+            status = privilegeVectorToBSONArray(args.privileges, &privileges);
+            if (!status.isOK()) {
+                addStatus(status, result);
+                return false;
+            }
+            roleObjBuilder.append("privileges", privileges);
+
             AuthorizationManager* authzManager = getGlobalAuthorizationManager();
             AuthzDocumentsUpdateGuard updateGuard(authzManager);
             if (!updateGuard.tryLock("Create role")) {
@@ -885,19 +1112,16 @@ namespace mongo {
                 return false;
             }
 
-            BSONObj roleObj;
-            BSONObj writeConcern;
-            Status status = auth::parseAndValidateCreateRoleCommand(cmdObj,
-                                                                    dbname,
-                                                                    authzManager,
-                                                                    &roleObj,
-                                                                    &writeConcern);
+            // Role existence has to be checked after acquiring the update lock
+            BSONArray roles;
+            status = getBSONForRoleVectorIfRolesExist(args.roles, authzManager, &roles);
             if (!status.isOK()) {
                 addStatus(status, result);
                 return false;
             }
+            roleObjBuilder.append("roles", roles);
 
-            status = authzManager->insertRoleDocument(roleObj, writeConcern);
+            status = authzManager->insertRoleDocument(roleObjBuilder.done(), args.writeConcern);
             if (!status.isOK()) {
                 addStatus(status, result);
                 return false;
@@ -1022,7 +1246,7 @@ namespace mongo {
             return true;
         }
 
-    } cmdGrantPrivilegeToRole;
+    } cmdGrantPrivilegesToRole;
 
     class CmdRolesInfo: public Command {
     public:

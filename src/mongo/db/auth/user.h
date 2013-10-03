@@ -55,6 +55,8 @@ namespace mongo {
             bool hasRole;
             bool canDelegate;
             RoleData() : hasRole(false), canDelegate(false) {}
+            RoleData(const RoleName& _name, bool _hasRole, bool _canDelegate) :
+                name(_name), hasRole(_hasRole), canDelegate(_canDelegate) {}
         };
 
         typedef unordered_map<RoleName, RoleData> RoleDataMap;
