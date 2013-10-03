@@ -297,7 +297,6 @@ __rec_review(WT_SESSION_IMPL *session, WT_REF *ref, WT_PAGE *page,
 	uint32_t i;
 
 	btree = S2BT(session);
-	*inmem_split = *istree = 0;
 
 	/*
 	 * Get exclusive access to the page if our caller doesn't have the tree
@@ -456,7 +455,12 @@ ckpt:		WT_CSTAT_INCR(session, cache_eviction_checkpoint);
 		 * If reconciliation failed due to active modifications and
 		 * the page is a lot larger than the maximum allowed, it is
 		 * likely that we are having trouble reconciling it due to
-		 * contention. Attempt to split the page in memory.
+		 * contention, attempt to split the page in memory.
+		 *
+		 * Note, we won't be here if recursively descending a tree of
+		 * pages: dirty row-store leaf pages can't be merged into their
+		 * parents, which means if top wasn't true in this test, we'd
+		 * have returned busy before attempting reconciliation.
 		 */
 		if (ret == EBUSY &&
 		    page->type == WT_PAGE_ROW_LEAF &&
