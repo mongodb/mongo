@@ -698,10 +698,6 @@ namespace mongo {
                 ret = unsafe_recv(buf, len);
             }
 
-            if ( len <= static_cast<int>(sizeof(MSGHEADER)) && ret != len ) {
-                LOG(_logLevel) << "Socket recv() got " << ret <<
-                    " bytes wanted len=" << len << endl;
-            }
             fassert(16508, ret <= len);
             len -= ret;
             buf += ret;
