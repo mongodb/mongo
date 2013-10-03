@@ -102,30 +102,6 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, int exclusive)
 		else
 			__rec_page_clean_update(session, parent_ref);
 
-		/* Discard the page. */
-		{
-		WT_REF *ref;
-		uint32_t i;
-		switch (page->type) {
-		case WT_PAGE_COL_INT:
-		case WT_PAGE_ROW_INT:
-			WT_REF_FOREACH(page, ref, i) {
-				if (ref->state == WT_REF_DISK ||
-				    ref->state == WT_REF_DELETED)
-					continue;
-				fprintf(stderr, "\n\n");
-				fprintf(stderr, "HIT: #682\n");
-				fprintf(stderr, "HIT: #682\n");
-				fprintf(stderr, "HIT: #682\n");
-				fprintf(stderr, "\n\n");
-				WT_ASSERT(session,
-				    exclusive || ref->state == WT_REF_LOCKED);
-				break;
-			}
-		}
-		}
-		__rec_discard_tree(session, page, exclusive);
-
 		WT_CSTAT_INCR(session, cache_eviction_clean);
 		WT_DSTAT_INCR(session, cache_eviction_clean);
 	} else {
@@ -135,12 +111,13 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, int exclusive)
 			WT_ERR(__rec_page_dirty_update(
 			    session, parent_ref, page));
 
-		/* Discard the tree rooted in this page. */
-		__rec_discard_tree(session, page, exclusive);
-
 		WT_CSTAT_INCR(session, cache_eviction_dirty);
 		WT_DSTAT_INCR(session, cache_eviction_dirty);
 	}
+
+	/* Discard the tree rooted in this page. */
+	__rec_discard_tree(session, page, exclusive);
+
 	if (0) {
 err:		/*
 		 * If unable to evict this page, release exclusive reference(s)
