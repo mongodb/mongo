@@ -777,6 +777,7 @@ __evict_init_candidate(
 	u_int slot;
 
 	cache = S2C(session)->cache;
+	WT_ASSERT(session, page->ref->state == WT_REF_EVICT_WALK);
 
 	/* Keep track of the maximum slot we are using. */
 	slot = (u_int)(evict - cache->evict);

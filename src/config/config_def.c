@@ -368,7 +368,7 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	},
 	{ "session.open_cursor",
 	  "append=0,bulk=0,checkpoint=,dump=,next_random=0,overwrite=,raw=0"
-	  ",statistics_clear=0,statistics_fast=0,target=",
+	  ",statistics_clear=0,statistics_fast=,target=",
 	  confchk_session_open_cursor
 	},
 	{ "session.reconfigure",

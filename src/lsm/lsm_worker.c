@@ -21,7 +21,7 @@ __lsm_copy_chunks(WT_SESSION_IMPL *session,
     WT_LSM_TREE *lsm_tree, WT_LSM_WORKER_COOKIE *cookie, int old_chunks)
 {
 	WT_DECL_RET;
-	u_int nchunks;
+	u_int i, nchunks;
 	size_t alloc;
 
 	/* Always return zero chunks on error. */
@@ -48,11 +48,38 @@ __lsm_copy_chunks(WT_SESSION_IMPL *session,
 		    old_chunks ? lsm_tree->old_chunks : lsm_tree->chunk,
 		    nchunks * sizeof(*cookie->chunk_array));
 
+	/*
+	 * Mark each chunk as active, so we don't drop it until after we know
+	 * it's safe.
+	 */
+	for (i = 0; i < nchunks; i++)
+		(void)WT_ATOMIC_ADD(cookie->chunk_array[i]->refcnt, 1);
+
 err:	WT_TRET(__wt_rwunlock(session, lsm_tree->rwlock));
 
 	if (ret == 0)
 		cookie->nchunks = nchunks;
 	return (ret);
+}
+
+/*
+ * __lsm_unpin_chunks --
+ *	Decrement the reference count for a set of chunks. Allowing those
+ *	chunks to be considered for deletion.
+ */
+static void
+__lsm_unpin_chunks(WT_SESSION_IMPL *session, WT_LSM_WORKER_COOKIE *cookie)
+{
+	u_int i;
+
+	for (i = 0; i < cookie->nchunks; i++) {
+		if (cookie->chunk_array[i] == NULL)
+			continue;
+		WT_ASSERT(session, cookie->chunk_array[i]->refcnt > 0);
+		(void)WT_ATOMIC_SUB(cookie->chunk_array[i]->refcnt, 1);
+	}
+	/* Ensure subsequent calls don't double decrement. */
+	cookie->nchunks = 0;
 }
 
 /*
@@ -190,12 +217,14 @@ __wt_lsm_bloom_worker(void *arg)
 				break;
 			++j;
 		}
+		__lsm_unpin_chunks(session, &cookie);
 		if (j == 0 && F_ISSET(lsm_tree, WT_LSM_TREE_WORKING))
 			WT_ERR(__wt_cond_wait(
 			    session, lsm_tree->work_cond, 100000));
 	}
 
-err:	__wt_free(session, cookie.chunk_array);
+err:	__lsm_unpin_chunks(session, &cookie);
+	__wt_free(session, cookie.chunk_array);
 	/*
 	 * The thread will only exit with failure if we run out of memory or
 	 * there is some other system driven failure. We can't keep going
@@ -333,12 +362,14 @@ __wt_lsm_checkpoint_worker(void *arg)
 			WT_VERBOSE_ERR(session, lsm,
 			     "LSM worker checkpointed %u", i);
 		}
+		__lsm_unpin_chunks(session, &cookie);
 		if (j == 0 && F_ISSET(lsm_tree, WT_LSM_TREE_WORKING) &&
 		    !F_ISSET(lsm_tree, WT_LSM_TREE_NEED_SWITCH))
 			WT_ERR(__wt_cond_wait(
 			    session, lsm_tree->work_cond, 100000));
 	}
-err:	__wt_free(session, cookie.chunk_array);
+err:	__lsm_unpin_chunks(session, &cookie);
+	__wt_free(session, cookie.chunk_array);
 	/*
 	 * The thread will only exit with failure if we run out of memory or
 	 * there is some other system driven failure. We can't keep going
@@ -538,6 +569,10 @@ __lsm_free_chunks(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	for (i = skipped = 0, progress = 0; i < cookie.nchunks; i++) {
 		chunk = cookie.chunk_array[i];
 		WT_ASSERT(session, chunk != NULL);
+		/* Skip the chunk if another worker is using it. */
+		if (chunk->refcnt > 1)
+			continue;
+
 		if (F_ISSET(chunk, WT_LSM_CHUNK_BLOOM)) {
 			/*
 			 * An EBUSY return is acceptable - a cursor may still
@@ -593,10 +628,16 @@ __lsm_free_chunks(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 			    sizeof(WT_LSM_CHUNK *));
 			lsm_tree->old_chunks[lsm_tree->nold_chunks] = NULL;
 		}
+		/*
+		 * Clear the chunk in the cookie so we don't attempt to
+		 * decrement the reference count.
+		 */
+		cookie.chunk_array[i] = NULL;
 		WT_ERR(__wt_rwunlock(session, lsm_tree->rwlock));
 	}
 
-err:	__wt_free(session, cookie.chunk_array);
+err:	__lsm_unpin_chunks(session, &cookie);
+	__wt_free(session, cookie.chunk_array);
 	if (progress)
 		WT_TRET(__wt_lsm_meta_write(session, lsm_tree));
 

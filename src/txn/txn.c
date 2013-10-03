@@ -163,12 +163,22 @@ __wt_txn_refresh(WT_SESSION_IMPL *session, uint64_t max_id, int get_snapshot)
 			if (TXNID_LT(id, snap_min))
 				snap_min = id;
 		}
+
 		/*
 		 * Ignore the session's own snap_min if we are in the process
 		 * of updating it.
 		 */
 		if (get_snapshot && s == txn_state)
 			continue;
+
+		/*
+		 * !!!
+		 * Note: Don't ignore snap_min values oldest than the previous
+		 * oldest ID.  Read-uncommitted operation publish snap_min
+		 * values without incrementing scan_count to protect the global
+		 * table.  See the comment in __wt_txn_cursor_op for
+		 * more details.
+		 */
 		if ((id = s->snap_min) != WT_TXN_NONE &&
 		    TXNID_LT(id, oldest_id))
 			oldest_id = id;

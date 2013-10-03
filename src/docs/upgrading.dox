@@ -12,6 +12,15 @@ position.  Application insert cursors should be reviewed to confirm they do
 not attempt to iterate after an insert.
 </dd>
 
+<dt>WT_SESSION::open_cursor statistics_fast configuration</dt>
+<dd>
+In previous releases, the default \c statistics_fast configuration to
+the WT_SESSION::open_cursor method was \c false; in the 1.6.5 release,
+the default statistics_fast configuration is \c true.  Applications
+opening statistics cursors should be reviewed to confirm they have the
+correct behavior.
+</dd>
+
 </dl>
 <hr>
 @section version_164 Upgrading to Version 1.6.4
