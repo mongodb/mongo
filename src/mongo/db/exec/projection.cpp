@@ -59,9 +59,11 @@ namespace mongo {
                 return PlanStage::FAILURE;
             }
             *out = id;
+            ++_commonStats.advanced;
         }
         else if (PlanStage::NEED_FETCH == status) {
             *out = id;
+            ++_commonStats.needFetch;
         }
 
         return status;
