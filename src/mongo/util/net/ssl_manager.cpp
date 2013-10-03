@@ -792,6 +792,8 @@ namespace mongo {
     }
 
     void SSLManager::_handleSSLError(int code) {
+        int ret = ERR_get_error();
+        
         switch (code) {
         case SSL_ERROR_WANT_READ:
         case SSL_ERROR_WANT_WRITE:
@@ -799,30 +801,22 @@ namespace mongo {
             // However, it turns out this CAN happen during a connect, if the other side
             // accepts the socket connection but fails to do the SSL handshake in a timely
             // manner.
-            error() << "SSL error: " << code << ", possibly timed out during connect" << endl;
+            error() << "SSL error: " << code << ", possibly timed out during connect";
             break;
 
+        case SSL_ERROR_ZERO_RETURN: 
         case SSL_ERROR_SYSCALL:
-            if (code < 0) {
-                error() << "socket error: " << errnoWithDescription() << endl;
-            }
-            else {
-                error() << "could not negotiate SSL connection: EOF detected" << endl;
-            }
+            error() << "SSL network connection closed"; 
             break;
 
         case SSL_ERROR_SSL:
         {
-            int ret = ERR_get_error();
-            error() << getSSLErrorMessage(ret) << endl;
+            error() << "SSL error : " << getSSLErrorMessage(ret);
             break;
         }
-        case SSL_ERROR_ZERO_RETURN:
-            error() << "could not negotiate SSL connection: EOF detected" << endl;
-            break;
         
         default:
-            error() << "unrecognized SSL error" << endl;
+            error() << "unrecognized SSL error";
             break;
         }
         throw SocketException(SocketException::CONNECT_ERROR, "");
