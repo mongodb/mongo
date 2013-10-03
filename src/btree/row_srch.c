@@ -133,6 +133,16 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 	item = &_item;
 	WT_CLEAR(_item);
 
+	/*
+	 * The row-store search routine uses a different comparison API.
+	 * The assumption is we're comparing more than a few keys with
+	 * matching prefixes, and it's a win to avoid the memory fetches
+	 * by skipping over those prefixes.  That's done by tracking the
+	 * length of the prefix match for the lowest and highest keys we
+	 * compare as we descend the tree.
+	 */
+	skiphigh = skiplow = 0;
+
 	/* Search the internal pages of the tree. */
 	cmp = -1;
 	for (depth = 2,
@@ -153,17 +163,7 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 		if (cmp >= 0)
 			goto descend;
 
-		/*
-		 * Binary search of internal pages.
-		 *
-		 * The row-store search routine uses a different comparison API.
-		 * The assumption is we're comparing more than a few keys with
-		 * matching prefixes, and it's a win to avoid the memory fetches
-		 * by skipping over those prefixes.  That's done by tracking the
-		 * length of the prefix match for the lowest and highest keys we
-		 * compare.
-		 */
-		skiphigh = skiplow = 0;
+		/* Binary search of internal pages. */
 		for (base = 0, ref = NULL,
 		    limit = page->entries - 1; limit != 0; limit >>= 1) {
 			indx = base + (limit >> 1);
@@ -234,7 +234,6 @@ descend:	WT_ASSERT(session, ref != NULL);
 	 * the comparison value.
 	 */
 	cmp = -1;
-	skiphigh = skiplow = 0;			/* See internal loop comment. */
 	for (base = 0, limit = page->entries; limit != 0; limit >>= 1) {
 		indx = base + (limit >> 1);
 		rip = page->u.row.d + indx;

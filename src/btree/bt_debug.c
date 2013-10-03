@@ -507,9 +507,7 @@ __debug_page_modify(WT_DBG *ds, WT_PAGE *page)
 	if ((mod = page->modify) == NULL)
 		return (0);
 
-	__dmsg(ds,
-	    "\t" "write/disk generations: %" PRIu32 "/%" PRIu32 "\n",
-	    mod->write_gen, mod->disk_gen);
+	__dmsg(ds, "\t" "write generation: %" PRIu32 "\n", mod->write_gen);
 
 	switch (page->modify == NULL ?
 	    0 : F_ISSET(page->modify, WT_PM_REC_MASK)) {

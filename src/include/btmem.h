@@ -182,52 +182,6 @@ struct __wt_ovfl_txnc {
  */
 struct __wt_page_modify {
 	/*
-	 * The write generation is incremented after a page is modified.  That
-	 * is, it tracks page versions.
-	 *
-	 * The write generation value is used to detect changes scheduled based
-	 * on out-of-date information.  Two threads of control updating the same
-	 * page could both search the page in state A.  When the updates are
-	 * performed serially, one of the changes will happen after the page is
-	 * modified, and the search state for the other thread might no longer
-	 * be applicable.  To avoid this race, page write generations are copied
-	 * into the search stack whenever a page is read, and check when a
-	 * modification is serialized.  The serialized function compares each
-	 * page's current write generation to the generation copied in the
-	 * read/search; if the two values match, the search occurred on a
-	 * current version of the page and the modification can proceed.  If the
-	 * two generations differ, the serialized call returns an error and the
-	 * operation must be restarted.
-	 *
-	 * The write-generation value could be stored on a per-entry basis if
-	 * there's sufficient contention for the page as a whole.
-	 *
-	 * The write-generation is not declared volatile: write-generation is
-	 * written by a serialized function when modifying a page, and must be
-	 * flushed in order as the serialized updates are flushed.
-	 *
-	 * !!!
-	 * 32-bit values are probably more than is needed: at some point we may
-	 * need to clean up pages once there have been sufficient modifications
-	 * to make our linked lists of inserted cells too slow to search, or as
-	 * soon as enough memory is allocated in service of page modifications
-	 * (although we should be able to release memory from the MVCC list as
-	 * soon as there's no running thread/txn which might want that version
-	 * of the data).   I've used 32-bit types instead of 16-bit types as I
-	 * am less confident a 16-bit write to memory will invariably be atomic.
-	 */
-	uint32_t write_gen;
-
-	/*
-	 * The disk generation tracks page versions written to disk.  When a
-	 * page is reconciled and written to disk, the thread doing that work
-	 * is just another reader of the page, and other readers and writers
-	 * can access the page at the same time.  For this reason, the thread
-	 * reconciling the page logs the write generation of the page it read.
-	 */
-	uint32_t disk_gen;
-
-	/*
 	 * Track the highest transaction ID at which the page was written to
 	 * disk.  This can be used to avoid trying to write the page multiple
 	 * times if a snapshot is keeping old versions pinned (e.g., in a
@@ -238,6 +192,10 @@ struct __wt_page_modify {
 	/* The largest transaction ID written to disk, for clean pages. */
 	uint64_t disk_txn;
 
+	/*
+	 * When pages are reconciled, the result can be a replacement page or a
+	 * split page.
+	 */
 	union {
 		WT_PAGE *split;		/* Resulting split page */
 		WT_ADDR	 replace;	/* Resulting replacement */
@@ -265,6 +223,16 @@ struct __wt_page_modify {
 		WT_OVFL_REUSE	*ovfl_reuse[WT_SKIP_MAXDEPTH];
 		WT_OVFL_TXNC	*ovfl_txnc[WT_SKIP_MAXDEPTH];
 	} *ovfl_track;
+
+	/*
+	 * The write generation is incremented when a page is modified, a page
+	 * is clean if the write generation is 0.
+	 *
+	 * !!!
+	 * 4B values are probably larger than required, but I'm more confident
+	 * 4B types will always be backed by atomic writes to memory.
+	 */
+	uint32_t write_gen;
 
 #define	WT_PM_REC_EMPTY		0x01	/* Reconciliation: page empty */
 #define	WT_PM_REC_REPLACE	0x02	/* Reconciliation: page replaced */

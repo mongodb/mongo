@@ -218,7 +218,7 @@ __evict_worker(WT_SESSION_IMPL *session)
 		 * target dirty percentage.
 		 */
 		bytes_inuse = __wt_cache_bytes_inuse(cache);
-		dirty_inuse = __wt_cache_bytes_dirty(cache);
+		dirty_inuse = cache->bytes_dirty;
 		bytes_max = conn->cache_size;
 		if (bytes_inuse < (cache->eviction_target * bytes_max) / 100 &&
 		    dirty_inuse <
@@ -778,6 +778,7 @@ __evict_init_candidate(
 	u_int slot;
 
 	cache = S2C(session)->cache;
+	WT_ASSERT(session, page->ref->state == WT_REF_EVICT_WALK);
 
 	/* Keep track of the maximum slot we are using. */
 	slot = (u_int)(evict - cache->evict);

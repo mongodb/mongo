@@ -178,20 +178,25 @@ __wt_tree_walk(WT_SESSION_IMPL *session, WT_PAGE **pagep, uint32_t flags)
 	skip_intl = LF_ISSET(WT_TREE_SKIP_INTL) ? 1 : 0;
 	skip_leaf = LF_ISSET(WT_TREE_SKIP_LEAF) ? 1 : 0;
 
-	/* Take a copy of any held page and clear the return value. */
-	page = *pagep;
-	*pagep = NULL;
-
 	/*
-	 * If not the eviction thread, we're hazard-pointer coupling through the
-	 * tree and that's OK (hazard pointers can't deadlock, so there's none
-	 * of the usual problems found when logically locking up a btree).  If
-	 * the eviction thread tries to evict the active page, it fails because
-	 * of our hazard pointer.  If eviction tries to evict our parent, that
+	 * Ordinary walks use hazard-pointer coupling through the tree and
+	 * that's OK (hazard pointers can't deadlock, so there's none of the
+	 * usual problems found when logically locking up a btree).  If the
+	 * eviction thread tries to evict the active page, it fails because of
+	 * our hazard pointer.  If eviction tries to evict our parent, that
 	 * fails because the parent has a child page that can't be discarded.
-	 * We do play one game: don't couple up to our parent and then back down
-	 * to a new leaf, couple to the next page to which we're descending, it
-	 * saves a hazard-pointer swap for each cursor page movement.
+	 * We do play one game: don't couple up to our parent and then back
+	 * down to a new leaf, couple to the next page to which we're
+	 * descending, it saves a hazard-pointer swap for each cursor page
+	 * movement.
+	 *
+	 * The eviction thread uses the special state WT_REF_EVICT_WALK to
+	 * protect pages while they are being walked.  This state allows
+	 * ordinary access to the page (just like WT_REF_MEM), except that the
+	 * page cannot be locked for eviction.  All the pages below the root
+	 * down to the current walk point have this state.  Once the walk moves
+	 * on, the state is switched back to WT_REF_MEM, and another thread may
+	 * choose that page to evict.
 	 *
 	 * !!!
 	 * NOTE: we don't bother checking if we're hazard-pointer coupling when
@@ -199,11 +204,18 @@ __wt_tree_walk(WT_SESSION_IMPL *session, WT_PAGE **pagep, uint32_t flags)
 	 * variable couple if the variable eviction is true.
 	 *
 	 * NOTE: we depend on the fact it's OK to release a page we don't hold,
-	 * that is, it's OK to release couple, when couple is set to NULL.
+	 * that is, it's OK to release couple when couple is set to NULL.
 	 *
-	 * Remember the  hazard pointer we're currently holding.
+	 * Take a copy of any held page and clear the return value.  Remember
+	 * the hazard pointer we're currently holding.
+	 *
+	 * We may be clearing btree->evict_page here.  We check when discarding
+	 * pages that we're not discarding that page, so for the eviction
+	 * thread, this must be cleared before the page's state is switched to
+	 * WT_REF_MEM.
 	 */
-	couple = page;
+	couple = page = *pagep;
+	*pagep = NULL;
 
 	/* If no page is active, begin a walk from the start of the tree. */
 	if (page == NULL) {
@@ -220,17 +232,25 @@ ascend:	/*
 	if (WT_PAGE_IS_ROOT(page))
 		return (eviction ? 0 : __wt_page_release(session, couple));
 
-	/* If the eviction thread, clear the page's walk status. */
-	if (eviction)
-		if (page->ref->state == WT_REF_EVICT_WALK)
-			page->ref->state = WT_REF_MEM;
-
 	/*
 	 * Figure out the current slot in the parent page's WT_REF array and
 	 * switch to the parent.
 	 */
-	slot = (uint32_t)(page->ref - page->parent->u.intl.t);
+	ref = page->ref;
+	slot = (uint32_t)(ref - page->parent->u.intl.t);
 	page = page->parent;
+
+	/* If the eviction thread, clear the page's walk status.
+	 *
+	 * !!!
+	 * Don't do this any earlier: after this, another thread could select
+	 * the page for eviction, so this is the only thing that makes it safe
+	 * to look inside the page structure.
+	 */
+	if (eviction) {
+		WT_ASSERT(session, ref->state == WT_REF_EVICT_WALK);
+		ref->state = WT_REF_MEM;
+	}
 
 	for (;;) {
 		/*

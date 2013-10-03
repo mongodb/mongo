@@ -138,8 +138,11 @@ __conn_dhandle_get(WT_SESSION_IMPL *session,
 	 * We hold only the schema lock here, not the dhandle lock.  Eviction
 	 * walks this list only holding the dhandle lock.  This works because
 	 * we're inserting at the beginning of the list, and we're only
-	 * publishing this one entry per lock acquisition.  Eviction will
-	 * either see our newly added entry or the former head of the list.
+	 * publishing this one entry per lock acquisition.  Eviction either
+	 * sees our newly added entry or the former head of the list, and it
+	 * doesn't matter which (if eviction only sees a single element in the
+	 * list because the insert races, it will return without finding enough
+	 * candidates for eviction, and will then retry).
 	 */
 	SLIST_INSERT_HEAD(&conn->dhlh, dhandle, l);
 
