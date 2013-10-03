@@ -28,6 +28,7 @@
 
 #include "mongo/s/write_op.h"
 
+#include "mongo/base/error_codes.h"
 #include "mongo/base/owned_pointer_vector.h"
 #include "mongo/util/assert_util.h"
 
@@ -116,7 +117,8 @@ namespace mongo {
             endpoints.push_back( endpoint );
         }
 
-        for ( vector<ShardEndpoint*>::iterator it = endpoints.begin(); it != endpoints.end(); ) {
+        for ( vector<ShardEndpoint*>::iterator it = endpoints.begin(); it != endpoints.end();
+            ++it ) {
 
             ShardEndpoint* endpoint = *it;
 
@@ -137,16 +139,14 @@ namespace mongo {
 
             _childOps.back()->pendingWrite = targetedWrites->back();
             _childOps.back()->state = WriteOpState_Pending;
-
-            // Don't cleanup the endpoint, now owned by child op
-            endpoints.erase( it++ );
         }
 
+        _state = WriteOpState_Pending;
         return Status::OK();
     }
 
     static bool isRetryErrCode( int errCode ) {
-        return errCode == RecvStaleConfigCode;
+        return errCode == ErrorCodes::StaleShardVersion;
     }
 
     // Aggregate a bunch of errors for a single op together
@@ -158,8 +158,7 @@ namespace mongo {
             return;
         }
 
-        // TODO: XXX
-        error->setErrCode( 99999 );
+        error->setErrCode( ErrorCodes::MultipleErrorsOccurred );
 
         // Generate the multi-error message below
         stringstream msg;

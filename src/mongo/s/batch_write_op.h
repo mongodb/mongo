@@ -45,9 +45,7 @@ namespace mongo {
 
     class TargetedWriteBatch;
     struct ShardError;
-
-    // TODO: Expand this into a dedicated class, if needed
-    typedef unordered_map<int, std::vector<ShardError*> > TrackedErrorMap;
+    class TrackedErrors;
 
     /**
      * The BatchWriteOp class manages the lifecycle of a batched write received by mongos.  Each
@@ -126,7 +124,14 @@ namespace mongo {
          */
         void noteBatchResponse( const TargetedWriteBatch& targetedBatch,
                                 const BatchedCommandResponse& response,
-                                TrackedErrorMap* trackedErrors );
+                                TrackedErrors* trackedErrors );
+
+        /**
+         * Stores an error that occurred while trying to send/recv a TargetedWriteBatch for this
+         * BatchWriteOp, and so a response is not available.
+         */
+        void noteBatchError( const TargetedWriteBatch& targetedBatch,
+                             const BatchedErrorDetail& error );
 
         /**
          * Returns false if the batch write op needs more processing.
@@ -208,6 +213,30 @@ namespace mongo {
 
         const ShardEndpoint endpoint;
         BatchedErrorDetail error;
+    };
+
+    /**
+     * Helper class for tracking certain errors from batch operations
+     */
+    class TrackedErrors {
+    public:
+
+        ~TrackedErrors();
+
+        void startTracking( int errCode );
+
+        bool isTracking( int errCode ) const;
+
+        void addError( ShardError* error );
+
+        const std::vector<ShardError*>& getErrors( int errCode ) const;
+
+        void clear();
+
+    private:
+
+        typedef unordered_map<int, std::vector<ShardError*> > TrackedErrorMap;
+        TrackedErrorMap _errorMap;
     };
 
 }

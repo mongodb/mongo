@@ -135,6 +135,7 @@ namespace mongo {
 
         BatchItemRef( const BatchedCommandRequest* request, int itemIndex ) :
             _request( request ), _itemIndex( itemIndex ) {
+            dassert( itemIndex < static_cast<int>( request->sizeWriteOps() ) );
         }
 
         const BatchedCommandRequest* getRequest() const {

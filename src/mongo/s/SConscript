@@ -201,6 +201,7 @@ env.StaticLibrary(
     source=[
         'write_op.cpp',
         'batch_write_op.cpp',
+        'batch_write_exec.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/bson',
@@ -214,6 +215,7 @@ env.CppUnitTest(
         'write_op_test.cpp',
     ],
     LIBDEPS=[
+        'base',
         'write_ops',
         '$BUILD_DIR/mongo/db/common',
     ]
@@ -225,6 +227,19 @@ env.CppUnitTest(
         'batch_write_op_test.cpp',
     ],
     LIBDEPS=[
+        'base',
+        'write_ops',
+        '$BUILD_DIR/mongo/db/common',
+    ]
+)
+
+env.CppUnitTest(
+    target='batch_write_exec_test',
+    source=[
+        'batch_write_exec_test.cpp',
+    ],
+    LIBDEPS=[
+        'base',
         'write_ops',
         '$BUILD_DIR/mongo/db/common',
     ]

@@ -272,7 +272,13 @@ namespace mongo {
     Status ChunkManagerTargeter::refreshIfNeeded() {
 
         //
-        // Get the latest metadata information from the cache, no matter what
+        // Did we have any stale config or targeting errors at all?
+        //
+
+        if ( !_needsTargetingRefresh && _remoteShardVersions.empty() ) return Status::OK();
+
+        //
+        // Get the latest metadata information from the cache if there were issues
         //
 
         ChunkManagerPtr lastManager = _manager;
