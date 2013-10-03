@@ -212,5 +212,18 @@ result = db.literal.aggregate(
 
 assert.eq([{cost:'$.99'}], result.result);
 
+// Do a basic sharded explain. This just makes sure that it doesn't error and has the right fields.
+var res = db.ts1.runCommand("aggregate", {pipeline: [{$project: {a: 1}}], explain:true });
+assert.commandWorked(res);
+printjson(res);
+assert("splitPipeline" in res);
+assert("shardsPart" in res.splitPipeline);
+assert("mergerPart" in res.splitPipeline);
+assert("shards" in res);
+for (var shardName in res.shards) {
+    assert("host" in res.shards[shardName]);
+    assert("stages" in res.shards[shardName]);
+}
+
 // shut everything down
 shardedAggTest.stop();
