@@ -26,7 +26,41 @@
  */
 
 #include "wt_internal.h"
+#include <stddef.h>
+#include <stdint.h>
 
+#define CRC_HARDWARE_UNKNOWN	0
+#define CRC_HARDWARE_PRESENT	1
+#define CRC_HARDWARE_ABSENT	2
+
+/*
+ * This file contains two ways of computing CRC: one that uses a
+ * hardware CRC instruction (only on newer x86_64/amd64), and one that
+ * uses a fast software algorithm.  __wt_cksum() provides a common
+ * entry point that uses one of these two methods.
+ *
+ * To take advantage of the CRC hardware instruction, we detect it
+ * using get_cpuid() on the first call to __wt_cksum().  Using runtime
+ * detection with get_cpuid allows for single compatible binary that
+ * can be used across all x86_64/amd64 processors, even those without
+ * the CRC hardware.
+ *
+ * If we do not have CPUID, or if the detection fails to find hardware
+ * CRC, we'll use a software algorithm as a fallback.
+ */
+#undef TEST_CRC_HARDWARE
+#if (defined(__amd64) || defined(__x86_64))
+#define CRC_HARDWARE_DEFAULT CRC_HARDWARE_UNKNOWN
+#define TEST_CRC_HARDWARE
+#else
+#define CRC_HARDWARE_DEFAULT CRC_HARDWARE_ABSENT
+#endif
+
+static volatile int crc_hardware_check = CRC_HARDWARE_DEFAULT;
+
+/*
+ * The CRC slicing tables are used by cksum_sw.
+ */
 static const uint32_t g_crc_slicing[8][256] = {
 #ifdef WORDS_BIGENDIAN
 	/*
@@ -1080,8 +1114,8 @@ static const uint32_t g_crc_slicing[8][256] = {
 };
 
 /*
- * __wt_cksum --
- *	Return a checksum for a chunk of memory.
+ * cksum_sw --
+ *	Return a checksum for a chunk of memory, computed in software.
  *
  * Slicing-by-8 algorithm by Michael E. Kounavis and Frank L. Berry from
  * Intel Corp.:
@@ -1094,8 +1128,8 @@ static const uint32_t g_crc_slicing[8][256] = {
  * value of the crc is byte reversed from what it would be at that step for
  * little endian.
  */
-uint32_t
-__wt_cksum(const void *chunk, size_t len)
+static uint32_t
+cksum_sw(const void *chunk, size_t len)
 {
 	uint32_t crc, next;
 	size_t nqwords;
@@ -1157,4 +1191,101 @@ __wt_cksum(const void *chunk, size_t len)
 		crc = g_crc_slicing[0][(crc ^ *p) & 0xFF] ^ (crc >> 8);
 #endif
 	return (~crc);
+}
+
+#ifdef TEST_CRC_HARDWARE
+/*
+ * cksum_hw --
+ *	Return a checksum for a chunk of memory, computed in hardware
+ *	using 8 byte steps.
+ */
+static uint32_t
+cksum_hw(const void *chunk, size_t len)
+{
+	uint32_t crc;
+	size_t nqwords;
+	const uint8_t *p;
+	const uint64_t *p64;
+
+	crc = 0xffffffff;
+
+	/* Checksum one byte at a time to the first 4B boundary. */
+	for (p = chunk;
+	    ((uintptr_t)p & (sizeof(uint32_t) - 1)) != 0 &&
+		 len > 0; ++p, --len) {
+		__asm__ __volatile__(
+				     ".byte 0xF2, 0x0F, 0x38, 0xF0, 0xF1"
+				     : "=S" (crc)
+				     : "0" (crc), "c" (*p));
+	}
+
+	p64 = (const uint64_t *)p;
+	/* Checksum in 8B chunks. */
+	for (nqwords = len / sizeof(uint64_t); nqwords; nqwords--) {
+		__asm__ __volatile__ (
+				      ".byte 0xF2, 0x48, 0x0F, 0x38, 0xF1, 0xF1"
+				      : "=S"(crc)
+				      : "0"(crc), "c" (*p64));
+		p64++;
+	}
+
+	/* Checksum trailing bytes one byte at a time. */
+        p = (const uint8_t *)p64;
+	for (len &= 0x7; len > 0; ++p, len--) {
+		__asm__ __volatile__(
+				     ".byte 0xF2, 0x0F, 0x38, 0xF0, 0xF1"
+				     : "=S" (crc)
+				     : "0" (crc), "c" (*p));
+	}
+	return (~crc);
+}
+
+/*
+ * detect_crc_hardware --
+ *	Detect CRC hardware if possible, and return one of
+ *	CRC_HARDWARE_PRESENT or CRC_HARDWARE_ABSENT.
+ */
+static int detect_crc_hardware()
+{
+	unsigned int eax, ebx, ecx, edx;
+
+	__asm__ __volatile__ (
+			      "cpuid"
+			      : "=a" (eax), "=b" (ebx), "=c" (ecx), "=d" (edx)
+			      : "a" (1));
+ 
+#define CPUID_ECX_HAS_SSE42	(1 << 20)
+
+	if (ecx & CPUID_ECX_HAS_SSE42)
+		return (CRC_HARDWARE_PRESENT);
+	return (CRC_HARDWARE_ABSENT);
+}
+#endif
+
+/*
+ * __wt_cksum --
+ *	Return a checksum for a chunk of memory
+ *	using the fastest method available.
+ */
+uint32_t
+__wt_cksum(const void *chunk, size_t len)
+{
+#ifdef TEST_CRC_HARDWARE
+	uint32_t result;
+
+	if (crc_hardware_check == CRC_HARDWARE_UNKNOWN)
+		crc_hardware_check = detect_crc_hardware();
+
+	switch (crc_hardware_check) {
+	case CRC_HARDWARE_PRESENT:
+		result = cksum_hw(chunk, len);
+		break;
+	default:
+		result = cksum_sw(chunk, len);
+		break;
+	}
+	return (result);
+#else
+	return (cksum_sw(chunk, len));
+#endif
 }
