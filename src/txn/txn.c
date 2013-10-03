@@ -173,8 +173,8 @@ __wt_txn_refresh(WT_SESSION_IMPL *session, uint64_t max_id, int get_snapshot)
 
 		/*
 		 * !!!
-		 * Note: Don't ignore snap_min values oldest than the previous
-		 * oldest ID.  Read-uncommitted operation publish snap_min
+		 * Note: Don't ignore snap_min values older than the previous
+		 * oldest ID.  Read-uncommitted operations publish snap_min
 		 * values without incrementing scan_count to protect the global
 		 * table.  See the comment in __wt_txn_cursor_op for
 		 * more details.

@@ -275,7 +275,7 @@ __wt_txn_cursor_op(WT_SESSION_IMPL *session)
 	 *
 	 * !!!
 	 * Note:  We are updating the global table unprotected, so the
-	 * oldest_id may move past than this ID if a scan races with this
+	 * oldest_id may move past this ID if a scan races with this
 	 * value being published.  That said, read-uncommitted operations
 	 * always take the most recent version of a value, so for that version
 	 * to be freed, two newer versions would have to be committed.  Putting
