@@ -45,7 +45,7 @@ namespace mongo {
     class DiskLoc;
     class PlanExecutor;
     class PlanStage;
-    class QuerySolution;
+    struct QuerySolution;
     class TypeExplain;
     class WorkingSet;
 
