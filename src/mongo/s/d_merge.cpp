@@ -94,7 +94,16 @@ namespace mongo {
         //
 
         ChunkVersion shardVersion;
-        shardingState.refreshMetadataNow( nss.ns(), &shardVersion );
+        Status status = shardingState.refreshMetadataNow( nss.ns(), &shardVersion );
+
+        if ( !status.isOK() ) {
+
+            *errMsg = str::stream() << "could not merge chunks, failed to refresh metadata for "
+                                    << nss.ns() << causedBy( status.reason() );
+
+            warning() << *errMsg << endl;
+            return false;
+        }
 
         if ( epoch.isSet() && shardVersion.epoch() != epoch ) {
 
