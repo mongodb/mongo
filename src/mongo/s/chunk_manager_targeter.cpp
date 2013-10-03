@@ -130,10 +130,9 @@ namespace mongo {
         dassert( !_needsTargetingRefresh );
 
         ChunkVersion remoteShardVersion = ChunkVersion::fromBSON( staleInfo, "vWanted" );
-        ShardVersionMap::iterator seenIt = _remoteShardVersions.find( endpoint.shardName );
 
         // We assume here that we can't have more than one stale config per-shard
-        dassert( seenIt == _remoteShardVersions.end() );
+        dassert( _remoteShardVersions.find( endpoint.shardName ) == _remoteShardVersions.end() );
         _remoteShardVersions.insert( make_pair( endpoint.shardName, remoteShardVersion ) );
     }
 
