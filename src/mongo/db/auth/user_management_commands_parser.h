@@ -34,6 +34,7 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/role_name.h"
+#include "mongo/db/auth/user.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/jsobj.h"
 
@@ -43,31 +44,28 @@ namespace mongo {
 
 namespace auth {
 
-    /**
-     * Takes a command object describing an invocation of the "createUser" command on the database
-     * "dbname", and returns (via the output param "parsedUserObj") a user object that can be
-     * inserted into admin.system.users to create the user as described by the command object.
-     * Also validates the input and returns a non-ok Status if there is anything wrong.
-     */
-    Status parseAndValidateCreateUserCommand(const BSONObj& cmdObj,
-                                             const std::string& dbname,
-                                             AuthorizationManager* authzManager,
-                                             BSONObj* parsedUserObj,
-                                             BSONObj* parsedWriteConcern);
+    struct CreateOrUpdateUserArgs {
+        UserName userName;
+        bool hasHashedPassword;
+        std::string hashedPassword;
+        bool hasCustomData;
+        BSONObj customData;
+        bool hasRoles;
+        std::vector<User::RoleData> roles;
+        BSONObj writeConcern;
+        CreateOrUpdateUserArgs() :
+            hasHashedPassword(false), hasCustomData(false),  hasRoles(false) {}
+    };
 
     /**
-     * Takes a command object describing an invocation of the "updateUser" command on the database
-     * "dbname", and returns (via the output param "parsedUpdateObj") an update specifier that can
-     * be used to update the user document in admin.system.users as described by the command object,
-     * as well as the user name of the user being updated (via the "parsedUserName" output param).
-     * Also validates the input and returns a non-ok Status if there is anything wrong.
+     * Takes a command object describing an invocation of the "createUser" or "updateUser" commands
+     * (which command it is is specified in "cmdName") on the database "dbname", and parses out all
+     * the arguments into the "parsedArgs" output param.
      */
-    Status parseAndValidateUpdateUserCommand(const BSONObj& cmdObj,
-                                             const std::string& dbname,
-                                             AuthorizationManager* authzManager,
-                                             BSONObj* parsedUpdateObj,
-                                             UserName* parsedUserName,
-                                             BSONObj* parsedWriteConcern);
+    Status parseCreateOrUpdateUserCommands(const BSONObj& cmdObj,
+                                           const StringData& cmdName,
+                                           const std::string& dbname,
+                                           CreateOrUpdateUserArgs* parsedArgs);
 
     /**
      * Takes a command object describing an invocation of one of "grantRolesToUser",
@@ -75,13 +73,13 @@ namespace auth {
      * command it is is specified in the "cmdName" argument), and parses out the user name of the
      * user being modified, the roles being granted or revoked, and the write concern to use.
      */
-    Status parseUserRoleManipulationCommand(const BSONObj& cmdObj,
-                                            const StringData& cmdName,
-                                            const std::string& dbname,
-                                            AuthorizationManager* authzManager,
-                                            UserName* parsedUserName,
-                                            vector<RoleName>* parsedRoleNames,
-                                            BSONObj* parsedWriteConcern);
+    Status parseRolePossessionManipulationCommands(const BSONObj& cmdObj,
+                                                   const StringData& cmdName,
+                                                   const StringData& rolesFieldName,
+                                                   const std::string& dbname,
+                                                   std::string* parsedName,
+                                                   vector<RoleName>* parsedRoleNames,
+                                                   BSONObj* parsedWriteConcern);
 
     /**
      * Takes a command object describing an invocation of the "removeUser" command and parses out
@@ -113,17 +111,26 @@ namespace auth {
                                         const std::string& dbname,
                                         bool* parsedAnyDb,
                                         BSONElement* parsedNameFilter);
+
+    struct CreateOrUpdateRoleArgs {
+        RoleName roleName;
+        bool hasRoles;
+        std::vector<RoleName> roles;
+        bool hasPrivileges;
+        PrivilegeVector privileges;
+        BSONObj writeConcern;
+        CreateOrUpdateRoleArgs() : hasRoles(false), hasPrivileges(false) {}
+    };
+
     /**
-     * Takes a command object describing an invocation of the "createRole" command on the database
-     * "dbname", and returns (via the output param "parsedRoleObj") a role object that can be
-     * inserted into admin.system.roles to create the role as described by the command object.
-     * Also validates the input and returns a non-ok Status if there is anything wrong.
+     * Takes a command object describing an invocation of the "createRole" or "updateRole" commands
+     * (which command it is is specified in "cmdName") on the database "dbname", and parses out all
+     * the arguments into the "parsedArgs" output param.
      */
-    Status parseAndValidateCreateRoleCommand(const BSONObj& cmdObj,
-                                             const std::string& dbname,
-                                             AuthorizationManager* authzManager,
-                                             BSONObj* parsedRoleObj,
-                                             BSONObj* parsedWriteConcern);
+    Status parseCreateOrUpdateRoleCommands(const BSONObj& cmdObj,
+                                           const StringData& cmdName,
+                                           const std::string& dbname,
+                                           CreateOrUpdateRoleArgs* parsedArgs);
 
     /**
      * Takes a command object describing an invocation of the "grantPrivilegesToRole" or

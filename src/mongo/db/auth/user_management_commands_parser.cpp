@@ -84,22 +84,15 @@ namespace auth {
     /**
      * Takes a BSONArray of name,source pair documents, parses that array and returns (via the
      * output param parsedRoleNames) a list of the role names in the input array.
-     * Also validates the input array and returns a non-OK status if there is anything wrong.
      */
-    Status _extractRoleNamesFromBSONArray(const BSONArray rolesArray,
-                                         const std::string& dbname,
-                                         AuthorizationManager* authzManager,
-                                         std::vector<RoleName>* parsedRoleNames) {
+    Status _extractRoleNamesFromBSONArray(const BSONArray& rolesArray,
+                                          const std::string& dbname,
+                                          const StringData& rolesFieldName,
+                                          std::vector<RoleName>* parsedRoleNames) {
         for (BSONObjIterator it(rolesArray); it.more(); it.next()) {
             BSONElement element = *it;
             if (element.type() == String) {
-                RoleName roleName(element.String(), dbname);
-                if (!authzManager->roleExists(roleName)) {
-                    return Status(ErrorCodes::RoleNotFound,
-                                  mongoutils::str::stream() << roleName.getFullName() <<
-                                          " does not name an existing role");
-                }
-                parsedRoleNames->push_back(roleName);
+                parsedRoleNames->push_back(RoleName(element.String(), dbname));
             } else if (element.type() == Object) {
                 BSONObj roleObj = element.Obj();
 
@@ -114,28 +107,73 @@ namespace auth {
                     return status;
                 }
 
-                RoleName roleName(roleNameString, roleSource);
-                if (!authzManager->roleExists(roleName)) {
-                    return Status(ErrorCodes::RoleNotFound,
-                                  mongoutils::str::stream() << roleName.getFullName() <<
-                                          " does not name an existing role");
-                }
-                parsedRoleNames->push_back(roleName);
+                parsedRoleNames->push_back(RoleName(roleNameString, roleSource));
             } else {
-                return Status(ErrorCodes::UnsupportedFormat,
-                              "Values in 'roles' array must be sub-documents or strings");
+                return Status(ErrorCodes::BadValue,
+                              mongoutils::str::stream() << "Values in \"" << rolesFieldName <<
+                                      "\" array must be sub-documents or strings");
             }
         }
         return Status::OK();
     }
 
-    Status parseUserRoleManipulationCommand(const BSONObj& cmdObj,
-                                            const StringData& cmdName,
-                                            const std::string& dbname,
-                                            AuthorizationManager* authzManager,
-                                            UserName* parsedUserName,
-                                            vector<RoleName>* parsedRoleNames,
-                                            BSONObj* parsedWriteConcern) {
+    Status _extractRoleDataFromBSONArray(const BSONElement& rolesElement,
+                                         const std::string& dbname,
+                                         std::vector<User::RoleData> *parsedRoleData) {
+        for (BSONObjIterator it(rolesElement.Obj()); it.more(); it.next()) {
+            BSONElement element = *it;
+            if (element.type() == String) {
+                RoleName roleName(element.String(), dbname);
+                parsedRoleData->push_back(User::RoleData(roleName, true, false));
+           } else if (element.type() == Object) {
+               // Check that the role object is valid
+               V2UserDocumentParser parser;
+               BSONObj roleObj = element.Obj();
+               Status status = parser.checkValidRoleObject(roleObj, true);
+               if (!status.isOK()) {
+                   return status;
+               }
+
+               std::string roleName;
+               std::string roleSource;
+               bool hasRole;
+               bool canDelegate;
+               status = bsonExtractStringField(roleObj, "name", &roleName);
+               if (!status.isOK()) {
+                   return status;
+               }
+               status = bsonExtractStringField(roleObj, "source", &roleSource);
+               if (!status.isOK()) {
+                   return status;
+               }
+               status = bsonExtractBooleanField(roleObj, "hasRole", &hasRole);
+               if (!status.isOK()) {
+                   return status;
+               }
+               status = bsonExtractBooleanField(roleObj, "canDelegate", &canDelegate);
+               if (!status.isOK()) {
+                   return status;
+               }
+
+               parsedRoleData->push_back(User::RoleData(RoleName(roleName, roleSource),
+                                                        hasRole,
+                                                        canDelegate));
+           } else {
+               return Status(ErrorCodes::UnsupportedFormat,
+                             "Values in 'roles' array must be sub-documents or strings");
+           }
+       }
+
+       return Status::OK();
+    }
+
+    Status parseRolePossessionManipulationCommands(const BSONObj& cmdObj,
+                                                   const StringData& cmdName,
+                                                   const StringData& rolesFieldName,
+                                                   const std::string& dbname,
+                                                   std::string* parsedName,
+                                                   vector<RoleName>* parsedRoleNames,
+                                                   BSONObj* parsedWriteConcern) {
         unordered_set<std::string> validFieldNames;
         validFieldNames.insert(cmdName.toString());
         validFieldNames.insert("roles");
@@ -156,7 +194,7 @@ namespace auth {
         if (!status.isOK()) {
             return status;
         }
-        *parsedUserName = UserName(userNameStr, dbname);
+        *parsedName = userNameStr;
 
         BSONElement rolesElement;
         status = bsonExtractTypedField(cmdObj, "roles", Array, &rolesElement);
@@ -166,7 +204,7 @@ namespace auth {
 
         status = _extractRoleNamesFromBSONArray(BSONArray(rolesElement.Obj()),
                                                 dbname,
-                                                authzManager,
+                                                rolesFieldName,
                                                 parsedRoleNames);
         if (!status.isOK()) {
             return status;
@@ -253,24 +291,23 @@ namespace auth {
         return Status::OK();
     }
 
-    Status parseAndValidateCreateUserCommand(const BSONObj& cmdObj,
-                                             const std::string& dbname,
-                                             AuthorizationManager* authzManager,
-                                             BSONObj* parsedUserObj,
-                                             BSONObj* parsedWriteConcern) {
+    Status parseCreateOrUpdateUserCommands(const BSONObj& cmdObj,
+                                           const StringData& cmdName,
+                                           const std::string& dbname,
+                                           CreateOrUpdateUserArgs* parsedArgs) {
         unordered_set<std::string> validFieldNames;
-        validFieldNames.insert("createUser");
+        validFieldNames.insert(cmdName.toString());
         validFieldNames.insert("customData");
         validFieldNames.insert("pwd");
         validFieldNames.insert("roles");
         validFieldNames.insert("writeConcern");
 
-        Status status = _checkNoExtraFields(cmdObj, "createUser", validFieldNames);
+        Status status = _checkNoExtraFields(cmdObj, cmdName, validFieldNames);
         if (!status.isOK()) {
             return status;
         }
 
-        status = _extractWriteConcern(cmdObj, parsedWriteConcern);
+        status = _extractWriteConcern(cmdObj, &parsedArgs->writeConcern);
         if (!status.isOK()) {
             return status;
         }
@@ -279,20 +316,12 @@ namespace auth {
 
         // Parse user name
         std::string userName;
-        status = bsonExtractStringField(cmdObj, "createUser", &userName);
+        status = bsonExtractStringField(cmdObj, cmdName, &userName);
         if (!status.isOK()) {
             return status;
         }
 
-        // Prevent creating users in the local database
-        if (dbname == "local") {
-            return Status(ErrorCodes::BadValue, "Cannot create users in the local database");
-        }
-
-        userObjBuilder.append("_id", dbname + "." + userName);
-        userObjBuilder.append(AuthorizationManager::USER_NAME_FIELD_NAME, userName);
-        userObjBuilder.append(AuthorizationManager::USER_SOURCE_FIELD_NAME, dbname);
-
+        parsedArgs->userName = UserName(userName, dbname);
 
         // Parse password
         if (cmdObj.hasField("pwd")) {
@@ -302,16 +331,9 @@ namespace auth {
                 return status;
             }
 
-            std::string password = auth::createPasswordDigest(userName, clearTextPassword);
-            userObjBuilder.append("credentials", BSON("MONGODB-CR" << password));
-        } else {
-            if (dbname != "$external") {
-                return Status(ErrorCodes::BadValue,
-                              "Must provide a 'pwd' field for all user documents, except those"
-                                      " with '$external' as the user's source");
-            }
+            parsedArgs->hashedPassword = auth::createPasswordDigest(userName, clearTextPassword);
+            parsedArgs->hasHashedPassword = true;
         }
-
 
         // Parse custom data
         if (cmdObj.hasField("customData")) {
@@ -320,7 +342,8 @@ namespace auth {
             if (!status.isOK()) {
                 return status;
             }
-            userObjBuilder.append("customData", element.Obj());
+            parsedArgs->customData = element.Obj();
+            parsedArgs->hasCustomData = true;
         }
 
         // Parse roles
@@ -330,116 +353,13 @@ namespace auth {
             if (!status.isOK()) {
                 return status;
             }
-            BSONArray modifiedRolesArray;
-            status = _validateAndModifyRolesArray(rolesElement,
-                                                  dbname,
-                                                  authzManager,
-                                                  true,
-                                                  &modifiedRolesArray);
+            status = _extractRoleDataFromBSONArray(rolesElement, dbname, &parsedArgs->roles);
             if (!status.isOK()) {
                 return status;
             }
-
-            userObjBuilder.append("roles", modifiedRolesArray);
+            parsedArgs->hasRoles = true;
         }
 
-        *parsedUserObj = userObjBuilder.obj();
-
-        // Make sure document to insert is valid
-        V2UserDocumentParser parser;
-        status = parser.checkValidUserDocument(*parsedUserObj);
-        if (!status.isOK()) {
-            return status;
-        }
-
-        return Status::OK();
-    }
-
-
-    Status parseAndValidateUpdateUserCommand(const BSONObj& cmdObj,
-                                             const std::string& dbname,
-                                             AuthorizationManager* authzManager,
-                                             BSONObj* parsedUpdateObj,
-                                             UserName* parsedUserName,
-                                             BSONObj* parsedWriteConcern) {
-        unordered_set<std::string> validFieldNames;
-        validFieldNames.insert("updateUser");
-        validFieldNames.insert("customData");
-        validFieldNames.insert("pwd");
-        validFieldNames.insert("roles");
-        validFieldNames.insert("writeConcern");
-
-        Status status = _checkNoExtraFields(cmdObj, "updateUser", validFieldNames);
-        if (!status.isOK()) {
-            return status;
-        }
-
-        status = _extractWriteConcern(cmdObj, parsedWriteConcern);
-        if (!status.isOK()) {
-            return status;
-        }
-
-        BSONObjBuilder updateSetBuilder;
-
-        // Parse user name
-        std::string userName;
-        status = bsonExtractStringField(cmdObj, "updateUser", &userName);
-        if (!status.isOK()) {
-            return status;
-        }
-        *parsedUserName = UserName(userName, dbname);
-
-        // Parse password
-        if (cmdObj.hasField("pwd")) {
-            std::string clearTextPassword;
-            status = bsonExtractStringField(cmdObj, "pwd", &clearTextPassword);
-            if (!status.isOK()) {
-                return status;
-            }
-
-            std::string password = auth::createPasswordDigest(userName, clearTextPassword);
-            updateSetBuilder.append("credentials.MONGODB-CR", password);
-        }
-
-
-        // Parse custom data
-        if (cmdObj.hasField("customData")) {
-            BSONElement element;
-            status = bsonExtractTypedField(cmdObj, "customData", Object, &element);
-            if (!status.isOK()) {
-                return status;
-            }
-            updateSetBuilder.append("customData", element.Obj());
-        }
-
-        // Parse roles
-        if (cmdObj.hasField("roles")) {
-            BSONElement rolesElement;
-            Status status = bsonExtractTypedField(cmdObj, "roles", Array, &rolesElement);
-            if (!status.isOK()) {
-                return status;
-            }
-
-            BSONArray modifiedRolesObj;
-            status = _validateAndModifyRolesArray(rolesElement,
-                                                  dbname,
-                                                  authzManager,
-                                                  true,
-                                                  &modifiedRolesObj);
-            if (!status.isOK()) {
-                return status;
-            }
-
-            updateSetBuilder.append("roles", modifiedRolesObj);
-        }
-
-        BSONObj updateSet = updateSetBuilder.obj();
-        if (updateSet.isEmpty()) {
-            return Status(ErrorCodes::UserModificationFailed,
-                          "Must specify at least one field to update in updateUser");
-        }
-
-        *parsedUpdateObj = BSON("$set" << updateSet);
         return Status::OK();
     }
 
@@ -559,82 +479,69 @@ namespace auth {
                 return Status(ErrorCodes::FailedToParse, errmsg);
             }
 
-            if (parsedPrivileges) {
-                parsedPrivileges->push_back(privilege);
-            }
+            parsedPrivileges->push_back(privilege);
         }
         return Status::OK();
     }
 
-    Status parseAndValidateCreateRoleCommand(const BSONObj& cmdObj,
-                                             const std::string& dbname,
-                                             AuthorizationManager* authzManager,
-                                             BSONObj* parsedRoleObj,
-                                             BSONObj* parsedWriteConcern) {
+    Status parseCreateOrUpdateRoleCommands(const BSONObj& cmdObj,
+                                           const StringData& cmdName,
+                                           const std::string& dbname,
+                                           CreateOrUpdateRoleArgs* parsedArgs) {
         unordered_set<std::string> validFieldNames;
-        validFieldNames.insert("createRole");
+        validFieldNames.insert(cmdName.toString());
         validFieldNames.insert("privileges");
         validFieldNames.insert("roles");
         validFieldNames.insert("writeConcern");
 
-        Status status = _checkNoExtraFields(cmdObj, "createRole", validFieldNames);
+        Status status = _checkNoExtraFields(cmdObj, cmdName, validFieldNames);
         if (!status.isOK()) {
             return status;
         }
 
-        status = _extractWriteConcern(cmdObj, parsedWriteConcern);
+        status = _extractWriteConcern(cmdObj, &parsedArgs->writeConcern);
         if (!status.isOK()) {
             return status;
         }
 
-        BSONObjBuilder roleObjBuilder;
-
-        // Parse role name
         std::string roleName;
         status = bsonExtractStringField(cmdObj, "createRole", &roleName);
         if (!status.isOK()) {
             return status;
         }
-
-        // Prevent creating roles in the local database
-        if (dbname == "local") {
-            return Status(ErrorCodes::BadValue, "Cannot create roles in the local database");
-        }
-
-        roleObjBuilder.append("_id", dbname + "." + roleName);
-        roleObjBuilder.append(AuthorizationManager::ROLE_NAME_FIELD_NAME, roleName);
-        roleObjBuilder.append(AuthorizationManager::ROLE_SOURCE_FIELD_NAME, dbname);
+        parsedArgs->roleName = RoleName(roleName, dbname);
 
         // Parse privileges
-        BSONElement privilegesElement;
-        status = bsonExtractTypedField(cmdObj, "privileges", Array, &privilegesElement);
-        if (!status.isOK()) {
-            return status;
+        if (cmdObj.hasField("privileges")) {
+            BSONElement privilegesElement;
+            status = bsonExtractTypedField(cmdObj, "privileges", Array, &privilegesElement);
+            if (!status.isOK()) {
+                return status;
+            }
+            status = _parseAndValidatePrivilegeArray(BSONArray(privilegesElement.Obj()),
+                                                     &parsedArgs->privileges);
+            if (!status.isOK()) {
+                return status;
+            }
+            parsedArgs->hasPrivileges = true;
         }
-        status = _parseAndValidatePrivilegeArray(BSONArray(privilegesElement.Obj()), NULL);
-        if (!status.isOK()) {
-            return status;
-        }
-        roleObjBuilder.append(privilegesElement);
 
         // Parse roles
-        BSONElement rolesElement;
-        status = bsonExtractTypedField(cmdObj, "roles", Array, &rolesElement);
-        if (!status.isOK()) {
-            return status;
+        if (cmdObj.hasField("roles")) {
+            BSONElement rolesElement;
+            status = bsonExtractTypedField(cmdObj, "roles", Array, &rolesElement);
+            if (!status.isOK()) {
+                return status;
+            }
+            status = _extractRoleNamesFromBSONArray(BSONArray(rolesElement.Obj()),
+                                                    dbname,
+                                                    "roles",
+                                                    &parsedArgs->roles);
+            if (!status.isOK()) {
+                return status;
+            }
+            parsedArgs->hasRoles = true;
         }
-        BSONArray modifiedRolesArray;
-        status = _validateAndModifyRolesArray(rolesElement,
-                                              dbname,
-                                              authzManager,
-                                              false,
-                                              &modifiedRolesArray);
-        if (!status.isOK()) {
-            return status;
-        }
-        roleObjBuilder.append("roles", modifiedRolesArray);
-
-        *parsedRoleObj = roleObjBuilder.obj();
         return Status::OK();
     }
 
