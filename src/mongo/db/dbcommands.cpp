@@ -593,6 +593,7 @@ namespace mongo {
                 ok = false;
                 if ( !err.empty() ) {
                     errmsg = err;
+                    result.append("code", errCode);
                     return false;
                 }
             }
