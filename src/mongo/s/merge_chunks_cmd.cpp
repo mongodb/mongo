@@ -62,6 +62,7 @@ namespace mongo {
             return Status::OK();
         }
 
+        virtual bool adminOnly() const { return true; }
         virtual bool slaveOk() const { return false; }
         virtual LockType locktype() const { return NONE; }
 
