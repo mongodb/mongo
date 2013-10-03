@@ -47,6 +47,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
 #include "mongo/db/lasterror.h"
+#include "mongo/db/log_process_details.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/db/repl/multicmd.h"
 #include "mongo/db/repl/write_concern.h"
@@ -239,7 +240,10 @@ namespace mongo {
             out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
         }
         virtual bool run(const string& ns, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            return rotateLogs();
+            bool didRotate = rotateLogs();
+            if (didRotate)
+                logProcessDetailsForLogRotate();
+            return didRotate;
         }
 
     } logRotateCmd;
