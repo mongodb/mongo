@@ -28,6 +28,8 @@
 
 #include "mongo/s/batch_write_op.h"
 
+#include "mongo/base/error_codes.h"
+
 namespace mongo {
 
     void BatchWriteOp::initClientRequest( const BatchedCommandRequest* clientRequest ) {
@@ -45,9 +47,7 @@ namespace mongo {
     }
 
     static void buildTargetError( const Status& errStatus, BatchedErrorDetail* details ) {
-        // TODO: XXX
-        details->setErrCode( 99999 );
-        details->setErrInfo( BSON( "code" << errStatus.code() ) );
+        details->setErrCode( errStatus.code() );
         details->setErrMessage( errStatus.reason() );
     }
 
@@ -277,25 +277,23 @@ namespace mongo {
     static void cloneBatchErrorTo( const BatchedCommandResponse& batchResp,
                                    BatchedErrorDetail* details ) {
         details->setErrCode( batchResp.getErrCode() );
-        details->setErrInfo( batchResp.getErrInfo() );
+        if ( batchResp.isErrInfoSet() ) details->setErrInfo( batchResp.getErrInfo() );
         details->setErrMessage( batchResp.getErrMessage() );
     }
 
     static void cloneBatchErrorFrom( const BatchedErrorDetail& details,
                                      BatchedCommandResponse* response ) {
         response->setErrCode( details.getErrCode() );
-        response->setErrInfo( details.getErrInfo() );
+        if ( details.isErrInfoSet() ) response->setErrInfo( details.getErrInfo() );
         response->setErrMessage( details.getErrMessage() );
     }
 
     static bool isWCErrCode( int errCode ) {
-        // TODO: XXX
-        return errCode == 99999;
+        return errCode == ErrorCodes::WriteConcernFailed;
     }
 
     static bool isItemErrorsOnlyCode( int errCode ) {
-        // TODO: XXX
-        return errCode == 99999;
+        return errCode == ErrorCodes::MultipleErrorsOccurred;
     }
 
     // Given *either* a batch error or an array of per-item errors, copies errors we're interested
@@ -303,13 +301,10 @@ namespace mongo {
     static void trackErrors( const ShardEndpoint& endpoint,
                              const BatchedErrorDetail* batchError,
                              const vector<BatchedErrorDetail*> itemErrors,
-                             TrackedErrorMap* trackedErrors ) {
+                             TrackedErrors* trackedErrors ) {
         if ( batchError ) {
-            int errCode = batchError->getErrCode();
-
-            if ( trackedErrors->find( errCode ) != trackedErrors->end() ) {
-                ShardError* shardError = new ShardError( endpoint, *batchError );
-                ( *trackedErrors )[errCode].push_back( shardError );
+            if ( trackedErrors->isTracking( batchError->getErrCode() ) ) {
+                trackedErrors->addError( new ShardError( endpoint, *batchError ) );
             }
         }
         else {
@@ -317,11 +312,9 @@ namespace mongo {
                 it != itemErrors.end(); ++it ) {
 
                 const BatchedErrorDetail* error = *it;
-                int errCode = error->getErrCode();
 
-                if ( trackedErrors->find( errCode ) != trackedErrors->end() ) {
-                    ShardError* shardError = new ShardError( endpoint, *error );
-                    ( *trackedErrors )[errCode].push_back( shardError );
+                if ( trackedErrors->isTracking( error->getErrCode() ) ) {
+                    trackedErrors->addError( new ShardError( endpoint, *error ) );
                 }
             }
         }
@@ -329,7 +322,7 @@ namespace mongo {
 
     void BatchWriteOp::noteBatchResponse( const TargetedWriteBatch& targetedBatch,
                                           const BatchedCommandResponse& response,
-                                          TrackedErrorMap* trackedErrors ) {
+                                          TrackedErrors* trackedErrors ) {
 
         //
         // Organize errors based on error code and special cases based on size of request
@@ -442,6 +435,14 @@ namespace mongo {
         _targeted.erase( &targetedBatch );
     }
 
+    void BatchWriteOp::noteBatchError( const TargetedWriteBatch& targetedBatch,
+                                       const BatchedErrorDetail& error ) {
+        BatchedCommandResponse response;
+        response.setOk( false );
+        cloneBatchErrorFrom( error, &response );
+        noteBatchResponse( targetedBatch, response, NULL );
+    }
+
     bool BatchWriteOp::isFinished() {
         size_t numWriteOps = _clientRequest->sizeWriteOps();
         for ( size_t i = 0; i < numWriteOps; ++i ) {
@@ -465,8 +466,7 @@ namespace mongo {
             return;
         }
 
-        // TODO: XXX
-        error->setErrCode( 99999 );
+        error->setErrCode( ErrorCodes::MultipleErrorsOccurred );
 
         // Generate the multi-item error message below
         stringstream msg;
@@ -492,8 +492,7 @@ namespace mongo {
             return;
         }
 
-        // TODO: XXX
-        error->setErrCode( 99999 );
+        error->setErrCode( ErrorCodes::WriteConcernFailed );
 
         // Generate the multi-error message below
         stringstream msg;
@@ -573,9 +572,54 @@ namespace mongo {
         // Caller's responsibility to dispose of TargetedBatches
         dassert( _targeted.empty() );
 
-        if ( NULL != _writeOps ) delete[] _writeOps;
-        _writeOps = NULL;
+        if ( NULL != _writeOps ) {
+
+            size_t numWriteOps = _clientRequest->sizeWriteOps();
+            for ( size_t i = 0; i < numWriteOps; ++i ) {
+                // Placement new so manual destruct
+                _writeOps[i].~WriteOp();
+            }
+
+            ::operator delete[]( _writeOps );
+            _writeOps = NULL;
+        }
+    }
+
+    void TrackedErrors::startTracking( int errCode ) {
+        dassert( !isTracking( errCode ) );
+        _errorMap.insert( make_pair( errCode, vector<ShardError*>() ) );
+    }
+
+    bool TrackedErrors::isTracking( int errCode ) const {
+        return _errorMap.find( errCode ) != _errorMap.end();
+    }
+
+    void TrackedErrors::addError( ShardError* error ) {
+        TrackedErrorMap::iterator seenIt = _errorMap.find( error->error.getErrCode() );
+        if ( seenIt == _errorMap.end() ) return;
+        seenIt->second.push_back( error );
+    }
+
+    const vector<ShardError*>& TrackedErrors::getErrors( int errCode ) const {
+        dassert( isTracking( errCode ) );
+        return _errorMap.find( errCode )->second;
+    }
+
+    void TrackedErrors::clear() {
+        for ( TrackedErrorMap::iterator it = _errorMap.begin(); it != _errorMap.end(); ++it ) {
+
+            vector<ShardError*>& errors = it->second;
+
+            for ( vector<ShardError*>::iterator errIt = errors.begin(); errIt != errors.end();
+                ++errIt ) {
+                delete *errIt;
+            }
+            errors.clear();
+        }
+    }
+
+    TrackedErrors::~TrackedErrors() {
+        clear();
     }
 
 }
-
