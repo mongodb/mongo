@@ -258,16 +258,16 @@ namespace mongo {
 
         ClientBasic *client = ClientBasic::getCurrent();
         AuthorizationSession* authorizationSession = client->getAuthorizationSession();
-        StringData subjectName = client->port()->getX509SubjectName();
+        std::string subjectName = client->port()->getX509SubjectName();
 
         if (user.getUser() != subjectName) {
             return Status(ErrorCodes::AuthenticationFailed,
                           "There is no x.509 client certificate matching the user.");
         }
         else {
-            StringData srvSubjectName = getSSLManager()->getServerSubjectName();
-            StringData srvClusterId = srvSubjectName.substr(srvSubjectName.find(",OU="));
-            StringData peerClusterId = subjectName.substr(subjectName.find(",OU="));
+            std::string srvSubjectName = getSSLManager()->getServerSubjectName();
+            std::string srvClusterId = srvSubjectName.substr(srvSubjectName.find(",OU="));
+            std::string peerClusterId = subjectName.substr(subjectName.find(",OU="));
 
             fassert(17002, !srvClusterId.empty() && srvClusterId != srvSubjectName);
 
