@@ -63,15 +63,15 @@ namespace mongo {
         class Result {
         public:
             Result( const std::string& name )
-                : _name( name ) , _rc(0) , _tests(0) , _fails(0) , _asserts(0), _millis(0) {}
+                : _name( name ) , _rc(0) , _tests(0) , _fails() , _asserts(0), _millis(0) {}
 
             std::string toString() {
                 std::stringstream ss;
 
                 char result[128];
                 sprintf(result,
-                        "%-30s | tests: %4d | fails: %4d | assert calls: %10d | time secs: %6.3f\n",
-                        _name.c_str(), _tests, _fails, _asserts, _millis/1000.0 );
+                        "%-30s | tests: %4d | fails: %4zd | assert calls: %10d | time secs: %6.3f\n",
+                        _name.c_str(), _tests, _fails.size(), _asserts, _millis/1000.0 );
                 ss << result;
 
                 for ( std::vector<std::string>::iterator i=_messages.begin(); i!=_messages.end(); i++ ) {
@@ -89,7 +89,7 @@ namespace mongo {
 
             int _rc;
             int _tests;
-            int _fails;
+            std::vector<std::string> _fails;
             int _asserts;
             int _millis;
             std::vector<std::string> _messages;
@@ -183,12 +183,12 @@ namespace mongo {
                 if ( ! passes ) {
                     std::string s = err.str();
                     log() << "FAIL: " << s << std::endl;
-                    r->_fails++;
+                    r->_fails.push_back(tc->getName());
                     r->_messages.push_back( s );
                 }
             }
 
-            if ( r->_fails )
+            if ( !r->_fails.empty() )
                 r->_rc = 17;
 
             r->_millis = timer.millis();
@@ -240,9 +240,11 @@ namespace mongo {
             int rc = 0;
 
             int tests = 0;
-            int fails = 0;
             int asserts = 0;
             int millis = 0;
+
+            Result totals ("TOTALS");
+            std::vector<std::string> failedSuites;
 
             for ( std::vector<Result*>::iterator i=results.begin(); i!=results.end(); i++ ) {
                 Result* r = *i;
@@ -251,18 +253,38 @@ namespace mongo {
                     rc = r->rc();
 
                 tests += r->_tests;
-                fails += r->_fails;
+                if ( !r->_fails.empty() ) {
+                    failedSuites.push_back(r->toString());
+                    for ( std::vector<std::string>::const_iterator j=r->_fails.begin();
+                          j!=r->_fails.end(); j++ ) {
+                        const std::string& s = (*j);
+                        totals._fails.push_back(r->_name + "/" + s);
+                    }
+                }
                 asserts += r->_asserts;
                 millis += r->_millis;
             }
 
-            Result totals ("TOTALS");
             totals._tests = tests;
-            totals._fails = fails;
             totals._asserts = asserts;
             totals._millis = millis;
 
             log() << totals.toString(); // includes endl
+
+            // summary
+            if ( !totals._fails.empty() ) {
+                log() << "Failing tests:" << std::endl;
+                for ( std::vector<std::string>::const_iterator i=totals._fails.begin();
+                      i!=totals._fails.end(); i++ ) {
+                    const std::string& s = (*i);
+                    log() << "\t " << s << " Failed";
+                }
+                log() << "FAILURE - " << totals._fails.size() << " tests in "
+                      << failedSuites.size() << " suites failed";
+            }
+            else {
+                log() << "SUCCESS - All tests in all suites passed";
+            }
 
             return rc;
         }
