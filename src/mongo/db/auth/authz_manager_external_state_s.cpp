@@ -373,7 +373,7 @@ namespace {
         lockHolder->setLockMessage(why.toString());
 
         std::string errmsg;
-        if (!lockHolder->tryAcquire(&errmsg)) {
+        if (!lockHolder->acquire(_authzUpdateLockAcquisitionTimeoutMillis, &errmsg)) {
             warning() <<
                     "Error while attempting to acquire distributed lock for user modification: " <<
                     errmsg << endl;

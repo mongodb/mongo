@@ -138,8 +138,7 @@ namespace mongo {
          */
         boost::mutex _roleGraphMutex;
 
-        boost::mutex _authzDataUpdateLock;
-
+        boost::timed_mutex _authzDataUpdateLock;
     };
 
 } // namespace mongo

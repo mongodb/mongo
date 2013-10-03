@@ -270,6 +270,8 @@ namespace mongo {
         virtual Status _findUser(const std::string& usersNamespace,
                                  const BSONObj& query,
                                  BSONObj* result) = 0;
+
+        static const long long _authzUpdateLockAcquisitionTimeoutMillis = 5000;
     };
 
 } // namespace mongo
