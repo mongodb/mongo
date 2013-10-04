@@ -194,12 +194,21 @@ __wt_txn_refresh(WT_SESSION_IMPL *session, uint64_t max_id, int get_snapshot)
 	}
 
 	/*
+	 * Update the last running ID if we have a much newer value or we are
+	 * forcing an update.
+	 */
+	if (!get_snapshot || snap_min > txn_global->last_running + 100)
+		txn_global->last_running = snap_min;
+
+	/*
 	 * Update the oldest ID if we have a newer ID and we can get exclusive
-	 * access.  Once we get exclusive access, do another pass to make sure
-	 * nobody else is using an earlier ID.
+	 * access.  During normal snapshot refresh, only do this if we have a
+	 * much newer value.  Once we get exclusive access, do another pass to
+	 * make sure nobody else is using an earlier ID.
 	 */
 	if (max_id == WT_TXN_NONE &&
 	    TXNID_LT(prev_oldest_id, oldest_id) &&
+	    (!get_snapshot || oldest_id - prev_oldest_id > 100) &&
 	    WT_ATOMIC_CAS(txn_global->scan_count, 1, -1)) {
 		WT_ORDERED_READ(session_cnt, conn->session_cnt);
 		for (i = 0, s = txn_global->states; i < session_cnt; i++, s++) {
@@ -482,6 +491,8 @@ __wt_txn_global_init(WT_CONNECTION_IMPL *conn, const char *cfg[])
 	session = conn->default_session;
 	txn_global = &conn->txn_global;
 	txn_global->current = 1;
+	txn_global->oldest_id = 1;
+	txn_global->last_running = 1;
 
 	WT_RET(__wt_calloc_def(
 	    session, conn->session_size, &txn_global->states));
