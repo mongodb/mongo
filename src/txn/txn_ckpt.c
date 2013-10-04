@@ -184,10 +184,12 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_DECL_RET;
 	WT_SESSION *wt_session;
 	WT_TXN *txn;
+	WT_TXN_ISOLATION saved_isolation;
 	void *saved_meta_next;
 	int tracking;
 
 	conn = S2C(session);
+	saved_isolation = session->isolation;
 	txn = &session->txn;
 	tracking = 0;
 
@@ -203,7 +205,7 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_ERR(__checkpoint_data_source(session, cfg));
 
 	/* Flush dirty leaf pages before we start the checkpoint. */
-	txn->isolation = TXN_ISO_READ_COMMITTED;
+	session->isolation = txn->isolation = TXN_ISO_READ_COMMITTED;
 	WT_ERR(__checkpoint_apply(session, cfg, __wt_checkpoint_write_leaves));
 
 	WT_ERR(__wt_meta_track_on(session));
@@ -262,7 +264,7 @@ err:	/*
 	 * overwritten the checkpoint, so what ends up on disk is not
 	 * consistent.
 	 */
-	txn->isolation = TXN_ISO_READ_UNCOMMITTED;
+	session->isolation = txn->isolation = TXN_ISO_READ_UNCOMMITTED;
 	if (tracking)
 		WT_TRET(__wt_meta_track_off(session, ret != 0));
 
@@ -271,6 +273,7 @@ err:	/*
 	__wt_spin_unlock(session, &conn->checkpoint_lock);
 
 	__wt_scr_free(&tmp);
+	session->isolation = txn->isolation = saved_isolation;
 	return (ret);
 }
 
@@ -408,15 +411,16 @@ __checkpoint_worker(
 	int deleted, force, hot_backup_locked, track_ckpt;
 	char *name_alloc;
 
-	conn = S2C(session);
 	btree = S2BT(session);
+	conn = S2C(session);
+	dhandle = session->dhandle;
+	txn = &session->txn;
+
 	bm = btree->bm;
 	ckpt = ckptbase = NULL;
-	dhandle = session->dhandle;
-	name_alloc = NULL;
-	txn = &session->txn;
-	saved_isolation = txn->isolation;
 	hot_backup_locked = 0;
+	name_alloc = NULL;
+	saved_isolation = session->isolation;
 	track_ckpt = 1;
 
 	/*
@@ -712,8 +716,7 @@ __checkpoint_worker(
 	if (is_checkpoint)
 		WT_ERR(__wt_bt_cache_op(session, ckptbase, WT_SYNC_CHECKPOINT));
 	else {
-		txn->isolation = TXN_ISO_READ_UNCOMMITTED;
-
+		session->isolation = txn->isolation = TXN_ISO_READ_UNCOMMITTED;
 		WT_ERR(__wt_bt_cache_op(session, ckptbase, WT_SYNC_DISCARD));
 	}
 
@@ -725,9 +728,8 @@ __checkpoint_worker(
 		if (F_ISSET(ckpt, WT_CKPT_ADD))
 			ckpt->write_gen = btree->write_gen;
 
-fake:
-	/* Update the object's metadata. */
-	txn->isolation = TXN_ISO_READ_UNCOMMITTED;
+fake:	/* Update the object's metadata. */
+	session->isolation = txn->isolation = TXN_ISO_READ_UNCOMMITTED;
 	ret = __wt_meta_ckptlist_set(session, dhandle->name, ckptbase);
 	WT_ERR(ret);
 
@@ -749,7 +751,7 @@ err:	if (hot_backup_locked)
 		__wt_spin_unlock(session, &conn->hot_backup_lock);
 skip:	__wt_meta_ckptlist_free(session, ckptbase);
 	__wt_free(session, name_alloc);
-	txn->isolation = saved_isolation;
+	session->isolation = txn->isolation = saved_isolation;
 	return (ret);
 }
 
