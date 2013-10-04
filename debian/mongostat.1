@@ -1,4 +1,6 @@
-.TH "MONGOSTAT" "1" "March 14, 2013" "2.2.3" "mongodb-manual"
+.\" Man page generated from reStructuredText.
+.
+.TH "MONGOSTAT" "1" "October 03, 2013" "2.4" "mongodb-manual"
 .SH NAME
 mongostat \- MongoDB
 .
@@ -28,42 +30,47 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.\" Man page generated from reStructuredText.
-.
 .SH SYNOPSIS
 .sp
-The \fI\%mongostat\fP utility provides a quick overview of the
+The \fBmongostat\fP utility provides a quick overview of the
 status of a currently running \fBmongod\fP
 or \fBmongos\fP
-instance. \fI\%mongostat\fP is functionally similar to the
+instance. \fBmongostat\fP is functionally similar to the
 UNIX/Linux file system utility \fBvmstat\fP, but provides data regarding
 \fBmongod\fP and \fBmongos\fP instances.
-.IP "See also"
 .sp
+\fBSEE ALSO:\fP
+.INDENT 0.0
+.INDENT 3.5
 For more information about monitoring MongoDB, see
-\fB/administration/monitoring\fP.
+http://docs.mongodb.org/manual/administration/monitoring\&.
 .sp
 For more background on various other MongoDB status outputs see:
 .INDENT 0.0
 .IP \(bu 2
-\fB/reference/server\-status\fP
+http://docs.mongodb.org/manual/reference/command/serverStatus
 .IP \(bu 2
-\fB/reference/replica\-status\fP
+http://docs.mongodb.org/manual/reference/command/replSetGetStatus
 .IP \(bu 2
-\fB/reference/database\-statistics\fP
+http://docs.mongodb.org/manual/reference/command/dbStats
 .IP \(bu 2
-\fB/reference/collection\-statistics\fP
+http://docs.mongodb.org/manual/reference/command/collStats
 .UNINDENT
 .sp
 For an additional utility that provides MongoDB metrics see
-"\fBmongotop\fP."
-.RE
+\fBmongotop\fP\&.
+.UNINDENT
+.UNINDENT
 .sp
-\fI\%mongostat\fP connects to the \fBmongod\fP instance running
+\fBmongostat\fP connects to the \fBmongod\fP instance running
 on the local host interface on TCP port \fB27017\fP; however,
-\fI\%mongostat\fP can connect to any accessible remote \fBmongod\fP
+\fBmongostat\fP can connect to any accessible remote \fBmongod\fP
 instance.
 .SH OPTIONS
+.INDENT 0.0
+.TP
+.B mongostat
+.UNINDENT
 .INDENT 0.0
 .TP
 .B mongostat
@@ -78,25 +85,27 @@ Returns a basic help and usage text.
 .B \-\-verbose, \-v
 Increases the amount of internal reporting returned on the command
 line. Increase the verbosity with the \fB\-v\fP form by including
-the option multiple times, (e.g. \fB\-vvvvv\fP.)
+the option multiple times, (e.g. \fB\-vvvvv\fP\&.)
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-version
-Returns the version of the \fI\%mongostat\fP utility.
+Returns the version of the \fBmongostat\fP utility.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-host <hostname><:port>
 Specifies a resolvable hostname for the \fBmongod\fP from which you
-want to export data. By default \fI\%mongostat\fP attempts to connect
-to a MongoDB instance running on the localhost port number \fB27017\fP.
+want to export data. By default \fBmongostat\fP attempts to connect
+to a MongoDB instance running on the localhost port number \fB27017\fP\&.
 .sp
 Optionally, specify a port number to connect a MongoDB instance
-running on a port other than \fB27017\fP.
+running on a port other than \fB27017\fP\&.
 .sp
 To connect to a replica set, you can specify the replica set seed
 name, and a seed list of set members, in the following format:
+.INDENT 7.0
+.INDENT 3.5
 .sp
 .nf
 .ft C
@@ -104,37 +113,45 @@ name, and a seed list of set members, in the following format:
 .ft P
 .fi
 .UNINDENT
+.UNINDENT
+.UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-port <port>
 Specifies the port number, if the MongoDB instance is not running on
 the standard port. (i.e. \fB27017\fP) You may also specify a port
-number using the \fI\%mongostat --host\fP command.
+number using the \fImongostat \-\-host\fP command.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-ipv6
-Enables IPv6 support that allows \fI\%mongostat\fP to connect
+Enables IPv6 support that allows \fBmongostat\fP to connect
 to the MongoDB instance using an IPv6 network. All MongoDB programs
-and processes, including \fI\%mongostat\fP, disable IPv6
+and processes, including \fBmongostat\fP, disable IPv6
 support by default.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-ssl
 New in version 2.4: MongoDB added support for SSL connections to \fBmongod\fP
-instances in mongostat.
-.IP Note
+instances in mongostat\&.
+
+.sp
+\fBNOTE:\fP
+.INDENT 7.0
+.INDENT 3.5
 SSL support in mongostat is not compiled into the default
-distribution of MongoDB. See \fB/administration/ssl\fP for more
-information on SSL and MongoDB.
+distribution of MongoDB. See
+http://docs.mongodb.org/manual/tutorial/configure\-ssl for more information on SSL
+and MongoDB.
 .sp
 Additionally, mongostat does not support connections to
 \fBmongod\fP instances that require client certificate
 validation.
-.RE
+.UNINDENT
+.UNINDENT
 .sp
-Allows \fI\%mongostat\fP to connect to \fBmongod\fP
+Allows \fBmongostat\fP to connect to \fBmongod\fP
 instance over an SSL connection.
 .UNINDENT
 .INDENT 0.0
@@ -142,48 +159,63 @@ instance over an SSL connection.
 .B \-\-username <username>, \-u <username>
 Specifies a username to authenticate to the MongoDB instance, if your
 database requires authentication. Use in conjunction with the
-\fI\%mongostat --password\fP option to supply a password.
+\fImongostat \-\-password\fP option to supply a password.
+.sp
+\fBIMPORTANT:\fP
+.INDENT 7.0
+.INDENT 3.5
+This user must have sufficient credentials to run
+the \fBserverStatus\fP command, which is the
+\fBclusterAdmin\fP role. See
+http://docs.mongodb.org/manual/reference/user\-privileges and
+http://docs.mongodb.org/manual/reference/privilege\-documents for more information.
+.UNINDENT
+.UNINDENT
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-password <password>, \-p <password>
 Specifies a password to authenticate to the MongoDB instance. Use
-in conjunction with the \fI\%mongostat --username\fP option to
+in conjunction with the \fImongostat \-\-username\fP option to
 supply a username.
 .sp
-If you specify a \fI\%--username\fP
-without the \fI\%--password\fP option, \fI\%mongostat\fP will
-prompt for a password interactively.
+If you specify a \fI\-\-username\fP, and do do not pass an
+argument to \fI\-\-password\fP, \fBmongostat\fP will prompt
+for a password interactively. If you do not specify a password on
+the command line, \fI\-\-password\fP must be the last argument
+specified.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-authenticationDatabase <dbname>
 New in version 2.4.
+
 .sp
 Specifies the database that holds the user\(aqs (e.g
-\fI\%--username\fP) credentials.
+\fI\-\-username\fP) credentials.
 .sp
-By default, \fI\%mongostat\fP assumes that the database specified to the
+By default, \fBmongostat\fP assumes that the database specified to the
 \fI\-\-db\fP argument holds the user\(aqs credentials, unless you
-specify \fI\%--authenticationDatabase\fP.
+specify \fI\-\-authenticationDatabase\fP\&.
 .sp
 See \fBuserSource\fP,
-\fB/reference/privilege\-documents\fP and
-\fB/reference/user\-privileges\fP for more information about
+http://docs.mongodb.org/manual/reference/privilege\-documents and
+http://docs.mongodb.org/manual/reference/user\-privileges for more information about
 delegated authentication in MongoDB.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-authenticationMechanism <name>
 New in version 2.4.
+
 .sp
 Specifies the authentication mechanism. By default, the
 authentication mechanism is \fBMONGODB\-CR\fP, which is the MongoDB
-challenge/response authentication mechanism. In the MongoDB Subscriber Edition,
-\fI\%mongostat\fP also includes support for \fBGSSAPI\fP to handle
+challenge/response authentication mechanism. In MongoDB Enterprise,
+\fBmongostat\fP also includes support for \fBGSSAPI\fP to handle
 Kerberos authentication.
 .sp
-See \fB/tutorial/control\-access\-to\-mongodb\-with\-kerberos\-authentication\fP
+See http://docs.mongodb.org/manual/tutorial/control\-access\-to\-mongodb\-with\-kerberos\-authentication
 for more information about Kerberos authentication.
 .UNINDENT
 .INDENT 0.0
@@ -196,57 +228,57 @@ Disables the output of column or field names.
 .B \-\-rowcount <number>, \-n <number>
 Controls the number of rows to output. Use in conjunction with
 the \fBsleeptime\fP argument to control the duration of a
-\fI\%mongostat\fP operation.
+\fBmongostat\fP operation.
 .sp
-Unless \fI\%--rowcount\fP is specified, \fI\%mongostat\fP
+Unless \fI\%--rowcount\fP is specified, \fBmongostat\fP
 will return an infinite number
-of rows (e.g. value of \fB0\fP.)
+of rows (e.g. value of \fB0\fP\&.)
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-http
-Configures \fI\%mongostat\fP to collect data using the HTTP interface
+Configures \fBmongostat\fP to collect data using the HTTP interface
 rather than a raw database connection.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-discover
-With this option \fI\%mongostat\fP discovers and reports on
+With this option \fBmongostat\fP discovers and reports on
 statistics from all members of a \fIreplica set\fP or
-\fIsharded cluster\fP. When connected to any member of a replica
+\fIsharded cluster\fP\&. When connected to any member of a replica
 set, \fI\%--discover\fP all non\-\fIhidden members\fP of the replica set. When connected to a \fBmongos\fP,
-\fI\%mongostat\fP will return data from all \fIshards\fP in the cluster. If a replica set provides a shard in the
-sharded cluster, \fI\%mongostat\fP will report on non\-hidden
+\fBmongostat\fP will return data from all \fIshards\fP in the cluster. If a replica set provides a shard in the
+sharded cluster, \fBmongostat\fP will report on non\-hidden
 members of that replica set.
 .sp
-The \fI\%mongostat --host\fP option is not required but
+The \fImongostat \-\-host\fP option is not required but
 potentially useful in this case.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-all
-Configures \fI\%mongostat\fP to return all optional \fI\%fields\fP.
+Configures \fBmongostat\fP to return all optional \fI\%fields\fP\&.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B <sleeptime>
 The final argument is the length of time, in seconds, that
-\fI\%mongostat\fP waits in between calls. By default \fI\%mongostat\fP
+\fBmongostat\fP waits in between calls. By default \fBmongostat\fP
 returns one call every second.
 .sp
-\fI\%mongostat\fP returns values that reflect the operations
+\fBmongostat\fP returns values that reflect the operations
 over a 1 second period. For values of \fB<sleeptime>\fP greater
-than 1, \fI\%mongostat\fP averages data to reflect average
+than 1, \fBmongostat\fP averages data to reflect average
 operations per second.
 .UNINDENT
 .SH FIELDS
 .sp
-\fI\%mongostat\fP returns values that reflect the operations over a
+\fBmongostat\fP returns values that reflect the operations over a
 1 second period. When \fBmongostat <sleeptime>\fP has a value
-greater than 1, \fI\%mongostat\fP averages the statistics to reflect
+greater than 1, \fBmongostat\fP averages the statistics to reflect
 average operations per second.
 .sp
-\fI\%mongostat\fP outputs the following fields:
+\fBmongostat\fP outputs the following fields:
 .INDENT 0.0
 .TP
 .B inserts
@@ -278,7 +310,7 @@ The number of get more (i.e. cursor batch) operations per second.
 .TP
 .B command
 The number of commands per second. On \fIslave\fP and
-\fIsecondary\fP systems, \fI\%mongostat\fP presents two values
+\fIsecondary\fP systems, \fBmongostat\fP presents two values
 separated by a pipe character (e.g. \fB|\fP), in the form of
 \fBlocal|replicated\fP commands.
 .UNINDENT
@@ -291,24 +323,25 @@ The number of \fIfsync\fP operations per second.
 .TP
 .B mapped
 The total amount of data mapped in megabytes. This is the total
-data size at the time of the last \fI\%mongostat\fP call.
+data size at the time of the last \fBmongostat\fP call.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B size
 The amount of (virtual) memory in megabytes used by the process at
-the time of the last \fI\%mongostat\fP call.
+the time of the last \fBmongostat\fP call.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B res
 The amount of (resident) memory in megabytes used by the process at
-the time of the last \fI\%mongostat\fP call.
+the time of the last \fBmongostat\fP call.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B faults
 Changed in version 2.1.
+
 .sp
 The number of page faults per second.
 .sp
@@ -323,15 +356,17 @@ The percent of time in a global write lock.
 Changed in version 2.2: The \fBlocked db\fP field replaces the \fBlocked %\fP field to
 more appropriate data regarding the database specific locks in
 version 2.2.
+
 .UNINDENT
 .INDENT 0.0
 .TP
 .B locked db
 New in version 2.2.
+
 .sp
 The percent of time in the per\-database context\-specific
-lock. \fI\%mongostat\fP will report the database that has spent
-the most time since the last \fI\%mongostat\fP call with a write
+lock. \fBmongostat\fP will report the database that has spent
+the most time since the last \fBmongostat\fP call with a write
 lock.
 .sp
 This value represents the amount of time that the listed database
@@ -372,14 +407,14 @@ The number of active clients performing write operations.
 .B netIn
 The amount of network traffic, in \fIbytes\fP, received by the MongoDB instance.
 .sp
-This includes traffic from \fI\%mongostat\fP itself.
+This includes traffic from \fBmongostat\fP itself.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B netOut
 The amount of network traffic, in \fIbytes\fP, sent by the MongoDB instance.
 .sp
-This includes traffic from \fI\%mongostat\fP itself.
+This includes traffic from \fBmongostat\fP itself.
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -394,7 +429,7 @@ The name, if applicable, of the replica set.
 .INDENT 0.0
 .TP
 .B repl
-The replication status of the node.
+The replication status of the member.
 .TS
 center;
 |l|l|.
@@ -439,11 +474,13 @@ _
 .UNINDENT
 .SH USAGE
 .sp
-In the first example, \fI\%mongostat\fP will return data every
-second for 20 seconds. \fI\%mongostat\fP collects data from the
+In the first example, \fBmongostat\fP will return data every
+second for 20 seconds. \fBmongostat\fP collects data from the
 \fBmongod\fP instance running on the localhost interface on
 port 27017. All of the following invocations produce identical
 behavior:
+.INDENT 0.0
+.INDENT 3.5
 .sp
 .nf
 .ft C
@@ -453,12 +490,16 @@ mongostat \-n 20 1
 mongostat \-n 20
 .ft P
 .fi
+.UNINDENT
+.UNINDENT
 .sp
-In the next example, \fI\%mongostat\fP returns data every 5 minutes
-(or 300 seconds) for as long as the program runs. \fI\%mongostat\fP
+In the next example, \fBmongostat\fP returns data every 5 minutes
+(or 300 seconds) for as long as the program runs. \fBmongostat\fP
 collects data from the \fBmongod\fP instance running on the
-localhost interface on port \fB27017\fP. Both of the following
+localhost interface on port \fB27017\fP\&. Both of the following
 invocations produce identical behavior.
+.INDENT 0.0
+.INDENT 3.5
 .sp
 .nf
 .ft C
@@ -467,12 +508,16 @@ mongostat \-n 0 300
 mongostat 300
 .ft P
 .fi
+.UNINDENT
+.UNINDENT
 .sp
-In the following example, \fI\%mongostat\fP returns data every 5
-minutes for an hour (12 times.) \fI\%mongostat\fP collects data
+In the following example, \fBmongostat\fP returns data every 5
+minutes for an hour (12 times.) \fBmongostat\fP collects data
 from the \fBmongod\fP instance running on the localhost interface
 on port 27017. Both of the following invocations produce identical
 behavior.
+.INDENT 0.0
+.INDENT 3.5
 .sp
 .nf
 .ft C
@@ -480,22 +525,28 @@ mongostat \-\-rowcount 12 300
 mongostat \-n 12 300
 .ft P
 .fi
+.UNINDENT
+.UNINDENT
 .sp
-In many cases, using the \fI\%--discover\fP
+In many cases, using the \fI\-\-discover\fP
 will help provide a more complete snapshot of the state of an entire
 group of machines. If a \fBmongos\fP process connected to a
 \fIsharded cluster\fP is running on port \fB27017\fP of the local
 machine, you can use the following form to return statistics from all
 members of the cluster:
+.INDENT 0.0
+.INDENT 3.5
 .sp
 .nf
 .ft C
 mongostat \-\-discover
 .ft P
 .fi
+.UNINDENT
+.UNINDENT
 .SH AUTHOR
 MongoDB Documentation Project
 .SH COPYRIGHT
-2011-2013, 10gen, Inc.
+2011-2013, MongoDB, Inc.
 .\" Generated by docutils manpage writer.
 .

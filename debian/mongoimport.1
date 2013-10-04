@@ -1,4 +1,6 @@
-.TH "MONGOIMPORT" "1" "March 14, 2013" "2.2.3" "mongodb-manual"
+.\" Man page generated from reStructuredText.
+.
+.TH "MONGOIMPORT" "1" "October 03, 2013" "2.4" "mongodb-manual"
 .SH NAME
 mongoimport \- MongoDB
 .
@@ -28,25 +30,31 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.\" Man page generated from reStructuredText.
-.
 .SH SYNOPSIS
 .sp
-The \fI\%mongoimport\fP tool provides a route to import content from a
+The \fBmongoimport\fP tool provides a route to import content from a
 JSON, CSV, or TSV export created by \fBmongoexport\fP, or
 potentially, another third\-party export tool. See the
-"\fB/administration/import\-export\fP" document for a more in depth
-usage overview, and the "\fBmongoexport\fP" document for more
+http://docs.mongodb.org/manual/core/import\-export document for a more in depth
+usage overview, and the \fBmongoexport\fP document for more
 information regarding \fBmongoexport\fP, which
 provides the inverse "importing" capability.
-.IP Note
-Do not use \fI\%mongoimport\fP and \fBmongoexport\fP for
+.sp
+\fBNOTE:\fP
+.INDENT 0.0
+.INDENT 3.5
+Do not use \fBmongoimport\fP and \fBmongoexport\fP for
 full instance, production backups because they will not reliably capture data type
 information. Use \fBmongodump\fP and \fBmongorestore\fP as
-described in "\fB/administration/backups\fP" for this kind of
+described in http://docs.mongodb.org/manual/core/backups for this kind of
 functionality.
-.RE
+.UNINDENT
+.UNINDENT
 .SH OPTIONS
+.INDENT 0.0
+.TP
+.B mongoimport
+.UNINDENT
 .INDENT 0.0
 .TP
 .B mongoimport
@@ -61,35 +69,39 @@ Returns a basic help and usage text.
 .B \-\-verbose, \-v
 Increases the amount of internal reporting returned on the command
 line. Increase the verbosity with the \fB\-v\fP form by including
-the option multiple times, (e.g. \fB\-vvvvv\fP.)
+the option multiple times, (e.g. \fB\-vvvvv\fP\&.)
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-version
-Returns the version of the \fI\%mongoimport\fP program.
+Returns the version of the \fBmongoimport\fP program.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-host <hostname><:port>, \-h
 Specifies a resolvable hostname for the \fBmongod\fP to which
-you want to restore the database. By default \fI\%mongoimport\fP
+you want to restore the database. By default \fBmongoimport\fP
 will attempt to connect to a MongoDB process ruining on the
-localhost port numbered \fB27017\fP.
+localhost port numbered \fB27017\fP\&.
 .sp
 Optionally, specify a port number to connect a MongoDB instance
-running on a port other than \fB27017\fP.
+running on a port other than \fB27017\fP\&.
 .sp
-To connect to a replica set, use the \fI\%--host\fP argument with a
+To connect to a replica set, use the \fI\-\-host\fP argument with a
 setname, followed by a slash and a comma\-separated list of host and
-port names. \fI\%mongoimport\fP will, given the seed of at least
-one connected set member, connect to primary node of that set. This
+port names. \fBmongoimport\fP will, given the seed of at least
+one connected set member, connect to the \fIprimary\fP of that set. This
 option would resemble:
+.INDENT 7.0
+.INDENT 3.5
 .sp
 .nf
 .ft C
 \-\-host repl0/mongo0.example.net,mongo0.example.net:27018,mongo1.example.net,mongo2.example.net
 .ft P
 .fi
+.UNINDENT
+.UNINDENT
 .sp
 You can always connect directly to a single MongoDB instance by
 specifying the host and port number directly.
@@ -99,32 +111,38 @@ specifying the host and port number directly.
 .B \-\-port <port>
 Specifies the port number, if the MongoDB instance is not running on
 the standard port. (i.e. \fB27017\fP) You may also specify a port
-number using the \fI\%mongoimport --host\fP command.
+number using the \fImongoimport \-\-host\fP command.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-ipv6
-Enables IPv6 support that allows \fI\%mongoimport\fP to connect
+Enables IPv6 support that allows \fBmongoimport\fP to connect
 to the MongoDB instance using an IPv6 network. All MongoDB programs
-and processes, including \fI\%mongoimport\fP, disable IPv6
+and processes, including \fBmongoimport\fP, disable IPv6
 support by default.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-ssl
 New in version 2.4: MongoDB added support for SSL connections to \fBmongod\fP
-instances in mongoimport.
-.IP Note
+instances in mongoimport\&.
+
+.sp
+\fBNOTE:\fP
+.INDENT 7.0
+.INDENT 3.5
 SSL support in mongoimport is not compiled into the default
-distribution of MongoDB. See \fB/administration/ssl\fP for more
-information on SSL and MongoDB.
+distribution of MongoDB. See
+http://docs.mongodb.org/manual/tutorial/configure\-ssl for more information on SSL
+and MongoDB.
 .sp
 Additionally, mongoimport does not support connections to
 \fBmongod\fP instances that require client certificate
 validation.
-.RE
+.UNINDENT
+.UNINDENT
 .sp
-Allows \fI\%mongoimport\fP to connect to \fBmongod\fP
+Allows \fBmongoimport\fP to connect to \fBmongod\fP
 instance over an SSL connection.
 .UNINDENT
 .INDENT 0.0
@@ -132,70 +150,74 @@ instance over an SSL connection.
 .B \-\-username <username>, \-u <username>
 Specifies a username to authenticate to the MongoDB instance, if your
 database requires authentication. Use in conjunction with the
-\fI\%mongoimport --password\fP option to supply a password.
+\fImongoimport \-\-password\fP option to supply a password.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-password <password>, \-p <password>
 Specifies a password to authenticate to the MongoDB instance. Use
-in conjunction with the \fI\%mongoimport --username\fP option to
+in conjunction with the \fImongoimport \-\-username\fP option to
 supply a username.
 .sp
-If you specify a \fI\%--username\fP
-without the \fI\%--password\fP option, \fI\%mongoimport\fP
-will prompt for a password interactively.
+If you specify a \fI\-\-username\fP and
+do not pass an argument to \fI\-\-password\fP,
+\fBmongoimport\fP will prompt for a password interactively. If
+you do not specify a password on the command line,
+\fI\-\-password\fP must be the last option.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-authenticationDatabase <dbname>
 New in version 2.4.
+
 .sp
 Specifies the database that holds the user\(aqs (e.g
-\fI\%--username\fP) credentials.
+\fI\-\-username\fP) credentials.
 .sp
-By default, \fI\%mongoimport\fP assumes that the database specified to the
-\fI\%--db\fP argument holds the user\(aqs credentials, unless you
-specify \fI\%--authenticationDatabase\fP.
+By default, \fBmongoimport\fP assumes that the database specified to the
+\fI\-\-db\fP argument holds the user\(aqs credentials, unless you
+specify \fI\-\-authenticationDatabase\fP\&.
 .sp
 See \fBuserSource\fP,
-\fB/reference/privilege\-documents\fP and
-\fB/reference/user\-privileges\fP for more information about
+http://docs.mongodb.org/manual/reference/privilege\-documents and
+http://docs.mongodb.org/manual/reference/user\-privileges for more information about
 delegated authentication in MongoDB.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-authenticationMechanism <name>
 New in version 2.4.
+
 .sp
 Specifies the authentication mechanism. By default, the
 authentication mechanism is \fBMONGODB\-CR\fP, which is the MongoDB
-challenge/response authentication mechanism. In the MongoDB Subscriber Edition,
-\fI\%mongoimport\fP also includes support for \fBGSSAPI\fP to handle
+challenge/response authentication mechanism. In MongoDB Enterprise,
+\fBmongoimport\fP also includes support for \fBGSSAPI\fP to handle
 Kerberos authentication.
 .sp
-See \fB/tutorial/control\-access\-to\-mongodb\-with\-kerberos\-authentication\fP
+See http://docs.mongodb.org/manual/tutorial/control\-access\-to\-mongodb\-with\-kerberos\-authentication
 for more information about Kerberos authentication.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-dbpath <path>
 Specifies the directory of the MongoDB data files. If used, the
-\fI\%--dbpath\fP option enables
-\fI\%mongoimport\fP to attach directly to local data files and
-insert the data without the \fBmongod\fP. To run with
-\fB\-\-dbpath\fP, \fI\%mongoimport\fP needs to lock access to the
+\fI\-\-dbpath\fP option enables
+\fBmongoimport\fP to attach directly to local data files and
+insert the data without the \fBmongod\fP\&. To run with
+\fB\-\-dbpath\fP, \fBmongoimport\fP needs to lock access to the
 data directory: as a result, no \fBmongod\fP can access the
 same path while the process runs.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-directoryperdb
-Use the \fI\%--directoryperdb\fP in conjunction with the
+Use the \fI\-\-directoryperdb\fP in conjunction with the
 corresponding option to \fBmongod\fP, which allows
-\fI\%mongoimport\fP to import data into MongoDB instances that
+\fBmongoimport\fP to import data into MongoDB instances that
 have every database\(aqs files saved in discrete directories on the
 disk. This option is only relevant when specifying the
-\fI\%--dbpath\fP option.
+\fI\-\-dbpath\fP option.
 .UNINDENT
 .INDENT 0.0
 .TP
@@ -203,33 +225,24 @@ disk. This option is only relevant when specifying the
 Allows \fBmongoexport\fP write to the durability
 \fIjournal\fP to ensure that the data files will remain in a
 consistent state during the write process. This option is only
-relevant when specifying the \fI\%--dbpath\fP option.
+relevant when specifying the \fI\-\-dbpath\fP option.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-db <db>, \-d <db>
-Use the \fI\%--db\fP option to specify a database for
-\fI\%mongoimport\fP to restore data. If you do not specify a
-\fB<db>\fP, \fI\%mongoimport\fP creates new databases that
-correspond to the databases where data originated and data may be
-overwritten. Use this option to restore data into a MongoDB
-instance that already has data, or to restore only some data in the
-specified backup.
+Use the \fI\-\-db\fP option to specify a database for
+\fBmongoimport\fP to import data.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-collection <collection>, \-c <collection>
-Use the \fI\%--collection\fP option to specify a collection for
-\fBmongorestore\fP to restore. If you do not specify a
-\fB<collection>\fP, \fI\%mongoimport\fP imports all collections
-created. Existing data may be overwritten. Use this option to
-restore data into a MongoDB instance that already has data, or to
-restore only some data in the specified imported data set.
+Use the \fI\-\-collection\fP option to specify a collection for
+\fBmongoimport\fP to import.
 .UNINDENT
 .INDENT 0.0
 .TP
-.B \-\-fields <field1<,filed2>>, \-f <field1[,filed2]>
-Specify a comma seperatedlist of field names when importing
+.B \-\-fields <field1<,field2>>, \-f <field1[,field2]>
+Specify a comma separated list of field names when importing
 \fIcsv\fP or \fItsv\fP files that do not have field names in
 the first (i.e. header) line of the file.
 .UNINDENT
@@ -237,7 +250,7 @@ the first (i.e. header) line of the file.
 .TP
 .B \-\-fieldFile <filename>
 As an alternative to \fI\%--fields\fP the \fI\%--fieldFile\fP
-option allows you to specify a file (e.g. \fB<file>\(ga\fP) to that
+option allows you to specify a file (e.g. \fB<file>\fP) to that
 holds a list of field names if your \fIcsv\fP or \fItsv\fP
 file does not include field names in the first (i.e. header) line
 of the file. Place one field per line.
@@ -246,7 +259,7 @@ of the file. Place one field per line.
 .TP
 .B \-\-ignoreBlanks
 In \fIcsv\fP and \fItsv\fP exports, ignore empty fields. If not
-specified, \fI\%mongoimport\fP creates fields without values in
+specified, \fBmongoimport\fP creates fields without values in
 imported documents.
 .UNINDENT
 .INDENT 0.0
@@ -260,22 +273,22 @@ Declare the type of export format to import. The default format is
 .TP
 .B \-\-file <filename>
 Specify the location of a file containing the data to
-import. \fI\%mongoimport\fP will read data from standard input
+import. \fBmongoimport\fP will read data from standard input
 (e.g. "stdin.") if you do not specify a file.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-drop
-Modifies the importation procedure so that the target instance
-drops every collection before restoring the collection from the
-dumped backup.
+Modifies the import process so that the target instance
+drops every collection before importing the collection from the
+input.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-headerline
-If using "\fI\%--type csv\fP" or
-"\fI\%--type tsv\fP," use the first line as
-field names. Otherwise, \fI\%mongoimport\fP will import the first
+If using "\fI\-\-type csv\fP" or
+"\fI\-\-type tsv\fP," use the first line as
+field names. Otherwise, \fBmongoimport\fP will import the first
 line as a distinct document.
 .UNINDENT
 .INDENT 0.0
@@ -286,14 +299,14 @@ database if they match an imported object, while inserting all
 other objects.
 .sp
 If you do not specify a field or fields using the
-\fI\%--upsertFields\fP \fI\%mongoimport\fP will upsert on the
+\fI\%--upsertFields\fP \fBmongoimport\fP will upsert on the
 basis of the \fB_id\fP field.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-upsertFields <field1[,field2]>
 Specifies a list of fields for the query portion of the
-\fIupsert\fP. Use this option if the \fB_id\fP fields in the
+\fIupsert\fP\&. Use this option if the \fB_id\fP fields in the
 existing documents don\(aqt match the field in the document, but
 another field or field combination can uniquely identify
 documents as a basis for performing upsert operations.
@@ -305,16 +318,18 @@ field or fields.
 .TP
 .B \-\-stopOnError
 New in version 2.2.
+
 .sp
-Forces \fI\%mongoimport\fP to halt the import operation at the
+Forces \fBmongoimport\fP to halt the import operation at the
 first error rather than continuing the operation despite errors.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-jsonArray
 Changed in version 2.2: The limit on document size increased from 4MB to 16MB.
+
 .sp
-Accept import of data expressed with multiple MongoDB document
+Accept import of data expressed with multiple MongoDB documents
 within a single \fIJSON\fP array.
 .sp
 Use in conjunction with \fImongoexport \-\-jsonArray\fP to
@@ -323,57 +338,73 @@ imports of 16 MB or smaller.
 .UNINDENT
 .SH USAGE
 .sp
-In this example, \fI\%mongoimport\fP imports the \fIcsv\fP
+In this example, \fBmongoimport\fP imports the \fIcsv\fP
 formatted data in the \fB/opt/backups/contacts.csv\fP into the
 collection \fBcontacts\fP in the \fBusers\fP database on the MongoDB
-instance running on the localhost port numbered \fB27017\fP.
+instance running on the localhost port numbered \fB27017\fP\&.
+.INDENT 0.0
+.INDENT 3.5
 .sp
 .nf
 .ft C
 mongoimport \-\-db users \-\-collection contacts \-\-type csv \-\-file /opt/backups/contacts.csv
 .ft P
 .fi
+.UNINDENT
+.UNINDENT
 .sp
-In the following example, \fI\%mongoimport\fP imports the data in
+In the following example, \fBmongoimport\fP imports the data in
 the \fIJSON\fP formatted file \fBcontacts.json\fP into the collection
 \fBcontacts\fP on the MongoDB instance running on the localhost port
 number 27017. Journaling is explicitly enabled.
+.INDENT 0.0
+.INDENT 3.5
 .sp
 .nf
 .ft C
-mongoimport \-\-collection contacts \-\-file contacts.json \-\-journal
+mongoimport \-\-collection contacts \-\-file contacts.json
 .ft P
 .fi
+.UNINDENT
+.UNINDENT
 .sp
-In the next example, \fI\%mongoimport\fP takes data passed to it on
+In the next example, \fBmongoimport\fP takes data passed to it on
 standard input (i.e. with a \fB|\fP pipe.)  and imports it into the
 collection \fBcontacts\fP in the \fBsales\fP database is the
-MongoDB datafiles located at \fB/srv/mongodb/\fP. if the import process
-encounters an error, the \fI\%mongoimport\fP will halt because of
-the \fI\%--stopOnError\fP option.
+MongoDB datafiles located at \fB/srv/mongodb/\fP\&. if the import process
+encounters an error, the \fBmongoimport\fP will halt because of
+the \fI\-\-stopOnError\fP option.
+.INDENT 0.0
+.INDENT 3.5
 .sp
 .nf
 .ft C
 mongoimport \-\-db sales \-\-collection contacts \-\-stopOnError \-\-dbpath /srv/mongodb/
 .ft P
 .fi
+.UNINDENT
+.UNINDENT
 .sp
-In the final example, \fI\%mongoimport\fP imports data from the
+In the final example, \fBmongoimport\fP imports data from the
 file \fB/opt/backups/mdb1\-examplenet.json\fP into the collection
 \fBcontacts\fP within the database \fBmarketing\fP on a remote MongoDB
-database. This \fI\%mongoimport\fP accesses the \fBmongod\fP
+database. This \fBmongoimport\fP accesses the \fBmongod\fP
 instance running on the host \fBmongodb1.example.net\fP over port
 \fB37017\fP, which requires the username \fBuser\fP and the password
-\fBpass\fP.
+\fBpass\fP\&.
+.INDENT 0.0
+.INDENT 3.5
 .sp
 .nf
 .ft C
 mongoimport \-\-host mongodb1.example.net \-\-port 37017 \-\-username user \-\-password pass \-\-collection contacts \-\-db marketing \-\-file /opt/backups/mdb1\-examplenet.json
 .ft P
 .fi
+.UNINDENT
+.UNINDENT
 .SH AUTHOR
 MongoDB Documentation Project
 .SH COPYRIGHT
-2011-2013, 10gen, Inc.
+2011-2013, MongoDB, Inc.
 .\" Generated by docutils manpage writer.
 .

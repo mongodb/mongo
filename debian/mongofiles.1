@@ -1,4 +1,6 @@
-.TH "MONGOFILES" "1" "March 14, 2013" "2.2.3" "mongodb-manual"
+.\" Man page generated from reStructuredText.
+.
+.TH "MONGOFILES" "1" "October 03, 2013" "2.4" "mongodb-manual"
 .SH NAME
 mongofiles \- MongoDB
 .
@@ -28,82 +30,56 @@ level margin: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .\" new: \\n[rst2man-indent\\n[rst2man-indent-level]]
 .in \\n[rst2man-indent\\n[rst2man-indent-level]]u
 ..
-.\" Man page generated from reStructuredText.
-.
 .SH SYNOPSIS
 .sp
-The \fI\%mongofiles\fP utility makes it possible to manipulate files
+The \fBmongofiles\fP utility makes it possible to manipulate files
 stored in your MongoDB instance in \fIGridFS\fP objects from the
 command line. It is particularly useful as it provides an interface
 between objects stored in your file system and GridFS.
 .sp
-All \fI\%mongofiles\fP commands take arguments in three groups:
+All \fBmongofiles\fP commands have the following form:
 .INDENT 0.0
-.IP 1. 3
-\fI\%Options\fP. You may use one or more of
-these options to control the behavior of \fI\%mongofiles\fP.
-.IP 2. 3
-\fI\%Commands\fP. Use one of these commands to
-determine the action of \fI\%mongofiles\fP.
-.IP 3. 3
-A file name representing either the name of a file on your system\(aqs
-file system, a GridFS object.
+.INDENT 3.5
+.sp
+.nf
+.ft C
+mongofiles <options> <commands> <filename>
+.ft P
+.fi
+.UNINDENT
 .UNINDENT
 .sp
-\fI\%mongofiles\fP, like \fBmongodump\fP, \fBmongoexport\fP,
+The components of the \fBmongofiles\fP command are:
+.INDENT 0.0
+.IP 1. 3
+\fI\%Options\fP\&. You may use one or more of
+these options to control the behavior of \fBmongofiles\fP\&.
+.IP 2. 3
+\fI\%Commands\fP\&. Use one of these commands to
+determine the action of \fBmongofiles\fP\&.
+.IP 3. 3
+A filename which is either: the name of a file on your local\(aqs file
+system, or a GridFS object.
+.UNINDENT
+.sp
+\fBmongofiles\fP, like \fBmongodump\fP, \fBmongoexport\fP,
 \fBmongoimport\fP, and \fBmongorestore\fP, can access data
 stored in a MongoDB data directory without requiring a running
 \fBmongod\fP instance, if no other \fBmongod\fP is running.
-.IP Note
-For \fIreplica sets\fP, \fI\%mongofiles\fP can
-only read from the set\(aqs \(aq\fIprimary\fP.
-.RE
-.SH COMMANDS
+.sp
+\fBIMPORTANT:\fP
+.INDENT 0.0
+.INDENT 3.5
+For \fIreplica sets\fP,
+\fBmongofiles\fP can only read from the set\(aqs
+\(aq\fIprimary\fP\&.
+.UNINDENT
+.UNINDENT
+.SH OPTIONS
 .INDENT 0.0
 .TP
 .B mongofiles
 .UNINDENT
-.INDENT 0.0
-.TP
-.B list <prefix>
-Lists the files in the GridFS store. The characters specified after
-\fBlist\fP (e.g. \fB<prefix>\fP) optionally limit the list of
-returned items to files that begin with that string of characters.
-.UNINDENT
-.INDENT 0.0
-.TP
-.B search <string>
-Lists the files in the GridFS store with names that match any
-portion of \fB<string>\fP.
-.UNINDENT
-.INDENT 0.0
-.TP
-.B put <filename>
-Copy the specified file from the local file system into GridFS
-storage.
-.sp
-Here, \fB<filename>\fP refers to the name the object will have in
-GridFS, and \fI\%mongofiles\fP assumes that this reflects the name the
-file has on the local file system. If the local filename is
-different use the \fI\%mongofiles --local\fP option.
-.UNINDENT
-.INDENT 0.0
-.TP
-.B get <filename>
-Copy the specified file from GridFS storage to the local file
-system.
-.sp
-Here, \fB<filename>\fP refers to the name the object will have in
-GridFS, and \fI\%mongofiles\fP assumes that this reflects the name the
-file has on the local file system. If the local filename is
-different use the \fI\%mongofiles --local\fP option.
-.UNINDENT
-.INDENT 0.0
-.TP
-.B delete <filename>
-Delete the specified file from GridFS storage.
-.UNINDENT
-.SH OPTIONS
 .INDENT 0.0
 .TP
 .B \-\-help
@@ -114,20 +90,20 @@ Returns a basic help and usage text.
 .B \-\-verbose, \-v
 Increases the amount of internal reporting returned on the command
 line. Increase the verbosity with the \fB\-v\fP form by including
-the option multiple times, (e.g. \fB\-vvvvv\fP.)
+the option multiple times, (e.g. \fB\-vvvvv\fP\&.)
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-version
-Returns the version of the \fI\%mongofiles\fP utility.
+Returns the version of the \fBmongofiles\fP utility.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-host <hostname><:port>
 Specifies a resolvable hostname for the \fBmongod\fP that
-holds your GridFS system. By default \fI\%mongofiles\fP attempts
+holds your GridFS system. By default \fBmongofiles\fP attempts
 to connect to a MongoDB process ruining on the localhost port
-number \fB27017\fP.
+number \fB27017\fP\&.
 .sp
 Optionally, specify a port number to connect a MongoDB instance
 running on a port other than 27017.
@@ -137,32 +113,38 @@ running on a port other than 27017.
 .B \-\-port <port>
 Specifies the port number, if the MongoDB instance is not running on
 the standard port. (i.e. \fB27017\fP) You may also specify a port
-number using the \fI\%mongofiles --host\fP command.
+number using the \fImongofiles \-\-host\fP command.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-ipv6
-Enables IPv6 support that allows \fI\%mongofiles\fP to connect
+Enables IPv6 support that allows \fBmongofiles\fP to connect
 to the MongoDB instance using an IPv6 network. All MongoDB programs
-and processes, including \fI\%mongofiles\fP, disable IPv6
+and processes, including \fBmongofiles\fP, disable IPv6
 support by default.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-ssl
 New in version 2.4: MongoDB added support for SSL connections to \fBmongod\fP
-instances in mongofiles.
-.IP Note
+instances in mongofiles\&.
+
+.sp
+\fBNOTE:\fP
+.INDENT 7.0
+.INDENT 3.5
 SSL support in mongofiles is not compiled into the default
-distribution of MongoDB. See \fB/administration/ssl\fP for more
-information on SSL and MongoDB.
+distribution of MongoDB. See
+http://docs.mongodb.org/manual/tutorial/configure\-ssl for more information on SSL
+and MongoDB.
 .sp
 Additionally, mongofiles does not support connections to
 \fBmongod\fP instances that require client certificate
 validation.
-.RE
+.UNINDENT
+.UNINDENT
 .sp
-Allows \fI\%mongofiles\fP to connect to \fBmongod\fP
+Allows \fBmongofiles\fP to connect to \fBmongod\fP
 instance over an SSL connection.
 .UNINDENT
 .INDENT 0.0
@@ -170,82 +152,86 @@ instance over an SSL connection.
 .B \-\-username <username>, \-u <username>
 Specifies a username to authenticate to the MongoDB instance, if your
 database requires authentication. Use in conjunction with the
-\fI\%mongofiles --password\fP option to supply a password.
+\fImongofiles \-\-password\fP option to supply a password.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-password <password>, \-p <password>
 Specifies a password to authenticate to the MongoDB instance. Use
-in conjunction with the \fI\%mongofiles --username\fP option to
+in conjunction with the \fImongofiles \-\-username\fP option to
 supply a username.
 .sp
-If you specify a \fI\%--username\fP
-without the \fI\%--password\fP option, \fI\%mongofiles\fP
-will prompt for a password interactively.
+If you specify a \fI\-\-username\fP and
+do not pass an argument to \fI\-\-password\fP,
+\fBmongofiles\fP will prompt for a password interactively. If
+you do not specify a password on the command line,
+\fI\-\-password\fP must be the last argument specified.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-authenticationDatabase <dbname>
 New in version 2.4.
+
 .sp
 Specifies the database that holds the user\(aqs (e.g
-\fI\%--username\fP) credentials.
+\fI\-\-username\fP) credentials.
 .sp
-By default, \fI\%mongofiles\fP assumes that the database specified to the
-\fI\%--db\fP argument holds the user\(aqs credentials, unless you
-specify \fI\%--authenticationDatabase\fP.
+By default, \fBmongofiles\fP assumes that the database specified to the
+\fI\-\-db\fP argument holds the user\(aqs credentials, unless you
+specify \fI\-\-authenticationDatabase\fP\&.
 .sp
 See \fBuserSource\fP,
-\fB/reference/privilege\-documents\fP and
-\fB/reference/user\-privileges\fP for more information about
+http://docs.mongodb.org/manual/reference/privilege\-documents and
+http://docs.mongodb.org/manual/reference/user\-privileges for more information about
 delegated authentication in MongoDB.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-authenticationMechanism <name>
 New in version 2.4.
+
 .sp
 Specifies the authentication mechanism. By default, the
 authentication mechanism is \fBMONGODB\-CR\fP, which is the MongoDB
-challenge/response authentication mechanism. In the MongoDB Subscriber Edition,
-\fI\%mongofiles\fP also includes support for \fBGSSAPI\fP to handle
+challenge/response authentication mechanism. In MongoDB Enterprise,
+\fBmongofiles\fP also includes support for \fBGSSAPI\fP to handle
 Kerberos authentication.
 .sp
-See \fB/tutorial/control\-access\-to\-mongodb\-with\-kerberos\-authentication\fP
+See http://docs.mongodb.org/manual/tutorial/control\-access\-to\-mongodb\-with\-kerberos\-authentication
 for more information about Kerberos authentication.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-dbpath <path>
 Specifies the directory of the MongoDB data files. If used, the
-\fI\%--dbpath\fP option enables \fI\%mongofiles\fP to attach directly to
+\fI\-\-dbpath\fP option enables \fBmongofiles\fP to attach directly to
 local data files interact with the GridFS data without the
-\fBmongod\fP. To run with \fI\%--dbpath\fP, \fI\%mongofiles\fP needs to lock
+\fBmongod\fP\&. To run with \fI\-\-dbpath\fP, \fBmongofiles\fP needs to lock
 access to the data directory: as a result, no \fBmongod\fP can access
 the same path while the process runs.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-directoryperdb
-Use the \fI\%--directoryperdb\fP in conjunction with the corresponding
-option to \fBmongod\fP, which allows \fI\%mongofiles\fP when
-running with the \fI\%--dbpath\fP option and MongoDB uses an
+Use the \fI\-\-directoryperdb\fP in conjunction with the corresponding
+option to \fBmongod\fP, which allows \fBmongofiles\fP when
+running with the \fI\-\-dbpath\fP option and MongoDB uses an
 on\-disk format where every database has a distinct
 directory. This option is only relevant when specifying the
-\fI\%--dbpath\fP option.
+\fI\-\-dbpath\fP option.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-journal
-Allows \fI\%mongofiles\fP operations to use the durability
-\fIjournal\fP when running with \fI\%--dbpath\fP
+Allows \fBmongofiles\fP operations to use the durability
+\fIjournal\fP when running with \fI\-\-dbpath\fP
 to ensure that the database maintains a recoverable state. This
-forces \fI\%mongofiles\fP to record all data on disk regularly.
+forces \fBmongofiles\fP to record all data on disk regularly.
 .UNINDENT
 .INDENT 0.0
 .TP
 .B \-\-db <db>, \-d <db>
-Use the \fI\%--db\fP option to specify the MongoDB database that stores
+Use the \fI\-\-db\fP option to specify the MongoDB database that stores
 or will store the GridFS files.
 .UNINDENT
 .INDENT 0.0
@@ -262,7 +248,7 @@ operations.
 .sp
 In the \fBmongofiles put\fP and \fBmongofiles get\fP
 commands the required \fB<filename>\fP modifier refers to the name
-the object will have in GridFS. \fI\%mongofiles\fP assumes that
+the object will have in GridFS. \fBmongofiles\fP assumes that
 this reflects the file\(aqs name on the local file
 system. This setting overrides this default.
 .UNINDENT
@@ -270,7 +256,7 @@ system. This setting overrides this default.
 .TP
 .B \-\-type <MIME>, t <MIME>
 Provides the ability to specify a \fIMIME\fP type to describe the
-file inserted into GridFS storage. \fI\%mongofiles\fP omits this
+file inserted into GridFS storage. \fBmongofiles\fP omits this
 option in the default operation.
 .sp
 Use only with \fBmongofiles put\fP operations.
@@ -285,21 +271,68 @@ adding an additional object with the same name.
 In the default operation, files will not be overwritten by a
 \fBmongofiles put\fP option.
 .UNINDENT
-.SH USE
+.SH COMMANDS
+.INDENT 0.0
+.TP
+.B list <prefix>
+Lists the files in the GridFS store. The characters specified after
+\fBlist\fP (e.g. \fB<prefix>\fP) optionally limit the list of
+returned items to files that begin with that string of characters.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B search <string>
+Lists the files in the GridFS store with names that match any
+portion of \fB<string>\fP\&.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B put <filename>
+Copy the specified file from the local file system into GridFS
+storage.
+.sp
+Here, \fB<filename>\fP refers to the name the object will have in
+GridFS, and \fBmongofiles\fP assumes that this reflects the name the
+file has on the local file system. If the local filename is
+different use the \fImongofiles \-\-local\fP option.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B get <filename>
+Copy the specified file from GridFS storage to the local file
+system.
+.sp
+Here, \fB<filename>\fP refers to the name the object will have in
+GridFS, and \fBmongofiles\fP assumes that this reflects the name the
+file has on the local file system. If the local filename is
+different use the \fImongofiles \-\-local\fP option.
+.UNINDENT
+.INDENT 0.0
+.TP
+.B delete <filename>
+Delete the specified file from GridFS storage.
+.UNINDENT
+.SH EXAMPLES
 .sp
 To return a list of all files in a \fIGridFS\fP collection in the
 \fBrecords\fP database, use the following invocation at the system shell:
+.INDENT 0.0
+.INDENT 3.5
 .sp
 .nf
 .ft C
 mongofiles \-d records list
 .ft P
 .fi
+.UNINDENT
+.UNINDENT
 .sp
-This \fI\%mongofiles\fP instance will connect to the
+This \fBmongofiles\fP instance will connect to the
 \fBmongod\fP instance running on the \fB27017\fP localhost
 interface to specify the same operation on a different port or
 hostname, and issue a command that resembles one of the following:
+.INDENT 0.0
+.INDENT 3.5
 .sp
 .nf
 .ft C
@@ -308,58 +341,80 @@ mongofiles \-\-hostname db1.example.net \-d records list
 mongofiles \-\-hostname db1.example.net \-\-port 37017 \-d records list
 .ft P
 .fi
+.UNINDENT
+.UNINDENT
 .sp
 Modify any of the following commands as needed if you\(aqre connecting
 the \fBmongod\fP instances on different ports or hosts.
 .sp
 To upload a file named \fB32\-corinth.lp\fP to the GridFS collection in
 the \fBrecords\fP database, you can use the following command:
+.INDENT 0.0
+.INDENT 3.5
 .sp
 .nf
 .ft C
 mongofiles \-d records put 32\-corinth.lp
 .ft P
 .fi
+.UNINDENT
+.UNINDENT
 .sp
 To delete the \fB32\-corinth.lp\fP file from this GridFS collection in
 the \fBrecords\fP database, you can use the following command:
+.INDENT 0.0
+.INDENT 3.5
 .sp
 .nf
 .ft C
 mongofiles \-d records delete 32\-corinth.lp
 .ft P
 .fi
+.UNINDENT
+.UNINDENT
 .sp
 To search for files in the GridFS collection in the \fBrecords\fP
 database that have the string \fBcorinth\fP in their names, you can use
 following command:
+.INDENT 0.0
+.INDENT 3.5
 .sp
 .nf
 .ft C
 mongofiles \-d records search corinth
 .ft P
 .fi
+.UNINDENT
+.UNINDENT
 .sp
 To list all files in the GridFS collection in the \fBrecords\fP database
 that begin with the string \fB32\fP, you can use the following command:
+.INDENT 0.0
+.INDENT 3.5
 .sp
 .nf
 .ft C
 mongofiles \-d records list 32
 .ft P
 .fi
+.UNINDENT
+.UNINDENT
 .sp
 To fetch the file from the GridFS collection in the \fBrecords\fP
 database named \fB32\-corinth.lp\fP, you can use the following command:
+.INDENT 0.0
+.INDENT 3.5
 .sp
 .nf
 .ft C
 mongofiles \-d records get 32\-corinth.lp
 .ft P
 .fi
+.UNINDENT
+.UNINDENT
 .SH AUTHOR
 MongoDB Documentation Project
 .SH COPYRIGHT
-2011-2013, 10gen, Inc.
+2011-2013, MongoDB, Inc.
 .\" Generated by docutils manpage writer.
 .
