@@ -194,6 +194,14 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	tracking = 0;
 
 	/*
+	 * Update the global oldest ID so we do all possible cleanup.
+	 *
+	 * This is particularly important for compact, so that all dirty pages
+	 * can be fully written.
+	 */
+	__wt_txn_refresh_force(session);
+
+	/*
 	 * Only one checkpoint can be active at a time, and checkpoints must run
 	 * in the same order as they update the metadata, also, there are other
 	 * operations (for example, Btree compaction) that must serialize with
