@@ -13,7 +13,7 @@ static void __rec_excl_clear(WT_SESSION_IMPL *);
 static void __rec_page_clean_update(WT_SESSION_IMPL *, WT_REF *);
 static int  __rec_page_dirty_update(WT_SESSION_IMPL *, WT_REF *, WT_PAGE *);
 static int  __rec_review(
-    WT_SESSION_IMPL *, WT_REF *, WT_PAGE *, int, int, int, int *);
+    WT_SESSION_IMPL *, WT_REF *, WT_PAGE *, int, int, int, int *, int *);
 static void __rec_root_update(WT_SESSION_IMPL *);
 
 /*
@@ -26,13 +26,13 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, int exclusive)
 	WT_DECL_RET;
 	WT_PAGE_MODIFY *mod;
 	WT_REF *parent_ref;
-	int merge, inmem_split;
+	int merge, inmem_split, istree;
 
 	WT_VERBOSE_RET(session, evict,
 	    "page %p (%s)", page, __wt_page_type_string(page->type));
 
 	WT_ASSERT(session, session->excl_next == 0);
-	inmem_split = 0;
+	inmem_split = istree = 0;
 
 	/*
 	 * If we get a split-merge page during normal eviction, try to collapse
@@ -59,8 +59,8 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, int exclusive)
 	 * hazard pointers in that case.
 	 */
 	parent_ref = page->ref;
-	WT_ERR(__rec_review(
-	    session, parent_ref, page, exclusive, merge, 1, &inmem_split));
+	WT_ERR(__rec_review(session,
+	    parent_ref, page, exclusive, merge, 1, &inmem_split, &istree));
 
 	/* Try to merge internal pages. */
 	if (merge)
@@ -102,9 +102,6 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, int exclusive)
 		else
 			__rec_page_clean_update(session, parent_ref);
 
-		/* Discard the page. */
-		__wt_page_out(session, &page);
-
 		WT_CSTAT_INCR(session, cache_eviction_clean);
 		WT_DSTAT_INCR(session, cache_eviction_clean);
 	} else {
@@ -114,12 +111,16 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, int exclusive)
 			WT_ERR(__rec_page_dirty_update(
 			    session, parent_ref, page));
 
-		/* Discard the tree rooted in this page. */
-		__rec_discard_tree(session, page, exclusive);
-
 		WT_CSTAT_INCR(session, cache_eviction_dirty);
 		WT_DSTAT_INCR(session, cache_eviction_dirty);
 	}
+
+	/* Discard the page or tree rooted in this page. */
+	if (istree)
+		__rec_discard_tree(session, page, exclusive);
+	else
+		__wt_page_out(session, &page);
+
 	if (0) {
 err:		/*
 		 * If unable to evict this page, release exclusive reference(s)
@@ -286,8 +287,8 @@ __rec_discard_tree(WT_SESSION_IMPL *session, WT_PAGE *page, int exclusive)
  *	hazard pointer.
  */
 static int
-__rec_review(WT_SESSION_IMPL *session, WT_REF *ref,
-    WT_PAGE *page, int exclusive, int merge, int top, int *inmem_split)
+__rec_review(WT_SESSION_IMPL *session, WT_REF *ref, WT_PAGE *page,
+    int exclusive, int merge, int top, int *inmem_split, int *istree)
 {
 	WT_BTREE *btree;
 	WT_DECL_RET;
@@ -296,7 +297,6 @@ __rec_review(WT_SESSION_IMPL *session, WT_REF *ref,
 	uint32_t i;
 
 	btree = S2BT(session);
-	*inmem_split = 0;
 
 	/*
 	 * Get exclusive access to the page if our caller doesn't have the tree
@@ -327,9 +327,15 @@ __rec_review(WT_SESSION_IMPL *session, WT_REF *ref,
 			case WT_REF_DELETED:		/* On-disk, deleted */
 				break;
 			case WT_REF_MEM:		/* In-memory */
+				/*
+				 * Tell our caller if there's a subtree so we
+				 * know to do a full walk when discarding the
+				 * page.
+				 */
+				*istree = 1;
 				WT_RET(__rec_review(
 				    session, ref, ref->page,
-				    exclusive, merge, 0, inmem_split));
+				    exclusive, merge, 0, inmem_split, istree));
 				break;
 			case WT_REF_EVICT_WALK:		/* Walk point */
 			case WT_REF_LOCKED:		/* Being evicted */
@@ -449,7 +455,12 @@ ckpt:		WT_CSTAT_INCR(session, cache_eviction_checkpoint);
 		 * If reconciliation failed due to active modifications and
 		 * the page is a lot larger than the maximum allowed, it is
 		 * likely that we are having trouble reconciling it due to
-		 * contention. Attempt to split the page in memory.
+		 * contention, attempt to split the page in memory.
+		 *
+		 * Note, we won't be here if recursively descending a tree of
+		 * pages: dirty row-store leaf pages can't be merged into their
+		 * parents, which means if top wasn't true in this test, we'd
+		 * have returned busy before attempting reconciliation.
 		 */
 		if (ret == EBUSY &&
 		    page->type == WT_PAGE_ROW_LEAF &&
