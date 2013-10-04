@@ -341,6 +341,10 @@ sh.removeShardTag = function( shard, tag ) {
 }
 
 sh.addTagRange = function( ns, min, max, tag ) {
+    if ( bsonWoCompare( min, max ) == 0 ) {
+        throw new Error("min and max cannot be the same");
+    }
+
     var config = db.getSisterDB( "config" );
     config.tags.update( {_id: { ns : ns , min : min } } , 
             {_id: { ns : ns , min : min }, ns : ns , min : min , max : max , tag : tag } , 
