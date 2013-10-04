@@ -1284,6 +1284,8 @@ namespace mongo {
         injectV8Function("MD5", md5Init);
         injectV8Function("HexData", hexDataInit);
 
+        injectV8Function("bsonWoCompare", bsonWoCompare);
+
         _global->Get(strLitToV8("Object"))->ToObject()->ForceSet(
                             strLitToV8("bsonsize"),
                             createV8Function(bsonsize)->GetFunction());
