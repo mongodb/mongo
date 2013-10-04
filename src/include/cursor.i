@@ -196,9 +196,8 @@ __cursor_row_slot_return(WT_CURSOR_BTREE *cbt, WT_ROW *rip, WT_UPDATE *upd)
 			goto slow;
 		__wt_cell_unpack((WT_CELL *)ikey, unpack);
 		if (unpack->type == WT_CELL_KEY && unpack->prefix == 0) {
-			kb->data = cbt->tmp.data = unpack->data;
-			kb->size = cbt->tmp.size = unpack->size;
-			cbt->rip_saved = rip;
+			cbt->tmp.data = unpack->data;
+			cbt->tmp.size = unpack->size;
 		} else if (unpack->type == WT_CELL_KEY &&
 		    cbt->rip_saved != NULL && cbt->rip_saved == rip - 1) {
 			/*
@@ -222,17 +221,17 @@ __cursor_row_slot_return(WT_CURSOR_BTREE *cbt, WT_ROW *rip, WT_UPDATE *upd)
 			memcpy((uint8_t *)cbt->tmp.data +
 			    unpack->prefix, unpack->data, unpack->size);
 			cbt->tmp.size = unpack->prefix + unpack->size;
-			kb->data = cbt->tmp.data;
-			kb->size = cbt->tmp.size;
-			cbt->rip_saved = rip;
 		} else {
 			/*
 			 * __wt_row_leaf_key_work instead of __wt_row_leaf_key:
 			 * we do __wt_row_leaf_key's fast-path checks inline.
 			 */
 slow:			WT_RET(__wt_row_leaf_key_work(
-			    session, cbt->page, rip, kb, 0));
+			    session, cbt->page, rip, &cbt->tmp, 0));
 		}
+		kb->data = cbt->tmp.data;
+		kb->size = cbt->tmp.size;
+		cbt->rip_saved = rip;
 	}
 
 	/*
