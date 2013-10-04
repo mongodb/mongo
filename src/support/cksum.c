@@ -1238,7 +1238,7 @@ __wt_cksum(const void *chunk, size_t len)
  *	CRC_HARDWARE_PRESENT or CRC_HARDWARE_ABSENT.
  */
 void
-__wt_cksum_init()
+__wt_cksum_init(void)
 {
 #if (defined(__amd64) || defined(__x86_64))
 	unsigned int eax, ebx, ecx, edx;
