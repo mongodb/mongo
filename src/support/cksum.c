@@ -26,39 +26,20 @@
  */
 
 #include "wt_internal.h"
-#include <stddef.h>
-#include <stdint.h>
-
-#define	CRC_HARDWARE_UNKNOWN	0
-#define	CRC_HARDWARE_PRESENT	1
-#define	CRC_HARDWARE_ABSENT	2
 
 /*
- * This file contains two ways of computing CRC: one that uses a hardware CRC
- * instruction (only on newer x86_64/amd64), and one that uses a fast software
- * algorithm.  __wt_cksum() provides a common entry point that uses one of these
- * two methods.
- *
- * To take advantage of the CRC hardware instruction, we detect it using
- * get_cpuid() on the first call to __wt_cksum().  Using runtime detection with
- * get_cpuid allows for single compatible binary that can be used across all
- * x86_64/amd64 processors, even those without the CRC hardware.
- *
- * If we do not have CPUID, or if the detection fails to find hardware CRC,
- * we'll use a software algorithm as a fallback.
+ * This file contains two implementations for computing CRC: one that uses
+ * hardware CRC instructions, available on newer x86_64/amd64, and one that uses
+ * a fast software algorithm.  __wt_cksum() provides a common entry point that
+ * indirects to one of these two methods.
  */
-#undef TEST_CRC_HARDWARE
-#if (defined(__amd64) || defined(__x86_64))
-#define	CRC_HARDWARE_DEFAULT CRC_HARDWARE_UNKNOWN
-#define	TEST_CRC_HARDWARE
-#else
-#define	CRC_HARDWARE_DEFAULT CRC_HARDWARE_ABSENT
-#endif
+static uint32_t __wt_cksum_sw(const void *chunk, size_t len);
+static uint32_t __wt_cksum_hw(const void *chunk, size_t len);
 
-static volatile int crc_hardware_check = CRC_HARDWARE_DEFAULT;
+static uint32_t (*__wt_cksum_func)(const void *chunk, size_t len);
 
 /*
- * The CRC slicing tables are used by cksum_sw.
+ * The CRC slicing tables are used by __wt_cksum_sw.
  */
 static const uint32_t g_crc_slicing[8][256] = {
 #ifdef WORDS_BIGENDIAN
@@ -1113,7 +1094,7 @@ static const uint32_t g_crc_slicing[8][256] = {
 };
 
 /*
- * cksum_sw --
+ * __wt_cksum_sw --
  *	Return a checksum for a chunk of memory, computed in software.
  *
  * Slicing-by-8 algorithm by Michael E. Kounavis and Frank L. Berry from
@@ -1128,7 +1109,7 @@ static const uint32_t g_crc_slicing[8][256] = {
  * little endian.
  */
 static uint32_t
-cksum_sw(const void *chunk, size_t len)
+__wt_cksum_sw(const void *chunk, size_t len)
 {
 	uint32_t crc, next;
 	size_t nqwords;
@@ -1192,14 +1173,14 @@ cksum_sw(const void *chunk, size_t len)
 	return (~crc);
 }
 
-#ifdef TEST_CRC_HARDWARE
+#if (defined(__amd64) || defined(__x86_64))
 /*
- * cksum_hw --
+ * __wt_cksum_hw --
  *	Return a checksum for a chunk of memory, computed in hardware
  *	using 8 byte steps.
  */
 static uint32_t
-cksum_hw(const void *chunk, size_t len)
+__wt_cksum_hw(const void *chunk, size_t len)
 {
 	uint32_t crc;
 	size_t nqwords;
@@ -1238,28 +1219,6 @@ cksum_hw(const void *chunk, size_t len)
 	}
 	return (~crc);
 }
-
-/*
- * detect_crc_hardware --
- *	Detect CRC hardware if possible, and return one of
- *	CRC_HARDWARE_PRESENT or CRC_HARDWARE_ABSENT.
- */
-static int
-detect_crc_hardware(void)
-{
-	unsigned int eax, ebx, ecx, edx;
-
-	__asm__ __volatile__ (
-			      "cpuid"
-			      : "=a" (eax), "=b" (ebx), "=c" (ecx), "=d" (edx)
-			      : "a" (1));
-
-#define	CPUID_ECX_HAS_SSE42	(1 << 20)
-
-	if (ecx & CPUID_ECX_HAS_SSE42)
-		return (CRC_HARDWARE_PRESENT);
-	return (CRC_HARDWARE_ABSENT);
-}
 #endif
 
 /*
@@ -1270,22 +1229,33 @@ detect_crc_hardware(void)
 uint32_t
 __wt_cksum(const void *chunk, size_t len)
 {
-#ifdef TEST_CRC_HARDWARE
-	uint32_t result;
+	return (*__wt_cksum_func)(chunk, len);
+}
 
-	if (crc_hardware_check == CRC_HARDWARE_UNKNOWN)
-		crc_hardware_check = detect_crc_hardware();
+/*
+ * __wt_cksum_init --
+ *	Detect CRC hardware if possible, and return one of
+ *	CRC_HARDWARE_PRESENT or CRC_HARDWARE_ABSENT.
+ */
+void
+__wt_cksum_init()
+{
+#if (defined(__amd64) || defined(__x86_64))
+	unsigned int eax, ebx, ecx, edx;
 
-	switch (crc_hardware_check) {
-	case CRC_HARDWARE_PRESENT:
-		result = cksum_hw(chunk, len);
-		break;
-	default:
-		result = cksum_sw(chunk, len);
-		break;
-	}
-	return (result);
+	__asm__ __volatile__ (
+			      "cpuid"
+			      : "=a" (eax), "=b" (ebx), "=c" (ecx), "=d" (edx)
+			      : "a" (1));
+
+#define	CPUID_ECX_HAS_SSE42	(1 << 20)
+
+	if (ecx & CPUID_ECX_HAS_SSE42)
+		__wt_cksum_func = __wt_cksum_hw;
+	else
+		__wt_cksum_func = __wt_cksum_sw;
+
 #else
-	return (cksum_sw(chunk, len));
+	__wt_cksum_func = __wt_cksum_sw;
 #endif
 }
