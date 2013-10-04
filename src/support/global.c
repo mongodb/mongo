@@ -32,6 +32,7 @@ static void
 __wt_pthread_once(void)
 {
 	__wt_spin_init(NULL, &__wt_process.spinlock);
+	__wt_cksum_init();
 
 	TAILQ_INIT(&__wt_process.connqh);
 
