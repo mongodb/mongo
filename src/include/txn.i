@@ -5,9 +5,6 @@
  * See the file LICENSE for redistribution information.
  */
 
-static inline void __wt_txn_read_first(WT_SESSION_IMPL *session);
-static inline void __wt_txn_read_last(WT_SESSION_IMPL *session);
-
 /*
  * __wt_txn_modify --
  *	Mark a WT_UPDATE object modified by the current transaction.
