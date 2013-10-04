@@ -84,6 +84,7 @@ mkdir -p $RPM_BUILD_ROOT/etc/sysconfig
 cp -v rpm/mongod.sysconfig $RPM_BUILD_ROOT/etc/sysconfig/mongod
 mkdir -p $RPM_BUILD_ROOT/var/lib/mongodb
 mkdir -p $RPM_BUILD_ROOT/var/log/mongodb
+mkdir -p $RPM_BUILD_ROOT/var/run/mongodb
 touch $RPM_BUILD_ROOT/var/log/mongodb/mongod.log
 
 %clean
@@ -126,6 +127,7 @@ fi
 /etc/sysconfig/mongod
 %attr(0755,mongodb,mongodb) %dir /var/lib/mongodb
 %attr(0755,mongodb,mongodb) %dir /var/log/mongodb
+%attr(0755,mongodb,mongodb) %dir /var/run/mongodb
 %attr(0640,mongodb,mongodb) %config(noreplace) %verify(not md5 size mtime) /var/log/mongodb/mongod.log
 
 %files shell
