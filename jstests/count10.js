@@ -11,6 +11,7 @@ db.getLastError();
 
 var thr = new Thread(function () {
     try {
+        db.getSisterDB("admin").auth("admin", "password");
         db.count10.find("sleep(1000)").count();
     }
     catch (e) {
