@@ -110,10 +110,6 @@ lsm_config = [
 		the number of hash values per item used for LSM bloom
 		filters''',
 		min='2', max='100'),
-	Config('lsm_bloom_newest', 'false', r'''
-		create a bloom filter on an LSM tree chunk before its first
-		merge.  Only supported if bloom filters are enabled''',
-		type='boolean'),
 	Config('lsm_bloom_oldest', 'false', r'''
 		create a bloom filter on the oldest LSM tree chunk. Only
 		supported if bloom filters are enabled''',

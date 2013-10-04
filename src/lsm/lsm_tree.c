@@ -89,10 +89,6 @@ __lsm_tree_close(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 			}
 		WT_TRET(__wt_cond_signal(session, lsm_tree->work_cond));
 		WT_TRET(__wt_thread_join(session, lsm_tree->ckpt_tid));
-		if (FLD_ISSET(lsm_tree->bloom, WT_LSM_BLOOM_NEWEST)) {
-			WT_TRET(__wt_cond_signal(session, lsm_tree->work_cond));
-			WT_TRET(__wt_thread_join(session, lsm_tree->bloom_tid));
-		}
 	}
 
 	/*
@@ -115,20 +111,6 @@ __lsm_tree_close(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 		 * not freed, but are managed by the connection.
 		 */
 		__wt_free(NULL, s->hazard);
-	}
-
-	if (lsm_tree->bloom_session != NULL) {
-		F_SET(lsm_tree->bloom_session,
-		    F_ISSET(session, WT_SESSION_SCHEMA_LOCKED));
-
-		wt_session = &lsm_tree->bloom_session->iface;
-		WT_TRET(wt_session->close(wt_session, NULL));
-
-		/*
-		 * This is safe after the close because session handles are
-		 * not freed, but are managed by the connection.
-		 */
-		__wt_free(NULL, lsm_tree->bloom_session->hazard);
 	}
 
 	if (lsm_tree->ckpt_session != NULL) {
@@ -293,15 +275,6 @@ __lsm_tree_start_worker(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 			    &lsm_tree->worker_tids[i],
 			    __wt_lsm_merge_worker, wargs));
 		}
-	if (FLD_ISSET(lsm_tree->bloom, WT_LSM_BLOOM_NEWEST)) {
-		WT_RET(wt_conn->open_session(
-		    wt_conn, NULL, "isolation=read-uncommitted", &wt_session));
-		lsm_tree->bloom_session = (WT_SESSION_IMPL *)wt_session;
-		F_SET(lsm_tree->bloom_session, WT_SESSION_INTERNAL);
-
-		WT_RET(__wt_thread_create(session,
-		    &lsm_tree->bloom_tid, __wt_lsm_bloom_worker, lsm_tree));
-	}
 	WT_RET(__wt_thread_create(session,
 	    &lsm_tree->ckpt_tid, __wt_lsm_checkpoint_worker, lsm_tree));
 
@@ -372,16 +345,12 @@ __wt_lsm_tree_create(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_config_gets(session, cfg, "lsm_bloom", &cval));
 	FLD_SET(lsm_tree->bloom,
 	    (cval.val == 0 ? WT_LSM_BLOOM_OFF : WT_LSM_BLOOM_MERGED));
-	WT_ERR(__wt_config_gets(session, cfg, "lsm_bloom_newest", &cval));
-	if (cval.val != 0)
-		FLD_SET(lsm_tree->bloom, WT_LSM_BLOOM_NEWEST);
 	WT_ERR(__wt_config_gets(session, cfg, "lsm_bloom_oldest", &cval));
 	if (cval.val != 0)
 		FLD_SET(lsm_tree->bloom, WT_LSM_BLOOM_OLDEST);
 
 	if (FLD_ISSET(lsm_tree->bloom, WT_LSM_BLOOM_OFF) &&
-	    (FLD_ISSET(lsm_tree->bloom, WT_LSM_BLOOM_NEWEST) ||
-	    FLD_ISSET(lsm_tree->bloom, WT_LSM_BLOOM_OLDEST)))
+	    FLD_ISSET(lsm_tree->bloom, WT_LSM_BLOOM_OLDEST))
 		WT_ERR_MSG(session, EINVAL,
 		    "Bloom filters can only be created on newest and oldest "
 		    "chunks if bloom filters are enabled");

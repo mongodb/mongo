@@ -140,7 +140,6 @@ static const WT_CONFIG_CHECK confchk_session_create[] = {
 	{ "lsm_bloom_bit_count", "int", "min=2,max=1000", NULL},
 	{ "lsm_bloom_config", "string", NULL, NULL},
 	{ "lsm_bloom_hash_count", "int", "min=2,max=100", NULL},
-	{ "lsm_bloom_newest", "boolean", NULL, NULL},
 	{ "lsm_bloom_oldest", "boolean", NULL, NULL},
 	{ "lsm_chunk_size", "int", "min=512K,max=500MB", NULL},
 	{ "lsm_merge_max", "int", "min=2,max=100", NULL},
@@ -351,11 +350,11 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  "internal_item_max=0,internal_key_truncate=,internal_page_max=4KB"
 	  ",key_format=u,key_gap=10,leaf_item_max=0,leaf_page_max=1MB,"
 	  "lsm_auto_throttle=,lsm_bloom=,lsm_bloom_bit_count=8,"
-	  "lsm_bloom_config=,lsm_bloom_hash_count=4,lsm_bloom_newest=0,"
-	  "lsm_bloom_oldest=0,lsm_chunk_size=2MB,lsm_merge_max=15,"
-	  "lsm_merge_threads=1,memory_page_max=5MB,os_cache_dirty_max=0,"
-	  "os_cache_max=0,prefix_compression=,prefix_compression_min=4,"
-	  "source=,split_pct=75,type=file,value_format=u",
+	  "lsm_bloom_config=,lsm_bloom_hash_count=4,lsm_bloom_oldest=0,"
+	  "lsm_chunk_size=2MB,lsm_merge_max=15,lsm_merge_threads=1,"
+	  "memory_page_max=5MB,os_cache_dirty_max=0,os_cache_max=0,"
+	  "prefix_compression=,prefix_compression_min=4,source=,"
+	  "split_pct=75,type=file,value_format=u",
 	  confchk_session_create
 	},
 	{ "session.drop",

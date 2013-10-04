@@ -789,7 +789,6 @@ extern int __wt_lsm_tree_worker(WT_SESSION_IMPL *session,
     const char *cfg[],
     uint32_t open_flags);
 extern void *__wt_lsm_merge_worker(void *vargs);
-extern void *__wt_lsm_bloom_worker(void *arg);
 extern void *__wt_lsm_checkpoint_worker(void *arg);
 extern int __wt_meta_btree_apply(WT_SESSION_IMPL *session,
     int (*func)(WT_SESSION_IMPL *,
