@@ -252,7 +252,7 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 	 * to open one.  We are holding other handle locks, it is not safe to
 	 * lock conn->spinlock.
 	 */
-	txn->isolation = TXN_ISO_READ_UNCOMMITTED;
+	session->isolation = txn->isolation = TXN_ISO_READ_UNCOMMITTED;
 	saved_meta_next = session->meta_track_next;
 	session->meta_track_next = NULL;
 	WT_WITH_DHANDLE(session, dhandle, ret = __wt_checkpoint(session, cfg));
@@ -281,7 +281,7 @@ err:	/*
 	__wt_spin_unlock(session, &conn->checkpoint_lock);
 
 	__wt_scr_free(&tmp);
-	session->isolation = txn->isolation = saved_isolation;
+	session->isolation = saved_isolation;
 	return (ret);
 }
 
@@ -413,8 +413,6 @@ __checkpoint_worker(
 	WT_CONNECTION_IMPL *conn;
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
-	WT_TXN *txn;
-	WT_TXN_ISOLATION saved_isolation;
 	const char *name;
 	int deleted, force, hot_backup_locked, track_ckpt;
 	char *name_alloc;
@@ -422,13 +420,11 @@ __checkpoint_worker(
 	btree = S2BT(session);
 	conn = S2C(session);
 	dhandle = session->dhandle;
-	txn = &session->txn;
 
 	bm = btree->bm;
 	ckpt = ckptbase = NULL;
 	hot_backup_locked = 0;
 	name_alloc = NULL;
-	saved_isolation = session->isolation;
 	track_ckpt = 1;
 
 	/*
@@ -723,10 +719,8 @@ __checkpoint_worker(
 	/* Flush the file from the cache, creating the checkpoint. */
 	if (is_checkpoint)
 		WT_ERR(__wt_bt_cache_op(session, ckptbase, WT_SYNC_CHECKPOINT));
-	else {
-		session->isolation = txn->isolation = TXN_ISO_READ_UNCOMMITTED;
+	else
 		WT_ERR(__wt_bt_cache_op(session, ckptbase, WT_SYNC_DISCARD));
-	}
 
 	/*
 	 * All blocks being written have been written; set the object's write
@@ -737,7 +731,6 @@ __checkpoint_worker(
 			ckpt->write_gen = btree->write_gen;
 
 fake:	/* Update the object's metadata. */
-	session->isolation = txn->isolation = TXN_ISO_READ_UNCOMMITTED;
 	ret = __wt_meta_ckptlist_set(session, dhandle->name, ckptbase);
 	WT_ERR(ret);
 
@@ -759,7 +752,6 @@ err:	if (hot_backup_locked)
 		__wt_spin_unlock(session, &conn->hot_backup_lock);
 skip:	__wt_meta_ckptlist_free(session, ckptbase);
 	__wt_free(session, name_alloc);
-	session->isolation = txn->isolation = saved_isolation;
 	return (ret);
 }
 
