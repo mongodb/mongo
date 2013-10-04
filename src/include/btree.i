@@ -252,6 +252,16 @@ __wt_page_only_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * and transactional information.
 	 */
 	if (WT_ATOMIC_ADD(page->modify->write_gen, 1) == 1) {
+		/*
+		 * Update the cache's information, mirroring reconciliation's
+		 * code when the page transitions from dirty to clean.  The
+		 * idea is reconciliation only updates the cache information
+		 * while the page is dirty, this function only updates cache
+		 * information while the page is clean, and so we won't race.
+		 * That's almost true: if this just-dirtied page were selected
+		 * by eviction and then reconciled before we could update the
+		 * cache, we could race -- it's hard to imagine that happening.
+		 */
 		__wt_cache_dirty_incr(session, page);
 
 		/*

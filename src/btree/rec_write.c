@@ -3951,6 +3951,16 @@ err:			__wt_scr_free(&tkey);
 	 * amount as the page size changes.  Update the increment/decrement as
 	 * part of reconciliation, regardless of the page becoming clean, so we
 	 * don't fall too far behind reality.
+	 *
+	 * This code cannot only update the cache if we successfully mark the
+	 * page clean, that approach might race with threads marking the page
+	 * dirty between our marking it clean but before we update the cache.
+	 * Instead, decrement the cache information while the page is dirty,
+	 * and increment it if we fail to mark the page clean.  That way, we
+	 * only ever modify the cache information while the page is dirty; as
+	 * the serialization function only modifies the cache information when
+	 * the page is clean (that's not quite correct, see the page-modify-set
+	 * function's comment for clarification), we won't race.
 	 */
 	__wt_cache_dirty_decr(session, page);
 	if (r->upd_skipped ||
