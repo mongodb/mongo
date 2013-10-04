@@ -784,6 +784,14 @@ __session_checkpoint(WT_SESSION *wt_session, const char *config)
 	 */
 	WT_ERR(__session_reset_cursors(session));
 
+	/*
+	 * Update the global oldest ID so we do all possible cleanup.
+	 *
+	 * This is particularly important for compact, so that all dirty pages
+	 * can be fully written.
+	 */
+	__wt_txn_refresh_force(session);
+
 	WT_WITH_SCHEMA_LOCK(session,
 	    ret = __wt_txn_checkpoint(session, cfg));
 

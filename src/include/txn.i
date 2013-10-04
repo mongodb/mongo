@@ -285,7 +285,7 @@ __wt_txn_cursor_op(WT_SESSION_IMPL *session)
 	 */
 	if (txn->isolation == TXN_ISO_READ_UNCOMMITTED &&
 	    !F_ISSET(txn, TXN_RUNNING) &&
-	    txn_state->snap_min == WT_TXN_NONE)
+	    TXNID_LT(txn_state->snap_min, txn_global->last_running))
 		txn_state->snap_min = txn_global->last_running;
 }
 
