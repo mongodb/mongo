@@ -194,71 +194,111 @@ namespace mongo {
         _allowLocalShard = allow;
     }
 
-    /**
-     * Performs sanity check on the given connection string on whether the seed list
-     * is consistent with the view of the set using replSetGetStatus.
-     */
-    bool addReplSetShardCheck( const ConnectionString& servers, string* errMsg ) {
-        bool ok = false;
-        BSONObj replSetStat;
+    bool Grid::addShard( string* name , const ConnectionString& servers , long long maxSize , string& errMsg ) {
+        // name can be NULL, so provide a dummy one here to avoid testing it elsewhere
+        string nameInternal;
+        if ( ! name ) {
+            name = &nameInternal;
+        }
+
+        ReplicaSetMonitorPtr rsMonitor;
+
+        // Check whether the host (or set) exists and run several sanity checks on this request.
+        // There are two set of sanity checks: making sure adding this particular shard is consistent
+        // with the replica set state (if it exists) and making sure this shards databases can be
+        // brought into the grid without conflict.
+
+        vector<string> dbNames;
         try {
             ScopedDbConnection newShardConn(servers.toString());
-            ok = newShardConn->runCommand( "admin", BSON( "replSetGetStatus" << 1 ),
-                    replSetStat );
-            newShardConn.done();
-        }
-        catch ( const DBException& ex ) {
-            *errMsg = str::stream() << "Error encountered while checking status of "
-                    << servers.toString() << ": " << causedBy( ex );
-        }
+            newShardConn->getLastError();
 
-        if( !ok ) {
-            if ( replSetStat["info"].str() == "configsvr" ) {
-                *errMsg = "the specified mongod is a --configsvr and "
-                    "should thus not be a shard server";
+            if ( newShardConn->type() == ConnectionString::SYNC ) {
+                newShardConn.done();
+                errMsg = "can't use sync cluster as a shard.  for replica set, have to use <setname>/<server1>,<server2>,...";
+                return false;
             }
-            else {
-                *errMsg = str::stream() << "error encountered calling replSetGetStatus: "
-                        << replSetStat;
+            
+            BSONObj resIsMongos;
+            bool ok = newShardConn->runCommand( "admin" , BSON( "isdbgrid" << 1 ) , resIsMongos );
+
+            // should return ok=0, cmd not found if it's a normal mongod
+            if ( ok ) {
+                errMsg = "can't add a mongos process as a shard";
+                newShardConn.done();
+                return false;
             }
 
-            return false;
-        }
+            BSONObj resIsMaster;
+            ok =  newShardConn->runCommand( "admin" , BSON( "isMaster" << 1 ) , resIsMaster );
+            if ( !ok ) {
+                ostringstream ss;
+                ss << "failed running isMaster: " << resIsMaster;
+                errMsg = ss.str();
+                newShardConn.done();
+                return false;
+            }
 
-        // if the shard has only one host, make sure it is not part of a replica set
-        string setName = replSetStat["set"].str();
-        string commandSetName = servers.getSetName();
-        if ( commandSetName.empty() && ! setName.empty() ) {
-            *errMsg = str::stream() << "host is part of set: " << setName
-                        << " use replica set url format <setname>/<server1>,<server2>,....";
-            return false;
-        }
+            // if the shard has only one host, make sure it is not part of a replica set
+            string setName = resIsMaster["setName"].str();
+            string commandSetName = servers.getSetName();
+            if ( commandSetName.empty() && ! setName.empty() ) {
+                ostringstream ss;
+                ss << "host is part of set: " << setName << " use replica set url format <setname>/<server1>,<server2>,....";
+                errMsg = ss.str();
+                newShardConn.done();
+                return false;
+            }
+            if ( !commandSetName.empty() && setName.empty() ) {
+                ostringstream ss;
+                ss << "host did not return a set name, is the replica set still initializing? " << resIsMaster;
+                errMsg = ss.str();
+                newShardConn.done();
+                return false;
+            }
 
-        if ( !commandSetName.empty() && setName.empty() ) {
-            *errMsg = str::stream() << "host did not return a set name, "
-                        << "is the replica set still initializing?" << replSetStat;
-            return false;
-        }
+            // if the shard is part of replica set, make sure it is the right one
+            if ( ! commandSetName.empty() && ( commandSetName != setName ) ) {
+                ostringstream ss;
+                ss << "host is part of a different set: " << setName;
+                errMsg = ss.str();
+                newShardConn.done();
+                return false;
+            }
 
-        // if the shard is part of replica set, make sure it is the right one
-        if ( ! commandSetName.empty() && ( commandSetName != setName ) ) {
-            *errMsg = str::stream() << "host is part of a different set: " << setName;
-            return false;
-        }
+            if( setName.empty() ) { 
+                // check this isn't a --configsvr
+                BSONObj res;
+                bool ok = newShardConn->runCommand("admin",BSON("replSetGetStatus"<<1),res);
+                ostringstream ss;
+                if( !ok && res["info"].type() == String && res["info"].String() == "configsvr" ) {
+                    errMsg = "the specified mongod is a --configsvr and should thus not be a shard server";
+                    newShardConn.done();
+                    return false;
+                }                
+            }
 
-        // if the shard is part of a replica set, make sure all the hosts mentioned in
-        // 'servers' are part of the set. It is fine if not all members of the set
-        // are present in 'servers'.
-        bool foundAll = true;
-        string offendingHost;
-        if ( ! commandSetName.empty() ) {
-            set<string> hostSet;
-
-            BSONElement membersElem( replSetStat["members"] );
-            if ( membersElem.type() == Array ) {
-                BSONArrayIteratorSorted iter( BSONArray( membersElem.Obj() ));
+            // if the shard is part of a replica set, make sure all the hosts mentioned in 'servers' are part of
+            // the set. It is fine if not all members of the set are present in 'servers'.
+            bool foundAll = true;
+            string offendingHost;
+            if ( ! commandSetName.empty() ) {
+                set<string> hostSet;
+                BSONObjIterator iter( resIsMaster["hosts"].Obj() );
                 while ( iter.more() ) {
-                    hostSet.insert( iter.next()["name"].str() ); // host:port
+                    hostSet.insert( iter.next().String() ); // host:port
+                }
+                if ( resIsMaster["passives"].isABSONObj() ) {
+                    BSONObjIterator piter( resIsMaster["passives"].Obj() );
+                    while ( piter.more() ) {
+                        hostSet.insert( piter.next().String() ); // host:port
+                    }
+                }
+                if ( resIsMaster["arbiters"].isABSONObj() ) {
+                    BSONObjIterator piter( resIsMaster["arbiters"].Obj() );
+                    while ( piter.more() ) {
+                        hostSet.insert( piter.next().String() ); // host:port
+                    }
                 }
 
                 vector<HostAndPort> hosts = servers.getServers();
@@ -274,88 +314,30 @@ namespace mongo {
                     }
                 }
             }
-
-            if ( hostSet.empty() ) {
-                *errMsg = "replSetGetStatus returned an empty set. "
-                        " Please wait for the set to initialize and try again.";
-                return false;
-            }
-        }
-
-        if ( ! foundAll ) {
-            *errMsg = str::stream() << "in seed list " << servers.toString()
-                            << ", host " << offendingHost
-                            << " does not belong to replica set " << setName;
-            return false;
-        }
-
-        return true;
-    }
-
-    bool Grid::addShard( string* name , const ConnectionString& servers , long long maxSize , string& errMsg ) {
-        // name can be NULL, so provide a dummy one here to avoid testing it elsewhere
-        string nameInternal;
-        if ( ! name ) {
-            name = &nameInternal;
-        }
-
-        ReplicaSetMonitorPtr rsMonitor;
-
-        // Check whether the host (or set) exists and run several sanity checks on this request.
-        // There are two set of sanity checks: making sure adding this particular shard is consistent
-        // with the replica set state (if it exists) and making sure this shards databases can be
-        // brought into the grid without conflict.
-
-        if ( servers.type() == ConnectionString::SYNC ) {
-            errMsg = "can't use sync cluster as a shard for replica set, "
-                    "have to use <setname>/<server1>,<server2>,...";
-            return false;
-        }
-
-        vector<string> dbNames;
-        try {
-            bool ok = false;
-
-            {
-                ScopedDbConnection newShardConn(servers.toString());
-
-                BSONObj resIsMongos;
-                ok = newShardConn->runCommand( "admin", BSON( "isdbgrid" << 1 ), resIsMongos );
+            if ( ! foundAll ) {
+                ostringstream ss;
+                ss << "in seed list " << servers.toString() << ", host " << offendingHost
+                   << " does not belong to replica set " << setName;
+                errMsg = ss.str();
                 newShardConn.done();
-            }
-
-            // should return ok=0, cmd not found if it's a normal mongod
-            if ( ok ) {
-                errMsg = "can't add a mongos process as a shard";
                 return false;
             }
 
-            if ( servers.type() == ConnectionString::SET ) {
-                if (!addReplSetShardCheck( servers, &errMsg )) {
-                    return false;
-                }
+            // shard name defaults to the name of the replica set
+            if ( name->empty() && ! setName.empty() )
+                *name = setName;
 
-                // shard name defaults to the name of the replica set
-                if ( name->empty() && !servers.getSetName().empty() ) {
-                    *name = servers.getSetName();
-                }
-            }
-
-            // In order to be accepted as a new shard, that mongod must not have any database name
-            // that exists already in any other shards. If that test passes, the new shard's
-            // databases are going to be entered as non-sharded db's whose primary is the
-            // newly added shard.
+            // In order to be accepted as a new shard, that mongod must not have any database name that exists already
+            // in any other shards. If that test passes, the new shard's databases are going to be entered as
+            // non-sharded db's whose primary is the newly added shard.
 
             BSONObj resListDB;
-            {
-                ScopedDbConnection newShardConn(servers.toString());
-                ok = newShardConn->runCommand( "admin", BSON( "listDatabases" << 1 ), resListDB );
-                newShardConn.done();
-            }
-
+            ok = newShardConn->runCommand( "admin" , BSON( "listDatabases" << 1 ) , resListDB );
             if ( !ok ) {
-                errMsg = str::stream() << "failed listing " << servers.toString()
-                            << "'s databases:" << resListDB;;
+                ostringstream ss;
+                ss << "failed listing " << servers.toString() << "'s databases:" << resListDB;
+                errMsg = ss.str();
+                newShardConn.done();
                 return false;
             }
 
@@ -372,16 +354,19 @@ namespace mongo {
                 }
             }
 
-            if ( servers.type() == ConnectionString::SET ) {
-                rsMonitor = ReplicaSetMonitor::get( servers.getSetName() );
-            }
+            if ( newShardConn->type() == ConnectionString::SET ) 
+                rsMonitor = ReplicaSetMonitor::get( setName );
+
+            newShardConn.done();
         }
         catch ( DBException& e ) {
             if ( servers.type() == ConnectionString::SET ) {
                 ReplicaSetMonitor::remove( servers.getSetName() );
             }
-
-            errMsg = str::stream() << "couldn't connect to new shard " << causedBy(e);
+            ostringstream ss;
+            ss << "couldn't connect to new shard ";
+            ss << e.what();
+            errMsg = ss.str();
             return false;
         }
 
