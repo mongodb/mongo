@@ -8,6 +8,7 @@ chatty = function(s){
         print( s );
 }
 
+// Please consider using bsonWoCompare instead of this as much as possible.
 friendlyEqual = function( a , b ){
     if ( a == b )
         return true;

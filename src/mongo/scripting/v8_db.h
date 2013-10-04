@@ -109,6 +109,11 @@ namespace mongo {
     // Object.bsonsize()
     v8::Handle<v8::Value> bsonsize(V8Scope* scope, const v8::Arguments& args);
 
+    // global method
+    // Accepts 2 objects, converts them to BSONObj and calls woCompare on the first against the
+    // second.
+    v8::Handle<v8::Value> bsonWoCompare(V8Scope* scope, const v8::Arguments& args);
+
     // 'db.collection' property handlers
     v8::Handle<v8::Value> collectionGetter(v8::Local<v8::String> name,
                                            const v8::AccessorInfo& info);

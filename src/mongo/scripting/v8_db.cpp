@@ -995,4 +995,16 @@ namespace mongo {
         return v8::Number::New(scope->v8ToMongo(args[0]->ToObject()).objsize());
     }
 
+    v8::Handle<v8::Value> bsonWoCompare(V8Scope* scope, const v8::Arguments& args) {
+        argumentCheck(args.Length() == 2, "bsonWoCompare needs 2 argument");
+
+        argumentCheck(args[0]->IsObject(), "first argument to bsonWoCompare has to be an object");
+        argumentCheck(args[1]->IsObject(), "second argument to bsonWoCompare has to be an object");
+
+        BSONObj firstObject(scope->v8ToMongo(args[0]->ToObject()));
+        BSONObj secondObject(scope->v8ToMongo(args[1]->ToObject()));
+
+        return v8::Number::New(firstObject.woCompare(secondObject));
+    }
+
 }
