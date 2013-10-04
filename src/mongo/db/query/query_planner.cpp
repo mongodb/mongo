@@ -401,7 +401,8 @@ namespace mongo {
             //
             //    XXX: There is more to it than this.  See index13.js.
 
-            bool shouldMergeBounds = !indices[currentIndexNumber].multikey;
+            bool shouldMergeBounds = (currentIndexNumber != IndexTag::kNoIndex)
+                                     && !indices[currentIndexNumber].multikey;
 
             // XXX: commented out until cases in index13.js are resolved.
             // bool shouldMergeBounds = !indices[currentIndexNumber].multikey || inArrayOperator;
