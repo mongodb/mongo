@@ -253,7 +253,7 @@ __wt_page_only_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 */
 	if (WT_ATOMIC_ADD(page->modify->write_gen, 1) == 1) {
 		/*
-		 * Update the cache's information, mirroring reconciliation's
+		 * Update the cache's information, mirroring reconciliation
 		 * code when the page transitions from dirty to clean.  The
 		 * idea is reconciliation only updates the cache information
 		 * while the page is dirty, this function only updates cache
