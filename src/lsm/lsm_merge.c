@@ -207,8 +207,8 @@ __wt_lsm_merge(
 	F_SET(src, WT_CURSTD_RAW);
 	WT_ERR(__wt_clsm_init_merge(src, start_chunk, start_id, nchunks));
 
-	WT_WITH_SCHEMA_LOCK(session, ret = __wt_lsm_tree_setup_chunk(
-	    session, lsm_tree, chunk));
+	WT_WITH_SCHEMA_LOCK(session,
+	    ret = __wt_lsm_tree_setup_chunk(session, lsm_tree, chunk));
 	WT_ERR(ret);
 	if (create_bloom) {
 		WT_CLEAR(buf);
@@ -232,10 +232,9 @@ __wt_lsm_merge(
 
 	for (insert_count = 0; (ret = src->next(src)) == 0; insert_count++) {
 		if (insert_count % 1000 &&
-		    !F_ISSET(lsm_tree, WT_LSM_TREE_WORKING)) {
-			ret = EINTR;
-			goto err;
-		}
+		    !F_ISSET(lsm_tree, WT_LSM_TREE_WORKING))
+			WT_ERR(EINTR);
+
 		WT_ERR(src->get_key(src, &key));
 		dest->set_key(dest, &key);
 		WT_ERR(src->get_value(src, &value));
@@ -284,7 +283,7 @@ __wt_lsm_merge(
 
 	/*
 	 * Open a handle on the new chunk before application threads attempt
-	 * to access it. Opening the pre-loads internal pages into the file
+	 * to access it, opening it pre-loads internal pages into the file
 	 * system cache.
 	 */
 	cfg[1] = "checkpoint=WiredTigerCheckpoint";

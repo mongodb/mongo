@@ -33,8 +33,12 @@ __wt_pthread_once(void)
 {
 	WT_DECL_RET;
 
-	if ((ret = __wt_spin_init(NULL, &__wt_process.spinlock)) != 0)
+	if ((ret = __wt_spin_init(NULL, &__wt_process.spinlock)) != 0) {
 		__wt_pthread_once_failed = ret;
+		return;
+	}
+
+	__wt_cksum_init();
 
 	TAILQ_INIT(&__wt_process.connqh);
 
