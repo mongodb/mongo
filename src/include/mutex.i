@@ -20,19 +20,21 @@
 #define	WT_SPIN_COUNT 1000
 #endif
 
-static inline void
+static inline int
 __wt_spin_init(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 {
 	WT_UNUSED(session);
 
 	*(t) = 0;
+	return (0);
 }
 
 static inline void
 __wt_spin_destroy(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 {
 	WT_UNUSED(session);
-	WT_UNUSED(t);
+
+	*(t) = 0;
 }
 
 static inline void
@@ -68,7 +70,7 @@ __wt_spin_unlock(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 
 #elif SPINLOCK_TYPE == SPINLOCK_PTHREAD_MUTEX
 
-static inline void
+static inline int
 __wt_spin_init(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 {
 #ifdef HAVE_MUTEX_ADAPTIVE
@@ -76,12 +78,14 @@ __wt_spin_init(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 
 	pthread_mutexattr_init(&attr);
 	pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_ADAPTIVE_NP);
-	(void)pthread_mutex_init(t, &attr);
+	WT_RET(pthread_mutex_init(&t->lock, &attr));
 #else
-	(void)pthread_mutex_init(t, NULL);
+	WT_RET(pthread_mutex_init(&t->lock, NULL));
 #endif
+	t->initialized = 1;
 
 	WT_UNUSED(session);
+	return (0);
 }
 
 static inline void
@@ -89,28 +93,34 @@ __wt_spin_destroy(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 {
 	WT_UNUSED(session);
 
-	(void)pthread_mutex_destroy(t);
+	if (t->initialized) {
+		(void)pthread_mutex_destroy(&t->lock);
+		t->initialized = 0;
+	}
 }
 
 static inline void
 __wt_spin_lock(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 {
 	WT_UNUSED(session);
-	pthread_mutex_lock(t);
+
+	pthread_mutex_lock(&t->lock);
 }
 
 static inline int
 __wt_spin_trylock(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 {
 	WT_UNUSED(session);
-	return (pthread_mutex_trylock(t));
+
+	return (pthread_mutex_trylock(&t->lock));
 }
 
 static inline void
 __wt_spin_unlock(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 {
 	WT_UNUSED(session);
-	pthread_mutex_unlock(t);
+
+	pthread_mutex_unlock(&t->lock);
 }
 
 #else
