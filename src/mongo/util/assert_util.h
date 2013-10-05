@@ -168,6 +168,7 @@ namespace mongo {
     void wasserted(const char *msg, const char *file, unsigned line);
     MONGO_COMPILER_NORETURN void fassertFailed( int msgid );
     MONGO_COMPILER_NORETURN void fassertFailedNoTrace( int msgid );
+    MONGO_COMPILER_NORETURN void fassertFailedWithStatus(int msgid, const Status& status);
     
     /** a "user assertion".  throws UserAssertion.  logs.  typically used for errors that a user
         could cause, such as duplicate key, disk full, etc.
@@ -197,6 +198,11 @@ namespace mongo {
 
     /** aborts on condition failure */
     inline void fassert(int msgid, bool testOK) {if (MONGO_unlikely(!testOK)) fassertFailed(msgid);}
+    inline void fassert(int msgid, const Status& status) {
+        if (MONGO_unlikely(!status.isOK())) {
+            fassertFailedWithStatus(msgid, status);
+        }
+    }
 
 
     /* "user assert".  if asserts, user did something wrong, not our code */
