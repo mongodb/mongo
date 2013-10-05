@@ -159,21 +159,26 @@ def get_variant_dir():
             x = substitute( get_option( name ) )
             a.append( name + "_" + x )
 
-    s = "#build/${PYSYSPLATFORM}/"
-
     extras = []
     if has_option("extra-variant-dirs"):
         extras = [substitute(x) for x in get_option( 'extra-variant-dirs' ).split( ',' )]
 
     if has_option("add-branch-to-variant-dir"):
         extras += ["branch_" + substitute( utils.getGitBranch() )]
-    a += extras
 
-    if len(a) > 0:
-        a.sort()
-        s += "/".join( a ) + "/"
+    if has_option('cache'):
+        s = "#build/cached/"
+        s += "/".join(extras) + "/"
     else:
-        s += "normal/"
+        s = "#build/${PYSYSPLATFORM}/"
+        a += extras
+
+        if len(a) > 0:
+            a.sort()
+            s += "/".join( a ) + "/"
+        else:
+            s += "normal/"
+
     return s
 
 # build output
@@ -321,6 +326,14 @@ elif windows:
                type = 'choice', default = None,
                choices = win_version_min_choices.keys())
 
+add_option('cache',
+           "Use an object cache rather than a per-build variant directory (experimental)",
+           0, False)
+
+add_option('cache-dir',
+           "Specify the directory to use for caching objects if --cache is in use",
+           1, False, default="#build/cached/.cache")
+
 # don't run configure if user calls --help
 if GetOption('help'):
     Return()
@@ -460,6 +473,13 @@ env = Environment( BUILD_DIR=variantDir,
                    CONFIGUREDIR = '#' + scons_data_dir + '/sconf_temp',
                    CONFIGURELOG = '#' + scons_data_dir + '/config.log'
                    )
+
+if has_option("cache"):
+    EnsureSConsVersion( 2, 3, 0 )
+    if has_option("release"):
+        print("Using the experimental --cache option is not permitted for --release builds")
+        Exit(1)
+    env.CacheDir(str(env.Dir(get_option('cache-dir'))))
 
 # This could be 'if solaris', but unfortuantely that variable hasn't been set yet.
 if "sunos5" == os.sys.platform:
