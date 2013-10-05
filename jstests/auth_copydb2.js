@@ -3,8 +3,8 @@ b = db.getSisterDB( "copydb2-test-b" );
 
 a.dropDatabase();
 b.dropDatabase();
-a.removeAllUsers();
-b.removeAllUsers();
+a.dropAllUsers();
+b.dropAllUsers();
 
 a.foo.save( { a : 1 } );
 

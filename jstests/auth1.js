@@ -1,4 +1,4 @@
-db.removeAllUsers();
+db.dropAllUsers();
 
 pass = "a" + Math.random();
 //print( "password [" + pass + "]" );
@@ -15,18 +15,18 @@ assert( ! db.auth( "eliot" , pass ) , "failed to change password failed" );
 assert( db.auth( "eliot" , pass2 ) , "new password didn't take" );
 
 assert( db.auth( "eliot" , pass2 ) , "what?" );
-db.removeUser( "eliot" );
-assert( ! db.auth( "eliot" , pass2 ) , "didn't remove user" );
+db.dropUser( "eliot" );
+assert( ! db.auth( "eliot" , pass2 ) , "didn't drop user" );
 
 
 var a = db.getMongo().getDB( "admin" );
-a.removeAllUsers();
+a.dropAllUsers();
 pass = "c" + Math.random();
 a.addUser( "super", pass, jsTest.adminUserRoles, 1 );
 assert( a.auth( "super" , pass ) , "auth failed" );
 assert( !a.auth( "super" , pass + "a" ) , "auth should have failed" );
 
-db.removeAllUsers();
+db.dropAllUsers();
 pass = "a" + Math.random();
 
 db.addUser( "eliot" , pass, jsTest.basicUserRoles, 1 );
@@ -50,5 +50,5 @@ assert( before > 0 , "C3" )
 assert.eq( before , after , "C4" )
 
 // Clean up after ourselves so other tests using authentication don't get messed up.
-db.removeAllUsers()
-db.getSiblingDB('admin').removeAllUsers();
+db.dropAllUsers()
+db.getSiblingDB('admin').dropAllUsers();

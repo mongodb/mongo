@@ -9,7 +9,7 @@ db = m.getDB( "admin" );
 t = db[ baseName ];
 t.drop();
 
-db.removeAllUsers();
+db.dropAllUsers();
 
 db.addUser( "eliot" , "eliot", jsTest.adminUserRoles );
 

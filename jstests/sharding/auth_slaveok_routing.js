@@ -1,4 +1,4 @@
-1/**
+/**
  * This tests whether slaveOk reads are properly routed through mongos in
  * an authenticated environment. This test also includes restarting the
  * entire set, then querying afterwards.
@@ -98,7 +98,7 @@ assert( doesRouteToSec( coll, { v: vToFind++ }));
 // Cleanup auth so Windows will be able to shutdown gracefully
 priAdminDB = replTest.getPrimary().getDB( 'admin' );
 priAdminDB.auth( 'user', 'password' );
-priAdminDB.removeUser( 'user' );
+priAdminDB.dropUser( 'user' );
 
 st.stop();
 

@@ -383,10 +383,10 @@ namespace mongo {
 
     } cmdUpdateUser;
 
-    class CmdRemoveUser : public Command {
+    class CmdDropUser : public Command {
     public:
 
-        CmdRemoveUser() : Command("removeUser") {}
+        CmdDropUser() : Command("dropUser") {}
 
         virtual bool logTheOp() {
             return false;
@@ -401,7 +401,7 @@ namespace mongo {
         }
 
         virtual void help(stringstream& ss) const {
-            ss << "Removes a single user." << endl;
+            ss << "Drops a single user." << endl;
         }
 
         virtual void addRequiredPrivileges(const std::string& dbname,
@@ -421,7 +421,7 @@ namespace mongo {
                  bool fromRepl) {
             AuthorizationManager* authzManager = getGlobalAuthorizationManager();
             AuthzDocumentsUpdateGuard updateGuard(authzManager);
-            if (!updateGuard.tryLock("Remove user")) {
+            if (!updateGuard.tryLock("Drop user")) {
                 addStatus(Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."),
                           result);
                 return false;
@@ -430,10 +430,10 @@ namespace mongo {
             UserName userName;
             BSONObj writeConcern;
 
-            Status status = auth::parseAndValidateRemoveUserCommand(cmdObj,
-                                                                    dbname,
-                                                                    &userName,
-                                                                    &writeConcern);
+            Status status = auth::parseAndValidateDropUserCommand(cmdObj,
+                                                                  dbname,
+                                                                  &userName,
+                                                                  &writeConcern);
             if (!status.isOK()) {
                 addStatus(status, result);
                 return false;
@@ -463,12 +463,12 @@ namespace mongo {
             return true;
         }
 
-    } cmdRemoveUser;
+    } cmdDropUser;
 
-    class CmdRemoveUsersFromDatabase : public Command {
+    class CmdDropUsersFromDatabase : public Command {
     public:
 
-        CmdRemoveUsersFromDatabase() : Command("removeUsersFromDatabase") {}
+        CmdDropUsersFromDatabase() : Command("dropUsersFromDatabase") {}
 
         virtual bool logTheOp() {
             return false;
@@ -483,7 +483,7 @@ namespace mongo {
         }
 
         virtual void help(stringstream& ss) const {
-            ss << "Removes all users for a single database." << endl;
+            ss << "Drops all users for a single database." << endl;
         }
 
         virtual void addRequiredPrivileges(const std::string& dbname,
@@ -503,14 +503,14 @@ namespace mongo {
                  bool fromRepl) {
             AuthorizationManager* authzManager = getGlobalAuthorizationManager();
             AuthzDocumentsUpdateGuard updateGuard(authzManager);
-            if (!updateGuard.tryLock("Remove all users from database")) {
+            if (!updateGuard.tryLock("Drop all users from database")) {
                 addStatus(Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."),
                           result);
                 return false;
             }
 
             BSONObj writeConcern;
-            Status status = auth::parseAndValidateRemoveUsersFromDatabaseCommand(cmdObj,
+            Status status = auth::parseAndValidateDropUsersFromDatabaseCommand(cmdObj,
                                                                                  dbname,
                                                                                  &writeConcern);
             if (!status.isOK()) {
@@ -534,7 +534,7 @@ namespace mongo {
             return true;
         }
 
-    } cmdRemoveUsersFromDatabase;
+    } cmdDropUsersFromDatabase;
 
     class CmdGrantRolesToUser: public Command {
     public:
@@ -1744,10 +1744,10 @@ namespace mongo {
 
     } cmdRevokeRolesFromRole;
 
-    class CmdRemoveRole: public Command {
+    class CmdDropRole: public Command {
     public:
 
-        CmdRemoveRole() : Command("removeRole") {}
+        CmdDropRole() : Command("dropRole") {}
 
         virtual bool logTheOp() {
             return false;
@@ -1762,7 +1762,7 @@ namespace mongo {
         }
 
         virtual void help(stringstream& ss) const {
-            ss << "Removes a single role.  Before deleting the role completely it must remove it "
+            ss << "Drops a single role.  Before deleting the role completely it must remove it "
                   "from any users or roles that reference it.  If any errors occur in the middle "
                   "of that process it's possible to be left in a state where the role has been "
                   "removed from some user/roles but otherwise still exists."<< endl;
@@ -1785,7 +1785,7 @@ namespace mongo {
                  bool fromRepl) {
             AuthorizationManager* authzManager = getGlobalAuthorizationManager();
             AuthzDocumentsUpdateGuard updateGuard(authzManager);
-            if (!updateGuard.tryLock("Remove role")) {
+            if (!updateGuard.tryLock("Drop role")) {
                 addStatus(Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."),
                           result);
                 return false;
@@ -1794,7 +1794,7 @@ namespace mongo {
             RoleName roleName;
             BSONObj writeConcern;
 
-            Status status = auth::parseRemoveRoleCommand(cmdObj,
+            Status status = auth::parseDropRoleCommand(cmdObj,
                                                          dbname,
                                                          &roleName,
                                                          &writeConcern);
@@ -1901,7 +1901,7 @@ namespace mongo {
             return true;
         }
 
-    } cmdRemoveRole;
+    } cmdDropRole;
 
     class CmdRolesInfo: public Command {
     public:

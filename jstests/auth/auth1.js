@@ -16,7 +16,7 @@ mro = new Mongo(m.host);
 dbRO = mro.getDB( "test" );
 tRO = dbRO[ baseName ];
 
-db.removeAllUsers();
+db.dropAllUsers();
 
 db.getSisterDB( "admin" ).addUser( "super", "super", ["__system"] );
 db.getSisterDB("admin").auth("super", "super");
