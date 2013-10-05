@@ -16,7 +16,8 @@ def getSysInfo():
     else:
         return " ".join( os.uname() )
 
-buildinfo_filename = '#build/buildinfo.cpp'
+buildinfo_filename = '$BUILD_DIR/buildinfo.cpp'
+env.NoCache(buildinfo_filename)
 
 buildinfo_template = '''
 #include <string>
