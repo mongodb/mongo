@@ -353,6 +353,9 @@ __wt_lsm_checkpoint_worker(void *arg)
 			++lsm_tree->dsk_gen;
 			WT_TRET(__wt_rwunlock(session, lsm_tree->rwlock));
 
+			/* Make sure we aren't pinning a transaction ID. */
+			__wt_txn_release_snapshot(session);
+
 			if (ret != 0) {
 				__wt_err(session, ret,
 				    "LSM checkpoint metadata write");
