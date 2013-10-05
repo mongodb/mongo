@@ -322,7 +322,7 @@ namespace mongo {
             *ss << " filter= " << filter->toString() << endl;
         }
         addIndent(ss, indent + 1);
-        *ss << "dir = " << direction << endl;
+        *ss << "direction = " << direction << endl;
         addIndent(ss, indent + 1);
         *ss << "bounds = " << bounds.toString() << endl;
         addIndent(ss, indent + 1);

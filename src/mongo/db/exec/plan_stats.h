@@ -195,6 +195,10 @@ namespace mongo {
         // used.
         BSONObj indexBounds;
 
+        // >1 if we're traversing the index along with its order. <1 if we're traversing it
+        // against the order.
+        int direction;
+
         // Whether this index is over a field that contain array values.
         bool isMultiKey;
 

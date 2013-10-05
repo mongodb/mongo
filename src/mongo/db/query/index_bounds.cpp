@@ -117,9 +117,30 @@ namespace mongo {
                      itInterval != itField->intervals.end();
                      ++itInterval) {
                     BSONArrayBuilder intervalBuilder;
-                    intervalBuilder.append(itInterval->start);
-                    intervalBuilder.append(itInterval->end);
-                    fieldBuilder.append(intervalBuilder.arr());
+
+                    // Careful to output $minElement/$maxElement if we don't have bounds.
+                    if (itInterval->start.eoo()) {
+                        BSONObjBuilder minBuilder;
+                        minBuilder.appendMinKey("");
+                        BSONObj minKeyObj = minBuilder.obj();
+                        intervalBuilder.append(minKeyObj.firstElement());
+                    }
+                    else {
+                        intervalBuilder.append(itInterval->start);
+                    }
+
+                    if (itInterval->end.eoo()) {
+                        BSONObjBuilder maxBuilder;
+                        maxBuilder.appendMaxKey("");
+                        BSONObj maxKeyObj = maxBuilder.obj();
+                        intervalBuilder.append(maxKeyObj.firstElement());
+                    }
+                    else {
+                        intervalBuilder.append(itInterval->end);
+                    }
+
+                    fieldBuilder.append(
+                        static_cast<BSONArray>(intervalBuilder.arr().clientReadable()));
                 }
             }
         }
