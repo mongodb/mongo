@@ -130,15 +130,16 @@ namespace {
 
         unordered_set<RoleName> indirectRoles;
         PrivilegeVector allPrivileges;
+        bool isRoleGraphInconsistent;
         {
             boost::lock_guard<boost::mutex> lk(_roleGraphMutex);
-
+            isRoleGraphInconsistent = _roleGraphState == roleGraphStateConsistent;
             for (size_t i = 0; i < directRoles.size(); ++i) {
                 const User::RoleData& role(directRoles[i]);
                 if (!role.hasRole)
                     continue;
                 indirectRoles.insert(role.name);
-                if (_roleGraphState == roleGraphStateConsistent) {
+                if (isRoleGraphInconsistent) {
                     for (RoleNameIterator subordinates = _roleGraph.getIndirectSubordinates(
                                  role.name);
                          subordinates.more();
@@ -148,7 +149,7 @@ namespace {
                     }
                 }
                 const PrivilegeVector& rolePrivileges(
-                        (_roleGraphState == roleGraphStateConsistent) ?
+                        isRoleGraphInconsistent ?
                         _roleGraph.getAllPrivileges(role.name) :
                         _roleGraph.getDirectPrivileges(role.name));
                 for (PrivilegeVector::const_iterator priv = rolePrivileges.begin(),
@@ -167,7 +168,7 @@ namespace {
         mutablebson::Element warningsElement = resultDoc.makeElementArray("warnings");
         fassert(17158, resultDoc.root().pushBack(privilegesElement));
         fassert(17159, resultDoc.root().pushBack(indirectRolesElement));
-        if (_roleGraphState != roleGraphStateConsistent) {
+        if (!isRoleGraphInconsistent) {
             fassert(17160, warningsElement.appendString(
                             "", "Role graph inconsistent, only direct privileges available."));
         }
