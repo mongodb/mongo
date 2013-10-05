@@ -51,6 +51,11 @@ namespace mongo {
 
         AuthzManagerExternalStateMock() {};
 
+        virtual Status initialize();
+        virtual Status getUserDescription(const UserName& userName, BSONObj* result);
+        virtual Status getRoleDescription(const RoleName& roleName, BSONObj* result);
+
+
         virtual Status insertPrivilegeDocument(const std::string& dbname,
                                                const BSONObj& userObj,
                                                const BSONObj& writeConcern);

@@ -52,6 +52,14 @@ namespace mongo {
      */
     class RoleGraph {
     public:
+        /**
+         * Adds to "privileges" the privileges associated with the named built-in role, and returns
+         * true. Returns false if "role" does not name a built-in role, and does not modify
+         * "privileges".  Addition of new privileges is done as with
+         * Privilege::addPrivilegeToPrivilegeVector.
+         */
+        static bool addPrivilegesForBuiltinRole(const RoleName& role, PrivilegeVector* privileges);
+
         RoleGraph();
         RoleGraph(const RoleGraph& other);
         ~RoleGraph();
@@ -71,20 +79,20 @@ namespace mongo {
         static void generateUniversalPrivileges(PrivilegeVector* privileges);
 
         /**
-         * Returns a vector of the RoleNames of the "members" of the given role.
+         * Returns an iterator over the RoleNames of the "members" of the given role.
          * Members of a role are roles that have been granted this role directly (roles that are
          * members transitively through another role are not included).  These are the "parents" of
          * this node in the graph.
          */
-        const std::vector<RoleName>& getDirectMembers(const RoleName& role);
+        RoleNameIterator getDirectMembers(const RoleName& role);
 
         /**
-         * Returns a vector of the RoleNames of the "subordninates" of the given role.
+         * Returns an iterator over the RoleNames of the "subordninates" of the given role.
          * Subordinate roles are the roles that this role has been granted directly (roles
          * that have been granted transitively through another role are not included).  These are
          * the "children" of this node in the graph.
          */
-        const std::vector<RoleName>& getDirectSubordinates(const RoleName& role);
+        RoleNameIterator getDirectSubordinates(const RoleName& role);
 
         /**
          * Returns an iterator that can be used to get a full list of roles that this role inherits
@@ -116,7 +124,7 @@ namespace mongo {
         /**
          * Returns whether the given role corresponds to a built-in role.
          */
-        bool isBuiltinRole(const RoleName& role);
+        static bool isBuiltinRole(const RoleName& role);
 
         // Mutation functions
 
@@ -151,6 +159,13 @@ namespace mongo {
          * Returns InvalidRoleModification if "role" is a built-in role.
          */
         Status removeRoleFromRole(const RoleName& recipient, const RoleName& role);
+
+        /**
+         * Removes all roles held by "victim".
+         * Returns RoleNotFound if "victim" doesn't exist in the role graph.
+         * Returns InvalidRoleModification if "victim" is a built-in role.
+         */
+        Status removeAllRolesFromRole(const RoleName& victim);
 
         /**
          * Grants "privilegeToAdd" to "role".

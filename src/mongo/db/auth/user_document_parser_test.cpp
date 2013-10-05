@@ -346,52 +346,47 @@ namespace {
     TEST_F(V2UserDocumentParsing, V2RoleExtraction) {
         // "roles" field must be provided
         ASSERT_NOT_OK(v2parser.initializeUserRolesFromUserDocument(
-                user.get(),
                 BSON("name" << "spencer"),
-                "test"));
+                user.get()));
 
         // V1-style roles arrays no longer work
         ASSERT_NOT_OK(v2parser.initializeUserRolesFromUserDocument(
-                user.get(),
                 BSON("name" << "spencer" <<
                      "roles" << BSON_ARRAY("read")),
-                "test"));
+                user.get()));
 
         // Roles must have "name", "source", "canDelegate", and "hasRole" fields
         ASSERT_NOT_OK(v2parser.initializeUserRolesFromUserDocument(
-                user.get(),
                 BSON("name" << "spencer" <<
                      "roles" << BSON_ARRAY(BSONObj())),
-                "test"));
+                user.get()));
 
         ASSERT_NOT_OK(v2parser.initializeUserRolesFromUserDocument(
-                user.get(),
                 BSON("name" << "spencer" <<
                      "roles" << BSON_ARRAY(BSON("name" << "roleA"))),
-                "test"));
+                user.get()));
 
         ASSERT_NOT_OK(v2parser.initializeUserRolesFromUserDocument(
-                user.get(),
                 BSON("name" << "spencer" <<
                      "roles" << BSON_ARRAY(BSON("name" << "roleA" << "source" << "dbA"))),
-                "test"));
+                user.get()));
+
         ASSERT_NOT_OK(v2parser.initializeUserRolesFromUserDocument(
-                user.get(),
                 BSON("name" << "spencer" <<
                      "roles" << BSON_ARRAY(BSON("name" << "roleA" <<
                                                 "source" << "dbA" <<
                                                 "canDelegate" << true))),
-                "test"));
+                user.get()));
 
         // Role doesn't get added if hasRole is false
         ASSERT_OK(v2parser.initializeUserRolesFromUserDocument(
-                user.get(),
                 BSON("name" << "spencer" <<
                      "roles" << BSON_ARRAY(BSON("name" << "roleA" <<
                                                 "source" << "dbA" <<
                                                 "canDelegate" << true <<
                                                 "hasRole" << false))),
-                "test"));
+                user.get()));
+
         const User::RoleDataMap& roles = user->getRoles();
         ASSERT_EQUALS(1U, roles.size());
         User::RoleData role = roles.begin()->second;
@@ -401,13 +396,12 @@ namespace {
 
         // Valid role names are extracted successfully
         ASSERT_OK(v2parser.initializeUserRolesFromUserDocument(
-                user.get(),
                 BSON("name" << "spencer" <<
                      "roles" << BSON_ARRAY(BSON("name" << "roleA" <<
                                                 "source" << "dbA" <<
                                                 "canDelegate" << true <<
                                                 "hasRole" << true))),
-                "test"));
+                user.get()));
         const User::RoleDataMap& roles2 = user->getRoles();
         ASSERT_EQUALS(1U, roles2.size());
         role = roles2.begin()->second;
@@ -417,7 +411,6 @@ namespace {
 
         // Multiple roles OK
         ASSERT_OK(v2parser.initializeUserRolesFromUserDocument(
-                user.get(),
                 BSON("name" << "spencer" <<
                      "roles" << BSON_ARRAY(BSON("name" << "roleA" <<
                                                 "source" << "dbA" <<
@@ -427,7 +420,7 @@ namespace {
                                                 "source" << "dbB" <<
                                                 "canDelegate" << false <<
                                                 "hasRole" << true))),
-                "test"));
+                user.get()));
         const User::RoleDataMap& roles3 = user->getRoles();
         ASSERT_EQUALS(2U, roles3.size());
         role = roles3.find(RoleName("roleA", "dbA"))->second;

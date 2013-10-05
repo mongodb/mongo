@@ -707,12 +707,7 @@ namespace mongo {
         if (mongodGlobalParams.upgrade)
             return;
 
-        AuthorizationManager* authzManager = getGlobalAuthorizationManager();
-        if (authzManager->isAuthEnabled()) {
-            Status status = getGlobalAuthorizationManager()->initialize();
-            uassertStatusOK(status);
-        }
-
+        uassertStatusOK(getGlobalAuthorizationManager()->initialize());
 
         /* this is for security on certain platforms (nonce generation) */
         srand((unsigned) (curTimeMicros() ^ startupSrandTimer.micros()));

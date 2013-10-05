@@ -61,5 +61,6 @@ error_code("RoleModificationFailed", 58)
 error_code("CommandNotFound", 59)
 error_code("DatabaseNotFound", 60)
 error_code("ShardKeyNotFound", 61)
+error_code("OplogOperationUnsupported", 62)
 
 error_class("NetworkError", ["HostUnreachable", "HostNotFound"])

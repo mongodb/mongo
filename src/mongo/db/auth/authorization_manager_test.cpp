@@ -154,7 +154,7 @@ namespace {
         AuthzManagerExternalStateMock* externalState;
     };
 
-    TEST_F(AuthorizationManagerTest, testAquireV0User) {
+    TEST_F(AuthorizationManagerTest, testAcquireV0User) {
         authzManager->setAuthorizationVersion(1);
 
         ASSERT_OK(externalState->insert(NamespaceString("test.system.users"),
@@ -166,6 +166,7 @@ namespace {
                                              "readOnly" << true),
                                         BSONObj()));
 
+        ASSERT_OK(authzManager->initialize());
         User* v0RW;
         ASSERT_OK(authzManager->acquireUser(UserName("v0RW", "test"), &v0RW));
         ASSERT_EQUALS(UserName("v0RW", "test"), v0RW->getName());
@@ -195,7 +196,7 @@ namespace {
         authzManager->releaseUser(v0AdminRO);
     }
 
-    TEST_F(AuthorizationManagerTest, testAquireV1User) {
+    TEST_F(AuthorizationManagerTest, testAcquireV1User) {
         authzManager->setAuthorizationVersion(1);
 
         ASSERT_OK(externalState->insert(NamespaceString("test.system.users"),
@@ -327,7 +328,7 @@ namespace {
     }
 
 
-    TEST_F(AuthorizationManagerTest, testAquireV2User) {
+    TEST_F(AuthorizationManagerTest, testAcquireV2User) {
         authzManager->setAuthorizationVersion(2);
 
         ASSERT_OK(externalState->insertPrivilegeDocument(

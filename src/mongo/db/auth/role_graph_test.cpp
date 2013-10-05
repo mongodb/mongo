@@ -52,27 +52,32 @@ namespace {
         ASSERT_OK(graph.createRole(roleB));
         ASSERT_OK(graph.createRole(roleC));
 
-        std::vector<RoleName> roles = graph.getDirectSubordinates(roleA);
-        ASSERT_EQUALS(0U, roles.size());
-        roles = graph.getDirectMembers(roleA);
-        ASSERT_EQUALS(0U, roles.size());
+        RoleNameIterator it;
+        it = graph.getDirectSubordinates(roleA);
+        ASSERT_FALSE(it.more());
+        it = graph.getDirectMembers(roleA);
+        ASSERT_FALSE(it.more());
 
         ASSERT_OK(graph.addRoleToRole(roleA, roleB));
 
         // A -> B
-        roles = graph.getDirectSubordinates(roleA);
-        ASSERT_EQUALS(1U, roles.size());
-        ASSERT_EQUALS(roles[0].getFullName(), roleB.getFullName());
+        it = graph.getDirectSubordinates(roleA);
+        ASSERT_TRUE(it.more());
+        // should not advance the iterator
+        ASSERT_EQUALS(it.get().getFullName(), roleB.getFullName());
+        ASSERT_EQUALS(it.get().getFullName(), roleB.getFullName());
+        ASSERT_EQUALS(it.next().getFullName(), roleB.getFullName());
+        ASSERT_FALSE(it.more());
 
-        roles = graph.getDirectMembers(roleA);
-        ASSERT_EQUALS(0U, roles.size());
+        it = graph.getDirectMembers(roleA);
+        ASSERT_FALSE(it.more());
 
-        roles = graph.getDirectMembers(roleB);
-        ASSERT_EQUALS(1U, roles.size());
-        ASSERT_EQUALS(roles[0].getFullName(), roleA.getFullName());
+        it = graph.getDirectMembers(roleB);
+        ASSERT_EQUALS(it.next().getFullName(), roleA.getFullName());
+        ASSERT_FALSE(it.more());
 
-        roles= graph.getDirectSubordinates(roleB);
-        ASSERT_EQUALS(0U, roles.size());
+        it = graph.getDirectSubordinates(roleB);
+        ASSERT_FALSE(it.more());
 
         ASSERT_OK(graph.addRoleToRole(roleA, roleC));
         ASSERT_OK(graph.addRoleToRole(roleB, roleC));
@@ -91,9 +96,20 @@ namespace {
          * D
         */
 
-        // Check indirect roles for roleA. should have roleB, roleC and roleD, order doesn't matter.
+
+        it = graph.getDirectSubordinates(roleA); // should be roleB and roleC, order doesn't matter
+        RoleName cur = it.next();
+        if (cur == roleB) {
+            ASSERT_EQUALS(it.next().getFullName(), roleC.getFullName());
+        } else if (cur == roleC) {
+            ASSERT_EQUALS(it.next().getFullName(), roleB.getFullName());
+        } else {
+            FAIL(mongoutils::str::stream() << "unexpected role returned: " << cur.getFullName());
+        }
+        ASSERT_FALSE(it.more());
+
         ASSERT_OK(graph.recomputePrivilegeData());
-        RoleNameIterator it = graph.getIndirectSubordinates(roleA);
+        it = graph.getIndirectSubordinates(roleA); // should have roleB, roleC and roleD
         bool hasB = false;
         bool hasC = false;
         bool hasD = false;
@@ -117,32 +133,39 @@ namespace {
         ASSERT(hasC);
         ASSERT(hasD);
 
-        roles = graph.getDirectSubordinates(roleA); // should be roleB then roleC
-        ASSERT_EQUALS(2U, roles.size());
-        ASSERT_EQUALS(roleB.getFullName(), roles[0].getFullName());
-        ASSERT_EQUALS(roleC.getFullName(), roles[1].getFullName());
+        it = graph.getDirectSubordinates(roleB); // should be roleC and roleD, order doesn't matter
+        cur = it.next();
+        if (cur == roleC) {
+            ASSERT_EQUALS(it.next().getFullName(), roleD.getFullName());
+        } else if (cur == roleD) {
+            ASSERT_EQUALS(it.next().getFullName(), roleC.getFullName());
+        } else {
+            FAIL(mongoutils::str::stream() << "unexpected role returned: " << cur.getFullName());
+        }
+        ASSERT_FALSE(it.more());
 
-        roles = graph.getDirectSubordinates(roleB); // should be roleC then roleD
-        ASSERT_EQUALS(2U, roles.size());
-        ASSERT_EQUALS(roleC.getFullName(), roles[0].getFullName());
-        ASSERT_EQUALS(roleD.getFullName(), roles[1].getFullName());
+        it = graph.getDirectSubordinates(roleC);
+        ASSERT_FALSE(it.more());
 
-        roles = graph.getDirectSubordinates(roleC);
-        ASSERT_EQUALS(0U, roles.size());
+        it = graph.getDirectMembers(roleA);
+        ASSERT_FALSE(it.more());
 
-        roles = graph.getDirectMembers(roleA);
-        ASSERT_EQUALS(0U, roles.size());
+        it = graph.getDirectMembers(roleB);
+        ASSERT_EQUALS(it.next().getFullName(), roleA.getFullName());
+        ASSERT_FALSE(it.more());
 
-        roles = graph.getDirectMembers(roleB);
-        ASSERT_EQUALS(1U, roles.size());
-        ASSERT_EQUALS(roleA.getFullName(), roles[0].getFullName());
+        it = graph.getDirectMembers(roleC); // should be role A and role B, order doesn't matter
+        cur = it.next();
+        if (cur == roleA) {
+            ASSERT_EQUALS(it.next().getFullName(), roleB.getFullName());
+        } else if (cur == roleB) {
+            ASSERT_EQUALS(it.next().getFullName(), roleA.getFullName());
+        } else {
+            FAIL(mongoutils::str::stream() << "unexpected role returned: " << cur.getFullName());
+        }
+        ASSERT_FALSE(it.more());
 
-        roles = graph.getDirectMembers(roleC); // should be role A then role B
-        ASSERT_EQUALS(2U, roles.size());
-        ASSERT_EQUALS(roleA.getFullName(), roles[0].getFullName());
-        ASSERT_EQUALS(roleB.getFullName(), roles[1].getFullName());
-
-        // Now remove roleD from roleB and make sure graph is updated correctly
+        // Now remove roleD from roleB and make sure graph is update correctly
         ASSERT_OK(graph.removeRoleFromRole(roleB, roleD));
 
         /*
@@ -152,23 +175,23 @@ namespace {
          * v   v
          * B -> C
          */
-        roles = graph.getDirectSubordinates(roleB); // should be just roleC
-        ASSERT_EQUALS(1U, roles.size());
-        ASSERT_EQUALS(roleC.getFullName(), roles[0].getFullName());
+        it = graph.getDirectSubordinates(roleB); // should be just roleC
+        ASSERT_EQUALS(it.next().getFullName(), roleC.getFullName());
+        ASSERT_FALSE(it.more());
 
-        roles = graph.getDirectSubordinates(roleD); // should be empty
-        ASSERT_EQUALS(0U, roles.size());
+        it = graph.getDirectSubordinates(roleD); // should be empty
+        ASSERT_FALSE(it.more());
 
 
         // Now delete roleB entirely and make sure that the other roles are updated properly
         ASSERT_OK(graph.deleteRole(roleB));
         ASSERT_NOT_OK(graph.deleteRole(roleB));
-        roles = graph.getDirectSubordinates(roleA);
-        ASSERT_EQUALS(1U, roles.size());
-        ASSERT_EQUALS(roleC.getFullName(), roles[0].getFullName());
-        roles = graph.getDirectMembers(roleC);
-        ASSERT_EQUALS(1U, roles.size());
-        ASSERT_EQUALS(roleA.getFullName(), roles[0].getFullName());
+        it = graph.getDirectSubordinates(roleA);
+        ASSERT_EQUALS(it.next().getFullName(), roleC.getFullName());
+        ASSERT_FALSE(it.more());
+        it = graph.getDirectMembers(roleC);
+        ASSERT_EQUALS(it.next().getFullName(), roleA.getFullName());
+        ASSERT_FALSE(it.more());
     }
 
     const ResourcePattern collectionAFooResource(ResourcePattern::forExactNamespace(
@@ -503,9 +526,10 @@ namespace {
         // properly.
         swap(tempGraph, graph);
 
-        std::vector<RoleName> roles = graph.getDirectSubordinates(roleB);
-        ASSERT_EQUALS(1U, roles.size());
-        ASSERT_EQUALS(roleC.getFullName(), roles[0].getFullName());
+        RoleNameIterator it = graph.getDirectSubordinates(roleB);
+        ASSERT_TRUE(it.more());
+        ASSERT_EQUALS(it.next().getFullName(), roleC.getFullName());
+        ASSERT_FALSE(it.more());
 
         graph.getAllPrivileges(roleA); // should have privileges from roleB *and* role C
         PrivilegeVector privileges = graph.getAllPrivileges(roleA);

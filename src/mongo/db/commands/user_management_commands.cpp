@@ -50,6 +50,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/platform/unordered_set.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/sequence_util.h"
 
 namespace mongo {
 
@@ -86,37 +87,22 @@ namespace mongo {
         return arrBuilder.arr();
     }
 
-    // Should only be called inside the AuthzUpdateLock
-    static Status rolesVectorToBSONArrayIfRolesExist(const std::vector<RoleName>& roles,
-                                                     AuthorizationManager* authzManager,
-                                                     BSONArray* result) {
+    static Status rolesVectorToBSONArray(const std::vector<RoleName>& roles, BSONArray* result) {
         BSONArrayBuilder rolesArrayBuilder;
         for (std::vector<RoleName>::const_iterator it = roles.begin(); it != roles.end(); ++it) {
             const RoleName& role = *it;
-            if (!authzManager->roleExists(role)) {
-                return Status(ErrorCodes::RoleNotFound,
-                              str::stream() << role.getFullName() <<
-                                      " does not name an existing role");
-            }
             rolesArrayBuilder.append(BSON("name" << role.getRole() << "source" << role.getDB()));
         }
         *result = rolesArrayBuilder.arr();
         return Status::OK();
     }
 
-    // Should only be called inside the AuthzUpdateLock
-    static Status roleDataVectorToBSONArrayIfRolesExist(const std::vector<User::RoleData>& roles,
-                                                        AuthorizationManager* authzManager,
-                                                        BSONArray* result) {
+    static Status roleDataVectorToBSONArray(const std::vector<User::RoleData>& roles,
+                                            BSONArray* result) {
         BSONArrayBuilder rolesArrayBuilder;
         for (std::vector<User::RoleData>::const_iterator it = roles.begin();
                 it != roles.end(); ++it) {
             const User::RoleData& role = *it;
-            if (!authzManager->roleExists(role.name)) {
-                return Status(ErrorCodes::RoleNotFound,
-                              str::stream() << it->name.getFullName() <<
-                                      " does not name an existing role");
-            }
             if (!role.hasRole && !role.canDelegate) {
                 return Status(ErrorCodes::BadValue, "At least one of \"hasRole\" and "
                               "\"canDelegate\" must be true for every role object");
@@ -255,9 +241,9 @@ namespace mongo {
                 return false;
             }
 
-            // Role existence has to be checked after acquiring the update lock
+            // TODO: Check role existence has to be checked after acquiring the update lock
             BSONArray rolesArray;
-            status = roleDataVectorToBSONArrayIfRolesExist(args.roles, authzManager, &rolesArray);
+            status = roleDataVectorToBSONArray(args.roles, &rolesArray);
             if (!status.isOK()) {
                 addStatus(status, result);
                 return false;
@@ -356,12 +342,10 @@ namespace mongo {
                 return false;
             }
 
-            // Role existence has to be checked after acquiring the update lock
+            // TODO: Role existence has to be checked after acquiring the update lock
             if (args.hasRoles) {
                 BSONArray rolesArray;
-                status = roleDataVectorToBSONArrayIfRolesExist(args.roles,
-                                                               authzManager,
-                                                               &rolesArray);
+                status = roleDataVectorToBSONArray(args.roles, &rolesArray);
                 if (!status.isOK()) {
                     addStatus(status, result);
                     return false;
@@ -610,13 +594,13 @@ namespace mongo {
 
             for (vector<RoleName>::iterator it = roles.begin(); it != roles.end(); ++it) {
                 RoleName& roleName = *it;
-                if (!authzManager->roleExists(roleName)) {
-                    addStatus(Status(ErrorCodes::RoleNotFound,
-                                     str::stream() << roleName.getFullName() <<
-                                             " does not name an existing role"),
-                              result);
+                BSONObj roleDoc;
+                status = authzManager->getRoleDescription(roleName, &roleDoc);
+                if (!status.isOK()) {
+                    addStatus(status, result);
                     return false;
                 }
+
                 User::RoleData& role = userRoles[roleName];
                 if (role.name.empty()) {
                     role.name = roleName;
@@ -708,13 +692,13 @@ namespace mongo {
 
             for (vector<RoleName>::iterator it = roles.begin(); it != roles.end(); ++it) {
                 RoleName& roleName = *it;
-                if (!authzManager->roleExists(roleName)) {
-                    addStatus(Status(ErrorCodes::RoleNotFound,
-                                     str::stream() << roleName.getFullName() <<
-                                             " does not name an existing role"),
-                              result);
+                BSONObj roleDoc;
+                status = authzManager->getRoleDescription(roleName, &roleDoc);
+                if (!status.isOK()) {
+                    addStatus(status, result);
                     return false;
                 }
+
                 User::RoleDataMap::iterator roleDataIt = userRoles.find(roleName);
                 if (roleDataIt == userRoles.end()) {
                     continue; // User already doesn't have the role, nothing to do
@@ -814,11 +798,10 @@ namespace mongo {
 
             for (vector<RoleName>::iterator it = roles.begin(); it != roles.end(); ++it) {
                 RoleName& roleName = *it;
-                if (!authzManager->roleExists(roleName)) {
-                    addStatus(Status(ErrorCodes::RoleNotFound,
-                                     str::stream() << roleName.getFullName() <<
-                                             " does not name an existing role"),
-                              result);
+                BSONObj roleDoc;
+                status = authzManager->getRoleDescription(roleName, &roleDoc);
+                if (!status.isOK()) {
+                    addStatus(status, result);
                     return false;
                 }
                 User::RoleData& role = userRoles[roleName];
@@ -913,11 +896,10 @@ namespace mongo {
 
             for (vector<RoleName>::iterator it = roles.begin(); it != roles.end(); ++it) {
                 RoleName& roleName = *it;
-                if (!authzManager->roleExists(roleName)) {
-                    addStatus(Status(ErrorCodes::RoleNotFound,
-                                     str::stream() << roleName.getFullName() <<
-                                             " does not name an existing role"),
-                              result);
+                BSONObj roleDoc;
+                status = authzManager->getRoleDescription(roleName, &roleDoc);
+                if (!status.isOK()) {
+                    addStatus(status, result);
                     return false;
                 }
                 User::RoleDataMap::iterator roleDataIt = userRoles.find(roleName);
@@ -998,6 +980,28 @@ namespace mongo {
                 addStatus(status, result);
                 return false;
             }
+
+            bool wantsDetails = cmdObj["details"].trueValue();
+            if (wantsDetails) {
+                if (anyDB || usersFilter.type() != String) {
+                    addStatus(Status(ErrorCodes::IllegalOperation,
+                                     "Cannot only get privilege details on exact-match usersInfo "
+                                     "queries."),
+                              result);
+                    return false;
+                }
+
+                BSONObj userDetails;
+                status = getGlobalAuthorizationManager()->getUserDescription(
+                        UserName(usersFilter.str(), dbname), &userDetails);
+                if (!status.isOK()) {
+                    addStatus(status, result);
+                    return false;
+                }
+                result.append("users", BSON_ARRAY(userDetails));
+                return true;
+            }
+
 
             BSONObjBuilder queryBuilder;
             queryBuilder.appendAs(usersFilter, "name");
@@ -1112,9 +1116,9 @@ namespace mongo {
                 return false;
             }
 
-            // Role existence has to be checked after acquiring the update lock
+            // TODO: Role existence has to be checked after acquiring the update lock
             BSONArray roles;
-            status = rolesVectorToBSONArrayIfRolesExist(args.roles, authzManager, &roles);
+            status = rolesVectorToBSONArray(args.roles, &roles);
             if (!status.isOK()) {
                 addStatus(status, result);
                 return false;
@@ -1204,10 +1208,10 @@ namespace mongo {
                 return false;
             }
 
-            // Role existence has to be checked after acquiring the update lock
+            // TODO: Role existence has to be checked after acquiring the update lock
             if (args.hasRoles) {
                 BSONArray roles;
-                status = rolesVectorToBSONArrayIfRolesExist(args.roles, authzManager, &roles);
+                status = rolesVectorToBSONArray(args.roles, &roles);
                 if (!status.isOK()) {
                     addStatus(status, result);
                     return false;
@@ -1287,15 +1291,7 @@ namespace mongo {
                 return false;
             }
 
-            if (!authzManager->roleExists(roleName)) {
-                addStatus(Status(ErrorCodes::RoleNotFound,
-                                 str::stream() << roleName.getFullName() <<
-                                         " does not name an existing role"),
-                          result);
-                return false;
-            }
-
-            if (authzManager->isBuiltinRole(roleName)) {
+            if (RoleGraph::isBuiltinRole(roleName)) {
                 addStatus(Status(ErrorCodes::InvalidRoleModification,
                                  str::stream() << roleName.getFullName() <<
                                          " is a built-in role and cannot be modified."),
@@ -1303,7 +1299,22 @@ namespace mongo {
                 return false;
             }
 
-            PrivilegeVector privileges = authzManager->getDirectPrivilegesForRole(roleName);
+            BSONObj roleDoc;
+            status = authzManager->getRoleDescription(roleName, &roleDoc);
+            if (!status.isOK()) {
+                addStatus(status, result);
+                return false;
+            }
+
+            PrivilegeVector privileges;
+            status = auth::parseAndValidatePrivilegeArray(BSONArray(roleDoc["privileges"].Obj()),
+                                                          &privileges);
+
+            if (!status.isOK()) {
+                addStatus(status, result);
+                return false;
+            }
+
             for (PrivilegeVector::iterator it = privilegesToAdd.begin();
                     it != privilegesToAdd.end(); ++it) {
                 Privilege::addPrivilegeToPrivilegeVector(&privileges, *it);
@@ -1404,15 +1415,7 @@ namespace mongo {
                 return false;
             }
 
-            if (!authzManager->roleExists(roleName)) {
-                addStatus(Status(ErrorCodes::RoleNotFound,
-                                 str::stream() << roleName.getFullName() <<
-                                         " does not name an existing role"),
-                          result);
-                return false;
-            }
-
-            if (authzManager->isBuiltinRole(roleName)) {
+            if (RoleGraph::isBuiltinRole(roleName)) {
                 addStatus(Status(ErrorCodes::InvalidRoleModification,
                                  str::stream() << roleName.getFullName() <<
                                          " is a built-in role and cannot be modified."),
@@ -1420,7 +1423,21 @@ namespace mongo {
                 return false;
             }
 
-            PrivilegeVector privileges = authzManager->getDirectPrivilegesForRole(roleName);
+            BSONObj roleDoc;
+            status = authzManager->getRoleDescription(roleName, &roleDoc);
+            if (!status.isOK()) {
+                addStatus(status, result);
+                return false;
+            }
+
+            PrivilegeVector privileges;
+            status = auth::parseAndValidatePrivilegeArray(BSONArray(roleDoc["privileges"].Obj()),
+                                                          &privileges);
+            if (!status.isOK()) {
+                addStatus(status, result);
+                return false;
+            }
+
             for (PrivilegeVector::iterator itToRm = privilegesToRemove.begin();
                     itToRm != privilegesToRemove.end(); ++itToRm) {
                 for (PrivilegeVector::iterator curIt = privileges.begin();
@@ -1531,15 +1548,7 @@ namespace mongo {
             }
 
             RoleName roleName(roleNameString, dbname);
-            if (!authzManager->roleExists(roleName)) {
-                addStatus(Status(ErrorCodes::RoleNotFound,
-                                 str::stream() << roleName.getFullName() <<
-                                         " does not name an existing role"),
-                          result);
-                return false;
-            }
-
-            if (authzManager->isBuiltinRole(roleName)) {
+            if (RoleGraph::isBuiltinRole(roleName)) {
                 addStatus(Status(ErrorCodes::InvalidRoleModification,
                                  str::stream() << roleName.getFullName() <<
                                          " is a built-in role and cannot be modified."),
@@ -1547,20 +1556,58 @@ namespace mongo {
                 return false;
             }
 
-            // TODO(spencer): Make sure that this update doesn't introduce a cycle
-            std::vector<RoleName> roles = authzManager->getSubordinateRolesForRole(roleName);
+            BSONObj roleDoc;
+            status = authzManager->getRoleDescription(roleName, &roleDoc);
+            if (!status.isOK()) {
+                addStatus(status, result);
+                return false;
+            }
+
+            std::vector<RoleName> roles;
+            status = auth::parseRoleNamesFromBSONArray(BSONArray(roleDoc["roles"].Obj()),
+                                                       roleName.getDB(),
+                                                       "roles",
+                                                       &roles);
+
             for (vector<RoleName>::iterator it = rolesToAdd.begin(); it != rolesToAdd.end(); ++it) {
-                RoleName& roleToAdd = *it;
-                if (std::find(roles.begin(), roles.end(), roleToAdd) == roles.end()) {
-                    // Only add role if it's not already present
-                    roles.push_back(roleToAdd);
+                const RoleName& roleToAdd = *it;
+                if (sequenceContains(roles, roleToAdd))
+                    continue;
+                BSONObj roleToAddDoc;
+                status = authzManager->getRoleDescription(roleToAdd, &roleToAddDoc);
+                if (status == ErrorCodes::RoleNotFound) {
+                    addStatus(Status(ErrorCodes::RoleNotFound,
+                                     "Cannot grant nonexistent role " + roleToAdd.toString()),
+                              result);
+                    return false;
                 }
+                if (!status.isOK()) {
+                    addStatus(status, result);
+                    return false;
+                }
+                std::vector<RoleName> indirectSubordinatesOfToAdd;
+                status = auth::parseRoleNamesFromBSONArray(
+                        BSONArray(roleDoc["indirectRoles"].Obj()),
+                        roleName.getDB(),
+                        "indirectRoles",
+                        &indirectSubordinatesOfToAdd);
+                if (!status.isOK()) {
+                    addStatus(status, result);
+                    return false;
+                }
+                if (sequenceContains(indirectSubordinatesOfToAdd, roleName)) {
+                    addStatus(Status(ErrorCodes::InvalidRoleModification,
+                                     mongoutils::str::stream() <<"Adding " <<
+                                     roleToAdd.getFullName() << " to " << roleName.getFullName() <<
+                                     " would introduce a cycle in the role graph."),
+                              result);
+                    return false;
+                }
+                roles.push_back(*it);
             }
 
             BSONArray newRolesBSONArray;
-            status = rolesVectorToBSONArrayIfRolesExist(roles,
-                                                        authzManager,
-                                                        &newRolesBSONArray);
+            status = rolesVectorToBSONArray(roles, &newRolesBSONArray);
             if (!status.isOK()) {
                 addStatus(status, result);
                 return false;
@@ -1636,15 +1683,7 @@ namespace mongo {
             }
 
             RoleName roleName(roleNameString, dbname);
-            if (!authzManager->roleExists(roleName)) {
-                addStatus(Status(ErrorCodes::RoleNotFound,
-                                 str::stream() << roleName.getFullName() <<
-                                         " does not name an existing role"),
-                          result);
-                return false;
-            }
-
-            if (authzManager->isBuiltinRole(roleName)) {
+            if (RoleGraph::isBuiltinRole(roleName)) {
                 addStatus(Status(ErrorCodes::InvalidRoleModification,
                                  str::stream() << roleName.getFullName() <<
                                          " is a built-in role and cannot be modified."),
@@ -1652,8 +1691,24 @@ namespace mongo {
                 return false;
             }
 
-            std::vector<RoleName> roles = authzManager->getSubordinateRolesForRole(roleName);
-            for (vector<RoleName>::iterator it = rolesToRemove.begin();
+            BSONObj roleDoc;
+            status = authzManager->getRoleDescription(roleName, &roleDoc);
+            if (!status.isOK()) {
+                addStatus(status, result);
+                return false;
+            }
+
+            std::vector<RoleName> roles;
+            status = auth::parseRoleNamesFromBSONArray(BSONArray(roleDoc["roles"].Obj()),
+                                                       roleName.getDB(),
+                                                       "roles",
+                                                       &roles);
+            if (!status.isOK()) {
+                addStatus(status, result);
+                return false;
+            }
+
+            for (vector<RoleName>::const_iterator it = rolesToRemove.begin();
                     it != rolesToRemove.end(); ++it) {
                 vector<RoleName>::iterator itToRm = std::find(roles.begin(), roles.end(), *it);
                 if (itToRm != roles.end()) {
@@ -1662,9 +1717,7 @@ namespace mongo {
             }
 
             BSONArray newRolesBSONArray;
-            status = rolesVectorToBSONArrayIfRolesExist(roles,
-                                                        authzManager,
-                                                        &newRolesBSONArray);
+            status = rolesVectorToBSONArray(roles, &newRolesBSONArray);
             if (!status.isOK()) {
                 addStatus(status, result);
                 return false;
@@ -1739,19 +1792,18 @@ namespace mongo {
                 return false;
             }
 
-            if (!authzManager->roleExists(roleName)) {
-                addStatus(Status(ErrorCodes::RoleNotFound,
-                                 str::stream() << roleName.getFullName() <<
-                                         " does not name an existing role"),
-                          result);
-                return false;
-            }
-
-            if (authzManager->isBuiltinRole(roleName)) {
+            if (RoleGraph::isBuiltinRole(roleName)) {
                 addStatus(Status(ErrorCodes::InvalidRoleModification,
                                  str::stream() << roleName.getFullName() <<
                                          " is a built-in role and cannot be modified."),
                           result);
+                return false;
+            }
+
+            BSONObj roleDoc;
+            status = authzManager->getRoleDescription(roleName, &roleDoc);
+            if (!status.isOK()) {
+                addStatus(status, result);
                 return false;
             }
 
@@ -1889,23 +1941,14 @@ namespace mongo {
                 return false;
             }
 
-            BSONObjBuilder queryBuilder;
-            queryBuilder.appendAs(rolesFilter, "name");
-            if (!anyDB) {
-                queryBuilder.append("source", dbname);
+            BSONObj roleObj;
+            status = getGlobalAuthorizationManager()->getRoleDescription(
+                    RoleName(rolesFilter.str(), dbname), &roleObj);
+            if (!status.isOK()) {
+                addStatus(status, result);
+                return false;
             }
-
-            BSONArrayBuilder rolesArrayBuilder;
-            BSONArrayBuilder& (BSONArrayBuilder::* appendBSONObj) (const BSONObj&) =
-                    &BSONArrayBuilder::append<BSONObj>;
-            const boost::function<void(const BSONObj&)> function =
-                    boost::bind(appendBSONObj, &rolesArrayBuilder, _1);
-            AuthorizationManager* authzManager = getGlobalAuthorizationManager();
-            authzManager->queryAuthzDocument(NamespaceString("admin.system.roles"),
-                                             queryBuilder.done(),
-                                             function);
-
-            result.append("roles", rolesArrayBuilder.arr());
+            result.append("roles", BSON_ARRAY(roleObj));
             return true;
         }
 

@@ -40,43 +40,6 @@ namespace mongo {
 
 namespace {
     PrivilegeVector emptyPrivilegeVector;
-    std::vector<RoleName> emptyRoleVector;
-
-    // RoleNameIterator for iterating over an unordered_set of RoleNames.
-    class RoleNameSetIterator : public RoleNameIterator::Impl {
-        MONGO_DISALLOW_COPYING(RoleNameSetIterator);
-
-    public:
-        RoleNameSetIterator(const unordered_set<RoleName>::const_iterator& begin,
-                            const unordered_set<RoleName>::const_iterator& end) :
-                _begin(begin), _end(end) {}
-
-        virtual ~RoleNameSetIterator() {}
-
-        virtual bool more() const {
-            return _begin != _end;
-        }
-
-        virtual const RoleName& next() {
-            const RoleName& toReturn = get();
-            ++_begin;
-            return toReturn;
-        }
-
-
-        virtual const RoleName& get() const {
-            return *_begin;
-        }
-
-    private:
-        virtual Impl* doClone() const {
-            return new RoleNameSetIterator(_begin, _end);
-        }
-
-        unordered_set<RoleName>::const_iterator _begin;
-        unordered_set<RoleName>::const_iterator _end;
-    };
-
 } // namespace
 
     RoleGraph::RoleGraph() {};
@@ -110,19 +73,13 @@ namespace {
         if (edgeIt == _roleToSubordinates.end())
             return false;
         edgeIt = _roleToMembers.find(role);
-        massert(16825,
-                "Role found in forward edges but not all reverse edges map, this should not "
-                     "be possible",
-                edgeIt != _roleToMembers.end());
+        fassert(16825, edgeIt != _roleToMembers.end());
 
         RolePrivilegeMap::const_iterator strIt = _directPrivilegesForRole.find(role);
         if (strIt == _directPrivilegesForRole.end())
             return false;
         strIt = _allPrivilegesForRole.find(role);
-        massert(16826,
-                "Role found in direct privileges map but not all privileges map, this should not "
-                        "be possible",
-                strIt != _allPrivilegesForRole.end());
+        fassert(16826, strIt != _allPrivilegesForRole.end());
         return true;
     }
 
@@ -182,23 +139,22 @@ namespace {
         return Status::OK();
     }
 
-    const std::vector<RoleName>& RoleGraph::getDirectSubordinates(const RoleName& role) {
+    RoleNameIterator RoleGraph::getDirectSubordinates(const RoleName& role) {
         if (!roleExists(role))
-            return emptyRoleVector;
-        return _roleToSubordinates.find(role)->second;
+            return RoleNameIterator(NULL);
+        return makeRoleNameIteratorForContainer(_roleToSubordinates[role]);
     }
 
     RoleNameIterator RoleGraph::getIndirectSubordinates(const RoleName& role) {
         if (!roleExists(role))
             return RoleNameIterator(NULL);
-        const unordered_set<RoleName>& subs = _roleToIndirectSubordinates.find(role)->second;
-        return RoleNameIterator(new RoleNameSetIterator(subs.begin(), subs.end()));
+        return makeRoleNameIteratorForContainer(_roleToIndirectSubordinates[role]);
     }
 
-    const std::vector<RoleName>& RoleGraph::getDirectMembers(const RoleName& role) {
+    RoleNameIterator RoleGraph::getDirectMembers(const RoleName& role) {
         if (!roleExists(role))
-            return emptyRoleVector;
-        return _roleToMembers.find(role)->second;
+            return RoleNameIterator(NULL);
+        return makeRoleNameIteratorForContainer(_roleToMembers[role]);
     }
 
     const PrivilegeVector& RoleGraph::getDirectPrivileges(const RoleName& role) {
@@ -277,13 +233,39 @@ namespace {
         itToRm = std::find(_roleToSubordinates[recipient].begin(),
                            _roleToSubordinates[recipient].end(),
                            role);
-        massert(16827,
-                mongoutils::str::stream() << role.getFullName() << " is not a subordinate"
-                        " of " << recipient.getFullName() << ", even though " <<
-                        recipient.getFullName() << " is a member of " << role.getFullName() <<
-                        ". This shouldn't be possible",
-                itToRm != _roleToSubordinates[recipient].end());
+        fassert(16827, itToRm != _roleToSubordinates[recipient].end());
         _roleToSubordinates[recipient].erase(itToRm);
+        return Status::OK();
+    }
+
+    Status RoleGraph::removeAllRolesFromRole(const RoleName& victim) {
+        typedef std::vector<RoleName> RoleNameVector;
+        if (!roleExists(victim)) {
+            return Status(ErrorCodes::RoleNotFound,
+                          mongoutils::str::stream() << "Role: " << victim.getFullName() <<
+                          " does not exist",
+                          0);
+        }
+        if (isBuiltinRole(victim)) {
+            return Status(ErrorCodes::InvalidRoleModification,
+                          mongoutils::str::stream() << "Cannot remove roles from built-in role: " <<
+                          victim.getFullName(),
+                          0);
+        }
+
+        RoleNameVector& subordinatesOfVictim = _roleToSubordinates[victim];
+        for (RoleNameVector::const_iterator subordinateRole = subordinatesOfVictim.begin(),
+                 end = subordinatesOfVictim.end();
+             subordinateRole != end;
+             ++subordinateRole) {
+
+            RoleNameVector& membersOfSubordinate = _roleToMembers[*subordinateRole];
+            RoleNameVector::iterator toErase = std::find(
+                    membersOfSubordinate.begin(), membersOfSubordinate.end(), victim);
+            fassert(17173, toErase != membersOfSubordinate.end());
+            membersOfSubordinate.erase(toErase);
+        }
+        subordinatesOfVictim.clear();
         return Status::OK();
     }
 
@@ -331,10 +313,7 @@ namespace {
 
         for (PrivilegeVector::const_iterator it = privilegesToAdd.begin();
                 it != privilegesToAdd.end(); ++it) {
-            Status status = addPrivilegeToRole(role, *it);
-            if (!status.isOK()) {
-                return status;
-            }
+            _addPrivilegeToRoleNoChecks(role, *it);
         }
         return Status::OK();
     }

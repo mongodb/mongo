@@ -36,6 +36,8 @@
 
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/dbhash.h"
@@ -365,6 +367,7 @@ namespace mongo {
 
         logOpForSharding(opstr, ns, obj, patt, fullObj, fromMigrate);
         logOpForDbHash(opstr, ns, obj, patt, fullObj, fromMigrate);
+        getGlobalAuthorizationManager()->logOp(opstr, ns, obj, patt, b, fromMigrate, fullObj);
     }
 
     void createOplog() {

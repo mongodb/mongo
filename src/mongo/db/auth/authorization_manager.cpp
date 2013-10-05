@@ -41,6 +41,7 @@
 #include "mongo/bson/mutable/element.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/authz_documents_update_guard.h"
+#include "mongo/db/auth/authz_manager_external_state.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/role_graph.h"
 #include "mongo/db/auth/user.h"
@@ -50,6 +51,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/platform/unordered_map.h"
+#include "mongo/util/log.h"
 #include "mongo/util/map_util.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -79,12 +81,19 @@ namespace mongo {
     const std::string AuthorizationManager::V1_USER_NAME_FIELD_NAME = "user";
     const std::string AuthorizationManager::V1_USER_SOURCE_FIELD_NAME = "userSource";
 
+    const NamespaceString AuthorizationManager::adminCommandNamespace("admin.$cmd");
+    const NamespaceString AuthorizationManager::rolesCollectionNamespace("admin.system.roles");
+    const NamespaceString AuthorizationManager::usersCollectionNamespace("admin.system.users");
+    const NamespaceString AuthorizationManager::versionCollectionNamespace("admin.system.version");
+
+
     bool AuthorizationManager::_doesSupportOldStylePrivileges = true;
     bool AuthorizationManager::_authEnabled = false;
 
 
     AuthorizationManager::AuthorizationManager(AuthzManagerExternalState* externalState) :
-            _externalState(externalState) {
+        _externalState(externalState) {
+
         setAuthorizationVersion(2);
     }
 
@@ -105,11 +114,7 @@ namespace mongo {
     Status AuthorizationManager::setAuthorizationVersion(int version) {
         boost::lock_guard<boost::mutex> lk(_lock);
 
-        if (version == 1) {
-            _parser.reset(new V1UserDocumentParser());
-        } else if (version == 2) {
-            _parser.reset(new V2UserDocumentParser());
-        } else {
+        if (version != 1 && version != 2) {
             return Status(ErrorCodes::UnsupportedFormat,
                           mongoutils::str::stream() <<
                                   "Unrecognized authorization format version: " <<
@@ -166,7 +171,7 @@ namespace mongo {
     Status AuthorizationManager::removeRoleDocuments(const BSONObj& query,
                                                      const BSONObj& writeConcern,
                                                      int* numRemoved) const {
-        Status status = _externalState->remove(NamespaceString("admin.system.roles"),
+        Status status = _externalState->remove(rolesCollectionNamespace,
                                                query,
                                                writeConcern,
                                                numRemoved);
@@ -178,7 +183,7 @@ namespace mongo {
 
     Status AuthorizationManager::insertRoleDocument(const BSONObj& roleObj,
                                                     const BSONObj& writeConcern) const {
-        Status status = _externalState->insert(NamespaceString("admin.system.roles"),
+        Status status = _externalState->insert(rolesCollectionNamespace,
                                                roleObj,
                                                writeConcern);
         if (status.isOK()) {
@@ -201,7 +206,7 @@ namespace mongo {
                                                     const BSONObj& updateObj,
                                                     const BSONObj& writeConcern) const {
         Status status = _externalState->updateOne(
-                NamespaceString("admin.system.roles"),
+                rolesCollectionNamespace,
                 BSON(AuthorizationManager::ROLE_NAME_FIELD_NAME << role.getRole() <<
                      AuthorizationManager::ROLE_SOURCE_FIELD_NAME << role.getDB()),
                 updateObj,
@@ -244,27 +249,6 @@ namespace mongo {
                                       numUpdated);
     }
 
-    bool AuthorizationManager::roleExists(const RoleName& role) {
-        boost::lock_guard<boost::mutex> lk(_lock);
-        return _roleGraph.roleExists(role);
-    }
-
-    bool AuthorizationManager::isBuiltinRole(const RoleName& role) {
-        boost::lock_guard<boost::mutex> lk(_lock);
-        return _roleGraph.isBuiltinRole(role);
-    }
-
-    PrivilegeVector AuthorizationManager::getDirectPrivilegesForRole(const RoleName& role) {
-        boost::lock_guard<boost::mutex> lk(_lock);
-        return _roleGraph.getDirectPrivileges(role);
-    }
-
-    std::vector<RoleName> AuthorizationManager::getSubordinateRolesForRole(
-            const RoleName& role) {
-        boost::lock_guard<boost::mutex> lk(_lock);
-        return _roleGraph.getDirectSubordinates(role);
-    }
-
     Status AuthorizationManager::getBSONForPrivileges(const PrivilegeVector& privileges,
                                                       mutablebson::Element resultArray) {
         for (PrivilegeVector::const_iterator it = privileges.begin();
@@ -305,10 +289,11 @@ namespace mongo {
         // Build roles array
         mutablebson::Element rolesArrayElement = result.getDocument().makeElementArray("roles");
         result.pushBack(rolesArrayElement);
-        const std::vector<RoleName> roles = graph->getDirectSubordinates(roleName);
-        for (std::vector<RoleName>::const_iterator it = roles.begin();
-                it != roles.end(); ++it) {
-            const RoleName& subRole = *it;
+        for (RoleNameIterator roles = graph->getDirectSubordinates(roleName);
+             roles.more();
+             roles.next()) {
+
+            const RoleName& subRole = roles.get();
             mutablebson::Element roleObj = result.getDocument().makeElementObject("");
             roleObj.appendString("name", subRole.getRole());
             roleObj.appendString("source", subRole.getDB());
@@ -318,18 +303,22 @@ namespace mongo {
         return Status::OK();
     }
 
-    void AuthorizationManager::_initializeUserPrivilegesFromRoles_inlock(User* user) {
+    static void _initializeUserPrivilegesFromRolesV1(User* user) {
         const User::RoleDataMap& roles = user->getRoles();
+        PrivilegeVector privileges;
         for (User::RoleDataMap::const_iterator it = roles.begin(); it != roles.end(); ++it) {
             const User::RoleData& role= it->second;
-            if (role.hasRole)
-                user->addPrivileges(_roleGraph.getAllPrivileges(role.name));
+            if (role.hasRole) {
+                RoleGraph::addPrivilegesForBuiltinRole(role.name, &privileges);
+            }
         }
+        user->addPrivileges(privileges);
     }
 
     Status AuthorizationManager::_initializeUserFromPrivilegeDocument(
             User* user, const BSONObj& privDoc) {
-        std::string userName = _parser->extractUserNameFromUserDocument(privDoc);
+        V2UserDocumentParser parser;
+        std::string userName = parser.extractUserNameFromUserDocument(privDoc);
         if (userName != user->getName().getUser()) {
             return Status(ErrorCodes::BadValue,
                           mongoutils::str::stream() << "User name from privilege document \""
@@ -340,27 +329,28 @@ namespace mongo {
                           0);
         }
 
-        Status status = _parser->initializeUserCredentialsFromUserDocument(user, privDoc);
+        Status status = parser.initializeUserCredentialsFromUserDocument(user, privDoc);
         if (!status.isOK()) {
             return status;
         }
-        status = _parser->initializeUserRolesFromUserDocument(user,
-                                                                 privDoc,
-                                                                 user->getName().getDB());
+        status = parser.initializeUserRolesFromUserDocument(privDoc, user);
         if (!status.isOK()) {
             return status;
         }
-        _initializeUserPrivilegesFromRoles_inlock(user);
+        status = parser.initializeUserPrivilegesFromUserDocument(privDoc, user);
         return Status::OK();
+    }
+
+    Status AuthorizationManager::getUserDescription(const UserName& userName, BSONObj* result) {
+        return _externalState->getUserDescription(userName, result);
+    }
+
+    Status AuthorizationManager::getRoleDescription(const RoleName& roleName, BSONObj* result) {
+        return _externalState->getRoleDescription(roleName, result);
     }
 
     Status AuthorizationManager::acquireUser(const UserName& userName, User** acquiredUser) {
         boost::lock_guard<boost::mutex> lk(_lock);
-        return _acquireUser_inlock(userName, acquiredUser);
-    }
-
-    Status AuthorizationManager::_acquireUser_inlock(const UserName& userName,
-                                                     User** acquiredUser) {
         unordered_map<UserName, User*>::iterator it = _userCache.find(userName);
         if (it != _userCache.end()) {
             fassert(16914, it->second);
@@ -371,15 +361,18 @@ namespace mongo {
             return Status::OK();
         }
 
+        if (_getVersion_inlock() != 2) {
+            return Status(ErrorCodes::UserNotFound, mongoutils::str::stream() <<
+                          "User " << userName.getFullName() << " not found.");
+        }
+
         // Put the new user into an auto_ptr temporarily in case there's an error while
         // initializing the user.
         auto_ptr<User> userHolder(new User(userName));
         User* user = userHolder.get();
 
         BSONObj userObj;
-        Status status = _externalState->getPrivilegeDocument(userName,
-                                                             _getVersion_inlock(),
-                                                             &userObj);
+        Status status = getUserDescription(userName, &userObj);
         if (!status.isOK()) {
             return status;
         }
@@ -475,13 +468,13 @@ namespace mongo {
                 continue;
             }
             it->second->invalidate();
-            // Need to decrement ref count and manually clean up User object to prevent memory leaks
-            // since we're pinning all User objects by incrementing their ref count when we
-            // initially populate the cache.
-            // TODO(spencer): remove this once we're not pinning User objects.
-            it->second->decrementRefCount();
-            if (it->second->getRefCount() == 0)
-                delete it->second;
+            // // Need to decrement ref count and manually clean up User object to prevent memory leaks
+            // // since we're pinning all User objects by incrementing their ref count when we
+            // // initially populate the cache.
+            // // TODO(spencer): remove this once we're not pinning User objects.
+            // it->second->decrementRefCount();
+            // if (it->second->getRefCount() == 0)
+            //     delete it->second;
         }
         _userCache.clear();
         // Make sure the internal user stays in the cache.
@@ -489,11 +482,16 @@ namespace mongo {
     }
 
     Status AuthorizationManager::initialize() {
-        if (getAuthorizationVersion() < 2) {
+        Status status = _externalState->initialize();
+        if (!status.isOK())
+            return status;
+
+        if (isAuthEnabled() && getAuthorizationVersion() < 2) {
             // If we are not yet upgraded to the V2 authorization format, build up a read-only
             // view of the V1 style authorization data.
             return _initializeAllV1UserData();
         }
+
         return Status::OK();
     }
 
@@ -556,7 +554,7 @@ namespace mongo {
                     if (!status.isOK()) {
                         return status;
                     }
-                    _initializeUserPrivilegesFromRoles_inlock(user);
+                    _initializeUserPrivilegesFromRolesV1(user);
                 }
             }
         } catch (const DBException& e) {
@@ -606,10 +604,8 @@ namespace mongo {
             return builder.obj();
         }
 
-        const NamespaceString newusersCollectionName("admin._newusers");
-        const NamespaceString usersCollectionName("admin.system.users");
-        const NamespaceString backupUsersCollectionName("admin.backup.users");
-        const NamespaceString versionCollectionName("admin.system.version");
+        const NamespaceString newusersCollectionNamespace("admin._newusers");
+        const NamespaceString backupUsersCollectionNamespace("admin.backup.users");
         const BSONObj versionDocumentQuery = BSON("_id" << 1);
 
         /**
@@ -619,7 +615,9 @@ namespace mongo {
         Status readAuthzVersion(AuthzManagerExternalState* externalState, int* outVersion) {
             BSONObj versionDoc;
             Status status = externalState->findOne(
-                    versionCollectionName, versionDocumentQuery, &versionDoc);
+                    AuthorizationManager::versionCollectionNamespace,
+                    versionDocumentQuery,
+                    &versionDoc);
             if (!status.isOK() && ErrorCodes::NoMatchingDocument != status) {
                 return status;
             }
@@ -638,6 +636,7 @@ namespace mongo {
         if (!lkUpgrade.tryLock("Upgrade authorization data")) {
             return Status(ErrorCodes::LockBusy, "Could not lock auth data upgrade process lock.");
         }
+        boost::lock_guard<boost::mutex> lkLocal(_lock);
         int durableVersion = 0;
         Status status = readAuthzVersion(_externalState.get(), &durableVersion);
         if (!status.isOK())
@@ -681,16 +680,16 @@ namespace mongo {
 
         BSONObj writeConcern;
         // Upgrade from v1 to v2.
-        status = _externalState->copyCollection(usersCollectionName,
-                                                backupUsersCollectionName,
+        status = _externalState->copyCollection(usersCollectionNamespace,
+                                                backupUsersCollectionNamespace,
                                                 writeConcern);
         if (!status.isOK())
             return status;
-        status = _externalState->dropCollection(newusersCollectionName, writeConcern);
+        status = _externalState->dropCollection(newusersCollectionNamespace, writeConcern);
         if (!status.isOK())
             return status;
         status = _externalState->createIndex(
-                newusersCollectionName,
+                newusersCollectionNamespace,
                 BSON(USER_NAME_FIELD_NAME << 1 << USER_SOURCE_FIELD_NAME << 1),
                 true, // unique
                 writeConcern
@@ -698,7 +697,6 @@ namespace mongo {
         if (!status.isOK())
             return status;
 
-        boost::lock_guard<boost::mutex> lkLocal(_lock);
         for (unordered_map<UserName, User*>::const_iterator iter = _userCache.begin();
              iter != _userCache.end(); ++iter) {
 
@@ -707,18 +705,18 @@ namespace mongo {
                 continue;
 
             status = _externalState->insert(
-                    newusersCollectionName, userAsV2PrivilegeDocument(*iter->second),
+                    newusersCollectionNamespace, userAsV2PrivilegeDocument(*iter->second),
                     writeConcern);
             if (!status.isOK())
                 return status;
         }
-        status = _externalState->renameCollection(newusersCollectionName,
-                                                  usersCollectionName,
+        status = _externalState->renameCollection(newusersCollectionNamespace,
+                                                  usersCollectionNamespace,
                                                   writeConcern);
         if (!status.isOK())
             return status;
         status = _externalState->updateOne(
-                versionCollectionName,
+                versionCollectionNamespace,
                 versionDocumentQuery,
                 BSON("$set" << BSON("currentVersion" << 2)),
                 true,
@@ -727,6 +725,26 @@ namespace mongo {
             return status;
         _version = 2;
         return status;
+    }
+
+    void AuthorizationManager::logOp(
+            const char* op,
+            const char* ns,
+            const BSONObj& o,
+            BSONObj* o2,
+            bool* b,
+            bool fromMigrateUnused,
+            const BSONObj* fullObjUnused) {
+
+        _externalState->logOp(op, ns, o, o2, b, fromMigrateUnused, fullObjUnused);
+        if (ns == rolesCollectionNamespace.ns() ||
+            ns == adminCommandNamespace.ns() ||
+            ns == usersCollectionNamespace.ns()) {
+            boost::lock_guard<boost::mutex> lk(_lock);
+            if (_getVersion_inlock() == 2) {
+                _invalidateUserCache_inlock();
+            }
+        }
     }
 
 } // namespace mongo

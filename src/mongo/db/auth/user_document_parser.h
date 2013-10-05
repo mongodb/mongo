@@ -36,75 +36,49 @@
 
 namespace mongo {
 
-    /**
-     * Interface for class used to initialize User objects from their system.users documents.
-     */
-    class UserDocumentParser {
-        MONGO_DISALLOW_COPYING(UserDocumentParser);
-    public:
-        UserDocumentParser() {};
-        virtual ~UserDocumentParser() {};
-
-        /**
-         * Returns the name of the user in the given user document.
-         */
-        virtual std::string extractUserNameFromUserDocument(const BSONObj& doc) const = 0;
-
-        /**
-         * Parses privDoc and initializes the user's "credentials" field with the credential
-         * information extracted from the user document.
-         */
-        virtual Status initializeUserCredentialsFromUserDocument(
-                User* user, const BSONObj& privDoc) const = 0;
-
-        /**
-         * Parses privDoc and initializes the user's "roles" field with the role list extracted
-         * from the user document.
-         */
-        virtual Status initializeUserRolesFromUserDocument(
-                User* user, const BSONObj& privDoc, const StringData& dbname) const = 0;
-
-    };
-
-    class V1UserDocumentParser : public UserDocumentParser {
+    class V1UserDocumentParser {
         MONGO_DISALLOW_COPYING(V1UserDocumentParser);
     public:
-
         V1UserDocumentParser() {}
-        virtual ~V1UserDocumentParser() {}
+        std::string extractUserNameFromUserDocument(const BSONObj& doc) const;
 
-        virtual std::string extractUserNameFromUserDocument(const BSONObj& doc) const;
+        Status initializeUserFromUserDocument(const BSONObj& userDoc, User* user) const;
 
-        virtual Status initializeUserCredentialsFromUserDocument(User* user,
-                                                                 const BSONObj& privDoc) const;
+        Status initializeUserCredentialsFromUserDocument(User* user,
+                                                         const BSONObj& privDoc) const;
 
-        virtual Status initializeUserRolesFromUserDocument(
+        Status initializeUserRolesFromUserDocument(
                         User* user, const BSONObj& privDoc, const StringData& dbname) const;
     };
 
-    class V2UserDocumentParser : public UserDocumentParser {
+    class V2UserDocumentParser {
         MONGO_DISALLOW_COPYING(V2UserDocumentParser);
     public:
-
         V2UserDocumentParser() {}
-        virtual ~V2UserDocumentParser() {}
-
         Status checkValidUserDocument(const BSONObj& doc) const;
+
+        Status initializeUserFromUserDocument(const BSONObj& doc, User* user);
 
         /**
          * Returns Status::OK() iff the given BSONObj describes a valid element from a roles array.
          * If hasPossessionBools is true then the role object must have "hasRole" and
          * "canDelegate" booleans, if false then they must be missing.
          */
-        Status checkValidRoleObject(const BSONObj& roleObject, bool hasPossessionBools) const;
+        static Status checkValidRoleObject(const BSONObj& roleObject, bool hasPossessionBools);
 
-        virtual std::string extractUserNameFromUserDocument(const BSONObj& doc) const;
+        static Status parseRoleData(const BSONObj& roleObject, User::RoleData* result);
 
-        virtual Status initializeUserCredentialsFromUserDocument(User* user,
-                                                                 const BSONObj& privDoc) const;
+        static Status parseRoleVector(const BSONArray& rolesArray,
+                                      std::vector<User::RoleData>* result);
 
-        virtual Status initializeUserRolesFromUserDocument(
-                        User* user, const BSONObj& privDoc, const StringData& unused) const;
+        std::string extractUserNameFromUserDocument(const BSONObj& doc) const;
+
+        Status initializeUserFromUserDocument(const BSONObj& userDoc, User* user) const;
+
+        Status initializeUserCredentialsFromUserDocument(User* user, const BSONObj& privDoc) const;
+
+        Status initializeUserRolesFromUserDocument(const BSONObj& doc, User* user) const;
+        Status initializeUserPrivilegesFromUserDocument(const BSONObj& doc, User* user) const;
     };
 
 } // namespace mongo
