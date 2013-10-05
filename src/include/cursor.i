@@ -211,15 +211,14 @@ __cursor_row_slot_return(WT_CURSOR_BTREE *cbt, WT_ROW *rip, WT_UPDATE *upd)
 			 * copy the prefix into place, and then re-point the
 			 * WT_ITEM->data field to the newly constructed memory.
 			 */
+			WT_ASSERT(session, cbt->tmp.size >= unpack->prefix);
+			if (cbt->tmp.data != cbt->tmp.mem)
+				WT_RET(__wt_buf_set(session, &cbt->tmp,
+				    cbt->tmp.data, unpack->prefix));
 			WT_RET(__wt_buf_grow(
 			    session, &cbt->tmp, unpack->prefix + unpack->size));
-			if (cbt->tmp.data != cbt->tmp.mem) {
-				memcpy((uint8_t *)cbt->tmp.mem,
-				    cbt->tmp.data, unpack->prefix);
-				cbt->tmp.data = cbt->tmp.mem;
-			}
-			memcpy((uint8_t *)cbt->tmp.data +
-			    unpack->prefix, unpack->data, unpack->size);
+			memcpy((uint8_t *)cbt->tmp.data + unpack->prefix,
+			    unpack->data, unpack->size);
 			cbt->tmp.size = unpack->prefix + unpack->size;
 		} else {
 			/*
