@@ -107,7 +107,8 @@ namespace mongo {
         else if (leaf->stageType == STAGE_IXSCAN) {
             IndexScanStats* indexStats = static_cast<IndexScanStats*>(leaf->specific.get());
             dassert(indexStats);
-            res->setCursor(indexStats->indexType + " " + indexStats->indexName);
+            string direction = indexStats > 0 ? "" : " reverse";
+            res->setCursor(indexStats->indexType + " " + indexStats->indexName + direction);
             res->setNScanned(indexStats->keysExamined);
 
             // If we're covered, that is, no FETCH is present, then, by definition,

@@ -75,6 +75,7 @@ namespace mongo {
         _specificStats.indexType = "BtreeCursor"; // TODO amName;
         _specificStats.indexName = _descriptor->infoObj()["name"].String();
         _specificStats.indexBounds = _params.bounds.toBSON();
+        _specificStats.direction = _params.direction;
         _specificStats.isMultiKey = _descriptor->isMultikey();
     }
 
@@ -105,6 +106,10 @@ namespace mongo {
                 // Start at one key, end at another.
                 Status status = _indexCursor->seek(_params.bounds.startKey);
                 if (!status.isOK()) {
+
+
+
+
                     warning() << "Seek failed: " << status.toString();
                     _hitEnd = true;
                     return PlanStage::FAILURE;
