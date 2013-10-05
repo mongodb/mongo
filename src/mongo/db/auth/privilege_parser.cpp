@@ -27,6 +27,7 @@ namespace mongo {
 
     using mongoutils::str::stream;
 
+    const BSONField<bool> ParsedResource::anyResource("anyResource");
     const BSONField<bool> ParsedResource::cluster("cluster");
     const BSONField<string> ParsedResource::db("db");
     const BSONField<string> ParsedResource::collection("collection");
@@ -44,14 +45,24 @@ namespace mongo {
             errMsg = &dummy;
         }
 
-        if (!isClusterSet() && (!isDbSet() || !isCollectionSet())) {
-            *errMsg = stream() << "resource must have " << db.name() << " and " <<
-                    collection.name() << " set, or must have " << cluster.name();
+        int numCandidateTypes = 0;
+        if (isAnyResourceSet()) ++numCandidateTypes;
+        if (isClusterSet()) ++numCandidateTypes;
+        if (isDbSet() || isCollectionSet()) ++numCandidateTypes;
+
+        if (isDbSet() != isCollectionSet()) {
+            *errMsg = stream() << "resource must set both " << db.name() << " and " <<
+                collection.name() << " or neither, but not exactly one.";
             return false;
         }
-        if (isClusterSet() && (isDbSet() || isCollectionSet())) {
-            *errMsg = stream() << "resource cannot have " << cluster.name() << " set as well as "
-                    << db.name() << " or " << collection.name();
+        if (numCandidateTypes != 1) {
+            *errMsg = stream() << "resource must have exactly " << db.name()  << " and " <<
+                collection.name() << " set, or have only " << cluster.name() << " set " <<
+                " or have only " << anyResource.name() << " set";
+            return false;
+        }
+        if (isAnyResourceSet() && !getAnyResource()) {
+            *errMsg = stream() << anyResource.name() << " must be true when specified";
             return false;
         }
         if (isClusterSet() && !getCluster()) {
@@ -73,6 +84,8 @@ namespace mongo {
     BSONObj ParsedResource::toBSON() const {
         BSONObjBuilder builder;
 
+        if (_isAnyResourceSet) builder.append(anyResource(), _anyResource);
+
         if (_isClusterSet) builder.append(cluster(), _cluster);
 
         if (_isDbSet) builder.append(db(), _db);
@@ -89,6 +102,10 @@ namespace mongo {
         if (!errMsg) errMsg = &dummy;
 
         FieldParser::FieldState fieldState;
+        fieldState = FieldParser::extract(source, anyResource, &_anyResource, errMsg);
+        if (fieldState == FieldParser::FIELD_INVALID) return false;
+        _isAnyResourceSet = fieldState == FieldParser::FIELD_SET;
+
         fieldState = FieldParser::extract(source, cluster, &_cluster, errMsg);
         if (fieldState == FieldParser::FIELD_INVALID) return false;
         _isClusterSet = fieldState == FieldParser::FIELD_SET;
@@ -105,6 +122,9 @@ namespace mongo {
     }
 
     void ParsedResource::clear() {
+        _anyResource = false;
+        _isAnyResourceSet = false;
+
         _cluster = false;
         _isClusterSet = false;
 
@@ -119,6 +139,9 @@ namespace mongo {
     void ParsedResource::cloneTo(ParsedResource* other) const {
         other->clear();
 
+        other->_anyResource = _anyResource;
+        other->_isAnyResourceSet = _isAnyResourceSet;
+
         other->_cluster = _cluster;
         other->_isClusterSet = _isClusterSet;
 
@@ -131,6 +154,24 @@ namespace mongo {
 
     std::string ParsedResource::toString() const {
         return toBSON().toString();
+    }
+
+    void ParsedResource::setAnyResource(bool anyResource) {
+        _anyResource = anyResource;
+        _isAnyResourceSet = true;
+    }
+
+    void ParsedResource::unsetAnyResource() {
+         _isAnyResourceSet = false;
+     }
+
+    bool ParsedResource::isAnyResourceSet() const {
+         return _isAnyResourceSet;
+    }
+
+    bool ParsedResource::getAnyResource() const {
+        dassert(_isAnyResourceSet);
+        return _anyResource;
     }
 
     void ParsedResource::setCluster(bool cluster) {
@@ -359,7 +400,9 @@ namespace mongo {
         // Build resource
         ResourcePattern resource;
         const ParsedResource& parsedResource = parsedPrivilege.getResource();
-        if (parsedResource.isClusterSet() && parsedResource.getCluster()) {
+        if (parsedResource.isAnyResourceSet() && parsedResource.getAnyResource()) {
+            resource = ResourcePattern::forAnyResource();
+        } else if (parsedResource.isClusterSet() && parsedResource.getCluster()) {
             resource = ResourcePattern::forClusterResource();
         } else {
             if (parsedResource.isDbSet() && !parsedResource.getDb().empty()) {
@@ -401,6 +444,8 @@ namespace mongo {
             parsedResource.setCollection("");
         } else if (privilege.getResourcePattern().isClusterResourcePattern()) {
             parsedResource.setCluster(true);
+        } else if (privilege.getResourcePattern().isAnyResourcePattern()) {
+            parsedResource.setAnyResource(true);
         } else {
             *errmsg = stream() << privilege.getResourcePattern().toString() <<
                     " is not a valid user-grantable resource pattern";

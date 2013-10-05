@@ -39,6 +39,7 @@ namespace mongo {
         // schema declarations
         //
 
+        static const BSONField<bool> anyResource;
         static const BSONField<bool> cluster;
         static const BSONField<string> db;
         static const BSONField<string> collection;
@@ -67,6 +68,11 @@ namespace mongo {
         // individual field accessors
         //
 
+        void setAnyResource(bool anyResource);
+        void unsetAnyResource();
+        bool isAnyResourceSet() const;
+        bool getAnyResource() const;
+
         void setCluster(bool cluster);
         void unsetCluster();
         bool isClusterSet() const;
@@ -84,6 +90,10 @@ namespace mongo {
 
     private:
         // Convention: (M)andatory, (O)ptional
+
+        // (O) Only present if the resource matches anything.
+        bool _anyResource;
+        bool _isAnyResourceSet;
 
         // (O) Only present if the resource is the cluster
         bool _cluster;

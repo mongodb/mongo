@@ -123,6 +123,13 @@ namespace mongo {
         }
 
         /**
+         * Returns true if this pattern matches any resource.
+         */
+        bool isAnyResourcePattern() const {
+            return _matchType == matchAnyResource;
+        }
+
+        /**
          * Returns the namespace that this pattern matches.
          *
          * Behavior is undefined unless isExactNamespacePattern() is true.
