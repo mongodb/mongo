@@ -19,34 +19,33 @@ env.StaticLibrary('authcore', ['action_set.cpp',
                                'privilege_parser.cpp',
                                'resource_pattern.cpp',
                                'role_graph.cpp',
+                               'role_graph_update.cpp',
                                'role_name.cpp',
                                'role_graph_builtin_roles.cpp',
                                'user.cpp',
                                'user_document_parser.cpp',
+                               'user_management_commands_parser.cpp',
                                'user_name.cpp',
                                'user_set.cpp'],
-                  LIBDEPS=['$BUILD_DIR/mongo/base/base',
+                  LIBDEPS=['$BUILD_DIR/mongo/auth_helpers',
+                           '$BUILD_DIR/mongo/base/base',
                            '$BUILD_DIR/mongo/bson',
                            '$BUILD_DIR/mongo/db/common',
+                           '$BUILD_DIR/mongo/db/ops/update_driver',
                            '$BUILD_DIR/mongo/stringutils'])
-
-env.StaticLibrary('usercommandsparser', ['user_management_commands_parser.cpp'],
-                  LIBDEPS=['authcore', '$BUILD_DIR/mongo/mongocommon'])
-
 
 env.StaticLibrary('authservercommon',
                   ['auth_server_parameters.cpp',
                    'authorization_manager_global.cpp',
                    'authz_session_external_state_server_common.cpp',
                    'security_key.cpp'],
-                  LIBDEPS=['authcore', 'usercommandsparser'])
+                  LIBDEPS=['authcore'])
 
 env.StaticLibrary('authmongod',
                   ['authz_manager_external_state_d.cpp',
                    'authz_session_external_state_d.cpp',
                    'auth_index_d.cpp'],
-                  LIBDEPS=['authservercommon',
-                           '$BUILD_DIR/mongo/db/ops/update_driver',])
+                  LIBDEPS=['authservercommon',])
 
 env.StaticLibrary('authmongos',
                   ['authz_manager_external_state_s.cpp',
@@ -59,9 +58,7 @@ env.StaticLibrary('authmocks',
                            '$BUILD_DIR/mongo/expressions'])
 
 env.CppUnitTest('action_set_test', 'action_set_test.cpp', LIBDEPS=['authcore'])
-env.CppUnitTest('privilege_parser_test', 'privilege_parser_test.cpp',
-                LIBDEPS=['usercommandsparser'],
-                NO_CRUTCH=True)
+env.CppUnitTest('privilege_parser_test', 'privilege_parser_test.cpp', LIBDEPS=['authcore'])
 env.CppUnitTest('role_graph_test', 'role_graph_test.cpp', LIBDEPS=['authcore'])
 env.CppUnitTest('user_document_parser_test', 'user_document_parser_test.cpp', LIBDEPS=['authcore'])
 env.CppUnitTest('user_set_test', 'user_set_test.cpp', LIBDEPS=['authcore'])

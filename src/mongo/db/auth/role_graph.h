@@ -34,10 +34,13 @@
 #include "mongo/base/status.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/role_name.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/platform/unordered_map.h"
 #include "mongo/platform/unordered_set.h"
 
 namespace mongo {
+
+    class BSONOBj;
 
     /**
      * A graph of role and privilege relationships.
@@ -220,6 +223,24 @@ namespace mongo {
         Status replaceRole(const RoleName& roleName,
                            const std::vector<RoleName>& roles,
                            const PrivilegeVector& privileges);
+
+        /**
+         * Adds the role described in "doc" the role graph.
+         */
+        Status addRoleFromDocument(const BSONObj& doc);
+
+        /**
+         * Applies to the RoleGraph the oplog operation described by the parameters.
+         *
+         * Returns Status::OK() on success, ErrorCodes::OplogOperationUnsupported if the oplog
+         * operation is not supported, and other codes (typically BadValue) if the oplog operation
+         * is ill-described.
+         */
+        Status handleLogOp(
+                const char* op,
+                const NamespaceString& ns,
+                const BSONObj& o,
+                const BSONObj* o2);
 
         /**
          * Recomputes the indirect (getAllPrivileges) data for this graph.
