@@ -149,27 +149,35 @@ MONGO_HASH_NAMESPACE_END
 
 namespace mongo {
 
-    // RoleNameIterator for iterating over a vector of RoleNames.
-    class RoleNameVectorIterator : public RoleNameIterator::Impl {
-        MONGO_DISALLOW_COPYING(RoleNameVectorIterator);
-
+    template <typename ContainerIterator>
+    class RoleNameContainerIteratorImpl : public RoleNameIterator::Impl {
+        MONGO_DISALLOW_COPYING(RoleNameContainerIteratorImpl);
     public:
-        RoleNameVectorIterator(const std::vector<RoleName>::const_iterator& begin,
-                               const std::vector<RoleName>::const_iterator& end);
-
-        virtual ~RoleNameVectorIterator();
-
-        virtual bool more() const;
-
-        virtual const RoleName& next();
-
-        virtual const RoleName& get() const;
+        RoleNameContainerIteratorImpl(const ContainerIterator& begin,
+                                      const ContainerIterator& end) :
+            _curr(begin), _end(end) {}
+        virtual ~RoleNameContainerIteratorImpl() {}
+        virtual bool more() const { return _curr != _end; }
+        virtual const RoleName& next() { return *(_curr++); }
+        virtual const RoleName& get() const { return *_curr; }
+        virtual RoleNameIterator::Impl* doClone() const {
+            return new RoleNameContainerIteratorImpl(_curr, _end);
+        }
 
     private:
-        virtual Impl* doClone() const;
-
-        std::vector<RoleName>::const_iterator _begin;
-        std::vector<RoleName>::const_iterator _end;
+        ContainerIterator _curr;
+        ContainerIterator _end;
     };
+
+    template <typename ContainerIterator>
+    RoleNameIterator makeRoleNameIterator(const ContainerIterator& begin,
+                                          const ContainerIterator& end) {
+        return RoleNameIterator( new RoleNameContainerIteratorImpl<ContainerIterator>(begin, end));
+    }
+
+    template <typename Container>
+    RoleNameIterator makeRoleNameIteratorForContainer(const Container& container) {
+        return makeRoleNameIterator(container.begin(), container.end());
+    }
 
 }  // namespace mongo
