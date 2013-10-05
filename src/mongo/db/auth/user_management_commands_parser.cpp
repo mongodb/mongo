@@ -80,19 +80,16 @@ namespace auth {
         return Status::OK();
     }
 
-    /**
-     * Takes a BSONArray of name,source pair documents, parses that array and returns (via the
-     * output param parsedRoleNames) a list of the role names in the input array.
-     */
-    Status _extractRoleNamesFromBSONArray(const BSONArray& rolesArray,
-                                          const std::string& dbname,
-                                          const StringData& rolesFieldName,
-                                          std::vector<RoleName>* parsedRoleNames) {
+    Status parseRoleNamesFromBSONArray(const BSONArray& rolesArray,
+                                       const StringData& dbname,
+                                       const StringData& rolesFieldName,
+                                       std::vector<RoleName>* parsedRoleNames) {
         for (BSONObjIterator it(rolesArray); it.more(); it.next()) {
             BSONElement element = *it;
             if (element.type() == String) {
                 parsedRoleNames->push_back(RoleName(element.String(), dbname));
-            } else if (element.type() == Object) {
+            }
+            else if (element.type() == Object) {
                 BSONObj roleObj = element.Obj();
 
                 std::string roleNameString;
@@ -107,7 +104,8 @@ namespace auth {
                 }
 
                 parsedRoleNames->push_back(RoleName(roleNameString, roleSource));
-            } else {
+            }
+            else {
                 return Status(ErrorCodes::BadValue,
                               mongoutils::str::stream() << "Values in \"" << rolesFieldName <<
                                       "\" array must be sub-documents or strings");
@@ -199,10 +197,10 @@ namespace auth {
             return status;
         }
 
-        status = _extractRoleNamesFromBSONArray(BSONArray(rolesElement.Obj()),
-                                                dbname,
-                                                rolesFieldName,
-                                                parsedRoleNames);
+        status = parseRoleNamesFromBSONArray(BSONArray(rolesElement.Obj()),
+                                             dbname,
+                                             rolesFieldName,
+                                             parsedRoleNames);
         if (!status.isOK()) {
             return status;
         }
@@ -344,6 +342,7 @@ namespace auth {
         validFieldNames.insert(cmdName.toString());
         validFieldNames.insert("anyDB");
         validFieldNames.insert("writeConcern");
+        validFieldNames.insert("details");
 
         Status status = _checkNoExtraFields(cmdObj, cmdName, validFieldNames);
         if (!status.isOK()) {
@@ -380,8 +379,8 @@ namespace auth {
      * Validates that the given privilege BSONArray is valid.
      * If parsedPrivileges is not NULL, adds to it the privileges parsed out of the input BSONArray.
      */
-    Status _parseAndValidatePrivilegeArray(const BSONArray& privileges,
-                                           PrivilegeVector* parsedPrivileges) {
+    Status parseAndValidatePrivilegeArray(const BSONArray& privileges,
+                                          PrivilegeVector* parsedPrivileges) {
         for (BSONObjIterator it(privileges); it.more(); it.next()) {
             BSONElement element = *it;
             if (element.type() != Object) {
@@ -442,8 +441,8 @@ namespace auth {
             if (!status.isOK()) {
                 return status;
             }
-            status = _parseAndValidatePrivilegeArray(BSONArray(privilegesElement.Obj()),
-                                                     &parsedArgs->privileges);
+            status = parseAndValidatePrivilegeArray(BSONArray(privilegesElement.Obj()),
+                                                    &parsedArgs->privileges);
             if (!status.isOK()) {
                 return status;
             }
@@ -457,10 +456,10 @@ namespace auth {
             if (!status.isOK()) {
                 return status;
             }
-            status = _extractRoleNamesFromBSONArray(BSONArray(rolesElement.Obj()),
-                                                    dbname,
-                                                    "roles",
-                                                    &parsedArgs->roles);
+            status = parseRoleNamesFromBSONArray(BSONArray(rolesElement.Obj()),
+                                                 dbname,
+                                                 "roles",
+                                                 &parsedArgs->roles);
             if (!status.isOK()) {
                 return status;
             }
@@ -506,8 +505,8 @@ namespace auth {
         if (!status.isOK()) {
             return status;
         }
-        status = _parseAndValidatePrivilegeArray(BSONArray(privilegesElement.Obj()),
-                                                 parsedPrivileges);
+        status = parseAndValidatePrivilegeArray(BSONArray(privilegesElement.Obj()),
+                                                parsedPrivileges);
         if (!status.isOK()) {
             return status;
         }
