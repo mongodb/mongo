@@ -17,7 +17,7 @@ var adminUser = {
 var test1User = {
     user: "test",
     pwd: "a",
-    roles: [{name: 'readWrite', source: 'test1', hasRole: true, canDelegate: false}]
+    roles: [{name: 'readWrite', db: 'test1', hasRole: true, canDelegate: false}]
 };
 
 function assertGLEOK(status) {

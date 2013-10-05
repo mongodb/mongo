@@ -74,9 +74,9 @@ namespace mongo {
     }
 
     const std::string AuthorizationManager::USER_NAME_FIELD_NAME = "name";
-    const std::string AuthorizationManager::USER_SOURCE_FIELD_NAME = "source";
+    const std::string AuthorizationManager::USER_SOURCE_FIELD_NAME = "db";
     const std::string AuthorizationManager::ROLE_NAME_FIELD_NAME = "name";
-    const std::string AuthorizationManager::ROLE_SOURCE_FIELD_NAME = "source";
+    const std::string AuthorizationManager::ROLE_SOURCE_FIELD_NAME = "db";
     const std::string AuthorizationManager::PASSWORD_FIELD_NAME = "pwd";
     const std::string AuthorizationManager::V1_USER_NAME_FIELD_NAME = "user";
     const std::string AuthorizationManager::V1_USER_SOURCE_FIELD_NAME = "userSource";
@@ -273,8 +273,8 @@ namespace mongo {
         }
         std::string id = mongoutils::str::stream() << roleName.getDB() << "." << roleName.getRole();
         result.appendString("_id", id);
-        result.appendString("name", roleName.getRole());
-        result.appendString("source", roleName.getDB());
+        result.appendString(ROLE_NAME_FIELD_NAME, roleName.getRole());
+        result.appendString(ROLE_SOURCE_FIELD_NAME, roleName.getDB());
 
         // Build privileges array
         mutablebson::Element privilegesArrayElement =
@@ -295,8 +295,8 @@ namespace mongo {
 
             const RoleName& subRole = roles.get();
             mutablebson::Element roleObj = result.getDocument().makeElementObject("");
-            roleObj.appendString("name", subRole.getRole());
-            roleObj.appendString("source", subRole.getDB());
+            roleObj.appendString(ROLE_NAME_FIELD_NAME, subRole.getRole());
+            roleObj.appendString(ROLE_SOURCE_FIELD_NAME, subRole.getDB());
             rolesArrayElement.pushBack(roleObj);
         }
 
@@ -594,8 +594,8 @@ namespace mongo {
             for (User::RoleDataMap::const_iterator it = roles.begin(); it != roles.end(); ++it) {
                 const User::RoleData& role = it->second;
                 BSONObjBuilder roleBuilder(rolesArray.subobjStart());
-                roleBuilder.append("name", role.name.getRole());
-                roleBuilder.append("source", role.name.getDB());
+                roleBuilder.append(AuthorizationManager::USER_NAME_FIELD_NAME, role.name.getRole());
+                roleBuilder.append(AuthorizationManager::USER_SOURCE_FIELD_NAME, role.name.getDB());
                 roleBuilder.appendBool("canDelegate", role.canDelegate);
                 roleBuilder.appendBool("hasRole", role.hasRole);
                 roleBuilder.doneFast();

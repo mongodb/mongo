@@ -36,9 +36,9 @@ assert.throws(function() {db.addUser({user:'andy', pwd:'password', roles:['read'
 // Create valid extended form external user
 db.getSiblingDB("$external").addUser({user:'spencer', roles:['readWrite']});
 assert.eq(2, admin.system.users.count());
-userObj = admin.system.users.findOne({name:'spencer', source:'$external'});
+userObj = admin.system.users.findOne({name:'spencer', db:'$external'});
 assert.eq('spencer', userObj['name']);
-assert.eq('$external', userObj['source']);
+assert.eq('$external', userObj['db']);
 assert(!userObj['credentials']);
 
 

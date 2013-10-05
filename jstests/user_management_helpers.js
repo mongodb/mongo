@@ -1,13 +1,13 @@
-function assertHasRole(rolesArray, roleName, roleSource, hasRole, canDelegate) {
+function assertHasRole(rolesArray, roleName, roleDB, hasRole, canDelegate) {
     for (i in rolesArray) {
         var curRole = rolesArray[i];
-        if (curRole.name == roleName && curRole.source == roleSource) {
+        if (curRole.name == roleName && curRole.db == roleDB) {
             assert.eq(hasRole, curRole.hasRole);
             assert.eq(canDelegate, curRole.canDelegate);
             return;
         }
     }
-    assert(false, "role " + roleName + "@" + roleSource + " not found in array: " + rolesArray);
+    assert(false, "role " + roleName + "@" + roleDB + " not found in array: " + rolesArray);
 }
 
 

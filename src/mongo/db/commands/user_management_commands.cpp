@@ -79,10 +79,11 @@ namespace mongo {
         BSONArrayBuilder arrBuilder;
         for (User::RoleDataMap::const_iterator it = roles.begin(); it != roles.end(); ++it) {
             const User::RoleData& role = it->second;
-            arrBuilder.append(BSON("name" << role.name.getRole() <<
-                                   "source" << role.name.getDB() <<
-                                   "hasRole" << role.hasRole <<
-                                   "canDelegate" << role.canDelegate));
+            arrBuilder.append(
+                    BSON(AuthorizationManager::ROLE_NAME_FIELD_NAME << role.name.getRole() <<
+                         AuthorizationManager::ROLE_SOURCE_FIELD_NAME << role.name.getDB() <<
+                         "hasRole" << role.hasRole <<
+                         "canDelegate" << role.canDelegate));
         }
         return arrBuilder.arr();
     }
@@ -91,7 +92,9 @@ namespace mongo {
         BSONArrayBuilder rolesArrayBuilder;
         for (std::vector<RoleName>::const_iterator it = roles.begin(); it != roles.end(); ++it) {
             const RoleName& role = *it;
-            rolesArrayBuilder.append(BSON("name" << role.getRole() << "source" << role.getDB()));
+            rolesArrayBuilder.append(
+                    BSON(AuthorizationManager::ROLE_NAME_FIELD_NAME << role.getRole() <<
+                         AuthorizationManager::ROLE_SOURCE_FIELD_NAME << role.getDB()));
         }
         *result = rolesArrayBuilder.arr();
         return Status::OK();
@@ -107,10 +110,11 @@ namespace mongo {
                 return Status(ErrorCodes::BadValue, "At least one of \"hasRole\" and "
                               "\"canDelegate\" must be true for every role object");
             }
-            rolesArrayBuilder.append(BSON("name" << role.name.getRole() <<
-                                          "source" << role.name.getDB() <<
-                                          "hasRole" << role.hasRole <<
-                                          "canDelegate" << role.canDelegate));
+            rolesArrayBuilder.append(
+                    BSON(AuthorizationManager::ROLE_NAME_FIELD_NAME << role.name.getRole() <<
+                         AuthorizationManager::ROLE_SOURCE_FIELD_NAME << role.name.getDB() <<
+                         "hasRole" << role.hasRole <<
+                         "canDelegate" << role.canDelegate));
         }
         *result = rolesArrayBuilder.arr();
         return Status::OK();
@@ -206,7 +210,7 @@ namespace mongo {
             if (!args.hasHashedPassword && args.userName.getDB() != "$external") {
                 addStatus(Status(ErrorCodes::BadValue,
                                  "Must provide a 'pwd' field for all user documents, except those"
-                                         " with '$external' as the user's source"),
+                                         " with '$external' as the user's source db"),
                           result);
                 return false;
             }
@@ -1011,9 +1015,9 @@ namespace mongo {
 
 
             BSONObjBuilder queryBuilder;
-            queryBuilder.appendAs(usersFilter, "name");
+            queryBuilder.appendAs(usersFilter, AuthorizationManager::USER_NAME_FIELD_NAME);
             if (!anyDB) {
-                queryBuilder.append("source", dbname);
+                queryBuilder.append(AuthorizationManager::USER_SOURCE_FIELD_NAME, dbname);
             }
 
             BSONArrayBuilder usersArrayBuilder;

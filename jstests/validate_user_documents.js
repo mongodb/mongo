@@ -41,7 +41,7 @@ assert.commandWorked(mydb.runCommand({ createUser: "spencer",
 assert.commandWorked(mydb.runCommand({ createUser: "andy",
                                        pwd: "password",
                                        roles: [{name: "dbAdmin",
-                                                source: "validate_user_documents",
+                                                db: "validate_user_documents",
                                                 hasRole: true,
                                                 canDelegate: false}] }));
 
