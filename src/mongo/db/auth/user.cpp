@@ -73,6 +73,22 @@ namespace mongo {
         _credentials = credentials;
     }
 
+    void User::setRoleData(const std::vector<User::RoleData>& roles) {
+        _roles.clear();
+        for (size_t i = 0; i < roles.size(); ++i) {
+            const User::RoleData& role = roles[i];
+            _roles[role.name] = role;
+        }
+    }
+
+    void User::setPrivileges(const PrivilegeVector& privileges) {
+        _privileges.clear();
+        for (size_t i = 0; i < privileges.size(); ++i) {
+            const Privilege& privilege = privileges[i];
+            _privileges[privilege.getResourcePattern()] = privilege;
+        }
+    }
+
     void User::addRole(const RoleName& roleName) {
         RoleData& role = _roles[roleName];
         if (role.name.empty()) {
