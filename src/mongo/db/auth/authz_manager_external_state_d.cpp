@@ -512,12 +512,8 @@ namespace {
                     "Only direct privileges available. " << status.reason() <<
                     " after applying oplog entry " << op;
             }
-            else if (!status.isOK()) {
-                _roleGraphState = roleGraphStateInitial;
-                error() << "Error updating role graph; only builtin roles available. "
-                    "TODO how to remedy. " << status << " Oplog entry: " << op;
-            }
             else {
+                fassert(0, status);
                 _roleGraphState = roleGraphStateConsistent;
             }
         }
