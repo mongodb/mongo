@@ -40,6 +40,109 @@
 
 namespace mongo {
 
+    string IndexBoundsBuilder::simpleRegex(const char* regex, const char* flags, bool* exact) {
+        string r = "";
+        *exact = false;
+
+        bool multilineOK;
+        if ( regex[0] == '\\' && regex[1] == 'A') {
+            multilineOK = true;
+            regex += 2;
+        }
+        else if (regex[0] == '^') {
+            multilineOK = false;
+            regex += 1;
+        }
+        else {
+            return r;
+        }
+
+        bool extended = false;
+        while (*flags) {
+            switch (*(flags++)) {
+            case 'm': // multiline
+                if (multilineOK)
+                    continue;
+                else
+                    return r;
+            case 'x': // extended
+                extended = true;
+                break;
+            default:
+                return r; // cant use index
+            }
+        }
+
+        stringstream ss;
+
+        while(*regex) {
+            char c = *(regex++);
+            if ( c == '*' || c == '?' ) {
+                // These are the only two symbols that make the last char optional
+                r = ss.str();
+                r = r.substr( 0 , r.size() - 1 );
+                return r; //breaking here fails with /^a?/
+            }
+            else if (c == '|') {
+                // whole match so far is optional. Nothing we can do here.
+                return string();
+            }
+            else if (c == '\\') {
+                c = *(regex++);
+                if (c == 'Q'){
+                    // \Q...\E quotes everything inside
+                    while (*regex) {
+                        c = (*regex++);
+                        if (c == '\\' && (*regex == 'E')){
+                            regex++; //skip the 'E'
+                            break; // go back to start of outer loop
+                        }
+                        else {
+                            ss << c; // character should match itself
+                        }
+                    }
+                }
+                else if ((c >= 'A' && c <= 'Z') ||
+                        (c >= 'a' && c <= 'z') ||
+                        (c >= '0' && c <= '0') ||
+                        (c == '\0')) {
+                    // don't know what to do with these
+                    r = ss.str();
+                    break;
+                }
+                else {
+                    // slash followed by non-alphanumeric represents the following char
+                    ss << c;
+                }
+            }
+            else if (strchr("^$.[()+{", c)) {
+                // list of "metacharacters" from man pcrepattern
+                r = ss.str();
+                break;
+            }
+            else if (extended && c == '#') {
+                // comment
+                r = ss.str();
+                break;
+            }
+            else if (extended && isspace(c)) {
+                continue;
+            }
+            else {
+                // self-matching char
+                ss << c;
+            }
+        }
+
+        if ( r.empty() && *regex == 0 ) {
+            r = ss.str();
+            *exact = !r.empty();
+        }
+
+        return r;
+    }
+
+
     // static
     void IndexBoundsBuilder::allValuesForField(const BSONElement& elt, OrderedIntervalList* out) {
         // ARGH, BSONValue would make this shorter.
@@ -66,13 +169,42 @@ namespace mongo {
         return makeRangeInterval(bob.obj(), true, true);
     }
 
+    bool IntervalComparison(const Interval& lhs, const Interval& rhs) {
+        int wo = lhs.start.woCompare(rhs.start, false);
+        if (0 != wo) {
+            return wo < 0;
+        }
+        // The start and end are equal.  Put the bound that's inclusive to the left.
+        if (lhs.startInclusive) {
+            return true;
+        }
+        if (rhs.startInclusive) {
+            return false;
+        }
+        // If neither start nor end is inclusive but they begin at the same point who cares which is
+        // first.
+        return true;
+    }
+
+    // static
+    void IndexBoundsBuilder::translateAndIntersect(const MatchExpression* expr, const BSONElement& elt,
+                                                   OrderedIntervalList* oilOut, bool* exactOut) {
+        OrderedIntervalList arg;
+        translate(expr, elt, &arg, exactOut);
+        // translate outputs arg in sorted order.  intersectize assumes that its arguments are sorted.
+        intersectize(arg, oilOut);
+    }
+
+    // static
+    void IndexBoundsBuilder::translateAndUnion(const MatchExpression* expr, const BSONElement& elt,
+                                               OrderedIntervalList* oilOut, bool* exactOut) {
+        translate(expr, elt, oilOut, exactOut);
+        unionize(oilOut);
+    }
+
     // static
     void IndexBoundsBuilder::translate(const MatchExpression* expr, const BSONElement& elt,
                                        OrderedIntervalList* oilOut, bool* exactOut) {
-        int direction = (elt.numberInt() >= 0) ? 1 : -1;
-
-        Interval interval;
-        bool exact = false;
         oilOut->name = elt.fieldName();
 
         bool isHashed = false;
@@ -86,41 +218,8 @@ namespace mongo {
         }
 
         if (MatchExpression::EQ == expr->matchType()) {
-            const EqualityMatchExpression* node =
-                static_cast<const EqualityMatchExpression*>(expr);
-
-            // We have to copy the data out of the parse tree and stuff it into the index
-            // bounds.  BSONValue will be useful here.
-            BSONObj dataObj;
-
-            if (isHashed) {
-                dataObj = ExpressionMapping::hash(node->getData());
-            }
-            else {
-                dataObj = objFromElement(node->getData());
-            }
-
-            // UNITTEST 11738048
-            if (Array == dataObj.firstElement().type()) {
-                // XXX: build better bounds
-                warning() << "building lazy bounds for " << expr->toString() << endl;
-                interval = allValues();
-                exact = false;
-            }
-            else {
-                verify(dataObj.isOwned());
-                interval = makePointInterval(dataObj);
-                // XXX: it's exact if the index isn't sparse
-                if (dataObj.firstElement().isNull()) {
-                    exact = false;
-                }
-                else if (isHashed) {
-                    exact = false;
-                }
-                else {
-                    exact = true;
-                }
-            }
+            const EqualityMatchExpression* node = static_cast<const EqualityMatchExpression*>(expr);
+            translateEquality(node->getData(), isHashed, oilOut, exactOut);
         }
         else if (MatchExpression::LTE == expr->matchType()) {
             const LTEMatchExpression* node = static_cast<const LTEMatchExpression*>(expr);
@@ -130,9 +229,9 @@ namespace mongo {
             bob.append(dataElt);
             BSONObj dataObj = bob.obj();
             verify(dataObj.isOwned());
-            interval = makeRangeInterval(dataObj, true, true);
+            oilOut->intervals.push_back(makeRangeInterval(dataObj, true, true));
             // XXX: only exact if not (null or array)
-            exact = true;
+            *exactOut = true;
         }
         else if (MatchExpression::LT == expr->matchType()) {
             const LTMatchExpression* node = static_cast<const LTMatchExpression*>(expr);
@@ -142,9 +241,9 @@ namespace mongo {
             bob.append(dataElt);
             BSONObj dataObj = bob.obj();
             verify(dataObj.isOwned());
-            interval = makeRangeInterval(dataObj, true, false);
+            oilOut->intervals.push_back(makeRangeInterval(dataObj, true, false));
             // XXX: only exact if not (null or array)
-            exact = true;
+            *exactOut = true;
         }
         else if (MatchExpression::GT == expr->matchType()) {
             const GTMatchExpression* node = static_cast<const GTMatchExpression*>(expr);
@@ -154,9 +253,9 @@ namespace mongo {
             bob.appendMaxForType("", dataElt.type());
             BSONObj dataObj = bob.obj();
             verify(dataObj.isOwned());
-            interval = makeRangeInterval(dataObj, false, true);
+            oilOut->intervals.push_back(makeRangeInterval(dataObj, false, true));
             // XXX: only exact if not (null or array)
-            exact = true;
+            *exactOut = true;
         }
         else if (MatchExpression::GTE == expr->matchType()) {
             const GTEMatchExpression* node = static_cast<const GTEMatchExpression*>(expr);
@@ -167,14 +266,14 @@ namespace mongo {
             bob.appendMaxForType("", dataElt.type());
             BSONObj dataObj = bob.obj();
             verify(dataObj.isOwned());
-            interval = makeRangeInterval(dataObj, true, true);
+
+            oilOut->intervals.push_back(makeRangeInterval(dataObj, true, true));
             // XXX: only exact if not (null or array)
-            exact = true;
+            *exactOut = true;
         }
         else if (MatchExpression::REGEX == expr->matchType()) {
-            warning() << "building lazy bounds for " << expr->toString() << endl;
-            interval = allValues();
-            exact = false;
+            const RegexMatchExpression* rme = static_cast<const RegexMatchExpression*>(expr);
+            translateRegex(rme, oilOut, exactOut);
         }
         else if (MatchExpression::MOD == expr->matchType()) {
             BSONObjBuilder bob;
@@ -182,13 +281,8 @@ namespace mongo {
             bob.appendMaxForType("", NumberDouble);
             BSONObj dataObj = bob.obj();
             verify(dataObj.isOwned());
-            interval = makeRangeInterval(dataObj, true, true);
-            exact = false;
-        }
-        else if (MatchExpression::MATCH_IN == expr->matchType()) {
-            warning() << "building lazy bounds for " << expr->toString() << endl;
-            interval = allValues();
-            exact = false;
+            oilOut->intervals.push_back(makeRangeInterval(dataObj, true, true));
+            *exactOut = false;
         }
         else if (MatchExpression::TYPE_OPERATOR == expr->matchType()) {
             const TypeMatchExpression* tme = static_cast<const TypeMatchExpression*>(expr);
@@ -197,13 +291,40 @@ namespace mongo {
             bob.appendMaxForType("", tme->getData());
             BSONObj dataObj = bob.obj();
             verify(dataObj.isOwned());
-            interval = makeRangeInterval(dataObj, true, true);
-            exact = false;
+            oilOut->intervals.push_back(makeRangeInterval(dataObj, true, true));
+            *exactOut = false;
         }
         else if (MatchExpression::MATCH_IN == expr->matchType()) {
-            warning() << "building lazy bounds for " << expr->toString() << endl;
-            interval = allValues();
-            exact = false;
+            const InMatchExpression* ime = static_cast<const InMatchExpression*>(expr);
+            const ArrayFilterEntries& afr = ime->getData();
+
+            *exactOut = true;
+
+            // Create our various intervals.
+
+            bool thisBoundExact = false;
+            for (BSONElementSet::iterator it = afr.equalities().begin();
+                 it != afr.equalities().end(); ++it) {
+
+                translateEquality(*it, isHashed, oilOut, &thisBoundExact);
+                if (!thisBoundExact) {
+                    *exactOut = false;
+                }
+            }
+
+            for (size_t i = 0; i < afr.numRegexes(); ++i) {
+                translateRegex(afr.regex(i), oilOut, &thisBoundExact);
+                if (!thisBoundExact) {
+                    *exactOut = false;
+                }
+            }
+
+            // XXX: what happens here?
+            if (afr.hasNull()) { }
+            // XXX: what happens here as well?
+            if (afr.hasEmptyArray()) { }
+
+            unionize(oilOut);
         }
         else if (MatchExpression::GEO == expr->matchType()) {
             const GeoMatchExpression* gme = static_cast<const GeoMatchExpression*>(expr);
@@ -217,21 +338,12 @@ namespace mongo {
             const S2Region& region = gme->getGeoQuery().getRegion();
             ExpressionMapping::cover2dsphere(region, oilOut);
             *exactOut = false;
-            // XXX: restructure this method
-            return;
         }
         else {
             warning() << "Planner error, trying to build bounds for expr "
                       << expr->toString() << endl;
             verify(0);
         }
-
-        if (-1 == direction) {
-            reverseInterval(&interval);
-        }
-
-        oilOut->intervals.push_back(interval);
-        *exactOut = exact;
     }
 
     // static
@@ -247,6 +359,116 @@ namespace mongo {
         verify(it.more());
         ret.end = it.next();
         return ret;
+    }
+
+    // static
+    void IndexBoundsBuilder::intersectize(const OrderedIntervalList& arg,
+                                          OrderedIntervalList* oilOut) {
+        verify(arg.name == oilOut->name);
+
+        size_t argidx = 0;
+        const vector<Interval>& argiv = arg.intervals;
+
+        size_t ividx = 0;
+        vector<Interval>& iv = oilOut->intervals;
+
+        vector<Interval> result;
+
+        while (argidx < argiv.size() && ividx < iv.size()) {
+            Interval::IntervalComparison cmp = argiv[argidx].compare(iv[ividx]);
+            cout << "comparing " << argiv[argidx].toString()
+                 << " with " << iv[ividx].toString()
+                 << " cmp is " << Interval::cmpstr(cmp) << endl;
+
+            verify(Interval::INTERVAL_UNKNOWN != cmp);
+
+            if (cmp == Interval::INTERVAL_PRECEDES
+                || cmp == Interval::INTERVAL_PRECEDES_COULD_UNION) {
+                // argiv is before iv.  move argiv forward.
+                ++argidx;
+            }
+            else if (cmp == Interval::INTERVAL_SUCCEEDS) {
+                // iv is before argiv.  move iv forward.
+                ++ividx;
+            }
+            else {
+                // argiv[argidx] (cmpresults) iv[ividx]
+                Interval newInt = argiv[argidx];
+                newInt.intersect(iv[ividx], cmp);
+                result.push_back(newInt);
+
+                if (Interval::INTERVAL_EQUALS == cmp) {
+                    ++argidx;
+                    ++ividx;
+                }
+                else if (Interval::INTERVAL_WITHIN == cmp) {
+                    ++argidx;
+                }
+                else if (Interval::INTERVAL_CONTAINS == cmp) {
+                    ++ividx;
+                }
+                else if (Interval::INTERVAL_OVERLAPS_BEFORE == cmp) {
+                    ++argidx;
+                }
+                else if (Interval::INTERVAL_OVERLAPS_AFTER == cmp) {
+                    ++ividx;
+                }
+                else {
+                    verify(0);
+                }
+            }
+        }
+        // XXX swap
+        oilOut->intervals = result;
+    }
+
+    // static
+    void IndexBoundsBuilder::unionize(OrderedIntervalList* oilOut) {
+        // Step 1: sort.
+        std::sort(oilOut->intervals.begin(), oilOut->intervals.end(), IntervalComparison);
+
+        // Step 2: Walk through and merge.
+        vector<Interval>& iv = oilOut->intervals;
+        size_t i = 0;
+        while (i < iv.size() - 1) {
+            // Compare i with i + 1.
+            Interval::IntervalComparison cmp = iv[i].compare(iv[i + 1]);
+            // cout << "comparing " << iv[i].toString() << " with " << iv[i+1].toString()
+                 // << " cmp is " << Interval::cmpstr(cmp) << endl;
+
+            // This means our sort didn't work.
+            verify(Interval::INTERVAL_SUCCEEDS != cmp);
+
+            // Intervals are correctly ordered.
+            if (Interval::INTERVAL_PRECEDES == cmp) {
+                // We can move to the next pair.
+                ++i;
+            }
+            else if (Interval::INTERVAL_EQUALS == cmp || Interval::INTERVAL_WITHIN == cmp) {
+                // Interval 'i' is equal to i+1, or is contained within i+1.
+                // Remove interval i and don't move to the next value of 'i'.
+                iv.erase(iv.begin() + i);
+            }
+            else if (Interval::INTERVAL_CONTAINS == cmp) {
+                // Interval 'i' contains i+1, remove i+1 and don't move to the next value of 'i'.
+                iv.erase(iv.begin() + i + 1);
+            }
+            else if (Interval::INTERVAL_OVERLAPS_BEFORE == cmp
+                     || Interval::INTERVAL_PRECEDES_COULD_UNION == cmp) {
+                // We want to merge intervals i and i+1.
+                // Interval 'i' starts before interval 'i+1'.
+                BSONObjBuilder bob;
+                bob.append(iv[i].start);
+                bob.append(iv[i + 1].end);
+                BSONObj data = bob.obj();
+                bool startInclusive = iv[i].startInclusive;
+                bool endInclusive = iv[i + i].endInclusive;
+                iv.erase(iv.begin() + i);
+                // iv[i] is now the former iv[i + 1]
+                iv[i] = makeRangeInterval(data, startInclusive, endInclusive);
+                // Don't increment 'i'.
+            }
+        }
     }
 
     // static
@@ -290,6 +512,67 @@ namespace mongo {
         bool tmpInc = ival->startInclusive;
         ival->startInclusive = ival->endInclusive;
         ival->endInclusive = tmpInc;
+    }
+
+    // static
+    void IndexBoundsBuilder::translateRegex(const RegexMatchExpression* rme,
+                                            OrderedIntervalList* oilOut, bool* exact) {
+
+        const string start = simpleRegex(rme->getString().c_str(), rme->getFlags().c_str(), exact);
+
+        cout << "regex bounds start is " << start << endl;
+        // Note that 'exact' is set by simpleRegex above.
+        if (!start.empty()) {
+            string end = start;
+            end[end.size() - 1]++;
+            oilOut->intervals.push_back(makeRangeInterval(start, end, true, false));
+        }
+        else {
+            BSONObjBuilder bob;
+            bob.appendMinForType("", String);
+            bob.appendMaxForType("", String);
+            BSONObj dataObj = bob.obj();
+            verify(dataObj.isOwned());
+            oilOut->intervals.push_back(makeRangeInterval(dataObj, true, false));
+        }
+
+        // Regexes are after strings.
+        BSONObjBuilder bob;
+        bob.appendRegex("", rme->getString(), rme->getFlags());
+        oilOut->intervals.push_back(makePointInterval(bob.obj()));
+    }
+
+    // static
+    void IndexBoundsBuilder::translateEquality(const BSONElement& data, bool isHashed,
+                                               OrderedIntervalList* oil, bool* exact) {
+        // We have to copy the data out of the parse tree and stuff it into the index
+        // bounds.  BSONValue will be useful here.
+        BSONObj dataObj;
+
+        if (isHashed) {
+            dataObj = ExpressionMapping::hash(data);
+        }
+        else {
+            dataObj = objFromElement(data);
+        }
+
+        // UNITTEST 11738048
+        if (Array == dataObj.firstElement().type()) {
+            // XXX: bad
+            oil->intervals.push_back(allValues());
+            *exact = false;
+        }
+        else {
+            verify(dataObj.isOwned());
+            oil->intervals.push_back(makePointInterval(dataObj));
+            // XXX: it's exact if the index isn't sparse?
+            if (dataObj.firstElement().isNull() || isHashed) {
+                *exact = false;
+            }
+            else {
+                *exact = true;
+            }
+        }
     }
 
 }  // namespace mongo

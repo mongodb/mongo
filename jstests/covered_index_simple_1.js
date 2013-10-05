@@ -58,3 +58,4 @@ assert.eq(true, plan.indexOnly, "simple.1.8 - indexOnly should be true on covere
 assert.eq(28, plan.nscannedObjects, "simple.1.8 - nscannedObjects should be 0 for covered query")
 
 print ('all tests pass')
+

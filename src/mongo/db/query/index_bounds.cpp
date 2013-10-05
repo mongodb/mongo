@@ -201,15 +201,20 @@ namespace mongo {
         }
     }
 
-    void IndexBoundsChecker::getStartKey(vector<const BSONElement*>* valueOut,
-                                          vector<bool>* inclusiveOut) {
+    bool IndexBoundsChecker::getStartKey(vector<const BSONElement*>* valueOut,
+                                         vector<bool>* inclusiveOut) {
         verify(valueOut->size() == _bounds->fields.size());
         verify(inclusiveOut->size() == _bounds->fields.size());
 
         for (size_t i = 0; i < _bounds->fields.size(); ++i) {
+            if (0 == _bounds->fields[i].intervals.size()) {
+                return false;
+            }
             (*valueOut)[i] = &_bounds->fields[i].intervals[0].start;
             (*inclusiveOut)[i] = _bounds->fields[i].intervals[0].startInclusive;
         }
+
+        return true;
     }
 
     bool IndexBoundsChecker::findLeftmostProblem(const vector<BSONElement>& keyValues,

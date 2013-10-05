@@ -74,6 +74,7 @@ namespace mongo {
 
         // Stats
         CommonStats _commonStats;
+        CollectionScanStats _specificStats;
     };
 
 }  // namespace mongo

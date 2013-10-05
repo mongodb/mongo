@@ -109,9 +109,11 @@ namespace mongo {
                     _hitEnd = true;
                     return PlanStage::FAILURE;
                 }
+                if (!isEOF()) {
+                    _specificStats.keysExamined = 1;
+                }
             }
             else {
-                // XXX: must be actually a Btree
                 // "Fast" Btree-specific navigation.
                 _btreeCursor = static_cast<BtreeIndexCursor*>(_indexCursor.get());
                 _checker.reset(new IndexBoundsChecker(&_params.bounds,
@@ -123,11 +125,14 @@ namespace mongo {
                 vector<bool> inc;
                 key.resize(nFields);
                 inc.resize(nFields);
-                _checker->getStartKey(&key, &inc);
-                _btreeCursor->seek(key, inc);
-
-                _keyElts.resize(nFields);
-                _keyEltsInc.resize(nFields);
+                if (_checker->getStartKey(&key, &inc)) {
+                    _btreeCursor->seek(key, inc);
+                    _keyElts.resize(nFields);
+                    _keyEltsInc.resize(nFields);
+                }
+                else {
+                    _hitEnd = true;
+                }
             }
 
             checkEnd();
@@ -141,7 +146,6 @@ namespace mongo {
             // _indexCursor->next() if we're EOF.
             if (!isEOF()) {
                 _indexCursor->next();
-                ++_specificStats.keysExamined;
                 checkEnd();
             }
         }
@@ -189,7 +193,7 @@ namespace mongo {
             return false;
         }
 
-        return _indexCursor->isEOF() || _hitEnd;
+        return _hitEnd || _indexCursor->isEOF();
     }
 
     void IndexScan::prepareToYield() {
@@ -261,6 +265,10 @@ namespace mongo {
                 _hitEnd = true;
                 _commonStats.isEOF = true;
             }
+
+            if (!isEOF() && _params.bounds.isSimpleRange) {
+                ++_specificStats.keysExamined;
+            }
         }
         else {
             verify(NULL != _btreeCursor);
@@ -268,6 +276,8 @@ namespace mongo {
 
             // Use _checker to see how things are.
             for (;;) {
+                //cout << "current index key is " << _indexCursor->getKey().toString() << endl;
+                //cout << "keysExamined is " << _specificStats.keysExamined << endl;
                 IndexBoundsChecker::KeyState keyState;
                 keyState = _checker->checkKey(_indexCursor->getKey(),
                                               &_keyEltsToUse,
@@ -275,13 +285,19 @@ namespace mongo {
                                               &_keyElts,
                                               &_keyEltsInc);
 
-                if (IndexBoundsChecker::VALID == keyState) {
-                    break;
-                }
                 if (IndexBoundsChecker::DONE == keyState) {
                     _hitEnd = true;
                     break;
                 }
+
+                // This seems weird but it's the old definition of nscanned.
+                ++_specificStats.keysExamined;
+
+                if (IndexBoundsChecker::VALID == keyState) {
+                    break;
+                }
+
+                // cout << "skipping...\n";
                 verify(IndexBoundsChecker::MUST_ADVANCE == keyState);
                 _btreeCursor->skip(_indexCursor->getKey(), _keyEltsToUse, _movePastKeyElts,
                                    _keyElts, _keyEltsInc);

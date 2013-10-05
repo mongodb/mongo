@@ -136,19 +136,19 @@ namespace {
 
     TEST(Comparison, Succeds) {
         Interval a(BSON("" << 10 << "" << 20), true, true);
-        ASSERT_NOT_EQUALS(a.compare(a), Interval::INTERVAL_SUCCEDS);
+        ASSERT_NOT_EQUALS(a.compare(a), Interval::INTERVAL_SUCCEEDS);
 
         Interval b(BSON("" << 20 << "" << 30), true, true);
-        ASSERT_NOT_EQUALS(b.compare(a), Interval::INTERVAL_SUCCEDS);
+        ASSERT_NOT_EQUALS(b.compare(a), Interval::INTERVAL_SUCCEEDS);
 
         Interval c(BSON("" << 20 << "" << 30), false, true);
-        ASSERT_EQUALS(c.compare(a), Interval::INTERVAL_SUCCEDS);
+        ASSERT_EQUALS(c.compare(a), Interval::INTERVAL_SUCCEEDS);
 
         Interval d(BSON("" << 21 << "" << 30), true, true);
-        ASSERT_EQUALS(d.compare(a), Interval::INTERVAL_SUCCEDS);
+        ASSERT_EQUALS(d.compare(a), Interval::INTERVAL_SUCCEEDS);
 
         Interval e(BSON("" << 15 << "" << 30), true, true);
-        ASSERT_NOT_EQUALS(e.compare(a), Interval::INTERVAL_SUCCEDS);
+        ASSERT_NOT_EQUALS(e.compare(a), Interval::INTERVAL_SUCCEEDS);
     }
 
     //

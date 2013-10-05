@@ -622,6 +622,7 @@ namespace {
     }
 
     TEST_F(SingleIndexTest, Basic2DSphereGeoNearReverseCompound) {
+        setIndex(BSON("x" << 1));
         setIndex(BSON("x" << 1 << "a" << "2dsphere"));
         runQuery(fromjson("{x:1, a: {$nearSphere: [0,0], $maxDistance: 0.31 }}"));
         dumpSolutions();

@@ -99,13 +99,9 @@ namespace mongo {
 
     } // unnamed namespace
 
-    Interval:: Interval()
-        : _intervalData(BSONObj())
-        , start(BSONElement())
-        , startInclusive(false)
-        , end(BSONElement())
-        , endInclusive(false) {
-    }
+    Interval::Interval()
+        : _intervalData(BSONObj()), start(BSONElement()), startInclusive(false), end(BSONElement()),
+          endInclusive(false) { }
 
     Interval::Interval(BSONObj base, bool si, bool ei) {
         init(base, si, ei);
@@ -128,11 +124,11 @@ namespace mongo {
 
     // TODO: shortcut number of comparisons
     Interval::IntervalComparison Interval::compare(const Interval& other) const {
-
         //
         // Intersect cases
         //
 
+        // TODO: rewrite this to be member functions so semantics are clearer.
         if (intersects(*this, other)) {
             if (exact(*this, other)) {
                 return INTERVAL_EQUALS;
@@ -144,7 +140,7 @@ namespace mongo {
                 return INTERVAL_CONTAINS;
             }
             if (precedes(*this, other)) {
-                    return INTERVAL_OVERLAPS_BEFORE;
+                return INTERVAL_OVERLAPS_BEFORE;
             }
             return INTERVAL_OVERLAPS_AFTER;
         }
@@ -154,9 +150,13 @@ namespace mongo {
         //
 
         if (precedes(*this, other)) {
+            if (0 == end.woCompare(other.start, false)) {
+                return INTERVAL_PRECEDES_COULD_UNION;
+            }
             return INTERVAL_PRECEDES;
         }
-        return INTERVAL_SUCCEDS;
+
+        return INTERVAL_SUCCEEDS;
     }
 
     void Interval::intersect(const Interval& other, IntervalComparison cmp) {
@@ -190,7 +190,7 @@ namespace mongo {
             break;
 
         case INTERVAL_PRECEDES:
-        case INTERVAL_SUCCEDS:
+        case INTERVAL_SUCCEEDS:
             *this = Interval();
             break;
 
@@ -218,7 +218,7 @@ namespace mongo {
             break;
 
         case INTERVAL_OVERLAPS_AFTER:
-        case INTERVAL_SUCCEDS:
+        case INTERVAL_SUCCEEDS:
             builder.append(other.start);
             builder.append(end);
             init(builder.obj(), other.startInclusive, endInclusive);
@@ -234,6 +234,57 @@ namespace mongo {
         default:
             dassert(false);
         }
+    }
+
+    // static
+    string Interval::cmpstr(IntervalComparison c) {
+        if (c == INTERVAL_EQUALS) {
+            return "INTERVAL_EQUALS";
+        }
+
+        // 'this' contains the other interval.
+        if (c == INTERVAL_CONTAINS) {
+            return "INTERVAL_CONTAINS";
+        }
+
+        // 'this' is contained by the other interval.
+        if (c == INTERVAL_WITHIN) {
+            return "INTERVAL_WITHIN";
+        }
+
+        // The two intervals intersect and 'this' is before the other interval.
+        if (c == INTERVAL_OVERLAPS_BEFORE) {
+            return "INTERVAL_OVERLAPS_BEFORE";
+        }
+
+        // The two intervals intersect and 'this is after the other interval.
+        if (c == INTERVAL_OVERLAPS_AFTER) {
+            return "INTERVAL_OVERLAPS_AFTER";
+        }
+
+        // There is no intersection.
+        if (c == INTERVAL_PRECEDES) {
+            return "INTERVAL_PRECEDES";
+        }
+
+        if (c == INTERVAL_PRECEDES_COULD_UNION) {
+            return "INTERVAL_PRECEDES_COULD_UNION";
+        }
+
+        if (c == INTERVAL_SUCCEEDS) {
+            return "INTERVAL_SUCCEEDS";
+        }
+
+        if (c == INTERVAL_UNKNOWN) {
+            return "INTERVAL_UNKNOWN";
+        }
+
+        return "NO IDEA DUDE";
+    }
+
+    void Interval::reverse() {
+        std::swap(start, end);
+        std::swap(startInclusive, endInclusive);
     }
 
 } // namespace mongo

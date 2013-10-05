@@ -90,6 +90,8 @@ namespace mongo {
         member->obj = member->loc.obj();
         member->state = WorkingSetMember::LOC_AND_UNOWNED_OBJ;
 
+        ++_specificStats.docsTested;
+
         if (Filter::passes(member, _filter)) {
             *out = id;
             ++_commonStats.advanced;
@@ -134,6 +136,7 @@ namespace mongo {
     PlanStageStats* CollectionScan::getStats() {
         _commonStats.isEOF = isEOF();
         auto_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_COLLSCAN));
+        ret->specific.reset(new CollectionScanStats(_specificStats));
         return ret.release();
     }
 

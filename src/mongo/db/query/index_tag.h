@@ -57,6 +57,12 @@ namespace mongo {
         std::vector<size_t> first;
         std::vector<size_t> notFirst;
 
+        // We don't know the full path from a node unless we keep notes as we traverse from the
+        // root.  We do this once and store it.
+        // TODO: Do a FieldRef / StringData pass.
+        // TODO: We might want this inside of the MatchExpression.
+        string path;
+
         virtual void debugString(StringBuilder* builder) const {
             *builder << "First: ";
             for (size_t i = 0; i < first.size(); ++i) {
@@ -66,6 +72,7 @@ namespace mongo {
             for (size_t i = 0; i < notFirst.size(); ++i) {
                 *builder << notFirst[i] << " ";
             }
+            *builder << "full path: " << path;
         }
 
         virtual MatchExpression::TagData* clone() const {

@@ -58,6 +58,20 @@ namespace mongo {
         static void translate(const MatchExpression* expr, const BSONElement& elt,
                               OrderedIntervalList* oilOut, bool* exactOut);
 
+        /**
+         * Creates bounds for 'expr' (indexed according to 'elt').  Intersects those bounds
+         * with the bounds in oilOut, which is an in/out parameter.
+         */
+        static void translateAndIntersect(const MatchExpression* expr, const BSONElement& elt,
+                                          OrderedIntervalList* oilOut, bool* exactOut);
+
+        /**
+         * Creates bounds for 'expr' (indexed according to 'elt').  Unions those bounds
+         * with the bounds in oilOut, which is an in/out parameter.
+         */
+        static void translateAndUnion(const MatchExpression* expr, const BSONElement& elt,
+                                      OrderedIntervalList* oilOut, bool* exactOut);
+
     private:
         friend class ExpressionMapping;
 
@@ -91,7 +105,27 @@ namespace mongo {
          */
         static void reverseInterval(Interval* ival);
 
+        /**
+         * Copied almost verbatim from db/queryutil.cpp.
+         *
+         *  returns a string that when used as a matcher, would match a super set of regex()
+         *
+         *  returns "" for complex regular expressions
+         *
+         *  used to optimize queries in some simple regex cases that start with '^'
+         */
+        static string simpleRegex(const char* regex, const char* flags, bool* exact);
+
         static Interval allValues();
+
+        static void translateRegex(const RegexMatchExpression* rme, OrderedIntervalList* oil,
+                                   bool* exact);
+
+        static void translateEquality(const BSONElement& data, bool isHashed,
+                                      OrderedIntervalList* oil, bool* exact);
+
+        static void unionize(OrderedIntervalList* oilOut);
+        static void intersectize(const OrderedIntervalList& arg, OrderedIntervalList* oilOut);
     };
 
 }  // namespace mongo

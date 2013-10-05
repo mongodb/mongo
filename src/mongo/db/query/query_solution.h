@@ -49,6 +49,12 @@ namespace mongo {
          */
         virtual StageType getType() const = 0;
 
+        string toString() const {
+            stringstream ss;
+            appendToString(&ss, 0);
+            return ss.str();
+        }
+
         /**
          * Internal function called by toString()
          *
@@ -74,9 +80,6 @@ namespace mongo {
          *
          * Usage: If an index-only plan has all the fields we're interested in, we don't
          * have to fetch to show results with those fields.
-         *
-         * XXX TODO: Cover issues resulting from covered and multikey.  Multikey prohibits
-         * covering, but allows sort (double check!)
          *
          * TODO: 'field' is probably more appropriate as a FieldRef or string.
          */
@@ -296,6 +299,8 @@ namespace mongo {
         BSONObj getSort() const { return indexKeyPattern; }
 
         BSONObj indexKeyPattern;
+
+        bool indexIsMultiKey;
 
         scoped_ptr<MatchExpression> filter;
 
