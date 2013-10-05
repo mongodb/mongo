@@ -24,7 +24,7 @@ assert.soon("db.system.users.findOne()", "no data after restore");
 assert.eq(1, db.system.users.find({name:'user'}).count(), "didn't restore users")
 assert.eq(2, db.system.indexes.count(), "didn't restore indexes")
 
-db.removeUser('user')
+db.dropUser('user')
 db.addUser('user2', 'password2', jsTest.basicUserRoles)
 
 t.runTool("restore", "--dir", t.ext, "--drop")

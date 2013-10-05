@@ -294,21 +294,21 @@ namespace auth {
         return Status::OK();
     }
 
-    Status parseAndValidateRemoveUserCommand(const BSONObj& cmdObj,
-                                             const std::string& dbname,
-                                             UserName* parsedUserName,
-                                             BSONObj* parsedWriteConcern) {
+    Status parseAndValidateDropUserCommand(const BSONObj& cmdObj,
+                                           const std::string& dbname,
+                                           UserName* parsedUserName,
+                                           BSONObj* parsedWriteConcern) {
         unordered_set<std::string> validFieldNames;
-        validFieldNames.insert("removeUser");
+        validFieldNames.insert("dropUser");
         validFieldNames.insert("writeConcern");
 
-        Status status = _checkNoExtraFields(cmdObj, "removeUser", validFieldNames);
+        Status status = _checkNoExtraFields(cmdObj, "dropUser", validFieldNames);
         if (!status.isOK()) {
             return status;
         }
 
         std::string user;
-        status = bsonExtractStringField(cmdObj, "removeUser", &user);
+        status = bsonExtractStringField(cmdObj, "dropUser", &user);
         if (!status.isOK()) {
             return status;
         }
@@ -322,14 +322,14 @@ namespace auth {
         return Status::OK();
     }
 
-    Status parseAndValidateRemoveUsersFromDatabaseCommand(const BSONObj& cmdObj,
-                                                          const std::string& dbname,
-                                                          BSONObj* parsedWriteConcern) {
+    Status parseAndValidateDropUsersFromDatabaseCommand(const BSONObj& cmdObj,
+                                                        const std::string& dbname,
+                                                        BSONObj* parsedWriteConcern) {
         unordered_set<std::string> validFieldNames;
-        validFieldNames.insert("removeUsersFromDatabase");
+        validFieldNames.insert("dropUsersFromDatabase");
         validFieldNames.insert("writeConcern");
 
-        Status status = _checkNoExtraFields(cmdObj, "removeUsersFromDatabase", validFieldNames);
+        Status status = _checkNoExtraFields(cmdObj, "dropUsersFromDatabase", validFieldNames);
         if (!status.isOK()) {
             return status;
         }
@@ -523,21 +523,21 @@ namespace auth {
         return Status::OK();
     }
 
-    Status parseRemoveRoleCommand(const BSONObj& cmdObj,
-                                  const std::string& dbname,
-                                  RoleName* parsedRoleName,
-                                  BSONObj* parsedWriteConcern) {
+    Status parseDropRoleCommand(const BSONObj& cmdObj,
+                                const std::string& dbname,
+                                RoleName* parsedRoleName,
+                                BSONObj* parsedWriteConcern) {
         unordered_set<std::string> validFieldNames;
-        validFieldNames.insert("removeRole");
+        validFieldNames.insert("dropRole");
         validFieldNames.insert("writeConcern");
 
-        Status status = _checkNoExtraFields(cmdObj, "removeRole", validFieldNames);
+        Status status = _checkNoExtraFields(cmdObj, "dropRole", validFieldNames);
         if (!status.isOK()) {
             return status;
         }
 
         std::string user;
-        status = bsonExtractStringField(cmdObj, "removeRole", &user);
+        status = bsonExtractStringField(cmdObj, "dropRole", &user);
         if (!status.isOK()) {
             return status;
         }
@@ -551,14 +551,14 @@ namespace auth {
         return Status::OK();
     }
 
-    Status parseRemoveRolesFromDatabaseCommand(const BSONObj& cmdObj,
-                                               const std::string& dbname,
-                                               BSONObj* parsedWriteConcern) {
+    Status parseDropRolesFromDatabaseCommand(const BSONObj& cmdObj,
+                                             const std::string& dbname,
+                                             BSONObj* parsedWriteConcern) {
         unordered_set<std::string> validFieldNames;
-        validFieldNames.insert("removeRolesFromDatabase");
+        validFieldNames.insert("dropRolesFromDatabase");
         validFieldNames.insert("writeConcern");
 
-        Status status = _checkNoExtraFields(cmdObj, "removeRolesFromDatabase", validFieldNames);
+        Status status = _checkNoExtraFields(cmdObj, "dropRolesFromDatabase", validFieldNames);
         if (!status.isOK()) {
             return status;
         }

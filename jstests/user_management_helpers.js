@@ -14,7 +14,7 @@ function assertHasRole(rolesArray, roleName, roleDB, hasRole, canDelegate) {
 (function(db) {
      var db = db.getSiblingDB("user_management_helpers");
      db.dropDatabase();
-     db.removeAllUsers();
+     db.dropAllUsers();
 
      db.addUser("spencer", "password", ['readWrite']);
      db.addUser("andy", "password", ['readWrite']);

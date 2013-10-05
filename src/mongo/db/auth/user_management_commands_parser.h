@@ -81,23 +81,23 @@ namespace auth {
                                                    BSONObj* parsedWriteConcern);
 
     /**
-     * Takes a command object describing an invocation of the "removeUser" command and parses out
+     * Takes a command object describing an invocation of the "dropUser" command and parses out
      * the UserName of the user to be removed and the writeConcern.
      * Also validates the input and returns a non-ok Status if there is anything wrong.
      */
-    Status parseAndValidateRemoveUserCommand(const BSONObj& cmdObj,
-                                             const std::string& dbname,
-                                             UserName* parsedUserName,
-                                             BSONObj* parsedWriteConcern);
+    Status parseAndValidateDropUserCommand(const BSONObj& cmdObj,
+                                           const std::string& dbname,
+                                           UserName* parsedUserName,
+                                           BSONObj* parsedWriteConcern);
 
     /**
-     * Takes a command object describing an invocation of the "removeUsersFromDatabase" command and
+     * Takes a command object describing an invocation of the "dropUsersFromDatabase" command and
      * parses out the write concern.
      * Also validates the input and returns a non-ok Status if there is anything wrong.
      */
-    Status parseAndValidateRemoveUsersFromDatabaseCommand(const BSONObj& cmdObj,
-                                                          const std::string& dbname,
-                                                          BSONObj* parsedWriteConcern);
+    Status parseAndValidateDropUsersFromDatabaseCommand(const BSONObj& cmdObj,
+                                                        const std::string& dbname,
+                                                        BSONObj* parsedWriteConcern);
 
     /**
      * Takes a command object describing an invocation of the "usersInfo" or "rolesInfo" commands
@@ -144,21 +144,21 @@ namespace auth {
                                                              BSONObj* parsedWriteConcern);
 
     /**
-     * Takes a command object describing an invocation of the "removeRole" command and parses out
+     * Takes a command object describing an invocation of the "dropRole" command and parses out
      * the RoleName of the role to be removed and the writeConcern.
      */
-    Status parseRemoveRoleCommand(const BSONObj& cmdObj,
-                                  const std::string& dbname,
-                                  RoleName* parsedRoleName,
-                                  BSONObj* parsedWriteConcern);
+    Status parseDropRoleCommand(const BSONObj& cmdObj,
+                                const std::string& dbname,
+                                RoleName* parsedRoleName,
+                                BSONObj* parsedWriteConcern);
 
     /**
-     * Takes a command object describing an invocation of the "removeRolesFromDatabase" command and
+     * Takes a command object describing an invocation of the "dropRolesFromDatabase" command and
      * parses out the write concern.
      */
-    Status parseRemoveRolesFromDatabaseCommand(const BSONObj& cmdObj,
-                                               const std::string& dbname,
-                                               BSONObj* parsedWriteConcern);
+    Status parseDropRolesFromDatabaseCommand(const BSONObj& cmdObj,
+                                             const std::string& dbname,
+                                             BSONObj* parsedWriteConcern);
     /**
      * Parses the privileges described in "privileges" into a vector of Privilege objects.
      * Returns Status::OK() upon successfully parsing all the elements of "privileges".

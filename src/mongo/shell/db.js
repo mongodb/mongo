@@ -295,7 +295,7 @@ DB.prototype.help = function() {
     print("\tdb.printReplicationInfo()");
     print("\tdb.printShardingStatus()");
     print("\tdb.printSlaveReplicationInfo()");
-    print("\tdb.removeUser(username)");
+    print("\tdb.dropUser(username)");
     print("\tdb.repairDatabase()");
     print("\tdb.resetError()");
     print("\tdb.runCommand(cmdObj) run a database command.  if cmdObj is a string, turns it into { cmdObj : 1 }");
@@ -1072,8 +1072,14 @@ DB.prototype.logout = function(){
     return this.getMongo().logout(this.getName());
 };
 
-DB.prototype.removeUser = function( username, writeConcern ){
-    var cmdObj = {removeUser: username,
+// For backwards compatibility
+DB.prototype.removeUser = function( username, writeConcern ) {
+    print("WARNING: db.removeUser has been deprected, please use db.dropUser instead");
+    return db.dropUser(username, writeConcern);
+}
+
+DB.prototype.dropUser = function( username, writeConcern ){
+    var cmdObj = {dropUser: username,
                   writeConcern: writeConcern ? writeConcern : _defaultWriteConcern};
     var res = this.runCommand(cmdObj);
 
@@ -1086,11 +1092,11 @@ DB.prototype.removeUser = function( username, writeConcern ){
         return false;
     }
 
-    if (res.errmsg == "no such cmd: removeUsers") {
+    if (res.errmsg == "no such cmd: dropUsers") {
         return this._removeUserV1(username, cmdObj['writeConcern']);
     }
 
-    throw "Couldn't remove user: " + res.errmsg;
+    throw "Couldn't drop user: " + res.errmsg;
 }
 
 DB.prototype._removeUserV1 = function(username, writeConcern) {
@@ -1109,8 +1115,8 @@ DB.prototype._removeUserV1 = function(username, writeConcern) {
     }
 }
 
-DB.prototype.removeAllUsers = function(writeConcern) {
-    var res = this.runCommand({removeUsersFromDatabase:1,
+DB.prototype.dropAllUsers = function(writeConcern) {
+    var res = this.runCommand({dropUsersFromDatabase:1,
                                writeConcern: writeConcern ? writeConcern : _defaultWriteConcern});
 
     if (res.n == 0) {
@@ -1121,7 +1127,7 @@ DB.prototype.removeAllUsers = function(writeConcern) {
         return true;
     }
 
-    throw "Couldn't remove users: " + res.errmsg;
+    throw "Couldn't drop users: " + res.errmsg;
 }
 
 DB.prototype.__pwHash = function( nonce, username, pass ) {

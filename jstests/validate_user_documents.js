@@ -14,7 +14,7 @@ function assertGLENotOK(status) {
 }
 
 mydb.dropDatabase();
-mydb.removeAllUsers();
+mydb.dropAllUsers();
 
 //
 // Tests of the insert path
