@@ -528,34 +528,6 @@ namespace {
     }
 
     /**
-     * Updates "roleGraph" by adding the role described by "role".  If the
-     * name "role" already exists, it is replaced.  Any subordinate roles
-     * mentioned in role.roles are created, if needed, with empty
-     * privilege and subordinate role lists.
-     *
-     * Should _only_ fail if the role to replace is a builtin role, in which
-     * case it will return ErrorCodes::InvalidRoleModification.
-     */
-    Status replaceRole(RoleGraph* roleGraph, const RoleInfo& role) {
-        Status status = roleGraph->removeAllPrivilegesFromRole(role.name);
-        if (status == ErrorCodes::RoleNotFound) {
-            fassert(17168, roleGraph->createRole(role.name).isOK());
-        }
-        else if (!status.isOK()) {
-            return status;
-        }
-        fassert(17169, roleGraph->removeAllRolesFromRole(role.name).isOK());
-        for (size_t i = 0; i < role.roles.size(); ++i) {
-            const RoleName& grantedRole = role.roles[i];
-            status = roleGraph->createRole(grantedRole);
-            fassert(17170, status.isOK() || status == ErrorCodes::DuplicateKey);
-            fassert(17171, roleGraph->addRoleToRole(role.name, grantedRole).isOK());
-        }
-        fassert(17172, roleGraph->addPrivilegesToRole(role.name, role.privileges).isOK());
-        return Status::OK();
-    }
-
-    /**
      * Adds the role described in "doc" to "roleGraph".
      *
      * Returns a status.
@@ -565,7 +537,7 @@ namespace {
         Status status = parseRoleFromDocument(doc, &role);
         if (!status.isOK())
             return status;
-        status = replaceRole(roleGraph, role);
+        status = roleGraph->replaceRole(role.name, role.roles, role.privileges);
         return status;
     }
 
@@ -588,7 +560,7 @@ namespace {
         Status status = parseRoleFromDocument(insertedObj, &role);
         if (!status.isOK())
             return status;
-        status = replaceRole(roleGraph, role);
+        status = roleGraph->replaceRole(role.name, role.roles, role.privileges);
         return status;
     }
 
@@ -631,7 +603,7 @@ namespace {
         status = parseRoleFromDocument(roleDocument.getObject(), &role);
         if (!status.isOK())
             return status;
-        status = replaceRole(roleGraph, role);
+        status = roleGraph->replaceRole(role.name, role.roles, role.privileges);
 
         return status;
     }
