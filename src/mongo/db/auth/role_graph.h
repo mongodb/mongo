@@ -209,6 +209,19 @@ namespace mongo {
         Status removeAllPrivilegesFromRole(const RoleName& role);
 
         /**
+         * Updates the RoleGraph by adding the role named "roleName", with the given role
+         * memberships and privileges.  If the name "roleName" already exists, it is replaced.  Any
+         * subordinate roles mentioned in role.roles are created, if needed, with empty privilege
+         * and subordinate role lists.
+         *
+         * Should _only_ fail if the role to replace is a builtin role, in which
+         * case it will return ErrorCodes::InvalidRoleModification.
+         */
+        Status replaceRole(const RoleName& roleName,
+                           const std::vector<RoleName>& roles,
+                           const PrivilegeVector& privileges);
+
+        /**
          * Recomputes the indirect (getAllPrivileges) data for this graph.
          *
          * Must be called between calls to any of the mutation functions and calls
