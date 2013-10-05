@@ -48,30 +48,6 @@ namespace mongo {
         _splitPoint = role.size();
     }
 
-    RoleNameVectorIterator::RoleNameVectorIterator(
-            const std::vector<RoleName>::const_iterator& begin,
-            const std::vector<RoleName>::const_iterator& end) : _begin(begin), _end(end) {}
-
-    RoleNameVectorIterator::~RoleNameVectorIterator() {};
-
-    bool RoleNameVectorIterator::more() const {
-        return _begin != _end;
-    }
-
-    const RoleName& RoleNameVectorIterator::next() {
-        const RoleName& toReturn = get();
-        ++_begin;
-        return toReturn;
-    }
-
-    const RoleName& RoleNameVectorIterator::get() const {
-        return *_begin;
-    }
-
-    RoleNameIterator::Impl* RoleNameVectorIterator::doClone() const {
-        return new RoleNameVectorIterator(_begin, _end);
-    }
-
     std::ostream& operator<<(std::ostream& os, const RoleName& name) {
         return os << name.getFullName();
     }
