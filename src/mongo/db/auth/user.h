@@ -59,6 +59,7 @@ namespace mongo {
                 name(_name), hasRole(_hasRole), canDelegate(_canDelegate) {}
         };
 
+        typedef unordered_map<ResourcePattern, Privilege> ResourcePrivilegeMap;
         typedef unordered_map<RoleName, RoleData> RoleDataMap;
 
         explicit User(const UserName& name);
@@ -70,9 +71,14 @@ namespace mongo {
         const UserName& getName() const;
 
         /**
-         * Returns an iterator that can be used to get the list of roles this user belongs to.
+         * Returns a reference to the information about the users' role membership.
          */
         const RoleDataMap& getRoles() const;
+
+        /**
+         * Returns a reference to the information about the user's privileges.
+         */
+        const ResourcePrivilegeMap& getPrivileges() const { return _privileges; }
 
         /**
          * Returns the CredentialData for this user.
@@ -109,6 +115,16 @@ namespace mongo {
          * Sets this user's authentication credentials.
          */
         void setCredentials(const CredentialData& credentials);
+
+        /**
+         * Replaces any existing user role membership information with "roles".
+         */
+        void setRoleData(const std::vector<RoleData>& roles);
+
+        /**
+         * Replaces any existing user privilege information with "privileges".
+         */
+        void setPrivileges(const PrivilegeVector& privileges);
 
         /**
          * Adds the given role name to the list of roles of which this user is a member.
@@ -169,8 +185,6 @@ namespace mongo {
     private:
 
         UserName _name;
-
-        typedef unordered_map<ResourcePattern, Privilege> ResourcePrivilegeMap;
 
         // Maps resource name to privilege on that resource
         ResourcePrivilegeMap _privileges;
