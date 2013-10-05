@@ -36,13 +36,6 @@
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
-
-    // Crutches to make the test compile
-    ServerGlobalParams serverGlobalParams;
-    bool inShutdown() {
-        return false;
-    }
-
 namespace {
 
     TEST(PrivilegeParserTest, IsValidTest) {

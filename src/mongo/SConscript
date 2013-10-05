@@ -200,6 +200,8 @@ env.StaticLibrary( 'mongohasher', [ "db/hasher.cpp" ] )
 
 env.StaticLibrary('synchronization', [ 'util/concurrency/synchronization.cpp' ])
 
+env.StaticLibrary('auth_helpers', ['client/auth_helpers.cpp'], LIBDEPS=['md5'])
+
 commonFiles = [ "pch.cpp",
                 "buildinfo.cpp",
                 "db/lasterror.cpp",
@@ -229,7 +231,6 @@ commonFiles = [ "pch.cpp",
                 "util/net/listen.cpp",
                 "util/startup_test.cpp",
                 "util/version.cpp",
-                "client/auth_helpers.cpp",
                 "client/connpool.cpp",
                 "client/dbclient.cpp",
                 "client/dbclient_rs.cpp",
@@ -289,7 +290,8 @@ env.StaticLibrary("fail_point",
                   LIBDEPS=["foundation", "bson"])
 
 env.StaticLibrary('mongocommon', commonFiles,
-                  LIBDEPS=['bson',
+                  LIBDEPS=['auth_helpers',
+                           'bson',
                            'foundation',
                            'mongohasher',
                            'md5',
