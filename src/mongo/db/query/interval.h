@@ -76,22 +76,52 @@ namespace mongo {
         /** Returns true if an empty-constructed interval hasn't been init()-ialized yet */
         bool isEmpty() const;
 
+        /**
+         * Swap start and end points of interval.
+         */
+        void reverse();
+
         /** Returns how 'this' compares to 'other' */
         enum IntervalComparison {
+            //
             // There is some intersection.
+            //
+
+            // The two intervals are *exactly* equal.
             INTERVAL_EQUALS,
+
+            // 'this' contains the other interval.
             INTERVAL_CONTAINS,
+
+            // 'this' is contained by the other interval.
             INTERVAL_WITHIN,
+
+            // The two intervals intersect and 'this' is before the other interval.
             INTERVAL_OVERLAPS_BEFORE,
+
+            // The two intervals intersect and 'this is after the other interval.
             INTERVAL_OVERLAPS_AFTER,
 
+            //
             // There is no intersection.
+            //
+
             INTERVAL_PRECEDES,
-            INTERVAL_SUCCEDS,
+
+            // This happens if we have [a,b) [b,c]
+            INTERVAL_PRECEDES_COULD_UNION,
+
+            INTERVAL_SUCCEEDS,
 
             INTERVAL_UNKNOWN
         };
+
         IntervalComparison compare(const Interval& other) const;
+
+        /**
+         * toString for IntervalComparison
+         */
+        static string cmpstr(IntervalComparison c);
 
         /**
          * Updates 'this' with the intersection of 'this' and 'other'. If 'this' and 'other'

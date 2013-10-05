@@ -107,8 +107,10 @@ namespace mongo {
 
         /**
          * Get the key that we should with.
+         *
+         * Returns true if there is a valid start key.  Returns false otherwise.
          */
-        void getStartKey(vector<const BSONElement*>* valueOut, vector<bool>* inclusiveOut);
+        bool getStartKey(vector<const BSONElement*>* valueOut, vector<bool>* inclusiveOut);
 
         /**
          * The states of a key from an index scan.  See checkKey below.

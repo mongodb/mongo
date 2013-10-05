@@ -81,12 +81,23 @@ namespace mongo {
         //   number of keys that cursor retrieved, and into the stage's stats 'advanced' for
         //   nscannedObjects', which would be the number of keys that survived the IXSCAN
         //   filter. Those keys would have been FETCH-ed, if a fetch is present.
-        //
-        // TODO: This is kind of a lie for STAGE_GEO_NEAR_2DSPHERE.
-        if (leaf->stageType == STAGE_COLLSCAN || leaf->stageType == STAGE_GEO_NEAR_2DSPHERE) {
+        if (leaf->stageType == STAGE_COLLSCAN) {
+            CollectionScanStats* csStats = static_cast<CollectionScanStats*>(leaf->specific.get());
             res->setCursor("BasicCursor");
-            res->setNScanned(leaf->common.advanced);
-            res->setNScannedObjects(leaf->common.advanced);
+            res->setNScanned(csStats->docsTested);
+            res->setNScannedObjects(csStats->docsTested);
+
+            if (fullDetails) {
+                res->setIsMultiKey(false);
+                res->setIndexOnly(false);
+            }
+        }
+        else if (leaf->stageType == STAGE_GEO_NEAR_2DSPHERE) {
+            // TODO: This is kind of a lie for STAGE_GEO_NEAR_2DSPHERE.
+            res->setCursor("S2NearCursor");
+            // The first work() is an init.  Every subsequent work examines a document.
+            res->setNScanned(leaf->common.works);
+            res->setNScannedObjects(leaf->common.works);
 
             if (fullDetails) {
                 res->setIsMultiKey(false);

@@ -108,6 +108,13 @@ namespace mongo {
         virtual ~SpecificStats() { }
     };
 
+    struct CollectionScanStats : public SpecificStats {
+        CollectionScanStats() : docsTested(0) { }
+
+        // How many documents did we check against our filter?
+        uint64_t docsTested;
+    };
+
     struct AndHashStats : public SpecificStats {
         AndHashStats() : flaggedButPassed(0),
                          flaggedInProgress(0) { }

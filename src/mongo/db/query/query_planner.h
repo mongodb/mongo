@@ -189,15 +189,16 @@ namespace mongo {
          *
          * If the node is a geo node, XXX.
          */
-        static QuerySolutionNode* makeLeafNode(const BSONObj& indexKeyPattern,
+        static QuerySolutionNode* makeLeafNode(const IndexEntry& index,
                                                MatchExpression* expr,
                                                bool* exact);
 
         /**
          * Merge the predicate 'expr' with the leaf node 'node'.
          */
-        static void mergeWithLeafNode(MatchExpression* expr, const BSONObj& keyPattern,
-                                      size_t pos, bool* exactOut, QuerySolutionNode* node);
+        static void mergeWithLeafNode(MatchExpression* expr, const IndexEntry& index,
+                                      size_t pos, bool* exactOut, QuerySolutionNode* node,
+                                      MatchExpression::MatchType mergeType);
 
         /**
          * If index scan, fill in any bounds that are missing in 'node' with the "all values for
@@ -205,7 +206,7 @@ namespace mongo {
          *
          * If geo, XXX.
          */
-        static void finishLeafNode(QuerySolutionNode* node, const BSONObj& indexKeyPattern);
+        static void finishLeafNode(QuerySolutionNode* node, const IndexEntry& index);
 
         //
         // Analysis of Data Access

@@ -309,7 +309,8 @@ namespace mongo {
     // IndexScanNode
     //
 
-    IndexScanNode::IndexScanNode() : filter(NULL), limit(0), direction(1) { }
+    IndexScanNode::IndexScanNode()
+        : indexIsMultiKey(false), filter(NULL), limit(0), direction(1) { }
 
     void IndexScanNode::appendToString(stringstream* ss, int indent) const {
         addIndent(ss, indent);
@@ -333,6 +334,10 @@ namespace mongo {
     }
 
     bool IndexScanNode::hasField(const string& field) const {
+        // There is no covering in a multikey index because you don't know whether or not the field
+        // in the key was extracted from an array in the original document.
+        if (indexIsMultiKey) { return false; }
+
         BSONObjIterator it(indexKeyPattern);
         while (it.more()) {
             if (field == it.next().fieldName()) {

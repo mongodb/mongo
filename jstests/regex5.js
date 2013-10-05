@@ -44,4 +44,5 @@ assert.eq( {
 
 // SERVER-505
 assert.eq( {x:[["a","a"]]}, t.find( { x : { $all: [ "a", /^a/ ] } } ).explain().indexBounds );
-assert.eq( {x:[["a","b"]]}, t.find( { x : { $all: [ /^a/ ] } } ).explain().indexBounds );
+// These aren't the right bounds.  We won't retrieve an array that contains the regexp value.
+//assert.eq( {x:[["a","b"]]}, t.find( { x : { $all: [ /^a/ ] } } ).explain().indexBounds );

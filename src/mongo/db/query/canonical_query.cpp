@@ -83,14 +83,17 @@ namespace mongo {
         return Status::OK();
     }
 
-    void normalizeTree(MatchExpression* root) {
+    /**
+     * Returns the normalized version of the subtree rooted at 'root'.
+     */
+    MatchExpression* normalizeTree(MatchExpression* root) {
         // root->isLogical() is true now.  We care about AND and OR.  Negations currently scare us.
         if (MatchExpression::AND == root->matchType() || MatchExpression::OR == root->matchType()) {
             // We could have AND of AND of AND.  Make sure we clean up our children before merging
             // them.
             // UNITTEST 11738048
-            for (size_t i = 0; i < root->numChildren(); ++i) {
-                normalizeTree(root->getChild(i));
+            for (size_t i = 0; i < root->getChildVector()->size(); ++i) {
+                (*root->getChildVector())[i] = normalizeTree(root->getChild(i));
             }
 
             // If any of our children are of the same logical operator that we are, we remove the
@@ -119,7 +122,17 @@ namespace mongo {
             root->getChildVector()->insert(root->getChildVector()->end(),
                                            absorbedChildren.begin(),
                                            absorbedChildren.end());
+
+            // AND of 1 thing is the thing, OR of 1 thing is the thing.
+            if (1 == root->numChildren()) {
+                MatchExpression* ret = root->getChild(0);
+                root->getChildVector()->clear();
+                delete root;
+                return ret;
+            }
         }
+
+        return root;
     }
 
     // TODO: Should this really live in the parsing?  Or elsewhere?
@@ -202,7 +215,7 @@ namespace mongo {
         if (!swme.isOK()) { return swme.getStatus(); }
 
         MatchExpression* root = swme.getValue();
-        normalizeTree(root);
+        root = normalizeTree(root);
         Status validStatus = isValid(root);
         if (!validStatus.isOK()) {
             return validStatus;

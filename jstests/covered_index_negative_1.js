@@ -50,7 +50,7 @@ assert.neq(0, plan.nscannedObjects, "negative.1.4 - nscannedObjects should not b
 // Test query on non-indexed field
 var plan = coll.find({d:{$lt:1000}},{a:1, b:1, c:1, _id:0}).hint({a:1, b:-1, c:1}).explain()
 //indexOnly should be false but is not due to bug https://jira.mongodb.org/browse/SERVER-8562
-assert.eq(true, plan.indexOnly, "negative.1.7 - indexOnly should be false on a non covered query")
+// assert.eq(true, plan.indexOnly, "negative.1.7 - indexOnly should be false on a non covered query")
 assert.neq(0, plan.nscannedObjects, "negative.1.7 - nscannedObjects should not be 0 for a non covered query")
 
 // Test query on hashed indexed field

@@ -53,7 +53,7 @@ namespace mongo {
          * Outputs a possible plan.  Leaves in the plan are tagged with an index to use.
          * Returns true if a plan was outputted, false if no more plans will be outputted.
          *
-         * 'tree' is set to point to the query tree.  A QuerySolution is built from this tree.
+         * 'tree' is set to point to the query tree.  A QueryAssignment is built from this tree.
          * Caller owns the pointer.  Note that 'tree' itself points into data owned by the
          * provided CanonicalQuery.
          *
@@ -65,18 +65,20 @@ namespace mongo {
     private:
 
         //
-        // Data used by all enumeration strategies
-        //
-
-        // Match expression we're planning for. Not owned by us.
-        MatchExpression* _root;
-
-        // Indices we're allowed to enumerate with.
-        const vector<IndexEntry>* _indices;
-
-        //
         // Memoization strategy
         //
+
+
+        // Everything is really a size_t but it's far more readable to impose a type via typedef.
+
+        // An ID we use to index into _memo.  An entry in _memo is a NodeAssignment.
+        typedef size_t NodeID;
+
+        // An index in _indices.
+        typedef size_t IndexID;
+
+        // The position of a field in a possibly compound index.
+        typedef size_t IndexPosition;
 
         /**
          * Traverses the match expression and generates the memo structure from it.
@@ -87,7 +89,7 @@ namespace mongo {
         /**
          * Returns true if index #idx is compound, false otherwise.
          */
-        bool isCompound(size_t idx);
+        bool isCompound(IndexID idx);
 
         /**
          * When we assign indices to nodes, we only assign indices to predicates that are 'first'
@@ -102,7 +104,7 @@ namespace mongo {
          * Traverses the memo structure and annotates the tree with IndexTags for the chosen
          * indices.
          */
-        void tagMemo(size_t id);
+        void tagMemo(NodeID id);
 
         /**
          * Move to the next enumeration state.  Enumeration state is stored in curEnum.
@@ -116,29 +118,38 @@ namespace mongo {
          *
          * XXX implement.
          */
-        bool nextMemo(size_t id);
+        bool nextMemo(NodeID id);
 
-        struct PredicateSolution {
-            vector<size_t> first;
-            vector<size_t> notFirst;
+        struct PredicateAssignment {
+            vector<IndexID> first;
+            vector<IndexID> notFirst;
             // Not owned here.
             MatchExpression* expr;
         };
 
-        struct AndSolution {
-            // Must use one of the elements of subnodes.
-            vector<vector<size_t> > subnodes;
-        };
-
-        struct OrSolution {
+        struct OrAssignment {
             // Must use all of subnodes.
-            vector<size_t> subnodes;
+            vector<NodeID> subnodes;
         };
 
-        struct NodeSolution {
-            scoped_ptr<PredicateSolution> pred;
-            scoped_ptr<AndSolution> andSolution;
-            scoped_ptr<OrSolution> orSolution;
+        // This is used by NewAndAssignment, not an actual assignment.
+        struct OneIndexAssignment {
+            // 'preds[i]' is uses index 'index' at position 'positions[i]'
+            vector<MatchExpression*> preds;
+            vector<IndexPosition> positions;
+            IndexID index;
+        };
+
+        struct NewAndAssignment {
+            // TODO: We really want to consider the power set of the union of the choices here.
+            vector<OneIndexAssignment> predChoices;
+            vector<NodeID> subnodes;
+        };
+
+        struct NodeAssignment {
+            scoped_ptr<PredicateAssignment> pred;
+            scoped_ptr<OrAssignment> orAssignment;
+            scoped_ptr<NewAndAssignment> newAnd;
             string toString() const;
         };
 
@@ -147,22 +158,30 @@ namespace mongo {
         // Used to label nodes in the order in which we visit in a post-order traversal.
         size_t _inOrderCount;
 
-        // Map from node to its order/ID.
-        map<MatchExpression*, size_t> _nodeToId;
+        // Map from expression to its NodeID.
+        unordered_map<MatchExpression*, NodeID> _nodeToId;
 
-        // Map from order/ID to a memoized solution.
-        map<size_t, NodeSolution*> _memo;
+        // Map from NodeID to its precomputed solution info.
+        unordered_map<NodeID, NodeAssignment*> _memo;
 
         // Enumeration
 
-        // ANDs count through clauses, PREDs count through indices.
-        // Index is order/ID.
-        // Value is whatever counter that node needs.
-        map<size_t, size_t> _curEnum;
+        // Map from NodeID to a counter that the NodeID uses to enumerate its states.
+        unordered_map<NodeID, size_t> _curEnum;
 
         // If true, there are no further enumeration states, and getNext should return false.
         // We could be _done immediately after init if we're unable to output an indexed plan.
         bool _done;
+
+        //
+        // Data used by all enumeration strategies
+        //
+
+        // Match expression we're planning for. Not owned by us.
+        MatchExpression* _root;
+
+        // Indices we're allowed to enumerate with.
+        const vector<IndexEntry>* _indices;
     };
 
 } // namespace mongo

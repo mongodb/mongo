@@ -28,7 +28,8 @@
 
 #pragma once
 
-#include <vector>
+#include <sstream>
+#include <string>
 
 #include "mongo/db/jsobj.h"
 
@@ -38,7 +39,8 @@ namespace mongo {
      * This name sucks, but every name involving 'index' is used somewhere.
      */
     struct IndexEntry {
-        IndexEntry(BSONObj kp, bool mk, bool sp) : keyPattern(kp), multikey(mk), sparse(sp) { }
+        IndexEntry(const BSONObj& kp, bool mk, bool sp)
+            : keyPattern(kp), multikey(mk), sparse(sp) { }
 
         IndexEntry(const IndexEntry& other) {
             keyPattern = other.keyPattern;
@@ -51,6 +53,18 @@ namespace mongo {
         bool multikey;
 
         bool sparse;
+
+        std::string toString() const {
+            stringstream ss;
+            ss << keyPattern.toString();
+            if (multikey) {
+                ss << " multikey";
+            }
+            if (sparse) {
+                ss << " sparse";
+            }
+            return ss.str();
+        }
     };
 
 }  // namespace mongo
