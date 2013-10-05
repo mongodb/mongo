@@ -368,56 +368,53 @@ namespace {
         RoleGraph::generateUniversalPrivileges(privileges);
     }
 
-    /**
-     * Returns the privilege that corresponds with the given built-in role.
-     */
-    PrivilegeVector getPrivilegesForBuiltinRole(const RoleName& roleName) {
-        PrivilegeVector result;
+}  // namespace
+
+    bool RoleGraph::addPrivilegesForBuiltinRole(const RoleName& roleName,
+                                                PrivilegeVector* result) {
         const bool isAdminDB = (roleName.getDB() == ADMIN_DBNAME);
 
         if (roleName.getRole() == BUILTIN_ROLE_READ) {
-            addReadOnlyDbPrivileges(&result, roleName.getDB());
+            addReadOnlyDbPrivileges(result, roleName.getDB());
         }
         else if (roleName.getRole() == BUILTIN_ROLE_READ_WRITE) {
-            addReadWriteDbPrivileges(&result, roleName.getDB());
+            addReadWriteDbPrivileges(result, roleName.getDB());
         }
         else if (roleName.getRole() == BUILTIN_ROLE_USER_ADMIN) {
-            addUserAdminDbPrivileges(&result, roleName.getDB());
+            addUserAdminDbPrivileges(result, roleName.getDB());
         }
         else if (roleName.getRole() == BUILTIN_ROLE_DB_ADMIN) {
-            addDbAdminDbPrivileges(&result, roleName.getDB());
+            addDbAdminDbPrivileges(result, roleName.getDB());
         }
         else if (roleName.getRole() == BUILTIN_ROLE_DB_OWNER) {
-            addDbOwnerPrivileges(&result, roleName.getDB());
+            addDbOwnerPrivileges(result, roleName.getDB());
         }
         else if (isAdminDB && roleName.getRole() == BUILTIN_ROLE_READ_ANY_DB) {
-            addReadOnlyAnyDbPrivileges(&result);
+            addReadOnlyAnyDbPrivileges(result);
         }
         else if (isAdminDB && roleName.getRole() == BUILTIN_ROLE_READ_WRITE_ANY_DB) {
-            addReadWriteAnyDbPrivileges(&result);
+            addReadWriteAnyDbPrivileges(result);
         }
         else if (isAdminDB && roleName.getRole() == BUILTIN_ROLE_USER_ADMIN_ANY_DB) {
-            addUserAdminAnyDbPrivileges(&result);
+            addUserAdminAnyDbPrivileges(result);
         }
         else if (isAdminDB && roleName.getRole() == BUILTIN_ROLE_DB_ADMIN_ANY_DB) {
-            addDbAdminAnyDbPrivileges(&result);
+            addDbAdminAnyDbPrivileges(result);
         }
         else if (isAdminDB && roleName.getRole() == BUILTIN_ROLE_CLUSTER_ADMIN) {
-            addClusterAdminPrivileges(&result);
+            addClusterAdminPrivileges(result);
         }
         else if (isAdminDB && roleName.getRole() == BUILTIN_ROLE_ROOT) {
-            addRootRolePrivileges(&result);
+            addRootRolePrivileges(result);
         }
         else if (isAdminDB && roleName.getRole() == BUILTIN_ROLE_INTERNAL) {
-            addInternalRolePrivileges(&result);
+            addInternalRolePrivileges(result);
         }
         else {
-            fassertFailed(17145);
+            return false;
         }
-        return result;
+        return true;
     }
-
-}  // namespace
 
     void RoleGraph::generateUniversalPrivileges(PrivilegeVector* privileges) {
         ActionSet allActions;
@@ -464,7 +461,6 @@ namespace {
         else if (isAdminDB && role.getRole() == BUILTIN_ROLE_INTERNAL) {
             return true;
         }
-
         return false;
     }
 
@@ -474,7 +470,8 @@ namespace {
         }
 
         _createRoleDontCheckIfRoleExists(role);
-        PrivilegeVector privileges = getPrivilegesForBuiltinRole(role);
+        PrivilegeVector privileges;
+        fassert(17145, addPrivilegesForBuiltinRole(role, &privileges));
         for (size_t i = 0; i < privileges.size(); ++i) {
             _addPrivilegeToRoleNoChecks(role, privileges[i]);
             _allPrivilegesForRole[role].push_back(privileges[i]);

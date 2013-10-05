@@ -37,17 +37,18 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/mutable/element.h"
 #include "mongo/db/auth/action_set.h"
-#include "mongo/db/auth/authz_manager_external_state.h"
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/auth/role_graph.h"
 #include "mongo/db/auth/user.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/auth/user_name_hash.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/platform/unordered_map.h"
 
 namespace mongo {
 
+    class AuthzManagerExternalState;
     class UserDocumentParser;
 
     /**
@@ -78,6 +79,11 @@ namespace mongo {
         static const std::string PASSWORD_FIELD_NAME;
         static const std::string V1_USER_NAME_FIELD_NAME;
         static const std::string V1_USER_SOURCE_FIELD_NAME;
+
+        static const NamespaceString adminCommandNamespace;
+        static const NamespaceString rolesCollectionNamespace;
+        static const NamespaceString usersCollectionNamespace;
+        static const NamespaceString versionCollectionNamespace;
 
         // TODO: Make the following functions no longer static.
 
@@ -226,6 +232,31 @@ namespace mongo {
         ActionSet getActionsForOldStyleUser(const std::string& dbname, bool readOnly) const;
 
         /**
+         * Writes into "result" a document describing the named user and returns Status::OK().  The
+         * description includes the user credentials and customData, if present, the user's role
+         * membership and delegation information, a full list of the user's privileges, and a full
+         * list of the user's roles, including those roles held implicitly through other roles
+         * (indirect roles).  In the event that some of this information is inconsistent, the
+         * document will contain a "warnings" array, with string messages describing
+         * inconsistencies.
+         *
+         * If the user does not exist, returns ErrorCodes::UserNotFound.
+         */
+        Status getUserDescription(const UserName& userName, BSONObj* result);
+
+        /**
+         * Writes into "result" a document describing the named role and returns Status::OK().  The
+         * description includes the role's in which the named role has membership, a full list of
+         * the role's privileges, and a full list of the roles of which the named role is a member,
+         * including those roles memberships held implicitly through other roles (indirect roles).
+         * In the event that some of this information is inconsistent, the document will contain a
+         * "warnings" array, with string messages describing inconsistencies.
+         *
+         * If the role does not exist, returns ErrorCodes::RoleNotFound.
+         */
+        Status getRoleDescription(const RoleName& roleName, BSONObj* result);
+
+        /**
          *  Returns the User object for the given userName in the out parameter "acquiredUser".
          *  If the user cache already has a user object for this user, it increments the refcount
          *  on that object and gives out a pointer to it.  If no user object for this user name
@@ -263,26 +294,6 @@ namespace mongo {
          * user into the cache at process startup.
          */
         void addInternalUser(User* user);
-
-        /**
-         * Returns true if the role name given refers to a valid built-in or user defined role.
-         */
-        bool roleExists(const RoleName& role);
-
-        /**
-         * Returns true if the role name given refers to a built-in role.
-         */
-        bool isBuiltinRole(const RoleName& role);
-
-        /**
-         * Returns the direct privileges for the given role.
-         */
-        PrivilegeVector getDirectPrivilegesForRole(const RoleName& role);
-
-        /**
-         * Returns the direct subordinate roles of the given role.
-         */
-        std::vector<RoleName> getSubordinateRolesForRole(const RoleName& role);
 
         /**
          * Initializes the authorization manager.  Depending on what version the authorization
@@ -334,9 +345,19 @@ namespace mongo {
          */
         Status upgradeAuthCollections();
 
-    private:
+        /**
+         * Hook called by replication code to let the AuthorizationManager observe changes
+         * to relevant collections.
+         */
+        void logOp(const char* opstr,
+                   const char* ns,
+                   const BSONObj& obj,
+                   BSONObj* patt,
+                   bool* b,
+                   bool fromMigrate,
+                   const BSONObj* fullObj);
 
-        Status _acquireUser_inlock(const UserName& userName, User** acquiredUser);
+    private:
 
         /**
          * Returns the current version number of the authorization system.  Should only be called
@@ -345,17 +366,8 @@ namespace mongo {
         int _getVersion_inlock() const { return _version; }
 
         /**
-         * Modifies the given User object by inspecting its roles and giving it the relevant
-         * privileges from those roles.
-         */
-        void _initializeUserPrivilegesFromRoles_inlock(User* user);
-
-        /**
          * Invalidates all User objects in the cache and removes them from the cache.
          * Should only be called when already holding _lock.
-         * TODO(spencer): This only exists because we're currently calling initializeAllV1UserData
-         * every time user data is changed.  Once we only call that once at startup, this function
-         * should be removed.
          */
         void _invalidateUserCache_inlock();
 
@@ -383,11 +395,6 @@ namespace mongo {
         // All reads/writes to _version must be done within _lock.
         int _version;
 
-        /**
-         * Used for parsing privilege documents.  Set whenever _version is set.  Guarded by _lock.
-         */
-        scoped_ptr<UserDocumentParser> _parser;
-
         scoped_ptr<AuthzManagerExternalState> _externalState;
 
         /**
@@ -399,12 +406,7 @@ namespace mongo {
         unordered_map<UserName, User*> _userCache;
 
         /**
-         * Stores a full representation of all roles in the system (both user-defined and built-in)
-         */
-        RoleGraph _roleGraph;
-
-        /**
-         * Protects _userCache, _roleGraph, _version, and _parser.
+         * Protects _userCache and _version.
          */
         boost::mutex _lock;
     };

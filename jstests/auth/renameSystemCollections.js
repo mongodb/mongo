@@ -96,14 +96,6 @@ adminDB.auth('rootier', 'password');
 jsTestLog("Test that with __system you CAN rename to/from system.users");
 var res = adminDB.system.users.renameCollection("users", true);
 assert.eq(1, res.ok, tojson(res));
-assert.eq(0, adminDB.system.users.count());
-assert.eq(5, adminDB.users.count());
 
-adminDB.users.drop();
-adminDB.users.insert(backdoorUserDoc);
-var res = adminDB.users.renameCollection("system.users", true);
-assert.eq(1, res.ok);
-assert.neq(null, adminDB.system.users.findOne({name: backdoorUserDoc.name}));
-assert.eq(null, adminDB.system.users.findOne({name:'userAdmin'}));
-
-
+// At this point, all the user documents are gone, so further activity may be unauthorized,
+// depending on cluster configuration.  So, this is the end of the test.

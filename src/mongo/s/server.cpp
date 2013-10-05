@@ -328,13 +328,10 @@ static bool runMongosServer( bool doUpgrade ) {
     if (serverGlobalParams.isHttpInterfaceEnabled)
         boost::thread web( boost::bind(&webServerThread, new NoAdminAccess() /* takes ownership */) );
 
-    AuthorizationManager* authzManager = getGlobalAuthorizationManager();
-    if (authzManager->isAuthEnabled()) {
-        Status status = getGlobalAuthorizationManager()->initialize();
-        if (!status.isOK()) {
-            log() << "Initializing authorization data failed: " << status.toString() << endl;
-            return false;
-        }
+    Status status = getGlobalAuthorizationManager()->initialize();
+    if (!status.isOK()) {
+        log() << "Initializing authorization data failed: " << status;
+        return false;
     }
 
     MessageServer::Options opts;

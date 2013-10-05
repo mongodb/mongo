@@ -34,6 +34,7 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
+#include "mongo/db/auth/role_name.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
@@ -52,32 +53,75 @@ namespace mongo {
 
         virtual ~AuthzManagerExternalState();
 
-        // Gets the privilege information document for "userName".  authzVersion indicates what
-        // version of the privilege document format is being used, which is needed to know how to
-        // query for the user's privilege document.
-        //
-        // On success, returns Status::OK() and stores a shared-ownership copy of the document into
-        // "result".
+        /**
+         * Initializes the external state object.  Must be called after construction and before
+         * calling other methods.  Object may not be used after this method returns something other
+         * than Status::OK().
+         */
+        virtual Status initialize() = 0;
+
+        /**
+         * Writes into "result" a document describing the named user and returns Status::OK().  The
+         * description includes the user credentials, if present, the user's role membership and
+         * delegation information, a full list of the user's privileges, and a full list of the
+         * user's roles, including those roles held implicitly through other roles (indirect roles).
+         * In the event that some of this information is inconsistent, the document will contain a
+         * "warnings" array, with string messages describing inconsistencies.
+         *
+         * If the user does not exist, returns ErrorCodes::UserNotFound.
+         */
+        virtual Status getUserDescription(const UserName& userName, BSONObj* result) = 0;
+
+        /**
+         * Writes into "result" a document describing the named role and returns Status::OK().  The
+         * description includes the role's in which the named role has membership, a full list of
+         * the role's privileges, and a full list of the roles of which the named role is a member,
+         * including those roles memberships held implicitly through other roles (indirect roles).
+         * In the event that some of this information is inconsistent, the document will contain a
+         * "warnings" array, with string messages describing inconsistencies.
+         *
+         * If the user does not exist, returns ErrorCodes::UserNotFound.
+         */
+        virtual Status getRoleDescription(const RoleName& roleName, BSONObj* result) = 0;
+
+        /**
+         * Gets the privilege information document for "userName".  authzVersion indicates what
+         * version of the privilege document format is being used, which is needed to know how to
+         * query for the user's privilege document.
+         *
+         *
+         * On success, returns Status::OK() and stores a shared-ownership copy of the document into
+         * "result".
+         */
         Status getPrivilegeDocument(const UserName& userName,
                                     int authzVersion,
                                     BSONObj* result);
 
-        // Returns true if there exists at least one privilege document in the system.
+        /**
+         * Returns true if there exists at least one privilege document in the system.
+         */
         bool hasAnyPrivilegeDocuments();
 
-        // Creates the given user object in the given database.
-        // TODO(spencer): remove dbname argument once users are only written into the admin db
+        /**
+         * Creates the given user object in the given database.
+         *
+         * TODO(spencer): remove dbname argument once users are only written into the admin db
+         */
         virtual Status insertPrivilegeDocument(const std::string& dbname,
                                                const BSONObj& userObj,
                                                const BSONObj& writeConcern);
 
-        // Updates the given user object with the given update modifier.
+        /**
+         * Updates the given user object with the given update modifier.
+         */
         virtual Status updatePrivilegeDocument(const UserName& user,
                                                const BSONObj& updateObj,
                                                const BSONObj& writeConcern);
 
-        // Removes users for the given database matching the given query.
-        // Writes into *numRemoved the number of user documents that were modified.
+        /**
+         * Removes users for the given database matching the given query.
+         * Writes into *numRemoved the number of user documents that were modified.
+         */
         virtual Status removePrivilegeDocuments(const BSONObj& query,
                                                 const BSONObj& writeConcern,
                                                 int* numRemoved);
@@ -200,13 +244,25 @@ namespace mongo {
          */
         virtual void releaseAuthzUpdateLock() = 0;
 
+        virtual void logOp(
+                const char* op,
+                const char* ns,
+                const BSONObj& o,
+                BSONObj* o2,
+                bool* b,
+                bool fromMigrateUnused,
+                const BSONObj* fullObjUnused) {}
+
+
     protected:
         AuthzManagerExternalState(); // This class should never be instantiated directly.
 
-        // Queries the userNamespace with the given query and returns the privilegeDocument found
-        // in *result.  Returns Status::OK if it finds a document matching the query.  If it doesn't
-        // find a document matching the query, returns a Status with code UserNotFound.  Other
-        // errors may return other Status codes.
+        /**
+         * Queries the userNamespace with the given query and returns the privilegeDocument found
+         * in *result.  Returns Status::OK if it finds a document matching the query.  If it doesn't
+         * find a document matching the query, returns a Status with code UserNotFound.  Other
+         * errors may return other Status codes.
+         */
         virtual Status _findUser(const std::string& usersNamespace,
                                  const BSONObj& query,
                                  BSONObj* result) = 0;

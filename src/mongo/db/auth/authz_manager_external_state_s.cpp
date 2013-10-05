@@ -53,18 +53,68 @@ namespace {
 
     AuthzManagerExternalStateMongos::~AuthzManagerExternalStateMongos() {}
 
+    Status AuthzManagerExternalStateMongos::initialize() {
+        return Status::OK();
+    }
+
     namespace {
-        ScopedDbConnection* getConnectionForAuthzCollection(const std::string& ns) {
+        ScopedDbConnection* getConnectionForAuthzCollection(const NamespaceString& ns) {
             //
             // Note: The connection mechanism here is *not* ideal, and should not be used elsewhere.
             // If the primary for the collection moves, this approach may throw rather than handle
             // version exceptions.
             //
 
-            DBConfigPtr config = grid.getDBConfig(ns);
-            Shard s = config->getShard(ns);
+            DBConfigPtr config = grid.getDBConfig(ns.ns());
+            Shard s = config->getShard(ns.ns());
 
             return new ScopedDbConnection(s.getConnString(), 30.0);
+        }
+    }
+
+    Status AuthzManagerExternalStateMongos::getUserDescription(const UserName& userName,
+                                                               BSONObj* result) {
+        try {
+            scoped_ptr<ScopedDbConnection> conn(getConnectionForAuthzCollection(
+                    AuthorizationManager::usersCollectionNamespace));
+            BSONObj cmdResult;
+            conn->get()->runCommand(
+                    userName.getDB().toString(),  // TODO: Change usersInfo so this command can always go to "admin".
+                    BSON("usersInfo" << userName.getUser() << "details" << true),
+                    cmdResult);
+            if (!cmdResult["ok"].trueValue()) {
+                int code = cmdResult["code"].numberInt();
+                if (code == 0) code = ErrorCodes::UnknownError;
+                return Status(ErrorCodes::Error(code), cmdResult["errmsg"].str());
+            }
+            *result = cmdResult["users"]["0"].Obj().getOwned();
+            conn->done();
+            return Status::OK();
+        } catch (const DBException& e) {
+            return e.toStatus();
+        }
+    }
+
+    Status AuthzManagerExternalStateMongos::getRoleDescription(const RoleName& roleName,
+                                                               BSONObj* result) {
+        try {
+            scoped_ptr<ScopedDbConnection> conn(getConnectionForAuthzCollection(
+                    AuthorizationManager::rolesCollectionNamespace));
+            BSONObj cmdResult;
+            conn->get()->runCommand(
+                    roleName.getDB().toString(),  // TODO: Change rolesInfo so this command can always go to "admin".
+                    BSON("rolesInfo" << roleName.getRole()),
+                    cmdResult);
+            if (!cmdResult["ok"].trueValue()) {
+                int code = cmdResult["code"].numberInt();
+                if (code == 0) code = ErrorCodes::UnknownError;
+                return Status(ErrorCodes::Error(code), cmdResult["errmsg"].str());
+            }
+            *result = cmdResult["roles"]["0"].Obj().getOwned();
+            conn->done();
+            return Status::OK();
+        } catch (const DBException& e) {
+            return e.toStatus();
         }
     }
 
@@ -72,7 +122,8 @@ namespace {
                                                       const BSONObj& query,
                                                       BSONObj* result) {
         try {
-            scoped_ptr<ScopedDbConnection> conn(getConnectionForAuthzCollection(usersNamespace));
+            scoped_ptr<ScopedDbConnection> conn(getConnectionForAuthzCollection(
+                    AuthorizationManager::usersCollectionNamespace));
             *result = conn->get()->findOne(usersNamespace, query).getOwned();
             conn->done();
             if (result->isEmpty()) {
@@ -89,8 +140,7 @@ namespace {
             const BSONObj& query,
             const boost::function<void(const BSONObj&)>& resultProcessor) {
         try {
-            scoped_ptr<ScopedDbConnection> conn(
-                    getConnectionForAuthzCollection(collectionName.ns()));
+            scoped_ptr<ScopedDbConnection> conn(getConnectionForAuthzCollection(collectionName));
             conn->get()->query(resultProcessor, collectionName.ns(), query);
             return Status::OK();
         } catch (const DBException& e) {
@@ -102,7 +152,7 @@ namespace {
             std::vector<std::string>* dbnames) {
         try {
             scoped_ptr<ScopedDbConnection> conn(
-                    getConnectionForAuthzCollection(DatabaseType::ConfigNS));
+                    getConnectionForAuthzCollection(NamespaceString(DatabaseType::ConfigNS)));
             auto_ptr<DBClientCursor> c = conn->get()->query(DatabaseType::ConfigNS, Query());
 
             while (c->more()) {
@@ -124,7 +174,7 @@ namespace {
     Status AuthzManagerExternalStateMongos::getAllV1PrivilegeDocsForDB(
             const std::string& dbname, std::vector<BSONObj>* privDocs) {
         try {
-            std::string usersNamespace = dbname + ".system.users";
+            NamespaceString usersNamespace(dbname, "system.users");
             scoped_ptr<ScopedDbConnection> conn(getConnectionForAuthzCollection(usersNamespace));
             auto_ptr<DBClientCursor> c = conn->get()->query(usersNamespace, Query());
 

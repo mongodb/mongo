@@ -51,6 +51,11 @@ namespace mongo {
         AuthzManagerExternalStateMongos();
         virtual ~AuthzManagerExternalStateMongos();
 
+        virtual Status initialize();
+
+        virtual Status getUserDescription(const UserName& userName, BSONObj* result);
+        virtual Status getRoleDescription(const RoleName& roleName, BSONObj* result);
+
         virtual Status getAllDatabaseNames(std::vector<std::string>* dbnames);
 
         virtual Status getAllV1PrivilegeDocsForDB(const std::string& dbname,

@@ -35,6 +35,7 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
 #include "mongo/db/auth/authz_manager_external_state.h"
+#include "mongo/db/auth/role_graph.h"
 #include "mongo/db/auth/user_name.h"
 
 namespace mongo {
@@ -48,6 +49,11 @@ namespace mongo {
     public:
         AuthzManagerExternalStateMongod();
         virtual ~AuthzManagerExternalStateMongod();
+
+        virtual Status initialize();
+
+        virtual Status getUserDescription(const UserName& userName, BSONObj* result);
+        virtual Status getRoleDescription(const RoleName& roleName, BSONObj* result);
 
         virtual Status getAllDatabaseNames(std::vector<std::string>* dbnames);
 
@@ -89,13 +95,51 @@ namespace mongo {
         virtual bool tryAcquireAuthzUpdateLock(const StringData& why);
         virtual void releaseAuthzUpdateLock();
 
+        virtual void logOp(
+                const char* op,
+                const char* ns,
+                const BSONObj& o,
+                BSONObj* o2,
+                bool* b,
+                bool fromMigrateUnused,
+                const BSONObj* fullObjUnused);
+
     protected:
         virtual Status _findUser(const string& usersNamespace,
                                  const BSONObj& query,
                                  BSONObj* result);
 
     private:
+        enum RoleGraphState {
+            roleGraphStateInitial = 0,
+            roleGraphStateConsistent,
+            roleGraphStateHasCycle
+        };
+
+        /**
+         * Initializes the role graph from the contents of the admin.system.roles collection.
+         */
+        Status _initializeRoleGraph();
+
+        /**
+         * Eventually consistent, in-memory representation of all roles in the system (both
+         * user-defined and built-in).  Synchronized via _roleGraphMutex.
+         */
+        RoleGraph _roleGraph;
+
+        /**
+         * State of _roleGraph, one of "initial", "consistent" and "has cycle".  Synchronized via
+         * _roleGraphMutex.
+         */
+        RoleGraphState _roleGraphState;
+
+        /**
+         * Guards _roleGraphState and _roleGraph.
+         */
+        boost::mutex _roleGraphMutex;
+
         boost::mutex _authzDataUpdateLock;
+
     };
 
 } // namespace mongo

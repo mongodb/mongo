@@ -43,6 +43,21 @@
 
 namespace mongo {
 
+    Status AuthzManagerExternalStateMock::initialize() {
+        return Status::OK();
+    }
+
+    Status AuthzManagerExternalStateMock::getUserDescription(
+            const UserName& userName, BSONObj* result) {
+        return Status(ErrorCodes::InternalError, "Not implemented");
+    }
+
+    Status AuthzManagerExternalStateMock::getRoleDescription(
+            const RoleName& roleName, BSONObj* result) {
+        return Status(ErrorCodes::InternalError, "Not implemented");
+    }
+
+
     Status AuthzManagerExternalStateMock::updatePrivilegeDocument(const UserName& user,
                                                                   const BSONObj& updateObj,
                                                                   const BSONObj&) {
@@ -122,11 +137,16 @@ namespace mongo {
         if (!status.isOK()) {
             return status;
         }
-        for (std::vector<BSONObjCollection::iterator>::iterator it = iterVector.begin();
-                it != iterVector.end(); ++it) {
-            resultProcessor(**it);
+        try {
+            for (std::vector<BSONObjCollection::iterator>::iterator it = iterVector.begin();
+                 it != iterVector.end(); ++it) {
+                resultProcessor(**it);
+            }
         }
-        return Status::OK();
+        catch (const DBException& ex) {
+            status = ex.toStatus();
+        }
+        return status;
     }
 
     Status AuthzManagerExternalStateMock::insert(

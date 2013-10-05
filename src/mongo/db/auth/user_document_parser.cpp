@@ -52,17 +52,16 @@ namespace {
     const std::string ROLE_CAN_DELEGATE_FIELD_NAME = "canDelegate";
     const std::string ROLE_HAS_ROLE_FIELD_NAME = "hasRole";
     const std::string MONGODB_CR_CREDENTIAL_FIELD_NAME = "MONGODB-CR";
-}  // namespace
 
-    static inline Status _badValue(const char* reason, int location) {
+    inline Status _badValue(const char* reason, int location) {
         return Status(ErrorCodes::BadValue, reason, location);
     }
 
-    static inline Status _badValue(const std::string& reason, int location) {
+    inline Status _badValue(const std::string& reason, int location) {
         return Status(ErrorCodes::BadValue, reason, location);
     }
 
-    static inline StringData makeStringDataFromBSONElement(const BSONElement& element) {
+    inline StringData makeStringDataFromBSONElement(const BSONElement& element) {
         return StringData(element.valuestr(), element.valuestrsize() - 1);
     }
 
@@ -79,6 +78,7 @@ namespace {
         }
         return Status::OK();
     }
+}  // namespace
 
     std::string V1UserDocumentParser::extractUserNameFromUserDocument(
             const BSONObj& doc) const {
@@ -110,7 +110,7 @@ namespace {
         return Status::OK();
     }
 
-    void _initializeUserRolesFromV0UserDocument(
+    static void _initializeUserRolesFromV0UserDocument(
             User* user, const BSONObj& privDoc, const StringData& dbname) {
         bool readOnly = privDoc["readOnly"].trueValue();
         if (dbname == "admin") {
@@ -147,7 +147,7 @@ namespace {
         return Status::OK();
     }
 
-    Status _initializeUserRolesFromV1UserDocument(
+    static Status _initializeUserRolesFromV1UserDocument(
                 User* user, const BSONObj& privDoc, const StringData& dbname) {
 
         if (!privDoc[READONLY_FIELD_NAME].eoo()) {
@@ -220,37 +220,9 @@ namespace {
             if ((*iter).type() != Object) {
                 return _badValue("Elements in 'roles' array must objects", 0);
             }
-            BSONObj roleObj = (*iter).Obj();
-            BSONElement nameElement = roleObj[ROLE_NAME_FIELD_NAME];
-            BSONElement sourceElement = roleObj[ROLE_SOURCE_FIELD_NAME];
-            BSONElement canDelegateElement = roleObj[ROLE_CAN_DELEGATE_FIELD_NAME];
-            BSONElement hasRoleElement = roleObj[ROLE_HAS_ROLE_FIELD_NAME];
-
-            if (nameElement.type() != String ||
-                    makeStringDataFromBSONElement(nameElement).empty()) {
-                return _badValue("Entries in 'roles' array need 'name' field to be a non-empty "
-                                         "string",
-                                 0);
-            }
-            if (sourceElement.type() != String ||
-                    makeStringDataFromBSONElement(sourceElement).empty()) {
-                return _badValue("Entries in 'roles' array need 'source' field to be a non-empty "
-                                         "string",
-                                 0);
-            }
-            if (canDelegateElement.type() != Bool) {
-                return _badValue("Entries in 'roles' array need a 'canDelegate' boolean field",
-                                 0);
-            }
-            if (hasRoleElement.type() != Bool) {
-                return _badValue("Entries in 'roles' array need a 'canDelegate' boolean field",
-                                 0);
-            }
-            if (!canDelegateElement.Bool() && !hasRoleElement.Bool()) {
-                return _badValue("At least one of 'canDelegate' and 'hasRole' must be true for "
-                                         "every role in the 'roles' array",
-                                 0);
-            }
+            Status status = V2UserDocumentParser::checkValidRoleObject((*iter).Obj(), true);
+            if (!status.isOK())
+                return status;
         }
         return Status::OK();
     }
@@ -355,54 +327,112 @@ namespace {
         return Status::OK();
     }
 
-    Status V2UserDocumentParser::checkValidRoleObject(
-            const BSONObj& roleObject, bool hasPossessionBools) const {
-        BSONElement roleNameElement = roleObject[ROLE_NAME_FIELD_NAME];
-        BSONElement roleSourceElement = roleObject[ROLE_SOURCE_FIELD_NAME];
-        BSONElement canDelegateElement = roleObject[ROLE_CAN_DELEGATE_FIELD_NAME];
-        BSONElement hasRoleElement = roleObject[ROLE_HAS_ROLE_FIELD_NAME];
+    static Status _extractRoleDocumentElements(
+            const BSONObj& roleObject,
+            bool hasPossessionBools,
+            BSONElement* roleNameElement,
+            BSONElement* roleSourceElement,
+            BSONElement* canDelegateElement,
+            BSONElement* hasRoleElement) {
 
-        if (roleNameElement.type() != String ||
-                makeStringDataFromBSONElement(roleNameElement).empty()) {
+        *roleNameElement = roleObject[ROLE_NAME_FIELD_NAME];
+        *roleSourceElement = roleObject[ROLE_SOURCE_FIELD_NAME];
+        *canDelegateElement = roleObject[ROLE_CAN_DELEGATE_FIELD_NAME];
+        *hasRoleElement = roleObject[ROLE_HAS_ROLE_FIELD_NAME];
+
+        if (roleNameElement->type() != String ||
+                makeStringDataFromBSONElement(*roleNameElement).empty()) {
             return Status(ErrorCodes::UnsupportedFormat,
                           "Role names must be non-empty strings");
         }
-        if (roleSourceElement.type() != String ||
-                makeStringDataFromBSONElement(roleSourceElement).empty()) {
+        if (roleSourceElement->type() != String ||
+                makeStringDataFromBSONElement(*roleSourceElement).empty()) {
             return Status(ErrorCodes::UnsupportedFormat,
                           "Role source must be non-empty strings");
         }
         if (hasPossessionBools) {
-            if (canDelegateElement.type() != Bool) {
+            if (canDelegateElement->type() != Bool) {
                 return Status(ErrorCodes::UnsupportedFormat,
                               "Entries in 'roles' array need a 'canDelegate' boolean field");
             }
-            if (hasRoleElement.type() != Bool) {
+            if (hasRoleElement->type() != Bool) {
                 return Status(ErrorCodes::UnsupportedFormat,
                               "Entries in 'roles' array need a 'hasRole' boolean field");
             }
 
-            if (!hasRoleElement.Bool() && !canDelegateElement.Bool()) {
+            if (!hasRoleElement->Bool() && !canDelegateElement->Bool()) {
                 return Status(ErrorCodes::UnsupportedFormat,
                               "At least one of 'canDelegate' and 'hasRole' must be true for "
                               "every role in the 'roles' array");
             }
         } else {
-            if (canDelegateElement.type() != EOO) {
+            if (canDelegateElement->type() != EOO) {
                 return Status(ErrorCodes::UnsupportedFormat,
                               "Invalid field 'canDelegate' found in role object");
             }
-            if (hasRoleElement.type() != EOO) {
+            if (hasRoleElement->type() != EOO) {
                 return Status(ErrorCodes::UnsupportedFormat,
                               "Invalid field 'hasRole' found in role object");
             }
         }
+        return Status::OK();
+    }
 
+
+    Status V2UserDocumentParser::checkValidRoleObject(
+            const BSONObj& roleObject, bool hasPossessionBools) {
+        BSONElement roleNameElement;
+        BSONElement roleSourceElement;
+        BSONElement canDelegateElement;
+        BSONElement hasRoleElement;
+        return _extractRoleDocumentElements(
+                roleObject,
+                hasPossessionBools,
+                &roleNameElement,
+                &roleSourceElement,
+                &canDelegateElement,
+                &hasRoleElement);
+    }
+
+    Status V2UserDocumentParser::parseRoleData(const BSONObj& roleObject, User::RoleData* result) {
+        BSONElement roleNameElement;
+        BSONElement roleSourceElement;
+        BSONElement canDelegateElement;
+        BSONElement hasRoleElement;
+        Status status =  _extractRoleDocumentElements(
+                roleObject,
+                true,
+                &roleNameElement,
+                &roleSourceElement,
+                &canDelegateElement,
+                &hasRoleElement);
+        if (!status.isOK())
+            return status;
+        result->name = RoleName(roleNameElement.str(), roleSourceElement.str());
+        result->canDelegate = canDelegateElement.trueValue();
+        result->hasRole = hasRoleElement.trueValue();
+        return status;
+    }
+
+    Status V2UserDocumentParser::parseRoleVector(const BSONArray& rolesArray,
+                                                 std::vector<User::RoleData>* result) {
+        std::vector<User::RoleData> roles;
+        for (BSONObjIterator it(rolesArray); it.more(); it.next()) {
+            if ((*it).type() != Object) {
+                return Status(ErrorCodes::TypeMismatch, "Roles must be objects.");
+            }
+            User::RoleData role;
+            Status status = parseRoleData((*it).Obj(), &role);
+            if (!status.isOK())
+                return status;
+            roles.push_back(role);
+        }
+        std::swap(*result, roles);
         return Status::OK();
     }
 
     Status V2UserDocumentParser::initializeUserRolesFromUserDocument(
-            User* user, const BSONObj& privDoc, const StringData&) const {
+            const BSONObj& privDoc, User* user) const {
 
         BSONElement rolesElement = privDoc[ROLES_FIELD_NAME];
 
@@ -411,6 +441,7 @@ namespace {
                           "User document needs 'roles' field to be an array");
         }
 
+        std::vector<User::RoleData> roles;
         for (BSONObjIterator it(rolesElement.Obj()); it.more(); it.next()) {
             if ((*it).type() != Object) {
                 return Status(ErrorCodes::UnsupportedFormat,
@@ -418,24 +449,45 @@ namespace {
             }
             BSONObj roleObject = (*it).Obj();
 
-            Status status = checkValidRoleObject(roleObject, true);
+            roles.resize(roles.size() + 1);
+            Status status = parseRoleData(roleObject, &roles.back());
             if (!status.isOK()) {
                 return status;
             }
-
-            BSONElement roleNameElement = roleObject[ROLE_NAME_FIELD_NAME];
-            BSONElement roleSourceElement = roleObject[ROLE_SOURCE_FIELD_NAME];
-            BSONElement canDelegateElement = roleObject[ROLE_CAN_DELEGATE_FIELD_NAME];
-            BSONElement hasRoleElement = roleObject[ROLE_HAS_ROLE_FIELD_NAME];
-
-            if (hasRoleElement.Bool()) {
-                user->addRole(RoleName(roleNameElement.String(), roleSourceElement.String()));
-            }
-            if (canDelegateElement.Bool()) {
-                user->addDelegatableRole(RoleName(roleNameElement.String(),
-                                                  roleSourceElement.String()));
-            }
         }
+        user->setRoleData(roles);
+        return Status::OK();
+    }
+
+    Status V2UserDocumentParser::initializeUserPrivilegesFromUserDocument(const BSONObj& doc,
+                                                                          User* user) const {
+        BSONElement privilegesElement = doc["privileges"];
+        if (privilegesElement.eoo())
+            return Status::OK();
+        if (privilegesElement.type() != Array) {
+            return Status(ErrorCodes::UnsupportedFormat,
+                          "User document 'privileges' element must be Array if present.");
+        }
+        PrivilegeVector privileges;
+        std::string errmsg;
+        for (BSONObjIterator it(privilegesElement.Obj()); it.more(); it.next()) {
+            if ((*it).type() != Object) {
+                warning() << "Wrong type of element in privileges array for " << user->getName() <<
+                    ": " << *it;
+                continue;
+            }
+            Privilege privilege;
+            ParsedPrivilege pp;
+            if (!pp.parseBSON((*it).Obj(), &errmsg) ||
+                !ParsedPrivilege::parsedPrivilegeToPrivilege(pp, &privilege, &errmsg)) {
+
+                warning() << "Could not parse privilege element in user document for " <<
+                    user->getName() << ": " << errmsg;
+                continue;
+            }
+            privileges.push_back(privilege);
+        }
+        user->setPrivileges(privileges);
         return Status::OK();
     }
 
