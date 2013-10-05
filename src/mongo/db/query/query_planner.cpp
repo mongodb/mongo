@@ -250,11 +250,11 @@ namespace mongo {
         if (MatchExpression::GEO_NEAR == expr->matchType()) {
             // We must not keep the expression node around.
             *exact = true;
-            GeoNearMatchExpression* near = static_cast<GeoNearMatchExpression*>(expr);
+            GeoNearMatchExpression* nearme = static_cast<GeoNearMatchExpression*>(expr);
             if (indexIs2D) {
                 GeoNear2DNode* ret = new GeoNear2DNode();
                 ret->indexKeyPattern = indexKeyPattern;
-                ret->seek = near->getRawObj();
+                ret->seek = nearme->getRawObj();
                 return ret;
             }
             else {
@@ -264,7 +264,7 @@ namespace mongo {
                 cout << "Making geonear 2dblahblah kp " << indexKeyPattern.toString() << endl;
                 GeoNear2DSphereNode* ret = new GeoNear2DSphereNode();
                 ret->indexKeyPattern = indexKeyPattern;
-                ret->nq = near->getData();
+                ret->nq = nearme->getData();
                 ret->baseBounds.fields.resize(indexKeyPattern.nFields());
                 stringstream ss;
                 ret->appendToString(&ss, 0);
@@ -276,11 +276,11 @@ namespace mongo {
             // We must not keep the expression node around.
             *exact = true;
             verify(MatchExpression::GEO == expr->matchType());
-            GeoMatchExpression* near = static_cast<GeoMatchExpression*>(expr);
+            GeoMatchExpression* nearme = static_cast<GeoMatchExpression*>(expr);
             verify(indexIs2D);
             Geo2DNode* ret = new Geo2DNode();
             ret->indexKeyPattern = indexKeyPattern;
-            ret->seek = near->getRawObj();
+            ret->seek = nearme->getRawObj();
             return ret;
         }
         else {

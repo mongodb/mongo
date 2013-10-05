@@ -47,7 +47,7 @@ namespace mongo {
         ASSERT( gq.parseFrom( query["loc"].Obj() ) );
 
         GeoMatchExpression ge;
-        ASSERT( ge.init( "a", gq ).isOK() );
+        ASSERT( ge.init("a", gq, query ).isOK() );
 
         ASSERT(!ge.matchesBSON(fromjson("{a: [3,4]}")));
         ASSERT(ge.matchesBSON(fromjson("{a: [4,4]}")));
@@ -64,7 +64,7 @@ namespace mongo {
         ASSERT(nq.parseFrom(query["loc"].Obj()));
 
         GeoNearMatchExpression gne;
-        ASSERT(gne.init("a", nq).isOK());
+        ASSERT(gne.init("a", nq, query).isOK());
 
         // We can't match the data but we can make sure it was parsed OK.
         ASSERT_EQUALS(gne.getData().centroid.crs, FLAT);
