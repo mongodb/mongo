@@ -70,6 +70,7 @@ files.forEach(function(x) {
         'copydb-auth|' +
         'profile\\d*|' +
         'dbhash|' +
+        'dbhash2|' +
         'median|' +
         'apitest_dbcollection|' +
         'evalb|' +
