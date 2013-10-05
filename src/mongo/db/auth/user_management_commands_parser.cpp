@@ -35,6 +35,7 @@
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/auth_helpers.h"
 #include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/privilege_parser.h"
 #include "mongo/db/auth/user_document_parser.h"
@@ -94,11 +95,15 @@ namespace auth {
 
                 std::string roleNameString;
                 std::string roleSource;
-                Status status = bsonExtractStringField(roleObj, "name", &roleNameString);
+                Status status = bsonExtractStringField(roleObj,
+                                                       AuthorizationManager::ROLE_NAME_FIELD_NAME,
+                                                       &roleNameString);
                 if (!status.isOK()) {
                     return status;
                 }
-                status = bsonExtractStringField(roleObj, "source", &roleSource);
+                status = bsonExtractStringField(roleObj,
+                                                AuthorizationManager::ROLE_SOURCE_FIELD_NAME,
+                                                &roleSource);
                 if (!status.isOK()) {
                     return status;
                 }
@@ -135,11 +140,15 @@ namespace auth {
                std::string roleSource;
                bool hasRole;
                bool canDelegate;
-               status = bsonExtractStringField(roleObj, "name", &roleName);
+               status = bsonExtractStringField(roleObj,
+                                               AuthorizationManager::ROLE_NAME_FIELD_NAME,
+                                               &roleName);
                if (!status.isOK()) {
                    return status;
                }
-               status = bsonExtractStringField(roleObj, "source", &roleSource);
+               status = bsonExtractStringField(roleObj,
+                                               AuthorizationManager::ROLE_SOURCE_FIELD_NAME,
+                                               &roleSource);
                if (!status.isOK()) {
                    return status;
                }

@@ -27,7 +27,7 @@ assert.eq(null,
           adminDB.system.namespaces.findOne(
               {$and : [{name : /^admin\.system\.users\.\$/},
                        {name : {$ne : "admin.system.users.$_id_"}},
-                       {name : {$ne : "admin.system.users.$name_1_source_1"}} ]}));
+                       {name : {$ne : "admin.system.users.$name_1_db_1"}} ]}));
 adminDB.logout();
 
 adminDB.auth('admin','x');

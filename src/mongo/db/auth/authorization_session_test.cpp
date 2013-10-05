@@ -120,14 +120,14 @@ namespace {
         // Add a user with readWrite and dbAdmin on the test DB
         ASSERT_OK(managerState->insertPrivilegeDocument("admin",
                 BSON("name" << "spencer" <<
-                     "source" << "test" <<
+                     "db" << "test" <<
                      "credentials" << BSON("MONGODB-CR" << "a") <<
                      "roles" << BSON_ARRAY(BSON("name" << "readWrite" <<
-                                                "source" << "test" <<
+                                                "db" << "test" <<
                                                 "hasRole" << true <<
                                                 "canDelegate" << false) <<
                                            BSON("name" << "dbAdmin" <<
-                                                "source" << "test" <<
+                                                "db" << "test" <<
                                                 "hasRole" << true <<
                                                 "canDelegate" << false))),
                 BSONObj()));
@@ -143,10 +143,10 @@ namespace {
         // Add an admin user with readWriteAnyDatabase
         ASSERT_OK(managerState->insertPrivilegeDocument("admin",
                 BSON("name" << "admin" <<
-                     "source" << "admin" <<
+                     "db" << "admin" <<
                      "credentials" << BSON("MONGODB-CR" << "a") <<
                      "roles" << BSON_ARRAY(BSON("name" << "readWriteAnyDatabase" <<
-                                                "source" << "admin" <<
+                                                "db" << "admin" <<
                                                 "hasRole" << true <<
                                                 "canDelegate" << false))),
                 BSONObj()));
@@ -185,45 +185,45 @@ namespace {
     TEST_F(AuthorizationSessionTest, SystemCollectionsAccessControl) {
         ASSERT_OK(managerState->insertPrivilegeDocument("admin",
                 BSON("name" << "rw" <<
-                     "source" << "test" <<
+                     "db" << "test" <<
                      "credentials" << BSON("MONGODB-CR" << "a") <<
                      "roles" << BSON_ARRAY(BSON("name" << "readWrite" <<
-                                                "source" << "test" <<
+                                                "db" << "test" <<
                                                 "hasRole" << true <<
                                                 "canDelegate" << false) <<
                                            BSON("name" << "dbAdmin" <<
-                                                "source" << "test" <<
+                                                "db" << "test" <<
                                                 "hasRole" << true <<
                                                 "canDelegate" << false))),
                 BSONObj()));
         ASSERT_OK(managerState->insertPrivilegeDocument("admin",
                 BSON("name" << "useradmin" <<
-                     "source" << "test" <<
+                     "db" << "test" <<
                      "credentials" << BSON("MONGODB-CR" << "a") <<
                      "roles" << BSON_ARRAY(BSON("name" << "userAdmin" <<
-                                                "source" << "test" <<
+                                                "db" << "test" <<
                                                 "hasRole" << true <<
                                                 "canDelegate" << false))),
                 BSONObj()));
         ASSERT_OK(managerState->insertPrivilegeDocument("admin",
                 BSON("name" << "rwany" <<
-                     "source" << "test" <<
+                     "db" << "test" <<
                      "credentials" << BSON("MONGODB-CR" << "a") <<
                      "roles" << BSON_ARRAY(BSON("name" << "readWriteAnyDatabase" <<
-                                                "source" << "admin" <<
+                                                "db" << "admin" <<
                                                 "hasRole" << true <<
                                                 "canDelegate" << false) <<
                                            BSON("name" << "dbAdminAnyDatabase" <<
-                                                "source" << "admin" <<
+                                                "db" << "admin" <<
                                                 "hasRole" << true <<
                                                 "canDelegate" << false))),
                 BSONObj()));
         ASSERT_OK(managerState->insertPrivilegeDocument("admin",
                 BSON("name" << "useradminany" <<
-                     "source" << "test" <<
+                     "db" << "test" <<
                      "credentials" << BSON("MONGODB-CR" << "a") <<
                      "roles" << BSON_ARRAY(BSON("name" << "userAdminAnyDatabase" <<
-                                                "source" << "admin" <<
+                                                "db" << "admin" <<
                                                 "hasRole" << true <<
                                                 "canDelegate" << false))),
                 BSONObj()));
@@ -311,10 +311,10 @@ namespace {
         // Add a readWrite user
         ASSERT_OK(managerState->insertPrivilegeDocument("admin",
                 BSON("name" << "spencer" <<
-                     "source" << "test" <<
+                     "db" << "test" <<
                      "credentials" << BSON("MONGODB-CR" << "a") <<
                      "roles" << BSON_ARRAY(BSON("name" << "readWrite" <<
-                                                "source" << "test" <<
+                                                "db" << "test" <<
                                                 "hasRole" << true <<
                                                 "canDelegate" << false))),
                 BSONObj()));
@@ -332,10 +332,10 @@ namespace {
         managerState->clearPrivilegeDocuments();
         ASSERT_OK(managerState->insertPrivilegeDocument("admin",
                 BSON("name" << "spencer" <<
-                     "source" << "test" <<
+                     "db" << "test" <<
                      "credentials" << BSON("MONGODB-CR" << "a") <<
                      "roles" << BSON_ARRAY(BSON("name" << "read" <<
-                                                "source" << "test" <<
+                                                "db" << "test" <<
                                                 "hasRole" << true <<
                                                 "canDelegate" << false))),
                 BSONObj()));
@@ -365,10 +365,10 @@ namespace {
         // Add a readWrite user
         ASSERT_OK(managerState->insertPrivilegeDocument("admin",
                 BSON("name" << "spencer" <<
-                     "source" << "test" <<
+                     "db" << "test" <<
                      "credentials" << BSON("MONGODB-CR" << "a") <<
                      "roles" << BSON_ARRAY(BSON("name" << "readWrite" <<
-                                                "source" << "test" <<
+                                                "db" << "test" <<
                                                 "hasRole" << true <<
                                                 "canDelegate" << false))),
                 BSONObj()));
@@ -387,10 +387,10 @@ namespace {
         managerState->clearPrivilegeDocuments();
         ASSERT_OK(managerState->insertPrivilegeDocument("admin",
                 BSON("name" << "spencer" <<
-                     "source" << "test" <<
+                     "db" << "test" <<
                      "credentials" << BSON("MONGODB-CR" << "a") <<
                      "roles" << BSON_ARRAY(BSON("name" << "read" <<
-                                                "source" << "test" <<
+                                                "db" << "test" <<
                                                 "hasRole" << true <<
                                                 "canDelegate" << false))),
                 BSONObj()));

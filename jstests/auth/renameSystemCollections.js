@@ -7,7 +7,7 @@ var testDB2 = conn.getDB("testdb2");
 
 var CodeUnauthorized = 13;
 
-var backdoorUserDoc = { name: 'backdoor', source: 'admin', pwd: 'hashed', roles: ['root'] }
+var backdoorUserDoc = { name: 'backdoor', db: 'admin', pwd: 'hashed', roles: ['root'] }
 
 adminDB.addUser({name:'userAdmin',
                  pwd:'password',

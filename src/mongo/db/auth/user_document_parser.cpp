@@ -48,7 +48,7 @@ namespace {
     const std::string READONLY_FIELD_NAME = "readOnly";
     const std::string CREDENTIALS_FIELD_NAME = "credentials";
     const std::string ROLE_NAME_FIELD_NAME = "name";
-    const std::string ROLE_SOURCE_FIELD_NAME = "source";
+    const std::string ROLE_SOURCE_FIELD_NAME = "db";
     const std::string ROLE_CAN_DELEGATE_FIELD_NAME = "canDelegate";
     const std::string ROLE_HAS_ROLE_FIELD_NAME = "hasRole";
     const std::string MONGODB_CR_CREDENTIAL_FIELD_NAME = "MONGODB-CR";
@@ -242,19 +242,18 @@ namespace {
         // Validate the "userSource" element
         if (userSourceElement.type() != String ||
                 makeStringDataFromBSONElement(userSourceElement).empty()) {
-            return _badValue("User document needs 'userSource' field to be a non-empty string", 0);
+            return _badValue("User document needs 'db' field to be a non-empty string", 0);
         }
         StringData userSourceStr = makeStringDataFromBSONElement(userSourceElement);
         if (!NamespaceString::validDBName(userSourceStr) && userSourceStr != "$external") {
             return _badValue(mongoutils::str::stream() << "'" << userSourceStr <<
-                                     "' is not a valid value for the userSource field.",
+                                     "' is not a valid value for the db field.",
                              0);
         }
 
         // Validate the "credentials" element
         if (credentialsElement.eoo() && userSourceStr != "$external") {
-            return _badValue("User document needs 'credentials' field unless userSource is "
-                            "'$external'",
+            return _badValue("User document needs 'credentials' field unless 'db' is '$external'",
                     0);
         }
         if (!credentialsElement.eoo()) {
@@ -320,7 +319,7 @@ namespace {
         } else {
                 return Status(ErrorCodes::UnsupportedFormat,
                               "Cannot extract credentials from user documents without a "
-                              "'credentials' field and with userSource != \"$external\"");
+                              "'credentials' field and with 'db' != \"$external\"");
         }
 
         user->setCredentials(credentials);
@@ -347,8 +346,7 @@ namespace {
         }
         if (roleSourceElement->type() != String ||
                 makeStringDataFromBSONElement(*roleSourceElement).empty()) {
-            return Status(ErrorCodes::UnsupportedFormat,
-                          "Role source must be non-empty strings");
+            return Status(ErrorCodes::UnsupportedFormat, "Role db must be non-empty strings");
         }
         if (hasPossessionBools) {
             if (canDelegateElement->type() != Bool) {
