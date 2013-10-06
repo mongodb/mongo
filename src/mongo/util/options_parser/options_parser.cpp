@@ -462,6 +462,12 @@ namespace optionenvironment {
                 return ret;
             }
         }
+        catch (po::multiple_occurrences& e) {
+            StringBuilder sb;
+            sb << "Error parsing command line:  Multiple occurrences of option \"--"
+               << e.get_option_name() << "\"";
+            return Status(ErrorCodes::BadValue, sb.str());
+        }
         catch (po::error& e) {
             StringBuilder sb;
             sb << "Error parsing command line: " << e.what();
@@ -495,6 +501,12 @@ namespace optionenvironment {
             if (!ret.isOK()) {
                 return ret;
             }
+        }
+        catch (po::multiple_occurrences& e) {
+            StringBuilder sb;
+            sb << "Error parsing INI config file:  Multiple occurrences of option \""
+               << e.get_option_name() << "\"";
+            return Status(ErrorCodes::BadValue, sb.str());
         }
         catch (po::error& e) {
             StringBuilder sb;

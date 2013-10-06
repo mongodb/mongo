@@ -657,10 +657,10 @@ MONGO_INITIALIZER_GENERAL(ParseStartupConfiguration,
     retStatus = parser.run(mongoShellOptions, context->args(), context->env(),
                            &mongoShellParsedOptions);
     if (!retStatus.isOK()) {
-        StringBuilder sb;
-        sb << "Error parsing options: " << retStatus.toString() << "\n";
-        sb << getMongoShellHelp(context->args()[0], mongoShellOptions);
-        return Status(ErrorCodes::FailedToParse, sb.str());
+        std::cerr << retStatus.reason() << std::endl;
+        std::cerr << "try '" << context->args()[0]
+                  << " --help' for more information" << std::endl;
+        ::_exit(EXIT_BADOPTIONS);
     }
 
     retStatus = handlePrevalidationMongoShellOptions(mongoShellParsedOptions, context->args());
