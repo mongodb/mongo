@@ -102,10 +102,10 @@ MONGO_INITIALIZER_GENERAL(ParseStartupConfiguration,
     retStatus = parser.run(frameworkOptions, context->args(), context->env(),
                            &frameworkParsedOptions);
     if (!retStatus.isOK()) {
-        StringBuilder sb;
-        sb << "Error parsing options: " << retStatus.toString() << "\n";
-        sb << getTestFrameworkHelp(context->args()[0], frameworkOptions);
-        return Status(ErrorCodes::FailedToParse, sb.str());
+        std::cerr << retStatus.reason() << std::endl;
+        std::cerr << "try '" << context->args()[0]
+                  << " --help' for more information" << std::endl;
+        ::_exit(EXIT_BADOPTIONS);
     }
 
     retStatus = preValidationTestFrameworkOptions(frameworkParsedOptions, context->args());

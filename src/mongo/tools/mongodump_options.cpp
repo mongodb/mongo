@@ -150,10 +150,10 @@ namespace mongo {
 
         retStatus = parser.run(toolsOptions, context->args(), context->env(), &toolsParsedOptions);
         if (!retStatus.isOK()) {
-            std::ostringstream oss;
-            oss << retStatus.toString() << "\n";
-            printMongoDumpHelp(toolsOptions, &oss);
-            return Status(ErrorCodes::FailedToParse, oss.str());
+            std::cerr << retStatus.reason() << std::endl;
+            std::cerr << "try '" << context->args()[0]
+                      << " --help' for more information" << std::endl;
+            ::_exit(EXIT_BADOPTIONS);
         }
 
         retStatus = handlePreValidationMongoDumpOptions(toolsParsedOptions);

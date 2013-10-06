@@ -250,8 +250,9 @@ namespace mongo {
         moe::OptionsParser parser;
         ret = parser.run(serverOptions, context->args(), context->env(), &serverParsedOptions);
         if (!ret.isOK()) {
-            std::cerr << "Error parsing command line: " << ret.toString() << std::endl;
-            std::cerr << "use --help for help" << std::endl;
+            std::cerr << ret.reason() << std::endl;
+            std::cerr << "try '" << context->args()[0]
+                      << " --help' for more information" << std::endl;
             ::_exit(EXIT_BADOPTIONS);
         }
 
