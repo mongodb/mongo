@@ -204,10 +204,6 @@
 	__wt_page_in_func(session, parent, ref, __FILE__, __LINE__)
 #define	__wt_page_swap(session, out, in, inref)				\
 	__wt_page_swap_func(session, out, in, inref, __FILE__, __LINE__)
-#define	__wt_spin_lock(session, addr) do {				\
-	static int __slno;						\
-	__wt_spin_lock_func(session, addr, &__slno, __FILE__, __LINE__);\
-} while (0)
 #else
 #define	__wt_scr_alloc(session, size, scratchp)				\
 	__wt_scr_alloc_func(session, size, scratchp)
@@ -215,6 +211,4 @@
 	__wt_page_in_func(session, parent, ref)
 #define	__wt_page_swap(session, out, in, inref)				\
 	__wt_page_swap_func(session, out, in, inref)
-#define	__wt_spin_lock(session, addr)					\
-	__wt_spin_lock_func(session, addr)
 #endif

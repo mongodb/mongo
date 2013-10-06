@@ -228,3 +228,11 @@ typedef	struct {
 #error Unknown spinlock type
 
 #endif
+
+/* When logging statistics, we track which spinlocks block and why. */
+#define	WT_SPINLOCK_REGISTER		-1
+#define	WT_SPINLOCK_REGISTER_FAILED	-2
+#define	__wt_spin_lock(session, addr) do {				\
+	static int __slno = WT_SPINLOCK_REGISTER;			\
+	__wt_spin_lock_func(session, addr, &__slno, __FILE__, __LINE__);\
+} while (0)

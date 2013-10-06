@@ -69,21 +69,20 @@ __wt_spin_lock_func(WT_SESSION_IMPL *session, WT_SPINLOCK *t
 #endif
 )
 {
-	/* If we're not maintaining statistics on the spinlocks, it's fast. */
+	/* If we're not maintaining statistics on the spinlocks, it's simple. */
 	if (session == NULL || !S2C(session)->statistics) {
 		pthread_mutex_lock(&t->lock);
 		return;
 	}
 
+	/* If this caller hasn't yet registered, do so. */
+	if (*slnop == WT_SPINLOCK_REGISTER)
+		__wt_spin_lock_register(session, file, line, t->name, slnop);
+
 	/* Try to acquire the lock, if we fail, update blocked information. */
 	if (pthread_mutex_trylock(&t->lock)) {
-		/* If this caller hasn't yet registered, do so. */
-		if (*slnop == 0)
-			__wt_spin_lock_register(
-			    session, file, line, t->name, slnop);
-
 		/* Update blocking count. */
-		if (*slnop > 0 && t->id > 0)
+		if (*slnop >= 0 && t->id >= 0)
 			++S2C(session)->spinlock_stats[*slnop].blocked[t->id];
 
 		/* Block and wait. */
