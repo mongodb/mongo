@@ -309,9 +309,7 @@ namespace mongo {
                             r.d().reservedField() |= Reserved_FromWriteback;
 
                             ClientInfo * ci = r.getClientInfo();
-                            if (AuthorizationManager::isAuthEnabled()) {
-                                ci->getAuthorizationSession()->grantInternalAuthorization();
-                            }
+                            ci->getAuthorizationSession()->grantInternalAuthorization();
                             ci->noAutoSplit();
 
                             r.process( attempts );

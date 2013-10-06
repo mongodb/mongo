@@ -926,8 +926,6 @@ namespace mongo {
     }
 
     void replLocalAuth() {
-        if (!AuthorizationManager::isAuthEnabled())
-            return;
         cc().getAuthorizationSession()->grantInternalAuthorization();
     }
 

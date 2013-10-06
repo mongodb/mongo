@@ -726,7 +726,7 @@ namespace mongo {
         mongo::signalForkSuccess();
 #endif
 
-        if(AuthorizationManager::isAuthEnabled()) {
+        if(getGlobalAuthorizationManager()->isAuthEnabled()) {
             // open admin db in case we need to use it later. TODO this is not the right way to
             // resolve this.
             Client::WriteContext c("admin", storageGlobalParams.dbpath);

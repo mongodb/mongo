@@ -42,6 +42,7 @@
 #include "mongo/base/init.h"
 #include "mongo/client/sasl_client_authenticate.h"
 #include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/auth/security_key.h"
 #include "mongo/logger/logger.h"
 #include "mongo/logger/message_event.h"
@@ -318,7 +319,7 @@ namespace mongo {
         // Auto-enable auth except if clusterAuthMode is not set.
         // clusterAuthMode is automatically set if a --keyfile parameter is provided.
         if (!serverGlobalParams.clusterAuthMode.empty()) {
-            AuthorizationManager::setAuthEnabled(true);
+            getGlobalAuthorizationManager()->setAuthEnabled(true);
         }
 
 #ifdef MONGO_SSL

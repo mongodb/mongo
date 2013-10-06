@@ -33,6 +33,8 @@
 
 #include "mongo/base/counter.h"
 #include "mongo/client/dbclientinterface.h"
+#include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/auth/security_key.h"
@@ -55,7 +57,7 @@ namespace mongo {
     static const BSONObj userReplQuery = fromjson("{\"user\":\"repl\"}");
 
     bool replAuthenticate(DBClientBase *conn) {
-        if (!AuthorizationManager::isAuthEnabled())
+        if (!getGlobalAuthorizationManager()->isAuthEnabled())
             return true;
 
         if (!isInternalAuthSet())
@@ -97,7 +99,9 @@ namespace mongo {
                                                                           tcp_timeout));
             string errmsg;
             if ( !_conn->connect(hostName.c_str(), errmsg) ||
-                 (AuthorizationManager::isAuthEnabled() && !replAuthenticate(_conn.get())) ) {
+                 (getGlobalAuthorizationManager()->isAuthEnabled() &&
+                  !replAuthenticate(_conn.get())) ) {
+
                 resetConnection();
                 log() << "repl: " << errmsg << endl;
                 return false;

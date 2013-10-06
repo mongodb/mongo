@@ -99,16 +99,6 @@ namespace mongo {
         static bool getSupportOldStylePrivilegeDocuments();
 
         /**
-         * Sets whether or not access control enforcement is enabled for this whole server.
-         */
-        static void setAuthEnabled(bool enabled);
-
-        /**
-         * Returns true if access control is enabled on this server.
-         */
-        static bool isAuthEnabled();
-
-        /**
          * Takes a vector of privileges and fills the output param "resultArray" with a BSON array
          * representation of the privileges.
          */
@@ -128,7 +118,15 @@ namespace mongo {
                                      mutablebson::Element result);
 
 
-        AuthzManagerExternalState* getExternalState() const;
+        /**
+         * Sets whether or not access control enforcement is enabled for this manager.
+         */
+        void setAuthEnabled(bool enabled);
+
+        /**
+         * Returns true if access control is enabled for this manager .
+         */
+        bool isAuthEnabled() const;
 
         /**
          * Sets the version number of the authorization system.  Returns an invalid status if the
@@ -383,16 +381,21 @@ namespace mongo {
 
         static bool _doesSupportOldStylePrivileges;
 
-        // True if access control enforcement is enabled on this node (ie it was started with
-        // --auth or --keyFile).
-        // This is a config setting, set at startup and not changing after initialization.
-        static bool _authEnabled;
+        /**
+         * True if access control enforcement is enabled in this AuthorizationManager.
+         *
+         * Defaults to false.  Changes to its value are not synchronized, so it should only be set
+         * at initalization-time.
+         */
+        bool _authEnabled;
 
-        // Integer that represents what format version the privilege documents in the system are.
-        // The current version is 2.  When upgrading to v2.6 or later from v2.4 or prior, the
-        // version is 1.  After running the upgrade process to upgrade to the new privilege document
-        // format, the version will be 2.
-        // All reads/writes to _version must be done within _lock.
+        /**
+         * Integer that represents what format version the privilege documents in the system are.
+         * The current version is 2.  When upgrading to v2.6 or later from v2.4 or prior, the
+         * version is 1.  After running the upgrade process to upgrade to the new privilege document
+         * format, the version will be 2.
+         * All reads/writes to _version must be done within _lock.
+         */
         int _version;
 
         scoped_ptr<AuthzManagerExternalState> _externalState;
