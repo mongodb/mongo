@@ -216,7 +216,11 @@ typedef	volatile int WT_SPINLOCK;
 
 typedef	struct {
 	pthread_mutex_t lock;
-	int initialized;
+
+	const char *name;		/* Mutex name, for statistics */
+	int8_t id;			/* Current holder, for statistics */
+
+	int8_t initialized;		/* Lock initialized, for cleanup */
 } WT_SPINLOCK;
 
 #else

@@ -217,6 +217,7 @@ Sevii
 SiH
 Skiplist
 Solaris
+Spinlock
 Split's
 Stoica
 StoreLoad
@@ -743,6 +744,7 @@ snaplen
 snprintf
 sp
 spinlock
+spinlocks
 sprintf
 src
 srch

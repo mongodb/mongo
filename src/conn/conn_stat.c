@@ -156,6 +156,9 @@ __statlog_dump(WT_SESSION_IMPL *session, const char *name, int conn_stats)
 		    conn->stat_stamp, value, name, desc) < 0), __wt_errno());
 	WT_ERR_NOTFOUND_OK(ret);
 
+	/* Spinlock statistics. */
+	WT_ERR(__wt_statlog_spinlock_dump(conn));
+
 err:	WT_TRET(cursor->close(cursor));
 
 	return (ret);

@@ -96,8 +96,8 @@ __wt_cache_create(WT_CONNECTION_IMPL *conn, const char *cfg[])
 	    "cache eviction server", 0, &cache->evict_cond));
 	WT_ERR(__wt_cond_alloc(session,
 	    "eviction waiters", 0, &cache->evict_waiter_cond));
-	WT_ERR(__wt_spin_init(session, &cache->evict_lock));
-	WT_ERR(__wt_spin_init(session, &cache->evict_walk_lock));
+	WT_ERR(__wt_spin_init(session, &cache->evict_lock, "cache eviction"));
+	WT_ERR(__wt_spin_init(session, &cache->evict_walk_lock, "cache walk"));
 
 	/* Allocate the LRU eviction queue. */
 	cache->evict_slots = WT_EVICT_WALK_BASE + WT_EVICT_WALK_INCR;

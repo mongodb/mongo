@@ -34,12 +34,12 @@ __wt_connection_init(WT_CONNECTION_IMPL *conn)
 	__wt_stat_init_connection_stats(&conn->stats);
 
 	/* Locks. */
-	WT_RET(__wt_spin_init(session, &conn->api_lock));
-	WT_RET(__wt_spin_init(session, &conn->checkpoint_lock));
-	WT_RET(__wt_spin_init(session, &conn->dhandle_lock));
-	WT_RET(__wt_spin_init(session, &conn->fh_lock));
-	WT_RET(__wt_spin_init(session, &conn->hot_backup_lock));
-	WT_RET(__wt_spin_init(session, &conn->schema_lock));
+	WT_RET(__wt_spin_init(session, &conn->api_lock, "api"));
+	WT_RET(__wt_spin_init(session, &conn->checkpoint_lock, "checkpoint"));
+	WT_RET(__wt_spin_init(session, &conn->dhandle_lock, "data handle"));
+	WT_RET(__wt_spin_init(session, &conn->fh_lock, "file list"));
+	WT_RET(__wt_spin_init(session, &conn->hot_backup_lock, "hot backup"));
+	WT_RET(__wt_spin_init(session, &conn->schema_lock, "schema"));
 
 	/*
 	 * Block manager.
@@ -47,7 +47,7 @@ __wt_connection_init(WT_CONNECTION_IMPL *conn)
 	 * If there's ever a second block manager, we'll want to make this
 	 * more opaque, but for now this is simpler.
 	 */
-	WT_RET(__wt_spin_init(session, &conn->block_lock));
+	WT_RET(__wt_spin_init(session, &conn->block_lock, "block manager"));
 	TAILQ_INIT(&conn->blockqh);		/* Block manager list */
 
 	return (0);

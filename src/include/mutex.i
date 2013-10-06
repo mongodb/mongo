@@ -20,28 +20,20 @@
 #define	WT_SPIN_COUNT 1000
 #endif
 
-static inline int
-__wt_spin_init(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
-{
-	WT_UNUSED(session);
-
-	*(t) = 0;
-	return (0);
-}
-
 static inline void
-__wt_spin_destroy(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
-{
-	WT_UNUSED(session);
-
-	*(t) = 0;
-}
-
-static inline void
-__wt_spin_lock(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
+__wt_spin_lock_func(WT_SESSION_IMPL *session, WT_SPINLOCK *t
+#ifdef HAVE_DIAGNOSTIC
+    , int *slnop, const char *file, int line
+#endif
+)
 {
 	int i;
 
+#ifdef HAVE_DIAGNOSTIC
+	WT_UNUSED(slnop);
+	WT_UNUSED(file);
+	WT_UNUSED(line);
+#endif
 	WT_UNUSED(session);
 
 	while (__sync_lock_test_and_set(t, 1)) {
@@ -70,41 +62,37 @@ __wt_spin_unlock(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 
 #elif SPINLOCK_TYPE == SPINLOCK_PTHREAD_MUTEX
 
-static inline int
-__wt_spin_init(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
-{
-#ifdef HAVE_MUTEX_ADAPTIVE
-	pthread_mutexattr_t attr;
-
-	pthread_mutexattr_init(&attr);
-	pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_ADAPTIVE_NP);
-	WT_RET(pthread_mutex_init(&t->lock, &attr));
-#else
-	WT_RET(pthread_mutex_init(&t->lock, NULL));
+static inline void
+__wt_spin_lock_func(WT_SESSION_IMPL *session, WT_SPINLOCK *t
+#ifdef HAVE_DIAGNOSTIC
+    , int *slnop, const char *file, int line
 #endif
-	t->initialized = 1;
-
-	WT_UNUSED(session);
-	return (0);
-}
-
-static inline void
-__wt_spin_destroy(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
+)
 {
-	WT_UNUSED(session);
-
-	if (t->initialized) {
-		(void)pthread_mutex_destroy(&t->lock);
-		t->initialized = 0;
+	/* If we're not maintaining statistics on the spinlocks, it's fast. */
+	if (session == NULL || !S2C(session)->statistics) {
+		pthread_mutex_lock(&t->lock);
+		return;
 	}
-}
 
-static inline void
-__wt_spin_lock(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
-{
-	WT_UNUSED(session);
+	/* Try to acquire the lock, if we fail, update blocked information. */
+	if (pthread_mutex_trylock(&t->lock)) {
+		/* If this caller hasn't yet registered, do so. */
+		if (*slnop == 0)
+			__wt_spin_lock_register(
+			    session, file, line, t->name, slnop);
 
-	pthread_mutex_lock(&t->lock);
+		/* Update blocking count. */
+		if (*slnop > 0 && t->id > 0)
+			++S2C(session)->spinlock_stats[*slnop].blocked[t->id];
+
+		/* Block and wait. */
+		pthread_mutex_lock(&t->lock);
+	}
+
+	/* We own the mutex, flush our ID as the holder. */
+	t->id = *slnop;
+	WT_WRITE_BARRIER();
 }
 
 static inline int

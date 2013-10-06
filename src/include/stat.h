@@ -98,6 +98,18 @@ struct __wt_stats {
 #define	WT_STATISTICS_FAST	0x02
 
 /*
+ * Mutex statistics.
+ */
+#define	WT_STATS_SPINLOCK_MAX	50
+struct __wt_connection_stats_spinlock {
+	const char *name;		/* Mutex name */
+	const char *file;		/* Caller's file/line */
+	int line;
+					/* Count of blocked calls */
+	u_int blocked[WT_STATS_SPINLOCK_MAX];
+};
+
+/*
  * DO NOT EDIT: automatically built by dist/stat.py.
  */
 /* Statistics section: BEGIN */
