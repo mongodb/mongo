@@ -34,14 +34,51 @@
 #include "mongo/bson/mutable/algorithm.h"
 #include "mongo/bson/mutable/document.h"
 #include "mongo/bson/mutable/element.h"
+#include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/ops/update_driver.h"
 #include "mongo/platform/unordered_set.h"
 #include "mongo/util/map_util.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
+namespace {
+    void addRoleNameToObjectElement(mutablebson::Element object, const RoleName& role) {
+        fassert(17175, object.appendString(AuthorizationManager::ROLE_NAME_FIELD_NAME, role.getRole()));
+        fassert(17176, object.appendString(AuthorizationManager::ROLE_SOURCE_FIELD_NAME, role.getDB()));
+    }
+
+    void addRoleNameObjectsToArrayElement(mutablebson::Element array, RoleNameIterator roles) {
+        for (; roles.more(); roles.next()) {
+            mutablebson::Element roleElement = array.getDocument().makeElementObject("");
+            addRoleNameToObjectElement(roleElement, roles.get());
+            fassert(17177, array.pushBack(roleElement));
+        }
+    }
+
+    void addPrivilegeObjectsOrWarningsToArrayElement(mutablebson::Element privilegesElement,
+                                                     mutablebson::Element warningsElement,
+                                                     const PrivilegeVector& privileges) {
+        std::string errmsg;
+        for (size_t i = 0; i < privileges.size(); ++i) {
+            ParsedPrivilege pp;
+            if (ParsedPrivilege::privilegeToParsedPrivilege(privileges[i], &pp, &errmsg)) {
+                fassert(17178, privilegesElement.appendObject("", pp.toBSON()));
+            } else {
+                fassert(17179,
+                        warningsElement.appendString(
+                        "",
+                        std::string(mongoutils::str::stream() <<
+                                    "Skipped privileges on resource " <<
+                                    privileges[i].getResourcePattern().toString() <<
+                                    ". Reason: " << errmsg)));
+            }
+        }
+    }
+}  // namespace
+
 
     Status AuthzManagerExternalStateMock::initialize() {
         return Status::OK();
@@ -49,12 +86,57 @@ namespace mongo {
 
     Status AuthzManagerExternalStateMock::getUserDescription(
             const UserName& userName, BSONObj* result) {
-        return Status(ErrorCodes::InternalError, "Not implemented");
+        BSONObj privDoc;
+        Status status = getPrivilegeDocument(userName, 2, &privDoc);
+        if (!status.isOK())
+            return status;
+
+        unordered_set<RoleName> indirectRoles;
+        PrivilegeVector allPrivileges;
+        for (BSONObjIterator iter(privDoc["roles"].Obj()); iter.more(); iter.next()) {
+            if (!(*iter)["hasRole"].trueValue())
+                continue;
+            RoleName roleName((*iter)[AuthorizationManager::ROLE_NAME_FIELD_NAME].str(),
+                              (*iter)[AuthorizationManager::ROLE_SOURCE_FIELD_NAME].str());
+            indirectRoles.insert(roleName);
+            for (RoleNameIterator subordinates = _roleGraph.getIndirectSubordinates(
+                         roleName);
+                 subordinates.more();
+                 subordinates.next()) {
+
+                indirectRoles.insert(subordinates.get());
+            }
+            const PrivilegeVector& rolePrivileges(_roleGraph.getAllPrivileges(roleName));
+            for (PrivilegeVector::const_iterator priv = rolePrivileges.begin(),
+                     end = rolePrivileges.end();
+                 priv != end;
+                 ++priv) {
+
+                Privilege::addPrivilegeToPrivilegeVector(&allPrivileges, *priv);
+            }
+        }
+
+        mutablebson::Document userDoc(privDoc, mutablebson::Document::kInPlaceDisabled);
+        mutablebson::Element indirectRolesElement = userDoc.makeElementArray("indirectRoles");
+        mutablebson::Element privilegesElement = userDoc.makeElementArray("privileges");
+        mutablebson::Element warningsElement = userDoc.makeElementArray("warnings");
+        fassert(17180, userDoc.root().pushBack(privilegesElement));
+        fassert(17181, userDoc.root().pushBack(indirectRolesElement));
+
+        addRoleNameObjectsToArrayElement(indirectRolesElement,
+                                         makeRoleNameIteratorForContainer(indirectRoles));
+        addPrivilegeObjectsOrWarningsToArrayElement(
+                privilegesElement, warningsElement, allPrivileges);
+        if (warningsElement.hasChildren()) {
+            fassert(17182, userDoc.root().pushBack(warningsElement));
+        }
+        *result = userDoc.getObject();
+        return Status::OK();
     }
 
     Status AuthzManagerExternalStateMock::getRoleDescription(
             const RoleName& roleName, BSONObj* result) {
-        return Status(ErrorCodes::InternalError, "Not implemented");
+        return Status(ErrorCodes::RoleNotFound, "Not implemented");
     }
 
 

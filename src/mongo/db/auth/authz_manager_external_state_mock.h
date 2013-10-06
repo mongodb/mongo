@@ -36,6 +36,7 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
 #include "mongo/db/auth/authz_manager_external_state.h"
+#include "mongo/db/auth/role_graph.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
 
@@ -142,6 +143,7 @@ namespace mongo {
 
 
         NamespaceDocumentMap _documents; // Mock database.
+        RoleGraph _roleGraph;
     };
 
 } // namespace mongo

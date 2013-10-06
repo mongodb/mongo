@@ -69,6 +69,7 @@ namespace {
             // This duplicates the behavior from the server that adds the internal user at process
             // startup via a MONGO_INITIALIZER
             authzManager->addInternalUser(internalSecurity.user);
+            authzManager->setAuthEnabled(true);
         }
     };
 
