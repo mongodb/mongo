@@ -157,7 +157,7 @@ __statlog_dump(WT_SESSION_IMPL *session, const char *name, int conn_stats)
 	WT_ERR_NOTFOUND_OK(ret);
 
 	/* Spinlock statistics. */
-	WT_ERR(__wt_statlog_spinlock_dump(conn));
+	WT_ERR(__wt_statlog_spinlock_dump(conn, name));
 
 err:	WT_TRET(cursor->close(cursor));
 

@@ -1283,7 +1283,8 @@ extern void __wt_spin_lock_register(WT_SESSION_IMPL *session,
     int line,
     const char *name,
     int *slnop);
-extern int __wt_statlog_spinlock_dump(WT_CONNECTION_IMPL *conn);
+extern int __wt_statlog_spinlock_dump(WT_CONNECTION_IMPL *conn,
+    const char *name);
 extern uint32_t __wt_nlpo2_round(uint32_t v);
 extern uint32_t __wt_nlpo2(uint32_t v);
 extern uint32_t __wt_log2_int(uint32_t n);
