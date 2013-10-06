@@ -241,7 +241,14 @@ namespace mongo {
                 return false;
             }
 
-            // TODO: Check role existence has to be checked after acquiring the update lock
+            for (size_t i = 0; i < args.roles.size(); ++i) {
+                BSONObj ignored;
+                Status status = authzManager->getRoleDescription(args.roles[i].name, &ignored);
+                if (!status.isOK()) {
+                    addStatus(status, result);
+                    return false;
+                }
+            }
             BSONArray rolesArray;
             status = roleDataVectorToBSONArray(args.roles, &rolesArray);
             if (!status.isOK()) {
