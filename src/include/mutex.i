@@ -21,20 +21,16 @@
 #endif
 
 static inline void
-__wt_spin_lock_func(WT_SESSION_IMPL *session, WT_SPINLOCK *t
-#ifdef HAVE_DIAGNOSTIC
-    , int *slnop, const char *file, int line
-#endif
+__wt_spin_lock_func(WT_SESSION_IMPL *session,
+    WT_SPINLOCK *t, int *slnop, const char *file, int line
 )
 {
 	int i;
 
-#ifdef HAVE_DIAGNOSTIC
+	WT_UNUSED(session);
 	WT_UNUSED(slnop);
 	WT_UNUSED(file);
 	WT_UNUSED(line);
-#endif
-	WT_UNUSED(session);
 
 	while (__sync_lock_test_and_set(t, 1)) {
 		for (i = 0; *t && i < WT_SPIN_COUNT; i++)
@@ -63,11 +59,8 @@ __wt_spin_unlock(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 #elif SPINLOCK_TYPE == SPINLOCK_PTHREAD_MUTEX
 
 static inline void
-__wt_spin_lock_func(WT_SESSION_IMPL *session, WT_SPINLOCK *t
-#ifdef HAVE_DIAGNOSTIC
-    , int *slnop, const char *file, int line
-#endif
-)
+__wt_spin_lock_func(WT_SESSION_IMPL *session,
+    WT_SPINLOCK *t, int *slnop, const char *file, int line)
 {
 	/* If we're not maintaining statistics on the spinlocks, it's simple. */
 	if (session == NULL || !S2C(session)->statistics) {
