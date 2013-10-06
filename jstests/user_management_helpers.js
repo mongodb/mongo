@@ -1,3 +1,5 @@
+// This test is a basic sanity check of the shell helpers for manipulating user objects
+// It is not a comprehensive test of the functionality of the user manipulation commands
 function assertHasRole(rolesArray, roleName, roleDB, hasRole, canDelegate) {
     for (i in rolesArray) {
         var curRole = rolesArray[i];
@@ -7,7 +9,7 @@ function assertHasRole(rolesArray, roleName, roleDB, hasRole, canDelegate) {
             return;
         }
     }
-    assert(false, "role " + roleName + "@" + roleDB + " not found in array: " + rolesArray);
+    assert(false, "role " + roleName + "@" + roleDB + " not found in array: " + tojson(rolesArray));
 }
 
 
@@ -72,4 +74,11 @@ function assertHasRole(rolesArray, roleName, roleDB, hasRole, canDelegate) {
      assert.eq(1, userObj.roles.length);
      assertHasRole(userObj.roles, "readWrite", db.getName(), false, true);
 
+     // Test dropUser
+     db.dropUser('andy');
+     assert.throws(function() {printjson(db.getUser('andy'))});
+
+     // Test dropAllUsers
+     db.dropAllUsers()
+     assert.eq(0, db.getUsers().length);
 }(db));

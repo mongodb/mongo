@@ -1087,8 +1087,7 @@ DB.prototype.dropUser = function( username, writeConcern ){
         return true;
     }
 
-    var notFoundErrmsg = "User '" + username + "@" + this.getName() + "' not found";
-    if (res.errmsg == notFoundErrmsg) {
+    if (res.code == 11) { // Code 11 = UserNotFound
         return false;
     }
 
@@ -1096,7 +1095,7 @@ DB.prototype.dropUser = function( username, writeConcern ){
         return this._removeUserV1(username, cmdObj['writeConcern']);
     }
 
-    throw "Couldn't drop user: " + res.errmsg;
+    throw Error(res.errmsg);
 }
 
 DB.prototype._removeUserV1 = function(username, writeConcern) {
@@ -1119,15 +1118,11 @@ DB.prototype.dropAllUsers = function(writeConcern) {
     var res = this.runCommand({dropUsersFromDatabase:1,
                                writeConcern: writeConcern ? writeConcern : _defaultWriteConcern});
 
-    if (res.n == 0) {
-        return false;
+    if (!res.ok) {
+        throw Error(res.errmsg);
     }
 
-    if (res.ok) {
-        return true;
-    }
-
-    throw "Couldn't drop users: " + res.errmsg;
+    return res.n;
 }
 
 DB.prototype.__pwHash = function( nonce, username, pass ) {
@@ -1230,6 +1225,9 @@ DB.prototype.getUser = function(username) {
         throw Error(res.errmsg);
     }
 
+    if (res.users.length == 0) {
+        throw Error("User " + username + "@" + db.getName() + " not found");
+    }
     return res.users[0];
 }
 
@@ -1240,6 +1238,113 @@ DB.prototype.getUsers = function() {
     }
 
     return res.users;
+}
+
+DB.prototype.addRole = function(roleObj, writeConcern) {
+    var name = roleObj["name"];
+    var cmdObj = {createRole:name};
+    cmdObj = Object.extend(cmdObj, roleObj);
+    delete cmdObj["name"];
+    cmdObj["writeConcern"] = writeConcern ? writeConcern : _defaultWriteConcern;
+
+    var res = this.runCommand(cmdObj);
+
+    if (!res.ok) {
+        throw Error(res.errmsg);
+    }
+    printjson(roleObj);
+}
+
+DB.prototype.updateRole = function(name, updateObject, writeConcern) {
+    var cmdObj = {updateRole:name};
+    cmdObj = Object.extend(cmdObj, updateObject);
+    cmdObj['writeConcern'] =  writeConcern ? writeConcern : _defaultWriteConcern;
+    var res = this.runCommand(cmdObj);
+    if (!res.ok) {
+        throw Error(res.errmsg);
+    }
+};
+
+DB.prototype.dropRole = function(name, writeConcern) {
+    var cmdObj = {dropRole:name,
+                  writeConcern: writeConcern ? writeConcern : _defaultWriteConcern};
+    var res = this.runCommand(cmdObj);
+
+    if (res.ok) {
+        return true;
+    }
+
+    if (res.code == 31) { // Code 31 = RoleNotFound
+        return false;
+    }
+
+    throw Error(res.errmsg);
+};
+
+DB.prototype.dropAllRoles = function(writeConcern) {
+    var res = this.runCommand({dropRolesFromDatabase:1,
+                               writeConcern: writeConcern ? writeConcern : _defaultWriteConcern});
+
+    if (!res.ok) {
+        throw Error(res.errmsg);
+    }
+
+    return res.n;
+}
+
+DB.prototype.grantRolesToRole = function(rolename, roles, writeConcern) {
+    var cmdObj = {grantRolesToRole: rolename,
+                  grantedRoles: roles,
+                  writeConcern: writeConcern ? writeConcern : _defaultWriteConcern};
+    var res = this.runCommand(cmdObj);
+    if (!res.ok) {
+        throw Error(res.errmsg);
+    }
+}
+
+DB.prototype.revokeRolesFromRole = function(rolename, roles, writeConcern) {
+    var cmdObj = {revokeRolesFromRole: rolename,
+                  revokedRoles: roles,
+                  writeConcern: writeConcern ? writeConcern : _defaultWriteConcern};
+    var res = this.runCommand(cmdObj);
+    if (!res.ok) {
+        throw Error(res.errmsg);
+    }
+}
+
+DB.prototype.grantPrivilegesToRole = function(rolename, privileges, writeConcern) {
+    var cmdObj = {grantPrivilegesToRole: rolename,
+                  privileges: privileges,
+                  writeConcern: writeConcern ? writeConcern : _defaultWriteConcern};
+    var res = this.runCommand(cmdObj);
+    if (!res.ok) {
+        throw Error(res.errmsg);
+    }
+}
+
+DB.prototype.revokePrivilegesFromRole = function(rolename, privileges, writeConcern) {
+    var cmdObj = {revokePrivilegesFromRole: rolename,
+                  privileges: privileges,
+                  writeConcern: writeConcern ? writeConcern : _defaultWriteConcern};
+    var res = this.runCommand(cmdObj);
+    if (!res.ok) {
+        throw Error(res.errmsg);
+    }
+}
+
+DB.prototype.getRole = function(rolename) {
+    if (typeof rolename != "string") {
+        throw Error("Role name for getRole shell helper must be a string");
+    }
+    var res = this.runCommand({rolesInfo: rolename});
+    if (!res.ok) {
+        throw Error(res.errmsg);
+    }
+
+    if (res.roles.length == 0) {
+        throw Error("Role " + rolename + "@" + db.getName() + " not found");
+    }
+    return res.roles[0];
 }
 
 }());
