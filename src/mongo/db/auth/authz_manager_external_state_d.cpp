@@ -515,7 +515,7 @@ namespace {
                     " after applying oplog entry " << op;
             }
             else {
-                fassert(0, status);
+                fassert(17183, status);
                 _roleGraphState = roleGraphStateConsistent;
             }
         }
