@@ -980,56 +980,79 @@ namespace mongo {
                  BSONObjBuilder& result,
                  bool fromRepl) {
 
-            bool anyDB = false;
-            BSONElement usersFilter;
-            Status status = auth::parseAndValidateInfoCommands(cmdObj,
-                                                               "usersInfo",
-                                                               dbname,
-                                                               &anyDB,
-                                                               &usersFilter);
+            auth::UsersInfoArgs args;
+            Status status = auth::parseUsersInfoCommand(cmdObj, dbname, &args);
             if (!status.isOK()) {
                 addStatus(status, result);
                 return false;
             }
 
-            bool wantsDetails = cmdObj["details"].trueValue();
-            if (wantsDetails) {
-                if (anyDB || usersFilter.type() != String) {
-                    addStatus(Status(ErrorCodes::IllegalOperation,
-                                     "Cannot only get privilege details on exact-match usersInfo "
-                                     "queries."),
-                              result);
-                    return false;
-                }
-
-                BSONObj userDetails;
-                status = getGlobalAuthorizationManager()->getUserDescription(
-                        UserName(usersFilter.str(), dbname), &userDetails);
-                if (!status.isOK()) {
-                    addStatus(status, result);
-                    return false;
-                }
-                result.append("users", BSON_ARRAY(userDetails));
-                return true;
-            }
-
-
-            BSONObjBuilder queryBuilder;
-            queryBuilder.appendAs(usersFilter, AuthorizationManager::USER_NAME_FIELD_NAME);
-            if (!anyDB) {
-                queryBuilder.append(AuthorizationManager::USER_SOURCE_FIELD_NAME, dbname);
+            if (args.allForDB && args.showPrivileges) {
+                addStatus(Status(ErrorCodes::IllegalOperation,
+                                 "Cannot only get privilege details on exact-match usersInfo "
+                                 "queries."),
+                          result);
+                return false;
             }
 
             BSONArrayBuilder usersArrayBuilder;
-            BSONArrayBuilder& (BSONArrayBuilder::* appendBSONObj) (const BSONObj&) =
-                    &BSONArrayBuilder::append<BSONObj>;
-            const boost::function<void(const BSONObj&)> function =
-                    boost::bind(appendBSONObj, &usersArrayBuilder, _1);
-            AuthorizationManager* authzManager = getGlobalAuthorizationManager();
-            authzManager->queryAuthzDocument(NamespaceString("admin.system.users"),
-                                             queryBuilder.done(),
-                                             function);
+            if (args.showPrivileges) {
+                // If you want privileges you need to call getUserDescription on each user.
+                for (size_t i = 0; i < args.userNames.size(); ++i) {
+                    BSONObj userDetails;
+                    status = getGlobalAuthorizationManager()->getUserDescription(
+                            args.userNames[i], &userDetails);
+                    if (status.code() == ErrorCodes::UserNotFound) {
+                        continue;
+                    }
+                    if (!status.isOK()) {
+                        addStatus(status, result);
+                        return false;
+                    }
+                    if (!args.showCredentials) {
+                        // getUserDescription always includes credentials, need to strip it out
+                        BSONObjBuilder userWithoutCredentials(usersArrayBuilder.subobjStart());
+                        for (BSONObjIterator it(userDetails);  it.more(); ) {
+                            BSONElement e = it.next();
+                            if (e.fieldNameStringData() != "credentials")
+                                userWithoutCredentials.append(e);
+                        }
+                        userWithoutCredentials.doneFast();
+                    } else {
+                        usersArrayBuilder.append(userDetails);
+                    }
+                }
+            } else {
+                // If you don't need privileges, you can just do a regular query on system.users
+                BSONObjBuilder queryBuilder;
+                if (args.allForDB) {
+                    queryBuilder.append(AuthorizationManager::USER_SOURCE_FIELD_NAME, dbname);
+                } else {
+                    BSONArrayBuilder usersMatchArray;
+                    for (size_t i = 0; i < args.userNames.size(); ++i) {
+                        usersMatchArray.append(BSON(AuthorizationManager::USER_NAME_FIELD_NAME <<
+                                                    args.userNames[i].getUser() <<
+                                                    AuthorizationManager::USER_SOURCE_FIELD_NAME <<
+                                                    args.userNames[i].getDB()));
+                    }
+                    queryBuilder.append("$or", usersMatchArray.arr());
 
+                }
+
+                AuthorizationManager* authzManager = getGlobalAuthorizationManager();
+                BSONObjBuilder projection;
+                if (!args.showCredentials) {
+                    projection.append("credentials", 0);
+                }
+                BSONArrayBuilder& (BSONArrayBuilder::* appendBSONObj) (const BSONObj&) =
+                        &BSONArrayBuilder::append<BSONObj>;
+                const boost::function<void(const BSONObj&)> function =
+                        boost::bind(appendBSONObj, &usersArrayBuilder, _1);
+                authzManager->queryAuthzDocument(AuthorizationManager::usersCollectionNamespace,
+                                                 queryBuilder.done(),
+                                                 projection.done(),
+                                                 function);
+            }
             result.append("users", usersArrayBuilder.arr());
             return true;
         }
@@ -1577,7 +1600,6 @@ namespace mongo {
             std::vector<RoleName> roles;
             status = auth::parseRoleNamesFromBSONArray(BSONArray(roleDoc["roles"].Obj()),
                                                        roleName.getDB(),
-                                                       "roles",
                                                        &roles);
 
             for (vector<RoleName>::iterator it = rolesToAdd.begin(); it != rolesToAdd.end(); ++it) {
@@ -1600,7 +1622,6 @@ namespace mongo {
                 status = auth::parseRoleNamesFromBSONArray(
                         BSONArray(roleDoc["indirectRoles"].Obj()),
                         roleName.getDB(),
-                        "indirectRoles",
                         &indirectSubordinatesOfToAdd);
                 if (!status.isOK()) {
                     addStatus(status, result);
@@ -1712,7 +1733,6 @@ namespace mongo {
             std::vector<RoleName> roles;
             status = auth::parseRoleNamesFromBSONArray(BSONArray(roleDoc["roles"].Obj()),
                                                        roleName.getDB(),
-                                                       "roles",
                                                        &roles);
             if (!status.isOK()) {
                 addStatus(status, result);
@@ -1940,26 +1960,28 @@ namespace mongo {
                  BSONObjBuilder& result,
                  bool fromRepl) {
 
-            bool anyDB = false;
-            BSONElement rolesFilter;
-            Status status = auth::parseAndValidateInfoCommands(cmdObj,
-                                                               "rolesInfo",
-                                                               dbname,
-                                                               &anyDB,
-                                                               &rolesFilter);
+            std::vector<RoleName> roleNames;
+            Status status = auth::parseRolesInfoCommand(cmdObj, dbname, &roleNames);
             if (!status.isOK()) {
                 addStatus(status, result);
                 return false;
             }
 
-            BSONObj roleObj;
-            status = getGlobalAuthorizationManager()->getRoleDescription(
-                    RoleName(rolesFilter.str(), dbname), &roleObj);
-            if (!status.isOK()) {
-                addStatus(status, result);
-                return false;
+            BSONArrayBuilder rolesArrayBuilder;
+            for (size_t i = 0; i < roleNames.size(); ++i) {
+                BSONObj roleDetails;
+                status = getGlobalAuthorizationManager()->getRoleDescription(
+                        roleNames[i], &roleDetails);
+                if (status.code() == ErrorCodes::RoleNotFound) {
+                    continue;
+                }
+                if (!status.isOK()) {
+                    addStatus(status, result);
+                    return false;
+                }
+                rolesArrayBuilder.append(roleDetails);
             }
-            result.append("roles", BSON_ARRAY(roleObj));
+            result.append("roles", rolesArrayBuilder.arr());
             return true;
         }
 

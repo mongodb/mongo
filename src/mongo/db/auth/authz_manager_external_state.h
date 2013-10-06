@@ -156,6 +156,7 @@ namespace mongo {
          */
         virtual Status query(const NamespaceString& collectionName,
                              const BSONObj& query,
+                             const BSONObj& projection,
                              const boost::function<void(const BSONObj&)>& resultProcessor) = 0;
 
         /**

@@ -81,42 +81,80 @@ namespace auth {
         return Status::OK();
     }
 
-    Status parseRoleNamesFromBSONArray(const BSONArray& rolesArray,
-                                       const StringData& dbname,
-                                       const StringData& rolesFieldName,
-                                       std::vector<RoleName>* parsedRoleNames) {
-        for (BSONObjIterator it(rolesArray); it.more(); it.next()) {
-            BSONElement element = *it;
-            if (element.type() == String) {
-                parsedRoleNames->push_back(RoleName(element.String(), dbname));
-            }
-            else if (element.type() == Object) {
-                BSONObj roleObj = element.Obj();
+    // Extracts a UserName or RoleName object from a BSONElement.
+    template <typename Name>
+    Status _parseNameFromBSONElement(const BSONElement& element,
+                                     const StringData& dbname,
+                                     const StringData& nameFieldName,
+                                     const StringData& sourceFieldName,
+                                     Name* parsedName) {
+        if (element.type() == String) {
+            *parsedName = Name(element.String(), dbname);
+        }
+        else if (element.type() == Object) {
+            BSONObj obj = element.Obj();
 
-                std::string roleNameString;
-                std::string roleSource;
-                Status status = bsonExtractStringField(roleObj,
-                                                       AuthorizationManager::ROLE_NAME_FIELD_NAME,
-                                                       &roleNameString);
-                if (!status.isOK()) {
-                    return status;
-                }
-                status = bsonExtractStringField(roleObj,
-                                                AuthorizationManager::ROLE_SOURCE_FIELD_NAME,
-                                                &roleSource);
-                if (!status.isOK()) {
-                    return status;
-                }
+            std::string name;
+            std::string source;
+            Status status = bsonExtractStringField(obj, nameFieldName, &name);
+            if (!status.isOK()) {
+                return status;
+            }
+            status = bsonExtractStringField(obj, sourceFieldName, &source);
+            if (!status.isOK()) {
+                return status;
+            }
 
-                parsedRoleNames->push_back(RoleName(roleNameString, roleSource));
-            }
-            else {
-                return Status(ErrorCodes::BadValue,
-                              mongoutils::str::stream() << "Values in \"" << rolesFieldName <<
-                                      "\" array must be sub-documents or strings");
-            }
+            *parsedName = Name(name, source);
+        }
+        else {
+            return Status(ErrorCodes::BadValue,
+                          "User and role names must be either strings or objects");
         }
         return Status::OK();
+    }
+
+    // Extracts UserName or RoleName objects from a BSONArray of role/user names.
+    template <typename Name>
+    Status _parseNamesFromBSONArray(const BSONArray& array,
+                                    const StringData& dbname,
+                                    const StringData& nameFieldName,
+                                    const StringData& sourceFieldName,
+                                    std::vector<Name>* parsedNames) {
+        for (BSONObjIterator it(array); it.more(); it.next()) {
+            BSONElement element = *it;
+            Name name;
+            Status status = _parseNameFromBSONElement(element,
+                                                      dbname,
+                                                      nameFieldName,
+                                                      sourceFieldName,
+                                                      &name);
+            if (!status.isOK()) {
+                return status;
+            }
+            parsedNames->push_back(name);
+        }
+        return Status::OK();
+    }
+
+    Status _parseUserNamesFromBSONArray(const BSONArray& usersArray,
+                                        const StringData& dbname,
+                                       std::vector<UserName>* parsedUserNames) {
+        return _parseNamesFromBSONArray(usersArray,
+                                        dbname,
+                                        AuthorizationManager::USER_NAME_FIELD_NAME,
+                                        AuthorizationManager::USER_SOURCE_FIELD_NAME,
+                                        parsedUserNames);
+    }
+
+    Status parseRoleNamesFromBSONArray(const BSONArray& rolesArray,
+                                       const StringData& dbname,
+                                       std::vector<RoleName>* parsedRoleNames) {
+        return _parseNamesFromBSONArray(rolesArray,
+                                        dbname,
+                                        AuthorizationManager::ROLE_NAME_FIELD_NAME,
+                                        AuthorizationManager::ROLE_SOURCE_FIELD_NAME,
+                                        parsedRoleNames);
     }
 
     Status _extractRoleDataFromBSONArray(const BSONElement& rolesElement,
@@ -208,7 +246,6 @@ namespace auth {
 
         status = parseRoleNamesFromBSONArray(BSONArray(rolesElement.Obj()),
                                              dbname,
-                                             rolesFieldName,
                                              parsedRoleNames);
         if (!status.isOK()) {
             return status;
@@ -342,44 +379,89 @@ namespace auth {
         return Status::OK();
     }
 
-    Status parseAndValidateInfoCommands(const BSONObj& cmdObj,
-                                        const StringData& cmdName,
-                                        const std::string& dbname,
-                                        bool* parsedAnyDB,
-                                        BSONElement* parsedNameFilter) {
+    Status parseUsersInfoCommand(const BSONObj& cmdObj,
+                                 const StringData& dbname,
+                                 UsersInfoArgs* parsedArgs) {
         unordered_set<std::string> validFieldNames;
-        validFieldNames.insert(cmdName.toString());
-        validFieldNames.insert("anyDB");
-        validFieldNames.insert("writeConcern");
-        validFieldNames.insert("details");
+        validFieldNames.insert("usersInfo");
+        validFieldNames.insert("showPrivileges");
+        validFieldNames.insert("showCredentials");
 
-        Status status = _checkNoExtraFields(cmdObj, cmdName, validFieldNames);
+        Status status = _checkNoExtraFields(cmdObj, "usersInfo", validFieldNames);
         if (!status.isOK()) {
             return status;
         }
 
-        if (cmdObj[cmdName].type() != String && cmdObj[cmdName].type() != RegEx) {
-            return Status(ErrorCodes::BadValue,
-                          mongoutils::str::stream() << "Argument to \"" << cmdName <<
-                                  "\"command must be either a string or a regex");
-        }
-        *parsedNameFilter = cmdObj[cmdName];
-
-
-        bool anyDB = false;
-        if (cmdObj.hasField("anyDB")) {
-            if (dbname == "admin") {
-                Status status = bsonExtractBooleanField(cmdObj, "anyDB", &anyDB);
-                if (!status.isOK()) {
-                    return status;
-                }
-            } else {
-                return Status(ErrorCodes::BadValue,
-                              mongoutils::str::stream() << "\"anyDB\" argument to \"" << cmdName <<
-                                      "\"command is only valid when run on the \"admin\" database");
+        if (cmdObj["usersInfo"].numberInt() == 1) {
+            parsedArgs->allForDB = true;
+        } else if (cmdObj["usersInfo"].type() == Array) {
+            status = _parseUserNamesFromBSONArray(BSONArray(cmdObj["usersInfo"].Obj()),
+                                                  dbname,
+                                                  &parsedArgs->userNames);
+            if (!status.isOK()) {
+                return status;
             }
+        } else {
+            UserName name;
+            status = _parseNameFromBSONElement(cmdObj["usersInfo"],
+                                               dbname,
+                                               AuthorizationManager::USER_NAME_FIELD_NAME,
+                                               AuthorizationManager::USER_SOURCE_FIELD_NAME,
+                                               &name);
+            if (!status.isOK()) {
+                return status;
+            }
+            parsedArgs->userNames.push_back(name);
         }
-        *parsedAnyDB = anyDB;
+
+        status = bsonExtractBooleanFieldWithDefault(cmdObj,
+                                                    "showPrivileges",
+                                                    false,
+                                                    &parsedArgs->showPrivileges);
+        if (!status.isOK()) {
+            return status;
+        }
+        status = bsonExtractBooleanFieldWithDefault(cmdObj,
+                                                    "showCredentials",
+                                                    false,
+                                                    &parsedArgs->showCredentials);
+        if (!status.isOK()) {
+            return status;
+        }
+
+        return Status::OK();
+    }
+
+    Status parseRolesInfoCommand(const BSONObj& cmdObj,
+                                 const StringData& dbname,
+                                 std::vector<RoleName>* parsedRoleNames) {
+        unordered_set<std::string> validFieldNames;
+        validFieldNames.insert("rolesInfo");
+
+        Status status = _checkNoExtraFields(cmdObj, "rolesInfo", validFieldNames);
+        if (!status.isOK()) {
+            return status;
+        }
+
+        if (cmdObj["rolesInfo"].type() == Array) {
+            status = parseRoleNamesFromBSONArray(BSONArray(cmdObj["rolesInfo"].Obj()),
+                                                 dbname,
+                                                 parsedRoleNames);
+            if (!status.isOK()) {
+                return status;
+            }
+        } else {
+            RoleName name;
+            status = _parseNameFromBSONElement(cmdObj["rolesInfo"],
+                                               dbname,
+                                               AuthorizationManager::ROLE_NAME_FIELD_NAME,
+                                               AuthorizationManager::ROLE_SOURCE_FIELD_NAME,
+                                               &name);
+            if (!status.isOK()) {
+                return status;
+            }
+            parsedRoleNames->push_back(name);
+        }
 
         return Status::OK();
     }
@@ -467,7 +549,6 @@ namespace auth {
             }
             status = parseRoleNamesFromBSONArray(BSONArray(rolesElement.Obj()),
                                                  dbname,
-                                                 "roles",
                                                  &parsedArgs->roles);
             if (!status.isOK()) {
                 return status;

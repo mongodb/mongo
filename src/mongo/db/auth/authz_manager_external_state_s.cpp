@@ -79,8 +79,14 @@ namespace {
                     AuthorizationManager::usersCollectionNamespace));
             BSONObj cmdResult;
             conn->get()->runCommand(
-                    userName.getDB().toString(),  // TODO: Change usersInfo so this command can always go to "admin".
-                    BSON("usersInfo" << userName.getUser() << "details" << true),
+                    "admin",
+                    BSON("usersInfo" <<
+                         BSON_ARRAY(BSON(AuthorizationManager::USER_NAME_FIELD_NAME <<
+                                         userName.getUser() <<
+                                         AuthorizationManager::USER_SOURCE_FIELD_NAME <<
+                                         userName.getDB())) <<
+                         "showPrivileges" << true <<
+                         "showCredentials" << true),
                     cmdResult);
             if (!cmdResult["ok"].trueValue()) {
                 int code = cmdResult["code"].numberInt();
@@ -102,8 +108,12 @@ namespace {
                     AuthorizationManager::rolesCollectionNamespace));
             BSONObj cmdResult;
             conn->get()->runCommand(
-                    roleName.getDB().toString(),  // TODO: Change rolesInfo so this command can always go to "admin".
-                    BSON("rolesInfo" << roleName.getRole()),
+                    "admin",
+                    BSON("rolesInfo" <<
+                         BSON_ARRAY(BSON(AuthorizationManager::ROLE_NAME_FIELD_NAME <<
+                                         roleName.getRole() <<
+                                         AuthorizationManager::ROLE_SOURCE_FIELD_NAME <<
+                                         roleName.getDB()))),
                     cmdResult);
             if (!cmdResult["ok"].trueValue()) {
                 int code = cmdResult["code"].numberInt();
@@ -138,10 +148,11 @@ namespace {
     Status AuthzManagerExternalStateMongos::query(
             const NamespaceString& collectionName,
             const BSONObj& query,
+            const BSONObj& projection,
             const boost::function<void(const BSONObj&)>& resultProcessor) {
         try {
             scoped_ptr<ScopedDbConnection> conn(getConnectionForAuthzCollection(collectionName));
-            conn->get()->query(resultProcessor, collectionName.ns(), query);
+            conn->get()->query(resultProcessor, collectionName.ns(), query, &projection);
             return Status::OK();
         } catch (const DBException& e) {
             return e.toStatus();

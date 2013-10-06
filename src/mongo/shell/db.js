@@ -1234,7 +1234,7 @@ DB.prototype.getUser = function(username) {
 }
 
 DB.prototype.getUsers = function() {
-    var res = this.runCommand({usersInfo: /.*/});
+    var res = this.runCommand({usersInfo: 1});
     if (!res.ok) {
         throw Error(res.errmsg);
     }

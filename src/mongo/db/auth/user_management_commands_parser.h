@@ -99,17 +99,29 @@ namespace auth {
                                                         const std::string& dbname,
                                                         BSONObj* parsedWriteConcern);
 
+    struct UsersInfoArgs {
+        std::vector<UserName> userNames;
+        bool allForDB;
+        bool showPrivileges;
+        bool showCredentials;
+        UsersInfoArgs() : allForDB(false), showPrivileges(false), showCredentials(false) {}
+    };
+
     /**
-     * Takes a command object describing an invocation of the "usersInfo" or "rolesInfo" commands
-     * (which command it is is specified in the "cmdName" argument) and parses out a BSONElement
-     * with the user/role name filter to be applied, as well as the anyDB boolean.
-     * Also validates the input and returns a non-ok Status if there is anything wrong.
+     * Takes a command object describing an invocation of the "usersInfo" command  and parses out
+     * all the arguments into the "parsedArgs" output param.
      */
-    Status parseAndValidateInfoCommands(const BSONObj& cmdObj,
-                                        const StringData& cmdName,
-                                        const std::string& dbname,
-                                        bool* parsedAnyDb,
-                                        BSONElement* parsedNameFilter);
+    Status parseUsersInfoCommand(const BSONObj& cmdObj,
+                                 const StringData& dbname,
+                                 UsersInfoArgs* parsedArgs);
+
+    /**
+     * Takes a command object describing an invocation of the "rolesInfo" command  and parses out
+     * the role names requested into the "parsedRoleNames" output param.
+     */
+    Status parseRolesInfoCommand(const BSONObj& cmdObj,
+                                 const StringData& dbname,
+                                 std::vector<RoleName>* parsedRoleNames);
 
     struct CreateOrUpdateRoleArgs {
         RoleName roleName;
@@ -173,7 +185,6 @@ namespace auth {
      */
     Status parseRoleNamesFromBSONArray(const BSONArray& rolesArray,
                                        const StringData& dbname,
-                                       const StringData& rolesFieldName,
                                        std::vector<RoleName>* parsedRoleNames);
 
 } // namespace auth

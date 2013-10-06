@@ -87,6 +87,7 @@ namespace mongo {
 
         virtual Status query(const NamespaceString& collectionName,
                              const BSONObj& query,
+                             const BSONObj& projection, // Currently unused in mock
                              const boost::function<void(const BSONObj&)>& resultProcessor);
 
         // This implementation does not understand uniqueness constraints.
