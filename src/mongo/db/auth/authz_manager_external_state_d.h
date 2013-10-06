@@ -65,6 +65,7 @@ namespace mongo {
                                BSONObj* result);
         virtual Status query(const NamespaceString& collectionName,
                              const BSONObj& query,
+                             const BSONObj& projection,
                              const boost::function<void(const BSONObj&)>& resultProcessor);
         virtual Status insert(const NamespaceString& collectionName,
                               const BSONObj& document,

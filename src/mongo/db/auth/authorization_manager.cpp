@@ -225,8 +225,9 @@ namespace mongo {
     Status AuthorizationManager::queryAuthzDocument(
             const NamespaceString& collectionName,
             const BSONObj& query,
+            const BSONObj& projection,
             const boost::function<void(const BSONObj&)>& resultProcessor) {
-        return _externalState->query(collectionName, query, resultProcessor);
+        return _externalState->query(collectionName, query, projection, resultProcessor);
     }
 
     Status AuthorizationManager::updateAuthzDocuments(const NamespaceString& collectionName,

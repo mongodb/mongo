@@ -217,6 +217,7 @@ namespace mongo {
          */
         Status queryAuthzDocument(const NamespaceString& collectionName,
                                   const BSONObj& query,
+                                  const BSONObj& projection,
                                   const boost::function<void(const BSONObj&)>& resultProcessor);
 
         // Checks to see if "doc" is a valid privilege document, assuming it is stored in the

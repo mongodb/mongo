@@ -186,7 +186,7 @@ var testOps = function(db, allowedActions) {
     }, db);
 
     checkErr(allowedActions.hasOwnProperty('user_r'), function() {
-        var result = db.runCommand({usersInfo: /.*/});
+        var result = db.runCommand({usersInfo: 1});
         if (!result.ok) {
             throw new Error(tojson(result));
         }

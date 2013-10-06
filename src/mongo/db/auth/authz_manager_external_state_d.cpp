@@ -237,11 +237,12 @@ namespace {
     Status AuthzManagerExternalStateMongod::query(
             const NamespaceString& collectionName,
             const BSONObj& query,
+            const BSONObj& projection,
             const boost::function<void(const BSONObj&)>& resultProcessor) {
         try {
             DBDirectClient client;
             Client::GodScope gs;
-            client.query(resultProcessor, collectionName.ns(), query);
+            client.query(resultProcessor, collectionName.ns(), query, &projection);
             return Status::OK();
         } catch (const DBException& e) {
             return e.toStatus();
@@ -451,6 +452,7 @@ namespace {
         RoleGraph newRoleGraph;
         Status status = query(
                 AuthorizationManager::rolesCollectionNamespace,
+                BSONObj(),
                 BSONObj(),
                 boost::bind(addRoleFromDocumentOrWarn, &newRoleGraph, _1));
         if (!status.isOK())
