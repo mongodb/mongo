@@ -1923,6 +1923,129 @@ namespace mongo {
 
     } cmdDropRole;
 
+    class CmdDropRolesFromDatabase: public Command {
+    public:
+
+        CmdDropRolesFromDatabase() : Command("dropRolesFromDatabase") {}
+
+        virtual bool logTheOp() {
+            return false;
+        }
+
+        virtual bool slaveOk() const {
+            return false;
+        }
+
+        virtual LockType locktype() const {
+            return NONE;
+        }
+
+        virtual void help(stringstream& ss) const {
+            ss << "Drops all roles from the given database.  Before deleting the roles completely "
+                  "it must remove them from any users or other roles that reference them.  If any "
+                  "errors occur in the middle of that process it's possible to be left in a state "
+                  "where the roles have been removed from some user/roles but otherwise still "
+                  "exist." << endl;
+        }
+
+        virtual void addRequiredPrivileges(const std::string& dbname,
+                                           const BSONObj& cmdObj,
+                                           std::vector<Privilege>* out) {
+            // TODO: update this with the new rules around user creation in 2.6.
+            ActionSet actions;
+            actions.addAction(ActionType::userAdmin);
+            out->push_back(Privilege(ResourcePattern::forDatabaseName(dbname), actions));
+        }
+
+        bool run(const string& dbname,
+                 BSONObj& cmdObj,
+                 int options,
+                 string& errmsg,
+                 BSONObjBuilder& result,
+                 bool fromRepl) {
+            BSONObj writeConcern;
+            Status status = auth::parseDropRolesFromDatabaseCommand(cmdObj,
+                                                                    dbname,
+                                                                    &writeConcern);
+            if (!status.isOK()) {
+                addStatus(status, result);
+                return false;
+            }
+
+            AuthorizationManager* authzManager = getGlobalAuthorizationManager();
+            AuthzDocumentsUpdateGuard updateGuard(authzManager);
+            if (!updateGuard.tryLock("Drop roles from database")) {
+                addStatus(Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."),
+                          result);
+                return false;
+            }
+
+            // Remove these roles from all users
+            int numUpdated;
+            status = authzManager->updateAuthzDocuments(
+                    AuthorizationManager::usersCollectionNamespace,
+                    BSON("roles" << BSON(AuthorizationManager::ROLE_SOURCE_FIELD_NAME << dbname)),
+                    BSON("$pull" << BSON("roles" <<
+                                         BSON(AuthorizationManager::ROLE_SOURCE_FIELD_NAME <<
+                                              dbname))),
+                    false,
+                    true,
+                    writeConcern,
+                    &numUpdated);
+            if (!status.isOK()) {
+                ErrorCodes::Error code = status.code() == ErrorCodes::UnknownError ?
+                        ErrorCodes::UserModificationFailed : status.code();
+                addStatus(Status(code,
+                                 str::stream() << "Failed to remove roles from \"" << dbname
+                                         << "\" db from all users: " << status.reason()),
+                          result);
+                return false;
+            }
+
+            // Remove these roles from all other roles
+            std::string sourceFieldName =
+                    str::stream() << "roles." << AuthorizationManager::ROLE_SOURCE_FIELD_NAME;
+            status = authzManager->updateAuthzDocuments(
+                    AuthorizationManager::rolesCollectionNamespace,
+                    BSON(sourceFieldName << dbname),
+                    BSON("$pull" << BSON("roles" <<
+                                         BSON(AuthorizationManager::ROLE_SOURCE_FIELD_NAME <<
+                                              dbname))),
+                    false,
+                    true,
+                    writeConcern,
+                    &numUpdated);
+            if (!status.isOK()) {
+                ErrorCodes::Error code = status.code() == ErrorCodes::UnknownError ?
+                        ErrorCodes::RoleModificationFailed : status.code();
+                addStatus(Status(code,
+                                 str::stream() << "Failed to remove roles from \"" << dbname
+                                         << "\" db from all roles: " << status.reason()),
+                          result);
+                return false;
+            }
+
+            // Finally, remove the actual role documents
+            status = authzManager->removeRoleDocuments(
+                    BSON(AuthorizationManager::ROLE_SOURCE_FIELD_NAME << dbname),
+                    writeConcern,
+                    &numUpdated);
+            if (!status.isOK()) {
+                addStatus(Status(status.code(),
+                                 str::stream() << "Removed roles from \"" << dbname << "\" db "
+                                         " from all users and roles but failed to actually delete"
+                                         " those roles themselves: " <<  status.reason()),
+                          result);
+                return false;
+            }
+
+            result.append("n", numUpdated);
+
+            return true;
+        }
+
+    } cmdDropRolesFromDatabase;
+
     class CmdRolesInfo: public Command {
     public:
 
