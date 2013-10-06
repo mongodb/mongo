@@ -60,9 +60,7 @@ namespace mongo {
             Client::initThread("RangeDeleter");
         }
 
-        if (AuthorizationManager::isAuthEnabled()) {
-            cc().getAuthorizationSession()->grantInternalAuthorization();
-        }
+        cc().getAuthorizationSession()->grantInternalAuthorization();
 
         ShardForceVersionOkModeBlock forceVersion;
         {

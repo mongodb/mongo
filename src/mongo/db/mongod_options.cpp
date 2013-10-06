@@ -35,6 +35,7 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/module.h"
 #include "mongo/db/pdfile.h"
@@ -479,10 +480,10 @@ namespace mongo {
             serverGlobalParams.cpu = true;
         }
         if (params.count("noauth")) {
-            AuthorizationManager::setAuthEnabled(false);
+            getGlobalAuthorizationManager()->setAuthEnabled(false);
         }
         if (params.count("auth")) {
-            AuthorizationManager::setAuthEnabled(true);
+            getGlobalAuthorizationManager()->setAuthEnabled(true);
         }
         if (params.count("quota")) {
             storageGlobalParams.quota = true;
@@ -782,7 +783,9 @@ namespace mongo {
     }
 
     MONGO_INITIALIZER_GENERAL(ParseStartupConfiguration,
-            ("GlobalLogManager"),
+            ("GlobalLogManager",
+             "CreateAuthorizationManager"  // Requried to call getGlobalAuthorizationManager().
+             ),
             ("default", "completedStartupConfig"))(InitializerContext* context) {
 
         serverOptions = moe::OptionSection("Allowed options");

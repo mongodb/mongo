@@ -40,7 +40,7 @@
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
-#include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/security_key.h"
 #include "mongo/db/commands.h"
@@ -416,7 +416,7 @@ namespace mongo {
     }
 
     void ShardingConnectionHook::onCreate( DBClientBase * conn ) {
-        if(AuthorizationManager::isAuthEnabled()) {
+        if(getGlobalAuthorizationManager()->isAuthEnabled()) {
             LOG(2) << "calling onCreate auth for " << conn->toString() << endl;
 
             bool result = authenticateInternalUser(conn);

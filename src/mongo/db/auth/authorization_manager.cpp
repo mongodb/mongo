@@ -59,7 +59,9 @@ namespace mongo {
 
     AuthInfo internalSecurity;
 
-    MONGO_INITIALIZER(SetupInternalSecurityUser)(InitializerContext* context) {
+    MONGO_INITIALIZER_WITH_PREREQUISITES(SetupInternalSecurityUser, MONGO_NO_PREREQUISITES)(
+            InitializerContext* context) {
+
         User* user = new User(UserName("__system", "local"));
 
         user->incrementRefCount(); // Pin this user so the ref count never drops below 1.
@@ -88,11 +90,9 @@ namespace mongo {
 
 
     bool AuthorizationManager::_doesSupportOldStylePrivileges = true;
-    bool AuthorizationManager::_authEnabled = false;
-
 
     AuthorizationManager::AuthorizationManager(AuthzManagerExternalState* externalState) :
-        _externalState(externalState) {
+        _authEnabled(false), _externalState(externalState) {
 
         setAuthorizationVersion(2);
     }
@@ -105,10 +105,6 @@ namespace mongo {
                 delete it->second ;
             }
         }
-    }
-
-    AuthzManagerExternalState* AuthorizationManager::getExternalState() const {
-        return _externalState.get();
     }
 
     Status AuthorizationManager::setAuthorizationVersion(int version) {
@@ -142,7 +138,7 @@ namespace mongo {
         _authEnabled = enabled;
     }
 
-    bool AuthorizationManager::isAuthEnabled() {
+    bool AuthorizationManager::isAuthEnabled() const {
         return _authEnabled;
     }
 

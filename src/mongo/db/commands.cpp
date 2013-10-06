@@ -257,7 +257,7 @@ namespace mongo {
             return Status(ErrorCodes::Unauthorized, str::stream() << c->name <<
                           " may only be run against the admin database.");
         }
-        if (AuthorizationManager::isAuthEnabled()) {
+        if (client->getAuthorizationSession()->getAuthorizationManager().isAuthEnabled()) {
             Status status = c->checkAuthForCommand(client, dbname, cmdObj);
             if (status == ErrorCodes::Unauthorized) {
                 mmb::Document cmdToLog(cmdObj, mmb::Document::kInPlaceDisabled);

@@ -30,6 +30,8 @@
 
 #include "mongo/client/constants.h"
 #include "mongo/client/dbclientcursor.h"
+#include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/security_key.h"
 #include "mongo/db/dbhelpers.h"
@@ -50,7 +52,7 @@ namespace mongo {
     }
 
     bool SyncSourceFeedback::replAuthenticate() {
-        if (!AuthorizationManager::isAuthEnabled())
+        if (!getGlobalAuthorizationManager()->isAuthEnabled())
             return true;
 
         if (!isInternalAuthSet())
@@ -150,7 +152,7 @@ namespace mongo {
         _connection.reset(new DBClientConnection(false, 0, OplogReader::tcp_timeout));
         string errmsg;
         if (!_connection->connect(hostName.c_str(), errmsg) ||
-                (AuthorizationManager::isAuthEnabled() && !replAuthenticate())) {
+            (getGlobalAuthorizationManager()->isAuthEnabled() && !replAuthenticate())) {
             resetConnection();
             log() << "repl: " << errmsg << endl;
             return false;
