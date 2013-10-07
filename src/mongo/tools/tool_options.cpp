@@ -89,10 +89,10 @@ namespace mongo {
         if(!ret.isOK()) {
             return ret;
         }
+
 #ifdef MONGO_SSL
-        ret = options->addOption(OD("ssl", "ssl", moe::Switch,
-                    "use SSL for all connections", true));
-        if(!ret.isOK()) {
+        ret = addSSLClientOptions(options);
+        if (!ret.isOK()) {
             return ret;
         }
 #endif
@@ -274,8 +274,9 @@ namespace mongo {
         toolGlobalParams.quiet = params.count("quiet");
 
 #ifdef MONGO_SSL
-        if (params.count("ssl")) {
-            sslGlobalParams.sslMode.store(SSLGlobalParams::SSLMode_sslOnly);
+        Status ret = storeSSLClientOptions(params);
+        if (!ret.isOK()) {
+            return ret;
         }
 #endif
 

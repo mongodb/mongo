@@ -107,7 +107,7 @@ if shellEnv is not None:
     addSmoketest( "smokeAggregation", [ add_exe( "mongo" ), add_exe( "mongod" ), add_exe( "mongos" ) ] )
     addSmoketest( "smokeMultiVersion", [ add_exe( "mongo" ), add_exe( "mongod" ), add_exe( "mongos" ) ] )
     addSmoketest( "smokeFailPoint", [ add_exe( "mongo" ), add_exe( "mongod" ), add_exe( "mongos" ) ] )
-    addSmoketest( "smokeSsl", [ add_exe("mongo"), add_exe("mongod"), add_exe("mongos") ], 
+    addSmoketest( "smokeSsl", [ add_exe("mongo"), add_exe("mongod"), add_exe("mongos"), "tools" ],
                   ['--use-ssl','--use-x509'] )
     
     addSmoketest( "smokeFailingTests", [ add_exe( "mongo" ), add_exe( "mongod" ) ], ['--only-old-fails', '--continue-on-failure'] )
