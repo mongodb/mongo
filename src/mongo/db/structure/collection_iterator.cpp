@@ -48,7 +48,11 @@ namespace mongo {
 
             const ExtentManager* em = _collection->getExtentManager();
 
-            if (CollectionScanParams::FORWARD == _direction) {
+            if ( _collection->_details->firstExtent().isNull() ) {
+                // nothing in the collection
+                verify( _collection->_details->lastExtent().isNull() );
+            }
+            else if (CollectionScanParams::FORWARD == _direction) {
 
                 // Find a non-empty extent and start with the first record in it.
                 Extent* e = em->getExtent( _collection->_details->firstExtent() );
