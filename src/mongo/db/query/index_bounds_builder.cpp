@@ -376,9 +376,11 @@ namespace mongo {
 
         while (argidx < argiv.size() && ividx < iv.size()) {
             Interval::IntervalComparison cmp = argiv[argidx].compare(iv[ividx]);
+            /*
             cout << "comparing " << argiv[argidx].toString()
                  << " with " << iv[ividx].toString()
                  << " cmp is " << Interval::cmpstr(cmp) << endl;
+                 */
 
             verify(Interval::INTERVAL_UNKNOWN != cmp);
 
@@ -429,6 +431,10 @@ namespace mongo {
 
         // Step 2: Walk through and merge.
         vector<Interval>& iv = oilOut->intervals;
+
+        // This can happen.
+        if (iv.empty()) { return; }
+
         size_t i = 0;
         while (i < iv.size() - 1) {
             // Compare i with i + 1.
@@ -520,7 +526,7 @@ namespace mongo {
 
         const string start = simpleRegex(rme->getString().c_str(), rme->getFlags().c_str(), exact);
 
-        cout << "regex bounds start is " << start << endl;
+        // cout << "regex bounds start is " << start << endl;
         // Note that 'exact' is set by simpleRegex above.
         if (!start.empty()) {
             string end = start;

@@ -178,6 +178,9 @@ namespace mongo {
                 options |= QueryPlanner::NO_TABLE_SCAN;
             }
         }
+        else {
+            options |= QueryPlanner::INCLUDE_COLLSCAN;
+        }
         QueryPlanner::plan(*canonicalQuery, indices, options, &solutions);
 
         /*

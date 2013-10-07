@@ -191,6 +191,8 @@ namespace mongo {
         // name of the index being used
         std::string indexName;
 
+        BSONObj keyPattern;
+
         // A BSON (opaque, ie. hands off other than toString() it) representation of the bounds
         // used.
         BSONObj indexBounds;

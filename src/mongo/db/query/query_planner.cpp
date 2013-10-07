@@ -333,16 +333,12 @@ namespace mongo {
             if (STAGE_GEO_NEAR_2DSPHERE == type) {
                 GeoNear2DSphereNode* gn = static_cast<GeoNear2DSphereNode*>(node);
                 boundsToFillOut = &gn->baseBounds;
-                cout << "YO it's a geo near node\n";
             }
             else {
                 verify(type == STAGE_IXSCAN);
                 IndexScanNode* scan = static_cast<IndexScanNode*>(node);
                 boundsToFillOut = &scan->bounds;
-                cout << "YO it's an ixscan node\n";
             }
-
-            cout << "pos is " << pos << endl;
 
             // Get the ixtag->pos-th element of the index key pattern.
             // TODO: cache this instead/with ixtag->pos?
@@ -1189,10 +1185,12 @@ namespace mongo {
                 QuerySolution* soln = analyzeDataAccess(query, solnRoot);
                 verify(NULL != soln);
 
-                cout << "Adding solution:\n" << soln->toString() << endl;
+                cout << "Planner: adding solution:\n" << soln->toString() << endl;
                 out->push_back(soln);
             }
         }
+
+        cout << "Planner: outputted " << out->size() << " indexed solutions.\n";
 
         // An index was hinted.  If there are any solutions, they use the hinted index.  If not, we
         // scan the entire index to provide results and output that as our plan.  This is the
@@ -1233,7 +1231,7 @@ namespace mongo {
             verify(NULL != soln);
             out->push_back(soln);
 
-            cout << "using hinted index as scan, soln = " << soln->toString() << endl;
+            cout << "Planner: using hinted index as scan, soln = " << soln->toString() << endl;
             return;
         }
 
@@ -1280,7 +1278,7 @@ namespace mongo {
                         QuerySolution* soln = analyzeDataAccess(query, fetch);
                         verify(NULL != soln);
                         out->push_back(soln);
-                        cout << "using index to provide sort, soln = " << soln->toString() << endl;
+                        cout << "Planner: using index to provide sort, soln = " << soln->toString() << endl;
                         break;
                     }
                 }
@@ -1293,7 +1291,7 @@ namespace mongo {
             && ((options & QueryPlanner::INCLUDE_COLLSCAN) || (0 == out->size() && canTableScan))) {
             QuerySolution* collscan = makeCollectionScan(query, false);
             out->push_back(collscan);
-            cout << "Outputting a collscan\n";
+            cout << "Planner: outputting a collscan\n";
         }
     }
 
