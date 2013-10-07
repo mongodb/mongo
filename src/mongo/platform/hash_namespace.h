@@ -15,10 +15,15 @@
 
 #pragma once
 
-// NOTE(acm): Before gcc-4.7, __cplusplus is always defined to be 1,
-// so we can't reliably detect C++11 support by exclusively checking
-// the value of __cplusplus.
-#if __cplusplus >= 201103L || defined(__GXX_EXPERIMENTAL_CXX0X__)
+// We need to drag in a C++ header so we can examine __GXX_EXPERIMENTAL_CXX0X__ or
+// _LIBCPP_VERSION meaningfully. The <new> header is pretty lightweight, mostly unavoidable,
+// and almost certain to bring in the standard library configuration macros.
+#include <new>
+
+// NOTE(acm): Before gcc-4.7, __cplusplus is always defined to be 1, so we can't reliably
+// detect C++11 support by exclusively checking the value of __cplusplus.  Additionaly, libc++,
+// whether in C++11 or C++03 mode, doesn't use TR1 and drops things into std instead.
+#if __cplusplus >= 201103L || defined(__GXX_EXPERIMENTAL_CXX0X__) || defined(_LIBCPP_VERSION)
 
 #include <functional>
 
