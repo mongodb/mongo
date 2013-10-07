@@ -34,10 +34,12 @@
 
 #include "mongo/db/client.h"
 #include "mongo/db/d_concurrency.h"
+#include "mongo/db/memconcept.h"
+#include "mongo/db/namespace_details.h"
 #include "mongo/db/storage/data_file.h"
+#include "mongo/db/storage/extent.h"
 #include "mongo/db/storage/extent_manager.h"
 
-// XXX-erh
 #include "mongo/db/pdfile.h"
 
 namespace mongo {
@@ -105,6 +107,8 @@ namespace mongo {
     const DataFile* ExtentManager::_getOpenFile( int n ) const {
         verify(this);
         DEV Lock::assertAtLeastReadLocked( _dbname );
+        if ( n < 0 || n >= static_cast<int>(_files.size()) )
+            log() << "uh oh: " << n;
         verify( n >= 0 && n < static_cast<int>(_files.size()) );
         return _files[n];
     }
@@ -313,38 +317,21 @@ namespace mongo {
         return newSize;
     }
 
-    bool fileIndexExceedsQuota( const char *ns, int fileIndex ) {
-        return
-            storageGlobalParams.quota &&
-            fileIndex >= storageGlobalParams.quotaFiles &&
-            // we don't enforce the quota on "special" namespaces as that could lead to problems -- e.g.
-            // rejecting an index insert after inserting the main record.
-            !NamespaceString::special( ns ) &&
-            nsToDatabaseSubstring( ns ) != "local";
-    }
-
-    // XXX-ERH
-    void addNewExtentToNamespace(const char *ns, Extent *e, DiskLoc eloc, DiskLoc emptyLoc, bool capped);
-
     void _quotaExceeded() {
         uasserted(12501, "quota exceeded");
     }
 
-    Extent* ExtentManager::_createExtentInFile( int fileNo, DataFile* f,
-                                                const char* ns, int size, bool newCapped,
-                                                bool enforceQuota ) {
+    DiskLoc ExtentManager::_createExtentInFile( int fileNo, DataFile* f,
+                                                int size, int maxFileNoForQuota ) {
 
         size = ExtentManager::quantizeExtentSize( size );
 
-        if ( enforceQuota ) {
-            if ( fileIndexExceedsQuota( ns, fileNo - 1 ) ) {
-                if ( cc().hasWrittenThisPass() ) {
-                    warning() << "quota exceeded, but can't assert "
-                              << " going over quota for: " << ns << " " << fileNo << endl;
-                }
-                else {
-                    _quotaExceeded();
-                }
+        if ( maxFileNoForQuota > 0 && fileNo - 1 >= maxFileNoForQuota ) {
+            if ( cc().hasWrittenThisPass() ) {
+                warning() << "quota exceeded, but can't assert" << endl;
+            }
+            else {
+                _quotaExceeded();
             }
         }
 
@@ -356,18 +343,13 @@ namespace mongo {
         Extent *e = getExtent( loc, false );
         verify( e );
 
-        DiskLoc emptyLoc = getDur().writing(e)->init(ns, size, fileNo, loc.getOfs(), newCapped);
+        getDur().writing(e)->init("", size, fileNo, loc.getOfs(), false);
 
-        addNewExtentToNamespace(ns, e, loc, emptyLoc, newCapped);
-
-        LOG(1) << "ExtentManager: creating new extent for: " << ns << " in file: " << fileNo
-               << " size: " << size << endl;
-
-        return e;
+        return loc;
     }
 
 
-    Extent* ExtentManager::createExtent(const char *ns, int size, bool newCapped, bool enforceQuota ) {
+    DiskLoc ExtentManager::createExtent( int size, int maxFileNoForQuota ) {
         size = quantizeExtentSize( size );
 
         if ( size > Extent::maxSize() )
@@ -378,12 +360,12 @@ namespace mongo {
         for ( int i = numFiles() - 1; i >= 0; i-- ) {
             DataFile* f = getFile( i );
             if ( f->getHeader()->unusedLength >= size ) {
-                return _createExtentInFile( i, f, ns, size, newCapped, enforceQuota );
+                return _createExtentInFile( i, f, size, maxFileNoForQuota );
             }
         }
 
-        if ( enforceQuota &&
-             fileIndexExceedsQuota( ns, numFiles() ) &&
+        if ( maxFileNoForQuota > 0 &&
+             static_cast<int>( numFiles() ) >= maxFileNoForQuota &&
              !cc().hasWrittenThisPass() ) {
             _quotaExceeded();
         }
@@ -395,7 +377,7 @@ namespace mongo {
             DataFile* f = addAFile( size, false );
 
             if ( f->getHeader()->unusedLength >= size ) {
-                return _createExtentInFile( numFiles() - 1, f, ns, size, newCapped, enforceQuota );
+                return _createExtentInFile( numFiles() - 1, f, size, maxFileNoForQuota );
             }
 
         }
@@ -413,9 +395,9 @@ namespace mongo {
         }
     }
 
-    Extent* ExtentManager::allocFromFreeList( const char *ns, int approxSize, bool capped ) {
+    DiskLoc ExtentManager::allocFromFreeList( int approxSize, bool capped ) {
         if ( !_freeListDetails ) {
-            return NULL;
+            return DiskLoc();
         }
 
         // setup extent constraints
@@ -485,7 +467,7 @@ namespace mongo {
         if ( n > 128 ) { LOG( n < 512 ? 1 : 0 ) << "warning: newExtent " << n << " scanned\n"; }
 
         if ( !best )
-            return NULL;
+            return DiskLoc();
 
         // remove from the free list
         if ( !best->xprev.isNull() )
@@ -497,9 +479,7 @@ namespace mongo {
         if ( _freeListDetails->lastExtent() == best->myLoc )
             _freeListDetails->setLastExtent( best->xprev );
 
-        DiskLoc emptyLoc = best->reuse(ns, capped);
-        addNewExtentToNamespace(ns, best, best->myLoc, emptyLoc, capped);
-        return best;
+        return best->myLoc;
     }
 
     void ExtentManager::freeExtents(DiskLoc firstExt, DiskLoc lastExt) {
