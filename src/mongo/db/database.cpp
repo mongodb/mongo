@@ -505,9 +505,9 @@ namespace mongo {
         verify( _namespaceIndex.details( ns ) == NULL );
 
         if ( serverGlobalParams.configsvr &&
-             ( ns.startsWith( "config." ) ||
-               ns.startsWith( "local." ) ||
-               ns.startsWith( "admin." ) ) ) {
+             !( ns.startsWith( "config." ) ||
+                ns.startsWith( "local." ) ||
+                ns.startsWith( "admin." ) ) ) {
             uasserted(14037, "can't create user databases on a --configsvr instance");
         }
 
