@@ -592,8 +592,7 @@ namespace mongo {
     /// warn if readahead > 256KB (gridfs chunk size)
     static void checkReadAhead(const string& dir) {
 #ifdef __linux__
-        try
-        {
+        try {
             const dev_t dev = getPartition(dir);
 
             // This path handles the case where the filesystem uses the whole device (including LVM)
@@ -628,9 +627,11 @@ namespace mongo {
                 }
             }
         }
-        catch (const boost::filesystem::filesystem_error& ex)
-        {
-            log() << ex.what() << endl;
+        catch (const std::exception& e) {
+            log() << "unable to validate readahead settings due to error: " << e.what()
+                  << startupWarningsLog;
+            log() << "for more information, see http://dochub.mongodb.org/core/readahead"
+                  << startupWarningsLog;
         }
 #endif // __linux__
     }
