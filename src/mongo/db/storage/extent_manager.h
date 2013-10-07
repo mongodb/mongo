@@ -102,12 +102,12 @@ namespace mongo {
         /* allocate a new Extent, does not check free list
            @param capped - true if capped collection
         */
-        Extent* createExtent( const char *ns, int approxSize, bool newCapped, bool enforceQuota );
+        DiskLoc createExtent( int approxSize, int maxFileNoForQuota );
 
         /**
          * will return NULL if nothing suitable in free list
          */
-        Extent* allocFromFreeList( const char *ns, int approxSize, bool capped = false);
+        DiskLoc allocFromFreeList( int approxSize, bool capped );
 
 
         /**
@@ -160,9 +160,8 @@ namespace mongo {
 
         const DataFile* _getOpenFile( int n ) const;
 
-        Extent* _createExtentInFile( int fileNo, DataFile* f,
-                                     const char* ns, int size, bool newCapped,
-                                     bool enforceQuota );
+        DiskLoc _createExtentInFile( int fileNo, DataFile* f,
+                                     int size, int maxFileNoForQuota );
 
         boost::filesystem::path fileName( int n ) const;
 

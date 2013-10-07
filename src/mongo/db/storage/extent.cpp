@@ -41,7 +41,7 @@
 
 namespace mongo {
 
-    static void extent_getEmptyLoc(const char *ns,
+    static void extent_getEmptyLoc(const StringData& ns,
                                    const DiskLoc extentLoc,
                                    int extentLength,
                                    bool capped,
@@ -50,7 +50,7 @@ namespace mongo {
         emptyLoc = extentLoc;
         emptyLoc.inc( Extent::HeaderSize() );
         delRecLength = extentLength - Extent::HeaderSize();
-        if( delRecLength >= 32*1024 && str::contains(ns, '$') && !capped ) {
+        if( delRecLength >= 32*1024 && ns.find('$') != string::npos && !capped ) {
             // probably an index. so skip forward to keep its records page aligned
             int& ofs = emptyLoc.GETOFS();
             int newOfs = (ofs + 0xfff) & ~0xfff;
@@ -128,11 +128,11 @@ namespace mongo {
         lastRecord.Null();
     }
 
-    DiskLoc Extent::reuse(const char *nsname, bool capped) {
+    DiskLoc Extent::reuse(const StringData& nsname, bool capped) {
         return getDur().writing(this)->_reuse(nsname, capped);
     }
 
-    DiskLoc Extent::_reuse(const char *nsname, bool capped) {
+    DiskLoc Extent::_reuse(const StringData& nsname, bool capped) {
         LOG(3) << "_reuse extent was:" << nsDiagnostic.toString() << " now:" << nsname << endl;
         if (magic != extentSignature) {
             StringBuilder sb;
