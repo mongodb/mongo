@@ -150,7 +150,7 @@ namespace mongo {
             }
 
             //theDataFileMgr.deleteRecord(ns, rloc.rec(), rloc);
-            currentClient.get()->database()->getCollectionTemp( ns )->deleteDocument( rloc );
+            currentClient.get()->database()->getCollection( ns )->deleteDocument( rloc );
 
             nDeleted++;
             if ( foundAllResults ) {

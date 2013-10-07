@@ -395,7 +395,7 @@ namespace mongo {
                     callback->goingToDelete( obj );
 
                 logOp("d", ns.c_str(), obj["_id"].wrap(), 0, 0, fromMigrate);
-                c.database()->getCollectionTemp( ns )->deleteDocument( rloc );
+                c.database()->getCollection( ns )->deleteDocument( rloc );
                 numDeleted++;
             }
 

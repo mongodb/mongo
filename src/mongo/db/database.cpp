@@ -268,7 +268,7 @@ namespace mongo {
     Status Database::dropCollection( const StringData& fullns ) {
         LOG(1) << "dropCollection: " << fullns << endl;
 
-        CollectionTemp* collection = getCollectionTemp( fullns );
+        Collection* collection = getCollection( fullns );
         if ( !collection ) {
             // collection doesn't exist
             return Status::OK();
@@ -316,7 +316,7 @@ namespace mongo {
 
     }
 
-    CollectionTemp* Database::getCollectionTemp( const StringData& ns ) {
+    Collection* Database::getCollection( const StringData& ns ) {
         StringData dbName = nsToDatabaseSubstring( ns );
         verify( dbName == _name);
 
@@ -345,7 +345,7 @@ namespace mongo {
             return NULL;
         }
 
-        CollectionTemp* c = new CollectionTemp( ns, details, this );
+        Collection* c = new Collection( ns, details, this );
         _collections[myns] = c;
         return c;
     }
@@ -501,7 +501,7 @@ namespace mongo {
         log() << "have free list for " << _extentFreelistName << endl;
     }
 
-    CollectionTemp* Database::createCollection( const StringData& ns, bool capped, const BSONObj* options ) {
+    Collection* Database::createCollection( const StringData& ns, bool capped, const BSONObj* options ) {
         verify( _namespaceIndex.details( ns ) == NULL );
 
         if ( serverGlobalParams.configsvr &&
@@ -520,7 +520,7 @@ namespace mongo {
             authindex::createSystemIndexes( ns );
         }
 
-        CollectionTemp* collection = getCollectionTemp( ns );
+        Collection* collection = getCollection( ns );
         verify( collection );
         return collection;
     }

@@ -39,7 +39,7 @@ namespace mongo {
     // Regular / non-capped collection traversal
     //
 
-    FlatIterator::FlatIterator(const CollectionTemp* collection,
+    FlatIterator::FlatIterator(const Collection* collection,
                                const DiskLoc& start,
                                const CollectionScanParams::Direction& dir)
         : _curr(start), _collection(collection), _direction(dir) {
@@ -130,7 +130,7 @@ namespace mongo {
     // Capped collection traversal
     //
 
-    CappedIterator::CappedIterator(const CollectionTemp* collection,
+    CappedIterator::CappedIterator(const Collection* collection,
                                    const DiskLoc& start, bool tailable,
                                    const CollectionScanParams::Direction& dir)
         : _collection(collection), _curr(start), _tailable(tailable),

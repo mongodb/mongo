@@ -52,13 +52,13 @@ namespace mongo {
      * this is NOT safe through a yield right now
      * not sure if it will be, or what yet
      */
-    class CollectionTemp {
+    class Collection {
     public:
-        CollectionTemp( const StringData& fullNS,
+        Collection( const StringData& fullNS,
                         NamespaceDetails* details,
                         Database* database );
 
-        ~CollectionTemp();
+        ~Collection();
 
         bool ok() const { return _magic == 1357924; }
 

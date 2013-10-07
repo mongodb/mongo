@@ -234,7 +234,7 @@ namespace mongo {
 
         cc().database()->createCollection( ns, options["capped"].trueValue(), &options );
 
-        CollectionTemp* collection = cc().database()->getCollectionTemp( ns );
+        Collection* collection = cc().database()->getCollection( ns );
         verify( collection );
 
         // $nExtents just for debug/testing.
@@ -785,7 +785,7 @@ namespace mongo {
 
         LOG(1) << "allocating new extent for " << ns << " padding:" << d->paddingFactor() << " lenWHdr: " << lenWHdr << endl;
 
-        CollectionTemp* collection = cc().database()->getCollectionTemp( ns );
+        Collection* collection = cc().database()->getCollection( ns );
         verify( collection );
 
         collection->increaseStorageSize( Extent::followupSize(lenWHdr, d->lastExtentSize()), !god );
@@ -990,7 +990,7 @@ namespace mongo {
         }
         bool addIndex = wouldAddIndex && mayAddIndex;
 
-        CollectionTemp* collection = cc().database()->getCollectionTemp( ns );
+        Collection* collection = cc().database()->getCollection( ns );
         if ( collection == NULL ) {
             collection = cc().database()->createCollection( ns, false, NULL );
 

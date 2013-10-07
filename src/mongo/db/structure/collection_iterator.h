@@ -32,7 +32,7 @@
 
 namespace mongo {
 
-    class CollectionTemp;
+    class Collection;
     class DiskLoc;
     class ExtentManager;
     class NamespaceDetails;
@@ -70,7 +70,7 @@ namespace mongo {
      */
     class FlatIterator : public CollectionIterator {
     public:
-        FlatIterator(const CollectionTemp* collection, const DiskLoc& start,
+        FlatIterator(const Collection* collection, const DiskLoc& start,
                      const CollectionScanParams::Direction& dir);
         virtual ~FlatIterator() { }
 
@@ -85,7 +85,7 @@ namespace mongo {
         // The result returned on the next call to getNext().
         DiskLoc _curr;
 
-        const CollectionTemp* _collection;
+        const Collection* _collection;
 
         CollectionScanParams::Direction _direction;
     };
@@ -101,7 +101,7 @@ namespace mongo {
      */
     class CappedIterator : public CollectionIterator {
     public:
-        CappedIterator(const CollectionTemp* collection, const DiskLoc& start, bool tailable,
+        CappedIterator(const Collection* collection, const DiskLoc& start, bool tailable,
                        const CollectionScanParams::Direction& dir);
         virtual ~CappedIterator() { }
 
@@ -125,7 +125,7 @@ namespace mongo {
                                 const DiskLoc& prev);
 
         // The collection we're iterating over.
-        const CollectionTemp* _collection;
+        const Collection* _collection;
 
         // The result returned on the next call to getNext().
         DiskLoc _curr;
