@@ -30,6 +30,7 @@
 
 #include <boost/function.hpp>
 #include <boost/scoped_ptr.hpp>
+#include <boost/thread/condition_variable.hpp>
 #include <boost/thread/mutex.hpp>
 #include <string>
 
@@ -276,11 +277,6 @@ namespace mongo {
         /**
          * Marks the given user as invalid and removes it from the user cache.
          */
-        void invalidateUser(User* user);
-
-        /**
-         * Marks the given user as invalid and removes it from the user cache.
-         */
         void invalidateUserByName(const UserName& user);
 
         /**
@@ -357,16 +353,21 @@ namespace mongo {
                    const BSONObj* fullObj);
 
     private:
+        /**
+         * Type used to guard accesses and updates to the user cache.
+         */
+        class CacheGuard;
+        friend class AuthorizationManager::CacheGuard;
 
         /**
          * Returns the current version number of the authorization system.  Should only be called
-         * when holding _lock.
+         * when holding _userCacheMutex.
          */
         int _getVersion_inlock() const { return _version; }
 
         /**
          * Invalidates all User objects in the cache and removes them from the cache.
-         * Should only be called when already holding _lock.
+         * Should only be called when already holding _userCacheMutex.
          */
         void _invalidateUserCache_inlock();
 
@@ -395,7 +396,7 @@ namespace mongo {
          * The current version is 2.  When upgrading to v2.6 or later from v2.4 or prior, the
          * version is 1.  After running the upgrade process to upgrade to the new privilege document
          * format, the version will be 2.
-         * All reads/writes to _version must be done within _lock.
+         * All reads/writes to _version must be done within _userCacheMutex.
          */
         int _version;
 
@@ -410,9 +411,23 @@ namespace mongo {
         unordered_map<UserName, User*> _userCache;
 
         /**
-         * Protects _userCache and _version.
+         * True if there is an update to the _userCache in progress, and that update is currently in
+         * the "fetch phase", during which it does not hold the _userCacheMutex.
+         *
+         * Manipulated via CacheGuard.
          */
-        boost::mutex _lock;
+        bool _isFetchPhaseBusy;
+
+        /**
+         * Protects _userCache, _version and _isFetchPhaseBusy.  Manipulated via CacheGuard.
+         */
+        boost::mutex _userCacheMutex;
+
+        /**
+         * Condition used to signal that it is OK for another CacheGuard to enter a fetch phase.
+         * Manipulated via CacheGuard.
+         */
+        boost::condition_variable _fetchPhaseIsReady;
     };
 
 } // namespace mongo

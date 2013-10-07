@@ -342,7 +342,7 @@ namespace {
                 BSONObj()));
 
         // Make sure that invalidating the user causes the session to reload its privileges.
-        authzManager->invalidateUser(user);
+        authzManager->invalidateUserByName(user->getName());
         ASSERT_TRUE(authzSession->isAuthorizedForActionsOnResource(
                             testFooCollResource, ActionType::find));
         ASSERT_FALSE(authzSession->isAuthorizedForActionsOnResource(
@@ -354,7 +354,7 @@ namespace {
         // Delete the user.
         managerState->clearPrivilegeDocuments();
         // Make sure that invalidating the user causes the session to reload its privileges.
-        authzManager->invalidateUser(user);
+        authzManager->invalidateUserByName(user->getName());
         ASSERT_FALSE(authzSession->isAuthorizedForActionsOnResource(
                             testFooCollResource, ActionType::find));
         ASSERT_FALSE(authzSession->isAuthorizedForActionsOnResource(
@@ -399,7 +399,7 @@ namespace {
         // Even though the user's privileges have been reduced, since we've configured user
         // document lookup to fail, the authz session should continue to use its known out-of-date
         // privilege data.
-        authzManager->invalidateUser(user);
+        authzManager->invalidateUserByName(user->getName());
         ASSERT_TRUE(authzSession->isAuthorizedForActionsOnResource(
                             testFooCollResource, ActionType::find));
         ASSERT_TRUE(authzSession->isAuthorizedForActionsOnResource(

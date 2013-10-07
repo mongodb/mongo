@@ -91,8 +91,98 @@ namespace mongo {
 
     bool AuthorizationManager::_doesSupportOldStylePrivileges = true;
 
+    /**
+     * Guard object for synchronizing accesses to the user cache.  This guard allows one thread to
+     * access the cache at a time, and provides an exception-safe mechanism for a thread to release
+     * the cache mutex while performing network or disk operations while allowing other readers
+     * to proceed.
+     *
+     * There are two ways to use this guard.  One may simply instantiate the guard like a
+     * std::lock_guard, and perform reads or writes of the cache.
+     *
+     * Alternatively, one may instantiate the guard, examine the cache, and then enter into an
+     * update mode by first wait()ing until otherUpdateInFetchPhase() is false, and then
+     * calling beginFetchPhase().  At this point, other threads may acquire the guard in the simple
+     * manner and do reads, but other threads may not enter into a fetch phase.  During the fetch
+     * phase, the thread should perform required network or disk activity to determine what update
+     * it will make to the cache.  Then, it should call endFetchPhase(), to reacquire the user cache
+     * mutex.  At that point, the thread can make its modifications to the cache and let the guard
+     * go out of scope.
+     *
+     * All updates by guards using a fetch-phase are totally ordered with respect to one another,
+     * and all guards using no fetch phase are totally ordered with respect to one another, but
+     * there is not a total ordering among all guard objects.
+     */
+    class AuthorizationManager::CacheGuard {
+        MONGO_DISALLOW_COPYING(CacheGuard);
+    public:
+        enum FetchSynchronization {
+            fetchSynchronizationAutomatic,
+            fetchSynchronizationManual
+        };
+
+        /**
+         * Constructs a cache guard, locking the mutex that synchronizes user cache accesses.
+         */
+        CacheGuard(AuthorizationManager* authzManager,
+                   const FetchSynchronization sync = fetchSynchronizationAutomatic) :
+            _isThisGuardInFetchPhase(false),
+            _authzManager(authzManager),
+            _lock(authzManager->_userCacheMutex) {
+
+            if (fetchSynchronizationAutomatic == sync) {
+                synchronizeWithFetchPhase();
+            }
+        }
+
+        /**
+         * Releases the mutex that synchronizes user cache access, if held, and notifies
+         * any threads waiting for their own opportunity to update the user cache.
+         */
+        ~CacheGuard() {
+            if (!_lock.owns_lock()) {
+                _lock.lock();
+            }
+            if (_isThisGuardInFetchPhase) {
+                fassert(0, _authzManager->_isFetchPhaseBusy);
+                _authzManager->_isFetchPhaseBusy = false;
+                _authzManager->_fetchPhaseIsReady.notify_all();
+            }
+        }
+
+        bool otherUpdateInFetchPhase() { return _authzManager->_isFetchPhaseBusy; }
+
+        void wait() {
+            _authzManager->_fetchPhaseIsReady.wait(_lock);
+        }
+
+        void beginFetchPhase() {
+            fassert(0, !_authzManager->_isFetchPhaseBusy);
+            _isThisGuardInFetchPhase = true;
+            _authzManager->_isFetchPhaseBusy = true;
+            _lock.unlock();
+        }
+
+        void endFetchPhase() {
+            _lock.lock();
+        }
+
+    private:
+        void synchronizeWithFetchPhase() {
+            while (otherUpdateInFetchPhase())
+                wait();
+            fassert(0, !_authzManager->_isFetchPhaseBusy);
+            _isThisGuardInFetchPhase = true;
+            _authzManager->_isFetchPhaseBusy = true;
+        }
+
+        bool _isThisGuardInFetchPhase;
+        AuthorizationManager* _authzManager;
+        boost::unique_lock<boost::mutex> _lock;
+    };
+
     AuthorizationManager::AuthorizationManager(AuthzManagerExternalState* externalState) :
-        _authEnabled(false), _externalState(externalState) {
+        _authEnabled(false), _externalState(externalState), _isFetchPhaseBusy(false) {
 
         setAuthorizationVersion(2);
     }
@@ -108,7 +198,7 @@ namespace mongo {
     }
 
     Status AuthorizationManager::setAuthorizationVersion(int version) {
-        boost::lock_guard<boost::mutex> lk(_lock);
+        CacheGuard guard(this);
 
         if (version != 1 && version != 2) {
             return Status(ErrorCodes::UnsupportedFormat,
@@ -122,7 +212,7 @@ namespace mongo {
     }
 
     int AuthorizationManager::getAuthorizationVersion() {
-        boost::lock_guard<boost::mutex> lk(_lock);
+        CacheGuard guard(this, CacheGuard::fetchSynchronizationManual);
         return _getVersion_inlock();
     }
 
@@ -347,8 +437,15 @@ namespace mongo {
     }
 
     Status AuthorizationManager::acquireUser(const UserName& userName, User** acquiredUser) {
-        boost::lock_guard<boost::mutex> lk(_lock);
-        unordered_map<UserName, User*>::iterator it = _userCache.find(userName);
+        unordered_map<UserName, User*>::iterator it;
+
+        CacheGuard guard(this, CacheGuard::fetchSynchronizationManual);
+        while ((_userCache.end() == (it = _userCache.find(userName))) &&
+               guard.otherUpdateInFetchPhase()) {
+
+            guard.wait();
+        }
+
         if (it != _userCache.end()) {
             fassert(16914, it->second);
             fassert(17003, it->second->isValid());
@@ -363,22 +460,24 @@ namespace mongo {
                           "User " << userName.getFullName() << " not found.");
         }
 
-        // Put the new user into an auto_ptr temporarily in case there's an error while
-        // initializing the user.
-        auto_ptr<User> userHolder(new User(userName));
-        User* user = userHolder.get();
-
+        guard.beginFetchPhase();
         BSONObj userObj;
         Status status = getUserDescription(userName, &userObj);
         if (!status.isOK()) {
             return status;
         }
 
+        // Put the new user into an auto_ptr temporarily in case there's an error while
+        // initializing the user.
+        auto_ptr<User> userHolder(new User(userName));
+        User* user = userHolder.get();
+
         status = _initializeUserFromPrivilegeDocument(user, userObj);
         if (!status.isOK()) {
             return status;
         }
 
+        guard.endFetchPhase();
         user->incrementRefCount();
         _userCache.insert(make_pair(userName, userHolder.release()));
         *acquiredUser = user;
@@ -390,7 +489,7 @@ namespace mongo {
             return;
         }
 
-        boost::lock_guard<boost::mutex> lk(_lock);
+        CacheGuard guard(this, CacheGuard::fetchSynchronizationManual);
         user->decrementRefCount();
         if (user->getRefCount() == 0) {
             // If it's been invalidated then it's not in the _userCache anymore.
@@ -402,25 +501,8 @@ namespace mongo {
         }
     }
 
-    void AuthorizationManager::invalidateUser(User* user) {
-        boost::lock_guard<boost::mutex> lk(_lock);
-        if (!user->isValid()) {
-            return;
-        }
-
-        unordered_map<UserName, User*>::iterator it = _userCache.find(user->getName());
-        massert(17052,
-                mongoutils::str::stream() <<
-                        "Invalidating cache for user " << user->getName().getFullName() <<
-                        " failed as it is not present in the user cache",
-                it != _userCache.end() && it->second == user);
-        _userCache.erase(it);
-        user->invalidate();
-    }
-
     void AuthorizationManager::invalidateUserByName(const UserName& userName) {
-        boost::lock_guard<boost::mutex> lk(_lock);
-
+        CacheGuard guard(this);
         unordered_map<UserName, User*>::iterator it = _userCache.find(userName);
         if (it == _userCache.end()) {
             return;
@@ -432,8 +514,7 @@ namespace mongo {
     }
 
     void AuthorizationManager::invalidateUsersFromDB(const std::string& dbname) {
-        boost::lock_guard<boost::mutex> lk(_lock);
-
+        CacheGuard guard(this);
         unordered_map<UserName, User*>::iterator it = _userCache.begin();
         while (it != _userCache.end()) {
             User* user = it->second;
@@ -448,12 +529,12 @@ namespace mongo {
 
 
     void AuthorizationManager::addInternalUser(User* user) {
-        boost::lock_guard<boost::mutex> lk(_lock);
+        CacheGuard guard(this);
         _userCache.insert(make_pair(user->getName(), user));
     }
 
     void AuthorizationManager::invalidateUserCache() {
-        boost::lock_guard<boost::mutex> lk(_lock);
+        CacheGuard guard(this);
         _invalidateUserCache_inlock();
     }
 
@@ -493,7 +574,7 @@ namespace mongo {
     }
 
     Status AuthorizationManager::_initializeAllV1UserData() {
-        boost::lock_guard<boost::mutex> lk(_lock);
+        CacheGuard guard(this);
         _invalidateUserCache_inlock();
         V1UserDocumentParser parser;
 
@@ -633,7 +714,7 @@ namespace mongo {
         if (!lkUpgrade.tryLock("Upgrade authorization data")) {
             return Status(ErrorCodes::LockBusy, "Could not lock auth data upgrade process lock.");
         }
-        boost::lock_guard<boost::mutex> lkLocal(_lock);
+        CacheGuard guard(this);
         int durableVersion = 0;
         Status status = readAuthzVersion(_externalState.get(), &durableVersion);
         if (!status.isOK())
@@ -737,7 +818,7 @@ namespace mongo {
         if (ns == rolesCollectionNamespace.ns() ||
             ns == adminCommandNamespace.ns() ||
             ns == usersCollectionNamespace.ns()) {
-            boost::lock_guard<boost::mutex> lk(_lock);
+            CacheGuard guard(this);
             if (_getVersion_inlock() == 2) {
                 _invalidateUserCache_inlock();
             }
