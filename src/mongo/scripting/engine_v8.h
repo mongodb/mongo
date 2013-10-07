@@ -432,7 +432,31 @@ namespace mongo {
 
         v8::Persistent<v8::Function> _jsRegExpConstructor;
 
-        v8::Isolate* _isolate;
+        /// Like v8::Isolate* but calls Dispose() in destructor.
+        class IsolateHolder {
+            MONGO_DISALLOW_COPYING(IsolateHolder);
+        public:
+            IsolateHolder() :_isolate(NULL) {}
+            ~IsolateHolder() {
+                if (_isolate) {
+                    _isolate->Dispose();
+                    _isolate = NULL;
+                }
+            }
+
+            void set(v8::Isolate* isolate) {
+                fassert(17184, !_isolate);
+                _isolate = isolate;
+            }
+
+            v8::Isolate* operator -> () const { return _isolate; };
+            operator v8::Isolate* () const { return _isolate; };
+        private:
+            v8::Isolate* _isolate;
+        };
+
+        IsolateHolder _isolate; // NOTE: this must be destructed before the ObjTrackers
+
         V8CpuProfiler _cpuProfiler;
 
         // See comments in strLitToV8
