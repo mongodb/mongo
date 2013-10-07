@@ -44,7 +44,7 @@ namespace {
 
     static const char* ns = "somebogusns";
 
-    class SingleIndexTest : public mongo::unittest::Test {
+    class IndexAssignmentTest : public mongo::unittest::Test {
     protected:
         void tearDown() {
             delete cq;
@@ -58,10 +58,14 @@ namespace {
         // Build up test.
         //
 
-        void setIndex(BSONObj keyPattern) {
+        void addIndex(BSONObj keyPattern) {
             // The first false means not multikey.
             // The second false means not sparse.
             keyPatterns.push_back(IndexEntry(keyPattern, false, false));
+        }
+
+        void addIndex(BSONObj keyPattern, bool multikey, bool sparse) {
+            keyPatterns.push_back(IndexEntry(keyPattern, multikey, sparse));
         }
 
         //
@@ -97,6 +101,9 @@ namespace {
                 cout << (*it)->toString() << endl;
             }
         }
+
+        // TODO:
+        // bool hasIndexedPlan(BSONObj indexKeyPattern);
 
         void getPlanByType(StageType stageType, QuerySolution** soln) const {
             size_t found = 0;
@@ -173,152 +180,122 @@ namespace {
     // Equality
     //
 
-    TEST_F(SingleIndexTest, EqualityIndexScan) {
-        setIndex(BSON("x" << 1));
+    TEST_F(IndexAssignmentTest, EqualityIndexScan) {
+        addIndex(BSON("x" << 1));
+
         runQuery(BSON("x" << 5));
+
         ASSERT_EQUALS(getNumSolutions(), 2U);
 
         QuerySolution* collScanSolution;
         getPlanByType(STAGE_COLLSCAN, &collScanSolution);
-        // TODO check filter
 
         QuerySolution* indexedSolution;
         getPlanByType(STAGE_FETCH, &indexedSolution);
         FetchNode* fn = static_cast<FetchNode*>(indexedSolution->root.get());
         IndexScanNode* ixNode = static_cast<IndexScanNode*>(fn->child.get());
-
         boundsEqual(fromjson("{x: [ [5, 5, true, true] ] }"), ixNode->bounds);
-        // TODO check filter
     }
 
-    TEST_F(SingleIndexTest, EqualityIndexScanWithTrailingFields) {
-        setIndex(BSON("x" << 1 << "y" << 1));
+    TEST_F(IndexAssignmentTest, EqualityIndexScanWithTrailingFields) {
+        addIndex(BSON("x" << 1 << "y" << 1));
+
         runQuery(BSON("x" << 5));
+
         ASSERT_EQUALS(getNumSolutions(), 2U);
 
         QuerySolution* collScanSolution;
         getPlanByType(STAGE_COLLSCAN, &collScanSolution);
-        // TODO check filter
 
-        //QuerySolution* indexedSolution;
-        //getPlanByType(STAGE_FETCH, &indexedSolution);
-        //FetchNode* fn = static_cast<FetchNode*>(indexedSolution->root.get());
-        //IndexScanNode* ixNode = static_cast<IndexScanNode*>(fn->child.get());
-
-        // XXX: this boundsEqual check is bogus, need bounds on y.
-        // boundsEqual(fromjson("{x: [ [5, 5, true, true] ] }"), ixNode->bounds);
-
-        // TODO check filter
+        QuerySolution* indexedSolution;
+        getPlanByType(STAGE_FETCH, &indexedSolution);
     }
-
-    // TODO: Check compound indices.
-    // TODO: Check diff. index directions for ranges below.
 
     //
     // <
     //
 
-    TEST_F(SingleIndexTest, LessThan) {
-        setIndex(BSON("x" << 1));
+    TEST_F(IndexAssignmentTest, LessThan) {
+        addIndex(BSON("x" << 1));
+
         runQuery(BSON("x" << BSON("$lt" << 5)));
+
         ASSERT_EQUALS(getNumSolutions(), 2U);
 
         QuerySolution* collScanSolution;
         getPlanByType(STAGE_COLLSCAN, &collScanSolution);
-        // TODO check filter
 
         QuerySolution* indexedSolution;
         getPlanByType(STAGE_FETCH, &indexedSolution);
-
-        //FetchNode* fn = static_cast<FetchNode*>(indexedSolution->root.get());
-        //IndexScanNode* ixNode = static_cast<IndexScanNode*>(fn->child.get());
-        //BSONObj bounds = BSON("x" << BSON_ARRAY(BSON_ARRAY(MINKEY << 5 << true << false)));
-        //boundsEqual(bounds, ixNode->bounds);
-        // todo check filter
     }
 
     //
     // <=
     //
 
-    TEST_F(SingleIndexTest, LessThanEqual) {
-        setIndex(BSON("x" << 1));
+    TEST_F(IndexAssignmentTest, LessThanEqual) {
+        addIndex(BSON("x" << 1));
+
         runQuery(BSON("x" << BSON("$lte" << 5)));
+
         ASSERT_EQUALS(getNumSolutions(), 2U);
 
         QuerySolution* collScanSolution;
         getPlanByType(STAGE_COLLSCAN, &collScanSolution);
-        // TODO check filter
 
         QuerySolution* indexedSolution;
         getPlanByType(STAGE_FETCH, &indexedSolution);
-
-        //FetchNode* fn = static_cast<FetchNode*>(indexedSolution->root.get());
-        //IndexScanNode* ixNode = static_cast<IndexScanNode*>(fn->child.get());
-
-        //BSONObj bounds = BSON("x" << BSON_ARRAY(BSON_ARRAY(MINKEY << 5 << true << true)));
-        //boundsEqual(bounds, ixNode->bounds);
-        // todo check filter
     }
 
     //
     // >
     //
 
-    TEST_F(SingleIndexTest, GreaterThan) {
-        setIndex(BSON("x" << 1));
+    TEST_F(IndexAssignmentTest, GreaterThan) {
+        addIndex(BSON("x" << 1));
+
         runQuery(BSON("x" << BSON("$gt" << 5)));
+
         ASSERT_EQUALS(getNumSolutions(), 2U);
 
         QuerySolution* collScanSolution;
         getPlanByType(STAGE_COLLSCAN, &collScanSolution);
-        // TODO check filter
 
         QuerySolution* indexedSolution;
         getPlanByType(STAGE_FETCH, &indexedSolution);
-
-        //FetchNode* fn = static_cast<FetchNode*>(indexedSolution->root.get());
-        //IndexScanNode* ixNode = static_cast<IndexScanNode*>(fn->child.get());
-        //BSONObj bounds = BSON("x" << BSON_ARRAY(BSON_ARRAY(5 << MAXKEY << false << true)));
-        //boundsEqual(bounds, ixNode->bounds);
-        // todo check filter
     }
 
     //
     // >=
     //
 
-    TEST_F(SingleIndexTest, GreaterThanEqual) {
-        setIndex(BSON("x" << 1));
+    TEST_F(IndexAssignmentTest, GreaterThanEqual) {
+        addIndex(BSON("x" << 1));
+
         runQuery(BSON("x" << BSON("$gte" << 5)));
+
         ASSERT_EQUALS(getNumSolutions(), 2U);
 
         QuerySolution* collScanSolution;
         getPlanByType(STAGE_COLLSCAN, &collScanSolution);
-        // TODO check filter
 
         QuerySolution* indexedSolution;
         getPlanByType(STAGE_FETCH, &indexedSolution);
-
-        //FetchNode* fn = static_cast<FetchNode*>(indexedSolution->root.get());
-        //IndexScanNode* ixNode = static_cast<IndexScanNode*>(fn->child.get());
-        //BSONObj bounds = BSON("x" << BSON_ARRAY(BSON_ARRAY(5 << MAXKEY << true << true)));
-        //boundsEqual(bounds, ixNode->bounds);
-        // todo check filter
     }
 
     //
     // tree operations
     //
 
-    TEST_F(SingleIndexTest, TwoPredicatesAnding) {
-        setIndex(BSON("x" << 1));
+    TEST_F(IndexAssignmentTest, TwoPredicatesAnding) {
+        addIndex(BSON("x" << 1));
+
         runQuery(fromjson("{$and: [ {x: {$gt: 1}}, {x: {$lt: 3}} ] }"));
+
         ASSERT_EQUALS(getNumSolutions(), 2U);
 
         QuerySolution* collScanSolution;
         getPlanByType(STAGE_COLLSCAN, &collScanSolution);
-        // TODO check filter
 
         QuerySolution* indexedSolution;
         // This is a fetch not an ixscan because our index tagging isn't good so far and we don't
@@ -332,8 +309,8 @@ namespace {
         // TODO check filter
     }
 
-    TEST_F(SingleIndexTest, SimpleOr) {
-        setIndex(BSON("a" << 1));
+    TEST_F(IndexAssignmentTest, SimpleOr) {
+        addIndex(BSON("a" << 1));
         runQuery(fromjson("{$or: [ {a: 20}, {a: 21}]}"));
         ASSERT_EQUALS(getNumSolutions(), 2U);
         QuerySolution* indexedSolution = NULL;
@@ -341,8 +318,8 @@ namespace {
         cout << indexedSolution->toString() << endl;
     }
 
-    TEST_F(SingleIndexTest, OrWithoutEnoughIndices) {
-        setIndex(BSON("a" << 1));
+    TEST_F(IndexAssignmentTest, OrWithoutEnoughIndices) {
+        addIndex(BSON("a" << 1));
         runQuery(fromjson("{$or: [ {a: 20}, {b: 21}]}"));
         ASSERT_EQUALS(getNumSolutions(), 1U);
         QuerySolution* collScanSolution;
@@ -350,8 +327,8 @@ namespace {
         cout << collScanSolution->toString() << endl;
     }
 
-    TEST_F(SingleIndexTest, OrWithAndChild) {
-        setIndex(BSON("a" << 1));
+    TEST_F(IndexAssignmentTest, OrWithAndChild) {
+        addIndex(BSON("a" << 1));
         runQuery(fromjson("{$or: [ {a: 20}, {$and: [{a:1}, {b:7}]}]}"));
         ASSERT_EQUALS(getNumSolutions(), 2U);
         QuerySolution* indexedSolution = NULL;
@@ -359,8 +336,8 @@ namespace {
         cout << indexedSolution->toString() << endl;
     }
 
-    TEST_F(SingleIndexTest, AndWithUnindexedOrChild) {
-        setIndex(BSON("a" << 1));
+    TEST_F(IndexAssignmentTest, AndWithUnindexedOrChild) {
+        addIndex(BSON("a" << 1));
         runQuery(fromjson("{a:20, $or: [{b:1}, {c:7}]}"));
         ASSERT_EQUALS(getNumSolutions(), 2U);
         QuerySolution* indexedSolution = NULL;
@@ -369,9 +346,9 @@ namespace {
     }
 
 
-    TEST_F(SingleIndexTest, AndWithOrWithOneIndex) {
-        setIndex(BSON("b" << 1));
-        setIndex(BSON("a" << 1));
+    TEST_F(IndexAssignmentTest, AndWithOrWithOneIndex) {
+        addIndex(BSON("b" << 1));
+        addIndex(BSON("a" << 1));
         runQuery(fromjson("{$or: [{b:1}, {c:7}], a:20}"));
         ASSERT_EQUALS(getNumSolutions(), 2U);
         QuerySolution* indexedSolution = NULL;
@@ -383,8 +360,8 @@ namespace {
     // Tree operations that require simple tree rewriting.
     //
 
-    TEST_F(SingleIndexTest, AndOfAnd) {
-        setIndex(BSON("x" << 1));
+    TEST_F(IndexAssignmentTest, AndOfAnd) {
+        addIndex(BSON("x" << 1));
         runQuery(fromjson("{$and: [ {$and: [ {x: 2.5}]}, {x: {$gt: 1}}, {x: {$lt: 3}} ] }"));
         ASSERT_EQUALS(getNumSolutions(), 2U);
 
@@ -410,8 +387,8 @@ namespace {
     // Basic covering
     //
 
-    TEST_F(SingleIndexTest, BasicCovering) {
-        setIndex(BSON("x" << 1));
+    TEST_F(IndexAssignmentTest, BasicCovering) {
+        addIndex(BSON("x" << 1));
         // query, sort, proj
         runDetailedQuery(fromjson("{ x : {$gt: 1}}"), BSONObj(), fromjson("{_id: 0, x: 1}"));
         ASSERT_EQUALS(getNumSolutions(), 2U);
@@ -431,8 +408,8 @@ namespace {
     // Basic sort elimination
     //
 
-    TEST_F(SingleIndexTest, BasicSortElim) {
-        setIndex(BSON("x" << 1));
+    TEST_F(IndexAssignmentTest, BasicSortElim) {
+        addIndex(BSON("x" << 1));
         // query, sort, proj
         runDetailedQuery(fromjson("{ x : {$gt: 1}}"), fromjson("{x: 1}"), BSONObj());
         ASSERT_EQUALS(getNumSolutions(), 2U);
@@ -448,8 +425,8 @@ namespace {
     // Basic compound
     //
 
-    TEST_F(SingleIndexTest, BasicCompound) {
-        setIndex(BSON("x" << 1 << "y" << 1));
+    TEST_F(IndexAssignmentTest, BasicCompound) {
+        addIndex(BSON("x" << 1 << "y" << 1));
         runQuery(fromjson("{ x : 5, y: 10}"));
         ASSERT_EQUALS(getNumSolutions(), 2U);
 
@@ -460,8 +437,8 @@ namespace {
         getPlanByType(STAGE_FETCH, &indexedSolution);
     }
 
-    TEST_F(SingleIndexTest, CompoundMissingField) {
-        setIndex(BSON("x" << 1 << "y" << 1 << "z" << 1));
+    TEST_F(IndexAssignmentTest, CompoundMissingField) {
+        addIndex(BSON("x" << 1 << "y" << 1 << "z" << 1));
         runQuery(fromjson("{ x : 5, z: 10}"));
         ASSERT_EQUALS(getNumSolutions(), 2U);
 
@@ -472,8 +449,8 @@ namespace {
         getPlanByType(STAGE_FETCH, &indexedSolution);
     }
 
-    TEST_F(SingleIndexTest, CompoundFieldsOrder) {
-        setIndex(BSON("x" << 1 << "y" << 1 << "z" << 1));
+    TEST_F(IndexAssignmentTest, CompoundFieldsOrder) {
+        addIndex(BSON("x" << 1 << "y" << 1 << "z" << 1));
         runQuery(fromjson("{ x : 5, z: 10, y:1}"));
         ASSERT_EQUALS(getNumSolutions(), 2U);
 
@@ -484,8 +461,8 @@ namespace {
         getPlanByType(STAGE_FETCH, &indexedSolution);
     }
 
-    TEST_F(SingleIndexTest, CantUseCompound) {
-        setIndex(BSON("x" << 1 << "y" << 1));
+    TEST_F(IndexAssignmentTest, CantUseCompound) {
+        addIndex(BSON("x" << 1 << "y" << 1));
         runQuery(fromjson("{ y: 10}"));
         ASSERT_EQUALS(getNumSolutions(), 1U);
 
@@ -497,54 +474,55 @@ namespace {
     // Array operators
     //
 
-    TEST_F(SingleIndexTest, ElemMatchOneField) {
-        setIndex(BSON("a.b" << 1));
+    TEST_F(IndexAssignmentTest, ElemMatchOneField) {
+        addIndex(BSON("a.b" << 1));
         runQuery(fromjson("{a : {$elemMatch: {b:1}}}"));
         dumpSolutions();
         ASSERT_EQUALS(getNumSolutions(), 2U);
     }
 
-    TEST_F(SingleIndexTest, ElemMatchTwoFields) {
-        setIndex(BSON("a.b" << 1));
-        setIndex(BSON("a.c" << 1));
+    TEST_F(IndexAssignmentTest, ElemMatchTwoFields) {
+        addIndex(BSON("a.b" << 1));
+        addIndex(BSON("a.c" << 1));
         runQuery(fromjson("{a : {$elemMatch: {b:1, c:1}}}"));
         dumpSolutions();
-        ASSERT_EQUALS(getNumSolutions(), 2U);
+        ASSERT_EQUALS(getNumSolutions(), 3U);
     }
 
-    TEST_F(SingleIndexTest, BasicAllElemMatch) {
-        setIndex(BSON("foo.a" << 1));
-        setIndex(BSON("foo.b" << 1));
+    TEST_F(IndexAssignmentTest, BasicAllElemMatch) {
+        addIndex(BSON("foo.a" << 1));
+        addIndex(BSON("foo.b" << 1));
         runQuery(fromjson("{foo: {$all: [ {$elemMatch: {a:1, b:1}}, {$elemMatch: {a:2, b:2}}]}}"));
         dumpSolutions();
-        ASSERT_EQUALS(getNumSolutions(), 2U);
+        ASSERT_EQUALS(getNumSolutions(), 5U);
     }
 
-    TEST_F(SingleIndexTest, ElemMatchValueMatch) {
-        setIndex(BSON("foo" << 1));
+    TEST_F(IndexAssignmentTest, ElemMatchValueMatch) {
+        addIndex(BSON("foo" << 1));
+        addIndex(BSON("foo" << 1 << "bar" << 1));
         runQuery(fromjson("{foo: {$elemMatch: {$gt: 5, $lt: 10}}}"));
         dumpSolutions();
-        ASSERT_EQUALS(getNumSolutions(), 2U);
+        ASSERT_EQUALS(getNumSolutions(), 3U);
     }
 
-    TEST_F(SingleIndexTest, ElemMatchNested) {
-        setIndex(BSON("a.b.c" << 1));
+    TEST_F(IndexAssignmentTest, ElemMatchNested) {
+        addIndex(BSON("a.b.c" << 1));
         runQuery(fromjson("{ a:{ $elemMatch:{ b:{ $elemMatch:{ c:{ $gte:1, $lte:1 } } } } }}"));
         dumpSolutions();
         ASSERT_EQUALS(getNumSolutions(), 2U);
     }
 
-    TEST_F(SingleIndexTest, TwoElemMatchNested) {
-        setIndex(BSON("a.d.e" << 1));
-        setIndex(BSON("a.b.c" << 1));
+    TEST_F(IndexAssignmentTest, TwoElemMatchNested) {
+        addIndex(BSON("a.d.e" << 1));
+        addIndex(BSON("a.b.c" << 1));
         runQuery(fromjson("  { a:{ $elemMatch:{ d:{ $elemMatch:{ e:{ $lte:1 } } },"
                                                "b:{ $elemMatch:{ c:{ $gte:1 } } } } } }"));
         dumpSolutions();
-        ASSERT_EQUALS(getNumSolutions(), 2U);
+        ASSERT_EQUALS(getNumSolutions(), 3U);
     }
 
-    TEST_F(SingleIndexTest, ElemMatchCompoundTwoFields) {
-        setIndex(BSON("a.b" << 1 << "a.c" << 1));
+    TEST_F(IndexAssignmentTest, ElemMatchCompoundTwoFields) {
+        addIndex(BSON("a.b" << 1 << "a.c" << 1));
         runQuery(fromjson("{a : {$elemMatch: {b:1, c:1}}}"));
         dumpSolutions();
         ASSERT_EQUALS(getNumSolutions(), 2U);
@@ -555,10 +533,10 @@ namespace {
     // http://docs.mongodb.org/manual/reference/operator/query-geospatial/#geospatial-query-compatibility-chart
     //
 
-    TEST_F(SingleIndexTest, Basic2DNonNear) {
+    TEST_F(IndexAssignmentTest, Basic2DNonNear) {
         // 2d can answer: within poly, within center, within centersphere, within box.
         // And it can use an index (or not) for each of them.  As such, 2 solns expected.
-        setIndex(BSON("a" << "2d"));
+        addIndex(BSON("a" << "2d"));
 
         // Polygon
         runQuery(fromjson("{a : { $within: { $polygon : [[0,0], [2,0], [4,0]] } }}"));
@@ -583,9 +561,9 @@ namespace {
         // TODO: test that we *don't* annotate for things we shouldn't.
     }
 
-    TEST_F(SingleIndexTest, Basic2DSphereNonNear) {
+    TEST_F(IndexAssignmentTest, Basic2DSphereNonNear) {
         // 2dsphere can do: within+geometry, intersects+geometry
-        setIndex(BSON("a" << "2dsphere"));
+        addIndex(BSON("a" << "2dsphere"));
 
         runQuery(fromjson("{a: {$geoIntersects: {$geometry: {type: 'Point',"
                                                            "coordinates: [10.0, 10.0]}}}}"));
@@ -599,17 +577,17 @@ namespace {
         // TODO: test that we *don't* annotate for things we shouldn't.
     }
 
-    TEST_F(SingleIndexTest, Basic2DGeoNear) {
+    TEST_F(IndexAssignmentTest, Basic2DGeoNear) {
         // Can only do near + old point.
-        setIndex(BSON("a" << "2d"));
+        addIndex(BSON("a" << "2d"));
         runQuery(fromjson("{a: {$near: [0,0], $maxDistance:0.3 }}"));
         dumpSolutions();
         ASSERT_EQUALS(getNumSolutions(), 1U);
     }
 
-    TEST_F(SingleIndexTest, Basic2DSphereGeoNear) {
+    TEST_F(IndexAssignmentTest, Basic2DSphereGeoNear) {
         // Can do nearSphere + old point, near + new point.
-        setIndex(BSON("a" << "2dsphere"));
+        addIndex(BSON("a" << "2dsphere"));
 
         runQuery(fromjson("{a: {$nearSphere: [0,0], $maxDistance: 0.31 }}"));
         dumpSolutions();
@@ -621,33 +599,62 @@ namespace {
         ASSERT_EQUALS(getNumSolutions(), 1U);
     }
 
-    TEST_F(SingleIndexTest, Basic2DSphereGeoNearReverseCompound) {
-        setIndex(BSON("x" << 1));
-        setIndex(BSON("x" << 1 << "a" << "2dsphere"));
+    TEST_F(IndexAssignmentTest, Basic2DSphereGeoNearReverseCompound) {
+        addIndex(BSON("x" << 1));
+        addIndex(BSON("x" << 1 << "a" << "2dsphere"));
         runQuery(fromjson("{x:1, a: {$nearSphere: [0,0], $maxDistance: 0.31 }}"));
         dumpSolutions();
         ASSERT_EQUALS(getNumSolutions(), 1U);
     }
 
-    TEST_F(SingleIndexTest, NearNoIndex) {
-        setIndex(BSON("x" << 1));
+    TEST_F(IndexAssignmentTest, NearNoIndex) {
+        addIndex(BSON("x" << 1));
         runQuery(fromjson("{x:1, a: {$nearSphere: [0,0], $maxDistance: 0.31 }}"));
         dumpSolutions();
         ASSERT_EQUALS(getNumSolutions(), 0U);
     }
 
-    TEST_F(SingleIndexTest, TwoDSphereNoGeoPred) {
-        setIndex(BSON("x" << 1 << "a" << "2dsphere"));
+    TEST_F(IndexAssignmentTest, TwoDSphereNoGeoPred) {
+        addIndex(BSON("x" << 1 << "a" << "2dsphere"));
         runQuery(fromjson("{x:1}"));
         dumpSolutions();
         ASSERT_EQUALS(getNumSolutions(), 2U);
     }
 
+    //
+    // Multiple solutions
+    //
+
+    TEST_F(IndexAssignmentTest, TwoPlans) {
+        addIndex(BSON("a" << 1));
+        addIndex(BSON("a" << 1 << "b" << 1));
+
+        runQuery(fromjson("{a:1, b:{$gt:2,$lt:2}}"));
+
+        dumpSolutions();
+
+        // 2 indexed solns and one non-indexed
+        ASSERT_EQUALS(getNumSolutions(), 3U);
+    }
+
+    TEST_F(IndexAssignmentTest, TwoPlansElemMatch) {
+        addIndex(BSON("a" << 1 << "b" << 1));
+        addIndex(BSON("arr.x" << 1 << "a" << 1));
+
+        runQuery(fromjson("{arr: { $elemMatch : { x : 5 , y : 5 } },"
+                          " a : 55 , b : { $in : [ 1 , 5 , 8 ] } }"));
+
+        dumpSolutions();
+
+        // 2 indexed solns and one non-indexed
+        ASSERT_EQUALS(getNumSolutions(), 3U);
+    }
+
     // STOPPED HERE - need to hook up machinery for multiple indexed predicates
     //                second is not working (until the machinery is in place)
     //
-    // TEST_F(SingleIndexTest, TwoPredicatesOring) {
-    //     setIndex(BSON("x" << 1));
+    // TEST_F(IndexAssignmentTest, TwoPredicatesOring) {
+    //     addIndex(BSON("x" << 1));
     //     runQuery(fromjson("{$or: [ {a: 1}, {a: 2} ] }"));
     //     ASSERT_EQUALS(getNumSolutions(), 2U);
 

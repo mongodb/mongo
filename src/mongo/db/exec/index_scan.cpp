@@ -77,6 +77,7 @@ namespace mongo {
         _specificStats.indexBounds = _params.bounds.toBSON();
         _specificStats.direction = _params.direction;
         _specificStats.isMultiKey = _descriptor->isMultikey();
+        _specificStats.keyPattern = _descriptor->keyPattern();
     }
 
     PlanStage::StageState IndexScan::work(WorkingSetID* out) {

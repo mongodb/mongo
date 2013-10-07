@@ -56,7 +56,7 @@ namespace mongo {
         /**
          * Assign the stats tree a 'goodness' score.  Used internally.
          */
-        static double scoreTree(const PlanStageStats& stats);
+        static double scoreTree(const PlanStageStats* stats);
     };
 
     /**

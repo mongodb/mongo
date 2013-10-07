@@ -51,7 +51,8 @@ namespace mongo {
         double maxScore = 0;
         size_t bestChild = numeric_limits<size_t>::max();
         for (size_t i = 0; i < statTrees.size(); ++i) {
-            double score = scoreTree(*statTrees[i]);
+            double score = scoreTree(statTrees[i]);
+            cout << "score of plan " << i << " is " << score << endl;
             if (score > maxScore) {
                 maxScore = score;
                 bestChild = i;
@@ -77,20 +78,36 @@ namespace mongo {
         return bestChild;
     }
 
-    // static 
-    double PlanRanker::scoreTree(const PlanStageStats& stats) {
-        // EOF?  You win!
-        if (stats.common.isEOF) {
-            return std::numeric_limits<double>::max();
+    // TODO: Move this out.  This is a signal for ranking but will become its own complicated
+    // stats-collecting beast.
+    double computeSelectivity(const PlanStageStats* stats) {
+        if (STAGE_IXSCAN == stats->stageType) {
+            IndexScanStats* iss = static_cast<IndexScanStats*>(stats->specific.get());
+            return iss->keyPattern.nFields();
         }
         else {
-            // This is a placeholder for better ranking logic.
-            //
-            // We start all scores at 1.  Our "no plan selected" score is 0 and we want all plans to
-            // be greater than that.
-            return 1 + static_cast<double>(stats.common.advanced)
-                   / static_cast<double>(stats.common.works);
+            double sum = 0;
+            for (size_t i = 0; i < stats->children.size(); ++i) {
+                sum += computeSelectivity(stats->children[i]);
+            }
+            return sum;
         }
+    }
+
+    // static 
+    double PlanRanker::scoreTree(const PlanStageStats* stats) {
+        // We start all scores at 1.  Our "no plan selected" score is 0 and we want all plans to
+        // be greater than that.
+        double baseScore = 1;
+
+        // How much did a plan produce?
+        double productivity = static_cast<double>(stats->common.advanced)
+                            / static_cast<double>(stats->common.works);
+
+        // How selective do we think an index is?
+        double selectivity = computeSelectivity(stats);
+
+        return baseScore + productivity + selectivity;
     }
 
 }  // namespace mongo

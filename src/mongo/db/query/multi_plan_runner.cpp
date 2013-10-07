@@ -252,6 +252,8 @@ namespace mongo {
     }
 
     bool MultiPlanRunner::workAllPlans() {
+        bool planHitEOF = false;
+
         for (size_t i = 0; i < _candidates.size(); ++i) {
             CandidatePlan& candidate = _candidates[i];
             if (candidate.failed) { continue; }
@@ -303,7 +305,7 @@ namespace mongo {
             else if (PlanStage::IS_EOF == state) {
                 // First plan to hit EOF wins automatically.  Stop evaluating other plans.
                 // Assumes that the ranking will pick this plan.
-                return false;
+                planHitEOF = true;
             }
             else {
                 // FAILURE.  Do we want to just tank that plan and try the rest?  We probably want
@@ -327,7 +329,7 @@ namespace mongo {
             }
         }
 
-        return true;
+        return !planHitEOF;
     }
 
     void MultiPlanRunner::allPlansSaveState() {
