@@ -42,7 +42,7 @@
 
 namespace mongo {
 
-    CollectionTemp::CollectionTemp( const StringData& fullNS,
+    Collection::Collection( const StringData& fullNS,
                                     NamespaceDetails* details,
                                     Database* database )
         : _ns( fullNS ) {
@@ -54,12 +54,12 @@ namespace mongo {
         _magic = 1357924;
     }
 
-    CollectionTemp::~CollectionTemp() {
+    Collection::~Collection() {
         verify( ok() );
         _magic = 0;
     }
 
-    CollectionIterator* CollectionTemp::getIterator( const DiskLoc& start, bool tailable,
+    CollectionIterator* Collection::getIterator( const DiskLoc& start, bool tailable,
                                                      const CollectionScanParams::Direction& dir) const {
         verify( ok() );
         if ( _details->isCapped() )
@@ -67,12 +67,12 @@ namespace mongo {
         return new FlatIterator( this, start, dir );
     }
 
-    BSONObj CollectionTemp::docFor( const DiskLoc& loc ) {
+    BSONObj Collection::docFor( const DiskLoc& loc ) {
         Record* rec = getExtentManager()->recordFor( loc );
         return BSONObj::make( rec->accessed() );
     }
 
-    void CollectionTemp::deleteDocument( const DiskLoc& loc, bool cappedOK, bool noWarn,
+    void Collection::deleteDocument( const DiskLoc& loc, bool cappedOK, bool noWarn,
                                          BSONObj* deletedId ) {
         if ( _details->isCapped() && !cappedOK ) {
             log() << "failing remove on a capped ns " << _ns << endl;
@@ -102,17 +102,17 @@ namespace mongo {
     }
 
 
-    ExtentManager* CollectionTemp::getExtentManager() {
+    ExtentManager* Collection::getExtentManager() {
         verify( ok() );
         return &_database->getExtentManager();
     }
 
-    const ExtentManager* CollectionTemp::getExtentManager() const {
+    const ExtentManager* Collection::getExtentManager() const {
         verify( ok() );
         return &_database->getExtentManager();
     }
 
-    Extent* CollectionTemp::increaseStorageSize( int size, bool enforceQuota ) {
+    Extent* Collection::increaseStorageSize( int size, bool enforceQuota ) {
 
         int quotaMax = 0;
         if ( enforceQuota )
@@ -161,7 +161,7 @@ namespace mongo {
         return e;
     }
 
-    int CollectionTemp::largestFileNumberInQuota() const {
+    int Collection::largestFileNumberInQuota() const {
         if ( !storageGlobalParams.quota )
             return 0;
 

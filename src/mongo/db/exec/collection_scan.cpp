@@ -50,7 +50,7 @@ namespace mongo {
         if (_nsDropped) { return PlanStage::IS_EOF; }
 
         if (NULL == _iter) {
-            CollectionTemp* collection = cc().database()->getCollectionTemp( _params.ns );
+            Collection* collection = cc().database()->getCollection( _params.ns );
             if ( collection == NULL ) {
                 _nsDropped = true;
                 return PlanStage::IS_EOF;

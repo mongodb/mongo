@@ -38,7 +38,7 @@
 
 namespace mongo {
 
-    class CollectionTemp;
+    class Collection;
     class Extent;
     class DataFile;
 
@@ -130,12 +130,12 @@ namespace mongo {
 
         Status dropCollection( const StringData& fullns );
 
-        CollectionTemp* createCollection( const StringData& ns, bool capped, const BSONObj* options );
+        Collection* createCollection( const StringData& ns, bool capped, const BSONObj* options );
 
         /**
          * @param ns - this is fully qualified, which is maybe not ideal ???
          */
-        CollectionTemp* getCollectionTemp( const StringData& ns );
+        Collection* getCollection( const StringData& ns );
 
         Status renameCollection( const StringData& fromNS, const StringData& toNS, bool stayTemp );
 
@@ -201,7 +201,7 @@ namespace mongo {
         // TODO: make sure deletes go through
         // this in some ways is a dupe of _namespaceIndex
         // but it points to a much more useful data structure
-        typedef std::map< std::string, CollectionTemp* > CollectionMap;
+        typedef std::map< std::string, Collection* > CollectionMap;
         CollectionMap _collections;
         mutex _collectionLock;
 
