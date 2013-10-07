@@ -458,7 +458,7 @@ namespace mongo {
           _pendingKill(false) {
 
         // create new isolate and enter it via a scope
-        _isolate = v8::Isolate::New();
+        _isolate.set(v8::Isolate::New());
         v8::Isolate::Scope iscope(_isolate);
 
         // lock the isolate and enter the context
@@ -529,24 +529,12 @@ namespace mongo {
         // install global utility functions
         installGlobalUtils(*this);
 
+        // Don't add anything that can throw after this line otherwise we won't be unregistered.
         registerOpId();
     }
 
     V8Scope::~V8Scope() {
         unregisterOpId();
-        {
-            V8_SIMPLE_HEADER
-            for(unsigned i = 0; i < _funcs.size(); ++i)
-                _funcs[ i ].Dispose();
-            _funcs.clear();
-            _global.Dispose();
-            _context.Dispose();
-            // Note: This block is unnecessary since we destroy the v8 Heap (Isolate) immediately
-            //       after. Leaving in for now, but nothing new should be added.
-        }
-        _isolate->Dispose();
-        // set the isolate to NULL so ObjTracker destructors know that v8 is no longer reachable
-        _isolate = NULL;
     }
 
     bool V8Scope::hasOutOfMemoryException() {
