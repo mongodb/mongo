@@ -242,18 +242,6 @@ namespace mongo {
         }
     }
 
-    Extent* Database::allocExtent( const char *ns, int size, bool capped, bool enforceQuota ) {
-        bool fromFreeList = true;
-        Extent *e = _extentManager.allocFromFreeList( ns, size, capped );
-        if( e == 0 ) {
-            fromFreeList = false;
-            e = _extentManager.createExtent( ns, size, capped, enforceQuota );
-        }
-        LOG(1) << "allocExtent " << ns << " size " << size << ' ' << fromFreeList << endl;
-        return e;
-    }
-
-
     bool Database::setProfilingLevel( int newLevel , string& errmsg ) {
         if ( _profile == newLevel )
             return true;
@@ -317,10 +305,15 @@ namespace mongo {
         NamespaceDetailsTransient::eraseCollection( fullns.toString() );
         dropNS( fullns.toString() );
 
+        _clearCollectionCache( fullns );
+
+        return Status::OK();
+    }
+
+    void Database::_clearCollectionCache( const StringData& fullns ) {
         scoped_lock lk( _collectionLock );
         _collections.erase( fullns.toString() );
 
-        return Status::OK();
     }
 
     CollectionTemp* Database::getCollectionTemp( const StringData& ns ) {
@@ -336,6 +329,11 @@ namespace mongo {
             if ( it->second ) {
                 DEV {
                     NamespaceDetails* details = _namespaceIndex.details( ns );
+                    if ( details != it->second->_details ) {
+                        log() << "about to crash for mismatch on ns: " << ns
+                              << " current: " << (void*)details
+                              << " cached: " << (void*)it->second->_details;
+                    }
                     verify( details == it->second->_details );
                 }
                 return it->second;
@@ -501,6 +499,52 @@ namespace mongo {
         _extentManager.init( details );
         verify( _extentManager.hasFreeList() );
         log() << "have free list for " << _extentFreelistName << endl;
+    }
+
+    CollectionTemp* Database::createCollection( const StringData& ns, bool capped, const BSONObj* options ) {
+        verify( _namespaceIndex.details( ns ) == NULL );
+
+        if ( serverGlobalParams.configsvr &&
+             ( ns.startsWith( "config." ) ||
+               ns.startsWith( "local." ) ||
+               ns.startsWith( "admin." ) ) ) {
+            uasserted(14037, "can't create user databases on a --configsvr instance");
+        }
+
+        _namespaceIndex.add_ns( ns, DiskLoc(), capped );
+        _addNamespaceToCatalog( ns, options );
+
+        // TODO: option for: allocation, indexes?
+
+        if ( nsToCollectionSubstring( ns ).startsWith( "system." ) ) {
+            authindex::createSystemIndexes( ns );
+        }
+
+        CollectionTemp* collection = getCollectionTemp( ns );
+        verify( collection );
+        return collection;
+    }
+
+
+    void Database::_addNamespaceToCatalog( const StringData& ns, const BSONObj* options ) {
+        LOG(1) << "Database::_addNamespaceToCatalog ns: " << ns << endl;
+        if ( nsToCollectionSubstring( ns ) == "system.namespaces" ) {
+            // system.namespaces holds all the others, so it is not explicitly listed in the catalog.
+            return;
+        }
+
+        if ( ns == _extentFreelistName ) {
+            // this doesn't go in catalog
+            return;
+        }
+
+        BSONObjBuilder b;
+        b.append("name", ns);
+        if ( options )
+            b.append("options", *options);
+        BSONObj obj = b.done();
+
+        theDataFileMgr.insert( _namespacesName.c_str(), obj.objdata(), obj.objsize(), false, true);
     }
 
 } // namespace mongo

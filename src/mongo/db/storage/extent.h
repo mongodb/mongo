@@ -74,7 +74,7 @@ namespace mongo {
         DiskLoc init(const char *nsname, int _length, int _fileNo, int _offset, bool capped);
 
         /* like init(), but for a reuse case */
-        DiskLoc reuse(const char *nsname, bool newUseIsAsCapped);
+        DiskLoc reuse(const StringData& nsname, bool newUseIsAsCapped);
 
         bool isOk() const { return magic == extentSignature; }
         void assertOk() const { verify(isOk()); }
@@ -115,7 +115,7 @@ namespace mongo {
         /** caller must declare write intent first */
         void markEmpty();
     private:
-        DiskLoc _reuse(const char *nsname, bool newUseIsAsCapped); // recycle an extent and reuse it for a different ns
+        DiskLoc _reuse(const StringData& nsname, bool newUseIsAsCapped); // recycle an extent and reuse it for a different ns
     };
 
 #pragma pack()
