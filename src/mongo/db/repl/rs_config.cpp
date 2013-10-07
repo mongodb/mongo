@@ -73,20 +73,21 @@ namespace mongo {
     /* comment MUST only be set when initiating the set by the initiator */
     void ReplSetConfig::saveConfigLocally(bo comment) {
         checkRsConfig();
-        log() << "replSet info saving a newer config version to local.system.replset" << rsLog;
+
+        BSONObj newConfigBSON = asBson();
+
+        log() << "replSet info saving a newer config version to local.system.replset: "
+              << newConfigBSON << rsLog;
         {
-            Lock::GlobalWrite lk; // TODO: does this really need to be a global lock?
-            Client::Context cx( rsConfigNs );
-            cx.db()->flushFiles(true);
+            Client::WriteContext cx( rsConfigNs );
 
             //theReplSet->lastOpTimeWritten = ??;
             //rather than above, do a logOp()? probably
-            BSONObj o = asBson();
-            Helpers::putSingletonGod(rsConfigNs.c_str(), o, false/*logOp=false; local db so would work regardless...*/);
+            Helpers::putSingletonGod(rsConfigNs.c_str(),
+                                     newConfigBSON,
+                                     false/*logOp=false; local db so would work regardless...*/);
             if( !comment.isEmpty() && (!theReplSet || theReplSet->isPrimary()) )
                 logOpInitiate(comment);
-
-            cx.db()->flushFiles(true);
         }
         log() << "replSet saveConfigLocally done" << rsLog;
     }
