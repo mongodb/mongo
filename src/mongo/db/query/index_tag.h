@@ -78,7 +78,7 @@ namespace mongo {
         virtual MatchExpression::TagData* clone() const {
             RelevantTag* ret = new RelevantTag();
             ret->first = first;
-            ret->notFirst = first;
+            ret->notFirst = notFirst;
             return ret;
         }
     };
