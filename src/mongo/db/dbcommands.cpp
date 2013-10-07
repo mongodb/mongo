@@ -656,7 +656,7 @@ namespace mongo {
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {
             ActionSet actions;
-            actions.addAction(ActionType::dropIndexes);
+            actions.addAction(ActionType::dropIndex);
             out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
         }
 
@@ -1511,7 +1511,7 @@ namespace mongo {
 
             ActionSet targetActions;
             targetActions.addAction(ActionType::insert);
-            targetActions.addAction(ActionType::ensureIndex);
+            targetActions.addAction(ActionType::createIndex);
             std::string collection = cmdObj.getStringField("toCollection");
             uassert(16708, "bad 'toCollection' value", !collection.empty());
 

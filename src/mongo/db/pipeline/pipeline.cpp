@@ -346,7 +346,7 @@ namespace mongo {
 
                 // on temp ns due to implementation, but not logically on output ns
                 actions.addAction(ActionType::createCollection);
-                actions.addAction(ActionType::ensureIndex);
+                actions.addAction(ActionType::createIndex);
                 actions.addAction(ActionType::dropCollection);
                 actions.addAction(ActionType::renameCollectionSameDB);
 

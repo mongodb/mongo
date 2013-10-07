@@ -149,7 +149,7 @@ namespace {
                               "system.indexes documents without a string-typed \"ns\" field.");
             }
             NamespaceString indexNS(nsElement.str());
-            if (!isAuthorizedForActionsOnNamespace(indexNS, ActionType::ensureIndex)) {
+            if (!isAuthorizedForActionsOnNamespace(indexNS, ActionType::createIndex)) {
                 return Status(ErrorCodes::Unauthorized,
                               mongoutils::str::stream() << "not authorized to create index on " <<
                               indexNS.ns());

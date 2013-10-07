@@ -5,6 +5,8 @@
 # This means that the integer value assigned to each ActionType and used internally in ActionSet
 # also may change between versions.
 ["addShard",
+"applicationMessage",  # Not used for permissions checks, but to id the event in logs.
+"auditLogRotate",  # Not used for permissions checks, but to id the event in logs.
 "authCheck",  # Not used for permissions checks, but to id the authorization-checking event in logs.
 "authenticate",  # Not used for permission checks, but to id authentication events in logs.
 "captrunc",
@@ -23,16 +25,23 @@
 "copyDBTarget",
 "cpuProfiler",
 "createCollection",
+"createDatabase",  # Not used for permissions checks, but to id the event in logs.
+"createIndex",  # Not used for permissions checks, but to id the event in logs.
+"createRole",
+"createUser",
 "cursorInfo",
 "dbHash",
 "dbStats",
 "diagLogging",
+"dropAllRolesForDatabase",  # Not used for permissions checks, but to id the event in logs.
+"dropAllUsersFromDatabase",  # Not used for permissions checks, but to id the event in logs.
 "dropCollection",
 "dropDatabase",
-"dropIndexes",
+"dropIndex",  # Not used for permissions checks, but to id the event in logs.
+"dropRole",
+"dropUser",
 "emptycapped",
 "enableSharding",
-"ensureIndex",
 "find",
 "flushRouterConfig",
 "fsync",
@@ -41,6 +50,10 @@
 "getParameter",
 "getShardMap",
 "getShardVersion",
+"grantDelegateRolesToUser",  # Not used for permissions checks, but to id the event in logs.
+"grantPrivilegesToRole",
+"grantRolesToRole",  # Not used for permissions checks, but to id the event in logs.
+"grantRolesToUser",  # Not used for permissions checks, but to id the event in logs.
 "handshake",
 "hostInfo",
 "indexRead",
@@ -77,6 +90,10 @@
 "replSetSyncFrom",
 "replSetUpdatePosition",
 "resync",
+"revokeDelegateRolesFromUser",  # Not used for permissions checks, but to id the event in logs.
+"revokePrivilegesFromRole",
+"revokeRolesFromRole",  # Not used for permissions checks, but to id the event in logs.
+"revokeRolesFromUser",  # Not used for permissions checks, but to id the event in logs.
 "serverStatus",
 "setParameter",
 "setShardVersion",
@@ -92,6 +109,8 @@
 "unlock",
 "unsetSharding",
 "update",
+"updateRole",  # Not used for permissions checks, but to id the event in logs.
+"updateUser",  # Not used for permissions checks, but to id the event in logs.
 "userAdmin",
 "userAdminV1",
 "validate",

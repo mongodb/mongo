@@ -98,9 +98,9 @@ namespace {
             << ActionType::convertToCapped
             << ActionType::createCollection // db admin gets this also
             << ActionType::dropCollection
-            << ActionType::dropIndexes
+            << ActionType::dropIndex
             << ActionType::emptycapped
-            << ActionType::ensureIndex
+            << ActionType::createIndex
             << ActionType::insert
             << ActionType::remove
             << ActionType::renameCollectionSameDB // db admin gets this also
@@ -121,8 +121,8 @@ namespace {
             << ActionType::createCollection // read_write gets this also
             << ActionType::dbStats
             << ActionType::dropCollection
-            << ActionType::dropIndexes
-            << ActionType::ensureIndex
+            << ActionType::dropIndex
+            << ActionType::createIndex
             << ActionType::indexStats
             << ActionType::profileEnable
             << ActionType::reIndex
