@@ -122,7 +122,7 @@ namespace {
         ASSERT_NOT_EQUALS(b.compare(a), Interval::INTERVAL_PRECEDES);
 
         Interval c(BSON("" << 0 << "" << 10), true, false);
-        ASSERT_EQUALS(c.compare(a), Interval::INTERVAL_PRECEDES);
+        ASSERT_EQUALS(c.compare(a), Interval::INTERVAL_PRECEDES_COULD_UNION);
 
         Interval d(BSON("" << 0 << "" << 9), true, true);
         ASSERT_EQUALS(d.compare(a), Interval::INTERVAL_PRECEDES);
