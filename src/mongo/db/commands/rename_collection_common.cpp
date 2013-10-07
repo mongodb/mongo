@@ -57,7 +57,7 @@ namespace rename_collection {
             sourceActions.addAction(ActionType::dropCollection);
             targetActions.addAction(ActionType::createCollection);
             targetActions.addAction(ActionType::cloneCollectionTarget);
-            targetActions.addAction(ActionType::ensureIndex);
+            targetActions.addAction(ActionType::createIndex);
         }
 
         out->push_back(Privilege(ResourcePattern::forExactNamespace(sourceNS), sourceActions));

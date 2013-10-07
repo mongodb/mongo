@@ -230,7 +230,7 @@ namespace mongo {
                                                const BSONObj& cmdObj,
                                                std::vector<Privilege>* out) {
                 ActionSet actions;
-                actions.addAction(ActionType::dropIndexes);
+                actions.addAction(ActionType::dropIndex);
                 out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
             }
         } dropIndexesCmd;
