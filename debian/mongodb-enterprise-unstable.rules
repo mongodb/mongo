@@ -1,0 +1,155 @@
+#!/usr/bin/make -f
+# -*- makefile -*-
+# Sample debian/rules that uses debhelper.
+# This file was originally written by Joey Hess and Craig Small.
+# As a special exception, when this file is copied by dh-make into a
+# dh-make output file, you may use that output file without restriction.
+# This special exception was added by Craig Small in version 0.37 of dh-make.
+
+# Uncomment this to turn on verbose mode.
+export DH_VERBOSE=1
+
+
+configure: configure-stamp
+configure-stamp:
+	dh_testdir
+        # Add here commands to configure the package.
+
+	touch configure-stamp
+
+
+build: build-stamp
+
+build-stamp: configure-stamp  
+	dh_testdir
+
+        # Add here commands to compile the package.
+# THE FOLLOWING LINE IS INTENTIONALLY COMMENTED. 
+	# scons 
+        #docbook-to-man debian/mongodb.sgml > mongodb.1
+	echo debian/bsondump.1 > debian/mongodb-enterprise-unstable-tools.manpages
+	echo debian/mongodump.1 >> debian/mongodb-enterprise-unstable-tools.manpages
+	echo debian/mongoexport.1 >> debian/mongodb-enterprise-unstable-tools.manpages
+	echo debian/mongofiles.1 >> debian/mongodb-enterprise-unstable-tools.manpages
+	echo debian/mongoimport.1 >> debian/mongodb-enterprise-unstable-tools.manpages
+	echo debian/mongooplog.1 >> debian/mongodb-enterprise-unstable-tools.manpages
+	echo debian/mongoperf.1 >> debian/mongodb-enterprise-unstable-tools.manpages
+	echo debian/mongorestore.1 >> debian/mongodb-enterprise-unstable-tools.manpages
+	echo debian/mongosniff.1 >> debian/mongodb-enterprise-unstable-tools.manpages
+	echo debian/mongostat.1 >> debian/mongodb-enterprise-unstable-tools.manpages
+	echo debian/mongotop.1 >> debian/mongodb-enterprise-unstable-tools.manpages
+
+	echo debian/mongo.1 > debian/mongodb-enterprise-unstable-shell.manpages
+	echo debian/mongod.1 > debian/mongodb-enterprise-unstable-server.manpages
+	echo debian/mongos.1 > debian/mongodb-enterprise-unstable-mongos.manpages
+
+	touch $@
+
+clean: 
+	dh_testdir
+	dh_testroot
+	rm -f build-stamp configure-stamp
+
+	# FIXME: scons freaks out at the presence of target files
+	# under debian/mongodb.
+	#scons -c
+
+	rm -f debian/*.manpages
+
+	rm -rf $(CURDIR)/debian/mongodb-enterprise-unstable
+	rm -rf $(CURDIR)/debian/mongodb-enterprise-unstable-shell
+	rm -rf $(CURDIR)/debian/mongodb-enterprise-unstable-server
+	rm -rf $(CURDIR)/debian/mongodb-enterprise-unstable-mongos
+	rm -rf $(CURDIR)/debian/mongodb-enterprise-unstable-tools
+	rm -f config.log
+	rm -f mongo
+	rm -f mongod
+	rm -f mongoimportjson
+	rm -f mongoexport
+	rm -f mongorestore
+	rm -f mongodump
+	rm -f mongofiles
+	rm -f .sconsign.dblite
+	rm -f libmongoclient.a
+	rm -rf client/*.o
+	rm -rf tools/*.o
+	rm -rf shell/*.o
+	rm -rf .sconf_temp
+	rm -f buildscripts/*.pyc 
+	rm -f *.pyc
+	rm -f buildinfo.cpp
+	dh_clean debian/files
+
+install: build
+	dh_testdir
+	dh_testroot
+	dh_prep
+	dh_installdirs
+
+# THE FOLLOWING LINE IS INTENTIONALLY COMMENTED.
+	# scons --prefix=$(CURDIR)/debian/mongodb/usr install
+	mkdir -p $(CURDIR)/debian/mongodb-enterprise-unstable-shell/usr/bin
+	mkdir -p $(CURDIR)/debian/mongodb-enterprise-unstable-server/usr/bin
+	mkdir -p $(CURDIR)/debian/mongodb-enterprise-unstable-mongos/usr/bin
+	mkdir -p $(CURDIR)/debian/mongodb-enterprise-unstable-tools/usr/bin
+	cp -v $(CURDIR)/BINARIES/usr/bin/mongo $(CURDIR)/debian/mongodb-enterprise-unstable-shell/usr/bin
+	cp -v $(CURDIR)/BINARIES/usr/bin/mongod $(CURDIR)/debian/mongodb-enterprise-unstable-server/usr/bin
+	cp -v $(CURDIR)/BINARIES/usr/bin/mongos $(CURDIR)/debian/mongodb-enterprise-unstable-mongos/usr/bin
+
+	cp -v $(CURDIR)/BINARIES/usr/bin/bsondump $(CURDIR)/debian/mongodb-enterprise-unstable-tools/usr/bin
+	cp -v $(CURDIR)/BINARIES/usr/bin/mongodump $(CURDIR)/debian/mongodb-enterprise-unstable-tools/usr/bin
+	cp -v $(CURDIR)/BINARIES/usr/bin/mongoexport $(CURDIR)/debian/mongodb-enterprise-unstable-tools/usr/bin
+	cp -v $(CURDIR)/BINARIES/usr/bin/mongofiles $(CURDIR)/debian/mongodb-enterprise-unstable-tools/usr/bin
+	cp -v $(CURDIR)/BINARIES/usr/bin/mongoimport $(CURDIR)/debian/mongodb-enterprise-unstable-tools/usr/bin
+	cp -v $(CURDIR)/BINARIES/usr/bin/mongooplog $(CURDIR)/debian/mongodb-enterprise-unstable-tools/usr/bin
+	cp -v $(CURDIR)/BINARIES/usr/bin/mongoperf $(CURDIR)/debian/mongodb-enterprise-unstable-tools/usr/bin
+	cp -v $(CURDIR)/BINARIES/usr/bin/mongorestore $(CURDIR)/debian/mongodb-enterprise-unstable-tools/usr/bin
+	cp -v $(CURDIR)/BINARIES/usr/bin/mongostat $(CURDIR)/debian/mongodb-enterprise-unstable-tools/usr/bin
+	cp -v $(CURDIR)/BINARIES/usr/bin/mongotop $(CURDIR)/debian/mongodb-enterprise-unstable-tools/usr/bin
+
+	mkdir -p $(CURDIR)/debian/mongodb-enterprise-unstable-server/etc
+	cp $(CURDIR)/debian/mongod.conf $(CURDIR)/debian/mongodb-enterprise-unstable-server/etc/mongod.conf 
+
+	mkdir -p $(CURDIR)/debian/mongodb-enterprise-unstable-shell/usr/share/lintian/overrides/
+	mkdir -p $(CURDIR)/debian/mongodb-enterprise-unstable-server/usr/share/lintian/overrides/
+	mkdir -p $(CURDIR)/debian/mongodb-enterprise-unstable-mongos/usr/share/lintian/overrides/
+	mkdir -p $(CURDIR)/debian/mongodb-enterprise-unstable-tools/usr/share/lintian/overrides/
+	install -m 644 $(CURDIR)/debian/lintian-overrides 		$(CURDIR)/debian/mongodb-enterprise-unstable-shell/usr/share/lintian/overrides/mongodb-enterprise-unstable-shell
+	install -m 644 $(CURDIR)/debian/lintian-overrides 		$(CURDIR)/debian/mongodb-enterprise-unstable-server/usr/share/lintian/overrides/mongodb-enterprise-unstable-server
+	install -m 644 $(CURDIR)/debian/lintian-overrides 		$(CURDIR)/debian/mongodb-enterprise-unstable-mongos/usr/share/lintian/overrides/mongodb-enterprise-unstable-mongos
+	install -m 644 $(CURDIR)/debian/lintian-overrides 		$(CURDIR)/debian/mongodb-enterprise-unstable-tools/usr/share/lintian/overrides/mongodb-enterprise-unstable-tools
+
+# Build architecture-independent files here.
+binary-indep: build install
+# We have nothing to do by default.
+
+# Build architecture-dependent files here.
+binary-arch: build install
+	dh_testdir
+	dh_testroot
+	dh_installchangelogs 
+	dh_installdocs
+	dh_installexamples
+#	dh_install
+#	dh_installmenu
+#	dh_installdebconf	
+#	dh_installlogrotate
+#	dh_installemacsen
+#	dh_installpam
+#	dh_installmime
+	dh_installinit -pmongodb-enterprise-unstable-server --name=mongod
+#	dh_installinfo
+	dh_installman
+	dh_link
+# Appears to be broken on Ubuntu 11.10...?
+#	dh_strip
+	dh_compress
+	dh_fixperms
+	dh_installdeb
+	dh_shlibdeps
+	dh_gencontrol
+	dh_md5sums
+	dh_builddeb
+
+binary: binary-indep binary-arch
+.PHONY: build clean binary-indep binary-arch binary install configure

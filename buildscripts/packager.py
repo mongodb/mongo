@@ -367,8 +367,8 @@ def make_deb(distro, arch, spec, srcdir):
         raise Exception("unknown debianoid flavor: not sysvinit or upstart?")
     write_debian_changelog(sdir+"debian/changelog", spec, srcdir)
     distro_arch=distro.archname(arch)
-    sysassert(["cp", "-v", srcdir+"debian/control", sdir+"debian/"])
-    sysassert(["cp", "-v", srcdir+"debian/rules", sdir+"debian/"])
+    sysassert(["cp", "-v", srcdir+"debian/%s%s.control" % (distro.pkgbase(), suffix), sdir+"debian/control"])
+    sysassert(["cp", "-v", srcdir+"debian/%s%s.rules" % (distro.pkgbase(), suffix), sdir+"debian/rules"])
 
     
     # old non-server-package postinst will be hanging around for old versions
