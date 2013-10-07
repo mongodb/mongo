@@ -178,6 +178,8 @@ __wt_insert_serial_func(WT_SESSION_IMPL *session, void *args)
 	WT_PAGE *page;
 	u_int i, skipdepth;
 
+	WT_UNUSED(session);
+
 	__wt_insert_unpack(args, &page,
 	    &ins_head, &ins_stack, &next_stack, &new_ins, &skipdepth);
 
@@ -234,9 +236,6 @@ __wt_insert_serial_func(WT_SESSION_IMPL *session, void *args)
 		*ins_stack[i] = new_ins;
 	}
 
-	__wt_insert_new_ins_taken(args);
-
-	__wt_page_modify_set(session, page);
 	return (0);
 }
 
@@ -391,12 +390,10 @@ __wt_update_serial_func(WT_SESSION_IMPL *session, void *args)
 	 * pointer is set before we update the linked list.
 	 */
 	WT_PUBLISH(*upd_entry, upd);
-	__wt_update_upd_taken(args);
 
 	/* Discard obsolete WT_UPDATE structures. */
 	*upd_obsolete = upd->next == NULL ?
 	    NULL : __wt_update_obsolete_check(session, upd->next);
 
-	__wt_page_modify_set(session, page);
 	return (0);
 }
