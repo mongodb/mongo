@@ -344,8 +344,8 @@ static bool runMongosServer( bool doUpgrade ) {
     return true;
 }
 
-MONGO_INITIALIZER_GENERAL(ForkServerOrDie,
-                          ("completedStartupConfig"),
+MONGO_INITIALIZER_GENERAL(ForkServer,
+                          ("EndStartupOptionHandling"),
                           ("default"))(InitializerContext* context) {
     mongo::forkServerOrDie();
     return Status::OK();

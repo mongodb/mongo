@@ -62,7 +62,7 @@ namespace mongo {
 
     std::string getMongoShellHelp(const StringData& name, const moe::OptionSection& options);
 
-    Status handlePrevalidationMongoShellOptions(const moe::Environment& params,
+    Status handlePreValidationMongoShellOptions(const moe::Environment& params,
                                                 const std::vector<std::string>& args);
 
     Status storeMongoShellOptions(const moe::Environment& params,

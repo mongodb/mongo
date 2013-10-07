@@ -16,13 +16,13 @@
 
 #include "mongo/tools/mongodump_options.h"
 
-#include "mongo/base/init.h"
 #include "mongo/base/status.h"
 #include "mongo/util/log.h"
 #include "mongo/util/options_parser/environment.h"
 #include "mongo/util/options_parser/option_description.h"
 #include "mongo/util/options_parser/option_section.h"
 #include "mongo/util/options_parser/options_parser.h"
+#include "mongo/util/options_parser/startup_option_init.h"
 
 namespace mongo {
 
@@ -136,41 +136,36 @@ namespace mongo {
         return Status::OK();
     }
 
-    MONGO_INITIALIZER_GENERAL(ParseStartupConfiguration,
-            MONGO_NO_PREREQUISITES,
-            ("default"))(InitializerContext* context) {
+    MONGO_GENERAL_STARTUP_OPTIONS_REGISTER(MongoDumpOptions)(InitializerContext* context) {
+        return addMongoDumpOptions(&toolsOptions);
+    }
 
-        toolsOptions = moe::OptionSection( "options" );
+    MONGO_STARTUP_OPTIONS_PARSE(MongoDumpOptions)(InitializerContext* context) {
         moe::OptionsParser parser;
-
-        Status retStatus = addMongoDumpOptions(&toolsOptions);
-        if (!retStatus.isOK()) {
-            return retStatus;
-        }
-
-        retStatus = parser.run(toolsOptions, context->args(), context->env(), &toolsParsedOptions);
-        if (!retStatus.isOK()) {
-            std::cerr << retStatus.reason() << std::endl;
+        Status ret = parser.run(toolsOptions, context->args(), context->env(),
+                                &toolsParsedOptions);
+        if (!ret.isOK()) {
+            std::cerr << ret.reason() << std::endl;
             std::cerr << "try '" << context->args()[0]
                       << " --help' for more information" << std::endl;
             ::_exit(EXIT_BADOPTIONS);
         }
-
-        retStatus = handlePreValidationMongoDumpOptions(toolsParsedOptions);
-        if (!retStatus.isOK()) {
-            return retStatus;
-        }
-
-        retStatus = toolsParsedOptions.validate();
-        if (!retStatus.isOK()) {
-            return retStatus;
-        }
-
-        retStatus = storeMongoDumpOptions(toolsParsedOptions, context->args());
-        if (!retStatus.isOK()) {
-            return retStatus;
-        }
-
         return Status::OK();
+    }
+
+    MONGO_STARTUP_OPTIONS_VALIDATE(MongoDumpOptions)(InitializerContext* context) {
+        Status ret = handlePreValidationMongoDumpOptions(toolsParsedOptions);
+        if (!ret.isOK()) {
+            return ret;
+        }
+        ret = toolsParsedOptions.validate();
+        if (!ret.isOK()) {
+            return ret;
+        }
+        return Status::OK();
+    }
+
+    MONGO_STARTUP_OPTIONS_STORE(MongoDumpOptions)(InitializerContext* context) {
+        return storeMongoDumpOptions(toolsParsedOptions, context->args());
     }
 }

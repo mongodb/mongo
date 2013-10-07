@@ -31,7 +31,6 @@
 #include <string>
 #include <vector>
 
-#include "mongo/base/init.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/auth/authorization_manager.h"
@@ -46,6 +45,7 @@
 #include "mongo/util/options_parser/option_description.h"
 #include "mongo/util/options_parser/option_section.h"
 #include "mongo/util/options_parser/options_parser.h"
+#include "mongo/util/options_parser/startup_option_init.h"
 #include "mongo/util/version.h"
 
 namespace mongo {
@@ -782,43 +782,42 @@ namespace mongo {
         return Status::OK();
     }
 
-    MONGO_INITIALIZER_GENERAL(ParseStartupConfiguration,
-            ("GlobalLogManager",
-             "CreateAuthorizationManager"  // Requried to call getGlobalAuthorizationManager().
-             ),
-            ("default", "completedStartupConfig"))(InitializerContext* context) {
+    MONGO_GENERAL_STARTUP_OPTIONS_REGISTER(MongodOptions)(InitializerContext* context) {
+        return addMongodOptions(&serverOptions);
+    }
 
-        serverOptions = moe::OptionSection("Allowed options");
-        Status ret = addMongodOptions(&serverOptions);
-        if (!ret.isOK()) {
-            return ret;
-        }
-
+    MONGO_STARTUP_OPTIONS_PARSE(MongodOptions)(InitializerContext* context) {
         moe::OptionsParser parser;
-        ret = parser.run(serverOptions, context->args(), context->env(), &serverParsedOptions);
+        Status ret = parser.run(serverOptions, context->args(), context->env(),
+                                &serverParsedOptions);
         if (!ret.isOK()) {
             std::cerr << ret.reason() << std::endl;
             std::cerr << "try '" << context->args()[0]
                       << " --help' for more information" << std::endl;
             ::_exit(EXIT_BADOPTIONS);
         }
+        return Status::OK();
+    }
 
-        ret = handlePreValidationMongodOptions(serverParsedOptions, context->args());
+    MONGO_STARTUP_OPTIONS_VALIDATE(MongodOptions)(InitializerContext* context) {
+        Status ret = handlePreValidationMongodOptions(serverParsedOptions, context->args());
         if (!ret.isOK()) {
             return ret;
         }
-
         ret = serverParsedOptions.validate();
         if (!ret.isOK()) {
             return ret;
         }
-
-        ret = storeMongodOptions(serverParsedOptions, context->args());
-        if (!ret.isOK()) {
-            return ret;
-        }
-
         return Status::OK();
+    }
+
+    MONGO_INITIALIZER_GENERAL(MongodOptions_Store,
+                              ("BeginStartupOptionStorage",
+                               "CreateAuthorizationManager"), // Requried to call
+                                                              // getGlobalAuthorizationManager().
+                              ("EndStartupOptionStorage"))
+                             (InitializerContext* context) {
+        return storeMongodOptions(serverParsedOptions, context->args());
     }
 
     Status addModuleOptions(moe::OptionSection* options) {

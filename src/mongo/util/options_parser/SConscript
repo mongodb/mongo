@@ -7,6 +7,7 @@ env.StaticLibrary('options_parser', ['environment.cpp',
                                      'constraints.cpp',
                                      'option_section.cpp',
                                      'options_parser.cpp',
+                                     'startup_option_init.cpp',
                                      ],
                                     LIBDEPS=['$BUILD_DIR/mongo/bson'])
 

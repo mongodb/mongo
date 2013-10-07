@@ -16,4 +16,3 @@
 #include "mongo/base/init.h"
 
 MONGO_INITIALIZER_GROUP(default, MONGO_NO_PREREQUISITES, MONGO_NO_DEPENDENTS)
-MONGO_INITIALIZER_GROUP(completedStartupConfig, MONGO_NO_PREREQUISITES, ("default"))

@@ -16,12 +16,12 @@
 
 #include "mongo/tools/mongofiles_options.h"
 
-#include "mongo/base/init.h"
 #include "mongo/base/status.h"
 #include "mongo/util/options_parser/environment.h"
 #include "mongo/util/options_parser/option_description.h"
 #include "mongo/util/options_parser/option_section.h"
 #include "mongo/util/options_parser/options_parser.h"
+#include "mongo/util/options_parser/startup_option_init.h"
 
 namespace mongo {
 
@@ -120,41 +120,36 @@ namespace mongo {
         return Status::OK();
     }
 
-    MONGO_INITIALIZER_GENERAL(ParseStartupConfiguration,
-            MONGO_NO_PREREQUISITES,
-            ("default"))(InitializerContext* context) {
+    MONGO_GENERAL_STARTUP_OPTIONS_REGISTER(MongoFilesOptions)(InitializerContext* context) {
+        return addMongoFilesOptions(&toolsOptions);
+    }
 
-        toolsOptions = moe::OptionSection( "options" );
+    MONGO_STARTUP_OPTIONS_PARSE(MongoFilesOptions)(InitializerContext* context) {
         moe::OptionsParser parser;
-
-        Status retStatus = addMongoFilesOptions(&toolsOptions);
-        if (!retStatus.isOK()) {
-            return retStatus;
-        }
-
-        retStatus = parser.run(toolsOptions, context->args(), context->env(), &toolsParsedOptions);
-        if (!retStatus.isOK()) {
-            std::cerr << retStatus.reason() << std::endl;
+        Status ret = parser.run(toolsOptions, context->args(), context->env(),
+                                &toolsParsedOptions);
+        if (!ret.isOK()) {
+            std::cerr << ret.reason() << std::endl;
             std::cerr << "try '" << context->args()[0]
                       << " --help' for more information" << std::endl;
             ::_exit(EXIT_BADOPTIONS);
         }
-
-        retStatus = handlePreValidationMongoFilesOptions(toolsParsedOptions);
-        if (!retStatus.isOK()) {
-            return retStatus;
-        }
-
-        retStatus = toolsParsedOptions.validate();
-        if (!retStatus.isOK()) {
-            return retStatus;
-        }
-
-        retStatus = storeMongoFilesOptions(toolsParsedOptions, context->args());
-        if (!retStatus.isOK()) {
-            return retStatus;
-        }
-
         return Status::OK();
+    }
+
+    MONGO_STARTUP_OPTIONS_VALIDATE(MongoFilesOptions)(InitializerContext* context) {
+        Status ret = handlePreValidationMongoFilesOptions(toolsParsedOptions);
+        if (!ret.isOK()) {
+            return ret;
+        }
+        ret = toolsParsedOptions.validate();
+        if (!ret.isOK()) {
+            return ret;
+        }
+        return Status::OK();
+    }
+
+    MONGO_STARTUP_OPTIONS_STORE(MongoFilesOptions)(InitializerContext* context) {
+        return storeMongoFilesOptions(toolsParsedOptions, context->args());
     }
 }

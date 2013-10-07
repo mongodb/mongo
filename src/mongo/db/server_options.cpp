@@ -49,7 +49,7 @@ namespace mongo {
     typedef moe::OptionDescription OD;
     typedef moe::PositionalOptionDescription POD;
 
-    moe::OptionSection serverOptions;
+    moe::OptionSection serverOptions("Allowed options");
     moe::Environment serverParsedOptions;
 
     ServerGlobalParams serverGlobalParams;

@@ -34,7 +34,7 @@
 
 namespace mongo {
 
-    moe::OptionSection toolsOptions;
+    moe::OptionSection toolsOptions("options");
     moe::Environment toolsParsedOptions;
     ToolGlobalParams toolGlobalParams;
     BSONToolGlobalParams bsonToolGlobalParams;

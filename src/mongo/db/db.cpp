@@ -815,8 +815,8 @@ int main(int argc, char* argv[], char** envp) {
 }
 #endif
 
-MONGO_INITIALIZER_GENERAL(ForkServerOrDie,
-                          ("completedStartupConfig"),
+MONGO_INITIALIZER_GENERAL(ForkServer,
+                          ("EndStartupOptionHandling"),
                           ("default"))(InitializerContext* context) {
     mongo::forkServerOrDie();
     return Status::OK();

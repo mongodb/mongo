@@ -27,11 +27,13 @@
 #include "mongo/util/options_parser/environment.h"
 #include "mongo/util/options_parser/option_description.h"
 #include "mongo/util/options_parser/option_section.h"
+#include "mongo/util/options_parser/options_parser.h"
+#include "mongo/util/options_parser/startup_option_init.h"
 #include "mongo/util/version.h"
 
 namespace mongo {
 
-    moe::OptionSection mongoShellOptions;
+    moe::OptionSection mongoShellOptions("options");
     moe::Environment mongoShellParsedOptions;
     ShellGlobalParams shellGlobalParams;
 
@@ -166,7 +168,7 @@ namespace mongo {
         return sb.str();
     }
 
-    Status handlePrevalidationMongoShellOptions(const moe::Environment& params,
+    Status handlePreValidationMongoShellOptions(const moe::Environment& params,
                                                 const std::vector<std::string>& args) {
         if ( mongoShellParsedOptions.count( "help" ) ) {
             std::cout << getMongoShellHelp(args[0], mongoShellOptions) << std::endl;
@@ -279,5 +281,38 @@ namespace mongo {
         }
 
         return Status::OK();
+    }
+
+    MONGO_GENERAL_STARTUP_OPTIONS_REGISTER(MongoShellOptions)(InitializerContext* context) {
+        return addMongoShellOptions(&mongoShellOptions);
+    }
+
+    MONGO_STARTUP_OPTIONS_PARSE(MongoShellOptions)(InitializerContext* context) {
+        moe::OptionsParser parser;
+        Status ret = parser.run(mongoShellOptions, context->args(), context->env(),
+                                &mongoShellParsedOptions);
+        if (!ret.isOK()) {
+            std::cerr << ret.reason() << std::endl;
+            std::cerr << "try '" << context->args()[0]
+                      << " --help' for more information" << std::endl;
+            ::_exit(EXIT_BADOPTIONS);
+        }
+        return Status::OK();
+    }
+
+    MONGO_STARTUP_OPTIONS_VALIDATE(MongoShellOptions)(InitializerContext* context) {
+        Status ret = handlePreValidationMongoShellOptions(mongoShellParsedOptions, context->args());
+        if (!ret.isOK()) {
+            return ret;
+        }
+        ret = mongoShellParsedOptions.validate();
+        if (!ret.isOK()) {
+            return ret;
+        }
+        return Status::OK();
+    }
+
+    MONGO_STARTUP_OPTIONS_STORE(MongoShellOptions)(InitializerContext* context) {
+        return storeMongoShellOptions(mongoShellParsedOptions, context->args());
     }
 }

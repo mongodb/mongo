@@ -186,7 +186,7 @@ namespace mongo {
     }
 
     MONGO_INITIALIZER_GENERAL(ServerLogRedirection,
-                              ("GlobalLogManager", "completedStartupConfig"),
+                              ("GlobalLogManager", "EndStartupOptionHandling", "ForkServer"),
                               ("default"))(
             InitializerContext*) {
 

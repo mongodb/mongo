@@ -25,7 +25,7 @@
 #include <sys/file.h>
 #endif
 
-#include "mongo/base/init.h"
+#include "mongo/base/initializer.h"
 #include "mongo/base/status.h"
 #include "mongo/db/client.h"
 #include "mongo/db/dur.h"
@@ -35,9 +35,6 @@
 #include "mongo/util/background.h"
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/file_allocator.h"
-#include "mongo/util/options_parser/environment.h"
-#include "mongo/util/options_parser/option_section.h"
-#include "mongo/util/options_parser/options_parser.h"
 #include "mongo/util/version.h"
 
 namespace moe = mongo::optionenvironment;
@@ -86,45 +83,6 @@ namespace mongo {
                 }
             }
         };
-
-MONGO_INITIALIZER_GENERAL(ParseStartupConfiguration,
-                            ("GlobalLogManager"),
-                            ("default", "completedStartupConfig"))(InitializerContext* context) {
-
-    frameworkOptions = moe::OptionSection("options");
-    moe::OptionsParser parser;
-
-    Status retStatus = addTestFrameworkOptions(&frameworkOptions);
-    if (!retStatus.isOK()) {
-        return retStatus;
-    }
-
-    retStatus = parser.run(frameworkOptions, context->args(), context->env(),
-                           &frameworkParsedOptions);
-    if (!retStatus.isOK()) {
-        std::cerr << retStatus.reason() << std::endl;
-        std::cerr << "try '" << context->args()[0]
-                  << " --help' for more information" << std::endl;
-        ::_exit(EXIT_BADOPTIONS);
-    }
-
-    retStatus = preValidationTestFrameworkOptions(frameworkParsedOptions, context->args());
-    if (!retStatus.isOK()) {
-        return retStatus;
-    }
-
-    retStatus = frameworkParsedOptions.validate();
-    if (!retStatus.isOK()) {
-        return retStatus;
-    }
-
-    retStatus = storeTestFrameworkOptions(frameworkParsedOptions, context->args());
-    if (!retStatus.isOK()) {
-        return retStatus;
-    }
-
-    return Status::OK();
-}
 
         int runDbTests(int argc, char** argv) {
             frameworkGlobalParams.perfHist = 1;

@@ -28,11 +28,13 @@
 #include "mongo/util/options_parser/environment.h"
 #include "mongo/util/options_parser/option_description.h"
 #include "mongo/util/options_parser/option_section.h"
+#include "mongo/util/options_parser/options_parser.h"
+#include "mongo/util/options_parser/startup_option_init.h"
 #include "mongo/util/password.h"
 
 namespace mongo {
 
-    moe::OptionSection frameworkOptions;
+    moe::OptionSection frameworkOptions("options");
     moe::Environment frameworkParsedOptions;
     FrameworkGlobalParams frameworkGlobalParams;
 
@@ -132,8 +134,8 @@ namespace mongo {
         return sb.str();
     }
 
-    Status preValidationTestFrameworkOptions(const moe::Environment& params,
-                                             const std::vector<std::string>& args) {
+    Status handlePreValidationTestFrameworkOptions(const moe::Environment& params,
+                                                   const std::vector<std::string>& args) {
         if (params.count("help")) {
             std::cout << getTestFrameworkHelp(args[0], frameworkOptions) << std::endl;
             ::_exit(EXIT_SUCCESS);
@@ -263,5 +265,39 @@ namespace mongo {
         }
 
         return Status::OK();
+    }
+
+    MONGO_GENERAL_STARTUP_OPTIONS_REGISTER(FrameworkOptions)(InitializerContext* context) {
+        return addTestFrameworkOptions(&frameworkOptions);
+    }
+
+    MONGO_STARTUP_OPTIONS_PARSE(FrameworkOptions)(InitializerContext* context) {
+        moe::OptionsParser parser;
+        Status ret = parser.run(frameworkOptions, context->args(), context->env(),
+                                &frameworkParsedOptions);
+        if (!ret.isOK()) {
+            std::cerr << ret.reason() << std::endl;
+            std::cerr << "try '" << context->args()[0]
+                      << " --help' for more information" << std::endl;
+            ::_exit(EXIT_BADOPTIONS);
+        }
+        return Status::OK();
+    }
+
+    MONGO_STARTUP_OPTIONS_VALIDATE(FrameworkOptions)(InitializerContext* context) {
+        Status ret = handlePreValidationTestFrameworkOptions(frameworkParsedOptions,
+                                                             context->args());
+        if (!ret.isOK()) {
+            return ret;
+        }
+        ret = frameworkParsedOptions.validate();
+        if (!ret.isOK()) {
+            return ret;
+        }
+        return Status::OK();
+    }
+
+    MONGO_STARTUP_OPTIONS_STORE(FrameworkOptions)(InitializerContext* context) {
+        return storeTestFrameworkOptions(frameworkParsedOptions, context->args());
     }
 }
