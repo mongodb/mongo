@@ -74,7 +74,6 @@ _ disallow system* manipulations from the database.
 #include "mongo/db/sort_phase_one.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/storage_options.h"
-#include "mongo/db/structure/collection.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/file.h"
 #include "mongo/util/file_allocator.h"
@@ -145,6 +144,13 @@ namespace mongo {
         }
     }
 
+    static void _ensureSystemIndexes(const char* ns) {
+        NamespaceString nsstring(ns);
+        if ( nsstring.coll().startsWith( "system." ) ) {
+            authindex::createSystemIndexes(nsstring);
+        }
+    }
+
     string getDbContext() {
         stringstream ss;
         Client * c = currentClient.get();
@@ -196,6 +202,15 @@ namespace mongo {
         _applyOpToDataFiles( database, deleter, true );
     }
 
+    void checkConfigNS(const char *ns) {
+        if ( serverGlobalParams.configsvr &&
+             !( str::startsWith( ns, "config." ) ||
+                str::startsWith( ns, "local." ) ||
+                str::startsWith( ns, "admin." ) ) ) {
+            uasserted(14037, "can't create user databases on a --configsvr instance");
+        }
+    }
+
     bool _userCreateNS(const char *ns, const BSONObj& options, string& err, bool *deferIdIndex) {
         LOG(1) << "create collection " << ns << ' ' << options << endl;
 
@@ -203,6 +218,8 @@ namespace mongo {
             err = "collection already exists";
             return false;
         }
+
+        checkConfigNS(ns);
 
         long long size = Extent::initialSize(128);
         {
@@ -231,15 +248,9 @@ namespace mongo {
             }
         }
 
-
-        cc().database()->createCollection( ns, options["capped"].trueValue(), &options );
-
-        CollectionTemp* collection = cc().database()->getCollectionTemp( ns );
-        verify( collection );
-
         // $nExtents just for debug/testing.
         BSONElement e = options.getField( "$nExtents" );
-
+        Database *database = cc().database();
         if ( e.type() == Array ) {
             // We create one extent per array entry, with size specified
             // by the array value.
@@ -251,7 +262,7 @@ namespace mongo {
                 // $nExtents is just for testing - always allocate new extents
                 // rather than reuse existing extents so we have some predictibility
                 // in the extent size used by our tests
-                collection->increaseStorageSize( (int)size, false );
+                database->allocExtent( ns, (int)size, newCapped, false );
             }
         }
         else if ( int( e.number() ) > 0 ) {
@@ -263,7 +274,7 @@ namespace mongo {
                 // $nExtents is just for testing - always allocate new extents
                 // rather than reuse existing extents so we have some predictibility
                 // in the extent size used by our tests
-                collection->increaseStorageSize( (int)size, false );
+                database->allocExtent( ns, (int)size, newCapped, false );
             }
         }
         else {
@@ -275,14 +286,14 @@ namespace mongo {
                 desiredExtentSize = static_cast<int> (desiredExtentSize < min ? min : desiredExtentSize);
 
                 desiredExtentSize &= 0xffffff00;
-                Extent* e = collection->increaseStorageSize( (int)desiredExtentSize, true );
+                Extent *e = database->allocExtent( ns, desiredExtentSize, newCapped, true );
                 size -= e->length;
             }
         }
 
         NamespaceDetails *d = nsdetails(ns);
         verify(d);
-
+        
         bool ensure = true;
 
         // respect autoIndexId if set. otherwise, create an _id index for all colls, except for
@@ -300,9 +311,15 @@ namespace mongo {
                 ensureIdIndexForNewNs( ns );
         }
 
+        _ensureSystemIndexes(ns);
+
         if ( mx > 0 )
             d->setMaxCappedDocs( mx );
 
+        bool isFreeList = strstr(ns, FREELIST_NS) != 0;
+        if( !isFreeList )
+            addNewNamespaceToCatalog(ns, options.isEmpty() ? 0 : &options);
+        
         if ( options["flags"].numberInt() ) {
             d->replaceUserFlags( options["flags"].numberInt() );
         }
@@ -332,6 +349,31 @@ namespace mongo {
         }
         return ok;
     }
+
+    /*---------------------------------------------------------------------*/
+
+
+    void addNewExtentToNamespace(const char *ns, Extent *e, DiskLoc eloc, DiskLoc emptyLoc, bool capped) {
+        NamespaceIndex *ni = nsindex(ns);
+        NamespaceDetails *details = ni->details(ns);
+        if ( details ) {
+            verify( !details->lastExtent().isNull() );
+            verify( !details->firstExtent().isNull() );
+            getDur().writingDiskLoc(e->xprev) = details->lastExtent();
+            getDur().writingDiskLoc(details->lastExtent().ext()->xnext) = eloc;
+            verify( !eloc.isNull() );
+            details->setLastExtent( eloc );
+        }
+        else {
+            ni->add_ns(ns, eloc, capped);
+            details = ni->details(ns);
+        }
+
+        details->setLastExtentSize( e->length );
+
+        details->addDeletedRec(emptyLoc.drec(), emptyLoc);
+    }
+
 
     /*---------------------------------------------------------------------*/
 
@@ -778,37 +820,21 @@ namespace mongo {
 
     NOINLINE_DECL DiskLoc outOfSpace(const char* ns, NamespaceDetails* d, int lenWHdr, bool god) {
         DiskLoc loc;
-        if ( d->isCapped() ) {
-            // size capped doesn't grow
-            return loc;
-        }
-
-        LOG(1) << "allocating new extent for " << ns << " padding:" << d->paddingFactor() << " lenWHdr: " << lenWHdr << endl;
-
-        CollectionTemp* collection = cc().database()->getCollectionTemp( ns );
-        verify( collection );
-
-        collection->increaseStorageSize( Extent::followupSize(lenWHdr, d->lastExtentSize()), !god );
-
-        loc = d->alloc(ns, lenWHdr);
-        if ( !loc.isNull() ) {
-            // got on first try
-            return loc;
-        }
-
-        log() << "warning: alloc() failed after allocating new extent. "
-              << "lenWHdr: " << lenWHdr << " last extent size:"
-              << d->lastExtentSize() << "; trying again" << endl;
-
-        for ( int z = 0; z < 10 && lenWHdr > d->lastExtentSize(); z++ ) {
-            log() << "try #" << z << endl;
-            collection->increaseStorageSize( Extent::followupSize(lenWHdr, d->lastExtentSize()), !god);
-
+        if ( ! d->isCapped() ) { // size capped doesn't grow
+            LOG(1) << "allocating new extent for " << ns << " padding:" << d->paddingFactor() << " lenWHdr: " << lenWHdr << endl;
+            cc().database()->allocExtent(ns, Extent::followupSize(lenWHdr, d->lastExtentSize()), false, !god);
             loc = d->alloc(ns, lenWHdr);
-            if ( ! loc.isNull() )
-                break;
+            if ( loc.isNull() ) {
+                log() << "warning: alloc() failed after allocating new extent. lenWHdr: " << lenWHdr << " last extent size:" << d->lastExtentSize() << "; trying again" << endl;
+                for ( int z=0; z<10 && lenWHdr > d->lastExtentSize(); z++ ) {
+                    log() << "try #" << z << endl;
+                    cc().database()->allocExtent(ns, Extent::followupSize(lenWHdr, d->lastExtentSize()), false, !god);
+                    loc = d->alloc(ns, lenWHdr);
+                    if ( ! loc.isNull() )
+                        break;
+                }
+            }
         }
-
         return loc;
     }
 
@@ -844,6 +870,25 @@ namespace mongo {
         }
         return true;
     }
+
+    NOINLINE_DECL NamespaceDetails* insert_newNamespace(const char *ns, int len, bool god) { 
+        checkConfigNS(ns);
+        // This may create first file in the database.
+        int ies = Extent::initialSize(len);
+        if( str::contains(ns, '$') && len + Record::HeaderSize >= BtreeData_V1::BucketSize - 256 && len + Record::HeaderSize <= BtreeData_V1::BucketSize + 256 ) { 
+            // probably an index.  so we pick a value here for the first extent instead of using initialExtentSize() which is more 
+            // for user collections.  TODO: we could look at the # of records in the parent collection to be smarter here.
+            ies = (32+4) * 1024;
+        }
+        cc().database()->allocExtent(ns, ies, false, false);
+        NamespaceDetails *d = nsdetails(ns);
+        if ( !god )
+            ensureIdIndexForNewNs(ns);
+        _ensureSystemIndexes(ns);
+        addNewNamespaceToCatalog(ns);
+        return d;
+    }
+
 
     /**
      * @param loc the location in system.indexes where the index spec is
@@ -990,25 +1035,10 @@ namespace mongo {
         }
         bool addIndex = wouldAddIndex && mayAddIndex;
 
-        CollectionTemp* collection = cc().database()->getCollectionTemp( ns );
-        if ( collection == NULL ) {
-            collection = cc().database()->createCollection( ns, false, NULL );
-
-            int ies = Extent::initialSize(len);
-            if( str::contains(ns, '$') &&
-                len + Record::HeaderSize >= BtreeData_V1::BucketSize - 256 &&
-                len + Record::HeaderSize <= BtreeData_V1::BucketSize + 256 ) {
-                // probably an index.  so we pick a value here for the first extent instead of using
-                // initialExtentSize() which is more for user collections.
-                // TODO: we could look at the # of records in the parent collection to be smarter here.
-                ies = (32+4) * 1024;
-            }
-            collection->increaseStorageSize( ies, false);
-            if ( !god )
-                ensureIdIndexForNewNs(ns);
+        NamespaceDetails *d = nsdetails(ns);
+        if ( d == 0 ) {
+            d = insert_newNamespace(ns, len, god);
         }
-
-        NamespaceDetails* d = collection->details();
 
         NamespaceDetails *tableToIndex = 0;
 

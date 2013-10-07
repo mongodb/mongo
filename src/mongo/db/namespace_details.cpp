@@ -852,9 +852,6 @@ namespace mongo {
         NamespaceDetails* d = writingWithExtra();
 
         IndexDetails *id = &d->idx(idxNumber);
-
-        string indexNamespace = id->indexNamespace();
-
         id->kill_idx();
 
         // fix the _multiKeyIndexBits, by moving all bits above me down one
@@ -869,8 +866,6 @@ namespace mongo {
             d->idx(i) = d->idx(i+1);
 
         d->idx( getTotalIndexCount() ) = IndexDetails();
-
-        cc().database()->_clearCollectionCache( indexNamespace );
     }
 
     BSONObj NamespaceDetails::prepOneUnfinishedIndex() {
