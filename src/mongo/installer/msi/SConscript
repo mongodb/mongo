@@ -1,0 +1,91 @@
+# -*- mode: python; -*-
+
+Import("env")
+Import("installSetup")
+Import("windows")
+Import("mongoCodeVersion")
+Import("s3push")
+
+# Build an msi
+driverIncludeSource = "$BUILD_DIR/msi/DriverInclude.wxs"
+
+env = env.Clone()
+env['WIXPATH'] = r'%ProgramFiles(x86)%\WiX Toolset v3.7\bin'
+env['WIXHEAT'] = r'$WIXPATH\heat.exe'
+env['WIXCANDLE'] = r'$WIXPATH\candle.exe'
+env['WIXLIGHT'] = r'$WIXPATH\light.exe'
+env['WIXUIEXT'] = r'$WIXPATH\WixUIExtension.dll'
+
+sources = [ driverIncludeSource,
+            "wxs/BinaryFragment.wxs",
+            "wxs/FeatureFragment.wxs",
+            "wxs/LicensingFragment.wxs",
+            "wxs/Installer_64.wxs"
+            ]
+objects = [ "$BUILD_DIR/msi/DriverInclude.wixobj",
+            "$BUILD_DIR/msi/BinaryFragment.wixobj",
+            "$BUILD_DIR/msi/FeatureFragment.wixobj",
+            "$BUILD_DIR/msi/LicensingFragment.wixobj",
+            "$BUILD_DIR/msi/Installer_64.wixobj"
+           ]
+# heat: slurp up the headers and generate a WiX file listing them as things to include in msi
+env.Command(driverIncludeSource, "$INSTALL_DIR/include/mongo/",
+            '"$WIXHEAT" dir $SOURCE -gg -g1 -frag -cg cg_DriverHeaders'
+            ' -nologo -directoryid -out $TARGET -dr Header -srd -var var.ClientHeaderSource')
+
+env.AlwaysBuild(driverIncludeSource)
+
+# Need to do this in order to get scons to translate path separators into native format
+buildDir = Dir(env["BUILD_DIR"]).path
+
+# candle: compile .wxs files into .wixobjs
+env.Command(objects, 
+            sources,
+            '"$WIXCANDLE" -wx'
+            # cannot have anything other than x.x.x.x in version string.
+            # we should choose a fourth version number that reflects pre-ness.
+            ' -dMongoDBVersion=' + mongoCodeVersion.partition('-')[0] +
+            ' -dLicenseSource=distsrc'
+            r' -dEnterpriseBase=src\mongo\db\modules\subscription\\'
+            ' -dBinarySource=' + buildDir + r'\mongo'
+            ' -dEdition=Enterprise'
+            ' -d"ProductId=*\"'
+            ' -dUpgradeCode=FCF901F6-E963-40B1-9A17-978242068587'
+            ' -dClientSource=' + buildDir + r'\client_build'
+            r' -dClientHeaderSource=${INSTALL_DIR}\include\mongo'
+            ' -dConfiguration=Release'
+            ' -dOutDir=' + buildDir + r'\msi'
+            ' -dPlatform=x64'
+            ' -dFlavor=2008R2Plus'
+            r' -dProjectDir=buildscripts\packaging\msi\\'
+            ' -dProjectName=MongoDB'
+            ' -dTargetDir=' + buildDir + r'\msi'
+            ' -dTargetExt=.msi'
+            ' -dTargetFileName=${SERVER_ARCHIVE}'
+            r' -dSaslSource=d:\work\sasl\bin'
+            r' -dSnmpSource=d:\work\snmp\bin'
+            r' -dSslSource=d:\work\ssl\bin'
+            ' -out ' + buildDir + r'\msi\\'
+            ' -arch x64'
+            ' -ext "$WIXUIEXT"'
+            ' $SOURCES')
+
+#light: link .objs into an msi
+msi = "$BUILD_DIR/msi/${SERVER_DIST_BASENAME}.msi"
+env.Command(msi,
+            objects,
+            '"$WIXLIGHT" -out ${TARGET} -wx -cultures:null -sice:ICE82 '
+            ' -ext "$WIXUIEXT"'
+            ' ${SOURCES}')
+
+env.AlwaysBuild(msi)
+
+env.Alias( "msi" , msi )
+
+def s3msipush( env , target , source ):
+    s3push( source )
+
+env.Alias( "s3msi" , [ msi ] , [ s3msipush ] )
+env.AlwaysBuild( "s3msi" )
+
+

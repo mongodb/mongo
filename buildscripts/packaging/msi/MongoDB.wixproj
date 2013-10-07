@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
@@ -30,10 +30,10 @@
     <DefineConstants>MongoDBVersion=$(Version);LicenseSource=$(License);BinarySource=$(Source);Edition=Standard;ProductId=$(ProductId);UpgradeCode=$(UpgradeCode);ClientSource=$(ClientSource);ClientHeaderSource=$(ClientHeaderSource)</DefineConstants>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="wxs\BinaryFragment.wxs" />
-    <Compile Include="wxs\FeatureFragment.wxs" />
-    <Compile Include="wxs\LicensingFragment.wxs" />
-    <Compile Include="wxs\Installer.wxs" />
+    <Compile Include="..\..\..\src\mongo\installer\msi\wxs\BinaryFragment.wxs" />
+    <Compile Include="..\..\..\src\mongo\installer\msi\wxs\FeatureFragment.wxs" />
+    <Compile Include="..\..\..\src\mongo\installer\msi\wxs\LicensingFragment.wxs" />
+    <Compile Include="..\..\..\src\mongo\installer\msi\wxs\Installer.wxs" />
     <Compile Include="$(OutputPath)DriverInclude.wxs" />
   </ItemGroup>
   <ItemGroup>

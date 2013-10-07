@@ -36,10 +36,10 @@
     <VerboseOutput>True</VerboseOutput>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="wxs\BinaryFragment.wxs" />
-    <Compile Include="wxs\FeatureFragment.wxs" />
-    <Compile Include="wxs\Installer_64.wxs" />
-    <Compile Include="wxs\LicensingFragment.wxs" />
+    <Compile Include="..\..\..\src\mongo\installer\msi\wxs\BinaryFragment.wxs" />
+    <Compile Include="..\..\..\src\mongo\installer\msi\wxs\FeatureFragment.wxs" />
+    <Compile Include="..\..\..\src\mongo\installer\msi\wxs\Installer_64.wxs" />
+    <Compile Include="..\..\..\src\mongo\installer\msi\wxs\LicensingFragment.wxs" />
     <Compile Include="$(OutputPath)DriverInclude.wxs" />
   </ItemGroup>
   <ItemGroup>

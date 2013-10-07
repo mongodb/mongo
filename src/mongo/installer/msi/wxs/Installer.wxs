@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+	<Product Id="$(var.ProductId)" 
+           Name="!(wix.ProductName)" 
+           Language="1033" 
+           Version="$(var.MongoDBVersion)" 
+           Manufacturer="MongoDB" 
+           UpgradeCode="$(var.UpgradeCode)">
+
+		<Package InstallerVersion="200" Compressed="yes" />
+    <WixVariable Id="ProductName" Value="MongoDB $(var.MongoDBVersion)" />
+    <WixVariable Id="InstallFolder" Value="MongoDB $(var.MongoDBVersion) $(var.Edition)"/>
+
+    <Directory Id="TARGETDIR" Name="SourceDir">
+      <Directory Id="ProgramFilesFolder">
+        <Directory Id="INSTALLLOCATION" Name="!(wix.InstallFolder)">
+          <Directory Id="BIN" Name="bin" />
+        </Directory>
+      </Directory>
+    </Directory>
+    
+    <Media Id="1" Cabinet="media1.cab" EmbedCab="yes" />
+    <WixVariable Id="WixUIDialogBmp" Value="Dialog.bmp" />
+    <WixVariable Id="WixUIBannerBmp" Value="Banner.bmp" />
+    <WixVariable Id="WixUIInfoIco" Value="Installer_Icon_32x32.ico" />
+    <WixVariable Id="WixUIExclamationIco" Value="Installer_Icon_32x32.ico" />
+    <!--
+    <WixVariable Id="WixUINewIco" Value="Installer_Icon_16x16.ico" />
+    <WixVariable Id="WixUIUpIco" Value="Installer_Icon_16x16.ico" />
+  More information can be found at http://wix.tramontana.co.hu/tutorial/user-interface/ui-wizardry
+    -->
+
+    <FeatureGroupRef Id="fg_MongoDBAll" />
+    
+    <UIRef Id="WixUI_Mondo" />
+    <UIRef Id="WixUI_ErrorProgressText" />
+    <Property Id="WIXUI_INSTALLDIR" Value="INSTALLLOCATION" />
+  </Product>
+</Wix>
