@@ -150,6 +150,9 @@ namespace mutablebson {
     }
 
     std::string Element::toString() const {
+        if (!ok())
+            return "INVALID-MUTABLE-ELEMENT";
+
         if (hasValue())
             return getValue().toString();
 

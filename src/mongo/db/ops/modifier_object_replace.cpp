@@ -35,6 +35,8 @@
 
 namespace mongo {
 
+    namespace str = mongoutils::str;
+
     namespace {
         // TODO: Egregiously stolen from jsobjmanipulator.h and instance.cpp to break a link
         // dependency cycle. We should sort this out, but we don't need to do it right now.
@@ -83,20 +85,27 @@ namespace mongo {
     Status ModifierObjectReplace::init(const BSONElement& modExpr, const Options& opts) {
 
         if (modExpr.type() != Object) {
-            return Status(ErrorCodes::BadValue, mongoutils::str::stream() <<
-                          "object replace expects full object but type was " << modExpr.type());
+            // Impossible, really since the caller check this already...
+            return Status(ErrorCodes::BadValue,
+                          str::stream() << "object replace expects full object but type was "
+                                        << modExpr.type());
         }
 
-        if (opts.enforceOkForStorage && !modExpr.embeddedObject().okForStorageAsRoot()) {
-            return Status(ErrorCodes::BadValue, "not okForStorage: "
-                                                " the document has invalid fields");
-        }
-
-        BSONObjIterator it(modExpr.embeddedObject());
-        while (it.more()) {
-            BSONElement elem = it.next();
-            if (*elem.fieldName() == '$') {
-                return Status(ErrorCodes::BadValue, "can't mix modifiers and non-modifiers");
+        if (opts.enforceOkForStorage) {
+            Status s = modExpr.embeddedObject().storageValid();
+            if (!s.isOK())
+                return s;
+        } else {
+            // storageValid checks for $-prefixed field names, so only run if we didn't do that.
+            BSONObjIterator it(modExpr.embeddedObject());
+            while (it.more()) {
+                BSONElement elem = it.next();
+                if (*elem.fieldName() == '$') {
+                    return Status(ErrorCodes::BadValue,
+                                  str::stream() << "A replace document can't"
+                                                   " contain update modifiers: "
+                                                << elem.fieldNameStringData());
+                }
             }
         }
 

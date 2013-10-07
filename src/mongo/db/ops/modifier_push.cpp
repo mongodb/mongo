@@ -41,6 +41,9 @@
 
 namespace mongo {
 
+    namespace mb = mutablebson;
+    namespace str = mongoutils::str;
+
     namespace {
 
         bool isPatternElement(const BSONElement& pattern) {
@@ -110,9 +113,9 @@ namespace mongo {
             while (itEach.more()) {
                 BSONElement eachItem = itEach.next();
                 if (eachItem.type() == Object || eachItem.type() == Array) {
-                    if (! eachItem.Obj().okForStorage()) {
-                        return Status(ErrorCodes::BadValue, "cannot use '$' in $each entries");
-                    }
+                    Status s = eachItem.Obj().storageValidEmbedded();
+                    if (!s.isOK())
+                        return s;
                 }
             }
 
@@ -207,7 +210,9 @@ namespace mongo {
         size_t foundCount;
         bool foundDollar = fieldchecker::isPositional(_fieldRef, &_posDollar, &foundCount);
         if (foundDollar && foundCount > 1) {
-            return Status(ErrorCodes::BadValue, "too many positional($) elements found.");
+            return Status(ErrorCodes::BadValue,
+                          str::stream() << "Too many positional (i.e. '$') elements found in path '"
+                                        << _fieldRef.dottedField() << "'");
         }
 
         //
@@ -220,8 +225,10 @@ namespace mongo {
         switch (modExpr.type()) {
 
         case Array:
-            if (! modExpr.Obj().okForStorage()) {
-                return Status(ErrorCodes::BadValue, "cannot use '$' or '.' as values");
+            {
+                Status s = modExpr.Obj().storageValidEmbedded();
+                if (!s.isOK())
+                    return s;
             }
 
             if (_pushMode == PUSH_ALL) {
@@ -242,7 +249,9 @@ namespace mongo {
 
         case Object:
             if (_pushMode == PUSH_ALL) {
-                return Status(ErrorCodes::BadValue, "$pushAll requires an array of values");
+                return Status(ErrorCodes::BadValue,
+                              str::stream() << "$pushAll requires an array of values "
+                                      "but was given an embedded document, not an array.");
             }
 
             // If any known clause ($each, $slice, or $sort) is present, we'd assume
@@ -259,16 +268,20 @@ namespace mongo {
                 }
             }
             else {
-                if (! modExpr.Obj().okForStorage()) {
-                    return Status(ErrorCodes::BadValue, "cannot use '$' as values");
-                }
+                Status s = modExpr.Obj().storageValidEmbedded();
+                if (!s.isOK())
+                    return s;
+
                 _val = modExpr;
             }
             break;
 
         default:
             if (_pushMode == PUSH_ALL) {
-                return Status(ErrorCodes::BadValue, "$pushAll requires an array of values");
+                return Status(ErrorCodes::BadValue,
+                              str::stream() << "$pushAll requires an array of values "
+                                               "but was given an "
+                                            << typeName(modExpr.type()));
             }
 
             _val = modExpr;
@@ -282,14 +295,18 @@ namespace mongo {
             }
 
             if (!sliceElem.isNumber()) {
-                return Status(ErrorCodes::BadValue, "$slice must be a numeric value");
+                return Status(ErrorCodes::BadValue,
+                              str::stream() << "The value for $slice must "
+                                               "a be a numeric value not "
+                                            << typeName(sliceElem.type()));
             }
 
             // If the value of slice is not fraction, even if it's a double, we allow it. The
             // reason here is that the shell will use doubles by default unless told otherwise.
             double fractional = sliceElem.numberDouble();
             if (fractional - static_cast<int64_t>(fractional) != 0) {
-                return Status(ErrorCodes::BadValue, "$slice in $push cannot be fractional");
+                return Status(ErrorCodes::BadValue,
+                              "The $slice value in $push cannot be fractional");
             }
 
             _slice = sliceElem.numberLong();
@@ -299,17 +316,21 @@ namespace mongo {
         // Is sort present and correct?
         if (sortElem.type() != EOO) {
             if (_pushMode == PUSH_ALL) {
-                return Status(ErrorCodes::BadValue, "cannot use $sort in $pushAll");
+                return Status(ErrorCodes::BadValue,
+                              "cannot use $sort in $pushAll");
             }
 
             if (sortElem.type() != Object && !sortElem.isNumber()) {
-                return Status(ErrorCodes::BadValue, "invalid $sort clause");
+                return Status(ErrorCodes::BadValue,
+                              "The $sort is invalid: use 1/-1 to sort the whole element, "
+                              "or {field:1/-1} to sort embedded fields");
             }
 
             if (sortElem.isABSONObj()) {
                 BSONObj sortObj = sortElem.embeddedObject();
                 if (sortObj.isEmpty()) {
-                    return Status(ErrorCodes::BadValue, "sort pattern is empty");
+                    return Status(ErrorCodes::BadValue,
+                                  "The $sort pattern is empty when it should be a set of fields.");
                 }
 
                 // Check if the sort pattern is sound.
@@ -321,7 +342,7 @@ namespace mongo {
                     // We require either <field>: 1 or -1 for asc and desc.
                     if (!isPatternElement(sortPatternElem)) {
                         return Status(ErrorCodes::BadValue,
-                                      "$sort elements' must be either 1 or -1");
+                                      "The $sort element value must be either 1 or -1");
                     }
 
                     // All fields parts must be valid.
@@ -329,13 +350,15 @@ namespace mongo {
                     sortField.parse(sortPatternElem.fieldName());
                     if (sortField.numParts() == 0) {
                         return Status(ErrorCodes::BadValue,
-                                      "$sort field cannot be empty");
+                                      "The $sort field cannot be empty");
                     }
 
                     for (size_t i = 0; i < sortField.numParts(); i++) {
                         if (sortField.getPart(i).size() == 0) {
                             return Status(ErrorCodes::BadValue,
-                                          "empty field in dotted sort pattern");
+                                          str::stream() << "The $sort field is a dotted field "
+                                                           "but has an empty part: "
+                                                        << sortField.dottedField());
                         }
                     }
                 }
@@ -346,7 +369,7 @@ namespace mongo {
                 // Ensure the sortElem number is valid.
                 if (!isPatternElement(sortElem)) {
                     return Status(ErrorCodes::BadValue,
-                                  "$sort elements' must be either 1 or -1");
+                                  "The $sort element value must be either 1 or -1");
                 }
 
                 _sort = PatternElementCmp(BSON("" << sortElem.number()));
@@ -367,7 +390,10 @@ namespace mongo {
         // If we have a $-positional field, it is time to bind it to an actual field part.
         if (_posDollar) {
             if (matchedField.empty()) {
-                return Status(ErrorCodes::BadValue, "matched field not provided");
+                return Status(ErrorCodes::BadValue,
+                              str::stream() << "The positional operator did not find the match "
+                                               "needed from the query. Unexpanded update: "
+                                            << _fieldRef.dottedField());
             }
             _preparedState->boundDollar = matchedField.toString();
             _fieldRef.setPart(_posDollar, _preparedState->boundDollar);
@@ -395,7 +421,12 @@ namespace mongo {
             // If the path exists, we require the target field to be already an
             // array.
             if (destExists && _preparedState->elemFound.getType() != Array) {
-                return Status(ErrorCodes::BadValue, "can only $push into arrays");
+                mb::Element idElem = mb::findElementNamed(root.leftChild(), "_id");
+                return Status(ErrorCodes::BadValue,
+                              str::stream() << "The field '" << _fieldRef.dottedField() << "'"
+                                            << " must be and array but is of type "
+                                            << typeName(_preparedState->elemFound.getType())
+                                            << " in document " << idElem.toString() );
             }
         }
         else {

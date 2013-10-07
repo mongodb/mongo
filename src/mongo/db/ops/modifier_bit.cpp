@@ -29,6 +29,7 @@
 #include "mongo/db/ops/modifier_bit.h"
 
 #include "mongo/base/error_codes.h"
+#include "mongo/bson/mutable/algorithm.h"
 #include "mongo/bson/mutable/document.h"
 #include "mongo/db/ops/field_checker.h"
 #include "mongo/db/ops/log_builder.h"
@@ -37,7 +38,8 @@
 
 namespace mongo {
 
-    using mongoutils::str::stream;
+    namespace mb = mutablebson;
+    namespace str = mongoutils::str;
 
     struct ModifierBit::PreparedState {
 
@@ -92,12 +94,17 @@ namespace mongo {
         size_t foundCount;
         bool foundDollar = fieldchecker::isPositional(_fieldRef, &_posDollar, &foundCount);
         if (foundDollar && foundCount > 1) {
-            return Status(ErrorCodes::BadValue, "too many positional($) elements found.");
+            return Status(ErrorCodes::BadValue,
+                          str::stream() << "Too many positional (i.e. '$') elements found in path '"
+                                        << _fieldRef.dottedField() << "'");
         }
 
         if (modExpr.type() != mongo::Object)
             return Status(ErrorCodes::BadValue,
-                          "Value following $bit must be an Object");
+                          str::stream() << "The $bit modifier is not compatible with "
+                                        << typeName(modExpr.type())
+                                        << ". You must pass in an embedded document: "
+                                           "{$bit: {field: {and/or/xor: #}}");
 
         BSONObjIterator opsIterator(modExpr.embeddedObject());
 
@@ -110,7 +117,9 @@ namespace mongo {
                 (curOp.type() != mongo::NumberLong))
                 return Status(
                     ErrorCodes::BadValue,
-                    "Argument to $bit operation must be a NumberInt or NumberLong");
+                    str::stream() << "The $bit modifier field must be an Integer(32/64 bit); a '"
+                                  << typeName(curOp.type())
+                                  << "' is not supported here: " << curOp);
 
             SafeNumOp op = NULL;
 
@@ -126,7 +135,9 @@ namespace mongo {
             else {
                 return Status(
                     ErrorCodes::BadValue,
-                    "Only 'and', 'or', and 'xor' are supported $bit sub-operators");
+                    str::stream() << "The $bit modifier only supports 'and', 'or', and 'xor', not '"
+                                  << payloadFieldName
+                                  << "' which is an unknown operator: " << curOp);
             }
 
             const OpEntry entry = {SafeNum(curOp), op};
@@ -147,7 +158,10 @@ namespace mongo {
         // If we have a $-positional field, it is time to bind it to an actual field part.
         if (_posDollar) {
             if (matchedField.empty()) {
-                return Status(ErrorCodes::BadValue, "matched field not provided");
+                return Status(ErrorCodes::BadValue,
+                              str::stream() << "The positional operator did not find the match "
+                                                "needed from the query. Unexpanded update: "
+                                            << _fieldRef.dottedField());
             }
             _preparedState->boundDollar = matchedField.toString();
             _fieldRef.setPart(_posDollar, _preparedState->boundDollar);
@@ -188,20 +202,28 @@ namespace mongo {
             return Status::OK();
         }
 
-        if (!_preparedState->elemFound.isIntegral())
+        if (!_preparedState->elemFound.isIntegral()) {
+            mb::Element idElem = mb::findElementNamed(root.leftChild(), "_id");
             return Status(
                 ErrorCodes::BadValue,
-                "Cannot apply $bit to a value of non-integral type");
+                str::stream() << "Cannot apply $bit to a value of non-integral type."
+                              << idElem.toString()
+                              << " has the field " <<  _preparedState->elemFound.getFieldName()
+                              << " of non-integer type "
+                              << typeName(_preparedState->elemFound.getType()));
+        }
 
         const SafeNum currentValue = _preparedState->elemFound.getValueSafeNum();
 
         // Apply the op over the existing value and the mod value, and capture the result.
         _preparedState->newValue = apply(currentValue);
 
-        if (!_preparedState->newValue.isValid())
+        if (!_preparedState->newValue.isValid()) {
+            // TODO: Include list of ops, if that is easy, at some future point.
             return Status(ErrorCodes::BadValue,
-                          "Failed to apply $bit to current value");
-
+                          str::stream() << "Failed to apply $bit operations to current value: "
+                                        << currentValue.debugString());
+        }
         // If the values are identical (same type, same value), then this is a no-op.
         if (_preparedState->newValue.isIdentical(currentValue)) {
             _preparedState->noOp = execInfo->noOp = true;
@@ -257,9 +279,12 @@ namespace mongo {
             _fieldRef.dottedField(),
             _preparedState->newValue);
 
-        if (!logElement.ok())
-            return Status(ErrorCodes::InternalError, "cannot append details for $bit mod");
-
+        if (!logElement.ok()) {
+            return Status(ErrorCodes::InternalError,
+                          str::stream() << "Could not append entry to $bit oplog entry: "
+                                        << "set '" << _fieldRef.dottedField() << "' -> "
+                                        << _preparedState->newValue.debugString() );
+        }
         return logBuilder->addToSets(logElement);
 
     }

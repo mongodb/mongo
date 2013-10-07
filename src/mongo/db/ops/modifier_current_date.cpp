@@ -89,7 +89,9 @@ namespace mongo {
                                    &_pathReplacementPosition,
                                    &foundCount);
         if (_pathReplacementPosition && foundCount > 1) {
-            return Status(ErrorCodes::BadValue, "too many positional($) elements found.");
+            return Status(ErrorCodes::BadValue,
+                          str::stream() << "Too many positional (i.e. '$') elements found in path '"
+                                        << _updatePath.dottedField() << "'");
         }
 
         // Validate and store the type to produce
@@ -153,7 +155,10 @@ namespace mongo {
         // If we have a $-positional field, it is time to bind it to an actual field part.
         if (_pathReplacementPosition) {
             if (matchedField.empty()) {
-                return Status(ErrorCodes::BadValue, "matched field not provided");
+                return Status(ErrorCodes::BadValue,
+                              str::stream() << "The positional operator did not find the match "
+                                               "needed from the query. Unexpanded update: "
+                                            << _updatePath.dottedField());
             }
             _preparedState->pathReplacementString = matchedField.toString();
             _updatePath.setPart(_pathReplacementPosition, _preparedState->pathReplacementString);

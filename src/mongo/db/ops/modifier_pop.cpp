@@ -34,8 +34,12 @@
 #include "mongo/db/ops/field_checker.h"
 #include "mongo/db/ops/log_builder.h"
 #include "mongo/db/ops/path_support.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
+
+    namespace mb = mutablebson;
+    namespace str = mongoutils::str;
 
     struct ModifierPop::PreparedState {
 
@@ -92,7 +96,9 @@ namespace mongo {
                                                       &_positionalPathIndex,
                                                       &foundCount);
         if (foundDollar && foundCount > 1) {
-            return Status(ErrorCodes::BadValue, "too many positional($) elements found.");
+            return Status(ErrorCodes::BadValue,
+                          str::stream() << "Too many positional($) elements found in path '"
+                                        << _fieldRef.dottedField() << "'");
         }
 
         //
@@ -118,7 +124,10 @@ namespace mongo {
         // If we have a $-positional field, it is time to bind it to an actual field part.
         if (_positionalPathIndex) {
             if (matchedField.empty()) {
-                return Status(ErrorCodes::BadValue, "matched field not provided");
+                return Status(ErrorCodes::BadValue,
+                              str::stream() << "The positional operator did not find the match "
+                                               "needed from the query. Unexpanded update: "
+                                            << _fieldRef.dottedField());
             }
             _preparedState->pathPositionalPart = matchedField.toString();
             _fieldRef.setPart(_positionalPathIndex, _preparedState->pathPositionalPart);
@@ -135,7 +144,15 @@ namespace mongo {
             // If the path exists, we require the target field to be already an
             // array.
             if (_preparedState->pathFoundElement.getType() != Array) {
-                return Status(ErrorCodes::BadValue, "can only $pop from arrays");
+                mb::Element idElem = mb::findElementNamed(root, "_id");
+                return Status(
+                    ErrorCodes::BadValue,
+                    str::stream() << "Can only $pop from arrays. "
+                                  << idElem.toString()
+                                  << " has the field "
+                                  << _preparedState->pathFoundElement.getFieldName()
+                                  << " of non-array type "
+                                  << typeName(_preparedState->pathFoundElement.getType()));
             }
 
             // No children, nothing to do -- not an error state
@@ -180,7 +197,10 @@ namespace mongo {
             doc.makeElementBool(_fieldRef.dottedField(), true);
 
         if (!logElement.ok()) {
-            return Status(ErrorCodes::InternalError, "cannot create details");
+            return Status(ErrorCodes::InternalError,
+                          str::stream() << "Could not append entry to $pop oplog entry: "
+                                        << "set '" << _fieldRef.dottedField() << "' -> "
+                                        << _preparedState->pathFoundElement.toString() );
         }
 
         // Now, we attach the {<fieldname>: <value>} Element under the {$op: ...} one.

@@ -33,8 +33,11 @@
 #include "mongo/db/ops/field_checker.h"
 #include "mongo/db/ops/log_builder.h"
 #include "mongo/db/ops/path_support.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
+
+    namespace str = mongoutils::str;
 
     struct ModifierUnset::PreparedState {
 
@@ -78,8 +81,7 @@ namespace mongo {
         // field name analysis
         //
 
-        // Break down the field name into its 'dotted' components (aka parts) and check that
-        // there are no empty parts.
+        // Perform standard field name and updateable checks.
         _fieldRef.parse(modExpr.fieldName());
         Status status = fieldchecker::isUpdatableLegacy(_fieldRef);
         if (! status.isOK()) {
@@ -91,8 +93,11 @@ namespace mongo {
         size_t foundCount;
         bool foundDollar = fieldchecker::isPositional(_fieldRef, &_posDollar, &foundCount);
         if (foundDollar && foundCount > 1) {
-            return Status(ErrorCodes::BadValue, "too many positional($) elements found.");
+            return Status(ErrorCodes::BadValue,
+                          str::stream() << "Too many positional (i.e. '$') elements found in path '"
+                                        << _fieldRef.dottedField() << "'");
         }
+
 
         //
         // value analysis
@@ -113,11 +118,15 @@ namespace mongo {
         // If we have a $-positional field, it is time to bind it to an actual field part.
         if (_posDollar) {
             if (matchedField.empty()) {
-                return Status(ErrorCodes::BadValue, "matched field not provided");
+                return Status(ErrorCodes::BadValue,
+                              str::stream() << "The positional operator did not find the match "
+                                               "needed from the query. Unexpanded update: "
+                                            << _fieldRef.dottedField());
             }
             _preparedState->boundDollar = matchedField.toString();
             _fieldRef.setPart(_posDollar, _preparedState->boundDollar);
         }
+
 
         // Locate the field name in 'root'. Note that if we don't have the full path in the
         // doc, there isn't anything to unset, really.

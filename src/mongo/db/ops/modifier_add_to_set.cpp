@@ -33,10 +33,12 @@
 #include "mongo/db/ops/field_checker.h"
 #include "mongo/db/ops/log_builder.h"
 #include "mongo/db/ops/path_support.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
     namespace mb = mutablebson;
+    namespace str = mongoutils::str;
 
     namespace {
 
@@ -129,7 +131,9 @@ namespace mongo {
         size_t foundCount;
         bool foundDollar = fieldchecker::isPositional(_fieldRef, &_posDollar, &foundCount);
         if (foundDollar && foundCount > 1) {
-            return Status(ErrorCodes::BadValue, "too many positional($) elements found.");
+            return Status(ErrorCodes::BadValue,
+                          str::stream() << "Too many positional (i.e. '$') elements found in path '"
+                                        << _fieldRef.dottedField() << "'");
         }
 
         // TODO: The driver could potentially do this re-writing.
@@ -143,7 +147,9 @@ namespace mongo {
                 // set our flag, and store the array as our value.
                 if (modExprObjPayload.type() != mongo::Array) {
                     return Status(ErrorCodes::BadValue,
-                                  "Argument to $each operator in $addToSet must be an array");
+                                  str::stream() << "The argument to $each in $addToSet must "
+                                                   "be an array but it was type of: "
+                                                << typeName(modExprObjPayload.type()));
                 }
 
                 status = _valDoc.root().appendElement(modExprObjPayload);
@@ -178,20 +184,23 @@ namespace mongo {
         while (valCursor.ok()) {
             const BSONType type = valCursor.getType();
             dassert(valCursor.hasValue());
-            bool okForStorage = true;
             switch(type) {
-            case mongo::Object:
-                okForStorage = valCursor.getValueObject().okForStorage();
-                break;
-            case mongo::Array:
-                okForStorage = valCursor.getValueArray().okForStorage();
-                break;
-            default:
+            case mongo::Object: {
+                Status s = valCursor.getValueObject().storageValidEmbedded();
+                if (!s.isOK())
+                    return s;
+
                 break;
             }
+            case mongo::Array: {
+                Status s = valCursor.getValueArray().storageValidEmbedded();
+                if (!s.isOK())
+                    return s;
 
-            if (!okForStorage) {
-                return Status(ErrorCodes::BadValue, "Field name not OK for storage");
+                break;
+            }
+            default:
+                break;
             }
 
             valCursor = valCursor.rightSibling();
@@ -209,7 +218,10 @@ namespace mongo {
         // If we have a $-positional field, it is time to bind it to an actual field part.
         if (_posDollar) {
             if (matchedField.empty()) {
-                return Status(ErrorCodes::BadValue, "matched field not provided");
+                return Status(ErrorCodes::BadValue,
+                              str::stream() << "The positional operator did not find the match "
+                                               "needed from the query. Unexpanded update: "
+                                            << _fieldRef.dottedField());
             }
             _preparedState->boundDollar = matchedField.toString();
             _fieldRef.setPart(_posDollar, _preparedState->boundDollar);
@@ -248,10 +260,17 @@ namespace mongo {
         }
 
         // This operation only applies to arrays
-        if (_preparedState->elemFound.getType() != mongo::Array)
+        if (_preparedState->elemFound.getType() != mongo::Array) {
+            mb::Element idElem = mb::findElementNamed(root.leftChild(), "_id");
             return Status(
                 ErrorCodes::BadValue,
-                "Cannot apply $addToSet to a non-array value");
+                str::stream() << "Cannot apply $addToSet to a non-array field. Field named '"
+                              <<  _preparedState->elemFound.getFieldName()
+                              << "' has a non-array type "
+                              << typeName(_preparedState->elemFound.getType())
+                              << " in the document "
+                              << idElem.toString());
+        }
 
         // If the array is empty, then we don't need to check anything: all of the values are
         // going to be added.
@@ -400,7 +419,9 @@ namespace mongo {
             }
             Status status = logElement.pushBack(currCopy);
             if (!status.isOK()) {
-                return Status(ErrorCodes::BadValue, "could not append entry for $addToSet log");
+                return Status(ErrorCodes::BadValue,
+                              str::stream() << "Could not append entry for $addToSet oplog entry."
+                                            << "Underlying cause: " << status.toString());
             }
             curr = curr.rightSibling();
         }
