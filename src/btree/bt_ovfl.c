@@ -224,13 +224,13 @@ __val_ovfl_cache_row(WT_SESSION_IMPL *session,
 	 * from the beginning after we acquire the lock so we can't overlap with
 	 * a truncation.
 	 */
-	__wt_spin_lock(session, &S2C(session)->serial_lock);
+	__wt_spin_lock(session, &S2BT(session)->serial_lock);
 	for (upd = WT_ROW_UPDATE(page, rip);; upd = upd->next)
 		if (upd->next == NULL) {
 			upd->next = new;
 			break;
 		}
-	__wt_spin_unlock(session, &S2C(session)->serial_lock);
+	__wt_spin_unlock(session, &S2BT(session)->serial_lock);
 
 	/* Update the in-memory footprint. */
 	__wt_cache_page_inmem_incr(session, page, upd_size);

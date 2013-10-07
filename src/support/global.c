@@ -31,7 +31,13 @@ __system_is_little_endian(void)
 static void
 __wt_pthread_once(void)
 {
-	__wt_spin_init(NULL, &__wt_process.spinlock);
+	WT_DECL_RET;
+
+	if ((ret = __wt_spin_init(NULL, &__wt_process.spinlock)) != 0) {
+		__wt_pthread_once_failed = ret;
+		return;
+	}
+
 	__wt_cksum_init();
 
 	TAILQ_INIT(&__wt_process.connqh);

@@ -214,7 +214,10 @@ typedef	volatile int WT_SPINLOCK;
 
 #elif SPINLOCK_TYPE == SPINLOCK_PTHREAD_MUTEX
 
-typedef pthread_mutex_t WT_SPINLOCK;
+typedef	struct {
+	pthread_mutex_t lock;
+	int initialized;
+} WT_SPINLOCK;
 
 #else
 
