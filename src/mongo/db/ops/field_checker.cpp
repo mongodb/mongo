@@ -44,21 +44,25 @@ namespace fieldchecker {
             const size_t numParts = field.numParts();
 
             if (numParts == 0) {
-                return Status(ErrorCodes::BadValue, "cannot update an empty field name");
+                return Status(ErrorCodes::EmptyFieldName,
+                              "An empty update path is not valid.");
             }
 
             for (size_t i = 0; i != numParts; ++i) {
                 const StringData part = field.getPart(i);
 
                 if ((i == 0) && part.compare("_id") == 0) {
-                    return Status(ErrorCodes::BadValue,
-                                  "update cannot affect the _id");
+                    return Status(ErrorCodes::ImmutableIdField,
+                                  mongoutils::str::stream() << "The update path '"
+                                  << field.dottedField()
+                                  << "' contains the '_id' field, which cannot be updated.");
                 }
 
                 if (part.empty()) {
-                    return Status(ErrorCodes::BadValue,
-                                  mongoutils::str::stream() << field.dottedField()
-                                  << " contains empty fields");
+                    return Status(ErrorCodes::EmptyFieldName,
+                                  mongoutils::str::stream() << "The update path '"
+                                  << field.dottedField()
+                                  << "' contains an empty field, which is not allowed.");
                 }
 
                 if (!legacy && (part[0] == '$')) {
@@ -88,9 +92,11 @@ namespace fieldchecker {
                             part.startsWith("$ref");
 
                         if (!mightBePartOfDbRef)
-                            return Status(ErrorCodes::BadValue,
-                                          mongoutils::str::stream() << field.dottedField()
-                                          << " contains field names with leading '$' character");
+                            return Status(ErrorCodes::DollarPrefixedFieldName,
+                                          mongoutils::str::stream() << "The update path '"
+                                              << field.dottedField()
+                                              << "' contains an illegal field name "
+                                                      "(field name starts with '$').");
 
                     }
 

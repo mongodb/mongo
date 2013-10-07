@@ -29,6 +29,7 @@
 #include "mongo/db/ops/modifier_inc.h"
 
 #include "mongo/base/error_codes.h"
+#include "mongo/bson/mutable/algorithm.h"
 #include "mongo/bson/mutable/document.h"
 #include "mongo/db/ops/field_checker.h"
 #include "mongo/db/ops/log_builder.h"
@@ -37,7 +38,8 @@
 
 namespace mongo {
 
-    using mongoutils::str::stream;
+    namespace mb = mutablebson;
+    namespace str = mongoutils::str;
 
     struct ModifierInc::PreparedState {
 
@@ -98,7 +100,9 @@ namespace mongo {
         size_t foundCount;
         bool foundDollar = fieldchecker::isPositional(_fieldRef, &_posDollar, &foundCount);
         if (foundDollar && foundCount > 1) {
-            return Status(ErrorCodes::BadValue, "too many positional($) elements found.");
+            return Status(ErrorCodes::BadValue,
+                          str::stream() << "Too many positional (i.e. '$') elements found in path '"
+                                        << _fieldRef.dottedField() << "'");
         }
 
         //
@@ -109,7 +113,8 @@ namespace mongo {
             // TODO: Context for mod error messages would be helpful
             // include mod code, etc.
             return Status(ErrorCodes::BadValue,
-                          "Cannot increment with non-numeric argument");
+                          str::stream() << "Cannot increment with non-numeric argument: "
+                                        << modExpr);
         }
 
         _val = modExpr;
@@ -127,7 +132,10 @@ namespace mongo {
         // If we have a $-positional field, it is time to bind it to an actual field part.
         if (_posDollar) {
             if (matchedField.empty()) {
-                return Status(ErrorCodes::BadValue, "matched field not provided");
+                return Status(ErrorCodes::BadValue,
+                              str::stream() << "The positional operator did not find the match "
+                                               "needed from the query. Unexpanded update: "
+                                            << _fieldRef.dottedField());
             }
             _preparedState->boundDollar = matchedField.toString();
             _fieldRef.setPart(_posDollar, _preparedState->boundDollar);
@@ -180,10 +188,16 @@ namespace mongo {
 
         // If the value being $inc'ed is the same as the one already in the doc, than this is a
         // noOp.
-        if (!_preparedState->elemFound.isNumeric())
-            return Status(ErrorCodes::BadValue,
-                          "invalid attempt to increment a non-numeric field");
-
+        if (!_preparedState->elemFound.isNumeric()) {
+            mb::Element idElem = mb::findElementNamed(root.leftChild(), "_id");
+            return Status(
+                ErrorCodes::BadValue,
+                str::stream() << "Cannot apply $inc to a value of non-numeric type."
+                              << idElem.toString()
+                              << " has the field " <<  _preparedState->elemFound.getFieldName()
+                              << " of non-numeric type "
+                              << typeName(_preparedState->elemFound.getType()));
+        }
         const SafeNum currentValue = _preparedState->elemFound.getValueSafeNum();
 
         // Update newValue w.r.t to the current value of the found element.
@@ -193,9 +207,11 @@ namespace mongo {
             _preparedState->newValue *= currentValue;
 
         // If the result of the addition is invalid, we must return an error.
-        if (!_preparedState->newValue.isValid())
+        if (!_preparedState->newValue.isValid()) {
             return Status(ErrorCodes::BadValue,
-                          "Failed to increment current value");
+                          str::stream() << "Failed to apply $inc operations to current value: "
+                                        << currentValue.debugString());
+        }
 
         // If the values are identical (same type, same value), then this is a no-op.
         if (_preparedState->newValue.isIdentical(currentValue)) {
@@ -260,7 +276,12 @@ namespace mongo {
             _preparedState->newValue);
 
         if (!logElement.ok()) {
-            return Status(ErrorCodes::InternalError, "cannot append details for $inc/$mul mod");
+            return Status(ErrorCodes::InternalError,
+                          str::stream() << "Could not append entry to "
+                                        << (_mode == MODE_INC ? "$inc" : "$mul")
+                                        << " oplog entry: "
+                                        << "set '" << _fieldRef.dottedField() << "' -> "
+                                        << _preparedState->newValue.debugString() );
         }
 
         // Now, we attach the {<fieldname>: <value>} Element under the {$set: ...} segment.

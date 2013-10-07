@@ -21,9 +21,11 @@
 #include "mongo/db/ops/field_checker.h"
 #include "mongo/db/ops/log_builder.h"
 #include "mongo/db/ops/path_support.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
+    namespace str = mongoutils::str;
 
     struct ModifierCompare::PreparedState {
 
@@ -55,6 +57,7 @@ namespace mongo {
     }
 
     Status ModifierCompare::init(const BSONElement& modExpr, const Options& opts) {
+
         _updatePath.parse(modExpr.fieldName());
         Status status = fieldchecker::isUpdatable(_updatePath);
         if (!status.isOK()) {
@@ -66,7 +69,9 @@ namespace mongo {
         size_t foundCount;
         fieldchecker::isPositional(_updatePath, &_pathReplacementPosition, &foundCount);
         if (_pathReplacementPosition && foundCount > 1) {
-            return Status(ErrorCodes::BadValue, "too many positional($) elements found.");
+            return Status(ErrorCodes::BadValue,
+                          str::stream() << "Too many positional (i.e. '$') elements found in path '"
+                                        << _updatePath.dottedField() << "'");
         }
 
         // Store value for later.
@@ -83,7 +88,10 @@ namespace mongo {
         // If we have a $-positional field, it is time to bind it to an actual field part.
         if (_pathReplacementPosition) {
             if (matchedField.empty()) {
-                return Status(ErrorCodes::BadValue, "matched field not provided");
+                return Status(ErrorCodes::BadValue,
+                              str::stream() << "The positional operator did not find the match "
+                                               "needed from the query. Unexpanded update: "
+                                            << _updatePath.dottedField());
             }
             _preparedState->pathReplacementString = matchedField.toString();
             _updatePath.setPart(_pathReplacementPosition, _preparedState->pathReplacementString);

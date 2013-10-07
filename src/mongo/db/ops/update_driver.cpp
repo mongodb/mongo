@@ -42,6 +42,8 @@
 
 namespace mongo {
 
+    namespace str = mongoutils::str;
+
     UpdateDriver::UpdateDriver(const Options& opts)
         : _multi(opts.multi)
         , _upsert(opts.upsert)
@@ -91,17 +93,25 @@ namespace mongo {
             // Check whether this is a valid mod type.
             modifiertable::ModifierType modType = modifiertable::getType(outerModElem.fieldName());
             if (modType == modifiertable::MOD_UNKNOWN) {
-                return Status(ErrorCodes::FailedToParse, "unknown modifier type");
+                return Status(ErrorCodes::FailedToParse,
+                              str::stream() << "Unknown modifier: " << outerModElem.fieldName());
             }
 
             // Check whether there is indeed a list of mods under this modifier.
             if (outerModElem.type() != Object) {
-                return Status(ErrorCodes::FailedToParse, "List of mods must be an object");
+                return Status(ErrorCodes::FailedToParse,
+                              str::stream() << "List of $mods must be an embedded document"
+                                                  " but it is a  "
+                                            << typeName(outerModElem.type())
+                                            << " instead.");
             }
 
             // Check whether there are indeed mods under this modifier.
             if (outerModElem.embeddedObject().isEmpty()) {
-                return Status(ErrorCodes::FailedToParse, "Empty expression after update $mod");
+                return Status(ErrorCodes::FailedToParse,
+                              str::stream() << outerModElem.fieldName()
+                                            << " is empty. You must specify a field like so: "
+                                                    "{$mod: {<field>: ...}}");
             }
 
             BSONObjIterator innerIter(outerModElem.embeddedObject());
@@ -110,7 +120,10 @@ namespace mongo {
 
                 if (innerModElem.eoo()) {
                     return Status(ErrorCodes::FailedToParse,
-                                  "empty entry in $mod expression list");
+                                  str::stream() << outerModElem.fieldName()
+                                                << "." << innerModElem.fieldName()
+                                                << " has no value: " << innerModElem
+                                                << " which is not allowed for any $<mod>.");
                 }
 
                 auto_ptr<ModifierInterface> mod(modifiertable::makeUpdateMod(modType));
@@ -230,10 +243,11 @@ namespace mongo {
                     const FieldRef* other;
                     if (!targetFields.insert(execInfo.fieldRef[i], &other)) {
                         return Status(ErrorCodes::ConflictingUpdateOperators,
-                                      mongoutils::str::stream()
-                                      << "Cannot update '" << other->dottedField()
-                                      << "' and '" << execInfo.fieldRef[i]->dottedField()
-                                      << "' at the same time");
+                                      str::stream() << "Cannot update '"
+                                                    << other->dottedField()
+                                                    << "' and '"
+                                                    << execInfo.fieldRef[i]->dottedField()
+                                                    << "' at the same time");
                     }
                 }
 
@@ -342,7 +356,10 @@ namespace mongo {
            return idPattern.obj();
         }
         else {
-           uassert( 16980, "multi-update requires all modified objects to have an _id" , ! multi );
+           uassert( 16980,
+                    str::stream() << "Multi-update operations require all documents to "
+                                     "have an '_id' field. " << doc.toString(false, false),
+                    ! multi );
            return doc;
         }
     }

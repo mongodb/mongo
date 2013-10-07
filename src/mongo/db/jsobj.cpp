@@ -932,7 +932,7 @@ namespace mongo {
                      && str::equals(name,"_id")) {
                 return Status(ErrorCodes::InvalidIdField,
                               str::stream() << name
-                                            << " is not valid for storage because of the type: "
+                                            << " is not valid for storage because it is of type "
                                             << typeName(e.type()));
             }
 

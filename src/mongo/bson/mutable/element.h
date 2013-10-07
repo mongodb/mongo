@@ -548,7 +548,8 @@ namespace mutablebson {
          */
         Status appendSafeNum(const StringData& fieldName, SafeNum value);
 
-        /** Convert this element to its JSON representation */
+        /** Convert this element to its JSON representation if ok(),
+         *  otherwise return !ok() message */
         std::string toString() const;
 
     private:
