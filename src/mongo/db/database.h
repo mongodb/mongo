@@ -96,6 +96,8 @@ namespace mongo {
          */
         void preallocateAFile() { _extentManager.preallocateAFile(); }
 
+        Extent* allocExtent( const char *ns, int size, bool capped, bool enforceQuota );
+
         /**
          * @return true if success.  false if bad level or error creating profile ns
          */
@@ -130,8 +132,6 @@ namespace mongo {
 
         Status dropCollection( const StringData& fullns );
 
-        CollectionTemp* createCollection( const StringData& ns, bool capped, const BSONObj* options );
-
         /**
          * @param ns - this is fully qualified, which is maybe not ideal ???
          */
@@ -150,11 +150,7 @@ namespace mongo {
 
     private:
 
-        void _clearCollectionCache( const StringData& fullns );
-
         ~Database(); // closes files and other cleanup see below.
-
-        void _addNamespaceToCatalog( const StringData& ns, const BSONObj* options );
 
         /**
          * make sure namespace is initialized and $freelist is allocated before
@@ -205,7 +201,6 @@ namespace mongo {
         CollectionMap _collections;
         mutex _collectionLock;
 
-        friend class NamespaceDetails;
     };
 
 } // namespace mongo

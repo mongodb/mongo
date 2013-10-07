@@ -62,9 +62,6 @@ namespace mongo {
 
         bool ok() const { return _magic == 1357924; }
 
-        NamespaceDetails* details() { return _details; } // TODO: remove
-        const NamespaceDetails* details() const { return _details; }
-
         const NamespaceString& ns() const { return _ns; }
 
         BSONObj docFor( const DiskLoc& loc );
@@ -77,16 +74,7 @@ namespace mongo {
                              bool noWarn = false,
                              BSONObj* deletedId = 0 );
 
-        // this is temporary, moving up from DB for now
-        // this will add a new extent the collection
-        // the new extent will be returned
-        // it will have been added to the linked list already
-        Extent* increaseStorageSize( int size, bool enforceQuota );
-
     private:
-
-        // @return 0 for inf., otherwise a number of files
-        int largestFileNumberInQuota() const;
 
         ExtentManager* getExtentManager();
         const ExtentManager* getExtentManager() const;
