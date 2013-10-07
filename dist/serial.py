@@ -104,7 +104,7 @@ typedef struct {
 ''')
 		else:
 			f.write('\targs->' + l.name + ' = ' + l.name + ';\n\n')
-	f.write('\t__wt_spin_lock(session, &S2C(session)->serial_lock);\n')
+	f.write('\t__wt_spin_lock(session, &S2BT(session)->serial_lock);\n')
 	f.write('\tret = __wt_' + entry.name + '_serial_func(session, args);\n')
 
 	if sizes:
@@ -124,7 +124,7 @@ typedef struct {
 \t\t__wt_cache_page_inmem_incr(session, page, incr_mem);
 
 ''')
-	f.write('\t__wt_spin_unlock(session, &S2C(session)->serial_lock);\n')
+	f.write('\t__wt_spin_unlock(session, &S2BT(session)->serial_lock);\n')
 
 	if sizes:
 		f.write('''

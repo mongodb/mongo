@@ -278,10 +278,12 @@ err:	/*
 
 	if (F_ISSET(txn, TXN_RUNNING))
 		__wt_txn_release(session);
+	else
+		__wt_txn_release_snapshot(session);
 	__wt_spin_unlock(session, &conn->checkpoint_lock);
 
 	__wt_scr_free(&tmp);
-	session->isolation = saved_isolation;
+	session->isolation = txn->isolation = saved_isolation;
 	return (ret);
 }
 
