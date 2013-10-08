@@ -1,11 +1,9 @@
 // This test is a basic sanity check of the shell helpers for manipulating user objects
 // It is not a comprehensive test of the functionality of the user manipulation commands
-function assertHasRole(rolesArray, roleName, roleDB, hasRole, canDelegate) {
+function assertHasRole(rolesArray, roleName, roleDB) {
     for (i in rolesArray) {
         var curRole = rolesArray[i];
         if (curRole.name == roleName && curRole.db == roleDB) {
-            assert.eq(hasRole, curRole.hasRole);
-            assert.eq(canDelegate, curRole.canDelegate);
             return;
         }
     }
@@ -24,7 +22,7 @@ function assertHasRole(rolesArray, roleName, roleDB, hasRole, canDelegate) {
      // Test getUser
      var userObj = db.getUser('spencer');
      assert.eq(1, userObj.roles.length);
-     assertHasRole(userObj.roles, "readWrite", db.getName(), true, false);
+     assertHasRole(userObj.roles, "readWrite", db.getName());
 
      // Test getUsers
      var users = db.getUsers();
@@ -33,9 +31,8 @@ function assertHasRole(rolesArray, roleName, roleDB, hasRole, canDelegate) {
      assert(users[0].name == 'andy' || users[1].name == 'andy');
      assert.eq(1, users[0].roles.length);
      assert.eq(1, users[1].roles.length);
-     assertHasRole(users[0].roles, "readWrite", db.getName(), true, false);
-     assertHasRole(users[1].roles, "readWrite", db.getName(), true, false);
-
+     assertHasRole(users[0].roles, "readWrite", db.getName());
+     assertHasRole(users[1].roles, "readWrite", db.getName());
 
      // Granting roles to nonexistent user fails
      assert.throws(function() { db.grantRolesToUser("fakeUser", ['dbAdmin']); });
@@ -44,35 +41,20 @@ function assertHasRole(rolesArray, roleName, roleDB, hasRole, canDelegate) {
 
      userObj = db.getUser('spencer');
      assert.eq(1, userObj.roles.length);
-     assertHasRole(userObj.roles, "readWrite", db.getName(), true, false);
+     assertHasRole(userObj.roles, "readWrite", db.getName());
 
      // Granting a role you already have is no problem
      db.grantRolesToUser("spencer", ['readWrite', 'dbAdmin']);
      userObj = db.getUser('spencer');
      assert.eq(2, userObj.roles.length);
-     assertHasRole(userObj.roles, "readWrite", db.getName(), true, false);
-     assertHasRole(userObj.roles, "dbAdmin", db.getName(), true, false);
-
-     // Grant delgation
-     db.grantDelegateRolesToUser("spencer", ['readWrite', 'read']);
-     userObj = db.getUser('spencer');
-     assert.eq(3, userObj.roles.length);
-     assertHasRole(userObj.roles, "readWrite", db.getName(), true, true);
-     assertHasRole(userObj.roles, "dbAdmin", db.getName(), true, false);
-     assertHasRole(userObj.roles, "read", db.getName(), false, true);
-
-     // read role is unaffected b/c user only had delegate on it, dbAdmin role is completely removed
-     db.revokeRolesFromUser("spencer", ['readWrite', 'dbAdmin', 'read'])
-     userObj = db.getUser('spencer');
-     assert.eq(2, userObj.roles.length);
-     assertHasRole(userObj.roles, "readWrite", db.getName(), false, true);
-     assertHasRole(userObj.roles, "read", db.getName(), false, true);
+     assertHasRole(userObj.roles, "readWrite", db.getName());
+     assertHasRole(userObj.roles, "dbAdmin", db.getName());
 
      // Revoking roles the user doesn't have is fine
-     db.revokeDelegateRolesFromUser('spencer', ['read', 'dbAdmin'])
+     db.revokeRolesFromUser("spencer", ['dbAdmin', 'read'])
      userObj = db.getUser('spencer');
      assert.eq(1, userObj.roles.length);
-     assertHasRole(userObj.roles, "readWrite", db.getName(), false, true);
+     assertHasRole(userObj.roles, "readWrite", db.getName());
 
      // Test dropUser
      db.dropUser('andy');

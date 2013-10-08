@@ -1186,28 +1186,8 @@ DB.prototype.grantRolesToUser = function(username, roles, writeConcern) {
     }
 }
 
-DB.prototype.grantDelegateRolesToUser = function(username, roles, writeConcern) {
-    var cmdObj = {grantDelegateRolesToUser: username,
-                  roles: roles,
-                  writeConcern: writeConcern ? writeConcern : _defaultWriteConcern};
-    var res = this.runCommand(cmdObj);
-    if (!res.ok) {
-        throw Error(res.errmsg);
-    }
-}
-
 DB.prototype.revokeRolesFromUser = function(username, roles, writeConcern) {
     var cmdObj = {revokeRolesFromUser: username,
-                  roles: roles,
-                  writeConcern: writeConcern ? writeConcern : _defaultWriteConcern};
-    var res = this.runCommand(cmdObj);
-    if (!res.ok) {
-        throw Error(res.errmsg);
-    }
-}
-
-DB.prototype.revokeDelegateRolesFromUser = function(username, roles, writeConcern) {
-    var cmdObj = {revokeDelegateRolesFromUser: username,
                   roles: roles,
                   writeConcern: writeConcern ? writeConcern : _defaultWriteConcern};
     var res = this.runCommand(cmdObj);
