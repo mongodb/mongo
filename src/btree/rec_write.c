@@ -3962,10 +3962,15 @@ err:			__wt_scr_free(&tkey);
 	 * the page is clean (that's not quite correct, see the page-modify-set
 	 * function's comment for clarification), we won't race.
 	 */
-	__wt_cache_dirty_decr(session, page);
-	if (r->upd_skipped ||
-	    !WT_ATOMIC_CAS(mod->write_gen, r->orig_write_gen, 0))
-		__wt_cache_dirty_incr(session, page);
+	if (!r->upd_skipped) {
+		mod->disk_txn = r->max_txn;
+
+		if (WT_ATOMIC_CAS(mod->write_gen, r->orig_write_gen, 0))
+			__wt_cache_dirty_decr(session, page);
+	}
+
+	/* Record the most recent transaction ID we have *not* written. */
+	mod->disk_snap_min = session->txn.snap_min;
 
 	return (0);
 }
