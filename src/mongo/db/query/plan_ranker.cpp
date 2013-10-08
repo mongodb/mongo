@@ -105,9 +105,10 @@ namespace mongo {
                             / static_cast<double>(stats->common.works);
 
         // How selective do we think an index is?
-        double selectivity = computeSelectivity(stats);
+        //double selectivity = computeSelectivity(stats);
 
-        return baseScore + productivity + selectivity;
+        return baseScore + productivity;
+        //return baseScore + productivity + selectivity;
     }
 
 }  // namespace mongo
