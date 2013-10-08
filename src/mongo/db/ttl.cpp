@@ -119,7 +119,7 @@ namespace mongo {
                         continue;
                     }
 
-                    n = deleteObjects( ns.c_str() , query , false , true );
+                    n = deleteObjects( ns , query , false , true );
                     ttlDeletedDocuments.increment( n );
                 }
 

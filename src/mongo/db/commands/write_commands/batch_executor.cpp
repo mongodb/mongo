@@ -326,7 +326,7 @@ namespace mongo {
         long long n;
 
         try {
-            n = deleteObjects( ns.c_str(), queryObj, // ns, query
+            n = deleteObjects( ns, queryObj, // ns, query
                                false, // justOne
                                true, // logOp
                                false // god

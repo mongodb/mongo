@@ -44,24 +44,24 @@
 #include "mongo/util/stacktrace.h"
 
 namespace mongo {
-    
+
     /* ns:      namespace, e.g. <database>.<collection>
        pattern: the "where" clause / criteria
        justOne: stop after 1 match
        god:     allow access to system namespaces, and don't yield
     */
-    long long deleteObjects(const char *ns, BSONObj pattern, bool justOne, bool logop, bool god) {
+    long long deleteObjects(const StringData& ns, BSONObj pattern, bool justOne, bool logop, bool god) {
         if( !god ) {
-            if ( strstr(ns, ".system.") ) {
+            if ( ns.find( ".system.") != string::npos ) {
                 /* note a delete from system.indexes would corrupt the db
                 if done here, as there are pointers into those objects in
                 NamespaceDetails.
                 */
-                uassert(12050, "cannot delete from system namespace", legalClientSystemNS( ns , true ) );
+                uassert(12050, "cannot delete from system namespace", legalClientSystemNS( ns, true ) );
             }
-            if ( strchr( ns , '$' ) ) {
+            if ( ns.find( '$' ) != string::npos ) {
                 log() << "cannot delete from collection with reserved $ in name: " << ns << endl;
-                uassert( 10100 ,  "cannot delete from collection with reserved $ in name", strchr(ns, '$') == 0 );
+                uasserted( 10100, "cannot delete from collection with reserved $ in name" );
             }
         }
 
@@ -69,8 +69,10 @@ namespace mongo {
             NamespaceDetails *d = nsdetails( ns );
             if ( ! d )
                 return 0;
-            uassert( 10101 ,  "can't remove from a capped collection" , ! d->isCapped() );
+            uassert( 10101, "can't remove from a capped collection", ! d->isCapped() );
         }
+
+        string nsForLoOp = ns.toString(); // XXX-ERH
 
         long long nDeleted = 0;
 
@@ -142,7 +144,7 @@ namespace mongo {
                     BSONObjBuilder b;
                     b.append( e );
                     bool replJustOne = true;
-                    logOp( "d", ns, b.done(), 0, &replJustOne );
+                    logOp( "d", nsForLoOp.c_str(), b.done(), 0, &replJustOne );
                 }
                 else {
                     problem() << "deleted object without id, not logging" << endl;

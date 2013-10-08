@@ -58,7 +58,7 @@ namespace mongo {
      */
     class ClientCursor : private boost::noncopyable {
     public:
-        ClientCursor(int qopts, const shared_ptr<Cursor>& c, const string& ns,
+        ClientCursor(int qopts, const shared_ptr<Cursor>& c, const StringData& ns,
                      BSONObj query = BSONObj());
 
         ClientCursor(Runner* runner, int qopts = 0, const BSONObj query = BSONObj());

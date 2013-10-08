@@ -66,10 +66,6 @@ namespace mongo {
     void dropDatabase(const std::string& db);
     bool repairDatabase(string db, string &errmsg, bool preserveClonedFilesOnFailure = false, bool backupOriginalFiles = false);
 
-    /* low level - only drops this ns */
-    void dropNS(const string& dropNs);
-
-    /* deletes this ns, indexes and cursors */
     bool userCreateNS(const char *ns, BSONObj j, string& err, bool logForReplication, bool *deferIdIndex = 0);
     shared_ptr<Cursor> findTableScan(const char *ns, const BSONObj& order, const DiskLoc &startLoc=DiskLoc());
 

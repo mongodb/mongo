@@ -199,7 +199,7 @@ namespace mongo {
             if ( remove ) {
                 _appendHelper( result , doc , found , fields );
                 if ( found ) {
-                    deleteObjects( ns.c_str() , queryModified , true , true );
+                    deleteObjects( ns , queryModified , true , true );
                     BSONObjBuilder le( result.subobjStart( "lastErrorObject" ) );
                     le.appendNumber( "n" , 1 );
                     le.done();
