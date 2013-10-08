@@ -39,13 +39,14 @@ namespace mongo {
      * This name sucks, but every name involving 'index' is used somewhere.
      */
     struct IndexEntry {
-        IndexEntry(const BSONObj& kp, bool mk, bool sp)
-            : keyPattern(kp), multikey(mk), sparse(sp) { }
+        IndexEntry(const BSONObj& kp, bool mk, bool sp, const string& n)
+            : keyPattern(kp), multikey(mk), sparse(sp), name(n) { }
 
         IndexEntry(const IndexEntry& other) {
             keyPattern = other.keyPattern;
             multikey = other.multikey;
             sparse = other.sparse;
+            name = other.name;
         }
 
         BSONObj keyPattern;
@@ -53,6 +54,8 @@ namespace mongo {
         bool multikey;
 
         bool sparse;
+
+        string name;
 
         std::string toString() const {
             stringstream ss;

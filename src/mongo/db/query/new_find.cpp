@@ -187,7 +187,7 @@ namespace mongo {
         vector<IndexEntry> indices;
         for (int i = 0; i < nsd->getCompletedIndexCount(); ++i) {
             auto_ptr<IndexDescriptor> desc(CatalogHack::getDescriptor(nsd, i));
-            indices.push_back(IndexEntry(desc->keyPattern(), desc->isMultikey(), desc->isSparse()));
+            indices.push_back(IndexEntry(desc->keyPattern(), desc->isMultikey(), desc->isSparse(), desc->indexName()));
         }
 
         vector<QuerySolution*> solutions;

@@ -61,7 +61,8 @@ namespace {
         void addIndex(BSONObj keyPattern) {
             // The first false means not multikey.
             // The second false means not sparse.
-            keyPatterns.push_back(IndexEntry(keyPattern, false, false));
+            // The third arg is the index name and I am egotistical.
+            keyPatterns.push_back(IndexEntry(keyPattern, false, false, "hari_king_of_the_stove"));
         }
 
         void addIndex(BSONObj keyPattern, bool multikey, bool sparse) {

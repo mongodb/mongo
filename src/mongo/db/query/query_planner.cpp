@@ -1129,19 +1129,39 @@ namespace mongo {
         size_t hintIndexNumber = numeric_limits<size_t>::max();
 
         if (!hintIndex.isEmpty()) {
-            for (size_t i = 0; i < indices.size(); ++i) {
-                if (0 == indices[i].keyPattern.woCompare(hintIndex)) {
-                    relevantIndices.clear();
-                    relevantIndices.push_back(indices[i]);
-                    cout << "hint specified, restricting indices to " << hintIndex.toString()
-                         << endl;
-                    hintIndexNumber = i;
-                    break;
+            // Sigh.  If the hint is specified it might be using the index name.
+            BSONElement firstHintElt = hintIndex.firstElement();
+            if (str::equals("$hint", firstHintElt.fieldName()) && String == firstHintElt.type()) {
+                string hintName = firstHintElt.String();
+                for (size_t i = 0; i < indices.size(); ++i) {
+                    if (indices[i].name == hintName) {
+                        cout << "hint by name specified, restricting indices to "
+                             << indices[i].keyPattern.toString() << endl;
+                        relevantIndices.clear();
+                        relevantIndices.push_back(indices[i]);
+                        hintIndexNumber = i;
+                        hintIndex = indices[i].keyPattern;
+                        break;
+                    }
                 }
             }
+            else {
+                for (size_t i = 0; i < indices.size(); ++i) {
+                    if (0 == indices[i].keyPattern.woCompare(hintIndex)) {
+                        relevantIndices.clear();
+                        relevantIndices.push_back(indices[i]);
+                        cout << "hint specified, restricting indices to " << hintIndex.toString()
+                             << endl;
+                        hintIndexNumber = i;
+                        break;
+                    }
+                }
+            }
+
             if (hintIndexNumber == numeric_limits<size_t>::max()) {
-                warning() << "Hinted index " << hintIndex.toString()
-                          << " does not exist, ignoring.";
+                warning() << "Can't find hint for " << hintIndex.toString()
+                          << ", ignoring.";
+                hintIndex = BSONObj();
             }
         }
         else {
