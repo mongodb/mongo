@@ -82,8 +82,8 @@ namespace mongo {
 #ifdef __linux__
         if (boost::filesystem::exists("/proc/vz") && !boost::filesystem::exists("/proc/bc")) {
             log() << startupWarningsLog;
-            log() << "** WARNING: You are running in OpenVZ. This is known to be broken!!!"
-                  << startupWarningsLog;
+            log() << "** WARNING: You are running in OpenVZ which can cause issues on versions "
+                  << "of RHEL older than RHEL6." << startupWarningsLog;
             warned = true;
         }
 
