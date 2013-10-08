@@ -101,17 +101,41 @@ namespace mongo {
     bool isNewQueryFrameworkEnabled() { return newQueryFrameworkEnabled; }
     void enableNewQueryFramework() { newQueryFrameworkEnabled = true; }
 
+    // Do we use the old or the new?  I call this the spigot.
+    bool canUseNewSystem(const QueryMessage& qm, CanonicalQuery** cqOut) {
+        CanonicalQuery* cq;
+        Status status = CanonicalQuery::canonicalize(qm, &cq);
+        if (!status.isOK()) { return false; }
+        auto_ptr<CanonicalQuery> scopedCq(cq);
+
+        const LiteParsedQuery& pq = cq->getParsed();
+
+        // Things we know we fail at:
+        if (!pq.getSort().isEmpty()) {
+            // We can deal with this 'cuz it means do a collscan.
+            BSONElement natural = pq.getSort().getFieldDotted("$natural");
+            if (natural.eoo()) {
+                cout << "rejecting query w/sort\n";
+                return false;
+            }
+        }
+
+        if (!pq.getProj().isEmpty()) {
+            cout << "rejecting query w/proj\n";
+            return false;
+        }
+
+        *cqOut = scopedCq.release();
+        return true;
+    }
+
     /**
      * For a given query, get a runner.  The runner could be a SingleSolutionRunner, a
      * CachedQueryRunner, or a MultiPlanRunner, depending on the cache/query solver/etc.
      */
-    Status getRunner(QueryMessage& q, Runner** out, CanonicalQuery** rawCanonicalQuery) {
-        // Canonicalize the query and wrap it in an auto_ptr so we don't leak it if something goes
-        // wrong.
-        Status status = CanonicalQuery::canonicalize(q, rawCanonicalQuery);
-        if (!status.isOK()) { return status; }
+    Status getRunner(CanonicalQuery* rawCanonicalQuery, Runner** out) {
         verify(rawCanonicalQuery);
-        auto_ptr<CanonicalQuery> canonicalQuery(*rawCanonicalQuery);
+        auto_ptr<CanonicalQuery> canonicalQuery(rawCanonicalQuery);
 
         // Try to look up a cached solution for the query.
         // TODO: Can the cache have negative data about a solution?
@@ -389,17 +413,17 @@ namespace mongo {
     /**
      * This is called by db/ops/query.cpp.  This is the entry point for answering a query.
      */
-    std::string newRunQuery(Message& m, QueryMessage& q, CurOp& curop, Message &result) {
+    std::string newRunQuery(CanonicalQuery* cq, CurOp& curop, Message &result) {
         // This is a read lock.
-        Client::ReadContext ctx(q.ns, storageGlobalParams.dbpath);
+        Client::ReadContext ctx(cq->ns(), storageGlobalParams.dbpath);
 
         // Parse, canonicalize, plan, transcribe, and get a runner.
         Runner* rawRunner;
-        CanonicalQuery* cq;
-        Status status = getRunner(q, &rawRunner, &cq);
+        // Takes ownership of cq.
+        Status status = getRunner(cq, &rawRunner);
         if (!status.isOK()) {
-            uasserted(17007, "Couldn't process query " + q.query.toString()
-                         + " why: " + status.reason());
+            uasserted(17007, "Couldn't process query " + cq->toString()
+                             + " why: " + status.reason());
         }
         verify(NULL != rawRunner);
         auto_ptr<Runner> runner(rawRunner);
@@ -407,7 +431,7 @@ namespace mongo {
         log() << "Running query on new system: " << cq->toString();
 
         // We freak out later if this changes before we're done with the query.
-        const ChunkVersion shardingVersionAtStart = shardingState.getVersion(q.ns);
+        const ChunkVersion shardingVersionAtStart = shardingState.getVersion(cq->ns());
 
         // We use this a lot below.
         const LiteParsedQuery& pq = cq->getParsed();

@@ -32,6 +32,7 @@
 
 #include "mongo/db/curop.h"
 #include "mongo/db/dbmessage.h"
+#include "mongo/db/query/canonical_query.h"
 #include "mongo/util/net/message.h"
 
 namespace mongo {
@@ -54,7 +55,17 @@ namespace mongo {
 
     /**
      * Called from the runQuery entry point in ops/query.cpp.
+     *
+     * Takes ownership of cq.
      */
-    std::string newRunQuery(Message& m, QueryMessage& q, CurOp& curop, Message &result);
+    std::string newRunQuery(CanonicalQuery* cq, CurOp& curop, Message &result);
+
+    /**
+     * Can the new system handle the provided query?
+     *
+     * Returns false if not.  cqOut is not modified.
+     * Returns true if so.  Caller owns *cqOut.
+     */
+    bool canUseNewSystem(const QueryMessage& qm, CanonicalQuery** cqOut);
 
 }  // namespace mongo
