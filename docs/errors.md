@@ -741,20 +741,6 @@ src/mongo/db/nonce.cpp
 * 10355 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/nonce.cpp#L62) devrandom failed
 
 
-src/mongo/db/oplog.cpp
-----
-* 13044 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/oplog.cpp#L524) no ts field in query
-* 13257 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/oplog.cpp#L349) 
-* 13288 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/oplog.cpp#L52) replSet error write op to db before replSet initialized", str::startsWith(ns, "local.
-* 13312 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/oplog.cpp#L141) replSet error : logOp() but not primary?
-* 13347 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/oplog.cpp#L179) local.oplog.rs missing. did you drop it? if so restart server
-* 13389 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/oplog.cpp#L71) local.oplog.rs missing. did you drop it? if so restart server
-* 14038 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/oplog.cpp#L468) invalid _findingStartMode
-* 14825 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/oplog.cpp#L838) error in applyOperation : unknown opType 
-* 15916 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/oplog.cpp#L670) Can no longer connect to initial sync source: 
-* 15917 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/oplog.cpp#L704) Got bad disk location when attempting to insert
-
-
 src/mongo/db/oplogreader.h
 ----
 * 15910 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/oplogreader.h#L82) Doesn't have cursor for reading oplog
@@ -1144,6 +1130,12 @@ src/mongo/db/repl.cpp
 * 15914 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/repl.cpp#L623) Failure retrying initial sync update
 
 
+src/mongo/db/repl/finding_start_cursor.cpp
+----
+* 14038 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/repl/finding_start_cursor.cpp#L113) invalid _findingStartMode
+* 13044 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/repl/finding_start_cursor.cpp#L176) no ts field in query
+
+
 src/mongo/db/repl/health.h
 ----
 * 13112 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/repl/health.h#L41) bad replset heartbeat option
@@ -1153,6 +1145,21 @@ src/mongo/db/repl/health.h
 src/mongo/db/repl/heartbeat.cpp
 ----
 * 15900 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/repl/heartbeat.cpp#L146) can't heartbeat: too much lock
+
+src/mongo/db/repl/oplog.cpp
+----
+* 13257 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/repl/oplog.cpp#L395) 
+* 13288 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/repl/oplog.cpp#L76) replSet error write op to db before replSet initialized", str::startsWith(ns, "local.
+* 13312 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/repl/oplog.cpp#L197) replSet error : logOp() but not primary?
+* 13347 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/repl/oplog.cpp#L236) local.oplog.rs missing. did you drop it? if so restart server
+* 13389 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/repl/oplog.cpp#L95) local.oplog.rs missing. did you drop it? if so restart server
+* 14825 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/repl/oplog.cpp#L617) error in applyOperation : unknown opType 
+
+
+src/mongo/db/repl/sync.cpp
+----
+* 15916 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/repl/sync.cpp#L101) Can no longer connect to initial sync source: 
+* 15917 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/db/repl/sync.cpp#L124) Got bad disk location when attempting to insert
 
 
 src/mongo/db/repl/rs.cpp
