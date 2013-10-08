@@ -38,7 +38,7 @@ namespace QueryStageCollectionScan {
         QueryStageCollectionScanCappedBase() : _context(ns()) { }
 
         virtual ~QueryStageCollectionScanCappedBase() {
-            dropNS(ns());
+            _context.db()->dropCollection( ns() );
         }
 
         void run() {

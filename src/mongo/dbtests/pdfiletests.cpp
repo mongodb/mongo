@@ -36,8 +36,7 @@ namespace PdfileTests {
             virtual ~Base() {
                 if ( !nsd() )
                     return;
-                string n( ns() );
-                dropNS( n );
+                _context.db()->dropCollection( ns() );
             }
             void run() {
                 stringstream spec;
@@ -277,8 +276,7 @@ namespace PdfileTests {
             virtual ~Base() {
                 if ( !nsd() )
                     return;
-                string n( ns() );
-                dropNS( n );
+                _context.db()->dropCollection( ns() );
             }
         protected:
             static const char *ns() {

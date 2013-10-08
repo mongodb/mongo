@@ -1633,8 +1633,7 @@ namespace QueryUtilTests {
             ~IndexBase() {
                 if ( !nsd() )
                     return;
-                string s( ns() );
-                dropNS( s );
+                _ctx.db()->dropCollection( ns() );
             }
         protected:
             static const char *ns() { return "unittests.FieldRangeSetPairTests"; }
