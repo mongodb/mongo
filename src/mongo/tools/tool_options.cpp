@@ -146,7 +146,7 @@ namespace mongo {
             return ret;
         }
         ret = options->addOption(OD("directoryperdb", "directoryperdb", moe::Switch,
-                    "each db is in a separate directly "
+                    "each db is in a separate directory "
                     "(relevant only if dbpath specified)", true));
         if(!ret.isOK()) {
             return ret;
