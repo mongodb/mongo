@@ -7,5 +7,5 @@ for (var i=0; i < 5; i++)
     c.insert({_id:i});
 
 res = c.aggregate({$sort: {_id: -1}}, {$limit: 2}); // uses index for sort
-assert.eq(res.result, [{_id: 4}, {_id: 3}]);
+assert.eq(res.toArray(), [{_id: 4}, {_id: 3}]);
 

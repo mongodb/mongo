@@ -27,7 +27,7 @@ function testVersions(versions) {
             // 2.6 features aren't guaranteed to work until upgrade is complete. They may work
             // anyway if all data is on upgraded shards and the primary is updated, which is why
             // these only run in the "normal" sharded case
-            assert.throws(function() {coll.aggregateCursor({$limit: 100000})});
+            assert.throws(function() {coll.aggregate({$limit: 100000})});
             assert.commandFailed(coll.runCommand('aggregate', {pipeline: [{$out: "ts1_out"}]}));
             assert.commandFailed(coll.runCommand('aggregate', {pipeline: [{$limit: 10}],
                                                             allowDiskUsage:true}));

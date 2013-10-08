@@ -20,15 +20,15 @@ for (var i = 0; i < NUM_OBJS; i++) {
     c.insert({inc: i, dec: NUM_OBJS-i, rnd: generateRandom()});
 }
 
-var inc_sorted = c.aggregate({$sort: {inc:1}}).result;
-var dec_sorted = c.aggregate({$sort: {dec:1}}).result;
-var rnd_sorted = c.aggregate({$sort: {rnd:1}}).result;
+var inc_sorted = c.aggregate({$sort: {inc:1}}).toArray();
+var dec_sorted = c.aggregate({$sort: {dec:1}}).toArray();
+var rnd_sorted = c.aggregate({$sort: {rnd:1}}).toArray();
 
 function test(limit, direction) {
     try {
-        var res_inc = c.aggregate({$sort: {inc:direction}}, {$limit:limit}).result;
-        var res_dec = c.aggregate({$sort: {dec:direction}}, {$limit:limit}).result;
-        var res_rnd = c.aggregate({$sort: {rnd:direction}}, {$limit:limit}).result;
+        var res_inc = c.aggregate({$sort: {inc:direction}}, {$limit:limit}).toArray();
+        var res_dec = c.aggregate({$sort: {dec:direction}}, {$limit:limit}).toArray();
+        var res_rnd = c.aggregate({$sort: {rnd:direction}}, {$limit:limit}).toArray();
 
         var expectedLength = Math.min(limit, NUM_OBJS) ;
 

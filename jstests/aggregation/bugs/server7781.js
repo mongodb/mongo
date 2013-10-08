@@ -15,11 +15,10 @@ assertErrorCode(db[coll],
 
 function checkOutput(cmdOut, aggOut, expectedNum) {
     assert.commandWorked(cmdOut, "geoNear command");
-    assert.commandWorked(aggOut, "aggregate command");
 
-    // the output arrays are named differently
+    // the output arrays are accessed differently
     cmdOut = cmdOut.results;
-    aggOut = aggOut.result;
+    aggOut = aggOut.toArray();
 
     assert.eq(cmdOut.length, expectedNum);
     assert.eq(aggOut.length, expectedNum);

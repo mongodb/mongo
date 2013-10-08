@@ -31,7 +31,7 @@ function test(pipeline, outOfMemoryCode) {
     assert.eq(res.code, 16949);
 
     // ensure we work when allowingDiskUsage === true
-    var res = t.aggregateCursor(pipeline, {allowDiskUsage: true});
+    var res = t.aggregate(pipeline, {allowDiskUsage: true});
     assert.eq(res.itcount(), t.count()); // all tests output one doc per input doc
 }
 

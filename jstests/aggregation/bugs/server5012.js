@@ -15,8 +15,6 @@ var r3 = article.aggregate(
     }}
 );
 
-printjson(r3);
-
 var r3result = [
     {
         "Writer" : "bob"
@@ -29,4 +27,4 @@ var r3result = [
     }
 ];
 
-assert.eq(r3.result, r3result, 's5012 failed');
+assert.eq(r3.toArray(), r3result, 's5012 failed');

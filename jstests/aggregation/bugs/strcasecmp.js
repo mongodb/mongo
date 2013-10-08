@@ -6,11 +6,11 @@ t.drop();
 t.save( {} );
 
 function cmp( a, b ) {
-    return t.aggregate( { $project:{ a:{ $cmp:[ a, b ] } } } ).result[ 0 ].a;
+    return t.aggregate( { $project:{ a:{ $cmp:[ a, b ] } } } ).toArray()[ 0 ].a;
 }
 
 function strcasecmp( a, b ) {
-    return t.aggregate( { $project:{ a:{ $strcasecmp:[ a, b ] } } } ).result[ 0 ].a;
+    return t.aggregate( { $project:{ a:{ $strcasecmp:[ a, b ] } } } ).toArray()[ 0 ].a;
 }
 
 function assertException( args ) {

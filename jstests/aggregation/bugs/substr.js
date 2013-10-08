@@ -7,7 +7,7 @@ t.save( {} );
 
 function assertSubstring( expected, str, offset, len ) {
     assert.eq( expected,
-               t.aggregate( { $project:{ a:{ $substr:[ str, offset, len ] } } } ).result[ 0 ].a );
+               t.aggregate( { $project:{ a:{ $substr:[ str, offset, len ] } } } ).toArray()[ 0 ].a );
 }
 
 function assertArgsException( args ) {
@@ -108,4 +108,4 @@ assert.eq( 'e',
                           }, 2, 5 ]
                          }, 0, 3 ]
                         }, 1, 1 ]
-                      } } } ).result[ 0 ].a ); 
+                      } } } ).toArray()[ 0 ].a );

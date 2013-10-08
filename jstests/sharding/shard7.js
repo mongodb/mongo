@@ -33,8 +33,7 @@ assert.eq( 0, c.count(unsatisfiable) );
 assert.eq( [], c.distinct('a',unsatisfiable) );
 
 aggregate = c.aggregate( { $match:unsatisfiable } );
-assert.commandWorked( aggregate );
-assert.eq( 0, aggregate.result.length );
+assert.eq( 0, aggregate.toArray().length );
 
 c.save( {a:null,b:null} );
 c.save( {a:1,b:1} );

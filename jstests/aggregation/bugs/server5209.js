@@ -14,7 +14,7 @@ var at = db.aggtype.aggregate(
         _id: "$key",
         s: {$sum: "$value"}
     }}
-);
+).toArray();
 
-assert(at.result[0].s == 30, 'server5209 failed');
-assert(at.result[1].s == 30, 'server5209 failed');
+assert(at[0].s == 30, 'server5209 failed');
+assert(at[1].s == 30, 'server5209 failed');

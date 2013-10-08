@@ -14,8 +14,7 @@ db.s6239.save({date:new Date(millis), num: num});
 
 function test(expression, expected) {
     var res = db.s6239.aggregate({$project: {out: expression}});
-    assert.commandWorked(res, tojson(expression));
-    assert.eq(res.result[0].out, expected, tojson(expression));
+    assert.eq(res.toArray()[0].out, expected, tojson(expression));
 }
 function fail(expression, code) {
     assertErrorCode(db.s6239, {$project: {out: expression}}, code);

@@ -13,11 +13,9 @@ function test(variant) {
     query = {loc: {$within: {$center: [[5,5], 3]}}};
     sort = {_id: 1};
     aggOut = c.aggregate({$match:query}, {$sort: sort});
-    assert.commandWorked(aggOut, variant);
-
     cursor = c.find(query).sort(sort);
 
-    assert.eq(aggOut.result, cursor.toArray());
+    assert.eq(aggOut.toArray(), cursor.toArray());
 }
 
 test("no index");

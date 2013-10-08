@@ -7,7 +7,7 @@ t.save( {} );
 
 function assertResult( expectedUpper, expectedLower, string ) {
     result = t.aggregate( { $project:{ upper:{ $toUpper:string },
-                                       lower:{ $toLower:string } } } ).result[ 0 ];
+                                       lower:{ $toLower:string } } } ).toArray()[ 0 ];
     assert.eq( expectedUpper, result.upper );
     assert.eq( expectedLower, result.lower );
 }

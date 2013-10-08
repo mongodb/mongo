@@ -59,11 +59,10 @@ function test(date, testSynthetics) {
                                       , dayOfYear:{ $dayOfYear: '$date' }
                                       } } );
 
-        assert.commandWorked(res);
-        assert.eq(res.result[0], { week: 0
-                                 , dayOfWeek: 7
-                                 , dayOfYear: 2
-                                 } );
+        assert.eq(res.toArray()[0], { week: 0
+                                    , dayOfWeek: 7
+                                    , dayOfYear: 2
+                                    } );
     }
 }
 

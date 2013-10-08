@@ -6,7 +6,7 @@ c.save( { a:'foo', b:{ c:'bar', z:'not there' } } );
 
 function test(projection) {
     res = c.aggregate({$project: projection})
-    assert.eq(res.result[0], {b: {c: 'bar'}});
+    assert.eq(res.toArray()[0], {b: {c: 'bar'}});
 }
 
 // These should all mean the same thing

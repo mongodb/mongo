@@ -5,8 +5,8 @@ db.s6232.save({});
 
 // case where an empty object is evaluated
 result = db.s6232.aggregate({$project: {a: {$and: [{}]}}});
-assert.eq(result.result[0].a, true);
+assert.eq(result.toArray()[0].a, true);
 
 // case where result should contain a new empty object
 result = db.s6232.aggregate({$project: {a: {$ifNull: ['$b', {}]}}});
-assert.eq(result.result[0].a, {});
+assert.eq(result.toArray()[0].a, {});

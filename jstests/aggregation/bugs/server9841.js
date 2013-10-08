@@ -12,7 +12,7 @@ t.insert({
 });
 
 function test(expression, expected) {
-    var result = t.aggregate({$project:{_id:0, res: expression}}).result;
+    var result = t.aggregate({$project:{_id:0, res: expression}}).toArray();
     assert.eq(result, [{res:expected}]);
 }
 

@@ -34,11 +34,11 @@ function assertResults( expectedResults, matchSpec ) {
     }
     matchStage = { $match:matchSpec };
     // Check where matching is folded in to DocumentSourceCursor.
-    assertEqualResultsUnordered( findResults, t.aggregate( matchStage ).result );
+    assertEqualResultsUnordered( findResults, t.aggregate( matchStage ).toArray() );
     // Check where matching is not folded in to DocumentSourceCursor.
     assertEqualResultsUnordered( findResults,
                                  t.aggregate( { $project:identityProjection },
-                                              matchStage ).result );    
+                                              matchStage ).toArray() );
 }
 
 // Invalid matcher syntax.

@@ -6,4 +6,4 @@ c.save( { x:'3' } );
 
 project = { $project:{ a:{ $concat:[ '1', { $concat:[ 'foo', '$x', 'bar' ] }, '2' ] } } };
 
-assert.eq( '1foo3bar2', c.aggregate( project ).result[ 0 ].a );
+assert.eq( '1foo3bar2', c.aggregate( project ).toArray()[ 0 ].a );

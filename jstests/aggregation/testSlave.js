@@ -13,7 +13,6 @@ mast.agg.insert({});
 mast.getLastError(2);
 
 var res = slav.agg.aggregate({$group: {_id: null, count: {$sum: 1}}});
-assert.commandWorked(res);
-assert.eq(res.result, [{_id:null, count: 3}]);
+assert.eq(res.toArray(), [{_id:null, count: 3}]);
 
 replTest.stopSet();

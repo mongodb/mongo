@@ -55,8 +55,7 @@ DBCollection.prototype.help = function () {
     // print("\tdb." + shortName + ".indexStats({expandNodes: [<expanded child numbers>}, <detailed: t/f>) - output aggregate/per-depth btree bucket stats");
     print("\tdb." + shortName + ".insert(obj)");
     print("\tdb." + shortName + ".mapReduce( mapFunction , reduceFunction , <optional params> )");
-    print("\tdb." + shortName + ".aggregate( pipeline ) - performs an aggregation on collection;"
-        + " pipeline can be specified as array or args");
+    print("\tdb." + shortName + ".aggregate( [pipeline], <optional params> ) - performs an aggregation on a collection; returns a cursor");
     print("\tdb." + shortName + ".remove(query)");
     print("\tdb." + shortName + ".renameCollection( newName , <dropTarget> ) renames the collection.");
     print("\tdb." + shortName + ".runCommand( name , <options> ) runs a db command with the given name where the first param is the collection name");
@@ -886,9 +885,7 @@ DBCollection.prototype.distinct = function( keyString , query ){
 }
 
 
-DBCollection.prototype.aggregateCursor = function(pipeline, extraOpts) {
-    // This function should replace aggregate() in SERVER-10165.
-
+DBCollection.prototype.aggregate = function(pipeline, extraOpts) {
     var cmd = {pipeline: pipeline};
 
     if (!(pipeline instanceof Array)) {
@@ -906,35 +903,16 @@ DBCollection.prototype.aggregateCursor = function(pipeline, extraOpts) {
         cmd.cursor = {};
     }
 
-    var cursorRes = this.runCommand("aggregate", cmd);
-    assert.commandWorked(cursorRes, "aggregate with cursor failed");
-    return new DBCommandCursor(this._mongo, cursorRes);
-}
-
-DBCollection.prototype.aggregate = function( ops ) {
-    
-    var arr = ops;
-    
-    if (!ops.length) {
-        arr = [];
-        for (var i=0; i<arguments.length; i++) {
-            arr.push(arguments[i]);
-        }
+    if (TestData && !('batchSize' in cmd.cursor)) {
+        // If we are running in a test, set batchsize to 0 to make sure it works across a GetMore
+        cmd.cursor.batchSize = 0;
     }
 
-    var res = this.runCommand("aggregate", {pipeline: arr});
-    if (!res.ok) {
-        printStackTrace();
-        throw "aggregate failed: " + tojson(res);
-    }
+    var res = this.runCommand("aggregate", cmd);
+    assert.commandWorked(res, "aggregate with cursor failed");
 
-    if (TestData) {
-        // If we are running in a test, make sure cursor output is the same.
-        // This block should go away with work on SERVER-10165.
-
-        var cursor = this.aggregateCursor(arr, {cursor: {batchSize: 0}});
-        assert.eq(cursor.toArray(), res.result);
-    }
+    if ("cursor" in res)
+        return new DBCommandCursor(this._mongo, res);
 
     return res;
 }

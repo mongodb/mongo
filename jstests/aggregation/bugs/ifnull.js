@@ -12,9 +12,8 @@ function assertError( expectedErrorCode, ifNullSpec ) {
 }
 
 function assertResult( expectedResult, arg0, arg1 ) {
-    var res = t.aggregate( { $project:{ a:{ $ifNull:[ arg0, arg1 ] } } } );
-    assert.commandWorked(res);
-    assert.eq( expectedResult, res.result[ 0 ].a );
+    var res = t.aggregate( { $project:{ a:{ $ifNull:[ arg0, arg1 ] } } } ).toArray()[0];
+    assert.eq( expectedResult, res.a );
 }
 
 // Wrong number of args.

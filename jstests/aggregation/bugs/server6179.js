@@ -25,7 +25,7 @@ s.adminCommand( { movechunk:"test.data", find:{ _id:50 },
 // Check that we get results rather than an error
 result = d.data.aggregate({$group: {_id: '$_id', i: {$first: '$i'}}},
                           {$group: {_id: '$i', avg_id: {$avg: '$_id'}}},
-                          {$sort: {_id: 1}}).result;
+                          {$sort: {_id: 1}}).toArray();
 expected = [
     {
         "_id" : 0,

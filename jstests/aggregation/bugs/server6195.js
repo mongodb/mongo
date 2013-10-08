@@ -6,17 +6,17 @@ c = db.s6570;
 c.drop();
 c.save({v:"$", w:".", x:"foo", y:"bar"});
 
-assert.eq(c.aggregate({$project:{str:{$concat:["X", "$x", "Y", "$y"]}}}).result[0].str, "XfooYbar");
-assert.eq(c.aggregate({$project:{str:{$concat:["$v", "X", "$w", "Y"]}}}).result[0].str, "$X.Y");
-assert.eq(c.aggregate({$project:{str:{$concat:["$w", "X", "$v", "Y"]}}}).result[0].str, ".X$Y");
+assert.eq(c.aggregate({$project:{str:{$concat:["X", "$x", "Y", "$y"]}}}).toArray()[0].str, "XfooYbar");
+assert.eq(c.aggregate({$project:{str:{$concat:["$v", "X", "$w", "Y"]}}}).toArray()[0].str, "$X.Y");
+assert.eq(c.aggregate({$project:{str:{$concat:["$w", "X", "$v", "Y"]}}}).toArray()[0].str, ".X$Y");
 
 // Nullish (both with and without other strings)
-assert.isnull(c.aggregate({$project:{str:{$concat: ["$missing"] }}}).result[0].str);
-assert.isnull(c.aggregate({$project:{str:{$concat: [null] }}}).result[0].str);
-assert.isnull(c.aggregate({$project:{str:{$concat: [undefined] }}}).result[0].str);
-assert.isnull(c.aggregate({$project:{str:{$concat: ["$x", "$missing", "$y"] }}}).result[0].str);
-assert.isnull(c.aggregate({$project:{str:{$concat: ["$x", null, "$y"] }}}).result[0].str);
-assert.isnull(c.aggregate({$project:{str:{$concat: ["$x", undefined, "$y"] }}}).result[0].str);
+assert.isnull(c.aggregate({$project:{str:{$concat: ["$missing"] }}}).toArray()[0].str);
+assert.isnull(c.aggregate({$project:{str:{$concat: [null] }}}).toArray()[0].str);
+assert.isnull(c.aggregate({$project:{str:{$concat: [undefined] }}}).toArray()[0].str);
+assert.isnull(c.aggregate({$project:{str:{$concat: ["$x", "$missing", "$y"] }}}).toArray()[0].str);
+assert.isnull(c.aggregate({$project:{str:{$concat: ["$x", null, "$y"] }}}).toArray()[0].str);
+assert.isnull(c.aggregate({$project:{str:{$concat: ["$x", undefined, "$y"] }}}).toArray()[0].str);
 
 // assert fail for all other types
 assertErrorCode(c, {$project:{str:{$concat: [MinKey]}}}, 16702);

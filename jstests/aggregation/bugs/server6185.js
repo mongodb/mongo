@@ -9,4 +9,4 @@ c.save({a:1});
 c.save({b:1});
 
 // assert the aggregation and the query produce the same thing
-assert.eq(c.aggregate({$project:{'a.b':1}}).result, c.find({}, {'a.b':1}).toArray());
+assert.eq(c.aggregate({$project:{'a.b':1}}).toArray(), c.find({}, {'a.b':1}).toArray());

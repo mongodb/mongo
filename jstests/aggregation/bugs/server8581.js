@@ -154,11 +154,11 @@ a5result = [{ _id: 1,
              level: 4,
            }];
 
-assert.eq(a1.result, a1result);
-assert.eq(a2.result, a2result);
-assert.eq(a3.result, a3result);
-assert.eq(a4.result, a4result);
-assert.eq(a5.result, a5result);
+assert.eq(a1.toArray(), a1result);
+assert.eq(a2.toArray(), a2result);
+assert.eq(a3.toArray(), a3result);
+assert.eq(a4.toArray(), a4result);
+assert.eq(a5.toArray(), a5result);
 
 // test $$KEEP
 t.drop();
@@ -191,6 +191,6 @@ b23result = [{ _id: 1,
               f: 9
            }];
 
-assert.eq(b1.result, b1result);
-assert.eq(b2.result, b23result);
-assert.eq(b3.result, b23result);
+assert.eq(b1.toArray(), b1result);
+assert.eq(b2.toArray(), b23result);
+assert.eq(b3.toArray(), b23result);
