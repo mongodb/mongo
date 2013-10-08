@@ -41,6 +41,7 @@
 
 namespace mongo {
 
+    BOOST_STATIC_ASSERT( sizeof(DataFileHeader)-4 == 8192 );
 
     static void data_file_check(void *_mb) {
         if( sizeof(char *) == 4 )

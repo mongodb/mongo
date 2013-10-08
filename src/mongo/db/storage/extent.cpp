@@ -41,6 +41,8 @@
 
 namespace mongo {
 
+    BOOST_STATIC_ASSERT( sizeof(Extent)-4 == 48+128 );
+
     static void extent_getEmptyLoc(const StringData& ns,
                                    const DiskLoc extentLoc,
                                    int extentLength,

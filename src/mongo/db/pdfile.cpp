@@ -86,9 +86,6 @@ _ disallow system* manipulations from the database.
 
 namespace mongo {
 
-    BOOST_STATIC_ASSERT( sizeof(Extent)-4 == 48+128 );
-    BOOST_STATIC_ASSERT( sizeof(DataFileHeader)-4 == 8192 );
-
     //The oplog entries inserted
     static TimerStats oplogInsertStats;
     static ServerStatusMetricField<TimerStats> displayInsertedOplogEntries(
@@ -331,23 +328,6 @@ namespace mongo {
         }
         return ok;
     }
-
-    /*---------------------------------------------------------------------*/
-
-    void getEmptyLoc(const char *ns, const DiskLoc extentLoc, int extentLength, bool capped, /*out*/DiskLoc& emptyLoc, /*out*/int& delRecLength) { 
-        emptyLoc = extentLoc;
-        emptyLoc.inc( Extent::HeaderSize() );
-        delRecLength = extentLength - Extent::HeaderSize();
-        if( delRecLength >= 32*1024 && str::contains(ns, '$') && !capped ) { 
-            // probably an index. so skip forward to keep its records page aligned 
-            int& ofs = emptyLoc.GETOFS();
-            int newOfs = (ofs + 0xfff) & ~0xfff; 
-            delRecLength -= (newOfs-ofs);
-            dassert( delRecLength > 0 );
-            ofs = newOfs;
-        }
-    }
-
 
     /*---------------------------------------------------------------------*/
 
@@ -625,32 +605,6 @@ namespace mongo {
         return dl;
     }
 
-
-#if 0    
-    void testSorting() {
-        BSONObjBuilder b;
-        b.appendNull("");
-        BSONObj x = b.obj();
-
-        BSONObjExternalSorter sorter(*IndexDetails::iis[1]);
-
-        sorter.add(x, DiskLoc(3,7));
-        sorter.add(x, DiskLoc(4,7));
-        sorter.add(x, DiskLoc(2,7));
-        sorter.add(x, DiskLoc(1,7));
-        sorter.add(x, DiskLoc(3,77));
-
-        sorter.sort();
-
-        auto_ptr<BSONObjExternalSorter::Iterator> i = sorter.iterator();
-        while( i->more() ) {
-            BSONObjExternalSorter::Data d = i->next();
-            /*cout << d.second.toString() << endl;
-            cout << d.first.objsize() << endl;
-            cout<<"SORTER next:" << d.first.toString() << endl;*/
-        }
-    }
-#endif
 #pragma pack(1)
     struct IDToInsert {
         char type;
@@ -1406,50 +1360,6 @@ namespace mongo {
                 break;
             i++;
         }
-    }
-
-    NamespaceDetails* nsdetails_notinline(const char *ns) { return nsdetails(ns); }
-
-    bool DatabaseHolder::closeAll( const string& path , BSONObjBuilder& result , bool force ) {
-        log() << "DatabaseHolder::closeAll path:" << path << endl;
-        verify( Lock::isW() );
-        getDur().commitNow(); // bad things happen if we close a DB with outstanding writes
-
-        map<string,Database*>& m = _paths[path];
-        _size -= m.size();
-
-        set< string > dbs;
-        for ( map<string,Database*>::iterator i = m.begin(); i != m.end(); i++ ) {
-            wassert( i->second->path() == path );
-            dbs.insert( i->first );
-        }
-
-        currentClient.get()->getContext()->_clear();
-
-        BSONObjBuilder bb( result.subarrayStart( "dbs" ) );
-        int n = 0;
-        int nNotClosed = 0;
-        for( set< string >::iterator i = dbs.begin(); i != dbs.end(); ++i ) {
-            string name = *i;
-            LOG(2) << "DatabaseHolder::closeAll path:" << path << " name:" << name << endl;
-            Client::Context ctx( name , path );
-            if( !force && BackgroundOperation::inProgForDb(name) ) {
-                log() << "WARNING: can't close database " << name << " because a bg job is in progress - try killOp command" << endl;
-                nNotClosed++;
-            }
-            else {
-                Database::closeDatabase( name.c_str() , path );
-                bb.append( bb.numStr( n++ ) , name );
-            }
-        }
-        bb.done();
-        if( nNotClosed )
-            result.append("nNotClosed", nNotClosed);
-        else {
-            ClientCursor::assertNoCursors();
-        }
-
-        return true;
     }
 
 } // namespace mongo
