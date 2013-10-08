@@ -100,6 +100,97 @@ namespace audit {
             bool isMulti,
             ErrorCodes::Error result) MONGO_AUDIT_STUB
 
+    void logCreateUser(ClientBasic* client,
+                       const UserName& username,
+                       bool password,
+                       const BSONObj* customData,
+                       const std::vector<User::RoleData>& roles) MONGO_AUDIT_STUB
+
+    void logDropUser(ClientBasic* client,
+                     const UserName& username) MONGO_AUDIT_STUB
+
+    void logDropAllUsersFromDatabase(ClientBasic* client,
+                                     const StringData& dbname) MONGO_AUDIT_STUB
+
+    void logUpdateUser(ClientBasic* client,
+                       const UserName& username,
+                       bool password,
+                       const BSONObj* customData,
+                       const std::vector<User::RoleData>* roles) MONGO_AUDIT_STUB
+
+    void logGrantRolesToUser(ClientBasic* client,
+                             const UserName& username,
+                             const std::vector<RoleName>& roles) MONGO_AUDIT_STUB
+
+    void logRevokeRolesFromUser(ClientBasic* client,
+                                const UserName& username,
+                                const std::vector<RoleName>& roles) MONGO_AUDIT_STUB
+
+    void logCreateRole(ClientBasic* client,
+                       const RoleName& role,
+                       const std::vector<RoleName>& roles,
+                       const PrivilegeVector& privileges) MONGO_AUDIT_STUB
+
+    void logUpdateRole(ClientBasic* client,
+                       const RoleName& role,
+                       const std::vector<RoleName>* roles,
+                       const PrivilegeVector* privileges) MONGO_AUDIT_STUB
+
+    void logDropRole(ClientBasic* client,
+                     const RoleName& role) MONGO_AUDIT_STUB
+
+    void logDropAllRolesForDatabase(ClientBasic* client,
+                                    const StringData& dbname) MONGO_AUDIT_STUB
+
+    void logGrantRolesToRole(ClientBasic* client,
+                             const RoleName& role,
+                             const std::vector<RoleName>& roles) MONGO_AUDIT_STUB
+
+    void logRevokeRolesFromRole(ClientBasic* client,
+                                const RoleName& role,
+                                const std::vector<RoleName>& roles) MONGO_AUDIT_STUB
+
+    void logGrantPrivilegesToRole(ClientBasic* client,
+                                  const RoleName& role,
+                                  const PrivilegeVector& privileges) MONGO_AUDIT_STUB
+
+    void logRevokePrivilegesFromRole(ClientBasic* client,
+                                     const RoleName& role,
+                                     const PrivilegeVector& privileges) MONGO_AUDIT_STUB
+
+    void logReplSetReconfig(ClientBasic* client,
+                            const BSONObj* oldConfig,
+                            const BSONObj* newConfig) MONGO_AUDIT_STUB
+
+    void logApplicationMessage(ClientBasic* client,
+                               const StringData& msg) MONGO_AUDIT_STUB
+
+    void logShutdown(ClientBasic* client) MONGO_AUDIT_STUB
+
+    void logAuditLogRotate(ClientBasic* client,
+                           const StringData& file) MONGO_AUDIT_STUB
+
+    void logCreateIndex(ClientBasic* client,
+                        const BSONObj* indexSpec,
+                        const StringData& indexname,
+                        const StringData& dbname) MONGO_AUDIT_STUB
+
+    void logCreateCollection(ClientBasic* client,
+                             const StringData& dbname) MONGO_AUDIT_STUB
+
+    void logCreateDatabase(ClientBasic* client,
+                           const StringData& dbname) MONGO_AUDIT_STUB
+
+
+    void logDropIndex(ClientBasic* client,
+                      const StringData& indexname,
+                      const StringData& dbname) MONGO_AUDIT_STUB
+
+    void logDropCollection(ClientBasic* client,
+                           const StringData& dbname) MONGO_AUDIT_STUB
+
+    void logDropDatabase(ClientBasic* client,
+                         const StringData& dbname) MONGO_AUDIT_STUB
 }  // namespace audit
 }  // namespace mongo
 

@@ -34,12 +34,15 @@
 #pragma once
 
 #include "mongo/base/error_codes.h"
+#include "mongo/db/auth/privilege.h"
+#include "mongo/db/auth/user.h"
 
 namespace mongo {
 
     class BSONObj;
     class ClientBasic;
     class NamespaceString;
+    class ReplSetConfig;
     class StringData;
     class UserName;
 
@@ -153,5 +156,168 @@ namespace audit {
             bool isMulti,
             ErrorCodes::Error result);
 
+    /**
+     * Logs the result of a createUser command.
+     */
+    void logCreateUser(ClientBasic* client,
+                       const UserName& username,
+                       bool password,
+                       const BSONObj* customData,
+                       const std::vector<User::RoleData>& roles);
+
+    /**
+     * Logs the result of a dropUser command.
+     */
+    void logDropUser(ClientBasic* client,
+                     const UserName& username);
+
+    /**
+     * Logs the result of a dropAllUsersFromDatabase command.
+     */
+    void logDropAllUsersFromDatabase(ClientBasic* client,
+                                     const StringData& dbname);
+
+    /**
+     * Logs the result of a updateUser command.
+     */
+    void logUpdateUser(ClientBasic* client,
+                       const UserName& username,
+                       bool password,
+                       const BSONObj* customData,
+                       const std::vector<User::RoleData>* roles);
+
+    /**
+     * Logs the result of a grantRolesToUser command.
+     */
+    void logGrantRolesToUser(ClientBasic* client,
+                             const UserName& username,
+                             const std::vector<RoleName>& roles);
+
+    /**
+     * Logs the result of a revokeRolesFromUser command.
+     */
+    void logRevokeRolesFromUser(ClientBasic* client,
+                                const UserName& username,
+                                const std::vector<RoleName>& roles);
+
+    /**
+     * Logs the result of a createRole command.
+     */
+    void logCreateRole(ClientBasic* client,
+                       const RoleName& role,
+                       const std::vector<RoleName>& roles,
+                       const PrivilegeVector& privileges);
+
+    /**
+     * Logs the result of a updateRole command.
+     */
+    void logUpdateRole(ClientBasic* client,
+                       const RoleName& role,
+                       const std::vector<RoleName>* roles,
+                       const PrivilegeVector* privileges);
+
+    /**
+     * Logs the result of a dropRole command.
+     */
+    void logDropRole(ClientBasic* client,
+                     const RoleName& role);
+
+    /**
+     * Logs the result of a dropAllRolesForDatabase command.
+     */
+    void logDropAllRolesForDatabase(ClientBasic* client,
+                                    const StringData& dbname);
+
+    /**
+     * Logs the result of a grantRolesToRole command.
+     */
+    void logGrantRolesToRole(ClientBasic* client,
+                             const RoleName& role,
+                             const std::vector<RoleName>& roles);
+
+    /**
+     * Logs the result of a revokeRolesFromRole command.
+     */
+    void logRevokeRolesFromRole(ClientBasic* client,
+                                const RoleName& role,
+                                const std::vector<RoleName>& roles);
+
+    /**
+     * Logs the result of a grantPrivilegesToRole command.
+     */
+    void logGrantPrivilegesToRole(ClientBasic* client,
+                                  const RoleName& role,
+                                  const PrivilegeVector& privileges);
+
+    /**
+     * Logs the result of a revokePrivilegesFromRole command.
+     */
+    void logRevokePrivilegesFromRole(ClientBasic* client,
+                                     const RoleName& role,
+                                     const PrivilegeVector& privileges);
+
+    /**
+     * Logs the result of a replSet(Re)config command.
+     */
+    void logReplSetReconfig(ClientBasic* client,
+                            const BSONObj* oldConfig,
+                            const BSONObj* newConfig);
+
+    /**
+     * Logs the result of an ApplicationMessage command.
+     */
+    void logApplicationMessage(ClientBasic* client,
+                               const StringData& msg);
+
+    /**
+     * Logs the result of a shutdown command.
+     */
+    void logShutdown(ClientBasic* client);
+
+    /**
+     * Logs the result of an AuditLogRotate command.
+     */
+    void logAuditLogRotate(ClientBasic* client,
+                           const StringData& file);
+
+    /**
+     * Logs the result of a createIndex command.
+     */
+    void logCreateIndex(ClientBasic* client,
+                        const BSONObj* indexSpec,
+                        const StringData& indexname,
+                        const StringData& dbname);
+
+    /**
+     * Logs the result of a createCollection command.
+     */
+    void logCreateCollection(ClientBasic* client,
+                             const StringData& dbname);
+
+    /**
+     * Logs the result of a createDatabase command.
+     */
+    void logCreateDatabase(ClientBasic* client,
+                           const StringData& dbname);
+
+
+    /**
+     * Logs the result of a dropIndex command.
+     */
+    void logDropIndex(ClientBasic* client,
+                      const StringData& indexname,
+                      const StringData& dbname);
+
+    /**
+     * Logs the result of a dropCollection command.
+     */
+    void logDropCollection(ClientBasic* client,
+                           const StringData& dbname);
+
+    /**
+     * Logs the result of a dropDatabase command.
+     */
+    void logDropDatabase(ClientBasic* client,
+                         const StringData& dbname);
 }  // namespace audit
 }  // namespace mongo
