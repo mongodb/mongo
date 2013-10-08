@@ -24,6 +24,7 @@
 #include "mongo/db/storage_options.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/sock.h"
+#include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/net/ssl_options.h"
 #include "mongo/util/options_parser/environment.h"
 #include "mongo/util/options_parser/option_description.h"
@@ -280,7 +281,7 @@ namespace mongo {
 
 #ifdef MONGO_SSL
         if (toolsParsedOptions.count("ssl")) {
-            sslGlobalParams.sslOnNormalPorts = true;
+            sslGlobalParams.sslMode.store(SSLGlobalParams::SSLMode_sslOnly);
         }
 #endif
 

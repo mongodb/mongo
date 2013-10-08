@@ -27,6 +27,7 @@
 #include "mongo/util/net/listen.h"
 #include "mongo/util/net/message.h"
 #include "mongo/util/net/ssl_manager.h"
+#include "mongo/util/net/ssl_options.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/time_support.h"
 
@@ -162,7 +163,7 @@ again:
             int headerLen = sizeof(MSGHEADER);
             psock->recv( (char *)&header, headerLen );
             int len = header.messageLength; 
- 
+
             if ( len == 542393671 ) {
                 // an http GET
                 string msg = "It looks like you are trying to access MongoDB over HTTP on the native driver port.\n";
@@ -181,17 +182,24 @@ again:
                 goto again;
             }
             // If responseTo is not 0 or -1 for first packet assume SSL
-            else if (psock->isAwaitingHandshake() && 
-                     header.responseTo != 0 && header.responseTo != -1) {
-#ifdef MONGO_SSL
-                uassert(17132, "SSL handshake received but server is started without SSL support",
-                        NULL != getSSLManager());
-                psock->setHandshakeReceived();
-                setX509SubjectName(psock->doSSLHandshake(
-                                   reinterpret_cast<const char*>(&header), sizeof(header)));
-                goto again;
-#else 
-                uasserted(17133, "SSL handshake requested, SSL feature not available in this build");  
+            else if (psock->isAwaitingHandshake()) {
+#ifndef MONGO_SSL
+                if (header.responseTo != 0 && header.responseTo != -1) {
+                    uasserted(17133,
+                              "SSL handshake requested, SSL feature not available in this build");
+                }
+#else                    
+                if (header.responseTo != 0 && header.responseTo != -1) {
+                    uassert(17132,
+                            "SSL handshake received but server is started without SSL support",
+                            sslGlobalParams.sslMode.load() != SSLGlobalParams::SSLMode_noSSL);
+                    setX509SubjectName(psock->doSSLHandshake(
+                                       reinterpret_cast<const char*>(&header), sizeof(header)));
+                    psock->setHandshakeReceived();
+                    goto again;
+                }
+                uassert(17185, "The server is configured to only allow SSL connections",
+                        sslGlobalParams.sslMode.load() != SSLGlobalParams::SSLMode_sslOnly);
 #endif // MONGO_SSL
             }
             else if ( len < static_cast<int>(sizeof(MSGHEADER)) || len > MaxMessageSizeBytes ) {
@@ -199,7 +207,7 @@ again:
                        << "Min " << sizeof(MSGHEADER) << " Max: " << MaxMessageSizeBytes << endl;
                 return false;
             }
- 
+
             psock->setHandshakeReceived();
             int z = (len+1023)&0xfffffc00;
             verify(z>=len);

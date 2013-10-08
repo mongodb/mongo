@@ -164,7 +164,8 @@ ReplTest.prototype.getOptions = function( master , extra , putBinaryFirst, norep
     }
 
     if( jsTestOptions().useSSL ) {
-        a.push( "--sslOnNormalPorts" )
+        a.push( "--sslMode" )
+        a.push( "sslOnly" )
         a.push( "--sslPEMKeyFile" )
         a.push( "jstests/libs/server.pem" )
         a.push( "--sslCAFile" )

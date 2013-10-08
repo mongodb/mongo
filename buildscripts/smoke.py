@@ -167,7 +167,7 @@ class mongod(object):
 
     def setup_admin_user(self, port=mongod_port):
         try:
-            Connection( "localhost" , int(port) ).admin.command("createUser", "admin",
+            Connection( "localhost" , int(port), ssl=use_ssl ).admin.command("createUser", "admin",
                                                                 pwd="password",
                                                                 roles=["__system"])
         except OperationFailure, e:
@@ -222,7 +222,7 @@ class mongod(object):
                 argv += ['--setParameter', 'authenticationMechanisms=' + authMechanism]
             self.auth = True
         if self.kwargs.get('use_ssl') or self.kwargs.get('use_x509'):
-            argv += ['--sslOnNormalPorts',
+            argv += ['--sslMode', "sslOnly",
                      '--sslPEMKeyFile', 'jstests/libs/server.pem',
                      '--sslCAFile', 'jstests/libs/ca.pem',
                      '--sslWeakCertificateValidation']

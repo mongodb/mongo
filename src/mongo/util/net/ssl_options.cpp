@@ -34,6 +34,11 @@ namespace mongo {
         if (!ret.isOK()) {
             return ret;
         }
+        ret = options->addOption(OD("ssl.mode", "sslMode", moe::String,
+                    "set the SSL operation mode (noSSL|acceptSSL|sendAcceptSSL|sslOnly)", true));
+        if (!ret.isOK()) {
+            return ret;
+        }
         ret = options->addOption(OD("ssl.PEMKeyFile", "sslPEMKeyFile", moe::String,
                     "PEM file for ssl", true));
         if (!ret.isOK()) {
@@ -116,6 +121,26 @@ namespace mongo {
 
     Status storeSSLServerOptions(const moe::Environment& params) {
 
+        if (params.count("ssl.mode")) {
+            std::string sslModeParam = params["ssl.mode"].as<string>();
+            if (sslModeParam == "noSSL") {
+                sslGlobalParams.sslMode.store(SSLGlobalParams::SSLMode_noSSL);
+            }
+            else if (sslModeParam == "acceptSSL") {
+                sslGlobalParams.sslMode.store(SSLGlobalParams::SSLMode_acceptSSL);
+            }
+            else if (sslModeParam == "sendAcceptSSL") {
+                sslGlobalParams.sslMode.store(SSLGlobalParams::SSLMode_sendAcceptSSL);
+            }
+            else if (sslModeParam == "sslOnly") {
+                sslGlobalParams.sslMode.store(SSLGlobalParams::SSLMode_sslOnly);
+            }
+            else {
+                return Status(ErrorCodes::BadValue, 
+                              "unsupported value for sslMode " + sslModeParam );
+            }
+        }
+
         if (params.count("ssl.PEMKeyFile")) {
             sslGlobalParams.sslPEMKeyFile = boost::filesystem::absolute(
                                         params["ssl.PEMKeyFile"].as<string>()).generic_string();
@@ -148,10 +173,19 @@ namespace mongo {
             sslGlobalParams.sslWeakCertificateValidation = true;
         }
         if (params.count("ssl.sslOnNormalPorts")) {
-            sslGlobalParams.sslOnNormalPorts = true;
+            if (params.count("ssl.mode")) {
+                    return Status(ErrorCodes::BadValue, 
+                                  "can't have both sslMode and sslOnNormalPorts");
+            }
+            else {
+                sslGlobalParams.sslMode.store(SSLGlobalParams::SSLMode_sslOnly);
+            }
+        }
+
+        if (sslGlobalParams.sslMode.load() != SSLGlobalParams::SSLMode_noSSL) {
             if (sslGlobalParams.sslPEMKeyFile.size() == 0) {
                 return Status(ErrorCodes::BadValue,
-                              "need sslPEMKeyFile with sslOnNormalPorts");
+                              "need sslPEMKeyFile when SSL is enabled");
             }
             if (sslGlobalParams.sslWeakCertificateValidation &&
                 sslGlobalParams.sslCAFile.empty()) {
@@ -174,13 +208,15 @@ namespace mongo {
                  sslGlobalParams.sslCRLFile.size() ||
                  sslGlobalParams.sslWeakCertificateValidation ||
                  sslGlobalParams.sslFIPSMode) {
-            return Status(ErrorCodes::BadValue, "need to enable sslOnNormalPorts");
+            return Status(ErrorCodes::BadValue,
+                          "need to enable SSL via the sslMode flag when"
+                          "using SSL configuration parameters");
         }
         if (serverGlobalParams.clusterAuthMode == "sendKeyfile" ||
             serverGlobalParams.clusterAuthMode == "sendX509" ||
             serverGlobalParams.clusterAuthMode == "x509") {
-            if (!sslGlobalParams.sslOnNormalPorts){
-                return Status(ErrorCodes::BadValue, "need to enable sslOnNormalPorts");
+            if (sslGlobalParams.sslMode.load() == SSLGlobalParams::SSLMode_noSSL){
+                return Status(ErrorCodes::BadValue, "need to enable SSL via the sslMode flag");
             }
         }
         else if (params.count("clusterAuthMode") &&
@@ -195,7 +231,7 @@ namespace mongo {
 
     Status storeSSLClientOptions(const moe::Environment& params) {
         if (params.count("ssl")) {
-            sslGlobalParams.sslOnNormalPorts = true;
+            sslGlobalParams.sslMode.store(SSLGlobalParams::SSLMode_sslOnly);
         }
         if (params.count("ssl.PEMKeyFile")) {
             sslGlobalParams.sslPEMKeyFile = params["ssl.PEMKeyFile"].as<std::string>();

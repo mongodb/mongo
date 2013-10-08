@@ -2,10 +2,7 @@
 // This test is launching replsets/initial_sync1.js with different 
 // values for clusterAuthMode to emulate an upgrade process.
 
-var common_options = {sslOnNormalPorts : "",
-                      sslPEMKeyFile : "jstests/libs/server.pem",
-                      sslCAFile: "jstests/libs/ca.pem",
-                      keyFile : "jstests/libs/key1"};
+var common_options = {keyFile : "jstests/libs/key1"};
 
 // Standard case, clusterAuthMode: x509
 x509_options1 = Object.merge(common_options, 

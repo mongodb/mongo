@@ -11,7 +11,7 @@ resetDbpath(dbpath);
 md = startMongod("--nopreallocj",
                  "--port", port, 
                  "--dbpath", dbpath, 
-                 "--sslOnNormalPorts",
+                 "--sslMode","sslOnly",
                  "--sslPEMKeyFile", "jstests/libs/password_protected.pem",
                  "--sslPEMKeyPassword", "qwerty");
 // startMongod connects a Mongo shell, so if we get here, the test is successful.
