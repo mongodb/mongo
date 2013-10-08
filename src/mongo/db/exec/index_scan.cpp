@@ -303,7 +303,7 @@ namespace mongo {
                     break;
                 }
 
-                // cout << "skipping...\n";
+                //cout << "skipping...\n";
                 verify(IndexBoundsChecker::MUST_ADVANCE == keyState);
                 _btreeCursor->skip(_indexCursor->getKey(), _keyEltsToUse, _movePastKeyElts,
                                    _keyElts, _keyEltsInc);

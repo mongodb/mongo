@@ -124,8 +124,26 @@ namespace mongo {
                                 int pass,
                                 bool& exhaust,
                                 bool* isCursorAuthorized ) {
+
         if (isNewQueryFrameworkEnabled()) {
-            return newGetMore(ns, ntoreturn, cursorid, curop, pass, exhaust, isCursorAuthorized);
+            bool useNewSystem = false;
+
+            // Scoped to kill the pin after seeing if the runner's there.
+            {
+                // See if there's a runner.  We do this because some CCs may be cursors and some may
+                // be runners until we're done implementing all new functionality in the new
+                // system...
+                ClientCursorPin p(cursorid);
+                ClientCursor *cc = p.c();
+                if (NULL != cc && NULL != cc->getRunner()) {
+                    useNewSystem = true;
+                }
+            }
+
+            if (useNewSystem) {
+                return newGetMore(ns, ntoreturn, cursorid, curop, pass, exhaust,
+                                  isCursorAuthorized);
+            }
         }
 
         exhaust = false;
@@ -1082,7 +1100,10 @@ namespace mongo {
 
         if (isNewQueryFrameworkEnabled()) {
             // TODO: Copy prequel curop debugging into runNewQuery
-            return newRunQuery(m, q, curop, result);
+            CanonicalQuery* cq = NULL;
+            if (canUseNewSystem(q, &cq)) {
+                return newRunQuery(cq, curop, result);
+            }
         }
 
         // Handle query option $maxTimeMS (not used with commands).
