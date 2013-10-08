@@ -238,6 +238,11 @@ namespace mongo {
                 assign->index = it->first;
                 // We can swap because we're never touching idxToFirst again after this loop over it.
                 assign->preds.swap(it->second);
+                // If it's a multikey index, we can't intersect the bounds, so we only want one pred.
+                if ((*_indices)[it->first].multikey) {
+                    // XXX: pick a better pred than the first one that happens to wander in.
+                    assign->preds.resize(1);
+                }
                 assign->positions.resize(assign->preds.size(), 0);
 
                 //
