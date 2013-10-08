@@ -372,8 +372,6 @@ namespace mongo {
 
 
 
-    void addNewNamespaceToCatalog(const char *ns, const BSONObj *options = 0); // XXX
-
     Status Database::renameCollection( const StringData& fromNS, const StringData& toNS,
                                        bool stayTemp ) {
 
@@ -504,7 +502,8 @@ namespace mongo {
             }
             newSpec = b.obj();
         }
-        addNewNamespaceToCatalog( toNSString.c_str(), newSpec.isEmpty() ? 0 : &newSpec );
+
+        _addNamespaceToCatalog( toNSString, newSpec.isEmpty() ? 0 : &newSpec );
 
         deleteObjects( _namespacesName, BSON( "name" << fromNS ), false, false, true );
 

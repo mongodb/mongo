@@ -136,7 +136,6 @@ namespace mongo {
         return _dbHolder;
     }
 
-    void addNewNamespaceToCatalog(const char *ns, const BSONObj *options = 0);
     void ensureIdIndexForNewNs(const char *ns) {
         if ( ( strstr( ns, ".system." ) == 0 || legalClientSystemNS( ns , false ) ) &&
                 strstr( ns, FREELIST_NS ) == 0 ) {
