@@ -41,6 +41,7 @@ namespace mongo {
     class Collection;
     class Extent;
     class DataFile;
+    class IndexDetails;
 
     /**
      * Database represents a database database
@@ -206,6 +207,7 @@ namespace mongo {
         mutex _collectionLock;
 
         friend class NamespaceDetails;
+        friend class IndexDetails;
     };
 
 } // namespace mongo

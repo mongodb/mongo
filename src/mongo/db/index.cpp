@@ -123,6 +123,7 @@ namespace mongo {
             int n = removeFromSysIndexes(pns, name);
             wassert( n == 1 );
 
+            cc().database()->_clearCollectionCache( ns );
         }
         catch ( DBException &e ) {
             log() << "exception in kill_idx: " << e << ", ns: " << ns << endl;

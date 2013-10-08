@@ -307,18 +307,34 @@ namespace mongo {
 
         _clearCollectionCache( fullns );
 
+        DEV {
+            // check all index collection entries are gone
+            string nstocheck = fullns.toString() + ".$";
+            scoped_lock lk( _collectionLock );
+            for ( CollectionMap::iterator i = _collections.begin();
+                  i != _collections.end();
+                  ++i ) {
+                string temp = i->first;
+                if ( temp.find( nstocheck ) != 0 )
+                    continue;
+                log() << "after drop, bad cache entries for: "
+                      << fullns << " have " << temp;
+                verify(0);
+            }
+        }
+
         return Status::OK();
     }
 
     void Database::_clearCollectionCache( const StringData& fullns ) {
+        verify( _name == nsToDatabaseSubstring( fullns ) );
         scoped_lock lk( _collectionLock );
         _collections.erase( fullns.toString() );
 
     }
 
     Collection* Database::getCollection( const StringData& ns ) {
-        StringData dbName = nsToDatabaseSubstring( ns );
-        verify( dbName == _name);
+        verify( _name == nsToDatabaseSubstring( ns ) );
 
         scoped_lock lk( _collectionLock );
 
@@ -452,12 +468,14 @@ namespace mongo {
         catch( DBException& ) {
             // could end up here if .ns is full - if so try to clean up / roll back a little
             _namespaceIndex.kill_ns(toNSString.c_str());
+            _clearCollectionCache(toNSString);
             throw;
         }
 
         // at this point, code .ns stuff moved
 
         _namespaceIndex.kill_ns( fromNSString.c_str() );
+        _clearCollectionCache(fromNSString);
         fromDetails = NULL;
 
         // fix system.namespaces
