@@ -562,24 +562,19 @@ namespace ExpressionTests {
                 BSONElement specElement = specObject.firstElement();
                 intrusive_ptr<Expression> expression = Expression::parseOperand( specElement );
                 intrusive_ptr<Expression> optimized = expression->optimize();
-                ASSERT_EQUALS( expectedFieldRange(),
-                               (bool)dynamic_pointer_cast<ExpressionFieldRange>( optimized ) );
                 ASSERT_EQUALS( constify( expectedOptimized() ), expressionToBson( optimized ) );
             }
         protected:
             virtual BSONObj spec() = 0;
             virtual BSONObj expectedOptimized() = 0;
-            virtual bool expectedFieldRange() = 0;
         };
         
         class FieldRangeOptimize : public OptimizeBase {
             BSONObj expectedOptimized() { return spec(); }
-            bool expectedFieldRange() { return true; }
         };
         
         class NoOptimize : public OptimizeBase {
             BSONObj expectedOptimized() { return spec(); }
-            bool expectedFieldRange() { return false; }
         };
 
         /** Check expected result for expressions depending on constants. */
@@ -607,7 +602,6 @@ namespace ExpressionTests {
             virtual BSONObj expectedOptimized() {
                 return BSON( "$const" << expectedResult().firstElement() );
             }
-            virtual bool expectedFieldRange() { return false; }
         };
 
         class ExpectedTrue : public ExpectedResultBase {
@@ -778,7 +772,6 @@ namespace ExpressionTests {
         class OptimizeConstants : public OptimizeBase {
             BSONObj spec() { return BSON( "$eq" << BSON_ARRAY( 1 << 1 ) ); }
             BSONObj expectedOptimized() { return BSON( "$const" << true ); }
-            bool expectedFieldRange() { return false; }
         };
 
         /** $cmp is not optimized. */
@@ -818,7 +811,6 @@ namespace ExpressionTests {
         /** A reverse sense equality expression is optimized. */
         class OptimizeEqReverse : public FieldRangeOptimize {
             BSONObj spec() { return BSON( "$eq" << BSON_ARRAY( 1 << "$a" ) ); }
-            BSONObj expectedOptimized() { return BSON( "$eq" << BSON_ARRAY( "$a" << 1 ) ); }
         };
         
         /** A $lt expression is optimized. */
@@ -829,7 +821,6 @@ namespace ExpressionTests {
         /** A reverse sense $lt expression is optimized. */
         class OptimizeLtReverse : public FieldRangeOptimize {
             BSONObj spec() { return BSON( "$lt" << BSON_ARRAY( 1 << "$a" ) ); }
-            BSONObj expectedOptimized() { return BSON( "$gt" << BSON_ARRAY( "$a" << 1 ) ); }
         };
         
         /** A $lte expression is optimized. */
@@ -840,7 +831,6 @@ namespace ExpressionTests {
         /** A reverse sense $lte expression is optimized. */
         class OptimizeLteReverse : public FieldRangeOptimize {
             BSONObj spec() { return BSON( "$lte" << BSON_ARRAY( 2 << "$b" ) ); }
-            BSONObj expectedOptimized() { return BSON( "$gte" << BSON_ARRAY( "$b" << 2 ) ); }
         };
         
         /** A $gt expression is optimized. */
@@ -851,7 +841,6 @@ namespace ExpressionTests {
         /** A reverse sense $gt expression is optimized. */
         class OptimizeGtReverse : public FieldRangeOptimize {
             BSONObj spec() { return BSON( "$gt" << BSON_ARRAY( 2 << "$b" ) ); }
-            BSONObj expectedOptimized() { return BSON( "$lt" << BSON_ARRAY( "$b" << 2 ) ); }
         };
         
         /** A $gte expression is optimized. */
@@ -862,7 +851,6 @@ namespace ExpressionTests {
         /** A reverse sense $gte expression is optimized. */
         class OptimizeGteReverse : public FieldRangeOptimize {
             BSONObj spec() { return BSON( "$gte" << BSON_ARRAY( 2 << "$b" ) ); }
-            BSONObj expectedOptimized() { return BSON( "$lte" << BSON_ARRAY( "$b" << 2 ) ); }
         };
         
     } // namespace Compare
@@ -1177,180 +1165,6 @@ namespace ExpressionTests {
         
     } // namespace FieldPath
 
-    namespace FieldRange {
-
-        // Much of ExpressionFieldRange's functionality is not reachable in mongo 2.2. and some of
-        // it does not work properly.  These tests generally focus portions of ExpressionFieldRange
-        // that are reachable in mongo 2.2.
-
-        class CheckResultBase {
-        public:
-            virtual ~CheckResultBase() {
-            }
-            void run() {
-                intrusive_ptr<ExpressionFieldRange> expression =
-                        ExpressionFieldRange::create( mongo::ExpressionFieldPath::create( "a" ),
-                                                      compareOp(), valueFromBson( value() ) );
-                ASSERT_EQUALS( constify( expectedSpec() ), expressionToBson( expression ) );
-                ASSERT_EQUALS( toBson( expectedResult() ? Value(true) : Value(false) ),
-                               toBson( expression->evaluate( fromBson( sourceDocument() ) ) ) );
-            }
-        protected:
-            virtual Expression::CmpOp compareOp() = 0;
-            virtual BSONObj expectedSpec() = 0;
-            virtual BSONObj value() = 0;
-            virtual BSONObj sourceDocument() = 0;
-            virtual bool expectedResult() = 0;
-        };
-
-        class EqBase : public CheckResultBase {
-            Expression::CmpOp compareOp() { return Expression::EQ; }
-            BSONObj expectedSpec() { return BSON( "$eq" << BSON_ARRAY( "$a" << 1 ) ); }
-            BSONObj value() { return BSON( "" << 1 ); }
-        };
-
-        /** $eq operator with 'a' < value. */
-        class EqLt : public EqBase {
-            BSONObj sourceDocument() { return BSON( "a" << 0 ); }
-            bool expectedResult() { return false; }
-        };
-
-        /** $eq operator with 'a' == value. */
-        class EqEq : public EqBase {
-            BSONObj sourceDocument() { return BSON( "a" << 1 ); }
-            bool expectedResult() { return true; }
-        };
-        
-        /** $eq operator with 'a' > value. */
-        class EqGt : public EqBase {
-            BSONObj sourceDocument() { return BSON( "a" << 2 ); }
-            bool expectedResult() { return false; }
-        };
-        
-        class LtBase : public CheckResultBase {
-            Expression::CmpOp compareOp() { return Expression::LT; }
-            BSONObj expectedSpec() { return BSON( "$lt" << BSON_ARRAY( "$a" << "y" ) ); }
-            BSONObj value() { return BSON( "" << "y" ); }
-        };
-        
-        /** $lt operator with 'a' < value. */
-        class LtLt : public LtBase {
-            BSONObj sourceDocument() { return BSON( "a" << "x" ); }
-            bool expectedResult() { return true; }
-        };
-        
-        /** $lt operator with 'a' == value. */
-        class LtEq : public LtBase {
-            BSONObj sourceDocument() { return BSON( "a" << "y" ); }
-            bool expectedResult() { return false; }
-        };
-        
-        /** $lt operator with 'a' > value. */
-        class LtGt : public LtBase {
-            BSONObj sourceDocument() { return BSON( "a" << "z" ); }
-            bool expectedResult() { return false; }
-        };
-        
-        class LteBase : public CheckResultBase {
-            Expression::CmpOp compareOp() { return Expression::LTE; }
-            BSONObj expectedSpec() { return BSON( "$lte" << BSON_ARRAY( "$a" << 1.1 ) ); }
-            BSONObj value() { return BSON( "" << 1.1 ); }
-        };
-        
-        /** $lte operator with 'a' < value. */
-        class LteLt : public LteBase {
-            BSONObj sourceDocument() { return BSON( "a" << 1.0 ); }
-            bool expectedResult() { return true; }
-        };
-        
-        /** $lte operator with 'a' == value. */
-        class LteEq : public LteBase {
-            BSONObj sourceDocument() { return BSON( "a" << 1.1 ); }
-            bool expectedResult() { return true; }
-        };
-        
-        /** $lte operator with 'a' > value. */
-        class LteGt : public LteBase {
-            BSONObj sourceDocument() { return BSON( "a" << 1.2 ); }
-            bool expectedResult() { return false; }
-        };
-        
-        class GtBase : public CheckResultBase {
-            Expression::CmpOp compareOp() { return Expression::GT; }
-            BSONObj expectedSpec() { return BSON( "$gt" << BSON_ARRAY( "$a" << 100 ) ); }
-            BSONObj value() { return BSON( "" << 100 ); }
-        };
-        
-        /** $gt operator with 'a' < value. */
-        class GtLt : public GtBase {
-            BSONObj sourceDocument() { return BSON( "a" << 50 ); }
-            bool expectedResult() { return false; }
-        };
-        
-        /** $gt operator with 'a' == value. */
-        class GtEq : public GtBase {
-            BSONObj sourceDocument() { return BSON( "a" << 100 ); }
-            bool expectedResult() { return false; }
-        };
-        
-        /** $gt operator with 'a' > value. */
-        class GtGt : public GtBase {
-            BSONObj sourceDocument() { return BSON( "a" << 150 ); }
-            bool expectedResult() { return true; }
-        };
-        
-        class GteBase : public CheckResultBase {
-            Expression::CmpOp compareOp() { return Expression::GTE; }
-            BSONObj expectedSpec() { return BSON( "$gte" << BSON_ARRAY( "$a" << "abc" ) ); }
-            BSONObj value() { return BSON( "" << "abc" ); }
-        };
-        
-        /** $gte operator with 'a' < value. */
-        class GteLt : public GteBase {
-            BSONObj sourceDocument() { return BSON( "a" << "a" ); }
-            bool expectedResult() { return false; }
-        };
-        
-        /** $gte operator with 'a' == value. */
-        class GteEq : public GteBase {
-            BSONObj sourceDocument() { return BSON( "a" << "abc" ); }
-            bool expectedResult() { return true; }
-        };
-        
-        /** $gte operator with 'a' > value. */
-        class GteGt : public GteBase {
-            BSONObj sourceDocument() { return BSON( "a" << "abcd" ); }
-            bool expectedResult() { return true; }
-        };
-
-        /** The FieldRange's FieldPath is a dependency. */
-        class Dependencies {
-        public:
-            void run() {
-                intrusive_ptr<ExpressionFieldRange> expression =
-                        ExpressionFieldRange::create( mongo::ExpressionFieldPath::create( "a.b.c" ),
-                                                      Expression::EQ, Value(0) );
-                set<string> dependencies;
-                expression->addDependencies( dependencies );
-                ASSERT_EQUALS( 1U, dependencies.size() );
-                ASSERT_EQUALS( 1U, dependencies.count( "a.b.c" ) );
-            }
-        };
-
-        /** Comparison is performed for multikey values rather than set-containment. */
-        class Multikey {
-        public:
-            void run() {
-                intrusive_ptr<ExpressionFieldRange> expression =
-                        ExpressionFieldRange::create( mongo::ExpressionFieldPath::create( "a" ),
-                                                      Expression::EQ, Value(0) );
-                Document document =
-                        fromBson( BSON( "a" << BSON_ARRAY( 1 << 0 << 2 ) ) );
-                ASSERT_EQUALS(expression->evaluate(document), Value(false));
-            }
-        };
-        
-    } // namespace FieldRange
 
     namespace Nary {
 
@@ -3670,24 +3484,6 @@ namespace ExpressionTests {
             add<FieldPath::ExpandNestedArrays>();
             add<FieldPath::AddToBsonObj>();
             add<FieldPath::AddToBsonArray>();
-
-            add<FieldRange::EqLt>();
-            add<FieldRange::EqEq>();
-            add<FieldRange::EqGt>();
-            add<FieldRange::LtLt>();
-            add<FieldRange::LtEq>();
-            add<FieldRange::LtGt>();
-            add<FieldRange::LteLt>();
-            add<FieldRange::LteEq>();
-            add<FieldRange::LteGt>();
-            add<FieldRange::GtLt>();
-            add<FieldRange::GtEq>();
-            add<FieldRange::GtGt>();
-            add<FieldRange::GteLt>();
-            add<FieldRange::GteEq>();
-            add<FieldRange::GteGt>();
-            add<FieldRange::Dependencies>();
-            add<FieldRange::Multikey>();
 
             add<Nary::AddOperand>();
             add<Nary::Dependencies>();
