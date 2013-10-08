@@ -224,6 +224,8 @@ struct __wt_page_modify {
 		WT_OVFL_TXNC	*ovfl_txnc[WT_SKIP_MAXDEPTH];
 	} *ovfl_track;
 
+	int64_t bytes_dirty;		/* Dirty bytes added to cache. */
+
 	/*
 	 * The write generation is incremented when a page is modified, a page
 	 * is clean if the write generation is 0.
@@ -350,8 +352,6 @@ struct __wt_page {
 
 	/* Memory attached to the page. */
 	uint32_t memory_footprint;
-
-	int64_t bytes_dirty;		/* Dirty bytes added to cache. */
 
 #define	WT_PAGE_INVALID		0	/* Invalid page */
 #define	WT_PAGE_BLOCK_MANAGER	1	/* Block-manager page */
