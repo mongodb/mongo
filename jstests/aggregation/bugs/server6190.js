@@ -9,7 +9,7 @@ t.save( {} );
 
 function week( date ) {
     return t.aggregate( { $project:{ a:{ $week:date } } },
-                        { $match:{ a:{ $type:16 /* Int type expected */ } } } ).result[ 0 ].a;
+                        { $match:{ a:{ $type:16 /* Int type expected */ } } } ).toArray()[ 0 ].a;
 }
 
 function assertWeek( expectedWeek, date ) {

@@ -6,7 +6,7 @@ t.drop();
 t.save( {object: {a:1}} );
 
 function coerceToBool( value ) {
-    return t.aggregate( { $project:{ boolValue:{ $and:[ value ] } } } ).result[ 0 ].boolValue;
+    return t.aggregate( { $project:{ boolValue:{ $and:[ value ] } } } ).toArray()[ 0 ].boolValue;
 }
 
 function assertBoolValue( expectedBool, value ) {

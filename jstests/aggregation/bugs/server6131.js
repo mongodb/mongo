@@ -4,8 +4,7 @@ t = db.jstests_aggregation_server6131;
 t.drop();
 
 function assertAggregationResults( expected, aggregation ) {
-    ret = t.aggregate( aggregation );
-    assert.eq( expected, ret.result );
+    assert.eq(expected, t.aggregate(aggregation).toArray());
 }
 
 t.drop();

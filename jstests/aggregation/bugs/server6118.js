@@ -26,7 +26,7 @@ s.adminCommand( { movechunk:"test.data", find:{ _id:50 },
                 to:s.getOther( s.getServer( "test" ) ).name } );
 
 // Check that the results are in order.
-result = d.data.aggregate( { $sort: { _id:1 } } ).result;
+result = d.data.aggregate( { $sort: { _id:1 } } ).toArray();
 printjson(result);
 for( i = 0; i < N; ++i ) {
     assert.eq( i, result[ i ]._id );

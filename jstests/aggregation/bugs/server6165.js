@@ -75,4 +75,4 @@ var s6165result = [
 ];
 
 // Assert
-assert.eq(s6165.result, s6165result, 's6165 failed');
+assert.eq(s6165.toArray(), s6165result, 's6165 failed');

@@ -11,8 +11,7 @@ function test(op, val) {
     obj[op] = ['$a', val];
     result = t.aggregate({$project: {_id: 0, bool: obj}});
 
-    assert.commandWorked(result);
-    assert.eq(result.result, [{bool:true}, {bool:false}]);
+    assert.eq(result.toArray(), [{bool:true}, {bool:false}]);
 }
 test('$and', true);
 test('$or', false);

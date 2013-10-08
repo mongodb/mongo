@@ -55,4 +55,4 @@ var s6127result = [
 ];
 
 // Assert
-assert.eq(s6127.result, s6127result, 's6127 failed');
+assert.eq(s6127.toArray(), s6127result, 's6127 failed');

@@ -1,10 +1,18 @@
 load('jstests/aggregation/extras/utils.js');
 
+// Use this for aggregations that only have arrays or results of specified order.
+// It will check that cursors return the same results as non-cursors.
+function aggregateOrdered(coll, pipeline) {
+    var cursor = coll.aggregate(pipeline).toArray()
+    var noCursor = coll.runCommand('aggregate', {pipeline:pipeline}).result
+    assert.eq(cursor, noCursor);
+    return cursor;
+}
+
 // Use this for aggregations that have arrays or results of unspecified order.
 // It will bypass the check that cursors return the same results as non-cursors.
 function aggregateNoOrder(coll, pipeline) {
-    var cursor = coll.aggregateCursor(pipeline);
-    return {result: cursor.toArray(), ok: 1};
+    return coll.aggregate(pipeline).toArray();
 }
 
 /*
@@ -101,38 +109,36 @@ var a1 = aggregateNoOrder(db.ts1, [
     { $sort: {_id:1} }
 ]);
 
-var a1result = a1.result;
 for(i = 0 ; i < 10; ++i) {
-    assert.eq(a1result[i].avgCounter, a1result[i]._id,
+    assert.eq(a1[i].avgCounter, a1[i]._id,
            'agg sharded test avgCounter failed');
-    assert.eq(a1result[i].numberSet.length, 2,
+    assert.eq(a1[i].numberSet.length, 2,
            'agg sharded test numberSet length failed');
 }
 
 // an initial group starts the group in the shards, and combines them in mongos
-var a2 = db.ts1.aggregate(
+var a2 = aggregateOrdered(db.ts1 , [
     { $group: {
         _id: "all",
         total: {$sum: "$counter"}
     }}
-);
+]);
 
 // sum of an arithmetic progression S(n) = (n/2)(a(1) + a(n));
-assert.eq(a2.result[0].total, (nItems/2)*(1 + nItems),
+assert.eq(a2[0].total, (nItems/2)*(1 + nItems),
        'agg sharded test counter sum failed');
 
 // an initial group starts the group in the shards, and combines them in mongos
-var a3 = db.ts1.aggregate(
+var a3 = aggregateOrdered(db.ts1, [
     { $group: {
         _id: "$number",
         total: {$sum: 1}
     }},
     { $sort: {_id:1} }
-);
+]);
 
-var a3result = a3.result;
 for(i = 0 ; i < strings.length; ++i) {
-    assert.eq(a3result[i].total, nItems/strings.length,
+    assert.eq(a3[i].total, nItems/strings.length,
            'agg sharded test sum numbers failed');
 }
 
@@ -144,9 +150,8 @@ var a4 = aggregateNoOrder(db.ts1, [
     }
 ]);
 
-var a4result = a4.result;
 for(i = 0; i < 6; ++i) {
-    c = a4result[i].counter;
+    c = a4[i].counter;
     printjson({c:c})
     assert((c == 55) || (c == 1111) || (c == 2222) ||
            (c == 33333) || (c = 99999) || (c == 55555),
@@ -161,9 +166,8 @@ function testSkipLimit(ops, expectedCount) {
 
     ops.push({$group: {_id:1, count: {$sum: 1}}});
 
-    var out = db.ts1.aggregate(ops);
-    assert.commandWorked(out);
-    assert.eq(out.result[0].count, expectedCount);
+    var out = aggregateOrdered(db.ts1, ops);
+    assert.eq(out[0].count, expectedCount);
 }
 
 testSkipLimit([], nItems); // control
@@ -181,10 +185,10 @@ function testSortLimit(limit, direction) {
                             .sort({random: direction})
                             .limit(limit)
                             .toArray();
-    var from_agg = db.ts1.aggregate({$project: {random:1, _id:0}}
-                                   ,{$sort: {random: direction}}
-                                   ,{$limit: limit}
-                                   ).result;
+    var from_agg = aggregateOrdered(db.ts1, [{$project: {random:1, _id:0}}
+                                            ,{$sort: {random: direction}}
+                                            ,{$limit: limit}
+                                            ]);
     assert.eq(from_cursor, from_agg);
 }
 testSortLimit(1,  1);
@@ -196,8 +200,7 @@ testSortLimit(100, -1);
 
 // test $out by copying source collection verbatim to output
 var outCollection = db.ts1_out;
-var res = db.ts1.aggregate({$out: outCollection.getName()});
-assert.eq(res, {result: [], ok: 1});
+var res = aggregateOrdered(db.ts1, [{$out: outCollection.getName()}]);
 assert.eq(db.ts1.find().itcount(), outCollection.find().itcount());
 assert.eq(db.ts1.find().sort({_id:1}).toArray(),
           outCollection.find().sort({_id:1}).toArray());
@@ -207,13 +210,13 @@ assertErrorCode(db.outCollection, [{$out: db.ts1.getName()}], 17017);
 
 db.literal.save({dollar:false});
 
-result = db.literal.aggregate(
-            {$project:{_id:0, cost:{$cond:['$dollar', {$literal:'$1.00'}, {$literal:'$.99'}]}}});
+result = aggregateOrdered(db.literal,
+            [{$project:{_id:0, cost:{$cond:['$dollar', {$literal:'$1.00'}, {$literal:'$.99'}]}}}]);
 
-assert.eq([{cost:'$.99'}], result.result);
+assert.eq([{cost:'$.99'}], result);
 
 // Do a basic sharded explain. This just makes sure that it doesn't error and has the right fields.
-var res = db.ts1.runCommand("aggregate", {pipeline: [{$project: {a: 1}}], explain:true });
+var res = db.ts1.aggregate([{$project: {a: 1}}], {explain:true});
 assert.commandWorked(res);
 printjson(res);
 assert("splitPipeline" in res);

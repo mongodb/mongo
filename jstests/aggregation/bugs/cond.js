@@ -13,7 +13,7 @@ function assertError( expectedErrorCode, condSpec ) {
 
 function assertResult( expectedResult, arg ) {
     assert.eq( expectedResult,
-               t.aggregate( { $project:{ a:{ $cond:arg } } } ).result[ 0 ].a );
+               t.aggregate( { $project:{ a:{ $cond:arg } } } ).toArray()[0].a );
 }
 
 // Wrong number of args.
@@ -72,5 +72,5 @@ assert.eq( [ 'breakfast', 'brunch', 'linner', 'dinner' ],
                                                  { $cond:[ { $eq:[ '$mealCombined', 'yes' ] },
                                                            'brunch', 'breakfast' ] },
                                                  { $cond:[ { $eq:[ '$mealCombined', 'yes' ] },
-                                                           'linner', 'dinner' ] } ] } } } ).result
+                                                           'linner', 'dinner' ] } ] } } } )
            .map( function( x ) { return x.a; } ) );

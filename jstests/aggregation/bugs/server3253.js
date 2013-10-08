@@ -10,10 +10,9 @@ output.drop();
 
 function test(pipeline, expected) {
     pipeline.push({$out: output.getName()});
-    var result = input.aggregate(pipeline);
-    assert.eq(result, {result: [], ok: 1});
 
-    assert.eq(output.find().toArray(), expected);
+    assert.eq(input.aggregate(pipeline).itcount(), 0); // empty cursor returned
+    assert.eq(output.find().toArray(), expected); // correct results
 }
 
 

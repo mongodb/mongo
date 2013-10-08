@@ -12,7 +12,7 @@ function assertCode( code, expression ) {
 }
 
 function assertResult( result, expression ) {
-    assert.eq( result, t.aggregate( expression ).result );    
+    assert.eq( result, t.aggregate( expression ).toArray() );
 }
 
 // Correct number of fields.

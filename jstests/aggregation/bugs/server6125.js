@@ -23,7 +23,7 @@ function runSort( chkDoc, nest, problem ){
     t.drop();
     t.insert( chkArray );
      
-    runAsserts( t.aggregate( { $sort : chkDoc } ).result, problem );
+    runAsserts( t.aggregate( { $sort : chkDoc } ).toArray(), problem );
 }
  
 //actually run the tests

@@ -11,4 +11,4 @@ var r = c.aggregate(
         "x" : NumberInt(1)
     }});
 
-assert.eq(r.result, [{key: 4, v: 3, x: 2}], "support204 failed");
+assert.eq(r.toArray(), [{key: 4, v: 3, x: 2}], "support204 failed");

@@ -11,7 +11,7 @@ function assertFirstLast( expectedFirst, expectedLast, pipeline, expression ) {
     pipeline.push( { $group:{ _id:'$a',
                               first:{ $first:expression },
                               last:{ $last:expression } } } );
-    result = t.aggregate( pipeline ).result;
+    result = t.aggregate( pipeline ).toArray();
     for( var i = 0; i < result.length; ++i ) {
         if ( result[ i ]._id == 1 ) {
             // Check results for group _id 1.

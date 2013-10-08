@@ -102,5 +102,5 @@ var l2result = [
 ];
 
 // Asserts
-assert.eq(l1.result, l1result, 'l1 failed');
-assert.eq(l2.result, l2result, 'l2 failed');
+assert.eq(l1.toArray(), l1result, 'l1 failed');
+assert.eq(l2.toArray(), l2result, 'l2 failed');

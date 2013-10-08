@@ -11,14 +11,14 @@ assertErrorCode(c, {$project: {a:0}}, 16406);
 
 // excluding top-level _id is still allowed
 res = c.aggregate({$project: {_id:0, a:1}});
-assert.eq(res.result[0], {a:2});
+assert.eq(res.toArray()[0], {a:2});
 
 // excluding nested _id is not
 assertErrorCode(c, {$project: {'nested._id':0}}, 16406);
 
 // nested _id is not automatically included
 res = c.aggregate({$project: {_id:0, 'nested.other':1}})
-assert.eq(res.result[0], {nested: {other:2}});
+assert.eq(res.toArray()[0], {nested: {other:2}});
 
 // not including anything is an error
 assertErrorCode(c, {$project: {}}, 16403);

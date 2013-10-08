@@ -9,11 +9,11 @@ function test(expression, expected) {
     t.insert({zero:0, one:1, two:2, three:3, nested: {four: 4}});
 
     // Test in projection:
-    var result = t.aggregate({$project:{_id:0, res: expression}}).result;
+    var result = t.aggregate({$project:{_id:0, res: expression}}).toArray();
     assert.eq(result, [{res:expected}]);
 
     // Test in group:
-    var result = t.aggregate({$group:{_id: 0, res: {$sum: expression}}}).result;
+    var result = t.aggregate({$group:{_id: 0, res: {$sum: expression}}}).toArray();
     assert.eq(result, [{_id: 0, res:expected}]);
 }
 
@@ -64,13 +64,13 @@ test({$let: {vars: {'日本語': 10}, in: '$$日本語'}}, 10) // Japanese for "
 // Can use ROOT and CURRENT directly with no subfield (SERVER-5916)
 t.drop();
 t.insert({_id: 'obj'});
-assert.eq(t.aggregate({$project: {_id:0, obj: '$$ROOT'}}).result,
+assert.eq(t.aggregate({$project: {_id:0, obj: '$$ROOT'}}).toArray(),
           [{obj: {_id: 'obj'}}]);
-assert.eq(t.aggregate({$project: {_id:0, obj: '$$CURRENT'}}).result,
+assert.eq(t.aggregate({$project: {_id:0, obj: '$$CURRENT'}}).toArray(),
           [{obj: {_id: 'obj'}}]);
-assert.eq(t.aggregate({$group: {_id:0, objs: {$push: '$$ROOT'}}}).result,
+assert.eq(t.aggregate({$group: {_id:0, objs: {$push: '$$ROOT'}}}).toArray(),
           [{_id: 0, objs: [{_id: 'obj'}]}]);
-assert.eq(t.aggregate({$group: {_id:0, objs: {$push: '$$CURRENT'}}}).result,
+assert.eq(t.aggregate({$group: {_id:0, objs: {$push: '$$CURRENT'}}}).toArray(),
           [{_id: 0, objs: [{_id: 'obj'}]}]);
 
 // check name validity checks

@@ -6,7 +6,7 @@ t.drop();
 t.save( {} );
 
 function substr( string, pos, n ) {
-    return t.aggregate( { $project:{ a:{ $substr:[ string, pos, n ] } } } ).result[ 0 ].a;
+    return t.aggregate( { $project:{ a:{ $substr:[ string, pos, n ] } } } ).toArray()[ 0 ].a;
 }
 
 function expectedSubstr( string, pos, n ) {

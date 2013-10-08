@@ -4,21 +4,17 @@
 t = db.server4638
 t.drop();
 
-for ( i=0; i<2; i++ ){
-    //t.insert( { _id : i , x : i } ); // this version works
-    t.insert( { _id : i , x : i , undef: undefined } );
-}
+t.insert( { _id : 0 , x : 0 , undef: undefined } );
 
 db.getLastError();
-res = t.aggregate( { $project : { x : 1 } } )
-printjson(res)
 
-assert(res.ok, 'server4638 failed');
+// Make sure having an undefined doesn't break pipelines not using the field
+res = t.aggregate( { $project : { x : 1 } } ).toArray();
+assert.eq(res[0].x, 0);
 
-res = t.aggregate( { $project : { undef : 1 } } )
-printjson(res)
 
-assert(res.ok, 'server4638 failed 2');
-assert.eq(res.result[0].undef, undefined);
-// assert.eq(typeof(res.result[0].undef), "undefined"); // Commented out due to SERVER-6102
+// Make sure having an undefined doesn't break pipelines that do use the field
+res = t.aggregate( { $project : { undef : 1 } } ).toArray();
+assert.eq(res[0].undef, undefined);
+// assert.eq(typeof(res[0].undef), "undefined"); // Commented out due to SERVER-6102
 
