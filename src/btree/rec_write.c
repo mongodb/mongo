@@ -3918,17 +3918,8 @@ err:			__wt_scr_free(&tkey);
 	mod->disk_snap_min = session->txn.snap_min;
 
 	/*
-	 * If modifications were not skipped, we have a new maximum transaction
-	 * written for the page (used to decide if a clean page can be evicted).
-	 */
-	if (!r->upd_skipped)
-		mod->disk_txn = r->max_txn;
-
-	/*
-	 * Success.
-	 *
-	 * If modifications were skipped, the tree isn't clean.  The checkpoint
-	 * call cleared the tree's modified value before it called the eviction
+	 * If updates were skipped, the tree isn't clean.  The checkpoint call
+	 * cleared the tree's modified value before it called the eviction
 	 * thread, so we must explicitly reset the tree's modified flag.  We
 	 * publish the change for clarity (the requirement is the value be set
 	 * before a subsequent checkpoint reads it, and because the current
@@ -3939,33 +3930,18 @@ err:			__wt_scr_free(&tkey);
 		WT_PUBLISH(btree->modified, 1);
 
 	/*
-	 * If modifications were not skipped, the page might be clean; if the
-	 * write generation is unchanged, clear it.
-	 *
-	 * Update the cache's dirty-bytes information: every time a page goes
-	 * to/from clean/dirty, we increment/decrement the cache's dirty byte
-	 * count.  The actual page footprint isn't latched, so we have to save
-	 * a copy of the value by which we incremented/decremented so the same
-	 * amount is incremented/decremented as the page transitions.  However,
-	 * that means our increment/decrement count is potentially off by some
-	 * amount as the page size changes.  Update the increment/decrement as
-	 * part of reconciliation, regardless of the page becoming clean, so we
-	 * don't fall too far behind reality.
-	 *
-	 * This code cannot only update the cache if we successfully mark the
-	 * page clean, that approach might race with threads marking the page
-	 * dirty between our marking it clean but before we update the cache.
-	 * Instead, decrement the cache information while the page is dirty,
-	 * and increment it if we fail to mark the page clean.  That way, we
-	 * only ever modify the cache information while the page is dirty; as
-	 * the serialization function only modifies the cache information when
-	 * the page is clean (that's not quite correct, see the page-modify-set
-	 * function's comment for clarification), we won't race.
+	 * If no updates were skipped, we have a new maximum transaction
+	 * written for the page (used to decide if a clean page can be
+	 * evicted).  The page might be clean; if the write generation is
+	 * unchanged since reconciliation started, clear it and update the
+	 * cache's dirty statistics.
 	 */
-	__wt_cache_dirty_decr(session, page);
-	if (r->upd_skipped ||
-	    !WT_ATOMIC_CAS(mod->write_gen, r->orig_write_gen, 0))
-		__wt_cache_dirty_incr(session, page);
+	if (!r->upd_skipped) {
+		mod->disk_txn = r->max_txn;
+
+		if (WT_ATOMIC_CAS(mod->write_gen, r->orig_write_gen, 0))
+			__wt_cache_dirty_decr(session, page);
+	}
 
 	return (0);
 }

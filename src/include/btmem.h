@@ -234,13 +234,6 @@ struct __wt_page_modify {
 	 */
 	uint32_t write_gen;
 
-	/*
-	 * When a page transitions to/from clean/dirty, the cache's dirty-byte
-	 * count is updated.  This field tracks the last such value to ensure
-	 * the increment/decrement pairs match.
-	 */
-	uint32_t last_memory_footprint;
-
 #define	WT_PM_REC_EMPTY		0x01	/* Reconciliation: page empty */
 #define	WT_PM_REC_REPLACE	0x02	/* Reconciliation: page replaced */
 #define	WT_PM_REC_SPLIT		0x04	/* Reconciliation: page split */
@@ -357,6 +350,8 @@ struct __wt_page {
 
 	/* Memory attached to the page. */
 	uint32_t memory_footprint;
+
+	int64_t bytes_dirty;		/* Dirty bytes added to cache. */
 
 #define	WT_PAGE_INVALID		0	/* Invalid page */
 #define	WT_PAGE_BLOCK_MANAGER	1	/* Block-manager page */
