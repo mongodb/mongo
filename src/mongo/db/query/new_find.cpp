@@ -35,6 +35,7 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/kill_current_op.h"
+#include "mongo/db/matcher/expression.h"
 #include "mongo/db/query/cached_plan_runner.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/eof_runner.h"
@@ -101,6 +102,18 @@ namespace mongo {
     bool isNewQueryFrameworkEnabled() { return newQueryFrameworkEnabled; }
     void enableNewQueryFramework() { newQueryFrameworkEnabled = true; }
 
+    bool hasNode(MatchExpression* root, MatchExpression::MatchType type) {
+        if (type == root->matchType()) {
+            return true;
+        }
+        for (size_t i = 0; i < root->numChildren(); ++i) {
+            if (hasNode(root->getChild(i), type)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     // Do we use the old or the new?  I call this the spigot.
     bool canUseNewSystem(const QueryMessage& qm, CanonicalQuery** cqOut) {
         CanonicalQuery* cq;
@@ -124,6 +137,21 @@ namespace mongo {
             cout << "rejecting query w/proj\n";
             return false;
         }
+
+        if (hasNode(cq->root(), MatchExpression::NOT)
+            || hasNode(cq->root(), MatchExpression::NOR)) {
+
+            cout << "rejecting query w/negation\n";
+            return false;
+        }
+
+        if (pq.returnKey() || pq.showDiskLoc() || (0 != pq.getMaxScan()) || !pq.getMin().isEmpty()
+            || !pq.getMax().isEmpty()) {
+            cout << "rejecting wacky query args query\n";
+            return false;
+        }
+
+        // XXX: 2d.
 
         *cqOut = scopedCq.release();
         return true;

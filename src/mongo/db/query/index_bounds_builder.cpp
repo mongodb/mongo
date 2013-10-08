@@ -224,9 +224,17 @@ namespace mongo {
         else if (MatchExpression::LTE == expr->matchType()) {
             const LTEMatchExpression* node = static_cast<const LTEMatchExpression*>(expr);
             BSONElement dataElt = node->getData();
+
+            // Everything is <= MaxKey.
+            if (MaxKey == dataElt.type()) {
+                oilOut->intervals.push_back(allValues());
+                *exactOut = true;
+                return;
+            }
+
             BSONObjBuilder bob;
             bob.appendMinForType("", dataElt.type());
-            bob.append(dataElt);
+            bob.appendAs(dataElt, "");
             BSONObj dataObj = bob.obj();
             verify(dataObj.isOwned());
             oilOut->intervals.push_back(makeRangeInterval(dataObj, true, true));
@@ -236,11 +244,20 @@ namespace mongo {
         else if (MatchExpression::LT == expr->matchType()) {
             const LTMatchExpression* node = static_cast<const LTMatchExpression*>(expr);
             BSONElement dataElt = node->getData();
+
+            // Everything is <= MaxKey.
+            if (MaxKey == dataElt.type()) {
+                oilOut->intervals.push_back(allValues());
+                *exactOut = true;
+                return;
+            }
+
             BSONObjBuilder bob;
             bob.appendMinForType("", dataElt.type());
-            bob.append(dataElt);
+            bob.appendAs(dataElt, "");
             BSONObj dataObj = bob.obj();
             verify(dataObj.isOwned());
+            cout << "data obj is " << dataObj.toString() << endl;
             oilOut->intervals.push_back(makeRangeInterval(dataObj, true, false));
             // XXX: only exact if not (null or array)
             *exactOut = true;
@@ -248,8 +265,16 @@ namespace mongo {
         else if (MatchExpression::GT == expr->matchType()) {
             const GTMatchExpression* node = static_cast<const GTMatchExpression*>(expr);
             BSONElement dataElt = node->getData();
+
+            // Everything is > MinKey.
+            if (MinKey == dataElt.type()) {
+                oilOut->intervals.push_back(allValues());
+                *exactOut = true;
+                return;
+            }
+
             BSONObjBuilder bob;
-            bob.append(node->getData());
+            bob.appendAs(node->getData(), "");
             bob.appendMaxForType("", dataElt.type());
             BSONObj dataObj = bob.obj();
             verify(dataObj.isOwned());
@@ -261,8 +286,15 @@ namespace mongo {
             const GTEMatchExpression* node = static_cast<const GTEMatchExpression*>(expr);
             BSONElement dataElt = node->getData();
 
+            // Everything is >= MinKey.
+            if (MinKey == dataElt.type()) {
+                oilOut->intervals.push_back(allValues());
+                *exactOut = true;
+                return;
+            }
+
             BSONObjBuilder bob;
-            bob.append(dataElt);
+            bob.appendAs(dataElt, "");
             bob.appendMaxForType("", dataElt.type());
             BSONObj dataObj = bob.obj();
             verify(dataObj.isOwned());
@@ -464,8 +496,8 @@ namespace mongo {
                 // We want to merge intervals i and i+1.
                 // Interval 'i' starts before interval 'i+1'.
                 BSONObjBuilder bob;
-                bob.append(iv[i].start);
-                bob.append(iv[i + 1].end);
+                bob.appendAs(iv[i].start, "");
+                bob.appendAs(iv[i + 1].end, "");
                 BSONObj data = bob.obj();
                 bool startInclusive = iv[i].startInclusive;
                 bool endInclusive = iv[i + i].endInclusive;
@@ -505,7 +537,7 @@ namespace mongo {
     // static
     BSONObj IndexBoundsBuilder::objFromElement(const BSONElement& elt) {
         BSONObjBuilder bob;
-        bob.append(elt);
+        bob.appendAs(elt, "");
         return bob.obj();
     }
 
