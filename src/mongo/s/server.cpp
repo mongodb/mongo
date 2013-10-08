@@ -38,10 +38,12 @@
 #include "mongo/base/initializer.h"
 #include "mongo/base/status.h"
 #include "mongo/client/connpool.h"
+#include "mongo/db/audit.h"
 #include "mongo/db/auth/authz_manager_external_state_s.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/auth/user_cache_invalidator_job.h"
+#include "mongo/db/client_basic.h"
 #include "mongo/db/dbwebserver.h"
 #include "mongo/db/initialize_server_global_state.h"
 #include "mongo/db/instance.h"
@@ -499,6 +501,7 @@ void mongo::exitCleanly( ExitCode code ) {
 
 void mongo::dbexit( ExitCode rc, const char *why ) {
     dbexitCalled = true;
+    audit::logShutdown(ClientBasic::getCurrent());
 #if defined(_WIN32)
     if ( rc == EXIT_WINDOWS_SERVICE_STOP ) {
         log() << "dbexit: exiting because Windows service was stopped" << endl;

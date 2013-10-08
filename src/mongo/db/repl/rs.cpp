@@ -30,6 +30,7 @@
 
 #include "mongo/base/owned_pointer_vector.h"
 #include "mongo/base/status.h"
+#include "mongo/db/audit.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/client.h"
@@ -893,6 +894,11 @@ namespace {
         newConfig.saveConfigLocally(comment);
 
         try {
+            BSONObj oldConfForAudit = config().asBson();
+            BSONObj newConfForAudit = newConfig.asBson();
+            audit::logReplSetReconfig(ClientBasic::getCurrent(),
+                                      &oldConfForAudit,
+                                      &newConfForAudit);
             if (initFromConfig(newConfig, true)) {
                 log() << "replSet replSetReconfig new config saved locally" << rsLog;
             }

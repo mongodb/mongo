@@ -29,6 +29,7 @@
 #include "mongo/db/index_update.h"
 
 #include "mongo/client/dbclientinterface.h"
+#include "mongo/db/audit.h"
 #include "mongo/db/background.h"
 #include "mongo/db/btreebuilder.h"
 #include "mongo/db/clientcursor.h"

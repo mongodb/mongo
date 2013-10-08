@@ -1180,6 +1180,7 @@ namespace mongo {
         flushForGcov();
 
         Client * c = currentClient.get();
+        audit::logShutdown(c);
         {
             scoped_lock lk( exitMutex );
             if ( numExitCalls++ > 0 ) {
