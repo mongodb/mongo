@@ -357,13 +357,11 @@ namespace mongo {
     class ExpressionCompare : public ExpressionFixedArity<ExpressionCompare, 2> {
     public:
         // virtuals from ExpressionNary
-        virtual intrusive_ptr<Expression> optimize();
         virtual Value evaluateInternal(const Variables& vars) const;
         virtual const char *getOpName() const;
 
         static intrusive_ptr<Expression> parse(BSONElement bsonExpr);
 
-        friend class ExpressionFieldRange;
         ExpressionCompare(CmpOp cmpOp);
 
     private:
@@ -506,82 +504,6 @@ namespace mongo {
 
         const FieldPath _fieldPath;
         const BaseVar _baseVar;
-    };
-
-
-    class ExpressionFieldRange : public Expression {
-    public:
-        // virtuals from expression
-        virtual intrusive_ptr<Expression> optimize();
-        virtual void addDependencies(set<string>& deps, vector<string>* path=NULL) const;
-        virtual Value evaluateInternal(const Variables& vars) const;
-        virtual Value serialize() const;
-        virtual void toMatcherBson(BSONObjBuilder *pBuilder) const;
-
-        /*
-          Create a field range expression.
-
-          Field ranges are meant to match up with classic Matcher semantics,
-          and therefore are conjunctions.  For example, these appear in
-          mongo shell predicates in one of these forms:
-          { a : C } -> (a == C) // degenerate "point" range
-          { a : { $lt : C } } -> (a < C) // open range
-          { a : { $gt : C1, $lte : C2 } } -> ((a > C1) && (a <= C2)) // closed
-
-          When initially created, a field range only includes one end of
-          the range.  Additional points may be added via intersect().
-
-          Note that NE and CMP are not supported.
-
-          @param pFieldPath the field path for extracting the field value
-          @param cmpOp the comparison operator
-          @param pValue the value to compare against
-          @returns the newly created field range expression
-         */
-        static intrusive_ptr<ExpressionFieldRange> create(
-            const intrusive_ptr<ExpressionFieldPath> &pFieldPath,
-            CmpOp cmpOp, const Value& pValue);
-
-        /*
-          Add an intersecting range.
-
-          This can be done any number of times after creation.  The
-          range is internally optimized for each new addition.  If the new
-          intersection extends or reduces the values within the range, the
-          internal representation is adjusted to reflect that.
-
-          Note that NE and CMP are not supported.
-
-          @param cmpOp the comparison operator
-          @param pValue the value to compare against
-         */
-        void intersect(CmpOp cmpOp, const Value& pValue);
-
-    private:
-        ExpressionFieldRange(const intrusive_ptr<ExpressionFieldPath> &pFieldPath,
-                             CmpOp cmpOp,
-                             const Value& pValue);
-
-        intrusive_ptr<ExpressionFieldPath> pFieldPath;
-
-        class Range {
-        public:
-            Range(CmpOp cmpOp, const Value& pValue);
-            Range(const Range &rRange);
-
-            Range *intersect(const Range *pRange) const;
-            bool contains(const Value& pValue) const;
-
-            Range(const Value& pBottom, bool bottomOpen,
-                  const Value& pTop, bool topOpen);
-
-            bool bottomOpen;
-            bool topOpen;
-            Value pBottom;
-            Value pTop;
-        };
-
-        scoped_ptr<Range> pRange;
     };
 
 
