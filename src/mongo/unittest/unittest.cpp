@@ -70,8 +70,8 @@ namespace mongo {
 
                 char result[128];
                 sprintf(result,
-                        "%-30s | tests: %4d | fails: %4zd | assert calls: %10d | time secs: %6.3f\n",
-                        _name.c_str(), _tests, _fails.size(), _asserts, _millis/1000.0 );
+                        "%-30s | tests: %4d | fails: %4d | assert calls: %10d | time secs: %6.3f\n",
+                        _name.c_str(), _tests, static_cast<int>(_fails.size()), _asserts, _millis/1000.0 );
                 ss << result;
 
                 for ( std::vector<std::string>::iterator i=_messages.begin(); i!=_messages.end(); i++ ) {
