@@ -920,29 +920,6 @@ namespace mongo {
 
     /* ------------------------------------------------------------------------- */
 
-    /* add a new namespace to the system catalog (<dbname>.system.namespaces).
-       options: { capped : ..., size : ... }
-    */
-    void addNewNamespaceToCatalog(const char *ns, const BSONObj *options = 0) {
-        LOG(1) << "New namespace: " << ns << endl;
-        if ( strstr(ns, "system.namespaces") ) {
-            // system.namespaces holds all the others, so it is not explicitly listed in the catalog.
-            // TODO: fix above should not be strstr!
-            return;
-        }
-        
-        BSONObjBuilder b;
-        b.append("name", ns);
-        if ( options )
-            b.append("options", *options);
-        BSONObj j = b.done();
-        char database[256];
-        nsToDatabase(ns, database);
-        string s = string(database) + ".system.namespaces";
-        theDataFileMgr.insert(s.c_str(), j.objdata(), j.objsize(), false, true);
-    }
-
-
     bool legalClientSystemNS( const StringData& ns , bool write ) {
         if( ns == "local.system.replset" ) return true;
 
