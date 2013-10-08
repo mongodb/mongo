@@ -110,10 +110,6 @@ namespace mongo {
 
     /* --------------------------- Expression ------------------------------ */
 
-    void Expression::toMatcherBson(BSONObjBuilder *pBuilder) const {
-        verify(false && "Expression::toMatcherBson()");
-    }
-
     Expression::ObjectCtx::ObjectCtx(int theOptions)
         : options(theOptions)
     {}
@@ -475,19 +471,6 @@ namespace {
     const char *ExpressionAnd::getOpName() const {
         return "$and";
     }
-
-    void ExpressionAnd::toMatcherBson(BSONObjBuilder *pBuilder) const {
-        /*
-          There are two patterns we can handle:
-          (1) one or two comparisons on the same field: { a:{$gte:3, $lt:7} }
-          (2) multiple field comparisons: {a:7, b:{$lte:6}, c:2}
-            This can be recognized as a conjunction of a set of  range
-            expressions.  Direct equality is a degenerate range expression;
-            range expressions can be open-ended.
-        */
-        verify(false && "unimplemented");
-    }
-
 
     /* ------------------------- ExpressionAnyElementTrue -------------------------- */
 
@@ -1239,7 +1222,6 @@ namespace {
         }
     }
 
-
     /* ------------------------- ExpressionLet ----------------------------- */
 
     REGISTER_EXPRESSION("$let", ExpressionLet::parse);
@@ -1744,16 +1726,6 @@ namespace {
         }
 
         return Value(false);
-    }
-
-    void ExpressionOr::toMatcherBson(
-        BSONObjBuilder *pBuilder) const {
-        BSONObjBuilder opArray;
-        const size_t n = vpOperand.size();
-        for(size_t i = 0; i < n; ++i)
-            vpOperand[i]->toMatcherBson(&opArray);
-
-        pBuilder->append("$or", opArray.done());
     }
 
     intrusive_ptr<Expression> ExpressionOr::optimize() {

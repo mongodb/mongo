@@ -113,26 +113,6 @@ namespace mongo {
          */
         virtual Value serialize() const = 0;
 
-        /*
-          Convert the expression into a BSONObj that corresponds to the
-          db.collection.find() predicate language.  This is intended for
-          use by DocumentSourceFilter.
-
-          This is more limited than the full expression language supported
-          by all available expressions in a DocumentSource processing
-          pipeline, and will fail with an assertion if an attempt is made
-          to go outside the bounds of the recognized patterns, which don't
-          include full computed expressions.  There are other methods available
-          on DocumentSourceFilter which can be used to analyze a filter
-          predicate and break it up into appropriate expressions which can
-          be translated within these constraints.  As a result, the default
-          implementation is to fail with an assertion; only a subset of
-          operators will be able to fulfill this request.
-
-          @param pBuilder the builder to add the expression to.
-         */
-        virtual void toMatcherBson(BSONObjBuilder *pBuilder) const;
-
         /// Evaluate expression with specified inputs and return result.
         Value evaluate(const Document& root) const { return evaluate(Variables(root)); }
         Value evaluate(const Document& root, const Value& current) const {
@@ -322,7 +302,6 @@ namespace mongo {
         virtual intrusive_ptr<Expression> optimize();
         virtual Value evaluateInternal(const Variables& vars) const;
         virtual const char *getOpName() const;
-        virtual void toMatcherBson(BSONObjBuilder *pBuilder) const;
         virtual bool isAssociativeAndCommutative() const { return true; }
     };
 
@@ -727,7 +706,6 @@ namespace mongo {
         virtual intrusive_ptr<Expression> optimize();
         virtual Value evaluateInternal(const Variables& vars) const;
         virtual const char *getOpName() const;
-        virtual void toMatcherBson(BSONObjBuilder *pBuilder) const;
         virtual bool isAssociativeAndCommutative() const { return true; }
     };
 
