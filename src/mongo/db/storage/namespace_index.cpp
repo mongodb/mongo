@@ -67,7 +67,7 @@ namespace mongo {
         uassert( 10081 , "too many namespaces/collections", _ht->put(ns, *details));
     }
 
-    void NamespaceIndex::kill_ns(const char *ns) {
+    void NamespaceIndex::kill_ns(const StringData& ns) {
         Lock::assertWriteLocked(ns);
         if ( !_ht )
             return;

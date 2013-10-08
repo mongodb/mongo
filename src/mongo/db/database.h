@@ -157,6 +157,15 @@ namespace mongo {
 
         void _addNamespaceToCatalog( const StringData& ns, const BSONObj* options );
 
+
+        /**
+         * removes from *.system.namespaces
+         * frees extents
+         * removes from NamespaceIndex
+         * NOT RIGHT NOW, removes cache entry in Database TODO?
+         */
+        Status _dropNS( const StringData& ns );
+
         /**
          * make sure namespace is initialized and $freelist is allocated before
          * doing anything that will write

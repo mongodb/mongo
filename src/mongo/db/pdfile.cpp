@@ -438,45 +438,6 @@ namespace mongo {
         }
     }
 
-    /* drop a collection/namespace */
-    void dropNS(const string& nsToDrop) {
-        NamespaceDetails* d = nsdetails(nsToDrop);
-        uassert( 10086 ,  (string)"ns not found: " + nsToDrop , d );
-
-        BackgroundOperation::assertNoBgOpInProgForNs(nsToDrop.c_str());
-
-        NamespaceString s(nsToDrop);
-        verify( s.db() == cc().database()->name() );
-        if( s.isSystem() ) {
-            if( s.coll() == "system.profile" ) {
-                uassert( 10087,
-                         "turn off profiling before dropping system.profile collection",
-                         cc().database()->getProfilingLevel() == 0 );
-            }
-            else {
-                uasserted( 12502, "can't drop system ns" );
-            }
-        }
-
-        {
-            // remove from the system catalog
-            BSONObj cond = BSON( "name" << nsToDrop );   // { name: "colltodropname" }
-            string system_namespaces = cc().database()->name() + ".system.namespaces";
-            /*int n = */ deleteObjects(system_namespaces.c_str(), cond, false, false, true);
-            // no check of return code as this ns won't exist for some of the new storage engines
-        }
-
-        // free extents
-        if( !d->firstExtent().isNull() ) {
-            cc().database()->getExtentManager().freeExtents(d->firstExtent(), d->lastExtent());
-            d->setFirstExtentInvalid();
-            d->setLastExtentInvalid();
-        }
-
-        // remove from the catalog hashtable
-        cc().database()->namespaceIndex().kill_ns(nsToDrop.c_str());
-    }
-
     /* deletes a record, just the pdfile portion -- no index cleanup, no cursor cleanup, etc.
        caller must check if capped
     */

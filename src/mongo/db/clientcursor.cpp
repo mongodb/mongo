@@ -67,9 +67,9 @@ namespace mongo {
                                   const NamespaceDetails* nsd,
                                   const DiskLoc& dl ); // from s/d_logic.h
 
-    ClientCursor::ClientCursor(int qopts, const shared_ptr<Cursor>& c, const string& ns,
+    ClientCursor::ClientCursor(int qopts, const shared_ptr<Cursor>& c, const StringData& ns,
                                BSONObj query)
-        : _ns(ns), _query(query), _runner(NULL), _c(c), _yieldSometimesTracker(128, 10) {
+        : _ns(ns.toString()), _query(query), _runner(NULL), _c(c), _yieldSometimesTracker(128, 10) {
 
         _queryOptions = qopts;
         _doingDeletes = false;

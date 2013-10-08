@@ -303,9 +303,13 @@ namespace mongo {
         ClientCursor::invalidate( fullns );
         Top::global.collectionDropped( fullns );
         NamespaceDetailsTransient::eraseCollection( fullns.toString() );
-        dropNS( fullns.toString() );
 
-        _clearCollectionCache( fullns );
+        Status s = _dropNS( fullns );
+
+        _clearCollectionCache( fullns ); // we want to do this always
+
+        if ( !s.isOK() )
+            return s;
 
         DEV {
             // check all index collection entries are gone
@@ -417,7 +421,7 @@ namespace mongo {
             if ( !s.isOK() )
                 return s;
 
-            deleteObjects( indexName.c_str(), oldIndexSpec, true, false, true );
+            deleteObjects( indexName, oldIndexSpec, true, false, true );
         }
 
         Top::global.collectionDropped( fromNS.toString() );
@@ -467,14 +471,14 @@ namespace mongo {
         }
         catch( DBException& ) {
             // could end up here if .ns is full - if so try to clean up / roll back a little
-            _namespaceIndex.kill_ns(toNSString.c_str());
+            _namespaceIndex.kill_ns( toNSString );
             _clearCollectionCache(toNSString);
             throw;
         }
 
         // at this point, code .ns stuff moved
 
-        _namespaceIndex.kill_ns( fromNSString.c_str() );
+        _namespaceIndex.kill_ns( fromNSString );
         _clearCollectionCache(fromNSString);
         fromDetails = NULL;
 
@@ -502,7 +506,7 @@ namespace mongo {
         }
         addNewNamespaceToCatalog( toNSString.c_str(), newSpec.isEmpty() ? 0 : &newSpec );
 
-        deleteObjects( _namespacesName.c_str(), BSON( "name" << fromNS ), false, false, true );
+        deleteObjects( _namespacesName, BSON( "name" << fromNS ), false, false, true );
 
         return Status::OK();
     }
@@ -563,6 +567,46 @@ namespace mongo {
         BSONObj obj = b.done();
 
         theDataFileMgr.insert( _namespacesName.c_str(), obj.objdata(), obj.objsize(), false, true);
+    }
+
+    Status Database::_dropNS( const StringData& ns ) {
+        NamespaceDetails* d = _namespaceIndex.details( ns );
+        if ( !d )
+            return Status( ErrorCodes::InternalError, str::stream() << "ns not found: " << ns );
+
+        BackgroundOperation::assertNoBgOpInProgForNs( ns );
+
+        NamespaceString s( ns );
+        verify( s.db() == _name );
+
+        if( s.isSystem() ) {
+            if( s.coll() == "system.profile" ) {
+                if ( _profile != 0 )
+                    return Status( ErrorCodes::IllegalOperation,
+                                   "turn off profiling before dropping system.profile collection" );
+            }
+            else {
+                return Status( ErrorCodes::IllegalOperation, "can't drop system ns" );
+            }
+        }
+
+        {
+            // remove from the system catalog
+            BSONObj cond = BSON( "name" << ns );   // { name: "colltodropname" }
+            deleteObjects( _namespacesName, cond, false, false, true);
+        }
+
+        // free extents
+        if( !d->firstExtent().isNull() ) {
+            _extentManager.freeExtents(d->firstExtent(), d->lastExtent());
+            d->setFirstExtentInvalid();
+            d->setLastExtentInvalid();
+        }
+
+        // remove from the catalog hashtable
+        _namespaceIndex.kill_ns( ns );
+
+        return Status::OK();
     }
 
 } // namespace mongo

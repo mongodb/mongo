@@ -60,7 +60,7 @@ namespace mongo {
         b.append("ns", ns);
         b.append("name", idxName); // e.g.: { name: "ts_1", ns: "foo.coll" }
         BSONObj cond = b.done();
-        return (int) deleteObjects(system_indexes.c_str(), cond, false, false, true);
+        return (int) deleteObjects(system_indexes, cond, false, false, true);
     }
 
     /* this is just an attempt to clean up old orphaned stuff on a delete all indexes
@@ -75,7 +75,7 @@ namespace mongo {
             b.append("name", BSON( "$ne" << idIndex->indexName().c_str() ));
         }
         BSONObj cond = b.done();
-        int n = (int) deleteObjects(system_indexes.c_str(), cond, false, false, true);
+        int n = (int) deleteObjects(system_indexes, cond, false, false, true);
         if( n ) {
             log() << "info: assureSysIndexesEmptied cleaned up " << n << " entries" << endl;
         }
@@ -109,13 +109,13 @@ namespace mongo {
 
             string name = indexName();
 
-            /* important to catch exception here so we can finish cleanup below. */
-            try {
-                dropNS(ns.c_str());
+            Database* db = cc().database();
+
+            Status s = db->_dropNS( ns );
+            if ( !s.isOK() ) {
+                LOG(2) << "IndexDetails::kill(): couldn't drop ns " << ns;
             }
-            catch(DBException& ) {
-                LOG(2) << "IndexDetails::kill(): couldn't drop ns " << ns << endl;
-            }
+
             head.setInvalid();
             info.setInvalid();
 
@@ -123,7 +123,7 @@ namespace mongo {
             int n = removeFromSysIndexes(pns, name);
             wassert( n == 1 );
 
-            cc().database()->_clearCollectionCache( ns );
+            db->_clearCollectionCache( ns );
         }
         catch ( DBException &e ) {
             log() << "exception in kill_idx: " << e << ", ns: " << ns << endl;

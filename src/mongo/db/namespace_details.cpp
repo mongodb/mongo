@@ -750,7 +750,7 @@ namespace mongo {
         verify( Helpers::findOne( system_namespaces , BSON( "name" << ns ) , oldEntry ) );
         BSONObj newEntry = applyUpdateOperators( oldEntry , BSON( "$set" << BSON( "options.flags" << userFlags() ) ) );
         
-        verify( 1 == deleteObjects( system_namespaces.c_str() , oldEntry , true , false , true ) );
+        verify( 1 == deleteObjects( system_namespaces , oldEntry , true , false , true ) );
         theDataFileMgr.insert( system_namespaces.c_str(),
                                newEntry.objdata(),
                                newEntry.objsize(),
@@ -943,7 +943,7 @@ namespace mongo {
     }
 
 
-    bool legalClientSystemNS( const string& ns , bool write ) {
+    bool legalClientSystemNS( const StringData& ns , bool write ) {
         if( ns == "local.system.replset" ) return true;
 
         if ( ns.find( ".system.users" ) != string::npos )

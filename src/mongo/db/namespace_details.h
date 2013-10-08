@@ -49,7 +49,7 @@ namespace mongo {
         For example <dbname>.system.users is ok for regular clients to update.
         @param write used when .system.js
     */
-    bool legalClientSystemNS( const string& ns , bool write );
+    bool legalClientSystemNS( const StringData& ns , bool write );
 
     /* deleted lists -- linked lists of deleted records -- are placed in 'buckets' of various sizes
        so you can look for a deleterecord about the right size.

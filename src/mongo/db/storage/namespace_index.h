@@ -64,7 +64,7 @@ namespace mongo {
         NamespaceDetails* details(const StringData& ns);
         NamespaceDetails* details(const Namespace& ns);
 
-        void kill_ns(const char *ns);
+        void kill_ns(const StringData& ns);
 
         bool allocated() const { return _ht != 0; }
 

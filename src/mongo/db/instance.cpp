@@ -710,7 +710,7 @@ namespace mongo {
                 
                 Client::Context ctx(ns);
                 
-                long long n = deleteObjects(ns.ns().c_str(), pattern, justOne, true);
+                long long n = deleteObjects(ns.ns(), pattern, justOne, true);
                 lastError.getSafe()->recordDelete( n );
                 op.debug().ndeleted = n;
                 break;
