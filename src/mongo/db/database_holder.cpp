@@ -31,7 +31,9 @@
 #include "mongo/pch.h"
 
 #include "mongo/db/auth/auth_index_d.h"
+#include "mongo/db/background.h"
 #include "mongo/db/client.h"
+#include "mongo/db/clientcursor.h"
 #include "mongo/db/database_holder.h"
 
 namespace mongo {
@@ -82,4 +84,48 @@ namespace mongo {
 
         return db;
     }
+
+    bool DatabaseHolder::closeAll( const string& path , BSONObjBuilder& result , bool force ) {
+        log() << "DatabaseHolder::closeAll path:" << path << endl;
+        verify( Lock::isW() );
+        getDur().commitNow(); // bad things happen if we close a DB with outstanding writes
+
+        map<string,Database*>& m = _paths[path];
+        _size -= m.size();
+
+        set< string > dbs;
+        for ( map<string,Database*>::iterator i = m.begin(); i != m.end(); i++ ) {
+            wassert( i->second->path() == path );
+            dbs.insert( i->first );
+        }
+
+        currentClient.get()->getContext()->_clear();
+
+        BSONObjBuilder bb( result.subarrayStart( "dbs" ) );
+        int n = 0;
+        int nNotClosed = 0;
+        for( set< string >::iterator i = dbs.begin(); i != dbs.end(); ++i ) {
+            string name = *i;
+            LOG(2) << "DatabaseHolder::closeAll path:" << path << " name:" << name << endl;
+            Client::Context ctx( name , path );
+            if( !force && BackgroundOperation::inProgForDb(name) ) {
+                log() << "WARNING: can't close database " << name << " because a bg job is in progress - try killOp command" << endl;
+                nNotClosed++;
+            }
+            else {
+                Database::closeDatabase( name.c_str() , path );
+                bb.append( bb.numStr( n++ ) , name );
+            }
+        }
+        bb.done();
+        if( nNotClosed )
+            result.append("nNotClosed", nNotClosed);
+        else {
+            ClientCursor::assertNoCursors();
+        }
+
+        return true;
+    }
+
+
 }
