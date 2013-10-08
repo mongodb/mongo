@@ -97,7 +97,15 @@ var agreeOnPrimaryAndSetVersion = function( setVersion ) {
     var primary = undefined;
     var lastSetVersion = setVersion; 
     for ( var i = 0; i < nodes.length; i++ ) {
-        var isMasterResult = nodes[i].getDB( "admin" ).runCommand({ isMaster : 1 });
+        try {
+            var isMasterResult = nodes[i].getDB( "admin" ).runCommand({ isMaster : 1 });
+        }
+        catch (e) {
+            // handle reconnect errors due to step downs
+            print("Error while calling isMaster on " + nodes[i] + ": " + e);
+            return false;
+        }
+
         printjson( isMasterResult );
         if ( !primary ) primary = isMasterResult.primary;
         if ( !lastSetVersion ) lastSetVersion = isMasterResult.setVersion;
