@@ -143,6 +143,7 @@ namespace {
 
         // Cluster admin role actions that target the cluster resource.
         clusterAdminRoleClusterActions
+            << ActionType::applicationMessage
             << ActionType::connPoolStats
             << ActionType::connPoolSync
             << ActionType::getCmdLineOpts

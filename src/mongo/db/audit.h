@@ -286,13 +286,13 @@ namespace audit {
     void logCreateIndex(ClientBasic* client,
                         const BSONObj* indexSpec,
                         const StringData& indexname,
-                        const StringData& dbname);
+                        const StringData& nsname);
 
     /**
      * Logs the result of a createCollection command.
      */
     void logCreateCollection(ClientBasic* client,
-                             const StringData& dbname);
+                             const StringData& nsname);
 
     /**
      * Logs the result of a createDatabase command.
@@ -306,13 +306,13 @@ namespace audit {
      */
     void logDropIndex(ClientBasic* client,
                       const StringData& indexname,
-                      const StringData& dbname);
+                      const StringData& nsname);
 
     /**
      * Logs the result of a dropCollection command.
      */
     void logDropCollection(ClientBasic* client,
-                           const StringData& dbname);
+                           const StringData& nsname);
 
     /**
      * Logs the result of a dropDatabase command.

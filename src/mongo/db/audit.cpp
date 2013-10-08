@@ -173,10 +173,10 @@ namespace audit {
     void logCreateIndex(ClientBasic* client,
                         const BSONObj* indexSpec,
                         const StringData& indexname,
-                        const StringData& dbname) MONGO_AUDIT_STUB
+                        const StringData& nsname) MONGO_AUDIT_STUB
 
     void logCreateCollection(ClientBasic* client,
-                             const StringData& dbname) MONGO_AUDIT_STUB
+                             const StringData& nsname) MONGO_AUDIT_STUB
 
     void logCreateDatabase(ClientBasic* client,
                            const StringData& dbname) MONGO_AUDIT_STUB
@@ -184,10 +184,10 @@ namespace audit {
 
     void logDropIndex(ClientBasic* client,
                       const StringData& indexname,
-                      const StringData& dbname) MONGO_AUDIT_STUB
+                      const StringData& nsname) MONGO_AUDIT_STUB
 
     void logDropCollection(ClientBasic* client,
-                           const StringData& dbname) MONGO_AUDIT_STUB
+                           const StringData& nsname) MONGO_AUDIT_STUB
 
     void logDropDatabase(ClientBasic* client,
                          const StringData& dbname) MONGO_AUDIT_STUB
