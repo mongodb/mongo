@@ -479,6 +479,9 @@ if has_option("cache"):
     if has_option("release"):
         print("Using the experimental --cache option is not permitted for --release builds")
         Exit(1)
+    if has_option("gcov"):
+        print("Mixing --cache and --gcov doesn't work correctly yet. See SERVER-11084")
+        Exit(1)
     env.CacheDir(str(env.Dir(get_option('cache-dir'))))
 
 # This could be 'if solaris', but unfortuantely that variable hasn't been set yet.
