@@ -175,18 +175,18 @@ namespace mongo {
                 scoped_ptr<ScopedDbConnection> serverConnPtr;
 
                 bool resultOk;
-                BSONObj serverStatus;
+                BSONObj buildInfo;
 
                 try {
                     serverConnPtr.reset(new ScopedDbConnection(serverLoc, 30));
                     ScopedDbConnection& serverConn = *serverConnPtr;
 
                     resultOk = serverConn->runCommand("admin",
-                                                      BSON("serverStatus" << 1),
-                                                      serverStatus);
+                                                      BSON("buildInfo" << 1),
+                                                      buildInfo);
                 }
                 catch (const DBException& e) {
-                    warning() << "could not run server status command on " << serverLoc.toString()
+                    warning() << "could not run buildInfo command on " << serverLoc.toString()
                               << causedBy(e) << ", you must manually verify this mongo server is "
                               << "offline (for at least 5 minutes) or of a version >= 2.2" << endl;
                     continue;
@@ -195,14 +195,14 @@ namespace mongo {
                 // TODO: Make running commands saner such that we can consolidate error handling
                 if (!resultOk) {
                     return Status(ErrorCodes::UnknownError,
-                                  stream() << DBClientConnection::getLastErrorString(serverStatus)
-                                           << causedBy(serverStatus.toString()));
+                                  stream() << DBClientConnection::getLastErrorString(buildInfo)
+                                           << causedBy(buildInfo.toString()));
                 }
 
                 serverConnPtr->done();
 
-                verify(serverStatus["version"].type() == String);
-                string mongoVersion = serverStatus["version"].String();
+                verify(buildInfo["version"].type() == String);
+                string mongoVersion = buildInfo["version"].String();
 
                 if (versionCmp(mongoVersion, minMongoVersion) < 0) {
                     return Status(ErrorCodes::RemoteValidationError,

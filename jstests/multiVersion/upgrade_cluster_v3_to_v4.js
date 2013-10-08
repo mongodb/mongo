@@ -127,6 +127,29 @@ createShardedCollection(mongos22.getDB("admin"), mongos22.getCollection("fooMixe
 st.printShardingStatus();
 
 //
+// Upgrade 2.0/2.2 cluster to all mongoses at 2.2
+//
+
+jsTest.log("Upgrading all mongoses to 2.2...");
+
+st.upgradeCluster("2.2", { upgradeShards : false, upgradeMongos : true, upgradeConfigs : true });
+st.restartMongoses();
+
+//
+// Make sure 2.4 mongoses won't start in 2.0/2.2 shard cluster
+//
+
+jsTest.log("Starting v2.4 mongos in 2.0/2.2 (shard) cluster....")
+
+var mongos = MongoRunner.runMongos({ binVersion : "2.4", configdb : configConnStr })
+assert.eq(null, mongos);
+
+var mongos = MongoRunner.runMongos({ binVersion : "2.4", configdb : configConnStr, upgrade : "" })
+assert.eq(null, mongos);
+
+jsTest.log("2.4 mongoses did not start or upgrade in 2.0/2.2 (shard) cluster (which is correct).")
+
+//
 // Upgrade 2.0/2.2 cluster to only 2.2
 //
 
