@@ -351,6 +351,8 @@ struct __wt_page {
 	/* Memory attached to the page. */
 	uint32_t memory_footprint;
 
+	int64_t bytes_dirty;		/* Dirty bytes added to cache. */
+
 #define	WT_PAGE_INVALID		0	/* Invalid page */
 #define	WT_PAGE_BLOCK_MANAGER	1	/* Block-manager page */
 #define	WT_PAGE_COL_FIX		2	/* Col-store fixed-len leaf */

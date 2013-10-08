@@ -446,7 +446,7 @@ methods = {
 		reset statistics counters when the cursor is closed; valid
 		only for statistics cursors''',
 		type='boolean'),
-	Config('statistics_fast', 'false', r'''
+	Config('statistics_fast', 'true', r'''
 		only gather statistics that don't require traversing the tree;
 		valid only for statistics cursors''',
 		type='boolean'),
@@ -596,7 +596,7 @@ methods = {
 		Config('archive', 'true', r'''
 		automatically archive unneeded log files''',
 		type='boolean'),
-		Config('enabled', 'true', r'''
+		Config('enabled', 'false', r'''
 		enable logging subsystem''',
 		type='boolean'),
 		Config('file_max', '100MB', r'''

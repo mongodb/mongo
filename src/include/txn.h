@@ -29,6 +29,9 @@ struct __wt_txn_state {
 struct __wt_txn_global {
 	volatile uint64_t current;	/* Current transaction ID. */
 
+	/* The oldest running transaction ID (may race). */
+	uint64_t last_running;
+
 	/*
 	 * The oldest transaction ID that is not yet visible to some
 	 * transaction in the system.

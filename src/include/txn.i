@@ -8,6 +8,10 @@
 static inline void __wt_txn_read_first(WT_SESSION_IMPL *session);
 static inline void __wt_txn_read_last(WT_SESSION_IMPL *session);
 
+/*
+ * __wt_txn_modify --
+ *	Mark a WT_UPDATE object modified by the current transaction.
+ */
 static inline int
 __txn_next_op(WT_SESSION_IMPL *session, WT_TXN_OP **opp)
 {
@@ -284,14 +288,23 @@ __wt_txn_cursor_op(WT_SESSION_IMPL *session)
 	/*
 	 * If there is no transaction running (so we don't have an ID), and no
 	 * snapshot allocated, put an ID in the global table to prevent any
-	 * update that we are reading from being trimmed to save memory.
-	 * NOTE:  We're accessing the global table unprotected, so the oldest_id
-	 * may, in fact, be larger/younger than this value.  But putting this
-	 * value in the table preserves the oldest_id, whatever value it is.
+	 * update that we are reading from being trimmed to save memory.  Do a
+	 * read before the write because this shared data is accessed a lot.
+	 *
+	 * !!!
+	 * Note:  We are updating the global table unprotected, so the
+	 * oldest_id may move past this ID if a scan races with this
+	 * value being published.  That said, read-uncommitted operations
+	 * always take the most recent version of a value, so for that version
+	 * to be freed, two newer versions would have to be committed.  Putting
+	 * this snap_min ID in the table prevents the oldest ID from moving
+	 * further forward, so that once a read-uncommitted cursor is
+	 * positioned on a value, it can't be freed.
 	 */
 	if (txn->isolation == TXN_ISO_READ_UNCOMMITTED &&
-	    !F_ISSET(txn, TXN_RUNNING))
-		txn_state->snap_min = txn_global->current;
+	    !F_ISSET(txn, TXN_RUNNING) &&
+	    TXNID_LT(txn_state->snap_min, txn_global->last_running))
+		txn_state->snap_min = txn_global->last_running;
 }
 
 /*

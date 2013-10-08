@@ -370,7 +370,7 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	},
 	{ "session.open_cursor",
 	  "append=0,bulk=0,checkpoint=,dump=,next_random=0,overwrite=,raw=0"
-	  ",statistics_clear=0,statistics_fast=0,target=",
+	  ",statistics_clear=0,statistics_fast=,target=",
 	  confchk_session_open_cursor
 	},
 	{ "session.reconfigure",
@@ -410,8 +410,8 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  "checkpoint=(name=\"WiredTigerCheckpoint\",wait=0),"
 	  "checkpoint_sync=,create=0,direct_io=,error_prefix=,"
 	  "eviction_dirty_target=80,eviction_target=80,eviction_trigger=95,"
-	  "extensions=,file_extend=,hazard_max=1000,log=(archive=,enabled=,"
-	  "file_max=100MB,path=\"\"),lsm_merge=,mmap=,multiprocess=0,"
+	  "extensions=,file_extend=,hazard_max=1000,log=(archive=,enabled=0"
+	  ",file_max=100MB,path=\"\"),lsm_merge=,mmap=,multiprocess=0,"
 	  "session_max=50,shared_cache=(chunk=10MB,enable=0,name=pool,"
 	  "reserve=0,size=500MB),statistics=0,statistics_log=(clear=,"
 	  "path=\"WiredTigerStat.%H\",sources=,timestamp=\"%b %d %H:%M:%S\""

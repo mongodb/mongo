@@ -52,6 +52,8 @@
 struct __wt_btree {
 	WT_DATA_HANDLE *dhandle;
 
+	WT_SPINLOCK serial_lock;	/* Serial function call spinlock */
+
 	WT_CKPT	  *ckpt;		/* Checkpoint information */
 
 	enum {	BTREE_COL_FIX=1,	/* Fixed-length column store */

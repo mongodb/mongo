@@ -54,8 +54,7 @@ __wt_buf_grow(WT_SESSION_IMPL *session, WT_ITEM *buf, size_t size)
 		if (buf->data == NULL) {
 			offset = 0;
 			set_data = 1;
-		} else if (buf->data >= buf->mem &&
-		    WT_PTRDIFF(buf->data, buf->mem) < buf->memsize) {
+		} else if (WT_DATA_IN_ITEM(buf)) {
 			offset = WT_PTRDIFF(buf->data, buf->mem);
 			set_data = 1;
 		} else {

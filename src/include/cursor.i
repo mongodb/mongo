@@ -196,43 +196,46 @@ __cursor_row_slot_return(WT_CURSOR_BTREE *cbt, WT_ROW *rip, WT_UPDATE *upd)
 			goto slow;
 		__wt_cell_unpack((WT_CELL *)ikey, unpack);
 		if (unpack->type == WT_CELL_KEY && unpack->prefix == 0) {
-			kb->data = cbt->tmp.data = unpack->data;
-			kb->size = cbt->tmp.size = unpack->size;
-			cbt->rip_saved = rip;
+			cbt->tmp.data = unpack->data;
+			cbt->tmp.size = unpack->size;
 		} else if (unpack->type == WT_CELL_KEY &&
 		    cbt->rip_saved != NULL && cbt->rip_saved == rip - 1) {
+			WT_ASSERT(session, cbt->tmp.size >= unpack->prefix);
 			/*
 			 * If we previously built a prefix-compressed key in the
 			 * temporary buffer, the WT_ITEM->data field will be the
-			 * same as the WT_ITEM->mem field: grow the buffer if
-			 * necessary and copy the suffix into place.  If we
-			 * previously pointed the temporary buffer at an on-page
-			 * key, the WT_ITEM->data field will not be the same as
-			 * the WT_ITEM->mem field: grow the buffer if necessary,
-			 * copy the prefix into place, and then re-point the
-			 * WT_ITEM->data field to the newly constructed memory.
+			 * same as the WT_ITEM->mem field.  If we previously
+			 * pointed the temporary buffer at an on-page key, the
+			 * WT_ITEM->data field will not be the same as the
+			 * WT_ITEM->mem field: first copy the prefix into place.
+			 *
+			 * Care is required: the WT_ITEM_MAPPED flag may be set
+			 * if this is a memory-mapped file, so it is important
+			 * to copy the data before growing the buffer.
+			 */
+			if (cbt->tmp.data != cbt->tmp.mem)
+				WT_RET(__wt_buf_set(session, &cbt->tmp,
+				    cbt->tmp.data, unpack->prefix));
+			/*
+			 * Grow the buffer if necessary, and copy the suffix
+			 * into place.
 			 */
 			WT_RET(__wt_buf_grow(
 			    session, &cbt->tmp, unpack->prefix + unpack->size));
-			if (cbt->tmp.data != cbt->tmp.mem) {
-				memcpy((uint8_t *)cbt->tmp.mem,
-				    cbt->tmp.data, unpack->prefix);
-				cbt->tmp.data = cbt->tmp.mem;
-			}
-			memcpy((uint8_t *)cbt->tmp.data +
-			    unpack->prefix, unpack->data, unpack->size);
+			memcpy((uint8_t *)cbt->tmp.data + unpack->prefix,
+			    unpack->data, unpack->size);
 			cbt->tmp.size = unpack->prefix + unpack->size;
-			kb->data = cbt->tmp.data;
-			kb->size = cbt->tmp.size;
-			cbt->rip_saved = rip;
 		} else {
 			/*
 			 * __wt_row_leaf_key_work instead of __wt_row_leaf_key:
 			 * we do __wt_row_leaf_key's fast-path checks inline.
 			 */
 slow:			WT_RET(__wt_row_leaf_key_work(
-			    session, cbt->page, rip, kb, 0));
+			    session, cbt->page, rip, &cbt->tmp, 0));
 		}
+		kb->data = cbt->tmp.data;
+		kb->size = cbt->tmp.size;
+		cbt->rip_saved = rip;
 	}
 
 	/*

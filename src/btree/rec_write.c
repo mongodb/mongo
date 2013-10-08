@@ -3935,22 +3935,8 @@ err:			__wt_scr_free(&tkey);
 	if (!r->upd_skipped) {
 		mod->disk_txn = r->max_txn;
 
-		/*
-		 * !!!
-		 * This code has a bug: the idea is to read the memory footprint
-		 * before attempting to "clean" the page, which is safe because
-		 * the atomic compare-and-swap is a read barrier so the read of
-		 * the memory footprint precedes the update of the page's write
-		 * generation.   Since it is possible to decrement the footprint
-		 * of the page without making the page "dirty" (for example
-		 * when freeing an obsolete update list), the footprint could
-		 * be decremented between read and swap, and we might attempt to
-		 * decrement more than the bytes held by the page.   Unlikely,
-		 * but technically possible.
-		 */
-		size = page->memory_footprint;
 		if (WT_ATOMIC_CAS(mod->write_gen, r->orig_write_gen, 0))
-			__wt_cache_dirty_decr(session, size);
+			__wt_cache_dirty_decr(session, page);
 	}
 
 	/* Record the most recent transaction ID we have *not* written. */
