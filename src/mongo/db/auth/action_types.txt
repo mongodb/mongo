@@ -10,6 +10,10 @@
 "authCheck",  # Not used for permissions checks, but to id the authorization-checking event in logs.
 "authenticate",  # Not used for permission checks, but to id authentication events in logs.
 "captrunc",
+"changeAnyCustomData",
+"changeAnyPassword",
+"changeOwnPassword",
+"changeOwnCustomData",
 "clean",
 "cleanupOrphaned",
 "clone",
@@ -50,6 +54,7 @@
 "getParameter",
 "getShardMap",
 "getShardVersion",
+"grantAnyRole",
 "grantPrivilegesToRole",
 "grantRolesToRole",  # Not used for permissions checks, but to id the event in logs.
 "grantRolesToUser",  # Not used for permissions checks, but to id the event in logs.
@@ -89,6 +94,7 @@
 "replSetSyncFrom",
 "replSetUpdatePosition",
 "resync",
+"revokeAnyRole",
 "revokePrivilegesFromRole",
 "revokeRolesFromRole",  # Not used for permissions checks, but to id the event in logs.
 "revokeRolesFromUser",  # Not used for permissions checks, but to id the event in logs.
@@ -112,6 +118,8 @@
 "userAdmin",
 "userAdminV1",
 "validate",
+"viewRole",
+"viewUser",
 "writebacklisten",
 "writeBacksQueued",
 "_migrateClone",

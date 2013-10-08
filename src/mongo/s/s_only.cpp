@@ -125,12 +125,6 @@ namespace mongo {
                                          bool fromRepl ) {
         std::string dbname = nsToDatabase(ns);
 
-        Status status = _checkAuthorization(c, &client, dbname, cmdObj, fromRepl);
-        if (!status.isOK()) {
-            appendCommandStatus(result, status);
-            return;
-        }
-
         if (cmdObj.getBoolField("help")) {
             stringstream help;
             help << "help for: " << c->name << " ";
@@ -140,6 +134,13 @@ namespace mongo {
             appendCommandStatus(result, true, "");
             return;
         }
+
+        Status status = _checkAuthorization(c, &client, dbname, cmdObj, fromRepl);
+        if (!status.isOK()) {
+            appendCommandStatus(result, status);
+            return;
+        }
+
         std::string errmsg;
         bool ok;
         try {

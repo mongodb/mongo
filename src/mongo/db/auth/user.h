@@ -76,6 +76,11 @@ namespace mongo {
         const RoleDataMap& getRoles() const;
 
         /**
+         * Returns true if this user is a member of the given role.
+         */
+        bool hasRole(const RoleName& roleName) const;
+
+        /**
          * Returns a reference to the information about the user's privileges.
          */
         const ResourcePrivilegeMap& getPrivileges() const { return _privileges; }

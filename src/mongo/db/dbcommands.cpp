@@ -1899,12 +1899,6 @@ namespace mongo {
         std::string dbname = nsToDatabase( cmdns );
         scoped_ptr<MaintenanceModeSetter> mmSetter;
 
-        Status status = _checkAuthorization(c, &client, dbname, cmdObj, fromRepl);
-        if (!status.isOK()) {
-            appendCommandStatus(result, status);
-            return;
-        }
-
         if ( cmdObj["help"].trueValue() ) {
             client.curop()->ensureStarted();
             stringstream ss;
@@ -1913,6 +1907,12 @@ namespace mongo {
             result.append( "help" , ss.str() );
             result.append( "lockType" , c->locktype() );
             appendCommandStatus(result, true, "");
+            return;
+        }
+
+        Status status = _checkAuthorization(c, &client, dbname, cmdObj, fromRepl);
+        if (!status.isOK()) {
+            appendCommandStatus(result, status);
             return;
         }
 

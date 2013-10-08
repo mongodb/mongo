@@ -81,6 +81,9 @@ namespace mongo {
         // and ownership of the user stays with the AuthorizationManager
         User* lookupUser(const UserName& name);
 
+        // Returns the number of authenticated users in this session.
+        size_t getNumAuthenticatedUsers();
+
         // Gets an iterator over the names of all authenticated users stored in this manager.
         UserSet::NameIterator getAuthenticatedUserNames();
 
@@ -119,6 +122,34 @@ namespace mongo {
         // Checks if this connection has the privileges necessary to perform a delete on the given
         // namespace.
         Status checkAuthForDelete(const NamespaceString& ns, const BSONObj& query);
+
+        // Checks if this connection has the privileges necessary to grant the given privilege
+        // to a role.
+        Status checkAuthorizedToGrantPrivilege(const Privilege& privilege);
+
+        // Checks if this connection has the privileges necessary to revoke the given privilege
+        // from a role.
+        Status checkAuthorizedToRevokePrivilege(const Privilege& privilege);
+
+        // Utility function for isAuthorizedForActionsOnResource(
+        //         ResourcePattern::forDatabaseName(role.getDB()), ActionType::grantAnyRole)
+        bool isAuthorizedToGrantRole(const RoleName& role);
+
+        // Utility function for isAuthorizedForActionsOnResource(
+        //         ResourcePattern::forDatabaseName(role.getDB()), ActionType::grantAnyRole)
+        bool isAuthorizedToRevokeRole(const RoleName& role);
+
+        // Returns true if the current session is authenticated as the given user and that user
+        // is allowed to change his/her own password
+        bool isAuthorizedToChangeOwnPasswordAsUser(const UserName& userName);
+
+        // Returns true if the current session is authenticated as the given user and that user
+        // is allowed to change his/her own customData.
+        bool isAuthorizedToChangeOwnCustomDataAsUser(const UserName& userName);
+
+        // Returns true if any of the authenticated users on this session have the given role.
+        // NOTE: this does not refresh any of the users even if they are marked as invalid.
+        bool isAuthenticatedAsUserWithRole(const RoleName& roleName);
 
         // Returns true if this session is authorized for the given Privilege.
         //

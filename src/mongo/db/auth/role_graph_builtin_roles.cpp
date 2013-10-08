@@ -95,7 +95,7 @@ namespace {
         readWriteRoleActions += readRoleActions;
         readWriteRoleActions
             << ActionType::cloneCollectionTarget
-            << ActionType::convertToCapped
+            << ActionType::convertToCapped // db admin gets this also
             << ActionType::createCollection // db admin gets this also
             << ActionType::dropCollection
             << ActionType::dropIndex
@@ -108,7 +108,18 @@ namespace {
 
         // User admin role
         userAdminRoleActions
-            << ActionType::userAdmin;
+            << ActionType::changeAnyCustomData
+            << ActionType::changeAnyPassword
+            << ActionType::createUser
+            << ActionType::createRole
+            << ActionType::dropUser
+            << ActionType::dropRole
+            << ActionType::grantAnyRole
+            << ActionType::revokeAnyRole
+            << ActionType::userAdmin
+            << ActionType::viewUser
+            << ActionType::viewRole;
+
 
         // DB admin role
         dbAdminRoleActions
@@ -117,7 +128,7 @@ namespace {
             << ActionType::collMod
             << ActionType::collStats
             << ActionType::compact
-            << ActionType::convertToCapped
+            << ActionType::convertToCapped // read_write gets this also
             << ActionType::createCollection // read_write gets this also
             << ActionType::dbStats
             << ActionType::dropCollection

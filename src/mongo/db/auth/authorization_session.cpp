@@ -91,6 +91,10 @@ namespace {
         return _authenticatedUsers.lookup(name);
     }
 
+    size_t AuthorizationSession::getNumAuthenticatedUsers() {
+        return _authenticatedUsers.size();
+    }
+
     void AuthorizationSession::logoutDatabase(const std::string& dbname) {
         User* removedUser = _authenticatedUsers.removeByDBName(dbname);
         if (removedUser) {
@@ -198,6 +202,56 @@ namespace {
         return Status::OK();
     }
 
+    Status AuthorizationSession::checkAuthorizedToGrantPrivilege(const Privilege& privilege) {
+        const ResourcePattern& resource = privilege.getResourcePattern();
+        if (resource.isDatabasePattern() || resource.isExactNamespacePattern()) {
+            if (!isAuthorizedForActionsOnResource(
+                    ResourcePattern::forDatabaseName(resource.databaseToMatch()),
+                    ActionType::grantAnyRole)) {
+                return Status(ErrorCodes::Unauthorized,
+                              str::stream() << "Not authorized to grant privileges on the "
+                                      << resource.databaseToMatch() << "database");
+            }
+        } else if (!isAuthorizedForActionsOnResource(
+                ResourcePattern::forDatabaseName("admin"), ActionType::grantAnyRole)) {
+            return Status(ErrorCodes::Unauthorized,
+                          "To grant privileges affecting multiple databases or the cluster,"
+                          " must be authorized to grant roles from the admin database");
+        }
+        return Status::OK();
+    }
+
+
+    Status AuthorizationSession::checkAuthorizedToRevokePrivilege(const Privilege& privilege) {
+        const ResourcePattern& resource = privilege.getResourcePattern();
+        if (resource.isDatabasePattern() || resource.isExactNamespacePattern()) {
+            if (!isAuthorizedForActionsOnResource(
+                    ResourcePattern::forDatabaseName(resource.databaseToMatch()),
+                    ActionType::revokeAnyRole)) {
+                return Status(ErrorCodes::Unauthorized,
+                              str::stream() << "Not authorized to revoke privileges on the "
+                                      << resource.databaseToMatch() << "database");
+            }
+        } else if (!isAuthorizedForActionsOnResource(
+                ResourcePattern::forDatabaseName("admin"), ActionType::revokeAnyRole)) {
+            return Status(ErrorCodes::Unauthorized,
+                          "To revoke privileges affecting multiple databases or the cluster,"
+                          " must be authorized to revoke roles from the admin database");
+        }
+        return Status::OK();
+    }
+
+    bool AuthorizationSession::isAuthorizedToGrantRole(const RoleName& role) {
+        return isAuthorizedForActionsOnResource(
+                ResourcePattern::forDatabaseName(role.getDB()),
+                ActionType::grantAnyRole);
+    }
+
+    bool AuthorizationSession::isAuthorizedToRevokeRole(const RoleName& role) {
+        return isAuthorizedForActionsOnResource(
+                ResourcePattern::forDatabaseName(role.getDB()),
+                ActionType::revokeAnyRole);
+    }
 
     bool AuthorizationSession::isAuthorizedForPrivilege(const Privilege& privilege) {
         if (_externalState->shouldIgnoreAuthChecks())
@@ -284,6 +338,48 @@ namespace {
         resourceSearchList[size++] = target;
         dassert(size <= resourceSearchListCapacity);
         return size;
+    }
+
+    bool AuthorizationSession::isAuthorizedToChangeOwnPasswordAsUser(const UserName& userName) {
+        User* user = lookupUser(userName);
+        if (!user) {
+            return false;
+        }
+        ResourcePattern resourceSearchList[resourceSearchListCapacity];
+        const int resourceSearchListLength =
+                buildResourceSearchList(ResourcePattern::forClusterResource(), resourceSearchList);
+
+        ActionSet actions;
+        for (int i = 0; i < resourceSearchListLength; ++i) {
+            actions.addAllActionsFromSet(user->getActionsForResource(resourceSearchList[i]));
+        }
+        return actions.contains(ActionType::changeOwnPassword);
+    }
+
+    bool AuthorizationSession::isAuthorizedToChangeOwnCustomDataAsUser(const UserName& userName) {
+        User* user = lookupUser(userName);
+        if (!user) {
+            return false;
+        }
+        ResourcePattern resourceSearchList[resourceSearchListCapacity];
+        const int resourceSearchListLength =
+                buildResourceSearchList(ResourcePattern::forClusterResource(), resourceSearchList);
+
+        ActionSet actions;
+        for (int i = 0; i < resourceSearchListLength; ++i) {
+            actions.addAllActionsFromSet(user->getActionsForResource(resourceSearchList[i]));
+        }
+        return actions.contains(ActionType::changeOwnCustomData);
+    }
+
+    bool AuthorizationSession::isAuthenticatedAsUserWithRole(const RoleName& roleName) {
+        for (UserSet::iterator it = _authenticatedUsers.begin();
+                it != _authenticatedUsers.end(); ++it) {
+            if ((*it)->hasRole(roleName)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     bool AuthorizationSession::_isAuthorizedForPrivilege(const Privilege& privilege) {

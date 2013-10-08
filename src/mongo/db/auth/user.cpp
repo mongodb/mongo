@@ -40,6 +40,10 @@ namespace mongo {
         return _roles;
     }
 
+    bool User::hasRole(const RoleName& roleName) const {
+        return _roles.count(roleName);
+    }
+
     const User::CredentialData& User::getCredentials() const {
         return _credentials;
     }

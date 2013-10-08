@@ -42,7 +42,9 @@
 #include "mongo/db/auth/authz_documents_update_guard.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_global.h"
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege.h"
+#include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/auth/user.h"
 #include "mongo/db/auth/user_document_parser.h"
 #include "mongo/db/auth/user_management_commands_parser.h"
@@ -155,6 +157,56 @@ namespace mongo {
         return Status::OK();
     }
 
+    static Status checkAuthorizedToGrantRoles(AuthorizationSession* authzSession,
+                                              const std::vector<RoleName>& roles) {
+        for (size_t i = 0; i < roles.size(); ++i) {
+            if (!authzSession->isAuthorizedToGrantRole(roles[i])) {
+                return Status(ErrorCodes::Unauthorized,
+                              str::stream() << "Not authorized to grant role: " <<
+                                      roles[i].getFullName());
+            }
+        }
+        return Status::OK();
+    }
+
+    static Status checkAuthorizedToRevokeRoles(AuthorizationSession* authzSession,
+                                               const std::vector<RoleName>& roles) {
+        for (size_t i = 0; i < roles.size(); ++i) {
+            if (!authzSession->isAuthorizedToRevokeRole(roles[i])) {
+                return Status(ErrorCodes::Unauthorized,
+                              str::stream() << "Not authorized to revoke role: " <<
+                                      roles[i].getFullName());
+            }
+        }
+        return Status::OK();
+    }
+
+    static Status checkAuthorizedToGrantPrivileges(AuthorizationSession* authzSession,
+                                                   const PrivilegeVector& privileges) {
+        for (PrivilegeVector::const_iterator it = privileges.begin();
+                it != privileges.end(); ++it) {
+            Status status = authzSession->checkAuthorizedToGrantPrivilege(*it);
+            if (!status.isOK()) {
+                return status;
+            }
+        }
+
+        return Status::OK();
+    }
+
+    static Status checkAuthorizedToRevokePrivileges(AuthorizationSession* authzSession,
+                                                    const PrivilegeVector& privileges) {
+        for (PrivilegeVector::const_iterator it = privileges.begin();
+                it != privileges.end(); ++it) {
+            Status status = authzSession->checkAuthorizedToRevokePrivilege(*it);
+            if (!status.isOK()) {
+                return status;
+            }
+        }
+
+        return Status::OK();
+    }
+
     class CmdCreateUser : public Command {
     public:
 
@@ -176,13 +228,34 @@ namespace mongo {
             ss << "Adds a user to the system" << endl;
         }
 
-        virtual void addRequiredPrivileges(const std::string& dbname,
-                                           const BSONObj& cmdObj,
-                                           std::vector<Privilege>* out) {
-            // TODO: update this with the new rules around user creation in 2.6.
-            ActionSet actions;
-            actions.addAction(ActionType::userAdmin);
-            out->push_back(Privilege(ResourcePattern::forDatabaseName(dbname), actions));
+        virtual Status checkAuthForCommand(ClientBasic* client,
+                                           const std::string& dbname,
+                                           const BSONObj& cmdObj) {
+            AuthorizationSession* authzSession = client->getAuthorizationSession();
+            auth::CreateOrUpdateUserArgs args;
+            Status status = auth::parseCreateOrUpdateUserCommands(cmdObj,
+                                                                  "createUser",
+                                                                  dbname,
+                                                                  &args);
+            if (!status.isOK()) {
+                return status;
+            }
+
+            if (!authzSession->isAuthorizedForActionsOnResource(
+                    ResourcePattern::forDatabaseName(args.userName.getDB()),
+                    ActionType::createUser)) {
+                return Status(ErrorCodes::Unauthorized,
+                              str::stream() << "Not authorized to create users on db: " <<
+                                      args.userName.getDB());
+            }
+
+            // TODO(spencer): building this vector won't be necessary once the roles coming
+            // from the parsed args are RoleNames, not User::RoleInfo structs.
+            std::vector<RoleName> roles;
+            for (size_t i = 0; i < args.roles.size(); ++i) {
+                roles.push_back(args.roles[i].name);
+            }
+            return checkAuthorizedToGrantRoles(authzSession, roles);
         }
 
         bool run(const string& dbname,
@@ -193,9 +266,9 @@ namespace mongo {
                  bool fromRepl) {
             auth::CreateOrUpdateUserArgs args;
             Status status = auth::parseCreateOrUpdateUserCommands(cmdObj,
-                                                                 "createUser",
-                                                                 dbname,
-                                                                 &args);
+                                                                  "createUser",
+                                                                  dbname,
+                                                                  &args);
             if (!status.isOK()) {
                 addStatus(status, result);
                 return false;
@@ -305,13 +378,60 @@ namespace mongo {
             ss << "Used to update a user, for example to change its password" << endl;
         }
 
-        virtual void addRequiredPrivileges(const std::string& dbname,
-                                           const BSONObj& cmdObj,
-                                           std::vector<Privilege>* out) {
-            // TODO: update this with the new rules around user creation in 2.6.
-            ActionSet actions;
-            actions.addAction(ActionType::userAdmin);
-            out->push_back(Privilege(ResourcePattern::forDatabaseName(dbname), actions));
+        virtual Status checkAuthForCommand(ClientBasic* client,
+                                           const std::string& dbname,
+                                           const BSONObj& cmdObj) {
+            AuthorizationSession* authzSession = client->getAuthorizationSession();
+            auth::CreateOrUpdateUserArgs args;
+            Status status = auth::parseCreateOrUpdateUserCommands(cmdObj,
+                                                                  "updateUser",
+                                                                  dbname,
+                                                                  &args);
+            if (!status.isOK()) {
+                return status;
+            }
+
+            if (args.hasHashedPassword) {
+                if (!authzSession->isAuthorizedToChangeOwnPasswordAsUser(args.userName) &&
+                        !authzSession->isAuthorizedForActionsOnResource(
+                                ResourcePattern::forDatabaseName(args.userName.getDB()),
+                                ActionType::changeAnyPassword)) {
+                    return Status(ErrorCodes::Unauthorized,
+                                  str::stream() << "Not authorized to change password of user: " <<
+                                          args.userName.getFullName());
+                }
+            }
+
+            if (args.hasCustomData) {
+                if (!authzSession->isAuthorizedToChangeOwnCustomDataAsUser(args.userName) &&
+                        !authzSession->isAuthorizedForActionsOnResource(
+                                ResourcePattern::forDatabaseName(args.userName.getDB()),
+                                ActionType::changeAnyCustomData)) {
+                    return Status(ErrorCodes::Unauthorized,
+                                  str::stream() << "Not authorized to change customData of user: "
+                                          << args.userName.getFullName());
+                }
+            }
+
+            if (args.hasRoles) {
+                // You don't know what roles you might be revoking, so require the ability to
+                // revoke any role in the system.
+                if (!authzSession->isAuthorizedForActionsOnResource(
+                        ResourcePattern::forAnyNormalResource(), ActionType::revokeAnyRole)) {
+                    return Status(ErrorCodes::Unauthorized,
+                                  "In order to use updateUser to set roles array, must be "
+                                  "authorized to revoke any role in the system");
+                }
+
+                // TODO(spencer): building this vector won't be necessary once the roles coming
+                // from the parsed args are RoleNames, not User::RoleInfo structs.
+                std::vector<RoleName> roles;
+                for (size_t i = 0; i < args.roles.size(); ++i) {
+                    roles.push_back(args.roles[i].name);
+                }
+                return checkAuthorizedToGrantRoles(authzSession, roles);
+            }
+            return Status::OK();
         }
 
         bool run(const string& dbname,
@@ -322,9 +442,9 @@ namespace mongo {
                  bool fromRepl) {
             auth::CreateOrUpdateUserArgs args;
             Status status = auth::parseCreateOrUpdateUserCommands(cmdObj,
-                                                                 "updateUser",
-                                                                 dbname,
-                                                                 &args);
+                                                                  "updateUser",
+                                                                  dbname,
+                                                                  &args);
             if (!status.isOK()) {
                 addStatus(status, result);
                 return false;
@@ -404,13 +524,27 @@ namespace mongo {
             ss << "Drops a single user." << endl;
         }
 
-        virtual void addRequiredPrivileges(const std::string& dbname,
-                                           const BSONObj& cmdObj,
-                                           std::vector<Privilege>* out) {
-            // TODO: update this with the new rules around user creation in 2.6.
-            ActionSet actions;
-            actions.addAction(ActionType::userAdmin);
-            out->push_back(Privilege(ResourcePattern::forDatabaseName(dbname), actions));
+        virtual Status checkAuthForCommand(ClientBasic* client,
+                                           const std::string& dbname,
+                                           const BSONObj& cmdObj) {
+            AuthorizationSession* authzSession = client->getAuthorizationSession();
+            UserName userName;
+            BSONObj unusedWriteConcern;
+            Status status = auth::parseAndValidateDropUserCommand(cmdObj,
+                                                                  dbname,
+                                                                  &userName,
+                                                                  &unusedWriteConcern);
+            if (!status.isOK()) {
+                return status;
+            }
+
+            if (!authzSession->isAuthorizedForActionsOnResource(
+                    ResourcePattern::forDatabaseName(userName.getDB()), ActionType::dropUser)) {
+                return Status(ErrorCodes::Unauthorized,
+                              str::stream() << "Not authorized to drop users from the " <<
+                                      userName.getDB() << " database");
+            }
+            return Status::OK();
         }
 
         bool run(const string& dbname,
@@ -429,7 +563,6 @@ namespace mongo {
 
             UserName userName;
             BSONObj writeConcern;
-
             Status status = auth::parseAndValidateDropUserCommand(cmdObj,
                                                                   dbname,
                                                                   &userName,
@@ -486,13 +619,17 @@ namespace mongo {
             ss << "Drops all users for a single database." << endl;
         }
 
-        virtual void addRequiredPrivileges(const std::string& dbname,
-                                           const BSONObj& cmdObj,
-                                           std::vector<Privilege>* out) {
-            // TODO: update this with the new rules around user creation in 2.6.
-            ActionSet actions;
-            actions.addAction(ActionType::userAdmin);
-            out->push_back(Privilege(ResourcePattern::forDatabaseName(dbname), actions));
+        virtual Status checkAuthForCommand(ClientBasic* client,
+                                           const std::string& dbname,
+                                           const BSONObj& cmdObj) {
+            AuthorizationSession* authzSession = client->getAuthorizationSession();
+            if (!authzSession->isAuthorizedForActionsOnResource(
+                    ResourcePattern::forDatabaseName(dbname), ActionType::dropUser)) {
+                return Status(ErrorCodes::Unauthorized,
+                              str::stream() << "Not authorized to drop users from the " <<
+                                      dbname << " database");
+            }
+            return Status::OK();
         }
 
         bool run(const string& dbname,
@@ -511,8 +648,8 @@ namespace mongo {
 
             BSONObj writeConcern;
             Status status = auth::parseAndValidateDropUsersFromDatabaseCommand(cmdObj,
-                                                                                 dbname,
-                                                                                 &writeConcern);
+                                                                               dbname,
+                                                                               &writeConcern);
             if (!status.isOK()) {
                 addStatus(status, result);
                 return false;
@@ -557,13 +694,25 @@ namespace mongo {
             ss << "Grants roles to a user." << endl;
         }
 
-        virtual void addRequiredPrivileges(const std::string& dbname,
-                                           const BSONObj& cmdObj,
-                                           std::vector<Privilege>* out) {
-            // TODO: update this with the new rules around user creation in 2.6.
-            ActionSet actions;
-            actions.addAction(ActionType::userAdmin);
-            out->push_back(Privilege(ResourcePattern::forDatabaseName(dbname), actions));
+        virtual Status checkAuthForCommand(ClientBasic* client,
+                                           const std::string& dbname,
+                                           const BSONObj& cmdObj) {
+            AuthorizationSession* authzSession = client->getAuthorizationSession();
+            std::vector<RoleName> roles;
+            std::string unusedUserNameString;
+            BSONObj unusedWriteConcern;
+            Status status = auth::parseRolePossessionManipulationCommands(cmdObj,
+                                                                          "grantRolesToUser",
+                                                                          "roles",
+                                                                          dbname,
+                                                                          &unusedUserNameString,
+                                                                          &roles,
+                                                                          &unusedWriteConcern);
+            if (!status.isOK()) {
+                return status;
+            }
+
+            return checkAuthorizedToGrantRoles(authzSession, roles);
         }
 
         bool run(const string& dbname,
@@ -655,13 +804,25 @@ namespace mongo {
             ss << "Revokes roles from a user." << endl;
         }
 
-        virtual void addRequiredPrivileges(const std::string& dbname,
-                                           const BSONObj& cmdObj,
-                                           std::vector<Privilege>* out) {
-            // TODO: update this with the new rules around user creation in 2.6.
-            ActionSet actions;
-            actions.addAction(ActionType::userAdmin);
-            out->push_back(Privilege(ResourcePattern::forDatabaseName(dbname), actions));
+        virtual Status checkAuthForCommand(ClientBasic* client,
+                                           const std::string& dbname,
+                                           const BSONObj& cmdObj) {
+            AuthorizationSession* authzSession = client->getAuthorizationSession();
+            std::vector<RoleName> roles;
+            std::string unusedUserNameString;
+            BSONObj unusedWriteConcern;
+            Status status = auth::parseRolePossessionManipulationCommands(cmdObj,
+                                                                          "revokeRolesFromUser",
+                                                                          "roles",
+                                                                          dbname,
+                                                                          &unusedUserNameString,
+                                                                          &roles,
+                                                                          &unusedWriteConcern);
+            if (!status.isOK()) {
+                return status;
+            }
+
+            return checkAuthorizedToRevokeRoles(authzSession, roles);
         }
 
         bool run(const string& dbname,
@@ -761,13 +922,38 @@ namespace mongo {
             ss << "Returns information about users." << endl;
         }
 
-        virtual void addRequiredPrivileges(const std::string& dbname,
-                                           const BSONObj& cmdObj,
-                                           std::vector<Privilege>* out) {
-            // TODO: update this with the new rules around user creation in 2.6.
-            ActionSet actions;
-            actions.addAction(ActionType::userAdmin);
-            out->push_back(Privilege(ResourcePattern::forDatabaseName(dbname), actions));
+        virtual Status checkAuthForCommand(ClientBasic* client,
+                                           const std::string& dbname,
+                                           const BSONObj& cmdObj) {
+            AuthorizationSession* authzSession = client->getAuthorizationSession();
+            auth::UsersInfoArgs args;
+            Status status = auth::parseUsersInfoCommand(cmdObj, dbname, &args);
+            if (!status.isOK()) {
+                return status;
+            }
+
+            if (args.allForDB) {
+                if (!authzSession->isAuthorizedForActionsOnResource(
+                        ResourcePattern::forDatabaseName(dbname), ActionType::viewUser)) {
+                    return Status(ErrorCodes::Unauthorized,
+                                  str::stream() << "Not authorized to view users from the " <<
+                                          dbname << " database");
+                }
+            } else {
+                for (size_t i = 0; i < args.userNames.size(); ++i) {
+                    if (authzSession->lookupUser(args.userNames[i])) {
+                        continue; // Can always view users you are logged in as
+                    }
+                    if (!authzSession->isAuthorizedForActionsOnResource(
+                            ResourcePattern::forDatabaseName(args.userNames[i].getDB()),
+                            ActionType::viewUser)) {
+                        return Status(ErrorCodes::Unauthorized,
+                                      str::stream() << "Not authorized to view users from the " <<
+                                              dbname << " database");
+                    }
+                }
+            }
+            return Status::OK();
         }
 
         bool run(const string& dbname,
@@ -877,13 +1063,25 @@ namespace mongo {
             ss << "Adds a role to the system" << endl;
         }
 
-        virtual void addRequiredPrivileges(const std::string& dbname,
-                                           const BSONObj& cmdObj,
-                                           std::vector<Privilege>* out) {
-            // TODO: update this with the new rules around user creation in 2.6.
-            ActionSet actions;
-            actions.addAction(ActionType::userAdmin);
-            out->push_back(Privilege(ResourcePattern::forDatabaseName(dbname), actions));
+        virtual Status checkAuthForCommand(ClientBasic* client,
+                                           const std::string& dbname,
+                                           const BSONObj& cmdObj) {
+            AuthorizationSession* authzSession = client->getAuthorizationSession();
+            auth::CreateOrUpdateRoleArgs args;
+            Status status = auth::parseCreateOrUpdateRoleCommands(cmdObj,
+                                                                  "createRole",
+                                                                  dbname,
+                                                                  &args);
+            if (!status.isOK()) {
+                return status;
+            }
+
+            status = checkAuthorizedToGrantRoles(authzSession, args.roles);
+            if (!status.isOK()) {
+                return status;
+            }
+
+            return checkAuthorizedToGrantPrivileges(authzSession, args.privileges);
         }
 
         bool run(const string& dbname,
@@ -987,13 +1185,34 @@ namespace mongo {
             ss << "Used to update a role" << endl;
         }
 
-        virtual void addRequiredPrivileges(const std::string& dbname,
-                                           const BSONObj& cmdObj,
-                                           std::vector<Privilege>* out) {
-            // TODO: update this with the new rules around user creation in 2.6.
-            ActionSet actions;
-            actions.addAction(ActionType::userAdmin);
-            out->push_back(Privilege(ResourcePattern::forDatabaseName(dbname), actions));
+        virtual Status checkAuthForCommand(ClientBasic* client,
+                                           const std::string& dbname,
+                                           const BSONObj& cmdObj) {
+            AuthorizationSession* authzSession = client->getAuthorizationSession();
+            auth::CreateOrUpdateRoleArgs args;
+            Status status = auth::parseCreateOrUpdateRoleCommands(cmdObj,
+                                                                  "updateRole",
+                                                                  dbname,
+                                                                  &args);
+            if (!status.isOK()) {
+                return status;
+            }
+
+            // You don't know what roles or privileges you might be revoking, so require the ability
+            // to revoke any role (or privilege) in the system.
+            if (!authzSession->isAuthorizedForActionsOnResource(
+                    ResourcePattern::forAnyNormalResource(), ActionType::revokeAnyRole)) {
+                return Status(ErrorCodes::Unauthorized,
+                              "updateRole command required the ability to revoke any role in the "
+                              "system");
+            }
+
+            status = checkAuthorizedToGrantRoles(authzSession, args.roles);
+            if (!status.isOK()) {
+                return status;
+            }
+
+            return checkAuthorizedToGrantPrivileges(authzSession, args.privileges);
         }
 
         bool run(const string& dbname,
@@ -1004,7 +1223,7 @@ namespace mongo {
                  bool fromRepl) {
             auth::CreateOrUpdateRoleArgs args;
             Status status = auth::parseCreateOrUpdateRoleCommands(cmdObj,
-                                                                  "createRole",
+                                                                  "updateRole",
                                                                   dbname,
                                                                   &args);
             if (!status.isOK()) {
@@ -1084,13 +1303,25 @@ namespace mongo {
             ss << "Grants privileges to a role" << endl;
         }
 
-        virtual void addRequiredPrivileges(const std::string& dbname,
-                                           const BSONObj& cmdObj,
-                                           std::vector<Privilege>* out) {
-            // TODO: update this with the new rules around user creation in 2.6.
-            ActionSet actions;
-            actions.addAction(ActionType::userAdmin);
-            out->push_back(Privilege(ResourcePattern::forDatabaseName(dbname), actions));
+        virtual Status checkAuthForCommand(ClientBasic* client,
+                                           const std::string& dbname,
+                                           const BSONObj& cmdObj) {
+            AuthorizationSession* authzSession = client->getAuthorizationSession();
+            PrivilegeVector privileges;
+            RoleName unusedRoleName;
+            BSONObj unusedWriteConcern;
+            Status status = auth::parseAndValidateRolePrivilegeManipulationCommands(
+                    cmdObj,
+                    "grantPrivilegesToRole",
+                    dbname,
+                    &unusedRoleName,
+                    &privileges,
+                    &unusedWriteConcern);
+            if (!status.isOK()) {
+                return status;
+            }
+
+            return checkAuthorizedToGrantPrivileges(authzSession, privileges);
         }
 
         bool run(const string& dbname,
@@ -1208,13 +1439,25 @@ namespace mongo {
             ss << "Revokes privileges from a role" << endl;
         }
 
-        virtual void addRequiredPrivileges(const std::string& dbname,
-                                           const BSONObj& cmdObj,
-                                           std::vector<Privilege>* out) {
-            // TODO: update this with the new rules around user creation in 2.6.
-            ActionSet actions;
-            actions.addAction(ActionType::userAdmin);
-            out->push_back(Privilege(ResourcePattern::forDatabaseName(dbname), actions));
+        virtual Status checkAuthForCommand(ClientBasic* client,
+                                           const std::string& dbname,
+                                           const BSONObj& cmdObj) {
+            AuthorizationSession* authzSession = client->getAuthorizationSession();
+            PrivilegeVector privileges;
+            RoleName unusedRoleName;
+            BSONObj unusedWriteConcern;
+            Status status = auth::parseAndValidateRolePrivilegeManipulationCommands(
+                    cmdObj,
+                    "revokePrivilegesFromRole",
+                    dbname,
+                    &unusedRoleName,
+                    &privileges,
+                    &unusedWriteConcern);
+            if (!status.isOK()) {
+                return status;
+            }
+
+            return checkAuthorizedToRevokePrivileges(authzSession, privileges);
         }
 
         bool run(const string& dbname,
@@ -1340,13 +1583,25 @@ namespace mongo {
             ss << "Grants roles to another role." << endl;
         }
 
-        virtual void addRequiredPrivileges(const std::string& dbname,
-                                           const BSONObj& cmdObj,
-                                           std::vector<Privilege>* out) {
-            // TODO: update this with the new rules around user creation in 2.6.
-            ActionSet actions;
-            actions.addAction(ActionType::userAdmin);
-            out->push_back(Privilege(ResourcePattern::forDatabaseName(dbname), actions));
+        virtual Status checkAuthForCommand(ClientBasic* client,
+                                           const std::string& dbname,
+                                           const BSONObj& cmdObj) {
+            AuthorizationSession* authzSession = client->getAuthorizationSession();
+            std::vector<RoleName> roles;
+            std::string unusedUserNameString;
+            BSONObj unusedWriteConcern;
+            Status status = auth::parseRolePossessionManipulationCommands(cmdObj,
+                                                                          "grantRolesToRole",
+                                                                          "grantedRoles",
+                                                                          dbname,
+                                                                          &unusedUserNameString,
+                                                                          &roles,
+                                                                          &unusedWriteConcern);
+            if (!status.isOK()) {
+                return status;
+            }
+
+            return checkAuthorizedToGrantRoles(authzSession, roles);
         }
 
         bool run(const string& dbname,
@@ -1473,13 +1728,25 @@ namespace mongo {
             ss << "Revokes roles from another role." << endl;
         }
 
-        virtual void addRequiredPrivileges(const std::string& dbname,
-                                           const BSONObj& cmdObj,
-                                           std::vector<Privilege>* out) {
-            // TODO: update this with the new rules around user creation in 2.6.
-            ActionSet actions;
-            actions.addAction(ActionType::userAdmin);
-            out->push_back(Privilege(ResourcePattern::forDatabaseName(dbname), actions));
+        virtual Status checkAuthForCommand(ClientBasic* client,
+                                           const std::string& dbname,
+                                           const BSONObj& cmdObj) {
+            AuthorizationSession* authzSession = client->getAuthorizationSession();
+            std::vector<RoleName> roles;
+            std::string unusedUserNameString;
+            BSONObj unusedWriteConcern;
+            Status status = auth::parseRolePossessionManipulationCommands(cmdObj,
+                                                                          "revokeRolesFromRole",
+                                                                          "revokedRoles",
+                                                                          dbname,
+                                                                          &unusedUserNameString,
+                                                                          &roles,
+                                                                          &unusedWriteConcern);
+            if (!status.isOK()) {
+                return status;
+            }
+
+            return checkAuthorizedToRevokeRoles(authzSession, roles);
         }
 
         bool run(const string& dbname,
@@ -1585,13 +1852,24 @@ namespace mongo {
                   "removed from some user/roles but otherwise still exists."<< endl;
         }
 
-        virtual void addRequiredPrivileges(const std::string& dbname,
-                                           const BSONObj& cmdObj,
-                                           std::vector<Privilege>* out) {
-            // TODO: update this with the new rules around user creation in 2.6.
-            ActionSet actions;
-            actions.addAction(ActionType::userAdmin);
-            out->push_back(Privilege(ResourcePattern::forDatabaseName(dbname), actions));
+        virtual Status checkAuthForCommand(ClientBasic* client,
+                                           const std::string& dbname,
+                                           const BSONObj& cmdObj) {
+            AuthorizationSession* authzSession = client->getAuthorizationSession();
+            RoleName roleName;
+            BSONObj unusedWriteConcern;
+            Status status = auth::parseDropRoleCommand(cmdObj,
+                                                         dbname,
+                                                         &roleName,
+                                                         &unusedWriteConcern);
+
+            if (!authzSession->isAuthorizedForActionsOnResource(
+                    ResourcePattern::forDatabaseName(roleName.getDB()), ActionType::dropRole)) {
+                return Status(ErrorCodes::Unauthorized,
+                              str::stream() << "Not authorized to drop roles from the " <<
+                                      roleName.getDB() << " database");
+            }
+            return Status::OK();
         }
 
         bool run(const string& dbname,
@@ -1610,7 +1888,6 @@ namespace mongo {
 
             RoleName roleName;
             BSONObj writeConcern;
-
             Status status = auth::parseDropRoleCommand(cmdObj,
                                                          dbname,
                                                          &roleName,
@@ -1745,13 +2022,17 @@ namespace mongo {
                   "exist." << endl;
         }
 
-        virtual void addRequiredPrivileges(const std::string& dbname,
-                                           const BSONObj& cmdObj,
-                                           std::vector<Privilege>* out) {
-            // TODO: update this with the new rules around user creation in 2.6.
-            ActionSet actions;
-            actions.addAction(ActionType::userAdmin);
-            out->push_back(Privilege(ResourcePattern::forDatabaseName(dbname), actions));
+        virtual Status checkAuthForCommand(ClientBasic* client,
+                                           const std::string& dbname,
+                                           const BSONObj& cmdObj) {
+            AuthorizationSession* authzSession = client->getAuthorizationSession();
+            if (!authzSession->isAuthorizedForActionsOnResource(
+                    ResourcePattern::forDatabaseName(dbname), ActionType::dropRole)) {
+                return Status(ErrorCodes::Unauthorized,
+                              str::stream() << "Not authorized to drop roles from the " <<
+                                      dbname << " database");
+            }
+            return Status::OK();
         }
 
         bool run(const string& dbname,
@@ -1864,13 +2145,31 @@ namespace mongo {
             ss << "Returns information about roles." << endl;
         }
 
-        virtual void addRequiredPrivileges(const std::string& dbname,
-                                           const BSONObj& cmdObj,
-                                           std::vector<Privilege>* out) {
-            // TODO: update this with the new rules around user creation in 2.6.
-            ActionSet actions;
-            actions.addAction(ActionType::userAdmin);
-            out->push_back(Privilege(ResourcePattern::forDatabaseName(dbname), actions));
+        virtual Status checkAuthForCommand(ClientBasic* client,
+                                           const std::string& dbname,
+                                           const BSONObj& cmdObj) {
+            AuthorizationSession* authzSession = client->getAuthorizationSession();
+            std::vector<RoleName> roleNames;
+            Status status = auth::parseRolesInfoCommand(cmdObj, dbname, &roleNames);
+            if (!status.isOK()) {
+                return status;
+            }
+
+            for (size_t i = 0; i < roleNames.size(); ++i) {
+                if (authzSession->isAuthenticatedAsUserWithRole(roleNames[i])) {
+                    continue; // Can always see roles that you are a member of
+                }
+
+                if (!authzSession->isAuthorizedForActionsOnResource(
+                        ResourcePattern::forDatabaseName(roleNames[i].getDB()),
+                        ActionType::viewRole)) {
+                    return Status(ErrorCodes::Unauthorized,
+                                  str::stream() << "Not authorized to view roles from the " <<
+                                          dbname << " database");
+                }
+            }
+
+            return Status::OK();
         }
 
         bool run(const string& dbname,
