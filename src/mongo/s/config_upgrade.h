@@ -100,25 +100,11 @@ namespace mongo {
         /**
          * Version upgrade with the following changes:
          *
-         * Semantic changes:
          * + Dropping a collection from mongos now waits for the chunks to be removed from the
-         *   config server before contacting each shard.
-         * + Version epoch comparison is now strict. OID(000...) is no longer a "wildcard" that
-         *   matches everything. (TODO)
-         * + config.collections lastmod now displays the timestamp correctly.
-         * + initShardVersion can now return isMaster output, which contains remote version
-         *   information. (TODO)
-         *
-         * Syntax:
-         * + Replaced lastModEpoch with epoch in config.collections. (TODO)
-         * + Deprecated version field in config.versions. (TODO)
-         * + Deprecated "name" and "sharded" fields in config.databases. (TODO)
-         * + Added additional info to changelog entries for migration.
-         * + Added an optional "draining" field to config.databases and config.collections. (TODO)
-         * + Added "host" field to config.locks.
-         * + Added an optional "pending" to config.chunks.
+         *   config server before contacting each shard. Because of this, mongos should be
+         *   upgraded first before mongod or never drop collections during upgrade.
          */
-        UpgradeHistory_StrictEpochVersion = 5
+        UpgradeHistory_DummyBumpPre2_6 = 5
     };
 
     //
@@ -130,7 +116,7 @@ namespace mongo {
     const int MIN_COMPATIBLE_CONFIG_VERSION = UpgradeHistory_MandatoryEpochVersion;
 
     // Latest version we know how to communicate with
-    const int CURRENT_CONFIG_VERSION = UpgradeHistory_StrictEpochVersion;
+    const int CURRENT_CONFIG_VERSION = UpgradeHistory_DummyBumpPre2_6;
 
     //
     // DECLARATION OF UPGRADE FUNCTIONALITY

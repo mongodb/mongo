@@ -104,4 +104,27 @@ namespace mongo {
                            const VersionType& lastVersionInfo,
                            std::string minMongosVersion);
 
+    /**
+     * Sets a new upgradeID and empties upgrade state to the config server.
+     */
+    Status startConfigUpgrade(const std::string& configServer,
+                              int currentVersion,
+                              const OID& upgradeID);
+
+    /**
+     * Informs the config server that we are about to enter to the critical section of
+     * the upgrade.
+     */
+    Status enterConfigUpgradeCriticalSection(const std::string& configServer, int currentVersion);
+
+    /**
+     * Informs the config server that the upgrade task was completed by bumping the version.
+     * This also clears all upgrade state effectively leaving the critical section if the
+     * upgrade process did enter it.
+     */
+    Status commitConfigUpgrade(const std::string& configServer,
+                               int currentVersion,
+                               int minCompatibleVersion,
+                               int newVersion);
+
 }

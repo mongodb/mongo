@@ -24,19 +24,6 @@ namespace mongo {
 
     static const char* minMongoProcessVersion = "2.4";
 
-    // We want to keep this around, at the same time we don't want the compiler to complain
-    // about unused variable.
-#if 0
-    static const char* cleanupMessage =
-            "\n\n"
-            "******\n"
-            "Did not upgrade config database from v4 to v5 because the upgrade failed in\n"
-            "the critical section.  Manual intervention is required to re-sync the config\n"
-            "servers.  See:\n"
-            "http://dochub.mongodb.org/core/2dot6upgradenotes\n"
-            "******\n";
-#endif
-
     static const char* cannotCleanupMessage =
             "\n\n"
             "******\n"
@@ -57,7 +44,7 @@ namespace mongo {
         string dummy;
         if (!errMsg) errMsg = &dummy;
 
-        verify(lastVersionInfo.getCurrentVersion() == UpgradeHistory_StrictEpochVersion);
+        verify(lastVersionInfo.getCurrentVersion() == UpgradeHistory_MandatoryEpochVersion);
         Status result = preUpgradeCheck(configLoc, lastVersionInfo, minMongoProcessVersion);
 
         if (!result.isOK()) {
@@ -71,10 +58,35 @@ namespace mongo {
             return false;
         }
 
-        // TODO: grab necessary locks
-        // TODO: backup collections
-        // TODO: perform upgrade on the backup.
-        // TODO: perform switch from backup to actual.
+        // This is not needed because we are not actually going to make any modifications
+        // on the other collections in the config server for this particular upgrade.
+        // startConfigUpgrade(configLoc.toString(),
+        //                    lastVersionInfo.getCurrentVersion(),
+        //                    OID::gen());
+
+        // If we actually need to modify something in the config servers these need to follow
+        // after calling startConfigUpgrade(...):
+        //
+        // 1. Acquire necessary locks.
+        // 2. Make a backup of the collections we are about to modify.
+        // 3. Perform the upgrade process on the backup collection.
+        // 4. Verify that no changes were made to the collections since the backup was performed.
+        // 5. Call enterConfigUpgradeCriticalSection(configLoc.toString(),
+        //    lastVersionInfo.getCurrentVersion()).
+        // 6. Rename the backup collection to the name of the original collection with
+        //    dropTarget set to true.
+
+        // We're only after the version bump in commitConfigUpgrade here since we never
+        // get into the critical section.
+        Status commitStatus = commitConfigUpgrade(configLoc.toString(),
+                                                  lastVersionInfo.getCurrentVersion(),
+                                                  MIN_COMPATIBLE_CONFIG_VERSION,
+                                                  CURRENT_CONFIG_VERSION);
+
+        if (!commitStatus.isOK()) {
+            *errMsg = commitStatus.toString();
+            return false;
+        }
 
         return true;
     }

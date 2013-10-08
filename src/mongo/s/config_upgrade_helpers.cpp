@@ -407,4 +407,84 @@ namespace mongo {
         return checkClusterMongoVersions(configServer, string(minMongosVersion));
     }
 
+    Status startConfigUpgrade(const string& configServer,
+                              int currentVersion,
+                              const OID& upgradeID) {
+        BSONObjBuilder setUpgradeIdObj;
+        setUpgradeIdObj << VersionType::upgradeId(upgradeID);
+        setUpgradeIdObj << VersionType::upgradeState(BSONObj());
+
+        try {
+            ScopedDbConnection conn(configServer, 30);
+            conn->update(VersionType::ConfigNS,
+                         BSON("_id" << 1 << VersionType::currentVersion(currentVersion)),
+                         BSON("$set" << setUpgradeIdObj.done()));
+            _checkGLE(conn);
+            conn.done();
+        }
+        catch (const DBException& e) {
+            return e.toStatus("could not initialize version info for upgrade");
+        }
+
+        return Status::OK();
+    }
+
+    Status enterConfigUpgradeCriticalSection(const string& configServer, int currentVersion) {
+        BSONObjBuilder setUpgradeStateObj;
+        setUpgradeStateObj.append(VersionType::upgradeState(), BSON(inCriticalSectionField(true)));
+
+        try {
+            ScopedDbConnection conn(configServer, 30);
+            conn->update(VersionType::ConfigNS,
+                         BSON("_id" << 1 << VersionType::currentVersion(currentVersion)),
+                         BSON("$set" << setUpgradeStateObj.done()));
+            _checkGLE(conn);
+            conn.done();
+        }
+        catch (const DBException& e) {
+
+            // No cleanup message here since we're not sure if we wrote or not, and
+            // not dangerous either way except to prevent further updates (at which point
+            // the message is printed)
+            return e.toStatus("could not update version info to enter critical update section");
+        }
+
+        log() << "entered critical section for config upgrade" << endl;
+        return Status::OK();
+    }
+
+
+    Status commitConfigUpgrade(const string& configServer,
+                               int currentVersion,
+                               int minCompatibleVersion,
+                               int newVersion) {
+
+        // Note: DO NOT CLEAR the config version unless bumping the minCompatibleVersion,
+        // we want to save the excludes that were set.
+
+        BSONObjBuilder setObj;
+        setObj << VersionType::minCompatibleVersion(minCompatibleVersion);
+        setObj << VersionType::version_DEPRECATED(minCompatibleVersion);
+        setObj << VersionType::currentVersion(newVersion);
+
+        BSONObjBuilder unsetObj;
+        unsetObj.append(VersionType::upgradeId(), 1);
+        unsetObj.append(VersionType::upgradeState(), 1);
+
+        try {
+            ScopedDbConnection conn(configServer, 30);
+            conn->update(VersionType::ConfigNS,
+                         BSON("_id" << 1 << VersionType::currentVersion(currentVersion)),
+                         BSON("$set" << setObj.done() << "$unset" << unsetObj.done()));
+            _checkGLE(conn);
+            conn.done();
+        }
+        catch (const DBException& e) {
+            return e.toStatus("could not write new version info and "
+                              "exit critical upgrade section");
+        }
+
+        return Status::OK();
+    }
+
 }
