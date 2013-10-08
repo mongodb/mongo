@@ -2034,33 +2034,28 @@ namespace mutablebson {
 
     Document::Document()
         : _impl(new Impl(Document::kInPlaceDisabled))
-        , _root(makeElementObject(StringData(kRootFieldName, StringData::LiteralTag()))) {
+        , _root(makeRootElement()) {
         dassert(_root._repIdx == kRootRepIdx);
     }
 
     Document::Document(const BSONObj& value, InPlaceMode inPlaceMode)
         : _impl(new Impl(inPlaceMode))
-        , _root(makeElementObject(StringData(kRootFieldName, StringData::LiteralTag()), value)) {
+        , _root(makeRootElement(value)) {
         dassert(_root._repIdx == kRootRepIdx);
     }
 
     void Document::reset() {
         _impl->reset(Document::kInPlaceDisabled);
-
-        const Element newRoot = makeElementObject(
-            StringData(kRootFieldName, StringData::LiteralTag()));
-
-        verify(newRoot._repIdx == _root._repIdx);
+        const Element newRoot = makeRootElement();
+        dassert(newRoot._repIdx == _root._repIdx);
+        dassert(_root._repIdx == kRootRepIdx);
     }
 
     void Document::reset(const BSONObj& value, InPlaceMode inPlaceMode) {
         _impl->reset(inPlaceMode);
-
-        const Element newRoot = makeElementObject(
-            StringData(kRootFieldName, StringData::LiteralTag()),
-            value);
-
-        verify(newRoot._repIdx == _root._repIdx);
+        const Element newRoot = makeRootElement(value);
+        dassert(newRoot._repIdx == _root._repIdx);
+        dassert(_root._repIdx == kRootRepIdx);
     }
 
     Document::~Document() {}
@@ -2118,34 +2113,15 @@ namespace mutablebson {
         dassert(impl.doesNotAlias(fieldName));
         dassert(impl.doesNotAlias(value));
 
-        Element::RepIdx newEltIdx = Element::kInvalidRepIdx;
-        ElementRep* newElt = NULL;
+        // Copy the provided values into the leaf builder.
+        BSONObjBuilder& builder = impl.leafBuilder();
+        const int leafRef = builder.len();
+        builder.append(fieldName, value);
+        Element::RepIdx newEltIdx = impl.insertLeafElement(leafRef);
+        ElementRep& newElt = impl.getElementRep(newEltIdx);
 
-        // A cheap hack to detect that this Object Element is for the root.
-        if (fieldName.rawData() == &kRootFieldName[0]) {
-
-            newElt = &impl.makeNewRep(&newEltIdx);
-
-            // A BSONObj provided for the root Element is stored in _objects rather than being
-            // copied like all other BSONObjs.
-            newElt->objIdx = impl.insertObject(value);
-            impl.insertFieldName(*newElt, fieldName);
-            // Strictly, the following is a lie: the root isn't serialized, because it doesn't
-            // have a contiguous fieldname. However, it is a useful fiction to pretend that it
-            // is, so we can easily check if we have a 'pristine' document state by checking if
-            // the root is marked as serialized.
-            newElt->serialized = true;
-        } else {
-            // Copy the provided values into the leaf builder.
-            BSONObjBuilder& builder = impl.leafBuilder();
-            const int leafRef = builder.len();
-            builder.append(fieldName, value);
-            newEltIdx = impl.insertLeafElement(leafRef);
-            newElt = &impl.getElementRep(newEltIdx);
-        }
-
-        newElt->child.left = Element::kOpaqueRepIdx;
-        newElt->child.right = Element::kOpaqueRepIdx;
+        newElt.child.left = Element::kOpaqueRepIdx;
+        newElt.child.right = Element::kOpaqueRepIdx;
 
         return Element(this, newEltIdx);
     }
@@ -2416,6 +2392,37 @@ namespace mutablebson {
     Element Document::makeElementWithNewFieldName(const StringData& fieldName,
                                                   ConstElement element) {
         return makeElement(element, &fieldName);
+    }
+
+    Element Document::makeRootElement() {
+        return makeElementObject(StringData(kRootFieldName, StringData::LiteralTag()));
+    }
+
+    Element Document::makeRootElement(const BSONObj& value) {
+        Impl& impl = getImpl();
+        Element::RepIdx newEltIdx = Element::kInvalidRepIdx;
+        ElementRep* newElt = &impl.makeNewRep(&newEltIdx);
+
+        // A BSONObj provided for the root Element is stored in _objects rather than being
+        // copied like all other BSONObjs.
+        newElt->objIdx = impl.insertObject(value);
+        impl.insertFieldName(*newElt, kRootFieldName);
+
+        // Strictly, the following is a lie: the root isn't serialized, because it doesn't
+        // have a contiguous fieldname. However, it is a useful fiction to pretend that it
+        // is, so we can easily check if we have a 'pristine' document state by checking if
+        // the root is marked as serialized.
+        newElt->serialized = true;
+
+        // If the provided value is empty, mark it as having no children, otherwise mark the
+        // children as opaque.
+        if (value.isEmpty())
+            newElt->child.left = Element::kInvalidRepIdx;
+        else
+            newElt->child.left = Element::kOpaqueRepIdx;
+        newElt->child.right = newElt->child.left;
+
+        return Element(this, newEltIdx);
     }
 
     Element Document::makeElement(ConstElement element, const StringData* fieldName) {

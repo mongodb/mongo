@@ -490,6 +490,8 @@ namespace mutablebson {
         inline Impl& getImpl();
         inline const Impl& getImpl() const;
 
+        Element makeRootElement();
+        Element makeRootElement(const BSONObj& value);
         Element makeElement(ConstElement element, const StringData* fieldName);
 
         const boost::scoped_ptr<Impl> _impl;
