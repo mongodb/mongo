@@ -1007,6 +1007,13 @@ namespace mongo {
             solnRoot = skip;
         }
 
+        if (0 != query.getParsed().getNumToReturn() && !query.getParsed().wantMore()) {
+            LimitNode* limit = new LimitNode();
+            limit->limit = query.getParsed().getNumToReturn();
+            limit->child.reset(solnRoot);
+            solnRoot = limit;
+        }
+
         soln->root.reset(solnRoot);
         return soln.release();
     }
