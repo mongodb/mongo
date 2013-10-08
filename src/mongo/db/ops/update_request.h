@@ -32,8 +32,11 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query_plan_selection_policy.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
+
+    namespace str = mongoutils::str;
 
     class UpdateRequest {
     public:
@@ -124,6 +127,17 @@ namespace mongo {
             return _fromReplication;
         }
 
+        const std::string toString() const {
+            return str::stream()
+                        << " query: " << _query
+                        << " updated: " << _updates
+                        << " god: " << _god
+                        << " upsert: " << _upsert
+                        << " multe: " << _multi
+                        << " logToOplog: " << _updateOpLog
+                        << " fromMigration: " << _fromMigration
+                        << " fromReplications: " << _fromReplication;
+        }
     private:
 
         const NamespaceString& _nsString;

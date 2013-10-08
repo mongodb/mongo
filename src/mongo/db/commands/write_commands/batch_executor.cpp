@@ -348,7 +348,7 @@ namespace mongo {
 
         bool resExisting = false;
         long long resNum = 0;
-        OID resUpserted = OID();
+        BSONObj resUpserted;
         try {
 
             const NamespaceString requestNs( ns );
@@ -366,8 +366,8 @@ namespace mongo {
             resNum = res.numMatched;
             resUpserted = res.upserted;
 
-            stats->numUpdated += !resUpserted.isSet() ? resNum : 0;
-            stats->numUpserted += resUpserted.isSet() ? 1 : 0;
+            stats->numUpdated += resUpserted.isEmpty() ? resNum : 0;
+            stats->numUpserted += !resUpserted.isEmpty() ? 1 : 0;
         }
         catch ( const UserException& ex ) {
             opDebug.exceptionInfo = ex.getInfo();

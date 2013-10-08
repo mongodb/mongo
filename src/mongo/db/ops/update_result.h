@@ -32,8 +32,11 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query_plan_selection_policy.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
+
+    namespace str = mongoutils::str;
 
     struct UpdateResult {
 
@@ -45,10 +48,9 @@ namespace mongo {
             , modifiers(modifiers_)
             , numMatched(numMatched_) {
 
-            upserted.clear();
             BSONElement id = upsertedObject_["_id"];
-            if ( ! existing && numMatched == 1 && id.type() == jstOID ) {
-                upserted = id.OID();
+            if ( ! existing && numMatched == 1 && !id.eoo() ) {
+                upserted = id.wrap(kUpsertedFieldName);
             }
         }
 
@@ -63,7 +65,15 @@ namespace mongo {
         const long long numMatched;
 
         // if something was upserted, the new _id of the object
-        OID upserted;
+        BSONObj upserted;
+
+        const std::string toString() const {
+            return str::stream()
+                        << " upserted: " << upserted
+                        << " modifiers: " << modifiers
+                        << " existing: " << existing
+                        << " numMatched: " << numMatched;
+        }
     };
 
 } // namespace mongo

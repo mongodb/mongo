@@ -9,15 +9,15 @@ function getNextVal(counterName){
                 upsert: true,
                 'new': true,
                 });
-    return ret.val;
+    return ret;
 }
 
-assert.eq(getNextVal("a"), 1);
-assert.eq(getNextVal("a"), 2);
-assert.eq(getNextVal("a"), 3);
-assert.eq(getNextVal("z"), 1);
-assert.eq(getNextVal("z"), 2);
-assert.eq(getNextVal("a"), 4);
+assert.eq(getNextVal("a"), {_id:"a", val:1});
+assert.eq(getNextVal("a"), {_id:"a", val:2});
+assert.eq(getNextVal("a"), {_id:"a", val:3});
+assert.eq(getNextVal("z"), {_id:"z", val:1});
+assert.eq(getNextVal("z"), {_id:"z", val:2});
+assert.eq(getNextVal("a"), {_id:"a", val:4});
 
 t.drop();
 
