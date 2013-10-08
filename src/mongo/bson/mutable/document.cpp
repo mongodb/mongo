@@ -2046,14 +2046,14 @@ namespace mutablebson {
 
     void Document::reset() {
         _impl->reset(Document::kInPlaceDisabled);
-        const Element newRoot = makeRootElement();
+        MONGO_COMPILER_VARIABLE_UNUSED const Element newRoot = makeRootElement();
         dassert(newRoot._repIdx == _root._repIdx);
         dassert(_root._repIdx == kRootRepIdx);
     }
 
     void Document::reset(const BSONObj& value, InPlaceMode inPlaceMode) {
         _impl->reset(inPlaceMode);
-        const Element newRoot = makeRootElement(value);
+        MONGO_COMPILER_VARIABLE_UNUSED const Element newRoot = makeRootElement(value);
         dassert(newRoot._repIdx == _root._repIdx);
         dassert(_root._repIdx == kRootRepIdx);
     }
