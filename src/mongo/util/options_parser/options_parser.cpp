@@ -249,8 +249,31 @@ namespace optionenvironment {
                 BSONElement elem = iterator.next();
                 string fieldName= elem.fieldName();
 
-                std::string dottedName = ( parentPath.empty() ? fieldName
-                                                              : parentPath+'.'+fieldName );
+                // The following code should allow the following comment styles:
+                // { "option" : { "value" : <value>, "comment" : "comment string" } }
+                // { "option" : <value>, "comment" : "comment string" }
+
+                // Ignore fields with a name of "comment"
+                if (fieldName == "comment") {
+                    continue;
+                }
+
+                std::string dottedName;
+                if (parentPath.empty()) {
+                    // We are at the top level, so the full specifier is just the current field name
+                    dottedName = fieldName;
+                }
+                else {
+                    // If our field name is "value", assume this contains the value for the parent
+                    if (fieldName == "value") {
+                        dottedName = parentPath;
+                    }
+                    // If this is not a special field name, and we are in a sub object, append our
+                    // current fieldName to the selector for the sub object we are traversing
+                    else {
+                        dottedName = parentPath + '.' + fieldName;
+                    }
+                }
 
                 if (elem.type() == ::mongo::Object) {
                     addBSONElementsToEnvironment( elem.Obj(), options, dottedName, environment );

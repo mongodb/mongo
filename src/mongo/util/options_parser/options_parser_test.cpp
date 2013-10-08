@@ -1416,4 +1416,214 @@ namespace {
         }
     }
 
+    TEST(JSONConfigFile, NestedComments) {
+        OptionsParserTester parser;
+        moe::Environment environment;
+
+        moe::OptionSection testOpts;
+        testOpts.addOption(moe::OptionDescription("config", "config",
+                                                  moe::String, "Config file to parse"));
+        testOpts.addOption(moe::OptionDescription("port", "port", moe::Int, "Port"));
+        testOpts.addOption(moe::OptionDescription("host", "host", moe::String, "Host"));
+
+        std::vector<std::string> argv;
+        argv.push_back("binaryname");
+        argv.push_back("--config");
+        argv.push_back("config.json");
+        std::map<std::string, std::string> env_map;
+
+        parser.setConfig("config.json",
+                         "{ port : { comment : \"comment on port\", value : 5 },"
+                         "host : { comment : \"comment on host\", value : \"localhost\" } }");
+
+        moe::Value value;
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        ASSERT_OK(environment.get(moe::Key("port"), &value));
+        int port;
+        ASSERT_OK(value.get(&port));
+        ASSERT_EQUALS(port, 5);
+        ASSERT_OK(environment.get(moe::Key("host"), &value));
+        std::string host;
+        ASSERT_OK(value.get(&host));
+        ASSERT_EQUALS(host, "localhost");
+    }
+
+    TEST(JSONConfigFile, FlatComments) {
+        OptionsParserTester parser;
+        moe::Environment environment;
+
+        moe::OptionSection testOpts;
+        testOpts.addOption(moe::OptionDescription("config", "config",
+                                                  moe::String, "Config file to parse"));
+        testOpts.addOption(moe::OptionDescription("port", "port", moe::Int, "Port"));
+        testOpts.addOption(moe::OptionDescription("host", "host", moe::String, "Host"));
+
+        std::vector<std::string> argv;
+        argv.push_back("binaryname");
+        argv.push_back("--config");
+        argv.push_back("config.json");
+        std::map<std::string, std::string> env_map;
+
+        parser.setConfig("config.json",
+                         "{ comment : \"comment on port\", port : 5 ,"
+                         "  comment : \"comment on host\", host : \"localhost\" }");
+
+        moe::Value value;
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        ASSERT_OK(environment.get(moe::Key("port"), &value));
+        int port;
+        ASSERT_OK(value.get(&port));
+        ASSERT_EQUALS(port, 5);
+        ASSERT_OK(environment.get(moe::Key("host"), &value));
+        std::string host;
+        ASSERT_OK(value.get(&host));
+        ASSERT_EQUALS(host, "localhost");
+    }
+
+    TEST(JSONConfigFile, MixedComments) {
+        OptionsParserTester parser;
+        moe::Environment environment;
+
+        moe::OptionSection testOpts;
+        testOpts.addOption(moe::OptionDescription("config", "config",
+                                                  moe::String, "Config file to parse"));
+        testOpts.addOption(moe::OptionDescription("port", "port", moe::Int, "Port"));
+        testOpts.addOption(moe::OptionDescription("host", "host", moe::String, "Host"));
+
+        std::vector<std::string> argv;
+        argv.push_back("binaryname");
+        argv.push_back("--config");
+        argv.push_back("config.json");
+        std::map<std::string, std::string> env_map;
+
+        parser.setConfig("config.json",
+                         "{ port : { comment : \"comment on port\", value : 5 },"
+                         "  comment : \"comment on host\", host : \"localhost\" }");
+
+        moe::Value value;
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        ASSERT_OK(environment.get(moe::Key("port"), &value));
+        int port;
+        ASSERT_OK(value.get(&port));
+        ASSERT_EQUALS(port, 5);
+        ASSERT_OK(environment.get(moe::Key("host"), &value));
+        std::string host;
+        ASSERT_OK(value.get(&host));
+        ASSERT_EQUALS(host, "localhost");
+    }
+
+    TEST(JSONConfigFile, NestedCommentsBadValue) {
+        OptionsParserTester parser;
+        moe::Environment environment;
+
+        moe::OptionSection testOpts;
+        testOpts.addOption(moe::OptionDescription("config", "config",
+                                                  moe::String, "Config file to parse"));
+        testOpts.addOption(moe::OptionDescription("port", "port", moe::Int, "Port"));
+        testOpts.addOption(moe::OptionDescription("host", "host", moe::String, "Host"));
+
+        std::vector<std::string> argv;
+        argv.push_back("binaryname");
+        argv.push_back("--config");
+        argv.push_back("config.json");
+        std::map<std::string, std::string> env_map;
+
+        parser.setConfig("config.json",
+                         "{ port : { comment : \"comment on port\", value : \"string\" },"
+                         "host : { comment : \"comment on host\", value : \"localhost\" } }");
+
+        moe::Value value;
+        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    }
+
+    TEST(JSONConfigFile, FlatCommentsBadValue) {
+        OptionsParserTester parser;
+        moe::Environment environment;
+
+        moe::OptionSection testOpts;
+        testOpts.addOption(moe::OptionDescription("config", "config",
+                                                  moe::String, "Config file to parse"));
+        testOpts.addOption(moe::OptionDescription("port", "port", moe::Int, "Port"));
+        testOpts.addOption(moe::OptionDescription("host", "host", moe::String, "Host"));
+
+        std::vector<std::string> argv;
+        argv.push_back("binaryname");
+        argv.push_back("--config");
+        argv.push_back("config.json");
+        std::map<std::string, std::string> env_map;
+
+        parser.setConfig("config.json",
+                         "{ comment : \"comment on port\", port : \"string\" ,"
+                         "  comment : \"comment on host\", host : \"localhost\" }");
+
+        moe::Value value;
+        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    }
+
+    TEST(JSONConfigFile, NestedCommentsOtherTypes) {
+        OptionsParserTester parser;
+        moe::Environment environment;
+
+        moe::OptionSection testOpts;
+        testOpts.addOption(moe::OptionDescription("config", "config",
+                                                  moe::String, "Config file to parse"));
+        testOpts.addOption(moe::OptionDescription("port", "port", moe::Int, "Port"));
+        testOpts.addOption(moe::OptionDescription("host", "host", moe::String, "Host"));
+
+        std::vector<std::string> argv;
+        argv.push_back("binaryname");
+        argv.push_back("--config");
+        argv.push_back("config.json");
+        std::map<std::string, std::string> env_map;
+
+        parser.setConfig("config.json",
+                         "{ port : { comment : [ \"can\", \"be\", \"array\", true ], value : 5 },"
+                         "  host : { comment : { nestedcomment : \"really descriptive\" },"
+                                               " value : \"localhost\" } }");
+
+        moe::Value value;
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        ASSERT_OK(environment.get(moe::Key("port"), &value));
+        int port;
+        ASSERT_OK(value.get(&port));
+        ASSERT_EQUALS(port, 5);
+        ASSERT_OK(environment.get(moe::Key("host"), &value));
+        std::string host;
+        ASSERT_OK(value.get(&host));
+        ASSERT_EQUALS(host, "localhost");
+    }
+
+    TEST(JSONConfigFile, FlatCommentsOtherTypes) {
+        OptionsParserTester parser;
+        moe::Environment environment;
+
+        moe::OptionSection testOpts;
+        testOpts.addOption(moe::OptionDescription("config", "config",
+                                                  moe::String, "Config file to parse"));
+        testOpts.addOption(moe::OptionDescription("port", "port", moe::Int, "Port"));
+        testOpts.addOption(moe::OptionDescription("host", "host", moe::String, "Host"));
+
+        std::vector<std::string> argv;
+        argv.push_back("binaryname");
+        argv.push_back("--config");
+        argv.push_back("config.json");
+        std::map<std::string, std::string> env_map;
+
+        parser.setConfig("config.json",
+                         "{ comment : [ \"can\", \"be\", \"array\", true ], port : 5,"
+                         "  comment : { nestedcomment : \"really descriptive\" },"
+                         "  host : \"localhost\" }");
+
+        moe::Value value;
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        ASSERT_OK(environment.get(moe::Key("port"), &value));
+        int port;
+        ASSERT_OK(value.get(&port));
+        ASSERT_EQUALS(port, 5);
+        ASSERT_OK(environment.get(moe::Key("host"), &value));
+        std::string host;
+        ASSERT_OK(value.get(&host));
+        ASSERT_EQUALS(host, "localhost");
+    }
+
 } // unnamed namespace
