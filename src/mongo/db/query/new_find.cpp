@@ -36,12 +36,14 @@
 #include "mongo/db/keypattern.h"
 #include "mongo/db/kill_current_op.h"
 #include "mongo/db/matcher/expression.h"
+#include "mongo/db/matcher/expression_geo.h"
 #include "mongo/db/query/cached_plan_runner.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/eof_runner.h"
 #include "mongo/db/query/multi_plan_runner.h"
 #include "mongo/db/query/plan_cache.h"
 #include "mongo/db/query/query_planner.h"
+#include "mongo/db/query/query_planner_common.h"
 #include "mongo/db/query/single_solution_runner.h"
 #include "mongo/db/query/stage_builder.h"
 #include "mongo/db/query/type_explain.h"
@@ -102,18 +104,6 @@ namespace mongo {
     bool isNewQueryFrameworkEnabled() { return newQueryFrameworkEnabled; }
     void enableNewQueryFramework() { newQueryFrameworkEnabled = true; }
 
-    bool hasNode(MatchExpression* root, MatchExpression::MatchType type) {
-        if (type == root->matchType()) {
-            return true;
-        }
-        for (size_t i = 0; i < root->numChildren(); ++i) {
-            if (hasNode(root->getChild(i), type)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
     // Do we use the old or the new?  I call this the spigot.
     bool canUseNewSystem(const QueryMessage& qm, CanonicalQuery** cqOut) {
         CanonicalQuery* cq;
@@ -138,8 +128,8 @@ namespace mongo {
             return false;
         }
 
-        if (hasNode(cq->root(), MatchExpression::NOT)
-            || hasNode(cq->root(), MatchExpression::NOR)) {
+        if (QueryPlannerCommon::hasNode(cq->root(), MatchExpression::NOT)
+            || QueryPlannerCommon::hasNode(cq->root(), MatchExpression::NOR)) {
 
             cout << "rejecting query w/negation\n";
             return false;
@@ -151,7 +141,29 @@ namespace mongo {
             return false;
         }
 
-        // XXX: 2d.
+        MatchExpression* nearNode;
+        if (QueryPlannerCommon::hasNode(cq->root(), MatchExpression::GEO_NEAR, &nearNode)) {
+            GeoNearMatchExpression* gnme = static_cast<GeoNearMatchExpression*>(nearNode);
+            // This is a read lock.
+            Client::ReadContext ctx(cq->ns());
+            NamespaceDetails* nsd = nsdetails(cq->ns().c_str());
+            if (NULL == nsd) { return true; }
+            for (int i = 0; i < nsd->getCompletedIndexCount(); ++i) {
+                auto_ptr<IndexDescriptor> desc(CatalogHack::getDescriptor(nsd, i));
+                BSONObjIterator kpIt(desc->keyPattern());
+                while (kpIt.more()) {
+                    BSONElement elt = kpIt.next();
+                    // An index over the GEO_NEAR field...
+                    if (gnme->getData().field != elt.fieldName()) {
+                        continue;
+                    }
+                    if (String == elt.type() && elt.String() == "2d") {
+                        cout << "ignoring 2d geonear\n";
+                        return false;
+                    }
+                }
+            }
+        }
 
         *cqOut = scopedCq.release();
         return true;

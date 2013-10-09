@@ -147,17 +147,8 @@ namespace mongo {
     void IndexBoundsBuilder::allValuesForField(const BSONElement& elt, OrderedIntervalList* out) {
         // ARGH, BSONValue would make this shorter.
         BSONObjBuilder bob;
-        if (-1 == elt.number()) {
-            // Index should go from MaxKey to MinKey as it's descending.
-            bob.appendMaxKey("");
-            bob.appendMinKey("");
-        }
-        else {
-            // Index goes from MinKey to MaxKey as it's ascending.
-            bob.appendMinKey("");
-            bob.appendMaxKey("");
-        }
-
+        bob.appendMinKey("");
+        bob.appendMaxKey("");
         out->name = elt.fieldName();
         out->intervals.push_back(makeRangeInterval(bob.obj(), true, true));
     }

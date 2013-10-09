@@ -43,6 +43,7 @@
 #include "mongo/db/query/index_tag.h"
 #include "mongo/db/query/indexability.h"
 #include "mongo/db/query/plan_enumerator.h"
+#include "mongo/db/query/query_planner_common.h"
 #include "mongo/db/query/query_solution.h"
 
 namespace mongo {
@@ -1018,28 +1019,6 @@ namespace mongo {
         return soln.release();
     }
 
-    /**
-     * Does the tree rooted at 'root' have a node with matchType 'type'?
-     */
-    bool hasNode(MatchExpression* root, MatchExpression::MatchType type,
-                 MatchExpression** out = NULL) {
-        if (type == root->matchType()) {
-            if (NULL != out) {
-                *out = root;
-            }
-            return true;
-        }
-        for (size_t i = 0; i < root->numChildren(); ++i) {
-            if (hasNode(root->getChild(i), type)) {
-                if (NULL != out) {
-                    *out = root->getChild(i);
-                }
-                return true;
-            }
-        }
-        return false;
-    }
-
     // Copied verbatim from db/index.h
     static bool isIdIndex( const BSONObj &pattern ) {
         BSONObjIterator i(pattern);
@@ -1068,7 +1047,9 @@ namespace mongo {
         // could ask for a tailable cursor and it just tried to give you one.  Now, we fail if we
         // can't provide one.  Is this what we want?
         if (query.getParsed().hasOption(QueryOption_CursorTailable)) {
-            if (!hasNode(query.root(), MatchExpression::GEO_NEAR) && canTableScan) {
+            if (!QueryPlannerCommon::hasNode(query.root(), MatchExpression::GEO_NEAR)
+                && canTableScan) {
+
                 out->push_back(makeCollectionScan(query, true));
             }
             return;
@@ -1089,12 +1070,12 @@ namespace mongo {
 
         // NOR and NOT we can't handle well with indices.  If we see them here, they weren't
         // rewritten to remove the negation.  Just output a collscan for those.
-        if (hasNode(query.root(), MatchExpression::NOT)
-            || hasNode(query.root(), MatchExpression::NOR)) {
+        if (QueryPlannerCommon::hasNode(query.root(), MatchExpression::NOT)
+            || QueryPlannerCommon::hasNode(query.root(), MatchExpression::NOR)) {
 
             // If there's a near predicate, we can't handle this.
             // TODO: Should canonicalized query detect this?
-            if (hasNode(query.root(), MatchExpression::GEO_NEAR)) {
+            if (QueryPlannerCommon::hasNode(query.root(), MatchExpression::GEO_NEAR)) {
                 warning() << "Can't handle NOT/NOR with GEO_NEAR";
                 return;
             }
@@ -1181,7 +1162,7 @@ namespace mongo {
 
         // If there is a GEO_NEAR it must have an index it can use directly.
         MatchExpression* gnNode;
-        if (hasNode(query.root(), MatchExpression::GEO_NEAR, &gnNode)) {
+        if (QueryPlannerCommon::hasNode(query.root(), MatchExpression::GEO_NEAR, &gnNode)) {
             RelevantTag* tag = static_cast<RelevantTag*>(gnNode->getTag());
             if (0 == tag->first.size() && 0 == tag->notFirst.size()) {
                 return;
@@ -1267,7 +1248,7 @@ namespace mongo {
         //
         // XXX XXX: Can we do this even if the index is sparse?  Might we miss things?
         if (!query.getParsed().getSort().isEmpty()
-            && !hasNode(query.root(), MatchExpression::GEO_NEAR)) {
+            && !QueryPlannerCommon::hasNode(query.root(), MatchExpression::GEO_NEAR)) {
 
             // See if we have a sort provided from an index already.
             bool usingIndexToSort = false;
@@ -1314,7 +1295,7 @@ namespace mongo {
 
         // TODO: Do we always want to offer a collscan solution?
         // XXX: currently disabling the always-use-a-collscan in order to find more planner bugs.
-        if (!hasNode(query.root(), MatchExpression::GEO_NEAR)
+        if (!QueryPlannerCommon::hasNode(query.root(), MatchExpression::GEO_NEAR)
             && ((options & QueryPlanner::INCLUDE_COLLSCAN) || (0 == out->size() && canTableScan))) {
             QuerySolution* collscan = makeCollectionScan(query, false);
             out->push_back(collscan);
