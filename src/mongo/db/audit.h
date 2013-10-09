@@ -326,5 +326,34 @@ namespace audit {
     void logRenameCollection(ClientBasic* client,
                              const StringData& source,
                              const StringData& target);
+
+    /**
+     * Logs the result of a enableSharding command.
+     */
+    void logEnableSharding(ClientBasic* client,
+                           const StringData& dbname);
+
+    /**
+     * Logs the result of a addShard command.
+     */
+    void logAddShard(ClientBasic* client,
+                     const StringData& name,
+                     const std::string& servers,
+                     long long maxsize);
+
+    /**
+     * Logs the result of a removeShard command.
+     */
+    void logRemoveShard(ClientBasic* client,
+                        const StringData& shardname);
+
+    /**
+     * Logs the result of a shardCollection command.
+     */
+    void logShardCollection(ClientBasic* client,
+                            const StringData& ns,
+                            const BSONObj& keyPattern,
+                            bool unique);
+
 }  // namespace audit
 }  // namespace mongo

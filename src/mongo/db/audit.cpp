@@ -195,6 +195,22 @@ namespace audit {
     void logRenameCollection(ClientBasic* client,
                              const StringData& source,
                              const StringData& target) MONGO_AUDIT_STUB
+
+    void logEnableSharding(ClientBasic* client,
+                           const StringData& dbname) MONGO_AUDIT_STUB
+
+    void logAddShard(ClientBasic* client,
+                     const StringData& name,
+                     const std::string& servers,
+                     long long maxsize) MONGO_AUDIT_STUB
+
+    void logRemoveShard(ClientBasic* client,
+                        const StringData& shardname) MONGO_AUDIT_STUB
+
+    void logShardCollection(ClientBasic* client,
+                            const StringData& ns,
+                            const BSONObj& keyPattern,
+                            bool unique) MONGO_AUDIT_STUB
 }  // namespace audit
 }  // namespace mongo
 
