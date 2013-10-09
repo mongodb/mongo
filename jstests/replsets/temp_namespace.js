@@ -61,7 +61,7 @@ assert.eq(secondDB.system.namespaces.count({name: /temp\d\.\$.*$/}) , 0); //inde
 assert.eq(secondDB.system.namespaces.count({name: /keep\d$/}) , 4);
 
 // check that former primary dropped collections
-secondDB.getLastError(2);
+replTest.awaitReplication()
 assert.eq(masterDB.system.namespaces.count({name: /temp\d$/}) , 0); // collections
 assert.eq(masterDB.system.namespaces.count({name: /temp\d\.\$.*$/}) , 0); //indexes
 assert.eq(masterDB.system.namespaces.count({name: /keep\d$/}) , 4);
