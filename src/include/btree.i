@@ -104,16 +104,18 @@ __wt_cache_page_inmem_decr(WT_SESSION_IMPL *session, WT_PAGE *page, size_t size)
 static inline void
 __wt_cache_dirty_incr(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
-	uint32_t size;
+	WT_CACHE *cache;
+	size_t size;
 
-	(void)WT_ATOMIC_ADD(S2C(session)->cache->pages_dirty, 1);
+	cache = S2C(session)->cache;
+	(void)WT_ATOMIC_ADD(cache->pages_dirty, 1);
 
 	/*
 	 * Take care to read the memory_footprint once in case we are racing
 	 * with updates.
 	 */
 	size = page->memory_footprint;
-	(void)WT_ATOMIC_ADD(S2C(session)->cache->bytes_dirty, size);
+	(void)WT_ATOMIC_ADD(cache->bytes_dirty, size);
 	(void)WT_ATOMIC_ADD(page->modify->bytes_dirty, size);
 }
 
@@ -128,7 +130,6 @@ __wt_cache_dirty_decr(WT_SESSION_IMPL *session, WT_PAGE *page)
 	size_t size;
 
 	cache = S2C(session)->cache;
-	size = page->memory_footprint;
 
 	if (cache->pages_dirty < 1) {
 		(void)__wt_errx(session,
@@ -155,8 +156,7 @@ __wt_cache_dirty_decr(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 */
 	size = WT_MIN(page->memory_footprint, cache->bytes_dirty);
 	(void)WT_ATOMIC_SUB(cache->bytes_dirty, size);
-	(void)WT_ATOMIC_SUB(cache->pages_dirty, 1);
-	(void)WT_ATOMIC_SUB(page->bytes_dirty, size);
+	(void)WT_ATOMIC_SUB(page->modify->bytes_dirty, size);
 }
 
 /*
