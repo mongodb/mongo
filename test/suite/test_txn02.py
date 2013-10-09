@@ -29,9 +29,10 @@
 #   Transactions: commits and rollbacks
 #
 
-import wiredtiger, wttest
 import os, shutil
+from wiredtiger import wiredtiger_open
 from wtscenario import multiply_scenarios, number_scenarios
+import wttest
 
 class test_txn02(wttest.WiredTigerTestCase):
     tablename = 'test_txn02'
@@ -77,7 +78,8 @@ class test_txn02(wttest.WiredTigerTestCase):
     def setUpConnectionOpen(self, dir):
         self.home = dir
         self.backup_dir = os.path.join(self.home, "WT_BACKUP")
-        conn = wiredtiger.wiredtiger_open(dir, 'create,log=(file_max=100K),' +
+        conn = wiredtiger_open(dir,
+                'create,log=(enabled,file_max=100K),' +
                 ('error_prefix="%s: ",' % self.shortid()))
         self.pr(`conn`)
         self.session2 = conn.open_session()
@@ -113,7 +115,7 @@ class test_txn02(wttest.WiredTigerTestCase):
         # committed results.
         wttest.removeAll(self.backup_dir)
         shutil.copytree(self.home, self.backup_dir)
-        backup_conn = wiredtiger.wiredtiger_open(self.backup_dir)
+        backup_conn = wiredtiger_open(self.backup_dir, 'log=(enabled)')
         try:
             self.check(backup_conn.open_session(), None, committed)
             #self.check(backup_conn.open_session(), None, {})
