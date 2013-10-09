@@ -72,7 +72,6 @@ typedef struct {
 		f.write('\t' + decl(l) + ';\n')
 		if l.sized:
 			sizes = 1
-			f.write('\tint ' + l.name + '_taken;\n')
 	f.write('} __wt_' + entry.name + '_args;\n\n')
 
 	f.write('static inline int\n__wt_' + entry.name + '_serial(\n')
@@ -99,47 +98,54 @@ typedef struct {
 \t\targs->''' + l.name + ''' = *''' + l.name + '''p;
 \t\t*''' + l.name + '''p = NULL;
 \t}
-\targs->''' + l.name + '''_taken = 0;
 
 ''')
 		else:
 			f.write('\targs->' + l.name + ' = ' + l.name + ';\n\n')
 	f.write('\t__wt_spin_lock(session, &S2BT(session)->serial_lock);\n')
 	f.write('\tret = __wt_' + entry.name + '_serial_func(session, args);\n')
+	f.write('\t__wt_spin_unlock(session, &S2BT(session)->serial_lock);\n')
+	f.write('\n')
 
+	f.write('\tif (ret != 0) {\n')
 	if sizes:
-		f.write('''
-\t/* Increment in-memory footprint before decrement is possible. */
-''')
-		f.write('\tincr_mem = 0;\n')
+		f.write('\t\t/* Free unused memory. */\n')
 		for l in entry.args:
 			if not l.sized:
 				continue
-			f.write('\tif (args->' + l.name + '_taken) {\n')
-			f.write('\t\tWT_ASSERT(session, ' +
+			f.write(
+			    '\t\t__wt_free(session, args->' + l.name + ');\n')
+		f.write('''
+\t\treturn (ret);
+\t}
+''')
+
+	if sizes:
+		f.write('''
+\t/*
+\t * Increment in-memory footprint after releasing the mutex: that's safe
+\t * because the structures we added cannot be discarded while visible to
+\t * any running transaction, and we're a running transaction, which means
+\t * there can be no corresponding delete until we complete.
+\t */
+\tincr_mem = 0;
+''')
+		for l in entry.args:
+			if not l.sized:
+				continue
+			f.write('\tWT_ASSERT(session, ' +
 			    l.name + '_size != 0);\n')
-			f.write('\t\tincr_mem += ' + l.name + '_size;\n')
-			f.write('\t}\n')
+			f.write('\tincr_mem += ' + l.name + '_size;\n')
 		f.write('''\tif (incr_mem != 0)
 \t\t__wt_cache_page_inmem_incr(session, page, incr_mem);
 
-''')
-	f.write('\t__wt_spin_unlock(session, &S2BT(session)->serial_lock);\n')
+\t/* Mark the page dirty after updating the footprint. */
+\t__wt_page_modify_set(session, page);
 
-	if sizes:
-		f.write('''
-\t/* Free any unused memory after releasing serialization mutex. */
-''')
-		for l in entry.args:
-			if not l.sized:
-				continue
-			f.write('\tif (!args->' + l.name + '_taken)\n')
-			f.write(
-			    '\t\t__wt_free(session, args->' + l.name + ');\n')
-		f.write('\n')
+\treturn (0);
+}
 
-	f.write('\treturn (ret);\n')
-	f.write('}\n\n')
+''')
 
 	# unpack function
 	f.write('static inline void\n__wt_' + entry.name + '_unpack(\n')
@@ -156,19 +162,6 @@ typedef struct {
 	for l in entry.args:
 		f.write('\t*' + l.name + 'p = args->' + l.name + ';\n')
 	f.write('}\n')
-
-	# taken functions
-	for l in entry.args:
-		if l.sized:
-			f.write('''
-static inline void\n__wt_''' + entry.name + '_' + l.name +
-    '''_taken(void *untyped_args)
-{
-\t__wt_''' + entry.name + '''_args *args = (__wt_''' + entry.name + '''_args *)untyped_args;
-
-\targs->''' + l.name + '''_taken = 1;
-}
-''')
 
 #####################################################################
 # Update serial_funcs.i.

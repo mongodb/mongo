@@ -71,8 +71,10 @@ __wt_cache_page_inmem_incr(WT_SESSION_IMPL *session, WT_PAGE *page, size_t size)
 	cache = S2C(session)->cache;
 	(void)WT_ATOMIC_ADD(cache->bytes_inmem, size);
 	(void)WT_ATOMIC_ADD(page->memory_footprint, WT_STORE_SIZE(size));
-	if (__wt_page_is_modified(page))
+	if (__wt_page_is_modified(page)) {
 		(void)WT_ATOMIC_ADD(cache->bytes_dirty, size);
+		(void)WT_ATOMIC_ADD(page->modify->bytes_dirty, size);
+	}
 }
 
 /*
@@ -89,35 +91,72 @@ __wt_cache_page_inmem_decr(WT_SESSION_IMPL *session, WT_PAGE *page, size_t size)
 	cache = S2C(session)->cache;
 	(void)WT_ATOMIC_SUB(cache->bytes_inmem, size);
 	(void)WT_ATOMIC_SUB(page->memory_footprint, WT_STORE_SIZE(size));
-	if (__wt_page_is_modified(page))
+	if (__wt_page_is_modified(page)) {
 		(void)WT_ATOMIC_SUB(cache->bytes_dirty, size);
+		(void)WT_ATOMIC_SUB(page->modify->bytes_dirty, size);
+	}
+}
+
+/*
+ * __wt_cache_dirty_incr --
+ *	Increment the cache dirty page/byte counts.
+ */
+static inline void
+__wt_cache_dirty_incr(WT_SESSION_IMPL *session, WT_PAGE *page)
+{
+	WT_CACHE *cache;
+	size_t size;
+
+	cache = S2C(session)->cache;
+	(void)WT_ATOMIC_ADD(cache->pages_dirty, 1);
+
+	/*
+	 * Take care to read the memory_footprint once in case we are racing
+	 * with updates.
+	 */
+	size = page->memory_footprint;
+	(void)WT_ATOMIC_ADD(cache->bytes_dirty, size);
+	(void)WT_ATOMIC_ADD(page->modify->bytes_dirty, size);
 }
 
 /*
  * __wt_cache_dirty_decr --
- *	Decrement a page's memory footprint from the cache dirty count. Will
- *	be called after a reconciliation leaves a page clean.
+ *	Decrement the cache dirty page/byte counts.
  */
 static inline void
-__wt_cache_dirty_decr(WT_SESSION_IMPL *session, size_t size)
+__wt_cache_dirty_decr(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_CACHE *cache;
+	size_t size;
 
 	cache = S2C(session)->cache;
-	if (cache->bytes_dirty < size || cache->pages_dirty == 0) {
-		if (WT_VERBOSE_ISSET(session, evictserver))
-			(void)__wt_verbose(session,
-			    "Cache dirty decrement failed: %" PRIu64
-			    " pages dirty, %" PRIu64
-			    " bytes dirty, decrement size %" PRIuMAX,
-			    cache->pages_dirty,
-			    cache->bytes_dirty, (uintmax_t)size);
-		cache->bytes_dirty = 0;
+
+	if (cache->pages_dirty < 1) {
+		(void)__wt_errx(session,
+		   "cache dirty decrement failed: cache dirty page count went "
+		   "negative");
 		cache->pages_dirty = 0;
-	} else {
-		(void)WT_ATOMIC_SUB(cache->bytes_dirty, size);
+	} else
 		(void)WT_ATOMIC_SUB(cache->pages_dirty, 1);
-	}
+
+	/*
+	 * It is possible to decrement the footprint of the page without making
+	 * the page dirty (for example when freeing an obsolete update list),
+	 * so the footprint could change between read and decrement, and we
+	 * might attempt to decrement by a different amount than the bytes held
+	 * by the page.
+	 *
+	 * We catch that by maintaining a per-page dirty size, and fixing the
+	 * cache stats if that is non-zero when the page is discarded.
+	 *
+	 * Also take care that the global size doesn't go negative.  This may
+	 * lead to small accounting errors (particularly on the last page of the
+	 * last file in a checkpoint), but that will come out in the wash when
+	 * the page is evicted.
+	 */
+	size = WT_MIN(page->memory_footprint, cache->bytes_dirty);
+	(void)WT_ATOMIC_SUB(cache->bytes_dirty, size);
+	(void)WT_ATOMIC_SUB(page->modify->bytes_dirty, size);
 }
 
 /*
@@ -128,15 +167,24 @@ static inline void
 __wt_cache_page_evict(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_CACHE *cache;
+	WT_PAGE_MODIFY *mod;
 
 	cache = S2C(session)->cache;
+	mod = page->modify;
+
+	/*
+	 * In rare cases, we may race tracking a page's dirty footprint.
+	 * If so, we will get here with a non-zero dirty_size in the page, and
+	 * we can fix the global stats.
+	 */
+	if (mod != NULL && mod->bytes_dirty != 0)
+		(void)WT_ATOMIC_SUB(cache->bytes_dirty, mod->bytes_dirty);
 
 	WT_ASSERT(session, page->memory_footprint != 0);
+	(void)WT_ATOMIC_ADD(cache->bytes_evict, page->memory_footprint);
+	page->memory_footprint = 0;
 
 	(void)WT_ATOMIC_ADD(cache->pages_evict, 1);
-	(void)WT_ATOMIC_ADD(cache->bytes_evict, page->memory_footprint);
-
-	page->memory_footprint = 0;
 }
 
 static inline uint64_t
@@ -221,12 +269,11 @@ __wt_page_only_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * and/or page reconciliation might be looking at a clean page/tree.
 	 *
 	 * Every time the page transitions from clean to dirty, update the cache
-	 * and transactional information.
+	 * and transactional information.  Take care to read the
+	 * memory_footprint once in case we are racing with updates.
 	 */
 	if (WT_ATOMIC_ADD(page->modify->write_gen, 1) == 1) {
-		(void)WT_ATOMIC_ADD(S2C(session)->cache->pages_dirty, 1);
-		(void)WT_ATOMIC_ADD(
-		    S2C(session)->cache->bytes_dirty, page->memory_footprint);
+		__wt_cache_dirty_incr(session, page);
 
 		/*
 		 * The page can never end up with changes older than the oldest

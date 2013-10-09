@@ -33,9 +33,6 @@
  * a fast software algorithm.  __wt_cksum() provides a common entry point that
  * indirects to one of these two methods.
  */
-static uint32_t __wt_cksum_sw(const void *chunk, size_t len);
-static uint32_t __wt_cksum_hw(const void *chunk, size_t len);
-
 static uint32_t (*__wt_cksum_func)(const void *chunk, size_t len);
 
 /*

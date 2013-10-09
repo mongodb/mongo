@@ -260,8 +260,6 @@ __wt_col_append_serial_func(WT_SESSION_IMPL *session, void *args)
 			*ins_stack[i] = new_ins;
 	}
 
-	__wt_col_append_new_ins_taken(args);
-
 	/*
 	 * Set the calling cursor's record number.
 	 * If we extended the file, update the last record number.
@@ -270,7 +268,6 @@ __wt_col_append_serial_func(WT_SESSION_IMPL *session, void *args)
 	if (recno > btree->last_recno)
 		btree->last_recno = recno;
 
-	__wt_page_modify_set(session, page);
 	return (0);
 }
 
