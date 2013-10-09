@@ -338,15 +338,31 @@ namespace mongo {
              * @return true if the given token matches the next non whitespace
              * sequence in our buffer, and false if the token doesn't match or
              * we reach the end of our buffer.  Do not update the pointer to our
+             * buffer (same as calling readTokenImpl with advance=false).
+             */
+            inline bool peekToken(const char* token);
+
+            /**
+             * @return true if the given token matches the next non whitespace
+             * sequence in our buffer, and false if the token doesn't match or
+             * we reach the end of our buffer.  Updates the pointer to our
+             * buffer (same as calling readTokenImpl with advance=true).
+             */
+            inline bool readToken(const char* token);
+
+            /**
+             * @return true if the given token matches the next non whitespace
+             * sequence in our buffer, and false if the token doesn't match or
+             * we reach the end of our buffer.  Do not update the pointer to our
              * buffer if advance is false.
              */
-            bool accept(const char* token, bool advance=true);
+            bool readTokenImpl(const char* token, bool advance=true);
 
             /**
              * @return true if the next field in our stream matches field.
              * Handles single quoted, double quoted, and unquoted field names
              */
-            bool acceptField(const StringData& field);
+            bool readField(const StringData& field);
 
             /**
              * @return true if matchChar is in matchSet
