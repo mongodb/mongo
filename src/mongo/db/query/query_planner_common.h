@@ -47,7 +47,7 @@ namespace mongo {
             }
 
             for (size_t i = 0; i < root->numChildren(); ++i) {
-                if (hasNode(root->getChild(i), type)) {
+                if (hasNode(root->getChild(i), type, out)) {
                     return true;
                 }
             }
