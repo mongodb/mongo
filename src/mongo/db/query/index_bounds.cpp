@@ -317,8 +317,22 @@ namespace mongo {
         }
 
         // Field number 'firstNonContainedField' of the index key is before its current interval.
-        // Tell the caller to move forward to the start of the current interval.
         if (BEHIND == orientation) {
+            // It's behind our current interval, but our current interval could be wrong.  Start all
+            // intervals from firstNonContainedField to the right over...
+            for (size_t i = firstNonContainedField; i < _curInterval.size(); ++i) {
+                _curInterval[i] = 0;
+            }
+
+            // ...and try again.
+            if (!findLeftmostProblem(keyValues, &firstNonContainedField, &orientation)) {
+                return VALID;
+            }
+        }
+
+        // Field number 'firstNonContainedField' of the index key is before all current intervals.
+        if (BEHIND == orientation) {
+            // Tell the caller to move forward to the start of the current interval.
             *keyEltsToUse = firstNonContainedField;
             *movePastKeyElts = false;
 

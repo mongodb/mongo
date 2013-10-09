@@ -393,6 +393,66 @@ namespace {
         ASSERT_EQUALS(inc[1], false);
     }
 
+    TEST(IndexBoundsCheckerTest, SecondIntervalMustRewind) {
+        OrderedIntervalList first("first");
+        first.intervals.push_back(Interval(BSON("" << 25 << "" << 30), true, true));
+
+        OrderedIntervalList second("second");
+        second.intervals.push_back(Interval(BSON("" << 0 << "" << 0), true, true));
+        second.intervals.push_back(Interval(BSON("" << 9 << "" << 9), true, true));
+
+        IndexBounds bounds;
+        bounds.fields.push_back(first);
+        bounds.fields.push_back(second);
+
+        BSONObj idx = BSON("first" << 1 << "second" << 1);
+        ASSERT(bounds.isValidFor(idx, 1));
+        IndexBoundsChecker it(&bounds, idx, 1);
+
+        int keyEltsToUse;
+        bool movePastKeyElts;
+
+        vector<const BSONElement*> elt(2);
+        vector<bool> inc(2);
+
+        IndexBoundsChecker::KeyState state;
+
+        state = it.checkKey(BSON("" << 25 << "" << 0),
+                             &keyEltsToUse,
+                             &movePastKeyElts,
+                             &elt,
+                             &inc);
+        ASSERT_EQUALS(state, IndexBoundsChecker::VALID);
+
+        // MONKEYBUTT
+        state = it.checkKey(BSON("" << 25 << "" << 1),
+                             &keyEltsToUse,
+                             &movePastKeyElts,
+                             &elt,
+                             &inc);
+        ASSERT_EQUALS(state, IndexBoundsChecker::MUST_ADVANCE);
+        ASSERT_EQUALS(keyEltsToUse, 1);
+        ASSERT_EQUALS(movePastKeyElts, false);
+        ASSERT_EQUALS(elt[1]->numberInt(), 9);
+        ASSERT_EQUALS(inc[1], true);
+
+        state = it.checkKey(BSON("" << 25 << "" << 9),
+                             &keyEltsToUse,
+                             &movePastKeyElts,
+                             &elt,
+                             &inc);
+        ASSERT_EQUALS(state, IndexBoundsChecker::VALID);
+
+        // First key moved forward.  The second key moved back to a valid state but it's behind
+        // the interval that the checker thought it was in.
+        state = it.checkKey(BSON("" << 26 << "" << 0),
+                             &keyEltsToUse,
+                             &movePastKeyElts,
+                             &elt,
+                             &inc);
+        ASSERT_EQUALS(state, IndexBoundsChecker::VALID);
+    }
+
     TEST(IndexBoundsCheckerTest, SimpleCheckKeyBackwards) {
         OrderedIntervalList fooList("foo");
         fooList.intervals.push_back(Interval(BSON("" << 20 << "" << 7), true, true));
