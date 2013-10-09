@@ -882,7 +882,11 @@ namespace mutablebson {
 
         inline bool doesNotAlias(const StringData& s) const {
             // StringData may come from either the field name heap or the leaf builder.
-            return !inLeafBuilder(s.rawData()) && !inFieldNameHeap(s.rawData());
+            return doesNotAliasLeafBuilder(s) && !inFieldNameHeap(s.rawData());
+        }
+
+        inline bool doesNotAliasLeafBuilder(const StringData& s) const {
+            return !inLeafBuilder(s.rawData());
         }
 
         inline bool doesNotAlias(const BSONElement& e) const {
@@ -2110,7 +2114,7 @@ namespace mutablebson {
 
     Element Document::makeElementObject(const StringData& fieldName, const BSONObj& value) {
         Impl& impl = getImpl();
-        dassert(impl.doesNotAlias(fieldName));
+        dassert(impl.doesNotAliasLeafBuilder(fieldName));
         dassert(impl.doesNotAlias(value));
 
         // Copy the provided values into the leaf builder.
@@ -2139,7 +2143,8 @@ namespace mutablebson {
 
     Element Document::makeElementArray(const StringData& fieldName, const BSONObj& value) {
         Impl& impl = getImpl();
-        dassert(impl.doesNotAlias(fieldName));
+        dassert(impl.doesNotAliasLeafBuilder(fieldName));
+        dassert(impl.doesNotAlias(value));
 
         // Copy the provided array values into the leaf builder.
         BSONObjBuilder& builder = impl.leafBuilder();
@@ -2327,7 +2332,6 @@ namespace mutablebson {
 
     Element Document::makeElement(const BSONElement& value) {
         Impl& impl = getImpl();
-        dassert(impl.doesNotAlias(value));
 
         // Attempts to create an EOO element are translated to returning an invalid
         // Element. For array and object nodes, we flow through the custom
@@ -2340,6 +2344,7 @@ namespace mutablebson {
         else if(value.type() == mongo::Array)
             return makeElementArray(value.fieldNameStringData(), value.Obj());
         else {
+            dassert(impl.doesNotAlias(value));
             BSONObjBuilder& builder = impl.leafBuilder();
             const int leafRef = builder.len();
             builder.append(value);
@@ -2350,8 +2355,6 @@ namespace mutablebson {
     Element Document::makeElementWithNewFieldName(const StringData& fieldName,
                                                   const BSONElement& value) {
         Impl& impl = getImpl();
-        dassert(getImpl().doesNotAlias(fieldName));
-        dassert(getImpl().doesNotAlias(value));
 
         // See the above makeElement for notes on these cases.
         if (value.type() == mongo::EOO)
@@ -2361,6 +2364,8 @@ namespace mutablebson {
         else if(value.type() == mongo::Array)
             return makeElementArray(fieldName, value.Obj());
         else {
+            dassert(getImpl().doesNotAliasLeafBuilder(fieldName));
+            dassert(getImpl().doesNotAlias(value));
             BSONObjBuilder& builder = impl.leafBuilder();
             const int leafRef = builder.len();
             builder.appendAs(value, fieldName);

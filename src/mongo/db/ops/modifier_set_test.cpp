@@ -737,4 +737,27 @@ namespace {
         ASSERT_EQUALS(fromjson("{$set: {'r.a': 2}}"), logDoc);
     }
 
+    TEST(Ephemeral, ApplySetModToEphemeralDocument) {
+        // The following mod when applied to a document constructed node by node exposed a
+        // latent debug only defect in mutable BSON, so this is more a test of mutable than
+        // $set.
+        Document doc;
+        Element x = doc.makeElementObject("x");
+        doc.root().pushBack(x);
+        Element a  = doc.makeElementInt("a", 100);
+        x.pushBack(a);
+
+        Mod setMod(fromjson("{ $set: { x: { a: 100, b: 2 }}}"), true);
+
+        ModifierInterface::ExecInfo execInfo;
+        ASSERT_OK(setMod.prepare(doc.root(), "", &execInfo));
+
+        ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "x");
+        ASSERT_FALSE(execInfo.noOp);
+
+        ASSERT_OK(setMod.apply());
+        ASSERT_FALSE(doc.isInPlaceModeEnabled());
+        ASSERT_EQUALS(fromjson("{ x : { a : 100, b : 2 } }"), doc);
+    }
+
 } // unnamed namespace
