@@ -11,7 +11,6 @@ files = [
     'src/base/atomicops-internals-x86.cc',
     'src/base/sysinfo.cc',
     'src/base/spinlock.cc',
-    'src/tcmalloc.cc',
     'src/malloc_hook.cc',
     'src/span.cc',
     'src/maybe_threads.cc',
@@ -29,6 +28,11 @@ files = [
     'src/sampler.cc',
     'src/stacktrace.cc'
     ]
+
+if not debugBuild:
+    files += ['src/tcmalloc.cc'],
+else:
+    files += ['src/debugallocation.cc']
 
 if has_option( 'use-cpu-profiler' ):
     files += [
