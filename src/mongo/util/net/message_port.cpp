@@ -198,7 +198,7 @@ again:
                     psock->setHandshakeReceived();
                     goto again;
                 }
-                uassert(17185, "The server is configured to only allow SSL connections",
+                uassert(17189, "The server is configured to only allow SSL connections",
                         sslGlobalParams.sslMode.load() != SSLGlobalParams::SSLMode_sslOnly);
 #endif // MONGO_SSL
             }
