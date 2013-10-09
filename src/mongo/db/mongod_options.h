@@ -62,6 +62,4 @@ namespace mongo {
                                             const std::vector<std::string>& args);
 
     Status storeMongodOptions(const moe::Environment& params, const std::vector<std::string>& args);
-
-    Status addModuleOptions(moe::OptionSection* options);
 }

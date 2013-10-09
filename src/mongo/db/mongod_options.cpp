@@ -36,7 +36,6 @@
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/instance.h"
-#include "mongo/db/module.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/db/repl/replication_server_status.h"
 #include "mongo/db/server_options.h"
@@ -386,11 +385,6 @@ namespace mongo {
         }
 
         ret = options->addPositionalOption(POD("command", moe::String, 3));
-        if (!ret.isOK()) {
-            return ret;
-        }
-
-        ret = addModuleOptions(options);
         if (!ret.isOK()) {
             return ret;
         }
@@ -818,11 +812,6 @@ namespace mongo {
                               ("EndStartupOptionStorage"))
                              (InitializerContext* context) {
         return storeMongodOptions(serverParsedOptions, context->args());
-    }
-
-    Status addModuleOptions(moe::OptionSection* options) {
-        Module::addAllOptions(options);
-        return Status::OK();
     }
 
 } // namespace mongo
