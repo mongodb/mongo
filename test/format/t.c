@@ -37,18 +37,23 @@ int
 main(int argc, char *argv[])
 {
 	int ch, reps, ret;
+	const char *config;
+
+	config = NULL;
 
 	if ((g.progname = strrchr(argv[0], '/')) == NULL)
 		g.progname = argv[0];
 	else
 		++g.progname;
 
+#if 0
+	/* Configure the GNU malloc for debugging. */
+	(void)setenv("MALLOC_CHECK_", "2", 1);
+#endif
+#if 0
 	/* Configure the FreeBSD malloc for debugging. */
 	(void)setenv("MALLOC_OPTIONS", "AJ", 1);
-
-	/* Set values from the "CONFIG" file, if it exists. */
-	if (access("CONFIG", R_OK) == 0)
-		config_file("CONFIG");
+#endif
 
 	/* Track progress unless we're re-directing output to a file. */
 	g.track = isatty(STDOUT_FILENO) ? 1 : 0;
@@ -63,7 +68,7 @@ main(int argc, char *argv[])
 			g.config_open = optarg;
 			break;
 		case 'c':			/* Configuration from a file */
-			config_file(optarg);
+			config = optarg;
 			break;
 		case 'L':			/* Re-direct output to a log */
 			/*
@@ -86,9 +91,22 @@ main(int argc, char *argv[])
 		default:
 			usage();
 		}
-
 	argc -= optind;
 	argv += optind;
+
+	/*
+	 * If we weren't given a configuration file, set values from "CONFIG",
+	 * if it exists.
+	 */
+	if (config == NULL && access("CONFIG", R_OK) == 0)
+		config = "CONFIG";
+	if (config != NULL)
+		config_file(config);
+
+	/*
+	 * The rest of the arguments are individual configurations that modify
+	 * the base configuration.
+	 */
 	for (; *argv != NULL; ++argv)
 		config_single(*argv, 1);
 

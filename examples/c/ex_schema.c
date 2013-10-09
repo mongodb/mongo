@@ -140,14 +140,17 @@ main(void)
 	ret = session->open_cursor(session,
 	    "table:poptable", NULL, "raw", &cursor);
 	while ((ret = cursor->next(cursor)) == 0) {
-		WT_ITEM value;
+		WT_ITEM key, value;
 
-		ret = cursor->get_key(cursor, &recno);
+		ret = cursor->get_key(cursor, &key);
+		ret = wiredtiger_struct_unpack(session,
+		    key.data, key.size, "r", &recno);
+		printf("ID %" PRIu64, recno);
+
 		ret = cursor->get_value(cursor, &value);
 		ret = wiredtiger_struct_unpack(session,
 		    value.data, value.size,
 		    "5sHQ", &country, &year, &population);
-		printf("ID %" PRIu64, recno);
 		printf(": country %s, year %u, population %" PRIu64 "\n",
 		    country, year, population);
 	}

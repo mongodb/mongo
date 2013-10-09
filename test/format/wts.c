@@ -84,12 +84,13 @@ wts_open(const char *home, int set_api, WT_CONNECTION **connp)
 	    "create,"
 	    "checkpoint_sync=false,cache_size=%" PRIu32 "MB,"
 	    "buffer_alignment=512,error_prefix=\"%s\","
-	    "%s,"
+	    "%s,%s,"
 	    "extensions="
 	    "[\"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\"],"
 	    "%s,%s",
 	    g.c_cache,
 	    g.progname,
+	    g.c_statistics ? "statistics=true," : "",
 	    g.c_data_extend ? "file_extend=(data=8MB)," : "",
 	    g.c_reverse ? REVERSE_PATH : "",
 	    access(BZIP_PATH, R_OK) == 0 ? BZIP_PATH : "",
@@ -266,8 +267,15 @@ wts_create(void)
 	if (DATASOURCE("kvsbdb"))
 		p += snprintf(p, (size_t)(end - p), ",type=kvsbdb");
 
-	if (DATASOURCE("lsm"))
+	if (DATASOURCE("lsm")) {
 		p += snprintf(p, (size_t)(end - p), ",type=lsm");
+		if (MMRAND(1, 10) <= 2)			/* 20% */
+			p += snprintf(
+			    p, (size_t)(end - p), ",lsm_bloom_newest=true");
+		if (MMRAND(1, 10) <= 2)			/* 20% */
+			p += snprintf(
+			    p, (size_t)(end - p), ",lsm_bloom_oldest=true");
+	}
 
 	if (DATASOURCE("memrata"))
 		p += snprintf(p, (size_t)(end - p),
@@ -410,6 +418,10 @@ wts_stats(void)
 
 	/* Data-sources that don't support statistics. */
 	if (DATASOURCE("kvsbdb") || DATASOURCE("memrata"))
+		return;
+
+	/* Ignore statistics if they're not configured. */
+	if (g.c_statistics == 0)
 		return;
 
 	conn = g.wts_conn;

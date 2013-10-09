@@ -160,6 +160,7 @@ typedef struct {
 	u_int c_rows;
 	u_int c_runs;
 	u_int c_split_pct;
+	u_int c_statistics;
 	u_int c_threads;
 	u_int c_value_max;
 	u_int c_value_min;

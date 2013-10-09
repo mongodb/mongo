@@ -5,9 +5,6 @@
  * See the file LICENSE for redistribution information.
  */
 
-static inline void __wt_txn_read_first(WT_SESSION_IMPL *session);
-static inline void __wt_txn_read_last(WT_SESSION_IMPL *session);
-
 /*
  * __wt_txn_modify --
  *	Mark a WT_UPDATE object modified by the current transaction.
@@ -97,7 +94,7 @@ __wt_txn_visible(WT_SESSION_IMPL *session, uint64_t id)
 	 * schema and metadata locks) to protect access to in-flight updates.
 	 */
 	if (txn->isolation == TXN_ISO_READ_UNCOMMITTED ||
-	    S2BT(session) == session->metafile)
+	    S2BT_SAFE(session) == session->metafile)
 		return (1);
 
 	/*
@@ -220,11 +217,6 @@ __wt_txn_read_first(WT_SESSION_IMPL *session)
 	txn_global = &S2C(session)->txn_global;
 	txn_state = &txn_global->states[session->id];
 
-	/*
-	 * If there is no transaction running, put an ID in the global table so
-	 * the oldest reader in the system can be tracked.  This prevents any
-	 * update the we are reading from being trimmed to save memory.
-	 */
 	WT_ASSERT(session, F_ISSET(txn, TXN_RUNNING) ||
 	    (txn_state->id == WT_TXN_NONE &&
 	    txn_state->snap_min == WT_TXN_NONE));
@@ -233,8 +225,6 @@ __wt_txn_read_first(WT_SESSION_IMPL *session)
 	    (!F_ISSET(txn, TXN_RUNNING) &&
 	    txn->isolation == TXN_ISO_SNAPSHOT))
 		__wt_txn_refresh(session, WT_TXN_NONE, 1);
-	else if (!F_ISSET(txn, TXN_RUNNING))
-		txn_state->snap_min = txn_global->current;
 }
 
 /*
@@ -257,6 +247,43 @@ __wt_txn_read_last(WT_SESSION_IMPL *session)
 		__wt_txn_release_snapshot(session);
 	else if (!F_ISSET(txn, TXN_RUNNING))
 		txn_state->snap_min = WT_TXN_NONE;
+}
+
+/*
+ * __wt_txn_cursor_op --
+ *	Called for each cursor operation.
+ */
+static inline void
+__wt_txn_cursor_op(WT_SESSION_IMPL *session)
+{
+	WT_TXN *txn;
+	WT_TXN_GLOBAL *txn_global;
+	WT_TXN_STATE *txn_state;
+
+	txn = &session->txn;
+	txn_global = &S2C(session)->txn_global;
+	txn_state = &txn_global->states[session->id];
+
+	/*
+	 * If there is no transaction running (so we don't have an ID), and no
+	 * snapshot allocated, put an ID in the global table to prevent any
+	 * update that we are reading from being trimmed to save memory.  Do a
+	 * read before the write because this shared data is accessed a lot.
+	 *
+	 * !!!
+	 * Note:  We are updating the global table unprotected, so the
+	 * oldest_id may move past this ID if a scan races with this
+	 * value being published.  That said, read-uncommitted operations
+	 * always take the most recent version of a value, so for that version
+	 * to be freed, two newer versions would have to be committed.  Putting
+	 * this snap_min ID in the table prevents the oldest ID from moving
+	 * further forward, so that once a read-uncommitted cursor is
+	 * positioned on a value, it can't be freed.
+	 */
+	if (txn->isolation == TXN_ISO_READ_UNCOMMITTED &&
+	    !F_ISSET(txn, TXN_RUNNING) &&
+	    TXNID_LT(txn_state->snap_min, txn_global->last_running))
+		txn_state->snap_min = txn_global->last_running;
 }
 
 /*

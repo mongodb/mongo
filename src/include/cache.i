@@ -26,7 +26,7 @@ __wt_eviction_check(WT_SESSION_IMPL *session, int *read_lockoutp, int wake)
 	 * don't run on the edge all the time.
 	 */
 	bytes_inuse = __wt_cache_bytes_inuse(cache);
-	dirty_inuse = __wt_cache_bytes_dirty(cache);
+	dirty_inuse = cache->bytes_dirty;
 	bytes_max = conn->cache_size;
 	if (read_lockoutp != NULL)
 		*read_lockoutp = (bytes_inuse > bytes_max);

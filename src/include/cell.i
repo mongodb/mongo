@@ -195,7 +195,7 @@ __wt_cell_pack_data(WT_CELL *cell, uint64_t rle, uint32_t size)
 	 * Short data cells without run-length encoding have 6 bits of data
 	 * length in the descriptor byte.
 	 */
-	if (rle == 0 && size <= WT_CELL_SHORT_MAX) {
+	if (rle < 2 && size <= WT_CELL_SHORT_MAX) {
 		byte = (uint8_t)size;			/* Type + length */
 		cell->__chunk[0] =
 		    (byte << WT_CELL_SHORT_SHIFT) | WT_CELL_VALUE_SHORT;
@@ -237,40 +237,33 @@ __wt_cell_pack_data_match(
 	 */
 	a = (uint8_t *)page_cell;
 	b = (uint8_t *)val_cell;
-	if (*a != *b)				/* Type + value flag */
-		return (0);
 
-	/*
-	 * Check for a short value; otherwise, it's a "normal" value cell (we
-	 * don't get called if the on-page cell is an overflow, for example).
-	 */
 	if (WT_CELL_SHORT_TYPE(a[0]) == WT_CELL_VALUE_SHORT) {
 		av = a[0] >> WT_CELL_SHORT_SHIFT;
 		++a;
-
-		/*
-		 * We know the lengths match, it's encoded in the cell byte
-		 * which already compared equal.
-		 */
-	} else {
-		rle = a[0] & WT_CELL_64V ? 1 : 0;	/* Value */
+	} else if (WT_CELL_TYPE(a[0]) == WT_CELL_VALUE) {
+		rle = a[0] & WT_CELL_64V ? 1 : 0;	/* Skip any RLE */
 		++a;
-		++b;
-		if (rle) {				/* Skip RLE */
+		if (rle)
 			WT_RET(__wt_vunpack_uint(&a, 0, &av));
-			WT_RET(__wt_vunpack_uint(&b, 0, &bv));
-		}
 		WT_RET(__wt_vunpack_uint(&a, 0, &av));	/* Length */
-		WT_RET(__wt_vunpack_uint(&b, 0, &bv));
-		if (av != bv)
-			return (0);
-	}
+	} else
+		return (0);
 
-	/*
-	 * This is safe, we know the length of the value's data because it was
-	 * was encoded in the value cell.
-	 */
-	*matchp = memcmp(a, val_data, av) == 0 ? 1 : 0;
+	if (WT_CELL_SHORT_TYPE(b[0]) == WT_CELL_VALUE_SHORT) {
+		bv = b[0] >> WT_CELL_SHORT_SHIFT;
+		++b;
+	} else if (WT_CELL_TYPE(b[0]) == WT_CELL_VALUE) {
+		rle = b[0] & WT_CELL_64V ? 1 : 0;	/* Skip any RLE */
+		++b;
+		if (rle)
+			WT_RET(__wt_vunpack_uint(&b, 0, &bv));
+		WT_RET(__wt_vunpack_uint(&b, 0, &bv));	/* Length */
+	} else
+		return (0);
+
+	if (av == bv)
+		*matchp = memcmp(a, val_data, av) == 0 ? 1 : 0;
 	return (0);
 }
 

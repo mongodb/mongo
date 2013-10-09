@@ -155,10 +155,13 @@ __wt_btree_close(WT_SESSION_IMPL *session)
 	/* Close the Huffman tree. */
 	__wt_btree_huffman_close(session);
 
+	/* Destroy locks. */
+	__wt_spin_destroy(session, &btree->serial_lock);
+	WT_TRET(__wt_rwlock_destroy(session, &btree->val_ovfl_lock));
+
 	/* Free allocated memory. */
 	__wt_free(session, btree->key_format);
 	__wt_free(session, btree->value_format);
-	WT_TRET(__wt_rwlock_destroy(session, &btree->val_ovfl_lock));
 
 	btree->bulk_load_ok = 0;
 
@@ -184,6 +187,8 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 	btree = S2BT(session);
 	conn = S2C(session);
 	cfg = btree->dhandle->cfg;
+
+	WT_RET(__wt_spin_init(session, &btree->serial_lock));
 
 	/* Dump out format information. */
 	if (WT_VERBOSE_ISSET(session, version)) {
@@ -433,7 +438,7 @@ __btree_tree_open_empty(WT_SESSION_IMPL *session, int creation)
 	 * or it's actually modified.
 	 */
 	WT_ERR(__wt_page_modify_init(session, leaf));
-	__wt_page_modify_set(session, leaf);
+	__wt_page_only_modify_set(session, leaf);
 
 	btree->root_page = root;
 

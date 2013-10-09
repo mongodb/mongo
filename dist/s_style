@@ -90,7 +90,7 @@ for f in `find examples ext src test -name '*.[chisy]' -o -name '*.in' |
 	sed -n -e '/API_CALL.*;$/,/API_END.*;/{=;p;}' \
 	       -e '/va_start/,/va_end/{=;p;}' $f | \
 		sed 'N;s/\n/:/' | \
-		egrep 'return|WT_RET' | \
+		egrep -w 'return|WT_RET' | \
 		sed -e "s,^,$f:," -e 's/$/ [return skips API_END call]/'
 
 	tr -cd '[:alnum:][:space:][:punct:]' < $f |

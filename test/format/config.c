@@ -163,6 +163,14 @@ config_setup(void)
 			g.c_delete_pct = 0;
 	}
 
+	/* If it's an LSM run, crank up the insert percentage. */
+	if (DATASOURCE("lsm")) {
+		cp = config_find("insert_pct", strlen("insert_pct"));
+		if (cp->name != NULL &&
+		    !(cp->flags & (C_IGNORE | C_PERM | C_TEMP)))
+			g.c_insert_pct = MMRAND(50, 85);
+	}
+
 	/* Reset the key count. */
 	g.key_cnt = 0;
 }

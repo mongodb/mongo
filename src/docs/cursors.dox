@@ -55,12 +55,14 @@ The following are some of the common builtin cursor types:
 
 <table>
   @hrow{URI, Type, Notes}
-   @row{<tt>backup:</tt>,
+  @row{<tt>backup:</tt>,
 hot backup cursor, See also: @ref hot_backup}
-   @row{<tt>colgroup:\<table name\>:\<column group name\></tt>,
+  @row{<tt>colgroup:\<table name\>:\<column group name\></tt>,
 column group cursor,}
   @row{<tt>index:\<table name\>:\<index name\></tt>,
 index cursor (key=index key\, value=table value),}
+  @row{<tt>metadata:</tt>,
+metadata cursor, See also: @ref metadata}
   @row{<tt>statistics:[\<data source URI\>]</tt>,
 database or file statistics (key=(int)\,
 value=(string)description\, (string)value\, (uint64_t)value),}
@@ -128,5 +130,19 @@ example lists just the country and year columns from the table record
 values, using raw mode:
 
 @snippet ex_schema.c Return a subset of values from the table using raw mode
+
+@section metadata Reading WiredTiger Metadata
+
+WiredTiger cursors provide access to data from a variety of sources.
+One of these sources is the list of objects in the database.
+
+To retrieve the list of database objects, open a cursor on the uri
+\c metadata:.  Each returned key will be a database object and each
+returned value will be the information stored in the metadata for
+object named by the key.
+
+For example:
+
+@snippet ex_all.c Open a cursor on the metadata
 
 */

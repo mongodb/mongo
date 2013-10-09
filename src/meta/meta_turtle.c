@@ -104,6 +104,51 @@ err:	if (fp != NULL)
 }
 
 /*
+ * __metadata_load_bulk --
+ *	Create any bulk-loaded file stubs.
+ */
+static int
+__metadata_load_bulk(WT_SESSION_IMPL *session)
+{
+	WT_CURSOR *cursor;
+	WT_DECL_RET;
+	uint32_t allocsize;
+	int exist;
+	const char *filecfg[] = { WT_CONFIG_BASE(session, file_meta), NULL };
+	const char *key;
+
+	/*
+	 * If a file was being bulk-loaded during the hot backup, it will appear
+	 * in the metadata file, but the file won't exist.  Create on demand.
+	 */
+	WT_ERR(__wt_metadata_cursor(session, NULL, &cursor));
+	while ((ret = cursor->next(cursor)) == 0) {
+		WT_ERR(cursor->get_key(cursor, &key));
+		if (!WT_PREFIX_SKIP(key, "file:"))
+			continue;
+
+		/* If the file exists, it's all good. */
+		WT_ERR(__wt_exist(session, key, &exist));
+		if (exist)
+			continue;
+
+		/*
+		 * If the file doesn't exist, assume it's a bulk-loaded file;
+		 * retrieve the allocation size and re-create the file.
+		 */
+		WT_ERR(__wt_direct_io_size_check(
+		    session, filecfg, "allocation_size", &allocsize));
+		WT_ERR(__wt_block_manager_create(session, key, allocsize));
+	}
+	WT_ERR_NOTFOUND_OK(ret);
+
+err:	if (cursor != NULL)
+		WT_TRET(cursor->close(cursor));
+
+	return (ret);
+}
+
+/*
  * __wt_turtle_init --
  *	Check the turtle file and create if necessary.
  */
@@ -144,6 +189,9 @@ __wt_turtle_init(WT_SESSION_IMPL *session)
 
 	/* Load any hot-backup information. */
 	WT_RET(__metadata_load_hot_backup(session));
+
+	/* Create any bulk-loaded file stubs. */
+	WT_RET(__metadata_load_bulk(session));
 
 	/* Create the turtle file. */
 	WT_RET(__metadata_config(session, &metaconf));

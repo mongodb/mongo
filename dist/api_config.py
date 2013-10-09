@@ -159,7 +159,7 @@ tfile.write('''/* DO NOT EDIT: automatically built by dist/config.py. */
 ''')
 
 # Make a TextWrapper that can wrap at commas.
-w = textwrap.TextWrapper(width=68, break_on_hyphens=False)
+w = textwrap.TextWrapper(width=64, break_on_hyphens=False)
 w.wordsep_re = w.wordsep_simple_re = re.compile(r'(,)')
 
 def checkstr(c):

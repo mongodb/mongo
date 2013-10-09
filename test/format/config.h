@@ -171,6 +171,10 @@ static CONFIG c[] = {
 	  "Btree page split size as a percentage of the maximum page size",
 	  0x0, 0x0, 40, 85, 85, &g.c_split_pct, NULL },
 
+	{ "statistics",
+	  "maintain statistics",			/* 20% */
+	  0x0, C_BOOL, 20, 0, 0, &g.c_statistics, NULL },
+
 	{ "threads",
 	  "the number of threads",
 	  0x0, C_IGNORE, 1, 32, 128, &g.c_threads, NULL },

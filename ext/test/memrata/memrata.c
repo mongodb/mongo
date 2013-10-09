@@ -100,6 +100,15 @@
 #define	KVS_MAJOR	1			/* KVS major, minor version */
 #define	KVS_MINOR	0
 
+/*
+ * WiredTiger name space on the memrata device: all primary store objects are
+ * named "WiredTiger.XXX", the cache store object is "WiredTiger.XXX.cache",
+ * and the per-device transaction file is "WiredTiger.txn".
+ */
+#define	WT_NAME_PREFIX	"WiredTiger."
+#define	WT_NAME_TXN	"WiredTiger.txn"
+#define	WT_NAME_CACHE	".cache"
+
 typedef struct __wt_source {
 	char *uri;				/* Unique name */
 
@@ -238,12 +247,14 @@ typedef struct __cursor {
 static void
 cursor_destroy(CURSOR *cursor)
 {
-	free(cursor->v);
-	free(cursor->t1.v);
-	free(cursor->t2.v);
-	free(cursor->t3.v);
-	free(cursor->cache);
-	OVERWRITE_AND_FREE(cursor);
+	if (cursor != NULL) {
+		free(cursor->v);
+		free(cursor->t1.v);
+		free(cursor->t2.v);
+		free(cursor->t3.v);
+		free(cursor->cache);
+		OVERWRITE_AND_FREE(cursor);
+	}
 }
 
 /*
@@ -267,7 +278,8 @@ lock_init(
 	int ret = 0;
 
 	if ((ret = pthread_rwlock_init(lockp, NULL)) != 0)
-		ERET(wtext, session, WT_PANIC, "lock init: %s", strerror(ret));
+		ERET(wtext, session, WT_PANIC,
+		    "pthread_rwlock_init: %s", strerror(ret));
 	return (0);
 }
 
@@ -282,8 +294,8 @@ lock_destroy(
 	int ret = 0;
 
 	if ((ret = pthread_rwlock_destroy(lockp)) != 0)
-		ERET(wtext,
-		    session, WT_PANIC, "lock destroy: %s", strerror(ret));
+		ERET(wtext, session, WT_PANIC,
+		    "pthread_rwlock_destroy: %s", strerror(ret));
 	return (0);
 }
 
@@ -298,8 +310,8 @@ writelock(
 	int ret = 0;
 
 	if ((ret = pthread_rwlock_wrlock(lockp)) != 0)
-		ERET(wtext,
-		    session, WT_PANIC, "write-lock: %s", strerror(ret));
+		ERET(wtext, session, WT_PANIC,
+		    "pthread_rwlock_wrlock: %s", strerror(ret));
 	return (0);
 }
 
@@ -313,7 +325,8 @@ unlock(WT_EXTENSION_API *wtext, WT_SESSION *session, pthread_rwlock_t *lockp)
 	int ret = 0;
 
 	if ((ret = pthread_rwlock_unlock(lockp)) != 0)
-		ERET(wtext, session, WT_PANIC, "unlock: %s", strerror(ret));
+		ERET(wtext, session, WT_PANIC,
+		    "pthread_rwlock_unlock: %s", strerror(ret));
 	return (0);
 }
 
@@ -747,17 +760,15 @@ cache_value_visible(WT_CURSOR *wtcursor, CACHE_RECORD **cpp)
  *	Return if a cache entry has no updates that aren't globally visible.
  */
 static int
-cache_value_visible_all(WT_CURSOR *wtcursor, uint64_t oldest, int final)
+cache_value_visible_all(WT_CURSOR *wtcursor, uint64_t oldest)
 {
 	CACHE_RECORD *cp;
 	CURSOR *cursor;
-	WT_EXTENSION_API *wtext;
 	WT_SESSION *session;
 	u_int i;
 
 	session = wtcursor->session;
 	cursor = (CURSOR *)wtcursor;
-	wtext = cursor->wtext;
 
 	/*
 	 * Compare the update's transaction ID and the oldest transaction ID
@@ -769,18 +780,8 @@ cache_value_visible_all(WT_CURSOR *wtcursor, uint64_t oldest, int final)
 	 */
 	for (i = 0, cp = cursor->cache; i < cursor->cache_entries; ++i, ++cp)
 		if (cp->txnid >= oldest)
-			break;
-	if (i == cursor->cache_entries)
-		return (1);
-
-	/*
-	 * If this is the final pass when shutting down the KVS store, there
-	 * should not be any entries that aren't globally visible.
-	 */
-	if (final)
-		ERET(wtext, session, 0,
-		    "cleaner: closing with unresolved updates in the cache");
-	return (0);
+			return (0);
+	return (1);
 }
 
 /*
@@ -1196,7 +1197,7 @@ cache_clean:
 
 /*
  * kvs_cursor_next --
- *	WT_CURSOR::next method.
+ *	WT_CURSOR.next method.
  */
 static int
 kvs_cursor_next(WT_CURSOR *wtcursor)
@@ -1206,7 +1207,7 @@ kvs_cursor_next(WT_CURSOR *wtcursor)
 
 /*
  * kvs_cursor_prev --
- *	WT_CURSOR::prev method.
+ *	WT_CURSOR.prev method.
  */
 static int
 kvs_cursor_prev(WT_CURSOR *wtcursor)
@@ -1216,7 +1217,7 @@ kvs_cursor_prev(WT_CURSOR *wtcursor)
 
 /*
  * kvs_cursor_reset --
- *	WT_CURSOR::reset method.
+ *	WT_CURSOR.reset method.
  */
 static int
 kvs_cursor_reset(WT_CURSOR *wtcursor)
@@ -1237,7 +1238,7 @@ kvs_cursor_reset(WT_CURSOR *wtcursor)
 
 /*
  * kvs_cursor_search --
- *	WT_CURSOR::search method.
+ *	WT_CURSOR.search method.
  */
 static int
 kvs_cursor_search(WT_CURSOR *wtcursor)
@@ -1276,7 +1277,7 @@ kvs_cursor_search(WT_CURSOR *wtcursor)
 
 /*
  * kvs_cursor_search_near --
- *	WT_CURSOR::search_near method.
+ *	WT_CURSOR.search_near method.
  */
 static int
 kvs_cursor_search_near(WT_CURSOR *wtcursor, int *exact)
@@ -1319,7 +1320,7 @@ kvs_cursor_search_near(WT_CURSOR *wtcursor, int *exact)
 
 /*
  * kvs_cursor_insert --
- *	WT_CURSOR::insert method.
+ *	WT_CURSOR.insert method.
  */
 static int
 kvs_cursor_insert(WT_CURSOR *wtcursor)
@@ -1530,7 +1531,7 @@ err:	ESET(unlock(wtext, session, &ws->lock));
 
 /*
  * kvs_cursor_update --
- *	WT_CURSOR::update method.
+ *	WT_CURSOR.update method.
  */
 static int
 kvs_cursor_update(WT_CURSOR *wtcursor)
@@ -1540,7 +1541,7 @@ kvs_cursor_update(WT_CURSOR *wtcursor)
 
 /*
  * kvs_cursor_remove --
- *	WT_CURSOR::remove method.
+ *	WT_CURSOR.remove method.
  */
 static int
 kvs_cursor_remove(WT_CURSOR *wtcursor)
@@ -1565,7 +1566,7 @@ kvs_cursor_remove(WT_CURSOR *wtcursor)
 
 /*
  * kvs_cursor_close --
- *	WT_CURSOR::close method.
+ *	WT_CURSOR.close method.
  */
 static int
 kvs_cursor_close(WT_CURSOR *wtcursor)
@@ -1595,24 +1596,34 @@ kvs_cursor_close(WT_CURSOR *wtcursor)
  *	Build a namespace name.
  */
 static inline int
-ws_source_name(
-    const char *uri, const char *suffix, const char **pp, char **bufp)
+ws_source_name(WT_DATA_SOURCE *wtds,
+    WT_SESSION *session, const char *uri, const char *suffix, char **pp)
 {
+	DATA_SOURCE *ds;
+	WT_EXTENSION_API *wtext;
 	size_t len;
-	char *buf;
+	const char *p;
 
-	*bufp = NULL;
+	ds = (DATA_SOURCE *)wtds;
+	wtext = ds->wtext;
 
-	/* Create the store's name: the uri with an optional trailing suffix. */
-	if (suffix == NULL)
-		*pp = uri;
-	else {
-		len = strlen(uri) + strlen(".") + strlen(suffix) + 5;
-		if ((buf = malloc(len)) == NULL)
-			return (os_errno());
-		(void)snprintf(buf, len, "%s.%s", uri, suffix);
-		*pp = *bufp = buf;
-	}
+	/*
+	 * Create the store's name.  Application URIs are "memrata:device/XXX";
+	 * we want the names on the memrata device to be obviously WiredTiger's,
+	 * and the device name isn't interesting.  Convert to "WiredTiger:XXX",
+	 * and add an optional suffix.
+	 */
+	if (strncmp(uri, "memrata:", sizeof("memrata:") - 1) != 0 ||
+	    (p = strchr(uri, '/')) == NULL)
+		ERET(wtext, session, EINVAL, "%s: illegal memrata URI", uri);
+	++p;
+
+	len = strlen(WT_NAME_PREFIX) +
+	    strlen(p) + (suffix == NULL ? 0 : strlen(suffix)) + 5;
+	if ((*pp = malloc(len)) == NULL)
+		return (os_errno());
+	(void)snprintf(*pp, len, "%s%s%s",
+	    WT_NAME_PREFIX, p, suffix == NULL ? "" : suffix);
 	return (0);
 }
 
@@ -1627,21 +1638,20 @@ ws_source_drop_namespace(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 	DATA_SOURCE *ds;
 	WT_EXTENSION_API *wtext;
 	int ret = 0;
-	const char *p;
-	char *buf;
+	char *p;
 
 	ds = (DATA_SOURCE *)wtds;
 	wtext = ds->wtext;
-	buf = NULL;
+	p = NULL;
 
 	/* Drop the underlying KVS namespace. */
-	if ((ret = ws_source_name(uri, suffix, &p, &buf)) != 0)
+	if ((ret = ws_source_name(wtds, session, uri, suffix, &p)) != 0)
 		return (ret);
 	if ((ret = kvs_delete_namespace(kvs_device, p)) != 0)
 		EMSG(wtext, session, WT_ERROR,
 		    "kvs_delete_namespace: %s: %s", p, kvs_strerror(ret));
 
-	free(buf);
+	free(p);
 	return (ret);
 }
 
@@ -1656,23 +1666,22 @@ ws_source_rename_namespace(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 	DATA_SOURCE *ds;
 	WT_EXTENSION_API *wtext;
 	int ret = 0;
-	const char *p, *pnew;
-	char *buf, *bufnew;
+	char *p, *pnew;
 
 	ds = (DATA_SOURCE *)wtds;
 	wtext = ds->wtext;
-	buf = bufnew = NULL;
+	p = pnew = NULL;
 
 	/* Rename the underlying KVS namespace. */
-	ret = ws_source_name(uri, suffix, &p, &buf);
+	ret = ws_source_name(wtds, session, uri, suffix, &p);
 	if (ret == 0)
-		ret = ws_source_name(newuri, suffix, &pnew, &bufnew);
+		ret = ws_source_name(wtds, session, newuri, suffix, &pnew);
 	if (ret == 0 && (ret = kvs_rename_namespace(kvs_device, p, pnew)) != 0)
 		EMSG(wtext, session, WT_ERROR,
 		    "kvs_rename_namespace: %s: %s", p, kvs_strerror(ret));
 
-	free(buf);
-	free(bufnew);
+	free(p);
+	free(pnew);
 	return (ret);
 }
 
@@ -1696,7 +1705,7 @@ ws_source_close(WT_EXTENSION_API *wtext, WT_SESSION *session, WT_SOURCE *ws)
 	ws->kvs = NULL;
 	if (ws->kvscache != NULL && (ret = kvs_close(ws->kvscache)) != 0)
 		EMSG(wtext, session, WT_ERROR,
-		    "kvs_close: %s.cache: %s", ws->uri, kvs_strerror(ret));
+		    "kvs_close: %s(cache): %s", ws->uri, kvs_strerror(ret));
 	ws->kvscache = NULL;
 
 	if (ws->lockinit)
@@ -1713,28 +1722,31 @@ ws_source_close(WT_EXTENSION_API *wtext, WT_SESSION *session, WT_SOURCE *ws)
  *	Open a namespace.
  */
 static int
-ws_source_open_namespace(WT_EXTENSION_API *wtext, WT_SESSION *session,
+ws_source_open_namespace(WT_DATA_SOURCE *wtds, WT_SESSION *session,
     const char *uri, const char *suffix, kvs_t kvs_device, int flags,
     kvs_t *kvsp)
 {
+	DATA_SOURCE *ds;
+	WT_EXTENSION_API *wtext;
 	kvs_t kvs;
+	char *p;
 	int ret = 0;
-	const char *p;
-	char *buf;
 
 	*kvsp = NULL;
 
-	buf = NULL;
+	ds = (DATA_SOURCE *)wtds;
+	wtext = ds->wtext;
+	p = NULL;
 
 	/* Open the underlying KVS namespace. */
-	if ((ret = ws_source_name(uri, suffix, &p, &buf)) != 0)
+	if ((ret = ws_source_name(wtds, session, uri, suffix, &p)) != 0)
 		return (ret);
 	if ((kvs = kvs_open_namespace(kvs_device, p, flags)) == NULL)
 		EMSG(wtext, session, WT_ERROR,
 		    "kvs_open_namespace: %s: %s", p, kvs_strerror(os_errno()));
 	*kvsp = kvs;
 
-	free(buf);
+	free(p);
 	return (ret);
 }
 
@@ -1854,11 +1866,11 @@ bad_name:	ERET(wtext, session, EINVAL, "%s: illegal name format", uri);
 		goto err;
 	}
 
-	if ((ret = ws_source_open_namespace(wtext,
+	if ((ret = ws_source_open_namespace(wtds,
 	    session, uri, NULL, ks->kvs_device, oflags, &ws->kvs)) != 0)
 		goto err;
-	if ((ret = ws_source_open_namespace(wtext,
-	    session, uri, "cache", ks->kvs_device, oflags, &ws->kvscache)) != 0)
+	if ((ret = ws_source_open_namespace(wtds, session,
+	    uri, WT_NAME_CACHE, ks->kvs_device, oflags, &ws->kvscache)) != 0)
 		goto err;
 	if ((ret = kvs_commit(ws->kvs)) != 0)
 		EMSG_ERR(wtext, session, WT_ERROR,
@@ -2021,7 +2033,7 @@ master_uri_set(WT_DATA_SOURCE *wtds,
 
 /*
  * kvs_session_open_cursor --
- *	WT_SESSION::open_cursor method.
+ *	WT_SESSION.open_cursor method.
  */
 static int
 kvs_session_open_cursor(WT_DATA_SOURCE *wtds, WT_SESSION *session,
@@ -2142,8 +2154,7 @@ kvs_session_open_cursor(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 	if (0) {
 err:		if (ws != NULL && locked)
 			ESET(unlock(wtext, session, &ws->lock));
-		if (cursor != NULL)
-			cursor_destroy(cursor);
+		cursor_destroy(cursor);
 	}
 	free((void *)value);
 	return (ret);
@@ -2151,7 +2162,7 @@ err:		if (ws != NULL && locked)
 
 /*
  * kvs_session_create --
- *	WT_SESSION::create method.
+ *	WT_SESSION.create method.
  */
 static int
 kvs_session_create(WT_DATA_SOURCE *wtds,
@@ -2189,7 +2200,7 @@ kvs_session_create(WT_DATA_SOURCE *wtds,
 
 /*
  * kvs_session_drop --
- *	WT_SESSION::drop method.
+ *	WT_SESSION.drop method.
  */
 static int
 kvs_session_drop(WT_DATA_SOURCE *wtds,
@@ -2229,7 +2240,7 @@ kvs_session_drop(WT_DATA_SOURCE *wtds,
 	ESET(ws_source_drop_namespace(
 	    wtds, session, uri, NULL, ks->kvs_device));
 	ESET(ws_source_drop_namespace(
-	    wtds, session, uri, "cache", ks->kvs_device));
+	    wtds, session, uri, WT_NAME_CACHE, ks->kvs_device));
 
 	/* Push the change. */
 	if ((ret = kvs_commit(ks->kvs_device)) != 0)
@@ -2252,7 +2263,7 @@ kvs_session_drop(WT_DATA_SOURCE *wtds,
 
 /*
  * kvs_session_rename --
- *	WT_SESSION::rename method.
+ *	WT_SESSION.rename method.
  */
 static int
 kvs_session_rename(WT_DATA_SOURCE *wtds, WT_SESSION *session,
@@ -2291,7 +2302,7 @@ kvs_session_rename(WT_DATA_SOURCE *wtds, WT_SESSION *session,
 	ESET(ws_source_rename_namespace(
 	    wtds, session, uri, newuri, NULL, ks->kvs_device));
 	ESET(ws_source_rename_namespace(
-	    wtds, session, uri, newuri, "cache", ks->kvs_device));
+	    wtds, session, uri, newuri, WT_NAME_CACHE, ks->kvs_device));
 
 	/* Push the change. */
 	if ((ret = kvs_commit(ws->kvs)) != 0)
@@ -2315,7 +2326,7 @@ err:	ESET(unlock(wtext, session, &ds->global_lock));
 
 /*
  * kvs_session_truncate --
- *	WT_SESSION::truncate method.
+ *	WT_SESSION.truncate method.
  */
 static int
 kvs_session_truncate(WT_DATA_SOURCE *wtds,
@@ -2348,7 +2359,7 @@ kvs_session_truncate(WT_DATA_SOURCE *wtds,
 
 /*
  * kvs_session_verify --
- *	WT_SESSION::verify method.
+ *	WT_SESSION.verify method.
  */
 static int
 kvs_session_verify(WT_DATA_SOURCE *wtds,
@@ -2368,7 +2379,7 @@ kvs_session_verify(WT_DATA_SOURCE *wtds,
 
 /*
  * kvs_session_checkpoint --
- *	WT_SESSION::checkpoint method.
+ *	WT_SESSION.checkpoint method.
  */
 static int
 kvs_session_checkpoint(
@@ -2420,7 +2431,7 @@ kvs_config_devices(
 	if ((ret = wtext->config_scan_begin(
 	    wtext, NULL, orig->str, orig->len, &scan)) != 0)
 		EMSG_ERR(wtext, NULL, ret,
-		    "WT_EXTENSION_API::config_scan_begin: %s",
+		    "WT_EXTENSION_API.config_scan_begin: %s",
 		    wtext->strerror(ret));
 
 	for (cnt = slots = 0; (ret = wtext->
@@ -2444,11 +2455,11 @@ kvs_config_devices(
 	}
 	if (ret != WT_NOTFOUND)
 		EMSG_ERR(wtext, NULL, ret,
-		    "WT_EXTENSION_API::config_scan_next: %s",
+		    "WT_EXTENSION_API.config_scan_next: %s",
 		    wtext->strerror(ret));
 	if ((ret = wtext->config_scan_end(wtext, scan)) != 0)
 		EMSG_ERR(wtext, NULL, ret,
-		    "WT_EXTENSION_API::config_scan_end: %s",
+		    "WT_EXTENSION_API.config_scan_end: %s",
 		    wtext->strerror(ret));
 
 	*devices = argv;
@@ -2483,7 +2494,7 @@ kvs_config_read(WT_EXTENSION_API *wtext, WT_CONFIG_ITEM *config,
 	if ((ret = wtext->config_scan_begin(
 	    wtext, NULL, config->str, config->len, &scan)) != 0)
 		ERET(wtext, NULL, ret,
-		    "WT_EXTENSION_API::config_scan_begin: %s",
+		    "WT_EXTENSION_API.config_scan_begin: %s",
 		    wtext->strerror(ret));
 	while ((ret = wtext->config_scan_next(wtext, scan, &k, &v)) == 0) {
 		if (STRING_MATCH("kvs_devices", k.str, k.len)) {
@@ -2529,12 +2540,12 @@ kvs_config_read(WT_EXTENSION_API *wtext, WT_CONFIG_ITEM *config,
 		ret = 0;
 	if (ret != 0)
 		EMSG_ERR(wtext, NULL, ret,
-		    "WT_EXTENSION_API::config_scan_next: %s",
+		    "WT_EXTENSION_API.config_scan_next: %s",
 		    wtext->strerror(ret));
 
 err:	if ((tret = wtext->config_scan_end(wtext, scan)) != 0)
 		EMSG(wtext, NULL, tret,
-		    "WT_EXTENSION_API::config_scan_end: %s",
+		    "WT_EXTENSION_API.config_scan_end: %s",
 		    wtext->strerror(ret));
 
 	return (ret);
@@ -2556,7 +2567,7 @@ kvs_source_close(WT_EXTENSION_API *wtext, WT_SESSION *session, KVS_SOURCE *ks)
 
 		if ((tret = pthread_join(ks->cleaner_id, NULL)) != 0)
 			EMSG(wtext, session, tret,
-			    "pthread_join: %s", kvs_strerror(tret));
+			    "pthread_join: %s", strerror(tret));
 		ks->cleaner_id = 0;
 	}
 
@@ -2575,8 +2586,8 @@ kvs_source_close(WT_EXTENSION_API *wtext, WT_SESSION *session, KVS_SOURCE *ks)
 		/* If the owner, close the database transaction store. */
 		if (ks->kvsowner && (tret = kvs_close(ks->kvstxn)) != 0)
 			EMSG(wtext, session, tret,
-			    "kvs_close: %s.txn: %s",
-			    ks->name, kvs_strerror(tret));
+			    "kvs_close: %s: %s",
+			    WT_NAME_TXN, kvs_strerror(tret));
 
 		if ((tret = kvs_close(ks->kvs_device)) != 0)
 			EMSG(wtext, session, WT_ERROR,
@@ -2595,8 +2606,8 @@ kvs_source_close(WT_EXTENSION_API *wtext, WT_SESSION *session, KVS_SOURCE *ks)
  *	Migrate information from the cache to the primary store.
  */
 static int
-cache_cleaner(WT_EXTENSION_API *wtext, WT_CURSOR *wtcursor,
-    uint64_t oldest, int final, uint64_t *txnminp)
+cache_cleaner(WT_EXTENSION_API *wtext,
+    WT_CURSOR *wtcursor, uint64_t oldest, uint64_t *txnminp)
 {
 	struct kvs_record *r;
 	CACHE_RECORD *cp;
@@ -2641,7 +2652,7 @@ cache_cleaner(WT_EXTENSION_API *wtext, WT_CURSOR *wtcursor,
 		 */
 		if ((ret = cache_value_unmarshall(wtcursor)) != 0)
 			goto err;
-		if (!recovery && !cache_value_visible_all(wtcursor, oldest, 0))
+		if (!recovery && !cache_value_visible_all(wtcursor, oldest))
 			continue;
 		if (recovery)
 			cache_value_last_committed(wtcursor, &cp);
@@ -2715,7 +2726,7 @@ cache_cleaner(WT_EXTENSION_API *wtext, WT_CURSOR *wtcursor,
 		 */
 		if ((ret = cache_value_unmarshall(wtcursor)) != 0)
 			goto err;
-		if (cache_value_visible_all(wtcursor, oldest, final)) {
+		if (cache_value_visible_all(wtcursor, oldest)) {
 			if ((ret = kvs_del(ws->kvscache, r)) != 0)
 				EMSG_ERR(wtext, NULL, WT_ERROR,
 				    "kvs_del: %s", kvs_strerror(ret));
@@ -2776,7 +2787,7 @@ txn_cleaner(WT_CURSOR *wtcursor, kvs_t kvstxn, uint64_t txnmin)
 		memcpy(&txnid, r->key, sizeof(txnid));
 		if (txnid < txnmin && (ret = kvs_del(kvstxn, r)) != 0)
 			ERET(wtext, NULL, WT_ERROR,
-			    "kvs_del: transaction: %s", kvs_strerror(ret));
+			    "kvs_del: %s", kvs_strerror(ret));
 	}
 	if (ret == WT_NOTFOUND)
 		ret = 0;
@@ -2895,8 +2906,8 @@ kvs_cleaner(void *arg)
 		txnmin = UINT64_MAX;
 		for (ws = ks->ws_head; ws != NULL; ws = ws->next) {
 			cursor->ws = ws;
-			if ((ret = cache_cleaner(wtext, wtcursor,
-			    oldest, cleaner_stop, &txntmp)) != 0)
+			if ((ret = cache_cleaner(
+			    wtext, wtcursor, oldest, &txntmp)) != 0)
 				goto err;
 			if (txntmp < txnmin)
 				txnmin = txntmp;
@@ -2919,9 +2930,7 @@ kvs_cleaner(void *arg)
 			break;
 	}
 
-err:	if (cursor != NULL)
-		cursor_destroy(cursor);
-
+err:	cursor_destroy(cursor);
 	return (NULL);
 }
 
@@ -2973,7 +2982,8 @@ kvs_source_open(DATA_SOURCE *ds, WT_CONFIG_ITEM *k, WT_CONFIG_ITEM *v)
 		    EINVAL, "%s: no devices specified", ks->name);
 
 	/* Open the underlying KVS store (creating it if necessary). */
-	ks->kvs_device = kvs_open(device_list, NULL, flags | KVS_O_CREATE);
+	ks->kvs_device =
+	    kvs_open(device_list, &kvs_config, flags | KVS_O_CREATE);
 	if (ks->kvs_device == NULL)
 		EMSG_ERR(wtext, NULL, WT_ERROR,
 		    "kvs_open: %s: %s", ks->name, kvs_strerror(os_errno()));
@@ -3020,8 +3030,8 @@ kvs_source_open_txn(DATA_SOURCE *ds)
 	kstxn = NULL;
 	kvstxn = NULL;
 	for (ks = ds->kvs_head; ks != NULL; ks = ks->next)
-		if ((t =
-		    kvs_open_namespace(ks->kvs_device, "txn", 0)) != NULL) {
+		if ((t = kvs_open_namespace(
+		    ks->kvs_device, WT_NAME_TXN, 0)) != NULL) {
 			if (kstxn != NULL) {
 				(void)kvs_close(t);
 				(void)kvs_close(kvstxn);
@@ -3043,10 +3053,10 @@ kvs_source_open_txn(DATA_SOURCE *ds)
 		for (ks = ds->kvs_head; ks->next != NULL; ks = ks->next)
 			;
 		if ((kvstxn = kvs_open_namespace(
-		    ks->kvs_device, "txn", KVS_O_CREATE)) == NULL)
+		    ks->kvs_device, WT_NAME_TXN, KVS_O_CREATE)) == NULL)
 			ERET(wtext, NULL, WT_ERROR,
-			    "kvs_open_namespace: %s.txn: %s",
-			    ks->name, kvs_strerror(os_errno()));
+			    "kvs_open_namespace: %s: %s",
+			    WT_NAME_TXN, kvs_strerror(os_errno()));
 
 		/* Push the change. */
 		if ((ret = kvs_commit(ks->kvs_device)) != 0)
@@ -3065,65 +3075,64 @@ kvs_source_open_txn(DATA_SOURCE *ds)
 }
 
 /*
- * kvs_source_open_recover --
- *	Recover the KVS source.
+ * kvs_source_recover_namespace --
+ *	Recover a single cache/primary pair in a KVS namespace.
  */
 static int
-kvs_source_open_recover(
-    WT_DATA_SOURCE *wtds, KVS_SOURCE *ks, WT_CONFIG_ARG *config)
+kvs_source_recover_namespace(WT_DATA_SOURCE *wtds,
+    KVS_SOURCE *ks, const char *name, WT_CONFIG_ARG *config)
 {
-	static const char *name[] = { "memrata:dev1/access", NULL };
-	const char **p;
-
 	CURSOR *cursor;
 	DATA_SOURCE *ds;
 	WT_CURSOR *wtcursor;
 	WT_EXTENSION_API *wtext;
 	WT_SOURCE *ws;
+	size_t len;
 	int ret = 0;
+	const char *p;
+	char *uri;
 
 	ds = (DATA_SOURCE *)wtds;
 	wtext = ds->wtext;
 	cursor = NULL;
 	ws = NULL;
+	uri = NULL;
 
 	/*
-	 * The Memrata folks are working on an API to retrieve the list of
-	 * stores on the KVS pool, I'm waiting on that to make this real.
+	 * The name we store on the Memrata device is a translation of the
+	 * WiredTiger name: do the reverse process here so we can use the
+	 * standard source-open function.
 	 */
-	return (0);
+	p = name + (sizeof(WT_NAME_PREFIX) - 1);
+	len = strlen("memrata:") + strlen(ks->name) + strlen(p) + 10;
+	if ((uri = malloc(len)) == NULL) {
+		ret = os_errno();
+		goto err;
+	}
+	(void)snprintf(uri, len, "memrata:%s/%s", ks->name, p);
+
+	/*
+	 * Open the cache/primary pair by going through the full open process,
+	 * instantiating the underlying WT_SOURCE object.
+	 */
+	if ((ret = ws_source_open(wtds, NULL, uri, config, 0, &ws)) != 0)
+		goto err;
+	if ((ret = unlock(wtext, NULL, &ws->lock)) != 0)
+		goto err;
 
 	/* Fake up a cursor. */
 	if ((ret = fake_cursor(wtext, &wtcursor)) != 0)
-		EMSG_ERR(wtext, NULL, ret, "kvs_cleaner: %s", strerror(ret));
+		EMSG_ERR(wtext, NULL, ret,
+		    "kvs_source_recover_namespace: %s", strerror(ret));
 	cursor = (CURSOR *)wtcursor;
+	cursor->ws = ws;
 
-	/* Recover every cache/primary object pair in the KVS source. */
-	for (p = name; *p != NULL; ++p) {
-		/*
-		 * Open the cache/primary pair by going through the full open
-		 * process, instantiating the underlying WT_SOURCE object.
-		 */
-		if ((ret = ws_source_open(wtds, NULL, *p, config, 0, &ws)) != 0)
-			goto err;
-		if ((ret = unlock(wtext, NULL, &ws->lock)) != 0)
-			goto err;
-
-		/* Process, then clear, the cache. */
-		cursor->ws = ws;
-		if ((ret = cache_cleaner(wtext, wtcursor, 0, 0, NULL)) != 0)
-			goto err;
-
-		if ((ret = kvs_truncate(ws->kvscache)) != 0)
-			EMSG_ERR(wtext, NULL, WT_ERROR,
-			    "kvs_truncate: %s.cache: %s",
-			    ws->uri, kvs_strerror(ret));
-	}
-
-	/* Discard the transaction store. */
-	if ((ret = kvs_truncate(ks->kvstxn)) != 0)
+	/* Process, then clear, the cache. */
+	if ((ret = cache_cleaner(wtext, wtcursor, 0, NULL)) != 0)
+		goto err;
+	if ((ret = kvs_truncate(ws->kvscache)) != 0)
 		EMSG_ERR(wtext, NULL, WT_ERROR,
-		    "kvs_truncate: %s.txn: %s", ks->name, kvs_strerror(ret));
+		    "kvs_truncate: %s(cache): %s", ws->uri, kvs_strerror(ret));
 
 	/* Close the underlying WiredTiger sources. */
 err:	while ((ws = ks->ws_head) != NULL) {
@@ -3131,8 +3140,97 @@ err:	while ((ws = ks->ws_head) != NULL) {
 		ESET(ws_source_close(wtext, NULL, ws));
 	}
 
-	if (cursor != NULL)
-		cursor_destroy(cursor);
+	cursor_destroy(cursor);
+	free(uri);
+
+	return (ret);
+}
+
+struct kvs_namespace_cookie {
+	char **list;
+	u_int  list_cnt;
+	u_int  list_max;
+};
+
+/*
+ * kvs_namespace_list --
+ *	Get a list of the objects we're going to recover.
+ */
+static int
+kvs_namespace_list(void *cookie, const char *name)
+{
+	struct kvs_namespace_cookie *names;
+	const char *p;
+	void *allocp;
+
+	names = cookie;
+
+	/* Ignore any files without a WiredTiger prefix. */
+	if (strncmp(name, WT_NAME_PREFIX, sizeof(WT_NAME_PREFIX) - 1) != 0)
+		return (0);
+
+	/* Ignore the transaction store. */
+	if (strcmp(name, WT_NAME_TXN) == 0)
+		return (0);
+
+	/* Ignore the "cache" files. */
+	p = name + (sizeof(WT_NAME_PREFIX) - 1);
+	if ((p = strchr(p, '.')) != NULL && strcmp(p, WT_NAME_CACHE) == 0)
+		return (0);
+
+	if (names->list_cnt + 1 >= names->list_max) {
+		if ((allocp = realloc(names->list,
+		    (names->list_max + 20) * sizeof(names->list[0]))) == NULL)
+			return (os_errno());
+		names->list = allocp;
+		names->list_max += 20;
+	}
+	if ((names->list[names->list_cnt] = strdup(name)) == NULL)
+		return (os_errno());
+	++names->list_cnt;
+	names->list[names->list_cnt] = NULL;
+	return (0);
+}
+
+/*
+ * kvs_source_recover --
+ *	Recover the KVS source.
+ */
+static int
+kvs_source_recover(WT_DATA_SOURCE *wtds, KVS_SOURCE *ks, WT_CONFIG_ARG *config)
+{
+	struct kvs_namespace_cookie names;
+	DATA_SOURCE *ds;
+	WT_EXTENSION_API *wtext;
+	u_int i;
+	int ret = 0;
+
+	ds = (DATA_SOURCE *)wtds;
+	wtext = ds->wtext;
+
+	memset(&names, 0, sizeof(names));
+
+	/* Get a list of the cache/primary object pairs in the KVS source. */
+	if ((ret = kvs_namespaces(
+	    ks->kvs_device, kvs_namespace_list, &names)) != 0)
+		ERET(wtext, NULL, WT_ERROR,
+		    "kvs_namespaces: %s: %s", ks->name, kvs_strerror(ret));
+
+	/* Recover the objects. */
+	for (i = 0; i < names.list_cnt; ++i)
+		if ((ret = kvs_source_recover_namespace(
+		    wtds, ks, names.list[i], config)) != 0)
+			goto err;
+
+	/* Clear the transaction store. */
+	if ((ret = kvs_truncate(ks->kvstxn)) != 0)
+		EMSG_ERR(wtext, NULL, WT_ERROR,
+		    "kvs_truncate: %s: %s", WT_NAME_TXN, kvs_strerror(ret));
+
+err:	for (i = 0; i < names.list_cnt; ++i)
+		free(names.list[i]);
+	free(names.list);
+
 	return (ret);
 }
 
@@ -3226,9 +3324,9 @@ wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 	wtext = connection->get_extension_api(connection);
 
 						/* Check the library version */
-#if KVS_VERSION_MAJOR != 4 || KVS_VERSION_MINOR != 2
+#if KVS_VERSION_MAJOR != 4 || KVS_VERSION_MINOR != 13
 	ERET(wtext, NULL, EINVAL,
-	    "unsupported KVS library version %d.%d",
+	    "unsupported KVS library version %d.%d, expected version 4.13",
 	    KVS_VERSION_MAJOR, KVS_VERSION_MINOR);
 #endif
 
@@ -3247,7 +3345,7 @@ wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 		    "WT_EXTENSION_API.config_get: config: %s",
 		    wtext->strerror(ret));
 
-	/* Step through the list of entries, opening each one. */
+	/* Step through the list of KVS sources, opening each one. */
 	if ((ret =
 	    wtext->config_scan_begin(wtext, NULL, v.str, v.len, &scan)) != 0)
 		EMSG_ERR(wtext, NULL, ret,
@@ -3267,11 +3365,11 @@ wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 
 	/* Find and open the database transaction store. */
 	if ((ret = kvs_source_open_txn(ds)) != 0)
-		goto err;
+		return (ret);
 
 	/* Recover each KVS source. */
 	for (ks = ds->kvs_head; ks != NULL; ks = ks->next)
-		if ((ret = kvs_source_open_recover(&ds->wtds, ks, config)) != 0)
+		if ((ret = kvs_source_recover(&ds->wtds, ks, config)) != 0)
 			goto err;
 
 	/* Start each KVS source cleaner thread. */
@@ -3280,7 +3378,7 @@ wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
 		    &ks->cleaner_id, NULL, kvs_cleaner, ks)) != 0)
 			EMSG_ERR(wtext, NULL, ret,
 			    "%s: pthread_create: cleaner thread: %s",
-			    ks->name, wtext->strerror(ret));
+			    ks->name, strerror(ret));
 
 	/* Add KVS-specific configuration options.  */
 	for (p = session_create_opts; *p != NULL; ++p)

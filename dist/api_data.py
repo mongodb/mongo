@@ -111,7 +111,7 @@ lsm_config = [
 		filters''',
 		min='2', max='100'),
 	Config('lsm_bloom_newest', 'false', r'''
-		create a bloom filter on an LSM tree chunk before it's first
+		create a bloom filter on an LSM tree chunk before its first
 		merge.  Only supported if bloom filters are enabled''',
 		type='boolean'),
 	Config('lsm_bloom_oldest', 'false', r'''
@@ -321,7 +321,6 @@ connection_runtime_config = [
 		list, such as <code>"verbose=[evictserver,read]"</code>''',
 		type='list', choices=[
 		    'block',
-		    'shared_cache',
 		    'ckpt',
 		    'evict',
 		    'evictserver',
@@ -330,10 +329,12 @@ connection_runtime_config = [
 		    'log',
 		    'lsm',
 		    'mutex',
+		    'overflow',
 		    'read',
 		    'readserver',
 		    'reconcile',
 		    'salvage',
+		    'shared_cache',
 		    'verify',
 		    'version',
 		    'write']),
@@ -421,9 +422,9 @@ methods = {
 	Config('next_random', 'false', r'''
 		configure the cursor to return a pseudo-random record from
 		the object; valid only for row-store cursors.  Cursors
-		configured with \c next_random only support the WT_CURSOR::next
-		and WT_CURSOR::close methods.  See @ref cursor_random for
-		details''',
+		configured with \c next_random=true only support the
+		WT_CURSOR::next and WT_CURSOR::close methods.  See @ref
+		cursor_random for details''',
 		type='boolean'),
 	Config('overwrite', 'true', r'''
 		configures whether the cursor's insert, update and remove
@@ -440,7 +441,7 @@ methods = {
 		reset statistics counters when the cursor is closed; valid
 		only for statistics cursors''',
 		type='boolean'),
-	Config('statistics_fast', 'false', r'''
+	Config('statistics_fast', 'true', r'''
 		only gather statistics that don't require traversing the tree;
 		valid only for statistics cursors''',
 		type='boolean'),
@@ -590,7 +591,7 @@ methods = {
 		Config('archive', 'true', r'''
 		automatically archive unneeded log files''',
 		type='boolean'),
-		Config('enabled', 'true', r'''
+		Config('enabled', 'false', r'''
 		enable logging subsystem''',
 		type='boolean'),
 		Config('file_max', '100MB', r'''

@@ -218,7 +218,7 @@ __evict_worker(WT_SESSION_IMPL *session)
 		 * target dirty percentage.
 		 */
 		bytes_inuse = __wt_cache_bytes_inuse(cache);
-		dirty_inuse = __wt_cache_bytes_dirty(cache);
+		dirty_inuse = cache->bytes_dirty;
 		bytes_max = conn->cache_size;
 		if (bytes_inuse < (cache->eviction_target * bytes_max) / 100 &&
 		    dirty_inuse <
@@ -359,7 +359,7 @@ __wt_evict_page(WT_SESSION_IMPL *session, WT_PAGE *page)
 		    txn->snapshot != saved_txn.snapshot);
 		__wt_txn_destroy(session);
 	} else
-		__wt_txn_release_snapshot(session);
+		__wt_txn_release_evict_snapshot(session);
 
 	*txn = saved_txn;
 	return (ret);
@@ -470,8 +470,7 @@ __wt_evict_file(WT_SESSION_IMPL *session, int syncop)
 			if (WT_PAGE_IS_ROOT(page))
 				btree->root_page = NULL;
 			if (__wt_page_is_modified(page))
-				__wt_cache_dirty_decr(
-				    session, page->memory_footprint);
+				__wt_cache_dirty_decr(session, page);
 			__wt_page_out(session, &page);
 			break;
 		WT_ILLEGAL_VALUE_ERR(session);
@@ -718,7 +717,7 @@ __evict_walk(WT_SESSION_IMPL *session, u_int *entriesp, int clean)
 	__wt_spin_lock(session, &conn->dhandle_lock);
 	WT_CSTAT_INCR(session, dh_evict_locks);
 retry:	file_count = 0;
-	TAILQ_FOREACH(dhandle, &conn->dhqh, q) {
+	SLIST_FOREACH(dhandle, &conn->dhlh, l) {
 		if (!WT_PREFIX_MATCH(dhandle->name, "file:") ||
 		    !F_ISSET(dhandle, WT_DHANDLE_OPEN))
 			continue;
@@ -778,6 +777,7 @@ __evict_init_candidate(
 	u_int slot;
 
 	cache = S2C(session)->cache;
+	WT_ASSERT(session, page->ref->state == WT_REF_EVICT_WALK);
 
 	/* Keep track of the maximum slot we are using. */
 	slot = (u_int)(evict - cache->evict);
@@ -1096,7 +1096,7 @@ __wt_cache_dump(WT_SESSION_IMPL *session)
 	conn = S2C(session);
 	total_bytes = 0;
 
-	TAILQ_FOREACH(dhandle, &conn->dhqh, q) {
+	SLIST_FOREACH(dhandle, &conn->dhlh, l) {
 		if (!WT_PREFIX_MATCH(dhandle->name, "file:") ||
 		    !F_ISSET(dhandle, WT_DHANDLE_OPEN))
 			continue;

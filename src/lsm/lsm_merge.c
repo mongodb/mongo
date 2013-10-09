@@ -17,32 +17,19 @@ __wt_lsm_merge_update_tree(WT_SESSION_IMPL *session,
     WT_LSM_TREE *lsm_tree, u_int start_chunk, u_int nchunks,
     WT_LSM_CHUNK *chunk)
 {
-	size_t chunk_sz, chunks_after_merge;
-	u_int i, j;
+	size_t chunks_after_merge;
+	u_int i;
 
 	WT_ASSERT(session, start_chunk + nchunks <= lsm_tree->nchunks);
 
 	/* Setup the array of obsolete chunks. */
-	if (nchunks > lsm_tree->old_avail) {
-		chunk_sz = sizeof(*lsm_tree->old_chunks);
-		WT_RET(__wt_realloc_def(session, &lsm_tree->old_alloc,
-		    (lsm_tree->nold_chunks - lsm_tree->old_avail) + nchunks,
-		    &lsm_tree->old_chunks));
-		lsm_tree->old_avail += (u_int)(lsm_tree->old_alloc / chunk_sz) -
-		    lsm_tree->nold_chunks;
-		lsm_tree->nold_chunks = (u_int)(lsm_tree->old_alloc / chunk_sz);
-	}
-	/* Copy entries one at a time, so we can reuse gaps in the list. */
-	for (i = j = 0; j < nchunks && i < lsm_tree->nold_chunks; i++) {
-		if (lsm_tree->old_chunks[i] == NULL) {
-			lsm_tree->old_chunks[i] =
-			    lsm_tree->chunk[start_chunk + j];
-			++j;
-			--lsm_tree->old_avail;
-		}
-	}
+	WT_RET(__wt_realloc_def(session, &lsm_tree->old_alloc,
+	    lsm_tree->nold_chunks + nchunks, &lsm_tree->old_chunks));
 
-	WT_ASSERT(session, j == nchunks);
+	/* Copy entries one at a time, so we can reuse gaps in the list. */
+	for (i = 0; i < nchunks; i++)
+		lsm_tree->old_chunks[lsm_tree->nold_chunks++] =
+		    lsm_tree->chunk[start_chunk + i];
 
 	/* Update the current chunk list. */
 	chunks_after_merge = lsm_tree->nchunks - (nchunks + start_chunk);
@@ -63,24 +50,27 @@ __wt_lsm_merge_update_tree(WT_SESSION_IMPL *session,
  */
 int
 __wt_lsm_merge(
-    WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, u_int id, int stalls)
+    WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, u_int id, int aggressive)
 {
 	WT_BLOOM *bloom;
-	WT_CURSOR *src, *dest;
+	WT_CURSOR *dest, *src;
 	WT_DECL_ITEM(bbuf);
 	WT_DECL_RET;
 	WT_ITEM buf, key, value;
 	WT_LSM_CHUNK *chunk, *youngest;
 	uint32_t generation, start_id;
 	uint64_t insert_count, record_count;
-	u_int dest_id, end_chunk, i, max_chunks, nchunks, start_chunk;
+	u_int dest_id, end_chunk, i, nchunks, start_chunk;
+	u_int max_chunks, min_chunks;
 	int create_bloom;
 	const char *cfg[3];
 
-	src = dest = NULL;
 	bloom = NULL;
-	max_chunks = lsm_tree->merge_max;
 	create_bloom = 0;
+	dest = src = NULL;
+	max_chunks = lsm_tree->merge_max;
+	min_chunks = (id == 0) ? lsm_tree->merge_min : 2;
+	start_id = 0;
 
 	/*
 	 * If there aren't any chunks to merge, or some of the chunks aren't
@@ -126,31 +116,27 @@ __wt_lsm_merge(
 	    start_chunk > 0; ) {
 		chunk = lsm_tree->chunk[start_chunk - 1];
 		youngest = lsm_tree->chunk[end_chunk];
-		nchunks = (end_chunk - start_chunk) + 1;
+		nchunks = (end_chunk + 1) - start_chunk;
 
 		/* If the chunk is already involved in a merge, stop. */
 		if (F_ISSET(chunk, WT_LSM_CHUNK_MERGING))
 			break;
 
-		/* Don't merge across more than 2 generations. */
-		if (chunk->generation >= youngest->generation + 2)
+		/*
+		 * Stay in the youngest generation in the first thread if there
+		 * are multiple threads.  If there is a single thread, wait
+		 * looking for small merges before trying a big one.
+		 */
+		if (id == 0 && chunk->generation > 0 &&
+		    (!aggressive || lsm_tree->merge_threads > 1))
 			break;
 
 		/*
-		 * If the next chunk is more than double the average size of
-		 * the chunks we have so far, stop.
+		 * If we have enough chunks for a merge and the next chunk is
+		 * in a different generation, stop.
 		 */
-		if (nchunks > 1 && chunk->count > 2 * record_count / nchunks)
-			break;
-
-		/*
-		 * Never merges across generations in the first thread if there
-		 * are multiple threads.  If there is a single thread, wait for
-		 * 30 seconds looking for small merges before trying a big one.
-		 */
-		if (id == 0 && nchunks > 0 &&
-		    chunk->generation > youngest->generation &&
-		    (lsm_tree->merge_threads > 1 || stalls < 30))
+		if (nchunks >= min_chunks &&
+		    chunk->generation > youngest->generation)
 			break;
 
 		F_SET(chunk, WT_LSM_CHUNK_MERGING);
@@ -164,15 +150,25 @@ __wt_lsm_merge(
 		}
 	}
 
-	nchunks = (end_chunk - start_chunk) + 1;
+	nchunks = (end_chunk + 1) - start_chunk;
 	WT_ASSERT(session, nchunks <= max_chunks);
 
-	/* Don't do small merges. */
-	if (nchunks <= 1 || (id == 0 && nchunks < max_chunks / 2)) {
-		for (i = 0; i < nchunks; i++)
-			F_CLR(lsm_tree->chunk[start_chunk + i],
-			    WT_LSM_CHUNK_MERGING);
-		nchunks = 0;
+	if (nchunks > 0) {
+		chunk = lsm_tree->chunk[start_chunk];
+		start_id = chunk->id;
+		youngest = lsm_tree->chunk[end_chunk];
+
+		/*
+		 * Don't do small merges or merge across more than 2
+		 * generations.
+		 */
+		if (nchunks < min_chunks ||
+		    chunk->generation > youngest->generation + 1) {
+			for (i = 0; i < nchunks; i++)
+				F_CLR(lsm_tree->chunk[start_chunk + i],
+				    WT_LSM_CHUNK_MERGING);
+			nchunks = 0;
+		}
 	}
 
 	/* Find the merge generation. */
@@ -180,7 +176,6 @@ __wt_lsm_merge(
 		generation = WT_MAX(generation,
 		    lsm_tree->chunk[start_chunk + i]->generation + 1);
 
-	start_id = lsm_tree->chunk[start_chunk]->id;
 	WT_RET(__wt_rwunlock(session, lsm_tree->rwlock));
 
 	if (nchunks == 0)
@@ -212,8 +207,8 @@ __wt_lsm_merge(
 	F_SET(src, WT_CURSTD_RAW);
 	WT_ERR(__wt_clsm_init_merge(src, start_chunk, start_id, nchunks));
 
-	WT_WITH_SCHEMA_LOCK(session, ret = __wt_lsm_tree_setup_chunk(
-	    session, lsm_tree, chunk));
+	WT_WITH_SCHEMA_LOCK(session,
+	    ret = __wt_lsm_tree_setup_chunk(session, lsm_tree, chunk));
 	WT_ERR(ret);
 	if (create_bloom) {
 		WT_CLEAR(buf);
@@ -237,10 +232,9 @@ __wt_lsm_merge(
 
 	for (insert_count = 0; (ret = src->next(src)) == 0; insert_count++) {
 		if (insert_count % 1000 &&
-		    !F_ISSET(lsm_tree, WT_LSM_TREE_WORKING)) {
-			ret = EINTR;
-			goto err;
-		}
+		    !F_ISSET(lsm_tree, WT_LSM_TREE_WORKING))
+			WT_ERR(EINTR);
+
 		WT_ERR(src->get_key(src, &key));
 		dest->set_key(dest, &key);
 		WT_ERR(src->get_value(src, &value));
@@ -289,7 +283,7 @@ __wt_lsm_merge(
 
 	/*
 	 * Open a handle on the new chunk before application threads attempt
-	 * to access it. Opening the pre-loads internal pages into the file
+	 * to access it, opening it pre-loads internal pages into the file
 	 * system cache.
 	 */
 	cfg[1] = "checkpoint=WiredTigerCheckpoint";

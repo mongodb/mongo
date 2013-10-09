@@ -48,7 +48,9 @@ CMP
 COL's
 CONCAT
 CONFIG
+CPUID
 CPUs
+CRC
 CURSORs
 CURSTD
 CallsCustDate
@@ -91,6 +93,7 @@ FALLTHROUGH
 FH
 FLD
 FNV
+FORALL
 FOREACH
 FREELIST
 Fasttrack
@@ -181,6 +184,7 @@ Pandis
 Phong
 PlatformSDK
 Pre
+Prepend
 Qsort
 RCS
 READONLY
@@ -225,6 +229,7 @@ TOOSMALL
 TORTIOUS
 TRK
 TXN
+TXNC
 TXNID
 Timestamp
 TxnID
@@ -272,6 +277,7 @@ alfred
 alloc
 allocator
 allocsize
+amd
 ao
 ap
 api
@@ -354,6 +360,7 @@ const
 copyin
 copyout
 cp
+cpuid
 crc
 cref
 ctime
@@ -494,6 +501,7 @@ hrow
 html
 huffman
 hval
+hw
 iS
 iSh
 icount
@@ -505,6 +513,7 @@ incr
 incrementing
 incrv
 indices
+indirects
 indx
 infeasible
 init
@@ -753,6 +762,7 @@ strerror
 strftime
 strget
 stringin
+strncmp
 strncpy
 strndup
 strsep
@@ -769,6 +779,7 @@ subtree
 subtrees
 sunique
 superset
+sw
 sys
 syserr
 sz
@@ -823,6 +834,7 @@ tverify
 twiredtiger
 twrite
 txn
+txnc
 txnid
 txnidp
 txnmin
@@ -883,6 +895,7 @@ wrlock
 ws
 wti
 wts
+xF
 xff
 xxxx
 xxxxx

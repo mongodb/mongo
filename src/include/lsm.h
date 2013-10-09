@@ -52,14 +52,16 @@ struct __wt_lsm_chunk {
 	const char *bloom_uri;		/* URI of Bloom filter, if any */
 	uint64_t count;			/* Approximate count of records */
 	struct timespec create_ts;	/* Creation time (for rate limiting) */
+	uint32_t refcnt;		/* Number of worker thread references */
 
 	uint64_t txnid_max;		/* Newest transactional update */
 
 #define	WT_LSM_CHUNK_BLOOM	0x01
-#define	WT_LSM_CHUNK_EVICTED	0x02
-#define	WT_LSM_CHUNK_MERGING	0x04
-#define	WT_LSM_CHUNK_ONDISK	0x08
-#define	WT_LSM_CHUNK_STABLE	0x10
+#define	WT_LSM_CHUNK_EMPTY	0x02
+#define	WT_LSM_CHUNK_EVICTED	0x04
+#define	WT_LSM_CHUNK_MERGING	0x08
+#define	WT_LSM_CHUNK_ONDISK	0x10
+#define	WT_LSM_CHUNK_STABLE	0x20
 	uint32_t flags;
 };
 
@@ -85,12 +87,13 @@ struct __wt_lsm_tree {
 	uint64_t dsk_gen;
 
 	long throttle_sleep;		/* Rate limiting */
+	uint64_t chunk_fill_ms;		/* Estimate of time to fill a chunk */
 
 	/* Configuration parameters */
 	uint32_t bloom_bit_count;
 	uint32_t bloom_hash_count;
 	uint32_t chunk_size;
-	u_int merge_max;
+	u_int merge_min, merge_max;
 	u_int merge_threads;
 
 #define	WT_LSM_BLOOM_MERGED				0x00000001
@@ -118,7 +121,6 @@ struct __wt_lsm_tree {
 	WT_LSM_CHUNK **old_chunks;	/* Array of old LSM chunks */
 	size_t old_alloc;		/* Space allocated for old chunks */
 	u_int nold_chunks;		/* Number of old chunks */
-	u_int old_avail;		/* Available old chunk slots */
 
 #define	WT_LSM_TREE_LOCKED	0x01
 #define	WT_LSM_TREE_NEED_SWITCH	0x02

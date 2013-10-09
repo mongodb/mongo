@@ -293,9 +293,14 @@ struct __wt_cursor {
 	int __F(reset)(WT_CURSOR *cursor);
 
 	/*!
-	 * Move to the record matching the key. The key must first be set.
+	 * Return the record matching the key. The key must first be set.
 	 *
 	 * @snippet ex_all.c Search for an exact match
+	 *
+	 * On success, the cursor ends positioned at the returned record; to
+	 * minimize cursor resources, the WT_CURSOR::reset method should be
+	 * called as soon as the record has been retrieved and the cursor no
+	 * longer needs that position.
 	 *
 	 * @param cursor the cursor handle
 	 * @errors
@@ -303,16 +308,32 @@ struct __wt_cursor {
 	int __F(search)(WT_CURSOR *cursor);
 
 	/*!
-	 * Move to the record matching the key if it exists, or a record that
-	 * would be adjacent.  Either the smallest record larger than the key
-	 * or the largest record smaller than the key (in other words, a
-	 * logically adjacent key).  The key must first be set.
+	 * Return the record matching the key if it exists, or an adjacent
+	 * record.  An adjacent record is either the smallest record larger
+	 * than the key or the largest record smaller than the key (in other
+	 * words, a logically adjacent key).
+	 *
+	 * The key must first be set.
+	 *
+	 * An example of a search for an exact or adjacent match:
 	 *
 	 * @snippet ex_all.c Search for an exact or adjacent match
 	 *
+	 * An example of a forward scan through the table, where all keys
+	 * greater than or equal to a specified prefix are included in the
+	 * scan:
+	 *
 	 * @snippet ex_all.c Forward scan greater than or equal
 	 *
+	 * An example of a backward scan through the table, where all keys
+	 * less than a specified prefix are included in the scan:
+	 *
 	 * @snippet ex_all.c Backward scan less than
+	 *
+	 * On success, the cursor ends positioned at the returned record; to
+	 * minimize cursor resources, the WT_CURSOR::reset method should be
+	 * called as soon as the record has been retrieved and the cursor no
+	 * longer needs that position.
 	 *
 	 * @param cursor the cursor handle
 	 * @param exactp the status of the search: 0 if an exact match is
@@ -330,23 +351,28 @@ struct __wt_cursor {
 	/*!
 	 * Insert a record and optionally update an existing record.
 	 *
-	 * If the cursor was configured with "overwrite" (the default), both
-	 * the key and value must be set; if the record already exists, the
-	 * key's value will be updated, otherwise, the record will be inserted.
+	 * If the cursor was configured with "overwrite=true" (the default),
+	 * both the key and value must be set; if the record already exists,
+	 * the key's value will be updated, otherwise, the record will be
+	 * inserted.
 	 *
 	 * @snippet ex_all.c Insert a new record or overwrite an existing record
 	 *
-	 * If the cursor was not configured with "overwrite", both the key
-	 * and value must be set and the record must not already exist;
-	 * the record will be inserted.
+	 * If the cursor was not configured with "overwrite=true", both the key
+	 * and value must be set and the record must not already exist; the
+	 * record will be inserted.
 	 *
 	 * @snippet ex_all.c Insert a new record and fail if the record exists
 	 *
-	 * If a cursor with record number keys was configured with "append",
-	 * the value must be set; a new record will be appended and the record
-	 * number set as the cursor key value.
+	 * If a cursor with record number keys was configured with
+	 * "append=true" (not the default), the value must be set; a new record
+	 * will be appended and the record number set as the cursor key value.
 	 *
 	 * @snippet ex_all.c Insert a new record and assign a record number
+	 *
+	 * The cursor ends with no position, and a subsequent call to the
+	 * WT_CURSOR::next (WT_CURSOR::prev) method will iterate from the
+	 * beginning (end) of the table.
 	 *
 	 * Inserting a new record after the current maximum record in a
 	 * fixed-length bit field column-store (that is, a store with an
@@ -368,17 +394,21 @@ struct __wt_cursor {
 	/*!
 	 * Update a record and optionally insert an existing record.
 	 *
-	 * If the cursor was configured with "overwrite" (the default), both
-	 * the key and value must be set; if the record already exists, the
+	 * If the cursor was configured with "overwrite=true" (the default),
+	 * both the key and value must be set; if the record already exists, the
 	 * key's value will be updated, otherwise, the record will be inserted.
 	 *
 	 * @snippet ex_all.c Update an existing record or insert a new record
 	 *
-	 * If the cursor was not configured with "overwrite", both the key
+	 * If the cursor was not configured with "overwrite=true", both the key
 	 * and value must be set and the record must already exist; the
 	 * record will be updated.
 	 *
 	 * @snippet ex_all.c Update an existing record and fail if DNE
+	 *
+	 * On success, the cursor ends positioned at the modified record; to
+	 * minimize cursor resources, the WT_CURSOR::reset method should be
+	 * called as soon as the cursor no longer needs that position.
 	 *
 	 * @param cursor the cursor handle
 	 * @errors
@@ -390,20 +420,24 @@ struct __wt_cursor {
 	/*!
 	 * Remove a record.
 	 *
-	 * If the cursor was configured with "overwrite" (the default), the
-	 * key must be set; the key's record will be removed if it exists,
+	 * If the cursor was configured with "overwrite=true" (the default),
+	 * the key must be set; the key's record will be removed if it exists,
 	 * no error will be returned if the record does not exist.
 	 *
 	 * @snippet ex_all.c Remove a record
 	 *
-	 * If the cursor was not configured with "overwrite", the key must be
-	 * set and the key's record must exist; the record will be removed.
+	 * If the cursor was not configured with "overwrite=true", the key must
+	 * be set and the key's record must exist; the record will be removed.
 	 *
 	 * @snippet ex_all.c Remove a record and fail if DNE
 	 *
 	 * Removing a record in a fixed-length bit field column-store
 	 * (that is, a store with an 'r' type key and 't' type value) is
 	 * identical to setting the record's value to 0.
+	 *
+	 * On success, the cursor ends positioned at the removed record; to
+	 * minimize cursor resources, the WT_CURSOR::reset method should be
+	 * called as soon as the cursor no longer needs that position.
 	 *
 	 * @param cursor the cursor handle
 	 * @errors
@@ -575,14 +609,18 @@ struct __wt_session {
 	 *	table cursor,
 	 *	table key\, table value(s) with optional projection of columns}
 	 *  </table>
-	 *  Advanced applications may also open the following low-level cursor
-	 *  types:
+	 *  Advanced applications may also choose to open the following
+	 *  additional cursor types:
 	 *  <table>
 	 *  @row{<tt>file:\<file name\></tt>,
 	 *	file cursor,
-	 *	file key\, file value(s)}
+	 *	file key\, file value}
 	 *  @row{<tt>lsm:\<name\></tt>,
-	 *	LSM cursor (key=LSM key\, value=LSM value), See also: @ref lsm}
+	 *	LSM cursor,
+	 *	LSM key\, LSM value: see @ref lsm}
+	 *  @row{<tt>metadata:</tt>,
+	 *	metadata cursor,
+	 *	metadata key\, metadata value: see @ref metadata}
 	 *  </table>
 	 * @param to_dup a cursor to duplicate
 	 * @configstart{session.open_cursor, see dist/api_data.py}
@@ -615,8 +653,8 @@ struct __wt_session {
 	 * "hex"\, \c "print"; default empty.}
 	 * @config{next_random, configure the cursor to return a pseudo-random
 	 * record from the object; valid only for row-store cursors.  Cursors
-	 * configured with \c next_random only support the WT_CURSOR::next and
-	 * WT_CURSOR::close methods.  See @ref cursor_random for details., a
+	 * configured with \c next_random=true only support the WT_CURSOR::next
+	 * and WT_CURSOR::close methods.  See @ref cursor_random for details., a
 	 * boolean flag; default \c false.}
 	 * @config{overwrite, configures whether the cursor's insert\, update
 	 * and remove methods check the existing state of the record.  If \c
@@ -632,7 +670,7 @@ struct __wt_session {
 	 * default \c false.}
 	 * @config{statistics_fast, only gather statistics that don't require
 	 * traversing the tree; valid only for statistics cursors., a boolean
-	 * flag; default \c false.}
+	 * flag; default \c true.}
 	 * @config{target, if non-empty\, backup the list of objects; valid only
 	 * for a backup data source., a list of strings; default empty.}
 	 * @configend
@@ -759,7 +797,7 @@ struct __wt_session {
 	 * @config{lsm_bloom_hash_count, the number of hash values per item used
 	 * for LSM bloom filters., an integer between 2 and 100; default \c 4.}
 	 * @config{lsm_bloom_newest, create a bloom filter on an LSM tree chunk
-	 * before it's first merge.  Only supported if bloom filters are
+	 * before its first merge.  Only supported if bloom filters are
 	 * enabled., a boolean flag; default \c false.}
 	 * @config{lsm_bloom_oldest, create a bloom filter on the oldest LSM
 	 * tree chunk.  Only supported if bloom filters are enabled., a boolean
@@ -812,7 +850,8 @@ struct __wt_session {
 	    const char *name, const char *config);
 
 	/*!
-	 * Compact an object.
+	 * Compact a row- or column-store btree (log-structured merge
+	 * trees cannot be compacted).
 	 *
 	 * @snippet ex_all.c Compact a table
 	 *
@@ -1148,10 +1187,10 @@ struct __wt_connection {
 	 * @config{verbose, enable messages for various events.  Options are
 	 * given as a list\, such as
 	 * <code>"verbose=[evictserver\,read]"</code>., a list\, with values
-	 * chosen from the following options: \c "block"\, \c "shared_cache"\,
-	 * \c "ckpt"\, \c "evict"\, \c "evictserver"\, \c "fileops"\, \c
-	 * "hazard"\, \c "log"\, \c "lsm"\, \c "mutex"\, \c "read"\, \c
-	 * "readserver"\, \c "reconcile"\, \c "salvage"\, \c "verify"\, \c
+	 * chosen from the following options: \c "block"\, \c "ckpt"\, \c
+	 * "evict"\, \c "evictserver"\, \c "fileops"\, \c "hazard"\, \c "log"\,
+	 * \c "lsm"\, \c "mutex"\, \c "overflow"\, \c "read"\, \c "readserver"\,
+	 * \c "reconcile"\, \c "salvage"\, \c "shared_cache"\, \c "verify"\, \c
 	 * "version"\, \c "write"; default empty.}
 	 * @configend
 	 * @errors
@@ -1403,12 +1442,14 @@ struct __wt_connection {
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;archive, automatically
  * archive unneeded log files., a boolean flag; default \c true.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;enabled, enable logging subsystem., a boolean
- * flag; default \c true.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;file_max, the maximum
- * size of the log file., an integer between 1MB and 2GB; default \c 100MB.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;path, the path to a directory into which the
- * log files are written.  If the value is not an absolute path name\, the files
- * are created relative to the database home., a string; default \c "".}
+ * flag; default \c false.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;file_max, the
+ * maximum size of the log file., an integer between 1MB and 2GB; default \c
+ * 100MB.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;path, the path to a directory into
+ * which the log files are written.  If the value is not an absolute path name\,
+ * the files are created relative to the database home., a string; default \c
+ * "".}
  * @config{ ),,}
  * @config{lsm_merge, merge LSM chunks where possible., a boolean flag; default
  * \c true.}
@@ -1475,11 +1516,11 @@ struct __wt_connection {
  * information., a boolean flag; default \c false.}
  * @config{verbose, enable messages for various events.  Options are given as a
  * list\, such as <code>"verbose=[evictserver\,read]"</code>., a list\, with
- * values chosen from the following options: \c "block"\, \c "shared_cache"\, \c
- * "ckpt"\, \c "evict"\, \c "evictserver"\, \c "fileops"\, \c "hazard"\, \c
- * "log"\, \c "lsm"\, \c "mutex"\, \c "read"\, \c "readserver"\, \c
- * "reconcile"\, \c "salvage"\, \c "verify"\, \c "version"\, \c "write"; default
- * empty.}
+ * values chosen from the following options: \c "block"\, \c "ckpt"\, \c
+ * "evict"\, \c "evictserver"\, \c "fileops"\, \c "hazard"\, \c "log"\, \c
+ * "lsm"\, \c "mutex"\, \c "overflow"\, \c "read"\, \c "readserver"\, \c
+ * "reconcile"\, \c "salvage"\, \c "shared_cache"\, \c "verify"\, \c "version"\,
+ * \c "write"; default empty.}
  * @configend
  * Additionally, if a file named \c WiredTiger.config appears in the WiredTiger
  * home directory, it is read for configuration values (see @ref config_file

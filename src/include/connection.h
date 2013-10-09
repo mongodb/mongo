@@ -79,7 +79,6 @@ struct __wt_connection_impl {
 	WT_SPINLOCK checkpoint_lock;	/* Checkpoint spinlock */
 	WT_SPINLOCK fh_lock;		/* File handle queue spinlock */
 	WT_SPINLOCK schema_lock;	/* Schema operation spinlock */
-	WT_SPINLOCK serial_lock;	/* Serial function call spinlock */
 
 					/* Connection queue */
 	TAILQ_ENTRY(__wt_connection_impl) q;
@@ -107,7 +106,7 @@ struct __wt_connection_impl {
 	int32_t	dhandle_dead;		/* Not locked: dead dhandles seen */
 	WT_SPINLOCK dhandle_lock;	/* Locked: dhandle sweep */
 					/* Locked: data handle list */
-	TAILQ_HEAD(__wt_dhandle_qh, __wt_data_handle) dhqh;
+	SLIST_HEAD(__wt_dhandle_lh, __wt_data_handle) dhlh;
 					/* Locked: LSM handle list. */
 	TAILQ_HEAD(__wt_lsm_qh, __wt_lsm_tree) lsmqh;
 					/* Locked: file list */

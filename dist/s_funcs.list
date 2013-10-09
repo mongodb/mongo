@@ -2,6 +2,9 @@
 WT_CURDUMP_PASS
 __bit_ffs
 __bit_nclr
+__ovfl_onpage_dump
+__ovfl_reuse_dump
+__ovfl_txnc_dump
 __wt_bloom_drop
 __wt_bloom_get
 __wt_cache_dump
