@@ -8,7 +8,11 @@
            UpgradeCode="$(var.UpgradeCode)">
 
     <Package InstallerVersion="405" Compressed="yes" Platform="x64"/>
-    <WixVariable Id="InstallFolder" Value="MongoDB $(var.MongoDBVersion) $(var.Edition)"/>
+    <?if $(var.Flavor) = 2008R2Plus?>
+      <WixVariable Id="InstallFolder" Value="MongoDB $(var.MongoDBVersion) $(var.Edition)"/>
+    <?else?>
+      <WixVariable Id="InstallFolder" Value="MongoDB $(var.MongoDBVersion) $(var.Edition) Legacy"/>
+    <?endif?>
       
     <?if $(var.Edition) = Enterprise ?>
       <?if $(var.Flavor) = 2008R2Plus?>
