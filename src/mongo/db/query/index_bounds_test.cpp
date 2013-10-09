@@ -424,7 +424,6 @@ namespace {
                              &inc);
         ASSERT_EQUALS(state, IndexBoundsChecker::VALID);
 
-        // MONKEYBUTT
         state = it.checkKey(BSON("" << 25 << "" << 1),
                              &keyEltsToUse,
                              &movePastKeyElts,

@@ -324,7 +324,9 @@ namespace mongo {
                 _curInterval[i] = 0;
             }
 
-            // ...and try again.
+            // ...and try again.  This call modifies 'orientation', so we may check its value again
+            // in the clause below if field number 'firstNonContainedField' isn't in its first
+            // interval.
             if (!findLeftmostProblem(keyValues, &firstNonContainedField, &orientation)) {
                 return VALID;
             }

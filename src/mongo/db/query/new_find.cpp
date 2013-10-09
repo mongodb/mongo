@@ -114,6 +114,8 @@ namespace mongo {
         const LiteParsedQuery& pq = cq->getParsed();
 
         // Things we know we fail at:
+
+        // Sort.
         if (!pq.getSort().isEmpty()) {
             // We can deal with this 'cuz it means do a collscan.
             BSONElement natural = pq.getSort().getFieldDotted("$natural");
@@ -123,11 +125,13 @@ namespace mongo {
             }
         }
 
+        // Projections.
         if (!pq.getProj().isEmpty()) {
             cout << "rejecting query w/proj\n";
             return false;
         }
 
+        // Negations.
         if (QueryPlannerCommon::hasNode(cq->root(), MatchExpression::NOT)
             || QueryPlannerCommon::hasNode(cq->root(), MatchExpression::NOR)) {
 
@@ -135,12 +139,14 @@ namespace mongo {
             return false;
         }
 
+        // Obscure arguments to .find().
         if (pq.returnKey() || pq.showDiskLoc() || (0 != pq.getMaxScan()) || !pq.getMin().isEmpty()
             || !pq.getMax().isEmpty()) {
             cout << "rejecting wacky query args query\n";
             return false;
         }
 
+        // 2d-indexed $near.
         MatchExpression* nearNode;
         if (QueryPlannerCommon::hasNode(cq->root(), MatchExpression::GEO_NEAR, &nearNode)) {
             GeoNearMatchExpression* gnme = static_cast<GeoNearMatchExpression*>(nearNode);
