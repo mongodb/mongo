@@ -269,8 +269,7 @@ __wt_page_only_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * and/or page reconciliation might be looking at a clean page/tree.
 	 *
 	 * Every time the page transitions from clean to dirty, update the cache
-	 * and transactional information.  Take care to read the
-	 * memory_footprint once in case we are racing with updates.
+	 * and transactional information.
 	 */
 	if (WT_ATOMIC_ADD(page->modify->write_gen, 1) == 1) {
 		__wt_cache_dirty_incr(session, page);
