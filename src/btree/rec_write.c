@@ -3708,8 +3708,8 @@ static int
 __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 {
 	WT_BM *bm;
-	WT_BTREE *btree;
 	WT_BOUNDARY *bnd;
+	WT_BTREE *btree;
 	WT_PAGE_MODIFY *mod;
 	WT_REF *ref;
 	uint32_t size;
@@ -3914,11 +3914,12 @@ err:			__wt_scr_free(&tkey);
 		break;
 	}
 
+	/* Record the most recent transaction ID we have *not* written. */
+	mod->disk_snap_min = session->txn.snap_min;
+
 	/*
-	 * Success.
-	 *
-	 * If modifications were skipped, the tree isn't clean.  The checkpoint
-	 * call cleared the tree's modified value before it called the eviction
+	 * If updates were skipped, the tree isn't clean.  The checkpoint call
+	 * cleared the tree's modified value before it called the eviction
 	 * thread, so we must explicitly reset the tree's modified flag.  We
 	 * publish the change for clarity (the requirement is the value be set
 	 * before a subsequent checkpoint reads it, and because the current
@@ -3929,8 +3930,11 @@ err:			__wt_scr_free(&tkey);
 		WT_PUBLISH(btree->modified, 1);
 
 	/*
-	 * If modifications were not skipped, the page might be clean; if the
-	 * write generation is unchanged, clear it and update cache information.
+	 * If no updates were skipped, we have a new maximum transaction
+	 * written for the page (used to decide if a clean page can be
+	 * evicted).  The page might be clean; if the write generation is
+	 * unchanged since reconciliation started, clear it and update the
+	 * cache's dirty statistics.
 	 */
 	if (!r->upd_skipped) {
 		mod->disk_txn = r->max_txn;
@@ -3938,9 +3942,6 @@ err:			__wt_scr_free(&tkey);
 		if (WT_ATOMIC_CAS(mod->write_gen, r->orig_write_gen, 0))
 			__wt_cache_dirty_decr(session, page);
 	}
-
-	/* Record the most recent transaction ID we have *not* written. */
-	mod->disk_snap_min = session->txn.snap_min;
 
 	return (0);
 }

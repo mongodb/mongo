@@ -189,7 +189,7 @@ struct __wt_page_modify {
 	 */
 	uint64_t disk_snap_min;
 
-	/* The largest transaction ID written to disk, for clean pages. */
+	/* The largest transaction ID written to disk for the page. */
 	uint64_t disk_txn;
 
 	/*
@@ -223,6 +223,8 @@ struct __wt_page_modify {
 		WT_OVFL_REUSE	*ovfl_reuse[WT_SKIP_MAXDEPTH];
 		WT_OVFL_TXNC	*ovfl_txnc[WT_SKIP_MAXDEPTH];
 	} *ovfl_track;
+
+	int64_t bytes_dirty;		/* Dirty bytes added to cache. */
 
 	/*
 	 * The write generation is incremented when a page is modified, a page
@@ -350,8 +352,6 @@ struct __wt_page {
 
 	/* Memory attached to the page. */
 	uint32_t memory_footprint;
-
-	int64_t bytes_dirty;		/* Dirty bytes added to cache. */
 
 #define	WT_PAGE_INVALID		0	/* Invalid page */
 #define	WT_PAGE_BLOCK_MANAGER	1	/* Block-manager page */
