@@ -1,3 +1,42 @@
+WiredTiger release 1.6.5, 2013-10-09
+------------------------------------
+
+This is primarily a bugfix and performance tuning release. The main changes are:
+
+* Change the default statistics_fast configuration from false to true.
+
+* Change WT_CURSOR::insert to not hold a position. [#673]
+
+* Disallow WT_SESSION::compact operations on LSM trees.
+
+* The 'sync' setting to wiredtiger_open has been renamed 'checkpoint_sync'.
+
+* Add a "metadata:" cursor type. [#660]
+
+* Fix race in the cache's dirty byte tracking. [#635, #699]
+
+* Fix a bug scanning through a memory-mapped file with overflow items. [#701]
+
+* Use hardware checksum instructions when available. [#582, #702]
+
+* Several bug fixes related to tracking active transaction IDs and detection of
+  obsolete updates with high concurrency workloads. [#639, #643, #657, #683]
+
+* Fix several bugs in LSM including races on shutdown and Bloom filter
+  creation. [#686, #687, #688].
+
+* Fix a bug in LSM where we were not including Bloom filter files in backups.
+  [#684]
+
+* Optimize the LSM throttle and merge algorithms. [#676]
+
+* Make hot backups work concurrently with files being bulk-loaded. [#570, #653]
+
+* Add full support for snapshot isolation to LSM: only switch LSM chunks if all
+  changes are globally visible and detect conflicts between transactions across
+  file switches. [#629]
+
+
 WiredTiger release 1.6.4, 2013-08-20
 ------------------------------------
 
