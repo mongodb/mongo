@@ -66,7 +66,7 @@ namespace {
         }
 
         void addIndex(BSONObj keyPattern, bool multikey, bool sparse) {
-            keyPatterns.push_back(IndexEntry(keyPattern, multikey, sparse));
+            keyPatterns.push_back(IndexEntry(keyPattern, multikey, sparse, "note_to_self_dont_break_build"));
         }
 
         //
