@@ -1,4 +1,17 @@
 // Tests whether the geospatial search is stable under btree updates
+//
+// Tests the implementation of the 2d search, not the behavior we promise.  MongoDB currently
+// promises no isolation, so there is no guarantee that we get the results we expect in this file.
+
+// The old query system, if it saw a 2d query, would never consider a collscan.
+//
+// The new query system can answer the queries in this file with a collscan and ranks
+// the collscan against the indexed result.
+//
+// In order to expose the specific NON GUARANTEED isolation behavior this file tests
+// we disable table scans to ensure that the new query system only looks at the 2d
+// scan.
+assert.commandWorked( db._adminCommand( { setParameter:1, notablescan:true } ) );
 
 var status = function( msg ){
     print( "\n\n###\n" + msg + "\n###\n\n" )
