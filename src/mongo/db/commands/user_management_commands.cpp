@@ -309,23 +309,6 @@ namespace mongo {
             if (args.hasCustomData) {
                 userObjBuilder.append("customData", args.customData);
             }
-
-            AuthorizationManager* authzManager = getGlobalAuthorizationManager();
-            AuthzDocumentsUpdateGuard updateGuard(authzManager);
-            if (!updateGuard.tryLock("Create user")) {
-                addStatus(Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."),
-                          result);
-                return false;
-            }
-
-            for (size_t i = 0; i < args.roles.size(); ++i) {
-                BSONObj ignored;
-                Status status = authzManager->getRoleDescription(args.roles[i].name, &ignored);
-                if (!status.isOK()) {
-                    addStatus(status, result);
-                    return false;
-                }
-            }
             BSONArray rolesArray;
             status = roleDataVectorToBSONArray(args.roles, &rolesArray);
             if (!status.isOK()) {
@@ -341,6 +324,25 @@ namespace mongo {
                 addStatus(status, result);
                 return false;
             }
+
+            AuthorizationManager* authzManager = getGlobalAuthorizationManager();
+            AuthzDocumentsUpdateGuard updateGuard(authzManager);
+            if (!updateGuard.tryLock("Create user")) {
+                addStatus(Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."),
+                          result);
+                return false;
+            }
+
+            // Role existence has to be checked after acquiring the update lock
+            for (size_t i = 0; i < args.roles.size(); ++i) {
+                BSONObj ignored;
+                Status status = authzManager->getRoleDescription(args.roles[i].name, &ignored);
+                if (!status.isOK()) {
+                    addStatus(status, result);
+                    return false;
+                }
+            }
+
             status = authzManager->insertPrivilegeDocument(dbname,
                                                            userObj,
                                                            args.writeConcern);
@@ -464,6 +466,15 @@ namespace mongo {
             if (args.hasCustomData) {
                 updateSetBuilder.append("customData", args.customData);
             }
+            if (args.hasRoles) {
+                BSONArray rolesArray;
+                status = roleDataVectorToBSONArray(args.roles, &rolesArray);
+                if (!status.isOK()) {
+                    addStatus(status, result);
+                    return false;
+                }
+                updateSetBuilder.append("roles", rolesArray);
+            }
 
             AuthorizationManager* authzManager = getGlobalAuthorizationManager();
             AuthzDocumentsUpdateGuard updateGuard(authzManager);
@@ -473,15 +484,16 @@ namespace mongo {
                 return false;
             }
 
-            // TODO: Role existence has to be checked after acquiring the update lock
+            // Role existence has to be checked after acquiring the update lock
             if (args.hasRoles) {
-                BSONArray rolesArray;
-                status = roleDataVectorToBSONArray(args.roles, &rolesArray);
-                if (!status.isOK()) {
-                    addStatus(status, result);
-                    return false;
+                for (size_t i = 0; i < args.roles.size(); ++i) {
+                    BSONObj ignored;
+                    status = authzManager->getRoleDescription(args.roles[i].name, &ignored);
+                    if (!status.isOK()) {
+                        addStatus(status, result);
+                        return false;
+                    }
                 }
-                updateSetBuilder.append("roles", rolesArray);
             }
 
             status = authzManager->updatePrivilegeDocument(args.userName,
@@ -1137,6 +1149,14 @@ namespace mongo {
             }
             roleObjBuilder.append("privileges", privileges);
 
+            BSONArray roles;
+            status = rolesVectorToBSONArray(args.roles, &roles);
+            if (!status.isOK()) {
+                addStatus(status, result);
+                return false;
+            }
+            roleObjBuilder.append("roles", roles);
+
             AuthorizationManager* authzManager = getGlobalAuthorizationManager();
             AuthzDocumentsUpdateGuard updateGuard(authzManager);
             if (!updateGuard.tryLock("Create role")) {
@@ -1145,14 +1165,15 @@ namespace mongo {
                 return false;
             }
 
-            // TODO: Role existence has to be checked after acquiring the update lock
-            BSONArray roles;
-            status = rolesVectorToBSONArray(args.roles, &roles);
-            if (!status.isOK()) {
-                addStatus(status, result);
-                return false;
+            // Role existence has to be checked after acquiring the update lock
+            for (size_t i = 0; i < args.roles.size(); ++i) {
+                BSONObj ignored;
+                status = authzManager->getRoleDescription(args.roles[i], &ignored);
+                if (!status.isOK()) {
+                    addStatus(status, result);
+                    return false;
+                }
             }
-            roleObjBuilder.append("roles", roles);
 
             status = authzManager->insertRoleDocument(roleObjBuilder.done(), args.writeConcern);
             if (!status.isOK()) {
@@ -1250,15 +1271,6 @@ namespace mongo {
                 updateSetBuilder.append("privileges", privileges);
             }
 
-            AuthorizationManager* authzManager = getGlobalAuthorizationManager();
-            AuthzDocumentsUpdateGuard updateGuard(authzManager);
-            if (!updateGuard.tryLock("Update role")) {
-                addStatus(Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."),
-                          result);
-                return false;
-            }
-
-            // TODO: Role existence has to be checked after acquiring the update lock
             if (args.hasRoles) {
                 BSONArray roles;
                 status = rolesVectorToBSONArray(args.roles, &roles);
@@ -1268,6 +1280,26 @@ namespace mongo {
                 }
 
                 updateSetBuilder.append("roles", roles);
+            }
+
+            AuthorizationManager* authzManager = getGlobalAuthorizationManager();
+            AuthzDocumentsUpdateGuard updateGuard(authzManager);
+            if (!updateGuard.tryLock("Update role")) {
+                addStatus(Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."),
+                          result);
+                return false;
+            }
+
+            if (args.hasRoles) {
+                // Role existence has to be checked after acquiring the update lock
+                for (size_t i = 0; i < args.roles.size(); ++i) {
+                    BSONObj ignored;
+                    status = authzManager->getRoleDescription(args.roles[i], &ignored);
+                    if (!status.isOK()) {
+                        addStatus(status, result);
+                        return false;
+                    }
+                }
             }
 
             status = authzManager->updateRoleDocument(args.roleName,

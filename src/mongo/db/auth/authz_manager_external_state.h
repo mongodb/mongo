@@ -80,7 +80,7 @@ namespace mongo {
          * In the event that some of this information is inconsistent, the document will contain a
          * "warnings" array, with string messages describing inconsistencies.
          *
-         * If the user does not exist, returns ErrorCodes::UserNotFound.
+         * If the role does not exist, returns ErrorCodes::RoleNotFound.
          */
         virtual Status getRoleDescription(const RoleName& roleName, BSONObj* result) = 0;
 
