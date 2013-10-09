@@ -150,6 +150,7 @@ namespace mongo {
         const vector<BSONElement>& exteriorRing = coordinates[0].Array();
         vector<S2Point> exteriorVertices;
         if (!parsePoints(exteriorRing, &exteriorVertices)) { return false; }
+        eraseDuplicatePoints(&exteriorVertices);
         // The last point is duplicated.  We drop it, since S2Loop expects no
         // duplicate points
         exteriorVertices.resize(exteriorVertices.size() - 1);
@@ -171,6 +172,7 @@ namespace mongo {
         for (size_t i = 1; i < coordinates.size(); ++i) {
             vector<S2Point> holePoints;
             if (!parsePoints(coordinates[i].Array(), &holePoints)) { return false; }
+            eraseDuplicatePoints(&holePoints);
             // Drop the duplicated last point.
             holePoints.resize(holePoints.size() - 1);
             // Interior rings are clockwise.
