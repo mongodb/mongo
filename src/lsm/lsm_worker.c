@@ -573,8 +573,10 @@ __lsm_free_chunks(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 		chunk = cookie.chunk_array[i];
 		WT_ASSERT(session, chunk != NULL);
 		/* Skip the chunk if another worker is using it. */
-		if (chunk->refcnt > 1)
+		if (chunk->refcnt > 1) {
+			++skipped;
 			continue;
+		}
 
 		if (F_ISSET(chunk, WT_LSM_CHUNK_BLOOM)) {
 			/*
