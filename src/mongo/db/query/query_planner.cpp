@@ -1161,7 +1161,7 @@ namespace mongo {
         rateIndices(query.root(), "", relevantIndices);
 
         // If there is a GEO_NEAR it must have an index it can use directly.
-        MatchExpression* gnNode;
+        MatchExpression* gnNode = NULL;
         if (QueryPlannerCommon::hasNode(query.root(), MatchExpression::GEO_NEAR, &gnNode)) {
             RelevantTag* tag = static_cast<RelevantTag*>(gnNode->getTag());
             if (0 == tag->first.size() && 0 == tag->notFirst.size()) {
