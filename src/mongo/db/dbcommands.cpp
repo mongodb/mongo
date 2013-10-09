@@ -536,9 +536,14 @@ namespace mongo {
 
             d = NULL;
 
-            cc().database()->dropCollection( nsToDrop );
+            Status s = cc().database()->dropCollection( nsToDrop );
 
-            return true;
+            if ( s.isOK() )
+                return true;
+            
+            appendCommandStatus( result, s );
+
+            return false;
         }
     } cmdDrop;
 
