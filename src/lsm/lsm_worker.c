@@ -478,13 +478,7 @@ __lsm_discard_handle(
 	WT_DECL_RET;
 	int locked;
 
-	/*
-	 * We need to grab the schema lock to drop the file, so first try to
-	 * discard the handle so there is minimal work to do while holding the
-	 * schema lock.
-	 *
-	 * This will fail with EBUSY if the file is still in use.
-	 */
+	/* This will fail with EBUSY if the file is still in use. */
 	WT_RET(__wt_session_get_btree(session, uri, checkpoint, NULL,
 	    WT_DHANDLE_EXCLUSIVE | WT_DHANDLE_LOCK_ONLY));
 
