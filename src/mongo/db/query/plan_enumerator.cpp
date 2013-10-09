@@ -241,6 +241,7 @@ namespace mongo {
                 // If it's a multikey index, we can't intersect the bounds, so we only want one pred.
                 if ((*_indices)[it->first].multikey) {
                     // XXX: pick a better pred than the first one that happens to wander in.
+                    // XXX: see and3.js, indexq.js, arrayfind7.js
                     assign->preds.resize(1);
                 }
                 assign->positions.resize(assign->preds.size(), 0);

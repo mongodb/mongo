@@ -219,8 +219,8 @@ namespace mongo {
         _bestPlan->setYieldPolicy(_policy);
         _alreadyProduced = _candidates[bestChild].results;
         _bestSolution.reset(_candidates[bestChild].solution);
-        // XXX
-        // cout << "Winning solution:\n" << _bestSolution->toString() << endl;
+
+        cout << "Winning solution:\n" << _bestSolution->toString() << endl;
 
         // TODO:
         // Store the choice we just made in the cache.
