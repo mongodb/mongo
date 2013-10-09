@@ -153,6 +153,8 @@ namespace mongo {
 
         void _clearCollectionCache( const StringData& fullns );
 
+        void _clearCollectionCache_inlock( const StringData& fullns );
+
         ~Database(); // closes files and other cleanup see below.
 
         void _addNamespaceToCatalog( const StringData& ns, const BSONObj* options );

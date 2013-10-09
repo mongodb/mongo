@@ -578,8 +578,6 @@ namespace mongo {
         prefix += '.';
         ClientCursor::invalidate(prefix.c_str());
 
-        NamespaceDetailsTransient::eraseDB( prefix );
-
         dbHolderW().erase( db, path );
         ctx->_clear();
         delete database; // closes files

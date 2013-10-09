@@ -65,6 +65,7 @@ namespace mongo {
         }
         _collections.clear();
 
+        NamespaceDetailsTransient::eraseDB( _name );
     }
 
     Status Database::validateDBName( const StringData& dbname ) {
@@ -347,10 +348,18 @@ namespace mongo {
     }
 
     void Database::_clearCollectionCache( const StringData& fullns ) {
-        verify( _name == nsToDatabaseSubstring( fullns ) );
         scoped_lock lk( _collectionLock );
-        _collections.erase( fullns.toString() );
+        _clearCollectionCache_inlock( fullns );
+    }
 
+    void Database::_clearCollectionCache_inlock( const StringData& fullns ) {
+        verify( _name == nsToDatabaseSubstring( fullns ) );
+        CollectionMap::iterator it = _collections.find( fullns.toString() );
+        if ( it == _collections.end() )
+            return;
+
+        delete it->second;
+        _collections.erase( it );
     }
 
     Collection* Database::getCollection( const StringData& ns ) {
@@ -461,8 +470,8 @@ namespace mongo {
         // remove anything cached
         {
             scoped_lock lk( _collectionLock );
-            _collections.erase( fromNSString );
-            _collections.erase( toNSString );
+            _clearCollectionCache_inlock( fromNSString );
+            _clearCollectionCache_inlock( toNSString );
         }
 
         ClientCursor::invalidate( fromNSString.c_str() );
