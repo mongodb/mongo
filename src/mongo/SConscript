@@ -632,7 +632,7 @@ env.CppUnitTest( "balancer_policy_test" , [ "s/balancer_policy_tests.cpp" ] ,
                          "mongocommon",
                          "coreserver",
                          "coredb",
-                         "mongodandmongos"],
+                         "message_server_port"],
                 NO_CRUTCH=True)
 
 env.CppUnitTest("dbclient_rs_test", [ "client/dbclient_rs_test.cpp" ],
@@ -642,7 +642,7 @@ env.CppUnitTest("dbclient_rs_test", [ "client/dbclient_rs_test.cpp" ],
                     "coreshard",
                     "mocklib",
                     "mongocommon",
-                    "mongodandmongos",
+                    "message_server_port",
                     "mongoscore"],
                  NO_CRUTCH=True)
 
@@ -652,7 +652,7 @@ env.CppUnitTest("scoped_db_conn_test", [ "client/scoped_db_conn_test.cpp" ],
                     "coreserver",
                     "coreshard",
                     "mongocommon",
-                    "mongodandmongos",
+                    "message_server_port",
                     "mongoscore"],
                  NO_CRUTCH=True)
 
@@ -663,7 +663,7 @@ env.CppUnitTest("shard_conn_test", [ "s/shard_conn_test.cpp" ],
                     "mongocommon",
                     "coreserver",
                     "coredb",
-                    "mongodandmongos",
+                    "message_server_port",
                     "mocklib",
                     "$BUILD_DIR/mongo/db/auth/authmocks"],
                  NO_CRUTCH=True)
@@ -674,7 +674,7 @@ env.CppUnitTest("shard_test", [ "s/shard_test.cpp" ],
                           "mongocommon",
                           "coreserver",
                           "coredb",
-                          "mongodandmongos",
+                          "message_server_port",
                           "mocklib"],
                 NO_CRUTCH=True)
 
@@ -684,7 +684,7 @@ env.CppUnitTest('config_server_tests', [ 's/config_server_tests.cpp' ],
                           "mongocommon",
                           "coreserver",
                           "coredb",
-                          "mongodandmongos",
+                          "message_server_port",
                           "mocklib"],
                 NO_CRUTCH=True)
 
@@ -756,14 +756,16 @@ env.StaticLibrary("serveronly", serverOnlyFiles,
                            '$BUILD_DIR/third_party/shim_snappy'])
 
 
+env.StaticLibrary("message_server_port", "util/net/message_server_port.cpp")
+
 # These files go into mongos and mongod only, not into the shell or any tools.
 mongodAndMongosFiles = [
     "db/initialize_server_global_state.cpp",
     "db/server_extra_log_context.cpp",
-    "util/net/message_server_port.cpp",
     "db/dbwebserver.cpp",
     ]
-env.StaticLibrary("mongodandmongos", mongodAndMongosFiles)
+env.StaticLibrary("mongodandmongos", mongodAndMongosFiles,
+                  LIBDEPS=["message_server_port"])
 
 env.StaticLibrary("mongodwebserver",
                   [
