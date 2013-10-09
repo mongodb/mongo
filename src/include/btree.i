@@ -130,34 +130,33 @@ __wt_cache_dirty_decr(WT_SESSION_IMPL *session, WT_PAGE *page)
 	cache = S2C(session)->cache;
 	size = page->memory_footprint;
 
-	if (cache->bytes_dirty < size || cache->pages_dirty == 0) {
-		if (WT_VERBOSE_ISSET(session, evictserver))
-			(void)__wt_verbose(session,
-			    "Cache dirty decrement failed: %" PRIu64
-			    " pages dirty, %" PRIu64
-			    " bytes dirty, decrement size %" PRIuMAX,
-			    cache->pages_dirty,
-			    cache->bytes_dirty, (uintmax_t)size);
-		cache->bytes_dirty = 0;
+	if (cache->pages_dirty < 1) {
+		(void)__wt_errx(session,
+		   "cache dirty decrement failed: cache dirty page count went "
+		   "negative");
 		cache->pages_dirty = 0;
-		page->modify->bytes_dirty = 0;
-	} else {
+	} else
 		(void)WT_ATOMIC_SUB(cache->pages_dirty, 1);
 
-		/*
-		 * It is possible to decrement the footprint of the page
-		 * without making the page dirty (for example when freeing an
-		 * obsolete update list), so the footprint could change between
-		 * read and decrement, and we might attempt to decrement by a
-		 * different amount than the bytes held by the page.
-		 *
-		 * We catch that by maintaining a per-page dirty size, and
-		 * fixing the cache stats if that is non-zero when the page is
-		 * discarded.
-		 */
-		(void)WT_ATOMIC_SUB(cache->bytes_dirty, size);
-		(void)WT_ATOMIC_SUB(page->modify->bytes_dirty, size);
-	}
+	/*
+	 * It is possible to decrement the footprint of the page without making
+	 * the page dirty (for example when freeing an obsolete update list),
+	 * so the footprint could change between read and decrement, and we
+	 * might attempt to decrement by a different amount than the bytes held
+	 * by the page.
+	 *
+	 * We catch that by maintaining a per-page dirty size, and fixing the
+	 * cache stats if that is non-zero when the page is discarded.
+	 *
+	 * Also take care that the global size doesn't go negative.  This may
+	 * lead to small accounting errors (particularly on the last page of the
+	 * last file in a checkpoint), but that will come out in the wash when
+	 * the page is evicted.
+	 */
+	size = WT_MIN(page->memory_footprint, cache->bytes_dirty);
+	(void)WT_ATOMIC_SUB(cache->bytes_dirty, size);
+	(void)WT_ATOMIC_SUB(cache->pages_dirty, 1);
+	(void)WT_ATOMIC_SUB(page->bytes_dirty, size);
 }
 
 /*
