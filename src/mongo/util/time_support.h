@@ -99,6 +99,12 @@ namespace mongo {
 
         void nextSleepMillis();
 
+        /**
+         * testing-only function. used in dbtests/basictests.cpp
+         */
+        int getNextSleepMillis(int lastSleepMillis, unsigned long long currTimeMillis,
+                               unsigned long long lastErrorTimeMillis) const;
+
     private:
 
         // Parameters

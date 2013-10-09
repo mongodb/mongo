@@ -307,6 +307,15 @@ namespace mongo {
         unsigned long long lastErrorTimeMillis = _lastErrorTimeMillis;
         _lastErrorTimeMillis = currTimeMillis;
 
+        lastSleepMillis = getNextSleepMillis(lastSleepMillis, currTimeMillis, lastErrorTimeMillis);
+
+        // Store the last slept time
+        _lastSleepMillis = lastSleepMillis;
+        sleepmillis( lastSleepMillis );
+    }
+
+    int Backoff::getNextSleepMillis(int lastSleepMillis, unsigned long long currTimeMillis,
+                                    unsigned long long lastErrorTimeMillis) const {
         // Backoff logic
 
         // Get the time since the last error
@@ -326,9 +335,7 @@ namespace mongo {
         if( lastSleepMillis == 0 ) lastSleepMillis = 1;
         else lastSleepMillis = std::min( lastSleepMillis * 2, _maxSleepMillis );
 
-        // Store the last slept time
-        _lastSleepMillis = lastSleepMillis;
-        sleepmillis( lastSleepMillis );
+        return lastSleepMillis;
     }
 
     extern long long jsTime_virtual_skew;
