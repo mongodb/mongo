@@ -319,5 +319,12 @@ namespace audit {
      */
     void logDropDatabase(ClientBasic* client,
                          const StringData& dbname);
+
+    /**
+     * Logs a collection rename event.
+     */
+    void logRenameCollection(ClientBasic* client,
+                             const StringData& source,
+                             const StringData& target);
 }  // namespace audit
 }  // namespace mongo

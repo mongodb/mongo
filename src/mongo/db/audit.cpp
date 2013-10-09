@@ -191,6 +191,10 @@ namespace audit {
 
     void logDropDatabase(ClientBasic* client,
                          const StringData& dbname) MONGO_AUDIT_STUB
+
+    void logRenameCollection(ClientBasic* client,
+                             const StringData& source,
+                             const StringData& target) MONGO_AUDIT_STUB
 }  // namespace audit
 }  // namespace mongo
 
