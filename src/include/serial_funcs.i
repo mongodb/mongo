@@ -6,7 +6,6 @@ typedef struct {
 	WT_INSERT ***ins_stack;
 	WT_INSERT **next_stack;
 	WT_INSERT *new_ins;
-	int new_ins_taken;
 	uint64_t *recno;
 	u_int skipdepth;
 } __wt_col_append_args;
@@ -34,7 +33,6 @@ __wt_col_append_serial(
 		args->new_ins = *new_insp;
 		*new_insp = NULL;
 	}
-	args->new_ins_taken = 0;
 
 	args->recno = recno;
 
@@ -42,23 +40,31 @@ __wt_col_append_serial(
 
 	__wt_spin_lock(session, &S2BT(session)->serial_lock);
 	ret = __wt_col_append_serial_func(session, args);
+	__wt_spin_unlock(session, &S2BT(session)->serial_lock);
 
-	/* Increment in-memory footprint before decrement is possible. */
-	incr_mem = 0;
-	if (args->new_ins_taken) {
-		WT_ASSERT(session, new_ins_size != 0);
-		incr_mem += new_ins_size;
+	if (ret != 0) {
+		/* Free unused memory. */
+		__wt_free(session, args->new_ins);
+
+		return (ret);
 	}
+
+	/*
+	 * Increment in-memory footprint after releasing the mutex: that's safe
+	 * because the structures we added cannot be discarded while visible to
+	 * any running transaction, and we're a running transaction, which means
+	 * there can be no corresponding delete until we complete.
+	 */
+	incr_mem = 0;
+	WT_ASSERT(session, new_ins_size != 0);
+	incr_mem += new_ins_size;
 	if (incr_mem != 0)
 		__wt_cache_page_inmem_incr(session, page, incr_mem);
 
-	__wt_spin_unlock(session, &S2BT(session)->serial_lock);
+	/* Mark the page dirty after updating the footprint. */
+	__wt_page_modify_set(session, page);
 
-	/* Free any unused memory after releasing serialization mutex. */
-	if (!args->new_ins_taken)
-		__wt_free(session, args->new_ins);
-
-	return (ret);
+	return (0);
 }
 
 static inline void
@@ -78,21 +84,12 @@ __wt_col_append_unpack(
 	*skipdepthp = args->skipdepth;
 }
 
-static inline void
-__wt_col_append_new_ins_taken(void *untyped_args)
-{
-	__wt_col_append_args *args = (__wt_col_append_args *)untyped_args;
-
-	args->new_ins_taken = 1;
-}
-
 typedef struct {
 	WT_PAGE *page;
 	WT_INSERT_HEAD *inshead;
 	WT_INSERT ***ins_stack;
 	WT_INSERT **next_stack;
 	WT_INSERT *new_ins;
-	int new_ins_taken;
 	u_int skipdepth;
 } __wt_insert_args;
 
@@ -119,29 +116,36 @@ __wt_insert_serial(
 		args->new_ins = *new_insp;
 		*new_insp = NULL;
 	}
-	args->new_ins_taken = 0;
 
 	args->skipdepth = skipdepth;
 
 	__wt_spin_lock(session, &S2BT(session)->serial_lock);
 	ret = __wt_insert_serial_func(session, args);
+	__wt_spin_unlock(session, &S2BT(session)->serial_lock);
 
-	/* Increment in-memory footprint before decrement is possible. */
-	incr_mem = 0;
-	if (args->new_ins_taken) {
-		WT_ASSERT(session, new_ins_size != 0);
-		incr_mem += new_ins_size;
+	if (ret != 0) {
+		/* Free unused memory. */
+		__wt_free(session, args->new_ins);
+
+		return (ret);
 	}
+
+	/*
+	 * Increment in-memory footprint after releasing the mutex: that's safe
+	 * because the structures we added cannot be discarded while visible to
+	 * any running transaction, and we're a running transaction, which means
+	 * there can be no corresponding delete until we complete.
+	 */
+	incr_mem = 0;
+	WT_ASSERT(session, new_ins_size != 0);
+	incr_mem += new_ins_size;
 	if (incr_mem != 0)
 		__wt_cache_page_inmem_incr(session, page, incr_mem);
 
-	__wt_spin_unlock(session, &S2BT(session)->serial_lock);
+	/* Mark the page dirty after updating the footprint. */
+	__wt_page_modify_set(session, page);
 
-	/* Free any unused memory after releasing serialization mutex. */
-	if (!args->new_ins_taken)
-		__wt_free(session, args->new_ins);
-
-	return (ret);
+	return (0);
 }
 
 static inline void
@@ -160,20 +164,11 @@ __wt_insert_unpack(
 	*skipdepthp = args->skipdepth;
 }
 
-static inline void
-__wt_insert_new_ins_taken(void *untyped_args)
-{
-	__wt_insert_args *args = (__wt_insert_args *)untyped_args;
-
-	args->new_ins_taken = 1;
-}
-
 typedef struct {
 	WT_PAGE *page;
 	WT_UPDATE **srch_upd;
 	WT_UPDATE *old_upd;
 	WT_UPDATE *upd;
-	int upd_taken;
 	WT_UPDATE **upd_obsolete;
 } __wt_update_args;
 
@@ -198,29 +193,36 @@ __wt_update_serial(
 		args->upd = *updp;
 		*updp = NULL;
 	}
-	args->upd_taken = 0;
 
 	args->upd_obsolete = upd_obsolete;
 
 	__wt_spin_lock(session, &S2BT(session)->serial_lock);
 	ret = __wt_update_serial_func(session, args);
+	__wt_spin_unlock(session, &S2BT(session)->serial_lock);
 
-	/* Increment in-memory footprint before decrement is possible. */
-	incr_mem = 0;
-	if (args->upd_taken) {
-		WT_ASSERT(session, upd_size != 0);
-		incr_mem += upd_size;
+	if (ret != 0) {
+		/* Free unused memory. */
+		__wt_free(session, args->upd);
+
+		return (ret);
 	}
+
+	/*
+	 * Increment in-memory footprint after releasing the mutex: that's safe
+	 * because the structures we added cannot be discarded while visible to
+	 * any running transaction, and we're a running transaction, which means
+	 * there can be no corresponding delete until we complete.
+	 */
+	incr_mem = 0;
+	WT_ASSERT(session, upd_size != 0);
+	incr_mem += upd_size;
 	if (incr_mem != 0)
 		__wt_cache_page_inmem_incr(session, page, incr_mem);
 
-	__wt_spin_unlock(session, &S2BT(session)->serial_lock);
+	/* Mark the page dirty after updating the footprint. */
+	__wt_page_modify_set(session, page);
 
-	/* Free any unused memory after releasing serialization mutex. */
-	if (!args->upd_taken)
-		__wt_free(session, args->upd);
-
-	return (ret);
+	return (0);
 }
 
 static inline void
@@ -235,12 +237,4 @@ __wt_update_unpack(
 	*old_updp = args->old_upd;
 	*updp = args->upd;
 	*upd_obsoletep = args->upd_obsolete;
-}
-
-static inline void
-__wt_update_upd_taken(void *untyped_args)
-{
-	__wt_update_args *args = (__wt_update_args *)untyped_args;
-
-	args->upd_taken = 1;
 }
