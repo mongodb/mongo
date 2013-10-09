@@ -48,7 +48,9 @@ CMP
 COL's
 CONCAT
 CONFIG
+CPUID
 CPUs
+CRC
 CURSORs
 CURSTD
 CallsCustDate
@@ -275,6 +277,7 @@ alfred
 alloc
 allocator
 allocsize
+amd
 ao
 ap
 api
@@ -357,6 +360,7 @@ const
 copyin
 copyout
 cp
+cpuid
 crc
 cref
 ctime
@@ -497,6 +501,7 @@ hrow
 html
 huffman
 hval
+hw
 iS
 iSh
 icount
@@ -508,6 +513,7 @@ incr
 incrementing
 incrv
 indices
+indirects
 indx
 infeasible
 init
@@ -773,6 +779,7 @@ subtree
 subtrees
 sunique
 superset
+sw
 sys
 syserr
 sz
@@ -888,6 +895,7 @@ wrlock
 ws
 wti
 wts
+xF
 xff
 xxxx
 xxxxx

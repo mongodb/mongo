@@ -34,13 +34,12 @@ __wt_connection_init(WT_CONNECTION_IMPL *conn)
 	__wt_stat_init_connection_stats(&conn->stats);
 
 	/* Locks. */
-	__wt_spin_init(session, &conn->api_lock);
-	__wt_spin_init(session, &conn->checkpoint_lock);
-	__wt_spin_init(session, &conn->dhandle_lock);
-	__wt_spin_init(session, &conn->fh_lock);
-	__wt_spin_init(session, &conn->hot_backup_lock);
-	__wt_spin_init(session, &conn->schema_lock);
-	__wt_spin_init(session, &conn->serial_lock);
+	WT_RET(__wt_spin_init(session, &conn->api_lock));
+	WT_RET(__wt_spin_init(session, &conn->checkpoint_lock));
+	WT_RET(__wt_spin_init(session, &conn->dhandle_lock));
+	WT_RET(__wt_spin_init(session, &conn->fh_lock));
+	WT_RET(__wt_spin_init(session, &conn->hot_backup_lock));
+	WT_RET(__wt_spin_init(session, &conn->schema_lock));
 
 	/*
 	 * Block manager.
@@ -48,7 +47,7 @@ __wt_connection_init(WT_CONNECTION_IMPL *conn)
 	 * If there's ever a second block manager, we'll want to make this
 	 * more opaque, but for now this is simpler.
 	 */
-	__wt_spin_init(session, &conn->block_lock);
+	WT_RET(__wt_spin_init(session, &conn->block_lock));
 	TAILQ_INIT(&conn->blockqh);		/* Block manager list */
 
 	return (0);
@@ -95,7 +94,6 @@ __wt_connection_destroy(WT_CONNECTION_IMPL *conn)
 	__wt_spin_destroy(session, &conn->fh_lock);
 	__wt_spin_destroy(session, &conn->hot_backup_lock);
 	__wt_spin_destroy(session, &conn->schema_lock);
-	__wt_spin_destroy(session, &conn->serial_lock);
 
 	/* Free allocated memory. */
 	__wt_free(session, conn->home);

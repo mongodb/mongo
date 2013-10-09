@@ -40,7 +40,7 @@ __wt_col_append_serial(
 
 	args->skipdepth = skipdepth;
 
-	__wt_spin_lock(session, &S2C(session)->serial_lock);
+	__wt_spin_lock(session, &S2BT(session)->serial_lock);
 	ret = __wt_col_append_serial_func(session, args);
 
 	/* Increment in-memory footprint before decrement is possible. */
@@ -52,7 +52,7 @@ __wt_col_append_serial(
 	if (incr_mem != 0)
 		__wt_cache_page_inmem_incr(session, page, incr_mem);
 
-	__wt_spin_unlock(session, &S2C(session)->serial_lock);
+	__wt_spin_unlock(session, &S2BT(session)->serial_lock);
 
 	/* Free any unused memory after releasing serialization mutex. */
 	if (!args->new_ins_taken)
@@ -123,7 +123,7 @@ __wt_insert_serial(
 
 	args->skipdepth = skipdepth;
 
-	__wt_spin_lock(session, &S2C(session)->serial_lock);
+	__wt_spin_lock(session, &S2BT(session)->serial_lock);
 	ret = __wt_insert_serial_func(session, args);
 
 	/* Increment in-memory footprint before decrement is possible. */
@@ -135,7 +135,7 @@ __wt_insert_serial(
 	if (incr_mem != 0)
 		__wt_cache_page_inmem_incr(session, page, incr_mem);
 
-	__wt_spin_unlock(session, &S2C(session)->serial_lock);
+	__wt_spin_unlock(session, &S2BT(session)->serial_lock);
 
 	/* Free any unused memory after releasing serialization mutex. */
 	if (!args->new_ins_taken)
@@ -202,7 +202,7 @@ __wt_update_serial(
 
 	args->upd_obsolete = upd_obsolete;
 
-	__wt_spin_lock(session, &S2C(session)->serial_lock);
+	__wt_spin_lock(session, &S2BT(session)->serial_lock);
 	ret = __wt_update_serial_func(session, args);
 
 	/* Increment in-memory footprint before decrement is possible. */
@@ -214,7 +214,7 @@ __wt_update_serial(
 	if (incr_mem != 0)
 		__wt_cache_page_inmem_incr(session, page, incr_mem);
 
-	__wt_spin_unlock(session, &S2C(session)->serial_lock);
+	__wt_spin_unlock(session, &S2BT(session)->serial_lock);
 
 	/* Free any unused memory after releasing serialization mutex. */
 	if (!args->upd_taken)

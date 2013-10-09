@@ -21,6 +21,11 @@ opening statistics cursors should be reviewed to confirm they have the
 correct behavior.
 </dd>
 
+<dt>Synchronous checkpoint configuration</dt>
+<dd>
+The \c sync configuration key to ::wiredtiger_open has been renamed \c checkpoint_sync.
+</dd>
+
 </dl>
 <hr>
 @section version_164 Upgrading to Version 1.6.4

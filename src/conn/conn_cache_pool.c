@@ -73,7 +73,7 @@ __wt_conn_cache_pool_config(WT_SESSION_IMPL *session, const char **cfg)
 		cp->name = pool_name;
 		pool_name = NULL; /* Belongs to the cache pool now. */
 		TAILQ_INIT(&cp->cache_pool_qh);
-		__wt_spin_init(session, &cp->cache_pool_lock);
+		WT_ERR(__wt_spin_init(session, &cp->cache_pool_lock));
 		WT_ERR(__wt_cond_alloc(session,
 		    "cache pool server", 0, &cp->cache_pool_cond));
 
