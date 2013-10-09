@@ -7,9 +7,9 @@
                Description="!(wix.ProductName)"
                Level="1"
                ConfigurableDirectory="INSTALLLOCATION">
-
-        <MergeRef Id="m_vcredist"/>
-
+        <?if $(var.Edition) = Enterprise ?>
+          <MergeRef Id="m_vcredist"/>
+        <?endif?>
         <ComponentGroupRef Id="cg_License" />
         <Feature Id="Server"
                  Title ="Server"

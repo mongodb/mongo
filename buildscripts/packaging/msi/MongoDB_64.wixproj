@@ -35,6 +35,9 @@
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|x64' ">
     <VerboseOutput>True</VerboseOutput>
   </PropertyGroup>
+  <PropertyGroup Condition=" '$(Edition)' == 'Enterprise' ">
+    <TreatWarningsAsErrors>False</TreatWarningsAsErrors>
+  </PropertyGroup>
   <ItemGroup>
     <Compile Include="..\..\..\src\mongo\installer\msi\wxs\BinaryFragment.wxs" />
     <Compile Include="..\..\..\src\mongo\installer\msi\wxs\FeatureFragment.wxs" />

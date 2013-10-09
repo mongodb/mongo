@@ -36,15 +36,6 @@
       </Directory>
     </Directory>
 
-    <!--
-    Only use VC redistributable on builds with /MD - for now, just Enterprise 
-    -->
-    <?if $(var.Edition) = Enterprise ?>
-      <DirectoryRef Id="TARGETDIR">
-        <Merge Id="m_vcredist" SourceFile="$(env.CommonProgramFiles(x86))\Merge Modules\Microsoft_VC100_CRT_x64.msm" DiskId="1" Language="0"/>
-      </DirectoryRef>
-    <?endif?>
-
     <Media Id="1" Cabinet="media1.cab" EmbedCab="yes" />
     <WixVariable Id="WixUIDialogBmp" Value="$(var.ProjectDir)Dialog.bmp" />
     <WixVariable Id="WixUIBannerBmp" Value="$(var.ProjectDir)Banner.bmp" />
