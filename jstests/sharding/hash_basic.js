@@ -74,10 +74,21 @@ assert.eq(chunkCountBefore + 3, chunkList.length);
 chunkList.forEach(function(chunkToMove) {
     var toShard = configDB.shards.findOne({ _id: { $ne: chunkToMove.shard }})._id;
 
-    var cmdRes = testDB.adminCommand({ moveChunk: 'test.user',
-        bounds: [ chunkToMove.min, chunkToMove.max ],
-        to: toShard, _waitForDelete: true });
-    assert(cmdRes.ok, 'Cmd failed: ' + tojson(cmdRes));
+    print(jsTestName() + " - moving chunk " + chunkToMove._id + " from shard " +
+          chunkToMove.shard + " to " + toShard + "...");
+
+    // Sometimes the TO-side shard isn't immediately ready, this
+    // causes problems on slow hosts.
+    // Remove when SERVER-10232 is fixed
+
+    assert.soon(function() {
+        var cmdRes = testDB.adminCommand({ moveChunk: 'test.user',
+            bounds: [ chunkToMove.min, chunkToMove.max ],
+            to: toShard, _waitForDelete: true });
+        print(jsTestName() + " - result from moving chunk " + chunkToMove._id + ": " +
+              tojson(cmdRes));
+        return cmdRes.ok;
+    }, "Moving chunk " + chunkToMove._id, 10000, 1000);
 });
 
 st.stop();
