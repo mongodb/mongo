@@ -290,20 +290,24 @@ __wt_page_only_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
 static inline void
 __wt_page_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
-	__wt_page_only_modify_set(session, page);
-
 	/*
 	 * Mark the tree dirty (even if the page is already marked dirty, newly
 	 * created pages to support "empty" files are dirty, but the file isn't
 	 * marked dirty until there's a real change needing to be written. Test
 	 * before setting the dirty flag, it's a hot cache line.
 	 *
-	 * We shouldn't need an additional barrier: while technically possible
-	 * a tree is marked dirty but no dirty pages found, it shouldn't cause
-	 * problems.
+	 * The tree's modified flag is cleared by the checkpoint thread: set it
+	 * and insert a barrier before dirtying the page.  (I don't think it's
+	 * a problem if the tree is marked dirty with all the pages clean, it
+	 * might result in an extra checkpoint that doesn't do any work but it
+	 * shouldn't cause problems; regardless, let's play it safe.)
 	 */
-	if (S2BT(session)->modified == 0)
+	if (S2BT(session)->modified == 0) {
 		S2BT(session)->modified = 1;
+		WT_FULL_BARRIER();
+	}
+
+	__wt_page_only_modify_set(session, page);
 }
 
 /*
