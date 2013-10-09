@@ -25,7 +25,7 @@ namespace mongo {
         const BSONField<bool> BatchedCommandResponse::ok("ok");
         const BSONField<int> BatchedCommandResponse::errCode("errCode");
         const BSONField<BSONObj> BatchedCommandResponse::errInfo("errInfo");
-        const BSONField<string> BatchedCommandResponse::errMessage("errMessage");
+        const BSONField<string> BatchedCommandResponse::errMessage("errMsg");
         const BSONField<long long> BatchedCommandResponse::n("n");
         const BSONField<long long> BatchedCommandResponse::upserted("upserted");
         const BSONField<Date_t> BatchedCommandResponse::lastOp("lastOP");
@@ -65,9 +65,9 @@ namespace mongo {
 
         if (_isErrMessageSet) builder.append(errMessage(), _errMessage);
 
-        if (_isNSet) builder.append(n(), _n);
+        if (_isNSet) builder.appendNumber(n(), _n);
 
-        if (_isUpsertedSet) builder.append(upserted(), _upserted);
+        if (_isUpsertedSet) builder.appendNumber(upserted(), _upserted);
 
         if (_isLastOpSet) builder.append(lastOp(), _lastOp);
 
@@ -108,13 +108,39 @@ namespace mongo {
         if (fieldState == FieldParser::FIELD_INVALID) return false;
         _isErrMessageSet = fieldState == FieldParser::FIELD_SET;
 
-        fieldState = FieldParser::extract(source, n, &_n, errMsg);
+        // XXX
+        // We're using appendNumber on generation but being strict in ingestion
+        // This should hold until we give FieldParser some flexibility.
+        BSONField<int> fieldN("n");
+        int tempN;
+        fieldState = FieldParser::extract(source, fieldN, &tempN, errMsg);
         if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isNSet = fieldState == FieldParser::FIELD_SET;
+        if (fieldState == FieldParser::FIELD_SET) {
+            _isNSet = true;
+            _n = tempN;
+        }
 
-        fieldState = FieldParser::extract(source, upserted, &_upserted, errMsg);
+        // XXX
+        //fieldState = FieldParser::extract(source, n, &_n, errMsg);
+        //if (fieldState == FieldParser::FIELD_INVALID) return false;
+        //_isNSet = fieldState == FieldParser::FIELD_SET;
+
+        // XXX
+        // We're using appendNumber on generation but being strict in ingestion
+        // This should hold until we give FieldParser some flexibility.
+        BSONField<int> fieldUpserted("upserted");
+        int tempUpserted;
+        fieldState = FieldParser::extract(source, fieldUpserted, &tempUpserted, errMsg);
         if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isUpsertedSet = fieldState == FieldParser::FIELD_SET;
+        if (fieldState == FieldParser::FIELD_SET) {
+            _isUpsertedSet = true;
+            _upserted = tempUpserted;
+        }
+
+        // XXX
+        // fieldState = FieldParser::extract(source, upserted, &_upserted, errMsg);
+        // if (fieldState == FieldParser::FIELD_INVALID) return false;
+        // _isUpsertedSet = fieldState == FieldParser::FIELD_SET;
 
         fieldState = FieldParser::extract(source, lastOp, &_lastOp, errMsg);
         if (fieldState == FieldParser::FIELD_INVALID) return false;

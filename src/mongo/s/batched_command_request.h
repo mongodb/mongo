@@ -100,10 +100,10 @@ namespace mongo {
         bool isWriteConcernSet() const;
         const BSONObj& getWriteConcern() const;
 
-        void setContinueOnError( bool continueOnError );
-        void unsetContinueOnError();
-        bool isContinueOnErrorSet() const;
-        bool getContinueOnError() const;
+        void setOrdered( bool ordered );
+        void unsetOrdered();
+        bool isOrderedSet() const;
+        bool getOrdered() const;
 
         void setShardVersion( const ChunkVersion& shardVersion );
         void unsetShardVersion();

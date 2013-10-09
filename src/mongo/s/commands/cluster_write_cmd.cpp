@@ -107,7 +107,7 @@ namespace mongo {
     MONGO_DISALLOW_COPYING(ClusterCmdInsert);
     public:
         ClusterCmdInsert() :
-            ClusterWriteCmd( "insert", //
+            ClusterWriteCmd( "insert",
                              BatchedCommandRequest::BatchType_Insert,
                              ActionType::insert ) {
         }
@@ -121,7 +121,7 @@ namespace mongo {
     MONGO_DISALLOW_COPYING(ClusterCmdUpdate);
     public:
         ClusterCmdUpdate() :
-            ClusterWriteCmd( "update", //
+            ClusterWriteCmd( "update",
                              BatchedCommandRequest::BatchType_Update,
                              ActionType::update ) {
         }
@@ -135,7 +135,7 @@ namespace mongo {
     MONGO_DISALLOW_COPYING(ClusterCmdDelete);
     public:
         ClusterCmdDelete() :
-            ClusterWriteCmd( "delete", //
+            ClusterWriteCmd( "delete",
                              BatchedCommandRequest::BatchType_Delete,
                              ActionType::remove ) {
         }
@@ -166,7 +166,13 @@ namespace mongo {
             response.setErrCode( ErrorCodes::FailedToParse );
             response.setErrMessage( errMsg );
             result.appendElements( response.toBSON() );
-            return response.getOk();
+
+            // TODO
+            // There's a pending issue about how to report response here. If we use
+            // the command infra-structure, we should reuse the 'errmsg' field. But
+            // we have already filed that message inside the BatchCommandResponse.
+            // return response.getOk();
+            return true;
         }
 
         //
@@ -174,6 +180,9 @@ namespace mongo {
         //
 
         ChunkManagerTargeter targeter;
+
+        NamespaceString nss( dbName, request.getNS() );
+        request.setNS( nss.ns() );
 
         Status targetInitStatus = targeter.init( NamespaceString( request.getNS() ) );
 
@@ -192,7 +201,13 @@ namespace mongo {
         exec.executeBatch( request, &response );
 
         result.appendElements( response.toBSON() );
-        return response.getOk();
+
+        // TODO
+        // There's a pending issue about how to report response here. If we use
+        // the command infra-structure, we should reuse the 'errmsg' field. But
+        // we have already filed that message inside the BatchCommandResponse.
+        // return response.getOk();
+        return true;
     }
 
     //

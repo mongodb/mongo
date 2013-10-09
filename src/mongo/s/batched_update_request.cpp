@@ -27,7 +27,7 @@ namespace mongo {
         const BSONField<std::string> BatchedUpdateRequest::collName("update");
         const BSONField<std::vector<BatchedUpdateDocument*> > BatchedUpdateRequest::updates("updates");
         const BSONField<BSONObj> BatchedUpdateRequest::writeConcern("writeConcern");
-        const BSONField<bool> BatchedUpdateRequest::continueOnError("continueOnError", false);
+        const BSONField<bool> BatchedUpdateRequest::ordered("ordered", false);
         const BSONField<ChunkVersion> BatchedUpdateRequest::shardVersion("shardVersion");
         const BSONField<long long> BatchedUpdateRequest::session("session");
 
@@ -58,8 +58,8 @@ namespace mongo {
             *errMsg = stream() << "missing " << writeConcern.name() << " field";
             return false;
         }
-        if (!_isContinueOnErrorSet) {
-            *errMsg = stream() << "missing " << continueOnError.name() << " field";
+        if (!_isOrderedSet) {
+            *errMsg = stream() << "missing " << ordered.name() << " field";
             return false;
         }
 
@@ -84,7 +84,7 @@ namespace mongo {
 
         if (_isWriteConcernSet) builder.append(writeConcern(), _writeConcern);
 
-        if (_isContinueOnErrorSet) builder.append(continueOnError(), _continueOnError);
+        if (_isOrderedSet) builder.append(ordered(), _ordered);
 
         if (_shardVersion.get()) {
             // ChunkVersion wants to be an array.
@@ -115,9 +115,9 @@ namespace mongo {
         if (fieldState == FieldParser::FIELD_INVALID) return false;
         _isWriteConcernSet = fieldState == FieldParser::FIELD_SET;
 
-        fieldState = FieldParser::extract(source, continueOnError, &_continueOnError, errMsg);
+        fieldState = FieldParser::extract(source, ordered, &_ordered, errMsg);
         if (fieldState == FieldParser::FIELD_INVALID) return false;
-        _isContinueOnErrorSet = fieldState == FieldParser::FIELD_SET;
+        _isOrderedSet = fieldState == FieldParser::FIELD_SET;
 
         ChunkVersion* tempChunkVersion = NULL;
         fieldState = FieldParser::extract(source, shardVersion, &tempChunkVersion, errMsg);
@@ -140,8 +140,8 @@ namespace mongo {
         _writeConcern = BSONObj();
         _isWriteConcernSet = false;
 
-        _continueOnError = false;
-        _isContinueOnErrorSet = false;
+        _ordered = false;
+        _isOrderedSet = false;
 
         _shardVersion.reset();
 
@@ -168,8 +168,8 @@ namespace mongo {
         other->_writeConcern = _writeConcern;
         other->_isWriteConcernSet = _isWriteConcernSet;
 
-        other->_continueOnError = _continueOnError;
-        other->_isContinueOnErrorSet = _isContinueOnErrorSet;
+        other->_ordered = _ordered;
+        other->_isOrderedSet = _isOrderedSet;
 
         if (other->_shardVersion.get()) _shardVersion->cloneTo(other->_shardVersion.get());
 
@@ -263,22 +263,22 @@ namespace mongo {
         return _writeConcern;
     }
 
-    void BatchedUpdateRequest::setContinueOnError(bool continueOnError) {
-        _continueOnError = continueOnError;
-        _isContinueOnErrorSet = true;
+    void BatchedUpdateRequest::setOrdered(bool ordered) {
+        _ordered = ordered;
+        _isOrderedSet = true;
     }
 
-    void BatchedUpdateRequest::unsetContinueOnError() {
-         _isContinueOnErrorSet = false;
+    void BatchedUpdateRequest::unsetOrdered() {
+         _isOrderedSet = false;
      }
 
-    bool BatchedUpdateRequest::isContinueOnErrorSet() const {
-         return _isContinueOnErrorSet;
+    bool BatchedUpdateRequest::isOrderedSet() const {
+         return _isOrderedSet;
     }
 
-    bool BatchedUpdateRequest::getContinueOnError() const {
-        dassert(_isContinueOnErrorSet);
-        return _continueOnError;
+    bool BatchedUpdateRequest::getOrdered() const {
+        dassert(_isOrderedSet);
+        return _ordered;
     }
 
     void BatchedUpdateRequest::setShardVersion(const ChunkVersion& shardVersion) {

@@ -57,7 +57,7 @@ namespace {
 
         BatchedCommandRequest request( BatchedCommandRequest::BatchType_Insert );
         request.setNS( nss.ns() );
-        request.setContinueOnError( true );
+        request.setOrdered( false );
         request.setWriteConcern( BSONObj() );
 
         // Do single-target, single doc batch write op
@@ -126,7 +126,7 @@ namespace {
 
         BatchedCommandRequest request( BatchedCommandRequest::BatchType_Insert );
         request.setNS( nss.ns() );
-        request.setContinueOnError( true );
+        request.setOrdered( false );
         request.setWriteConcern( BSONObj() );
 
         // Do single-target, single doc batch write op
@@ -186,7 +186,7 @@ namespace {
 
         BatchedCommandRequest request( BatchedCommandRequest::BatchType_Insert );
         request.setNS( nss.ns() );
-        request.setContinueOnError( true );
+        request.setOrdered( false );
         request.setWriteConcern( BSONObj() );
 
         // Do single-target, multi-doc batch write op
@@ -256,7 +256,7 @@ namespace {
 
         BatchedCommandRequest request( BatchedCommandRequest::BatchType_Insert );
         request.setNS( nss.ns() );
-        request.setContinueOnError( true );
+        request.setOrdered( false );
         request.setWriteConcern( BSONObj() );
 
         // Do multi-target, multi-doc batch write op
@@ -331,7 +331,7 @@ namespace {
 
         BatchedCommandRequest request( BatchedCommandRequest::BatchType_Delete );
         request.setNS( nss.ns() );
-        request.setContinueOnError( true );
+        request.setOrdered( false );
         request.setWriteConcern( BSONObj() );
 
         // Each op goes to both shards
@@ -397,7 +397,7 @@ namespace {
 
         BatchedCommandRequest request( BatchedCommandRequest::BatchType_Delete );
         request.setNS( nss.ns() );
-        request.setContinueOnError( true );
+        request.setOrdered( false );
         request.setWriteConcern( BSONObj() );
 
         // Each op goes to both shards
@@ -467,7 +467,7 @@ namespace {
 
         BatchedCommandRequest request( BatchedCommandRequest::BatchType_Insert );
         request.setNS( nss.ns() );
-        request.setContinueOnError( true );
+        request.setOrdered( false );
         request.setWriteConcern( BSONObj() );
 
         // Do single-target, multi-doc batch write op
@@ -525,7 +525,7 @@ namespace {
 
         BatchedCommandRequest request( BatchedCommandRequest::BatchType_Insert );
         request.setNS( nss.ns() );
-        request.setContinueOnError( true );
+        request.setOrdered( false );
         request.setWriteConcern( BSONObj() );
 
         // Do single-target, single doc batch write op

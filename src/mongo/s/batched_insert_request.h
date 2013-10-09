@@ -46,7 +46,7 @@ namespace mongo {
         static const BSONField<std::string> collName;
         static const BSONField<std::vector<BSONObj> > documents;
         static const BSONField<BSONObj> writeConcern;
-        static const BSONField<bool> continueOnError;
+        static const BSONField<bool> ordered;
         static const BSONField<ChunkVersion> shardVersion;
         static const BSONField<long long> session;
 
@@ -92,10 +92,10 @@ namespace mongo {
         bool isWriteConcernSet() const;
         const BSONObj& getWriteConcern() const;
 
-        void setContinueOnError(bool continueOnError);
-        void unsetContinueOnError();
-        bool isContinueOnErrorSet() const;
-        bool getContinueOnError() const;
+        void setOrdered(bool ordered);
+        void unsetOrdered();
+        bool isOrderedSet() const;
+        bool getOrdered() const;
 
         void setShardVersion(const ChunkVersion& shardVersion);
         void unsetShardVersion();
@@ -123,8 +123,8 @@ namespace mongo {
         bool _isWriteConcernSet;
 
         // (M)  whether batch is issued in parallel or not
-        bool _continueOnError;
-        bool _isContinueOnErrorSet;
+        bool _ordered;
+        bool _isOrderedSet;
 
         // (O)  version for this collection on a given shard
         boost::scoped_ptr<ChunkVersion> _shardVersion;

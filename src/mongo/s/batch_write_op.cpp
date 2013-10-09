@@ -130,7 +130,7 @@ namespace mongo {
         for ( size_t i = 0; i < numWriteOps; ++i ) {
 
             // Only do one-at-a-time ops if COE is false
-            if ( !_clientRequest->getContinueOnError() && !batchMap.empty() ) break;
+            if ( _clientRequest->getOrdered() && !batchMap.empty() ) break;
 
             WriteOp& writeOp = _writeOps[i];
 
@@ -254,8 +254,9 @@ namespace mongo {
         if ( _clientRequest->isWriteConcernSet() ) {
             request->setWriteConcern( _clientRequest->getWriteConcern() );
         }
-        if ( _clientRequest->isContinueOnErrorSet() ) {
-            request->setContinueOnError( _clientRequest->getContinueOnError() );
+
+        if ( !request->isOrderedSet() ) {
+            request->setOrdered( _clientRequest->getOrdered() );
         }
         request->setSession( 0 );
     }
@@ -424,7 +425,7 @@ namespace mongo {
 
     bool BatchWriteOp::isFinished() {
         size_t numWriteOps = _clientRequest->sizeWriteOps();
-        bool orderedOps = !_clientRequest->getContinueOnError();
+        bool orderedOps = _clientRequest->getOrdered();
         for ( size_t i = 0; i < numWriteOps; ++i ) {
             WriteOp& writeOp = _writeOps[i];
             if ( writeOp.getWriteState() < WriteOpState_Completed ) return false;

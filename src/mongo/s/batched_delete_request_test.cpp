@@ -57,7 +57,7 @@ namespace {
             BSON(BatchedDeleteRequest::collName("test") <<
                  BatchedDeleteRequest::deletes() << deleteArray <<
                  BatchedDeleteRequest::writeConcern(writeConcernObj) <<
-                 BatchedDeleteRequest::continueOnError(false) <<
+                 BatchedDeleteRequest::ordered(true) <<
                  BatchedDeleteRequest::shardVersion() << shardVersionArray <<
                  BatchedDeleteRequest::session(0));
 

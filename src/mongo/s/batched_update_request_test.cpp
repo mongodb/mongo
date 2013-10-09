@@ -60,7 +60,7 @@ namespace {
             BSON(BatchedUpdateRequest::collName("test") <<
                  BatchedUpdateRequest::updates() << updateArray <<
                  BatchedUpdateRequest::writeConcern(writeConcernObj) <<
-                 BatchedUpdateRequest::continueOnError(false) <<
+                 BatchedUpdateRequest::ordered(true) <<
                  BatchedUpdateRequest::shardVersion() << shardVersionArray <<
                  BatchedUpdateRequest::session(0));
 

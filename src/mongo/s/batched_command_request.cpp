@@ -230,20 +230,20 @@ namespace mongo {
         INVOKE( getWriteConcern );
     }
 
-    void BatchedCommandRequest::setContinueOnError( bool continueOnError ) {
-        INVOKE( setContinueOnError, continueOnError );
+    void BatchedCommandRequest::setOrdered( bool continueOnError ) {
+        INVOKE( setOrdered, continueOnError );
     }
 
-    void BatchedCommandRequest::unsetContinueOnError() {
-        INVOKE( unsetContinueOnError );
+    void BatchedCommandRequest::unsetOrdered() {
+        INVOKE( unsetOrdered );
     }
 
-    bool BatchedCommandRequest::isContinueOnErrorSet() const {
-        INVOKE( isContinueOnErrorSet );
+    bool BatchedCommandRequest::isOrderedSet() const {
+        INVOKE( isOrderedSet );
     }
 
-    bool BatchedCommandRequest::getContinueOnError() const {
-        INVOKE( getContinueOnError );
+    bool BatchedCommandRequest::getOrdered() const {
+        INVOKE( getOrdered );
     }
 
     void BatchedCommandRequest::setShardVersion( const ChunkVersion& shardVersion ) {

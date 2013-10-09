@@ -47,7 +47,7 @@ namespace {
             BSON(BatchedInsertRequest::collName("test") <<
                  BatchedInsertRequest::documents() << insertArray <<
                  BatchedInsertRequest::writeConcern(writeConcernObj) <<
-                 BatchedInsertRequest::continueOnError(false) <<
+                 BatchedInsertRequest::ordered(true) <<
                  BatchedInsertRequest::shardVersion() << shardVersionArray <<
                  BatchedInsertRequest::session(0));
 

@@ -88,15 +88,28 @@ namespace mongo {
         BatchedCommandRequest request( _writeType );
         BatchedCommandResponse response;
 
-        // TODO: if we do namespace parsing, push this to the type
         if ( !request.parseBSON( cmdObj, &errMsg ) || !request.isValid( &errMsg ) ) {
             // Batch parse failure
             response.setOk( false );
             response.setErrCode( 99999 );
             response.setErrMessage( errMsg );
             result.appendElements( response.toBSON() );
-            return response.getOk();
+
+            // TODO
+            // There's a pending issue about how to report response here. If we use
+            // the command infra-structure, we should reuse the 'errmsg' field. But
+            // we have already filed that message inside the BatchCommandResponse.
+            // return response.getOk();
+            return true;
         }
+
+        // Note that this is a runCommmand, and therefore, the database and the collection name
+        // are in different parts of the grammar for the command. But it's more convenient to
+        // work with a NamespaceString. We built it here and replace it in the parsed command.
+        // Internally, everything work with the namespace string as opposed to just the
+        // collection name.
+        NamespaceString nss(dbName, request.getNS());
+        request.setNS(nss.ns());
 
         {
             // Commands with locktype == NONE need to acquire a Context in order to set
@@ -114,7 +127,13 @@ namespace mongo {
         writeBatchExecutor.executeBatch( request, &response );
 
         result.appendElements( response.toBSON() );
-        return response.getOk();
+
+        // TODO
+        // There's a pending issue about how to report response here. If we use
+        // the command infra-structure, we should reuse the 'errmsg' field. But
+        // we have already filed that message inside the BatchCommandResponse.
+        // return response.getOk();
+        return true;
     }
 
     CmdInsert::CmdInsert() :

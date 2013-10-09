@@ -28,6 +28,8 @@
 
 #include "mongo/db/commands/write_commands/batch_executor.h"
 
+#include <memory>
+
 #include "mongo/base/error_codes.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/instance.h"
@@ -45,11 +47,29 @@
 
 namespace mongo {
 
-    using std::auto_ptr;
-    using mongoutils::str::stream;
+    namespace {
 
-    WriteBatchExecutor::WriteBatchExecutor( Client* client, OpCounters* opCounters, LastError* le ) :
-        _client( client ), _opCounters( opCounters ), _le( le ) {
+        // We're assuming here that writeConcern was parsed and is valid. This is just
+        // a quick check of whether is is {w:0} or not.
+        bool verboseResponse( BSONObj writeConcern ) {
+            if ( writeConcern.nFields() != 1 ) {
+                return true;
+            }
+
+            BSONElement wElem = writeConcern["w"];
+            if ( !wElem.isNumber() || wElem.Number() != 0 ) {
+                return true;
+            }
+
+            return false;
+        }
+
+    }
+
+    WriteBatchExecutor::WriteBatchExecutor( Client* client,
+                                            OpCounters* opCounters,
+                                            LastError* le )
+        : _client( client ), _opCounters( opCounters ), _le( le ) {
     }
 
     void WriteBatchExecutor::executeBatch( const BatchedCommandRequest& request,
@@ -58,39 +78,81 @@ namespace mongo {
         Timer commandTimer;
 
         WriteStats stats;
-        auto_ptr<BatchedErrorDetail> error( new BatchedErrorDetail );
+        std::auto_ptr<BatchedErrorDetail> error( new BatchedErrorDetail );
         bool batchSuccess = true;
         bool staleBatch = false;
 
-        // Apply batch ops
+        // Apply each batch item, stopping on an error if we were asked to apply the batch
+        // sequentially.
         size_t numBatchOps = request.sizeWriteOps();
+        bool verbose = verboseResponse( request.getWriteConcern() );
         for ( size_t i = 0; i < numBatchOps; i++ ) {
+
             if ( !applyWriteItem( BatchItemRef( &request, i ), &stats, error.get() ) ) {
 
-                // Batch item failed
+                // If the error is sharding related, we'll have to investigate whether we
+                // have a stale view of sharding state.
                 if ( error->getErrCode() == ErrorCodes::StaleShardVersion ) staleBatch = true;
-                error->setIndex( static_cast<int>( i ) );
-                response->addToErrDetails( error.release() );
+
+                // Don't bother recording if the user doesn't want a verbose answer. We want to
+                // keep the error if this is a one-item batch, since we already compact the
+                // response for those.
+                if (verbose || numBatchOps == 1) {
+                    error->setIndex( static_cast<int>( i ) );
+                    response->addToErrDetails( error.release() );
+                }
+
                 batchSuccess = false;
 
-                if ( !request.getContinueOnError() ) break;
+                if ( request.getOrdered() ) break;
 
                 error.reset( new BatchedErrorDetail );
             }
         }
 
-        //int batchTime = commandTimer.millisReset();
+        // So far, we may have failed some of the batch's items. So we record
+        // that. Rergardless, we still need to apply the write concern.  If that generates a
+        // more specific error, we'd replace for the intermediate error here. Note that we
+        // "compatct" the error messge if this is an one-item batch. (See rationale later in
+        // this file.)
+        if ( !batchSuccess ) {
 
-        // Do write concern
+            if (numBatchOps > 1) {
+                // TODO
+                // Define the final error code here.
+                // Might be used as a final error, depending on write concern success.
+                response->setErrCode( 99999 );
+                response->setErrMessage( "batch op errors occurred" );
+            }
+            else {
+                // Promote the single error.
+                const BatchedErrorDetail* error = response->getErrDetailsAt( 0 );
+                response->setErrCode( error->getErrCode() );
+                if ( error->isErrInfoSet() ) response->setErrInfo( error->getErrInfo() );
+                response->setErrMessage( error->getErrMessage() );
+                response->unsetErrDetails();
+                error = NULL;
+            }
+        }
+
+        // Apply write concern. Note, again, that we're only assembling a full response if the
+        // user is interested in it.
         string errMsg;
         BSONObjBuilder wcResultsB;
         if ( !waitForWriteConcern( request.getWriteConcern(),
                                    !batchSuccess,
                                    &wcResultsB,
                                    &errMsg ) ) {
-            response->setErrCode( ErrorCodes::WriteConcernFailed );
-            response->setErrInfo( wcResultsB.obj() );
+
+            // TODO
+            // Not using error codes yet; we may use the "family" facility of Status for that
+            // response->setErrCode( ErrorCodes::WriteConcernFailed );
+            response->setErrCode( 99999 );
             response->setErrMessage( errMsg );
+
+            if ( verbose ) {
+                response->setErrInfo( wcResultsB.obj() );
+            }
         }
 
         // TODO: Audit where we want to queue here
@@ -101,29 +163,15 @@ namespace mongo {
                                                    &latestShardVersion );
         }
 
-        // int wcTime = commandTimer.millisReset();
-
-        // Only one of these is set
-        response->setN( stats.numUpdated + stats.numInserted + stats.numDeleted );
-        response->setUpserted( stats.numUpserted );
-
-        bool onlyOpErrors = !response->isErrCodeSet() && response->isErrDetailsSet()
-                            && response->sizeErrDetails() > 0;
-        if ( numBatchOps == 1 && onlyOpErrors ) {
-            // Promote single error
-            const BatchedErrorDetail* error = response->getErrDetailsAt( 0 );
-            response->setErrCode( error->getErrCode() );
-            if ( error->isErrInfoSet() ) response->setErrInfo( error->getErrInfo() );
-            response->setErrMessage( error->getErrMessage() );
-            response->unsetErrDetails();
-            error = NULL;
-        }
-        else if ( numBatchOps > 1 && onlyOpErrors ) {
-            response->setErrCode( ErrorCodes::MultipleErrorsOccurred );
-            response->setErrMessage( "multiple batch item errors occurred" );
-        }
-
+        // Set the main body of the response. We assume that, if there was an error, the error
+        // code would already be set.
         response->setOk( !response->isErrCodeSet() );
+        response->setN( stats.numUpdated + stats.numInserted + stats.numDeleted );
+
+        // 'upserted' is only relevant for updated batches.
+        if (request.getBatchType() == BatchedCommandRequest::BatchType_Update) {
+            response->setUpserted( stats.numUpserted );
+        }
     }
 
     namespace {
@@ -252,7 +300,7 @@ namespace mongo {
                 shardVersion.addToBSON( infoB, "vWanted" );
                 error->setErrInfo( infoB.obj() );
 
-                string errMsg = stream()
+                string errMsg = mongoutils::str::stream()
                     << "stale shard version detected before write, received "
                     << request.getShardVersion().toString() << " but local version is "
                     << shardVersion.toString();
