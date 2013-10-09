@@ -1,4 +1,4 @@
-# -*- python-mode -*-
+# -*- mode: python -*-
 
 error_code("OK", 0)
 error_code("InternalError", 1)
