@@ -276,6 +276,22 @@ namespace mongo {
 
         _initForWrites();
 
+        {
+            NamespaceString s( fullns );
+            verify( s.db() == _name );
+
+            if( s.isSystem() ) {
+                if( s.coll() == "system.profile" ) {
+                    if ( _profile != 0 )
+                        return Status( ErrorCodes::IllegalOperation,
+                                       "turn off profiling before dropping system.profile collection" );
+                }
+                else {
+                    return Status( ErrorCodes::IllegalOperation, "can't drop system ns" );
+                }
+            }
+        }
+
         BackgroundOperation::assertNoBgOpInProgForNs( fullns );
 
         if ( collection->_details->getTotalIndexCount() > 0 ) {
@@ -574,20 +590,6 @@ namespace mongo {
             return Status( ErrorCodes::InternalError, str::stream() << "ns not found: " << ns );
 
         BackgroundOperation::assertNoBgOpInProgForNs( ns );
-
-        NamespaceString s( ns );
-        verify( s.db() == _name );
-
-        if( s.isSystem() ) {
-            if( s.coll() == "system.profile" ) {
-                if ( _profile != 0 )
-                    return Status( ErrorCodes::IllegalOperation,
-                                   "turn off profiling before dropping system.profile collection" );
-            }
-            else {
-                return Status( ErrorCodes::IllegalOperation, "can't drop system ns" );
-            }
-        }
 
         {
             // remove from the system catalog
