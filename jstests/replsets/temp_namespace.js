@@ -42,13 +42,11 @@ assert.eq(secondDB.system.namespaces.count({name: /temp\d\.\$.*$/}) , 4); // ind
 assert.eq(secondDB.system.namespaces.count({name: /keep\d$/}) , 4);
 
 // step down primary and make sure former secondary (now primary) drops collections
-var threw = false;
 try {
     master.adminCommand({replSetStepDown: 50, force : true});
 } catch (e) {
-    threw = true;
+    // ignoring socket errors since they sometimes, but not always, fire after running that command.
 }
-assert(threw);
 
 assert.soon(function() {
     printjson(secondDB.adminCommand("replSetGetStatus"));
