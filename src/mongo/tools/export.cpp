@@ -80,7 +80,7 @@ public:
         case jstOID:
             return "ObjectID(" + object.OID().toString() + ")"; // OIDs are always 24 bytes
         case Date:
-            return timeToISOString(object.Date() / 1000);
+            return dateToISOStringUTC(object.Date());
         case Timestamp:
             return csvEscape(object.jsonString(Strict, false));
         case RegEx:
