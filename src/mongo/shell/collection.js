@@ -903,11 +903,6 @@ DBCollection.prototype.aggregate = function(pipeline, extraOpts) {
         cmd.cursor = {};
     }
 
-    if (TestData && !('batchSize' in cmd.cursor)) {
-        // If we are running in a test, set batchsize to 0 to make sure it works across a GetMore
-        cmd.cursor.batchSize = 0;
-    }
-
     var res = this.runCommand("aggregate", cmd);
     assert.commandWorked(res, "aggregate with cursor failed");
 
