@@ -359,7 +359,7 @@ DB.prototype.setProfilingLevel = function(level,slowms) {
     }
 
     var cmd = { profile: level };
-    if ( slowms )
+    if ( isNumber( slowms ) )
         cmd["slowms"] = slowms;
     return this._dbCommand( cmd );
 }
