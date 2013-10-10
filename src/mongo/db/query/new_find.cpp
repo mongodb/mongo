@@ -107,6 +107,11 @@ namespace mongo {
 
     // Do we use the old or the new?  I call this the spigot.
     bool canUseNewSystem(const QueryMessage& qm, CanonicalQuery** cqOut) {
+        // This is a read lock.  We require this because if we're parsing a $where, the
+        // where-specific parsing code assumes we have a lock and creates execution machinery that
+        // requires it.
+        Client::ReadContext ctx(qm.ns);
+
         CanonicalQuery* cq;
         Status status = CanonicalQuery::canonicalize(qm, &cq);
         if (!status.isOK()) { return false; }
@@ -151,8 +156,6 @@ namespace mongo {
         MatchExpression* nearNode;
         if (QueryPlannerCommon::hasNode(cq->root(), MatchExpression::GEO_NEAR, &nearNode)) {
             GeoNearMatchExpression* gnme = static_cast<GeoNearMatchExpression*>(nearNode);
-            // This is a read lock.
-            Client::ReadContext ctx(cq->ns());
             NamespaceDetails* nsd = nsdetails(cq->ns().c_str());
             if (NULL == nsd) { return true; }
             for (int i = 0; i < nsd->getCompletedIndexCount(); ++i) {
@@ -650,6 +653,10 @@ namespace mongo {
                 // Fill in the number of documents consummed that were involved in an ongoing
                 // (or aborted) migration.
                 explain->setNChunkSkips(numMisplacedDocs);
+
+                // We might have skipped some results due to chunk migration etc. so our count is
+                // correct and explain's is not.
+                explain->setN(numResults);
 
                 // Clock the whole operation.
                 explain->setMillis(curop.elapsedMillis());
