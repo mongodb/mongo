@@ -285,6 +285,17 @@ namespace mongo {
                         return s;
                     root->add( s.getValue() );
                 }
+                else if ( mongoutils::str::equals( "text", rest ) ) {
+                    if ( e.type() != Object ) {
+                        return StatusWithMatchExpression( ErrorCodes::BadValue,
+                                                          "$text expects an object" );
+                    }
+                    StatusWithMatchExpression s = expressionParserTextCallback( e.Obj() );
+                    if ( !s.isOK() ) {
+                        return s;
+                    }
+                    root->add( s.getValue() );
+                }
                 else if ( mongoutils::str::equals( "comment", rest ) ) {
                 }
                 else {
@@ -623,19 +634,30 @@ namespace mongo {
         return StatusWithMatchExpression( myAnd.release() );
     }
 
+    // Geo
     StatusWithMatchExpression expressionParserGeoCallbackDefault( const char* name,
                                                                   int type,
                                                                   const BSONObj& section ) {
         return StatusWithMatchExpression( ErrorCodes::BadValue, "geo not linked in" );
     }
 
-    MatchExpressionParserGeoCallback expressionParserGeoCallback = expressionParserGeoCallbackDefault;
+    MatchExpressionParserGeoCallback expressionParserGeoCallback =
+        expressionParserGeoCallbackDefault;
 
+    // Where
     StatusWithMatchExpression expressionParserWhereCallbackDefault(const BSONElement& where) {
         return StatusWithMatchExpression( ErrorCodes::BadValue, "$where not linked in" );
     }
 
-    MatchExpressionParserWhereCallback expressionParserWhereCallback = expressionParserWhereCallbackDefault;
+    MatchExpressionParserWhereCallback expressionParserWhereCallback =
+        expressionParserWhereCallbackDefault;
 
+    // Text
+    StatusWithMatchExpression expressionParserTextCallbackDefault( const BSONObj& queryObj ) {
+        return StatusWithMatchExpression( ErrorCodes::BadValue, "$text not linked in" );
+    }
+
+    MatchExpressionParserTextCallback expressionParserTextCallback =
+        expressionParserTextCallbackDefault;
 
 }

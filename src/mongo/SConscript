@@ -158,6 +158,11 @@ env.StaticLibrary('expressions_geo',
                    'db/matcher/expression_parser_geo.cpp'],
                   LIBDEPS=['expressions','geoquery','geoparser'] )
 
+env.StaticLibrary('expressions_text',
+                  ['db/matcher/expression_text.cpp',
+                   'db/matcher/expression_parser_text.cpp'],
+                  LIBDEPS=['expressions','db/fts/base'] )
+
 env.StaticLibrary('expressions_where',
                   ['db/matcher/expression_where.cpp'],
                   LIBDEPS=['expressions'] )
@@ -173,6 +178,10 @@ env.CppUnitTest('expression_geo_test',
                 ['db/matcher/expression_geo_test.cpp',
                  'db/matcher/expression_parser_geo_test.cpp'],
                 LIBDEPS=['expressions_geo'] )
+
+env.CppUnitTest('expression_text_test',
+                ['db/matcher/expression_parser_text_test.cpp'],
+                LIBDEPS=['expressions_text'] )
 
 env.CppUnitTest('expression_parser_test',
                 ['db/matcher/expression_parser_test.cpp',
@@ -373,6 +382,7 @@ env.StaticLibrary("coredb", [
                            'expressions',
                            'expressions_geo',
                            'expressions_where',
+                           'expressions_text',
                            'db/exec/working_set',
                            '$BUILD_DIR/mongo/foundation',
                            '$BUILD_DIR/third_party/shim_snappy',

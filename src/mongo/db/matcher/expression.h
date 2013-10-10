@@ -62,8 +62,7 @@ namespace mongo {
             ATOMIC, ALWAYS_FALSE,
 
             // Things that we parse but cannot be answered without an index.
-            // TODO: Text goes here eventually.
-            GEO_NEAR,
+            GEO_NEAR, TEXT,
         };
 
         MatchExpression( MatchType type );

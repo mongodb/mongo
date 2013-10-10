@@ -260,6 +260,7 @@ namespace mongo {
         case MatchExpression::GEO_NEAR:
         case MatchExpression::NOT:
         case MatchExpression::NOR:
+        case MatchExpression::TEXT:
             // maybe?
             return NULL;
 

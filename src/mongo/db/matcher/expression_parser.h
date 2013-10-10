@@ -123,4 +123,7 @@ namespace mongo {
     typedef boost::function<StatusWithMatchExpression(const BSONElement& where)> MatchExpressionParserWhereCallback;
     extern MatchExpressionParserWhereCallback expressionParserWhereCallback;
 
+    typedef boost::function<StatusWithMatchExpression(const BSONObj& queryObj)> MatchExpressionParserTextCallback;
+    extern MatchExpressionParserTextCallback expressionParserTextCallback;
+
 }
