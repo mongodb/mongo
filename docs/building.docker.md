@@ -4,6 +4,6 @@ Assuming you have [docker](http://www.docker.io/gettingstarted/#h_installation) 
 
 ```bash
 git clone https://github.com/mongodb/mongo.git
-cd mongo/buildscripts
+cd mongo
 docker build -t=mongo .
 ```

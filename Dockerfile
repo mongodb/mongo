@@ -8,8 +8,8 @@ RUN apt-get install -y python-pymongo
 
 RUN mkdir -p /usr/src/mongo
 WORKDIR /usr/src/mongo
-ADD ../ .
+ADD ./ /usr/src/mongo
 
-RUN cd scons all -j `nproc`
+RUN scons all -j `nproc`
 
 ENTRYPOINT /bin/bash
