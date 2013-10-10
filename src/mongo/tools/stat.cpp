@@ -86,8 +86,8 @@ namespace mongo {
         }
 
         int run() {
-            _statUtil.setSeconds(mongoStatGlobalParams.allFields);
-            _statUtil.setAll(mongoStatGlobalParams.sleep);
+            _statUtil.setAll(mongoStatGlobalParams.allFields);
+            _statUtil.setSeconds(mongoStatGlobalParams.sleep);
             if (mongoStatGlobalParams.many)
                 return runMany();
             return runNormal();
