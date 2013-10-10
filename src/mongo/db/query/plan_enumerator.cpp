@@ -20,6 +20,7 @@
 
 #include "mongo/db/query/indexability.h"
 #include "mongo/db/query/index_tag.h"
+#include "mongo/db/query/qlog.h"
 
 namespace mongo {
 
@@ -37,7 +38,7 @@ namespace mongo {
         _inOrderCount = 0;
         _done = false;
 
-        cout << "enumerator received root:\n" << _root->toString() << endl;
+        QLOG() << "enumerator received root:\n" << _root->toString() << endl;
 
         // Fill out our memo structure from the tagged _root.
         _done = !prepMemo(_root);
@@ -51,7 +52,7 @@ namespace mongo {
     void PlanEnumerator::dumpMemo() {
         verify(_inOrderCount == _memo.size());
         for (size_t i = 0; i < _inOrderCount; ++i) {
-            cout << "[Node #" << i << "]: " << _memo[i]->toString() << endl;
+            QLOG() << "[Node #" << i << "]: " << _memo[i]->toString() << endl;
         }
     }
 
@@ -126,10 +127,10 @@ namespace mongo {
         sortUsingTags(*tree);
 
         _root->resetTag();
-        cout << "Enumerator: memo right before moving:\n";
+        QLOG() << "Enumerator: memo right before moving:\n";
         dumpMemo();
         _done = nextMemo(_nodeToId[_root]);
-        cout << "Enumerator: memo right after moving:\n";
+        QLOG() << "Enumerator: memo right after moving:\n";
         dumpMemo();
         return true;
     }
@@ -242,6 +243,10 @@ namespace mongo {
                 if ((*_indices)[it->first].multikey) {
                     // XXX: pick a better pred than the first one that happens to wander in.
                     // XXX: see and3.js, indexq.js, arrayfind7.js
+                    QLOG() << "Index " << (*_indices)[it->first].keyPattern.toString()
+                         << " is multikey but has >1 pred possible, should be smarter"
+                         << " here and pick the best one"
+                         << endl;
                     assign->preds.resize(1);
                 }
                 assign->positions.resize(assign->preds.size(), 0);
@@ -330,7 +335,7 @@ namespace mongo {
     }
 
     void PlanEnumerator::tagMemo(size_t id) {
-        cout << "Tagging memoID " << id << endl;
+        QLOG() << "Tagging memoID " << id << endl;
         NodeAssignment* assign = _memo[id];
         verify(NULL != assign);
 

@@ -35,6 +35,7 @@
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/explain_plan.h"
 #include "mongo/db/query/plan_executor.h"
+#include "mongo/db/query/qlog.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/type_explain.h"
 
@@ -220,7 +221,7 @@ namespace mongo {
         _alreadyProduced = _candidates[bestChild].results;
         _bestSolution.reset(_candidates[bestChild].solution);
 
-        cout << "Winning solution:\n" << _bestSolution->toString() << endl;
+        QLOG() << "Winning solution:\n" << _bestSolution->toString() << endl;
 
         // TODO:
         // Store the choice we just made in the cache.

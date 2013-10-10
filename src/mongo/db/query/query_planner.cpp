@@ -45,6 +45,7 @@
 #include "mongo/db/query/plan_enumerator.h"
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/db/query/query_solution.h"
+#include "mongo/db/query/qlog.h"
 
 namespace mongo {
 
@@ -228,7 +229,7 @@ namespace mongo {
             }
         }
 
-        // cout << "Outputting collscan " << soln->toString() << endl;
+        // QLOG() << "Outputting collscan " << soln->toString() << endl;
         return analyzeDataAccess(query, csn);
     }
 
@@ -236,7 +237,7 @@ namespace mongo {
     QuerySolutionNode* QueryPlanner::makeLeafNode(const IndexEntry& index,
                                                   MatchExpression* expr,
                                                   bool* exact) {
-        // cout << "making leaf node for " << expr->toString() << endl;
+        // QLOG() << "making leaf node for " << expr->toString() << endl;
         // We're guaranteed that all GEO_NEARs are first.  This slightly violates the "sort index
         // predicates by their position in the compound index" rule but GEO_NEAR isn't an ixscan.
         // This saves our bacon when we have {foo: 1, bar: "2dsphere"} and the predicate on bar is a
@@ -263,14 +264,14 @@ namespace mongo {
                 // Note that even if we're starting a GeoNear node, we may never get a
                 // predicate for $near.  So, in that case, the builder "collapses" it into
                 // an ixscan.
-                // cout << "Making geonear 2dblahblah kp " << index.toString() << endl;
+                // QLOG() << "Making geonear 2dblahblah kp " << index.toString() << endl;
                 GeoNear2DSphereNode* ret = new GeoNear2DSphereNode();
                 ret->indexKeyPattern = index.keyPattern;
                 ret->nq = nearme->getData();
                 ret->baseBounds.fields.resize(index.keyPattern.nFields());
                 stringstream ss;
                 ret->appendToString(&ss, 0);
-                // cout << "geonear 2dsphere out " << ss.str() << endl;
+                // QLOG() << "geonear 2dsphere out " << ss.str() << endl;
                 return ret;
             }
         }
@@ -286,7 +287,7 @@ namespace mongo {
             return ret;
         }
         else {
-            // cout << "making ixscan for " << expr->toString() << endl;
+            // QLOG() << "making ixscan for " << expr->toString() << endl;
 
             // Note that indexKeyPattern.firstElement().fieldName() may not equal expr->path()
             // because expr might be inside an array operator that provides a path prefix.
@@ -295,24 +296,10 @@ namespace mongo {
             isn->indexIsMultiKey = index.multikey;
             isn->bounds.fields.resize(index.keyPattern.nFields());
 
-            // XXX XXX: move this if inside of the bounds builder.
-            if (MatchExpression::ELEM_MATCH_VALUE == expr->matchType()) {
-                // Root is tagged with an index.  We have predicates over root's path.  Pick one
-                // to define the bounds.
+            IndexBoundsBuilder::translate(expr, index.keyPattern.firstElement(),
+                                          &isn->bounds.fields[0], exact);
 
-                // TODO: We could/should merge the bounds (possibly subject to various multikey
-                // etc.  restrictions).  For now we don't bother.
-                IndexBoundsBuilder::translate(expr->getChild(0), index.keyPattern.firstElement(),
-                                              &isn->bounds.fields[0], exact);
-                // TODO: I think this is valid but double check.
-                *exact = false;
-            }
-            else {
-                IndexBoundsBuilder::translate(expr, index.keyPattern.firstElement(),
-                                              &isn->bounds.fields[0], exact);
-            }
-
-            // cout << "bounds are " << isn->bounds.toString() << " exact " << *exact << endl;
+            // QLOG() << "bounds are " << isn->bounds.toString() << " exact " << *exact << endl;
             return isn;
         }
     }
@@ -352,10 +339,10 @@ namespace mongo {
             verify(!keyElt.eoo());
             *exactOut = false;
 
-            //cout << "current bounds are " << currentScan->bounds.toString() << endl;
-            //cout << "node merging in " << child->toString() << endl;
-            //cout << "merging with field " << keyElt.toString(true, true) << endl;
-            //cout << "taking advantage of compound index "
+            //QLOG() << "current bounds are " << currentScan->bounds.toString() << endl;
+            //QLOG() << "node merging in " << child->toString() << endl;
+            //QLOG() << "merging with field " << keyElt.toString(true, true) << endl;
+            //QLOG() << "taking advantage of compound index "
                  //<< indices[currentIndexNumber].keyPattern.toString() << endl;
 
             verify(boundsToFillOut->fields.size() > pos);
@@ -393,7 +380,7 @@ namespace mongo {
                 std::reverse(iv.begin(), iv.end());
                 // Step 2: reverse each interval.
                 for (size_t i = 0; i < iv.size(); ++i) {
-                    // cout << "reversing " << iv[i].toString() << endl;
+                    // QLOG() << "reversing " << iv[i].toString() << endl;
                     iv[i].reverse();
                 }
             }
@@ -402,7 +389,7 @@ namespace mongo {
 
         // XXX: some day we'll maybe go backward to pull a sort out
         if (!bounds->isValidFor(kp, 1)) {
-            cout << "INVALID BOUNDS: " << bounds->toString() << endl;
+            QLOG() << "INVALID BOUNDS: " << bounds->toString() << endl;
             verify(0);
         }
     }
@@ -823,7 +810,7 @@ namespace mongo {
                 verify(NULL != soln);
                 stringstream ss;
                 soln->appendToString(&ss, 0);
-                // cout << "about to finish leaf node, soln " << ss.str() << endl;
+                // QLOG() << "about to finish leaf node, soln " << ss.str() << endl;
                 finishLeafNode(soln, indices[tag->index]);
 
                 if (inArrayOperator) {
@@ -954,10 +941,10 @@ namespace mongo {
 
         // Project the results.
         if (NULL != query.getProj()) {
-            cout << "PROJECTION: fetched status: " << solnRoot->fetched() << endl;
-            cout << "PROJECTION: Current plan is " << solnRoot->toString() << endl;
+            QLOG() << "PROJECTION: fetched status: " << solnRoot->fetched() << endl;
+            QLOG() << "PROJECTION: Current plan is " << solnRoot->toString() << endl;
             if (query.getProj()->requiresDocument()) {
-                cout << "PROJECTION: claims to require doc adding fetch.\n";
+                QLOG() << "PROJECTION: claims to require doc adding fetch.\n";
                 // If the projection requires the entire document, somebody must fetch.
                 if (!solnRoot->fetched()) {
                     FetchNode* fetch = new FetchNode();
@@ -966,12 +953,12 @@ namespace mongo {
                 }
             }
             else {
-                cout << "PROJECTION: requires fields\n";
+                QLOG() << "PROJECTION: requires fields\n";
                 const vector<string>& fields = query.getProj()->requiredFields();
                 bool covered = true;
                 for (size_t i = 0; i < fields.size(); ++i) {
                     if (!solnRoot->hasField(fields[i])) {
-                        cout << "PROJECTION: not covered cuz doesn't have field "
+                        QLOG() << "PROJECTION: not covered cuz doesn't have field "
                              << fields[i] << endl;
                         covered = false;
                         break;
@@ -1035,7 +1022,7 @@ namespace mongo {
     // static
     void QueryPlanner::plan(const CanonicalQuery& query, const vector<IndexEntry>& indices,
                             size_t options, vector<QuerySolution*>* out) {
-        cout << "Begin planning.\nquery = " << query.toString() << endl;
+        QLOG() << "Begin planning.\nquery = " << query.toString() << endl;
 
         bool canTableScan = !(options & QueryPlanner::NO_TABLE_SCAN);
 
@@ -1060,7 +1047,7 @@ namespace mongo {
         if (!query.getParsed().getHint().isEmpty()) {
             BSONElement natural = query.getParsed().getHint().getFieldDotted("$natural");
             if (!natural.eoo()) {
-                cout << "forcing a table scan due to hinted $natural\n";
+                QLOG() << "forcing a table scan due to hinted $natural\n";
                 if (canTableScan) {
                     out->push_back(makeCollectionScan(query, false));
                 }
@@ -1079,7 +1066,7 @@ namespace mongo {
                 warning() << "Can't handle NOT/NOR with GEO_NEAR";
                 return;
             }
-            cout << "NOT/NOR in plan, just outtping a collscan\n";
+            QLOG() << "NOT/NOR in plan, just outtping a collscan\n";
             if (canTableScan) {
                 out->push_back(makeCollectionScan(query, false));
             }
@@ -1092,7 +1079,7 @@ namespace mongo {
 
         /*
         for (unordered_set<string>::const_iterator it = fields.begin(); it != fields.end(); ++it) {
-            cout << "field " << *it << endl;
+            QLOG() << "field " << *it << endl;
         }
         */
 
@@ -1123,7 +1110,7 @@ namespace mongo {
                 string hintName = firstHintElt.String();
                 for (size_t i = 0; i < indices.size(); ++i) {
                     if (indices[i].name == hintName) {
-                        cout << "hint by name specified, restricting indices to "
+                        QLOG() << "hint by name specified, restricting indices to "
                              << indices[i].keyPattern.toString() << endl;
                         relevantIndices.clear();
                         relevantIndices.push_back(indices[i]);
@@ -1138,7 +1125,7 @@ namespace mongo {
                     if (0 == indices[i].keyPattern.woCompare(hintIndex)) {
                         relevantIndices.clear();
                         relevantIndices.push_back(indices[i]);
-                        cout << "hint specified, restricting indices to " << hintIndex.toString()
+                        QLOG() << "hint specified, restricting indices to " << hintIndex.toString()
                              << endl;
                         hintIndexNumber = i;
                         break;
@@ -1172,7 +1159,7 @@ namespace mongo {
         // If we have any relevant indices, we try to create indexed plans.
         if (0 < relevantIndices.size()) {
             for (size_t i = 0; i < relevantIndices.size(); ++i) {
-                cout << "relevant idx " << i << " is " << relevantIndices[i].toString() << endl;
+                QLOG() << "relevant idx " << i << " is " << relevantIndices[i].toString() << endl;
             }
 
             // The enumerator spits out trees tagged with IndexTag(s).
@@ -1181,7 +1168,7 @@ namespace mongo {
 
             MatchExpression* rawTree;
             while (isp.getNext(&rawTree)) {
-                cout << "about to build solntree from tagged tree:\n" << rawTree->toString()
+                QLOG() << "about to build solntree from tagged tree:\n" << rawTree->toString()
                      << endl;
 
                 // This can fail if enumeration makes a mistake.
@@ -1193,12 +1180,12 @@ namespace mongo {
                 QuerySolution* soln = analyzeDataAccess(query, solnRoot);
                 verify(NULL != soln);
 
-                cout << "Planner: adding solution:\n" << soln->toString() << endl;
+                QLOG() << "Planner: adding solution:\n" << soln->toString() << endl;
                 out->push_back(soln);
             }
         }
 
-        cout << "Planner: outputted " << out->size() << " indexed solutions.\n";
+        QLOG() << "Planner: outputted " << out->size() << " indexed solutions.\n";
 
         // An index was hinted.  If there are any solutions, they use the hinted index.  If not, we
         // scan the entire index to provide results and output that as our plan.  This is the
@@ -1239,7 +1226,7 @@ namespace mongo {
             verify(NULL != soln);
             out->push_back(soln);
 
-            cout << "Planner: using hinted index as scan, soln = " << soln->toString() << endl;
+            QLOG() << "Planner: using hinted index as scan, soln = " << soln->toString() << endl;
             return;
         }
 
@@ -1286,7 +1273,7 @@ namespace mongo {
                         QuerySolution* soln = analyzeDataAccess(query, fetch);
                         verify(NULL != soln);
                         out->push_back(soln);
-                        cout << "Planner: using index to provide sort, soln = " << soln->toString() << endl;
+                        QLOG() << "Planner: using index to provide sort, soln = " << soln->toString() << endl;
                         break;
                     }
                 }
@@ -1299,7 +1286,7 @@ namespace mongo {
             && ((options & QueryPlanner::INCLUDE_COLLSCAN) || (0 == out->size() && canTableScan))) {
             QuerySolution* collscan = makeCollectionScan(query, false);
             out->push_back(collscan);
-            cout << "Planner: outputting a collscan\n";
+            QLOG() << "Planner: outputting a collscan\n";
         }
     }
 

@@ -33,6 +33,7 @@
 #include "mongo/db/index/expression_index.h"
 #include "mongo/db/matcher/expression_geo.h"
 #include "mongo/db/query/indexability.h"
+#include "mongo/db/query/qlog.h"
 #include "mongo/util/mongoutils/str.h"
 #include "third_party/s2/s2.h"
 #include "third_party/s2/s2cell.h"
@@ -208,7 +209,28 @@ namespace mongo {
                    || MatchExpression::MATCH_IN == expr->matchType());
         }
 
-        if (MatchExpression::EQ == expr->matchType()) {
+        if (MatchExpression::ELEM_MATCH_VALUE == expr->matchType()) {
+            OrderedIntervalList acc;
+            bool exact;
+            translate(expr->getChild(0), elt, &acc, &exact);
+            if (!exact) {
+                *exactOut = false;
+            }
+            for (size_t i = 1; i < expr->numChildren(); ++i) {
+                OrderedIntervalList next;
+                translate(expr->getChild(i), elt, &next, &exact);
+                if (!exact) {
+                    *exactOut = false;
+                }
+                intersectize(next, &acc);
+            }
+
+            for (size_t i = 0; i < acc.intervals.size(); ++i) {
+                oilOut->intervals.push_back(acc.intervals[i]);
+            }
+            std::sort(oilOut->intervals.begin(), oilOut->intervals.end(), IntervalComparison);
+        }
+        else if (MatchExpression::EQ == expr->matchType()) {
             const EqualityMatchExpression* node = static_cast<const EqualityMatchExpression*>(expr);
             translateEquality(node->getData(), isHashed, oilOut, exactOut);
         }
@@ -248,7 +270,7 @@ namespace mongo {
             bob.appendAs(dataElt, "");
             BSONObj dataObj = bob.obj();
             verify(dataObj.isOwned());
-            cout << "data obj is " << dataObj.toString() << endl;
+            QLOG() << "data obj is " << dataObj.toString() << endl;
             oilOut->intervals.push_back(makeRangeInterval(dataObj, true, false));
             // XXX: only exact if not (null or array)
             *exactOut = true;
@@ -400,7 +422,7 @@ namespace mongo {
         while (argidx < argiv.size() && ividx < iv.size()) {
             Interval::IntervalComparison cmp = argiv[argidx].compare(iv[ividx]);
             /*
-            cout << "comparing " << argiv[argidx].toString()
+            QLOG() << "comparing " << argiv[argidx].toString()
                  << " with " << iv[ividx].toString()
                  << " cmp is " << Interval::cmpstr(cmp) << endl;
                  */
@@ -462,7 +484,7 @@ namespace mongo {
         while (i < iv.size() - 1) {
             // Compare i with i + 1.
             Interval::IntervalComparison cmp = iv[i].compare(iv[i + 1]);
-            // cout << "comparing " << iv[i].toString() << " with " << iv[i+1].toString()
+            // QLOG() << "comparing " << iv[i].toString() << " with " << iv[i+1].toString()
                  // << " cmp is " << Interval::cmpstr(cmp) << endl;
 
             // This means our sort didn't work.
@@ -549,7 +571,7 @@ namespace mongo {
 
         const string start = simpleRegex(rme->getString().c_str(), rme->getFlags().c_str(), exact);
 
-        // cout << "regex bounds start is " << start << endl;
+        // QLOG() << "regex bounds start is " << start << endl;
         // Note that 'exact' is set by simpleRegex above.
         if (!start.empty()) {
             string end = start;

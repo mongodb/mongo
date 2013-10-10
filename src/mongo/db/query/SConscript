@@ -11,6 +11,7 @@ env.StaticLibrary(
         "lite_parsed_query.cpp",
         "plan_enumerator.cpp",
         "projection_parser.cpp",
+        "qlog.cpp",
         "query_planner.cpp",
         "query_solution.cpp",
     ],
@@ -20,6 +21,7 @@ env.StaticLibrary(
         "$BUILD_DIR/mongo/mongohasher",
         "$BUILD_DIR/mongo/expressions",
         "$BUILD_DIR/mongo/expressions_geo",
+        "$BUILD_DIR/mongo/server_parameters",
     ],
 )
 

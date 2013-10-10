@@ -33,6 +33,7 @@
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/query/query_solution.h"
+#include "mongo/db/query/qlog.h"
 
 namespace mongo {
 
@@ -52,7 +53,7 @@ namespace mongo {
         size_t bestChild = numeric_limits<size_t>::max();
         for (size_t i = 0; i < statTrees.size(); ++i) {
             double score = scoreTree(statTrees[i]);
-            cout << "score of plan " << i << " is " << score << endl;
+            QLOG() << "score of plan " << i << " is " << score << endl;
             if (score > maxScore) {
                 maxScore = score;
                 bestChild = i;

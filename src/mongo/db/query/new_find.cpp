@@ -42,6 +42,7 @@
 #include "mongo/db/query/eof_runner.h"
 #include "mongo/db/query/multi_plan_runner.h"
 #include "mongo/db/query/plan_cache.h"
+#include "mongo/db/query/qlog.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/db/query/single_solution_runner.h"
@@ -120,14 +121,14 @@ namespace mongo {
             // We can deal with this 'cuz it means do a collscan.
             BSONElement natural = pq.getSort().getFieldDotted("$natural");
             if (natural.eoo()) {
-                cout << "rejecting query w/sort\n";
+                QLOG() << "rejecting query w/sort\n";
                 return false;
             }
         }
 
         // Projections.
         if (!pq.getProj().isEmpty()) {
-            cout << "rejecting query w/proj\n";
+            QLOG() << "rejecting query w/proj\n";
             return false;
         }
 
@@ -135,14 +136,14 @@ namespace mongo {
         if (QueryPlannerCommon::hasNode(cq->root(), MatchExpression::NOT)
             || QueryPlannerCommon::hasNode(cq->root(), MatchExpression::NOR)) {
 
-            cout << "rejecting query w/negation\n";
+            QLOG() << "rejecting query w/negation\n";
             return false;
         }
 
         // Obscure arguments to .find().
         if (pq.returnKey() || pq.showDiskLoc() || (0 != pq.getMaxScan()) || !pq.getMin().isEmpty()
             || !pq.getMax().isEmpty()) {
-            cout << "rejecting wacky query args query\n";
+            QLOG() << "rejecting wacky query args query\n";
             return false;
         }
 
@@ -164,7 +165,7 @@ namespace mongo {
                         continue;
                     }
                     if (String == elt.type() && elt.String() == "2d") {
-                        cout << "ignoring 2d geonear\n";
+                        QLOG() << "ignoring 2d geonear\n";
                         return false;
                     }
                 }
@@ -255,7 +256,7 @@ namespace mongo {
 
         /*
         for (size_t i = 0; i < solutions.size(); ++i) {
-            cout << "solution " << i << " is " << solutions[i]->toString() << endl;
+            QLOG() << "solution " << i << " is " << solutions[i]->toString() << endl;
         }
         */
 
@@ -304,7 +305,7 @@ namespace mongo {
         // This is a read lock.  TODO: There is a cursor flag for not needing this.  Do we care?
         Client::ReadContext ctx(ns);
 
-        //log() << "running getMore in new system, cursorid " << cursorid << endl;
+        QLOG() << "running getMore in new system, cursorid " << cursorid << endl;
 
         // This checks to make sure the operation is allowed on a replicated node.  Since we are not
         // passing in a query object (necessary to check SlaveOK query option), the only state where
@@ -474,7 +475,7 @@ namespace mongo {
         verify(NULL != rawRunner);
         auto_ptr<Runner> runner(rawRunner);
 
-        log() << "Running query on new system: " << cq->toString();
+        QLOG() << "Running query on new system: " << cq->toString();
 
         // We freak out later if this changes before we're done with the query.
         const ChunkVersion shardingVersionAtStart = shardingState.getVersion(cq->ns());
@@ -672,8 +673,8 @@ namespace mongo {
                                                 cq->getParsed().getFilter());
             ccId = cc->cursorid();
 
-            log() << "caching runner with cursorid " << ccId
-                  << " after returning " << numResults << " results" << endl;
+            QLOG() << "caching runner with cursorid " << ccId
+                   << " after returning " << numResults << " results" << endl;
 
             // ClientCursor takes ownership of runner.  Release to make sure it's not deleted.
             runner.release();
