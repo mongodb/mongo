@@ -30,6 +30,9 @@
 
 #ifdef _WIN32
 #include <direct.h>
+#else
+#define SYSLOG_NAMES
+#include <syslog.h>
 #endif
 
 #include "mongo/base/status.h"
@@ -138,6 +141,14 @@ namespace mongo {
         if (!ret.isOK()) {
             return ret;
         }
+#ifndef _WIN32
+        ret = options->addOption(OD("syslogFacility", "syslogFacility", moe::String,
+                    "syslog facility used for monogdb syslog message",
+                    true));
+        if (!ret.isOK()) {
+            return ret;
+        }
+#endif // _WIN32
         ret = options->addOption(OD("logappend", "logappend", moe::Switch,
                     "append to logpath instead of over-writing", true));
         if (!ret.isOK()) {
@@ -494,6 +505,28 @@ namespace mongo {
         }
 
         serverGlobalParams.logWithSyslog = params.count("syslog");
+
+        if (params.count("syslogFacility")) {
+            std::string facility = params["syslogFacility"].as<string>();
+            bool set = false;
+            // match facility string to facility value
+            for (unsigned long i = 0; i < sizeof(facilitynames)/sizeof(facilitynames[0]); i++) {
+                if (!facility.compare(facilitynames[i].c_name)) {
+                    serverGlobalParams.syslogFacility = facilitynames[i].c_val;
+                    set = true;
+                }
+            }
+            if (!set) {
+                StringBuilder sb;
+                sb << "ERROR: syslogFacility must be set to a string representing one of the "
+                   << "possible syslog facilities";
+                return Status(ErrorCodes::BadValue, sb.str());
+            }
+        }
+        else {
+            serverGlobalParams.syslogFacility = LOG_USER;
+        }
+
         serverGlobalParams.logAppend = params.count("logappend");
         if (!serverGlobalParams.logpath.empty() && serverGlobalParams.logWithSyslog) {
             return Status(ErrorCodes::BadValue, "Cant use both a logpath and syslog ");
