@@ -424,9 +424,11 @@ namespace mongo {
 
     bool BatchWriteOp::isFinished() {
         size_t numWriteOps = _clientRequest->sizeWriteOps();
+        bool orderedOps = !_clientRequest->getContinueOnError();
         for ( size_t i = 0; i < numWriteOps; ++i ) {
             WriteOp& writeOp = _writeOps[i];
             if ( writeOp.getWriteState() < WriteOpState_Completed ) return false;
+            else if ( orderedOps && writeOp.getWriteState() == WriteOpState_Error ) return true;
         }
 
         return true;
@@ -504,7 +506,6 @@ namespace mongo {
         for ( size_t i = 0; i < numWriteOps; ++i ) {
 
             WriteOp& writeOp = _writeOps[i];
-            dassert( writeOp.getWriteState() >= WriteOpState_Completed );
 
             if ( writeOp.getWriteState() == WriteOpState_Error ) {
                 errOps.push_back( &writeOp );
