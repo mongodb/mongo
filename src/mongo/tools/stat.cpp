@@ -387,7 +387,7 @@ namespace mongo {
             int row = 0;
             int maxLockedDbWidth = 0;
 
-            while ( 1 ) {
+            while (mongoStatGlobalParams.rowCount == 0 || row < mongoStatGlobalParams.rowCount) {
                 sleepsecs( (int)ceil(_statUtil.getSeconds()) );
 
                 // collect data

@@ -164,6 +164,11 @@ namespace mongo {
             ::_exit(EXIT_BADOPTIONS);
         }
 
+        if (mongoStatGlobalParams.rowCount < 0) {
+            cerr << "Error parsing command line: --rowcount (-n) can't be negative" << endl;
+            ::_exit(EXIT_BADOPTIONS);
+        }
+
         return Status::OK();
     }
 
