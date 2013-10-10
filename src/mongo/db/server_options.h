@@ -38,12 +38,10 @@ namespace mongo {
 
     namespace optionenvironment {
         class OptionSection;
+        class Environment;
     } // namespace optionenvironment
 
     namespace moe = mongo::optionenvironment;
-
-    extern moe::OptionSection serverOptions;
-    extern moe::Environment serverParsedOptions;
 
     struct ServerGlobalParams {
 

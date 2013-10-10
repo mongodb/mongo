@@ -40,7 +40,7 @@ namespace mongo {
 
     Status addMongoStatOptions(moe::OptionSection* options);
 
-    void printMongoStatHelp(const moe::OptionSection options, std::ostream* out);
+    void printMongoStatHelp(std::ostream* out);
 
     Status handlePreValidationMongoStatOptions(const moe::Environment& params);
 

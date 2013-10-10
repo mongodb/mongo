@@ -33,7 +33,7 @@ public:
     Files() : Tool() { }
 
     virtual void printHelp( ostream & out ) {
-        printMongoFilesHelp(toolsOptions, &out);
+        printMongoFilesHelp(&out);
     }
 
     void display( GridFS * grid , BSONObj obj ) {

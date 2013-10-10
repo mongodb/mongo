@@ -25,10 +25,8 @@
 #include "mongo/s/chunk.h"
 #include "mongo/s/version_mongos.h"
 #include "mongo/util/net/ssl_options.h"
-#include "mongo/util/options_parser/option_description.h"
-#include "mongo/util/options_parser/option_section.h"
-#include "mongo/util/options_parser/options_parser.h"
 #include "mongo/util/options_parser/startup_option_init.h"
+#include "mongo/util/options_parser/startup_options.h"
 #include "mongo/util/startup_test.h"
 #include "mongo/util/stringutils.h"
 
@@ -137,7 +135,7 @@ namespace mongo {
     Status handlePreValidationMongosOptions(const moe::Environment& params,
                                             const std::vector<std::string>& args) {
         if (params.count("help")) {
-            printMongosHelp(serverOptions);
+            printMongosHelp(moe::startupOptions);
             ::_exit(EXIT_SUCCESS);
         }
         if (params.count("version")) {
@@ -238,28 +236,15 @@ namespace mongo {
     }
 
     MONGO_GENERAL_STARTUP_OPTIONS_REGISTER(MongosOptions)(InitializerContext* context) {
-        return addMongosOptions(&serverOptions);
-    }
-
-    MONGO_STARTUP_OPTIONS_PARSE(MongosOptions)(InitializerContext* context) {
-        moe::OptionsParser parser;
-        Status ret = parser.run(serverOptions, context->args(), context->env(),
-                                &serverParsedOptions);
-        if (!ret.isOK()) {
-            std::cerr << ret.reason() << std::endl;
-            std::cerr << "try '" << context->args()[0]
-                      << " --help' for more information" << std::endl;
-            ::_exit(EXIT_BADOPTIONS);
-        }
-        return Status::OK();
+        return addMongosOptions(&moe::startupOptions);
     }
 
     MONGO_STARTUP_OPTIONS_VALIDATE(MongosOptions)(InitializerContext* context) {
-        Status ret = handlePreValidationMongosOptions(serverParsedOptions, context->args());
+        Status ret = handlePreValidationMongosOptions(moe::startupOptionsParsed, context->args());
         if (!ret.isOK()) {
             return ret;
         }
-        ret = serverParsedOptions.validate();
+        ret = moe::startupOptionsParsed.validate();
         if (!ret.isOK()) {
             return ret;
         }
@@ -272,7 +257,7 @@ namespace mongo {
                                                               // getGlobalAuthorizationManager().
                               ("EndStartupOptionStorage"))
                              (InitializerContext* context) {
-        return storeMongosOptions(serverParsedOptions, context->args());
+        return storeMongosOptions(moe::startupOptionsParsed, context->args());
     }
 
 } // namespace mongo

@@ -44,16 +44,12 @@
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/listen.h" // For DEFAULT_MAX_CONN
 #include "mongo/util/net/ssl_options.h"
-#include "mongo/util/options_parser/option_description.h"
-#include "mongo/util/options_parser/option_section.h"
+#include "mongo/util/options_parser/startup_options.h"
 
 namespace mongo {
 
     typedef moe::OptionDescription OD;
     typedef moe::PositionalOptionDescription POD;
-
-    moe::OptionSection serverOptions("Allowed options");
-    moe::Environment serverParsedOptions;
 
     ServerGlobalParams serverGlobalParams;
 

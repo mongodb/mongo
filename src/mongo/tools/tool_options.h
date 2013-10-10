@@ -31,9 +31,6 @@ namespace mongo {
 
     namespace moe = mongo::optionenvironment;
 
-    extern moe::OptionSection toolsOptions;
-    extern moe::Environment toolsParsedOptions;
-
     struct ToolGlobalParams {
 
         ToolGlobalParams() : hostSet(false), portSet(false) { }

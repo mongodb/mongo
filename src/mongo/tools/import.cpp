@@ -273,7 +273,7 @@ public:
     }
 
     virtual void printHelp( ostream & out ) {
-        printMongoImportHelp(toolsOptions, &out);
+        printMongoImportHelp(&out);
     }
 
     unsigned long long lastErrorFailures;

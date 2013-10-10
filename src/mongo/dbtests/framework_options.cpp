@@ -25,17 +25,12 @@
 #include "mongo/db/storage_options.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/options_parser/environment.h"
-#include "mongo/util/options_parser/option_description.h"
-#include "mongo/util/options_parser/option_section.h"
-#include "mongo/util/options_parser/options_parser.h"
 #include "mongo/util/options_parser/startup_option_init.h"
+#include "mongo/util/options_parser/startup_options.h"
 #include "mongo/util/password.h"
 
 namespace mongo {
 
-    moe::OptionSection frameworkOptions("options");
-    moe::Environment frameworkParsedOptions;
     FrameworkGlobalParams frameworkGlobalParams;
 
     Status addTestFrameworkOptions(moe::OptionSection* options) {
@@ -137,7 +132,7 @@ namespace mongo {
     Status handlePreValidationTestFrameworkOptions(const moe::Environment& params,
                                                    const std::vector<std::string>& args) {
         if (params.count("help")) {
-            std::cout << getTestFrameworkHelp(args[0], frameworkOptions) << std::endl;
+            std::cout << getTestFrameworkHelp(args[0], moe::startupOptions) << std::endl;
             ::_exit(EXIT_SUCCESS);
         }
 
@@ -202,7 +197,7 @@ namespace mongo {
                 if (!boost::filesystem::is_directory(p)) {
                     std::cerr << "ERROR: path \"" << p.string() << "\" is not a directory"
                                 << std::endl;
-                    std::cerr << getTestFrameworkHelp(args[0], frameworkOptions) << std::endl;
+                    std::cerr << getTestFrameworkHelp(args[0], moe::startupOptions) << std::endl;
                     ::_exit(EXIT_BADOPTIONS);
                 }
                 boost::filesystem::directory_iterator end_iter;
@@ -268,29 +263,16 @@ namespace mongo {
     }
 
     MONGO_GENERAL_STARTUP_OPTIONS_REGISTER(FrameworkOptions)(InitializerContext* context) {
-        return addTestFrameworkOptions(&frameworkOptions);
-    }
-
-    MONGO_STARTUP_OPTIONS_PARSE(FrameworkOptions)(InitializerContext* context) {
-        moe::OptionsParser parser;
-        Status ret = parser.run(frameworkOptions, context->args(), context->env(),
-                                &frameworkParsedOptions);
-        if (!ret.isOK()) {
-            std::cerr << ret.reason() << std::endl;
-            std::cerr << "try '" << context->args()[0]
-                      << " --help' for more information" << std::endl;
-            ::_exit(EXIT_BADOPTIONS);
-        }
-        return Status::OK();
+        return addTestFrameworkOptions(&moe::startupOptions);
     }
 
     MONGO_STARTUP_OPTIONS_VALIDATE(FrameworkOptions)(InitializerContext* context) {
-        Status ret = handlePreValidationTestFrameworkOptions(frameworkParsedOptions,
+        Status ret = handlePreValidationTestFrameworkOptions(moe::startupOptionsParsed,
                                                              context->args());
         if (!ret.isOK()) {
             return ret;
         }
-        ret = frameworkParsedOptions.validate();
+        ret = moe::startupOptionsParsed.validate();
         if (!ret.isOK()) {
             return ret;
         }
@@ -298,6 +280,6 @@ namespace mongo {
     }
 
     MONGO_STARTUP_OPTIONS_STORE(FrameworkOptions)(InitializerContext* context) {
-        return storeTestFrameworkOptions(frameworkParsedOptions, context->args());
+        return storeTestFrameworkOptions(moe::startupOptionsParsed, context->args());
     }
 }

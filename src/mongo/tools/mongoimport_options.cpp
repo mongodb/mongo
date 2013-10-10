@@ -17,11 +17,8 @@
 #include "mongo/tools/mongoimport_options.h"
 
 #include "mongo/base/status.h"
-#include "mongo/util/options_parser/environment.h"
-#include "mongo/util/options_parser/option_description.h"
-#include "mongo/util/options_parser/option_section.h"
-#include "mongo/util/options_parser/options_parser.h"
 #include "mongo/util/options_parser/startup_option_init.h"
+#include "mongo/util/options_parser/startup_options.h"
 #include "mongo/util/text.h"
 
 namespace mongo {
@@ -118,18 +115,18 @@ namespace mongo {
         return Status::OK();
     }
 
-    void printMongoImportHelp(const moe::OptionSection options, std::ostream* out) {
+    void printMongoImportHelp(std::ostream* out) {
         *out << "Import CSV, TSV or JSON data into MongoDB.\n" << std::endl;
         *out << "When importing JSON documents, each document must be a separate line of the input file.\n";
         *out << "\nExample:\n";
         *out << "  mongoimport --host myhost --db my_cms --collection docs < mydocfile.json\n" << std::endl;
-        *out << options.helpString();
+        *out << moe::startupOptions.helpString();
         *out << std::flush;
     }
 
     Status handlePreValidationMongoImportOptions(const moe::Environment& params) {
-        if (toolsParsedOptions.count("help")) {
-            printMongoImportHelp(toolsOptions, &std::cout);
+        if (params.count("help")) {
+            printMongoImportHelp(&std::cout);
             ::_exit(0);
         }
         return Status::OK();
@@ -176,28 +173,15 @@ namespace mongo {
     }
 
     MONGO_GENERAL_STARTUP_OPTIONS_REGISTER(MongoImportOptions)(InitializerContext* context) {
-        return addMongoImportOptions(&toolsOptions);
-    }
-
-    MONGO_STARTUP_OPTIONS_PARSE(MongoImportOptions)(InitializerContext* context) {
-        moe::OptionsParser parser;
-        Status ret = parser.run(toolsOptions, context->args(), context->env(),
-                                &toolsParsedOptions);
-        if (!ret.isOK()) {
-            std::cerr << ret.reason() << std::endl;
-            std::cerr << "try '" << context->args()[0]
-                      << " --help' for more information" << std::endl;
-            ::_exit(EXIT_BADOPTIONS);
-        }
-        return Status::OK();
+        return addMongoImportOptions(&moe::startupOptions);
     }
 
     MONGO_STARTUP_OPTIONS_VALIDATE(MongoImportOptions)(InitializerContext* context) {
-        Status ret = handlePreValidationMongoImportOptions(toolsParsedOptions);
+        Status ret = handlePreValidationMongoImportOptions(moe::startupOptionsParsed);
         if (!ret.isOK()) {
             return ret;
         }
-        ret = toolsParsedOptions.validate();
+        ret = moe::startupOptionsParsed.validate();
         if (!ret.isOK()) {
             return ret;
         }
@@ -205,6 +189,6 @@ namespace mongo {
     }
 
     MONGO_STARTUP_OPTIONS_STORE(MongoImportOptions)(InitializerContext* context) {
-        return storeMongoImportOptions(toolsParsedOptions, context->args());
+        return storeMongoImportOptions(moe::startupOptionsParsed, context->args());
     }
 }

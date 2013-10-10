@@ -17,11 +17,8 @@
 #include "mongo/tools/mongorestore_options.h"
 
 #include "mongo/base/status.h"
-#include "mongo/util/options_parser/environment.h"
-#include "mongo/util/options_parser/option_description.h"
-#include "mongo/util/options_parser/option_section.h"
-#include "mongo/util/options_parser/options_parser.h"
 #include "mongo/util/options_parser/startup_option_init.h"
+#include "mongo/util/options_parser/startup_options.h"
 
 namespace mongo {
 
@@ -114,17 +111,17 @@ namespace mongo {
         return Status::OK();
     }
 
-    void printMongoRestoreHelp(const moe::OptionSection options, std::ostream* out) {
+    void printMongoRestoreHelp(std::ostream* out) {
         *out << "Import BSON files into MongoDB.\n" << std::endl;
         *out << "usage: mongorestore [options] [directory or filename to restore from]"
              << std::endl;
-        *out << options.helpString();
+        *out << moe::startupOptions.helpString();
         *out << std::flush;
     }
 
     Status handlePreValidationMongoRestoreOptions(const moe::Environment& params) {
-        if (toolsParsedOptions.count("help")) {
-            printMongoRestoreHelp(toolsOptions, &std::cout);
+        if (params.count("help")) {
+            printMongoRestoreHelp(&std::cout);
             ::_exit(0);
         }
         return Status::OK();
@@ -152,7 +149,7 @@ namespace mongo {
         mongoRestoreGlobalParams.oplogLimit = getParam("oplogLimit", "");
 
         // Make the default db "" if it was not explicitly set
-        if (!toolsParsedOptions.count("db")) {
+        if (!params.count("db")) {
             toolGlobalParams.db = "";
         }
 
@@ -160,28 +157,15 @@ namespace mongo {
     }
 
     MONGO_GENERAL_STARTUP_OPTIONS_REGISTER(MongoRestoreOptions)(InitializerContext* context) {
-        return addMongoRestoreOptions(&toolsOptions);
-    }
-
-    MONGO_STARTUP_OPTIONS_PARSE(MongoRestoreOptions)(InitializerContext* context) {
-        moe::OptionsParser parser;
-        Status ret = parser.run(toolsOptions, context->args(), context->env(),
-                                &toolsParsedOptions);
-        if (!ret.isOK()) {
-            std::cerr << ret.reason() << std::endl;
-            std::cerr << "try '" << context->args()[0]
-                      << " --help' for more information" << std::endl;
-            ::_exit(EXIT_BADOPTIONS);
-        }
-        return Status::OK();
+        return addMongoRestoreOptions(&moe::startupOptions);
     }
 
     MONGO_STARTUP_OPTIONS_VALIDATE(MongoRestoreOptions)(InitializerContext* context) {
-        Status ret = handlePreValidationMongoRestoreOptions(toolsParsedOptions);
+        Status ret = handlePreValidationMongoRestoreOptions(moe::startupOptionsParsed);
         if (!ret.isOK()) {
             return ret;
         }
-        ret = toolsParsedOptions.validate();
+        ret = moe::startupOptionsParsed.validate();
         if (!ret.isOK()) {
             return ret;
         }
@@ -189,6 +173,6 @@ namespace mongo {
     }
 
     MONGO_STARTUP_OPTIONS_STORE(MongoRestoreOptions)(InitializerContext* context) {
-        return storeMongoRestoreOptions(toolsParsedOptions, context->args());
+        return storeMongoRestoreOptions(moe::startupOptionsParsed, context->args());
     }
 }

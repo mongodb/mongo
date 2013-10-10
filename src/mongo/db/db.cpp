@@ -82,9 +82,7 @@
 #include "mongo/util/net/message_server.h"
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/ntservice.h"
-#include "mongo/util/options_parser/environment.h"
-#include "mongo/util/options_parser/option_section.h"
-#include "mongo/util/options_parser/options_parser.h"
+#include "mongo/util/options_parser/startup_options.h"
 #include "mongo/util/ramlog.h"
 #include "mongo/util/stacktrace.h"
 #include "mongo/util/startup_test.h"
@@ -827,8 +825,8 @@ static void startupConfigActions(const std::vector<std::string>& args) {
     // The "command" option is deprecated.  For backward compatibility, still support the "run"
     // and "dbppath" command.  The "run" command is the same as just running mongod, so just
     // falls through.
-    if (serverParsedOptions.count("command")) {
-        vector<string> command = serverParsedOptions["command"].as< vector<string> >();
+    if (moe::startupOptionsParsed.count("command")) {
+        vector<string> command = moe::startupOptionsParsed["command"].as< vector<string> >();
 
         if (command[0].compare("dbpath") == 0) {
             cout << storageGlobalParams.dbpath << endl;
@@ -837,27 +835,27 @@ static void startupConfigActions(const std::vector<std::string>& args) {
 
         if (command[0].compare("run") != 0) {
             cout << "Invalid command: " << command[0] << endl;
-            printMongodHelp(serverOptions);
+            printMongodHelp(moe::startupOptions);
             ::_exit(EXIT_FAILURE);
         }
 
         if (command.size() > 1) {
             cout << "Too many parameters to 'run' command" << endl;
-            printMongodHelp(serverOptions);
+            printMongodHelp(moe::startupOptions);
             ::_exit(EXIT_FAILURE);
         }
     }
 
 #ifdef _WIN32
     ntservice::configureService(initService,
-            serverParsedOptions,
+            moe::startupOptionsParsed,
             defaultServiceStrings,
             std::vector<std::string>(),
             args);
 #endif  // _WIN32
 
 #ifdef __linux__
-    if (serverParsedOptions.count("shutdown")){
+    if (moe::startupOptionsParsed.count("shutdown")){
         bool failed = false;
 
         string name = (boost::filesystem::path(storageGlobalParams.dbpath) / "mongod.lock").string();

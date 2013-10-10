@@ -30,9 +30,6 @@ namespace mongo {
 
     namespace moe = mongo::optionenvironment;
 
-    extern moe::OptionSection mongoShellOptions;
-    extern moe::Environment mongoShellParsedOptions;
-
     struct ShellGlobalParams {
         std::string url;
         std::string dbhost;

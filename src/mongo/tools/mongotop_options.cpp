@@ -17,11 +17,8 @@
 #include "mongo/tools/mongotop_options.h"
 
 #include "mongo/base/status.h"
-#include "mongo/util/options_parser/environment.h"
-#include "mongo/util/options_parser/option_description.h"
-#include "mongo/util/options_parser/option_section.h"
-#include "mongo/util/options_parser/options_parser.h"
 #include "mongo/util/options_parser/startup_option_init.h"
+#include "mongo/util/options_parser/startup_options.h"
 
 namespace mongo {
 
@@ -55,15 +52,15 @@ namespace mongo {
         return Status::OK();
     }
 
-    void printMongoTopHelp(const moe::OptionSection options, std::ostream* out) {
+    void printMongoTopHelp(std::ostream* out) {
         *out << "View live MongoDB collection statistics.\n" << std::endl;
-        *out << options.helpString();
+        *out << moe::startupOptions.helpString();
         *out << std::flush;
     }
 
     Status handlePreValidationMongoTopOptions(const moe::Environment& params) {
-        if (toolsParsedOptions.count("help")) {
-            printMongoTopHelp(toolsOptions, &std::cout);
+        if (params.count("help")) {
+            printMongoTopHelp(&std::cout);
             ::_exit(0);
         }
         return Status::OK();
@@ -80,7 +77,7 @@ namespace mongo {
         mongoTopGlobalParams.useLocks = hasParam("locks");
 
         // Make the default db "admin" if it was not explicitly set
-        if (!toolsParsedOptions.count("db")) {
+        if (!params.count("db")) {
             toolGlobalParams.db = "admin";
         }
 
@@ -88,28 +85,15 @@ namespace mongo {
     }
 
     MONGO_GENERAL_STARTUP_OPTIONS_REGISTER(MongoTopOptions)(InitializerContext* context) {
-        return addMongoTopOptions(&toolsOptions);
-    }
-
-    MONGO_STARTUP_OPTIONS_PARSE(MongoTopOptions)(InitializerContext* context) {
-        moe::OptionsParser parser;
-        Status ret = parser.run(toolsOptions, context->args(), context->env(),
-                                &toolsParsedOptions);
-        if (!ret.isOK()) {
-            std::cerr << ret.reason() << std::endl;
-            std::cerr << "try '" << context->args()[0]
-                      << " --help' for more information" << std::endl;
-            ::_exit(EXIT_BADOPTIONS);
-        }
-        return Status::OK();
+        return addMongoTopOptions(&moe::startupOptions);
     }
 
     MONGO_STARTUP_OPTIONS_VALIDATE(MongoTopOptions)(InitializerContext* context) {
-        Status ret = handlePreValidationMongoTopOptions(toolsParsedOptions);
+        Status ret = handlePreValidationMongoTopOptions(moe::startupOptionsParsed);
         if (!ret.isOK()) {
             return ret;
         }
-        ret = toolsParsedOptions.validate();
+        ret = moe::startupOptionsParsed.validate();
         if (!ret.isOK()) {
             return ret;
         }
@@ -117,6 +101,6 @@ namespace mongo {
     }
 
     MONGO_STARTUP_OPTIONS_STORE(MongoTopOptions)(InitializerContext* context) {
-        return storeMongoTopOptions(toolsParsedOptions, context->args());
+        return storeMongoTopOptions(moe::startupOptionsParsed, context->args());
     }
 }

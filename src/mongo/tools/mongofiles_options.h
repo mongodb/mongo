@@ -37,7 +37,7 @@ namespace mongo {
 
     Status addMongoFilesOptions(moe::OptionSection* options);
 
-    void printMongoFilesHelp(const moe::OptionSection options, std::ostream* out);
+    void printMongoFilesHelp(std::ostream* out);
 
     Status handlePreValidationMongoFilesOptions(const moe::Environment& params);
 

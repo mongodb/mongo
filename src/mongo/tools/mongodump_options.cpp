@@ -18,11 +18,8 @@
 
 #include "mongo/base/status.h"
 #include "mongo/util/log.h"
-#include "mongo/util/options_parser/environment.h"
-#include "mongo/util/options_parser/option_description.h"
-#include "mongo/util/options_parser/option_section.h"
-#include "mongo/util/options_parser/options_parser.h"
 #include "mongo/util/options_parser/startup_option_init.h"
+#include "mongo/util/options_parser/startup_options.h"
 
 namespace mongo {
 
@@ -81,15 +78,15 @@ namespace mongo {
         return Status::OK();
     }
 
-    void printMongoDumpHelp(const moe::OptionSection options, std::ostream* out) {
+    void printMongoDumpHelp(std::ostream* out) {
         *out << "Export MongoDB data to BSON files.\n" << std::endl;
-        *out << options.helpString();
+        *out << moe::startupOptions.helpString();
         *out << std::flush;
     }
 
     Status handlePreValidationMongoDumpOptions(const moe::Environment& params) {
-        if (toolsParsedOptions.count("help")) {
-            printMongoDumpHelp(toolsOptions, &std::cout);
+        if (params.count("help")) {
+            printMongoDumpHelp(&std::cout);
             ::_exit(0);
         }
         return Status::OK();
@@ -129,7 +126,7 @@ namespace mongo {
         }
 
         // Make the default db "" if it was not explicitly set
-        if (!toolsParsedOptions.count("db")) {
+        if (!params.count("db")) {
             toolGlobalParams.db = "";
         }
 
@@ -137,28 +134,15 @@ namespace mongo {
     }
 
     MONGO_GENERAL_STARTUP_OPTIONS_REGISTER(MongoDumpOptions)(InitializerContext* context) {
-        return addMongoDumpOptions(&toolsOptions);
-    }
-
-    MONGO_STARTUP_OPTIONS_PARSE(MongoDumpOptions)(InitializerContext* context) {
-        moe::OptionsParser parser;
-        Status ret = parser.run(toolsOptions, context->args(), context->env(),
-                                &toolsParsedOptions);
-        if (!ret.isOK()) {
-            std::cerr << ret.reason() << std::endl;
-            std::cerr << "try '" << context->args()[0]
-                      << " --help' for more information" << std::endl;
-            ::_exit(EXIT_BADOPTIONS);
-        }
-        return Status::OK();
+        return addMongoDumpOptions(&moe::startupOptions);
     }
 
     MONGO_STARTUP_OPTIONS_VALIDATE(MongoDumpOptions)(InitializerContext* context) {
-        Status ret = handlePreValidationMongoDumpOptions(toolsParsedOptions);
+        Status ret = handlePreValidationMongoDumpOptions(moe::startupOptionsParsed);
         if (!ret.isOK()) {
             return ret;
         }
-        ret = toolsParsedOptions.validate();
+        ret = moe::startupOptionsParsed.validate();
         if (!ret.isOK()) {
             return ret;
         }
@@ -166,6 +150,6 @@ namespace mongo {
     }
 
     MONGO_STARTUP_OPTIONS_STORE(MongoDumpOptions)(InitializerContext* context) {
-        return storeMongoDumpOptions(toolsParsedOptions, context->args());
+        return storeMongoDumpOptions(moe::startupOptionsParsed, context->args());
     }
 }

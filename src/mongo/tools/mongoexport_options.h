@@ -41,7 +41,7 @@ namespace mongo {
 
     Status addMongoExportOptions(moe::OptionSection* options);
 
-    void printMongoExportHelp(const moe::OptionSection options, std::ostream* out);
+    void printMongoExportHelp(std::ostream* out);
 
     Status handlePreValidationMongoExportOptions(const moe::Environment& params);
 

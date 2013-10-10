@@ -17,11 +17,8 @@
 #include "mongo/tools/mongofiles_options.h"
 
 #include "mongo/base/status.h"
-#include "mongo/util/options_parser/environment.h"
-#include "mongo/util/options_parser/option_description.h"
-#include "mongo/util/options_parser/option_section.h"
-#include "mongo/util/options_parser/options_parser.h"
 #include "mongo/util/options_parser/startup_option_init.h"
+#include "mongo/util/options_parser/startup_options.h"
 
 namespace mongo {
 
@@ -80,7 +77,7 @@ namespace mongo {
         return Status::OK();
     }
 
-    void printMongoFilesHelp(const moe::OptionSection options, std::ostream* out) {
+    void printMongoFilesHelp(std::ostream* out) {
         *out << "Browse and modify a GridFS filesystem.\n" << std::endl;
         *out << "usage: mongofiles [options] command [gridfs filename]" << std::endl;
         *out << "command:" << std::endl;
@@ -92,13 +89,13 @@ namespace mongo {
         *out << "  put - add a file with filename 'gridfs filename'" << std::endl;
         *out << "  get - get a file with filename 'gridfs filename'" << std::endl;
         *out << "  delete - delete all files with filename 'gridfs filename'" << std::endl;
-        *out << options.helpString();
+        *out << moe::startupOptions.helpString();
         *out << std::flush;
     }
 
     Status handlePreValidationMongoFilesOptions(const moe::Environment& params) {
-        if (toolsParsedOptions.count("help")) {
-            printMongoFilesHelp(toolsOptions, &std::cout);
+        if (params.count("help")) {
+            printMongoFilesHelp(&std::cout);
             ::_exit(0);
         }
         return Status::OK();
@@ -121,28 +118,15 @@ namespace mongo {
     }
 
     MONGO_GENERAL_STARTUP_OPTIONS_REGISTER(MongoFilesOptions)(InitializerContext* context) {
-        return addMongoFilesOptions(&toolsOptions);
-    }
-
-    MONGO_STARTUP_OPTIONS_PARSE(MongoFilesOptions)(InitializerContext* context) {
-        moe::OptionsParser parser;
-        Status ret = parser.run(toolsOptions, context->args(), context->env(),
-                                &toolsParsedOptions);
-        if (!ret.isOK()) {
-            std::cerr << ret.reason() << std::endl;
-            std::cerr << "try '" << context->args()[0]
-                      << " --help' for more information" << std::endl;
-            ::_exit(EXIT_BADOPTIONS);
-        }
-        return Status::OK();
+        return addMongoFilesOptions(&moe::startupOptions);
     }
 
     MONGO_STARTUP_OPTIONS_VALIDATE(MongoFilesOptions)(InitializerContext* context) {
-        Status ret = handlePreValidationMongoFilesOptions(toolsParsedOptions);
+        Status ret = handlePreValidationMongoFilesOptions(moe::startupOptionsParsed);
         if (!ret.isOK()) {
             return ret;
         }
-        ret = toolsParsedOptions.validate();
+        ret = moe::startupOptionsParsed.validate();
         if (!ret.isOK()) {
             return ret;
         }
@@ -150,6 +134,6 @@ namespace mongo {
     }
 
     MONGO_STARTUP_OPTIONS_STORE(MongoFilesOptions)(InitializerContext* context) {
-        return storeMongoFilesOptions(toolsParsedOptions, context->args());
+        return storeMongoFilesOptions(moe::startupOptionsParsed, context->args());
     }
 }

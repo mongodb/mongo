@@ -26,17 +26,13 @@
 #include "mongo/util/net/sock.h"
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/net/ssl_options.h"
-#include "mongo/util/options_parser/environment.h"
-#include "mongo/util/options_parser/option_description.h"
-#include "mongo/util/options_parser/option_section.h"
+#include "mongo/util/options_parser/startup_options.h"
 #include "mongo/util/password.h"
 #include "mongo/util/text.h"
 #include "mongo/util/version.h"
 
 namespace mongo {
 
-    moe::OptionSection toolsOptions("options");
-    moe::Environment toolsParsedOptions;
     ToolGlobalParams toolGlobalParams;
     BSONToolGlobalParams bsonToolGlobalParams;
 
@@ -210,19 +206,19 @@ namespace mongo {
     }
 
     std::string getParam(std::string name, std::string def) {
-        if (toolsParsedOptions.count(name)) {
-            return toolsParsedOptions[name.c_str()].as<string>();
+        if (moe::startupOptionsParsed.count(name)) {
+            return moe::startupOptionsParsed[name.c_str()].as<string>();
         }
         return def;
     }
     int getParam(std::string name, int def) {
-        if (toolsParsedOptions.count(name)) {
-            return toolsParsedOptions[name.c_str()].as<int>();
+        if (moe::startupOptionsParsed.count(name)) {
+            return moe::startupOptionsParsed[name.c_str()].as<int>();
         }
         return def;
     }
     bool hasParam(std::string name) {
-        return toolsParsedOptions.count(name);
+        return moe::startupOptionsParsed.count(name);
     }
 
     void printToolVersionString(std::ostream &out) {
@@ -233,7 +229,7 @@ namespace mongo {
     }
 
     Status handlePreValidationGeneralToolOptions(const moe::Environment& params) {
-        if (toolsParsedOptions.count("version")) {
+        if (moe::startupOptionsParsed.count("version")) {
             printToolVersionString(std::cout);
             ::_exit(0);
         }
@@ -254,22 +250,22 @@ namespace mongo {
         storageGlobalParams.dur = false;
 
         // Set authentication parameters
-        if ( toolsParsedOptions.count( "authenticationDatabase" ) ) {
+        if (params.count("authenticationDatabase")) {
             toolGlobalParams.authenticationDatabase =
-                toolsParsedOptions["authenticationDatabase"].as<string>();
+                params["authenticationDatabase"].as<string>();
         }
 
-        if ( toolsParsedOptions.count( "authenticationMechanism" ) ) {
+        if (params.count("authenticationMechanism")) {
             toolGlobalParams.authenticationMechanism =
-                toolsParsedOptions["authenticationMechanism"].as<string>();
+                params["authenticationMechanism"].as<string>();
         }
 
-        if (toolsParsedOptions.count("verbose")) {
+        if (params.count("verbose")) {
             logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogSeverity::Debug(1));
         }
 
         for (string s = "vv"; s.length() <= 12; s.append("v")) {
-            if (toolsParsedOptions.count(s)) {
+            if (params.count(s)) {
                 logger::globalLogDomain()->setMinimumLoggedSeverity(
                         logger::LogSeverity::Debug(s.length()));
             }
@@ -280,7 +276,7 @@ namespace mongo {
         }
 
 #ifdef MONGO_SSL
-        if (toolsParsedOptions.count("ssl")) {
+        if (params.count("ssl")) {
             sslGlobalParams.sslMode.store(SSLGlobalParams::SSLMode_sslOnly);
         }
 #endif
@@ -300,48 +296,48 @@ namespace mongo {
         toolGlobalParams.quiet = false;
         toolGlobalParams.noconnection = false;
 
-        if (toolsParsedOptions.count("db"))
-            toolGlobalParams.db = toolsParsedOptions["db"].as<string>();
+        if (params.count("db"))
+            toolGlobalParams.db = params["db"].as<string>();
 
-        if (toolsParsedOptions.count("collection"))
-            toolGlobalParams.coll = toolsParsedOptions["collection"].as<string>();
+        if (params.count("collection"))
+            toolGlobalParams.coll = params["collection"].as<string>();
 
-        if (toolsParsedOptions.count("username"))
-            toolGlobalParams.username = toolsParsedOptions["username"].as<string>();
+        if (params.count("username"))
+            toolGlobalParams.username = params["username"].as<string>();
 
-        if (toolsParsedOptions.count("password")) {
-            toolGlobalParams.password = toolsParsedOptions["password"].as<string>();
+        if (params.count("password")) {
+            toolGlobalParams.password = params["password"].as<string>();
             if (toolGlobalParams.password.empty()) {
                 toolGlobalParams.password = askPassword();
             }
         }
 
-        if (toolsParsedOptions.count("ipv6")) {
+        if (params.count("ipv6")) {
             enableIPv6();
         }
 
         toolGlobalParams.dbpath = getParam("dbpath");
         toolGlobalParams.useDirectClient = hasParam("dbpath");
-        if (toolGlobalParams.useDirectClient && toolsParsedOptions.count("journal")) {
+        if (toolGlobalParams.useDirectClient && params.count("journal")) {
             storageGlobalParams.dur = true;
         }
 
         if (!toolGlobalParams.useDirectClient) {
             toolGlobalParams.connectionString = "127.0.0.1";
-            if (toolsParsedOptions.count("host")) {
+            if (params.count("host")) {
                 toolGlobalParams.hostSet = true;
-                toolGlobalParams.host = toolsParsedOptions["host"].as<string>();
-                toolGlobalParams.connectionString = toolsParsedOptions["host"].as<string>();
+                toolGlobalParams.host = params["host"].as<string>();
+                toolGlobalParams.connectionString = params["host"].as<string>();
             }
 
-            if (toolsParsedOptions.count("port")) {
+            if (params.count("port")) {
                 toolGlobalParams.portSet = true;
-                toolGlobalParams.port = toolsParsedOptions["port"].as<string>();
-                toolGlobalParams.connectionString += ':' + toolsParsedOptions["port"].as<string>();
+                toolGlobalParams.port = params["port"].as<string>();
+                toolGlobalParams.connectionString += ':' + params["port"].as<string>();
             }
         }
         else {
-            if (toolsParsedOptions.count("directoryperdb")) {
+            if (params.count("directoryperdb")) {
                 storageGlobalParams.directoryperdb = true;
             }
 

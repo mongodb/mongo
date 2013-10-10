@@ -53,7 +53,7 @@ public:
     Restore() : BSONTool() { }
 
     virtual void printHelp(ostream& out) {
-        printMongoRestoreHelp(toolsOptions, &out);
+        printMongoRestoreHelp(&out);
     }
 
     virtual int doRun() {

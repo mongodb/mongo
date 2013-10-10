@@ -24,17 +24,12 @@
 #include "mongo/shell/shell_utils.h"
 #include "mongo/util/net/sock.h"
 #include "mongo/util/net/ssl_options.h"
-#include "mongo/util/options_parser/environment.h"
-#include "mongo/util/options_parser/option_description.h"
-#include "mongo/util/options_parser/option_section.h"
-#include "mongo/util/options_parser/options_parser.h"
 #include "mongo/util/options_parser/startup_option_init.h"
+#include "mongo/util/options_parser/startup_options.h"
 #include "mongo/util/version.h"
 
 namespace mongo {
 
-    moe::OptionSection mongoShellOptions("options");
-    moe::Environment mongoShellParsedOptions;
     ShellGlobalParams shellGlobalParams;
 
     Status addMongoShellOptions(moe::OptionSection* options) {
@@ -170,27 +165,27 @@ namespace mongo {
 
     Status handlePreValidationMongoShellOptions(const moe::Environment& params,
                                                 const std::vector<std::string>& args) {
-        if ( mongoShellParsedOptions.count( "help" ) ) {
-            std::cout << getMongoShellHelp(args[0], mongoShellOptions) << std::endl;
+        if (params.count("help")) {
+            std::cout << getMongoShellHelp(args[0], moe::startupOptions) << std::endl;
             ::_exit(EXIT_CLEAN);
         }
-        if ( mongoShellParsedOptions.count( "version" ) ) {
+        if (params.count("version")) {
             cout << "MongoDB shell version: " << mongo::versionString << endl;
             ::_exit(EXIT_CLEAN);
         }
-        if (mongoShellParsedOptions.count("quiet")) {
+        if (params.count("quiet")) {
             mongo::serverGlobalParams.quiet = true;
         }
 #ifdef MONGO_SSL
-        Status ret = storeSSLClientOptions(mongoShellParsedOptions);
+        Status ret = storeSSLClientOptions(params);
         if (!ret.isOK()) {
             return ret;
         }
 #endif
-        if (mongoShellParsedOptions.count("ipv6")) {
+        if (params.count("ipv6")) {
             mongo::enableIPv6();
         }
-        if (mongoShellParsedOptions.count("verbose")) {
+        if (params.count("verbose")) {
             logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogSeverity::Debug(1));
         }
 
@@ -199,53 +194,53 @@ namespace mongo {
 
     Status storeMongoShellOptions(const moe::Environment& params,
                                   const std::vector<std::string>& args) {
-        if (mongoShellParsedOptions.count("port")) {
-            shellGlobalParams.port = mongoShellParsedOptions["port"].as<string>();
+        if (params.count("port")) {
+            shellGlobalParams.port = params["port"].as<string>();
         }
 
-        if (mongoShellParsedOptions.count("host")) {
-            shellGlobalParams.dbhost = mongoShellParsedOptions["host"].as<string>();
+        if (params.count("host")) {
+            shellGlobalParams.dbhost = params["host"].as<string>();
         }
 
-        if (mongoShellParsedOptions.count("eval")) {
-            shellGlobalParams.script = mongoShellParsedOptions["eval"].as<string>();
+        if (params.count("eval")) {
+            shellGlobalParams.script = params["eval"].as<string>();
         }
 
-        if (mongoShellParsedOptions.count("username")) {
-            shellGlobalParams.username = mongoShellParsedOptions["username"].as<string>();
+        if (params.count("username")) {
+            shellGlobalParams.username = params["username"].as<string>();
         }
 
-        if (mongoShellParsedOptions.count("password")) {
+        if (params.count("password")) {
             shellGlobalParams.usingPassword = true;
-            shellGlobalParams.password = mongoShellParsedOptions["password"].as<string>();
+            shellGlobalParams.password = params["password"].as<string>();
         }
 
-        if (mongoShellParsedOptions.count("authenticationDatabase")) {
+        if (params.count("authenticationDatabase")) {
             shellGlobalParams.authenticationDatabase =
-                mongoShellParsedOptions["authenticationDatabase"].as<string>();
+                params["authenticationDatabase"].as<string>();
         }
 
-        if (mongoShellParsedOptions.count("authenticationMechanism")) {
+        if (params.count("authenticationMechanism")) {
             shellGlobalParams.authenticationMechanism =
-                mongoShellParsedOptions["authenticationMechanism"].as<string>();
+                params["authenticationMechanism"].as<string>();
         }
 
-        if ( mongoShellParsedOptions.count( "shell" ) ) {
+        if (params.count("shell")) {
             shellGlobalParams.runShell = true;
         }
-        if ( mongoShellParsedOptions.count( "nodb" ) ) {
+        if (params.count("nodb")) {
             shellGlobalParams.nodb = true;
         }
-        if ( mongoShellParsedOptions.count( "norc" ) ) {
+        if (params.count("norc")) {
             shellGlobalParams.norc = true;
         }
-        if ( mongoShellParsedOptions.count( "files" ) ) {
-            shellGlobalParams.files = mongoShellParsedOptions["files"].as< vector<string> >();
+        if (params.count("files")) {
+            shellGlobalParams.files = params["files"].as< vector<string> >();
         }
-        if ( mongoShellParsedOptions.count( "nokillop" ) ) {
+        if (params.count("nokillop")) {
             mongo::shell_utils::_nokillop = true;
         }
-        if ( mongoShellParsedOptions.count( "autokillop" ) ) {
+        if (params.count("autokillop")) {
             shellGlobalParams.autoKillOp = true;
         }
 
@@ -256,8 +251,8 @@ namespace mongo {
          * only if one of these conditions is met:
          *   - it contains no '.' after the last appearance of '\' or '/'
          *   - it doesn't end in '.js' and it doesn't specify a path to an existing file */
-        if ( mongoShellParsedOptions.count( "dbaddress" ) ) {
-            string dbaddress = mongoShellParsedOptions["dbaddress"].as<string>();
+        if (params.count("dbaddress")) {
+            string dbaddress = params["dbaddress"].as<string>();
             if (shellGlobalParams.nodb) {
                 shellGlobalParams.files.insert( shellGlobalParams.files.begin(), dbaddress );
             }
@@ -276,7 +271,7 @@ namespace mongo {
 
         if ( shellGlobalParams.url == "*" ) {
             std::cerr << "ERROR: " << "\"*\" is an invalid db address" << std::endl;
-            std::cerr << getMongoShellHelp(args[0], mongoShellOptions) << std::endl;
+            std::cerr << getMongoShellHelp(args[0], moe::startupOptions) << std::endl;
             ::_exit(EXIT_BADOPTIONS);
         }
 
@@ -284,28 +279,15 @@ namespace mongo {
     }
 
     MONGO_GENERAL_STARTUP_OPTIONS_REGISTER(MongoShellOptions)(InitializerContext* context) {
-        return addMongoShellOptions(&mongoShellOptions);
-    }
-
-    MONGO_STARTUP_OPTIONS_PARSE(MongoShellOptions)(InitializerContext* context) {
-        moe::OptionsParser parser;
-        Status ret = parser.run(mongoShellOptions, context->args(), context->env(),
-                                &mongoShellParsedOptions);
-        if (!ret.isOK()) {
-            std::cerr << ret.reason() << std::endl;
-            std::cerr << "try '" << context->args()[0]
-                      << " --help' for more information" << std::endl;
-            ::_exit(EXIT_BADOPTIONS);
-        }
-        return Status::OK();
+        return addMongoShellOptions(&moe::startupOptions);
     }
 
     MONGO_STARTUP_OPTIONS_VALIDATE(MongoShellOptions)(InitializerContext* context) {
-        Status ret = handlePreValidationMongoShellOptions(mongoShellParsedOptions, context->args());
+        Status ret = handlePreValidationMongoShellOptions(moe::startupOptionsParsed, context->args());
         if (!ret.isOK()) {
             return ret;
         }
-        ret = mongoShellParsedOptions.validate();
+        ret = moe::startupOptionsParsed.validate();
         if (!ret.isOK()) {
             return ret;
         }
@@ -313,6 +295,6 @@ namespace mongo {
     }
 
     MONGO_STARTUP_OPTIONS_STORE(MongoShellOptions)(InitializerContext* context) {
-        return storeMongoShellOptions(mongoShellParsedOptions, context->args());
+        return storeMongoShellOptions(moe::startupOptionsParsed, context->args());
     }
 }

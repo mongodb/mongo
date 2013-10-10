@@ -35,7 +35,7 @@ namespace mongo {
 
     Status addMongoOplogOptions(moe::OptionSection* options);
 
-    void printMongoOplogHelp(const moe::OptionSection options, std::ostream* out);
+    void printMongoOplogHelp(std::ostream* out);
 
     Status handlePreValidationMongoOplogOptions(const moe::Environment& params);
 

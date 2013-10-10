@@ -42,7 +42,7 @@ namespace mongo {
 
     Status addMongoImportOptions(moe::OptionSection* options);
 
-    void printMongoImportHelp(const moe::OptionSection options, std::ostream* out);
+    void printMongoImportHelp(std::ostream* out);
 
     Status handlePreValidationMongoImportOptions(const moe::Environment& params);
 

@@ -52,7 +52,7 @@ public:
     }
 
     virtual void printHelp(ostream& out) {
-        printMongoDumpHelp(toolsOptions, &out);
+        printMongoDumpHelp(&out);
     }
 
     // This is a functor that writes a BSONObj to a file

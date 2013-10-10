@@ -34,7 +34,7 @@ namespace mongo {
 
     Status addMongoTopOptions(moe::OptionSection* options);
 
-    void printMongoTopHelp(const moe::OptionSection options, std::ostream* out);
+    void printMongoTopHelp(std::ostream* out);
 
     Status handlePreValidationMongoTopOptions(const moe::Environment& params);
 

@@ -32,7 +32,7 @@ public:
     OplogTool() : Tool() { }
 
     virtual void printHelp( ostream & out ) {
-        printMongoOplogHelp(toolsOptions, &out);
+        printMongoOplogHelp(&out);
     }
 
     int run() {

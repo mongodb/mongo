@@ -27,8 +27,6 @@ namespace mongo {
 
     namespace moe = mongo::optionenvironment;
 
-    extern moe::Environment sslParsedOptions;
-
     struct SSLGlobalParams {
         AtomicInt32 sslMode;        // --sslMode - the SSL operation mode, see enum SSLModes
         bool sslOnNormalPorts;      // --sslOnNormalPorts (deprecated)

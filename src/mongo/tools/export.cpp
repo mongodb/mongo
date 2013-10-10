@@ -45,7 +45,7 @@ public:
     }
 
     virtual void printHelp( ostream & out ) {
-        printMongoExportHelp(toolsOptions, &out);
+        printMongoExportHelp(&out);
     }
 
     // Turn every double quote character into two double quote characters

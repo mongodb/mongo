@@ -30,9 +30,6 @@ namespace mongo {
 
     namespace moe = mongo::optionenvironment;
 
-    extern moe::OptionSection frameworkOptions;
-    extern moe::Environment frameworkParsedOptions;
-
     struct FrameworkGlobalParams {
         unsigned perfHist;
         unsigned long long seed;
