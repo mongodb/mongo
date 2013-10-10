@@ -40,7 +40,6 @@
 #include "mongo/base/init.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/util/builder.h"
-#include "mongo/db/audit.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
@@ -309,7 +308,6 @@ namespace mongo {
             if ( p != 1 )
                 return false;
             stopIndexBuilds(dbname, cmdObj);
-            audit::logDropDatabase(ClientBasic::getCurrent(), dbname);
             dropDatabase(dbname);
             result.append( "dropped" , dbname );
             log() << "dropDatabase " << dbname << " finished" << endl;

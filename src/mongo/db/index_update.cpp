@@ -29,7 +29,6 @@
 #include "mongo/db/index_update.h"
 
 #include "mongo/client/dbclientinterface.h"
-#include "mongo/db/audit.h"
 #include "mongo/db/background.h"
 #include "mongo/db/btreebuilder.h"
 #include "mongo/db/clientcursor.h"
@@ -348,7 +347,6 @@ namespace mongo {
                     continue;
                 }
 
-                audit::logDropIndex(ClientBasic::getCurrent(), name, ns);
                 d->removeIndex( i );
                 i--;
             }
@@ -376,7 +374,6 @@ namespace mongo {
                 LOG(4) << "  d->nIndexes was " << d->getCompletedIndexCount() << endl;
                 anObjBuilder.appendNumber("nIndexesWas", d->getCompletedIndexCount() );
 
-                audit::logDropIndex(ClientBasic::getCurrent(), name, ns);
                 d->removeIndex( x );
             }
             else {

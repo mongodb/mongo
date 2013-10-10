@@ -37,7 +37,6 @@
 #include "mongo/bson/mutable/element.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/dbclientinterface.h"
-#include "mongo/db/audit.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authz_documents_update_guard.h"
@@ -269,12 +268,6 @@ namespace mongo {
                 addStatus(status, result);
                 return false;
             }
-
-            audit::logCreateUser(ClientBasic::getCurrent(),
-                                 args.userName,
-                                 args.hasHashedPassword,
-                                 args.hasCustomData? &args.customData : NULL,
-                                 args.roles);
             status = authzManager->insertPrivilegeDocument(dbname,
                                                            userObj,
                                                            args.writeConcern);
@@ -371,12 +364,6 @@ namespace mongo {
                 updateSetBuilder.append("roles", rolesArray);
             }
 
-            audit::logUpdateUser(ClientBasic::getCurrent(),
-                                 args.userName,
-                                 args.hasHashedPassword,
-                                 args.hasCustomData? &args.customData : NULL,
-                                 args.hasRoles? &args.roles : NULL);
-
             status = authzManager->updatePrivilegeDocument(args.userName,
                                                            BSON("$set" << updateSetBuilder.done()),
                                                            args.writeConcern);
@@ -453,9 +440,6 @@ namespace mongo {
             }
 
             int numUpdated;
-
-            audit::logDropUser(ClientBasic::getCurrent(), userName);
-
             status = authzManager->removePrivilegeDocuments(
                     BSON(AuthorizationManager::USER_NAME_FIELD_NAME << userName.getUser() <<
                          AuthorizationManager::USER_SOURCE_FIELD_NAME << userName.getDB()),
@@ -535,9 +519,6 @@ namespace mongo {
             }
 
             int numRemoved;
-
-            audit::logDropAllUsersFromDatabase(ClientBasic::getCurrent(), dbname);
-
             status = authzManager->removePrivilegeDocuments(
                     BSON(AuthorizationManager::USER_SOURCE_FIELD_NAME << dbname),
                     writeConcern,
@@ -637,10 +618,6 @@ namespace mongo {
                 }
                 role.hasRole = true;
             }
-
-            audit::logGrantRolesToUser(ClientBasic::getCurrent(),
-                                       userName,
-                                       roles);
 
             BSONArray newRolesBSONArray = roleDataMapToBSONArray(userRoles);
             status = authzManager->updatePrivilegeDocument(
@@ -747,10 +724,6 @@ namespace mongo {
                     userRoles.erase(roleDataIt);
                 }
             }
-
-            audit::logRevokeRolesFromUser(ClientBasic::getCurrent(),
-                                          userName,
-                                          roles);
 
             BSONArray newRolesBSONArray = roleDataMapToBSONArray(userRoles);
             status = authzManager->updatePrivilegeDocument(
@@ -983,11 +956,6 @@ namespace mongo {
             }
             roleObjBuilder.append("roles", roles);
 
-            audit::logCreateRole(ClientBasic::getCurrent(),
-                                 args.roleName,
-                                 args.roles,
-                                 args.privileges);
-
             status = authzManager->insertRoleDocument(roleObjBuilder.done(), args.writeConcern);
             if (!status.isOK()) {
                 addStatus(status, result);
@@ -1082,11 +1050,6 @@ namespace mongo {
 
                 updateSetBuilder.append("roles", roles);
             }
-
-            audit::logUpdateRole(ClientBasic::getCurrent(),
-                                 args.roleName,
-                                 args.hasRoles? &args.roles : NULL,
-                                 args.hasPrivileges? &args.privileges : NULL);
 
             status = authzManager->updateRoleDocument(args.roleName,
                                                       BSON("$set" << updateSetBuilder.done()),
@@ -1207,10 +1170,6 @@ namespace mongo {
                 addStatus(status, result);
                 return false;
             }
-
-            audit::logRevokePrivilegesFromRole(ClientBasic::getCurrent(),
-                                               roleName,
-                                               privileges);
 
             BSONObjBuilder updateBSONBuilder;
             updateObj.writeTo(&updateBSONBuilder);
@@ -1346,11 +1305,6 @@ namespace mongo {
 
             BSONObjBuilder updateBSONBuilder;
             updateObj.writeTo(&updateBSONBuilder);
-
-            audit::logGrantPrivilegesToRole(ClientBasic::getCurrent(),
-                                            roleName,
-                                            privileges);
-
             status = authzManager->updateRoleDocument(
                     roleName,
                     updateBSONBuilder.done(),
@@ -1487,11 +1441,6 @@ namespace mongo {
                 addStatus(status, result);
                 return false;
             }
-
-            audit::logRevokeRolesFromRole(ClientBasic::getCurrent(),
-                                          roleName,
-                                          roles);
-
             status = authzManager->updateRoleDocument(
                     roleName, BSON("$set" << BSON("roles" << newRolesBSONArray)), writeConcern);
             if (!status.isOK()) {
@@ -1601,11 +1550,6 @@ namespace mongo {
                 addStatus(status, result);
                 return false;
             }
-
-            audit::logGrantRolesToRole(ClientBasic::getCurrent(),
-                                       roleName,
-                                       roles);
-
             status = authzManager->updateRoleDocument(
                     roleName, BSON("$set" << BSON("roles" << newRolesBSONArray)), writeConcern);
             if (!status.isOK()) {
@@ -1747,8 +1691,6 @@ namespace mongo {
                 return false;
             }
 
-            audit::logDropRole(ClientBasic::getCurrent(),
-                               roleName);
             // Finally, remove the actual role document
             status = authzManager->removeRoleDocuments(
                     BSON(AuthorizationManager::ROLE_NAME_FIELD_NAME << roleName.getRole() <<
