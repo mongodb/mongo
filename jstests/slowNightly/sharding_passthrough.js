@@ -138,16 +138,19 @@ files.forEach(function(x) {
         print(" >>>>>>>>>>>>>>> skipping test that would correctly fail under sharding " + x.name);
         return;
     }
-
+    
     print(" *******************************************");
     print("         Test : " + x.name + " ...");
     print("                " +
         Date.timeFunc(function() {
             load(x.name);
         }, 1) + "ms");
-        gc(); // TODO SERVER-8683: remove gc() calls once resolved
-    }
-);
+
+    gc(); // TODO SERVER-8683: remove gc() calls once resolved
+    
+    // Reset "db" variable, just in case someone broke the rules and used it themselves 
+    db = myShardingTest.getDB("test");
+});
 
 
 myShardingTest.stop();

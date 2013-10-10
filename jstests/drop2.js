@@ -1,48 +1,53 @@
-t = db.jstests_drop2;
-t.drop();
+var coll = db.jstests_drop2;
+coll.drop();
 
 function debug( x ) {
     printjson( x );
 }
 
-t.save( {} );
+coll.save( {} );
 db.getLastError();
 
-function op( drop ) {
-    p = db.currentOp().inprog;
-    debug( p );
-    for ( var i in p ) {
-        var o = p[ i ];
+function getOpId( drop ) {
+    var inProg = db.currentOp().inprog;
+    debug( inProg );
+    for ( var id in inProg ) {
+        var op = inProg[ id ];
         if ( drop ) {
-            if (  o.query && o.query.drop && o.query.drop == "jstests_drop2" ) {
-                return o.opid;
+            if (  op.query && op.query.drop && op.query.drop == coll.getName() ) {
+                return op.opid;
             }
         } else {
-            if (  o.query && o.query.query && o.query.query.$where && o.ns == "test.jstests_drop2" ) {
-                return o.opid;
+            if (  op.query && op.query.query && op.query.query.$where && op.ns == (coll + "") ) {
+                return op.opid;
             }
         }
     }
     return null;
 }
 
-s1 = startParallelShell( "print(\"Count thread started\");"
-                         + "db.jstests_drop2.count( { $where: function() {"
-                         + "while( 1 ) { sleep( 1 ); } } } );"
-                         + "print(\"Count thread terminating\");" );
-countOp = null;
-assert.soon( function() { countOp = op( false ); return countOp; } );
+var shell1 = startParallelShell( "print(\"Count thread started\");"
+                                 + "db.getMongo().getCollection(\""
+                                 + (coll + "") + "\")" 
+                                 + ".count( { $where: function() {"
+                                 + "while( 1 ) { sleep( 1 ); } } } );"
+                                 + "print(\"Count thread terminating\");" );
+countOpId = null;
+assert.soon( function() { countOpId = getOpId( false ); return countOpId; } );
 
-s2 = startParallelShell( "print(\"Drop thread started\");"
-                         + "print(\"drop result: \" + db.jstests_drop2.drop() );"
-                         + "print(\"Drop thread terminating\")" );
-dropOp = null;
-assert.soon( function() { dropOp = op( true ); return dropOp; } );
+var shell2 = startParallelShell( "print(\"Drop thread started\");"
+                                 + "print(\"drop result: \" + " 
+                                 + "db.getMongo().getCollection(\"" 
+                                 + (coll + "") + "\")"
+                                 + ".drop() );"
+                                 + "print(\"Drop thread terminating\")" );
+dropOpId = null;
+assert.soon( function() { dropOpId = getOpId( true ); return dropOpId; } );
 
-db.killOp( dropOp );
-db.killOp( countOp );
+db.killOp( dropOpId );
+db.killOp( countOpId );
 
-s1();
-s2();
+shell1();
+shell2();
 
-t.drop(); // in SERVER-1818, this fails
+coll.drop(); // in SERVER-1818, this fails
