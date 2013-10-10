@@ -180,6 +180,7 @@ namespace {
             << ActionType::flushRouterConfig
             << ActionType::fsync
             << ActionType::inprog
+            << ActionType::invalidateUserCache
             << ActionType::killop
             << ActionType::mergeChunks
             << ActionType::moveChunk

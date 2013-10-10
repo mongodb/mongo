@@ -2237,4 +2237,50 @@ namespace mongo {
         }
 
     } cmdRolesInfo;
+
+    class CmdInvalidateUserCache: public Command {
+    public:
+
+        virtual bool logTheOp() {
+            return false;
+        }
+
+        virtual bool slaveOk() const {
+            return true;
+        }
+
+        virtual LockType locktype() const {
+            return NONE;
+        }
+
+        CmdInvalidateUserCache() : Command("invalidateUserCache") {}
+
+        virtual void help(stringstream& ss) const {
+            ss << "Invalidates the in-memory cache of user information" << endl;
+        }
+
+        virtual Status checkAuthForCommand(ClientBasic* client,
+                                           const std::string& dbname,
+                                           const BSONObj& cmdObj) {
+            AuthorizationSession* authzSession = client->getAuthorizationSession();
+            if (!authzSession->isAuthorizedForActionsOnResource(
+                    ResourcePattern::forClusterResource(), ActionType::invalidateUserCache)) {
+                return Status(ErrorCodes::Unauthorized, "Not authorized to invalidate user cache");
+            }
+            return Status::OK();
+        }
+
+        bool run(const string& dbname,
+                 BSONObj& cmdObj,
+                 int options,
+                 string& errmsg,
+                 BSONObjBuilder& result,
+                 bool fromRepl) {
+
+            AuthorizationManager* authzManager = getGlobalAuthorizationManager();
+            authzManager->invalidateUserCache();
+            return true;
+        }
+
+    } cmdInvalidateUserCache;
 }

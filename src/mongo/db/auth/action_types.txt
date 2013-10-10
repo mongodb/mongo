@@ -64,6 +64,7 @@
 "indexStats",
 "inprog",
 "insert",
+"invalidateUserCache",
 "killCursors",
 "killop",
 "listDatabases",
