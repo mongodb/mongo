@@ -534,9 +534,11 @@ namespace {
         return Value(false);
     }
 
-    Value ExpressionCoerceToBool::serialize() const {
-        // Serializing as an $and expression which will become a CoerceToBool
-        return Value(DOC("$and" << DOC_ARRAY(pExpression->serialize())));
+    Value ExpressionCoerceToBool::serialize(bool explain) const {
+        // When not explaining, serialize to an $and expression. When parsed, the $and expression
+        // will be optimized back into a ExpressionCoerceToBool.
+        const char* name = explain ? "$coerceToBool" : "$and";
+        return Value(DOC(name << DOC_ARRAY(pExpression->serialize(explain))));
     }
 
     /* ----------------------- ExpressionCompare --------------------------- */
@@ -726,7 +728,7 @@ namespace {
         return pValue;
     }
 
-    Value ExpressionConstant::serialize() const {
+    Value ExpressionConstant::serialize(bool explain) const {
         return serializeConstant(pValue);
     }
 
@@ -1081,7 +1083,7 @@ namespace {
         addField(theFieldPath, NULL);
     }
 
-    Value ExpressionObject::serialize() const {
+    Value ExpressionObject::serialize(bool explain) const {
         MutableDocument valBuilder;
         if (_excludeId)
             valBuilder["_id"] = Value(false);
@@ -1096,7 +1098,7 @@ namespace {
                 valBuilder[fieldName] = Value(true);
             }
             else {
-                valBuilder[fieldName] = expr->serialize();
+                valBuilder[fieldName] = expr->serialize(explain);
             }
         }
         return valBuilder.freezeToValue();
@@ -1210,7 +1212,7 @@ namespace {
         }
     }
 
-    Value ExpressionFieldPath::serialize() const {
+    Value ExpressionFieldPath::serialize(bool explain) const {
         if (_fieldPath.getFieldName(0) == "CURRENT" && _fieldPath.getPathLength() > 1) {
             // use short form for "$$CURRENT.foo" but not just "$$CURRENT"
             return Value("$" + _fieldPath.tail().getPath(false));
@@ -1281,15 +1283,15 @@ namespace {
         return this;
     }
 
-    Value ExpressionLet::serialize() const {
+    Value ExpressionLet::serialize(bool explain) const {
         MutableDocument vars;
         for (VariableMap::const_iterator it=_variables.begin(), end=_variables.end();
                 it != end; ++it) {
-            vars[it->first] = it->second->serialize();
+            vars[it->first] = it->second->serialize(explain);
         }
 
         return Value(DOC("$let" << DOC("vars" << vars.freeze()
-                                    << "in" << _subExpression->serialize())
+                                    << "in" << _subExpression->serialize(explain))
                                     ));
     }
 
@@ -1385,10 +1387,10 @@ namespace {
         return this;
     }
 
-    Value ExpressionMap::serialize() const {
-        return Value(DOC("$map" << DOC("input" << _input->serialize()
+    Value ExpressionMap::serialize(bool explain) const {
+        return Value(DOC("$map" << DOC("input" << _input->serialize(explain)
                                     << "as" << _varName
-                                    << "in" << _each->serialize()
+                                    << "in" << _each->serialize(explain)
                                     )));
     }
 
@@ -1687,12 +1689,12 @@ namespace {
         vpOperand.push_back(pExpression);
     }
 
-    Value ExpressionNary::serialize() const {
+    Value ExpressionNary::serialize(bool explain) const {
         const size_t nOperand = vpOperand.size();
         vector<Value> array;
         /* build up the array */
         for(size_t i = 0; i < nOperand; i++)
-            array.push_back(vpOperand[i]->serialize());
+            array.push_back(vpOperand[i]->serialize(explain));
 
         return Value(DOC(getOpName() << array));
     }

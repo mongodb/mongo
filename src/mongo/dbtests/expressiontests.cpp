@@ -62,7 +62,7 @@ namespace ExpressionTests {
 
     /** Convert Expression to BSON. */
     static BSONObj expressionToBson( const intrusive_ptr<Expression>& expression ) {
-        return BSON("" << expression->serialize()).firstElement().embeddedObject().getOwned();
+        return BSON("" << expression->serialize(false)).firstElement().embeddedObject().getOwned();
     }
 
     /** Convert Document to BSON. */
@@ -524,7 +524,7 @@ namespace ExpressionTests {
             }
         private:
             static BSONObj toBsonObj(const intrusive_ptr<Expression>& expression) {
-                return BSON("field" << expression->serialize());
+                return BSON("field" << expression->serialize(false));
             }
         };
 
@@ -541,7 +541,7 @@ namespace ExpressionTests {
         private:
             static BSONArray toBsonArray(const intrusive_ptr<Expression>& expression) {
                 BSONArrayBuilder bab;
-                bab << expression->serialize();
+                bab << expression->serialize(false);
                 return bab.arr();
             }
         };
@@ -916,7 +916,7 @@ namespace ExpressionTests {
             }
         private:
             static BSONObj toBsonObj( const intrusive_ptr<Expression>& expression ) {
-                return BSON("field" << expression->serialize());
+                return BSON("field" << expression->serialize(false));
             }
         };
 
@@ -932,7 +932,7 @@ namespace ExpressionTests {
         private:
             static BSONObj toBsonArray( const intrusive_ptr<Expression>& expression ) {
                 BSONArrayBuilder bab;
-                bab << expression->serialize();
+                bab << expression->serialize(false);
                 return bab.obj();
             }            
         };
@@ -1148,7 +1148,8 @@ namespace ExpressionTests {
         public:
             void run() {
                 intrusive_ptr<Expression> expression = ExpressionFieldPath::create( "a.b.c" );
-                assertBinaryEqual(BSON("foo" << "$a.b.c"), BSON("foo" << expression->serialize()));
+                assertBinaryEqual(BSON("foo" << "$a.b.c"),
+                                  BSON("foo" << expression->serialize(false)));
             }
         };
 
@@ -1158,7 +1159,7 @@ namespace ExpressionTests {
             void run() {
                 intrusive_ptr<Expression> expression = ExpressionFieldPath::create( "a.b.c" );
                 BSONArrayBuilder bab;
-                bab << expression->serialize();
+                bab << expression->serialize(false);
                 assertBinaryEqual( BSON_ARRAY( "$a.b.c" ), bab.arr() );
             }
         };
@@ -1269,7 +1270,7 @@ namespace ExpressionTests {
                 intrusive_ptr<Testable> testable = Testable::create();
                 testable->addOperand( ExpressionConstant::create( Value( 5 ) ) );
                 ASSERT_EQUALS(BSON("foo" << BSON("$testable" << BSON_ARRAY(BSON("$const" << 5)))),
-                              BSON("foo" << testable->serialize()));
+                              BSON("foo" << testable->serialize(false)));
             }
         };
 
@@ -1280,7 +1281,7 @@ namespace ExpressionTests {
                 intrusive_ptr<Testable> testable = Testable::create();
                 testable->addOperand( ExpressionConstant::create( Value( 5 ) ) );
                 ASSERT_EQUALS(constify(BSON_ARRAY(BSON("$testable" << BSON_ARRAY(5)))),
-                               BSON_ARRAY(testable->serialize()));
+                               BSON_ARRAY(testable->serialize(false)));
             }
         };
 
@@ -2098,7 +2099,7 @@ namespace ExpressionTests {
                 expression->addField( mongo::FieldPath( "a" ),
                                       ExpressionConstant::create( Value( 5 ) ) );
                 ASSERT_EQUALS(constify(BSON("foo" << BSON("a" << 5))),
-                              BSON("foo" << expression->serialize()));
+                              BSON("foo" << expression->serialize(false)));
             }
         };
 
@@ -2110,7 +2111,7 @@ namespace ExpressionTests {
                 expression->addField( mongo::FieldPath( "a" ),
                                       ExpressionConstant::create( Value( 5 ) ) );
                 ASSERT_EQUALS(BSON("foo" << BSON("a" << BSON("$const" << 5))),
-                              BSON("foo" << expression->serialize()));
+                              BSON("foo" << expression->serialize(false)));
             }
         };
         
@@ -2122,7 +2123,7 @@ namespace ExpressionTests {
                 expression->addField( mongo::FieldPath( "a" ),
                                       ExpressionConstant::create( Value( 5 ) ) );
                 BSONArrayBuilder bab;
-                bab << expression->serialize();
+                bab << expression->serialize(false);
                 ASSERT_EQUALS( constify( BSON_ARRAY( BSON( "a" << 5 ) ) ), bab.arr() );
             }
         };
@@ -2688,7 +2689,7 @@ namespace ExpressionTests {
                     BSONElement specElement = specObject.firstElement();
                     intrusive_ptr<mongo::Expression> expression =
                             mongo::Expression::parseOperand( specElement );
-                    ASSERT_EQUALS(specObject, BSON("" << expression->serialize()));
+                    ASSERT_EQUALS(specObject, BSON("" << expression->serialize(false)));
                 }
             };
 
@@ -2751,7 +2752,7 @@ namespace ExpressionTests {
                             string errMsg = str::stream()
                                 << "for expression " << field.first.toString()
                                 << " with argument " << args.toString()
-                                << " full tree: " << expr->serialize().toString()
+                                << " full tree: " << expr->serialize(false).toString()
                                 << " expected: " << expected.toString()
                                 << " but got: " << result.toString();
                             FAIL(errMsg);
@@ -3271,7 +3272,7 @@ namespace ExpressionTests {
                             string errMsg = str::stream()
                                                 << "for expression " << field.first.toString()
                                                 << " with argument " << args.toString()
-                                                << " full tree: " << expr->serialize().toString()
+                                                << " full tree: " << expr->serialize(false).toString()
                                                 << " expected: " << expected.toString()
                                                 << " but got: " << result.toString();
                             FAIL(errMsg);

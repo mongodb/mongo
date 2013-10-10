@@ -125,13 +125,14 @@ namespace mongo {
         MutableDocument insides;
 
         // add the _id
-        insides["_id"] = pIdExpression->serialize();
+        insides["_id"] = pIdExpression->serialize(explain);
 
         // add the remaining fields
         const size_t n = vFieldName.size();
         for(size_t i = 0; i < n; ++i) {
             intrusive_ptr<Accumulator> accum = vpAccumulatorFactory[i]();
-            insides[vFieldName[i]] = Value(DOC(accum->getOpName() << vpExpression[i]->serialize()));
+            insides[vFieldName[i]] =
+                Value(DOC(accum->getOpName() << vpExpression[i]->serialize(explain)));
         }
 
         if (_doingMerge) {

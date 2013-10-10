@@ -140,7 +140,7 @@ namespace mongo {
     }
 
     Value DocumentSourceRedact::serialize(bool explain) const {
-        return Value(DOC(getSourceName() << _expression.get()->serialize()));
+        return Value(DOC(getSourceName() << _expression.get()->serialize(explain)));
     }
 
     intrusive_ptr<DocumentSource> DocumentSourceRedact::createFromBson(

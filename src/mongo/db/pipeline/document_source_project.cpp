@@ -95,7 +95,7 @@ namespace mongo {
     }
 
     Value DocumentSourceProject::serialize(bool explain) const {
-        return Value(DOC(getSourceName() << pEO->serialize()));
+        return Value(DOC(getSourceName() << pEO->serialize(explain)));
     }
 
     intrusive_ptr<DocumentSource> DocumentSourceProject::createFromBson(
