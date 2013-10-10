@@ -49,7 +49,8 @@ env.StaticLibrary('authmongod',
 
 env.StaticLibrary('authmongos',
                   ['authz_manager_external_state_s.cpp',
-                   'authz_session_external_state_s.cpp'],
+                   'authz_session_external_state_s.cpp',
+                   'user_cache_invalidator_job.cpp'],
                   LIBDEPS=['authservercommon'])
 
 env.StaticLibrary('authmocks',

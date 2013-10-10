@@ -41,6 +41,7 @@
 #include "mongo/db/auth/authz_manager_external_state_s.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_global.h"
+#include "mongo/db/auth/user_cache_invalidator_job.h"
 #include "mongo/db/dbwebserver.h"
 #include "mongo/db/initialize_server_global_state.h"
 #include "mongo/db/instance.h"
@@ -248,6 +249,9 @@ namespace mongo {
     void start( const MessageServer::Options& opts ) {
         balancer.go();
         cursorCache.startTimeoutThread();
+        UserCacheInvalidator cacheInvalidatorThread(getGlobalAuthorizationManager());
+        cacheInvalidatorThread.go();
+
         PeriodicTask::theRunner->go();
 
         ShardedMessageHandler handler;
