@@ -33,11 +33,11 @@ namespace {
     class ExportedInvalidationIntervalParameter : public ExportedServerParameter<int> {
     public:
         ExportedInvalidationIntervalParameter() :
-            ExportedServerParameter(ServerParameterSet::getGlobal(),
-                                    "userCacheInvalidationIntervalSecs",
-                                    &userCacheInvalidationIntervalSecs,
-                                    true,
-                                    true) {}
+            ExportedServerParameter<int>(ServerParameterSet::getGlobal(),
+                                         "userCacheInvalidationIntervalSecs",
+                                         &userCacheInvalidationIntervalSecs,
+                                         true,
+                                         true) {}
 
         virtual Status validate( const int& potentialNewValue )
         {
