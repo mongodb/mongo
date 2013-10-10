@@ -374,31 +374,33 @@ namespace mongo {
         //
 
         TypeExplain* chosenPlan = NULL;
-        explainPlan(*stats, &chosenPlan, false /* no full details */);
-        if (chosenPlan) {
-            (*explain)->addToAllPlans(chosenPlan);
+        status = explainPlan(*stats, &chosenPlan, false /* no full details */);
+        if (!status.isOK()) {
+            return status;
         }
-        (*explain)->setNScannedObjectsAllPlans((*explain)->getNScannedObjects());
-        (*explain)->setNScannedAllPlans((*explain)->getNScanned());
 
+        (*explain)->addToAllPlans(chosenPlan); // ownership xfer
+
+        uint64_t nScannedObjectsAllPlans = chosenPlan->getNScannedObjects();
+        uint64_t nScannedAllPlans = chosenPlan->getNScanned();
         for (std::vector<PlanStageStats*>::const_iterator it = _candidateStats.begin();
              it != _candidateStats.end();
              ++it) {
 
             TypeExplain* candidateExplain;
-            if (explainPlan(**it, &candidateExplain, false /* no full details */) != Status::OK()) {
+            status = explainPlan(**it, &candidateExplain, false /* no full details */);
+            if (status != Status::OK()) {
                 continue;
             }
 
-            // TODO: we only need this in "explain({verbose:true}) mode.
             (*explain)->addToAllPlans(candidateExplain); // ownership xfer
 
-            (*explain)->setNScannedObjectsAllPlans((*explain)->getNScannedObjectsAllPlans() +
-                                                   candidateExplain->getNScannedObjects());
-
-            (*explain)->setNScannedAllPlans((*explain)->getNScannedAllPlans() +
-                                            candidateExplain->getNScanned());
+            nScannedObjectsAllPlans += candidateExplain->getNScannedObjects();
+            nScannedAllPlans += candidateExplain->getNScanned();
         }
+
+        (*explain)->setNScannedObjectsAllPlans(nScannedObjectsAllPlans);
+        (*explain)->setNScannedAllPlans(nScannedAllPlans);
 
         return Status::OK();
     }

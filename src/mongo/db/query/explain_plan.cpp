@@ -33,10 +33,28 @@
 
 namespace mongo {
 
+    namespace {
+
+        bool isLogicalStage(StageType stageType) {
+            switch (stageType) {
+            // case STAGE_AND_HASH:
+            // case STAGE_AND_SORTED:
+            case STAGE_OR:
+            case STAGE_SORT_MERGE:
+                return true;
+
+            default:
+                return false;
+            }
+        }
+
+    }
+
     Status explainPlan(const PlanStageStats& stats, TypeExplain** explain, bool fullDetails) {
         auto_ptr<TypeExplain> res(new TypeExplain);
 
         // Descend the plan looking for structural properties:
+        // + is there any 'or's (TODO ands)? if so, prepare to explain each branch recursively
         // + is is a collection scan or a an index scan?
         // + if the latter, was it covered?
         // + was a sort necessary?
@@ -44,14 +62,14 @@ namespace mongo {
         // TODO: For now, we assume that at most one index is used in a plan
         bool covered = true;
         bool sortPresent = false;
+        const PlanStageStats* logicalStage = NULL;
         const PlanStageStats* root = &stats;
         const PlanStageStats* leaf = root;
         while (leaf->children.size() > 0) {
 
-            // We're not failing a plan with multiple children (e.g., OR) but we're not
-            // yet outputing it properly.
-            // TODO: "clauses" field of the explain structure.
-            if (leaf->children.size() > 1) {
+            // We're failing a plan with multiple children other than OR.
+            // TODO: explain richer plans.
+            if (leaf->children.size() > 1 && !isLogicalStage(leaf->stageType)) {
                 res->setCursor("Complex Plan");
                 res->setNScanned(0);
                 res->setNScannedObjects(0);
@@ -59,6 +77,10 @@ namespace mongo {
                 return Status::OK();
             }
 
+            if (isLogicalStage(leaf->stageType)) {
+                logicalStage = leaf;
+                break;
+            }
             if (leaf->stageType == STAGE_FETCH) {
                 covered = false;
             }
@@ -81,16 +103,38 @@ namespace mongo {
         //   number of keys that cursor retrieved, and into the stage's stats 'advanced' for
         //   nscannedObjects', which would be the number of keys that survived the IXSCAN
         //   filter. Those keys would have been FETCH-ed, if a fetch is present.
-        if (leaf->stageType == STAGE_COLLSCAN) {
+
+        if (logicalStage != NULL) {
+            uint64_t nScanned = 0;
+            uint64_t nScannedObjects = 0;
+            bool isMultiKey = false;
+            bool isIndexOnly = covered;
+            const std::vector<PlanStageStats*>& children = logicalStage->children;
+            for (std::vector<PlanStageStats*>::const_iterator it = children.begin();
+                 it != children.end();
+                 ++it) {
+                TypeExplain* childExplain = NULL;
+                explainPlan(**it, &childExplain, false /* no full details */);
+                if (childExplain) {
+                    res->addToClauses(childExplain);
+                    nScanned += childExplain->getNScanned();
+
+                    // We don't necessarilly fetch on a branch, but the old query framework
+                    // did. We're still emulating the number it would have produced.
+                    nScannedObjects += childExplain->getNScanned();
+
+                    isMultiKey |= childExplain->getIsMultiKey();
+                    isIndexOnly &= childExplain->getIndexOnly();
+                }
+            }
+            res->setNScanned(nScanned);
+            res->setNScannedObjects(nScannedObjects);
+        }
+        else if (leaf->stageType == STAGE_COLLSCAN) {
             CollectionScanStats* csStats = static_cast<CollectionScanStats*>(leaf->specific.get());
             res->setCursor("BasicCursor");
             res->setNScanned(csStats->docsTested);
             res->setNScannedObjects(csStats->docsTested);
-
-            if (fullDetails) {
-                res->setIsMultiKey(false);
-                res->setIndexOnly(false);
-            }
         }
         else if (leaf->stageType == STAGE_GEO_NEAR_2DSPHERE) {
             // TODO: This is kind of a lie for STAGE_GEO_NEAR_2DSPHERE.
@@ -98,11 +142,8 @@ namespace mongo {
             // The first work() is an init.  Every subsequent work examines a document.
             res->setNScanned(leaf->common.works);
             res->setNScannedObjects(leaf->common.works);
-
-            if (fullDetails) {
-                res->setIsMultiKey(false);
-                res->setIndexOnly(false);
-            }
+            res->setIsMultiKey(false);
+            res->setIndexOnly(false);
         }
         else if (leaf->stageType == STAGE_IXSCAN) {
             IndexScanStats* indexStats = static_cast<IndexScanStats*>(leaf->specific.get());
@@ -114,27 +155,21 @@ namespace mongo {
             // If we're covered, that is, no FETCH is present, then, by definition,
             // nScannedObject would be zero because no full document would have been fetched
             // from disk.
-            if (covered) {
-                res->setNScannedObjects(0);
-            }
-            else {
-                res->setNScannedObjects(leaf->common.advanced);
-            }
+            res->setNScannedObjects(covered ? 0 : leaf->common.advanced);
 
             res->setIndexBounds(indexStats->indexBounds);
-
-            if (fullDetails) {
-                res->setIsMultiKey(indexStats->isMultiKey);
-                res->setIndexOnly(covered);
-            }
+            res->setIsMultiKey(indexStats->isMultiKey);
+            res->setIndexOnly(covered);
         }
         else {
             return Status(ErrorCodes::InternalError, "cannot interpret execution plan");
         }
 
+        res->setScanAndOrder(sortPresent);
+
         // Statistics for the plan (appear only in a detailed mode)
+        // TODO: if we can get this from the runner, we can kill "detailed mode"
         if (fullDetails) {
-            res->setScanAndOrder(sortPresent);
             res->setNYields(root->common.yields);
         }
 

@@ -222,7 +222,7 @@ namespace mongo {
         long long _millis;
         bool _isMillisSet;
 
-        // (M)  keys used to seek in and out of an index
+        // (O)  keys used to seek in and out of an index
         BSONObj _indexBounds;
         bool _isIndexBoundsSet;
 

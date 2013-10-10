@@ -36,7 +36,7 @@ namespace mongo {
     const BSONField<long long> TypeExplain::nYields("nYields");
     const BSONField<long long> TypeExplain::nChunkSkips("nChunkSkips");
     const BSONField<long long> TypeExplain::millis("millis");
-    const BSONField<BSONObj> TypeExplain::indexBounds("indexBounds", BSONObj());
+    const BSONField<BSONObj> TypeExplain::indexBounds("indexBounds");
     const BSONField<std::vector<TypeExplain*> > TypeExplain::allPlans("allPlans");
     const BSONField<TypeExplain*> TypeExplain::oldPlan("oldPlan");
     const BSONField<std::string> TypeExplain::server("server");
@@ -69,11 +69,6 @@ namespace mongo {
 
         if (!_isNScannedSet) {
             *errMsg = stream() << "missing " << nScanned.name() << " field";
-            return false;
-        }
-
-        if (!_isIndexBoundsSet) {
-            *errMsg = stream() << "missing " << indexBounds.name() << " field";
             return false;
         }
 
@@ -134,12 +129,7 @@ namespace mongo {
 
         if (_isMillisSet) builder.appendNumber(millis(), _millis);
 
-        if (_isIndexBoundsSet) {
-            builder.append(indexBounds(), _indexBounds);
-        }
-        else {
-            builder.append(indexBounds(), indexBounds.getDefault());
-        }
+        if (_isIndexBoundsSet) builder.append(indexBounds(), _indexBounds);
 
         if (_allPlans.get()) {
             BSONArrayBuilder allPlansBuilder(builder.subarrayStart(allPlans()));
