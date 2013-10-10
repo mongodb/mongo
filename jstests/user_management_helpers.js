@@ -3,7 +3,7 @@
 function assertHasRole(rolesArray, roleName, roleDB) {
     for (i in rolesArray) {
         var curRole = rolesArray[i];
-        if (curRole.name == roleName && curRole.db == roleDB) {
+        if (curRole.role == roleName && curRole.db == roleDB) {
             return;
         }
     }
@@ -27,8 +27,8 @@ function assertHasRole(rolesArray, roleName, roleDB) {
      // Test getUsers
      var users = db.getUsers();
      assert.eq(2, users.length);
-     assert(users[0].name == 'spencer' || users[1].name == 'spencer');
-     assert(users[0].name == 'andy' || users[1].name == 'andy');
+     assert(users[0].user == 'spencer' || users[1].user == 'spencer');
+     assert(users[0].user == 'andy' || users[1].user == 'andy');
      assert.eq(1, users[0].roles.length);
      assert.eq(1, users[1].roles.length);
      assertHasRole(users[0].roles, "readWrite", db.getName());

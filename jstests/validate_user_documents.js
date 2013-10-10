@@ -40,7 +40,7 @@ assert.commandWorked(mydb.runCommand({ createUser: "spencer",
 // Valid V2 user document; insert should succeed.
 assert.commandWorked(mydb.runCommand({ createUser: "andy",
                                        pwd: "password",
-                                       roles: [{name: "dbAdmin",
+                                       roles: [{role: "dbAdmin",
                                                 db: "validate_user_documents",
                                                 hasRole: true,
                                                 canDelegate: false}] }));

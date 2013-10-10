@@ -4,7 +4,7 @@
 function assertHasRole(rolesArray, roleName, roleDB) {
     for (i in rolesArray) {
         var curRole = rolesArray[i];
-        if (curRole.name == roleName && curRole.db == roleDB) {
+        if (curRole.role == roleName && curRole.db == roleDB) {
             return;
         }
     }
@@ -35,10 +35,10 @@ function assertHasPrivilege(privilegeArray, privilege) {
      db.dropDatabase();
      db.dropAllRoles();
 
-     db.addRole({name:'roleA', roles: [], privileges: [{resource: {db:db.getName(), collection: ""},
+     db.addRole({role:'roleA', roles: [], privileges: [{resource: {db:db.getName(), collection: ""},
                                                         actions: ['find']}]});
-     db.addRole({name:'roleB', privileges: [], roles: ["roleA"]});
-     db.addRole({name:'roleC', privileges: [], roles: []});
+     db.addRole({role:'roleB', privileges: [], roles: ["roleA"]});
+     db.addRole({role:'roleC', privileges: [], roles: []});
 
      // Test getRole
      var roleObj = db.getRole("roleA");
