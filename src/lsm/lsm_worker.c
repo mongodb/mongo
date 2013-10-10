@@ -323,12 +323,6 @@ __wt_lsm_checkpoint_worker(void *arg)
 				   session, &S2C(session)->checkpoint_lock);
 			}
 
-			/*
-			 * Clear the "cache resident" flag so the primary can
-			 * be evicted and eventually closed.
-			 */
-			if (ret == 0)
-				__wt_btree_evictable(session, 1);
 			WT_TRET(__wt_session_release_btree(session));
 			WT_ERR(ret);
 
@@ -345,6 +339,18 @@ __wt_lsm_checkpoint_worker(void *arg)
 				__wt_err(session, ret, "LSM checkpoint");
 				break;
 			}
+
+			/*
+			 * Clear the "cache resident" flag so the primary can
+			 * be evicted and eventually closed.  Only do this once
+			 * the checkpoint has succeeded: otherwise, accessing
+			 * the leaf page during the checkpoint can trigger
+			 * forced eviction.
+			 */
+			WT_ERR(__wt_session_get_btree(
+			    session, chunk->uri, NULL, NULL, 0));
+			__wt_btree_evictable(session, 1);
+			WT_ERR(__wt_session_release_btree(session));
 
 			++j;
 			WT_ERR(__wt_writelock(session, lsm_tree->rwlock));
