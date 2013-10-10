@@ -68,8 +68,7 @@ __wt_lsm_stat_init(WT_SESSION_IMPL *session,
 	 * For each chunk, aggregate its statistics, as well as any associated
 	 * bloom filter statistics, into the total statistics.
 	 */
-	WT_STAT_SET(
-	    session, &lsm_tree->stats, lsm_chunk_count, lsm_tree->nchunks);
+	WT_STAT_SET(&lsm_tree->stats, lsm_chunk_count, lsm_tree->nchunks);
 	for (i = 0; i < lsm_tree->nchunks; i++) {
 		chunk = lsm_tree->chunk[i];
 
@@ -96,8 +95,7 @@ __wt_lsm_stat_init(WT_SESSION_IMPL *session,
 		 * top-level.
 		 */
 		child = (WT_DSRC_STATS *)WT_CURSOR_STATS(stat_cursor);
-		WT_STAT_SET(
-		    session, child, lsm_generation_max, chunk->generation);
+		WT_STAT_SET(child, lsm_generation_max, chunk->generation);
 
 		__wt_stat_aggregate_dsrc_stats(child, stats);
 		WT_ERR(stat_cursor->close(stat_cursor));
@@ -106,7 +104,7 @@ __wt_lsm_stat_init(WT_SESSION_IMPL *session,
 			continue;
 
 		/* Maintain a count of bloom filters. */
-		WT_STAT_INCR(session, &lsm_tree->stats, bloom_count);
+		WT_STAT_INCR(&lsm_tree->stats, bloom_count);
 
 		/* Get the bloom filter's underlying object. */
 		WT_ERR(__wt_buf_fmt(
@@ -120,14 +118,12 @@ __wt_lsm_stat_init(WT_SESSION_IMPL *session,
 		 * into the top-level.
 		 */
 		child = (WT_DSRC_STATS *)WT_CURSOR_STATS(stat_cursor);
-		WT_STAT_SET(session, child,
+		WT_STAT_SET(child,
 		    bloom_size, (chunk->count * lsm_tree->bloom_bit_count) / 8);
-		WT_STAT_SET(session, child,
-		    bloom_page_evict,
+		WT_STAT_SET(child, bloom_page_evict,
 		    WT_STAT(child, cache_eviction_clean) +
 		    WT_STAT(child, cache_eviction_dirty));
-		WT_STAT_SET(session,
-		    child, bloom_page_read, WT_STAT(child, cache_read));
+		WT_STAT_SET(child, bloom_page_read, WT_STAT(child, cache_read));
 
 		__wt_stat_aggregate_dsrc_stats(child, stats);
 		WT_ERR(stat_cursor->close(stat_cursor));

@@ -48,7 +48,7 @@ __wt_bm_preload(WT_BM *bm,
 		}
 	}
 
-	WT_CSTAT_INCR(session, block_preload);
+	WT_RUNSTAT_CONN_INCR(session, block_preload);
 
 	return (0);
 }
@@ -96,8 +96,8 @@ __wt_bm_read(WT_BM *bm, WT_SESSION_IMPL *session,
 		F_SET(buf, WT_ITEM_MAPPED);
 		WT_RET(__wt_mmap_preload(session, buf->mem, buf->size));
 
-		WT_CSTAT_INCR(session, block_map_read);
-		WT_CSTAT_INCRV(session, block_byte_map_read, size);
+		WT_RUNSTAT_CONN_INCR(session, block_map_read);
+		WT_RUNSTAT_CONN_INCRV(session, block_byte_map_read, size);
 		return (0);
 	}
 
@@ -183,7 +183,7 @@ __wt_block_read_off(WT_SESSION_IMPL *session,
 		return (WT_ERROR);
 	}
 
-	WT_CSTAT_INCR(session, block_read);
-	WT_CSTAT_INCRV(session, block_byte_read, size);
+	WT_RUNSTAT_CONN_INCR(session, block_read);
+	WT_RUNSTAT_CONN_INCRV(session, block_byte_read, size);
 	return (0);
 }

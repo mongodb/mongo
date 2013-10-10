@@ -401,8 +401,8 @@ __wt_btcur_next(WT_CURSOR_BTREE *cbt, int discard)
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
 
-	WT_CSTAT_INCR(session, cursor_next);
-	WT_DSTAT_INCR(session, cursor_next);
+	WT_RUNSTAT_CONN_INCR(session, cursor_next);
+	WT_RUNSTAT_DATA_INCR(session, cursor_next);
 
 	flags = WT_TREE_SKIP_INTL;			/* Tree walk flags. */
 	if (discard)
@@ -498,8 +498,8 @@ __wt_btcur_next_random(WT_CURSOR_BTREE *cbt)
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
 	btree = cbt->btree;
 
-	WT_CSTAT_INCR(session, cursor_next);
-	WT_DSTAT_INCR(session, cursor_next);
+	WT_RUNSTAT_CONN_INCR(session, cursor_next);
+	WT_RUNSTAT_DATA_INCR(session, cursor_next);
 
 retry:	WT_RET(__cursor_func_init(cbt, 1));
 

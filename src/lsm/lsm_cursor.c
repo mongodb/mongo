@@ -783,11 +783,11 @@ __clsm_lookup(WT_CURSOR_LSM *clsm)
 
 			ret = __wt_bloom_hash_get(bloom, &bhash);
 			if (ret == WT_NOTFOUND) {
-				WT_STAT_INCR(session,
+				WT_RUNSTAT_INCR(session,
 				    &clsm->lsm_tree->stats, bloom_miss);
 				continue;
 			} else if (ret == 0)
-				WT_STAT_INCR(session,
+				WT_RUNSTAT_INCR(session,
 				    &clsm->lsm_tree->stats, bloom_hit);
 			WT_ERR(ret);
 		}
@@ -804,10 +804,10 @@ __clsm_lookup(WT_CURSOR_LSM *clsm)
 		F_CLR(c, WT_CURSTD_KEY_SET);
 		/* Update stats: the active chunk can't have a bloom filter. */
 		if (bloom != NULL)
-			WT_STAT_INCR(session,
+			WT_RUNSTAT_INCR(session,
 			    &clsm->lsm_tree->stats, bloom_false_positive);
 		else if (clsm->primary_chunk == NULL || i != clsm->nchunks)
-			WT_STAT_INCR(session,
+			WT_RUNSTAT_INCR(session,
 			    &clsm->lsm_tree->stats, lsm_lookup_no_bloom);
 	}
 	ret = WT_NOTFOUND;

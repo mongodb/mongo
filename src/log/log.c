@@ -202,7 +202,7 @@ __log_fill(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_write(session, myslot->slot->slot_fh,
 	    myslot->offset + myslot->slot->slot_start_offset,
 	    logrec->len, (void *)logrec));
-	WT_CSTAT_INCRV(session, log_bytes_written, logrec->len);
+	WT_RUNSTAT_CONN_INCRV(session, log_bytes_written, logrec->len);
 	if (lsnp != NULL) {
 		*lsnp = myslot->slot->slot_start_lsn;
 		lsnp->offset += (off_t)myslot->offset;
@@ -363,7 +363,7 @@ __log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 	while (LOG_CMP(&log->write_lsn, &slot->slot_release_lsn) != 0)
 		__wt_yield();
 	if (FLD_ISSET(slot->slot_flags, SLOT_SYNC)) {
-		WT_CSTAT_INCR(session, log_sync);
+		WT_RUNSTAT_CONN_INCR(session, log_sync);
 		WT_ERR(__wt_fsync(session, log->log_fh));
 		FLD_CLR(slot->slot_flags, SLOT_SYNC);
 		log->sync_lsn = slot->slot_end_lsn;
@@ -523,7 +523,7 @@ __wt_log_read(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 		goto err;
 	}
 	record->size = logrec->len;
-	WT_CSTAT_INCR(session, log_reads);
+	WT_RUNSTAT_CONN_INCR(session, log_reads);
 err:
 	WT_TRET(__wt_close(session, log_fh));
 	return (ret);
@@ -636,7 +636,7 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 			WT_ERR(__wt_buf_grow(session, &buf, rdup_len));
 			WT_ERR(__wt_read(
 			    session, log_fh, rd_lsn.offset, reclen, buf.mem));
-			WT_CSTAT_INCR(session, log_scan_rereads);
+			WT_RUNSTAT_CONN_INCR(session, log_scan_rereads);
 		}
 		/*
 		 * We read in the record, verify checksum.
@@ -658,11 +658,11 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 		if (rd_lsn.offset != 0)
 			WT_ERR((*func)(session, &buf, &rd_lsn, cookie));
 
-		WT_CSTAT_INCR(session, log_scan_records);
+		WT_RUNSTAT_CONN_INCR(session, log_scan_records);
 		rd_lsn.offset += (off_t)rdup_len;
 	} while (!done);
 
-err:	WT_CSTAT_INCR(session, log_scans);
+err:	WT_RUNSTAT_CONN_INCR(session, log_scans);
 	__wt_buf_free(session, &buf);
 	if (ret == ENOENT)
 		ret = 0;
@@ -700,7 +700,7 @@ __wt_log_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 	 * that we can write the full amount.  Do this whether or not
 	 * direct_io is in use because it makes the reading code cleaner.
 	 */
-	WT_CSTAT_INCRV(session, log_bytes_user, record->size);
+	WT_RUNSTAT_CONN_INCRV(session, log_bytes_user, record->size);
 	rdup_len = __wt_rduppo2(record->size, log->allocsize);
 	WT_ERR(__wt_buf_grow(session, record, rdup_len));
 	WT_ASSERT(session, record->data == record->mem);
@@ -719,7 +719,7 @@ __wt_log_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 	logrec->checksum = __wt_cksum(logrec, record->size);
 
 	memset(&tmp, 0, sizeof(tmp));
-	WT_CSTAT_INCR(session, log_writes);
+	WT_RUNSTAT_CONN_INCR(session, log_writes);
 	if (__wt_spin_trylock(session, &log->log_slot_lock) == 0) {
 		/*
 		 * No contention, just write our record.  We're not using

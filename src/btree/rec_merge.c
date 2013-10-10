@@ -482,13 +482,13 @@ __wt_merge_tree(WT_SESSION_IMPL *session, WT_PAGE *top)
 		rchild->read_gen = WT_READ_GEN_OLDEST;
 
 	/* Update statistics. */
-	WT_CSTAT_INCR(session, cache_eviction_merge);
-	WT_DSTAT_INCR(session, cache_eviction_merge);
+	WT_RUNSTAT_CONN_INCR(session, cache_eviction_merge);
+	WT_RUNSTAT_DATA_INCR(session, cache_eviction_merge);
 
 	/* How many levels did we remove? */
 	levels = visit_state.maxdepth - (promote ? 2 : 1);
-	WT_CSTAT_INCRV(session, cache_eviction_merge_levels, levels);
-	WT_DSTAT_INCRV(session, cache_eviction_merge_levels, levels);
+	WT_RUNSTAT_CONN_INCRV(session, cache_eviction_merge_levels, levels);
+	WT_RUNSTAT_DATA_INCRV(session, cache_eviction_merge_levels, levels);
 
 	return (0);
 
@@ -497,8 +497,8 @@ err:	WT_VERBOSE_TRET(session, evict,
 	    " split-merge pages containing %" PRIu32 " keys\n",
 	    visit_state.maxdepth, refcnt);
 
-	WT_CSTAT_INCR(session, cache_eviction_merge_fail);
-	WT_DSTAT_INCR(session, cache_eviction_merge_fail);
+	WT_RUNSTAT_CONN_INCR(session, cache_eviction_merge_fail);
+	WT_RUNSTAT_DATA_INCR(session, cache_eviction_merge_fail);
 
 	if (newtop != NULL)
 		__wt_page_out(session, &newtop);

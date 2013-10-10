@@ -43,7 +43,7 @@ __wt_ovfl_read(WT_SESSION_IMPL *session, WT_CELL_UNPACK *unpack, WT_ITEM *store)
 	WT_DECL_RET;
 
 	btree = S2BT(session);
-	WT_DSTAT_INCR(session, cache_read_overflow);
+	WT_RUNSTAT_DATA_INCR(session, cache_read_overflow);
 
 	/*
 	 * The cell type might have been reset (if we race with reconciliation),
@@ -310,13 +310,13 @@ __wt_val_ovfl_cache(WT_SESSION_IMPL *session,
 		if (__ovfl_cache_col_visible(session, cookie, unpack))
 			break;
 		WT_ERR(__val_ovfl_cache_col(session, page, unpack));
-		WT_DSTAT_INCR(session, cache_overflow_value);
+		WT_RUNSTAT_DATA_INCR(session, cache_overflow_value);
 		break;
 	case WT_PAGE_ROW_LEAF:
 		if (__ovfl_cache_row_visible(session, page, cookie))
 			break;
 		WT_ERR(__val_ovfl_cache_row(session, page, cookie, unpack));
-		WT_DSTAT_INCR(session, cache_overflow_value);
+		WT_RUNSTAT_DATA_INCR(session, cache_overflow_value);
 		break;
 	WT_ILLEGAL_VALUE_ERR(session);
 	}

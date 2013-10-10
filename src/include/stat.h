@@ -12,73 +12,93 @@ struct __wt_stats {
 
 #define	WT_STAT(stats, fld)						\
 	((stats)->fld.v)
-
-#define	WT_STAT_ATOMIC_DECR(session, stats, fld) do {			\
-	if (S2C(session)->statistics)					\
-		(void)WT_ATOMIC_SUB(WT_STAT(stats, fld), 1);		\
+#define	WT_STAT_DECR(stats, fld) do {					\
+	--(stats)->fld.v;						\
 } while (0)
-#define	WT_STAT_DECR(session, stats, fld) do {				\
-	if (S2C(session)->statistics)					\
-		--(stats)->fld.v;					\
+#define	WT_STAT_ATOMIC_DECR(stats, fld) do {				\
+	(void)WT_ATOMIC_SUB(WT_STAT(stats, fld), 1);			\
 } while (0)
-#define	WT_STAT_ATOMIC_INCR(session, stats, fld) do {			\
-	if (S2C(session)->statistics)					\
-		(void)WT_ATOMIC_ADD(WT_STAT(stats, fld), 1);		\
+#define	WT_STAT_INCR(stats, fld) do {					\
+	++(stats)->fld.v;						\
 } while (0)
-#define	WT_STAT_INCR(session, stats, fld) do {				\
-	if (S2C(session)->statistics)					\
-		++(stats)->fld.v;					\
+#define	WT_STAT_ATOMIC_INCR(stats, fld) do {				\
+	(void)WT_ATOMIC_ADD(WT_STAT(stats, fld), 1);			\
 } while (0)
-#define	WT_STAT_INCRV(session, stats, fld, value) do {			\
-	if (S2C(session)->statistics)					\
-		(stats)->fld.v += (value);				\
+#define	WT_STAT_INCRV(stats, fld, value) do {				\
+	(stats)->fld.v += (value);					\
 } while (0)
-#define	WT_STAT_INCRKV(session, stats, key, value) do {			\
-	if (S2C(session)->statistics)					\
-		((WT_STATS *)stats)[(key)].v += (value);		\
+#define	WT_STAT_INCRV_KEY(stats, key, value) do {			\
+	((WT_STATS *)stats)[(key)].v += (value);			\
 } while (0)
-#define	WT_STAT_SET(session, stats, fld, value) do {			\
-	if (S2C(session)->statistics)					\
-		(stats)->fld.v = (uint64_t)(value);			\
+#define	WT_STAT_SET(stats, fld, value) do {				\
+	(stats)->fld.v = (uint64_t)(value);				\
 } while (0)
 
-/* Connection statistics. */
-#define	WT_CSTAT_ATOMIC_DECR(session, fld)				\
-	WT_STAT_ATOMIC_DECR(session, &S2C(session)->stats, fld)
-#define	WT_CSTAT_DECR(session, fld)					\
-	WT_STAT_DECR(session, &S2C(session)->stats, fld)
-#define	WT_CSTAT_ATOMIC_INCR(session, fld)				\
-	WT_STAT_ATOMIC_INCR(session, &S2C(session)->stats, fld)
-#define	WT_CSTAT_INCR(session, fld)					\
-	WT_STAT_INCR(session, &S2C(session)->stats, fld)
-#define	WT_CSTAT_INCRV(session, fld, v)					\
-	WT_STAT_INCRV(session, &S2C(session)->stats, fld, v)
-#define	WT_CSTAT_SET(session, fld, v)					\
-	WT_STAT_SET(session, &S2C(session)->stats, fld, v)
+/* Run-time statistics, maintained only if statistics configured. */
+#define	WT_RUNSTAT_DECR(session, stats, fld) do {			\
+	if (S2C(session)->statistics)					\
+		WT_STAT_DECR(stats, fld);				\
+} while (0)
+#define	WT_RUNSTAT_ATOMIC_DECR(session, stats, fld) do {		\
+	if (S2C(session)->statistics)					\
+		WT_STAT_ATOMIC_DECR(stats, fld);			\
+} while (0)
+#define	WT_RUNSTAT_INCR(session, stats, fld) do {			\
+	if (S2C(session)->statistics)					\
+		WT_STAT_INCR(stats, fld);				\
+} while (0)
+#define	WT_RUNSTAT_ATOMIC_INCR(session, stats, fld) do {		\
+	if (S2C(session)->statistics)					\
+		WT_STAT_ATOMIC_INCR(stats, fld);			\
+} while (0)
+#define	WT_RUNSTAT_INCRV(session, stats, fld, value) do {		\
+	if (S2C(session)->statistics)					\
+		WT_STAT_INCRV(stats, fld, value);			\
+} while (0)
+#define	WT_RUNSTAT_SET(session, stats, fld, value) do {			\
+	if (S2C(session)->statistics)					\
+		WT_STAT_SET(stats, fld, value);				\
+} while (0)
+
+/* Connection-level run-time statistics. */
+#define	WT_RUNSTAT_CONN_DECR(session, fld)				\
+	WT_RUNSTAT_DECR(session, &S2C(session)->stats, fld)
+#define	WT_RUNSTAT_CONN_ATOMIC_DECR(session, fld)			\
+	WT_RUNSTAT_ATOMIC_DECR(session, &S2C(session)->stats, fld)
+#define	WT_RUNSTAT_CONN_INCR(session, fld)				\
+	WT_RUNSTAT_INCR(session, &S2C(session)->stats, fld)
+#define	WT_RUNSTAT_CONN_ATOMIC_INCR(session, fld)			\
+	WT_RUNSTAT_ATOMIC_INCR(session, &S2C(session)->stats, fld)
+#define	WT_RUNSTAT_CONN_INCRV(session, fld, v)				\
+	WT_RUNSTAT_INCRV(session, &S2C(session)->stats, fld, v)
+#define	WT_RUNSTAT_CONN_SET(session, fld, v)				\
+	WT_RUNSTAT_SET(session, &S2C(session)->stats, fld, v)
 
 /*
- * Data-source statistics.
+ * Data-source-handle run-time statistics.
  *
  * XXX
  * We shouldn't have to check if the data-source handle is NULL, but it's
  * useful until everything is converted to using data-source handles.
  */
-#define	WT_DSTAT_DECR(session, fld) do {				\
+#define	WT_RUNSTAT_DATA_DECR(session, fld) do {				\
 	if ((session)->dhandle != NULL)					\
-		WT_STAT_DECR(session, &(session)->dhandle->stats, fld);	\
+		WT_RUNSTAT_DECR(					\
+		    session, &(session)->dhandle->stats, fld);		\
 } while (0)
-#define	WT_DSTAT_INCR(session, fld) do {				\
+#define	WT_RUNSTAT_DATA_INCR(session, fld) do {				\
 	if ((session)->dhandle != NULL)					\
-		WT_STAT_INCR(session, &(session)->dhandle->stats, fld);	\
+		WT_RUNSTAT_INCR(					\
+		    session, &(session)->dhandle->stats, fld);		\
 } while (0)
-#define	WT_DSTAT_INCRV(session, fld, v) do {				\
+#define	WT_RUNSTAT_DATA_INCRV(session, fld, v) do {			\
 	if ((session)->dhandle != NULL)					\
-		WT_STAT_INCRV(						\
+		WT_RUNSTAT_INCRV(					\
 		    session, &(session)->dhandle->stats, fld, v);	\
 } while (0)
-#define	WT_DSTAT_SET(session, fld, v) do {				\
+#define	WT_RUNSTAT_DATA_SET(session, fld, v) do {			\
 	if ((session)->dhandle != NULL)					\
-		WT_STAT_SET(						\
+		WT_RUNSTAT_SET(						\
 		   session, &(session)->dhandle->stats, fld, v);	\
 } while (0)
 

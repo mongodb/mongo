@@ -245,7 +245,7 @@ __wt_lsm_merge(
 	}
 	WT_ERR_NOTFOUND_OK(ret);
 
-	WT_CSTAT_INCRV(session, lsm_rows_merged, insert_count);
+	WT_RUNSTAT_CONN_INCRV(session, lsm_rows_merged, insert_count);
 	WT_VERBOSE_ERR(session, lsm,
 	    "Bloom size for %" PRIu64 " has %" PRIu64 " items inserted.",
 	    record_count, insert_count);
