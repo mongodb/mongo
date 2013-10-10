@@ -7,21 +7,21 @@ var testDB2 = conn.getDB("testdb2");
 
 var CodeUnauthorized = 13;
 
-var backdoorUserDoc = { name: 'backdoor', db: 'admin', pwd: 'hashed', roles: ['root'] }
+var backdoorUserDoc = { user: 'backdoor', db: 'admin', pwd: 'hashed', roles: ['root'] }
 
-adminDB.addUser({name:'userAdmin',
+adminDB.addUser({user:'userAdmin',
                  pwd:'password',
                  roles:['userAdminAnyDatabase']});
 
 adminDB.auth('userAdmin', 'password');
-adminDB.addUser({name:'readWriteAdmin',
+adminDB.addUser({user:'readWriteAdmin',
                  pwd:'password',
                  roles:['readWriteAnyDatabase']});
-adminDB.addUser({name:'readWriteAndUserAdmin',
+adminDB.addUser({user:'readWriteAndUserAdmin',
                  pwd:'password',
                  roles:['readWriteAnyDatabase', 'userAdminAnyDatabase']});
-adminDB.addUser({name: 'root', pwd: 'password', roles: ['root']});
-adminDB.addUser({name: 'rootier', pwd: 'password', roles: ['__system']});
+adminDB.addUser({user: 'root', pwd: 'password', roles: ['root']});
+adminDB.addUser({user: 'rootier', pwd: 'password', roles: ['__system']});
 adminDB.logout();
 
 
@@ -69,8 +69,8 @@ var res = adminDB.users.renameCollection("system.users");
 assert.eq(0, res.ok);
 assert.eq(CodeUnauthorized, res.code);
 
-assert.eq(null, adminDB.system.users.findOne({name: backdoorUserDoc.name}));
-assert.neq(null, adminDB.system.users.findOne({name:'userAdmin'}));
+assert.eq(null, adminDB.system.users.findOne({user: backdoorUserDoc.user}));
+assert.neq(null, adminDB.system.users.findOne({user:'userAdmin'}));
 
 adminDB.auth('root', 'password');
 adminDB.users.drop();
@@ -88,8 +88,8 @@ var res = adminDB.users.renameCollection("system.users");
 assert.eq(0, res.ok);
 assert.eq(CodeUnauthorized, res.code);
 
-assert.eq(null, adminDB.system.users.findOne({name: backdoorUserDoc.name}));
-assert.neq(null, adminDB.system.users.findOne({name:'userAdmin'}));
+assert.eq(null, adminDB.system.users.findOne({user: backdoorUserDoc.user}));
+assert.neq(null, adminDB.system.users.findOne({user:'userAdmin'}));
 
 adminDB.auth('rootier', 'password');
 

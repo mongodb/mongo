@@ -47,7 +47,7 @@ namespace {
     const std::string OTHER_DB_ROLES_FIELD_NAME = "otherDBRoles";
     const std::string READONLY_FIELD_NAME = "readOnly";
     const std::string CREDENTIALS_FIELD_NAME = "credentials";
-    const std::string ROLE_NAME_FIELD_NAME = "name";
+    const std::string ROLE_NAME_FIELD_NAME = "role";
     const std::string ROLE_SOURCE_FIELD_NAME = "db";
     const std::string ROLE_CAN_DELEGATE_FIELD_NAME = "canDelegate";
     const std::string ROLE_HAS_ROLE_FIELD_NAME = "hasRole";

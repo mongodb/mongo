@@ -69,7 +69,7 @@ namespace {
         BSONObj roleDoc = doc.getObject();
 
         ASSERT_EQUALS("dbA.roleA", roleDoc["_id"].String());
-        ASSERT_EQUALS("roleA", roleDoc["name"].String());
+        ASSERT_EQUALS("roleA", roleDoc["role"].String());
         ASSERT_EQUALS("dbA", roleDoc["db"].String());
 
         vector<BSONElement> privs = roleDoc["privileges"].Array();
@@ -84,9 +84,9 @@ namespace {
 
         vector<BSONElement> roles = roleDoc["roles"].Array();
         ASSERT_EQUALS(2U, roles.size());
-        ASSERT_EQUALS("roleC", roles[0].Obj()["name"].String());
+        ASSERT_EQUALS("roleC", roles[0].Obj()["role"].String());
         ASSERT_EQUALS("dbC", roles[0].Obj()["db"].String());
-        ASSERT_EQUALS("roleB", roles[1].Obj()["name"].String());
+        ASSERT_EQUALS("roleB", roles[1].Obj()["role"].String());
         ASSERT_EQUALS("dbB", roles[1].Obj()["db"].String());
 
         // Role B
@@ -95,7 +95,7 @@ namespace {
         roleDoc = doc.getObject();
 
         ASSERT_EQUALS("dbB.roleB", roleDoc["_id"].String());
-        ASSERT_EQUALS("roleB", roleDoc["name"].String());
+        ASSERT_EQUALS("roleB", roleDoc["role"].String());
         ASSERT_EQUALS("dbB", roleDoc["db"].String());
 
         privs = roleDoc["privileges"].Array();
@@ -110,7 +110,7 @@ namespace {
 
         roles = roleDoc["roles"].Array();
         ASSERT_EQUALS(1U, roles.size());
-        ASSERT_EQUALS("roleC", roles[0].Obj()["name"].String());
+        ASSERT_EQUALS("roleC", roles[0].Obj()["role"].String());
         ASSERT_EQUALS("dbC", roles[0].Obj()["db"].String());
 
         // Role C
@@ -119,7 +119,7 @@ namespace {
         roleDoc = doc.getObject();
 
         ASSERT_EQUALS("dbC.roleC", roleDoc["_id"].String());
-        ASSERT_EQUALS("roleC", roleDoc["name"].String());
+        ASSERT_EQUALS("roleC", roleDoc["role"].String());
         ASSERT_EQUALS("dbC", roleDoc["db"].String());
 
         privs = roleDoc["privileges"].Array();
@@ -336,20 +336,20 @@ namespace {
 
         ASSERT_OK(externalState->insertPrivilegeDocument(
                 "admin",
-                BSON("name" << "v2read" <<
+                BSON("user" << "v2read" <<
                      "db" << "test" <<
                      "credentials" << BSON("MONGODB-CR" << "password") <<
-                     "roles" << BSON_ARRAY(BSON("name" << "read" <<
+                     "roles" << BSON_ARRAY(BSON("role" << "read" <<
                                                 "db" << "test" <<
                                                 "canDelegate" << false <<
                                                 "hasRole" << true))),
                 BSONObj()));
         ASSERT_OK(externalState->insertPrivilegeDocument(
                 "admin",
-                BSON("name" << "v2cluster" <<
+                BSON("user" << "v2cluster" <<
                      "db" << "admin" <<
                      "credentials" << BSON("MONGODB-CR" << "password") <<
-                     "roles" << BSON_ARRAY(BSON("name" << "clusterAdmin" <<
+                     "roles" << BSON_ARRAY(BSON("role" << "clusterAdmin" <<
                                                 "db" << "admin" <<
                                                 "canDelegate" << true <<
                                                 "hasRole" << true))),
@@ -448,26 +448,26 @@ namespace {
             // Verify that the expected users are present.
             ASSERT_EQUALS(3U, externalState->getCollectionContents(usersCollectionName).size());
             ASSERT_OK(externalState->findOne(usersCollectionName,
-                                             BSON("name" << "readOnly" << "db" << "test"),
+                                             BSON("user" << "readOnly" << "db" << "test"),
                                              &doc));
-            ASSERT_EQUALS("readOnly", doc["name"].str());
+            ASSERT_EQUALS("readOnly", doc["user"].str());
             ASSERT_EQUALS("test", doc["db"].str());
             ASSERT_EQUALS("password", doc["credentials"]["MONGODB-CR"].str());
             ASSERT_EQUALS(1U, doc["roles"].Array().size());
 
             ASSERT_OK(externalState->findOne(
                               usersCollectionName,
-                              BSON("name" << "clusterAdmin" << "db" << "$external"),
+                              BSON("user" << "clusterAdmin" << "db" << "$external"),
                               &doc));
-            ASSERT_EQUALS("clusterAdmin", doc["name"].str());
+            ASSERT_EQUALS("clusterAdmin", doc["user"].str());
             ASSERT_EQUALS("$external", doc["db"].str());
             ASSERT_EQUALS(1U, doc["roles"].Array().size());
 
             ASSERT_OK(externalState->findOne(
                               usersCollectionName,
-                              BSON("name" << "readWriteMultiDB" << "db" << "test"),
+                              BSON("user" << "readWriteMultiDB" << "db" << "test"),
                               &doc));
-            ASSERT_EQUALS("readWriteMultiDB", doc["name"].str());
+            ASSERT_EQUALS("readWriteMultiDB", doc["user"].str());
             ASSERT_EQUALS("test", doc["db"].str());
             ASSERT_EQUALS("password", doc["credentials"]["MONGODB-CR"].str());
             ASSERT_EQUALS(2U, doc["roles"].Array().size());

@@ -17,17 +17,17 @@ assert.throws(function() {db.addUser('spencer', 'password'); });
 assert.throws(function() {db.addUser({user:'noroles', pwd:'password'});});
 
 // Create valid V2 format user
-db.addUser({name:'andy', pwd:'password', roles:['read']});
+db.addUser({user:'andy', pwd:'password', roles:['read']});
 assert.eq(1, admin.system.users.count());
-userObj = admin.system.users.findOne({name:'andy'});
-assert.eq('andy', userObj['name']);
+userObj = admin.system.users.findOne({user:'andy'});
+assert.eq('andy', userObj['user']);
 assert.eq(passwordHash('andy', 'password'), userObj['credentials']['MONGODB-CR']);
 
 // test changing password
 db.changeUserPassword('andy', 'newpassword');
 assert.eq(1, admin.system.users.count());
 userObj = admin.system.users.findOne();
-assert.eq('andy', userObj['name']);
+assert.eq('andy', userObj['user']);
 assert.eq(passwordHash('andy', 'newpassword'), userObj['credentials']['MONGODB-CR']);
 
 // Should fail because user already exists
@@ -36,8 +36,8 @@ assert.throws(function() {db.addUser({user:'andy', pwd:'password', roles:['read'
 // Create valid extended form external user
 db.getSiblingDB("$external").addUser({user:'spencer', roles:['readWrite']});
 assert.eq(2, admin.system.users.count());
-userObj = admin.system.users.findOne({name:'spencer', db:'$external'});
-assert.eq('spencer', userObj['name']);
+userObj = admin.system.users.findOne({user:'spencer', db:'$external'});
+assert.eq('spencer', userObj['user']);
 assert.eq('$external', userObj['db']);
 assert(!userObj['credentials']);
 
@@ -45,6 +45,6 @@ assert(!userObj['credentials']);
 // Create valid V2 format user using new helper format
 db.addUser('bob', 'password', ['read']);
 assert.eq(3, admin.system.users.count());
-userObj = admin.system.users.findOne({name:'bob'});
-assert.eq('bob', userObj['name']);
+userObj = admin.system.users.findOne({user:'bob'});
+assert.eq('bob', userObj['user']);
 assert.eq(passwordHash('bob', 'password'), userObj['credentials']['MONGODB-CR']);

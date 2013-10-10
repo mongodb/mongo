@@ -936,26 +936,10 @@ DB.prototype._createUserV1 = function(userObj, replicatedTo, timeout) {
     throw "couldn't add user: " + le.err;
 }
 
-function _extractUserNameFromUserCommand(cmdObj) {
-    if (cmdObj.hasOwnProperty("name") && cmdObj.hasOwnProperty("user")) {
-        throw Error("Cannot provide both 'name' and 'user' field to user management commands");
-    }
-
-    var name = "";
-    if (cmdObj.hasOwnProperty("name")) {
-        name = cmdObj["name"];
-    } else {
-        // For backwards compatibility
-        name = cmdObj["user"];
-    }
-    return name;
-}
-
 DB.prototype._createUser = function(userObj, replicatedTo, timeout) {
-    var name = _extractUserNameFromUserCommand(userObj);
+    var name = userObj["user"];
     var cmdObj = {createUser:name};
     cmdObj = Object.extend(cmdObj, userObj);
-    delete cmdObj["name"];
     delete cmdObj["user"];
 
     replicatedTo = replicatedTo != null ? replicatedTo : "majority";
@@ -997,7 +981,7 @@ DB.prototype._addUserExplicitArgs = function(username, password, roles, replicat
     if (password == null || password.length == 0) {
         throw Error("password can't be empty");
     }
-    var userObj = { name: arguments[0], pwd: arguments[1], roles: arguments[2] };
+    var userObj = { user: arguments[0], pwd: arguments[1], roles: arguments[2] };
     this._createUser(userObj, replicatedTo, timeout);
 }
 
@@ -1221,10 +1205,10 @@ DB.prototype.getUsers = function() {
 }
 
 DB.prototype.addRole = function(roleObj, writeConcern) {
-    var name = roleObj["name"];
+    var name = roleObj["role"];
     var cmdObj = {createRole:name};
     cmdObj = Object.extend(cmdObj, roleObj);
-    delete cmdObj["name"];
+    delete cmdObj["role"];
     cmdObj["writeConcern"] = writeConcern ? writeConcern : _defaultWriteConcern;
 
     var res = this.runCommand(cmdObj);

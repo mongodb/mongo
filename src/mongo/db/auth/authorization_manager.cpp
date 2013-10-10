@@ -75,9 +75,9 @@ namespace mongo {
         return Status::OK();
     }
 
-    const std::string AuthorizationManager::USER_NAME_FIELD_NAME = "name";
+    const std::string AuthorizationManager::USER_NAME_FIELD_NAME = "user";
     const std::string AuthorizationManager::USER_SOURCE_FIELD_NAME = "db";
-    const std::string AuthorizationManager::ROLE_NAME_FIELD_NAME = "name";
+    const std::string AuthorizationManager::ROLE_NAME_FIELD_NAME = "role";
     const std::string AuthorizationManager::ROLE_SOURCE_FIELD_NAME = "db";
     const std::string AuthorizationManager::PASSWORD_FIELD_NAME = "pwd";
     const std::string AuthorizationManager::V1_USER_NAME_FIELD_NAME = "user";
