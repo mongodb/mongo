@@ -1066,7 +1066,8 @@ var p19 = db.runCommand({aggregate : "article", pipeline : [
         dayOfWeek: {$dayOfWeek: "$posted"},
         month: {$month: "$posted"},
         week: {$week: "$posted"},
-        year: {$year: "$posted"}
+        year: {$year: "$posted"},
+        dateFormat: {$dateFormat: ["$posted", "%Y-%m"]}
     }}
 ]});
 
@@ -1083,6 +1084,7 @@ var p19result = [
         "month" : 3,
         "week" : 12,
         "year" : 2004,
+        "dateFormat": "2004-03"
     },
     {
         "_id" : 2,
@@ -1096,6 +1098,7 @@ var p19result = [
         "month" : 8,
         "week" : 31,
         "year" : 2030,
+        "dateFormat": "2030-08"
     },
     {
         "_id" : 3,
@@ -1109,6 +1112,7 @@ var p19result = [
         "month" : 12,
         "week" : 53,
         "year" : 2000,
+        "dateFormat": "2000-12"
     }
 ];
 

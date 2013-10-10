@@ -416,6 +416,12 @@ namespace mongo {
         virtual const char *getOpName() const;
     };
 
+    class ExpressionDateFormat : public ExpressionFixedArity<ExpressionDateFormat, 2> {
+    public:
+        // virtuals from ExpressionNary
+        virtual Value evaluateInternal(const Variables& vars) const;
+        virtual const char *getOpName() const;
+    };
 
     class ExpressionDivide : public ExpressionFixedArity<ExpressionDivide, 2> {
     public:
