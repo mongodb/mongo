@@ -157,6 +157,13 @@ namespace mongo {
             toolGlobalParams.db = "admin";
         }
 
+        // end of storage / start of validation
+
+        if (mongoStatGlobalParams.sleep <= 0) {
+            cerr << "Error parsing command line: --sleep must be greater than 0" << endl;
+            ::_exit(EXIT_BADOPTIONS);
+        }
+
         return Status::OK();
     }
 
