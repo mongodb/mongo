@@ -8,10 +8,10 @@ function go( prefix ){
     assert.eq( 1 , t.find( { a : { $elemMatch : { x : { $lt : 2 } } } } ).count() , prefix + " A3" );
     assert.eq( 1 , t.find( { a : { $all : [ { $elemMatch : { x : { $lt : 4 } } } ,
                                             { $elemMatch : { x : { $gt : 5 } } } ] } } ).count() , prefix + " A4" );
-    
+
     assert.throws( function() { return t.findOne( { a : { $all : [ 1, { $elemMatch : { x : 3 } } ] } } ) } );
     assert.throws( function() { return t.findOne( { a : { $all : [ /a/, { $elemMatch : { x : 3 } } ] } } ) } );
-        
+
 }
 
 t.save( { a : [ { x : 1 } , { x : 5 } ] } )
@@ -22,7 +22,10 @@ go( "no index" );
 t.ensureIndex( { a : 1 } );
 go( "index(a)" );
 
-assert.eq( {}, t.find( { a : { $all : [ { $elemMatch : { x : 3 } } ] } } ).explain().indexBounds );
+// QUERY MIGRATION
+// New query systems does not print bounds for a query that doesn use indices
+// printjson( t.find( { a : { $all : [ { $elemMatch : { x : 3 } } ] } } ).explain() );
+// assert.eq( {}, t.find( { a : { $all : [ { $elemMatch : { x : 3 } } ] } } ).explain().indexBounds );
 
 t.ensureIndex( { "a.x": 1 } );
 

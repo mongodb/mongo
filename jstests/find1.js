@@ -3,9 +3,11 @@ t.drop();
 
 lookAtDocumentMetrics = false;
 
+// QUERY MIGRATION
+// New system is still not connected to server status
 if ( db.serverStatus().metrics ) {
-    var ss = db.serverStatus();
-    lookAtDocumentMetrics = ss.metrics.document != null && ss.metrics.queryExecutor.scanned != null;
+    // var ss = db.serverStatus();
+    // lookAtDocumentMetrics = ss.metrics.document != null && ss.metrics.queryExecutor.scanned != null;
 }
 
 print( "lookAtDocumentMetrics: " + lookAtDocumentMetrics );

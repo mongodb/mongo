@@ -15,12 +15,14 @@ function checkField( explain, name, value ) {
 function checkNonCursorPlanFields( explain, matches, n ) {
     checkField( explain, "n", n );
     checkField( explain, "nscannedObjects", matches );
-    checkField( explain, "nscanned", matches );    
+    checkField( explain, "nscanned", matches );
 }
 
 function checkPlanFields( explain, matches, n ) {
     checkField( explain, "cursor", "BasicCursor" );
-    checkField( explain, "indexBounds", {} );    
+    // QUERY MIGRATION
+    // index related fields do not appear in non-indexed plan
+    //checkField( explain, "indexBounds", {} );
     checkNonCursorPlanFields( explain, matches, n );
 }
 
@@ -33,14 +35,16 @@ function checkFields( matches, sort, limit ) {
         cursor.limit( limit );
     }
     explain = cursor.explain( true );
-//    printjson( explain );
+    // printjson( explain );
     checkPlanFields( explain, matches, matches > 0 ? 1 : 0 );
     checkField( explain, "scanAndOrder", sort );
     checkField( explain, "millis" );
     checkField( explain, "nYields" );
     checkField( explain, "nChunkSkips", 0 );
-    checkField( explain, "isMultiKey", false );
-    checkField( explain, "indexOnly", false );
+    // QUERY MIGRATION
+    // index related fields do not appear in non-indexed plan
+    // checkField( explain, "isMultiKey", false );
+    // checkField( explain, "indexOnly", false );
     checkField( explain, "server" );
     checkField( explain, "allPlans" );
     explain.allPlans.forEach( function( x ) { checkPlanFields( x, matches, matches ); } );

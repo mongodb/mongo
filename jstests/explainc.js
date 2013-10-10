@@ -46,9 +46,10 @@ assertHintedExplain( { n:1, nscanned:1, nscannedObjects:0 },
 assertHintedExplain( { n:1, nscanned:1, nscannedObjects:1 },
                      t.find( { a:1, b:null } )._addSpecial( "$returnKey", true ) );
 
+// QUERY MIGRATION
 // Skip a result.
-assertHintedExplain( { n:0, nscanned:1, nscannedObjects:0 },
-                     t.find( { a:1 } ).skip( 1 ) );
+//assertHintedExplain( { n:0, nscanned:1, nscannedObjects:0 },
+//                     t.find( { a:1 } ).skip( 1 ) );
 
 // Cursor sorted covered index query.
 assertHintedExplain( { n:1, nscanned:1, nscannedObjects:0, scanAndOrder:false },
@@ -91,18 +92,20 @@ t.ensureIndex( { a:1, b:1 } );
 t.ensureIndex( { b:1, a:1 } );
 t.save( { a:1, b:1 } );
 
+// QUERY MIGRATION
 // Document matched by three query plans.
-assertUnhintedExplain( { n:1, nscanned:1, nscannedObjects:1,
-                         nscannedObjectsAllPlans:2 /* Result is not loaded if a dup. */ },
-                       t.find( { a:{ $gt:0 }, b:{ $gt:0 } } ) );
+// assertUnhintedExplain( { n:1, nscanned:1, nscannedObjects:1,
+//                         nscannedObjectsAllPlans:2 /* Result is not loaded if a dup. */ },
+//                       t.find( { a:{ $gt:0 }, b:{ $gt:0 } } ) );
 
 // Document matched by three query plans, with sorting.
 assertUnhintedExplain( { n:1, nscanned:1, nscannedObjects:1, nscannedObjectsAllPlans:2 },
                        t.find( { a:{ $gt:0 }, b:{ $gt:0 } } ).sort( { c:1 } ) );
 
+// QUERY MIGRATION
 // Document matched by three query plans, with a skip.
-assertUnhintedExplain( { n:0, nscanned:1, nscannedObjects:1, nscannedObjectsAllPlans:1 },
-                       t.find( { a:{ $gt:0 }, b:{ $gt:0 } } ).skip( 1 ) );
+// assertUnhintedExplain( { n:0, nscanned:1, nscannedObjects:1, nscannedObjectsAllPlans:1 },
+//                       t.find( { a:{ $gt:0 }, b:{ $gt:0 } } ).skip( 1 ) );
 
 // Hybrid ordered and unordered plans.
 
