@@ -167,5 +167,10 @@ namespace optionenvironment {
         return *this;
     }
 
+    OptionDescription& OptionDescription::setSources(OptionSources sources) {
+        _sources = sources;
+        return *this;
+    }
+
 } // namespace optionenvironment
 } // namespace mongo

@@ -98,7 +98,9 @@ namespace optionenvironment {
 
         try {
             addOptionChaining(positionalOption._name, positionalOption._name,
-                              positionalOption._type, "hidden description").hidden();
+                              positionalOption._type, "hidden description")
+                .hidden()
+                .setSources(SourceCommandLine);
         }
         catch (DBException &e) {
             return e.toStatus();
@@ -370,11 +372,15 @@ namespace optionenvironment {
 
     Status OptionSection::getBoostOptions(po::options_description* boostOptions,
                                           bool visibleOnly,
-                                          bool includeDefaults) const {
+                                          bool includeDefaults,
+                                          OptionSources sources) const {
 
         std::list<OptionDescription>::const_iterator oditerator;
         for (oditerator = _options.begin(); oditerator != _options.end(); oditerator++) {
-            if (!visibleOnly || (oditerator->_isVisible)) {
+            // Only include this option if it matches the sources we specified and the option is
+            // either visible or we are requesting hidden options
+            if ((!visibleOnly || (oditerator->_isVisible)) &&
+                (oditerator->_sources & sources)) {
                 std::auto_ptr<po::value_semantic> boostType;
                 Status ret = typeToBoostType(&boostType,
                                              oditerator->_type,

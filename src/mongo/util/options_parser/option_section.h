@@ -79,14 +79,20 @@ namespace optionenvironment {
          * Add an option to this section, and returns a reference to an OptionDescription to allow
          * for chaining.
          *
-         * Example:
+         * Examples:
          *
          * options.addOptionChaining("option", "option", moe::String, "Chaining Registration")
          *                          .hidden().setDefault(moe::Value("default"))
-         *                          .setImplicit(moe::Value("implicit")).composing();
+         *                          .setImplicit(moe::Value("implicit"));
          *
-         * This creates a hidden option that is composing and has default and implicit values.  See
-         * the OptionDescription class for details on these attributes.
+         * This creates a hidden option that has default and implicit values.
+         *
+         * options.addOptionChaining("name", "name", moe::String, "Composing Option")
+         *                          .composing().sources(SourceAllConfig);
+         *
+         * This creates an option that is composing and can be specified only in config files.
+         *
+         * See the OptionDescription class for details on the supported attributes.
          *
          * throws DBException on errors, such as attempting to register an option with the same name
          * as another option.  These represent programming errors that should not happen during
@@ -110,7 +116,8 @@ namespace optionenvironment {
         // These functions are used by the OptionsParser to make calls into boost::program_options
         Status getBoostOptions(po::options_description* boostOptions,
                                bool visibleOnly = false,
-                               bool includeDefaults = false) const;
+                               bool includeDefaults = false,
+                               OptionSources = SourceAll) const;
         Status getBoostPositionalOptions(
                 po::positional_options_description* boostPositionalOptions) const;
 

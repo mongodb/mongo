@@ -50,6 +50,7 @@ namespace {
                 ASSERT_TRUE(iterator->_default.isEmpty());
                 ASSERT_TRUE(iterator->_implicit.isEmpty());
                 ASSERT_EQUALS(iterator->_isComposing, false);
+                ASSERT_EQUALS(iterator->_sources, moe::SourceAll);
             }
             else if (iterator->_dottedName == "dbpath") {
                 ASSERT_EQUALS(iterator->_singleName, "dbpath");
@@ -60,6 +61,7 @@ namespace {
                 ASSERT_TRUE(iterator->_default.equal(defaultVal));
                 ASSERT_TRUE(iterator->_implicit.isEmpty());
                 ASSERT_EQUALS(iterator->_isComposing, false);
+                ASSERT_EQUALS(iterator->_sources, moe::SourceAll);
             }
             else if (iterator->_dottedName == "debug") {
                 ASSERT_EQUALS(iterator->_singleName, "debug");
@@ -69,6 +71,7 @@ namespace {
                 ASSERT_TRUE(iterator->_default.isEmpty());
                 ASSERT_TRUE(iterator->_implicit.isEmpty());
                 ASSERT_EQUALS(iterator->_isComposing, false);
+                ASSERT_EQUALS(iterator->_sources, moe::SourceAll);
             }
             else if (iterator->_dottedName == "list") {
                 ASSERT_EQUALS(iterator->_singleName, "list,l");
@@ -78,6 +81,7 @@ namespace {
                 ASSERT_TRUE(iterator->_default.isEmpty());
                 ASSERT_TRUE(iterator->_implicit.isEmpty());
                 ASSERT_EQUALS(iterator->_isComposing, false);
+                ASSERT_EQUALS(iterator->_sources, moe::SourceAll);
             }
             else if (iterator->_dottedName == "bigfiles") {
                 ASSERT_EQUALS(iterator->_singleName, "bigfiles");
@@ -87,6 +91,7 @@ namespace {
                 ASSERT_TRUE(iterator->_default.isEmpty());
                 ASSERT_TRUE(iterator->_implicit.isEmpty());
                 ASSERT_EQUALS(iterator->_isComposing, false);
+                ASSERT_EQUALS(iterator->_sources, moe::SourceAll);
             }
             else if (iterator->_dottedName == "filter") {
                 ASSERT_EQUALS(iterator->_singleName, "filter,f");
@@ -96,6 +101,7 @@ namespace {
                 ASSERT_TRUE(iterator->_default.isEmpty());
                 ASSERT_TRUE(iterator->_implicit.isEmpty());
                 ASSERT_EQUALS(iterator->_isComposing, false);
+                ASSERT_EQUALS(iterator->_sources, moe::SourceAll);
             }
             else if (iterator->_dottedName == "verbose") {
                 ASSERT_EQUALS(iterator->_singleName, "verbose,v");
@@ -105,6 +111,7 @@ namespace {
                 ASSERT_TRUE(iterator->_default.isEmpty());
                 ASSERT_TRUE(iterator->_implicit.isEmpty());
                 ASSERT_EQUALS(iterator->_isComposing, false);
+                ASSERT_EQUALS(iterator->_sources, moe::SourceAll);
             }
             else if (iterator->_dottedName == "useNewQueryFramework") {
                 ASSERT_EQUALS(iterator->_singleName, "useNewQueryFramework");
@@ -114,6 +121,7 @@ namespace {
                 ASSERT_TRUE(iterator->_default.isEmpty());
                 ASSERT_TRUE(iterator->_implicit.isEmpty());
                 ASSERT_EQUALS(iterator->_isComposing, false);
+                ASSERT_EQUALS(iterator->_sources, moe::SourceAll);
             }
             else if (iterator->_dottedName == "dur") {
                 ASSERT_EQUALS(iterator->_singleName, "dur");
@@ -123,6 +131,7 @@ namespace {
                 ASSERT_TRUE(iterator->_default.isEmpty());
                 ASSERT_TRUE(iterator->_implicit.isEmpty());
                 ASSERT_EQUALS(iterator->_isComposing, false);
+                ASSERT_EQUALS(iterator->_sources, moe::SourceAll);
             }
             else if (iterator->_dottedName == "nodur") {
                 ASSERT_EQUALS(iterator->_singleName, "nodur");
@@ -132,6 +141,7 @@ namespace {
                 ASSERT_TRUE(iterator->_default.isEmpty());
                 ASSERT_TRUE(iterator->_implicit.isEmpty());
                 ASSERT_EQUALS(iterator->_isComposing, false);
+                ASSERT_EQUALS(iterator->_sources, moe::SourceAll);
             }
             else if (iterator->_dottedName == "seed") {
                 ASSERT_EQUALS(iterator->_singleName, "seed");
@@ -141,6 +151,7 @@ namespace {
                 ASSERT_TRUE(iterator->_default.isEmpty());
                 ASSERT_TRUE(iterator->_implicit.isEmpty());
                 ASSERT_EQUALS(iterator->_isComposing, false);
+                ASSERT_EQUALS(iterator->_sources, moe::SourceAll);
             }
             else if (iterator->_dottedName == "runs") {
                 ASSERT_EQUALS(iterator->_singleName, "runs");
@@ -150,6 +161,7 @@ namespace {
                 ASSERT_TRUE(iterator->_default.isEmpty());
                 ASSERT_TRUE(iterator->_implicit.isEmpty());
                 ASSERT_EQUALS(iterator->_isComposing, false);
+                ASSERT_EQUALS(iterator->_sources, moe::SourceAll);
             }
             else if (iterator->_dottedName == "perfHist") {
                 ASSERT_EQUALS(iterator->_singleName, "perfHist");
@@ -159,6 +171,7 @@ namespace {
                 ASSERT_TRUE(iterator->_default.isEmpty());
                 ASSERT_TRUE(iterator->_implicit.isEmpty());
                 ASSERT_EQUALS(iterator->_isComposing, false);
+                ASSERT_EQUALS(iterator->_sources, moe::SourceAll);
             }
             else if (iterator->_dottedName == "suites") {
                 ASSERT_EQUALS(iterator->_singleName, "suites");
@@ -168,6 +181,7 @@ namespace {
                 ASSERT_TRUE(iterator->_default.isEmpty());
                 ASSERT_TRUE(iterator->_implicit.isEmpty());
                 ASSERT_EQUALS(iterator->_isComposing, false);
+                ASSERT_EQUALS(iterator->_sources, moe::SourceAll);
             }
             else if (iterator->_dottedName == "nopreallocj") {
                 ASSERT_EQUALS(iterator->_singleName, "nopreallocj");
@@ -177,6 +191,7 @@ namespace {
                 ASSERT_TRUE(iterator->_default.isEmpty());
                 ASSERT_TRUE(iterator->_implicit.isEmpty());
                 ASSERT_EQUALS(iterator->_isComposing, false);
+                ASSERT_EQUALS(iterator->_sources, moe::SourceAll);
             }
             else {
                 ::mongo::StringBuilder sb;

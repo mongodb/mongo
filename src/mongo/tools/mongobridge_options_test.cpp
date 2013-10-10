@@ -44,6 +44,7 @@ namespace {
                 ASSERT_TRUE(iterator->_default.isEmpty());
                 ASSERT_TRUE(iterator->_implicit.isEmpty());
                 ASSERT_EQUALS(iterator->_isComposing, false);
+                ASSERT_EQUALS(iterator->_sources, moe::SourceAll);
             }
             else if (iterator->_dottedName == "port") {
                 ASSERT_EQUALS(iterator->_singleName, "port");
@@ -53,6 +54,7 @@ namespace {
                 ASSERT_TRUE(iterator->_default.isEmpty());
                 ASSERT_TRUE(iterator->_implicit.isEmpty());
                 ASSERT_EQUALS(iterator->_isComposing, false);
+                ASSERT_EQUALS(iterator->_sources, moe::SourceAll);
             }
             else if (iterator->_dottedName == "dest") {
                 ASSERT_EQUALS(iterator->_singleName, "dest");
@@ -62,6 +64,7 @@ namespace {
                 ASSERT_TRUE(iterator->_default.isEmpty());
                 ASSERT_TRUE(iterator->_implicit.isEmpty());
                 ASSERT_EQUALS(iterator->_isComposing, false);
+                ASSERT_EQUALS(iterator->_sources, moe::SourceAll);
             }
             else if (iterator->_dottedName == "delay") {
                 ASSERT_EQUALS(iterator->_singleName, "delay");
@@ -72,6 +75,7 @@ namespace {
                 ASSERT_TRUE(iterator->_default.equal(defaultVal));
                 ASSERT_TRUE(iterator->_implicit.isEmpty());
                 ASSERT_EQUALS(iterator->_isComposing, false);
+                ASSERT_EQUALS(iterator->_sources, moe::SourceAll);
             }
             else {
                 ::mongo::StringBuilder sb;

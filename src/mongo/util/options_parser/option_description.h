@@ -39,6 +39,18 @@ namespace optionenvironment {
     };
 
     /**
+     * An OptionSources is an enum representing where an option can come from
+     */
+    enum OptionSources {
+        SourceCommandLine = 1,
+        SourceINIConfig = 2,
+        SourceJSONConfig = 4,
+        SourceAllConfig = SourceINIConfig | SourceJSONConfig,
+        SourceAllLegacy = SourceINIConfig | SourceCommandLine,
+        SourceAll = SourceCommandLine | SourceINIConfig | SourceJSONConfig
+    };
+
+    /**
      * The OptionDescription and PositionalOptionDescription classes are containers for information
      * about the options we are expecting either on the command line or in config files.  These
      * should be registered in an OptionSection instance and passed to an OptionsParser.
@@ -56,7 +68,8 @@ namespace optionenvironment {
             _isVisible(true),
             _default(Value()),
             _implicit(Value()),
-            _isComposing(false) { }
+            _isComposing(false),
+            _sources(SourceAll) { }
 
         /*
          * The following functions are part of the chaining interface for option registration.  See
@@ -95,6 +108,12 @@ namespace optionenvironment {
          */
         OptionDescription& composing();
 
+        /*
+         * Specify the allowed sources for this option, such as CommandLine, JSONConfig, or
+         * INIConfig.  The default is SourceAll which means the option can be present in any source
+         */
+        OptionDescription& setSources(OptionSources sources);
+
         std::string _dottedName; // Used for JSON config and in Environment
         std::string _singleName; // Used for boost command line and INI
         OptionType _type; // Storage type of the argument value, or switch type (bool)
@@ -104,6 +123,8 @@ namespace optionenvironment {
         Value _default; // Value if option is not specified
         Value _implicit; // Value if option is specified with no argument
         bool _isComposing; // Aggregate values from different sources instead of overriding
+        OptionSources _sources; // Places where an option can be specified (current sources are
+                                // command line, json config, and ini config)
     };
 
     class PositionalOptionDescription {

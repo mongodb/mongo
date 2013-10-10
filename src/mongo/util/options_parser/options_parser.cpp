@@ -167,7 +167,7 @@ namespace optionenvironment {
 
             for(std::vector<OptionDescription>::const_iterator iterator = options_vector.begin();
                 iterator != options_vector.end(); iterator++) {
-                if (key == iterator->_dottedName) {
+                if (key == iterator->_dottedName && (iterator->_sources & SourceJSONConfig)) {
                     return Status::OK();
                 }
             }
@@ -463,7 +463,7 @@ namespace optionenvironment {
                       po::command_line_style::allow_long_disguise) ^
                      po::command_line_style::allow_sticky);
 
-        Status ret = options.getBoostOptions(&boostOptions);
+        Status ret = options.getBoostOptions(&boostOptions, false, false, SourceCommandLine);
         if (!ret.isOK()) {
             return ret;
         }
@@ -512,7 +512,7 @@ namespace optionenvironment {
         po::options_description boostOptions;
         po::variables_map vm;
 
-        Status ret = options.getBoostOptions(&boostOptions);
+        Status ret = options.getBoostOptions(&boostOptions, false, false, SourceINIConfig);
         if (!ret.isOK()) {
             return ret;
         }

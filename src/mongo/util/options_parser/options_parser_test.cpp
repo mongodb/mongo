@@ -1867,4 +1867,268 @@ namespace {
         }
     }
 
+    TEST(OptionSources, SourceCommandLine) {
+        OptionsParserTester parser;
+        moe::Environment environment;
+        moe::Value value;
+        std::vector<std::string> argv;
+        std::map<std::string, std::string> env_map;
+        std::string parameter;
+
+        moe::OptionSection testOpts;
+        testOpts.addOptionChaining("config", "config", moe::String, "Config file to parse");
+        testOpts.addOptionChaining("parameter", "parameter", moe::String, "Parameter")
+                                  .setSources(moe::SourceCommandLine);
+
+        argv.clear();
+        argv.push_back("binaryname");
+        argv.push_back("--parameter");
+        argv.push_back("allowed");
+
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        ASSERT_OK(environment.get(moe::Key("parameter"), &value));
+        ASSERT_OK(value.get(&parameter));
+        ASSERT_EQUALS(parameter, "allowed");
+
+        argv.clear();
+        argv.push_back("binaryname");
+        argv.push_back("--config");
+        argv.push_back("config.json");
+
+        parser.setConfig("config.json", "{ parameter : \"disallowed\" }");
+
+        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+
+        argv.clear();
+        argv.push_back("binaryname");
+        argv.push_back("--config");
+        argv.push_back("config.ini");
+
+        parser.setConfig("config.ini", "parameter=disallowed");
+
+        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    }
+
+    TEST(OptionSources, SourceINIConfig) {
+        OptionsParserTester parser;
+        moe::Environment environment;
+        moe::Value value;
+        std::vector<std::string> argv;
+        std::map<std::string, std::string> env_map;
+        std::string parameter;
+
+        moe::OptionSection testOpts;
+        testOpts.addOptionChaining("config", "config", moe::String, "Config file to parse");
+        testOpts.addOptionChaining("parameter", "parameter", moe::String, "Parameter")
+                                  .setSources(moe::SourceINIConfig);
+
+        argv.clear();
+        argv.push_back("binaryname");
+        argv.push_back("--parameter");
+        argv.push_back("disallowed");
+
+        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+
+        argv.clear();
+        argv.push_back("binaryname");
+        argv.push_back("--config");
+        argv.push_back("config.json");
+
+        parser.setConfig("config.json", "{ parameter : \"disallowed\" }");
+
+        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+
+        argv.clear();
+        argv.push_back("binaryname");
+        argv.push_back("--config");
+        argv.push_back("config.ini");
+
+        parser.setConfig("config.ini", "parameter=allowed");
+
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        ASSERT_OK(environment.get(moe::Key("parameter"), &value));
+        ASSERT_OK(value.get(&parameter));
+        ASSERT_EQUALS(parameter, "allowed");
+
+    }
+
+    TEST(OptionSources, SourceJSONConfig) {
+        OptionsParserTester parser;
+        moe::Environment environment;
+        moe::Value value;
+        std::vector<std::string> argv;
+        std::map<std::string, std::string> env_map;
+        std::string parameter;
+
+        moe::OptionSection testOpts;
+        testOpts.addOptionChaining("config", "config", moe::String, "Config file to parse");
+        testOpts.addOptionChaining("parameter", "parameter", moe::String, "Parameter")
+                                  .setSources(moe::SourceJSONConfig);
+
+        argv.clear();
+        argv.push_back("binaryname");
+        argv.push_back("--parameter");
+        argv.push_back("disallowed");
+
+        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+
+        argv.clear();
+        argv.push_back("binaryname");
+        argv.push_back("--config");
+        argv.push_back("config.json");
+
+        parser.setConfig("config.json", "{ parameter : \"allowed\" }");
+
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        ASSERT_OK(environment.get(moe::Key("parameter"), &value));
+        ASSERT_OK(value.get(&parameter));
+        ASSERT_EQUALS(parameter, "allowed");
+
+        argv.clear();
+        argv.push_back("binaryname");
+        argv.push_back("--config");
+        argv.push_back("config.ini");
+
+        parser.setConfig("config.ini", "parameter=disallowed");
+
+        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    }
+
+    TEST(OptionSources, SourceAllConfig) {
+        OptionsParserTester parser;
+        moe::Environment environment;
+        moe::Value value;
+        std::vector<std::string> argv;
+        std::map<std::string, std::string> env_map;
+        std::string parameter;
+
+        moe::OptionSection testOpts;
+        testOpts.addOptionChaining("config", "config", moe::String, "Config file to parse");
+        testOpts.addOptionChaining("parameter", "parameter", moe::String, "Parameter")
+                                  .setSources(moe::SourceAllConfig);
+
+        argv.clear();
+        argv.push_back("binaryname");
+        argv.push_back("--parameter");
+        argv.push_back("disallowed");
+
+        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+
+        argv.clear();
+        argv.push_back("binaryname");
+        argv.push_back("--config");
+        argv.push_back("config.json");
+
+        parser.setConfig("config.json", "{ parameter : \"allowed\" }");
+
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        ASSERT_OK(environment.get(moe::Key("parameter"), &value));
+        ASSERT_OK(value.get(&parameter));
+        ASSERT_EQUALS(parameter, "allowed");
+
+        argv.clear();
+        argv.push_back("binaryname");
+        argv.push_back("--config");
+        argv.push_back("config.ini");
+
+        parser.setConfig("config.ini", "parameter=allowed");
+
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        ASSERT_OK(environment.get(moe::Key("parameter"), &value));
+        ASSERT_OK(value.get(&parameter));
+        ASSERT_EQUALS(parameter, "allowed");
+    }
+
+    TEST(OptionSources, SourceAllLegacy) {
+        OptionsParserTester parser;
+        moe::Environment environment;
+        moe::Value value;
+        std::vector<std::string> argv;
+        std::map<std::string, std::string> env_map;
+        std::string parameter;
+
+        moe::OptionSection testOpts;
+        testOpts.addOptionChaining("config", "config", moe::String, "Config file to parse");
+        testOpts.addOptionChaining("parameter", "parameter", moe::String, "Parameter")
+                                  .setSources(moe::SourceAllLegacy);
+
+        argv.clear();
+        argv.push_back("binaryname");
+        argv.push_back("--parameter");
+        argv.push_back("allowed");
+
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        ASSERT_OK(environment.get(moe::Key("parameter"), &value));
+        ASSERT_OK(value.get(&parameter));
+        ASSERT_EQUALS(parameter, "allowed");
+
+        argv.clear();
+        argv.push_back("binaryname");
+        argv.push_back("--config");
+        argv.push_back("config.json");
+
+        parser.setConfig("config.json", "{ parameter : \"disallowed\" }");
+
+        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+
+        argv.clear();
+        argv.push_back("binaryname");
+        argv.push_back("--config");
+        argv.push_back("config.ini");
+
+        parser.setConfig("config.ini", "parameter=allowed");
+
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        ASSERT_OK(environment.get(moe::Key("parameter"), &value));
+        ASSERT_OK(value.get(&parameter));
+        ASSERT_EQUALS(parameter, "allowed");
+    }
+
+    TEST(OptionSources, SourceAll) {
+        OptionsParserTester parser;
+        moe::Environment environment;
+        moe::Value value;
+        std::vector<std::string> argv;
+        std::map<std::string, std::string> env_map;
+        std::string parameter;
+
+        moe::OptionSection testOpts;
+        testOpts.addOptionChaining("config", "config", moe::String, "Config file to parse");
+        testOpts.addOptionChaining("parameter", "parameter", moe::String, "Parameter")
+                                  .setSources(moe::SourceAll);
+
+        argv.clear();
+        argv.push_back("binaryname");
+        argv.push_back("--parameter");
+        argv.push_back("allowed");
+
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        ASSERT_OK(environment.get(moe::Key("parameter"), &value));
+        ASSERT_OK(value.get(&parameter));
+        ASSERT_EQUALS(parameter, "allowed");
+
+        argv.clear();
+        argv.push_back("binaryname");
+        argv.push_back("--config");
+        argv.push_back("config.json");
+
+        parser.setConfig("config.json", "{ parameter : \"allowed\" }");
+
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        ASSERT_OK(environment.get(moe::Key("parameter"), &value));
+        ASSERT_OK(value.get(&parameter));
+        ASSERT_EQUALS(parameter, "allowed");
+
+        argv.clear();
+        argv.push_back("binaryname");
+        argv.push_back("--config");
+        argv.push_back("config.ini");
+
+        parser.setConfig("config.ini", "parameter=allowed");
+
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        ASSERT_OK(environment.get(moe::Key("parameter"), &value));
+        ASSERT_OK(value.get(&parameter));
+        ASSERT_EQUALS(parameter, "allowed");
+    }
 } // unnamed namespace
