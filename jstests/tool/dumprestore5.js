@@ -21,7 +21,7 @@ assert.eq(0, db.system.indexes.count(), "didn't drop indexes")
 t.runTool("restore", "--dir", t.ext)
 
 assert.soon("db.system.users.findOne()", "no data after restore");
-assert.eq(1, db.system.users.find({name:'user'}).count(), "didn't restore users")
+assert.eq(1, db.system.users.find({user:'user'}).count(), "didn't restore users")
 assert.eq(2, db.system.indexes.count(), "didn't restore indexes")
 
 db.dropUser('user')
@@ -29,8 +29,8 @@ db.addUser('user2', 'password2', jsTest.basicUserRoles)
 
 t.runTool("restore", "--dir", t.ext, "--drop")
 
-assert.soon("1 == db.system.users.find({name:'user'}).count()", "didn't restore users 2")
-assert.eq(0, db.system.users.find({name:'user2'}).count(), "didn't drop users")
+assert.soon("1 == db.system.users.find({user:'user'}).count()", "didn't restore users 2")
+assert.eq(0, db.system.users.find({user:'user2'}).count(), "didn't drop users")
 assert.eq(2, db.system.indexes.count(), "didn't maintain indexes")
 
 t.stop();
