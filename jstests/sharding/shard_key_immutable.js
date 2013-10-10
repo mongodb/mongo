@@ -677,7 +677,6 @@ compoundColl.remove({}, false);
 compoundColl.insert({ a: 100, b: 100 });
 compoundColl.update({ a: 100, b: 100 }, { $set: { c: 1 }}, false, true);
 gle = db.runCommand({ getLastError: 1 });
-doc = compoundColl.findOne();
 assert(gle.err == null, 'gleObj: ' + tojson(gle));
 doc = compoundColl.findOne();
 delete doc._id;
@@ -1021,7 +1020,7 @@ dotColl.remove({}, false);
 dotColl.update({ 'x.a': 100 }, { x: { a: 100, b: 2 }}, true);
 gle = db.runCommand({ getLastError: 1 });
 assert(gle.err != null, 'gleObj: ' + tojson(gle));
-doc = compoundColl.findOne();
+doc = dotColl.findOne();
 assert(doc == null, 'doc was upserted: ' + tojson(doc));
 
 // Dotted field names in the resulting objects should not be allowed.
@@ -1049,14 +1048,14 @@ dotColl.remove({}, false);
 dotColl.update({ 'x.a': 100 }, { x: 100 }, true);
 gle = db.runCommand({ getLastError: 1 });
 assert(gle.err != null, 'gleObj: ' + tojson(gle));
-doc = compoundColl.findOne();
+doc = dotColl.findOne();
 assert(doc == null, 'doc was upserted: ' + tojson(doc));
 
 dotColl.remove({}, false);
 dotColl.update({ 'x.a': 100 }, { x: { b: 100 }}, true);
 gle = db.runCommand({ getLastError: 1 });
 assert(gle.err != null, 'gleObj: ' + tojson(gle));
-doc = compoundColl.findOne();
+doc = dotColl.findOne();
 assert(doc == null, 'doc was upserted: ' + tojson(doc));
 
 /*
@@ -1064,7 +1063,7 @@ dotColl.remove({}, false);
 dotColl.update({ 'x.a': 100 }, { $set: { x: { a: 100, b: 2 }}}, true);
 gle = db.runCommand({ getLastError: 1 });
 assert(gle.err == null, 'gleObj: ' + tojson(gle));
-doc = compoundColl.findOne();
+doc = dotColl.findOne();
 assert(friendlyEqual(doc, { x: { a: 100, 2: 3 }}), 'bad doc: ' + tojson(doc));
 */
 
@@ -1072,14 +1071,14 @@ dotColl.remove({}, false);
 dotColl.update({ 'x.a': 100 }, { $set: { x: { a: 2 }}}, true);
 gle = db.runCommand({ getLastError: 1 });
 assert(gle.err != null, 'gleObj: ' + tojson(gle));
-doc = compoundColl.findOne();
+doc = dotColl.findOne();
 assert(doc == null, 'doc was upserted: ' + tojson(doc));
 
 dotColl.remove({}, false);
 dotColl.update({ 'x.a': 100 }, { $set: { x: { b: 100 }}}, true);
 gle = db.runCommand({ getLastError: 1 });
 assert(gle.err != null, 'gleObj: ' + tojson(gle));
-doc = compoundColl.findOne();
+doc = dotColl.findOne();
 assert(doc == null, 'doc was upserted: ' + tojson(doc));
 
 /*
@@ -1087,7 +1086,7 @@ dotColl.remove({}, false);
 dotColl.update({ 'x.a': 100 }, { $set: { 'x.a': 100, b: 3 }}, true);
 gle = db.runCommand({ getLastError: 1 });
 assert(gle.err == null, 'gleObj: ' + tojson(gle));
-doc = compoundColl.findOne();
+doc = dotColl.findOne();
 assert(friendlyEqual(doc, { x: { a: 100 }, b: 3 }), 'bad doc: ' + tojson(doc));
 */
 
@@ -1095,35 +1094,28 @@ dotColl.remove({}, false);
 dotColl.update({ 'x.a': 100 }, { $set: { 'x.a': 2 }}, true);
 gle = db.runCommand({ getLastError: 1 });
 assert(gle.err != null, 'gleObj: ' + tojson(gle));
-doc = compoundColl.findOne();
-assert(doc == null, 'doc was upserted: ' + tojson(doc));
-
-dotColl.remove({}, false);
-dotColl.update({ 'x.a': 100 }, { $set: { x: { b: 100 }}}, true);
-gle = db.runCommand({ getLastError: 1 });
-assert(gle.err != null, 'gleObj: ' + tojson(gle));
-doc = compoundColl.findOne();
+doc = dotColl.findOne();
 assert(doc == null, 'doc was upserted: ' + tojson(doc));
 
 dotColl.remove({}, false);
 dotColl.update({ 'x.a': 100 }, { $set: { x: { 'a.z': 100 }}}, true);
 gle = db.runCommand({ getLastError: 1 });
 assert(gle.err != null, 'gleObj: ' + tojson(gle));
-doc = compoundColl.findOne();
+doc = dotColl.findOne();
 assert(doc == null, 'doc was upserted: ' + tojson(doc));
 
 dotColl.remove({}, false);
 dotColl.update({ 'x.a': 100 }, { $set: { 'x.a.z': 100 }}, true);
 gle = db.runCommand({ getLastError: 1 });
 assert(gle.err != null, 'gleObj: ' + tojson(gle));
-doc = compoundColl.findOne();
+doc = dotColl.findOne();
 assert(doc == null, 'doc was upserted: ' + tojson(doc));
 
 dotColl.remove({}, false);
 dotColl.update({ 'x.a': 100 }, { $set: { x: 100 }}, true);
 gle = db.runCommand({ getLastError: 1 });
 assert(gle.err != null, 'gleObj: ' + tojson(gle));
-doc = compoundColl.findOne();
+doc = dotColl.findOne();
 assert(doc == null, 'doc was upserted: ' + tojson(doc));
 
 /*
@@ -1131,7 +1123,7 @@ dotColl.remove({}, false);
 dotColl.update({ 'x.a': 100 }, { $set: { 'x.b': 2 }}, true);
 gle = db.runCommand({ getLastError: 1 });
 assert(gle.err != null, 'gleObj: ' + tojson(gle));
-doc = compoundColl.findOne();
+doc = dotColl.findOne();
 assert(friendlyEqual(doc, { x: { a: 100, b: 2 }}), 'bad doc: ' + tojson(doc));
 */
 
