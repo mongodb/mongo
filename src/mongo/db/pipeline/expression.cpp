@@ -777,6 +777,28 @@ namespace {
         return "$dayOfYear";
     }
 
+    /* ------------------------- ExpressionDateFormat ----------------------------- */
+
+    Value ExpressionDateFormat::evaluateInternal(const Variables& vars) const {
+        Value pDate(vpOperand[0]->evaluateInternal(vars));
+        Value pFormat(vpOperand[1]->evaluateInternal(vars));
+
+        string format = pFormat.coerceToString();
+        tm date = pDate.coerceToTm();
+
+        char buf[128];
+        size_t len = strftime(buf, sizeof(buf), format.c_str(), &date);
+
+        uassert(17190, "Failed formatting datetime", len > 0);
+
+        return Value(string(buf));
+    }
+
+    REGISTER_EXPRESSION("$dateFormat", ExpressionDateFormat::parse);
+    const char *ExpressionDateFormat::getOpName() const {
+        return "$dateFormat";
+    }
+
     /* ----------------------- ExpressionDivide ---------------------------- */
 
     Value ExpressionDivide::evaluateInternal(const Variables& vars) const {
