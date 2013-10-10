@@ -454,6 +454,7 @@ __wt_conn_btree_apply(WT_SESSION_IMPL *session,
 	SLIST_FOREACH(dhandle, &conn->dhlh, l)
 		if (F_ISSET(dhandle, WT_DHANDLE_OPEN) &&
 		    WT_PREFIX_MATCH(dhandle->name, "file:") &&
+		    dhandle->checkpoint == NULL &&
 		    !WT_IS_METADATA(dhandle)) {
 			/*
 			 * We need to pull the handle into the session handle
