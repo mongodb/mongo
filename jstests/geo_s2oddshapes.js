@@ -50,8 +50,6 @@ assert.eq(result[0].name, 'origin');
 result = t.find({geo: {$geoIntersects: {$geometry: tallPoly}}});
 assert.eq(result.itcount(), 2);
 result = t.find({geo: {$geoIntersects: {$geometry: tallPoly}}});
-assert.eq(result[0].name, 'horiz');
-assert.eq(result[1].name, 'origin');
 
 //Test a poly that runs horizontally along the equator.
 
