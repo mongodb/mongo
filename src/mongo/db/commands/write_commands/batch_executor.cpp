@@ -28,6 +28,7 @@
 
 #include "mongo/db/commands/write_commands/batch_executor.h"
 
+#include "mongo/base/error_codes.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/introspect.h"
@@ -38,13 +39,17 @@
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/s/batched_error_detail.h"
+#include "mongo/s/collection_metadata.h"
+#include "mongo/s/d_logic.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
     using std::auto_ptr;
+    using mongoutils::str::stream;
 
     WriteBatchExecutor::WriteBatchExecutor( Client* client, OpCounters* opCounters, LastError* le ) :
-            _client( client ), _opCounters( opCounters ), _le( le ) {
+        _client( client ), _opCounters( opCounters ), _le( le ) {
     }
 
     void WriteBatchExecutor::executeBatch( const BatchedCommandRequest& request,
@@ -55,13 +60,15 @@ namespace mongo {
         WriteStats stats;
         auto_ptr<BatchedErrorDetail> error( new BatchedErrorDetail );
         bool batchSuccess = true;
+        bool staleBatch = false;
 
         // Apply batch ops
         size_t numBatchOps = request.sizeWriteOps();
         for ( size_t i = 0; i < numBatchOps; i++ ) {
-            if ( !applyWriteItem( request, i, &stats, error.get() ) ) {
+            if ( !applyWriteItem( BatchItemRef( &request, i ), &stats, error.get() ) ) {
 
                 // Batch item failed
+                if ( error->getErrCode() == ErrorCodes::StaleShardVersion ) staleBatch = true;
                 error->setIndex( static_cast<int>( i ) );
                 response->addToErrDetails( error.release() );
                 batchSuccess = false;
@@ -81,9 +88,17 @@ namespace mongo {
                                    !batchSuccess,
                                    &wcResultsB,
                                    &errMsg ) ) {
-            response->setErrCode( 99999 );
+            response->setErrCode( ErrorCodes::WriteConcernFailed );
             response->setErrInfo( wcResultsB.obj() );
             response->setErrMessage( errMsg );
+        }
+
+        // TODO: Audit where we want to queue here
+        if ( staleBatch ) {
+            ChunkVersion latestShardVersion;
+            shardingState.refreshMetadataIfNeeded( request.getNS(),
+                                                   request.getShardVersion(),
+                                                   &latestShardVersion );
         }
 
         // int wcTime = commandTimer.millisReset();
@@ -104,8 +119,8 @@ namespace mongo {
             error = NULL;
         }
         else if ( numBatchOps > 1 && onlyOpErrors ) {
-            response->setErrCode( 99999 );
-            response->setErrMessage( "batch op errors occurred" );
+            response->setErrCode( ErrorCodes::MultipleErrorsOccurred );
+            response->setErrMessage( "multiple batch item errors occurred" );
         }
 
         response->setOk( !response->isErrCodeSet() );
@@ -130,10 +145,10 @@ namespace mongo {
 
     } // namespace
 
-    bool WriteBatchExecutor::applyWriteItem( const BatchedCommandRequest& request,
-                                             int index,
+    bool WriteBatchExecutor::applyWriteItem( const BatchItemRef& itemRef,
                                              WriteStats* stats,
                                              BatchedErrorDetail* error ) {
+        const BatchedCommandRequest& request = *itemRef.getRequest();
         const string& ns = request.getNS();
 
         // Clear operation's LastError before starting.
@@ -151,42 +166,23 @@ namespace mongo {
                 // Execute the write item as a child operation of the current operation.
                 CurOp childOp( _client, _client->curop() );
 
+                HostAndPort remote =
+                    _client->hasRemote() ? _client->getRemote() : HostAndPort( "0.0.0.0", 0 );
+
                 // TODO Modify CurOp "wrapped" constructor to take an opcode, so calling .reset()
                 // is unneeded
-                childOp.reset( _client->getRemote(), getOpCode( request.getBatchType() ) );
+                childOp.reset( remote, getOpCode( request.getBatchType() ) );
 
                 childOp.ensureStarted();
                 OpDebug& opDebug = childOp.debug();
                 opDebug.ns = ns;
                 {
-                    Client::WriteContext ctx( ns );
+                    Lock::DBWrite dbLock( ns );
+                    Client::Context ctx( ns,
+                                         storageGlobalParams.dbpath, // TODO: better constructor?
+                                         false /* don't check version here */);
 
-                    switch ( request.getBatchType() ) {
-                    case BatchedCommandRequest::BatchType_Insert:
-                        opSuccess =
-                                applyInsert( ns,
-                                             request.getInsertRequest()->getDocumentsAt( index ),
-                                             &childOp,
-                                             stats,
-                                             error );
-                        break;
-                    case BatchedCommandRequest::BatchType_Update:
-                        opSuccess = applyUpdate( ns,
-                                                 *request.getUpdateRequest()->getUpdatesAt( index ),
-                                                 &childOp,
-                                                 stats,
-                                                 error );
-                        break;
-                    default:
-                        dassert( request.getBatchType() ==
-                                BatchedCommandRequest::BatchType_Delete );
-                        opSuccess = applyDelete( ns,
-                                                 *request.getDeleteRequest()->getDeletesAt( index ),
-                                                 &childOp,
-                                                 stats,
-                                                 error );
-                        break;
-                    }
+                    opSuccess = doWrite( ns, itemRef, &childOp, stats, error );
                 }
                 childOp.done();
                 //itemTimeMicros = childOp.totalTimeMicros();
@@ -225,11 +221,87 @@ namespace mongo {
         error->setErrMessage( ex.what() );
     }
 
-    bool WriteBatchExecutor::applyInsert( const string& ns,
-                                          const BSONObj& insertOp,
-                                          CurOp* currentOp,
-                                          WriteStats* stats,
-                                          BatchedErrorDetail* error ) {
+    bool WriteBatchExecutor::doWrite( const string& ns,
+                                      const BatchItemRef& itemRef,
+                                      CurOp* currentOp,
+                                      WriteStats* stats,
+                                      BatchedErrorDetail* error ) {
+
+        const BatchedCommandRequest& request = *itemRef.getRequest();
+        int index = itemRef.getItemIndex();
+
+        //
+        // Check our shard version if we need to (must be in the write lock)
+        //
+
+        if ( shardingState.enabled() && request.isShardVersionSet()
+             && !ChunkVersion::isIgnoredVersion( request.getShardVersion() ) ) {
+
+            Lock::assertWriteLocked( ns );
+            CollectionMetadataPtr metadata = shardingState.getCollectionMetadata( ns );
+            ChunkVersion shardVersion =
+                metadata ? metadata->getShardVersion() : ChunkVersion::UNSHARDED();
+
+            if ( !request.getShardVersion() //
+                .isWriteCompatibleWith( shardVersion ) ) {
+
+                // Write stale error to results
+                error->setErrCode( ErrorCodes::StaleShardVersion );
+
+                BSONObjBuilder infoB;
+                shardVersion.addToBSON( infoB, "vWanted" );
+                error->setErrInfo( infoB.obj() );
+
+                string errMsg = stream()
+                    << "stale shard version detected before write, received "
+                    << request.getShardVersion().toString() << " but local version is "
+                    << shardVersion.toString();
+                error->setErrMessage( errMsg );
+
+                return false;
+            }
+        }
+
+        //
+        // Not stale, do the actual write
+        //
+
+        if ( request.getBatchType() == BatchedCommandRequest::BatchType_Insert ) {
+
+            // Insert
+            return doInsert( ns,
+                             request.getInsertRequest()->getDocumentsAt( index ),
+                             currentOp,
+                             stats,
+                             error );
+        }
+        else if ( request.getBatchType() == BatchedCommandRequest::BatchType_Update ) {
+
+            // Update
+            return doUpdate( ns,
+                             *request.getUpdateRequest()->getUpdatesAt( index ),
+                             currentOp,
+                             stats,
+                             error );
+        }
+        else {
+            dassert( request.getBatchType() ==
+                BatchedCommandRequest::BatchType_Delete );
+
+            // Delete
+            return doDelete( ns,
+                             *request.getDeleteRequest()->getDeletesAt( index ),
+                             currentOp,
+                             stats,
+                             error );
+        }
+    }
+
+    bool WriteBatchExecutor::doInsert( const string& ns,
+                                       const BSONObj& insertOp,
+                                       CurOp* currentOp,
+                                       WriteStats* stats,
+                                       BatchedErrorDetail* error ) {
         OpDebug& opDebug = currentOp->debug();
 
         _opCounters->gotInsert();
@@ -256,11 +328,11 @@ namespace mongo {
         return true;
     }
 
-    bool WriteBatchExecutor::applyUpdate( const string& ns,
-                                          const BatchedUpdateDocument& updateOp,
-                                          CurOp* currentOp,
-                                          WriteStats* stats,
-                                          BatchedErrorDetail* error ) {
+    bool WriteBatchExecutor::doUpdate( const string& ns,
+                                       const BatchedUpdateDocument& updateOp,
+                                       CurOp* currentOp,
+                                       WriteStats* stats,
+                                       BatchedErrorDetail* error ) {
         OpDebug& opDebug = currentOp->debug();
 
         _opCounters->gotUpdate();
@@ -308,11 +380,11 @@ namespace mongo {
         return true;
     }
 
-    bool WriteBatchExecutor::applyDelete( const string& ns,
-                                          const BatchedDeleteDocument& deleteOp,
-                                          CurOp* currentOp,
-                                          WriteStats* stats,
-                                          BatchedErrorDetail* error ) {
+    bool WriteBatchExecutor::doDelete( const string& ns,
+                                       const BatchedDeleteDocument& deleteOp,
+                                       CurOp* currentOp,
+                                       WriteStats* stats,
+                                       BatchedErrorDetail* error ) {
         OpDebug& opDebug = currentOp->debug();
 
         _opCounters->gotDelete();

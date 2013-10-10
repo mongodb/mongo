@@ -237,8 +237,8 @@ namespace mongo {
                 // Compare the remote and cached versions
                 //
 
-                CompareResult result = compareShardVersions( remoteShardVersion,
-                                                             cachedShardVersion );
+                CompareResult result = compareShardVersions( cachedShardVersion,
+                                                             remoteShardVersion );
 
                 if ( result == CompareResult_Unknown ) return result;
                 if ( result == CompareResult_LT ) finalResult = CompareResult_LT;
@@ -332,7 +332,6 @@ namespace mongo {
             CompareResult result = compareAllShardVersions( _manager,
                                                             _primary,
                                                             _remoteShardVersions );
-
             // Reset the versions
             _remoteShardVersions.clear();
 

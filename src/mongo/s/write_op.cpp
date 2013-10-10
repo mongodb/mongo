@@ -270,6 +270,8 @@ namespace mongo {
         childOp.endpoint.reset( new ShardEndpoint( targetedWrite.endpoint ) );
         childOp.error.reset( new BatchedErrorDetail );
         error.cloneTo( childOp.error.get() );
+        dassert( ref.first == _itemRef.getItemIndex() );
+        childOp.error->setIndex( _itemRef.getItemIndex() );
         childOp.state = WriteOpState_Error;
         updateOpState();
     }
@@ -278,6 +280,7 @@ namespace mongo {
         dassert( _state == WriteOpState_Ready );
         _error.reset( new BatchedErrorDetail );
         error.cloneTo( _error.get() );
+        _error->setIndex( _itemRef.getItemIndex() );
         _state = WriteOpState_Error;
         // No need to updateOpState, set directly
     }

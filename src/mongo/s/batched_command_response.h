@@ -122,7 +122,7 @@ namespace mongo {
         bool _ok;
         bool _isOkSet;
 
-        // (M)  whether all items in the batch applied correctly
+        // (O)  whether all items in the batch applied correctly
         int _errCode;
         bool _isErrCodeSet;
 

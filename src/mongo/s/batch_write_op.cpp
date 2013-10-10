@@ -221,27 +221,26 @@ namespace mongo {
             it != targetedWrites.end(); ++it ) {
 
             const WriteOpRef& writeOpRef = ( *it )->writeOpRef;
-
             BatchedCommandRequest::BatchType batchType = _clientRequest->getBatchType();
 
             // NOTE:  We copy the batch items themselves here from the client request
             // TODO: This could be inefficient, maybe we want to just reference in the future
             if ( batchType == BatchedCommandRequest::BatchType_Insert ) {
                 BatchedInsertRequest* clientInsertRequest = _clientRequest->getInsertRequest();
-                BSONObj insertDoc = clientInsertRequest->getDocumentsAt( writeOpRef.second );
+                BSONObj insertDoc = clientInsertRequest->getDocumentsAt( writeOpRef.first );
                 request->getInsertRequest()->addToDocuments( insertDoc );
             }
             else if ( batchType == BatchedCommandRequest::BatchType_Update ) {
                 BatchedUpdateRequest* clientUpdateRequest = _clientRequest->getUpdateRequest();
                 BatchedUpdateDocument* updateDoc = new BatchedUpdateDocument;
-                clientUpdateRequest->getUpdatesAt( writeOpRef.second )->cloneTo( updateDoc );
+                clientUpdateRequest->getUpdatesAt( writeOpRef.first )->cloneTo( updateDoc );
                 request->getUpdateRequest()->addToUpdates( updateDoc );
             }
             else {
                 dassert( batchType == BatchedCommandRequest::BatchType_Delete );
                 BatchedDeleteRequest* clientDeleteRequest = _clientRequest->getDeleteRequest();
                 BatchedDeleteDocument* deleteDoc = new BatchedDeleteDocument;
-                clientDeleteRequest->getDeletesAt( writeOpRef.second )->cloneTo( deleteDoc );
+                clientDeleteRequest->getDeletesAt( writeOpRef.first )->cloneTo( deleteDoc );
                 request->getDeleteRequest()->addToDeletes( deleteDoc );
             }
 
@@ -252,10 +251,10 @@ namespace mongo {
             //}
         }
 
-        if ( request->isWriteConcernSet() ) {
+        if ( _clientRequest->isWriteConcernSet() ) {
             request->setWriteConcern( _clientRequest->getWriteConcern() );
         }
-        if ( request->isContinueOnErrorSet() ) {
+        if ( _clientRequest->isContinueOnErrorSet() ) {
             request->setContinueOnError( _clientRequest->getContinueOnError() );
         }
         request->setSession( 0 );
@@ -325,64 +324,44 @@ namespace mongo {
                                           TrackedErrors* trackedErrors ) {
 
         //
-        // Organize errors based on error code and special cases based on size of request
+        // Organize errors based on error code.
         // We may have *either* a batch error or errors per-item.
-        // Write Concern errors are stored and handled later.
+        // (Write Concern errors are stored and handled later.)
         //
 
         vector<BatchedErrorDetail*> itemErrors;
-        scoped_ptr<BatchedErrorDetail> topLevelItemError;
         scoped_ptr<BatchedErrorDetail> batchError;
 
         if ( !response.getOk() ) {
 
             int errCode = response.getErrCode();
+            bool isWCError = isWCErrCode( errCode );
 
-            if ( isWCErrCode( errCode ) ) {
-
-                // Write concern error, per-item errors may also be set
+            // Special handling for write concern errors, save for later
+            if ( isWCError ) {
                 BatchedErrorDetail error;
                 cloneBatchErrorTo( response, &error );
                 ShardError* wcError = new ShardError( targetedBatch.getEndpoint(), error );
                 _wcErrors.mutableVector().push_back( wcError );
-
-                if ( response.isErrDetailsSet() ) {
-                    itemErrors.insert( itemErrors.begin(),
-                                       response.getErrDetails().begin(),
-                                       response.getErrDetails().end() );
-
-                    // Sort responses
-                    std::sort( itemErrors.begin(), itemErrors.end(), BatchedErrorDetailComp() );
-                }
             }
-            else if ( isItemErrorsOnlyCode( errCode ) ) {
 
-                // Composite error, per-item errors have been set
+            // Handle batch and per-item errors
+            if ( response.isErrDetailsSet() ) {
+
+                // Per-item errors were set
                 itemErrors.insert( itemErrors.begin(),
                                    response.getErrDetails().begin(),
                                    response.getErrDetails().end() );
 
-                // Sort responses
+                // Sort per-item errors by index
                 std::sort( itemErrors.begin(), itemErrors.end(), BatchedErrorDetailComp() );
             }
-            else if ( targetedBatch.getWrites().size() == 1u ) {
+            else if ( !isWCError ) {
 
-                // Treat all errors for batch size 1 as per-item errors, no other per-item errors
-                // can be set
-                topLevelItemError.reset( new BatchedErrorDetail );
-                cloneBatchErrorTo( response, topLevelItemError.get() );
-                topLevelItemError->setIndex( 0 );
-                itemErrors.push_back( topLevelItemError.get() );
-
-                dassert( !response.isErrDetailsSet() );
-            }
-            else {
-
-                // Batch error, no per-item errors set
+                // Per-item errors were not set and this error is not a WC error
+                // => this is a full-batch error
                 batchError.reset( new BatchedErrorDetail );
                 cloneBatchErrorTo( response, batchError.get() );
-
-                dassert( !response.isErrDetailsSet() );
             }
         }
 

@@ -62,7 +62,7 @@ namespace mongo {
             PendingCommand( const ConnectionString& endpoint, const BSONObj& cmdObj );
 
             // What to send
-            const ConnectionString& endpoint;
+            const ConnectionString endpoint;
             BSONObj cmdObj;
 
             // Where to send it

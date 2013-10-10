@@ -51,11 +51,6 @@ namespace mongo {
             return false;
         }
 
-        if (!_isErrCodeSet) {
-            *errMsg = stream() << "missing " << errCode.name() << " field";
-            return false;
-        }
-
         return true;
     }
 

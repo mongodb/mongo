@@ -79,8 +79,7 @@ namespace mongo {
          * Returns true iff write item was issued sucessfully and increments stats, populates error
          * if not successful.
          */
-        bool applyWriteItem( const BatchedCommandRequest& request,
-                             int index,
+        bool applyWriteItem( const BatchItemRef& itemRef,
                              WriteStats* stats,
                              BatchedErrorDetail* error );
 
@@ -89,23 +88,30 @@ namespace mongo {
         // Returns true iff write item was issued sucessfully and increments stats, populates error
         // if not successful.
         //
-        bool applyInsert( const std::string& ns,
-                          const BSONObj& insertOp,
-                          CurOp* currentOp,
-                          WriteStats* stats,
-                          BatchedErrorDetail* error );
 
-        bool applyUpdate( const std::string& ns,
-                          const BatchedUpdateDocument& updateOp,
-                          CurOp* currentOp,
-                          WriteStats* stats,
-                          BatchedErrorDetail* error );
+        bool doWrite( const string& ns,
+                      const BatchItemRef& itemRef,
+                      CurOp* currentOp,
+                      WriteStats* stats,
+                      BatchedErrorDetail* error );
 
-        bool applyDelete( const std::string& ns,
-                          const BatchedDeleteDocument& deleteOp,
-                          CurOp* currentOp,
-                          WriteStats* stats,
-                          BatchedErrorDetail* error );
+        bool doInsert( const std::string& ns,
+                       const BSONObj& insertOp,
+                       CurOp* currentOp,
+                       WriteStats* stats,
+                       BatchedErrorDetail* error );
+
+        bool doUpdate( const std::string& ns,
+                       const BatchedUpdateDocument& updateOp,
+                       CurOp* currentOp,
+                       WriteStats* stats,
+                       BatchedErrorDetail* error );
+
+        bool doDelete( const std::string& ns,
+                       const BatchedDeleteDocument& deleteOp,
+                       CurOp* currentOp,
+                       WriteStats* stats,
+                       BatchedErrorDetail* error );
 
         // Client object to issue writes on behalf of.
         // Not owned here.

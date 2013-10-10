@@ -84,9 +84,6 @@ namespace mongo {
             if ( name.find( "Tests" ) != string::npos )
                 return EXEMPT;
             
-            if ( name.find( "ScopedDistributedLock" ) != string::npos )
-                return EXEMPT;
-
             if ( name.find( "PooledScope" ) != string::npos ) {
                 // SERVER-8090
                 return EXEMPT;
@@ -96,6 +93,16 @@ namespace mongo {
                 // SERVER-9778
                 return EXEMPT;
             }
+
+            // For sharding dbtests - page fault exceptions cause sporadic errors unrelated to tests
+            if ( name.find( "ScopedDistributedLock" ) != string::npos ) {
+                return EXEMPT;
+            }
+
+            if ( name.find( "CollectionInfo" ) != string::npos ) {
+                return EXEMPT;
+            }
+            // End sharding dbtest exemptions
 
             return method == clazz ? YES : NO;
         }
