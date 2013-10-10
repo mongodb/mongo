@@ -535,6 +535,7 @@ namespace mongo {
         // virtuals from DocumentSource
         virtual boost::optional<Document> getNext();
         virtual const char *getSourceName() const;
+        virtual void optimize();
         virtual GetDepsReturn getDependencies(set<string>& deps) const;
         virtual void dispose();
         virtual Value serialize(bool explain = false) const;

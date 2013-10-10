@@ -121,6 +121,14 @@ namespace mongo {
         pSource->dispose();
     }
 
+    void DocumentSourceGroup::optimize() {
+        pIdExpression = pIdExpression->optimize();
+
+        for (size_t i = 0; i < vFieldName.size(); i++) {
+             vpExpression[i] = vpExpression[i]->optimize();
+        }
+    }
+
     Value DocumentSourceGroup::serialize(bool explain) const {
         MutableDocument insides;
 
