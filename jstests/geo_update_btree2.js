@@ -63,3 +63,4 @@ status( "Counting final points..." )
 assert.eq( ( numPoints - 2 ) / 2, query.itcount() )
 
 
+assert.commandWorked( db._adminCommand( { setParameter:1, notablescan:false} ) );
