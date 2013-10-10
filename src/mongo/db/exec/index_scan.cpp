@@ -99,7 +99,8 @@ namespace mongo {
             }
 
             IndexCursor *cursor;
-            _iam->newCursor(&cursor);
+            Status s = _iam->newCursor(&cursor);
+            verify(s.isOK());
             _indexCursor.reset(cursor);
             _indexCursor->setOptions(cursorOptions);
 

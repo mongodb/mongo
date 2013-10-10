@@ -40,6 +40,7 @@
 #include "mongo/db/exec/or.h"
 #include "mongo/db/exec/skip.h"
 #include "mongo/db/exec/sort.h"
+#include "mongo/db/exec/text.h"
 #include "mongo/db/index/catalog_hack.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression_parser.h"
@@ -64,6 +65,8 @@ namespace mongo {
      *                          stop: stopObj, endInclusive: true/false, direction: -1/1,
      *                          limit: int}}}
      * node -> {cscan: {filter: {filter}, args: {name: "collectionname", direction: -1/1}}}
+     * TODO: language for text.
+     * node -> {text: {filter: {filter}, args: {name: "collectionname", search: "searchstr"}}}
      *
      * Internal Nodes:
      *
@@ -339,6 +342,37 @@ namespace mongo {
                     mergeStage->addChild(subNode);
                 }
                 return mergeStage.release();
+            }
+            else if ("text" == nodeName) {
+                string collection = nodeArgs["name"].String();
+                string search = nodeArgs["search"].String();
+                NamespaceDetails* ns = nsdetails(collection.c_str());
+                uassert(17193, "Can't find namespace " + collection, NULL != ns);
+                vector<int> idxMatches;
+                ns->findIndexByType("text", idxMatches);
+                uassert(17194, "Expected exactly one text index", idxMatches.size() == 1);
+
+                IndexDescriptor* index = CatalogHack::getDescriptor(ns, idxMatches[0]);
+                auto_ptr<FTSAccessMethod> fam(new FTSAccessMethod(index));
+                TextStageParams params(fam->getSpec());
+                params.ns = collection;
+                params.index = index;
+
+                // XXX: Deal with non-empty filters.  This is a hack to put in covering information
+                // that can only be checked for equality.  We ignore this now.
+                Status s = fam->getSpec().getIndexPrefix(BSONObj(), &params.indexPrefix);
+                if (!s.isOK()) {
+                    // errmsg = s.toString();
+                    return false;
+                }
+
+                params.spec = fam->getSpec();
+
+                if (!params.query.parse(search, fam->getSpec().defaultLanguage()).isOK()) {
+                    return false;
+                }
+
+                return new TextStage(params, workingSet, matcher);
             }
             else {
                 return NULL;

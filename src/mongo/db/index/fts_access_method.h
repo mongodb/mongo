@@ -30,18 +30,11 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/fts/fts_spec.h"
-#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/btree_access_method_internal.h"
+#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/jsobj.h"
 
 namespace mongo {
-
-    // Because they're in another namespace, FTSAccessMethod can't be friends w/them unless they're
-    // forward declared.
-    namespace fts {
-        class FTSCommand;
-        class FTSSearch;
-    }
 
     class FTSAccessMethod : public BtreeBasedAccessMethod {
     public:
@@ -51,9 +44,6 @@ namespace mongo {
         // Not implemented:
         virtual Status newCursor(IndexCursor** out);
 
-    protected:
-        friend class fts::FTSCommand;
-        friend class fts::FTSSearch;
         fts::FTSSpec& getSpec() { return _ftsSpec; }
 
     private:
@@ -63,4 +53,4 @@ namespace mongo {
         fts::FTSSpec _ftsSpec;
     };
 
-} //namespace mongo
+} // namespace mongo

@@ -50,6 +50,7 @@ env.StaticLibrary(
         "skip.cpp",
         "sort.cpp",
         "stagedebug_cmd.cpp",
+        "text.cpp",
         "working_set_common.cpp",
     ],
     LIBDEPS = [
