@@ -28,6 +28,7 @@
 #include "mongo/db/json.h"
 #include "mongo/db/queryutil.h"
 #include "mongo/db/storage/namespace.h"
+#include "mongo/db/structure/collection.h"
 #include "mongo/dbtests/dbtests.h"
 
 
@@ -50,7 +51,9 @@ namespace NamespaceTests {
             }
         protected:
             void create( bool sparse = false ) {
-                NamespaceDetailsTransient::get( ns() ).deletedIndex();
+                Collection* collection = _context.db()->getCollection( ns() );
+                if ( collection )
+                    collection->infoCache()->reset();
                 BSONObjBuilder builder;
                 builder.append( "ns", ns() );
                 builder.append( "name", "testIndex" );
@@ -1592,9 +1595,15 @@ namespace NamespaceTests {
             NamespaceDetails *nsd() const {
                 return nsdetails( ns() )->writingWithExtra();
             }
-            NamespaceDetailsTransient &nsdt() const {
-                return NamespaceDetailsTransient::get( ns() );
+            Collection* collection() const {
+                Collection* c =  _context.db()->getCollection( ns() );
+                verify(c);
+                return c;
             }
+            CollectionInfoCache* infoCache() const {
+                return collection()->infoCache();
+            }
+
             static BSONObj bigObj(bool bGenID=false) {
                 BSONObjBuilder b;
                 if (bGenID)
@@ -2234,12 +2243,11 @@ namespace NamespaceTests {
         protected:
             void assertCachedIndexKey( const BSONObj &indexKey ) const {
                 ASSERT_EQUALS( indexKey,
-                              nsdt().cachedQueryPlanForPattern( _pattern ).indexKey() );
+                               infoCache()->cachedQueryPlanForPattern( _pattern ).indexKey() );
             }
             void registerIndexKey( const BSONObj &indexKey ) {
-                nsdt().registerCachedQueryPlanForPattern
-                        ( _pattern,
-                         CachedQueryPlan( indexKey, 1, CandidatePlanCharacter( true, false ) ) );                
+                infoCache()->registerCachedQueryPlanForPattern( _pattern,
+                                                                CachedQueryPlan( indexKey, 1, CandidatePlanCharacter( true, false ) ) );
             }
             FieldRangeSet _fieldRangeSet;
             QueryPattern _pattern;
@@ -2304,8 +2312,8 @@ namespace NamespaceTests {
 
     } // namespace NamespaceDetailsTests
 
-    namespace NamespaceDetailsTransientTests {
-        
+    namespace CollectionInfoCacheTests {
+
         /** clearQueryCache() clears the query plan cache. */
         class ClearQueryCache : public NamespaceDetailsTests::CachedPlanBase {
         public:
@@ -2313,15 +2321,15 @@ namespace NamespaceTests {
                 // Register a query plan in the query plan cache.
                 registerIndexKey( BSON( "a" << 1 ) );
                 assertCachedIndexKey( BSON( "a" << 1 ) );
-                
+
                 // The query plan is cleared.
-                nsdt().clearQueryCache();
+                infoCache()->clearQueryCache();
                 assertCachedIndexKey( BSONObj() );
             }
-        };                                                                                         
-        
-    } // namespace NamespaceDetailsTransientTests
-                                                                                 
+        };
+
+    } // namespace CollectionInfoCacheTests
+
     class All : public Suite {
     public:
         All() : Suite( "namespace" ) {
@@ -2435,7 +2443,7 @@ namespace NamespaceTests {
             //            add< NamespaceDetailsTests::BigCollection >();
             add< NamespaceDetailsTests::Size >();
             add< NamespaceDetailsTests::SetIndexIsMultikey >();
-            add< NamespaceDetailsTransientTests::ClearQueryCache >();
+            add< CollectionInfoCacheTests::ClearQueryCache >();
             add< MissingFieldTests::BtreeIndexMissingField >();
             add< MissingFieldTests::TwoDIndexMissingField >();
             add< MissingFieldTests::HashedIndexMissingField >();

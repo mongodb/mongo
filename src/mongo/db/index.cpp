@@ -46,6 +46,7 @@
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repl/rs.h"
+#include "mongo/db/structure/collection.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -103,13 +104,15 @@ namespace mongo {
         try {
 
             string pns = parentNS(); // note we need a copy, as parentNS() won't work after the drop() below
-
-            // clean up parent namespace index cache
-            NamespaceDetailsTransient::get( pns.c_str() ).deletedIndex();
-
-            string name = indexName();
+            string name = indexName(); // ts_1
 
             Database* db = cc().database();
+
+            Collection* parentCollection = db->getCollection( pns );
+
+            // clean up parent namespace index cache
+            if ( parentCollection )
+                parentCollection->infoCache()->reset();
 
             Status s = db->_dropNS( ns );
             if ( !s.isOK() ) {

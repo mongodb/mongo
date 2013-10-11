@@ -45,7 +45,7 @@ namespace mongo {
     Collection::Collection( const StringData& fullNS,
                                     NamespaceDetails* details,
                                     Database* database )
-        : _ns( fullNS ) {
+        : _ns( fullNS ), _infoCache( this ) {
         _details = details;
         _database = database;
         _recordStore.init( _details,
@@ -97,8 +97,7 @@ namespace mongo {
 
         _recordStore.deallocRecord( loc, rec );
 
-        NamespaceDetailsTransient::get( _ns.ns().c_str() ).notifyOfWriteOp();
-
+        _infoCache.notifyOfWriteOp();
     }
 
 

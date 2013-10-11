@@ -38,6 +38,7 @@
 #include "mongo/db/parsed_query.h"
 #include "mongo/db/query_plan_selection_policy.h"
 #include "mongo/db/queryutil.h"
+#include "mongo/db/structure/collection.h"
 
 //#define DEBUGQO(x) cout << x << endl;
 #define DEBUGQO(x)
@@ -1574,32 +1575,39 @@ namespace mongo {
         return USELESS != IndexSelection::isSuitableFor(keyPattern, frsp.frsForIndex( d , idxNo ) ,
                                            order );
     }
-    
+
     void QueryUtilIndexed::clearIndexesForPatterns( const FieldRangeSetPair& frsp,
                                                     const BSONObj& order ) {
-        SimpleMutex::scoped_lock lk(NamespaceDetailsTransient::_qcMutex);
-        NamespaceDetailsTransient& nsdt = NamespaceDetailsTransient::get_inlock( frsp.ns() );
         CachedQueryPlan noCachedPlan;
-        nsdt.registerCachedQueryPlanForPattern( frsp._singleKey.pattern( order ), noCachedPlan );
-        nsdt.registerCachedQueryPlanForPattern( frsp._multiKey.pattern( order ), noCachedPlan );
+
+        Collection* collection = cc().database()->getCollection( frsp.ns() );
+        if ( !collection )
+            return;
+
+        collection->infoCache()->registerCachedQueryPlanForPattern( frsp._singleKey.pattern( order ),
+                                                                    noCachedPlan );
+        collection->infoCache()->registerCachedQueryPlanForPattern( frsp._multiKey.pattern( order ),
+                                                                    noCachedPlan );
     }
-    
+
     CachedQueryPlan QueryUtilIndexed::bestIndexForPatterns( const FieldRangeSetPair& frsp,
                                                             const BSONObj& order ) {
-        SimpleMutex::scoped_lock lk( NamespaceDetailsTransient::_qcMutex );
-        NamespaceDetailsTransient& nsdt = NamespaceDetailsTransient::get_inlock( frsp.ns() );
+
+        Collection* collection = cc().database()->getCollection( frsp.ns() );
+        verify( collection );
+
         // TODO Maybe it would make sense to return the index with the lowest
         // nscanned if there are two possibilities.
         {
             QueryPattern pattern = frsp._singleKey.pattern( order );
-            CachedQueryPlan cachedQueryPlan = nsdt.cachedQueryPlanForPattern( pattern );
+            CachedQueryPlan cachedQueryPlan = collection->infoCache()->cachedQueryPlanForPattern( pattern );
             if ( !cachedQueryPlan.indexKey().isEmpty() ) {
                 return cachedQueryPlan;
             }
         }
         {
             QueryPattern pattern = frsp._multiKey.pattern( order );
-            CachedQueryPlan cachedQueryPlan = nsdt.cachedQueryPlanForPattern( pattern );
+            CachedQueryPlan cachedQueryPlan = collection->infoCache()->cachedQueryPlanForPattern( pattern );
             if ( !cachedQueryPlan.indexKey().isEmpty() ) {
                 return cachedQueryPlan;
             }

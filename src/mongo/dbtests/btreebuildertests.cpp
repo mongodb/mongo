@@ -61,7 +61,7 @@ namespace BtreeBuilderTests {
             memcpy( infoRecord->data(), indexInfo.objdata(), indexInfo.objsize() );
             addRecordToRecListInExtent( infoRecord, infoLoc );
             IndexDetails& id = nsdetails( _ns )->getNextIndexDetails( _ns );
-            nsdetails( _ns )->addIndex( _ns );
+            nsdetails( _ns )->addIndex();
             id.info.writing() = infoLoc;
             return id;
         }

@@ -39,6 +39,7 @@
 #include "mongo/db/index_update.h"
 #include "mongo/db/json.h"
 #include "mongo/db/pdfile.h"
+#include "mongo/db/structure/collection.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/util/hashtab.h"
 #include "mongo/util/mmap.h"
@@ -459,7 +460,9 @@ namespace mongo {
 
         // Clear all references to this namespace.
         ClientCursor::invalidate( ns );
-        NamespaceDetailsTransient::resetCollection( ns );
+        Collection* collection = cc().database()->getCollection( ns );
+        verify( collection->details() == this );
+        collection->infoCache()->reset();
 
         // Get a writeable reference to 'this' and reset all pertinent
         // attributes.

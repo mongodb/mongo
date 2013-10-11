@@ -29,6 +29,7 @@
 #include "mongo/db/query_optimizer_internal.h"
 #include "mongo/db/queryoptimizercursorimpl.h"
 #include "mongo/db/queryutil.h"
+#include "mongo/db/structure/collection.h"
 #include "mongo/dbtests/dbtests.h"
 
 namespace mongo {
@@ -258,8 +259,15 @@ namespace QueryOptimizerCursorTests {
         }
         BSONObj cachedIndexForQuery( const BSONObj &query, const BSONObj &order = BSONObj() ) {
             QueryPattern queryPattern = FieldRangeSet( ns(), query, true, true ).pattern( order );
-            NamespaceDetailsTransient &nsdt = NamespaceDetailsTransient::get( ns() );
-            return nsdt.cachedQueryPlanForPattern( queryPattern ).indexKey();
+
+            Client* client = currentClient.get();
+            verify( client );
+
+            Collection* collection = client->database()->getCollection( ns() );
+            if ( !collection )
+                return BSONObj();
+
+            return collection->infoCache()->cachedQueryPlanForPattern( queryPattern ).indexKey();
         }
     private:
         shared_ptr<Cursor> _c;
@@ -3327,13 +3335,14 @@ namespace QueryOptimizerCursorTests {
     private:
         /** Record the a:1 index for the query pattern of interest. */
         void recordAIndex() const {
-            NamespaceDetailsTransient &nsdt = NamespaceDetailsTransient::get( ns() );
-            nsdt.clearQueryCache();
+            Collection* collection = cc().database()->getCollection( ns() );
+            CollectionInfoCache* cache = collection->infoCache();
+            cache->clearQueryCache();
             shared_ptr<QueryOptimizerCursor> c = getCursor( _aPreferableQuery, BSON( "a" << 1 ) );
             while( c->advance() );
             FieldRangeSet aPreferableFields( ns(), _aPreferableQuery, true, true );
             ASSERT_EQUALS( BSON( "a" << 1 ),
-                          nsdt.cachedQueryPlanForPattern
+                          cache->cachedQueryPlanForPattern
                           ( aPreferableFields.pattern( BSON( "a" << 1 ) ) ).indexKey() );
         }
         /** The first results come from the recorded index. */

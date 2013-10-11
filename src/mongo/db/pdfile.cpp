@@ -481,7 +481,7 @@ namespace mongo {
             uassert( 10089 ,  "can't remove from a capped collection" , 0 );
             return;
         }
-        
+
         BSONObj toDelete;
         if ( doLog ) {
             BSONElement e = dl.obj()["_id"];
@@ -496,7 +496,10 @@ namespace mongo {
         unindexRecord(d, todelete, dl, noWarn);
 
         _deleteRecord(d, ns, todelete, dl);
-        NamespaceDetailsTransient::get( ns ).notifyOfWriteOp();
+
+        Collection* collection = cc().database()->getCollection( ns );
+        verify( collection );
+        collection->infoCache()->notifyOfWriteOp();
 
         if ( ! toDelete.isEmpty() ) {
             logOp( "d" , ns , toDelete );
@@ -510,8 +513,7 @@ namespace mongo {
      */
     const DiskLoc DataFileMgr::updateRecord(
         const char *ns,
-        NamespaceDetails *d,
-        NamespaceDetailsTransient *nsdt,
+        Collection* collection,
         Record *toupdate, const DiskLoc& dl,
         const char *_buf, int _len, OpDebug& debug,  bool god) {
 
@@ -548,9 +550,9 @@ namespace mongo {
            below.  that is suboptimal, but it's pretty complicated to do it the other way without rollbacks...
         */
         OwnedPointerVector<UpdateTicket> updateTickets;
-        updateTickets.mutableVector().resize(d->getTotalIndexCount());
-        for (int i = 0; i < d->getTotalIndexCount(); ++i) {
-            auto_ptr<IndexDescriptor> descriptor(CatalogHack::getDescriptor(d, i));
+        updateTickets.mutableVector().resize(collection->details()->getTotalIndexCount());
+        for (int i = 0; i < collection->details()->getTotalIndexCount(); ++i) {
+            auto_ptr<IndexDescriptor> descriptor(CatalogHack::getDescriptor(collection->details(), i));
             auto_ptr<IndexAccessMethod> iam(CatalogHack::getIndex(descriptor.get()));
             InsertDeleteOptions options;
             options.logIfError = false;
@@ -569,8 +571,10 @@ namespace mongo {
         if ( toupdate->netLength() < objNew.objsize() ) {
             // doesn't fit.  reallocate -----------------------------------------------------
             moveCounter.increment();
-            uassert( 10003 , "failing update: objects in a capped ns cannot grow", !(d && d->isCapped()));
-            d->paddingTooSmall();
+            uassert( 10003,
+                     "failing update: objects in a capped ns cannot grow",
+                     !(collection && collection->details()->isCapped()));
+            collection->details()->paddingTooSmall();
             deleteRecord(ns, toupdate, dl);
             DiskLoc res = insert(ns, objNew.objdata(), objNew.objsize(), false, god);
 
@@ -582,13 +586,13 @@ namespace mongo {
             return res;
         }
 
-        nsdt->notifyOfWriteOp();
-        d->paddingFits();
+        collection->infoCache()->notifyOfWriteOp();
+        collection->details()->paddingFits();
 
         debug.keyUpdates = 0;
 
-        for (int i = 0; i < d->getTotalIndexCount(); ++i) {
-            auto_ptr<IndexDescriptor> descriptor(CatalogHack::getDescriptor(d, i));
+        for (int i = 0; i < collection->details()->getTotalIndexCount(); ++i) {
+            auto_ptr<IndexDescriptor> descriptor(CatalogHack::getDescriptor(collection->details(), i));
             auto_ptr<IndexAccessMethod> iam(CatalogHack::getIndex(descriptor.get()));
             int64_t updatedKeys;
             Status ret = iam->update(*updateTickets.vector()[i], &updatedKeys);
@@ -835,7 +839,10 @@ namespace mongo {
             }
 
             // clear transient info caches so they refresh; increments nIndexes
-            tableToIndex->addIndex(tabletoidxns.c_str());
+            tableToIndex->addIndex();
+            Collection* collection = cc().database()->getCollection( tabletoidxns );
+            if ( collection )
+                collection->infoCache()->addedIndex();
 
             IndexLegacy::postBuildHook(tableToIndex, idx);
         }
@@ -1015,7 +1022,7 @@ namespace mongo {
 
         // we don't bother resetting query optimizer stats for the god tables - also god is true when adding a btree bucket
         if ( !god )
-            NamespaceDetailsTransient::get( ns ).notifyOfWriteOp();
+            collection->infoCache()->notifyOfWriteOp();
 
         if ( tableToIndex ) {
             insert_makeIndex(tableToIndex, tabletoidxns, loc, mayInterrupt);

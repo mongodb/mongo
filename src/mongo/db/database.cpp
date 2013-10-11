@@ -64,8 +64,6 @@ namespace mongo {
             delete i->second;
         }
         _collections.clear();
-
-        NamespaceDetailsTransient::eraseDB( _name );
     }
 
     Status Database::validateDBName( const StringData& dbname ) {
@@ -319,7 +317,6 @@ namespace mongo {
 
         ClientCursor::invalidate( fullns );
         Top::global.collectionDropped( fullns );
-        NamespaceDetailsTransient::eraseCollection( fullns.toString() );
 
         Status s = _dropNS( fullns );
 
@@ -476,8 +473,6 @@ namespace mongo {
 
         ClientCursor::invalidate( fromNSString.c_str() );
         ClientCursor::invalidate( toNSString.c_str() );
-        NamespaceDetailsTransient::eraseCollection( fromNSString ); // XXX
-        NamespaceDetailsTransient::eraseCollection( toNSString ); // XXX
 
         // at this point, we haven't done anything destructive yet
 

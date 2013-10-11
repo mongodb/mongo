@@ -41,6 +41,7 @@
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/ops/update.h"
 #include "mongo/db/pdfile.h"
+#include "mongo/db/structure/collection.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/util/hashtab.h"
 #include "mongo/util/startup_test.h"
@@ -458,7 +459,9 @@ namespace mongo {
             *getDur().writing(&_multiKeyIndexBits) &= mask;
         }
 
-        NamespaceDetailsTransient::get(thisns).clearQueryCache();
+        Collection* collection = cc().database()->getCollection( thisns );
+        if ( collection )
+            collection->infoCache()->clearQueryCache();
     }
 
     IndexDetails& NamespaceDetails::getNextIndexDetails(const char* thisns) {
@@ -474,8 +477,7 @@ namespace mongo {
     }
 
     /* you MUST call when adding an index.  see pdfile.cpp */
-    void NamespaceDetails::addIndex(const char* thisns) {
-        NamespaceDetailsTransient::get(thisns).addedIndex();
+    void NamespaceDetails::addIndex() {
         (*getDur().writing(&_nIndexes))++;
     }
 
@@ -575,92 +577,6 @@ namespace mongo {
     }
 
     /* ------------------------------------------------------------------------- */
-
-    SimpleMutex NamespaceDetailsTransient::_qcMutex("qc");
-    NamespaceDetailsTransient::DMap NamespaceDetailsTransient::_nsdMap;
-
-    void NamespaceDetailsTransient::reset() {
-        Lock::assertWriteLocked(_ns); 
-        clearQueryCache();
-        _keysComputed = false;
-    }
-
-    NamespaceDetailsTransient::CMap& NamespaceDetailsTransient::get_cmap_inlock(const string& ns) {
-        CMap*& m = _nsdMap[ns];
-        if ( ! m )
-            m = new CMap();
-        return *m;
-    }
-
-    /*static*/ NOINLINE_DECL NamespaceDetailsTransient& NamespaceDetailsTransient::make_inlock(const string& ns) {
-        shared_ptr< NamespaceDetailsTransient > &t = get_cmap_inlock(ns)[ ns ];
-        verify( t.get() == 0 );
-        Database *database = cc().database();
-        verify( database );
-        if( _nsdMap.size() % 20000 == 10000 ) { 
-            // so we notice if insanely large #s
-            log() << "opening namespace " << ns << endl;
-            log() << _nsdMap.size() << " namespaces in nsdMap" << endl;
-        }
-        t.reset( new NamespaceDetailsTransient(database, ns) );
-        return *t;
-    }
-
-    // note with repair there could be two databases with the same ns name.
-    // that is NOT handled here yet!  TODO
-    // repair may not use nsdt though not sure.  anyway, requires work.
-    NamespaceDetailsTransient::NamespaceDetailsTransient(Database *db, const string& ns) : 
-        _ns(ns), _keysComputed(false), _qcWriteCount() 
-    {
-        dassert(db);
-    }
-
-    NamespaceDetailsTransient::~NamespaceDetailsTransient() { 
-    }
-    
-    void NamespaceDetailsTransient::resetCollection(const string& ns ) {
-        SimpleMutex::scoped_lock lk(_qcMutex);
-        Lock::assertWriteLocked(ns);
-        get_cmap_inlock(ns)[ns].reset();
-    }
-        
-    void NamespaceDetailsTransient::eraseDB(const string& db) {
-        SimpleMutex::scoped_lock lk(_qcMutex);
-        Lock::assertWriteLocked(db);
-        
-        DMap::iterator i = _nsdMap.find( db );
-        if ( i != _nsdMap.end() ) {
-            delete i->second;
-            _nsdMap.erase( i );
-        }
-    }
-    
-    void NamespaceDetailsTransient::eraseCollection(const string& ns) {
-        SimpleMutex::scoped_lock lk(_qcMutex);
-        Lock::assertWriteLocked(ns);
-        get_cmap_inlock(ns).erase(ns);
-    }
-
-
-    void NamespaceDetailsTransient::computeIndexKeys() {
-        _indexedPaths.clear();
-
-        NamespaceDetails *d = nsdetails(_ns);
-        if ( ! d )
-            return;
-
-        NamespaceDetails::IndexIterator i = d->ii( true );
-        while( i.more() ) {
-            BSONObj key = i.next().keyPattern();
-            BSONObjIterator j( key );
-            while ( j.more() ) {
-                BSONElement e = j.next();
-                _indexedPaths.addPath( e.fieldName() );
-            }
-        }
-
-        _keysComputed = true;
-    }
 
     void NamespaceDetails::updateTTLIndex( int idxNo , const BSONElement& newExpireSecs ) {
         // Need to get the actual DiskLoc of the index to update. This is embedded in the 'info'

@@ -83,8 +83,7 @@ namespace mongo {
         // changedId should be initialized to false
         const DiskLoc updateRecord(
             const char *ns,
-            NamespaceDetails *d,
-            NamespaceDetailsTransient *nsdt,
+            Collection* collection,
             Record *toupdate, const DiskLoc& dl,
             const char *buf, int len, OpDebug& debug, bool god=false);
 

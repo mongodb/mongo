@@ -39,6 +39,7 @@
 #include "mongo/db/parsed_query.h"
 #include "mongo/db/query_plan_summary.h"
 #include "mongo/db/queryutil.h"
+#include "mongo/db/structure/collection.h"
 #include "mongo/server.h"
 
 namespace mongo {
@@ -361,13 +362,14 @@ doneCheckOrder:
             return;
         }
 
-        SimpleMutex::scoped_lock lk( NamespaceDetailsTransient::_qcMutex );
         QueryPattern queryPattern = _frs.pattern( _order );
         CachedQueryPlan queryPlanToCache( indexKey(), nScanned, candidatePlans );
-        NamespaceDetailsTransient &nsdt = NamespaceDetailsTransient::get_inlock( ns() );
-        nsdt.registerCachedQueryPlanForPattern( queryPattern, queryPlanToCache );
+
+        Collection* collection = cc().database()->getCollection( ns() );
+        verify( collection );
+        collection->infoCache()->registerCachedQueryPlanForPattern( queryPattern, queryPlanToCache );
     }
-    
+
     void QueryPlan::checkTableScanAllowed() const {
         if (likely(!storageGlobalParams.noTableScan))
             return;

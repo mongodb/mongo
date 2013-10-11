@@ -43,6 +43,7 @@
 #include "mongo/db/query/runner_yield_policy.h"
 #include "mongo/db/repl/is_master.h"
 #include "mongo/db/repl/rs.h"
+#include "mongo/db/structure/collection.h"
 #include "mongo/util/processinfo.h"
 
 namespace mongo {
@@ -234,8 +235,12 @@ namespace mongo {
             bgJobsInProgress.insert(d);
         }
         void done(const char *ns) {
-            NamespaceDetailsTransient::get(ns).addedIndex(); // clear query optimizer cache
             Lock::assertWriteLocked(ns);
+
+            // clear query optimizer cache
+            Collection* collection = cc().database()->getCollection( ns );
+            if ( collection )
+                collection->infoCache()->addedIndex();
         }
 
     public:
@@ -245,7 +250,9 @@ namespace mongo {
 
             // clear cached things since we are changing state
             // namely what fields are indexed
-            NamespaceDetailsTransient::get(ns.c_str()).addedIndex();
+            Collection* collection = cc().database()->getCollection( ns );
+            if ( collection )
+                collection->infoCache()->addedIndex();
 
             unsigned long long n = 0;
 

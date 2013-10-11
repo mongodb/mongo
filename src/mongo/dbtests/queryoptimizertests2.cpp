@@ -25,6 +25,7 @@
 #include "mongo/db/ops/query.h"
 #include "mongo/db/query_optimizer.h"
 #include "mongo/db/queryutil.h"
+#include "mongo/db/structure/collection.h"
 #include "mongo/dbtests/dbtests.h"
 
 
@@ -47,7 +48,6 @@ namespace {
             virtual ~Base() {
                 if ( !nsd() )
                     return;
-                NamespaceDetailsTransient::get_inlock( ns() ).clearQueryCache();
                 cc().database()->dropCollection( ns() );
             }
         protected:
@@ -83,6 +83,8 @@ namespace {
             static const char *ns() { return "unittests.QueryPlanSetTests"; }
             static NamespaceDetails *nsd() { return nsdetails( ns() ); }
             DBDirectClient &client() { return _client; }
+            Collection* collection() { return _context.db()->getCollection( ns() ); }
+            CollectionInfoCache* infoCache() { return collection()->infoCache(); }
         private:
             Lock::GlobalWrite lk_;
             Client::Context _context;
@@ -117,8 +119,7 @@ namespace {
                 // The optimal plan is recorded in the plan cache.
                 FieldRangeSet frs( ns(), query, true, true );
                 CachedQueryPlan cachedPlan =
-                        NamespaceDetailsTransient::get( ns() ).cachedQueryPlanForPattern
-                            ( QueryPattern( frs, BSONObj() ) );
+                    infoCache()->cachedQueryPlanForPattern( QueryPattern( frs, BSONObj() ) );
                 ASSERT_EQUALS( BSON( "a" << 1 ), cachedPlan.indexKey() );
                 CandidatePlanCharacter planCharacter = cachedPlan.planCharacter();
                 ASSERT( planCharacter.mayRunInOrderPlan() );
@@ -270,10 +271,9 @@ namespace {
                 theDataFileMgr.insertWithObjMod( ns(), one );
                 BSONObj delSpec = BSON( "a" << 1 << "_id" << NE << 0 );
                 deleteObjects( ns(), delSpec, false );
-                
-                NamespaceDetailsTransient &nsdt = NamespaceDetailsTransient::get( ns() );
+
                 QueryPattern queryPattern = FieldRangeSet( ns(), delSpec, true, true ).pattern();
-                CachedQueryPlan cachedQueryPlan = nsdt.cachedQueryPlanForPattern( queryPattern ); 
+                CachedQueryPlan cachedQueryPlan = infoCache()->cachedQueryPlanForPattern( queryPattern );
                 ASSERT_EQUALS( BSON( "a" << 1 ), cachedQueryPlan.indexKey() );
                 ASSERT_EQUALS( 1, cachedQueryPlan.nScanned() );
             }
@@ -449,12 +449,10 @@ namespace {
                     ASSERT( !qps->hasPossiblyExcludedPlans() );
                     ASSERT( !qps->usingCachedPlan() );
                 }
-                
-                NamespaceDetailsTransient &nsdt = NamespaceDetailsTransient::get( ns() );
-                
-                nsdt.registerCachedQueryPlanForPattern( makePattern( BSON( "a" << 1 ), BSONObj() ),
-                                                       CachedQueryPlan( BSON( "a" << 1 ), 1,
-                                                        CandidatePlanCharacter( true, false ) ) );
+
+                infoCache()->registerCachedQueryPlanForPattern( makePattern( BSON( "a" << 1 ), BSONObj() ),
+                                                                CachedQueryPlan( BSON( "a" << 1 ), 1,
+                                                                                 CandidatePlanCharacter( true, false ) ) );
                 {
                     shared_ptr<QueryPlanSet> qps = makeQps( BSON( "a" << 1 ), BSONObj() );
                     ASSERT_EQUALS( 1, qps->nPlans() );
@@ -465,10 +463,9 @@ namespace {
                     ASSERT( qps->usingCachedPlan() );
                 }
 
-                nsdt.registerCachedQueryPlanForPattern
-                        ( makePattern( BSON( "a" << 1 ), BSON( "b" << 1 ) ),
-                         CachedQueryPlan( BSON( "a" << 1 ), 1,
-                                         CandidatePlanCharacter( true, true ) ) );
+                infoCache()->registerCachedQueryPlanForPattern( makePattern( BSON( "a" << 1 ), BSON( "b" << 1 ) ),
+                                                                CachedQueryPlan( BSON( "a" << 1 ), 1,
+                                                                                 CandidatePlanCharacter( true, true ) ) );
 
                 {
                     shared_ptr<QueryPlanSet> qps = makeQps( BSON( "a" << 1 ), BSON( "b" << 1 ) );
@@ -480,11 +477,9 @@ namespace {
                     ASSERT( qps->usingCachedPlan() );
                 }
 
-                nsdt.registerCachedQueryPlanForPattern
-                        ( makePattern( BSON( "a" << 1 ), BSON( "b" << 1 ) ),
-                         CachedQueryPlan( BSON( "b" << 1 ), 1,
-                                         CandidatePlanCharacter( true, true ) ) );
-                
+                infoCache()->registerCachedQueryPlanForPattern( makePattern( BSON( "a" << 1 ), BSON( "b" << 1 ) ),
+                                                                CachedQueryPlan( BSON( "b" << 1 ), 1,
+                                                                                 CandidatePlanCharacter( true, true ) ) );
                 {
                     shared_ptr<QueryPlanSet> qps = makeQps( BSON( "a" << 1 ), BSON( "b" << 1 ) );
                     ASSERT_EQUALS( 1, qps->nPlans() );
@@ -514,11 +509,9 @@ namespace {
                 client().ensureIndex( ns(), BSON( "a" << 1 ) );
 
                 // Record the {a:1} index for a {b:1} query.
-                NamespaceDetailsTransient &nsdt = NamespaceDetailsTransient::get( ns() );
-                nsdt.registerCachedQueryPlanForPattern
-                        ( makePattern( BSON( "b" << 1 ), BSONObj() ),
-                         CachedQueryPlan( BSON( "a" << 1 ), 1,
-                                         CandidatePlanCharacter( true, false ) ) );
+                infoCache()->registerCachedQueryPlanForPattern( makePattern( BSON( "b" << 1 ), BSONObj() ),
+                                                                CachedQueryPlan( BSON( "a" << 1 ), 1,
+                                                                                 CandidatePlanCharacter( true, false ) ) );
 
                 // The {a:1} index is not used for a {b:1} query because it generates an unhelpful
                 // plan.
@@ -539,11 +532,9 @@ namespace {
                                      "sparse" << true ) );
 
                 // Record the {a:1} index for a {a:null} query.
-                NamespaceDetailsTransient &nsdt = NamespaceDetailsTransient::get( ns() );
-                nsdt.registerCachedQueryPlanForPattern
-                ( makePattern( BSON( "a" << BSONNULL ), BSONObj() ),
-                 CachedQueryPlan( BSON( "a" << 1 ), 1,
-                                 CandidatePlanCharacter( true, false ) ) );
+                infoCache()->registerCachedQueryPlanForPattern( makePattern( BSON( "a" << BSONNULL ), BSONObj() ),
+                                                                CachedQueryPlan( BSON( "a" << 1 ), 1,
+                                                                                 CandidatePlanCharacter( true, false ) ) );
                 
                 // The {a:1} index is not used for an {a:{$exists:false}} query because it generates
                 // a disallowed plan.
@@ -580,11 +571,9 @@ namespace {
                                UserException );
 
                 // The special plan is not chosen if not allowed, even if cached.
-                NamespaceDetailsTransient &nsdt = NamespaceDetailsTransient::get( ns() );
-                nsdt.registerCachedQueryPlanForPattern
-                        ( makePattern( query, BSONObj() ),
-                          CachedQueryPlan( specialIndex, 1,
-                                           CandidatePlanCharacter( true, false ) ) );
+                infoCache()->registerCachedQueryPlanForPattern( makePattern( query, BSONObj() ),
+                                                                CachedQueryPlan( specialIndex, 1,
+                                                                                 CandidatePlanCharacter( true, false ) ) );
                 assertSingleIndex( naturalIndex, makeQps( query, BSONObj(), BSONObj(), false ) );
             }
         private:
@@ -620,6 +609,8 @@ namespace {
             return ret;
         }
         DBDirectClient &client() { return _client; }
+        Collection* collection() { return _ctx.db()->getCollection( ns() ); }
+        CollectionInfoCache* infoCache() { return collection()->infoCache(); }
     private:
         Lock::GlobalWrite lk_;
         Client::Context _ctx;
@@ -660,12 +651,10 @@ namespace {
                     ASSERT( mps->possibleOutOfOrderPlan() );
                     ASSERT( !mps->hasPossiblyExcludedPlans() );
                 }
-                
-                NamespaceDetailsTransient &nsdt = NamespaceDetailsTransient::get( ns() );
 
-                nsdt.registerCachedQueryPlanForPattern( makePattern( BSON( "a" << 1 ), BSONObj() ),
-                                                       CachedQueryPlan( BSON( "a" << 1 ), 1,
-                                                        CandidatePlanCharacter( true, false ) ) );
+                infoCache()->registerCachedQueryPlanForPattern( makePattern( BSON( "a" << 1 ), BSONObj() ),
+                                                                CachedQueryPlan( BSON( "a" << 1 ), 1,
+                                                                                 CandidatePlanCharacter( true, false ) ) );
                 {
                     shared_ptr<MultiPlanScanner> mps = makeMps( BSON( "a" << 1 ), BSONObj() );
                     ASSERT_EQUALS( 1, mps->currentNPlans() );
@@ -675,11 +664,10 @@ namespace {
                     ASSERT( !mps->hasPossiblyExcludedPlans() );
                 }
 
-                nsdt.registerCachedQueryPlanForPattern
-                        ( makePattern( BSON( "a" << 1 ), BSON( "b" << 1 ) ),
-                         CachedQueryPlan( BSON( "a" << 1 ), 1,
-                                         CandidatePlanCharacter( true, true ) ) );
-                
+                infoCache()->registerCachedQueryPlanForPattern( makePattern( BSON( "a" << 1 ), BSON( "b" << 1 ) ),
+                                                                CachedQueryPlan( BSON( "a" << 1 ), 1,
+                                                                                 CandidatePlanCharacter( true, true ) ) );
+
                 {
                     shared_ptr<MultiPlanScanner> mps =
                     makeMps( BSON( "a" << 1 ), BSON( "b" << 1 ) );
@@ -689,12 +677,11 @@ namespace {
                     ASSERT( mps->possibleOutOfOrderPlan() );
                     ASSERT( mps->hasPossiblyExcludedPlans() );
                 }
-                
-                nsdt.registerCachedQueryPlanForPattern
-                        ( makePattern( BSON( "a" << 1 ), BSON( "b" << 1 ) ),
-                         CachedQueryPlan( BSON( "b" << 1 ), 1,
-                                         CandidatePlanCharacter( true, true ) ) );
-                
+
+                infoCache()->registerCachedQueryPlanForPattern( makePattern( BSON( "a" << 1 ), BSON( "b" << 1 ) ),
+                                                                CachedQueryPlan( BSON( "b" << 1 ), 1,
+                                                                                 CandidatePlanCharacter( true, true ) ) );
+
                 {
                     shared_ptr<MultiPlanScanner> mps =
                     makeMps( BSON( "a" << 1 ), BSON( "b" << 1 ) );
@@ -704,7 +691,7 @@ namespace {
                     ASSERT( mps->possibleOutOfOrderPlan() );
                     ASSERT( mps->hasPossiblyExcludedPlans() );
                 }
-                
+
                 {
                     shared_ptr<MultiPlanScanner> mps =
                     makeMps( BSON( "a" << 1 ), BSON( "c" << 1 ) );
@@ -714,7 +701,7 @@ namespace {
                     ASSERT( mps->possibleOutOfOrderPlan() );
                     ASSERT( !mps->hasPossiblyExcludedPlans() );
                 }
-                
+
                 {
                     shared_ptr<MultiPlanScanner> mps =
                     makeMps( fromjson( "{$or:[{a:1},{a:2}]}" ), BSON( "c" << 1 ) );
@@ -769,11 +756,9 @@ namespace {
 
             FieldRangeSet frs( "ns", BSON( "a" << 1 ), true, true );
             {
-                SimpleMutex::scoped_lock lk(NamespaceDetailsTransient::_qcMutex);
-                NamespaceDetailsTransient::get_inlock( ns() ).
-                        registerCachedQueryPlanForPattern( frs.pattern( BSON( "b" << 1 ) ),
-                                                          CachedQueryPlan( BSON( "a" << 1 ), 0,
-                                                        CandidatePlanCharacter( true, true ) ) );
+                infoCache()->registerCachedQueryPlanForPattern( frs.pattern( BSON( "b" << 1 ) ),
+                                                                CachedQueryPlan( BSON( "a" << 1 ), 0,
+                                                                                 CandidatePlanCharacter( true, true ) ) );
             }
             
             c = getBestGuessCursor( ns(), fromjson( "{a:1,$or:[{y:1}]}" ), BSON( "b" << 1 ) );

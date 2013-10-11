@@ -49,6 +49,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/kill_current_op.h"
 #include "mongo/db/pdfile.h"
+#include "mongo/db/structure/collection.h"
 #include "mongo/util/concurrency/task.h"
 #include "mongo/util/timer.h"
 #include "mongo/util/touch_pages.h"
@@ -198,7 +199,9 @@ namespace mongo {
                                                         extents.size()));
 
         // same data, but might perform a little different after compact?
-        NamespaceDetailsTransient::get(ns).clearQueryCache();
+        Collection* collection = cc().database()->getCollection( ns );
+        if ( collection )
+            collection->infoCache()->addedIndex();
 
         verify( d->getCompletedIndexCount() == d->getTotalIndexCount() );
         int nidx = d->getCompletedIndexCount();

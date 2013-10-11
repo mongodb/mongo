@@ -37,6 +37,7 @@
 #include "mongo/db/exec/collection_scan_common.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/storage/record_store.h"
+#include "mongo/db/structure/collection_info_cache.h"
 
 namespace mongo {
 
@@ -64,6 +65,9 @@ namespace mongo {
 
         NamespaceDetails* details() { return _details; } // TODO: remove
         const NamespaceDetails* details() const { return _details; }
+
+        CollectionInfoCache* infoCache() { return &_infoCache; }
+        const CollectionInfoCache* infoCache() const { return &_infoCache; }
 
         const NamespaceString& ns() const { return _ns; }
 
@@ -97,6 +101,8 @@ namespace mongo {
         NamespaceDetails* _details;
         Database* _database;
         RecordStore _recordStore;
+        CollectionInfoCache _infoCache;
+
 
         friend class Database;
         friend class FlatIterator;
