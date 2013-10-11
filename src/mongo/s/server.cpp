@@ -73,9 +73,7 @@
 #include "mongo/util/net/message_server.h"
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/ntservice.h"
-#include "mongo/util/options_parser/environment.h"
-#include "mongo/util/options_parser/option_section.h"
-#include "mongo/util/options_parser/options_parser.h"
+#include "mongo/util/options_parser/startup_options.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/ramlog.h"
 #include "mongo/util/signal_handlers.h"
@@ -366,7 +364,7 @@ static void startupConfigActions(const std::vector<std::string>& argv) {
     vector<string> disallowedOptions;
     disallowedOptions.push_back( "upgrade" );
     ntservice::configureService(initService,
-                                serverParsedOptions,
+                                moe::startupOptionsParsed,
                                 defaultServiceStrings,
                                 disallowedOptions,
                                 argv);
