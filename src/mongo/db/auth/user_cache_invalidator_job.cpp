@@ -28,7 +28,7 @@
 namespace mongo {
 namespace {
 
-    int userCacheInvalidationIntervalSecs;
+    int userCacheInvalidationIntervalSecs = 60 * 10; // 10 minute default
 
     class ExportedInvalidationIntervalParameter : public ExportedServerParameter<int> {
     public:
