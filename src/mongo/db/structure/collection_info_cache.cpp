@@ -36,6 +36,9 @@
 #include "mongo/db/structure/collection.h"
 #include "mongo/util/debug_util.h"
 
+#include "mongo/db/index.h" // XXX
+#include "mongo/db/pdfile.h" // XXX
+
 namespace mongo {
 
     CollectionInfoCache::CollectionInfoCache( Collection* collection )

@@ -53,8 +53,6 @@
 #include "mongo/util/log.h"
 #include "mongo/util/mmap.h"
 
-#include "mongo/db/pdfile.h" // XXX
-
 namespace mongo {
 
     class Cursor;
