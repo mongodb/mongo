@@ -348,11 +348,11 @@ namespace {
             return Status(ErrorCodes::UnsupportedFormat, "Role db must be non-empty strings");
         }
 
-        if (canDelegateElement->eoo() && canDelegateElement->type() != Bool) {
+        if (!canDelegateElement->eoo() && canDelegateElement->type() != Bool) {
             return Status(ErrorCodes::UnsupportedFormat,
                           "'canDelegate' field must be a boolean if provided");
         }
-        if (hasRoleElement->eoo() && hasRoleElement->type() != Bool) {
+        if (!hasRoleElement->eoo() && hasRoleElement->type() != Bool) {
             return Status(ErrorCodes::UnsupportedFormat,
                           "'hasRole' field must be a boolean if provided");
         }
