@@ -531,6 +531,10 @@ namespace mongo {
         // We use this a lot below.
         const LiteParsedQuery& pq = cq->getParsed();
 
+        // Need to call cq->toString() now, since upon error getRunner doesn't guarantee
+        // cq is in a consistent state.
+        string cqStr = cq->toString();
+
         Status status = Status::OK();
         if (pq.hasOption(QueryOption_OplogReplay)) {
             status = getOplogStartHack(cq, &rawRunner);
@@ -541,8 +545,7 @@ namespace mongo {
         }
 
         if (!status.isOK()) {
-            uasserted(17007, "Couldn't process query " + cq->toString()
-                             + " why: " + status.reason());
+            uasserted(17007, "Couldn't process query " + cqStr + " why: " + status.reason());
         }
 
         verify(NULL != rawRunner);

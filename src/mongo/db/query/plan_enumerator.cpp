@@ -304,8 +304,11 @@ namespace mongo {
 
                 for (size_t j = 0; j < oie.preds.size(); ++j) {
                     MatchExpression* expr = oie.preds[j];
-                    // TODO: Text goes here.
                     if (MatchExpression::GEO_NEAR == expr->matchType()) {
+                        hasPredThatRequiresIndex = true;
+                        break;
+                    }
+                    if (MatchExpression::TEXT == expr->matchType()) {
                         hasPredThatRequiresIndex = true;
                         break;
                     }

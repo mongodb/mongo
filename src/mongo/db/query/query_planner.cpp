@@ -37,6 +37,7 @@
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/matcher/expression_array.h"
 #include "mongo/db/matcher/expression_geo.h"
+#include "mongo/db/matcher/expression_text.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/index_bounds_builder.h"
@@ -153,7 +154,10 @@ namespace mongo {
             }
             return false;
         }
-        else if ("text" == ixtype || "_fts" == ixtype || "geoHaystack" == ixtype) {
+        else if ("text" == ixtype || "fts" == ixtype) {
+            return (exprtype == MatchExpression::TEXT);
+        }
+        else if ("geoHaystack" == ixtype) {
             return false;
         }
         else {
@@ -286,6 +290,16 @@ namespace mongo {
             ret->seek = nearme->getRawObj();
             return ret;
         }
+        else if (MatchExpression::TEXT == expr->matchType()) {
+            // We must not keep the expression node around.
+            *exact = true;
+            TextMatchExpression* textExpr = static_cast<TextMatchExpression*>(expr);
+            TextNode* ret = new TextNode();
+            ret->_indexKeyPattern = index.keyPattern;
+            ret->_query = textExpr->getQuery();
+            ret->_language = textExpr->getLanguage();
+            return ret;
+        }
         else {
             // QLOG() << "making ixscan for " << expr->toString() << endl;
 
@@ -398,7 +412,7 @@ namespace mongo {
     void QueryPlanner::finishLeafNode(QuerySolutionNode* node, const IndexEntry& index) {
         const StageType type = node->getType();
 
-        if (STAGE_GEO_2D == type || STAGE_GEO_NEAR_2D == type) {
+        if (STAGE_GEO_2D == type || STAGE_GEO_NEAR_2D == type || STAGE_TEXT == type) {
             // XXX: do we do anything here?
             return;
         }
@@ -1153,6 +1167,15 @@ namespace mongo {
             }
         }
 
+        // Likewise, if there is a TEXT it must have an index it can use directly.
+        MatchExpression* textNode;
+        if (QueryPlannerCommon::hasNode(query.root(), MatchExpression::TEXT, &textNode)) {
+            RelevantTag* tag = static_cast<RelevantTag*>(textNode->getTag());
+            if (0 == tag->first.size() && 0 == tag->notFirst.size()) {
+                return;
+            }
+        }
+
         // If we have any relevant indices, we try to create indexed plans.
         if (0 < relevantIndices.size()) {
             for (size_t i = 0; i < relevantIndices.size(); ++i) {
@@ -1279,8 +1302,10 @@ namespace mongo {
 
         // TODO: Do we always want to offer a collscan solution?
         // XXX: currently disabling the always-use-a-collscan in order to find more planner bugs.
-        if (!QueryPlannerCommon::hasNode(query.root(), MatchExpression::GEO_NEAR)
-            && ((options & QueryPlanner::INCLUDE_COLLSCAN) || (0 == out->size() && canTableScan))) {
+        if (    !QueryPlannerCommon::hasNode(query.root(), MatchExpression::GEO_NEAR)
+             && !QueryPlannerCommon::hasNode(query.root(), MatchExpression::TEXT)
+             && ((options & QueryPlanner::INCLUDE_COLLSCAN) || (0 == out->size() && canTableScan)))
+        {
             QuerySolution* collscan = makeCollectionScan(query, false);
             out->push_back(collscan);
             QLOG() << "Planner: outputting a collscan\n";

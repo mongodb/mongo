@@ -53,6 +53,7 @@ namespace mongo {
         STAGE_SKIP,
         STAGE_SORT,
         STAGE_SORT_MERGE,
+        STAGE_TEXT,
         STAGE_UNKNOWN,
     };
 

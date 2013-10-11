@@ -42,6 +42,9 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/matcher.h"
 
+// mongo::fts::FTSSearch is deprecated: the "text" command is deprecated in favor of the $text
+// query operator.
+
 namespace mongo {
 
     class BtreeCursor;

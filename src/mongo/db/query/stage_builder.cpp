@@ -40,6 +40,7 @@
 #include "mongo/db/exec/s2near.h"
 #include "mongo/db/exec/sort.h"
 #include "mongo/db/exec/skip.h"
+#include "mongo/db/exec/text.h"
 #include "mongo/db/index/catalog_hack.h"
 #include "mongo/db/namespace_details.h"
 
@@ -188,6 +189,36 @@ namespace mongo {
             const GeoNear2DSphereNode* node = static_cast<const GeoNear2DSphereNode*>(root);
             return new S2NearStage(ns, node->indexKeyPattern, node->nq, node->baseBounds,
                                    node->filter.get(), ws);
+        }
+        else if (STAGE_TEXT == root->getType()) {
+            const TextNode* node = static_cast<const TextNode*>(root);
+
+            NamespaceDetails* nsd = nsdetails(ns.c_str());
+            if (NULL == nsd) { return NULL; }
+            vector<int> idxMatches;
+            nsd->findIndexByType("text", idxMatches);
+            if (0 == idxMatches.size()) { return NULL; }
+            IndexDescriptor* index = CatalogHack::getDescriptor(nsd, idxMatches[0]);
+            auto_ptr<FTSAccessMethod> fam(new FTSAccessMethod(index));
+            TextStageParams params(fam->getSpec());
+
+            params.ns = ns;
+            params.index = index;
+            params.spec = fam->getSpec();
+            params.limit = node->_numWanted;
+            Status s = fam->getSpec().getIndexPrefix(BSONObj(), &params.indexPrefix);
+            if (!s.isOK()) { return NULL; }
+
+            string language = ("" == node->_language
+                               ? fam->getSpec().defaultLanguage()
+                               : node->_language);
+
+            FTSQuery ftsq;
+            Status parseStatus = ftsq.parse(node->_query, language);
+            if (!parseStatus.isOK()) { return NULL; }
+            params.query = ftsq;
+
+            return new TextStage(params, ws, node->_filter.get());
         }
         else {
             stringstream ss;

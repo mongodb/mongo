@@ -35,6 +35,9 @@
 
 #include "mongo/db/commands.h"
 
+// mongo::fts::FTSCommand is deprecated: the "text" command is deprecated in favor of the $text
+// query operator.
+
 namespace mongo {
 
     namespace fts {

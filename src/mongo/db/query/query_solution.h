@@ -30,11 +30,14 @@
 
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/geo/geoquery.h"
+#include "mongo/db/fts/fts_query.h"
 #include "mongo/db/query/index_bounds.h"
 #include "mongo/db/query/projection_parser.h"
 #include "mongo/db/query/stage_types.h"
 
 namespace mongo {
+
+    using mongo::fts::FTSQuery;
 
     /**
      * This is an abstract representation of a query plan.  It can be transcribed into a tree of
@@ -153,6 +156,26 @@ namespace mongo {
         }
     private:
         MONGO_DISALLOW_COPYING(QuerySolution);
+    };
+
+    struct TextNode : public QuerySolutionNode {
+        TextNode() : _numWanted(100) { }
+        virtual ~TextNode() { }
+
+        virtual StageType getType() const { return STAGE_TEXT; }
+
+        virtual void appendToString(stringstream* ss, int indent) const;
+
+        bool fetched() const { return false; }
+        bool hasField(const string& field) const { return false; }
+        bool sortedByDiskLoc() const { return false; }
+        BSONObj getSort() const { return _indexKeyPattern; }
+
+        uint32_t _numWanted;
+        BSONObj  _indexKeyPattern;
+        std::string _query;
+        std::string _language;
+        scoped_ptr<MatchExpression> _filter;
     };
 
     struct CollectionScanNode : public QuerySolutionNode {

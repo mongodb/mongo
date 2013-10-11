@@ -31,6 +31,29 @@
 namespace mongo {
 
     //
+    // TextNode
+    //
+
+    void TextNode::appendToString(stringstream* ss, int indent) const {
+        addIndent(ss, indent);
+        *ss << "TEXT\n";
+        addIndent(ss, indent + 1);
+        *ss << "numWanted = " << _numWanted << endl;
+        addIndent(ss, indent + 1);
+        *ss << "keyPattern = " << _indexKeyPattern.toString() << endl;
+        addIndent(ss, indent + 1);
+        *ss << "fetched = " << fetched() << endl;
+        addIndent(ss, indent + 1);
+        *ss << "sortedByDiskLoc = " << sortedByDiskLoc() << endl;
+        addIndent(ss, indent + 1);
+        *ss << "getSort = " << getSort().toString() << endl;
+        addIndent(ss, indent + 1);
+        *ss << "query = " << _query << endl;
+        addIndent(ss, indent + 1);
+        *ss << "language = " << _language << endl;
+    }
+
+    //
     // CollectionScanNode
     //
 
