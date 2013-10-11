@@ -683,7 +683,7 @@ namespace mongo {
         if (!readToken(RPAREN)) {
             return parseError("Expecting ')'");
         }
-        builder.appendNumber(fieldName, val);
+        builder.appendNumber(fieldName, static_cast<long long int>(val));
         return Status::OK();
     }
 
@@ -704,7 +704,7 @@ namespace mongo {
         if (!readToken(RPAREN)) {
             return parseError("Expecting ')'");
         }
-        builder.appendNumber(fieldName, val);
+        builder.appendNumber(fieldName, static_cast<int>(val));
         return Status::OK();
     }
 
