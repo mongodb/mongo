@@ -167,9 +167,13 @@ struct __wt_connection_impl {
 	const char	*stat_format;	/* Statistics log timestamp format */
 	FILE		*stat_fp;	/* Statistics log file handle */
 	const char	*stat_path;	/* Statistics log path format */
-	char	       **stat_sources;	/* Statistics log list of objects */
 	const char	*stat_stamp;	/* Statistics log entry timestamp */
 	long		 stat_usecs;	/* Statistics log period */
+	struct __wt_connection_stat_source {
+		char	*source;	/* Statistics log source */
+		int	 set;		/* Statistics log init flag */
+		WT_DSRC_STATS stats;	/* Statistics log source stats */
+	} *stat_sources;		/* Statistics log list of objects */
 
 	int		 logging;	/* Global logging configuration */
 	int		 archive;	/* Global archive configuration */

@@ -95,6 +95,8 @@ struct __wt_config_entry;
     typedef struct __wt_config_entry WT_CONFIG_ENTRY;
 struct __wt_connection_impl;
     typedef struct __wt_connection_impl WT_CONNECTION_IMPL;
+struct __wt_connection_stat_source;
+    typedef struct __wt_connection_stat_source WT_CONNECTION_STAT_SOURCE;
 struct __wt_connection_stats;
     typedef struct __wt_connection_stats WT_CONNECTION_STATS;
 struct __wt_cursor_backup;

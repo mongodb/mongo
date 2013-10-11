@@ -86,7 +86,7 @@ __statlog_config(WT_SESSION_IMPL *session, const char **cfg, int *runp)
 				    "supports objects of type \"file\" or "
 				    "\"lsm\"");
 			WT_RET(__wt_strndup(session,
-			    k.str, k.len, &conn->stat_sources[cnt]));
+			    k.str, k.len, &conn->stat_sources[cnt].source));
 		}
 		WT_RET_NOTFOUND_OK(ret);
 	}
@@ -102,11 +102,161 @@ __statlog_config(WT_SESSION_IMPL *session, const char **cfg, int *runp)
 }
 
 /*
- * __statlog_dump --
+ * __statlog_conn_dump --
  *	Dump out the connection statistics.
  */
 static int
-__statlog_dump(WT_SESSION_IMPL *session, const char *name, int conn_stats)
+__statlog_conn_dump(WT_SESSION_IMPL *session, const char *name)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_CURSOR *cursor;
+	WT_DECL_RET;
+	WT_SESSION *wt_session;
+	uint64_t value;
+	const char *config, *desc, *pdesc;
+
+	conn = S2C(session);
+
+	wt_session = (WT_SESSION *)session;
+	config = S2C(session)->stat_clear ?
+	    "statistics_clear,statistics_fast" : "statistics_fast";
+	WT_RET(wt_session->open_cursor(
+	    wt_session, "statistics:", NULL, config, &cursor));
+
+	while ((ret = cursor->next(cursor)) == 0 &&
+	    (ret = cursor->get_value(cursor, &desc, &pdesc, &value)) == 0)
+		WT_ERR_TEST((fprintf(conn->stat_fp,
+		    "%s %" PRIu64 " %s %s\n",
+		    conn->stat_stamp, value, name, desc) < 0), __wt_errno());
+	WT_ERR_NOTFOUND_OK(ret);
+
+err:	WT_TRET(cursor->close(cursor));
+
+	return (ret);
+}
+
+/*
+ * __statlog_accumulate --
+ *	Accumulate statistics for a handle.
+ */
+static int
+__statlog_accumulate(WT_SESSION_IMPL *session,
+    WT_DATA_HANDLE *dhandle, WT_CONNECTION_STAT_SOURCE *source)
+{
+	WT_CURSOR *cursor;
+	WT_DECL_ITEM(config);
+	WT_DECL_ITEM(uri);
+	WT_DECL_RET;
+	const char *cfg[] = {
+	    WT_CONFIG_BASE(session, session_open_cursor),
+	    "statistics_fast", NULL, NULL };
+
+	/* Build URI and configuration string. */
+	WT_RET(__wt_scr_alloc(session, 0, &uri));
+	WT_ERR(__wt_buf_fmt(session, uri, "statistics:%s", dhandle->name));
+	if (dhandle->checkpoint != NULL) {
+		WT_ERR(__wt_scr_alloc(session, 0, &config));
+		WT_ERR(__wt_buf_fmt(
+		    session, config, "checkpoint=%s", dhandle->checkpoint));
+		cfg[2] = config->data;
+	}
+
+	/*
+	 * Get the statistics for the underlying object; the first retrieved
+	 * becomes a copy, all subsequent retrievals are aggregated.
+	 */
+	if ((ret = __wt_curstat_open(session, uri->data, cfg, &cursor)) == 0) {
+		if (source->set == 0) {
+			source->stats =
+			    *(WT_DSRC_STATS *)WT_CURSOR_STATS(cursor);
+			source->set = 1;
+		} else
+			__wt_stat_aggregate_dsrc_stats(
+			    WT_CURSOR_STATS(cursor), &source->stats);
+
+		WT_ERR(cursor->close(cursor));
+	} else if (ret == WT_NOTFOUND) {
+		/*
+		 * If we don't find an underlying object, silently ignore it,
+		 * the object may exist only intermittently.
+		 */
+		ret = 0;
+	}
+
+err:	__wt_scr_free(&config);
+	__wt_scr_free(&uri);
+
+	return (ret);
+}
+
+/*
+ * __statlog_dump --
+ *	Dump out the accumulated statistics.
+ */
+static int
+__statlog_dump(WT_SESSION_IMPL *session)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_CONNECTION_STAT_SOURCE *source;
+	WT_DECL_RET;
+	WT_STATS *sp;
+	u_int i;
+
+	conn = S2C(session);
+
+	for (source = conn->stat_sources; source->source != NULL; ++source) {
+		if (source->set == 0)
+			continue;
+		source->set = 0;
+		for (i = 0, sp = (WT_STATS *)&source->stats;
+		    i < sizeof(source->stats) / sizeof(WT_STATS); ++i, ++sp)
+			WT_ERR_TEST((fprintf(conn->stat_fp,
+			    "%s %" PRIu64 " %s %s\n",
+			    conn->stat_stamp,
+			    sp->v, source->source, sp->desc) < 0),
+			    __wt_errno());
+	}
+
+err:	/*
+	 * The first time we accumulate statistics we simply do an assignment
+	 * from another stat structure, clear our "set" flag so that happens.
+	 * We did it already on success, but it feels cleaner to make sure we
+	 * finish up on error as well.
+	 */
+	for (; source->source != NULL; ++source)
+		source->set = 0;
+
+	return (ret);
+}
+
+/*
+ * __statlog_handle --
+ *	Review a single open handle and dump statistics on demand.
+ */
+static int
+__statlog_handle(WT_SESSION_IMPL *session, const char *cfg[])
+{
+	WT_CONNECTION_STAT_SOURCE *source;
+	WT_DATA_HANDLE *dhandle;
+
+	WT_UNUSED(cfg);
+
+	dhandle = session->dhandle;
+
+	/* Check for a match on the set of sources. */
+	for (source =
+	    S2C(session)->stat_sources; source->source != NULL; ++source)
+		if (WT_PREFIX_MATCH(dhandle->name, source->source))
+			return (__statlog_accumulate(session, dhandle, source));
+	return (0);
+}
+
+/*
+ * __statlog_lsm_dump --
+ *	Dump out the LSM statistics.
+ */
+static int
+__statlog_lsm_dump(WT_SESSION_IMPL *session, const char *name, int conn_stats)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_CURSOR *cursor;
@@ -162,27 +312,6 @@ err:	WT_TRET(cursor->close(cursor));
 }
 
 /*
- * __statlog_apply --
- *	Review a single open handle and dump statistics on demand.
- */
-static int
-__statlog_apply(WT_SESSION_IMPL *session, const char *cfg[])
-{
-	WT_DATA_HANDLE *dhandle;
-	char **p;
-
-	WT_UNUSED(cfg);
-
-	dhandle = session->dhandle;
-
-	/* Check for a match on the set of sources. */
-	for (p = S2C(session)->stat_sources; *p != NULL; ++p)
-		if (WT_PREFIX_MATCH(dhandle->name, *p))
-			return (__statlog_dump(session, dhandle->name, 0));
-	return (0);
-}
-
-/*
  * __wt_statlog_lsm_apply --
  *	Review the list open LSM trees, and dump statistics on demand.
  *
@@ -193,10 +322,10 @@ static int
 __wt_statlog_lsm_apply(WT_SESSION_IMPL *session)
 {
 #define	WT_LSM_TREE_LIST_SLOTS	100
-	WT_LSM_TREE *lsm_tree, *list[WT_LSM_TREE_LIST_SLOTS];
+	WT_CONNECTION_STAT_SOURCE *source;
 	WT_DECL_RET;
+	WT_LSM_TREE *lsm_tree, *list[WT_LSM_TREE_LIST_SLOTS];
 	int cnt, locked;
-	char **p;
 
 	cnt = locked = 0;
 
@@ -219,8 +348,9 @@ __wt_statlog_lsm_apply(WT_SESSION_IMPL *session)
 	TAILQ_FOREACH(lsm_tree, &S2C(session)->lsmqh, q) {
 		if (cnt == WT_LSM_TREE_LIST_SLOTS)
 			break;
-		for (p = S2C(session)->stat_sources; *p != NULL; ++p)
-			if (WT_PREFIX_MATCH(lsm_tree->name, *p)) {
+		for (source = S2C(session)->stat_sources;
+		    source->source != NULL; ++source)
+			if (WT_PREFIX_MATCH(lsm_tree->name, source->source)) {
 				WT_ERR(__wt_lsm_tree_get(
 				    session, lsm_tree->name, 0, &list[cnt++]));
 				break;
@@ -231,7 +361,7 @@ __wt_statlog_lsm_apply(WT_SESSION_IMPL *session)
 
 	while (cnt > 0) {
 		--cnt;
-		WT_TRET(__statlog_dump(session, list[cnt]->name, 0));
+		WT_TRET(__statlog_lsm_dump(session, list[cnt]->name, 0));
 		__wt_lsm_tree_release(session, list[cnt]);
 	}
 
@@ -316,17 +446,22 @@ __statlog_server(void *arg)
 		conn->stat_stamp = tmp.mem;
 
 		/* Dump the connection statistics. */
-		WT_ERR(__statlog_dump(session, conn->home, 1));
+		WT_ERR(__statlog_conn_dump(session, conn->home));
+
+		/* If we don't have a list of sources, that's all we dump. */
+		if (conn->stat_sources == NULL)
+			goto done;
 
 		/*
 		 * Lock the schema and walk the list of open handles, dumping
-		 * any that match the list of object sources.
+		 * any that match the list of data sources.
 		 */
-		if (conn->stat_sources != NULL)
-			WT_WITH_SCHEMA_LOCK(session,
-			    ret = __wt_conn_btree_apply(
-			    session, __statlog_apply, NULL));
+		WT_WITH_SCHEMA_LOCK(session, ret =
+		    __wt_conn_btree_apply(session, 1, __statlog_handle, NULL));
 		WT_ERR(ret);
+
+		/* Dump accumulated statistics. */
+		WT_ERR(__statlog_dump(session));
 
 		/*
 		 * Walk the list of open LSM trees, dumping any that match the
@@ -336,11 +471,10 @@ __statlog_server(void *arg)
 		 * This code should be removed when LSM objects are converted to
 		 * data handles.
 		 */
-		if (conn->stat_sources != NULL)
-			WT_ERR(__wt_statlog_lsm_apply(session));
+		WT_ERR(__wt_statlog_lsm_apply(session));
 
 		/* Flush. */
-		WT_ERR(fflush(fp) == 0 ? 0 : __wt_errno());
+done:		WT_ERR(fflush(fp) == 0 ? 0 : __wt_errno());
 
 		/* Wait until the next event. */
 		WT_ERR(
@@ -407,10 +541,10 @@ __wt_statlog_create(WT_CONNECTION_IMPL *conn, const char *cfg[])
 int
 __wt_statlog_destroy(WT_CONNECTION_IMPL *conn)
 {
+	WT_CONNECTION_STAT_SOURCE *source;
 	WT_DECL_RET;
 	WT_SESSION *wt_session;
 	WT_SESSION_IMPL *session;
-	char **p;
 
 	session = conn->default_session;
 
@@ -421,9 +555,9 @@ __wt_statlog_destroy(WT_CONNECTION_IMPL *conn)
 	}
 	WT_TRET(__wt_cond_destroy(session, &conn->stat_cond));
 
-	if ((p = conn->stat_sources) != NULL) {
-		for (; *p != NULL; ++p)
-			__wt_free(session, *p);
+	if ((source = conn->stat_sources) != NULL) {
+		for (; source->source != NULL; ++source)
+			__wt_free(session, source->source);
 		__wt_free(session, conn->stat_sources);
 	}
 	__wt_free(session, conn->stat_path);
