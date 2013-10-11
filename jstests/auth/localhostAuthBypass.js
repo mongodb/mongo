@@ -12,7 +12,7 @@ var host = "localhost:" + port;
 
 var addUser = function(mongo) {
     print("============ adding a user.");
-    mongo.getDB("admin").addUser(username, password, jsTest.adminUserRoles);
+    mongo.getDB("admin").addUser({user:username,pwd:  password, roles: jsTest.adminUserRoles});
 };
 
 var assertCannotRunCommands = function(mongo) {

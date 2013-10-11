@@ -14,8 +14,8 @@ var test = conn.getDB("test");
 test.foo.insert({a:1});
 test.getLastError();
 assert.eq(1, test.foo.findOne().a);
-test.addUser('a', 'a', jsTest.basicUserRoles);
-test.addUser('b', 'b', jsTest.basicUserRoles);
+test.addUser({user:'a', pwd: 'a', roles: jsTest.basicUserRoles});
+test.addUser({user:'b', pwd: 'b', roles: jsTest.basicUserRoles});
 
 function missingOrEquals(string) {
     return 'function() { '

@@ -6,7 +6,7 @@ var baseName = "jstests_show_log_auth";
 var m = startMongod( "--auth", "--port", port, "--dbpath", "/data/db/" + baseName, "--nohttpinterface", "--bind_ip", "127.0.0.1" , "--nojournal" , "--smallfiles" );
 var db = m.getDB( "admin" );
 
-db.addUser( "admin" , "pass", jsTest.adminUserRoles );
+db.addUser({user: "admin" , pwd: "pass", roles: jsTest.adminUserRoles});
 
 // Temporarily capture this shell's print() output
 var oldprint = print, printed = [];

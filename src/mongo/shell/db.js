@@ -863,7 +863,7 @@ function printUserObj(userObj) {
 /**
  * Used for creating users in systems with v1 style user information (ie MongoDB v2.4 and prior)
  */
-DB.prototype._createUserV1 = function(userObj, replicatedTo, timeout) {
+DB.prototype._createUserWithInsert = function(userObj, replicatedTo, timeout) {
     var c = this.getCollection( "system.users" );
     var oldPwd;
     if (userObj.pwd != null) {
@@ -937,6 +937,15 @@ DB.prototype._createUserV1 = function(userObj, replicatedTo, timeout) {
 }
 
 DB.prototype._createUser = function(userObj, replicatedTo, timeout) {
+    var commandExisted = this._createUserWithCommand(userObj, replicatedTo, timeout);
+    if (!commandExisted) {
+        this._createUserWithInsert(userObj, replicatedTo, timeout);
+    }
+}
+
+// Returns true if it worked, false if the createUser command wasn't found, and throws on all other
+// failures
+DB.prototype._createUserWithCommand = function(userObj, replicatedTo, timeout) {
     var name = userObj["user"];
     var cmdObj = {createUser:name};
     cmdObj = Object.extend(cmdObj, userObj);
@@ -950,11 +959,11 @@ DB.prototype._createUser = function(userObj, replicatedTo, timeout) {
 
     if (res.ok) {
         printUserObj(userObj);
-        return;
+        return true;
     }
 
     if (res.errmsg == "no such cmd: createUser") {
-        return this._createUserV1(userObj, replicatedTo, timeout);
+        return false;
     }
 
     // We can't detect replica set shards via mongos, so we'll sometimes get this error
@@ -962,27 +971,51 @@ DB.prototype._createUser = function(userObj, replicatedTo, timeout) {
     // the user has been written and we're happy
     if (res.errmsg == "norepl" || res.errmsg == "noreplset") {
         // nothing we can do
-        return;
+        return true;
     }
 
     if (res.errmsg == "timeout") {
-        throw "timed out while waiting for user authentication to replicate - " +
-              "database will not be fully secured until replication finishes"
+        throw Error("timed out while waiting for user authentication to replicate - " +
+                    "database will not be fully secured until replication finishes");
     }
 
-    throw "couldn't add user: " + res.errmsg;
+    throw Error("couldn't add user: " + res.errmsg);
 }
 
 function _hashPassword(username, password) {
     return hex_md5(username + ":mongo:" + password);
 }
 
-DB.prototype._addUserExplicitArgs = function(username, password, roles, replicatedTo, timeout) {
-    if (password == null || password.length == 0) {
-        throw Error("password can't be empty");
+// We need to continue to support the addUser(username, password, readOnly) form of addUser for at
+// least one release, even though its behavior of creating a super-user by default is bad.
+// TODO(spencer): remove this form from v2.8
+DB.prototype._createUserDeprecatedV22Version = function(username, pass, readOnly, replicatedTo, timeout) {
+    print("WARNING: This form of the addUser shell helper (that takes username, password, " +
+          "and readOnly boolean) is DEPRECATED. Use the form that takes a user object instead");
+
+    if ( pass == null || pass.length == 0 )
+        throw "password can't be empty";
+
+    var userObjForCommand = { user: username, pwd: pass };
+    if (this.getName() == "admin") {
+        if (readOnly) {
+            userObjForCommand["roles"] = ['readAnyDatabase'];
+        } else {
+            userObjForCommand["roles"] = ['root'];
+        }
+    } else {
+        if (readOnly) {
+            userObjForCommand["roles"] = ['read'];
+        } else {
+            userObjForCommand["roles"] = ['dbOwner'];
+        }
     }
-    var userObj = { user: arguments[0], pwd: arguments[1], roles: arguments[2] };
-    this._createUser(userObj, replicatedTo, timeout);
+
+    var commandExisted = this._createUserWithCommand(userObjForCommand, replicatedTo, timeout);
+    if (!commandExisted) {
+        var userObjForInsert = { user: username, pwd: pass, readOnly: readOnly || false };
+        this._createUserWithInsert(userObjForInsert, replicatedTo, timeout);
+    }
 }
 
 // TODO(spencer): properly handle write concern objects in addUser
@@ -993,12 +1026,8 @@ DB.prototype.addUser = function() {
 
     if (typeof arguments[0] == "object") {
         this._createUser.apply(this, arguments);
-    } else if (Array.isArray(arguments[2])) {
-        this._addUserExplicitArgs.apply(this, arguments);
     } else {
-        throw Error("Invalid arguments to addUser.  addUser must either be run with a full user " +
-                    "object or with a username, password, and roles array");
-
+        this._createUserDeprecatedV22Version.apply(this, arguments);
     }
 }
 
@@ -1082,6 +1111,10 @@ DB.prototype.dropUser = function( username, writeConcern ){
     throw Error(res.errmsg);
 }
 
+/**
+ * Used for removing users in systems with V1 style user information
+ * (ie MongoDB v2.4 and prior)
+ */
 DB.prototype._removeUserV1 = function(username, writeConcern) {
     this.getCollection( "system.users" ).remove( { user : username } );
 

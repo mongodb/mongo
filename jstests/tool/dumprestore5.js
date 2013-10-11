@@ -6,7 +6,7 @@ t.startDB( "foo" );
 
 db = t.db.getSiblingDB("admin")
 
-db.addUser('user','password', jsTest.basicUserRoles)
+db.addUser({user: 'user',pwd: 'password', roles: jsTest.basicUserRoles});
 
 assert.eq(1, db.system.users.count(), "setup")
 assert.eq(2, db.system.indexes.count(), "setup2")
@@ -25,7 +25,7 @@ assert.eq(1, db.system.users.find({user:'user'}).count(), "didn't restore users"
 assert.eq(2, db.system.indexes.count(), "didn't restore indexes")
 
 db.dropUser('user')
-db.addUser('user2', 'password2', jsTest.basicUserRoles)
+db.addUser({user: 'user2', pwd: 'password2', roles: jsTest.basicUserRoles});
 
 t.runTool("restore", "--dir", t.ext, "--drop")
 

@@ -21,10 +21,10 @@ for( var i = 0; i < 1000; i++) t.insert( {_id:i, x:i%10, y:i%100} );
 assert.eq( 1000, t.count(), "inserts failed" );
 
 d.dropAllUsers();
-d.getSisterDB( "admin" ).addUser( "admin", "admin", jsTest.adminUserRoles );
+d.getSisterDB( "admin" ).addUser({user: "admin", pwd: "admin", roles: jsTest.adminUserRoles });
 d.getSisterDB( "admin" ).auth('admin', 'admin');
-d.addUser( "write" , "write", jsTest.basicUserRoles );
-d.addUser( "read" , "read", jsTest.readOnlyUserRoles );
+d.addUser({user: "write" , pwd: "write", roles: jsTest.basicUserRoles});
+d.addUser({user: "read" , pwd: "read", roles: jsTest.readOnlyUserRoles});
 d.getSisterDB( "admin" ).logout();
 
 t.mapReduce( map, red, {out: { inline: 1 }} )

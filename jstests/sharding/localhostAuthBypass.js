@@ -12,14 +12,14 @@ var password = "bar";
 
 var addUser = function(mongo) {
     print("============ adding a user.");
-    mongo.getDB("admin").addUser(username, password, jsTest.adminUserRoles);
+    mongo.getDB("admin").addUser({user: username, pwd: password, roles: jsTest.adminUserRoles});
 };
 
 var addUsersToEachShard = function(st) {
     for(i = 0; i < numShards; i++) {
         print("============ adding a user to shard " + i);
         var d = st["shard" + i];
-        d.getDB("admin").addUser(username, password, jsTest.adminUserRoles);
+        d.getDB("admin").addUser({user: username, pwd: password, roles: jsTest.adminUserRoles});
     }
 };
 

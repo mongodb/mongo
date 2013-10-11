@@ -14,7 +14,7 @@ var sourceTestDB = sourceMongodConn.getDB('test');
 
 sourceTestDB.foo.insert({a:1});
 
-destAdminDB.addUser('admin', 'password'); // Turns on access control enforcement
+destAdminDB.addUser({user: 'admin', pwd: 'password', roles: jsTest.adminUserRoles}); // Turns on access control enforcement
 
 jsTestLog("Running copydb that should fail");
 var res = destAdminDB.runCommand({copydb:1,

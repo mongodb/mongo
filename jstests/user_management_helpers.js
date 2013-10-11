@@ -16,8 +16,8 @@ function assertHasRole(rolesArray, roleName, roleDB) {
      db.dropDatabase();
      db.dropAllUsers();
 
-     db.addUser("spencer", "password", ['readWrite']);
-     db.addUser("andy", "password", ['readWrite']);
+     db.addUser({user: "spencer", pwd: "password", roles: ['readWrite']});
+     db.addUser({user: "andy", pwd: "password", roles: ['readWrite']});
 
      // Test getUser
      var userObj = db.getUser('spencer');

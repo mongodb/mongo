@@ -5,7 +5,7 @@ t = new ToolTest("dumprestore_auth", { auth : "" });
 c = t.startDB("foo");
 
 adminDB = c.getDB().getSiblingDB('admin');
-adminDB.addUser('admin', 'password', ['__system']);
+adminDB.addUser({user: 'admin', pwd: 'password', roles: ['__system']});
 adminDB.auth('admin','password');
 
 assert.eq(0 , c.count() , "setup1");

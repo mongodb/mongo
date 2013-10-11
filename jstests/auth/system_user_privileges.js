@@ -35,7 +35,7 @@
     //
     // Preliminary set up.
     //
-    admin.addUser('admin', 'a', jsTest.adminUserRoles);
+    admin.addUser({user:'admin', pwd: 'a', roles: jsTest.adminUserRoles});
     admin.auth('admin', 'a');
 
     //

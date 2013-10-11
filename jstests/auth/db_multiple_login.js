@@ -33,7 +33,7 @@ var conn = MongoRunner.runMongod({ auth: "", smallfiles: "" });
 var admin = conn.getDB("admin");
 var test = conn.getDB("test");
 
-admin.addUser('admin', 'a', jsTest.adminUserRoles);
+admin.addUser({user:'admin', pwd: 'a', roles: jsTest.adminUserRoles});
 assert(admin.auth('admin', 'a'));
 test.addUser({user: 'reader', pwd: 'a', roles: [ "read" ]});
 test.addUser({user: 'writer', pwd: 'a', roles: [ "readWrite" ]});

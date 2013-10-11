@@ -52,7 +52,7 @@ if (user) {
 }
 else {
     print("adding user");
-    s.getDB(adminUser.db).addUser(adminUser.username, adminUser.password, jsTest.adminUserRoles);
+    s.getDB(adminUser.db).addUser({user: adminUser.username, pwd: adminUser.password, roles: jsTest.adminUserRoles});
 }
 
 login(adminUser);
@@ -112,7 +112,7 @@ s.getDB("admin").runCommand({shardCollection : "test.foo", key : {x : 1}});
 
 d1.waitForState( d1.getSecondaries(), d1.SECONDARY, 5 * 60 * 1000 )
 
-s.getDB(testUser.db).addUser(testUser.username, testUser.password , jsTest.basicUserRoles, 3 )
+s.getDB(testUser.db).addUser({user: testUser.username, pwd: testUser.password , roles: jsTest.basicUserRoles}, 3 )
 s.getDB(testUserReadOnly.db).addUser(testUserReadOnly.username,
                                      testUserReadOnly.password,
                                      jsTest.readOnlyUserRoles,

@@ -12,7 +12,7 @@ t.drop();
 users = db.getCollection( "system.users" );
 assert.eq( 0 , users.count() );
 
-db.addUser( "eliot" , "eliot", jsTest.adminUserRoles );
+db.addUser({user:  "eliot" , pwd: "eliot", roles: jsTest.adminUserRoles});
 
 assert.throws( function(){ db.users.count(); } )
 

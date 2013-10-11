@@ -193,7 +193,7 @@ var testOps = function(db, allowedActions) {
     });
 
     checkErr(allowedActions.hasOwnProperty('user_w'), function() {
-        db.addUser('a', 'a', jsTest.basicUserRoles);
+        db.addUser({user:'a', pwd: 'a', roles: jsTest.basicUserRoles});
         db.dropUser('a');
     }, db);
 
@@ -487,7 +487,7 @@ var runTests = function(conn) {
         }
 
         adminDB.addUser({ user: 'root', pwd: AUTH_INFO.admin.root.pwd,
-            roles: AUTH_INFO.admin.root.roles });
+                          roles: AUTH_INFO.admin.root.roles });
         adminDB.auth('root', AUTH_INFO.admin.root.pwd);
 
         for (var dbName in AUTH_INFO) {

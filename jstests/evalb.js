@@ -16,7 +16,7 @@ function lastOp() {
 try {
 
     username = 'jstests_evalb_user';
-    db.addUser( username, 'password', jsTest.basicUserRoles, 1 );
+    db.addUser({user: username, pwd: 'password', roles: jsTest.basicUserRoles});
     db.auth( username, 'password' );
 
     t = db.evalb;

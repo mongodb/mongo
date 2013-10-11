@@ -8,7 +8,7 @@ var doTest = function (mongo, callSetParam) {
     var TEST_PWD = 'bar';
     var testDB = mongo.getDB('test');
 
-    testDB.addUser(TEST_USER, TEST_PWD, jsTest.basicUserRoles);
+    testDB.addUser({user: TEST_USER, pwd: TEST_PWD, roles: jsTest.basicUserRoles});
     testDB.auth(TEST_USER, TEST_PWD);
 
     testDB.runCommand({ dbStats: 1 });

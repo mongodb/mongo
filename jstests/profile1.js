@@ -18,7 +18,7 @@ db.dropDatabase();
 try {
 
     username = "jstests_profile1_user";
-    db.addUser( username, "password", jsTest.basicUserRoles, 1 );
+    db.addUser({user: username, pwd: "password", roles: jsTest.basicUserRoles});
     db.auth( username, "password" );
 
     function profileCursor( query ) {

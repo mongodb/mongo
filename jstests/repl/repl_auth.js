@@ -4,7 +4,7 @@ var baseName = "jstests_repl11test";
 var keyFilePath = "jstests/libs/key1";
 
 setAdmin = function( n ) {
-    n.getDB( "admin" ).addUser( "super", "super", jsTest.adminUserRoles, 3 );
+    n.getDB( "admin" ).addUser({user: "super", pwd: "super", roles: jsTest.adminUserRoles}, 3 );
 }
 
 auth = function( n ) {
@@ -16,7 +16,7 @@ doTest = function(signal, extraOpts) {
     rt = new ReplTest( baseName );
     
     m = rt.start( true, {}, false, true );
-    m.getDB( baseName ).addUser( "test", "test", jsTest.basicUserRoles, 3 );
+    m.getDB( baseName ).addUser({user: "test", pwd: "test", roles: jsTest.basicUserRoles}, 3 );
 
     setAdmin( m );
     rt.stop( true );

@@ -38,10 +38,10 @@ var nodeCount = replTest.nodes.length;
  * is no admin user.
  */
 var adminDB = mongos.getDB( 'admin' )
-adminDB.addUser('user', 'password', jsTest.adminUserRoles);
+adminDB.addUser({user: 'user', pwd: 'password', roles: jsTest.adminUserRoles});
 adminDB.auth( 'user', 'password' );
 var priAdminDB = replTest.getPrimary().getDB( 'admin' );
-priAdminDB.addUser( 'user', 'password', jsTest.adminUserRoles, 3 );
+priAdminDB.addUser({user:  'user', pwd: 'password', roles: jsTest.adminUserRoles}, 3);
 
 coll.drop();
 coll.setSlaveOk( true );
