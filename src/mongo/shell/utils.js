@@ -229,7 +229,7 @@ if ( typeof _threadInject != "undefined" ){
                                    "jstests/opcounters.js",
                                    "jstests/currentop.js", // SERVER-8673, plus rwlock yielding issues
                                    "jstests/set_param1.js", // changes global state
-                                   "jstests/geo_update_btree.js" // SERVER-11132 test disables table scans
+                                   "jstests/geo_update_btree2.js" // SERVER-11132 test disables table scans
                                   ] );
         
         // some tests can't be run in parallel with each other
