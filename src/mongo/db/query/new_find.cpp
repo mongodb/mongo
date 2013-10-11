@@ -400,16 +400,29 @@ namespace mongo {
                 }
             }
 
-            if (Runner::RUNNER_EOF == state
-                && 0 == numResults
-                && (queryOptions & QueryOption_CursorTailable)
-                && (queryOptions & QueryOption_AwaitData)
-                && (pass < 1000)) {
+            if (Runner::RUNNER_EOF == state && 0 == numResults && (queryOptions & QueryOption_CursorTailable)
+                && (queryOptions & QueryOption_AwaitData) && (pass < 1000)) {
                 // If the cursor is tailable we don't kill it if it's eof.  We let it try to get
                 // data some # of times first.
                 return 0;
             }
-            else if (Runner::RUNNER_DEAD == state || Runner::RUNNER_EOF == state) {
+
+            bool saveClientCursor = true;
+
+            if (Runner::RUNNER_DEAD == state || Runner::RUNNER_ERROR == state) {
+                // If we're dead there's no way to get more results.
+                saveClientCursor = false;
+            }
+            else if (Runner::RUNNER_EOF == state) {
+                // EOF is also end of the line unless it's tailable.
+                saveClientCursor = queryOptions & QueryOption_CursorTailable;
+            }
+            else {
+                verify(Runner::RUNNER_ADVANCED == state);
+                saveClientCursor = true;
+            }
+
+            if (!saveClientCursor) {
                 ccPin.free();
                 // cc is now invalid, as is the runner
                 cursorid = 0;
@@ -773,8 +786,7 @@ namespace mongo {
         qr->setOperation(opReply);
         qr->startingFrom = 0;
         qr->nReturned = numResults;
-        // TODO: nscanned is bogus.
-        // curop.debug().nscanned = ( cursor ? cursor->nscanned() : 0LL );
+
         curop.debug().ntoskip = pq.getSkip();
         curop.debug().nreturned = numResults;
 
