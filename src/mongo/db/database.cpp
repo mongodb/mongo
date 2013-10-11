@@ -35,6 +35,7 @@
 #include <algorithm>
 #include <boost/filesystem/operations.hpp>
 
+#include "mongo/db/audit.h"
 #include "mongo/db/auth/auth_index_d.h"
 #include "mongo/db/background.h"
 #include "mongo/db/clientcursor.h"
@@ -293,6 +294,8 @@ namespace mongo {
 
         BackgroundOperation::assertNoBgOpInProgForNs( fullns );
 
+        audit::logDropCollection( currentClient.get(), fullns );
+
         if ( collection->_details->getTotalIndexCount() > 0 ) {
             try {
                 string errmsg;
@@ -404,6 +407,8 @@ namespace mongo {
 
         NamespaceDetails* details = _namespaceIndex.details( toNS );
         verify( details );
+
+        audit::logRenameCollection( currentClient.get(), fromNS, toNS );
 
         // move index namespaces
         string indexName = _name + ".system.indexes";
@@ -536,6 +541,10 @@ namespace mongo {
             _namespaceIndex.add_ns( _extentFreelistName, DiskLoc(), false );
             details = _namespaceIndex.details( _extentFreelistName );
             verify( details );
+
+            // TODO: this is an odd place, but because of lazy init,
+            // this is the only place its safe/easy
+            audit::logCreateDatabase( currentClient.get(), _name );
         }
         _extentManager.init( details );
         verify( _extentManager.hasFreeList() );
@@ -551,6 +560,8 @@ namespace mongo {
                 ns.startsWith( "admin." ) ) ) {
             uasserted(14037, "can't create user databases on a --configsvr instance");
         }
+
+        audit::logCreateCollection( currentClient.get(), ns );
 
         _namespaceIndex.add_ns( ns, DiskLoc(), capped );
         _addNamespaceToCatalog( ns, options );

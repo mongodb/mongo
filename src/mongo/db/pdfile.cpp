@@ -46,6 +46,7 @@ _ disallow system* manipulations from the database.
 
 #include "mongo/base/counter.h"
 #include "mongo/base/owned_pointer_vector.h"
+#include "mongo/db/audit.h"
 #include "mongo/db/auth/auth_index_d.h"
 #include "mongo/db/auth/user_document_parser.h"
 #include "mongo/db/pdfile_private.h"
@@ -1135,6 +1136,8 @@ namespace mongo {
         verify( d->name() == db );
 
         BackgroundOperation::assertNoBgOpInProgForDb(d->name().c_str());
+
+        audit::logDropDatabase( currentClient.get(), db );
 
         // Not sure we need this here, so removed.  If we do, we need to move it down
         // within other calls both (1) as they could be called from elsewhere and

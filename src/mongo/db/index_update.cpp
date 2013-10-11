@@ -287,6 +287,8 @@ namespace mongo {
 
         MONGO_TLOG(0) << "build index on: " << ns << " properties: " << idxInfo.jsonString() << endl;
 
+        audit::logCreateIndex( currentClient.get(), &idxInfo, idx.indexName(), ns );
+
         Timer t;
         unsigned long long n;
 

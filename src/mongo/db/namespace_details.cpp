@@ -33,6 +33,7 @@
 #include <algorithm>
 #include <list>
 
+#include "mongo/db/audit.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/db.h"
 #include "mongo/db/dbhelpers.h"
@@ -770,6 +771,8 @@ namespace mongo {
         IndexDetails *id = &d->idx(idxNumber);
 
         string indexNamespace = id->indexNamespace();
+
+        audit::logDropIndex( currentClient.get(), indexNamespace, id->parentNS() );
 
         id->kill_idx();
 
