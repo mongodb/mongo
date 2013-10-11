@@ -502,6 +502,7 @@ namespace mongo {
 
         serverGlobalParams.logWithSyslog = params.count("syslog");
 
+#ifndef _WIN32
         if (params.count("syslogFacility")) {
             std::string facility = params["syslogFacility"].as<string>();
             bool set = false;
@@ -522,6 +523,7 @@ namespace mongo {
         else {
             serverGlobalParams.syslogFacility = LOG_USER;
         }
+#endif // _WIN32
 
         serverGlobalParams.logAppend = params.count("logappend");
         if (!serverGlobalParams.logpath.empty() && serverGlobalParams.logWithSyslog) {
