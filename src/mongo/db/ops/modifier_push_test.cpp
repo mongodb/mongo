@@ -1305,4 +1305,175 @@ namespace {
         }
     }
 
+    // Push to position tests
+
+    TEST(ToPosition, BadInputs) {
+        const char* const bad[] = {
+               "{$push: {a: { $each: [1], $position:-1}}}",
+               "{$push: {a: { $each: [1], $position:'s'}}}",
+               "{$push: {a: { $each: [1], $position:{}}}}",
+               "{$push: {a: { $each: [1], $position:[0]}}}",
+               "{$push: {a: { $each: [1], $position:1.1211212}}}",
+               "{$push: {a: { $each: [1], $position:3.000000000001}}}",
+               "{$push: {a: { $each: [1], $position:1.2}}}",
+               "{$push: {a: { $each: [1], $position:-1.2}}}",
+               "{$push: {a: { $each: [1], $position:9223372036854775810}}}",
+               "{$push: {a: { $each: [1], $position:-9223372036854775810}}}",
+               NULL,
+        };
+
+        int i = 0;
+        while(bad[i] != NULL)
+        {
+            ModifierPush pushMod(ModifierPush::PUSH_NORMAL);
+            BSONObj modObj = fromjson(bad[i]);
+            ASSERT_NOT_OK(pushMod.init(modObj.firstElement().embeddedObject().firstElement(),
+                                       ModifierInterface::Options::normal()));
+            i++;
+        }
+    }
+
+    TEST(ToPosition, GoodInputs) {
+        {
+            Document doc(fromjson("{a: []}"));
+            Mod pushMod(fromjson("{$push: {a: { $each: [1], $position: NumberLong(1)}}}"));
+
+            ModifierInterface::ExecInfo execInfo;
+            ASSERT_OK(pushMod.prepare(doc.root(), "", &execInfo));
+        }
+        {
+            Document doc(fromjson("{a: []}"));
+            Mod pushMod(fromjson("{$push: {a: { $each: [1], $position:NumberInt(100)}}}"));
+
+            ModifierInterface::ExecInfo execInfo;
+            ASSERT_OK(pushMod.prepare(doc.root(), "", &execInfo));
+        }
+        {
+            Document doc(fromjson("{a: []}"));
+            Mod pushMod(fromjson("{$push: {a: { $each: [1], $position:1.0}}}"));
+
+            ModifierInterface::ExecInfo execInfo;
+            ASSERT_OK(pushMod.prepare(doc.root(), "", &execInfo));
+        }
+        {
+            Document doc(fromjson("{a: []}"));
+            Mod pushMod(fromjson("{$push: {a: { $each: [1], $position:1000000}}}"));
+
+            ModifierInterface::ExecInfo execInfo;
+            ASSERT_OK(pushMod.prepare(doc.root(), "", &execInfo));
+        }
+        {
+            Document doc(fromjson("{a: []}"));
+            Mod pushMod(fromjson("{$push: {a: { $each: [1], $position:0}}}"));
+
+            ModifierInterface::ExecInfo execInfo;
+            ASSERT_OK(pushMod.prepare(doc.root(), "", &execInfo));
+        }
+    }
+
+    TEST(ToPosition, EmptyArrayFront) {
+        Document doc(fromjson("{a: []}"));
+        Mod pushMod(fromjson("{$push: {a: { $each: [1], $position:0}}}"));
+
+        ModifierInterface::ExecInfo execInfo;
+        ASSERT_OK(pushMod.prepare(doc.root(), "", &execInfo));
+
+        ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
+        ASSERT_FALSE(execInfo.noOp);
+
+        ASSERT_OK(pushMod.apply());
+        ASSERT_FALSE(doc.isInPlaceModeEnabled());
+        ASSERT_EQUALS(fromjson("{a: [1]}"), doc);
+
+        Document logDoc;
+        LogBuilder logBuilder(logDoc.root());
+        ASSERT_OK(pushMod.log(&logBuilder));
+        ASSERT_EQUALS(countChildren(logDoc.root()), 1u);
+        ASSERT_EQUALS(fromjson("{$set: {'a':[1]}}"), logDoc);
+    }
+
+    TEST(ToPosition, EmptyArrayBackBigPosition) {
+        Document doc(fromjson("{a: []}"));
+        Mod pushMod(fromjson("{$push: {a: { $each: [1], $position:1000}}}"));
+
+        ModifierInterface::ExecInfo execInfo;
+        ASSERT_OK(pushMod.prepare(doc.root(), "", &execInfo));
+
+        ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
+        ASSERT_FALSE(execInfo.noOp);
+
+        ASSERT_OK(pushMod.apply());
+        ASSERT_FALSE(doc.isInPlaceModeEnabled());
+        ASSERT_EQUALS(fromjson("{a: [1]}"), doc);
+
+        Document logDoc;
+        LogBuilder logBuilder(logDoc.root());
+        ASSERT_OK(pushMod.log(&logBuilder));
+        ASSERT_EQUALS(countChildren(logDoc.root()), 1u);
+        ASSERT_EQUALS(fromjson("{$set: {'a':[1]}}"), logDoc);
+    }
+
+    TEST(ToPosition, EmptyArrayBack) {
+        Document doc(fromjson("{a: []}"));
+        Mod pushMod(fromjson("{$push: {a: { $each: [1], $position:1}}}"));
+
+        ModifierInterface::ExecInfo execInfo;
+        ASSERT_OK(pushMod.prepare(doc.root(), "", &execInfo));
+
+        ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
+        ASSERT_FALSE(execInfo.noOp);
+
+        ASSERT_OK(pushMod.apply());
+        ASSERT_FALSE(doc.isInPlaceModeEnabled());
+        ASSERT_EQUALS(fromjson("{a: [1]}"), doc);
+
+        Document logDoc;
+        LogBuilder logBuilder(logDoc.root());
+        ASSERT_OK(pushMod.log(&logBuilder));
+        ASSERT_EQUALS(countChildren(logDoc.root()), 1u);
+        ASSERT_EQUALS(fromjson("{$set: {'a':[1]}}"), logDoc);
+    }
+
+    TEST(ToPosition, Front) {
+        Document doc(fromjson("{a: [0]}"));
+        Mod pushMod(fromjson("{$push: {a: { $each: [1], $position:0}}}"));
+
+        ModifierInterface::ExecInfo execInfo;
+        ASSERT_OK(pushMod.prepare(doc.root(), "", &execInfo));
+
+        ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
+        ASSERT_FALSE(execInfo.noOp);
+
+        ASSERT_OK(pushMod.apply());
+        ASSERT_FALSE(doc.isInPlaceModeEnabled());
+        ASSERT_EQUALS(fromjson("{a: [1, 0]}"), doc);
+
+        Document logDoc;
+        LogBuilder logBuilder(logDoc.root());
+        ASSERT_OK(pushMod.log(&logBuilder));
+        ASSERT_EQUALS(countChildren(logDoc.root()), 1u);
+        ASSERT_EQUALS(fromjson("{$set: {'a':[1, 0]}}"), logDoc);
+    }
+
+    TEST(ToPosition, Back) {
+        Document doc(fromjson("{a: [0]}"));
+        Mod pushMod(fromjson("{$push: {a: { $each: [1], $position:100}}}"));
+
+        ModifierInterface::ExecInfo execInfo;
+        ASSERT_OK(pushMod.prepare(doc.root(), "", &execInfo));
+
+        ASSERT_EQUALS(execInfo.fieldRef[0]->dottedField(), "a");
+        ASSERT_FALSE(execInfo.noOp);
+
+        ASSERT_OK(pushMod.apply());
+        ASSERT_FALSE(doc.isInPlaceModeEnabled());
+        ASSERT_EQUALS(fromjson("{a: [0,1]}"), doc);
+
+        Document logDoc;
+        LogBuilder logBuilder(logDoc.root());
+        ASSERT_OK(pushMod.log(&logBuilder));
+        ASSERT_EQUALS(countChildren(logDoc.root()), 1u);
+        ASSERT_EQUALS(fromjson("{$set: {'a.1':1}}"), logDoc);
+    }
+
 } // unnamed namespace

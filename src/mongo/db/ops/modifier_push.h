@@ -113,6 +113,8 @@ namespace mongo {
         bool _slicePresent;
         int64_t _slice;
         bool _sortPresent;
+        size_t _startPosition;
+
         PatternElementCmp _sort;
 
         // Whether this mod is supposed to be parsed as a $pushAll.
