@@ -164,15 +164,21 @@ ReplTest.prototype.getOptions = function( master , extra , putBinaryFirst, norep
     }
 
     if( jsTestOptions().useSSL ) {
-        a.push( "--sslMode" )
-        a.push( "sslOnly" )
-        a.push( "--sslPEMKeyFile" )
-        a.push( "jstests/libs/server.pem" )
-        a.push( "--sslCAFile" )
-        a.push( "jstests/libs/ca.pem" )
+        if (!a.contains("--sslMode")) {
+            a.push( "--sslMode" )
+            a.push( "sslOnly" )
+        }
+        if (!a.contains("--sslPEMKeyFile")) {
+            a.push( "--sslPEMKeyFile" )
+            a.push( "jstests/libs/server.pem" )
+        }
+        if (!a.contains("--sslCAFile")) {
+            a.push( "--sslCAFile" )
+            a.push( "jstests/libs/ca.pem" )
+        }
         a.push( "--sslWeakCertificateValidation" )
     }
-    if( jsTestOptions().useX509 ) {
+    if( jsTestOptions().useX509 && !a.contains("--clusterAuthMode")) {
         a.push( "--clusterAuthMode" )
         a.push( "x509" )
     }

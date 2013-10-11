@@ -14,7 +14,7 @@ load("jstests/replsets/initial_sync1.js");
 // Mixed clusterAuthMode: sendX509 and sendKeyfile and try adding --auth 
 x509_options1 = Object.merge(common_options, 
                              {sslClusterFile: "jstests/libs/cluster-cert.pem",
-                              clusterAuthMode: "x509",
+                              clusterAuthMode: "sendX509",
                               auth: ""});
 x509_options2 = Object.merge(common_options, {clusterAuthMode: "sendKeyfile"});
 load("jstests/replsets/initial_sync1.js");

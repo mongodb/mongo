@@ -414,13 +414,13 @@ MongoRunner.mongoOptions = function( opts ){
     if (waitForConnect == undefined || waitForConnect == null) opts.waitForConnect = true;
     
     if( jsTestOptions().useSSL ) {
-        opts.sslMode = "sslOnly";
-        opts.sslPEMKeyFile = "jstests/libs/server.pem";
-        opts.sslCAFile = "jstests/libs/ca.pem";
+        if (!opts.sslMode) opts.sslMode = "sslOnly";
+        if (!opts.sslPEMKeyFile) opts.sslPEMKeyFile = "jstests/libs/server.pem";
+        if (!opts.sslCAFile) opts.sslCAFile = "jstests/libs/ca.pem";
         opts.sslWeakCertificateValidation = "";
     }
 
-    if ( jsTestOptions().useX509 ) {
+    if ( jsTestOptions().useX509 && !opts.clusterAuthMode ) {
         opts.clusterAuthMode = "x509";
     }
     
@@ -478,13 +478,13 @@ MongoRunner.mongodOptions = function( opts ){
     }
 
     if( jsTestOptions().useSSL ) {
-        opts.sslMode = "sslOnly";
-        opts.sslPEMKeyFile = "jstests/libs/server.pem";
-        opts.sslCAFile = "jstests/libs/ca.pem";
+        if (!opts.sslMode) opts.sslMode = "sslOnly";
+        if (!opts.sslPEMKeyFile) opts.sslPEMKeyFile = "jstests/libs/server.pem";
+        if (!opts.sslCAFile) opts.sslCAFile = "jstests/libs/ca.pem";
         opts.sslWeakCertificateValidation = "";
     }
 
-    if ( jsTestOptions().useX509 ) {
+    if ( jsTestOptions().useX509 && !opts.clusterAuthMode ) {
         opts.clusterAuthMode = "x509";
     }
 
@@ -712,13 +712,13 @@ startMongodTest = function (port, dirname, restart, extraOptions ) {
     if( jsTestOptions().keyFile && (!extraOptions || !extraOptions['keyFile']) ) options['keyFile'] = jsTestOptions().keyFile
 
     if( jsTestOptions().useSSL ) {
-        options["sslMode"] = "sslOnly";
-        options["sslPEMKeyFile"] = "jstests/libs/server.pem";
-        options["sslCAFile"] = "jstests/libs/ca.pem";
+        if (!options["sslMode"]) options["sslMode"] = "sslOnly";
+        if (!options["sslPEMKeyFile"]) options["sslPEMKeyFile"] = "jstests/libs/server.pem";
+        if (!options["sslCAFile"]) options["sslCAFile"] = "jstests/libs/ca.pem";
         options["sslWeakCertificateValidation"] = "";
     }
 
-    if ( jsTestOptions().useX509 ) {
+    if ( jsTestOptions().useX509 && !options["clusterAuthMode"] ) {
         options["clusterAuthMode"] = "x509";
     }
 
