@@ -108,39 +108,37 @@ namespace mongo {
         if (fieldState == FieldParser::FIELD_INVALID) return false;
         _isErrMessageSet = fieldState == FieldParser::FIELD_SET;
 
-        // XXX
-        // We're using appendNumber on generation but being strict in ingestion
-        // This should hold until we give FieldParser some flexibility.
+        // We're using appendNumber on generation so we'll try a smaller type
+        // (int) first and then fall back to the original type (long long).
         BSONField<int> fieldN("n");
         int tempN;
         fieldState = FieldParser::extract(source, fieldN, &tempN, errMsg);
-        if (fieldState == FieldParser::FIELD_INVALID) return false;
-        if (fieldState == FieldParser::FIELD_SET) {
+        if (fieldState == FieldParser::FIELD_INVALID) {
+            // try falling back to a larger type
+            fieldState = FieldParser::extract(source, n, &_n, errMsg);
+            if (fieldState == FieldParser::FIELD_INVALID) return false;
+            _isNSet = fieldState == FieldParser::FIELD_SET;
+        }
+        else if (fieldState == FieldParser::FIELD_SET) {
             _isNSet = true;
             _n = tempN;
         }
 
-        // XXX
-        //fieldState = FieldParser::extract(source, n, &_n, errMsg);
-        //if (fieldState == FieldParser::FIELD_INVALID) return false;
-        //_isNSet = fieldState == FieldParser::FIELD_SET;
-
-        // XXX
-        // We're using appendNumber on generation but being strict in ingestion
-        // This should hold until we give FieldParser some flexibility.
+        // We're using appendNumber on generation so we'll try a smaller type
+        // (int) first and then fall back to the original type (long long).
         BSONField<int> fieldUpserted("upserted");
         int tempUpserted;
         fieldState = FieldParser::extract(source, fieldUpserted, &tempUpserted, errMsg);
-        if (fieldState == FieldParser::FIELD_INVALID) return false;
-        if (fieldState == FieldParser::FIELD_SET) {
+        if (fieldState == FieldParser::FIELD_INVALID) {
+            // try falling back to larger type
+            fieldState = FieldParser::extract(source, upserted, &_upserted, errMsg);
+            if (fieldState == FieldParser::FIELD_INVALID) return false;
+            _isUpsertedSet = fieldState == FieldParser::FIELD_SET;
+        }
+        else if (fieldState == FieldParser::FIELD_SET) {
             _isUpsertedSet = true;
             _upserted = tempUpserted;
         }
-
-        // XXX
-        // fieldState = FieldParser::extract(source, upserted, &_upserted, errMsg);
-        // if (fieldState == FieldParser::FIELD_INVALID) return false;
-        // _isUpsertedSet = fieldState == FieldParser::FIELD_SET;
 
         fieldState = FieldParser::extract(source, lastOp, &_lastOp, errMsg);
         if (fieldState == FieldParser::FIELD_INVALID) return false;

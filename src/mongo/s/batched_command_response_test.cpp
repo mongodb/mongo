@@ -20,6 +20,7 @@
 
 #include "mongo/db/jsobj.h"
 #include "mongo/s/batched_error_detail.h"
+#include "mongo/platform/cstdint.h"
 #include "mongo/unittest/unittest.h"
 
 namespace {
