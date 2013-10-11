@@ -22,6 +22,9 @@ explain = t.find( { $or:clauses } ).explain( true );
 
 // Verify the duration of the whole query, and of each clause.
 assert.gt( explain.millis, 1000 - 500 + 2000 - 500 + 3000 - 500 );
-for( j = 0; j < 3; ++j ) {
-    assert.gt( explain.clauses[ j ].millis, ( j + 1 ) * 1000 - 500 );
-}
+
+// QUERY MIGRATION
+// The new system doesnt measure branches of the or
+//for( j = 0; j < 3; ++j ) {
+//    assert.gt( explain.clauses[ j ].millis, ( j + 1 ) * 1000 - 500 );
+//}
