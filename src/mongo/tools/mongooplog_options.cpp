@@ -89,8 +89,8 @@ namespace mongo {
         }
 
         if (!hasParam("from")) {
-            log() << "need to specify --from" << std::endl;
-            ::_exit(-1);
+            std::cerr << "need to specify --from" << std::endl;
+            ::_exit(EXIT_BADOPTIONS);
         }
         else {
             mongoOplogGlobalParams.from = getParam("from");

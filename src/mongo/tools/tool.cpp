@@ -79,22 +79,20 @@ namespace mongo {
                 ConnectionString cs = ConnectionString::parse(toolGlobalParams.connectionString,
                                                               errmsg);
                 if ( ! cs.isValid() ) {
-                    cerr << "invalid hostname [" << toolGlobalParams.connectionString << "] "
-                         << errmsg << endl;
+                    toolError() << "invalid hostname [" << toolGlobalParams.connectionString << "] "
+                              << errmsg << std::endl;
                     ::_exit(-1);
                 }
 
                 _conn = cs.connect( errmsg );
                 if ( ! _conn ) {
-                    std::cerr << "couldn't connect to [" << toolGlobalParams.connectionString
+                    toolError() << "couldn't connect to [" << toolGlobalParams.connectionString
                               << "] " << errmsg << std::endl;
                     ::_exit(-1);
                 }
 
-                if (!toolGlobalParams.quiet) {
-                    toolOutput() << "connected to: " << toolGlobalParams.connectionString
-                                  << std::endl;
-                }
+                toolInfoOutput() << "connected to: " << toolGlobalParams.connectionString
+                                 << std::endl;
             }
 
         }
@@ -108,9 +106,9 @@ namespace mongo {
                 acquirePathLock();
             }
             catch ( DBException& ) {
-                cerr << endl << "If you are running a mongod on the same "
-                     "path you should connect to that instead of direct data "
-                     "file access" << endl << endl;
+                toolError() << std::endl << "If you are running a mongod on the same "
+                             "path you should connect to that instead of direct data "
+                              "file access" << std::endl << std::endl;
                 dbexit( EXIT_FS );
                 ::_exit(EXIT_FAILURE);
             }
@@ -127,7 +125,7 @@ namespace mongo {
             ret = run();
         }
         catch ( DBException& e ) {
-            cerr << "assertion: " << e.toString() << endl;
+            toolError() << "assertion: " << e.toString() << std::endl;
             ret = -1;
         }
         catch(const boost::filesystem::filesystem_error &fse) {
@@ -153,7 +151,7 @@ namespace mongo {
                 printHelp(cerr);
             else
 #endif // _WIN32
-                cerr << "error: " << fse.what() << endl;
+                toolError() << "error: " << fse.what() << std::endl;
 
             ret = -1;
         }
@@ -190,8 +188,9 @@ namespace mongo {
         bool ok = conn().isMaster(isMaster, &info);
 
         if (ok && !isMaster) {
-            cerr << "ERROR: trying to write to non-master " << conn().toString() << endl;
-            cerr << "isMaster info: " << info << endl;
+            toolError() << "ERROR: trying to write to non-master " << conn().toString()
+                        << std::endl;
+            toolError() << "isMaster info: " << info << std::endl;
             return false;
         }
 
@@ -257,16 +256,15 @@ namespace mongo {
         unsigned long long fileLength = file_size( root );
 
         if ( fileLength == 0 ) {
-            if (!toolGlobalParams.quiet) {
-                toolOutput() << "file " << fileName << " empty, skipping" << endl;
-            }
+            toolInfoOutput() << "file " << fileName << " empty, skipping" << std::endl;
             return 0;
         }
 
 
         FILE* file = fopen( fileName.c_str() , "rb" );
         if ( ! file ) {
-            cerr << "error opening file: " << fileName << " " << errnoWithDescription() << endl;
+            toolError() << "error opening file: " << fileName << " " << errnoWithDescription()
+                      << std::endl;
             return 0;
         }
 
@@ -274,9 +272,8 @@ namespace mongo {
         posix_fadvise(fileno(file), 0, fileLength, POSIX_FADV_SEQUENTIAL);
 #endif
 
-        if (!toolGlobalParams.quiet &&
-            logger::globalLogDomain()->shouldLog(logger::LogSeverity::Debug(1))) {
-            toolOutput() << "\t file size: " << fileLength << endl;
+        if (logger::globalLogDomain()->shouldLog(logger::LogSeverity::Debug(1))) {
+            toolInfoOutput() << "\t file size: " << fileLength << std::endl;
         }
 
         unsigned long long read = 0;
@@ -287,8 +284,10 @@ namespace mongo {
         boost::scoped_array<char> buf_holder(new char[BUF_SIZE]);
         char * buf = buf_holder.get();
 
-        ProgressMeter m( fileLength );
-        m.setUnits( "bytes" );
+        ProgressMeter m(fileLength);
+        if (!toolGlobalParams.quiet) {
+            m.setUnits( "bytes" );
+        }
 
         while ( read < fileLength ) {
             size_t amt = fread(buf, 1, 4, file);
@@ -302,8 +301,8 @@ namespace mongo {
 
             BSONObj o( buf );
             if (bsonToolGlobalParams.objcheck && !o.valid()) {
-                cerr << "INVALID OBJECT - going to try and print out " << endl;
-                cerr << "size: " << size << endl;
+                toolError() << "INVALID OBJECT - going to try and print out " << std::endl;
+                toolError() << "size: " << size << std::endl;
                 BSONObjIterator i(o);
                 while ( i.more() ) {
                     BSONElement e = i.next();
@@ -311,10 +310,11 @@ namespace mongo {
                         e.validate();
                     }
                     catch ( ... ) {
-                        cerr << "\t\t NEXT ONE IS INVALID" << endl;
+                        toolError() << "\t\t NEXT ONE IS INVALID" << std::endl;
                     }
-                    cerr << "\t name : " << e.fieldName() << " " << e.type() << endl;
-                    cerr << "\t " << e << endl;
+                    toolError() << "\t name : " << e.fieldName() << " " << typeName(e.type())
+                                << std::endl;
+                    toolError() << "\t " << e << std::endl;
                 }
             }
 
@@ -326,17 +326,17 @@ namespace mongo {
             read += o.objsize();
             num++;
 
-            m.hit( o.objsize() );
+            if (!toolGlobalParams.quiet) {
+                m.hit(o.objsize());
+            }
         }
 
         fclose( file );
 
-        uassert( 10265 ,  "counts don't match" , m.done() == fileLength );
-        if (!toolGlobalParams.quiet) {
-            toolOutput() << m.hits() << " objects found" << std::endl;
-            if (bsonToolGlobalParams.hasFilter)
-                toolOutput() << processed << " objects processed" << std::endl;
-        }
+        uassert(10265, "counts don't match", read == fileLength);
+        toolInfoOutput() << num << " objects found" << std::endl;
+        if (bsonToolGlobalParams.hasFilter)
+            toolInfoOutput() << processed << " objects processed" << std::endl;
         return processed;
     }
 

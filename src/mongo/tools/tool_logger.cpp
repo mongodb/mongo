@@ -54,6 +54,14 @@ namespace {
 
     std::ostream& ErrorConsole::out() { return std::cerr; }
 
+namespace {
+
+    logger::MessageLogDomain* toolErrorOutput = NULL;
+    logger::MessageLogDomain* toolNonErrorOutput = NULL;
+    logger::MessageLogDomain* toolNonErrorDecoratedOutput = NULL;
+
+}  // namespace
+
 MONGO_INITIALIZER_GENERAL(ToolLogRedirection,
                             ("GlobalLogManager", "EndStartupOptionHandling"),
                             ("default"))(InitializerContext*) {
@@ -63,6 +71,17 @@ MONGO_INITIALIZER_GENERAL(ToolLogRedirection,
     using logger::MessageLogDomain;
     using logger::ConsoleAppender;
 
+    toolErrorOutput = logger::globalLogManager()->getNamedDomain("toolErrorOutput");
+    toolNonErrorOutput = logger::globalLogManager()->getNamedDomain("toolNonErrorOutput");
+    toolNonErrorDecoratedOutput =
+        logger::globalLogManager()->getNamedDomain("toolNonErrorDecoratedOutput");
+
+    // Errors in the tools always go to stderr
+    toolErrorOutput->attachAppender(
+            MessageLogDomain::AppenderAutoPtr(
+                new ConsoleAppender<MessageEventEphemeral, ErrorConsole>(
+                    new logger::MessageEventUnadornedEncoder)));
+
     // If we are outputting data to stdout, we may need to redirect all logging to stderr
     if (!toolGlobalParams.canUseStdout) {
         logger::globalLogDomain()->clearAppenders();
@@ -71,11 +90,54 @@ MONGO_INITIALIZER_GENERAL(ToolLogRedirection,
                         new MessageEventDetailsEncoder)));
     }
 
+    // Only put an appender on our informational messages if we did not use --quiet
+    if (!toolGlobalParams.quiet) {
+        if (toolGlobalParams.canUseStdout) {
+            // If we can use stdout, we can use the ConsoleAppender with the default console
+            toolNonErrorOutput->attachAppender(
+                    MessageLogDomain::AppenderAutoPtr(
+                        new ConsoleAppender<MessageEventEphemeral>(
+                            new logger::MessageEventUnadornedEncoder)));
+
+            toolNonErrorDecoratedOutput->attachAppender(
+                    MessageLogDomain::AppenderAutoPtr(
+                        new ConsoleAppender<MessageEventEphemeral>(
+                            new logger::MessageEventDetailsEncoder)));
+        }
+        else {
+            // If we cannot use stdout, we have to use ErrorConsole to redirect informational
+            // messages to stderr
+            toolNonErrorOutput->attachAppender(
+                    MessageLogDomain::AppenderAutoPtr(
+                            new ConsoleAppender<MessageEventEphemeral, ErrorConsole>(
+                                    new logger::MessageEventUnadornedEncoder)));
+
+            toolNonErrorDecoratedOutput->attachAppender(
+                    MessageLogDomain::AppenderAutoPtr(
+                            new ConsoleAppender<MessageEventEphemeral, ErrorConsole>(
+                                    new logger::MessageEventDetailsEncoder)));
+        }
+    }
+
     return Status::OK();
 }
 
-    std::ostream& toolOutput() {
-        return toolGlobalParams.canUseStdout ? std::cout : std::cerr;
+    LogstreamBuilder toolInfoLog() {
+        return LogstreamBuilder(toolNonErrorDecoratedOutput,
+                                "",
+                                logger::LogSeverity::Log());
+    }
+
+    LogstreamBuilder toolInfoOutput() {
+        return LogstreamBuilder(toolNonErrorOutput,
+                                "",
+                                logger::LogSeverity::Log());
+    }
+
+    LogstreamBuilder toolError() {
+        return LogstreamBuilder(toolErrorOutput,
+                                "",
+                                logger::LogSeverity::Log());
     }
 
 }  // namespace mongo

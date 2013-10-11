@@ -39,34 +39,37 @@ public:
 
         Client::initThread( "oplogreplay" );
 
-        log() << "going to connect" << endl;
+        toolInfoLog() << "going to connect" << std::endl;
         
         OplogReader r;
         r.setTailingQueryOptions( QueryOption_SlaveOk | QueryOption_AwaitData );
         r.connect(mongoOplogGlobalParams.from);
 
-        log() << "connected" << endl;
+        toolInfoLog() << "connected" << std::endl;
 
         OpTime start(time(0) - mongoOplogGlobalParams.seconds, 0);
-        log() << "starting from " << start.toStringPretty() << endl;
+        toolInfoLog() << "starting from " << start.toStringPretty() << std::endl;
 
         r.tailingQueryGTE(mongoOplogGlobalParams.ns.c_str(), start);
 
         int num = 0;
         while ( r.more() ) {
             BSONObj o = r.next();
-            LOG(2) << o << endl;
+            if (logger::globalLogDomain()->shouldLog(logger::LogSeverity::Debug(2))) {
+                toolInfoLog() << o << std::endl;
+            }
             
             if ( o["$err"].type() ) {
-                log() << "error getting oplog" << endl;
-                log() << o << endl;
+                toolError() << "error getting oplog" << std::endl;
+                toolError() << o << std::endl;
                 return -1;
             }
                 
 
             bool print = ++num % 100000 == 0;
-            if ( print )
-                cout << num << "\t" << o << endl;
+            if (print) {
+                toolInfoLog() << num << "\t" << o << std::endl;
+            }
             
             if ( o["op"].String() == "n" )
                 continue;
@@ -80,8 +83,11 @@ public:
             
             BSONObj res;
             bool ok = conn().runCommand( "admin" , c , res );
-            if ( print || ! ok )
-                log() << res << endl;
+            if (!ok) {
+                toolError() << res << std::endl;
+            } else if (print) {
+                toolInfoLog() << res << std::endl;
+            }
         }
 
         return 0;

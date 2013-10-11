@@ -48,7 +48,7 @@ namespace mongo {
 
             BSONObj out;
             if (!conn().simpleCommand(toolGlobalParams.db, &out, "serverStatus")) {
-                cout << "error: " << out << endl;
+                toolError() << "error: " << out << std::endl;
                 return NamespaceStats();
             }
 
@@ -60,12 +60,12 @@ namespace mongo {
 
             BSONObj out;
             if (!conn().simpleCommand(toolGlobalParams.db, &out, "top")) {
-                cout << "error: " << out << endl;
+                toolError() << "error: " << out << std::endl;
                 return stats;
             }
 
             if ( ! out["totals"].isABSONObj() ) {
-                cout << "error: invalid top\n" << out << endl;
+                toolError() << "error: invalid top\n" << out << std::endl;
                 return stats;
             }
 
@@ -131,7 +131,7 @@ namespace mongo {
 
         int run() {
             if (isMongos()) {
-                log() << "mongotop only works on instances of mongod." << endl;
+                toolError() << "mongotop only works on instances of mongod." << std::endl;
                 return EXIT_FAILURE;
             }
 
@@ -145,7 +145,7 @@ namespace mongo {
                     now = getData();
                 }
                 catch ( std::exception& e ) {
-                    cout << "can't get data: " << e.what() << endl;
+                    toolError() << "can't get data: " << e.what() << std::endl;
                     continue;
                 }
 
@@ -156,7 +156,7 @@ namespace mongo {
                     printDiff( prev , now );
                 }
                 catch ( AssertionException& e ) {
-                    cout << "\nerror: " << e.what() << endl;
+                    toolError() << "\nerror: " << e.what() << std::endl;
                 }
 
                 prev = now;

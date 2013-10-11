@@ -18,6 +18,8 @@
 #include <boost/thread/mutex.hpp>
 #include <iosfwd>
 
+#include "mongo/logger/logstream_builder.h"
+
 namespace mongo {
 
     /**
@@ -34,6 +36,23 @@ namespace mongo {
         boost::unique_lock<boost::mutex> _consoleLock;
     };
 
-    std::ostream& toolOutput();
+    using logger::LogstreamBuilder;
+
+    /*
+     * Informational messages.  Messages sent here will go to stdout normally, stderr if data is
+     * being sent to stdout, and be silenced if the user specifies --quiet.
+     */
+    LogstreamBuilder toolInfoOutput();
+    /*
+     * Informational messages.  Messages sent here will go to stdout normally, stderr if data is
+     * being sent to stdout, and be silenced if the user specifies --quiet.  Incudes extra log
+     * decoration.
+     */
+    LogstreamBuilder toolInfoLog();
+    /*
+     * Error messages.  Messages sent here should always go to stderr and not be silenced by
+     * --quiet.
+     */
+    LogstreamBuilder toolError();
 
 }  // namespace mongo

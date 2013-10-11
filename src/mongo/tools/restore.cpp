@@ -66,7 +66,7 @@ public:
         }
 
         if (isMongos() && toolGlobalParams.db == "" && exists(root / "config")) {
-            log() << "Cannot do a full restore on a sharded system" << endl;
+            toolError() << "Cannot do a full restore on a sharded system" << std::endl;
             return -1;
         }
 
@@ -74,25 +74,26 @@ public:
             // fail early if errors
 
             if (toolGlobalParams.db != "") {
-                log() << "Can only replay oplog on full restore" << endl;
+                toolError() << "Can only replay oplog on full restore" << std::endl;
                 return -1;
             }
 
             if ( ! exists(root / "oplog.bson") ) {
-                log() << "No oplog file to replay. Make sure you run mongodump with --oplog." << endl;
+                toolError() << "No oplog file to replay. Make sure you run mongodump with --oplog."
+                          << std::endl;
                 return -1;
             }
 
 
             BSONObj out;
             if (! conn().simpleCommand("admin", &out, "buildinfo")) {
-                log() << "buildinfo command failed: " << out["errmsg"].String() << endl;
+                toolError() << "buildinfo command failed: " << out["errmsg"].String() << std::endl;
                 return -1;
             }
 
             StringData version = out["version"].valuestr();
             if (versionCmp(version, "1.7.4-pre-") < 0) {
-                log() << "Can only replay oplog to server version >= 1.7.4" << endl;
+                toolError() << "Can only replay oplog to server version >= 1.7.4" << std::endl;
                 return -1;
             }
 
@@ -115,9 +116,9 @@ public:
                             mongoRestoreGlobalParams.oplogLimit.c_str()),
                         boost::lexical_cast<unsigned long>(oplogInc.c_str())));
                 } catch( const boost::bad_lexical_cast& error) {
-                    log() << "Could not parse oplogLimit into Timestamp from values ( "
-                          << mongoRestoreGlobalParams.oplogLimit << " , " << oplogInc << " )"
-                          << endl;
+                    toolError() << "Could not parse oplogLimit into Timestamp from values ( "
+                              << mongoRestoreGlobalParams.oplogLimit << " , " << oplogInc << " )"
+                              << std::endl;
                     return -1;
                 }
 
@@ -132,9 +133,9 @@ public:
                     if (cursor->more()) {
                         tsOptime = cursor->next().getField("ts")._opTime();
                         if (tsOptime > *_oplogLimitTS.get()) {
-                            log() << "The oplogLimit is not newer than"
-                                  << " the last oplog entry on the server."
-                                  << endl;
+                            toolError() << "The oplogLimit is not newer than"
+                                      << " the last oplog entry on the server."
+                                      << std::endl;
                             return -1;
                         }
                     }
@@ -147,10 +148,10 @@ public:
                     BSONObj query = BSON("ts" << tsRestrictBldr.obj());
 
                     if (!tsOptime.isNull()) {
-                        log() << "Latest oplog entry on the server is " << tsOptime.getSecs()
-                                << ":" << tsOptime.getInc() << endl;
-                        log() << "Only applying oplog entries matching this criteria: "
-                                << query.jsonString() << endl;
+                        toolInfoLog() << "Latest oplog entry on the server is " << tsOptime.getSecs()
+                                      << ":" << tsOptime.getInc() << std::endl;
+                        toolInfoLog() << "Only applying oplog entries matching this criteria: "
+                                      << query.jsonString() << std::endl;
                     }
                     _opmatcher.reset(new Matcher(query));
                 }
@@ -172,16 +173,16 @@ public:
         // should this happen for oplog replay as well?
         string err = conn().getLastError(toolGlobalParams.db == "" ? "admin" : toolGlobalParams.db);
         if (!err.empty()) {
-            error() << err;
+            toolError() << err << std::endl;
         }
 
         if (mongoRestoreGlobalParams.oplogReplay) {
-            log() << "\t Replaying oplog" << endl;
+            toolInfoLog() << "\t Replaying oplog" << std::endl;
             _curns = OPLOG_SENTINEL;
             processFile( root / "oplog.bson" );
-            log() << "Applied " << _oplogEntryApplies << " oplog entries out of "
-                  << _oplogEntryApplies + _oplogEntrySkips << " (" << _oplogEntrySkips
-                  << " skipped)." << endl;
+            toolInfoLog() << "Applied " << _oplogEntryApplies << " oplog entries out of "
+                          << _oplogEntryApplies + _oplogEntrySkips << " (" << _oplogEntrySkips
+                          << " skipped)." << std::endl;
         }
 
         return EXIT_CLEAN;
@@ -193,7 +194,9 @@ public:
                     bool oplogReplayLimit,
                     bool top_level=false) {
         bool json_metadata = false;
-        LOG(2) << "drillDown: " << root.string() << endl;
+        if (logger::globalLogDomain()->shouldLog(logger::LogSeverity::Debug(2))) {
+            toolInfoLog() << "drillDown: " << root.string() << std::endl;
+        }
 
         // skip hidden files and directories
         if (root.leaf().string()[0] == '.' && root.leaf().string() != ".")
@@ -209,18 +212,23 @@ public:
 
                 if (use_db) {
                     if (boost::filesystem::is_directory(p)) {
-                        error() << "ERROR: root directory must be a dump of a single database" << endl;
-                        error() << "       when specifying a db name with --db" << endl;
-                        printHelp(cout);
+                        toolError() << "ERROR: root directory must be a dump of a single database"
+                                  << std::endl;
+                        toolError() << "       when specifying a db name with --db" << std::endl;
+                        toolError() << "       use the --help option for more information"
+                                  << std::endl;
                         return;
                     }
                 }
 
                 if (use_coll) {
                     if (boost::filesystem::is_directory(p) || i != end) {
-                        error() << "ERROR: root directory must be a dump of a single collection" << endl;
-                        error() << "       when specifying a collection name with --collection" << endl;
-                        printHelp(cout);
+                        toolError() << "ERROR: root directory must be a dump of a single collection"
+                                  << std::endl;
+                        toolError() << "       when specifying a collection name with --collection"
+                                  << std::endl;
+                        toolError() << "       use the --help option for more information"
+                                  << std::endl;
                         return;
                     }
                 }
@@ -255,14 +263,14 @@ public:
 
         if ( ! ( endsWith( root.string().c_str() , ".bson" ) ||
                  endsWith( root.string().c_str() , ".bin" ) ) ) {
-            error() << "don't know what to do with file [" << root.string() << "]" << endl;
+            toolError() << "don't know what to do with file [" << root.string() << "]" << std::endl;
             return;
         }
 
-        log() << root.string() << endl;
+        toolInfoLog() << root.string() << std::endl;
 
         if ( root.leaf() == "system.profile.bson" ) {
-            log() << "\t skipping" << endl;
+            toolInfoLog() << "\t skipping system.profile.bson" << std::endl;
             return;
         }
 
@@ -288,17 +296,17 @@ public:
         }
 
         if (oplogReplayLimit) {
-            error() << "The oplogLimit option cannot be used if "
-                    << "normal databases/collections exist in the dump directory."
-                    << endl;
+            toolError() << "The oplogLimit option cannot be used if "
+                      << "normal databases/collections exist in the dump directory."
+                      << std::endl;
             exit(EXIT_FAILURE);
         }
 
-        log() << "\tgoing into namespace [" << ns << "]" << endl;
+        toolInfoLog() << "\tgoing into namespace [" << ns << "]" << std::endl;
 
         if (mongoRestoreGlobalParams.drop) {
             if (root.leaf() != "system.users.bson" ) {
-                log() << "\t dropping" << endl;
+                toolInfoLog() << "\t dropping" << std::endl;
                 conn().dropCollection( ns );
             } else {
                 // Create map of the users currently in the DB
@@ -318,7 +326,7 @@ public:
                 // This is fine because dumps from before 2.1 won't have a metadata file, just print a warning.
                 // System collections shouldn't have metadata so don't warn if that file is missing.
                 if (!startsWith(metadataFile.leaf().string(), "system.")) {
-                    log() << metadataFile.string() << " not found. Skipping." << endl;
+                    toolInfoLog() << metadataFile.string() << " not found. Skipping." << std::endl;
                 }
             } else {
                 metadataObject = parseMetadataFile(metadataFile.string());
@@ -335,9 +343,9 @@ public:
                                                              Query(BSON("name" << ns))));
              if (cursor->more()) {
                  // collection already exists show warning
-                 warning() << "Restoring to " << ns << " without dropping. Restored data "
-                              "will be inserted without raising errors; check your server log"
-                              << endl;
+                 toolError() << "Restoring to " << ns << " without dropping. Restored data "
+                           << "will be inserted without raising errors; check your server log"
+                           << std::endl;
              }
          }
 
@@ -387,7 +395,7 @@ public:
             if (mongoRestoreGlobalParams.w > 0) {
                 string err = conn().getLastError(db, false, false, mongoRestoreGlobalParams.w);
                 if (!err.empty()) {
-                    error() << "Error while replaying oplog: " << err;
+                    toolError() << "Error while replaying oplog: " << err << std::endl;
                 }
             }
         }
@@ -410,7 +418,7 @@ public:
             if (mongoRestoreGlobalParams.w > 0) {
                 string err = conn().getLastError(_curdb, false, false, mongoRestoreGlobalParams.w);
                 if (!err.empty()) {
-                    error() << err;
+                    toolError() << err << std::endl;
                 }
             }
         }
@@ -472,7 +480,8 @@ private:
             }
             else {
                 if (e.type() == Undefined) {
-                    log() << _curns << ": skipping undefined field: " << e.fieldName() << endl;
+                    toolInfoLog() << _curns << ": skipping undefined field: " << e.fieldName()
+                                  << std::endl;
                 }
                 else {
                     bo.append(e);
@@ -489,7 +498,10 @@ private:
             createColl = false;
             BSONObj obj = cursor->next();
             if (!obj.hasField("options") || !optionsSame(cmdObj, obj["options"].Obj())) {
-                    log() << "WARNING: collection " << _curns << " exists with different options than are in the metadata.json file and not using --drop. Options in the metadata file will be ignored." << endl;
+                toolError() << "WARNING: collection " << _curns
+                          << " exists with different options than are in the metadata.json file and"
+                          << " not using --drop. Options in the metadata file will be ignored."
+                          << std::endl;
             }
         }
 
@@ -501,7 +513,8 @@ private:
         if (!conn().runCommand(_curdb, cmdObj, info)) {
             uasserted(15936, "Creating collection " + _curns + " failed. Errmsg: " + info["errmsg"].String());
         } else {
-            log() << "\tCreated collection " << _curns << " with options: " << cmdObj.jsonString() << endl;
+            toolInfoLog() << "\tCreated collection " << _curns << " with options: "
+                          << cmdObj.jsonString() << std::endl;
         }
     }
 
@@ -524,7 +537,9 @@ private:
             }
         }
         BSONObj o = bo.obj();
-        LOG(0) << "\tCreating index: " << o << endl;
+        if (logger::globalLogDomain()->shouldLog(logger::LogSeverity::Debug(0))) {
+            toolInfoLog() << "\tCreating index: " << o << std::endl;
+        }
         conn().insert( _curdb + ".system.indexes" ,  o );
 
         // We're stricter about errors for indexes than for regular data
@@ -532,7 +547,7 @@ private:
 
         if (err.hasField("err") && !err["err"].isNull()) {
             if (err["err"].str() == "norepl" && mongoRestoreGlobalParams.w > 1) {
-                error() << "Cannot specify write concern for non-replicas" << endl;
+                toolError() << "Cannot specify write concern for non-replicas" << std::endl;
             }
             else {
                 string errCode;
@@ -541,8 +556,8 @@ private:
                     errCode = str::stream() << err["code"].numberInt();
                 }
 
-                error() << "Error creating index " << o["ns"].String() << ": "
-                        << errCode << " " << err["err"] << endl;
+                toolError() << "Error creating index " << o["ns"].String() << ": "
+                          << errCode << " " << err["err"] << std::endl;
             }
 
             ::abort();

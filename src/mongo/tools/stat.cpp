@@ -61,21 +61,21 @@ namespace mongo {
                 }
 
                 if ( c.get( url , &r ) != 200 ) {
-                    cout << "error (http): " << r.getEntireResponse() << endl;
+                    toolError() << "error (http): " << r.getEntireResponse() << std::endl;
                     return BSONObj();
                 }
 
                 BSONObj x = fromjson( r.getBody() );
                 BSONElement e = x["serverStatus"];
                 if ( e.type() != Object ) {
-                    cout << "BROKEN: " << x << endl;
+                    toolError() << "BROKEN: " << x << std::endl;
                     return BSONObj();
                 }
                 return e.embeddedObjectUserCheck();
             }
             BSONObj out;
             if (!conn().simpleCommand(toolGlobalParams.db, &out, "serverStatus")) {
-                cout << "error: " << out << endl;
+                toolError() << "error: " << out << std::endl;
                 return BSONObj();
             }
             return out.getOwned();
@@ -147,7 +147,7 @@ namespace mongo {
                     now = stats();
                 }
                 catch ( std::exception& e ) {
-                    cout << "can't get data: " << e.what() << endl;
+                    toolError() << "can't get data: " << e.what() << std::endl;
                     continue;
                 }
 
@@ -168,9 +168,9 @@ namespace mongo {
 
                 }
                 catch ( AssertionException& e ) {
-                    cout << "\nerror: " << e.what() << "\n"
-                         << now
-                         << endl;
+                    toolError() << "\nerror: " << e.what() << "\n"
+                              << now
+                              << std::endl;
                 }
 
                 prev = now;
@@ -273,10 +273,11 @@ namespace mongo {
 
             }
             catch ( std::exception& e ) {
-                cout << "serverThread (" << state->host << ") fatal error : " << e.what() << endl;
+                toolError() << "serverThread (" << state->host << ") fatal error : " << e.what()
+                          << std::endl;
             }
             catch ( ... ) {
-                cout << "serverThread (" << state->host << ") fatal error" << endl;
+                toolError() << "serverThread (" << state->host << ") fatal error" << std::endl;
             }
         }
 
@@ -336,7 +337,7 @@ namespace mongo {
                     string errmsg;
                     ConnectionString cs = ConnectionString::parse( x["host"].String() , errmsg );
                     if ( errmsg.size() ) {
-                        cerr << errmsg << endl;
+                        toolError() << errmsg << std::endl;
                         continue;
                     }
 

@@ -90,7 +90,8 @@ public:
             f.write(mongoFilesGlobalParams.localFile);
 
             if (mongoFilesGlobalParams.localFile != "-") {
-                cout << "done write to: " << mongoFilesGlobalParams.localFile << endl;
+                toolInfoOutput() << "done write to: " << mongoFilesGlobalParams.localFile
+                                 << std::endl;
             }
 
             return 0;
@@ -100,7 +101,7 @@ public:
             BSONObj file = g.storeFile(mongoFilesGlobalParams.localFile,
                                        mongoFilesGlobalParams.gridFSFilename,
                                        mongoFilesGlobalParams.contentType);
-            cout << "added file: " << file << endl;
+            toolInfoOutput() << "added file: " << file << std::endl;
 
             if (mongoFilesGlobalParams.replace) {
                 auto_ptr<DBClientCursor> cursor =
@@ -111,20 +112,20 @@ public:
                     BSONObj o = cursor->nextSafe();
                     conn().remove(toolGlobalParams.db + ".fs.files", BSON("_id" << o["_id"]));
                     conn().remove(toolGlobalParams.db + ".fs.chunks", BSON("_id" << o["_id"]));
-                    cout << "removed file: " << o << endl;
+                    toolInfoOutput() << "removed file: " << o << std::endl;
                 }
 
             }
 
             conn().getLastError();
-            cout << "done!" << endl;
+            toolInfoOutput() << "done!" << std::endl;
             return 0;
         }
 
         if (mongoFilesGlobalParams.command == "delete") {
             g.removeFile(mongoFilesGlobalParams.gridFSFilename);
             conn().getLastError();
-            cout << "done!" << endl;
+            toolInfoOutput() << "done!" << std::endl;
             return 0;
         }
 

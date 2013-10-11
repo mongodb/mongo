@@ -102,21 +102,21 @@ namespace mongo {
         mongoDumpGlobalParams.repair = hasParam("repair");
         if (mongoDumpGlobalParams.repair){
             if (!hasParam("dbpath")) {
-                log() << "repair mode only works with --dbpath" << std::endl;
-                ::_exit(-1);
+                std::cerr << "repair mode only works with --dbpath" << std::endl;
+                ::_exit(EXIT_BADOPTIONS);
             }
 
             if (!hasParam("db")) {
-                log() << "repair mode only works on 1 db at a time right now" << std::endl;
-                ::_exit(-1);
+                std::cerr << "repair mode only works on 1 db at a time right now" << std::endl;
+                ::_exit(EXIT_BADOPTIONS);
             }
         }
         mongoDumpGlobalParams.query = getParam("query");
         mongoDumpGlobalParams.useOplog = hasParam("oplog");
         if (mongoDumpGlobalParams.useOplog) {
             if (hasParam("query") || hasParam("db") || hasParam("collection")) {
-                log() << "oplog mode is only supported on full dumps" << std::endl;
-                ::_exit(-1);
+                std::cerr << "oplog mode is only supported on full dumps" << std::endl;
+                ::_exit(EXIT_BADOPTIONS);
             }
         }
         mongoDumpGlobalParams.outputFile = getParam("out");
