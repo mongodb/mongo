@@ -32,7 +32,9 @@
 #include <vector>
 
 #include "mongo/base/status.h"
+#include "mongo/base/owned_pointer_vector.h"
 #include "mongo/bson/mutable/document.h"
+#include "mongo/db/field_ref_set.h"
 #include "mongo/db/index_set.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/ops/modifier_interface.h"
@@ -97,6 +99,30 @@ namespace mongo {
         bool modsAffectIndices() const;
         void refreshIndexKeys(const IndexPathSet& indexedFields);
 
+        /** Inform the update driver of which fields are shard keys so that attempts to modify
+         *  those fields can be rejected by the driver. Pass an empty object to indicate that
+         *  no shard keys are in play.
+         */
+        void refreshShardKeyPattern(const BSONObj& shardKeyPattern);
+
+        /** After calling 'update' above, this will return true if it appears that the modifier
+         *  updates may have altered any shard keys. If this returns 'true',
+         *  'verifyShardKeysUnaltered' should be called with the original unmutated object so
+         *  field comparisons can be made and illegal mutations detected.
+         */
+        bool modsAffectShardKeys() const;
+
+        /** If the mods were detected to have potentially affected shard keys during a
+         *  non-upsert udpate, call this method, providing the original unaltered document so
+         *  that the apparently altered fields can be verified to have not actually changed. A
+         *  non-OK status indicates that at least one mutation to a shard key was detected, and
+         *  the update should be rejected rather than applied. You may pass an empty original
+         *  object on an upsert, since there is not an original object against which to
+         *  compare. In that case, only the existence of shard keys in 'updated' is verified.
+         */
+        Status checkShardKeysUnaltered(const BSONObj& original,
+                                       const mutablebson::Document& updated) const;
+
         bool multi() const;
         void setMulti(bool multi);
 
@@ -152,6 +178,25 @@ namespace mongo {
         // Are any of the fields mentioned in the mods participating in any index? Is set anew
         // at each call to update.
         bool _affectIndices;
+
+        // Holds the fields relevant to any optional shard key state.
+        struct ShardKeyState {
+            // The current shard key pattern
+            BSONObj pattern;
+
+            // A vector owning the FieldRefs parsed from the pattern field names.
+            OwnedPointerVector<FieldRef> keys;
+
+            // A FieldRefSet containing pointers to the FieldRefs in 'keys'.
+            FieldRefSet keySet;
+
+            // The current set of keys known to be affected by the current update. This is
+            // reset on each call to 'update'.
+            FieldRefSet affectedKeySet;
+        };
+
+        // If shard keys have been set, holds the relevant state.
+        boost::scoped_ptr<ShardKeyState> _shardKeyState;
 
         // Is this update going to be an upsert?
         ModifierInterface::ExecInfo::UpdateContext _context;

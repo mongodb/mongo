@@ -56,6 +56,28 @@ namespace mongo {
     FieldRefSet::FieldRefSet() {
     }
 
+    void FieldRefSet::getConflicts(const FieldRef* toCheck, FieldRefSet* conflicts) const {
+
+        // If the set is empty, there is no work to do.
+        if (_fieldSet.empty())
+            return;
+
+        StringData prefixStr = safeFirstPart(toCheck);
+        FieldRef prefixField;
+        prefixField.parse(prefixStr);
+
+        FieldSet::iterator it = _fieldSet.lower_bound(&prefixField);
+        // Now, iterate over all the present fields in the set that have the same prefix.
+
+        while (it != _fieldSet.end() && safeFirstPart(*it) == prefixStr) {
+            size_t common = (*it)->commonPrefixSize(*toCheck);
+            if ((*it)->numParts() == common || toCheck->numParts() == common) {
+                conflicts->_fieldSet.insert(*it);
+            }
+            ++it;
+        }
+    }
+
     bool FieldRefSet::insert(const FieldRef* toInsert, const FieldRef** conflict) {
 
         // We can determine if two fields conflict by checking their common prefix.

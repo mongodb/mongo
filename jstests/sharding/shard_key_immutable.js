@@ -38,7 +38,6 @@ delete doc._id;
 assert(friendlyEqual(doc, { a: 100, b: 100 }), 'doc changed: ' + tojson(doc));
 doc = compoundColl.findOne();
 
-/*
 compoundColl.remove({}, false);
 compoundColl.insert({ a: 100, b: 100 });
 compoundColl.update({}, { a: 1, b: 1 }, false);
@@ -47,7 +46,6 @@ assert(gle.err != null, 'gleObj: ' + tojson(gle));
 doc = compoundColl.findOne();
 delete doc._id;
 assert(friendlyEqual(doc, { a: 100, b: 100 }), 'doc changed: ' + tojson(doc));
-*/
 
 compoundColl.remove({}, false);
 compoundColl.insert({ a: 100, b: 100 });
@@ -118,22 +116,22 @@ assert(gle.err != null, 'gleObj: ' + tojson(gle));
 doc = compoundColl.findOne();
 assert(doc == null, 'doc upserted: ' + tojson(doc));
 
-/*
 compoundColl.remove({}, false);
 compoundColl.update({}, { a: 1, b: 1 }, true);
 gle = db.runCommand({ getLastError: 1 });
-assert(gle.err != null, 'gleObj: ' + tojson(gle));
+assert(gle.err == null, 'gleObj: ' + tojson(gle));
 doc = compoundColl.findOne();
-assert(doc == null, 'doc upserted: ' + tojson(doc));
+delete doc._id;
+assert(friendlyEqual(doc, { a: 1, b: 1 }), 'doc not upserted properly: ' + tojson(doc));
 
 // Cannot modify _id!
 compoundColl.remove({}, false);
 compoundColl.update({}, { a: 1, b: 1, _id: 1 }, true);
 gle = db.runCommand({ getLastError: 1 });
-assert(gle.err != null, 'gleObj: ' + tojson(gle));
+assert(gle.err == null, 'gleObj: ' + tojson(gle));
 doc = compoundColl.findOne();
-assert(doc == null, 'doc upserted: ' + tojson(doc));
-*/
+delete doc._id;
+assert(friendlyEqual(doc, { a: 1, b: 1 }), 'doc not upserted properly: ' + tojson(doc));
 
 compoundColl.remove({}, false);
 compoundColl.update({}, { $set: { a: 1 }}, true, true);
@@ -186,7 +184,6 @@ doc = compoundColl.findOne();
 delete doc._id;
 assert(friendlyEqual(doc, { a: 100, b: 100 }), 'doc changed: ' + tojson(doc));
 
-/*
 compoundColl.remove({}, false);
 compoundColl.insert({ a: 100, b: 100 });
 compoundColl.update({ a: 100 }, { a: 100, b: 1 }, false);
@@ -195,7 +192,6 @@ assert(gle.err != null, 'gleObj: ' + tojson(gle));
 doc = compoundColl.findOne();
 delete doc._id;
 assert(friendlyEqual(doc, { a: 100, b: 100 }), 'doc changed: ' + tojson(doc));
-*/
 
 // Inspecting query and update alone is not enough to tell whether a shard key will change.
 compoundColl.remove({}, false);
@@ -289,16 +285,14 @@ doc = compoundColl.findOne();
 delete doc._id;
 assert(friendlyEqual(doc, { a: 100, b: 100, c: 1 }), 'doc did not change: ' + tojson(doc));
 
-/*
 compoundColl.remove({}, false);
 compoundColl.insert({ a: 100, b: 100 });
 compoundColl.update({ a: 100 }, { $rename: { c: 'a' }}, false, true);
 gle = db.runCommand({ getLastError: 1 });
-assert(gle.err != null, 'gleObj: ' + tojson(gle));
+assert(gle.err == null, 'gleObj: ' + tojson(gle));
 doc = compoundColl.findOne();
 delete doc._id;
 assert(friendlyEqual(doc, { a: 100, b: 100 }), 'doc changed: ' + tojson(doc));
-*/
 
 //
 // Partial skey query upsert
@@ -419,7 +413,6 @@ delete doc._id;
 assert(friendlyEqual(doc, { a: 100, b: 100 }), 'doc changed: ' + tojson(doc));
 */
 
-/*
 compoundColl.remove({}, false);
 compoundColl.insert({ a: 100, b: 100 });
 compoundColl.update({ b: 100 }, { a: 1, b: 100 }, false);
@@ -428,7 +421,6 @@ assert(gle.err != null, 'gleObj: ' + tojson(gle));
 doc = compoundColl.findOne();
 delete doc._id;
 assert(friendlyEqual(doc, { a: 100, b: 100 }), 'doc changed: ' + tojson(doc));
-*/
 
 // Inspecting query and update alone is not enough to tell whether a shard key will change.
 compoundColl.remove({}, false);
@@ -776,7 +768,6 @@ doc = compoundColl.findOne();
 delete doc._id;
 assert(friendlyEqual(doc, { a: 100, b: 100 }), 'doc changed: ' + tojson(doc));
 
-/*
 compoundColl.remove({}, false);
 compoundColl.insert({ _id: 1, a: 100, b: 100 });
 compoundColl.update({ _id: 1 }, { a: 1, b: 1 });
@@ -785,7 +776,6 @@ assert(gle.err != null, 'gleObj: ' + tojson(gle));
 doc = compoundColl.findOne();
 delete doc._id;
 assert(friendlyEqual(doc, { a: 100, b: 100 }), 'doc changed: ' + tojson(doc));
-*/
 
 compoundColl.remove({}, false);
 compoundColl.insert({ _id: 1, a: 100, b: 100 });
@@ -1001,16 +991,14 @@ doc = dotColl.findOne();
 delete doc._id;
 assert(friendlyEqual(doc, { x: { a: 100 }}), 'doc changed: ' + tojson(doc));
 
-/*
 dotColl.remove({}, false);
 dotColl.insert({ x: { a: 100 }});
 dotColl.update({ 'x.a': 100 }, { $set: { 'x.b': 200 }}, false, true);
-assert(gle.err == null, 'gleObj: ' + tojson(gle));
 gle = db.runCommand({ getLastError: 1 });
+assert(gle.err == null, 'gleObj: ' + tojson(gle));
 doc = dotColl.findOne();
 delete doc._id;
 assert(friendlyEqual(doc, { x: { a: 100, b: 200 }}), 'doc did not change: ' + tojson(doc));
-*/
 
 //
 // Dotted query upsert
@@ -1064,6 +1052,7 @@ dotColl.update({ 'x.a': 100 }, { $set: { x: { a: 100, b: 2 }}}, true);
 gle = db.runCommand({ getLastError: 1 });
 assert(gle.err == null, 'gleObj: ' + tojson(gle));
 doc = dotColl.findOne();
+delete doc._id;
 assert(friendlyEqual(doc, { x: { a: 100, 2: 3 }}), 'bad doc: ' + tojson(doc));
 */
 
@@ -1087,6 +1076,7 @@ dotColl.update({ 'x.a': 100 }, { $set: { 'x.a': 100, b: 3 }}, true);
 gle = db.runCommand({ getLastError: 1 });
 assert(gle.err == null, 'gleObj: ' + tojson(gle));
 doc = dotColl.findOne();
+delete doc._id;
 assert(friendlyEqual(doc, { x: { a: 100 }, b: 3 }), 'bad doc: ' + tojson(doc));
 */
 
@@ -1118,14 +1108,13 @@ assert(gle.err != null, 'gleObj: ' + tojson(gle));
 doc = dotColl.findOne();
 assert(doc == null, 'doc was upserted: ' + tojson(doc));
 
-/*
 dotColl.remove({}, false);
 dotColl.update({ 'x.a': 100 }, { $set: { 'x.b': 2 }}, true);
 gle = db.runCommand({ getLastError: 1 });
-assert(gle.err != null, 'gleObj: ' + tojson(gle));
+assert(gle.err == null, 'gleObj: ' + tojson(gle));
 doc = dotColl.findOne();
+delete doc._id;
 assert(friendlyEqual(doc, { x: { a: 100, b: 2 }}), 'bad doc: ' + tojson(doc));
-*/
 
 st.stop();
 

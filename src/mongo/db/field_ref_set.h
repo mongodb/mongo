@@ -42,8 +42,31 @@ namespace mongo {
      */
     class FieldRefSet {
         MONGO_DISALLOW_COPYING(FieldRefSet);
+
+        struct FieldRefPtrLessThan {
+            bool operator()(const FieldRef* lhs, const FieldRef* rhs) const;
+        };
+
+        typedef std::set<const FieldRef*, FieldRefPtrLessThan> FieldSet;
+
     public:
+        typedef FieldSet::iterator iterator;
+        typedef FieldSet::const_iterator const_iterator;
+
         FieldRefSet();
+
+        /** Returns 'true' if the set is empty */
+        bool empty() const {
+            return _fieldSet.empty();
+        }
+
+        inline const_iterator begin() const {
+            return _fieldSet.begin();
+        }
+
+        inline const_iterator end() const {
+            return _fieldSet.end();
+        }
 
         /**
          * Returns true if the field 'toInsert' can be added in the set without
@@ -56,17 +79,17 @@ namespace mongo {
          */
         bool insert(const FieldRef* toInsert, const FieldRef** conflict);
 
-        /** Returns 'true' if the set is empty */
-        bool empty() const {
-            return _fieldSet.empty();
+        /**
+         * Find all inserted fields which conflict with the FieldRef 'toCheck' by the semantics
+         * of 'insert', and add those fields to the 'conflicts' set.
+         */
+        void getConflicts(const FieldRef* toCheck, FieldRefSet* conflicts) const;
+
+        void clear() {
+            _fieldSet.clear();
         }
 
     private:
-        struct FieldRefPtrLessThan {
-            bool operator()(const FieldRef* lhs, const FieldRef* rhs) const;
-        };
-        typedef std::set<const FieldRef*, FieldRefPtrLessThan> FieldSet;
-
         // A set of field_ref pointers, none of which is owned here.
         FieldSet _fieldSet;
     };

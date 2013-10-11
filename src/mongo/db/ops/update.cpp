@@ -346,6 +346,11 @@ namespace mongo {
             BSONObj newObj;
             const char* source = NULL;
             bool inPlace = doc.getInPlaceUpdates(&damages, &source);
+
+            // If something changed in the document, verify that no shard keys were altered.
+            if ((!inPlace || !damages.empty()) && driver->modsAffectShardKeys())
+                uassertStatusOK( driver->checkShardKeysUnaltered (oldObj, doc ) );
+
             if ( inPlace && !driver->modsAffectIndices() ) {
                 // If a set of modifiers were all no-ops, we are still 'in place', but there is
                 // no work to do, in which case we want to consider the object unchanged.
@@ -441,10 +446,8 @@ namespace mongo {
         driver->setLogOp( false );
         driver->setContext( ModifierInterface::ExecInfo::INSERT_CONTEXT );
 
-        BSONObj baseObj;
-
         // Reset the document we will be writing to
-        doc.reset( baseObj, mutablebson::Document::kInPlaceDisabled );
+        doc.reset();
         if ( request.getQuery().hasElement("_id") ) {
             uassertStatusOK(doc.root().appendElement(request.getQuery().getField("_id")));
         }
@@ -465,7 +468,12 @@ namespace mongo {
             uasserted( 16836, status.reason() );
         }
 
+        // Validate that the object replacement or modifiers resulted in a document
+        // that contains all the shard keys.
+        uassertStatusOK( driver->checkShardKeysUnaltered(BSONObj(), doc) );
+
         BSONObj newObj = doc.getObject();
+
         theDataFileMgr.insertWithObjMod( nsString.ns().c_str(), newObj, false, request.isGod() );
         if ( request.shouldUpdateOpLog() ) {
             logOp( "i", nsString.ns().c_str(), newObj,

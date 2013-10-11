@@ -32,7 +32,6 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/mutable/document.h"
 #include "mongo/db/field_ref.h"
-#include "mongo/db/field_ref_set.h"
 #include "mongo/db/ops/log_builder.h"
 #include "mongo/db/ops/modifier_object_replace.h"
 #include "mongo/db/ops/modifier_table.h"
@@ -205,7 +204,11 @@ namespace mongo {
         // TODO: assert that update() is called at most once in a !_multi case.
 
         FieldRefSet targetFields;
+
         _affectIndices = false;
+
+        if (_shardKeyState)
+            _shardKeyState->affectedKeySet.clear();
 
         _logDoc.reset();
         LogBuilder logBuilder(_logDoc.root());
@@ -223,7 +226,7 @@ namespace mongo {
             // strict update), we should respect that. If a mod doesn't care, it would state
             // it is fine with ANY update context.
             const bool validContext = (execInfo.context == ModifierInterface::ExecInfo::ANY_CONTEXT ||
-                                 execInfo.context == _context);
+                                       execInfo.context == _context);
 
             // Nothing to do if not in a valid context.
             if (!validContext) {
@@ -238,6 +241,11 @@ namespace mongo {
                 if (execInfo.fieldRef[i] == 0) {
                     break;
                 }
+
+                if (!execInfo.noOp && _shardKeyState)
+                    _shardKeyState->keySet.getConflicts(
+                        execInfo.fieldRef[i],
+                        &_shardKeyState->affectedKeySet);
 
                 if (!targetFields.empty() || _mods.size() > 1) {
                     const FieldRef* other;
@@ -302,6 +310,152 @@ namespace mongo {
 
     void UpdateDriver::refreshIndexKeys(const IndexPathSet& indexedFields) {
         _indexedFields = indexedFields;
+    }
+
+    void UpdateDriver::refreshShardKeyPattern(const BSONObj& shardKeyPattern) {
+
+        // An empty pattern object means no shard keys.
+        if (shardKeyPattern.isEmpty()) {
+            _shardKeyState.reset();
+            return;
+        }
+
+        // If we have already parsed an identical shard key pattern, don't do it again.
+        if (_shardKeyState && (_shardKeyState->pattern.woCompare(shardKeyPattern) == 0))
+            return;
+
+        // Reset the shard key state and capture the new pattern.
+        _shardKeyState.reset(new ShardKeyState);
+        _shardKeyState->pattern = shardKeyPattern;
+
+        // Parse the shard keys into the states 'keys' and 'keySet' members.
+        BSONObjIterator patternIter = _shardKeyState->pattern.begin();
+        while (patternIter.more())  {
+            BSONElement current = patternIter.next();
+
+            _shardKeyState->keys.mutableVector().push_back(new FieldRef);
+            FieldRef* const newFieldRef = _shardKeyState->keys.mutableVector().back();
+            newFieldRef->parse(current.fieldNameStringData());
+
+            // TODO: what about bad parse?
+
+            const FieldRef* conflict;
+            if ( !_shardKeyState->keySet.insert( newFieldRef, &conflict ) ) {
+                // This seems pretty unlikely in practice.
+                uasserted(
+                    17152, str::stream()
+                    << "Shard key '"
+                    << newFieldRef->dottedField()
+                    << "' conflicts with shard key '"
+                    << conflict->dottedField()
+                    << "'" );
+            }
+        }
+    }
+
+    bool UpdateDriver::modsAffectShardKeys() const {
+        // If we have no shard key state, the mods could not have affected them.
+        if (!_shardKeyState)
+            return false;
+
+        // In replacement mode, we always assume that all shard keys need to be checked. For
+        // upsert, we are inserting a new object, so it must have all shard keys. Otherwise, it
+        // depends on whether any shard keys were added to the affectedKeySet state.
+        return (_replacementMode || !_shardKeyState->affectedKeySet.empty());
+    }
+
+    Status UpdateDriver::checkShardKeysUnaltered(const BSONObj& original,
+                                                 const mutablebson::Document& updated) const {
+
+        if (!_shardKeyState)
+            return Status::OK();
+
+        // In replacement mode, we validate the values for all shard keys. Otherwise, only the
+        // ones tagged as being potentially invalidated. For an upsert, we check all keys.
+        const FieldRefSet& affected = (_replacementMode || original.isEmpty()) ?
+            _shardKeyState->keySet :
+            _shardKeyState->affectedKeySet;
+
+        const mutablebson::ConstElement id = updated.root()["_id"];
+
+        FieldRefSet::const_iterator where = affected.begin();
+        const FieldRefSet::const_iterator end = affected.end();
+        for( ; where != end; ++where ) {
+            const FieldRef& current = **where;
+
+            // Find the affected field in the updated document.
+            mutablebson::ConstElement elt = updated.root();
+            size_t currentPart = 0;
+            while (elt.ok() && currentPart < current.numParts())
+                elt = elt[current.getPart(currentPart++)];
+
+            if (!elt.ok()) {
+                if (original.isEmpty()) {
+                    return Status(ErrorCodes::NoSuchKey,
+                                  mongoutils::str::stream()
+                                  << "After applying modifiers of replacement in an upsert"
+                                  << "', the shard key field '" << current.dottedField() <<
+                                  "' was not found in the resulting document.");
+
+                }
+                else {
+                    return Status(ErrorCodes::ImmutableShardKeyField,
+                                  mongoutils::str::stream()
+                                  << "After applying updates to the object with _id '"
+                                  << id.toString()
+                                  << "', the shard key field '" << current.dottedField() <<
+                                  "' was found to have been removed from the document");
+                }
+            }
+
+            // For upserts, we don't have an original object to compare against. The existence
+            // check above must be sufficient for now. Potentially, we could do keyBelongsTo me
+            // here.
+            //
+            // TODO: Investigate calling keyBelongsToMe here. We'd need to do this if we want
+            // mongod to be a full backstop for incorrect updates in a forward compatible way,
+            // looking at the day where we open up the floodgates for updates through mongod.
+            if (!original.isEmpty()) {
+
+                // Find the potentially affected field in the original document.
+                const BSONElement foundInOld = original.getFieldDotted(current.dottedField());
+                if (foundInOld.eoo()) {
+
+                    // NOTE: These errors should really never occur. It would mean that the base
+                    // document on disk was missing the shard key, so we have no way to validate
+                    // that it wasn't changed.
+
+                    BSONElement id;
+                    if (original.getObjectID(id)) {
+                        return Status(ErrorCodes::NoSuchKey,
+                                      mongoutils::str::stream()
+                                      << "While updating object with _id '" << id << "', the field"
+                                      << " for shard key '"
+                                      << current.dottedField() << "' was not found "
+                                      << "in the original document");
+                    }
+                    else {
+                        return Status(ErrorCodes::NoSuchKey,
+                                      mongoutils::str::stream()
+                                      << "While updating an object with no '_id' field, the field"
+                                      << " for shard key '"
+                                      << current.dottedField() << "' was not found "
+                                      << "in the original document");
+                    }
+                }
+
+                if (elt.compareWithBSONElement(foundInOld, false) != 0) {
+                    return Status(ErrorCodes::ImmutableShardKeyField,
+                                  mongoutils::str::stream()
+                                  << "After applying updates to the object with _id '" <<
+                                  id.toString()
+                                  << "', the shard key field '" << current.dottedField() <<
+                                  "' was found to have been altered");
+                }
+            }
+        }
+
+        return Status::OK();
     }
 
     bool UpdateDriver::multi() const {
@@ -369,6 +523,7 @@ namespace mongo {
         }
         _indexedFields.clear();
         _replacementMode = false;
+        _shardKeyState.reset();
     }
 
 } // namespace mongo

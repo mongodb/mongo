@@ -117,6 +117,8 @@ namespace mongo {
          */
         size_t numParts() const { return _size; }
 
+        bool empty() const { return numParts() == 0; }
+
     private:
         // Dotted fields are most often not longer than four parts. We use a mixed structure
         // here that will not require any extra memory allocation when that is the case. And
