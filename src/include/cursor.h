@@ -205,7 +205,7 @@ struct __wt_cursor_data_source {
 
 	WT_COLLATOR *collator;			/* Configured collator */
 
-	WT_CURSOR *source;			/* Application-owned cursor. */
+	WT_CURSOR *source;			/* Application-owned cursor */
 };
 
 struct __wt_cursor_dump {
@@ -238,8 +238,8 @@ struct __wt_cursor_stat {
 	uint64_t v;			/* Current stats value */
 	WT_ITEM   pv;			/* Current stats value (string) */
 
-	void (*clear_func)(void *);	/* Function to clear stats. */
-	WT_BTREE *btree;		/* Pinned btree handle. */
+	void (*refresh_func)(void *);	/* Function to clear selected values */
+	WT_BTREE *btree;		/* Pinned btree handle */
 };
 
 /*

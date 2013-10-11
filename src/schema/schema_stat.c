@@ -78,15 +78,13 @@ __curstat_table_init(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_schema_get_table(session, name, strlen(name), 0, &table));
 
 	/* Clear the statistics we are about to recalculate. */
-	if (cst->stats != NULL) {
-		__wt_stat_clear_dsrc_stats(cst->stats);
-		stats = (WT_DSRC_STATS *)cst->stats;
-	} else {
+	if (cst->stats == NULL) {
 		WT_ERR(__wt_calloc_def(session, 1, &stats));
-		__wt_stat_init_dsrc_stats(stats);
 		cst->stats_first = cst->stats = (WT_STATS *)stats;
 		cst->stats_count = sizeof(*stats) / sizeof(WT_STATS);
-	}
+	} else
+		stats = (WT_DSRC_STATS *)cst->stats;
+	__wt_stat_init_dsrc_stats(stats);
 
 	/* Process the column groups. */
 	for (i = 0; i < WT_COLGROUPS(table); i++) {

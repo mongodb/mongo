@@ -48,17 +48,13 @@ __wt_lsm_stat_init(WT_SESSION_IMPL *session,
 	if (LF_ISSET(WT_STATISTICS_FAST))
 		*p++ = "statistics_fast=true";
 
-	/*
-	 * Allocate an aggregated statistics structure, or clear any already
-	 * allocated one.
-	 */
+	/* Allocate an aggregated statistics structure as necessary. */
 	if ((stats = (WT_DSRC_STATS *)cst->stats) == NULL) {
 		WT_ERR(__wt_calloc_def(session, 1, &stats));
-		__wt_stat_init_dsrc_stats(stats);
 		cst->stats_first = cst->stats = (WT_STATS *)stats;
 		cst->stats_count = sizeof(*stats) / sizeof(WT_STATS);
-	} else
-		__wt_stat_clear_dsrc_stats(stats);
+	}
+	__wt_stat_init_dsrc_stats(stats);
 
 	/* Hold the LSM lock so that we can safely walk through the chunks. */
 	WT_ERR(__wt_readlock(session, lsm_tree->rwlock));
@@ -136,7 +132,7 @@ __wt_lsm_stat_init(WT_SESSION_IMPL *session,
 	/* Aggregate, and optionally clear, LSM-level specific information. */
 	__wt_stat_aggregate_dsrc_stats(&lsm_tree->stats, stats);
 	if (LF_ISSET(WT_STATISTICS_CLEAR))
-		__wt_stat_clear_dsrc_stats(&lsm_tree->stats);
+		__wt_stat_refresh_dsrc_stats(&lsm_tree->stats);
 
 err:	if (locked)
 		WT_TRET(__wt_rwunlock(session, lsm_tree->rwlock));

@@ -289,8 +289,8 @@ __curstat_close(WT_CURSOR *cursor)
 	cst = (WT_CURSOR_STAT *)cursor;
 	CURSOR_API_CALL(cursor, session, close, cst->btree);
 
-	if (cst->clear_func)
-		cst->clear_func(cst->stats_first);
+	if (cst->refresh_func)
+		cst->refresh_func(cst->stats_first);
 
 	__wt_buf_free(session, &cst->pv);
 
@@ -318,8 +318,8 @@ __curstat_conn_init(
 	cst->notpositioned = 1;
 	cst->stats_first = (WT_STATS *)&S2C(session)->stats;
 	cst->stats_count = sizeof(S2C(session)->stats) / sizeof(WT_STATS);
-	cst->clear_func = LF_ISSET(WT_STATISTICS_CLEAR) ?
-	    __wt_stat_clear_connection_stats : NULL;
+	cst->refresh_func = LF_ISSET(WT_STATISTICS_CLEAR) ?
+	    __wt_stat_refresh_connection_stats : NULL;
 }
 
 /*
@@ -340,8 +340,8 @@ __curstat_file_init(WT_SESSION_IMPL *session,
 	cst->notpositioned = 1;
 	cst->stats_first = (WT_STATS *)&btree->dhandle->stats;
 	cst->stats_count = sizeof(WT_DSRC_STATS) / sizeof(WT_STATS);
-	cst->clear_func = LF_ISSET(WT_STATISTICS_CLEAR) ?
-	    __wt_stat_clear_dsrc_stats : NULL;
+	cst->refresh_func = LF_ISSET(WT_STATISTICS_CLEAR) ?
+	    __wt_stat_refresh_dsrc_stats : NULL;
 	return (0);
 }
 
@@ -366,8 +366,8 @@ __curstat_lsm_init(WT_SESSION_IMPL *session,
 
 	cst->btree = NULL;
 	cst->notpositioned = 1;
-	cst->clear_func = LF_ISSET(WT_STATISTICS_CLEAR) ?
-	    __wt_stat_clear_dsrc_stats : NULL;
+	cst->refresh_func = LF_ISSET(WT_STATISTICS_CLEAR) ?
+	    __wt_stat_refresh_dsrc_stats : NULL;
 	return (0);
 }
 
