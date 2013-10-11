@@ -226,12 +226,10 @@ namespace mongo {
         virtual Value serialize(bool explain = false) const = 0;
     };
 
-    /** This class marks DocumentSources that should be split between the router and the shards
-     *  See Pipeline::splitForSharded() for details
-     *
-     *  TODO inheriting from DocumentSource here was a mistake. It should be separate.
+    /** This class marks DocumentSources that should be split between the merger and the shards.
+     *  See Pipeline::splitForSharded() for details.
      */
-    class SplittableDocumentSource : public DocumentSource {
+    class SplittableDocumentSource {
     public:
         /** returns a source to be run on the shards.
          *  if NULL, don't run on shards
@@ -243,7 +241,8 @@ namespace mongo {
          */
         virtual intrusive_ptr<DocumentSource> getRouterSource() = 0;
     protected:
-        SplittableDocumentSource(intrusive_ptr<ExpressionContext> ctx) :DocumentSource(ctx) {}
+        // It is invalid to delete through a SplittableDocumentSource-typed pointer.
+        virtual ~SplittableDocumentSource() {}
     };
 
 
@@ -524,8 +523,8 @@ namespace mongo {
     };
 
 
-    class DocumentSourceGroup :
-        public SplittableDocumentSource {
+    class DocumentSourceGroup : public DocumentSource
+                              , public SplittableDocumentSource {
     public:
         // virtuals from DocumentSource
         virtual boost::optional<Document> getNext();
@@ -755,7 +754,8 @@ namespace mongo {
         bool _unstarted;
     };
 
-    class DocumentSourceOut : public SplittableDocumentSource
+    class DocumentSourceOut : public DocumentSource
+                            , public SplittableDocumentSource
                             , public DocumentSourceNeedsMongod {
     public:
         // virtuals from DocumentSource
@@ -870,8 +870,8 @@ namespace mongo {
         intrusive_ptr<Expression> _expression;
     };
 
-    class DocumentSourceSort :
-        public SplittableDocumentSource {
+    class DocumentSourceSort : public DocumentSource
+                             , public SplittableDocumentSource {
     public:
         // virtuals from DocumentSource
         virtual boost::optional<Document> getNext();
@@ -978,8 +978,8 @@ namespace mongo {
         scoped_ptr<MySorter::Iterator> _output;
     };
 
-    class DocumentSourceLimit :
-        public SplittableDocumentSource {
+    class DocumentSourceLimit : public DocumentSource
+                              , public SplittableDocumentSource {
     public:
         // virtuals from DocumentSource
         virtual boost::optional<Document> getNext();
@@ -1034,8 +1034,8 @@ namespace mongo {
         long long count;
     };
 
-    class DocumentSourceSkip :
-        public SplittableDocumentSource {
+    class DocumentSourceSkip : public DocumentSource
+                             , public SplittableDocumentSource {
     public:
         // virtuals from DocumentSource
         virtual boost::optional<Document> getNext();
@@ -1129,7 +1129,8 @@ namespace mongo {
         scoped_ptr<Unwinder> _unwinder;
     };
 
-    class DocumentSourceGeoNear : public SplittableDocumentSource
+    class DocumentSourceGeoNear : public DocumentSource
+                                , public SplittableDocumentSource
                                 , public DocumentSourceNeedsMongod {
     public:
         // virtuals from DocumentSource

@@ -157,7 +157,7 @@ namespace mongo {
 
     DocumentSourceOut::DocumentSourceOut(const NamespaceString& outputNs,
                                          const intrusive_ptr<ExpressionContext>& pExpCtx)
-        : SplittableDocumentSource(pExpCtx)
+        : DocumentSource(pExpCtx)
         , _done(false)
         , _tempNs("") // filled in by prepTempCollection
         , _outputNs(outputNs)

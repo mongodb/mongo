@@ -40,7 +40,7 @@ namespace mongo {
     const char DocumentSourceSkip::skipName[] = "$skip";
 
     DocumentSourceSkip::DocumentSourceSkip(const intrusive_ptr<ExpressionContext> &pExpCtx):
-        SplittableDocumentSource(pExpCtx),
+        DocumentSource(pExpCtx),
         _skip(0),
         _needToSkip(true) {
     }

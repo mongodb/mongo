@@ -76,7 +76,7 @@ namespace mongo {
     }
 
     DocumentSourceSort::DocumentSourceSort(const intrusive_ptr<ExpressionContext> &pExpCtx)
-        : SplittableDocumentSource(pExpCtx)
+        : DocumentSource(pExpCtx)
         , populated(false)
     {}
 

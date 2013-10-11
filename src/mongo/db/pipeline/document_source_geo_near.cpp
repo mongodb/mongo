@@ -208,7 +208,7 @@ namespace mongo {
     }
 
     DocumentSourceGeoNear::DocumentSourceGeoNear(const intrusive_ptr<ExpressionContext> &pExpCtx)
-        : SplittableDocumentSource(pExpCtx)
+        : DocumentSource(pExpCtx)
         , coordsIsArray(false)
         , limit(100)
         , maxDistance(-1.0)

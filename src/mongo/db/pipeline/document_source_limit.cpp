@@ -40,7 +40,7 @@ namespace mongo {
 
     DocumentSourceLimit::DocumentSourceLimit(const intrusive_ptr<ExpressionContext> &pExpCtx,
                                              long long limit)
-        : SplittableDocumentSource(pExpCtx)
+        : DocumentSource(pExpCtx)
         , limit(limit)
         , count(0)
     {}
