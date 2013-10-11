@@ -1,5 +1,5 @@
-// If we are running in use-x509 passthrough mode, turn it off or else the auth tests 
-// will not work correctly
+// If we are running in use-x509 passthrough mode, turn it off or else the auth 
+// part of this test will not work correctly
 TestData.useX509 = false
 
 var SERVER_CERT = "jstests/libs/server.pem"
