@@ -61,10 +61,8 @@ namespace mongo {
 
         /**
          * Returns Status::OK() iff the given BSONObj describes a valid element from a roles array.
-         * If hasPossessionBools is true then the role object must have "hasRole" and
-         * "canDelegate" booleans, if false then they must be missing.
          */
-        static Status checkValidRoleObject(const BSONObj& roleObject, bool hasPossessionBools);
+        static Status checkValidRoleObject(const BSONObj& roleObject);
 
         static Status parseRoleData(const BSONObj& roleObject, User::RoleData* result);
 

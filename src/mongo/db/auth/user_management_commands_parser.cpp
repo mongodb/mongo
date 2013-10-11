@@ -169,7 +169,7 @@ namespace auth {
                // Check that the role object is valid
                V2UserDocumentParser parser;
                BSONObj roleObj = element.Obj();
-               Status status = parser.checkValidRoleObject(roleObj, true);
+               Status status = parser.checkValidRoleObject(roleObj);
                if (!status.isOK()) {
                    return status;
                }
@@ -190,11 +190,14 @@ namespace auth {
                if (!status.isOK()) {
                    return status;
                }
-               status = bsonExtractBooleanField(roleObj, "hasRole", &hasRole);
+               status = bsonExtractBooleanFieldWithDefault(roleObj, "hasRole", true, &hasRole);
                if (!status.isOK()) {
                    return status;
                }
-               status = bsonExtractBooleanField(roleObj, "canDelegate", &canDelegate);
+               status = bsonExtractBooleanFieldWithDefault(roleObj,
+                                                           "canDelegate",
+                                                           false,
+                                                           &canDelegate);
                if (!status.isOK()) {
                    return status;
                }

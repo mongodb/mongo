@@ -220,7 +220,7 @@ namespace {
             if ((*iter).type() != Object) {
                 return _badValue("Elements in 'roles' array must objects", 0);
             }
-            Status status = V2UserDocumentParser::checkValidRoleObject((*iter).Obj(), true);
+            Status status = V2UserDocumentParser::checkValidRoleObject((*iter).Obj());
             if (!status.isOK())
                 return status;
         }
@@ -328,7 +328,6 @@ namespace {
 
     static Status _extractRoleDocumentElements(
             const BSONObj& roleObject,
-            bool hasPossessionBools,
             BSONElement* roleNameElement,
             BSONElement* roleSourceElement,
             BSONElement* canDelegateElement,
@@ -348,44 +347,26 @@ namespace {
                 makeStringDataFromBSONElement(*roleSourceElement).empty()) {
             return Status(ErrorCodes::UnsupportedFormat, "Role db must be non-empty strings");
         }
-        if (hasPossessionBools) {
-            if (canDelegateElement->type() != Bool) {
-                return Status(ErrorCodes::UnsupportedFormat,
-                              "Entries in 'roles' array need a 'canDelegate' boolean field");
-            }
-            if (hasRoleElement->type() != Bool) {
-                return Status(ErrorCodes::UnsupportedFormat,
-                              "Entries in 'roles' array need a 'hasRole' boolean field");
-            }
 
-            if (!hasRoleElement->Bool() && !canDelegateElement->Bool()) {
-                return Status(ErrorCodes::UnsupportedFormat,
-                              "At least one of 'canDelegate' and 'hasRole' must be true for "
-                              "every role in the 'roles' array");
-            }
-        } else {
-            if (canDelegateElement->type() != EOO) {
-                return Status(ErrorCodes::UnsupportedFormat,
-                              "Invalid field 'canDelegate' found in role object");
-            }
-            if (hasRoleElement->type() != EOO) {
-                return Status(ErrorCodes::UnsupportedFormat,
-                              "Invalid field 'hasRole' found in role object");
-            }
+        if (canDelegateElement->eoo() && canDelegateElement->type() != Bool) {
+            return Status(ErrorCodes::UnsupportedFormat,
+                          "'canDelegate' field must be a boolean if provided");
+        }
+        if (hasRoleElement->eoo() && hasRoleElement->type() != Bool) {
+            return Status(ErrorCodes::UnsupportedFormat,
+                          "'hasRole' field must be a boolean if provided");
         }
         return Status::OK();
     }
 
 
-    Status V2UserDocumentParser::checkValidRoleObject(
-            const BSONObj& roleObject, bool hasPossessionBools) {
+    Status V2UserDocumentParser::checkValidRoleObject(const BSONObj& roleObject) {
         BSONElement roleNameElement;
         BSONElement roleSourceElement;
         BSONElement canDelegateElement;
         BSONElement hasRoleElement;
         return _extractRoleDocumentElements(
                 roleObject,
-                hasPossessionBools,
                 &roleNameElement,
                 &roleSourceElement,
                 &canDelegateElement,
@@ -399,7 +380,6 @@ namespace {
         BSONElement hasRoleElement;
         Status status =  _extractRoleDocumentElements(
                 roleObject,
-                true,
                 &roleNameElement,
                 &roleSourceElement,
                 &canDelegateElement,
@@ -407,8 +387,8 @@ namespace {
         if (!status.isOK())
             return status;
         result->name = RoleName(roleNameElement.str(), roleSourceElement.str());
-        result->canDelegate = canDelegateElement.trueValue();
-        result->hasRole = hasRoleElement.trueValue();
+        result->canDelegate = canDelegateElement.eoo() ? false : canDelegateElement.trueValue();
+        result->hasRole = hasRoleElement.eoo() ? true : hasRoleElement.trueValue();
         return status;
     }
 
