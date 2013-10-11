@@ -117,7 +117,7 @@ namespace mongo {
 
     UpdateResult update(const UpdateRequest& request, OpDebug* opDebug, UpdateDriver* driver) {
 
-        LOG(0) << "processing update : " << request;
+        LOG(3) << "processing update : " << request;
         const NamespaceString& nsString = request.getNamespaceString();
 
         validateUpdate( nsString.ns().c_str(), request.getUpdates(), request.getQuery() );

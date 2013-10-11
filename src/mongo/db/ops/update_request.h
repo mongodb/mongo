@@ -133,7 +133,7 @@ namespace mongo {
                         << " updated: " << _updates
                         << " god: " << _god
                         << " upsert: " << _upsert
-                        << " multe: " << _multi
+                        << " multi: " << _multi
                         << " logToOplog: " << _updateOpLog
                         << " fromMigration: " << _fromMigration
                         << " fromReplications: " << _fromReplication;
