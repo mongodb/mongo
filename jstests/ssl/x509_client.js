@@ -1,7 +1,7 @@
 // If we are running in use-x509 passthrough mode, turn it off or else the auth 
 // part of this test will not work correctly
-TestData.useX509 = false
 
+TestData.useX509 = false;
 var SERVER_CERT = "jstests/libs/server.pem"
 var CA_CERT = "jstests/libs/ca.pem" 
 
@@ -16,8 +16,8 @@ function authAndTest(mongo) {
 
     // Add user using localhost exception
     external.addUser({user: CLIENT_USER, roles:[
-            {'name':'userAdminAnyDatabase', 'db':'admin', 'hasRole':true, 'canDelegate':true}, 
-            {'name':'readWriteAnyDatabase', 'db':'admin', 'hasRole':true, 'canDelegate':true}]})
+            {'role':'userAdminAnyDatabase', 'db':'admin'}, 
+            {'role':'readWriteAnyDatabase', 'db':'admin'}]})
 
     // Localhost exception should not be in place anymore
     assert.throws( function() { test.foo.findOne()}, {}, "read without login" )
@@ -29,19 +29,19 @@ function authAndTest(mongo) {
 
     // Check that we can add a user and read data
     test.addUser({user: "test", pwd: "test", roles:[ 
-            {'name': 'readWriteAnyDatabase', 'db': 'admin', 'hasRole': true, 'canDelegate': true}]})
+            {'role': 'readWriteAnyDatabase', 'db': 'admin'}]})
     test.foo.findOne()
- 
+
     external.logout();
     assert.throws( function() { test.foo.findOne()}, {}, "read after logout" )
 }
 
 print("1. Testing x.509 auth to mongod");
 var mongo = MongoRunner.runMongod({port : port,
-                                   sslMode : "sslOnly", 
-                                   sslPEMKeyFile : SERVER_CERT, 
-                                   sslCAFile : CA_CERT,
-                                   auth:""});
+                                sslMode : "sslOnly", 
+                                sslPEMKeyFile : SERVER_CERT, 
+                                sslCAFile : CA_CERT,
+                                auth:""});
 
 authAndTest(mongo);
 stopMongod(port);
