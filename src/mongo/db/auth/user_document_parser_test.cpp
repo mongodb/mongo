@@ -228,36 +228,14 @@ namespace {
                 BSON("user" << "spencer" <<
                      "db" << "test" <<
                      "credentials" << BSON("MONGODB-CR" << "a") <<
-                     "roles" << BSON_ARRAY(BSON("db" << "dbA" <<
-                                                "canDelegate" << true <<
-                                                "hasRole" << true)))));
+                     "roles" << BSON_ARRAY(BSON("db" << "dbA")))));
 
         // Role needs source
         ASSERT_NOT_OK(v2parser.checkValidUserDocument(
                 BSON("user" << "spencer" <<
                      "db" << "test" <<
                      "credentials" << BSON("MONGODB-CR" << "a") <<
-                     "roles" << BSON_ARRAY(BSON("role" << "roleA" <<
-                                                "canDelegate" << true <<
-                                                "hasRole" << true)))));
-
-        // Role needs canDelegate
-        ASSERT_NOT_OK(v2parser.checkValidUserDocument(
-                BSON("user" << "spencer" <<
-                     "db" << "test" <<
-                     "credentials" << BSON("MONGODB-CR" << "a") <<
-                     "roles" << BSON_ARRAY(BSON("role" << "roleA" <<
-                                                "db" << "dbA" <<
-                                                "hasRole" << true)))));
-
-        // Role needs hasRole
-        ASSERT_NOT_OK(v2parser.checkValidUserDocument(
-                BSON("user" << "spencer" <<
-                     "db" << "test" <<
-                     "credentials" << BSON("MONGODB-CR" << "a") <<
-                     "roles" << BSON_ARRAY(BSON("role" << "roleA" <<
-                                                "db" << "dbA" <<
-                                                "canDelegate" << true)))));
+                     "roles" << BSON_ARRAY(BSON("role" << "roleA")))));
 
 
         // Basic valid user document
@@ -266,9 +244,7 @@ namespace {
                      "db" << "test" <<
                      "credentials" << BSON("MONGODB-CR" << "a") <<
                      "roles" << BSON_ARRAY(BSON("role" << "roleA" <<
-                                                "db" << "dbA" <<
-                                                "canDelegate" << true <<
-                                                "hasRole" << true)))));
+                                                "db" << "dbA")))));
 
         // Multiple roles OK
         ASSERT_OK(v2parser.checkValidUserDocument(
@@ -276,13 +252,9 @@ namespace {
                      "db" << "test" <<
                      "credentials" << BSON("MONGODB-CR" << "a") <<
                      "roles" << BSON_ARRAY(BSON("role" << "roleA" <<
-                                                "db" << "dbA" <<
-                                                "canDelegate" << true <<
-                                                "hasRole" << true) <<
+                                                "db" << "dbA") <<
                                            BSON("role" << "roleB" <<
-                                                "db" << "dbB" <<
-                                                "canDelegate" << true <<
-                                                "hasRole" << true)))));
+                                                "db" << "dbB")))));
 
         // Optional extraData field OK
         ASSERT_OK(v2parser.checkValidUserDocument(
@@ -291,9 +263,7 @@ namespace {
                      "credentials" << BSON("MONGODB-CR" << "a") <<
                      "extraData" << BSON("foo" << "bar") <<
                      "roles" << BSON_ARRAY(BSON("role" << "roleA" <<
-                                                "db" << "dbA" <<
-                                                "canDelegate" << true <<
-                                                "hasRole" << true)))));
+                                                "db" << "dbA")))));
     }
 
     TEST_F(V2UserDocumentParsing, V2CredentialExtraction) {
@@ -355,7 +325,7 @@ namespace {
                      "roles" << BSON_ARRAY("read")),
                 user.get()));
 
-        // Roles must have "user", "db", "canDelegate", and "hasRole" fields
+        // Roles must have "db" field
         ASSERT_NOT_OK(v2parser.initializeUserRolesFromUserDocument(
                 BSON("user" << "spencer" <<
                      "roles" << BSON_ARRAY(BSONObj())),
@@ -368,69 +338,35 @@ namespace {
 
         ASSERT_NOT_OK(v2parser.initializeUserRolesFromUserDocument(
                 BSON("user" << "spencer" <<
-                     "roles" << BSON_ARRAY(BSON("role" << "roleA" << "db" << "dbA"))),
-                user.get()));
-
-        ASSERT_NOT_OK(v2parser.initializeUserRolesFromUserDocument(
-                BSON("user" << "spencer" <<
                      "roles" << BSON_ARRAY(BSON("user" << "roleA" <<
-                                                "db" << "dbA" <<
-                                                "canDelegate" << true))),
+                                                "db" << "dbA"))),
                 user.get()));
-
-        // Role doesn't get added if hasRole is false
-        ASSERT_OK(v2parser.initializeUserRolesFromUserDocument(
-                BSON("user" << "spencer" <<
-                     "roles" << BSON_ARRAY(BSON("role" << "roleA" <<
-                                                "db" << "dbA" <<
-                                                "canDelegate" << true <<
-                                                "hasRole" << false))),
-                user.get()));
-
-        const User::RoleDataMap& roles = user->getRoles();
-        ASSERT_EQUALS(1U, roles.size());
-        User::RoleData role = roles.begin()->second;
-        ASSERT_EQUALS(RoleName("roleA", "dbA"), role.name);
-        ASSERT(!role.hasRole);
-        ASSERT(role.canDelegate);
 
         // Valid role names are extracted successfully
         ASSERT_OK(v2parser.initializeUserRolesFromUserDocument(
                 BSON("user" << "spencer" <<
                      "roles" << BSON_ARRAY(BSON("role" << "roleA" <<
-                                                "db" << "dbA" <<
-                                                "canDelegate" << true <<
-                                                "hasRole" << true))),
+                                                "db" << "dbA"))),
                 user.get()));
         const User::RoleDataMap& roles2 = user->getRoles();
         ASSERT_EQUALS(1U, roles2.size());
-        role = roles2.begin()->second;
+        User::RoleData role = roles2.begin()->second;
         ASSERT_EQUALS(RoleName("roleA", "dbA"), role.name);
-        ASSERT(role.hasRole);
-        ASSERT(role.canDelegate);
 
         // Multiple roles OK
         ASSERT_OK(v2parser.initializeUserRolesFromUserDocument(
                 BSON("user" << "spencer" <<
                      "roles" << BSON_ARRAY(BSON("role" << "roleA" <<
-                                                "db" << "dbA" <<
-                                                "canDelegate" << true <<
-                                                "hasRole" << true) <<
+                                                "db" << "dbA") <<
                                            BSON("role" << "roleB" <<
-                                                "db" << "dbB" <<
-                                                "canDelegate" << false <<
-                                                "hasRole" << true))),
+                                                "db" << "dbB"))),
                 user.get()));
         const User::RoleDataMap& roles3 = user->getRoles();
         ASSERT_EQUALS(2U, roles3.size());
         role = roles3.find(RoleName("roleA", "dbA"))->second;
         ASSERT_EQUALS(RoleName("roleA", "dbA"), role.name);
-        ASSERT(role.hasRole);
-        ASSERT(role.canDelegate);
         role = roles3.find(RoleName("roleB", "dbB"))->second;
         ASSERT_EQUALS(RoleName("roleB", "dbB"), role.name);
-        ASSERT(role.hasRole);
-        ASSERT(!role.canDelegate);
     }
 
 }  // namespace
