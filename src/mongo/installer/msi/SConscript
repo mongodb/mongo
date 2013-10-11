@@ -10,7 +10,7 @@ Import("s3push")
 driverIncludeSource = "$BUILD_DIR/msi/DriverInclude.wxs"
 
 env = env.Clone()
-env['WIXPATH'] = r'%ProgramFiles(x86)%\WiX Toolset v3.7\bin'
+env['WIXPATH'] = r'%WIX%bin'
 env['WIXHEAT'] = r'$WIXPATH\heat.exe'
 env['WIXCANDLE'] = r'$WIXPATH\candle.exe'
 env['WIXLIGHT'] = r'$WIXPATH\light.exe'
