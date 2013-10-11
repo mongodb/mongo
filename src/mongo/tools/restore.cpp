@@ -422,7 +422,7 @@ private:
         long long fileSize = boost::filesystem::file_size(filePath);
         ifstream file(filePath.c_str(), ios_base::in);
 
-        scoped_ptr<char> buf(new char[fileSize]);
+        boost::scoped_array<char> buf(new char[fileSize]);
         file.read(buf.get(), fileSize);
         int objSize;
         BSONObj obj;
