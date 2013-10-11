@@ -1,5 +1,6 @@
 load("jstests/replsets/rslib.js");
-var ssl_options;
+var ssl_options1;
+var ssl_options2;
 doTest = function( signal ) {
 
     // Test basic replica set functionality.
@@ -8,7 +9,9 @@ doTest = function( signal ) {
 
     // Replica set testing API
     // Create a new replica set test. Specify set name and the number of nodes you want.
-    var replTest = new ReplSetTest( {name: 'testSet', nodes: 3, nodeOptions: ssl_options} );
+    // n0 and n1 get the same SSL config since there are 3 nodes but only 2 different configs
+    var replTest = new ReplSetTest( {name: 'testSet', nodes:
+                                    {n0: ssl_options1, n1: ssl_options1, n2: ssl_options2}});
 
     // call startSet() to start each mongod in the replica set
     // this returns a list of nodes
