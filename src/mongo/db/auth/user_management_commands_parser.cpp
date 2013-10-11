@@ -301,6 +301,9 @@ namespace auth {
             if (!status.isOK()) {
                 return status;
             }
+            if (clearTextPassword.empty()) {
+                return Status(ErrorCodes::BadValue, "User passwords must not be empty");
+            }
 
             parsedArgs->hashedPassword = auth::createPasswordDigest(userName, clearTextPassword);
             parsedArgs->hasHashedPassword = true;
