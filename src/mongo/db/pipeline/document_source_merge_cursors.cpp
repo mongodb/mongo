@@ -95,32 +95,46 @@ namespace mongo {
         , cursor(connection.get(), ns, id, 0, 0)
     {}
 
-    boost::optional<Document> DocumentSourceMergeCursors::getNext() {
-        if (_unstarted) {
-            _unstarted = false;
-
-            // open each cursor and send message asking for a batch
-            for (CursorIds::const_iterator it = _cursorIds.begin(); it !=_cursorIds.end(); ++it) {
-                _cursors.push_back(boost::make_shared<CursorAndConnection>(
-                            it->first, pExpCtx->ns, it->second));
-                verify(_cursors.back()->connection->lazySupported());
-                _cursors.back()->cursor.initLazy(); // shouldn't block
-            }
-
-            // wait for all cursors to return a batch
-            // TODO need a way to keep cursors alive if some take longer than 10 minutes.
-            for (Cursors::const_iterator it = _cursors.begin(); it !=_cursors.end(); ++it) {
-                bool retry = false;
-                bool ok = (*it)->cursor.initLazyFinish(retry); // blocks here for first batch
-
-                uassert(17028,
-                        "error reading response from " + _cursors.back()->connection->toString(),
-                        ok);
-                verify(!retry);
-            }
-
-            _currentCursor = _cursors.begin();
+    vector<DBClientCursor*> DocumentSourceMergeCursors::getCursors() {
+        verify(_unstarted);
+        start();
+        vector<DBClientCursor*> out;
+        for (Cursors::const_iterator it = _cursors.begin(); it !=_cursors.end(); ++it) {
+            out.push_back(&((*it)->cursor));
         }
+
+        return out;
+    }
+
+    void DocumentSourceMergeCursors::start() {
+        _unstarted = false;
+
+        // open each cursor and send message asking for a batch
+        for (CursorIds::const_iterator it = _cursorIds.begin(); it !=_cursorIds.end(); ++it) {
+            _cursors.push_back(boost::make_shared<CursorAndConnection>(
+                        it->first, pExpCtx->ns, it->second));
+            verify(_cursors.back()->connection->lazySupported());
+            _cursors.back()->cursor.initLazy(); // shouldn't block
+        }
+
+        // wait for all cursors to return a batch
+        // TODO need a way to keep cursors alive if some take longer than 10 minutes.
+        for (Cursors::const_iterator it = _cursors.begin(); it !=_cursors.end(); ++it) {
+            bool retry = false;
+            bool ok = (*it)->cursor.initLazyFinish(retry); // blocks here for first batch
+
+            uassert(17028,
+                    "error reading response from " + _cursors.back()->connection->toString(),
+                    ok);
+            verify(!retry);
+        }
+
+        _currentCursor = _cursors.begin();
+    }
+
+    boost::optional<Document> DocumentSourceMergeCursors::getNext() {
+        if (_unstarted)
+            start();
 
         // purge eof cursors and release their connections
         while (!_cursors.empty() && !(*_currentCursor)->cursor.more()) {

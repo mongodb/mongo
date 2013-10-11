@@ -331,6 +331,12 @@ namespace mongo {
         /* convenient shorthand for a commonly used type */
         typedef vector<Strategy::CommandResult> ShardOutput;
 
+        /** Returns the result arrays from shards using the 2.4 protocol.
+         *  Call this instead of getNext() if you want access to the raw streams.
+         *  This method should only be called at most once.
+         */
+        vector<BSONArray> getArrays();
+
         /**
           Create a DocumentSource that wraps the output of many shards
 
@@ -729,6 +735,12 @@ namespace mongo {
 
         static const char name[];
 
+        /** Returns non-owning pointers to cursors managed by this stage.
+         *  Call this instead of getNext() if you want access to the raw streams.
+         *  This method should only be called at most once.
+         */
+        vector<DBClientCursor*> getCursors();
+
     private:
 
         struct CursorAndConnection {
@@ -743,6 +755,9 @@ namespace mongo {
         DocumentSourceMergeCursors(
             const CursorIds& cursorIds,
             const intrusive_ptr<ExpressionContext> &pExpCtx);
+
+        // Converts _cursorIds into active _cursors.
+        void start();
 
         // This is the description of cursors to merge.
         const CursorIds _cursorIds;
@@ -882,12 +897,8 @@ namespace mongo {
 
         virtual GetDepsReturn getDependencies(set<string>& deps) const;
 
-        // Virtuals for SplittableDocumentSource
-        // All work for sort is done in router currently if there is no limit.
-        // If there is a limit, the $sort/$limit combination is performed on the
-        // shards, then the results are resorted and limited on mongos
-        virtual intrusive_ptr<DocumentSource> getShardSource() { return limitSrc ? this : NULL; }
-        virtual intrusive_ptr<DocumentSource> getRouterSource() { return this; }
+        virtual intrusive_ptr<DocumentSource> getShardSource();
+        virtual intrusive_ptr<DocumentSource> getRouterSource();
 
         /**
           Add sort key field.
@@ -948,6 +959,16 @@ namespace mongo {
         void populate();
         bool populated;
 
+        SortOptions makeSortOptions() const;
+
+        // These are used to merge pre-sorted results from a DocumentSourceMergeCursors or a
+        // DocumentSourceCommandShards depending on whether we have finished upgrading to 2.6 or
+        // not.
+        class IteratorFromCursor;
+        class IteratorFromBsonArray;
+        void populateFromCursors(const vector<DBClientCursor*>& cursors);
+        void populateFromBsonArrays(const vector<BSONArray>& arrays);
+
         /* these two parallel each other */
         typedef vector<intrusive_ptr<ExpressionFieldPath> > SortPaths;
         SortPaths vSortKey;
@@ -975,6 +996,7 @@ namespace mongo {
         intrusive_ptr<DocumentSourceLimit> limitSrc;
 
         bool _done;
+        bool _mergingPresorted;
         scoped_ptr<MySorter::Iterator> _output;
     };
 

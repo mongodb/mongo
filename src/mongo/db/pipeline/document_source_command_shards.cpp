@@ -65,6 +65,35 @@ namespace mongo {
         return pSource;
     }
 
+namespace {
+    BSONArray extractResultsArray(const Strategy::CommandResult& result) {
+        /* grab the next command result */
+        BSONObj resultObj = result.result;
+
+        uassert(16390, str::stream() << "sharded pipeline failed on shard " <<
+                                    result.shardTarget.getName() << ": " <<
+                                    resultObj.toString(),
+                resultObj["ok"].trueValue());
+
+        /* grab the result array out of the shard server's response */
+        BSONElement resultArray = resultObj["result"];
+        massert(16391, str::stream() << "no result array? shard:" <<
+                                    result.shardTarget.getName() << ": " <<
+                                    resultObj.toString(),
+                resultArray.type() == Array);
+
+        return BSONArray(resultArray.Obj());
+    }
+}
+
+    vector<BSONArray> DocumentSourceCommandShards::getArrays() {
+        vector<BSONArray> out;
+        for (; iterator != listEnd; ++iterator) {
+            out.push_back(extractResultsArray(*iterator));
+        }
+        return out;
+    }
+
     boost::optional<Document> DocumentSourceCommandShards::getNext() {
         pExpCtx->checkForInterrupt();
 
@@ -74,30 +103,17 @@ namespace mongo {
                 if (iterator == listEnd)
                     return boost::none;
 
-                /* grab the next command result */
-                BSONObj resultObj = iterator->result;
-
-                uassert(16390, str::stream() << "sharded pipeline failed on shard " <<
-                                            iterator->shardTarget.getName() << ": " <<
-                                            resultObj.toString(),
-                        resultObj["ok"].trueValue());
-
-                /* grab the result array out of the shard server's response */
-                BSONElement resultArray = resultObj["result"];
-                massert(16391, str::stream() << "no result array? shard:" <<
-                                            iterator->shardTarget.getName() << ": " <<
-                                            resultObj.toString(),
-                        resultArray.type() == Array);
+                BSONArray resultArray = extractResultsArray(*iterator);
 
                 // done with error checking, don't need the shard name anymore
                 ++iterator;
 
-                if (resultArray.embeddedObject().isEmpty()){
+                if (resultArray.isEmpty()){
                     // this shard had no results, on to the next one
                     continue;
                 }
 
-                pBsonSource = DocumentSourceBsonArray::create(resultArray.Obj(), pExpCtx);
+                pBsonSource = DocumentSourceBsonArray::create(resultArray, pExpCtx);
             }
 
             if (boost::optional<Document> out = pBsonSource->getNext())

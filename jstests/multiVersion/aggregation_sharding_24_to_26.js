@@ -17,6 +17,12 @@ function testVersions(versions) {
                                                                      }}]});
         assert.eq(res.result, [{_id: null, count: 1000, avg: 499.5}]);
 
+        // sorting with 2.4 shards uses a different codepath
+        var res = coll.runCommand('aggregate', {pipeline: [{$project: {_id:1}},
+                                                           {$sort: {_id: 1}},
+                                                           {$limit: 5}]});
+        assert.eq(res.result, [{_id: 0}, {_id: 1}, {_id: 2}, {_id: 3}, {_id: 4}]);
+
         // Targeted aggregation works
         var res = coll.runCommand('aggregate', {pipeline: [{$match: {_id: 0}},
                                                            {$project: {_id: 1}},
