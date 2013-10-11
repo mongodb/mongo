@@ -49,11 +49,14 @@ namespace mongo {
 
         // The aggregation command may now be requested to return cursors.
         AGG_RETURNS_CURSORS = 1,
+
+        // insert, update, and delele batch command
+        BATCH_COMMANDS = 2
     };
 
     // Latest version that the server accepts. This should always be at the latest entry in
     // WireVersion.
-    static const int maxWireVersion = AGG_RETURNS_CURSORS;
+    static const int maxWireVersion = BATCH_COMMANDS;
 
     // Minimum version that the server accepts. We should bump this whenever we don't want
     // to allow communication with too old agents.
