@@ -112,12 +112,13 @@ namespace mongo {
         const int bufSize = 32;
         char buf[bufSize];
         struct tm t;
-        time_t_to_Struct(date.toTimeT(), &t, local);
+        time_t_to_Struct(millisToTimeT(static_cast<long long>(date.millis)), &t, local);
         int pos = strftime(buf, bufSize, MONGO_ISO_DATE_FMT_NO_TZ, &t);
         fassert(16981, 0 < pos);
         char* cur = buf + pos;
         int bufRemaining = bufSize - pos;
-        pos = snprintf(cur, bufRemaining, ".%03d", static_cast<int32_t>(date.asInt64() % 1000));
+        pos = snprintf(cur, bufRemaining, ".%03d",
+                       extractMillisPortion(static_cast<long long>(date.millis)));
         fassert(16982, bufRemaining > pos && pos > 0);
         cur += pos;
         bufRemaining -= pos;
@@ -180,6 +181,30 @@ namespace mongo {
         verify((long long)millis >= 0); // TODO when millis is signed, delete 
         verify(((long long)millis/1000) < (std::numeric_limits<time_t>::max)());
         return millis / 1000;
+    }
+
+    time_t millisToTimeT(long long millis) {
+        if (millis < 0) {
+            // We want the division below to truncate toward -inf rather than 0
+            // eg Dec 31, 1969 23:59:58.001 should be -2 seconds rather than -1
+            // This is needed to get the correct values from coerceToTM
+            if ( -1999 / 1000 != -2) { // this is implementation defined
+                millis -= 1000-1;
+            }
+        }
+        const long long seconds = millis / 1000;
+
+        uassert(16421, "Can't handle date values outside of time_t range",
+               seconds >= std::numeric_limits<time_t>::min() &&
+               seconds <= std::numeric_limits<time_t>::max());
+
+        return static_cast<time_t>(seconds);
+    }
+
+    int extractMillisPortion(long long millisSinceEpoch) {
+        const int ms = millisSinceEpoch % 1000LL;
+        // adding 1000 since dates before 1970 would have negative ms
+        return ms >= 0 ? ms : 1000 + ms;
     }
 
     std::string dateToCtimeString(Date_t date) {

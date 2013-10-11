@@ -63,6 +63,52 @@ namespace {
                           dateToISOStringUTC(Date_t(2781455351100ULL)));
         ASSERT_EQUALS(std::string("2013-02-20T18:29:11.100Z"),
                       dateToISOStringUTC(Date_t(1361384951100ULL)));
+
+        // Basic test
+#ifndef _WIN32 // Negative Dates don't currently work on Windows
+        ASSERT_EQUALS(std::string("1960-01-02T03:04:05.006Z"),
+                      dateToISOStringUTC(Date_t(-315521754994LL)));
+#endif
+
+        // Testing special rounding rules for seconds
+#ifndef _WIN32 // Negative Dates don't currently work on Windows
+        ASSERT_EQUALS(std::string("1960-01-02T03:04:04.999Z"),
+                      dateToISOStringUTC(Date_t(-315521755001LL))); // second = 4
+        ASSERT_EQUALS(std::string("1960-01-02T03:04:05.000Z"),
+                      dateToISOStringUTC(Date_t(-315521755000LL))); // second = 5
+        ASSERT_EQUALS(std::string("1960-01-02T03:04:05.001Z"),
+                      dateToISOStringUTC(Date_t(-315521754999LL))); // second = 5
+        ASSERT_EQUALS(std::string("1960-01-02T03:04:05.999Z"),
+                      dateToISOStringUTC(Date_t(-315521754001LL))); // second = 5
+#endif
+
+        // Test date before 1900 (negative tm_year values from gmtime)
+#ifndef _WIN32 // Negative Dates don't currently work on Windows
+        ASSERT_EQUALS(std::string("1860-01-02T03:04:05.006Z"),
+                      dateToISOStringUTC(Date_t(-3471195354994LL)));
+#endif
+
+        // Test with time_t == -1
+#ifndef _WIN32 // Negative Dates don't currently work on Windows
+        ASSERT_EQUALS(std::string("1969-12-31T23:59:59.000Z"),
+                      dateToISOStringUTC(Date_t(-1000LL)));
+#endif
+
+        // Testing dates between 1970 and 2000
+        ASSERT_EQUALS(std::string("1970-01-01T00:00:00.000Z"),
+                      dateToISOStringUTC(Date_t(0ULL)));
+        ASSERT_EQUALS(std::string("1970-01-01T00:00:00.999Z"),
+                      dateToISOStringUTC(Date_t(999ULL)));
+        ASSERT_EQUALS(std::string("1980-05-20T12:54:04.834Z"),
+                      dateToISOStringUTC(Date_t(327675244834ULL)));
+        ASSERT_EQUALS(std::string("1999-12-31T00:00:00.000Z"),
+                      dateToISOStringUTC(Date_t(946598400000ULL)));
+        ASSERT_EQUALS(std::string("1999-12-31T23:59:59.999Z"),
+                      dateToISOStringUTC(Date_t(946684799999ULL)));
+
+        // Test date > 2000 for completeness (using now)
+        ASSERT_EQUALS(std::string("2013-10-11T23:20:12.072Z"),
+                      dateToISOStringUTC(Date_t(1381533612072ULL)));
     }
 
     TEST(TimeFormatting, DateAsISO8601Local) {
