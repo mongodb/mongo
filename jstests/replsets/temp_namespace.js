@@ -1,9 +1,18 @@
 // SERVER-10927
 // This is to make sure that temp collections get cleaned up on promotion to primary
 
-var replTest = new ReplSetTest({ name: 'testSet', nodes: 2 });
-var nodes = replTest.startSet();
-replTest.initiate();
+var replTest = new ReplSetTest({ name: 'testSet', nodes: 3 });
+var nodes = replTest.nodeList();
+printjson(nodes);
+
+// We need an arbiter to ensure that the primary doesn't step down when we restart the secondary
+replTest.startSet();
+replTest.initiate({"_id" : "testSet",
+                   "members" : [
+                    {"_id" : 0, "host" : nodes[0]},
+                    {"_id" : 1, "host" : nodes[1]},
+                    {"_id" : 2, "host" : nodes[2], "arbiterOnly" : true}]});
+
 var master = replTest.getMaster();
 var second = replTest.getSecondary();
 
@@ -33,10 +42,14 @@ assert.eq(secondDB.system.namespaces.count({name: /temp\d$/}) , 2); // collectio
 assert.eq(secondDB.system.namespaces.count({name: /temp\d\.\$.*$/}) , 4); // indexes (2 _id + 2 x)
 assert.eq(secondDB.system.namespaces.count({name: /keep\d$/}) , 4);
 
-// make sure restarting secondary doesn't drop collections
+// restart secondary and reconnect
 replTest.restart(secondId, {},  /*wait=*/true);
-second = replTest.getSecondary();
-secondDB = second.getDB('test');
+try {
+    secondDB.system.namespaces.count(); // trigger a reconnect if needed
+} catch (e) {
+}
+
+// make sure restarting secondary didn't drop collections
 assert.eq(secondDB.system.namespaces.count({name: /temp\d$/}) , 2); // collections
 assert.eq(secondDB.system.namespaces.count({name: /temp\d\.\$.*$/}) , 4); // indexes (2 _id + 2 x)
 assert.eq(secondDB.system.namespaces.count({name: /keep\d$/}) , 4);
@@ -50,7 +63,7 @@ try {
 
 assert.soon(function() {
     printjson(secondDB.adminCommand("replSetGetStatus"));
-    printjson(secondDB.getSisterDB('local').system.replset.findOne());
+    printjson(secondDB.isMaster());
     return secondDB.isMaster().ismaster;
 }, '',  75*1000); // must wait for secondary to be willing to promote self
 
