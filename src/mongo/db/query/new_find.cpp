@@ -31,6 +31,8 @@
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/exec/filter.h"
+#include "mongo/db/exec/oplogstart.h"
 #include "mongo/db/index/catalog_hack.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/keypattern.h"
@@ -40,6 +42,7 @@
 #include "mongo/db/query/cached_plan_runner.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/eof_runner.h"
+#include "mongo/db/query/internal_plans.h"
 #include "mongo/db/query/multi_plan_runner.h"
 #include "mongo/db/query/plan_cache.h"
 #include "mongo/db/query/qlog.h"
@@ -126,7 +129,7 @@ namespace mongo {
             // We can deal with this 'cuz it means do a collscan.
             BSONElement natural = pq.getSort().getFieldDotted("$natural");
             if (natural.eoo()) {
-                QLOG() << "rejecting query w/sort\n";
+                QLOG() << "rejecting query w/sort: " << pq.getSort().toString() << endl;
                 return false;
             }
         }
@@ -308,7 +311,7 @@ namespace mongo {
         // This is a read lock.  TODO: There is a cursor flag for not needing this.  Do we care?
         Client::ReadContext ctx(ns);
 
-        QLOG() << "running getMore in new system, cursorid " << cursorid << endl;
+        //cout << "running getMore in new system, cursorid " << cursorid << endl;
 
         // This checks to make sure the operation is allowed on a replicated node.  Since we are not
         // passing in a query object (necessary to check SlaveOK query option), the only state where
@@ -438,6 +441,7 @@ namespace mongo {
         qr->startingFrom = startingResult;
         qr->nReturned = numResults;
         bb.decouple();
+        //cout << "getMore returned " << numResults << " results\n";
         return qr;
     }
 
@@ -460,36 +464,79 @@ namespace mongo {
         Runner* _runner;
     };
 
+    Status getOplogStartHack(CanonicalQuery* cq, Runner** runnerOut) {
+        // Make an oplog start finding stage.
+        WorkingSet* oplogws = new WorkingSet();
+        OplogStart* stage = new OplogStart(cq->ns(), cq->root(), oplogws);
+
+        // Takes ownership of ws and stage.
+        auto_ptr<InternalRunner> runner(new InternalRunner(cq->ns(), stage, oplogws));
+        runner->setYieldPolicy(Runner::YIELD_AUTO);
+
+        // The stage returns a DiskLoc of where to start.
+        DiskLoc startLoc;
+        Runner::RunnerState state = runner->getNext(NULL, &startLoc);
+
+        // This is normal.  The start of the oplog is the beginning of the collection.
+        if (Runner::RUNNER_EOF == state) { return getRunner(cq, runnerOut); }
+
+        // This is not normal.  An error was encountered.
+        if (Runner::RUNNER_ADVANCED != state) {
+            return Status(ErrorCodes::InternalError,
+                          "quick oplog start location had error...?");
+        }
+
+        // cout << "diskloc is " << startLoc.toString() << endl;
+
+        // Build our collection scan...
+        CollectionScanParams params;
+        params.ns = cq->ns();
+        params.start = startLoc;
+        params.direction = CollectionScanParams::FORWARD;
+        params.tailable = true;
+        verify(cq->getParsed().hasOption(QueryOption_CursorTailable));
+
+        WorkingSet* ws = new WorkingSet();
+        CollectionScan* cs = new CollectionScan(params, ws, cq->root());
+        // Takes ownership of cq, cs, ws.
+        *runnerOut = new SingleSolutionRunner(cq, NULL, cs, ws);
+        return Status::OK();
+    }
+
     /**
      * This is called by db/ops/query.cpp.  This is the entry point for answering a query.
      */
     std::string newRunQuery(CanonicalQuery* cq, CurOp& curop, Message &result) {
+        QLOG() << "Running query on new system: " << cq->toString();
+
         // This is a read lock.
         Client::ReadContext ctx(cq->ns(), storageGlobalParams.dbpath);
 
         // Parse, canonicalize, plan, transcribe, and get a runner.
-        Runner* rawRunner;
-        // Takes ownership of cq.
-        Status status = getRunner(cq, &rawRunner);
-        if (!status.isOK()) {
-            uasserted(17007, "Couldn't process query " + cq->toString()
-                             + " why: " + status.reason());
-        }
-        verify(NULL != rawRunner);
-        auto_ptr<Runner> runner(rawRunner);
-
-        QLOG() << "Running query on new system: " << cq->toString();
-
-        // We freak out later if this changes before we're done with the query.
-        const ChunkVersion shardingVersionAtStart = shardingState.getVersion(cq->ns());
+        Runner* rawRunner = NULL;
 
         // We use this a lot below.
         const LiteParsedQuery& pq = cq->getParsed();
 
-        // TODO: Remove when impl'd
+        Status status = Status::OK();
         if (pq.hasOption(QueryOption_OplogReplay)) {
-            warning() << "haven't implemented findingstartcursor yet\n";
+            status = getOplogStartHack(cq, &rawRunner);
         }
+        else {
+            // Takes ownership of cq.
+            Status status = getRunner(cq, &rawRunner);
+        }
+
+        if (!status.isOK()) {
+            uasserted(17007, "Couldn't process query " + cq->toString()
+                             + " why: " + status.reason());
+        }
+
+        verify(NULL != rawRunner);
+        auto_ptr<Runner> runner(rawRunner);
+
+        // We freak out later if this changes before we're done with the query.
+        const ChunkVersion shardingVersionAtStart = shardingState.getVersion(cq->ns());
 
         // Handle query option $maxTimeMS (not used with commands).
         curop.setMaxTimeMicros(static_cast<unsigned long long>(pq.getMaxTimeMS()) * 1000);
@@ -542,6 +589,8 @@ namespace mongo {
         const bool isExplain = pq.isExplain();
 
         while (Runner::RUNNER_ADVANCED == (state = runner->getNext(&obj, NULL))) {
+            // cout << "pulled out of runner: " << obj.toString() << endl;
+
             // If we're sharded make sure that we don't return any data that hasn't been migrated
             // off of our shared yet.
             if (collMetadata) {
@@ -650,6 +699,10 @@ namespace mongo {
                     << getHostNameCached() << ":" << serverGlobalParams.port;
                 explain->setServer(server);
 
+                // We might have skipped some results due to chunk migration etc. so our count is
+                // correct.
+                explain->setN(numResults);
+
                 // Fill in the number of documents consummed that were involved in an ongoing
                 // (or aborted) migration.
                 explain->setNChunkSkips(numMisplacedDocs);
@@ -680,8 +733,8 @@ namespace mongo {
                                                 cq->getParsed().getFilter());
             ccId = cc->cursorid();
 
-            QLOG() << "caching runner with cursorid " << ccId
-                   << " after returning " << numResults << " results" << endl;
+            //cout << "caching runner with cursorid " << ccId
+                 //<< " after returning " << numResults << " results" << endl;
 
             // ClientCursor takes ownership of runner.  Release to make sure it's not deleted.
             runner.release();
@@ -703,6 +756,9 @@ namespace mongo {
             // If the query had a time limit, remaining time is "rolled over" to the cursor (for
             // use by future getmore ops).
             cc->setLeftoverMaxTimeMicros(curop.getRemainingMaxTimeMicros());
+        }
+        else {
+            //cout << "not caching runner but returning " << numResults << " results\n";
         }
 
         // Add the results from the query into the output buffer.

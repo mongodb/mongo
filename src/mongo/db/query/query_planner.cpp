@@ -1026,9 +1026,6 @@ namespace mongo {
 
         bool canTableScan = !(options & QueryPlanner::NO_TABLE_SCAN);
 
-        // XXX: If pq.hasOption(QueryOption_OplogReplay) use FindingStartCursor equivalent which
-        // must be translated into stages.
-
         // If the query requests a tailable cursor, the only solution is a collscan + filter with
         // tailable set on the collscan.  TODO: This is a policy departure.  Previously I think you
         // could ask for a tailable cursor and it just tried to give you one.  Now, we fail if we

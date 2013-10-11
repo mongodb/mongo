@@ -42,6 +42,7 @@ env.StaticLibrary(
         "index_scan.cpp",
         "limit.cpp",
         "merge_sort.cpp",
+        "oplogstart.cpp",
         "or.cpp",
         "projection.cpp",
         "projection_executor.cpp",
