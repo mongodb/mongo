@@ -144,7 +144,7 @@ namespace mongo {
                 _lock.lock();
             }
             if (_isThisGuardInFetchPhase) {
-                fassert(0, _authzManager->_isFetchPhaseBusy);
+                fassert(17190, _authzManager->_isFetchPhaseBusy);
                 _authzManager->_isFetchPhaseBusy = false;
                 _authzManager->_fetchPhaseIsReady.notify_all();
             }
@@ -157,7 +157,7 @@ namespace mongo {
         }
 
         void beginFetchPhase() {
-            fassert(0, !_authzManager->_isFetchPhaseBusy);
+            fassert(17191, !_authzManager->_isFetchPhaseBusy);
             _isThisGuardInFetchPhase = true;
             _authzManager->_isFetchPhaseBusy = true;
             _lock.unlock();
@@ -171,7 +171,7 @@ namespace mongo {
         void synchronizeWithFetchPhase() {
             while (otherUpdateInFetchPhase())
                 wait();
-            fassert(0, !_authzManager->_isFetchPhaseBusy);
+            fassert(17192, !_authzManager->_isFetchPhaseBusy);
             _isThisGuardInFetchPhase = true;
             _authzManager->_isFetchPhaseBusy = true;
         }
