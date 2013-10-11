@@ -112,6 +112,18 @@ namespace mongo {
                 return ret;
             }
         }
+        else if (readToken("NumberLong")) {
+            Status ret = numberLong(fieldName, builder);
+            if (ret != Status::OK()) {
+                return ret;
+            }
+        }
+        else if (readToken("NumberInt")) {
+            Status ret = numberInt(fieldName, builder);
+            if (ret != Status::OK()) {
+                return ret;
+            }
+        }
         else if (readToken("Dbref") || readToken("DBRef")) {
             Status ret = dbRef(fieldName, builder);
             if (ret != Status::OK()) {
@@ -653,6 +665,49 @@ namespace mongo {
         builder.append(fieldName, OID(id));
         return Status::OK();
     }
+
+    Status JParse::numberLong(const StringData& fieldName, BSONObjBuilder& builder) {
+        if (!readToken(LPAREN)) {
+            return parseError("Expecting '('");
+        }
+        errno = 0;
+        char* endptr;
+        int64_t val = strtoll(_input, &endptr, 10);
+        if (errno == ERANGE) {
+            return parseError("NumberLong out of range");
+        }
+        if (_input == endptr) {
+            return parseError("Expecting unsigned number in NumberLong");
+        }
+        _input = endptr;
+        if (!readToken(RPAREN)) {
+            return parseError("Expecting ')'");
+        }
+        builder.appendNumber(fieldName, val);
+        return Status::OK();
+    }
+
+    Status JParse::numberInt(const StringData& fieldName, BSONObjBuilder& builder) {
+        if (!readToken(LPAREN)) {
+            return parseError("Expecting '('");
+        }
+        errno = 0;
+        char* endptr;
+        int32_t val = strtol(_input, &endptr, 10);
+        if (errno == ERANGE) {
+            return parseError("NumberInt out of range");
+        }
+        if (_input == endptr) {
+            return parseError("Expecting unsigned number in NumberInt");
+        }
+        _input = endptr;
+        if (!readToken(RPAREN)) {
+            return parseError("Expecting ')'");
+        }
+        builder.appendNumber(fieldName, val);
+        return Status::OK();
+    }
+
 
     Status JParse::dbRef(const StringData& fieldName, BSONObjBuilder& builder) {
         BSONObjBuilder subBuilder(builder.subobjStart(fieldName));

@@ -71,6 +71,8 @@ namespace mongo {
              * VALUE :
              *     STRING
              *   | NUMBER
+             *   | NUMBERINT
+             *   | NUMBERLONG
              *   | OBJECT
              *   | ARRAY
              *
@@ -215,6 +217,18 @@ namespace mongo {
              *     ObjectId( <24 character hex string> )
              */
             Status objectId(const StringData& fieldName, BSONObjBuilder&);
+
+            /*
+             * NUMBERLONG :
+             *     NumberLong( <number> )
+             */
+            Status numberLong(const StringData& fieldName, BSONObjBuilder&);
+
+            /*
+             * NUMBERINT :
+             *     NumberInt( <number> )
+             */
+            Status numberInt(const StringData& fieldName, BSONObjBuilder&);
 
             /*
              * DBREF :

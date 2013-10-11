@@ -78,9 +78,19 @@ namespace mongo {
             s << '"' << escape( string(valuestr(), valuestrsize()-1) ) << '"';
             break;
         case NumberLong:
-            s << _numberLong();
+/* TODO: Enable when SERVER-11135 fixed
+               if(format == JS) {
+                s << "NumberLong(" << _numberLong() << ")";
+            }
+            else
+*/
+                s << _numberLong();
             break;
         case NumberInt:
+            if(format == JS) {
+                s << "NumberInt(" << _numberInt() << ")";
+                break;
+            }
         case NumberDouble:
             if ( number() >= -numeric_limits< double >::max() &&
                     number() <= numeric_limits< double >::max() ) {

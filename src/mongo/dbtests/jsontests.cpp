@@ -431,23 +431,28 @@ namespace JsonTests {
             virtual ~Base() {}
             void run() {
                 ASSERT( fromjson( json() ).valid() );
-                assertEquals( bson(), fromjson( json() ) );
-                assertEquals( bson(), fromjson( bson().jsonString( Strict ) ) );
-                assertEquals( bson(), fromjson( bson().jsonString( TenGen ) ) );
-                assertEquals( bson(), fromjson( bson().jsonString( JS ) ) );
+                assertEquals( bson(), fromjson( json() ), "mode: <default>" );
+                assertEquals( bson(), fromjson( bson().jsonString( Strict ) ), "mode: strict" );
+                assertEquals( bson(), fromjson( bson().jsonString( TenGen ) ), "mode: tengen" );
+                assertEquals( bson(), fromjson( bson().jsonString( JS ) ), "mode: js" );
             }
         protected:
             virtual BSONObj bson() const = 0;
             virtual string json() const = 0;
         private:
-            static void assertEquals( const BSONObj &expected, const BSONObj &actual ) {
-                if ( expected.woCompare( actual ) ) {
+            void assertEquals( const BSONObj &expected,
+                               const BSONObj &actual,
+                               const char* msg) {
+                const bool bad = expected.woCompare( actual );
+                if ( bad ) {
                     out() << "want:" << expected.jsonString() << " size: " << expected.objsize() << endl;
                     out() << "got :" << actual.jsonString() << " size: " << actual.objsize() << endl;
                     out() << expected.hexDump() << endl;
                     out() << actual.hexDump() << endl;
+                    out() << msg << endl;
+                    out() << "orig json:" << this->json();
                 }
-                ASSERT( !expected.woCompare( actual ) );
+                ASSERT( !bad );
             }
         };
 
@@ -1513,6 +1518,77 @@ namespace JsonTests {
             }
         };
 
+        class NumberLongTest : public Base {
+            virtual BSONObj bson() const {
+                BSONObjBuilder b;
+                b.appendNumber("a", 20000LL);
+                return b.obj();
+            }
+            virtual string json() const {
+                return "{ \"a\" : NumberLong( 20000 ) }";
+            }
+        };
+
+        class NumberLongMin : public Base {
+            virtual BSONObj bson() const {
+                BSONObjBuilder b;
+                b.appendNumber("a", std::numeric_limits<long long>::min());
+                return b.obj();
+            }
+            virtual string json() const {
+                std::stringstream ss;
+                ss << "{'a': NumberLong(";
+                ss << std::numeric_limits<long long>::min() ;
+                ss << ") }";
+                return ss.str();
+            }
+        };
+
+        class NumberIntTest : public Base {
+            virtual BSONObj bson() const {
+                BSONObjBuilder b;
+                b.appendNumber("a", 20000);
+                return b.obj();
+            }
+            virtual string json() const {
+                return "{ \"a\" : NumberInt( 20000 ) }";
+            }
+        };
+
+        class NumberLongNeg : public Base {
+            virtual BSONObj bson() const {
+                BSONObjBuilder b;
+                b.appendNumber("a", -20000LL);
+                return b.obj();
+            }
+            virtual string json() const {
+                return "{ \"a\" : NumberLong( -20000 ) }";
+            }
+        };
+
+        class NumberIntNeg : public Base {
+            virtual BSONObj bson() const {
+                BSONObjBuilder b;
+                b.appendNumber("a", -20000);
+                return b.obj();
+            }
+            virtual string json() const {
+                return "{ \"a\" : NumberInt( -20000 ) }";
+            }
+        };
+
+        class NumberLongBad : public Bad {
+            virtual string json() const {
+                return "{ \"a\" : NumberLong( 'sdf' ) }";
+            }
+        };
+
+        class NumberIntBad : public Bad {
+            virtual string json() const {
+                return "{ \"a\" : NumberInt( 'sdf' ) }";
+            }
+        };
+
         class Timestamp : public Base {
             virtual BSONObj bson() const {
                 BSONObjBuilder b;
@@ -2198,6 +2274,68 @@ namespace JsonTests {
             }
         };
 
+        class NumericTypesJS : public Base {
+        public:
+            void run() {
+                Base::run();
+
+                BSONObj o = fromjson(json());
+
+                ASSERT(o["int"].type() == NumberInt);
+                ASSERT(o["long"].type() == NumberLong);
+                ASSERT(o["double"].type() == NumberDouble);
+
+                ASSERT(o["long"].numberLong() == 9223372036854775807ll);
+            }
+
+            virtual BSONObj bson() const {
+                return BSON( "int" << 123
+                             << "long" << 9223372036854775807ll // 2**63 - 1
+                             << "double" << 3.14
+                           );
+            }
+            virtual string json() const {
+                return "{ 'int': NumberInt(123), "
+                         "'long': NumberLong(9223372036854775807), "
+                         "'double': 3.14 }";
+            }
+        };
+
+        class NumericLongMin : public Base {
+            virtual BSONObj bson() const {
+/* TODO: Enable when SERVER-11135 fixed
+                BSONObjBuilder b;
+                b.appendNumber("a", std::numeric_limits<long long>::min());
+                return b.obj();
+*/
+                return BSON("a" << std::numeric_limits<long long>::min());
+
+            }
+            virtual string json() const {
+                std::stringstream ss;
+                ss << "{'a': ";
+                ss << std::numeric_limits<long long>::min() ;
+                ss << " }";
+                return ss.str();
+            }
+        };
+
+        class NumericIntMin : public Base {
+            virtual BSONObj bson() const {
+                BSONObjBuilder b;
+                b.appendNumber("a", std::numeric_limits<int>::min());
+                return b.obj();
+            }
+            virtual string json() const {
+                std::stringstream ss;
+                ss << "{'a': ";
+                ss << std::numeric_limits<int>::min() ;
+                ss << " }";
+                return ss.str();
+            }
+        };
+
+
         class NumericLimits : public Base {
             virtual BSONObj bson() const {
                 BSONObjBuilder builder;
@@ -2464,6 +2602,13 @@ namespace JsonTests {
             add< FromJsonTests::DateMaxUnsigned >();
             add< FromJsonTests::DateStrictNegative >();
             add< FromJsonTests::DateNegative >();
+            add< FromJsonTests::NumberLongTest >();
+            add< FromJsonTests::NumberLongMin >();
+            add< FromJsonTests::NumberIntTest >();
+            add< FromJsonTests::NumberLongNeg >();
+            add< FromJsonTests::NumberIntNeg >();
+            add< FromJsonTests::NumberLongBad >();
+            add< FromJsonTests::NumberIntBad >();
             add< FromJsonTests::Timestamp >();
             add< FromJsonTests::TimestampNoIncrement >();
             add< FromJsonTests::TimestampZero >();
@@ -2551,7 +2696,10 @@ namespace JsonTests {
             add< FromJsonTests::QuoteTest6 >();
             add< FromJsonTests::ObjectId >();
             add< FromJsonTests::ObjectId2 >();
+            add< FromJsonTests::NumericIntMin >();
+            add< FromJsonTests::NumericLongMin >();
             add< FromJsonTests::NumericTypes >();
+            add< FromJsonTests::NumericTypesJS >();
             add< FromJsonTests::NumericLimits >();
             add< FromJsonTests::NumericLimitsBad >();
             add< FromJsonTests::NumericLimitsBad1 >();
