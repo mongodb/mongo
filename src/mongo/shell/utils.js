@@ -436,8 +436,10 @@ jsTest.addAuth = function(conn) {
         localconn = new Mongo(hosts.join(','));
     }
     print ("Adding admin user on connection: " + localconn);
-    return localconn.getDB('admin').addUser(jsTestOptions().adminUser, jsTestOptions().adminPassword,
-                                            ["__system"], 'majority', 60000);
+    return localconn.getDB('admin').addUser({user: jsTestOptions().adminUser,
+                                             pwd: jsTestOptions().adminPassword,
+                                             roles: ["__system"]},
+                                            'majority', 60000);
 }
 
 jsTest.authenticate = function(conn) {
