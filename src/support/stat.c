@@ -212,7 +212,7 @@ __wt_stat_refresh_dsrc_stats(void *stats_arg)
 }
 
 void
-__wt_stat_aggregate_dsrc_stats(void *child, void *parent)
+__wt_stat_aggregate_dsrc_stats(const void *child, const void *parent)
 {
 	WT_DSRC_STATS *c, *p;
 

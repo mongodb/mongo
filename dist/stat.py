@@ -126,7 +126,8 @@ __wt_stat_refresh_''' + name + '''_stats(void *stats_arg)
 
 	f.write('''
 void
-__wt_stat_aggregate_''' + name + '''_stats(void *child, void *parent)
+__wt_stat_aggregate_''' + name +
+'''_stats(const void *child, const void *parent)
 {
 \tWT_''' + name.upper() + '''_STATS *c, *p;
 

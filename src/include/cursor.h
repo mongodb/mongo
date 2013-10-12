@@ -236,10 +236,7 @@ struct __wt_cursor_stat {
 
 	int	 key;			/* Current stats key */
 	uint64_t v;			/* Current stats value */
-	WT_ITEM   pv;			/* Current stats value (string) */
-
-	void (*refresh_func)(void *);	/* Function to clear selected values */
-	WT_BTREE *btree;		/* Pinned btree handle */
+	WT_ITEM	 pv;			/* Current stats value (string) */
 };
 
 /*
