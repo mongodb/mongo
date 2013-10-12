@@ -774,10 +774,8 @@ function appendSetParameterArgs(argArray) {
         }
         if (jsTest.options().authMechanism && jsTest.options().authMechanism != "MONGODB-CR") {
             var hasAuthMechs = false;
-            var i;
-            for (i = 0; i < argArray.length; i++) {
-                if (typeof argArray[i] === 'string' &&
-                    argArray[i].indexOf('authenticationMechanisms') != -1) {
+            for (i in argArray) {
+                if (argArray[i].indexOf('authenticationMechanisms') != -1) {
                     hasAuthMechs = true;
                     break;
                 }
