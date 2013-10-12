@@ -197,7 +197,7 @@ namespace mongo {
             if (NULL == nsd) { return NULL; }
             vector<int> idxMatches;
             nsd->findIndexByType("text", idxMatches);
-            if (0 == idxMatches.size()) { return NULL; }
+            if (1 != idxMatches.size()) { return NULL; }
             IndexDescriptor* index = CatalogHack::getDescriptor(nsd, idxMatches[0]);
             auto_ptr<FTSAccessMethod> fam(new FTSAccessMethod(index));
             TextStageParams params(fam->getSpec());
