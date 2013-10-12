@@ -1145,9 +1145,9 @@ namespace mongo {
             }
 
             if (hintIndexNumber == numeric_limits<size_t>::max()) {
-                warning() << "Can't find hint for " << hintIndex.toString()
-                          << ", ignoring.";
-                hintIndex = BSONObj();
+                // This is supposed to be an error.
+                warning() << "Can't find hint for " << hintIndex.toString();
+                return;
             }
         }
         else {
