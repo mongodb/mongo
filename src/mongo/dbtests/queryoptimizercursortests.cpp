@@ -3711,43 +3711,47 @@ namespace QueryOptimizerCursorTests {
             }
         };
 
+        // QUERY MIGRATION
+        // Cache is turned off
         /**
          * If an optimal plan is cached, return a Cursor for it rather than a QueryOptimizerCursor.
          */
-        class BestSavedOptimal : public QueryOptimizerCursorTests::Base {
-        public:
-            void run() {
-                _cli.insert( ns(), BSON( "_id" << 1 ) );
-                _cli.ensureIndex( ns(), BSON( "_id" << 1 << "q" << 1 ) );
-                ASSERT( _cli.query( ns(), QUERY( "_id" << GT << 0 ) )->more() );
-                Lock::GlobalWrite lk;
-                Client::Context ctx( ns() );
-                // Check the plan that was recorded for this query.
-                ASSERT_EQUALS( BSON( "_id" << 1 ), cachedIndexForQuery( BSON( "_id" << GT << 0 ) ) );
-                shared_ptr<Cursor> c = getOptimizedCursor( ns(), BSON( "_id" << GT << 0 ) );
-                // No need for query optimizer cursor since the plan is optimal.
-                ASSERT_EQUALS( "BtreeCursor _id_", c->toString() );
-            }
-        };
-        
+        // class BestSavedOptimal : public QueryOptimizerCursorTests::Base {
+        // public:
+        //     void run() {
+        //         _cli.insert( ns(), BSON( "_id" << 1 ) );
+        //         _cli.ensureIndex( ns(), BSON( "_id" << 1 << "q" << 1 ) );
+        //         ASSERT( _cli.query( ns(), QUERY( "_id" << GT << 0 ) )->more() );
+        //         Lock::GlobalWrite lk;
+        //         Client::Context ctx( ns() );
+        //         // Check the plan that was recorded for this query.
+        //         ASSERT_EQUALS( BSON( "_id" << 1 ), cachedIndexForQuery( BSON( "_id" << GT << 0 ) ) );
+        //         shared_ptr<Cursor> c = getOptimizedCursor( ns(), BSON( "_id" << GT << 0 ) );
+        //         // No need for query optimizer cursor since the plan is optimal.
+        //         ASSERT_EQUALS( "BtreeCursor _id_", c->toString() );
+        //     }
+        // };
+
+        // QUERY MIGRATIOM
+        // Cache is turned off
         /** If a non optimal plan is a candidate a QueryOptimizerCursor should be returned, even if plan has been recorded. */
-        class BestSavedNotOptimal : public QueryOptimizerCursorTests::Base {
-        public:
-            void run() {
-                _cli.insert( ns(), BSON( "_id" << 1 << "q" << 1 ) );
-                _cli.ensureIndex( ns(), BSON( "q" << 1 ) );
-                // Record {_id:1} index for this query
-                ASSERT( _cli.query( ns(), QUERY( "q" << 1 << "_id" << 1 ) )->more() );
-                Lock::GlobalWrite lk;
-                Client::Context ctx( ns() );
-                ASSERT_EQUALS( BSON( "_id" << 1 ),
-                              cachedIndexForQuery( BSON( "q" << 1 << "_id" << 1 ) ) );
-                shared_ptr<Cursor> c = getOptimizedCursor( ns(), BSON( "q" << 1 << "_id" << 1 ) );
-                // Need query optimizer cursor since the cached plan is not optimal.
-                ASSERT_EQUALS( "QueryOptimizerCursor", c->toString() );
-            }
-        };
-                
+        // class BestSavedNotOptimal : public QueryOptimizerCursorTests::Base {
+        // public:
+        //     void run() {
+        //         _cli.insert( ns(), BSON( "_id" << 1 << "q" << 1 ) );
+        //         _cli.ensureIndex( ns(), BSON( "q" << 1 ) );
+        //         // Record {_id:1} index for this query
+        //         ASSERT( _cli.query( ns(), QUERY( "q" << 1 << "_id" << 1 ) )->more() );
+        //         Lock::GlobalWrite lk;
+        //         Client::Context ctx( ns() );
+        //         ASSERT_EQUALS( BSON( "_id" << 1 ),
+        //                       cachedIndexForQuery( BSON( "q" << 1 << "_id" << 1 ) ) );
+        //         shared_ptr<Cursor> c = getOptimizedCursor( ns(), BSON( "q" << 1 << "_id" << 1 ) );
+        //         // Need query optimizer cursor since the cached plan is not optimal.
+        //         ASSERT_EQUALS( "QueryOptimizerCursor", c->toString() );
+        //     }
+        // };
+
         class MultiIndex : public Base {
         public:
             MultiIndex() {
@@ -3903,28 +3907,30 @@ namespace QueryOptimizerCursorTests {
                     ASSERT_THROWS( c->advance(), MsgAssertionException );
                 }
             };
-            
-            class RecordedUnindexedPlan : public Base {
-            public:
-                RecordedUnindexedPlan() {
-                    _cli.ensureIndex( ns(), BSON( "a" << 1 ) );
-                    _cli.insert( ns(), BSON( "a" << BSON_ARRAY( 1 << 2 << 3 ) << "b" << 1 ) );
-                    auto_ptr<DBClientCursor> cursor =
-                    _cli.query( ns(), QUERY( "a" << GT << 0 << "b" << 1 ).explain() );
-                    BSONObj explain = cursor->next();
-                    ASSERT_EQUALS( "BasicCursor", explain[ "cursor" ].String() );
-                }
-                string expectedType() const { return "QueryOptimizerCursor"; }
-                BSONObj query() const { return BSON( "a" << GT << 0 << "b" << 1 ); }
-                void check( const shared_ptr<Cursor> &c ) {
-                    ASSERT( c->ok() );
-                    ASSERT_EQUALS( BSON( "a" << 1 ), c->indexKeyPattern() );
-                    while( c->advance() ) {
-                        ASSERT_EQUALS( BSON( "a" << 1 ), c->indexKeyPattern() );                    
-                    }
-                }
-            };
-                
+
+            // QUERY MIGRATION
+            // Cached is turned off
+            // class RecordedUnindexedPlan : public Base {
+            // public:
+            //     RecordedUnindexedPlan() {
+            //         _cli.ensureIndex( ns(), BSON( "a" << 1 ) );
+            //         _cli.insert( ns(), BSON( "a" << BSON_ARRAY( 1 << 2 << 3 ) << "b" << 1 ) );
+            //         auto_ptr<DBClientCursor> cursor =
+            //         _cli.query( ns(), QUERY( "a" << GT << 0 << "b" << 1 ).explain() );
+            //         BSONObj explain = cursor->next();
+            //         ASSERT_EQUALS( "BasicCursor", explain[ "cursor" ].String() );
+            //     }
+            //     string expectedType() const { return "QueryOptimizerCursor"; }
+            //     BSONObj query() const { return BSON( "a" << GT << 0 << "b" << 1 ); }
+            //     void check( const shared_ptr<Cursor> &c ) {
+            //         ASSERT( c->ok() );
+            //         ASSERT_EQUALS( BSON( "a" << 1 ), c->indexKeyPattern() );
+            //         while( c->advance() ) {
+            //             ASSERT_EQUALS( BSON( "a" << 1 ), c->indexKeyPattern() );
+            //         }
+            //     }
+            // };
+
         } // namespace RequireIndex
         
         namespace IdElseNatural {
@@ -4942,8 +4948,8 @@ namespace QueryOptimizerCursorTests {
             add<GetCursor::PreventOutOfOrderPlan>();
             add<GetCursor::AllowOutOfOrderPlan>();
             add<GetCursor::BestSavedOutOfOrder>();
-            add<GetCursor::BestSavedOptimal>();
-            add<GetCursor::BestSavedNotOptimal>();
+            //add<GetCursor::BestSavedOptimal>();
+            //add<GetCursor::BestSavedNotOptimal>();
             add<GetCursor::MultiIndex>();
             add<GetCursor::Hint>();
             add<GetCursor::Snapshot>();
@@ -4957,7 +4963,7 @@ namespace QueryOptimizerCursorTests {
             add<GetCursor::RequireIndex::SecondOrClauseIndexed>();
             add<GetCursor::RequireIndex::SecondOrClauseUnindexed>();
             add<GetCursor::RequireIndex::SecondOrClauseUnindexedUndetected>();
-            add<GetCursor::RequireIndex::RecordedUnindexedPlan>();
+            //add<GetCursor::RequireIndex::RecordedUnindexedPlan>();
             add<GetCursor::IdElseNatural::AllowOptimalNaturalPlan>();
             add<GetCursor::IdElseNatural::AllowOptimalIdPlan>();
             add<GetCursor::IdElseNatural::HintedIdForQuery>( BSON( "_id" << 1 ) );
@@ -4999,4 +5005,3 @@ namespace QueryOptimizerCursorTests {
     } myall;
     
 } // namespace QueryOptimizerTests
-
