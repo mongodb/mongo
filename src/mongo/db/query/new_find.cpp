@@ -55,6 +55,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/storage_options.h"
+#include "mongo/db/structure/collection.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/d_logic.h"
 #include "mongo/s/stale_exception.h"
@@ -690,10 +691,14 @@ namespace mongo {
         if (Runner::RUNNER_DEAD == state) {
             saveClientCursor = false;
         }
-        else if (pq.hasOption(QueryOption_CursorTailable) && (1 != pq.getNumToReturn())) {
-            // If pq.hasOption(tailable) the only plan the planner will output is a collscan with
-            // tailable set.
-            saveClientCursor = true;
+        else if (pq.hasOption(QueryOption_CursorTailable)) {
+            // If we're tailing a capped collection, we don't bother saving the cursor if the
+            // collection is empty. Otherwise, the semantics of the tailable cursor is that the
+            // client will keep trying to read from it. So we'll keep it around.
+            Collection* collection = ctx.ctx().db()->getCollection(cq->ns());
+            if (collection->numRecords() != 0) {
+                saveClientCursor = true;
+            }
         }
 
         // TODO(greg): This will go away soon.

@@ -38,6 +38,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/structure/collection_info_cache.h"
+#include "mongo/platform/cstdint.h"
 
 namespace mongo {
 
@@ -86,6 +87,12 @@ namespace mongo {
         // the new extent will be returned
         // it will have been added to the linked list already
         Extent* increaseStorageSize( int size, bool enforceQuota );
+
+        //
+        // Stats
+        //
+
+        uint64_t numRecords() const;
 
     private:
 

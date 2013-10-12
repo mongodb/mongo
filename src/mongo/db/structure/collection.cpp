@@ -173,4 +173,8 @@ namespace mongo {
         return storageGlobalParams.quotaFiles;
     }
 
+    uint64_t Collection::numRecords() const {
+        return _details->numRecords();
+    }
+
 }
