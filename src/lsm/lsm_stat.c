@@ -18,7 +18,7 @@ __wt_lsm_stat_init(WT_SESSION_IMPL *session,
 	WT_CURSOR *stat_cursor;
 	WT_DECL_ITEM(uribuf);
 	WT_DECL_RET;
-	WT_DSRC_STATS *child, *stats;
+	WT_DSRC_STATS *new, *stats;
 	WT_LSM_CHUNK *chunk;
 	u_int i;
 	int locked;
@@ -91,11 +91,19 @@ __wt_lsm_stat_init(WT_SESSION_IMPL *session,
 		 * values from the chunk's information, then aggregate into the
 		 * top-level.
 		 */
-		child = (WT_DSRC_STATS *)WT_CURSOR_STATS(stat_cursor);
+		new = (WT_DSRC_STATS *)WT_CURSOR_STATS(stat_cursor);
 		WT_STAT_SET(
-		    session, child, lsm_generation_max, chunk->generation);
+		    session, new, lsm_generation_max, chunk->generation);
 
-		__wt_stat_aggregate_dsrc_stats(child, stats);
+		/*
+		 * We want to aggregate the table's statistics.  Get a base set
+		 * of statistics from the first chunk, then aggregate statistics
+		 * from each new chunk.
+		 */
+		if (i == 0)
+			*stats = *new;
+		else
+			__wt_stat_aggregate_dsrc_stats(new, stats);
 		WT_ERR(stat_cursor->close(stat_cursor));
 
 		if (!F_ISSET(chunk, WT_LSM_CHUNK_BLOOM))
@@ -115,17 +123,17 @@ __wt_lsm_stat_init(WT_SESSION_IMPL *session,
 		 * values from the bloom filter's information, then aggregate
 		 * into the top-level.
 		 */
-		child = (WT_DSRC_STATS *)WT_CURSOR_STATS(stat_cursor);
-		WT_STAT_SET(session, child,
+		new = (WT_DSRC_STATS *)WT_CURSOR_STATS(stat_cursor);
+		WT_STAT_SET(session, new,
 		    bloom_size, (chunk->count * lsm_tree->bloom_bit_count) / 8);
-		WT_STAT_SET(session, child,
+		WT_STAT_SET(session, new,
 		    bloom_page_evict,
-		    WT_STAT(child, cache_eviction_clean) +
-		    WT_STAT(child, cache_eviction_dirty));
+		    WT_STAT(new, cache_eviction_clean) +
+		    WT_STAT(new, cache_eviction_dirty));
 		WT_STAT_SET(session,
-		    child, bloom_page_read, WT_STAT(child, cache_read));
+		    new, bloom_page_read, WT_STAT(new, cache_read));
 
-		__wt_stat_aggregate_dsrc_stats(child, stats);
+		__wt_stat_aggregate_dsrc_stats(new, stats);
 		WT_ERR(stat_cursor->close(stat_cursor));
 	}
 
