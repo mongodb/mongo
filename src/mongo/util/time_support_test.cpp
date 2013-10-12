@@ -84,8 +84,9 @@ namespace {
 
         // Test date before 1900 (negative tm_year values from gmtime)
 #ifndef _WIN32 // Negative Dates don't currently work on Windows
-        ASSERT_EQUALS(std::string("1860-01-02T03:04:05.006Z"),
-                      dateToISOStringUTC(Date_t(-3471195354994LL)));
+        if (!isTimeTSmall)
+            ASSERT_EQUALS(std::string("1860-01-02T03:04:05.006Z"),
+                          dateToISOStringUTC(Date_t(-3471195354994LL)));
 #endif
 
         // Test with time_t == -1
