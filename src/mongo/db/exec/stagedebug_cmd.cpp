@@ -363,13 +363,13 @@ namespace mongo {
                 Status s = fam->getSpec().getIndexPrefix(BSONObj(), &params.indexPrefix);
                 if (!s.isOK()) {
                     // errmsg = s.toString();
-                    return false;
+                    return NULL;
                 }
 
                 params.spec = fam->getSpec();
 
                 if (!params.query.parse(search, fam->getSpec().defaultLanguage()).isOK()) {
-                    return false;
+                    return NULL;
                 }
 
                 return new TextStage(params, workingSet, matcher);
