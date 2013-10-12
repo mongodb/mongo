@@ -219,15 +219,16 @@ if buildShared:
     # InstallVersionedLibrary support is only stable in SCons > 2.3.0, so if you add support
     # here, be sure to add an EnsuredSconsVersion here as well.
     sharedLibEnv = env.Clone()
-    sharedLibEnv.AppendUnique(
-        LIBS=mongoClientLibs + mongoClientSysLibDeps,
-        # TODO: This currently causes the files for the libdep to get dragged into dependents
-        # of this shared library, incorrectly. We need to patch up libdeps to treat shared
-        # libraries as dependency terminals.
-        LIBDEPS=mongoClientLibDeps)
+    sharedLibEnv.AppendUnique(LIBS=mongoClientSysLibDeps)
 
-    if linux:
-        sharedLibEnv.AppendUnique(SHLINKFLAGS=["-Wl,--as-needed", "-Wl,-zdefs"])
+    # Attach the shim only if we are using the external libraries so that we pick up what
+    # configure found for us.
+    if use_system_version_of_library("boost"):
+        sharedLibEnv.AppendUnique(LIBDEPS=mongoClientLibDeps)
+        if linux:
+            sharedLibEnv.AppendUnique(SHLINKFLAGS=["-Wl,--as-needed", "-Wl,-zdefs"])
+    elif darwin:
+        sharedLibEnv.AppendUnique(SHLINKFLAGS=["-Wl,-undefined,dynamic_lookup"])
 
     if windows:
         # Ignore warning LNK4102, which complains about exposing deleting destructors.
@@ -238,7 +239,7 @@ if buildShared:
         # SCons automatically looks for this file in the source list and passes the proper
         # parameter to MS-LINK automatically.
         clientObjects.append('mongoclient.def')
-    
+
     mongoClientSharedLib = sharedLibEnv.SharedLibrary('mongoclient', clientObjects)
 
     mongoClientSharedLibInstall = sharedLibEnv.Install(
@@ -303,7 +304,7 @@ if buildShared:
     sharedClientEnv.PrependUnique(
         LIBS=['mongoclient'],
         LIBPATH=["#/sharedclient"],
-        LIBDEPS=['$BUILD_DIR/third_party/shim_boost']
+        LIBDEPS=mongoClientLibDeps,
     )
 
     # Deal with the different lookup models between regular UNIX and Darwin. For regular unix,
