@@ -1634,8 +1634,7 @@ namespace UpdateTests {
         void run() {
             client().insert( ns(), BSON( "_id" << 55 << "i" << 5 ) );
             client().update( ns(), BSON( "i" << 5 ), BSON( "i" << 6 ) );
-            ASSERT( !client().findOne( ns(), Query( BSON( "_id" << 55 ) ).hint
-                                       ( "{\"_id\":ObjectId(\"000000000000000000000000\")}" ) ).isEmpty() );
+            ASSERT( !client().findOne( ns(), Query( BSON( "_id" << 55 ) ).hint ( "{\"_id\":1}" ) ).isEmpty() );
         }
     };
 
