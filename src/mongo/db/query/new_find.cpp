@@ -541,7 +541,7 @@ namespace mongo {
         }
         else {
             // Takes ownership of cq.
-            Status status = getRunner(cq, &rawRunner);
+            status = getRunner(cq, &rawRunner);
         }
 
         if (!status.isOK()) {
