@@ -400,14 +400,15 @@ namespace mongo {
                 }
             }
 
-            if (Runner::RUNNER_EOF == state && 0 == numResults && (queryOptions & QueryOption_CursorTailable)
+            if (Runner::RUNNER_EOF == state && 0 == numResults
+                && (queryOptions & QueryOption_CursorTailable)
                 && (queryOptions & QueryOption_AwaitData) && (pass < 1000)) {
                 // If the cursor is tailable we don't kill it if it's eof.  We let it try to get
                 // data some # of times first.
                 return 0;
             }
 
-            bool saveClientCursor = true;
+            bool saveClientCursor = false;
 
             if (Runner::RUNNER_DEAD == state || Runner::RUNNER_ERROR == state) {
                 // If we're dead there's no way to get more results.
@@ -506,8 +507,7 @@ namespace mongo {
         params.ns = cq->ns();
         params.start = startLoc;
         params.direction = CollectionScanParams::FORWARD;
-        params.tailable = true;
-        verify(cq->getParsed().hasOption(QueryOption_CursorTailable));
+        params.tailable = cq->getParsed().hasOption(QueryOption_CursorTailable);
 
         WorkingSet* ws = new WorkingSet();
         CollectionScan* cs = new CollectionScan(params, ws, cq->root());
@@ -651,7 +651,7 @@ namespace mongo {
             else if (enoughForFirstBatch(pq, numResults, bb.len())) {
                 // If only one result requested assume it's a findOne() and don't save the cursor.
                 if (pq.wantMore() && 1 != pq.getNumToReturn()) {
-                    saveClientCursor = true;
+                    saveClientCursor = !runner->isEOF();
                 }
                 break;
             }

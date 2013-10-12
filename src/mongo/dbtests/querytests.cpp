@@ -206,8 +206,9 @@ namespace QueryTests {
                 Lock::DBWrite lk(ns);
                 Client::Context ctx( ns );
                 ClientCursorPin clientCursor( cursorId );
-                ASSERT( clientCursor.c()->pq );
-                ASSERT_EQUALS( 2, clientCursor.c()->pq->getNumToReturn() );
+                // pq doesn't exist if it's a runner inside of the clientcursor.
+                // ASSERT( clientCursor.c()->pq );
+                // ASSERT_EQUALS( 2, clientCursor.c()->pq->getNumToReturn() );
                 ASSERT_EQUALS( 2, clientCursor.c()->pos() );
             }
             
