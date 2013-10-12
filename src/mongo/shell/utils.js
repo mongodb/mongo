@@ -436,13 +436,21 @@ jsTest.addAuth = function(conn) {
         localconn = new Mongo(hosts.join(','));
     }
     print ("Adding admin user on connection: " + localconn);
-    return localconn.getDB('admin').addUser({user: jsTestOptions().adminUser,
-                                             pwd: jsTestOptions().adminPassword,
-                                             roles: ["__system"]},
-                                            'majority', 60000);
+    try {
+        localconn._skipAuth = true; // Make sure we don't try to authenticate the conn while adding the user
+        return localconn.getDB('admin').addUser({user: jsTestOptions().adminUser,
+                                                 pwd: jsTestOptions().adminPassword,
+                                                 roles: ["__system"]},
+                                                'majority', 60000);
+    } finally {
+        localconn._skipAuth = false;
+    }
 }
 
 jsTest.authenticate = function(conn) {
+    if (conn._skipAuth) { // To prevent us from trying to authenticate while in the process of adding user.
+        return true;
+    }
     if (!jsTest.options().auth && !jsTest.options().keyFile && !jsTest.options().useX509) {
         conn.authenticated = true;
         return true;
