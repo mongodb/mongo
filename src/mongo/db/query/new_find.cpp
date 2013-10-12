@@ -212,14 +212,6 @@ namespace mongo {
         // Get the indices that we could possibly use.
         NamespaceDetails* nsd = nsdetails(canonicalQuery->ns().c_str());
 
-        // If this is NULL, there is no data but the query is valid.  You're allowed to query for
-        // data on an empty collection and it's not an error.  There just isn't any data...
-        if (NULL == nsd) {
-            const std::string& ns = canonicalQuery->ns();
-            *out = new EOFRunner(canonicalQuery.release(), ns);
-            return Status::OK();
-        }
-
         // Tailable: If the query requests tailable the collection must be capped.
         if (canonicalQuery->getParsed().hasOption(QueryOption_CursorTailable)) {
             if (!nsd->isCapped()) {
@@ -551,8 +543,24 @@ namespace mongo {
         // cq is in a consistent state.
         string cqStr = cq->toString();
 
+        // We'll now try to get the query runner that will execute this query for us. There
+        // are a few cases in which we know upfront which runner we should get and, therefore,
+        // we shortcut the selection process here.
+        //
+        // (a) If the query is over a collection that doesn't exist, we get a special runner
+        // that's is so (a runner) which doesn't return results, the EOFRunner.
+        //
+        // (b) if the query is a replication's initial sync one, we get a SingleSolutinRunner
+        // that uses a specifically designed stage that skips extents faster (see details in
+        // exec/oplogstart.h)
+        //
+        // Otherwise we go through the selection of which runner is most suited to the
+        // query + run-time context at hand.
         Status status = Status::OK();
-        if (pq.hasOption(QueryOption_OplogReplay)) {
+        if (ctx.ctx().db()->getCollection(cq->ns()) == NULL) {
+            rawRunner = new EOFRunner(cq, cq->ns());
+        }
+        else if (pq.hasOption(QueryOption_OplogReplay)) {
             status = getOplogStartHack(cq, &rawRunner);
         }
         else {
