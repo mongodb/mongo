@@ -33,6 +33,7 @@
 #include "mongo/db/fts/fts_spec.h"
 #include "mongo/db/fts/fts_util.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/stringutils.h"
 
 namespace mongo {
 
@@ -40,7 +41,8 @@ namespace mongo {
 
         using namespace mongoutils;
 
-        const double MAX_WEIGHT = 1000000000.0;
+        const double DEFAULT_WEIGHT = 1;
+        const double MAX_WEIGHT = 1000000000;
         const double MAX_WORD_WEIGHT = MAX_WEIGHT / 10000;
 
         FTSSpec::FTSSpec( const BSONObj& indexInfo ) {
@@ -101,101 +103,113 @@ namespace mongo {
             }
         }
 
-        bool FTSSpec::weight( const StringData& field, double* out ) const {
-            Weights::const_iterator i = _weights.find( field.toString() );
-            if ( i == _weights.end() )
-                return false;
-            *out = i->second;
-            return true;
-        }
-
-        string FTSSpec::getLanguageToUse( const BSONObj& userDoc ) const {
+        string FTSSpec::getLanguageToUse( const BSONObj& userDoc,
+                                          const string& currentLanguage ) const {
             BSONElement e = userDoc[_languageOverrideField];
             if ( e.type() == String ) {
                 const char * x = e.valuestrsafe();
                 if ( strlen( x ) > 0 )
                     return x;
             }
-            return _defaultLanguage;
+            return currentLanguage;
         }
 
 
-        /*
-         * Calculates the score for all terms in a document of a collection
-         * @param obj, the document in the collection being parsed
-         * @param term_freqs, map<string,double> to fill up
-         */
-        void FTSSpec::scoreDocument( const BSONObj& obj, TermFrequencyMap* term_freqs ) const {
 
-            string language = getLanguageToUse( obj );
-
-            Stemmer stemmer(language);
-            Tools tools(language);
-            tools.stemmer = &stemmer;
-            tools.stopwords = StopWords::getStopWords( language );
-
-            if ( wildcard() ) {
-                // if * is specified for weight, we can recurse over all fields.
-                _scoreRecurse(tools, obj, term_freqs);
-                return;
-            }
-
-            // otherwise, we need to remember the different weights for each field
-            // and act accordingly (in other words, call _score)
-            for ( Weights::const_iterator i = _weights.begin(); i != _weights.end(); i++ ) {
-                const char * leftOverName = i->first.c_str();
-                // name of field
-                BSONElement e = obj.getFieldDottedOrArray(leftOverName);
-                // weight associated to name of field
-                double weight = i->second;
-
-                if ( e.eoo() ) {
-                    // do nothing
+        namespace {
+            /**
+             * Check for exact match or path prefix match.
+             */
+            inline bool _matchPrefix( const string& dottedName, const string& weight ) {
+                if ( weight == dottedName ) {
+                    return true;
                 }
-                else if ( e.type() == Array ) {
-                    BSONObjIterator j( e.Obj() );
-                    while ( j.more() ) {
-                        BSONElement x = j.next();
-                        if ( leftOverName[0] && x.isABSONObj() )
-                            x = x.Obj().getFieldDotted( leftOverName );
-                        if ( x.type() == String )
-                            _scoreString( tools, x.valuestr(), term_freqs, weight );
-                    }
-                }
-                else if ( e.type() == String ) {
-                    _scoreString( tools, e.valuestr(), term_freqs, weight );
-                }
-
+                return str::startsWith( weight, dottedName + '.' );
             }
         }
 
+        void FTSSpec::scoreDocument( const BSONObj& obj,
+                                     const string& parentLanguage,
+                                     const string& parentPath,
+                                     bool isArray,
+                                     TermFrequencyMap* term_freqs ) const {
+            string language = getLanguageToUse( obj, parentLanguage );
+            Stemmer stemmer( language );
+            Tools tools( language, &stemmer, StopWords::getStopWords( language ) );
 
-        /*
-         * Recurses over all fields of an obj (document in collection)
-         *    and fills term,score map term_freqs
-         * @param tokenizer, tokenizer to tokenize a string into terms
-         * @param obj, object being parsed
-         * term_freqs, map <term,score> to be filled up
-         */
-        void FTSSpec::_scoreRecurse(const Tools& tools,
-                                    const BSONObj& obj,
-                                    TermFrequencyMap* term_freqs ) const {
+            // Perform a depth-first traversal of obj, skipping fields not touched by this spec.
             BSONObjIterator j( obj );
             while ( j.more() ) {
-                BSONElement x = j.next();
 
-                if ( languageOverrideField() == x.fieldName() )
+                BSONElement elem = j.next();
+                string fieldName = elem.fieldName();
+
+                // Skip "language" specifier fields if wildcard.
+                if ( wildcard() && languageOverrideField() == fieldName ) {
                     continue;
-
-                if (x.type() == String) {
-                    double w = 1;
-                    weight( x.fieldName(), &w );
-                    _scoreString(tools, x.valuestr(), term_freqs, w);
-                }
-                else if ( x.isABSONObj() ) {
-                    _scoreRecurse( tools, x.Obj(), term_freqs);
                 }
 
+                // Compose the dotted name of the current field:
+                // 1. parent path empty (top level): use the current field name
+                // 2. parent path non-empty and obj is an array: use the parent path
+                // 3. parent path non-empty and obj is a sub-doc: append field name to parent path
+                string dottedName = ( parentPath.empty() ? fieldName
+                                          : isArray ? parentPath
+                                          : parentPath + '.' + fieldName );
+
+                // Find lower bound of dottedName in _weights.  lower_bound leaves us at the first
+                // weight that could possibly match or be a prefix of dottedName.  And if this
+                // element fails to match, then no subsequent weight can match, since the weights
+                // are lexicographically ordered.
+                Weights::const_iterator i = _weights.lower_bound( dottedName );
+
+                // possibleWeightMatch is set if the weight map contains either a match or some item
+                // lexicographically larger than fieldName.  This boolean acts as a guard on
+                // dereferences of iterator 'i'.
+                bool possibleWeightMatch = ( i != _weights.end() );
+
+                // Optimize away two cases, when not wildcard:
+                // 1. lower_bound seeks to end(): no prefix match possible
+                // 2. lower_bound seeks to a name which is not a prefix
+                if ( !wildcard() ) {
+                    if ( !possibleWeightMatch ) {
+                        continue;
+                    }
+                    else if ( !_matchPrefix( dottedName, i->first ) ) {
+                        continue;
+                    }
+                }
+
+                // Is the current field an exact match on a weight?
+                bool exactMatch = ( possibleWeightMatch && i->first == dottedName );
+
+                double weight = ( possibleWeightMatch ? i->second : DEFAULT_WEIGHT );
+
+                switch ( elem.type() ) {
+                case String:
+                    // Only index strings on exact match or wildcard.
+                    if ( exactMatch || wildcard() ) {
+                        _scoreString( tools, elem.valuestr(), term_freqs, weight );
+                    }
+                    break;
+                case Object:
+                    // Only descend into a sub-document on proper prefix or wildcard.  Note that
+                    // !exactMatch is a sufficient test for proper prefix match, because of
+                    // matchPrefix() continue block above.
+                    if ( !exactMatch || wildcard() ) {
+                        scoreDocument( elem.Obj(), language, dottedName, false, term_freqs );
+                    }
+                    break;
+                case Array:
+                    // Only descend into arrays from non-array parents or on wildcard.
+                    if ( !isArray || wildcard() ) {
+                        scoreDocument( elem.Obj(), language, dottedName, true, term_freqs );
+                    }
+                    break;
+                default:
+                    // Skip over all other BSON types.
+                    break;
+                }
             }
         }
 

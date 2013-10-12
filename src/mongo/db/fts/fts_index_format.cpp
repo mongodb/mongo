@@ -79,7 +79,7 @@ namespace mongo {
 
 
             TermFrequencyMap term_freqs;
-            spec.scoreDocument( obj, &term_freqs );
+            spec.scoreDocument( obj, spec.defaultLanguage(), "", false, &term_freqs );
 
             // create index keys from raw scores
             // only 1 per string

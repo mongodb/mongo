@@ -54,8 +54,13 @@ namespace mongo {
         class FTSSpec {
 
             struct Tools {
-                Tools( string language )
-                    : language( language ){}
+                Tools( string _language,
+                       const Stemmer* _stemmer,
+                       const StopWords* _stopwords )
+                    : language( _language )
+                    , stemmer( _stemmer )
+                    , stopwords( _stopwords ) {}
+
                 const std::string& language;
                 const Stemmer* stemmer;
                 const StopWords* stopwords;
@@ -74,9 +79,26 @@ namespace mongo {
             size_t numExtraAfter() const { return _extraAfter.size(); }
             const std::string& extraAfter( unsigned i ) const { return _extraAfter[i]; }
 
-            string getLanguageToUse( const BSONObj& userDoc ) const;
+            /**
+             * Find a "language" field, if any, in a given BSON doc.  If the language is not on the
+             * list of valid languages, return current.
+             */
+            string getLanguageToUse( const BSONObj& userDoc,
+                                     const std::string& currentLanguage ) const;
 
-            void scoreDocument( const BSONObj& obj, TermFrequencyMap* scores ) const;
+            /**
+             * Calculates term/score pairs for a BSONObj as applied to this spec.
+             * - "obj": the BSONObj to traverse; can be a subdocument or array
+             * - "parentLanguage": nearest enclosing document "language" spec for obj
+             * - "parentPath": obj's dotted path in containing document
+             * - "isArray": true if obj is an array
+             * - "term_freqs": out-parameter to store results
+             */
+            void scoreDocument( const BSONObj& obj,
+                                const string& parentLanguage,
+                                const string& parentPath,
+                                bool isArray,
+                                TermFrequencyMap* term_freqs ) const;
 
             /**
              * given a query, pulls out the pieces (in order) that go in the index first
@@ -85,19 +107,8 @@ namespace mongo {
 
             const Weights& weights() const { return _weights; }
 
-            /**
-             * @param out - untouched if field isn't present
-             * @return if field is here
-             */
-            bool weight( const StringData& field, double* out ) const;
-
-
             static BSONObj fixSpec( const BSONObj& spec );
         private:
-            void _scoreRecurse(const Tools& tools,
-                               const BSONObj& obj,
-                               TermFrequencyMap* term_freqs ) const;
-
             void _scoreString( const Tools& tools,
                                const StringData& raw,
                                TermFrequencyMap* term_freqs,
