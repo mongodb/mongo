@@ -74,15 +74,13 @@ __curstat_table_init(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_schema_get_table(session, name, strlen(name), 0, &table));
 
 	/*
-	 * Allocate an aggregated statistics structure as necessary.  Don't
+	 * Set the cursor to reference the data source statistics; we don't
 	 * initialize it, instead we copy (rather than aggregate), the first
 	 * column's statistics, which has the same effect.
 	 */
-	if ((stats = (WT_DSRC_STATS *)cst->stats) == NULL) {
-		WT_ERR(__wt_calloc_def(session, 1, &stats));
-		cst->stats_first = cst->stats = (WT_STATS *)stats;
-		cst->stats_count = sizeof(WT_DSRC_STATS) / sizeof(WT_STATS);
-	}
+	stats = &cst->u.dsrc_stats;
+	cst->stats_first = cst->stats = (WT_STATS *)stats;
+	cst->stats_count = sizeof(WT_DSRC_STATS) / sizeof(WT_STATS);
 
 	/* Process the column groups. */
 	for (i = 0; i < WT_COLGROUPS(table); i++) {

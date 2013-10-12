@@ -49,15 +49,13 @@ __wt_lsm_stat_init(WT_SESSION_IMPL *session,
 		*p++ = "statistics_fast=true";
 
 	/*
-	 * Allocate an aggregated statistics structure as necessary.  Don't
+	 * Set the cursor to reference the data source statistics; we don't
 	 * initialize it, instead we copy (rather than aggregate), the first
 	 * chunk's statistics, which has the same effect.
 	 */
-	if ((stats = (WT_DSRC_STATS *)cst->stats) == NULL) {
-		WT_ERR(__wt_calloc_def(session, 1, &stats));
-		cst->stats_first = cst->stats = (WT_STATS *)stats;
-		cst->stats_count = sizeof(WT_DSRC_STATS) / sizeof(WT_STATS);
-	}
+	stats = &cst->u.dsrc_stats;
+	cst->stats_first = cst->stats = (WT_STATS *)stats;
+	cst->stats_count = sizeof(WT_DSRC_STATS) / sizeof(WT_STATS);
 
 	/* Hold the LSM lock so that we can safely walk through the chunks. */
 	WT_ERR(__wt_readlock(session, lsm_tree->rwlock));

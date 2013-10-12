@@ -228,9 +228,14 @@ struct __wt_cursor_index {
 struct __wt_cursor_stat {
 	WT_CURSOR iface;
 
-	WT_STATS *stats;		/* Stats owned by the cursor. */
+	WT_STATS *stats;		/* Stats owned by the cursor */
 	WT_STATS *stats_first;		/* First stats reference */
 	int	  stats_count;		/* Count of stats elements */
+
+	union {				/* Copies of the statistics */
+		WT_DSRC_STATS dsrc_stats;
+		WT_CONNECTION_STATS conn_stats;
+	} u;
 
 	int	 notpositioned;		/* Cursor not positioned */
 

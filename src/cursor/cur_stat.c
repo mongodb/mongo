@@ -291,7 +291,6 @@ __curstat_close(WT_CURSOR *cursor)
 
 	__wt_buf_free(session, &cst->pv);
 
-	__wt_free(session, cst->stats);
 	WT_ERR(__wt_cursor_close(cursor));
 
 err:	API_END(session);
@@ -302,36 +301,25 @@ err:	API_END(session);
  * __curstat_conn_init --
  *	Initialize the statistics for a connection.
  */
-static int
+static void
 __curstat_conn_init(
     WT_SESSION_IMPL *session, WT_CURSOR_STAT *cst, uint32_t flags)
 {
 	WT_CONNECTION_IMPL *conn;
-	WT_CONNECTION_STATS *stats;
 
 	conn = S2C(session);
 
-	cst->notpositioned = 1;
-
-	/* Allocate a statistics structure as necessary. */
-	if ((stats = (WT_CONNECTION_STATS *)cst->stats) == NULL) {
-		WT_RET(__wt_calloc_def(session, 1, &stats));
-		cst->stats_first = cst->stats = (WT_STATS *)stats;
-		cst->stats_count =
-		    sizeof(WT_CONNECTION_STATS) / sizeof(WT_STATS);
-	}
-
-	/* Fill in the connection statistics. */
+	/*
+	 * Fill in the connection statistics, and copy them to the cursor.
+	 * Optionally clear the connection statistics.
+	 */
 	__wt_conn_stat_init(session, flags);
-
-	/* Copy them into the cursor's structure. */
-	*stats = conn->stats;
-
-	/* Optionally clear the connection statistics. */
+	cst->u.conn_stats = conn->stats;
 	if (LF_ISSET(WT_STATISTICS_CLEAR))
 		__wt_stat_refresh_connection_stats(&conn->stats);
 
-	return (0);
+	cst->stats_first = cst->stats = (WT_STATS *)&cst->u.conn_stats;
+	cst->stats_count = sizeof(WT_CONNECTION_STATS) / sizeof(WT_STATS);
 }
 
 /*
@@ -361,31 +349,23 @@ __curstat_file_init(WT_SESSION_IMPL *session,
     const char *uri, const char *cfg[], WT_CURSOR_STAT *cst, uint32_t flags)
 {
 	WT_DATA_HANDLE *dhandle, *saved_dhandle;
-	WT_DSRC_STATS *stats;
 	WT_DECL_RET;
 	const char *magic[] = { NULL, NULL };
-
-	cst->notpositioned = 1;
 
 	WT_RET(__wt_session_get_btree_ckpt(session, uri, cfg, 0));
 	dhandle = session->dhandle;
 
-	/* Allocate an aggregated statistics structure as necessary. */
-	if ((stats = (WT_DSRC_STATS *)cst->stats) == NULL) {
-		WT_ERR(__wt_calloc_def(session, 1, &stats));
-		cst->stats_first = cst->stats = (WT_STATS *)stats;
-		cst->stats_count = sizeof(WT_DSRC_STATS) / sizeof(WT_STATS);
-	}
-
-	/* Fill in the data sources statistics. */
+	/*
+	 * Fill in the data source statistics, and copy them to the cursor.
+	 * Optionally clear the data source statistics.
+	 */
 	WT_ERR(__wt_btree_stat_init(session, flags));
-
-	/* Copy them into the cursor's structure. */
-	*stats = dhandle->stats;
-
-	/* Optionally clear the data sources statistics. */
+	cst->u.dsrc_stats = dhandle->stats;
 	if (LF_ISSET(WT_STATISTICS_CLEAR))
 		__wt_stat_refresh_dsrc_stats(&dhandle->stats);
+
+	cst->stats_first = cst->stats = (WT_STATS *)&cst->u.dsrc_stats;
+	cst->stats_count = sizeof(WT_DSRC_STATS) / sizeof(WT_STATS);
 
 	/* Release our handle, we're done with it. */
 err:	WT_TRET(__wt_session_release_btree(session));
@@ -402,7 +382,7 @@ err:	WT_TRET(__wt_session_release_btree(session));
 		 * this is really, really awful.
 		 */
 		magic[0] = dhandle->name;
-		magic[1] = (char *)stats;
+		magic[1] = (char *)&cst->u.dsrc_stats;
 
 		/*
 		 * We're likely holding the schema lock inside the statistics
@@ -430,8 +410,6 @@ __curstat_lsm_init(WT_SESSION_IMPL *session,
 	WT_DECL_RET;
 	WT_LSM_TREE *lsm_tree;
 
-	cst->notpositioned = 1;
-
 	WT_WITH_SCHEMA_LOCK_OPT(session,
 	    ret = __wt_lsm_tree_get(session, uri, 0, &lsm_tree));
 	WT_RET(ret);
@@ -449,9 +427,12 @@ int
 __wt_curstat_init(WT_SESSION_IMPL *session,
     const char *uri, const char *cfg[], WT_CURSOR_STAT *cst, uint32_t flags)
 {
-	if (strcmp(uri, "statistics:") == 0)
-		return (__curstat_conn_init(session, cst, flags));
-	else if (WT_PREFIX_MATCH(uri, "statistics:file:"))
+	cst->notpositioned = 1;
+
+	if (strcmp(uri, "statistics:") == 0) {
+		__curstat_conn_init(session, cst, flags);
+		return (0);
+	} else if (WT_PREFIX_MATCH(uri, "statistics:file:"))
 		return (__curstat_file_init(session,
 		    uri + strlen("statistics:"), cfg, cst, flags));
 	else if (WT_PREFIX_MATCH(uri, "statistics:lsm:"))
@@ -521,8 +502,7 @@ __wt_curstat_open(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_cursor_init(cursor, uri, NULL, cfg, cursorp));
 
 	if (0) {
-err:		__wt_free(session, cst->stats);
-		__wt_free(session, cst);
+err:		__wt_free(session, cst);
 	}
 
 	return (ret);
