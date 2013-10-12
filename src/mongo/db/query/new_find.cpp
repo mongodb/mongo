@@ -103,7 +103,7 @@ namespace {
 namespace mongo {
 
     // Server parameter
-    MONGO_EXPORT_SERVER_PARAMETER(newQueryFrameworkEnabled, bool, false);
+    MONGO_EXPORT_SERVER_PARAMETER(newQueryFrameworkEnabled, bool, true);
 
     bool isNewQueryFrameworkEnabled() { return newQueryFrameworkEnabled; }
     void enableNewQueryFramework() { newQueryFrameworkEnabled = true; }
