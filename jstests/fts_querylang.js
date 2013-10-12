@@ -14,6 +14,9 @@ t.insert({_id:1, _idCopy: 1, a:"additional content"});
 t.insert({_id:2, _idCopy: 2, a:"irrelevant content"});
 t.ensureIndex({a:"text"});
 
+// Test text query with no results.
+assert.eq(false, t.find({$text: {$search: "words"}}).hasNext());
+
 // Test implicit sort for basic text query.
 results = t.find({$text: {$search: "textual content -irrelevant"}}).toArray();
 assert.eq(results.length, 2);

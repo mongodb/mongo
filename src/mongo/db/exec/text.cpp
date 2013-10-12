@@ -58,10 +58,10 @@ namespace mongo {
         // Fill out our result queue.
         if (!_filledOutResults) {
             PlanStage::StageState ss = fillOutResults();
-            if (PlanStage::NEED_TIME != ss) {
-                // fillOutResults() returns NEED_TIME on success, FAILURE otherwise.
+            if (ss == PlanStage::IS_EOF || ss == PlanStage::FAILURE) {
                 return ss;
             }
+            verify(ss == PlanStage::NEED_TIME);
         }
 
         // Having cached all our results, return them one at a time.
@@ -197,6 +197,10 @@ namespace mongo {
         }
 
         _filledOutResults = true;
+
+        if (_results.size() == 0) {
+            return PlanStage::IS_EOF;
+        }
         return PlanStage::NEED_TIME;
     }
 

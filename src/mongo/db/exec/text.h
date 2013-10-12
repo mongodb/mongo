@@ -113,7 +113,8 @@ namespace mongo {
             }
         };
 
-        // Helper for buffering results array.  Returns NEED_TIME on success, FAILURE on failure.
+        // Helper for buffering results array.  Returns NEED_TIME (if any results were produced),
+        // IS_EOF, or FAILURE.
         StageState fillOutResults();
 
         // Helper to update _scores with a new-found (term, score) pair for this document.  Also
