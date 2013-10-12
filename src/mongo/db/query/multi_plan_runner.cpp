@@ -309,8 +309,8 @@ namespace mongo {
                 planHitEOF = true;
             }
             else {
-                // FAILURE.  Do we want to just tank that plan and try the rest?  We probably want
-                // to fail globally as this shouldn't happen anyway.
+                // FAILURE or DEAD.  Do we want to just tank that plan and try the rest?  We
+                // probably want to fail globally as this shouldn't happen anyway.
 
                 candidate.failed = true;
                 ++_failureCount;

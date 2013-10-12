@@ -154,6 +154,9 @@ namespace mongo {
             else if (PlanStage::IS_EOF == code) {
                 return Runner::RUNNER_EOF;
             }
+            else if (PlanStage::DEAD == code) {
+                return Runner::RUNNER_DEAD;
+            }
             else {
                 verify(PlanStage::FAILURE == code);
                 return Runner::RUNNER_ERROR;

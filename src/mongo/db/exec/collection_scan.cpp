@@ -47,13 +47,13 @@ namespace mongo {
 
     PlanStage::StageState CollectionScan::work(WorkingSetID* out) {
         ++_commonStats.works;
-        if (_nsDropped) { return PlanStage::IS_EOF; }
+        if (_nsDropped) { return PlanStage::DEAD; }
 
         if (NULL == _iter) {
             Collection* collection = cc().database()->getCollection( _params.ns );
             if ( collection == NULL ) {
                 _nsDropped = true;
-                return PlanStage::IS_EOF;
+                return PlanStage::DEAD;
             }
 
             _iter.reset( collection->getIterator( _params.start,
@@ -128,6 +128,7 @@ namespace mongo {
         ++_commonStats.unyields;
         if (NULL != _iter) {
             if (!_iter->recoverFromYield()) {
+                warning() << "collection dropped during yield of collscan or state deleted";
                 _nsDropped = true;
             }
         }

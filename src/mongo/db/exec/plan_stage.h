@@ -119,6 +119,10 @@ namespace mongo {
             // nothing output in the out parameter.
             NEED_TIME,
 
+            // Something went wrong but it's not an internal error.  Perhaps our collection was
+            // dropped or state deleted.
+            DEAD,
+
             // Something has gone unrecoverably wrong.  Stop running this query.  There is nothing
             // output in the out parameter.
             FAILURE,

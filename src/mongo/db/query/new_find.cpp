@@ -311,7 +311,7 @@ namespace mongo {
         // This is a read lock.  TODO: There is a cursor flag for not needing this.  Do we care?
         Client::ReadContext ctx(ns);
 
-        //cout << "running getMore in new system, cursorid " << cursorid << endl;
+        QLOG() << "running getMore in new system, cursorid " << cursorid << endl;
 
         // This checks to make sure the operation is allowed on a replicated node.  Since we are not
         // passing in a query object (necessary to check SlaveOK query option), the only state where
@@ -413,6 +413,15 @@ namespace mongo {
             if (Runner::RUNNER_DEAD == state || Runner::RUNNER_ERROR == state) {
                 // If we're dead there's no way to get more results.
                 saveClientCursor = false;
+                // In the old system tailable capped cursors would be killed off at the
+                // cursorid level.  If a tailable capped cursor is nuked the cursorid
+                // would vanish.
+                // 
+                // In the new system they die and are cleaned up later (or time out).
+                // So this is where we get to remove the cursorid.
+                if (0 == numResults) {
+                    resultFlags = ResultFlag_CursorNotFound;
+                }
             }
             else if (Runner::RUNNER_EOF == state) {
                 // EOF is also end of the line unless it's tailable.
@@ -428,11 +437,17 @@ namespace mongo {
                 // cc is now invalid, as is the runner
                 cursorid = 0;
                 cc = NULL;
+                QLOG() << "getMore NOT saving client cursor, ended w/state "
+                       << Runner::statestr(state)
+                       << endl;
             }
             else {
                 // Continue caching the ClientCursor.
                 cc->incPos(numResults);
                 runner->saveState();
+                QLOG() << "getMore saving client cursor ended w/state "
+                       << Runner::statestr(state)
+                       << endl;
 
                 // Possibly note slave's position in the oplog.
                 if ((queryOptions & QueryOption_OplogReplay) && !slaveReadTill.isNull()) {
@@ -455,7 +470,7 @@ namespace mongo {
         qr->startingFrom = startingResult;
         qr->nReturned = numResults;
         bb.decouple();
-        //cout << "getMore returned " << numResults << " results\n";
+        QLOG() << "getMore returned " << numResults << " results\n";
         return qr;
     }
 
@@ -749,8 +764,8 @@ namespace mongo {
                                                 cq->getParsed().getFilter());
             ccId = cc->cursorid();
 
-            //cout << "caching runner with cursorid " << ccId
-                 //<< " after returning " << numResults << " results" << endl;
+            QLOG() << "caching runner with cursorid " << ccId
+                   << " after returning " << numResults << " results" << endl;
 
             // ClientCursor takes ownership of runner.  Release to make sure it's not deleted.
             runner.release();
@@ -774,7 +789,7 @@ namespace mongo {
             cc->setLeftoverMaxTimeMicros(curop.getRemainingMaxTimeMicros());
         }
         else {
-            //cout << "not caching runner but returning " << numResults << " results\n";
+            QLOG() << "not caching runner but returning " << numResults << " results\n";
         }
 
         // Add the results from the query into the output buffer.

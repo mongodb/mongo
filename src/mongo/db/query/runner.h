@@ -58,6 +58,22 @@ namespace mongo {
             RUNNER_ERROR,
         };
 
+        static string statestr(RunnerState s) {
+            if (RUNNER_ADVANCED == s) {
+                return "RUNNER_ADVANCED";
+            }
+            else if (RUNNER_EOF == s) {
+                return "RUNNER_EOF";
+            }
+            else if (RUNNER_DEAD == s) {
+                return "RUNNER_DEAD";
+            }
+            else {
+                verify(RUNNER_ERROR == s);
+                return "RUNNER_ERROR";
+            }
+        }
+
         /**
          * The yielding policy of the runner.  By default, a runner does not yield itself
          * (YIELD_MANUAL).
