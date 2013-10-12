@@ -383,7 +383,7 @@ namespace mongo {
                 language_override = "language";
 
             int version = -1;
-            int textIndexVersion = 1;
+            int textIndexVersion = 2;
 
             BSONObjBuilder b;
             BSONObjIterator i( spec );
@@ -411,7 +411,7 @@ namespace mongo {
                     textIndexVersion = e.numberInt();
                     uassert( 16730,
                              str::stream() << "bad textIndexVersion: " << textIndexVersion,
-                             textIndexVersion == 1 );
+                             textIndexVersion == 2 );
                 }
                 else {
                     b.append( e );
