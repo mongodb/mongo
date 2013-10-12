@@ -21,7 +21,7 @@ set -e
 case "$1" in
     configure)
 	# create a mongodb group and user
-        if ! grep -q mongodb /etc/passwd; then
+        if ! getent passwd mongodb >/dev/null 2>&1; then
 		adduser --system --no-create-home mongodb
 		addgroup --system mongodb
 		adduser mongodb mongodb
