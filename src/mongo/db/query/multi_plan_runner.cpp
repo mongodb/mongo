@@ -347,7 +347,9 @@ namespace mongo {
     }
 
     Status MultiPlanRunner::getExplainPlan(TypeExplain** explain) const {
-        dassert(_bestPlan.get());
+        if (NULL == _bestPlan.get()) {
+            return Status(ErrorCodes::InternalError, "No plan available to provide stats");
+        }
 
         //
         // Explain for the winner plan
