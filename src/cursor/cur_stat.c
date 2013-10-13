@@ -323,19 +323,37 @@ __curstat_conn_init(
 }
 
 /*
+ * When returning the statistics for a file URI, we review open handles, and
+ * aggregate checkpoint handle statistics with the file URI statistics.  To
+ * make that work, we have to pass information to the function reviewing the
+ * handles, this structure is what we pass.
+ */
+struct __checkpoint_args {
+	const char *name;		/* Data source handle name */
+	WT_DSRC_STATS *stats;		/* Stat structure being filled */
+	int clear;			/* WT_STATISTICS_CLEAR */
+};
+
+/*
  * __curstat_checkpoint --
  *	Aggregate statistics from checkpoint handles.
  */
 static int
-__curstat_checkpoint(WT_SESSION_IMPL *session, const char *magic[])
+__curstat_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 {
+	struct __checkpoint_args *args;
 	WT_DATA_HANDLE *dhandle;
 
 	dhandle = session->dhandle;
+	args = (struct __checkpoint_args *)cfg[0];
 
 	/* Aggregate the flagged file's checkpoint handles. */
-	if (dhandle->checkpoint != NULL && strcmp(dhandle->name, magic[0]) == 0)
-		__wt_stat_aggregate_dsrc_stats(&dhandle->stats, magic[1]);
+	if (dhandle->checkpoint != NULL &&
+	    strcmp(dhandle->name, args->name) == 0) {
+		__wt_stat_aggregate_dsrc_stats(&dhandle->stats, args->stats);
+		if (args->clear)
+			__wt_stat_refresh_dsrc_stats(&dhandle->stats);
+	}
 
 	return (0);
 }
@@ -350,7 +368,6 @@ __curstat_file_init(WT_SESSION_IMPL *session,
 {
 	WT_DATA_HANDLE *dhandle, *saved_dhandle;
 	WT_DECL_RET;
-	const char *magic[] = { NULL, NULL };
 
 	WT_RET(__wt_session_get_btree_ckpt(session, uri, cfg, 0));
 	dhandle = session->dhandle;
@@ -376,13 +393,13 @@ err:	WT_TRET(__wt_session_release_btree(session));
 	 * the statistics from any checkpoint handles matching this file.
 	 */
 	if (dhandle->checkpoint == NULL) {
-		/*
-		 * !!!
-		 * We have to pass some information to the callback function;
-		 * this is really, really awful.
-		 */
-		magic[0] = dhandle->name;
-		magic[1] = (char *)&cst->u.dsrc_stats;
+		struct __checkpoint_args args;
+		const char *cfg_arg[] = { NULL, NULL };
+
+		args.name = dhandle->name;
+		args.stats = &cst->u.dsrc_stats;
+		args.clear = LF_ISSET(WT_STATISTICS_CLEAR) ? 1 : 0;
+		cfg_arg[0] = (char *)&args;
 
 		/*
 		 * We're likely holding the schema lock inside the statistics
@@ -392,7 +409,7 @@ err:	WT_TRET(__wt_session_release_btree(session));
 		saved_dhandle = dhandle;
 		WT_WITH_SCHEMA_LOCK_OPT(session,
 		    ret = __wt_conn_btree_apply(
-		    session, 1, __curstat_checkpoint, magic));
+		    session, 1, __curstat_checkpoint, cfg_arg));
 		session->dhandle = saved_dhandle;
 	}
 
