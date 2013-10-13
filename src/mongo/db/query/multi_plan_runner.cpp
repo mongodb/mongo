@@ -136,7 +136,8 @@ namespace mongo {
         if (_failure || _killed) { return true; }
         // If _bestPlan is not NULL, you haven't picked the best plan yet, so you're not EOF.
         if (NULL == _bestPlan) { return false; }
-        return _bestPlan->isEOF();
+        // We must return all our cached results and there must be no results from the best plan.
+        return _alreadyProduced.empty() && _bestPlan->isEOF();
     }
 
     const std::string& MultiPlanRunner::ns() {

@@ -673,8 +673,13 @@ namespace mongo {
                 break;
             }
             else if (enoughForFirstBatch(pq, numResults, bb.len())) {
+                QLOG() << "Enough for first batch, wantMore=" << pq.wantMore()
+                       << " numToReturn=" << pq.getNumToReturn()
+                       << " numResults=" << numResults
+                       << endl;
                 // If only one result requested assume it's a findOne() and don't save the cursor.
                 if (pq.wantMore() && 1 != pq.getNumToReturn()) {
+                    QLOG() << " runner EOF=" << runner->isEOF() << endl;
                     saveClientCursor = !runner->isEOF();
                 }
                 break;
