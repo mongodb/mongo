@@ -839,7 +839,7 @@ for x in normalTools:
 env.Install( '#/', [
         env.Program( "mongofiles", ["tools/files.cpp", "tools/mongofiles_options.cpp"], LIBDEPS=["alltools", "gridfs"] ),
         env.Program( "bsondump", ["tools/bsondump.cpp", "tools/bsondump_options.cpp"], LIBDEPS=["alltools"]),
-        env.Program( "mongobridge", "tools/bridge.cpp",
+        env.Program( "mongobridge", ["tools/bridge.cpp", "tools/mongobridge_options.cpp"],
                      LIBDEPS=["serveronly", "coreserver", "coredb"] ),
         env.Program( "mongoperf", "client/examples/mongoperf.cpp",
                      LIBDEPS=["serveronly", "coreserver", "coredb"] ),

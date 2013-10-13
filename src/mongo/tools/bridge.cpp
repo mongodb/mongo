@@ -21,6 +21,7 @@
 #include "mongo/base/initializer.h"
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/dbmessage.h"
+#include "mongo/tools/mongobridge_options.h"
 #include "mongo/util/net/listen.h"
 #include "mongo/util/net/message.h"
 #include "mongo/util/stacktrace.h"
@@ -29,9 +30,6 @@
 using namespace mongo;
 using namespace std;
 
-int port = 0;
-int delay = 0;
-string destUri;
 void cleanup( int sig );
 
 class Forwarder {
@@ -41,7 +39,7 @@ public:
     void operator()() const {
         DBClientConnection dest;
         string errmsg;
-        while( !dest.connect( destUri, errmsg ) )
+        while (!dest.connect(mongoBridgeGlobalParams.destUri, errmsg))
             sleepmillis( 500 );
         Message m;
         while( 1 ) {
@@ -52,7 +50,7 @@ public:
                     mp_.shutdown();
                     break;
                 }
-                sleepmillis( delay );
+                sleepmillis(mongoBridgeGlobalParams.delay);
 
                 int oldId = m.header()->id;
                 if ( m.operation() == dbQuery || m.operation() == dbMsg || m.operation() == dbGetMore ) {
@@ -137,19 +135,6 @@ void setupSignals() {
 inline void setupSignals() {}
 #endif
 
-void helpExit() {
-    cout << "usage mongobridge --port <port> --dest <destUri> [ --delay <ms> ]" << endl;
-    cout << "    port: port to listen for mongo messages" << endl;
-    cout << "    destUri: uri of remote mongod instance" << endl;
-    cout << "    ms: transfer delay in milliseconds (default = 0)" << endl;
-    ::_exit( -1 );
-}
-
-void check( bool b ) {
-    if ( !b )
-        helpExit();
-}
-
 int toolMain( int argc, char **argv, char** envp ) {
     mongo::runGlobalInitializersOrDie(argc, argv, envp);
 
@@ -157,26 +142,7 @@ int toolMain( int argc, char **argv, char** envp ) {
 
     setupSignals();
 
-    check( argc == 5 || argc == 7 );
-
-    for( int i = 1; i < argc; ++i ) {
-        check( i % 2 != 0 );
-        if ( strcmp( argv[ i ], "--port" ) == 0 ) {
-            port = strtol( argv[ ++i ], 0, 10 );
-        }
-        else if ( strcmp( argv[ i ], "--dest" ) == 0 ) {
-            destUri = argv[ ++i ];
-        }
-        else if ( strcmp( argv[ i ], "--delay" ) == 0 ) {
-            delay = strtol( argv[ ++i ], 0, 10 );
-        }
-        else {
-            check( false );
-        }
-    }
-    check( port != 0 && !destUri.empty() );
-
-    listener.reset( new MyListener( port ) );
+    listener.reset(new MyListener(mongoBridgeGlobalParams.port));
     listener->setupSockets();
     listener->initAndListen();
 
