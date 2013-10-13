@@ -387,7 +387,7 @@ namespace mongo {
                     }
                 }
 
-                if ((numResults && numResults >= ntoreturn)
+                if ((ntoreturn && numResults >= ntoreturn)
                     || bb.len() > MaxBytesToReturnToClientAtOnce) {
                     break;
                 }
