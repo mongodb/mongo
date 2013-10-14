@@ -531,7 +531,7 @@ static void
 __lsm_tree_throttle(
     WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 {
-	WT_LSM_CHUNK *chunk, **cp;
+	WT_LSM_CHUNK *chunk, **cp, *prev_chunk;
 	uint64_t cache_sz, cache_used, record_count;
 	uint32_t in_memory;
 
@@ -539,13 +539,15 @@ __lsm_tree_throttle(
 
 	/*
 	 * In the steady state, we expect that the checkpoint worker thread
-	 * will keep up with inserts.  If not, we throttle the insert rate to
+	 * will keep up with inserts.  If not, throttle the insert rate to
 	 * avoid filling the cache with in-memory chunks.  Threads sleep every
 	 * 100 operations, so take that into account in the calculation.
 	 */
 	record_count = 1;
-	for (in_memory = 1, cp = lsm_tree->chunk + lsm_tree->nchunks - 1;
-	    in_memory < lsm_tree->nchunks && !F_ISSET(*cp, WT_LSM_CHUNK_ONDISK);
+	for (in_memory = 0, cp = lsm_tree->chunk + lsm_tree->nchunks - 1;
+	    in_memory < lsm_tree->nchunks &&
+		(*cp)->generation == 0 &&
+		!F_ISSET(*cp, WT_LSM_CHUNK_ONDISK);
 	    ++in_memory, --cp)
 		record_count += (*cp)->count;
 
@@ -562,6 +564,8 @@ __lsm_tree_throttle(
 		lsm_tree->throttle_sleep =
 		    WT_MAX(20, 2 * lsm_tree->throttle_sleep);
 	} else {
+		WT_ASSERT(session,
+		    WT_TIMECMP(chunk->create_ts, (*cp)->create_ts) >= 0);
 		lsm_tree->throttle_sleep = (long)((in_memory - 2) *
 		    WT_TIMEDIFF(chunk->create_ts, (*cp)->create_ts) /
 		    (20 * record_count));
@@ -585,10 +589,15 @@ __lsm_tree_throttle(
 	 * Filter out some noise by keeping a weighted history of the
 	 * calculated value.
 	 */
-	if (in_memory > 1)
-		lsm_tree->chunk_fill_ms = (3 * lsm_tree->chunk_fill_ms +
-		    WT_TIMEDIFF(chunk->create_ts, (*cp)->create_ts) / 1000000) /
-		    (3 + in_memory - 1);
+	prev_chunk = lsm_tree->chunk[lsm_tree->nchunks - 2];
+	if (in_memory > 1) {
+		WT_ASSERT(session, prev_chunk->generation == 0);
+		WT_ASSERT(session, WT_TIMECMP(
+		    chunk->create_ts, prev_chunk->create_ts) >= 0);
+		lsm_tree->chunk_fill_ms =
+		    (3 * lsm_tree->chunk_fill_ms + WT_TIMEDIFF(
+		    chunk->create_ts, prev_chunk->create_ts) / 1000000) / 4;
+	}
 }
 
 /*
@@ -605,7 +614,7 @@ __wt_lsm_tree_switch(
 
 	new_id = WT_ATOMIC_ADD(lsm_tree->last, 1);
 
-	if (lsm_tree->nchunks > 0)
+	if (lsm_tree->nchunks > 1)
 		__lsm_tree_throttle(session, lsm_tree);
 
 	WT_ERR(__wt_realloc_def(session, &lsm_tree->chunk_alloc,

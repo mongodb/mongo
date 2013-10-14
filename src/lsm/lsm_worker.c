@@ -313,12 +313,6 @@ __wt_lsm_checkpoint_worker(void *arg)
 				   session, &S2C(session)->checkpoint_lock);
 			}
 
-			/*
-			 * Clear the "cache resident" flag so the primary can
-			 * be evicted and eventually closed.
-			 */
-			if (ret == 0)
-				__wt_btree_evictable(session, 1);
 			WT_TRET(__wt_session_release_btree(session));
 			WT_ERR(ret);
 
@@ -335,6 +329,18 @@ __wt_lsm_checkpoint_worker(void *arg)
 				__wt_err(session, ret, "LSM checkpoint");
 				break;
 			}
+
+			/*
+			 * Clear the "cache resident" flag so the primary can
+			 * be evicted and eventually closed.  Only do this once
+			 * the checkpoint has succeeded: otherwise, accessing
+			 * the leaf page during the checkpoint can trigger
+			 * forced eviction.
+			 */
+			WT_ERR(__wt_session_get_btree(
+			    session, chunk->uri, NULL, NULL, 0));
+			__wt_btree_evictable(session, 1);
+			WT_ERR(__wt_session_release_btree(session));
 
 			++j;
 			WT_ERR(__wt_writelock(session, lsm_tree->rwlock));
@@ -468,13 +474,7 @@ __lsm_discard_handle(
 	WT_DECL_RET;
 	int locked;
 
-	/*
-	 * We need to grab the schema lock to drop the file, so first try to
-	 * discard the handle so there is minimal work to do while holding the
-	 * schema lock.
-	 *
-	 * This will fail with EBUSY if the file is still in use.
-	 */
+	/* This will fail with EBUSY if the file is still in use. */
 	WT_RET(__wt_session_get_btree(session, uri, checkpoint, NULL,
 	    WT_DHANDLE_EXCLUSIVE | WT_DHANDLE_LOCK_ONLY));
 
@@ -563,8 +563,10 @@ __lsm_free_chunks(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 		chunk = cookie.chunk_array[i];
 		WT_ASSERT(session, chunk != NULL);
 		/* Skip the chunk if another worker is using it. */
-		if (chunk->refcnt > 1)
+		if (chunk->refcnt > 1) {
+			++skipped;
 			continue;
+		}
 
 		if (F_ISSET(chunk, WT_LSM_CHUNK_BLOOM)) {
 			/*
