@@ -48,6 +48,59 @@
 
 namespace mongo {
 
+/**
+ * SERVER-11160 syslog.h does not define facilitynames under solaris
+ * Besides facilitynames, there are other macros defined under linux
+ * that are not provided by solaris. Those will not be reproduced here.
+ * These could also go into a syslog.h compatibility header.
+ */
+
+namespace {
+
+#if defined(SYSLOG_NAMES)
+#if defined(__sunos__)
+
+#if !defined(LOG_MAKEPRI)
+#  define LOG_MAKEPRI(fac, pri) (((fac) << 3) | (pri))
+#endif // !defined(LOG_MAKEPRI)
+
+#define INTERNAL_MARK  LOG_MAKEPRI(LOG_NFACILITIES, 0)
+
+    typedef struct _code {
+    	const char* c_name;
+    	int         c_val;
+    } CODE;
+    
+    CODE facilitynames[] =
+      {
+        { "auth", LOG_AUTH },
+        { "cron", LOG_CRON },
+        { "daemon", LOG_DAEMON },
+        { "kern", LOG_KERN },
+        { "lpr", LOG_LPR },
+        { "mail", LOG_MAIL },
+        { "mark", INTERNAL_MARK },		/* INTERNAL */
+        { "news", LOG_NEWS },
+        { "security", LOG_AUTH },		/* DEPRECATED */
+        { "syslog", LOG_SYSLOG },
+        { "user", LOG_USER },
+        { "uucp", LOG_UUCP },
+        { "local0", LOG_LOCAL0 },
+        { "local1", LOG_LOCAL1 },
+        { "local2", LOG_LOCAL2 },
+        { "local3", LOG_LOCAL3 },
+        { "local4", LOG_LOCAL4 },
+        { "local5", LOG_LOCAL5 },
+        { "local6", LOG_LOCAL6 },
+        { "local7", LOG_LOCAL7 },
+        { NULL, -1 }
+    };
+
+#endif // defined(__sunos__)
+#endif // defined(SYSLOG_NAMES)
+
+} // namespace
+
     typedef moe::OptionDescription OD;
     typedef moe::PositionalOptionDescription POD;
 
