@@ -31,11 +31,6 @@ for f in `find examples ext src test -name '*.[chisy]' -o -name '*.in' |
 		cat $t
 	fi
 
-	if egrep '%l[diouxXn]|%[diouxXn]l' $f > $t; then
-		echo "$f: incorrect or dangerous printf format: %l[diouxXn]"
-		cat $t
-	fi
-
 	if grep "(unsigned)" $f > $t; then
 		echo "$f: (unsigned) cast is wrong"
 		cat $t
