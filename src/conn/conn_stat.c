@@ -129,7 +129,7 @@ __statlog_dump(WT_SESSION_IMPL *session, const char *name, int conn_stats)
 		WT_ERR(__wt_buf_fmt(session, tmp, "statistics:%s", name));
 		uri = tmp->data;
 	}
-	cfg[1] = S2C(session)->stat_clear ?
+	cfg[1] = conn->stat_clear ?
 	    "statistics_clear,statistics_fast" : "statistics_fast";
 
 	/*
@@ -159,9 +159,6 @@ __statlog_dump(WT_SESSION_IMPL *session, const char *name, int conn_stats)
 	default:
 		break;
 	}
-
-	/* Spinlock statistics. */
-	WT_ERR(__wt_statlog_spinlock_dump(conn, name));
 
 err:	__wt_scr_free(&tmp);
 	return (ret);
@@ -323,6 +320,9 @@ __statlog_server(void *arg)
 
 		/* Dump the connection statistics. */
 		WT_ERR(__statlog_dump(session, conn->home, 1));
+
+		/* Dump the spinlock statistics. */
+		WT_ERR(__wt_statlog_dump_spinlock(conn, conn->home));
 
 		/*
 		 * Lock the schema and walk the list of open handles, dumping
