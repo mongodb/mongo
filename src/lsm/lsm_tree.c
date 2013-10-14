@@ -77,16 +77,26 @@ __lsm_tree_close(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	if (F_ISSET(lsm_tree, WT_LSM_TREE_WORKING)) {
 		F_CLR(lsm_tree, WT_LSM_TREE_WORKING);
 		/*
-		 * Signal twice to wake up all threads, even if they are racing
-		 * to check the "working" flag.
+		 * Signal all threads to wake them up, then wait for them to
+		 * exit.
+		 *
+		 * !!!
+		 * If we have the schema lock, have the LSM worker sessions
+		 * inherit the flag before we do anything.  The thread may
+		 * already be waiting for the schema lock, but the loop in the
+		 * WT_WITH_SCHEMA_LOCK macro takes care of that.
 		 */
 		if (F_ISSET(S2C(session), WT_CONN_LSM_MERGE))
 			for (i = 0; i < lsm_tree->merge_threads; i++) {
+				F_SET(lsm_tree->worker_sessions[i],
+				    F_ISSET(session, WT_SESSION_SCHEMA_LOCKED));
 				WT_TRET(__wt_cond_signal(
 				    session, lsm_tree->work_cond));
 				WT_TRET(__wt_thread_join(
 				    session, lsm_tree->worker_tids[i]));
 			}
+		F_SET(lsm_tree->ckpt_session,
+		    F_ISSET(session, WT_SESSION_SCHEMA_LOCKED));
 		WT_TRET(__wt_cond_signal(session, lsm_tree->work_cond));
 		WT_TRET(__wt_thread_join(session, lsm_tree->ckpt_tid));
 	}
@@ -102,7 +112,6 @@ __lsm_tree_close(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 		if ((s = lsm_tree->worker_sessions[i]) == NULL)
 			continue;
 		lsm_tree->worker_sessions[i] = NULL;
-		F_SET(s, F_ISSET(session, WT_SESSION_SCHEMA_LOCKED));
 		wt_session = &s->iface;
 		WT_TRET(wt_session->close(wt_session, NULL));
 
@@ -114,9 +123,6 @@ __lsm_tree_close(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	}
 
 	if (lsm_tree->ckpt_session != NULL) {
-		F_SET(lsm_tree->ckpt_session,
-		    F_ISSET(session, WT_SESSION_SCHEMA_LOCKED));
-
 		wt_session = &lsm_tree->ckpt_session->iface;
 		WT_TRET(wt_session->close(wt_session, NULL));
 

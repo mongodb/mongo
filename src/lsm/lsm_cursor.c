@@ -1257,7 +1257,7 @@ __wt_clsm_open(WT_SESSION_IMPL *session,
 		return (EINVAL);
 
 	/* Get the LSM tree. */
-	WT_WITH_SCHEMA_LOCK_OPT(session,
+	WT_WITH_SCHEMA_LOCK(session,
 	    ret = __wt_lsm_tree_get(session, uri, 0, &lsm_tree));
 	WT_RET(ret);
 

@@ -72,14 +72,8 @@ __session_close(WT_SESSION *wt_session, const char *config)
 
 	WT_ASSERT(session, session->ncursors == 0);
 
-	/*
-	 * Acquire the schema lock: we may be closing btree handles.
-	 *
-	 * Note that in some special cases, the schema may already be locked
-	 * (e.g., if this session is an LSM tree worker and the tree is being
-	 * dropped).
-	 */
-	WT_WITH_SCHEMA_LOCK_OPT(session, tret = __session_close_cache(session));
+	/* Acquire the schema lock: we may be closing btree handles. */
+	WT_WITH_SCHEMA_LOCK(session, tret = __session_close_cache(session));
 	WT_TRET(tret);
 
 	/* Discard metadata tracking. */
