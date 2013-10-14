@@ -103,7 +103,7 @@ __statlog_config(WT_SESSION_IMPL *session, const char **cfg, int *runp)
 
 /*
  * __statlog_dump --
- *	Dump out the connection statistics.
+ *	Dump out handle/connection statistics.
  */
 static int
 __statlog_dump(WT_SESSION_IMPL *session, const char *name, int conn_stats)
@@ -112,52 +112,55 @@ __statlog_dump(WT_SESSION_IMPL *session, const char *name, int conn_stats)
 	WT_CURSOR *cursor;
 	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
-	WT_SESSION *wt_session;
-	uint64_t value;
-	const char *config, *desc, *pdesc, *uri;
+	WT_STATS *stats;
+	u_int i;
+	uint64_t max;
+	const char *uri;
+	const char *cfg[] = {
+	    WT_CONFIG_BASE(session, session_open_cursor), NULL, NULL };
 
 	conn = S2C(session);
 
-	/* Build the statistics cursor URI. */
+	/* Build URI and configuration string. */
 	if (conn_stats)
 		uri = "statistics:";
 	else {
-		WT_RET(__wt_scr_alloc(
-		    session, strlen("statistics:") + strlen(name) + 5, &tmp));
-		(void)strcpy(tmp->mem, "statistics:");
-		(void)strcat(tmp->mem, name);
-		uri = tmp->mem;
+		WT_RET(__wt_scr_alloc(session, 0, &tmp));
+		WT_ERR(__wt_buf_fmt(session, tmp, "statistics:%s", name));
+		uri = tmp->data;
+	}
+	cfg[1] = S2C(session)->stat_clear ?
+	    "statistics_clear,statistics_fast" : "statistics_fast";
+
+	/*
+	 * Open the statistics cursor and dump the statistics.
+	 *
+	 * If we don't find an underlying object, silently ignore it, the object
+	 * may exist only intermittently.
+	 */
+	switch (ret = __wt_curstat_open(session, uri, cfg, &cursor)) {
+	case 0:
+		max = conn_stats ?
+		    sizeof(WT_CONNECTION_STATS) / sizeof(WT_STATS) :
+		    sizeof(WT_DSRC_STATS) / sizeof(WT_STATS);
+		for (i = 0,
+		    stats = WT_CURSOR_STATS(cursor); i <  max; ++i, ++stats)
+			WT_ERR_TEST((fprintf(conn->stat_fp,
+			    "%s %" PRIu64 " %s %s\n",
+			    conn->stat_stamp,
+			    stats->v, name, stats->desc) < 0), __wt_errno());
+		WT_ERR(cursor->close(cursor));
+		break;
+	case EBUSY:
+	case ENOENT:
+	case WT_NOTFOUND:
+		ret = 0;
+		break;
+	default:
+		break;
 	}
 
-	/*
-	 * Open the statistics cursor; immediately free any temporary buffer,
-	 * it makes error handling easier.
-	 */
-	wt_session = (WT_SESSION *)session;
-	config = S2C(session)->stat_clear ?
-	    "statistics_clear,statistics_fast" : "statistics_fast";
-	ret = wt_session->open_cursor(wt_session, uri, NULL, config, &cursor);
-	__wt_scr_free(&tmp);
-
-	/*
-	 * If we don't find an underlying object, silently ignore it, the object
-	 * may exist only intermittently.  User-level APIs return ENOENT instead
-	 * of WT_NOTFOUND for missing files, check both, as well as for EBUSY if
-	 * the handle is exclusively locked at the moment.
-	 */
-	if (ret == EBUSY || ret == ENOENT || ret == WT_NOTFOUND)
-		return (0);
-	WT_RET(ret);
-
-	while ((ret = cursor->next(cursor)) == 0 &&
-	    (ret = cursor->get_value(cursor, &desc, &pdesc, &value)) == 0)
-		WT_ERR_TEST((fprintf(conn->stat_fp,
-		    "%s %" PRIu64 " %s %s\n",
-		    conn->stat_stamp, value, name, desc) < 0), __wt_errno());
-	WT_ERR_NOTFOUND_OK(ret);
-
-err:	WT_TRET(cursor->close(cursor));
-
+err:	__wt_scr_free(&tmp);
 	return (ret);
 }
 
@@ -183,14 +186,14 @@ __statlog_apply(WT_SESSION_IMPL *session, const char *cfg[])
 }
 
 /*
- * __wt_statlog_lsm_apply --
+ * __statlog_lsm_apply --
  *	Review the list open LSM trees, and dump statistics on demand.
  *
  * XXX
  * This code should be removed when LSM objects are converted to data handles.
  */
 static int
-__wt_statlog_lsm_apply(WT_SESSION_IMPL *session)
+__statlog_lsm_apply(WT_SESSION_IMPL *session)
 {
 #define	WT_LSM_TREE_LIST_SLOTS	100
 	WT_LSM_TREE *lsm_tree, *list[WT_LSM_TREE_LIST_SLOTS];
@@ -322,11 +325,12 @@ __statlog_server(void *arg)
 		 * Lock the schema and walk the list of open handles, dumping
 		 * any that match the list of object sources.
 		 */
-		if (conn->stat_sources != NULL)
+		if (conn->stat_sources != NULL) {
 			WT_WITH_SCHEMA_LOCK(session,
 			    ret = __wt_conn_btree_apply(
-			    session, __statlog_apply, NULL));
-		WT_ERR(ret);
+			    session, 0, __statlog_apply, NULL));
+			WT_ERR(ret);
+		}
 
 		/*
 		 * Walk the list of open LSM trees, dumping any that match the
@@ -337,7 +341,7 @@ __statlog_server(void *arg)
 		 * data handles.
 		 */
 		if (conn->stat_sources != NULL)
-			WT_ERR(__wt_statlog_lsm_apply(session));
+			WT_ERR(__statlog_lsm_apply(session));
 
 		/* Flush. */
 		WT_ERR(fflush(fp) == 0 ? 0 : __wt_errno());

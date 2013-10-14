@@ -442,7 +442,7 @@ __cache_pool_adjust(uint64_t highest, uint64_t bump_threshold)
 
 		read_pressure = cache->cp_current_evict / highest;
 		WT_VERBOSE_RET(session, shared_cache,
-		    "\t%"PRIu64", %"PRIu64", %d",
+		    "\t%" PRIu64 ", %" PRIu64 ", %" PRIu32,
 		    entry->cache_size, read_pressure, cache->cp_skip_count);
 
 		/* Allow to stabilize after changes. */

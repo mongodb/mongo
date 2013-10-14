@@ -611,8 +611,7 @@ __lsm_tree_throttle(
  *	Switch to a new in-memory tree.
  */
 int
-__wt_lsm_tree_switch(
-    WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
+__wt_lsm_tree_switch(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 {
 	WT_DECL_RET;
 	WT_LSM_CHUNK *chunk;
@@ -626,8 +625,9 @@ __wt_lsm_tree_switch(
 	WT_ERR(__wt_realloc_def(session, &lsm_tree->chunk_alloc,
 	    lsm_tree->nchunks + 1, &lsm_tree->chunk));
 
-	WT_VERBOSE_ERR(session, lsm, "Tree switch to: %d, throttle %d",
-	    new_id, (int)lsm_tree->throttle_sleep);
+	WT_VERBOSE_ERR(session, lsm,
+	    "Tree switch to: %" PRIu32 ", throttle %ld",
+	    new_id, lsm_tree->throttle_sleep);
 
 	WT_ERR(__wt_calloc_def(session, 1, &chunk));
 	chunk->id = new_id;

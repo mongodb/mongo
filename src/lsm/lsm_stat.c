@@ -7,18 +7,42 @@
 
 #include "wt_internal.h"
 
+static int __lsm_stat_init(
+    WT_SESSION_IMPL *, WT_LSM_TREE *, WT_CURSOR_STAT *, uint32_t);
+
 /*
- * __wt_lsm_stat_init --
- *	Initialize a LSM statistics structure.
+ * __wt_curstat_lsm_init --
+ *	Initialize the statistics for a LSM tree.
  */
 int
-__wt_lsm_stat_init(WT_SESSION_IMPL *session,
+__wt_curstat_lsm_init(WT_SESSION_IMPL *session,
+    const char *uri, WT_CURSOR_STAT *cst, uint32_t flags)
+{
+	WT_DECL_RET;
+	WT_LSM_TREE *lsm_tree;
+
+	WT_WITH_SCHEMA_LOCK(session,
+	    ret = __wt_lsm_tree_get(session, uri, 0, &lsm_tree));
+	WT_RET(ret);
+
+	ret = __lsm_stat_init(session, lsm_tree, cst, flags);
+
+	__wt_lsm_tree_release(session, lsm_tree);
+	return (ret);
+}
+
+/*
+ * __lsm_stat_init --
+ *	Initialize a LSM statistics structure.
+ */
+static int
+__lsm_stat_init(WT_SESSION_IMPL *session,
     WT_LSM_TREE *lsm_tree, WT_CURSOR_STAT *cst, uint32_t flags)
 {
 	WT_CURSOR *stat_cursor;
 	WT_DECL_ITEM(uribuf);
 	WT_DECL_RET;
-	WT_DSRC_STATS *child, *stats;
+	WT_DSRC_STATS *new, *stats;
 	WT_LSM_CHUNK *chunk;
 	u_int i;
 	int locked;
@@ -49,16 +73,13 @@ __wt_lsm_stat_init(WT_SESSION_IMPL *session,
 		*p++ = "statistics_fast=true";
 
 	/*
-	 * Allocate an aggregated statistics structure, or clear any already
-	 * allocated one.
+	 * Set the cursor to reference the data source statistics; we don't
+	 * initialize it, instead we copy (rather than aggregate), the first
+	 * chunk's statistics, which has the same effect.
 	 */
-	if ((stats = (WT_DSRC_STATS *)cst->stats) == NULL) {
-		WT_ERR(__wt_calloc_def(session, 1, &stats));
-		__wt_stat_init_dsrc_stats(stats);
-		cst->stats_first = cst->stats = (WT_STATS *)stats;
-		cst->stats_count = sizeof(*stats) / sizeof(WT_STATS);
-	} else
-		__wt_stat_clear_dsrc_stats(stats);
+	stats = &cst->u.dsrc_stats;
+	cst->stats_first = cst->stats = (WT_STATS *)stats;
+	cst->stats_count = sizeof(WT_DSRC_STATS) / sizeof(WT_STATS);
 
 	/* Hold the LSM lock so that we can safely walk through the chunks. */
 	WT_ERR(__wt_readlock(session, lsm_tree->rwlock));
@@ -95,11 +116,19 @@ __wt_lsm_stat_init(WT_SESSION_IMPL *session,
 		 * values from the chunk's information, then aggregate into the
 		 * top-level.
 		 */
-		child = (WT_DSRC_STATS *)WT_CURSOR_STATS(stat_cursor);
+		new = (WT_DSRC_STATS *)WT_CURSOR_STATS(stat_cursor);
 		WT_STAT_SET(
-		    session, child, lsm_generation_max, chunk->generation);
+		    session, new, lsm_generation_max, chunk->generation);
 
-		__wt_stat_aggregate_dsrc_stats(child, stats);
+		/*
+		 * We want to aggregate the table's statistics.  Get a base set
+		 * of statistics from the first chunk, then aggregate statistics
+		 * from each new chunk.
+		 */
+		if (i == 0)
+			*stats = *new;
+		else
+			__wt_stat_aggregate_dsrc_stats(new, stats);
 		WT_ERR(stat_cursor->close(stat_cursor));
 
 		if (!F_ISSET(chunk, WT_LSM_CHUNK_BLOOM))
@@ -119,24 +148,24 @@ __wt_lsm_stat_init(WT_SESSION_IMPL *session,
 		 * values from the bloom filter's information, then aggregate
 		 * into the top-level.
 		 */
-		child = (WT_DSRC_STATS *)WT_CURSOR_STATS(stat_cursor);
-		WT_STAT_SET(session, child,
+		new = (WT_DSRC_STATS *)WT_CURSOR_STATS(stat_cursor);
+		WT_STAT_SET(session, new,
 		    bloom_size, (chunk->count * lsm_tree->bloom_bit_count) / 8);
-		WT_STAT_SET(session, child,
+		WT_STAT_SET(session, new,
 		    bloom_page_evict,
-		    WT_STAT(child, cache_eviction_clean) +
-		    WT_STAT(child, cache_eviction_dirty));
+		    WT_STAT(new, cache_eviction_clean) +
+		    WT_STAT(new, cache_eviction_dirty));
 		WT_STAT_SET(session,
-		    child, bloom_page_read, WT_STAT(child, cache_read));
+		    new, bloom_page_read, WT_STAT(new, cache_read));
 
-		__wt_stat_aggregate_dsrc_stats(child, stats);
+		__wt_stat_aggregate_dsrc_stats(new, stats);
 		WT_ERR(stat_cursor->close(stat_cursor));
 	}
 
 	/* Aggregate, and optionally clear, LSM-level specific information. */
 	__wt_stat_aggregate_dsrc_stats(&lsm_tree->stats, stats);
 	if (LF_ISSET(WT_STATISTICS_CLEAR))
-		__wt_stat_clear_dsrc_stats(&lsm_tree->stats);
+		__wt_stat_refresh_dsrc_stats(&lsm_tree->stats);
 
 err:	if (locked)
 		WT_TRET(__wt_rwunlock(session, lsm_tree->rwlock));

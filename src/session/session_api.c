@@ -831,7 +831,7 @@ __wt_open_session(WT_CONNECTION_IMPL *conn, int internal,
 			break;
 	if (i == conn->session_size)
 		WT_ERR_MSG(session, WT_ERROR,
-		    "only configured to support %d thread contexts",
+		    "only configured to support %" PRIu32 " thread contexts",
 		    conn->session_size);
 
 	/*
