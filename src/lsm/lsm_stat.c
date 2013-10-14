@@ -7,12 +7,36 @@
 
 #include "wt_internal.h"
 
+static int __lsm_stat_init(
+    WT_SESSION_IMPL *, WT_LSM_TREE *, WT_CURSOR_STAT *, uint32_t);
+
 /*
- * __wt_lsm_stat_init --
- *	Initialize a LSM statistics structure.
+ * __wt_curstat_lsm_init --
+ *	Initialize the statistics for a LSM tree.
  */
 int
-__wt_lsm_stat_init(WT_SESSION_IMPL *session,
+__wt_curstat_lsm_init(WT_SESSION_IMPL *session,
+    const char *uri, WT_CURSOR_STAT *cst, uint32_t flags)
+{
+	WT_DECL_RET;
+	WT_LSM_TREE *lsm_tree;
+
+	WT_WITH_SCHEMA_LOCK_OPT(session,
+	    ret = __wt_lsm_tree_get(session, uri, 0, &lsm_tree));
+	WT_RET(ret);
+
+	ret = __lsm_stat_init(session, lsm_tree, cst, flags);
+
+	__wt_lsm_tree_release(session, lsm_tree);
+	return (ret);
+}
+
+/*
+ * __lsm_stat_init --
+ *	Initialize a LSM statistics structure.
+ */
+static int
+__lsm_stat_init(WT_SESSION_IMPL *session,
     WT_LSM_TREE *lsm_tree, WT_CURSOR_STAT *cst, uint32_t flags)
 {
 	WT_CURSOR *stat_cursor;

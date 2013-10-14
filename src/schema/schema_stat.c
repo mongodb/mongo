@@ -8,11 +8,11 @@
 #include "wt_internal.h"
 
 /*
- * __curstat_colgroup_init --
+ * __wt_curstat_colgroup_init --
  *	Initialize the statistics for a column group.
  */
-static int
-__curstat_colgroup_init(WT_SESSION_IMPL *session,
+int
+__wt_curstat_colgroup_init(WT_SESSION_IMPL *session,
     const char *uri, const char *cfg[], WT_CURSOR_STAT *cst, uint32_t flags)
 {
 	WT_COLGROUP *colgroup;
@@ -30,11 +30,11 @@ err:	__wt_scr_free(&buf);
 }
 
 /*
- * __curstat_index_init --
+ * __wt_curstat_index_init --
  *	Initialize the statistics for an index.
  */
-static int
-__curstat_index_init(WT_SESSION_IMPL *session,
+int
+__wt_curstat_index_init(WT_SESSION_IMPL *session,
     const char *uri, const char *cfg[], WT_CURSOR_STAT *cst, uint32_t flags)
 {
 	WT_DECL_ITEM(buf);
@@ -52,11 +52,11 @@ err:	__wt_scr_free(&buf);
 }
 
 /*
- * __curstat_table_init --
+ * __wt_curstat_table_init --
  *	Initialize the statistics for a table.
  */
-static int
-__curstat_table_init(WT_SESSION_IMPL *session,
+int
+__wt_curstat_table_init(WT_SESSION_IMPL *session,
     const char *uri, const char *cfg[], WT_CURSOR_STAT *cst, uint32_t flags)
 {
 	WT_CURSOR *stat_cursor;
@@ -111,29 +111,4 @@ __curstat_table_init(WT_SESSION_IMPL *session,
 err:	__wt_scr_free(&buf);
 	__wt_schema_release_table(session, table);
 	return (ret);
-}
-
-/*
- * __wt_schema_stat_init --
- *	Configure a statistics cursor for a schema-level object.
- */
-int
-__wt_schema_stat_init(WT_SESSION_IMPL *session,
-    const char *uri, const char *cfg[], WT_CURSOR_STAT *cst, uint32_t flags)
-{
-	const char *dsrc_uri;
-
-	dsrc_uri = uri + strlen("statistics:");
-
-	if (WT_PREFIX_MATCH(dsrc_uri, "colgroup:"))
-		return (__curstat_colgroup_init(
-		    session, dsrc_uri, cfg, cst, flags));
-	else if (WT_PREFIX_MATCH(dsrc_uri, "index:"))
-		return (__curstat_index_init(
-		    session, dsrc_uri, cfg, cst, flags));
-	else if (WT_PREFIX_MATCH(dsrc_uri, "table:"))
-		return (__curstat_table_init(
-		    session, dsrc_uri, cfg, cst, flags));
-
-	return (__wt_bad_object_type(session, uri));
 }

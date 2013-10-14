@@ -741,8 +741,8 @@ extern int __wt_lsm_merge( WT_SESSION_IMPL *session,
     int aggressive);
 extern int __wt_lsm_meta_read(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree);
 extern int __wt_lsm_meta_write(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree);
-extern int __wt_lsm_stat_init(WT_SESSION_IMPL *session,
-    WT_LSM_TREE *lsm_tree,
+extern int __wt_curstat_lsm_init(WT_SESSION_IMPL *session,
+    const char *uri,
     WT_CURSOR_STAT *cst,
     uint32_t flags);
 extern int __wt_lsm_tree_close_all(WT_SESSION_IMPL *session);
@@ -1112,7 +1112,17 @@ extern int __wt_schema_rename(WT_SESSION_IMPL *session,
     const char *uri,
     const char *newuri,
     const char *cfg[]);
-extern int __wt_schema_stat_init(WT_SESSION_IMPL *session,
+extern int __wt_curstat_colgroup_init(WT_SESSION_IMPL *session,
+    const char *uri,
+    const char *cfg[],
+    WT_CURSOR_STAT *cst,
+    uint32_t flags);
+extern int __wt_curstat_index_init(WT_SESSION_IMPL *session,
+    const char *uri,
+    const char *cfg[],
+    WT_CURSOR_STAT *cst,
+    uint32_t flags);
+extern int __wt_curstat_table_init(WT_SESSION_IMPL *session,
     const char *uri,
     const char *cfg[],
     WT_CURSOR_STAT *cst,

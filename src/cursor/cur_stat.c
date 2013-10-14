@@ -417,26 +417,6 @@ __curstat_file_init(WT_SESSION_IMPL *session,
 }
 
 /*
- * __curstat_lsm_init --
- *	Initialize the statistics for a LSM tree.
- */
-static int
-__curstat_lsm_init(WT_SESSION_IMPL *session,
-    const char *uri, WT_CURSOR_STAT *cst, uint32_t flags)
-{
-	WT_DECL_RET;
-	WT_LSM_TREE *lsm_tree;
-
-	WT_WITH_SCHEMA_LOCK_OPT(session,
-	    ret = __wt_lsm_tree_get(session, uri, 0, &lsm_tree));
-	WT_RET(ret);
-
-	ret = __wt_lsm_stat_init(session, lsm_tree, cst, flags);
-	__wt_lsm_tree_release(session, lsm_tree);
-	return (ret);
-}
-
-/*
  * __wt_curstat_init --
  *	Initialize a statistics cursor.
  */
@@ -444,19 +424,37 @@ int
 __wt_curstat_init(WT_SESSION_IMPL *session,
     const char *uri, const char *cfg[], WT_CURSOR_STAT *cst, uint32_t flags)
 {
+	const char *dsrc_uri;
+
 	cst->notpositioned = 1;
 
 	if (strcmp(uri, "statistics:") == 0) {
 		__curstat_conn_init(session, cst, flags);
 		return (0);
-	} else if (WT_PREFIX_MATCH(uri, "statistics:file:"))
-		return (__curstat_file_init(session,
-		    uri + strlen("statistics:"), cfg, cst, flags));
-	else if (WT_PREFIX_MATCH(uri, "statistics:lsm:"))
-		return (__curstat_lsm_init(session,
-		    uri + strlen("statistics:"), cst, flags));
-	else
-		return (__wt_schema_stat_init(session, uri, cfg, cst, flags));
+	}
+
+	dsrc_uri = uri + strlen("statistics:");
+
+	if (WT_PREFIX_MATCH(dsrc_uri, "colgroup:"))
+		return (__wt_curstat_colgroup_init(
+		    session, dsrc_uri, cfg, cst, flags));
+
+	if (WT_PREFIX_MATCH(dsrc_uri, "file:"))
+		return (__curstat_file_init(
+		    session, dsrc_uri, cfg, cst, flags));
+
+	if (WT_PREFIX_MATCH(dsrc_uri, "index:"))
+		return (__wt_curstat_index_init(
+		    session, dsrc_uri, cfg, cst, flags));
+
+	if (WT_PREFIX_MATCH(dsrc_uri, "lsm:"))
+		return (__wt_curstat_lsm_init(session, dsrc_uri, cst, flags));
+
+	if (WT_PREFIX_MATCH(dsrc_uri, "table:"))
+		return (__wt_curstat_table_init(
+		    session, dsrc_uri, cfg, cst, flags));
+
+	return (__wt_bad_object_type(session, uri));
 }
 
 /*
