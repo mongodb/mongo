@@ -565,6 +565,7 @@ extern int __wt_conn_btree_get(WT_SESSION_IMPL *session,
     const char *op_cfg[],
     uint32_t flags);
 extern int __wt_conn_btree_apply(WT_SESSION_IMPL *session,
+    int apply_checkpoints,
     int (*func)(WT_SESSION_IMPL *,
     const char *[]),
     const char *cfg[]);
@@ -607,8 +608,6 @@ extern int __wt_curbackup_open(WT_SESSION_IMPL *session,
     WT_CURSOR **cursorp);
 extern int __wt_backup_list_uri_append(WT_SESSION_IMPL *session,
     const char *name);
-extern int __wt_backup_list_all_append(WT_SESSION_IMPL *session,
-    const char *cfg[]);
 extern int __wt_curbulk_init(WT_CURSOR_BULK *cbulk, int bitmap);
 extern int __wt_curconfig_open(WT_SESSION_IMPL *session,
     const char *uri,
@@ -1327,10 +1326,11 @@ extern void __wt_ext_scr_free(WT_EXTENSION_API *wt_api,
 extern void __wt_session_dump_all(WT_SESSION_IMPL *session);
 extern void __wt_session_dump(WT_SESSION_IMPL *session);
 extern void __wt_stat_init_dsrc_stats(WT_DSRC_STATS *stats);
-extern void __wt_stat_clear_dsrc_stats(void *stats_arg);
-extern void __wt_stat_aggregate_dsrc_stats(void *child, void *parent);
+extern void __wt_stat_refresh_dsrc_stats(void *stats_arg);
+extern void __wt_stat_aggregate_dsrc_stats(const void *child,
+    const void *parent);
 extern void __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats);
-extern void __wt_stat_clear_connection_stats(void *stats_arg);
+extern void __wt_stat_refresh_connection_stats(void *stats_arg);
 extern int __wt_txnid_cmp(const void *v1, const void *v2);
 extern void __wt_txn_release_evict_snapshot(WT_SESSION_IMPL *session);
 extern void __wt_txn_release_snapshot(WT_SESSION_IMPL *session);

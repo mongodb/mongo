@@ -27,9 +27,6 @@ struct __wt_stats {
 #define	WT_STAT_INCRV(stats, fld, value) do {				\
 	(stats)->fld.v += (value);					\
 } while (0)
-#define	WT_STAT_INCRV_KEY(stats, key, value) do {			\
-	((WT_STATS *)stats)[(key)].v += (value);			\
-} while (0)
 #define	WT_STAT_SET(stats, fld, value) do {				\
 	(stats)->fld.v = (uint64_t)(value);				\
 } while (0)

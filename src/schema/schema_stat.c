@@ -59,17 +59,13 @@ static int
 __curstat_table_init(WT_SESSION_IMPL *session,
     const char *uri, const char *cfg[], WT_CURSOR_STAT *cst, uint32_t flags)
 {
-	WT_COLGROUP *colgroup;
 	WT_CURSOR *stat_cursor;
 	WT_DECL_ITEM(buf);
 	WT_DECL_RET;
-	WT_DSRC_STATS *stats;
-	WT_INDEX *idx;
+	WT_DSRC_STATS *new, *stats;
 	WT_TABLE *table;
-	const char *desc, *name, *pvalue;
-	uint64_t value;
 	u_int i;
-	int stat_key;
+	const char *name;
 
 	WT_UNUSED(flags);
 	name = uri + strlen("table:");
@@ -77,53 +73,38 @@ __curstat_table_init(WT_SESSION_IMPL *session,
 	WT_RET(__wt_scr_alloc(session, 0, &buf));
 	WT_ERR(__wt_schema_get_table(session, name, strlen(name), 0, &table));
 
-	/* Clear the statistics we are about to recalculate. */
-	if (cst->stats != NULL) {
-		__wt_stat_clear_dsrc_stats(cst->stats);
-		stats = (WT_DSRC_STATS *)cst->stats;
-	} else {
-		WT_ERR(__wt_calloc_def(session, 1, &stats));
-		__wt_stat_init_dsrc_stats(stats);
-		cst->stats_first = cst->stats = (WT_STATS *)stats;
-		cst->stats_count = sizeof(*stats) / sizeof(WT_STATS);
-	}
+	/*
+	 * Set the cursor to reference the data source statistics; we don't
+	 * initialize it, instead we copy (rather than aggregate), the first
+	 * column's statistics, which has the same effect.
+	 */
+	stats = &cst->u.dsrc_stats;
+	cst->stats_first = cst->stats = (WT_STATS *)stats;
+	cst->stats_count = sizeof(WT_DSRC_STATS) / sizeof(WT_STATS);
 
 	/* Process the column groups. */
 	for (i = 0; i < WT_COLGROUPS(table); i++) {
-		colgroup = table->cgroups[i];
-
 		WT_ERR(__wt_buf_fmt(
-		    session, buf, "statistics:%s", colgroup->name));
+		    session, buf, "statistics:%s", table->cgroups[i]->name));
 		WT_ERR(__wt_curstat_open(
 		    session, buf->data, cfg, &stat_cursor));
-
-		while ((ret = stat_cursor->next(stat_cursor)) == 0) {
-			WT_ERR(stat_cursor->get_key(stat_cursor, &stat_key));
-			WT_ERR(stat_cursor->get_value(
-			    stat_cursor, &desc, &pvalue, &value));
-			WT_STAT_INCRV_KEY(stats, stat_key, value);
-		}
-		WT_ERR_NOTFOUND_OK(ret);
+		new = (WT_DSRC_STATS *)WT_CURSOR_STATS(stat_cursor);
+		if (i == 0)
+			*stats = *new;
+		else
+			__wt_stat_aggregate_dsrc_stats(new, stats);
 		WT_ERR(stat_cursor->close(stat_cursor));
 	}
 
 	/* Process the indices. */
 	WT_ERR(__wt_schema_open_indices(session, table));
 	for (i = 0; i < table->nindices; i++) {
-		idx = table->indices[i];
-
 		WT_ERR(__wt_buf_fmt(
-		    session, buf, "statistics:%s", idx->name));
+		    session, buf, "statistics:%s", table->indices[i]->name));
 		WT_ERR(__wt_curstat_open(
 		    session, buf->data, cfg, &stat_cursor));
-
-		while ((ret = stat_cursor->next(stat_cursor)) == 0) {
-			WT_ERR(stat_cursor->get_key(stat_cursor, &stat_key));
-			WT_ERR(stat_cursor->get_value(
-			    stat_cursor, &desc, &pvalue, &value));
-			WT_STAT_INCRV_KEY(stats, stat_key, value);
-		}
-		WT_ERR_NOTFOUND_OK(ret);
+		new = (WT_DSRC_STATS *)WT_CURSOR_STATS(stat_cursor);
+		__wt_stat_aggregate_dsrc_stats(new, stats);
 		WT_ERR(stat_cursor->close(stat_cursor));
 	}
 
