@@ -101,11 +101,10 @@ __wt_spin_lock_register(WT_SESSION_IMPL *session,
  *	Log the spin-lock statistics.
  */
 int
-__wt_statlog_spinlock_dump(
-    WT_CONNECTION_IMPL *conn, const char *name)
+__wt_statlog_dump_spinlock(WT_CONNECTION_IMPL *conn, const char *name)
 {
 	WT_CONNECTION_STATS_SPINLOCK *p, *t;
-	int i, j;
+	u_int i, j;
 
 	for (i = 0,
 	    p = conn->spinlock_stats; i < WT_STATS_SPINLOCK_MAX; ++i, ++p) {
@@ -113,16 +112,15 @@ __wt_statlog_spinlock_dump(
 			break;
 
 		for (j = 0; j < WT_STATS_SPINLOCK_MAX; ++j) {
-			if (p->blocked[j] == 0)
-				continue;
-
 			t = &conn->spinlock_stats[j];
 			WT_RET_TEST((fprintf(conn->stat_fp,
 			    "%s %d %s spinlock %s: %s(%d) blocked by %s(%d)\n",
 			    conn->stat_stamp, p->blocked[j], name, p->name,
 			    p->file, p->line,
 			    t->file, t->line) < 0), __wt_errno());
-			p->blocked[j] = 0;
+
+			    if (conn->stat_clear)
+				p->blocked[j] = 0;
 		}
 	}
 	return (0);
