@@ -45,7 +45,7 @@ __curstat_get_key(WT_CURSOR *cursor, ...)
 
 	cst = (WT_CURSOR_STAT *)cursor;
 	va_start(ap, cursor);
-	CURSOR_API_CALL(cursor, session, get_key, cst->btree);
+	CURSOR_API_CALL(cursor, session, get_key, NULL);
 
 	WT_CURSOR_NEEDKEY(cursor);
 
@@ -85,7 +85,7 @@ __curstat_get_value(WT_CURSOR *cursor, ...)
 
 	cst = (WT_CURSOR_STAT *)cursor;
 	va_start(ap, cursor);
-	CURSOR_API_CALL(cursor, session, get_value, cst->btree);
+	CURSOR_API_CALL(cursor, session, get_value, NULL);
 
 	WT_CURSOR_NEEDVALUE(cursor);
 
@@ -132,7 +132,7 @@ __curstat_set_key(WT_CURSOR *cursor, ...)
 	va_list ap;
 
 	cst = (WT_CURSOR_STAT *)cursor;
-	CURSOR_API_CALL(cursor, session, set_key, cst->btree);
+	CURSOR_API_CALL(cursor, session, set_key, NULL);
 	F_CLR(cursor, WT_CURSTD_KEY_SET);
 
 	va_start(ap, cursor);
@@ -173,7 +173,7 @@ __curstat_next(WT_CURSOR *cursor)
 	WT_SESSION_IMPL *session;
 
 	cst = (WT_CURSOR_STAT *)cursor;
-	CURSOR_API_CALL(cursor, session, next, cst->btree);
+	CURSOR_API_CALL(cursor, session, next, NULL);
 
 	/* Move to the next item. */
 	if (cst->notpositioned) {
@@ -205,7 +205,7 @@ __curstat_prev(WT_CURSOR *cursor)
 	WT_SESSION_IMPL *session;
 
 	cst = (WT_CURSOR_STAT *)cursor;
-	CURSOR_API_CALL(cursor, session, prev, cst->btree);
+	CURSOR_API_CALL(cursor, session, prev, NULL);
 
 	/* Move to the previous item. */
 	if (cst->notpositioned) {
@@ -238,7 +238,7 @@ __curstat_reset(WT_CURSOR *cursor)
 	WT_SESSION_IMPL *session;
 
 	cst = (WT_CURSOR_STAT *)cursor;
-	CURSOR_API_CALL(cursor, session, reset, cst->btree);
+	CURSOR_API_CALL(cursor, session, reset, NULL);
 
 	cst->notpositioned = 1;
 	F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
@@ -259,7 +259,7 @@ __curstat_search(WT_CURSOR *cursor)
 	WT_SESSION_IMPL *session;
 
 	cst = (WT_CURSOR_STAT *)cursor;
-	CURSOR_API_CALL(cursor, session, search, cst->btree);
+	CURSOR_API_CALL(cursor, session, search, NULL);
 
 	WT_CURSOR_NEEDKEY(cursor);
 	F_CLR(cursor, WT_CURSTD_VALUE_SET | WT_CURSTD_VALUE_SET);
@@ -287,18 +287,11 @@ __curstat_close(WT_CURSOR *cursor)
 	WT_SESSION_IMPL *session;
 
 	cst = (WT_CURSOR_STAT *)cursor;
-	CURSOR_API_CALL(cursor, session, close, cst->btree);
-
-	if (cst->clear_func)
-		cst->clear_func(cst->stats_first);
+	CURSOR_API_CALL(cursor, session, close, NULL);
 
 	__wt_buf_free(session, &cst->pv);
 
-	if (cst->btree != NULL)
-		WT_TRET(__wt_session_release_btree(session));
-
-	__wt_free(session, cst->stats);
-	WT_TRET(__wt_cursor_close(cursor));
+	WT_ERR(__wt_cursor_close(cursor));
 
 err:	API_END(session);
 	return (ret);
@@ -312,14 +305,57 @@ static void
 __curstat_conn_init(
     WT_SESSION_IMPL *session, WT_CURSOR_STAT *cst, uint32_t flags)
 {
-	__wt_conn_stat_init(session, flags);
+	WT_CONNECTION_IMPL *conn;
 
-	cst->btree = NULL;
-	cst->notpositioned = 1;
-	cst->stats_first = (WT_STATS *)&S2C(session)->stats;
-	cst->stats_count = sizeof(S2C(session)->stats) / sizeof(WT_STATS);
-	cst->clear_func = LF_ISSET(WT_STATISTICS_CLEAR) ?
-	    __wt_stat_clear_connection_stats : NULL;
+	conn = S2C(session);
+
+	/*
+	 * Fill in the connection statistics, and copy them to the cursor.
+	 * Optionally clear the connection statistics.
+	 */
+	__wt_conn_stat_init(session, flags);
+	cst->u.conn_stats = conn->stats;
+	if (LF_ISSET(WT_STATISTICS_CLEAR))
+		__wt_stat_refresh_connection_stats(&conn->stats);
+
+	cst->stats_first = cst->stats = (WT_STATS *)&cst->u.conn_stats;
+	cst->stats_count = sizeof(WT_CONNECTION_STATS) / sizeof(WT_STATS);
+}
+
+/*
+ * When returning the statistics for a file URI, we review open handles, and
+ * aggregate checkpoint handle statistics with the file URI statistics.  To
+ * make that work, we have to pass information to the function reviewing the
+ * handles, this structure is what we pass.
+ */
+struct __checkpoint_args {
+	const char *name;		/* Data source handle name */
+	WT_DSRC_STATS *stats;		/* Stat structure being filled */
+	int clear;			/* WT_STATISTICS_CLEAR */
+};
+
+/*
+ * __curstat_checkpoint --
+ *	Aggregate statistics from checkpoint handles.
+ */
+static int
+__curstat_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
+{
+	struct __checkpoint_args *args;
+	WT_DATA_HANDLE *dhandle;
+
+	dhandle = session->dhandle;
+	args = (struct __checkpoint_args *)cfg[0];
+
+	/* Aggregate the flagged file's checkpoint handles. */
+	if (dhandle->checkpoint != NULL &&
+	    strcmp(dhandle->name, args->name) == 0) {
+		__wt_stat_aggregate_dsrc_stats(&dhandle->stats, args->stats);
+		if (args->clear)
+			__wt_stat_refresh_dsrc_stats(&dhandle->stats);
+	}
+
+	return (0);
 }
 
 /*
@@ -330,19 +366,54 @@ static int
 __curstat_file_init(WT_SESSION_IMPL *session,
     const char *uri, const char *cfg[], WT_CURSOR_STAT *cst, uint32_t flags)
 {
-	WT_BTREE *btree;
+	struct __checkpoint_args args;
+	WT_DATA_HANDLE *dhandle, *saved_dhandle;
+	WT_DECL_RET;
+	const char *cfg_arg[] = { NULL, NULL };
 
 	WT_RET(__wt_session_get_btree_ckpt(session, uri, cfg, 0));
-	btree = S2BT(session);
-	WT_RET(__wt_btree_stat_init(session, flags));
+	dhandle = session->dhandle;
 
-	cst->btree = btree;
-	cst->notpositioned = 1;
-	cst->stats_first = (WT_STATS *)&btree->dhandle->stats;
-	cst->stats_count = sizeof(WT_DSRC_STATS) / sizeof(WT_STATS);
-	cst->clear_func = LF_ISSET(WT_STATISTICS_CLEAR) ?
-	    __wt_stat_clear_dsrc_stats : NULL;
-	return (0);
+	/*
+	 * Fill in the data source statistics, and copy them to the cursor.
+	 * Optionally clear the data source statistics.
+	 */
+	if ((ret = __wt_btree_stat_init(session, flags)) == 0) {
+		cst->u.dsrc_stats = dhandle->stats;
+		if (LF_ISSET(WT_STATISTICS_CLEAR))
+			__wt_stat_refresh_dsrc_stats(&dhandle->stats);
+
+		cst->stats_first = cst->stats = (WT_STATS *)&cst->u.dsrc_stats;
+		cst->stats_count = sizeof(WT_DSRC_STATS) / sizeof(WT_STATS);
+	}
+
+	/* Release the handle, we're done with it. */
+	WT_TRET(__wt_session_release_btree(session));
+	WT_RET(ret);
+
+	/*
+	 * If no checkpoint was specified, review the open handles and aggregate
+	 * the statistics from any checkpoint handles matching this file.
+	 */
+	if (dhandle->checkpoint == NULL) {
+		args.name = dhandle->name;
+		args.stats = &cst->u.dsrc_stats;
+		args.clear = LF_ISSET(WT_STATISTICS_CLEAR) ? 1 : 0;
+		cfg_arg[0] = (char *)&args;
+
+		/*
+		 * We're likely holding the schema lock inside the statistics
+		 * logging thread, not to mention calling __wt_conn_btree_apply
+		 * from there as well.  Save/restore the handle.
+		 */
+		saved_dhandle = dhandle;
+		WT_WITH_SCHEMA_LOCK_OPT(session,
+		    ret = __wt_conn_btree_apply(
+		    session, 1, __curstat_checkpoint, cfg_arg));
+		session->dhandle = saved_dhandle;
+	}
+
+	return (ret);
 }
 
 /*
@@ -362,13 +433,7 @@ __curstat_lsm_init(WT_SESSION_IMPL *session,
 
 	ret = __wt_lsm_stat_init(session, lsm_tree, cst, flags);
 	__wt_lsm_tree_release(session, lsm_tree);
-	WT_RET(ret);
-
-	cst->btree = NULL;
-	cst->notpositioned = 1;
-	cst->clear_func = LF_ISSET(WT_STATISTICS_CLEAR) ?
-	    __wt_stat_clear_dsrc_stats : NULL;
-	return (0);
+	return (ret);
 }
 
 /*
@@ -379,6 +444,8 @@ int
 __wt_curstat_init(WT_SESSION_IMPL *session,
     const char *uri, const char *cfg[], WT_CURSOR_STAT *cst, uint32_t flags)
 {
+	cst->notpositioned = 1;
+
 	if (strcmp(uri, "statistics:") == 0) {
 		__curstat_conn_init(session, cst, flags);
 		return (0);
@@ -452,8 +519,7 @@ __wt_curstat_open(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_cursor_init(cursor, uri, NULL, cfg, cursorp));
 
 	if (0) {
-err:		__wt_free(session, cst->stats);
-		__wt_free(session, cst);
+err:		__wt_free(session, cst);
 	}
 
 	return (ret);

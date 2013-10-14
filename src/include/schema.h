@@ -68,6 +68,7 @@ struct __wt_table {
 #define	WT_COLGROUPS(t)	WT_MAX((t)->ncolgroups, 1)
 
 #define	WT_WITH_SCHEMA_LOCK(session, op) do {				\
+	WT_ASSERT(session, !F_ISSET(session, WT_SESSION_SCHEMA_LOCKED));\
 	__wt_spin_lock(session, &S2C(session)->schema_lock);		\
 	F_SET(session, WT_SESSION_SCHEMA_LOCKED);			\
 	(op);								\

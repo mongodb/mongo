@@ -33,10 +33,6 @@ struct __wt_stats {
 	if (S2C(session)->statistics)					\
 		(stats)->fld.v += (value);				\
 } while (0)
-#define	WT_STAT_INCRKV(session, stats, key, value) do {			\
-	if (S2C(session)->statistics)					\
-		((WT_STATS *)stats)[(key)].v += (value);		\
-} while (0)
 #define	WT_STAT_SET(session, stats, fld, value) do {			\
 	if (S2C(session)->statistics)					\
 		(stats)->fld.v = (uint64_t)(value);			\

@@ -10,6 +10,7 @@
 static int __backup_all(WT_SESSION_IMPL *, WT_CURSOR_BACKUP *);
 static int __backup_file_create(WT_SESSION_IMPL *, WT_CURSOR_BACKUP *);
 static int __backup_file_remove(WT_SESSION_IMPL *);
+static int __backup_list_all_append(WT_SESSION_IMPL *, const char *[]);
 static int __backup_list_append(
     WT_SESSION_IMPL *, WT_CURSOR_BACKUP *, const char *);
 static int __backup_start(
@@ -323,8 +324,7 @@ __backup_all(WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb)
 	WT_ERR_NOTFOUND_OK(ret);
 
 	/* Build a list of the file objects that need to be copied. */
-	WT_ERR(
-	    __wt_meta_btree_apply(session, __wt_backup_list_all_append, NULL));
+	WT_ERR(__wt_meta_btree_apply(session, __backup_list_all_append, NULL));
 
 err:	if (cursor != NULL)
 		WT_TRET(cursor->close(cursor));
@@ -433,12 +433,12 @@ __wt_backup_list_uri_append(WT_SESSION_IMPL *session, const char *name)
 }
 
 /*
- * __wt_backup_list_all_append --
+ * __backup_list_all_append --
  *	Append a new file name to the list, allocate space as necessary.
  *	Called via the __wt_meta_btree_apply function.
  */
-int
-__wt_backup_list_all_append(WT_SESSION_IMPL *session, const char *cfg[])
+static int
+__backup_list_all_append(WT_SESSION_IMPL *session, const char *cfg[])
 {
 	WT_CURSOR_BACKUP *cb;
 
