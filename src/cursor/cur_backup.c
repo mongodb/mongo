@@ -220,13 +220,11 @@ __backup_start(
 			WT_ERR(__backup_list_append(session, cb, logfiles[i]));
 	}
 
-	/* Close the hot backup file. */
-	ret = fclose(cb->bfp);
-	cb->bfp = NULL;
-	WT_ERR_TEST(ret == EOF, __wt_errno());
-
-err:	if (cb->bfp != NULL)
+err:	/* Close the hot backup file. */
+	if (cb->bfp != NULL) {
 		WT_TRET(fclose(cb->bfp) == 0 ? 0 : __wt_errno());
+		cb->bfp = NULL;
+	}
 	if (logfiles != NULL)
 		__wt_log_files_free(session, logfiles, logcount);
 
