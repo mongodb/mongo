@@ -113,6 +113,9 @@ __wt_statlog_dump_spinlock(WT_CONNECTION_IMPL *conn, const char *name)
 
 		for (j = 0; j < WT_STATS_SPINLOCK_MAX; ++j) {
 			t = &conn->spinlock_stats[j];
+			if (t->file == NULL)
+				continue;
+
 			WT_RET_TEST((fprintf(conn->stat_fp,
 			    "%s %d %s spinlock %s: %s(%d) blocked by %s(%d)\n",
 			    conn->stat_stamp, p->blocked[j], name, p->name,
