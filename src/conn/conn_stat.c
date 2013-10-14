@@ -114,7 +114,7 @@ __statlog_dump(WT_SESSION_IMPL *session, const char *name, int conn_stats)
 	WT_DECL_RET;
 	WT_STATS *stats;
 	u_int i;
-	u_int64_t max;
+	uint64_t max;
 	const char *uri;
 	const char *cfg[] = {
 	    WT_CONFIG_BASE(session, session_open_cursor), NULL, NULL };
