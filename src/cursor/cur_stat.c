@@ -376,16 +376,17 @@ __curstat_file_init(WT_SESSION_IMPL *session,
 	 * Fill in the data source statistics, and copy them to the cursor.
 	 * Optionally clear the data source statistics.
 	 */
-	WT_ERR(__wt_btree_stat_init(session, flags));
-	cst->u.dsrc_stats = dhandle->stats;
-	if (LF_ISSET(WT_STATISTICS_CLEAR))
-		__wt_stat_refresh_dsrc_stats(&dhandle->stats);
+	if ((ret = __wt_btree_stat_init(session, flags)) == 0) {
+		cst->u.dsrc_stats = dhandle->stats;
+		if (LF_ISSET(WT_STATISTICS_CLEAR))
+			__wt_stat_refresh_dsrc_stats(&dhandle->stats);
 
-	cst->stats_first = cst->stats = (WT_STATS *)&cst->u.dsrc_stats;
-	cst->stats_count = sizeof(WT_DSRC_STATS) / sizeof(WT_STATS);
+		cst->stats_first = cst->stats = (WT_STATS *)&cst->u.dsrc_stats;
+		cst->stats_count = sizeof(WT_DSRC_STATS) / sizeof(WT_STATS);
+	}
 
-	/* Release our handle, we're done with it. */
-err:	WT_TRET(__wt_session_release_btree(session));
+	/* Release the handle, we're done with it. */
+	WT_TRET(__wt_session_release_btree(session));
 	WT_RET(ret);
 
 	/*
