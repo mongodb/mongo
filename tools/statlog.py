@@ -73,8 +73,12 @@ no_scale_per_second_list = [
 ]
 # no scale-per-second list section: END
 
+reportno = 0
+
 # Plot a set of entries for a title.
-def plot(title, values, num):
+def plot(title, values):
+    global reportno
+
     # Ignore entries where the value never changes.
     skip = True
     t0, v0 = values[0]
@@ -83,10 +87,12 @@ def plot(title, values, num):
             skip = False
             break
     if skip:
-        print '\tskipping ' + title
+        print 'skipping: ' + title
         return
 
-    print 'building ' + title
+    print 'building: ' + title
+    reportno = reportno + 1
+    num = "%03d" % reportno
 
     ylabel = 'Value'
     if title.split(' ', 1)[1] in no_scale_per_second_list:
@@ -148,5 +154,5 @@ for line in fileinput.input(sys.argv[1:]):
     d[desc].append((month + " " + day + " " + time, v))
 
 # Plot each entry in the dictionary.
-for rno, items in enumerate(sorted(d.iteritems()), 1):
-    plot(items[0], items[1], "%03d" % rno)
+for items in sorted(d.iteritems()):
+    plot(items[0], items[1])
