@@ -152,6 +152,7 @@ __statlog_dump(WT_SESSION_IMPL *session, const char *name, int conn_stats)
 		break;
 	case EBUSY:
 	case ENOENT:
+	case WT_NOTFOUND:
 		ret = 0;
 		break;
 	default:
