@@ -552,7 +552,7 @@ __conn_reconfigure(WT_CONNECTION *wt_conn, const char *config)
 	    __wt_config_gets(session, raw_cfg, "statistics", &cval)) == 0) {
 		conn->statistics = cval.val == 0 ? 0 : 1;
 		if (conn->statistics)
-			__wt_stat_clear_connection_stats(&conn->stats);
+			__wt_stat_refresh_connection_stats(&conn->stats);
 	}
 	WT_ERR_NOTFOUND_OK(ret);
 

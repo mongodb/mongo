@@ -79,32 +79,45 @@ __wt_verify(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_CKPT_FOREACH(ckptbase, ckpt) {
 		WT_VERBOSE_ERR(session, verify,
 		    "%s: checkpoint %s", btree->dhandle->name, ckpt->name);
+
+		/* Fake checkpoints require no work. */
+		if (F_ISSET(ckpt, WT_CKPT_FAKE))
+			continue;
+
 #ifdef HAVE_DIAGNOSTIC
 		if (vs->dump_address || vs->dump_blocks || vs->dump_pages)
 			WT_ERR(__wt_msg(session, "%s: checkpoint %s",
 			    btree->dhandle->name, ckpt->name));
 #endif
 
-		/* Fake checkpoints require no work. */
-		if (F_ISSET(ckpt, WT_CKPT_FAKE))
-			continue;
-
 		/* House-keeping between checkpoints. */
 		__verify_checkpoint_reset(vs);
 
-		/* Load the checkpoint, ignore trees with no root page. */
+		/* Load the checkpoint. */
 		WT_ERR(bm->checkpoint_load(bm, session,
 		    ckpt->raw.data, ckpt->raw.size,
 		    root_addr, &root_addr_size, 1));
-		if (root_addr_size != 0) {
-			/* Verify then discard the checkpoint from the cache. */
-			if ((ret = __wt_btree_tree_open(
-			    session, root_addr, root_addr_size)) == 0) {
-				ret = __verify_tree(
-				    session, btree->root_page, vs);
-				WT_TRET(__wt_bt_cache_op(
-				    session, NULL, WT_SYNC_DISCARD_NOWRITE));
-			}
+
+		/*
+		 * Ignore trees with no root page.
+		 * Verify, then discard the checkpoint from the cache.
+		 */
+		if (root_addr_size != 0 &&
+		    (ret = __wt_btree_tree_open(
+		    session, root_addr, root_addr_size)) == 0) {
+#ifdef HAVE_DIAGNOSTIC
+			if (vs->dump_address ||
+			    vs->dump_blocks || vs->dump_pages)
+				WT_ERR(__wt_msg(session, "Root: %s %s",
+				    __wt_addr_string(session, vs->tmp1,
+				    root_addr, root_addr_size),
+				    __wt_page_type_string(
+				    btree->root_page->type)));
+#endif
+			ret = __verify_tree(session, btree->root_page, vs);
+
+			WT_TRET(__wt_bt_cache_op(
+			    session, NULL, WT_SYNC_DISCARD_NOWRITE));
 		}
 
 		/* Unload the checkpoint. */
