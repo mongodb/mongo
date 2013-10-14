@@ -4692,8 +4692,14 @@ namespace QueryOptimizerCursorTests {
 
                 shared_ptr<ExplainQueryInfo> explain = explainHelper.queryInfo();
                 explain->reviseN( 3000000000000LL );
-                
-                ASSERT_EQUALS( 3000000000000LL, explain->bson()[ "n" ].Long() );
+
+                // large n could be stored either in bson as long or double
+                // retrieve value using safeNumberLong() so that we don't have to guess
+                // internal type
+                BSONObj obj = explain->bson();
+                BSONElement e  = obj.getField( "n" );
+                long long n = e.safeNumberLong();
+                ASSERT_EQUALS( 3000000000000LL, n );
             }
         };
 

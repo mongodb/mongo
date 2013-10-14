@@ -540,9 +540,9 @@ namespace JsobjTests {
                 ASSERT(o["i4"].type() == NumberInt);
                 ASSERT(o["i4"].number() == -1*billion);
 
-                ASSERT(o["L1"].type() == NumberLong);
+                ASSERT(o["L1"].isNumber());
                 ASSERT(o["L1"].number() == 2*billion);
-                ASSERT(o["L2"].type() == NumberLong);
+                ASSERT(o["L2"].isNumber());
                 ASSERT(o["L2"].number() == -2*billion);
                 ASSERT(o["L3"].type() == NumberLong);
                 ASSERT(o["L3"].number() == 4*billion);
