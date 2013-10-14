@@ -5,6 +5,14 @@ t = new ToolTest("csvexport_date_before_epoch")
 c = t.startDB("foo");
 
 function test(date) {
+
+    if (date.valueOf() < 0 && _isWindows()) {
+        // some versions of windows (but not all) fail with dates before 1970
+        print("skipping test of " + date.tojson() +
+              " because system might not support dates before 1970");
+        return;
+    }
+
     print("testing " + date);
 
     c.drop();
