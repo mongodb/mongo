@@ -160,9 +160,10 @@ __wt_lsm_merge(
 
 		/*
 		 * Don't do small merges or merge across more than 2
-		 * generations.
+		 * generations, unless we are aggressive.
 		 */
-		if (nchunks < min_chunks ||
+		if (aggressive ? nchunks < 2 :
+		    nchunks < min_chunks ||
 		    chunk->generation > youngest->generation + 1) {
 			for (i = 0; i < nchunks; i++)
 				F_CLR(lsm_tree->chunk[start_chunk + i],
