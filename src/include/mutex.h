@@ -75,9 +75,18 @@
 #define	WT_ATOMIC_CAS_VAL(v, oldv, newv)	(1)
 #define	WT_ATOMIC_STORE(v, val)			((v) = (val))
 #define	WT_ATOMIC_SUB(v, val)			((v) -= (val), (v))
-#define	WT_FULL_BARRIER()
-#define	WT_READ_BARRIER()
-#define	WT_WRITE_BARRIER()
+static inline void WT_FULL_BARRIER(void)
+{
+	return;
+}
+static inline void WT_READ_BARRIER(void)
+{
+	return;
+}
+static inline void WT_WRITE_BARRIER(void)
+{
+	return;
+}
 #define	HAVE_ATOMICS 1
 
 #elif defined(__GNUC__)
