@@ -46,7 +46,11 @@ test(ISODate('1960-01-02 03:04:05.001Z')); // second = 5
 test(ISODate('1960-01-02 03:04:05.999Z')); // second = 5
 
 // Test date before 1900 (negative tm_year values from gmtime)
-test(ISODate('1860-01-02 03:04:05.006Z'));
+// Skip this test on systems where a time_t is not big enough to store the value
+buildInfo = db.adminCommand("buildInfo");
+if (buildInfo.bits >= 64) {
+    test(ISODate('1860-01-02 03:04:05.006Z'));
+}
 
 // Test with time_t == -1 and 0
 test(new Date(-1000));
