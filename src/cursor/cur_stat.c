@@ -366,8 +366,10 @@ static int
 __curstat_file_init(WT_SESSION_IMPL *session,
     const char *uri, const char *cfg[], WT_CURSOR_STAT *cst, uint32_t flags)
 {
+	struct __checkpoint_args args;
 	WT_DATA_HANDLE *dhandle, *saved_dhandle;
 	WT_DECL_RET;
+	const char *cfg_arg[] = { NULL, NULL };
 
 	WT_RET(__wt_session_get_btree_ckpt(session, uri, cfg, 0));
 	dhandle = session->dhandle;
@@ -394,9 +396,6 @@ __curstat_file_init(WT_SESSION_IMPL *session,
 	 * the statistics from any checkpoint handles matching this file.
 	 */
 	if (dhandle->checkpoint == NULL) {
-		struct __checkpoint_args args;
-		const char *cfg_arg[] = { NULL, NULL };
-
 		args.name = dhandle->name;
 		args.stats = &cst->u.dsrc_stats;
 		args.clear = LF_ISSET(WT_STATISTICS_CLEAR) ? 1 : 0;
