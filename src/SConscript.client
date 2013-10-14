@@ -221,9 +221,13 @@ if buildShared:
     sharedLibEnv = env.Clone()
     sharedLibEnv.AppendUnique(LIBS=mongoClientSysLibDeps)
 
-    # Attach the shim only if we are using the external libraries so that we pick up what
-    # configure found for us.
-    if use_system_version_of_library("boost"):
+    # On windows, we always want to attach the shim, since independently of whether we are
+    # using the system or the vendored boost, the DLL must have complete symbols. For unix like
+    # systems, attach the shim only if we are using the external libraries so that we pick up
+    # what configure found for us. Otherwise, produce a dynamic object in which the boost
+    # symbols are undefined, ensuring that we pass any necessary OS flags to produce such a
+    # library.
+    if windows or use_system_version_of_library("boost"):
         sharedLibEnv.AppendUnique(LIBDEPS=mongoClientLibDeps)
         if linux:
             sharedLibEnv.AppendUnique(SHLINKFLAGS=["-Wl,--as-needed", "-Wl,-zdefs"])
