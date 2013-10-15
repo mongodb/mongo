@@ -51,14 +51,21 @@ function assertHasRole(rolesArray, roleName, roleDB) {
      assertHasRole(userObj.roles, "dbAdmin", db.getName());
 
      // Revoking roles the user doesn't have is fine
-     db.revokeRolesFromUser("spencer", ['dbAdmin', 'read'])
+     db.revokeRolesFromUser("spencer", ['dbAdmin', 'read']);
      userObj = db.getUser('spencer');
      assert.eq(1, userObj.roles.length);
      assertHasRole(userObj.roles, "readWrite", db.getName());
 
+     // Update user
+     db.updateUser("spencer", {customData: {hello: 'world'}, roles:['read']});
+     userObj = db.getUser('spencer');
+     assert.eq('world', userObj.customData.hello);
+     assert.eq(1, userObj.roles.length);
+     assertHasRole(userObj.roles, "read", db.getName());
+
      // Test dropUser
      db.dropUser('andy');
-     assert.throws(function() {printjson(db.getUser('andy'))});
+     assert.throws(function() {printjson(db.getUser('andy'));});
 
      // Test dropAllUsers
      db.dropAllUsers()
