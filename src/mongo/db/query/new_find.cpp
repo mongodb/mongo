@@ -119,6 +119,7 @@ namespace mongo {
         CanonicalQuery* cq;
         Status status = CanonicalQuery::canonicalize(qm, &cq);
         if (!status.isOK()) { return false; }
+        verify(cq);
         auto_ptr<CanonicalQuery> scopedCq(cq);
 
         const LiteParsedQuery& pq = cq->getParsed();
@@ -161,7 +162,11 @@ namespace mongo {
         if (QueryPlannerCommon::hasNode(cq->root(), MatchExpression::GEO_NEAR, &nearNode)) {
             GeoNearMatchExpression* gnme = static_cast<GeoNearMatchExpression*>(nearNode);
             NamespaceDetails* nsd = nsdetails(cq->ns().c_str());
-            if (NULL == nsd) { return true; }
+            if (NULL == nsd) {
+                // Will create an EOFRunner.
+                *cqOut = scopedCq.release();
+                return true;
+            }
             for (int i = 0; i < nsd->getCompletedIndexCount(); ++i) {
                 auto_ptr<IndexDescriptor> desc(CatalogHack::getDescriptor(nsd, i));
                 BSONObjIterator kpIt(desc->keyPattern());
