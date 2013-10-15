@@ -166,18 +166,13 @@ namespace mongo {
         if (0 != wo) {
             return wo < 0;
         }
-        if (lhs.startInclusive && rhs.startInclusive) { return false; }
-        // The start and end are equal.  Put the bound that's inclusive to the left.
-        if (lhs.startInclusive) {
-            return true;
-        }
-        if (rhs.startInclusive) {
-            return false;
-        }
 
-        // If neither start nor end is inclusive but they begin at the same point who cares which is
-        // first.  Strict weak requires irreflexivity requires false for equivalence.
-        return false;
+        // The start and end are equal.
+        // Strict weak requires irreflexivity which implies that equivalence returns false.
+        if (lhs.startInclusive == rhs.startInclusive) { return false; }
+
+        // Put the bound that's inclusive to the left.
+        return lhs.startInclusive;
     }
 
     // static
