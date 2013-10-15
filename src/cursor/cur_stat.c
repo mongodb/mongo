@@ -407,7 +407,7 @@ __curstat_file_init(WT_SESSION_IMPL *session,
 		 * from there as well.  Save/restore the handle.
 		 */
 		saved_dhandle = dhandle;
-		WT_WITH_SCHEMA_LOCK_OPT(session,
+		WT_WITH_SCHEMA_LOCK(session,
 		    ret = __wt_conn_btree_apply(
 		    session, 1, __curstat_checkpoint, cfg_arg));
 		session->dhandle = saved_dhandle;

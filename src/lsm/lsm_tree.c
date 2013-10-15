@@ -77,22 +77,28 @@ __lsm_tree_close(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	if (F_ISSET(lsm_tree, WT_LSM_TREE_WORKING)) {
 		F_CLR(lsm_tree, WT_LSM_TREE_WORKING);
 		/*
-		 * Signal twice to wake up all threads, even if they are racing
-		 * to check the "working" flag.
+		 * Signal all threads to wake them up, then wait for them to
+		 * exit.
+		 *
+		 * !!!
+		 * If we have the schema lock, have the LSM worker sessions
+		 * inherit the flag before we do anything.  The thread may
+		 * already be waiting for the schema lock, but the loop in the
+		 * WT_WITH_SCHEMA_LOCK macro takes care of that.
 		 */
 		if (F_ISSET(S2C(session), WT_CONN_LSM_MERGE))
 			for (i = 0; i < lsm_tree->merge_threads; i++) {
+				F_SET(lsm_tree->worker_sessions[i],
+				    F_ISSET(session, WT_SESSION_SCHEMA_LOCKED));
 				WT_TRET(__wt_cond_signal(
 				    session, lsm_tree->work_cond));
 				WT_TRET(__wt_thread_join(
 				    session, lsm_tree->worker_tids[i]));
 			}
+		F_SET(lsm_tree->ckpt_session,
+		    F_ISSET(session, WT_SESSION_SCHEMA_LOCKED));
 		WT_TRET(__wt_cond_signal(session, lsm_tree->work_cond));
 		WT_TRET(__wt_thread_join(session, lsm_tree->ckpt_tid));
-		if (FLD_ISSET(lsm_tree->bloom, WT_LSM_BLOOM_NEWEST)) {
-			WT_TRET(__wt_cond_signal(session, lsm_tree->work_cond));
-			WT_TRET(__wt_thread_join(session, lsm_tree->bloom_tid));
-		}
 	}
 
 	/*
@@ -106,7 +112,6 @@ __lsm_tree_close(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 		if ((s = lsm_tree->worker_sessions[i]) == NULL)
 			continue;
 		lsm_tree->worker_sessions[i] = NULL;
-		F_SET(s, F_ISSET(session, WT_SESSION_SCHEMA_LOCKED));
 		wt_session = &s->iface;
 		WT_TRET(wt_session->close(wt_session, NULL));
 
@@ -117,24 +122,7 @@ __lsm_tree_close(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 		__wt_free(NULL, s->hazard);
 	}
 
-	if (lsm_tree->bloom_session != NULL) {
-		F_SET(lsm_tree->bloom_session,
-		    F_ISSET(session, WT_SESSION_SCHEMA_LOCKED));
-
-		wt_session = &lsm_tree->bloom_session->iface;
-		WT_TRET(wt_session->close(wt_session, NULL));
-
-		/*
-		 * This is safe after the close because session handles are
-		 * not freed, but are managed by the connection.
-		 */
-		__wt_free(NULL, lsm_tree->bloom_session->hazard);
-	}
-
 	if (lsm_tree->ckpt_session != NULL) {
-		F_SET(lsm_tree->ckpt_session,
-		    F_ISSET(session, WT_SESSION_SCHEMA_LOCKED));
-
 		wt_session = &lsm_tree->ckpt_session->iface;
 		WT_TRET(wt_session->close(wt_session, NULL));
 
@@ -293,15 +281,6 @@ __lsm_tree_start_worker(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 			    &lsm_tree->worker_tids[i],
 			    __wt_lsm_merge_worker, wargs));
 		}
-	if (FLD_ISSET(lsm_tree->bloom, WT_LSM_BLOOM_NEWEST)) {
-		WT_RET(wt_conn->open_session(
-		    wt_conn, NULL, "isolation=read-uncommitted", &wt_session));
-		lsm_tree->bloom_session = (WT_SESSION_IMPL *)wt_session;
-		F_SET(lsm_tree->bloom_session, WT_SESSION_INTERNAL);
-
-		WT_RET(__wt_thread_create(session,
-		    &lsm_tree->bloom_tid, __wt_lsm_bloom_worker, lsm_tree));
-	}
 	WT_RET(__wt_thread_create(session,
 	    &lsm_tree->ckpt_tid, __wt_lsm_checkpoint_worker, lsm_tree));
 
@@ -372,16 +351,12 @@ __wt_lsm_tree_create(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_config_gets(session, cfg, "lsm_bloom", &cval));
 	FLD_SET(lsm_tree->bloom,
 	    (cval.val == 0 ? WT_LSM_BLOOM_OFF : WT_LSM_BLOOM_MERGED));
-	WT_ERR(__wt_config_gets(session, cfg, "lsm_bloom_newest", &cval));
-	if (cval.val != 0)
-		FLD_SET(lsm_tree->bloom, WT_LSM_BLOOM_NEWEST);
 	WT_ERR(__wt_config_gets(session, cfg, "lsm_bloom_oldest", &cval));
 	if (cval.val != 0)
 		FLD_SET(lsm_tree->bloom, WT_LSM_BLOOM_OLDEST);
 
 	if (FLD_ISSET(lsm_tree->bloom, WT_LSM_BLOOM_OFF) &&
-	    (FLD_ISSET(lsm_tree->bloom, WT_LSM_BLOOM_NEWEST) ||
-	    FLD_ISSET(lsm_tree->bloom, WT_LSM_BLOOM_OLDEST)))
+	    FLD_ISSET(lsm_tree->bloom, WT_LSM_BLOOM_OLDEST))
 		WT_ERR_MSG(session, EINVAL,
 		    "Bloom filters can only be created on newest and oldest "
 		    "chunks if bloom filters are enabled");
@@ -636,8 +611,7 @@ __lsm_tree_throttle(
  *	Switch to a new in-memory tree.
  */
 int
-__wt_lsm_tree_switch(
-    WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
+__wt_lsm_tree_switch(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 {
 	WT_DECL_RET;
 	WT_LSM_CHUNK *chunk;
@@ -651,8 +625,9 @@ __wt_lsm_tree_switch(
 	WT_ERR(__wt_realloc_def(session, &lsm_tree->chunk_alloc,
 	    lsm_tree->nchunks + 1, &lsm_tree->chunk));
 
-	WT_VERBOSE_ERR(session, lsm, "Tree switch to: %d, throttle %d",
-	    new_id, (int)lsm_tree->throttle_sleep);
+	WT_VERBOSE_ERR(session, lsm,
+	    "Tree switch to: %" PRIu32 ", throttle %ld",
+	    new_id, lsm_tree->throttle_sleep);
 
 	WT_ERR(__wt_calloc_def(session, 1, &chunk));
 	chunk->id = new_id;
@@ -881,7 +856,7 @@ __wt_lsm_tree_worker(WT_SESSION_IMPL *session,
 		WT_ERR(__wt_schema_worker(session, chunk->uri,
 		    file_func, name_func, cfg, open_flags));
 		if (name_func == __wt_backup_list_uri_append &&
-		    chunk->bloom_uri != NULL)
+		    F_ISSET(chunk, WT_LSM_CHUNK_BLOOM))
 			WT_ERR(__wt_schema_worker(session, chunk->bloom_uri,
 			    file_func, name_func, cfg, open_flags));
 	}
