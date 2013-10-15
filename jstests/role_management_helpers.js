@@ -93,6 +93,16 @@ function assertHasPrivilege(privilegeArray, privilege) {
      assertHasPrivilege(roleObj.privileges,
                         {resource: {cluster:true}, actions:['listDatabases']});
 
+     // Update role
+     db.updateRole("roleA", {roles:['roleB'],
+                             privileges:[{resource: {db: db.getName(), collection:""},
+                                          actions:['find']}]});
+     roleObj = db.getRole("roleA");
+     assert.eq(1, roleObj.roles.length);
+     assertHasRole(roleObj.roles, "roleB", db.getName());
+     assert.eq(1, roleObj.privileges.length);
+     assertHasPrivilege(roleObj.privileges,
+                        {resource: {db:db.getName(), collection:""}, actions:['find']});
 
      // Test dropRole
      db.dropRole('roleC');

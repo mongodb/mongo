@@ -525,7 +525,7 @@ namespace auth {
         }
 
         std::string roleName;
-        status = bsonExtractStringField(cmdObj, "createRole", &roleName);
+        status = bsonExtractStringField(cmdObj, cmdName, &roleName);
         if (!status.isOK()) {
             return status;
         }
