@@ -166,6 +166,7 @@ namespace mongo {
         if (0 != wo) {
             return wo < 0;
         }
+        if (lhs.startInclusive && rhs.startInclusive) { return false; }
         // The start and end are equal.  Put the bound that's inclusive to the left.
         if (lhs.startInclusive) {
             return true;
@@ -173,9 +174,10 @@ namespace mongo {
         if (rhs.startInclusive) {
             return false;
         }
+
         // If neither start nor end is inclusive but they begin at the same point who cares which is
-        // first.
-        return true;
+        // first.  Strict weak requires irreflexivity requires false for equivalence.
+        return false;
     }
 
     // static
@@ -228,7 +230,10 @@ namespace mongo {
             for (size_t i = 0; i < acc.intervals.size(); ++i) {
                 oilOut->intervals.push_back(acc.intervals[i]);
             }
-            std::sort(oilOut->intervals.begin(), oilOut->intervals.end(), IntervalComparison);
+
+            if (!oilOut->intervals.empty()) {
+                std::sort(oilOut->intervals.begin(), oilOut->intervals.end(), IntervalComparison);
+            }
         }
         else if (MatchExpression::EQ == expr->matchType()) {
             const EqualityMatchExpression* node = static_cast<const EqualityMatchExpression*>(expr);
@@ -471,15 +476,15 @@ namespace mongo {
 
     // static
     void IndexBoundsBuilder::unionize(OrderedIntervalList* oilOut) {
-        // Step 1: sort.
-        std::sort(oilOut->intervals.begin(), oilOut->intervals.end(), IntervalComparison);
-
-        // Step 2: Walk through and merge.
         vector<Interval>& iv = oilOut->intervals;
 
         // This can happen.
         if (iv.empty()) { return; }
 
+        // Step 1: sort.
+        std::sort(iv.begin(), iv.end(), IntervalComparison);
+
+        // Step 2: Walk through and merge.
         size_t i = 0;
         while (i < iv.size() - 1) {
             // Compare i with i + 1.
