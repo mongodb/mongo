@@ -32,7 +32,10 @@ namespace mongo {
         DatabaseDifferCaseCode = 13297 ,  // uassert( 13297 )
         SendStaleConfigCode = 13388 ,     // uassert( 13388 )
         RecvStaleConfigCode = 9996,       // uassert( 9996 )
-        PrepareConfigsFailedCode = 13104  // uassert( 13104 )
+        PrepareConfigsFailedCode = 13104, // uassert( 13104 )
+        NotMasterOrSecondaryCode = 13436, // uassert( 13436 )
+        NotMasterNoSlaveOkCode = 13435,   // uassert( 13435 )
+        NotMaster = 10107                 // uassert( 10107 )
     };
 
     class AssertionCount {

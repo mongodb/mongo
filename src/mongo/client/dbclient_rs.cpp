@@ -1755,7 +1755,8 @@ namespace mongo {
 
         // If the error code here ever changes, we need to change this code also
         BSONElement code = error["code"];
-        if( code.isNumber() && code.Int() == 13436 /* not master or secondary */ ){
+        if( code.isNumber() &&
+            code.Int() == NotMasterOrSecondaryCode /* not master or secondary */ ) {
             isntSecondary();
             throw DBException( str::stream() << "slave " << _lastSlaveOkHost.toString()
                     << " is no longer secondary", 14812 );
@@ -1951,7 +1952,8 @@ namespace mongo {
 
             // Check the error code for a slave not secondary error
             if( nReturned == -1 ||
-                ( hasErrField( dataObj ) &&  ! dataObj["code"].eoo() && dataObj["code"].Int() == 13436 ) ){
+                ( hasErrField( dataObj ) &&  ! dataObj["code"].eoo()
+                  && dataObj["code"].Int() == NotMasterOrSecondaryCode ) ){
 
                 bool wasMaster = false;
                 if( _lazyState._lastClient == _lastSlaveOkConn.get() ){
@@ -1980,7 +1982,8 @@ namespace mongo {
             // slaveOk is not set, just mark the master as bad
 
             if( nReturned == -1 ||
-               ( hasErrField( dataObj ) &&  ! dataObj["code"].eoo() && dataObj["code"].Int() == 13435 ) )
+               ( hasErrField( dataObj ) &&  ! dataObj["code"].eoo()
+                 && dataObj["code"].Int() == NotMasterNoSlaveOkCode ) )
             {
                 if( _lazyState._lastClient == _master.get() ){
                     isntMaster();
