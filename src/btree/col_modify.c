@@ -23,7 +23,7 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 	WT_INSERT_HEAD *ins_head, **ins_headp;
 	WT_ITEM *value, _value;
 	WT_PAGE *page;
-	WT_UPDATE *upd, *upd_obsolete;
+	WT_UPDATE *old_upd, *upd, *upd_obsolete;
 	size_t ins_size, upd_size;
 	uint64_t recno;
 	u_int i, skipdepth;
@@ -74,7 +74,7 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 	 */
 	if (cbt->compare == 0 && cbt->ins != NULL) {
 		/* Make sure the update can proceed. */
-		WT_ERR(__wt_txn_update_check(session, cbt->ins->upd));
+		WT_ERR(__wt_txn_update_check(session, old_upd = cbt->ins->upd));
 
 		/* Allocate the WT_UPDATE structure and transaction ID. */
 		WT_ERR(__wt_update_alloc(session, value, &upd, &upd_size));
@@ -83,10 +83,10 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 
 		/*
 		 * Point the new WT_UPDATE item to the next element in the list.
-		 * If we get it right, the serialization function locks acts as
+		 * If we get it right, the serialization function lock acts as
 		 * our memory barrier to flush this write.
 		 */
-		upd->next = cbt->ins->upd;
+		upd->next = old_upd;
 
 		/* Serialize the update. */
 		WT_ERR(__wt_update_serial(session, page,
