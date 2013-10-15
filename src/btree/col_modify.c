@@ -138,15 +138,16 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 		cbt->ins = ins;
 
 		/*
-		 * If there was no WT_INSERT_HEAD during the search, the
-		 * cursor's information cannot be correct, search could not
-		 * have initialized it.
+		 * If there was no insert list during the search, the cursor's
+		 * information cannot be correct, search couldn't have
+		 * initialized it.
 		 *
-		 * Otherwise, point the new WT_INSERT item's skiplist
-		 * references to the next elements in the insert list (which we
-		 * will check are still valid inside the serialization
-		 * function).  The serial mutex acts as our memory barrier to
-		 * flush these writes before inserting them into the list.
+		 * Otherwise, point the new WT_INSERT item's skiplist to the
+		 * next elements in the insert list (which we will check are
+		 * still valid inside the serialization function).
+		 *
+		 * The serial mutex acts as our memory barrier to flush these
+		 * writes before inserting them into the list.
 		 */
 		if (WT_SKIP_FIRST(ins_head) == NULL)
 			for (i = 0; i < skipdepth; i++) {
