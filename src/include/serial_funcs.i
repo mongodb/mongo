@@ -4,7 +4,6 @@ typedef struct {
 	WT_PAGE *page;
 	WT_INSERT_HEAD *inshead;
 	WT_INSERT ***ins_stack;
-	WT_INSERT **next_stack;
 	WT_INSERT *new_ins;
 	uint64_t *recno;
 	u_int skipdepth;
@@ -13,8 +12,8 @@ typedef struct {
 static inline int
 __wt_col_append_serial(
 	WT_SESSION_IMPL *session, WT_PAGE *page, WT_INSERT_HEAD *inshead,
-	WT_INSERT ***ins_stack, WT_INSERT **next_stack, WT_INSERT **new_insp,
-	size_t new_ins_size, uint64_t *recno, u_int skipdepth) {
+	WT_INSERT ***ins_stack, WT_INSERT **new_insp, size_t new_ins_size,
+	uint64_t *recno, u_int skipdepth) {
 	__wt_col_append_args _args, *args = &_args;
 	WT_DECL_RET;
 	size_t incr_mem;
@@ -24,8 +23,6 @@ __wt_col_append_serial(
 	args->inshead = inshead;
 
 	args->ins_stack = ins_stack;
-
-	args->next_stack = next_stack;
 
 	if (new_insp == NULL)
 		args->new_ins = NULL;
@@ -70,15 +67,14 @@ __wt_col_append_serial(
 static inline void
 __wt_col_append_unpack(
     void *untyped_args, WT_PAGE **pagep, WT_INSERT_HEAD **insheadp,
-    WT_INSERT ****ins_stackp, WT_INSERT ***next_stackp, WT_INSERT
-    **new_insp, uint64_t **recnop, u_int *skipdepthp)
+    WT_INSERT ****ins_stackp, WT_INSERT **new_insp, uint64_t **recnop,
+    u_int *skipdepthp)
 {
 	__wt_col_append_args *args = (__wt_col_append_args *)untyped_args;
 
 	*pagep = args->page;
 	*insheadp = args->inshead;
 	*ins_stackp = args->ins_stack;
-	*next_stackp = args->next_stack;
 	*new_insp = args->new_ins;
 	*recnop = args->recno;
 	*skipdepthp = args->skipdepth;
@@ -88,7 +84,6 @@ typedef struct {
 	WT_PAGE *page;
 	WT_INSERT_HEAD *inshead;
 	WT_INSERT ***ins_stack;
-	WT_INSERT **next_stack;
 	WT_INSERT *new_ins;
 	u_int skipdepth;
 } __wt_insert_args;
@@ -96,8 +91,8 @@ typedef struct {
 static inline int
 __wt_insert_serial(
 	WT_SESSION_IMPL *session, WT_PAGE *page, WT_INSERT_HEAD *inshead,
-	WT_INSERT ***ins_stack, WT_INSERT **next_stack, WT_INSERT **new_insp,
-	size_t new_ins_size, u_int skipdepth) {
+	WT_INSERT ***ins_stack, WT_INSERT **new_insp, size_t new_ins_size,
+	u_int skipdepth) {
 	__wt_insert_args _args, *args = &_args;
 	WT_DECL_RET;
 	size_t incr_mem;
@@ -107,8 +102,6 @@ __wt_insert_serial(
 	args->inshead = inshead;
 
 	args->ins_stack = ins_stack;
-
-	args->next_stack = next_stack;
 
 	if (new_insp == NULL)
 		args->new_ins = NULL;
@@ -151,15 +144,13 @@ __wt_insert_serial(
 static inline void
 __wt_insert_unpack(
     void *untyped_args, WT_PAGE **pagep, WT_INSERT_HEAD **insheadp,
-    WT_INSERT ****ins_stackp, WT_INSERT ***next_stackp, WT_INSERT
-    **new_insp, u_int *skipdepthp)
+    WT_INSERT ****ins_stackp, WT_INSERT **new_insp, u_int *skipdepthp)
 {
 	__wt_insert_args *args = (__wt_insert_args *)untyped_args;
 
 	*pagep = args->page;
 	*insheadp = args->inshead;
 	*ins_stackp = args->ins_stack;
-	*next_stackp = args->next_stack;
 	*new_insp = args->new_ins;
 	*skipdepthp = args->skipdepth;
 }

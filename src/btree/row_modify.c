@@ -125,19 +125,29 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 		cbt->ins = ins;
 
 		/*
-		 * Point the new WT_INSERT item's skiplist references to the
-		 * next elements in the insert list (which might be complete
-		 * garbage, but we'll check inside the serialization function).
-		 * If we get it right (and we can mostly), the serialization
-		 * function lock acts as our memory barrier to flush these
+		 * If there was no insert list during the search, the cursor's
+		 * information cannot be correct, search couldn't have
+		 * initialized it.
+		 *
+		 * Otherwise, point the new WT_INSERT item's skiplist to the
+		 * next elements in the insert list (which we will check are
+		 * still valid inside the serialization function).
+		 *
+		 * The serial mutex acts as our memory barrier to flush these
 		 * writes before inserting them into the list.
 		 */
-		for (i = 0; i < skipdepth && cbt->ins_stack[i] != NULL; i++)
-			ins->next[i] = *cbt->ins_stack[i];
+		if (WT_SKIP_FIRST(ins_head) == NULL)
+			for (i = 0; i < skipdepth; i++) {
+				cbt->ins_stack[i] = &ins_head->head[i];
+				ins->next[i] = cbt->next_stack[i] = NULL;
+			}
+		else
+			for (i = 0; i < skipdepth; i++)
+				ins->next[i] = cbt->next_stack[i];
 
 		/* Insert the WT_INSERT structure. */
-		WT_ERR(__wt_insert_serial(session, page,
-		    cbt->ins_head, cbt->ins_stack, cbt->next_stack,
+		WT_ERR(__wt_insert_serial(
+		    session, page, cbt->ins_head, cbt->ins_stack,
 		    &ins, ins_size, skipdepth));
 	}
 
@@ -191,72 +201,40 @@ __wt_row_insert_alloc(WT_SESSION_IMPL *session,
 int
 __wt_insert_serial_func(WT_SESSION_IMPL *session, void *args)
 {
-	WT_INSERT *new_ins, ***ins_stack, **next_stack;
+	WT_INSERT *new_ins, ***ins_stack;
 	WT_INSERT_HEAD *ins_head;
 	WT_PAGE *page;
 	u_int i, skipdepth;
-	int need_barrier;
 
 	WT_UNUSED(session);
 
 	__wt_insert_unpack(args, &page,
-	    &ins_head, &ins_stack, &next_stack, &new_ins, &skipdepth);
+	    &ins_head, &ins_stack, &new_ins, &skipdepth);
 
-	/*
-	 * Largely ignore the page's write-generation, just confirm it hasn't
-	 * wrapped.
-	 */
+	/* Confirm the page write generation won't wrap. */
 	WT_RET(__wt_page_write_gen_wrapped_check(page));
 
 	/*
-	 * If an empty WT_INSERT_HEAD, the cursor's information cannot be
-	 * correct, search could not have initialized it.
+	 * Confirm we are still in the expected position, and no item has been
+	 * added where our insert belongs.  Take extra care at the beginning
+	 * and end of the list (at each level): retry if we race there.
+	 *
+	 * !!!
+	 * Note the test for ins_stack[0] == NULL: that's the test for an
+	 * uninitialized cursor, ins_stack[0] is cleared as part of
+	 * initializing a cursor for a search.
 	 */
-	if (WT_SKIP_FIRST(ins_head) == NULL)
-		for (i = 0; i < WT_SKIP_MAXDEPTH; i++) {
-			ins_stack[i] = &ins_head->head[i];
-			next_stack[i] = NULL;
-		}
-	else
-		/*
-		 * Confirm we are still in the expected position, and no item
-		 * has been added where our insert belongs.  Take extra care
-		 * at the beginning and end of the list (at each level): retry
-		 * if we race there.
-		 *
-		 * !!!
-		 * Note the test for ins_stack[0] == NULL: that's the test for
-		 * an uninitialized cursor, ins_stack[0] is cleared as part of
-		 * initializing a cursor for a search.
-		 */
-		for (i = 0; i < skipdepth; i++) {
-			if (ins_stack[i] == NULL ||
-			    *ins_stack[i] != next_stack[i])
-				return (WT_RESTART);
-			if (next_stack[i] == NULL &&
-			    ins_head->tail[i] != NULL &&
-			    ins_stack[i] != &ins_head->tail[i]->next[i])
-				return (WT_RESTART);
-		}
+	for (i = 0; i < skipdepth; i++) {
+		if (ins_stack[i] == NULL ||
+		    *ins_stack[i] != new_ins->next[i])
+			return (WT_RESTART);
+		if (new_ins->next[i] == NULL &&
+		    ins_head->tail[i] != NULL &&
+		    ins_stack[i] != &ins_head->tail[i]->next[i])
+			return (WT_RESTART);
+	}
 
-	/*
-	 * First, if the new WT_INSERT item's skiplist references aren't already
-	 * set, point them to the next elements in the insert list, then flush
-	 * memory.
-	 */
-	need_barrier = 0;
-	for (i = 0; i < skipdepth; i++)
-		if (new_ins->next[i] != *ins_stack[i]) {
-			new_ins->next[i] = *ins_stack[i];
-			need_barrier = 1;
-		}
-	if (need_barrier)
-		WT_WRITE_BARRIER();
-
-	/*
-	 * Second, update the skiplist elements that reference the new WT_INSERT
-	 * item, this ensures the list is never inconsistent.
-	 */
+	/* Update the skiplist elements referencing the new WT_INSERT item. */
 	for (i = 0; i < skipdepth; i++) {
 		if (ins_head->tail[i] == NULL ||
 		    ins_stack[i] == &ins_head->tail[i]->next[i])
@@ -401,15 +379,16 @@ __wt_update_serial_func(WT_SESSION_IMPL *session, void *args)
 
 	__wt_update_unpack(args, &page, &upd_entry, &upd, &upd_obsolete);
 
-	/*
-	 * Ignore the page's write-generation (other than the special case of
-	 * it wrapping).  If we're still in the expected position, we're good
-	 * to go and no update has been added where ours belongs.  If a new
-	 * update has been added, check if our update is still permitted, and
-	 * if it is, do a full-barrier to ensure the new entry's next pointer
-	 * is set before we update the linked list.
-	 */
+	/* Confirm the page write generation won't wrap. */
 	WT_RET(__wt_page_write_gen_wrapped_check(page));
+
+	/*
+	 *
+	 * If we're still in the expected position, no update has been added
+	 * where ours belongs.  If a new update has been added, check if our
+	 * update is still permitted, and if it is, do a full-barrier to ensure
+	 * the new entry's next pointer is set before we update the linked list.
+	 */
 	if (upd->next != *upd_entry) {
 		WT_RET(__wt_txn_update_check(session, *upd_entry));
 
