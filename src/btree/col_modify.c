@@ -227,21 +227,18 @@ __wt_col_append_serial_func(WT_SESSION_IMPL *session, void *args)
 	__wt_col_append_unpack(args, &page,
 	    &ins_head, &ins_stack, &new_ins, &recnop, &skipdepth);
 
-	/*
-	 * Largely ignore the page's write-generation, just confirm it hasn't
-	 * wrapped.
-	 */
+	/* Confirm the page write generation won't wrap. */
 	WT_RET(__wt_page_write_gen_wrapped_check(page));
 
 	/*
-	 * If the application didn't specify a record number, we still have
-	 * to do a search in order to create the insert stack we need.
+	 * If the application didn't specify a record number, allocate a new one
+	 * and set up for an append.
 	 */
 	if ((recno = WT_INSERT_RECNO(new_ins)) == 0) {
 		recno = WT_INSERT_RECNO(new_ins) = btree->last_recno + 1;
 		for (i = 0; i < skipdepth; i++)
-			ins_stack[i] = (ins_head->tail[i] != NULL) ?
-			    &ins_head->tail[i]->next[i] : &ins_head->head[i];
+			ins_stack[i] = ins_head->tail[i] == NULL ?
+			    &ins_head->head[i] : &ins_head->tail[i]->next[i];
 	}
 
 	/*

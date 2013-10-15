@@ -211,10 +211,7 @@ __wt_insert_serial_func(WT_SESSION_IMPL *session, void *args)
 	__wt_insert_unpack(args, &page,
 	    &ins_head, &ins_stack, &new_ins, &skipdepth);
 
-	/*
-	 * Largely ignore the page's write-generation, just confirm it hasn't
-	 * wrapped.
-	 */
+	/* Confirm the page write generation won't wrap. */
 	WT_RET(__wt_page_write_gen_wrapped_check(page));
 
 	/*
@@ -382,15 +379,16 @@ __wt_update_serial_func(WT_SESSION_IMPL *session, void *args)
 
 	__wt_update_unpack(args, &page, &upd_entry, &upd, &upd_obsolete);
 
-	/*
-	 * Ignore the page's write-generation (other than the special case of
-	 * it wrapping).  If we're still in the expected position, we're good
-	 * to go and no update has been added where ours belongs.  If a new
-	 * update has been added, check if our update is still permitted, and
-	 * if it is, do a full-barrier to ensure the new entry's next pointer
-	 * is set before we update the linked list.
-	 */
+	/* Confirm the page write generation won't wrap. */
 	WT_RET(__wt_page_write_gen_wrapped_check(page));
+
+	/*
+	 *
+	 * If we're still in the expected position, no update has been added
+	 * where ours belongs.  If a new update has been added, check if our
+	 * update is still permitted, and if it is, do a full-barrier to ensure
+	 * the new entry's next pointer is set before we update the linked list.
+	 */
 	if (upd->next != *upd_entry) {
 		WT_RET(__wt_txn_update_check(session, *upd_entry));
 
