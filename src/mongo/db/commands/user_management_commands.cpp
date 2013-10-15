@@ -53,6 +53,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/platform/unordered_set.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/sequence_util.h"
 
 namespace mongo {
@@ -270,6 +271,18 @@ namespace mongo {
                 return false;
             }
 
+#ifdef MONGO_SSL
+            if (args.userName.getDB() == "$external" &&
+                getSSLManager() && 
+                getSSLManager()->getServerSubjectName() == args.userName.getUser()) {
+                addStatus(Status(ErrorCodes::BadValue,
+                                 "Cannot create an x.509 user with the same "
+                                 "subjectname as the server"),
+                          result);
+                return false;
+            }
+#endif
+ 
             BSONObjBuilder userObjBuilder;
             userObjBuilder.append("_id",
                                   str::stream() << args.userName.getDB() << "." <<
