@@ -135,7 +135,7 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 		 * function).  The serial mutex acts as our memory barrier to
 		 * flush these writes before inserting them into the list.
 		 */
-		if (cbt->ins_stack[0] == NULL)
+		if (WT_SKIP_FIRST(ins_head) == NULL)
 			for (i = 0; i < skipdepth; i++) {
 				cbt->ins_stack[i] = &ins_head->head[i];
 				ins->next[i] = cbt->next_stack[i] = NULL;
