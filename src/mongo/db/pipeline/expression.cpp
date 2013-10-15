@@ -31,6 +31,8 @@
 #include "db/pipeline/expression.h"
 
 #include <boost/algorithm/string.hpp>
+#include <boost/bind.hpp>
+#include <boost/function.hpp>
 #include <boost/preprocessor/cat.hpp> // like the ## operator but works with __LINE__
 #include <cstdio>
 
@@ -244,7 +246,7 @@ namespace mongo {
     }
 
 namespace {
-    typedef intrusive_ptr<Expression> (*ExpressionParser)(BSONElement);
+    typedef boost::function<intrusive_ptr<Expression>(BSONElement)> ExpressionParser;
     StringMap<ExpressionParser> expressionParserMap;
 }
 
@@ -261,7 +263,7 @@ namespace {
                                      << __FILE__ << ":" << __LINE__, \
                 op == expressionParserMap.end()); \
         /* register expression */ \
-        expressionParserMap[key] = parserFunc; \
+        expressionParserMap[key] = (parserFunc); \
         return Status::OK(); \
     }
 
@@ -543,35 +545,14 @@ namespace {
 
     /* ----------------------- ExpressionCompare --------------------------- */
 
-    REGISTER_EXPRESSION("$cmp", ExpressionCompare::parse);
-    REGISTER_EXPRESSION("$eq", ExpressionCompare::parse);
-    REGISTER_EXPRESSION("$gt", ExpressionCompare::parse);
-    REGISTER_EXPRESSION("$gte", ExpressionCompare::parse);
-    REGISTER_EXPRESSION("$lt", ExpressionCompare::parse);
-    REGISTER_EXPRESSION("$lte", ExpressionCompare::parse);
-    REGISTER_EXPRESSION("$ne", ExpressionCompare::parse);
-    intrusive_ptr<Expression> ExpressionCompare::parse(BSONElement bsonExpr) {
-        const char* compTypeStr = bsonExpr.fieldName();
-        CmpOp op;
-        if (str::equals(compTypeStr, "$cmp")) {
-            op = CMP;
-        } else if (str::equals(compTypeStr, "$eq")) {
-            op = EQ;
-        } else if (str::equals(compTypeStr, "$gt")) {
-            op = GT;
-        } else if (str::equals(compTypeStr, "$gte")) {
-            op = GTE;
-        } else if (str::equals(compTypeStr, "$lt")) {
-            op = LT;
-        } else if (str::equals(compTypeStr, "$lte")) {
-            op = LTE;
-        } else if (str::equals(compTypeStr, "$ne")) {
-            op = NE;
-        } else {
-            msgasserted(17063,
-                        str::stream() << "ExpressionCompare got unexpected op: " << compTypeStr);
-        }
-
+    REGISTER_EXPRESSION("$cmp", boost::bind(ExpressionCompare::parse, _1, ExpressionCompare::CMP));
+    REGISTER_EXPRESSION("$eq",  boost::bind(ExpressionCompare::parse, _1, ExpressionCompare::EQ));
+    REGISTER_EXPRESSION("$gt",  boost::bind(ExpressionCompare::parse, _1, ExpressionCompare::GT));
+    REGISTER_EXPRESSION("$gte", boost::bind(ExpressionCompare::parse, _1, ExpressionCompare::GTE));
+    REGISTER_EXPRESSION("$lt",  boost::bind(ExpressionCompare::parse, _1, ExpressionCompare::LT));
+    REGISTER_EXPRESSION("$lte", boost::bind(ExpressionCompare::parse, _1, ExpressionCompare::LTE));
+    REGISTER_EXPRESSION("$ne",  boost::bind(ExpressionCompare::parse, _1, ExpressionCompare::NE));
+    intrusive_ptr<Expression> ExpressionCompare::parse(BSONElement bsonExpr, CmpOp op) {
         intrusive_ptr<ExpressionCompare> expr = new ExpressionCompare(op);
         ExpressionVector args = parseArguments(bsonExpr);
         expr->validateArguments(args);
@@ -583,42 +564,44 @@ namespace {
         : cmpOp(theCmpOp)
     {}
 
-    /*
-      Lookup table for truth value returns
-    */
+namespace {
+    // Lookup table for truth value returns
     struct CmpLookup {
-        bool truthValue[3]; /* truth value for -1, 0, 1 */
-        Expression::CmpOp reverse; /* reverse comparison operator */
-        char name[5]; /* string name (w/trailing '\0') */
+        const bool truthValue[3]; // truth value for -1, 0, 1
+        const ExpressionCompare::CmpOp reverse; // reverse(b,a) returns the same as op(a,b)
+        const char name[5]; // string name with trailing '\0'
     };
     static const CmpLookup cmpLookup[7] = {
-        /*             -1      0      1      reverse          name   */
-        /* EQ  */ { { false, true,  false }, Expression::EQ,  "$eq"  },
-        /* NE  */ { { true,  false, true },  Expression::NE,  "$ne"  },
-        /* GT  */ { { false, false, true },  Expression::LT,  "$gt"  },
-        /* GTE */ { { false, true,  true },  Expression::LTE, "$gte" },
-        /* LT  */ { { true,  false, false }, Expression::GT,  "$lt"  },
-        /* LTE */ { { true,  true,  false }, Expression::GTE, "$lte" },
-        /* CMP */ { { false, false, false }, Expression::CMP, "$cmp" },
+        /*             -1      0      1      reverse                  name   */
+        /* EQ  */ { { false, true,  false }, ExpressionCompare::EQ,  "$eq"  },
+        /* NE  */ { { true,  false, true },  ExpressionCompare::NE,  "$ne"  },
+        /* GT  */ { { false, false, true },  ExpressionCompare::LT,  "$gt"  },
+        /* GTE */ { { false, true,  true },  ExpressionCompare::LTE, "$gte" },
+        /* LT  */ { { true,  false, false }, ExpressionCompare::GT,  "$lt"  },
+        /* LTE */ { { true,  true,  false }, ExpressionCompare::GTE, "$lte" },
+
+        // CMP is special. Only name is used.
+        /* CMP */ { { false, false, false }, ExpressionCompare::CMP, "$cmp" },
     };
+}
 
     Value ExpressionCompare::evaluateInternal(const Variables& vars) const {
         Value pLeft(vpOperand[0]->evaluateInternal(vars));
         Value pRight(vpOperand[1]->evaluateInternal(vars));
 
-        int cmp = signum(Value::compare(pLeft, pRight));
+        int cmp = Value::compare(pLeft, pRight);
 
-        if (cmpOp == CMP) {
-            switch(cmp) {
-            case -1:
-            case 0:
-            case 1:
-                return Value(cmp);
-
-            default:
-                verify(false); // CW TODO internal error
-            }
+        // Make cmp one of 1, 0, or -1.
+        if (cmp == 0) {
+            // leave as 0
+        } else if (cmp < 0) {
+            cmp = -1;
+        } else if (cmp > 0) {
+            cmp = 1;
         }
+
+        if (cmpOp == CMP)
+            return Value(cmp);
 
         bool returnValue = cmpLookup[cmpOp].truthValue[cmp + 1];
         return Value(returnValue);

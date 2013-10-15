@@ -176,25 +176,6 @@ namespace mongo {
          */
         static string removeFieldPrefix(const string &prefixedField);
 
-        /*
-          Enumeration of comparison operators.  These are shared between a
-          few expression implementations, so they are factored out here.
-
-          Any changes to these values require adjustment of the lookup
-          table in the implementation.
-        */
-        enum CmpOp {
-            EQ = 0, // return true for a == b, false otherwise
-            NE = 1, // return true for a != b, false otherwise
-            GT = 2, // return true for a > b, false otherwise
-            GTE = 3, // return true for a >= b, false otherwise
-            LT = 4, // return true for a < b, false otherwise
-            LTE = 5, // return true for a <= b, false otherwise
-            CMP = 6, // return -1, 0, 1 for a < b, a == b, a > b
-        };
-
-        static int signum(int i);
-
         /** Evaluate the subclass Expression using the given Variables as context and return result.
          *
          *  Should only be called by subclasses, but can't be protected because they need to call
@@ -334,11 +315,25 @@ namespace mongo {
 
     class ExpressionCompare : public ExpressionFixedArity<ExpressionCompare, 2> {
     public:
+
+        /** Enumeration of comparison operators. Any changes to these values require adjustment of
+         *  the lookup table in the implementation.
+         */
+        enum CmpOp {
+            EQ = 0, // return true for a == b, false otherwise
+            NE = 1, // return true for a != b, false otherwise
+            GT = 2, // return true for a > b, false otherwise
+            GTE = 3, // return true for a >= b, false otherwise
+            LT = 4, // return true for a < b, false otherwise
+            LTE = 5, // return true for a <= b, false otherwise
+            CMP = 6, // return -1, 0, 1 for a < b, a == b, a > b
+        };
+
         // virtuals from ExpressionNary
         virtual Value evaluateInternal(const Variables& vars) const;
         virtual const char *getOpName() const;
 
-        static intrusive_ptr<Expression> parse(BSONElement bsonExpr);
+        static intrusive_ptr<Expression> parse(BSONElement bsonExpr, CmpOp cmpOp);
 
         ExpressionCompare(CmpOp cmpOp);
 
@@ -829,14 +824,6 @@ namespace mongo {
 /* ======================= INLINED IMPLEMENTATIONS ========================== */
 
 namespace mongo {
-
-    inline int Expression::signum(int i) {
-        if (i < 0)
-            return -1;
-        if (i > 0)
-            return 1;
-        return 0;
-    }
 
     inline Value ExpressionConstant::getValue() const {
         return pValue;
