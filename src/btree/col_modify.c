@@ -138,26 +138,34 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 		cbt->ins = ins;
 
 		/*
-		 * Point the new WT_INSERT item's skiplist references to the
-		 * next elements in the insert list (which might be complete
-		 * garbage, but we'll check inside the serialization function).
-		 * If we get it right (and we can mostly), the serialization
-		 * function lock acts as our memory barrier to flush these
-		 * writes before inserting them into the list.
+		 * If there was no WT_INSERT_HEAD during the search, the
+		 * cursor's information cannot be correct, search could not
+		 * have initialized it.
+		 *
+		 * Otherwise, point the new WT_INSERT item's skiplist
+		 * references to the next elements in the insert list (which we
+		 * will check are still valid inside the serialization
+		 * function).  The serial mutex acts as our memory barrier to
+		 * flush these writes before inserting them into the list.
 		 */
-		for (i = 0; i < skipdepth && cbt->ins_stack[i] != NULL; i++)
-				ins->next[i] = *cbt->ins_stack[i];
+		if (cbt->ins_stack[0] == NULL)
+			for (i = 0; i < skipdepth; i++) {
+				cbt->ins_stack[i] = &ins_head->head[i];
+				ins->next[i] = cbt->next_stack[i] = NULL;
+			}
+		else
+			for (i = 0; i < skipdepth; i++)
+				ins->next[i] = cbt->next_stack[i];
 
 		/* Append or insert the WT_INSERT structure. */
 		if (append)
 			WT_ERR(__wt_col_append_serial(
 			    session, page,
-			    cbt->ins_head, cbt->ins_stack, cbt->next_stack,
+			    cbt->ins_head, cbt->ins_stack,
 			    &ins, ins_size, &cbt->recno, skipdepth));
 		else
 			WT_ERR(__wt_insert_serial(
-			    session, page,
-			    cbt->ins_head, cbt->ins_stack, cbt->next_stack,
+			    session, page, cbt->ins_head, cbt->ins_stack,
 			    &ins, ins_size, skipdepth));
 	}
 

@@ -29,7 +29,6 @@ Serial('insert', [
 		SerialArg('WT_PAGE *', 'page'),
 		SerialArg('WT_INSERT_HEAD *', 'inshead'),
 		SerialArg('WT_INSERT ***', 'ins_stack'),
-		SerialArg('WT_INSERT **', 'next_stack'),
 		SerialArg('WT_INSERT *', 'new_ins', 1),
 		SerialArg('u_int', 'skipdepth'),
 	]),
