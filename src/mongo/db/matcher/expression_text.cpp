@@ -42,7 +42,10 @@ namespace mongo {
 
     bool TextMatchExpression::matchesSingleElement( const BSONElement& e ) const {
         // This shouldn't be called.
-        verify(0);
+        massert( 17195,
+                 "attempted to match $text without consulting text index; "
+                    "perhaps operation is not using new query framework?",
+                 0 );
         return false;
     }
 
