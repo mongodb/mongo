@@ -48,12 +48,15 @@
 
 namespace mongo {
 
-/**
- * SERVER-11160 syslog.h does not define facilitynames under solaris
- * If syslog.h exports preprocessor macro INTERNAL_NOPRI if
+/*
+ * SERVER-11160 syslog.h does not define facilitynames under solaris.
+ * syslog.h exports preprocessor macro INTERNAL_NOPRI if
  * facilitynames is provided. This will be used to determine
  * if facilitynames should be defined here.
  * These could also go into a syslog.h compatibility header.
+ * We are using INTERNAL_NOPRI as the indicator macro for facilitynames
+ * because it's defined alongside facilitynames in the syslog.h headers
+ * that support SYSLOG_NAMES.
  */
 
 namespace {
