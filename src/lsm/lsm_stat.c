@@ -21,7 +21,7 @@ __wt_curstat_lsm_init(WT_SESSION_IMPL *session,
 	WT_DECL_RET;
 	WT_LSM_TREE *lsm_tree;
 
-	WT_WITH_SCHEMA_LOCK_OPT(session,
+	WT_WITH_SCHEMA_LOCK(session,
 	    ret = __wt_lsm_tree_get(session, uri, 0, &lsm_tree));
 	WT_RET(ret);
 

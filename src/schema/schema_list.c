@@ -83,7 +83,7 @@ __wt_schema_get_table(WT_SESSION_IMPL *session,
 	ret = __schema_find_table(session, name, namelen, &table);
 
 	if (ret == WT_NOTFOUND)
-		WT_WITH_SCHEMA_LOCK_OPT(session,
+		WT_WITH_SCHEMA_LOCK(session,
 		    ret = __schema_add_table(session, name, namelen, &table));
 
 	if (ret == 0) {

@@ -211,7 +211,7 @@ __wt_lsm_meta_write(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 		else
 			WT_ERR(__wt_buf_catfmt(session, buf, ","));
 		WT_ERR(__wt_buf_catfmt(session, buf, "\"%s\"", chunk->uri));
-		if (chunk->bloom_uri != NULL)
+		if (F_ISSET(chunk, WT_LSM_CHUNK_BLOOM))
 			WT_ERR(__wt_buf_catfmt(
 			    session, buf, ",bloom=\"%s\"", chunk->bloom_uri));
 	}
