@@ -92,6 +92,12 @@ namespace mongo {
                     error() << "key for ttl index can only have 1 field" << endl;
                     continue;
                 }
+                if (!idx[secondsExpireField].isNumber()) {
+                    log() << "ttl indexes require the " << secondsExpireField << " field to be "
+                          << "numeric but received a type of: "
+                          << typeName(idx[secondsExpireField].type());
+                    continue;
+                }
 
                 BSONObj query;
                 {
