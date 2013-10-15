@@ -1282,15 +1282,11 @@ extern int __wt_huffman_decode(WT_SESSION_IMPL *session,
     const uint8_t *from_arg,
     uint32_t from_len,
     WT_ITEM *to_buf);
-extern int __wt_spin_init(WT_SESSION_IMPL *session,
-    WT_SPINLOCK *t,
-    const char *name);
-extern void __wt_spin_destroy(WT_SESSION_IMPL *session, WT_SPINLOCK *t);
 extern void __wt_spin_lock_register(WT_SESSION_IMPL *session,
     const char *file,
     int line,
     const char *name,
-    int *slnop);
+    int *idp);
 extern int __wt_statlog_dump_spinlock(WT_CONNECTION_IMPL *conn,
     const char *name);
 extern uint32_t __wt_nlpo2_round(uint32_t v);

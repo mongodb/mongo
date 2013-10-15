@@ -321,8 +321,10 @@ __statlog_server(void *arg)
 		/* Dump the connection statistics. */
 		WT_ERR(__statlog_dump(session, conn->home, 1));
 
+#if SPINLOCK_TYPE == SPINLOCK_PTHREAD_MUTEX_LOGGING
 		/* Dump the spinlock statistics. */
 		WT_ERR(__wt_statlog_dump_spinlock(conn, conn->home));
+#endif
 
 		/*
 		 * Lock the schema and walk the list of open handles, dumping

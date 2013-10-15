@@ -7,59 +7,7 @@
 
 #include "wt_internal.h"
 
-#if SPINLOCK_TYPE == SPINLOCK_GCC
-
-int
-__wt_spin_init(WT_SESSION_IMPL *session, WT_SPINLOCK *t, const char *name)
-{
-	WT_UNUSED(session);
-	WT_UNUSED(name);
-
-	*(t) = 0;
-	return (0);
-}
-
-void
-__wt_spin_destroy(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
-{
-	WT_UNUSED(session);
-
-	*(t) = 0;
-}
-
-#elif SPINLOCK_TYPE == SPINLOCK_PTHREAD_MUTEX
-
-int
-/* s_prototypes */__wt_spin_init(
-    WT_SESSION_IMPL *session, WT_SPINLOCK *t, const char *name)
-{
-#ifdef HAVE_MUTEX_ADAPTIVE
-	pthread_mutexattr_t attr;
-
-	WT_RET(pthread_mutexattr_init(&attr));
-	WT_RET(pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_ADAPTIVE_NP));
-	WT_RET(pthread_mutex_init(&t->lock, &attr));
-#else
-	WT_RET(pthread_mutex_init(&t->lock, NULL));
-#endif
-
-	t->name = name;
-	t->initialized = 1;
-
-	WT_UNUSED(session);
-	return (0);
-}
-
-void
-/* s_prototypes */__wt_spin_destroy(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
-{
-	WT_UNUSED(session);
-
-	if (t->initialized) {
-		(void)pthread_mutex_destroy(&t->lock);
-		t->initialized = 0;
-	}
-}
+#if SPINLOCK_TYPE == SPINLOCK_PTHREAD_MUTEX_LOGGING
 
 /*
  * __wt_spin_lock_register --
@@ -67,7 +15,7 @@ void
  */
 void
 __wt_spin_lock_register(WT_SESSION_IMPL *session,
-    const char *file, int line, const char *name, int *slnop)
+    const char *file, int line, const char *name, int *idp)
 {
 	WT_CONNECTION_STATS_SPINLOCK *p;
 	int i;
@@ -87,13 +35,13 @@ __wt_spin_lock_register(WT_SESSION_IMPL *session,
 		if (p->file == NULL && WT_ATOMIC_CAS(p->file, NULL, s)) {
 			p->line = line;
 			p->name = name;
-			*slnop = i;
+			*idp = i;
 			return;
 		}
 
 	__wt_err(session, ENOMEM,
 	    "spin-lock registration failed, too many spinlocks");
-	*slnop = WT_SPINLOCK_REGISTER_FAILED;
+	*idp = WT_SPINLOCK_REGISTER_FAILED;
 }
 
 /*
@@ -128,4 +76,5 @@ __wt_statlog_dump_spinlock(WT_CONNECTION_IMPL *conn, const char *name)
 	}
 	return (0);
 }
-#endif
+
+#endif /* SPINLOCK_PTHREAD_MUTEX_LOGGING */
