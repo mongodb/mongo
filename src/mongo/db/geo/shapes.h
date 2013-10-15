@@ -133,10 +133,14 @@ namespace mongo {
     };
 
     struct PointWithCRS {
+        PointWithCRS() : flatUpgradedToSphere(false) { }
         S2Point point;
         S2Cell cell;
         Point oldPoint;
         CRS crs;
+        // If crs is FLAT, we might be able to upgrade the point to SPHERE if it's a valid SPHERE
+        // point (lng/lat in bounds).  In this case, we can use FLAT data with SPHERE predicates.
+        bool flatUpgradedToSphere;
     };
 
     struct LineWithCRS {
@@ -145,6 +149,7 @@ namespace mongo {
     };
 
     struct CapWithCRS {
+        // Only one of {cap, circle} is filled out depending on the CRS.
         S2Cap cap;
         Circle circle;
         CRS crs;

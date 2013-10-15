@@ -248,7 +248,7 @@ namespace mongo {
     }
 
     bool GeometryContainer::hasS2Region() const {
-        return NULL != _point
+        return (NULL != _point && (_point->crs == SPHERE || _point->flatUpgradedToSphere))
                || NULL != _line
                || (NULL != _polygon && _polygon->crs == SPHERE)
                || (NULL != _cap && _cap->crs == SPHERE)
@@ -298,6 +298,11 @@ namespace mongo {
 
         // Iterate over the other thing and see if we contain it all.
         if (NULL != otherContainer._point) {
+            // The point must be valid lng, lat if it was old-style.
+            if (FLAT == otherContainer._point->crs
+                && !otherContainer._point->flatUpgradedToSphere) {
+                return false;
+            }
             return contains(otherContainer._point->cell, otherContainer._point->point);
         }
 
@@ -506,6 +511,11 @@ namespace mongo {
 
     bool GeometryContainer::intersects(const GeometryContainer& otherContainer) const {
         if (NULL != otherContainer._point) {
+            // The point must be valid lng, lat if it was old-style.
+            if (FLAT == otherContainer._point->crs
+                && !otherContainer._point->flatUpgradedToSphere) {
+                return false;
+            }
             return intersects(otherContainer._point->cell);
         } else if (NULL != otherContainer._line) {
             return intersects(otherContainer._line->line);
@@ -573,6 +583,10 @@ namespace mongo {
     // Does this (GeometryContainer) intersect the provided data?
     bool GeometryContainer::intersects(const S2Cell &otherPoint) const {
         if (NULL != _point) {
+            // The point must be valid lng, lat if it was old-style.
+            if (FLAT == _point->crs && !_point->flatUpgradedToSphere) {
+                return false;
+            }
             return _point->cell.MayIntersect(otherPoint);
         } else if (NULL != _line) {
             return _line->line.MayIntersect(otherPoint);
@@ -647,6 +661,10 @@ namespace mongo {
 
     bool GeometryContainer::intersects(const S2Polyline& otherLine) const {
         if (NULL != _point) {
+            // The point must be valid lng, lat if it was old-style.
+            if (FLAT == _point->crs && !_point->flatUpgradedToSphere) {
+                return false;
+            }
             return otherLine.MayIntersect(_point->cell);
         } else if (NULL != _line) {
             return otherLine.Intersects(&_line->line);
@@ -717,6 +735,10 @@ namespace mongo {
     // Does 'this' intersect with the provided polygon?
     bool GeometryContainer::intersects(const S2Polygon& otherPolygon) const {
         if (NULL != _point) {
+            // The point must be valid lng, lat if it was old-style.
+            if (FLAT == _point->crs && !_point->flatUpgradedToSphere) {
+                return false;
+            }
             return otherPolygon.MayIntersect(_point->cell);
         } else if (NULL != _line) {
             return polygonLineIntersection(_line->line, otherPolygon);
@@ -873,7 +895,10 @@ namespace mongo {
 
     const S2Region& GeometryContainer::getRegion() const {
         if (NULL != _point) {
-            // _point->crs might be FLAT but we "upgrade" it for free.
+            // _point->crs might be FLAT but we "upgrade" it for free if it was in bounds.
+            if (FLAT == _point->crs) {
+                verify(_point->flatUpgradedToSphere);
+            }
             return _point->cell;
         } else if (NULL != _line) {
             return _line->line;

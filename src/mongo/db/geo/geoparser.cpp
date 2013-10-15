@@ -1,30 +1,30 @@
 /**
-*    Copyright (C) 2012 10gen Inc.
-*
-*    This program is free software: you can redistribute it and/or  modify
-*    it under the terms of the GNU Affero General Public License, version 3,
-*    as published by the Free Software Foundation.
-*
-*    This program is distributed in the hope that it will be useful,
-*    but WITHOUT ANY WARRANTY; without even the implied warranty of
-*    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-*    GNU Affero General Public License for more details.
-*
-*    You should have received a copy of the GNU Affero General Public License
-*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-*
-*    As a special exception, the copyright holders give permission to link the
-*    code of portions of this program with the OpenSSL library under certain
-*    conditions as described in each individual source file and distribute
-*    linked combinations including the program with the OpenSSL library. You
-*    must comply with the GNU Affero General Public License in all respects for
-*    all of the code used other than as permitted herein. If you modify file(s)
-*    with this exception, you may extend this exception to your version of the
-*    file(s), but you are not obligated to do so. If you do not wish to do so,
-*    delete this exception statement from your version. If you delete this
-*    exception statement from all source files in the program, then also delete
-*    it in the license file.
-*/
+ *    Copyright (C) 2012 10gen Inc.
+ *
+ *    This program is free software: you can redistribute it and/or  modify
+ *    it under the terms of the GNU Affero General Public License, version 3,
+ *    as published by the Free Software Foundation.
+ *
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU Affero General Public License for more details.
+ *
+ *    You should have received a copy of the GNU Affero General Public License
+ *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the GNU Affero General Public License in all respects for
+ *    all of the code used other than as permitted herein. If you modify file(s)
+ *    with this exception, you may extend this exception to your version of the
+ *    file(s), but you are not obligated to do so. If you do not wish to do so,
+ *    delete this exception statement from your version. If you delete this
+ *    exception statement from all source files in the program, then also delete
+ *    it in the license file.
+ */
 
 #include "mongo/db/geo/geoparser.h"
 
@@ -52,6 +52,10 @@ namespace mongo {
     static const string GEOJSON_COORDINATES = "coordinates";
     static const string GEOJSON_GEOMETRIES = "geometries";
 
+    bool isValidLngLat(double lng, double lat) {
+        return lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
+    }
+
     static bool isGeoJSONPoint(const BSONObj& obj) {
         BSONElement type = obj.getFieldDotted(GEOJSON_TYPE);
         if (type.eoo() || (String != type.type())) { return false; }
@@ -70,7 +74,7 @@ namespace mongo {
         if (!coordinates[0].isNumber() || !coordinates[1].isNumber()) { return false; }
         double lat = coordinates[1].Number();
         double lng = coordinates[0].Number();
-        return lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
+        return isValidLngLat(lng, lat);
     }
 
     static bool isLegacyPoint(const BSONObj &obj) {
@@ -86,8 +90,12 @@ namespace mongo {
     }
 
     static S2Point coordToPoint(double lng, double lat) {
+        // We don't rely on drem to clean up non-sane points.  We just don't let them become
+        // spherical.
+        verify(isValidLngLat(lng, lat));
         // Note that it's (lat, lng) for S2 but (lng, lat) for MongoDB.
         S2LatLng ll = S2LatLng::FromDegrees(lat, lng).Normalized();
+        // This shouldn't happen since we should only have valid lng/lats.
         if (!ll.is_valid()) {
             stringstream ss;
             ss << "coords invalid after normalization, lng = " << lng << " lat = " << lat << endl;
@@ -117,11 +125,10 @@ namespace mongo {
             for (size_t j = 0; j < thisCoord.size(); ++j) {
                 if (!thisCoord[j].isNumber()) { return false; }
             }
-            // ...where the latitude is valid
+            // ...where the longitude, latitude is valid
             double lat = thisCoord[1].Number();
             double lng = thisCoord[0].Number();
-            if (lat < -90 || lat > 90) { return false; }
-            if (lng < -180 || lng > 180) { return false; }
+            if (!isValidLngLat(lng, lat)) { return false; }
         }
         return true;
     }
@@ -130,6 +137,9 @@ namespace mongo {
         for (size_t i = 0; i < coordElt.size(); ++i) {
             const vector<BSONElement>& pointElt = coordElt[i].Array();
             if (pointElt.empty()) { continue; }
+            if (!isValidLngLat(pointElt[0].Number(), pointElt[1].Number())) {
+                return false;
+            }
             out->push_back(coordToPoint(pointElt[0].Number(), pointElt[1].Number()));
         }
 
@@ -281,6 +291,11 @@ namespace mongo {
         BSONElement center = objIt.next();
         if (!center.isABSONObj()) { return false; }
         if (!isLegacyPoint(center.Obj())) { return false; }
+        // Check to make sure the points are valid lng/lat.
+        BSONObjIterator coordIt(center.Obj());
+        BSONElement lng = coordIt.next();
+        BSONElement lat = coordIt.next();
+        if (!isValidLngLat(lng.Number(), lat.Number())) { return false; }
         if (!objIt.more()) { return false; }
         BSONElement radius = objIt.next();
         if (!radius.isNumber()) { return false; }
@@ -305,8 +320,11 @@ namespace mongo {
             BSONObjIterator it(obj);
             BSONElement x = it.next();
             BSONElement y = it.next();
-            out->point = coordToPoint(x.Number(), y.Number());
-            out->cell = S2Cell(out->point);
+            if (isValidLngLat(x.Number(), y.Number())) {
+                out->flatUpgradedToSphere = true;
+                out->point = coordToPoint(x.Number(), y.Number());
+                out->cell = S2Cell(out->point);
+            }
             out->oldPoint.x = x.Number();
             out->oldPoint.y = y.Number(); 
             out->crs = FLAT;
@@ -567,6 +585,7 @@ namespace mongo {
             out->circle.radius = radius.number();
             out->crs = FLAT;
         } else {
+            verify(isLegacyCenterSphere(obj));
             BSONObjIterator typeIt(obj);
             BSONElement type = typeIt.next();
             BSONObjIterator objIt(type.embeddedObject());
