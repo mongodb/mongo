@@ -26,7 +26,7 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 	WT_UPDATE *old_upd, *upd, *upd_obsolete;
 	size_t ins_size, upd_size;
 	uint64_t recno;
-	u_int skipdepth;
+	u_int i, skipdepth;
 	int append, logged;
 
 	btree = cbt->btree;
@@ -81,10 +81,16 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 		WT_ERR(__wt_txn_modify(session, &upd->txnid));
 		logged = 1;
 
+		/*
+		 * Point the new WT_UPDATE item to the next element in the list.
+		 * If we get it right, the serialization function lock acts as
+		 * our memory barrier to flush this write.
+		 */
+		upd->next = old_upd;
+
 		/* Serialize the update. */
 		WT_ERR(__wt_update_serial(session, page,
-		    &cbt->ins->upd, old_upd,
-		    &upd, upd_size, &upd_obsolete));
+		    &cbt->ins->upd, &upd, upd_size, &upd_obsolete));
 
 		/* Discard any obsolete WT_UPDATE structures. */
 		if (upd_obsolete != NULL)
@@ -130,6 +136,17 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 		 */
 		cbt->ins_head = ins_head;
 		cbt->ins = ins;
+
+		/*
+		 * Point the new WT_INSERT item's skiplist references to the
+		 * next elements in the insert list (which might be complete
+		 * garbage, but we'll check inside the serialization function).
+		 * If we get it right (and we can mostly), the serialization
+		 * function lock acts as our memory barrier to flush these
+		 * writes before inserting them into the list.
+		 */
+		for (i = 0; i < skipdepth && cbt->ins_stack[i] != NULL; i++)
+				ins->next[i] = *cbt->ins_stack[i];
 
 		/* Append or insert the WT_INSERT structure. */
 		if (append)
@@ -196,6 +213,7 @@ __wt_col_append_serial_func(WT_SESSION_IMPL *session, void *args)
 	WT_PAGE *page;
 	uint64_t recno, *recnop;
 	u_int i, skipdepth;
+	int need_barrier;
 
 	btree = S2BT(session);
 
@@ -244,14 +262,23 @@ __wt_col_append_serial_func(WT_SESSION_IMPL *session, void *args)
 	}
 
 	/*
-	 * Publish: First, point the new WT_INSERT item's skiplist references
-	 * to the next elements in the insert list, then flush memory.  Second,
-	 * update the skiplist elements that reference the new WT_INSERT item,
-	 * this ensures the list is never inconsistent.
+	 * First, if the new WT_INSERT item's skiplist references aren't already
+	 * set, point them to the next elements in the insert list, then flush
+	 * memory.
 	 */
+	need_barrier = 0;
 	for (i = 0; i < skipdepth; i++)
-		new_ins->next[i] = *ins_stack[i];
-	WT_WRITE_BARRIER();
+		if (new_ins->next[i] != *ins_stack[i]) {
+			new_ins->next[i] = *ins_stack[i];
+			need_barrier = 1;
+		}
+	if (need_barrier)
+		WT_WRITE_BARRIER();
+
+	/*
+	 * Second, update the skiplist elements that reference the new WT_INSERT
+	 * item, this ensures the list is never inconsistent.
+	 */
 	for (i = 0; i < skipdepth; i++) {
 		if (ins_head->tail[i] == NULL ||
 		    ins_stack[i] == &ins_head->tail[i]->next[i])
