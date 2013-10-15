@@ -50,21 +50,16 @@ namespace mongo {
 
 /**
  * SERVER-11160 syslog.h does not define facilitynames under solaris
- * Besides facilitynames, there are other macros defined under linux
- * that are not provided by solaris. Those will not be reproduced here.
+ * If syslog.h exports preprocessor macro INTERNAL_NOPRI if
+ * facilitynames is provided. This will be used to determine
+ * if facilitynames should be defined here.
  * These could also go into a syslog.h compatibility header.
  */
 
 namespace {
 
 #if defined(SYSLOG_NAMES)
-#if defined(__sunos__)
-
-#if !defined(LOG_MAKEPRI)
-#  define LOG_MAKEPRI(fac, pri) (((fac) << 3) | (pri))
-#endif // !defined(LOG_MAKEPRI)
-
-#define INTERNAL_MARK  LOG_MAKEPRI(LOG_NFACILITIES, 0)
+#if !defined(INTERNAL_NOPRI)
 
     typedef struct _code {
     	const char* c_name;
@@ -79,7 +74,6 @@ namespace {
         { "kern", LOG_KERN },
         { "lpr", LOG_LPR },
         { "mail", LOG_MAIL },
-        { "mark", INTERNAL_MARK },		/* INTERNAL */
         { "news", LOG_NEWS },
         { "security", LOG_AUTH },		/* DEPRECATED */
         { "syslog", LOG_SYSLOG },
@@ -96,7 +90,7 @@ namespace {
         { NULL, -1 }
     };
 
-#endif // defined(__sunos__)
+#endif // !defined(INTERNAL_NOPRI)
 #endif // defined(SYSLOG_NAMES)
 
 } // namespace
