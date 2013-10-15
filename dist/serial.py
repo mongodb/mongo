@@ -37,7 +37,6 @@ Serial('insert', [
 Serial('update', [
 		SerialArg('WT_PAGE *', 'page'),
 		SerialArg('WT_UPDATE **', 'srch_upd'),
-		SerialArg('WT_UPDATE *', 'old_upd'),
 		SerialArg('WT_UPDATE *', 'upd', 1),
 		SerialArg('WT_UPDATE **', 'upd_obsolete'),
 	]),
