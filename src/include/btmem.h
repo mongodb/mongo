@@ -154,8 +154,8 @@ struct __wt_ovfl_reuse {
 /*
  * Overflow tracking for cached values: When a page is reconciled, we write new
  * K/V overflow items, and discard previous underlying blocks.  If there's a
- * transaction in the system that needs to be read the previous value, we have
- * to cache the old value until no running transaction needs it.
+ * transaction in the system that needs to read the previous value, we have to
+ * cache the old value until no running transaction needs it.
  */
 struct __wt_ovfl_txnc {
 	uint32_t value_offset;		/* Overflow value offset */
