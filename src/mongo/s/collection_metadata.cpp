@@ -444,8 +444,9 @@ namespace mongo {
 
         bool good = rangeContains( it->first, it->second, key );
 
-#ifdef _DEBUG
-        // Logs if in debugging mode and the point doesn't belong here.
+#if 0
+        // DISABLED because of SERVER-11175 - huge amount of logging
+        // Logs if the point doesn't belong here.
         if ( !good ) {
             log() << "bad: " << key << " " << it->first << " " << key.woCompare( it->first ) << " "
                   << key.woCompare( it->second ) << endl;
