@@ -835,7 +835,7 @@ namespace mongo {
             currLock = conn->findOne( LocksType::ConfigNS , BSON( LocksType::name(_name) ) );
 
             if ( !errMsg.empty() || !err["n"].type() || err["n"].numberInt() < 1 ) {
-                logErrMsgOrWarn("could not acquire lock", lockName, errMsg, "(another update won");
+                logErrMsgOrWarn("could not acquire lock", lockName, errMsg, "(another update won)");
                 *other = currLock;
                 other->getOwned();
                 gotLock = false;
