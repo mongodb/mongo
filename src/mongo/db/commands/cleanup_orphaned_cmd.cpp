@@ -80,7 +80,7 @@ namespace mongo {
 
         BSONObj keyPattern = metadata->getKeyPattern();
         if ( !startingFromKey.isEmpty() ) {
-            if ( startingFromKey.nFields() != keyPattern.nFields() ) {
+            if ( !metadata->isValidKey( startingFromKey ) ) {
 
                 *errMsg = stream() << "could not cleanup orphaned data, start key "
                                    << startingFromKey

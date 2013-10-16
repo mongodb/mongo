@@ -136,6 +136,13 @@ namespace {
         ASSERT_FALSE( getCollMetadata().keyBelongsToMe(BSON("a" << 1 << "b" << 2)) );
     }
 
+    TEST_F(NoChunkFixture, IsKeyValid) {
+        ASSERT_TRUE( getCollMetadata().isValidKey( BSON( "a" << "abcde" ) ) );
+        ASSERT_TRUE( getCollMetadata().isValidKey( BSON( "a" << 3 ) ) );
+        ASSERT_FALSE( getCollMetadata().isValidKey( BSON( "a" << "abcde" << "b" << 1 ) ) );
+        ASSERT_FALSE( getCollMetadata().isValidKey( BSON( "c" << "abcde" ) ) );
+    }
+
     TEST_F(NoChunkFixture, getNextFromEmpty) {
         ChunkType nextChunk;
         ASSERT( !getCollMetadata().getNextChunk( getCollMetadata().getMinKey(), &nextChunk ) );
