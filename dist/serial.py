@@ -33,7 +33,6 @@ Serial('insert', [
 Serial('update', [
 		SerialArg('WT_UPDATE **', 'srch_upd'),
 		SerialArg('WT_UPDATE *', 'upd', 1),
-		SerialArg('WT_UPDATE **', 'upd_obsolete'),
 	]),
 ]
 
@@ -104,22 +103,28 @@ def output(entry, f):
 ''')
 
 	# Call the worker function.
-	f.write('''
+	if entry.name != "update":
+		f.write('''
 \t/* Acquire the serialization spinlock, call the worker function. */
-\t__wt_spin_lock(session, &S2BT(session)->serial_lock);
+\t__wt_spin_lock(session, &S2BT(session)->serial_lock);''')
+
+	f.write('''
 \tret = __''' + entry.name + '''_serial_func(
 ''')
-
 	o = 'session'
+	if entry.name == "update":
+		o += ', page'
 	for l in entry.args:
 		o += ', ' + l.name
 	o += ');'
 	f.write('\n'.join('\t    ' + l for l in textwrap.wrap(o, 70)))
-	f.write('''
-\t__wt_spin_unlock(session, &S2BT(session)->serial_lock);
-''')
+
+	if entry.name != "update":
+		f.write('''
+\t__wt_spin_unlock(session, &S2BT(session)->serial_lock);''')
 
 	f.write('''
+
 \t/* Free unused memory on error. */
 \tif (ret != 0) {
 ''')

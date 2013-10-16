@@ -23,7 +23,7 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 	WT_INSERT_HEAD *ins_head, **ins_headp;
 	WT_ITEM *value, _value;
 	WT_PAGE *page;
-	WT_UPDATE *old_upd, *upd, *upd_obsolete;
+	WT_UPDATE *old_upd, *upd;
 	size_t ins_size, upd_size;
 	uint64_t recno;
 	u_int i, skipdepth;
@@ -89,12 +89,8 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 		upd->next = old_upd;
 
 		/* Serialize the update. */
-		WT_ERR(__wt_update_serial(session, page,
-		    &cbt->ins->upd, &upd, upd_size, &upd_obsolete));
-
-		/* Discard any obsolete WT_UPDATE structures. */
-		if (upd_obsolete != NULL)
-			__wt_update_obsolete_free(session, page, upd_obsolete);
+		WT_ERR(__wt_update_serial(
+		    session, page, &cbt->ins->upd, &upd, upd_size));
 	} else {
 		/* Allocate the append/update list reference as necessary. */
 		if (append) {

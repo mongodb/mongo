@@ -19,7 +19,7 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 	WT_INSERT_HEAD *ins_head, **ins_headp;
 	WT_ITEM *key, *value;
 	WT_PAGE *page;
-	WT_UPDATE *old_upd, *upd, **upd_entry, *upd_obsolete;
+	WT_UPDATE *old_upd, *upd, **upd_entry;
 	size_t ins_size, upd_size;
 	uint32_t ins_slot;
 	u_int i, skipdepth;
@@ -73,12 +73,8 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 		upd->next = old_upd;
 
 		/* Serialize the update. */
-		WT_ERR(__wt_update_serial(session, page,
-		    upd_entry, &upd, upd_size, &upd_obsolete));
-
-		/* Discard any obsolete WT_UPDATE structures. */
-		if (upd_obsolete != NULL)
-			__wt_update_obsolete_free(session, page, upd_obsolete);
+		WT_ERR(__wt_update_serial(
+		    session, page, upd_entry, &upd, upd_size));
 	} else {
 		/*
 		 * Allocate the insert array as necessary.
