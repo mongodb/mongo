@@ -7,7 +7,7 @@
 
 /*
  * __page_write_gen_wrapped_check --
- *	Confirm the page's write generation number won't wrapped.
+ *	Confirm the page's write generation number won't wrap.
  */
 static inline int
 __page_write_gen_wrapped_check(WT_PAGE *page)
