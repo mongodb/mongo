@@ -144,10 +144,10 @@ Configure WiredTiger to support the \c verbose configuration string to
 ::wiredtiger_open.
 
 @par <code>--with-spinlock</code>
-Configure WiredTiger to use a specific mutex type, options are \c
-pthread_mutex (the default, which configures WiredTiger to use POSIX 1003.1c
-pthread mutexes for serialization) or \c gcc (which configures WiredTiger to
-use gcc-based spinlocks for serialization).
+Configure WiredTiger to use a specific mutex type for serialization;
+options are \c pthread (the default, which configures WiredTiger to use
+POSIX 1003.1c pthread mutexes) or \c gcc (which configures WiredTiger
+to use gcc-based spinlocks).
 
 @section compiler Changing compiler or loader options
 
