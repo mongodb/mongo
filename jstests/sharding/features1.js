@@ -88,6 +88,14 @@ assert.throws( function(){ db.eval( function(){ return db.foo2.findOne().a; } ) 
 assert.eq( 1 , db.eval( function(){ return db.foo3.count(); } ), "eval 3 " );
 assert.throws( function(){ db.eval( function(){ return db.foo2.count(); } ) } , null , "eval 4" )
 
+// ----- "eval" new command name SERVER-5588 -----
+var result;
+result = db.runCommand({eval: function () { return db.foo3.count(); } }); // non-sharded collection
+assert.eq(1, result.ok, "eval should work for non-sharded collection in cluster");
+
+result = db.runCommand({eval: function () { return db.foo2.count(); } }); // sharded collection
+assert.eq(0, result.ok, "eval should not work for sharded collection in cluster");
+
 
 // ---- unique shard key ----
 
