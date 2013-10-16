@@ -46,7 +46,7 @@ namespace mongo {
 
     struct IndexScanParams {
         IndexScanParams() : descriptor(NULL), direction(1), limit(0),
-                            forceBtreeAccessMethod(false) { }
+                            forceBtreeAccessMethod(false), doNotDedup(false) { }
 
         IndexDescriptor* descriptor;
 
@@ -59,6 +59,8 @@ namespace mongo {
 
         // Special indices internally open an IndexCursor over themselves but as a straight Btree.
         bool forceBtreeAccessMethod;
+
+        bool doNotDedup;
     };
 
     /**

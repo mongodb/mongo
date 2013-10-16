@@ -174,8 +174,6 @@ namespace mongo {
 
                 BSONObj key = bb.obj();
 
-                GEOQUADDEBUG("KEY: " << key);
-
                 // TODO(hk): this keeps a set of all DiskLoc seen in this pass so that we don't
                 // consider the element twice.  Do we want to instead store a hash of the set?
                 // Is this often big?
@@ -195,7 +193,6 @@ namespace mongo {
                     // is true.
                     if (p.second) {
                         hopper.consider(cursor->currLoc());
-                        GEOQUADDEBUG("\t" << cursor->current());
                         btreeMatches++;
                     }
                     cursor->advance();

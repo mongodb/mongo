@@ -161,7 +161,6 @@ namespace mongo {
                     && intervals[j].endInclusive) { continue; }
 
             if (cmp != expectedOrientation) {
-                log() << "interval " << intervals[j].toString() << " internally inconsistent";
                 return false;
             }
         }

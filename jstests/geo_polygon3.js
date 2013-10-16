@@ -22,16 +22,16 @@ for( var n = 0; n < numTests; n++ ){
 	triangle = [[0,0], [1,1], [0,2]];
 	
 	// Look at only a small slice of the data within a triangle
-	assert.eq( 1 , t.find( { loc: { "$within": { "$polygon" : triangle }}} ).count() , "Triangle Test" );
+	assert.eq( 1 , t.find( { loc: { "$within": { "$polygon" : triangle }}} ).itcount() , "Triangle Test" );
 	
 	
 	boxBounds = [ [0,0], [0,10], [10,10], [10,0] ];
 	
-	assert.eq( num , t.find( { loc : { "$within" : { "$polygon" : boxBounds } } } ).count() , "Bounding Box Test" );
+	assert.eq( num , t.find( { loc : { "$within" : { "$polygon" : boxBounds } } } ).itcount() , "Bounding Box Test" );
 	
 	// Look in a box much bigger than the one we have data in
 	boxBounds = [[-100,-100], [-100, 100], [100,100], [100,-100]];
-	assert.eq( num , t.find( { loc : { "$within" : { "$polygon" : boxBounds } } } ).count() , "Big Bounding Box Test" );
+	assert.eq( num , t.find( { loc : { "$within" : { "$polygon" : boxBounds } } } ).itcount() , "Big Bounding Box Test" );
 	
 	t.drop();
 	
@@ -44,11 +44,11 @@ for( var n = 0; n < numTests; n++ ){
 	t.save({loc: [1,3] }); // Add a point that's in
 	t.ensureIndex( { loc : "2d" }, { bits : 2 + t } );
 	
-	assert.eq( 1 , t.find({loc : { $within : { $polygon : pacman }}} ).count() , "Pacman single point" );
+	assert.eq( 1 , t.find({loc : { $within : { $polygon : pacman }}} ).itcount() , "Pacman single point" );
 	
 	t.save({ loc : [5, 3] })  // Add a point that's out right in the mouth opening
 	t.save({ loc : [3, 7] })  // Add a point above the center of the head
 	t.save({ loc : [3,-1] })  // Add a point below the center of the bottom
 	
-	assert.eq( 1 , t.find({loc : { $within : { $polygon : pacman }}} ).count() , "Pacman double point" );
+	assert.eq( 1 , t.find({loc : { $within : { $polygon : pacman }}} ).itcount() , "Pacman double point" );
 }

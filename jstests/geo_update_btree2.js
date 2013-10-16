@@ -53,6 +53,7 @@ printjson( removeIds )
 coll.remove({ _id : { $in : removeIds } })
 
 status( "Updating points returned by query..." )
+printjson(updateIds);
 
 var big = new Array( 3000 ).toString()
 for( var i = 0; i < updateIds.length; i++ ) 
@@ -60,7 +61,12 @@ for( var i = 0; i < updateIds.length; i++ )
 
 status( "Counting final points..." )
 
-assert.eq( ( numPoints - 2 ) / 2, query.itcount() )
-
+// QUERY_MIGRATION: it's not defined whether or not we return documents that are modified during a
+// query.  We shouldn't crash, but it's not defined how many results we get back.  This test is
+// modifying every doc not returned by the query, and since we currently handle the invalidation
+// by removing them, we won't return them.  But we shouldn't crash.
+//
+// assert.eq( ( numPoints - 2 ) / 2, query.itcount() )
+query.itcount();
 
 assert.commandWorked( db._adminCommand( { setParameter:1, notablescan:false} ) );

@@ -64,6 +64,11 @@ namespace mongo {
             : _namespaceDetails(namespaceDetails), _indexNumber(indexNumber), _onDiskData(data),
               _infoObj(infoObj), _numFields(infoObj.getObjectField("key").nFields()) { }
 
+        // XXX this is terrible
+        IndexDescriptor* clone() const {
+            return new IndexDescriptor(_namespaceDetails, _indexNumber, _onDiskData, _infoObj);
+        }
+
         //
         // Information about the key pattern.
         //

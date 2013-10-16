@@ -28,6 +28,8 @@
 
 #include "mongo/db/query/stage_builder.h"
 
+#include "mongo/db/exec/2d.h"
+#include "mongo/db/exec/2dnear.h"
 #include "mongo/db/exec/and_hash.h"
 #include "mongo/db/exec/and_sorted.h"
 #include "mongo/db/exec/collection_scan.h"
@@ -159,31 +161,26 @@ namespace mongo {
             return ret.release();
         }
         else if (STAGE_GEO_2D == root->getType()) {
-            // XXX: placeholder for having a real stage
             const Geo2DNode* node = static_cast<const Geo2DNode*>(root);
-            IndexScanParams params;
-            NamespaceDetails* nsd = nsdetails(ns.c_str());
-            if (NULL == nsd) { return NULL; }
-            int idxNo = nsd->findIndexByKeyPattern(node->indexKeyPattern);
-            if (-1 == idxNo) { return NULL; }
-            params.descriptor = CatalogHack::getDescriptor(nsd, idxNo);
-            params.bounds.isSimpleRange = true;
-            params.bounds.startKey = node->seek;
-            return new IndexScan(params, ws, NULL);
+            TwoDParams params;
+            params.gq = node->gq;
+            params.filter = node->filter.get();
+            params.indexKeyPattern = node->indexKeyPattern;
+            params.ns = ns;
+            return new TwoD(params, ws);
         }
         else if (STAGE_GEO_NEAR_2D == root->getType()) {
-            // XXX: placeholder for having a real stage
             const GeoNear2DNode* node = static_cast<const GeoNear2DNode*>(root);
-            IndexScanParams params;
-            NamespaceDetails* nsd = nsdetails(ns.c_str());
-            if (NULL == nsd) { return NULL; }
-            int idxNo = nsd->findIndexByKeyPattern(node->indexKeyPattern);
-            if (-1 == idxNo) { return NULL; }
-            params.descriptor = CatalogHack::getDescriptor(nsd, idxNo);
-            params.bounds.isSimpleRange = true;
-            params.bounds.startKey = node->seek;
-            params.limit = node->numWanted;
-            return new IndexScan(params, ws, NULL);
+            TwoDNearParams params;
+            params.nearQuery = node->nq;
+            params.ns = ns;
+            params.indexKeyPattern = node->indexKeyPattern;
+            params.filter = node->filter.get();
+            params.numWanted = node->numWanted;
+            // XXX XXX where do we grab this from??  the near query...modify geo parser... :(
+            params.uniqueDocs = false;
+            // XXX XXX where do we grab this from??  the near query...modify geo parser... :(
+            return new TwoDNear(params, ws);
         }
         else if (STAGE_GEO_NEAR_2DSPHERE == root->getType()) {
             const GeoNear2DSphereNode* node = static_cast<const GeoNear2DSphereNode*>(root);

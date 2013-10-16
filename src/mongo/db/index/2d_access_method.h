@@ -39,6 +39,18 @@ namespace mongo {
     class IndexDescriptor;
     struct TwoDIndexingParams;
 
+    namespace twod_exec {
+        class GeoPoint;
+        class GeoAccumulator;
+        class GeoBrowse;
+        class GeoHopper;
+        class GeoSearch;
+        class GeoCircleBrowse;
+        class GeoBoxBrowse;
+        class GeoPolygonBrowse;
+        class TwoDGeoNearRunner;
+    }
+
     namespace twod_internal {
         class GeoPoint;
         class GeoAccumulator;
@@ -72,6 +84,16 @@ namespace mongo {
         friend class twod_internal::GeoCircleBrowse;
         friend class twod_internal::GeoBoxBrowse;
         friend class twod_internal::GeoPolygonBrowse;
+
+        friend class twod_exec::GeoPoint;
+        friend class twod_exec::GeoAccumulator;
+        friend class twod_exec::GeoBrowse;
+        friend class twod_exec::GeoHopper;
+        friend class twod_exec::GeoSearch;
+        friend class twod_exec::GeoCircleBrowse;
+        friend class twod_exec::GeoBoxBrowse;
+        friend class twod_exec::GeoPolygonBrowse;
+
         friend class twod_internal::TwoDGeoNearRunner;
 
         BtreeInterface* getInterface() { return _interface; }

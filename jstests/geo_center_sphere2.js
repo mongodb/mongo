@@ -5,6 +5,23 @@
 // multiple documents, and so requires simultaneous testing.
 //
 
+function deg2rad(arg) { return arg * Math.PI / 180.0; }
+function rad2deg(arg) { return arg * 180.0 / Math.PI; }
+
+function computexscandist(y, maxDistDegrees) {
+    return maxDistDegrees / Math.min(Math.cos(deg2rad(Math.min(89.0, y + maxDistDegrees))),
+                                     Math.cos(deg2rad(Math.max(-89.0, y - maxDistDegrees))));
+}
+
+function pointIsOK(startPoint, radius) {
+    yscandist = rad2deg(radius) + 0.01;
+    xscandist = computexscandist(startPoint[1], yscandist);
+    return (startPoint[0] + xscandist < 180)
+           && (startPoint[0] - xscandist > -180)
+           && (startPoint[1] + yscandist < 90)
+           && (startPoint[1] - yscandist > -90);
+}
+
 var numTests = 30
 
 for ( var test = 0; test < numTests; test++ ) {
@@ -32,27 +49,16 @@ for ( var test = 0; test < numTests; test++ ) {
 	var startPoint
 	var ex = null
 	do {
-
 		t.drop()
 		startPoint = randomPoint()
 		t.ensureIndex( { loc : "2d" }, { bits : bits } )
-
-		try {
-			// Check for wrapping issues
-			t.find( { loc : { $within : { $centerSphere : [ startPoint, radius ] } } } ).toArray()
-			ex = null
-		} catch (e) {
-			ex = e
-		}
-	} while (ex)
+	} while (!pointIsOK(startPoint, radius))
 
 	var pointsIn = 0
 	var pointsOut = 0
 	var docsIn = 0
 	var docsOut = 0
 	var totalPoints = 0
-	
-	//var point = randomPoint()
 	
 	for ( var i = 0; i < numDocs; i++ ) {
 

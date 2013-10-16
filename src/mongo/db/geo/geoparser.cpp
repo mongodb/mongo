@@ -373,6 +373,7 @@ namespace mongo {
         BSONElement maxE = coordIt.next();
         if (!maxE.isABSONObj()) { return false; }
         if (!isLegacyPoint(maxE.Obj())) { return false; }
+        // XXX: VERIFY AREA >= 0
         return true;
     }
 
@@ -599,6 +600,8 @@ namespace mongo {
             BSONElement radiusElt = objIt.next();
             double radius = radiusElt.number();
             out->cap = S2Cap::FromAxisAngle(centerPoint, S1Angle::Radians(radius));
+            out->circle.radius = radius;
+            out->circle.center = Point(x.Number(), y.Number());
             out->crs = SPHERE;
         }
         return true;
@@ -640,6 +643,34 @@ namespace mongo {
             }
         }
 
+        return true;
+    }
+
+    bool GeoParser::parsePointWithMaxDistance(const BSONObj& obj, PointWithCRS* out, double* maxOut) {
+        BSONObjIterator it(obj);
+        if (!it.more()) { return false; }
+
+        BSONElement lng = it.next();
+        if (!lng.isNumber()) { return false; }
+        if (!it.more()) { return false; }
+
+        BSONElement lat = it.next();
+        if (!lat.isNumber()) { return false; }
+        if (!it.more()) { return false; }
+
+        BSONElement dist = it.next();
+        if (!dist.isNumber()) { return false; }
+        if (it.more()) { return false; }
+
+        out->crs = FLAT;
+        out->oldPoint.x = lng.number();
+        out->oldPoint.y = lat.number();
+        *maxOut = dist.number();
+        if (isValidLngLat(lng.Number(), lat.Number())) {
+            out->flatUpgradedToSphere = true;
+            out->point = coordToPoint(lng.Number(), lat.Number());
+            out->cell = S2Cell(out->point);
+        }
         return true;
     }
 

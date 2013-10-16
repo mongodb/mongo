@@ -35,6 +35,7 @@
 
 // For QueryOption_foobar
 #include "mongo/client/dbclientinterface.h"
+#include "mongo/db/geo/core.h"
 #include "mongo/db/matcher/expression_array.h"
 #include "mongo/db/matcher/expression_geo.h"
 #include "mongo/db/matcher/expression_text.h"
@@ -136,21 +137,35 @@ namespace mongo {
             return false;
         }
         else if ("2d" == ixtype) {
-            if (exprtype == MatchExpression::GEO) {
+            if (exprtype == MatchExpression::GEO_NEAR) {
+                GeoNearMatchExpression* gnme = static_cast<GeoNearMatchExpression*>(node);
+                return gnme->getData().centroid.crs == FLAT;
+            }
+            else if (exprtype == MatchExpression::GEO) {
                 // 2d only supports within.
                 GeoMatchExpression* gme = static_cast<GeoMatchExpression*>(node);
                 const GeoQuery& gq = gme->getGeoQuery();
                 if (GeoQuery::WITHIN != gq.getPred()) {
                     return false;
                 }
+
                 const GeometryContainer& gc = gq.getGeometry();
-                return gc.hasFlatRegion();
-            }
-            else if (exprtype == MatchExpression::GEO_NEAR) {
-                GeoNearMatchExpression* gnme = static_cast<GeoNearMatchExpression*>(node);
-                if (gnme->getData().centroid.crs == FLAT) {
+
+                // 2d indices answer flat queries.
+                if (gc.hasFlatRegion()) {
                     return true;
                 }
+
+                // 2d indices can answer centerSphere queries.
+                if (NULL == gc._cap.get()) {
+                    return false;
+                }
+
+                verify(SPHERE == gc._cap->crs);
+                // No wrapping in 2d centerSphere, don't use 2d index for that.
+                const Circle& circle = gc._cap->circle;
+                // An overestimate.
+                return twoDWontWrap(circle.center.x, circle.center.y, circle.radius);
             }
             return false;
         }
@@ -161,7 +176,7 @@ namespace mongo {
             return false;
         }
         else {
-            warning() << "Unknown indexing for for node " << node->toString()
+            warning() << "Unknown indexing for node " << node->toString()
                       << " and field " << elt.toString() << endl;
             verify(0);
         }
@@ -257,37 +272,25 @@ namespace mongo {
         if (MatchExpression::GEO_NEAR == expr->matchType()) {
             // We must not keep the expression node around.
             *exact = true;
-            GeoNearMatchExpression* nearme = static_cast<GeoNearMatchExpression*>(expr);
-            if (indexIs2D) {
-                GeoNear2DNode* ret = new GeoNear2DNode();
-                ret->indexKeyPattern = index.keyPattern;
-                ret->seek = nearme->getRawObj();
-                return ret;
-            }
-            else {
-                // Note that even if we're starting a GeoNear node, we may never get a
-                // predicate for $near.  So, in that case, the builder "collapses" it into
-                // an ixscan.
-                // QLOG() << "Making geonear 2dblahblah kp " << index.toString() << endl;
-                GeoNear2DSphereNode* ret = new GeoNear2DSphereNode();
-                ret->indexKeyPattern = index.keyPattern;
-                ret->nq = nearme->getData();
-                ret->baseBounds.fields.resize(index.keyPattern.nFields());
-                stringstream ss;
-                ret->appendToString(&ss, 0);
-                // QLOG() << "geonear 2dsphere out " << ss.str() << endl;
-                return ret;
-            }
+            GeoNearMatchExpression* nearExpr = static_cast<GeoNearMatchExpression*>(expr);
+            // 2d geoNear requires a hard limit and as such we take it out before it gets here.  If
+            // this happens it's a bug.
+            verify(!indexIs2D);
+            GeoNear2DSphereNode* ret = new GeoNear2DSphereNode();
+            ret->indexKeyPattern = index.keyPattern;
+            ret->nq = nearExpr->getData();
+            ret->baseBounds.fields.resize(index.keyPattern.nFields());
+            return ret;
         }
         else if (indexIs2D) {
             // We must not keep the expression node around.
             *exact = true;
             verify(MatchExpression::GEO == expr->matchType());
-            GeoMatchExpression* nearme = static_cast<GeoMatchExpression*>(expr);
+            GeoMatchExpression* nearExpr = static_cast<GeoMatchExpression*>(expr);
             verify(indexIs2D);
             Geo2DNode* ret = new Geo2DNode();
             ret->indexKeyPattern = index.keyPattern;
-            ret->seek = nearme->getRawObj();
+            ret->gq = nearExpr->getGeoQuery();
             return ret;
         }
         else if (MatchExpression::TEXT == expr->matchType()) {
@@ -457,12 +460,17 @@ namespace mongo {
 
             // For each field in the key...
             while (it.more()) {
-                // Be extra sure there's no data there.
-                verify("" == bounds->fields[firstEmptyField].name);
-                verify(bounds->fields[firstEmptyField].intervals.empty());
-                // ...build the "all values" interval.
-                IndexBoundsBuilder::allValuesForField(it.next(),
-                                                      &bounds->fields[firstEmptyField]);
+                BSONElement kpElt = it.next();
+                // There may be filled-in fields to the right of the firstEmptyField.
+                // Example:
+                // The index {loc:"2dsphere", x:1}
+                // With a predicate over x and a near search over loc.
+                if ("" == bounds->fields[firstEmptyField].name) {
+                    verify(bounds->fields[firstEmptyField].intervals.empty());
+                    // ...build the "all values" interval.
+                    IndexBoundsBuilder::allValuesForField(kpElt,
+                                                          &bounds->fields[firstEmptyField]);
+                }
                 ++firstEmptyField;
             }
 
@@ -1033,10 +1041,29 @@ namespace mongo {
         return i.next().eoo();
     }
 
+    static bool is2DIndex(const BSONObj& pattern) {
+        BSONObjIterator it(pattern);
+        while (it.more()) {
+            BSONElement e = it.next();
+            if (String == e.type() && str::equals("2d", e.valuestr())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     // static
     void QueryPlanner::plan(const CanonicalQuery& query, const vector<IndexEntry>& indices,
                             size_t options, vector<QuerySolution*>* out) {
-        QLOG() << "Begin planning.\nquery = " << query.toString() << endl;
+        QLOG() << "============================="
+               << "Beginning planning.\n"
+               << "query = " << query.toString()
+               << "============================="
+               << endl;
+
+        for (size_t i = 0; i < indices.size(); ++i) {
+            QLOG() << "idx " << i << " is " << indices[i].toString() << endl;
+        }
 
         bool canTableScan = !(options & QueryPlanner::NO_TABLE_SCAN);
 
@@ -1088,11 +1115,9 @@ namespace mongo {
         unordered_set<string> fields;
         getFields(query.root(), "", &fields);
 
-        /*
         for (unordered_set<string>::const_iterator it = fields.begin(); it != fields.end(); ++it) {
-            QLOG() << "field " << *it << endl;
+            QLOG() << "predicate over field " << *it << endl;
         }
-        */
 
         // Filter our indices so we only look at indices that are over our predicates.
         vector<IndexEntry> relevantIndices;
@@ -1151,20 +1176,93 @@ namespace mongo {
             }
         }
         else {
+            QLOG() << "Finding relevant indices\n";
             findRelevantIndices(fields, indices, &relevantIndices);
+        }
+
+        for (size_t i = 0; i < relevantIndices.size(); ++i) {
+            QLOG() << "relevant idx " << i << " is " << relevantIndices[i].toString() << endl;
         }
 
         // Figure out how useful each index is to each predicate.
         // query.root() is now annotated with RelevantTag(s).
         rateIndices(query.root(), "", relevantIndices);
 
+        QLOG() << "rated tree" << endl;
+        QLOG() << query.root()->toString() << endl;
+
         // If there is a GEO_NEAR it must have an index it can use directly.
         MatchExpression* gnNode = NULL;
         if (QueryPlannerCommon::hasNode(query.root(), MatchExpression::GEO_NEAR, &gnNode)) {
+            // No index for GEO_NEAR?  No query.
             RelevantTag* tag = static_cast<RelevantTag*>(gnNode->getTag());
             if (0 == tag->first.size() && 0 == tag->notFirst.size()) {
                 return;
             }
+
+            GeoNearMatchExpression* gnme = static_cast<GeoNearMatchExpression*>(gnNode);
+
+            vector<size_t> newFirst;
+
+            // 2d + GEO_NEAR is annoying.  Because 2d's GEO_NEAR isn't streaming we have to embed
+            // the full query tree inside it as a matcher.
+            for (size_t i = 0; i < tag->first.size(); ++i) {
+                // GEO_NEAR has a non-2d index it can use.  We can deal w/that in normal planning.
+                if (!is2DIndex(relevantIndices[tag->first[i]].keyPattern)) {
+                    newFirst.push_back(i);
+                    continue;
+                }
+
+                // If we're here, GEO_NEAR has a 2d index.  We create a 2dgeonear plan with the
+                // entire tree as a filter, if possible.
+
+                GeoNear2DNode* solnRoot = new GeoNear2DNode();
+                solnRoot->nq = gnme->getData();
+
+                if (MatchExpression::GEO_NEAR != query.root()->matchType()) {
+                    // root is an AND, clone and delete the GEO_NEAR child.
+                    MatchExpression* filterTree = query.root()->shallowClone();
+                    verify(MatchExpression::AND == filterTree->matchType());
+
+                    bool foundChild = false;
+                    for (size_t i = 0; i < filterTree->numChildren(); ++i) {
+                        if (MatchExpression::GEO_NEAR == filterTree->getChild(i)->matchType()) {
+                            foundChild = true;
+                            filterTree->getChildVector()->erase(filterTree->getChildVector()->begin() + i);
+                            break;
+                        }
+                    }
+                    verify(foundChild);
+                    solnRoot->filter.reset(filterTree);
+                }
+
+                solnRoot->numWanted = query.getParsed().getNumToReturn();
+                if (0 == solnRoot->numWanted) {
+                    solnRoot->numWanted = 100;
+                }
+                solnRoot->indexKeyPattern = relevantIndices[tag->first[i]].keyPattern;
+
+                // Remove the 2d index.  2d can only be the first field, and we know there is
+                // only one GEO_NEAR, so we don't care if anyone else was assigned it; it'll
+                // only be first for gnNode.
+                tag->first.erase(tag->first.begin() + i);
+
+                QuerySolution* soln = new QuerySolution();
+                soln->root.reset(solnRoot);
+                soln->ns = query.ns();
+                soln->filterData = query.getQueryObj();
+                out->push_back(soln);
+            }
+
+            /*
+            if (newFirst.empty()) {
+                // Only 2d indices for the near.
+                return;
+            }
+            */
+
+            // Continue planning w/non-2d indices tagged for this pred.
+            tag->first.swap(newFirst);
         }
 
         // Likewise, if there is a TEXT it must have an index it can use directly.
@@ -1178,10 +1276,6 @@ namespace mongo {
 
         // If we have any relevant indices, we try to create indexed plans.
         if (0 < relevantIndices.size()) {
-            for (size_t i = 0; i < relevantIndices.size(); ++i) {
-                QLOG() << "relevant idx " << i << " is " << relevantIndices[i].toString() << endl;
-            }
-
             // The enumerator spits out trees tagged with IndexTag(s).
             PlanEnumerator isp(query.root(), &relevantIndices);
             isp.init();

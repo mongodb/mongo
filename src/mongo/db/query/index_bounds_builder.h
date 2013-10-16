@@ -72,9 +72,6 @@ namespace mongo {
         static void translateAndUnion(const MatchExpression* expr, const BSONElement& elt,
                                       OrderedIntervalList* oilOut, bool* exactOut);
 
-    private:
-        friend class ExpressionMapping;
-
         /**
          * Make a range interval from the provided object.
          * The object must have exactly two fields.  The first field is the start, the second the

@@ -109,8 +109,6 @@ namespace mongo {
         for (BSONElementMSet::iterator setI = bSet.begin(); setI != bSet.end(); ++setI) {
             BSONElement geo = *setI;
 
-            GEODEBUG("Element " << geo << " found for query " << _geo.c_str());
-
             if (geo.eoo() || !geo.isABSONObj())
                 continue;
 

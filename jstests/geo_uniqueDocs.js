@@ -24,15 +24,15 @@ assert.eq(10, results[1].dis)
 
 // $within tests
 
-assert.eq(2, t.find( {locs: {$within: {$box : [[0,0],[9,9]]}}}).count())
-assert.eq(2, t.find( {locs: {$within: {$box : [[0,0],[9,9]], $uniqueDocs : true}}}).count())
-assert.eq(3, t.find( {locs: {$within: {$box : [[0,0],[9,9]], $uniqueDocs : false}}}).count())
+assert.eq(2, t.find( {locs: {$within: {$box : [[0,0],[9,9]]}}}).itcount())
+assert.eq(2, t.find( {locs: {$within: {$box : [[0,0],[9,9]], $uniqueDocs : true}}}).itcount())
+assert.eq(3, t.find( {locs: {$within: {$box : [[0,0],[9,9]], $uniqueDocs : false}}}).itcount())
 
-assert.eq(2, t.find( {locs: {$within: {$center : [[5,5],7], $uniqueDocs : true}}}).count())
-assert.eq(3, t.find( {locs: {$within: {$center : [[5,5],7], $uniqueDocs : false}}}).count())
+assert.eq(2, t.find( {locs: {$within: {$center : [[5,5],7], $uniqueDocs : true}}}).itcount())
+assert.eq(3, t.find( {locs: {$within: {$center : [[5,5],7], $uniqueDocs : false}}}).itcount())
 
-assert.eq(2, t.find( {locs: {$within: {$centerSphere : [[5,5],1], $uniqueDocs : true}}}).count())
-assert.eq(4, t.find( {locs: {$within: {$centerSphere : [[5,5],1], $uniqueDocs : false}}}).count())
+assert.eq(2, t.find( {locs: {$within: {$centerSphere : [[5,5],1], $uniqueDocs : true}}}).itcount())
+assert.eq(4, t.find( {locs: {$within: {$centerSphere : [[5,5],1], $uniqueDocs : false}}}).itcount())
 
-assert.eq(2, t.find( {locs: {$within: {$polygon : [[0,0],[0,9],[9,9]], $uniqueDocs : true}}}).count())
-assert.eq(3, t.find( {locs: {$within: {$polygon : [[0,0],[0,9],[9,9]], $uniqueDocs : false}}}).count())
+assert.eq(2, t.find( {locs: {$within: {$polygon : [[0,0],[0,9],[9,9]], $uniqueDocs : true}}}).itcount())
+assert.eq(3, t.find( {locs: {$within: {$polygon : [[0,0],[0,9],[9,9]], $uniqueDocs : false}}}).itcount())

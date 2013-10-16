@@ -437,23 +437,6 @@ namespace mongo {
     // the IXSCAN layer into the stage layer.
     //
 
-    struct GeoNear2DNode : public QuerySolutionNode {
-        GeoNear2DNode() : numWanted(100) { }
-        virtual ~GeoNear2DNode() { }
-
-        virtual StageType getType() const { return STAGE_GEO_NEAR_2D; }
-        virtual void appendToString(stringstream* ss, int indent) const;
-
-        bool fetched() const { return false; }
-        bool hasField(const string& field) const;
-        bool sortedByDiskLoc() const { return false; }
-        BSONObj getSort() const { return BSONObj(); }
-
-        int numWanted;
-        BSONObj indexKeyPattern;
-        BSONObj seek;
-    };
-
     // TODO: This is probably an expression index.
     struct Geo2DNode : public QuerySolutionNode {
         Geo2DNode() { }
@@ -468,7 +451,29 @@ namespace mongo {
         BSONObj getSort() const { return BSONObj(); }
 
         BSONObj indexKeyPattern;
-        BSONObj seek;
+        GeoQuery gq;
+
+        // TODO: Actually try to use this for covering
+        scoped_ptr<MatchExpression> filter;
+    };
+
+    // This is a standalone stage.
+    struct GeoNear2DNode : public QuerySolutionNode {
+        GeoNear2DNode() : numWanted(100) { }
+        virtual ~GeoNear2DNode() { }
+
+        virtual StageType getType() const { return STAGE_GEO_NEAR_2D; }
+        virtual void appendToString(stringstream* ss, int indent) const;
+
+        bool fetched() const { return true; }
+        bool hasField(const string& field) const { return true; }
+        bool sortedByDiskLoc() const { return false; }
+        BSONObj getSort() const { return BSONObj(); }
+
+        NearQuery nq;
+        scoped_ptr<MatchExpression> filter;
+        int numWanted;
+        BSONObj indexKeyPattern;
     };
 
     // This is actually its own standalone stage.

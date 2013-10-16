@@ -65,7 +65,8 @@ namespace mongo {
         // Used by s2cursor only to generate a covering of the query object.
         // One region is not NULL and this returns it.
         const S2Region& getRegion() const;
-    private:
+    // XXX FIXME
+    // private:
         // Does 'this' intersect with the provided type?
         bool intersects(const S2Cell& otherPoint) const;
         bool intersects(const S2Polyline& otherLine) const;
@@ -134,6 +135,8 @@ namespace mongo {
         string toString() const {
             stringstream ss;
             ss << " field=" << field;
+            ss << " maxdist=" << maxDistance;
+            ss << " isNearSphere=" << isNearSphere;
             return ss.str();
         }
 
@@ -145,8 +148,8 @@ namespace mongo {
     // This represents either a $within or a $geoIntersects.
     class GeoQuery {
     public:
-        GeoQuery() : field(""), predicate(INVALID) {}
-        GeoQuery(const string& f) : field(f), predicate(INVALID) {}
+        GeoQuery() : field(""), predicate(INVALID), _uniqueDocs(true) {}
+        GeoQuery(const string& f) : field(f), predicate(INVALID), _uniqueDocs(true) {}
 
         enum Predicate {
             WITHIN,
@@ -164,6 +167,8 @@ namespace mongo {
         Predicate getPred() const { return predicate; }
         const GeometryContainer& getGeometry() const { return geoContainer; }
 
+        bool uniqueDocs() const { return _uniqueDocs; }
+
     private:
         // Try to parse the provided object into the right place.
         bool parseLegacyQuery(const BSONObj &obj);
@@ -173,5 +178,6 @@ namespace mongo {
         string field;
         GeometryContainer geoContainer;
         Predicate predicate;
+        bool _uniqueDocs;
     };
 }  // namespace mongo

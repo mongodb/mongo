@@ -49,6 +49,11 @@
 
 namespace mongo {
 
+# define CDEBUG 10
+# define GEODEBUG(x)
+# define GEODEBUGPRINT(x)
+# define PREFIXDEBUG(x, y)
+
     // All these internal classes exist in namespace mongo until we kill the 2d index type.
     // For now, put them into their own namespace to avoid scary "which symbol are we using" issues.
     namespace twod_internal {
@@ -439,12 +444,8 @@ namespace mongo {
         static const shared_ptr<CoveredIndexMatcher> otherEmptyMatcher;
         virtual void noteLocation() { }
         virtual void checkLocation() { }
+        // XXX: near doesn't support this.
         virtual bool supportGetMore() { return false; }
-        virtual bool supportYields() { return false; }
-        virtual bool getsetdup(DiskLoc loc) { return false; }
-        virtual bool modifiedKeys() const { return true; }
-        virtual bool isMultiKey() const { return false; }
-        virtual bool autoDedup() const { return false; }
         virtual string toString() = 0;
     };
 

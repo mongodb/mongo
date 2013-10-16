@@ -38,7 +38,9 @@ for ( var t = 0; t < descriptors.length; t++) {
     assert.eq(1, coll.count(Object.merge(query, {field1 : "b"})));
     assert.eq(2, coll.count(Object.merge(query, {field2 : 1})));
     assert.eq(0, coll.count(Object.merge(query, {field2 : 0})));
-    assert.eq(2, coll.count(queryNear));
+    // QUERY_MIGRATION: can't use non-leftmost 2dsphere field for near search w/o preds on prior
+    // fields
+    // assert.eq(2, coll.count(queryNear));
 
     var firstEls = descriptors.splice(1);
     descriptors = firstEls.concat(descriptors);

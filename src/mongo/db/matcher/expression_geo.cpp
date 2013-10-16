@@ -57,7 +57,7 @@ namespace mongo {
 
     void GeoMatchExpression::debugString( StringBuilder& debug, int level ) const {
         _debugAddSpace( debug, level );
-        debug << "GEO";
+        debug << "GEO raw = " << _rawObj.toString();
         MatchExpression::TagData* td = getTag();
         if (NULL != td) {
             debug << " ";
@@ -108,7 +108,7 @@ namespace mongo {
 
     void GeoNearMatchExpression::debugString( StringBuilder& debug, int level ) const {
         _debugAddSpace( debug, level );
-        debug << "GEONEAR raw = " << _rawObj.toString();
+        debug << "GEONEAR " << _query.toString();
         MatchExpression::TagData* td = getTag();
         if (NULL != td) {
             debug << " ";

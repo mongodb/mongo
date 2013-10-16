@@ -72,6 +72,10 @@ namespace mongo {
             verify(_params.bounds.endKey.isEmpty());
         }
 
+        if (_params.doNotDedup) {
+            _shouldDedup = false;
+        }
+
         _specificStats.indexType = "BtreeCursor"; // TODO amName;
         _specificStats.indexName = _descriptor->infoObj()["name"].String();
         _specificStats.indexBounds = _params.bounds.toBSON();

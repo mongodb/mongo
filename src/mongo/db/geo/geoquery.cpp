@@ -75,11 +75,11 @@ namespace mongo {
                 if (!e.isABSONObj()) { return false; }
                 BSONObj embeddedObj = e.embeddedObject();
 
-                if (!GeoParser::isPoint(embeddedObj)) { continue; }
-                if (!GeoParser::parsePoint(embeddedObj, &centroid)) { return false; }
-
-                isNearSphere = equals(e.fieldName(), "$nearSphere");
-                hasGeometry = true;
+                if ((GeoParser::isPoint(embeddedObj) && GeoParser::parsePoint(embeddedObj, &centroid))
+                    || GeoParser::parsePointWithMaxDistance(embeddedObj, &centroid, &maxDistance)) {
+                    hasGeometry = true;
+                    isNearSphere = equals(e.fieldName(), "$nearSphere");
+                }
             } else if (equals(e.fieldName(), "$minDistance")) {
                 uassert(16893, "$minDistance must be a number", e.isNumber());
                 minDistance = e.Number();
@@ -151,27 +151,38 @@ namespace mongo {
     }
 
     bool GeoQuery::parseLegacyQuery(const BSONObj &obj) {
-        // Legacy within parsing #1: t.find({ loc : [0,0] }) This is should be
-        // point-only.  We tag it as intersect and limit $within to
-        // space-containing geometry.
-        if (GeoParser::isPoint(obj) && geoContainer.parseFrom(obj)) {
-            predicate = GeoQuery::INTERSECT;
-            return true;
+        // The only legacy syntax is {$within: {.....}}
+        BSONObjIterator outerIt(obj);
+        if (!outerIt.more()) { return false; }
+        BSONElement withinElt = outerIt.next();
+        if (outerIt.more()) { return false; }
+        if (!withinElt.isABSONObj()) { return false; }
+        if (!equals(withinElt.fieldName(), "$within") && !equals(withinElt.fieldName(), "$geoWithin")) {
+            return false;
+        }
+        BSONObj withinObj = withinElt.embeddedObject();
+
+        bool hasGeometry = false;
+
+        BSONObjIterator withinIt(withinObj);
+        while (withinIt.more()) {
+            BSONElement elt = withinIt.next();
+            if (equals(elt.fieldName(), "$uniqueDocs")) {
+                if (!elt.isBoolean()) { return false; }
+                _uniqueDocs = elt.boolean();
+            }
+            else if (elt.isABSONObj()) {
+                hasGeometry = geoContainer.parseFrom(elt.wrap());
+            }
+            else {
+                warning() << "bad geo query: " << obj.toString() << endl;
+                return false;
+            }
         }
 
-        BSONObjIterator it(obj);
-        if (!it.more()) { return false; }
-        BSONElement e = it.next();
-        if (!e.isABSONObj()) { return false; }
-        BSONObj embeddedObj = e.embeddedObject();
-        // Legacy within #2 : t.find({ loc : { $within : { $box/etc : ...
-        bool contains = (BSONObj::opWITHIN == static_cast<BSONObj::MatchType>(e.getGtLtOp()));
-        if (contains && geoContainer.parseFrom(embeddedObj)) {
-            predicate = GeoQuery::WITHIN;
-            return true;
-        }
+        predicate = GeoQuery::WITHIN;
 
-        return false;
+        return hasGeometry;
     }
 
     bool GeoQuery::parseNewQuery(const BSONObj &obj) {
@@ -260,7 +271,7 @@ namespace mongo {
 
     bool GeometryContainer::hasFlatRegion() const {
         return (NULL != _polygon && _polygon->crs == FLAT)
-               || NULL != _cap
+               || (NULL != _cap && _cap->crs == FLAT)
                || NULL != _box;
     }
 

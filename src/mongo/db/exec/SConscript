@@ -35,6 +35,9 @@ env.StaticLibrary(
 env.StaticLibrary(
     target = 'exec',
     source = [
+        "2d.cpp",
+        "2dcommon.cpp",
+        "2dnear.cpp",
         "and_hash.cpp",
         "and_sorted.cpp",
         "collection_scan.cpp",

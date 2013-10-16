@@ -157,33 +157,6 @@ namespace mongo {
             return false;
         }
 
-        // 2d-indexed $near.
-        MatchExpression* nearNode;
-        if (QueryPlannerCommon::hasNode(cq->root(), MatchExpression::GEO_NEAR, &nearNode)) {
-            GeoNearMatchExpression* gnme = static_cast<GeoNearMatchExpression*>(nearNode);
-            NamespaceDetails* nsd = nsdetails(cq->ns().c_str());
-            if (NULL == nsd) {
-                // Will create an EOFRunner.
-                *cqOut = scopedCq.release();
-                return true;
-            }
-            for (int i = 0; i < nsd->getCompletedIndexCount(); ++i) {
-                auto_ptr<IndexDescriptor> desc(CatalogHack::getDescriptor(nsd, i));
-                BSONObjIterator kpIt(desc->keyPattern());
-                while (kpIt.more()) {
-                    BSONElement elt = kpIt.next();
-                    // An index over the GEO_NEAR field...
-                    if (gnme->getData().field != elt.fieldName()) {
-                        continue;
-                    }
-                    if (String == elt.type() && elt.String() == "2d") {
-                        QLOG() << "ignoring 2d geonear\n";
-                        return false;
-                    }
-                }
-            }
-        }
-
         *cqOut = scopedCq.release();
         return true;
     }

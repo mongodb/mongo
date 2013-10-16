@@ -71,6 +71,8 @@ namespace mongo {
         static bool isGeometryCollection(const BSONObj &obj);
         static bool parseGeometryCollection(const BSONObj &obj, GeometryCollection *out);
 
+        static bool parsePointWithMaxDistance(const BSONObj& obj, PointWithCRS* out, double* maxOut);
+
         // Return true if the CRS field is 1. missing, or 2. is well-formed and
         // has a datum we accept.  Otherwise, return false.
         // NOTE(hk): If this is ever used anywhere but internally, consider

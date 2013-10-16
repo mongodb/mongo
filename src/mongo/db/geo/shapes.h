@@ -149,7 +149,6 @@ namespace mongo {
     };
 
     struct CapWithCRS {
-        // Only one of {cap, circle} is filled out depending on the CRS.
         S2Cap cap;
         Circle circle;
         CRS crs;
