@@ -1240,6 +1240,9 @@ namespace mongo {
                     shared_ptr<Future::CommandResult> res = *i;
                     if ( ! res->join() ) {
                         errmsg = res->result()["errmsg"].String();
+                        if (res->result().hasField("code")) {
+                            result.append(res->result()["code"]);
+                        }
                         return false;
                     }
 
