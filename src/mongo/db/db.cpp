@@ -95,6 +95,8 @@
 
 namespace mongo {
 
+    void (*snmpInit)() = NULL;
+
     /* only off if --nohints */
     extern bool useHints;
 
@@ -683,6 +685,12 @@ namespace mongo {
         boost::filesystem::remove_all(storageGlobalParams.dbpath + "/_tmp/");
 
         FileAllocator::get()->start();
+
+        // TODO:  This should go into a MONGO_INITIALIZER once we have figured out the correct
+        // dependencies.
+        if (snmpInit) {
+            snmpInit();
+        }
 
         MONGO_ASSERT_ON_EXCEPTION_WITH_MSG( clearTmpFiles(), "clear tmp files" );
 

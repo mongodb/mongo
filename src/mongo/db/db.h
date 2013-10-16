@@ -116,4 +116,6 @@ namespace mongo {
         bool unlocked() const { return real != 0; }
     };
 
+    extern void (*snmpInit)();
+
 } // namespace mongo
