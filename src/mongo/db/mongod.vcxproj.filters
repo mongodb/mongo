@@ -196,12 +196,6 @@
     <ClCompile Include="pipeline\document_source_command_shards.cpp">
       <Filter>db\pipeline\Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="pipeline\document_source_filter.cpp">
-      <Filter>db\pipeline\Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="pipeline\document_source_filter_base.cpp">
-      <Filter>db\pipeline\Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="pipeline\document_source_group.cpp">
       <Filter>db\pipeline\Source Files</Filter>
     </ClCompile>

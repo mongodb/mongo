@@ -456,49 +456,6 @@ namespace mongo {
     };
 
 
-    /*
-      This contains all the basic mechanics for filtering a stream of
-      Documents, except for the actual predicate evaluation itself.  This was
-      factored out so we could create DocumentSources that use both Matcher
-      style predicates as well as full Expressions.
-     */
-    class DocumentSourceFilterBase :
-        public DocumentSource {
-    public:
-        // virtuals from DocumentSource
-        virtual boost::optional<Document> getNext();
-
-        /**
-          Create a BSONObj suitable for Matcher construction.
-
-          This is used after filter analysis has moved as many filters to
-          as early a point as possible in the document processing pipeline.
-          See db/Matcher.h and the associated documentation for the format.
-          This conversion is used to move back to the low-level find()
-          Cursor mechanism.
-
-          @param pBuilder the builder to write to
-         */
-        virtual void toMatcherBson(BSONObjBuilder *pBuilder) const = 0;
-
-    protected:
-        DocumentSourceFilterBase(
-            const intrusive_ptr<ExpressionContext> &pExpCtx);
-
-        /**
-          Test the given document against the predicate and report if it
-          should be accepted or not.
-
-          @param pDocument the document to test
-          @returns true if the document matches the filter, false otherwise
-         */
-        virtual bool accept(const Document& pDocument) const = 0;
-
-    private:
-        bool unstarted;
-    };
-
-
     class DocumentSourceGroup : public DocumentSource
                               , public SplittableDocumentSource {
     public:
@@ -629,10 +586,10 @@ namespace mongo {
     };
 
 
-    class DocumentSourceMatch :
-        public DocumentSourceFilterBase {
+    class DocumentSourceMatch : public DocumentSource {
     public:
         // virtuals from DocumentSource
+        virtual boost::optional<Document> getNext();
         virtual const char *getSourceName() const;
         virtual Value serialize(bool explain = false) const;
 
@@ -660,9 +617,6 @@ namespace mongo {
         void toMatcherBson(BSONObjBuilder *pBuilder) const;
 
         static const char matchName[];
-
-        // virtuals from DocumentSourceFilterBase
-        virtual bool accept(const Document& pDocument) const;
 
         /** Returns the portion of the match that can safely be promoted to before a $redact.
          *  If this returns an empty BSONObj, no part of this match may safely be promoted.

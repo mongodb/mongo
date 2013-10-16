@@ -3729,12 +3729,6 @@
     <ClCompile Include="..\db\pipeline\document_source_cursor.cpp">
       <Filter>db\pipeline\Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\db\pipeline\document_source_filter.cpp">
-      <Filter>db\pipeline\Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\db\pipeline\document_source_filter_base.cpp">
-      <Filter>db\pipeline\Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\db\pipeline\document_source_group.cpp">
       <Filter>db\pipeline\Source Files</Filter>
     </ClCompile>

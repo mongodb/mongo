@@ -3377,8 +3377,6 @@ cscript //Nologo "$(ProjectDir)..\shell\createCPPfromJavaScriptFiles.js" "$(Proj
     <ClCompile Include="..\db\pipeline\document_source_bson_array.cpp" />
     <ClCompile Include="..\db\pipeline\document_source_command_shards.cpp" />
     <ClCompile Include="..\db\pipeline\document_source_cursor.cpp" />
-    <ClCompile Include="..\db\pipeline\document_source_filter.cpp" />
-    <ClCompile Include="..\db\pipeline\document_source_filter_base.cpp" />
     <ClCompile Include="..\db\pipeline\document_source_geo_near.cpp" />
     <ClCompile Include="..\db\pipeline\document_source_group.cpp" />
     <ClCompile Include="..\db\pipeline\document_source_limit.cpp" />

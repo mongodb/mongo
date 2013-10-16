@@ -49,21 +49,17 @@ namespace mongo {
         return Value(DOC(getSourceName() << Document(*matcher.getQuery())));
     }
 
-    bool DocumentSourceMatch::accept(const Document& input) const {
+    boost::optional<Document> DocumentSourceMatch::getNext() {
+        pExpCtx->checkForInterrupt();
 
-        /*
-          The matcher only takes BSON documents, so we have to make one.
+        while (boost::optional<Document> next = pSource->getNext()) {
+            // The matcher only takes BSON documents, so we have to make one.
+            if (matcher.matches(next->toBson()))
+                return next;
+        }
 
-          LATER
-          We could optimize this by making a document with only the
-          fields referenced by the Matcher.  We could do this by looking inside
-          the Matcher's BSON before it is created, and recording those.  The
-          easiest implementation might be to hold onto an ExpressionDocument
-          in here, and give that pDocument to create the created subset of
-          fields, and then convert that instead.
-        */
-
-        return matcher.matches(input.toBson());
+        // Nothing matched
+        return boost::none;
     }
 
 namespace {
@@ -294,10 +290,9 @@ namespace {
         pBuilder->appendElements(*pQuery);
     }
 
-    DocumentSourceMatch::DocumentSourceMatch(
-        const BSONObj &query,
-        const intrusive_ptr<ExpressionContext> &pExpCtx):
-        DocumentSourceFilterBase(pExpCtx),
-        matcher(query.getOwned()) {
-    }
+    DocumentSourceMatch::DocumentSourceMatch(const BSONObj &query,
+                                             const intrusive_ptr<ExpressionContext> &pExpCtx)
+        : DocumentSource(pExpCtx)
+        , matcher(query.getOwned())
+    {}
 }
