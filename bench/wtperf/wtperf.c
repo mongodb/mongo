@@ -72,7 +72,6 @@ typedef struct {
 #define PERF_RAND_WORKLOAD	0x04
 	uint32_t flags;
 	struct timeval phase_start_time;
-	uint32_t rand_range; /* The range to use if doing random inserts. */
 	uint32_t elapsed_time;
 
 	/* Fields changeable on command line are listed in wtperf_opt.i */
@@ -162,7 +161,6 @@ CONFIG default_cfg = {
 	WT_PERF_INIT, /* phase */
 	0,		/* flags */
 	{0, 0},		/* phase_start_time */
-	0,		/* rand_range */
 	0,		/* elapsed_time */
 
 #define OPT_DEFINE_DEFAULT
@@ -936,7 +934,7 @@ int main(int argc, char **argv)
 	}
 	snprintf(cfg.uri, req_len, "table:%s", cfg.table_name);
 	
-	if (cfg.rand_range > 0)
+	if (cfg.random_range > 0)
 		F_SET(&cfg, PERF_RAND_WORKLOAD);
 
 	if ((ret = setup_log_file(&cfg)) != 0)
@@ -1591,7 +1589,7 @@ void wtperf_srand(CONFIG *cfg) {
 
 uint64_t wtperf_value_range(CONFIG *cfg) {
 	if (F_ISSET(cfg, PERF_RAND_WORKLOAD))
-		return (cfg->icount + cfg->rand_range);
+		return (cfg->icount + cfg->random_range);
 	else 
 		return (cfg->icount + g_nins_ops - (cfg->insert_threads + 1));
 }
