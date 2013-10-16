@@ -533,6 +533,8 @@ namespace mongo {
      * This is called by db/ops/query.cpp.  This is the entry point for answering a query.
      */
     std::string newRunQuery(CanonicalQuery* cq, CurOp& curop, Message &result) {
+        QLOG() << "Running query on new system: " << cq->toString();
+
         // This is a read lock.
         Client::ReadContext ctx(cq->ns(), storageGlobalParams.dbpath);
 
@@ -560,8 +562,7 @@ namespace mongo {
         // Otherwise we go through the selection of which runner is most suited to the
         // query + run-time context at hand.
         Status status = Status::OK();
-        Collection* coll = ctx.ctx().db()->getCollection(cq->ns());
-        if (NULL == coll || (0 == coll->numRecords())) {
+        if (ctx.ctx().db()->getCollection(cq->ns()) == NULL) {
             rawRunner = new EOFRunner(cq, cq->ns());
         }
         else if (pq.hasOption(QueryOption_OplogReplay)) {
@@ -575,8 +576,6 @@ namespace mongo {
         if (!status.isOK()) {
             uasserted(17007, "Couldn't process query " + cqStr + " why: " + status.reason());
         }
-
-        QLOG() << "Running query on new system: " << cq->toString();
 
         verify(NULL != rawRunner);
         auto_ptr<Runner> runner(rawRunner);
