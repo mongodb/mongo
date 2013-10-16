@@ -197,7 +197,7 @@ namespace mongo {
     };
 
     /** This class marks DocumentSources that should be split between the merger and the shards.
-     *  See Pipeline::splitForSharded() for details.
+     *  See Pipeline::Optimizations::Sharded::findSplitPoint() for details.
      */
     class SplittableDocumentSource {
     public:

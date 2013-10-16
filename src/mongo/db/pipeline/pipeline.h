@@ -149,6 +149,18 @@ namespace mongo {
         friend class PipelineD;
 
     private:
+        class Optimizations {
+        public:
+            // These contain static functions that optimize pipelines in various ways.
+            // They are classes rather than namespaces so that they can be friends of Pipeline.
+            // Classes are defined in pipeline_optimizations.h.
+            class Local;
+            class Sharded;
+        };
+
+        friend class Optimizations::Local;
+        friend class Optimizations::Sharded;
+
         static const char pipelineName[];
         static const char explainName[];
         static const char fromRouterName[];
@@ -163,5 +175,4 @@ namespace mongo {
 
         boost::intrusive_ptr<ExpressionContext> pCtx;
     };
-
 } // namespace mongo
