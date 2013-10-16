@@ -145,12 +145,12 @@ def output(entry, f):
 ''')
 
 #####################################################################
-# Update serial_funcs.i.
+# Update serial.i.
 #####################################################################
 tmp_file = '__tmp'
 tfile = open(tmp_file, 'w')
 skip = 0
-for line in open('../src/include/serial_funcs.i', 'r'):
+for line in open('../src/include/serial.i', 'r'):
 	if not skip:
 		tfile.write(line)
 	if line.count('Serialization function section: END'):
@@ -166,4 +166,4 @@ for line in open('../src/include/serial_funcs.i', 'r'):
 		tfile.write('/*\n')
 
 tfile.close()
-compare_srcfile(tmp_file, '../src/include/serial_funcs.i')
+compare_srcfile(tmp_file, '../src/include/serial.i')

@@ -262,7 +262,7 @@ struct __wt_update;
 #include "bitstring.i"
 #include "column.i"
 #include "log.i"
-#include "serial_funcs.i"
+#include "serial.i"
 
 #if defined(__cplusplus)
 }
