@@ -54,8 +54,7 @@ __insert_serial_func(WT_SESSION_IMPL *session,
 		if (ins_head->tail[i] == NULL ||
 		    ins_stack[i] == &ins_head->tail[i]->next[i])
 			ins_head->tail[i] = new_ins;
-		if (ins_stack[i] != NULL)
-			*ins_stack[i] = new_ins;
+		*ins_stack[i] = new_ins;
 	}
 
 	return (0);
