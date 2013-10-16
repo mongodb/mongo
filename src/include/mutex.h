@@ -212,20 +212,26 @@ struct __wt_rwlock {
  *
  * These used for cases where fast mutual exclusion is needed (where operations
  * done while holding the spin lock are expected to complete in a small number
- * of instructions.
+ * of instructions).
  */
-#define	SPINLOCK_GCC 0
-#define	SPINLOCK_PTHREAD_MUTEX 1
+#define	SPINLOCK_GCC			0
+#define	SPINLOCK_PTHREAD_MUTEX		1
+#define	SPINLOCK_PTHREAD_MUTEX_LOGGING	2
 
 #if SPINLOCK_TYPE == SPINLOCK_GCC
 
 typedef	volatile int WT_SPINLOCK;
 
-#elif SPINLOCK_TYPE == SPINLOCK_PTHREAD_MUTEX
+#elif SPINLOCK_TYPE == SPINLOCK_PTHREAD_MUTEX ||\
+	SPINLOCK_TYPE == SPINLOCK_PTHREAD_MUTEX_LOGGING
 
 typedef	struct {
 	pthread_mutex_t lock;
-	int initialized;
+
+	const char *name;		/* Mutex name, for statistics */
+	int8_t id;			/* Current holder, for statistics */
+
+	int8_t initialized;		/* Lock initialized, for cleanup */
 } WT_SPINLOCK;
 
 #else
