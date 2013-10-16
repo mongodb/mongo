@@ -18,7 +18,7 @@ __page_write_gen_wrapped_check(WT_PAGE *page)
 
 /*
  * __col_append_serial_func --
- *	Server function to append an WT_INSERT entry to the tree.
+ *	Worker function to append an WT_INSERT entry to the tree.
  */
 static inline int
 __col_append_serial_func(WT_SESSION_IMPL *session,
@@ -86,7 +86,7 @@ __col_append_serial_func(WT_SESSION_IMPL *session,
 
 /*
  * __insert_serial_func --
- *	Server function to add an WT_INSERT entry to the page.
+ *	Worker function to add an WT_INSERT entry to the page.
  */
 static inline int
 __insert_serial_func(WT_SESSION_IMPL *session,
@@ -130,25 +130,22 @@ __insert_serial_func(WT_SESSION_IMPL *session,
 
 /*
  * __update_serial_func --
- *	Server function to add an WT_UPDATE entry in the page array.
+ *	Worker function to add an WT_UPDATE entry in the page array.
  */
 static inline int
 __update_serial_func(WT_SESSION_IMPL *session,
     WT_UPDATE **upd_entry, WT_UPDATE *upd, WT_UPDATE **upd_obsolete)
 {
 	/*
-	 * If we're still in the expected position, no update has been added
-	 * where ours belongs.  If a new update has been added, check if our
-	 * update is still permitted, and if it is, do a full-barrier to ensure
-	 * the new entry's next pointer is set before we update the linked list.
+	 * Swap the update into place.  If that fails, a new update was added
+	 * after our search, we raced.  Check if our update is still permitted,
+	 * and if it is, do a full-barrier to ensure the update's next pointer
+	 * is set before we update the linked list and try again.
 	 */
-	if (upd->next != *upd_entry) {
-		WT_RET(__wt_txn_update_check(session, *upd_entry));
-
-		upd->next = *upd_entry;
+	while (!WT_ATOMIC_CAS(*upd_entry, upd->next, upd)) {
+		WT_RET(__wt_txn_update_check(session, upd->next = *upd_entry));
 		WT_WRITE_BARRIER();
 	}
-	*upd_entry = upd;
 
 	/* Discard obsolete WT_UPDATE structures. */
 	*upd_obsolete = upd->next == NULL ?
@@ -304,11 +301,8 @@ __wt_update_serial(
 	 */
 	 WT_RET(__page_write_gen_wrapped_check(page));
 
-	/* Acquire the serialization spinlock, call the worker function. */
-	__wt_spin_lock(session, &S2BT(session)->serial_lock);
 	ret = __update_serial_func(
 	    session, srch_upd, upd, upd_obsolete);
-	__wt_spin_unlock(session, &S2BT(session)->serial_lock);
 
 	/* Free unused memory on error. */
 	if (ret != 0) {
