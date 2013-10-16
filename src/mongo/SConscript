@@ -345,6 +345,7 @@ env.StaticLibrary("coredb", [
         "db/pipeline/accumulator_avg.cpp",
         "db/pipeline/accumulator_first.cpp",
         "db/pipeline/accumulator_last.cpp",
+        "db/pipeline/accumulator_median.cpp",
         "db/pipeline/accumulator_min_max.cpp",
         "db/pipeline/accumulator_push.cpp",
         "db/pipeline/accumulator_sum.cpp",
