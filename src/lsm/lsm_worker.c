@@ -347,6 +347,9 @@ __wt_lsm_checkpoint_worker(void *arg)
 			F_SET(chunk, WT_LSM_CHUNK_ONDISK);
 			ret = __wt_lsm_meta_write(session, lsm_tree);
 			++lsm_tree->dsk_gen;
+
+			/* Update the throttle time. */
+			__wt_lsm_tree_throttle(session, lsm_tree);
 			WT_TRET(__wt_rwunlock(session, lsm_tree->rwlock));
 
 			/* Make sure we aren't pinning a transaction ID. */

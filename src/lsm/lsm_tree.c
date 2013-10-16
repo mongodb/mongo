@@ -533,13 +533,13 @@ __wt_lsm_tree_release(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
  * __lsm_tree_throttle --
  *	Calculate whether LSM updates need to be throttled.
  */
-static void
-__lsm_tree_throttle(
+void
+__wt_lsm_tree_throttle(
     WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 {
 	WT_LSM_CHUNK *chunk, **cp, *prev_chunk;
 	uint64_t cache_sz, cache_used, record_count;
-	uint32_t in_memory;
+	uint32_t i, in_memory;
 
 	cache_sz = S2C(session)->cache_size;
 
@@ -548,20 +548,26 @@ __lsm_tree_throttle(
 	 * will keep up with inserts.  If not, throttle the insert rate to
 	 * avoid filling the cache with in-memory chunks.  Threads sleep every
 	 * 100 operations, so take that into account in the calculation.
+	 *
+	 * Count the number of in-memory chunks, and find the most recent
+	 * on-disk chunk (if any).
 	 */
 	record_count = 1;
-	for (in_memory = 0, cp = lsm_tree->chunk + lsm_tree->nchunks - 1;
-	    in_memory < lsm_tree->nchunks &&
-		(*cp)->generation == 0 &&
-		!F_ISSET(*cp, WT_LSM_CHUNK_ONDISK);
-	    ++in_memory, --cp)
-		record_count += (*cp)->count;
+	for (i = in_memory = 0, cp = lsm_tree->chunk + lsm_tree->nchunks - 1;
+	    i < lsm_tree->nchunks;
+	    ++i, --cp)
+		if (!F_ISSET(*cp, WT_LSM_CHUNK_ONDISK)) {
+			record_count += (*cp)->count;
+			++in_memory;
+		} else if ((*cp)->generation == 0 ||
+		    F_ISSET(*cp, WT_LSM_CHUNK_STABLE))
+			break;
 
 	chunk = lsm_tree->chunk[lsm_tree->nchunks - 1];
 
 	if (!F_ISSET(lsm_tree, WT_LSM_TREE_THROTTLE) || in_memory <= 3)
 		lsm_tree->throttle_sleep = 0;
-	else if (in_memory == lsm_tree->nchunks ||
+	else if (i == lsm_tree->nchunks ||
 	    F_ISSET(*cp, WT_LSM_CHUNK_STABLE)) {
 		/*
 		 * No checkpoint has completed this run.  Keep slowing down
@@ -620,7 +626,7 @@ __wt_lsm_tree_switch(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	new_id = WT_ATOMIC_ADD(lsm_tree->last, 1);
 
 	if (lsm_tree->nchunks > 1)
-		__lsm_tree_throttle(session, lsm_tree);
+		__wt_lsm_tree_throttle(session, lsm_tree);
 
 	WT_ERR(__wt_realloc_def(session, &lsm_tree->chunk_alloc,
 	    lsm_tree->nchunks + 1, &lsm_tree->chunk));
