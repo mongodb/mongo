@@ -191,7 +191,6 @@ namespace mongo {
                     pDesc);
             intrusive_ptr<DocumentSource> stage = pDesc->pFactory(stageSpec, pCtx);
             verify(stage);
-            stage->setPipelineStep(iStep);
             sources.push_back(stage);
 
             if (dynamic_cast<DocumentSourceOut*>(stage.get())) {

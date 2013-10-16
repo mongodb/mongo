@@ -60,22 +60,6 @@ namespace mongo {
     public:
         virtual ~DocumentSource() {}
 
-        /**
-           Set the step for a user-specified pipeline step.
-
-           The step is used for diagnostics.
-
-           @param step step number 0 to n.
-        */
-        void setPipelineStep(int step);
-
-        /**
-           Get the user-specified pipeline step.
-
-           @returns the step number, or -1 if it has never been set
-        */
-        int getPipelineStep() const;
-
         /** Returns the next Document if there is one or boost::none if at EOF.
          *  Subclasses must call pExpCtx->checkForInterupt().
          */
@@ -199,21 +183,7 @@ namespace mongo {
         */
         DocumentSource *pSource;
 
-        /*
-          The zero-based user-specified pipeline step.  Used for diagnostics.
-          Will be set to -1 for artificial pipeline steps that were not part
-          of the original user specification.
-         */
-        int step;
-
         intrusive_ptr<ExpressionContext> pExpCtx;
-
-        /*
-          for explain: # of rows returned by this source
-
-          This is *not* unsigned so it can be passed to BSONObjBuilder.append().
-         */
-        long long nRowsOut;
 
     private:
         /**
@@ -1210,15 +1180,6 @@ namespace mongo {
 /* ======================= INLINED IMPLEMENTATIONS ========================== */
 
 namespace mongo {
-
-    inline void DocumentSource::setPipelineStep(int s) {
-        step = s;
-    }
-
-    inline int DocumentSource::getPipelineStep() const {
-        return step;
-    }
-    
     inline void DocumentSourceGroup::setIdExpression(
         const intrusive_ptr<Expression> &pExpression) {
         pIdExpression = pExpression;

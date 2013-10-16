@@ -34,13 +34,10 @@
 
 namespace mongo {
 
-    DocumentSource::DocumentSource(
-        const intrusive_ptr<ExpressionContext> &pCtx):
-        pSource(NULL),
-        step(-1),
-        pExpCtx(pCtx),
-        nRowsOut(0) {
-    }
+    DocumentSource::DocumentSource(const intrusive_ptr<ExpressionContext> &pCtx)
+        : pSource(NULL)
+        , pExpCtx(pCtx)
+    {}
 
     const char *DocumentSource::getSourceName() const {
         static const char unknown[] = "[UNKNOWN]";
