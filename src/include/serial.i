@@ -17,76 +17,8 @@ __page_write_gen_wrapped_check(WT_PAGE *page)
 }
 
 /*
- * __col_append_serial_func --
- *	Worker function to append an WT_INSERT entry to the tree.
- */
-static inline int
-__col_append_serial_func(WT_SESSION_IMPL *session,
-    WT_INSERT_HEAD *ins_head, WT_INSERT ***ins_stack, WT_INSERT *new_ins,
-    uint64_t *recnop, u_int skipdepth)
-{
-	WT_BTREE *btree;
-	uint64_t recno;
-	u_int i;
-
-	btree = S2BT(session);
-
-	/*
-	 * If the application didn't specify a record number, allocate a new one
-	 * and set up for an append.
-	 */
-	if ((recno = WT_INSERT_RECNO(new_ins)) == 0) {
-		recno = WT_INSERT_RECNO(new_ins) = btree->last_recno + 1;
-		WT_ASSERT(session, WT_SKIP_LAST(ins_head) == NULL ||
-		    recno > WT_INSERT_RECNO(WT_SKIP_LAST(ins_head)));
-		for (i = 0; i < skipdepth; i++)
-			ins_stack[i] = ins_head->tail[i] == NULL ?
-			    &ins_head->head[i] : &ins_head->tail[i]->next[i];
-	}
-
-	/*
-	 * Confirm we are still in the expected position, and no item has been
-	 * added where our insert belongs.  Take extra care at the beginning
-	 * and end of the list (at each level): retry if we race there.
-	 *
-	 * !!!
-	 * Note the test for ins_stack[0] == NULL: that's the test for an
-	 * uninitialized cursor, ins_stack[0] is cleared as part of
-	 * initializing a cursor for a search.
-	 */
-	for (i = 0; i < skipdepth; i++) {
-		if (ins_stack[i] == NULL ||
-		    *ins_stack[i] != new_ins->next[i])
-			return (WT_RESTART);
-		if (new_ins->next[i] == NULL &&
-		    ins_head->tail[i] != NULL &&
-		    ins_stack[i] != &ins_head->tail[i]->next[i])
-			return (WT_RESTART);
-	}
-
-	/* Update the skiplist elements that reference the new WT_INSERT. */
-	for (i = 0; i < skipdepth; i++) {
-		if (ins_head->tail[i] == NULL ||
-		    ins_stack[i] == &ins_head->tail[i]->next[i])
-			ins_head->tail[i] = new_ins;
-		if (ins_stack[i] != NULL)
-			*ins_stack[i] = new_ins;
-	}
-
-	/*
-	 * Set the calling cursor's record number.
-	 * If we extended the file, update the last record number.
-	 */
-	*recnop = recno;
-	if (recno > btree->last_recno)
-		btree->last_recno = recno;
-
-	return (0);
-}
-
-/*
  * __insert_serial_func --
- *	Worker function to add an WT_INSERT entry to the page.
+ *	Worker function to add a WT_INSERT entry to a skiplist.
  */
 static inline int
 __insert_serial_func(WT_SESSION_IMPL *session,
@@ -122,8 +54,53 @@ __insert_serial_func(WT_SESSION_IMPL *session,
 		if (ins_head->tail[i] == NULL ||
 		    ins_stack[i] == &ins_head->tail[i]->next[i])
 			ins_head->tail[i] = new_ins;
-		*ins_stack[i] = new_ins;
+		if (ins_stack[i] != NULL)
+			*ins_stack[i] = new_ins;
 	}
+
+	return (0);
+}
+
+/*
+ * __col_append_serial_func --
+ *	Worker function to allocate a record number as necessary, then add a
+ * WT_INSERT entry to a skiplist.
+ */
+static inline int
+__col_append_serial_func(WT_SESSION_IMPL *session,
+    WT_INSERT_HEAD *ins_head, WT_INSERT ***ins_stack, WT_INSERT *new_ins,
+    uint64_t *recnop, u_int skipdepth)
+{
+	WT_BTREE *btree;
+	uint64_t recno;
+	u_int i;
+
+	btree = S2BT(session);
+
+	/*
+	 * If the application didn't specify a record number, allocate a new one
+	 * and set up for an append.
+	 */
+	if ((recno = WT_INSERT_RECNO(new_ins)) == 0) {
+		recno = WT_INSERT_RECNO(new_ins) = btree->last_recno + 1;
+		WT_ASSERT(session, WT_SKIP_LAST(ins_head) == NULL ||
+		    recno > WT_INSERT_RECNO(WT_SKIP_LAST(ins_head)));
+		for (i = 0; i < skipdepth; i++)
+			ins_stack[i] = ins_head->tail[i] == NULL ?
+			    &ins_head->head[i] : &ins_head->tail[i]->next[i];
+	}
+
+	/* Confirm position and insert the new WT_INSERT item. */
+	WT_RET(__insert_serial_func(
+	    session, ins_head, ins_stack, new_ins, skipdepth));
+
+	/*
+	 * Set the calling cursor's record number.
+	 * If we extended the file, update the last record number.
+	 */
+	*recnop = recno;
+	if (recno > btree->last_recno)
+		btree->last_recno = recno;
 
 	return (0);
 }
