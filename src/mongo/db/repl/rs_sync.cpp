@@ -258,7 +258,7 @@ namespace replset {
         
         std::vector< std::vector<BSONObj> > writerVectors(theReplSet->replWriterThreadCount);
         fillWriterVectors(ops, &writerVectors);
-        LOG(1) << "replication batch size is " << ops.size() << endl;
+        LOG(2) << "replication batch size is " << ops.size() << endl;
         // We must grab this because we're going to grab write locks later.
         // We hold this mutex the entire time we're writing; it doesn't matter
         // because all readers are blocked anyway.
