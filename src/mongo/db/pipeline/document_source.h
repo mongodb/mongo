@@ -237,9 +237,9 @@ namespace mongo {
         virtual intrusive_ptr<DocumentSource> getShardSource() = 0;
 
         /** returns a source that combines results from shards.
-         *  if NULL, don't run on router
+         *  if NULL, don't run on merger
          */
-        virtual intrusive_ptr<DocumentSource> getRouterSource() = 0;
+        virtual intrusive_ptr<DocumentSource> getMergeSource() = 0;
     protected:
         // It is invalid to delete through a SplittableDocumentSource-typed pointer.
         virtual ~SplittableDocumentSource() {}
@@ -595,7 +595,7 @@ namespace mongo {
 
         // Virtuals for SplittableDocumentSource
         virtual intrusive_ptr<DocumentSource> getShardSource();
-        virtual intrusive_ptr<DocumentSource> getRouterSource();
+        virtual intrusive_ptr<DocumentSource> getMergeSource();
 
         static const char groupName[];
 
@@ -781,7 +781,7 @@ namespace mongo {
 
         // Virtuals for SplittableDocumentSource
         virtual intrusive_ptr<DocumentSource> getShardSource() { return NULL; }
-        virtual intrusive_ptr<DocumentSource> getRouterSource() { return this; }
+        virtual intrusive_ptr<DocumentSource> getMergeSource() { return this; }
 
         const NamespaceString& getOutputNs() const { return _outputNs; }
 
@@ -898,7 +898,7 @@ namespace mongo {
         virtual GetDepsReturn getDependencies(set<string>& deps) const;
 
         virtual intrusive_ptr<DocumentSource> getShardSource();
-        virtual intrusive_ptr<DocumentSource> getRouterSource();
+        virtual intrusive_ptr<DocumentSource> getMergeSource();
 
         /**
           Add sort key field.
@@ -1026,7 +1026,7 @@ namespace mongo {
         // Virtuals for SplittableDocumentSource
         // Need to run on rounter. Running on shard as well is an optimization.
         virtual intrusive_ptr<DocumentSource> getShardSource() { return this; }
-        virtual intrusive_ptr<DocumentSource> getRouterSource() { return this; }
+        virtual intrusive_ptr<DocumentSource> getMergeSource() { return this; }
 
         long long getLimit() const { return limit; }
         void setLimit(long long newLimit) { limit = newLimit; }
@@ -1081,7 +1081,7 @@ namespace mongo {
         // Virtuals for SplittableDocumentSource
         // Need to run on rounter. Can't run on shards.
         virtual intrusive_ptr<DocumentSource> getShardSource() { return NULL; }
-        virtual intrusive_ptr<DocumentSource> getRouterSource() { return this; }
+        virtual intrusive_ptr<DocumentSource> getMergeSource() { return this; }
 
         long long getSkip() const { return _skip; }
         void setSkip(long long newSkip) { _skip = newSkip; }
@@ -1165,7 +1165,7 @@ namespace mongo {
 
         // Virtuals for SplittableDocumentSource
         virtual intrusive_ptr<DocumentSource> getShardSource();
-        virtual intrusive_ptr<DocumentSource> getRouterSource();
+        virtual intrusive_ptr<DocumentSource> getMergeSource();
 
         static intrusive_ptr<DocumentSource> createFromBson(
             BSONElement elem,

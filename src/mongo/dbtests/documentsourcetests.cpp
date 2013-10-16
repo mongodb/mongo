@@ -664,7 +664,7 @@ namespace DocumentSourceTests {
                 SplittableDocumentSource *splittable =
                         dynamic_cast<SplittableDocumentSource*>( group() );
                 ASSERT( splittable );
-                intrusive_ptr<DocumentSource> routerSource = splittable->getRouterSource();
+                intrusive_ptr<DocumentSource> routerSource = splittable->getMergeSource();
                 ASSERT_NOT_EQUALS( group(), routerSource.get() );
                 return routerSource;
             }
@@ -1075,7 +1075,7 @@ namespace DocumentSourceTests {
                     ASSERT_EQUALS(arr[0].getDocument().toBson(), BSON("$sort" << BSON("a" << 1)));
 
                     ASSERT(sort()->getShardSource() == NULL);
-                    ASSERT(sort()->getRouterSource() != NULL);
+                    ASSERT(sort()->getMergeSource() != NULL);
                 }
 
                 ASSERT_TRUE(sort()->coalesce(mkLimit(10)));
@@ -1091,7 +1091,7 @@ namespace DocumentSourceTests {
                                           << DOC("$limit" << sort()->getLimit())));
 
                 ASSERT(sort()->getShardSource() != NULL);
-                ASSERT(sort()->getRouterSource() != NULL);
+                ASSERT(sort()->getMergeSource() != NULL);
             }
 
             intrusive_ptr<DocumentSource> mkLimit(int limit) {

@@ -73,7 +73,7 @@ namespace mongo {
     // This command is sent as-is to the shards.
     // On router this becomes a sort by distance (nearest-first) with limit.
     intrusive_ptr<DocumentSource> DocumentSourceGeoNear::getShardSource() { return this; }
-    intrusive_ptr<DocumentSource> DocumentSourceGeoNear::getRouterSource() {
+    intrusive_ptr<DocumentSource> DocumentSourceGeoNear::getMergeSource() {
         return DocumentSourceSort::create(pExpCtx,
                                           BSON(distanceField->getPath(false) << 1),
                                           limit);

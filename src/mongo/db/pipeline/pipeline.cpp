@@ -389,19 +389,19 @@ namespace mongo {
             sources.pop_front();
 
             // Check if this source is splittable
-            SplittableDocumentSource* splittable=
-                dynamic_cast<SplittableDocumentSource *>(pSource.get());
+            SplittableDocumentSource* splittable =
+                dynamic_cast<SplittableDocumentSource*>(pSource.get());
 
             if (!splittable){
-                // move the source from the router sources to the shard sources
+                // move the source from the merger sources to the shard sources
                 pShardPipeline->sources.push_back(pSource);
             }
             else {
-                // split into Router and Shard sources
-                intrusive_ptr<DocumentSource> shardSource  = splittable->getShardSource();
-                intrusive_ptr<DocumentSource> routerSource = splittable->getRouterSource();
+                // split this source into Merge and Shard sources
+                intrusive_ptr<DocumentSource> shardSource = splittable->getShardSource();
+                intrusive_ptr<DocumentSource> mergeSource = splittable->getMergeSource();
                 if (shardSource) pShardPipeline->sources.push_back(shardSource);
-                if (routerSource)          this->sources.push_front(routerSource);
+                if (mergeSource)           this->sources.push_front(mergeSource);
 
                 break;
             }

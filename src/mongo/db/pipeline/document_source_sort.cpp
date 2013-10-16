@@ -327,7 +327,7 @@ namespace mongo {
         return this;
     }
 
-    intrusive_ptr<DocumentSource> DocumentSourceSort::getRouterSource() {
+    intrusive_ptr<DocumentSource> DocumentSourceSort::getMergeSource() {
         verify(!_mergingPresorted);
         intrusive_ptr<DocumentSourceSort> other = new DocumentSourceSort(pExpCtx);
         other->vAscending = vAscending;

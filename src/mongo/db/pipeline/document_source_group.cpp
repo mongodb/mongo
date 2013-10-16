@@ -511,7 +511,7 @@ namespace mongo {
         return this; // No modifications necessary when on shard
     }
 
-    intrusive_ptr<DocumentSource> DocumentSourceGroup::getRouterSource() {
+    intrusive_ptr<DocumentSource> DocumentSourceGroup::getMergeSource() {
         intrusive_ptr<DocumentSourceGroup> pMerger(DocumentSourceGroup::create(pExpCtx));
         pMerger->setDoingMerge(true);
 
