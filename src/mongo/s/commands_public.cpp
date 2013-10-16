@@ -1302,7 +1302,7 @@ namespace mongo {
         public:
             AtomicUInt JOB_NUMBER;
 
-            MRCmd() : PublicGridCommand( "mapreduce" ) {}
+            MRCmd() : PublicGridCommand( "mapReduce", "mapreduce" ) {}
 
             virtual void addRequiredPrivileges(const std::string& dbname,
                                                const BSONObj& cmdObj,
@@ -1324,6 +1324,7 @@ namespace mongo {
                     string fn = e.fieldName();
                     if (fn == "map" ||
                             fn == "mapreduce" ||
+                            fn == "mapReduce" ||
                             fn == "mapparams" ||
                             fn == "reduce" ||
                             fn == "query" ||
@@ -1754,7 +1755,7 @@ namespace mongo {
 
         class EvalCmd : public PublicGridCommand {
         public:
-            EvalCmd() : PublicGridCommand( "$eval" ) {}
+            EvalCmd() : PublicGridCommand( "eval", "$eval" ) {}
             virtual void addRequiredPrivileges(const std::string& dbname,
                                                const BSONObj& cmdObj,
                                                std::vector<Privilege>* out) {

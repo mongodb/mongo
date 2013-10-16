@@ -103,3 +103,20 @@ assert(out.results != 'undefined', "no results for inline");
 out = db.srcNonSharded.mapReduce(map, reduce, { out: { replace: "mrReplace" + suffix, db: "mrShardOtherDB", sharded: true } });
 verifyOutput(out);
 
+
+// test new name "mapReduce", SERVER-5588
+out = db.runCommand({
+    mapReduce: "srcNonSharded", // use new name mapReduce rather than mapreduce
+    map: map,
+    reduce: reduce,
+    out: "mrBasic" + "srcNonSharded",
+  });
+verifyOutput(out);
+
+out = db.runCommand({
+    mapReduce: "srcSharded", // use new name mapReduce rather than mapreduce
+    map: map,
+    reduce: reduce,
+    out: "mrBasic" + "srcSharded",
+  });
+verifyOutput(out);
