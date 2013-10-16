@@ -631,13 +631,18 @@ __lsm_free_chunks(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 		 * decrement the reference count.
 		 */
 		cookie.chunk_array[i] = NULL;
+
+		/*
+		 * Update the metadata.  We used to try to optimize by only
+		 * updating the metadata once at the end, but the error
+		 * handling is not straightforward.
+		 */
+		WT_TRET(__wt_lsm_meta_write(session, lsm_tree));
 		WT_ERR(__wt_rwunlock(session, lsm_tree->rwlock));
 	}
 
 err:	__lsm_unpin_chunks(session, &cookie);
 	__wt_free(session, cookie.chunk_array);
-	if (progress)
-		WT_TRET(__wt_lsm_meta_write(session, lsm_tree));
 
 	/* Returning non-zero means there is no work to do. */
 	if (!progress)

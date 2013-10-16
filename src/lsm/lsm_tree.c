@@ -763,12 +763,10 @@ __wt_lsm_tree_rename(WT_SESSION_IMPL *session,
 		}
 	}
 
-	ret = __wt_rwunlock(session, lsm_tree->rwlock);
+	WT_TRET(__wt_lsm_meta_write(session, lsm_tree));
 	locked = 0;
-	if (ret == 0)
-		ret = __wt_lsm_meta_write(session, lsm_tree);
-	if (ret == 0)
-		ret = __wt_metadata_remove(session, olduri);
+	WT_ERR(__wt_rwunlock(session, lsm_tree->rwlock));
+	WT_ERR(__wt_metadata_remove(session, olduri));
 
 err:	if (locked)
 		WT_TRET(__wt_rwunlock(session, lsm_tree->rwlock));
