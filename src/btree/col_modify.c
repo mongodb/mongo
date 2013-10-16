@@ -138,9 +138,10 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 		cbt->ins = ins;
 
 		/*
-		 * If there was no insert list during the search, the cursor's
-		 * information cannot be correct, search couldn't have
-		 * initialized it.
+		 * If there was no insert list during the search, or there was
+		 * no search because the record number has not been allocated
+		 * yet, the cursor's information cannot be correct, search
+		 * couldn't have initialized it.
 		 *
 		 * Otherwise, point the new WT_INSERT item's skiplist to the
 		 * next elements in the insert list (which we will check are
@@ -149,7 +150,7 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 		 * The serial mutex acts as our memory barrier to flush these
 		 * writes before inserting them into the list.
 		 */
-		if (WT_SKIP_FIRST(ins_head) == NULL)
+		if (WT_SKIP_FIRST(ins_head) == NULL || recno == 0)
 			for (i = 0; i < skipdepth; i++) {
 				cbt->ins_stack[i] = &ins_head->head[i];
 				ins->next[i] = cbt->next_stack[i] = NULL;
@@ -236,6 +237,8 @@ __wt_col_append_serial_func(WT_SESSION_IMPL *session, void *args)
 	 */
 	if ((recno = WT_INSERT_RECNO(new_ins)) == 0) {
 		recno = WT_INSERT_RECNO(new_ins) = btree->last_recno + 1;
+		WT_ASSERT(session, WT_SKIP_LAST(ins_head) == NULL ||
+		    recno > WT_INSERT_RECNO(WT_SKIP_LAST(ins_head)));
 		for (i = 0; i < skipdepth; i++)
 			ins_stack[i] = ins_head->tail[i] == NULL ?
 			    &ins_head->head[i] : &ins_head->tail[i]->next[i];
