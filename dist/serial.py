@@ -16,7 +16,6 @@ class Serial:
 
 msgtypes = [
 Serial('col_append', [
-		SerialArg('WT_PAGE *', 'page'),
 		SerialArg('WT_INSERT_HEAD *', 'ins_head'),
 		SerialArg('WT_INSERT ***', 'ins_stack'),
 		SerialArg('WT_INSERT *', 'new_ins', 1),
@@ -25,7 +24,6 @@ Serial('col_append', [
 	]),
 
 Serial('insert', [
-		SerialArg('WT_PAGE *', 'page'),
 		SerialArg('WT_INSERT_HEAD *', 'ins_head'),
 		SerialArg('WT_INSERT ***', 'ins_stack'),
 		SerialArg('WT_INSERT *', 'new_ins', 1),
@@ -33,7 +31,6 @@ Serial('insert', [
 	]),
 
 Serial('update', [
-		SerialArg('WT_PAGE *', 'page'),
 		SerialArg('WT_UPDATE **', 'srch_upd'),
 		SerialArg('WT_UPDATE *', 'upd', 1),
 		SerialArg('WT_UPDATE **', 'upd_obsolete'),
@@ -62,7 +59,7 @@ def decl_p(l):
 def output(entry, f):
 	# Function declaration.
 	f.write('static inline int\n__wt_' + entry.name + '_serial(\n')
-	o = 'WT_SESSION_IMPL *session'
+	o = 'WT_SESSION_IMPL *session, WT_PAGE *page'
 	for l in entry.args:
 		if l.sized:
 			o += ', ' + decl_p(l) + ', size_t ' + l.name + '_size'
@@ -89,6 +86,24 @@ def output(entry, f):
 \t*''' + l.name + '''p = NULL;
 ''')
 
+	# Check the page write generation hasn't wrapped.
+	f.write('''
+\t/*
+\t * Check to see if the page's write generation is about to wrap (wildly
+\t * unlikely as it implies 4B updates between clean page reconciliations,
+\t * but technically possible), and fail the update.
+\t *
+\t * The check is outside of the serialization mutex because the page's
+\t * write generation is going to be a hot cache line, so technically it's
+\t * possible for the page's write generation to wrap between the test and
+\t * our subsequent modification of it.  However, the test is (4B-1M), and
+\t * there cannot be a million threads that have done the test but not yet
+\t * completed their modification.
+\t */
+\t WT_RET(__page_write_gen_wrapped_check(page));
+''')
+
+	# Call the worker function.
 	f.write('''
 \t/* Acquire the serialization spinlock, call the worker function. */
 \t__wt_spin_lock(session, &S2BT(session)->serial_lock);

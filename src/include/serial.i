@@ -6,11 +6,22 @@
  */
 
 /*
+ * __page_write_gen_wrapped_check --
+ *	Confirm the page's write generation number won't wrapped.
+ */
+static inline int
+__page_write_gen_wrapped_check(WT_PAGE *page)
+{
+	return (page->modify->write_gen >
+	    UINT32_MAX - WT_MILLION ? WT_RESTART : 0);
+}
+
+/*
  * __col_append_serial_func --
  *	Server function to append an WT_INSERT entry to the tree.
  */
 static inline int
-__col_append_serial_func(WT_SESSION_IMPL *session, WT_PAGE *page,
+__col_append_serial_func(WT_SESSION_IMPL *session,
     WT_INSERT_HEAD *ins_head, WT_INSERT ***ins_stack, WT_INSERT *new_ins,
     uint64_t *recnop, u_int skipdepth)
 {
@@ -19,9 +30,6 @@ __col_append_serial_func(WT_SESSION_IMPL *session, WT_PAGE *page,
 	u_int i;
 
 	btree = S2BT(session);
-
-	/* Confirm the page write generation won't wrap. */
-	WT_RET(__wt_page_write_gen_wrapped_check(page));
 
 	/*
 	 * If the application didn't specify a record number, allocate a new one
@@ -81,16 +89,13 @@ __col_append_serial_func(WT_SESSION_IMPL *session, WT_PAGE *page,
  *	Server function to add an WT_INSERT entry to the page.
  */
 static inline int
-__insert_serial_func(WT_SESSION_IMPL *session, WT_PAGE *page,
+__insert_serial_func(WT_SESSION_IMPL *session,
     WT_INSERT_HEAD *ins_head, WT_INSERT ***ins_stack, WT_INSERT *new_ins,
     u_int skipdepth)
 {
 	u_int i;
 
 	WT_UNUSED(session);
-
-	/* Confirm the page write generation won't wrap. */
-	WT_RET(__wt_page_write_gen_wrapped_check(page));
 
 	/*
 	 * Confirm we are still in the expected position, and no item has been
@@ -128,12 +133,9 @@ __insert_serial_func(WT_SESSION_IMPL *session, WT_PAGE *page,
  *	Server function to add an WT_UPDATE entry in the page array.
  */
 static inline int
-__update_serial_func(WT_SESSION_IMPL *session, WT_PAGE *page,
+__update_serial_func(WT_SESSION_IMPL *session,
     WT_UPDATE **upd_entry, WT_UPDATE *upd, WT_UPDATE **upd_obsolete)
 {
-	/* Confirm the page write generation won't wrap. */
-	WT_RET(__wt_page_write_gen_wrapped_check(page));
-
 	/*
 	 * If we're still in the expected position, no update has been added
 	 * where ours belongs.  If a new update has been added, check if our
@@ -173,10 +175,24 @@ __wt_col_append_serial(
 	/* Clear references to memory we now own. */
 	*new_insp = NULL;
 
+	/*
+	 * Check to see if the page's write generation is about to wrap (wildly
+	 * unlikely as it implies 4B updates between clean page reconciliations,
+	 * but technically possible), and fail the update.
+	 *
+	 * The check is outside of the serialization mutex because the page's
+	 * write generation is going to be a hot cache line, so technically it's
+	 * possible for the page's write generation to wrap between the test and
+	 * our subsequent modification of it.  However, the test is (4B-1M), and
+	 * there cannot be a million threads that have done the test but not yet
+	 * completed their modification.
+	 */
+	 WT_RET(__page_write_gen_wrapped_check(page));
+
 	/* Acquire the serialization spinlock, call the worker function. */
 	__wt_spin_lock(session, &S2BT(session)->serial_lock);
 	ret = __col_append_serial_func(
-	    session, page, ins_head, ins_stack, new_ins, recnop, skipdepth);
+	    session, ins_head, ins_stack, new_ins, recnop, skipdepth);
 	__wt_spin_unlock(session, &S2BT(session)->serial_lock);
 
 	/* Free unused memory on error. */
@@ -217,10 +233,24 @@ __wt_insert_serial(
 	/* Clear references to memory we now own. */
 	*new_insp = NULL;
 
+	/*
+	 * Check to see if the page's write generation is about to wrap (wildly
+	 * unlikely as it implies 4B updates between clean page reconciliations,
+	 * but technically possible), and fail the update.
+	 *
+	 * The check is outside of the serialization mutex because the page's
+	 * write generation is going to be a hot cache line, so technically it's
+	 * possible for the page's write generation to wrap between the test and
+	 * our subsequent modification of it.  However, the test is (4B-1M), and
+	 * there cannot be a million threads that have done the test but not yet
+	 * completed their modification.
+	 */
+	 WT_RET(__page_write_gen_wrapped_check(page));
+
 	/* Acquire the serialization spinlock, call the worker function. */
 	__wt_spin_lock(session, &S2BT(session)->serial_lock);
 	ret = __insert_serial_func(
-	    session, page, ins_head, ins_stack, new_ins, skipdepth);
+	    session, ins_head, ins_stack, new_ins, skipdepth);
 	__wt_spin_unlock(session, &S2BT(session)->serial_lock);
 
 	/* Free unused memory on error. */
@@ -260,10 +290,24 @@ __wt_update_serial(
 	/* Clear references to memory we now own. */
 	*updp = NULL;
 
+	/*
+	 * Check to see if the page's write generation is about to wrap (wildly
+	 * unlikely as it implies 4B updates between clean page reconciliations,
+	 * but technically possible), and fail the update.
+	 *
+	 * The check is outside of the serialization mutex because the page's
+	 * write generation is going to be a hot cache line, so technically it's
+	 * possible for the page's write generation to wrap between the test and
+	 * our subsequent modification of it.  However, the test is (4B-1M), and
+	 * there cannot be a million threads that have done the test but not yet
+	 * completed their modification.
+	 */
+	 WT_RET(__page_write_gen_wrapped_check(page));
+
 	/* Acquire the serialization spinlock, call the worker function. */
 	__wt_spin_lock(session, &S2BT(session)->serial_lock);
 	ret = __update_serial_func(
-	    session, page, srch_upd, upd, upd_obsolete);
+	    session, srch_upd, upd, upd_obsolete);
 	__wt_spin_unlock(session, &S2BT(session)->serial_lock);
 
 	/* Free unused memory on error. */
