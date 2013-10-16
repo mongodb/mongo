@@ -74,6 +74,7 @@ typedef struct {
 	struct timeval phase_start_time;
 	uint32_t elapsed_time;
 
+#define PERF_SLEEP_LOAD		0x01
 	/* Fields changeable on command line are listed in wtperf_opt.i */
 #define OPT_DECLARE_STRUCT
 #include "wtperf_opt.i"
@@ -647,6 +648,7 @@ int execute_populate(CONFIG *cfg)
 	double secs;
 	int ret;
 	uint64_t elapsed, last_ops;
+	uint32_t sleepsec;
 
 	conn = cfg->conn;
 	cfg->phase = WT_PERF_POP;
@@ -709,6 +711,20 @@ int execute_populate(CONFIG *cfg)
 	    "Load time: %.2f\n" "load ops/sec: %.2f",
 	    secs, cfg->icount / secs);
 
+	/*
+	 * If configured, sleep for some seconds to allow LSM merging
+	 * to complete in the background.  If user gives -1, UINT_MAX,
+	 * then sleep the load time amount.
+	 */
+	if (cfg->merge_sleep) {
+		if (cfg->merge_sleep == PERF_SLEEP_LOAD)
+			sleepsec = e.tv_sec - cfg->phase_start_time.tv_sec;
+		else
+			sleepsec = cfg->merge_sleep;
+		lprintf(cfg, 0, 1,
+		    "Sleep %d seconds for merging", sleepsec);
+		sleep(sleepsec);
+	}
 	return (0);
 }
 
