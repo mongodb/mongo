@@ -161,11 +161,17 @@ namespace mongo {
                     // If we already have a batch for this endpoint, continue
                     if ( pendingIt != pendingBatches.end() ) continue;
 
-                    // Otherwise send it out to the endpoint
+                    // Otherwise send it out to the endpoint via a command to a database
 
                     BatchedCommandRequest request( clientRequest.getBatchType() );
                     batchOp.buildBatchRequest( *nextBatch, &request );
-                    _dispatcher->addCommand( hostEndpoint, request );
+
+                    // Internally we use full namespaces for request/response, but we send the
+                    // command to a database with the collection name in the request.
+                    NamespaceString nss( request.getNS() );
+                    request.setNS( nss.coll() );
+
+                    _dispatcher->addCommand( hostEndpoint, nss.db(), request );
 
                     // Indicate we're done by setting the batch to NULL
                     // We'll only get duplicate hostEndpoints if we have broadcast and non-broadcast

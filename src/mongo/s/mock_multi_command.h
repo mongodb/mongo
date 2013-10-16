@@ -74,7 +74,9 @@ namespace mongo {
                                                    mockEndpoints.end() );
         }
 
-        void addCommand( const ConnectionString& endpoint, const BSONSerializable& request ) {
+        void addCommand( const ConnectionString& endpoint,
+                         const StringData& dbName,
+                         const BSONSerializable& request ) {
             _pending.push_back( endpoint );
         }
 

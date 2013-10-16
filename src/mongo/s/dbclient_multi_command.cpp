@@ -35,13 +35,19 @@
 namespace mongo {
 
     DBClientMultiCommand::PendingCommand::PendingCommand( const ConnectionString& endpoint,
+                                                          const StringData& dbName,
                                                           const BSONObj& cmdObj ) :
-        endpoint( endpoint ), cmdObj( cmdObj ), conn( NULL ), status( Status::OK() ) {
+        endpoint( endpoint ),
+        dbName( dbName.toString() ),
+        cmdObj( cmdObj ),
+        conn( NULL ),
+        status( Status::OK() ) {
     }
 
     void DBClientMultiCommand::addCommand( const ConnectionString& endpoint,
+                                           const StringData& dbName,
                                            const BSONSerializable& request ) {
-        PendingCommand* command = new PendingCommand( endpoint, request.toBSON() );
+        PendingCommand* command = new PendingCommand( endpoint, dbName, request.toBSON() );
         _pendingCommands.push_back( command );
     }
 
@@ -64,7 +70,7 @@ namespace mongo {
                 // see query.h for the protocol we are using here.
                 BufBuilder bufB;
                 bufB.appendNum( 0 ); // command/query options
-                bufB.appendStr( "admin.$cmd" ); // write command ns
+                bufB.appendStr( command->dbName + ".$cmd" ); // write command ns
                 bufB.appendNum( 0 ); // ntoskip (0 for command)
                 bufB.appendNum( 1 ); // ntoreturn (1 for command)
                 command->cmdObj.appendSelfToBufBuilder( bufB );

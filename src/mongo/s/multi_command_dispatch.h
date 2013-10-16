@@ -29,6 +29,7 @@
 #pragma once
 
 #include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/s/bson_serializable.h"
 
@@ -56,6 +57,7 @@ namespace mongo {
          * Commands are not sent immediately, they are sent on sendAll.
          */
         virtual void addCommand( const ConnectionString& endpoint,
+                                 const StringData& dbName,
                                  const BSONSerializable& request ) = 0;
 
         /**

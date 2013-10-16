@@ -46,7 +46,9 @@ namespace mongo {
 
         ~DBClientMultiCommand();
 
-        void addCommand( const ConnectionString& endpoint, const BSONSerializable& request );
+        void addCommand( const ConnectionString& endpoint,
+                         const StringData& dbName,
+                         const BSONSerializable& request );
 
         void sendAll();
 
@@ -59,11 +61,14 @@ namespace mongo {
         // All info associated with an pre- or in-flight command
         struct PendingCommand {
 
-            PendingCommand( const ConnectionString& endpoint, const BSONObj& cmdObj );
+            PendingCommand( const ConnectionString& endpoint,
+                            const StringData& dbName,
+                            const BSONObj& cmdObj );
 
             // What to send
             const ConnectionString endpoint;
-            BSONObj cmdObj;
+            const string dbName;
+            const BSONObj cmdObj;
 
             // Where to send it
             DBClientBase* conn;
