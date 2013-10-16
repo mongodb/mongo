@@ -247,7 +247,7 @@ DBCollection.prototype.update = function( query , obj , upsert , multi ){
 }
 
 DBCollection.prototype.save = function( obj ){
-    if ( obj == null || typeof( obj ) == "undefined" ) 
+    if ( obj == null )
         throw "can't save a null";
 
     if ( typeof( obj ) == "number" || typeof( obj) == "string" )
