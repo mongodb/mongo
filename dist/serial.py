@@ -33,7 +33,6 @@ Serial('insert', [
 Serial('update', [
 		SerialArg('WT_UPDATE **', 'srch_upd'),
 		SerialArg('WT_UPDATE *', 'upd', 1),
-		SerialArg('WT_UPDATE **', 'upd_obsolete'),
 	]),
 ]
 
@@ -113,6 +112,8 @@ def output(entry, f):
 \tret = __''' + entry.name + '''_serial_func(
 ''')
 	o = 'session'
+	if entry.name == "update":
+		o += ', page'
 	for l in entry.args:
 		o += ', ' + l.name
 	o += ');'

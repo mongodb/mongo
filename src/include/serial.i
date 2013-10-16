@@ -134,8 +134,10 @@ __insert_serial_func(WT_SESSION_IMPL *session,
  */
 static inline int
 __update_serial_func(WT_SESSION_IMPL *session,
-    WT_UPDATE **upd_entry, WT_UPDATE *upd, WT_UPDATE **upd_obsolete)
+    WT_PAGE *page, WT_UPDATE **upd_entry, WT_UPDATE *upd)
 {
+	WT_UPDATE *obsolete;
+
 	/*
 	 * Swap the update into place.  If that fails, a new update was added
 	 * after our search, we raced.  Check if our update is still permitted,
@@ -147,10 +149,17 @@ __update_serial_func(WT_SESSION_IMPL *session,
 		WT_WRITE_BARRIER();
 	}
 
-	/* Discard obsolete WT_UPDATE structures. */
-	*upd_obsolete = upd->next == NULL ?
-	    NULL : __wt_update_obsolete_check(session, upd->next);
-
+	/*
+	 * Discard obsolete WT_UPDATE structures if it looks useful; serialize
+	 * so only one thread does the obsolete check at a time.
+	 */
+	if (upd->next != NULL) {
+		__wt_spin_lock(session, &S2BT(session)->serial_lock);
+		obsolete = __wt_update_obsolete_check(session, upd->next);
+		__wt_spin_unlock(session, &S2BT(session)->serial_lock);
+		if (obsolete != NULL)
+			__wt_update_obsolete_free(session, page, obsolete);
+	}
 	return (0);
 }
 
@@ -278,7 +287,7 @@ __wt_insert_serial(
 static inline int
 __wt_update_serial(
 	WT_SESSION_IMPL *session, WT_PAGE *page, WT_UPDATE **srch_upd,
-	WT_UPDATE **updp, size_t upd_size, WT_UPDATE **upd_obsolete)
+	WT_UPDATE **updp, size_t upd_size)
 {
 	WT_UPDATE *upd = *updp;
 	WT_DECL_RET;
@@ -302,7 +311,7 @@ __wt_update_serial(
 	 WT_RET(__page_write_gen_wrapped_check(page));
 
 	ret = __update_serial_func(
-	    session, srch_upd, upd, upd_obsolete);
+	    session, page, srch_upd, upd);
 
 	/* Free unused memory on error. */
 	if (ret != 0) {
