@@ -1,47 +1,187 @@
-/* DO NOT EDIT: automatically built by dist/serial.py. */
+/*-
+ * Copyright (c) 2008-2013 WiredTiger, Inc.
+ *	All rights reserved.
+ *
+ * See the file LICENSE for redistribution information.
+ */
 
-typedef struct {
-	WT_PAGE *page;
-	WT_INSERT_HEAD *inshead;
-	WT_INSERT ***ins_stack;
-	WT_INSERT *new_ins;
-	uint64_t *recno;
-	u_int skipdepth;
-} __wt_col_append_args;
+/*
+ * __col_append_serial_func --
+ *	Server function to append an WT_INSERT entry to the tree.
+ */
+static inline int
+__col_append_serial_func(WT_SESSION_IMPL *session, WT_PAGE *page,
+    WT_INSERT_HEAD *ins_head, WT_INSERT ***ins_stack, WT_INSERT *new_ins,
+    uint64_t *recnop, u_int skipdepth)
+{
+	WT_BTREE *btree;
+	uint64_t recno;
+	u_int i;
+
+	btree = S2BT(session);
+
+	/* Confirm the page write generation won't wrap. */
+	WT_RET(__wt_page_write_gen_wrapped_check(page));
+
+	/*
+	 * If the application didn't specify a record number, allocate a new one
+	 * and set up for an append.
+	 */
+	if ((recno = WT_INSERT_RECNO(new_ins)) == 0) {
+		recno = WT_INSERT_RECNO(new_ins) = btree->last_recno + 1;
+		WT_ASSERT(session, WT_SKIP_LAST(ins_head) == NULL ||
+		    recno > WT_INSERT_RECNO(WT_SKIP_LAST(ins_head)));
+		for (i = 0; i < skipdepth; i++)
+			ins_stack[i] = ins_head->tail[i] == NULL ?
+			    &ins_head->head[i] : &ins_head->tail[i]->next[i];
+	}
+
+	/*
+	 * Confirm we are still in the expected position, and no item has been
+	 * added where our insert belongs.  Take extra care at the beginning
+	 * and end of the list (at each level): retry if we race there.
+	 *
+	 * !!!
+	 * Note the test for ins_stack[0] == NULL: that's the test for an
+	 * uninitialized cursor, ins_stack[0] is cleared as part of
+	 * initializing a cursor for a search.
+	 */
+	for (i = 0; i < skipdepth; i++) {
+		if (ins_stack[i] == NULL ||
+		    *ins_stack[i] != new_ins->next[i])
+			return (WT_RESTART);
+		if (new_ins->next[i] == NULL &&
+		    ins_head->tail[i] != NULL &&
+		    ins_stack[i] != &ins_head->tail[i]->next[i])
+			return (WT_RESTART);
+	}
+
+	/* Update the skiplist elements that reference the new WT_INSERT. */
+	for (i = 0; i < skipdepth; i++) {
+		if (ins_head->tail[i] == NULL ||
+		    ins_stack[i] == &ins_head->tail[i]->next[i])
+			ins_head->tail[i] = new_ins;
+		if (ins_stack[i] != NULL)
+			*ins_stack[i] = new_ins;
+	}
+
+	/*
+	 * Set the calling cursor's record number.
+	 * If we extended the file, update the last record number.
+	 */
+	*recnop = recno;
+	if (recno > btree->last_recno)
+		btree->last_recno = recno;
+
+	return (0);
+}
+
+/*
+ * __insert_serial_func --
+ *	Server function to add an WT_INSERT entry to the page.
+ */
+static inline int
+__insert_serial_func(WT_SESSION_IMPL *session, WT_PAGE *page,
+    WT_INSERT_HEAD *ins_head, WT_INSERT ***ins_stack, WT_INSERT *new_ins,
+    u_int skipdepth)
+{
+	u_int i;
+
+	WT_UNUSED(session);
+
+	/* Confirm the page write generation won't wrap. */
+	WT_RET(__wt_page_write_gen_wrapped_check(page));
+
+	/*
+	 * Confirm we are still in the expected position, and no item has been
+	 * added where our insert belongs.  Take extra care at the beginning
+	 * and end of the list (at each level): retry if we race there.
+	 *
+	 * !!!
+	 * Note the test for ins_stack[0] == NULL: that's the test for an
+	 * uninitialized cursor, ins_stack[0] is cleared as part of
+	 * initializing a cursor for a search.
+	 */
+	for (i = 0; i < skipdepth; i++) {
+		if (ins_stack[i] == NULL ||
+		    *ins_stack[i] != new_ins->next[i])
+			return (WT_RESTART);
+		if (new_ins->next[i] == NULL &&
+		    ins_head->tail[i] != NULL &&
+		    ins_stack[i] != &ins_head->tail[i]->next[i])
+			return (WT_RESTART);
+	}
+
+	/* Update the skiplist elements referencing the new WT_INSERT item. */
+	for (i = 0; i < skipdepth; i++) {
+		if (ins_head->tail[i] == NULL ||
+		    ins_stack[i] == &ins_head->tail[i]->next[i])
+			ins_head->tail[i] = new_ins;
+		*ins_stack[i] = new_ins;
+	}
+
+	return (0);
+}
+
+/*
+ * __update_serial_func --
+ *	Server function to add an WT_UPDATE entry in the page array.
+ */
+static inline int
+__update_serial_func(WT_SESSION_IMPL *session, WT_PAGE *page,
+    WT_UPDATE **upd_entry, WT_UPDATE *upd, WT_UPDATE **upd_obsolete)
+{
+	/* Confirm the page write generation won't wrap. */
+	WT_RET(__wt_page_write_gen_wrapped_check(page));
+
+	/*
+	 * If we're still in the expected position, no update has been added
+	 * where ours belongs.  If a new update has been added, check if our
+	 * update is still permitted, and if it is, do a full-barrier to ensure
+	 * the new entry's next pointer is set before we update the linked list.
+	 */
+	if (upd->next != *upd_entry) {
+		WT_RET(__wt_txn_update_check(session, *upd_entry));
+
+		upd->next = *upd_entry;
+		WT_WRITE_BARRIER();
+	}
+	*upd_entry = upd;
+
+	/* Discard obsolete WT_UPDATE structures. */
+	*upd_obsolete = upd->next == NULL ?
+	    NULL : __wt_update_obsolete_check(session, upd->next);
+
+	return (0);
+}
+
+/*
+ * DO NOT EDIT: automatically built by dist/serial.py.
+ * Serialization function section: BEGIN
+ */
 
 static inline int
 __wt_col_append_serial(
-	WT_SESSION_IMPL *session, WT_PAGE *page, WT_INSERT_HEAD *inshead,
+	WT_SESSION_IMPL *session, WT_PAGE *page, WT_INSERT_HEAD *ins_head,
 	WT_INSERT ***ins_stack, WT_INSERT **new_insp, size_t new_ins_size,
-	uint64_t *recno, u_int skipdepth) {
-	__wt_col_append_args _args, *args = &_args;
+	uint64_t *recnop, u_int skipdepth)
+{
+	WT_INSERT *new_ins = *new_insp;
 	WT_DECL_RET;
 	size_t incr_mem;
 
-	args->page = page;
+	/* Clear references to memory we now own. */
+	*new_insp = NULL;
 
-	args->inshead = inshead;
-
-	args->ins_stack = ins_stack;
-
-	if (new_insp == NULL)
-		args->new_ins = NULL;
-	else {
-		args->new_ins = *new_insp;
-		*new_insp = NULL;
-	}
-
-	args->recno = recno;
-
-	args->skipdepth = skipdepth;
-
+	/* Acquire the serialization spinlock, call the worker function. */
 	__wt_spin_lock(session, &S2BT(session)->serial_lock);
-	ret = __wt_col_append_serial_func(session, args);
+	ret = __col_append_serial_func(
+	    session, page, ins_head, ins_stack, new_ins, recnop, skipdepth);
 	__wt_spin_unlock(session, &S2BT(session)->serial_lock);
 
+	/* Free unused memory on error. */
 	if (ret != 0) {
-		/* Free unused memory. */
-		__wt_free(session, args->new_ins);
+		__wt_free(session, new_ins);
 
 		return (ret);
 	}
@@ -63,62 +203,29 @@ __wt_col_append_serial(
 
 	return (0);
 }
-
-static inline void
-__wt_col_append_unpack(
-    void *untyped_args, WT_PAGE **pagep, WT_INSERT_HEAD **insheadp,
-    WT_INSERT ****ins_stackp, WT_INSERT **new_insp, uint64_t **recnop,
-    u_int *skipdepthp)
-{
-	__wt_col_append_args *args = (__wt_col_append_args *)untyped_args;
-
-	*pagep = args->page;
-	*insheadp = args->inshead;
-	*ins_stackp = args->ins_stack;
-	*new_insp = args->new_ins;
-	*recnop = args->recno;
-	*skipdepthp = args->skipdepth;
-}
-
-typedef struct {
-	WT_PAGE *page;
-	WT_INSERT_HEAD *inshead;
-	WT_INSERT ***ins_stack;
-	WT_INSERT *new_ins;
-	u_int skipdepth;
-} __wt_insert_args;
 
 static inline int
 __wt_insert_serial(
-	WT_SESSION_IMPL *session, WT_PAGE *page, WT_INSERT_HEAD *inshead,
+	WT_SESSION_IMPL *session, WT_PAGE *page, WT_INSERT_HEAD *ins_head,
 	WT_INSERT ***ins_stack, WT_INSERT **new_insp, size_t new_ins_size,
-	u_int skipdepth) {
-	__wt_insert_args _args, *args = &_args;
+	u_int skipdepth)
+{
+	WT_INSERT *new_ins = *new_insp;
 	WT_DECL_RET;
 	size_t incr_mem;
 
-	args->page = page;
+	/* Clear references to memory we now own. */
+	*new_insp = NULL;
 
-	args->inshead = inshead;
-
-	args->ins_stack = ins_stack;
-
-	if (new_insp == NULL)
-		args->new_ins = NULL;
-	else {
-		args->new_ins = *new_insp;
-		*new_insp = NULL;
-	}
-
-	args->skipdepth = skipdepth;
-
+	/* Acquire the serialization spinlock, call the worker function. */
 	__wt_spin_lock(session, &S2BT(session)->serial_lock);
-	ret = __wt_insert_serial_func(session, args);
+	ret = __insert_serial_func(
+	    session, page, ins_head, ins_stack, new_ins, skipdepth);
 	__wt_spin_unlock(session, &S2BT(session)->serial_lock);
 
+	/* Free unused memory on error. */
 	if (ret != 0) {
-		/* Free unused memory. */
-		__wt_free(session, args->new_ins);
+		__wt_free(session, new_ins);
 
 		return (ret);
 	}
@@ -140,56 +247,28 @@ __wt_insert_serial(
 
 	return (0);
 }
-
-static inline void
-__wt_insert_unpack(
-    void *untyped_args, WT_PAGE **pagep, WT_INSERT_HEAD **insheadp,
-    WT_INSERT ****ins_stackp, WT_INSERT **new_insp, u_int *skipdepthp)
-{
-	__wt_insert_args *args = (__wt_insert_args *)untyped_args;
-
-	*pagep = args->page;
-	*insheadp = args->inshead;
-	*ins_stackp = args->ins_stack;
-	*new_insp = args->new_ins;
-	*skipdepthp = args->skipdepth;
-}
-
-typedef struct {
-	WT_PAGE *page;
-	WT_UPDATE **srch_upd;
-	WT_UPDATE *upd;
-	WT_UPDATE **upd_obsolete;
-} __wt_update_args;
 
 static inline int
 __wt_update_serial(
 	WT_SESSION_IMPL *session, WT_PAGE *page, WT_UPDATE **srch_upd,
-	WT_UPDATE **updp, size_t upd_size, WT_UPDATE **upd_obsolete) {
-	__wt_update_args _args, *args = &_args;
+	WT_UPDATE **updp, size_t upd_size, WT_UPDATE **upd_obsolete)
+{
+	WT_UPDATE *upd = *updp;
 	WT_DECL_RET;
 	size_t incr_mem;
 
-	args->page = page;
+	/* Clear references to memory we now own. */
+	*updp = NULL;
 
-	args->srch_upd = srch_upd;
-
-	if (updp == NULL)
-		args->upd = NULL;
-	else {
-		args->upd = *updp;
-		*updp = NULL;
-	}
-
-	args->upd_obsolete = upd_obsolete;
-
+	/* Acquire the serialization spinlock, call the worker function. */
 	__wt_spin_lock(session, &S2BT(session)->serial_lock);
-	ret = __wt_update_serial_func(session, args);
+	ret = __update_serial_func(
+	    session, page, srch_upd, upd, upd_obsolete);
 	__wt_spin_unlock(session, &S2BT(session)->serial_lock);
 
+	/* Free unused memory on error. */
 	if (ret != 0) {
-		/* Free unused memory. */
-		__wt_free(session, args->upd);
+		__wt_free(session, upd);
 
 		return (ret);
 	}
@@ -212,15 +291,7 @@ __wt_update_serial(
 	return (0);
 }
 
-static inline void
-__wt_update_unpack(
-    void *untyped_args, WT_PAGE **pagep, WT_UPDATE ***srch_updp, WT_UPDATE
-    **updp, WT_UPDATE ***upd_obsoletep)
-{
-	__wt_update_args *args = (__wt_update_args *)untyped_args;
-
-	*pagep = args->page;
-	*srch_updp = args->srch_upd;
-	*updp = args->upd;
-	*upd_obsoletep = args->upd_obsolete;
-}
+/*
+ * Serialization function section: END
+ * DO NOT EDIT: automatically built by dist/serial.py.
+ */

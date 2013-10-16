@@ -195,57 +195,6 @@ __wt_row_insert_alloc(WT_SESSION_IMPL *session,
 }
 
 /*
- * __wt_insert_serial_func --
- *	Server function to add an WT_INSERT entry to the page.
- */
-int
-__wt_insert_serial_func(WT_SESSION_IMPL *session, void *args)
-{
-	WT_INSERT *new_ins, ***ins_stack;
-	WT_INSERT_HEAD *ins_head;
-	WT_PAGE *page;
-	u_int i, skipdepth;
-
-	WT_UNUSED(session);
-
-	__wt_insert_unpack(args, &page,
-	    &ins_head, &ins_stack, &new_ins, &skipdepth);
-
-	/* Confirm the page write generation won't wrap. */
-	WT_RET(__wt_page_write_gen_wrapped_check(page));
-
-	/*
-	 * Confirm we are still in the expected position, and no item has been
-	 * added where our insert belongs.  Take extra care at the beginning
-	 * and end of the list (at each level): retry if we race there.
-	 *
-	 * !!!
-	 * Note the test for ins_stack[0] == NULL: that's the test for an
-	 * uninitialized cursor, ins_stack[0] is cleared as part of
-	 * initializing a cursor for a search.
-	 */
-	for (i = 0; i < skipdepth; i++) {
-		if (ins_stack[i] == NULL ||
-		    *ins_stack[i] != new_ins->next[i])
-			return (WT_RESTART);
-		if (new_ins->next[i] == NULL &&
-		    ins_head->tail[i] != NULL &&
-		    ins_stack[i] != &ins_head->tail[i]->next[i])
-			return (WT_RESTART);
-	}
-
-	/* Update the skiplist elements referencing the new WT_INSERT item. */
-	for (i = 0; i < skipdepth; i++) {
-		if (ins_head->tail[i] == NULL ||
-		    ins_stack[i] == &ins_head->tail[i]->next[i])
-			ins_head->tail[i] = new_ins;
-		*ins_stack[i] = new_ins;
-	}
-
-	return (0);
-}
-
-/*
  * __wt_update_alloc --
  *	Allocate a WT_UPDATE structure and associated value and fill it in.
  */
@@ -365,41 +314,4 @@ __wt_row_leaf_obsolete(WT_SESSION_IMPL *session, WT_PAGE *page)
 			    session, ins->upd)) != NULL)
 				__wt_update_obsolete_free(session, page, upd);
 	}
-}
-
-/*
- * __wt_update_serial_func --
- *	Server function to add an WT_UPDATE entry in the page array.
- */
-int
-__wt_update_serial_func(WT_SESSION_IMPL *session, void *args)
-{
-	WT_PAGE *page;
-	WT_UPDATE *upd, **upd_entry, **upd_obsolete;
-
-	__wt_update_unpack(args, &page, &upd_entry, &upd, &upd_obsolete);
-
-	/* Confirm the page write generation won't wrap. */
-	WT_RET(__wt_page_write_gen_wrapped_check(page));
-
-	/*
-	 *
-	 * If we're still in the expected position, no update has been added
-	 * where ours belongs.  If a new update has been added, check if our
-	 * update is still permitted, and if it is, do a full-barrier to ensure
-	 * the new entry's next pointer is set before we update the linked list.
-	 */
-	if (upd->next != *upd_entry) {
-		WT_RET(__wt_txn_update_check(session, *upd_entry));
-
-		upd->next = *upd_entry;
-		WT_WRITE_BARRIER();
-	}
-	*upd_entry = upd;
-
-	/* Discard obsolete WT_UPDATE structures. */
-	*upd_obsolete = upd->next == NULL ?
-	    NULL : __wt_update_obsolete_check(session, upd->next);
-
-	return (0);
 }
