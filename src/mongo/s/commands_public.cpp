@@ -1877,9 +1877,7 @@ namespace mongo {
             commandBuilder.setField("cursor", Value(DOC("batchSize" << 0)));
 
             BSONObj shardedCommand = commandBuilder.freeze().toBson();
-            BSONObjBuilder shardQueryBuilder;
-            pShardPipeline->getInitialQuery(&shardQueryBuilder);
-            BSONObj shardQuery(shardQueryBuilder.done());
+            BSONObj shardQuery = pShardPipeline->getInitialQuery();
 
             // Run the command on the shards
             // TODO need to make sure cursors are killed if a retry is needed
@@ -1975,10 +1973,7 @@ namespace mongo {
                 commandBuilder["$queryOptions"] = Value(cmdObj["$queryOptions"]);
             }
             BSONObj shardedCommand = commandBuilder.freeze().toBson();
-
-            BSONObjBuilder shardQueryBuilder;
-            shardPipeline->getInitialQuery(&shardQueryBuilder);
-            BSONObj shardQuery(shardQueryBuilder.done());
+            BSONObj shardQuery = shardPipeline->getInitialQuery();
 
             // Run the command on the shards
             vector<Strategy::CommandResult> shardResults;

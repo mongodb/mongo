@@ -603,18 +603,8 @@ namespace mongo {
             BSONElement elem,
             const intrusive_ptr<ExpressionContext> &pCtx);
 
-        /**
-          Create a BSONObj suitable for Matcher construction.
-
-          This is used after filter analysis has moved as many filters to
-          as early a point as possible in the document processing pipeline.
-          See db/Matcher.h and the associated documentation for the format.
-          This conversion is used to move back to the low-level find()
-          Cursor mechanism.
-
-          @param pBuilder the builder to write to
-         */
-        void toMatcherBson(BSONObjBuilder *pBuilder) const;
+        /// Returns the query in Matcher syntax.
+        BSONObj getQuery() const;
 
         static const char matchName[];
 

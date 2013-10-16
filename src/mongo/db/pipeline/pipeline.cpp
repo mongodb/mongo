@@ -409,23 +409,16 @@ namespace mongo {
         return pShardPipeline;
     }
 
-    bool Pipeline::getInitialQuery(BSONObjBuilder *pQueryBuilder) const
-    {
+    BSONObj Pipeline::getInitialQuery() const {
         if (sources.empty())
-            return false;
+            return BSONObj();
 
         /* look for an initial $match */
-        const intrusive_ptr<DocumentSource> &pMC = sources.front();
-        const DocumentSourceMatch *pMatch =
-            dynamic_cast<DocumentSourceMatch *>(pMC.get());
+        DocumentSourceMatch* match = dynamic_cast<DocumentSourceMatch*>(sources.front().get());
+        if (!match)
+            return BSONObj();
 
-        if (!pMatch)
-            return false;
-
-        /* build the query */
-        pMatch->toMatcherBson(pQueryBuilder);
-
-        return true;
+        return match->getQuery();
     }
 
     Document Pipeline::serialize() const {

@@ -90,28 +90,16 @@ namespace {
             return; // don't need a cursor
         }
 
-        /* look for an initial match */
-        BSONObjBuilder queryBuilder;
-        bool initQuery = pPipeline->getInitialQuery(&queryBuilder);
-        if (initQuery) {
-            /*
-              This will get built in to the Cursor we'll create, so
-              remove the match from the pipeline
-            */
+
+        // Look for an initial match. This works whether we got an initial query or not.
+        // If not, it results in a "{}" query, which will be what we want in that case.
+        const BSONObj queryObj = pPipeline->getInitialQuery();
+        if (!queryObj.isEmpty()) {
+            // This will get built in to the Cursor we'll create, so
+            // remove the match from the pipeline
             sources.pop_front();
         }
 
-        /*
-          Create a query object.
-
-          This works whether we got an initial query above or not; if not,
-          it results in a "{}" query, which will be what we want in that case.
-
-          We create a pointer to a shared object instead of a local
-          object so that we can preserve it for the Cursor we're going to
-          create below.
-         */
-        BSONObj queryObj = queryBuilder.obj();
 
         /* Look for an initial simple project; we'll avoid constructing Values
          * for fields that won't make it through the projection.

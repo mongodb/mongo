@@ -85,15 +85,10 @@ namespace mongo {
         */
         intrusive_ptr<Pipeline> splitForSharded();
 
-        /**
-           If the pipeline starts with a $match, dump its BSON predicate
-           specification to the supplied builder and return true.
-
-           @param pQueryBuilder the builder to put the match BSON into
-           @returns true if a match was found and dumped to pQueryBuilder,
-             false otherwise
+        /** If the pipeline starts with a $match, return its BSON predicate.
+         *  Returns empty BSON if the first stage isn't $match.
          */
-        bool getInitialQuery(BSONObjBuilder *pQueryBuilder) const;
+        BSONObj getInitialQuery() const;
 
         /**
           Write the Pipeline as a BSONObj command.  This should be the

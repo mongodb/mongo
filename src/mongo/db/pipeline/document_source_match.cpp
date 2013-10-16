@@ -46,7 +46,7 @@ namespace mongo {
     }
 
     Value DocumentSourceMatch::serialize(bool explain) const {
-        return Value(DOC(getSourceName() << Document(*matcher.getQuery())));
+        return Value(DOC(getSourceName() << Document(getQuery())));
     }
 
     boost::optional<Document> DocumentSourceMatch::getNext() {
@@ -256,7 +256,7 @@ namespace {
 }
 
     BSONObj DocumentSourceMatch::redactSafePortion() const {
-        return redactSafePortionTopLevel(*matcher.getQuery()).toBson();
+        return redactSafePortionTopLevel(getQuery()).toBson();
     }
 
     static void uassertNoDisallowedClauses(BSONObj query) {
@@ -285,9 +285,8 @@ namespace {
         return new DocumentSourceMatch(elem.Obj(), pExpCtx);
     }
 
-    void DocumentSourceMatch::toMatcherBson(BSONObjBuilder *pBuilder) const {
-        const BSONObj *pQuery = matcher.getQuery();
-        pBuilder->appendElements(*pQuery);
+    BSONObj DocumentSourceMatch::getQuery() const {
+        return *(matcher.getQuery());
     }
 
     DocumentSourceMatch::DocumentSourceMatch(const BSONObj &query,
