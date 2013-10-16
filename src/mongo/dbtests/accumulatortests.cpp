@@ -826,6 +826,124 @@ namespace AccumulatorTests {
         
     } // namespace Sum
 
+    namespace Median {
+
+        class Base : public AccumulatorTests::Base {
+        public:
+            virtual ~Base() {
+            }
+        protected:
+            void createAccumulator() {
+                _accumulator = AccumulatorMedian::create();
+                ASSERT_EQUALS(string("$median"), _accumulator->getOpName());
+            }
+            Accumulator *accumulator() { return _accumulator.get(); }
+        private:
+            intrusive_ptr<Accumulator> _accumulator;
+        };
+
+        /** No documents evaluated. */
+        class None : public Base {
+        public:
+            void run() {
+                createAccumulator();
+                ASSERT_EQUALS( 0, accumulator()->getValue(false).getDouble() );
+            }
+        };
+
+        /** An int. */
+        class OneInt : public Base {
+        public:
+            void run() {
+                createAccumulator();
+                accumulator()->process(Value(5), false);
+                ASSERT_EQUALS( 5, accumulator()->getValue(false).getDouble() );
+            }
+        };
+
+        /** A long. */
+        class OneLong : public Base {
+        public:
+            void run() {
+                createAccumulator();
+                accumulator()->process(Value(6LL), false);
+                ASSERT_EQUALS( 6, accumulator()->getValue(false).getDouble() );
+            }
+        };
+        
+        /** A double. */
+        class OneDouble : public Base {
+        public:
+            void run() {
+                createAccumulator();
+                accumulator()->process(Value(7.0), false);
+                ASSERT_EQUALS( 7.0, accumulator()->getValue(false).getDouble() );
+            }
+        };
+
+        /** Median of an even number of values, all ints **/
+        class IntInt : public Base {
+        public:
+            void run() {
+                createAccumulator();
+                accumulator()->process(Value(25), false);
+                accumulator()->process(Value(15), false);
+                ASSERT_EQUALS( 20.0, accumulator()->getValue(false).getDouble() );
+            }
+        };        
+        
+        /** Median of an even number of values, mixed int and double */
+        class IntDoubleIntDouble : public Base {
+        public:
+            void run() {
+                createAccumulator();
+                accumulator()->process(Value(25), false);
+                accumulator()->process(Value(15.0), false);
+                accumulator()->process(Value(30), false);
+                accumulator()->process(Value(10.0), false);
+                ASSERT_EQUALS( 20.0, accumulator()->getValue(false).getDouble() );
+            }
+        };  
+
+        /** Median of an odd number of values, all ints */
+        class IntIntInt : public Base {
+        public:
+            void run() {
+                createAccumulator();
+                accumulator()->process(Value(25), false);
+                accumulator()->process(Value(30), false);
+                accumulator()->process(Value(10), false);
+                ASSERT_EQUALS( 25.0, accumulator()->getValue(false).getDouble() );
+            }
+        };  
+
+        /** Medidan of an odd number of values, mixed int and double */
+        class IntDoubleDoubleDoubleInt : public Base {
+        public:
+            void run() {
+                createAccumulator();
+                accumulator()->process(Value(25), false);
+                accumulator()->process(Value(15.0), false);
+                accumulator()->process(Value(30.0), false);
+                accumulator()->process(Value(-10.0), false);
+                accumulator()->process(Value(15), false);
+                ASSERT_EQUALS( 15.0, accumulator()->getValue(false).getDouble() );
+            }
+        };
+
+        /** Medidan of an int and a string */
+        class IntString : public Base {
+        public:
+            void run() {
+                createAccumulator();
+                accumulator()->process(Value(25), false);
+                accumulator()->process(Value("a string"), false);
+                ASSERT_EQUALS( 25.0, accumulator()->getValue(false).getDouble() );
+            }
+        };
+
+    }  // namespace Median
+
     class All : public Suite {
     public:
         All() : Suite( "accumulator" ) {
@@ -902,6 +1020,16 @@ namespace AccumulatorTests {
             add<Sum::IntNull>();
             add<Sum::IntUndefined>();
             add<Sum::NoOverflowBeforeDouble>();
+
+            add<Median::None>();
+            add<Median::OneInt>();
+            add<Median::OneLong>();
+            add<Median::OneDouble>();
+            add<Median::IntInt>();
+            add<Median::IntDoubleIntDouble>();
+            add<Median::IntIntInt>();
+            add<Median::IntDoubleDoubleDoubleInt>();
+            add<Median::IntString>();
         }
     } myall;
 

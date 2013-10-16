@@ -52,10 +52,11 @@ namespace mongo {
     Value AccumulatorMedian::getValue(bool toBeMerged) const {
         if (!toBeMerged) {
             if(vpValue.empty())
-                return Value(0);
+                return Value(0.0);
 
-            std::vector<double> vals(vpValue.size());
-            for(std::vector<Value>::size_type i = 0; i != vpValue.size(); i++) {
+            // can't sort member variable from a const method, so copy out double values and sort
+            std::vector<double> vals;
+            for(std::vector<Value>::size_type i = 0; i < vpValue.size(); i++) {
                 vals.push_back(vpValue[i].coerceToDouble());    
             }
 
@@ -64,7 +65,7 @@ namespace mongo {
             if(vals.size() % 2 != 0)
                 return Value(vals[vals.size() / 2]);
 
-            return Value(vals[vals.size() / 2] + vals[(vals.size()) / 2 - 1] / 2);
+            return Value((vals[vals.size() / 2] + vals[(vals.size() / 2) - 1]) / 2);
         }
         else {
             return Super::getValue(toBeMerged);
