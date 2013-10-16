@@ -10,7 +10,7 @@ Import("s3push")
 driverIncludeSource = "$BUILD_DIR/msi/DriverInclude.wxs"
 
 env = env.Clone()
-env['WIXPATH'] = r'%WIX%bin'
+env['WIXPATH'] = r'C:\Program Files (x86)\WiX Toolset v3.7\bin'
 env['WIXHEAT'] = r'$WIXPATH\heat.exe'
 env['WIXCANDLE'] = r'$WIXPATH\candle.exe'
 env['WIXLIGHT'] = r'$WIXPATH\light.exe'
@@ -62,9 +62,9 @@ env.Command(objects,
             ' -dTargetDir=' + buildDir + r'\msi'
             ' -dTargetExt=.msi'
             ' -dTargetFileName=${SERVER_ARCHIVE}'
-            r' -dSaslSource=d:\work\sasl\bin'
-            r' -dSnmpSource=d:\work\snmp\bin'
-            r' -dSslSource=d:\work\ssl\bin'
+            r' -dSaslSource=c:\sasl\bin'
+            r' -dSnmpSource=c:\snmp\bin'
+            r' -dSslSource=c:\openssl\bin'
             ' -out ' + buildDir + r'\msi\\'
             ' -arch x64'
             ' -ext "$WIXUIEXT"'
