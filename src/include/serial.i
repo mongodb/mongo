@@ -132,9 +132,9 @@ __update_serial_func(WT_SESSION_IMPL *session,
 	 */
 	if (upd->next != NULL &&
 	    F_ISSET(S2C(session)->cache, WT_EVICT_ACTIVE)) {
-		__wt_spin_lock(session, &S2BT(session)->serial_lock);
+		WT_PAGE_LOCK(session, page);
 		obsolete = __wt_update_obsolete_check(session, upd->next);
-		__wt_spin_unlock(session, &S2BT(session)->serial_lock);
+		WT_PAGE_UNLOCK(session, page);
 		if (obsolete != NULL)
 			__wt_update_obsolete_free(session, page, obsolete);
 	}
@@ -173,11 +173,11 @@ __wt_col_append_serial(
 	 */
 	 WT_RET(__page_write_gen_wrapped_check(page));
 
-	/* Acquire the serialization spinlock, call the worker function. */
-	__wt_spin_lock(session, &S2BT(session)->serial_lock);
+	/* Acquire the page's spinlock, call the worker function. */
+	WT_PAGE_LOCK(session, page);
 	ret = __col_append_serial_func(
 	    session, ins_head, ins_stack, new_ins, recnop, skipdepth);
-	__wt_spin_unlock(session, &S2BT(session)->serial_lock);
+	WT_PAGE_UNLOCK(session, page);
 
 	/* Free unused memory on error. */
 	if (ret != 0) {
@@ -231,11 +231,11 @@ __wt_insert_serial(
 	 */
 	 WT_RET(__page_write_gen_wrapped_check(page));
 
-	/* Acquire the serialization spinlock, call the worker function. */
-	__wt_spin_lock(session, &S2BT(session)->serial_lock);
+	/* Acquire the page's spinlock, call the worker function. */
+	WT_PAGE_LOCK(session, page);
 	ret = __insert_serial_func(
 	    session, ins_head, ins_stack, new_ins, skipdepth);
-	__wt_spin_unlock(session, &S2BT(session)->serial_lock);
+	WT_PAGE_UNLOCK(session, page);
 
 	/* Free unused memory on error. */
 	if (ret != 0) {

@@ -105,8 +105,8 @@ def output(entry, f):
 	# Call the worker function.
 	if entry.name != "update":
 		f.write('''
-\t/* Acquire the serialization spinlock, call the worker function. */
-\t__wt_spin_lock(session, &S2BT(session)->serial_lock);''')
+\t/* Acquire the page's spinlock, call the worker function. */
+\tWT_PAGE_LOCK(session, page);''')
 
 	f.write('''
 \tret = __''' + entry.name + '''_serial_func(
@@ -121,7 +121,7 @@ def output(entry, f):
 
 	if entry.name != "update":
 		f.write('''
-\t__wt_spin_unlock(session, &S2BT(session)->serial_lock);''')
+\tWT_PAGE_UNLOCK(session, page);''')
 
 	f.write('''
 

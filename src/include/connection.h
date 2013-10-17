@@ -80,6 +80,16 @@ struct __wt_connection_impl {
 	WT_SPINLOCK fh_lock;		/* File handle queue spinlock */
 	WT_SPINLOCK schema_lock;	/* Schema operation spinlock */
 
+	/*
+	 * We distribute the btree page locks across a set of spin locks; it
+	 * can't be an array, we impose cache-line alignment and gcc doesn't
+	 * support that for arrays.
+	 */
+#define	WT_PAGE_LOCKS(conn)						\
+	(sizeof((conn)->page_lock) / sizeof((conn)->page_lock[0]))
+	WT_SPINLOCK *page_lock[256];	/* Btree page spinlocks */
+	u_int	     page_lock_cnt;	/* Next spinlock to use */
+
 					/* Connection queue */
 	TAILQ_ENTRY(__wt_connection_impl) q;
 					/* Cache pool queue */
