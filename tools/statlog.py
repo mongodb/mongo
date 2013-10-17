@@ -101,6 +101,8 @@ def plot(title, values):
         t1, v1 = values[1]
         seconds = (datetime.strptime(t1, TIMEFMT) -
             datetime.strptime(t0, TIMEFMT)).seconds
+	if seconds == 0:
+		seconds = 1
         ylabel += ' per second'
 
     # Write the raw data into a file for processing.
