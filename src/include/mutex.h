@@ -45,7 +45,8 @@ struct __wt_rwlock {
 
 #if SPINLOCK_TYPE == SPINLOCK_GCC
 
-typedef	volatile int WT_SPINLOCK;
+typedef volatile int
+    WT_SPINLOCK WT_GCC_ATTRIBUTE((aligned(WT_CACHE_LINE_ALIGNMENT)));
 
 #elif SPINLOCK_TYPE == SPINLOCK_PTHREAD_MUTEX ||\
 	SPINLOCK_TYPE == SPINLOCK_PTHREAD_MUTEX_LOGGING
