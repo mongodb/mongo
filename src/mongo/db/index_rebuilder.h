@@ -44,10 +44,10 @@ namespace mongo {
 
     private:
         /**
-         * Check each collection in the passed in vector to see if it has any in-progress index
+         * Check each collection in the passed in list to see if it has any in-progress index
          * builds that need to be retried.  If so, calls retryIndexBuild.
          */
-        void checkNS(const std::vector<std::string>& nsToCheck);
+        void checkNS(const std::list<std::string>& nsToCheck);
     };
 
     extern IndexRebuilder indexRebuilder;

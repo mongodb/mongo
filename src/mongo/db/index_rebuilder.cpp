@@ -55,27 +55,21 @@ namespace mongo {
         std::vector<std::string> dbNames;
         getDatabaseNames(dbNames);
 
-        std::vector<std::string> nsToCheck;
         try {
-            for (std::vector<std::string>::const_iterator it = dbNames.begin();
-                 it < dbNames.end();
-                 it++) {
-                const std::string systemNS = *it + ".system.namespaces";
-                DBDirectClient cli;
-                scoped_ptr<DBClientCursor> cursor(cli.query(systemNS, Query()));
-
-                // This depends on system.namespaces not changing while we iterate
-                while (cursor->more()) {
-                    BSONObj nsDoc = cursor->nextSafe();
-                    nsToCheck.push_back(nsDoc["name"].valuestrsafe());
-                }
+            std::list<std::string> collNames;
+            for (std::vector<std::string>::const_iterator dbName = dbNames.begin();
+                 dbName < dbNames.end();
+                 dbName++) {
+                Client::ReadContext ctx(*dbName);
+                Database* db = cc().database();
+                db->namespaceIndex().getNamespaces(collNames, /* onlyCollections */ true);
             }
             {
                 boost::unique_lock<boost::mutex> lk(ReplSet::rss.mtx);
                 ReplSet::rss.indexRebuildDone = true;
                 ReplSet::rss.cond.notify_all();
             }
-            checkNS(nsToCheck);
+            checkNS(collNames);
         }
         catch (const DBException&) {
             warning() << "index rebuilding did not complete" << endl;
@@ -88,9 +82,9 @@ namespace mongo {
         LOG(1) << "checking complete" << endl;
     }
 
-    void IndexRebuilder::checkNS(const std::vector<std::string>& nsToCheck) {
+    void IndexRebuilder::checkNS(const std::list<std::string>& nsToCheck) {
         bool firstTime = true;
-        for (std::vector<std::string>::const_iterator it = nsToCheck.begin();
+        for (std::list<std::string>::const_iterator it = nsToCheck.begin();
                 it != nsToCheck.end();
                 ++it) {
 
