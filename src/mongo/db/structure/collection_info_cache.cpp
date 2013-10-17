@@ -42,8 +42,10 @@
 namespace mongo {
 
     CollectionInfoCache::CollectionInfoCache( Collection* collection )
-        : _collection( collection ), _qcCacheMutex( "_qcCacheMutex" ) {
-    }
+        : _collection( collection ),
+          _keysComputed( false ),
+          _qcCacheMutex( "_qcCacheMutex" ),
+          _qcWriteCount( 0 ) {}
 
     void CollectionInfoCache::reset() {
         Lock::assertWriteLocked( _collection->ns().ns() );
