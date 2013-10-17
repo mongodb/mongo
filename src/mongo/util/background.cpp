@@ -143,6 +143,10 @@ namespace mongo {
 
     PeriodicTask::~PeriodicTask() {
         theRunner->remove( this );
+        if ( theRunner ) {
+            delete theRunner;
+            theRunner = NULL;
+        }
     }
 
     void PeriodicTask::Runner::add( PeriodicTask* task ) {
