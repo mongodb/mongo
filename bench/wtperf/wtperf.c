@@ -718,7 +718,8 @@ int execute_populate(CONFIG *cfg)
 	 */
 	if (cfg->merge_sleep) {
 		if (cfg->merge_sleep == PERF_SLEEP_LOAD)
-			sleepsec = e.tv_sec - cfg->phase_start_time.tv_sec;
+			sleepsec = (uint32_t)
+			    (e.tv_sec - cfg->phase_start_time.tv_sec);
 		else
 			sleepsec = cfg->merge_sleep;
 		lprintf(cfg, 0, 1,
