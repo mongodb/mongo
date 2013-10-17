@@ -267,9 +267,6 @@ wts_create(void)
 		p += snprintf(p, (size_t)(end - p), ",type=lsm");
 		if (MMRAND(1, 10) <= 2)			/* 20% */
 			p += snprintf(
-			    p, (size_t)(end - p), ",lsm_bloom_newest=true");
-		if (MMRAND(1, 10) <= 2)			/* 20% */
-			p += snprintf(
 			    p, (size_t)(end - p), ",lsm_bloom_oldest=true");
 	}
 

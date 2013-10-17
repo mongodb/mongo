@@ -23,10 +23,10 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 	WT_INSERT_HEAD *ins_head, **ins_headp;
 	WT_ITEM *value, _value;
 	WT_PAGE *page;
-	WT_UPDATE *old_upd, *upd, *upd_obsolete;
+	WT_UPDATE *old_upd, *upd;
 	size_t ins_size, upd_size;
 	uint64_t recno;
-	u_int skipdepth;
+	u_int i, skipdepth;
 	int append, logged;
 
 	btree = cbt->btree;
@@ -81,14 +81,16 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 		WT_ERR(__wt_txn_modify(session, &upd->txnid));
 		logged = 1;
 
-		/* Serialize the update. */
-		WT_ERR(__wt_update_serial(session, page,
-		    &cbt->ins->upd, old_upd,
-		    &upd, upd_size, &upd_obsolete));
+		/*
+		 * Point the new WT_UPDATE item to the next element in the list.
+		 * If we get it right, the serialization function lock acts as
+		 * our memory barrier to flush this write.
+		 */
+		upd->next = old_upd;
 
-		/* Discard any obsolete WT_UPDATE structures. */
-		if (upd_obsolete != NULL)
-			__wt_update_obsolete_free(session, page, upd_obsolete);
+		/* Serialize the update. */
+		WT_ERR(__wt_update_serial(
+		    session, page, &cbt->ins->upd, &upd, upd_size));
 	} else {
 		/* Allocate the append/update list reference as necessary. */
 		if (append) {
@@ -131,16 +133,36 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 		cbt->ins_head = ins_head;
 		cbt->ins = ins;
 
+		/*
+		 * If there was no insert list during the search, or there was
+		 * no search because the record number has not been allocated
+		 * yet, the cursor's information cannot be correct, search
+		 * couldn't have initialized it.
+		 *
+		 * Otherwise, point the new WT_INSERT item's skiplist to the
+		 * next elements in the insert list (which we will check are
+		 * still valid inside the serialization function).
+		 *
+		 * The serial mutex acts as our memory barrier to flush these
+		 * writes before inserting them into the list.
+		 */
+		if (WT_SKIP_FIRST(ins_head) == NULL || recno == 0)
+			for (i = 0; i < skipdepth; i++) {
+				cbt->ins_stack[i] = &ins_head->head[i];
+				ins->next[i] = cbt->next_stack[i] = NULL;
+			}
+		else
+			for (i = 0; i < skipdepth; i++)
+				ins->next[i] = cbt->next_stack[i];
+
 		/* Append or insert the WT_INSERT structure. */
 		if (append)
 			WT_ERR(__wt_col_append_serial(
-			    session, page,
-			    cbt->ins_head, cbt->ins_stack, cbt->next_stack,
+			    session, page, cbt->ins_head, cbt->ins_stack,
 			    &ins, ins_size, &cbt->recno, skipdepth));
 		else
 			WT_ERR(__wt_insert_serial(
-			    session, page,
-			    cbt->ins_head, cbt->ins_stack, cbt->next_stack,
+			    session, page, cbt->ins_head, cbt->ins_stack,
 			    &ins, ins_size, skipdepth));
 	}
 
@@ -180,94 +202,6 @@ __col_insert_alloc(WT_SESSION_IMPL *session,
 
 	*insp = ins;
 	*ins_sizep = ins_size;
-	return (0);
-}
-
-/*
- * __wt_col_append_serial_func --
- *	Server function to append an WT_INSERT entry to the tree.
- */
-int
-__wt_col_append_serial_func(WT_SESSION_IMPL *session, void *args)
-{
-	WT_BTREE *btree;
-	WT_INSERT *ins, *new_ins, ***ins_stack, **next_stack;
-	WT_INSERT_HEAD *ins_head;
-	WT_PAGE *page;
-	uint64_t recno, *recnop;
-	u_int i, skipdepth;
-
-	btree = S2BT(session);
-
-	__wt_col_append_unpack(args, &page,
-	    &ins_head, &ins_stack, &next_stack, &new_ins, &recnop, &skipdepth);
-
-	/*
-	 * Largely ignore the page's write-generation, just confirm it hasn't
-	 * wrapped.
-	 */
-	WT_RET(__wt_page_write_gen_wrapped_check(page));
-
-	/*
-	 * If the application specified a record number, there's a race: the
-	 * application may have searched for the record, not found it, then
-	 * called into the append code, and another thread might have added
-	 * the record.  Fortunately, we're in the right place because if the
-	 * record didn't exist at some point, it can only have been created
-	 * on this list.  Search for the record, if specified.
-	 *
-	 * If the application didn't specify a record number, we still have
-	 * to do a search in order to create the insert stack we need.
-	 */
-	if ((recno = WT_INSERT_RECNO(new_ins)) == 0)
-		recno = WT_INSERT_RECNO(new_ins) = btree->last_recno + 1;
-
-	/*
-	 * If an empty WT_INSERT_HEAD, the cursor's information cannot be
-	 * correct, search could not have initialized it.
-	 */
-	if (WT_SKIP_FIRST(ins_head) == NULL)
-		for (i = 0; i < WT_SKIP_MAXDEPTH; i++) {
-			ins_stack[i] = &ins_head->head[i];
-			next_stack[i] = NULL;
-		}
-	else {
-		ins =
-		    __col_insert_search(ins_head, ins_stack, next_stack, recno);
-
-		/*
-		 * If we find the record number, there's been a race, and we
-		 * should be updating an existing record, restart.
-		 */
-		if (ins != NULL && WT_INSERT_RECNO(ins) == recno)
-			WT_RET(WT_RESTART);
-	}
-
-	/*
-	 * Publish: First, point the new WT_INSERT item's skiplist references
-	 * to the next elements in the insert list, then flush memory.  Second,
-	 * update the skiplist elements that reference the new WT_INSERT item,
-	 * this ensures the list is never inconsistent.
-	 */
-	for (i = 0; i < skipdepth; i++)
-		new_ins->next[i] = *ins_stack[i];
-	WT_WRITE_BARRIER();
-	for (i = 0; i < skipdepth; i++) {
-		if (ins_head->tail[i] == NULL ||
-		    ins_stack[i] == &ins_head->tail[i]->next[i])
-			ins_head->tail[i] = new_ins;
-		if (ins_stack[i] != NULL)
-			*ins_stack[i] = new_ins;
-	}
-
-	/*
-	 * Set the calling cursor's record number.
-	 * If we extended the file, update the last record number.
-	 */
-	*recnop = recno;
-	if (recno > btree->last_recno)
-		btree->last_recno = recno;
-
 	return (0);
 }
 

@@ -511,9 +511,6 @@ __conn_close(WT_CONNECTION *wt_conn, const char *config)
 			wt_session = &s->iface;
 			WT_TRET(wt_session->close(wt_session, config));
 		}
-	for (s = conn->sessions, i = 0; i < conn->session_size; ++s, ++i)
-		if (!F_ISSET(s, WT_SESSION_INTERNAL))
-			__wt_free(session, s->hazard);
 
 	WT_TRET(__wt_connection_close(conn));
 

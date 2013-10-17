@@ -315,7 +315,7 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 		 * function that will optionally sweep the handle list to
 		 * remove any dead handles.
 		 */
-		WT_WITH_SCHEMA_LOCK_OPT(session, ret =
+		WT_WITH_SCHEMA_LOCK(session, ret =
 		    __session_open_btree(
 		    session, uri, checkpoint, cfg, dead, flags));
 		WT_RET(ret);

@@ -191,23 +191,6 @@ __clsm_open_cursors(
 	F_CLR(clsm, WT_CLSM_ITERATE_NEXT | WT_CLSM_ITERATE_PREV);
 
 	if (update) {
-		/*
-		 * If this is the first update in this cursor, check if a new
-		 * in-memory chunk is needed.
-		 *
-		 * !!!
-		 * It is exceeding unlikely that we get here at all, but
-		 * there is a transaction in progress and it could roll back,
-		 * leaving the metadata inconsistent.
-		 */
-		if (clsm->primary_chunk == NULL) {
-			WT_RET(__wt_writelock(session, lsm_tree->rwlock));
-			if (clsm->dsk_gen == lsm_tree->dsk_gen)
-				WT_WITH_SCHEMA_LOCK(session, ret =
-				    __wt_lsm_tree_switch(session, lsm_tree));
-			WT_TRET(__wt_rwunlock(session, lsm_tree->rwlock));
-			WT_RET(ret);
-		}
 		if (txn->isolation == TXN_ISO_SNAPSHOT)
 			F_SET(clsm, WT_CLSM_OPEN_SNAPSHOT);
 	} else
@@ -215,11 +198,37 @@ __clsm_open_cursors(
 
 	WT_RET(__wt_readlock(session, lsm_tree->rwlock));
 	locked = 1;
-retry:
+	/*
+	 * If there is no in-memory chunk in the tree for an update operation,
+	 * create one.
+	 *
+	 * !!!
+	 * It is exceeding unlikely that we get here at all, but if there is a
+	 * transaction in progress and it rolls back, it would leave the
+	 * metadata inconsistent.
+	 */
+	if (update && (lsm_tree->nchunks == 0 ||
+	    F_ISSET(lsm_tree->chunk[lsm_tree->nchunks - 1],
+	    WT_LSM_CHUNK_ONDISK))) {
+		/*
+		 * Upgrade to a write lock and re-check that a switch is
+		 * required.
+		 */
+		WT_RET(__wt_rwunlock(session, lsm_tree->rwlock));
+		WT_RET(__wt_writelock(session, lsm_tree->rwlock));
+
+		if (update && (lsm_tree->nchunks == 0 ||
+		    F_ISSET(lsm_tree->chunk[lsm_tree->nchunks - 1],
+		    WT_LSM_CHUNK_ONDISK))) {
+			WT_WITH_SCHEMA_LOCK(session, ret =
+			    __wt_lsm_tree_switch(session, lsm_tree));
+			WT_ERR(ret);
+		}
+	}
 	F_SET(session, WT_SESSION_NO_CACHE_CHECK);
 
 	/* Merge cursors have already figured out how many chunks they need. */
-	if (F_ISSET(clsm, WT_CLSM_MERGE)) {
+retry:	if (F_ISSET(clsm, WT_CLSM_MERGE)) {
 		nchunks = clsm->nchunks;
 		ngood = 0;
 
@@ -1257,7 +1266,7 @@ __wt_clsm_open(WT_SESSION_IMPL *session,
 		return (EINVAL);
 
 	/* Get the LSM tree. */
-	WT_WITH_SCHEMA_LOCK_OPT(session,
+	WT_WITH_SCHEMA_LOCK(session,
 	    ret = __wt_lsm_tree_get(session, uri, 0, &lsm_tree));
 	WT_RET(ret);
 

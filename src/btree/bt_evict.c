@@ -162,6 +162,7 @@ __wt_cache_evict_server(void *arg)
 		if (!F_ISSET(conn, WT_CONN_EVICTION_RUN))
 			break;
 
+		F_CLR(cache, WT_EVICT_ACTIVE);
 		WT_VERBOSE_ERR(session, evictserver, "sleeping");
 		/* Don't rely on signals: check periodically. */
 		WT_ERR(__wt_cond_wait(session, cache->evict_cond, 100000));
@@ -189,9 +190,8 @@ __wt_cache_evict_server(void *arg)
 	} else
 err:		WT_PANIC_ERR(session, ret, "eviction server error");
 
-	/* Close the eviction session and free its hazard array. */
+	/* Close the eviction session. */
 	(void)session->iface.close(&session->iface, NULL);
-	__wt_free(conn->default_session, session->hazard);
 
 	return (NULL);
 }
@@ -225,6 +225,7 @@ __evict_worker(WT_SESSION_IMPL *session)
 		    (cache->eviction_dirty_target * bytes_max) / 100)
 			break;
 
+		F_SET(cache, WT_EVICT_ACTIVE);
 		WT_VERBOSE_RET(session, evictserver,
 		    "Eviction pass with: Max: %" PRIu64
 		    " In use: %" PRIu64 " Dirty: %" PRIu64,

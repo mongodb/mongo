@@ -97,6 +97,8 @@ DEF_OPT_AS_FLAGVAL(insert_rmw, PERF_INSERT_RMW,
     "execute a read prior to each insert in populate")
 DEF_OPT_AS_UINT32(insert_threads, 0, "number of insert worker threads")
 DEF_OPT_AS_UINT32(key_sz, 20, "key item size")
+DEF_OPT_AS_UINT32(merge_sleep, 0,
+    "post-populate sleep seconds for LSM merging activity")
 DEF_OPT_AS_FLAGVAL(pareto, PERF_RAND_PARETO,
     "use pareto 80/20 distribution for random numbers")
 DEF_OPT_AS_UINT32(populate_ops_per_txn, 0,

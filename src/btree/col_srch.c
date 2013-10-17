@@ -142,7 +142,7 @@ past_end:
 	 *
 	 * Don't bother searching if the caller is appending a new record where
 	 * we'll allocate the record number; we're not going to find a match by
-	 * definition, and we're going to repeat the search when we do the work.
+	 * definition, and we figure out the position when we do the work.
 	 */
 	cbt->ins_head = WT_COL_APPEND(page);
 	if (recno == UINT64_MAX)

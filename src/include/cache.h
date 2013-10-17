@@ -92,6 +92,7 @@ struct __wt_cache {
 	 */
 #define	WT_EVICT_NO_PROGRESS	0x01	/* Check if pages are being evicted */
 #define	WT_EVICT_STUCK		0x02	/* Eviction server is stuck */
+#define	WT_EVICT_ACTIVE		0x04	/* Eviction server is active */
 	uint32_t flags;
 };
 

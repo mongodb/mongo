@@ -31,11 +31,6 @@ for f in `find examples ext src test -name '*.[chisy]' -o -name '*.in' |
 		cat $t
 	fi
 
-	if egrep '%l[diouxXn]|%[diouxXn]l' $f > $t; then
-		echo "$f: incorrect or dangerous printf format: %l[diouxXn]"
-		cat $t
-	fi
-
 	if grep "(unsigned)" $f > $t; then
 		echo "$f: (unsigned) cast is wrong"
 		cat $t
@@ -111,12 +106,11 @@ for f in `find examples ext src test -name '*.[chisy]' -o -name '*.in' |
 	    -e 's/\([	 ,]\)u_int32_t\([	 ,]\)/\1uint32_t\2/g' \
 	    -e 's/\([	 ,]\)u_int64_t\([	 ,]\)/\1uint64_t\2/g' \
 	    -e 's/\([|&=+-]\)  *\([^*]\)/\1 \2/' \
-	    -e 's/(void) /(void)/' \
+	    -e 's/(void) \([a-zA-Z_]\)/(void)\1/' \
 	    -e '/for /!s/;;$/;/' \
 	    -e 's/(EOPNOTSUPP)/(ENOTSUP)/' \
 	    -e 's/(unsigned)/(u_int)/' \
-	    -e 's/^#define /#define	/' \
-	    -e 's/sizeof(WT_PAGE_DISK)/WT_PAGE_DISK_SIZE/g' >$t
+	    -e 's/^#define /#define	/' >$t
 
 	cmp $t $f > /dev/null 2>&1 || (echo "modifying $f" && cp $t $f)
 done

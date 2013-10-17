@@ -72,14 +72,8 @@ __session_close(WT_SESSION *wt_session, const char *config)
 
 	WT_ASSERT(session, session->ncursors == 0);
 
-	/*
-	 * Acquire the schema lock: we may be closing btree handles.
-	 *
-	 * Note that in some special cases, the schema may already be locked
-	 * (e.g., if this session is an LSM tree worker and the tree is being
-	 * dropped).
-	 */
-	WT_WITH_SCHEMA_LOCK_OPT(session, tret = __session_close_cache(session));
+	/* Acquire the schema lock: we may be closing btree handles. */
+	WT_WITH_SCHEMA_LOCK(session, tret = __session_close_cache(session));
 	WT_TRET(tret);
 
 	/* Discard metadata tracking. */
@@ -837,7 +831,7 @@ __wt_open_session(WT_CONNECTION_IMPL *conn, int internal,
 			break;
 	if (i == conn->session_size)
 		WT_ERR_MSG(session, WT_ERROR,
-		    "only configured to support %d thread contexts",
+		    "only configured to support %" PRIu32 " thread contexts",
 		    conn->session_size);
 
 	/*
@@ -870,8 +864,9 @@ __wt_open_session(WT_CONNECTION_IMPL *conn, int internal,
 	 * first time we open this session.
 	 */
 	if (session_ret->hazard == NULL)
-		WT_ERR(__wt_calloc(session, conn->hazard_max,
-		    sizeof(WT_HAZARD), &session_ret->hazard));
+		WT_ERR(__wt_calloc_def(
+		    session, conn->hazard_max, &session_ret->hazard));
+
 	/*
 	 * Set an initial size for the hazard array. It will be grown as
 	 * required up to hazard_max. The hazard_size is reset on close, since

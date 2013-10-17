@@ -235,12 +235,21 @@ __wt_cache_bytes_inuse(WT_CACHE *cache)
 static inline int
 __wt_page_modify_init(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
+	WT_CONNECTION_IMPL *conn;
 	WT_PAGE_MODIFY *modify;
 
 	if (page->modify != NULL)
 		return (0);
 
+	conn = S2C(session);
+
 	WT_RET(__wt_calloc_def(session, 1, &modify));
+
+	/*
+	 * Select a spinlock for the page; let the barrier immediately below
+	 * keep things from racing too badly.
+	 */
+	modify->page_lock = ++conn->page_lock_cnt % WT_PAGE_LOCKS(conn);
 
 	/*
 	 * Multiple threads of control may be searching and deciding to modify
@@ -308,21 +317,6 @@ __wt_page_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
 	}
 
 	__wt_page_only_modify_set(session, page);
-}
-
-/*
- * __wt_page_write_gen_wrapped_check --
- *	Confirm the page's write generation number hasn't wrapped.
- */
-static inline int
-__wt_page_write_gen_wrapped_check(WT_PAGE *page)
-{
-	/*
-	 * Check to see if the page's write generation is about to wrap (wildly
-	 * unlikely as it implies 4B updates between clean page reconciliations,
-	 * but technically possible), and fail the update.
-	 */
-	return (page->modify->write_gen > UINT32_MAX - 100 ? WT_RESTART : 0);
 }
 
 /*
