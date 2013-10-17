@@ -34,6 +34,7 @@
 #define SYSLOG_NAMES
 #include <syslog.h>
 #endif
+#include <boost/filesystem.hpp>
 
 #include "mongo/base/status.h"
 #include "mongo/bson/util/builder.h"
@@ -505,7 +506,8 @@ namespace {
         }
 
         if (params.count("keyFile")) {
-            serverGlobalParams.keyFile = params["keyFile"].as<string>();
+            serverGlobalParams.keyFile = boost::filesystem::absolute(
+                                            params["keyFile"].as<string>()).generic_string();
         }
 
         if ( params.count("pidfilepath")) {
