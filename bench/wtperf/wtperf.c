@@ -398,7 +398,8 @@ err:	if (ret != 0)
 }
 
 /* Retrieve an ID for the next insert operation. */
-int get_next_op(uint64_t *op)
+int
+get_next_op(uint64_t *op)
 {
 	*op = ATOMIC_ADD(g_npop_ops, 1);
 	return (0);
@@ -639,7 +640,8 @@ err:	if (session != NULL)
 	return (arg);
 }
 
-int execute_populate(CONFIG *cfg)
+int
+execute_populate(CONFIG *cfg)
 {
 	WT_CONNECTION *conn;
 	WT_SESSION *session;
@@ -730,7 +732,8 @@ int execute_populate(CONFIG *cfg)
 	return (0);
 }
 
-int execute_workload(CONFIG *cfg)
+int
+execute_workload(CONFIG *cfg)
 {
 	pthread_t *ithreads, *rthreads, *uthreads;
 	uint64_t last_inserts, last_reads, last_updates;
@@ -802,7 +805,8 @@ int execute_workload(CONFIG *cfg)
  * Ensure that icount matches the number of records in the 
  * existing table.
  */
-int find_table_count(CONFIG *cfg)
+int
+find_table_count(CONFIG *cfg)
 {
 	WT_CONNECTION *conn;
 	WT_CURSOR *cursor;
@@ -835,7 +839,8 @@ err:	session->close(session, NULL);
 	return (ret);
 }
 
-int main(int argc, char **argv)
+int
+main(int argc, char *argv[])
 {
 	CONFIG cfg;
 	WT_CONNECTION *conn;
@@ -1104,7 +1109,8 @@ err:	g_util_running = 0;
 /* Assign the src config to the dest.
  * Any storage allocated in dest is freed as a result.
  */
-void config_assign(CONFIG *dest, const CONFIG *src)
+void
+config_assign(CONFIG *dest, const CONFIG *src)
 {
 	size_t i, len;
 	char *newstr, **pstr;
@@ -1583,7 +1589,8 @@ lprintf(CONFIG *cfg, int err, uint32_t level, const char *fmt, ...)
 }
 
 /* Setup the logging output mechanism. */
-int setup_log_file(CONFIG *cfg)
+int
+setup_log_file(CONFIG *cfg)
 {
 	char *fname;
 
@@ -1606,18 +1613,24 @@ int setup_log_file(CONFIG *cfg)
 	return (0);
 }
 
-void wtperf_srand(CONFIG *cfg) {
+void
+wtperf_srand(CONFIG *cfg)
+{
 	srand(cfg->rand_seed);
 }
 
-uint64_t wtperf_value_range(CONFIG *cfg) {
+uint64_t
+wtperf_value_range(CONFIG *cfg)
+{
 	if (F_ISSET(cfg, PERF_RAND_WORKLOAD))
 		return (cfg->icount + cfg->random_range);
 	else 
 		return (cfg->icount + g_nins_ops - (cfg->insert_threads + 1));
 }
 
-uint64_t wtperf_rand(CONFIG *cfg) {
+uint64_t
+wtperf_rand(CONFIG *cfg)
+{
 	double S1, S2, U;
 	uint64_t rval = (uint64_t)rand();
 	/* Use Pareto distribution to give 80/20 hot/cold values. */
@@ -1640,7 +1653,8 @@ uint64_t wtperf_rand(CONFIG *cfg) {
 	return (rval);
 }
 
-void indent_lines(const char *lines, const char *indent)
+void
+indent_lines(const char *lines, const char *indent)
 {
 	const char *bol, *eol;
 	int len;
@@ -1657,7 +1671,8 @@ void indent_lines(const char *lines, const char *indent)
 	}
 }
 
-void print_config(CONFIG *cfg)
+void
+print_config(CONFIG *cfg)
 {
 	printf("Workload configuration:\n");
 	printf("\t home: %s\n", cfg->home);
@@ -1683,7 +1698,8 @@ void print_config(CONFIG *cfg)
 	printf("\t Verbosity: %d\n", cfg->verbose);
 }
 
-void usage(void)
+void
+usage(void)
 {
 	printf("wtperf [-CLMOSThov]\n");
 	printf("\t-S Use a small default configuration\n");
