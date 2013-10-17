@@ -59,17 +59,6 @@
 #include <string.h>
 #include "wt_internal.h"
 
-static inline uint64_t CityHash64(const char *, size_t);
-/*
- * __wt_hash_city64 --
- * Wired Tiger wrapper around third party hash implementation.
- */
-uint64_t
-__wt_hash_city64(const void *string, size_t len)
-{
-	return (CityHash64((const char *)string, len));
-}
-
 /*
  * Google City Hash implementation. Based on source code from:
  * http://code.google.com/p/cityhash/
@@ -322,3 +311,14 @@ static inline uint64_t CityHash64(const char *s, size_t len) {
 	return HashLen16(HashLen16(v.first, w.first) + ShiftMix(y) * k1 + z,
 	    HashLen16(v.second, w.second) + x);
 }
+
+/*
+ * __wt_hash_city64 --
+ *	WiredTiger wrapper around third party hash implementation.
+ */
+uint64_t
+__wt_hash_city64(const void *s, size_t len)
+{
+	return (CityHash64(s, len));
+}
+
