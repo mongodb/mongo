@@ -255,6 +255,7 @@ namespace mongo {
 
     DBConnectionPool::~DBConnectionPool() {
         // connection closing is handled by ~PoolForHost
+         delete _hooks;
     }
 
     void DBConnectionPool::flush() {
