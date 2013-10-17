@@ -54,7 +54,7 @@ namespace mongo {
 
         while (boost::optional<Document> next = pSource->getNext()) {
             // The matcher only takes BSON documents, so we have to make one.
-            if (matcher.matches(next->toBson()))
+            if (matcher->matches(next->toBson()))
                 return next;
         }
 
@@ -62,8 +62,20 @@ namespace mongo {
         return boost::none;
     }
 
+    bool DocumentSourceMatch::coalesce(const intrusive_ptr<DocumentSource>& nextSource) {
+        DocumentSourceMatch* otherMatch = dynamic_cast<DocumentSourceMatch*>(nextSource.get());
+        if (!otherMatch)
+            return false;
+
+        // Replace our matcher with the $and of ours and theirs.
+        matcher.reset(new Matcher(BSON("$and" << BSON_ARRAY(getQuery()
+                                                         << otherMatch->getQuery()))));
+
+        return true;
+    }
+
 namespace {
-    // This block contains the functions that make up the implemantation of
+    // This block contains the functions that make up the implementation of
     // DocumentSourceMatch::redactSafePortion(). They will only be called after
     // the Match expression has been successfully parsed so they can assume that
     // input is well formed.
@@ -286,12 +298,12 @@ namespace {
     }
 
     BSONObj DocumentSourceMatch::getQuery() const {
-        return *(matcher.getQuery());
+        return *(matcher->getQuery());
     }
 
     DocumentSourceMatch::DocumentSourceMatch(const BSONObj &query,
                                              const intrusive_ptr<ExpressionContext> &pExpCtx)
         : DocumentSource(pExpCtx)
-        , matcher(query.getOwned())
+        , matcher(new Matcher(query.getOwned()))
     {}
 }

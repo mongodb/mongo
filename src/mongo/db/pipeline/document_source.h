@@ -591,6 +591,7 @@ namespace mongo {
         // virtuals from DocumentSource
         virtual boost::optional<Document> getNext();
         virtual const char *getSourceName() const;
+        virtual bool coalesce(const intrusive_ptr<DocumentSource>& nextSource);
         virtual Value serialize(bool explain = false) const;
 
         /**
@@ -624,7 +625,7 @@ namespace mongo {
         DocumentSourceMatch(const BSONObj &query,
             const intrusive_ptr<ExpressionContext> &pExpCtx);
 
-        Matcher matcher;
+        scoped_ptr<Matcher> matcher;
     };
 
     class DocumentSourceMergeCursors :

@@ -1648,18 +1648,21 @@ namespace DocumentSourceTests {
     namespace DocumentSourceMatch {
         using mongo::DocumentSourceMatch;
 
+        // Helpers to make a DocumentSourceMatch from a query object or json string
+        intrusive_ptr<DocumentSourceMatch> makeMatch(const BSONObj& query) {
+            intrusive_ptr<DocumentSource> uncasted =
+                DocumentSourceMatch::createFromBson(BSON("$match" << query).firstElement(), NULL);
+            return dynamic_cast<DocumentSourceMatch*>(uncasted.get());
+        }
+        intrusive_ptr<DocumentSourceMatch> makeMatch(const string& queryJson) {
+            return makeMatch(fromjson(queryJson));
+        }
+
         class RedactSafePortion {
         public:
             void test(string input, string safePortion) {
                 try {
-                    intrusive_ptr<DocumentSource> matchWrongType =
-                        DocumentSourceMatch::createFromBson(
-                            BSON("$match" << fromjson(input)).firstElement(),
-                            NULL);
-
-                    DocumentSourceMatch* match =
-                        dynamic_cast<DocumentSourceMatch*>(matchWrongType.get());
-
+                    intrusive_ptr<DocumentSourceMatch> match = makeMatch(input);
                     ASSERT_EQUALS(match->redactSafePortion(), fromjson(safePortion));
                 } catch(...) {
                     unittest::log() << "Problem with redactSafePortion() of: " << input;
@@ -1830,7 +1833,28 @@ namespace DocumentSourceTests {
                 }
             }
         };
-    } // namespace DocumentSourceGeoNear
+
+        class Coalesce {
+        public:
+            void run() {
+                intrusive_ptr<DocumentSourceMatch> match1 = makeMatch(BSON("a" << 1));
+                intrusive_ptr<DocumentSourceMatch> match2 = makeMatch(BSON("b" << 1));
+                intrusive_ptr<DocumentSourceMatch> match3 = makeMatch(BSON("c" << 1));
+
+                // Check initial state
+                ASSERT_EQUALS(match1->getQuery(), BSON("a" << 1));
+                ASSERT_EQUALS(match2->getQuery(), BSON("b" << 1));
+                ASSERT_EQUALS(match3->getQuery(), BSON("c" << 1));
+
+                ASSERT(match1->coalesce(match2));
+                ASSERT_EQUALS(match1->getQuery(), fromjson("{'$and': [{a:1}, {b:1}]}"));
+
+                ASSERT(match1->coalesce(match3));
+                ASSERT_EQUALS(match1->getQuery(), fromjson("{'$and': [{'$and': [{a:1}, {b:1}]},"
+                                                                     "{c:1}]}"));
+            }
+        };
+    } // namespace DocumentSourceMatch
 
     class All : public Suite {
     public:
@@ -1937,6 +1961,7 @@ namespace DocumentSourceTests {
             add<DocumentSourceGeoNear::LimitCoalesce>();
 
             add<DocumentSourceMatch::RedactSafePortion>();
+            add<DocumentSourceMatch::Coalesce>();
         }
     } myall;
 
