@@ -256,8 +256,7 @@ __backup_cleanup_handles(WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb)
 	for (p = cb->list; p->name != NULL; ++p) {
 		if (p->handle != NULL)
 			WT_WITH_DHANDLE(session, p->handle,
-			    WT_TRET(
-			    __wt_session_release_btree(session)));
+			    WT_TRET(__wt_session_release_btree(session)));
 		__wt_free(session, p->name);
 	}
 
