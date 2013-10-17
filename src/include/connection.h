@@ -157,7 +157,9 @@ struct __wt_connection_impl {
 	long		 ckpt_usecs;	/* Checkpoint period */
 
 	WT_CONNECTION_STATS stats;	/* Connection statistics */
+#if SPINLOCK_TYPE == SPINLOCK_PTHREAD_MUTEX_LOGGING
 	WT_CONNECTION_STATS_SPINLOCK spinlock_stats[WT_STATS_SPINLOCK_MAX];
+#endif
 
 	int		 statistics;	/* Global statistics configuration */
 	WT_SESSION_IMPL *stat_session;	/* Statistics log session */
