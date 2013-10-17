@@ -239,6 +239,9 @@ struct __wt_page_modify {
 #define	WT_PAGE_LOCK(session, page)					\
 	__wt_spin_lock(							\
 	    session, S2C(session)->page_lock[(page)->modify->page_lock])
+#define	WT_PAGE_TRYLOCK(session, page)					\
+	__wt_spin_trylock(						\
+	    session, S2C(session)->page_lock[(page)->modify->page_lock])
 #define	WT_PAGE_UNLOCK(session, page)					\
 	__wt_spin_unlock(						\
 	    session, S2C(session)->page_lock[(page)->modify->page_lock])
