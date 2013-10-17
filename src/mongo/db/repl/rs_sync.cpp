@@ -851,23 +851,24 @@ namespace replset {
         }
     }
 
-    void GhostSync::updateSlave(const mongo::OID& rid, const OpTime& last) {
+    bool GhostSync::updateSlave(const mongo::OID& rid, const OpTime& last) {
         rwlock lk( _lock , false );
         MAP::iterator i = _ghostCache.find( rid );
         if ( i == _ghostCache.end() ) {
             OCCASIONALLY warning() << "couldn't update position of the secondary with replSet _id '"
                                    << rid << "' because we have no entry for it" << rsLog;
-            return;
+            return false;
         }
 
         GhostSlave& slave = *(i->second);
         if (!slave.init) {
             OCCASIONALLY log() << "couldn't update position of the secondary with replSet _id '"
                                << rid << "' because it has not been initialized" << rsLog;
-            return;
+            return false;
         }
 
         ((ReplSetConfig::MemberCfg)slave.slave->config()).updateGroups(last);
+        return true;
     }
 
     void GhostSync::percolate(const mongo::OID& rid, const OpTime& last) {

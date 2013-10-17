@@ -442,9 +442,7 @@ namespace mongo {
             uassert(16888, "optimes field should be an array with an object for each secondary",
                     cmdObj["optimes"].type() == Array);
             BSONArray newTimes = BSONArray(cmdObj["optimes"].Obj());
-            updateSlaveLocations(newTimes);
-
-            return true;
+            return updateSlaveLocations(newTimes);
         }
     } cmdReplSetUpdatePosition;
 

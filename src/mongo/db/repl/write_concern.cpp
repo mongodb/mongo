@@ -130,7 +130,7 @@ namespace mongo {
             _slaves.clear();
         }
 
-        void update( const BSONObj& rid , const BSONObj config , const string& ns , OpTime last ) {
+        bool update( const BSONObj& rid , const BSONObj config , const string& ns , OpTime last ) {
             REPLDEBUG( config << " " << rid << " " << ns << " " << last );
 
             Ident ident(rid, config, ns);
@@ -142,7 +142,9 @@ namespace mongo {
                 _dirty = true;
 
                 if (theReplSet && theReplSet->isPrimary()) {
-                    theReplSet->ghost->updateSlave(ident.obj["_id"].OID(), last);
+                    if (!theReplSet->ghost->updateSlave(ident.obj["_id"].OID(), last)) {
+                        return false;
+                    }
                 }
 
                 if ( ! _started ) {
@@ -153,6 +155,7 @@ namespace mongo {
 
                 _threadsWaitingForReplication.notify_all();
             }
+            return true;
         }
 
         bool opReplicatedEnough( OpTime op , BSONElement w ) {
@@ -271,7 +274,7 @@ namespace mongo {
     const char * SlaveTracking::NS = "local.slaves";
 
     // parse optimes from replUpdatePositionCommand and pass them to SyncSourceFeedback
-    void updateSlaveLocations(BSONArray optimes) {
+    bool updateSlaveLocations(BSONArray optimes) {
         BSONForEach(elem, optimes) {
             BSONObj entry = elem.Obj();
             BSONObj id = BSON("_id" << entry["_id"].OID());
@@ -281,7 +284,9 @@ namespace mongo {
             // update locally
             // This updates the slave tracking map, as well as updates
             // the GhostSlave cache, and updates the tag groups
-            slaveTracking.update(id, config, "local.oplog.rs", ot);
+            if (!slaveTracking.update(id, config, "local.oplog.rs", ot)) {
+                return false;
+            }
 
             if (theReplSet && !theReplSet->isPrimary()) {
                 // pass along if we are not primary
@@ -289,6 +294,7 @@ namespace mongo {
                 theReplSet->syncSourceFeedback.percolate(entry["_id"].OID(), ot);
             }
         }
+        return true;
     }
 
     void updateSlaveLocation( CurOp& curop, const char * ns , OpTime lastOp ) {

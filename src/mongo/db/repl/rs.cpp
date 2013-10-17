@@ -644,21 +644,12 @@ namespace {
         // this is a shortcut for simple changes
         if( additive ) {
             log() << "replSet info : additive change to configuration" << rsLog;
-            for( list<ReplSetConfig::MemberCfg*>::const_iterator i = newOnes.begin(); i != newOnes.end(); i++ ) {
-                ReplSetConfig::MemberCfg *m = *i;
-                Member *mi = new Member(m->h, m->_id, m, false);
-
-                /** we will indicate that new members are up() initially so that we don't relinquish our
-                    primary state because we can't (transiently) see a majority.  they should be up as we
-                    check that new members are up before getting here on reconfig anyway.
-                    */
-                mi->get_hbinfo().health = 0.1;
-
-                _members.push(mi);
-                startHealthTaskFor(mi);
-            }
-
             if (updateConfigs) {
+                // we have new configs for existing members, so we need to repopulate _members
+                // with the most recent configs
+                _members.orphanAll();
+                ghost->clearCache();
+
                 // for logging
                 string members = "";
 
@@ -682,6 +673,24 @@ namespace {
                         _members.push(mi);
                     }
                 }
+                // trigger a handshake to update the syncSource of our writeconcern information
+                syncSourceFeedback.forwardSlaveHandshake();
+            }
+
+            // add any new members
+            for (list<ReplSetConfig::MemberCfg*>::const_iterator i = newOnes.begin();
+                    i != newOnes.end();
+                    i++) {
+                ReplSetConfig::MemberCfg *m = *i;
+                Member *mi = new Member(m->h, m->_id, m, false);
+
+                // we will indicate that new members are up() initially so that we don't relinquish
+                // our primary state because we can't (transiently) see a majority. they should be
+                // up as we check that new members are up before getting here on reconfig anyway.
+                mi->get_hbinfo().health = 0.1;
+
+                _members.push(mi);
+                startHealthTaskFor(mi);
             }
 
             // if we aren't creating new members, we may have to update the

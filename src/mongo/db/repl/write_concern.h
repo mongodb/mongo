@@ -41,7 +41,7 @@ namespace mongo {
 
     class CurOp;
 
-    void updateSlaveLocations(BSONArray optimes);
+    bool updateSlaveLocations(BSONArray optimes);
 
     void updateSlaveLocation( CurOp& curop, const char * oplog_ns , OpTime lastOp );
 

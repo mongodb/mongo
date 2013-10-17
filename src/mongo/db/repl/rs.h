@@ -171,7 +171,7 @@ namespace mongo {
          */
         void percolate(const mongo::OID& rid, const OpTime& last);
         void associateSlave(const BSONObj& rid, const int memberId);
-        void updateSlave(const mongo::OID& id, const OpTime& last);
+        bool updateSlave(const mongo::OID& id, const OpTime& last);
         void clearCache();
     };
 
