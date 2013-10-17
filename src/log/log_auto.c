@@ -63,7 +63,7 @@ __wt_logop_col_put_pack(
 	    (uint8_t *)logrec->data + logrec->size, size, fmt,
 	    optype, recsize, fileid, recno, value));
 
-	logrec->size += size;
+	logrec->size += (uint32_t)size;
 	return (0);
 }
 
@@ -121,7 +121,7 @@ __wt_logop_col_remove_pack(
 	    (uint8_t *)logrec->data + logrec->size, size, fmt,
 	    optype, recsize, fileid, recno));
 
-	logrec->size += size;
+	logrec->size += (uint32_t)size;
 	return (0);
 }
 
@@ -176,7 +176,7 @@ __wt_logop_col_truncate_pack(
 	    (uint8_t *)logrec->data + logrec->size, size, fmt,
 	    optype, recsize, fileid, start, stop));
 
-	logrec->size += size;
+	logrec->size += (uint32_t)size;
 	return (0);
 }
 
@@ -233,7 +233,7 @@ __wt_logop_row_put_pack(
 	    (uint8_t *)logrec->data + logrec->size, size, fmt,
 	    optype, recsize, fileid, key, value));
 
-	logrec->size += size;
+	logrec->size += (uint32_t)size;
 	return (0);
 }
 
@@ -292,7 +292,7 @@ __wt_logop_row_remove_pack(
 	    (uint8_t *)logrec->data + logrec->size, size, fmt,
 	    optype, recsize, fileid, key));
 
-	logrec->size += size;
+	logrec->size += (uint32_t)size;
 	return (0);
 }
 
@@ -348,7 +348,7 @@ __wt_logop_row_truncate_pack(
 	    (uint8_t *)logrec->data + logrec->size, size, fmt,
 	    optype, recsize, fileid, start, stop, mode));
 
-	logrec->size += size;
+	logrec->size += (uint32_t)size;
 	return (0);
 }
 

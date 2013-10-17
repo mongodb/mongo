@@ -362,4 +362,3 @@ __wt_txn_printlog(WT_SESSION *wt_session, FILE *out)
 
 	return (0);
 }
-

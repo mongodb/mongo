@@ -156,7 +156,7 @@ __wt_logop_%(name)s_pack(
 	    (uint8_t *)logrec->data + logrec->size, size, fmt,
 	    optype, recsize%(arg_names)s));
 
-	logrec->size += size;
+	logrec->size += (uint32_t)size;
 	return (0);
 }
 ''' % {

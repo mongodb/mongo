@@ -25,7 +25,7 @@ typedef struct {
 
 static int
 __recovery_cursor(WT_SESSION_IMPL *session, WT_RECOVERY *r,
-    WT_LSN *lsnp, u_int id, int dup, WT_CURSOR **cp)
+    WT_LSN *lsnp, u_int id, int duplicate, WT_CURSOR **cp)
 {
 	WT_CURSOR *c;
 	const char *cfg[] = { WT_CONFIG_BASE(session, session_open_cursor),
@@ -52,7 +52,7 @@ __recovery_cursor(WT_SESSION_IMPL *session, WT_RECOVERY *r,
 		r->files[id].c = c;
 	}
 
-	if (dup && c != NULL)
+	if (duplicate && c != NULL)
 		WT_RET(__wt_open_cursor(
 		    session, r->files[id].uri, NULL, cfg, &c));
 
@@ -270,8 +270,8 @@ __recovery_setup_file(WT_RECOVERY *r,
 	/* If there is checkpoint logged for the file, apply everything. */
 	if (cval.type != WT_CONFIG_ITEM_STRUCT)
 		INIT_LSN(&lsn);
-	else if (sscanf(cval.str, "(%" PRIu32 ",%" PRIuMAX ")",
-	    &lsn.file, &lsn.offset) != 2)
+	else if (sscanf(cval.str, "(%" PRIu32 ",%" PRIdMAX ")",
+	    &lsn.file, (intmax_t*)&lsn.offset) != 2)
 		WT_RET_MSG(r->session, EINVAL,
 		    "Failed to parse checkpoint LSN '%.*s'",
 		    (int)cval.len, cval.str);
