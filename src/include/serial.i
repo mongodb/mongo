@@ -126,10 +126,12 @@ __update_serial_func(WT_SESSION_IMPL *session,
 	}
 
 	/*
-	 * Discard obsolete WT_UPDATE structures if it looks useful; serialize
-	 * so only one thread does the obsolete check at a time.
+	 * If there are WT_UPDATE structures to review and we've been evicting
+	 * pages, discard obsolete WT_UPDATE structures.  Serialize so only one
+	 * thread does the obsolete check at a time.
 	 */
-	if (upd->next != NULL) {
+	if (upd->next != NULL &&
+	    F_ISSET(S2C(session)->cache, WT_EVICT_ACTIVE)) {
 		__wt_spin_lock(session, &S2BT(session)->serial_lock);
 		obsolete = __wt_update_obsolete_check(session, upd->next);
 		__wt_spin_unlock(session, &S2BT(session)->serial_lock);

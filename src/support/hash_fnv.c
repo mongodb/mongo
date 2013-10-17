@@ -87,15 +87,12 @@
 
 /*
  * This file contains a 64 bit hash implementation of the FNV 1a 64 bit hash
- * function.
- * The implementation is from a third party.
+ * function.  The implementation is from a third party.
+ *
  * The code has been updated to remove unnecessary content and better comply
- * with Wired Tiger coding standards.
- * The original source code can be found at:
+ * with WiredTiger coding standards.  The original source code can be found at:
  * FNV 1a 64 bit: http://www.isthe.com/chongo/src/fnv/hash_64a.c
  */
-
-static inline uint64_t fnv_64a_buf(void *, size_t , uint64_t);
 
 /*
  * 64 bit FNV-1 non-zero initial basis
@@ -112,16 +109,6 @@ static inline uint64_t fnv_64a_buf(void *, size_t , uint64_t);
 #define	FNV1A_64_INIT ((uint64_t)0xcbf29ce484222325ULL)
 
 /*
- * __wt_hash_fnv64 --
- * Wired Tiger wrapper around third party hash implementation.
- */
-uint64_t
-__wt_hash_fnv64(const void *string, uint32_t len)
-{
-	return (fnv_64a_buf((void *)string, len, FNV1A_64_INIT));
-}
-
-/*
  * fnv_64a_buf - perform a 64 bit Fowler/Noll/Vo FNV-1a hash on a buffer
  *
  * input:
@@ -136,10 +123,10 @@ __wt_hash_fnv64(const void *string, uint32_t len)
  * 	 hval arg on the first call to either fnv_64a_buf() or fnv_64a_str().
  */
 static inline uint64_t
-fnv_64a_buf(void *buf, size_t len, uint64_t hval)
+fnv_64a_buf(const void *buf, size_t len, uint64_t hval)
 {
-	unsigned char *bp = (unsigned char *)buf;	/* start of buffer */
-	unsigned char *be = bp + len;		/* beyond end of buffer */
+	const unsigned char *bp = buf;		/* start of buffer */
+	const unsigned char *be = bp + len;	/* beyond end of buffer */
 
 	/*
 	 * FNV-1a hash each octet of the buffer
@@ -160,4 +147,14 @@ fnv_64a_buf(void *buf, size_t len, uint64_t hval)
 
 	/* return our new hash value */
 	return (hval);
+}
+
+/*
+ * __wt_hash_fnv64 --
+ *	WiredTiger wrapper around third party hash implementation.
+ */
+uint64_t
+__wt_hash_fnv64(const void *string, uint32_t len)
+{
+	return (fnv_64a_buf(string, len, FNV1A_64_INIT));
 }
