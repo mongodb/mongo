@@ -190,9 +190,8 @@ __wt_cache_evict_server(void *arg)
 	} else
 err:		WT_PANIC_ERR(session, ret, "eviction server error");
 
-	/* Close the eviction session and free its hazard array. */
+	/* Close the eviction session. */
 	(void)session->iface.close(&session->iface, NULL);
-	__wt_free(conn->default_session, session->hazard);
 
 	return (NULL);
 }

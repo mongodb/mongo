@@ -141,11 +141,10 @@ __wt_checkpoint_destroy(WT_CONNECTION_IMPL *conn)
 
 	__wt_free(session, conn->ckpt_config);
 
-	/* Close the server thread's session, free its hazard array. */
+	/* Close the server thread's session. */
 	if (conn->ckpt_session != NULL) {
 		wt_session = &conn->ckpt_session->iface;
 		WT_TRET(wt_session->close(wt_session, NULL));
-		__wt_free(session, conn->ckpt_session->hazard);
 	}
 
 	return (ret);

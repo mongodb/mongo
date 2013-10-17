@@ -102,11 +102,8 @@ __lsm_tree_close(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	}
 
 	/*
-	 * Close the worker thread sessions and free their hazard arrays
-	 * (necessary because we set WT_SESSION_INTERNAL to simplify shutdown
-	 * ordering).
-	 *
-	 * Do this in the main thread to avoid deadlocks.
+	 * Close the worker thread sessions.  Do this in the main thread to
+	 * avoid deadlocks.
 	 */
 	for (i = 0; i < lsm_tree->merge_threads; i++) {
 		if ((s = lsm_tree->worker_sessions[i]) == NULL)
@@ -114,23 +111,11 @@ __lsm_tree_close(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 		lsm_tree->worker_sessions[i] = NULL;
 		wt_session = &s->iface;
 		WT_TRET(wt_session->close(wt_session, NULL));
-
-		/*
-		 * This is safe after the close because session handles are
-		 * not freed, but are managed by the connection.
-		 */
-		__wt_free(NULL, s->hazard);
 	}
 
 	if (lsm_tree->ckpt_session != NULL) {
 		wt_session = &lsm_tree->ckpt_session->iface;
 		WT_TRET(wt_session->close(wt_session, NULL));
-
-		/*
-		 * This is safe after the close because session handles are
-		 * not freed, but are managed by the connection.
-		 */
-		__wt_free(NULL, lsm_tree->ckpt_session->hazard);
 	}
 	if (ret != 0) {
 		__wt_err(session, ret, "shutdown error while cleaning up LSM");
