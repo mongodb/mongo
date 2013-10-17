@@ -733,7 +733,7 @@ int execute_populate(CONFIG *cfg)
 int execute_workload(CONFIG *cfg)
 {
 	pthread_t *ithreads, *rthreads, *uthreads;
-	uint64_t elapsed, last_inserts, last_reads, last_updates;
+	uint64_t last_inserts, last_reads, last_updates;
 	uint32_t nthreads;
 	int ret;
 
