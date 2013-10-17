@@ -131,7 +131,7 @@ __update_serial_func(WT_SESSION_IMPL *session,
 	 * thread does the obsolete check at a time.
 	 */
 	if (upd->next != NULL &&
-	    S2C(session)->cache->evict_candidates != 0) {
+	    F_ISSET(S2C(session)->cache, WT_EVICT_ACTIVE)) {
 		__wt_spin_lock(session, &S2BT(session)->serial_lock);
 		obsolete = __wt_update_obsolete_check(session, upd->next);
 		__wt_spin_unlock(session, &S2BT(session)->serial_lock);
