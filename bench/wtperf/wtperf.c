@@ -684,6 +684,7 @@ int execute_populate(CONFIG *cfg)
 		usleep(10000);
 		elapsed += 1;
 		if (elapsed % 100 == 0 &&
+		    cfg->report_interval != 0 &&
 		    (elapsed / 100) % cfg->report_interval == 0) {
 			lprintf(cfg, 0, 1, "%" PRIu64 " ops in %d secs",
 			    g_npop_ops - last_ops, cfg->report_interval);
@@ -732,12 +733,15 @@ int execute_populate(CONFIG *cfg)
 int execute_workload(CONFIG *cfg)
 {
 	pthread_t *ithreads, *rthreads, *uthreads;
-	uint64_t last_inserts, last_reads, last_updates;
+	uint64_t elapsed, last_inserts, last_reads, last_updates;
+	uint32_t nthreads;
 	int ret;
 
 	cfg->phase = WT_PERF_READ;
 	last_inserts = last_reads = last_updates = 0;
-	lprintf(cfg, 0, 1, "Starting read threads");
+	lprintf(cfg, 0, 1,
+	    "Starting workload threads: read %d, insert %d, update %d",
+	    cfg->read_threads, cfg->insert_threads, cfg->update_threads);
 
 	if (cfg->read_threads != 0 && (ret = start_threads(
 	    cfg, cfg->read_threads, &rthreads, read_thread)) != 0)
@@ -751,14 +755,16 @@ int execute_workload(CONFIG *cfg)
 	    cfg, cfg->update_threads, &uthreads, update_thread)) != 0)
 		return (ret);
 
+	nthreads = cfg->read_threads + cfg->insert_threads + cfg->update_threads;
+
 	/* Sanity check reporting interval. */
-	if (cfg->report_interval > cfg->run_time)
+	if (cfg->report_interval > cfg->run_time || cfg->report_interval == 0)
 		cfg->report_interval = cfg->run_time;
 
 	gettimeofday(&cfg->phase_start_time, NULL);
 	for (cfg->elapsed_time = 0;
 	    cfg->elapsed_time < cfg->run_time &&
-	    g_threads_quit < cfg->read_threads;
+	    g_threads_quit < nthreads;
 	    cfg->elapsed_time += cfg->report_interval) {
 		sleep(cfg->report_interval);
 		lprintf(cfg, 0, 1,
