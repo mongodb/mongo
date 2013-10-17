@@ -133,7 +133,7 @@ __update_serial_func(WT_SESSION_IMPL *session,
 	 */
 	if (upd->next != NULL &&
 	    F_ISSET(S2C(session)->cache, WT_EVICT_ACTIVE) &&
-	    WT_PAGE_TRYLOCK(session, page)) {
+	    WT_PAGE_TRYLOCK(session, page) == 0) {
 		obsolete = __wt_update_obsolete_check(session, upd->next);
 		WT_PAGE_UNLOCK(session, page);
 		if (obsolete != NULL)
