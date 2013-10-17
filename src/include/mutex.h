@@ -225,14 +225,15 @@ typedef	volatile int WT_SPINLOCK;
 #elif SPINLOCK_TYPE == SPINLOCK_PTHREAD_MUTEX ||\
 	SPINLOCK_TYPE == SPINLOCK_PTHREAD_MUTEX_LOGGING
 
-typedef	struct {
+#define	WT_CACHE_LINE_ALIGNMENT	64	/* Cache line alignment */
+typedef struct {
 	pthread_mutex_t lock;
 
 	const char *name;		/* Mutex name, for statistics */
 	int8_t id;			/* Current holder, for statistics */
 
 	int8_t initialized;		/* Lock initialized, for cleanup */
-} WT_SPINLOCK;
+} WT_SPINLOCK WT_GCC_ATTRIBUTE((aligned(WT_CACHE_LINE_ALIGNMENT)));
 
 #else
 
