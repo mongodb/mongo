@@ -33,7 +33,8 @@ __wt_pthread_once(void)
 {
 	WT_DECL_RET;
 
-	if ((ret = __wt_spin_init(NULL, &__wt_process.spinlock)) != 0) {
+	if ((ret =
+	    __wt_spin_init(NULL, &__wt_process.spinlock, "global")) != 0) {
 		__wt_pthread_once_failed = ret;
 		return;
 	}

@@ -476,8 +476,7 @@ __verify_dsk_col_var(
 		    session, cell_num, addr, unpack->type, dsk->type));
 		cell_type = unpack->type;
 
-		/* Check if any referenced item is entirely in the file.
-		 */
+		/* Check if any referenced item is entirely in the file. */
 		if (cell_type == WT_CELL_VALUE_OVFL &&
 		    !bm->addr_valid(bm, session, unpack->data, unpack->size))
 			return (__err_eof(session, cell_num, addr));

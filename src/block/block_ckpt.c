@@ -106,7 +106,7 @@ __wt_block_checkpoint_load(WT_SESSION_IMPL *session, WT_BLOCK *block,
 			endp = root_addr;
 			WT_ERR(__wt_block_addr_to_buffer(block, &endp,
 			    ci->root_offset, ci->root_size, ci->root_cksum));
-			*root_addr_size = WT_PTRDIFF32(endp, addr);
+			*root_addr_size = WT_PTRDIFF32(endp, root_addr);
 		}
 
 		/*

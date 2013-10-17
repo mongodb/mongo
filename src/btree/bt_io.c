@@ -113,8 +113,8 @@ __wt_bt_read(WT_SESSION_IMPL *session,
 	WT_DSTAT_INCR(session, cache_read);
 	if (F_ISSET(dsk, WT_PAGE_COMPRESSED))
 		WT_DSTAT_INCR(session, compress_read);
-	WT_CSTAT_INCRV(session, cache_bytes_read, addr_size);
-	WT_DSTAT_INCRV(session, cache_bytes_read, addr_size);
+	WT_CSTAT_INCRV(session, cache_bytes_read, dsk->mem_size);
+	WT_DSTAT_INCRV(session, cache_bytes_read, dsk->mem_size);
 
 err:	__wt_scr_free(&tmp);
 	return (ret);

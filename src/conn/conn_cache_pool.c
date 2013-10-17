@@ -73,7 +73,8 @@ __wt_conn_cache_pool_config(WT_SESSION_IMPL *session, const char **cfg)
 		cp->name = pool_name;
 		pool_name = NULL; /* Belongs to the cache pool now. */
 		TAILQ_INIT(&cp->cache_pool_qh);
-		WT_ERR(__wt_spin_init(session, &cp->cache_pool_lock));
+		WT_ERR(__wt_spin_init(
+		    session, &cp->cache_pool_lock, "cache shared pool"));
 		WT_ERR(__wt_cond_alloc(session,
 		    "cache pool server", 0, &cp->cache_pool_cond));
 
@@ -442,7 +443,7 @@ __cache_pool_adjust(uint64_t highest, uint64_t bump_threshold)
 
 		read_pressure = cache->cp_current_evict / highest;
 		WT_VERBOSE_RET(session, shared_cache,
-		    "\t%"PRIu64", %"PRIu64", %d",
+		    "\t%" PRIu64 ", %" PRIu64 ", %" PRIu32,
 		    entry->cache_size, read_pressure, cache->cp_skip_count);
 
 		/* Allow to stabilize after changes. */

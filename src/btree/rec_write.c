@@ -3919,15 +3919,17 @@ err:			__wt_scr_free(&tkey);
 
 	/*
 	 * If updates were skipped, the tree isn't clean.  The checkpoint call
-	 * cleared the tree's modified value before it called the eviction
-	 * thread, so we must explicitly reset the tree's modified flag.  We
-	 * publish the change for clarity (the requirement is the value be set
-	 * before a subsequent checkpoint reads it, and because the current
-	 * checkpoint is waiting on this reconciliation to complete, there's no
-	 * risk of that happening).
+	 * cleared the tree's modified value before calling the eviction thread,
+	 * so we must explicitly reset the tree's modified flag.  We insert a
+	 * barrier after the change for clarity (the requirement is the value
+	 * be set before a subsequent checkpoint reads it, and because the
+	 * current checkpoint is waiting on this reconciliation to complete,
+	 * there's no risk of that happening).
 	 */
-	if (r->upd_skipped)
-		WT_PUBLISH(btree->modified, 1);
+	if (r->upd_skipped) {
+		btree->modified = 1;
+		WT_FULL_BARRIER();
+	}
 
 	/*
 	 * If no updates were skipped, we have a new maximum transaction

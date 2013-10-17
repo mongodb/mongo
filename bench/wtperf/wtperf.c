@@ -72,9 +72,9 @@ typedef struct {
 #define PERF_RAND_WORKLOAD	0x04
 	uint32_t flags;
 	struct timeval phase_start_time;
-	uint32_t rand_range; /* The range to use if doing random inserts. */
 	uint32_t elapsed_time;
 
+#define PERF_SLEEP_LOAD		0x01
 	/* Fields changeable on command line are listed in wtperf_opt.i */
 #define OPT_DECLARE_STRUCT
 #include "wtperf_opt.i"
@@ -162,7 +162,6 @@ CONFIG default_cfg = {
 	WT_PERF_INIT, /* phase */
 	0,		/* flags */
 	{0, 0},		/* phase_start_time */
-	0,		/* rand_range */
 	0,		/* elapsed_time */
 
 #define OPT_DEFINE_DEFAULT
@@ -649,6 +648,7 @@ int execute_populate(CONFIG *cfg)
 	double secs;
 	int ret;
 	uint64_t elapsed, last_ops;
+	uint32_t sleepsec;
 
 	conn = cfg->conn;
 	cfg->phase = WT_PERF_POP;
@@ -711,6 +711,20 @@ int execute_populate(CONFIG *cfg)
 	    "Load time: %.2f\n" "load ops/sec: %.2f",
 	    secs, cfg->icount / secs);
 
+	/*
+	 * If configured, sleep for some seconds to allow LSM merging
+	 * to complete in the background.  If user gives -1, UINT_MAX,
+	 * then sleep the load time amount.
+	 */
+	if (cfg->merge_sleep) {
+		if (cfg->merge_sleep == PERF_SLEEP_LOAD)
+			sleepsec = e.tv_sec - cfg->phase_start_time.tv_sec;
+		else
+			sleepsec = cfg->merge_sleep;
+		lprintf(cfg, 0, 1,
+		    "Sleep %d seconds for merging", sleepsec);
+		sleep(sleepsec);
+	}
 	return (0);
 }
 
@@ -936,7 +950,7 @@ int main(int argc, char **argv)
 	}
 	snprintf(cfg.uri, req_len, "table:%s", cfg.table_name);
 	
-	if (cfg.rand_range > 0)
+	if (cfg.random_range > 0)
 		F_SET(&cfg, PERF_RAND_WORKLOAD);
 
 	if ((ret = setup_log_file(&cfg)) != 0)
@@ -1591,7 +1605,7 @@ void wtperf_srand(CONFIG *cfg) {
 
 uint64_t wtperf_value_range(CONFIG *cfg) {
 	if (F_ISSET(cfg, PERF_RAND_WORKLOAD))
-		return (cfg->icount + cfg->rand_range);
+		return (cfg->icount + cfg->random_range);
 	else 
 		return (cfg->icount + g_nins_ops - (cfg->insert_threads + 1));
 }

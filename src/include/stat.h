@@ -7,26 +7,15 @@
 
 struct __wt_stats {
 	const char	*desc;				/* text description */
-
-	/*
-	 * The underlying statistics values and operations come in two forms,
-	 * one with atomic updates (used if we care enough about the value to
-	 * avoid races), and standard where races are acceptable.  The atomic
-	 * updates are restricted to 4B values, other values can be up to 8B.
-	 * For simplicity, assume the 8B value can be treated as a two-element
-	 * 4B array, where array element 0 holds the 8B value's low-order bits.
-	 */
 	uint64_t	 v;				/* 64-bit value */
 };
 
 #define	WT_STAT(stats, fld)						\
 	((stats)->fld.v)
-#define	WT_STAT_ATOMIC_V(stats, fld)					\
-	(((uint32_t *)&(stats)->fld.v)[0])
 
 #define	WT_STAT_ATOMIC_DECR(session, stats, fld) do {			\
 	if (S2C(session)->statistics)					\
-		(void)WT_ATOMIC_SUB(WT_STAT_ATOMIC_V(stats, fld), 1);	\
+		(void)WT_ATOMIC_SUB(WT_STAT(stats, fld), 1);		\
 } while (0)
 #define	WT_STAT_DECR(session, stats, fld) do {				\
 	if (S2C(session)->statistics)					\
@@ -34,7 +23,7 @@ struct __wt_stats {
 } while (0)
 #define	WT_STAT_ATOMIC_INCR(session, stats, fld) do {			\
 	if (S2C(session)->statistics)					\
-		(void)WT_ATOMIC_ADD(WT_STAT_ATOMIC_V(stats, fld), 1);	\
+		(void)WT_ATOMIC_ADD(WT_STAT(stats, fld), 1);		\
 } while (0)
 #define	WT_STAT_INCR(session, stats, fld) do {				\
 	if (S2C(session)->statistics)					\
@@ -43,10 +32,6 @@ struct __wt_stats {
 #define	WT_STAT_INCRV(session, stats, fld, value) do {			\
 	if (S2C(session)->statistics)					\
 		(stats)->fld.v += (value);				\
-} while (0)
-#define	WT_STAT_INCRKV(session, stats, key, value) do {			\
-	if (S2C(session)->statistics)					\
-		((WT_STATS *)stats)[(key)].v += (value);		\
 } while (0)
 #define	WT_STAT_SET(session, stats, fld, value) do {			\
 	if (S2C(session)->statistics)					\
@@ -96,6 +81,18 @@ struct __wt_stats {
 /* Flags used by statistics initialization. */
 #define	WT_STATISTICS_CLEAR	0x01
 #define	WT_STATISTICS_FAST	0x02
+
+/*
+ * Mutex statistics.
+ */
+#define	WT_STATS_SPINLOCK_MAX	50
+struct __wt_connection_stats_spinlock {
+	const char *name;		/* Mutex name */
+	const char *file;		/* Caller's file/line */
+	int line;
+					/* Count of blocked calls */
+	u_int blocked[WT_STATS_SPINLOCK_MAX];
+};
 
 /*
  * DO NOT EDIT: automatically built by dist/stat.py.

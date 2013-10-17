@@ -7,7 +7,7 @@
 # currently open'.
 #
 # Optional configuration flags:
-#	no_clear	Value ignored by the statistics clear function
+#	no_clear	Value ignored by the statistics refresh function
 #	no_aggregate	Ignore the value when aggregating statistics
 #	max_aggregate	Take the maximum value when aggregating statistics
 #	no_scale	Don't scale value per second in the logging tool script

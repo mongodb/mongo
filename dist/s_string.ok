@@ -149,6 +149,7 @@ MAXID
 MBUF
 MEM
 MERCHANTABILITY
+MUTEX
 MVCC
 Manos
 Marsaglia's
@@ -180,6 +181,7 @@ PAGE's
 PARAM
 POSIX
 PSIZE
+PTHREAD
 PTR
 Pagesize
 Pandis
@@ -208,6 +210,7 @@ SIMD
 SLIST
 SLVG
 SML
+SPINLOCK
 SQL
 SSD
 SSq
@@ -219,6 +222,7 @@ Sevii
 SiH
 Skiplist
 Solaris
+Spinlock
 Split's
 Stoica
 StoreLoad
@@ -700,6 +704,7 @@ realloc
 recno
 recnos
 recsize
+reinitialization
 req
 rescan
 resize
@@ -746,6 +751,7 @@ snaplen
 snprintf
 sp
 spinlock
+spinlocks
 sprintf
 src
 srch

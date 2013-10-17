@@ -66,6 +66,7 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 	wt_conn = &conn->iface;
 	session = conn->default_session;
 
+	/* We're shutting down.  Make sure everything gets freed. */
 	__wt_txn_refresh_force(session);
 
 	/*

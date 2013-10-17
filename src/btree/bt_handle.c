@@ -188,7 +188,7 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 	conn = S2C(session);
 	cfg = btree->dhandle->cfg;
 
-	WT_RET(__wt_spin_init(session, &btree->serial_lock));
+	WT_RET(__wt_spin_init(session, &btree->serial_lock, "btree serial"));
 
 	/* Dump out format information. */
 	if (WT_VERBOSE_ISSET(session, version)) {
