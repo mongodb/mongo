@@ -24,11 +24,11 @@
 
 namespace mongo {
 
-/*
+/**
  *  Returns true if "container" contains "value".
  */
-template <typename C>
-bool sequenceContains(const C& container, typename C::const_reference value) {
+template <typename C, typename T>
+bool sequenceContains(const C& container, const T& value) {
     using std::find;
     return find(container.begin(), container.end(), value) != container.end();
 }
