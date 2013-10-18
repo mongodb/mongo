@@ -254,7 +254,7 @@ __verify_dsk_row(
 		case WT_CELL_KEY:
 			break;
 		case WT_CELL_KEY_OVFL:
-			WT_ERR(__wt_cell_unpack_ref(
+			WT_ERR(__wt_dsk_cell_data_ref(
 			    session, dsk->type, unpack, current));
 			goto key_compare;
 		default:
@@ -292,7 +292,7 @@ __verify_dsk_row(
 		 * much.
 		 */
 		if (huffman != NULL) {
-			WT_ERR(__wt_cell_unpack_ref(
+			WT_ERR(__wt_dsk_cell_data_ref(
 			    session, dsk->type, unpack, current));
 
 			/*

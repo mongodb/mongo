@@ -18,7 +18,6 @@ __wt_kv_return(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 	WT_CELL *cell;
 	WT_CELL_UNPACK unpack;
 	WT_CURSOR *cursor;
-	WT_DECL_RET;
 	WT_PAGE *page;
 	WT_ROW *rip;
 	WT_UPDATE *upd;
@@ -105,18 +104,7 @@ __wt_kv_return(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
 
 	/* The value is an on-page cell, unpack and expand it as necessary. */
 	__wt_cell_unpack(cell, &unpack);
-	ret =
-	    __wt_cell_unpack_ref(session, page->type, &unpack, &cursor->value);
+	WT_RET(__wt_page_cell_data_ref(session, page, &unpack, &cursor->value));
 
-	/*
-	 * Restart for a variable-length column-store.  We could catch restart
-	 * higher up the call-stack but there's no point to it: unlike row-store
-	 * (where a normal search path finds cached overflow values), we have to
-	 * access the page's reconciliation structures, and that's as easy here
-	 * as higher up the stack.
-	 */
-	if (ret == WT_RESTART && page->type == WT_PAGE_COL_VAR)
-		ret = __wt_ovfl_cache_col_restart(
-		    session, page, &unpack, &cursor->value);
-	return (ret);
+	return (0);
 }

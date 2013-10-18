@@ -142,7 +142,7 @@ __wt_btcur_search(WT_CURSOR_BTREE *cbt)
 	if (btree->type == BTREE_ROW)
 		WT_RET(__cursor_size_chk(session, &cursor->key));
 
-retry:	WT_RET(__cursor_func_init(cbt, 1));
+	WT_RET(__cursor_func_init(cbt, 1));
 
 	WT_ERR(btree->type == BTREE_ROW ?
 	    __wt_row_search(session, cbt) :
@@ -162,9 +162,7 @@ retry:	WT_RET(__cursor_func_init(cbt, 1));
 	} else
 		ret = __wt_kv_return(session, cbt);
 
-err:	if (ret == WT_RESTART)
-		goto retry;
-	if (ret != 0)
+err:	if (ret != 0)
 		WT_TRET(__cursor_error_resolve(cbt));
 	return (ret);
 }
@@ -193,7 +191,7 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exactp)
 	if (btree->type == BTREE_ROW)
 		WT_RET(__cursor_size_chk(session, &cursor->key));
 
-retry:	WT_RET(__cursor_func_init(cbt, 1));
+	WT_RET(__cursor_func_init(cbt, 1));
 
 	WT_ERR(btree->type == BTREE_ROW ?
 	    __wt_row_search(session, cbt) :
@@ -235,9 +233,7 @@ retry:	WT_RET(__cursor_func_init(cbt, 1));
 			exact = -1;
 	}
 
-err:	if (ret == WT_RESTART)
-		goto retry;
-	if (ret != 0)
+err:	if (ret != 0)
 		WT_TRET(__cursor_error_resolve(cbt));
 	if (exactp != NULL && (ret == 0 || ret == WT_NOTFOUND))
 		*exactp = exact;
