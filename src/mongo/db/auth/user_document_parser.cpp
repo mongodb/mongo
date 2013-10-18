@@ -203,8 +203,6 @@ namespace {
         } else {
             return _initializeUserRolesFromV1UserDocument(user, privDoc, dbname);
         }
-        // TODO(spencer): dassert that if you have a V0 or V1 user document that the _version
-        // of the system is 1.
         return Status::OK();
     }
 

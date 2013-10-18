@@ -42,8 +42,6 @@ namespace mongo {
         V1UserDocumentParser() {}
         std::string extractUserNameFromUserDocument(const BSONObj& doc) const;
 
-        Status initializeUserFromUserDocument(const BSONObj& userDoc, User* user) const;
-
         Status initializeUserCredentialsFromUserDocument(User* user,
                                                          const BSONObj& privDoc) const;
 
@@ -57,8 +55,6 @@ namespace mongo {
         V2UserDocumentParser() {}
         Status checkValidUserDocument(const BSONObj& doc) const;
 
-        Status initializeUserFromUserDocument(const BSONObj& doc, User* user);
-
         /**
          * Returns Status::OK() iff the given BSONObj describes a valid element from a roles array.
          */
@@ -70,8 +66,6 @@ namespace mongo {
                                       std::vector<User::RoleData>* result);
 
         std::string extractUserNameFromUserDocument(const BSONObj& doc) const;
-
-        Status initializeUserFromUserDocument(const BSONObj& userDoc, User* user) const;
 
         Status initializeUserCredentialsFromUserDocument(User* user, const BSONObj& privDoc) const;
 
