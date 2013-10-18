@@ -60,7 +60,7 @@ while( 1 ) { // if indexing finishes before we can run checks, try indexing w/ m
         printjson(ex)
         assert.eq( "BasicCursor", ex.cursor, "used btree cursor" );
         assert( ex.nscanned < 1000 , "took too long to find 100: " + tojson( ex ) );
-        // SERVER-8378: put this back after new query framework is live: t.remove( {i:1} );
+        t.remove( {i:40} );
         assert( !db.getLastError() );
         t.update( {i:10}, {i:-10} );
         assert( !db.getLastError() );
@@ -72,7 +72,7 @@ while( 1 ) { // if indexing finishes before we can run checks, try indexing w/ m
         t.save( {i:size+2} );
         assert( !db.getLastError() );
 
-// SERVER-8378, turn this back on:        assert.eq( size + 1, t.count() );
+        assert.eq( size + 1, t.count() );
         assert( !db.getLastError() );
 
     } catch( e ) {
@@ -101,8 +101,8 @@ assert.eq( "BtreeCursor i_1", t.find( {i:100} ).explain().cursor );
 assert.eq( 1, t.count( {i:-10} ) );
 assert.eq( 1, t.count( {i:-2} ) );
 assert.eq( 1, t.count( {i:-50} ) );
-// SERVER-8378, turn this back on: assert.eq( 1, t.count( {i:size+2} ) );
-// SERVER-8378 assert.eq( 0, t.count( {i:40} ) );
+assert.eq( 1, t.count( {i:size+2} ) );
+assert.eq( 0, t.count( {i:40} ) );
 assert( !db.getLastError() );
 print("about to drop index");
 t.dropIndex( {i:1} );
