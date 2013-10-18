@@ -846,6 +846,7 @@ namespace mongo {
             return true;
 
         if ( ns == "admin.system.roles" ) return true;
+        if ( ns == "admin.system.version" ) return true;
 
         if ( ns.find( ".system.js" ) != string::npos ) {
             if ( write )
