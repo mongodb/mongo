@@ -212,7 +212,14 @@ namespace mongo {
         virtual bool slaveOk() const { return false; }
         virtual bool slaveOverrideOk() const { return true; }
         virtual void help(stringstream &help) const {
-            help << "{ pipeline : [ { <data-pipe-op>: {...}}, ... ] }";
+            help << "{ pipeline: [ { $operator: {...}}, ... ]"
+                 << ", explain: <bool>"
+                 << ", allowDiskUsage: <bool>"
+                 << ", cursor: {batchSize: <number>}"
+                 << " }"
+                 << endl
+                 << "See http://dochub.mongodb.org/core/aggregation for more details."
+                 ;
         }
 
         virtual void addRequiredPrivileges(const std::string& dbname,
