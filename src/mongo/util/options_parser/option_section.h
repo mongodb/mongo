@@ -18,6 +18,7 @@
 
 #include <boost/program_options.hpp>
 #include <iostream>
+#include <list>
 
 #include "mongo/base/status.h"
 
@@ -78,6 +79,29 @@ namespace optionenvironment {
          */
         Status addOption(const OptionDescription& option);
         /**
+         * Add an option to this section, but returns a reference to an OptionDescription to allow
+         * for chaining.
+         *
+         * Example:
+         *
+         * options.addOptionChaining("option", "option", moe::String, "Chaining Registration")
+         *                          .hidden().setDefault(moe::Value("default"))
+         *                          .setImplicit(moe::Value("implicit")).composing();
+         *
+         * This creates a hidden option that is composing and has default and implicit values.  See
+         * the OptionDescription class for details on these attributes.
+         *
+         * throws DBException on errors, such as attempting to register an option with the same name
+         * as another option, registering a composing option that does not have the type
+         * StringVector, or registering an option with a default value that does not match its type.
+         * All of these cases represent programming errors and should not happen during normal
+         * operation.
+         */
+        OptionDescription& addOptionChaining(const std::string& dottedName,
+                                             const std::string& singleName,
+                                             const OptionType type,
+                                             const std::string& description);
+        /**
          * Add a positional option to this section.  Also adds a normal hidden option with the same
          * name as the PositionalOptionDescription because that is the mechanism boost program
          * options uses.  Unfortunately this means that positional options can also be accessed by
@@ -111,9 +135,9 @@ namespace optionenvironment {
 
     private:
         std::string _name;
-        std::vector<OptionSection> _subSections;
-        std::vector<OptionDescription> _options;
-        std::vector<PositionalOptionDescription> _positionalOptions;
+        std::list<OptionSection> _subSections;
+        std::list<OptionDescription> _options;
+        std::list<PositionalOptionDescription> _positionalOptions;
     };
 
 } // namespace optionenvironment

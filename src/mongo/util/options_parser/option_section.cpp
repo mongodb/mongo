@@ -18,6 +18,7 @@
 #include <sstream>
 
 #include "mongo/bson/util/builder.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/options_parser/value.h"
 
 namespace mongo {
@@ -99,7 +100,7 @@ namespace optionenvironment {
     Status OptionSection::addOption(const OptionDescription& option) {
         // Verify that neither the single name nor the dotted name for this option conflicts with
         // the names for any options we have already registered
-        std::vector<OptionDescription>::const_iterator oditerator;
+        std::list<OptionDescription>::const_iterator oditerator;
         for (oditerator = _options.begin(); oditerator != _options.end(); oditerator++) {
             if (option._dottedName == oditerator->_dottedName) {
                 StringBuilder sb;
@@ -159,10 +160,23 @@ namespace optionenvironment {
         return Status::OK();
     }
 
+    OptionDescription& OptionSection::addOptionChaining(const std::string& dottedName,
+                                                        const std::string& singleName,
+                                                        const OptionType type,
+                                                        const std::string& description) {
+        OptionDescription option(dottedName, singleName, type, description);
+        Status ret = addOption(option);
+        if (!ret.isOK()) {
+            // TODO: Determine if this is the exception we want to throw
+            throw DBException(ret.reason(), ret.code());
+        }
+        return _options.back();
+    }
+
     Status OptionSection::addPositionalOption(const PositionalOptionDescription& positionalOption) {
         // Verify that the name for this positional option does not conflict with the name for any
         // positional option we have already registered
-        std::vector<PositionalOptionDescription>::const_iterator poditerator;
+        std::list<PositionalOptionDescription>::const_iterator poditerator;
         for (poditerator = _positionalOptions.begin();
              poditerator != _positionalOptions.end(); poditerator++) {
             if (positionalOption._name == poditerator->_name) {
@@ -177,7 +191,7 @@ namespace optionenvironment {
         // positional options that we also want to be visible command line flags
         //
         // TODO: More robust way to do this.  This only works if we register the flag first
-        std::vector<OptionDescription>::const_iterator oditerator;
+        std::list<OptionDescription>::const_iterator oditerator;
         for (oditerator = _options.begin(); oditerator != _options.end(); oditerator++) {
             if (positionalOption._name == oditerator->_dottedName) {
                 _positionalOptions.push_back(positionalOption);
@@ -465,7 +479,7 @@ namespace optionenvironment {
                                           bool visibleOnly,
                                           bool includeDefaults) const {
 
-        std::vector<OptionDescription>::const_iterator oditerator;
+        std::list<OptionDescription>::const_iterator oditerator;
         for (oditerator = _options.begin(); oditerator != _options.end(); oditerator++) {
             if (!visibleOnly || (oditerator->_isVisible)) {
                 std::auto_ptr<po::value_semantic> boostType;
@@ -485,7 +499,7 @@ namespace optionenvironment {
             }
         }
 
-        std::vector<OptionSection>::const_iterator ositerator;
+        std::list<OptionSection>::const_iterator ositerator;
         for (ositerator = _subSections.begin(); ositerator != _subSections.end(); ositerator++) {
             po::options_description subGroup = ositerator->_name.empty()
                                                ? po::options_description()
@@ -500,7 +514,7 @@ namespace optionenvironment {
     Status OptionSection::getBoostPositionalOptions(
                             po::positional_options_description* boostPositionalOptions) const {
 
-        std::vector<PositionalOptionDescription>::const_iterator poditerator;
+        std::list<PositionalOptionDescription>::const_iterator poditerator;
         for (poditerator = _positionalOptions.begin();
              poditerator != _positionalOptions.end(); poditerator++) {
             boostPositionalOptions->add(poditerator->_name.c_str(), poditerator->_count);
@@ -514,12 +528,12 @@ namespace optionenvironment {
 
     Status OptionSection::getAllOptions(std::vector<OptionDescription>* options) const {
 
-        std::vector<OptionDescription>::const_iterator oditerator;
+        std::list<OptionDescription>::const_iterator oditerator;
         for (oditerator = _options.begin(); oditerator != _options.end(); oditerator++) {
             options->push_back(*oditerator);
         }
 
-        std::vector<OptionSection>::const_iterator ositerator;
+        std::list<OptionSection>::const_iterator ositerator;
         for (ositerator = _subSections.begin(); ositerator != _subSections.end(); ositerator++) {
             ositerator->getAllOptions(options);
         }
@@ -529,14 +543,14 @@ namespace optionenvironment {
 
     Status OptionSection::getDefaults(std::map<Key, Value>* values) const {
 
-        std::vector<OptionDescription>::const_iterator oditerator;
+        std::list<OptionDescription>::const_iterator oditerator;
         for (oditerator = _options.begin(); oditerator != _options.end(); oditerator++) {
             if (!oditerator->_default.isEmpty()) {
                 (*values)[oditerator->_dottedName] = oditerator->_default;
             }
         }
 
-        std::vector<OptionSection>::const_iterator ositerator;
+        std::list<OptionSection>::const_iterator ositerator;
         for (ositerator = _subSections.begin(); ositerator != _subSections.end(); ositerator++) {
             ositerator->getDefaults(values);
         }
@@ -602,7 +616,7 @@ namespace optionenvironment {
 
     /* Debugging */
     void OptionSection::dump() const {
-        std::vector<PositionalOptionDescription>::const_iterator poditerator;
+        std::list<PositionalOptionDescription>::const_iterator poditerator;
         for (poditerator = _positionalOptions.begin();
              poditerator != _positionalOptions.end(); poditerator++) {
             std::cout << " _name: " << poditerator->_name
@@ -610,7 +624,7 @@ namespace optionenvironment {
                     << " _count: " << poditerator->_count << std::endl;
         }
 
-        std::vector<OptionDescription>::const_iterator oditerator;
+        std::list<OptionDescription>::const_iterator oditerator;
         for (oditerator = _options.begin(); oditerator != _options.end(); oditerator++) {
             std::cout << " _dottedName: " << oditerator->_dottedName
                     << " _singleName: " << oditerator->_singleName
@@ -619,7 +633,7 @@ namespace optionenvironment {
                     << " _isVisible: " << oditerator->_isVisible << std::endl;
         }
 
-        std::vector<OptionSection>::const_iterator ositerator;
+        std::list<OptionSection>::const_iterator ositerator;
         for (ositerator = _subSections.begin(); ositerator != _subSections.end(); ositerator++) {
             std::cout << "Section Name: " << ositerator->_name << std::endl;
             ositerator->dump();

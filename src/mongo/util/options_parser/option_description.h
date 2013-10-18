@@ -62,6 +62,16 @@ namespace optionenvironment {
             _implicit(implicitValue),
             _isComposing(isComposing) { }
 
+        /*
+         * The following functions are part of the chaining interface for option registration.  See
+         * comments below for what each of these attributes mean, and the OptionSection class for
+         * more details on the chaining interface.
+         */
+        OptionDescription& hidden();
+        OptionDescription& setDefault(Value defaultValue);
+        OptionDescription& setImplicit(Value implicitValue);
+        OptionDescription& composing();
+
         std::string _dottedName; // Used for JSON config and in Environment
         std::string _singleName; // Used for boost command line and INI
         OptionType _type; // Storage type of the argument value, or switch type (bool)

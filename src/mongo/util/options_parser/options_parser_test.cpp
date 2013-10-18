@@ -1626,4 +1626,222 @@ namespace {
         ASSERT_EQUALS(host, "localhost");
     }
 
+    TEST(ChainingInterface, GoodReference) {
+        OptionsParserTester parser;
+        moe::Environment environment;
+
+        moe::OptionSection testOpts;
+        // This test is to make sure our reference stays good even after we add more options.  This
+        // would not be true if we were using a std::vector in our option section which may need to
+        // be moved and resized.
+        moe::OptionDescription& optionRef = testOpts.addOptionChaining("ref", "ref", moe::String,
+                                                                       "Save this Reference");
+        int i;
+        for (i = 0; i < 100; i++) {
+            ::mongo::StringBuilder sb;
+            sb << "filler" << i;
+            testOpts.addOptionChaining(sb.str(), sb.str(), moe::String, "Filler Option");
+        }
+        moe::Value defaultVal("default");
+        moe::Value implicitVal("implicit");
+        optionRef.hidden().setDefault(defaultVal);
+        optionRef.setImplicit(implicitVal).composing();
+
+        std::vector<moe::OptionDescription> options_vector;
+        ASSERT_OK(testOpts.getAllOptions(&options_vector));
+
+        bool foundRef = false;
+        for(std::vector<moe::OptionDescription>::const_iterator iterator = options_vector.begin();
+            iterator != options_vector.end(); iterator++) {
+
+            if (iterator->_dottedName == "ref") {
+                ASSERT_EQUALS(iterator->_singleName, "ref");
+                ASSERT_EQUALS(iterator->_type, moe::String);
+                ASSERT_EQUALS(iterator->_description, "Save this Reference");
+                ASSERT_EQUALS(iterator->_isVisible, false);
+                ASSERT_TRUE(iterator->_default.equal(defaultVal));
+                ASSERT_TRUE(iterator->_implicit.equal(implicitVal));
+                ASSERT_EQUALS(iterator->_isComposing, true);
+                foundRef = true;
+            }
+        }
+        if (!foundRef) {
+            FAIL("Could not find \"ref\" options that we registered");
+        }
+    }
+
+    TEST(ChainingInterface, Basic) {
+        OptionsParserTester parser;
+        moe::Environment environment;
+
+        moe::OptionSection testOpts;
+        testOpts.addOptionChaining("basic",
+                                   "basic",
+                                   moe::String,
+                                   "Default Option");
+
+        std::vector<moe::OptionDescription> options_vector;
+        ASSERT_OK(testOpts.getAllOptions(&options_vector));
+
+        for(std::vector<moe::OptionDescription>::const_iterator iterator = options_vector.begin();
+            iterator != options_vector.end(); iterator++) {
+
+            if (iterator->_dottedName == "basic") {
+                ASSERT_EQUALS(iterator->_singleName, "basic");
+                ASSERT_EQUALS(iterator->_type, moe::String);
+                ASSERT_EQUALS(iterator->_description, "Default Option");
+                ASSERT_EQUALS(iterator->_isVisible, true);
+                ASSERT_TRUE(iterator->_default.isEmpty());
+                ASSERT_TRUE(iterator->_implicit.isEmpty());
+                ASSERT_EQUALS(iterator->_isComposing, false);
+            }
+            else {
+                ::mongo::StringBuilder sb;
+                sb << "Found extra option: " << iterator->_dottedName <<
+                      " which we did not register";
+                FAIL(sb.str());
+            }
+        }
+    }
+
+    TEST(ChainingInterface, Hidden) {
+        OptionsParserTester parser;
+        moe::Environment environment;
+
+        moe::OptionSection testOpts;
+        testOpts.addOptionChaining("hidden",
+                                   "hidden",
+                                   moe::String,
+                                   "Hidden Option").hidden();
+
+        std::vector<moe::OptionDescription> options_vector;
+        ASSERT_OK(testOpts.getAllOptions(&options_vector));
+
+        for(std::vector<moe::OptionDescription>::const_iterator iterator = options_vector.begin();
+            iterator != options_vector.end(); iterator++) {
+
+            if (iterator->_dottedName == "hidden") {
+                ASSERT_EQUALS(iterator->_singleName, "hidden");
+                ASSERT_EQUALS(iterator->_type, moe::String);
+                ASSERT_EQUALS(iterator->_description, "Hidden Option");
+                ASSERT_EQUALS(iterator->_isVisible, false);
+                ASSERT_TRUE(iterator->_default.isEmpty());
+                ASSERT_TRUE(iterator->_implicit.isEmpty());
+                ASSERT_EQUALS(iterator->_isComposing, false);
+            }
+            else {
+                ::mongo::StringBuilder sb;
+                sb << "Found extra option: " << iterator->_dottedName <<
+                      " which we did not register";
+                FAIL(sb.str());
+            }
+        }
+    }
+
+    TEST(ChainingInterface, DefaultValue) {
+        OptionsParserTester parser;
+        moe::Environment environment;
+
+        moe::Value defaultVal("default");
+
+        moe::OptionSection testOpts;
+        testOpts.addOptionChaining("default",
+                                   "default",
+                                   moe::String,
+                                   "Option With Default Value").setDefault(defaultVal);
+
+        std::vector<moe::OptionDescription> options_vector;
+        ASSERT_OK(testOpts.getAllOptions(&options_vector));
+
+        for(std::vector<moe::OptionDescription>::const_iterator iterator = options_vector.begin();
+            iterator != options_vector.end(); iterator++) {
+
+            if (iterator->_dottedName == "default") {
+                ASSERT_EQUALS(iterator->_singleName, "default");
+                ASSERT_EQUALS(iterator->_type, moe::String);
+                ASSERT_EQUALS(iterator->_description, "Option With Default Value");
+                ASSERT_EQUALS(iterator->_isVisible, true);
+                ASSERT_TRUE(iterator->_default.equal(defaultVal));
+                ASSERT_TRUE(iterator->_implicit.isEmpty());
+                ASSERT_EQUALS(iterator->_isComposing, false);
+            }
+            else {
+                ::mongo::StringBuilder sb;
+                sb << "Found extra option: " << iterator->_dottedName <<
+                      " which we did not register";
+                FAIL(sb.str());
+            }
+        }
+    }
+
+    TEST(ChainingInterface, ImplicitValue) {
+        OptionsParserTester parser;
+        moe::Environment environment;
+
+        moe::Value implicitVal("implicit");
+
+        moe::OptionSection testOpts;
+        testOpts.addOptionChaining("implicit",
+                                   "implicit",
+                                   moe::String,
+                                   "Option With Implicit Value").setImplicit(implicitVal);
+
+        std::vector<moe::OptionDescription> options_vector;
+        ASSERT_OK(testOpts.getAllOptions(&options_vector));
+
+        for(std::vector<moe::OptionDescription>::const_iterator iterator = options_vector.begin();
+            iterator != options_vector.end(); iterator++) {
+
+            if (iterator->_dottedName == "implicit") {
+                ASSERT_EQUALS(iterator->_singleName, "implicit");
+                ASSERT_EQUALS(iterator->_type, moe::String);
+                ASSERT_EQUALS(iterator->_description, "Option With Implicit Value");
+                ASSERT_EQUALS(iterator->_isVisible, true);
+                ASSERT_TRUE(iterator->_default.isEmpty());
+                ASSERT_TRUE(iterator->_implicit.equal(implicitVal));
+                ASSERT_EQUALS(iterator->_isComposing, false);
+            }
+            else {
+                ::mongo::StringBuilder sb;
+                sb << "Found extra option: " << iterator->_dottedName <<
+                      " which we did not register";
+                FAIL(sb.str());
+            }
+        }
+    }
+
+    TEST(ChainingInterface, Composing) {
+        OptionsParserTester parser;
+        moe::Environment environment;
+
+        moe::OptionSection testOpts;
+        testOpts.addOptionChaining("setParameter",
+                                   "setParameter",
+                                   moe::StringVector,
+                                   "Multiple Values").composing();
+
+        std::vector<moe::OptionDescription> options_vector;
+        ASSERT_OK(testOpts.getAllOptions(&options_vector));
+
+        for(std::vector<moe::OptionDescription>::const_iterator iterator = options_vector.begin();
+            iterator != options_vector.end(); iterator++) {
+
+            if (iterator->_dottedName == "setParameter") {
+                ASSERT_EQUALS(iterator->_singleName, "setParameter");
+                ASSERT_EQUALS(iterator->_type, moe::StringVector);
+                ASSERT_EQUALS(iterator->_description, "Multiple Values");
+                ASSERT_EQUALS(iterator->_isVisible, true);
+                ASSERT_TRUE(iterator->_default.isEmpty());
+                ASSERT_TRUE(iterator->_implicit.isEmpty());
+                ASSERT_EQUALS(iterator->_isComposing, true);
+            }
+            else {
+                ::mongo::StringBuilder sb;
+                sb << "Found extra option: " << iterator->_dottedName <<
+                      " which we did not register";
+                FAIL(sb.str());
+            }
+        }
+    }
+
 } // unnamed namespace
