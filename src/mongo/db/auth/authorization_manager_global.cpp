@@ -26,16 +26,43 @@
 *    it in the license file.
 */
 
+#include "mongo/platform/basic.h"
+
+#include "mongo/base/disallow_copying.h"
 #include "mongo/base/init.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_global.h"
+#include "mongo/db/server_parameters.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
-
-namespace{
+namespace {
     AuthorizationManager* globalAuthManager = NULL;
-}
+
+    class AuthzVersionParameter : public ServerParameter {
+        MONGO_DISALLOW_COPYING(AuthzVersionParameter);
+    public:
+        AuthzVersionParameter(ServerParameterSet* sps, const std::string& name);
+        virtual void append(BSONObjBuilder& b, const std::string& name);
+        virtual Status set(const BSONElement& newValueElement);
+        virtual Status setFromString(const std::string& str);
+    } authzVersionParameter(ServerParameterSet::getGlobal(), "authzVersion");
+
+    AuthzVersionParameter::AuthzVersionParameter(ServerParameterSet* sps, const std::string& name) :
+        ServerParameter(sps, name, false, false) {}
+
+    void AuthzVersionParameter::append(BSONObjBuilder& b, const std::string& name) {
+        b.append(name, getGlobalAuthorizationManager()->getAuthorizationVersion());
+    }
+
+    Status AuthzVersionParameter::set(const BSONElement& newValueElement) {
+        return Status(ErrorCodes::InternalError, "set called on unsettable server parameter");
+    }
+
+    Status AuthzVersionParameter::setFromString(const std::string& newValueString) {
+        return Status(ErrorCodes::InternalError, "set called on unsettable server parameter");
+    }
+}  // namespace
 
     void setGlobalAuthorizationManager(AuthorizationManager* authManager) {
         fassert(16841, globalAuthManager == NULL);

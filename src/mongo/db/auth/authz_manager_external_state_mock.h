@@ -52,7 +52,10 @@ namespace mongo {
 
         AuthzManagerExternalStateMock() {};
 
+        void setAuthzVersion(int v) { _authzVersion = v; }
+
         virtual Status initialize();
+        virtual Status getStoredAuthorizationVersion(int* outVersion);
         virtual Status getUserDescription(const UserName& userName, BSONObj* result);
         virtual Status getRoleDescription(const RoleName& roleName, BSONObj* result);
 
@@ -145,6 +148,7 @@ namespace mongo {
 
         NamespaceDocumentMap _documents; // Mock database.
         RoleGraph _roleGraph;
+        int _authzVersion;
     };
 
 } // namespace mongo

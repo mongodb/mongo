@@ -61,6 +61,11 @@ namespace mongo {
         virtual Status initialize() = 0;
 
         /**
+         * Retrieves the schema version of the persistent data describing users and roles.
+         */
+        virtual Status getStoredAuthorizationVersion(int* outVersion) = 0;
+
+        /**
          * Writes into "result" a document describing the named user and returns Status::OK().  The
          * description includes the user credentials, if present, the user's role membership and
          * delegation information, a full list of the user's privileges, and a full list of the

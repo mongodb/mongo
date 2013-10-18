@@ -45,7 +45,7 @@ env.StaticLibrary('authmongod',
                   ['authz_manager_external_state_d.cpp',
                    'authz_session_external_state_d.cpp',
                    'auth_index_d.cpp'],
-                  LIBDEPS=['authservercommon',])
+                  LIBDEPS=['authservercommon', '$BUILD_DIR/mongo/server_parameters'])
 
 env.StaticLibrary('authmongos',
                   ['authz_manager_external_state_s.cpp',

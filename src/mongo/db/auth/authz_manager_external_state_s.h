@@ -52,7 +52,7 @@ namespace mongo {
         virtual ~AuthzManagerExternalStateMongos();
 
         virtual Status initialize();
-
+        virtual Status getStoredAuthorizationVersion(int* outVersion);
         virtual Status getUserDescription(const UserName& userName, BSONObj* result);
         virtual Status getRoleDescription(const RoleName& roleName, BSONObj* result);
 

@@ -72,6 +72,41 @@ namespace {
         }
     }
 
+    Status AuthzManagerExternalStateMongos::getStoredAuthorizationVersion(int* outVersion) {
+        try {
+            scoped_ptr<ScopedDbConnection> conn(getConnectionForAuthzCollection(
+                    AuthorizationManager::usersCollectionNamespace));
+            BSONObj cmdResult;
+            conn->get()->runCommand(
+                    "admin",
+                    BSON("getParameter" << 1 << "authzVersion" << 1),
+                    cmdResult);
+            if (!cmdResult["ok"].trueValue()) {
+                std::string errmsg = cmdResult["errmsg"].str();
+                if (errmsg == "no option found to get" ||
+                    StringData(errmsg).startsWith("no such cmd")) {
+
+                    *outVersion = 1;
+                    conn->done();
+                    return Status::OK();
+                }
+                int code = cmdResult["code"].numberInt();
+                if (code == 0) {
+                    code = ErrorCodes::UnknownError;
+                }
+                return Status(ErrorCodes::Error(code), errmsg);
+            }
+            BSONElement versionElement = cmdResult["authzVersion"];
+            if (versionElement.eoo())
+                return Status(ErrorCodes::UnknownError, "getParameter misbehaved.");
+            *outVersion = versionElement.numberInt();
+            conn->done();
+            return Status::OK();
+        } catch (const DBException& e) {
+            return e.toStatus();
+        }
+    }
+
     Status AuthzManagerExternalStateMongos::getUserDescription(const UserName& userName,
                                                                BSONObj* result) {
         try {

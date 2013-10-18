@@ -84,10 +84,23 @@ namespace {
         return Status::OK();
     }
 
+    Status AuthzManagerExternalStateMock::getStoredAuthorizationVersion(int* outVersion) {
+        if (_authzVersion < 0) {
+            return Status(ErrorCodes::UnknownError,
+                          "Mock configured to fail getStoredAuthorizationVersion()");
+        }
+        *outVersion = _authzVersion;
+        return Status::OK();
+    }
+
     Status AuthzManagerExternalStateMock::getUserDescription(
             const UserName& userName, BSONObj* result) {
         BSONObj privDoc;
-        Status status = getPrivilegeDocument(userName, 2, &privDoc);
+        Status status = _findUser(
+                "admin.system.users",
+                BSON(AuthorizationManager::USER_NAME_FIELD_NAME << userName.getUser() <<
+                     AuthorizationManager::USER_SOURCE_FIELD_NAME << userName.getDB()),
+                &privDoc);
         if (!status.isOK())
             return status;
 

@@ -106,6 +106,38 @@ namespace {
     }
 }  // namespace
 
+    Status AuthzManagerExternalStateMongod::getStoredAuthorizationVersion(int* outVersion) {
+        {
+            Client::GodScope gs;
+            Client::ReadContext ctx(AuthorizationManager::versionCollectionNamespace.ns());
+            BSONObj versionDoc;
+            if (Helpers::findOne(AuthorizationManager::versionCollectionNamespace.ns(),
+                                 BSON("_id" << 1),
+                                 versionDoc)) {
+                BSONElement versionElement = versionDoc["currentVersion"];
+                if (versionElement.isNumber()) {
+                    *outVersion = versionElement.numberInt();
+                    return Status::OK();
+                }
+                else if (versionElement.eoo()) {
+                    return Status(ErrorCodes::NoSuchKey, "No currentVersion field in version document.");
+                }
+                else {
+                    return Status(ErrorCodes::TypeMismatch, mongoutils::str::stream() <<
+                                  "Bad (non-numeric) type " << versionElement.type() <<
+                                  "for currentVersion field in version document");
+                }
+            }
+        }
+        if (hasAnyPrivilegeDocuments()) {
+            *outVersion = 1;
+        }
+        else {
+            *outVersion = 2;
+        }
+        return Status::OK();
+    }
+
     Status AuthzManagerExternalStateMongod::getUserDescription(const UserName& userName,
                                                                BSONObj* result) {
 
