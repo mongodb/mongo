@@ -652,8 +652,8 @@ __wt_cell_unpack(WT_CELL *cell, WT_CELL_UNPACK *unpack)
  *	Set a buffer to reference the data from an unpacked cell.
  */
 static inline int
-__wt_cell_unpack_ref(
-    WT_SESSION_IMPL *session, int type, WT_CELL_UNPACK *unpack, WT_ITEM *store)
+__wt_cell_unpack_ref(WT_SESSION_IMPL *session,
+    int page_type, WT_CELL_UNPACK *unpack, WT_ITEM *store)
 {
 	WT_BTREE *btree;
 	void *huffman;
@@ -665,7 +665,7 @@ __wt_cell_unpack_ref(
 	case WT_CELL_KEY:
 		store->data = unpack->data;
 		store->size = unpack->size;
-		if (type == WT_PAGE_ROW_INT)
+		if (page_type == WT_PAGE_ROW_INT)
 			return (0);
 
 		huffman = btree->huffman_key;
@@ -677,7 +677,7 @@ __wt_cell_unpack_ref(
 		break;
 	case WT_CELL_KEY_OVFL:
 		WT_RET(__wt_ovfl_read(session, unpack, store));
-		if (type == WT_PAGE_ROW_INT)
+		if (page_type == WT_PAGE_ROW_INT)
 			return (0);
 
 		huffman = btree->huffman_key;
@@ -699,8 +699,8 @@ __wt_cell_unpack_ref(
  *	Copy the data from an unpacked cell into a buffer.
  */
 static inline int
-__wt_cell_unpack_copy(
-    WT_SESSION_IMPL *session, int type, WT_CELL_UNPACK *unpack, WT_ITEM *store)
+__wt_cell_unpack_copy(WT_SESSION_IMPL *session,
+    int page_type, WT_CELL_UNPACK *unpack, WT_ITEM *store)
 {
 	/*
 	 * We have routines to both copy and reference a cell's information.  In
@@ -711,7 +711,7 @@ __wt_cell_unpack_copy(
 	 * the underlying object.  If that happens, we're done, otherwise make
 	 * a copy.
 	 */
-	WT_RET(__wt_cell_unpack_ref(session, type, unpack, store));
+	WT_RET(__wt_cell_unpack_ref(session, page_type, unpack, store));
 	if (!WT_DATA_IN_ITEM(store))
 		WT_RET(__wt_buf_set(session, store, store->data, store->size));
 	return (0);

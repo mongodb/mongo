@@ -161,8 +161,7 @@ __wt_block_open(WT_SESSION_IMPL *session,
 	    session, filename, 0, 0, WT_FILE_TYPE_DATA, &block->fh));
 
 	/* Initialize the live checkpoint's lock. */
-	WT_ERR(__wt_spin_init(
-	    session, &block->live_lock, "block manager checkpoint"));
+	WT_ERR(__wt_spin_init(session, &block->live_lock, "block manager"));
 
 	/*
 	 * Read the description information from the first block.
