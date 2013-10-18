@@ -154,9 +154,9 @@ namespace {
         status = bsonExtractTypedField(userDoc, "roles", Array, &directRolesElement);
         if (!status.isOK())
             return status;
-        std::vector<User::RoleData> directRoles;
+        std::vector<RoleName> directRoles;
         status = V2UserDocumentParser::parseRoleVector(BSONArray(directRolesElement.Obj()),
-                                                      &directRoles);
+                                                       &directRoles);
         if (!status.isOK())
             return status;
 
@@ -167,13 +167,10 @@ namespace {
             boost::lock_guard<boost::mutex> lk(_roleGraphMutex);
             isRoleGraphInconsistent = _roleGraphState == roleGraphStateConsistent;
             for (size_t i = 0; i < directRoles.size(); ++i) {
-                const User::RoleData& role(directRoles[i]);
-                if (!role.hasRole)
-                    continue;
-                indirectRoles.insert(role.name);
+                const RoleName& role(directRoles[i]);
+                indirectRoles.insert(role);
                 if (isRoleGraphInconsistent) {
-                    for (RoleNameIterator subordinates = _roleGraph.getIndirectSubordinates(
-                                 role.name);
+                    for (RoleNameIterator subordinates = _roleGraph.getIndirectSubordinates(role);
                          subordinates.more();
                          subordinates.next()) {
 
@@ -182,8 +179,8 @@ namespace {
                 }
                 const PrivilegeVector& rolePrivileges(
                         isRoleGraphInconsistent ?
-                        _roleGraph.getAllPrivileges(role.name) :
-                        _roleGraph.getDirectPrivileges(role.name));
+                        _roleGraph.getAllPrivileges(role) :
+                        _roleGraph.getDirectPrivileges(role));
                 for (PrivilegeVector::const_iterator priv = rolePrivileges.begin(),
                          end = rolePrivileges.end();
                      priv != end;

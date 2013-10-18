@@ -104,7 +104,7 @@ namespace audit {
                        const UserName& username,
                        bool password,
                        const BSONObj* customData,
-                       const std::vector<User::RoleData>& roles) MONGO_AUDIT_STUB
+                       const std::vector<RoleName>& roles) MONGO_AUDIT_STUB
 
     void logDropUser(ClientBasic* client,
                      const UserName& username) MONGO_AUDIT_STUB
@@ -116,7 +116,7 @@ namespace audit {
                        const UserName& username,
                        bool password,
                        const BSONObj* customData,
-                       const std::vector<User::RoleData>* roles) MONGO_AUDIT_STUB
+                       const std::vector<RoleName>* roles) MONGO_AUDIT_STUB
 
     void logGrantRolesToUser(ClientBasic* client,
                              const UserName& username,

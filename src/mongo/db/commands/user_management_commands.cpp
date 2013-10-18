@@ -78,20 +78,18 @@ namespace mongo {
         }
     }
 
-    static BSONArray roleDataMapToBSONArray(const User::RoleDataMap& roles) {
-        BSONArrayBuilder arrBuilder;
-        for (User::RoleDataMap::const_iterator it = roles.begin(); it != roles.end(); ++it) {
-            const User::RoleData& role = it->second;
-            arrBuilder.append(
-                    BSON(AuthorizationManager::ROLE_NAME_FIELD_NAME << role.name.getRole() <<
-                         AuthorizationManager::ROLE_SOURCE_FIELD_NAME << role.name.getDB() <<
-                         "hasRole" << role.hasRole <<
-                         "canDelegate" << role.canDelegate));
+    static BSONArray roleSetToBSONArray(const unordered_set<RoleName>& roles) {
+        BSONArrayBuilder rolesArrayBuilder;
+        for (unordered_set<RoleName>::const_iterator it = roles.begin(); it != roles.end(); ++it) {
+            const RoleName& role = *it;
+            rolesArrayBuilder.append(
+                    BSON(AuthorizationManager::ROLE_NAME_FIELD_NAME << role.getRole() <<
+                         AuthorizationManager::ROLE_SOURCE_FIELD_NAME << role.getDB()));
         }
-        return arrBuilder.arr();
+        return rolesArrayBuilder.arr();
     }
 
-    static Status rolesVectorToBSONArray(const std::vector<RoleName>& roles, BSONArray* result) {
+    static BSONArray rolesVectorToBSONArray(const std::vector<RoleName>& roles) {
         BSONArrayBuilder rolesArrayBuilder;
         for (std::vector<RoleName>::const_iterator it = roles.begin(); it != roles.end(); ++it) {
             const RoleName& role = *it;
@@ -99,28 +97,7 @@ namespace mongo {
                     BSON(AuthorizationManager::ROLE_NAME_FIELD_NAME << role.getRole() <<
                          AuthorizationManager::ROLE_SOURCE_FIELD_NAME << role.getDB()));
         }
-        *result = rolesArrayBuilder.arr();
-        return Status::OK();
-    }
-
-    static Status roleDataVectorToBSONArray(const std::vector<User::RoleData>& roles,
-                                            BSONArray* result) {
-        BSONArrayBuilder rolesArrayBuilder;
-        for (std::vector<User::RoleData>::const_iterator it = roles.begin();
-                it != roles.end(); ++it) {
-            const User::RoleData& role = *it;
-            if (!role.hasRole && !role.canDelegate) {
-                return Status(ErrorCodes::BadValue, "At least one of \"hasRole\" and "
-                              "\"canDelegate\" must be true for every role object");
-            }
-            rolesArrayBuilder.append(
-                    BSON(AuthorizationManager::ROLE_NAME_FIELD_NAME << role.name.getRole() <<
-                         AuthorizationManager::ROLE_SOURCE_FIELD_NAME << role.name.getDB() <<
-                         "hasRole" << role.hasRole <<
-                         "canDelegate" << role.canDelegate));
-        }
-        *result = rolesArrayBuilder.arr();
-        return Status::OK();
+        return rolesArrayBuilder.arr();
     }
 
     static Status privilegeVectorToBSONArray(const PrivilegeVector& privileges, BSONArray* result) {
@@ -147,13 +124,16 @@ namespace mongo {
 
     static Status getCurrentUserRoles(AuthorizationManager* authzManager,
                                       const UserName& userName,
-                                      User::RoleDataMap* roles) {
+                                      unordered_set<RoleName>* roles) {
         User* user;
         Status status = authzManager->acquireUser(userName, &user);
         if (!status.isOK()) {
             return status;
         }
-        *roles = user->getRoles();
+        RoleNameIterator rolesIt = user->getRoles();
+        while (rolesIt.more()) {
+            roles->insert(rolesIt.next());
+        }
         authzManager->releaseUser(user);
         return Status::OK();
     }
@@ -250,13 +230,7 @@ namespace mongo {
                                       args.userName.getDB());
             }
 
-            // TODO(spencer): building this vector won't be necessary once the roles coming
-            // from the parsed args are RoleNames, not User::RoleInfo structs.
-            std::vector<RoleName> roles;
-            for (size_t i = 0; i < args.roles.size(); ++i) {
-                roles.push_back(args.roles[i].name);
-            }
-            return checkAuthorizedToGrantRoles(authzSession, roles);
+            return checkAuthorizedToGrantRoles(authzSession, args.roles);
         }
 
         bool run(const string& dbname,
@@ -310,13 +284,7 @@ namespace mongo {
             if (args.hasCustomData) {
                 userObjBuilder.append("customData", args.customData);
             }
-            BSONArray rolesArray;
-            status = roleDataVectorToBSONArray(args.roles, &rolesArray);
-            if (!status.isOK()) {
-                addStatus(status, result);
-                return false;
-            }
-            userObjBuilder.append("roles", rolesArray);
+            userObjBuilder.append("roles", rolesVectorToBSONArray(args.roles));
 
             BSONObj userObj = userObjBuilder.obj();
             V2UserDocumentParser parser;
@@ -337,7 +305,7 @@ namespace mongo {
             // Role existence has to be checked after acquiring the update lock
             for (size_t i = 0; i < args.roles.size(); ++i) {
                 BSONObj ignored;
-                Status status = authzManager->getRoleDescription(args.roles[i].name, &ignored);
+                Status status = authzManager->getRoleDescription(args.roles[i], &ignored);
                 if (!status.isOK()) {
                     addStatus(status, result);
                     return false;
@@ -431,13 +399,7 @@ namespace mongo {
                                   "authorized to revoke any role in the system");
                 }
 
-                // TODO(spencer): building this vector won't be necessary once the roles coming
-                // from the parsed args are RoleNames, not User::RoleInfo structs.
-                std::vector<RoleName> roles;
-                for (size_t i = 0; i < args.roles.size(); ++i) {
-                    roles.push_back(args.roles[i].name);
-                }
-                return checkAuthorizedToGrantRoles(authzSession, roles);
+                return checkAuthorizedToGrantRoles(authzSession, args.roles);
             }
             return Status::OK();
         }
@@ -473,13 +435,7 @@ namespace mongo {
                 updateSetBuilder.append("customData", args.customData);
             }
             if (args.hasRoles) {
-                BSONArray rolesArray;
-                status = roleDataVectorToBSONArray(args.roles, &rolesArray);
-                if (!status.isOK()) {
-                    addStatus(status, result);
-                    return false;
-                }
-                updateSetBuilder.append("roles", rolesArray);
+                updateSetBuilder.append("roles", rolesVectorToBSONArray(args.roles));
             }
 
             AuthorizationManager* authzManager = getGlobalAuthorizationManager();
@@ -494,7 +450,7 @@ namespace mongo {
             if (args.hasRoles) {
                 for (size_t i = 0; i < args.roles.size(); ++i) {
                     BSONObj ignored;
-                    status = authzManager->getRoleDescription(args.roles[i].name, &ignored);
+                    status = authzManager->getRoleDescription(args.roles[i], &ignored);
                     if (!status.isOK()) {
                         addStatus(status, result);
                         return false;
@@ -775,7 +731,7 @@ namespace mongo {
             }
 
             UserName userName(userNameString, dbname);
-            User::RoleDataMap userRoles;
+            unordered_set<RoleName> userRoles;
             status = getCurrentUserRoles(authzManager, userName, &userRoles);
             if (!status.isOK()) {
                 addStatus(status, result);
@@ -791,14 +747,10 @@ namespace mongo {
                     return false;
                 }
 
-                User::RoleData& role = userRoles[roleName];
-                if (role.name.empty()) {
-                    role.name = roleName;
-                }
-                role.hasRole = true;
+                userRoles.insert(roleName);
             }
 
-            BSONArray newRolesBSONArray = roleDataMapToBSONArray(userRoles);
+            BSONArray newRolesBSONArray = roleSetToBSONArray(userRoles);
             status = authzManager->updatePrivilegeDocument(
                     userName, BSON("$set" << BSON("roles" << newRolesBSONArray)), writeConcern);
             // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
@@ -885,7 +837,7 @@ namespace mongo {
             }
 
             UserName userName(userNameString, dbname);
-            User::RoleDataMap userRoles;
+            unordered_set<RoleName> userRoles;
             status = getCurrentUserRoles(authzManager, userName, &userRoles);
             if (!status.isOK()) {
                 addStatus(status, result);
@@ -901,22 +853,10 @@ namespace mongo {
                     return false;
                 }
 
-                User::RoleDataMap::iterator roleDataIt = userRoles.find(roleName);
-                if (roleDataIt == userRoles.end()) {
-                    continue; // User already doesn't have the role, nothing to do
-                }
-                User::RoleData& role = roleDataIt->second;
-                if (role.canDelegate) {
-                    // If the user can still delegate the role, need to leave it in the roles array
-                    role.hasRole = false;
-                } else {
-                    // If the user can't delegate the role, and now doesn't have it either, remove
-                    // the role from that user's roles array entirely
-                    userRoles.erase(roleDataIt);
-                }
+                userRoles.erase(roleName);
             }
 
-            BSONArray newRolesBSONArray = roleDataMapToBSONArray(userRoles);
+            BSONArray newRolesBSONArray = roleSetToBSONArray(userRoles);
             status = authzManager->updatePrivilegeDocument(
                     userName, BSON("$set" << BSON("roles" << newRolesBSONArray)), writeConcern);
             // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
@@ -1167,13 +1107,7 @@ namespace mongo {
             }
             roleObjBuilder.append("privileges", privileges);
 
-            BSONArray roles;
-            status = rolesVectorToBSONArray(args.roles, &roles);
-            if (!status.isOK()) {
-                addStatus(status, result);
-                return false;
-            }
-            roleObjBuilder.append("roles", roles);
+            roleObjBuilder.append("roles", rolesVectorToBSONArray(args.roles));
 
             AuthorizationManager* authzManager = getGlobalAuthorizationManager();
             AuthzDocumentsUpdateGuard updateGuard(authzManager);
@@ -1295,14 +1229,7 @@ namespace mongo {
             }
 
             if (args.hasRoles) {
-                BSONArray roles;
-                status = rolesVectorToBSONArray(args.roles, &roles);
-                if (!status.isOK()) {
-                    addStatus(status, result);
-                    return false;
-                }
-
-                updateSetBuilder.append("roles", roles);
+                updateSetBuilder.append("roles", rolesVectorToBSONArray(args.roles));
             }
 
             AuthorizationManager* authzManager = getGlobalAuthorizationManager();
@@ -1759,19 +1686,14 @@ namespace mongo {
                 roles.push_back(*it);
             }
 
-            BSONArray newRolesBSONArray;
-            status = rolesVectorToBSONArray(roles, &newRolesBSONArray);
-            if (!status.isOK()) {
-                addStatus(status, result);
-                return false;
-            }
-
             audit::logGrantRolesToRole(ClientBasic::getCurrent(),
                                        roleName,
                                        roles);
 
             status = authzManager->updateRoleDocument(
-                    roleName, BSON("$set" << BSON("roles" << newRolesBSONArray)), writeConcern);
+                    roleName,
+                    BSON("$set" << BSON("roles" << rolesVectorToBSONArray(roles))),
+                    writeConcern);
             if (!status.isOK()) {
                 addStatus(status, result);
                 return false;
@@ -1885,19 +1807,14 @@ namespace mongo {
                 }
             }
 
-            BSONArray newRolesBSONArray;
-            status = rolesVectorToBSONArray(roles, &newRolesBSONArray);
-            if (!status.isOK()) {
-                addStatus(status, result);
-                return false;
-            }
-
             audit::logRevokeRolesFromRole(ClientBasic::getCurrent(),
                                           roleName,
                                           roles);
 
             status = authzManager->updateRoleDocument(
-                    roleName, BSON("$set" << BSON("roles" << newRolesBSONArray)), writeConcern);
+                    roleName,
+                    BSON("$set" << BSON("roles" << rolesVectorToBSONArray(roles))),
+                    writeConcern);
             if (!status.isOK()) {
                 addStatus(status, result);
                 return false;

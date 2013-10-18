@@ -163,7 +163,7 @@ namespace audit {
                        const UserName& username,
                        bool password,
                        const BSONObj* customData,
-                       const std::vector<User::RoleData>& roles);
+                       const std::vector<RoleName>& roles);
 
     /**
      * Logs the result of a dropUser command.
@@ -184,7 +184,7 @@ namespace audit {
                        const UserName& username,
                        bool password,
                        const BSONObj* customData,
-                       const std::vector<User::RoleData>* roles);
+                       const std::vector<RoleName>* roles);
 
     /**
      * Logs the result of a grantRolesToUser command.

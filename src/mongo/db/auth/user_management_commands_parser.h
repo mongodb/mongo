@@ -48,7 +48,7 @@ namespace auth {
         bool hasCustomData;
         BSONObj customData;
         bool hasRoles;
-        std::vector<User::RoleData> roles;
+        std::vector<RoleName> roles;
         BSONObj writeConcern;
         CreateOrUpdateUserArgs() :
             hasHashedPassword(false), hasCustomData(false),  hasRoles(false) {}

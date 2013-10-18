@@ -60,10 +60,9 @@ namespace mongo {
          */
         static Status checkValidRoleObject(const BSONObj& roleObject);
 
-        static Status parseRoleData(const BSONObj& roleObject, User::RoleData* result);
+        static Status parseRoleName(const BSONObj& roleObject, RoleName* result);
 
-        static Status parseRoleVector(const BSONArray& rolesArray,
-                                      std::vector<User::RoleData>* result);
+        static Status parseRoleVector(const BSONArray& rolesArray, std::vector<RoleName>* result);
 
         std::string extractUserNameFromUserDocument(const BSONObj& doc) const;
 

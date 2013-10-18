@@ -157,63 +157,6 @@ namespace auth {
                                         parsedRoleNames);
     }
 
-    Status _extractRoleDataFromBSONArray(const BSONElement& rolesElement,
-                                         const std::string& dbname,
-                                         std::vector<User::RoleData> *parsedRoleData) {
-        for (BSONObjIterator it(rolesElement.Obj()); it.more(); it.next()) {
-            BSONElement element = *it;
-            if (element.type() == String) {
-                RoleName roleName(element.String(), dbname);
-                parsedRoleData->push_back(User::RoleData(roleName, true, false));
-           } else if (element.type() == Object) {
-               // Check that the role object is valid
-               V2UserDocumentParser parser;
-               BSONObj roleObj = element.Obj();
-               Status status = parser.checkValidRoleObject(roleObj);
-               if (!status.isOK()) {
-                   return status;
-               }
-
-               std::string roleName;
-               std::string roleSource;
-               bool hasRole;
-               bool canDelegate;
-               status = bsonExtractStringField(roleObj,
-                                               AuthorizationManager::ROLE_NAME_FIELD_NAME,
-                                               &roleName);
-               if (!status.isOK()) {
-                   return status;
-               }
-               status = bsonExtractStringField(roleObj,
-                                               AuthorizationManager::ROLE_SOURCE_FIELD_NAME,
-                                               &roleSource);
-               if (!status.isOK()) {
-                   return status;
-               }
-               status = bsonExtractBooleanFieldWithDefault(roleObj, "hasRole", true, &hasRole);
-               if (!status.isOK()) {
-                   return status;
-               }
-               status = bsonExtractBooleanFieldWithDefault(roleObj,
-                                                           "canDelegate",
-                                                           false,
-                                                           &canDelegate);
-               if (!status.isOK()) {
-                   return status;
-               }
-
-               parsedRoleData->push_back(User::RoleData(RoleName(roleName, roleSource),
-                                                        hasRole,
-                                                        canDelegate));
-           } else {
-               return Status(ErrorCodes::UnsupportedFormat,
-                             "Values in 'roles' array must be sub-documents or strings");
-           }
-       }
-
-       return Status::OK();
-    }
-
     Status parseRolePossessionManipulationCommands(const BSONObj& cmdObj,
                                                    const StringData& cmdName,
                                                    const StringData& rolesFieldName,
@@ -327,7 +270,9 @@ namespace auth {
             if (!status.isOK()) {
                 return status;
             }
-            status = _extractRoleDataFromBSONArray(rolesElement, dbname, &parsedArgs->roles);
+            status = parseRoleNamesFromBSONArray(BSONArray(rolesElement.Obj()),
+                                                 dbname,
+                                                 &parsedArgs->roles);
             if (!status.isOK()) {
                 return status;
             }

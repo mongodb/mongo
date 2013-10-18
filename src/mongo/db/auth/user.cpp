@@ -36,8 +36,8 @@ namespace mongo {
         return _name;
     }
 
-    const User::RoleDataMap& User::getRoles() const {
-        return _roles;
+    RoleNameIterator User::getRoles() const {
+        return makeRoleNameIteratorForContainer(_roles);
     }
 
     bool User::hasRole(const RoleName& roleName) const {
@@ -77,11 +77,10 @@ namespace mongo {
         _credentials = credentials;
     }
 
-    void User::setRoleData(const std::vector<User::RoleData>& roles) {
+    void User::setRoles(RoleNameIterator roles) {
         _roles.clear();
-        for (size_t i = 0; i < roles.size(); ++i) {
-            const User::RoleData& role = roles[i];
-            _roles[role.name] = role;
+        while (roles.more()) {
+            _roles.insert(roles.next());
         }
     }
 
@@ -94,30 +93,12 @@ namespace mongo {
     }
 
     void User::addRole(const RoleName& roleName) {
-        RoleData& role = _roles[roleName];
-        if (role.name.empty()) {
-            role.name = roleName;
-        }
-        role.hasRole = true;
+        _roles.insert(roleName);
     }
 
     void User::addRoles(const std::vector<RoleName>& roles) {
         for (std::vector<RoleName>::const_iterator it = roles.begin(); it != roles.end(); ++it) {
             addRole(*it);
-        }
-    }
-
-    void User::addDelegatableRole(const RoleName& roleName) {
-        RoleData& role = _roles[roleName];
-        if (role.name.empty()) {
-            role.name = roleName;
-        }
-        role.canDelegate = true;
-    }
-
-    void User::addDelegatableRoles(const std::vector<RoleName>& roles) {
-        for (std::vector<RoleName>::const_iterator it = roles.begin(); it != roles.end(); ++it) {
-            addDelegatableRole(*it);
         }
     }
 

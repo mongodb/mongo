@@ -59,26 +59,30 @@ namespace {
 
         ASSERT_OK(v1parser.initializeUserRolesFromUserDocument(
                           user.get(), readOnly, "test"));
-        ASSERT_EQUALS(1U, user->getRoles().size());
-        ASSERT_EQUALS(1U, user->getRoles().count(RoleName("read", "test")));
+        RoleNameIterator roles = user->getRoles();
+        ASSERT_EQUALS(RoleName("read", "test"), roles.next());
+        ASSERT_FALSE(roles.more());
 
         resetUsers();
         ASSERT_OK(v1parser.initializeUserRolesFromUserDocument(
                           user.get(), readWrite, "test"));
-        ASSERT_EQUALS(1U, user->getRoles().size());
-        ASSERT_EQUALS(1U, user->getRoles().count(RoleName("dbOwner", "test")));
+        roles = user->getRoles();
+        ASSERT_EQUALS(RoleName("dbOwner", "test"), roles.next());
+        ASSERT_FALSE(roles.more());
 
         resetUsers();
         ASSERT_OK(v1parser.initializeUserRolesFromUserDocument(
                           adminUser.get(), readOnlyAdmin, "admin"));
-        ASSERT_EQUALS(1U, adminUser->getRoles().size());
-        ASSERT_EQUALS(1U, adminUser->getRoles().count(RoleName("readAnyDatabase", "admin")));
+        roles = adminUser->getRoles();
+        ASSERT_EQUALS(RoleName("readAnyDatabase", "admin"), roles.next());
+        ASSERT_FALSE(roles.more());
 
         resetUsers();
         ASSERT_OK(v1parser.initializeUserRolesFromUserDocument(
                           adminUser.get(), readWriteAdmin, "admin"));
-        ASSERT_EQUALS(1U, adminUser->getRoles().size());
-        ASSERT_EQUALS(1U, adminUser->getRoles().count(RoleName("root", "admin")));
+        roles = adminUser->getRoles();
+        ASSERT_EQUALS(RoleName("root", "admin"), roles.next());
+        ASSERT_FALSE(roles.more());
     }
 
     TEST_F(V1UserDocumentParsing, VerifyRolesFieldMustBeAnArray) {
@@ -86,7 +90,7 @@ namespace {
                 user.get(),
                 BSON("user" << "spencer" << "pwd" << "" << "roles" << "read"),
                 "test"));
-        ASSERT_EQUALS(0U, user->getRoles().size());
+        ASSERT_FALSE(user->getRoles().more());
     }
 
     TEST_F(V1UserDocumentParsing, VerifySemanticallyInvalidRolesStillParse) {
@@ -96,9 +100,15 @@ namespace {
                      "pwd" << "" <<
                      "roles" << BSON_ARRAY("read" << "frim")),
                 "test"));
-        ASSERT_EQUALS(2U, user->getRoles().size());
-        ASSERT_EQUALS(1U, user->getRoles().count(RoleName("read", "test")));
-        ASSERT_EQUALS(1U, user->getRoles().count(RoleName("frim", "test")));
+        RoleNameIterator roles = user->getRoles();
+        RoleName role = roles.next();
+        if (role == RoleName("read", "test")) {
+            ASSERT_EQUALS(RoleName("frim", "test"), roles.next());
+        } else {
+            ASSERT_EQUALS(RoleName("frim", "test"), role);
+            ASSERT_EQUALS(RoleName("read", "test"), roles.next());
+        }
+        ASSERT_FALSE(roles.more());
     }
 
     TEST_F(V1UserDocumentParsing, VerifyOtherDBRolesMustBeAnObjectOfArraysOfStrings) {
@@ -128,7 +138,7 @@ namespace {
                      "roles" << BSONArrayBuilder().arr() <<
                      "otherDBRoles" << BSON("test2" << BSON_ARRAY("read"))),
                 "test"));
-        ASSERT_EQUALS(0U, user->getRoles().size());
+        ASSERT_FALSE(user->getRoles().more());
     }
 
     TEST_F(V1UserDocumentParsing, GrantUserAdminOnTestViaAdmin) {
@@ -140,8 +150,9 @@ namespace {
                      "roles" << BSONArrayBuilder().arr() <<
                      "otherDBRoles" << BSON("test" << BSON_ARRAY("userAdmin"))),
                 "admin"));
-        ASSERT_EQUALS(1U, adminUser->getRoles().size());
-        ASSERT_EQUALS(1U, adminUser->getRoles().count(RoleName("userAdmin", "test")));
+        RoleNameIterator roles = adminUser->getRoles();
+        ASSERT_EQUALS(RoleName("userAdmin", "test"), roles.next());
+        ASSERT_FALSE(roles.more());
     }
 
     TEST_F(V1UserDocumentParsing, MixedV0V1UserDocumentsAreInvalid) {
@@ -153,7 +164,7 @@ namespace {
                      "readOnly" << false <<
                      "roles" << BSON_ARRAY("read")),
                 "test"));
-        ASSERT_EQUALS(0U, user->getRoles().size());
+        ASSERT_FALSE(user->getRoles().more());
     }
 
     class V2UserDocumentParsing : public ::mongo::unittest::Test {
@@ -348,10 +359,9 @@ namespace {
                      "roles" << BSON_ARRAY(BSON("role" << "roleA" <<
                                                 "db" << "dbA"))),
                 user.get()));
-        const User::RoleDataMap& roles2 = user->getRoles();
-        ASSERT_EQUALS(1U, roles2.size());
-        User::RoleData role = roles2.begin()->second;
-        ASSERT_EQUALS(RoleName("roleA", "dbA"), role.name);
+        RoleNameIterator roles = user->getRoles();
+        ASSERT_EQUALS(RoleName("roleA", "dbA"), roles.next());
+        ASSERT_FALSE(roles.more());
 
         // Multiple roles OK
         ASSERT_OK(v2parser.initializeUserRolesFromUserDocument(
@@ -361,12 +371,15 @@ namespace {
                                            BSON("role" << "roleB" <<
                                                 "db" << "dbB"))),
                 user.get()));
-        const User::RoleDataMap& roles3 = user->getRoles();
-        ASSERT_EQUALS(2U, roles3.size());
-        role = roles3.find(RoleName("roleA", "dbA"))->second;
-        ASSERT_EQUALS(RoleName("roleA", "dbA"), role.name);
-        role = roles3.find(RoleName("roleB", "dbB"))->second;
-        ASSERT_EQUALS(RoleName("roleB", "dbB"), role.name);
+        roles = user->getRoles();
+        RoleName role = roles.next();
+        if (role == RoleName("roleA", "dbA")) {
+            ASSERT_EQUALS(RoleName("roleB", "dbB"), roles.next());
+        } else {
+            ASSERT_EQUALS(RoleName("roleB", "dbB"), role);
+            ASSERT_EQUALS(RoleName("roleA", "dbA"), roles.next());
+        }
+        ASSERT_FALSE(roles.more());
     }
 
 }  // namespace

@@ -25,6 +25,7 @@
 #include "mongo/db/auth/user_name.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/unordered_map.h"
+#include "mongo/platform/unordered_set.h"
 
 namespace mongo {
 
@@ -50,17 +51,7 @@ namespace mongo {
             bool isExternal;
         };
 
-        struct RoleData {
-            RoleName name;
-            bool hasRole;
-            bool canDelegate;
-            RoleData() : hasRole(false), canDelegate(false) {}
-            RoleData(const RoleName& _name, bool _hasRole, bool _canDelegate) :
-                name(_name), hasRole(_hasRole), canDelegate(_canDelegate) {}
-        };
-
         typedef unordered_map<ResourcePattern, Privilege> ResourcePrivilegeMap;
-        typedef unordered_map<RoleName, RoleData> RoleDataMap;
 
         explicit User(const UserName& name);
         ~User();
@@ -71,9 +62,9 @@ namespace mongo {
         const UserName& getName() const;
 
         /**
-         * Returns a reference to the information about the users' role membership.
+         * Returns an iterator over the names of the user's direct roles
          */
-        const RoleDataMap& getRoles() const;
+        RoleNameIterator getRoles() const;
 
         /**
          * Returns true if this user is a member of the given role.
@@ -122,9 +113,9 @@ namespace mongo {
         void setCredentials(const CredentialData& credentials);
 
         /**
-         * Replaces any existing user role membership information with "roles".
+         * Replaces any existing user role membership information with the roles from "roles".
          */
-        void setRoleData(const std::vector<RoleData>& roles);
+        void setRoles(RoleNameIterator roles);
 
         /**
          * Replaces any existing user privilege information with "privileges".
@@ -140,16 +131,6 @@ namespace mongo {
          * Adds the given role names to the list of roles that this user belongs to.
          */
         void addRoles(const std::vector<RoleName>& roles);
-
-        /**
-         * Adds the given role name to the list of roles that this user is allowed to delegate.
-         */
-        void addDelegatableRole(const RoleName& role);
-
-        /**
-         * Adds the given role names to the list of roles that this user is allowed to delegate.
-         */
-        void addDelegatableRoles(const std::vector<RoleName>& roles);
 
         /**
          * Adds the given privilege to the list of privileges this user is authorized for.
@@ -194,8 +175,8 @@ namespace mongo {
         // Maps resource name to privilege on that resource
         ResourcePrivilegeMap _privileges;
 
-        // Roles the user has privileges from and/or can delegate
-        RoleDataMap _roles;
+        // Roles the user has privileges from
+        unordered_set<RoleName> _roles;
 
         CredentialData _credentials;
 

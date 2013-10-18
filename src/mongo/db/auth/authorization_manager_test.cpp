@@ -174,12 +174,9 @@ namespace {
         ASSERT_EQUALS(UserName("v0RW", "test"), v0RW->getName());
         ASSERT(v0RW->isValid());
         ASSERT_EQUALS(1U, v0RW->getRefCount());
-        const User::RoleDataMap& roles = v0RW->getRoles();
-        ASSERT_EQUALS(1U, roles.size());
-        User::RoleData role = roles.begin()->second;
-        ASSERT_EQUALS(RoleName("dbOwner", "test"), role.name);
-        ASSERT(role.hasRole);
-        ASSERT(!role.canDelegate);
+        RoleNameIterator roles = v0RW->getRoles();
+        ASSERT_EQUALS(RoleName("dbOwner", "test"), roles.next());
+        ASSERT_FALSE(roles.more());
         // Make sure user's refCount is 0 at the end of the test to avoid an assertion failure
         authzManager->releaseUser(v0RW);
 
@@ -188,12 +185,9 @@ namespace {
         ASSERT(UserName("v0AdminRO", "admin") == v0AdminRO->getName());
         ASSERT(v0AdminRO->isValid());
         ASSERT_EQUALS((uint32_t)1, v0AdminRO->getRefCount());
-        const User::RoleDataMap& adminRoles = v0AdminRO->getRoles();
-        ASSERT_EQUALS(1U, adminRoles.size());
-        role = adminRoles.begin()->second;
-        ASSERT_EQUALS(RoleName("readAnyDatabase", "admin"), role.name);
-        ASSERT(role.hasRole);
-        ASSERT(!role.canDelegate);
+        RoleNameIterator adminRoles = v0AdminRO->getRoles();
+        ASSERT_EQUALS(RoleName("readAnyDatabase", "admin"), adminRoles.next());
+        ASSERT_FALSE(adminRoles.more());
         // Make sure user's refCount is 0 at the end of the test to avoid an assertion failure
         authzManager->releaseUser(v0AdminRO);
     }
@@ -219,12 +213,9 @@ namespace {
         ASSERT(v1read->isValid());
         ASSERT_EQUALS((uint32_t)1, v1read->getRefCount());
 
-        const User::RoleDataMap& roles = v1read->getRoles();
-        ASSERT_EQUALS(1U, roles.size());
-        User::RoleData role = roles.begin()->second;
-        ASSERT_EQUALS(RoleName("read", "test"), role.name);
-        ASSERT(role.hasRole);
-        ASSERT(!role.canDelegate);
+        RoleNameIterator roles = v1read->getRoles();
+        ASSERT_EQUALS(RoleName("read", "test"), roles.next());
+        ASSERT_FALSE(roles.more());
         // Make sure user's refCount is 0 at the end of the test to avoid an assertion failure
         authzManager->releaseUser(v1read);
 
@@ -233,12 +224,9 @@ namespace {
         ASSERT_EQUALS(UserName("v1cluster", "admin"), v1cluster->getName());
         ASSERT(v1cluster->isValid());
         ASSERT_EQUALS((uint32_t)1, v1cluster->getRefCount());
-        const User::RoleDataMap& clusterRoles = v1cluster->getRoles();
-        ASSERT_EQUALS(1U, clusterRoles.size());
-        role = clusterRoles.begin()->second;
-        ASSERT_EQUALS(RoleName("clusterAdmin", "admin"), role.name);
-        ASSERT(role.hasRole);
-        ASSERT(!role.canDelegate);
+        RoleNameIterator clusterRoles = v1cluster->getRoles();
+        ASSERT_EQUALS(RoleName("clusterAdmin", "admin"), clusterRoles.next());
+        ASSERT_FALSE(clusterRoles.more());
         // Make sure user's refCount is 0 at the end of the test to avoid an assertion failure
         authzManager->releaseUser(v1cluster);
     }
@@ -275,12 +263,9 @@ namespace {
         ASSERT_EQUALS(UserName("readOnly", "test"), readOnly->getName());
         ASSERT(readOnly->isValid());
         ASSERT_EQUALS((uint32_t)2, readOnly->getRefCount());
-        const User::RoleDataMap& roles = readOnly->getRoles();
-        ASSERT_EQUALS(1U, roles.size());
-        User::RoleData role = roles.begin()->second;
-        ASSERT_EQUALS(RoleName("read", "test"), role.name);
-        ASSERT(role.hasRole);
-        ASSERT(!role.canDelegate);
+        RoleNameIterator roles = readOnly->getRoles();
+        ASSERT_EQUALS(RoleName("read", "test"), roles.next());
+        ASSERT_FALSE(roles.more());
         // Make sure user's refCount is 0 at the end of the test to avoid an assertion failure
         authzManager->releaseUser(readOnly);
 
@@ -289,12 +274,9 @@ namespace {
         ASSERT_EQUALS(UserName("clusterAdmin", "$external"), clusterAdmin->getName());
         ASSERT(clusterAdmin->isValid());
         ASSERT_EQUALS((uint32_t)2, clusterAdmin->getRefCount());
-        const User::RoleDataMap& clusterRoles = clusterAdmin->getRoles();
-        ASSERT_EQUALS(1U, clusterRoles.size());
-        role = clusterRoles.begin()->second;
-        ASSERT_EQUALS(RoleName("clusterAdmin", "admin"), role.name);
-        ASSERT(role.hasRole);
-        ASSERT(!role.canDelegate);
+        RoleNameIterator clusterRoles = clusterAdmin->getRoles();
+        ASSERT_EQUALS(RoleName("clusterAdmin", "admin"), clusterRoles.next());
+        ASSERT_FALSE(clusterRoles.more());
         // Make sure user's refCount is 0 at the end of the test to avoid an assertion failure
         authzManager->releaseUser(clusterAdmin);
 
@@ -308,16 +290,15 @@ namespace {
         ASSERT(multiDB->isValid());
         ASSERT_EQUALS((uint32_t)2, multiDB->getRefCount());
 
-        const User::RoleDataMap& multiDBRoles = multiDB->getRoles();
-        ASSERT_EQUALS(2U, multiDBRoles.size());
-        role = mapFindWithDefault(multiDBRoles, RoleName("readWrite", "test"), User::RoleData());
-        ASSERT_EQUALS(RoleName("readWrite", "test"), role.name);
-        ASSERT(role.hasRole);
-        ASSERT(!role.canDelegate);
-        role = mapFindWithDefault(multiDBRoles, RoleName("readWrite", "test2"), User::RoleData());
-        ASSERT_EQUALS(RoleName("readWrite", "test2"), role.name);
-        ASSERT(role.hasRole);
-        ASSERT(!role.canDelegate);
+        RoleNameIterator multiDBRoles = multiDB->getRoles();
+        RoleName role = multiDBRoles.next();
+        if (role == RoleName("readWrite", "test")) {
+            ASSERT_EQUALS(RoleName("readWrite", "test2"), multiDBRoles.next());
+        } else {
+            ASSERT_EQUALS(RoleName("readWrite", "test2"), role);
+            ASSERT_EQUALS(RoleName("readWrite", "test"), multiDBRoles.next());
+        }
+        ASSERT_FALSE(multiDBRoles.more());
 
         // Make sure user's refCount is 0 at the end of the test to avoid an assertion failure
         authzManager->releaseUser(multiDB);
@@ -360,12 +341,9 @@ namespace {
         ASSERT_EQUALS(UserName("v2read", "test"), v2read->getName());
         ASSERT(v2read->isValid());
         ASSERT_EQUALS((uint32_t)1, v2read->getRefCount());
-        const User::RoleDataMap& roles = v2read->getRoles();
-        ASSERT_EQUALS(1U, roles.size());
-        User::RoleData role = roles.begin()->second;
-        ASSERT_EQUALS(RoleName("read", "test"), role.name);
-        ASSERT(role.hasRole);
-        ASSERT(!role.canDelegate);
+        RoleNameIterator roles = v2read->getRoles();
+        ASSERT_EQUALS(RoleName("read", "test"), roles.next());
+        ASSERT_FALSE(roles.more());
         // Make sure user's refCount is 0 at the end of the test to avoid an assertion failure
         authzManager->releaseUser(v2read);
 
@@ -374,12 +352,9 @@ namespace {
         ASSERT_EQUALS(UserName("v2cluster", "admin"), v2cluster->getName());
         ASSERT(v2cluster->isValid());
         ASSERT_EQUALS((uint32_t)1, v2cluster->getRefCount());
-        const User::RoleDataMap& clusterRoles = v2cluster->getRoles();
-        ASSERT_EQUALS(1U, clusterRoles.size());
-        role = clusterRoles.begin()->second;
-        ASSERT_EQUALS(RoleName("clusterAdmin", "admin"), role.name);
-        ASSERT(role.hasRole);
-        ASSERT(role.canDelegate);
+        RoleNameIterator clusterRoles = v2cluster->getRoles();
+        ASSERT_EQUALS(RoleName("clusterAdmin", "admin"), clusterRoles.next());
+        ASSERT_FALSE(clusterRoles.more());
         // Make sure user's refCount is 0 at the end of the test to avoid an assertion failure
         authzManager->releaseUser(v2cluster);
     }
