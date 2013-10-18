@@ -78,18 +78,6 @@ namespace mongo {
      */
     std::string dateToCtimeString(Date_t date);
 
-    /**
-     * Converts millis to time_t, doing correct division for negative millis, and uasserting that
-     * the result falls within the valid range of a time_t.
-     */
-    time_t millisToTimeT(long long millis);
-
-    /**
-     * Returns the millis since the last whole second of the given millis since epoch, and correctly
-     * handles dates before epoch.
-     */
-    int extractMillisPortion(long long millisSinceEpoch);
-
     boost::gregorian::date currentDate();
 
     // parses time of day in "hh:mm" format assuming 'hh' is 00-23

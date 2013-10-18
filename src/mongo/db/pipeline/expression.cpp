@@ -1422,7 +1422,9 @@ namespace {
 
     Value ExpressionMillisecond::evaluateInternal(const Variables& vars) const {
         Value date(vpOperand[0]->evaluateInternal(vars));
-        return Value(extractMillisPortion(date.coerceToDate()));
+        const int ms = date.coerceToDate() % 1000LL;
+        // adding 1000 since dates before 1970 would have negative ms
+        return Value(ms >= 0 ? ms : 1000 + ms);
     }
 
     REGISTER_EXPRESSION("$millisecond", ExpressionMillisecond::parse);
