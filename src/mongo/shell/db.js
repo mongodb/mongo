@@ -943,6 +943,27 @@ DB.prototype._createUser = function(userObj, replicatedTo, timeout) {
     }
 }
 
+DB.prototype._modifyCommandToDigestPasswordIfNecessary = function(cmdObj, username) {
+    if (!cmdObj["pwd"]) {
+        return;
+    }
+    if (cmdObj.hasOwnProperty("digestPassword")) {
+        throw Error("Cannot specify 'digestPassword' through the user management shell helpers, " +
+                    "use 'passwordDigestor' instead");
+    }
+    var passwordDigestor = cmdObj["passwordDigestor"] ? cmdObj["passwordDigestor"] : "client";
+    if (passwordDigestor == "server") {
+        cmdObj["digestPassword"] = true;
+    } else if (passwordDigestor == "client") {
+        cmdObj["pwd"] = _hashPassword(username, cmdObj["pwd"]);
+        cmdObj["digestPassword"] = false;
+    } else {
+        throw Error("'passwordDigestor' must be either 'server' or 'client', got: '" +
+                    passwordDigestor + "'");
+    }
+    delete cmdObj["passwordDigestor"];
+}
+
 // Returns true if it worked, false if the createUser command wasn't found, and throws on all other
 // failures
 DB.prototype._createUserWithCommand = function(userObj, replicatedTo, timeout) {
@@ -950,6 +971,8 @@ DB.prototype._createUserWithCommand = function(userObj, replicatedTo, timeout) {
     var cmdObj = {createUser:name};
     cmdObj = Object.extend(cmdObj, userObj);
     delete cmdObj["user"];
+
+    this._modifyCommandToDigestPasswordIfNecessary(cmdObj, name);
 
     replicatedTo = replicatedTo != null ? replicatedTo : "majority";
     timeout = timeout || 30 * 1000;
@@ -1059,6 +1082,8 @@ DB.prototype.updateUser = function(name, updateObject, writeConcern) {
     var cmdObj = {updateUser:name};
     cmdObj = Object.extend(cmdObj, updateObject);
     cmdObj['writeConcern'] =  writeConcern ? writeConcern : _defaultWriteConcern;
+    this._modifyCommandToDigestPasswordIfNecessary(cmdObj, name);
+
     var res = this.runCommand(cmdObj);
     if (res.ok) {
         return;

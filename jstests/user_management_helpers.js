@@ -70,4 +70,25 @@ function assertHasRole(rolesArray, roleName, roleDB) {
      // Test dropAllUsers
      db.dropAllUsers()
      assert.eq(0, db.getUsers().length);
+
+     // Test password digestion
+     assert.throws(function() {
+                       db.addUser({user:'user1', pwd:'x', roles:[], digestPassword: true});});
+     assert.throws(function() {
+                       db.addUser({user:'user1', pwd:'x', roles:[], digestPassword: false});});
+     assert.throws(function() {
+                       db.addUser({user:'user1', pwd:'x', roles:[], passwordDigestor: 'foo'});});
+     db.addUser({user:'user1', pwd:'x', roles:[], passwordDigestor:"server"});
+     db.addUser({user:'user2', pwd:'x', roles:[], passwordDigestor:"client"});
+     assert(db.auth('user1', 'x'));
+     assert(db.auth('user2', 'x'));
+
+     assert.throws(function() { db.updateUser('user1', {pwd:'y', digestPassword: true});});
+     assert.throws(function() { db.updateUser('user1', {pwd:'y', digestPassword: false});});
+     assert.throws(function() { db.updateUser('user1', {pwd:'y', passwordDigestor: 'foo'});});
+     db.updateUser('user1', {pwd:'y', passwordDigestor: 'server'});
+     db.updateUser('user2', {pwd:'y', passwordDigestor: 'client'});
+     assert(db.auth('user1', 'y'));
+     assert(db.auth('user2', 'y'));
+
 }(db));

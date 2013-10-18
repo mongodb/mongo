@@ -212,6 +212,7 @@ namespace auth {
         unordered_set<std::string> validFieldNames;
         validFieldNames.insert(cmdName.toString());
         validFieldNames.insert("customData");
+        validFieldNames.insert("digestPassword");
         validFieldNames.insert("pwd");
         validFieldNames.insert("roles");
         validFieldNames.insert("writeConcern");
@@ -239,16 +240,29 @@ namespace auth {
 
         // Parse password
         if (cmdObj.hasField("pwd")) {
-            std::string clearTextPassword;
-            status = bsonExtractStringField(cmdObj, "pwd", &clearTextPassword);
+            std::string password;
+            status = bsonExtractStringField(cmdObj, "pwd", &password);
             if (!status.isOK()) {
                 return status;
             }
-            if (clearTextPassword.empty()) {
+            if (password.empty()) {
                 return Status(ErrorCodes::BadValue, "User passwords must not be empty");
             }
 
-            parsedArgs->hashedPassword = auth::createPasswordDigest(userName, clearTextPassword);
+            bool digestPassword; // True if the server should digest the password
+            status = bsonExtractBooleanFieldWithDefault(cmdObj,
+                                                        "digestPassword",
+                                                        true,
+                                                        &digestPassword);
+            if (!status.isOK()) {
+                return status;
+            }
+
+            if (digestPassword) {
+                parsedArgs->hashedPassword = auth::createPasswordDigest(userName, password);
+            } else {
+                parsedArgs->hashedPassword = password;
+            }
             parsedArgs->hasHashedPassword = true;
         }
 
