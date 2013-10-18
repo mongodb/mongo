@@ -184,6 +184,7 @@ __wt_logmgr_create(WT_CONNECTION_IMPL *conn, const char *cfg[])
 	INIT_LSN(&log->write_lsn);
 	log->fileid = 0;
 	WT_RET(__wt_log_open(session));
+	WT_RET(__wt_log_slot_init(session));
 
 	/* If archiving is not configured, we're done. */ 
 	if (!conn->archive)

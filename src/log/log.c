@@ -511,9 +511,6 @@ __wt_log_newfile(WT_SESSION_IMPL *session, int conn_create)
 	myslot.slot = &tmp;
 	myslot.offset = 0;
 
-	/* Initialize the slot array. */
-	WT_RET(__wt_log_slot_init(session));
-
 	/*
 	 * Recursively call __log_acquire to allocate log space for the
 	 * log descriptor record.  Call __log_fill to write it, but we
