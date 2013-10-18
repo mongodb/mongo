@@ -109,12 +109,12 @@ namespace mongo {
         *out << std::flush;
     }
 
-    Status handlePreValidationMongoStatOptions(const moe::Environment& params) {
+    bool handlePreValidationMongoStatOptions(const moe::Environment& params) {
         if (params.count("help")) {
             printMongoStatHelp(&std::cout);
-            ::_exit(0);
+            return true;
         }
-        return Status::OK();
+        return false;
     }
 
     Status storeMongoStatOptions(const moe::Environment& params,
@@ -152,13 +152,13 @@ namespace mongo {
         // end of storage / start of validation
 
         if (mongoStatGlobalParams.sleep <= 0) {
-            cerr << "Error parsing command line: --sleep must be greater than 0" << endl;
-            ::_exit(EXIT_BADOPTIONS);
+            return Status(ErrorCodes::BadValue,
+                          "Error parsing command line: --sleep must be greater than 0");
         }
 
         if (mongoStatGlobalParams.rowCount < 0) {
-            cerr << "Error parsing command line: --rowcount (-n) can't be negative" << endl;
-            ::_exit(EXIT_BADOPTIONS);
+            return Status(ErrorCodes::BadValue,
+                          "Error parsing command line: --rowcount (-n) can't be negative");
         }
 
         return Status::OK();
@@ -169,11 +169,10 @@ namespace mongo {
     }
 
     MONGO_STARTUP_OPTIONS_VALIDATE(MongoStatOptions)(InitializerContext* context) {
-        Status ret = handlePreValidationMongoStatOptions(moe::startupOptionsParsed);
-        if (!ret.isOK()) {
-            return ret;
+        if (handlePreValidationMongoStatOptions(moe::startupOptionsParsed)) {
+            ::_exit(EXIT_SUCCESS);
         }
-        ret = moe::startupOptionsParsed.validate();
+        Status ret = moe::startupOptionsParsed.validate();
         if (!ret.isOK()) {
             return ret;
         }
@@ -181,6 +180,13 @@ namespace mongo {
     }
 
     MONGO_STARTUP_OPTIONS_STORE(MongoStatOptions)(InitializerContext* context) {
-        return storeMongoStatOptions(moe::startupOptionsParsed, context->args());
+        Status ret = storeMongoStatOptions(moe::startupOptionsParsed, context->args());
+        if (!ret.isOK()) {
+            std::cerr << ret.toString() << std::endl;
+            std::cerr << "try '" << context->args()[0] << " --help' for more information"
+                      << std::endl;
+            ::_exit(EXIT_BADOPTIONS);
+        }
+        return Status::OK();
     }
 }

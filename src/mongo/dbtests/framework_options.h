@@ -45,7 +45,7 @@ namespace mongo {
 
     std::string getTestFrameworkHelp(const StringData& name, const moe::OptionSection& options);
 
-    Status preValidationTestFrameworkOptions(const moe::Environment& params,
+    bool handlePreValidationTestFrameworkOptions(const moe::Environment& params,
                                              const std::vector<std::string>& args);
 
     Status storeTestFrameworkOptions(const moe::Environment& params,

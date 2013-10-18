@@ -228,12 +228,12 @@ namespace mongo {
         out << std::endl;
     }
 
-    Status handlePreValidationGeneralToolOptions(const moe::Environment& params) {
+    bool handlePreValidationGeneralToolOptions(const moe::Environment& params) {
         if (moe::startupOptionsParsed.count("version")) {
             printToolVersionString(std::cout);
-            ::_exit(0);
+            return true;
         }
-        return Status::OK();
+        return false;
     }
 
     extern bool directoryperdb;

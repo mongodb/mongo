@@ -88,7 +88,7 @@ namespace mongo {
     int getParam(std::string name, int def);
     bool hasParam(std::string name);
 
-    Status handlePreValidationGeneralToolOptions(const moe::Environment& params);
+    bool handlePreValidationGeneralToolOptions(const moe::Environment& params);
 
     Status storeGeneralToolOptions(const moe::Environment& params,
                                    const std::vector<std::string>& args);

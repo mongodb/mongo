@@ -409,24 +409,24 @@ namespace mongo {
         }
     } // namespace
 
-    Status handlePreValidationMongodOptions(const moe::Environment& params,
+    bool handlePreValidationMongodOptions(const moe::Environment& params,
                                             const std::vector<std::string>& args) {
         if (params.count("help")) {
             printMongodHelp(moe::startupOptions);
-            ::_exit(EXIT_SUCCESS);
+            return true;
         }
         if (params.count("version")) {
             cout << mongodVersion() << endl;
             printGitVersion();
             printOpenSSLVersion();
-            ::_exit(EXIT_SUCCESS);
+            return true;
         }
         if (params.count("sysinfo")) {
             sysRuntimeInfo();
-            ::_exit(EXIT_SUCCESS);
+            return true;
         }
 
-        return Status::OK();
+        return false;
     }
 
     Status storeMongodOptions(const moe::Environment& params,
@@ -434,8 +434,7 @@ namespace mongo {
 
         Status ret = storeServerOptions(params, args);
         if (!ret.isOK()) {
-            std::cerr << "Error storing command line: " << ret.toString() << std::endl;
-            ::_exit(EXIT_BADOPTIONS);
+            return ret;
         }
 
         if (params.count("dbpath")) {
@@ -486,8 +485,8 @@ namespace mongo {
         }
         if ((params.count("nodur") || params.count("nojournal")) &&
             (params.count("dur") || params.count("journal"))) {
-            std::cerr << "Can't specify both --journal and --nojournal options." << std::endl;
-            ::_exit(EXIT_BADOPTIONS);
+            return Status(ErrorCodes::BadValue,
+                          "Can't specify both --journal and --nojournal options.");
         }
 
         if (params.count("nodur") || params.count("nojournal")) {
@@ -509,8 +508,8 @@ namespace mongo {
                 params["journalCommitInterval"].as<unsigned>();
             if (storageGlobalParams.journalCommitInterval <= 1 ||
                 storageGlobalParams.journalCommitInterval > 300) {
-                std::cerr << "--journalCommitInterval out of allowed range (0-300ms)" << std::endl;
-                ::_exit(EXIT_BADOPTIONS);
+                return Status(ErrorCodes::BadValue,
+                              "--journalCommitInterval out of allowed range (0-300ms)");
             }
         }
         if (params.count("journalOptions")) {
@@ -524,8 +523,8 @@ namespace mongo {
         }
         if (params.count("httpinterface")) {
             if (params.count("nohttpinterface")) {
-                std::cerr << "can't have both --httpinterface and --nohttpinterface" << std::endl;
-                ::_exit(EXIT_BADOPTIONS);
+                return Status(ErrorCodes::BadValue,
+                              "can't have both --httpinterface and --nohttpinterface");
             }
             serverGlobalParams.isHttpInterfaceEnabled = true;
         }
@@ -569,15 +568,14 @@ namespace mongo {
         if (params.count("diaglog")) {
             int x = params["diaglog"].as<int>();
             if ( x < 0 || x > 7 ) {
-                std::cerr << "can't interpret --diaglog setting" << std::endl;
-                ::_exit(EXIT_BADOPTIONS);
+                return Status(ErrorCodes::BadValue, "can't interpret --diaglog setting");
             }
             _diaglog.setLevel(x);
         }
 
         if ((params.count("dur") || params.count("journal")) && params.count("repair")) {
-            std::cerr << "Can't specify both --journal and --repair options." << std::endl;
-            ::_exit(EXIT_BADOPTIONS);
+            return Status(ErrorCodes::BadValue,
+                          "Can't specify both --journal and --repair options.");
         }
 
         if (params.count("repair")) {
@@ -608,10 +606,9 @@ namespace mongo {
         if (params.count("autoresync")) {
             replSettings.autoresync = true;
             if( params.count("replSet") ) {
-                std::cerr << "--autoresync is not used with --replSet\nsee "
-                    << "http://dochub.mongodb.org/core/resyncingaverystalereplicasetmember"
-                    << std::endl;
-                ::_exit(EXIT_BADOPTIONS);
+                return Status(ErrorCodes::BadValue,
+                              "--autoresync is not used with --replSet\nsee "
+                              "http://dochub.mongodb.org/core/resyncingaverystalereplicasetmember");
             }
         }
         if (params.count("source")) {
@@ -623,12 +620,10 @@ namespace mongo {
         }
         if (params.count("replSet")) {
             if (params.count("slavedelay")) {
-                std::cerr << "--slavedelay cannot be used with --replSet" << std::endl;
-                ::_exit(EXIT_BADOPTIONS);
+                return Status(ErrorCodes::BadValue, "--slavedelay cannot be used with --replSet");
             }
             else if (params.count("only")) {
-                std::cerr << "--only cannot be used with --replSet" << std::endl;
-                ::_exit(EXIT_BADOPTIONS);
+                return Status(ErrorCodes::BadValue, "--only cannot be used with --replSet");
             }
             /* seed list of hosts for the repl set */
             replSettings.replSet = params["replSet"].as<string>().c_str();
@@ -645,8 +640,7 @@ namespace mongo {
         if( params.count("nssize") ) {
             int x = params["nssize"].as<int>();
             if (x <= 0 || x > (0x7fffffff/1024/1024)) {
-                std::cerr << "bad --nssize arg" << std::endl;
-                ::_exit(EXIT_BADOPTIONS);
+                return Status(ErrorCodes::BadValue, "bad --nssize arg");
             }
             storageGlobalParams.lenForNewNsFiles = x * 1024 * 1024;
             verify(storageGlobalParams.lenForNewNsFiles > 0);
@@ -654,16 +648,14 @@ namespace mongo {
         if (params.count("oplogSize")) {
             long long x = params["oplogSize"].as<int>();
             if (x <= 0) {
-                std::cerr << "bad --oplogSize arg" << std::endl;
-                ::_exit(EXIT_BADOPTIONS);
+                return Status(ErrorCodes::BadValue, "bad --oplogSize arg");
             }
             // note a small size such as x==1 is ok for an arbiter.
             if( x > 1000 && sizeof(void*) == 4 ) {
                 StringBuilder sb;
-                std::cerr << "--oplogSize of " << x
-                    << "MB is too big for 32 bit version. Use 64 bit build instead."
-                    << std::endl;
-                ::_exit(EXIT_BADOPTIONS);
+                sb << "--oplogSize of " << x
+                   << "MB is too big for 32 bit version. Use 64 bit build instead.";
+                return Status(ErrorCodes::BadValue, sb.str());
             }
             replSettings.oplogSize = x * 1024 * 1024;
             verify(replSettings.oplogSize > 0);
@@ -671,11 +663,9 @@ namespace mongo {
         if (params.count("cacheSize")) {
             long x = params["cacheSize"].as<long>();
             if (x <= 0) {
-                std::cerr << "bad --cacheSize arg" << std::endl;
-                ::_exit(EXIT_BADOPTIONS);
+                return Status(ErrorCodes::BadValue, "bad --cacheSize arg");
             }
-            std::cerr << "--cacheSize option not currently supported" << std::endl;
-            ::_exit(EXIT_BADOPTIONS);
+            return Status(ErrorCodes::BadValue, "--cacheSize option not currently supported");
         }
         if (!params.count("port")) {
             if( params.count("configsvr") ) {
@@ -683,25 +673,23 @@ namespace mongo {
             }
             if( params.count("shardsvr") ) {
                 if( params.count("configsvr") ) {
-                    std::cerr << "can't do --shardsvr and --configsvr at the same time"
-                              << std::endl;
-                    ::_exit(EXIT_BADOPTIONS);
+                    return Status(ErrorCodes::BadValue,
+                                  "can't do --shardsvr and --configsvr at the same time");
                 }
                 serverGlobalParams.port = ServerGlobalParams::ShardServerPort;
             }
         }
         else {
             if (serverGlobalParams.port <= 0 || serverGlobalParams.port > 65535) {
-                std::cerr << "bad --port number" << std::endl;
-                ::_exit(EXIT_BADOPTIONS);
+                return Status(ErrorCodes::BadValue, "bad --port number");
             }
         }
         if ( params.count("configsvr" ) ) {
             serverGlobalParams.configsvr = true;
             storageGlobalParams.smallfiles = true; // config server implies small files
             if (replSettings.usingReplSets() || replSettings.master || replSettings.slave) {
-                std::cerr << "replication should not be enabled on a config server" << std::endl;
-                ::_exit(EXIT_BADOPTIONS);
+                return Status(ErrorCodes::BadValue,
+                              "replication should not be enabled on a config server");
             }
             if (!params.count("nodur") && !params.count("nojournal"))
                 storageGlobalParams.dur = true;
@@ -719,9 +707,8 @@ namespace mongo {
         }
 
         if (params.count("noMoveParanoia") && params.count("moveParanoia")) {
-            std::cerr << "The moveParanoia and noMoveParanoia flags cannot both be set; "
-                << "please use only one of them." << std::endl;
-            ::_exit(EXIT_BADOPTIONS);
+            return Status(ErrorCodes::BadValue,
+                          "The moveParanoia and noMoveParanoia flags cannot both be set");
         }
 
         if (params.count("noMoveParanoia"))
@@ -731,28 +718,27 @@ namespace mongo {
             serverGlobalParams.moveParanoia = true;
 
         if (params.count("pairwith") || params.count("arbiter") || params.count("opIdMem")) {
-            std::cerr << "****\n"
-                << "Replica Pairs have been deprecated. Invalid options: --pairwith, "
-                << "--arbiter, and/or --opIdMem\n"
-                << "<http://dochub.mongodb.org/core/replicapairs>\n"
-                << "****" << std::endl;
-            ::_exit(EXIT_BADOPTIONS);
+            return Status(ErrorCodes::BadValue,
+                          "****\n"
+                          "Replica Pairs have been deprecated. Invalid options: "
+                              "--pairwith, --arbiter, and/or --opIdMem\n"
+                          "<http://dochub.mongodb.org/core/replicapairs>\n"
+                          "****");
         }
 
         // needs to be after things like --configsvr parsing, thus here.
         if (params.count("repairpath")) {
             storageGlobalParams.repairpath = params["repairpath"].as<string>();
             if (!storageGlobalParams.repairpath.size()) {
-                std::cerr << "repairpath is empty" << std::endl;
-                ::_exit(EXIT_BADOPTIONS);
+                return Status(ErrorCodes::BadValue, "repairpath is empty");
             }
 
             if (storageGlobalParams.dur &&
                 !str::startsWith(storageGlobalParams.repairpath,
                                  storageGlobalParams.dbpath)) {
-                std::cerr << "You must use a --repairpath that is a subdirectory of "
-                    << "--dbpath when using journaling" << std::endl;
-                ::_exit(EXIT_BADOPTIONS);
+                return Status(ErrorCodes::BadValue,
+                              "You must use a --repairpath that is a subdirectory of --dbpath when "
+                              "using journaling");
             }
         }
         else {
@@ -779,11 +765,10 @@ namespace mongo {
     }
 
     MONGO_STARTUP_OPTIONS_VALIDATE(MongodOptions)(InitializerContext* context) {
-        Status ret = handlePreValidationMongodOptions(moe::startupOptionsParsed, context->args());
-        if (!ret.isOK()) {
-            return ret;
+        if (handlePreValidationMongodOptions(moe::startupOptionsParsed, context->args())) {
+            ::_exit(EXIT_SUCCESS);
         }
-        ret = moe::startupOptionsParsed.validate();
+        Status ret = moe::startupOptionsParsed.validate();
         if (!ret.isOK()) {
             return ret;
         }
@@ -796,7 +781,14 @@ namespace mongo {
                                                               // getGlobalAuthorizationManager().
                               ("EndStartupOptionStorage"))
                              (InitializerContext* context) {
-        return storeMongodOptions(moe::startupOptionsParsed, context->args());
+        Status ret = storeMongodOptions(moe::startupOptionsParsed, context->args());
+        if (!ret.isOK()) {
+            std::cerr << ret.toString() << std::endl;
+            std::cerr << "try '" << context->args()[0] << " --help' for more information"
+                      << std::endl;
+            ::_exit(EXIT_BADOPTIONS);
+        }
+        return Status::OK();
     }
 
 } // namespace mongo

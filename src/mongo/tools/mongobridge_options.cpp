@@ -61,27 +61,23 @@ namespace mongo {
         *out << std::flush;
     }
 
-    Status handlePreValidationMongoBridgeOptions(const moe::Environment& params) {
+    bool handlePreValidationMongoBridgeOptions(const moe::Environment& params) {
         if (params.count("help")) {
             printMongoBridgeHelp(&std::cout);
-            ::_exit(0);
+            return true;
         }
-        return Status::OK();
+        return false;
     }
 
     Status storeMongoBridgeOptions(const moe::Environment& params,
                                    const std::vector<std::string>& args) {
 
         if (!params.count("port")) {
-            std::cerr << "Missing required option: \"--port\"" << std::endl;
-            printMongoBridgeHelp(&std::cerr);
-            ::_exit(0);
+            return Status(ErrorCodes::BadValue, "Missing required option: \"--port\"");
         }
 
         if (!params.count("dest")) {
-            std::cerr << "Missing required option: \"--dest\"" << std::endl;
-            printMongoBridgeHelp(&std::cerr);
-            ::_exit(0);
+            return Status(ErrorCodes::BadValue, "Missing required option: \"--dest\"");
         }
 
         mongoBridgeGlobalParams.port = params["port"].as<int>();
@@ -99,11 +95,10 @@ namespace mongo {
     }
 
     MONGO_STARTUP_OPTIONS_VALIDATE(MongoBridgeOptions)(InitializerContext* context) {
-        Status ret = handlePreValidationMongoBridgeOptions(moe::startupOptionsParsed);
-        if (!ret.isOK()) {
-            return ret;
+        if (handlePreValidationMongoBridgeOptions(moe::startupOptionsParsed)) {
+            ::_exit(EXIT_SUCCESS);
         }
-        ret = moe::startupOptionsParsed.validate();
+        Status ret = moe::startupOptionsParsed.validate();
         if (!ret.isOK()) {
             return ret;
         }
@@ -111,7 +106,14 @@ namespace mongo {
     }
 
     MONGO_STARTUP_OPTIONS_STORE(MongoBridgeOptions)(InitializerContext* context) {
-        return storeMongoBridgeOptions(moe::startupOptionsParsed, context->args());
+        Status ret = storeMongoBridgeOptions(moe::startupOptionsParsed, context->args());
+        if (!ret.isOK()) {
+            std::cerr << ret.toString() << std::endl;
+            std::cerr << "try '" << context->args()[0] << " --help' for more information"
+                      << std::endl;
+            ::_exit(EXIT_BADOPTIONS);
+        }
+        return Status::OK();
     }
 }
 

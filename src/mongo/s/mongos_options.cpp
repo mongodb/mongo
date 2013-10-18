@@ -132,18 +132,24 @@ namespace mongo {
         std::cout << options.helpString() << std::endl;
     };
 
-    Status handlePreValidationMongosOptions(const moe::Environment& params,
+    bool handlePreValidationMongosOptions(const moe::Environment& params,
                                             const std::vector<std::string>& args) {
         if (params.count("help")) {
             printMongosHelp(moe::startupOptions);
-            ::_exit(EXIT_SUCCESS);
+            return true;
         }
         if (params.count("version")) {
             printShardingVersionInfo(true);
-            ::_exit(EXIT_SUCCESS);
+            return true;
+        }
+        if ( params.count( "test" ) ) {
+            ::mongo::logger::globalLogDomain()->setMinimumLoggedSeverity(
+                    ::mongo::logger::LogSeverity::Debug(5));
+            StartupTest::runTests();
+            return true;
         }
 
-        return Status::OK();
+        return false;
     }
 
     Status storeMongosOptions(const moe::Environment& params,
@@ -151,8 +157,7 @@ namespace mongo {
 
         Status ret = storeServerOptions(params, args);
         if (!ret.isOK()) {
-            std::cerr << "Error storing command line: " << ret.toString() << std::endl;
-            ::_exit(EXIT_BADOPTIONS);
+            return ret;
         }
 
         if ( params.count( "chunkSize" ) ) {
@@ -160,21 +165,19 @@ namespace mongo {
 
             // validate chunksize before proceeding
             if ( csize == 0 ) {
-                std::cerr << "error: need a non-zero chunksize" << std::endl;
-                ::_exit(EXIT_BADOPTIONS);
+                return Status(ErrorCodes::BadValue, "error: need a non-zero chunksize");
             }
 
             if ( !Chunk::setMaxChunkSizeSizeMB( csize ) ) {
-                std::cerr << "MaxChunkSize invalid" << std::endl;
-                ::_exit(EXIT_BADOPTIONS);
+                return Status(ErrorCodes::BadValue, "MaxChunkSize invalid");
             }
         }
 
         if (params.count( "port" ) ) {
             int port = params["port"].as<int>();
             if ( port <= 0 || port > 65535 ) {
-                out() << "error: port number must be between 1 and 65535" << endl;
-                ::_exit(EXIT_FAILURE);
+                return Status(ErrorCodes::BadValue,
+                              "error: port number must be between 1 and 65535");
             }
         }
 
@@ -190,21 +193,14 @@ namespace mongo {
             serverGlobalParams.jsonp = true;
         }
 
-        if ( params.count( "test" ) ) {
-            ::mongo::logger::globalLogDomain()->setMinimumLoggedSeverity(
-                    ::mongo::logger::LogSeverity::Debug(5));
-            StartupTest::runTests();
-            ::_exit(EXIT_SUCCESS);
-        }
-
         if (params.count("noscripting")) {
             // This option currently has no effect for mongos
         }
 
         if (params.count("httpinterface")) {
             if (params.count("nohttpinterface")) {
-                std::cerr << "can't have both --httpinterface and --nohttpinterface" << std::endl;
-                ::_exit(EXIT_BADOPTIONS);
+                return Status(ErrorCodes::BadValue,
+                              "can't have both --httpinterface and --nohttpinterface");
             }
             serverGlobalParams.isHttpInterfaceEnabled = true;
         }
@@ -215,14 +211,12 @@ namespace mongo {
         }
 
         if ( ! params.count( "configdb" ) ) {
-            std::cerr << "error: no args for --configdb" << std::endl;
-            ::_exit(EXIT_BADOPTIONS);
+            return Status(ErrorCodes::BadValue, "error: no args for --configdb");
         }
 
         splitStringDelim(params["configdb"].as<std::string>(), &mongosGlobalParams.configdbs, ',');
         if (mongosGlobalParams.configdbs.size() != 1 && mongosGlobalParams.configdbs.size() != 3) {
-            std::cerr << "need either 1 or 3 configdbs" << std::endl;
-            ::_exit(EXIT_BADOPTIONS);
+            return Status(ErrorCodes::BadValue, "need either 1 or 3 configdbs");
         }
 
         if (mongosGlobalParams.configdbs.size() == 1) {
@@ -240,11 +234,10 @@ namespace mongo {
     }
 
     MONGO_STARTUP_OPTIONS_VALIDATE(MongosOptions)(InitializerContext* context) {
-        Status ret = handlePreValidationMongosOptions(moe::startupOptionsParsed, context->args());
-        if (!ret.isOK()) {
-            return ret;
+        if (handlePreValidationMongosOptions(moe::startupOptionsParsed, context->args())) {
+            ::_exit(EXIT_SUCCESS);
         }
-        ret = moe::startupOptionsParsed.validate();
+        Status ret = moe::startupOptionsParsed.validate();
         if (!ret.isOK()) {
             return ret;
         }
@@ -257,7 +250,14 @@ namespace mongo {
                                                               // getGlobalAuthorizationManager().
                               ("EndStartupOptionStorage"))
                              (InitializerContext* context) {
-        return storeMongosOptions(moe::startupOptionsParsed, context->args());
+        Status ret = storeMongosOptions(moe::startupOptionsParsed, context->args());
+        if (!ret.isOK()) {
+            std::cerr << ret.toString() << std::endl;
+            std::cerr << "try '" << context->args()[0] << " --help' for more information"
+                      << std::endl;
+            ::_exit(EXIT_BADOPTIONS);
+        }
+        return Status::OK();
     }
 
 } // namespace mongo

@@ -42,7 +42,7 @@ namespace mongo {
 
     void printMongoRestoreHelp(std::ostream* out);
 
-    Status handlePreValidationMongoRestoreOptions(const moe::Environment& params);
+    bool handlePreValidationMongoRestoreOptions(const moe::Environment& params);
 
     Status storeMongoRestoreOptions(const moe::Environment& params,
                                     const std::vector<std::string>& args);

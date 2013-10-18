@@ -39,7 +39,7 @@ namespace mongo {
 
     void printMongoDumpHelp(std::ostream* out);
 
-    Status handlePreValidationMongoDumpOptions(const moe::Environment& params);
+    bool handlePreValidationMongoDumpOptions(const moe::Environment& params);
 
     Status storeMongoDumpOptions(const moe::Environment& params,
                                  const std::vector<std::string>& args);

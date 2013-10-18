@@ -36,7 +36,7 @@ namespace mongo {
 
     void printMongoTopHelp(std::ostream* out);
 
-    Status handlePreValidationMongoTopOptions(const moe::Environment& params);
+    bool handlePreValidationMongoTopOptions(const moe::Environment& params);
 
     Status storeMongoTopOptions(const moe::Environment& params,
                                 const std::vector<std::string>& args);

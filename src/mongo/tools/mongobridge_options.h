@@ -45,7 +45,7 @@ namespace mongo {
 
     void printMongoBridgeHelp(std::ostream* out);
 
-    Status handlePreValidationMongoBridgeOptions(const moe::Environment& params);
+    bool handlePreValidationMongoBridgeOptions(const moe::Environment& params);
 
     Status storeMongoBridgeOptions(const moe::Environment& params,
                                    const std::vector<std::string>& args);

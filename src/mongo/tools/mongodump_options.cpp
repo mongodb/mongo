@@ -84,12 +84,12 @@ namespace mongo {
         *out << std::flush;
     }
 
-    Status handlePreValidationMongoDumpOptions(const moe::Environment& params) {
+    bool handlePreValidationMongoDumpOptions(const moe::Environment& params) {
         if (params.count("help")) {
             printMongoDumpHelp(&std::cout);
-            ::_exit(0);
+            return true;;
         }
-        return Status::OK();
+        return false;
     }
 
     Status storeMongoDumpOptions(const moe::Environment& params,
@@ -102,21 +102,19 @@ namespace mongo {
         mongoDumpGlobalParams.repair = hasParam("repair");
         if (mongoDumpGlobalParams.repair){
             if (!hasParam("dbpath")) {
-                std::cerr << "repair mode only works with --dbpath" << std::endl;
-                ::_exit(EXIT_BADOPTIONS);
+                return Status(ErrorCodes::BadValue, "repair mode only works with --dbpath");
             }
 
             if (!hasParam("db")) {
-                std::cerr << "repair mode only works on 1 db at a time right now" << std::endl;
-                ::_exit(EXIT_BADOPTIONS);
+                return Status(ErrorCodes::BadValue,
+                              "repair mode only works on 1 db at a time right now");
             }
         }
         mongoDumpGlobalParams.query = getParam("query");
         mongoDumpGlobalParams.useOplog = hasParam("oplog");
         if (mongoDumpGlobalParams.useOplog) {
             if (hasParam("query") || hasParam("db") || hasParam("collection")) {
-                std::cerr << "oplog mode is only supported on full dumps" << std::endl;
-                ::_exit(EXIT_BADOPTIONS);
+                return Status(ErrorCodes::BadValue, "oplog mode is only supported on full dumps");
             }
         }
         mongoDumpGlobalParams.outputFile = getParam("out");
@@ -144,11 +142,10 @@ namespace mongo {
     }
 
     MONGO_STARTUP_OPTIONS_VALIDATE(MongoDumpOptions)(InitializerContext* context) {
-        Status ret = handlePreValidationMongoDumpOptions(moe::startupOptionsParsed);
-        if (!ret.isOK()) {
-            return ret;
+        if (handlePreValidationMongoDumpOptions(moe::startupOptionsParsed)) {
+            ::_exit(EXIT_SUCCESS);
         }
-        ret = moe::startupOptionsParsed.validate();
+        Status ret = moe::startupOptionsParsed.validate();
         if (!ret.isOK()) {
             return ret;
         }
@@ -156,6 +153,13 @@ namespace mongo {
     }
 
     MONGO_STARTUP_OPTIONS_STORE(MongoDumpOptions)(InitializerContext* context) {
-        return storeMongoDumpOptions(moe::startupOptionsParsed, context->args());
+        Status ret = storeMongoDumpOptions(moe::startupOptionsParsed, context->args());
+        if (!ret.isOK()) {
+            std::cerr << ret.toString() << std::endl;
+            std::cerr << "try '" << context->args()[0] << " --help' for more information"
+                      << std::endl;
+            ::_exit(EXIT_BADOPTIONS);
+        }
+        return Status::OK();
     }
 }

@@ -105,12 +105,12 @@ namespace mongo {
         *out << std::flush;
     }
 
-    Status handlePreValidationMongoExportOptions(const moe::Environment& params) {
+    bool handlePreValidationMongoExportOptions(const moe::Environment& params) {
         if (params.count("help")) {
             printMongoExportHelp(&std::cout);
-            ::_exit(0);
+            return true;
         }
-        return Status::OK();
+        return false;
     }
 
     Status storeMongoExportOptions(const moe::Environment& params,
@@ -155,11 +155,10 @@ namespace mongo {
     }
 
     MONGO_STARTUP_OPTIONS_VALIDATE(MongoExportOptions)(InitializerContext* context) {
-        Status ret = handlePreValidationMongoExportOptions(moe::startupOptionsParsed);
-        if (!ret.isOK()) {
-            return ret;
+        if (handlePreValidationMongoExportOptions(moe::startupOptionsParsed)) {
+            ::_exit(EXIT_SUCCESS);
         }
-        ret = moe::startupOptionsParsed.validate();
+        Status ret = moe::startupOptionsParsed.validate();
         if (!ret.isOK()) {
             return ret;
         }
@@ -167,6 +166,13 @@ namespace mongo {
     }
 
     MONGO_STARTUP_OPTIONS_STORE(MongoExportOptions)(InitializerContext* context) {
-        return storeMongoExportOptions(moe::startupOptionsParsed, context->args());
+        Status ret = storeMongoExportOptions(moe::startupOptionsParsed, context->args());
+        if (!ret.isOK()) {
+            std::cerr << ret.toString() << std::endl;
+            std::cerr << "try '" << context->args()[0] << " --help' for more information"
+                      << std::endl;
+            ::_exit(EXIT_BADOPTIONS);
+        }
+        return Status::OK();
     }
 }

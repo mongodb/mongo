@@ -163,16 +163,22 @@ namespace mongo {
         return sb.str();
     }
 
-    Status handlePreValidationMongoShellOptions(const moe::Environment& params,
+    bool handlePreValidationMongoShellOptions(const moe::Environment& params,
                                                 const std::vector<std::string>& args) {
         if (params.count("help")) {
             std::cout << getMongoShellHelp(args[0], moe::startupOptions) << std::endl;
-            ::_exit(EXIT_CLEAN);
+            return true;
         }
         if (params.count("version")) {
             cout << "MongoDB shell version: " << mongo::versionString << endl;
-            ::_exit(EXIT_CLEAN);
+            return true;
         }
+        return false;
+    }
+
+    Status storeMongoShellOptions(const moe::Environment& params,
+                                  const std::vector<std::string>& args) {
+
         if (params.count("quiet")) {
             mongo::serverGlobalParams.quiet = true;
         }
@@ -189,11 +195,6 @@ namespace mongo {
             logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogSeverity::Debug(1));
         }
 
-        return Status::OK();
-    }
-
-    Status storeMongoShellOptions(const moe::Environment& params,
-                                  const std::vector<std::string>& args) {
         if (params.count("port")) {
             shellGlobalParams.port = params["port"].as<string>();
         }
@@ -270,9 +271,10 @@ namespace mongo {
         }
 
         if ( shellGlobalParams.url == "*" ) {
-            std::cerr << "ERROR: " << "\"*\" is an invalid db address" << std::endl;
-            std::cerr << getMongoShellHelp(args[0], moe::startupOptions) << std::endl;
-            ::_exit(EXIT_BADOPTIONS);
+            StringBuilder sb;
+            sb << "ERROR: " << "\"*\" is an invalid db address";
+            sb << getMongoShellHelp(args[0], moe::startupOptions);
+            return Status(ErrorCodes::BadValue, sb.str());
         }
 
         return Status::OK();
@@ -283,11 +285,10 @@ namespace mongo {
     }
 
     MONGO_STARTUP_OPTIONS_VALIDATE(MongoShellOptions)(InitializerContext* context) {
-        Status ret = handlePreValidationMongoShellOptions(moe::startupOptionsParsed, context->args());
-        if (!ret.isOK()) {
-            return ret;
+        if (handlePreValidationMongoShellOptions(moe::startupOptionsParsed, context->args())) {
+            ::_exit(EXIT_SUCCESS);
         }
-        ret = moe::startupOptionsParsed.validate();
+        Status ret = moe::startupOptionsParsed.validate();
         if (!ret.isOK()) {
             return ret;
         }
@@ -295,6 +296,13 @@ namespace mongo {
     }
 
     MONGO_STARTUP_OPTIONS_STORE(MongoShellOptions)(InitializerContext* context) {
-        return storeMongoShellOptions(moe::startupOptionsParsed, context->args());
+        Status ret = storeMongoShellOptions(moe::startupOptionsParsed, context->args());
+        if (!ret.isOK()) {
+            std::cerr << ret.toString() << std::endl;
+            std::cerr << "try '" << context->args()[0] << " --help' for more information"
+                      << std::endl;
+            ::_exit(EXIT_BADOPTIONS);
+        }
+        return Status::OK();
     }
 }

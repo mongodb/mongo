@@ -42,7 +42,7 @@ namespace mongo {
 
     void printMongosHelp(const moe::OptionSection& options);
 
-    Status handlePreValidationMongosOptions(const moe::Environment& params,
+    bool handlePreValidationMongosOptions(const moe::Environment& params,
                                             const std::vector<std::string>& args);
 
     Status storeMongosOptions(const moe::Environment& params, const std::vector<std::string>& args);

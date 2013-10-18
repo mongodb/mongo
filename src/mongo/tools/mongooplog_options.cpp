@@ -73,12 +73,12 @@ namespace mongo {
         *out << std::flush;
     }
 
-    Status handlePreValidationMongoOplogOptions(const moe::Environment& params) {
+    bool handlePreValidationMongoOplogOptions(const moe::Environment& params) {
         if (params.count("help")) {
             printMongoOplogHelp(&std::cout);
-            ::_exit(0);
+            return true;
         }
-        return Status::OK();
+        return false;
     }
 
     Status storeMongoOplogOptions(const moe::Environment& params,
@@ -89,8 +89,7 @@ namespace mongo {
         }
 
         if (!hasParam("from")) {
-            std::cerr << "need to specify --from" << std::endl;
-            ::_exit(EXIT_BADOPTIONS);
+            return Status(ErrorCodes::BadValue, "need to specify --from");
         }
         else {
             mongoOplogGlobalParams.from = getParam("from");
@@ -107,11 +106,10 @@ namespace mongo {
     }
 
     MONGO_STARTUP_OPTIONS_VALIDATE(MongoOplogOptions)(InitializerContext* context) {
-        Status ret = handlePreValidationMongoOplogOptions(moe::startupOptionsParsed);
-        if (!ret.isOK()) {
-            return ret;
+        if (handlePreValidationMongoOplogOptions(moe::startupOptionsParsed)) {
+            ::_exit(EXIT_SUCCESS);
         }
-        ret = moe::startupOptionsParsed.validate();
+        Status ret = moe::startupOptionsParsed.validate();
         if (!ret.isOK()) {
             return ret;
         }
@@ -119,6 +117,13 @@ namespace mongo {
     }
 
     MONGO_STARTUP_OPTIONS_STORE(MongoOplogOptions)(InitializerContext* context) {
-        return storeMongoOplogOptions(moe::startupOptionsParsed, context->args());
+        Status ret = storeMongoOplogOptions(moe::startupOptionsParsed, context->args());
+        if (!ret.isOK()) {
+            std::cerr << ret.toString() << std::endl;
+            std::cerr << "try '" << context->args()[0] << " --help' for more information"
+                      << std::endl;
+            ::_exit(EXIT_BADOPTIONS);
+        }
+        return Status::OK();
     }
 }

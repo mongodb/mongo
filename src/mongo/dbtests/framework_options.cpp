@@ -129,11 +129,11 @@ namespace mongo {
         return sb.str();
     }
 
-    Status handlePreValidationTestFrameworkOptions(const moe::Environment& params,
+    bool handlePreValidationTestFrameworkOptions(const moe::Environment& params,
                                                    const std::vector<std::string>& args) {
         if (params.count("help")) {
             std::cout << getTestFrameworkHelp(args[0], moe::startupOptions) << std::endl;
-            ::_exit(EXIT_SUCCESS);
+            return true;
         }
 
         if (params.count("list")) {
@@ -143,10 +143,10 @@ namespace mongo {
 
                 std::cout << *i << std::endl;
             }
-            ::_exit(EXIT_SUCCESS);
+            return true;
         }
 
-        return Status::OK();
+        return false;
     }
 
     Status storeTestFrameworkOptions(const moe::Environment& params,
@@ -195,10 +195,10 @@ namespace mongo {
         try {
             if (boost::filesystem::exists(p)) {
                 if (!boost::filesystem::is_directory(p)) {
-                    std::cerr << "ERROR: path \"" << p.string() << "\" is not a directory"
-                                << std::endl;
-                    std::cerr << getTestFrameworkHelp(args[0], moe::startupOptions) << std::endl;
-                    ::_exit(EXIT_BADOPTIONS);
+                    StringBuilder sb;
+                    sb << "ERROR: path \"" << p.string() << "\" is not a directory";
+                    sb << getTestFrameworkHelp(args[0], moe::startupOptions);
+                    return Status(ErrorCodes::BadValue, sb.str());
                 }
                 boost::filesystem::directory_iterator end_iter;
                 for (boost::filesystem::directory_iterator dir_iter(p);
@@ -211,8 +211,9 @@ namespace mongo {
             }
         }
         catch (const boost::filesystem::filesystem_error& e) {
-            std::cerr << "boost::filesystem threw exception: " << e.what() << std::endl;
-            ::_exit(EXIT_BADOPTIONS);
+            StringBuilder sb;
+            sb << "boost::filesystem threw exception: " << e.what();
+            return Status(ErrorCodes::BadValue, sb.str());
         }
 
         string dbpathString = p.string();
@@ -267,12 +268,10 @@ namespace mongo {
     }
 
     MONGO_STARTUP_OPTIONS_VALIDATE(FrameworkOptions)(InitializerContext* context) {
-        Status ret = handlePreValidationTestFrameworkOptions(moe::startupOptionsParsed,
-                                                             context->args());
-        if (!ret.isOK()) {
-            return ret;
+        if (handlePreValidationTestFrameworkOptions(moe::startupOptionsParsed, context->args())) {
+            ::_exit(EXIT_SUCCESS);
         }
-        ret = moe::startupOptionsParsed.validate();
+        Status ret = moe::startupOptionsParsed.validate();
         if (!ret.isOK()) {
             return ret;
         }
@@ -280,6 +279,13 @@ namespace mongo {
     }
 
     MONGO_STARTUP_OPTIONS_STORE(FrameworkOptions)(InitializerContext* context) {
-        return storeTestFrameworkOptions(moe::startupOptionsParsed, context->args());
+        Status ret = storeTestFrameworkOptions(moe::startupOptionsParsed, context->args());
+        if (!ret.isOK()) {
+            std::cerr << ret.toString() << std::endl;
+            std::cerr << "try '" << context->args()[0] << " --help' for more information"
+                      << std::endl;
+            ::_exit(EXIT_BADOPTIONS);
+        }
+        return Status::OK();
     }
 }
