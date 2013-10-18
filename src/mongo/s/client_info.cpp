@@ -88,7 +88,6 @@ namespace mongo {
         _cur = _prev;
         _prev = temp;
         _cur->clear();
-        getAuthorizationSession()->startRequest();
     }
 
     ClientInfo* ClientInfo::create(AbstractMessagingPort* messagingPort) {

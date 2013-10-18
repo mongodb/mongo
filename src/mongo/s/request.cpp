@@ -33,6 +33,7 @@
 #include "mongo/s/request.h"
 
 #include "mongo/client/connpool.h"
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/stats/counters.h"
@@ -65,6 +66,7 @@ namespace mongo {
             return;
         _didInit = true;
         reset();
+        _clientInfo->getAuthorizationSession()->startRequest();
     }
 
     // Deprecated, will move to the strategy itself

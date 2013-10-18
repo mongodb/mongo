@@ -51,8 +51,12 @@ namespace mongo {
      *
      * An AuthorizationSession object is present within every mongo::ClientBasic object.
      *
-     * Predicate methods for checking authorization may in the worst case acquire read locks
-     * on the admin database.
+     * Users in the _authenticatedUsers cache may get marked as invalid by the AuthorizationManager,
+     * for instance if their privileges are changed by a user or role modification command.  At the
+     * beginning of every user-initiated operation startRequest() gets called which updates
+     * the cached information about any users who have been marked as invalid.  This guarantees that
+     * every operation looks at one consistent view of each user for every auth check required over
+     * the lifetime of the operation.
      */
     class AuthorizationSession {
         MONGO_DISALLOW_COPYING(AuthorizationSession);
@@ -177,6 +181,10 @@ namespace mongo {
         bool isAuthorizedForActionsOnNamespace(const NamespaceString& ns, const ActionSet& actions);
 
     private:
+
+        // If any users authenticated on this session are marked as invalid this updates them with
+        // up-to-date information. May require a read lock on the "admin" db to read the user data.
+        void _refreshUserInfoAsNeeded();
 
         // Checks if this connection is authorized for the given Privilege, ignoring whether or not
         // we should even be doing authorization checks in general.  Note: this may acquire a read

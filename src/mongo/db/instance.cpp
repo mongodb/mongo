@@ -359,6 +359,9 @@ namespace mongo {
         bool isCommand = false;
         const char *ns = m.singleData()->_data + 4;
 
+        Client& c = cc();
+        c.getAuthorizationSession()->startRequest();
+
         if ( op == dbQuery ) {
             if( strstr(ns, ".$cmd") ) {
                 isCommand = true;
@@ -414,9 +417,6 @@ namespace mongo {
             globalOpCounters.gotDelete();
             break;
         }
-
-        Client& c = cc();
-        c.getAuthorizationSession()->startRequest();
         
         auto_ptr<CurOp> nestedOp;
         CurOp* currentOpP = c.curop();

@@ -68,6 +68,7 @@ namespace {
 
     void AuthorizationSession::startRequest() {
         _externalState->startRequest();
+        _refreshUserInfoAsNeeded();
     }
 
     Status AuthorizationSession::addAndAuthorizeUser(const UserName& userName) {
@@ -382,14 +383,8 @@ namespace {
         return false;
     }
 
-    bool AuthorizationSession::_isAuthorizedForPrivilege(const Privilege& privilege) {
+    void AuthorizationSession::_refreshUserInfoAsNeeded() {
         AuthorizationManager& authMan = getAuthorizationManager();
-        const ResourcePattern& target(privilege.getResourcePattern());
-
-        ResourcePattern resourceSearchList[resourceSearchListCapacity];
-        const int resourceSearchListLength = buildResourceSearchList(target, resourceSearchList);
-
-        ActionSet unmetRequirements = privilege.getActions();
         UserSet::iterator it = _authenticatedUsers.begin();
         while (it != _authenticatedUsers.end()) {
             User* user = *it;
@@ -406,7 +401,6 @@ namespace {
                     // Success! Replace the old User object with the updated one.
                     fassert(17067, _authenticatedUsers.replaceAt(it, updatedUser) == user);
                     authMan.releaseUser(user);
-                    user = updatedUser;
                     LOG(1) << "Updated session cache of user information for " << name;
                     break;
                 }
@@ -426,6 +420,21 @@ namespace {
                     break;
                 }
             }
+            ++it;
+        }
+    }
+
+    bool AuthorizationSession::_isAuthorizedForPrivilege(const Privilege& privilege) {
+        const ResourcePattern& target(privilege.getResourcePattern());
+
+        ResourcePattern resourceSearchList[resourceSearchListCapacity];
+        const int resourceSearchListLength = buildResourceSearchList(target, resourceSearchList);
+
+        ActionSet unmetRequirements = privilege.getActions();
+
+        for (UserSet::iterator it = _authenticatedUsers.begin();
+                it != _authenticatedUsers.end(); ++it) {
+            User* user = *it;
 
             for (int i = 0; i < resourceSearchListLength; ++i) {
                 ActionSet userActions = user->getActionsForResource(resourceSearchList[i]);
@@ -434,7 +443,6 @@ namespace {
                 if (unmetRequirements.empty())
                     return true;
             }
-            ++it;
         }
 
         return false;
