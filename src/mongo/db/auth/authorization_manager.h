@@ -84,6 +84,7 @@ namespace mongo {
 
         static const NamespaceString adminCommandNamespace;
         static const NamespaceString rolesCollectionNamespace;
+        static const NamespaceString usersAltCollectionNamespace;
         static const NamespaceString usersCollectionNamespace;
         static const NamespaceString versionCollectionNamespace;
 

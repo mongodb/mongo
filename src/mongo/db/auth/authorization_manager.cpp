@@ -85,6 +85,7 @@ namespace mongo {
 
     const NamespaceString AuthorizationManager::adminCommandNamespace("admin.$cmd");
     const NamespaceString AuthorizationManager::rolesCollectionNamespace("admin.system.roles");
+    const NamespaceString AuthorizationManager::usersAltCollectionNamespace("admin.new.users");
     const NamespaceString AuthorizationManager::usersCollectionNamespace("admin.system.users");
     const NamespaceString AuthorizationManager::versionCollectionNamespace("admin.system.version");
 
@@ -885,7 +886,8 @@ namespace mongo {
             return builder.obj();
         }
 
-        const NamespaceString newusersCollectionNamespace("admin._newusers");
+        const NamespaceString newusersCollectionNamespace(
+                AuthorizationManager::usersAltCollectionNamespace);
         const NamespaceString backupUsersCollectionNamespace("admin.backup.users");
         const BSONObj versionDocumentQuery = BSON("_id" << 1);
 

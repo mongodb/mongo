@@ -143,16 +143,36 @@ namespace {
                                                                BSONObj* result) {
 
         BSONObj userDoc;
-        Status status = _findUser(
-                "admin.system.users",
-                BSON(AuthorizationManager::USER_NAME_FIELD_NAME << userName.getUser() <<
-                     AuthorizationManager::USER_DB_FIELD_NAME << userName.getDB()),
-                &userDoc);
-        if (!status.isOK())
-            return status;
+        {
+            Client::ReadContext ctx("admin");
+            int authzVersion;
+            Status status = getStoredAuthorizationVersion(&authzVersion);
+            if (!status.isOK())
+                return status;
+
+            switch (authzVersion) {
+            case AuthorizationManager::schemaVersion26Upgrade:
+            case AuthorizationManager::schemaVersion26Final:
+                break;
+            default:
+                return Status(ErrorCodes::AuthSchemaIncompatible, mongoutils::str::stream() <<
+                              "Unsupported schema version for getUserDescription(): " <<
+                              authzVersion);
+            }
+
+            status = _findUser(
+                    (authzVersion == AuthorizationManager::schemaVersion26Final ?
+                     AuthorizationManager::usersCollectionNamespace.ns() :
+                     AuthorizationManager::usersAltCollectionNamespace.ns()),
+                    BSON(AuthorizationManager::USER_NAME_FIELD_NAME << userName.getUser() <<
+                         AuthorizationManager::USER_DB_FIELD_NAME << userName.getDB()),
+                    &userDoc);
+            if (!status.isOK())
+                return status;
+        }
 
         BSONElement directRolesElement;
-        status = bsonExtractTypedField(userDoc, "roles", Array, &directRolesElement);
+        Status status = bsonExtractTypedField(userDoc, "roles", Array, &directRolesElement);
         if (!status.isOK())
             return status;
         std::vector<RoleName> directRoles;
