@@ -250,7 +250,7 @@ __wt_page_modify_init(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * keep things from racing too badly.
 	 */
 	modify->page_lock =
-            ++conn->page_lock_cnt % (uint32_t)(WT_PAGE_LOCKS(conn));
+	    ++conn->page_lock_cnt % (uint32_t)WT_PAGE_LOCKS(conn);
 
 	/*
 	 * Multiple threads of control may be searching and deciding to modify
