@@ -643,6 +643,11 @@ namespace replset {
         return _assumingPrimary;
     }
 
+    bool BackgroundSync::isPaused() {
+        boost::unique_lock<boost::mutex> lock(_mutex);
+        return _pause;
+    }
+
     void BackgroundSync::stopReplicationAndFlushBuffer() {
         boost::unique_lock<boost::mutex> lck(_mutex);
 

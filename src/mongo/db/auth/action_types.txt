@@ -91,6 +91,7 @@
 "replSetHeartbeat",
 "replSetInitiate",
 "replSetMaintenance",
+"replSetPauseReplication",
 "replSetReconfig",
 "replSetStepDown",
 "replSetSyncFrom",

@@ -80,16 +80,16 @@ namespace fieldchecker {
 
                         // We ignore the '$'-prefixed names that are part of a DBRef, because
                         // we don't have enough context here to validate that we have a proper
-                        // DB ref. Errors with the DBRef will be caught upstream when
+                        // DBRef. Errors with the DBRef will be caught upstream when
                         // okForStorage is invoked.
                         //
                         // TODO: We need to find a way to consolidate this checking with that
                         // done in okForStorage. There is too much duplication between this
                         // code and that code.
-                        const bool mightBePartOfDbRef =
-                            part.startsWith("$db") ||
-                            part.startsWith("$id") ||
-                            part.startsWith("$ref");
+                        const bool mightBePartOfDbRef = (i != 0) &&
+                                                        (part == "$db" ||
+                                                         part == "$id" ||
+                                                         part == "$ref");
 
                         if (!mightBePartOfDbRef)
                             return Status(ErrorCodes::DollarPrefixedFieldName,

@@ -47,17 +47,17 @@ namespace {
         fieldRef.parse("");
         ASSERT_NOT_OK(isUpdatable(fieldRef));
 
-//        FieldRef fieldRefDot;
-//        fieldRefDot.parse(".");
-//        ASSERT_NOT_OK(isUpdatable(fieldRefDot));
+        FieldRef fieldRefDot;
+        fieldRefDot.parse(".");
+        ASSERT_NOT_OK(isUpdatable(fieldRefDot));
 
         FieldRef fieldRefDollar;
         fieldRefDollar.parse("$");
         ASSERT_NOT_OK(isUpdatable(fieldRefDollar));
 
-//        FieldRef fieldRefADot;
-//        fieldRefADot.parse("a.");
-//        ASSERT_NOT_OK(isUpdatable(fieldRefADot));
+        FieldRef fieldRefADot;
+        fieldRefADot.parse("a.");
+        ASSERT_NOT_OK(isUpdatable(fieldRefADot));
 
         FieldRef fieldRefDotB;
         fieldRefDotB.parse(".b");
@@ -111,22 +111,109 @@ namespace {
         ASSERT_NOT_OK(isUpdatable(fieldRefLateDollar));
     }
 
-    TEST(IsUpdatable, DBRefNamesAreIgnored) {
+    // DBRef related tests
+
+    // Allowed
+    TEST(IsUpdatable, DBRefIdIgnored) {
         FieldRef fieldRefDBRef;
-        fieldRefDBRef.parse("$id.$ref.$db");
+        fieldRefDBRef.parse("a.$id");
         ASSERT_OK(isUpdatable(fieldRefDBRef));
     }
 
-    TEST(IsUpdatableLegacy, Basics) {
-        FieldRef fieldRefDollar;
-        fieldRefDollar.parse("$foo");
-        ASSERT_OK(isUpdatableLegacy(fieldRefDollar));
+    TEST(IsUpdatable, DBRefDbIgnored) {
+        FieldRef fieldRefDBRef;
+        fieldRefDBRef.parse("a.$db");
+        ASSERT_OK(isUpdatable(fieldRefDBRef));
     }
 
-    TEST(IsUpdatableLegacy, DollarPrefixedDeepFields) {
-        FieldRef fieldRefLateDollar;
-        fieldRefLateDollar.parse("a.$b");
-        ASSERT_OK(isUpdatableLegacy(fieldRefLateDollar));
+    TEST(IsUpdatable, DBRefRefIgnored) {
+        FieldRef fieldRefDBRef;
+        fieldRefDBRef.parse("a.$ref");
+        ASSERT_OK(isUpdatable(fieldRefDBRef));
+    }
+
+    TEST(IsUpdatable, DBRefIdIgnoredNested) {
+        FieldRef fieldRefDBRef;
+        fieldRefDBRef.parse("a.b.$id");
+        ASSERT_OK(isUpdatable(fieldRefDBRef));
+    }
+
+    TEST(IsUpdatable, DBRefDbIgnoredNested) {
+        FieldRef fieldRefDBRef;
+        fieldRefDBRef.parse("a.b.$db");
+        ASSERT_OK(isUpdatable(fieldRefDBRef));
+    }
+
+    TEST(IsUpdatable, DBRefRefIgnoredNested) {
+        FieldRef fieldRefDBRef;
+        fieldRefDBRef.parse("a.b.$ref");
+        ASSERT_OK(isUpdatable(fieldRefDBRef));
+    }
+
+    TEST(IsUpdatable, DBRefIdRoot) {
+        FieldRef fieldRefDBRef;
+        fieldRefDBRef.parse("$id");
+        ASSERT_NOT_OK(isUpdatable(fieldRefDBRef));
+    }
+
+    TEST(IsUpdatable, DBRefRefRoot) {
+        FieldRef fieldRefDBRef;
+        fieldRefDBRef.parse("$ref");
+        ASSERT_NOT_OK(isUpdatable(fieldRefDBRef));
+    }
+
+    TEST(IsUpdatable, DBRefDbRoot) {
+        FieldRef fieldRefDBRef;
+        fieldRefDBRef.parse("$db");
+        ASSERT_NOT_OK(isUpdatable(fieldRefDBRef));
+    }
+
+    TEST(IsUpdatable, DBRefIdLike) {
+        FieldRef fieldRefDBRef;
+        fieldRefDBRef.parse("$idasd");
+        ASSERT_NOT_OK(isUpdatable(fieldRefDBRef));
+    }
+
+    TEST(IsUpdatable, DBRefRefLike) {
+        FieldRef fieldRefDBRef;
+        fieldRefDBRef.parse("$refasd");
+        ASSERT_NOT_OK(isUpdatable(fieldRefDBRef));
+    }
+
+    TEST(IsUpdatable, DBRefDbLike) {
+        FieldRef fieldRefDBRef;
+        fieldRefDBRef.parse("$dbasd");
+        ASSERT_NOT_OK(isUpdatable(fieldRefDBRef));
+    }
+
+    TEST(IsUpdatable, DBRefIdLikeNested) {
+        FieldRef fieldRefDBRef;
+        fieldRefDBRef.parse("a.$idasd");
+        ASSERT_NOT_OK(isUpdatable(fieldRefDBRef));
+    }
+
+    TEST(IsUpdatable, DBRefRefLikeNested) {
+        FieldRef fieldRefDBRef;
+        fieldRefDBRef.parse("a.$refasd");
+        ASSERT_NOT_OK(isUpdatable(fieldRefDBRef));
+    }
+
+    TEST(IsUpdatable, DBRefDbLikeNested) {
+        FieldRef fieldRefDBRef;
+        fieldRefDBRef.parse("a.$dbasd");
+        ASSERT_NOT_OK(isUpdatable(fieldRefDBRef));
+    }
+
+    TEST(IsUpdatable, DBRefDbCase1) {
+        FieldRef fieldRefDBRef;
+        fieldRefDBRef.parse("a.$Db");
+        ASSERT_NOT_OK(isUpdatable(fieldRefDBRef));
+    }
+
+    TEST(IsUpdatable, DBRefDbCase2) {
+        FieldRef fieldRefDBRef;
+        fieldRefDBRef.parse("a.$DB");
+        ASSERT_NOT_OK(isUpdatable(fieldRefDBRef));
     }
 
     TEST(isPositional, EntireArrayItem) {
@@ -157,6 +244,31 @@ namespace {
         ASSERT_TRUE(isPositional(fieldRefPositional, &pos, &count));
         ASSERT_EQUALS(pos, 1u);
         ASSERT_EQUALS(count, 2u);
+    }
+
+    // Legacy tests which allow $prefix paths
+    TEST(IsUpdatableLegacy, Basics) {
+        FieldRef fieldRefDollar;
+        fieldRefDollar.parse("$foo");
+        ASSERT_OK(isUpdatableLegacy(fieldRefDollar));
+    }
+
+    TEST(IsUpdatableLegacy, DollarPrefixedNested) {
+        FieldRef fieldRefLateDollar;
+        fieldRefLateDollar.parse("a.$b");
+        ASSERT_OK(isUpdatableLegacy(fieldRefLateDollar));
+    }
+
+    TEST(IsUpdatableLegacy, DollarPrefixedDeepNested) {
+        FieldRef fieldRefLateDollar;
+        fieldRefLateDollar.parse("a.b.$c");
+        ASSERT_OK(isUpdatableLegacy(fieldRefLateDollar));
+    }
+
+    TEST(IsUpdatableLegacy, PositionalDollarPrefixed) {
+        FieldRef fieldRefLateDollar;
+        fieldRefLateDollar.parse("a.$.$b");
+        ASSERT_OK(isUpdatableLegacy(fieldRefLateDollar));
     }
 
 } // unnamed namespace

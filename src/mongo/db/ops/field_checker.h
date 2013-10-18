@@ -41,7 +41,7 @@ namespace mongo {
          *   + Non-empty
          *   + Not the _id field (or a subfield of the _id field, such as _id.x.y)
          *   + Does not start or end with a '.'
-         *   + Does not start with a $
+         *   + Does not start with a $ (unless a DBRef part $id/$ref/$db not at the root)
          * Otherwise returns a code indicating cause of failure.
          */
         Status isUpdatable(const FieldRef& field);
