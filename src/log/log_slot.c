@@ -36,6 +36,9 @@ __wt_log_slot_init(WT_SESSION_IMPL *session)
 	for (i = 0; i < SLOT_POOL; i++) {
 		log->slot_pool[i].slot_state = WT_LOG_SLOT_FREE;
 		log->slot_pool[i].slot_index = SLOT_INVALID_INDEX;
+		/* TODO: Memory leak on error. */
+		WT_RET(__wt_buf_init(session,
+		    &log->slot_pool[i].slot_buf, WT_LOG_SLOT_BUF_INIT_SIZE));
 	}
 
 	/*

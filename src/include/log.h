@@ -9,6 +9,7 @@
 
 /* Logging subsystem declarations. */
 #define	LOG_ALIGN		128
+#define	WT_LOG_SLOT_BUF_INIT_SIZE	4096
 
 struct __wt_lsn {
 	uint32_t	file;		/* Log file number */
@@ -82,6 +83,9 @@ typedef struct {
 #undef	slot_fh
 #define	slot_fh			u.slot.fh
 			WT_FH	*fh;		/* File handle for this group */
+#undef	slot_buf
+#define	slot_buf		u.slot.buf
+			WT_ITEM buf;		/* Buffer for grouped writes */
 #undef	slot_flags
 #define	slot_flags		u.slot.flags
 #define	SLOT_CLOSEFH	0x01			/* Close old fh on release */
