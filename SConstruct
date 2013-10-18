@@ -1226,9 +1226,11 @@ def doConfigure(myenv):
     # This needs to happen before we check for libc++, since it affects whether libc++ is available.
     if darwin and has_option('osx-version-min'):
         min_version = get_option('osx-version-min')
-        if not AddToCCFLAGSIfSupported(myenv, '-mmacosx-version-min=%s' % (min_version)):
+        min_version_flag = '-mmacosx-version-min=%s' % (min_version)
+        if not AddToCCFLAGSIfSupported(myenv, min_version_flag):
             print( "Can't set minimum OS X version with this compiler" )
             Exit(1)
+        myenv.AppendUnique(LINKFLAGS=[min_version_flag])
 
     if has_option('libc++'):
         if not using_clang():
