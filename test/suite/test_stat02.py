@@ -79,6 +79,7 @@ class test_stat_cursor_config(wttest.WiredTigerTestCase):
                 self.session.open_cursor('statistics:', None, config), msg)
 
 
+# Test the "clear" configuration.
 class test_stat_cursor_clear(wttest.WiredTigerTestCase):
     pfx = 'test_stat_cursor_clear'
 
@@ -92,12 +93,28 @@ class test_stat_cursor_clear(wttest.WiredTigerTestCase):
     def test_stat_cursor_clear(self):
         uri = 'table:' + self.pfx
         complex_populate(self, uri, 'key_format=S', 100)
+
+        # connection cursor_insert should clear
+        # connection cache_bytes_dirty should not clear
+        cursor = self.session.open_cursor(
+            'statistics:', None, 'statistics=(all,clear)')
+        self.assertGreater(cursor[stat.conn.cache_bytes_dirty][2], 0)
+        self.assertGreater(cursor[stat.conn.cursor_insert][2], 0)
+        cursor = self.session.open_cursor(
+            'statistics:', None, 'statistics=(all,clear)')
+        self.assertGreater(cursor[stat.conn.cache_bytes_dirty][2], 0)
+        self.assertEqual(cursor[stat.conn.cursor_insert][2], 0)
+
+        # data-source cursor_insert should clear
+        # data-source btree_maximum_depth should not clear
         cursor = self.session.open_cursor(
             'statistics:' + uri, None, 'statistics=(all,clear)')
         self.assertGreater(cursor[stat.dsrc.cursor_insert][2], 0)
+        self.assertGreater(cursor[stat.dsrc.btree_maximum_depth][2], 0)
         cursor = self.session.open_cursor(
             'statistics:' + uri, None, 'statistics=(all,clear)')
         self.assertEqual(cursor[stat.dsrc.cursor_insert][2], 0)
+        self.assertGreater(cursor[stat.dsrc.btree_maximum_depth][2], 0)
 
 
 if __name__ == '__main__':
