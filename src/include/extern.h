@@ -353,7 +353,7 @@ extern int __wt_kv_return(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt);
 extern int __wt_bt_salvage(WT_SESSION_IMPL *session,
     WT_CKPT *ckptbase,
     const char *cfg[]);
-extern int __wt_btree_stat_init(WT_SESSION_IMPL *session);
+extern int __wt_btree_stat_init(WT_SESSION_IMPL *session, WT_CURSOR_STAT *cst);
 extern int __wt_bt_cache_force_write(WT_SESSION_IMPL *session);
 extern int __wt_bt_cache_op(WT_SESSION_IMPL *session,
     WT_CKPT *ckptbase,

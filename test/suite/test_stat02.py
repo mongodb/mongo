@@ -142,5 +142,39 @@ class test_stat_cursor_dsrc_clear(wttest.WiredTigerTestCase):
         self.assertEqual(cursor[stat.dsrc.cursor_insert][2], 0)
 
 
+# Test the "fast" configuration.
+class test_stat_cursor_fast(wttest.WiredTigerTestCase):
+    pfx = 'test_stat_cursor_fast'
+
+    uri = [
+        ('1',  dict(uri='file:' + pfx, pop=simple_populate)),
+        ('2', dict(uri='table:' + pfx, pop=simple_populate)),
+        ('3', dict(uri='table:' + pfx, pop=complex_populate)),
+        ('4', dict(uri='table:' + pfx, pop=complex_populate_lsm))
+    ]
+
+    scenarios = number_scenarios(multiply_scenarios('.', uri))
+
+    # Override WiredTigerTestCase, we have extensions.
+    def setUpConnectionOpen(self, dir):
+        conn = wiredtiger.wiredtiger_open(dir,
+            'create,statistics=(all),' +
+            'error_prefix="%s: "' % self.shortid())
+        return conn
+
+    def test_stat_cursor_fast(self):
+        self.pop(self, self.uri, 'key_format=S', 100)
+
+        # A "fast" cursor shouldn't see the underlying btree statistics;
+        # check "fast" first, otherwise we get a copy of the statistics
+        # we generated in the "all" call, they just aren't updated.
+        cursor = self.session.open_cursor(
+            'statistics:' + self.uri, None, 'statistics=(fast)')
+        self.assertEqual(cursor[stat.dsrc.btree_entries][2], 0)
+        cursor = self.session.open_cursor(
+            'statistics:' + self.uri, None, 'statistics=(all)')
+        self.assertGreater(cursor[stat.dsrc.btree_entries][2], 0)
+
+
 if __name__ == '__main__':
     wttest.run()

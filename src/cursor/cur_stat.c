@@ -377,7 +377,7 @@ __curstat_file_init(WT_SESSION_IMPL *session,
 	 * Fill in the data source statistics, and copy them to the cursor.
 	 * Optionally clear the data source statistics.
 	 */
-	if ((ret = __wt_btree_stat_init(session)) == 0) {
+	if ((ret = __wt_btree_stat_init(session, cst)) == 0) {
 		cst->u.dsrc_stats = dhandle->stats;
 		if (cst->stat_clear)
 			__wt_stat_refresh_dsrc_stats(&dhandle->stats);
