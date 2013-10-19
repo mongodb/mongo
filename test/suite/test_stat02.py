@@ -165,8 +165,8 @@ class test_stat_cursor_fast(wttest.WiredTigerTestCase):
     def test_stat_cursor_fast(self):
         self.pop(self, self.uri, 'key_format=S', 100)
 
-        # A "fast" cursor shouldn't see the underlying btree statistics;
-        # check "fast" first, otherwise we get a copy of the statistics
+        # A "fast" cursor shouldn't see the underlying btree statistics.
+        # Check "fast" first, otherwise we get a copy of the statistics
         # we generated in the "all" call, they just aren't updated.
         cursor = self.session.open_cursor(
             'statistics:' + self.uri, None, 'statistics=(fast)')
