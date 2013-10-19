@@ -18,6 +18,14 @@ env.StaticLibrary('logger',
                   LIBDEPS=['$BUILD_DIR/mongo/base/base',
                            '$BUILD_DIR/mongo/util/concurrency/thread_name'])
 
+# writes multi-byte sequences to console
+# to support manual testing of console stream  under Windows
+# output should be visually verified under Command Prompt or Power Shell
+env.Program('console_test', 'console_test.cpp',
+                LIBDEPS=['logger',
+                         '$BUILD_DIR/mongo/unittest/unittest_crutch',
+                         '$BUILD_DIR/mongo/unittest/unittest_main'])
+
 env.CppUnitTest('log_test', 'log_test.cpp',
                 LIBDEPS=['logger', '$BUILD_DIR/mongo/foundation'])
 

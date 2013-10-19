@@ -39,7 +39,6 @@ namespace mongo {
         Console();
 
         std::ostream& out();
-        std::istream& in();
 
     private:
         boost::unique_lock<boost::mutex> _consoleLock;
