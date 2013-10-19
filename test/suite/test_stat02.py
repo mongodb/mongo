@@ -79,9 +79,9 @@ class test_stat_cursor_config(wttest.WiredTigerTestCase):
                 self.session.open_cursor('statistics:', None, config), msg)
 
 
-# Test the "clear" configuration.
-class test_stat_cursor_clear(wttest.WiredTigerTestCase):
-    pfx = 'test_stat_cursor_clear'
+# Test the connection "clear" configuration.
+class test_stat_cursor_conn_clear(wttest.WiredTigerTestCase):
+    pfx = 'test_stat_cursor_conn_clear'
 
     # Override WiredTigerTestCase, we have extensions.
     def setUpConnectionOpen(self, dir):
@@ -90,12 +90,12 @@ class test_stat_cursor_clear(wttest.WiredTigerTestCase):
             'error_prefix="%s: "' % self.shortid())
         return conn
 
-    def test_stat_cursor_clear(self):
+    def test_stat_cursor_conn_clear(self):
         uri = 'table:' + self.pfx
         complex_populate(self, uri, 'key_format=S', 100)
 
-        # connection cursor_insert should clear
-        # connection cache_bytes_dirty should not clear
+        # cursor_insert should clear
+        # cache_bytes_dirty should not clear
         cursor = self.session.open_cursor(
             'statistics:', None, 'statistics=(all,clear)')
         self.assertGreater(cursor[stat.conn.cache_bytes_dirty][2], 0)
@@ -105,16 +105,41 @@ class test_stat_cursor_clear(wttest.WiredTigerTestCase):
         self.assertGreater(cursor[stat.conn.cache_bytes_dirty][2], 0)
         self.assertEqual(cursor[stat.conn.cursor_insert][2], 0)
 
-        # data-source cursor_insert should clear
-        # data-source btree_maximum_depth should not clear
+
+# Test the data-source "clear" configuration.
+class test_stat_cursor_dsrc_clear(wttest.WiredTigerTestCase):
+    pfx = 'test_stat_cursor_dsrc_clear'
+
+    uri = [
+        ('1',  dict(uri='file:' + pfx, pop=simple_populate)),
+        ('2', dict(uri='table:' + pfx, pop=simple_populate)),
+        ('3', dict(uri='table:' + pfx, pop=complex_populate)),
+        ('4', dict(uri='table:' + pfx, pop=complex_populate_lsm))
+    ]
+
+    scenarios = number_scenarios(multiply_scenarios('.', uri))
+
+    # Override WiredTigerTestCase, we have extensions.
+    def setUpConnectionOpen(self, dir):
+        conn = wiredtiger.wiredtiger_open(dir,
+            'create,statistics=(all),' +
+            'error_prefix="%s: "' % self.shortid())
+        return conn
+
+    def test_stat_cursor_dsrc_clear(self):
+        self.pop(self, self.uri, 'key_format=S', 100)
+
+        # cursor_insert should clear
+        #
+        # We can't easily test data-source items that shouldn't clear: as I
+        # write this, session_cursor_open is the only such item, and it will
+        # change to account for the statistics cursors we open here.
         cursor = self.session.open_cursor(
-            'statistics:' + uri, None, 'statistics=(all,clear)')
+            'statistics:' + self.uri, None, 'statistics=(all,clear)')
         self.assertGreater(cursor[stat.dsrc.cursor_insert][2], 0)
-        self.assertGreater(cursor[stat.dsrc.btree_maximum_depth][2], 0)
         cursor = self.session.open_cursor(
-            'statistics:' + uri, None, 'statistics=(all,clear)')
+            'statistics:' + self.uri, None, 'statistics=(all,clear)')
         self.assertEqual(cursor[stat.dsrc.cursor_insert][2], 0)
-        self.assertGreater(cursor[stat.dsrc.btree_maximum_depth][2], 0)
 
 
 if __name__ == '__main__':
