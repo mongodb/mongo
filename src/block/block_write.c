@@ -188,8 +188,8 @@ __wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 			    session, ret, "%s: posix_fadvise", block->name);
 	}
 #endif
-	WT_RUNSTAT_CONN_INCR(session, block_write);
-	WT_RUNSTAT_CONN_INCRV(session, block_byte_write, align_size);
+	WT_STAT_FAST_CONN_INCR(session, block_write);
+	WT_STAT_FAST_CONN_INCRV(session, block_byte_write, align_size);
 
 	WT_VERBOSE_RET(session, write,
 	    "off %" PRIuMAX ", size %" PRIu32 ", cksum %" PRIu32,

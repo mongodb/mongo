@@ -309,9 +309,13 @@ connection_runtime_config = [
 		trigger eviction when the cache becomes this full (as a
 		percentage)''',
 		min=10, max=99),
-	Config('statistics', 'false', r'''
-		Maintain database statistics that may impact performance''',
-		type='boolean'),
+	Config('statistics', 'fast', r'''
+		Maintain database statistics, which may impact performance.
+		Choosing "all" maintains all statistics regardless of cost,
+		"fast" maintains a subset of statistics that are relatively
+		inexpensive, "none" turns off all statistics.  See @ref
+		statistics for more information''',
+		type='list', choices=['none', 'fast', 'all']),
 	Config('verbose', '', r'''
 		enable messages for various events.  Options are given as a
 		list, such as <code>"verbose=[evictserver,read]"</code>''',
@@ -433,14 +437,25 @@ methods = {
 		ignore the encodings for the key and value, manage data as if
 		the formats were \c "u".  See @ref cursor_raw for details''',
 		type='boolean'),
-	Config('statistics_clear', 'false', r'''
-		reset statistics counters when the cursor is closed; valid
-		only for statistics cursors''',
-		type='boolean'),
-	Config('statistics_fast', 'true', r'''
-		only gather statistics that don't require traversing the tree;
-		valid only for statistics cursors''',
-		type='boolean'),
+	Config('statistics', 'fast', r'''
+		Specify the statistics to be gathered.  Choosing "all" gathers
+		statistics regardless of cost and may include reading
+		underlying disk-based files; "fast" gathers a subset of
+		statistics that are relatively inexpensive.  The selection
+		must match the database \c statistics configuration specified
+		to ::wiredtiger_open or WT_CONNECTION::reconfigure.  For
+		example, "fast" or "all" can be configured when the database
+		is configured with "all", but the cursor open will fail if
+		"all" is configured when the database is configured with
+		"fast", and the cursor open will fail in all cases when the
+		database is configured with "none".  If \c statistics is not
+		configured, the default configuration is the database
+		configuration.  The "clear" configuration resets statistics
+		after gathering them, where appropriate.  For example, a cache
+		size statistic is not cleared, while the count of cursor insert
+		operations will be cleared.  See @ref statistics for more
+		information''',
+		type='list', choices=['clear', 'all', 'fast']),
 	Config('target', '', r'''
 		if non-empty, backup the list of objects; valid only for a
 		backup data source''',
@@ -614,33 +629,31 @@ methods = {
 		threads)''',
 		min='1'),
 	Config('statistics_log', '', r'''
-		log database connection statistics to a file (implies
-		setting the \c statistics configuration value to true).
-		See @ref statistics_log for more information''',
+		log any statistics the database is configured to maintain,
+		to a file.  See @ref statistics_log for more information''',
 		type='category', subconfig=[
 		Config('clear', 'true', r'''
-		reset statistics counters after each set of log records are
-		written''', type='boolean'),
+		reset statistics after each set of log records are written,
+		where appropriate.  For example, a cache size statistic is
+		not cleared, while the count of cursor insert operations is
+		cleared''', type='boolean'),
 		Config('path', '"WiredTigerStat.%H"', r'''
 		the pathname to a file into which the log records are written,
-		may contain strftime conversion specifications.  If the value
-		is not an absolute path name, the file is created relative to
-		the database home'''),
+		may contain ISO C standard strftime conversion specifications.
+		If the value is not an absolute path name, the file is created
+		relative to the database home'''),
 		Config('sources', '', r'''
 		if non-empty, include statistics for the list of data source
 		URIs, if they are open at the time of the statistics logging.
 		The list may include URIs matching a single data source
 		("table:mytable"), or a URI matching all data sources of a
-		particular type ("table:").  No statistics that require the 
-		traversal of a tree are reported, as if the \c statistics_fast
-		configuration string were set''',
+		particular type ("table:")''',
 		type='list'),
 		Config('timestamp', '"%b %d %H:%M:%S"', r'''
 		a timestamp prepended to each log record, may contain strftime
 		conversion specifications'''),
 		Config('wait', '0', r'''
-		seconds to wait between each write of the log records; setting
-		this value configures \c statistics and statistics logging''',
+		seconds to wait between each write of the log records''',
 		min='1', max='100000'),
 		]),
 	Config('transaction_sync', 'dsync', r'''

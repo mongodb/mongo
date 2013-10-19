@@ -35,7 +35,9 @@ class test_reconfig(wttest.WiredTigerTestCase):
         self.conn.reconfigure("shared_cache=(enable=true,size=300M)")
 
     def test_reconfig_statistics(self):
-        self.conn.reconfigure("statistics=true")
+        self.conn.reconfigure("statistics=(all)")
+        self.conn.reconfigure("statistics=(fast)")
+        self.conn.reconfigure("statistics=(none)")
 
     def test_reconfig_verbose(self):
         self.conn.reconfigure("verbose=[mutex]")

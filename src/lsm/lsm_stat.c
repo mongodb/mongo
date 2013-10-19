@@ -7,16 +7,15 @@
 
 #include "wt_internal.h"
 
-static int __lsm_stat_init(
-    WT_SESSION_IMPL *, WT_LSM_TREE *, WT_CURSOR_STAT *, uint32_t);
+static int __lsm_stat_init(WT_SESSION_IMPL *, WT_LSM_TREE *, WT_CURSOR_STAT *);
 
 /*
  * __wt_curstat_lsm_init --
  *	Initialize the statistics for a LSM tree.
  */
 int
-__wt_curstat_lsm_init(WT_SESSION_IMPL *session,
-    const char *uri, WT_CURSOR_STAT *cst, uint32_t flags)
+__wt_curstat_lsm_init(
+    WT_SESSION_IMPL *session, const char *uri, WT_CURSOR_STAT *cst)
 {
 	WT_DECL_RET;
 	WT_LSM_TREE *lsm_tree;
@@ -25,7 +24,7 @@ __wt_curstat_lsm_init(WT_SESSION_IMPL *session,
 	    ret = __wt_lsm_tree_get(session, uri, 0, &lsm_tree));
 	WT_RET(ret);
 
-	ret = __lsm_stat_init(session, lsm_tree, cst, flags);
+	ret = __lsm_stat_init(session, lsm_tree, cst);
 
 	__wt_lsm_tree_release(session, lsm_tree);
 	return (ret);
@@ -36,8 +35,8 @@ __wt_curstat_lsm_init(WT_SESSION_IMPL *session,
  *	Initialize a LSM statistics structure.
  */
 static int
-__lsm_stat_init(WT_SESSION_IMPL *session,
-    WT_LSM_TREE *lsm_tree, WT_CURSOR_STAT *cst, uint32_t flags)
+__lsm_stat_init(
+    WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, WT_CURSOR_STAT *cst)
 {
 	WT_CURSOR *stat_cursor;
 	WT_DECL_ITEM(uribuf);
@@ -46,31 +45,25 @@ __lsm_stat_init(WT_SESSION_IMPL *session,
 	WT_LSM_CHUNK *chunk;
 	u_int i;
 	int locked;
-	const char **p;
+	char config[64];
 	const char *cfg[] = {
-	    WT_CONFIG_BASE(session, session_open_cursor), NULL, NULL, NULL };
+	    WT_CONFIG_BASE(session, session_open_cursor), NULL, NULL };
 	const char *disk_cfg[] = {
 	   WT_CONFIG_BASE(session, session_open_cursor),
-	   "checkpoint=WiredTigerCheckpoint", NULL, NULL, NULL };
+	   "checkpoint=WiredTigerCheckpoint", NULL, NULL };
 
 	locked = 0;
 	WT_ERR(__wt_scr_alloc(session, 0, &uribuf));
 
-	/*
-	 * If the upper-level statistics call is fast and/or clear, propagate
-	 * that to the cursors we open.
-	 */
-	p = &cfg[1];
-	if (LF_ISSET(WT_STATISTICS_CLEAR))
-		*p++ = "statistics_clear=true";
-	if (LF_ISSET(WT_STATISTICS_FAST))
-		*p++ = "statistics_fast=true";
-
-	p = &disk_cfg[1];
-	if (LF_ISSET(WT_STATISTICS_CLEAR))
-		*p++ = "statistics_clear=true";
-	if (LF_ISSET(WT_STATISTICS_FAST))
-		*p++ = "statistics_fast=true";
+	/* Propagate all, fast and/or clear to the cursors we open. */
+	if (cst->stat_clear || cst->stat_all || cst->stat_fast) {
+		(void)snprintf(config, sizeof(config),
+		    "statistics=(%s%s%s)",
+		    cst->stat_clear ? "clear," : "",
+		    cst->stat_all ? "all," : "",
+		    cst->stat_fast ? "fast," : "");
+		cfg[1] = disk_cfg[1] = config;
+	}
 
 	/*
 	 * Set the cursor to reference the data source statistics; we don't
@@ -160,7 +153,7 @@ __lsm_stat_init(WT_SESSION_IMPL *session,
 
 	/* Aggregate, and optionally clear, LSM-level specific information. */
 	__wt_stat_aggregate_dsrc_stats(&lsm_tree->stats, stats);
-	if (LF_ISSET(WT_STATISTICS_CLEAR))
+	if (cst->stat_clear)
 		__wt_stat_refresh_dsrc_stats(&lsm_tree->stats);
 
 err:	if (locked)

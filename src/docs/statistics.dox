@@ -1,17 +1,22 @@
 /*! @page statistics Statistics
 
 WiredTiger can be configured to maintain a variety of run-time
-statistics.  The \c statistics configuration boolean must be set for
+statistics.
+
+The ::wiredtiger_open \c statistics configuration must be set for
 statistics to be maintained; see @ref data_statistics for information
-about accessing the statistics.  The following example configures
-WiredTiger to maintain statistics:
+about accessing the statistics.
+
+The following example configures WiredTiger to maintain a larger number
+than of statistics than the default:
 
 @snippet ex_all.c Statistics configuration
 
-Note that maintaining statistics involves updating shared-memory data
-structures and may decrease application performance.
+As maintaining statistics involves updating shared-memory data
+structures, it may decrease application performance.
 
 @section statistics_log Statistics logging
+
 WiredTiger will optionally log database statistics into a file when the
 the ::wiredtiger_open \c statistics_log configuration is set.  The
 following example logs statistics every 30 seconds:
@@ -25,7 +30,7 @@ The timestamp format may be changed with the \c statistics_log.timestamp
 configuration string.  The \c timestamp value may contain ISO C90 standard
 strftime conversion specifications.
 
-By default, only the database statistics are logged.
+Only the statistics the database is configured to maintain are logged.
 
 Statistics for specific underlying data sources may be included by adding
 a list of data source URIs to the \c statistics_log configuration string:

@@ -166,17 +166,23 @@ struct __wt_connection_impl {
 	const char	*ckpt_config;	/* Checkpoint configuration */
 	long		 ckpt_usecs;	/* Checkpoint period */
 
+	/*
+	 * There are only three statistics states so far: "none", "fast" and
+	 * "all".  Keep it simple, "all" sets both of these variables, "fast"
+	 * sets one of them.
+	 */
+	int		 stat_all;	/* "all" statistics configured */
+	int		 stat_fast;	/* "fast" statistics configured */
+
 	WT_CONNECTION_STATS stats;	/* Connection statistics */
 #if SPINLOCK_TYPE == SPINLOCK_PTHREAD_MUTEX_LOGGING
 	WT_CONNECTION_STATS_SPINLOCK spinlock_stats[WT_STATS_SPINLOCK_MAX];
 #endif
 
-	int		 statistics;	/* Global statistics configuration */
 	WT_SESSION_IMPL *stat_session;	/* Statistics log session */
 	pthread_t	 stat_tid;	/* Statistics log thread */
 	int		 stat_tid_set;	/* Statistics log thread set */
 	WT_CONDVAR	*stat_cond;	/* Statistics log wait mutex */
-
 	int		 stat_clear;	/* Statistics log clear */
 	const char	*stat_format;	/* Statistics log timestamp format */
 	FILE		*stat_fp;	/* Statistics log file handle */

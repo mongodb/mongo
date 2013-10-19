@@ -952,7 +952,7 @@ main(void)
 		(void)conn->close(conn, NULL);
 
 	/*! [Statistics configuration] */
-	ret = wiredtiger_open(home, NULL, "create,statistics=true", &conn);
+	ret = wiredtiger_open(home, NULL, "create,statistics=(all)", &conn);
 	/*! [Statistics configuration] */
 	if (ret == 0)
 		(void)conn->close(conn, NULL);

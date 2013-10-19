@@ -31,45 +31,45 @@ struct __wt_stats {
 	(stats)->fld.v = (uint64_t)(value);				\
 } while (0)
 
-/* Run-time statistics, maintained only if statistics configured. */
-#define	WT_RUNSTAT_DECR(session, stats, fld) do {			\
-	if (S2C(session)->statistics)					\
+/* "Fast" statistics. */
+#define	WT_STAT_FAST_DECR(session, stats, fld) do {			\
+	if (S2C(session)->stat_fast)					\
 		WT_STAT_DECR(stats, fld);				\
 } while (0)
-#define	WT_RUNSTAT_ATOMIC_DECR(session, stats, fld) do {		\
-	if (S2C(session)->statistics)					\
+#define	WT_STAT_FAST_ATOMIC_DECR(session, stats, fld) do {		\
+	if (S2C(session)->stat_fast)					\
 		WT_STAT_ATOMIC_DECR(stats, fld);			\
 } while (0)
-#define	WT_RUNSTAT_INCR(session, stats, fld) do {			\
-	if (S2C(session)->statistics)					\
+#define	WT_STAT_FAST_INCR(session, stats, fld) do {			\
+	if (S2C(session)->stat_fast)					\
 		WT_STAT_INCR(stats, fld);				\
 } while (0)
-#define	WT_RUNSTAT_ATOMIC_INCR(session, stats, fld) do {		\
-	if (S2C(session)->statistics)					\
+#define	WT_STAT_FAST_ATOMIC_INCR(session, stats, fld) do {		\
+	if (S2C(session)->stat_fast)					\
 		WT_STAT_ATOMIC_INCR(stats, fld);			\
 } while (0)
-#define	WT_RUNSTAT_INCRV(session, stats, fld, value) do {		\
-	if (S2C(session)->statistics)					\
+#define	WT_STAT_FAST_INCRV(session, stats, fld, value) do {		\
+	if (S2C(session)->stat_fast)					\
 		WT_STAT_INCRV(stats, fld, value);			\
 } while (0)
-#define	WT_RUNSTAT_SET(session, stats, fld, value) do {			\
-	if (S2C(session)->statistics)					\
+#define	WT_STAT_FAST_SET(session, stats, fld, value) do {		\
+	if (S2C(session)->stat_fast)					\
 		WT_STAT_SET(stats, fld, value);				\
 } while (0)
 
-/* Connection-level run-time statistics. */
-#define	WT_RUNSTAT_CONN_DECR(session, fld)				\
-	WT_RUNSTAT_DECR(session, &S2C(session)->stats, fld)
-#define	WT_RUNSTAT_CONN_ATOMIC_DECR(session, fld)			\
-	WT_RUNSTAT_ATOMIC_DECR(session, &S2C(session)->stats, fld)
-#define	WT_RUNSTAT_CONN_INCR(session, fld)				\
-	WT_RUNSTAT_INCR(session, &S2C(session)->stats, fld)
-#define	WT_RUNSTAT_CONN_ATOMIC_INCR(session, fld)			\
-	WT_RUNSTAT_ATOMIC_INCR(session, &S2C(session)->stats, fld)
-#define	WT_RUNSTAT_CONN_INCRV(session, fld, v)				\
-	WT_RUNSTAT_INCRV(session, &S2C(session)->stats, fld, v)
-#define	WT_RUNSTAT_CONN_SET(session, fld, v)				\
-	WT_RUNSTAT_SET(session, &S2C(session)->stats, fld, v)
+/* "Fast" connection-level statistics. */
+#define	WT_STAT_FAST_CONN_DECR(session, fld)				\
+	WT_STAT_FAST_DECR(session, &S2C(session)->stats, fld)
+#define	WT_STAT_FAST_CONN_ATOMIC_DECR(session, fld)			\
+	WT_STAT_FAST_ATOMIC_DECR(session, &S2C(session)->stats, fld)
+#define	WT_STAT_FAST_CONN_INCR(session, fld)				\
+	WT_STAT_FAST_INCR(session, &S2C(session)->stats, fld)
+#define	WT_STAT_FAST_CONN_ATOMIC_INCR(session, fld)			\
+	WT_STAT_FAST_ATOMIC_INCR(session, &S2C(session)->stats, fld)
+#define	WT_STAT_FAST_CONN_INCRV(session, fld, v)			\
+	WT_STAT_FAST_INCRV(session, &S2C(session)->stats, fld, v)
+#define	WT_STAT_FAST_CONN_SET(session, fld, v)				\
+	WT_STAT_FAST_SET(session, &S2C(session)->stats, fld, v)
 
 /*
  * Data-source-handle run-time statistics.
@@ -78,30 +78,26 @@ struct __wt_stats {
  * We shouldn't have to check if the data-source handle is NULL, but it's
  * useful until everything is converted to using data-source handles.
  */
-#define	WT_RUNSTAT_DATA_DECR(session, fld) do {				\
+#define	WT_STAT_FAST_DATA_DECR(session, fld) do {			\
 	if ((session)->dhandle != NULL)					\
-		WT_RUNSTAT_DECR(					\
+		WT_STAT_FAST_DECR(					\
 		    session, &(session)->dhandle->stats, fld);		\
 } while (0)
-#define	WT_RUNSTAT_DATA_INCR(session, fld) do {				\
+#define	WT_STAT_FAST_DATA_INCR(session, fld) do {			\
 	if ((session)->dhandle != NULL)					\
-		WT_RUNSTAT_INCR(					\
+		WT_STAT_FAST_INCR(					\
 		    session, &(session)->dhandle->stats, fld);		\
 } while (0)
-#define	WT_RUNSTAT_DATA_INCRV(session, fld, v) do {			\
+#define	WT_STAT_FAST_DATA_INCRV(session, fld, v) do {			\
 	if ((session)->dhandle != NULL)					\
-		WT_RUNSTAT_INCRV(					\
+		WT_STAT_FAST_INCRV(					\
 		    session, &(session)->dhandle->stats, fld, v);	\
 } while (0)
-#define	WT_RUNSTAT_DATA_SET(session, fld, v) do {			\
+#define	WT_STAT_FAST_DATA_SET(session, fld, v) do {			\
 	if ((session)->dhandle != NULL)					\
-		WT_RUNSTAT_SET(						\
+		WT_STAT_FAST_SET(					\
 		   session, &(session)->dhandle->stats, fld, v);	\
 } while (0)
-
-/* Flags used by statistics initialization. */
-#define	WT_STATISTICS_CLEAR	0x01
-#define	WT_STATISTICS_FAST	0x02
 
 /*
  * Mutex statistics.

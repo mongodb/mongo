@@ -477,7 +477,7 @@ __block_extend(
 	*offp = fh->size;
 	fh->size += size;
 
-	WT_RUNSTAT_DATA_INCR(session, block_extension);
+	WT_STAT_FAST_DATA_INCR(session, block_extension);
 	WT_VERBOSE_RET(session, block,
 	    "file extend %" PRIdMAX "B @ %" PRIdMAX,
 	    (intmax_t)size, (intmax_t)*offp);
@@ -496,7 +496,7 @@ __wt_block_alloc(
 	WT_EXT *ext;
 	WT_SIZE *szp, **sstack[WT_SKIP_MAXDEPTH];
 
-	WT_RUNSTAT_DATA_INCR(session, block_alloc);
+	WT_STAT_FAST_DATA_INCR(session, block_alloc);
 	if (size % block->allocsize != 0)
 		WT_RET_MSG(session, EINVAL,
 		    "cannot allocate a block size %" PRIdMAX " that is not "
@@ -563,7 +563,7 @@ __wt_block_free(WT_SESSION_IMPL *session,
 	uint32_t cksum, size;
 
 	WT_UNUSED(addr_size);
-	WT_RUNSTAT_DATA_INCR(session, block_free);
+	WT_STAT_FAST_DATA_INCR(session, block_free);
 
 	/* Crack the cookie. */
 	WT_RET(__wt_block_buffer_to_addr(block, addr, &offset, &size, &cksum));

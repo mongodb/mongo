@@ -185,7 +185,7 @@ __wt_open(WT_SESSION_IMPL *session,
 		}
 	if (!matched) {
 		TAILQ_INSERT_TAIL(&conn->fhqh, fh, q);
-		WT_RUNSTAT_CONN_INCR(session, file_open);
+		WT_STAT_FAST_CONN_INCR(session, file_open);
 
 		*fhp = fh;
 	}
@@ -223,7 +223,7 @@ __wt_close(WT_SESSION_IMPL *session, WT_FH *fh)
 
 	/* Remove from the list. */
 	TAILQ_REMOVE(&conn->fhqh, fh, q);
-	WT_RUNSTAT_CONN_DECR(session, file_open);
+	WT_STAT_FAST_CONN_DECR(session, file_open);
 
 	__wt_spin_unlock(session, &conn->fh_lock);
 

@@ -15,7 +15,7 @@ int
 __wt_read(WT_SESSION_IMPL *session,
     WT_FH *fh, off_t offset, uint32_t bytes, void *buf)
 {
-	WT_RUNSTAT_CONN_INCR(session, read_io);
+	WT_STAT_FAST_CONN_INCR(session, read_io);
 
 	WT_VERBOSE_RET(session, fileops,
 	    "%s: read %" PRIu32 " bytes at offset %" PRIuMAX,
@@ -47,7 +47,7 @@ int
 __wt_write(WT_SESSION_IMPL *session,
     WT_FH *fh, off_t offset, uint32_t bytes, const void *buf)
 {
-	WT_RUNSTAT_CONN_INCR(session, write_io);
+	WT_STAT_FAST_CONN_INCR(session, write_io);
 
 	WT_VERBOSE_RET(session, fileops,
 	    "%s: write %" PRIu32 " bytes at offset %" PRIuMAX,

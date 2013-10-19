@@ -109,12 +109,12 @@ __wt_bt_read(WT_SESSION_IMPL *session,
 		WT_ERR(__wt_verify_dsk(session, (const char *)tmp->data, buf));
 	}
 
-	WT_RUNSTAT_CONN_INCR(session, cache_read);
-	WT_RUNSTAT_DATA_INCR(session, cache_read);
+	WT_STAT_FAST_CONN_INCR(session, cache_read);
+	WT_STAT_FAST_DATA_INCR(session, cache_read);
 	if (F_ISSET(dsk, WT_PAGE_COMPRESSED))
-		WT_RUNSTAT_DATA_INCR(session, compress_read);
-	WT_RUNSTAT_CONN_INCRV(session, cache_bytes_read, dsk->mem_size);
-	WT_RUNSTAT_DATA_INCRV(session, cache_bytes_read, dsk->mem_size);
+		WT_STAT_FAST_DATA_INCR(session, compress_read);
+	WT_STAT_FAST_CONN_INCRV(session, cache_bytes_read, dsk->mem_size);
+	WT_STAT_FAST_DATA_INCRV(session, cache_bytes_read, dsk->mem_size);
 
 err:	__wt_scr_free(&tmp);
 	return (ret);
@@ -184,7 +184,7 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
 	    btree->compressor == NULL ||
 	    btree->compressor->compress == NULL || compressed) {
 		ip = buf;
-		WT_RUNSTAT_DATA_INCR(session, compress_write_too_small);
+		WT_STAT_FAST_DATA_INCR(session, compress_write_too_small);
 	} else {
 		/* Skip the header bytes of the source data. */
 		src = (uint8_t *)buf->mem + WT_BLOCK_COMPRESS_SKIP;
@@ -228,10 +228,10 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
 		    &result_len, &compression_failed));
 		if (compression_failed) {
 			ip = buf;
-			WT_RUNSTAT_DATA_INCR(session, compress_write_fail);
+			WT_STAT_FAST_DATA_INCR(session, compress_write_fail);
 		} else {
 			compressed = 1;
-			WT_RUNSTAT_DATA_INCR(session, compress_write);
+			WT_STAT_FAST_DATA_INCR(session, compress_write);
 
 			/*
 			 * Copy in the skipped header bytes, set the final data
@@ -288,10 +288,10 @@ __wt_bt_write(WT_SESSION_IMPL *session, WT_ITEM *buf,
 	    bm->checkpoint(bm, session, ip, btree->ckpt, data_cksum) :
 	    bm->write(bm, session, ip, addr, addr_size, data_cksum));
 
-	WT_RUNSTAT_CONN_INCR(session, cache_write);
-	WT_RUNSTAT_DATA_INCR(session, cache_write);
-	WT_RUNSTAT_CONN_INCRV(session, cache_bytes_write, ip->size);
-	WT_RUNSTAT_DATA_INCRV(session, cache_bytes_write, ip->size);
+	WT_STAT_FAST_CONN_INCR(session, cache_write);
+	WT_STAT_FAST_DATA_INCR(session, cache_write);
+	WT_STAT_FAST_CONN_INCRV(session, cache_bytes_write, ip->size);
+	WT_STAT_FAST_DATA_INCRV(session, cache_bytes_write, ip->size);
 
 err:	__wt_scr_free(&tmp);
 	return (ret);

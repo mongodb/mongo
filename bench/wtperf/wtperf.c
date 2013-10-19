@@ -554,7 +554,7 @@ stat_worker(void *arg)
 
 		/* Report data source stats. */
 		if ((ret = session->open_cursor(session, stat_uri,
-		    NULL, "statistics_fast", &cursor)) != 0) {
+		    NULL, "statistics=(clear)", &cursor)) != 0) {
 			/*
 			 * It is possible the data source is exclusively
 			 * locked at this moment.  Ignore it and try again.
@@ -575,7 +575,7 @@ stat_worker(void *arg)
 
 		/* Dump the connection statistics since last time. */
 		if ((ret = session->open_cursor(session, "statistics:",
-		    NULL, "statistics_clear", &cursor)) != 0) {
+		    NULL, "statistics=(clear)", &cursor)) != 0) {
 			lprintf(cfg, ret, 0,
 			    "open_cursor failed in statistics");
 			goto err;

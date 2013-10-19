@@ -302,8 +302,7 @@ err:	API_END(session);
  *	Initialize the statistics for a connection.
  */
 static void
-__curstat_conn_init(
-    WT_SESSION_IMPL *session, WT_CURSOR_STAT *cst, uint32_t flags)
+__curstat_conn_init(WT_SESSION_IMPL *session, WT_CURSOR_STAT *cst)
 {
 	WT_CONNECTION_IMPL *conn;
 
@@ -313,9 +312,9 @@ __curstat_conn_init(
 	 * Fill in the connection statistics, and copy them to the cursor.
 	 * Optionally clear the connection statistics.
 	 */
-	__wt_conn_stat_init(session, flags);
+	__wt_conn_stat_init(session);
 	cst->u.conn_stats = conn->stats;
-	if (LF_ISSET(WT_STATISTICS_CLEAR))
+	if (cst->stat_clear)
 		__wt_stat_refresh_connection_stats(&conn->stats);
 
 	cst->stats_first = cst->stats = (WT_STATS *)&cst->u.conn_stats;
@@ -364,7 +363,7 @@ __curstat_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
  */
 static int
 __curstat_file_init(WT_SESSION_IMPL *session,
-    const char *uri, const char *cfg[], WT_CURSOR_STAT *cst, uint32_t flags)
+    const char *uri, const char *cfg[], WT_CURSOR_STAT *cst)
 {
 	struct __checkpoint_args args;
 	WT_DATA_HANDLE *dhandle, *saved_dhandle;
@@ -378,9 +377,9 @@ __curstat_file_init(WT_SESSION_IMPL *session,
 	 * Fill in the data source statistics, and copy them to the cursor.
 	 * Optionally clear the data source statistics.
 	 */
-	if ((ret = __wt_btree_stat_init(session, flags)) == 0) {
+	if ((ret = __wt_btree_stat_init(session)) == 0) {
 		cst->u.dsrc_stats = dhandle->stats;
-		if (LF_ISSET(WT_STATISTICS_CLEAR))
+		if (cst->stat_clear)
 			__wt_stat_refresh_dsrc_stats(&dhandle->stats);
 
 		cst->stats_first = cst->stats = (WT_STATS *)&cst->u.dsrc_stats;
@@ -398,7 +397,7 @@ __curstat_file_init(WT_SESSION_IMPL *session,
 	if (dhandle->checkpoint == NULL) {
 		args.name = dhandle->name;
 		args.stats = &cst->u.dsrc_stats;
-		args.clear = LF_ISSET(WT_STATISTICS_CLEAR) ? 1 : 0;
+		args.clear = cst->stat_clear;
 		cfg_arg[0] = (char *)&args;
 
 		/*
@@ -422,37 +421,34 @@ __curstat_file_init(WT_SESSION_IMPL *session,
  */
 int
 __wt_curstat_init(WT_SESSION_IMPL *session,
-    const char *uri, const char *cfg[], WT_CURSOR_STAT *cst, uint32_t flags)
+    const char *uri, const char *cfg[], WT_CURSOR_STAT *cst)
 {
 	const char *dsrc_uri;
 
 	cst->notpositioned = 1;
 
 	if (strcmp(uri, "statistics:") == 0) {
-		__curstat_conn_init(session, cst, flags);
+		__curstat_conn_init(session, cst);
 		return (0);
 	}
 
 	dsrc_uri = uri + strlen("statistics:");
 
 	if (WT_PREFIX_MATCH(dsrc_uri, "colgroup:"))
-		return (__wt_curstat_colgroup_init(
-		    session, dsrc_uri, cfg, cst, flags));
+		return (
+		    __wt_curstat_colgroup_init(session, dsrc_uri, cfg, cst));
 
 	if (WT_PREFIX_MATCH(dsrc_uri, "file:"))
-		return (__curstat_file_init(
-		    session, dsrc_uri, cfg, cst, flags));
+		return (__curstat_file_init(session, dsrc_uri, cfg, cst));
 
 	if (WT_PREFIX_MATCH(dsrc_uri, "index:"))
-		return (__wt_curstat_index_init(
-		    session, dsrc_uri, cfg, cst, flags));
+		return (__wt_curstat_index_init(session, dsrc_uri, cfg, cst));
 
 	if (WT_PREFIX_MATCH(dsrc_uri, "lsm:"))
-		return (__wt_curstat_lsm_init(session, dsrc_uri, cst, flags));
+		return (__wt_curstat_lsm_init(session, dsrc_uri, cst));
 
 	if (WT_PREFIX_MATCH(dsrc_uri, "table:"))
-		return (__wt_curstat_table_init(
-		    session, dsrc_uri, cfg, cst, flags));
+		return (__wt_curstat_table_init(session, dsrc_uri, cfg, cst));
 
 	return (__wt_bad_object_type(session, uri));
 }
@@ -465,6 +461,7 @@ int
 __wt_curstat_open(WT_SESSION_IMPL *session,
     const char *uri, const char *cfg[], WT_CURSOR **cursorp)
 {
+	WT_CONNECTION_IMPL *conn;
 	WT_CURSOR_STATIC_INIT(iface,
 	    __curstat_get_key,		/* get-key */
 	    __curstat_get_value,	/* get-value */
@@ -480,29 +477,53 @@ __wt_curstat_open(WT_SESSION_IMPL *session,
 	    __wt_cursor_notsup,		/* update */
 	    __wt_cursor_notsup,		/* remove */
 	    __curstat_close);		/* close */
-	WT_CONFIG_ITEM cval;
+	WT_CONFIG_ITEM cval, sval;
 	WT_CURSOR *cursor;
 	WT_CURSOR_STAT *cst;
 	WT_DECL_RET;
-	uint32_t flags;
 
 	STATIC_ASSERT(offsetof(WT_CURSOR_STAT, iface) == 0);
 
-	cst = NULL;
-	flags = 0;
-
-	WT_RET(
-	    __wt_config_gets_def(session, cfg, "statistics_clear", 0, &cval));
-	if (cval.val != 0)
-		LF_SET(WT_STATISTICS_CLEAR);
-	WT_RET(__wt_config_gets_def(session, cfg, "statistics_fast", 0, &cval));
-	if (cval.val != 0)
-		LF_SET(WT_STATISTICS_FAST);
+	conn = S2C(session);
 
 	WT_ERR(__wt_calloc_def(session, 1, &cst));
 	cursor = &cst->iface;
 	*cursor = iface;
 	cursor->session = &session->iface;
+
+	/*
+	 * Statistics cursor configuration: must match (and defaults to), the
+	 * database configuration.
+	 */
+	if (conn->stat_all == 0 && conn->stat_fast == 0)
+		goto config_err;
+	if ((ret = __wt_config_gets(session, cfg, "statistics", &cval)) == 0) {
+		if ((ret = __wt_config_subgets(
+		    session, &cval, "all", &sval)) == 0 && sval.val != 0) {
+			if (!conn->stat_all)
+				goto config_err;
+			cst->stat_all = 1;
+		}
+		WT_ERR_NOTFOUND_OK(ret);
+		if ((ret = __wt_config_subgets(
+		    session, &cval, "fast", &sval)) == 0 && sval.val != 0) {
+			if (!conn->stat_all && !conn->stat_fast)
+config_err:			WT_ERR_MSG(session, EINVAL,
+				    "cursor's configuration doesn't match the "
+				    "database statistics configuration");
+			cst->stat_fast = 1;
+		}
+		WT_ERR_NOTFOUND_OK(ret);
+		if ((ret = __wt_config_subgets(
+		    session, &cval, "clear", &sval)) == 0 && sval.val != 0)
+			cst->stat_clear = 1;
+		WT_ERR_NOTFOUND_OK(ret);
+
+		if (cst->stat_all == 0 && cst->stat_fast == 0) {
+			cst->stat_all = conn->stat_all;
+			cst->stat_fast = conn->stat_fast;
+		}
+	}
 
 	/*
 	 * We return the statistics field's offset as the key, and a string
@@ -511,7 +532,7 @@ __wt_curstat_open(WT_SESSION_IMPL *session,
 	 */
 	cursor->key_format = "i";
 	cursor->value_format = "SSq";
-	WT_ERR(__wt_curstat_init(session, uri, cfg, cst, flags));
+	WT_ERR(__wt_curstat_init(session, uri, cfg, cst));
 
 	/* __wt_cursor_init is last so we don't have to clean up on error. */
 	WT_ERR(__wt_cursor_init(cursor, uri, NULL, cfg, cursorp));

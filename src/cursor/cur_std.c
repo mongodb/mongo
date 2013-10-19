@@ -381,8 +381,8 @@ __wt_cursor_close(WT_CURSOR *cursor)
 	if (F_ISSET(cursor, WT_CURSTD_OPEN)) {
 		TAILQ_REMOVE(&session->cursors, cursor, q);
 
-		WT_RUNSTAT_DATA_DECR(session, session_cursor_open);
-		WT_RUNSTAT_CONN_ATOMIC_DECR(session, session_cursor_open);
+		WT_STAT_FAST_DATA_DECR(session, session_cursor_open);
+		WT_STAT_FAST_CONN_ATOMIC_DECR(session, session_cursor_open);
 	}
 
 	__wt_free(session, cursor->uri);
@@ -572,8 +572,8 @@ __wt_cursor_init(WT_CURSOR *cursor,
 		TAILQ_INSERT_HEAD(&session->cursors, cursor, q);
 
 	F_SET(cursor, WT_CURSTD_OPEN);
-	WT_RUNSTAT_DATA_INCR(session, session_cursor_open);
-	WT_RUNSTAT_CONN_ATOMIC_INCR(session, session_cursor_open);
+	WT_STAT_FAST_DATA_INCR(session, session_cursor_open);
+	WT_STAT_FAST_CONN_ATOMIC_INCR(session, session_cursor_open);
 
 	*cursorp = (cdump != NULL) ? cdump : cursor;
 	return (0);

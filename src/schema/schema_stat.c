@@ -13,7 +13,7 @@
  */
 int
 __wt_curstat_colgroup_init(WT_SESSION_IMPL *session,
-    const char *uri, const char *cfg[], WT_CURSOR_STAT *cst, uint32_t flags)
+    const char *uri, const char *cfg[], WT_CURSOR_STAT *cst)
 {
 	WT_COLGROUP *colgroup;
 	WT_DECL_ITEM(buf);
@@ -23,7 +23,7 @@ __wt_curstat_colgroup_init(WT_SESSION_IMPL *session,
 
 	WT_RET(__wt_scr_alloc(session, 0, &buf));
 	WT_ERR(__wt_buf_fmt(session, buf, "statistics:%s", colgroup->source));
-	ret = __wt_curstat_init(session, buf->data, cfg, cst, flags);
+	ret = __wt_curstat_init(session, buf->data, cfg, cst);
 
 err:	__wt_scr_free(&buf);
 	return (ret);
@@ -35,7 +35,7 @@ err:	__wt_scr_free(&buf);
  */
 int
 __wt_curstat_index_init(WT_SESSION_IMPL *session,
-    const char *uri, const char *cfg[], WT_CURSOR_STAT *cst, uint32_t flags)
+    const char *uri, const char *cfg[], WT_CURSOR_STAT *cst)
 {
 	WT_DECL_ITEM(buf);
 	WT_DECL_RET;
@@ -45,7 +45,7 @@ __wt_curstat_index_init(WT_SESSION_IMPL *session,
 
 	WT_RET(__wt_scr_alloc(session, 0, &buf));
 	WT_ERR(__wt_buf_fmt(session, buf, "statistics:%s", idx->source));
-	ret = __wt_curstat_init(session, buf->data, cfg, cst, flags);
+	ret = __wt_curstat_init(session, buf->data, cfg, cst);
 
 err:	__wt_scr_free(&buf);
 	return (ret);
@@ -57,7 +57,7 @@ err:	__wt_scr_free(&buf);
  */
 int
 __wt_curstat_table_init(WT_SESSION_IMPL *session,
-    const char *uri, const char *cfg[], WT_CURSOR_STAT *cst, uint32_t flags)
+    const char *uri, const char *cfg[], WT_CURSOR_STAT *cst)
 {
 	WT_CURSOR *stat_cursor;
 	WT_DECL_ITEM(buf);
@@ -67,7 +67,6 @@ __wt_curstat_table_init(WT_SESSION_IMPL *session,
 	u_int i;
 	const char *name;
 
-	WT_UNUSED(flags);
 	name = uri + strlen("table:");
 
 	WT_RET(__wt_scr_alloc(session, 0, &buf));

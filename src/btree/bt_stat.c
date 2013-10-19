@@ -16,7 +16,7 @@ static int  __stat_page_row_leaf(WT_PAGE *, WT_DSRC_STATS *);
  *	Initialize the Btree statistics.
  */
 int
-__wt_btree_stat_init(WT_SESSION_IMPL *session, uint32_t flags)
+__wt_btree_stat_init(WT_SESSION_IMPL *session)
 {
 	WT_BM *bm;
 	WT_BTREE *btree;
@@ -37,10 +37,11 @@ __wt_btree_stat_init(WT_SESSION_IMPL *session, uint32_t flags)
 	WT_STAT_SET(stats, btree_maxleafitem, btree->maxleafitem);
 	WT_STAT_SET(stats, btree_maxleafpage, btree->maxleafpage);
 
-	page = NULL;
-	if (LF_ISSET(WT_STATISTICS_FAST))
+	/* Everything else is really, really expensive. */
+	if (!S2C(session)->stat_all)
 		return (0);
 
+	page = NULL;
 	while ((ret = __wt_tree_walk(session, &page, 0)) == 0 && page != NULL)
 		WT_RET(__stat_page(session, page, stats));
 	return (ret == WT_NOTFOUND ? 0 : ret);
