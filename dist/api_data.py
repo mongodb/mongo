@@ -309,7 +309,7 @@ connection_runtime_config = [
 		trigger eviction when the cache becomes this full (as a
 		percentage)''',
 		min=10, max=99),
-	Config('statistics', 'fast', r'''
+	Config('statistics', 'none', r'''
 		Maintain database statistics, which may impact performance.
 		Choosing "all" maintains all statistics regardless of cost,
 		"fast" maintains a subset of statistics that are relatively
