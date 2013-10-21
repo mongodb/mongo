@@ -758,7 +758,8 @@ execute_workload(CONFIG *cfg)
 	    cfg, cfg->update_threads, &uthreads, update_thread)) != 0)
 		return (ret);
 
-	nthreads = cfg->read_threads + cfg->insert_threads + cfg->update_threads;
+	nthreads =
+	    cfg->read_threads + cfg->insert_threads + cfg->update_threads;
 
 	/* Sanity check reporting interval. */
 	if (cfg->report_interval > cfg->run_time || cfg->report_interval == 0)
