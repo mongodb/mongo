@@ -29,33 +29,33 @@
  */
 
 #ifdef OPT_DECLARE_STRUCT
-#define DEF_OPT_AS_STRING(name, initval, desc)	const char *name;
-#define DEF_OPT_AS_CONFIG_STRING(name, initval, desc)	const char *name;
-#define DEF_OPT_AS_BOOL(name, initval, desc)	uint32_t name;
-#define DEF_OPT_AS_UINT32(name, initval, desc)	uint32_t name;
-#define DEF_OPT_AS_FLAGVAL(name, bits, desc)
+#define	DEF_OPT_AS_STRING(name, initval, desc)	const char *name;
+#define	DEF_OPT_AS_CONFIG_STRING(name, initval, desc)	const char *name;
+#define	DEF_OPT_AS_BOOL(name, initval, desc)	uint32_t name;
+#define	DEF_OPT_AS_UINT32(name, initval, desc)	uint32_t name;
+#define	DEF_OPT_AS_FLAGVAL(name, bits, desc)
 #endif
 
 #ifdef OPT_DEFINE_DESC
-#define DEF_OPT_AS_STRING(name, initval, desc)			\
+#define	DEF_OPT_AS_STRING(name, initval, desc)			\
 	{ #name, desc, #initval, STRING_TYPE, offsetof(CONFIG, name), 0 },
-#define DEF_OPT_AS_CONFIG_STRING(name, initval, desc)			\
+#define	DEF_OPT_AS_CONFIG_STRING(name, initval, desc)			\
 	{ #name, desc, #initval, CONFIG_STRING_TYPE,                    \
-        offsetof(CONFIG, name), 0 },
-#define DEF_OPT_AS_BOOL(name, initval, desc)			\
+	offsetof(CONFIG, name), 0 },
+#define	DEF_OPT_AS_BOOL(name, initval, desc)			\
 	{ #name, desc, #initval, BOOL_TYPE, offsetof(CONFIG, name), 0 },
-#define DEF_OPT_AS_UINT32(name, initval, desc)			\
+#define	DEF_OPT_AS_UINT32(name, initval, desc)			\
 	{ #name, desc, #initval, UINT32_TYPE, offsetof(CONFIG, name), 0 },
-#define DEF_OPT_AS_FLAGVAL(name, bits, desc)			\
+#define	DEF_OPT_AS_FLAGVAL(name, bits, desc)			\
 	{ #name, desc, "0", FLAG_TYPE, offsetof(CONFIG, flags), bits },
 #endif
 
 #ifdef OPT_DEFINE_DEFAULT
-#define DEF_OPT_AS_STRING(name, initval, desc)	initval,
-#define DEF_OPT_AS_CONFIG_STRING(name, initval, desc)	initval,
-#define DEF_OPT_AS_BOOL(name, initval, desc)	initval,
-#define DEF_OPT_AS_UINT32(name, initval, desc)	initval,
-#define DEF_OPT_AS_FLAGVAL(name, bits, desc)
+#define	DEF_OPT_AS_STRING(name, initval, desc)	initval,
+#define	DEF_OPT_AS_CONFIG_STRING(name, initval, desc)	initval,
+#define	DEF_OPT_AS_BOOL(name, initval, desc)	initval,
+#define	DEF_OPT_AS_UINT32(name, initval, desc)	initval,
+#define	DEF_OPT_AS_FLAGVAL(name, bits, desc)
 #endif
 
 /*
