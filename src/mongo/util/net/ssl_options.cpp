@@ -27,92 +27,60 @@ namespace mongo {
     typedef moe::PositionalOptionDescription POD;
 
     Status addSSLServerOptions(moe::OptionSection* options) {
-        Status ret = options->addOption(OD("ssl.sslOnNormalPorts", "sslOnNormalPorts", moe::Switch,
-                    "use ssl on configured ports", true));
-        if (!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("ssl.mode", "sslMode", moe::String,
-                    "set the SSL operation mode (noSSL|acceptSSL|sendAcceptSSL|sslOnly)", true));
-        if (!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("ssl.PEMKeyFile", "sslPEMKeyFile", moe::String,
-                    "PEM file for ssl", true));
-        if (!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("ssl.PEMKeyPassword", "sslPEMKeyPassword", moe::String,
-                    "PEM file password", true, moe::Value(), moe::Value(std::string(""))));
-        if (!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("ssl.clusterFile", "sslClusterFile", moe::String,
-                    "Key file for internal SSL authentication", true));
-        if (!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("ssl.clusterPassword", "sslClusterPassword", moe::String,
-                    "Internal authentication key file password", true, moe::Value(),
-                    moe::Value(std::string(""))));
-        if (!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("ssl.CAFile", "sslCAFile", moe::String,
-                    "Certificate Authority file for SSL", true));
-        if (!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("ssl.CRLFile", "sslCRLFile", moe::String,
-                    "Certificate Revocation List file for SSL", true));
-        if (!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("ssl.weakCertificateValidation", "sslWeakCertificateValidation",
-                    moe::Switch, "allow client to connect without presenting a certificate", true));
-        if (!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("ssl.FIPSMode", "sslFIPSMode", moe::Switch,
-                    "activate FIPS 140-2 mode at startup", true));
-        if (!ret.isOK()) {
-            return ret;
-        }
+        options->addOptionChaining("ssl.sslOnNormalPorts", "sslOnNormalPorts", moe::Switch,
+                "use ssl on configured ports");
+
+        options->addOptionChaining("ssl.mode", "sslMode", moe::String,
+                "set the SSL operation mode (noSSL|acceptSSL|sendAcceptSSL|sslOnly)");
+
+        options->addOptionChaining("ssl.PEMKeyFile", "sslPEMKeyFile", moe::String,
+                "PEM file for ssl");
+
+        options->addOptionChaining("ssl.PEMKeyPassword", "sslPEMKeyPassword", moe::String,
+                "PEM file password")
+                                  .setImplicit(moe::Value(std::string("")));
+
+        options->addOptionChaining("ssl.clusterFile", "sslClusterFile", moe::String,
+                "Key file for internal SSL authentication");
+
+        options->addOptionChaining("ssl.clusterPassword", "sslClusterPassword", moe::String,
+                "Internal authentication key file password")
+                                  .setImplicit(moe::Value(std::string("")));
+
+        options->addOptionChaining("ssl.CAFile", "sslCAFile", moe::String,
+                "Certificate Authority file for SSL");
+
+        options->addOptionChaining("ssl.CRLFile", "sslCRLFile", moe::String,
+                "Certificate Revocation List file for SSL");
+
+        options->addOptionChaining("ssl.weakCertificateValidation", "sslWeakCertificateValidation",
+                moe::Switch, "allow client to connect without presenting a certificate");
+
+        options->addOptionChaining("ssl.FIPSMode", "sslFIPSMode", moe::Switch,
+                "activate FIPS 140-2 mode at startup");
+
 
         return Status::OK();
     }
 
     Status addSSLClientOptions(moe::OptionSection* options) {
-        Status ret = options->addOption(OD("ssl", "ssl", moe::Switch, "use SSL for all connections",
-                    true));
-        if (!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("ssl.CAFile", "sslCAFile", moe::String,
-                    "Certificate Authority file for SSL", true));
-        if (!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("ssl.PEMKeyFile", "sslPEMKeyFile", moe::String,
-                    "PEM certificate/key file for SSL", true));
-        if (!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("ssl.PEMKeyPassword", "sslPEMKeyPassword", moe::String,
-                    "password for key in PEM file for SSL", true));
-        if (!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("ssl.CRLFile", "sslCRLFile", moe::String,
-                    "Certificate Revocation List file for SSL", true));
-        if (!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("ssl.FIPSMode", "sslFIPSMode", moe::Switch,
-                    "activate FIPS 140-2 mode at startup", true));
-        if (!ret.isOK()) {
-            return ret;
-        }
+        options->addOptionChaining("ssl", "ssl", moe::Switch, "use SSL for all connections");
+
+        options->addOptionChaining("ssl.CAFile", "sslCAFile", moe::String,
+                "Certificate Authority file for SSL");
+
+        options->addOptionChaining("ssl.PEMKeyFile", "sslPEMKeyFile", moe::String,
+                "PEM certificate/key file for SSL");
+
+        options->addOptionChaining("ssl.PEMKeyPassword", "sslPEMKeyPassword", moe::String,
+                "password for key in PEM file for SSL");
+
+        options->addOptionChaining("ssl.CRLFile", "sslCRLFile", moe::String,
+                "Certificate Revocation List file for SSL");
+
+        options->addOptionChaining("ssl.FIPSMode", "sslFIPSMode", moe::Switch,
+                "activate FIPS 140-2 mode at startup");
+
 
         return Status::OK();
     }

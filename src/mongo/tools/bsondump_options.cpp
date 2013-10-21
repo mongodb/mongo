@@ -37,11 +37,9 @@ namespace mongo {
             return ret;
         }
 
-        ret = options->addOption(OD("type", "type", moe::String ,
-                    "type of output: json,debug", true, moe::Value(std::string("json"))));
-        if(!ret.isOK()) {
-            return ret;
-        }
+        options->addOptionChaining("type", "type", moe::String, "type of output: json,debug")
+                                  .setDefault(moe::Value(std::string("json")));
+
 
         ret = options->addPositionalOption(POD( "file", moe::String, 1 ));
         if(!ret.isOK()) {

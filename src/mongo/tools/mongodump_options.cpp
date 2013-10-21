@@ -48,31 +48,21 @@ namespace mongo {
             return ret;
         }
 
-        ret = options->addOption(OD("out", "out,o", moe::String,
-                    "output directory or \"-\" for stdout", true,
-                    moe::Value(std::string("dump"))));
-        if(!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("query", "query,q", moe::String , "json query", true));
-        if(!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("oplog", "oplog", moe::Switch,
-                    "Use oplog for point-in-time snapshotting", true));
-        if(!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("repair", "repair", moe::Switch,
-                    "try to recover a crashed database", true));
-        if(!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("forceTableScan", "forceTableScan", moe::Switch,
-                    "force a table scan (do not use $snapshot)"));
-        if(!ret.isOK()) {
-            return ret;
-        }
+        options->addOptionChaining("out", "out,o", moe::String,
+                "output directory or \"-\" for stdout")
+                                  .setDefault(moe::Value(std::string("dump")));
+
+        options->addOptionChaining("query", "query,q", moe::String, "json query");
+
+        options->addOptionChaining("oplog", "oplog", moe::Switch,
+                "Use oplog for point-in-time snapshotting");
+
+        options->addOptionChaining("repair", "repair", moe::Switch,
+                "try to recover a crashed database");
+
+        options->addOptionChaining("forceTableScan", "forceTableScan", moe::Switch,
+                "force a table scan (do not use $snapshot)");
+
 
         return Status::OK();
     }

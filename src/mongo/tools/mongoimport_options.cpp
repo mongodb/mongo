@@ -53,58 +53,38 @@ namespace mongo {
             return ret;
         }
 
-        ret = options->addOption(OD("ignoreBlanks", "ignoreBlanks", moe::Switch,
-                    "if given, empty fields in csv and tsv will be ignored", true));
-        if(!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("type", "type",moe::String,
-                    "type of file to import.  default: json (json,csv,tsv)", true));
-        if(!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("file", "file",moe::String,
-                    "file to import from; if not specified stdin is used", true));
-        if(!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("drop", "drop", moe::Switch, "drop collection first ", true));
-        if(!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("headerline", "headerline", moe::Switch,
-                    "first line in input file is a header (CSV and TSV only)", true));
-        if(!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("upsert", "upsert", moe::Switch,
-                    "insert or update objects that already exist", true));
-        if(!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("upsertFields", "upsertFields", moe::String,
-                    "comma-separated fields for the query part of the upsert. "
-                    "You should make sure this is indexed", true));
-        if(!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("stopOnError", "stopOnError", moe::Switch,
-                    "stop importing at first error rather than continuing", true));
-        if(!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("jsonArray", "jsonArray", moe::Switch,
-                    "load a json array, not one item per line. "
-                    "Currently limited to 16MB.", true));
-        if(!ret.isOK()) {
-            return ret;
-        }
+        options->addOptionChaining("ignoreBlanks", "ignoreBlanks", moe::Switch,
+                "if given, empty fields in csv and tsv will be ignored");
 
-        ret = options->addOption(OD("noimport", "noimport", moe::Switch,
-                    "don't actually import. useful for benchmarking parser", false));
-        if(!ret.isOK()) {
-            return ret;
-        }
+        options->addOptionChaining("type", "type", moe::String,
+                "type of file to import.  default: json (json,csv,tsv)");
+
+        options->addOptionChaining("file", "file", moe::String,
+                "file to import from; if not specified stdin is used");
+
+        options->addOptionChaining("drop", "drop", moe::Switch, "drop collection first ");
+
+        options->addOptionChaining("headerline", "headerline", moe::Switch,
+                "first line in input file is a header (CSV and TSV only)");
+
+        options->addOptionChaining("upsert", "upsert", moe::Switch,
+                "insert or update objects that already exist");
+
+        options->addOptionChaining("upsertFields", "upsertFields", moe::String,
+                "comma-separated fields for the query part of the upsert. "
+                "You should make sure this is indexed");
+
+        options->addOptionChaining("stopOnError", "stopOnError", moe::Switch,
+                "stop importing at first error rather than continuing");
+
+        options->addOptionChaining("jsonArray", "jsonArray", moe::Switch,
+                "load a json array, not one item per line. Currently limited to 16MB.");
+
+
+        options->addOptionChaining("noimport", "noimport", moe::Switch,
+                "don't actually import. useful for benchmarking parser")
+                                  .hidden();
+
 
         ret = options->addPositionalOption(POD( "file", moe::String, 1 ));
         if(!ret.isOK()) {

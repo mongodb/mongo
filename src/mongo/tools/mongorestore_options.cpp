@@ -52,55 +52,39 @@ namespace mongo {
             return ret;
         }
 
-        ret = options->addOption(OD("drop", "drop", moe::Switch,
-                    "drop each collection before import", true));
-        if(!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("oplogReplay", "oplogReplay", moe::Switch,
-                    "replay oplog for point-in-time restore", true));
-        if(!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("oplogLimit", "oplogLimit", moe::String,
-                    "include oplog entries before the provided Timestamp "
-                    "(seconds[:ordinal]) during the oplog replay; "
-                    "the ordinal value is optional", true));
-        if(!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("keepIndexVersion", "keepIndexVersion", moe::Switch,
-                    "don't upgrade indexes to newest version", true));
-        if(!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("noOptionsRestore", "noOptionsRestore", moe::Switch,
-                    "don't restore collection options", true));
-        if(!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("noIndexRestore", "noIndexRestore", moe::Switch,
-                    "don't restore indexes", true));
-        if(!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("w", "w", moe::Int ,
-                    "minimum number of replicas per write" , true, moe::Value(0)));
-        if(!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("dir", "dir", moe::String,
-                    "directory to restore from" , false, moe::Value(std::string("dump"))));
-        if(!ret.isOK()) {
-            return ret;
-        }
+        options->addOptionChaining("drop", "drop", moe::Switch,
+                "drop each collection before import");
+
+        options->addOptionChaining("oplogReplay", "oplogReplay", moe::Switch,
+                "replay oplog for point-in-time restore");
+
+        options->addOptionChaining("oplogLimit", "oplogLimit", moe::String,
+                "include oplog entries before the provided Timestamp "
+                "(seconds[:ordinal]) during the oplog replay; "
+                "the ordinal value is optional");
+
+        options->addOptionChaining("keepIndexVersion", "keepIndexVersion", moe::Switch,
+                "don't upgrade indexes to newest version");
+
+        options->addOptionChaining("noOptionsRestore", "noOptionsRestore", moe::Switch,
+                "don't restore collection options");
+
+        options->addOptionChaining("noIndexRestore", "noIndexRestore", moe::Switch,
+                "don't restore indexes");
+
+        options->addOptionChaining("w", "w", moe::Int, "minimum number of replicas per write")
+                                  .setDefault(moe::Value(0));
+
+        options->addOptionChaining("dir", "dir", moe::String, "directory to restore from")
+                                  .hidden()
+                                  .setDefault(moe::Value(std::string("dump")));
+
 
         // left in for backwards compatibility
-        ret = options->addOption(OD("indexesLast", "indexesLast", moe::Switch,
-                    "wait to add indexes (now default)", false));
-        if(!ret.isOK()) {
-            return ret;
-        }
+        options->addOptionChaining("indexesLast", "indexesLast", moe::Switch,
+                "wait to add indexes (now default)")
+                                  .hidden();
+
 
         ret = options->addPositionalOption(POD("dir", moe::String, 1));
         if(!ret.isOK()) {

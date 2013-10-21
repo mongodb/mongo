@@ -37,11 +37,9 @@ namespace mongo {
             return ret;
         }
 
-        ret = options->addOption(OD("locks", "locks", moe::Switch,
-                    "use db lock info instead of top", true));
-        if(!ret.isOK()) {
-            return ret;
-        }
+        options->addOptionChaining("locks", "locks", moe::Switch,
+                "use db lock info instead of top");
+
 
         ret = options->addPositionalOption(POD( "sleep", moe::Int, 1 ));
         if(!ret.isOK()) {

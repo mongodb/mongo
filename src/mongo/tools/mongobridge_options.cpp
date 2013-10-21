@@ -28,27 +28,19 @@ namespace mongo {
 
     Status addMongoBridgeOptions(moe::OptionSection* options) {
 
-        Status ret = options->addOption(OD("help", "help", moe::Switch,
-                    "produce help message", true));
-        if(!ret.isOK()) {
-            return ret;
-        }
+        options->addOptionChaining("help", "help", moe::Switch, "produce help message");
 
-        ret = options->addOption(OD("port", "port", moe::Int, "port to listen for mongo messages"));
-        if(!ret.isOK()) {
-            return ret;
-        }
 
-        ret = options->addOption(OD("dest", "dest", moe::String, "uri of remote mongod instance"));
-        if(!ret.isOK()) {
-            return ret;
-        }
+        options->addOptionChaining("port", "port", moe::Int, "port to listen for mongo messages");
 
-        ret = options->addOption(OD("delay", "delay", moe::Int,
-                    "transfer delay in milliseconds (default = 0)", true, moe::Value(0)));
-        if(!ret.isOK()) {
-            return ret;
-        }
+
+        options->addOptionChaining("dest", "dest", moe::String, "uri of remote mongod instance");
+
+
+        options->addOptionChaining("delay", "delay", moe::Int,
+                "transfer delay in milliseconds (default = 0)")
+                                  .setDefault(moe::Value(0));
+
 
         return Status::OK();
     }

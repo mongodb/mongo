@@ -52,48 +52,31 @@ namespace mongo {
             return ret;
         }
 
-        ret = options->addOption(OD("query", "query,q", moe::String ,
-                    "query filter, as a JSON string", true));
-        if(!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("csv", "csv", moe::Switch,
-                    "export to csv instead of json", true));
-        if(!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("out", "out,o", moe::String,
-                    "output file; if not specified, stdout is used", true));
-        if(!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("jsonArray", "jsonArray", moe::Switch,
-                    "output to a json array rather than one object per line", true));
-        if(!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("slaveOk", "slaveOk,k", moe::Bool ,
-                    "use secondaries for export if available, default true", true,
-                    moe::Value(true)));
-        if(!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("forceTableScan", "forceTableScan", moe::Switch,
-                    "force a table scan (do not use $snapshot)", true));
-        if(!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("skip", "skip", moe::Int,
-                    "documents to skip, default 0", true, moe::Value(0)));
-        if(!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("limit", "limit", moe::Int,
-                    "limit the numbers of documents returned, default all", true,
-                    moe::Value(0)));
-        if(!ret.isOK()) {
-            return ret;
-        }
+        options->addOptionChaining("query", "query,q", moe::String,
+                "query filter, as a JSON string");
+
+        options->addOptionChaining("csv", "csv", moe::Switch, "export to csv instead of json");
+
+        options->addOptionChaining("out", "out,o", moe::String,
+                "output file; if not specified, stdout is used");
+
+        options->addOptionChaining("jsonArray", "jsonArray", moe::Switch,
+                "output to a json array rather than one object per line");
+
+        options->addOptionChaining("slaveOk", "slaveOk,k", moe::Bool,
+                "use secondaries for export if available, default true")
+                                  .setDefault(moe::Value(true));
+
+        options->addOptionChaining("forceTableScan", "forceTableScan", moe::Switch,
+                "force a table scan (do not use $snapshot)");
+
+        options->addOptionChaining("skip", "skip", moe::Int, "documents to skip, default 0")
+                                  .setDefault(moe::Value(0));
+
+        options->addOptionChaining("limit", "limit", moe::Int,
+                "limit the numbers of documents returned, default all")
+                                  .setDefault(moe::Value(0));
+
 
         return Status::OK();
     }

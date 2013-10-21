@@ -37,83 +37,50 @@ namespace mongo {
         typedef moe::OptionDescription OD;
         typedef moe::PositionalOptionDescription POD;
 
-        Status ret = options->addOption(OD("help", "help,h", moe::Switch,
-                    "show this usage information", true));
-        if (!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("dbpath", "dbpath", moe::String,
-                    "db data path for this test run. NOTE: the contents of this directory will "
-                    "be overwritten if it already exists", true, moe::Value(default_test_dbpath)));
-        if (!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("debug", "debug", moe::Switch,
-                    "run tests with verbose output", true));
-        if (!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("list", "list,l", moe::Switch, "list available test suites",
-                    true));
-        if (!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("bigfiles", "bigfiles", moe::Switch,
-                    "use big datafiles instead of smallfiles which is the default", true));
-        if (!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("filter", "filter,f", moe::String,
-                    "string substring filter on test name" , true));
-        if (!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("verbose", "verbose,v", moe::Switch, "verbose", true));
-        if (!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("useNewQueryFramework", "useNewQueryFramework", moe::Switch,
-                    "use the new query framework", true));
-        if (!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("dur", "dur", moe::Switch,
-                    "enable journaling (currently the default)", true));
-        if (!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("nodur", "nodur", moe::Switch, "disable journaling", true));
-        if (!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("seed", "seed", moe::UnsignedLongLong, "random number seed",
-                    true));
-        if (!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("runs", "runs", moe::Int,
-                    "number of times to run each test", true));
-        if (!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("perfHist", "perfHist", moe::Unsigned,
-                    "number of back runs of perf stats to display", true));
-        if (!ret.isOK()) {
-            return ret;
-        }
+        options->addOptionChaining("help", "help,h", moe::Switch, "show this usage information");
 
-        ret = options->addOption(OD("suites", "suites", moe::StringVector, "test suites to run",
-                    false));
-        if (!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("nopreallocj", "nopreallocj", moe::Switch,
-                    "disable journal prealloc", false));
-        if (!ret.isOK()) {
-            return ret;
-        }
+        options->addOptionChaining("dbpath", "dbpath", moe::String,
+                "db data path for this test run. NOTE: the contents of this directory will "
+                "be overwritten if it already exists")
+                                  .setDefault(moe::Value(default_test_dbpath));
 
-        ret = options->addPositionalOption(POD("suites", moe::String, -1));
+        options->addOptionChaining("debug", "debug", moe::Switch, "run tests with verbose output");
+
+        options->addOptionChaining("list", "list,l", moe::Switch, "list available test suites");
+
+        options->addOptionChaining("bigfiles", "bigfiles", moe::Switch,
+                "use big datafiles instead of smallfiles which is the default");
+
+        options->addOptionChaining("filter", "filter,f", moe::String,
+                "string substring filter on test name");
+
+        options->addOptionChaining("verbose", "verbose,v", moe::Switch, "verbose");
+
+        options->addOptionChaining("useNewQueryFramework", "useNewQueryFramework", moe::Switch,
+                "use the new query framework");
+
+        options->addOptionChaining("dur", "dur", moe::Switch,
+                "enable journaling (currently the default)");
+
+        options->addOptionChaining("nodur", "nodur", moe::Switch, "disable journaling");
+
+        options->addOptionChaining("seed", "seed", moe::UnsignedLongLong, "random number seed");
+
+        options->addOptionChaining("runs", "runs", moe::Int, "number of times to run each test");
+
+        options->addOptionChaining("perfHist", "perfHist", moe::Unsigned,
+                "number of back runs of perf stats to display");
+
+
+        options->addOptionChaining("suites", "suites", moe::StringVector, "test suites to run")
+                                  .hidden();
+
+        options->addOptionChaining("nopreallocj", "nopreallocj", moe::Switch,
+                "disable journal prealloc")
+                                  .hidden();
+
+
+        Status ret = options->addPositionalOption(POD("suites", moe::String, -1));
         if (!ret.isOK()) {
             return ret;
         }

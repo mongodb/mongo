@@ -40,167 +40,120 @@ namespace mongo {
     typedef moe::PositionalOptionDescription POD;
 
     Status addGeneralToolOptions(moe::OptionSection* options) {
-        Status ret = options->addOption(OD("help", "help", moe::Switch,
-                    "produce help message", true));
-        if(!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("verbose", "verbose,v", moe::Switch,
-                    "be more verbose (include multiple times "
-                    "for more verbosity e.g. -vvvvv)", true));
-        if(!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("quiet", "quiet", moe::Switch,
-                    "silence all non error diagnostic messages", true));
-        if(!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("version", "version", moe::Switch,
-                    "print the program's version and exit", true));
-        if(!ret.isOK()) {
-            return ret;
-        }
+        options->addOptionChaining("help", "help", moe::Switch, "produce help message");
+
+        options->addOptionChaining("verbose", "verbose,v", moe::Switch,
+                "be more verbose (include multiple times "
+                "for more verbosity e.g. -vvvvv)");
+
+        options->addOptionChaining("quiet", "quiet", moe::Switch,
+                "silence all non error diagnostic messages");
+
+        options->addOptionChaining("version", "version", moe::Switch,
+                "print the program's version and exit");
+
 
         /* support for -vv -vvvv etc. */
         for (string s = "vv"; s.length() <= 10; s.append("v")) {
-            ret = options->addOption(OD(s.c_str(), s.c_str(), moe::Switch, "verbose", false));
-            if(!ret.isOK()) {
-                return ret;
-            }
+            options->addOptionChaining(s.c_str(), s.c_str(), moe::Switch, "verbose")
+                                      .hidden();
         }
 
         return Status::OK();
     }
 
     Status addRemoteServerToolOptions(moe::OptionSection* options) {
-        Status ret = options->addOption(OD("host", "host,h", moe::String,
-                    "mongo host to connect to ( <set name>/s1,s2 for sets)", true));
-        if(!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("port", "port", moe::String,
-                    "server port. Can also use --host hostname:port", true));
-        if(!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("ipv6", "ipv6", moe::Switch,
-                    "enable IPv6 support (disabled by default)", true));
-        if(!ret.isOK()) {
-            return ret;
-        }
+        options->addOptionChaining("host", "host,h", moe::String,
+                "mongo host to connect to ( <set name>/s1,s2 for sets)");
+
+        options->addOptionChaining("port", "port", moe::String,
+                "server port. Can also use --host hostname:port");
+
+        options->addOptionChaining("ipv6", "ipv6", moe::Switch,
+                "enable IPv6 support (disabled by default)");
+
 
 #ifdef MONGO_SSL
-        ret = addSSLClientOptions(options);
+        Status ret = addSSLClientOptions(options);
         if (!ret.isOK()) {
             return ret;
         }
 #endif
 
-        ret = options->addOption(OD("username", "username,u", moe::String, "username", true));
-        if(!ret.isOK()) {
-            return ret;
-        }
+        options->addOptionChaining("username", "username,u", moe::String,
+                "username");
+
         // We ask a user for a password if they pass in an empty string or pass --password with no
         // argument.  This must be handled when the password value is checked.
         //
         // Desired behavior:
-        // --username test --password test // Continue with username "test" and password "test"
         // --username test // Continue with username "test" and no password
+        // --username test --password test // Continue with username "test" and password "test"
         // --username test --password // Continue with username "test" and prompt for password
         // --username test --password "" // Continue with username "test" and prompt for password
         //
         // To do this we pass moe::Value(std::string("")) as the "implicit value" of this option
-        ret = options->addOption(OD("password", "password,p", moe::String,
-                    "password", true, moe::Value(), moe::Value(std::string(""))));
-        if(!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("authenticationDatabase", "authenticationDatabase", moe::String,
-                    "user source (defaults to dbname)", true,
-                    moe::Value(std::string(""))));
-        if(!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("authenticationMechanism", "authenticationMechanism",
-                    moe::String,
-                    "authentication mechanism", true,
-                    moe::Value(std::string("MONGODB-CR"))));
-        if(!ret.isOK()) {
-            return ret;
-        }
+        options->addOptionChaining("password", "password,p", moe::String, "password")
+                                  .setImplicit(moe::Value(std::string("")));
+
+        options->addOptionChaining("authenticationDatabase", "authenticationDatabase", moe::String,
+                "user source (defaults to dbname)")
+                                  .setDefault(moe::Value(std::string("")));
+
+        options->addOptionChaining("authenticationMechanism", "authenticationMechanism",
+                moe::String, "authentication mechanism")
+                                  .setDefault(moe::Value(std::string("MONGODB-CR")));
+
 
         return Status::OK();
     }
 
     Status addLocalServerToolOptions(moe::OptionSection* options) {
-        Status ret = options->addOption(OD("dbpath", "dbpath",moe::String,
-                    "directly access mongod database files in the given path, instead of "
-                    "connecting to a mongod  server - needs to lock the data directory, "
-                    "so cannot be used if a mongod is currently accessing the same path",
-                    true));
-        if(!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("directoryperdb", "directoryperdb", moe::Switch,
-                    "each db is in a separate directory "
-                    "(relevant only if dbpath specified)", true));
-        if(!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("journal", "journal", moe::Switch,
-                    "enable journaling (relevant only if dbpath specified)", true));
-        if(!ret.isOK()) {
-            return ret;
-        }
+        options->addOptionChaining("dbpath", "dbpath", moe::String,
+                "directly access mongod database files in the given path, instead of "
+                "connecting to a mongod  server - needs to lock the data directory, "
+                "so cannot be used if a mongod is currently accessing the same path");
+
+        options->addOptionChaining("directoryperdb", "directoryperdb", moe::Switch,
+                "each db is in a separate directory (relevant only if dbpath specified)");
+
+        options->addOptionChaining("journal", "journal", moe::Switch,
+                "enable journaling (relevant only if dbpath specified)");
+
 
         return Status::OK();
     }
     Status addSpecifyDBCollectionToolOptions(moe::OptionSection* options) {
-        Status ret = options->addOption(OD("db", "db,d",moe::String, "database to use", true));
-        if(!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("collection", "collection,c",moe::String,
-                    "collection to use (some commands)", true));
-        if(!ret.isOK()) {
-            return ret;
-        }
+        options->addOptionChaining("db", "db,d", moe::String, "database to use");
+
+        options->addOptionChaining("collection", "collection,c", moe::String,
+                "collection to use (some commands)");
+
 
         return Status::OK();
     }
 
     Status addFieldOptions(moe::OptionSection* options) {
-        Status ret = options->addOption(OD("fields", "fields,f", moe::String ,
-                    "comma separated list of field names e.g. -f name,age", true));
-        if(!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("fieldFile", "fieldFile", moe::String ,
-                    "file with field names - 1 per line", true));
-        if(!ret.isOK()) {
-            return ret;
-        }
+        options->addOptionChaining("fields", "fields,f", moe::String,
+                "comma separated list of field names e.g. -f name,age");
+
+        options->addOptionChaining("fieldFile", "fieldFile", moe::String,
+                "file with field names - 1 per line");
+
 
         return Status::OK();
     }
 
     Status addBSONToolOptions(moe::OptionSection* options) {
-        Status ret = options->addOption(OD("objcheck", "objcheck", moe::Switch,
-                    "validate object before inserting (default)", true));
-        if(!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("noobjcheck", "noobjcheck", moe::Switch,
-                    "don't validate object before inserting", true));
-        if(!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("filter", "filter", moe::String ,
-                    "filter to apply before inserting", true));
-        if(!ret.isOK()) {
-            return ret;
-        }
+        options->addOptionChaining("objcheck", "objcheck", moe::Switch,
+                "validate object before inserting (default)");
+
+        options->addOptionChaining("noobjcheck", "noobjcheck", moe::Switch,
+                "don't validate object before inserting");
+
+        options->addOptionChaining("filter", "filter", moe::String,
+                "filter to apply before inserting");
+
 
         return Status::OK();
     }

@@ -36,79 +36,48 @@ namespace mongo {
         typedef moe::OptionDescription OD;
         typedef moe::PositionalOptionDescription POD;
 
-        Status ret = options->addOption(OD("shell", "shell", moe::Switch,
-                    "run the shell after executing files", true));
-        if (!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("nodb", "nodb", moe::Switch,
-                    "don't connect to mongod on startup - no 'db address' arg expected", true));
-        if (!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("norc", "norc", moe::Switch,
-                    "will not run the \".mongorc.js\" file on start up", true));
-        if (!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("quiet", "quiet", moe::Switch, "be less chatty", true));
-        if (!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("port", "port", moe::String, "port to connect to" , true));
-        if (!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("host", "host", moe::String, "server to connect to" , true));
-        if (!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("eval", "eval", moe::String, "evaluate javascript" , true));
-        if (!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("username", "username,u", moe::String,
-                    "username for authentication" , true));
-        if (!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("password", "password,p", moe::String,
-                    "password for authentication" , true, moe::Value(),
-                    moe::Value(std::string(""))));
-        if (!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("authenticationDatabase", "authenticationDatabase", moe::String,
-                    "user source (defaults to dbname)" , true, moe::Value(std::string(""))));
-        if (!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("authenticationMechanism", "authenticationMechanism",
-                    moe::String, "authentication mechanism", true,
-                    moe::Value(std::string("MONGODB-CR"))));
-        if (!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("help", "help,h", moe::Switch, "show this usage information",
-                    true));
-        if (!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("version", "version", moe::Switch, "show version information",
-                    true));
-        if (!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("verbose", "verbose", moe::Switch, "increase verbosity", true));
-        if (!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("ipv6", "ipv6", moe::Switch,
-                    "enable IPv6 support (disabled by default)", true));
-        if (!ret.isOK()) {
-            return ret;
-        }
+        options->addOptionChaining("shell", "shell", moe::Switch,
+                "run the shell after executing files");
 
+        options->addOptionChaining("nodb", "nodb", moe::Switch,
+                "don't connect to mongod on startup - no 'db address' arg expected");
+
+        options->addOptionChaining("norc", "norc", moe::Switch,
+                "will not run the \".mongorc.js\" file on start up");
+
+        options->addOptionChaining("quiet", "quiet", moe::Switch, "be less chatty");
+
+        options->addOptionChaining("port", "port", moe::String, "port to connect to");
+
+        options->addOptionChaining("host", "host", moe::String, "server to connect to");
+
+        options->addOptionChaining("eval", "eval", moe::String, "evaluate javascript");
+
+        options->addOptionChaining("username", "username,u", moe::String,
+                "username for authentication");
+
+        options->addOptionChaining("password", "password,p", moe::String,
+                "password for authentication")
+                                  .setImplicit(moe::Value(std::string("")));
+
+        options->addOptionChaining("authenticationDatabase", "authenticationDatabase", moe::String,
+                "user source (defaults to dbname)")
+                                  .setDefault(moe::Value(std::string("")));
+
+        options->addOptionChaining("authenticationMechanism", "authenticationMechanism",
+                moe::String, "authentication mechanism")
+                                  .setDefault(moe::Value(std::string("MONGODB-CR")));
+
+        options->addOptionChaining("help", "help,h", moe::Switch, "show this usage information");
+
+        options->addOptionChaining("version", "version", moe::Switch, "show version information");
+
+        options->addOptionChaining("verbose", "verbose", moe::Switch, "increase verbosity");
+
+        options->addOptionChaining("ipv6", "ipv6", moe::Switch,
+                "enable IPv6 support (disabled by default)");
+
+        Status ret = Status::OK();
 #ifdef MONGO_SSL
         ret = addSSLClientOptions(options);
         if (!ret.isOK()) {
@@ -116,25 +85,21 @@ namespace mongo {
         }
 #endif
 
-        ret = options->addOption(OD("dbaddress", "dbaddress", moe::String, "dbaddress" , false));
-        if (!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("files", "files", moe::StringVector, "files" , false));
-        if (!ret.isOK()) {
-            return ret;
-        }
+        options->addOptionChaining("dbaddress", "dbaddress", moe::String, "dbaddress")
+                                  .hidden();
+
+        options->addOptionChaining("files", "files", moe::StringVector, "files")
+                                  .hidden();
+
         // for testing, kill op will also be disabled automatically if the tests starts a mongo
         // program
-        ret = options->addOption(OD("nokillop", "nokillop", moe::Switch, "nokillop", false));
-        if (!ret.isOK()) {
-            return ret;
-        }
+        options->addOptionChaining("nokillop", "nokillop", moe::Switch, "nokillop")
+                                  .hidden();
+
         // for testing, will kill op without prompting
-        ret = options->addOption(OD("autokillop", "autokillop", moe::Switch, "autokillop", false));
-        if (!ret.isOK()) {
-            return ret;
-        }
+        options->addOptionChaining("autokillop", "autokillop", moe::Switch, "autokillop")
+                                  .hidden();
+
 
         ret = options->addPositionalOption(POD("dbaddress", moe::String, 1));
         if (!ret.isOK()) {

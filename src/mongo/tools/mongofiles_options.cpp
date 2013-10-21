@@ -47,22 +47,16 @@ namespace mongo {
             return ret;
         }
 
-        ret = options->addOption(OD("local", "local,l", moe::String,
-                    "local filename for put|get (default is to use the same name as "
-                    "'gridfs filename')", true));
-        if(!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("type", "type,t", moe::String,
-                    "MIME type for put (default is to omit)", true));
-        if(!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("replace", "replace,r", moe::Switch,
-                    "Remove other files with same name after PUT", true));
-        if(!ret.isOK()) {
-            return ret;
-        }
+        options->addOptionChaining("local", "local,l", moe::String,
+                "local filename for put|get (default is to use the same name as "
+                "'gridfs filename')");
+
+        options->addOptionChaining("type", "type,t", moe::String,
+                "MIME type for put (default is to omit)");
+
+        options->addOptionChaining("replace", "replace,r", moe::Switch,
+                "Remove other files with same name after PUT");
+
 
         ret = options->addPositionalOption(POD( "command", moe::String, 1 ));
         if(!ret.isOK()) {

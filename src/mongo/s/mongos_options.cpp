@@ -65,46 +65,29 @@ namespace mongo {
 
         moe::OptionSection sharding_options("Sharding options");
 
-        ret = sharding_options.addOption(OD("configdb", "configdb", moe::String,
-                    "1 or 3 comma separated config servers" , true));
-        if (!ret.isOK()) {
-            return ret;
-        }
-        ret = sharding_options.addOption(OD("localThreshold", "localThreshold", moe::Int,
-                    "ping time (in ms) for a node to be considered local (default 15ms)" , true));
-        if (!ret.isOK()) {
-            return ret;
-        }
-        ret = sharding_options.addOption(OD("test", "test", moe::Switch, "just run unit tests",
-                    true));
-        if (!ret.isOK()) {
-            return ret;
-        }
-        ret = sharding_options.addOption(OD("upgrade", "upgrade", moe::Switch,
-                    "upgrade meta data version", true));
-        if (!ret.isOK()) {
-            return ret;
-        }
-        ret = sharding_options.addOption(OD("chunkSize", "chunkSize", moe::Int,
-                    "maximum amount of data per chunk" , true));
-        if (!ret.isOK()) {
-            return ret;
-        }
-        ret = sharding_options.addOption(OD("ipv6", "ipv6", moe::Switch,
-                    "enable IPv6 support (disabled by default)", true));
-        if (!ret.isOK()) {
-            return ret;
-        }
-        ret = sharding_options.addOption(OD("jsonp", "jsonp", moe::Switch,
-                    "allow JSONP access via http (has security implications)", true));
-        if (!ret.isOK()) {
-            return ret;
-        }
-        ret = sharding_options.addOption(OD("noscripting", "noscripting", moe::Switch,
-                    "disable scripting engine", true));
-        if (!ret.isOK()) {
-            return ret;
-        }
+        sharding_options.addOptionChaining("configdb", "configdb", moe::String,
+                "1 or 3 comma separated config servers");
+
+        sharding_options.addOptionChaining("localThreshold", "localThreshold", moe::Int,
+                "ping time (in ms) for a node to be considered local (default 15ms)");
+
+        sharding_options.addOptionChaining("test", "test", moe::Switch, "just run unit tests");
+
+        sharding_options.addOptionChaining("upgrade", "upgrade", moe::Switch,
+                "upgrade meta data version");
+
+        sharding_options.addOptionChaining("chunkSize", "chunkSize", moe::Int,
+                "maximum amount of data per chunk");
+
+        sharding_options.addOptionChaining("ipv6", "ipv6", moe::Switch,
+                "enable IPv6 support (disabled by default)");
+
+        sharding_options.addOptionChaining("jsonp", "jsonp", moe::Switch,
+                "allow JSONP access via http (has security implications)");
+
+        sharding_options.addOptionChaining("noscripting", "noscripting", moe::Switch,
+                "disable scripting engine");
+
 
         options->addSection(general_options);
 
@@ -118,11 +101,10 @@ namespace mongo {
         options->addSection(ssl_options);
 #endif
 
-        ret = options->addOption(OD("noAutoSplit", "noAutoSplit", moe::Switch,
-                    "do not send split commands with writes", false));
-        if (!ret.isOK()) {
-            return ret;
-        }
+        options->addOptionChaining("noAutoSplit", "noAutoSplit", moe::Switch,
+                "do not send split commands with writes")
+                                  .hidden();
+
 
         return Status::OK();
     }

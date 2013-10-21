@@ -37,32 +37,21 @@ namespace mongo {
             return ret;
         }
 
-        ret = options->addOption(OD("noheaders", "noheaders", moe::Switch,
-                    "don't output column names", true));
-        if(!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("rowcount", "rowcount,n", moe::Int,
-                    "number of stats lines to print (0 for indefinite)", true,
-                    moe::Value(0)));
-        if(!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("http", "http", moe::Switch,
-                    "use http instead of raw db connection", true));
-        if(!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("discover", "discover", moe::Switch,
-                    "discover nodes and display stats for all", true));
-        if(!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("all", "all", moe::Switch,
-                    "all optional fields", true));
-        if(!ret.isOK()) {
-            return ret;
-        }
+        options->addOptionChaining("noheaders", "noheaders", moe::Switch,
+                "don't output column names");
+
+        options->addOptionChaining("rowcount", "rowcount,n", moe::Int,
+                "number of stats lines to print (0 for indefinite)")
+                                  .setDefault(moe::Value(0));
+
+        options->addOptionChaining("http", "http", moe::Switch,
+                "use http instead of raw db connection");
+
+        options->addOptionChaining("discover", "discover", moe::Switch,
+                "discover nodes and display stats for all");
+
+        options->addOptionChaining("all", "all", moe::Switch, "all optional fields");
+
 
         ret = options->addPositionalOption(POD( "sleep", moe::Int, 1 ));
         if(!ret.isOK()) {

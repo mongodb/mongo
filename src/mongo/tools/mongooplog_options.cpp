@@ -48,20 +48,14 @@ namespace mongo {
             return ret;
         }
 
-        ret = options->addOption(OD("seconds", "seconds,s", moe::Int ,
-                    "seconds to go back default:86400", true));
-        if(!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("from", "from", moe::String , "host to pull from", true));
-        if(!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addOption(OD("oplogns", "oplogns", moe::String ,
-                    "ns to pull from" , true, moe::Value(std::string("local.oplog.rs"))));
-        if(!ret.isOK()) {
-            return ret;
-        }
+        options->addOptionChaining("seconds", "seconds,s", moe::Int,
+                "seconds to go back default:86400");
+
+        options->addOptionChaining("from", "from", moe::String, "host to pull from");
+
+        options->addOptionChaining("oplogns", "oplogns", moe::String, "ns to pull from")
+                                  .setDefault(moe::Value(std::string("local.oplog.rs")));
+
 
         return Status::OK();
     }
