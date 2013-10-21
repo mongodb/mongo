@@ -47,14 +47,14 @@ class test_stat_log01(wttest.WiredTigerTestCase):
 
     def test_stats_log_default(self):
         self.conn = wiredtiger.wiredtiger_open(
-	    None, "create,statistics=(fast),statistics_log=(wait=1)")
+            None, "create,statistics=(fast),statistics_log=(wait=1)")
         # Wait for the default interval, to ensure stats have been written.
         time.sleep(2)
         self.check_stats_file("WiredTigerStat")
 
     def test_stats_log_name(self):
         self.conn = wiredtiger.wiredtiger_open(
-	    None, "create,statistics=(fast),statistics_log=(wait=1,path=foo)")
+            None, "create,statistics=(fast),statistics_log=(wait=1,path=foo)")
         # Wait for the default interval, to ensure stats have been written.
         time.sleep(2)
         self.check_stats_file("foo")
