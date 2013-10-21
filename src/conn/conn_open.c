@@ -154,9 +154,10 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 	}
 
 	/* Free the hazard references for all sessions. */
-	for (s = conn->sessions, i = 0; i < conn->session_size; ++s, ++i)
-		if (s != session)
-			__wt_free(session, s->hazard);
+	if ((s = conn->sessions) != NULL)
+		for (i = 0; i < conn->session_size; ++s, ++i)
+			if (s != session)
+				__wt_free(session, s->hazard);
 
 	/* Destroy the handle. */
 	WT_TRET(__wt_connection_destroy(conn));
