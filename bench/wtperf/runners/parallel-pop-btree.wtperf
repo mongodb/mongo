@@ -5,7 +5,6 @@ table_config="type=file"
 transaction_config="isolation=snapshot"
 icount=10000000
 report_interval=5
-stat_interval=4
 run_time=20
 populate_ops_per_txn=100
 populate_threads=5
