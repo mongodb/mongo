@@ -149,11 +149,6 @@ namespace mongo {
             toolGlobalParams.db = "admin";
         }
 
-        // Make the default db "admin" if it was not explicitly set
-        if (!params.count("db")) {
-            toolGlobalParams.db = "admin";
-        }
-
         // end of storage / start of validation
 
         if (mongoStatGlobalParams.sleep <= 0) {
