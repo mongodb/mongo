@@ -462,22 +462,33 @@ namespace mongo {
 
         OpCounters * opCounters = fromRepl ? &replOpCounters : &globalOpCounters;
 
-        const char *names[] = { "o", "ns", "op", "b" };
-        BSONElement fields[4];
-        op.getFields(4, names, fields);
+        const char *names[] = { "o", "ns", "op", "b", "o2" };
+        BSONElement fields[5];
+        op.getFields(5, names, fields);
+        BSONElement& fieldO = fields[0];
+        BSONElement& fieldNs = fields[1];
+        BSONElement& fieldOp = fields[2];
+        BSONElement& fieldB = fields[3];
+        BSONElement& fieldO2 = fields[4];
 
         BSONObj o;
-        if( fields[0].isABSONObj() )
-            o = fields[0].embeddedObject();
-            
-        const char *ns = fields[1].valuestrsafe();
+        if( fieldO.isABSONObj() )
+            o = fieldO.embeddedObject();
+
+        const char *ns = fieldNs.valuestrsafe();
+
+        BSONObj o2;
+        if (fieldO2.isABSONObj())
+            o2 = fieldO2.Obj();
+
+        bool valueB = fieldB.booleanSafe();
 
         Lock::assertWriteLocked(ns);
 
         NamespaceDetails *nsd = nsdetails(ns);
 
         // operation type -- see logOp() comments for types
-        const char *opType = fields[2].valuestrsafe();
+        const char *opType = fieldOp.valuestrsafe();
 
         if ( *opType == 'i' ) {
             opCounters->gotInsert();
@@ -548,8 +559,8 @@ namespace mongo {
             RARELY if ( nsd && !nsd->isCapped() ) { ensureHaveIdIndex(ns, false); }
 
             OpDebug debug;
-            BSONObj updateCriteria = op.getObjectField("o2");
-            const bool upsert = fields[3].booleanSafe() || convertUpdateToUpsert;
+            BSONObj updateCriteria = o2;
+            const bool upsert = valueB || convertUpdateToUpsert;
 
             const NamespaceString requestNs(ns);
             UpdateRequest request(requestNs, QueryPlanSelectionPolicy::idElseNatural());
@@ -600,7 +611,7 @@ namespace mongo {
         else if ( *opType == 'd' ) {
             opCounters->gotDelete();
             if ( opType[1] == 0 )
-                deleteObjects(ns, o, /*justOne*/ fields[3].booleanSafe());
+                deleteObjects(ns, o, /*justOne*/ valueB);
             else
                 verify( opType[1] == 'b' ); // "db" advertisement
         }
