@@ -811,12 +811,10 @@ static int
 __ovfl_txnc_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_OVFL_TXNC **e, **head, *txnc;
-	uint64_t last_running;
 	size_t decr;
 	int i;
 
 	head = page->modify->ovfl_track->ovfl_txnc;
-	last_running = S2C(session)->txn_global.last_running;
 
 	/*
 	 * Discard any transaction-cache records with transaction IDs earlier
@@ -827,7 +825,7 @@ __ovfl_txnc_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 */
 	for (i = WT_SKIP_MAXDEPTH - 1; i > 0; --i)
 		for (e = &head[i]; *e != NULL;) {
-			if ((*e)->current >= last_running) {
+			if (__wt_txn_visible_all(session, (*e)->current)) {
 				e = &(*e)->next[i];
 				continue;
 			}
@@ -837,7 +835,7 @@ __ovfl_txnc_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 	/* Second, discard any no longer needed transaction-cache records. */
 	decr = 0;
 	for (e = &head[0]; (txnc = *e) != NULL;) {
-		if ((*e)->current >= last_running) {
+		if (__wt_txn_visible_all(session, (*e)->current)) {
 			e = &(*e)->next[0];
 			continue;
 		}
@@ -951,10 +949,23 @@ __wt_ovfl_txnc_add(WT_SESSION_IMPL *session, WT_PAGE *page,
 int
 __wt_ovfl_track_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
-	if (page->modify->ovfl_track != NULL) {
+	WT_DECL_RET;
+	WT_PAGE_MODIFY *mod;
+
+	mod = page->modify;
+
+	if (mod->ovfl_track == NULL)
+		return (0);
+
+	if (mod->ovfl_track->ovfl_onpage[0] != NULL)
 		WT_RET(__ovfl_onpage_wrapup(session, page));
+	if (mod->ovfl_track->ovfl_reuse[0] != NULL)
 		WT_RET(__ovfl_reuse_wrapup(session, page));
-		WT_RET(__ovfl_txnc_wrapup(session, page));
+
+	if (mod->ovfl_track->ovfl_txnc[0] != NULL) {
+		WT_RET(__wt_writelock(session, S2BT(session)->val_ovfl_lock));
+		ret = __ovfl_txnc_wrapup(session, page);
+		WT_TRET(__wt_rwunlock(session, S2BT(session)->val_ovfl_lock));
 	}
 	return (0);
 }
@@ -966,10 +977,23 @@ __wt_ovfl_track_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 int
 __wt_ovfl_track_wrapup_err(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
-	if (page->modify->ovfl_track != NULL) {
+	WT_DECL_RET;
+	WT_PAGE_MODIFY *mod;
+
+	mod = page->modify;
+
+	if (mod->ovfl_track == NULL)
+		return (0);
+
+	if (mod->ovfl_track->ovfl_onpage[0] != NULL)
 		WT_RET(__ovfl_onpage_wrapup_err(session, page));
+	if (mod->ovfl_track->ovfl_reuse[0] != NULL)
 		WT_RET(__ovfl_reuse_wrapup_err(session, page));
-		WT_RET(__ovfl_txnc_wrapup(session, page));
+
+	if (mod->ovfl_track->ovfl_txnc[0] != NULL) {
+		WT_RET(__wt_writelock(session, S2BT(session)->val_ovfl_lock));
+		ret = __ovfl_txnc_wrapup(session, page);
+		WT_TRET(__wt_rwunlock(session, S2BT(session)->val_ovfl_lock));
 	}
 	return (0);
 }
