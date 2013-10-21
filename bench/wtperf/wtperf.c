@@ -566,10 +566,10 @@ stat_worker(void *arg)
 			goto err;
 		}
 		while ((ret = cursor->next(cursor)) == 0 && (ret =
-		    cursor->get_value(cursor, &desc, &pvalue, &value)) == 0 &&
-		    value != 0)
-			lprintf(cfg, 0, cfg->verbose,
-			    "stat:table: %s=%s", desc, pvalue);
+		    cursor->get_value(cursor, &desc, &pvalue, &value)) == 0)
+			if (value != 0)
+				lprintf(cfg, 0, cfg->verbose,
+				    "stat:table: %s=%s", desc, pvalue);
 		cursor->close(cursor);
 		lprintf(cfg, 0, cfg->verbose, "-----------------");
 
@@ -581,10 +581,10 @@ stat_worker(void *arg)
 			goto err;
 		}
 		while ((ret = cursor->next(cursor)) == 0 && (ret =
-		    cursor->get_value(cursor, &desc, &pvalue, &value)) == 0 &&
-		    value != 0)
-			lprintf(cfg, 0, cfg->verbose,
-			    "stat:conn: %s=%s", desc, pvalue);
+		    cursor->get_value(cursor, &desc, &pvalue, &value)) == 0)
+			if (value != 0)
+				lprintf(cfg, 0, cfg->verbose,
+				    "stat:conn: %s=%s", desc, pvalue);
 		cursor->close(cursor);
 	}
 err:	if (session != NULL)
