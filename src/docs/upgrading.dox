@@ -42,7 +42,7 @@ When "clear" is configured, statistics counters are reset after they are
 gathered.
 
 Additionally, in version 1.6.6, statistics cursors must be configured
-to match the database statistics configuration; when the database
+to agree with the database statistics configuration; when the database
 statistics are configured to "none", attempts to open a statistics
 cursor will fail; when the database statistics are configured to "fast",
 a statistics cursor must also be configured to "fast"; when the database
