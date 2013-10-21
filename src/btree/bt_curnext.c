@@ -165,7 +165,6 @@ __cursor_var_next(WT_CURSOR_BTREE *cbt, int newpage)
 	WT_CELL *cell;
 	WT_CELL_UNPACK unpack;
 	WT_COL *cip;
-	WT_DECL_RET;
 	WT_ITEM *val;
 	WT_SESSION_IMPL *session;
 	WT_UPDATE *upd;
@@ -220,20 +219,8 @@ new_page:	/* Find the matching WT_COL slot. */
 			__wt_cell_unpack(cell, &unpack);
 			if (unpack.type == WT_CELL_DEL)
 				continue;
-
-			/*
-			 * Restart for a variable-length column-store.  We could
-			 * catch restart higher up the call-stack but there's no
-			 * point to it: unlike row-store (where a normal search
-			 * path finds cached overflow values), we have to access
-			 * the page's reconciliation structures, and that's as
-			 * easy here as higher up the stack.
-			 */
-			if ((ret = __wt_cell_unpack_ref(session,
-			    WT_PAGE_COL_VAR, &unpack, &cbt->tmp)) == WT_RESTART)
-				ret = __wt_ovfl_cache_col_restart(
-				    session, cbt->page, &unpack, &cbt->tmp);
-			WT_RET(ret);
+			WT_RET(__wt_page_cell_data_ref(
+			    session, cbt->page, &unpack, &cbt->tmp));
 
 			cbt->cip_saved = cip;
 		}
@@ -408,7 +395,7 @@ __wt_btcur_next(WT_CURSOR_BTREE *cbt, int discard)
 	if (discard)
 		LF_SET(WT_TREE_DISCARD);
 
-retry:	WT_RET(__cursor_func_init(cbt, 0));
+	WT_RET(__cursor_func_init(cbt, 0));
 
 	/*
 	 * If we aren't already iterating in the right direction, there's
@@ -477,9 +464,7 @@ retry:	WT_RET(__cursor_func_init(cbt, 0));
 		cbt->page = page;
 	}
 
-err:	if (ret == WT_RESTART)
-		goto retry;
-	if (ret != 0)
+err:	if (ret != 0)
 		WT_TRET(__cursor_error_resolve(cbt));
 	return (ret);
 }
@@ -501,7 +486,7 @@ __wt_btcur_next_random(WT_CURSOR_BTREE *cbt)
 	WT_STAT_FAST_CONN_INCR(session, cursor_next);
 	WT_STAT_FAST_DATA_INCR(session, cursor_next);
 
-retry:	WT_RET(__cursor_func_init(cbt, 1));
+	WT_RET(__cursor_func_init(cbt, 1));
 
 	/*
 	 * Only supports row-store: applications can trivially select a random
@@ -512,9 +497,7 @@ retry:	WT_RET(__cursor_func_init(cbt, 1));
 	ret = cbt->compare == 0 ?
 	    __wt_kv_return(session, cbt) : WT_NOTFOUND;
 
-err:	if (ret == WT_RESTART)
-		goto retry;
-	if (ret != 0)
+err:	if (ret != 0)
 		WT_TRET(__cursor_error_resolve(cbt));
 	return (ret);
 }

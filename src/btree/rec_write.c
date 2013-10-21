@@ -1206,7 +1206,7 @@ __rec_split_row_promote_cell(
 	WT_ASSERT(session,
 	    unpack->prefix == 0 && unpack->raw != WT_CELL_VALUE_COPY);
 
-	WT_RET(__wt_cell_unpack_copy(session, dsk->type, unpack, copy));
+	WT_RET(__wt_cell_data_copy(session, dsk->type, unpack, copy));
 	return (0);
 }
 
@@ -2657,7 +2657,7 @@ __rec_col_var(WT_SESSION_IMPL *session,
 			 * where the new value happens (?) to match a Huffman-
 			 * encoded value in a previous or next record.
 			 */
-			WT_ERR(__wt_cell_unpack_ref(
+			WT_ERR(__wt_dsk_cell_data_ref(
 			    session, WT_PAGE_COL_VAR, unpack, orig));
 		}
 
@@ -2744,7 +2744,7 @@ record_loop:	/*
 					 * it for a key and now we need another
 					 * copy; read it into memory.
 					 */
-					WT_ERR(__wt_cell_unpack_ref(session,
+					WT_ERR(__wt_dsk_cell_data_ref(session,
 					    WT_PAGE_COL_VAR, unpack, orig));
 
 					ovfl_state = OVFL_IGNORE;
@@ -2822,7 +2822,7 @@ compare:		/*
 		if (ovfl_state == OVFL_UNUSED) {
 			WT_ERR(__wt_ovfl_onpage_add(
 			    session, page, unpack->data, unpack->size));
-			WT_ERR(__wt_val_ovfl_cache(session, page, upd, unpack));
+			WT_ERR(__wt_ovfl_cache(session, page, upd, unpack));
 		}
 	}
 
@@ -3366,7 +3366,7 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 			if (val_cell != NULL && unpack->ovfl) {
 				WT_ERR(__wt_ovfl_onpage_add(
 				    session, page, unpack->data, unpack->size));
-				WT_ERR(__wt_val_ovfl_cache(
+				WT_ERR(__wt_ovfl_cache(
 				    session, page, rip, unpack));
 			}
 
@@ -3527,7 +3527,7 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 			 * about to promote it.
 			 */
 			if (onpage_ovfl) {
-				WT_ERR(__wt_cell_unpack_copy(
+				WT_ERR(__wt_dsk_cell_data_ref(
 				    session, WT_PAGE_ROW_LEAF, unpack, r->cur));
 				onpage_ovfl = 0;
 			}

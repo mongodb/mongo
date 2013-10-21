@@ -319,13 +319,10 @@ extern const char *__wt_addr_string( WT_SESSION_IMPL *session,
     const uint8_t *addr,
     uint32_t size);
 extern int __wt_ovfl_read(WT_SESSION_IMPL *session,
-    WT_CELL_UNPACK *unpack,
-    WT_ITEM *store);
-extern int __wt_ovfl_cache_col_restart(WT_SESSION_IMPL *session,
     WT_PAGE *page,
     WT_CELL_UNPACK *unpack,
     WT_ITEM *store);
-extern int __wt_val_ovfl_cache(WT_SESSION_IMPL *session,
+extern int __wt_ovfl_cache(WT_SESSION_IMPL *session,
     WT_PAGE *page,
     void *cookie,
     WT_CELL_UNPACK *unpack);
