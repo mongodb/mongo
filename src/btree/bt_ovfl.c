@@ -197,9 +197,7 @@ __wt_ovfl_cache(WT_SESSION_IMPL *session,
 	/*
 	 * Check for a globally visible update.  If there is a globally visible
 	 * update, we don't need to cache the item because it's not possible for
-	 * a thread to be in the process of searching for an item and then have
-	 * a globally visible update added logically before its location in the
-	 * change set.
+	 * a running thread to have moved past it.
 	 */
 	switch (page->type) {
 	case WT_PAGE_COL_VAR:
