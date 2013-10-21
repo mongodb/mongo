@@ -25,7 +25,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import wiredtiger, wttest
+import itertools, wiredtiger, wttest
 from suite_subprocess import suite_subprocess
 from wtscenario import multiply_scenarios, number_scenarios
 from wiredtiger import stat
@@ -174,6 +174,53 @@ class test_stat_cursor_fast(wttest.WiredTigerTestCase):
         cursor = self.session.open_cursor(
             'statistics:' + self.uri, None, 'statistics=(all)')
         self.assertGreater(cursor[stat.dsrc.btree_entries][2], 0)
+
+
+# Test connection error combinations.
+class test_stat_cursor_conn_error(wttest.WiredTigerTestCase):
+    def setUpConnectionOpen(self, dir):
+        return None
+    def setUpSessionOpen(self, conn):
+        return None
+
+    def test_stat_cursor_conn_error(self):
+        args = ['none', 'all', 'fast']
+        for i in list(itertools.permutations(args, 2)):
+            config = 'create,statistics=(' + i[0] + ',' + i[1] + ')'
+            msg = '/only one statistics configuration value/'
+            self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+                lambda: wiredtiger.wiredtiger_open('.', config), msg)
+
+
+# Test data-source error combinations.
+class test_stat_cursor_dsrc_error(wttest.WiredTigerTestCase):
+    pfx = 'test_stat_cursor_dsrc_error'
+
+    uri = [
+        ('1',  dict(uri='file:' + pfx, pop=simple_populate)),
+        ('2', dict(uri='table:' + pfx, pop=simple_populate)),
+        ('3', dict(uri='table:' + pfx, pop=complex_populate)),
+        ('4', dict(uri='table:' + pfx, pop=complex_populate_lsm))
+    ]
+
+    scenarios = number_scenarios(multiply_scenarios('.', uri))
+
+    # Override WiredTigerTestCase, we have extensions.
+    def setUpConnectionOpen(self, dir):
+        conn = wiredtiger.wiredtiger_open(dir,
+            'create,statistics=(all),' +
+            'error_prefix="%s: "' % self.shortid())
+        return conn
+
+    def test_stat_cursor_dsrc_error(self):
+        self.pop(self, self.uri, 'key_format=S', 100)
+        args = ['all', 'fast']
+        for i in list(itertools.permutations(args, 2)):
+            config = 'statistics=(' + i[0] + ',' + i[1] + ')'
+            msg = '/only one statistics configuration value/'
+            self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+                lambda: self.session.open_cursor(
+                'statistics:' + self.uri, None, config), msg)
 
 
 if __name__ == '__main__':
