@@ -4,7 +4,6 @@ table_config="type=file"
 icount=5000000
 report_interval=5
 checkpoint_interval=10
-stat_interval=4
 run_time=120
 populate_threads=1
 read_threads=2

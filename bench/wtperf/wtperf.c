@@ -67,16 +67,16 @@ typedef struct {
 #define	WT_PERF_POP		0x01
 #define	WT_PERF_READ		0x02
 	uint32_t phase;
-#define PERF_INSERT_RMW		0x01
-#define PERF_RAND_PARETO	0x02 /* Use the Pareto random distribution. */
-#define PERF_RAND_WORKLOAD	0x04
+#define	PERF_INSERT_RMW		0x01
+#define	PERF_RAND_PARETO	0x02 /* Use the Pareto random distribution. */
+#define	PERF_RAND_WORKLOAD	0x04
 	uint32_t flags;
 	struct timeval phase_start_time;
 	uint32_t elapsed_time;
 
-#define PERF_SLEEP_LOAD		0x01
+#define	PERF_SLEEP_LOAD		0x01
 	/* Fields changeable on command line are listed in wtperf_opt.i */
-#define OPT_DECLARE_STRUCT
+#define	OPT_DECLARE_STRUCT
 #include "wtperf_opt.i"
 #undef OPT_DECLARE_STRUCT
 
@@ -98,7 +98,7 @@ typedef struct {
 /* All options changeable on command line using -o or -O are listed here. */
 CONFIG_OPT config_opts[] = {
 
-#define OPT_DEFINE_DESC
+#define	OPT_DEFINE_DESC
 #include "wtperf_opt.i"
 #undef OPT_DEFINE_DESC
 
@@ -148,10 +148,10 @@ uint64_t wtperf_value_range(CONFIG *);
 const char *wtperftmp_subdir = "/wtperftmp";
 
 /* Worker thread types. */
-#define WORKER_READ		0x01
-#define WORKER_INSERT		0x02
-#define WORKER_INSERT_RMW	0x03
-#define WORKER_UPDATE		0x04
+#define	WORKER_READ		0x01
+#define	WORKER_INSERT		0x02
+#define	WORKER_INSERT_RMW	0x03
+#define	WORKER_UPDATE		0x04
 
 /* Default values. */
 CONFIG default_cfg = {
@@ -164,7 +164,7 @@ CONFIG default_cfg = {
 	{0, 0},		/* phase_start_time */
 	0,		/* elapsed_time */
 
-#define OPT_DEFINE_DEFAULT
+#define	OPT_DEFINE_DEFAULT
 #include "wtperf_opt.i"
 #undef OPT_DEFINE_DEFAULT
 
@@ -311,7 +311,7 @@ worker(CONFIG *cfg, uint32_t worker_type)
 			continue;
 		sprintf(key_buf, "%0*" PRIu64, cfg->key_sz, next_val);
 		cursor->set_key(cursor, key_buf);
-		switch(worker_type) {
+		switch (worker_type) {
 		case WORKER_READ:
 			op_name = "read";
 			op_ret = cursor->search(cursor);
@@ -529,7 +529,7 @@ stat_worker(void *arg)
 	while (g_util_running) {
 		/* Break the sleep up, so we notice interrupts faster. */
 		for (i = 0; i < cfg->stat_interval; i++) {
-			sleep(cfg->report_interval);
+			sleep(1);
 			if (!g_util_running)
 				break;
 		}
@@ -554,7 +554,7 @@ stat_worker(void *arg)
 
 		/* Report data source stats. */
 		if ((ret = session->open_cursor(session, stat_uri,
-		    NULL, "statistics_fast", &cursor)) != 0) {
+		    NULL, "statistics=(clear)", &cursor)) != 0) {
 			/*
 			 * It is possible the data source is exclusively
 			 * locked at this moment.  Ignore it and try again.
@@ -566,25 +566,25 @@ stat_worker(void *arg)
 			goto err;
 		}
 		while ((ret = cursor->next(cursor)) == 0 && (ret =
-		    cursor->get_value(cursor, &desc, &pvalue, &value)) == 0 &&
-		    value != 0)
-			lprintf(cfg, 0, cfg->verbose,
-			    "stat:table: %s=%s", desc, pvalue);
+		    cursor->get_value(cursor, &desc, &pvalue, &value)) == 0)
+			if (value != 0)
+				lprintf(cfg, 0, cfg->verbose,
+				    "stat:table: %s=%s", desc, pvalue);
 		cursor->close(cursor);
 		lprintf(cfg, 0, cfg->verbose, "-----------------");
 
 		/* Dump the connection statistics since last time. */
 		if ((ret = session->open_cursor(session, "statistics:",
-		    NULL, "statistics_clear", &cursor)) != 0) {
+		    NULL, "statistics=(clear)", &cursor)) != 0) {
 			lprintf(cfg, ret, 0,
 			    "open_cursor failed in statistics");
 			goto err;
 		}
 		while ((ret = cursor->next(cursor)) == 0 && (ret =
-		    cursor->get_value(cursor, &desc, &pvalue, &value)) == 0 &&
-		    value != 0)
-			lprintf(cfg, 0, cfg->verbose,
-			    "stat:conn: %s=%s", desc, pvalue);
+		    cursor->get_value(cursor, &desc, &pvalue, &value)) == 0)
+			if (value != 0)
+				lprintf(cfg, 0, cfg->verbose,
+				    "stat:conn: %s=%s", desc, pvalue);
 		cursor->close(cursor);
 	}
 err:	if (session != NULL)
@@ -620,7 +620,7 @@ checkpoint_worker(void *arg)
 		 */
 		/* Break the sleep up, so we notice interrupts faster. */
 		for (i = 0; i < cfg->checkpoint_interval; i++) {
-			sleep(cfg->report_interval);
+			sleep(1);
 			if (!g_util_running)
 				break;
 		}
@@ -758,7 +758,8 @@ execute_workload(CONFIG *cfg)
 	    cfg, cfg->update_threads, &uthreads, update_thread)) != 0)
 		return (ret);
 
-	nthreads = cfg->read_threads + cfg->insert_threads + cfg->update_threads;
+	nthreads =
+	    cfg->read_threads + cfg->insert_threads + cfg->update_threads;
 
 	/* Sanity check reporting interval. */
 	if (cfg->report_interval > cfg->run_time || cfg->report_interval == 0)

@@ -23,10 +23,8 @@
  *	Initialize the per-connection statistics.
  */
 void
-__wt_conn_stat_init(WT_SESSION_IMPL *session, uint32_t flags)
+__wt_conn_stat_init(WT_SESSION_IMPL *session)
 {
-	WT_UNUSED(flags);
-
 	__wt_cache_stats_update(session);
 }
 
@@ -54,13 +52,8 @@ __statlog_config(WT_SESSION_IMPL *session, const char **cfg, int *runp)
 		*runp = 0;
 		return (0);
 	}
+	*runp = 1;
 	conn->stat_usecs = (long)cval.val * 1000000;
-
-	/* Statistics logging implies statistics. */
-	conn->statistics = *runp = 1;
-
-	WT_RET(__wt_config_gets(session, cfg, "statistics_log.clear", &cval));
-	conn->stat_clear = cval.val != 0;
 
 	WT_RET(__wt_config_gets(session, cfg, "statistics_log.sources", &cval));
 	WT_RET(__wt_config_subinit(session, &objectconf, &cval));
@@ -117,7 +110,7 @@ __statlog_dump(WT_SESSION_IMPL *session, const char *name, int conn_stats)
 	uint64_t max;
 	const char *uri;
 	const char *cfg[] = {
-	    WT_CONFIG_BASE(session, session_open_cursor), NULL, NULL };
+	    WT_CONFIG_BASE(session, session_open_cursor), NULL };
 
 	conn = S2C(session);
 
@@ -129,8 +122,6 @@ __statlog_dump(WT_SESSION_IMPL *session, const char *name, int conn_stats)
 		WT_ERR(__wt_buf_fmt(session, tmp, "statistics:%s", name));
 		uri = tmp->data;
 	}
-	cfg[1] = conn->stat_clear ?
-	    "statistics_clear,statistics_fast" : "statistics_fast";
 
 	/*
 	 * Open the statistics cursor and dump the statistics.
@@ -282,7 +273,7 @@ __statlog_server(void *arg)
 		 * If statistics are turned off, wait until it's time to output
 		 * statistics and check again.
 		 */
-		if (conn->statistics == 0) {
+		if (conn->stat_all == 0 && conn->stat_fast == 0) {
 			WT_ERR(__wt_cond_wait(
 			    session, conn->stat_cond, conn->stat_usecs));
 			continue;

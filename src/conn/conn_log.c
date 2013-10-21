@@ -42,7 +42,7 @@ __logmgr_config(WT_SESSION_IMPL *session, const char **cfg, int *runp)
 
 	WT_RET(__wt_config_gets(session, cfg, "log.file_max", &cval));
 	conn->log_file_max = (off_t)cval.val;
-	WT_CSTAT_SET(session, log_max_filesize, conn->log_file_max);
+	WT_STAT_FAST_CONN_SET(session, log_max_filesize, conn->log_file_max);
 
 	WT_RET(__wt_config_gets(session, cfg, "log.path", &cval));
 	WT_RET(__wt_strndup(session, cval.str, cval.len, &conn->log_path));

@@ -228,6 +228,12 @@ struct __wt_cursor_index {
 struct __wt_cursor_stat {
 	WT_CURSOR iface;
 
+	int	notpositioned;		/* Cursor not positioned */
+
+	int	stat_all;		/* "all" statistics configured */
+	int	stat_fast;		/* "fast" statistics configured */
+	int	stat_clear;		/* "clear" statistics configured */
+
 	WT_STATS *stats;		/* Stats owned by the cursor */
 	WT_STATS *stats_first;		/* First stats reference */
 	int	  stats_count;		/* Count of stats elements */
@@ -236,8 +242,6 @@ struct __wt_cursor_stat {
 		WT_DSRC_STATS dsrc_stats;
 		WT_CONNECTION_STATS conn_stats;
 	} u;
-
-	int	 notpositioned;		/* Cursor not positioned */
 
 	int	 key;			/* Current stats key */
 	uint64_t v;			/* Current stats value */
