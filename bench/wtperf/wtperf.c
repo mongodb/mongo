@@ -529,7 +529,7 @@ stat_worker(void *arg)
 	while (g_util_running) {
 		/* Break the sleep up, so we notice interrupts faster. */
 		for (i = 0; i < cfg->stat_interval; i++) {
-			sleep(cfg->report_interval);
+			sleep(1);
 			if (!g_util_running)
 				break;
 		}
@@ -620,7 +620,7 @@ checkpoint_worker(void *arg)
 		 */
 		/* Break the sleep up, so we notice interrupts faster. */
 		for (i = 0; i < cfg->checkpoint_interval; i++) {
-			sleep(cfg->report_interval);
+			sleep(1);
 			if (!g_util_running)
 				break;
 		}
