@@ -279,11 +279,6 @@ __wt_conn_cache_pool_destroy(WT_CONNECTION_IMPL *conn)
 		    "Freeing a cache pool session due to connection close.");
 		wt_session = &cp->session->iface;
 		WT_TRET(wt_session->close(wt_session, NULL));
-		/*
-		 * This is safe after the close because session handles are
-		 * not freed, but are managed by the connection.
-		 */
-		__wt_free(NULL, cp->session->hazard);
 		cp->session = NULL;
 	}
 

@@ -245,11 +245,10 @@ __wt_logmgr_destroy(WT_CONNECTION_IMPL *conn)
 
 	__wt_free(session, conn->log_path);
 
-	/* Close the server thread's session, free its hazard array. */
+	/* Close the server thread's session. */
 	if (conn->arch_session != NULL) {
 		wt_session = &conn->arch_session->iface;
 		WT_TRET(wt_session->close(wt_session, NULL));
-		__wt_free(session, conn->arch_session->hazard);
 		conn->arch_session = NULL;
 	}
 	__wt_spin_destroy(session, &log->log_lock);

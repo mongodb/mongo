@@ -55,7 +55,7 @@ struct __wt_page_header {
 #define	WT_PAGE_HEADER_SIZE		28
 
 /*
- * The block-manager specific information immediately follows the WT_PAGE_DISK
+ * The block-manager specific information immediately follows the WT_PAGE_HEADER
  * structure.
  */
 #define	WT_BLOCK_HEADER_REF(dsk)					\
@@ -158,6 +158,8 @@ struct __wt_ovfl_reuse {
  * cache the old value until no running transaction needs it.
  */
 struct __wt_ovfl_txnc {
+	uint64_t current;		/* Maximum transaction ID at store */
+
 	uint32_t value_offset;		/* Overflow value offset */
 	uint32_t value_size;		/* Overflow value size */
 	uint8_t  addr_offset;		/* Overflow addr offset */
@@ -235,6 +237,17 @@ struct __wt_page_modify {
 	 * 4B types will always be backed by atomic writes to memory.
 	 */
 	uint32_t write_gen;
+
+#define	WT_PAGE_LOCK(session, page)					\
+	__wt_spin_lock(							\
+	    session, S2C(session)->page_lock[(page)->modify->page_lock])
+#define	WT_PAGE_TRYLOCK(session, page)					\
+	__wt_spin_trylock(						\
+	    session, S2C(session)->page_lock[(page)->modify->page_lock])
+#define	WT_PAGE_UNLOCK(session, page)					\
+	__wt_spin_unlock(						\
+	    session, S2C(session)->page_lock[(page)->modify->page_lock])
+	uint8_t page_lock;		/* Page's spinlock */
 
 #define	WT_PM_REC_EMPTY		0x01	/* Reconciliation: page empty */
 #define	WT_PM_REC_REPLACE	0x02	/* Reconciliation: page replaced */
@@ -350,8 +363,7 @@ struct __wt_page {
 	 */
 	uint32_t entries;
 
-	/* Memory attached to the page. */
-	uint32_t memory_footprint;
+	uint32_t memory_footprint;	/* Memory attached to the page */
 
 #define	WT_PAGE_INVALID		0	/* Invalid page */
 #define	WT_PAGE_BLOCK_MANAGER	1	/* Block-manager page */

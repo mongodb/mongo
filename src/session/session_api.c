@@ -864,8 +864,9 @@ __wt_open_session(WT_CONNECTION_IMPL *conn, int internal,
 	 * first time we open this session.
 	 */
 	if (session_ret->hazard == NULL)
-		WT_ERR(__wt_calloc(session, conn->hazard_max,
-		    sizeof(WT_HAZARD), &session_ret->hazard));
+		WT_ERR(__wt_calloc_def(
+		    session, conn->hazard_max, &session_ret->hazard));
+
 	/*
 	 * Set an initial size for the hazard array. It will be grown as
 	 * required up to hazard_max. The hazard_size is reset on close, since

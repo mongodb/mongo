@@ -253,8 +253,7 @@ slow:			WT_RET(__wt_row_leaf_key_work(
 		vb->size = 0;
 	} else {
 		__wt_cell_unpack(cell, unpack);
-		WT_RET(__wt_cell_unpack_ref(
-		    session, WT_PAGE_ROW_LEAF, unpack, vb));
+		WT_RET(__wt_page_cell_data_ref(session, cbt->page, unpack, vb));
 	}
 
 	return (0);

@@ -69,27 +69,7 @@
  * atomic state changes, we rely on the WT_ATOMIC_ADD and WT_ATOMIC_CAS
  * (compare and swap) operations.
  */
-#if defined(_lint)
-#define	WT_ATOMIC_ADD(v, val)			((v) += (val), (v))
-#define	WT_ATOMIC_CAS(v, oldv, newv)		(1)
-#define	WT_ATOMIC_CAS_VAL(v, oldv, newv)	(1)
-#define	WT_ATOMIC_STORE(v, val)			((v) = (val))
-#define	WT_ATOMIC_SUB(v, val)			((v) -= (val), (v))
-static inline void WT_FULL_BARRIER(void)
-{
-	return;
-}
-static inline void WT_READ_BARRIER(void)
-{
-	return;
-}
-static inline void WT_WRITE_BARRIER(void)
-{
-	return;
-}
-#define	HAVE_ATOMICS 1
-
-#elif defined(__GNUC__)
+#if defined(__GNUC__)
 
 #define	WT_ATOMIC_ADD(v, val)						\
 	__sync_add_and_fetch(&(v), val)
@@ -101,6 +81,12 @@ static inline void WT_WRITE_BARRIER(void)
 	__sync_lock_test_and_set(&(v), val)
 #define	WT_ATOMIC_SUB(v, val)						\
 	__sync_sub_and_fetch(&(v), val)
+
+/* Compile read-write barrier */
+#define	WT_BARRIER() asm volatile("" ::: "memory")
+
+/* Pause instruction to prevent excess processor bus usage */
+#define	WT_PAUSE() asm volatile("pause\n" ::: "memory")
 
 #if defined(x86_64) || defined(__x86_64__)
 #define	WT_FULL_BARRIER() do {						\
@@ -122,6 +108,24 @@ static inline void WT_WRITE_BARRIER(void)
 #define	WT_WRITE_BARRIER()	WT_FULL_BARRIER()
 #define	HAVE_ATOMICS 1
 #endif
+
+#elif defined(_lint)
+
+#define	WT_ATOMIC_ADD(v, val)			((v) += (val), (v))
+#define	WT_ATOMIC_CAS(v, oldv, newv)					\
+    ((v) = ((v) == (oldv) ? (newv) : (oldv)), 1)
+#define	WT_ATOMIC_CAS_VAL(v, oldv, newv)				\
+    ((v) = ((v) == (oldv) ? (newv) : (oldv)), (oldv))
+#define	WT_ATOMIC_STORE(v, val)			((v) = (val))
+#define	WT_ATOMIC_SUB(v, val)			((v) -= (val), (v))
+
+static inline void WT_BARRIER(void) { return; }
+static inline void WT_FULL_BARRIER(void) { return; }
+static inline void WT_PAUSE(void) { return; }
+static inline void WT_READ_BARRIER(void) { return; }
+static inline void WT_WRITE_BARRIER(void) { return; }
+
+#define	HAVE_ATOMICS 1
 #endif
 
 #ifndef HAVE_ATOMICS
@@ -173,11 +177,5 @@ static inline void WT_WRITE_BARRIER(void)
 	    __orig, __orig & ~(uint32_t)(mask)));			\
 } while (0)
 #endif
-
-/* Compile read-write barrier */
-#define	WT_BARRIER() asm volatile("" ::: "memory")
-
-/* Pause instruction to prevent excess processor bus usage */
-#define	WT_PAUSE() asm volatile("pause\n" ::: "memory")
 
 #define	WT_CACHE_LINE_ALIGNMENT	64	/* Cache line alignment */

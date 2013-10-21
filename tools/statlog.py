@@ -26,7 +26,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 #
 
-import fileinput, os, shutil, sys
+import fileinput, os, shutil, sys, textwrap
 from collections import defaultdict
 from datetime import datetime
 from subprocess import call
@@ -101,6 +101,8 @@ def plot(title, values):
         t1, v1 = values[1]
         seconds = (datetime.strptime(t1, TIMEFMT) -
             datetime.strptime(t0, TIMEFMT)).seconds
+	if seconds == 0:
+		seconds = 1
         ylabel += ' per second'
 
     # Write the raw data into a file for processing.
@@ -155,4 +157,5 @@ for line in fileinput.input(sys.argv[1:]):
 
 # Plot each entry in the dictionary.
 for items in sorted(d.iteritems()):
-    plot(items[0], items[1])
+    plot('\\n'.join(l for l in textwrap.wrap(items[0], 60)), items[1])
+
