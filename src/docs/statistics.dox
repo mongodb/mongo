@@ -30,7 +30,7 @@ inexpensive, and the \c all configuration gathers all statistics,
 regardless of cost.  If no configuration is specified, the current
 database statistics configuration is assumed.
 
-The configuration of the WT_SESSION::open_cursor method must match the
+The configuration of the WT_SESSION::open_cursor method must agree with the
 database configuration: if the database is configured to maintain \c fast
 statistics, attempts to open a statistics cursor in \c all mode will fail.
 If the database has been configured to maintain \c all statistics, the

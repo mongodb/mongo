@@ -41,7 +41,7 @@ static const WT_CONFIG_CHECK confchk_connection_reconfigure[] = {
 	{ "shared_cache", "category", NULL,
 	     confchk_shared_cache_subconfigs},
 	{ "statistics", "list",
-	    "choices=[\"none\",\"fast\",\"all\",\"clear\"]",
+	    "choices=[\"all\",\"fast\",\"none\",\"clear\"]",
 	    NULL},
 	{ "verbose", "list",
 	    "choices=[\"block\",\"ckpt\",\"evict\",\"evictserver\","
@@ -251,7 +251,7 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open[] = {
 	{ "shared_cache", "category", NULL,
 	     confchk_shared_cache_subconfigs},
 	{ "statistics", "list",
-	    "choices=[\"none\",\"fast\",\"all\",\"clear\"]",
+	    "choices=[\"all\",\"fast\",\"none\",\"clear\"]",
 	    NULL},
 	{ "statistics_log", "category", NULL,
 	     confchk_statistics_log_subconfigs},

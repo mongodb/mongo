@@ -322,7 +322,7 @@ connection_runtime_config = [
 		is used to gather statistics, as well as each time statistics
 		are logged using the \c statistics_log configuration.  See
 		@ref statistics for more information''',
-		type='list', choices=['none', 'fast', 'all', 'clear']),
+		type='list', choices=['all', 'fast', 'none', 'clear']),
 	Config('verbose', '', r'''
 		enable messages for various events.  Options are given as a
 		list, such as <code>"verbose=[evictserver,read]"</code>''',
@@ -446,22 +446,21 @@ methods = {
 		type='boolean'),
 	Config('statistics', 'fast', r'''
 		Specify the statistics to be gathered.  Choosing "all" gathers
-		statistics regardless of cost and may include reading
-		underlying disk-based files; "fast" gathers a subset of
-		statistics that are relatively inexpensive.  The selection
-		must match the database \c statistics configuration specified
-		to ::wiredtiger_open or WT_CONNECTION::reconfigure.  For
-		example, "fast" or "all" can be configured when the database
-		is configured with "all", but the cursor open will fail if
-		"all" is configured when the database is configured with
-		"fast", and the cursor open will fail in all cases when the
-		database is configured with "none".  If \c statistics is not
-		configured, the default configuration is the database
-		configuration.  The "clear" configuration resets statistics
-		after gathering them, where appropriate (for example, a cache
-		size statistic is not cleared, while the count of cursor insert
-		operations will be cleared).  See @ref statistics for more
-		information''',
+		statistics regardless of cost and may include traversing
+		on-disk files; "fast" gathers a subset of relatively
+		inexpensive statistics.  The selection must agree with the
+		database \c statistics configuration specified to
+		::wiredtiger_open or WT_CONNECTION::reconfigure.  For example,
+		"all" or "fast" can be configured when the database is
+		configured with "all", but the cursor open will fail if "all"
+		is specified when the database is configured with "fast",
+		and the cursor open will fail in all cases when the database
+		is configured with "none".  If \c statistics is not configured,
+		the default configuration is the database configuration.
+		The "clear" configuration resets statistics after gathering
+		them, where appropriate (for example, a cache size statistic
+		is not cleared, while the count of cursor insert operations
+		will be cleared).  See @ref statistics for more information''',
 		type='list', choices=['all', 'fast', 'clear']),
 	Config('target', '', r'''
 		if non-empty, backup the list of objects; valid only for a
