@@ -479,8 +479,8 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *sizep)
 			break;
 		case WT_CELL_KEY_OVFL:
 			/* Instantiate any overflow records. */
-			WT_ERR(__wt_cell_unpack_ref(
-			    session, WT_PAGE_ROW_INT, unpack, current));
+			WT_ERR(__wt_dsk_cell_data_ref(
+			    session, page->type, unpack, current));
 
 			WT_ERR(__wt_row_ikey(session,
 			    WT_PAGE_DISK_OFFSET(page, cell),

@@ -158,6 +158,8 @@ struct __wt_ovfl_reuse {
  * cache the old value until no running transaction needs it.
  */
 struct __wt_ovfl_txnc {
+	uint64_t current;		/* Maximum transaction ID at store */
+
 	uint32_t value_offset;		/* Overflow value offset */
 	uint32_t value_size;		/* Overflow value size */
 	uint8_t  addr_offset;		/* Overflow addr offset */
