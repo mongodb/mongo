@@ -507,10 +507,6 @@ __wt_curstat_open(WT_SESSION_IMPL *session,
 		WT_ERR_NOTFOUND_OK(ret);
 		if ((ret = __wt_config_subgets(
 		    session, &cval, "fast", &sval)) == 0 && sval.val != 0) {
-			if (!conn->stat_all && !conn->stat_fast)
-config_err:			WT_ERR_MSG(session, EINVAL,
-				    "cursor's configuration doesn't match the "
-				    "database statistics configuration");
 			if (cst->stat_all)
 				WT_ERR_MSG(session, EINVAL,
 				    "only one statistics configuration value "
@@ -545,6 +541,12 @@ config_err:			WT_ERR_MSG(session, EINVAL,
 
 	/* __wt_cursor_init is last so we don't have to clean up on error. */
 	WT_ERR(__wt_cursor_init(cursor, uri, NULL, cfg, cursorp));
+
+	if (0) {
+config_err:	WT_ERR_MSG(session, EINVAL,
+		    "cursor's statistics configuration doesn't match the "
+		    "database statistics configuration");
+	}
 
 	if (0) {
 err:		__wt_free(session, cst);
