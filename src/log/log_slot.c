@@ -39,6 +39,7 @@ __wt_log_slot_init(WT_SESSION_IMPL *session)
 		/* TODO: Memory leak on error. */
 		WT_RET(__wt_buf_init(session,
 		    &log->slot_pool[i].slot_buf, WT_LOG_SLOT_BUF_INIT_SIZE));
+		FLD_SET(log->slot_pool[i].slot_flags, SLOT_BUFFERED);
 	}
 
 	/*
@@ -91,6 +92,17 @@ join_slot:
 	if (new_state < old_state) {
 		/* Our size doesn't fit here. */
 		WT_CSTAT_INCR(session, log_slot_toobig);
+		goto find_slot;
+	}
+	/*
+	 * If the slot buffer isn't big enough to hold this update, mark
+	 * the slot for a buffer size increase and find another slot.
+	 * TODO: Solve this if our record isn't going to fit into any
+	 * slots buffer and there aren't any other writes completing (i.e
+	 * __log_release is never called, so the buffer never grows).
+	 */
+	if (new_state > (int64_t)slot->slot_buf.memsize) {
+		FLD_SET(slot->slot_flags, SLOT_BUF_GROW);
 		goto find_slot;
 	}
 	cur_state = WT_ATOMIC_CAS_VAL(slot->slot_state, old_state, new_state);

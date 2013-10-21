@@ -90,6 +90,8 @@ typedef struct {
 #define	slot_flags		u.slot.flags
 #define	SLOT_CLOSEFH	0x01			/* Close old fh on release */
 #define	SLOT_SYNC	0x02			/* Needs sync on release */
+#define	SLOT_BUF_GROW	0x04			/* Grow buffer on release */
+#define	SLOT_BUFFERED	0x08			/* Buffer writes */
 			uint32_t flags;		/* Flags */
 		} slot;
 		uint8_t align[LOG_ALIGN];
@@ -132,7 +134,7 @@ typedef struct {
 	 * Consolidation array information
 	 * SLOT_ACTIVE must be less than SLOT_POOL.
 	 */
-#define	SLOT_ACTIVE	4
+#define	SLOT_ACTIVE	2
 #define	SLOT_POOL	16
 	uint32_t	 pool_index;		/* Global pool index */
 	WT_LOGSLOT	*slot_array[SLOT_ACTIVE];	/* Active slots */

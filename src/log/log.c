@@ -234,12 +234,10 @@ __log_fill(WT_SESSION_IMPL *session,
 		WT_ERR(__wt_write(session, myslot->slot->slot_fh,
 		    myslot->offset + myslot->slot->slot_start_offset,
 		    logrec->len, (void *)logrec));
-	else {
-		WT_ERR(__wt_buf_grow(session, &myslot->slot->slot_buf,
-		    (size_t)myslot->offset + logrec->len));
+	else
 		memcpy((char *)myslot->slot->slot_buf.mem + myslot->offset,
 		    logrec, logrec->len);
-	}
+
 	WT_CSTAT_INCRV(session, log_bytes_written, logrec->len);
 	if (lsnp != NULL) {
 		*lsnp = myslot->slot->slot_start_lsn;
@@ -414,6 +412,7 @@ __log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 	WT_DECL_RET;
 	WT_FH *close_fh;
 	WT_LOG *log;
+	uint32_t write_size;
 
 	conn = S2C(session);
 	log = conn->log;
@@ -429,10 +428,12 @@ __log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 	}
 
 	/* Write the buffered records */
-	WT_ERR(__wt_write(session, slot->slot_fh,
-	    slot->slot_start_offset,
-	    (uint32_t)(slot->slot_end_lsn.offset - slot->slot_start_offset),
-	    slot->slot_buf.mem));
+	if (FLD_ISSET(slot->slot_flags, SLOT_BUFFERED)) {
+		write_size = (uint32_t)
+		    (slot->slot_end_lsn.offset - slot->slot_start_offset);
+		WT_ERR(__wt_write(session, slot->slot_fh,
+		    slot->slot_start_offset, write_size, slot->slot_buf.mem));
+	}
 
 	/*
 	 * Wait for earlier groups to finish.
@@ -444,6 +445,11 @@ __log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 		WT_ERR(__wt_fsync(session, log->log_fh));
 		FLD_CLR(slot->slot_flags, SLOT_SYNC);
 		log->sync_lsn = slot->slot_end_lsn;
+	}
+	if (FLD_ISSET(slot->slot_flags, SLOT_BUF_GROW)) {
+		FLD_CLR(slot->slot_flags, SLOT_BUF_GROW);
+		WT_ERR(__wt_buf_grow(session,
+		    &slot->slot_buf, slot->slot_buf.memsize * 2));
 	}
 	log->write_lsn = slot->slot_end_lsn;
 	/*
@@ -804,6 +810,7 @@ __wt_log_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 
 	memset(&tmp, 0, sizeof(tmp));
 	WT_CSTAT_INCR(session, log_writes);
+#if 1
 	if (__wt_spin_trylock(session, &log->log_slot_lock) == 0) {
 		/*
 		 * No contention, just write our record.  We're not using
@@ -815,10 +822,11 @@ __wt_log_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 		WT_ERR(__log_acquire(session, rdup_len, &tmp));
 		__wt_spin_unlock(session, &log->log_slot_lock);
 		locked = 0;
-		WT_ERR(__log_fill(session, &myslot, 0, record, lsnp));
+		WT_ERR(__log_fill(session, &myslot, 1, record, lsnp));
 		WT_ERR(__log_release(session, &tmp));
 		return (0);
 	}
+#endif
 	WT_ERR(__wt_log_slot_join(session, rdup_len, flags, &myslot));
 	if (myslot.offset == 0) {
 		__wt_spin_lock(session, &log->log_slot_lock);
