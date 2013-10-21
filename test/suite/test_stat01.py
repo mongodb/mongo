@@ -40,6 +40,13 @@ class test_stat01(wttest.WiredTigerTestCase):
     config = 'key_format=S,allocation_size=512,internal_page_max=16K,leaf_page_max=128K'
     nentries = 25
 
+    # Override WiredTigerTestCase, we have extensions.
+    def setUpConnectionOpen(self, dir):
+        conn = wiredtiger.wiredtiger_open(dir,
+            'create,statistics=(fast),' +
+            'error_prefix="%s: "' % self.shortid())
+        return conn
+
     def statstr_to_int(self, str):
         """
         Convert a statistics value string, which may be in either form:
