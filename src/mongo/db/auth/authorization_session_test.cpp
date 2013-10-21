@@ -343,6 +343,7 @@ namespace {
 
         // Make sure that invalidating the user causes the session to reload its privileges.
         authzManager->invalidateUserByName(user->getName());
+        authzSession->startRequest(); // Refreshes cached data for invalid users
         ASSERT_TRUE(authzSession->isAuthorizedForActionsOnResource(
                             testFooCollResource, ActionType::find));
         ASSERT_FALSE(authzSession->isAuthorizedForActionsOnResource(
@@ -355,6 +356,7 @@ namespace {
         managerState->clearPrivilegeDocuments();
         // Make sure that invalidating the user causes the session to reload its privileges.
         authzManager->invalidateUserByName(user->getName());
+        authzSession->startRequest(); // Refreshes cached data for invalid users
         ASSERT_FALSE(authzSession->isAuthorizedForActionsOnResource(
                             testFooCollResource, ActionType::find));
         ASSERT_FALSE(authzSession->isAuthorizedForActionsOnResource(
@@ -400,6 +402,7 @@ namespace {
         // document lookup to fail, the authz session should continue to use its known out-of-date
         // privilege data.
         authzManager->invalidateUserByName(user->getName());
+        authzSession->startRequest(); // Refreshes cached data for invalid users
         ASSERT_TRUE(authzSession->isAuthorizedForActionsOnResource(
                             testFooCollResource, ActionType::find));
         ASSERT_TRUE(authzSession->isAuthorizedForActionsOnResource(
@@ -408,6 +411,7 @@ namespace {
         // Once we configure document lookup to succeed again, authorization checks should
         // observe the new values.
         managerState->setFindsShouldFail(false);
+        authzSession->startRequest(); // Refreshes cached data for invalid users
         ASSERT_TRUE(authzSession->isAuthorizedForActionsOnResource(
                             testFooCollResource, ActionType::find));
         ASSERT_FALSE(authzSession->isAuthorizedForActionsOnResource(
