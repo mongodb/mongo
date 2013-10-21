@@ -10,6 +10,7 @@ Import("env")
 Import("shellEnv")
 Import("testEnv")
 Import("has_option")
+Import("get_option")
 Import("usev8")
 Import("installSetup")
 Import("enforce_glibc")
@@ -366,6 +367,10 @@ env.CppUnitTest(
     ]
 )
 
+tcmallocServerStatus = []
+if get_option('allocator') == 'tcmalloc':
+    tcmallocServerStatus.append("util/tcmalloc_server_status_section.cpp")
+
 env.StaticLibrary("coredb", [
         "client/parallel.cpp",
         "db/audit.cpp",
@@ -420,7 +425,9 @@ env.StaticLibrary("coredb", [
         "db/stats/timer_stats.cpp",
         "db/stats/top.cpp",
         "s/shardconnection.cpp",
-        ],
+        ]
+        + tcmallocServerStatus
+        ,
                   LIBDEPS=['db/auth/serverauth',
                            'db/common',
                            'server_parameters',
