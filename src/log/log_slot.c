@@ -39,7 +39,7 @@ __wt_log_slot_init(WT_SESSION_IMPL *session)
 		/* TODO: Memory leak on error. */
 		WT_RET(__wt_buf_init(session,
 		    &log->slot_pool[i].slot_buf, WT_LOG_SLOT_BUF_INIT_SIZE));
-		FLD_SET(log->slot_pool[i].slot_flags, SLOT_BUFFERED);
+		F_SET(&log->slot_pool[i], SLOT_BUFFERED);
 	}
 
 	/*
@@ -102,7 +102,7 @@ join_slot:
 	 * __log_release is never called, so the buffer never grows).
 	 */
 	if (new_state > (int64_t)slot->slot_buf.memsize) {
-		FLD_SET(slot->slot_flags, SLOT_BUF_GROW);
+		F_SET(slot, SLOT_BUF_GROW);
 		goto find_slot;
 	}
 	cur_state = WT_ATOMIC_CAS_VAL(slot->slot_state, old_state, new_state);
@@ -122,7 +122,7 @@ join_slot:
 	 */
 	WT_CSTAT_INCR(session, log_slot_joins);
 	if (LF_ISSET(WT_LOG_FSYNC))
-		FLD_SET(slot->slot_flags, SLOT_SYNC);
+		F_SET(slot, SLOT_SYNC);
 	myslotp->slot = slot;
 	myslotp->offset = (off_t)old_state - WT_LOG_SLOT_READY;
 	return (0);

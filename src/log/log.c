@@ -384,7 +384,7 @@ __log_acquire(WT_SESSION_IMPL *session, uint64_t recsize, WT_LOGSLOT *slot)
 	if (!__log_size_fit(session, &log->alloc_lsn, recsize)) {
 		WT_RET(__wt_log_newfile(session, 0));
 		if (log->log_close_fh != NULL)
-			FLD_SET(slot->slot_flags, SLOT_CLOSEFH);
+			F_SET(slot, SLOT_CLOSEFH);
 	}
 	/*
 	 * Need to minimally fill in slot info here.  Our slot start LSN
@@ -421,14 +421,14 @@ __log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 	 * of the file handle structure.
 	 */
 	close_fh = NULL;
-	if (FLD_ISSET(slot->slot_flags, SLOT_CLOSEFH)) {
+	if (F_ISSET(slot, SLOT_CLOSEFH)) {
 		close_fh = log->log_close_fh;
 		log->log_close_fh = NULL;
-		FLD_CLR(slot->slot_flags, SLOT_CLOSEFH);
+		F_CLR(slot, SLOT_CLOSEFH);
 	}
 
 	/* Write the buffered records */
-	if (FLD_ISSET(slot->slot_flags, SLOT_BUFFERED)) {
+	if (F_ISSET(slot, SLOT_BUFFERED)) {
 		write_size = (uint32_t)
 		    (slot->slot_end_lsn.offset - slot->slot_start_offset);
 		WT_ERR(__wt_write(session, slot->slot_fh,
@@ -440,14 +440,14 @@ __log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 	 */
 	while (LOG_CMP(&log->write_lsn, &slot->slot_release_lsn) != 0)
 		__wt_yield();
-	if (FLD_ISSET(slot->slot_flags, SLOT_SYNC)) {
+	if (F_ISSET(slot, SLOT_SYNC)) {
 		WT_CSTAT_INCR(session, log_sync);
 		WT_ERR(__wt_fsync(session, log->log_fh));
-		FLD_CLR(slot->slot_flags, SLOT_SYNC);
+		F_CLR(slot, SLOT_SYNC);
 		log->sync_lsn = slot->slot_end_lsn;
 	}
-	if (FLD_ISSET(slot->slot_flags, SLOT_BUF_GROW)) {
-		FLD_CLR(slot->slot_flags, SLOT_BUF_GROW);
+	if (F_ISSET(slot, SLOT_BUF_GROW)) {
+		F_CLR(slot, SLOT_BUF_GROW);
 		WT_ERR(__wt_buf_grow(session,
 		    &slot->slot_buf, slot->slot_buf.memsize * 2));
 	}
@@ -818,7 +818,7 @@ __wt_log_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 		 */
 		locked = 1;
 		if (LF_ISSET(WT_LOG_FSYNC))
-			FLD_SET(tmp.slot_flags, SLOT_SYNC);
+			F_SET(&tmp, SLOT_SYNC);
 		WT_ERR(__log_acquire(session, rdup_len, &tmp));
 		__wt_spin_unlock(session, &log->log_slot_lock);
 		locked = 0;
