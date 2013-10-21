@@ -825,7 +825,7 @@ __ovfl_txnc_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 */
 	for (i = WT_SKIP_MAXDEPTH - 1; i > 0; --i)
 		for (e = &head[i]; *e != NULL;) {
-			if (__wt_txn_visible_all(session, (*e)->current)) {
+			if (!__wt_txn_visible_all(session, (*e)->current)) {
 				e = &(*e)->next[i];
 				continue;
 			}
@@ -835,7 +835,7 @@ __ovfl_txnc_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 	/* Second, discard any no longer needed transaction-cache records. */
 	decr = 0;
 	for (e = &head[0]; (txnc = *e) != NULL;) {
-		if (__wt_txn_visible_all(session, (*e)->current)) {
+		if (!__wt_txn_visible_all(session, (*e)->current)) {
 			e = &(*e)->next[0];
 			continue;
 		}
