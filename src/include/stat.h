@@ -10,6 +10,9 @@ struct __wt_stats {
 	uint64_t	 v;				/* 64-bit value */
 };
 
+/*
+ * Read/write statistics without any test for statistics configuration.
+ */
 #define	WT_STAT(stats, fld)						\
 	((stats)->fld.v)
 #define	WT_STAT_DECR(stats, fld) do {					\
@@ -31,7 +34,9 @@ struct __wt_stats {
 	(stats)->fld.v = (uint64_t)(value);				\
 } while (0)
 
-/* "Fast" statistics. */
+/*
+ * Read/write statistics if "fast" statistics are configured.
+ */
 #define	WT_STAT_FAST_DECR(session, stats, fld) do {			\
 	if (S2C(session)->stat_fast)					\
 		WT_STAT_DECR(stats, fld);				\
@@ -57,7 +62,9 @@ struct __wt_stats {
 		WT_STAT_SET(stats, fld, value);				\
 } while (0)
 
-/* "Fast" connection-level statistics. */
+/*
+ * Read/write connection handle statistics if "fast" statistics are configured.
+ */
 #define	WT_STAT_FAST_CONN_DECR(session, fld)				\
 	WT_STAT_FAST_DECR(session, &S2C(session)->stats, fld)
 #define	WT_STAT_FAST_CONN_ATOMIC_DECR(session, fld)			\
@@ -72,7 +79,8 @@ struct __wt_stats {
 	WT_STAT_FAST_SET(session, &S2C(session)->stats, fld, v)
 
 /*
- * Data-source-handle run-time statistics.
+ * Read/write data-source handle statistics if the data-source handle is set
+ * and "fast" statistics are configured.
  *
  * XXX
  * We shouldn't have to check if the data-source handle is NULL, but it's
