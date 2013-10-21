@@ -40,10 +40,7 @@ namespace optionenvironment {
      * Example:
      * MONGO_MODULE_STARTUP_OPTIONS_REGISTER(MongodOptions)(InitializerContext* context) {
      *          return addMongodOptions(&moe::startupOptions);
-     *     ret = startupOptions.addOption(OD("option", "option", moe::String, "description"))
-     *     if (!ret.isOK()) {
-     *         return ret;
-     *     }
+     *     startupOptions.addOptionChaining("option", "option", moe::String, "description");
      *     return Status::OK();
      * }
      */

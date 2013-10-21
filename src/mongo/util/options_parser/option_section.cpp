@@ -26,67 +26,6 @@ namespace optionenvironment {
 
     // Registration interface
 
-    namespace {
-        /**
-         * Utility function check that the type of our Value matches our OptionType
-         */
-        Status checkValueType(OptionType type, Value value) {
-            switch (type) {
-                case StringVector:
-                    {
-                        std::vector<std::string>  valueType;
-                        return value.get(&valueType);
-                    }
-                case Bool:
-                    {
-                        bool valueType;
-                        return value.get(&valueType);
-                    }
-                case Double:
-                    {
-                        double valueType;
-                        return value.get(&valueType);
-                    }
-                case Int:
-                    {
-                        int valueType;
-                        return value.get(&valueType);
-                    }
-                case Long:
-                    {
-                        long valueType;
-                        return value.get(&valueType);
-                    }
-                case String:
-                    {
-                        std::string valueType;
-                        return value.get(&valueType);
-                    }
-                case UnsignedLongLong:
-                    {
-                        unsigned long long valueType;
-                        return value.get(&valueType);
-                    }
-                case Unsigned:
-                    {
-                        unsigned valueType;
-                        return value.get(&valueType);
-                    }
-                case Switch:
-                    {
-                        bool valueType;
-                        return value.get(&valueType);
-                    }
-                default:
-                    {
-                        StringBuilder sb;
-                        sb << "Unrecognized option type: " << type;
-                        return Status(ErrorCodes::InternalError, sb.str());
-                    }
-            }
-        }
-    } // namespace
-
     // TODO: Make sure the section we are adding does not have duplicate options
     Status OptionSection::addSection(const OptionSection& subSection) {
         if (!subSection._positionalOptions.empty()) {
@@ -97,7 +36,12 @@ namespace optionenvironment {
         return Status::OK();
     }
 
-    Status OptionSection::addOption(const OptionDescription& option) {
+    OptionDescription& OptionSection::addOptionChaining(const std::string& dottedName,
+                                                        const std::string& singleName,
+                                                        const OptionType type,
+                                                        const std::string& description) {
+        OptionDescription option(dottedName, singleName, type, description);
+
         // Verify that neither the single name nor the dotted name for this option conflicts with
         // the names for any options we have already registered
         std::list<OptionDescription>::const_iterator oditerator;
@@ -106,70 +50,18 @@ namespace optionenvironment {
                 StringBuilder sb;
                 sb << "Attempted to register option with duplicate dottedName: "
                    << option._dottedName;
-                return Status(ErrorCodes::InternalError, sb.str());
+                throw DBException(sb.str(), ErrorCodes::InternalError);
             }
             if (option._singleName == oditerator->_singleName) {
                 StringBuilder sb;
                 sb << "Attempted to register option with duplicate singleName: "
                    << option._singleName;
-                return Status(ErrorCodes::InternalError, sb.str());
+                throw DBException(sb.str(), ErrorCodes::InternalError);
             }
-        }
-
-        // Make sure the type of our default value matches our declared type
-        if (!option._default.isEmpty()) {
-            Status ret = checkValueType(option._type, option._default);
-            if (!ret.isOK()) {
-                StringBuilder sb;
-                sb << "Could not register option \"" << option._dottedName << "\": "
-                << "mismatch between declared type and type of default value: "
-                << ret.toString();
-                return Status(ErrorCodes::TypeMismatch, sb.str());
-            }
-        }
-
-        // Make sure that if we are registering a composing option it has the type of StringVector
-        if (option._isComposing) {
-            if (option._type != StringVector) {
-                StringBuilder sb;
-                sb << "Could not register option \"" << option._dottedName << "\": "
-                   << "only options registered as StringVector can be composing";
-                return Status(ErrorCodes::TypeMismatch, sb.str());
-            }
-        }
-
-        // Disallow registering a default for a composing option since the interaction between the
-        // two is unclear (for example, should we override or compose the default)
-        if (option._isComposing && !option._default.isEmpty()) {
-            StringBuilder sb;
-            sb << "Could not register option \"" << option._dottedName << "\": "
-                << "Cannot register a default value for a composing option";
-            return Status(ErrorCodes::InternalError, sb.str());
-        }
-
-        // Disallow registering an implicit value for a composing option since the interaction
-        // between the two is unclear
-        if (option._isComposing && !option._implicit.isEmpty()) {
-            StringBuilder sb;
-            sb << "Could not register option \"" << option._dottedName << "\": "
-                << "Cannot register an implicit value for a composing option";
-            return Status(ErrorCodes::InternalError, sb.str());
         }
 
         _options.push_back(option);
-        return Status::OK();
-    }
 
-    OptionDescription& OptionSection::addOptionChaining(const std::string& dottedName,
-                                                        const std::string& singleName,
-                                                        const OptionType type,
-                                                        const std::string& description) {
-        OptionDescription option(dottedName, singleName, type, description);
-        Status ret = addOption(option);
-        if (!ret.isOK()) {
-            // TODO: Determine if this is the exception we want to throw
-            throw DBException(ret.reason(), ret.code());
-        }
         return _options.back();
     }
 
@@ -204,15 +96,16 @@ namespace optionenvironment {
             }
         }
 
-        Status ret = addOption(OptionDescription(positionalOption._name,
-                                                 positionalOption._name,
-                                                 positionalOption._type,
-                                                 "hidden description",
-                                                 false/*hidden*/));
-        if (!ret.isOK()) {
-            return ret;
+        try {
+            addOptionChaining(positionalOption._name, positionalOption._name,
+                              positionalOption._type, "hidden description").hidden();
         }
+        catch (DBException &e) {
+            return e.toStatus();
+        }
+
         _positionalOptions.push_back(positionalOption);
+
         return Status::OK();
     }
 

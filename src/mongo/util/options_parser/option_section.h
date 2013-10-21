@@ -45,13 +45,13 @@ namespace optionenvironment {
      *  moe::OptionSection subSection("Section Name");
      *
      *  // Register our allowed option flags with our OptionSection
-     *  options.addOption(moe::OptionDescription("help", "help", moe::Switch, "Display Help"));
+     *  options.addOptionChaining("help", "help", moe::Switch, "Display Help");
      *
      *  // Register our positional options with our OptionSection
      *  options.addPositionalOption(moe::PositionalOptionDescription("command", moe::String));
      *
      *  // Add a subsection
-     *  subSection.addOption(moe::OptionDescription("port", "port", moe::Int, "Port"));
+     *  subSection.addOptionChaining("port", "port", moe::Int, "Port");
      *  options.addSection(subSection);
      *
      *  // Run the parser
@@ -74,12 +74,9 @@ namespace optionenvironment {
          * we need generate the help string for the command line
          */
         Status addSection(const OptionSection& subSection);
+
         /**
-         * Add an option to this section
-         */
-        Status addOption(const OptionDescription& option);
-        /**
-         * Add an option to this section, but returns a reference to an OptionDescription to allow
+         * Add an option to this section, and returns a reference to an OptionDescription to allow
          * for chaining.
          *
          * Example:
@@ -92,10 +89,8 @@ namespace optionenvironment {
          * the OptionDescription class for details on these attributes.
          *
          * throws DBException on errors, such as attempting to register an option with the same name
-         * as another option, registering a composing option that does not have the type
-         * StringVector, or registering an option with a default value that does not match its type.
-         * All of these cases represent programming errors and should not happen during normal
-         * operation.
+         * as another option.  These represent programming errors that should not happen during
+         * normal operation.
          */
         OptionDescription& addOptionChaining(const std::string& dottedName,
                                              const std::string& singleName,
@@ -106,6 +101,9 @@ namespace optionenvironment {
          * name as the PositionalOptionDescription because that is the mechanism boost program
          * options uses.  Unfortunately this means that positional options can also be accessed by
          * name in the config files and via command line flags
+         *
+         * returns bad status on errors, such as attempting to register an option with the same name
+         * as another option
          */
         Status addPositionalOption(const PositionalOptionDescription& positionalOption);
 

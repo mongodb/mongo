@@ -41,8 +41,8 @@ namespace optionenvironment {
      *  moe::OptionSection options;
      *
      *  // Register our allowed options with our OptionSection
-     *  options.addOption(moe::OptionDescription("help", "help", moe::Switch, "Display Help"));
-     *  options.addOption(moe::OptionDescription("port", "port", moe::Int, "Port"));
+     *  options.addOptionChaining("help", "help", moe::Switch, "Display Help");
+     *  options.addOptionChaining("port", "port", moe::Int, "Port");
      *
      *  // Run the parser
      *  Status ret = parser.run(options, argv, env, &environment);

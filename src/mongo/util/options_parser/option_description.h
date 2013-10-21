@@ -48,28 +48,51 @@ namespace optionenvironment {
         OptionDescription(const std::string& dottedName,
                 const std::string& singleName,
                 const OptionType type,
-                const std::string& description,
-                const bool isVisible = true,
-                const Value defaultValue = Value(),
-                const Value implicitValue = Value(),
-                const bool isComposing = false)
+                const std::string& description)
             : _dottedName(dottedName),
             _singleName(singleName),
             _type(type),
             _description(description),
-            _isVisible(isVisible),
-            _default(defaultValue),
-            _implicit(implicitValue),
-            _isComposing(isComposing) { }
+            _isVisible(true),
+            _default(Value()),
+            _implicit(Value()),
+            _isComposing(false) { }
 
         /*
          * The following functions are part of the chaining interface for option registration.  See
          * comments below for what each of these attributes mean, and the OptionSection class for
          * more details on the chaining interface.
          */
+
+        /*
+         * Make this option hidden so it does not appear in command line help
+         */
         OptionDescription& hidden();
+
+        /*
+         * Add a default value for this option if it is not specified
+         *
+         * throws DBException on errors, such as trying to set a default that does not have the same
+         * type as the option, or trying to set a default for a composing option.
+         */
         OptionDescription& setDefault(Value defaultValue);
+
+        /*
+         * Add an implicit value for this option if it is specified with no argument
+         *
+         * throws DBException on errors, such as trying to set an implicit value that does not have
+         * the same type as the option, or trying to set an implicit value for a composing option.
+         */
         OptionDescription& setImplicit(Value implicitValue);
+
+        /*
+         * Make this option composing so that the different sources add their values instead of
+         * overriding (eg. setParameter values in the config file and on the command line all get
+         * aggregated together)
+         *
+         * throws DBException on errors, such as trying to make an option that is not a vector type
+         * composing, or or trying to set an implicit or default value for a composing option.
+         */
         OptionDescription& composing();
 
         std::string _dottedName; // Used for JSON config and in Environment
