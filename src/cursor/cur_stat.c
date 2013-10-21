@@ -511,6 +511,10 @@ __wt_curstat_open(WT_SESSION_IMPL *session,
 config_err:			WT_ERR_MSG(session, EINVAL,
 				    "cursor's configuration doesn't match the "
 				    "database statistics configuration");
+			if (cst->stat_all)
+				WT_ERR_MSG(session, EINVAL,
+				    "only one statistics configuration value "
+				    "may be specified");
 			cst->stat_fast = 1;
 		}
 		WT_ERR_NOTFOUND_OK(ret);
@@ -519,10 +523,15 @@ config_err:			WT_ERR_MSG(session, EINVAL,
 			cst->stat_clear = 1;
 		WT_ERR_NOTFOUND_OK(ret);
 
+		/* If no configuration, use the connection's configuration. */
 		if (cst->stat_all == 0 && cst->stat_fast == 0) {
 			cst->stat_all = conn->stat_all;
 			cst->stat_fast = conn->stat_fast;
 		}
+
+		/* If the connection configures clear, so do we. */
+		if (conn->stat_clear)
+			cst->stat_clear = 1;
 	}
 
 	/*

@@ -41,7 +41,7 @@ static const WT_CONFIG_CHECK confchk_connection_reconfigure[] = {
 	{ "shared_cache", "category", NULL,
 	     confchk_shared_cache_subconfigs},
 	{ "statistics", "list",
-	    "choices=[\"none\",\"fast\",\"all\"]",
+	    "choices=[\"none\",\"fast\",\"all\",\"clear\"]",
 	    NULL},
 	{ "verbose", "list",
 	    "choices=[\"block\",\"ckpt\",\"evict\",\"evictserver\","
@@ -173,7 +173,7 @@ static const WT_CONFIG_CHECK confchk_session_open_cursor[] = {
 	{ "overwrite", "boolean", NULL, NULL},
 	{ "raw", "boolean", NULL, NULL},
 	{ "statistics", "list",
-	    "choices=[\"clear\",\"all\",\"fast\"]",
+	    "choices=[\"all\",\"fast\",\"clear\"]",
 	    NULL},
 	{ "target", "list", NULL, NULL},
 	{ NULL, NULL, NULL, NULL }
@@ -221,7 +221,6 @@ static const WT_CONFIG_CHECK confchk_log_subconfigs[] = {
 };
 
 static const WT_CONFIG_CHECK confchk_statistics_log_subconfigs[] = {
-	{ "clear", "boolean", NULL, NULL },
 	{ "path", "string", NULL, NULL },
 	{ "sources", "list", NULL, NULL },
 	{ "timestamp", "string", NULL, NULL },
@@ -252,7 +251,7 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open[] = {
 	{ "shared_cache", "category", NULL,
 	     confchk_shared_cache_subconfigs},
 	{ "statistics", "list",
-	    "choices=[\"none\",\"fast\",\"all\"]",
+	    "choices=[\"none\",\"fast\",\"all\",\"clear\"]",
 	    NULL},
 	{ "statistics_log", "category", NULL,
 	     confchk_statistics_log_subconfigs},
@@ -416,9 +415,10 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  "extensions=,file_extend=,hazard_max=1000,log=(archive=,enabled=0"
 	  ",file_max=100MB,path=\"\"),lsm_merge=,mmap=,multiprocess=0,"
 	  "session_max=50,shared_cache=(chunk=10MB,enable=0,name=pool,"
-	  "reserve=0,size=500MB),statistics=none,statistics_log=(clear=,"
-	  "path=\"WiredTigerStat.%H\",sources=,timestamp=\"%b %d %H:%M:%S\""
-	  ",wait=0),transaction_sync=dsync,use_environment_priv=0,verbose=",
+	  "reserve=0,size=500MB),statistics=none,"
+	  "statistics_log=(path=\"WiredTigerStat.%H\",sources=,"
+	  "timestamp=\"%b %d %H:%M:%S\",wait=0),transaction_sync=dsync,"
+	  "use_environment_priv=0,verbose=",
 	  confchk_wiredtiger_open
 	},
 	{ NULL, NULL, NULL }

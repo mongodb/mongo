@@ -49,6 +49,7 @@ int checkpoint_ops(WT_SESSION *session);
 int connection_ops(WT_CONNECTION *conn);
 int cursor_ops(WT_SESSION *session);
 int cursor_search_near(WT_CURSOR *cursor);
+int cursor_statistics(WT_SESSION *session);
 int hot_backup(WT_SESSION *session);
 int pack_ops(WT_SESSION *session);
 int session_ops(WT_SESSION *session);
@@ -451,6 +452,41 @@ checkpoint_ops(WT_SESSION *session)
 	ret = session->
 	    checkpoint(session, "target=(\"table:table1\",\"table:table2\")");
 	/*! [JSON quoting example] */
+
+	return (ret);
+}
+
+int
+cursor_statistics(WT_SESSION *session)
+{
+	WT_CURSOR *cursor;
+	int ret;
+
+	/*! [Statistics cursor database] */
+	ret = session->open_cursor(
+	    session, "statistics:", NULL, NULL, &cursor);
+	/*! [Statistics cursor database] */
+
+	/*! [Statistics cursor table] */
+	ret = session->open_cursor(
+	    session, "statistics:table:mytable", NULL, NULL, &cursor);
+	/*! [Statistics cursor table] */
+
+	/*! [Statistics cursor table fast] */
+	ret = session->open_cursor(session,
+	    "statistics:table:mytable", NULL, "statistics=(fast)", &cursor);
+	/*! [Statistics cursor table fast] */
+
+	/*! [Statistics clear configuration] */
+	ret = session->open_cursor(session,
+	    "statistics:", NULL, "statistics=(fast,clear)", &cursor);
+	/*! [Statistics clear configuration] */
+
+	/*! [Statistics cursor clear configuration] */
+	ret = session->open_cursor(session,
+	    "statistics:table:mytable",
+	    NULL, "statistics=(all,clear)", &cursor);
+	/*! [Statistics cursor clear configuration] */
 
 	return (ret);
 }

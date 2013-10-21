@@ -313,9 +313,16 @@ connection_runtime_config = [
 		Maintain database statistics, which may impact performance.
 		Choosing "all" maintains all statistics regardless of cost,
 		"fast" maintains a subset of statistics that are relatively
-		inexpensive, "none" turns off all statistics.  See @ref
-		statistics for more information''',
-		type='list', choices=['none', 'fast', 'all']),
+		inexpensive, "none" turns off all statistics.  The "clear"
+		configuration resets statistics after they are gathered,
+		where appropriate (for example, a cache size statistic is
+		not cleared, while the count of cursor insert operations will
+		be cleared).   When "clear" is configured for the database,
+		gathered statistics are reset each time a statistics cursor
+		is used to gather statistics, as well as each time statistics
+		are logged using the \c statistics_log configuration.  See
+		@ref statistics for more information''',
+		type='list', choices=['none', 'fast', 'all', 'clear']),
 	Config('verbose', '', r'''
 		enable messages for various events.  Options are given as a
 		list, such as <code>"verbose=[evictserver,read]"</code>''',
@@ -451,11 +458,11 @@ methods = {
 		database is configured with "none".  If \c statistics is not
 		configured, the default configuration is the database
 		configuration.  The "clear" configuration resets statistics
-		after gathering them, where appropriate.  For example, a cache
+		after gathering them, where appropriate (for example, a cache
 		size statistic is not cleared, while the count of cursor insert
-		operations will be cleared.  See @ref statistics for more
+		operations will be cleared).  See @ref statistics for more
 		information''',
-		type='list', choices=['clear', 'all', 'fast']),
+		type='list', choices=['all', 'fast', 'clear']),
 	Config('target', '', r'''
 		if non-empty, backup the list of objects; valid only for a
 		backup data source''',
@@ -630,13 +637,8 @@ methods = {
 		min='1'),
 	Config('statistics_log', '', r'''
 		log any statistics the database is configured to maintain,
-		to a file.  See @ref statistics_log for more information''',
+		to a file.  See @ref statistics for more information''',
 		type='category', subconfig=[
-		Config('clear', 'true', r'''
-		reset statistics after each set of log records are written,
-		where appropriate.  For example, a cache size statistic is
-		not cleared, while the count of cursor insert operations is
-		cleared''', type='boolean'),
 		Config('path', '"WiredTigerStat.%H"', r'''
 		the pathname to a file into which the log records are written,
 		may contain ISO C standard strftime conversion specifications.

@@ -677,11 +677,11 @@ struct __wt_session {
 	 * when the database is configured with "none". If \c statistics is not
 	 * configured\, the default configuration is the database configuration.
 	 * The "clear" configuration resets statistics after gathering them\,
-	 * where appropriate.  For example\, a cache size statistic is not
+	 * where appropriate (for example\, a cache size statistic is not
 	 * cleared\, while the count of cursor insert operations will be
-	 * cleared.  See @ref statistics for more information., a list\, with
-	 * values chosen from the following options: \c "clear"\, \c "all"\, \c
-	 * "fast"; default \c fast.}
+	 * cleared). See @ref statistics for more information., a list\, with
+	 * values chosen from the following options: \c "all"\, \c "fast"\, \c
+	 * "clear"; default \c fast.}
 	 * @config{target, if non-empty\, backup the list of objects; valid only
 	 * for a backup data source., a list of strings; default empty.}
 	 * @configend
@@ -1193,9 +1193,16 @@ struct __wt_connection {
 	 * @config{statistics, Maintain database statistics\, which may impact
 	 * performance.  Choosing "all" maintains all statistics regardless of
 	 * cost\, "fast" maintains a subset of statistics that are relatively
-	 * inexpensive\, "none" turns off all statistics.  See @ref statistics
-	 * for more information., a list\, with values chosen from the following
-	 * options: \c "none"\, \c "fast"\, \c "all"; default \c none.}
+	 * inexpensive\, "none" turns off all statistics.  The "clear"
+	 * configuration resets statistics after they are gathered\, where
+	 * appropriate (for example\, a cache size statistic is not cleared\,
+	 * while the count of cursor insert operations will be cleared). When
+	 * "clear" is configured for the database\, gathered statistics are
+	 * reset each time a statistics cursor is used to gather statistics\, as
+	 * well as each time statistics are logged using the \c statistics_log
+	 * configuration.  See @ref statistics for more information., a list\,
+	 * with values chosen from the following options: \c "none"\, \c
+	 * "fast"\, \c "all"\, \c "clear"; default \c none.}
 	 * @config{verbose, enable messages for various events.  Options are
 	 * given as a list\, such as
 	 * <code>"verbose=[evictserver\,read]"</code>., a list\, with values
@@ -1493,16 +1500,18 @@ struct __wt_connection {
  * @config{statistics, Maintain database statistics\, which may impact
  * performance.  Choosing "all" maintains all statistics regardless of cost\,
  * "fast" maintains a subset of statistics that are relatively inexpensive\,
- * "none" turns off all statistics.  See @ref statistics for more information.,
- * a list\, with values chosen from the following options: \c "none"\, \c
- * "fast"\, \c "all"; default \c none.}
+ * "none" turns off all statistics.  The "clear" configuration resets statistics
+ * after they are gathered\, where appropriate (for example\, a cache size
+ * statistic is not cleared\, while the count of cursor insert operations will
+ * be cleared). When "clear" is configured for the database\, gathered
+ * statistics are reset each time a statistics cursor is used to gather
+ * statistics\, as well as each time statistics are logged using the \c
+ * statistics_log configuration.  See @ref statistics for more information., a
+ * list\, with values chosen from the following options: \c "none"\, \c "fast"\,
+ * \c "all"\, \c "clear"; default \c none.}
  * @config{statistics_log = (, log any statistics the database is configured to
- * maintain\, to a file.  See @ref statistics_log for more information., a set
- * of related configuration options defined below.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;clear, reset statistics after each set of log
- * records are written\, where appropriate.  For example\, a cache size
- * statistic is not cleared\, while the count of cursor insert operations is
- * cleared., a boolean flag; default \c true.}
+ * maintain\, to a file.  See @ref statistics for more information., a set of
+ * related configuration options defined below.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;path, the pathname to a file into which the
  * log records are written\, may contain ISO C standard strftime conversion
  * specifications.  If the value is not an absolute path name\, the file is

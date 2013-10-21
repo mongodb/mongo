@@ -35,7 +35,7 @@ statistics, regardless of cost.
 
 In version 1.6.6, these two configuration booleans have been replaced
 with a new configuration list \c statistics, which may be set from the
-values "clear", "fast" and "all".   When "fast" is configured, only only
+values "clear", "fast" and "all".   When "fast" is configured, only
 relatively performance-inexpensive statistics are gathered, and when
 "all" is configured, all statistics are gathered, regardless of cost.
 When "clear" is configured, statistics counters are reset after they are
