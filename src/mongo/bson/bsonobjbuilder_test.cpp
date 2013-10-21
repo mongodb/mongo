@@ -83,8 +83,8 @@ namespace {
             {                                         100, mongo::NumberInt },
             {                             maxEncodableInt, mongo::NumberInt },
             {                         maxEncodableInt + 1, mongo::NumberInt },
-            {                                      maxInt, mongo::NumberInt },
-            {                                  maxInt + 1, mongo::NumberInt },
+            {           static_cast<unsigned int>(maxInt), mongo::NumberInt },
+            {      static_cast<unsigned int>(maxInt) + 1U, mongo::NumberInt },
             {  (std::numeric_limits<unsigned int>::max)(), mongo::NumberInt },
             {                                           0, mongo::Undefined }
         };
@@ -158,8 +158,8 @@ namespace {
             {                                   100, mongo::NumberInt    },
             {                       maxEncodableInt, mongo::NumberInt    },
             {                   maxEncodableInt + 1, mongo::NumberLong   },
-            {                                maxInt, mongo::NumberLong   },
-            {                            maxInt + 1, mongo::NumberLong    },
+            {                        size_t(maxInt), mongo::NumberLong   },
+            {                   size_t(maxInt) + 1U, mongo::NumberLong   },
             {  (std::numeric_limits<size_t>::max)(), mongo::NumberLong   },
             {                                     0, mongo::Undefined    }
         };
