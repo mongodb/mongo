@@ -132,7 +132,7 @@ __wt_spin_lock_func(WT_SESSION_IMPL *session,
     WT_SPINLOCK *t, int *idp, const char *file, int line)
 {
 	/* If we're not maintaining statistics, it's simple. */
-	if (session == NULL || !S2C(session)->statistics) {
+	if (session == NULL || !S2C(session)->stat_fast) {
 		pthread_mutex_lock(&t->lock);
 		return;
 	}
