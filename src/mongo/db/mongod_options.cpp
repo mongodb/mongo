@@ -41,7 +41,6 @@
 #include "mongo/db/server_options.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/ssl_options.h"
-#include "mongo/util/options_parser/startup_option_init.h"
 #include "mongo/util/options_parser/startup_options.h"
 #include "mongo/util/version.h"
 
@@ -757,37 +756,6 @@ namespace mongo {
             log() << endl;
         }
 
-        return Status::OK();
-    }
-
-    MONGO_GENERAL_STARTUP_OPTIONS_REGISTER(MongodOptions)(InitializerContext* context) {
-        return addMongodOptions(&moe::startupOptions);
-    }
-
-    MONGO_STARTUP_OPTIONS_VALIDATE(MongodOptions)(InitializerContext* context) {
-        if (handlePreValidationMongodOptions(moe::startupOptionsParsed, context->args())) {
-            ::_exit(EXIT_SUCCESS);
-        }
-        Status ret = moe::startupOptionsParsed.validate();
-        if (!ret.isOK()) {
-            return ret;
-        }
-        return Status::OK();
-    }
-
-    MONGO_INITIALIZER_GENERAL(MongodOptions_Store,
-                              ("BeginStartupOptionStorage",
-                               "CreateAuthorizationManager"), // Requried to call
-                                                              // getGlobalAuthorizationManager().
-                              ("EndStartupOptionStorage"))
-                             (InitializerContext* context) {
-        Status ret = storeMongodOptions(moe::startupOptionsParsed, context->args());
-        if (!ret.isOK()) {
-            std::cerr << ret.toString() << std::endl;
-            std::cerr << "try '" << context->args()[0] << " --help' for more information"
-                      << std::endl;
-            ::_exit(EXIT_BADOPTIONS);
-        }
         return Status::OK();
     }
 

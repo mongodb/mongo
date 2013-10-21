@@ -17,7 +17,6 @@
 #include "mongo/tools/mongotop_options.h"
 
 #include "mongo/base/status.h"
-#include "mongo/util/options_parser/startup_option_init.h"
 #include "mongo/util/options_parser/startup_options.h"
 
 namespace mongo {
@@ -84,29 +83,4 @@ namespace mongo {
         return Status::OK();
     }
 
-    MONGO_GENERAL_STARTUP_OPTIONS_REGISTER(MongoTopOptions)(InitializerContext* context) {
-        return addMongoTopOptions(&moe::startupOptions);
-    }
-
-    MONGO_STARTUP_OPTIONS_VALIDATE(MongoTopOptions)(InitializerContext* context) {
-        if (handlePreValidationMongoTopOptions(moe::startupOptionsParsed)) {
-            ::_exit(EXIT_SUCCESS);
-        }
-        Status ret = moe::startupOptionsParsed.validate();
-        if (!ret.isOK()) {
-            return ret;
-        }
-        return Status::OK();
-    }
-
-    MONGO_STARTUP_OPTIONS_STORE(MongoTopOptions)(InitializerContext* context) {
-        Status ret = storeMongoTopOptions(moe::startupOptionsParsed, context->args());
-        if (!ret.isOK()) {
-            std::cerr << ret.toString() << std::endl;
-            std::cerr << "try '" << context->args()[0] << " --help' for more information"
-                      << std::endl;
-            ::_exit(EXIT_BADOPTIONS);
-        }
-        return Status::OK();
-    }
 }

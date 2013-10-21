@@ -25,7 +25,6 @@
 #include "mongo/db/storage_options.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/options_parser/startup_option_init.h"
 #include "mongo/util/options_parser/startup_options.h"
 #include "mongo/util/password.h"
 
@@ -263,29 +262,4 @@ namespace mongo {
         return Status::OK();
     }
 
-    MONGO_GENERAL_STARTUP_OPTIONS_REGISTER(FrameworkOptions)(InitializerContext* context) {
-        return addTestFrameworkOptions(&moe::startupOptions);
-    }
-
-    MONGO_STARTUP_OPTIONS_VALIDATE(FrameworkOptions)(InitializerContext* context) {
-        if (handlePreValidationTestFrameworkOptions(moe::startupOptionsParsed, context->args())) {
-            ::_exit(EXIT_SUCCESS);
-        }
-        Status ret = moe::startupOptionsParsed.validate();
-        if (!ret.isOK()) {
-            return ret;
-        }
-        return Status::OK();
-    }
-
-    MONGO_STARTUP_OPTIONS_STORE(FrameworkOptions)(InitializerContext* context) {
-        Status ret = storeTestFrameworkOptions(moe::startupOptionsParsed, context->args());
-        if (!ret.isOK()) {
-            std::cerr << ret.toString() << std::endl;
-            std::cerr << "try '" << context->args()[0] << " --help' for more information"
-                      << std::endl;
-            ::_exit(EXIT_BADOPTIONS);
-        }
-        return Status::OK();
-    }
 }

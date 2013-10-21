@@ -25,7 +25,6 @@
 #include "mongo/s/chunk.h"
 #include "mongo/s/version_mongos.h"
 #include "mongo/util/net/ssl_options.h"
-#include "mongo/util/options_parser/startup_option_init.h"
 #include "mongo/util/options_parser/startup_options.h"
 #include "mongo/util/startup_test.h"
 #include "mongo/util/stringutils.h"
@@ -226,37 +225,6 @@ namespace mongo {
 
         mongosGlobalParams.upgrade = params.count("upgrade");
 
-        return Status::OK();
-    }
-
-    MONGO_GENERAL_STARTUP_OPTIONS_REGISTER(MongosOptions)(InitializerContext* context) {
-        return addMongosOptions(&moe::startupOptions);
-    }
-
-    MONGO_STARTUP_OPTIONS_VALIDATE(MongosOptions)(InitializerContext* context) {
-        if (handlePreValidationMongosOptions(moe::startupOptionsParsed, context->args())) {
-            ::_exit(EXIT_SUCCESS);
-        }
-        Status ret = moe::startupOptionsParsed.validate();
-        if (!ret.isOK()) {
-            return ret;
-        }
-        return Status::OK();
-    }
-
-    MONGO_INITIALIZER_GENERAL(MongosOptions_Store,
-                              ("BeginStartupOptionStorage",
-                               "CreateAuthorizationManager"), // Requried to call
-                                                              // getGlobalAuthorizationManager().
-                              ("EndStartupOptionStorage"))
-                             (InitializerContext* context) {
-        Status ret = storeMongosOptions(moe::startupOptionsParsed, context->args());
-        if (!ret.isOK()) {
-            std::cerr << ret.toString() << std::endl;
-            std::cerr << "try '" << context->args()[0] << " --help' for more information"
-                      << std::endl;
-            ::_exit(EXIT_BADOPTIONS);
-        }
         return Status::OK();
     }
 

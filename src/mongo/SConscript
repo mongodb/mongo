@@ -795,7 +795,7 @@ env.StaticLibrary("mongodwebserver",
                    ],
                   LIBDEPS=["coredb", "mongodandmongos"])
 
-mongodOnlyFiles = [ "db/db.cpp", "db/commands/touch.cpp", "db/mongod_options.cpp" ]
+mongodOnlyFiles = [ "db/db.cpp", "db/commands/touch.cpp", "db/mongod_options_init.cpp" ]
 
 # ----- TARGETS ------
 
@@ -807,6 +807,18 @@ if has_option( 'use-cpu-profiler' ):
 
 env.StaticLibrary("coreserver", coreServerFiles, LIBDEPS=["mongocommon", "scripting"])
 
+# mongod options
+env.Library("mongod_options", ["db/mongod_options.cpp"],
+            LIBDEPS=['server_options',
+                     'mongocommon',
+                     'serveronly',
+                     'coreserver',
+                     'coredb',
+                     '$BUILD_DIR/mongo/util/options_parser/options_parser'])
+env.CppUnitTest('mongod_options_test', 'db/mongod_options_test.cpp',
+                LIBDEPS=['mongod_options'],
+                NO_CRUTCH=True)
+
 # main db target
 mongod = env.Install(
     '#/', env.Program( "mongod", mongodOnlyFiles,
@@ -816,14 +828,21 @@ mongod = env.Install(
                                 "mongodwebserver",
                                 "ntservice",
                                 "serveronly",
+                                "mongod_options",
                                 ] ) )
 Default( mongod )
 
 # tools
 allToolFiles = ["tools/tool.cpp",
                 "tools/stat_util.cpp",
-                "tools/tool_options.cpp",
                 "tools/tool_logger.cpp"]
+env.StaticLibrary("tool_options", "tools/tool_options.cpp",
+                  LIBDEPS=["server_options",
+                           "$BUILD_DIR/mongo/util/options_parser/options_parser",
+                           "serveronly",
+                           "coreserver",
+                           "coredb",
+                           ])
 env.StaticLibrary("alltools",
                   allToolFiles,
                   LIBDEPS=["serveronly",
@@ -833,27 +852,62 @@ env.StaticLibrary("alltools",
                            "$BUILD_DIR/mongo/db/auth/authmocks"])
 
 normalTools = [ "dump", "restore", "export", "import", "stat", "top", "oplog" ]
-env.Alias( "tools", [ "#/${PROGPREFIX}mongo" + x + "${PROGSUFFIX}" for x in normalTools ] )
-for x in normalTools:
-    env.Install( '#/', env.Program("mongo" + x,
-                                   ["tools/" + x + ".cpp", "tools/mongo" + x + "_options.cpp"],
-                                   LIBDEPS=["alltools"]) )
+env.Alias( "tools", [ "#/${PROGPREFIX}mongo" + name + "${PROGSUFFIX}" for name in normalTools ] )
+for name in normalTools:
+    env.Install( '#/', env.Program("mongo" + name,
+                                   ["tools/" + name + ".cpp", "tools/mongo" + name + "_options_init.cpp"],
+                                   LIBDEPS=["alltools", "mongo" + name + "_options"]) )
+    env.Library("mongo" + name + "_options", ["tools/mongo" + name + "_options.cpp"],
+                LIBDEPS=['tool_options', '$BUILD_DIR/mongo/util/options_parser/options_parser'])
+    env.CppUnitTest('mongo' + name + '_options_test', 'tools/mongo' + name + '_options_test.cpp',
+                    LIBDEPS=['mongo' + name + '_options'],
+                    NO_CRUTCH=True)
 
 #some special tools
+env.Library("mongofiles_options", ["tools/mongofiles_options.cpp"],
+            LIBDEPS=['tool_options', '$BUILD_DIR/mongo/util/options_parser/options_parser'])
+env.CppUnitTest('mongofiles_options_test', 'tools/mongofiles_options_test.cpp',
+                LIBDEPS=['mongofiles_options'],
+                NO_CRUTCH=True)
+env.Library("bsondump_options", ["tools/bsondump_options.cpp"],
+            LIBDEPS=['tool_options', '$BUILD_DIR/mongo/util/options_parser/options_parser'])
+env.CppUnitTest('bsondump_options_test', 'tools/bsondump_options_test.cpp',
+                LIBDEPS=['bsondump_options'],
+                NO_CRUTCH=True)
+env.Library("mongobridge_options", ["tools/mongobridge_options.cpp"],
+            LIBDEPS=['tool_options', '$BUILD_DIR/mongo/util/options_parser/options_parser'])
+env.CppUnitTest('mongobridge_options_test', 'tools/mongobridge_options_test.cpp',
+                LIBDEPS=['mongobridge_options'],
+                NO_CRUTCH=True)
+
 env.Install( '#/', [
-        env.Program( "mongofiles", ["tools/files.cpp", "tools/mongofiles_options.cpp"], LIBDEPS=["alltools", "gridfs"] ),
-        env.Program( "bsondump", ["tools/bsondump.cpp", "tools/bsondump_options.cpp"], LIBDEPS=["alltools"]),
-        env.Program( "mongobridge", ["tools/bridge.cpp", "tools/mongobridge_options.cpp"],
-                     LIBDEPS=["serveronly", "coreserver", "coredb"] ),
+        env.Program( "mongofiles", ["tools/files.cpp", "tools/mongofiles_options_init.cpp"],
+                     LIBDEPS=["alltools", "gridfs", "mongofiles_options"] ),
+        env.Program( "bsondump", ["tools/bsondump.cpp", "tools/bsondump_options_init.cpp"],
+                     LIBDEPS=["alltools", "bsondump_options"]),
+        env.Program( "mongobridge", ["tools/bridge.cpp", "tools/mongobridge_options_init.cpp"],
+                     LIBDEPS=["serveronly", "coreserver", "coredb", "mongobridge_options"] ),
         env.Program( "mongoperf", "client/examples/mongoperf.cpp",
                      LIBDEPS=["serveronly", "coreserver", "coredb"] ),
         ] )
 
+# mongos options
+env.Library("mongos_options", ["s/mongos_options.cpp"],
+            LIBDEPS=['mongoscore',
+                     'coreshard',
+                     'mongocommon',
+                     'coreserver',
+                     'coredb',
+                     '$BUILD_DIR/mongo/util/options_parser/options_parser'])
+env.CppUnitTest('mongos_options_test', 's/mongos_options_test.cpp',
+                LIBDEPS=['mongos_options'],
+                NO_CRUTCH=True)
+
 # mongos
 mongos = env.Program(
-    "mongos", [ "s/server.cpp", "s/mongos_options.cpp" ] ,
+    "mongos", [ "s/server.cpp", "s/mongos_options_init.cpp" ] ,
     LIBDEPS=["mongoscore", "coreserver", "coredb", "mongocommon", "coreshard", "ntservice",
-             "mongodandmongos", "s/upgrade" ])
+             "mongodandmongos", "s/upgrade", "mongos_options" ])
 env.Install( '#/', mongos )
 
 env.Library("clientandshell", ["client/clientAndShell.cpp"],
@@ -862,10 +916,24 @@ env.Library("clientandshell", ["client/clientAndShell.cpp"],
                                        "gridfs"])
 env.Library("allclient", "client/clientOnly.cpp", LIBDEPS=["clientandshell"])
 
+# dbtests test binary options
+env.Library("framework_options", ["dbtests/framework_options.cpp"],
+            LIBDEPS=['$BUILD_DIR/mongo/util/options_parser/options_parser'])
+env.CppUnitTest('framework_options_test', 'dbtests/framework_options_test.cpp',
+                LIBDEPS=['framework_options',
+                         'mongocommon',
+                         'serveronly',
+                         'server_options',
+                         'coreserver',
+                         'coredb',
+                         ],
+                NO_CRUTCH=True)
+
 # dbtests test binary
-env.StaticLibrary('testframework', ['dbtests/framework.cpp', 'dbtests/framework_options.cpp'],
+env.StaticLibrary('testframework', ['dbtests/framework.cpp', 'dbtests/framework_options_init.cpp'],
                   LIBDEPS=['unittest/unittest',
                   '$BUILD_DIR/mongo/util/options_parser/options_parser',
+                  'framework_options',
                   ])
 
 env.StaticLibrary('mocklib', [
@@ -882,7 +950,9 @@ test = testEnv.Install(
     testEnv.Program("test",
                     [ f for f in Glob("dbtests/*.cpp")
                       if not str(f).endswith('framework.cpp') and
-                         not str(f).endswith('framework_options.cpp') ],
+                         not str(f).endswith('framework_options.cpp') and
+                         not str(f).endswith('framework_options_init.cpp') and
+                         not str(f).endswith('framework_options_test.cpp') ],
                     LIBDEPS = [
                        "mutable_bson_test_utils",
                        "mongocommon",
@@ -932,23 +1002,36 @@ env.JSHeader("shell/mongo-server.cpp",
              ["shell/servers.js", "shell/shardingtest.js",
               "shell/servers_misc.js", "shell/replsettest.js", "shell/replsetbridge.js"])
 
-coreShellFiles = [ "shell/dbshell.cpp",
-                   "shell/shell_utils.cpp",
+coreShellFiles = [ "shell/shell_utils.cpp",
                    "shell/shell_utils_extended.cpp",
                    "shell/shell_utils_launcher.cpp",
                    "shell/mongo-server.cpp",
                    "shell/linenoise.cpp",
                    "shell/linenoise_utf8.cpp",
                    "shell/mk_wcwidth.cpp",
-                   "shell/shell_options.cpp" ]
+                   "shell/shell_options_init.cpp" ]
 
 if shellEnv is not None:
+    env.Library("shell_core", coreShellFiles,
+                LIBDEPS=['clientandshell',
+                         'scripting',
+                         'mongocommon'])
+    # mongo shell options
+    env.Library("shell_options", ["shell/shell_options.cpp"],
+                LIBDEPS=['$BUILD_DIR/mongo/util/options_parser/options_parser'])
+    env.CppUnitTest('shell_options_test', 'shell/shell_options_test.cpp',
+                    LIBDEPS=['shell_options',
+                             'shell_core'],
+                    NO_CRUTCH=True)
+
     mongo_shell = shellEnv.Program(
         "mongo",
-        coreShellFiles,
-        LIBDEPS=["clientandshell", "mongocommon", "scripting",
-                 "$BUILD_DIR/mongo/util/options_parser/options_parser",
-                 "$BUILD_DIR/third_party/shim_pcrecpp"])
+        "shell/dbshell.cpp",
+        LIBDEPS=["$BUILD_DIR/mongo/util/options_parser/options_parser",
+                 "$BUILD_DIR/third_party/shim_pcrecpp",
+                 "shell_options",
+                 "shell_core",
+                 ])
 
     shellEnv.Install( '#/', mongo_shell )
 
