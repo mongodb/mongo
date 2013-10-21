@@ -28,10 +28,18 @@
 namespace mongo {
 
     void ActionSet::addAction(const ActionType& action) {
+        if (action == ActionType::anyAction) {
+            addAllActions();
+            return;
+        }
         _actions.set(action.getIdentifier(), true);
     }
 
     void ActionSet::addAllActionsFromSet(const ActionSet& actions) {
+        if (actions.contains(ActionType::anyAction)) {
+            addAllActions();
+            return;
+        }
         _actions |= actions._actions;
     }
 
@@ -41,10 +49,14 @@ namespace mongo {
 
     void ActionSet::removeAction(const ActionType& action) {
         _actions.set(action.getIdentifier(), false);
+        _actions.set(ActionType::anyAction.getIdentifier(), false);
     }
 
     void ActionSet::removeAllActionsFromSet(const ActionSet& other) {
         _actions &= ~other._actions;
+        if (!other.empty()) {
+            _actions.set(ActionType::anyAction.getIdentifier(), false);
+        }
     }
 
     void ActionSet::removeAllActions() {
@@ -63,14 +75,23 @@ namespace mongo {
                                                ActionSet* result) {
         std::vector<std::string> actionsList;
         splitStringDelim(actionsString, &actionsList, ',');
+        return parseActionSetFromStringVector(actionsList, result);
+    }
+
+    Status ActionSet::parseActionSetFromStringVector(const std::vector<std::string>& actionsVector,
+                                                     ActionSet* result) {
         ActionSet actions;
-        for (size_t i = 0; i < actionsList.size(); i++) {
+        for (size_t i = 0; i < actionsVector.size(); i++) {
             ActionType action;
-            Status status = ActionType::parseActionFromString(actionsList[i], &action);
+            Status status = ActionType::parseActionFromString(actionsVector[i], &action);
             if (status != Status::OK()) {
                 ActionSet empty;
                 *result = empty;
                 return status;
+            }
+            if (action == ActionType::anyAction) {
+                actions.addAllActions();
+                break;
             }
             actions.addAction(action);
         }
@@ -79,6 +100,9 @@ namespace mongo {
     }
 
     std::string ActionSet::toString() const {
+        if (contains(ActionType::anyAction)) {
+            return ActionType::anyAction.toString();
+        }
         StringBuilder str;
         bool addedOne = false;
         for (int i = 0; i < ActionType::actionTypeEndValue; i++) {
@@ -96,6 +120,10 @@ namespace mongo {
 
     std::vector<std::string> ActionSet::getActionsAsStrings() const {
         std::vector<std::string> result;
+        if (contains(ActionType::anyAction)) {
+            result.push_back(ActionType::anyAction.toString());
+            return result;
+        }
         for (int i = 0; i < ActionType::actionTypeEndValue; i++) {
             ActionType action(i);
             if (contains(action)) {

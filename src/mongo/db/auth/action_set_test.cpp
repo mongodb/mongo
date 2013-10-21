@@ -99,5 +99,50 @@ namespace {
         ASSERT_FALSE(set3.isSupersetOf(set2));
     }
 
+    TEST(ActionSetTest, anyAction) {
+        ActionSet set;
+
+        ASSERT_OK(ActionSet::parseActionSetFromString("anyAction", &set));
+        ASSERT_TRUE(set.contains(ActionType::find));
+        ASSERT_TRUE(set.contains(ActionType::insert));
+        ASSERT_TRUE(set.contains(ActionType::anyAction));
+
+        set.removeAllActions();
+        set.addAllActions();
+        ASSERT_TRUE(set.contains(ActionType::find));
+        ASSERT_TRUE(set.contains(ActionType::insert));
+        ASSERT_TRUE(set.contains(ActionType::anyAction));
+
+        set.removeAllActions();
+        set.addAction(ActionType::anyAction);
+        ASSERT_TRUE(set.contains(ActionType::find));
+        ASSERT_TRUE(set.contains(ActionType::insert));
+        ASSERT_TRUE(set.contains(ActionType::anyAction));
+
+        set.removeAction(ActionType::find);
+        ASSERT_FALSE(set.contains(ActionType::find));
+        ASSERT_TRUE(set.contains(ActionType::insert));
+        ASSERT_FALSE(set.contains(ActionType::anyAction));
+
+        set.addAction(ActionType::find);
+        ASSERT_TRUE(set.contains(ActionType::find));
+        ASSERT_TRUE(set.contains(ActionType::insert));
+        ASSERT_FALSE(set.contains(ActionType::anyAction));
+
+        set.addAction(ActionType::anyAction);
+        ASSERT_TRUE(set.contains(ActionType::find));
+        ASSERT_TRUE(set.contains(ActionType::insert));
+        ASSERT_TRUE(set.contains(ActionType::anyAction));
+
+        ASSERT_EQUALS("anyAction", set.toString());
+
+        set.removeAction(ActionType::anyAction);
+        ASSERT_TRUE(set.contains(ActionType::find));
+        ASSERT_TRUE(set.contains(ActionType::insert));
+        ASSERT_FALSE(set.contains(ActionType::anyAction));
+
+        ASSERT_NOT_EQUALS("anyAction", set.toString());
+    }
+
 }  // namespace
 }  // namespace mongo

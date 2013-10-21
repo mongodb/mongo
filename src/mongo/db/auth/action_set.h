@@ -26,6 +26,8 @@ namespace mongo {
     /*
      *  An ActionSet is a bitmask of ActionTypes that represents a set of actions.
      *  These are the actions that a Privilege can grant a user to perform on a resource.
+     *  If the special ActionType::anyAction is granted to this set, it automatically sets all bits
+     *  in the bitmask, indicating that it contains all possible actions.
      */
     class ActionSet {
     public:
@@ -36,6 +38,8 @@ namespace mongo {
         void addAllActionsFromSet(const ActionSet& actionSet);
         void addAllActions();
 
+        // Removes action from the set.  Also removes the "anyAction" action, if present.
+        // Note: removing the "anyAction" action does *not* remove all other actions.
         void removeAction(const ActionType& action);
         void removeAllActionsFromSet(const ActionSet& actionSet);
         void removeAllActions();
@@ -59,6 +63,11 @@ namespace mongo {
         // Takes a comma-separated string of action type string representations and returns
         // an int bitmask of the actions.
         static Status parseActionSetFromString(const std::string& actionsString, ActionSet* result);
+
+        // Takes a vector of action type string representations and returns an ActionSet of the
+        // actions.
+        static Status parseActionSetFromStringVector(const std::vector<std::string>& actionsVector,
+                                                     ActionSet* result);
 
     private:
 

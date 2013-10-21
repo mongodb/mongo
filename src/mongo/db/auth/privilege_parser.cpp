@@ -386,15 +386,10 @@ namespace mongo {
         // Build actions
         ActionSet actions;
         const vector<std::string>& parsedActions = parsedPrivilege.getActions();
-        for (std::vector<std::string>::const_iterator it = parsedActions.begin();
-                it != parsedActions.end(); ++it) {
-            ActionType action;
-            Status status = ActionType::parseActionFromString(*it, &action);
-            if (!status.isOK()) {
-                *errmsg = status.reason();
-                return false;
-            }
-            actions.addAction(action);
+        Status status = ActionSet::parseActionSetFromStringVector(parsedActions, &actions);
+        if (!status.isOK()) {
+            *errmsg = status.reason();
+            return false;
         }
 
         // Build resource
