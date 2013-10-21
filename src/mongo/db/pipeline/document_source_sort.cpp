@@ -100,7 +100,8 @@ namespace mongo {
     }
 
     void DocumentSourceSort::addKey(const string& fieldPath, bool ascending) {
-        vSortKey.push_back(ExpressionFieldPath::parse("$$ROOT." + fieldPath));
+        VariablesParseState vps;
+        vSortKey.push_back(ExpressionFieldPath::parse("$$ROOT." + fieldPath, vps));
         vAscending.push_back(ascending);
     }
 

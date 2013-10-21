@@ -231,6 +231,7 @@ namespace mongo {
 
         BSONObj groupObj(elem.Obj());
         BSONObjIterator groupIterator(groupObj);
+        VariablesParseState vps;
         while(groupIterator.more()) {
             BSONElement groupField(groupIterator.next());
             const char *pFieldName = groupField.fieldName();
@@ -247,13 +248,13 @@ namespace mongo {
                       group-by key.
                     */
                     Expression::ObjectCtx oCtx(Expression::ObjectCtx::DOCUMENT_OK);
-                    pGroup->setIdExpression(Expression::parseObject(groupField.Obj(), &oCtx));
+                    pGroup->setIdExpression(Expression::parseObject(groupField.Obj(), &oCtx, vps));
                     idSet = true;
                 }
                 else if (groupType == String) {
                     const string groupString = groupField.str();
                     if (!groupString.empty() && groupString[0] == '$') {
-                        pGroup->setIdExpression(ExpressionFieldPath::parse(groupString));
+                        pGroup->setIdExpression(ExpressionFieldPath::parse(groupString, vps));
                         idSet = true;
                     }
                 }
@@ -312,14 +313,14 @@ namespace mongo {
                     BSONType elementType = subElement.type();
                     if (elementType == Object) {
                         Expression::ObjectCtx oCtx(Expression::ObjectCtx::DOCUMENT_OK);
-                        pGroupExpr = Expression::parseObject(subElement.Obj(), &oCtx);
+                        pGroupExpr = Expression::parseObject(subElement.Obj(), &oCtx, vps);
                     }
                     else if (elementType == Array) {
                         uasserted(15953, str::stream()
                                 << "aggregating group operators are unary (" << key.name << ")");
                     }
                     else { /* assume its an atomic single operand */
-                        pGroupExpr = Expression::parseOperand(subElement);
+                        pGroupExpr = Expression::parseOperand(subElement, vps);
                     }
 
                     pGroup->addAccumulator(pFieldName, pOp->factory, pGroupExpr);
@@ -524,8 +525,9 @@ namespace mongo {
         intrusive_ptr<DocumentSourceGroup> pMerger(DocumentSourceGroup::create(pExpCtx));
         pMerger->setDoingMerge(true);
 
+        VariablesParseState vps;
         /* the merger will use the same grouping key */
-        pMerger->setIdExpression(ExpressionFieldPath::parse("$$ROOT._id"));
+        pMerger->setIdExpression(ExpressionFieldPath::parse("$$ROOT._id", vps));
 
         const size_t n = vFieldName.size();
         for(size_t i = 0; i < n; ++i) {
@@ -539,7 +541,7 @@ namespace mongo {
             */
             pMerger->addAccumulator(
                 vFieldName[i], vpAccumulatorFactory[i],
-                ExpressionFieldPath::parse("$$ROOT." + vFieldName[i]));
+                ExpressionFieldPath::parse("$$ROOT." + vFieldName[i], vps));
         }
 
         return pMerger;

@@ -151,7 +151,8 @@ namespace mongo {
 
         Expression::ObjectCtx oCtx(0);
 
-        intrusive_ptr<Expression> expression = Expression::parseObject(elem.Obj(), &oCtx);
+        VariablesParseState vps;
+        intrusive_ptr<Expression> expression = Expression::parseObject(elem.Obj(), &oCtx, vps);
 
         return new DocumentSourceRedact(expCtx, expression);
     }

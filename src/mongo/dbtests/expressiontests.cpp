@@ -286,7 +286,8 @@ namespace ExpressionTests {
             void run() {
                 BSONObj specObject = BSON( "" << spec() );
                 BSONElement specElement = specObject.firstElement();
-                intrusive_ptr<Expression> expression = Expression::parseOperand( specElement );
+                VariablesParseState vps;
+                intrusive_ptr<Expression> expression = Expression::parseOperand(specElement, vps);
                 ASSERT_EQUALS( constify( spec() ), expressionToBson( expression ) );
                 ASSERT_EQUALS( BSON( "" << expectedResult() ),
                                toBson( expression->evaluate( fromBson( BSON( "a" << 1 ) ) ) ) );
@@ -306,7 +307,8 @@ namespace ExpressionTests {
             void run() {
                 BSONObj specObject = BSON( "" << spec() );
                 BSONElement specElement = specObject.firstElement();
-                intrusive_ptr<Expression> expression = Expression::parseOperand( specElement );
+                VariablesParseState vps;
+                intrusive_ptr<Expression> expression = Expression::parseOperand(specElement, vps);
                 ASSERT_EQUALS( constify( spec() ), expressionToBson( expression ) );
                 intrusive_ptr<Expression> optimized = expression->optimize();
                 ASSERT_EQUALS( expectedOptimized(), expressionToBson( optimized ) );
@@ -560,7 +562,8 @@ namespace ExpressionTests {
             void run() {
                 BSONObj specObject = BSON( "" << spec() );
                 BSONElement specElement = specObject.firstElement();
-                intrusive_ptr<Expression> expression = Expression::parseOperand( specElement );
+                VariablesParseState vps;
+                intrusive_ptr<Expression> expression = Expression::parseOperand(specElement, vps);
                 intrusive_ptr<Expression> optimized = expression->optimize();
                 ASSERT_EQUALS( constify( expectedOptimized() ), expressionToBson( optimized ) );
             }
@@ -584,7 +587,8 @@ namespace ExpressionTests {
                 OptimizeBase::run();
                 BSONObj specObject = BSON( "" << spec() );
                 BSONElement specElement = specObject.firstElement();
-                intrusive_ptr<Expression> expression = Expression::parseOperand( specElement );
+                VariablesParseState vps;
+                intrusive_ptr<Expression> expression = Expression::parseOperand(specElement, vps);
                 // Check expression spec round trip.
                 ASSERT_EQUALS( constify( spec() ), expressionToBson( expression ) );
                 // Check evaluation result.
@@ -619,7 +623,8 @@ namespace ExpressionTests {
             void run() {
                 BSONObj specObject = BSON( "" << spec() );
                 BSONElement specElement = specObject.firstElement();
-                ASSERT_THROWS( Expression::parseOperand( specElement ), UserException );
+                VariablesParseState vps;
+                ASSERT_THROWS( Expression::parseOperand(specElement, vps), UserException );
             }
         protected:
             virtual BSONObj spec() = 0;
@@ -760,7 +765,8 @@ namespace ExpressionTests {
             void run() {
                 BSONObj specObject = BSON( "" << BSON( "$ne" << BSON_ARRAY( "a" << 1 ) ) );
                 BSONElement specElement = specObject.firstElement();
-                intrusive_ptr<Expression> expression = Expression::parseOperand( specElement );
+                VariablesParseState vps;
+                intrusive_ptr<Expression> expression = Expression::parseOperand(specElement, vps);
                 ASSERT_EQUALS(expression->evaluate(Document()), Value(true));
             }
         };
@@ -1194,11 +1200,12 @@ namespace ExpressionTests {
             }
             static intrusive_ptr<Testable> createFromOperands( const BSONArray& operands,
                                                                bool haveFactory = false ) {
+                VariablesParseState vps;
                 intrusive_ptr<Testable> testable = create( haveFactory );
                 BSONObjIterator i( operands );
                 while( i.more() ) {
                     BSONElement element = i.next();
-                    testable->addOperand( Expression::parseOperand( element ) );
+                    testable->addOperand( Expression::parseOperand(element, vps) );
                 }
                 return testable;
             }
@@ -1246,7 +1253,8 @@ namespace ExpressionTests {
                 BSONObj spec = BSON( "" << BSON( "a" << "$x" << "q" << "$r" ) );
                 BSONElement specElement = spec.firstElement();
                 Expression::ObjectCtx ctx( Expression::ObjectCtx::DOCUMENT_OK );
-                testable->addOperand( Expression::parseObject( specElement.Obj(), &ctx ) );
+                VariablesParseState vps;
+                testable->addOperand( Expression::parseObject(specElement.Obj(), &ctx, vps) );
                 assertDependencies( BSON_ARRAY( "ab.c" << "r" << "x" ), testable );
             }
         private:
@@ -2160,7 +2168,8 @@ namespace ExpressionTests {
             void run() {
                 BSONObj specObject = BSON( "" << spec() );
                 BSONElement specElement = specObject.firstElement();
-                intrusive_ptr<Expression> expression = Expression::parseOperand( specElement );
+                VariablesParseState vps;
+                intrusive_ptr<Expression> expression = Expression::parseOperand(specElement, vps);
                 ASSERT_EQUALS( constify( spec() ), expressionToBson( expression ) );
                 ASSERT_EQUALS( BSON( "" << expectedResult() ),
                                toBson( expression->evaluate( fromBson( BSON( "a" << 1 ) ) ) ) );
@@ -2180,7 +2189,8 @@ namespace ExpressionTests {
             void run() {
                 BSONObj specObject = BSON( "" << spec() );
                 BSONElement specElement = specObject.firstElement();
-                intrusive_ptr<Expression> expression = Expression::parseOperand( specElement );
+                VariablesParseState vps;
+                intrusive_ptr<Expression> expression = Expression::parseOperand(specElement, vps);
                 ASSERT_EQUALS( constify( spec() ), expressionToBson( expression ) );
                 intrusive_ptr<Expression> optimized = expression->optimize();
                 ASSERT_EQUALS( expectedOptimized(), expressionToBson( optimized ) );
@@ -2361,8 +2371,9 @@ namespace ExpressionTests {
                     BSONObj specObject = BSON( "" << spec() );
                     BSONElement specElement = specObject.firstElement();
                     Expression::ObjectCtx context = objectCtx();
+                    VariablesParseState vps;
                     intrusive_ptr<Expression> expression =
-                            Expression::parseObject( specElement.Obj(), &context );
+                            Expression::parseObject( specElement.Obj(), &context, vps );
                     ASSERT_EQUALS( expectedBson(), expressionToBson( expression ) );
                 }
             protected:
@@ -2380,7 +2391,8 @@ namespace ExpressionTests {
                     BSONObj specObject = BSON( "" << spec() );
                     BSONElement specElement = specObject.firstElement();
                     Expression::ObjectCtx context = objectCtx();
-                    ASSERT_THROWS( Expression::parseObject( specElement.Obj(), &context ),
+                    VariablesParseState vps;
+                    ASSERT_THROWS( Expression::parseObject( specElement.Obj(), &context, vps ),
                                    UserException );
                 }
             protected:
@@ -2398,7 +2410,8 @@ namespace ExpressionTests {
                     BSONElement specElement = specObject.firstElement();
                     Expression::ObjectCtx context =
                             Expression::ObjectCtx( Expression::ObjectCtx::DOCUMENT_OK );
-                    ASSERT_THROWS( Expression::parseObject( specElement.Obj(), &context ),
+                    VariablesParseState vps;
+                    ASSERT_THROWS( Expression::parseObject( specElement.Obj(), &context, vps ),
                                    UserException );                    
                 }
             };
@@ -2566,7 +2579,9 @@ namespace ExpressionTests {
                 void run() {
                     BSONObj specObject = spec();
                     BSONElement specElement = specObject.firstElement();
-                    intrusive_ptr<Expression> expression = Expression::parseExpression(specElement);
+                    VariablesParseState vps;
+                    intrusive_ptr<Expression> expression = Expression::parseExpression(specElement,
+                                                                                       vps);
                     ASSERT_EQUALS( constify( expectedBson() ), expressionToBson( expression ) );
                 }
             protected:
@@ -2580,7 +2595,8 @@ namespace ExpressionTests {
                 void run() {
                     BSONObj specObject = spec();
                     BSONElement specElement = specObject.firstElement();
-                    ASSERT_THROWS(Expression::parseExpression(specElement), UserException);
+                    VariablesParseState vps;
+                    ASSERT_THROWS(Expression::parseExpression(specElement, vps), UserException);
                 }
             protected:
                 virtual BSONObj spec() = 0;
@@ -2660,8 +2676,9 @@ namespace ExpressionTests {
                 void run() {
                     BSONObj specObject = spec();
                     BSONElement specElement = specObject.firstElement();
+                    VariablesParseState vps;
                     intrusive_ptr<mongo::Expression> expression =
-                            mongo::Expression::parseOperand( specElement );
+                            mongo::Expression::parseOperand(specElement, vps);
                     ASSERT_EQUALS( expectedBson(), expressionToBson( expression ) );
                 }
             protected:
@@ -2675,7 +2692,8 @@ namespace ExpressionTests {
                 void run() {
                     BSONObj specObject = spec();
                     BSONElement specElement = specObject.firstElement();
-                    ASSERT_THROWS( mongo::Expression::parseOperand( specElement ), UserException );
+                    VariablesParseState vps;
+                    ASSERT_THROWS(mongo::Expression::parseOperand(specElement, vps), UserException);
                 }
             protected:
                 virtual BSONObj spec() = 0;
@@ -2687,8 +2705,9 @@ namespace ExpressionTests {
                 void run() {
                     BSONObj specObject = BSON( "" << "$field" );
                     BSONElement specElement = specObject.firstElement();
+                    VariablesParseState vps;
                     intrusive_ptr<mongo::Expression> expression =
-                            mongo::Expression::parseOperand( specElement );
+                            mongo::Expression::parseOperand(specElement, vps);
                     ASSERT_EQUALS(specObject, BSON("" << expression->serialize(false)));
                 }
             };
@@ -2742,8 +2761,9 @@ namespace ExpressionTests {
                         const Document::FieldPair field(fields.next());
                         const Value expected = field.second;
                         const BSONObj obj = BSON(field.first << args);
+                        VariablesParseState vps;
                         const intrusive_ptr<Expression> expr =
-                                Expression::parseExpression(obj.firstElement());
+                                Expression::parseExpression(obj.firstElement(), vps);
                         Value result = expr->evaluate(Document());
                         if (result.getType() == Array) {
                             result = sortSet(result);
@@ -2765,10 +2785,11 @@ namespace ExpressionTests {
                     size_t n = asserters.size();
                     for (size_t i = 0; i < n; i++) {
                         const BSONObj obj = BSON(asserters[i].getString() << args);
+                        VariablesParseState vps;
                         ASSERT_THROWS({
                             // NOTE: parse and evaluatation failures are treated the same
                             const intrusive_ptr<Expression> expr =
-                                    Expression::parseExpression(obj.firstElement());
+                                    Expression::parseExpression(obj.firstElement(), vps);
                             expr->evaluate(Document());
                         }, UserException);
                     }
@@ -3060,7 +3081,8 @@ namespace ExpressionTests {
             void assertResult( int expectedResult, const BSONObj& spec ) {
                 BSONObj specObj = BSON( "" << spec );
                 BSONElement specElement = specObj.firstElement();
-                intrusive_ptr<Expression> expression = Expression::parseOperand( specElement );
+                VariablesParseState vps;
+                intrusive_ptr<Expression> expression = Expression::parseOperand(specElement, vps);
                 ASSERT_EQUALS( constify( spec ), expressionToBson( expression ) );
                 ASSERT_EQUALS( BSON( "" << expectedResult ),
                                toBson( expression->evaluate( Document() ) ) );                
@@ -3108,7 +3130,8 @@ namespace ExpressionTests {
             void run() {
                 BSONObj specObj = BSON( "" << spec() );
                 BSONElement specElement = specObj.firstElement();
-                intrusive_ptr<Expression> expression = Expression::parseOperand( specElement );
+                VariablesParseState vps;
+                intrusive_ptr<Expression> expression = Expression::parseOperand(specElement, vps);
                 ASSERT_EQUALS( constify( spec() ), expressionToBson( expression ) );
                 ASSERT_EQUALS( BSON( "" << expectedResult() ),
                                toBson( expression->evaluate( Document() ) ) );
@@ -3175,7 +3198,8 @@ namespace ExpressionTests {
             void run() {
                 BSONObj specObj = BSON( "" << spec() );
                 BSONElement specElement = specObj.firstElement();
-                intrusive_ptr<Expression> expression = Expression::parseOperand( specElement );
+                VariablesParseState vps;
+                intrusive_ptr<Expression> expression = Expression::parseOperand(specElement, vps);
                 ASSERT_EQUALS( constify( spec() ), expressionToBson( expression ) );
                 ASSERT_EQUALS( BSON( "" << expectedResult() ),
                                toBson( expression->evaluate( Document() ) ) );
@@ -3218,7 +3242,8 @@ namespace ExpressionTests {
             void run() {
                 BSONObj specObj = BSON( "" << spec() );
                 BSONElement specElement = specObj.firstElement();
-                intrusive_ptr<Expression> expression = Expression::parseOperand( specElement );
+                VariablesParseState vps;
+                intrusive_ptr<Expression> expression = Expression::parseOperand(specElement, vps);
                 ASSERT_EQUALS( constify( spec() ), expressionToBson( expression ) );
                 ASSERT_EQUALS( BSON( "" << expectedResult() ),
                                toBson( expression->evaluate( Document() ) ) );
@@ -3265,8 +3290,9 @@ namespace ExpressionTests {
                         const Document::FieldPair field(fields.next());
                         const Value expected = field.second;
                         const BSONObj obj = BSON(field.first << args);
+                        VariablesParseState vps;
                         const intrusive_ptr<Expression> expr =
-                                Expression::parseExpression(obj.firstElement());
+                                Expression::parseExpression(obj.firstElement(), vps);
                         const Value result = expr->evaluate(Document());
                         if (result != expected) {
                             string errMsg = str::stream()
@@ -3285,10 +3311,11 @@ namespace ExpressionTests {
                     size_t n = asserters.size();
                     for (size_t i = 0; i < n; i++) {
                         const BSONObj obj = BSON(asserters[i].getString() << args);
+                        VariablesParseState vps;
                         ASSERT_THROWS({
                             // NOTE: parse and evaluatation failures are treated the same
                             const intrusive_ptr<Expression> expr =
-                                    Expression::parseExpression(obj.firstElement());
+                                    Expression::parseExpression(obj.firstElement(), vps);
                             expr->evaluate(Document());
                         }, UserException);
                     }

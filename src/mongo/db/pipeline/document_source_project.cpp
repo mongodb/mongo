@@ -113,7 +113,8 @@ namespace mongo {
             | Expression::ObjectCtx::INCLUSION_OK
             );
 
-        intrusive_ptr<Expression> parsed = Expression::parseObject(elem.Obj(), &objectCtx);
+        VariablesParseState vps;
+        intrusive_ptr<Expression> parsed = Expression::parseObject(elem.Obj(), &objectCtx, vps);
         ExpressionObject* exprObj = dynamic_cast<ExpressionObject*>(parsed.get());
         massert(16402, "parseObject() returned wrong type of Expression", exprObj);
         uassert(16403, "$projection requires at least one output field", exprObj->getFieldCount());

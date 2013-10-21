@@ -140,7 +140,10 @@ namespace mongo {
         return string(pPrefixedField + 1);
     }
 
-    intrusive_ptr<Expression> Expression::parseObject(BSONObj obj, ObjectCtx *pCtx) {
+    intrusive_ptr<Expression> Expression::parseObject(
+            BSONObj obj,
+            ObjectCtx* pCtx,
+            const VariablesParseState& vps) {
         /*
           An object expression can take any of the following forms:
 
@@ -172,7 +175,7 @@ namespace mongo {
                 /* we've determined this "object" is an operator expression */
                 kind = OPERATOR;
 
-                pExpression = parseExpression(fieldElement);
+                pExpression = parseExpression(fieldElement, vps);
             }
             else {
                 uassert(15990, str::stream() << "this object is already an operator expression, and can't be used as a document expression (at '" <<
@@ -205,14 +208,15 @@ namespace mongo {
                              | (pCtx->inclusionOk() ? ObjectCtx::INCLUSION_OK : 0));
                             
                         pExpressionObject->addField(fieldName,
-                                                    parseObject(fieldElement.Obj(), &oCtx));
+                                                    parseObject(fieldElement.Obj(), &oCtx, vps));
                         break;
                     }
                     case String: {
                         /* it's a renamed field */
                         // CW TODO could also be a constant
                         pExpressionObject->addField(fieldName,
-                                                    ExpressionFieldPath::parse(fieldElement.str()));
+                                                    ExpressionFieldPath::parse(fieldElement.str(),
+                                                                               vps));
                         break;
                     }
                     case Bool:
@@ -246,7 +250,8 @@ namespace mongo {
     }
 
 namespace {
-    typedef boost::function<intrusive_ptr<Expression>(BSONElement)> ExpressionParser;
+    typedef boost::function<intrusive_ptr<Expression>(BSONElement, const VariablesParseState&)>
+            ExpressionParser;
     StringMap<ExpressionParser> expressionParserMap;
 }
 
@@ -267,7 +272,10 @@ namespace {
         return Status::OK(); \
     }
 
-    intrusive_ptr<Expression> Expression::parseExpression(BSONElement exprElement) {
+    intrusive_ptr<Expression> Expression::parseExpression(
+            BSONElement exprElement,
+            const VariablesParseState& vps) {
+
         /* look for the specified operator */
         const char* opName = exprElement.fieldName();
         StringMap<ExpressionParser>::const_iterator op = expressionParserMap.find(opName);
@@ -275,36 +283,42 @@ namespace {
                 op != expressionParserMap.end());
 
         /* make the expression node */
-        return op->second(exprElement);
+        return op->second(exprElement, vps);
     }
 
-    Expression::ExpressionVector ExpressionNary::parseArguments(BSONElement exprElement) {
+    Expression::ExpressionVector ExpressionNary::parseArguments(
+            BSONElement exprElement,
+            const VariablesParseState& vps) {
+
         ExpressionVector out;
         if (exprElement.type() == Array) {
             BSONForEach(elem, exprElement.Obj()) {
-                out.push_back(Expression::parseOperand(elem));
+                out.push_back(Expression::parseOperand(elem, vps));
             }
         }
         else { // assume it's an atomic operand
-            out.push_back(Expression::parseOperand(exprElement));
+            out.push_back(Expression::parseOperand(exprElement, vps));
         }
 
         return out;
     }
 
-    intrusive_ptr<Expression> Expression::parseOperand(BSONElement exprElement) {
+    intrusive_ptr<Expression> Expression::parseOperand(
+            BSONElement exprElement,
+            const VariablesParseState& vps) {
+
         BSONType type = exprElement.type();
 
         if (type == String && exprElement.valuestr()[0] == '$') {
             /* if we got here, this is a field path expression */
-            return ExpressionFieldPath::parse(exprElement.str());
+            return ExpressionFieldPath::parse(exprElement.str(), vps);
         }
         else if (type == Object) {
             ObjectCtx oCtx(ObjectCtx::DOCUMENT_OK);
-            return Expression::parseObject(exprElement.Obj(), &oCtx);
+            return Expression::parseObject(exprElement.Obj(), &oCtx, vps);
         }
         else {
-            return ExpressionConstant::parse(exprElement);
+            return ExpressionConstant::parse(exprElement, vps);
         }
     }
 
@@ -545,16 +559,27 @@ namespace {
 
     /* ----------------------- ExpressionCompare --------------------------- */
 
-    REGISTER_EXPRESSION("$cmp", boost::bind(ExpressionCompare::parse, _1, ExpressionCompare::CMP));
-    REGISTER_EXPRESSION("$eq",  boost::bind(ExpressionCompare::parse, _1, ExpressionCompare::EQ));
-    REGISTER_EXPRESSION("$gt",  boost::bind(ExpressionCompare::parse, _1, ExpressionCompare::GT));
-    REGISTER_EXPRESSION("$gte", boost::bind(ExpressionCompare::parse, _1, ExpressionCompare::GTE));
-    REGISTER_EXPRESSION("$lt",  boost::bind(ExpressionCompare::parse, _1, ExpressionCompare::LT));
-    REGISTER_EXPRESSION("$lte", boost::bind(ExpressionCompare::parse, _1, ExpressionCompare::LTE));
-    REGISTER_EXPRESSION("$ne",  boost::bind(ExpressionCompare::parse, _1, ExpressionCompare::NE));
-    intrusive_ptr<Expression> ExpressionCompare::parse(BSONElement bsonExpr, CmpOp op) {
+    REGISTER_EXPRESSION("$cmp",
+                        boost::bind(ExpressionCompare::parse, _1, _2, ExpressionCompare::CMP));
+    REGISTER_EXPRESSION("$eq",
+                        boost::bind(ExpressionCompare::parse, _1, _2, ExpressionCompare::EQ));
+    REGISTER_EXPRESSION("$gt",
+                        boost::bind(ExpressionCompare::parse, _1, _2, ExpressionCompare::GT));
+    REGISTER_EXPRESSION("$gte",
+                        boost::bind(ExpressionCompare::parse, _1, _2, ExpressionCompare::GTE));
+    REGISTER_EXPRESSION("$lt",
+                        boost::bind(ExpressionCompare::parse, _1, _2, ExpressionCompare::LT));
+    REGISTER_EXPRESSION("$lte",
+                        boost::bind(ExpressionCompare::parse, _1, _2, ExpressionCompare::LTE));
+    REGISTER_EXPRESSION("$ne",
+                        boost::bind(ExpressionCompare::parse, _1, _2, ExpressionCompare::NE));
+    intrusive_ptr<Expression> ExpressionCompare::parse(
+            BSONElement bsonExpr,
+            const VariablesParseState& vps,
+            CmpOp op) {
+
         intrusive_ptr<ExpressionCompare> expr = new ExpressionCompare(op);
-        ExpressionVector args = parseArguments(bsonExpr);
+        ExpressionVector args = parseArguments(bsonExpr, vps);
         expr->validateArguments(args);
         expr->vpOperand = args;
         return expr;
@@ -645,9 +670,12 @@ namespace {
         return vpOperand[idx]->evaluateInternal(vars);
     }
 
-    intrusive_ptr<Expression> ExpressionCond::parse(BSONElement expr) {
+    intrusive_ptr<Expression> ExpressionCond::parse(
+            BSONElement expr,
+            const VariablesParseState& vps) {
+
         if (expr.type() != Object) {
-            return Base::parse(expr);
+            return Base::parse(expr, vps);
         }
         verify(str::equals(expr.fieldName(), "$cond"));
 
@@ -657,11 +685,11 @@ namespace {
         const BSONObj args = expr.embeddedObject();
         BSONForEach(arg, args) {
             if (str::equals(arg.fieldName(), "if")) {
-                ret->vpOperand[0] = parseOperand(arg);
+                ret->vpOperand[0] = parseOperand(arg, vps);
             } else if (str::equals(arg.fieldName(), "then")) {
-                ret->vpOperand[1] = parseOperand(arg);
+                ret->vpOperand[1] = parseOperand(arg, vps);
             } else if (str::equals(arg.fieldName(), "else")) {
-                ret->vpOperand[2] = parseOperand(arg);
+                ret->vpOperand[2] = parseOperand(arg, vps);
             } else {
                 uasserted(17083, str::stream()
                         << "Unrecognized parameter to $cond: " << arg.fieldName());
@@ -685,7 +713,9 @@ namespace {
 
     /* ---------------------- ExpressionConstant --------------------------- */
 
-    intrusive_ptr<Expression> ExpressionConstant::parse(BSONElement exprElement) {
+    intrusive_ptr<Expression> ExpressionConstant::parse(
+            BSONElement exprElement,
+            const VariablesParseState& vps) {
         return new ExpressionConstant(Value(exprElement));
     }
 
@@ -1095,7 +1125,10 @@ namespace {
     }
 
     // this is the new version that supports every syntax
-    intrusive_ptr<ExpressionFieldPath> ExpressionFieldPath::parse(const string& raw) {
+    intrusive_ptr<ExpressionFieldPath> ExpressionFieldPath::parse(
+            const string& raw,
+            const VariablesParseState& vps) {
+
         uassert(16873, str::stream() << "FieldPath '" << raw << "' doesn't start with $",
                 raw.c_str()[0] == '$'); // c_str()[0] is always a valid reference.
 
@@ -1208,7 +1241,10 @@ namespace {
     /* ------------------------- ExpressionLet ----------------------------- */
 
     REGISTER_EXPRESSION("$let", ExpressionLet::parse);
-    intrusive_ptr<Expression> ExpressionLet::parse(BSONElement expr) {
+    intrusive_ptr<Expression> ExpressionLet::parse(
+            BSONElement expr,
+            const VariablesParseState& vps) {
+
         verify(str::equals(expr.fieldName(), "$let"));
 
         uassert(16874, "$let only supports an object as it's argument",
@@ -1226,11 +1262,11 @@ namespace {
                 haveVars = true;
                 BSONForEach(variable, arg.embeddedObjectUserCheck()) {
                     Variables::uassertValidNameForUserWrite(variable.fieldName());
-                    vars[variable.fieldName()] = parseOperand(variable);
+                    vars[variable.fieldName()] = parseOperand(variable, vps);
                 }
             } else if (str::equals(arg.fieldName(), "in")) {
                 haveIn = true;
-                subExpression = parseOperand(arg);
+                subExpression = parseOperand(arg, vps);
             } else {
                 uasserted(16875, str::stream()
                         << "Unrecognized parameter to $let: " << arg.fieldName());
@@ -1312,7 +1348,10 @@ namespace {
     /* ------------------------- ExpressionMap ----------------------------- */
 
     REGISTER_EXPRESSION("$map", ExpressionMap::parse);
-    intrusive_ptr<Expression> ExpressionMap::parse(BSONElement expr) {
+    intrusive_ptr<Expression> ExpressionMap::parse(
+            BSONElement expr,
+            const VariablesParseState& vps) {
+
         verify(str::equals(expr.fieldName(), "$map"));
 
         uassert(16878, "$map only supports an object as it's argument",
@@ -1331,14 +1370,14 @@ namespace {
         BSONForEach(arg, args) {
             if (str::equals(arg.fieldName(), "input")) {
                 haveInput = true;
-                input = parseOperand(arg);
+                input = parseOperand(arg, vps);
             } else if (str::equals(arg.fieldName(), "as")) {
                 haveAs = true;
                 varName = arg.str();
                 Variables::uassertValidNameForUserWrite(varName);
             } else if (str::equals(arg.fieldName(), "in")) {
                 haveIn = true;
-                in = parseOperand(arg);
+                in = parseOperand(arg, vps);
             } else {
                 uasserted(16879, str::stream()
                         << "Unrecognized parameter to $map: " << arg.fieldName());

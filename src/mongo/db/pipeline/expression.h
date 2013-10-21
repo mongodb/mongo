@@ -68,6 +68,9 @@ namespace mongo {
         Document rest;
     };
 
+    class VariablesParseState {
+    };
+
     class Expression :
         public IntrusiveCounterUnsigned {
     public:
@@ -141,30 +144,45 @@ namespace mongo {
             int options;
         };
 
-        /*
-          Parse BSON Object.  The object could represent a functional
-          expression or a Document expression.
+        //
+        // Diagram of relationship between parse functions when parsing a $op:
+        //
+        // { someFieldOrArrayIndex: { $op: [ARGS] } }
+        //                             ^ parseExpression on inner $op BSONElement
+        //                          ^ parseObject on BSONObject
+        //             ^ parseOperand on outer BSONElement wrapping the $op Object
+        //
 
-          @param obj the object to parse
-          @param pCtx a MiniCtx representing the options above
-          @returns the parsed Expression
+        /**
+         * Parses a BSON Object that could represent a functional expression or a Document
+         * expression.
          */
-        static intrusive_ptr<Expression> parseObject(BSONObj obj, ObjectCtx *pCtx);
+        static intrusive_ptr<Expression> parseObject(
+            BSONObj obj,
+            ObjectCtx *pCtx,
+            const VariablesParseState& vps);
 
-        /*
-          Parse a BSONElement Object which has already been determined to be
-          functional expression.
-        */
-        static intrusive_ptr<Expression> parseExpression(BSONElement exprElement);
-
-
-        /*
-          Parse a BSONElement which is an operand in an Expression.
-
-          @param exprElement the expected operand's BSONElement
-          @returns the parsed operand, as an Expression
+        /**
+         * Parses a BSONElement which has already been determined to be functional expression.
+         *
+         * exprElement should be the only element inside the expression object. That is the
+         * field name should be the $op for the expression.
          */
-        static intrusive_ptr<Expression> parseOperand(BSONElement exprElement);
+        static intrusive_ptr<Expression> parseExpression(
+            BSONElement exprElement,
+            const VariablesParseState& vps);
+
+
+        /**
+         * Parses a BSONElement which is an operand in an Expression.
+         *
+         * This is the most generic parser and can parse ExpressionFieldPath, a literal, or a $op.
+         * If it is a $op, exprElement should be the outer element whose value is an Object
+         * containing the $op.
+         */
+        static intrusive_ptr<Expression> parseOperand(
+            BSONElement exprElement,
+            const VariablesParseState& vps);
 
         /*
           Produce a field path string with the field prefix removed.
@@ -219,7 +237,9 @@ namespace mongo {
         /// Allow subclasses the opportunity to validate arguments at parse time.
         virtual void validateArguments(const ExpressionVector& args) const {}
 
-        static ExpressionVector parseArguments(BSONElement bsonExpr);
+        static ExpressionVector parseArguments(
+            BSONElement bsonExpr,
+            const VariablesParseState& vps);
 
     protected:
         ExpressionNary() {}
@@ -231,9 +251,10 @@ namespace mongo {
     template <typename SubClass>
     class ExpressionNaryBase : public ExpressionNary {
     public:
-        static intrusive_ptr<Expression> parse(BSONElement bsonExpr) {
+        static intrusive_ptr<Expression> parse(BSONElement bsonExpr,
+                                               const VariablesParseState& vps) {
             intrusive_ptr<ExpressionNaryBase> expr = new SubClass();
-            ExpressionVector args = parseArguments(bsonExpr);
+            ExpressionVector args = parseArguments(bsonExpr, vps);
             expr->validateArguments(args);
             expr->vpOperand = args;
             return expr;
@@ -333,7 +354,10 @@ namespace mongo {
         virtual Value evaluateInternal(const Variables& vars) const;
         virtual const char *getOpName() const;
 
-        static intrusive_ptr<Expression> parse(BSONElement bsonExpr, CmpOp cmpOp);
+        static intrusive_ptr<Expression> parse(
+            BSONElement bsonExpr,
+            const VariablesParseState& vps,
+            CmpOp cmpOp);
 
         ExpressionCompare(CmpOp cmpOp);
 
@@ -357,7 +381,9 @@ namespace mongo {
         virtual Value evaluateInternal(const Variables& vars) const;
         virtual const char *getOpName() const;
 
-        static intrusive_ptr<Expression> parse(BSONElement expr);
+        static intrusive_ptr<Expression> parse(
+            BSONElement expr,
+            const VariablesParseState& vps);
     };
 
 
@@ -370,8 +396,10 @@ namespace mongo {
         virtual const char *getOpName() const;
         virtual Value serialize(bool explain) const;
 
-        static intrusive_ptr<Expression> parse(BSONElement bsonExpr);
         static intrusive_ptr<ExpressionConstant> create(const Value& pValue);
+        static intrusive_ptr<Expression> parse(
+            BSONElement bsonExpr,
+            const VariablesParseState& vps = VariablesParseState());
 
         /*
           Get the constant value represented by this Expression.
@@ -430,7 +458,7 @@ namespace mongo {
         /*
           Create a field path expression using old semantics (rooted off of CURRENT).
 
-          // NOTE: this method is deprecated
+          // NOTE: this method is deprecated and only used by tests
           // TODO remove this method in favor of parse()
 
           Evaluation will extract the value associated with the given field
@@ -443,7 +471,9 @@ namespace mongo {
         static intrusive_ptr<ExpressionFieldPath> create(const string& fieldPath);
 
         /// Like create(), but works with the raw string from the user with the "$" prefixes.
-        static intrusive_ptr<ExpressionFieldPath> parse(const string& raw);
+        static intrusive_ptr<ExpressionFieldPath> parse(
+            const string& raw,
+            const VariablesParseState& vps);
 
         const FieldPath& getFieldPath() const { return _fieldPath; }
 
@@ -504,7 +534,9 @@ namespace mongo {
         virtual Value evaluateInternal(const Variables& vars) const;
         virtual void addDependencies(set<string>& deps, vector<string>* path=NULL) const;
 
-        static intrusive_ptr<Expression> parse(BSONElement expr);
+        static intrusive_ptr<Expression> parse(
+            BSONElement expr,
+            const VariablesParseState& vps);
 
         typedef map<string, intrusive_ptr<Expression> > VariableMap;
 
@@ -523,7 +555,9 @@ namespace mongo {
         virtual Value evaluateInternal(const Variables& vars) const;
         virtual void addDependencies(set<string>& deps, vector<string>* path=NULL) const;
 
-        static intrusive_ptr<Expression> parse(BSONElement expr);
+        static intrusive_ptr<Expression> parse(
+            BSONElement expr,
+            const VariablesParseState& vps);
 
     private:
         ExpressionMap(const string& varName, // name of variable to set
