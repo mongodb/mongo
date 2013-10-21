@@ -453,12 +453,18 @@ namespace mongo {
         }
 
 
+        // This remains the empty object in the case of an object replacement, but in the case
+        // of an upsert where we are creating a base object from the query and applying mods,
+        // we capture the query as the original so that we can detect shard key mutations.
+        BSONObj original = BSONObj();
+
         // If this is a $mod base update, we need to generate a document by examining the
         // query and the mods. Otherwise, we can use the object replacement sent by the user
         // update command that was parsed by the driver before.
         // In the following block we handle the query part, and then do the regular mods after.
         if ( *request.getUpdates().firstElementFieldName() == '$' ) {
-            uassertStatusOK(UpdateDriver::createFromQuery(request.getQuery(), doc));
+            original = request.getQuery();
+            uassertStatusOK(UpdateDriver::createFromQuery(original, doc));
             opDebug->fastmodinsert = true;
         }
 
@@ -470,7 +476,7 @@ namespace mongo {
 
         // Validate that the object replacement or modifiers resulted in a document
         // that contains all the shard keys.
-        uassertStatusOK( driver->checkShardKeysUnaltered(BSONObj(), doc) );
+        uassertStatusOK( driver->checkShardKeysUnaltered(original, doc) );
 
         BSONObj newObj = doc.getObject();
 
