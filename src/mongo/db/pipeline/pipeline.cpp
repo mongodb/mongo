@@ -322,10 +322,6 @@ namespace mongo {
                 mongoutils::str::stream() << "Invalid input resource, " << inputResource.toString(),
                 inputResource.isExactNamespacePattern());
 
-        if (false && cmdObj["allowDiskUsage"].trueValue()) {
-            // TODO no privilege for this yet.
-        }
-
         out->push_back(Privilege(inputResource, ActionType::find));
 
         BSONObj pipeline = cmdObj.getObjectField("pipeline");
