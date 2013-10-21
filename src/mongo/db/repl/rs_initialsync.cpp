@@ -479,6 +479,10 @@ namespace mongo {
 
             cx.ctx().db()->flushFiles(true);
         }
+        {
+            boost::unique_lock<boost::mutex> lock(theReplSet->initialSyncMutex);
+            theReplSet->initialSyncRequested = false;
+        }
 
         // If we just cloned & there were no ops applied, we still want the primary to know where
         // we're up to

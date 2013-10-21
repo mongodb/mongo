@@ -44,6 +44,10 @@ namespace mongo {
     // Main entry point for master/slave at startup time.
     void startMasterSlave();
 
+    // externed for use with resync.cpp
+    extern volatile int relinquishSyncingSome;
+    extern volatile int syncing;
+
     // Global variable that contains a string telling why master/slave halted
     extern const char *replAllDead;
 

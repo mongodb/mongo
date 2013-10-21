@@ -531,6 +531,11 @@ namespace mongo {
         const Member* findById(unsigned id) const;
         Member* getMutableMember(unsigned id);
         Member* findByName(const std::string& hostname) const;
+
+        /**
+         * Cause the node to resync from scratch.
+         */
+        bool resync(std::string& errmsg);
     private:
         void _getTargets(list<Target>&, int &configVersion);
         void getTargets(list<Target>&, int &configVersion);
@@ -608,6 +613,10 @@ namespace mongo {
         static void setInitialSyncFlag();
 
         int oplogVersion;
+
+        // bool for indicating resync need on this node and the mutex that protects it
+        bool initialSyncRequested;
+        boost::mutex initialSyncMutex;
     private:
         IndexPrefetchConfig _indexPrefetchConfig;
 

@@ -61,7 +61,7 @@ namespace mongo {
 
     /* if 1 sync() is running */
     volatile int syncing = 0;
-    static volatile int relinquishSyncingSome = 0;
+    volatile int relinquishSyncingSome = 0;
 
     /* "dead" means something really bad happened like replication falling completely out of sync.
        when non-null, we are dead and the string is informational
@@ -80,72 +80,6 @@ namespace mongo {
             replInfo = "?";
         }
     };
-
-
-    /* operator requested resynchronization of replication (on the slave).  { resync : 1 } */
-    class CmdResync : public Command {
-    public:
-        virtual bool slaveOk() const {
-            return true;
-        }
-        virtual bool adminOnly() const {
-            return true;
-        }
-        virtual bool logTheOp() { return false; }
-        virtual bool lockGlobally() const { return true; }
-        virtual LockType locktype() const { return WRITE; }
-        virtual void addRequiredPrivileges(const std::string& dbname,
-                                           const BSONObj& cmdObj,
-                                           std::vector<Privilege>* out) {
-            ActionSet actions;
-            actions.addAction(ActionType::resync);
-            out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
-        }
-        void help(stringstream&h) const { h << "resync (from scratch) an out of date replica slave.\nhttp://dochub.mongodb.org/core/masterslave"; }
-        CmdResync() : Command("resync") { }
-        virtual bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            if (replSettings.usingReplSets()) {
-                errmsg = "resync command not currently supported with replica sets.  See RS102 info in the mongodb documentations";
-                result.append("info", "http://dochub.mongodb.org/core/resyncingaverystalereplicasetmember");
-                return false;
-            }
-
-            if ( cmdObj.getBoolField( "force" ) ) {
-                if ( !waitForSyncToFinish( errmsg ) )
-                    return false;
-                replAllDead = "resync forced";
-            }
-            if ( !replAllDead ) {
-                errmsg = "not dead, no need to resync";
-                return false;
-            }
-            if ( !waitForSyncToFinish( errmsg ) )
-                return false;
-
-            ReplSource::forceResyncDead( "client" );
-            result.append( "info", "triggered resync for all sources" );
-            return true;
-        }
-        bool waitForSyncToFinish( string &errmsg ) const {
-            // Wait for slave thread to finish syncing, so sources will be be
-            // reloaded with new saved state on next pass.
-            Timer t;
-            while ( 1 ) {
-                if ( syncing == 0 || t.millis() > 30000 )
-                    break;
-                {
-                    Lock::TempRelease t;
-                    relinquishSyncingSome = 1;
-                    sleepmillis(1);
-                }
-            }
-            if ( syncing ) {
-                errmsg = "timeout waiting for sync() to finish";
-                return false;
-            }
-            return true;
-        }
-    } cmdResync;
 
 
     ReplSource::ReplSource() {

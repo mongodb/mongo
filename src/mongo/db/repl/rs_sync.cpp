@@ -415,6 +415,13 @@ namespace replset {
                 // (always checked in the first iteration of this do-while loop, because
                 // ops is empty)
                 if (ops.empty() || now > lastTimeChecked) {
+                    {
+                        boost::unique_lock<boost::mutex> lock(theReplSet->initialSyncMutex);
+                        if (theReplSet->initialSyncRequested) {
+                            // got a resync command
+                            return;
+                        }
+                    }
                     lastTimeChecked = now;
                     // can we become secondary?
                     // we have to check this before calling mgr, as we must be a secondary to
@@ -748,10 +755,16 @@ namespace replset {
             return;
         }
 
+        bool initialSyncRequested = false;
+        {
+            boost::unique_lock<boost::mutex> lock(theReplSet->initialSyncMutex);
+            initialSyncRequested = theReplSet->initialSyncRequested;
+        }
         // Check criteria for doing an initial sync:
         // 1. If the oplog is empty, do an initial sync
         // 2. If minValid has _initialSyncFlag set, do an initial sync
-        if (lastOpTimeWritten.isNull() || getInitialSyncFlag()) {
+        // 3. If initialSyncRequested is true
+        if (lastOpTimeWritten.isNull() || getInitialSyncFlag() || initialSyncRequested) {
             syncDoInitialSync();
             return; // _syncThread will be recalled, starts from top again in case sync failed.
         }
@@ -759,6 +772,20 @@ namespace replset {
         /* we have some data.  continue tailing. */
         replset::SyncTail tail(replset::BackgroundSync::get());
         tail.oplogApplication();
+    }
+
+    bool ReplSetImpl::resync(string& errmsg) {
+        changeState(MemberState::RS_RECOVERING);
+        {
+            Client::Context ctx("local");
+            cc().database()->dropCollection("local.oplog.rs");
+        }
+        _veto.clear();
+        {
+            boost::unique_lock<boost::mutex> lock(theReplSet->initialSyncMutex);
+            theReplSet->initialSyncRequested = true;
+        }
+        return true;
     }
 
     void ReplSetImpl::syncThread() {

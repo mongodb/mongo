@@ -488,6 +488,7 @@ namespace {
         _writerPool(replWriterThreadCount),
         _prefetcherPool(replPrefetcherThreadCount),
         oplogVersion(0),
+        initialSyncRequested(false), // only used for resync
         _indexPrefetchConfig(PREFETCH_ALL) {
     }
 
