@@ -28,7 +28,7 @@ DBQuery.prototype.help = function () {
     print("\t.sort( {...} )")
     print("\t.limit( n )")
     print("\t.skip( n )")
-    print("\t.count() - total # of objects matching query, ignores skip,limit")
+    print("\t.count(applySkipLimit) - total # of objects matching query. by default ignores skip,limit")
     print("\t.size() - total # of objects cursor would return, honors skip,limit")
     print("\t.explain([verbose])")
     print("\t.hint(...)")
@@ -49,8 +49,8 @@ DBQuery.prototype.help = function () {
     print("\t.hasNext()")
     print("\t.next()")
     print("\t.objsLeftInBatch() - returns count of docs left in current batch (when exhausted, a new getMore will be issued)")
-    print("\t.count(applySkipLimit) - runs command at server")    
     print("\t.itcount() - iterates through documents and counts them")
+    print("\t.pretty() - pretty print each document, possibly over multiple lines")
 }
 
 DBQuery.prototype.clone = function(){
@@ -414,6 +414,19 @@ DBCommandCursor.prototype.objsLeftInBatch = function() {
     else {
         return this._cursor.objsLeftInBatch();
     }
+}
+
+DBCommandCursor.prototype.help = function () {
+    // This is the same as the "Cursor Methods" section of DBQuery.help().
+    print("\nCursor methods");
+    print("\t.toArray() - iterates through docs and returns an array of the results")
+    print("\t.forEach( func )")
+    print("\t.map( func )")
+    print("\t.hasNext()")
+    print("\t.next()")
+    print("\t.objsLeftInBatch() - returns count of docs left in current batch (when exhausted, a new getMore will be issued)")
+    print("\t.itcount() - iterates through documents and counts them")
+    print("\t.pretty() - pretty print each document, possibly over multiple lines")
 }
 
 // Copy these methods from DBQuery
