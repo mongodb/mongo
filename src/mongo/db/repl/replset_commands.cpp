@@ -34,7 +34,6 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/health.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replication_server_status.h"  // replSettings
@@ -292,43 +291,6 @@ namespace mongo {
             return true;
         }
     } cmdReplSetFreeze;
-
-    class CmdReplSetPauseReplication : public ReplSetCommand {
-    public:
-        virtual void help( stringstream &help ) const {
-            help << "{ replSetPauseReplication : <seconds> }";
-            help << "Stops replication temporarily, for at least the number of seconds supplied.\n";
-            help << "\nhttp://dochub.mongodb.org/core/replicasetcommands";
-        }
-        virtual void addRequiredPrivileges(const std::string& dbname,
-                                           const BSONObj& cmdObj,
-                                           std::vector<Privilege>* out) {
-            ActionSet actions;
-            actions.addAction(ActionType::replSetPauseReplication);
-            out->push_back(Privilege(AuthorizationManager::SERVER_RESOURCE_NAME, actions));
-        }
-        CmdReplSetPauseReplication() : ReplSetCommand("replSetPauseReplication") { }
-        virtual bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            if( !check(errmsg, result) )
-                return false;
-
-            if( theReplSet->isPrimary() ) {
-                errmsg = "Cannot pause replication on the primary";
-                return false;
-            }
-
-            int secs = (int) cmdObj.firstElement().numberInt();
-            result.append("secs", secs);
-            if( secs == 0 ) {
-                replset::BackgroundSync::get()->start();
-                result.append("info","resuming replication");
-            } else {
-                replset::BackgroundSync::get()->start();
-                result.append("info","pausing replication");
-            }
-            return true;
-        }
-    } CmdReplSetPauseReplication;
 
     class CmdReplSetStepDown: public ReplSetCommand {
     public:

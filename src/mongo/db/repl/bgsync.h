@@ -115,6 +115,10 @@ namespace replset {
         bool shouldChangeSyncTarget();
         // check lastOpTimeWritten against the remote's earliest op, filling in remoteOldestOp.
         bool isStale(OplogReader& r, BSONObj& remoteOldestOp);
+        // stop syncing when this becomes a primary
+        void stop();
+        // restart syncing
+        void start();
 
         // Tracker thread
         // tells the sync target where this member is synced to
@@ -128,11 +132,6 @@ namespace replset {
         bool isAssumingPrimary();
 
     public:
-        // stop syncing when this becomes a primary
-        void stop();
-        // restart syncing
-        void start();
-
         static BackgroundSync* get();
         static void shutdown();
         static void notify();
@@ -157,8 +156,6 @@ namespace replset {
         // Wait for replication to finish and buffer to be applied so that the member can become
         // primary.
         void stopReplicationAndFlushBuffer();
-
-        bool isPaused();
     };
 
 
