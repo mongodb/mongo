@@ -479,7 +479,12 @@ DBCollection.prototype.validate = function(full) {
 DBCollection.prototype.diskStorageStats = function(opt) {
     var cmd = { storageDetails: this.getName(), analyze: 'diskStorage' };
     if (typeof(opt) == 'object') Object.extend(cmd, opt);
-    return this._db.runCommand(cmd);
+
+    var res = this._db.runCommand(cmd);
+    if (!res.ok && res.errmsg.match(/no such cmd/)) {
+        print("this command requires starting mongod with --enableExperimentalStorageDetailsCmd");
+    }
+    return res;
 }
 
 // Refer to diskStorageStats
@@ -550,7 +555,12 @@ DBCollection.prototype.getDiskStorageStats = function(params) {
 DBCollection.prototype.pagesInRAM = function(opt) {
     var cmd = { storageDetails: this.getName(), analyze: 'pagesInRAM' };
     if (typeof(opt) == 'object') Object.extend(cmd, opt);
-    return this._db.runCommand(cmd);
+
+    var res = this._db.runCommand(cmd);
+    if (!res.ok && res.errmsg.match(/no such cmd/)) {
+        print("this command requires starting mongod with --enableExperimentalStorageDetailsCmd");
+    }
+    return res;
 }
 
 // Refer to pagesInRAM
@@ -623,7 +633,11 @@ DBCollection.prototype.indexStats = function(params) {
     if (typeof(params) == 'object') // support arbitrary options here
         Object.extend(cmd, params);
 
-    return this._db.runCommand( cmd );
+    var res = this._db.runCommand(cmd);
+    if (!res.ok && res.errmsg.match(/no such cmd/)) {
+        print("this command requires starting mongod with --enableExperimentalIndexStatsCmd");
+    }
+    return res;
 }
 
 DBCollection.prototype.getIndexStats = function(params, detailed) {
