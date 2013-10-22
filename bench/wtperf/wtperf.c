@@ -851,7 +851,7 @@ main(int argc, char *argv[])
 	WT_SESSION *parse_session;
 	pthread_t checkpoint_thread, stat_thread;
 	uint64_t req_len;
-	int ch, checkpoint_created, stat_created, ret;
+	int ch, checkpoint_created, ret, stat_created;
 	const char *user_cconfig, *user_tconfig;
 	const char *opts = "C:O:T:h:o:SML";
 	char *cc_buf, *tc_buf, *opt_home;
