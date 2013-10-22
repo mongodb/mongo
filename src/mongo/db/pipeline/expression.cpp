@@ -2006,6 +2006,19 @@ namespace {
 
     /* ----------------------- ExpressionSetIsSubset ---------------------------- */
 
+namespace {
+    Value setIsSubsetHelper(const vector<Value>& lhs, const ValueSet& rhs) {
+        // do not shortcircuit when lhs.size() > rhs.size()
+        // because lhs can have redundant entries
+        for (vector<Value>::const_iterator it = lhs.begin(); it != lhs.end(); ++it) {
+            if (!rhs.count(*it)) {
+                return Value(false);
+            }
+        }
+        return Value(true);
+    }
+}
+
     Value ExpressionSetIsSubset::evaluateInternal(Variables* vars) const {
         const Value lhs = vpOperand[0]->evaluateInternal(vars);
         const Value rhs = vpOperand[1]->evaluateInternal(vars);
@@ -2017,18 +2030,56 @@ namespace {
                                      << "argument is of type: " << typeName(rhs.getType()),
                 rhs.getType() == Array);
 
-        const vector<Value>& potentialSubset = lhs.getArray();
-        const ValueSet& fullSet = arrayToSet(rhs);
+        return setIsSubsetHelper(lhs.getArray(), arrayToSet(rhs));
+    }
 
-        // do not shortcircuit when potentialSubset.size() > fullSet.size()
-        // because potentialSubset can have redundant entries
-        for (vector<Value>::const_iterator it = potentialSubset.begin();
-                it != potentialSubset.end(); ++it) {
-            if (!fullSet.count(*it)) {
-                return Value(false);
-            }
+    /**
+     * This class handles the case where the RHS set is constant.
+     *
+     * Since it is constant we can construct the hashset once which makes the runtime performance
+     * effectively constant with respect to the size of RHS. Large, constant RHS is expected to be a
+     * major use case for $redact and this has been verified to improve performance significantly.
+     */
+    class ExpressionSetIsSubset::Optimized : public ExpressionSetIsSubset {
+    public:
+        Optimized(const ValueSet& cachedRhsSet, const ExpressionVector& operands)
+            : _cachedRhsSet(cachedRhsSet)
+        {
+            vpOperand = operands;
         }
-        return Value(true);
+
+        virtual Value evaluateInternal(Variables* vars) const {
+            const Value lhs = vpOperand[0]->evaluateInternal(vars);
+
+            uassert(17310, str::stream() << "both operands of $setIsSubset must be arrays. First "
+                                         << "argument is of type: " << typeName(lhs.getType()),
+                    lhs.getType() == Array);
+
+            return setIsSubsetHelper(lhs.getArray(), _cachedRhsSet);
+        }
+
+    private:
+        const ValueSet _cachedRhsSet;
+    };
+
+    intrusive_ptr<Expression> ExpressionSetIsSubset::optimize() {
+        // perfore basic optimizations
+        intrusive_ptr<Expression> optimized = ExpressionNary::optimize();
+
+        // if ExpressionNary::optimize() created a new value, return it directly
+        if (optimized.get() != this)
+            return optimized;
+
+        if (ExpressionConstant* ec = dynamic_cast<ExpressionConstant*>(vpOperand[1].get())) {
+            const Value rhs = ec->getValue();
+            uassert(17311, str::stream() << "both operands of $setIsSubset must be arrays. Second "
+                                         << "argument is of type: " << typeName(rhs.getType()),
+                    rhs.getType() == Array);
+
+            return new Optimized(arrayToSet(rhs), vpOperand);
+        }
+
+        return optimized;
     }
 
     REGISTER_EXPRESSION("$setIsSubset", ExpressionSetIsSubset::parse);

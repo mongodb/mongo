@@ -869,8 +869,11 @@ namespace mongo {
     class ExpressionSetIsSubset : public ExpressionFixedArity<ExpressionSetIsSubset, 2> {
     public:
         // virtuals from ExpressionNary
+        virtual intrusive_ptr<Expression> optimize();
         virtual Value evaluateInternal(Variables* vars) const;
         virtual const char *getOpName() const;
+    private:
+        class Optimized;
     };
 
 
