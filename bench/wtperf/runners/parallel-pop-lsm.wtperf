@@ -8,4 +8,3 @@ report_interval=5
 run_time=20
 populate_ops_per_txn=100
 populate_threads=5
-verbose=1

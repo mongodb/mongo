@@ -9,4 +9,3 @@ populate_threads=1
 read_threads=2
 insert_threads=2
 update_threads=2
-verbose=1
