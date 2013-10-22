@@ -27,6 +27,7 @@ int
 __wt_log_slot_init(WT_SESSION_IMPL *session)
 {
 	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
 	WT_LOG *log;
 	WT_LOGSLOT *slot;
 	uint32_t i;
@@ -36,10 +37,6 @@ __wt_log_slot_init(WT_SESSION_IMPL *session)
 	for (i = 0; i < SLOT_POOL; i++) {
 		log->slot_pool[i].slot_state = WT_LOG_SLOT_FREE;
 		log->slot_pool[i].slot_index = SLOT_INVALID_INDEX;
-		/* TODO: Memory leak on error. */
-		WT_RET(__wt_buf_init(session,
-		    &log->slot_pool[i].slot_buf, WT_LOG_SLOT_BUF_INIT_SIZE));
-		F_SET(&log->slot_pool[i], SLOT_BUFFERED);
 	}
 
 	/*
@@ -51,7 +48,21 @@ __wt_log_slot_init(WT_SESSION_IMPL *session)
 		slot->slot_state = WT_LOG_SLOT_READY;
 		log->slot_array[i] = slot;
 	}
-	return (0);
+
+	/*
+	 * Allocate memory for buffers now that the arrays are setup. Split
+	 * this out to make error handling simpler.
+	 */
+	for (i = 0; i < SLOT_ACTIVE; i++) {
+		WT_ERR(__wt_buf_init(session,
+		    &log->slot_pool[i].slot_buf, WT_LOG_SLOT_BUF_INIT_SIZE));
+		F_SET(&log->slot_pool[i], SLOT_BUFFERED);
+	}
+	if (0) {
+err:		while (--i > 0)
+			__wt_buf_free(session, &log->slot_pool[i].slot_buf);
+	}
+	return (ret);
 }
 
 /*
@@ -257,7 +268,7 @@ __wt_log_slot_grow_buffers(WT_SESSION_IMPL *session, int64_t newsize)
 	WT_DECL_RET;
 	WT_LOG *log;
 	WT_LOGSLOT *slot;
-	int64_t orig_state;
+	int64_t orig_state, size;
 	uint32_t i;
 
 	conn = S2C(session);
@@ -270,8 +281,13 @@ __wt_log_slot_grow_buffers(WT_SESSION_IMPL *session, int64_t newsize)
 	__wt_spin_lock(session, &log->log_slot_lock);
 	for (i = 0; i < SLOT_POOL; i++) {
 		slot = &log->slot_pool[i];
+		/* Avoid atomic operations if they won't succeed. */
 		if (slot->slot_state != WT_LOG_SLOT_FREE &&
 		    slot->slot_state != WT_LOG_SLOT_READY)
+			continue;
+		/* Don't keep growing unrelated buffers. */
+		if (slot->slot_buf.memsize > 10 * newsize &&
+		    !F_ISSET(slot, SLOT_BUF_GROW))
 			continue;
 		orig_state = WT_ATOMIC_CAS_VAL(
 		    slot->slot_state, WT_LOG_SLOT_FREE, WT_LOG_SLOT_PENDING);
@@ -282,6 +298,7 @@ __wt_log_slot_grow_buffers(WT_SESSION_IMPL *session, int64_t newsize)
 				continue;
 		}
 
+		/* We have a slot - now go ahead and grow the buffer. */
 		F_CLR(slot, SLOT_BUF_GROW);
 		WT_ERR(__wt_buf_grow(session, &slot->slot_buf,
 		    WT_MAX(slot->slot_buf.memsize * 2, newsize)));
