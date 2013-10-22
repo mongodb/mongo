@@ -260,6 +260,14 @@ namespace mongo {
             CandidatePlan& candidate = _candidates[i];
             if (candidate.failed) { continue; }
 
+            // Yield, if we can yield ourselves.
+            if (NULL != _yieldPolicy.get() && _yieldPolicy->shouldYield()) {
+                saveState();
+                _yieldPolicy->yield();
+                if (_failure || _killed) { return false; }
+                restoreState();
+            }
+
             WorkingSetID id;
             PlanStage::StageState state = candidate.root->work(&id);
 
@@ -320,14 +328,6 @@ namespace mongo {
                     _failure = true;
                     return false;
                 }
-            }
-
-            // Yield, if we can yield ourselves.
-            if (NULL != _yieldPolicy.get() && _yieldPolicy->shouldYield()) {
-                saveState();
-                _yieldPolicy->yield();
-                if (_failure || _killed) { return false; }
-                restoreState();
             }
         }
 

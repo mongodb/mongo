@@ -40,10 +40,16 @@
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/instance.h"
-#include "mongo/db/query_optimizer.h"
+#include "mongo/db/query/new_find.h"
+#include "mongo/db/query/query_planner_common.h"
+#include "mongo/db/query_optimizer.h"   // XXX old sys
+#include "mongo/db/server_options.h"
+#include "mongo/db/server_parameters.h"
 #include "mongo/scripting/engine.h"
 
 namespace mongo {
+
+    MONGO_EXPORT_SERVER_PARAMETER(newGroup, bool, true);
 
     class GroupCommand : public Command {
     public:
@@ -132,49 +138,93 @@ namespace mongo {
             map<BSONObj,int,BSONObjCmp> map;
             list<BSONObj> blah;
 
-            shared_ptr<Cursor> cursor = getOptimizedCursor(ns.c_str() , query);
-            ClientCursorHolder ccPointer( new ClientCursor( QueryOption_NoCursorTimeout, cursor,
-                                                             ns ) );
-
-            while ( cursor->ok() ) {
-                
-                if ( !ccPointer->yieldSometimes( ClientCursor::MaybeCovered ) ||
-                    !cursor->ok() ) {
-                    break;
-                }
-                
-                if ( !cursor->currentMatches() || cursor->getsetdup( cursor->currLoc() ) ) {
-                    cursor->advance();
-                    continue;
+            if (newGroup) {
+                CanonicalQuery* cq;
+                if (!CanonicalQuery::canonicalize(ns, query, &cq).isOK()) {
+                    uasserted(17212, "Can't canonicalize query " + query.toString());
+                    return 0;
                 }
 
-                if ( !ccPointer->yieldSometimes( ClientCursor::WillNeed ) ||
-                    !cursor->ok() ) {
-                    break;
-                }
-                
-                BSONObj obj = cursor->current();
-                cursor->advance();
-
-                BSONObj key = getKey( obj , keyPattern , keyFunction , keysize / keynum , s.get() );
-                keysize += key.objsize();
-                keynum++;
-
-                int& n = map[key];
-                if ( n == 0 ) {
-                    n = map.size();
-                    s->setObject( "$key" , key , true );
-
-                    uassert( 10043 ,  "group() can't handle more than 20000 unique keys" , n <= 20000 );
+                Runner* rawRunner;
+                if (!getRunner(cq, &rawRunner).isOK()) {
+                    uasserted(17213, "Can't get runner for query " + query.toString());
+                    return 0;
                 }
 
-                s->setObject( "obj" , obj , true );
-                s->setNumber( "n" , n - 1 );
-                if ( s->invoke( f , 0, 0 , 0 , true ) ) {
-                    throw UserException( 9010 , (string)"reduce invoke failed: " + s->getError() );
+                auto_ptr<Runner> runner(rawRunner);
+                auto_ptr<DeregisterEvenIfUnderlyingCodeThrows> safety;
+                ClientCursor::registerRunner(runner.get());
+                runner->setYieldPolicy(Runner::YIELD_AUTO);
+                safety.reset(new DeregisterEvenIfUnderlyingCodeThrows(runner.get()));
+
+                BSONObj obj;
+                Runner::RunnerState state;
+                while (Runner::RUNNER_ADVANCED == (state = runner->getNext(&obj, NULL))) {
+                    BSONObj key = getKey(obj , keyPattern , keyFunction , keysize / keynum,
+                                         s.get() );
+                    keysize += key.objsize();
+                    keynum++;
+
+                    int& n = map[key];
+                    if ( n == 0 ) {
+                        n = map.size();
+                        s->setObject( "$key" , key , true );
+                        uassert(17203, "group() can't handle more than 20000 unique keys",
+                                n <= 20000 );
+                    }
+
+                    s->setObject( "obj" , obj , true );
+                    s->setNumber( "n" , n - 1 );
+                    if ( s->invoke( f , 0, 0 , 0 , true ) ) {
+                        throw UserException(17214, (string)"reduce invoke failed: " + s->getError());
+                    }
                 }
             }
-            ccPointer.reset();
+            else {
+                shared_ptr<Cursor> cursor = getOptimizedCursor(ns.c_str() , query);
+                ClientCursorHolder ccPointer( new ClientCursor( QueryOption_NoCursorTimeout, cursor,
+                                                                 ns ) );
+
+                while ( cursor->ok() ) {
+                    if ( !ccPointer->yieldSometimes( ClientCursor::MaybeCovered ) ||
+                        !cursor->ok() ) {
+                        break;
+                    }
+                    
+                    if ( !cursor->currentMatches() || cursor->getsetdup( cursor->currLoc() ) ) {
+                        cursor->advance();
+                        continue;
+                    }
+
+                    if ( !ccPointer->yieldSometimes( ClientCursor::WillNeed ) ||
+                        !cursor->ok() ) {
+                        break;
+                    }
+                    
+                    BSONObj obj = cursor->current();
+                    cursor->advance();
+
+                    BSONObj key = getKey(obj , keyPattern , keyFunction , keysize / keynum,
+                                         s.get() );
+                    keysize += key.objsize();
+                    keynum++;
+
+                    int& n = map[key];
+                    if ( n == 0 ) {
+                        n = map.size();
+                        s->setObject( "$key" , key , true );
+                        uassert(10043, "group() can't handle more than 20000 unique keys",
+                                n <= 20000 );
+                    }
+
+                    s->setObject( "obj" , obj , true );
+                    s->setNumber( "n" , n - 1 );
+                    if ( s->invoke( f , 0, 0 , 0 , true ) ) {
+                        throw UserException(9010, (string)"reduce invoke failed: " + s->getError());
+                    }
+                }
+                ccPointer.reset();
+            }
 
             if (!finalize.empty()) {
                 s->exec( "$finalize = " + finalize , "$group finalize define" , false , true , true , 100 );

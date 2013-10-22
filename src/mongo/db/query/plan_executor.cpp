@@ -79,6 +79,14 @@ namespace mongo {
         if (_killed) { return Runner::RUNNER_DEAD; }
 
         for (;;) {
+            // Yield, if we can yield ourselves.
+            if (NULL != _yieldPolicy.get() && _yieldPolicy->shouldYield()) {
+                saveState();
+                _yieldPolicy->yield();
+                if (_killed) { return Runner::RUNNER_DEAD; }
+                restoreState();
+            }
+
             WorkingSetID id;
             PlanStage::StageState code = _root->work(&id);
 
@@ -160,14 +168,6 @@ namespace mongo {
             else {
                 verify(PlanStage::FAILURE == code);
                 return Runner::RUNNER_ERROR;
-            }
-
-            // Yield, if we can yield ourselves.
-            if (NULL != _yieldPolicy.get() && _yieldPolicy->shouldYield()) {
-                saveState();
-                _yieldPolicy->yield();
-                if (_killed) { return Runner::RUNNER_DEAD; }
-                restoreState();
             }
         }
     }

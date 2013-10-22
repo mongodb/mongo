@@ -142,6 +142,17 @@ namespace mongo {
             // The first work() is an init.  Every subsequent work examines a document.
             res->setNScanned(leaf->common.works);
             res->setNScannedObjects(leaf->common.works);
+            // TODO: Could be multikey.
+            res->setIsMultiKey(false);
+            res->setIndexOnly(false);
+        }
+        else if (leaf->stageType == STAGE_GEO_NEAR_2D) {
+            // TODO: This is kind of a lie.
+            res->setCursor("GeoSearchCursor");
+            // The first work() is an init.  Every subsequent work examines a document.
+            res->setNScanned(leaf->common.works);
+            res->setNScannedObjects(leaf->common.works);
+            // TODO: Could be multikey.
             res->setIsMultiKey(false);
             res->setIndexOnly(false);
         }

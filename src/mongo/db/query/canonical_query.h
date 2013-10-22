@@ -41,8 +41,14 @@ namespace mongo {
     public:
         static Status canonicalize(const QueryMessage& qm, CanonicalQuery** out);
 
-        // These are for testing, when we don't have a QueryMessage.
+        /**
+         * For testing or for internal clients to use.
+         */
         static Status canonicalize(const string& ns, const BSONObj& query, CanonicalQuery** out);
+
+        static Status canonicalize(const string& ns, const BSONObj& query, long long skip,
+                                   long long limit, CanonicalQuery** out);
+
         static Status canonicalize(const string& ns, const BSONObj& query, const BSONObj& sort,
                                    const BSONObj& proj, CanonicalQuery** out);
 

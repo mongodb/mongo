@@ -25,4 +25,5 @@ t.save( { a : { b : "c" } , c : 12 } );
 
 res = t.distinct( "a.b" );
 assert.eq( "a,b,c" , res.toString() , "B1" );
+printjson(t._distinct( "a.b" ).stats);
 assert.eq( "BasicCursor" , t._distinct( "a.b" ).stats.cursor , "B2" )

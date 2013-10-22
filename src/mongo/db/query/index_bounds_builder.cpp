@@ -191,6 +191,15 @@ namespace mongo {
         unionize(oilOut);
     }
 
+    bool typeMatch(const BSONObj& obj) {
+        BSONObjIterator it(obj);
+        verify(it.more());
+        BSONElement first = it.next();
+        verify(it.more());
+        BSONElement second = it.next();
+        return first.canonicalType() == second.canonicalType();
+    }
+
     // static
     void IndexBoundsBuilder::translate(const MatchExpression* expr, const BSONElement& elt,
                                        OrderedIntervalList* oilOut, bool* exactOut) {
@@ -250,7 +259,7 @@ namespace mongo {
             bob.appendAs(dataElt, "");
             BSONObj dataObj = bob.obj();
             verify(dataObj.isOwned());
-            oilOut->intervals.push_back(makeRangeInterval(dataObj, true, true));
+            oilOut->intervals.push_back(makeRangeInterval(dataObj, typeMatch(dataObj), true));
             // XXX: only exact if not (null or array)
             *exactOut = true;
         }
@@ -271,7 +280,7 @@ namespace mongo {
             BSONObj dataObj = bob.obj();
             verify(dataObj.isOwned());
             QLOG() << "data obj is " << dataObj.toString() << endl;
-            oilOut->intervals.push_back(makeRangeInterval(dataObj, true, false));
+            oilOut->intervals.push_back(makeRangeInterval(dataObj, typeMatch(dataObj), false));
             // XXX: only exact if not (null or array)
             *exactOut = true;
         }
@@ -291,7 +300,7 @@ namespace mongo {
             bob.appendMaxForType("", dataElt.type());
             BSONObj dataObj = bob.obj();
             verify(dataObj.isOwned());
-            oilOut->intervals.push_back(makeRangeInterval(dataObj, false, true));
+            oilOut->intervals.push_back(makeRangeInterval(dataObj, false, typeMatch(dataObj)));
             // XXX: only exact if not (null or array)
             *exactOut = true;
         }
@@ -312,7 +321,7 @@ namespace mongo {
             BSONObj dataObj = bob.obj();
             verify(dataObj.isOwned());
 
-            oilOut->intervals.push_back(makeRangeInterval(dataObj, true, true));
+            oilOut->intervals.push_back(makeRangeInterval(dataObj, true, typeMatch(dataObj)));
             // XXX: only exact if not (null or array)
             *exactOut = true;
         }

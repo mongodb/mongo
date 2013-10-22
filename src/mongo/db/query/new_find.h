@@ -30,12 +30,25 @@
 
 #include <string>
 
+#include "mongo/db/clientcursor.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/runner.h"
 #include "mongo/util/net/message.h"
 
 namespace mongo {
+
+    /**
+     * Get a runner for a query.  Takes ownership of rawCanonicalQuery.
+     *
+     * If the query is valid and a runner could be created, returns Status::OK()
+     * and populates *out with the Runner.
+     *
+     * If the query cannot be executed, returns a Status indicating why.  Deletes
+     * rawCanonicalQuery.
+     */
+    Status getRunner(CanonicalQuery* rawCanonicalQuery, Runner** out);
 
     /**
      * A switch to choose between old Cursor-based code and new Runner-based code.
@@ -67,5 +80,24 @@ namespace mongo {
      * Returns true if so.  Caller owns *cqOut.
      */
     bool canUseNewSystem(const QueryMessage& qm, CanonicalQuery** cqOut);
+
+    /**
+     * RAII approach to ensuring that runners are deregistered in newRunQuery.
+     *
+     * While retrieving the first bach of results, newRunQuery manually registers the runner with
+     * ClientCursor.  Certain query execution paths, namely $where, can throw an exception.  If we
+     * fail to deregister the runner, we will call invalidate/kill on the
+     * still-registered-yet-deleted runner.
+     *
+     * For any subsequent calls to getMore, the runner is already registered with ClientCursor
+     * by virtue of being cached, so this exception-proofing is not required.
+     */
+    struct DeregisterEvenIfUnderlyingCodeThrows {
+        DeregisterEvenIfUnderlyingCodeThrows(Runner* runner) : _runner(runner) { }
+        ~DeregisterEvenIfUnderlyingCodeThrows() {
+            ClientCursor::deregisterRunner(_runner);
+        }
+        Runner* _runner;
+    };
 
 }  // namespace mongo

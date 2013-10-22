@@ -114,6 +114,12 @@ namespace mongo {
 
         // TODO: use indexnames
         if ("" == ixtype) {
+            if (index.sparse && exprtype == MatchExpression::EQ) {
+                // Can't check for null w/a sparse index.
+                const EqualityMatchExpression* expr
+                    = static_cast<const EqualityMatchExpression*>(node);
+                return !expr->getData().isNull();
+            }
             return exprtype != MatchExpression::GEO && exprtype != MatchExpression::GEO_NEAR;
         }
         else if ("hashed" == ixtype) {
@@ -1254,15 +1260,12 @@ namespace mongo {
                 out->push_back(soln);
             }
 
-            /*
-            if (newFirst.empty()) {
-                // Only 2d indices for the near.
-                return;
-            }
-            */
-
             // Continue planning w/non-2d indices tagged for this pred.
             tag->first.swap(newFirst);
+
+            if (0 == tag->first.size() && 0 == tag->notFirst.size()) {
+                return;
+            }
         }
 
         // Likewise, if there is a TEXT it must have an index it can use directly.

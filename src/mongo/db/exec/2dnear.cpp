@@ -47,6 +47,7 @@ namespace mongo {
     }
 
     PlanStage::StageState TwoDNear::work(WorkingSetID* out) {
+        ++_commonStats.works;
         if (!_initted) {
             _initted = true;
             NamespaceDetails* nsd = nsdetails(_params.ns);
@@ -54,18 +55,25 @@ namespace mongo {
             int idxNo = nsd->findIndexByKeyPattern(_params.indexKeyPattern);
             if (-1 == idxNo) { return PlanStage::IS_EOF; }
             auto_ptr<IndexDescriptor> desc(CatalogHack::getDescriptor(nsd, idxNo));
-            auto_ptr<TwoDAccessMethod> am(static_cast<TwoDAccessMethod*>(CatalogHack::getIndex(desc.get())));
+            auto_ptr<TwoDAccessMethod> am(static_cast<TwoDAccessMethod*>(
+                CatalogHack::getIndex(desc.get())));
             auto_ptr<twod_exec::GeoSearch> search;
             search.reset(new twod_exec::GeoSearch(am.get(),
                                            _params.nearQuery.centroid.oldPoint,
                                            _params.numWanted, 
                                            _params.filter,
                                            _params.nearQuery.maxDistance,
-                                           _params.nearQuery.isNearSphere ? twod_exec::GEO_SPHERE : twod_exec::GEO_PLANE,
+                                           _params.nearQuery.isNearSphere ? twod_exec::GEO_SPHERE
+                                                                          : twod_exec::GEO_PLANE,
                                            _params.uniqueDocs,
                                            false));
+
+            // This is where all the work is done.  :(
             search->exec();
-            for (twod_exec::GeoHopper::Holder::iterator it = search->_points.begin(); it != search->_points.end(); it++) {
+
+            for (twod_exec::GeoHopper::Holder::iterator it = search->_points.begin();
+                 it != search->_points.end(); it++) {
+
                 WorkingSetID id = _workingSet->allocate();
                 WorkingSetMember* member = _workingSet->get(id);
                 member->loc = it->_loc;
@@ -123,7 +131,8 @@ namespace mongo {
     }
 
     PlanStageStats* TwoDNear::getStats() {
-        return NULL;
+        _commonStats.isEOF = isEOF();
+        return new PlanStageStats(_commonStats, STAGE_GEO_NEAR_2D);
     }
 
 }  // namespace mongo

@@ -150,8 +150,9 @@ checkBoundsAndMatch( { $gt:4 }, [[ 4, maxNumber ]], [ 5 ] );
 
 // Multiple constraints within a $elemMatch clause.
 checkBoundsAndMatch( { $gt:4, $lt:6 }, [[ 4, 6 ]], [ 5 ], null, [ 3, 7 ] );
-checkBoundsAndMatch( { $gt:4, $not:{ $gte:6 } }, [[ 4, 6 ]], [ 5 ] );
-checkBoundsAndMatch( { $gt:4, $not:{ $ne:6 } }, [[ 6, 6 ]], [ 6 ] );
+// QUERY_MIGRATION: negation
+//checkBoundsAndMatch( { $gt:4, $not:{ $gte:6 } }, [[ 4, 6 ]], [ 5 ] );
+//checkBoundsAndMatch( { $gt:4, $not:{ $ne:6 } }, [[ 6, 6 ]], [ 6 ] );
 checkBoundsAndMatch( { $gte:5, $lte:5 }, [[ 5, 5 ]], [ 5 ], null, [ 4, 6 ] );
 checkBoundsAndMatch( { $in:[ 4, 6 ], $gt:5 }, [[ 6, 6 ]], [ 6 ], null, [ 4, 7 ] );
 checkBoundsAndMatch( { $regex:'^a' }, [[ 'a', 'b' ], [ /^a/, /^a/ ]], [ 'a' ] );

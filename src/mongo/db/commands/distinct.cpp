@@ -39,17 +39,26 @@
 #include "mongo/db/instance.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/kill_current_op.h"
-#include "mongo/db/query_optimizer.h"
+#include "mongo/db/query/new_find.h"
+#include "mongo/db/query/query_planner_common.h"
+#include "mongo/db/query/type_explain.h"
+#include "mongo/db/query_optimizer.h"  // XXX old sys
+#include "mongo/db/server_options.h"
+#include "mongo/db/server_parameters.h"
 #include "mongo/util/timer.h"
 
 namespace mongo {
 
+    MONGO_EXPORT_SERVER_PARAMETER(newDistinct, bool, true);
+
     class DistinctCommand : public Command {
     public:
         DistinctCommand() : Command("distinct") {}
+
         virtual bool slaveOk() const { return false; }
         virtual bool slaveOverrideOk() const { return true; }
         virtual LockType locktype() const { return READ; }
+
         virtual void addRequiredPrivileges(const std::string& dbname,
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {
@@ -57,11 +66,14 @@ namespace mongo {
             actions.addAction(ActionType::find);
             out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
         }
+
         virtual void help( stringstream &help ) const {
             help << "{ distinct : 'collection name' , key : 'a.b' , query : {} }";
         }
 
-        bool run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
+        bool run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result,
+                 bool fromRepl ) {
+
             Timer t;
             string ns = dbname + '.' + cmdObj.firstElement().valuestr();
 
@@ -80,106 +92,156 @@ namespace mongo {
             long long nscanned = 0; // locations looked at
             long long nscannedObjects = 0; // full objects looked at
             long long n = 0; // matches
-            MatchDetails md;
 
             NamespaceDetails * d = nsdetails( ns );
 
-            if ( ! d ) {
+            string cursorName;
+
+            if (!d) {
                 result.appendArray( "values" , BSONObj() );
-                result.append( "stats" , BSON( "n" << 0 << "nscanned" << 0 << "nscannedObjects" << 0 ) );
+                result.append("stats", BSON("n" << 0 <<
+                                            "nscanned" << 0 <<
+                                            "nscannedObjects" << 0));
                 return true;
             }
 
-            shared_ptr<Cursor> cursor;
-            if ( ! query.isEmpty() ) {
-                cursor = getOptimizedCursor( ns.c_str(), query, BSONObj() );
+            if (newDistinct) {
+                CanonicalQuery* cq;
+                // XXX: project out just the field we're distinct-ing.  May be covered.
+                if (!CanonicalQuery::canonicalize(ns, query, &cq).isOK()) {
+                    uasserted(17215, "Can't canonicalize query " + query.toString());
+                    return 0;
+                }
+
+                Runner* rawRunner;
+                if (!getRunner(cq, &rawRunner).isOK()) {
+                    uasserted(17216, "Can't get runner for query " + query.toString());
+                    return 0;
+                }
+
+                auto_ptr<Runner> runner(rawRunner);
+                auto_ptr<DeregisterEvenIfUnderlyingCodeThrows> safety;
+                ClientCursor::registerRunner(runner.get());
+                runner->setYieldPolicy(Runner::YIELD_AUTO);
+                safety.reset(new DeregisterEvenIfUnderlyingCodeThrows(runner.get()));
+
+                BSONObj obj;
+                Runner::RunnerState state;
+                while (Runner::RUNNER_ADVANCED == (state = runner->getNext(&obj, NULL))) {
+                    BSONElementSet elts;
+                    obj.getFieldsDotted(key, elts);
+
+                    for (BSONElementSet::iterator it = elts.begin(); it != elts.end(); ++it) {
+                        BSONElement elt = *it;
+                        if (values.count(elt)) { continue; }
+                        int currentBufPos = bb.len();
+
+                        uassert(17217, "distinct too big, 16mb cap",
+                                (currentBufPos + elt.size() + 1024) < bufSize);
+
+                        arr.append(elt);
+                        BSONElement x(start + currentBufPos);
+                        values.insert(x);
+                    }
+                }
+                TypeExplain* bareExplain;
+                Status res = runner->getExplainPlan(&bareExplain);
+                if (res.isOK()) {
+                    auto_ptr<TypeExplain> explain(bareExplain);
+                    cursorName = explain->getCursor();
+                    n = explain->getN();
+                    nscanned = explain->getNScanned();
+                    nscannedObjects = explain->getNScannedObjects();
+                }
             }
             else {
-
-                // query is empty, so lets see if we can find an index
-                // with the key so we don't have to hit the raw data
-                NamespaceDetails::IndexIterator ii = d->ii();
-                while ( ii.more() ) {
-                    IndexDetails& idx = ii.next();
-
-                    if ( d->isMultikey( ii.pos() - 1 ) )
-                        continue;
-
-                    if ( idx.inKeyPattern( key ) ) {
-                        cursor = getBestGuessCursor( ns.c_str(), BSONObj(), idx.keyPattern() );
-                        if( cursor.get() ) break;
-                    }
-
+                shared_ptr<Cursor> cursor;
+                if ( ! query.isEmpty() ) {
+                    cursor = getOptimizedCursor( ns.c_str(), query, BSONObj() );
                 }
-
-                if ( ! cursor.get() )
-                    cursor = getOptimizedCursor(ns.c_str() , query , BSONObj() );
-
-            }
-
-            
-            verify( cursor );
-            string cursorName = cursor->toString();
-            
-            auto_ptr<ClientCursor> cc (new ClientCursor(QueryOption_NoCursorTimeout, cursor, ns));
-
-            // map from indexed field to offset in key object
-            map<string, int> indexedFields;  
-            if (!cursor->modifiedKeys()) {
-                // store index information so we can decide if we can
-                // get something out of the index key rather than full object
-
-                int x = 0;
-                BSONObjIterator i( cursor->indexKeyPattern() );
-                while ( i.more() ) {
-                    BSONElement e = i.next();
-                    if ( e.isNumber() ) {
-                        // only want basic index fields, not "2d" etc
-                        indexedFields[e.fieldName()] = x;
-                    }
-                    x++;
-                }
-            }
-
-            while ( cursor->ok() ) {
-                nscanned++;
-                bool loadedRecord = false;
-
-                if ( cursor->currentMatches( &md ) && !cursor->getsetdup( cursor->currLoc() ) ) {
-                    n++;
-
-                    BSONObj holder;
-                    BSONElementSet temp;
-                    // Try to get the record from the key fields.
-                    loadedRecord = !getFieldsDotted(indexedFields, cursor, key, temp, holder);
-
-                    for ( BSONElementSet::iterator i=temp.begin(); i!=temp.end(); ++i ) {
-                        BSONElement e = *i;
-                        if ( values.count( e ) )
+                else {
+                    // query is empty, so lets see if we can find an index
+                    // with the key so we don't have to hit the raw data
+                    NamespaceDetails::IndexIterator ii = d->ii();
+                    while ( ii.more() ) {
+                        IndexDetails& idx = ii.next();
+                        if ( d->isMultikey( ii.pos() - 1 ) )
                             continue;
 
-                        int now = bb.len();
+                        if ( idx.inKeyPattern( key ) ) {
+                            cursor = getBestGuessCursor( ns.c_str(), BSONObj(), idx.keyPattern() );
+                            if( cursor.get() ) break;
+                        }
+                    }
+                    if ( ! cursor.get() )
+                        cursor = getOptimizedCursor(ns.c_str() , query , BSONObj() );
+                }
+            
+                verify( cursor );
+                cursorName = cursor->toString();
 
-                        uassert(10044,  "distinct too big, 16mb cap", ( now + e.size() + 1024 ) < bufSize );
+                auto_ptr<ClientCursor> cc(
+                    new ClientCursor(QueryOption_NoCursorTimeout, cursor, ns));
 
-                        arr.append( e );
-                        BSONElement x( start + now );
+                // map from indexed field to offset in key object
+                map<string, int> indexedFields;  
+                if (!cursor->modifiedKeys()) {
+                    // store index information so we can decide if we can
+                    // get something out of the index key rather than full object
 
-                        values.insert( x );
+                    int x = 0;
+                    BSONObjIterator i( cursor->indexKeyPattern() );
+                    while ( i.more() ) {
+                        BSONElement e = i.next();
+                        if ( e.isNumber() ) {
+                            // only want basic index fields, not "2d" etc
+                            indexedFields[e.fieldName()] = x;
+                        }
+                        x++;
                     }
                 }
 
-                if ( loadedRecord || md.hasLoadedRecord() )
-                    nscannedObjects++;
+                while ( cursor->ok() ) {
+                    nscanned++;
+                    bool loadedRecord = false;
+                    MatchDetails md;
 
-                cursor->advance();
+                    if (cursor->currentMatches( &md ) && !cursor->getsetdup( cursor->currLoc() ) ) {
+                        n++;
 
-                if (!cc->yieldSometimes( ClientCursor::MaybeCovered )) {
-                    cc.release();
-                    break;
+                        BSONObj holder;
+                        BSONElementSet temp;
+                        // Try to get the record from the key fields.
+                        loadedRecord = !getFieldsDotted(indexedFields, cursor, key, temp, holder);
+
+                        for ( BSONElementSet::iterator i=temp.begin(); i!=temp.end(); ++i ) {
+                            BSONElement e = *i;
+                            if ( values.count( e ) )
+                                continue;
+
+                            int now = bb.len();
+
+                            uassert(10044, "distinct too big, 16mb cap",
+                                    ( now + e.size() + 1024 ) < bufSize );
+
+                            arr.append( e );
+                            BSONElement x( start + now );
+                            values.insert( x );
+                        }
+                    }
+
+                    if ( loadedRecord || md.hasLoadedRecord() )
+                        nscannedObjects++;
+
+                    cursor->advance();
+
+                    if (!cc->yieldSometimes( ClientCursor::MaybeCovered )) {
+                        cc.release();
+                        break;
+                    }
+
+                    RARELY killCurrentOp.checkForInterrupt();
                 }
-
-                RARELY killCurrentOp.checkForInterrupt();
             }
 
             verify( start == bb.buf() );

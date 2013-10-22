@@ -67,6 +67,24 @@ namespace mongo {
 
     // static
     Status CanonicalQuery::canonicalize(const string& ns, const BSONObj& query,
+                                        long long skip, long long limit,
+                                        CanonicalQuery** out) {
+        LiteParsedQuery* lpq;
+        // Pass empty sort and projection.
+        BSONObj emptyObj;
+        Status parseStatus = LiteParsedQuery::make(ns, skip, limit, 0, query, emptyObj, emptyObj, &lpq);
+        if (!parseStatus.isOK()) { return parseStatus; }
+
+        auto_ptr<CanonicalQuery> cq(new CanonicalQuery());
+        Status initStatus = cq->init(lpq);
+        if (!initStatus.isOK()) { return initStatus; }
+
+        *out = cq.release();
+        return Status::OK();
+    }
+
+    // static
+    Status CanonicalQuery::canonicalize(const string& ns, const BSONObj& query,
                                         const BSONObj& sort, const BSONObj& proj,
                                         CanonicalQuery** out) {
         LiteParsedQuery* lpq;
@@ -236,9 +254,12 @@ namespace mongo {
     }
 
     string CanonicalQuery::toString() const {
-        return "ns = " + _pq->ns()
-               + "\nTree: " + _root->toString()
-               + "\nSort: " + _pq->getSort().toString();
+        stringstream ss;
+        ss << "ns=" << _pq->ns() << " limit=" << _pq->getNumToReturn() << " skip=" << _pq->getSkip() << endl;
+        ss << "Tree: " << _root->toString() << endl;
+        ss << "Sort: " << _pq->getSort().toString() << endl;
+        ss << "Proj: " << _pq->getProj().toString() << endl;
+        return ss.str();
     }
 
 }  // namespace mongo

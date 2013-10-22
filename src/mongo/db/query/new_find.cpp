@@ -142,14 +142,6 @@ namespace mongo {
             return false;
         }
 
-        // Negations.
-        if (QueryPlannerCommon::hasNode(cq->root(), MatchExpression::NOT)
-            || QueryPlannerCommon::hasNode(cq->root(), MatchExpression::NOR)) {
-
-            QLOG() << "rejecting query w/negation\n";
-            return false;
-        }
-
         // Obscure arguments to .find().
         if (pq.returnKey() || pq.showDiskLoc() || (0 != pq.getMaxScan()) || !pq.getMin().isEmpty()
             || !pq.getMax().isEmpty()) {
@@ -239,8 +231,7 @@ namespace mongo {
 
         // We cannot figure out how to answer the query.  Should this ever happen?
         if (0 == solutions.size()) {
-            return Status(ErrorCodes::BadValue, "Can't create a plan for the canonical query " +
-                                                 canonicalQuery->toString());
+            return Status(ErrorCodes::BadValue, "No query solutions");
         }
 
         if (1 == solutions.size()) {
@@ -445,25 +436,6 @@ namespace mongo {
         return qr;
     }
 
-    /**
-     * RAII approach to ensuring that runners are deregistered in newRunQuery.
-     *
-     * While retrieving the first bach of results, newRunQuery manually registers the runner with
-     * ClientCursor.  Certain query execution paths, namely $where, can throw an exception.  If we
-     * fail to deregister the runner, we will call invalidate/kill on the
-     * still-registered-yet-deleted runner.
-     *
-     * For any subsequent calls to getMore, the runner is already registered with ClientCursor
-     * by virtue of being cached, so this exception-proofing is not required.
-     */
-    struct DeregisterEvenIfUnderlyingCodeThrows {
-        DeregisterEvenIfUnderlyingCodeThrows(Runner* runner) : _runner(runner) { }
-        ~DeregisterEvenIfUnderlyingCodeThrows() {
-            ClientCursor::deregisterRunner(_runner);
-        }
-        Runner* _runner;
-    };
-
     Status getOplogStartHack(CanonicalQuery* cq, Runner** runnerOut) {
         // Make an oplog start finding stage.
         WorkingSet* oplogws = new WorkingSet();
@@ -547,7 +519,7 @@ namespace mongo {
         }
 
         if (!status.isOK()) {
-            uasserted(17007, "Couldn't process query " + cqStr + " why: " + status.reason());
+            uasserted(17007, "Couldn't get runner for query because: " + status.reason() + " query is " + cqStr);
         }
 
         verify(NULL != rawRunner);

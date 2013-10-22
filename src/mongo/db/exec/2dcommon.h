@@ -126,8 +126,8 @@ namespace twod_exec {
 
         void advance();
 
-        void save() { _scan->prepareToYield(); }
-        void restore() { _scan->recoverFromYield(); }
+        void prepareToYield() { _scan->prepareToYield(); }
+        void recoverFromYield() { _scan->recoverFromYield(); }
 
         // Returns the min and max keys which bound a particular location.
         // The only time these may be equal is when we actually equal the location
@@ -238,38 +238,7 @@ namespace twod_exec {
 
         void notePrefix() { _expPrefixes.push_back(_prefix); }
 
-        void invalidate(const DiskLoc& dl) {
-            if (ok()) {
-                list<GeoPoint>::iterator it = _stack.begin();
-                while (it != _stack.end()) {
-                    if (it->_loc == dl) {
-                        list<GeoPoint>::iterator old = it;
-                        it++;
-                        _stack.erase(old);
-                    }
-                    else {
-                        it++;
-                    }
-                }
-                if (ok() && _cur._loc == dl) {
-                    advance();
-                }
-                if (!_min.eof() && _min._loc == dl) {
-                    _min.restore();
-                    while (_min._loc == dl && !_min.eof()) {
-                        _min.advance();
-                    }
-                    _min.save();
-                }
-                while (!_max.eof() && _max._loc == dl) {
-                    _max.restore();
-                    while (_max._loc == dl && !_max.eof()) {
-                        _max.advance();
-                    }
-                    _max.save();
-                }
-            }
-        }
+        void invalidate(const DiskLoc& dl);
 
         string _type;
         list<GeoPoint> _stack;

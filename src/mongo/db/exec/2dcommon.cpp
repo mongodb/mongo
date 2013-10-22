@@ -138,6 +138,7 @@ namespace twod_exec {
                 continue;
             }
             else {
+                // Error or EOF.  Either way, stop.
                 _eof = true;
                 return;
             }
@@ -148,50 +149,6 @@ namespace twod_exec {
         _key = wsm->keyData[0].keyData;
         _loc = wsm->loc;
         _ws->free(id);
-    }
-
-    static BSONObj makeKey(const GeoHash& hash, BSONObj keyPattern, int scanDirection) {
-        BSONObjBuilder bob;
-
-        BSONObjIterator it(keyPattern);
-
-        BSONObj hashWrap = hash.wrap();
-
-        // First field is always the hash
-        it.next();
-        bob.appendAs(hashWrap.firstElement(), "");
-
-        while (it.more()) {
-            BSONElement elt = it.next();
-            int direction = elt.numberInt() >= 0 ? 1 : -1;
-            direction *= scanDirection;
-            if (-1 == direction) {
-                bob.appendMaxKey("");
-            }
-            else {
-                bob.appendMinKey("");
-            }
-        }
-
-        return bob.obj();
-    }
-
-    static BSONObj makeEndKey(const BSONObj& keyPattern, int scanDirection) {
-        BSONObjIterator it(keyPattern);
-
-        BSONObjBuilder bob;
-        while (it.more()) {
-            BSONElement elt = it.next();
-            int direction = elt.numberInt() >= 0 ? 1 : -1;
-            direction *= scanDirection;
-            if (1 == direction) {
-                bob.appendMaxKey("");
-            }
-            else {
-                bob.appendMinKey("");
-            }
-        }
-        return bob.obj();
     }
 
     // Returns the min and max keys which bound a particular location.
@@ -205,6 +162,8 @@ namespace twod_exec {
         min._eof = false;
         max._eof = false;
 
+        // Add the range for the 2d indexed field to the keys used.
+
         // Two scans: one for min one for max.
         IndexScanParams minParams;
         minParams.direction = -1;
@@ -212,29 +171,30 @@ namespace twod_exec {
         minParams.descriptor = descriptor->clone();
         minParams.bounds.fields.resize(descriptor->keyPattern().nFields());
         minParams.doNotDedup = true;
-        // First field goes (MINKEY, start] (in reverse)
-        BSONObjBuilder firstbob;
-        firstbob.appendMinKey("");
-        start.appendToBuilder(&firstbob, "");
-        minParams.bounds.fields[0].intervals.push_back(Interval(firstbob.obj(), false, true));
+        // First field of start key goes (MINKEY, start] (in reverse)
+        BSONObjBuilder firstBob;
+        firstBob.appendMinKey("");
+        start.appendToBuilder(&firstBob, "");
+        minParams.bounds.fields[0].intervals.push_back(Interval(firstBob.obj(), false, true));
 
         IndexScanParams maxParams;
         maxParams.forceBtreeAccessMethod = true;
         maxParams.direction = 1;
         maxParams.descriptor = descriptor->clone();
         maxParams.bounds.fields.resize(descriptor->keyPattern().nFields());
-        // XXX???
+        // Don't have the ixscan dedup since we want dup DiskLocs because of multi-point docs.
         maxParams.doNotDedup = true;
-        // First field goes (start, MAXKEY)
-        BSONObjBuilder secondbob;
-        start.appendToBuilder(&secondbob, "");
-        secondbob.appendMaxKey("");
-        maxParams.bounds.fields[0].intervals.push_back(Interval(secondbob.obj(), false, false));
+        // First field of end key goes (start, MAXKEY)
+        BSONObjBuilder secondBob;
+        start.appendToBuilder(&secondBob, "");
+        secondBob.appendMaxKey("");
+        maxParams.bounds.fields[0].intervals.push_back(Interval(secondBob.obj(), false, false));
 
         BSONObjIterator it(descriptor->keyPattern());
         BSONElement kpElt = it.next();
         maxParams.bounds.fields[0].name = kpElt.fieldName();
         minParams.bounds.fields[0].name = kpElt.fieldName();
+        // Fill out the non-2d indexed fields with the "all values" interval, aligned properly.
         size_t idx = 1;
         while (it.more()) {
             kpElt = it.next();
@@ -341,16 +301,16 @@ namespace twod_exec {
 
     void GeoBrowse::noteLocation() {
         // Remember where our _max, _min are
-        _min.save();
-        _max.save();
+        _min.prepareToYield();
+        _max.prepareToYield();
     }
 
     /* called before query getmore block is iterated */
     void GeoBrowse::checkLocation() {
         // We can assume an error was thrown earlier if this database somehow disappears
         // Recall our _max, _min
-        _min.restore();
-        _max.restore();
+        _min.recoverFromYield();
+        _max.recoverFromYield();
     }
 
     Record* GeoBrowse::_current() { verify(ok()); return _cur._loc.rec(); }
@@ -615,6 +575,42 @@ namespace twod_exec {
         // b << "pointsSavedForYield" << _nDirtied;
         // b << "pointsChangedOnYield" << _nChangedOnYield;
         // b << "pointsRemovedOnYield" << _nRemovedOnYield;
+    }
+
+    void GeoBrowse::invalidate(const DiskLoc& dl) {
+        if (_firstCall) { return; }
+
+        if (_cur._loc == dl) {
+            advance();
+        }
+
+        list<GeoPoint>::iterator it = _stack.begin();
+        while (it != _stack.end()) {
+            if (it->_loc == dl) {
+                list<GeoPoint>::iterator old = it;
+                it++;
+                _stack.erase(old);
+            }
+            else {
+                it++;
+            }
+        }
+
+        if (!_min.eof() && _min._loc == dl) {
+            _min.recoverFromYield();
+            while (_min._loc == dl && !_min.eof()) {
+                _min.advance();
+            }
+            _min.prepareToYield();
+        }
+
+        if (!_max.eof() && _max._loc == dl) {
+            _max.recoverFromYield();
+            while (_max._loc == dl && !_max.eof()) {
+                _max.advance();
+            }
+            _max.prepareToYield();
+        }
     }
 
 }  // namespace twod_exec

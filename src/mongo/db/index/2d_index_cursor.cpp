@@ -444,7 +444,6 @@ namespace mongo {
         static const shared_ptr<CoveredIndexMatcher> otherEmptyMatcher;
         virtual void noteLocation() { }
         virtual void checkLocation() { }
-        // XXX: near doesn't support this.
         virtual bool supportGetMore() { return false; }
         virtual string toString() = 0;
     };
