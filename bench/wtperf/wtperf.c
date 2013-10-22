@@ -851,7 +851,7 @@ main(int argc, char *argv[])
 	WT_SESSION *parse_session;
 	pthread_t checkpoint_thread, stat_thread;
 	uint64_t req_len;
-	int ch, ret;
+	int ch, checkpoint_created, stat_created, ret;
 	const char *user_cconfig, *user_tconfig;
 	const char *opts = "C:O:T:h:o:SML";
 	char *cc_buf, *tc_buf, *opt_home;
@@ -862,7 +862,7 @@ main(int argc, char *argv[])
 	cc_buf = opt_home = tc_buf = NULL;
 	user_cconfig = user_tconfig = NULL;
 	conn = NULL;
-	checkpoint_thread = stat_thread = NULL;
+	checkpoint_created = stat_created = 0;
 	parse_session = NULL;
 
 	/*
@@ -1039,17 +1039,23 @@ main(int argc, char *argv[])
 	cfg.conn = conn;
 
 	g_util_running = 1;
-	if (cfg.stat_interval != 0 &&
-	    (ret = pthread_create(
-	    &stat_thread, NULL, stat_worker, &cfg)) != 0) {
-		lprintf(&cfg, ret, 0, "Error creating statistics thread.");
-		goto err;
+	if (cfg.stat_interval != 0) {
+		if ((ret = pthread_create(
+		    &stat_thread, NULL, stat_worker, &cfg)) != 0) {
+			lprintf(
+			    &cfg, ret, 0, "Error creating statistics thread.");
+			goto err;
+		}
+		stat_created = 1;
 	}
-	if (cfg.checkpoint_interval != 0 &&
-	    (ret = pthread_create(
-	    &checkpoint_thread, NULL, checkpoint_worker, &cfg)) != 0) {
-		lprintf(&cfg, ret, 0, "Error creating checkpoint thread.");
-		goto err;
+	if (cfg.checkpoint_interval != 0) {
+		if ((ret = pthread_create(
+		    &checkpoint_thread, NULL, checkpoint_worker, &cfg)) != 0) {
+			lprintf(
+			    &cfg, ret, 0, "Error creating checkpoint thread.");
+			goto err;
+		}
+		checkpoint_created = 1;
 	}
 	if (cfg.create != 0 && execute_populate(&cfg) != 0)
 		goto err;
@@ -1082,10 +1088,11 @@ err:	g_util_running = 0;
 
 	if (parse_session != NULL)
 		assert(parse_session->close(parse_session, NULL) == 0);
-	if (checkpoint_thread != NULL &&
+	if (checkpoint_created != 0 &&
 	    (ret = pthread_join(checkpoint_thread, NULL)) != 0)
 		lprintf(&cfg, ret, 0, "Error joining checkpoint thread.");
-	if (stat_thread != NULL && (ret = pthread_join(stat_thread, NULL)) != 0)
+	if (stat_created != 0 &&
+	    (ret = pthread_join(stat_thread, NULL)) != 0)
 		lprintf(&cfg, ret, 0, "Error joining stat thread.");
 	if (conn != NULL && (ret = conn->close(conn, NULL)) != 0)
 		lprintf(&cfg, ret, 0,
