@@ -189,6 +189,49 @@ namespace mongo {
         return Status::OK();
     }
 
+    /*
+     * Checks that every role in "rolesToAdd" exists, and that adding each of those roles to "role"
+     * will not result in a cycle to the role graph.
+     */
+    static Status checkOkayToGrantRolesToRole(const RoleName& role,
+                                              const std::vector<RoleName> rolesToAdd,
+                                              AuthorizationManager* authzManager) {
+        for (vector<RoleName>::const_iterator it = rolesToAdd.begin();
+                it != rolesToAdd.end(); ++it) {
+            const RoleName& roleToAdd = *it;
+            if (roleToAdd == role) {
+                return Status(ErrorCodes::InvalidRoleModification,
+                              mongoutils::str::stream() << "Cannot grant role " <<
+                                      role.getFullName() << " to itself.");
+            }
+            BSONObj roleToAddDoc;
+            Status status = authzManager->getRoleDescription(roleToAdd, &roleToAddDoc);
+            if (status == ErrorCodes::RoleNotFound) {
+                return Status(ErrorCodes::RoleNotFound,
+                              "Cannot grant nonexistent role " + roleToAdd.toString());
+            }
+            if (!status.isOK()) {
+                return status;
+            }
+            std::vector<RoleName> indirectRoles;
+            status = auth::parseRoleNamesFromBSONArray(
+                    BSONArray(roleToAddDoc["indirectRoles"].Obj()),
+                    role.getDB(),
+                    &indirectRoles);
+            if (!status.isOK()) {
+                return status;
+            }
+
+            if (sequenceContains(indirectRoles, role)) {
+                return Status(ErrorCodes::InvalidRoleModification,
+                              mongoutils::str::stream() << "Granting" <<
+                                      roleToAdd.getFullName() << " to " << role.getFullName()
+                                      << " would introduce a cycle in the role graph.");
+            }
+        }
+        return Status::OK();
+    }
+
     class CmdCreateUser : public Command {
     public:
 
@@ -1131,13 +1174,10 @@ namespace mongo {
             }
 
             // Role existence has to be checked after acquiring the update lock
-            for (size_t i = 0; i < args.roles.size(); ++i) {
-                BSONObj ignored;
-                status = authzManager->getRoleDescription(args.roles[i], &ignored);
-                if (!status.isOK()) {
-                    addStatus(status, result);
-                    return false;
-                }
+            status = checkOkayToGrantRolesToRole(args.roleName, args.roles, authzManager);
+            if (!status.isOK()) {
+                addStatus(status, result);
+                return false;
             }
 
             audit::logCreateRole(ClientBasic::getCurrent(),
@@ -1253,15 +1293,19 @@ namespace mongo {
                 return false;
             }
 
+            // Role existence has to be checked after acquiring the update lock
+            BSONObj ignored;
+            status = authzManager->getRoleDescription(args.roleName, &ignored);
+            if (!status.isOK()) {
+                addStatus(status, result);
+                return false;
+            }
+
             if (args.hasRoles) {
-                // Role existence has to be checked after acquiring the update lock
-                for (size_t i = 0; i < args.roles.size(); ++i) {
-                    BSONObj ignored;
-                    status = authzManager->getRoleDescription(args.roles[i], &ignored);
-                    if (!status.isOK()) {
-                        addStatus(status, result);
-                        return false;
-                    }
+                status = checkOkayToGrantRolesToRole(args.roleName, args.roles, authzManager);
+                if (!status.isOK()) {
+                    addStatus(status, result);
+                    return false;
                 }
             }
 
@@ -1619,14 +1663,6 @@ namespace mongo {
                  string& errmsg,
                  BSONObjBuilder& result,
                  bool fromRepl) {
-            AuthorizationManager* authzManager = getGlobalAuthorizationManager();
-            AuthzDocumentsUpdateGuard updateGuard(authzManager);
-            if (!updateGuard.tryLock("Grant roles to role")) {
-                addStatus(Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."),
-                          result);
-                return false;
-            }
-
             std::string roleNameString;
             std::vector<RoleName> rolesToAdd;
             BSONObj writeConcern;
@@ -1651,6 +1687,15 @@ namespace mongo {
                 return false;
             }
 
+            AuthorizationManager* authzManager = getGlobalAuthorizationManager();
+            AuthzDocumentsUpdateGuard updateGuard(authzManager);
+            if (!updateGuard.tryLock("Grant roles to role")) {
+                addStatus(Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."),
+                          result);
+                return false;
+            }
+
+            // Role existence has to be checked after acquiring the update lock
             BSONObj roleDoc;
             status = authzManager->getRoleDescription(roleName, &roleDoc);
             if (!status.isOK()) {
@@ -1658,54 +1703,35 @@ namespace mongo {
                 return false;
             }
 
-            std::vector<RoleName> roles;
+            // Check for cycles
+            status = checkOkayToGrantRolesToRole(roleName, rolesToAdd, authzManager);
+            if (!status.isOK()) {
+                addStatus(status, result);
+                return false;
+            }
+
+            // Add new roles to existing roles
+            std::vector<RoleName> directRoles;
             status = auth::parseRoleNamesFromBSONArray(BSONArray(roleDoc["roles"].Obj()),
                                                        roleName.getDB(),
-                                                       &roles);
-
+                                                       &directRoles);
+            if (!status.isOK()) {
+                addStatus(status, result);
+                return false;
+            }
             for (vector<RoleName>::iterator it = rolesToAdd.begin(); it != rolesToAdd.end(); ++it) {
                 const RoleName& roleToAdd = *it;
-                if (sequenceContains(roles, roleToAdd))
-                    continue;
-                BSONObj roleToAddDoc;
-                status = authzManager->getRoleDescription(roleToAdd, &roleToAddDoc);
-                if (status == ErrorCodes::RoleNotFound) {
-                    addStatus(Status(ErrorCodes::RoleNotFound,
-                                     "Cannot grant nonexistent role " + roleToAdd.toString()),
-                              result);
-                    return false;
-                }
-                if (!status.isOK()) {
-                    addStatus(status, result);
-                    return false;
-                }
-                std::vector<RoleName> indirectSubordinatesOfToAdd;
-                status = auth::parseRoleNamesFromBSONArray(
-                        BSONArray(roleDoc["indirectRoles"].Obj()),
-                        roleName.getDB(),
-                        &indirectSubordinatesOfToAdd);
-                if (!status.isOK()) {
-                    addStatus(status, result);
-                    return false;
-                }
-                if (sequenceContains(indirectSubordinatesOfToAdd, roleName)) {
-                    addStatus(Status(ErrorCodes::InvalidRoleModification,
-                                     mongoutils::str::stream() <<"Adding " <<
-                                     roleToAdd.getFullName() << " to " << roleName.getFullName() <<
-                                     " would introduce a cycle in the role graph."),
-                              result);
-                    return false;
-                }
-                roles.push_back(*it);
+                if (!sequenceContains(directRoles, roleToAdd)) // Don't double-add role
+                    directRoles.push_back(*it);
             }
 
             audit::logGrantRolesToRole(ClientBasic::getCurrent(),
                                        roleName,
-                                       roles);
+                                       directRoles);
 
             status = authzManager->updateRoleDocument(
                     roleName,
-                    BSON("$set" << BSON("roles" << rolesVectorToBSONArray(roles))),
+                    BSON("$set" << BSON("roles" << rolesVectorToBSONArray(directRoles))),
                     writeConcern);
             if (!status.isOK()) {
                 addStatus(status, result);
