@@ -8,4 +8,3 @@ populate_threads=1
 read_threads=16
 insert_threads=0
 update_threads=0
-verbose=1

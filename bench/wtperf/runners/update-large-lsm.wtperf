@@ -10,4 +10,3 @@ populate_threads=10
 read_threads=10
 insert_threads=2
 update_threads=2
-verbose=1

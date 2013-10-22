@@ -122,7 +122,7 @@ DEF_OPT_AS_CONFIG_STRING(transaction_config, "",
     "relevant when populate_opts_per_txn is nonzero")
 DEF_OPT_AS_UINT32(update_threads, 0, "number of update threads")
 DEF_OPT_AS_STRING(table_name, "test", "table name")
-DEF_OPT_AS_UINT32(verbose, 0, "verbosity")
+DEF_OPT_AS_UINT32(verbose, 1, "verbosity")
 
 #undef DEF_OPT_AS_STRING
 #undef DEF_OPT_AS_CONFIG_STRING
