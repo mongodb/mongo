@@ -365,10 +365,10 @@ namespace mongo {
                 memoryUsageBytes = 0;
             }
 
-            const Variables vars(*input);
+            Variables vars(*input);
 
             /* get the _id value */
-            Value id = pIdExpression->evaluate(vars);
+            Value id = pIdExpression->evaluate(&vars);
 
             /* treat missing values the same as NULL SERVER-4674 */
             if (id.missing())
@@ -400,7 +400,7 @@ namespace mongo {
             /* tickle all the accumulators for the group we found */
             dassert(numAccumulators == group.size());
             for (size_t i = 0; i < numAccumulators; i++) {
-                group[i]->process(vpExpression[i]->evaluate(vars), _doingMerge);
+                group[i]->process(vpExpression[i]->evaluate(&vars), _doingMerge);
                 memoryUsageBytes += group[i]->memUsageForSorter();
             }
 

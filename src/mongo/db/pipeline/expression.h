@@ -45,7 +45,7 @@ namespace mongo {
     class DocumentSource;
 
     // TODO: Look into merging with ExpressionContext and possibly ObjectCtx.
-    /// The state used as input to Expressions
+    /// The state used as input and working space for Expressions.
     class Variables {
     public:
         /**
@@ -154,12 +154,19 @@ namespace mongo {
          */
         virtual Value serialize(bool explain) const = 0;
 
-        /// Evaluate expression with specified inputs and return result.
-        Value evaluate(const Document& root) const { return evaluate(Variables(root)); }
-        Value evaluate(const Document& root, const Value& current) const {
-            return evaluate(Variables(root, current));
+        /// Evaluate expression with specified inputs and return result. (only used by tests)
+        Value evaluate(const Document& root) const {
+            Variables vars(root);
+            return evaluate(&vars);
         }
-        Value evaluate(const Variables& vars) const { return evaluateInternal(vars); }
+
+        /**
+         * Evaluate expression with specified inputs and return result.
+         *
+         * While vars is non-const, if properly constructed, subexpressions modifications to it
+         * should not effect outer expressions due to unique variable Ids.
+         */
+        Value evaluate(Variables* vars) const { return evaluateInternal(vars); }
 
         /*
           Utility class for parseObject() below.
@@ -237,7 +244,7 @@ namespace mongo {
          *  Should only be called by subclasses, but can't be protected because they need to call
          *  this function on each other.
          */
-        virtual Value evaluateInternal(const Variables& vars) const = 0;
+        virtual Value evaluateInternal(Variables* vars) const = 0;
 
     protected:
         typedef vector<intrusive_ptr<Expression> > ExpressionVector;
@@ -321,7 +328,7 @@ namespace mongo {
     class ExpressionAdd : public ExpressionVariadic<ExpressionAdd> {
     public:
         // virtuals from Expression
-        virtual Value evaluateInternal(const Variables& vars) const;
+        virtual Value evaluateInternal(Variables* vars) const;
         virtual const char *getOpName() const;
         virtual bool isAssociativeAndCommutative() const { return true; }
     };
@@ -330,7 +337,7 @@ namespace mongo {
     class ExpressionAllElementsTrue : public ExpressionFixedArity<ExpressionAllElementsTrue, 1> {
     public:
         // virtuals from ExpressionNary
-        virtual Value evaluateInternal(const Variables& vars) const;
+        virtual Value evaluateInternal(Variables* vars) const;
         virtual const char *getOpName() const;
     };
 
@@ -339,7 +346,7 @@ namespace mongo {
     public:
         // virtuals from Expression
         virtual intrusive_ptr<Expression> optimize();
-        virtual Value evaluateInternal(const Variables& vars) const;
+        virtual Value evaluateInternal(Variables* vars) const;
         virtual const char *getOpName() const;
         virtual bool isAssociativeAndCommutative() const { return true; }
     };
@@ -348,7 +355,7 @@ namespace mongo {
     class ExpressionAnyElementTrue : public ExpressionFixedArity<ExpressionAnyElementTrue, 1> {
     public:
         // virtuals from ExpressionNary
-        virtual Value evaluateInternal(const Variables& vars) const;
+        virtual Value evaluateInternal(Variables* vars) const;
         virtual const char *getOpName() const;
     };
 
@@ -358,7 +365,7 @@ namespace mongo {
         // virtuals from ExpressionNary
         virtual intrusive_ptr<Expression> optimize();
         virtual void addDependencies(set<string>& deps, vector<string>* path=NULL) const;
-        virtual Value evaluateInternal(const Variables& vars) const;
+        virtual Value evaluateInternal(Variables* vars) const;
         virtual Value serialize(bool explain) const;
 
         static intrusive_ptr<ExpressionCoerceToBool> create(
@@ -389,7 +396,7 @@ namespace mongo {
         };
 
         // virtuals from ExpressionNary
-        virtual Value evaluateInternal(const Variables& vars) const;
+        virtual Value evaluateInternal(Variables* vars) const;
         virtual const char *getOpName() const;
 
         static intrusive_ptr<Expression> parse(
@@ -407,7 +414,7 @@ namespace mongo {
     class ExpressionConcat : public ExpressionVariadic<ExpressionConcat> {
     public:
         // virtuals from ExpressionNary
-        virtual Value evaluateInternal(const Variables& vars) const;
+        virtual Value evaluateInternal(Variables* vars) const;
         virtual const char *getOpName() const;
     };
 
@@ -416,7 +423,7 @@ namespace mongo {
         typedef ExpressionFixedArity<ExpressionCond, 3> Base;
     public:
         // virtuals from ExpressionNary
-        virtual Value evaluateInternal(const Variables& vars) const;
+        virtual Value evaluateInternal(Variables* vars) const;
         virtual const char *getOpName() const;
 
         static intrusive_ptr<Expression> parse(
@@ -430,7 +437,7 @@ namespace mongo {
         // virtuals from Expression
         virtual intrusive_ptr<Expression> optimize();
         virtual void addDependencies(set<string>& deps, vector<string>* path=NULL) const;
-        virtual Value evaluateInternal(const Variables& vars) const;
+        virtual Value evaluateInternal(Variables* vars) const;
         virtual const char *getOpName() const;
         virtual Value serialize(bool explain) const;
 
@@ -456,7 +463,7 @@ namespace mongo {
     class ExpressionDayOfMonth : public ExpressionFixedArity<ExpressionDayOfMonth, 1> {
     public:
         // virtuals from ExpressionNary
-        virtual Value evaluateInternal(const Variables& vars) const;
+        virtual Value evaluateInternal(Variables* vars) const;
         virtual const char *getOpName() const;
     };
 
@@ -464,7 +471,7 @@ namespace mongo {
     class ExpressionDayOfWeek : public ExpressionFixedArity<ExpressionDayOfWeek, 1> {
     public:
         // virtuals from ExpressionNary
-        virtual Value evaluateInternal(const Variables& vars) const;
+        virtual Value evaluateInternal(Variables* vars) const;
         virtual const char *getOpName() const;
     };
 
@@ -472,7 +479,7 @@ namespace mongo {
     class ExpressionDayOfYear : public ExpressionFixedArity<ExpressionDayOfYear, 1> {
     public:
         // virtuals from ExpressionNary
-        virtual Value evaluateInternal(const Variables& vars) const;
+        virtual Value evaluateInternal(Variables* vars) const;
         virtual const char *getOpName() const;
     };
 
@@ -480,7 +487,7 @@ namespace mongo {
     class ExpressionDivide : public ExpressionFixedArity<ExpressionDivide, 2> {
     public:
         // virtuals from ExpressionNary
-        virtual Value evaluateInternal(const Variables& vars) const;
+        virtual Value evaluateInternal(Variables* vars) const;
         virtual const char *getOpName() const;
     };
 
@@ -490,7 +497,7 @@ namespace mongo {
         // virtuals from Expression
         virtual intrusive_ptr<Expression> optimize();
         virtual void addDependencies(set<string>& deps, vector<string>* path=NULL) const;
-        virtual Value evaluateInternal(const Variables& vars) const;
+        virtual Value evaluateInternal(Variables* vars) const;
         virtual Value serialize(bool explain) const;
 
         /*
@@ -552,7 +559,7 @@ namespace mongo {
     class ExpressionHour : public ExpressionFixedArity<ExpressionHour, 1> {
     public:
         // virtuals from ExpressionNary
-        virtual Value evaluateInternal(const Variables& vars) const;
+        virtual Value evaluateInternal(Variables* vars) const;
         virtual const char *getOpName() const;
     };
 
@@ -560,7 +567,7 @@ namespace mongo {
     class ExpressionIfNull : public ExpressionFixedArity<ExpressionIfNull, 2> {
     public:
         // virtuals from ExpressionNary
-        virtual Value evaluateInternal(const Variables& vars) const;
+        virtual Value evaluateInternal(Variables* vars) const;
         virtual const char *getOpName() const;
     };
 
@@ -570,7 +577,7 @@ namespace mongo {
         // virtuals from Expression
         virtual intrusive_ptr<Expression> optimize();
         virtual Value serialize(bool explain) const;
-        virtual Value evaluateInternal(const Variables& vars) const;
+        virtual Value evaluateInternal(Variables* vars) const;
         virtual void addDependencies(set<string>& deps, vector<string>* path=NULL) const;
 
         static intrusive_ptr<Expression> parse(
@@ -603,7 +610,7 @@ namespace mongo {
         // virtuals from Expression
         virtual intrusive_ptr<Expression> optimize();
         virtual Value serialize(bool explain) const;
-        virtual Value evaluateInternal(const Variables& vars) const;
+        virtual Value evaluateInternal(Variables* vars) const;
         virtual void addDependencies(set<string>& deps, vector<string>* path=NULL) const;
 
         static intrusive_ptr<Expression> parse(
@@ -625,7 +632,7 @@ namespace mongo {
     class ExpressionMillisecond : public ExpressionFixedArity<ExpressionMillisecond, 1> {
     public:
         // virtuals from ExpressionNary
-        virtual Value evaluateInternal(const Variables& vars) const;
+        virtual Value evaluateInternal(Variables* vars) const;
         virtual const char* getOpName() const;
     };
 
@@ -633,7 +640,7 @@ namespace mongo {
     class ExpressionMinute : public ExpressionFixedArity<ExpressionMinute, 1> {
     public:
         // virtuals from ExpressionNary
-        virtual Value evaluateInternal(const Variables& vars) const;
+        virtual Value evaluateInternal(Variables* vars) const;
         virtual const char *getOpName() const;
     };
 
@@ -641,7 +648,7 @@ namespace mongo {
     class ExpressionMod : public ExpressionFixedArity<ExpressionMod, 2> {
     public:
         // virtuals from ExpressionNary
-        virtual Value evaluateInternal(const Variables& vars) const;
+        virtual Value evaluateInternal(Variables* vars) const;
         virtual const char *getOpName() const;
     };
     
@@ -649,7 +656,7 @@ namespace mongo {
     class ExpressionMultiply : public ExpressionVariadic<ExpressionMultiply> {
     public:
         // virtuals from Expression
-        virtual Value evaluateInternal(const Variables& vars) const;
+        virtual Value evaluateInternal(Variables* vars) const;
         virtual const char *getOpName() const;
         virtual bool isAssociativeAndCommutative() const { return true; }
     };
@@ -658,7 +665,7 @@ namespace mongo {
     class ExpressionMonth : public ExpressionFixedArity<ExpressionMonth, 1> {
     public:
         // virtuals from ExpressionNary
-        virtual Value evaluateInternal(const Variables& vars) const;
+        virtual Value evaluateInternal(Variables* vars) const;
         virtual const char *getOpName() const;
     };
 
@@ -666,7 +673,7 @@ namespace mongo {
     class ExpressionNot : public ExpressionFixedArity<ExpressionNot, 1> {
     public:
         // virtuals from ExpressionNary
-        virtual Value evaluateInternal(const Variables& vars) const;
+        virtual Value evaluateInternal(Variables* vars) const;
         virtual const char *getOpName() const;
     };
 
@@ -678,11 +685,11 @@ namespace mongo {
         virtual bool isSimple();
         virtual void addDependencies(set<string>& deps, vector<string>* path=NULL) const;
         /** Only evaluates non inclusion expressions.  For inclusions, use addToDocument(). */
-        virtual Value evaluateInternal(const Variables& vars) const;
+        virtual Value evaluateInternal(Variables* vars) const;
         virtual Value serialize(bool explain) const;
 
         /// like evaluate(), but return a Document instead of a Value-wrapped Document.
-        Document evaluateDocument(const Variables& vars) const;
+        Document evaluateDocument(Variables* vars) const;
 
         /** Evaluates with inclusions and adds results to passed in Mutable document
          *
@@ -692,7 +699,7 @@ namespace mongo {
          */
         void addToDocument(MutableDocument& ouput,
                            const Document& currentDoc,
-                           const Variables& vars
+                           Variables* vars
                           ) const;
 
         // estimated number of fields that will be output
@@ -785,7 +792,7 @@ namespace mongo {
     public:
         // virtuals from Expression
         virtual intrusive_ptr<Expression> optimize();
-        virtual Value evaluateInternal(const Variables& vars) const;
+        virtual Value evaluateInternal(Variables* vars) const;
         virtual const char *getOpName() const;
         virtual bool isAssociativeAndCommutative() const { return true; }
     };
@@ -794,7 +801,7 @@ namespace mongo {
     class ExpressionSecond : public ExpressionFixedArity<ExpressionSecond, 1> {
     public:
         // virtuals from ExpressionNary
-        virtual Value evaluateInternal(const Variables& vars) const;
+        virtual Value evaluateInternal(Variables* vars) const;
         virtual const char *getOpName() const;
     };
 
@@ -802,7 +809,7 @@ namespace mongo {
     class ExpressionSetDifference : public ExpressionFixedArity<ExpressionSetDifference, 2> {
     public:
         // virtuals from ExpressionNary
-        virtual Value evaluateInternal(const Variables& vars) const;
+        virtual Value evaluateInternal(Variables* vars) const;
         virtual const char *getOpName() const;
     };
 
@@ -810,7 +817,7 @@ namespace mongo {
     class ExpressionSetEquals : public ExpressionVariadic<ExpressionSetEquals> {
     public:
         // virtuals from ExpressionNary
-        virtual Value evaluateInternal(const Variables& vars) const;
+        virtual Value evaluateInternal(Variables* vars) const;
         virtual const char *getOpName() const;
         virtual void validateArguments(const ExpressionVector& args) const;
     };
@@ -819,7 +826,7 @@ namespace mongo {
     class ExpressionSetIntersection : public ExpressionVariadic<ExpressionSetIntersection> {
     public:
         // virtuals from ExpressionNary
-        virtual Value evaluateInternal(const Variables& vars) const;
+        virtual Value evaluateInternal(Variables* vars) const;
         virtual const char *getOpName() const;
         virtual bool isAssociativeAndCommutative() const { return true; }
     };
@@ -828,7 +835,7 @@ namespace mongo {
     class ExpressionSetIsSubset : public ExpressionFixedArity<ExpressionSetIsSubset, 2> {
     public:
         // virtuals from ExpressionNary
-        virtual Value evaluateInternal(const Variables& vars) const;
+        virtual Value evaluateInternal(Variables* vars) const;
         virtual const char *getOpName() const;
     };
 
@@ -837,7 +844,7 @@ namespace mongo {
     public:
         // virtuals from ExpressionNary
         // virtual intrusive_ptr<Expression> optimize();
-        virtual Value evaluateInternal(const Variables& vars) const;
+        virtual Value evaluateInternal(Variables* vars) const;
         virtual const char *getOpName() const;
         virtual bool isAssociativeAndCommutative() const { return true; }
     };
@@ -846,7 +853,7 @@ namespace mongo {
     class ExpressionSize : public ExpressionFixedArity<ExpressionSize, 1> {
     public:
         // virtuals from ExpressionNary
-        virtual Value evaluateInternal(const Variables& vars) const;
+        virtual Value evaluateInternal(Variables* vars) const;
         virtual const char *getOpName() const;
     };
 
@@ -854,7 +861,7 @@ namespace mongo {
     class ExpressionStrcasecmp : public ExpressionFixedArity<ExpressionStrcasecmp, 2> {
     public:
         // virtuals from ExpressionNary
-        virtual Value evaluateInternal(const Variables& vars) const;
+        virtual Value evaluateInternal(Variables* vars) const;
         virtual const char *getOpName() const;
     };
 
@@ -862,7 +869,7 @@ namespace mongo {
     class ExpressionSubstr : public ExpressionFixedArity<ExpressionSubstr, 3> {
     public:
         // virtuals from ExpressionNary
-        virtual Value evaluateInternal(const Variables& vars) const;
+        virtual Value evaluateInternal(Variables* vars) const;
         virtual const char *getOpName() const;
     };
 
@@ -870,7 +877,7 @@ namespace mongo {
     class ExpressionSubtract : public ExpressionFixedArity<ExpressionSubtract, 2> {
     public:
         // virtuals from ExpressionNary
-        virtual Value evaluateInternal(const Variables& vars) const;
+        virtual Value evaluateInternal(Variables* vars) const;
         virtual const char *getOpName() const;
     };
 
@@ -878,7 +885,7 @@ namespace mongo {
     class ExpressionToLower : public ExpressionFixedArity<ExpressionToLower, 1> {
     public:
         // virtuals from ExpressionNary
-        virtual Value evaluateInternal(const Variables& vars) const;
+        virtual Value evaluateInternal(Variables* vars) const;
         virtual const char *getOpName() const;
     };
 
@@ -886,7 +893,7 @@ namespace mongo {
     class ExpressionToUpper : public ExpressionFixedArity<ExpressionToUpper, 1> {
     public:
         // virtuals from ExpressionNary
-        virtual Value evaluateInternal(const Variables& vars) const;
+        virtual Value evaluateInternal(Variables* vars) const;
         virtual const char *getOpName() const;
     };
 
@@ -894,7 +901,7 @@ namespace mongo {
     class ExpressionWeek : public ExpressionFixedArity<ExpressionWeek, 1> {
     public:
         // virtuals from ExpressionNary
-        virtual Value evaluateInternal(const Variables& vars) const;
+        virtual Value evaluateInternal(Variables* vars) const;
         virtual const char *getOpName() const;
     };
 
@@ -902,7 +909,7 @@ namespace mongo {
     class ExpressionYear : public ExpressionFixedArity<ExpressionYear, 1> {
     public:
         // virtuals from ExpressionNary
-        virtual Value evaluateInternal(const Variables& vars) const;
+        virtual Value evaluateInternal(Variables* vars) const;
         virtual const char *getOpName() const;
     };
 }

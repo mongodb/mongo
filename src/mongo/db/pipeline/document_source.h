@@ -795,8 +795,8 @@ namespace mongo {
     private:
         DocumentSourceRedact(const intrusive_ptr<ExpressionContext>& expCtx,
                              const intrusive_ptr<Expression>& previsit);
-        boost::optional<Document> redactObject(const Variables& in);
-        Value redactValue(const Variables& vars, const Value& in);
+        boost::optional<Document> redactObject(Variables* in);
+        Value redactValue(Variables* vars, const Value& in);
 
         intrusive_ptr<Expression> _expression;
     };

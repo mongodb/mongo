@@ -1178,7 +1178,7 @@ namespace ExpressionTests {
         /** A dummy child of ExpressionNary used for testing. */
         class Testable : public ExpressionNary {
         public:
-            virtual Value evaluateInternal(const Variables& vars) const {
+            virtual Value evaluateInternal(Variables* vars) const {
                 // Just put all the values in a list.  This is not associative/commutative so
                 // the results will change if a factory is provided and operations are reordered.
                 vector<Value> values;
@@ -1449,7 +1449,8 @@ namespace ExpressionTests {
                 prepareExpression();
                 Document document = fromBson( source() );
                 MutableDocument result;
-                expression()->addToDocument( result, document, Variables(document) );
+                Variables vars(document);
+                expression()->addToDocument( result, document, &vars );
                 assertBinaryEqual( expected(), toBson( result.freeze() ) );
                 assertDependencies( expectedDependencies(), _expression );
                 ASSERT_EQUALS( expectedBsonRepresentation(), expressionToBson( _expression ) );

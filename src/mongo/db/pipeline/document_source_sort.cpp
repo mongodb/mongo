@@ -278,11 +278,11 @@ namespace mongo {
             return vSortKey[0]->evaluate(d);
         }
 
-        const Variables vars(d);
+        Variables vars(d);
         vector<Value> keys;
         keys.reserve(vSortKey.size());
         for (size_t i=0; i < vSortKey.size(); i++) {
-            keys.push_back(vSortKey[i]->evaluate(vars));
+            keys.push_back(vSortKey[i]->evaluate(&vars));
         }
         return Value::consume(keys);
     }

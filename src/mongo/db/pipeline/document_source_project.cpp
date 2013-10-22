@@ -65,7 +65,8 @@ namespace mongo {
           If we're excluding fields at the top level, leave out the _id if
           it is found, because we took care of it above.
         */
-        pEO->addToDocument(out, *input, Variables(*input));
+        Variables vars(*input);
+        pEO->addToDocument(out, *input, &vars);
 
 #if defined(_DEBUG)
         if (!_simpleProjection.getSpec().isEmpty()) {

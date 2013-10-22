@@ -63,7 +63,7 @@ namespace mongo {
                                         << "PRUNE" << pruneVal
                                         << "KEEP" << keepVal));
 
-            if (boost::optional<Document> result = redactObject(vars)) {
+            if (boost::optional<Document> result = redactObject(&vars)) {
                 return result;
             }
         }
@@ -71,12 +71,12 @@ namespace mongo {
         return boost::none;
     }
 
-    Value DocumentSourceRedact::redactValue(const Variables& vars, const Value& in) {
+    Value DocumentSourceRedact::redactValue(Variables* vars, const Value& in) {
         const BSONType valueType = in.getType();
         if (valueType == Object) {
-            Variables recurse = vars;
+            Variables recurse = *vars;
             recurse.current = in;
-            const boost::optional<Document> result = redactObject(recurse);
+            const boost::optional<Document> result = redactObject(&recurse);
             if (result) {
                 return Value(*result);
             }
@@ -106,18 +106,18 @@ namespace mongo {
         }
     }
 
-    boost::optional<Document> DocumentSourceRedact::redactObject(const Variables& in) {
+    boost::optional<Document> DocumentSourceRedact::redactObject(Variables* in) {
         const Value expressionResult = _expression->evaluate(in);
 
         if (expressionResult == keepVal) {
-            return in.current.getDocument();
+            return in->current.getDocument();
         }
         else if (expressionResult == pruneVal) {
             return boost::optional<Document>();
         }
         else if (expressionResult == descendVal) {
             MutableDocument out;
-            FieldIterator fields(in.current.getDocument());
+            FieldIterator fields(in->current.getDocument());
             while (fields.more()) {
                 const Document::FieldPair field(fields.next());
                 const Value val = redactValue(in, field.second);

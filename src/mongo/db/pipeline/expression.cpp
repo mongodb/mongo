@@ -345,7 +345,7 @@ namespace {
 
     /* ------------------------- ExpressionAdd ----------------------------- */
 
-    Value ExpressionAdd::evaluateInternal(const Variables& vars) const {
+    Value ExpressionAdd::evaluateInternal(Variables* vars) const {
 
         /*
           We'll try to return the narrowest possible result value.  To do that
@@ -413,7 +413,7 @@ namespace {
 
     /* ------------------------- ExpressionAllElementsTrue -------------------------- */
 
-    Value ExpressionAllElementsTrue::evaluateInternal(const Variables& vars) const {
+    Value ExpressionAllElementsTrue::evaluateInternal(Variables* vars) const {
         const Value arr = vpOperand[0]->evaluateInternal(vars);
         uassert(17040, str::stream() << getOpName() << "'s argument must be an array, but is "
                                      << typeName(arr.getType()),
@@ -461,7 +461,7 @@ namespace {
           Evaluate and coerce the last argument to a boolean.  If it's false,
           then we can replace this entire expression.
          */
-        bool last = pLast->evaluateInternal(Variables()).coerceToBool();
+        bool last = pConst->getValue().coerceToBool();
         if (!last) {
             intrusive_ptr<ExpressionConstant> pFinal(
                 ExpressionConstant::create(Value(false)));
@@ -491,7 +491,7 @@ namespace {
         return pE;
     }
 
-    Value ExpressionAnd::evaluateInternal(const Variables& vars) const {
+    Value ExpressionAnd::evaluateInternal(Variables* vars) const {
         const size_t n = vpOperand.size();
         for(size_t i = 0; i < n; ++i) {
             Value pValue(vpOperand[i]->evaluateInternal(vars));
@@ -509,7 +509,7 @@ namespace {
 
     /* ------------------------- ExpressionAnyElementTrue -------------------------- */
 
-    Value ExpressionAnyElementTrue::evaluateInternal(const Variables& vars) const {
+    Value ExpressionAnyElementTrue::evaluateInternal(Variables* vars) const {
         const Value arr = vpOperand[0]->evaluateInternal(vars);
         uassert(17041, str::stream() << getOpName() << "'s argument must be an array, but is "
                                      << typeName(arr.getType()),
@@ -563,7 +563,7 @@ namespace {
         pExpression->addDependencies(deps);
     }
 
-    Value ExpressionCoerceToBool::evaluateInternal(const Variables& vars) const {
+    Value ExpressionCoerceToBool::evaluateInternal(Variables* vars) const {
         Value pResult(pExpression->evaluateInternal(vars));
         bool b = pResult.coerceToBool();
         if (b)
@@ -631,7 +631,7 @@ namespace {
     };
 }
 
-    Value ExpressionCompare::evaluateInternal(const Variables& vars) const {
+    Value ExpressionCompare::evaluateInternal(Variables* vars) const {
         Value pLeft(vpOperand[0]->evaluateInternal(vars));
         Value pRight(vpOperand[1]->evaluateInternal(vars));
 
@@ -659,7 +659,7 @@ namespace {
 
     /* ------------------------- ExpressionConcat ----------------------------- */
 
-    Value ExpressionConcat::evaluateInternal(const Variables& vars) const {
+    Value ExpressionConcat::evaluateInternal(Variables* vars) const {
         const size_t n = vpOperand.size();
 
         StringBuilder result;
@@ -685,7 +685,7 @@ namespace {
 
     /* ----------------------- ExpressionCond ------------------------------ */
 
-    Value ExpressionCond::evaluateInternal(const Variables& vars) const {
+    Value ExpressionCond::evaluateInternal(Variables* vars) const {
         Value pCond(vpOperand[0]->evaluateInternal(vars));
         int idx = pCond.coerceToBool() ? 1 : 2;
         return vpOperand[idx]->evaluateInternal(vars);
@@ -758,7 +758,7 @@ namespace {
         /* nothing to do */
     }
 
-    Value ExpressionConstant::evaluateInternal(const Variables& vars) const {
+    Value ExpressionConstant::evaluateInternal(Variables* vars) const {
         return pValue;
     }
 
@@ -774,7 +774,7 @@ namespace {
 
     /* ---------------------- ExpressionDayOfMonth ------------------------- */
 
-    Value ExpressionDayOfMonth::evaluateInternal(const Variables& vars) const {
+    Value ExpressionDayOfMonth::evaluateInternal(Variables* vars) const {
         Value pDate(vpOperand[0]->evaluateInternal(vars));
         tm date = pDate.coerceToTm();
         return Value(date.tm_mday);
@@ -787,7 +787,7 @@ namespace {
 
     /* ------------------------- ExpressionDayOfWeek ----------------------------- */
 
-    Value ExpressionDayOfWeek::evaluateInternal(const Variables& vars) const {
+    Value ExpressionDayOfWeek::evaluateInternal(Variables* vars) const {
         Value pDate(vpOperand[0]->evaluateInternal(vars));
         tm date = pDate.coerceToTm();
         return Value(date.tm_wday+1); // MySQL uses 1-7 tm uses 0-6
@@ -800,7 +800,7 @@ namespace {
 
     /* ------------------------- ExpressionDayOfYear ----------------------------- */
 
-    Value ExpressionDayOfYear::evaluateInternal(const Variables& vars) const {
+    Value ExpressionDayOfYear::evaluateInternal(Variables* vars) const {
         Value pDate(vpOperand[0]->evaluateInternal(vars));
         tm date = pDate.coerceToTm();
         return Value(date.tm_yday+1); // MySQL uses 1-366 tm uses 0-365
@@ -813,7 +813,7 @@ namespace {
 
     /* ----------------------- ExpressionDivide ---------------------------- */
 
-    Value ExpressionDivide::evaluateInternal(const Variables& vars) const {
+    Value ExpressionDivide::evaluateInternal(Variables* vars) const {
         Value lhs = vpOperand[0]->evaluateInternal(vars);
         Value rhs = vpOperand[1]->evaluateInternal(vars);
 
@@ -910,7 +910,7 @@ namespace {
     void ExpressionObject::addToDocument(
         MutableDocument& out,
         const Document& currentDoc,
-        const Variables& vars
+        Variables* vars
         ) const
     {
         FieldMap::const_iterator end = _expressions.end();
@@ -1045,7 +1045,7 @@ namespace {
         return _expressions.size() + (_excludeId ? 0 : 1);
     }
 
-    Document ExpressionObject::evaluateDocument(const Variables& vars) const {
+    Document ExpressionObject::evaluateDocument(Variables* vars) const {
         /* create and populate the result */
         MutableDocument out (getSizeHint());
         
@@ -1055,7 +1055,7 @@ namespace {
         return out.freeze();
     }
 
-    Value ExpressionObject::evaluateInternal(const Variables& vars) const {
+    Value ExpressionObject::evaluateInternal(Variables* vars) const {
         return Value(evaluateDocument(vars));
     }
 
@@ -1233,12 +1233,12 @@ namespace {
         }
     }
 
-    Value ExpressionFieldPath::evaluateInternal(const Variables& vars) const {
+    Value ExpressionFieldPath::evaluateInternal(Variables* vars) const {
         Value var;
         switch (_baseVar) {
-        case CURRENT: var = vars.current; break;
-        case ROOT:    var = vars.root; break;
-        default:      var = vars.rest[_fieldPath.getFieldName(0)]; break;
+        case CURRENT: var = vars->current; break;
+        case ROOT:    var = vars->root; break;
+        default:      var = vars->rest[_fieldPath.getFieldName(0)]; break;
         }
 
         if (_fieldPath.getPathLength() == 1)
@@ -1344,9 +1344,9 @@ namespace {
                                     ));
     }
 
-    Value ExpressionLet::evaluateInternal(const Variables& originalVars) const {
-        Variables newVars = originalVars;
-        MutableDocument newRest(originalVars.rest);
+    Value ExpressionLet::evaluateInternal(Variables* originalVars) const {
+        Variables newVars = *originalVars;
+        MutableDocument newRest(originalVars->rest);
         for (VariableMap::const_iterator it=_variables.begin(), end=_variables.end();
                 it != end; ++it) {
 
@@ -1361,7 +1361,7 @@ namespace {
         }
 
         newVars.rest = newRest.freeze();
-        return _subExpression->evaluateInternal(newVars);
+        return _subExpression->evaluateInternal(&newVars);
     }
 
     void ExpressionLet::addDependencies(set<string>& deps, vector<string>* path) const {
@@ -1451,7 +1451,7 @@ namespace {
                                     )));
     }
 
-    Value ExpressionMap::evaluateInternal(const Variables& originalVars) const {
+    Value ExpressionMap::evaluateInternal(Variables* originalVars) const {
         const Value inputVal = _input->evaluateInternal(originalVars);
         if (inputVal.nullish())
             return Value(BSONNULL);
@@ -1465,11 +1465,11 @@ namespace {
         if (input.empty())
             return inputVal;
 
-        MutableDocument newRest(originalVars.rest);
+        MutableDocument newRest(originalVars->rest);
         vector<Value> output;
         output.reserve(input.size());
         for (size_t i=0; i < input.size(); i++) {
-            Variables newVars = originalVars;
+            Variables newVars = *originalVars;
             if (_varName == "CURRENT") { // Can't set ROOT (checked in parse())
                 newVars.current = input[i];
             } else {
@@ -1477,7 +1477,7 @@ namespace {
                 newVars.rest = newRest.peek();
             }
 
-            Value toInsert = _each->evaluateInternal(newVars);
+            Value toInsert = _each->evaluateInternal(&newVars);
             if (toInsert.missing())
                 toInsert = Value(BSONNULL); // can't insert missing values into array
 
@@ -1494,7 +1494,7 @@ namespace {
 
     /* ------------------------- ExpressionMillisecond ----------------------------- */
 
-    Value ExpressionMillisecond::evaluateInternal(const Variables& vars) const {
+    Value ExpressionMillisecond::evaluateInternal(Variables* vars) const {
         Value date(vpOperand[0]->evaluateInternal(vars));
         const int ms = date.coerceToDate() % 1000LL;
         // adding 1000 since dates before 1970 would have negative ms
@@ -1508,7 +1508,7 @@ namespace {
 
     /* ------------------------- ExpressionMinute -------------------------- */
 
-    Value ExpressionMinute::evaluateInternal(const Variables& vars) const {
+    Value ExpressionMinute::evaluateInternal(Variables* vars) const {
         Value pDate(vpOperand[0]->evaluateInternal(vars));
         tm date = pDate.coerceToTm();
         return Value(date.tm_min);
@@ -1521,7 +1521,7 @@ namespace {
 
     /* ----------------------- ExpressionMod ---------------------------- */
 
-    Value ExpressionMod::evaluateInternal(const Variables& vars) const {
+    Value ExpressionMod::evaluateInternal(Variables* vars) const {
         Value lhs = vpOperand[0]->evaluateInternal(vars);
         Value rhs = vpOperand[1]->evaluateInternal(vars);
 
@@ -1574,7 +1574,7 @@ namespace {
 
     /* ------------------------ ExpressionMonth ----------------------------- */
 
-    Value ExpressionMonth::evaluateInternal(const Variables& vars) const {
+    Value ExpressionMonth::evaluateInternal(Variables* vars) const {
         Value pDate(vpOperand[0]->evaluateInternal(vars));
         tm date = pDate.coerceToTm();
         return Value(date.tm_mon + 1); // MySQL uses 1-12 tm uses 0-11
@@ -1587,7 +1587,7 @@ namespace {
 
     /* ------------------------- ExpressionMultiply ----------------------------- */
 
-    Value ExpressionMultiply::evaluateInternal(const Variables& vars) const {
+    Value ExpressionMultiply::evaluateInternal(Variables* vars) const {
         /*
           We'll try to return the narrowest possible result value.  To do that
           without creating intermediate Values, do the arithmetic for double
@@ -1634,7 +1634,7 @@ namespace {
 
     /* ------------------------- ExpressionHour ----------------------------- */
 
-    Value ExpressionHour::evaluateInternal(const Variables& vars) const {
+    Value ExpressionHour::evaluateInternal(Variables* vars) const {
         Value pDate(vpOperand[0]->evaluateInternal(vars));
         tm date = pDate.coerceToTm();
         return Value(date.tm_hour);
@@ -1647,7 +1647,7 @@ namespace {
 
     /* ----------------------- ExpressionIfNull ---------------------------- */
 
-    Value ExpressionIfNull::evaluateInternal(const Variables& vars) const {
+    Value ExpressionIfNull::evaluateInternal(Variables* vars) const {
         Value pLeft(vpOperand[0]->evaluateInternal(vars));
         if (!pLeft.nullish())
             return pLeft;
@@ -1683,7 +1683,8 @@ namespace {
         // If all the operands are constant, we can replace this expression with a constant. Using
         // an empty Variables since it will never be accessed.  
         if (constCount == n) {
-            Value pResult(evaluateInternal(Variables()));
+            Variables emptyVars;
+            Value pResult(evaluateInternal(&emptyVars));
             intrusive_ptr<Expression> pReplacement(
                 ExpressionConstant::create(pResult));
             return pReplacement;
@@ -1725,7 +1726,8 @@ namespace {
         Value constValue;
         if (!constExprs.empty()) {
             vpOperand = constExprs;
-            constValue = evaluateInternal(Variables());
+            Variables emptyVars;
+            constValue = evaluateInternal(&emptyVars);
         }
 
         // now set the final expression list with constant (if any) at the end
@@ -1760,7 +1762,7 @@ namespace {
 
     /* ------------------------- ExpressionNot ----------------------------- */
 
-    Value ExpressionNot::evaluateInternal(const Variables& vars) const {
+    Value ExpressionNot::evaluateInternal(Variables* vars) const {
         Value pOp(vpOperand[0]->evaluateInternal(vars));
 
         bool b = pOp.coerceToBool();
@@ -1774,7 +1776,7 @@ namespace {
 
     /* -------------------------- ExpressionOr ----------------------------- */
 
-    Value ExpressionOr::evaluateInternal(const Variables& vars) const {
+    Value ExpressionOr::evaluateInternal(Variables* vars) const {
         const size_t n = vpOperand.size();
         for(size_t i = 0; i < n; ++i) {
             Value pValue(vpOperand[i]->evaluateInternal(vars));
@@ -1812,7 +1814,7 @@ namespace {
           Evaluate and coerce the last argument to a boolean.  If it's true,
           then we can replace this entire expression.
          */
-        bool last = pLast->evaluateInternal(Variables()).coerceToBool();
+        bool last = pConst->getValue().coerceToBool();
         if (last) {
             intrusive_ptr<ExpressionConstant> pFinal(
                 ExpressionConstant::create(Value(true)));
@@ -1845,7 +1847,7 @@ namespace {
 
     /* ------------------------- ExpressionSecond ----------------------------- */
 
-    Value ExpressionSecond::evaluateInternal(const Variables& vars) const {
+    Value ExpressionSecond::evaluateInternal(Variables* vars) const {
         Value pDate(vpOperand[0]->evaluateInternal(vars));
         tm date = pDate.coerceToTm();
         return Value(date.tm_sec);
@@ -1867,7 +1869,7 @@ namespace {
 
     /* ----------------------- ExpressionSetDifference ---------------------------- */
 
-    Value ExpressionSetDifference::evaluateInternal(const Variables& vars) const {
+    Value ExpressionSetDifference::evaluateInternal(Variables* vars) const {
         const Value lhs = vpOperand[0]->evaluateInternal(vars);
         const Value rhs = vpOperand[1]->evaluateInternal(vars);
 
@@ -1909,7 +1911,7 @@ namespace {
                 args.size() >= 2);
     }
 
-    Value ExpressionSetEquals::evaluateInternal(const Variables& vars) const {
+    Value ExpressionSetEquals::evaluateInternal(Variables* vars) const {
         const size_t n = vpOperand.size();
         std::set<Value> lhs;
 
@@ -1940,7 +1942,7 @@ namespace {
 
     /* ----------------------- ExpressionSetIntersection ---------------------------- */
 
-    Value ExpressionSetIntersection::evaluateInternal(const Variables& vars) const {
+    Value ExpressionSetIntersection::evaluateInternal(Variables* vars) const {
         const size_t n = vpOperand.size();
         ValueSet currentIntersection;
         for (size_t i = 0; i < n; i++) {
@@ -1991,7 +1993,7 @@ namespace {
 
     /* ----------------------- ExpressionSetIsSubset ---------------------------- */
 
-    Value ExpressionSetIsSubset::evaluateInternal(const Variables& vars) const {
+    Value ExpressionSetIsSubset::evaluateInternal(Variables* vars) const {
         const Value lhs = vpOperand[0]->evaluateInternal(vars);
         const Value rhs = vpOperand[1]->evaluateInternal(vars);
 
@@ -2023,7 +2025,7 @@ namespace {
 
     /* ----------------------- ExpressionSetUnion ---------------------------- */
 
-    Value ExpressionSetUnion::evaluateInternal(const Variables& vars) const {
+    Value ExpressionSetUnion::evaluateInternal(Variables* vars) const {
         ValueSet unionedSet;
         const size_t n = vpOperand.size();
         for (size_t i = 0; i < n; i++) {
@@ -2048,7 +2050,7 @@ namespace {
 
     /* ----------------------- ExpressionSize ---------------------------- */
 
-    Value ExpressionSize::evaluateInternal(const Variables& vars) const {
+    Value ExpressionSize::evaluateInternal(Variables* vars) const {
         Value array = vpOperand[0]->evaluateInternal(vars);
 
         uassert(17124, str::stream() << "The argument to $size must be an Array, but was of type: "
@@ -2064,7 +2066,7 @@ namespace {
 
     /* ----------------------- ExpressionStrcasecmp ---------------------------- */
 
-    Value ExpressionStrcasecmp::evaluateInternal(const Variables& vars) const {
+    Value ExpressionStrcasecmp::evaluateInternal(Variables* vars) const {
         Value pString1(vpOperand[0]->evaluateInternal(vars));
         Value pString2(vpOperand[1]->evaluateInternal(vars));
 
@@ -2088,7 +2090,7 @@ namespace {
 
     /* ----------------------- ExpressionSubstr ---------------------------- */
 
-    Value ExpressionSubstr::evaluateInternal(const Variables& vars) const {
+    Value ExpressionSubstr::evaluateInternal(Variables* vars) const {
         Value pString(vpOperand[0]->evaluateInternal(vars));
         Value pLower(vpOperand[1]->evaluateInternal(vars));
         Value pLength(vpOperand[2]->evaluateInternal(vars));
@@ -2123,7 +2125,7 @@ namespace {
 
     /* ----------------------- ExpressionSubtract ---------------------------- */
 
-    Value ExpressionSubtract::evaluateInternal(const Variables& vars) const {
+    Value ExpressionSubtract::evaluateInternal(Variables* vars) const {
         Value lhs = vpOperand[0]->evaluateInternal(vars);
         Value rhs = vpOperand[1]->evaluateInternal(vars);
             
@@ -2177,7 +2179,7 @@ namespace {
 
     /* ------------------------- ExpressionToLower ----------------------------- */
 
-    Value ExpressionToLower::evaluateInternal(const Variables& vars) const {
+    Value ExpressionToLower::evaluateInternal(Variables* vars) const {
         Value pString(vpOperand[0]->evaluateInternal(vars));
         string str = pString.coerceToString();
         boost::to_lower(str);
@@ -2191,7 +2193,7 @@ namespace {
 
     /* ------------------------- ExpressionToUpper -------------------------- */
 
-    Value ExpressionToUpper::evaluateInternal(const Variables& vars) const {
+    Value ExpressionToUpper::evaluateInternal(Variables* vars) const {
         Value pString(vpOperand[0]->evaluateInternal(vars));
         string str(pString.coerceToString());
         boost::to_upper(str);
@@ -2205,7 +2207,7 @@ namespace {
 
     /* ------------------------- ExpressionWeek ----------------------------- */
 
-    Value ExpressionWeek::evaluateInternal(const Variables& vars) const {
+    Value ExpressionWeek::evaluateInternal(Variables* vars) const {
         Value pDate(vpOperand[0]->evaluateInternal(vars));
         tm date = pDate.coerceToTm();
         int dayOfWeek = date.tm_wday;
@@ -2234,7 +2236,7 @@ namespace {
 
     /* ------------------------- ExpressionYear ----------------------------- */
 
-    Value ExpressionYear::evaluateInternal(const Variables& vars) const {
+    Value ExpressionYear::evaluateInternal(Variables* vars) const {
         Value pDate(vpOperand[0]->evaluateInternal(vars));
         tm date = pDate.coerceToTm();
         return Value(date.tm_year + 1900); // tm_year is years since 1900
