@@ -108,14 +108,14 @@ namespace {
 
         // User admin role
         userAdminRoleActions
-            << ActionType::changeAnyCustomData
-            << ActionType::changeAnyPassword
+            << ActionType::changeCustomData
+            << ActionType::changePassword
             << ActionType::createUser
             << ActionType::createRole
             << ActionType::dropUser
             << ActionType::dropRole
-            << ActionType::grantAnyRole
-            << ActionType::revokeAnyRole
+            << ActionType::grantRole
+            << ActionType::revokeRole
             << ActionType::userAdmin
             << ActionType::viewUser
             << ActionType::viewRole;

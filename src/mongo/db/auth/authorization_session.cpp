@@ -208,13 +208,13 @@ namespace {
         if (resource.isDatabasePattern() || resource.isExactNamespacePattern()) {
             if (!isAuthorizedForActionsOnResource(
                     ResourcePattern::forDatabaseName(resource.databaseToMatch()),
-                    ActionType::grantAnyRole)) {
+                    ActionType::grantRole)) {
                 return Status(ErrorCodes::Unauthorized,
                               str::stream() << "Not authorized to grant privileges on the "
                                       << resource.databaseToMatch() << "database");
             }
         } else if (!isAuthorizedForActionsOnResource(
-                ResourcePattern::forDatabaseName("admin"), ActionType::grantAnyRole)) {
+                ResourcePattern::forDatabaseName("admin"), ActionType::grantRole)) {
             return Status(ErrorCodes::Unauthorized,
                           "To grant privileges affecting multiple databases or the cluster,"
                           " must be authorized to grant roles from the admin database");
@@ -228,13 +228,13 @@ namespace {
         if (resource.isDatabasePattern() || resource.isExactNamespacePattern()) {
             if (!isAuthorizedForActionsOnResource(
                     ResourcePattern::forDatabaseName(resource.databaseToMatch()),
-                    ActionType::revokeAnyRole)) {
+                    ActionType::revokeRole)) {
                 return Status(ErrorCodes::Unauthorized,
                               str::stream() << "Not authorized to revoke privileges on the "
                                       << resource.databaseToMatch() << "database");
             }
         } else if (!isAuthorizedForActionsOnResource(
-                ResourcePattern::forDatabaseName("admin"), ActionType::revokeAnyRole)) {
+                ResourcePattern::forDatabaseName("admin"), ActionType::revokeRole)) {
             return Status(ErrorCodes::Unauthorized,
                           "To revoke privileges affecting multiple databases or the cluster,"
                           " must be authorized to revoke roles from the admin database");
@@ -245,13 +245,13 @@ namespace {
     bool AuthorizationSession::isAuthorizedToGrantRole(const RoleName& role) {
         return isAuthorizedForActionsOnResource(
                 ResourcePattern::forDatabaseName(role.getDB()),
-                ActionType::grantAnyRole);
+                ActionType::grantRole);
     }
 
     bool AuthorizationSession::isAuthorizedToRevokeRole(const RoleName& role) {
         return isAuthorizedForActionsOnResource(
                 ResourcePattern::forDatabaseName(role.getDB()),
-                ActionType::revokeAnyRole);
+                ActionType::revokeRole);
     }
 
     bool AuthorizationSession::isAuthorizedForPrivilege(const Privilege& privilege) {

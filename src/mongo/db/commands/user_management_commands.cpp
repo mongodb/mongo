@@ -384,7 +384,7 @@ namespace mongo {
                 if (!authzSession->isAuthorizedToChangeOwnPasswordAsUser(args.userName) &&
                         !authzSession->isAuthorizedForActionsOnResource(
                                 ResourcePattern::forDatabaseName(args.userName.getDB()),
-                                ActionType::changeAnyPassword)) {
+                                ActionType::changePassword)) {
                     return Status(ErrorCodes::Unauthorized,
                                   str::stream() << "Not authorized to change password of user: " <<
                                           args.userName.getFullName());
@@ -395,7 +395,7 @@ namespace mongo {
                 if (!authzSession->isAuthorizedToChangeOwnCustomDataAsUser(args.userName) &&
                         !authzSession->isAuthorizedForActionsOnResource(
                                 ResourcePattern::forDatabaseName(args.userName.getDB()),
-                                ActionType::changeAnyCustomData)) {
+                                ActionType::changeCustomData)) {
                     return Status(ErrorCodes::Unauthorized,
                                   str::stream() << "Not authorized to change customData of user: "
                                           << args.userName.getFullName());
@@ -406,7 +406,7 @@ namespace mongo {
                 // You don't know what roles you might be revoking, so require the ability to
                 // revoke any role in the system.
                 if (!authzSession->isAuthorizedForActionsOnResource(
-                        ResourcePattern::forAnyNormalResource(), ActionType::revokeAnyRole)) {
+                        ResourcePattern::forAnyNormalResource(), ActionType::revokeRole)) {
                     return Status(ErrorCodes::Unauthorized,
                                   "In order to use updateUser to set roles array, must be "
                                   "authorized to revoke any role in the system");
@@ -1192,7 +1192,7 @@ namespace mongo {
             // You don't know what roles or privileges you might be revoking, so require the ability
             // to revoke any role (or privilege) in the system.
             if (!authzSession->isAuthorizedForActionsOnResource(
-                    ResourcePattern::forAnyNormalResource(), ActionType::revokeAnyRole)) {
+                    ResourcePattern::forAnyNormalResource(), ActionType::revokeRole)) {
                 return Status(ErrorCodes::Unauthorized,
                               "updateRole command required the ability to revoke any role in the "
                               "system");
