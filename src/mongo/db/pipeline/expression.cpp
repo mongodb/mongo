@@ -110,12 +110,40 @@ namespace mongo {
         }
     }
 
+    void Variables::setValue(Id id, const Value& value) {
+        massert(17199, "can't use Variables::setValue to set ROOT",
+                id != ROOT_ID);
+
+        verify(id < _numVars);
+        _rest[id] = value;
+    }
+
+    Value Variables::getValue(Id id) const {
+        if (id == ROOT_ID)
+            return Value(_root);
+
+        verify(id < _numVars);
+        return  _rest[id];
+    }
+
+    Document Variables::getDocument(Id id) const {
+        if (id == ROOT_ID)
+            return _root;
+
+        verify(id < _numVars);
+        const Value var = _rest[id];
+        if (var.getType() == Object)
+            return var.getDocument();
+
+        return Document();
+    }
+
     Variables::Id VariablesParseState::defineVariable(const StringData& name) {
         // caller should have validated before hand by using Variables::uassertValidNameForUserWrite
         massert(17275, "Can't redefine ROOT",
                 name != "ROOT");
 
-        Variables::Id id = (*_nextId)++;
+        Variables::Id id = _idGenerator->generateId();
         _variables[name] = id;
         return id;
     }
@@ -1234,16 +1262,15 @@ namespace {
     }
 
     Value ExpressionFieldPath::evaluateInternal(Variables* vars) const {
-        Value var;
-        switch (_baseVar) {
-        case CURRENT: var = vars->current; break;
-        case ROOT:    var = vars->root; break;
-        default:      var = vars->rest[_fieldPath.getFieldName(0)]; break;
+        if (_fieldPath.getPathLength() == 1) // get the whole variable
+            return vars->getValue(_variable);
+
+        if (_variable == Variables::ROOT_ID) {
+            // ROOT is always a document so use optimized code path
+            return evaluatePath(1, vars->getRoot());
         }
 
-        if (_fieldPath.getPathLength() == 1)
-            return var;
-
+        Value var = vars->getValue(_variable);
         switch (var.getType()) {
         case Object: return evaluatePath(1, var.getDocument());
         case Array: return evaluatePathArray(1, var);
@@ -1344,24 +1371,16 @@ namespace {
                                     ));
     }
 
-    Value ExpressionLet::evaluateInternal(Variables* originalVars) const {
-        Variables newVars = *originalVars;
-        MutableDocument newRest(originalVars->rest);
+    Value ExpressionLet::evaluateInternal(Variables* vars) const {
         for (VariableMap::const_iterator it=_variables.begin(), end=_variables.end();
                 it != end; ++it) {
-
-            const Value newVar = it->second.expression->evaluateInternal(originalVars);
-
-            // Can't set ROOT (checked in parse())
-            if (it->second.name == "CURRENT") {
-                newVars.current = newVar;
-            } else {
-                newRest[it->second.name] = newVar;
-            }
+            // It is guaranteed at parse-time that these expressions don't use the variable ids we
+            // are setting
+            vars->setValue(it->first,
+                           it->second.expression->evaluateInternal(vars));
         }
 
-        newVars.rest = newRest.freeze();
-        return _subExpression->evaluateInternal(&newVars);
+        return _subExpression->evaluateInternal(vars);
     }
 
     void ExpressionLet::addDependencies(set<string>& deps, vector<string>* path) const {
@@ -1451,8 +1470,9 @@ namespace {
                                     )));
     }
 
-    Value ExpressionMap::evaluateInternal(Variables* originalVars) const {
-        const Value inputVal = _input->evaluateInternal(originalVars);
+    Value ExpressionMap::evaluateInternal(Variables* vars) const {
+        // guaranteed at parse time that this isn't using our _varId
+        const Value inputVal = _input->evaluateInternal(vars);
         if (inputVal.nullish())
             return Value(BSONNULL);
 
@@ -1465,19 +1485,12 @@ namespace {
         if (input.empty())
             return inputVal;
 
-        MutableDocument newRest(originalVars->rest);
         vector<Value> output;
         output.reserve(input.size());
         for (size_t i=0; i < input.size(); i++) {
-            Variables newVars = *originalVars;
-            if (_varName == "CURRENT") { // Can't set ROOT (checked in parse())
-                newVars.current = input[i];
-            } else {
-                newRest[_varName] = input[i];
-                newVars.rest = newRest.peek();
-            }
+            vars->setValue(_varId, input[i]);
 
-            Value toInsert = _each->evaluateInternal(&newVars);
+            Value toInsert = _each->evaluateInternal(vars);
             if (toInsert.missing())
                 toInsert = Value(BSONNULL); // can't insert missing values into array
 

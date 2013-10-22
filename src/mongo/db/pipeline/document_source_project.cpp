@@ -65,8 +65,9 @@ namespace mongo {
           If we're excluding fields at the top level, leave out the _id if
           it is found, because we took care of it above.
         */
-        Variables vars(*input);
-        pEO->addToDocument(out, *input, &vars);
+        _variables->setRoot(*input);
+        pEO->addToDocument(out, *input, _variables.get());
+        _variables->clearRoot();
 
 #if defined(_DEBUG)
         if (!_simpleProjection.getSpec().isEmpty()) {
@@ -114,13 +115,15 @@ namespace mongo {
             | Expression::ObjectCtx::INCLUSION_OK
             );
 
-        VariablesParseState vps;
+        VariablesIdGenerator idGenerator;
+        VariablesParseState vps(&idGenerator);
         intrusive_ptr<Expression> parsed = Expression::parseObject(elem.Obj(), &objectCtx, vps);
         ExpressionObject* exprObj = dynamic_cast<ExpressionObject*>(parsed.get());
         massert(16402, "parseObject() returned wrong type of Expression", exprObj);
         uassert(16403, "$projection requires at least one output field", exprObj->getFieldCount());
 
         intrusive_ptr<DocumentSourceProject> pProject(new DocumentSourceProject(pExpCtx, exprObj));
+        pProject->_variables.reset(new Variables(idGenerator.getIdCount()));
 
         BSONObj projectObj = elem.Obj();
         pProject->_raw = projectObj.getOwned(); // probably not necessary, but better to be safe

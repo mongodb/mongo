@@ -47,23 +47,20 @@ namespace mongo {
     // TODO: Look into merging with ExpressionContext and possibly ObjectCtx.
     /// The state used as input and working space for Expressions.
     class Variables {
+        MONGO_DISALLOW_COPYING(Variables);
     public:
         /**
          * Each unique variable is assigned a unique id of this type
          */
         typedef size_t Id;
 
-        Variables() {}
-
-        explicit Variables(const Document& rootAndCurrent)
-            : root(rootAndCurrent)
-            , current(rootAndCurrent)
-        {}
-
-        Variables(const Document& root, const Value& current, const Document& rest = Document())
-            : root(root)
-            , current(current)
-            , rest(rest)
+        // This is only for expressions that use no variables (even ROOT).
+        Variables() :_numVars(0) {}
+    
+        explicit Variables(size_t numVars, const Document& root = Document())
+            : _root(root)
+            , _rest(numVars == 0 ? NULL : new Value[numVars])
+            , _numVars(numVars)
         {}
 
         static void uassertValidNameForUserWrite(StringData varName);
@@ -71,9 +68,44 @@ namespace mongo {
 
         static const Id ROOT_ID = Id(-1);
 
-        Value root;
-        Value current;
-        Document rest;
+        /**
+         * Use this instead of setValue for setting ROOT
+         */
+        void setRoot(const Document& root) { _root = root; }
+        void clearRoot() { _root = Document(); }
+        const Document& getRoot() const { return _root; }
+
+        void setValue(Id id, const Value& value);
+        Value getValue(Id id) const;
+
+        /**
+         * returns Document() for non-document values.
+         */
+        Document getDocument(Id id) const;
+
+    private:
+        Document _root;
+        const boost::scoped_array<Value> _rest;
+        const size_t _numVars;
+    };
+
+    /**
+     * Generates Variables::Ids and keeps track of the number of Ids handed out.
+     */
+    class VariablesIdGenerator {
+    public:
+        VariablesIdGenerator() : _nextId(0) {}
+
+        Variables::Id generateId() { return _nextId++; }
+
+        /**
+         * Returns the number of Ids handed out by this Generator.
+         * Return value is intended to be passed to Variables constructor.
+         */
+        Variables::Id getIdCount() const { return _nextId; }
+
+    private:
+        Variables::Id _nextId;
     };
 
     /**
@@ -85,7 +117,9 @@ namespace mongo {
      */
     class VariablesParseState {
     public:
-        VariablesParseState() : _nextId(new Variables::Id(0)) {}
+        explicit VariablesParseState(VariablesIdGenerator* idGenerator)
+            : _idGenerator(idGenerator)
+        {}
 
         /**
          * Assigns a named variable a unique Id. This differs from all other variables, even
@@ -106,7 +140,7 @@ namespace mongo {
 
     private:
         StringMap<Variables::Id> _variables;
-        shared_ptr<Variables::Id> _nextId;
+        VariablesIdGenerator* _idGenerator;
     };
 
     class Expression :
@@ -156,7 +190,7 @@ namespace mongo {
 
         /// Evaluate expression with specified inputs and return result. (only used by tests)
         Value evaluate(const Document& root) const {
-            Variables vars(root);
+            Variables vars(0, root);
             return evaluate(&vars);
         }
 
@@ -444,7 +478,7 @@ namespace mongo {
         static intrusive_ptr<ExpressionConstant> create(const Value& pValue);
         static intrusive_ptr<Expression> parse(
             BSONElement bsonExpr,
-            const VariablesParseState& vps = VariablesParseState());
+            const VariablesParseState& vps);
 
         /*
           Get the constant value represented by this Expression.

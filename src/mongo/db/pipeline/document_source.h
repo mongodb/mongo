@@ -574,6 +574,7 @@ namespace mongo {
         bool _spilled;
         const bool _extSortAllowed;
         const int _maxMemoryUsageBytes;
+        boost::scoped_ptr<Variables> _variables;
 
         // only used when !_spilled
         GroupsMap::iterator groupsIterator;
@@ -768,6 +769,7 @@ namespace mongo {
                               const intrusive_ptr<ExpressionObject>& exprObj);
 
         // configuration state
+        boost::scoped_ptr<Variables> _variables;
         intrusive_ptr<ExpressionObject> pEO;
         BSONObj _raw;
 
@@ -795,9 +797,13 @@ namespace mongo {
     private:
         DocumentSourceRedact(const intrusive_ptr<ExpressionContext>& expCtx,
                              const intrusive_ptr<Expression>& previsit);
-        boost::optional<Document> redactObject(Variables* in);
-        Value redactValue(Variables* vars, const Value& in);
 
+        // These both work over _variables
+        boost::optional<Document> redactObject(); // redacts CURRENT
+        Value redactValue(const Value& in);
+
+        Variables::Id _currentId;
+        boost::scoped_ptr<Variables> _variables;
         intrusive_ptr<Expression> _expression;
     };
 

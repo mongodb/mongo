@@ -100,7 +100,8 @@ namespace mongo {
     }
 
     void DocumentSourceSort::addKey(const string& fieldPath, bool ascending) {
-        VariablesParseState vps;
+        VariablesIdGenerator idGenerator;
+        VariablesParseState vps(&idGenerator);
         vSortKey.push_back(ExpressionFieldPath::parse("$$ROOT." + fieldPath, vps));
         vAscending.push_back(ascending);
     }
@@ -274,11 +275,11 @@ namespace mongo {
     }
 
     Value DocumentSourceSort::extractKey(const Document& d) const {
+        Variables vars(0, d);
         if (vSortKey.size() == 1) {
-            return vSortKey[0]->evaluate(d);
+            return vSortKey[0]->evaluate(&vars);
         }
 
-        Variables vars(d);
         vector<Value> keys;
         keys.reserve(vSortKey.size());
         for (size_t i=0; i < vSortKey.size(); i++) {

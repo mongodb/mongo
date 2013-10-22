@@ -57,13 +57,9 @@ namespace mongo {
 
     boost::optional<Document> DocumentSourceRedact::getNext() {
         while (boost::optional<Document> in = pSource->getNext()) {
-            Variables vars = Variables(*in,
-                                       Value(*in),
-                                       DOC("DESCEND" << descendVal
-                                        << "PRUNE" << pruneVal
-                                        << "KEEP" << keepVal));
-
-            if (boost::optional<Document> result = redactObject(&vars)) {
+            _variables->setRoot(*in);
+            _variables->setValue(_currentId, Value(*in));
+            if (boost::optional<Document> result = redactObject()) {
                 return result;
             }
         }
@@ -71,12 +67,11 @@ namespace mongo {
         return boost::none;
     }
 
-    Value DocumentSourceRedact::redactValue(Variables* vars, const Value& in) {
+    Value DocumentSourceRedact::redactValue(const Value& in) {
         const BSONType valueType = in.getType();
         if (valueType == Object) {
-            Variables recurse = *vars;
-            recurse.current = in;
-            const boost::optional<Document> result = redactObject(&recurse);
+            _variables->setValue(_currentId, in);
+            const boost::optional<Document> result = redactObject();
             if (result) {
                 return Value(*result);
             }
@@ -90,7 +85,7 @@ namespace mongo {
             const vector<Value>& arr = in.getArray();
             for (size_t i = 0; i < arr.size(); i++) {
                 if (arr[i].getType() == Object || arr[i].getType() == Array) {
-                    const Value toAdd = redactValue(vars, arr[i]) ;
+                    const Value toAdd = redactValue(arr[i]) ;
                     if (!toAdd.missing()) {
                         newArr.push_back(toAdd);
                     }
@@ -106,21 +101,23 @@ namespace mongo {
         }
     }
 
-    boost::optional<Document> DocumentSourceRedact::redactObject(Variables* in) {
-        const Value expressionResult = _expression->evaluate(in);
+    boost::optional<Document> DocumentSourceRedact::redactObject() {
+        const Value expressionResult = _expression->evaluate(_variables.get());
 
         if (expressionResult == keepVal) {
-            return in->current.getDocument();
+            return _variables->getDocument(_currentId);
         }
         else if (expressionResult == pruneVal) {
             return boost::optional<Document>();
         }
         else if (expressionResult == descendVal) {
             MutableDocument out;
-            FieldIterator fields(in->current.getDocument());
+            FieldIterator fields(_variables->getDocument(_currentId));
             while (fields.more()) {
                 const Document::FieldPair field(fields.next());
-                const Value val = redactValue(in, field.second);
+
+                // This changes CURRENT so don't read from _variables after this
+                const Value val = redactValue(field.second);
                 if (!val.missing()) {
                     out.addField(field.first, val);
                 }
@@ -151,14 +148,24 @@ namespace mongo {
 
         Expression::ObjectCtx oCtx(0);
 
-        VariablesParseState vps;
-        // TODO save and use the returned ids somehow
-        vps.defineVariable("CURRENT"); // will differ from ROOT in this DocumentSource
-        vps.defineVariable("DESCEND");
-        vps.defineVariable("PRUNE");
-        vps.defineVariable("KEEP");
+        VariablesIdGenerator idGenerator;
+        VariablesParseState vps(&idGenerator);
+        Variables::Id currentId = vps.defineVariable("CURRENT"); // will differ from ROOT
+        Variables::Id decendId = vps.defineVariable("DESCEND");
+        Variables::Id pruneId = vps.defineVariable("PRUNE");
+        Variables::Id keepId = vps.defineVariable("KEEP");
         intrusive_ptr<Expression> expression = Expression::parseObject(elem.Obj(), &oCtx, vps);
+        intrusive_ptr<DocumentSourceRedact> source = new DocumentSourceRedact(expCtx, expression);
 
-        return new DocumentSourceRedact(expCtx, expression);
+        // TODO figure out how much of this belongs in constructor and how much here.
+        // Set up variables. Never need to reset DESCEND, PRUNE, or KEEP.
+        source->_currentId = currentId;
+        source->_variables.reset(new Variables(idGenerator.getIdCount()));
+        source->_variables->setValue(decendId, descendVal);
+        source->_variables->setValue(pruneId, pruneVal);
+        source->_variables->setValue(keepId, keepVal);
+
+
+        return source;
     }
 }

@@ -231,7 +231,8 @@ namespace mongo {
 
         BSONObj groupObj(elem.Obj());
         BSONObjIterator groupIterator(groupObj);
-        VariablesParseState vps;
+        VariablesIdGenerator idGenerator;
+        VariablesParseState vps(&idGenerator);
         while(groupIterator.more()) {
             BSONElement groupField(groupIterator.next());
             const char *pFieldName = groupField.fieldName();
@@ -335,6 +336,8 @@ namespace mongo {
 
         uassert(15955, "a group specification must include an _id", idSet);
 
+        pGroup->_variables.reset(new Variables(idGenerator.getIdCount()));
+
         return pGroup;
     }
 
@@ -365,10 +368,10 @@ namespace mongo {
                 memoryUsageBytes = 0;
             }
 
-            Variables vars(*input);
+            _variables->setRoot(*input);
 
             /* get the _id value */
-            Value id = pIdExpression->evaluate(&vars);
+            Value id = pIdExpression->evaluate(_variables.get());
 
             /* treat missing values the same as NULL SERVER-4674 */
             if (id.missing())
@@ -400,9 +403,12 @@ namespace mongo {
             /* tickle all the accumulators for the group we found */
             dassert(numAccumulators == group.size());
             for (size_t i = 0; i < numAccumulators; i++) {
-                group[i]->process(vpExpression[i]->evaluate(&vars), _doingMerge);
+                group[i]->process(vpExpression[i]->evaluate(_variables.get()), _doingMerge);
                 memoryUsageBytes += group[i]->memUsageForSorter();
             }
+
+            // We are done with the ROOT document so release it.
+            _variables->clearRoot();
 
             DEV {
                 // In debug mode, spill every time we have a duplicate id to stress merge logic.
@@ -525,7 +531,8 @@ namespace mongo {
         intrusive_ptr<DocumentSourceGroup> pMerger(DocumentSourceGroup::create(pExpCtx));
         pMerger->setDoingMerge(true);
 
-        VariablesParseState vps;
+        VariablesIdGenerator idGenerator;
+        VariablesParseState vps(&idGenerator);
         /* the merger will use the same grouping key */
         pMerger->setIdExpression(ExpressionFieldPath::parse("$$ROOT._id", vps));
 
@@ -543,6 +550,8 @@ namespace mongo {
                 vFieldName[i], vpAccumulatorFactory[i],
                 ExpressionFieldPath::parse("$$ROOT." + vFieldName[i], vps));
         }
+
+        pMerger->_variables.reset(new Variables(idGenerator.getIdCount()));
 
         return pMerger;
     }
