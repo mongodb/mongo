@@ -714,7 +714,7 @@ namespace mongo {
             // collection is empty. Otherwise, the semantics of the tailable cursor is that the
             // client will keep trying to read from it. So we'll keep it around.
             Collection* collection = ctx.ctx().db()->getCollection(cq->ns());
-            if (collection->numRecords() != 0 && pq.getNumToReturn() != 1) {
+            if (collection && collection->numRecords() != 0 && pq.getNumToReturn() != 1) {
                 saveClientCursor = true;
             }
         }
