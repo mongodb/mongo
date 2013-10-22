@@ -309,15 +309,8 @@ namespace {
             const BSONObj& writeConcern) {
         try {
             DBDirectClient client;
-            {
-                Client::GodScope gs;
-                // TODO(spencer): Once we're no longer fully rebuilding the user cache on every
-                // change to user data we should remove the global lock and uncomment the
-                // WriteContext below
-                Lock::GlobalWrite w;
-                // Client::WriteContext ctx(userNS);
-                client.insert(collectionName, document);
-            }
+            Client::GodScope gs;
+            client.insert(collectionName, document);
 
             // Handle write concern
             BSONObjBuilder gleBuilder;
@@ -347,15 +340,8 @@ namespace {
                                                    int* numUpdated) {
         try {
             DBDirectClient client;
-            {
-                Client::GodScope gs;
-                // TODO(spencer): Once we're no longer fully rebuilding the user cache on every
-                // change to user data we should remove the global lock and uncomment the
-                // WriteContext below
-                Lock::GlobalWrite w;
-                // Client::WriteContext ctx(userNS);
-                client.update(collectionName, query, updatePattern, upsert, multi);
-            }
+            Client::GodScope gs;
+            client.update(collectionName, query, updatePattern, upsert, multi);
 
             // Handle write concern
             BSONObjBuilder gleBuilder;
@@ -382,15 +368,8 @@ namespace {
             int* numRemoved) {
         try {
             DBDirectClient client;
-            {
-                Client::GodScope gs;
-                // TODO(spencer): Once we're no longer fully rebuilding the user cache on every
-                // change to user data we should remove the global lock and uncomment the
-                // WriteContext below
-                Lock::GlobalWrite w;
-                // Client::WriteContext ctx(userNS);
-                client.remove(collectionName, query);
-            }
+            Client::GodScope gs;
+            client.remove(collectionName, query);
 
             // Handle write concern
             BSONObjBuilder gleBuilder;
@@ -439,7 +418,7 @@ namespace {
     }
 
     bool AuthzManagerExternalStateMongod::tryAcquireAuthzUpdateLock(const StringData& why) {
-        log() << "Attempting to lock user data for: " << why << endl;
+        LOG(2) << "Attempting to lock user data for: " << why << endl;
         return _authzDataUpdateLock.try_lock();
     }
 

@@ -112,6 +112,10 @@ namespace mongo {
      * All updates by guards using a fetch-phase are totally ordered with respect to one another,
      * and all guards using no fetch phase are totally ordered with respect to one another, but
      * there is not a total ordering among all guard objects.
+     *
+     * NOTE: It is not safe to enter fetch phase while holding a database lock.  Fetch phase
+     * operations are allowed to acquire database locks themselves, so entering fetch while holding
+     * a database lock may lead to deadlock.
      */
     class AuthorizationManager::CacheGuard {
         MONGO_DISALLOW_COPYING(CacheGuard);
@@ -182,7 +186,10 @@ namespace mongo {
     };
 
     AuthorizationManager::AuthorizationManager(AuthzManagerExternalState* externalState) :
-        _authEnabled(false), _externalState(externalState), _isFetchPhaseBusy(false) {
+        _authEnabled(false),
+        _externalState(externalState),
+        _userCacheGeneration(0),
+        _isFetchPhaseBusy(false) {
 
         setAuthorizationVersion(2);
     }
@@ -457,6 +464,7 @@ namespace mongo {
                           "User " << userName.getFullName() << " not found.");
         }
 
+        const uint64_t startGeneration = _userCacheGeneration;
         guard.beginFetchPhase();
         BSONObj userObj;
         Status status = getUserDescription(userName, &userObj);
@@ -476,8 +484,16 @@ namespace mongo {
 
         guard.endFetchPhase();
         user->incrementRefCount();
-        _userCache.insert(make_pair(userName, userHolder.release()));
-        *acquiredUser = user;
+        if (startGeneration == _userCacheGeneration) {
+            _userCache.insert(make_pair(userName, user));
+        }
+        else {
+            // If the cache generation changed while this thread was in fetch mode, the data
+            // associated with the user may now be invalid, so we must mark it as such.  The caller
+            // may still opt to use the information for a short while, but not indefinitely.
+            user->invalidate();
+        }
+        *acquiredUser = userHolder.release();
         return Status::OK();
     }
 
@@ -499,7 +515,8 @@ namespace mongo {
     }
 
     void AuthorizationManager::invalidateUserByName(const UserName& userName) {
-        CacheGuard guard(this);
+        CacheGuard guard(this, CacheGuard::fetchSynchronizationManual);
+        ++_userCacheGeneration;
         unordered_map<UserName, User*>::iterator it = _userCache.find(userName);
         if (it == _userCache.end()) {
             return;
@@ -511,7 +528,8 @@ namespace mongo {
     }
 
     void AuthorizationManager::invalidateUsersFromDB(const std::string& dbname) {
-        CacheGuard guard(this);
+        CacheGuard guard(this, CacheGuard::fetchSynchronizationManual);
+        ++_userCacheGeneration;
         unordered_map<UserName, User*>::iterator it = _userCache.begin();
         while (it != _userCache.end()) {
             User* user = it->second;
@@ -531,11 +549,12 @@ namespace mongo {
     }
 
     void AuthorizationManager::invalidateUserCache() {
-        CacheGuard guard(this);
+        CacheGuard guard(this, CacheGuard::fetchSynchronizationManual);
         _invalidateUserCache_inlock();
     }
 
     void AuthorizationManager::_invalidateUserCache_inlock() {
+        ++_userCacheGeneration;
         for (unordered_map<UserName, User*>::iterator it = _userCache.begin();
                 it != _userCache.end(); ++it) {
             if (it->second->getName() == internalSecurity.user->getName()) {
@@ -813,7 +832,7 @@ namespace mongo {
         if (ns == rolesCollectionNamespace.ns() ||
             ns == adminCommandNamespace.ns() ||
             ns == usersCollectionNamespace.ns()) {
-            CacheGuard guard(this);
+            CacheGuard guard(this, CacheGuard::fetchSynchronizationManual);
             if (_getVersion_inlock() == 2) {
                 _invalidateUserCache_inlock();
             }

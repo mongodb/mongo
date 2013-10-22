@@ -411,6 +411,12 @@ namespace mongo {
         unordered_map<UserName, User*> _userCache;
 
         /**
+         * Current generation of the user cache.  Bumped every time part of the cache gets
+         * invalidated.
+         */
+        uint64_t _userCacheGeneration;
+
+        /**
          * True if there is an update to the _userCache in progress, and that update is currently in
          * the "fetch phase", during which it does not hold the _userCacheMutex.
          *
@@ -419,7 +425,8 @@ namespace mongo {
         bool _isFetchPhaseBusy;
 
         /**
-         * Protects _userCache, _version and _isFetchPhaseBusy.  Manipulated via CacheGuard.
+         * Protects _userCache, _userCacheGeneration, _version and _isFetchPhaseBusy.  Manipulated
+         * via CacheGuard.
          */
         boost::mutex _userCacheMutex;
 
