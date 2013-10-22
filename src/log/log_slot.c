@@ -59,7 +59,7 @@ __wt_log_slot_init(WT_SESSION_IMPL *session)
 		F_SET(&log->slot_pool[i], SLOT_BUFFERED);
 	}
 	if (0) {
-err:		while (--i > 0)
+err:		while (--i >= 0)
 			__wt_buf_free(session, &log->slot_pool[i].slot_buf);
 	}
 	return (ret);
