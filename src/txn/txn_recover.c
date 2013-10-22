@@ -397,9 +397,15 @@ __wt_txn_recover(WT_SESSION_IMPL *default_session)
 
 	WT_ERR(__recovery_file_scan(&r, &start_lsn));
 
-	/* Now, recover all the files apart from the metadata. */
+	/*
+	 * Now, recover all the files apart from the metadata.
+	 *
+	 * If some files have LSNs earlier than the first log file found, they
+	 * must have been unmodified in later checkpoints (which led to earlier
+	 * log files being archived).
+	 */
 	r.metadata_only = 0;
-	if (IS_INIT_LSN(&start_lsn))
+	if (LOG_CMP(&start_lsn, &S2C(session)->log->first_lsn) < 0)
 		WT_ERR(__wt_log_scan(
 		    session, NULL, WT_LOGSCAN_FIRST, __txn_log_recover, &r));
 	else
