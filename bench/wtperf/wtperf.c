@@ -1676,27 +1676,28 @@ void
 print_config(CONFIG *cfg)
 {
 	printf("Workload configuration:\n");
-	printf("\t home: %s\n", cfg->home);
-	printf("\t table_name: %s\n", cfg->table_name);
-	printf("\t Connection configuration: %s\n", cfg->conn_config);
-	printf("\t Table configuration: %s\n", cfg->table_config);
-	printf("\t %s\n", cfg->create ? "Creating" : "Using existing");
-	printf("\t Checkpoint interval: %d\n", cfg->checkpoint_interval);
-	printf("\t Random seed: %d\n", cfg->rand_seed);
+	printf("\thome: %s\n", cfg->home);
+	printf("\ttable_name: %s\n", cfg->table_name);
+	printf("\tConnection configuration: %s\n", cfg->conn_config);
+	printf("\tTable configuration: %s\n", cfg->table_config);
+	printf("\t%s\n", cfg->create ? "Creating" : "Using existing");
+	printf("\tWorkload period: %d\n", cfg->run_time);
+	printf("\tCheckpoint interval: %d\n", cfg->checkpoint_interval);
+	printf("\tReporting interval: %d\n", cfg->report_interval);
+	printf("\tStatistics interval: %d\n", cfg->stat_interval);
 	if (cfg->create) {
-		printf("\t Insert count: %d\n", cfg->icount);
-		printf("\t Number populate threads: %d\n",
+		printf("\tInsert count: %d\n", cfg->icount);
+		printf("\tNumber populate threads: %d\n",
 		    cfg->populate_threads);
 	}
-	printf("\t key size: %d data size: %d\n", cfg->key_sz, cfg->data_sz);
-	printf("\t Reporting interval: %d\n", cfg->report_interval);
-	printf("\t Workload period: %d\n", cfg->run_time);
-	printf("\t Number read threads: %d\n", cfg->read_threads);
-	printf("\t Number insert threads: %d\n", cfg->insert_threads);
+	printf("\tNumber read threads: %d\n", cfg->read_threads);
+	printf("\tNumber insert threads: %d\n", cfg->insert_threads);
 	if (F_ISSET(cfg, PERF_INSERT_RMW))
-		printf("\t Insert operations are RMW.\n");
-	printf("\t Number update threads: %d\n", cfg->update_threads);
-	printf("\t Verbosity: %d\n", cfg->verbose);
+		printf("\tInsert operations are RMW.\n");
+	printf("\tNumber update threads: %d\n", cfg->update_threads);
+	printf("\tkey size: %d data size: %d\n", cfg->key_sz, cfg->data_sz);
+	printf("\tRandom seed: %d\n", cfg->rand_seed);
+	printf("\tVerbosity: %d\n", cfg->verbose);
 }
 
 void
