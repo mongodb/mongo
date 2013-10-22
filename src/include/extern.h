@@ -1359,7 +1359,7 @@ extern int __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[]);
 extern int __wt_checkpoint_write_leaves(WT_SESSION_IMPL *session,
     const char *cfg[]);
 extern int __wt_checkpoint_sync(WT_SESSION_IMPL *session, const char *cfg[]);
-extern int __wt_checkpoint_close(WT_SESSION_IMPL *session, const char *cfg[]);
+extern int __wt_checkpoint_close(WT_SESSION_IMPL *session);
 extern uint64_t __wt_ext_transaction_id(WT_EXTENSION_API *wt_api,
     WT_SESSION *wt_session);
 extern int __wt_ext_transaction_isolation_level( WT_EXTENSION_API *wt_api,
