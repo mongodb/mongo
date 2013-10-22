@@ -101,7 +101,17 @@ assert.eq(0, result.ok, "eval should not work for sharded collection in cluster"
 
 assert( s.admin.runCommand( { shardcollection : "test.foo4" , key : { num : 1 } , unique : true } ).ok , "shard with index and unique" );
 s.adminCommand( { split : "test.foo4" , middle : { num : 10 } } );
-s.adminCommand( { movechunk : "test.foo4" , find : { num : 20 } , to : s.getOther( s.getServer( "test" ) ).name } );
+
+//movechunk commands are wrapped in assert.soon
+//Sometimes the TO-side shard isn't immediately ready, this
+//causes problems on slow hosts.
+//Remove when SERVER-10232 is fixed
+
+assert.soon( function() {
+    var cmdRes = s.admin.runCommand( { movechunk : "test.foo4" , find : { num : 20 } , to : s.getOther( s.getServer( "test" ) ).name } );
+    return cmdRes.ok;
+}, 'move chunk test.foo4', 60000, 1000 );
+
 db.foo4.save( { num : 5 } );
 db.foo4.save( { num : 15 } );
 db.getLastError();
@@ -162,7 +172,16 @@ assert( s.admin.runCommand( { shardcollection : "test.foo6" , key : { a : 1 } } 
 assert.eq( 3 , db.foo6.find().count() );
 
 s.adminCommand( { split : "test.foo6" , middle : { a : 2 } } );
-s.adminCommand( { movechunk : "test.foo6" , find : { a : 3 } , to : s.getOther( s.getServer( "test" ) ).name } );
+
+//movechunk commands are wrapped in assert.soon
+//Sometimes the TO-side shard isn't immediately ready, this
+//causes problems on slow hosts.
+//Remove when SERVER-10232 is fixed
+
+assert.soon( function() {
+    var cmdRes = s.admin.runCommand( { movechunk : "test.foo6" , find : { a : 3 } , to : s.getOther( s.getServer( "test" ) ).name } );
+    return cmdRes.ok;
+}, 'move chunk test.foo6', 60000, 1000 );
 
 assert.throws( function(){ db.foo6.group( { key : { a : 1 } , initial : { count : 0 } , reduce : function(z,prev){ prev.count++; } } ); } );;
 

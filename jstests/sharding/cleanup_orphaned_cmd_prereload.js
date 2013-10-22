@@ -45,10 +45,18 @@ assert( !st.shard1.getDB( "admin" )
 
 jsTest.log( "Moving some chunks back to shard0 after empty..." );
 
-assert(admin.runCommand({moveChunk : coll + "",
+//movechunk commands are wrapped in assert.soon
+//Sometimes the TO-side shard isn't immediately ready, this
+//causes problems on slow hosts.
+//Remove when SERVER-10232 is fixed
+
+assert.soon( function() {
+    var cmdRes = admin.runCommand({moveChunk : coll + "",
                          find : { _id : -1 },
                          to : shards[1]._id,
-                         _waitForDelete : true }).ok);
+                         _waitForDelete : true });
+    return cmdRes.ok;
+}, 'move chunk id -1 to ' + shards[1]._id, 60000, 1000 );
 
 var metadata = st.shard0.getDB( "admin" )
                    .runCommand({ getShardVersion : coll + "", fullMetadata : true }).metadata;
