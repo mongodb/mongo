@@ -157,6 +157,7 @@ namespace mongo {
         verify(db);
         verify(ns.startsWith(db->name()));
 
+        recursive_scoped_lock cclock(ccmutex);
         // Look at all active non-cached Runners.  These are the runners that are in auto-yield mode
         // that are not attached to the the client cursor. For example, all internal runners don't
         // need to be cached -- there will be no getMore.
@@ -170,7 +171,6 @@ namespace mongo {
             }
         }
 
-        recursive_scoped_lock cclock(ccmutex);
         CCById::const_iterator it = clientCursorsById.begin();
         while (it != clientCursorsById.end()) {
             ClientCursor* cc = it->second;
