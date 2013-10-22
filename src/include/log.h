@@ -9,7 +9,7 @@
 
 /* Logging subsystem declarations. */
 #define	LOG_ALIGN		128
-#define	WT_LOG_SLOT_BUF_INIT_SIZE	4096
+#define	WT_LOG_SLOT_BUF_INIT_SIZE	8192
 
 struct __wt_lsn {
 	uint32_t	file;		/* Log file number */
@@ -107,12 +107,13 @@ typedef struct {
 	 * Consolidation array information
 	 * SLOT_ACTIVE must be less than SLOT_POOL.
 	 */
-#define	SLOT_ACTIVE	2
+#define	SLOT_ACTIVE	1
 #define	SLOT_POOL	16
 	uint32_t	 pool_index;		/* Global pool index */
 	WT_LOGSLOT	*slot_array[SLOT_ACTIVE];	/* Active slots */
 	WT_LOGSLOT	 slot_pool[SLOT_POOL];	/* Pool of all slots */
 
+#define	WT_LOG_FORCE_CONSOLIDATE	0x01
 	uint32_t	 flags;			/* Currently unused */
 } WT_LOG;
 

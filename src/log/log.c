@@ -761,6 +761,43 @@ err:	WT_CSTAT_INCR(session, log_scans);
 	return (ret);
 }
 
+/*
+ * Write a log record without using the consolidation arrays.
+ */
+static int
+__log_direct_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
+    uint32_t flags)
+{
+	WT_DECL_RET;
+	WT_LOG *log;
+	WT_LOGSLOT tmp;
+	WT_MYSLOT myslot;
+	int locked;
+
+	log = S2C(session)->log;
+	locked = 0;
+	myslot.slot = &tmp;
+	myslot.offset = 0;
+
+	/* Fast path the contended case. */
+	if (__wt_spin_trylock(session, &log->log_slot_lock) != 0)
+		return (EAGAIN);
+
+	memset(&tmp, 0, sizeof(tmp));
+	locked = 1;
+	if (LF_ISSET(WT_LOG_FSYNC))
+		F_SET(&tmp, SLOT_SYNC);
+	WT_ERR(__log_acquire(session, record->size, &tmp));
+	__wt_spin_unlock(session, &log->log_slot_lock);
+	locked = 0;
+	WT_ERR(__log_fill(session, &myslot, 1, record, lsnp));
+	WT_ERR(__log_release(session, &tmp));
+
+err:	if (locked)
+		__wt_spin_unlock(session, &log->log_slot_lock);
+	return (ret);
+}
+
 int
 __wt_log_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
     uint32_t flags)
@@ -769,7 +806,6 @@ __wt_log_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 	WT_DECL_RET;
 	WT_LOG *log;
 	WT_LOG_RECORD *logrec;
-	WT_LOGSLOT tmp;
 	WT_LSN tmp_lsn;
 	WT_MYSLOT myslot;
 	uint32_t rdup_len;
@@ -779,8 +815,6 @@ __wt_log_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 	log = conn->log;
 	locked = 0;
 	INIT_LSN(&tmp_lsn);
-	myslot.slot = &tmp;
-	myslot.offset = 0;
 	/*
 	 * Assume the WT_ITEM the user passed is a WT_LOG_RECORD, which has
 	 * a header at the beginning for us to fill in.
@@ -808,26 +842,44 @@ __wt_log_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 	logrec->checksum = 0;
 	logrec->checksum = __wt_cksum(logrec, record->size);
 
-	memset(&tmp, 0, sizeof(tmp));
 	WT_CSTAT_INCR(session, log_writes);
-#if 1
-	if (__wt_spin_trylock(session, &log->log_slot_lock) == 0) {
+
+	if (!F_ISSET(log, WT_LOG_FORCE_CONSOLIDATE)) {
+		ret = __log_direct_write(session, record, lsnp, flags);
+		if (ret == 0)
+			return (0);
+		if (ret != EAGAIN)
+			WT_ERR(ret);
 		/*
-		 * No contention, just write our record.  We're not using
-		 * the consolidation arrays, so send in the tmp slot.
+		 * An EAGAIN return means we failed to get the trylock - 
+		 * fall through to the consolidation code in that case.
 		 */
-		locked = 1;
-		if (LF_ISSET(WT_LOG_FSYNC))
-			F_SET(&tmp, SLOT_SYNC);
-		WT_ERR(__log_acquire(session, rdup_len, &tmp));
-		__wt_spin_unlock(session, &log->log_slot_lock);
-		locked = 0;
-		WT_ERR(__log_fill(session, &myslot, 1, record, lsnp));
-		WT_ERR(__log_release(session, &tmp));
+	}
+
+	/*
+	 * As soon as we see contention for the log slot, disable direct
+	 * log writes. We get better performance by forcing writes through
+	 * the consolidation code. This is because individual writes flood
+	 * the I/O system faster than they contend on the log slot lock.
+	 */
+	F_SET(log, WT_LOG_FORCE_CONSOLIDATE);
+	if ((ret = __wt_log_slot_join(
+	    session, rdup_len, flags, &myslot)) == ENOMEM) {
+		/*
+		 * If we couldn't find a consolidated slot for this record
+		 * write the record directly.
+		 */
+		while ((ret = __log_direct_write(
+		    session, record, lsnp, flags)) == EAGAIN) {}
+		WT_ERR(ret);
+		/*
+		 * Increase the buffer size of any slots we can get access
+		 * to, so future consolidations are likely to succeed.
+		 */
+		__wt_log_slot_grow_buffers(session, 4 * rdup_len);
 		return (0);
 	}
-#endif
-	WT_ERR(__wt_log_slot_join(session, rdup_len, flags, &myslot));
+	WT_ERR(ret);
 	if (myslot.offset == 0) {
 		__wt_spin_lock(session, &log->log_slot_lock);
 		locked = 1;
