@@ -822,6 +822,7 @@ var tests = [
         command: {renameCollection: firstDbName + ".x", to: secondDbName + ".y"},
         setup: function (db) {
             db.getSisterDB(firstDbName).x.save( {} );
+            db.getSisterDB(firstDbName).getLastError();
             db.getSisterDB(adminDbName).runCommand({movePrimary: firstDbName, to: shard0name});
             db.getSisterDB(adminDbName).runCommand({movePrimary: secondDbName, to: shard0name});
         },
@@ -1175,6 +1176,7 @@ function testProperAuthorization(conn, t, testcase, r) {
     if (t.setup) {
         adminDb.auth("admin", "password");
         t.setup(runOnDb);
+        runOnDb.getLastError();
         adminDb.logout();
     }
     assert(r.db.auth("user|" + r.role, "password"));
