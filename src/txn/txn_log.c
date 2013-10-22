@@ -82,7 +82,7 @@ __wt_txn_log_commit(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_DECL_ITEM(logrec);
 	WT_TXN *txn;
 	WT_TXN_OP *op;
-	const char *fmt = "I";
+	const char *fmt = "Iq";
 	size_t header_size;
 	uint32_t rectype = WT_LOGREC_COMMIT;
 	u_int i;
@@ -90,11 +90,12 @@ __wt_txn_log_commit(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_UNUSED(cfg);
 	txn = &session->txn;
 
-	WT_RET(__wt_struct_size(session, &header_size, fmt, rectype));
+	WT_RET(__wt_struct_size(session, &header_size, fmt, rectype, txn->id));
 	WT_RET(__wt_logrec_alloc(session, header_size, &logrec));
 
 	WT_ERR(__wt_struct_pack(session,
-	    (uint8_t *)logrec->data + logrec->size, header_size, fmt, rectype));
+	    (uint8_t *)logrec->data + logrec->size, header_size,
+	    fmt, rectype, txn->id));
 	logrec->size += (uint32_t)header_size;
 
 	/* Write updates to the log. */
