@@ -165,6 +165,7 @@ clientHeaderDirectories = [
     "util/",
     "util/concurrency/",
     "util/mongoutils/",
+    "util/options_parser/",
     "util/net/",
     ""
     ]
@@ -282,7 +283,42 @@ if installSetup.headers:
         mongoClientPrefixInstalls.append(inst)
 
 if installSetup.headers or installSetup.libraries:
-    env.Alias('install-mongoclient', mongoClientPrefixInstalls)
+    installAlias = env.Alias('install-mongoclient', mongoClientPrefixInstalls)
+
+    # Build some simple mainlines that include the dbclient.h and bson.h headers
+    # with things set up to include from the installation directory.
+
+    # Remove anything that says $BUILD_DIR from the CPPPATH, except for things in third party,
+    # so we have a source for boost, etc if we aren't getting them from the system.
+    limit_cpppath=[p for p in env['CPPPATH'] if not ('$BUILD_DIR' in p and not 'third_party' in p)]
+
+    # Create an environment where include files and libraries come from the installation directory.
+    installationTestEnv = env.Clone(
+        CPPPATH=["$INSTALL_DIR/include"] + limit_cpppath,
+        LIBPATH=["$INSTALL_DIR/lib"],
+        CPPDEFINES=[],
+    )
+
+    include_dbclienth_test_file = 'mongo/client/include_dbclienth_test.cpp'
+    env.Depends(include_dbclienth_test_file, installAlias)
+    include_dbclienth_test = installationTestEnv.Object(
+        target='include_dbclienth_test',
+        source=[include_dbclienth_test_file])
+    env.AlwaysBuild(include_dbclienth_test)
+    env.NoCache(include_dbclienth_test)
+
+    include_bsonh_test_file = 'mongo/client/include_bsonh_test.cpp'
+    env.Depends(include_bsonh_test_file, installAlias)
+    include_bsonh_test = installationTestEnv.Object(
+        target='include_bsonh_test',
+        source=[include_bsonh_test_file])
+    env.AlwaysBuild(include_bsonh_test)
+    env.NoCache(include_bsonh_test)
+
+    env.Alias('check-install-mongoclient', [
+        include_dbclienth_test,
+        include_bsonh_test,
+    ])
 
 clientEnv = env.Clone()
 clientEnv['CPPDEFINES'].remove('MONGO_EXPOSE_MACROS')
