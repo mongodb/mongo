@@ -379,24 +379,12 @@ __wt_txn_recover(WT_SESSION_IMPL *default_session)
 	WT_ERR(__wt_metadata_cursor(session, NULL, &r.files[0].c));
 
 	/*
-	 * TODO: find the last checkpoint log record.
-	 *
-	 * Problem: if the metadata was written after the last checkpoint, it
-	 * won't have the last checkpoint LSN...
-	 *
-	 * TODO: extract the snapshot from the checkpoint log record, set
-	 * up txn->snapshot and set isolation == TXN_ISO_SNAPSHOT.
-	 *
-	 * TODO: add a visibility check before applying commits.
-	 */
-
-	/*
 	 * First, recover the metadata, starting from the checkpoint's LSN.
 	 * Pass WT_LOGSCAN_RECOVER so that old logs get truncated.
 	 *
 	 * If we get here with no start LSN, that could either mean that no
 	 * metadata checkpoint ever completed, or that we are recovering after
-	 * a hotbackup (when the metadata is recreated from scratch).
+	 * a hot backup (when the metadata is recreated from scratch).
 	 */
 	r.metadata_only = 1;
 	if (IS_INIT_LSN(&start_lsn))

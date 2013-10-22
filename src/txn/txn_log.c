@@ -82,7 +82,7 @@ __wt_txn_log_commit(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_DECL_ITEM(logrec);
 	WT_TXN *txn;
 	WT_TXN_OP *op;
-	const char *fmt = "Iq";
+	const char *fmt = WT_UNCHECKED_STRING(Iq);
 	size_t header_size;
 	uint32_t rectype = WT_LOGREC_COMMIT;
 	u_int i;
@@ -229,10 +229,12 @@ __wt_txn_log_checkpoint(
 		WT_ERR(__wt_log_write(session, logrec, lsnp, 0));
 
 		/*
-		 * If this a full checkpoint completed successfully, we can
-		 * archive up to the checkpoint LSN.
+		 * If this a full checkpoint completed successfully and there
+		 * is no hot backup in progress, we can archive up to the
+		 * checkpoint LSN.
 		 */
-		WT_ERR(__wt_log_ckpt(session, ckpt_lsn));
+		if (!S2C(session)->hot_backup)
+			WT_ERR(__wt_log_ckpt(session, ckpt_lsn));
 
 		/* FALLTHROUGH */
 	case WT_TXN_LOG_CKPT_FAIL:
