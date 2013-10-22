@@ -226,6 +226,7 @@ __txn_log_recover(
     WT_SESSION_IMPL *session, WT_ITEM *logrec, WT_LSN *lsnp, void *cookie)
 {
 	const uint8_t *end, *p;
+	uint64_t txnid;
 	uint32_t rectype;
 
 	p = (const uint8_t *)logrec->data + offsetof(WT_LOG_RECORD, record);
@@ -236,6 +237,8 @@ __txn_log_recover(
 
 	switch (rectype) {
 	case WT_LOGREC_COMMIT:
+		WT_RET(__wt_vunpack_uint(&p, WT_PTRDIFF(end, p), &txnid));
+		WT_UNUSED(txnid);
 		WT_RET(__txn_commit_apply(cookie, lsnp, &p, end));
 		break;
 	}
@@ -390,14 +393,19 @@ __wt_txn_recover(WT_SESSION_IMPL *default_session)
 	/*
 	 * First, recover the metadata, starting from the checkpoint's LSN.
 	 * Pass WT_LOGSCAN_RECOVER so that old logs get truncated.
+	 *
+	 * If we get here with no start LSN, that could either mean that no
+	 * metadata checkpoint ever completed, or that we are recovering after
+	 * a hotbackup (when the metadata is recreated from scratch).
 	 */
 	r.metadata_only = 1;
-#if 0
-	WT_ERR(__wt_log_scan(
-	    session, &start_lsn, WT_LOGSCAN_RECOVER, __txn_log_recover, &r));
-#else
-	WT_ERR(__wt_log_scan(session, &start_lsn, 0, __txn_log_recover, &r));
-#endif
+	if (IS_INIT_LSN(&start_lsn))
+		WT_ERR(__wt_log_scan(session, NULL,
+		    WT_LOGSCAN_FIRST | WT_LOGSCAN_RECOVER,
+		    __txn_log_recover, &r));
+	else
+		WT_ERR(__wt_log_scan(session, &start_lsn, WT_LOGSCAN_RECOVER,
+		    __txn_log_recover, &r));
 
 	WT_ERR(__recovery_file_scan(&r, &start_lsn));
 

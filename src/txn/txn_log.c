@@ -228,9 +228,11 @@ __wt_txn_log_checkpoint(
 		logrec->size += (uint32_t)recsize;
 		WT_ERR(__wt_log_write(session, logrec, lsnp, 0));
 
-#if 0
+		/*
+		 * If this a full checkpoint completed successfully, we can
+		 * archive up to the checkpoint LSN.
+		 */
 		WT_ERR(__wt_log_ckpt(session, ckpt_lsn));
-#endif
 
 		/* FALLTHROUGH */
 	case WT_TXN_LOG_CKPT_FAIL:
@@ -316,6 +318,7 @@ __txn_printlog(
 {
 	FILE *out;
 	const uint8_t *end, *p;
+	uint64_t txnid;
 	uint32_t rectype;
 
 	out = cookie;
@@ -333,6 +336,10 @@ __txn_printlog(
 
 	switch (rectype) {
 	case WT_LOGREC_COMMIT:
+		WT_RET(__wt_vunpack_uint(&p, WT_PTRDIFF(end, p), &txnid));
+		if (fprintf(
+		    out, "    \"txnid\" : %" PRIu64 ",\n", txnid) < 0)
+			return (errno);
 		WT_RET(__txn_commit_printlog(session, &p, end, out));
 		break;
 	}
