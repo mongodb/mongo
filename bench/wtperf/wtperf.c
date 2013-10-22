@@ -120,7 +120,7 @@ int find_table_count(CONFIG *);
 int get_next_op(uint64_t *);
 void indent_lines(const char *, const char *);
 void *insert_thread(void *);
-int lprintf(CONFIG *cfg, int err, uint32_t level, const char *fmt, ...)
+void lprintf(CONFIG *cfg, int err, uint32_t level, const char *fmt, ...)
 #ifdef __GNUC__
     __attribute__((format (printf, 4, 5)))
 #endif
@@ -1549,7 +1549,7 @@ stop_threads(CONFIG *cfg, u_int num, pthread_t *threads)
 /*
  * Log printf - output a log message.
  */
-int
+void
 lprintf(CONFIG *cfg, int err, uint32_t level, const char *fmt, ...)
 {
 	va_list ap;
@@ -1568,7 +1568,7 @@ lprintf(CONFIG *cfg, int err, uint32_t level, const char *fmt, ...)
 		}
 	}
 	if (err == 0)
-		return (0);
+		return;
 
 	/* We are dealing with an error. */
 	va_start(ap, fmt);
@@ -1585,8 +1585,6 @@ lprintf(CONFIG *cfg, int err, uint32_t level, const char *fmt, ...)
 	/* Never attempt to continue if we got a panic from WiredTiger. */
 	if (err == WT_PANIC)
 		exit(1);
-
-	return (0);
 }
 
 /* Setup the logging output mechanism. */
