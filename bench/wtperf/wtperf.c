@@ -321,7 +321,7 @@ worker(CONFIG *cfg, uint32_t worker_type)
 			op_ret = cursor->search(cursor);
 			if (op_ret != WT_NOTFOUND)
 				break;
-			/* Fall through */
+			/* FALLTHROUGH */
 		case WORKER_INSERT:
 			op_name = "insert";
 			cursor->set_value(cursor, data_buf);
