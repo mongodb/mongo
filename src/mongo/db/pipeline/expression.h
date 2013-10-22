@@ -35,6 +35,7 @@
 #include "mongo/db/pipeline/value.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/string_map.h"
 
 namespace mongo {
 
@@ -47,6 +48,11 @@ namespace mongo {
     /// The state used as input to Expressions
     class Variables {
     public:
+        /**
+         * Each unique variable is assigned a unique id of this type
+         */
+        typedef size_t Id;
+
         Variables() {}
 
         explicit Variables(const Document& rootAndCurrent)
@@ -63,12 +69,44 @@ namespace mongo {
         static void uassertValidNameForUserWrite(StringData varName);
         static void uassertValidNameForUserRead(StringData varName);
 
+        static const Id ROOT_ID = Id(-1);
+
         Value root;
         Value current;
         Document rest;
     };
 
+    /**
+     * This class represents the Variables that are defined in an Expression tree.
+     *
+     * All copies from a given instance share enough information to ensure unique Ids are assigned
+     * and to propagate back to the original instance enough information to correctly construct a
+     * Variables instance.
+     */
     class VariablesParseState {
+    public:
+        VariablesParseState() : _nextId(new Variables::Id(0)) {}
+
+        /**
+         * Assigns a named variable a unique Id. This differs from all other variables, even
+         * others with the same name.
+         *
+         * The special variables ROOT and CURRENT are always implicitly defined with CURRENT
+         * equivalent to ROOT. If CURRENT is explicitly defined by a call to this function, it
+         * breaks that equivalence.
+         *
+         * NOTE: Name validation is responsibility of caller.
+         */
+        Variables::Id defineVariable(const StringData& name);
+
+        /**
+         * Returns the current Id for a variable. uasserts if the variable isn't defined.
+         */
+        Variables::Id getVariable(const StringData& name) const;
+
+    private:
+        StringMap<Variables::Id> _variables;
+        shared_ptr<Variables::Id> _nextId;
     };
 
     class Expression :
@@ -478,7 +516,7 @@ namespace mongo {
         const FieldPath& getFieldPath() const { return _fieldPath; }
 
     private:
-        ExpressionFieldPath(const string &fieldPath);
+        ExpressionFieldPath(const string& fieldPath, Variables::Id variable);
 
         /*
           Internal implementation of evaluateInternal(), used recursively.
@@ -506,7 +544,8 @@ namespace mongo {
         };
 
         const FieldPath _fieldPath;
-        const BaseVar _baseVar;
+        const Variables::Id _variable;
+        const BaseVar _baseVar; // TODO remove
     };
 
 
@@ -538,10 +577,22 @@ namespace mongo {
             BSONElement expr,
             const VariablesParseState& vps);
 
-        typedef map<string, intrusive_ptr<Expression> > VariableMap;
+        struct NameAndExpression {
+            NameAndExpression() {}
+            NameAndExpression(string name, intrusive_ptr<Expression> expression)
+                : name(name)
+                , expression(expression)
+            {}
+
+            string name;
+            intrusive_ptr<Expression> expression;
+        };
+
+        typedef map<Variables::Id, NameAndExpression> VariableMap;
 
     private:
-        ExpressionLet(const VariableMap& vars, intrusive_ptr<Expression> subExpression);
+        ExpressionLet(const VariableMap& vars,
+                      intrusive_ptr<Expression> subExpression);
 
         VariableMap _variables;
         intrusive_ptr<Expression> _subExpression;
@@ -561,10 +612,12 @@ namespace mongo {
 
     private:
         ExpressionMap(const string& varName, // name of variable to set
+                      Variables::Id varId, // id of variable to set
                       intrusive_ptr<Expression> input, // yields array to iterate
                       intrusive_ptr<Expression> each); // yields results to be added to output array
 
         string _varName;
+        Variables::Id _varId;
         intrusive_ptr<Expression> _input;
         intrusive_ptr<Expression> _each;
     };

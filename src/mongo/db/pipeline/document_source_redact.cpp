@@ -152,6 +152,11 @@ namespace mongo {
         Expression::ObjectCtx oCtx(0);
 
         VariablesParseState vps;
+        // TODO save and use the returned ids somehow
+        vps.defineVariable("CURRENT"); // will differ from ROOT in this DocumentSource
+        vps.defineVariable("DESCEND");
+        vps.defineVariable("PRUNE");
+        vps.defineVariable("KEEP");
         intrusive_ptr<Expression> expression = Expression::parseObject(elem.Obj(), &oCtx, vps);
 
         return new DocumentSourceRedact(expCtx, expression);

@@ -110,6 +110,27 @@ namespace mongo {
         }
     }
 
+    Variables::Id VariablesParseState::defineVariable(const StringData& name) {
+        // caller should have validated before hand by using Variables::uassertValidNameForUserWrite
+        massert(17275, "Can't redefine ROOT",
+                name != "ROOT");
+
+        Variables::Id id = (*_nextId)++;
+        _variables[name] = id;
+        return id;
+    }
+
+    Variables::Id VariablesParseState::getVariable(const StringData& name) const {
+        StringMap<Variables::Id>::const_iterator it = _variables.find(name);
+        if (it != _variables.end())
+            return it->second;
+
+        uassert(17276, str::stream() << "Use of undefinded variable: " << name,
+                name == "ROOT" || name == "CURRENT");
+
+        return Variables::ROOT_ID;
+    }
+
     /* --------------------------- Expression ------------------------------ */
 
     Expression::ObjectCtx::ObjectCtx(int theOptions)
@@ -1119,9 +1140,9 @@ namespace {
 
     /* --------------------- ExpressionFieldPath --------------------------- */
 
-    // this is the old deprecated version
+    // this is the old deprecated version only used by tests not using variables
     intrusive_ptr<ExpressionFieldPath> ExpressionFieldPath::create(const string& fieldPath) {
-        return new ExpressionFieldPath("CURRENT." + fieldPath);
+        return new ExpressionFieldPath("CURRENT." + fieldPath, Variables::ROOT_ID);
     }
 
     // this is the new version that supports every syntax
@@ -1138,18 +1159,20 @@ namespace {
         if (raw[1] == '$') {
             const StringData rawSD = raw;
             const StringData fieldPath = rawSD.substr(2); // strip off $$
-            const StringData varName = fieldPath.substr(0, fieldPath.find('.')-1);
+            const StringData varName = fieldPath.substr(0, fieldPath.find('.'));
             Variables::uassertValidNameForUserRead(varName);
-            return new ExpressionFieldPath(fieldPath.toString());
+            return new ExpressionFieldPath(fieldPath.toString(), vps.getVariable(varName));
         }
         else {
-            return new ExpressionFieldPath("CURRENT." + raw.substr(1)); // strip the "$" prefix
+            return new ExpressionFieldPath("CURRENT." + raw.substr(1), // strip the "$" prefix
+                                           vps.getVariable("CURRENT"));
         }
     }
 
 
-    ExpressionFieldPath::ExpressionFieldPath(const string& theFieldPath)
+    ExpressionFieldPath::ExpressionFieldPath(const string& theFieldPath, Variables::Id variable)
         : _fieldPath(theFieldPath)
+        , _variable(variable)
         , _baseVar(_fieldPath.getFieldName(0) == "CURRENT" ? CURRENT :
                    _fieldPath.getFieldName(0) == "ROOT" ?    ROOT :
                                                              OTHER)
@@ -1243,7 +1266,7 @@ namespace {
     REGISTER_EXPRESSION("$let", ExpressionLet::parse);
     intrusive_ptr<Expression> ExpressionLet::parse(
             BSONElement expr,
-            const VariablesParseState& vps) {
+            const VariablesParseState& vpsIn) {
 
         verify(str::equals(expr.fieldName(), "$let"));
 
@@ -1251,22 +1274,14 @@ namespace {
                 expr.type() == Object);
         const BSONObj args = expr.embeddedObject();
 
-        // used for input validation
-        bool haveVars = false;
-        bool haveIn = false;
-
-        VariableMap vars;
-        intrusive_ptr<Expression> subExpression;
+        // varsElem must be parsed before inElem regardless of BSON order.
+        BSONElement varsElem;
+        BSONElement inElem;
         BSONForEach(arg, args) {
             if (str::equals(arg.fieldName(), "vars")) {
-                haveVars = true;
-                BSONForEach(variable, arg.embeddedObjectUserCheck()) {
-                    Variables::uassertValidNameForUserWrite(variable.fieldName());
-                    vars[variable.fieldName()] = parseOperand(variable, vps);
-                }
+                varsElem = arg;
             } else if (str::equals(arg.fieldName(), "in")) {
-                haveIn = true;
-                subExpression = parseOperand(arg, vps);
+                inElem = arg;
             } else {
                 uasserted(16875, str::stream()
                         << "Unrecognized parameter to $let: " << arg.fieldName());
@@ -1274,9 +1289,24 @@ namespace {
         }
 
         uassert(16876, "Missing 'vars' parameter to $let",
-                haveVars);
+                !varsElem.eoo());
         uassert(16877, "Missing 'in' parameter to $let",
-                haveIn);
+                !inElem.eoo());
+
+        // parse "vars"
+        VariablesParseState vpsSub(vpsIn); // vpsSub gets our vars, vpsIn doesn't.
+        VariableMap vars;
+        BSONForEach(varElem, varsElem.embeddedObjectUserCheck()) {
+            const string varName = varElem.fieldName();
+            Variables::uassertValidNameForUserWrite(varName);
+            Variables::Id id = vpsSub.defineVariable(varName);
+
+            vars[id] = NameAndExpression(varName,
+                                         parseOperand(varElem, vpsIn)); // only has outer vars
+        }
+
+        // parse "in"
+        intrusive_ptr<Expression> subExpression = parseOperand(inElem, vpsSub); // has our vars
 
         return new ExpressionLet(vars, subExpression);
     }
@@ -1293,7 +1323,7 @@ namespace {
         }
 
         for (VariableMap::iterator it=_variables.begin(), end=_variables.end(); it != end; ++it) {
-            it->second = it->second->optimize();
+            it->second.expression = it->second.expression->optimize();
         }
 
         // TODO be smarter with constant "variables"
@@ -1306,7 +1336,7 @@ namespace {
         MutableDocument vars;
         for (VariableMap::const_iterator it=_variables.begin(), end=_variables.end();
                 it != end; ++it) {
-            vars[it->first] = it->second->serialize(explain);
+            vars[it->second.name] = it->second.expression->serialize(explain);
         }
 
         return Value(DOC("$let" << DOC("vars" << vars.freeze()
@@ -1320,13 +1350,13 @@ namespace {
         for (VariableMap::const_iterator it=_variables.begin(), end=_variables.end();
                 it != end; ++it) {
 
-            const Value newVar = it->second->evaluateInternal(originalVars);
+            const Value newVar = it->second.expression->evaluateInternal(originalVars);
 
             // Can't set ROOT (checked in parse())
-            if (it->first == "CURRENT") {
+            if (it->second.name == "CURRENT") {
                 newVars.current = newVar;
             } else {
-                newRest[it->first] = newVar;
+                newRest[it->second.name] = newVar;
             }
         }
 
@@ -1337,7 +1367,7 @@ namespace {
     void ExpressionLet::addDependencies(set<string>& deps, vector<string>* path) const {
         for (VariableMap::const_iterator it=_variables.begin(), end=_variables.end();
                 it != end; ++it) {
-            it->second->addDependencies(deps);
+            it->second.expression->addDependencies(deps);
         }
 
         // TODO be smarter when CURRENT is a bound variable
@@ -1350,34 +1380,25 @@ namespace {
     REGISTER_EXPRESSION("$map", ExpressionMap::parse);
     intrusive_ptr<Expression> ExpressionMap::parse(
             BSONElement expr,
-            const VariablesParseState& vps) {
+            const VariablesParseState& vpsIn) {
 
         verify(str::equals(expr.fieldName(), "$map"));
 
         uassert(16878, "$map only supports an object as it's argument",
                 expr.type() == Object);
 
-        // used for input validation
-        bool haveInput = false;
-        bool haveAs = false;
-        bool haveIn = false;
-
-        string varName;
-        intrusive_ptr<Expression> input;
-        intrusive_ptr<Expression> in;
-
+        // "in" must be parsed after "as" regardless of BSON order
+        BSONElement inputElem;
+        BSONElement asElem;
+        BSONElement inElem;
         const BSONObj args = expr.embeddedObject();
         BSONForEach(arg, args) {
             if (str::equals(arg.fieldName(), "input")) {
-                haveInput = true;
-                input = parseOperand(arg, vps);
+                inputElem = arg;
             } else if (str::equals(arg.fieldName(), "as")) {
-                haveAs = true;
-                varName = arg.str();
-                Variables::uassertValidNameForUserWrite(varName);
+                asElem = arg;
             } else if (str::equals(arg.fieldName(), "in")) {
-                haveIn = true;
-                in = parseOperand(arg, vps);
+                inElem = arg;
             } else {
                 uasserted(16879, str::stream()
                         << "Unrecognized parameter to $map: " << arg.fieldName());
@@ -1385,19 +1406,33 @@ namespace {
         }
 
         uassert(16880, "Missing 'input' parameter to $map",
-                haveInput);
+                !inputElem.eoo());
         uassert(16881, "Missing 'as' parameter to $map",
-                haveAs);
+                !asElem.eoo());
         uassert(16882, "Missing 'in' parameter to $map",
-                haveIn);
+                !inElem.eoo());
 
-        return new ExpressionMap(varName, input, in);
+        // parse "input"
+        intrusive_ptr<Expression> input = parseOperand(inputElem, vpsIn); // only has outer vars
+
+        // parse "as"
+        VariablesParseState vpsSub(vpsIn); // vpsSub gets our vars, vpsIn doesn't.
+        string varName = asElem.str();
+        Variables::uassertValidNameForUserWrite(varName);
+        Variables::Id varId = vpsSub.defineVariable(varName);
+
+        // parse "in"
+        intrusive_ptr<Expression> in = parseOperand(inElem, vpsSub); // has access to map variable
+
+        return new ExpressionMap(varName, varId, input, in);
     }
 
     ExpressionMap::ExpressionMap(const string& varName,
+                                 Variables::Id varId,
                                  intrusive_ptr<Expression> input,
                                  intrusive_ptr<Expression> each)
         : _varName(varName)
+        , _varId(varId)
         , _input(input)
         , _each(each)
     {}
