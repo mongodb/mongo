@@ -257,4 +257,30 @@ env.StaticLibrary(
     ],
 )
 
+env.StaticLibrary(
+    target='write_op_conversion',
+    source=[
+        'batch_upconvert.cpp',
+        # More to come
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/bson',
+        'write_ops',
+        '$BUILD_DIR/mongo/db/common', # for Message
+    ],
+)
+
+env.CppUnitTest(
+    target='batch_upconvert_test',
+    source=[
+        'batch_upconvert_test.cpp',
+    ],
+    LIBDEPS=[
+        'write_ops',
+        'write_op_conversion',
+        '$BUILD_DIR/mongo/db/common',
+        '$BUILD_DIR/mongo/server_options', # DbMessage needs server options, sigh
+    ]
+)
+
 
