@@ -217,7 +217,6 @@ uint64_t g_nins_ops;
 uint64_t g_npop_ops;
 uint64_t g_nread_ops;
 uint64_t g_nupdate_ops;
-uint64_t g_nworker_ops;
 int g_running;
 int g_util_running;
 uint32_t g_threads_quit; /* For tracking threads that exit early. */
@@ -381,7 +380,6 @@ worker(CONFIG *cfg, uint32_t worker_type)
 				++g_nread_ops;
 			else if (worker_type == WORKER_UPDATE)
 				++g_nupdate_ops;
-			++g_nworker_ops;
 		}
 	}
 
