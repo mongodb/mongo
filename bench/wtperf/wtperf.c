@@ -965,10 +965,9 @@ main(int argc, char *argv[])
 			break;
 		}
 
-	/* Pre-populate the URI from the table name. */
+	/* Build the URI from the table name. */
 	req_len = strlen("table:") + strlen(cfg.table_name) + 1;
-	cfg.uri = (char *)calloc(req_len, 1);
-	if (cfg.uri == NULL) {
+	if ((cfg.uri = calloc(req_len, 1)) == NULL) {
 		ret = ENOMEM;
 		goto err;
 	}
@@ -1032,13 +1031,14 @@ main(int argc, char *argv[])
 		goto err;
 	}
 
+					/* Remove the test directory. */
 	if ((ret = remove_all(opt_home, 1)) != 0)
 		goto err;
 
-	if (cfg.verbose > 1)
+	if (cfg.verbose > 1)		/* Display the configuration. */
 		print_config(&cfg);
 
-	/* Now open the real connection. */
+					/* Open the real connection. */
 	if ((ret = wiredtiger_open(
 	    cfg.home, NULL, cfg.conn_config, &conn)) != 0) {
 		lprintf(&cfg, ret, 0, "Error connecting to %s", cfg.home);
@@ -1046,7 +1046,7 @@ main(int argc, char *argv[])
 	}
 	cfg.conn = conn;
 
-	g_util_running = 1;
+	g_util_running = 1;		/* Start the statistics thread. */
 	if (cfg.stat_interval != 0) {
 		if ((ret = pthread_create(
 		    &stat_thread, NULL, stat_worker, &cfg)) != 0) {
@@ -1055,7 +1055,7 @@ main(int argc, char *argv[])
 			goto err;
 		}
 		stat_created = 1;
-	}
+	}				/* Start the checkpoint thread. */
 	if (cfg.checkpoint_interval != 0) {
 		if ((ret = pthread_create(
 		    &checkpoint_thread, NULL, checkpoint_worker, &cfg)) != 0) {
@@ -1065,12 +1065,13 @@ main(int argc, char *argv[])
 		}
 		checkpoint_created = 1;
 	}
+					/* If creating, populate the table. */
 	if (cfg.create != 0 && execute_populate(&cfg) != 0)
 		goto err;
-	/* If we aren't populating, set the insert count. */
+					/* Not creating, set insert count. */
 	if (cfg.create == 0 && find_table_count(&cfg) != 0)
 		goto err;
-
+					/* Execute the workload. */
 	if (cfg.run_time != 0 &&
 	    cfg.read_threads + cfg.insert_threads + cfg.update_threads != 0 &&
 	    (ret = execute_workload(&cfg)) != 0)
