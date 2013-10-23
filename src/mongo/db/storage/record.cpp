@@ -395,12 +395,12 @@ namespace mongo {
 
     
     // These need to be outside the ps namespace due to the way they are defined
-#if defined(__linux__) && defined(__GNUC__)
+#if defined(MONGO_HAVE___THREAD)
     __thread ps::PointerTable::Data _pointerTableData;
     ps::PointerTable::Data* ps::PointerTable::getData() { 
         return &_pointerTableData; 
     }
-#elif defined(_WIN32)
+#elif defined(MONGO_HAVE___DECLSPEC_THREAD)
     __declspec( thread ) ps::PointerTable::Data _pointerTableData;
     ps::PointerTable::Data* ps::PointerTable::getData() { 
         return &_pointerTableData; 

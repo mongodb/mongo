@@ -86,7 +86,7 @@ namespace mongo {
        a combination here, with the assumption that reset's are infrequent, so that 
        get's are fast.
     */
-#if defined(_WIN32) || (defined(__GNUC__) && defined(__linux__))
+#if defined(MONGO_HAVE___THREAD) || defined(MONGO_HAVE___DECLSPEC_THREAD)
         
     template< class T >
     struct TSP {
@@ -102,7 +102,7 @@ namespace mongo {
         }
     };
 
-# if defined(_WIN32)
+# if defined(MONGO_HAVE___DECLSPEC_THREAD)
 
 #  define TSP_DECLARE(T,p) extern TSP<T> p;
 
@@ -129,7 +129,7 @@ namespace mongo {
     TSP<T> p;
 # endif
 
-#elif defined(__APPLE__)
+#elif defined(_POSIX_THREADS) && (_POSIX_THREADS >= 0)
     template< class T>
     struct TSP {
         pthread_key_t _key;

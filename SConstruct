@@ -1321,6 +1321,49 @@ def doConfigure(myenv):
     if linux:
         AddToCCFLAGSIfSupported(myenv, "-fno-builtin-memcmp")
 
+    # When using msvc, check for support for __declspec(thread), unless we have been asked
+    # explicitly not to use it. For other compilers, see if __thread works.
+    if using_msvc():
+        def CheckDeclspecThread(context):
+            test_body = """
+            __declspec( thread ) int tsp_int;
+            int main(int argc, char* argv[]) {
+                tsp_int = argc;
+                return 0;
+            }
+            """
+            context.Message('Checking for __declspec(thread)... ')
+            ret = context.TryLink(textwrap.dedent(test_body), ".cpp")
+            context.Result(ret)
+            return ret
+        conf = Configure(myenv, help=False, custom_tests = {
+            'CheckDeclspecThread' : CheckDeclspecThread,
+        })
+        haveDeclSpecThread = conf.CheckDeclspecThread()
+        conf.Finish()
+        if haveDeclSpecThread:
+            myenv.Append(CPPDEFINES=['MONGO_HAVE___DECLSPEC_THREAD'])
+    else:
+        def CheckUUThread(context):
+            test_body = """
+            __thread int tsp_int;
+            int main(int argc, char* argv[]) {
+                tsp_int = argc;
+                return 0;
+            }
+            """
+            context.Message('Checking for __thread... ')
+            ret = context.TryLink(textwrap.dedent(test_body), ".cpp")
+            context.Result(ret)
+            return ret
+        conf = Configure(myenv, help=False, custom_tests = {
+            'CheckUUThread' : CheckUUThread,
+        })
+        haveUUThread = conf.CheckUUThread()
+        conf.Finish()
+        if haveUUThread:
+            myenv.Append(CPPDEFINES=['MONGO_HAVE___THREAD'])
+
     conf = Configure(myenv)
     libdeps.setup_conftests(conf)
 
