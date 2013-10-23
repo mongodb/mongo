@@ -62,7 +62,7 @@ namespace mongo {
         if(!ret.isOK()) {
             return ret;
         }
-        ret = options->addPositionalOption(POD( "file", moe::String, 2 ));
+        ret = options->addPositionalOption(POD( "file", moe::String, 1 ));
         if(!ret.isOK()) {
             return ret;
         }
