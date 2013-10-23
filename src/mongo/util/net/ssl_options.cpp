@@ -175,7 +175,7 @@ namespace mongo {
                           "need to enable SSL via the sslMode flag when "
                           "using SSL configuration parameters");
         }
-        if (serverGlobalParams.clusterAuthMode == "sendKeyfile" ||
+        if (serverGlobalParams.clusterAuthMode == "sendKeyFile" ||
             serverGlobalParams.clusterAuthMode == "sendX509" ||
             serverGlobalParams.clusterAuthMode == "x509") {
             if (sslGlobalParams.sslMode.load() == SSLGlobalParams::SSLMode_noSSL){
@@ -183,7 +183,7 @@ namespace mongo {
             }
         }
         else if (params.count("clusterAuthMode") &&
-                 serverGlobalParams.clusterAuthMode != "keyfile") {
+                 serverGlobalParams.clusterAuthMode != "keyFile") {
             StringBuilder sb;
             sb << "unsupported value for clusterAuthMode " << serverGlobalParams.clusterAuthMode;
             return Status(ErrorCodes::BadValue, sb.str());

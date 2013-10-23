@@ -189,7 +189,7 @@ namespace {
 
         options->addOptionChaining("clusterAuthMode", "clusterAuthMode", moe::String,
                 "Authentication mode used for cluster authentication. Alternatives are "
-                "(keyfile|sendKeyfile|sendX509|x509)");
+                "(keyFile|sendKeyFile|sendX509|x509)");
 
 #ifndef _WIN32
         options->addOptionChaining("nounixsocket", "nounixsocket", moe::Switch,
@@ -548,7 +548,7 @@ namespace {
             }
         }
         if (!params.count("clusterAuthMode") && params.count("keyFile")){
-            serverGlobalParams.clusterAuthMode = "keyfile";
+            serverGlobalParams.clusterAuthMode = "keyFile";
         }
 
 #ifdef MONGO_SSL
@@ -557,8 +557,8 @@ namespace {
             return ret;
         }
 #else // ifdef MONGO_SSL
-        // Keyfile is currently the only supported value if not using SSL
-        if (params.count("clusterAuthMode") && serverGlobalParams.clusterAuthMode != "keyfile") {
+        // keyFile is currently the only supported value if not using SSL
+        if (params.count("clusterAuthMode") && serverGlobalParams.clusterAuthMode != "keyFile") {
             StringBuilder sb;
             sb << "unsupported value for clusterAuthMode " << serverGlobalParams.clusterAuthMode;
             return Status(ErrorCodes::BadValue, sb.str());

@@ -275,7 +275,7 @@ namespace mongo {
             // Handle internal cluster member auth, only applies to server-server connections 
             if (srvClusterId == peerClusterId) {
                 if (serverGlobalParams.clusterAuthMode.empty() ||
-                    serverGlobalParams.clusterAuthMode == "keyfile") {
+                    serverGlobalParams.clusterAuthMode == "keyFile") {
                     return Status(ErrorCodes::AuthenticationFailed, "The provided certificate " 
                                   "can only be used for cluster authentication, not client " 
                                   "authentication. The current configuration does not allow " 
