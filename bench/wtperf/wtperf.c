@@ -47,8 +47,6 @@
 #include <wiredtiger.h>
 #include <wiredtiger_ext.h>
 
-#define	ATOMIC_ADD(v, val)						\
-	__sync_add_and_fetch(&(v), val)
 #ifndef F_CLR
 #define	F_CLR(p, mask)		((p)->flags &= ~((uint32_t)(mask)))
 #endif
@@ -60,18 +58,23 @@
 #endif
 
 typedef struct {
-	const char *home;
-	char *uri;
-	WT_CONNECTION *conn;
-	FILE *logf;
+	const char *home;	/* WiredTiger home */
+	char *uri;		/* Object URI */
+
+	WT_CONNECTION *conn;	/* Database connection */
+
+	FILE *logf;		/* Logging handle */
+
 #define	WT_PERF_INIT		0x00
 #define	WT_PERF_POP		0x01
 #define	WT_PERF_READ		0x02
 	uint32_t phase;
+
 #define	PERF_INSERT_RMW		0x01
 #define	PERF_RAND_PARETO	0x02 /* Use the Pareto random distribution. */
 #define	PERF_RAND_WORKLOAD	0x04
 	uint32_t flags;
+
 	struct timeval phase_start_time;
 	uint32_t elapsed_time;
 
@@ -118,7 +121,6 @@ void config_opt_usage(void);
 int execute_populate(CONFIG *);
 int execute_workload(CONFIG *);
 int find_table_count(CONFIG *);
-void get_next_op(uint64_t *);
 void indent_lines(const char *, const char *);
 void *insert_thread(void *);
 void lprintf(CONFIG *cfg, int err, uint32_t level, const char *fmt, ...)
@@ -223,6 +225,26 @@ uint32_t g_threads_quit; /* For tracking threads that exit early. */
 
 /* End global values shared by threads. */
 
+/*
+ * Atomic update where needed.
+ */
+#define	ATOMIC_ADD(v, val)						\
+	__sync_add_and_fetch(&(v), val)
+
+/* Retrieve an ID for the next populate operation. */
+static inline uint64_t
+get_next_populate(void)
+{
+	return (ATOMIC_ADD(g_npop_ops, 1));
+}
+
+/* Retrieve an ID for the next insert operation. */
+static inline uint64_t
+get_next_incr(void)
+{
+	return (ATOMIC_ADD(g_nins_ops, 1));
+}
+
 void *
 read_thread(void *arg)
 {
@@ -293,7 +315,7 @@ worker(CONFIG *cfg, uint32_t worker_type)
 	while (g_running) {
 		/* Get a value in range, avoid zero. */
 		if (worker_type == WORKER_INSERT)
-			next_incr = ATOMIC_ADD(g_nins_ops, 1);
+			next_incr = get_next_incr();
 
 		if (!F_ISSET(cfg, PERF_RAND_WORKLOAD) &&
 		    worker_type == WORKER_INSERT)
@@ -391,13 +413,6 @@ err:	if (ret != 0)
 	free(key_buf);
 }
 
-/* Retrieve an ID for the next insert operation. */
-void
-get_next_op(uint64_t *op)
-{
-	*op = ATOMIC_ADD(g_npop_ops, 1);
-}
-
 void *
 populate_thread(void *arg)
 {
@@ -459,7 +474,7 @@ populate_thread(void *arg)
 			assert(session->begin_transaction(
 			    session, cfg->transaction_config) == 0);
 		}
-		get_next_op(&op);
+		op = get_next_populate();
 		if (op > cfg->icount)
 			break;
 		sprintf(key_buf, "%0*" PRIu64, cfg->key_sz, op);
