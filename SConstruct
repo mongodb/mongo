@@ -201,6 +201,7 @@ add_option( "static" , "fully static build" , 0 , False )
 add_option( "static-libstdc++" , "statically link libstdc++" , 0 , False )
 add_option( "lto", "enable link time optimizations (experimental, except with MSVC)" , 0 , True )
 add_option( "dynamic-windows", "dynamically link on Windows", 0, True)
+add_option( "disable-declspec-thread", "don't use __declspec(thread) on Windows", 0, True)
 
 # base compile flags
 add_option( "64" , "whether to force 64 bit" , 0 , True , "force64" )
@@ -1324,23 +1325,25 @@ def doConfigure(myenv):
     # When using msvc, check for support for __declspec(thread), unless we have been asked
     # explicitly not to use it. For other compilers, see if __thread works.
     if using_msvc():
-        def CheckDeclspecThread(context):
-            test_body = """
-            __declspec( thread ) int tsp_int;
-            int main(int argc, char* argv[]) {
-                tsp_int = argc;
-                return 0;
-            }
-            """
-            context.Message('Checking for __declspec(thread)... ')
-            ret = context.TryLink(textwrap.dedent(test_body), ".cpp")
-            context.Result(ret)
-            return ret
-        conf = Configure(myenv, help=False, custom_tests = {
-            'CheckDeclspecThread' : CheckDeclspecThread,
-        })
-        haveDeclSpecThread = conf.CheckDeclspecThread()
-        conf.Finish()
+        haveDeclSpecThread = False
+        if not has_option("disable-declspec-thread"):
+            def CheckDeclspecThread(context):
+                test_body = """
+                __declspec( thread ) int tsp_int;
+                int main(int argc, char* argv[]) {
+                    tsp_int = argc;
+                    return 0;
+                }
+                """
+                context.Message('Checking for __declspec(thread)... ')
+                ret = context.TryLink(textwrap.dedent(test_body), ".cpp")
+                context.Result(ret)
+                return ret
+            conf = Configure(myenv, help=False, custom_tests = {
+                'CheckDeclspecThread' : CheckDeclspecThread,
+            })
+            haveDeclSpecThread = conf.CheckDeclspecThread()
+            conf.Finish()
         if haveDeclSpecThread:
             myenv.Append(CPPDEFINES=['MONGO_HAVE___DECLSPEC_THREAD'])
     else:
