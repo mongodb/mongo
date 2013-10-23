@@ -707,6 +707,7 @@ execute_populate(CONFIG *cfg)
 	}
 	assert(gettimeofday(&e, NULL) == 0);
 
+	g_running = 0;
 	if ((ret = stop_threads(cfg, cfg->populate_threads, threads)) != 0)
 		return (ret);
 
@@ -748,7 +749,7 @@ execute_workload(CONFIG *cfg)
 {
 	pthread_t *ithreads, *rthreads, *uthreads;
 	uint64_t last_inserts, last_reads, last_updates;
-	uint32_t elapsed_time;
+	uint32_t interval, run_time;
 	int ret, tret;
 
 	cfg->phase = WT_PERF_READ;
@@ -757,7 +758,11 @@ execute_workload(CONFIG *cfg)
 	last_inserts = last_reads = last_updates = 0;
 	ret = 0;
 
-	/* Sanity check reporting interval. */
+	/* Sanity check run time and reporting interval. */
+	if (cfg->run_time == 0) {
+		lprintf(cfg, WT_ERROR, 0, "Run-time not set.");
+		return (WT_ERROR);
+	}
 	if (cfg->report_interval > cfg->run_time || cfg->report_interval == 0)
 		cfg->report_interval = cfg->run_time;
 
@@ -789,11 +794,18 @@ execute_workload(CONFIG *cfg)
 	}
 
 	assert(gettimeofday(&cfg->phase_start_time, NULL) == 0);
-	for (elapsed_time = 0;
-	    elapsed_time < cfg->run_time &&
-	    g_threads_quit == 0;
-	    elapsed_time += cfg->report_interval) {
-		sleep(cfg->report_interval);
+	for (run_time = cfg->run_time; g_threads_quit == 0;) {
+		if (cfg->report_interval == 0 ||
+		    run_time < cfg->report_interval)
+			interval = run_time;
+		else
+			interval = cfg->report_interval;
+		(void)sleep(interval);
+
+		run_time -= interval;
+		if (run_time == 0)
+			break;
+
 		lprintf(cfg, 0, 1,
 		    "%" PRIu64 " reads, %" PRIu64 " inserts, %" PRIu64
 		    " updates in %d secs",
@@ -806,7 +818,8 @@ execute_workload(CONFIG *cfg)
 		last_updates = g_nupdate_ops;
 	}
 
-err:	if (cfg->read_threads != 0 && rthreads != NULL &&
+err:	g_running = 0;
+	if (cfg->read_threads != 0 && rthreads != NULL &&
 	    (tret = stop_threads(cfg, cfg->read_threads, rthreads)) != 0 &&
 	    ret == 0)
 		ret = tret;
@@ -1567,8 +1580,6 @@ stop_threads(CONFIG *cfg, u_int num, pthread_t *threads)
 {
 	u_int i;
 	int ret;
-
-	g_running = 0;
 
 	for (i = 0; i < num; i++)
 		if ((ret = pthread_join(threads[i], NULL)) != 0) {
