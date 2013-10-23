@@ -357,6 +357,7 @@ namespace mongo {
     }
 
     bool Chunk::splitIfShould( long dataWritten ) const {
+        dassert( ShouldAutoSplit );
         LastError::Disabled d( lastError.get() );
 
         try {

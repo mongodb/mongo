@@ -51,6 +51,10 @@ namespace mongo {
         return config;
     }
 
+    ChunkManagerTargeter::ChunkManagerTargeter() :
+            _needsTargetingRefresh( false ), _stats( new TargeterStats ) {
+    }
+
     Status ChunkManagerTargeter::init( const NamespaceString& nss ) {
 
         _nss = nss;
@@ -91,6 +95,8 @@ namespace mongo {
             *endpoint = new ShardEndpoint( chunk->getShard().getName(),
                                            _manager->getVersion( chunk->getShard() ),
                                            chunk->getShard().getAddress() );
+
+            _stats->chunkSizeDelta[chunk->getMin()] += doc.objsize();
         }
         else {
             *endpoint = new ShardEndpoint( _primary->getName(),
@@ -139,6 +145,10 @@ namespace mongo {
     void ChunkManagerTargeter::noteCouldNotTarget() {
         dassert( _remoteShardVersions.empty() );
         _needsTargetingRefresh = true;
+    }
+
+    const TargeterStats* ChunkManagerTargeter::getStats() const {
+        return _stats.get();
     }
 
     namespace {

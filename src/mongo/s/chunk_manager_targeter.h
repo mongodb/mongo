@@ -27,6 +27,8 @@
 
 namespace mongo {
 
+    class TargeterStats;
+
     /**
      * NSTargeter based on a ChunkManager implementation.  Wraps all exception codepaths and
      * returns DatabaseNotFound statuses on applicable failures.
@@ -36,9 +38,7 @@ namespace mongo {
     class ChunkManagerTargeter : public NSTargeter {
     public:
 
-        ChunkManagerTargeter() :
-            _needsTargetingRefresh( false ) {
-        }
+        ChunkManagerTargeter();
 
         /**
          * Initializes the ChunkManagerTargeter with the latest targeting information for the
@@ -66,6 +66,11 @@ namespace mongo {
          * Also see NSTargeter::refreshIfNeeded().
          */
         Status refreshIfNeeded();
+
+        /**
+         * Returns the stats. Note that the returned stats object is still owned by this targeter.
+         */
+        const TargeterStats* getStats() const;
 
     private:
 
@@ -98,6 +103,15 @@ namespace mongo {
 
         // Stores whether we need to check the remote server on refresh
         bool _needsTargetingRefresh;
+
+        // Represents only the view and not really part of the targeter state.
+        mutable boost::scoped_ptr<TargeterStats> _stats;
+    };
+
+    struct TargeterStats {
+        // Map of chunk shard minKey -> approximate delta. This is used for deciding
+        // whether a chunk might need splitting or not.
+        std::map<BSONObj, int> chunkSizeDelta;
     };
 
 } // namespace mongo
