@@ -221,7 +221,7 @@ uint64_t g_nread_ops;
 uint64_t g_nupdate_ops;
 int g_running;
 int g_util_running;
-uint32_t g_threads_quit; /* For tracking threads that exit early. */
+uint32_t g_threads_quit; 	/* For tracking threads that exit early. */
 
 /* End global values shared by threads. */
 
@@ -405,6 +405,7 @@ worker(CONFIG *cfg, uint32_t worker_type)
 		}
 	}
 
+	/* To ensure managing thread knows if we exited early. */
 err:	if (ret != 0)
 		++g_threads_quit;
 	if (session != NULL)
@@ -489,11 +490,10 @@ populate_thread(void *arg)
 	    (ret = session->commit_transaction(session, NULL)) != 0)
 		lprintf(cfg, ret, 0,
 		    "Fail committing final populate transaction");
+
 	/* To ensure managing thread knows if we exited early. */
-err:	if (ret != 0) {
-		lprintf(cfg,ret, 0, "Error from populate thread.");
+err:	if (ret != 0)
 		++g_threads_quit;
-	}
 	if (session != NULL)
 		assert(session->close(session, NULL) == 0);
 	free(data_buf);
@@ -705,9 +705,10 @@ execute_populate(CONFIG *cfg)
 			last_ops = g_npop_ops;
 		}
 	}
-	if (g_threads_quit == cfg->populate_threads) {
+	/* Report if any worker threads didn't finish. */
+	if (g_threads_quit != 0) {
 		lprintf(cfg, WT_ERROR, 0,
-		    "Populate threads exited without finishing.");
+		    "Populate thread(s) exited without finishing.");
 		return (WT_ERROR);
 	}
 	assert(gettimeofday(&e, NULL) == 0);
