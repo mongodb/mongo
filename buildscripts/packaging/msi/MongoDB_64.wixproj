@@ -29,8 +29,9 @@
     <Source Condition=" '$(Source)' == '' ">..\..\..\build\win32\64\mongo</Source>
     <SslSource Condition=" '$(SslSource)' == '' ">..\..\..\build\win32\64\mongo</SslSource>
     <Version Condition=" '$(Version)' == '' ">2.4.0</Version>
+    <MergeModulesBasePath Condition=" '$(MergeModulesBasePath)' == '' ">C:\Program Files (x86)\Common Files\Merge Modules</MergeModulesBasePath>
     <ClientHeaderSource Condition=" '$(ClientHeaderSource)' == '' ">..\..\..\build\win32\normal\clientlib\include</ClientHeaderSource>
-    <DefineConstants>MongoDBVersion=$(Version);LicenseSource=$(License);BinarySource=$(Source);Edition=$(Edition);SaslSource=$(SaslSource);SslSource=$(SslSource);SnmpSource=$(SnmpSource);ProductId=$(ProductId);UpgradeCode=$(UpgradeCode);Flavor=$(Flavor);ClientSource=$(ClientSource);EnterpriseBase=$(EnterpriseBase);ClientHeaderSource=$(ClientHeaderSource)</DefineConstants>
+    <DefineConstants>MongoDBVersion=$(Version);LicenseSource=$(License);BinarySource=$(Source);Edition=$(Edition);SaslSource=$(SaslSource);SslSource=$(SslSource);SnmpSource=$(SnmpSource);ProductId=$(ProductId);UpgradeCode=$(UpgradeCode);Flavor=$(Flavor);ClientSource=$(ClientSource);EnterpriseBase=$(EnterpriseBase);ClientHeaderSource=$(ClientHeaderSource);MergeModulesBasePath=$(MergeModulesBasePath)</DefineConstants>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|x64' ">
     <VerboseOutput>True</VerboseOutput>
