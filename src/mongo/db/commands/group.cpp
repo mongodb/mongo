@@ -54,13 +54,23 @@ namespace mongo {
         virtual void help( stringstream &help ) const {
             help << "http://dochub.mongodb.org/core/aggregation";
         }
-        virtual void addRequiredPrivileges(const std::string& dbname,
-                                           const BSONObj& cmdObj,
-                                           std::vector<Privilege>* out) {
-            ActionSet actions;
-            actions.addAction(ActionType::find);
-            out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
+        Status checkAuthForCommand(ClientBasic* client,
+                                   const std::string& dbname,
+                                   const BSONObj& cmdObj) {
+            std::string ns = parseNs(dbname, cmdObj);
+            if (!client->getAuthorizationSession()->isAuthorizedForActionsOnNamespace(
+                    NamespaceString(ns), ActionType::find)) {
+                return Status(ErrorCodes::Unauthorized, "unauthorized");
+            }
+            return Status::OK();
         }
+
+        string parseNs(const string& dbname, const BSONObj& cmdObj) const {
+            const BSONObj& p = cmdObj.firstElement().embeddedObjectUserCheck();
+            uassert(17211, "ns has to be set", p["ns"].type() == String);
+            return dbname + "." + p["ns"].String();
+        }
+
         BSONObj getKey( const BSONObj& obj , const BSONObj& keyPattern , ScriptingFunction func , double avgSize , Scope * s ) {
             if ( func ) {
                 BSONObjBuilder b( obj.objsize() + 32 );
@@ -206,12 +216,7 @@ namespace mongo {
             else
                 q = getQuery( p );
 
-            if ( p["ns"].type() != String ) {
-                errmsg = "ns has to be set";
-                return false;
-            }
-
-            string ns = dbname + "." + p["ns"].String();
+            string ns = parseNs(dbname, jsobj);
 
             BSONObj key;
             string keyf;
