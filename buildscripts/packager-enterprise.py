@@ -543,7 +543,7 @@ Homepage: http://www.mongodb.org
 Package: @@PACKAGE_BASENAME@@
 Conflicts: @@PACKAGE_CONFLICTS@@
 Architecture: any
-Depends: libc6 (>= 2.3.2), libgcc1 (>= 1:4.1.1), libstdc++6 (>= 4.1.1), libsnmp15, libgsasl7, libssl1.0.0
+Depends: libc6 (>= 2.3.2), libgcc1 (>= 1:4.1.1), libstdc++6 (>= 4.1.1), libsnmp15, libsasl2-2, libssl1.0.0
 Description: An object/document-oriented database
  MongoDB is a high-performance, open source, schema-free 
  document-oriented  data store that's easy to deploy, manage
@@ -792,7 +792,7 @@ Summary: mongo client shell and tools
 License: AGPL 3.0
 URL: http://www.mongodb.org
 Group: Applications/Databases
-Requires: libgsasl, net-snmp-libs
+Requires: cyrus-sasl, net-snmp-libs
 
 Source0: %{name}-%{version}.tar.gz
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root
