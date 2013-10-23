@@ -205,16 +205,25 @@ namespace mongo {
                 result.appendNumber("max", d->maxCappedDocs());
             }
 
-            result.append( "firstExtent", str::stream() << d->firstExtent().toString()
-                           << " ns:" << d->firstExtent().ext()->nsDiagnostic.toString());
-            result.append( "lastExtent", str::stream() <<  d->lastExtent().toString()
-                           << " ns:" <<  d->lastExtent().ext()->nsDiagnostic.toString());
+            if ( d->firstExtent().isNull() )
+                result.append( "firstExtent", "null" );
+            else
+                result.append( "firstExtent", str::stream() << d->firstExtent().toString()
+                               << " ns:" << d->firstExtent().ext()->nsDiagnostic.toString());
+            if ( d->lastExtent().isNull() )
+                result.append( "lastExtent", "null" );
+            else
+                result.append( "lastExtent", str::stream() <<  d->lastExtent().toString()
+                               << " ns:" <<  d->lastExtent().ext()->nsDiagnostic.toString());
 
             BSONArrayBuilder extentData;
             int extentCount = 0;
             try {
-                d->firstExtent().ext()->assertOk();
-                d->lastExtent().ext()->assertOk();
+
+                if ( !d->firstExtent().isNull() ) {
+                    d->firstExtent().ext()->assertOk();
+                    d->lastExtent().ext()->assertOk();
+                }
 
                 DiskLoc extentDiskLoc = d->firstExtent();
                 while (!extentDiskLoc.isNull()) {
@@ -269,8 +278,7 @@ namespace mongo {
                 bool testingLastExtent = false;
                 try {
                     if (d->firstExtent().isNull()) {
-                        errors << "'firstExtent' pointer is null";
-                        valid=false;
+                        // this is ok
                     }
                     else {
                         result.append("firstExtentDetails", d->firstExtent().ext()->dump());
@@ -285,8 +293,7 @@ namespace mongo {
                     }
                     testingLastExtent = true;
                     if (d->lastExtent().isNull()) {
-                        errors << "'lastExtent' pointer is null";
-                        valid=false;
+                        // this is ok
                     }
                     else {
                         if (d->firstExtent() != d->lastExtent()) {
