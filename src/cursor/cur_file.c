@@ -390,8 +390,8 @@ __wt_curfile_create(WT_SESSION_IMPL *session,
 	/* __wt_cursor_init is last so we don't have to clean up on error. */
 	WT_ERR(__wt_cursor_init(cursor, cursor->uri, owner, cfg, cursorp));
 
-	WT_CSTAT_INCR(session, cursor_create);
-	WT_DSTAT_INCR(session, cursor_create);
+	WT_STAT_FAST_CONN_INCR(session, cursor_create);
+	WT_STAT_FAST_DATA_INCR(session, cursor_create);
 
 	if (0) {
 err:		__wt_free(session, cbt);

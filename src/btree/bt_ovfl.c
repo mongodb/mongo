@@ -30,7 +30,7 @@ __ovfl_read(WT_SESSION_IMPL *session,
 	store->data = WT_PAGE_HEADER_BYTE(btree, store->mem);
 	store->size = ((WT_PAGE_HEADER *)store->mem)->u.datalen;
 
-	WT_DSTAT_INCR(session, cache_read_overflow);
+	WT_STAT_FAST_DATA_INCR(session, cache_read_overflow);
 
 	return (0);
 }
@@ -217,7 +217,7 @@ __wt_ovfl_cache(WT_SESSION_IMPL *session,
 		 */
 		if (!visible) {
 			WT_ERR(__ovfl_cache(session, page, unpack));
-			WT_DSTAT_INCR(session, cache_overflow_value);
+			WT_STAT_FAST_DATA_INCR(session, cache_overflow_value);
 		}
 
 		/*

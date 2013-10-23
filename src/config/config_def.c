@@ -40,7 +40,9 @@ static const WT_CONFIG_CHECK confchk_connection_reconfigure[] = {
 	{ "eviction_trigger", "int", "min=10,max=99", NULL},
 	{ "shared_cache", "category", NULL,
 	     confchk_shared_cache_subconfigs},
-	{ "statistics", "boolean", NULL, NULL},
+	{ "statistics", "list",
+	    "choices=[\"all\",\"fast\",\"none\",\"clear\"]",
+	    NULL},
 	{ "verbose", "list",
 	    "choices=[\"block\",\"ckpt\",\"evict\",\"evictserver\","
 	    "\"fileops\",\"hazard\",\"log\",\"lsm\",\"mutex\",\"overflow\","
@@ -172,8 +174,9 @@ static const WT_CONFIG_CHECK confchk_session_open_cursor[] = {
 	{ "next_random", "boolean", NULL, NULL},
 	{ "overwrite", "boolean", NULL, NULL},
 	{ "raw", "boolean", NULL, NULL},
-	{ "statistics_clear", "boolean", NULL, NULL},
-	{ "statistics_fast", "boolean", NULL, NULL},
+	{ "statistics", "list",
+	    "choices=[\"all\",\"fast\",\"clear\"]",
+	    NULL},
 	{ "target", "list", NULL, NULL},
 	{ NULL, NULL, NULL, NULL }
 };
@@ -220,7 +223,6 @@ static const WT_CONFIG_CHECK confchk_log_subconfigs[] = {
 };
 
 static const WT_CONFIG_CHECK confchk_statistics_log_subconfigs[] = {
-	{ "clear", "boolean", NULL, NULL },
 	{ "path", "string", NULL, NULL },
 	{ "sources", "list", NULL, NULL },
 	{ "timestamp", "string", NULL, NULL },
@@ -250,7 +252,9 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open[] = {
 	{ "session_max", "int", "min=1", NULL},
 	{ "shared_cache", "category", NULL,
 	     confchk_shared_cache_subconfigs},
-	{ "statistics", "boolean", NULL, NULL},
+	{ "statistics", "list",
+	    "choices=[\"all\",\"fast\",\"none\",\"clear\"]",
+	    NULL},
 	{ "statistics_log", "category", NULL,
 	     confchk_statistics_log_subconfigs},
 	{ "transaction_sync", "string",
@@ -303,7 +307,8 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	{ "connection.reconfigure",
 	  "cache_size=100MB,error_prefix=,eviction_dirty_target=80,"
 	  "eviction_target=80,eviction_trigger=95,shared_cache=(chunk=10MB,"
-	  "enable=0,name=pool,reserve=0,size=500MB),statistics=0,verbose=",
+	  "enable=0,name=pool,reserve=0,size=500MB),statistics=none,"
+	  "verbose=",
 	  confchk_connection_reconfigure
 	},
 	{ "cursor.close",
@@ -369,7 +374,7 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	},
 	{ "session.open_cursor",
 	  "append=0,bulk=0,checkpoint=,dump=,next_random=0,overwrite=,raw=0"
-	  ",statistics_clear=0,statistics_fast=,target=",
+	  ",statistics=fast,target=",
 	  confchk_session_open_cursor
 	},
 	{ "session.reconfigure",
@@ -412,9 +417,10 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  "extensions=,file_extend=,hazard_max=1000,log=(archive=,enabled=0"
 	  ",file_max=100MB,path=\"\"),lsm_merge=,mmap=,multiprocess=0,"
 	  "session_max=50,shared_cache=(chunk=10MB,enable=0,name=pool,"
-	  "reserve=0,size=500MB),statistics=0,statistics_log=(clear=,"
-	  "path=\"WiredTigerStat.%H\",sources=,timestamp=\"%b %d %H:%M:%S\""
-	  ",wait=0),transaction_sync=dsync,use_environment_priv=0,verbose=",
+	  "reserve=0,size=500MB),statistics=none,"
+	  "statistics_log=(path=\"WiredTigerStat.%H\",sources=,"
+	  "timestamp=\"%b %d %H:%M:%S\",wait=0),transaction_sync=dsync,"
+	  "use_environment_priv=0,verbose=",
 	  confchk_wiredtiger_open
 	},
 	{ NULL, NULL, NULL }

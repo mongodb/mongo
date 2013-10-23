@@ -480,8 +480,8 @@ __wt_btcur_prev(WT_CURSOR_BTREE *cbt, int discard)
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
 
-	WT_CSTAT_INCR(session, cursor_prev);
-	WT_DSTAT_INCR(session, cursor_prev);
+	WT_STAT_FAST_CONN_INCR(session, cursor_prev);
+	WT_STAT_FAST_DATA_INCR(session, cursor_prev);
 
 	flags = WT_TREE_SKIP_INTL | WT_TREE_PREV;	/* Tree walk flags. */
 	if (discard)

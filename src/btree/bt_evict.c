@@ -260,7 +260,8 @@ __evict_worker(WT_SESSION_IMPL *session)
 		if (F_ISSET(cache, WT_EVICT_NO_PROGRESS)) {
 			if (loop == 100) {
 				F_SET(cache, WT_EVICT_STUCK);
-				WT_CSTAT_INCR(session, cache_eviction_slow);
+				WT_STAT_FAST_CONN_INCR(
+				    session, cache_eviction_slow);
 				WT_VERBOSE_RET(session, evictserver,
 				    "unable to reach eviction goal");
 				break;
@@ -716,7 +717,6 @@ __evict_walk(WT_SESSION_IMPL *session, u_int *entriesp, int clean)
 	 * from under us.
 	 */
 	__wt_spin_lock(session, &conn->dhandle_lock);
-	WT_CSTAT_INCR(session, dh_evict_locks);
 retry:	file_count = 0;
 	SLIST_FOREACH(dhandle, &conn->dhlh, l) {
 		if (!WT_PREFIX_MATCH(dhandle->name, "file:") ||
@@ -839,7 +839,7 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp, int clean)
 			continue;
 		}
 
-		WT_CSTAT_INCR(session, cache_eviction_walk);
+		WT_STAT_FAST_CONN_INCR(session, cache_eviction_walk);
 
 		/* Ignore root pages entirely. */
 		if (WT_PAGE_IS_ROOT(page))
@@ -967,7 +967,7 @@ __evict_get_page(
 	if (is_app && F_ISSET(cache, WT_EVICT_STUCK) &&
 	    __wt_txn_am_oldest(session)) {
 		F_CLR(cache, WT_EVICT_STUCK);
-		WT_CSTAT_INCR(session, txn_fail_cache);
+		WT_STAT_FAST_CONN_INCR(session, txn_fail_cache);
 		return (WT_DEADLOCK);
 	}
 

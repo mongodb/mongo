@@ -4,11 +4,9 @@ table_config="lsm_chunk_size=50MB,type=lsm,lsm_merge_threads=3"
 icount=200000000
 report_interval=5
 checkpoint_interval=0
-stat_interval=4
 merge_sleep=600
 run_time=1200
 populate_threads=10
 read_threads=10
 insert_threads=2
 update_threads=2
-verbose=1

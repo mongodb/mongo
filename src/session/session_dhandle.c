@@ -225,7 +225,7 @@ __session_dhandle_sweep(WT_SESSION_IMPL *session)
 		dhandle_cache_next = SLIST_NEXT(dhandle_cache, l);
 		dhandle = dhandle_cache->dhandle;
 		if (!F_ISSET(dhandle, WT_DHANDLE_EXCLUSIVE|WT_DHANDLE_OPEN)) {
-			WT_CSTAT_INCR(session, dh_session_handles);
+			WT_STAT_FAST_CONN_INCR(session, dh_session_handles);
 			WT_TRET(__wt_session_discard_btree(
 			    session, dhandle_cache));
 		}
@@ -247,7 +247,7 @@ __session_open_btree(WT_SESSION_IMPL *session,
 	WT_DECL_RET;
 
 	if (dead) {
-		WT_CSTAT_INCR(session, dh_sweeps);
+		WT_STAT_FAST_CONN_INCR(session, dh_sweeps);
 		WT_TRET(__session_dhandle_sweep(session));
 	}
 	WT_TRET(__wt_conn_btree_get(session, name, ckpt, op_cfg, flags));
