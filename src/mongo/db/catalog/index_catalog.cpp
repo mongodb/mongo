@@ -36,6 +36,7 @@
 #include "mongo/db/background.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/index_legacy.h"
+#include "mongo/db/index_update.h"
 #include "mongo/db/index/2d_access_method.h"
 #include "mongo/db/index/btree_access_method.h"
 #include "mongo/db/index/btree_access_method_internal.h"
@@ -140,6 +141,67 @@ namespace mongo {
 
 
     // ---------------------------
+
+    Status IndexCatalog::createIndex( const BSONObj& spec, bool mayInterrupt ) {
+
+        // 1) add entry in system.indexes
+        // 2) call into buildAnIndex?
+
+        Status status = okToAddIndex( spec );
+        if ( !status.isOK() )
+            return status;
+
+        Database* db = _collection->_database;
+        Collection* systemIndexes = db->getCollection( db->_indexesName );
+        if ( !systemIndexes ) {
+            systemIndexes = db->createCollection( db->_indexesName, false, NULL );
+            verify( systemIndexes );
+        }
+
+        StatusWith<DiskLoc> loc = systemIndexes->insertDocument( spec, false );
+        if ( !loc.isOK() )
+            return loc.getStatus();
+        verify( !loc.getValue().isNull() );
+
+        string idxName = spec["name"].valuestr();
+
+        // Set curop description before setting indexBuildInProg, so that there's something
+        // commands can find and kill as soon as indexBuildInProg is set. Only set this if it's a
+        // killable index, so we don't overwrite commands in currentOp.
+        if ( mayInterrupt ) {
+            cc().curop()->setQuery( spec );
+        }
+
+        IndexBuildBlock indexBuildBlock( this, idxName, loc.getValue() );
+        verify( indexBuildBlock.indexDetails() );
+
+        try {
+            buildAnIndex( _collection->ns(), _collection->details(),
+                          *indexBuildBlock.indexDetails(), mayInterrupt);
+            indexBuildBlock.success();
+            return Status::OK();
+        }
+        catch (DBException& e) {
+            // save our error msg string as an exception or dropIndexes will overwrite our message
+            LastError *le = lastError.get();
+            int savecode = 0;
+            string saveerrmsg;
+            if ( le ) {
+                savecode = le->code;
+                saveerrmsg = le->msg;
+            }
+            else {
+                savecode = e.getCode();
+                saveerrmsg = e.what();
+            }
+
+            verify(le && !saveerrmsg.empty());
+            setLastError(savecode,saveerrmsg.c_str());
+            throw; // XXX
+        }
+
+
+    }
 
     IndexCatalog::IndexBuildBlock::IndexBuildBlock( IndexCatalog* catalog,
                                                     const StringData& indexName,
