@@ -145,6 +145,7 @@ env.StaticLibrary(
         'batched_insert_request.cpp',
         'batched_update_request.cpp',
         'batched_update_document.cpp',
+        'batched_upsert_detail.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base/base',

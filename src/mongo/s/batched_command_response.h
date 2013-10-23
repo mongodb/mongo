@@ -23,6 +23,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/s/batched_error_detail.h"
+#include "mongo/s/batched_upsert_detail.h"
 #include "mongo/s/bson_serializable.h"
 
 namespace mongo {
@@ -39,12 +40,13 @@ namespace mongo {
         // schema declarations
         //
 
-        static const BSONField<bool> ok;
+        static const BSONField<int> ok;
         static const BSONField<int> errCode;
         static const BSONField<BSONObj> errInfo;
         static const BSONField<string> errMessage;
         static const BSONField<long long> n;
-        static const BSONField<long long> upserted;
+        static const BSONField<BSONObj> singleUpserted;
+        static const BSONField<std::vector<BatchedUpsertDetail*> > upsertDetails;
         static const BSONField<Date_t> lastOp;
         static const BSONField<std::vector<BatchedErrorDetail*> > errDetails;
 
@@ -72,10 +74,10 @@ namespace mongo {
         // individual field accessors
         //
 
-        void setOk(bool ok);
+        void setOk(int ok);
         void unsetOk();
         bool isOkSet() const;
-        bool getOk() const;
+        int getOk() const;
 
         void setErrCode(int errCode);
         void unsetErrCode();
@@ -97,10 +99,18 @@ namespace mongo {
         bool isNSet() const;
         long long getN() const;
 
-        void setUpserted(long long upserted);
-        void unsetUpserted();
-        bool isUpsertedSet() const;
-        long long getUpserted() const;
+        void setSingleUpserted(const BSONObj& singleUpserted);
+        void unsetSingleUpserted();
+        bool isSingleUpsertedSet() const;
+        const BSONObj& getSingleUpserted() const;
+
+        void setUpsertDetails(const std::vector<BatchedUpsertDetail*>& upsertDetails);
+        void addToUpsertDetails(BatchedUpsertDetail* upsertDetails);
+        void unsetUpsertDetails();
+        bool isUpsertDetailsSet() const;
+        std::size_t sizeUpsertDetails() const;
+        const std::vector<BatchedUpsertDetail*>& getUpsertDetails() const;
+        const BatchedUpsertDetail* getUpsertDetailsAt(std::size_t pos) const;
 
         void setLastOp(Date_t lastOp);
         void unsetLastOp();
@@ -118,8 +128,8 @@ namespace mongo {
     private:
         // Convention: (M)andatory, (O)ptional
 
-        // (M)  false if batch didn't get to be applied for any reason
-        bool _ok;
+        // (M)  0 if batch didn't get to be applied for any reason
+        int _ok;
         bool _isOkSet;
 
         // (O)  whether all items in the batch applied correctly
@@ -138,9 +148,14 @@ namespace mongo {
         long long _n;
         bool _isNSet;
 
-        // (O)  in updates, number of ops that were upserts
-        long long _upserted;
-        bool _isUpsertedSet;
+        // (0)  "promoted" _upserted, if the corresponding request contained only one batch item
+        //      Should only be present if _upserted is not.
+        BSONObj _singleUpserted;
+        bool _isSingleUpsertedSet;
+
+        // (O)  Array of upserted items' _id's
+        //      Should only be present if _singleUpserted is not.
+        boost::scoped_ptr<std::vector<BatchedUpsertDetail*> >_upsertDetails;
 
         // (O)  XXX What is lastop?
         Date_t _lastOp;

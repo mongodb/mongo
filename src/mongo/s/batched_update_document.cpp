@@ -25,8 +25,8 @@ namespace mongo {
 
     const BSONField<BSONObj> BatchedUpdateDocument::query("q");
     const BSONField<BSONObj> BatchedUpdateDocument::updateExpr("u");
-    const BSONField<bool> BatchedUpdateDocument::multi("multi");
-    const BSONField<bool> BatchedUpdateDocument::upsert("upsert");
+    const BSONField<bool> BatchedUpdateDocument::multi("multi", false);
+    const BSONField<bool> BatchedUpdateDocument::upsert("upsert", false);
 
     BatchedUpdateDocument::BatchedUpdateDocument() {
         clear();

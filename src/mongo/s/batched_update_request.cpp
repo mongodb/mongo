@@ -27,7 +27,7 @@ namespace mongo {
         const BSONField<std::string> BatchedUpdateRequest::collName("update");
         const BSONField<std::vector<BatchedUpdateDocument*> > BatchedUpdateRequest::updates("updates");
         const BSONField<BSONObj> BatchedUpdateRequest::writeConcern("writeConcern");
-        const BSONField<bool> BatchedUpdateRequest::ordered("ordered", false);
+        const BSONField<bool> BatchedUpdateRequest::ordered("ordered", true);
         const BSONField<ChunkVersion> BatchedUpdateRequest::shardVersion("shardVersion");
         const BSONField<long long> BatchedUpdateRequest::session("session");
 
@@ -50,16 +50,9 @@ namespace mongo {
             *errMsg = stream() << "missing " << collName.name() << " field";
             return false;
         }
+
         if (!_isUpdatesSet) {
             *errMsg = stream() << "missing " << updates.name() << " field";
-            return false;
-        }
-        if (!_isWriteConcernSet) {
-            *errMsg = stream() << "missing " << writeConcern.name() << " field";
-            return false;
-        }
-        if (!_isOrderedSet) {
-            *errMsg = stream() << "missing " << ordered.name() << " field";
             return false;
         }
 
@@ -277,8 +270,12 @@ namespace mongo {
     }
 
     bool BatchedUpdateRequest::getOrdered() const {
-        dassert(_isOrderedSet);
-        return _ordered;
+        if (_isOrderedSet) {
+            return _ordered;
+        }
+        else {
+            return ordered.getDefault();
+        }
     }
 
     void BatchedUpdateRequest::setShardVersion(const ChunkVersion& shardVersion) {

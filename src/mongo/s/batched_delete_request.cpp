@@ -27,7 +27,7 @@ namespace mongo {
         const BSONField<std::string> BatchedDeleteRequest::collName("delete");
         const BSONField<std::vector<BatchedDeleteDocument*> > BatchedDeleteRequest::deletes("deletes");
         const BSONField<BSONObj> BatchedDeleteRequest::writeConcern("writeConcern");
-        const BSONField<bool> BatchedDeleteRequest::ordered("ordered", false);
+        const BSONField<bool> BatchedDeleteRequest::ordered("ordered", true);
         const BSONField<ChunkVersion> BatchedDeleteRequest::shardVersion("shardVersion");
         const BSONField<long long> BatchedDeleteRequest::session("session");
 
@@ -53,16 +53,6 @@ namespace mongo {
 
         if (!_isDeletesSet) {
             *errMsg = stream() << "missing " << deletes.name() << " field";
-            return false;
-        }
-
-        if (!_isWriteConcernSet) {
-            *errMsg = stream() << "missing " << writeConcern.name() << " field";
-            return false;
-        }
-
-        if (!_isOrderedSet) {
-            *errMsg = stream() << "missing " << ordered.name() << " field";
             return false;
         }
 
@@ -279,8 +269,12 @@ namespace mongo {
     }
 
     bool BatchedDeleteRequest::getOrdered() const {
-        dassert(_isOrderedSet);
-        return _ordered;
+        if (_isOrderedSet) {
+            return _ordered;
+        }
+        else {
+            return ordered.getDefault();
+        }
     }
 
     void BatchedDeleteRequest::setShardVersion(const ChunkVersion& shardVersion) {

@@ -51,7 +51,10 @@ namespace mongo {
     class WriteBatchExecutor {
         MONGO_DISALLOW_COPYING(WriteBatchExecutor);
     public:
-        WriteBatchExecutor( Client* client, OpCounters* opCounters, LastError* le );
+        WriteBatchExecutor( const BSONObj& defaultWriteConcern,
+                            Client* client,
+                            OpCounters* opCounters,
+                            LastError* le );
 
         /**
          * Issues writes with requested write concern.  Fills response with errors if problems
@@ -75,12 +78,14 @@ namespace mongo {
         };
 
         /**
-         * Issues a single write.  Fills "results" with write result.
-         * Returns true iff write item was issued sucessfully and increments stats, populates error
-         * if not successful.
+         * Issues the single write 'itemRef'. Returns true iff write item was issued
+         * sucessfully and increments 'stats'. If the item is an upsert, fills in the
+         * 'upsertedID' also, with the '_id' chosen for that update. If the write failed,
+         * returns false and populates 'error'
          */
         bool applyWriteItem( const BatchItemRef& itemRef,
                              WriteStats* stats,
+                             BSONObj* upsertedID,
                              BatchedErrorDetail* error );
 
         //
@@ -93,6 +98,7 @@ namespace mongo {
                       const BatchItemRef& itemRef,
                       CurOp* currentOp,
                       WriteStats* stats,
+                      BSONObj* upsertedID,
                       BatchedErrorDetail* error );
 
         bool doInsert( const std::string& ns,
@@ -105,6 +111,7 @@ namespace mongo {
                        const BatchedUpdateDocument& updateOp,
                        CurOp* currentOp,
                        WriteStats* stats,
+                       BSONObj* upsertedID,
                        BatchedErrorDetail* error );
 
         bool doDelete( const std::string& ns,
@@ -112,6 +119,9 @@ namespace mongo {
                        CurOp* currentOp,
                        WriteStats* stats,
                        BatchedErrorDetail* error );
+
+        // Default write concern, if one isn't provide in the batches.
+        const BSONObj _defaultWriteConcern;
 
         // Client object to issue writes on behalf of.
         // Not owned here.
@@ -124,6 +134,7 @@ namespace mongo {
         // LastError object to use for preparing write results.
         // Not owned here.
         LastError* _le;
+
     };
 
 } // namespace mongo

@@ -41,6 +41,7 @@
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/s/batched_error_detail.h"
+#include "mongo/s/batched_upsert_detail.h"
 #include "mongo/s/collection_metadata.h"
 #include "mongo/s/d_logic.h"
 #include "mongo/util/mongoutils/str.h"
@@ -49,13 +50,14 @@ namespace mongo {
 
     namespace {
 
-        // We're assuming here that writeConcern was parsed and is valid. This is just
-        // a quick check of whether is is {w:0} or not.
-        bool verboseResponse( BSONObj writeConcern ) {
-            if ( writeConcern.nFields() != 1 ) {
+        // We're assuming here that writeConcern was parsed and is valid or is not
+        // present. This is just a quick check of whether is is {w:0} or not.
+        bool verboseResponse( const BatchedCommandRequest& request ) {
+            if ( !request.isWriteConcernSet() ) {
                 return true;
             }
 
+            BSONObj writeConcern = request.getWriteConcern();
             BSONElement wElem = writeConcern["w"];
             if ( !wElem.isNumber() || wElem.Number() != 0 ) {
                 return true;
@@ -66,10 +68,11 @@ namespace mongo {
 
     }
 
-    WriteBatchExecutor::WriteBatchExecutor( Client* client,
+    WriteBatchExecutor::WriteBatchExecutor( const BSONObj& wc,
+                                            Client* client,
                                             OpCounters* opCounters,
                                             LastError* le )
-        : _client( client ), _opCounters( opCounters ), _le( le ) {
+        : _defaultWriteConcern(wc), _client( client ), _opCounters( opCounters ), _le( le ) {
     }
 
     void WriteBatchExecutor::executeBatch( const BatchedCommandRequest& request,
@@ -79,17 +82,40 @@ namespace mongo {
 
         WriteStats stats;
         std::auto_ptr<BatchedErrorDetail> error( new BatchedErrorDetail );
+        BSONObj upsertedID = BSONObj();
         bool batchSuccess = true;
         bool staleBatch = false;
 
         // Apply each batch item, stopping on an error if we were asked to apply the batch
         // sequentially.
         size_t numBatchOps = request.sizeWriteOps();
-        bool verbose = verboseResponse( request.getWriteConcern() );
+        bool verbose = verboseResponse( request );
         for ( size_t i = 0; i < numBatchOps; i++ ) {
 
-            if ( !applyWriteItem( BatchItemRef( &request, i ), &stats, error.get() ) ) {
+            if ( applyWriteItem( BatchItemRef( &request, i ),
+                                 &stats,
+                                 &upsertedID,
+                                 error.get() ) ) {
 
+                // In case updates turned out to be upserts, the callers may be interested
+                // in learning what _id was used for that document.
+                if (!upsertedID.isEmpty()) {
+                    if (numBatchOps == 1) {
+                        response->setSingleUpserted(upsertedID);
+                    }
+                    else {
+                        std::auto_ptr<BatchedUpsertDetail> upsertDetail(new BatchedUpsertDetail);
+                        upsertDetail->setIndex(i);
+                        upsertDetail->setUpsertedID(upsertedID);
+                        response->addToUpsertDetails(upsertDetail.release());
+                    }
+                    upsertedID = BSONObj();
+                }
+
+            }
+            else {
+
+                // The applyWriteItem did not go thgrou
                 // If the error is sharding related, we'll have to investigate whether we
                 // have a stale view of sharding state.
                 if ( error->getErrCode() == ErrorCodes::StaleShardVersion ) staleBatch = true;
@@ -137,17 +163,20 @@ namespace mongo {
 
         // Apply write concern. Note, again, that we're only assembling a full response if the
         // user is interested in it.
+        BSONObj writeConcern;
+        if ( request.isWriteConcernSet() ) {
+            writeConcern = request.getWriteConcern();
+        }
+        else {
+            writeConcern = _defaultWriteConcern;
+        }
+
         string errMsg;
         BSONObjBuilder wcResultsB;
-        if ( !waitForWriteConcern( request.getWriteConcern(),
-                                   !batchSuccess,
-                                   &wcResultsB,
-                                   &errMsg ) ) {
+        if ( !waitForWriteConcern( writeConcern, !batchSuccess, &wcResultsB, &errMsg ) ) {
 
-            // TODO
-            // Not using error codes yet; we may use the "family" facility of Status for that
-            // response->setErrCode( ErrorCodes::WriteConcernFailed );
-            response->setErrCode( 99999 );
+            // TODO Revisit when user visiible family error codes are set
+            response->setErrCode( ErrorCodes::WriteConcernFailed );
             response->setErrMessage( errMsg );
 
             if ( verbose ) {
@@ -167,11 +196,6 @@ namespace mongo {
         // code would already be set.
         response->setOk( !response->isErrCodeSet() );
         response->setN( stats.numUpdated + stats.numInserted + stats.numDeleted );
-
-        // 'upserted' is only relevant for updated batches.
-        if (request.getBatchType() == BatchedCommandRequest::BatchType_Update) {
-            response->setUpserted( stats.numUpserted );
-        }
     }
 
     namespace {
@@ -195,6 +219,7 @@ namespace mongo {
 
     bool WriteBatchExecutor::applyWriteItem( const BatchItemRef& itemRef,
                                              WriteStats* stats,
+                                             BSONObj* upsertedID,
                                              BatchedErrorDetail* error ) {
         const BatchedCommandRequest& request = *itemRef.getRequest();
         const string& ns = request.getNS();
@@ -230,7 +255,7 @@ namespace mongo {
                                          storageGlobalParams.dbpath, // TODO: better constructor?
                                          false /* don't check version here */);
 
-                    opSuccess = doWrite( ns, itemRef, &childOp, stats, error );
+                    opSuccess = doWrite( ns, itemRef, &childOp, stats, upsertedID, error );
                 }
                 childOp.done();
                 //itemTimeMicros = childOp.totalTimeMicros();
@@ -273,6 +298,7 @@ namespace mongo {
                                       const BatchItemRef& itemRef,
                                       CurOp* currentOp,
                                       WriteStats* stats,
+                                      BSONObj* upsertedID,
                                       BatchedErrorDetail* error ) {
 
         const BatchedCommandRequest& request = *itemRef.getRequest();
@@ -330,6 +356,7 @@ namespace mongo {
                              *request.getUpdateRequest()->getUpdatesAt( index ),
                              currentOp,
                              stats,
+                             upsertedID,
                              error );
         }
         else {
@@ -380,6 +407,7 @@ namespace mongo {
                                        const BatchedUpdateDocument& updateOp,
                                        CurOp* currentOp,
                                        WriteStats* stats,
+                                       BSONObj* upsertedID,
                                        BatchedErrorDetail* error ) {
         OpDebug& opDebug = currentOp->debug();
 
@@ -394,9 +422,9 @@ namespace mongo {
         opDebug.op = dbUpdate;
         opDebug.query = queryObj;
 
-        bool resExisting = false;
-        long long resNum = 0;
-        BSONObj resUpserted;
+        bool updateExisting = false;
+        long long numUpdated = 0;
+        BSONObj resUpsertedID;
         try {
 
             const NamespaceString requestNs( ns );
@@ -410,12 +438,12 @@ namespace mongo {
 
             UpdateResult res = update( request, &opDebug );
 
-            resExisting = res.existing;
-            resNum = res.numMatched;
-            resUpserted = res.upserted;
+            updateExisting = res.existing;
+            numUpdated = res.numMatched;
+            resUpsertedID = res.upserted;
 
-            stats->numUpdated += resUpserted.isEmpty() ? resNum : 0;
-            stats->numUpserted += !resUpserted.isEmpty() ? 1 : 0;
+            stats->numUpdated += resUpsertedID.isEmpty() ? numUpdated : 0;
+            stats->numUpserted += !resUpsertedID.isEmpty() ? 1 : 0;
         }
         catch ( const UserException& ex ) {
             opDebug.exceptionInfo = ex.getInfo();
@@ -423,7 +451,11 @@ namespace mongo {
             return false;
         }
 
-        _le->recordUpdate( resExisting, resNum, resUpserted );
+        _le->recordUpdate( updateExisting, numUpdated, resUpsertedID );
+
+        if (!resUpsertedID.isEmpty()) {
+            *upsertedID = resUpsertedID;
+        }
 
         return true;
     }

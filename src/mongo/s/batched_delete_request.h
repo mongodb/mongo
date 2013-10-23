@@ -119,11 +119,11 @@ namespace mongo {
         std::vector<BatchedDeleteDocument*> _deletes;
         bool _isDeletesSet;
 
-        // (M)  to be issued after the batch applied
+        // (O)  to be issued after the batch applied
         BSONObj _writeConcern;
         bool _isWriteConcernSet;
 
-        // (M)  whether batch is issued in parallel or not
+        // (O)  whether batch is issued in parallel or not
         bool _ordered;
         bool _isOrderedSet;
 

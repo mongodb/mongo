@@ -122,7 +122,16 @@ namespace mongo {
             Client::ReadContext ctx( dbName + ".$cmd" );
         }
 
-        WriteBatchExecutor writeBatchExecutor(&cc(), &globalOpCounters, lastError.get());
+        // TODO: there can be a default write concern for the replica set. If so, use
+        // that instead.
+        BSONObjBuilder b;
+        b.append("w",1);
+        BSONObj defaultWriteConcern = b.obj();
+
+        WriteBatchExecutor writeBatchExecutor(defaultWriteConcern,
+                                              &cc(),
+                                              &globalOpCounters,
+                                              lastError.get());
 
         writeBatchExecutor.executeBatch( request, &response );
 

@@ -54,7 +54,6 @@ namespace {
                  BatchedCommandResponse::errInfo(BSON("moreInfo" << 1)) <<
                  BatchedCommandResponse::errMessage("this batch didn't work") <<
                  BatchedCommandResponse::n(0) <<
-                 BatchedCommandResponse::upserted(false) <<
                  BatchedCommandResponse::lastOp(Date_t(1)) <<
                  BatchedCommandResponse::errDetails() << errDetailsArray);
 

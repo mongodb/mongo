@@ -25,7 +25,7 @@ namespace mongo {
         const BSONField<int> BatchedErrorDetail::index("index");
         const BSONField<int> BatchedErrorDetail::errCode("errCode");
         const BSONField<BSONObj> BatchedErrorDetail::errInfo("errInfo");
-        const BSONField<std::string> BatchedErrorDetail::errMessage("errMessage");
+        const BSONField<std::string> BatchedErrorDetail::errMessage("errmsg");
 
     BatchedErrorDetail::BatchedErrorDetail() {
         clear();
