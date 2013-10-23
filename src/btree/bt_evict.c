@@ -717,7 +717,6 @@ __evict_walk(WT_SESSION_IMPL *session, u_int *entriesp, int clean)
 	 * from under us.
 	 */
 	__wt_spin_lock(session, &conn->dhandle_lock);
-	WT_STAT_FAST_CONN_INCR(session, dh_evict_locks);
 retry:	file_count = 0;
 	SLIST_FOREACH(dhandle, &conn->dhlh, l) {
 		if (!WT_PREFIX_MATCH(dhandle->name, "file:") ||
