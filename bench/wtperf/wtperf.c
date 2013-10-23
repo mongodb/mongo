@@ -680,6 +680,9 @@ execute_populate(CONFIG *cfg)
 	}
 	assert(session->close(session, NULL) == 0);
 
+	g_nins_ops = g_npop_ops = g_nread_ops = g_nupdate_ops = 0;
+	g_running = 1;
+	g_threads_quit = 0;
 	if ((ret = start_threads(
 	    cfg, cfg->populate_threads, &threads, populate_thread)) != 0)
 		return (ret);
@@ -753,6 +756,10 @@ execute_workload(CONFIG *cfg)
 	lprintf(cfg, 0, 1,
 	    "Starting workload threads: read %d, insert %d, update %d",
 	    cfg->read_threads, cfg->insert_threads, cfg->update_threads);
+
+	g_nins_ops = g_npop_ops = g_nread_ops = g_nupdate_ops = 0;
+	g_running = 1;
+	g_threads_quit = 0;
 
 	if (cfg->read_threads != 0 && (ret = start_threads(
 	    cfg, cfg->read_threads, &rthreads, read_thread)) != 0)
@@ -1019,15 +1026,21 @@ main(int argc, char *argv[])
 
 	wtperf_srand(&cfg);
 
-	assert(parse_session->close(parse_session, NULL) == 0);
+	ret = parse_session->close(parse_session, NULL);
 	parse_session = NULL;
-	if ((ret = conn->close(conn, NULL)) != 0) {
+	if (ret != 0) {
 		fprintf(stderr,
-		    "Error closing connection to %s: %s",
+		    "session.close: %s\n", wiredtiger_strerror(ret));
+		goto err;
+	}
+	ret = conn->close(conn, NULL);
+	conn = NULL;
+	if (ret != 0) {
+		fprintf(stderr,
+		    "%s: connection.close: %s\n",
 		    opt_home, wiredtiger_strerror(ret));
 		goto err;
 	}
-
 					/* Remove the test directory. */
 	if ((ret = remove_all(opt_home, 1)) != 0)
 		goto err;
@@ -1522,9 +1535,6 @@ start_threads(
 	u_int i;
 	int ret;
 
-	g_running = 1;
-	g_npop_ops = g_nread_ops = g_nupdate_ops = 0;
-	g_threads_quit = 0;
 	threads = calloc(num, sizeof(pthread_t *));
 	if (threads == NULL)
 		return (ENOMEM);
