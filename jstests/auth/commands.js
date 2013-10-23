@@ -195,11 +195,18 @@ var tests = [
         ]
     },
     {
-        testname: "checkShardingIndex",
-        command: {checkShardingIndex: "test.x", keyPattern: {_id: 1} },
+        testname: "checkShardingIndexFirstDB",
+        command: {checkShardingIndex: firstDbName + ".x", keyPattern: {_id: 1} },
         skipSharded: true,
         testcases: [
-            { runOnDb: firstDbName, rolesAllowed: roles_readWrite },
+            { runOnDb: firstDbName, rolesAllowed: roles_readWrite }
+        ]
+    },
+    {
+        testname: "checkShardingSecondDB",
+        command: {checkShardingIndex: secondDbName + ".x", keyPattern: {_id: 1} },
+        skipSharded: true,
+        testcases: [
             { runOnDb: secondDbName, rolesAllowed: roles_readWriteAny }
         ]
     },

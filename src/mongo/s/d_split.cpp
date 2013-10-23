@@ -90,9 +90,14 @@ namespace mongo {
             actions.addAction(ActionType::find);
             out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
         }
+
+        std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const {
+            return parseNsFullyQualified(dbname, cmdObj);
+        }
+
         bool run(const string& dbname, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
 
-            const char* ns = jsobj.getStringField( "checkShardingIndex" );
+            std::string ns = parseNs(dbname, jsobj);
             BSONObj keyPattern = jsobj.getObjectField( "keyPattern" );
 
             if ( keyPattern.isEmpty() ) {
