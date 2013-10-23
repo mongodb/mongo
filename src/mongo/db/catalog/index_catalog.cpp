@@ -512,7 +512,7 @@ namespace mongo {
 
         BSONObj info = _details->idx(offset).info.obj().getOwned();
 
-        Status s = dropIndex( offset );
+        Status s = _dropIndex( offset );
 
         massert( 17200,
                  str::stream() << "failed to to dropIndex in prepOneUnfinishedIndex: " << s.toString(),
