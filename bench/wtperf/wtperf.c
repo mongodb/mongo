@@ -76,7 +76,6 @@ typedef struct {
 	uint32_t flags;
 
 	struct timeval phase_start_time;
-	uint32_t elapsed_time;
 
 #define	PERF_SLEEP_LOAD		0x01
 	/* Fields changeable on command line are listed in wtperf_opt.i */
@@ -165,7 +164,6 @@ CONFIG default_cfg = {
 	WT_PERF_INIT, /* phase */
 	0,		/* flags */
 	{0, 0},		/* phase_start_time */
-	0,		/* elapsed_time */
 
 #define	OPT_DEFINE_DEFAULT
 #include "wtperf_opt.i"
@@ -657,9 +655,9 @@ execute_populate(CONFIG *cfg)
 	pthread_t *threads;
 	struct timeval e;
 	double secs;
-	int ret;
-	uint64_t elapsed, last_ops;
-	uint32_t sleepsec;
+	uint64_t last_ops;
+	uint32_t interval, sleepsec;
+	int elapsed, ret;
 
 	conn = cfg->conn;
 	cfg->phase = WT_PERF_POP;
@@ -688,21 +686,24 @@ execute_populate(CONFIG *cfg)
 		return (ret);
 
 	assert(gettimeofday(&cfg->phase_start_time, NULL) == 0);
-	for (cfg->elapsed_time = 0, elapsed = last_ops = 0;
+	for (elapsed = 0, interval = 0, last_ops = 0;
 	    g_npop_ops < cfg->icount && g_threads_quit == 0;) {
 		/*
 		 * Sleep for 100th of a second, report_interval is in second
-		 * granularity, so adjust accordingly.
+		 * granularity, each 100th increment of elapsed is a single
+		 * increment of interval.
 		 */
 		(void)usleep(10000);
-		elapsed += 1;
-		if (elapsed % 100 == 0 &&
-		    cfg->report_interval != 0 &&
-		    (elapsed / 100) % cfg->report_interval == 0) {
-			lprintf(cfg, 0, 1, "%" PRIu64 " ops in %d secs",
-			    g_npop_ops - last_ops, cfg->report_interval);
-			last_ops = g_npop_ops;
-		}
+		if (cfg->report_interval == 0 || ++elapsed < 100)
+			continue;
+		elapsed = 0;
+		if (++interval < cfg->report_interval)
+			continue;
+		interval = 0;
+		lprintf(cfg, 0, 1,
+		    "%" PRIu64 " ops in %d secs",
+		    g_npop_ops - last_ops, cfg->report_interval);
+		last_ops = g_npop_ops;
 	}
 	assert(gettimeofday(&e, NULL) == 0);
 
@@ -747,6 +748,7 @@ execute_workload(CONFIG *cfg)
 {
 	pthread_t *ithreads, *rthreads, *uthreads;
 	uint64_t last_inserts, last_reads, last_updates;
+	uint32_t elapsed_time;
 	int ret, tret;
 
 	cfg->phase = WT_PERF_READ;
@@ -787,10 +789,10 @@ execute_workload(CONFIG *cfg)
 	}
 
 	assert(gettimeofday(&cfg->phase_start_time, NULL) == 0);
-	for (cfg->elapsed_time = 0;
-	    cfg->elapsed_time < cfg->run_time &&
+	for (elapsed_time = 0;
+	    elapsed_time < cfg->run_time &&
 	    g_threads_quit == 0;
-	    cfg->elapsed_time += cfg->report_interval) {
+	    elapsed_time += cfg->report_interval) {
 		sleep(cfg->report_interval);
 		lprintf(cfg, 0, 1,
 		    "%" PRIu64 " reads, %" PRIu64 " inserts, %" PRIu64
