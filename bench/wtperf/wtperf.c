@@ -712,16 +712,14 @@ execute_populate(CONFIG *cfg)
 	if ((ret = stop_threads(cfg, cfg->populate_threads, threads)) != 0)
 		return (ret);
 
-	lprintf(cfg, 0, 1,
-	    "Finished load of %d items", cfg->icount);
+	lprintf(cfg, 0, 1, "Finished load of %d items", cfg->icount);
 	secs = e.tv_sec + e.tv_usec / 1000000.0;
-	secs -= (cfg->phase_start_time.tv_sec +
-	    cfg->phase_start_time.tv_usec / 1000000.0);
+	secs -= cfg->phase_start_time.tv_sec +
+	    cfg->phase_start_time.tv_usec / 1000000.0;
 	if (secs == 0)
 		++secs;
 	lprintf(cfg, 0, 1,
-	    "Load time: %.2f\n" "load ops/sec: %.2f",
-	    secs, cfg->icount / secs);
+	    "Load time: %.2f\n" "load ops/sec: %.2f", secs, cfg->icount / secs);
 
 	/*
 	 * If configured, sleep for some seconds to allow LSM merging
@@ -734,8 +732,7 @@ execute_populate(CONFIG *cfg)
 			    (e.tv_sec - cfg->phase_start_time.tv_sec);
 		else
 			sleepsec = cfg->merge_sleep;
-		lprintf(cfg, 0, 1,
-		    "Sleep %d seconds for merging", sleepsec);
+		lprintf(cfg, 0, 1, "Sleep %d seconds for merging", sleepsec);
 		(void)sleep(sleepsec);
 	}
 	return (0);
