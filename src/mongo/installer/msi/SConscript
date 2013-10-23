@@ -1,5 +1,7 @@
 # -*- mode: python; -*-
 
+import os
+
 Import("env")
 Import("installSetup")
 Import("windows")
@@ -10,11 +12,13 @@ Import("s3push")
 driverIncludeSource = "$BUILD_DIR/msi/DriverInclude.wxs"
 
 env = env.Clone()
-env['WIXPATH'] = r'C:\Program Files (x86)\WiX Toolset v3.7\bin'
+env['WIX'] = os.environ['WIX']
+env['WIXPATH'] = r'$WIX\bin'
 env['WIXHEAT'] = r'$WIXPATH\heat.exe'
 env['WIXCANDLE'] = r'$WIXPATH\candle.exe'
 env['WIXLIGHT'] = r'$WIXPATH\light.exe'
 env['WIXUIEXT'] = r'$WIXPATH\WixUIExtension.dll'
+env['MERGEMODULESBASEPATH'] = os.environ['MERGEMODULESBASEPATH']
 
 sources = [ driverIncludeSource,
             "wxs/BinaryFragment.wxs",
@@ -48,6 +52,7 @@ env.Command(objects,
             ' -dLicenseSource=distsrc'
             r' -dEnterpriseBase=src\mongo\db\modules\subscription\\'
             ' -dBinarySource=' + buildDir + r'\mongo'
+            ' -dMergeModulesBasePath="$MERGEMODULESBASEPATH"'
             ' -dEdition=Enterprise'
             ' -d"ProductId=*\"'
             ' -dUpgradeCode=FCF901F6-E963-40B1-9A17-978242068587'
