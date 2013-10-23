@@ -17,6 +17,8 @@ typedef struct {
 		WT_LSN ckpt_lsn;
 	} *files;
 
+	WT_LSN ckpt_lsn;
+
 	size_t file_alloc;
 	u_int max_fileid, nfiles;
 
@@ -225,10 +227,12 @@ static int
 __txn_log_recover(
     WT_SESSION_IMPL *session, WT_ITEM *logrec, WT_LSN *lsnp, void *cookie)
 {
+	WT_RECOVERY *r;
 	const uint8_t *end, *p;
 	uint64_t txnid;
 	uint32_t rectype;
 
+	r = cookie;
 	p = (const uint8_t *)logrec->data + offsetof(WT_LOG_RECORD, record);
 	end = (const uint8_t *)logrec->data + logrec->size;
 
@@ -236,10 +240,16 @@ __txn_log_recover(
 	WT_RET(__wt_logrec_read(session, &p, end, &rectype));
 
 	switch (rectype) {
+	case WT_LOGREC_CHECKPOINT:
+		if (r->metadata_only)
+			WT_RET(__wt_txn_checkpoint_logread(
+			    session, &p, end, &r->ckpt_lsn));
+		break;
+
 	case WT_LOGREC_COMMIT:
 		WT_RET(__wt_vunpack_uint(&p, WT_PTRDIFF(end, p), &txnid));
 		WT_UNUSED(txnid);
-		WT_RET(__txn_commit_apply(cookie, lsnp, &p, end));
+		WT_RET(__txn_commit_apply(r, lsnp, &p, end));
 		break;
 	}
 
@@ -251,8 +261,7 @@ __txn_log_recover(
  *	Set up the recovery slot for a file.
  */
 static int
-__recovery_setup_file(WT_RECOVERY *r,
-    const char *uri, const char *config, WT_LSN *start_lsnp)
+__recovery_setup_file(WT_RECOVERY *r, const char *uri, const char *config)
 {
 	WT_CONFIG_ITEM cval;
 	WT_LSN lsn;
@@ -278,10 +287,7 @@ __recovery_setup_file(WT_RECOVERY *r,
 		WT_RET_MSG(r->session, EINVAL,
 		    "Failed to parse checkpoint LSN '%.*s'",
 		    (int)cval.len, cval.str);
-
 	r->files[fileid].ckpt_lsn = lsn;
-	if (LOG_CMP(&lsn, start_lsnp) < 0)
-		*start_lsnp = lsn;
 
 	WT_VERBOSE_RET(r->session, recovery,
 	    "Recovering %s with id %u @ (%" PRIu32 ", %" PRIu64 ")",
@@ -320,7 +326,7 @@ __recovery_free(WT_RECOVERY *r)
  *	about them for recovery.
  */
 static int
-__recovery_file_scan(WT_RECOVERY *r, WT_LSN *start_lsnp)
+__recovery_file_scan(WT_RECOVERY *r)
 {
 	WT_DECL_RET;
 	WT_CURSOR *c;
@@ -343,7 +349,7 @@ __recovery_file_scan(WT_RECOVERY *r, WT_LSN *start_lsnp)
 		if (!WT_PREFIX_MATCH(uri, "file:"))
 			break;
 		WT_ERR(c->get_value(c, &config));
-		WT_ERR(__recovery_setup_file(r, uri, config, start_lsnp));
+		WT_ERR(__recovery_setup_file(r, uri, config));
 	}
 	WT_ERR_NOTFOUND_OK(ret);
 
@@ -360,13 +366,13 @@ __wt_txn_recover(WT_SESSION_IMPL *default_session)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
-	WT_LSN start_lsn;
 	WT_RECOVERY r;
 	WT_SESSION_IMPL *session;
 	const char *config;
 
 	conn = S2C(default_session);
 	WT_CLEAR(r);
+	INIT_LSN(&r.ckpt_lsn);
 
 	/* We need a real session for recovery. */
 	WT_RET(__wt_open_session(conn, 0, NULL, NULL, &session));
@@ -374,43 +380,24 @@ __wt_txn_recover(WT_SESSION_IMPL *default_session)
 	r.session = session;
 
 	WT_ERR(__wt_metadata_search(session, WT_METADATA_URI, &config));
-	MAX_LSN(&start_lsn);
-	WT_ERR(__recovery_setup_file(&r, WT_METADATA_URI, config, &start_lsn));
+	WT_ERR(__recovery_setup_file(&r, WT_METADATA_URI, config));
 	WT_ERR(__wt_metadata_cursor(session, NULL, &r.files[0].c));
 
 	/*
-	 * First, recover the metadata, starting from the checkpoint's LSN.
-	 * Pass WT_LOGSCAN_RECOVER so that old logs get truncated.
-	 *
-	 * If we get here with no start LSN, that could either mean that no
-	 * metadata checkpoint ever completed, or that we are recovering after
-	 * a hot backup (when the metadata is recreated from scratch).
+	 * First, do a full pass through the log to recover the metadata,
+	 * and establish the last checkpoint LSN.  Pass WT_LOGSCAN_RECOVER so
+	 * that old logs get truncated.
 	 */
 	r.metadata_only = 1;
-	if (IS_INIT_LSN(&start_lsn))
-		WT_ERR(__wt_log_scan(session, NULL,
-		    WT_LOGSCAN_FIRST | WT_LOGSCAN_RECOVER,
-		    __txn_log_recover, &r));
-	else
-		WT_ERR(__wt_log_scan(session, &start_lsn, WT_LOGSCAN_RECOVER,
-		    __txn_log_recover, &r));
+	WT_ERR(__wt_log_scan(session, NULL,
+	    WT_LOGSCAN_FIRST | WT_LOGSCAN_RECOVER,
+	    __txn_log_recover, &r));
 
-	WT_ERR(__recovery_file_scan(&r, &start_lsn));
+	WT_ERR(__recovery_file_scan(&r));
 
-	/*
-	 * Now, recover all the files apart from the metadata.
-	 *
-	 * If some files have LSNs earlier than the first log file found, they
-	 * must have been unmodified in later checkpoints (which led to earlier
-	 * log files being archived).
-	 */
+	/* Now, recover all the files apart from the metadata. */
 	r.metadata_only = 0;
-	if (LOG_CMP(&start_lsn, &S2C(session)->log->first_lsn) < 0)
-		WT_ERR(__wt_log_scan(
-		    session, NULL, WT_LOGSCAN_FIRST, __txn_log_recover, &r));
-	else
-		WT_ERR(__wt_log_scan(
-		    session, &start_lsn, 0, __txn_log_recover, &r));
+	WT_ERR(__wt_log_scan(session, &r.ckpt_lsn, 0, __txn_log_recover, &r));
 
 	conn->next_file_id = r.max_fileid;
 

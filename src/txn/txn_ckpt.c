@@ -224,7 +224,7 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 
 	/* Tell logging that we are about to start a database checkpoint. */
 	if (S2C(session)->logging && full)
-		WT_ERR(__wt_txn_log_checkpoint(
+		WT_ERR(__wt_txn_checkpoint_log(
 		    session, 1, WT_TXN_LOG_CKPT_PREPARE, NULL));
 
 	/* Start a snapshot transaction for the checkpoint. */
@@ -233,7 +233,7 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 
 	/* Tell logging that we have started a database checkpoint. */
 	if (S2C(session)->logging && full)
-		WT_ERR(__wt_txn_log_checkpoint(
+		WT_ERR(__wt_txn_checkpoint_log(
 		    session, 1, WT_TXN_LOG_CKPT_START, NULL));
 
 	WT_ERR(__checkpoint_apply(session, cfg, __wt_checkpoint, NULL));
@@ -297,7 +297,7 @@ err:	/*
 
 	/* Tell logging that we have finished a database checkpoint. */
 	if (S2C(session)->logging && full)
-		WT_TRET(__wt_txn_log_checkpoint(session, 1,
+		WT_TRET(__wt_txn_checkpoint_log(session, 1,
 		    (ret == 0) ? WT_TXN_LOG_CKPT_STOP : WT_TXN_LOG_CKPT_FAIL,
 		    NULL));
 
@@ -732,7 +732,7 @@ __checkpoint_worker(
 
 	/* Tell logging that a file checkpoint is starting. */
 	if (S2C(session)->logging)
-		WT_ERR(__wt_txn_log_checkpoint(
+		WT_ERR(__wt_txn_checkpoint_log(
 		    session, 0, WT_TXN_LOG_CKPT_START, &ckptlsn));
 
 	/*
@@ -782,7 +782,7 @@ fake:	/* Update the object's metadata. */
 
 	/* Tell logging that the checkpoint is complete. */
 	if (S2C(session)->logging)
-		WT_ERR(__wt_txn_log_checkpoint(
+		WT_ERR(__wt_txn_checkpoint_log(
 		    session, 0, WT_TXN_LOG_CKPT_STOP, NULL));
 
 err:	if (hot_backup_locked)

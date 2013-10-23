@@ -1492,7 +1492,11 @@ extern int __wt_ext_transaction_visible( WT_EXTENSION_API *wt_api,
     uint64_t transaction_id);
 extern void __wt_txn_op_free(WT_SESSION_IMPL *session, WT_TXN_OP *op);
 extern int __wt_txn_log_commit(WT_SESSION_IMPL *session, const char *cfg[]);
-extern int __wt_txn_log_checkpoint( WT_SESSION_IMPL *session,
+extern int __wt_txn_checkpoint_logread( WT_SESSION_IMPL *session,
+    const uint8_t **pp,
+    const uint8_t *end,
+    WT_LSN *ckpt_lsn);
+extern int __wt_txn_checkpoint_log( WT_SESSION_IMPL *session,
     int full,
     uint32_t flags,
     WT_LSN *lsnp);
