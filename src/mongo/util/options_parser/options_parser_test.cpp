@@ -83,6 +83,45 @@ namespace {
                                                                                     moe::Int)));
     }
 
+    TEST(Registration, BadRangesPositional) {
+        moe::OptionSection testOpts;
+        try {
+            testOpts.addOptionChaining("positional1", "positional1", moe::String, "Positional")
+                                      .positional(-1, 1);
+            FAIL("Was able to register positional with negative start for range");
+        }
+        catch (::mongo::DBException &e) {
+        }
+        try {
+            testOpts.addOptionChaining("positional1", "positional1", moe::String, "Positional")
+                                      .positional(2, 1);
+            FAIL("Was able to register positional with start of range larger than end");
+        }
+        catch (::mongo::DBException &e) {
+        }
+        try {
+            testOpts.addOptionChaining("positional1", "positional1", moe::String, "Positional")
+                                      .positional(1, -2);
+            FAIL("Was able to register positional with bad end of range");
+        }
+        catch (::mongo::DBException &e) {
+        }
+        try {
+            testOpts.addOptionChaining("positional1", "positional1", moe::String, "Positional")
+                                      .positional(0, 1);
+            FAIL("Was able to register positional with bad start of range");
+        }
+        catch (::mongo::DBException &e) {
+        }
+        try {
+            testOpts.addOptionChaining("positional1", "positional1", moe::String, "Positional")
+                                      .positional(1, 2);
+            FAIL("Was able to register multi valued positional with non StringVector type");
+        }
+        catch (::mongo::DBException &e) {
+        }
+    }
+
     TEST(Registration, DefaultValueWrongType) {
         moe::OptionSection testOpts;
         try {
@@ -316,7 +355,7 @@ namespace {
         moe::OptionSection testOpts;
         testOpts.addOptionChaining("positional", "positional", moe::String,
                                                   "Positional");
-        testOpts.addPositionalOption(moe::PositionalOptionDescription("positional", moe::String));
+        ASSERT_OK(testOpts.addPositionalOption(moe::PositionalOptionDescription("positional", moe::String)));
 
         std::vector<std::string> argv;
         argv.push_back("binaryname");
@@ -1865,6 +1904,312 @@ namespace {
                 FAIL(sb.str());
             }
         }
+    }
+
+    TEST(ChainingInterface, Positional) {
+        moe::OptionsParser parser;
+        moe::Environment environment;
+
+        moe::OptionSection testOpts;
+        testOpts.addOptionChaining("positional", "positional", moe::String, "Positional")
+                                  .positional(1, 1);
+
+        std::vector<std::string> argv;
+        argv.push_back("binaryname");
+        argv.push_back("positional");
+        std::map<std::string, std::string> env_map;
+
+        moe::Value value;
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        ASSERT_OK(environment.get(moe::Key("positional"), &value));
+        std::string positional;
+        ASSERT_OK(value.get(&positional));
+        ASSERT_EQUALS(positional, "positional");
+    }
+
+    TEST(ChainingInterface, PositionalTooMany) {
+        moe::OptionsParser parser;
+        moe::Environment environment;
+
+        moe::OptionSection testOpts;
+        testOpts.addOptionChaining("positional", "positional", moe::String, "Positional")
+                                  .positional(1, 1);
+
+        std::vector<std::string> argv;
+        argv.push_back("binaryname");
+        argv.push_back("positional");
+        argv.push_back("extrapositional");
+        std::map<std::string, std::string> env_map;
+
+        moe::Value value;
+        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    }
+
+    TEST(ChainingInterface, PositionalAndFlag) {
+        moe::OptionsParser parser;
+        moe::Environment environment;
+
+        moe::OptionSection testOpts;
+        testOpts.addOptionChaining("positional", "positional", moe::String, "Positional")
+                                  .positional(1, 1);
+        testOpts.addOptionChaining("port", "port", moe::Int, "Port");
+
+        std::vector<std::string> argv;
+        argv.push_back("binaryname");
+        argv.push_back("positional");
+        argv.push_back("--port");
+        argv.push_back("5");
+        std::map<std::string, std::string> env_map;
+
+        moe::Value value;
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        ASSERT_OK(environment.get(moe::Key("positional"), &value));
+        std::string positional;
+        ASSERT_OK(value.get(&positional));
+        ASSERT_EQUALS(positional, "positional");
+        ASSERT_OK(environment.get(moe::Key("port"), &value));
+        int port;
+        ASSERT_OK(value.get(&port));
+        ASSERT_EQUALS(port, 5);
+    }
+
+    TEST(ChainingInterface, PositionalMultiple) {
+        moe::OptionsParser parser;
+        moe::Environment environment;
+
+        moe::OptionSection testOpts;
+        testOpts.addOptionChaining("positional", "positional", moe::StringVector, "Positional")
+                                  .positional(1, 2);
+
+        std::vector<std::string> argv;
+        argv.push_back("binaryname");
+        argv.push_back("positional1");
+        argv.push_back("positional2");
+        std::map<std::string, std::string> env_map;
+
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        moe::Value value;
+        ASSERT_OK(environment.get(moe::Key("positional"), &value));
+        std::vector<std::string> positional;
+        ASSERT_OK(value.get(&positional));
+        std::vector<std::string>::iterator positionalit = positional.begin();
+        ASSERT_EQUALS(*positionalit, "positional1");
+        positionalit++;
+        ASSERT_EQUALS(*positionalit, "positional2");
+    }
+
+    TEST(ChainingInterface, PositionalMultipleExtra) {
+        moe::OptionsParser parser;
+        moe::Environment environment;
+
+        moe::OptionSection testOpts;
+        testOpts.addOptionChaining("positional", "positional", moe::StringVector, "Positional")
+                                  .positional(1, 2);
+
+        std::vector<std::string> argv;
+        argv.push_back("binaryname");
+        argv.push_back("positional1");
+        argv.push_back("positional2");
+        argv.push_back("positional2");
+        std::map<std::string, std::string> env_map;
+
+        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    }
+
+    TEST(ChainingInterface, PositionalMultipleUnlimited) {
+        moe::OptionsParser parser;
+        moe::Environment environment;
+
+        moe::OptionSection testOpts;
+        testOpts.addOptionChaining("positional", "positional", moe::StringVector, "Positional")
+                                  .positional(1, -1);
+
+        std::vector<std::string> argv;
+        argv.push_back("binaryname");
+        argv.push_back("positional1");
+        argv.push_back("positional2");
+        argv.push_back("positional3");
+        argv.push_back("positional4");
+        argv.push_back("positional5");
+        std::map<std::string, std::string> env_map;
+
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        moe::Value value;
+        ASSERT_OK(environment.get(moe::Key("positional"), &value));
+        std::vector<std::string> positional;
+        ASSERT_OK(value.get(&positional));
+        std::vector<std::string>::iterator positionalit = positional.begin();
+        ASSERT_EQUALS(*positionalit, "positional1");
+        positionalit++;
+        ASSERT_EQUALS(*positionalit, "positional2");
+        positionalit++;
+        ASSERT_EQUALS(*positionalit, "positional3");
+        positionalit++;
+        ASSERT_EQUALS(*positionalit, "positional4");
+        positionalit++;
+        ASSERT_EQUALS(*positionalit, "positional5");
+    }
+
+    TEST(ChainingInterface, PositionalMultipleAndFlag) {
+        moe::OptionsParser parser;
+        moe::Environment environment;
+
+        moe::OptionSection testOpts;
+        testOpts.addOptionChaining("positional", "positional", moe::StringVector, "Positional")
+                                  .positional(1, 2);
+        testOpts.addOptionChaining("port", "port", moe::Int, "Port");
+
+        std::vector<std::string> argv;
+        argv.push_back("binaryname");
+        argv.push_back("positional1");
+        argv.push_back("--port");
+        argv.push_back("5");
+        argv.push_back("positional2");
+        std::map<std::string, std::string> env_map;
+
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        moe::Value value;
+        ASSERT_OK(environment.get(moe::Key("positional"), &value));
+        std::vector<std::string> positional;
+        ASSERT_OK(value.get(&positional));
+        std::vector<std::string>::iterator positionalit = positional.begin();
+        ASSERT_EQUALS(*positionalit, "positional1");
+        positionalit++;
+        ASSERT_EQUALS(*positionalit, "positional2");
+        ASSERT_OK(environment.get(moe::Key("port"), &value));
+        int port;
+        ASSERT_OK(value.get(&port));
+        ASSERT_EQUALS(port, 5);
+    }
+
+    TEST(ChainingInterface, PositionalSingleMultipleUnlimitedAndFlag) {
+        moe::OptionsParser parser;
+        moe::Environment environment;
+
+        moe::OptionSection testOpts;
+        testOpts.addOptionChaining("positional1", "positional1", moe::String, "Positional")
+                                  .positional(1, 1);
+        testOpts.addOptionChaining("positional2", "positional2", moe::StringVector, "Positional")
+                                  .positional(2, 3);
+        testOpts.addOptionChaining("positional3", "positional3", moe::StringVector, "Positional")
+                                  .positional(4, -1);
+        testOpts.addOptionChaining("port", "port", moe::Int, "Port");
+
+        std::vector<std::string> argv;
+        argv.push_back("binaryname");
+        argv.push_back("positional1");
+        argv.push_back("positional2");
+        argv.push_back("positional3");
+        argv.push_back("positional4");
+        argv.push_back("positional5");
+        argv.push_back("positional6");
+        argv.push_back("--port");
+        argv.push_back("5");
+        argv.push_back("positional7");
+        argv.push_back("positional8");
+        argv.push_back("positional9");
+        std::map<std::string, std::string> env_map;
+
+        moe::Value value;
+        std::vector<std::string>::iterator positionalit;
+
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        ASSERT_OK(environment.get(moe::Key("positional1"), &value));
+        std::string positionalSingle;
+        ASSERT_OK(value.get(&positionalSingle));
+        ASSERT_EQUALS(positionalSingle, "positional1");
+
+        ASSERT_OK(environment.get(moe::Key("positional2"), &value));
+        std::vector<std::string> positionalMultiple;
+        ASSERT_OK(value.get(&positionalMultiple));
+        positionalit = positionalMultiple.begin();
+        ASSERT_EQUALS(*positionalit, "positional2");
+        positionalit++;
+        ASSERT_EQUALS(*positionalit, "positional3");
+
+        ASSERT_OK(environment.get(moe::Key("positional3"), &value));
+        std::vector<std::string> positionalUnlimited;
+        ASSERT_OK(value.get(&positionalUnlimited));
+        positionalit = positionalUnlimited.begin();
+        ASSERT_EQUALS(*positionalit, "positional4");
+        positionalit++;
+        ASSERT_EQUALS(*positionalit, "positional5");
+        positionalit++;
+        ASSERT_EQUALS(*positionalit, "positional6");
+        positionalit++;
+        ASSERT_EQUALS(*positionalit, "positional7");
+        positionalit++;
+        ASSERT_EQUALS(*positionalit, "positional8");
+        positionalit++;
+        ASSERT_EQUALS(*positionalit, "positional9");
+
+        ASSERT_OK(environment.get(moe::Key("port"), &value));
+        int port;
+        ASSERT_OK(value.get(&port));
+        ASSERT_EQUALS(port, 5);
+    }
+
+    TEST(ChainingInterface, PositionalHoleInRange) {
+        moe::OptionsParser parser;
+        moe::Environment environment;
+
+        moe::OptionSection testOpts;
+        testOpts.addOptionChaining("positional1", "positional1", moe::String, "Positional")
+                                  .positional(1, 1);
+        testOpts.addOptionChaining("positional3", "positional2", moe::StringVector, "Positional")
+                                  .positional(3, -1);
+        testOpts.addOptionChaining("port", "port", moe::Int, "Port");
+
+        std::vector<std::string> argv;
+        argv.push_back("binaryname");
+        std::map<std::string, std::string> env_map;
+
+        moe::Value value;
+        std::vector<std::string>::iterator positionalit;
+
+        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    }
+
+    TEST(ChainingInterface, PositionalOverlappingRange) {
+        moe::OptionsParser parser;
+        moe::Environment environment;
+
+        moe::OptionSection testOpts;
+        testOpts.addOptionChaining("positional1", "positional1", moe::String, "Positional")
+                                  .positional(1, 1);
+        testOpts.addOptionChaining("positional3", "positional2", moe::StringVector, "Positional")
+                                  .positional(1, -1);
+        testOpts.addOptionChaining("port", "port", moe::Int, "Port");
+
+        std::vector<std::string> argv;
+        argv.push_back("binaryname");
+        std::map<std::string, std::string> env_map;
+
+        moe::Value value;
+        std::vector<std::string>::iterator positionalit;
+
+        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    }
+
+    TEST(ChainingInterface, PositionalMultipleInfinite) {
+        moe::OptionsParser parser;
+        moe::Environment environment;
+
+        moe::OptionSection testOpts;
+        testOpts.addOptionChaining("positional1", "positional1", moe::String, "Positional")
+                                  .positional(1, -1);
+        testOpts.addOptionChaining("positional3", "positional2", moe::StringVector, "Positional")
+                                  .positional(3, -1);
+        testOpts.addOptionChaining("port", "port", moe::Int, "Port");
+
+        std::vector<std::string> argv;
+        argv.push_back("binaryname");
+        std::map<std::string, std::string> env_map;
+
+        moe::Value value;
+        std::vector<std::string>::iterator positionalit;
+
+        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
     }
 
     TEST(OptionSources, SourceCommandLine) {

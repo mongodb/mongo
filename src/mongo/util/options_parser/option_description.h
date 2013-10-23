@@ -69,7 +69,9 @@ namespace optionenvironment {
             _default(Value()),
             _implicit(Value()),
             _isComposing(false),
-            _sources(SourceAll) { }
+            _sources(SourceAll),
+            _positionalStart(-1),
+            _positionalEnd(-1) { }
 
         /*
          * The following functions are part of the chaining interface for option registration.  See
@@ -114,6 +116,30 @@ namespace optionenvironment {
          */
         OptionDescription& setSources(OptionSources sources);
 
+        /*
+         * Specify that this is a positional option.  "start" should be the first position the
+         * option can be found in, and "end" is the last position, inclusive.  The positions start
+         * at index 1 (after the executable name).  If "start" is greater than "end", then the
+         * option must be able to support multiple values.  Specifying -1 for the "end" means that
+         * the option can repeat forever.  Any "holes" in the positional ranges will result in an
+         * error during parsing.
+         *
+         * Examples:
+         *
+         * .positional(1,1) // Single positional argument at position 1
+         * ...
+         * .positional(2,3) // More positional arguments at position 2 and 3 (multivalued option)
+         * ...
+         * .positional(4,-1) // Can repeat this positional option forever after position 4
+         *
+         *
+         * (sverch) TODO: When we can support it (i.e. when we can get rid of boost) add a
+         * "positionalOnly" attribute that specifies that it is not also a command line flag.  In
+         * boost program options, the only way to have a positional argument is to register a flag
+         * and mark it as also being positional.
+         */
+        OptionDescription& positional(int start, int end);
+
         std::string _dottedName; // Used for JSON config and in Environment
         std::string _singleName; // Used for boost command line and INI
         OptionType _type; // Storage type of the argument value, or switch type (bool)
@@ -125,6 +151,8 @@ namespace optionenvironment {
         bool _isComposing; // Aggregate values from different sources instead of overriding
         OptionSources _sources; // Places where an option can be specified (current sources are
                                 // command line, json config, and ini config)
+        int _positionalStart; // The starting position if this is a positional option. -1 otherwise.
+        int _positionalEnd; // The ending position if this is a positional option.  -1 if unlimited.
     };
 
     class PositionalOptionDescription {

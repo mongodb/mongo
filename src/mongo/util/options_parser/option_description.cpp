@@ -172,5 +172,29 @@ namespace optionenvironment {
         return *this;
     }
 
+    OptionDescription& OptionDescription::positional(int start, int end) {
+
+        if (start < 1 || (end < 1 && end != -1) || (end != -1 && end < start)) {
+            StringBuilder sb;
+            sb << "Could not register option \"" << _dottedName << "\": "
+               << "Invalid positional specification:  \"start\": " << start << ", \"end\": " << end;
+            throw DBException(sb.str(), ErrorCodes::InternalError);
+        }
+
+        if ((end - start) > 0) {
+            if (_type != StringVector) {
+                StringBuilder sb;
+                sb << "Could not register option \"" << _dottedName << "\": "
+                   << "Positional range implies that multiple values are allowed, "
+                   << "but option is not registered as type StringVector";
+                throw DBException(sb.str(), ErrorCodes::InternalError);
+            }
+        }
+
+        _positionalStart = start;
+        _positionalEnd = end;
+        return *this;
+    }
+
 } // namespace optionenvironment
 } // namespace mongo

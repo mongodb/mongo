@@ -142,7 +142,6 @@ namespace optionenvironment {
         std::string _name;
         std::list<OptionSection> _subSections;
         std::list<OptionDescription> _options;
-        std::list<PositionalOptionDescription> _positionalOptions;
     };
 
 } // namespace optionenvironment

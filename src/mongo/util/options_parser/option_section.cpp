@@ -28,9 +28,13 @@ namespace optionenvironment {
 
     // TODO: Make sure the section we are adding does not have duplicate options
     Status OptionSection::addSection(const OptionSection& subSection) {
-        if (!subSection._positionalOptions.empty()) {
-            return Status(ErrorCodes::InternalError,
-                          "Attempted to add subsection with positional options");
+        std::list<OptionDescription>::const_iterator oditerator;
+        for (oditerator = _options.begin();
+             oditerator != _options.end(); oditerator++) {
+            if (oditerator->_positionalStart != -1) {
+                return Status(ErrorCodes::InternalError,
+                              "Attempted to add subsection with positional options");
+            }
         }
         _subSections.push_back(subSection);
         return Status::OK();
@@ -66,32 +70,63 @@ namespace optionenvironment {
     }
 
     Status OptionSection::addPositionalOption(const PositionalOptionDescription& positionalOption) {
-        // Verify that the name for this positional option does not conflict with the name for any
-        // positional option we have already registered
-        std::list<PositionalOptionDescription>::const_iterator poditerator;
-        for (poditerator = _positionalOptions.begin();
-             poditerator != _positionalOptions.end(); poditerator++) {
-            if (positionalOption._name == poditerator->_name) {
-                StringBuilder sb;
-                sb << "Attempted to register duplicate positional option: "
-                   << positionalOption._name;
-                return Status(ErrorCodes::InternalError, sb.str());
+
+        std::list<OptionDescription>::iterator oditerator;
+
+        // Get place where this positional option should be
+        int nextPosition = 1;
+        for (oditerator = _options.begin();
+             oditerator != _options.end(); oditerator++) {
+
+            // This option is positional, so we need to advance nextPosition
+            if (oditerator->_positionalStart != -1) {
+
+                // Verify that the name for this positional option does not conflict with the name
+                // for any positional option we have already registered
+                if (positionalOption._name == oditerator->_dottedName ||
+                    positionalOption._name == oditerator->_singleName) {
+                    StringBuilder sb;
+                    sb << "Attempted to register duplicate positional option: "
+                       << positionalOption._name;
+                    return Status(ErrorCodes::InternalError, sb.str());
+                }
+
+                // Verify that we are not trying to register a positional option with a section that
+                // already has one with an infinite count
+                if (oditerator->_positionalEnd == -1) {
+                    StringBuilder sb;
+                    sb << "Error, found an exisiting option with infinite count: "
+                       << positionalOption._name;
+                    return Status(ErrorCodes::InternalError, sb.str());
+                }
+
+                nextPosition = oditerator->_positionalEnd + 1;
             }
+        }
+
+        int positionalStart = nextPosition;
+        int positionalEnd = nextPosition;
+
+        if (positionalOption._count == -1) {
+            positionalEnd = -1;
+        }
+        else {
+            positionalEnd = nextPosition + (positionalOption._count - 1);
         }
 
         // Don't register this positional option if it has already been registered to support
         // positional options that we also want to be visible command line flags
         //
-        // TODO: More robust way to do this.  This only works if we register the flag first
-        std::list<OptionDescription>::const_iterator oditerator;
+        // TODO:  More robust way to do this.  This whole function only works if we register the
+        // flag first.  Make everything use the chaining interface and remove this function.
         for (oditerator = _options.begin(); oditerator != _options.end(); oditerator++) {
             if (positionalOption._name == oditerator->_dottedName) {
-                _positionalOptions.push_back(positionalOption);
+                oditerator->positional(positionalStart, positionalEnd);
                 return Status::OK();
             }
 
             if (positionalOption._name == oditerator->_singleName) {
-                _positionalOptions.push_back(positionalOption);
+                oditerator->positional(positionalStart, positionalEnd);
                 return Status::OK();
             }
         }
@@ -100,13 +135,12 @@ namespace optionenvironment {
             addOptionChaining(positionalOption._name, positionalOption._name,
                               positionalOption._type, "hidden description")
                 .hidden()
-                .setSources(SourceCommandLine);
+                .setSources(SourceCommandLine)
+                .positional(positionalStart, positionalEnd);
         }
         catch (DBException &e) {
             return e.toStatus();
         }
-
-        _positionalOptions.push_back(positionalOption);
 
         return Status::OK();
     }
@@ -413,11 +447,57 @@ namespace optionenvironment {
     Status OptionSection::getBoostPositionalOptions(
                             po::positional_options_description* boostPositionalOptions) const {
 
-        std::list<PositionalOptionDescription>::const_iterator poditerator;
-        for (poditerator = _positionalOptions.begin();
-             poditerator != _positionalOptions.end(); poditerator++) {
-            boostPositionalOptions->add(poditerator->_name.c_str(), poditerator->_count);
+        std::list<OptionDescription> positionalOptions;
+
+        std::list<OptionDescription>::const_iterator oditerator;
+        for (oditerator = _options.begin(); oditerator != _options.end(); oditerator++) {
+            // Check if this is a positional option, and extract it if it is
+            if (oditerator->_positionalStart != -1) {
+                positionalOptions.push_back(*oditerator);
+            }
         }
+
+        int nextPosition = 1;
+        bool foundAtPosition = false;
+        while (!positionalOptions.empty()) {
+            foundAtPosition = false;
+            std::list<OptionDescription>::iterator poditerator;
+            for (poditerator = positionalOptions.begin(); poditerator != positionalOptions.end();) {
+                if (poditerator->_positionalStart == nextPosition) {
+                    foundAtPosition = true;
+
+                    int count;
+                    if (poditerator->_positionalEnd == -1) {
+                        count = -1;
+                        if (positionalOptions.size() != 1) {
+                            StringBuilder sb;
+                            sb << "Found positional option with infinite count, but still have "
+                               << "more positional options registered";
+                            return Status(ErrorCodes::InternalError, sb.str());
+                        }
+                    }
+                    else {
+                        count = (poditerator->_positionalEnd + 1) - poditerator->_positionalStart;
+                    }
+
+                    boostPositionalOptions->add(poditerator->_dottedName.c_str(), count);
+                    nextPosition += count;
+                    std::list<OptionDescription>::iterator old_poditerator = poditerator;
+                    poditerator++;
+                    positionalOptions.erase(old_poditerator);
+                }
+                else {
+                    poditerator++;
+                }
+            }
+            if (!foundAtPosition) {
+                StringBuilder sb;
+                sb << "Did not find option at position: " << nextPosition;
+                return Status(ErrorCodes::InternalError, sb.str());
+            }
+        }
+
+        // XXX: Right now only the top level section can have positional options
 
         return Status::OK();
     }
@@ -515,13 +595,6 @@ namespace optionenvironment {
 
     /* Debugging */
     void OptionSection::dump() const {
-        std::list<PositionalOptionDescription>::const_iterator poditerator;
-        for (poditerator = _positionalOptions.begin();
-             poditerator != _positionalOptions.end(); poditerator++) {
-            std::cout << " _name: " << poditerator->_name
-                    << " _type: " << poditerator->_type
-                    << " _count: " << poditerator->_count << std::endl;
-        }
 
         std::list<OptionDescription>::const_iterator oditerator;
         for (oditerator = _options.begin(); oditerator != _options.end(); oditerator++) {
