@@ -44,7 +44,7 @@ import urlparse
 # web server will look for repositories.
 REPOPATH="/var/www/repo"
 
-# The MongoDB names for the architectures we support.
+# The 10gen names for the architectures we support.
 ARCHES=["x86_64"]
 
 # Made up names for the flavors of distribution we package for.
@@ -88,7 +88,7 @@ class Spec(object):
         elif "suffix" in self.params:
             return self.params["suffix"]
         else:
-            return "-enterprise" if int(self.ver.split(".")[1])%2==0 else "-enterprise-unstable"
+            return "-10gen-enterprise" if int(self.ver.split(".")[1])%2==0 else "-10gen-unstable"
 
 
     def pversion(self, distro):
@@ -116,7 +116,9 @@ class Distro(object):
         return self.n
 
     def pkgbase(self):
-        return "mongodb"
+        # pkgbase is the first part of the package's name on
+        # this distro.
+        return "mongo" if re.search("(redhat|fedora|centos)", self.n) else "mongodb"
 
     def archname(self, arch):
         if re.search("^(debian|ubuntu)", self.n):
@@ -132,7 +134,7 @@ class Distro(object):
         layout (as distinct from where that distro's packaging building
         tools place the package files)."""
         if re.search("^(debian|ubuntu)", self.n):
-            return "repo/%s/dists/dist/mongodb/binary-%s/" % (self.n, self.archname(arch))
+            return "repo/%s/dists/dist/10gen/binary-%s/" % (self.n, self.archname(arch))
         elif re.search("(redhat|fedora|centos)", self.n):
             return "repo/%s/os/%s/RPMS/" % (self.n, self.archname(arch))
         else:
@@ -175,7 +177,7 @@ def main(argv):
     os.chdir(prefix)
     try:
         # Download the binaries.
-        urlfmt="http://downloads.mongodb.com/linux/mongodb-linux-%s-subscription-%s-%s.tgz"
+        urlfmt="http://downloads.10gen.com/linux/mongodb-linux-%s-subscription-%s-%s.tgz"
     
         # Build a pacakge for each distro/spec/arch tuple, and
         # accumulate the repository-layout directories.
@@ -283,7 +285,7 @@ def setupdir(distro, arch, spec):
     # distro's packaging tools (e.g., package metadata files, init
     # scripts, etc), along with the already-built binaries).  In case
     # the following format string is unclear, an example setupdir
-    # would be dst/x86_64/debian-sysvinit/mongodb-org-unstable/
+    # would be dst/x86_64/debian-sysvinit/mongodb-10gen-unstable/
     return "dst/%s/%s/%s%s-%s/" % (arch, distro.name(), distro.pkgbase(), spec.suffix(), spec.pversion(distro))
 
 def unpack_binaries_into(distro, arch, spec, where):
@@ -346,10 +348,10 @@ def make_deb(distro, arch, spec, srcdir):
     suffix=spec.suffix()
     sdir=setupdir(distro, arch, spec)
     if re.search("sysvinit", distro.name()):
-        os.link(sdir+"debian/init.d", sdir+"debian/%s%s-server.mongod.init" % (distro.pkgbase(), suffix))
-        os.unlink(sdir+"debian/mongod.upstart")
+        os.link(sdir+"debian/init.d", sdir+"debian/%s%s.mongodb.init" % (distro.pkgbase(), suffix))
+        os.unlink(sdir+"debian/mongodb.upstart")
     elif re.search("upstart", distro.name()):
-        os.link(sdir+"debian/mongod.upstart", sdir+"debian/%s%s-server.mongod.upstart" % (distro.pkgbase(), suffix))
+        os.link(sdir+"debian/mongodb.upstart", sdir+"debian/%s%s.upstart" % (distro.pkgbase(), suffix))
         os.unlink(sdir+"debian/init.d")
     else:
         raise Exception("unknown debianoid flavor: not sysvinit or upstart?")
@@ -398,14 +400,14 @@ def make_deb_repo(repo):
     # and must be created after all the Packages.gz files have been
     # done.
     s="""
-Origin: mongodb
-Label: mongodb
-Suite: mongodb
+Origin: 10gen
+Label: 10gen
+Suite: 10gen
 Codename: %s
 Version: %s
 Architectures: i386 amd64
-Components: mongodb
-Description: mongodb packages
+Components: 10gen
+Description: 10gen packages
 """ % ("dist", "dist")
     if os.path.exists(repo+"../../Release"):
         os.unlink(repo+"../../Release")
@@ -539,9 +541,9 @@ Standards-Version: 3.8.0
 Homepage: http://www.mongodb.org
 
 Package: @@PACKAGE_BASENAME@@
-Conflicts: mongo-10gen, mongo-10gen-enterprise, mongo-10gen-enterprise-server, mongo-10gen-server, mongo-10gen-unstable, mongo-10gen-unstable-enterprise, mongo-10gen-unstable-enterprise-mongos, mongo-10gen-unstable-enterprise-server, mongo-10gen-unstable-enterprise-shell, mongo-10gen-unstable-enterprise-tools, mongo-10gen-unstable-mongos, mongo-10gen-unstable-server, mongo-10gen-unstable-shell, mongo-10gen-unstable-tools, mongo18-10gen, mongo18-10gen-server, mongo20-10gen, mongo20-10gen-server, mongodb, mongodb-10gen, mongodb-10gen-enterprise, mongodb-10gen-unstable, mongodb-10gen-unstable-enterprise, mongodb-10gen-unstable-enterprise-mongos, mongodb-10gen-unstable-enterprise-server, mongodb-10gen-unstable-enterprise-shell, mongodb-10gen-unstable-enterprise-tools, mongodb-10gen-unstable-mongos, mongodb-10gen-unstable-server, mongodb-10gen-unstable-shell, mongodb-10gen-unstable-tools, mongodb-enterprise, mongodb-enterprise-mongos, mongodb-enterprise-server, mongodb-enterprise-shell, mongodb-enterprise-tools, mongodb-nightly, mongodb-org, mongodb-org-mongos, mongodb-org-server, mongodb-org-shell, mongodb-org-tools, mongodb-stable, mongodb18-10gen, mongodb20-10gen, mongodb-org-unstable, mongodb-org-unstable-mongos, mongodb-org-unstable-server, mongodb-org-unstable-shell, mongodb-org-unstable-tools
+Conflicts: @@PACKAGE_CONFLICTS@@
 Architecture: any
-Depends: libc6 (>= 2.3.2), libgcc1 (>= 1:4.1.1), libstdc++6 (>= 4.1.1), libsnmp15, libsasl2-2, libssl1.0.0
+Depends: libc6 (>= 2.3.2), libgcc1 (>= 1:4.1.1), libstdc++6 (>= 4.1.1), libsnmp15, libgsasl7, libssl1.0.0
 Description: An object/document-oriented database
  MongoDB is a high-performance, open source, schema-free 
  document-oriented  data store that's easy to deploy, manage
@@ -561,6 +563,9 @@ Description: An object/document-oriented database
  functionality are the goals for the project.
 """
     s=re.sub("@@PACKAGE_BASENAME@@", "mongodb%s" % spec.suffix(), s)
+    conflict_suffixes=["", "-stable", "-unstable", "-nightly", "-10gen", "-10gen-unstable", "-10gen-enterprise"]
+    conflict_suffixes = [suff for suff in conflict_suffixes if suff != spec.suffix()]
+    s=re.sub("@@PACKAGE_CONFLICTS@@", ", ".join(["mongodb"+suffix for suffix in conflict_suffixes] + [ "mongodb18"+suffix for suffix in conflict_suffixes] + ["mongodb20"+suffix for suffix in conflict_suffixes]), s)
 
     f=open(path, 'w')
     try:
@@ -642,7 +647,7 @@ install: build
 \t# scons --prefix=$(CURDIR)/debian/mongodb/usr install
 \tcp -v $(CURDIR)/@@BINARYDIR@@/usr/bin/* $(CURDIR)/debian/@@PACKAGE_NAME@@/usr/bin
 \tmkdir -p $(CURDIR)/debian/@@PACKAGE_NAME@@/etc
-\tcp $(CURDIR)/debian/mongod.conf $(CURDIR)/debian/@@PACKAGE_NAME@@/etc/mongod.conf 
+\tcp $(CURDIR)/debian/mongodb.conf $(CURDIR)/debian/@@PACKAGE_NAME@@/etc/mongodb.conf 
 
 \tmkdir -p $(CURDIR)/debian/@@PACKAGE_NAME@@/usr/share/lintian/overrides/
 \tinstall -m 644 $(CURDIR)/debian/lintian-overrides \
@@ -699,7 +704,7 @@ def make_rpm(distro, arch, spec, srcdir):
     # Create the specfile.
     suffix=spec.suffix()
     sdir=setupdir(distro, arch, spec)
-    specfile=sdir+"rpm/mongodb%s.spec" % suffix
+    specfile=sdir+"rpm/mongo%s.spec" % suffix
     write_rpm_spec_file(specfile, spec)
     topdir=ensure_dir(os.getcwd()+'/rpmbuild/')
     for subdir in ["BUILD", "RPMS", "SOURCES", "SPECS", "SRPMS"]:
@@ -742,11 +747,11 @@ def make_rpm(distro, arch, spec, srcdir):
     oldcwd=os.getcwd()
     os.chdir(sdir+"/../")
     try:
-        sysassert(["tar", "-cpzf", topdir+"SOURCES/mongodb%s-%s.tar.gz" % (suffix, spec.pversion(distro)), os.path.basename(os.path.dirname(sdir))])
+        sysassert(["tar", "-cpzf", topdir+"SOURCES/mongo%s-%s.tar.gz" % (suffix, spec.pversion(distro)), os.path.basename(os.path.dirname(sdir))])
     finally:
         os.chdir(oldcwd)
     # Do the build.
-    sysassert(["rpmbuild", "-ba", "--target", distro_arch] + flags + ["%s/SPECS/mongodb%s.spec" % (topdir, suffix)])
+    sysassert(["rpmbuild", "-ba", "--target", distro_arch] + flags + ["%s/SPECS/mongo%s.spec" % (topdir, suffix)])
     r=distro.repodir(arch)
     ensure_dir(r)
     # FIXME: see if some combination of shutil.copy<hoohah> and glob
@@ -779,7 +784,7 @@ def write_rpm_macros_file(path, topdir):
 
 def write_rpm_spec_file(path, spec):
     s="""Name: @@PACKAGE_BASENAME@@
-Conflicts: mongo-10gen, mongo-10gen-enterprise, mongo-10gen-enterprise-server, mongo-10gen-server, mongo-10gen-unstable, mongo-10gen-unstable-enterprise, mongo-10gen-unstable-enterprise-mongos, mongo-10gen-unstable-enterprise-server, mongo-10gen-unstable-enterprise-shell, mongo-10gen-unstable-enterprise-tools, mongo-10gen-unstable-mongos, mongo-10gen-unstable-server, mongo-10gen-unstable-shell, mongo-10gen-unstable-tools, mongo18-10gen, mongo18-10gen-server, mongo20-10gen, mongo20-10gen-server, mongodb, mongodb-10gen, mongodb-10gen-enterprise, mongodb-10gen-unstable, mongodb-10gen-unstable-enterprise, mongodb-10gen-unstable-enterprise-mongos, mongodb-10gen-unstable-enterprise-server, mongodb-10gen-unstable-enterprise-shell, mongodb-10gen-unstable-enterprise-tools, mongodb-10gen-unstable-mongos, mongodb-10gen-unstable-server, mongodb-10gen-unstable-shell, mongodb-10gen-unstable-tools, mongodb-enterprise, mongodb-enterprise-mongos, mongodb-enterprise-server, mongodb-enterprise-shell, mongodb-enterprise-tools, mongodb-nightly, mongodb-org, mongodb-org-mongos, mongodb-org-server, mongodb-org-shell, mongodb-org-tools, mongodb-stable, mongodb18-10gen, mongodb20-10gen, mongodb-org-unstable, mongodb-org-unstable-mongos, mongodb-org-unstable-server, mongodb-org-unstable-shell, mongodb-org-unstable-tools
+Conflicts: @@PACKAGE_CONFLICTS@@
 Obsoletes: @@PACKAGE_OBSOLETES@@
 Version: @@PACKAGE_VERSION@@
 Release: mongodb_@@PACKAGE_REVISION@@%{?dist}
@@ -787,7 +792,7 @@ Summary: mongo client shell and tools
 License: AGPL 3.0
 URL: http://www.mongodb.org
 Group: Applications/Databases
-Requires: cyrus-sasl, net-snmp-libs
+Requires: libgsasl, net-snmp-libs
 
 Source0: %{name}-%{version}.tar.gz
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root
@@ -844,21 +849,21 @@ mkdir -p $RPM_BUILD_ROOT/etc
 cp -v rpm/mongod.conf $RPM_BUILD_ROOT/etc/mongod.conf
 mkdir -p $RPM_BUILD_ROOT/etc/sysconfig
 cp -v rpm/mongod.sysconfig $RPM_BUILD_ROOT/etc/sysconfig/mongod
-mkdir -p $RPM_BUILD_ROOT/var/lib/mongodb
-mkdir -p $RPM_BUILD_ROOT/var/log/mongodb
-touch $RPM_BUILD_ROOT/var/log/mongodb/mongod.log
+mkdir -p $RPM_BUILD_ROOT/var/lib/mongo
+mkdir -p $RPM_BUILD_ROOT/var/log/mongo
+touch $RPM_BUILD_ROOT/var/log/mongo/mongod.log
 
 %clean
 #scons -c
 rm -rf $RPM_BUILD_ROOT
 
 %pre server
-if ! /usr/bin/id -g mongodb &>/dev/null; then
+if ! /usr/bin/id -g mongod &>/dev/null; then
     /usr/sbin/groupadd -r mongod
 fi
-if ! /usr/bin/id mongodb &>/dev/null; then
-    /usr/sbin/useradd -M -r -g mongodb -d /var/lib/mongodb -s /bin/false \
-	-c mongodb mongodb > /dev/null 2>&1
+if ! /usr/bin/id mongod &>/dev/null; then
+    /usr/sbin/useradd -M -r -g mongod -d /var/lib/mongo -s /bin/false \
+	-c mongod mongod > /dev/null 2>&1
 fi
 
 %post server
@@ -923,9 +928,9 @@ fi
 /etc/rc.d/init.d/mongod
 /etc/sysconfig/mongod
 #/etc/rc.d/init.d/mongos
-%attr(0755,mongodb,mongodb) %dir /var/lib/mongodb
-%attr(0755,mongodb,mongodb) %dir /var/log/mongodb
-%attr(0640,mongodb,mongodb) %config(noreplace) %verify(not md5 size mtime) /var/log/mongodb/mongod.log
+%attr(0755,mongod,mongod) %dir /var/lib/mongo
+%attr(0755,mongod,mongod) %dir /var/log/mongo
+%attr(0640,mongod,mongod) %config(noreplace) %verify(not md5 size mtime) /var/log/mongo/mongod.log
 
 %changelog
 * Thu Jan 28 2010 Richard M Kreuter <richard@10gen.com>
@@ -935,25 +940,25 @@ fi
 - Wrote mongo.spec.
 """
     suffix=spec.suffix()
-    s=re.sub("@@PACKAGE_BASENAME@@", "mongodb%s" % suffix, s)
+    s=re.sub("@@PACKAGE_BASENAME@@", "mongo%s" % suffix, s)
     s=re.sub("@@PACKAGE_VERSION@@", spec.pversion(Distro("redhat")), s)
     # FIXME, maybe: the RPM guide says that Release numbers ought to
     # be integers starting at 1, but we use "mongodb_1{%dist}",
     # whatever the hell that means.
     s=re.sub("@@PACKAGE_REVISION@@", str(int(spec.param("revision"))+1) if spec.param("revision") else "1", s)
     s=re.sub("@@BINARYDIR@@", BINARYDIR, s)
-    if suffix.endswith("-org"):
-        s=re.sub("@@PACKAGE_PROVIDES@@", "mongodb-stable", s)
-        s=re.sub("@@PACKAGE_OBSOLETES@@", "mongodb-stable,mongo-stable", s)
-    elif suffix == "-org-unstable":
-        s=re.sub("@@PACKAGE_PROVIDES@@", "mongodb-unstable", s)
-        s=re.sub("@@PACKAGE_OBSOLETES@@", "mongodb-unstable,mongo-unstable", s)
-    elif suffix == "-enterprise":
-        s=re.sub("@@PACKAGE_PROVIDES@@", "mongodb-enterprise", s)
-        s=re.sub("@@PACKAGE_OBSOLETES@@", "mongodb-enterprise,mongo-enterprise", s)
-    elif suffix == "-enterprise-unstable":
-        s=re.sub("@@PACKAGE_PROVIDES@@", "mongodb-enterprise-unstable", s)
-        s=re.sub("@@PACKAGE_OBSOLETES@@", "mongodb-enterprise-unstable,mongo-enterprise-unstable", s)
+    conflict_suffixes=["", "-10gen", "-10gen-unstable", "-10gen-enterprise"]
+    conflict_suffixes = [suff for suff in conflict_suffixes if suff != spec.suffix()]
+    s=re.sub("@@PACKAGE_CONFLICTS@@", ", ".join(["mongo"+suffix for suffix in conflict_suffixes] + [ "mongo18"+suffix for suffix in conflict_suffixes] + ["mongo20"+suffix for suffix in conflict_suffixes]), s)
+    if suffix.endswith("-10gen"):
+        s=re.sub("@@PACKAGE_PROVIDES@@", "mongo-stable", s)
+        s=re.sub("@@PACKAGE_OBSOLETES@@", "mongo-stable", s)
+    elif suffix == "-10gen-unstable":
+        s=re.sub("@@PACKAGE_PROVIDES@@", "mongo-unstable", s)
+        s=re.sub("@@PACKAGE_OBSOLETES@@", "mongo-unstable", s)
+    elif suffix == "-10gen-enterprise":
+        s=re.sub("@@PACKAGE_PROVIDES@@", "mongo-enterprise", s)
+        s=re.sub("@@PACKAGE_OBSOLETES@@", "mongo-enterprise", s)
     else:
         raise Exception("BUG: unknown suffix %s" % suffix)
 
