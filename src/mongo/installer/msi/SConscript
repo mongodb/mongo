@@ -50,7 +50,7 @@ env.Command(objects,
             # we should choose a fourth version number that reflects pre-ness.
             ' -dMongoDBVersion=' + mongoCodeVersion.partition('-')[0] +
             ' -dLicenseSource=distsrc'
-            r' -dEnterpriseBase=src\mongo\db\modules\subscription\\'
+            r' -dEnterpriseBase=src\mongo\db\modules\enterprise\\'
             ' -dBinarySource=' + buildDir + r'\mongo'
             ' -dMergeModulesBasePath="$MERGEMODULESBASEPATH"'
             ' -dEdition=Enterprise'
