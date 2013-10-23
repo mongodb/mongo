@@ -367,24 +367,26 @@ worker(CONFIG_THREAD *thread, uint32_t worker_type)
 		cursor->set_key(cursor, key_buf);
 		switch (worker_type) {
 		case WORKER_READ:
+			if ((op_ret = cursor->search(cursor)) == 0) {
+				++thread->read_ops;
+				continue;
+			}
 			op_name = "read";
-			op_ret = cursor->search(cursor);
 			break;
 		case WORKER_INSERT_RMW:
-			op_name="insert_rmw";
-			op_ret = cursor->search(cursor);
-			if (op_ret != WT_NOTFOUND)
+			if ((op_ret = cursor->search(cursor)) != WT_NOTFOUND) {
+				op_name="insert_rmw";
 				break;
+			}
 			/* FALLTHROUGH */
 		case WORKER_INSERT:
-			op_name = "insert";
 			cursor->set_value(cursor, data_buf);
-			op_ret = cursor->insert(cursor);
+			if ((op_ret = cursor->insert(cursor)) == 0)
+				continue;
+			op_name = "insert";
 			break;
 		case WORKER_UPDATE:
-			op_name = "update";
-			op_ret = cursor->search(cursor);
-			if (op_ret == 0) {
+			if ((op_ret = cursor->search(cursor)) == 0) {
 				assert(cursor->get_value(cursor, &value) == 0);
 				memcpy(data_buf, value, cfg->data_sz);
 				if (data_buf[0] == 'a')
@@ -392,8 +394,12 @@ worker(CONFIG_THREAD *thread, uint32_t worker_type)
 				else
 					data_buf[0] = 'a';
 				cursor->set_value(cursor, data_buf);
-				op_ret = cursor->update(cursor);
+				if ((op_ret = cursor->update(cursor)) == 0) {
+					++thread->update_ops;
+					continue;
+				}
 			}
+			op_name = "update";
 			break;
 		default:
 			lprintf(cfg, EINVAL, 0, "Invalid worker type");
@@ -401,41 +407,32 @@ worker(CONFIG_THREAD *thread, uint32_t worker_type)
 		}
 
 		/* Report errors and continue. */
-		if (op_ret != 0) {
-			if (op_ret == WT_NOTFOUND &&
-			    F_ISSET(cfg, PERF_RAND_WORKLOAD))
-				continue;
+		if (op_ret == WT_NOTFOUND && F_ISSET(cfg, PERF_RAND_WORKLOAD))
+			continue;
 
-			/*
-			 * Emit a warning instead of an error if there are
-			 * insert threads, and the failed op was for an old
-			 * item.
-			 */
-			if (op_ret == WT_NOTFOUND && cfg->insert_threads > 0 &&
-			    (worker_type == WORKER_READ ||
-			    worker_type == WORKER_UPDATE)) {
-				if (next_val < cfg->icount)
-					lprintf(cfg, WT_PANIC, 0,
-					    "%s not found for: %s. Value was"
-					    " inserted during populate",
-					    op_name, key_buf);
-				if (next_val * 1.1 > wtperf_value_range(cfg))
-					continue;
-				lprintf(cfg, op_ret, 1,
-				    "%s not found for: %s, range: %" PRIu64
-				    " an insert is likely more than ten "
-				    "percent behind reads",
-				    op_name, key_buf, wtperf_value_range(cfg));
-			} else
-				lprintf(cfg, op_ret, 0,
-				    "%s failed for: %s, range: %"PRIu64,
-				    op_name, key_buf, wtperf_value_range(cfg));
-		} else {
-			if (worker_type == WORKER_READ)
-				++thread->read_ops;
-			else if (worker_type == WORKER_UPDATE)
-				++thread->update_ops;
-		}
+		/*
+		 * Emit a warning instead of an error if there are insert
+		 * threads, and the failed op was for an old item.
+		 */
+		if (op_ret == WT_NOTFOUND && cfg->insert_threads > 0 &&
+		    (worker_type == WORKER_READ ||
+		    worker_type == WORKER_UPDATE)) {
+			if (next_val < cfg->icount)
+				lprintf(cfg, WT_PANIC, 0,
+				    "%s not found for: %s. Value was"
+				    " inserted during populate",
+				    op_name, key_buf);
+			if (next_val * 1.1 > wtperf_value_range(cfg))
+				continue;
+			lprintf(cfg, op_ret, 1,
+			    "%s not found for: %s, range: %" PRIu64
+			    " an insert is likely more than ten "
+			    "percent behind reads",
+			    op_name, key_buf, wtperf_value_range(cfg));
+		} else
+			lprintf(cfg, op_ret, 0,
+			    "%s failed for: %s, range: %"PRIu64,
+			    op_name, key_buf, wtperf_value_range(cfg));
 	}
 
 	/* To ensure managing thread knows if we exited early. */
@@ -719,7 +716,7 @@ execute_populate(CONFIG *cfg)
 	}
 	assert(session->close(session, NULL) == 0);
 
-	g_nins_ops = g_npop_ops = g_nread_ops = g_nupdate_ops = 0;
+	g_npop_ops = 0;
 	g_running = 1;
 	g_threads_quit = 0;
 	if ((ret = start_threads(cfg,
@@ -802,7 +799,7 @@ execute_workload(CONFIG *cfg)
 	    "Starting workload threads: read %d, insert %d, update %d",
 	    cfg->read_threads, cfg->insert_threads, cfg->update_threads);
 
-	g_nins_ops = g_npop_ops = g_nread_ops = g_nupdate_ops = 0;
+	g_nins_ops = g_nread_ops = g_nupdate_ops = 0;
 	g_running = 1;
 	g_threads_quit = 0;
 
