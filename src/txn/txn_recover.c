@@ -389,15 +389,20 @@ __wt_txn_recover(WT_SESSION_IMPL *default_session)
 	 * that old logs get truncated.
 	 */
 	r.metadata_only = 1;
-	WT_ERR(__wt_log_scan(session, NULL,
-	    WT_LOGSCAN_FIRST | WT_LOGSCAN_RECOVER,
-	    __txn_log_recover, &r));
+	ret = __wt_log_scan(
+	    session, NULL, WT_LOGSCAN_FIRST, __txn_log_recover, &r);
+	WT_ASSERT(session, ret == 0);
 
-	WT_ERR(__recovery_file_scan(&r));
+	WT_ASSERT(session, LOG_CMP(&r.ckpt_lsn, &conn->log->first_lsn) >= 0);
+
+	ret = __recovery_file_scan(&r);
+	WT_ASSERT(session, ret == 0);
 
 	/* Now, recover all the files apart from the metadata. */
 	r.metadata_only = 0;
-	WT_ERR(__wt_log_scan(session, &r.ckpt_lsn, 0, __txn_log_recover, &r));
+	ret = __wt_log_scan(
+	    session, &r.ckpt_lsn, WT_LOGSCAN_RECOVER, __txn_log_recover, &r);
+	WT_ASSERT(session, ret == 0);
 
 	conn->next_file_id = r.max_fileid;
 

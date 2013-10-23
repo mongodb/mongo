@@ -59,12 +59,13 @@ __wt_log_get_active_files(
 	WT_RET(__wt_log_get_files(session, &files, &count));
 
 	/* Filter out any files that are below the checkpoint LSN. */
-	for (i = 0; i < count; i++) {
+	for (i = 0; i < count; ) {
 		WT_ERR(__wt_log_extract_lognum(session, files[i], &id));
 		if (id < log->ckpt_lsn.file) {
 			files[i] = files[count - 1];
 			files[--count] = NULL;
-		}
+		} else
+			i++;
 	}
 
 	*filesp = files;
@@ -217,8 +218,7 @@ __wt_log_open(WT_SESSION_IMPL *session)
 	 * XXX belongs at a higher level than this.
 	 */
 	if (logcount > 0) {
-		log->trunc_lsn.file = log->alloc_lsn.file;
-		log->trunc_lsn.offset = 0;
+		log->trunc_lsn = log->alloc_lsn;
 		WT_ERR(__wt_txn_recover(session));
 	}
 
@@ -656,6 +656,8 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 	/*
 	 * Check for correct usage.
 	 */
+	if (log == NULL)
+		return (ENOTSUP);
 	if (LF_ISSET(WT_LOGSCAN_FIRST|WT_LOGSCAN_FROM_CKP) && lsnp != NULL)
 		return (WT_ERROR);
 	/*
