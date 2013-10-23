@@ -705,16 +705,17 @@ execute_populate(CONFIG *cfg)
 			last_ops = g_npop_ops;
 		}
 	}
+	assert(gettimeofday(&e, NULL) == 0);
+
+	if ((ret = stop_threads(cfg, cfg->populate_threads, threads)) != 0)
+		return (ret);
+
 	/* Report if any worker threads didn't finish. */
 	if (g_threads_quit != 0) {
 		lprintf(cfg, WT_ERROR, 0,
 		    "Populate thread(s) exited without finishing.");
 		return (WT_ERROR);
 	}
-	assert(gettimeofday(&e, NULL) == 0);
-
-	if ((ret = stop_threads(cfg, cfg->populate_threads, threads)) != 0)
-		return (ret);
 
 	lprintf(cfg, 0, 1, "Finished load of %d items", cfg->icount);
 	secs = e.tv_sec + e.tv_usec / 1000000.0;
@@ -748,12 +749,20 @@ execute_workload(CONFIG *cfg)
 	pthread_t *ithreads, *rthreads, *uthreads;
 	uint64_t last_inserts, last_reads, last_updates;
 	uint32_t nthreads;
-	int ret;
-
-	ithreads = rthreads = uthreads = NULL;
+	int ret, tret;
 
 	cfg->phase = WT_PERF_READ;
+
+	ithreads = rthreads = uthreads = NULL;
 	last_inserts = last_reads = last_updates = 0;
+	nthreads =
+	    cfg->read_threads + cfg->insert_threads + cfg->update_threads;
+	ret = 0;
+
+	/* Sanity check reporting interval. */
+	if (cfg->report_interval > cfg->run_time || cfg->report_interval == 0)
+		cfg->report_interval = cfg->run_time;
+
 	lprintf(cfg, 0, 1,
 	    "Starting workload threads: read %d, insert %d, update %d",
 	    cfg->read_threads, cfg->insert_threads, cfg->update_threads);
@@ -762,24 +771,24 @@ execute_workload(CONFIG *cfg)
 	g_running = 1;
 	g_threads_quit = 0;
 
-	if (cfg->read_threads != 0 && (ret = start_threads(
-	    cfg, cfg->read_threads, &rthreads, read_thread)) != 0)
-		return (ret);
-
-	if (cfg->insert_threads != 0 && (ret = start_threads(
-	    cfg, cfg->insert_threads, &ithreads, insert_thread)) != 0)
-		return (ret);
-
-	if (cfg->update_threads != 0 && (ret = start_threads(
-	    cfg, cfg->update_threads, &uthreads, update_thread)) != 0)
-		return (ret);
-
-	nthreads =
-	    cfg->read_threads + cfg->insert_threads + cfg->update_threads;
-
-	/* Sanity check reporting interval. */
-	if (cfg->report_interval > cfg->run_time || cfg->report_interval == 0)
-		cfg->report_interval = cfg->run_time;
+	if (cfg->read_threads != 0 && (tret = start_threads(
+	    cfg, cfg->read_threads, &rthreads, read_thread)) != 0 &&
+	    ret == 0) {
+		ret = tret;
+		goto err;
+	}
+	if (cfg->insert_threads != 0 && (tret = start_threads(
+	    cfg, cfg->insert_threads, &ithreads, insert_thread)) != 0 &&
+	    ret == 0) {
+		ret = tret;
+		goto err;
+	}
+	if (cfg->update_threads != 0 && (tret = start_threads(
+	    cfg, cfg->update_threads, &uthreads, update_thread)) != 0 &&
+	    ret == 0) {
+		ret = tret;
+		goto err;
+	}
 
 	assert(gettimeofday(&cfg->phase_start_time, NULL) == 0);
 	for (cfg->elapsed_time = 0;
@@ -798,24 +807,29 @@ execute_workload(CONFIG *cfg)
 		last_inserts = g_nins_ops;
 		last_updates = g_nupdate_ops;
 	}
-	/* Report if any worker threads didn't finish. */
-	if (g_threads_quit != 0)
-		lprintf(cfg, WT_ERROR, 0,
-		    "Worker thread(s) exited without finishing.");
 
-	if (cfg->read_threads != 0 && rthreads != NULL &&
-	    (ret = stop_threads(cfg, cfg->read_threads, rthreads)) != 0)
-		return (ret);
-
+err:	if (cfg->read_threads != 0 && rthreads != NULL &&
+	    (tret = stop_threads(cfg, cfg->read_threads, rthreads)) != 0 &&
+	    ret == 0)
+		ret = tret;
 	if (cfg->insert_threads != 0 && ithreads != NULL &&
-	    (ret = stop_threads(cfg, cfg->insert_threads, ithreads)) != 0)
-		return (ret);
+	    (tret = stop_threads(cfg, cfg->insert_threads, ithreads)) != 0 &&
+	    ret == 0)
+		ret = tret;
 
 	if (cfg->update_threads != 0 && uthreads != NULL &&
-	    (ret = stop_threads(cfg, cfg->update_threads, uthreads)) != 0)
-		return (ret);
+	    (tret = stop_threads(cfg, cfg->update_threads, uthreads)) != 0 &&
+	    ret == 0)
+		ret = tret;
 
-	return (0);
+	/* Report if any worker threads didn't finish. */
+	if (g_threads_quit != 0) {
+		lprintf(cfg, WT_ERROR, 0,
+		    "Worker thread(s) exited without finishing.");
+		if (ret == 0)
+			ret = WT_ERROR;
+	}
+	return (ret);
 }
 
 /*
