@@ -463,6 +463,9 @@ namespace {
         else if (status.isOK()) {
             newState = roleGraphStateConsistent;
         }
+        else {
+            newState = roleGraphStateInitial;
+        }
 
         if (status.isOK()) {
             _roleGraph.swap(newRoleGraph);
