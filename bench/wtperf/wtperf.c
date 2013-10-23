@@ -689,8 +689,7 @@ execute_populate(CONFIG *cfg)
 
 	assert(gettimeofday(&cfg->phase_start_time, NULL) == 0);
 	for (cfg->elapsed_time = 0, elapsed = last_ops = 0;
-	    g_npop_ops < cfg->icount &&
-	    g_threads_quit < cfg->populate_threads;) {
+	    g_npop_ops < cfg->icount && g_threads_quit == 0;) {
 		/*
 		 * Sleep for 100th of a second, report_interval is in second
 		 * granularity, so adjust accordingly.
@@ -748,15 +747,12 @@ execute_workload(CONFIG *cfg)
 {
 	pthread_t *ithreads, *rthreads, *uthreads;
 	uint64_t last_inserts, last_reads, last_updates;
-	uint32_t nthreads;
 	int ret, tret;
 
 	cfg->phase = WT_PERF_READ;
 
 	ithreads = rthreads = uthreads = NULL;
 	last_inserts = last_reads = last_updates = 0;
-	nthreads =
-	    cfg->read_threads + cfg->insert_threads + cfg->update_threads;
 	ret = 0;
 
 	/* Sanity check reporting interval. */
@@ -793,7 +789,7 @@ execute_workload(CONFIG *cfg)
 	assert(gettimeofday(&cfg->phase_start_time, NULL) == 0);
 	for (cfg->elapsed_time = 0;
 	    cfg->elapsed_time < cfg->run_time &&
-	    g_threads_quit < nthreads;
+	    g_threads_quit == 0;
 	    cfg->elapsed_time += cfg->report_interval) {
 		sleep(cfg->report_interval);
 		lprintf(cfg, 0, 1,
