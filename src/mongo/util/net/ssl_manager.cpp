@@ -803,17 +803,17 @@ namespace mongo {
             // However, it turns out this CAN happen during a connect, if the other side
             // accepts the socket connection but fails to do the SSL handshake in a timely
             // manner.
-            error() << "SSL error: " << code << ", possibly timed out during connect";
+            error() << "SSL: " << code << ", possibly timed out during connect";
             break;
 
         case SSL_ERROR_ZERO_RETURN: 
         case SSL_ERROR_SYSCALL:
-            error() << "SSL network connection closed"; 
+            LOG(3) << "SSL network connection closed"; 
             break;
 
         case SSL_ERROR_SSL:
         {
-            error() << "SSL error : " << getSSLErrorMessage(ret);
+            error() << "SSL: " << getSSLErrorMessage(ret);
             break;
         }
         
