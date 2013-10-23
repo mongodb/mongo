@@ -30,6 +30,8 @@
 
 #include "mongo/db/repl/rs.h"
 
+#include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/client.h"
 #include "mongo/db/cloner.h"
 #include "mongo/db/dbhelpers.h"
@@ -449,6 +451,12 @@ namespace mongo {
         }
         
         // ---------
+
+        Status status = getGlobalAuthorizationManager()->initialize();
+        if (!status.isOK()) {
+            warning() << "Failed to reinitialize auth data after initial sync. " << status;
+            return;
+        }
 
         sethbmsg("initial sync finishing up",0);
 

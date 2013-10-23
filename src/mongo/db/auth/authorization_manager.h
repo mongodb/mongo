@@ -293,7 +293,7 @@ namespace mongo {
         /**
          * Initializes the authorization manager.  Depending on what version the authorization
          * system is at, this may involve building up the user cache and/or the roles graph.
-         * This function should be called once at startup and never again after that.
+         * Call this function at startup and after resynchronizing a slave/secondary.
          */
         Status initialize();
 
@@ -348,9 +348,7 @@ namespace mongo {
                    const char* ns,
                    const BSONObj& obj,
                    BSONObj* patt,
-                   bool* b,
-                   bool fromMigrate,
-                   const BSONObj* fullObj);
+                   bool* b);
 
     private:
         /**

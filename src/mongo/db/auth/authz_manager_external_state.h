@@ -255,9 +255,7 @@ namespace mongo {
                 const char* ns,
                 const BSONObj& o,
                 BSONObj* o2,
-                bool* b,
-                bool fromMigrateUnused,
-                const BSONObj* fullObjUnused) {}
+                bool* b) {}
 
 
     protected:

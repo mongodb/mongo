@@ -576,6 +576,7 @@ namespace mongo {
     }
 
     Status AuthorizationManager::initialize() {
+        invalidateUserCache();
         Status status = _externalState->initialize();
         if (!status.isOK())
             return status;
@@ -824,11 +825,9 @@ namespace mongo {
             const char* ns,
             const BSONObj& o,
             BSONObj* o2,
-            bool* b,
-            bool fromMigrateUnused,
-            const BSONObj* fullObjUnused) {
+            bool* b) {
 
-        _externalState->logOp(op, ns, o, o2, b, fromMigrateUnused, fullObjUnused);
+        _externalState->logOp(op, ns, o, o2, b);
         if (ns == rolesCollectionNamespace.ns() ||
             ns == adminCommandNamespace.ns() ||
             ns == usersCollectionNamespace.ns()) {

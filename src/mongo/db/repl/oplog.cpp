@@ -367,7 +367,7 @@ namespace mongo {
 
         logOpForSharding(opstr, ns, obj, patt, fullObj, fromMigrate);
         logOpForDbHash(opstr, ns, obj, patt, fullObj, fromMigrate);
-        getGlobalAuthorizationManager()->logOp(opstr, ns, obj, patt, b, fromMigrate, fullObj);
+        getGlobalAuthorizationManager()->logOp(opstr, ns, obj, patt, b);
     }
 
     void createOplog() {
@@ -627,6 +627,12 @@ namespace mongo {
         else {
             throw MsgAssertionException( 14825 , ErrorMsg("error in applyOperation : unknown opType ", *opType) );
         }
+        getGlobalAuthorizationManager()->logOp(
+                opType,
+                ns,
+                o,
+                fieldO2.isABSONObj() ? &o2 : NULL,
+                !fieldB.eoo() ? &valueB : NULL );
         return failedUpdate;
     }
 }

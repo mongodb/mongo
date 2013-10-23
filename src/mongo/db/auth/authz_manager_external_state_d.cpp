@@ -58,7 +58,8 @@ namespace mongo {
         if (!status.isOK()) {
             if (status == ErrorCodes::GraphContainsCycle) {
                 error() << "Cycle detected in admin.system.roles; role inheritance disabled. "
-                    "TODO EXPLAIN TO REMEDY. " << status.reason();
+                    "Remove the listed cycle and any others to re-enable role inheritance. " <<
+                    status.reason();
             }
             else {
                 error() << "Could not generate role graph from admin.system.roles; "
@@ -437,18 +438,9 @@ namespace {
 
     Status AuthzManagerExternalStateMongod::_initializeRoleGraph() {
         boost::lock_guard<boost::mutex> lkInitialzeRoleGraph(_roleGraphMutex);
-        switch (_roleGraphState) {
-        case roleGraphStateInitial:
-        case roleGraphStateHasCycle:
-            break;
-        case roleGraphStateConsistent:
-            return Status(ErrorCodes::AlreadyInitialized,
-                          "Role graph already initialized and consistent.");
-        default:
-            return Status(ErrorCodes::InternalError,
-                          mongoutils::str::stream() << "Invalid role graph state " <<
-                          _roleGraphState);
-        }
+
+        _roleGraphState = roleGraphStateInitial;
+        _roleGraph = RoleGraph();
 
         RoleGraph newRoleGraph;
         Status status = query(
@@ -471,10 +463,6 @@ namespace {
         else if (status.isOK()) {
             newState = roleGraphStateConsistent;
         }
-        else {
-            newState = roleGraphStateInitial;
-            newRoleGraph = RoleGraph();
-        }
 
         if (status.isOK()) {
             _roleGraph.swap(newRoleGraph);
@@ -488,9 +476,7 @@ namespace {
             const char* ns,
             const BSONObj& o,
             BSONObj* o2,
-            bool* b,
-            bool fromMigrateUnused,
-            const BSONObj* fullObjUnused) {
+            bool* b) {
 
         if (ns == AuthorizationManager::rolesCollectionNamespace.ns() ||
             ns == AuthorizationManager::adminCommandNamespace.ns()) {
