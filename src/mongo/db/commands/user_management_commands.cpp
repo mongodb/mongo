@@ -1102,6 +1102,14 @@ namespace mongo {
                 return status;
             }
 
+            if (!authzSession->isAuthorizedForActionsOnResource(
+                    ResourcePattern::forDatabaseName(args.roleName.getDB()),
+                    ActionType::createRole)) {
+                return Status(ErrorCodes::Unauthorized,
+                              str::stream() << "Not authorized to create roles on db: " <<
+                                      args.roleName.getDB());
+            }
+
             status = checkAuthorizedToGrantRoles(authzSession, args.roles);
             if (!status.isOK()) {
                 return status;
