@@ -262,7 +262,6 @@ namespace mongo {
         BSONObj o = toLog.obj();
 
         Lock::GlobalWrite lk;
-        Client::GodScope gs;
         DBDirectClient c;
         const char* name = "local.startup_log";
         c.createCollection( name, 10 * 1024 * 1024, true );
@@ -370,7 +369,6 @@ namespace mongo {
     // ran at startup.
     static void repairDatabasesAndCheckVersion(bool shouldClearNonLocalTmpCollections) {
         //        LastError * le = lastError.get( true );
-        Client::GodScope gs;
         LOG(1) << "enter repairDatabases (to check pdfile version #)" << endl;
 
         Lock::GlobalWrite lk;
@@ -476,7 +474,6 @@ namespace mongo {
     unsigned long long checkIfReplMissingFromCommandLine() {
         Lock::GlobalWrite lk; // this is helpful for the query below to work as you can't open files when readlocked
         if (!replSettings.usingReplSets()) {
-            Client::GodScope gs;
             DBDirectClient c;
             return c.count("local.system.replset");
         }

@@ -1011,7 +1011,21 @@ namespace mongo {
         return QueryOptions(DBClientBase::_lookupAvailableOptions() & ~QueryOption_Exhaust);
     }
 
+namespace {
+    class GodScope {
+        MONGO_DISALLOW_COPYING(GodScope);
+    public:
+        GodScope() {
+            _prev = cc().setGod(true);
+        }
+        ~GodScope() { cc().setGod(_prev); }
+    private:
+        bool _prev;
+    };
+}  // namespace
+
     bool DBDirectClient::call( Message &toSend, Message &response, bool assertOk , string * actualServer ) {
+        GodScope gs;
         if ( lastError._get() )
             lastError.startRequest( toSend, lastError._get() );
         DbResponse dbResponse;
@@ -1024,6 +1038,7 @@ namespace mongo {
     }
 
     void DBDirectClient::say( Message &toSend, bool isRetry, string * actualServer ) {
+        GodScope gs;
         if ( lastError._get() )
             lastError.startRequest( toSend, lastError._get() );
         DbResponse dbResponse;

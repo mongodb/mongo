@@ -108,7 +108,6 @@ namespace {
 
     Status AuthzManagerExternalStateMongod::getStoredAuthorizationVersion(int* outVersion) {
         {
-            Client::GodScope gs;
             Client::ReadContext ctx(AuthorizationManager::versionCollectionNamespace.ns());
             BSONObj versionDoc;
             if (Helpers::findOne(AuthorizationManager::versionCollectionNamespace.ns(),
@@ -254,7 +253,6 @@ namespace {
     Status AuthzManagerExternalStateMongod::_findUser(const string& usersNamespace,
                                                       const BSONObj& query,
                                                       BSONObj* result) {
-        Client::GodScope gs;
         Client::ReadContext ctx(usersNamespace);
 
         if (!Helpers::findOne(usersNamespace, query, *result)) {
@@ -270,7 +268,6 @@ namespace {
             const boost::function<void(const BSONObj&)>& resultProcessor) {
         try {
             DBDirectClient client;
-            Client::GodScope gs;
             client.query(resultProcessor, collectionName.ns(), query, &projection);
             return Status::OK();
         } catch (const DBException& e) {
@@ -289,7 +286,6 @@ namespace {
             const std::string& dbname, std::vector<BSONObj>* privDocs) {
         std::string usersNamespace = dbname + ".system.users";
 
-        Client::GodScope gs;
         Client::ReadContext ctx(usersNamespace);
 
         *privDocs = Helpers::findAll(usersNamespace, BSONObj());
@@ -309,7 +305,6 @@ namespace {
             const BSONObj& writeConcern) {
         try {
             DBDirectClient client;
-            Client::GodScope gs;
             client.insert(collectionName, document);
 
             // Handle write concern
@@ -340,7 +335,6 @@ namespace {
                                                    int* numUpdated) {
         try {
             DBDirectClient client;
-            Client::GodScope gs;
             client.update(collectionName, query, updatePattern, upsert, multi);
 
             // Handle write concern
@@ -368,7 +362,6 @@ namespace {
             int* numRemoved) {
         try {
             DBDirectClient client;
-            Client::GodScope gs;
             client.remove(collectionName, query);
 
             // Handle write concern

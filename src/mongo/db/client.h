@@ -113,6 +113,7 @@ namespace mongo {
         void appendLastOp( BSONObjBuilder& b ) const;
 
         bool isGod() const { return _god; } /* this is for map/reduce writes */
+        bool setGod(bool newVal) { const bool prev = _god; _god = newVal; return prev; }
         string toString() const;
         void gotHandshake( const BSONObj& o );
         BSONObj getRemoteID() const { return _remoteId; }
@@ -152,14 +153,6 @@ namespace mongo {
         friend class PageFaultRetryableSection; // TEMP
         friend class NoPageFaultsAllowed; // TEMP
     public:
-
-        /* set _god=true temporarily, safely */
-        class GodScope {
-            bool _prev;
-        public:
-            GodScope();
-            ~GodScope();
-        };
 
         /** "read lock, and set my context, all in one operation" 
          *  This handles (if not recursively locked) opening an unopened database.
@@ -254,13 +247,6 @@ namespace mongo {
         verify( c );
         return *c;
     }
-
-    inline Client::GodScope::GodScope() {
-        _prev = cc()._god;
-        cc()._god = true;
-    }
-    inline Client::GodScope::~GodScope() { cc()._god = _prev; }
-
 
     inline bool haveClient() { return currentClient.get() > 0; }
 
