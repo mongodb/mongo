@@ -113,7 +113,7 @@ namespace mongo {
             return Status(convertExceptionCode(getCode()), context + causedBy(*this));
         }
         Status toStatus() const {
-            return Status(convertExceptionCode(getCode()), this->toString());
+            return Status(convertExceptionCode(getCode()), this->what());
         }
 
         // context when applicable. otherwise ""

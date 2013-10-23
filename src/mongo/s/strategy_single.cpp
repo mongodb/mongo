@@ -111,9 +111,7 @@ namespace mongo {
                     if( loops < 4 ) versionManager.forceRemoteCheckShardVersionCB( staleNS );
                 }
                 catch ( AssertionException& e ) {
-                    e.getInfo().append( builder , "assertion" , "assertionCode" );
-                    builder.append( "errmsg" , "db assertion failure" );
-                    builder.append( "ok" , 0 );
+                    Command::appendCommandStatus(builder, e.toStatus());
                     BSONObj x = builder.done();
                     replyToQuery(0, r.p(), r.m(), x);
                     return;

@@ -74,11 +74,9 @@ namespace mongo {
         catch ( AssertionException& e ) {
             verify( e.getCode() != SendStaleConfigCode && e.getCode() != RecvStaleConfigCode );
 
-            e.getInfo().append( anObjBuilder , "assertion" , "assertionCode" );
+            Command::appendCommandStatus(anObjBuilder, e.toStatus());
             curop.debug().exceptionInfo = e.getInfo();
         }
-        anObjBuilder.append("errmsg", "db assertion failure");
-        anObjBuilder.append("ok", 0.0);
         BSONObj x = anObjBuilder.done();
         b.appendBuf((void*) x.objdata(), x.objsize());
         return true;
