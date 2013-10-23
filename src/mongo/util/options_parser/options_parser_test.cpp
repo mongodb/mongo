@@ -77,10 +77,15 @@ namespace {
 
     TEST(Registration, DuplicatePositional) {
         moe::OptionSection testOpts;
-        ASSERT_OK(testOpts.addPositionalOption(moe::PositionalOptionDescription("positional",
-                                                                                moe::Int)));
-        ASSERT_NOT_OK(testOpts.addPositionalOption(moe::PositionalOptionDescription("positional",
-                                                                                    moe::Int)));
+        try {
+            testOpts.addOptionChaining("positional", "positional", moe::Int, "Positional")
+                                      .positional(1, 1);
+            testOpts.addOptionChaining("positional", "positional", moe::Int, "Positional")
+                                      .positional(1, 1);
+            FAIL("Was able to register duplicate positional option");
+        }
+        catch (::mongo::DBException &e) {
+        }
     }
 
     TEST(Registration, BadRangesPositional) {
@@ -289,7 +294,8 @@ namespace {
         moe::Environment environment;
 
         moe::OptionSection testOpts;
-        testOpts.addPositionalOption(moe::PositionalOptionDescription("positional", moe::String));
+        testOpts.addOptionChaining("positional", "positional", moe::String, "Positional")
+                                  .positional(1, 1);
 
         std::vector<std::string> argv;
         argv.push_back("binaryname");
@@ -309,7 +315,8 @@ namespace {
         moe::Environment environment;
 
         moe::OptionSection testOpts;
-        testOpts.addPositionalOption(moe::PositionalOptionDescription("positional", moe::String));
+        testOpts.addOptionChaining("positional", "positional", moe::String, "Positional")
+                                  .positional(1, 1);
 
         std::vector<std::string> argv;
         argv.push_back("binaryname");
@@ -326,7 +333,8 @@ namespace {
         moe::Environment environment;
 
         moe::OptionSection testOpts;
-        testOpts.addPositionalOption(moe::PositionalOptionDescription("positional", moe::String));
+        testOpts.addOptionChaining("positional", "positional", moe::String, "Positional")
+                                  .positional(1, 1);
         testOpts.addOptionChaining("port", "port", moe::Int, "Port");
 
         std::vector<std::string> argv;
@@ -348,35 +356,13 @@ namespace {
         ASSERT_EQUALS(port, 5);
     }
 
-    TEST(Parsing, PositionalAlreadyRegistered) {
-        moe::OptionsParser parser;
-        moe::Environment environment;
-
-        moe::OptionSection testOpts;
-        testOpts.addOptionChaining("positional", "positional", moe::String,
-                                                  "Positional");
-        ASSERT_OK(testOpts.addPositionalOption(moe::PositionalOptionDescription("positional", moe::String)));
-
-        std::vector<std::string> argv;
-        argv.push_back("binaryname");
-        argv.push_back("positional");
-        std::map<std::string, std::string> env_map;
-
-        moe::Value value;
-        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
-        ASSERT_OK(environment.get(moe::Key("positional"), &value));
-        std::string positional;
-        ASSERT_OK(value.get(&positional));
-        ASSERT_EQUALS(positional, "positional");
-    }
-
     TEST(Parsing, PositionalMultiple) {
         moe::OptionsParser parser;
         moe::Environment environment;
 
         moe::OptionSection testOpts;
-        testOpts.addPositionalOption(moe::PositionalOptionDescription("positional",
-                                                                    moe::StringVector, 2));
+        testOpts.addOptionChaining("positional", "positional", moe::StringVector, "Positional")
+                                  .positional(1, 2);
 
         std::vector<std::string> argv;
         argv.push_back("binaryname");
@@ -400,8 +386,8 @@ namespace {
         moe::Environment environment;
 
         moe::OptionSection testOpts;
-        testOpts.addPositionalOption(moe::PositionalOptionDescription("positional",
-                                                                    moe::StringVector, 2));
+        testOpts.addOptionChaining("positional", "positional", moe::StringVector, "Positional")
+                                  .positional(1, 2);
 
         std::vector<std::string> argv;
         argv.push_back("binaryname");
@@ -418,8 +404,8 @@ namespace {
         moe::Environment environment;
 
         moe::OptionSection testOpts;
-        testOpts.addPositionalOption(moe::PositionalOptionDescription("positional",
-                                                                    moe::StringVector, -1));
+        testOpts.addOptionChaining("positional", "positional", moe::StringVector, "Positional")
+                                  .positional(1, -1);
 
         std::vector<std::string> argv;
         argv.push_back("binaryname");
@@ -452,8 +438,8 @@ namespace {
         moe::Environment environment;
 
         moe::OptionSection testOpts;
-        testOpts.addPositionalOption(moe::PositionalOptionDescription("positional",
-                                                                    moe::StringVector, 2));
+        testOpts.addOptionChaining("positional", "positional", moe::StringVector, "Positional")
+                                  .positional(1, 2);
         testOpts.addOptionChaining("port", "port", moe::Int, "Port");
 
         std::vector<std::string> argv;
@@ -2171,6 +2157,27 @@ namespace {
     }
 
     TEST(ChainingInterface, PositionalOverlappingRange) {
+        moe::OptionsParser parser;
+        moe::Environment environment;
+
+        moe::OptionSection testOpts;
+        testOpts.addOptionChaining("positional1", "positional1", moe::String, "Positional")
+                                  .positional(1, 1);
+        testOpts.addOptionChaining("positional3", "positional2", moe::StringVector, "Positional")
+                                  .positional(1, 2);
+        testOpts.addOptionChaining("port", "port", moe::Int, "Port");
+
+        std::vector<std::string> argv;
+        argv.push_back("binaryname");
+        std::map<std::string, std::string> env_map;
+
+        moe::Value value;
+        std::vector<std::string>::iterator positionalit;
+
+        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+    }
+
+    TEST(ChainingInterface, PositionalOverlappingRangeInfinite) {
         moe::OptionsParser parser;
         moe::Environment environment;
 

@@ -24,9 +24,6 @@ namespace mongo {
 
     MongoDumpGlobalParams mongoDumpGlobalParams;
 
-    typedef moe::OptionDescription OD;
-    typedef moe::PositionalOptionDescription POD;
-
     Status addMongoDumpOptions(moe::OptionSection* options) {
         Status ret = addGeneralToolOptions(options);
         if (!ret.isOK()) {

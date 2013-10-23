@@ -343,7 +343,7 @@ namespace {
             else if (iterator->_dottedName == "sleep") {
                 ASSERT_EQUALS(iterator->_singleName, "sleep");
                 ASSERT_EQUALS(iterator->_type, moe::Int);
-                ASSERT_EQUALS(iterator->_description, "hidden description");
+                ASSERT_EQUALS(iterator->_description, "seconds to sleep between samples");
                 ASSERT_EQUALS(iterator->_isVisible, false);
                 ASSERT_TRUE(iterator->_default.isEmpty());
                 ASSERT_TRUE(iterator->_implicit.isEmpty());

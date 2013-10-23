@@ -244,7 +244,7 @@ namespace {
             else if (iterator->_dottedName == "file") {
                 ASSERT_EQUALS(iterator->_singleName, "file");
                 ASSERT_EQUALS(iterator->_type, moe::String);
-                ASSERT_EQUALS(iterator->_description, "hidden description");
+                ASSERT_EQUALS(iterator->_description, "path to BSON file to dump");
                 ASSERT_EQUALS(iterator->_isVisible, false);
                 ASSERT_TRUE(iterator->_default.isEmpty());
                 ASSERT_TRUE(iterator->_implicit.isEmpty());

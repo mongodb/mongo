@@ -23,9 +23,6 @@ namespace mongo {
 
     MongoTopGlobalParams mongoTopGlobalParams;
 
-    typedef moe::OptionDescription OD;
-    typedef moe::PositionalOptionDescription POD;
-
     Status addMongoTopOptions(moe::OptionSection* options) {
         Status ret = addGeneralToolOptions(options);
         if (!ret.isOK()) {
@@ -40,11 +37,11 @@ namespace mongo {
         options->addOptionChaining("locks", "locks", moe::Switch,
                 "use db lock info instead of top");
 
+        options->addOptionChaining("sleep", "sleep", moe::Int, "seconds to sleep between samples")
+                                  .hidden()
+                                  .setSources(moe::SourceCommandLine)
+                                  .positional(1, 1);
 
-        ret = options->addPositionalOption(POD( "sleep", moe::Int, 1 ));
-        if(!ret.isOK()) {
-            return ret;
-        }
 
         return Status::OK();
     }

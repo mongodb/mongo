@@ -51,9 +51,9 @@ namespace optionenvironment {
     };
 
     /**
-     * The OptionDescription and PositionalOptionDescription classes are containers for information
-     * about the options we are expecting either on the command line or in config files.  These
-     * should be registered in an OptionSection instance and passed to an OptionsParser.
+     * The OptionDescription class is a container for information about the options we are expecting
+     * either on the command line or in config files.  These should be registered in an
+     * OptionSection instance and passed to an OptionsParser.
      */
     class OptionDescription {
     public:
@@ -153,20 +153,6 @@ namespace optionenvironment {
                                 // command line, json config, and ini config)
         int _positionalStart; // The starting position if this is a positional option. -1 otherwise.
         int _positionalEnd; // The ending position if this is a positional option.  -1 if unlimited.
-    };
-
-    class PositionalOptionDescription {
-    public:
-        PositionalOptionDescription(const std::string& name,
-                const OptionType type,
-                int count = 1)
-            : _name(name),
-                _type(type),
-                _count(count) { }
-
-        std::string _name; // Name used to access the value of this option after parsing
-        OptionType _type; // Storage type of the positional argument (required by boost)
-        int _count; // Max number of times this option can be specified.  -1 = unlimited
     };
 
 } // namespace optionenvironment

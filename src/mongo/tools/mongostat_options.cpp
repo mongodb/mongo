@@ -23,9 +23,6 @@ namespace mongo {
 
     MongoStatGlobalParams mongoStatGlobalParams;
 
-    typedef moe::OptionDescription OD;
-    typedef moe::PositionalOptionDescription POD;
-
     Status addMongoStatOptions(moe::OptionSection* options) {
         Status ret = addGeneralToolOptions(options);
         if (!ret.isOK()) {
@@ -52,11 +49,11 @@ namespace mongo {
 
         options->addOptionChaining("all", "all", moe::Switch, "all optional fields");
 
+        options->addOptionChaining("sleep", "sleep", moe::Int, "seconds to sleep between samples")
+                                  .hidden()
+                                  .setSources(moe::SourceCommandLine)
+                                  .positional(1, 1);
 
-        ret = options->addPositionalOption(POD( "sleep", moe::Int, 1 ));
-        if(!ret.isOK()) {
-            return ret;
-        }
 
         return Status::OK();
     }

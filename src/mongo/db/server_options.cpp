@@ -98,9 +98,6 @@ namespace {
 
 } // namespace
 
-    typedef moe::OptionDescription OD;
-    typedef moe::PositionalOptionDescription POD;
-
     ServerGlobalParams serverGlobalParams;
 
     Status addGeneralServerOptions(moe::OptionSection* options) {

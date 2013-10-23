@@ -24,9 +24,6 @@ namespace mongo {
 
     MongoOplogGlobalParams mongoOplogGlobalParams;
 
-    typedef moe::OptionDescription OD;
-    typedef moe::PositionalOptionDescription POD;
-
     Status addMongoOplogOptions(moe::OptionSection* options) {
         Status ret = addGeneralToolOptions(options);
         if (!ret.isOK()) {

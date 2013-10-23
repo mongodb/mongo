@@ -71,82 +71,6 @@ namespace optionenvironment {
         return _options.back();
     }
 
-    Status OptionSection::addPositionalOption(const PositionalOptionDescription& positionalOption) {
-
-        std::list<OptionDescription>::iterator oditerator;
-
-        // Get place where this positional option should be
-        int nextPosition = 1;
-        for (oditerator = _options.begin();
-             oditerator != _options.end(); oditerator++) {
-
-            // This option is positional, so we need to advance nextPosition
-            if (oditerator->_positionalStart != -1) {
-
-                // Verify that the name for this positional option does not conflict with the name
-                // for any positional option we have already registered
-                if (positionalOption._name == oditerator->_dottedName ||
-                    positionalOption._name == oditerator->_singleName) {
-                    StringBuilder sb;
-                    sb << "Attempted to register duplicate positional option: "
-                       << positionalOption._name;
-                    return Status(ErrorCodes::InternalError, sb.str());
-                }
-
-                // Verify that we are not trying to register a positional option with a section that
-                // already has one with an infinite count
-                if (oditerator->_positionalEnd == -1) {
-                    StringBuilder sb;
-                    sb << "Error, found an exisiting option with infinite count: "
-                       << positionalOption._name;
-                    return Status(ErrorCodes::InternalError, sb.str());
-                }
-
-                nextPosition = oditerator->_positionalEnd + 1;
-            }
-        }
-
-        int positionalStart = nextPosition;
-        int positionalEnd = nextPosition;
-
-        if (positionalOption._count == -1) {
-            positionalEnd = -1;
-        }
-        else {
-            positionalEnd = nextPosition + (positionalOption._count - 1);
-        }
-
-        // Don't register this positional option if it has already been registered to support
-        // positional options that we also want to be visible command line flags
-        //
-        // TODO:  More robust way to do this.  This whole function only works if we register the
-        // flag first.  Make everything use the chaining interface and remove this function.
-        for (oditerator = _options.begin(); oditerator != _options.end(); oditerator++) {
-            if (positionalOption._name == oditerator->_dottedName) {
-                oditerator->positional(positionalStart, positionalEnd);
-                return Status::OK();
-            }
-
-            if (positionalOption._name == oditerator->_singleName) {
-                oditerator->positional(positionalStart, positionalEnd);
-                return Status::OK();
-            }
-        }
-
-        try {
-            addOptionChaining(positionalOption._name, positionalOption._name,
-                              positionalOption._type, "hidden description")
-                .hidden()
-                .setSources(SourceCommandLine)
-                .positional(positionalStart, positionalEnd);
-        }
-        catch (DBException &e) {
-            return e.toStatus();
-        }
-
-        return Status::OK();
-    }
-
     // Stuff for dealing with Boost
 
     namespace {
@@ -446,6 +370,41 @@ namespace optionenvironment {
         return Status::OK();
     }
 
+    /*
+     * The way we specify positional options in our interface differs from the way boost does it, so
+     * we have to convert them here.
+     *
+     * For example, to specify positionals such that you can run "./exec [pos1] [pos2] [pos2]":
+     *
+     * Our interface:
+     *
+     * options.addOptionChaining("pos2", "pos2", moe::StringVector, "Pos2")
+     *                          .hidden() <- doesn't show up in help
+     *                          .sources(moe::SourceCommandLine) <- only allowed on command line
+     *                          .positional(2, <- start position
+     *                          3); <- end position
+     * options.addOptionChaining("pos1", "pos1", moe::String, "Pos1")
+     *                          .hidden() <- doesn't show up in help
+     *                          .sources(moe::SourceCommandLine) <- only allowed on command line
+     *                          .positional(1, <- start position
+     *                          1); <- end position
+     * // Note that order doesn't matter
+     *
+     * Boost's interface:
+     *
+     * boostHiddenOptions->add_options()("pos1", po::value<std::string>(), "Pos1")
+     *                                  ("pos2", po::value<std::string>(), "Pos2")
+     *
+     * boostPositionalOptions->add("pos1", 1); <- count of option (number of times it appears)
+     * boostPositionalOptions->add("pos2", 2); <- count of option (number of times it appears)
+     * // Note that order does matter
+     *
+     * Because of this, we have to perform the conversion in this function.  The tasks performed by
+     * this function are:
+     *
+     * 1. Making sure the ranges are valid as a whole (no overlap or holes)
+     * 2. Convert to the boost options and add them in the correct order
+     */
     Status OptionSection::getBoostPositionalOptions(
                             po::positional_options_description* boostPositionalOptions) const {
 
@@ -465,6 +424,16 @@ namespace optionenvironment {
             foundAtPosition = false;
             std::list<OptionDescription>::iterator poditerator;
             for (poditerator = positionalOptions.begin(); poditerator != positionalOptions.end();) {
+
+                if (poditerator->_positionalStart < nextPosition) {
+                    StringBuilder sb;
+                    sb << "Found option with overlapping positional range: "
+                        << "  Expected next option at position: " << nextPosition
+                        << ", but \"" << poditerator->_dottedName << "\" starts at position: "
+                        << poditerator->_positionalStart;
+                    return Status(ErrorCodes::InternalError, sb.str());
+                }
+
                 if (poditerator->_positionalStart == nextPosition) {
                     foundAtPosition = true;
 

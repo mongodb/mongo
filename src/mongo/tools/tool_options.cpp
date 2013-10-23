@@ -36,9 +36,6 @@ namespace mongo {
     ToolGlobalParams toolGlobalParams;
     BSONToolGlobalParams bsonToolGlobalParams;
 
-    typedef moe::OptionDescription OD;
-    typedef moe::PositionalOptionDescription POD;
-
     Status addGeneralToolOptions(moe::OptionSection* options) {
         options->addOptionChaining("help", "help", moe::Switch, "produce help message");
 

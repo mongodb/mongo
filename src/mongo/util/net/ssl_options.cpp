@@ -23,9 +23,6 @@
 
 namespace mongo {
 
-    typedef moe::OptionDescription OD;
-    typedef moe::PositionalOptionDescription POD;
-
     Status addSSLServerOptions(moe::OptionSection* options) {
         options->addOptionChaining("ssl.sslOnNormalPorts", "sslOnNormalPorts", moe::Switch,
                 "use ssl on configured ports");

@@ -23,9 +23,6 @@ namespace mongo {
 
     BSONDumpGlobalParams bsonDumpGlobalParams;
 
-    typedef moe::OptionDescription OD;
-    typedef moe::PositionalOptionDescription POD;
-
     Status addBSONDumpOptions(moe::OptionSection* options) {
         Status ret = addGeneralToolOptions(options);
         if (!ret.isOK()) {
@@ -40,11 +37,11 @@ namespace mongo {
         options->addOptionChaining("type", "type", moe::String, "type of output: json,debug")
                                   .setDefault(moe::Value(std::string("json")));
 
+        options->addOptionChaining("file", "file", moe::String, "path to BSON file to dump")
+                                  .hidden()
+                                  .setSources(moe::SourceCommandLine)
+                                  .positional(1, 1);
 
-        ret = options->addPositionalOption(POD( "file", moe::String, 1 ));
-        if(!ret.isOK()) {
-            return ret;
-        }
 
         return Status::OK();
     }

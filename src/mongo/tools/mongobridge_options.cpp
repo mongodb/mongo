@@ -23,9 +23,6 @@ namespace mongo {
 
     MongoBridgeGlobalParams mongoBridgeGlobalParams;
 
-    typedef moe::OptionDescription OD;
-    typedef moe::PositionalOptionDescription POD;
-
     Status addMongoBridgeOptions(moe::OptionSection* options) {
 
         options->addOptionChaining("help", "help", moe::Switch, "produce help message");

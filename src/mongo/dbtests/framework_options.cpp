@@ -34,9 +34,6 @@ namespace mongo {
 
     Status addTestFrameworkOptions(moe::OptionSection* options) {
 
-        typedef moe::OptionDescription OD;
-        typedef moe::PositionalOptionDescription POD;
-
         options->addOptionChaining("help", "help,h", moe::Switch, "show this usage information");
 
         options->addOptionChaining("dbpath", "dbpath", moe::String,
@@ -73,17 +70,13 @@ namespace mongo {
 
 
         options->addOptionChaining("suites", "suites", moe::StringVector, "test suites to run")
-                                  .hidden();
+                                  .hidden()
+                                  .positional(1, -1);
 
         options->addOptionChaining("nopreallocj", "nopreallocj", moe::Switch,
                 "disable journal prealloc")
                                   .hidden();
 
-
-        Status ret = options->addPositionalOption(POD("suites", moe::String, -1));
-        if (!ret.isOK()) {
-            return ret;
-        }
 
         return Status::OK();
     }

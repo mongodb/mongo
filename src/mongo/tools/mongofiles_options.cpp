@@ -23,9 +23,6 @@ namespace mongo {
 
     MongoFilesGlobalParams mongoFilesGlobalParams;
 
-    typedef moe::OptionDescription OD;
-    typedef moe::PositionalOptionDescription POD;
-
     Status addMongoFilesOptions(moe::OptionSection* options) {
         Status ret = addGeneralToolOptions(options);
         if (!ret.isOK()) {
@@ -57,15 +54,18 @@ namespace mongo {
         options->addOptionChaining("replace", "replace,r", moe::Switch,
                 "Remove other files with same name after PUT");
 
+        options->addOptionChaining("command", "command", moe::String,
+                "gridfs command to run")
+                                  .hidden()
+                                  .setSources(moe::SourceCommandLine)
+                                  .positional(1, 1);
 
-        ret = options->addPositionalOption(POD( "command", moe::String, 1 ));
-        if(!ret.isOK()) {
-            return ret;
-        }
-        ret = options->addPositionalOption(POD( "file", moe::String, 1 ));
-        if(!ret.isOK()) {
-            return ret;
-        }
+        options->addOptionChaining("file", "file", moe::String,
+                "'gridfs filename' with a special meaning for various commands")
+                                  .hidden()
+                                  .setSources(moe::SourceCommandLine)
+                                  .positional(2, 2);
+
 
         return Status::OK();
     }

@@ -31,9 +31,6 @@
 
 namespace mongo {
 
-    typedef moe::OptionDescription OD;
-    typedef moe::PositionalOptionDescription POD;
-
     MongosGlobalParams mongosGlobalParams;
 
     Status addMongosOptions(moe::OptionSection* options) {

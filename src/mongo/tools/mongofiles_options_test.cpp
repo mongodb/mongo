@@ -378,7 +378,7 @@ namespace {
             else if (iterator->_dottedName == "command") {
                 ASSERT_EQUALS(iterator->_singleName, "command");
                 ASSERT_EQUALS(iterator->_type, moe::String);
-                ASSERT_EQUALS(iterator->_description, "hidden description");
+                ASSERT_EQUALS(iterator->_description, "gridfs command to run");
                 ASSERT_EQUALS(iterator->_isVisible, false);
                 ASSERT_TRUE(iterator->_default.isEmpty());
                 ASSERT_TRUE(iterator->_implicit.isEmpty());
@@ -390,7 +390,7 @@ namespace {
             else if (iterator->_dottedName == "file") {
                 ASSERT_EQUALS(iterator->_singleName, "file");
                 ASSERT_EQUALS(iterator->_type, moe::String);
-                ASSERT_EQUALS(iterator->_description, "hidden description");
+                ASSERT_EQUALS(iterator->_description, "'gridfs filename' with a special meaning for various commands");
                 ASSERT_EQUALS(iterator->_isVisible, false);
                 ASSERT_TRUE(iterator->_default.isEmpty());
                 ASSERT_TRUE(iterator->_implicit.isEmpty());

@@ -27,10 +27,11 @@ namespace optionenvironment {
 
     namespace po = boost::program_options;
 
-    /** A container for OptionDescription instances and PositionalOptionDescription instances as
-     *  well as other OptionSection instances.  Provides a description of all options that are
-     *  supported to be passed in to an OptionsParser.  Has utility functions to support the various
-     *  formats needed by the parsing process
+    /**
+     *  A container for OptionDescription instances as well as other OptionSection instances.
+     *  Provides a description of all options that are supported to be passed in to an
+     *  OptionsParser.  Has utility functions to support the various formats needed by the parsing
+     *  process
      *
      *  The sections and section names only matter in the help string.  For sections in a JSON
      *  config, look at the dots in the dottedName of the relevant OptionDescription
@@ -48,7 +49,7 @@ namespace optionenvironment {
      *  options.addOptionChaining("help", "help", moe::Switch, "Display Help");
      *
      *  // Register our positional options with our OptionSection
-     *  options.addPositionalOption(moe::PositionalOptionDescription("command", moe::String));
+     *  options.addOptionChaining("command", "command", moe::String, "Command").positional(1, 1);
      *
      *  // Add a subsection
      *  subSection.addOptionChaining("port", "port", moe::Int, "Port");
@@ -102,16 +103,6 @@ namespace optionenvironment {
                                              const std::string& singleName,
                                              const OptionType type,
                                              const std::string& description);
-        /**
-         * Add a positional option to this section.  Also adds a normal hidden option with the same
-         * name as the PositionalOptionDescription because that is the mechanism boost program
-         * options uses.  Unfortunately this means that positional options can also be accessed by
-         * name in the config files and via command line flags
-         *
-         * returns bad status on errors, such as attempting to register an option with the same name
-         * as another option
-         */
-        Status addPositionalOption(const PositionalOptionDescription& positionalOption);
 
         // These functions are used by the OptionsParser to make calls into boost::program_options
         Status getBoostOptions(po::options_description* boostOptions,

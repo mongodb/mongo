@@ -23,9 +23,6 @@ namespace mongo {
 
     MongoRestoreGlobalParams mongoRestoreGlobalParams;
 
-    typedef moe::OptionDescription OD;
-    typedef moe::PositionalOptionDescription POD;
-
     Status addMongoRestoreOptions(moe::OptionSection* options) {
         Status ret = addGeneralToolOptions(options);
         if (!ret.isOK()) {
@@ -77,7 +74,8 @@ namespace mongo {
 
         options->addOptionChaining("dir", "dir", moe::String, "directory to restore from")
                                   .hidden()
-                                  .setDefault(moe::Value(std::string("dump")));
+                                  .setDefault(moe::Value(std::string("dump")))
+                                  .positional(1, 1);
 
 
         // left in for backwards compatibility
@@ -85,11 +83,6 @@ namespace mongo {
                 "wait to add indexes (now default)")
                                   .hidden();
 
-
-        ret = options->addPositionalOption(POD("dir", moe::String, 1));
-        if(!ret.isOK()) {
-            return ret;
-        }
 
         return Status::OK();
     }
