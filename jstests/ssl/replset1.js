@@ -1,3 +1,7 @@
+// If we are running in use-x509 passthrough mode, turn it off
+// since it is not necessary for this test.
+TestData.useX509 = false;
+
 ssl_options1 = {sslMode : "sslOnly",
                sslPEMKeyFile : "jstests/libs/server.pem",
                sslCAFile: "jstests/libs/ca.pem"};
