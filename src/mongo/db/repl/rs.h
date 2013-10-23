@@ -31,7 +31,7 @@
 #pragma once
 
 #include "mongo/db/commands.h"
-#include "mongo/db/index.h"
+#include "mongo/db/storage/index_details.h"
 #include "mongo/db/repl/oplogreader.h"
 #include "mongo/bson/optime.h"
 #include "mongo/db/repl/rs_config.h"

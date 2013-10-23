@@ -20,11 +20,13 @@
 
 #include "mongo/db/btree.h"
 #include "mongo/db/btreecursor.h"
+#include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/index/btree_based_builder.h"
 #include "mongo/db/kill_current_op.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/db/sort_phase_one.h"
+#include "mongo/db/structure/collection.h"
 #include "mongo/platform/cstdint.h"
 
 #include "mongo/dbtests/dbtests.h"
@@ -67,12 +69,16 @@ namespace IndexUpdateTests {
                                                                                  lenWHdr ) );
             memcpy( infoRecord->data(), indexInfo.objdata(), indexInfo.objsize() );
             addRecordToRecListInExtent( infoRecord, infoLoc );
-            IndexDetails& id = nsdetails( _ns )->getNextIndexDetails( _ns );
-            nsdetails( _ns )->addIndex();
-            id.info.writing() = infoLoc;
-            return id;
+
+            Collection* collection = _ctx.ctx().db()->getCollection( _ns );
+            verify( collection );
+
+            IndexCatalog::IndexBuildBlock blk( collection->getIndexCatalog(), "a_1", infoLoc );
+            IndexDetails* id = blk.indexDetails();
+            blk.success();
+            return *id;
         }
-    private:
+
         Client::WriteContext _ctx;
     };
 
@@ -526,37 +532,37 @@ namespace IndexUpdateTests {
     class IndexBuildInProgressTest : public IndexBuildBase {
     public:
         void run() {
+
+            NamespaceDetails* nsd = nsdetails( _ns );
+
             // _id_ is at 0, so nIndexes == 1
-            NamespaceDetails::IndexBuildBlock* a = halfAddIndex("a");
-            NamespaceDetails::IndexBuildBlock* b = halfAddIndex("b");
-            NamespaceDetails::IndexBuildBlock* c = halfAddIndex("c");
-            NamespaceDetails::IndexBuildBlock* d = halfAddIndex("d");
-            int offset = IndexBuildsInProgress::get(_ns, "b_1");
+            IndexCatalog::IndexBuildBlock* a = halfAddIndex("a");
+            IndexCatalog::IndexBuildBlock* b = halfAddIndex("b");
+            IndexCatalog::IndexBuildBlock* c = halfAddIndex("c");
+            IndexCatalog::IndexBuildBlock* d = halfAddIndex("d");
+            int offset = nsd->findIndexByName( "b_1", true );
             ASSERT_EQUALS(2, offset);
 
-            IndexBuildsInProgress::remove(_ns, offset);
             delete b;
 
-            ASSERT_EQUALS(2, IndexBuildsInProgress::get(_ns, "c_1"));
-            ASSERT_EQUALS(3, IndexBuildsInProgress::get(_ns, "d_1"));
+            ASSERT_EQUALS(2, nsd->findIndexByName( "c_1", true ) );
+            ASSERT_EQUALS(3, nsd->findIndexByName( "d_1", true ) );
 
-            offset = IndexBuildsInProgress::get(_ns, "d_1");
-            IndexBuildsInProgress::remove(_ns, offset);
+            offset = nsd->findIndexByName( "d_1", true );
             delete d;
 
-            ASSERT_EQUALS(2, IndexBuildsInProgress::get(_ns, "c_1"));
-            ASSERT_THROWS(IndexBuildsInProgress::get(_ns, "d_1"), MsgAssertionException);
+            ASSERT_EQUALS(2, nsd->findIndexByName( "c_1", true ) );
+            ASSERT( nsd->findIndexByName( "d_1", true ) < 0 );
 
-            offset = IndexBuildsInProgress::get(_ns, "a_1");
-            IndexBuildsInProgress::remove(_ns, offset);
+            offset = nsd->findIndexByName( "a_1", true );
             delete a;
 
-            ASSERT_EQUALS(1, IndexBuildsInProgress::get(_ns, "c_1"));
+            ASSERT_EQUALS(1, nsd->findIndexByName( "c_1", true ));
             delete c;
         }
 
     private:
-        NamespaceDetails::IndexBuildBlock* halfAddIndex(const std::string& key) {
+        IndexCatalog::IndexBuildBlock* halfAddIndex(const std::string& key) {
             string name = key + "_1";
             BSONObj indexInfo = BSON( "v" << 1 <<
                                       "key" << BSON( key << 1 ) <<
@@ -572,9 +578,8 @@ namespace IndexUpdateTests {
                                                                                  lenWHdr ) );
             memcpy( infoRecord->data(), indexInfo.objdata(), indexInfo.objsize() );
             addRecordToRecListInExtent( infoRecord, infoLoc );
-            IndexDetails& id = nsdetails( _ns )->getNextIndexDetails( _ns );
-            id.info = infoLoc;
-            return new NamespaceDetails::IndexBuildBlock( _ns, name );
+
+            return new IndexCatalog::IndexBuildBlock( _ctx.ctx().db()->getCollection( _ns )->getIndexCatalog(), name, infoLoc );
         }
     };
 

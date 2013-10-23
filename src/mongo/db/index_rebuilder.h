@@ -48,15 +48,6 @@ namespace mongo {
          * builds that need to be retried.  If so, calls retryIndexBuild.
          */
         void checkNS(const std::vector<std::string>& nsToCheck);
-
-        /**
-         * Actually retry an index build on a given namespace.
-         * @param dbName the name of the database for accessing db.system.indexes
-         * @param nsd the namespace details of the namespace building the index
-         * @param index the offset into nsd's index array of the partially-built index
-         */
-        void retryIndexBuild(const std::string& dbName,
-                             NamespaceDetails* nsd );
     };
 
     extern IndexRebuilder indexRebuilder;

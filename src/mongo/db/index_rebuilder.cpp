@@ -34,6 +34,7 @@
 #include "mongo/db/instance.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/db/repl/rs.h"
+#include "mongo/db/structure/collection.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
@@ -92,19 +93,24 @@ namespace mongo {
         for (std::vector<std::string>::const_iterator it = nsToCheck.begin();
                 it != nsToCheck.end();
                 ++it) {
+
             // This write lock is held throughout the index building process
             // for this namespace.
             Client::WriteContext ctx(*it);
-            NamespaceDetails* nsd = nsdetails(*it);
+            Collection* collection = ctx.ctx().db()->getCollection( *it );
+            if ( collection == NULL )
+                continue;
 
-            if ( nsd == NULL || nsd->getIndexBuildsInProgress() == 0 ) {
+            IndexCatalog* indexCatalog = collection->getIndexCatalog();
+
+            if ( indexCatalog->numIndexesInProgress() == 0 ) {
                 continue;
             }
 
             log() << "found interrupted index build(s) on " << *it << endl;
+
             if (firstTime) {
-                log() << "note: restart the server with --noIndexBuildRetry to skip index rebuilds"
-                      << endl;
+                log() << "note: restart the server with --noIndexBuildRetry to skip index rebuilds";
                 firstTime = false;
             }
 
@@ -112,38 +118,37 @@ namespace mongo {
             if (!serverGlobalParams.indexBuildRetry) {
                 // If we crash between unsetting the inProg flag and cleaning up the index, the
                 // index space will be lost.
-                nsd->blowAwayInProgressIndexEntries();
+                Status s = indexCatalog->blowAwayInProgressIndexEntries();
+                if ( !s.isOK() ) {
+                    log() << "failed to blowAwayInProgressIndexEntries: " << s;
+                    fassertFailed( 17201 );
+                }
                 continue;
             }
 
             // We go from right to left building these indexes, so that indexBuildInProgress-- has
             // the correct effect of "popping" an index off the list.
-            std::string dbName = it->substr(0, it->find('.'));
-            while ( nsd->getTotalIndexCount() > nsd->getCompletedIndexCount() ) {
-                retryIndexBuild(dbName, nsd);
+            while ( indexCatalog->numIndexesInProgress() > 0 ) {
+                // First, clean up the in progress index build.  Save the system.indexes entry so that we
+                // can add it again afterwards.
+                BSONObj indexObj = indexCatalog->prepOneUnfinishedIndex();
+
+                // The index has now been removed from system.indexes, so the only record of it is
+                // in-memory. If there is a journal commit between now and when insert() rewrites
+                // the entry and the db crashes before the new system.indexes entry is journalled,
+                // the index will be lost forever.  Thus, we're assuming no journaling will happen
+                // between now and the entry being re-written.
+
+                try {
+                    // TODO
+                    const std::string ns = collection->ns().getSystemIndexesCollection();
+                    theDataFileMgr.insert(ns.c_str(), indexObj.objdata(), indexObj.objsize(), false, true);
+                }
+                catch (const DBException& e) {
+                    log() << "building index failed: " << e.what() << " (" << e.getCode() << ")";
+                }
             }
         }
     }
 
-    void IndexRebuilder::retryIndexBuild(const std::string& dbName,
-                                         NamespaceDetails* nsd ) {
-        // First, clean up the in progress index build.  Save the system.indexes entry so that we
-        // can add it again afterwards.
-        BSONObj indexObj = nsd->prepOneUnfinishedIndex();
-
-        // The index has now been removed from system.indexes, so the only record of it is in-
-        // memory. If there is a journal commit between now and when insert() rewrites the entry and
-        // the db crashes before the new system.indexes entry is journalled, the index will be lost
-        // forever.  Thus, we're assuming no journaling will happen between now and the entry being
-        // re-written.
-
-        try {
-            const std::string ns = dbName + ".system.indexes";
-            theDataFileMgr.insert(ns.c_str(), indexObj.objdata(), indexObj.objsize(), false, true);
-        }
-        catch (const DBException& e) {
-            log() << "building index failed: " << e.what() << " (" << e.getCode() << ")"
-                  << endl;
-        }
-    }
 }

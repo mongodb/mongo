@@ -482,6 +482,56 @@ namespace mongo {
         return best->myLoc;
     }
 
+
+    Extent* ExtentManager::increaseStorageSize( const string& ns,
+                                                NamespaceDetails* details,
+                                                int size,
+                                                int quotaMax ) {
+
+        bool fromFreeList = true;
+        DiskLoc eloc = allocFromFreeList( size, details->isCapped() );
+        if ( eloc.isNull() ) {
+            fromFreeList = false;
+            eloc = createExtent( size, quotaMax );
+        }
+
+        verify( !eloc.isNull() );
+        verify( eloc.isValid() );
+
+        LOG(1) << "ExtentManager::increaseStorageSize"
+               << " ns:" << ns
+               << " desiredSize:" << size
+               << " fromFreeList: " << fromFreeList
+               << " eloc: " << eloc;
+
+        Extent *e = getExtent( eloc, false );
+        verify( e );
+
+        DiskLoc emptyLoc = getDur().writing(e)->reuse( ns,
+                                                       details->isCapped() );
+
+        if ( details->lastExtent().isNull() ) {
+            verify( details->firstExtent().isNull() );
+            details->setFirstExtent( eloc );
+            details->setLastExtent( eloc );
+            getDur().writingDiskLoc( details->capExtent() ) = eloc;
+            verify( e->xprev.isNull() );
+            verify( e->xnext.isNull() );
+        }
+        else {
+            verify( !details->firstExtent().isNull() );
+            getDur().writingDiskLoc(e->xprev) = details->lastExtent();
+            getDur().writingDiskLoc(details->lastExtent().ext()->xnext) = eloc;
+            details->setLastExtent( eloc );
+        }
+
+        details->setLastExtentSize( e->length );
+
+        details->addDeletedRec(emptyLoc.drec(), emptyLoc);
+
+        return e;
+    }
+
     void ExtentManager::freeExtents(DiskLoc firstExt, DiskLoc lastExt) {
 
         if ( firstExt.isNull() && lastExt.isNull() )

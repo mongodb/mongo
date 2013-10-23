@@ -54,6 +54,7 @@
         IndexDetails& id() {
             NamespaceDetails *nsd = nsdetails( ns() );
             verify( nsd );
+            verify( nsd->getTotalIndexCount() >= 2 );
             return nsd->idx( 1 );
         }
         void checkValid( int nKeys ) {

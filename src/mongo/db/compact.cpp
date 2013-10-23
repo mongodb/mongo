@@ -43,7 +43,7 @@
 #include "mongo/db/d_concurrency.h"
 #include "mongo/db/curop-inl.h"
 #include "mongo/db/extsort.h"
-#include "mongo/db/index.h"
+#include "mongo/db/storage/index_details.h"
 #include "mongo/db/index_builder.h"
 #include "mongo/db/index_update.h"
 #include "mongo/db/jsobj.h"
@@ -200,8 +200,8 @@ namespace mongo {
 
         // same data, but might perform a little different after compact?
         Collection* collection = cc().database()->getCollection( ns );
-        if ( collection )
-            collection->infoCache()->addedIndex();
+        verify( collection );
+        collection->infoCache()->addedIndex();
 
         verify( d->getCompletedIndexCount() == d->getTotalIndexCount() );
         int nidx = d->getCompletedIndexCount();
@@ -242,10 +242,10 @@ namespace mongo {
 
         // note that the drop indexes call also invalidates all clientcursors for the namespace, which is important and wanted here
         log() << "compact dropping indexes" << endl;
-        BSONObjBuilder b;
-        if( !dropIndexes(d, ns, "*", errmsg, b, true) ) { 
-            errmsg = "compact drop indexes failed";
-            log() << errmsg << endl;
+        Status status = collection->getIndexCatalog()->dropAllIndexes( true );
+        if ( !status.isOK() ) {
+            errmsg = str::stream() << "compact drop indexes failed: " << status.toString();
+            log() << status.toString() << endl;
             return false;
         }
 

@@ -43,9 +43,12 @@
 namespace mongo {
 
     Collection::Collection( const StringData& fullNS,
-                                    NamespaceDetails* details,
-                                    Database* database )
-        : _ns( fullNS ), _infoCache( this ) {
+                            NamespaceDetails* details,
+                            Database* database )
+        : _ns( fullNS ),
+          _recordStore( _ns.ns() ),
+          _infoCache( this ),
+          _indexCatalog( this, details ) {
         _details = details;
         _database = database;
         _recordStore.init( _details,
@@ -72,16 +75,82 @@ namespace mongo {
         return BSONObj::make( rec->accessed() );
     }
 
+    StatusWith<DiskLoc> Collection::insertDocument( const BSONObj& originalDoc, bool enforceQuota ) {
+        BSONObj docToInsert = originalDoc;
+        if ( originalDoc["_id"].eoo() ) {
+            BSONObjBuilder b;
+            b.appendOID( "_id", NULL, true );
+            BSONObjIterator i( originalDoc );
+            while ( i.more() )
+                b.append( i.next() );
+            docToInsert = b.obj();
+        }
+
+        int lenWHdr = _details->getRecordAllocationSize( docToInsert.objsize() + Record::HeaderSize );
+        fassert( 17208, lenWHdr >= ( docToInsert.objsize() + Record::HeaderSize ) );
+
+        if ( _details->isCapped() ) {
+            // TOOD: old god not done
+            Status ret = _indexCatalog.checkNoIndexConflicts( docToInsert );
+            uassert(17209, "duplicate key insert for unique index of capped collection", ret.isOK() );
+        }
+
+        // TODO: for now, capped logic lives inside NamespaceDetails, which is hidden
+        //       under the RecordStore, this feels broken since that should be a
+        //       collection access method probably
+        StatusWith<DiskLoc> loc = _recordStore.allocRecord( lenWHdr,
+                                                            enforceQuota ? largestFileNumberInQuota() : 0 );
+        if ( !loc.isOK() )
+            return loc;
+
+        Record *r = loc.getValue().rec();
+        fassert( 17210, r->lengthWithHeaders() >= lenWHdr );
+
+        // copy the data
+        r = reinterpret_cast<Record*>( getDur().writingPtr(r, lenWHdr) );
+        memcpy( r->data(), docToInsert.objdata(), docToInsert.objsize() );
+
+        addRecordToRecListInExtent(r, loc.getValue()); // XXX move down into record store
+
+        _details->incrementStats( r->netLength(), 1 );
+
+        // TOOD: old god not done
+        _infoCache.notifyOfWriteOp();
+
+        try {
+            _indexCatalog.indexRecord( docToInsert, loc.getValue() );
+        }
+        catch( AssertionException& e ) {
+            if ( _details->isCapped() ) {
+                return StatusWith<DiskLoc>( ErrorCodes::InternalError,
+                                            str::stream() << "unexpected index insertion failure on"
+                                            << " capped collection" << e.toString()
+                                            << " - collection and its index will not match" );
+            }
+
+            // normal case -- we can roll back
+            deleteDocument( loc.getValue(), false, true, NULL );
+            throw;
+        }
+
+        // TODO: this is what the old code did, but is it correct?
+        _details->paddingFits();
+
+        return loc;
+
+    }
+
     void Collection::deleteDocument( const DiskLoc& loc, bool cappedOK, bool noWarn,
-                                         BSONObj* deletedId ) {
+                                     BSONObj* deletedId ) {
         if ( _details->isCapped() && !cappedOK ) {
             log() << "failing remove on a capped ns " << _ns << endl;
             uasserted( 17115,  "cannot remove from a capped collection" ); // XXX 10089
             return;
         }
 
+        BSONObj doc = docFor( loc );
+
         if ( deletedId ) {
-            BSONObj doc = docFor( loc );
             BSONElement e = doc["_id"];
             if ( e.type() ) {
                 *deletedId = e.wrap();
@@ -93,7 +162,7 @@ namespace mongo {
 
         Record* rec = getExtentManager()->recordFor( loc );
 
-        unindexRecord(_details, rec, loc, noWarn);
+        _indexCatalog.unindexRecord( doc, loc, noWarn);
 
         _recordStore.deallocRecord( loc, rec );
 
@@ -112,52 +181,10 @@ namespace mongo {
     }
 
     Extent* Collection::increaseStorageSize( int size, bool enforceQuota ) {
-
-        int quotaMax = 0;
-        if ( enforceQuota )
-            quotaMax = largestFileNumberInQuota();
-
-        bool fromFreeList = true;
-        DiskLoc eloc = getExtentManager()->allocFromFreeList( size, _details->isCapped() );
-        if ( eloc.isNull() ) {
-            fromFreeList = false;
-            eloc = getExtentManager()->createExtent( size, quotaMax );
-        }
-
-        verify( !eloc.isNull() );
-        verify( eloc.isValid() );
-
-        LOG(1) << "Collection::increaseStorageSize"
-               << " ns:" << _ns
-               << " desiredSize:" << size
-               << " fromFreeList: " << fromFreeList
-               << " eloc: " << eloc;
-
-        Extent *e = getExtentManager()->getExtent( eloc, false );
-        verify( e );
-
-        DiskLoc emptyLoc = getDur().writing(e)->reuse( _ns.toString(), _details->isCapped() );
-
-        if ( _details->lastExtent().isNull() ) {
-            verify( _details->firstExtent().isNull() );
-            _details->setFirstExtent( eloc );
-            _details->setLastExtent( eloc );
-            _details->capExtent() = eloc;
-            verify( e->xprev.isNull() );
-            verify( e->xnext.isNull() );
-        }
-        else {
-            verify( !_details->firstExtent().isNull() );
-            getDur().writingDiskLoc(e->xprev) = _details->lastExtent();
-            getDur().writingDiskLoc(_details->lastExtent().ext()->xnext) = eloc;
-            _details->setLastExtent( eloc );
-        }
-
-        _details->setLastExtentSize( e->length );
-
-        _details->addDeletedRec(emptyLoc.drec(), emptyLoc);
-
-        return e;
+        return getExtentManager()->increaseStorageSize( _ns,
+                                                        _details,
+                                                        size,
+                                                        enforceQuota ? largestFileNumberInQuota() : 0 );
     }
 
     int Collection::largestFileNumberInQuota() const {

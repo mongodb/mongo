@@ -41,6 +41,7 @@ namespace mongo {
     class Collection;
     class Extent;
     class DataFile;
+    class IndexCatalog;
     class IndexDetails;
 
     /**
@@ -200,6 +201,7 @@ namespace mongo {
 
         const string _profileName; // "alleyinsider.system.profile"
         const string _namespacesName; // "alleyinsider.system.namespaces"
+        const string _indexesName; // "alleyinsider.system.indexes"
         const string _extentFreelistName;
 
         CCByLoc _ccByLoc; // use by ClientCursor
@@ -219,6 +221,7 @@ namespace mongo {
 
         friend class NamespaceDetails;
         friend class IndexDetails;
+        friend class IndexCatalog;
     };
 
 } // namespace mongo

@@ -1,4 +1,4 @@
-// index.h
+// index_details.h
 
 /**
 *    Copyright (C) 2008 10gen Inc.
@@ -174,11 +174,19 @@ namespace mongo {
         /** delete this index.  does NOT clean up the system catalog
             (system.indexes or system.namespaces) -- only NamespaceIndex.
         */
-        void kill_idx();
+        void _reset();
 
         string toString() const {
             return info.obj().toString();
         }
+
+        /**
+         * @param newSpec the new index specification to check.
+         *
+         * @return true if the given newSpec has the same options as the
+         *     existing index assuming the key spec matches.
+         */
+        bool areIndexOptionsEquivalent( const BSONObj& newSpec ) const;
 
         /** @return true if supported.  supported means we can use the index, including adding new keys.
                     it may not mean we can build the index version in question: we may not maintain building 
@@ -186,34 +194,5 @@ namespace mongo {
         */
         static bool isASupportedIndexVersionNumber(int v) { return (v&1)==v; } // v == 0 || v == 1
     };
-
-    class NamespaceDetails;
-    // changedId should be initialized to false
-    // @return how many things were deleted
-    int assureSysIndexesEmptied(const StringData& ns, IndexDetails *exceptForIdIndex);
-    int removeFromSysIndexes(const StringData& ns, const StringData& idxName);
-
-    /**
-     * Prepare to build an index.  Does not actually build it (except for a special _id case).
-     * - We validate that the params are good
-     * - That the index does not already exist
-     * - Creates the source collection if it DNE
-     *
-     * example of 'io':
-     *   { ns : 'test.foo', name : 'z', key : { z : 1 } }
-     *
-     * @throws DBException
-     *
-     * @param mayInterrupt - When true, killop may interrupt the function call.
-     * @param sourceNS - source NS we are indexing
-     * @param sourceCollection - its details ptr
-     * @return true if ok to continue.  when false we stop/fail silently (index already exists)
-     */
-    bool prepareToBuildIndex(const BSONObj& io,
-                             bool mayInterrupt,
-                             bool god,
-                             string& sourceNS,
-                             NamespaceDetails*& sourceCollection,
-                             BSONObj& fixedIndexObject);
 
 } // namespace mongo

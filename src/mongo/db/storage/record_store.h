@@ -40,7 +40,7 @@ namespace mongo {
 
     class RecordStore {
     public:
-        RecordStore();
+        RecordStore( const StringData& ns );
 
         void init( NamespaceDetails* details,
                    ExtentManager* em,
@@ -48,7 +48,10 @@ namespace mongo {
 
         void deallocRecord( const DiskLoc& dl, Record* todelete );
 
+        StatusWith<DiskLoc> allocRecord( int lengthWithHeaders, int quotaMax );
+
     private:
+        std::string _ns;
         NamespaceDetails* _details;
         ExtentManager* _extentManager;
         bool _isSystemIndexes;

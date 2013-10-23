@@ -35,6 +35,7 @@
 #include "mongo/db/index_update.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_details.h"
+#include "mongo/db/structure/collection.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 
@@ -75,11 +76,11 @@ namespace {
         NamespaceString systemUsersNS( systemUsers );
         createSystemIndexes(systemUsersNS);
 
-        NamespaceDetails* nsd = nsdetails(systemUsers);
-        if (nsd == NULL)
+        Collection* collection = wctx.ctx().db()->getCollection( systemUsers );
+        if (collection == NULL)
             return;
 
-        NamespaceDetails::IndexIterator indexIter = nsd->ii();
+        NamespaceDetails::IndexIterator indexIter = collection->details()->ii();
         std::vector<std::string> namedIndexesToDrop;
 
         while (indexIter.more()) {
@@ -88,21 +89,21 @@ namespace {
                     idetails.keyPattern() == v1SystemUsersKeyPattern)
                 namedIndexesToDrop.push_back(idetails.indexName());
         }
-        for (size_t i = 0; i < namedIndexesToDrop.size(); ++i) {
-            std::string errmsg;
-            BSONObjBuilder infoBuilder;
 
-            if (dropIndexes(nsd,
-                            systemUsers.c_str(),
-                            namedIndexesToDrop[i].c_str(),
-                            errmsg,
-                            infoBuilder,
-                            false)) {
+        for (size_t i = 0; i < namedIndexesToDrop.size(); ++i) {
+            int idxNo = collection->details()->findIndexByName( namedIndexesToDrop[i] );
+            verify( idxNo >= 0 );
+
+            Status status = collection->getIndexCatalog()->dropIndex( idxNo );
+            if ( status.isOK() ) {
                 log() << "Dropped index " << namedIndexesToDrop[i] << " from " << systemUsers <<
                     " because it is incompatible with v2 form privilege documents." << endl;
             }
             else {
                 // Only reason should be orphaned index, which dropIndexes logged.
+                LOG(2) << "configureSystemUsersIndexes couldn't drop index: "
+                       << namedIndexesToDrop[i]
+                       << " but should not matter";
             }
         }
     }

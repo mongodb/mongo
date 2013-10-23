@@ -34,7 +34,7 @@
 #include "mongo/db/btreebuilder.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/extsort.h"
-#include "mongo/db/index.h"
+#include "mongo/db/storage/index_details.h"
 #include "mongo/db/index/btree_based_builder.h"
 #include "mongo/db/index/catalog_hack.h"
 #include "mongo/db/kill_current_op.h"
@@ -48,40 +48,6 @@
 #include "mongo/util/processinfo.h"
 
 namespace mongo {
-    
-    /**
-     * Remove the provided (obj, dl) pair from the provided index.
-     */
-    static void _unindexRecord(NamespaceDetails *d, int idxNo, const BSONObj& obj,
-                               const DiskLoc& dl, bool logIfError = true) {
-        auto_ptr<IndexDescriptor> desc(CatalogHack::getDescriptor(d, idxNo));
-        auto_ptr<IndexAccessMethod> iam(CatalogHack::getIndex(desc.get()));
-        InsertDeleteOptions options;
-        options.logIfError = logIfError;
-
-        int64_t removed;
-        Status ret = iam->remove(obj, dl, options, &removed);
-        if (Status::OK() != ret) {
-            problem() << "Couldn't unindex record " << obj.toString() << " status: "
-                << ret.toString() << endl;
-        }
-    }
-
-    /**
-     * Remove the provided (obj, dl) pair from all indices.
-     */
-    void unindexRecord(NamespaceDetails* nsd, Record* todelete, const DiskLoc& dl,
-                       bool noWarn /* = false */) {
-
-        BSONObj obj = BSONObj::make(todelete);
-        int numIndices = nsd->getTotalIndexCount();
-
-        for (int i = 0; i < numIndices; i++) {
-            // If i >= d->nIndexes, it's a background index, and we DO NOT want to log anything.
-            bool logIfError = (i < nsd->getCompletedIndexCount()) ? !noWarn : false;
-            _unindexRecord(nsd, i, obj, dl, logIfError);
-        }
-    }
 
     /**
      * Add the provided (obj, dl) pair to the provided index.
@@ -100,34 +66,6 @@ namespace mongo {
         Status ret = iam->insert(obj, recordLoc, options, &inserted);
         if (Status::OK() != ret) {
             uasserted(ret.location(), ret.reason());
-        }
-    }
-
-    /**
-     * Add the provided (obj, loc) pair to all indices.
-     */
-    void indexRecord(const char *ns, NamespaceDetails *d, const BSONObj &obj, const DiskLoc &loc) {
-        int numIndices = d->getTotalIndexCount();
-
-        for (int i = 0; i < numIndices; ++i) {
-            IndexDetails &id = d->idx(i);
-
-            try {
-                addKeysToIndex(ns, d, i, obj, loc, !id.unique() || ignoreUniqueIndex(id));
-            }
-            catch (AssertionException&) {
-                // TODO: the new index layer indexes either all or no keys, so j <= i can be j < i.
-                for (int j = 0; j <= i; j++) {
-                    try {
-                        _unindexRecord(d, j, obj, loc, false);
-                    }
-                    catch(...) {
-                        LOG(3) << "unindex fails on rollback after unique "
-                                  "key constraint prevented insert" << std::endl;
-                    }
-                }
-                throw;
-            }
         }
     }
 
@@ -155,7 +93,8 @@ namespace mongo {
             RunnerYieldPolicy yieldPolicy;
 
             std::string idxName = idx.indexName();
-            int idxNo = IndexBuildsInProgress::get(ns, idxName);
+            int idxNo = d->findIndexByName( idxName, true );
+            verify( idxNo >= 0 );
 
             // After this yields in the loop, idx may point at a different index (if indexes get
             // flipped, see insert_makeIndex) or even an empty IndexDetails, so nothing below should
@@ -216,7 +155,8 @@ namespace mongo {
 
                     progress.setTotalWhileRunning( d->numRecords() );
                     // Recalculate idxNo if we yielded
-                    idxNo = IndexBuildsInProgress::get(ns, idxName);
+                    idxNo = d->findIndexByName( idxName, true );
+                    verify( idxNo >= 0 );
                 }
             }
 
@@ -295,7 +235,8 @@ namespace mongo {
         verify( Lock::isWriteLocked(ns) );
 
         if( inDBRepair || !idxInfo["background"].trueValue() ) {
-            int idxNo = IndexBuildsInProgress::get(ns.c_str(), idx.info.obj()["name"].valuestr());
+            int idxNo = d->findIndexByName( idx.info.obj()["name"].valuestr(), true );
+            verify( idxNo >= 0 );
             n = BtreeBasedBuilder::fastBuildIndex(ns.c_str(), d, idx, mayInterrupt, idxNo);
             verify( !idx.head.isNull() );
         }
@@ -335,68 +276,79 @@ namespace mongo {
         theDataFileMgr.insert(system_indexes.c_str(), o.objdata(), o.objsize(), mayInterrupt, true);
     }
 
-    bool dropIndexes(NamespaceDetails *d, const StringData& ns, const StringData& name, string &errmsg, BSONObjBuilder &anObjBuilder, bool mayDeleteIdIndex) {
-        BackgroundOperation::assertNoBgOpInProgForNs(ns);
+    static bool needToUpgradeMinorVersion(const string& newPluginName) {
+        if (IndexNames::existedBefore24(newPluginName))
+            return false;
 
-        /* there may be pointers pointing at keys in the btree(s).  kill them. */
-        ClientCursor::invalidate(ns);
+        DataFileHeader* dfh = cc().database()->getFile(0)->getHeader();
+        if (dfh->versionMinor == PDFILE_VERSION_MINOR_24_AND_NEWER)
+            return false; // these checks have already been done
 
-        // delete a specific index or all?
-        if ( name == "*" ) {
-            // this should be covered by assertNoBgOpInProgForNs above, but being paranoid
-            verify( d->getCompletedIndexCount() == d->getTotalIndexCount() );
+        fassert(16737, dfh->versionMinor == PDFILE_VERSION_MINOR_22_AND_OLDER);
 
-            LOG(4) << "  d->nIndexes was " << d->getCompletedIndexCount() << std::endl;
-            anObjBuilder.appendNumber("nIndexesWas", d->getCompletedIndexCount() );
-            IndexDetails *idIndex = 0;
-
-            for ( int i = 0; i < d->getCompletedIndexCount(); i++ ) {
-
-                if ( !mayDeleteIdIndex && d->idx(i).isIdIndex() ) {
-                    idIndex = &d->idx(i);
-                    continue;
-                }
-
-                d->removeIndex( i );
-                i--;
-            }
-
-            if ( idIndex ) {
-                verify( d->getCompletedIndexCount() == 1 );
-            }
-
-            //verify( 0 == assureSysIndexesEmptied(ns, idIndex) );// TODO(erh)
-            assureSysIndexesEmptied(ns, idIndex);
-            anObjBuilder.append("msg", mayDeleteIdIndex ?
-                                "indexes dropped for collection" :
-                                "non-_id indexes dropped for collection");
-        }
-        else {
-            // delete just one index
-            int x = d->findIndexByName(name);
-            if ( x >= 0 ) {
-
-                if ( !mayDeleteIdIndex && d->idx(x).isIdIndex() ) {
-                    errmsg = "may not delete _id index";
-                    return false;
-                }
-
-                LOG(4) << "  d->nIndexes was " << d->getCompletedIndexCount() << endl;
-                anObjBuilder.appendNumber("nIndexesWas", d->getCompletedIndexCount() );
-
-                d->removeIndex( x );
-            }
-            else {
-                int n = removeFromSysIndexes(ns, name); // just in case an orphaned listing there - i.e. should have been repaired but wasn't
-                if( n ) {
-                    log() << "info: removeFromSysIndexes cleaned up " << n << " entries" << endl;
-                }
-                log() << "dropIndexes: " << name << " not found" << endl;
-                errmsg = "index not found";
-                return false;
-            }
-        }
         return true;
     }
 
+    static void upgradeMinorVersionOrAssert(const string& newPluginName) {
+        const string systemIndexes = cc().database()->name() + ".system.indexes";
+        auto_ptr<Runner> runner(InternalPlanner::collectionScan(systemIndexes));
+        BSONObj index;
+        Runner::RunnerState state;
+        while (Runner::RUNNER_ADVANCED == (state = runner->getNext(&index, NULL))) {
+            const BSONObj key = index.getObjectField("key");
+            const string plugin = IndexNames::findPluginName(key);
+            if (IndexNames::existedBefore24(plugin))
+                continue;
+
+            const string errmsg = str::stream()
+                << "Found pre-existing index " << index << " with invalid type '" << plugin << "'. "
+                << "Disallowing creation of new index type '" << newPluginName << "'. See "
+                << "http://dochub.mongodb.org/core/index-type-changes"
+                ;
+
+            error() << errmsg << endl;
+            uasserted(16738, errmsg);
+        }
+
+        if (Runner::RUNNER_EOF != state) {
+            warning() << "Internal error while reading collection " << systemIndexes << endl;
+        }
+
+        DataFileHeader* dfh = cc().database()->getFile(0)->getHeader();
+        getDur().writingInt(dfh->versionMinor) = PDFILE_VERSION_MINOR_24_AND_NEWER;
+    }
+
+    bool prepareToBuildIndex(const BSONObj& io,
+                             bool mayInterrupt,
+                             bool god,
+                             const string& sourceNS ) {
+
+        BSONObj key = io.getObjectField("key");
+
+        /* this is because we want key patterns like { _id : 1 } and { _id : <someobjid> } to
+           all be treated as the same pattern.
+        */
+        if ( IndexDetails::isIdIndexPattern(key) ) {
+            if( !god ) {
+                ensureHaveIdIndex( sourceNS.c_str(), mayInterrupt );
+                return false;
+            }
+        }
+        else {
+            /* is buildIndexes:false set for this replica set member?
+               if so we don't build any indexes except _id
+            */
+            if( theReplSet && !theReplSet->buildIndexes() )
+                return false;
+        }
+
+        string pluginName = IndexNames::findPluginName( key );
+        if ( pluginName.size() ) {
+            if (needToUpgradeMinorVersion(pluginName))
+                upgradeMinorVersionOrAssert(pluginName);
+        }
+
+        return true;
+    }
 }  // namespace mongo
+

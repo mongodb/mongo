@@ -133,10 +133,10 @@ namespace mongo {
 
         void deleteRecord(const char *ns, Record *todelete, const DiskLoc& dl, bool cappedOK = false, bool noWarn = false, bool logOp=false);
 
-        void deleteRecord(NamespaceDetails* d, const char *ns, Record *todelete, const DiskLoc& dl, bool cappedOK = false, bool noWarn = false, bool logOp=false);
+        void deleteRecord(NamespaceDetails* d, const StringData& ns, Record *todelete, const DiskLoc& dl, bool cappedOK = false, bool noWarn = false, bool logOp=false);
 
         /* does not clean up indexes, etc. : just deletes the record in the pdfile. use deleteRecord() to unindex */
-        void _deleteRecord(NamespaceDetails *d, const char *ns, Record *todelete, const DiskLoc& dl);
+        void _deleteRecord(NamespaceDetails *d, const StringData& ns, Record *todelete, const DiskLoc& dl);
 
         /**
          * accessor/mutator for the 'precalced' keys (that is, sorted index keys)
@@ -432,22 +432,5 @@ namespace mongo {
 
     void addRecordToRecListInExtent(Record* r, DiskLoc loc);
 
-    /**
-     * Static helpers to manipulate the list of unfinished index builds.
-     */
-    class IndexBuildsInProgress {
-    public:
-        /**
-         * Find an unfinished index build by name.  Does not search finished index builds.
-         */
-        static int get(const char* ns, const std::string& indexName);
-
-        /**
-         * Remove an unfinished index build from the list of index builds and move every subsequent
-         * unfinished index build back one.  E.g., if x, y, z, and w are building and someone kills
-         * y, this method would rearrange the list to be x, z, w, (empty), etc.
-         */
-        static void remove(const char* ns, int offset);
-    };
 
 } // namespace mongo

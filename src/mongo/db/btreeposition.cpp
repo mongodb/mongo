@@ -29,7 +29,7 @@
 #include "mongo/db/btreeposition.h"
 
 #include "mongo/db/btree.h"
-#include "mongo/db/index.h"
+#include "mongo/db/storage/index_details.h"
 #include "mongo/db/pdfile.h"
 
 namespace mongo {

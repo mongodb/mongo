@@ -167,7 +167,7 @@ namespace mongo {
         return inCapExtent( next );
     }
 
-    void NamespaceDetails::advanceCapExtent( const char *ns ) {
+    void NamespaceDetails::advanceCapExtent( const StringData& ns ) {
         // We want cappedLastDelRecLastExtent() to be the last DeletedRecord of the prev cap extent
         // (or DiskLoc() if new capExtent == firstExtent)
         if ( _capExtent == _lastExtent )
@@ -214,7 +214,7 @@ namespace mongo {
         return ret;
     }
 
-    DiskLoc NamespaceDetails::cappedAlloc(const char *ns, int len) {
+    DiskLoc NamespaceDetails::cappedAlloc(const StringData& ns, int len) {
         
         if ( len > theCapExtent()->length ) {
             // the extent check is a way to try and improve performance
@@ -452,10 +452,12 @@ namespace mongo {
         }
 
         if ( _nIndexes ) {
-            string errmsg;
-            BSONObjBuilder note;
-            bool res = dropIndexes( this , ns , "*" , errmsg , note , true );
-            massert( 13426 , str::stream() << "failed during index drop: " << errmsg , res );
+            Collection* collection = cc().database()->getCollection( ns );
+            verify( collection );
+            Status status = collection->getIndexCatalog()->dropAllIndexes( true );
+            massert( 13426,
+                     str::stream() << "failed index drop: " << status.toString(),
+                     status.isOK() );
         }
 
         // Clear all references to this namespace.

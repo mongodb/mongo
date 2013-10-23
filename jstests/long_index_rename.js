@@ -14,4 +14,5 @@ t.createIndex({a:1}, {name: "aaa"});
 t.createIndex({a:1}, {name: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" +
                             "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"});
 var result = db.getLastErrorObj();
-assert.eq(result.code, 16829);
+assert( result.code >= 0 );
+assert( result.err.indexOf( "too long" ) >= 0 );

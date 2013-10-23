@@ -30,11 +30,13 @@
 
 #include <string>
 
-#include "mongo/db/index.h"  // For IndexDetails.
+#include "mongo/db/storage/index_details.h"  // For IndexDetails.
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_details.h"  // For NamespaceDetails.
 
 namespace mongo {
+
+    class IndexCatalog;
 
     /**
      * OnDiskIndexData (aka IndexDetails) is memory-mapped on-disk index data.
@@ -140,10 +142,10 @@ namespace mongo {
         DiskLoc& getHead() { return _onDiskData->head; }
 
         // Return a (rather compact) string representation.
-        string toString() { return _infoObj.toString(); }
+        string toString() const { return _infoObj.toString(); }
 
         // Return the info object.
-        BSONObj infoObj() { return _infoObj; }
+        const BSONObj& infoObj() const { return _infoObj; }
 
         // Set multikey attribute.  We never unset it.
         void setMultikey() {
@@ -151,12 +153,15 @@ namespace mongo {
         }
 
         // Is this index being created in the background?
-        bool isBackgroundIndex() {
+        bool isBackgroundIndex() const {
             return _indexNumber >= _namespaceDetails->getCompletedIndexCount();
         }
 
     private:
-        // Related catalog information.
+
+        int getIndexNumber() const { return _indexNumber; }
+
+        // Related catalog information of the parent collection
         NamespaceDetails* _namespaceDetails;
 
         // What # index are we in the catalog represented by _namespaceDetails?  Needed for setting
@@ -170,6 +175,8 @@ namespace mongo {
 
         // How many fields are indexed?
         int64_t _numFields;
+
+        friend class IndexCatalog;
     };
 
 }  // namespace mongo

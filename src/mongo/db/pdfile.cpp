@@ -349,6 +349,8 @@ namespace mongo {
             return shared_ptr<Cursor>(new BasicCursor(DiskLoc()));
 
         DiskLoc loc = d->firstExtent();
+        if ( loc.isNull() )
+            return shared_ptr<Cursor>(new BasicCursor(DiskLoc()));
         Extent *e = getExtent(loc);
 
         DEBUGGING {
@@ -421,7 +423,7 @@ namespace mongo {
     /* deletes a record, just the pdfile portion -- no index cleanup, no cursor cleanup, etc.
        caller must check if capped
     */
-    void DataFileMgr::_deleteRecord(NamespaceDetails *d, const char *ns, Record *todelete, const DiskLoc& dl) {
+    void DataFileMgr::_deleteRecord(NamespaceDetails *d, const StringData& ns, Record *todelete, const DiskLoc& dl) {
         /* remove ourself from the record next/prev chain */
         {
             if ( todelete->prevOfs() != DiskLoc::NullOfs )
@@ -470,11 +472,13 @@ namespace mongo {
         }
     }
 
-    void DataFileMgr::deleteRecord(const char *ns, Record *todelete, const DiskLoc& dl, bool cappedOK, bool noWarn, bool doLog ) {
+    void DataFileMgr::deleteRecord(const char *ns, Record *todelete, const DiskLoc& dl,
+                                   bool cappedOK, bool noWarn, bool doLog ) {
         deleteRecord( nsdetails(ns), ns, todelete, dl, cappedOK, noWarn, doLog );
     }
 
-    void DataFileMgr::deleteRecord(NamespaceDetails* d, const char *ns, Record *todelete, const DiskLoc& dl, bool cappedOK, bool noWarn, bool doLog ) {
+    void DataFileMgr::deleteRecord(NamespaceDetails* d, const StringData& ns, Record *todelete,
+                                   const DiskLoc& dl, bool cappedOK, bool noWarn, bool doLog ) {
         dassert( todelete == dl.rec() );
 
         if ( d->isCapped() && !cappedOK ) {
@@ -483,27 +487,37 @@ namespace mongo {
             return;
         }
 
+        BSONObj obj = BSONObj::make( todelete );
+
         BSONObj toDelete;
         if ( doLog ) {
-            BSONElement e = dl.obj()["_id"];
+            BSONElement e = obj["_id"];
             if ( e.type() ) {
                 toDelete = e.wrap();
             }
         }
+        Collection* collection = cc().database()->getCollection( ns );
+        verify( collection );
 
         /* check if any cursors point to us.  if so, advance them. */
         ClientCursor::aboutToDelete(ns, d, dl);
 
-        unindexRecord(d, todelete, dl, noWarn);
+        collection->getIndexCatalog()->unindexRecord( obj, dl, noWarn );
 
         _deleteRecord(d, ns, todelete, dl);
 
-        Collection* collection = cc().database()->getCollection( ns );
-        verify( collection );
         collection->infoCache()->notifyOfWriteOp();
 
         if ( ! toDelete.isEmpty() ) {
-            logOp( "d" , ns , toDelete );
+            // TODO: this is crazy, need to fix logOp
+            const char* raw = ns.rawData();
+            if ( strlen(raw) == ns.size() ) {
+                logOp( "d", raw, toDelete );
+            }
+            else {
+                string temp = ns.toString();
+                logOp( "d", temp.c_str(), toDelete );
+            }
         }
     }
 
@@ -651,30 +665,6 @@ namespace mongo {
         return loc;
     }
 
-    // We are now doing two btree scans for all unique indexes (one here, and one when we've
-    // written the record to the collection.  This could be made more efficient inserting
-    // dummy data here, keeping pointers to the btree nodes holding the dummy data and then
-    // updating the dummy data with the DiskLoc of the real record.
-    void checkNoIndexConflicts( NamespaceDetails *d, const BSONObj &obj ) {
-        for ( int idxNo = 0; idxNo < d->getCompletedIndexCount(); idxNo++ ) {
-            if( d->idx(idxNo).unique() ) {
-                IndexDetails& idx = d->idx(idxNo);
-                if (ignoreUniqueIndex(idx))
-                    continue;
-                auto_ptr<IndexDescriptor> descriptor(CatalogHack::getDescriptor(d, idxNo));
-                auto_ptr<IndexAccessMethod> iam(CatalogHack::getIndex(descriptor.get()));
-                InsertDeleteOptions options;
-                options.logIfError = false;
-                options.dupsAllowed = false;
-                UpdateTicket ticket;
-                Status ret = iam->validateUpdate(BSONObj(), obj, DiskLoc(), options, &ticket);
-                if (ret != Status::OK()) {
-                    uasserted(12582, "duplicate key insert for unique index of capped collection");
-                }
-            }
-        }
-    }
-
     /** add a record to the end of the linked list chain within this extent. 
         require: you must have already declared write intent for the record header.        
     */
@@ -767,19 +757,15 @@ namespace mongo {
     /**
      * @param loc the location in system.indexes where the index spec is
      */
-    void NOINLINE_DECL insert_makeIndex(NamespaceDetails* tableToIndex,
-                                        const string& tabletoidxns,
+    void NOINLINE_DECL insert_makeIndex(Collection* collectionToIndex,
                                         const DiskLoc& loc,
                                         bool mayInterrupt) {
         uassert(13143,
                 "can't create index on system.indexes",
-                nsToCollectionSubstring(tabletoidxns) != "system.indexes");
+                collectionToIndex->ns().coll() != "system.indexes");
 
         BSONObj info = loc.obj();
         std::string idxName = info["name"].valuestr();
-
-
-        int idxNo = -1;
 
         // Set curop description before setting indexBuildInProg, so that there's something
         // commands can find and kill as soon as indexBuildInProg is set. Only set this if it's a
@@ -788,110 +774,31 @@ namespace mongo {
             cc().curop()->setQuery(info);
         }
 
+        IndexCatalog::IndexBuildBlock indexBuildBlock( collectionToIndex->getIndexCatalog(), idxName, loc );
+        verify( indexBuildBlock.indexDetails() );
+
         try {
-            IndexDetails& idx = tableToIndex->getNextIndexDetails(tabletoidxns.c_str());
-            NamespaceDetails::IndexBuildBlock indexBuildBlock( tabletoidxns, idxName );
-
-            // It's important that this is outside the inner try/catch so that we never try to call
-            // kill_idx on a half-formed disk loc (if this asserts).
-            getDur().writingDiskLoc(idx.info) = loc;
-
-            try {
-                buildAnIndex(tabletoidxns, tableToIndex, idx, mayInterrupt);
-            }
-            catch (DBException& e) {
-                // save our error msg string as an exception or dropIndexes will overwrite our message
-                LastError *le = lastError.get();
-                int savecode = 0;
-                string saveerrmsg;
-                if ( le ) {
-                    savecode = le->code;
-                    saveerrmsg = le->msg;
-                }
-                else {
-                    savecode = e.getCode();
-                    saveerrmsg = e.what();
-                }
-
-                // Recalculate the index # so we can remove it from the list in the next catch
-                idxNo = IndexBuildsInProgress::get(tabletoidxns.c_str(), idxName);
-                // roll back this index
-                idx.kill_idx();
-
-                verify(le && !saveerrmsg.empty());
-                setLastError(savecode,saveerrmsg.c_str());
-                throw;
-            }
-
-            // Recompute index numbers
-            tableToIndex = nsdetails(tabletoidxns);
-            idxNo = IndexBuildsInProgress::get(tabletoidxns.c_str(), idxName);
-
-            // Make sure the newly created index is relocated to nIndexes, if it isn't already there
-            if ( idxNo != tableToIndex->getCompletedIndexCount() ) {
-                log() << "switching indexes at position " << idxNo << " and "
-                      << tableToIndex->getCompletedIndexCount() << endl;
-
-                tableToIndex->swapIndex( tabletoidxns.c_str(),
-                                         idxNo,
-                                         tableToIndex->getCompletedIndexCount() );
-
-                idxNo = tableToIndex->getCompletedIndexCount();
-            }
-
-            // clear transient info caches so they refresh; increments nIndexes
-            tableToIndex->addIndex();
-            Collection* collection = cc().database()->getCollection( tabletoidxns );
-            if ( collection )
-                collection->infoCache()->addedIndex();
-
-            IndexLegacy::postBuildHook(tableToIndex, idx);
+            buildAnIndex( collectionToIndex->ns(), collectionToIndex->details(),
+                          *indexBuildBlock.indexDetails(), mayInterrupt);
+            indexBuildBlock.success();
         }
-        catch (...) {
-            // Generally, this will be called as an exception from building the index bubbles up.
-            // Thus, the index will have already been cleaned up.  This catch just ensures that the
-            // metadata is consistent on any exception. It may leak like a sieve if the index
-            // successfully finished building and addIndex or kill_idx threw.
-
-            // Move any other in prog indexes "back" one. It is important that idxNo is set
-            // correctly so that the correct index is removed
-            if ( idxNo >= 0 ) {
-                IndexBuildsInProgress::remove(tabletoidxns.c_str(), idxNo);
-            }
-            throw;
-        }
-    }
-
-    // indexName is passed in because index details may not be pointing to something valid at this
-    // point
-    int IndexBuildsInProgress::get(const char* ns, const std::string& indexName) {
-        Lock::assertWriteLocked(ns);
-        NamespaceDetails* nsd = nsdetails(ns);
-
-        // Go through unfinished index builds and try to find this index
-        for ( int i=nsd->getCompletedIndexCount();
-              i < nsd->getTotalIndexCount();
-              i++ ) {
-            if (indexName == nsd->idx(i).indexName()) {
-                return i;
-            }
-        }
-        msgasserted(16574, "could not find index being built");
-    }
-
-    void IndexBuildsInProgress::remove(const char* ns, int offset) {
-        Lock::assertWriteLocked(ns);
-        NamespaceDetails* nsd = nsdetails(ns);
-
-        for (int i=offset; i<nsd->getTotalIndexCount(); i++) {
-            if (i < NamespaceDetails::NIndexesMax-1) {
-                *getDur().writing(&nsd->idx(i)) = nsd->idx(i+1);
-                nsd->setIndexIsMultikey(ns, i, nsd->isMultikey(i+1));
+        catch (DBException& e) {
+            // save our error msg string as an exception or dropIndexes will overwrite our message
+            LastError *le = lastError.get();
+            int savecode = 0;
+            string saveerrmsg;
+            if ( le ) {
+                savecode = le->code;
+                saveerrmsg = le->msg;
             }
             else {
-                *getDur().writing(&nsd->idx(i)) = IndexDetails();
-                nsd->setIndexIsMultikey(ns, i, false);
+                savecode = e.getCode();
+                saveerrmsg = e.what();
             }
+
+            verify(le && !saveerrmsg.empty());
+            setLastError(savecode,saveerrmsg.c_str());
+            throw;
         }
     }
 
@@ -902,6 +809,9 @@ namespace mongo {
                                 bool god,
                                 bool mayAddIndex,
                                 bool* addedID) {
+
+        Database* database = cc().database();
+
         bool wouldAddIndex = false;
         massert( 10093 , "cannot insert into reserved $ collection", god || NamespaceString::normal( ns ) );
         uassert( 10094 , str::stream() << "invalid ns: " << ns , isValidNS( ns ) );
@@ -912,9 +822,9 @@ namespace mongo {
         }
         bool addIndex = wouldAddIndex && mayAddIndex;
 
-        Collection* collection = cc().database()->getCollection( ns );
+        Collection* collection = database->getCollection( ns );
         if ( collection == NULL ) {
-            collection = cc().database()->createCollection( ns, false, NULL );
+            collection = database->createCollection( ns, false, NULL );
 
             int ies = Extent::initialSize(len);
             if( str::contains(ns, '$') &&
@@ -932,27 +842,56 @@ namespace mongo {
 
         NamespaceDetails* d = collection->details();
 
-        NamespaceDetails *tableToIndex = 0;
-
         string tabletoidxns;
+        Collection* collectionToIndex = 0;
+        NamespaceDetails* tableToIndex = 0;
+
         BSONObj fixedIndexObject;
         if ( addIndex ) {
             verify( obuf );
             BSONObj io((const char *) obuf);
+
+            tabletoidxns = io.getStringField( "ns" );
+            uassert(10096, "invalid ns to index", tabletoidxns.find( '.' ) != string::npos);
+            massert(10097,
+                    str::stream() << "trying to create index on wrong db "
+                    << " db: " << database->name() << " collection: " << tabletoidxns,
+                    database->ownsNS( tabletoidxns ) );
+
+            collectionToIndex = database->getCollection( tabletoidxns );
+            if ( !collectionToIndex ) {
+                collectionToIndex = database->createCollection( tabletoidxns, false, NULL );
+                verify( collectionToIndex );
+                if ( !god )
+                    ensureIdIndexForNewNs( tabletoidxns.c_str() );
+            }
+
+            tableToIndex = collectionToIndex->details();
+
+            Status status = collectionToIndex->getIndexCatalog()->okToAddIndex( io );
+            if ( status.code() == ErrorCodes::IndexAlreadyExists ) {
+                // dup index, we ignore
+                return DiskLoc();
+            }
+
+            uassert( 17199,
+                     str::stream() << "cannot build index on " << tabletoidxns
+                     << " because of " << status.toString(),
+                     status.isOK() );
+
             if( !prepareToBuildIndex(io,
                                      mayInterrupt,
                                      god,
-                                     tabletoidxns,
-                                     tableToIndex,
-                                     fixedIndexObject) ) {
+                                     tabletoidxns ) ) {
                 // prepare creates _id itself, or this indicates to fail the build silently (such 
                 // as if index already exists)
                 return DiskLoc();
             }
-            if ( ! fixedIndexObject.isEmpty() ) {
-                obuf = fixedIndexObject.objdata();
-                len = fixedIndexObject.objsize();
-            }
+
+            fixedIndexObject = IndexCatalog::fixIndexSpec( io );
+
+            obuf = fixedIndexObject.objdata();
+            len = fixedIndexObject.objsize();
         }
 
         IDToInsert idToInsert; // only initialized if needed
@@ -985,10 +924,10 @@ namespace mongo {
 
         // If the collection is capped, check if the new object will violate a unique index
         // constraint before allocating space.
-        if (d->getCompletedIndexCount() &&
-            d->isCapped() &&
-            !god) {
-            checkNoIndexConflicts( d, BSONObj( reinterpret_cast<const char *>( obuf ) ) );
+        if ( d->isCapped() && !god) {
+            BSONObj temp = BSONObj( reinterpret_cast<const char *>( obuf ) );
+            Status ret = collection->getIndexCatalog()->checkNoIndexConflicts( temp );
+            uassert(12582, "duplicate key insert for unique index of capped collection", ret.isOK() );
         }
 
         DiskLoc loc = allocateSpaceForANewRecord(ns, d, lenWHdr, god);
@@ -1026,14 +965,14 @@ namespace mongo {
             collection->infoCache()->notifyOfWriteOp();
 
         if ( tableToIndex ) {
-            insert_makeIndex(tableToIndex, tabletoidxns, loc, mayInterrupt);
+            insert_makeIndex(collectionToIndex, loc, mayInterrupt);
         }
 
         /* add this record to our indexes */
         if ( d->getTotalIndexCount() > 0 ) {
             try {
                 BSONObj obj(r->data());
-                indexRecord(ns, d, obj, loc);
+                collection->getIndexCatalog()->indexRecord(obj, loc);
             }
             catch( AssertionException& e ) {
                 // should be a dup key error on _id index

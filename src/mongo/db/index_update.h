@@ -29,17 +29,13 @@
 #pragma once
 
 #include "mongo/db/diskloc.h"
-#include "mongo/db/index.h"
+#include "mongo/db/storage/index_details.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/platform/cstdint.h"
 
 namespace mongo {
     class NamespaceDetails;
     class Record;
-
-    // unindex all keys in index for this record. 
-    void unindexRecord(NamespaceDetails *d, Record *todelete, const DiskLoc& dl,
-                       bool noWarn = false);
 
     // Build an index in the foreground
     // If background is false, uses fast index builder
@@ -49,16 +45,29 @@ namespace mongo {
                       IndexDetails& idx,
                       bool mayInterrupt);
 
-    // add index keys for a newly inserted record 
-    void indexRecord(const char *ns, NamespaceDetails *d, const BSONObj& obj, const DiskLoc &loc);
-
-    bool dropIndexes(NamespaceDetails *d, const StringData& ns, const StringData& name, string &errmsg,
-                     BSONObjBuilder &anObjBuilder, bool maydeleteIdIndex );
-
     /**
      * Add an _id index to namespace @param 'ns' if not already present.
      * @param mayInterrupt When true, killop may interrupt the function call.
      */
     void ensureHaveIdIndex(const char* ns, bool mayInterrupt);
+
+    /**
+     * Prepare to build an index.  Does not actually build it (except for a special _id case).
+     * - We validate that the params are good
+     * - That the index does not already exist
+     *
+     * example of 'io':
+     *   { ns : 'test.foo', name : 'z', key : { z : 1 } }
+     *
+     * @throws DBException
+     *
+     * @param mayInterrupt - When true, killop may interrupt the function call.
+     * @param sourceNS - source NS we are indexing
+     * @return true if ok to continue.  when false we stop/fail silently (index already exists)
+     */
+    bool prepareToBuildIndex(const BSONObj& io,
+                             bool mayInterrupt,
+                             bool god,
+                             const string& sourceNS );
 
 } // namespace mongo

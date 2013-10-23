@@ -38,7 +38,7 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/index.h"
+#include "mongo/db/storage/index_details.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/s/client_info.h"

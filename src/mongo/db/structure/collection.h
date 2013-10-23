@@ -33,6 +33,7 @@
 #include <string>
 
 #include "mongo/base/string_data.h"
+#include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/diskloc.h"
 #include "mongo/db/exec/collection_scan_common.h"
 #include "mongo/db/namespace_string.h"
@@ -45,6 +46,7 @@ namespace mongo {
     class Database;
     class ExtentManager;
     class NamespaceDetails;
+    class IndexCatalog;
 
     class CollectionIterator;
     class FlatIterator;
@@ -72,6 +74,9 @@ namespace mongo {
 
         const NamespaceString& ns() const { return _ns; }
 
+        const IndexCatalog* getIndexCatalog() const { return &_indexCatalog; }
+        IndexCatalog* getIndexCatalog() { return &_indexCatalog; }
+
         BSONObj docFor( const DiskLoc& loc );
 
         CollectionIterator* getIterator( const DiskLoc& start, bool tailable,
@@ -81,6 +86,8 @@ namespace mongo {
                              bool cappedOK = false,
                              bool noWarn = false,
                              BSONObj* deletedId = 0 );
+
+        StatusWith<DiskLoc> insertDocument( const BSONObj& doc, bool enforceQuota );
 
         // this is temporary, moving up from DB for now
         // this will add a new extent the collection
@@ -109,11 +116,12 @@ namespace mongo {
         Database* _database;
         RecordStore _recordStore;
         CollectionInfoCache _infoCache;
-
+        IndexCatalog _indexCatalog;
 
         friend class Database;
         friend class FlatIterator;
         friend class CappedIterator;
+        friend class IndexCatalog;
     };
 
 }

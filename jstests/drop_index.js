@@ -10,7 +10,7 @@ t.ensureIndex( { b : 1 } );
 assert.eq( 3 , t.getIndexes().length , "A2" );
 
 x = db._dbCommand( { dropIndexes: t.getName() , index : t._genIndexName( { a : 1 } ) } );
-assert.eq( 2 , t.getIndexes().length , "B1" );
+assert.eq( 2 , t.getIndexes().length , "B1 " + tojson(x) );
 
 x = db._dbCommand( { dropIndexes: t.getName() , index : { b : 1 } } )
 assert.eq( 1 , t.getIndexes().length , "B2" );

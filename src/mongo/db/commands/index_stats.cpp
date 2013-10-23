@@ -33,7 +33,7 @@
 #include "mongo/db/btree.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/db.h"
-#include "mongo/db/index.h"
+#include "mongo/db/storage/index_details.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/kill_current_op.h"
 #include "mongo/db/namespace_details.h"

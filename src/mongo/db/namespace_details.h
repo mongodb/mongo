@@ -31,7 +31,7 @@
 #include "mongo/pch.h"
 #include "mongo/db/d_concurrency.h"
 #include "mongo/db/diskloc.h"
-#include "mongo/db/index.h"
+#include "mongo/db/storage/index_details.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/index_set.h"
 #include "mongo/db/jsobj.h"
@@ -44,6 +44,7 @@
 
 namespace mongo {
     class Database;
+    class IndexCatalog;
 
     /** @return true if a client can modify this namespace even though it is under ".system."
         For example <dbname>.system.users is ok for regular clients to update.
@@ -101,7 +102,7 @@ namespace mongo {
         int _maxDocsInCapped;                  // max # of objects for a capped table, -1 for inf.
 
         double _paddingFactor;                 // 1.0 = no padding.
-        // ofs 386 (16)
+        // ofs 368 (16)
         int _systemFlags; // things that the system sets/cares about
 
         DiskLoc _capExtent; // the "current" extent we're writing too for a capped collection
@@ -171,9 +172,9 @@ namespace mongo {
 
     private:
         Extent *theCapExtent() const { return _capExtent.ext(); }
-        void advanceCapExtent( const char *ns );
+        void advanceCapExtent( const StringData& ns );
         DiskLoc __capAlloc(int len);
-        DiskLoc cappedAlloc(const char *ns, int len);
+        DiskLoc cappedAlloc(const StringData& ns, int len);
         DiskLoc &cappedFirstDeletedInCurExtent();
         bool nextIsInCapExtent( const DiskLoc &dl ) const;
 
@@ -290,15 +291,6 @@ namespace mongo {
          */
         IndexDetails& getNextIndexDetails(const char* thisns);
 
-        /**
-         * incremements _nIndexes
-         */
-        void addIndex();
-
-        void aboutToDeleteAnIndex() { 
-            clearSystemFlag( Flag_HaveIdIndex );
-        }
-
         /* returns index of the first index in which the field is present. -1 if not present. */
         int fieldIsIndexed(const char *fieldName);
 
@@ -371,25 +363,6 @@ namespace mongo {
         const IndexDetails* findIndexByPrefix( const BSONObj &keyPattern ,
                                                bool requireSingleKey );
 
-        void removeIndex( int idx );
-
-        /**
-         * removes things beteen getCompletedIndexCount() and getTotalIndexCount()
-         * this should only be used for crash recovery
-         */
-        void blowAwayInProgressIndexEntries();
-
-        /**
-         * @return the info for the index to retry
-         */
-        BSONObj prepOneUnfinishedIndex();
-
-        /**
-         * swaps all meta data for 2 indexes
-         * a and b are 2 index ids, whose contents will be swapped
-         * must have a lock on the entire collection to do this
-         */
-        void swapIndex( const char* ns, int a, int b );
 
         /* Updates the expireAfterSeconds field of the given index to the value in newExpireSecs.
          * The specified index must already contain an expireAfterSeconds field, and the value in
@@ -469,7 +442,7 @@ namespace mongo {
             @param lenToAlloc is WITH header
             @return null diskloc if no room - allocate a new extent then
         */
-        DiskLoc alloc(const char* ns, int lenToAlloc);
+        DiskLoc alloc(const StringData& ns, int lenToAlloc);
 
         /* add a given record to the deleted chains for this NS */
         void addDeletedRec(DeletedRecord *d, DiskLoc dloc);
@@ -492,25 +465,24 @@ namespace mongo {
         /** Make all linked Extra objects writeable as well */
         NamespaceDetails *writingWithExtra();
 
-        class IndexBuildBlock {
-        public:
-            IndexBuildBlock( const string& ns, const string& indexName );
-            ~IndexBuildBlock();
-
-        private:
-            string _ns;
-            string _indexName;
-        };
-
     private:
+        void _removeIndexFromMe( int idx );
 
-        void _removeIndex( int idx );
+        /**
+         * swaps all meta data for 2 indexes
+         * a and b are 2 index ids, whose contents will be swapped
+         * must have a lock on the entire collection to do this
+         */
+        void swapIndex( const char* ns, int a, int b );
 
-        DiskLoc _alloc(const char *ns, int len);
-        void maybeComplain( const char *ns, int len ) const;
+        DiskLoc _alloc(const StringData& ns, int len);
+        void maybeComplain( const StringData& ns, int len ) const;
         DiskLoc __stdAlloc(int len, bool willBeAt);
         void compact(); // combine adjacent deleted records
+
         friend class NamespaceIndex;
+        friend class IndexCatalog;
+
         struct ExtraOld {
             // note we could use this field for more chaining later, so don't waste it:
             unsigned long long reserved1;

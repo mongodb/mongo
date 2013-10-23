@@ -109,6 +109,14 @@ namespace mongo {
          */
         DiskLoc allocFromFreeList( int approxSize, bool capped );
 
+        /**
+         * TODO: this isn't quite in the right spot
+         *  really need the concept of a NamespaceStructure in the current paradigm
+         */
+        Extent* increaseStorageSize( const string& ns,
+                                     NamespaceDetails* details,
+                                     int size,
+                                     int quotaMax );
 
         /**
          * firstExt has to be == lastExt or a chain

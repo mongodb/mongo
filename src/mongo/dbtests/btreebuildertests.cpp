@@ -19,7 +19,9 @@
 #include "mongo/db/btreebuilder.h"
 
 #include "mongo/db/btreecursor.h"
+#include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/pdfile.h"
+#include "mongo/db/structure/collection.h"
 #include "mongo/platform/cstdint.h"
 
 #include "mongo/dbtests/dbtests.h"
@@ -60,10 +62,14 @@ namespace BtreeBuilderTests {
                                                                                  lenWHdr ) );
             memcpy( infoRecord->data(), indexInfo.objdata(), indexInfo.objsize() );
             addRecordToRecListInExtent( infoRecord, infoLoc );
-            IndexDetails& id = nsdetails( _ns )->getNextIndexDetails( _ns );
-            nsdetails( _ns )->addIndex();
-            id.info.writing() = infoLoc;
-            return id;
+
+            Collection* collection = _ctx.ctx().db()->getCollection( _ns );
+            verify( collection );
+
+            IndexCatalog::IndexBuildBlock  blk( collection->getIndexCatalog(), "a_1", infoLoc );
+            IndexDetails* id = blk.indexDetails();
+            blk.success();
+            return *id;
         }
     private:
         Client::WriteContext _ctx;

@@ -33,10 +33,10 @@
 #include <algorithm>
 #include <list>
 
-#include "mongo/db/audit.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/db.h"
 #include "mongo/db/dbhelpers.h"
+#include "mongo/db/index_legacy.h"
 #include "mongo/db/json.h"
 #include "mongo/db/storage/durable_mapped_file.h"
 #include "mongo/db/ops/delete.h"
@@ -199,7 +199,7 @@ namespace mongo {
         @param lenToAlloc is WITH header
         @return null diskloc if no room - allocate a new extent then
     */
-    DiskLoc NamespaceDetails::alloc(const char* ns, int lenToAlloc) {
+    DiskLoc NamespaceDetails::alloc(const StringData& ns, int lenToAlloc) {
         {
             // align very slightly.
             lenToAlloc = (lenToAlloc + 3) & 0xfffffffc;
@@ -377,7 +377,7 @@ namespace mongo {
     }
 
     int n_complaints_cap = 0;
-    void NamespaceDetails::maybeComplain( const char *ns, int len ) const {
+    void NamespaceDetails::maybeComplain( const StringData& ns, int len ) const {
         if ( ++n_complaints_cap < 8 ) {
             out() << "couldn't make room for new record (len: " << len << ") in capped ns " << ns << '\n';
             int i = 0;
@@ -395,7 +395,7 @@ namespace mongo {
     }
 
     /* alloc with capped table handling. */
-    DiskLoc NamespaceDetails::_alloc(const char *ns, int len) {
+    DiskLoc NamespaceDetails::_alloc(const StringData& ns, int len) {
         if ( ! isCapped() )
             return __stdAlloc(len, false);
 
@@ -477,11 +477,6 @@ namespace mongo {
         return *id;
     }
 
-    /* you MUST call when adding an index.  see pdfile.cpp */
-    void NamespaceDetails::addIndex() {
-        (*getDur().writing(&_nIndexes))++;
-    }
-
     // must be called when renaming a NS to fix up extra
     void NamespaceDetails::copyingFrom(const char *thisns, NamespaceDetails *src) {
         _extraOffset = 0; // we are a copy -- the old value is wrong.  fixing it up below.
@@ -518,6 +513,12 @@ namespace mongo {
     }
 
     long long NamespaceDetails::storageSize( int * numExtents , BSONArrayBuilder * extentInfo ) const {
+        if ( _firstExtent.isNull() ) {
+            if ( numExtents )
+                *numExtents = 0;
+            return 0;
+        }
+
         Extent * e = _firstExtent.ext();
         verify( e );
 
@@ -721,21 +722,6 @@ namespace mongo {
         return static_cast<int>(minRecordSize * _paddingFactor);
     }
 
-    NamespaceDetails::IndexBuildBlock::IndexBuildBlock( const string& ns, const string& indexName )
-        : _ns( ns ), _indexName( indexName ) {
-
-        NamespaceDetails* nsd = nsdetails( _ns );
-        verify( nsd );
-        getDur().writingInt( nsd->_indexBuildsInProgress ) += 1;
-    }
-
-    NamespaceDetails::IndexBuildBlock::~IndexBuildBlock() {
-        NamespaceDetails* nsd = nsdetails( _ns );
-        if ( nsd ) {
-            getDur().writingInt( nsd->_indexBuildsInProgress ) -= 1;
-        }
-    }
-
     /* remove bit from a bit array - actually remove its slot, not a clear
        note: this function does not work with x == 63 -- that is ok
              but keep in mind in the future if max indexes were extended to
@@ -748,33 +734,10 @@ namespace mongo {
             ((tmp >> (x+1)) << x);
     }
 
-    void NamespaceDetails::removeIndex( int idxNumber ) {
-        verify( idxNumber >= 0 );
-        verify( idxNumber < _nIndexes );
-        verify( _indexBuildsInProgress == 0 );
-
-        /* note it is  important we remove the IndexDetails with this
-           call, otherwise, on recreate, the old one would be reused, and its
-           IndexDetails::info ptr would be bad info.
-        */
-
-        aboutToDeleteAnIndex();
-
-        _removeIndex( idxNumber );
-    }
-
-    void NamespaceDetails::_removeIndex( int idxNumber ) {
+    void NamespaceDetails::_removeIndexFromMe( int idxNumber ) {
 
         // TODO: don't do this whole thing, do it piece meal for readability
         NamespaceDetails* d = writingWithExtra();
-
-        IndexDetails *id = &d->idx(idxNumber);
-
-        string indexNamespace = id->indexNamespace();
-
-        audit::logDropIndex( currentClient.get(), indexNamespace, id->parentNS() );
-
-        id->kill_idx();
 
         // fix the _multiKeyIndexBits, by moving all bits above me down one
         d->_multiKeyIndexBits = removeAndSlideBit(d->_multiKeyIndexBits, idxNumber);
@@ -788,34 +751,6 @@ namespace mongo {
             d->idx(i) = d->idx(i+1);
 
         d->idx( getTotalIndexCount() ) = IndexDetails();
-
-        cc().database()->_clearCollectionCache( indexNamespace );
-    }
-
-    BSONObj NamespaceDetails::prepOneUnfinishedIndex() {
-        verify( _indexBuildsInProgress > 0 );
-
-        // details.info is always a valid system.indexes entry because DataFileMgr::insert journals
-        // creating the index doc and then insert_makeIndex durably assigns its DiskLoc to info.
-        // indexBuildsInProgress is set after that, so if it is set, info must be set.
-        int offset = getTotalIndexCount() - 1;
-
-        BSONObj info = idx(offset).info.obj().getOwned();
-
-        _removeIndex( offset );
-
-        return info;
-    }
-
-    void NamespaceDetails::blowAwayInProgressIndexEntries() {
-        int inProg = _indexBuildsInProgress;
-
-        getDur().writingInt(_indexBuildsInProgress) = 0;
-
-        for (int i = 0; i < inProg; i++) {
-            idx( _nIndexes + i ).kill_idx();
-        }
-
     }
 
     void NamespaceDetails::swapIndex( const char* ns, int a, int b ) {

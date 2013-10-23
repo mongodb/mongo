@@ -40,7 +40,7 @@
 #include "mongo/db/background.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/database_holder.h"
-#include "mongo/db/index.h"
+#include "mongo/db/storage/index_details.h"
 #include "mongo/db/index_update.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/introspect.h"
@@ -108,6 +108,7 @@ namespace mongo {
           _extentManager(_name, _path, 0, storageGlobalParams.directoryperdb),
           _profileName(_name + ".system.profile"),
           _namespacesName(_name + ".system.namespaces"),
+          _indexesName(_name + ".system.indexes"),
           _extentFreelistName( _name + ".$freelist" ),
           _collectionLock( "Database::_collectionLock" )
     {
@@ -296,26 +297,23 @@ namespace mongo {
 
         audit::logDropCollection( currentClient.get(), fullns );
 
-        if ( collection->_details->getTotalIndexCount() > 0 ) {
-            try {
-                string errmsg;
-                BSONObjBuilder result;
-
-                if ( !dropIndexes( collection->_details, fullns, "*", errmsg, result, true) ) {
-                    warning() << "could not drop collection: " << fullns
-                              << " because of " << errmsg << endl;
-                    return Status( ErrorCodes::InternalError, errmsg );
-                }
+        try {
+            Status s = collection->getIndexCatalog()->dropAllIndexes( true );
+            if ( !s.isOK() ) {
+                warning() << "could not drop collection, trying to drop indexes"
+                          << fullns << " because of " << s.toString();
+                return s;
             }
-            catch( DBException& e ) {
-                stringstream ss;
-                ss << "drop: dropIndexes for collection failed - consider trying repair ";
-                ss << " cause: " << e.what();
-                warning() << ss.str() << endl;
-                return Status( ErrorCodes::InternalError, ss.str() );
-            }
-            verify( collection->_details->getTotalIndexCount() == 0 );
         }
+        catch( DBException& e ) {
+            stringstream ss;
+            ss << "drop: dropIndexes for collection failed - consider trying repair ";
+            ss << " cause: " << e.what();
+            warning() << ss.str() << endl;
+            return Status( ErrorCodes::InternalError, ss.str() );
+        }
+
+        verify( collection->_details->getTotalIndexCount() == 0 );
         LOG(1) << "\t dropIndexes done" << endl;
 
         ClientCursor::invalidate( fullns );
