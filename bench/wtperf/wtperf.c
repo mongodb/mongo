@@ -758,14 +758,6 @@ execute_workload(CONFIG *cfg)
 	last_inserts = last_reads = last_updates = 0;
 	ret = 0;
 
-	/* Sanity check run time and reporting interval. */
-	if (cfg->run_time == 0) {
-		lprintf(cfg, WT_ERROR, 0, "Run-time not set.");
-		return (WT_ERROR);
-	}
-	if (cfg->report_interval > cfg->run_time || cfg->report_interval == 0)
-		cfg->report_interval = cfg->run_time;
-
 	lprintf(cfg, 0, 1,
 	    "Starting workload threads: read %d, insert %d, update %d",
 	    cfg->read_threads, cfg->insert_threads, cfg->update_threads);
@@ -1070,6 +1062,18 @@ main(int argc, char *argv[])
 					/* Remove the test directory. */
 	if ((ret = remove_all(opt_home, 1)) != 0)
 		goto err;
+
+	/* Sanity check run time and reporting interval. */
+	if (cfg.run_time == 0) {
+		fprintf(stderr, "run-time not configured.\n");
+		ret = EINVAL;
+		goto err;
+	}
+	if (cfg.report_interval > cfg.run_time) {
+		fprintf(stderr, "report-interval larger than the run-time.n");
+		ret = EINVAL;
+		goto err;
+	}
 
 	if (cfg.verbose > 1)		/* Display the configuration. */
 		print_config(&cfg);
