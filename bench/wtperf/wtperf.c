@@ -213,7 +213,6 @@ const char *debug_tconfig = "";
  * g_nins_ops is used to track both insert count and assign keys, so use this
  * to track insert failures.
  */
-uint64_t g_nfailedins_ops; 
 uint64_t g_nins_ops;
 uint64_t g_npop_ops;
 uint64_t g_nread_ops;
@@ -377,10 +376,6 @@ worker(CONFIG *cfg, uint32_t worker_type)
 				lprintf(cfg, op_ret, 0,
 				    "%s failed for: %s, range: %"PRIu64,
 				    op_name, key_buf, wtperf_value_range(cfg));
-
-			if (worker_type == WORKER_INSERT ||
-			    worker_type == WORKER_INSERT_RMW)
-				++g_nfailedins_ops;
 		} else {
 			if (worker_type == WORKER_READ)
 				++g_nread_ops;
