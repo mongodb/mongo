@@ -21,6 +21,7 @@ typedef struct {
 
 	size_t file_alloc;
 	u_int max_fileid, nfiles;
+	int modified;
 
 	int metadata_only;
 } WT_RECOVERY;
@@ -200,6 +201,8 @@ __txn_op_apply(
 	WT_ILLEGAL_VALUE_ERR(session);
 	}
 
+	r->modified = 1;
+
 err:	if (ret != 0)
 		__wt_err(session, ret,
 		    "Operation failed during recovery");
@@ -369,6 +372,7 @@ __wt_txn_recover(WT_SESSION_IMPL *default_session)
 	WT_RECOVERY r;
 	WT_SESSION_IMPL *session;
 	const char *config;
+	int modified;
 
 	conn = S2C(default_session);
 	WT_CLEAR(r);
@@ -406,9 +410,18 @@ __wt_txn_recover(WT_SESSION_IMPL *default_session)
 
 	conn->next_file_id = r.max_fileid;
 
-err:	__recovery_free(&r);
+err:	modified = r.modified;
+	__recovery_free(&r);
 	__wt_free(session, config);
 	WT_TRET(session->iface.close(&session->iface, NULL));
+
+	/*
+	 * If recovery ran successfully and modified something, log a
+	 * checkpoint.
+	 */
+	if (ret == 0 && modified)
+		ret = __wt_txn_checkpoint_log(
+		    default_session, 1, WT_TXN_LOG_CKPT_STOP, NULL);
 
 	return (ret);
 }
