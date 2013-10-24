@@ -231,8 +231,11 @@ int g_util_running;		/* utility threads are running */
 /*
  * Atomic update where needed.
  */
-#define	ATOMIC_ADD(v, val)						\
-	__sync_add_and_fetch(&(v), val)
+#if defined(_lint)
+#define	ATOMIC_ADD(v, val)	((v) += (val), (v))
+#else
+#define	ATOMIC_ADD(v, val)	__sync_add_and_fetch(&(v), val)
+#endif
 
 /* Retrieve an ID for the next populate operation. */
 static inline uint64_t
@@ -952,7 +955,7 @@ main(int argc, char *argv[])
 		case '?':
 			fprintf(stderr, "Invalid option\n");
 			usage();
-			return (EINVAL);
+			goto einval;
 		}
 
 	opt_home = malloc(strlen(cfg.home) + strlen(wtperftmp_subdir) + 1);
@@ -991,24 +994,24 @@ main(int argc, char *argv[])
 	while ((ch = getopt(argc, argv, opts)) != EOF)
 		switch (ch) {
 		case 'S':
-			if (config_opt_line(&cfg,
-				parse_session, small_config_str) != 0)
-				return (EINVAL);
+			if (config_opt_line(
+			    &cfg, parse_session, small_config_str) != 0)
+				goto einval;
 			break;
 		case 'M':
-			if (config_opt_line(&cfg,
-				parse_session, med_config_str) != 0)
-				return (EINVAL);
+			if (config_opt_line(
+			    &cfg, parse_session, med_config_str) != 0)
+				goto einval;
 			break;
 		case 'L':
-			if (config_opt_line(&cfg,
-				parse_session, large_config_str) != 0)
-				return (EINVAL);
+			if (config_opt_line(
+			    &cfg, parse_session, large_config_str) != 0)
+				goto einval;
 			break;
 		case 'O':
-			if (config_opt_file(&cfg,
-				parse_session, optarg) != 0)
-				return (EINVAL);
+			if (config_opt_file(
+			    &cfg, parse_session, optarg) != 0)
+				goto einval;
 			break;
 		default:
 			/* Validation done previously. */
@@ -1022,7 +1025,7 @@ main(int argc, char *argv[])
 		case 'o':
 			/* Allow -o key=value */
 			if (config_opt_line(&cfg, parse_session, optarg) != 0)
-				return (EINVAL);
+				goto einval;
 			break;
 		case 'C':
 			user_cconfig = optarg;
@@ -1178,6 +1181,9 @@ main(int argc, char *argv[])
 		lprintf(&cfg, 0, 1,
 		    "Executed %" PRIu64 " update operations", g_nupdate_ops);
 
+	if (0) {
+einval:		ret = EINVAL;
+	}
 err:	g_util_running = 0;
 	if (parse_session != NULL)
 		assert(parse_session->close(parse_session, NULL) == 0);
@@ -1691,6 +1697,9 @@ int
 setup_log_file(CONFIG *cfg)
 {
 	char *fname;
+	int ret;
+
+	ret = 0;
 
 	if (cfg->verbose < 1 && cfg->stat_interval == 0)
 		return (0);
@@ -1703,12 +1712,13 @@ setup_log_file(CONFIG *cfg)
 	sprintf(fname, "%s/%s.stat", cfg->home, cfg->table_name);
 	if ((cfg->logf = fopen(fname, "w")) == NULL) {
 		fprintf(stderr, "Statistics failed to open log file.\n");
-		return (EINVAL);
+		ret = EINVAL;
+	} else {
+		/* Use line buffering for the log file. */
+		(void)setvbuf(cfg->logf, NULL, _IOLBF, 0);
 	}
-	/* Use line buffering for the log file. */
-	(void)setvbuf(cfg->logf, NULL, _IOLBF, 0);
 	free(fname);
-	return (0);
+	return (ret);
 }
 
 void
@@ -1731,6 +1741,7 @@ wtperf_rand(CONFIG *cfg)
 {
 	double S1, S2, U;
 	uint64_t rval = (uint64_t)rand();
+
 	/* Use Pareto distribution to give 80/20 hot/cold values. */
 	if (F_ISSET(cfg, PERF_RAND_PARETO)) {
 #define	PARETO_SHAPE	1.5
