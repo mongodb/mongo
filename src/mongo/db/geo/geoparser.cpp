@@ -190,6 +190,13 @@ namespace mongo {
             holeLoop.Normalize();
             if (!holeLoop.IsValid()) { return false; }
             if (!holeLoop.is_hole()) {
+                if (!exteriorLoop.Contains(&holeLoop)) { return false; }
+                holeLoop.Invert();
+            } else {
+                // It's already clockwise; we need to invert once to check that it's contained in
+                // the shell, then invert again.
+                holeLoop.Invert();
+                if (!exteriorLoop.Contains(&holeLoop)) { return false; }
                 holeLoop.Invert();
             }
             polyBuilder.AddLoop(&holeLoop);
