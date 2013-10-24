@@ -72,7 +72,6 @@ struct __wt_cache {
 	uint32_t evict_slots;		/* LRU list eviction slots */
 	const void
 		*evict_file_next;	/* LRU next file to search */
-	uint32_t force_entries;		/* Forced eviction page count */
 
 	/*
 	 * Sync/flush request information.
