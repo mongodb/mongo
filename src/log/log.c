@@ -31,13 +31,50 @@ __wt_log_ckpt(WT_SESSION_IMPL *session, WT_LSN *ckp_lsn)
  *	Retrieve the list of all existing log files.
  */
 int
-__wt_log_getfiles(WT_SESSION_IMPL *session, char ***files, u_int *count)
+__wt_log_get_files(WT_SESSION_IMPL *session, char ***filesp, u_int *countp)
 {
 	WT_CONNECTION_IMPL *conn;
 
 	conn = S2C(session);
 	return (__wt_dirlist(session, conn->log_path, WT_LOG_FILENAME,
-	    WT_DIRLIST_INCLUDE, files, count));
+	    WT_DIRLIST_INCLUDE, filesp, countp));
+}
+
+/*
+ * __wt_log_getfiles --
+ *	Retrieve the list of all existing log files.
+ */
+int
+__wt_log_get_active_files(
+	WT_SESSION_IMPL *session, char ***filesp, u_int *countp)
+{
+	WT_DECL_RET;
+	WT_LOG *log;
+	char **files;
+	uint32_t id;
+	u_int count, i;
+
+	log = S2C(session)->log;
+
+	WT_RET(__wt_log_get_files(session, &files, &count));
+
+	/* Filter out any files that are below the checkpoint LSN. */
+	for (i = 0; i < count; ) {
+		WT_ERR(__wt_log_extract_lognum(session, files[i], &id));
+		if (id < log->ckpt_lsn.file) {
+			files[i] = files[count - 1];
+			files[--count] = NULL;
+		} else
+			i++;
+	}
+
+	*filesp = files;
+	*countp = count;
+
+	if (0) {
+err:		__wt_log_files_free(session, files, count);
+	}
+	return (ret);
 }
 
 /*
@@ -158,7 +195,7 @@ __wt_log_open(WT_SESSION_IMPL *session)
 	lastlog = 0;
 	firstlog = UINT32_MAX;
 
-	WT_RET(__wt_log_getfiles(session, &logfiles, &logcount));
+	WT_RET(__wt_log_get_files(session, &logfiles, &logcount));
 	for (i = 0; i < logcount; i++) {
 		WT_ERR(__wt_log_extract_lognum(session, logfiles[i], &lognum));
 		lastlog = WT_MAX(lastlog, lognum);
@@ -181,8 +218,7 @@ __wt_log_open(WT_SESSION_IMPL *session)
 	 * XXX belongs at a higher level than this.
 	 */
 	if (logcount > 0) {
-		log->trunc_lsn.file = log->alloc_lsn.file;
-		log->trunc_lsn.offset = 0;
+		log->trunc_lsn = log->alloc_lsn;
 		WT_ERR(__wt_txn_recover(session));
 	}
 
@@ -238,7 +274,7 @@ __log_fill(WT_SESSION_IMPL *session,
 		memcpy((char *)myslot->slot->slot_buf.mem + myslot->offset,
 		    logrec, logrec->len);
 
-	WT_CSTAT_INCRV(session, log_bytes_written, logrec->len);
+	WT_STAT_FAST_CONN_INCRV(session, log_bytes_written, logrec->len);
 	if (lsnp != NULL) {
 		*lsnp = myslot->slot->slot_start_lsn;
 		lsnp->offset += (off_t)myslot->offset;
@@ -277,7 +313,7 @@ __log_truncate(WT_SESSION_IMPL *session, WT_LSN *lsn, uint32_t this_log)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
-	WT_FH *log_fh;
+	WT_FH *log_fh, *tmp_fh;
 	WT_LOG *log;
 	uint32_t lognum;
 	u_int i, logcount;
@@ -293,13 +329,17 @@ __log_truncate(WT_SESSION_IMPL *session, WT_LSN *lsn, uint32_t this_log)
 	 */
 	WT_ERR(__log_openfile(session, 0, &log_fh, lsn->file));
 	WT_ERR(__wt_ftruncate(session, log_fh, lsn->offset));
+	tmp_fh = log_fh;
+	log_fh = NULL;
+	WT_ERR(__wt_close(session, tmp_fh));
+
 	/*
 	 * If we just want to truncate the current log, return and skip
 	 * looking for intervening logs.
 	 */
 	if (this_log)
 		goto err;
-	WT_ERR(__wt_log_getfiles(session, &logfiles, &logcount));
+	WT_ERR(__wt_log_get_files(session, &logfiles, &logcount));
 	for (i = 0; i < logcount; i++) {
 		WT_ERR(__wt_log_extract_lognum(session, logfiles[i], &lognum));
 		if (lognum > lsn->file && lognum < log->trunc_lsn.file) {
@@ -310,7 +350,9 @@ __log_truncate(WT_SESSION_IMPL *session, WT_LSN *lsn, uint32_t this_log)
 			 */
 			WT_ERR(__wt_ftruncate(session,
 			    log_fh, LOG_FIRST_RECORD));
-			WT_ERR(__wt_close(session, log_fh));
+			tmp_fh = log_fh;
+			log_fh = NULL;
+			WT_ERR(__wt_close(session, tmp_fh));
 		}
 	}
 err:	if (log_fh != NULL)
@@ -441,7 +483,7 @@ __log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 	while (LOG_CMP(&log->write_lsn, &slot->slot_release_lsn) != 0)
 		__wt_yield();
 	if (F_ISSET(slot, SLOT_SYNC)) {
-		WT_CSTAT_INCR(session, log_sync);
+		WT_STAT_FAST_CONN_INCR(session, log_sync);
 		WT_ERR(__wt_fsync(session, log->log_fh));
 		F_CLR(slot, SLOT_SYNC);
 		log->sync_lsn = slot->slot_end_lsn;
@@ -608,7 +650,7 @@ __wt_log_read(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 		goto err;
 	}
 	record->size = logrec->len;
-	WT_CSTAT_INCR(session, log_reads);
+	WT_STAT_FAST_CONN_INCR(session, log_reads);
 err:
 	WT_TRET(__wt_close(session, log_fh));
 	return (ret);
@@ -636,6 +678,8 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 	/*
 	 * Check for correct usage.
 	 */
+	if (log == NULL)
+		return (ENOTSUP);
 	if (LF_ISSET(WT_LOGSCAN_FIRST|WT_LOGSCAN_FROM_CKP) && lsnp != NULL)
 		return (WT_ERROR);
 	/*
@@ -726,7 +770,7 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 			WT_ERR(__wt_buf_grow(session, &buf, rdup_len));
 			WT_ERR(__wt_read(
 			    session, log_fh, rd_lsn.offset, reclen, buf.mem));
-			WT_CSTAT_INCR(session, log_scan_rereads);
+			WT_STAT_FAST_CONN_INCR(session, log_scan_rereads);
 		}
 		/*
 		 * We read in the record, verify checksum.
@@ -748,11 +792,11 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
 		if (rd_lsn.offset != 0)
 			WT_ERR((*func)(session, &buf, &rd_lsn, cookie));
 
-		WT_CSTAT_INCR(session, log_scan_records);
+		WT_STAT_FAST_CONN_INCR(session, log_scan_records);
 		rd_lsn.offset += (off_t)rdup_len;
 	} while (!done);
 
-err:	WT_CSTAT_INCR(session, log_scans);
+err:	WT_STAT_FAST_CONN_INCR(session, log_scans);
 	__wt_buf_free(session, &buf);
 	if (ret == ENOENT)
 		ret = 0;
@@ -824,7 +868,7 @@ __wt_log_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 	 * that we can write the full amount.  Do this whether or not
 	 * direct_io is in use because it makes the reading code cleaner.
 	 */
-	WT_CSTAT_INCRV(session, log_bytes_user, record->size);
+	WT_STAT_FAST_CONN_INCRV(session, log_bytes_user, record->size);
 	rdup_len = __wt_rduppo2(record->size, log->allocsize);
 	WT_ERR(__wt_buf_grow(session, record, rdup_len));
 	WT_ASSERT(session, record->data == record->mem);
@@ -842,7 +886,7 @@ __wt_log_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 	logrec->checksum = 0;
 	logrec->checksum = __wt_cksum(logrec, record->size);
 
-	WT_CSTAT_INCR(session, log_writes);
+	WT_STAT_FAST_CONN_INCR(session, log_writes);
 
 	if (!F_ISSET(log, WT_LOG_FORCE_CONSOLIDATE)) {
 		ret = __log_direct_write(session, record, lsnp, flags);

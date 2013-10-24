@@ -42,7 +42,7 @@ __logmgr_config(WT_SESSION_IMPL *session, const char **cfg, int *runp)
 
 	WT_RET(__wt_config_gets(session, cfg, "log.file_max", &cval));
 	conn->log_file_max = (off_t)cval.val;
-	WT_CSTAT_SET(session, log_max_filesize, conn->log_file_max);
+	WT_STAT_FAST_CONN_SET(session, log_max_filesize, conn->log_file_max);
 
 	WT_RET(__wt_config_gets(session, cfg, "log.path", &cval));
 	WT_RET(__wt_strndup(session, cval.str, cval.len, &conn->log_path));
@@ -245,11 +245,10 @@ __wt_logmgr_destroy(WT_CONNECTION_IMPL *conn)
 
 	__wt_free(session, conn->log_path);
 
-	/* Close the server thread's session, free its hazard array. */
+	/* Close the server thread's session. */
 	if (conn->arch_session != NULL) {
 		wt_session = &conn->arch_session->iface;
 		WT_TRET(wt_session->close(wt_session, NULL));
-		__wt_free(session, conn->arch_session->hazard);
 		conn->arch_session = NULL;
 	}
 	__wt_spin_destroy(session, &log->log_lock);

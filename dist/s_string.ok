@@ -566,6 +566,7 @@ logf
 logmgr
 lognum
 logput
+logread
 lookup
 lookups
 lr

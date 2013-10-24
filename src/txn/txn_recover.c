@@ -17,8 +17,11 @@ typedef struct {
 		WT_LSN ckpt_lsn;
 	} *files;
 
+	WT_LSN ckpt_lsn;
+
 	size_t file_alloc;
 	u_int max_fileid, nfiles;
+	int modified;
 
 	int metadata_only;
 } WT_RECOVERY;
@@ -107,21 +110,16 @@ __txn_op_apply(
 			break;
 
 		/* Set up the cursors. */
-		start = stop = NULL;
-		switch (mode) {
-		case 1:
+		if (start_recno == 0) {
+			start = NULL;
 			stop = cursor;
-			break;
-		case 2:
+		} else if (stop_recno == 0) {
 			start = cursor;
-			break;
-		case 3:
+			stop = NULL;
+		} else {
 			start = cursor;
 			WT_ERR(__recovery_cursor(
 			    session, r, lsnp, fileid, 1, &stop));
-			break;
-
-		WT_ILLEGAL_VALUE_ERR(session);
 		}
 
 		/* Set the keys. */
@@ -132,7 +130,8 @@ __txn_op_apply(
 
 		WT_TRET(session->iface.truncate(&session->iface, NULL,
 		    start, stop, NULL));
-		if (mode == 3)
+		/* If we opened a duplicate cursor, close it now. */
+		if (stop != NULL && stop != cursor)
 			WT_TRET(stop->close(stop));
 		WT_ERR(ret);
 		break;
@@ -190,13 +189,16 @@ __txn_op_apply(
 
 		WT_TRET(session->iface.truncate(&session->iface, NULL,
 		    start, stop, NULL));
-		if (mode == 3)
+		/* If we opened a duplicate cursor, close it now. */
+		if (stop != NULL && stop != cursor)
 			WT_TRET(stop->close(stop));
 		WT_ERR(ret);
 		break;
 
 	WT_ILLEGAL_VALUE_ERR(session);
 	}
+
+	r->modified = 1;
 
 err:	if (ret != 0)
 		__wt_err(session, ret,
@@ -225,9 +227,12 @@ static int
 __txn_log_recover(
     WT_SESSION_IMPL *session, WT_ITEM *logrec, WT_LSN *lsnp, void *cookie)
 {
+	WT_RECOVERY *r;
 	const uint8_t *end, *p;
+	uint64_t txnid;
 	uint32_t rectype;
 
+	r = cookie;
 	p = (const uint8_t *)logrec->data + offsetof(WT_LOG_RECORD, record);
 	end = (const uint8_t *)logrec->data + logrec->size;
 
@@ -235,8 +240,16 @@ __txn_log_recover(
 	WT_RET(__wt_logrec_read(session, &p, end, &rectype));
 
 	switch (rectype) {
+	case WT_LOGREC_CHECKPOINT:
+		if (r->metadata_only)
+			WT_RET(__wt_txn_checkpoint_logread(
+			    session, &p, end, &r->ckpt_lsn));
+		break;
+
 	case WT_LOGREC_COMMIT:
-		WT_RET(__txn_commit_apply(cookie, lsnp, &p, end));
+		WT_RET(__wt_vunpack_uint(&p, WT_PTRDIFF(end, p), &txnid));
+		WT_UNUSED(txnid);
+		WT_RET(__txn_commit_apply(r, lsnp, &p, end));
 		break;
 	}
 
@@ -248,8 +261,7 @@ __txn_log_recover(
  *	Set up the recovery slot for a file.
  */
 static int
-__recovery_setup_file(WT_RECOVERY *r,
-    const char *uri, const char *config, WT_LSN *start_lsnp)
+__recovery_setup_file(WT_RECOVERY *r, const char *uri, const char *config)
 {
 	WT_CONFIG_ITEM cval;
 	WT_LSN lsn;
@@ -275,10 +287,7 @@ __recovery_setup_file(WT_RECOVERY *r,
 		WT_RET_MSG(r->session, EINVAL,
 		    "Failed to parse checkpoint LSN '%.*s'",
 		    (int)cval.len, cval.str);
-
 	r->files[fileid].ckpt_lsn = lsn;
-	if (LOG_CMP(&lsn, start_lsnp) < 0)
-		*start_lsnp = lsn;
 
 	WT_VERBOSE_RET(r->session, recovery,
 	    "Recovering %s with id %u @ (%" PRIu32 ", %" PRIu64 ")",
@@ -317,7 +326,7 @@ __recovery_free(WT_RECOVERY *r)
  *	about them for recovery.
  */
 static int
-__recovery_file_scan(WT_RECOVERY *r, WT_LSN *start_lsnp)
+__recovery_file_scan(WT_RECOVERY *r)
 {
 	WT_DECL_RET;
 	WT_CURSOR *c;
@@ -340,7 +349,7 @@ __recovery_file_scan(WT_RECOVERY *r, WT_LSN *start_lsnp)
 		if (!WT_PREFIX_MATCH(uri, "file:"))
 			break;
 		WT_ERR(c->get_value(c, &config));
-		WT_ERR(__recovery_setup_file(r, uri, config, start_lsnp));
+		WT_ERR(__recovery_setup_file(r, uri, config));
 	}
 	WT_ERR_NOTFOUND_OK(ret);
 
@@ -357,13 +366,14 @@ __wt_txn_recover(WT_SESSION_IMPL *default_session)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
-	WT_LSN start_lsn;
 	WT_RECOVERY r;
 	WT_SESSION_IMPL *session;
 	const char *config;
+	int modified;
 
 	conn = S2C(default_session);
 	WT_CLEAR(r);
+	INIT_LSN(&r.ckpt_lsn);
 
 	/* We need a real session for recovery. */
 	WT_RET(__wt_open_session(conn, 0, NULL, NULL, &session));
@@ -371,50 +381,44 @@ __wt_txn_recover(WT_SESSION_IMPL *default_session)
 	r.session = session;
 
 	WT_ERR(__wt_metadata_search(session, WT_METADATA_URI, &config));
-	MAX_LSN(&start_lsn);
-	WT_ERR(__recovery_setup_file(&r, WT_METADATA_URI, config, &start_lsn));
+	WT_ERR(__recovery_setup_file(&r, WT_METADATA_URI, config));
 	WT_ERR(__wt_metadata_cursor(session, NULL, &r.files[0].c));
 
 	/*
-	 * TODO: find the last checkpoint log record.
-	 *
-	 * Problem: if the metadata was written after the last checkpoint, it
-	 * won't have the last checkpoint LSN...
-	 *
-	 * TODO: extract the snapshot from the checkpoint log record, set
-	 * up txn->snapshot and set isolation == TXN_ISO_SNAPSHOT.
-	 *
-	 * TODO: add a visibility check before applying commits.
-	 */
-
-	/*
-	 * First, recover the metadata, starting from the checkpoint's LSN.
-	 * Pass WT_LOGSCAN_RECOVER so that old logs get truncated.
+	 * First, do a full pass through the log to recover the metadata,
+	 * and establish the last checkpoint LSN.  Pass WT_LOGSCAN_RECOVER so
+	 * that old logs get truncated.
 	 */
 	r.metadata_only = 1;
-#if 0
-	WT_ERR(__wt_log_scan(
-	    session, &start_lsn, WT_LOGSCAN_RECOVER, __txn_log_recover, &r));
-#else
-	WT_ERR(__wt_log_scan(session, &start_lsn, 0, __txn_log_recover, &r));
-#endif
+	ret = __wt_log_scan(
+	    session, NULL, WT_LOGSCAN_FIRST, __txn_log_recover, &r);
+	WT_ASSERT(session, ret == 0);
 
-	WT_ERR(__recovery_file_scan(&r, &start_lsn));
+	WT_ASSERT(session, LOG_CMP(&r.ckpt_lsn, &conn->log->first_lsn) >= 0);
+
+	ret = __recovery_file_scan(&r);
+	WT_ASSERT(session, ret == 0);
 
 	/* Now, recover all the files apart from the metadata. */
 	r.metadata_only = 0;
-	if (IS_INIT_LSN(&start_lsn))
-		WT_ERR(__wt_log_scan(
-		    session, NULL, WT_LOGSCAN_FIRST, __txn_log_recover, &r));
-	else
-		WT_ERR(__wt_log_scan(
-		    session, &start_lsn, 0, __txn_log_recover, &r));
+	ret = __wt_log_scan(
+	    session, &r.ckpt_lsn, WT_LOGSCAN_RECOVER, __txn_log_recover, &r);
+	WT_ASSERT(session, ret == 0);
 
 	conn->next_file_id = r.max_fileid;
 
-err:	__recovery_free(&r);
+err:	modified = r.modified;
+	__recovery_free(&r);
 	__wt_free(session, config);
 	WT_TRET(session->iface.close(&session->iface, NULL));
+
+	/*
+	 * If recovery ran successfully and modified something, log a
+	 * checkpoint.
+	 */
+	if (ret == 0 && modified)
+		ret = __wt_txn_checkpoint_log(
+		    default_session, 1, WT_TXN_LOG_CKPT_STOP, NULL);
 
 	return (ret);
 }

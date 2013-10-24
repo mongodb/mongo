@@ -7,6 +7,7 @@
 
 #include "wt_internal.h"
 
+static int __conn_statistics_config(WT_SESSION_IMPL *, const char *[]);
 static int __conn_verbose_config(WT_SESSION_IMPL *, const char *[]);
 
 /*
@@ -511,9 +512,6 @@ __conn_close(WT_CONNECTION *wt_conn, const char *config)
 			wt_session = &s->iface;
 			WT_TRET(wt_session->close(wt_session, config));
 		}
-	for (s = conn->sessions, i = 0; i < conn->session_size; ++s, ++i)
-		if (!F_ISSET(s, WT_SESSION_INTERNAL))
-			__wt_free(session, s->hazard);
 
 	WT_TRET(__wt_connection_close(conn));
 
@@ -530,7 +528,6 @@ err:	API_END_NOTFOUND_MAP(session, ret);
 static int
 __conn_reconfigure(WT_CONNECTION *wt_conn, const char *config)
 {
-	WT_CONFIG_ITEM cval;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
@@ -547,18 +544,10 @@ __conn_reconfigure(WT_CONNECTION *wt_conn, const char *config)
 
 	CONNECTION_API_CALL(conn, session, reconfigure, config, cfg);
 
-	/* Turning on statistics clears any existing values. */
-	if ((ret =
-	    __wt_config_gets(session, raw_cfg, "statistics", &cval)) == 0) {
-		conn->statistics = cval.val == 0 ? 0 : 1;
-		if (conn->statistics)
-			__wt_stat_refresh_connection_stats(&conn->stats);
-	}
-	WT_ERR_NOTFOUND_OK(ret);
-
 	WT_ERR(__wt_conn_cache_pool_config(session, cfg));
 	WT_ERR(__wt_cache_config(conn, raw_cfg));
 
+	WT_ERR(__conn_statistics_config(session, raw_cfg));
 	WT_ERR(__conn_verbose_config(session, raw_cfg));
 
 	/* Wake up the cache pool server so any changes are noticed. */
@@ -896,6 +885,57 @@ err:	if (conn->lock_fh != NULL) {
 }
 
 /*
+ * __conn_statistics_config --
+ *	Set statistics configuration.
+ */
+static int
+__conn_statistics_config(WT_SESSION_IMPL *session, const char *cfg[])
+{
+	WT_CONFIG_ITEM cval, sval;
+	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
+	int set;
+
+	conn = S2C(session);
+
+	if ((ret = __wt_config_gets(session, cfg, "statistics", &cval)) != 0)
+		return (ret == WT_NOTFOUND ? 0 : ret);
+
+	/* Configuring statistics clears any existing values. */
+	conn->stat_all = conn->stat_fast = conn->stat_clear = 0;
+
+	set = 0;
+	if ((ret = __wt_config_subgets(
+	    session, &cval, "none", &sval)) == 0 && sval.val != 0)
+		++set;
+	WT_RET_NOTFOUND_OK(ret);
+
+	if ((ret = __wt_config_subgets(
+	    session, &cval, "fast", &sval)) == 0 && sval.val != 0) {
+		++set;
+		conn->stat_fast = 1;
+	}
+	WT_RET_NOTFOUND_OK(ret);
+
+	if ((ret = __wt_config_subgets(
+	    session, &cval, "all", &sval)) == 0 && sval.val != 0) {
+		++set;
+		conn->stat_all = conn->stat_fast = 1;
+	}
+	WT_RET_NOTFOUND_OK(ret);
+
+	if ((ret = __wt_config_subgets(
+	    session, &cval, "clear", &sval)) == 0 && sval.val != 0)
+		conn->stat_clear = 1;
+	WT_RET_NOTFOUND_OK(ret);
+
+	if (set > 1)
+		WT_RET_MSG(session, EINVAL,
+		    "only one statistics configuration value may be specified");
+	return (0);
+}
+
+/*
  * __conn_verbose_config --
  *	Set verbose configuration.
  */
@@ -1112,8 +1152,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	WT_ERR(__wt_config_gets(session, cfg, "mmap", &cval));
 	conn->mmap = cval.val == 0 ? 0 : 1;
 
-	WT_ERR(__wt_config_gets(session, cfg, "statistics", &cval));
-	conn->statistics = cval.val == 0 ? 0 : 1;
+	WT_ERR(__conn_statistics_config(session, cfg));
 
 	/* Now that we know if verbose is configured, output the version. */
 	WT_VERBOSE_ERR(session, version, "%s", WIREDTIGER_VERSION_STRING);

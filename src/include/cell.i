@@ -648,12 +648,12 @@ __wt_cell_unpack(WT_CELL *cell, WT_CELL_UNPACK *unpack)
 }
 
 /*
- * __wt_cell_unpack_ref --
+ * __cell_data_ref --
  *	Set a buffer to reference the data from an unpacked cell.
  */
 static inline int
-__wt_cell_unpack_ref(
-    WT_SESSION_IMPL *session, int type, WT_CELL_UNPACK *unpack, WT_ITEM *store)
+__cell_data_ref(WT_SESSION_IMPL *session,
+    WT_PAGE *page, int page_type, WT_CELL_UNPACK *unpack, WT_ITEM *store)
 {
 	WT_BTREE *btree;
 	void *huffman;
@@ -665,7 +665,7 @@ __wt_cell_unpack_ref(
 	case WT_CELL_KEY:
 		store->data = unpack->data;
 		store->size = unpack->size;
-		if (type == WT_PAGE_ROW_INT)
+		if (page_type == WT_PAGE_ROW_INT)
 			return (0);
 
 		huffman = btree->huffman_key;
@@ -676,14 +676,14 @@ __wt_cell_unpack_ref(
 		huffman = btree->huffman_value;
 		break;
 	case WT_CELL_KEY_OVFL:
-		WT_RET(__wt_ovfl_read(session, unpack, store));
-		if (type == WT_PAGE_ROW_INT)
+		WT_RET(__wt_ovfl_read(session, page, unpack, store));
+		if (page_type == WT_PAGE_ROW_INT)
 			return (0);
 
 		huffman = btree->huffman_key;
 		break;
 	case WT_CELL_VALUE_OVFL:
-		WT_RET(__wt_ovfl_read(session, unpack, store));
+		WT_RET(__wt_ovfl_read(session, page, unpack, store));
 		huffman = btree->huffman_value;
 		break;
 	WT_ILLEGAL_VALUE(session);
@@ -695,12 +695,39 @@ __wt_cell_unpack_ref(
 }
 
 /*
- * __wt_cell_unpack_copy --
+ * __wt_dsk_cell_data_ref, __wt_page_cell_data_ref --
+ *	Set a buffer to reference the data from an unpacked cell, two flavors.
+ * There are two version because of WT_CELL_VALUE_OVFL_RM type cells.  When an
+ * overflow item is deleted, its backing blocks are removed; if there are still
+ * running transactions that might need to see the overflow item, we cache a
+ * copy of the item and reset the item's cell to WT_CELL_VALUE_OVFL_RM.  If we
+ * find a WT_CELL_VALUE_OVFL_RM cell when reading an overflow item, we use the
+ * page reference to look aside into the cache.  So, calling the "dsk" version
+ * of the function declares the cell cannot be of type WT_CELL_VALUE_OVFL_RM,
+ * and calling the "page" version means it might be.
+ */
+static inline int
+__wt_dsk_cell_data_ref(WT_SESSION_IMPL *session,
+    int page_type, WT_CELL_UNPACK *unpack, WT_ITEM *store)
+{
+	WT_ASSERT(session,
+	    __wt_cell_type_raw(unpack->cell) != WT_CELL_VALUE_OVFL_RM);
+	return (__cell_data_ref(session, NULL, page_type, unpack, store));
+}
+static inline int
+__wt_page_cell_data_ref(WT_SESSION_IMPL *session,
+    WT_PAGE *page, WT_CELL_UNPACK *unpack, WT_ITEM *store)
+{
+	return (__cell_data_ref(session, page, page->type, unpack, store));
+}
+
+/*
+ * __wt_cell_data_copy --
  *	Copy the data from an unpacked cell into a buffer.
  */
 static inline int
-__wt_cell_unpack_copy(
-    WT_SESSION_IMPL *session, int type, WT_CELL_UNPACK *unpack, WT_ITEM *store)
+__wt_cell_data_copy(WT_SESSION_IMPL *session,
+    int page_type, WT_CELL_UNPACK *unpack, WT_ITEM *store)
 {
 	/*
 	 * We have routines to both copy and reference a cell's information.  In
@@ -710,8 +737,11 @@ __wt_cell_unpack_copy(
 	 * a copy will be made (for example, when reading an overflow item from
 	 * the underlying object.  If that happens, we're done, otherwise make
 	 * a copy.
+	 *
+	 * We don't require two versions of this function, no callers need to
+	 * handle WT_CELL_VALUE_OVFL_RM cells.
 	 */
-	WT_RET(__wt_cell_unpack_ref(session, type, unpack, store));
+	WT_RET(__wt_dsk_cell_data_ref(session, page_type, unpack, store));
 	if (!WT_DATA_IN_ITEM(store))
 		WT_RET(__wt_buf_set(session, store, store->data, store->size));
 	return (0);

@@ -86,7 +86,7 @@ wts_open(const char *home, int set_api, WT_CONNECTION **connp)
 	    "%s,%s",
 	    g.c_cache,
 	    g.progname,
-	    g.c_statistics ? "statistics=true," : "",
+	    g.c_statistics ? "statistics=(fast)," : "statistics=(none)",
 	    g.c_data_extend ? "file_extend=(data=8MB)," : "",
 	    g.c_reverse ? REVERSE_PATH : "",
 	    access(BZIP_PATH, R_OK) == 0 ? BZIP_PATH : "",

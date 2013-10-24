@@ -204,7 +204,7 @@ __wt_conn_btree_sync_and_close(WT_SESSION_IMPL *session)
 
 	if (!F_ISSET(btree,
 	    WT_BTREE_SALVAGE | WT_BTREE_UPGRADE | WT_BTREE_VERIFY))
-		ret = __wt_checkpoint_close(session, NULL);
+		ret = __wt_checkpoint_close(session);
 
 	WT_TRET(__wt_btree_close(session));
 	F_CLR(dhandle, WT_DHANDLE_OPEN);
@@ -365,7 +365,7 @@ __conn_dhandle_sweep(WT_SESSION_IMPL *session)
 	 * is not free, we're done.  Cleaning up the list is a best effort only.
 	 */
 	if (__wt_spin_trylock(session, &conn->dhandle_lock) != 0) {
-		WT_CSTAT_INCR(session, dh_sweep_evict);
+		WT_STAT_FAST_CONN_INCR(session, dh_sweep_evict);
 		return (0);
 	}
 	/*
@@ -378,7 +378,7 @@ __conn_dhandle_sweep(WT_SESSION_IMPL *session)
 		dhandle_next = SLIST_NEXT(dhandle, l);
 		if (!F_ISSET(dhandle, WT_DHANDLE_OPEN) &&
 		    dhandle->refcnt == 0) {
-			WT_CSTAT_INCR(session, dh_conn_handles);
+			WT_STAT_FAST_CONN_INCR(session, dh_conn_handles);
 			SLIST_REMOVE(&conn->dhlh, dhandle, __wt_data_handle, l);
 			SLIST_INSERT_HEAD(&sweeplh, dhandle, l);
 		}

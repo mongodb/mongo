@@ -15,6 +15,7 @@ int
 __wt_connection_init(WT_CONNECTION_IMPL *conn)
 {
 	WT_SESSION_IMPL *session;
+	u_int i;
 
 	session = conn->default_session;
 
@@ -40,6 +41,11 @@ __wt_connection_init(WT_CONNECTION_IMPL *conn)
 	WT_RET(__wt_spin_init(session, &conn->fh_lock, "file list"));
 	WT_RET(__wt_spin_init(session, &conn->hot_backup_lock, "hot backup"));
 	WT_RET(__wt_spin_init(session, &conn->schema_lock, "schema"));
+	for (i = 0; i < WT_PAGE_LOCKS(conn); ++i) {
+		WT_RET(__wt_calloc_def(session, 1, &conn->page_lock[i]));
+		WT_RET(
+		    __wt_spin_init(session, conn->page_lock[i], "btree page"));
+	}
 
 	/*
 	 * Block manager.
@@ -62,6 +68,7 @@ __wt_connection_destroy(WT_CONNECTION_IMPL *conn)
 {
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
+	u_int i;
 
 	/* Check there's something to destroy. */
 	if (conn == NULL)
@@ -94,6 +101,10 @@ __wt_connection_destroy(WT_CONNECTION_IMPL *conn)
 	__wt_spin_destroy(session, &conn->fh_lock);
 	__wt_spin_destroy(session, &conn->hot_backup_lock);
 	__wt_spin_destroy(session, &conn->schema_lock);
+	for (i = 0; i < WT_PAGE_LOCKS(conn); ++i) {
+		__wt_spin_destroy(session, conn->page_lock[i]);
+		__wt_free(session, conn->page_lock[i]);
+	}
 
 	/* Free allocated memory. */
 	__wt_free(session, conn->home);

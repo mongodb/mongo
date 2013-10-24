@@ -224,7 +224,7 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 
 	/* Tell logging that we are about to start a database checkpoint. */
 	if (S2C(session)->logging && full)
-		WT_ERR(__wt_txn_log_checkpoint(
+		WT_ERR(__wt_txn_checkpoint_log(
 		    session, 1, WT_TXN_LOG_CKPT_PREPARE, NULL));
 
 	/* Start a snapshot transaction for the checkpoint. */
@@ -233,7 +233,7 @@ __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 
 	/* Tell logging that we have started a database checkpoint. */
 	if (S2C(session)->logging && full)
-		WT_ERR(__wt_txn_log_checkpoint(
+		WT_ERR(__wt_txn_checkpoint_log(
 		    session, 1, WT_TXN_LOG_CKPT_START, NULL));
 
 	WT_ERR(__checkpoint_apply(session, cfg, __wt_checkpoint, NULL));
@@ -297,7 +297,7 @@ err:	/*
 
 	/* Tell logging that we have finished a database checkpoint. */
 	if (S2C(session)->logging && full)
-		WT_TRET(__wt_txn_log_checkpoint(session, 1,
+		WT_TRET(__wt_txn_checkpoint_log(session, 1,
 		    (ret == 0) ? WT_TXN_LOG_CKPT_STOP : WT_TXN_LOG_CKPT_FAIL,
 		    NULL));
 
@@ -453,16 +453,6 @@ __checkpoint_worker(
 	hot_backup_locked = 0;
 	name_alloc = NULL;
 	track_ckpt = 1;
-
-	/*
-	 * Checkpoint handles are read-only by definition and don't participate
-	 * in checkpoints.   Closing one discards its blocks, otherwise there's
-	 * no work to do.
-	 */
-	if (dhandle->checkpoint != NULL)
-		return (is_checkpoint ? 0 :
-		    __wt_bt_cache_op(
-		    session, NULL, WT_SYNC_DISCARD_NOWRITE));
 
 	/*
 	 * If closing a file that's never been modified, discard its blocks.
@@ -732,7 +722,7 @@ __checkpoint_worker(
 
 	/* Tell logging that a file checkpoint is starting. */
 	if (S2C(session)->logging)
-		WT_ERR(__wt_txn_log_checkpoint(
+		WT_ERR(__wt_txn_checkpoint_log(
 		    session, 0, WT_TXN_LOG_CKPT_START, &ckptlsn));
 
 	/*
@@ -782,7 +772,7 @@ fake:	/* Update the object's metadata. */
 
 	/* Tell logging that the checkpoint is complete. */
 	if (S2C(session)->logging)
-		WT_ERR(__wt_txn_log_checkpoint(
+		WT_ERR(__wt_txn_checkpoint_log(
 		    session, 0, WT_TXN_LOG_CKPT_STOP, NULL));
 
 err:	if (hot_backup_locked)
@@ -799,6 +789,9 @@ skip:	__wt_meta_ckptlist_free(session, ckptbase);
 int
 __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
 {
+	/* Should not be called with a checkpoint handle. */
+	WT_ASSERT(session, session->dhandle->checkpoint == NULL);
+
 	return (__checkpoint_worker(session, cfg, 1));
 }
 
@@ -811,10 +804,12 @@ __wt_checkpoint_write_leaves(WT_SESSION_IMPL *session, const char *cfg[])
 {
 	WT_UNUSED(cfg);
 
-	if (S2BT(session)->modified)
-		WT_RET(__wt_bt_cache_op(session, NULL, WT_SYNC_WRITE_LEAVES));
+	/* Should not be called with a checkpoint handle. */
+	WT_ASSERT(session, session->dhandle->checkpoint == NULL);
 
-	return (0);
+	/* May not have been modified, in which case don't do the traversal. */
+	return (S2BT(session)->modified ?
+	    __wt_bt_cache_op(session, NULL, WT_SYNC_WRITE_LEAVES) : 0);
 }
 
 /*
@@ -824,26 +819,42 @@ __wt_checkpoint_write_leaves(WT_SESSION_IMPL *session, const char *cfg[])
 int
 __wt_checkpoint_sync(WT_SESSION_IMPL *session, const char *cfg[])
 {
-	WT_BTREE *btree;
+	WT_BM *bm;
 
 	WT_UNUSED(cfg);
-	btree = S2BT(session);
 
-	/* Only sync ordinary handles: checkpoint handles are read-only. */
-	if (btree->dhandle->checkpoint == NULL && btree->bm != NULL)
-		return (btree->bm->sync(btree->bm, session));
-	return (0);
+	bm = S2BT(session)->bm;
+
+	/* Should not be called with a checkpoint handle. */
+	WT_ASSERT(session, session->dhandle->checkpoint == NULL);
+
+	/* Should have an underlying block manager reference. */
+	WT_ASSERT(session, bm != NULL);
+
+	return (bm->sync(bm, session));
 }
 
 /*
  * __wt_checkpoint_close --
- *	Checkpoint a file as part of a close.
+ *	Checkpoint a single file as part of closing the handle.
  */
 int
-__wt_checkpoint_close(WT_SESSION_IMPL *session, const char *cfg[])
+__wt_checkpoint_close(WT_SESSION_IMPL *session)
 {
-	WT_RET(__checkpoint_worker(session, cfg, 0));
+	/*
+	 * Checkpoint handles are read-only: closing one discards its blocks,
+	 * otherwise there's no work to do.
+	 */
+	if (session->dhandle->checkpoint != NULL)
+		return (
+		    __wt_bt_cache_op(session, NULL, WT_SYNC_DISCARD_NOWRITE));
+
+	/*
+	 * Otherwise, checkpoint the file and optionally flush the writes to
+	 * stable storage.
+	 */
+	WT_RET(__checkpoint_worker(session, NULL, 0));
 	if (F_ISSET(S2C(session), WT_CONN_CKPT_SYNC))
-		WT_RET(__wt_checkpoint_sync(session, cfg));
+		WT_RET(__wt_checkpoint_sync(session, NULL));
 	return (0);
 }

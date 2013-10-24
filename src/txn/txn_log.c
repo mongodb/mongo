@@ -82,7 +82,7 @@ __wt_txn_log_commit(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_DECL_ITEM(logrec);
 	WT_TXN *txn;
 	WT_TXN_OP *op;
-	const char *fmt = "I";
+	const char *fmt = WT_UNCHECKED_STRING(Iq);
 	size_t header_size;
 	uint32_t rectype = WT_LOGREC_COMMIT;
 	u_int i;
@@ -90,11 +90,12 @@ __wt_txn_log_commit(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_UNUSED(cfg);
 	txn = &session->txn;
 
-	WT_RET(__wt_struct_size(session, &header_size, fmt, rectype));
+	WT_RET(__wt_struct_size(session, &header_size, fmt, rectype, txn->id));
 	WT_RET(__wt_logrec_alloc(session, header_size, &logrec));
 
 	WT_ERR(__wt_struct_pack(session,
-	    (uint8_t *)logrec->data + logrec->size, header_size, fmt, rectype));
+	    (uint8_t *)logrec->data + logrec->size, header_size,
+	    fmt, rectype, txn->id));
 	logrec->size += (uint32_t)header_size;
 
 	/* Write updates to the log. */
@@ -160,18 +161,40 @@ err:	__wt_logrec_free(session, &logrec);
 }
 
 /*
- * __wt_txn_log_checkpoint --
+ * __wt_txn_checkpoint_logread --
+ *	Read a log record for a checkpoint operation.
+ */
+int
+__wt_txn_checkpoint_logread(
+    WT_SESSION_IMPL *session, const uint8_t **pp, const uint8_t *end,
+    WT_LSN *ckpt_lsn)
+{
+	const char *fmt = WT_UNCHECKED_STRING(IQIU);
+	WT_ITEM ckpt_snapshot;
+	u_int ckpt_nsnapshot;
+
+	WT_RET(__wt_struct_unpack(session, *pp, WT_PTRDIFF(end, *pp), fmt,
+	    &ckpt_lsn->file, &ckpt_lsn->offset,
+	    &ckpt_nsnapshot, &ckpt_snapshot));
+	WT_UNUSED(ckpt_nsnapshot);
+	WT_UNUSED(ckpt_snapshot);
+	*pp = end;
+	return (0);
+}
+
+/*
+ * __wt_txn_checkpoint_log --
  *	Write a log record for a checkpoint operation.
  */
 int
-__wt_txn_log_checkpoint(
+__wt_txn_checkpoint_log(
     WT_SESSION_IMPL *session, int full, uint32_t flags, WT_LSN *lsnp)
 {
 	WT_DECL_RET;
 	WT_DECL_ITEM(logrec);
 	WT_LSN *ckpt_lsn;
 	WT_TXN *txn;
-	const char *fmt = WT_UNCHECKED_STRING(IIQIu);
+	const char *fmt = WT_UNCHECKED_STRING(IIQIU);
 	uint8_t *end, *p;
 	size_t recsize;
 	uint32_t i, rectype = WT_LOGREC_CHECKPOINT;
@@ -212,24 +235,38 @@ __wt_txn_log_checkpoint(
 
 	case WT_TXN_LOG_CKPT_STOP:
 		/*
+		 * During a clean connection close, we get here without the
+		 * prepare or start steps.  In that case, log the current LSN
+		 * as the checkpoint LSN.
+		 */
+		if (!txn->full_ckpt) {
+			txn->ckpt_nsnapshot = 0;
+			*ckpt_lsn = S2C(session)->log->alloc_lsn;
+		}
+
+		/*
 		 * Write the checkpoint log record and tell the logging
 		 * subsystem the checkpoint LSN.
 		 */
 		WT_ERR(__wt_struct_size(session, &recsize, fmt,
 		    rectype, ckpt_lsn->file, ckpt_lsn->offset,
-		    txn->ckpt_nsnapshot, txn->ckpt_snapshot));
+		    txn->ckpt_nsnapshot, &txn->ckpt_snapshot));
 		WT_ERR(__wt_logrec_alloc(session, recsize, &logrec));
 
 		WT_ERR(__wt_struct_pack(session,
 		    (uint8_t *)logrec->data + logrec->size, recsize, fmt,
 		    rectype, ckpt_lsn->file, ckpt_lsn->offset,
-		    txn->ckpt_nsnapshot, txn->ckpt_snapshot));
+		    txn->ckpt_nsnapshot, &txn->ckpt_snapshot));
 		logrec->size += (uint32_t)recsize;
 		WT_ERR(__wt_log_write(session, logrec, lsnp, 0));
 
-#if 0
-		WT_ERR(__wt_log_ckpt(session, ckpt_lsn));
-#endif
+		/*
+		 * If this a full checkpoint completed successfully and there
+		 * is no hot backup in progress, we can archive up to the
+		 * checkpoint LSN.
+		 */
+		if (!S2C(session)->hot_backup)
+			WT_ERR(__wt_log_ckpt(session, ckpt_lsn));
 
 		/* FALLTHROUGH */
 	case WT_TXN_LOG_CKPT_FAIL:
@@ -315,6 +352,7 @@ __txn_printlog(
 {
 	FILE *out;
 	const uint8_t *end, *p;
+	uint64_t txnid;
 	uint32_t rectype;
 
 	out = cookie;
@@ -332,6 +370,10 @@ __txn_printlog(
 
 	switch (rectype) {
 	case WT_LOGREC_COMMIT:
+		WT_RET(__wt_vunpack_uint(&p, WT_PTRDIFF(end, p), &txnid));
+		if (fprintf(
+		    out, "    \"txnid\" : %" PRIu64 ",\n", txnid) < 0)
+			return (errno);
 		WT_RET(__txn_commit_printlog(session, &p, end, out));
 		break;
 	}

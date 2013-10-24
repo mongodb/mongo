@@ -216,7 +216,8 @@ __backup_start(
 
 	/* Add log files if logging is on and we're doing a full backup. */
 	if (!target_list && conn->log) {
-		WT_ERR(__wt_log_getfiles(session, &logfiles, &logcount));
+		WT_ERR(
+		    __wt_log_get_active_files(session, &logfiles, &logcount));
 		for (i = 0; i < logcount; i++)
 			WT_ERR(__backup_list_append(session, cb, logfiles[i]));
 	}
@@ -256,8 +257,7 @@ __backup_cleanup_handles(WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb)
 	for (p = cb->list; p->name != NULL; ++p) {
 		if (p->handle != NULL)
 			WT_WITH_DHANDLE(session, p->handle,
-			    WT_TRET(
-			    __wt_session_release_btree(session)));
+			    WT_TRET(__wt_session_release_btree(session)));
 		__wt_free(session, p->name);
 	}
 

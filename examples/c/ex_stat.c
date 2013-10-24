@@ -188,7 +188,7 @@ main(void)
 	WT_SESSION *session;
 	int ret;
 
-	ret = wiredtiger_open(home, NULL, "create,statistics", &conn);
+	ret = wiredtiger_open(home, NULL, "create,statistics=(all)", &conn);
 	ret = conn->open_session(conn, NULL, NULL, &session);
 	ret = session->create(
 	    session, "table:access", "key_format=S,value_format=S");

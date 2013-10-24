@@ -95,7 +95,7 @@ join_slot:
 	 * from the active array.
 	 */
 	if (old_state < WT_LOG_SLOT_READY) {
-		WT_CSTAT_INCR(session, log_slot_transitions);
+		WT_STAT_FAST_CONN_INCR(session, log_slot_transitions);
 		goto find_slot;
 	}
 	/*
@@ -105,7 +105,7 @@ join_slot:
 	new_state = old_state + (int64_t)mysize;
 	if (new_state < old_state) {
 		/* Our size doesn't fit here. */
-		WT_CSTAT_INCR(session, log_slot_toobig);
+		WT_STAT_FAST_CONN_INCR(session, log_slot_toobig);
 		goto find_slot;
 	}
 	/*
@@ -128,7 +128,7 @@ join_slot:
 	 */
 	if (cur_state != old_state) {
 		old_state = cur_state;
-		WT_CSTAT_INCR(session, log_slot_races);
+		WT_STAT_FAST_CONN_INCR(session, log_slot_races);
 		goto join_slot;
 	}
 	WT_ASSERT(session, myslotp != NULL);
@@ -136,7 +136,7 @@ join_slot:
 	 * We joined this slot.  Fill in our information to return to
 	 * the caller.
 	 */
-	WT_CSTAT_INCR(session, log_slot_joins);
+	WT_STAT_FAST_CONN_INCR(session, log_slot_joins);
 	if (LF_ISSET(WT_LOG_FSYNC))
 		F_SET(slot, SLOT_SYNC);
 	myslotp->slot = slot;
@@ -183,7 +183,7 @@ retry:
 	 * Swap out the slot we're going to use and put a free one in the
 	 * slot array in its place so that threads can use it right away.
 	 */
-	WT_CSTAT_INCR(session, log_slot_closes);
+	WT_STAT_FAST_CONN_INCR(session, log_slot_closes);
 	newslot->slot_state = WT_LOG_SLOT_READY;
 	newslot->slot_index = slot->slot_index;
 	log->slot_array[newslot->slot_index] = &log->slot_pool[pool_i];
@@ -196,7 +196,7 @@ retry:
 	 * rounding up that is needed and the total bytes in __log_fill
 	 * is the amount of user bytes.
 	 */
-	WT_CSTAT_INCRV(session,
+	WT_STAT_FAST_CONN_INCRV(session,
 	    log_slot_consolidated, (uint64_t)slot->slot_group_size);
 	return (0);
 }

@@ -61,7 +61,8 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 	WT_NAMED_COLLATOR *ncoll;
 	WT_NAMED_COMPRESSOR *ncomp;
 	WT_NAMED_DATA_SOURCE *ndsrc;
-	WT_SESSION_IMPL *session;
+	WT_SESSION_IMPL *s, *session;
+	u_int i;
 
 	wt_conn = &conn->iface;
 	session = conn->default_session;
@@ -85,8 +86,16 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 	/* Close open data handles. */
 	WT_TRET(__wt_conn_dhandle_discard(conn));
 
-	/* Shut down the log manager (only after closing data handles). */
-	WT_TRET(__wt_logmgr_destroy(conn));
+	/*
+	 * Now that all data handles are closed, tell logging that a checkpoint
+	 * has completed then shut down the log manager (only after closing
+	 * data handles).
+	 */
+	if (conn->logging) {
+		WT_TRET(__wt_txn_checkpoint_log(
+		    session, 1, WT_TXN_LOG_CKPT_STOP, NULL));
+		WT_TRET(__wt_logmgr_destroy(conn));
+	}
 
 	/* Free memory for collators */
 	while ((ncoll = TAILQ_FIRST(&conn->collqh)) != NULL)
@@ -151,10 +160,14 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 	 */
 	if (session != &conn->dummy_session) {
 		WT_TRET(session->iface.close(&session->iface, NULL));
-		__wt_free(&conn->dummy_session, session->hazard);
-
-		conn->default_session = &conn->dummy_session;
+		session = conn->default_session = &conn->dummy_session;
 	}
+
+	/* Free the hazard references for all sessions. */
+	if ((s = conn->sessions) != NULL)
+		for (i = 0; i < conn->session_size; ++s, ++i)
+			if (s != session)
+				__wt_free(session, s->hazard);
 
 	/* Destroy the handle. */
 	WT_TRET(__wt_connection_destroy(conn));

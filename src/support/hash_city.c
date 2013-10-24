@@ -321,4 +321,3 @@ __wt_hash_city64(const void *s, size_t len)
 {
 	return (CityHash64(s, len));
 }
-
