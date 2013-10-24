@@ -1,5 +1,4 @@
 // Test mongod start with FIPS mode enabled
-if (0) { // SERVER-11005
 ports = allocatePorts(1);
 port1 = ports[0];
 var baseName = "jstests_ssl_ssl_fips";
@@ -15,6 +14,13 @@ var mongo = runMongoProgram("mongo", "--port", port1, "--ssl",
                             "--sslFIPSMode",
                             "--eval", ";");
 
-// 0 is the exit code for success
-assert(mongo==0);
+// if mongo shell didn't start/connect properly
+if (mongo != 0) {
+    print("mongod failed to start, checking for FIPS support");
+    assert(rawMongoProgramOutput().match(
+            /this version of mongodb was not compiled with FIPS support/));
+}
+else {
+    // kill mongod
+    stopMongod(port1);
 }
