@@ -761,7 +761,7 @@ execute_populate(CONFIG *cfg)
 			continue;
 		interval = 0;
 		lprintf(cfg, 0, 1,
-		    "%" PRIu64 " ops in %d secs",
+		    "%" PRIu64 " ops in %" PRIu32 " secs",
 		    g_npop_ops - last_ops, cfg->report_interval);
 		last_ops = g_npop_ops;
 	}
@@ -779,7 +779,7 @@ execute_populate(CONFIG *cfg)
 		return (WT_ERROR);
 	}
 
-	lprintf(cfg, 0, 1, "Finished load of %d items", cfg->icount);
+	lprintf(cfg, 0, 1, "Finished load of %" PRIu32 " items", cfg->icount);
 	secs = e.tv_sec + e.tv_usec / 1000000.0;
 	secs -= cfg->phase_start_time.tv_sec +
 	    cfg->phase_start_time.tv_usec / 1000000.0;
@@ -819,7 +819,8 @@ execute_workload(CONFIG *cfg)
 	ret = 0;
 
 	lprintf(cfg, 0, 1,
-	    "Starting workload threads: read %d, insert %d, update %d",
+	    "Starting workload threads: read %" PRIu32
+	    ", insert %" PRIu32 ", update %" PRIu32,
 	    cfg->read_threads, cfg->insert_threads, cfg->update_threads);
 
 	g_nins_ops = g_nread_ops = g_nupdate_ops = 0;
@@ -863,7 +864,7 @@ execute_workload(CONFIG *cfg)
 		    sum_update_ops(cfg->uthreads, cfg->update_threads);
 		lprintf(cfg, 0, 1,
 		    "%" PRIu64 " reads, %" PRIu64 " inserts, %" PRIu64
-		    " updates in %d secs",
+		    " updates in %" PRIu32 " secs",
 		    g_nread_ops - last_reads,
 		    g_nins_ops - last_inserts,
 		    g_nupdate_ops - last_updates,
@@ -1180,8 +1181,9 @@ main(int argc, char *argv[])
 		goto err;
 
 	lprintf(&cfg, 0, 1,
-	    "Ran performance test example with %d read threads, %d insert"
-	    " threads and %d update threads for %d seconds.",
+	    "Ran performance test example with %" PRIu32 " read threads, %"
+	    PRIu32 " insert threads and %" PRIu32 " update threads for %"
+	    PRIu32 " seconds.",
 	    cfg.read_threads, cfg.insert_threads,
 	    cfg.update_threads, cfg.run_time);
 
@@ -1576,7 +1578,7 @@ start_threads(
 
 		if ((ret = pthread_create(
 		    &threads->handle, NULL, func, threads)) != 0) {
-			lprintf(cfg, ret, 0, "Error creating thread: %d", i);
+			lprintf(cfg, ret, 0, "Error creating thread");
 			return (ret);
 		}
 	}
@@ -1595,7 +1597,7 @@ stop_threads(CONFIG *cfg, u_int num, CONFIG_THREAD **threadsp)
 
 	for (i = 0; i < num; ++i, ++threads)
 		if ((ret = pthread_join(threads->handle, NULL)) != 0) {
-			lprintf(cfg, ret, 0, "Error joining thread %d", i);
+			lprintf(cfg, ret, 0, "Error joining thread");
 			return (ret);
 		}
 
@@ -1742,23 +1744,25 @@ print_config(CONFIG *cfg)
 	printf("\tConnection configuration: %s\n", cfg->conn_config);
 	printf("\tTable configuration: %s\n", cfg->table_config);
 	printf("\t%s\n", cfg->create ? "Creating" : "Using existing");
-	printf("\tWorkload period: %d\n", cfg->run_time);
-	printf("\tCheckpoint interval: %d\n", cfg->checkpoint_interval);
-	printf("\tReporting interval: %d\n", cfg->report_interval);
-	printf("\tStatistics interval: %d\n", cfg->stat_interval);
+	printf("\tWorkload period: %" PRIu32 "\n", cfg->run_time);
+	printf(
+	    "\tCheckpoint interval: %" PRIu32 "\n", cfg->checkpoint_interval);
+	printf("\tReporting interval: %" PRIu32 "\n", cfg->report_interval);
+	printf("\tStatistics interval: %" PRIu32 "\n", cfg->stat_interval);
 	if (cfg->create) {
-		printf("\tInsert count: %d\n", cfg->icount);
-		printf("\tNumber populate threads: %d\n",
+		printf("\tInsert count: %" PRIu32 "\n", cfg->icount);
+		printf("\tNumber populate threads: %" PRIu32 "\n",
 		    cfg->populate_threads);
 	}
-	printf("\tNumber read threads: %d\n", cfg->read_threads);
-	printf("\tNumber insert threads: %d\n", cfg->insert_threads);
+	printf("\tNumber read threads: %" PRIu32 "\n", cfg->read_threads);
+	printf("\tNumber insert threads: %" PRIu32 "\n", cfg->insert_threads);
 	if (F_ISSET(cfg, PERF_INSERT_RMW))
 		printf("\tInsert operations are RMW.\n");
-	printf("\tNumber update threads: %d\n", cfg->update_threads);
-	printf("\tkey size: %d data size: %d\n", cfg->key_sz, cfg->data_sz);
-	printf("\tRandom seed: %d\n", cfg->rand_seed);
-	printf("\tVerbosity: %d\n", cfg->verbose);
+	printf("\tNumber update threads: %" PRIu32 "\n", cfg->update_threads);
+	printf("\tkey size: %" PRIu32 " data size: %" PRIu32 "\n",
+	    cfg->key_sz, cfg->data_sz);
+	printf("\tRandom seed: %" PRIu32 "\n", cfg->rand_seed);
+	printf("\tVerbosity: %" PRIu32 "\n", cfg->verbose);
 }
 
 void
