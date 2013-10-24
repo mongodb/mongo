@@ -137,8 +137,8 @@ void lprintf(CONFIG *cfg, int err, uint32_t level, const char *fmt, ...)
 void *populate_thread(void *);
 void print_config(CONFIG *);
 void *read_thread(void *);
-int remove_all(const char *, int);
-int remove_dir(const char *);
+int remove_all(CONFIG *, const char *, int);
+int remove_dir(CONFIG *, const char *);
 int setup_log_file(CONFIG *);
 int start_threads(CONFIG *, u_int, CONFIG_THREAD **, void *(*func)(void *));
 void *stat_worker(void *);
@@ -288,6 +288,18 @@ sum_update_ops(CONFIG_THREAD *threads, u_int num)
 	return (total);
 }
 
+static int
+enomem(CONFIG *cfg)
+{
+	const char *msg;
+
+	msg = "Unable to allocate memory";
+	if (cfg->logf == NULL)
+		fprintf(stderr, "%s\n", msg);
+	else
+		lprintf(cfg, ENOMEM, 0, "%s", msg);
+	return (ENOMEM);
+}
 
 void *
 insert_thread(void *arg)
@@ -325,29 +337,26 @@ worker(CONFIG_THREAD *thread, uint32_t worker_type)
 	op_ret = 0;
 
 	conn = cfg->conn;
-	key_buf = calloc(cfg->key_sz + 1, 1);
-	if (key_buf == NULL) {
-		lprintf(cfg, ret = ENOMEM, 0, "Populate key buffer");
+	if ((key_buf = calloc(cfg->key_sz + 1, 1)) == NULL) {
+		ret = enomem(cfg);
 		goto err;
 	}
 	if (IS_INSERT_WORKER(worker_type) || worker_type == WORKER_UPDATE) {
-		data_buf = calloc(cfg->data_sz, 1);
-		if (data_buf == NULL) {
-			lprintf(cfg, ret = ENOMEM, 0, "Populate data buffer");
+		if ((data_buf = calloc(cfg->data_sz, 1)) == NULL) {
+			ret = enomem(cfg);
 			goto err;
 		}
 		memset(data_buf, 'a', cfg->data_sz - 1);
 	}
 
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0) {
-		lprintf(cfg, ret, 0,
-		    "open_session failed in read thread");
+		lprintf(cfg, ret, 0, "worker: WT_CONNECTION.open_session");
 		goto err;
 	}
-	if ((ret = session->open_cursor(session, cfg->uri,
-	    NULL, NULL, &cursor)) != 0) {
-		lprintf(cfg, ret, 0,
-		    "open_cursor failed in read thread");
+	if ((ret = session->open_cursor(
+	    session, cfg->uri, NULL, NULL, &cursor)) != 0) {
+		lprintf(cfg,
+		    ret, 0, "worker: WT_SESSION.open_cursor: %s", cfg->uri);
 		goto err;
 	}
 
@@ -471,14 +480,12 @@ populate_thread(void *arg)
 
 	cfg->phase = WT_PERF_POP;
 
-	data_buf = calloc(cfg->data_sz, 1);
-	if (data_buf == NULL) {
-		lprintf(cfg, ENOMEM, 0, "Populate data buffer");
+	if ((key_buf = calloc(cfg->key_sz + 1, 1)) == NULL) {
+		ret = enomem(cfg);
 		goto err;
 	}
-	key_buf = calloc(cfg->key_sz + 1, 1);
-	if (key_buf == NULL) {
-		lprintf(cfg, ENOMEM, 0, "Populate key buffer");
+	if ((data_buf = calloc(cfg->data_sz, 1)) == NULL) {
+		ret = enomem(cfg);
 		goto err;
 	}
 
@@ -566,7 +573,7 @@ stat_worker(void *arg)
 
 	uri_len = strlen("statistics:") + strlen(cfg->uri) + 1;
 	if ((stat_uri = malloc(uri_len)) == NULL) {
-		lprintf(cfg, ENOMEM, 0, "Statistics thread uri create.");
+		ret = enomem(cfg);
 		goto err;
 	}
 	(void)snprintf(stat_uri, uri_len, "statistics:%s", cfg->uri);
@@ -961,7 +968,7 @@ main(int argc, char *argv[])
 	opt_home = malloc(strlen(cfg.home) + strlen(wtperftmp_subdir) + 1);
 	strcpy(opt_home, cfg.home);
 	strcat(opt_home, wtperftmp_subdir);
-	if ((ret = remove_all(opt_home, 0)) != 0)
+	if ((ret = remove_all(&cfg, opt_home, 0)) != 0)
 		goto err;
 
 	if ((ret = mkdir(opt_home, 0777)) != 0) {
@@ -1038,7 +1045,7 @@ main(int argc, char *argv[])
 	/* Build the URI from the table name. */
 	req_len = strlen("table:") + strlen(cfg.table_name) + 1;
 	if ((cfg.uri = calloc(req_len, 1)) == NULL) {
-		ret = ENOMEM;
+		ret = enomem(&cfg);
 		goto err;
 	}
 	snprintf(cfg.uri, req_len, "table:%s", cfg.table_name);
@@ -1057,9 +1064,8 @@ main(int argc, char *argv[])
 		req_len = strlen(cfg.conn_config) + strlen(debug_cconfig) + 3;
 		if (user_cconfig != NULL)
 			req_len += strlen(user_cconfig);
-		cc_buf = calloc(req_len, 1);
-		if (cc_buf == NULL) {
-			ret = ENOMEM;
+		if ((cc_buf = calloc(req_len, 1)) == NULL) {
+			ret = enomem(&cfg);
 			goto err;
 		}
 		snprintf(cc_buf, req_len, "%s%s%s%s%s",
@@ -1075,9 +1081,8 @@ main(int argc, char *argv[])
 		req_len = strlen(cfg.table_config) + strlen(debug_tconfig) + 3;
 		if (user_tconfig != NULL)
 			req_len += strlen(user_tconfig);
-		tc_buf = calloc(req_len, 1);
-		if (tc_buf == NULL) {
-			ret = ENOMEM;
+		if ((tc_buf = calloc(req_len, 1)) == NULL) {
+			ret = enomem(&cfg);
 			goto err;
 		}
 		snprintf(tc_buf, req_len, "%s%s%s%s%s",
@@ -1108,7 +1113,7 @@ main(int argc, char *argv[])
 		goto err;
 	}
 					/* Remove the test directory. */
-	if ((ret = remove_all(opt_home, 1)) != 0)
+	if ((ret = remove_all(&cfg, opt_home, 1)) != 0)
 		goto err;
 
 	/* Sanity check run time and reporting interval. */
@@ -1542,15 +1547,15 @@ config_opt_usage(void)
 }
 
 int
-remove_all(const char *name, int report)
+remove_all(CONFIG *cfg, const char *name, int report)
 {
-	int ret;
 	struct stat statbuf;
+	int ret;
 
 	ret = 0;
 	if (stat(name, &statbuf) == 0) {
 		if ((statbuf.st_mode & S_IFMT) == S_IFDIR) {
-			ret = remove_dir(name);
+			ret = remove_dir(cfg, name);
 		} else if (unlink(name) != 0) {
 			fprintf(stderr, "wtperf: unlink %s: %s\n",
 			    name, strerror(errno));
@@ -1564,7 +1569,7 @@ remove_all(const char *name, int report)
 }
 
 int
-remove_dir(const char *name)
+remove_dir(CONFIG *cfg, const char *name)
 {
 	int ret, t_ret;
 	char *newname;
@@ -1583,18 +1588,16 @@ remove_dir(const char *name)
 			    (strcmp(dp->d_name, ".") == 0 ||
 			    strcmp(dp->d_name, "..") == 0))
 				continue;
+
 			if ((newname = calloc(strlen(name) +
-			    strlen(dp->d_name) + 2, 1)) == NULL) {
-				fprintf(stderr, "wtperf: remove: no memory\n");
-				if (ret == 0)
-					ret = ENOMEM;
-			} else {
-				sprintf(newname, "%s/%s", name, dp->d_name);
-				if ((t_ret = remove_all(newname, 1)) != 0 &&
-				    ret == 0)
-					ret = t_ret;
-				free(newname);
-			}
+			    strlen(dp->d_name) + 2, 1)) == NULL)
+				return (enomem(cfg));
+
+			sprintf(newname, "%s/%s", name, dp->d_name);
+			if ((t_ret =
+			    remove_all(cfg, newname, 1)) != 0 && ret == 0)
+				ret = t_ret;
+			free(newname);
 		}
 		(void)closedir(dirp);
 		if (rmdir(name) != 0) {
@@ -1616,7 +1619,8 @@ start_threads(
 	int ret;
 
 	if ((*threadsp = calloc(num, sizeof(CONFIG_THREAD))) == NULL)
-		return (ENOMEM);
+		return (enomem(cfg));
+
 	for (i = 0, threads = *threadsp; i < num; ++i, ++threads) {
 		threads->cfg = cfg;
 
@@ -1705,10 +1709,9 @@ setup_log_file(CONFIG *cfg)
 		return (0);
 
 	if ((fname = calloc(strlen(cfg->home) +
-	    strlen(cfg->table_name) + strlen(".stat") + 2, 1)) == NULL) {
-		fprintf(stderr, "No memory in stat thread\n");
-		return (ENOMEM);
-	}
+	    strlen(cfg->table_name) + strlen(".stat") + 2, 1)) == NULL)
+		return (enomem(cfg));
+
 	sprintf(fname, "%s/%s.stat", cfg->home, cfg->table_name);
 	if ((cfg->logf = fopen(fname, "w")) == NULL) {
 		fprintf(stderr, "Statistics failed to open log file.\n");
