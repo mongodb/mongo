@@ -68,7 +68,7 @@ namespace mongo {
 
     /** @return number of skipped (invalid) documents */
     unsigned compactExtent(const char *ns, NamespaceDetails *d, const DiskLoc diskloc, int n,
-                           int nidx, bool validate, double pf, int pb) {
+                           int nidx, bool validate, double pf, int pb, bool useDefaultPadding) {
 
         log() << "compact begin extent #" << n << " for namespace " << ns << endl;
         unsigned oldObjSize = 0; // we'll report what the old padding was
@@ -82,8 +82,8 @@ namespace mongo {
         Database* db = cc().database();
 
         {
-            // the next/prev pointers within the extent might not be in order so we first page the whole thing in 
-            // sequentially
+            // the next/prev pointers within the extent might not be in order so we first
+            // page the whole thing in sequentially
             log() << "compact paging in len=" << e->length/1000000.0 << "MB" << endl;
             Timer t;
             DataFile* mdf = db->getFile( diskloc.a() );
@@ -95,7 +95,8 @@ namespace mongo {
             touch_pages(fd, offset, length, ext);
             int ms = t.millis();
             if( ms > 1000 ) 
-                log() << "compact end paging in " << ms << "ms " << e->length/1000000.0/ms << "MB/sec" << endl;
+                log() << "compact end paging in " << ms << "ms "
+                      << e->length/1000000.0/ms << "MB/sec" << endl;
         }
 
         {
@@ -118,13 +119,19 @@ namespace mongo {
 
                         unsigned lenWHdr = sz + Record::HeaderSize;
                         unsigned lenWPadding = lenWHdr;
-                        {
+                        // maintain UsePowerOf2Sizes if no padding values were passed in
+                        if (d->isUserFlagSet(NamespaceDetails::Flag_UsePowerOf2Sizes)
+                                && useDefaultPadding) {
+                            lenWPadding = d->quantizePowerOf2AllocationSpace(lenWPadding);
+                        }
+                        // otherwise use the padding values (pf and pb) that were passed in
+                        else {
                             lenWPadding = static_cast<unsigned>(pf*lenWPadding);
                             lenWPadding += pb;
                             lenWPadding = lenWPadding & quantizeMask(lenWPadding);
-                            if( lenWPadding < lenWHdr || lenWPadding > BSONObjMaxUserSize / 2 ) { 
-                                lenWPadding = lenWHdr;
-                            }
+                        }
+                        if (lenWPadding < lenWHdr || lenWPadding > BSONObjMaxUserSize / 2 ) { 
+                            lenWPadding = lenWHdr;
                         }
                         DiskLoc loc = allocateSpaceForANewRecord(ns, d, lenWPadding, false);
                         uassert(14024, "compact error out of space during compaction", !loc.isNull());
@@ -184,7 +191,8 @@ namespace mongo {
         return skipped;
     }
 
-    bool _compact(const char *ns, NamespaceDetails *d, string& errmsg, bool validate, BSONObjBuilder& result, double pf, int pb) { 
+    bool _compact(const char *ns, NamespaceDetails *d, string& errmsg, bool validate,
+                  BSONObjBuilder& result, double pf, int pb, bool useDefaultPadding) {
         // this is a big job, so might as well make things tidy before we start just to be nice.
         getDur().commitIfNeeded();
 
@@ -258,7 +266,7 @@ namespace mongo {
         d->setStats( 0, 0 );
 
         for( list<DiskLoc>::iterator i = extents.begin(); i != extents.end(); i++ ) { 
-            skipped += compactExtent(ns, d, *i, n++, nidx, validate, pf, pb);
+            skipped += compactExtent(ns, d, *i, n++, nidx, validate, pf, pb, useDefaultPadding);
             pm.hit();
         }
 
@@ -361,11 +369,16 @@ namespace mongo {
 
             double pf = 1.0;
             int pb = 0;
+            // useDefaultPadding is used to track whether or not a padding requirement was passed in
+            // if it wasn't than UsePowerOf2Sizes will be maintained when compacting
+            bool useDefaultPadding = true;
             if( cmdObj.hasElement("paddingFactor") ) {
+                useDefaultPadding = false;
                 pf = cmdObj["paddingFactor"].Number();
                 verify( pf >= 1.0 && pf <= 4.0 );
             }
             if( cmdObj.hasElement("paddingBytes") ) {
+                useDefaultPadding = false;
                 pb = (int) cmdObj["paddingBytes"].Number();
                 verify( pb >= 0 && pb <= 1024 * 1024 );
             }
@@ -391,7 +404,8 @@ namespace mongo {
                     log() << "paddingFactor:" << pf << " paddingBytes:" << pb << endl;
                 } 
                 try { 
-                    ok = _compact(ns.c_str(), d, errmsg, validate, result, pf, pb);
+                    ok = _compact(ns.c_str(), d, errmsg, validate,
+                                  result, pf, pb, useDefaultPadding);
                 }
                 catch(...) { 
                     log() << "compact " << ns << " end (with error)" << endl;
