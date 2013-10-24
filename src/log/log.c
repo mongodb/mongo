@@ -488,12 +488,12 @@ __log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 		F_CLR(slot, SLOT_SYNC);
 		log->sync_lsn = slot->slot_end_lsn;
 	}
+	log->write_lsn = slot->slot_end_lsn;
 	if (F_ISSET(slot, SLOT_BUF_GROW)) {
 		F_CLR(slot, SLOT_BUF_GROW);
 		WT_ERR(__wt_buf_grow(session,
 		    &slot->slot_buf, slot->slot_buf.memsize * 2));
 	}
-	log->write_lsn = slot->slot_end_lsn;
 	/*
 	 * If we have a file to close, close it now.
 	 */
