@@ -162,7 +162,7 @@ const char *wtperftmp_subdir = "/wtperftmp";
 #define	WORKER_INSERT_RMW	0x03
 #define	WORKER_UPDATE		0x04
 
-#define IS_INSERT_WORKER(w)			\
+#define	IS_INSERT_WORKER(w)			\
     ((w) == WORKER_INSERT || (w) == WORKER_INSERT_RMW)
 
 /* Default values. */
