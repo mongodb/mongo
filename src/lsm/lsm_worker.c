@@ -210,6 +210,8 @@ __lsm_bloom_work(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	int i;
 
 	WT_CLEAR(cookie);
+	/* If no work is done, tell our caller by returning WT_NOTFOUND. */
+	ret = WT_NOTFOUND;
 
 	WT_RET(__lsm_copy_chunks(session, lsm_tree, &cookie, 0));
 
@@ -229,15 +231,13 @@ __lsm_bloom_work(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 
 		/* See if we win the race to switch on the "busy" flag. */
 		if (WT_ATOMIC_CAS(chunk->bloom_busy, 0, 1)) {
-			WT_ERR(__lsm_bloom_create(session, lsm_tree, chunk));
-			goto done;
+			ret = __lsm_bloom_create(session, lsm_tree, chunk);
+			chunk->bloom_busy = 0;
+			break;
 		}
 	}
 
-	ret = WT_NOTFOUND;
-
-done:
-err:	__lsm_unpin_chunks(session, &cookie);
+	__lsm_unpin_chunks(session, &cookie);
 	__wt_free(session, cookie.chunk_array);
 	return (ret);
 }
