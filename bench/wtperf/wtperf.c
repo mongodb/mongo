@@ -297,11 +297,11 @@ worker(CONFIG_THREAD *thread, worker_type wtype)
 	const char *op_name;
 
 	cfg = thread->cfg;
+	conn = cfg->conn;
 	session = NULL;
 	data_buf = key_buf = NULL;
 	op_ret = 0;
 
-	conn = cfg->conn;
 	if ((key_buf = calloc(cfg->key_sz + 1, 1)) == NULL) {
 		ret = enomem(cfg);
 		goto err;
@@ -673,9 +673,9 @@ checkpoint_worker(void *arg)
 	uint32_t i;
 	int ret;
 
-	session = NULL;
 	cfg = (CONFIG *)arg;
 	conn = cfg->conn;
+	session = NULL;
 
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0) {
 		lprintf(cfg, ret, 0,
@@ -684,20 +684,19 @@ checkpoint_worker(void *arg)
 	}
 
 	while (g_util_running) {
-		/*
-		 * TODO: do we care how long the checkpoint takes?
-		 */
 		/* Break the sleep up, so we notice interrupts faster. */
-		for (i = 0; i < cfg->checkpoint_interval; i++) {
+		for (i = 0;
+		    i < cfg->checkpoint_interval && g_util_running; i++)
 			sleep(1);
-			if (!g_util_running)
-				break;
-		}
+		if (!g_util_running)
+			break;
 
 		assert(gettimeofday(&s, NULL) == 0);
-		if ((ret = session->checkpoint(session, NULL)) != 0)
+		if ((ret = session->checkpoint(session, NULL)) != 0) {
 			/* Report errors and continue. */
 			lprintf(cfg, ret, 0, "Checkpoint failed.");
+			continue;
+		}
 		assert(gettimeofday(&e, NULL) == 0);
 		ms = (e.tv_sec * 1000) + (e.tv_usec / 1000.0);
 		ms -= (s.tv_sec * 1000) + (s.tv_usec / 1000.0);
