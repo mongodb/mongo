@@ -64,10 +64,10 @@ typedef struct {
 	WT_LSN	slot_end_lsn;	/* Slot ending LSN */
 	WT_FH	*slot_fh;		/* File handle for this group */
 	WT_ITEM slot_buf;		/* Buffer for grouped writes */
-#define	SLOT_CLOSEFH	0x01			/* Close old fh on release */
-#define	SLOT_SYNC	0x02			/* Needs sync on release */
-#define	SLOT_BUF_GROW	0x04			/* Grow buffer on release */
-#define	SLOT_BUFFERED	0x08			/* Buffer writes */
+#define	SLOT_BUF_GROW	0x01			/* Grow buffer on release */
+#define	SLOT_BUFFERED	0x02			/* Buffer writes */
+#define	SLOT_CLOSEFH	0x04			/* Close old fh on release */
+#define	SLOT_SYNC	0x08			/* Needs sync on release */
 	uint32_t flags;		/* Flags */
 } WT_LOGSLOT WT_GCC_ATTRIBUTE((aligned(WT_CACHE_LINE_ALIGNMENT)));
 
@@ -106,6 +106,9 @@ typedef struct {
 	/*
 	 * Consolidation array information
 	 * SLOT_ACTIVE must be less than SLOT_POOL.
+	 * Our testing shows that the more consolidation we generate the
+	 * better the performance we see which equates to an active slot
+	 * slot count of one.
 	 */
 #define	SLOT_ACTIVE	1
 #define	SLOT_POOL	16
@@ -113,8 +116,8 @@ typedef struct {
 	WT_LOGSLOT	*slot_array[SLOT_ACTIVE];	/* Active slots */
 	WT_LOGSLOT	 slot_pool[SLOT_POOL];	/* Pool of all slots */
 
-#define	WT_LOG_FORCE_CONSOLIDATE	0x01
-	uint32_t	 flags;			/* Currently unused */
+#define	WT_LOG_FORCE_CONSOLIDATE	0x01	/* Disable direct writes */
+	uint32_t	 flags;
 } WT_LOG;
 
 typedef struct {

@@ -58,6 +58,8 @@ __wt_log_slot_init(WT_SESSION_IMPL *session)
 		    &log->slot_pool[i].slot_buf, WT_LOG_SLOT_BUF_INIT_SIZE));
 		F_SET(&log->slot_pool[i], SLOT_BUFFERED);
 	}
+	WT_STAT_FAST_CONN_INCRV(session,
+	    log_buffer_size, WT_LOG_SLOT_BUF_INIT_SIZE * SLOT_ACTIVE);
 	if (0) {
 err:		while (--i >= 0)
 			__wt_buf_free(session, &log->slot_pool[i].slot_buf);
@@ -111,14 +113,13 @@ join_slot:
 	/*
 	 * If the slot buffer isn't big enough to hold this update, mark
 	 * the slot for a buffer size increase and find another slot.
-	 * TODO: Solve this if our record isn't going to fit into any
-	 * slots buffer and there aren't any other writes completing (i.e
-	 * __log_release is never called, so the buffer never grows).
 	 */
 	if (new_state > (int64_t)slot->slot_buf.memsize) {
 		F_SET(slot, SLOT_BUF_GROW);
-		if (++slot_grow_attempts > 5)
+		if (++slot_grow_attempts > 5) {
+			WT_STAT_FAST_CONN_INCR(session, log_slot_toosmall);
 			return (ENOMEM);
+		}
 		goto find_slot;
 	}
 	cur_state = WT_ATOMIC_CAS_VAL(slot->slot_state, old_state, new_state);
@@ -268,11 +269,13 @@ __wt_log_slot_grow_buffers(WT_SESSION_IMPL *session, int64_t newsize)
 	WT_DECL_RET;
 	WT_LOG *log;
 	WT_LOGSLOT *slot;
-	int64_t orig_state, size;
+	int64_t old_size, orig_state, size, total_growth;
 	uint32_t i;
 
 	conn = S2C(session);
 	log = conn->log;
+	total_growth = 0;
+	WT_STAT_FAST_CONN_INCR(session, log_buffer_grow);
 	/*
 	 * Take the log slot lock to prevent other threads growing buffers
 	 * at the same time. Could tighten the scope of this lock, or have
@@ -299,11 +302,14 @@ __wt_log_slot_grow_buffers(WT_SESSION_IMPL *session, int64_t newsize)
 		}
 
 		/* We have a slot - now go ahead and grow the buffer. */
+		old_size = slot->slot_buf.memsize;
 		F_CLR(slot, SLOT_BUF_GROW);
 		WT_ERR(__wt_buf_grow(session, &slot->slot_buf,
 		    WT_MAX(slot->slot_buf.memsize * 2, newsize)));
 		WT_ATOMIC_STORE(slot->slot_state, orig_state);
+		total_growth += slot->slot_buf.memsize - old_size;
 	}
 err:	__wt_spin_unlock(session, &log->log_slot_lock);
+	WT_STAT_FAST_CONN_INCRV(session, log_buffer_size, total_growth);
 	return (ret);
 }

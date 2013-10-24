@@ -490,7 +490,10 @@ __log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot)
 	}
 	log->write_lsn = slot->slot_end_lsn;
 	if (F_ISSET(slot, SLOT_BUF_GROW)) {
+		WT_STAT_FAST_CONN_INCR(session, log_buffer_grow);
 		F_CLR(slot, SLOT_BUF_GROW);
+		WT_STAT_FAST_CONN_INCRV(session,
+		    log_buffer_size, slot->slot_buf.memsize);
 		WT_ERR(__wt_buf_grow(session,
 		    &slot->slot_buf, slot->slot_buf.memsize * 2));
 	}
@@ -895,7 +898,7 @@ __wt_log_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 		if (ret != EAGAIN)
 			WT_ERR(ret);
 		/*
-		 * An EAGAIN return means we failed to get the trylock - 
+		 * An EAGAIN return means we failed to get the try lock -
 		 * fall through to the consolidation code in that case.
 		 */
 	}
@@ -914,7 +917,8 @@ __wt_log_write(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp,
 		 * write the record directly.
 		 */
 		while ((ret = __log_direct_write(
-		    session, record, lsnp, flags)) == EAGAIN) {}
+		    session, record, lsnp, flags)) == EAGAIN)
+			;
 		WT_ERR(ret);
 		/*
 		 * Increase the buffer size of any slots we can get access
