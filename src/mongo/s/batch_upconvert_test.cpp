@@ -40,11 +40,6 @@ namespace {
 
     using namespace mongo;
 
-#define ASSERT_WITH_MSG(EXPRESSION,ERRMSG) \
-bool failed = !(EXPRESSION);\
-::mongo::unittest::TestAssertion( __FILE__, __LINE__ ).failIf( failed, \
-    ::std::string("Expected: " #EXPRESSION " Error: ") + ERRMSG )
-
     TEST(WriteBatchUpconvert, BasicInsert) {
 
         // Tests that an insert message is correctly upconverted to a batch insert
@@ -64,7 +59,7 @@ bool failed = !(EXPRESSION);\
         auto_ptr<BatchedCommandRequest> request( msgToBatchRequest( insertMsg ) );
         ASSERT_EQUALS( request->getBatchType(), BatchedCommandRequest::BatchType_Insert );
         string errMsg;
-        ASSERT_WITH_MSG( request->isValid( &errMsg ), errMsg );
+        ASSERT( request->isValid( &errMsg ) );
         ASSERT_EQUALS( request->getNS(), ns );
         ASSERT( !request->getOrdered() );
         ASSERT_EQUALS( request->sizeWriteOps(), 1u );
