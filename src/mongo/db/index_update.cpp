@@ -276,48 +276,6 @@ namespace mongo {
         theDataFileMgr.insert(system_indexes.c_str(), o.objdata(), o.objsize(), mayInterrupt, true);
     }
 
-    static bool needToUpgradeMinorVersion(const string& newPluginName) {
-        if (IndexNames::existedBefore24(newPluginName))
-            return false;
-
-        DataFileHeader* dfh = cc().database()->getFile(0)->getHeader();
-        if (dfh->versionMinor == PDFILE_VERSION_MINOR_24_AND_NEWER)
-            return false; // these checks have already been done
-
-        fassert(16737, dfh->versionMinor == PDFILE_VERSION_MINOR_22_AND_OLDER);
-
-        return true;
-    }
-
-    static void upgradeMinorVersionOrAssert(const string& newPluginName) {
-        const string systemIndexes = cc().database()->name() + ".system.indexes";
-        auto_ptr<Runner> runner(InternalPlanner::collectionScan(systemIndexes));
-        BSONObj index;
-        Runner::RunnerState state;
-        while (Runner::RUNNER_ADVANCED == (state = runner->getNext(&index, NULL))) {
-            const BSONObj key = index.getObjectField("key");
-            const string plugin = IndexNames::findPluginName(key);
-            if (IndexNames::existedBefore24(plugin))
-                continue;
-
-            const string errmsg = str::stream()
-                << "Found pre-existing index " << index << " with invalid type '" << plugin << "'. "
-                << "Disallowing creation of new index type '" << newPluginName << "'. See "
-                << "http://dochub.mongodb.org/core/index-type-changes"
-                ;
-
-            error() << errmsg << endl;
-            uasserted(16738, errmsg);
-        }
-
-        if (Runner::RUNNER_EOF != state) {
-            warning() << "Internal error while reading collection " << systemIndexes << endl;
-        }
-
-        DataFileHeader* dfh = cc().database()->getFile(0)->getHeader();
-        getDur().writingInt(dfh->versionMinor) = PDFILE_VERSION_MINOR_24_AND_NEWER;
-    }
-
     bool prepareToBuildIndex(const BSONObj& io,
                              bool mayInterrupt,
                              bool god,
@@ -340,12 +298,6 @@ namespace mongo {
             */
             if( theReplSet && !theReplSet->buildIndexes() )
                 return false;
-        }
-
-        string pluginName = IndexNames::findPluginName( key );
-        if ( pluginName.size() ) {
-            if (needToUpgradeMinorVersion(pluginName))
-                upgradeMinorVersionOrAssert(pluginName);
         }
 
         return true;

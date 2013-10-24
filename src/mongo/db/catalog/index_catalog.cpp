@@ -49,6 +49,7 @@
 #include "mongo/db/index_names.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/ops/delete.h"
+#include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repl/rs.h" // this is ugly
 #include "mongo/db/structure/collection.h"
 #include "mongo/util/assert_util.h"
@@ -142,7 +143,45 @@ namespace mongo {
 
     // ---------------------------
 
-    Status IndexCatalog::createIndex( const BSONObj& spec, bool mayInterrupt ) {
+    Status IndexCatalog::_upgradeDatabaseMinorVersionIfNeeded( const string& newPluginName ) {
+        Database* db = _collection->_database;
+
+        DataFileHeader* dfh = db->getFile(0)->getHeader();
+        if ( dfh->versionMinor == PDFILE_VERSION_MINOR_24_AND_NEWER ) {
+            return Status::OK(); // these checks have already been done
+        }
+
+        fassert(16737, dfh->versionMinor == PDFILE_VERSION_MINOR_22_AND_OLDER);
+
+        auto_ptr<Runner> runner( InternalPlanner::collectionScan( db->_indexesName ) );
+
+        BSONObj index;
+        Runner::RunnerState state;
+        while ( Runner::RUNNER_ADVANCED == (state = runner->getNext(&index, NULL)) ) {
+            const BSONObj key = index.getObjectField("key");
+            const string plugin = IndexNames::findPluginName(key);
+            if ( IndexNames::existedBefore24(plugin) )
+                continue;
+
+            const string errmsg = str::stream()
+                << "Found pre-existing index " << index << " with invalid type '" << plugin << "'. "
+                << "Disallowing creation of new index type '" << newPluginName << "'. See "
+                << "http://dochub.mongodb.org/core/index-type-changes"
+                ;
+
+            return Status( ErrorCodes::CannotCreateIndex, errmsg );
+        }
+
+        if ( Runner::RUNNER_EOF != state ) {
+            warning() << "Internal error while reading system.indexes collection";
+        }
+
+        getDur().writingInt(dfh->versionMinor) = PDFILE_VERSION_MINOR_24_AND_NEWER;
+
+        return Status::OK();
+    }
+
+    Status IndexCatalog::createIndex( BSONObj spec, bool mayInterrupt ) {
 
         // 1) add entry in system.indexes
         // 2) call into buildAnIndex?
@@ -151,7 +190,21 @@ namespace mongo {
         if ( !status.isOK() )
             return status;
 
+        // TODO: _id stuff from prepareToBuildIndex
+        // TODO: replica stuff from prepareToBuildIndex
+
+        spec = fixIndexSpec( spec );
+
         Database* db = _collection->_database;
+
+        string pluginName = IndexNames::findPluginName( spec["key"].Obj() );
+        if ( pluginName.size() ) {
+            Status s = _upgradeDatabaseMinorVersionIfNeeded( pluginName );
+            if ( !s.isOK() )
+                return s;
+        }
+
+
         Collection* systemIndexes = db->getCollection( db->_indexesName );
         if ( !systemIndexes ) {
             systemIndexes = db->createCollection( db->_indexesName, false, NULL );

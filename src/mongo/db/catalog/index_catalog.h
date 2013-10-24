@@ -78,7 +78,7 @@ namespace mongo {
 
         // ---- index modifiers ------
 
-        Status createIndex( const BSONObj& spec, bool mayInterrupt );
+        Status createIndex( BSONObj spec, bool mayInterrupt );
 
         Status okToAddIndex( const BSONObj& spec ) const;
 
@@ -146,6 +146,8 @@ namespace mongo {
         static BSONObj fixIndexSpec( const BSONObj& spec );
 
     private:
+
+        Status _upgradeDatabaseMinorVersionIfNeeded( const string& newPluginName );
 
         /**
          * this is just an attempt to clean up old orphaned stuff on a delete all indexes

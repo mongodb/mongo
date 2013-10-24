@@ -754,54 +754,6 @@ namespace mongo {
         return true;
     }
 
-    /**
-     * @param loc the location in system.indexes where the index spec is
-     */
-    void NOINLINE_DECL insert_makeIndex(Collection* collectionToIndex,
-                                        const DiskLoc& loc,
-                                        bool mayInterrupt) {
-        uassert(13143,
-                "can't create index on system.indexes",
-                collectionToIndex->ns().coll() != "system.indexes");
-
-        BSONObj info = loc.obj();
-        std::string idxName = info["name"].valuestr();
-
-        // Set curop description before setting indexBuildInProg, so that there's something
-        // commands can find and kill as soon as indexBuildInProg is set. Only set this if it's a
-        // killable index, so we don't overwrite commands in currentOp.
-        if (mayInterrupt) {
-            cc().curop()->setQuery(info);
-        }
-
-        IndexCatalog::IndexBuildBlock indexBuildBlock( collectionToIndex->getIndexCatalog(), idxName, loc );
-        verify( indexBuildBlock.indexDetails() );
-
-        try {
-            buildAnIndex( collectionToIndex->ns(), collectionToIndex->details(),
-                          *indexBuildBlock.indexDetails(), mayInterrupt);
-            indexBuildBlock.success();
-        }
-        catch (DBException& e) {
-            // save our error msg string as an exception or dropIndexes will overwrite our message
-            LastError *le = lastError.get();
-            int savecode = 0;
-            string saveerrmsg;
-            if ( le ) {
-                savecode = le->code;
-                saveerrmsg = le->msg;
-            }
-            else {
-                savecode = e.getCode();
-                saveerrmsg = e.what();
-            }
-
-            verify(le && !saveerrmsg.empty());
-            setLastError(savecode,saveerrmsg.c_str());
-            throw;
-        }
-    }
-
     DiskLoc DataFileMgr::insert(const char* ns,
                                 const void* obuf,
                                 int32_t len,
@@ -817,10 +769,37 @@ namespace mongo {
         uassert( 10094 , str::stream() << "invalid ns: " << ns , isValidNS( ns ) );
         {
             const char *sys = strstr(ns, "system.");
-            if ( sys && !insert_checkSys(sys, ns, wouldAddIndex, obuf, god) )
-                return DiskLoc();
+            if ( sys ) {
+
+                if ( !insert_checkSys(sys, ns, wouldAddIndex, obuf, god) )
+                    return DiskLoc();
+
+                if ( mayAddIndex && wouldAddIndex ) {
+                    // TODO: this should be handled above this function
+                    BSONObj spec( static_cast<const char*>( obuf ) );
+                    string collectionToIndex = spec.getStringField( "ns" );
+                    uassert(10096, "invalid ns to index", collectionToIndex.find( '.' ) != string::npos);
+                    massert(10097,
+                            str::stream() << "trying to create index on wrong db "
+                            << " db: " << database->name() << " collection: " << collectionToIndex,
+                            database->ownsNS( collectionToIndex ) );
+
+                    Collection* collection = database->getCollection( collectionToIndex );
+                    if ( !collection ) {
+                        collection = database->createCollection( collectionToIndex, false, NULL );
+                        verify( collection );
+                        if ( !god )
+                            ensureIdIndexForNewNs( collectionToIndex.c_str() );
+                    }
+
+                    Status status = collection->getIndexCatalog()->createIndex( spec, mayInterrupt );
+                    if ( status.code() == ErrorCodes::IndexAlreadyExists )
+                        return DiskLoc();
+                    uassertStatusOK( status );
+                    return DiskLoc();
+                }
+            }
         }
-        bool addIndex = wouldAddIndex && mayAddIndex;
 
         Collection* collection = database->getCollection( ns );
         if ( collection == NULL ) {
@@ -841,58 +820,6 @@ namespace mongo {
         }
 
         NamespaceDetails* d = collection->details();
-
-        string tabletoidxns;
-        Collection* collectionToIndex = 0;
-        NamespaceDetails* tableToIndex = 0;
-
-        BSONObj fixedIndexObject;
-        if ( addIndex ) {
-            verify( obuf );
-            BSONObj io((const char *) obuf);
-
-            tabletoidxns = io.getStringField( "ns" );
-            uassert(10096, "invalid ns to index", tabletoidxns.find( '.' ) != string::npos);
-            massert(10097,
-                    str::stream() << "trying to create index on wrong db "
-                    << " db: " << database->name() << " collection: " << tabletoidxns,
-                    database->ownsNS( tabletoidxns ) );
-
-            collectionToIndex = database->getCollection( tabletoidxns );
-            if ( !collectionToIndex ) {
-                collectionToIndex = database->createCollection( tabletoidxns, false, NULL );
-                verify( collectionToIndex );
-                if ( !god )
-                    ensureIdIndexForNewNs( tabletoidxns.c_str() );
-            }
-
-            tableToIndex = collectionToIndex->details();
-
-            Status status = collectionToIndex->getIndexCatalog()->okToAddIndex( io );
-            if ( status.code() == ErrorCodes::IndexAlreadyExists ) {
-                // dup index, we ignore
-                return DiskLoc();
-            }
-
-            uassert( 17199,
-                     str::stream() << "cannot build index on " << tabletoidxns
-                     << " because of " << status.toString(),
-                     status.isOK() );
-
-            if( !prepareToBuildIndex(io,
-                                     mayInterrupt,
-                                     god,
-                                     tabletoidxns ) ) {
-                // prepare creates _id itself, or this indicates to fail the build silently (such 
-                // as if index already exists)
-                return DiskLoc();
-            }
-
-            fixedIndexObject = IndexCatalog::fixIndexSpec( io );
-
-            obuf = fixedIndexObject.objdata();
-            len = fixedIndexObject.objsize();
-        }
 
         IDToInsert idToInsert; // only initialized if needed
 
@@ -964,10 +891,6 @@ namespace mongo {
         if ( !god )
             collection->infoCache()->notifyOfWriteOp();
 
-        if ( tableToIndex ) {
-            insert_makeIndex(collectionToIndex, loc, mayInterrupt);
-        }
-
         /* add this record to our indexes */
         if ( d->getTotalIndexCount() > 0 ) {
             try {
@@ -976,7 +899,7 @@ namespace mongo {
             }
             catch( AssertionException& e ) {
                 // should be a dup key error on _id index
-                if( tableToIndex || d->isCapped() ) {
+                if( d->isCapped() ) {
                     massert( 12583, "unexpected index insertion failure on capped collection", !d->isCapped() );
                     string s = e.toString();
                     s += " : on addIndex/capped - collection and its index will not match";
