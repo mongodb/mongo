@@ -311,7 +311,7 @@ worker(CONFIG_THREAD *thread, uint32_t worker_type)
 	WT_CONNECTION *conn;
 	WT_CURSOR *cursor;
 	WT_SESSION *session;
-	uint64_t next_incr, next_val;
+	uint64_t next_val;
 	int op_ret, ret;
 	char *data_buf, *key_buf, *value;
 	const char *op_name = "search";
@@ -349,13 +349,9 @@ worker(CONFIG_THREAD *thread, uint32_t worker_type)
 	}
 
 	while (g_running) {
-		/* Get a value in range, avoid zero. */
-		if (IS_INSERT_WORKER(worker_type))
-			next_incr = get_next_incr();
-
 		if (!F_ISSET(cfg, PERF_RAND_WORKLOAD) &&
 		    IS_INSERT_WORKER(worker_type))
-			next_val = cfg->icount + next_incr;
+			next_val = cfg->icount + get_next_incr();
 		else
 			next_val = wtperf_rand(cfg);
 
