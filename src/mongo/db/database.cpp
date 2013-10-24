@@ -41,7 +41,6 @@
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/database_holder.h"
 #include "mongo/db/storage/index_details.h"
-#include "mongo/db/index_update.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/introspect.h"
 #include "mongo/db/pdfile.h"

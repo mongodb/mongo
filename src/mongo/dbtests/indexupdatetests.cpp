@@ -16,8 +16,6 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "mongo/db/index_update.h"
-
 #include "mongo/db/btree.h"
 #include "mongo/db/btreecursor.h"
 #include "mongo/db/catalog/index_catalog.h"

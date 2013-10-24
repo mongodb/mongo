@@ -32,7 +32,6 @@
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/client.h"
 #include "mongo/db/dbhelpers.h"
-#include "mongo/db/index_update.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_details.h"
 #include "mongo/db/structure/collection.h"

@@ -36,7 +36,6 @@
 
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/db.h"
-#include "mongo/db/index_update.h"
 #include "mongo/db/json.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/db/structure/collection.h"

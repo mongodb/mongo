@@ -38,7 +38,6 @@
 #include "mongo/db/structure/collection_iterator.h"
 
 #include "mongo/db/pdfile.h" // XXX-ERH
-#include "mongo/db/index_update.h" // XXX-ERH
 
 namespace mongo {
 

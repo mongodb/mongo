@@ -28,14 +28,13 @@
 
 #pragma once
 
+#include <string>
+
 #include "mongo/db/diskloc.h"
 #include "mongo/db/storage/index_details.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/platform/cstdint.h"
 
 namespace mongo {
     class NamespaceDetails;
-    class Record;
 
     // Build an index in the foreground
     // If background is false, uses fast index builder

@@ -54,7 +54,6 @@
 #include "mongo/db/db.h"
 #include "mongo/db/dur_stats.h"
 #include "mongo/db/index_builder.h"
-#include "mongo/db/index_update.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/introspect.h"
 #include "mongo/db/jsobj.h"

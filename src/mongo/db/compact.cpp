@@ -45,7 +45,6 @@
 #include "mongo/db/extsort.h"
 #include "mongo/db/storage/index_details.h"
 #include "mongo/db/index_builder.h"
-#include "mongo/db/index_update.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/kill_current_op.h"
 #include "mongo/db/pdfile.h"
