@@ -102,11 +102,11 @@ namespace mongo {
             // false means Don't expand the last array, duh.
             obj.getFieldsDotted(e.fieldName(), fieldElements, false);
 
+            // If we're sparse and we're missing any field, bail out.
+            if (_descriptor->isSparse() && fieldElements.empty()) { return; }
+
             BSONObjSet keysForThisField;
             if (IndexNames::GEO_2DSPHERE == e.valuestr()) {
-                // We can't ever return documents that don't have geometry so don't bother indexing
-                // them.
-                if (fieldElements.empty()) { return; }
                 getGeoKeys(obj, fieldElements, &keysForThisField);
             } else {
                 getLiteralKeys(fieldElements, &keysForThisField);
