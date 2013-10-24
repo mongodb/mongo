@@ -214,8 +214,11 @@ __lsm_bloom_work(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 		    chunk->count == 0)
 			continue;
 
-		WT_ERR(__lsm_bloom_create(session, lsm_tree, chunk));
-		goto done;
+		/* See if we win the race to switch on the "busy" flag. */
+		if (WT_ATOMIC_CAS(chunk->bloom_busy, 0, 1)) {
+			WT_ERR(__lsm_bloom_create(session, lsm_tree, chunk));
+			goto done;
+		}
 	}
 
 	ret = WT_NOTFOUND;
