@@ -29,11 +29,13 @@ namespace optionenvironment {
     // TODO: Make sure the section we are adding does not have duplicate options
     Status OptionSection::addSection(const OptionSection& subSection) {
         std::list<OptionDescription>::const_iterator oditerator;
-        for (oditerator = _options.begin();
-             oditerator != _options.end(); oditerator++) {
+        for (oditerator = subSection._options.begin();
+             oditerator != subSection._options.end(); oditerator++) {
             if (oditerator->_positionalStart != -1) {
-                return Status(ErrorCodes::InternalError,
-                              "Attempted to add subsection with positional options");
+                StringBuilder sb;
+                sb << "Attempted to add subsection with positional option: "
+                   << oditerator->_dottedName;
+                return Status(ErrorCodes::InternalError, sb.str());
             }
         }
         _subSections.push_back(subSection);
