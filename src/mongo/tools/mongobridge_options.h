@@ -45,6 +45,11 @@ namespace mongo {
 
     void printMongoBridgeHelp(std::ostream* out);
 
+    /**
+     * Handle options that should come before validation, such as "help".
+     *
+     * Returns false if an option was found that implies we should prematurely exit with success.
+     */
     bool handlePreValidationMongoBridgeOptions(const moe::Environment& params);
 
     Status storeMongoBridgeOptions(const moe::Environment& params,

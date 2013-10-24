@@ -42,6 +42,11 @@ namespace mongo {
 
     void printMongoRestoreHelp(std::ostream* out);
 
+    /**
+     * Handle options that should come before validation, such as "help".
+     *
+     * Returns false if an option was found that implies we should prematurely exit with success.
+     */
     bool handlePreValidationMongoRestoreOptions(const moe::Environment& params);
 
     Status storeMongoRestoreOptions(const moe::Environment& params,

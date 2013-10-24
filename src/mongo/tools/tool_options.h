@@ -88,6 +88,11 @@ namespace mongo {
     int getParam(std::string name, int def);
     bool hasParam(std::string name);
 
+    /**
+     * Handle options that should come before validation, such as "help".
+     *
+     * Returns false if an option was found that implies we should prematurely exit with success.
+     */
     bool handlePreValidationGeneralToolOptions(const moe::Environment& params);
 
     Status storeGeneralToolOptions(const moe::Environment& params,

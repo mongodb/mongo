@@ -56,9 +56,9 @@ namespace mongo {
     bool handlePreValidationBSONDumpOptions(const moe::Environment& params) {
         if (params.count("help")) {
             printBSONDumpHelp(&std::cout);
-            return true;
+            return false;
         }
-        return false;
+        return true;
     }
 
     Status storeBSONDumpOptions(const moe::Environment& params,

@@ -55,9 +55,9 @@ namespace mongo {
     bool handlePreValidationMongoTopOptions(const moe::Environment& params) {
         if (params.count("help")) {
             printMongoTopHelp(&std::cout);
-            return true;
+            return false;
         }
-        return false;
+        return true;
     }
 
     Status storeMongoTopOptions(const moe::Environment& params,

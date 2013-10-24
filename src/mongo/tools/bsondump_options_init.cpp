@@ -25,7 +25,7 @@ namespace mongo {
     }
 
     MONGO_STARTUP_OPTIONS_VALIDATE(BSONDumpOptions)(InitializerContext* context) {
-        if (handlePreValidationBSONDumpOptions(moe::startupOptionsParsed)) {
+        if (!handlePreValidationBSONDumpOptions(moe::startupOptionsParsed)) {
             ::_exit(EXIT_SUCCESS);
         }
         Status ret = moe::startupOptionsParsed.validate();

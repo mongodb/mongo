@@ -114,20 +114,20 @@ namespace mongo {
                                             const std::vector<std::string>& args) {
         if (params.count("help")) {
             printMongosHelp(moe::startupOptions);
-            return true;
+            return false;
         }
         if (params.count("version")) {
             printShardingVersionInfo(true);
-            return true;
+            return false;
         }
         if ( params.count( "test" ) ) {
             ::mongo::logger::globalLogDomain()->setMinimumLoggedSeverity(
                     ::mongo::logger::LogSeverity::Debug(5));
             StartupTest::runTests();
-            return true;
+            return false;
         }
 
-        return false;
+        return true;
     }
 
     Status storeMongosOptions(const moe::Environment& params,

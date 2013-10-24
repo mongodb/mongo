@@ -87,9 +87,9 @@ namespace mongo {
     bool handlePreValidationMongoExportOptions(const moe::Environment& params) {
         if (params.count("help")) {
             printMongoExportHelp(&std::cout);
-            return true;
+            return false;
         }
-        return false;
+        return true;
     }
 
     Status storeMongoExportOptions(const moe::Environment& params,

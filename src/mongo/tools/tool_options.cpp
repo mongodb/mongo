@@ -181,9 +181,9 @@ namespace mongo {
     bool handlePreValidationGeneralToolOptions(const moe::Environment& params) {
         if (moe::startupOptionsParsed.count("version")) {
             printToolVersionString(std::cout);
-            return true;
+            return false;
         }
-        return false;
+        return true;
     }
 
     extern bool directoryperdb;

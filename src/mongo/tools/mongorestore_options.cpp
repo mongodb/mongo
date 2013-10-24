@@ -98,9 +98,9 @@ namespace mongo {
     bool handlePreValidationMongoRestoreOptions(const moe::Environment& params) {
         if (params.count("help")) {
             printMongoRestoreHelp(&std::cout);
-            return true;
+            return false;
         }
-        return false;
+        return true;
     }
 
     Status storeMongoRestoreOptions(const moe::Environment& params,

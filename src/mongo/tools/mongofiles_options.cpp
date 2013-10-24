@@ -89,9 +89,9 @@ namespace mongo {
     bool handlePreValidationMongoFilesOptions(const moe::Environment& params) {
         if (params.count("help")) {
             printMongoFilesHelp(&std::cout);
-            return true;
+            return false;
         }
-        return false;
+        return true;
     }
 
     Status storeMongoFilesOptions(const moe::Environment& params,

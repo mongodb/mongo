@@ -309,20 +309,20 @@ namespace mongo {
                                             const std::vector<std::string>& args) {
         if (params.count("help")) {
             printMongodHelp(moe::startupOptions);
-            return true;
+            return false;
         }
         if (params.count("version")) {
             cout << mongodVersion() << endl;
             printGitVersion();
             printOpenSSLVersion();
-            return true;
+            return false;
         }
         if (params.count("sysinfo")) {
             sysRuntimeInfo();
-            return true;
+            return false;
         }
 
-        return false;
+        return true;
     }
 
     Status storeMongodOptions(const moe::Environment& params,

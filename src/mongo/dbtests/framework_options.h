@@ -45,6 +45,11 @@ namespace mongo {
 
     std::string getTestFrameworkHelp(const StringData& name, const moe::OptionSection& options);
 
+    /**
+     * Handle options that should come before validation, such as "help".
+     *
+     * Returns false if an option was found that implies we should prematurely exit with success.
+     */
     bool handlePreValidationTestFrameworkOptions(const moe::Environment& params,
                                              const std::vector<std::string>& args);
 

@@ -52,9 +52,9 @@ namespace mongo {
     bool handlePreValidationMongoBridgeOptions(const moe::Environment& params) {
         if (params.count("help")) {
             printMongoBridgeHelp(&std::cout);
-            return true;
+            return false;
         }
-        return false;
+        return true;
     }
 
     Status storeMongoBridgeOptions(const moe::Environment& params,
