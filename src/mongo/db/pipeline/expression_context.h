@@ -42,22 +42,30 @@ namespace mongo {
             : inShard(false)
             , inRouter(false)
             , extSortAllowed(false)
-            , interruptStatus(status)
             , ns(ns)
+            , interruptStatus(status)
+            , interruptCounter(interruptCheckPeriod)
         {}
+
         /** Used by a pipeline to check for interrupts so that killOp() works.
          *  @throws if the operation has been interrupted
          */
         void checkForInterrupt() {
-            // The check could be expensive, at least in relative terms.
-            RARELY interruptStatus.checkForInterrupt();
+            if (--interruptCounter == 0) {
+                // The checkForInterrupt could be expensive, at least in relative terms.
+                interruptStatus.checkForInterrupt();
+                interruptCounter = interruptCheckPeriod;
+            }
         }
         
         bool inShard;
         bool inRouter;
         bool extSortAllowed;
-        const InterruptStatus& interruptStatus;
         NamespaceString ns;
         std::string tempDir; // Defaults to empty to prevent external sorting in mongos.
+
+        const InterruptStatus& interruptStatus;
+        static const int interruptCheckPeriod = 128;
+        int interruptCounter; // when 0, check interruptStatus
     };
 }
