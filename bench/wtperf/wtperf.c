@@ -162,6 +162,9 @@ const char *wtperftmp_subdir = "/wtperftmp";
 #define	WORKER_INSERT_RMW	0x03
 #define	WORKER_UPDATE		0x04
 
+#define IS_INSERT_WORKER(w)			\
+    ((w) == WORKER_INSERT || (w) == WORKER_INSERT_RMW)
+
 /* Default values. */
 CONFIG default_cfg = {
 	"WT_TEST",		/* home */
@@ -324,7 +327,7 @@ worker(CONFIG_THREAD *thread, uint32_t worker_type)
 		lprintf(cfg, ret = ENOMEM, 0, "Populate key buffer");
 		goto err;
 	}
-	if (worker_type == WORKER_INSERT || worker_type == WORKER_UPDATE) {
+	if (IS_INSERT_WORKER(worker_type) || worker_type == WORKER_UPDATE) {
 		data_buf = calloc(cfg->data_sz, 1);
 		if (data_buf == NULL) {
 			lprintf(cfg, ret = ENOMEM, 0, "Populate data buffer");
@@ -347,11 +350,11 @@ worker(CONFIG_THREAD *thread, uint32_t worker_type)
 
 	while (g_running) {
 		/* Get a value in range, avoid zero. */
-		if (worker_type == WORKER_INSERT)
+		if (IS_INSERT_WORKER(worker_type))
 			next_incr = get_next_incr();
 
 		if (!F_ISSET(cfg, PERF_RAND_WORKLOAD) &&
-		    worker_type == WORKER_INSERT)
+		    IS_INSERT_WORKER(worker_type))
 			next_val = cfg->icount + next_incr;
 		else
 			next_val = wtperf_rand(cfg);
@@ -360,7 +363,7 @@ worker(CONFIG_THREAD *thread, uint32_t worker_type)
 		 * If the workload is started without a populate phase we
 		 * rely on at least one insert to get a valid item id.
 		 */
-		if (worker_type != WORKER_INSERT &&
+		if (!IS_INSERT_WORKER(worker_type) &&
 		    wtperf_value_range(cfg) < next_val)
 			continue;
 		sprintf(key_buf, "%0*" PRIu64, cfg->key_sz, next_val);
@@ -378,6 +381,8 @@ worker(CONFIG_THREAD *thread, uint32_t worker_type)
 				op_name="insert_rmw";
 				break;
 			}
+			/* All error returns reset the cursor buffers. */
+			cursor->set_key(cursor, key_buf);
 			/* FALLTHROUGH */
 		case WORKER_INSERT:
 			cursor->set_value(cursor, data_buf);
