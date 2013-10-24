@@ -274,13 +274,16 @@ ReplSetTest.awaitRSClientHosts(st.s, st.rs0.nodes);
 // Tag primary with { dc: 'ny', tag: 'one' }, secondary with { dc: 'ny', tag: 'two' }
 var primary = st.rs0.getPrimary();
 var secondary = st.rs0.getSecondary();
+var PRIMARY_TAG = { dc: 'ny', tag: 'one' };
+var SECONDARY_TAG = { dc: 'ny', tag: 'two' };
+
 var rsConfig = primary.getDB("local").system.replset.findOne();
 jsTest.log('got rsconf ' + tojson(rsConfig));
 rsConfig.members.forEach(function(member) {
     if (member.host == primary.host) {
-        member.tags = { dc: 'ny', tag: 'one' }
+        member.tags = PRIMARY_TAG;
     } else {
-        member.tags = { dc: 'ny', tag: 'two' }
+        member.tags = SECONDARY_TAG;
     }
 });
 
@@ -320,14 +323,13 @@ jsTest.log('got rsconf ' + tojson(rsConfig));
 var replConn = new Mongo(st.rs0.getURL());
 
 // Make sure replica set connection is ready
-_awaitRSHostViaRSMonitor(st.rs0.nodeList()[0], {ok: true}, "test-rs0");
-_awaitRSHostViaRSMonitor(st.rs0.nodeList()[1], {ok: true}, "test-rs0");
+_awaitRSHostViaRSMonitor(primary.name, { ok: true, tags: PRIMARY_TAG }, st.rs0.name);
+_awaitRSHostViaRSMonitor(secondary.name, { ok: true, tags: SECONDARY_TAG }, st.rs0.name);
 
-//TODO: fix and reenable the testAllModes portions of this test
-//testAllModes(replConn, st.rs0.nodes, false);
+testAllModes(replConn, st.rs0.nodes, false);
 
 jsTest.log('Starting test for mongos connection');
 
-//testAllModes(st.s, st.rs0.nodes, true);
+testAllModes(st.s, st.rs0.nodes, true);
 
 st.stop();
