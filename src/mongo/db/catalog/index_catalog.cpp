@@ -234,7 +234,7 @@ namespace mongo {
         verify( indexBuildBlock.indexDetails() );
 
         try {
-            buildAnIndex( _collection->ns(), _collection->details(),
+            buildAnIndex( _collection,
                           *indexBuildBlock.indexDetails(), mayInterrupt);
             indexBuildBlock.success();
             return Status::OK();

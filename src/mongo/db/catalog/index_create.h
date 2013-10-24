@@ -32,18 +32,16 @@
 
 #include <string>
 
-#include "mongo/db/diskloc.h"
 #include "mongo/db/storage/index_details.h"
 
 namespace mongo {
-    class NamespaceDetails;
+    class Collection;
 
     // Build an index in the foreground
     // If background is false, uses fast index builder
     // If background is true, uses background index builder; blocks until done.
-    void buildAnIndex(const std::string& ns,
-                      NamespaceDetails *d,
-                      IndexDetails& idx,
-                      bool mayInterrupt);
+    void buildAnIndex( Collection* collection,
+                       IndexDetails& idx,
+                       bool mayInterrupt );
 
 } // namespace mongo
