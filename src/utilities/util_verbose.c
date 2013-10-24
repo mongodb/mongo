@@ -16,6 +16,7 @@ __handle_error_verbose(WT_EVENT_HANDLER *handler,
     WT_SESSION *session, int error, const char *errmsg)
 {
 	WT_UNUSED(handler);
+	WT_UNUSED(session);
 	WT_UNUSED(error);
 
 	return (fprintf(stderr, "%s\n", errmsg) < 0 ? EIO : 0);
@@ -30,6 +31,7 @@ __handle_message_verbose(WT_EVENT_HANDLER *handler,
     WT_SESSION *session, const char *message)
 {
 	WT_UNUSED(handler);
+	WT_UNUSED(session);
 
 	return (printf("%s\n", message) < 0 ? EIO : 0);
 }
@@ -43,6 +45,7 @@ __handle_progress_verbose(WT_EVENT_HANDLER *handler,
     WT_SESSION *session, const char *operation, uint64_t progress)
 {
 	WT_UNUSED(handler);
+	WT_UNUSED(session);
 
 	return (
 	    printf("\r\t%s %-20" PRIu64, operation, progress) < 0 ? EIO : 0);
