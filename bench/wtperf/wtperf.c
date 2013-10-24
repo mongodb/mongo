@@ -294,7 +294,7 @@ worker(CONFIG_THREAD *thread, worker_type wtype)
 	uint64_t next_val;
 	int op_ret, ret;
 	char *data_buf, *key_buf, *value;
-	const char *op_name = "search";
+	const char *op_name;
 
 	cfg = thread->cfg;
 	session = NULL;
