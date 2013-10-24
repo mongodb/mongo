@@ -80,14 +80,8 @@ __session_close(WT_SESSION *wt_session, const char *config)
 
 	WT_ASSERT(session, session->ncursors == 0);
 
-	/*
-	 * Acquire the schema lock: we may be closing btree handles.
-	 *
-	 * Note that in some special cases, the schema may already be locked
-	 * (e.g., if this session is an LSM tree worker and the tree is being
-	 * dropped).
-	 */
-	WT_WITH_SCHEMA_LOCK_OPT(session, tret = __session_close_cache(session));
+	/* Acquire the schema lock: we may be closing btree handles. */
+	WT_WITH_SCHEMA_LOCK(session, tret = __session_close_cache(session));
 	WT_TRET(tret);
 
 	/* Discard metadata tracking. */
@@ -675,7 +669,7 @@ __session_begin_transaction(WT_SESSION *wt_session, const char *config)
 
 	session = (WT_SESSION_IMPL *)wt_session;
 	SESSION_API_CALL(session, begin_transaction, config, cfg);
-	WT_CSTAT_INCR(session, txn_begin);
+	WT_STAT_FAST_CONN_INCR(session, txn_begin);
 
 	if (F_ISSET(&session->txn, TXN_RUNNING))
 		WT_ERR_MSG(session, EINVAL, "Transaction already running");
@@ -708,7 +702,7 @@ __session_commit_transaction(WT_SESSION *wt_session, const char *config)
 
 	session = (WT_SESSION_IMPL *)wt_session;
 	SESSION_API_CALL(session, commit_transaction, config, cfg);
-	WT_CSTAT_INCR(session, txn_commit);
+	WT_STAT_FAST_CONN_INCR(session, txn_commit);
 
 	txn = &session->txn;
 	if (F_ISSET(txn, TXN_ERROR)) {
@@ -739,7 +733,7 @@ __session_rollback_transaction(WT_SESSION *wt_session, const char *config)
 
 	session = (WT_SESSION_IMPL *)wt_session;
 	SESSION_API_CALL(session, rollback_transaction, config, cfg);
-	WT_CSTAT_INCR(session, txn_rollback);
+	WT_STAT_FAST_CONN_INCR(session, txn_rollback);
 
 	WT_TRET(__session_reset_cursors(session));
 
@@ -763,7 +757,7 @@ __session_checkpoint(WT_SESSION *wt_session, const char *config)
 	session = (WT_SESSION_IMPL *)wt_session;
 	txn = &session->txn;
 
-	WT_CSTAT_INCR(session, txn_checkpoint);
+	WT_STAT_FAST_CONN_INCR(session, txn_checkpoint);
 	SESSION_API_CALL(session, checkpoint, config, cfg);
 
 	/*
@@ -845,7 +839,7 @@ __wt_open_session(WT_CONNECTION_IMPL *conn, int internal,
 			break;
 	if (i == conn->session_size)
 		WT_ERR_MSG(session, WT_ERROR,
-		    "only configured to support %d thread contexts",
+		    "only configured to support %" PRIu32 " thread contexts",
 		    conn->session_size);
 
 	/*
@@ -878,8 +872,9 @@ __wt_open_session(WT_CONNECTION_IMPL *conn, int internal,
 	 * first time we open this session.
 	 */
 	if (session_ret->hazard == NULL)
-		WT_ERR(__wt_calloc(session, conn->hazard_max,
-		    sizeof(WT_HAZARD), &session_ret->hazard));
+		WT_ERR(__wt_calloc_def(
+		    session, conn->hazard_max, &session_ret->hazard));
+
 	/*
 	 * Set an initial size for the hazard array. It will be grown as
 	 * required up to hazard_max. The hazard_size is reset on close, since

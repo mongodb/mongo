@@ -72,8 +72,8 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, int exclusive)
 	 */
 	if (inmem_split) {
 		WT_ERR(__wt_split_page_inmem(session, page));
-		WT_CSTAT_INCR(session, cache_inmem_split);
-		WT_DSTAT_INCR(session, cache_inmem_split);
+		WT_STAT_FAST_CONN_INCR(session, cache_inmem_split);
+		WT_STAT_FAST_DATA_INCR(session, cache_inmem_split);
 		goto done;
 	}
 
@@ -86,8 +86,8 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, int exclusive)
 	/* Count evictions of internal pages during normal operation. */
 	if (!exclusive && !merge &&
 	    (page->type == WT_PAGE_COL_INT || page->type == WT_PAGE_ROW_INT)) {
-		WT_CSTAT_INCR(session, cache_eviction_internal);
-		WT_DSTAT_INCR(session, cache_eviction_internal);
+		WT_STAT_FAST_CONN_INCR(session, cache_eviction_internal);
+		WT_STAT_FAST_DATA_INCR(session, cache_eviction_internal);
 	}
 
 	/*
@@ -102,8 +102,8 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, int exclusive)
 		else
 			__rec_page_clean_update(session, parent_ref);
 
-		WT_CSTAT_INCR(session, cache_eviction_clean);
-		WT_DSTAT_INCR(session, cache_eviction_clean);
+		WT_STAT_FAST_CONN_INCR(session, cache_eviction_clean);
+		WT_STAT_FAST_DATA_INCR(session, cache_eviction_clean);
 	} else {
 		if (WT_PAGE_IS_ROOT(page))
 			__rec_root_update(session);
@@ -111,8 +111,8 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, int exclusive)
 			WT_ERR(__rec_page_dirty_update(
 			    session, parent_ref, page));
 
-		WT_CSTAT_INCR(session, cache_eviction_dirty);
-		WT_DSTAT_INCR(session, cache_eviction_dirty);
+		WT_STAT_FAST_CONN_INCR(session, cache_eviction_dirty);
+		WT_STAT_FAST_DATA_INCR(session, cache_eviction_dirty);
 	}
 
 	/* Discard the page or tree rooted in this page. */
@@ -128,8 +128,8 @@ err:		/*
 		 */
 		__rec_excl_clear(session);
 
-		WT_CSTAT_INCR(session, cache_eviction_fail);
-		WT_DSTAT_INCR(session, cache_eviction_fail);
+		WT_STAT_FAST_CONN_INCR(session, cache_eviction_fail);
+		WT_STAT_FAST_DATA_INCR(session, cache_eviction_fail);
 	}
 done:	session->excl_next = 0;
 
@@ -386,8 +386,8 @@ __rec_review(WT_SESSION_IMPL *session, WT_REF *ref, WT_PAGE *page,
 	 * we never find such a page.
 	 */
 	if (btree->checkpointing && !merge && __wt_page_is_modified(page)) {
-ckpt:		WT_CSTAT_INCR(session, cache_eviction_checkpoint);
-		WT_DSTAT_INCR(session, cache_eviction_checkpoint);
+ckpt:		WT_STAT_FAST_CONN_INCR(session, cache_eviction_checkpoint);
+		WT_STAT_FAST_DATA_INCR(session, cache_eviction_checkpoint);
 		return (EBUSY);
 	}
 
@@ -564,8 +564,8 @@ __hazard_exclusive(WT_SESSION_IMPL *session, WT_REF *ref, int top)
 	if (__wt_page_hazard_check(session, ref->page) == NULL)
 		return (0);
 
-	WT_DSTAT_INCR(session, cache_eviction_hazard);
-	WT_CSTAT_INCR(session, cache_eviction_hazard);
+	WT_STAT_FAST_DATA_INCR(session, cache_eviction_hazard);
+	WT_STAT_FAST_CONN_INCR(session, cache_eviction_hazard);
 
 	WT_VERBOSE_RET(
 	    session, evict, "page %p hazard request failed", ref->page);

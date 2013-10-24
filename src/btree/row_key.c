@@ -235,7 +235,7 @@ __wt_row_leaf_key_work(WT_SESSION_IMPL *session,
 			 * care if it's an overflow key, get a copy and wrap up.
 			 */
 			if (slot_offset == 0) {
-				WT_ERR(__wt_cell_unpack_ref(
+				WT_ERR(__wt_dsk_cell_data_ref(
 				    session, WT_PAGE_ROW_LEAF, unpack, retb));
 				break;
 			}
@@ -271,7 +271,7 @@ __wt_row_leaf_key_work(WT_SESSION_IMPL *session,
 			 * found this key while rolling backwards and switched
 			 * directions then.
 			 */
-			WT_ERR(__wt_cell_unpack_ref(
+			WT_ERR(__wt_dsk_cell_data_ref(
 			    session, WT_PAGE_ROW_LEAF, unpack, retb));
 			if (slot_offset == 0) {
 				/*
@@ -302,7 +302,7 @@ __wt_row_leaf_key_work(WT_SESSION_IMPL *session,
 			/* Get a reference to the current key's bytes. */
 			if (tmp == NULL)
 				WT_ERR(__wt_scr_alloc(session, 0, &tmp));
-			WT_ERR(__wt_cell_unpack_ref(
+			WT_ERR(__wt_dsk_cell_data_ref(
 			    session, WT_PAGE_ROW_LEAF, unpack, tmp));
 
 			/*

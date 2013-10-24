@@ -161,7 +161,7 @@ __wt_block_open(WT_SESSION_IMPL *session,
 	    session, filename, 0, 0, WT_FILE_TYPE_DATA, &block->fh));
 
 	/* Initialize the live checkpoint's lock. */
-	WT_ERR(__wt_spin_init(session, &block->live_lock));
+	WT_ERR(__wt_spin_init(session, &block->live_lock, "block manager"));
 
 	/*
 	 * Read the description information from the first block.
@@ -312,12 +312,11 @@ __wt_block_stat(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_DSRC_STATS *stats)
 	 * isn't like this is a common function for an application to call.
 	 */
 	__wt_spin_lock(session, &block->live_lock);
-	WT_STAT_SET(session, stats, block_allocsize, block->allocsize);
-	WT_STAT_SET(
-	    session, stats, block_checkpoint_size, block->live.ckpt_size);
-	WT_STAT_SET(session, stats, block_magic, WT_BLOCK_MAGIC);
-	WT_STAT_SET(session, stats, block_major, WT_BLOCK_MAJOR_VERSION);
-	WT_STAT_SET(session, stats, block_minor, WT_BLOCK_MINOR_VERSION);
-	WT_STAT_SET(session, stats, block_size, block->fh->size);
+	WT_STAT_SET(stats, block_allocsize, block->allocsize);
+	WT_STAT_SET(stats, block_checkpoint_size, block->live.ckpt_size);
+	WT_STAT_SET(stats, block_magic, WT_BLOCK_MAGIC);
+	WT_STAT_SET(stats, block_major, WT_BLOCK_MAJOR_VERSION);
+	WT_STAT_SET(stats, block_minor, WT_BLOCK_MINOR_VERSION);
+	WT_STAT_SET(stats, block_size, block->fh->size);
 	__wt_spin_unlock(session, &block->live_lock);
 }

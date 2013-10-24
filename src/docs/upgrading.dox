@@ -1,5 +1,61 @@
 /*! @page upgrading Upgrading WiredTiger applications
 
+@section version_166 Upgrading to Version 1.6.6
+<dl>
+
+<dt>Statistics configuration</dt>
+<dd>
+In previous releases, the ::wiredtiger_open function took a \c statistics
+configuration, which defaulted to false; when set to true, additional,
+generally performance-expensive statistics were maintained by the
+database, above and beyond a default set of statistics.  In version
+1.6.6, the \c statistics configuration is a list which may be set to
+"all", "fast" or "none".   When set to "none", no statistics are
+maintained by the database; when set to "fast", only relatively
+performance-inexpensive statistics are maintained, and when set to
+"all", all statistics are maintained, regardless of cost.
+
+In previous releases, the ::wiredtiger_open function took a \c statistics_log
+configuration which logged the performance-inexpensive database
+statistics to a file.  In version 1.6.6, the \c statistics_log
+configuration logs whatever statistics are configured for the database.
+If the database is configured with \c statistics to "none", no
+statistics will be logged to the file; if the database is configured
+with "all" or "fast", the corresponding statistics will be logged to the
+file.
+
+In previous releases, the WT_SESSION::cursor method took 
+\c statistics_clear and a \c statistics_fast configurations.  The
+\c statistics_clear configuration defaulted to false; when set to true,
+statistics counters were reset after they were gathered by the cursor.
+The \c statistics_fast configuration defaulted to true; when set to
+true, the cursor only gathered performance-inexpensive statistics for
+the cursor, and when set to false, the cursor gathered all available
+statistics, regardless of cost.
+
+In version 1.6.6, these two configuration booleans have been replaced
+with a new configuration list \c statistics, which may be set from the
+values "clear", "fast" and "all".   When "fast" is configured, only
+relatively performance-inexpensive statistics are gathered, and when
+"all" is configured, all statistics are gathered, regardless of cost.
+When "clear" is configured, statistics counters are reset after they are
+gathered.
+
+Additionally, in version 1.6.6, statistics cursors must be configured
+to agree with the database statistics configuration; when the database
+statistics are configured to "none", attempts to open a statistics
+cursor will fail; when the database statistics are configured to "fast",
+a statistics cursor must also be configured to "fast"; when the database
+statistics are configured to "all", a statistics cursor may be
+configured to either "fast" or "all".   Opening a statistics cursor
+without configuring either "fast" or "all" will configure the cursor to
+be the same as the current database configuration.
+
+Applications may require modifications to resolve run-time errors;
+application statistics configuration and cursors should be reviewed to
+confirm they are configured for the desired behavior;
+</dd>
+
 @section version_165 Upgrading to Version 1.6.5
 <dl>
 

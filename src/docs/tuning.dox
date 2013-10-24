@@ -72,6 +72,34 @@ example, Google's
 or <a href="http://www.canonware.com/jemalloc">jemalloc</a>),
 can dramatically improve throughput.
 
+@section transparent_huge_pages Linux transparent huge pages
+
+The performance of WiredTiger applications can be adversely affected when
+transparent huge pages are enabled on Linux systems. Some Linux systems
+enable transparent huge pages by default. Further information about
+transparent huge pages is
+<a href="https://access.redhat.com/site/documentation/en-US/Red_Hat_Enterprise_Linux/6/html/Performance_Tuning_Guide/s-memory-transhuge.html">here</a>.
+To disable transparent huge pages run the following command as the root user:
+
+@code
+echo never > /sys/kernel/mm/transparent_hugepage/enabled
+@endcode
+
+@section numa_zone_reclamation Linux zone reclamation memory management
+
+The performance of WiredTiger applications can be sensitive to the zone
+reclamation algorithms used in Linux Non Uniform Memory Management (NUMA).
+Details of NUMA with specific reference to Linux are in this
+<a href="http://queue.acm.org/detail.cfm?id=2513149">article</a>
+by Christoph Lameter. If a WiredTiger database cache is assigned a
+significant proportion of system memory, it will likely be beneficial to
+disable zone reclamation. Zone reclamation can be disabled by running the
+following command as the root user:
+
+@code
+echo 0 > /proc/sys/vm/zone_reclaim_mode
+@endcode
+
 @section tuning_cursor_persistence Cursor persistence
 
 Opening a new cursor is a relatively expensive operation in WiredTiger

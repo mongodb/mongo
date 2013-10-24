@@ -5,6 +5,9 @@
 void
 __wt_stat_init_dsrc_stats(WT_DSRC_STATS *stats)
 {
+	/* Clear, so can also be called for reinitialization. */
+	memset(stats, 0, sizeof(*stats));
+
 	stats->block_alloc.desc = "blocks allocated";
 	stats->block_allocsize.desc =
 	    "block manager file allocation unit size";
@@ -117,7 +120,7 @@ __wt_stat_init_dsrc_stats(WT_DSRC_STATS *stats)
 }
 
 void
-__wt_stat_clear_dsrc_stats(void *stats_arg)
+__wt_stat_refresh_dsrc_stats(void *stats_arg)
 {
 	WT_DSRC_STATS *stats;
 
@@ -209,7 +212,7 @@ __wt_stat_clear_dsrc_stats(void *stats_arg)
 }
 
 void
-__wt_stat_aggregate_dsrc_stats(void *child, void *parent)
+__wt_stat_aggregate_dsrc_stats(const void *child, const void *parent)
 {
 	WT_DSRC_STATS *c, *p;
 
@@ -298,6 +301,9 @@ __wt_stat_aggregate_dsrc_stats(void *child, void *parent)
 void
 __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 {
+	/* Clear, so can also be called for reinitialization. */
+	memset(stats, 0, sizeof(*stats));
+
 	stats->block_byte_map_read.desc =
 	    "mapped bytes read by the block manager";
 	stats->block_byte_read.desc = "bytes read by the block manager";
@@ -349,7 +355,6 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	stats->cursor_search_near.desc = "Btree cursor search near calls";
 	stats->cursor_update.desc = "Btree cursor update calls";
 	stats->dh_conn_handles.desc = "dhandle: connection dhandles swept";
-	stats->dh_evict_locks.desc = "dhandle: locked by eviction";
 	stats->dh_session_handles.desc = "dhandle: session dhandles swept";
 	stats->dh_sweep_evict.desc = "dhandle: sweeps conflicting with evict";
 	stats->dh_sweeps.desc = "dhandle: number of sweep attempts";
@@ -398,7 +403,7 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 }
 
 void
-__wt_stat_clear_connection_stats(void *stats_arg)
+__wt_stat_refresh_connection_stats(void *stats_arg)
 {
 	WT_CONNECTION_STATS *stats;
 
@@ -439,7 +444,6 @@ __wt_stat_clear_connection_stats(void *stats_arg)
 	stats->cursor_search_near.v = 0;
 	stats->cursor_update.v = 0;
 	stats->dh_conn_handles.v = 0;
-	stats->dh_evict_locks.v = 0;
 	stats->dh_session_handles.v = 0;
 	stats->dh_sweep_evict.v = 0;
 	stats->dh_sweeps.v = 0;

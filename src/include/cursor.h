@@ -205,7 +205,7 @@ struct __wt_cursor_data_source {
 
 	WT_COLLATOR *collator;			/* Configured collator */
 
-	WT_CURSOR *source;			/* Application-owned cursor. */
+	WT_CURSOR *source;			/* Application-owned cursor */
 };
 
 struct __wt_cursor_dump {
@@ -228,18 +228,24 @@ struct __wt_cursor_index {
 struct __wt_cursor_stat {
 	WT_CURSOR iface;
 
-	WT_STATS *stats;		/* Stats owned by the cursor. */
+	int	notpositioned;		/* Cursor not positioned */
+
+	int	stat_all;		/* "all" statistics configured */
+	int	stat_fast;		/* "fast" statistics configured */
+	int	stat_clear;		/* "clear" statistics configured */
+
+	WT_STATS *stats;		/* Stats owned by the cursor */
 	WT_STATS *stats_first;		/* First stats reference */
 	int	  stats_count;		/* Count of stats elements */
 
-	int	 notpositioned;		/* Cursor not positioned */
+	union {				/* Copies of the statistics */
+		WT_DSRC_STATS dsrc_stats;
+		WT_CONNECTION_STATS conn_stats;
+	} u;
 
 	int	 key;			/* Current stats key */
 	uint64_t v;			/* Current stats value */
-	WT_ITEM   pv;			/* Current stats value (string) */
-
-	void (*clear_func)(void *);	/* Function to clear stats. */
-	WT_BTREE *btree;		/* Pinned btree handle. */
+	WT_ITEM	 pv;			/* Current stats value (string) */
 };
 
 /*

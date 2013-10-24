@@ -96,8 +96,8 @@ __wt_cache_create(WT_CONNECTION_IMPL *conn, const char *cfg[])
 	    "cache eviction server", 0, &cache->evict_cond));
 	WT_ERR(__wt_cond_alloc(session,
 	    "eviction waiters", 0, &cache->evict_waiter_cond));
-	WT_ERR(__wt_spin_init(session, &cache->evict_lock));
-	WT_ERR(__wt_spin_init(session, &cache->evict_walk_lock));
+	WT_ERR(__wt_spin_init(session, &cache->evict_lock, "cache eviction"));
+	WT_ERR(__wt_spin_init(session, &cache->evict_walk_lock, "cache walk"));
 
 	/* Allocate the LRU eviction queue. */
 	cache->evict_slots = WT_EVICT_WALK_BASE + WT_EVICT_WALK_INCR;
@@ -129,17 +129,11 @@ __wt_cache_stats_update(WT_SESSION_IMPL *session)
 	cache = conn->cache;
 	stats = &conn->stats;
 
-	/*
-	 * Some statistics are always set, regardless of the configuration of
-	 * run-time statistics in the system.
-	 */
-	WT_STAT_SET(session, stats, cache_bytes_max, conn->cache_size);
-	WT_STAT_SET(
-	    session, stats, cache_bytes_inuse, __wt_cache_bytes_inuse(cache));
-	WT_STAT_SET(
-	    session, stats, cache_pages_inuse, __wt_cache_pages_inuse(cache));
-	WT_STAT_SET(session, stats, cache_bytes_dirty, cache->bytes_dirty);
-	WT_STAT_SET(session, stats, cache_pages_dirty, cache->pages_dirty);
+	WT_STAT_SET(stats, cache_bytes_max, conn->cache_size);
+	WT_STAT_SET(stats, cache_bytes_inuse, __wt_cache_bytes_inuse(cache));
+	WT_STAT_SET(stats, cache_pages_inuse, __wt_cache_pages_inuse(cache));
+	WT_STAT_SET(stats, cache_bytes_dirty, cache->bytes_dirty);
+	WT_STAT_SET(stats, cache_pages_dirty, cache->pages_dirty);
 }
 
 /*

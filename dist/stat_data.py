@@ -7,7 +7,7 @@
 # currently open'.
 #
 # Optional configuration flags:
-#	no_clear	Value ignored by the statistics clear function
+#	no_clear	Value ignored by the statistics refresh function
 #	no_aggregate	Ignore the value when aggregating statistics
 #	max_aggregate	Take the maximum value when aggregating statistics
 #	no_scale	Don't scale value per second in the logging tool script
@@ -92,7 +92,6 @@ connection_stats = [
 	# Dhandle statistics
 	##########################################
 	Stat('dh_conn_handles', 'dhandle: connection dhandles swept'),
-	Stat('dh_evict_locks', 'dhandle: locked by eviction'),
 	Stat('dh_session_handles', 'dhandle: session dhandles swept'),
 	Stat('dh_sweep_evict', 'dhandle: sweeps conflicting with evict'),
 	Stat('dh_sweeps', 'dhandle: number of sweep attempts'),

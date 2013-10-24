@@ -71,7 +71,6 @@ struct __wt_cache {
 	volatile uint32_t evict_max;	/* LRU maximum eviction slot used */
 	uint32_t evict_slots;		/* LRU list eviction slots */
 	u_int    evict_file_next;	/* LRU: next file to search */
-	uint32_t force_entries;		/* Forced eviction page count */
 
 	/*
 	 * Sync/flush request information.
@@ -92,6 +91,7 @@ struct __wt_cache {
 	 */
 #define	WT_EVICT_NO_PROGRESS	0x01	/* Check if pages are being evicted */
 #define	WT_EVICT_STUCK		0x02	/* Eviction server is stuck */
+#define	WT_EVICT_ACTIVE		0x04	/* Eviction server is active */
 	uint32_t flags;
 };
 

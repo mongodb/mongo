@@ -211,14 +211,12 @@ __wt_lsm_meta_write(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 		else
 			WT_ERR(__wt_buf_catfmt(session, buf, ","));
 		WT_ERR(__wt_buf_catfmt(session, buf, "\"%s\"", chunk->uri));
-		if (chunk->bloom_uri != NULL)
+		if (F_ISSET(chunk, WT_LSM_CHUNK_BLOOM))
 			WT_ERR(__wt_buf_catfmt(
 			    session, buf, ",bloom=\"%s\"", chunk->bloom_uri));
 	}
 	WT_ERR(__wt_buf_catfmt(session, buf, "]"));
-	__wt_spin_lock(session, &S2C(session)->checkpoint_lock);
 	ret = __wt_metadata_update(session, lsm_tree->name, buf->data);
-	__wt_spin_unlock(session, &S2C(session)->checkpoint_lock);
 	WT_ERR(ret);
 
 err:	__wt_scr_free(&buf);

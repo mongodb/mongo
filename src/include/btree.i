@@ -235,12 +235,22 @@ __wt_cache_bytes_inuse(WT_CACHE *cache)
 static inline int
 __wt_page_modify_init(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
+	WT_CONNECTION_IMPL *conn;
 	WT_PAGE_MODIFY *modify;
 
 	if (page->modify != NULL)
 		return (0);
 
+	conn = S2C(session);
+
 	WT_RET(__wt_calloc_def(session, 1, &modify));
+
+	/*
+	 * Select a spinlock for the page; let the barrier immediately below
+	 * keep things from racing too badly.
+	 */
+	modify->page_lock =
+	    ++conn->page_lock_cnt % (uint32_t)WT_PAGE_LOCKS(conn);
 
 	/*
 	 * Multiple threads of control may be searching and deciding to modify
@@ -269,8 +279,7 @@ __wt_page_only_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * and/or page reconciliation might be looking at a clean page/tree.
 	 *
 	 * Every time the page transitions from clean to dirty, update the cache
-	 * and transactional information.  Take care to read the
-	 * memory_footprint once in case we are racing with updates.
+	 * and transactional information.
 	 */
 	if (WT_ATOMIC_ADD(page->modify->write_gen, 1) == 1) {
 		__wt_cache_dirty_incr(session, page);
@@ -291,35 +300,24 @@ __wt_page_only_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
 static inline void
 __wt_page_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
-	__wt_page_only_modify_set(session, page);
-
 	/*
 	 * Mark the tree dirty (even if the page is already marked dirty, newly
 	 * created pages to support "empty" files are dirty, but the file isn't
 	 * marked dirty until there's a real change needing to be written. Test
 	 * before setting the dirty flag, it's a hot cache line.
 	 *
-	 * We shouldn't need an additional barrier: while technically possible
-	 * a tree is marked dirty but no dirty pages found, it shouldn't cause
-	 * problems.
+	 * The tree's modified flag is cleared by the checkpoint thread: set it
+	 * and insert a barrier before dirtying the page.  (I don't think it's
+	 * a problem if the tree is marked dirty with all the pages clean, it
+	 * might result in an extra checkpoint that doesn't do any work but it
+	 * shouldn't cause problems; regardless, let's play it safe.)
 	 */
-	if (S2BT(session)->modified == 0)
+	if (S2BT(session)->modified == 0) {
 		S2BT(session)->modified = 1;
-}
+		WT_FULL_BARRIER();
+	}
 
-/*
- * __wt_page_write_gen_wrapped_check --
- *	Confirm the page's write generation number hasn't wrapped.
- */
-static inline int
-__wt_page_write_gen_wrapped_check(WT_PAGE *page)
-{
-	/*
-	 * Check to see if the page's write generation is about to wrap (wildly
-	 * unlikely as it implies 4B updates between clean page reconciliations,
-	 * but technically possible), and fail the update.
-	 */
-	return (page->modify->write_gen > UINT32_MAX - 100 ? WT_RESTART : 0);
+	__wt_page_only_modify_set(session, page);
 }
 
 /*

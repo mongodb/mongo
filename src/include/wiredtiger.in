@@ -665,12 +665,23 @@ struct __wt_session {
 	 * @config{raw, ignore the encodings for the key and value\, manage data
 	 * as if the formats were \c "u". See @ref cursor_raw for details., a
 	 * boolean flag; default \c false.}
-	 * @config{statistics_clear, reset statistics counters when the cursor
-	 * is closed; valid only for statistics cursors., a boolean flag;
-	 * default \c false.}
-	 * @config{statistics_fast, only gather statistics that don't require
-	 * traversing the tree; valid only for statistics cursors., a boolean
-	 * flag; default \c true.}
+	 * @config{statistics, Specify the statistics to be gathered.  Choosing
+	 * "all" gathers statistics regardless of cost and may include
+	 * traversing on-disk files; "fast" gathers a subset of relatively
+	 * inexpensive statistics.  The selection must agree with the database
+	 * \c statistics configuration specified to ::wiredtiger_open or
+	 * WT_CONNECTION::reconfigure.  For example\, "all" or "fast" can be
+	 * configured when the database is configured with "all"\, but the
+	 * cursor open will fail if "all" is specified when the database is
+	 * configured with "fast"\, and the cursor open will fail in all cases
+	 * when the database is configured with "none". If \c statistics is not
+	 * configured\, the default configuration is the database configuration.
+	 * The "clear" configuration resets statistics after gathering them\,
+	 * where appropriate (for example\, a cache size statistic is not
+	 * cleared\, while the count of cursor insert operations will be
+	 * cleared). See @ref statistics for more information., a list\, with
+	 * values chosen from the following options: \c "all"\, \c "fast"\, \c
+	 * "clear"; default \c fast.}
 	 * @config{target, if non-empty\, backup the list of objects; valid only
 	 * for a backup data source., a list of strings; default empty.}
 	 * @configend
@@ -796,9 +807,6 @@ struct __wt_session {
 	 * empty.}
 	 * @config{lsm_bloom_hash_count, the number of hash values per item used
 	 * for LSM bloom filters., an integer between 2 and 100; default \c 4.}
-	 * @config{lsm_bloom_newest, create a bloom filter on an LSM tree chunk
-	 * before its first merge.  Only supported if bloom filters are
-	 * enabled., a boolean flag; default \c false.}
 	 * @config{lsm_bloom_oldest, create a bloom filter on the oldest LSM
 	 * tree chunk.  Only supported if bloom filters are enabled., a boolean
 	 * flag; default \c false.}
@@ -1182,8 +1190,19 @@ struct __wt_connection {
 	 * the shared cache.  Setting this will update the value if one is
 	 * already set., an integer between 1MB and 10TB; default \c 500MB.}
 	 * @config{ ),,}
-	 * @config{statistics, Maintain database statistics that may impact
-	 * performance., a boolean flag; default \c false.}
+	 * @config{statistics, Maintain database statistics\, which may impact
+	 * performance.  Choosing "all" maintains all statistics regardless of
+	 * cost\, "fast" maintains a subset of statistics that are relatively
+	 * inexpensive\, "none" turns off all statistics.  The "clear"
+	 * configuration resets statistics after they are gathered\, where
+	 * appropriate (for example\, a cache size statistic is not cleared\,
+	 * while the count of cursor insert operations will be cleared). When
+	 * "clear" is configured for the database\, gathered statistics are
+	 * reset each time a statistics cursor is used to gather statistics\, as
+	 * well as each time statistics are logged using the \c statistics_log
+	 * configuration.  See @ref statistics for more information., a list\,
+	 * with values chosen from the following options: \c "all"\, \c "fast"\,
+	 * \c "none"\, \c "clear"; default \c none.}
 	 * @config{verbose, enable messages for various events.  Options are
 	 * given as a list\, such as
 	 * <code>"verbose=[evictserver\,read]"</code>., a list\, with values
@@ -1478,17 +1497,23 @@ struct __wt_connection {
  * the value if one is already set., an integer between 1MB and 10TB; default \c
  * 500MB.}
  * @config{ ),,}
- * @config{statistics, Maintain database statistics that may impact
- * performance., a boolean flag; default \c false.}
- * @config{statistics_log = (, log database connection statistics to a file
- * (implies setting the \c statistics configuration value to true). See @ref
- * statistics_log for more information., a set of related configuration options
- * defined below.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;clear, reset statistics
- * counters after each set of log records are written., a boolean flag; default
- * \c true.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;path, the pathname to a file into
- * which the log records are written\, may contain strftime conversion
+ * @config{statistics, Maintain database statistics\, which may impact
+ * performance.  Choosing "all" maintains all statistics regardless of cost\,
+ * "fast" maintains a subset of statistics that are relatively inexpensive\,
+ * "none" turns off all statistics.  The "clear" configuration resets statistics
+ * after they are gathered\, where appropriate (for example\, a cache size
+ * statistic is not cleared\, while the count of cursor insert operations will
+ * be cleared). When "clear" is configured for the database\, gathered
+ * statistics are reset each time a statistics cursor is used to gather
+ * statistics\, as well as each time statistics are logged using the \c
+ * statistics_log configuration.  See @ref statistics for more information., a
+ * list\, with values chosen from the following options: \c "all"\, \c "fast"\,
+ * \c "none"\, \c "clear"; default \c none.}
+ * @config{statistics_log = (, log any statistics the database is configured to
+ * maintain\, to a file.  See @ref statistics for more information., a set of
+ * related configuration options defined below.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;path, the pathname to a file into which the
+ * log records are written\, may contain ISO C standard strftime conversion
  * specifications.  If the value is not an absolute path name\, the file is
  * created relative to the database home., a string; default \c
  * "WiredTigerStat.%H".}
@@ -1496,16 +1521,13 @@ struct __wt_connection {
  * include statistics for the list of data source URIs\, if they are open at the
  * time of the statistics logging.  The list may include URIs matching a single
  * data source ("table:mytable")\, or a URI matching all data sources of a
- * particular type ("table:"). No statistics that require the traversal of a
- * tree are reported\, as if the \c statistics_fast configuration string were
- * set., a list of strings; default empty.}
+ * particular type ("table:")., a list of strings; default empty.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;timestamp, a timestamp prepended to each log
  * record\, may contain strftime conversion specifications., a string; default
  * \c "%b %d %H:%M:%S".}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;wait, seconds to wait
- * between each write of the log records; setting this value configures \c
- * statistics and statistics logging., an integer between 1 and 100000; default
- * \c 0.}
+ * between each write of the log records., an integer between 1 and 100000;
+ * default \c 0.}
  * @config{ ),,}
  * @config{transaction_sync, how to sync log records when the transaction
  * commits., a string\, chosen from the following options: \c "dsync"\, \c
@@ -2450,80 +2472,78 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_CONN_CURSOR_UPDATE			37
 /*! dhandle: connection dhandles swept */
 #define	WT_STAT_CONN_DH_CONN_HANDLES			38
-/*! dhandle: locked by eviction */
-#define	WT_STAT_CONN_DH_EVICT_LOCKS			39
 /*! dhandle: session dhandles swept */
-#define	WT_STAT_CONN_DH_SESSION_HANDLES			40
+#define	WT_STAT_CONN_DH_SESSION_HANDLES			39
 /*! dhandle: sweeps conflicting with evict */
-#define	WT_STAT_CONN_DH_SWEEP_EVICT			41
+#define	WT_STAT_CONN_DH_SWEEP_EVICT			40
 /*! dhandle: number of sweep attempts */
-#define	WT_STAT_CONN_DH_SWEEPS				42
+#define	WT_STAT_CONN_DH_SWEEPS				41
 /*! files currently open */
-#define	WT_STAT_CONN_FILE_OPEN				43
+#define	WT_STAT_CONN_FILE_OPEN				42
 /*! log: total user provided log bytes written */
-#define	WT_STAT_CONN_LOG_BYTES_USER			44
+#define	WT_STAT_CONN_LOG_BYTES_USER			43
 /*! log: total log bytes written */
-#define	WT_STAT_CONN_LOG_BYTES_WRITTEN			45
+#define	WT_STAT_CONN_LOG_BYTES_WRITTEN			44
 /*! log: maximum log file size */
-#define	WT_STAT_CONN_LOG_MAX_FILESIZE			46
+#define	WT_STAT_CONN_LOG_MAX_FILESIZE			45
 /*! log: total log read operations */
-#define	WT_STAT_CONN_LOG_READS				47
+#define	WT_STAT_CONN_LOG_READS				46
 /*! log: total records processed by log scan */
-#define	WT_STAT_CONN_LOG_SCAN_RECORDS			48
+#define	WT_STAT_CONN_LOG_SCAN_RECORDS			47
 /*! log: log scan records requiring two reads */
-#define	WT_STAT_CONN_LOG_SCAN_REREADS			49
+#define	WT_STAT_CONN_LOG_SCAN_REREADS			48
 /*! log: total log scan operations */
-#define	WT_STAT_CONN_LOG_SCANS				50
+#define	WT_STAT_CONN_LOG_SCANS				49
 /*! log: total consolidated slot closures */
-#define	WT_STAT_CONN_LOG_SLOT_CLOSES			51
+#define	WT_STAT_CONN_LOG_SLOT_CLOSES			50
 /*! log: total logging bytes consolidated */
-#define	WT_STAT_CONN_LOG_SLOT_CONSOLIDATED		52
+#define	WT_STAT_CONN_LOG_SLOT_CONSOLIDATED		51
 /*! log: total consolidated slot joins */
-#define	WT_STAT_CONN_LOG_SLOT_JOINS			53
+#define	WT_STAT_CONN_LOG_SLOT_JOINS			52
 /*! log: total consolidated slot join races */
-#define	WT_STAT_CONN_LOG_SLOT_RACES			54
+#define	WT_STAT_CONN_LOG_SLOT_RACES			53
 /*! log: record size exceeded maximum */
-#define	WT_STAT_CONN_LOG_SLOT_TOOBIG			55
+#define	WT_STAT_CONN_LOG_SLOT_TOOBIG			54
 /*! log: total consolidated slot join transitions */
-#define	WT_STAT_CONN_LOG_SLOT_TRANSITIONS		56
+#define	WT_STAT_CONN_LOG_SLOT_TRANSITIONS		55
 /*! log: total log sync operations */
-#define	WT_STAT_CONN_LOG_SYNC				57
+#define	WT_STAT_CONN_LOG_SYNC				56
 /*! log: total log write operations */
-#define	WT_STAT_CONN_LOG_WRITES				58
+#define	WT_STAT_CONN_LOG_WRITES				57
 /*! rows merged in an LSM tree */
-#define	WT_STAT_CONN_LSM_ROWS_MERGED			59
+#define	WT_STAT_CONN_LSM_ROWS_MERGED			58
 /*! total heap memory allocations */
-#define	WT_STAT_CONN_MEMORY_ALLOCATION			60
+#define	WT_STAT_CONN_MEMORY_ALLOCATION			59
 /*! total heap memory frees */
-#define	WT_STAT_CONN_MEMORY_FREE			61
+#define	WT_STAT_CONN_MEMORY_FREE			60
 /*! total heap memory re-allocations */
-#define	WT_STAT_CONN_MEMORY_GROW			62
+#define	WT_STAT_CONN_MEMORY_GROW			61
 /*! total read I/Os */
-#define	WT_STAT_CONN_READ_IO				63
+#define	WT_STAT_CONN_READ_IO				62
 /*! page reconciliation calls */
-#define	WT_STAT_CONN_REC_PAGES				64
+#define	WT_STAT_CONN_REC_PAGES				63
 /*! page reconciliation calls for eviction */
-#define	WT_STAT_CONN_REC_PAGES_EVICTION			65
+#define	WT_STAT_CONN_REC_PAGES_EVICTION			64
 /*! reconciliation failed because an update could not be included */
-#define	WT_STAT_CONN_REC_SKIPPED_UPDATE			66
+#define	WT_STAT_CONN_REC_SKIPPED_UPDATE			65
 /*! pthread mutex shared lock read-lock calls */
-#define	WT_STAT_CONN_RWLOCK_READ			67
+#define	WT_STAT_CONN_RWLOCK_READ			66
 /*! pthread mutex shared lock write-lock calls */
-#define	WT_STAT_CONN_RWLOCK_WRITE			68
+#define	WT_STAT_CONN_RWLOCK_WRITE			67
 /*! open cursor count */
-#define	WT_STAT_CONN_SESSION_CURSOR_OPEN		69
+#define	WT_STAT_CONN_SESSION_CURSOR_OPEN		68
 /*! transactions */
-#define	WT_STAT_CONN_TXN_BEGIN				70
+#define	WT_STAT_CONN_TXN_BEGIN				69
 /*! transaction checkpoints */
-#define	WT_STAT_CONN_TXN_CHECKPOINT			71
+#define	WT_STAT_CONN_TXN_CHECKPOINT			70
 /*! transactions committed */
-#define	WT_STAT_CONN_TXN_COMMIT				72
+#define	WT_STAT_CONN_TXN_COMMIT				71
 /*! transaction failures due to cache overflow */
-#define	WT_STAT_CONN_TXN_FAIL_CACHE			73
+#define	WT_STAT_CONN_TXN_FAIL_CACHE			72
 /*! transactions rolled-back */
-#define	WT_STAT_CONN_TXN_ROLLBACK			74
+#define	WT_STAT_CONN_TXN_ROLLBACK			73
 /*! total write I/Os */
-#define	WT_STAT_CONN_WRITE_IO				75
+#define	WT_STAT_CONN_WRITE_IO				74
 
 /*!
  * @}

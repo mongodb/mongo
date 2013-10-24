@@ -1,5 +1,5 @@
 # Read the source files and output the statistics #defines plus the
-# initialize and clear code.
+# initialize and refresh code.
 
 import re, string, sys, textwrap
 from dist import compare_srcfile
@@ -94,6 +94,9 @@ def print_func(name, list):
 void
 __wt_stat_init_''' + name + '''_stats(WT_''' + name.upper() + '''_STATS *stats)
 {
+\t/* Clear, so can also be called for reinitialization. */
+\tmemset(stats, 0, sizeof(*stats));
+
 ''')
 	for l in sorted(list):
 		o = '\tstats->' + l.name + '.desc = "' + l.desc + '";\n'
@@ -105,7 +108,7 @@ __wt_stat_init_''' + name + '''_stats(WT_''' + name.upper() + '''_STATS *stats)
 
 	f.write('''
 void
-__wt_stat_clear_''' + name + '''_stats(void *stats_arg)
+__wt_stat_refresh_''' + name + '''_stats(void *stats_arg)
 {
 \tWT_''' + name.upper() + '''_STATS *stats;
 
@@ -123,7 +126,8 @@ __wt_stat_clear_''' + name + '''_stats(void *stats_arg)
 
 	f.write('''
 void
-__wt_stat_aggregate_''' + name + '''_stats(void *child, void *parent)
+__wt_stat_aggregate_''' + name +
+'''_stats(const void *child, const void *parent)
 {
 \tWT_''' + name.upper() + '''_STATS *c, *p;
 
@@ -141,7 +145,7 @@ __wt_stat_aggregate_''' + name + '''_stats(void *child, void *parent)
 		f.write('\t' + o + '\n')
 	f.write('}\n')
 
-# Write the stat initialization and clear routines to the stat.c file.
+# Write the stat initialization and refresh routines to the stat.c file.
 f = open(tmp_file, 'w')
 f.write('/* DO NOT EDIT: automatically built by dist/stat.py. */\n\n')
 f.write('#include "wt_internal.h"\n')

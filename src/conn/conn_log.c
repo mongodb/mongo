@@ -42,7 +42,7 @@ __logmgr_config(WT_SESSION_IMPL *session, const char **cfg, int *runp)
 
 	WT_RET(__wt_config_gets(session, cfg, "log.file_max", &cval));
 	conn->log_file_max = (off_t)cval.val;
-	WT_CSTAT_SET(session, log_max_filesize, conn->log_file_max);
+	WT_STAT_FAST_CONN_SET(session, log_max_filesize, conn->log_file_max);
 
 	WT_RET(__wt_config_gets(session, cfg, "log.path", &cval));
 	WT_RET(__wt_strndup(session, cval.str, cval.len, &conn->log_path));
@@ -97,7 +97,8 @@ __log_archive_server(void *arg)
 		lsn = log->ckpt_lsn;
 		lsn.offset = 0;
 		WT_VERBOSE_ERR(session, log,
-		    "log_archive: ckpt LSN %d,%" PRIu64, lsn.file, lsn.offset);
+		    "log_archive: ckpt LSN %" PRIu32 ",%" PRIu64,
+		    lsn.file, lsn.offset);
 		/*
 		 * Main archive code.  Get the list of all log files and
 		 * remove any earlier than the checkpoint LSN.
@@ -168,8 +169,8 @@ __wt_logmgr_create(WT_CONNECTION_IMPL *conn, const char *cfg[])
 	 */
 	WT_RET(__wt_calloc(session, 1, sizeof(WT_LOG), &conn->log));
 	log = conn->log;
-	WT_RET(__wt_spin_init(session, &log->log_lock));
-	WT_RET(__wt_spin_init(session, &log->log_slot_lock));
+	WT_RET(__wt_spin_init(session, &log->log_lock, "log"));
+	WT_RET(__wt_spin_init(session, &log->log_slot_lock, "log slot"));
 	if (FLD_ISSET(conn->direct_io, WT_FILE_TYPE_LOG))
 		log->allocsize =
 		    WT_MAX((uint32_t)conn->buffer_alignment, LOG_ALIGN);
@@ -243,11 +244,10 @@ __wt_logmgr_destroy(WT_CONNECTION_IMPL *conn)
 
 	__wt_free(session, conn->log_path);
 
-	/* Close the server thread's session, free its hazard array. */
+	/* Close the server thread's session. */
 	if (conn->arch_session != NULL) {
 		wt_session = &conn->arch_session->iface;
 		WT_TRET(wt_session->close(wt_session, NULL));
-		__wt_free(session, conn->arch_session->hazard);
 		conn->arch_session = NULL;
 	}
 	__wt_spin_destroy(session, &log->log_lock);

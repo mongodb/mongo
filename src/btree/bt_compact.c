@@ -22,7 +22,7 @@ __wt_compact(WT_SESSION_IMPL *session, const char *cfg[])
 
 	bm = S2BT(session)->bm;
 
-	WT_DSTAT_INCR(session, session_compact);
+	WT_STAT_FAST_DATA_INCR(session, session_compact);
 
 	WT_RET(__wt_config_gets(session, cfg, "trigger", &cval));
 	trigger = (int)cval.val;
@@ -64,7 +64,7 @@ __wt_compact(WT_SESSION_IMPL *session, const char *cfg[])
 		}
 		__wt_page_modify_set(session, page);
 
-		WT_DSTAT_INCR(session, btree_compact_rewrite);
+		WT_STAT_FAST_DATA_INCR(session, btree_compact_rewrite);
 	}
 
 	return (0);
@@ -181,6 +181,6 @@ disk:		__wt_get_addr(page->parent, page->ref, &addr, &addr_size);
 	WT_RET(__wt_page_modify_init(session, page));
 	__wt_page_modify_set(session, page);
 
-	WT_DSTAT_INCR(session, btree_compact_rewrite);
+	WT_STAT_FAST_DATA_INCR(session, btree_compact_rewrite);
 	return (0);
 }

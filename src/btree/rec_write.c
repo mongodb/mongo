@@ -294,11 +294,11 @@ __wt_rec_write(WT_SESSION_IMPL *session,
 
 	WT_VERBOSE_RET(
 	    session, reconcile, "%s", __wt_page_type_string(page->type));
-	WT_CSTAT_INCR(session, rec_pages);
-	WT_DSTAT_INCR(session, rec_pages);
+	WT_STAT_FAST_CONN_INCR(session, rec_pages);
+	WT_STAT_FAST_DATA_INCR(session, rec_pages);
 	if (LF_ISSET(WT_EVICTION_SERVER_LOCKED)) {
-		WT_CSTAT_INCR(session, rec_pages_eviction);
-		WT_DSTAT_INCR(session, rec_pages_eviction);
+		WT_STAT_FAST_CONN_INCR(session, rec_pages_eviction);
+		WT_STAT_FAST_DATA_INCR(session, rec_pages_eviction);
 	}
 
 	/* Initialize the reconciliation structure for each new run. */
@@ -590,8 +590,8 @@ __rec_txn_skip_chk(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 		WT_PANIC_RETX(
 		    session, "reconciliation illegally skipped an update");
 	case WT_SKIP_UPDATE_QUIT:
-		WT_CSTAT_INCR(session, rec_skipped_update);
-		WT_DSTAT_INCR(session, rec_skipped_update);
+		WT_STAT_FAST_CONN_INCR(session, rec_skipped_update);
+		WT_STAT_FAST_DATA_INCR(session, rec_skipped_update);
 		return (EBUSY);
 	case 0:
 	default:
@@ -1206,7 +1206,7 @@ __rec_split_row_promote_cell(
 	WT_ASSERT(session,
 	    unpack->prefix == 0 && unpack->raw != WT_CELL_VALUE_COPY);
 
-	WT_RET(__wt_cell_unpack_copy(session, dsk->type, unpack, copy));
+	WT_RET(__wt_cell_data_copy(session, dsk->type, unpack, copy));
 	return (0);
 }
 
@@ -1609,7 +1609,7 @@ __rec_split_raw_worker(WT_SESSION_IMPL *session, WT_RECONCILE *r, int final)
 	dst->size = (uint32_t)result_len + WT_BLOCK_COMPRESS_SKIP;
 
 	if (result_slots != 0) {
-		WT_DSTAT_INCR(session, compress_raw_ok);
+		WT_STAT_FAST_DATA_INCR(session, compress_raw_ok);
 
 		/*
 		 * Compression succeeded: finalize the header information.
@@ -1651,7 +1651,7 @@ __rec_split_raw_worker(WT_SESSION_IMPL *session, WT_RECONCILE *r, int final)
 
 		bnd->already_compressed = 1;
 	} else if (final) {
-		WT_DSTAT_INCR(session, compress_raw_fail);
+		WT_STAT_FAST_DATA_INCR(session, compress_raw_fail);
 
 too_small:	/*
 		 * Compression wasn't even attempted, or failed and there are no
@@ -1678,7 +1678,7 @@ too_small:	/*
 
 		bnd->already_compressed = 0;
 	} else {
-		WT_DSTAT_INCR(session, compress_raw_fail_temporary);
+		WT_STAT_FAST_DATA_INCR(session, compress_raw_fail_temporary);
 
 more_rows:	/*
 		 * Compression failed, increase the size of the "page" and try
@@ -2230,7 +2230,7 @@ __rec_col_merge(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	uint32_t i;
 	int state;
 
-	WT_DSTAT_INCR(session, rec_page_merge);
+	WT_STAT_FAST_DATA_INCR(session, rec_page_merge);
 
 	val = &r->v;
 	unpack = &_unpack;
@@ -2657,7 +2657,7 @@ __rec_col_var(WT_SESSION_IMPL *session,
 			 * where the new value happens (?) to match a Huffman-
 			 * encoded value in a previous or next record.
 			 */
-			WT_ERR(__wt_cell_unpack_ref(
+			WT_ERR(__wt_dsk_cell_data_ref(
 			    session, WT_PAGE_COL_VAR, unpack, orig));
 		}
 
@@ -2744,7 +2744,7 @@ record_loop:	/*
 					 * it for a key and now we need another
 					 * copy; read it into memory.
 					 */
-					WT_ERR(__wt_cell_unpack_ref(session,
+					WT_ERR(__wt_dsk_cell_data_ref(session,
 					    WT_PAGE_COL_VAR, unpack, orig));
 
 					ovfl_state = OVFL_IGNORE;
@@ -2822,7 +2822,7 @@ compare:		/*
 		if (ovfl_state == OVFL_UNUSED) {
 			WT_ERR(__wt_ovfl_onpage_add(
 			    session, page, unpack->data, unpack->size));
-			WT_ERR(__wt_val_ovfl_cache(session, page, upd, unpack));
+			WT_ERR(__wt_ovfl_cache(session, page, upd, unpack));
 		}
 	}
 
@@ -3135,7 +3135,7 @@ __rec_row_merge(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	int ovfl_key, state;
 	const void *p;
 
-	WT_DSTAT_INCR(session, rec_page_merge);
+	WT_STAT_FAST_DATA_INCR(session, rec_page_merge);
 
 	key = &r->k;
 	val = &r->v;
@@ -3366,7 +3366,7 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 			if (val_cell != NULL && unpack->ovfl) {
 				WT_ERR(__wt_ovfl_onpage_add(
 				    session, page, unpack->data, unpack->size));
-				WT_ERR(__wt_val_ovfl_cache(
+				WT_ERR(__wt_ovfl_cache(
 				    session, page, rip, unpack));
 			}
 
@@ -3527,7 +3527,7 @@ __rec_row_leaf(WT_SESSION_IMPL *session,
 			 * about to promote it.
 			 */
 			if (onpage_ovfl) {
-				WT_ERR(__wt_cell_unpack_copy(
+				WT_ERR(__wt_dsk_cell_data_ref(
 				    session, WT_PAGE_ROW_LEAF, unpack, r->cur));
 				onpage_ovfl = 0;
 			}
@@ -3802,7 +3802,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	switch (r->bnd_next) {
 	case 0:						/* Page delete */
 		WT_VERBOSE_RET(session, reconcile, "page %p empty", page);
-		WT_DSTAT_INCR(session, rec_page_delete);
+		WT_STAT_FAST_DATA_INCR(session, rec_page_delete);
 
 		/* If this is the root page, we need to create a sync point. */
 		if (WT_PAGE_IS_ROOT(page))
@@ -3847,12 +3847,12 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		switch (page->type) {
 		case WT_PAGE_COL_INT:
 		case WT_PAGE_ROW_INT:
-			WT_DSTAT_INCR(session, rec_split_internal);
+			WT_STAT_FAST_DATA_INCR(session, rec_split_internal);
 			break;
 		case WT_PAGE_COL_FIX:
 		case WT_PAGE_COL_VAR:
 		case WT_PAGE_ROW_LEAF:
-			WT_DSTAT_INCR(session, rec_split_leaf);
+			WT_STAT_FAST_DATA_INCR(session, rec_split_leaf);
 			break;
 		WT_ILLEGAL_VALUE(session);
 		}
@@ -3893,7 +3893,8 @@ err:			__wt_scr_free(&tkey);
 
 		if (r->bnd_next > r->bnd_next_max) {
 			r->bnd_next_max = r->bnd_next;
-			WT_DSTAT_SET(session, rec_split_max, r->bnd_next_max);
+			WT_STAT_FAST_DATA_SET(
+			    session, rec_split_max, r->bnd_next_max);
 		}
 
 		switch (page->type) {
@@ -3919,15 +3920,17 @@ err:			__wt_scr_free(&tkey);
 
 	/*
 	 * If updates were skipped, the tree isn't clean.  The checkpoint call
-	 * cleared the tree's modified value before it called the eviction
-	 * thread, so we must explicitly reset the tree's modified flag.  We
-	 * publish the change for clarity (the requirement is the value be set
-	 * before a subsequent checkpoint reads it, and because the current
-	 * checkpoint is waiting on this reconciliation to complete, there's no
-	 * risk of that happening).
+	 * cleared the tree's modified value before calling the eviction thread,
+	 * so we must explicitly reset the tree's modified flag.  We insert a
+	 * barrier after the change for clarity (the requirement is the value
+	 * be set before a subsequent checkpoint reads it, and because the
+	 * current checkpoint is waiting on this reconciliation to complete,
+	 * there's no risk of that happening).
 	 */
-	if (r->upd_skipped)
-		WT_PUBLISH(btree->modified, 1);
+	if (r->upd_skipped) {
+		btree->modified = 1;
+		WT_FULL_BARRIER();
+	}
 
 	/*
 	 * If no updates were skipped, we have a new maximum transaction
@@ -4179,7 +4182,7 @@ __rec_cell_build_int_key(WT_SESSION_IMPL *session,
 
 	/* Create an overflow object if the data won't fit. */
 	if (size > btree->maxintlitem) {
-		WT_DSTAT_INCR(session, rec_overflow_key_internal);
+		WT_STAT_FAST_DATA_INCR(session, rec_overflow_key_internal);
 
 		*is_ovflp = 1;
 		return (__rec_cell_build_ovfl(
@@ -4274,7 +4277,7 @@ __rec_cell_build_leaf_key(WT_SESSION_IMPL *session,
 		 * object that was prefix compressed.
 		 */
 		if (pfx == 0) {
-			WT_DSTAT_INCR(session, rec_overflow_key_leaf);
+			WT_STAT_FAST_DATA_INCR(session, rec_overflow_key_leaf);
 
 			*is_ovflp = 1;
 			return (__rec_cell_build_ovfl(
@@ -4355,7 +4358,7 @@ __rec_cell_build_val(WT_SESSION_IMPL *session,
 
 		/* Create an overflow object if the data won't fit. */
 		if (val->buf.size > btree->maxleafitem) {
-			WT_DSTAT_INCR(session, rec_overflow_value);
+			WT_STAT_FAST_DATA_INCR(session, rec_overflow_value);
 
 			return (__rec_cell_build_ovfl(
 			    session, r, val, WT_CELL_VALUE_OVFL, rle));
@@ -4602,7 +4605,7 @@ __rec_dictionary_lookup(
 		WT_RET(__wt_cell_pack_data_match(
 		    dp->cell, &val->cell, val->buf.data, &match));
 		if (match) {
-			WT_DSTAT_INCR(session, rec_dictionary);
+			WT_STAT_FAST_DATA_INCR(session, rec_dictionary);
 			*dpp = dp;
 			return (0);
 		}

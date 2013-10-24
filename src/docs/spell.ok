@@ -5,6 +5,7 @@ BLOBs
 CFLAGS
 CPPFLAGS
 Cheng
+Christoph
 DB's
 DBTs
 DbCursor
@@ -26,6 +27,7 @@ LDFLAGS
 LIBS
 LSB
 LSM
+Lameter
 MERCHANTABILITY
 MVCC's
 Makefiles
@@ -33,6 +35,7 @@ Memrata
 Mewhort
 NOTFOUND
 NoSQL
+NUMA
 RepMgr
 Rrx
 Seward's
@@ -156,6 +159,7 @@ hrow
 hsearch
 html
 huffman
+hugepage
 iflag
 indices
 init
@@ -239,6 +243,7 @@ notyet
 nowait
 nul
 num
+numa
 objectsin
 ol
 oltp
@@ -258,6 +263,7 @@ printf
 printlog
 printvalue
 priv
+proc
 pthread
 pthreads
 py
@@ -304,6 +310,7 @@ structs
 subdatabases
 subpage
 superset
+sys
 tablename
 tcl
 tcmalloc
@@ -339,6 +346,7 @@ valign
 valuefmt
 vec
 versa
+vm
 whitespace
 wiredtiger
 workQ

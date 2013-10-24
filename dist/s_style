@@ -24,15 +24,11 @@ for f in `find examples ext src test -name '*.[ci]'`; do
 	}
 done
 
-for f in `find examples ext src test -name '*.[chisy]' -o -name '*.in' |
+for f in \
+    `find bench/wtperf examples ext src test -name '*.[chisy]' -o -name '*.in' |
     sed '/Makefile.in/d'`; do
 	if grep "^[^}]*while (0);" $f > $t; then
 		echo "$f: while (0) has trailing semi-colon"
-		cat $t
-	fi
-
-	if egrep '%l[diouxXn]|%[diouxXn]l' $f > $t; then
-		echo "$f: incorrect or dangerous printf format: %l[diouxXn]"
 		cat $t
 	fi
 
@@ -49,7 +45,8 @@ for f in `find examples ext src test -name '*.[chisy]' -o -name '*.in' |
 
 	# Direct calls to functions we're not supposed to use in the library.
 	# We don't check for all of them, just a few of the common ones.
-	if ! expr "$f" : 'examples/.*' > /dev/null &&
+	if ! expr "$f" : 'bench/.*' > /dev/null &&
+	   ! expr "$f" : 'examples/.*' > /dev/null &&
 	   ! expr "$f" : 'ext/.*' > /dev/null &&
 	   ! expr "$f" : 'test/.*' > /dev/null &&
 	   ! expr "$f" : '.*/utilities/.*' > /dev/null; then
@@ -76,7 +73,8 @@ for f in `find examples ext src test -name '*.[chisy]' -o -name '*.in' |
 	fi
 
 	# Declaration of an integer return variable.
-	if ! expr "$f" : 'examples/.*' > /dev/null &&
+	if ! expr "$f" : 'bench/.*' > /dev/null &&
+	   ! expr "$f" : 'examples/.*' > /dev/null &&
 	   ! expr "$f" : 'test/.*' > /dev/null &&
 	   ! expr "$f" : 'ext/.*' > /dev/null; then
 		egrep -w ret $f | egrep 'int.*[, ]ret[,;]' > $t
@@ -111,12 +109,11 @@ for f in `find examples ext src test -name '*.[chisy]' -o -name '*.in' |
 	    -e 's/\([	 ,]\)u_int32_t\([	 ,]\)/\1uint32_t\2/g' \
 	    -e 's/\([	 ,]\)u_int64_t\([	 ,]\)/\1uint64_t\2/g' \
 	    -e 's/\([|&=+-]\)  *\([^*]\)/\1 \2/' \
-	    -e 's/(void) /(void)/' \
+	    -e 's/(void) \([a-zA-Z_]\)/(void)\1/' \
 	    -e '/for /!s/;;$/;/' \
 	    -e 's/(EOPNOTSUPP)/(ENOTSUP)/' \
 	    -e 's/(unsigned)/(u_int)/' \
-	    -e 's/^#define /#define	/' \
-	    -e 's/sizeof(WT_PAGE_DISK)/WT_PAGE_DISK_SIZE/g' >$t
+	    -e 's/^#define /#define	/' >$t
 
 	cmp $t $f > /dev/null 2>&1 || (echo "modifying $f" && cp $t $f)
 done
@@ -138,7 +135,7 @@ test -s $t && {
 }
 
 # Check for common typos (Wikipedia's list).
-find examples ext src test \
+find bench examples ext src test \
     -name '*.[chisy]' -o -name '*.in' -o -name '*.dox' |
 xargs egrep -w 'a a|an an|and and|are are|be be|by by|for for|from from|if if|in in|is is|it it|of of|the the|this this|to to|was was|were were|when when|with with|a an|an a|a the|the a' > $t
 	test -s $t && {

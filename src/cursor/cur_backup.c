@@ -8,8 +8,10 @@
 #include "wt_internal.h"
 
 static int __backup_all(WT_SESSION_IMPL *, WT_CURSOR_BACKUP *);
+static int __backup_cleanup_handles(WT_SESSION_IMPL *, WT_CURSOR_BACKUP *);
 static int __backup_file_create(WT_SESSION_IMPL *, WT_CURSOR_BACKUP *);
 static int __backup_file_remove(WT_SESSION_IMPL *);
+static int __backup_list_all_append(WT_SESSION_IMPL *, const char *[]);
 static int __backup_list_append(
     WT_SESSION_IMPL *, WT_CURSOR_BACKUP *, const char *);
 static int __backup_start(
@@ -76,7 +78,6 @@ static int
 __curbackup_close(WT_CURSOR *cursor)
 {
 	WT_CURSOR_BACKUP *cb;
-	WT_CURSOR_BACKUP_ENTRY *p;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 	int tret;
@@ -84,19 +85,7 @@ __curbackup_close(WT_CURSOR *cursor)
 	cb = (WT_CURSOR_BACKUP *)cursor;
 	CURSOR_API_CALL(cursor, session, close, NULL);
 
-	/* Release the handles, free the file names, free the list itself. */
-	if (cb->list != NULL) {
-		for (p = cb->list; p->name != NULL; ++p) {
-			if (p->handle != NULL)
-				WT_WITH_DHANDLE(session, p->handle,
-				    WT_TRET(
-				    __wt_session_release_btree(session)));
-			__wt_free(session, p->name);
-		}
-
-		__wt_free(session, cb->list);
-	}
-
+	WT_TRET(__backup_cleanup_handles(session, cb));
 	WT_TRET(__wt_cursor_close(cursor));
 	session->bkp_cursor = NULL;
 
@@ -232,19 +221,46 @@ __backup_start(
 			WT_ERR(__backup_list_append(session, cb, logfiles[i]));
 	}
 
-	/* Close the hot backup file. */
-	ret = fclose(cb->bfp);
-	cb->bfp = NULL;
-	WT_ERR_TEST(ret == EOF, __wt_errno());
-
-err:	if (cb->bfp != NULL)
+err:	/* Close the hot backup file. */
+	if (cb->bfp != NULL) {
 		WT_TRET(fclose(cb->bfp) == 0 ? 0 : __wt_errno());
+		cb->bfp = NULL;
+	}
 	if (logfiles != NULL)
 		__wt_log_files_free(session, logfiles, logcount);
 
-	if (ret != 0)
+	if (ret != 0) {
+		WT_TRET(__backup_cleanup_handles(session, cb));
 		WT_TRET(__backup_stop(session));
+	}
 
+	return (ret);
+}
+
+/*
+ * __backup_cleanup_handles --
+ *	Release and free all btree handles held by the backup. This is kept
+ *	separate from __backup_stop because it can be called without the
+ *	schema lock held.
+ */
+static int
+__backup_cleanup_handles(WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb)
+{
+	WT_CURSOR_BACKUP_ENTRY *p;
+	WT_DECL_RET;
+
+	if (cb->list == NULL)
+		return (0);
+
+	/* Release the handles, free the file names, free the list itself. */
+	for (p = cb->list; p->name != NULL; ++p) {
+		if (p->handle != NULL)
+			WT_WITH_DHANDLE(session, p->handle,
+			    WT_TRET(__wt_session_release_btree(session)));
+		__wt_free(session, p->name);
+	}
+
+	__wt_free(session, cb->list);
 	return (ret);
 }
 
@@ -323,8 +339,7 @@ __backup_all(WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb)
 	WT_ERR_NOTFOUND_OK(ret);
 
 	/* Build a list of the file objects that need to be copied. */
-	WT_ERR(
-	    __wt_meta_btree_apply(session, __wt_backup_list_all_append, NULL));
+	WT_ERR(__wt_meta_btree_apply(session, __backup_list_all_append, NULL));
 
 err:	if (cursor != NULL)
 		WT_TRET(cursor->close(cursor));
@@ -433,12 +448,12 @@ __wt_backup_list_uri_append(WT_SESSION_IMPL *session, const char *name)
 }
 
 /*
- * __wt_backup_list_all_append --
+ * __backup_list_all_append --
  *	Append a new file name to the list, allocate space as necessary.
  *	Called via the __wt_meta_btree_apply function.
  */
-int
-__wt_backup_list_all_append(WT_SESSION_IMPL *session, const char *cfg[])
+static int
+__backup_list_all_append(WT_SESSION_IMPL *session, const char *cfg[])
 {
 	WT_CURSOR_BACKUP *cb;
 

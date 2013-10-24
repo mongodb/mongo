@@ -54,7 +54,8 @@ class test_config04(wttest.WiredTigerTestCase):
         """
         create_args = 'key_format=S,value_format=S'
         self.session.create("table:" + self.table_name1, create_args)
-        cursor = self.session.open_cursor('table:' + self.table_name1, None, None)
+        cursor = self.session.open_cursor(
+            'table:' + self.table_name1, None, None)
         for i in range(0, self.nentries):
             cursor.set_key(str(1000000 + i))
             cursor.set_value('value' + str(i))
@@ -73,7 +74,7 @@ class test_config04(wttest.WiredTigerTestCase):
         Call wiredtiger_open and run a simple test.
         configextra are any extra configuration strings needed on the open.
         """
-        configarg = 'create,statistics'
+        configarg = 'create,statistics=(fast)'
         if configextra != None:
             configarg += ',' + configextra
         self.conn = wiredtiger.wiredtiger_open('.', configarg)
