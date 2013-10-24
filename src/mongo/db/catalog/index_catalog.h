@@ -145,6 +145,8 @@ namespace mongo {
 
         static BSONObj fixIndexSpec( const BSONObj& spec );
 
+        static BSONObj fixIndexKey( const BSONObj& key );
+
     private:
 
         Status _upgradeDatabaseMinorVersionIfNeeded( const string& newPluginName );

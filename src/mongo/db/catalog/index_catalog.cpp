@@ -190,10 +190,15 @@ namespace mongo {
         if ( !status.isOK() )
             return status;
 
-        // TODO: _id stuff from prepareToBuildIndex
         // TODO: replica stuff from prepareToBuildIndex
 
         spec = fixIndexSpec( spec );
+
+        // we double check with new index spec
+        status = okToAddIndex( spec );
+        if ( !status.isOK() )
+            return status;
+
 
         Database* db = _collection->_database;
 
@@ -824,6 +829,17 @@ namespace mongo {
         return true;
     }
 
+    BSONObj IndexCatalog::fixIndexKey( const BSONObj& key ) {
+        if ( IndexDetails::isIdIndexPattern( key ) ) {
+            return BSON( "_id" << 1 );
+        }
+        if ( key["_id"].type() == Bool && key.nFields() == 1 ) {
+            return BSON( "_id" << 1 );
+        }
+        return key;
+    }
+
+
     BSONObj IndexCatalog::fixIndexSpec( const BSONObj& spec ) {
         BSONObj o = IndexLegacy::adjustIndexSpecObject( spec );
 
@@ -844,14 +860,34 @@ namespace mongo {
         if( o["unique"].trueValue() )
             b.appendBool("unique", true); // normalize to bool true in case was int 1 or something...
 
+        BSONObj key = fixIndexKey( o["key"].Obj() );
+        b.append( "key", key );
+
+        string name = o["name"].String();
+        if ( IndexDetails::isIdIndexPattern( key ) ) {
+            name = "_id_";
+        }
+        b.append( "name", name );
+
         {
-            // stripping _id
             BSONObjIterator i(o);
             while ( i.more() ) {
                 BSONElement e = i.next();
                 string s = e.fieldName();
-                if ( s != "_id" && s != "v" && s != "unique" )
+
+                if ( s == "_id" ) {
+                    // skip
+                }
+                else if ( s == "v" || s == "unique" ||
+                          s == "key" || s == "name" ) {
+                    // covered above
+                }
+                else if ( s == "key" ) {
+                    b.append( "key", fixIndexKey( e.Obj() ) );
+                }
+                else {
                     b.append(e);
+                }
             }
         }
 

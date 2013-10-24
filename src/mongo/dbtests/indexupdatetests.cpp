@@ -732,6 +732,20 @@ namespace IndexUpdateTests {
         }
     };
 
+    class IndexCatatalogFixIndexKey {
+    public:
+        void run() {
+            ASSERT_EQUALS( BSON( "x" << 1 ),
+                           IndexCatalog::fixIndexKey( BSON( "x" << 1 ) ) );
+
+            ASSERT_EQUALS( BSON( "_id" << 1 ),
+                           IndexCatalog::fixIndexKey( BSON( "_id" << 1 ) ) );
+
+            ASSERT_EQUALS( BSON( "_id" << 1 ),
+                           IndexCatalog::fixIndexKey( BSON( "_id" << true ) ) );
+        }
+    };
+
     class IndexUpdateTests : public Suite {
     public:
         IndexUpdateTests() :
@@ -763,6 +777,8 @@ namespace IndexUpdateTests {
             add<SameSpecDifferentDropDups>();
             add<SameSpecDifferentSparse>();
             add<SameSpecDifferentTTL>();
+
+            add<IndexCatatalogFixIndexKey>();
         }
     } indexUpdateTests;
 
