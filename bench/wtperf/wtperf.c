@@ -246,13 +246,6 @@ get_next_incr(void)
 	return (ATOMIC_ADD(g_nins_ops, 1));
 }
 
-void *
-read_thread(void *arg)
-{
-	worker((CONFIG_THREAD *)arg, WORKER_READ);
-	return (NULL);
-}
-
 /* Return the total thread read operations. */
 static inline uint64_t
 sum_read_ops(CONFIG_THREAD *threads, u_int num)
@@ -294,24 +287,6 @@ enomem(CONFIG *cfg)
 	else
 		lprintf(cfg, ENOMEM, 0, "%s", msg);
 	return (ENOMEM);
-}
-
-void *
-insert_thread(void *arg)
-{
-	CONFIG *cfg;
-
-	cfg = ((CONFIG_THREAD *)arg)->cfg;
-	worker((CONFIG_THREAD *)arg,
-	    F_ISSET(cfg, PERF_INSERT_RMW) ? WORKER_INSERT_RMW : WORKER_INSERT);
-	return (NULL);
-}
-
-void *
-update_thread(void *arg)
-{
-	worker((CONFIG_THREAD *)arg, WORKER_UPDATE);
-	return (NULL);
 }
 
 void
@@ -450,6 +425,31 @@ err:	if (ret != 0)
 		assert(session->close(session, NULL) == 0);
 	free(data_buf);
 	free(key_buf);
+}
+
+void *
+read_thread(void *arg)
+{
+	worker((CONFIG_THREAD *)arg, WORKER_READ);
+	return (NULL);
+}
+
+void *
+insert_thread(void *arg)
+{
+	CONFIG *cfg;
+
+	cfg = ((CONFIG_THREAD *)arg)->cfg;
+	worker((CONFIG_THREAD *)arg,
+	    F_ISSET(cfg, PERF_INSERT_RMW) ? WORKER_INSERT_RMW : WORKER_INSERT);
+	return (NULL);
+}
+
+void *
+update_thread(void *arg)
+{
+	worker((CONFIG_THREAD *)arg, WORKER_UPDATE);
+	return (NULL);
 }
 
 void *
