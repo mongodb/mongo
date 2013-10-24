@@ -134,8 +134,6 @@ void lprintf(CONFIG *cfg, int err, uint32_t level, const char *fmt, ...)
 void *populate_thread(void *);
 void print_config(CONFIG *);
 void *read_thread(void *);
-int remove_all(CONFIG *, const char *, int);
-int remove_dir(CONFIG *, const char *);
 int setup_log_file(CONFIG *);
 int start_threads(CONFIG *, u_int, CONFIG_THREAD **, void *(*func)(void *));
 void *stat_worker(void *);
@@ -151,7 +149,7 @@ uint64_t wtperf_value_range(CONFIG *);
 	"key_format=S,value_format=S,type=lsm,exclusive=true,"		\
 	"leaf_page_max=4kb,internal_page_max=64kb,allocation_size=4kb,"
 
-const char *wtperftmp_subdir = "/wtperftmp";
+const char *wtperftmp_subdir = "wtperftmp";
 
 /* Worker thread types. */
 #define	WORKER_READ		0x01
@@ -956,25 +954,24 @@ main(int argc, char *argv[])
 	WT_CONNECTION *conn;
 	WT_SESSION *parse_session;
 	pthread_t checkpoint_thread, stat_thread;
+	size_t len;
 	uint64_t req_len;
 	int ch, checkpoint_created, ret, stat_created;
 	const char *user_cconfig, *user_tconfig;
 	const char *opts = "C:O:T:h:o:SML";
-	char *cc_buf, *tc_buf, *opt_home;
+	char *cmd, *cc_buf, *tc_buf, *tmphome;
 
 	/* Setup the default configuration values. */
 	memset(&cfg, 0, sizeof(cfg));
 	config_assign(&cfg, &default_cfg);
-	cc_buf = opt_home = tc_buf = NULL;
-	user_cconfig = user_tconfig = NULL;
-	conn = NULL;
-	checkpoint_created = stat_created = 0;
-	parse_session = NULL;
 
-	/*
-	 * First do a basic validation of options,
-	 * and home is needed before open.
-	 */
+	conn = NULL;
+	parse_session = NULL;
+	checkpoint_created = stat_created = 0;
+	user_cconfig = user_tconfig = NULL;
+	cmd = cc_buf = tc_buf = tmphome = NULL;
+
+	/* Do a basic validation of options, and home is needed before open. */
 	while ((ch = getopt(argc, argv, opts)) != EOF)
 		switch (ch) {
 		case 'h':
@@ -986,29 +983,32 @@ main(int argc, char *argv[])
 			goto einval;
 		}
 
-	opt_home = malloc(strlen(cfg.home) + strlen(wtperftmp_subdir) + 1);
-	strcpy(opt_home, cfg.home);
-	strcat(opt_home, wtperftmp_subdir);
-	if ((ret = remove_all(&cfg, opt_home, 0)) != 0)
-		goto err;
-
-	if ((ret = mkdir(opt_home, 0777)) != 0) {
-		fprintf(stderr, "wtperf: mkdir %s: %s\n", opt_home,
-		    strerror(errno));
-		goto err;
-	}
-
 	/*
-	 * We do an open now, since we'll need a connection and
-	 * session to use the extension config parser.  We will
-	 * reconfigure later as needed.
+	 * Create a temporary directory underneath the test directory in which
+	 * we do an initial WiredTiger open, because we need a connection and
+	 * session in order to use the extension configuration parser.  We will
+	 * open the real WiredTiger database after parsing the options.
 	 */
-	if ((ret = wiredtiger_open(
-	    opt_home, NULL, "create", &conn)) != 0) {
-		lprintf(&cfg, ret, 0, "Error connecting to %s", opt_home);
+	len = strlen(cfg.home) + strlen(wtperftmp_subdir) + 2;
+	if ((tmphome = malloc(len)) == NULL) {
+		ret = enomem(&cfg);
 		goto err;
 	}
-
+	snprintf(tmphome, len, "%s/%s", cfg.home, wtperftmp_subdir);
+	len = len * 2 + 100;
+	if ((cmd = malloc(len)) == NULL) {
+		ret = enomem(&cfg);
+		goto err;
+	}
+	snprintf(cmd, len, "rm -rf %s && mkdir %s", tmphome, tmphome);
+	if (system(cmd) != 0) {
+		fprintf(stderr, "%s: failed\n", cmd);
+		goto einval;
+	}
+	if ((ret = wiredtiger_open(tmphome, NULL, "create", &conn)) != 0) {
+		lprintf(&cfg, ret, 0, "wiredtiger_open: %s", tmphome);
+		goto err;
+	}
 	if ((ret = conn->open_session(conn, NULL, NULL, &parse_session)) != 0) {
 		lprintf(&cfg, ret, 0, "Error creating session");
 		goto err;
@@ -1121,21 +1121,15 @@ main(int argc, char *argv[])
 	ret = parse_session->close(parse_session, NULL);
 	parse_session = NULL;
 	if (ret != 0) {
-		fprintf(stderr,
-		    "session.close: %s\n", wiredtiger_strerror(ret));
+		lprintf(&cfg, ret, 0, "WT_SESSION.close");
 		goto err;
 	}
 	ret = conn->close(conn, NULL);
 	conn = NULL;
 	if (ret != 0) {
-		fprintf(stderr,
-		    "%s: connection.close: %s\n",
-		    opt_home, wiredtiger_strerror(ret));
+		lprintf(&cfg, ret, 0, "WT_CONNECTION.close: %s", tmphome);
 		goto err;
 	}
-					/* Remove the test directory. */
-	if ((ret = remove_all(&cfg, opt_home, 1)) != 0)
-		goto err;
 
 	/* Sanity check run time and reporting interval. */
 	if (cfg.run_time == 0) {
@@ -1211,25 +1205,30 @@ main(int argc, char *argv[])
 einval:		ret = EINVAL;
 	}
 err:	g_util_running = 0;
-	if (parse_session != NULL)
-		assert(parse_session->close(parse_session, NULL) == 0);
+
 	if (checkpoint_created != 0 &&
 	    (ret = pthread_join(checkpoint_thread, NULL)) != 0)
 		lprintf(&cfg, ret, 0, "Error joining checkpoint thread.");
 	if (stat_created != 0 &&
 	    (ret = pthread_join(stat_thread, NULL)) != 0)
 		lprintf(&cfg, ret, 0, "Error joining stat thread.");
+
+	if (parse_session != NULL)
+		assert(parse_session->close(parse_session, NULL) == 0);
 	if (conn != NULL && (ret = conn->close(conn, NULL)) != 0)
 		lprintf(&cfg, ret, 0,
 		    "Error closing connection to %s", cfg.home);
-	free(cc_buf);
-	free(opt_home);
-	free(tc_buf);
+
 	if (cfg.logf != NULL) {
 		assert(fflush(cfg.logf) == 0);
 		assert(fclose(cfg.logf) == 0);
 	}
 	config_free(&cfg);
+
+	free(cc_buf);
+	free(cmd);
+	free(tc_buf);
+	free(tmphome);
 
 	return (ret);
 }
@@ -1565,70 +1564,6 @@ config_opt_usage(void)
 			indent_lines(config_opts[i].description, "        ");
 		}
 	}
-}
-
-int
-remove_all(CONFIG *cfg, const char *name, int report)
-{
-	struct stat statbuf;
-	int ret;
-
-	ret = 0;
-	if (stat(name, &statbuf) == 0) {
-		if ((statbuf.st_mode & S_IFMT) == S_IFDIR) {
-			ret = remove_dir(cfg, name);
-		} else if (unlink(name) != 0) {
-			fprintf(stderr, "wtperf: unlink %s: %s\n",
-			    name, strerror(errno));
-			ret = errno;
-		}
-	} else if (report || errno != ENOENT) {
-		fprintf(stderr, "wtperf: stat %s: %s\n", name, strerror(errno));
-		ret = errno;
-	}
-	return (ret);
-}
-
-int
-remove_dir(CONFIG *cfg, const char *name)
-{
-	int ret, t_ret;
-	char *newname;
-	DIR *dirp;
-	struct dirent *dp;
-
-	ret = 0;
-	if ((dirp = opendir(name)) == NULL) {
-		fprintf(stderr, "wtperf: opendir %s: %s\n",
-		    name, strerror(errno));
-		ret = errno;
-	}
-	else {
-		while ((dp = readdir(dirp)) != NULL) {
-			if (dp->d_name[0] == '.' &&
-			    (strcmp(dp->d_name, ".") == 0 ||
-			    strcmp(dp->d_name, "..") == 0))
-				continue;
-
-			if ((newname = calloc(strlen(name) +
-			    strlen(dp->d_name) + 2, 1)) == NULL)
-				return (enomem(cfg));
-
-			sprintf(newname, "%s/%s", name, dp->d_name);
-			if ((t_ret =
-			    remove_all(cfg, newname, 1)) != 0 && ret == 0)
-				ret = t_ret;
-			free(newname);
-		}
-		(void)closedir(dirp);
-		if (rmdir(name) != 0) {
-			fprintf(stderr, "wtperf: rmdir %s: %s\n",
-			    name, strerror(errno));
-			if (ret == 0)
-				ret = errno;
-		}
-	}
-	return (ret);
 }
 
 int
