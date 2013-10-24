@@ -40,8 +40,6 @@
 
 namespace mongo {
 
-    class BSONOBj;
-
     /**
      * A graph of role and privilege relationships.
      *
