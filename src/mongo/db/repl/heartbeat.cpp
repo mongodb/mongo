@@ -169,9 +169,17 @@ namespace mongo {
             if( v > cmdObj["v"].Int() )
                 result << "config" << theReplSet->config().asBson();
 
-            Member *from = theReplSet->findByName(cmdObj.getStringField("from"));
+            Member* from = NULL;
+            if (cmdObj.hasField("fromId")) {
+                if (v == cmdObj["v"].Int()) {
+                    from = theReplSet->getMutableMember(cmdObj["fromId"].Int());
+                }
+            }
             if (!from) {
-                return true;
+                from = theReplSet->findByName(cmdObj.getStringField("from"));
+                if (!from) {
+                    return true;
+                }
             }
 
             // if we thought that this node is down, let it know
@@ -207,15 +215,23 @@ namespace mongo {
                 return false;
             }
         }
+        int me = -1;
+        if (theReplSet) {
+            me = theReplSet->selfId();
+        }
 
-        BSONObj cmd = BSON( "replSetHeartbeat" << setName <<
-                            "v" << myCfgVersion <<
-                            "pv" << 1 <<
-                            "checkEmpty" << checkEmpty <<
-                            "from" << from );
+        BSONObjBuilder cmdBuilder;
+        cmdBuilder.append("replSetHeartbeat", setName);
+        cmdBuilder.append("v", myCfgVersion);
+        cmdBuilder.append("pv", 1);
+        cmdBuilder.append("checkEmpty", checkEmpty);
+        cmdBuilder.append("from", from);
+        if (me > -1) {
+            cmdBuilder.append("fromId", me);
+        }
 
         ScopedConn conn(memberFullName);
-        return conn.runCommand("admin", cmd, result, 0);
+        return conn.runCommand("admin", cmdBuilder.done(), result, 0);
     }
 
     /**
@@ -421,7 +437,8 @@ namespace mongo {
             // if we've received a heartbeat from this member within the last two seconds, don't
             // change its state to down (if it's already down, leave it down since we don't have
             // any info about it other than it's heartbeating us)
-            if (m.lastHeartbeatRecv+2 >= time(0)) {
+            const Member* oldMemInfo = theReplSet->findById(mem.id());
+            if (oldMemInfo && oldMemInfo->hbinfo().lastHeartbeatRecv+2 >= time(0)) {
                 log() << "replset info " << h.toString()
                       << " just heartbeated us, but our heartbeat failed: " << msg
                       << ", not changing state" << rsLog;

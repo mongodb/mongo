@@ -36,8 +36,6 @@
  *     oplogSize {number}: Default: 40
  *     useSeedList {boolean}: Use the connection string format of this set
  *        as the replica set name (overrides the name property). Default: false
- *     bridged {boolean}: Whether to set a mongobridge between replicas.
- *        Default: false
  *     keyFile {string}
  *     shardSvr {boolean}: Default: false
  *     startPort {number}: port offset to be used for each replica. Default: 31000
@@ -54,7 +52,6 @@ ReplSetTest = function( opts ){
     this.numNodes = opts.nodes || 0;
     this.oplogSize = opts.oplogSize || 40;
     this.useSeedList = opts.useSeedList || false;
-    this.bridged = opts.bridged || false;
     this.ports = [];
     this.keyFile = opts.keyFile
     this.shardSvr = opts.shardSvr || false;
@@ -82,33 +79,13 @@ ReplSetTest = function( opts ){
             this.nodeOptions[ "n" + i ] = opts.nodeOptions;
     }
     
-    if(this.bridged) {
-        this.bridgePorts = [];
-
-        var allPorts = allocatePorts( this.numNodes * 2 , this.startPort );
-        for(var i=0; i < this.numNodes; i++) {
-            this.ports[i] = allPorts[i*2];
-            this.bridgePorts[i] = allPorts[i*2 + 1];
-        }
-
-        this.initBridges();
-    }
-    else {
-        this.ports = allocatePorts( this.numNodes , this.startPort );
-    }
-
+    this.ports = allocatePorts( this.numNodes , this.startPort );
     this.nodes = []
     this.initLiveNodes()
     
     Object.extend( this, ReplSetTest.Health )
     Object.extend( this, ReplSetTest.State )
     
-}
-
-ReplSetTest.prototype.initBridges = function() {
-    for(var i=0; i<this.ports.length; i++) {
-        startMongoProgram( "mongobridge", "--port", this.bridgePorts[i], "--dest", this.host + ":" + this.ports[i] );
-    }
 }
 
 // List of nodes as host:port strings.
@@ -177,10 +154,7 @@ ReplSetTest.prototype.getReplSetConfig = function() {
         member = {};
         member['_id']  = i;
 
-        if(this.bridged)
-          var port = this.bridgePorts[i];
-        else
-          var port = this.ports[i];
+        var port = this.ports[i];
 
         member['host'] = this.host + ":" + port;
         if( this.nodeOptions[ "n" + i ] && this.nodeOptions[ "n" + i ].arbiter )
@@ -197,19 +171,9 @@ ReplSetTest.prototype.getURL = function(){
     
     for(i=0; i<this.ports.length; i++) {
 
-        // Don't include this node in the replica set list
-        if(this.bridged && this.ports[i] == this.ports[n]) {
-            continue;
-        }
-        
         var port;
         // Connect on the right port
-        if(this.bridged) {
-            port = this.bridgePorts[i];
-        }
-        else {
-            port = this.ports[i];
-        }
+        port = this.ports[i];
         
         var str = this.host + ":" + port;
         hosts.push(str);
@@ -540,6 +504,16 @@ ReplSetTest.prototype.awaitReplication = function(timeout) {
                          for (var i=0; i < self.liveNodes.slaves.length; i++) {
                              var slave = self.liveNodes.slaves[i];
 
+                             var slaveConfigVersion =
+                                    slave.getDB("local")['system.replset'].findOne().version;
+
+                             if (configVersion != slaveConfigVersion) {
+                                 print("ReplSetTest awaitReplication: secondary #" + secondaryCount
+                                       + ", " + name + ", has config version #" + slaveConfigVersion
+                                       + ", but expected config version #" + configVersion);
+                                 return false;
+                             }
+
                              // Continue if we're connected to an arbiter
                              if (res = slave.getDB("admin").runCommand({replSetGetStatus: 1})) {
                                  if (res.myState == 7) {
@@ -584,15 +558,6 @@ ReplSetTest.prototype.awaitReplication = function(timeout) {
                              else {
                                  print("ReplSetTest awaitReplication: waiting for secondary #" +
                                        secondaryCount + ", " + name + ", to have an oplog built");
-                                 return false;
-                             }
-
-                             var slaveConfigVersion = slave.getDB("local")['system.replset'].findOne().version;
-
-                             if (configVersion != slaveConfigVersion) {
-                                 print("ReplSetTest awaitReplication: secondary #" + secondaryCount +
-                                       ", " + name + ", has config version #" + slaveConfigVersion +
-                                       ", but expected config version #" + configVersion);
                                  return false;
                              }
                          }
@@ -1080,6 +1045,9 @@ ReplSetTest.prototype.bridge = function( opts ) {
     for (var i=0; i<n; i++) {
         this.restart(i);
     }
+    this.reconfig = function() {
+        throw notImplemented;
+    }
 
     return this.getMaster();
 };
@@ -1119,4 +1087,40 @@ ReplSetTest.prototype.unPartition = function(from, to, bidirectional) {
     if (bidirectional) {
         this.bridges[to][from].start();
     }
+};
+
+/**
+ * Helpers for partitioning in only one direction so that the test files are more clear to readers.
+ */
+ReplSetTest.prototype.partitionOneWay = function(from, to) {
+    this.partition(from, to, false);
+};
+
+ReplSetTest.prototype.unPartitionOneWay = function(from, to) {
+    this.unPartition(from, to, false);
+};
+
+/**
+ * Helpers for adding/removing delays from a partition.
+ */
+ReplSetTest.prototype.addPartitionDelay = function(from, to, delay, bidirectional) {
+    bidirectional = typeof bidirectional !== 'undefined' ? bidirectional : true;
+
+    this.bridges[from][to].setDelay(delay);
+
+    if (bidirectional) {
+        this.bridges[to][from].setDelay(delay);
+    }
+};
+
+ReplSetTest.prototype.removePartitionDelay = function(from, to, bidirectional) {
+    this.addPartitionDelay(from, to, 0, bidirectional);
+};
+
+ReplSetTest.prototype.addOneWayPartitionDelay = function(from, to, delay) {
+    this.addPartitionDelay(from, to, delay, false);
+};
+
+ReplSetTest.prototype.removeOneWayPartitionDelay = function(from, to) {
+    this.addPartitionDelay(from, to, 0, false);
 };
