@@ -94,7 +94,7 @@ DEF_OPT_AS_BOOL(create, 1,
 DEF_OPT_AS_UINT32(data_sz, 100, "data item size")
 DEF_OPT_AS_UINT32(icount, 5000, "number of records to insert")
 DEF_OPT_AS_FLAGVAL(insert_rmw, PERF_INSERT_RMW,
-    "execute a read prior to each insert in populate")
+    "execute a read prior to each insert in workload phase")
 DEF_OPT_AS_UINT32(insert_threads, 0, "number of insert worker threads")
 DEF_OPT_AS_UINT32(key_sz, 20, "key item size")
 DEF_OPT_AS_UINT32(merge_sleep, 0,
