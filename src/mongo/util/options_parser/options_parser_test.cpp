@@ -18,6 +18,7 @@
 
 #include "mongo/bson/util/builder.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/options_parser/constraints.h"
 #include "mongo/util/options_parser/environment.h"
 #include "mongo/util/options_parser/option_description.h"
 #include "mongo/util/options_parser/option_section.h"
@@ -209,6 +210,19 @@ namespace {
                                       .composing()
                                       .setDefault(moe::Value(defaultVal));
             FAIL("Was able to set default value on composable option");
+        }
+        catch (::mongo::DBException &e) {
+        }
+    }
+
+    TEST(Registration, NumericRangeConstraint) {
+        moe::OptionSection testOpts;
+        try {
+            std::vector<std::string> defaultVal;
+            defaultVal.push_back("default");
+            testOpts.addOptionChaining("port", "port", moe::String, "Port")
+                                      .validRange(1000, 65535);
+            FAIL("Was able to register non numeric option with constraint on range");
         }
         catch (::mongo::DBException &e) {
         }
@@ -2482,5 +2496,61 @@ namespace {
         ASSERT_OK(environment.get(moe::Key("parameter"), &value));
         ASSERT_OK(value.get(&parameter));
         ASSERT_EQUALS(parameter, "allowed");
+    }
+
+    TEST(Constraints, NumericRangeConstraint) {
+        OptionsParserTester parser;
+        moe::Environment environment;
+        moe::Value value;
+        std::vector<std::string> argv;
+        std::map<std::string, std::string> env_map;
+        int port;
+
+        moe::OptionSection testOpts;
+        testOpts.addOptionChaining("config", "config", moe::String, "Config file to parse");
+        testOpts.addOptionChaining("port", "port", moe::Int, "Port")
+                                  .validRange(1000, 65535);
+
+        environment = moe::Environment();
+        argv.clear();
+        argv.push_back("binaryname");
+        argv.push_back("--port");
+        argv.push_back("999");
+
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        ASSERT_NOT_OK(environment.validate());;
+
+        environment = moe::Environment();
+        argv.clear();
+        argv.push_back("binaryname");
+        argv.push_back("--port");
+        argv.push_back("65536");
+
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        ASSERT_NOT_OK(environment.validate());;
+
+        environment = moe::Environment();
+        argv.clear();
+        argv.push_back("binaryname");
+        argv.push_back("--port");
+        argv.push_back("65535");
+
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        ASSERT_OK(environment.validate());;
+        ASSERT_OK(environment.get(moe::Key("port"), &value));
+        ASSERT_OK(value.get(&port));
+        ASSERT_EQUALS(port, 65535);
+
+        environment = moe::Environment();
+        argv.clear();
+        argv.push_back("binaryname");
+        argv.push_back("--port");
+        argv.push_back("1000");
+
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        ASSERT_OK(environment.validate());;
+        ASSERT_OK(environment.get(moe::Key("port"), &value));
+        ASSERT_OK(value.get(&port));
+        ASSERT_EQUALS(port, 1000);
     }
 } // unnamed namespace

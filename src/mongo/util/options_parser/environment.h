@@ -107,7 +107,7 @@ namespace optionenvironment {
              *
              *  It is an error to call these functions after "validate" has been called
              *
-             *  WARNING: These take ownership of the pointer passed in
+             *  NOTE: These DO NOT take ownership of the pointer passed in
              */
             Status addKeyConstraint(KeyConstraint* keyConstraint);
             Status addConstraint(Constraint* constraint);
@@ -197,8 +197,8 @@ namespace optionenvironment {
             void dump();
 
         protected:
-            std::vector<boost::shared_ptr<Constraint> > constraints;
-            std::vector<boost::shared_ptr<KeyConstraint> > keyConstraints;
+            std::vector<Constraint*> constraints;
+            std::vector<KeyConstraint*> keyConstraints;
             std::map <Key, Value> values;
             std::map <Key, Value> default_values;
             bool valid;

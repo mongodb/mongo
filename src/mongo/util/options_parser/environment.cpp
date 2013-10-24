@@ -28,12 +28,12 @@ namespace optionenvironment {
 
     // Environment implementation
 
-    Status Environment::addKeyConstraint(KeyConstraint* c) {
-        keyConstraints.push_back(boost::shared_ptr<KeyConstraint>(c));
+    Status Environment::addKeyConstraint(KeyConstraint* keyConstraint) {
+        keyConstraints.push_back(keyConstraint);
         return Status::OK();
     }
-    Status Environment::addConstraint(Constraint* c) {
-        constraints.push_back(boost::shared_ptr<Constraint>(c));
+    Status Environment::addConstraint(Constraint* constraint) {
+        constraints.push_back(constraint);
         return Status::OK();
     }
 
@@ -110,7 +110,7 @@ namespace optionenvironment {
 
         // 2. Add values to be added
         std::map <Key, Value> add_values = add_environment.values;
-        for(std::map<Key, Value>::const_iterator iterator = add_values.begin();
+        for (std::map<Key, Value>::const_iterator iterator = add_values.begin();
             iterator != add_values.end(); iterator++) {
             values[iterator->first] = iterator->second;
         }
@@ -134,20 +134,20 @@ namespace optionenvironment {
     Status Environment::validate() {
 
         // 1. Iterate and check all KeyConstraints
-        typedef std::vector<boost::shared_ptr<KeyConstraint> >::iterator it_keyConstraint;
-        for(it_keyConstraint iterator = keyConstraints.begin();
+        typedef std::vector<KeyConstraint*>::iterator it_keyConstraint;
+        for (it_keyConstraint iterator = keyConstraints.begin();
             iterator != keyConstraints.end(); iterator++) {
-            Status ret = (*(*iterator).get())(*this);
+            Status ret = (**iterator)(*this);
             if (!ret.isOK()) {
                 return ret;
             }
         }
 
         // 2. Iterate and check all Constraints
-        typedef std::vector<boost::shared_ptr<Constraint> >::iterator it_constraint;
-        for(it_constraint iterator = constraints.begin();
+        typedef std::vector<Constraint*>::iterator it_constraint;
+        for (it_constraint iterator = constraints.begin();
             iterator != constraints.end(); iterator++) {
-            Status ret = (*(*iterator).get())(*this);
+            Status ret = (**iterator)(*this);
             if (!ret.isOK()) {
                 return ret;
             }

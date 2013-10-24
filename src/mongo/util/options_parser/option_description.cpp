@@ -196,5 +196,26 @@ namespace optionenvironment {
         return *this;
     }
 
+    OptionDescription& OptionDescription::addConstraint(Constraint* c) {
+        _constraints.push_back(boost::shared_ptr<Constraint>(c));
+        return *this;
+    }
+
+    OptionDescription& OptionDescription::validRange(long min, long max) {
+        if (_type != Double &&
+            _type != Int &&
+            _type != Long &&
+            _type != UnsignedLongLong &&
+            _type != Unsigned) {
+            StringBuilder sb;
+            sb << "Could not register option \"" << _dottedName << "\": "
+               << "only options registered as a numeric type can have a valid range, "
+               << "but option has type: " << _type;
+            throw DBException(sb.str(), ErrorCodes::InternalError);
+        }
+
+        return addConstraint(new NumericKeyConstraint(_dottedName, min, max));
+    }
+
 } // namespace optionenvironment
 } // namespace mongo

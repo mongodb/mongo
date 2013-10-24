@@ -418,6 +418,26 @@ namespace optionenvironment {
             return Status::OK();
         }
 
+        /**
+        * For all options that have constraints, add those constraints to our environment so that
+        * they run when the environment gets validated.
+        */
+        Status addConstraints(const OptionSection& options, Environment* dest) {
+            std::vector<boost::shared_ptr<Constraint> > constraints_vector;
+            Status ret = options.getConstraints(&constraints_vector);
+            if (!ret.isOK()) {
+                return ret;
+            }
+
+            std::vector<boost::shared_ptr<Constraint> >::const_iterator citerator;
+            for (citerator = constraints_vector.begin();
+                    citerator != constraints_vector.end(); citerator++) {
+                dest->addConstraint(citerator->get());
+            }
+
+            return Status::OK();
+        }
+
     } // namespace
 
     /**
@@ -779,6 +799,12 @@ namespace optionenvironment {
 
         // Add this last because it represents the aggregated results of composing all environments
         ret = environment->setAll(composedEnvironment);
+        if (!ret.isOK()) {
+            return ret;
+        }
+
+        // Add the constraints from our options to the result environment
+        ret = addConstraints(options, environment);
         if (!ret.isOK()) {
             return ret;
         }

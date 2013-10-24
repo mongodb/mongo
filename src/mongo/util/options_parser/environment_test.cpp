@@ -33,7 +33,8 @@ namespace {
 
     TEST(Environment, Immutable) {
         moe::Environment environment;
-        environment.addKeyConstraint(new moe::ImmutableKeyConstraint(moe::Key("port")));
+        moe::ImmutableKeyConstraint immutableKeyConstraint(moe::Key("port"));
+        environment.addKeyConstraint(&immutableKeyConstraint);
         ASSERT_OK(environment.set(moe::Key("port"), moe::Value(5)));
         ASSERT_OK(environment.validate());
         ASSERT_NOT_OK(environment.set(moe::Key("port"), moe::Value(0)));
@@ -41,29 +42,34 @@ namespace {
 
     TEST(Environment, OutOfRange) {
         moe::Environment environment;
-        environment.addKeyConstraint(new moe::NumericKeyConstraint(moe::Key("port"), 1000, 65535));
+        moe::NumericKeyConstraint numericKeyConstraint(moe::Key("port"), 1000, 65535);
+        environment.addKeyConstraint(&numericKeyConstraint);
         ASSERT_OK(environment.validate());
         ASSERT_NOT_OK(environment.set(moe::Key("port"), moe::Value(0)));
     }
 
     TEST(Environment, NonNumericRangeConstraint) {
         moe::Environment environment;
-        environment.addKeyConstraint(new moe::NumericKeyConstraint(moe::Key("port"), 1000, 65535));
+        moe::NumericKeyConstraint numericKeyConstraint(moe::Key("port"), 1000, 65535);
+        environment.addKeyConstraint(&numericKeyConstraint);
         ASSERT_OK(environment.validate());
         ASSERT_NOT_OK(environment.set(moe::Key("port"), moe::Value("string")));
     }
 
     TEST(Environment, BadType) {
         moe::Environment environment;
-        environment.addKeyConstraint(new moe::TypeKeyConstraint<int>(moe::Key("port")));
+        moe::TypeKeyConstraint<int> typeKeyConstraintInt(moe::Key("port"));
+        environment.addKeyConstraint(&typeKeyConstraintInt);
         ASSERT_OK(environment.set(moe::Key("port"), moe::Value("string")));
         ASSERT_NOT_OK(environment.validate());
     }
 
     TEST(Environment, AllowNumeric) {
         moe::Environment environment;
-        environment.addKeyConstraint(new moe::TypeKeyConstraint<long>(moe::Key("port")));
-        environment.addKeyConstraint(new moe::TypeKeyConstraint<int>(moe::Key("port")));
+        moe::TypeKeyConstraint<long> typeKeyConstraintLong(moe::Key("port"));
+        environment.addKeyConstraint(&typeKeyConstraintLong);
+        moe::TypeKeyConstraint<int> typeKeyConstraintInt(moe::Key("port"));
+        environment.addKeyConstraint(&typeKeyConstraintInt);
         ASSERT_OK(environment.set(moe::Key("port"), moe::Value(1)));
         ASSERT_OK(environment.validate());
     }

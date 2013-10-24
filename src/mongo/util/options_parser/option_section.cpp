@@ -508,6 +508,26 @@ namespace optionenvironment {
         return Status::OK();
     }
 
+    Status OptionSection::getConstraints(
+            std::vector<boost::shared_ptr<Constraint > >* constraints) const {
+
+        std::list<OptionDescription>::const_iterator oditerator;
+        for (oditerator = _options.begin(); oditerator != _options.end(); oditerator++) {
+            std::vector<boost::shared_ptr<Constraint> >::const_iterator citerator;
+            for (citerator = oditerator->_constraints.begin();
+                 citerator != oditerator->_constraints.end(); citerator++) {
+                constraints->push_back(*citerator);
+            }
+        }
+
+        std::list<OptionSection>::const_iterator ositerator;
+        for (ositerator = _subSections.begin(); ositerator != _subSections.end(); ositerator++) {
+            ositerator->getConstraints(constraints);
+        }
+
+        return Status::OK();
+    }
+
     std::string OptionSection::positionalHelpString(const std::string& execName) const {
 
         po::positional_options_description boostPositionalOptions;

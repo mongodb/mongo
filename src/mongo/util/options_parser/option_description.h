@@ -15,9 +15,11 @@
 
 #pragma once
 
+#include <boost/shared_ptr.hpp>
 #include <iostream>
 
 #include "mongo/base/status.h"
+#include "mongo/util/options_parser/constraints.h"
 #include "mongo/util/options_parser/value.h"
 
 namespace mongo {
@@ -77,6 +79,13 @@ namespace optionenvironment {
          * The following functions are part of the chaining interface for option registration.  See
          * comments below for what each of these attributes mean, and the OptionSection class for
          * more details on the chaining interface.
+         */
+
+        /**
+         * Parsing Attributes.
+         *
+         * The functions below specify various attributes of our option that are relevant for
+         * parsing.
          */
 
         /*
@@ -140,6 +149,28 @@ namespace optionenvironment {
          */
         OptionDescription& positional(int start, int end);
 
+        /**
+         * Validation Constraints.
+         *
+         * The functions below specify constraints that must be met in order for this option to be
+         * valid.  These do not get checked during parsing, but will be added to the result
+         * Environment so that they will get checked when the Environment is validated.
+         */
+
+        /**
+         * Specifies the range allowed for this option.  Only allowed for options with numeric type.
+         */
+        OptionDescription& validRange(long min, long max);
+
+        /**
+         * Adds a constraint for this option.  During parsing, this Constraint will be added to the
+         * result Environment, ensuring that it will get checked when the environment is validated.
+         * See the documentation on the Constraint and Environment classes for more details.
+         *
+         * WARNING: This function takes ownership of the Constraint pointer that is passed in.
+         */
+        OptionDescription& addConstraint(Constraint* c);
+
         std::string _dottedName; // Used for JSON config and in Environment
         std::string _singleName; // Used for boost command line and INI
         OptionType _type; // Storage type of the argument value, or switch type (bool)
@@ -153,6 +184,16 @@ namespace optionenvironment {
                                 // command line, json config, and ini config)
         int _positionalStart; // The starting position if this is a positional option. -1 otherwise.
         int _positionalEnd; // The ending position if this is a positional option.  -1 if unlimited.
+
+        // TODO(sverch): We have to use pointers to keep track of the Constrants because we rely on
+        // inheritance to make Constraints work.  We have to use shared_ptrs because the
+        // OptionDescription is sometimes copied and because it is stored in a std::list in the
+        // OptionSection.  We should think about a better solution for the ownership semantics of
+        // these classes.  Note that the Environment (the storage for results of option parsing) has
+        // to know about the constraints for all the options, which is another factor to consider
+        // when thinking about ownership.
+        std::vector<boost::shared_ptr<Constraint> > _constraints; // Constraints that must be met
+                                                                  // for this option to be valid
     };
 
 } // namespace optionenvironment
