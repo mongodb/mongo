@@ -10,6 +10,7 @@ Import("env")
 env.StaticLibrary("unittest", ['unittest.cpp', 'temp_dir.cpp'],
                   LIBDEPS=['$BUILD_DIR/mongo/foundation',
                            '$BUILD_DIR/mongo/lasterror',
+                           '$BUILD_DIR/mongo/util/options_parser/options_parser',
                   ])
 
 env.StaticLibrary("unittest_main", ['unittest_main.cpp'],

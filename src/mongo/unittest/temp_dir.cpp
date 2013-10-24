@@ -24,18 +24,32 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/log.h"
+#include "mongo/util/options_parser/startup_options.h"
+#include "mongo/util/options_parser/startup_option_init.h"
 
 
 namespace mongo {
 namespace unittest {
     namespace str = mongoutils::str;
+    namespace moe = mongo::optionenvironment;
 
 namespace {
     boost::filesystem::path defaultRoot;
 
+    MONGO_GENERAL_STARTUP_OPTIONS_REGISTER(TempDirOptions)(InitializerContext* context) {
+        moe::startupOptions.addOptionChaining("tempPath",
+                                              "tempPath",
+                                              moe::String,
+                                              "directory to place mongo::TempDir subdirectories");
+        return Status::OK();
+    }
+
     MONGO_INITIALIZER(SetTempDirDefaultRoot)(InitializerContext* context) {
-        // TODO add a --tempPath parameter and use that if specified.
-        defaultRoot = boost::filesystem::temp_directory_path();
+        if (moe::startupOptionsParsed.count("tempPath")) {
+            defaultRoot = moe::startupOptionsParsed["tempPath"].as<string>();
+        } else {
+            defaultRoot = boost::filesystem::temp_directory_path();
+        }
 
         if (!boost::filesystem::exists(defaultRoot)) {
             return Status(ErrorCodes::BadValue,
