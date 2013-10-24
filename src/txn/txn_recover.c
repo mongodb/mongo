@@ -110,21 +110,16 @@ __txn_op_apply(
 			break;
 
 		/* Set up the cursors. */
-		start = stop = NULL;
-		switch (mode) {
-		case 1:
+		if (start_recno == 0) {
+			start = NULL;
 			stop = cursor;
-			break;
-		case 2:
+		} else if (stop_recno == 0) {
 			start = cursor;
-			break;
-		case 3:
+			stop = NULL;
+		} else {
 			start = cursor;
 			WT_ERR(__recovery_cursor(
 			    session, r, lsnp, fileid, 1, &stop));
-			break;
-
-		WT_ILLEGAL_VALUE_ERR(session);
 		}
 
 		/* Set the keys. */
@@ -135,7 +130,8 @@ __txn_op_apply(
 
 		WT_TRET(session->iface.truncate(&session->iface, NULL,
 		    start, stop, NULL));
-		if (mode == 3)
+		/* If we opened a duplicate cursor, close it now. */
+		if (stop != NULL && stop != cursor)
 			WT_TRET(stop->close(stop));
 		WT_ERR(ret);
 		break;
@@ -193,7 +189,8 @@ __txn_op_apply(
 
 		WT_TRET(session->iface.truncate(&session->iface, NULL,
 		    start, stop, NULL));
-		if (mode == 3)
+		/* If we opened a duplicate cursor, close it now. */
+		if (stop != NULL && stop != cursor)
 			WT_TRET(stop->close(stop));
 		WT_ERR(ret);
 		break;
