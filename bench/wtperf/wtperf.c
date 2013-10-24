@@ -489,17 +489,15 @@ populate_thread(void *arg)
 		goto err;
 	}
 
-	/* Open a session for the current thread's work. */
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0) {
-		lprintf(cfg, ret, 0,
-		    "Error opening a session on %s", cfg->home);
+		lprintf(cfg, ret, 0, "populate: WT_CONNECTION.open_session");
 		goto err;
 	}
-
 	/* Do a bulk load if populate is single-threaded. */
 	if ((ret = session->open_cursor(session, cfg->uri, NULL,
 	    cfg->populate_threads == 1 ? "bulk" : NULL, &cursor)) != 0) {
-		lprintf(cfg, ret, 0, "Error opening cursor %s", cfg->uri);
+		lprintf(cfg,
+		    ret, 0, "populate: WT_SESSION.open_cursor: %s", cfg->uri);
 		goto err;
 	}
 
