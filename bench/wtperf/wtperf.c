@@ -72,10 +72,7 @@ typedef struct {
 
 	CONFIG_THREAD *rthreads, *ithreads, *popthreads, *uthreads;
 
-#define	WT_PERF_INIT		0x00
-#define	WT_PERF_POP		0x01
-#define	WT_PERF_READ		0x02
-	uint32_t phase;
+	enum { WT_PERF_INIT, WT_PERF_POPULATE, WT_PERF_WORKER } phase;
 
 #define	PERF_INSERT_RMW		0x01
 #define	PERF_RAND_PARETO	0x02 /* Use the Pareto random distribution. */
@@ -478,8 +475,6 @@ populate_thread(void *arg)
 	ret = 0;
 	opcount = 0;
 
-	cfg->phase = WT_PERF_POP;
-
 	if ((key_buf = calloc(cfg->key_sz + 1, 1)) == NULL) {
 		ret = enomem(cfg);
 		goto err;
@@ -583,6 +578,7 @@ stat_worker(void *arg)
 			if (!g_util_running)
 				break;
 		}
+
 		/* Generic header. */
 		lprintf(cfg, 0, cfg->verbose,
 		    "=======================================");
@@ -592,11 +588,14 @@ stat_worker(void *arg)
 		    cfg->phase_start_time.tv_usec / 1000000.0);
 		if (secs == 0)
 			++secs;
-		if (cfg->phase == WT_PERF_POP)
+
+		switch (cfg->phase) {
+		case WT_PERF_POPULATE:
 			lprintf(cfg, 0, cfg->verbose,
 			    "inserts: %" PRIu64 ", elapsed time: %.2f",
 			    g_npop_ops, secs);
-		else {
+			break;
+		case WT_PERF_WORKER:
 			g_nread_ops =
 			    sum_read_ops(cfg->rthreads, cfg->read_threads);
 			g_nupdate_ops =
@@ -605,6 +604,10 @@ stat_worker(void *arg)
 			    "reads: %" PRIu64 " inserts: %" PRIu64
 			    " updates: %" PRIu64 ", elapsed time: %.2f",
 			    g_nread_ops, g_nins_ops, g_nupdate_ops, secs);
+			break;
+		case WT_PERF_INIT:
+		default:
+			break;
 		}
 
 		/* Report data source stats. */
@@ -707,7 +710,7 @@ execute_populate(CONFIG *cfg)
 	int elapsed, ret;
 
 	conn = cfg->conn;
-	cfg->phase = WT_PERF_POP;
+	cfg->phase = WT_PERF_POPULATE;
 	lprintf(cfg, 0, 1, "Starting populate threads");
 
 	/* First create the table. */
@@ -799,7 +802,8 @@ execute_workload(CONFIG *cfg)
 	uint32_t interval, run_time;
 	int ret, tret;
 
-	cfg->phase = WT_PERF_READ;
+	lprintf(cfg, 0, 1, "Starting worker threads");
+	cfg->phase = WT_PERF_WORKER;
 
 	last_inserts = last_reads = last_updates = 0;
 	ret = 0;
