@@ -162,7 +162,7 @@ namespace twod_exec {
                 : accessMethod->getParams().geoHashConverter->getErrorSphere()),
         _farthest(0) { }
 
-   GeoAccumulator:: KeyResult GeoHopper::approxKeyCheck(const Point& p, double& d) {
+    GeoAccumulator:: KeyResult GeoHopper::approxKeyCheck(const Point& p, double& d) {
         // Always check approximate distance, since it lets us avoid doing
         // checks of the rest of the object if it succeeds
         switch (_type) {
