@@ -134,12 +134,11 @@ namespace mongo {
         return _dbHolder;
     }
 
-    void ensureIdIndexForNewNs(const char *ns) {
-        if ( ( strstr( ns, ".system." ) == 0 || legalClientSystemNS( ns , false ) ) &&
-                strstr( ns, FREELIST_NS ) == 0 ) {
-            LOG( 1 ) << "adding _id index for collection " << ns << endl;
-            ensureHaveIdIndex( ns, false );
-        }
+    void ensureIdIndexForNewNs( Collection* collection ) {
+        if ( collection->ns().isSystem() && !legalClientSystemNS( collection->ns().ns(), false ) )
+            return;
+
+        uassertStatusOK( collection->getIndexCatalog()->ensureHaveIdIndex() );
     }
 
     string getDbContext() {
@@ -294,7 +293,7 @@ namespace mongo {
             if( deferIdIndex )
                 *deferIdIndex = true;
             else
-                ensureIdIndexForNewNs( ns );
+                ensureIdIndexForNewNs( collection );
         }
 
         if ( mx > 0 )
@@ -789,7 +788,7 @@ namespace mongo {
                         collection = database->createCollection( collectionToIndex, false, NULL );
                         verify( collection );
                         if ( !god )
-                            ensureIdIndexForNewNs( collectionToIndex.c_str() );
+                            ensureIdIndexForNewNs( collection );
                     }
 
                     Status status = collection->getIndexCatalog()->createIndex( spec, mayInterrupt );
@@ -816,7 +815,7 @@ namespace mongo {
             }
             collection->increaseStorageSize( ies, false);
             if ( !god )
-                ensureIdIndexForNewNs(ns);
+                ensureIdIndexForNewNs( collection );
         }
 
         NamespaceDetails* d = collection->details();

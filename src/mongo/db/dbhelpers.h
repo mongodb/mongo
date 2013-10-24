@@ -61,7 +61,6 @@ namespace mongo {
            This method can be a little (not much) cpu-slow, so you may wish to use
              OCCASIONALLY ensureIndex(...);
 
-           Note: use ensureHaveIdIndex() for the _id index: it is faster.
            Note: does nothing if collection does not yet exist.
         */
         static void ensureIndex(const char *ns, BSONObj keyPattern, bool unique, const char *name);

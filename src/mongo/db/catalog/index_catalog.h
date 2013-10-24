@@ -78,6 +78,8 @@ namespace mongo {
 
         // ---- index modifiers ------
 
+        Status ensureHaveIdIndex();
+
         Status createIndex( BSONObj spec, bool mayInterrupt );
 
         Status okToAddIndex( const BSONObj& spec ) const;
@@ -191,6 +193,7 @@ namespace mongo {
         std::vector<IndexAccessMethod*> _accessMethodCache;
         std::vector<BtreeBasedAccessMethod*> _forcedBtreeAccessMethodCache;
 
+        static const BSONObj _idObj; // { _id : 1 }
     };
 
 }

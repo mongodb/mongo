@@ -47,6 +47,7 @@
 #include "mongo/db/repl/oplogreader.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/db/storage_options.h"
+#include "mongo/db/structure/collection.h"
 
 namespace mongo {
 
@@ -309,7 +310,6 @@ namespace mongo {
     }
 
     extern bool inDBRepair;
-    void ensureIdIndexForNewNs(const char *ns);
 
     bool Cloner::go(const char *masterHost, string& errmsg, const string& fromdb, bool logForRepl, bool slaveOk, bool useReplAuth, bool snapshot, bool mayYield, bool mayBeInterrupted, int *errCode) {
 
@@ -470,7 +470,9 @@ namespace mongo {
                 bool old = inDBRepair;
                 try {
                     inDBRepair = true;
-                    ensureIdIndexForNewNs(to_name.c_str());
+                    Collection* c = cc().database()->getCollection( to_name );
+                    if ( c )
+                        c->getIndexCatalog()->ensureHaveIdIndex();
                     inDBRepair = old;
                 }
                 catch(...) {

@@ -45,10 +45,4 @@ namespace mongo {
                       IndexDetails& idx,
                       bool mayInterrupt);
 
-    /**
-     * Add an _id index to namespace @param 'ns' if not already present.
-     * @param mayInterrupt When true, killop may interrupt the function call.
-     */
-    void ensureHaveIdIndex(const char* ns, bool mayInterrupt);
-
 } // namespace mongo

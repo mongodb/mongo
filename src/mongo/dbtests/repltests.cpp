@@ -33,6 +33,7 @@
 #include "mongo/db/repl/replication_server_status.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/ops/update.h"
+#include "mongo/db/structure/collection.h"
 
 #include "mongo/dbtests/dbtests.h"
 
@@ -52,7 +53,12 @@ namespace ReplTests {
             replSettings.oplogSize = 5 * 1024 * 1024;
             replSettings.master = true;
             createOplog();
-            ensureHaveIdIndex( ns(), false );
+
+            Collection* c = _context.db()->getCollection( ns() );
+            if ( ! c ) {
+                c = _context.db()->createCollection( ns(), false, NULL );
+            }
+            c->getIndexCatalog()->ensureHaveIdIndex();
         }
         ~Base() {
             try {

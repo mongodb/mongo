@@ -58,24 +58,12 @@ namespace mongo {
     const BSONObj reverseNaturalObj = BSON( "$natural" << -1 );
 
     void Helpers::ensureIndex(const char *ns, BSONObj keyPattern, bool unique, const char *name) {
-        NamespaceDetails *d = nsdetails(ns);
-        if( d == 0 )
+        Database* db = cc().database();
+        verify(db);
+
+        Collection* collection = db->getCollection( ns );
+        if ( !collection )
             return;
-
-        {
-            NamespaceDetails::IndexIterator i = d->ii();
-            while( i.more() ) {
-                if( i.next().keyPattern().woCompare(keyPattern) == 0 )
-                    return;
-            }
-        }
-
-        if( d->getCompletedIndexCount() >= NamespaceDetails::NIndexesMax ) {
-            problem() << "Helper::ensureIndex fails, MaxIndexes exceeded " << ns << '\n';
-            return;
-        }
-
-        string system_indexes = cc().database()->name() + ".system.indexes";
 
         BSONObjBuilder b;
         b.append("name", name);
@@ -84,7 +72,10 @@ namespace mongo {
         b.appendBool("unique", unique);
         BSONObj o = b.done();
 
-        theDataFileMgr.insert(system_indexes.c_str(), o.objdata(), o.objsize());
+        Status status = collection->getIndexCatalog()->createIndex( o, false );
+        if ( status.code() == ErrorCodes::IndexAlreadyExists )
+            return;
+        uassertStatusOK( status );
     }
 
     /* fetch a single object from collection ns that matches query

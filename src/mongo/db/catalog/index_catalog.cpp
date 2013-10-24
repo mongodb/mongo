@@ -62,6 +62,8 @@ namespace mongo {
     // What's the default version of our indices?
     const int DefaultIndexVersionNumber = 1;
 
+    const BSONObj IndexCatalog::_idObj = BSON( "_id" << 1 );
+
     // -------------
 
     IndexCatalog::IndexCatalog( Collection* collection, NamespaceDetails* details )
@@ -367,6 +369,11 @@ namespace mongo {
             return Status( ErrorCodes::CannotCreateIndex,
                            "cannot create indexes on the system.indexes collection" );
 
+        if ( nss == _collection->_database->_extentFreelistName ) {
+            // this isn't really proper, but we never want it and its not an error per se
+            return Status( ErrorCodes::IndexAlreadyExists, "cannot index freelist" );
+        }
+
         // logical name of the index
         const char *name = spec.getStringField("name");
         if ( !name[0] )
@@ -460,6 +467,27 @@ namespace mongo {
         }
 
         return Status::OK();
+    }
+
+    Status IndexCatalog::ensureHaveIdIndex() {
+        if ( _details->isSystemFlagSet( NamespaceDetails::Flag_HaveIdIndex ) )
+            return Status::OK();
+
+        dassert( _idObj["_id"].type() == NumberInt );
+
+        BSONObjBuilder b;
+        b.append( "name", "_id_" );
+        b.append( "ns", _collection->ns().ns() );
+        b.append( "key", _idObj );
+        BSONObj o = b.done();
+
+        Status s = createIndex( o, false );
+        if ( s.isOK() || s.code() == ErrorCodes::IndexAlreadyExists ) {
+            _details->setSystemFlag( NamespaceDetails::Flag_HaveIdIndex );
+            return Status::OK();
+        }
+
+        return s;
     }
 
     Status IndexCatalog::dropAllIndexes( bool includingIdIndex ) {
@@ -839,10 +867,10 @@ namespace mongo {
 
     BSONObj IndexCatalog::fixIndexKey( const BSONObj& key ) {
         if ( IndexDetails::isIdIndexPattern( key ) ) {
-            return BSON( "_id" << 1 );
+            return _idObj;
         }
         if ( key["_id"].type() == Bool && key.nFields() == 1 ) {
-            return BSON( "_id" << 1 );
+            return _idObj;
         }
         return key;
     }

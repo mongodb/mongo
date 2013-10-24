@@ -249,32 +249,5 @@ namespace mongo {
 
     extern BSONObj id_obj;  // { _id : 1 }
 
-    void ensureHaveIdIndex(const char* ns, bool mayInterrupt) {
-        NamespaceDetails *d = nsdetails(ns);
-        if ( d == 0 || d->isSystemFlagSet(NamespaceDetails::Flag_HaveIdIndex) )
-            return;
-
-        d->setSystemFlag( NamespaceDetails::Flag_HaveIdIndex );
-
-        {
-            NamespaceDetails::IndexIterator i = d->ii();
-            while( i.more() ) {
-                if( i.next().isIdIndex() )
-                    return;
-            }
-        }
-
-        string system_indexes = cc().database()->name() + ".system.indexes";
-
-        BSONObjBuilder b;
-        b.append("name", "_id_");
-        b.append("ns", ns);
-        b.append("key", id_obj);
-        BSONObj o = b.done();
-
-        /* edge case: note the insert could fail if we have hit maxindexes already */
-        theDataFileMgr.insert(system_indexes.c_str(), o.objdata(), o.objsize(), mayInterrupt, true);
-    }
-
 }  // namespace mongo
 

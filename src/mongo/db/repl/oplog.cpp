@@ -53,6 +53,7 @@
 #include "mongo/db/repl/write_concern.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/storage_options.h"
+#include "mongo/db/structure/collection.h"
 #include "mongo/s/d_logic.h"
 #include "mongo/util/elapsed_tracker.h"
 #include "mongo/util/file.h"
@@ -485,7 +486,8 @@ namespace mongo {
 
         Lock::assertWriteLocked(ns);
 
-        NamespaceDetails *nsd = nsdetails(ns);
+        Collection* collection = cc().database()->getCollection( ns );
+        NamespaceDetails *nsd = collection == NULL ? NULL : collection->details();
 
         // operation type -- see logOp() comments for types
         const char *opType = fieldOp.valuestrsafe();
@@ -531,7 +533,9 @@ namespace mongo {
                 else {
                     // probably don't need this since all replicated colls have _id indexes now
                     // but keep it just in case
-                    RARELY if ( nsd && !nsd->isCapped() ) { ensureHaveIdIndex(ns, false); }
+                    RARELY if ( nsd && !nsd->isCapped() ) {
+                        collection->getIndexCatalog()->ensureHaveIdIndex();
+                    }
 
                     /* todo : it may be better to do an insert here, and then catch the dup key exception and do update
                               then.  very few upserts will not be inserts...
@@ -556,7 +560,9 @@ namespace mongo {
 
             // probably don't need this since all replicated colls have _id indexes now
             // but keep it just in case
-            RARELY if ( nsd && !nsd->isCapped() ) { ensureHaveIdIndex(ns, false); }
+            RARELY if ( nsd && !nsd->isCapped() ) {
+                collection->getIndexCatalog()->ensureHaveIdIndex();
+            }
 
             OpDebug debug;
             BSONObj updateCriteria = o2;
