@@ -105,7 +105,6 @@ DEF_OPT_AS_UINT32(populate_ops_per_txn, 0,
     "number of operations to group into each transaction in the\n"
     "populate phase. Zero for auto-commit.")
 DEF_OPT_AS_UINT32(populate_threads, 1, "number of populate threads")
-DEF_OPT_AS_UINT32(rand_seed, 14023954, "seed for random number generator")
 DEF_OPT_AS_UINT32(random_range, 0,
     "if non-zero, use random inserts in workload, reads and updates\n"
     "ignore WT_NOTFOUND")

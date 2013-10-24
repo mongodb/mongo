@@ -148,7 +148,6 @@ void *update_thread(void *);
 void usage(void);
 void worker(CONFIG_THREAD *, worker_type);
 uint64_t wtperf_rand(CONFIG *);
-void wtperf_srand(CONFIG *);
 uint64_t wtperf_value_range(CONFIG *);
 
 #define	DEFAULT_LSM_CONFIG						\
@@ -1111,8 +1110,6 @@ main(int argc, char *argv[])
 			goto err;
 	}
 
-	wtperf_srand(&cfg);
-
 	ret = parse_session->close(parse_session, NULL);
 	parse_session = NULL;
 	if (ret != 0) {
@@ -1676,12 +1673,6 @@ setup_log_file(CONFIG *cfg)
 	return (ret);
 }
 
-void
-wtperf_srand(CONFIG *cfg)
-{
-	srand(cfg->rand_seed);
-}
-
 uint64_t
 wtperf_value_range(CONFIG *cfg)
 {
@@ -1691,11 +1682,19 @@ wtperf_value_range(CONFIG *cfg)
 		return (cfg->icount + g_nins_ops - (cfg->insert_threads + 1));
 }
 
+extern uint32_t __wt_random(void);
+
 uint64_t
 wtperf_rand(CONFIG *cfg)
 {
 	double S1, S2, U;
-	uint64_t rval = (uint64_t)rand();
+	uint64_t rval;
+
+	/*
+	 * Use WiredTiger's random number routine: it's lock-free and fairly
+	 * good.
+	 */
+	rval = (uint64_t)__wt_random();
 
 	/* Use Pareto distribution to give 80/20 hot/cold values. */
 	if (F_ISSET(cfg, PERF_RAND_PARETO)) {
@@ -1761,7 +1760,6 @@ print_config(CONFIG *cfg)
 	printf("\tNumber update threads: %" PRIu32 "\n", cfg->update_threads);
 	printf("\tkey size: %" PRIu32 " data size: %" PRIu32 "\n",
 	    cfg->key_sz, cfg->data_sz);
-	printf("\tRandom seed: %" PRIu32 "\n", cfg->rand_seed);
 	printf("\tVerbosity: %" PRIu32 "\n", cfg->verbose);
 }
 
