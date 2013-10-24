@@ -1,3 +1,5 @@
+// index_create.cpp
+
 /**
 *    Copyright (C) 2008 10gen Inc.
 *
@@ -26,7 +28,7 @@
 *    it in the license file.
 */
 
-#include "mongo/db/index_update.h"
+#include "mongo/db/catalog/index_create.h"
 
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/audit.h"

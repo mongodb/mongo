@@ -34,9 +34,9 @@
 
 #include "mongo/db/audit.h"
 #include "mongo/db/background.h"
+#include "mongo/db/catalog/index_create.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/index_legacy.h"
-#include "mongo/db/index_update.h"
 #include "mongo/db/index/2d_access_method.h"
 #include "mongo/db/index/btree_access_method.h"
 #include "mongo/db/index/btree_access_method_internal.h"
