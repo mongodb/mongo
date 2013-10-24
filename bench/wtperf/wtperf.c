@@ -111,6 +111,12 @@ CONFIG_OPT config_opts[] = {
 
 };
 
+/* Worker thread types. */
+typedef enum {
+    WORKER_READ, WORKER_INSERT, WORKER_INSERT_RMW, WORKER_UPDATE } worker_type;
+#define	IS_INSERT_WORKER(w)						\
+    ((w) == WORKER_INSERT || (w) == WORKER_INSERT_RMW)
+
 /* Forward function definitions. */
 void *checkpoint_worker(void *);
 void config_assign(CONFIG *, const CONFIG *);
@@ -140,7 +146,7 @@ void *stat_worker(void *);
 int stop_threads(CONFIG *, u_int, CONFIG_THREAD **);
 void *update_thread(void *);
 void usage(void);
-void worker(CONFIG_THREAD *, uint32_t);
+void worker(CONFIG_THREAD *, worker_type);
 uint64_t wtperf_rand(CONFIG *);
 void wtperf_srand(CONFIG *);
 uint64_t wtperf_value_range(CONFIG *);
@@ -148,17 +154,6 @@ uint64_t wtperf_value_range(CONFIG *);
 #define	DEFAULT_LSM_CONFIG						\
 	"key_format=S,value_format=S,type=lsm,exclusive=true,"		\
 	"leaf_page_max=4kb,internal_page_max=64kb,allocation_size=4kb,"
-
-const char *wtperftmp_subdir = "wtperftmp";
-
-/* Worker thread types. */
-#define	WORKER_READ		0x01
-#define	WORKER_INSERT		0x02
-#define	WORKER_INSERT_RMW	0x03
-#define	WORKER_UPDATE		0x04
-
-#define	IS_INSERT_WORKER(w)			\
-    ((w) == WORKER_INSERT || (w) == WORKER_INSERT_RMW)
 
 /* Default values. */
 CONFIG default_cfg = {
@@ -290,7 +285,7 @@ enomem(CONFIG *cfg)
 }
 
 void
-worker(CONFIG_THREAD *thread, uint32_t worker_type)
+worker(CONFIG_THREAD *thread, worker_type wtype)
 {
 	CONFIG *cfg;
 	WT_CONNECTION *conn;
@@ -311,7 +306,7 @@ worker(CONFIG_THREAD *thread, uint32_t worker_type)
 		ret = enomem(cfg);
 		goto err;
 	}
-	if (IS_INSERT_WORKER(worker_type) || worker_type == WORKER_UPDATE) {
+	if (IS_INSERT_WORKER(wtype) || wtype == WORKER_UPDATE) {
 		if ((data_buf = calloc(cfg->data_sz, 1)) == NULL) {
 			ret = enomem(cfg);
 			goto err;
@@ -332,7 +327,7 @@ worker(CONFIG_THREAD *thread, uint32_t worker_type)
 
 	while (g_running) {
 		if (!F_ISSET(cfg, PERF_RAND_WORKLOAD) &&
-		    IS_INSERT_WORKER(worker_type))
+		    IS_INSERT_WORKER(wtype))
 			next_val = cfg->icount + get_next_incr();
 		else
 			next_val = wtperf_rand(cfg);
@@ -341,12 +336,12 @@ worker(CONFIG_THREAD *thread, uint32_t worker_type)
 		 * If the workload is started without a populate phase we
 		 * rely on at least one insert to get a valid item id.
 		 */
-		if (!IS_INSERT_WORKER(worker_type) &&
+		if (!IS_INSERT_WORKER(wtype) &&
 		    wtperf_value_range(cfg) < next_val)
 			continue;
 		sprintf(key_buf, "%0*" PRIu64, cfg->key_sz, next_val);
 		cursor->set_key(cursor, key_buf);
-		switch (worker_type) {
+		switch (wtype) {
 		case WORKER_READ:
 			if ((op_ret = cursor->search(cursor)) == 0) {
 				++thread->read_ops;
@@ -398,8 +393,7 @@ worker(CONFIG_THREAD *thread, uint32_t worker_type)
 		 * threads, and the failed op was for an old item.
 		 */
 		if (op_ret == WT_NOTFOUND && cfg->insert_threads > 0 &&
-		    (worker_type == WORKER_READ ||
-		    worker_type == WORKER_UPDATE)) {
+		    (wtype == WORKER_READ || wtype == WORKER_UPDATE)) {
 			if (next_val < cfg->icount)
 				lprintf(cfg, WT_PANIC, 0,
 				    "%s not found for: %s. Value was"
@@ -957,8 +951,9 @@ main(int argc, char *argv[])
 	size_t len;
 	uint64_t req_len;
 	int ch, checkpoint_created, ret, stat_created;
-	const char *user_cconfig, *user_tconfig;
 	const char *opts = "C:O:T:h:o:SML";
+	const char *wtperftmp_subdir = "wtperftmp";
+	const char *user_cconfig, *user_tconfig;
 	char *cmd, *cc_buf, *tc_buf, *tmphome;
 
 	/* Setup the default configuration values. */
