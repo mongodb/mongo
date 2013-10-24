@@ -314,17 +314,24 @@ int
 __wt_evict_page(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_DECL_RET;
+	WT_PAGE_MODIFY *mod;
 	WT_TXN saved_txn, *txn;
 	int was_running;
 
 	/*
-	 * Fast path for pages that were never modified.
+	 * Fast path for never modified pages, or pages marked clean with no
+	 * data required by other running transactions.
 	 *
-	 * Note that we can't use !__wt_page_is_modified: a checkpoint may have
-	 * written the page (making it clean), even though it contains some
-	 * changes that a running transaction needs.
+	 * We can't use __wt_page_is_modified by itself: a checkpoint may have
+	 * written the page and marked it clean, even though it contains some
+	 * changes a running transaction needs.  If the page is marked clean,
+	 * do a further check that the maximum transaction written for the page
+	 * is visible to all running transactions.
 	 */
-	if (page->modify == NULL)
+	mod = page->modify;
+	if (mod == NULL ||
+	    (!__wt_page_is_modified(page) &&
+	    __wt_txn_visible_all(session, mod->disk_txn)))
 		return (__wt_rec_evict(session, page, 0));
 
 	/*
