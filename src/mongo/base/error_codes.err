@@ -68,5 +68,6 @@ error_code("MultipleErrorsOccurred", 65)
 error_code("ImmutableShardKeyField", 66)
 error_code("CannotCreateIndex", 67 )
 error_code("IndexAlreadyExists", 68 )
+error_code("AuthSchemaIncompatible", 69)
 
 error_class("NetworkError", ["HostUnreachable", "HostNotFound"])

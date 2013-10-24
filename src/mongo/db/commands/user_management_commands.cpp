@@ -232,6 +232,32 @@ namespace mongo {
         return Status::OK();
     }
 
+    static Status requireAuthSchemaVersion26Final(AuthorizationManager* authzManager) {
+        const int foundSchemaVersion = authzManager->getAuthorizationVersion();
+        if (foundSchemaVersion != AuthorizationManager::schemaVersion26Final) {
+            return Status(
+                    ErrorCodes::AuthSchemaIncompatible,
+                    str::stream() << "User and role management commands require auth data to have "
+                    "schema version " << AuthorizationManager::schemaVersion26Final <<
+                    " but found " << foundSchemaVersion);
+        }
+        return Status::OK();
+    }
+
+    static Status requireAuthSchemaVersion26UpgradeOrFinal(AuthorizationManager* authzManager) {
+        const int foundSchemaVersion = authzManager->getAuthorizationVersion();
+        if (foundSchemaVersion != AuthorizationManager::schemaVersion26Final &&
+            foundSchemaVersion != AuthorizationManager::schemaVersion26Upgrade) {
+            return Status(
+                    ErrorCodes::AuthSchemaIncompatible,
+                    str::stream() << "The usersInfo and rolesInfo commands require auth data to "
+                    "have schema  version " << AuthorizationManager::schemaVersion26Final <<
+                    " or " << AuthorizationManager::schemaVersion26Upgrade <<
+                    " but found " << foundSchemaVersion);
+        }
+        return Status::OK();
+    }
+
     class CmdCreateUser : public Command {
     public:
 
@@ -361,10 +387,16 @@ namespace mongo {
                 return false;
             }
 
+            status = requireAuthSchemaVersion26Final(authzManager);
+            if (!status.isOK()) {
+                addStatus(status, result);
+                return false;
+            }
+
             // Role existence has to be checked after acquiring the update lock
             for (size_t i = 0; i < args.roles.size(); ++i) {
                 BSONObj ignored;
-                Status status = authzManager->getRoleDescription(args.roles[i], &ignored);
+                status = authzManager->getRoleDescription(args.roles[i], &ignored);
                 if (!status.isOK()) {
                     addStatus(status, result);
                     return false;
@@ -505,6 +537,13 @@ namespace mongo {
                 return false;
             }
 
+            status = requireAuthSchemaVersion26Final(authzManager);
+            if (!status.isOK()) {
+                addStatus(status, result);
+                return false;
+            }
+
+
             // Role existence has to be checked after acquiring the update lock
             if (args.hasRoles) {
                 for (size_t i = 0; i < args.roles.size(); ++i) {
@@ -600,12 +639,19 @@ namespace mongo {
                 return false;
             }
 
+            Status status = requireAuthSchemaVersion26Final(authzManager);
+            if (!status.isOK()) {
+                addStatus(status, result);
+                return false;
+            }
+
+
             UserName userName;
             BSONObj writeConcern;
-            Status status = auth::parseAndValidateDropUserCommand(cmdObj,
-                                                                  dbname,
-                                                                  &userName,
-                                                                  &writeConcern);
+            status = auth::parseAndValidateDropUserCommand(cmdObj,
+                                                           dbname,
+                                                           &userName,
+                                                           &writeConcern);
             if (!status.isOK()) {
                 addStatus(status, result);
                 return false;
@@ -688,10 +734,16 @@ namespace mongo {
                 return false;
             }
 
+            Status status = requireAuthSchemaVersion26Final(authzManager);
+            if (!status.isOK()) {
+                addStatus(status, result);
+                return false;
+            }
+
             BSONObj writeConcern;
-            Status status = auth::parseAndValidateDropUsersFromDatabaseCommand(cmdObj,
-                                                                               dbname,
-                                                                               &writeConcern);
+            status = auth::parseAndValidateDropUsersFromDatabaseCommand(cmdObj,
+                                                                        dbname,
+                                                                        &writeConcern);
             if (!status.isOK()) {
                 addStatus(status, result);
                 return false;
@@ -774,16 +826,22 @@ namespace mongo {
                 return false;
             }
 
+            Status status = requireAuthSchemaVersion26Final(authzManager);
+            if (!status.isOK()) {
+                addStatus(status, result);
+                return false;
+            }
+
             std::string userNameString;
             std::vector<RoleName> roles;
             BSONObj writeConcern;
-            Status status = auth::parseRolePossessionManipulationCommands(cmdObj,
-                                                                          "grantRolesToUser",
-                                                                          "roles",
-                                                                          dbname,
-                                                                          &userNameString,
-                                                                          &roles,
-                                                                          &writeConcern);
+            status = auth::parseRolePossessionManipulationCommands(cmdObj,
+                                                                   "grantRolesToUser",
+                                                                   "roles",
+                                                                   dbname,
+                                                                   &userNameString,
+                                                                   &roles,
+                                                                   &writeConcern);
             if (!status.isOK()) {
                 addStatus(status, result);
                 return false;
@@ -880,16 +938,22 @@ namespace mongo {
                 return false;
             }
 
+            Status status = requireAuthSchemaVersion26Final(authzManager);
+            if (!status.isOK()) {
+                addStatus(status, result);
+                return false;
+            }
+
             std::string userNameString;
             std::vector<RoleName> roles;
             BSONObj writeConcern;
-            Status status = auth::parseRolePossessionManipulationCommands(cmdObj,
-                                                                          "revokeRolesFromUser",
-                                                                          "roles",
-                                                                          dbname,
-                                                                          &userNameString,
-                                                                          &roles,
-                                                                          &writeConcern);
+            status = auth::parseRolePossessionManipulationCommands(cmdObj,
+                                                                   "revokeRolesFromUser",
+                                                                   "roles",
+                                                                   dbname,
+                                                                   &userNameString,
+                                                                   &roles,
+                                                                   &writeConcern);
             if (!status.isOK()) {
                 addStatus(status, result);
                 return false;
@@ -999,9 +1063,15 @@ namespace mongo {
                 return false;
             }
 
+            status = requireAuthSchemaVersion26UpgradeOrFinal(getGlobalAuthorizationManager());
+            if (!status.isOK()) {
+                addStatus(status, result);
+                return false;
+            }
+
             if (args.allForDB && args.showPrivileges) {
                 addStatus(Status(ErrorCodes::IllegalOperation,
-                                 "Cannot only get privilege details on exact-match usersInfo "
+                                 "Can only get privilege details on exact-match usersInfo "
                                  "queries."),
                           result);
                 return false;
@@ -1184,6 +1254,12 @@ namespace mongo {
                 return false;
             }
 
+            status = requireAuthSchemaVersion26Final(authzManager);
+            if (!status.isOK()) {
+                addStatus(status, result);
+                return false;
+            }
+
             // Role existence has to be checked after acquiring the update lock
             status = checkOkayToGrantRolesToRole(args.roleName, args.roles, authzManager);
             if (!status.isOK()) {
@@ -1304,6 +1380,12 @@ namespace mongo {
                 return false;
             }
 
+            status = requireAuthSchemaVersion26Final(authzManager);
+            if (!status.isOK()) {
+                addStatus(status, result);
+                return false;
+            }
+
             // Role existence has to be checked after acquiring the update lock
             BSONObj ignored;
             status = authzManager->getRoleDescription(args.roleName, &ignored);
@@ -1393,10 +1475,16 @@ namespace mongo {
                 return false;
             }
 
+            Status status = requireAuthSchemaVersion26Final(authzManager);
+            if (!status.isOK()) {
+                addStatus(status, result);
+                return false;
+            }
+
             RoleName roleName;
             PrivilegeVector privilegesToAdd;
             BSONObj writeConcern;
-            Status status = auth::parseAndValidateRolePrivilegeManipulationCommands(
+            status = auth::parseAndValidateRolePrivilegeManipulationCommands(
                     cmdObj,
                     "grantPrivilegesToRole",
                     dbname,
@@ -1534,10 +1622,16 @@ namespace mongo {
                 return false;
             }
 
+            Status status = requireAuthSchemaVersion26Final(authzManager);
+            if (!status.isOK()) {
+                addStatus(status, result);
+                return false;
+            }
+
             RoleName roleName;
             PrivilegeVector privilegesToRemove;
             BSONObj writeConcern;
-            Status status = auth::parseAndValidateRolePrivilegeManipulationCommands(
+            status = auth::parseAndValidateRolePrivilegeManipulationCommands(
                     cmdObj,
                     "revokePrivilegesFromRole",
                     dbname,
@@ -1677,13 +1771,14 @@ namespace mongo {
             std::string roleNameString;
             std::vector<RoleName> rolesToAdd;
             BSONObj writeConcern;
-            Status status = auth::parseRolePossessionManipulationCommands(cmdObj,
-                                                                          "grantRolesToRole",
-                                                                          "grantedRoles",
-                                                                          dbname,
-                                                                          &roleNameString,
-                                                                          &rolesToAdd,
-                                                                          &writeConcern);
+            Status status = auth::parseRolePossessionManipulationCommands(
+                    cmdObj,
+                    "grantRolesToRole",
+                    "grantedRoles",
+                    dbname,
+                    &roleNameString,
+                    &rolesToAdd,
+                    &writeConcern);
             if (!status.isOK()) {
                 addStatus(status, result);
                 return false;
@@ -1703,6 +1798,12 @@ namespace mongo {
             if (!updateGuard.tryLock("Grant roles to role")) {
                 addStatus(Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."),
                           result);
+                return false;
+            }
+
+            status = requireAuthSchemaVersion26Final(authzManager);
+            if (!status.isOK()) {
+                addStatus(status, result);
                 return false;
             }
 
@@ -1809,16 +1910,22 @@ namespace mongo {
                 return false;
             }
 
+            Status status = requireAuthSchemaVersion26Final(authzManager);
+            if (!status.isOK()) {
+                addStatus(status, result);
+                return false;
+            }
+
             std::string roleNameString;
             std::vector<RoleName> rolesToRemove;
             BSONObj writeConcern;
-            Status status = auth::parseRolePossessionManipulationCommands(cmdObj,
-                                                                          "revokeRolesFromRole",
-                                                                          "revokedRoles",
-                                                                          dbname,
-                                                                          &roleNameString,
-                                                                          &rolesToRemove,
-                                                                          &writeConcern);
+            status = auth::parseRolePossessionManipulationCommands(cmdObj,
+                                                                   "revokeRolesFromRole",
+                                                                   "revokedRoles",
+                                                                   dbname,
+                                                                   &roleNameString,
+                                                                   &rolesToRemove,
+                                                                   &writeConcern);
             if (!status.isOK()) {
                 addStatus(status, result);
                 return false;
@@ -1932,12 +2039,18 @@ namespace mongo {
                 return false;
             }
 
+            Status status = requireAuthSchemaVersion26Final(authzManager);
+            if (!status.isOK()) {
+                addStatus(status, result);
+                return false;
+            }
+
             RoleName roleName;
             BSONObj writeConcern;
-            Status status = auth::parseDropRoleCommand(cmdObj,
-                                                         dbname,
-                                                         &roleName,
-                                                         &writeConcern);
+            status = auth::parseDropRoleCommand(cmdObj,
+                                                dbname,
+                                                &roleName,
+                                                &writeConcern);
             if (!status.isOK()) {
                 addStatus(status, result);
                 return false;
@@ -2106,6 +2219,12 @@ namespace mongo {
                 return false;
             }
 
+            status = requireAuthSchemaVersion26Final(authzManager);
+            if (!status.isOK()) {
+                addStatus(status, result);
+                return false;
+            }
+
             // Remove these roles from all users
             int numUpdated;
             status = authzManager->updateAuthzDocuments(
@@ -2229,6 +2348,12 @@ namespace mongo {
 
             std::vector<RoleName> roleNames;
             Status status = auth::parseRolesInfoCommand(cmdObj, dbname, &roleNames);
+            if (!status.isOK()) {
+                addStatus(status, result);
+                return false;
+            }
+
+            status = requireAuthSchemaVersion26UpgradeOrFinal(getGlobalAuthorizationManager());
             if (!status.isOK()) {
                 addStatus(status, result);
                 return false;
