@@ -187,7 +187,6 @@ namespace {
             << ActionType::moveChunk
             << ActionType::movePrimary
             << ActionType::removeShard
-            << ActionType::repairDatabase
             << ActionType::replSetInitiate
             << ActionType::replSetReconfig
             << ActionType::resync
@@ -198,7 +197,8 @@ namespace {
 
         clusterAdminRoleDatabaseActions
             << ActionType::dropDatabase
-            << ActionType::killCursors;
+            << ActionType::killCursors
+            << ActionType::repairDatabase;
 
         // Database-owner role database actions.
         dbOwnerRoleActions += readWriteRoleActions;
