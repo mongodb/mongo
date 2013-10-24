@@ -51,23 +51,4 @@ namespace mongo {
      */
     void ensureHaveIdIndex(const char* ns, bool mayInterrupt);
 
-    /**
-     * Prepare to build an index.  Does not actually build it (except for a special _id case).
-     * - We validate that the params are good
-     * - That the index does not already exist
-     *
-     * example of 'io':
-     *   { ns : 'test.foo', name : 'z', key : { z : 1 } }
-     *
-     * @throws DBException
-     *
-     * @param mayInterrupt - When true, killop may interrupt the function call.
-     * @param sourceNS - source NS we are indexing
-     * @return true if ok to continue.  when false we stop/fail silently (index already exists)
-     */
-    bool prepareToBuildIndex(const BSONObj& io,
-                             bool mayInterrupt,
-                             bool god,
-                             const string& sourceNS );
-
 } // namespace mongo

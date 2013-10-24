@@ -38,6 +38,6 @@ namespace mongo {
     // For backward compatibility with versions before 2.4.0 all new DBs start
     // with PDFILE_VERSION_MINOR_22_AND_OLDER and are converted when the first
     // index using a new plugin is created. See the logic in
-    // prepareToBuildIndex() and upgradeMinorVersionOrAssert() for details
+    // IndexCatalog::_upgradeDatabaseMinorVersionIfNeeded for details
 
 } // namespace mongo

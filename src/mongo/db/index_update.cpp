@@ -276,31 +276,5 @@ namespace mongo {
         theDataFileMgr.insert(system_indexes.c_str(), o.objdata(), o.objsize(), mayInterrupt, true);
     }
 
-    bool prepareToBuildIndex(const BSONObj& io,
-                             bool mayInterrupt,
-                             bool god,
-                             const string& sourceNS ) {
-
-        BSONObj key = io.getObjectField("key");
-
-        /* this is because we want key patterns like { _id : 1 } and { _id : <someobjid> } to
-           all be treated as the same pattern.
-        */
-        if ( IndexDetails::isIdIndexPattern(key) ) {
-            if( !god ) {
-                ensureHaveIdIndex( sourceNS.c_str(), mayInterrupt );
-                return false;
-            }
-        }
-        else {
-            /* is buildIndexes:false set for this replica set member?
-               if so we don't build any indexes except _id
-            */
-            if( theReplSet && !theReplSet->buildIndexes() )
-                return false;
-        }
-
-        return true;
-    }
 }  // namespace mongo
 
