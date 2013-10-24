@@ -162,15 +162,53 @@ namespace mongo {
             chunksToMerge.mutableVector().push_back( saved.release() );
         }
 
+        if ( chunksToMerge.empty() ) {
+
+            *errMsg = stream() << "could not merge chunks, collection " << nss.ns()
+                               << " range starting at " << minKey
+                               << " and ending at " << maxKey
+                               << " does not belong to shard " << shardingState.getShardName();
+
+            warning() << *errMsg << endl;
+            return false;
+        }
+
         //
         // Validate the range starts and ends at chunks and has no holes, error if not valid
         //
 
-        bool validRangeStartKey = !chunksToMerge.empty() &&
-                                  ( *chunksToMerge.begin() )->getMin().woCompare( minKey ) == 0;
+        BSONObj firstDocMin = ( *chunksToMerge.begin() )->getMin();
+        BSONObj firstDocMax = ( *chunksToMerge.begin() )->getMax();
+        // minKey is inclusive
+        bool minKeyInRange = rangeContains( firstDocMin, firstDocMax, minKey );
 
-        bool validRangeEndKey = !chunksToMerge.empty() &&
-                                ( *chunksToMerge.rbegin() )->getMax().woCompare( maxKey ) == 0;
+        if ( !minKeyInRange ) {
+
+            *errMsg = stream() << "could not merge chunks, collection " << nss.ns()
+                               << " range starting at " << minKey
+                               << " does not belong to shard " << shardingState.getShardName();
+
+            warning() << *errMsg << endl;
+            return false;
+        }
+
+        BSONObj lastDocMin = ( *chunksToMerge.rbegin() )->getMin();
+        BSONObj lastDocMax = ( *chunksToMerge.rbegin() )->getMax();
+        // maxKey is exclusive
+        bool maxKeyInRange = lastDocMin.woCompare( maxKey ) < 0 &&
+                lastDocMax.woCompare( maxKey ) >= 0;
+
+        if ( !maxKeyInRange ) {
+            *errMsg = stream() << "could not merge chunks, collection " << nss.ns()
+                               << " range ending at " << maxKey
+                               << " does not belong to shard " << shardingState.getShardName();
+
+            warning() << *errMsg << endl;
+            return false;
+        }
+
+        bool validRangeStartKey = firstDocMin.woCompare( minKey ) == 0;
+        bool validRangeEndKey = lastDocMax.woCompare( maxKey ) == 0;
 
         if ( !validRangeStartKey || !validRangeEndKey ) {
 
