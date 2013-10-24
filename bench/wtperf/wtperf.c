@@ -629,7 +629,7 @@ stat_worker(void *arg)
 			break;
 		}
 
-		/* Report data source stats. */
+		/* Report data-source statistics. */
 		if ((ret = session->open_cursor(session, stat_uri,
 		    NULL, "statistics=(clear)", &cursor)) != 0) {
 			/*
@@ -650,7 +650,7 @@ stat_worker(void *arg)
 		assert(cursor->close(cursor) == 0);
 		lprintf(cfg, 0, cfg->verbose, "-----------------");
 
-		/* Dump the connection statistics since last time. */
+		/* Report connection statistics. */
 		if ((ret = session->open_cursor(session, "statistics:",
 		    NULL, "statistics=(clear)", &cursor)) != 0) {
 			lprintf(cfg, ret, 0,
