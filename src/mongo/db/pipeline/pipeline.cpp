@@ -352,6 +352,7 @@ namespace mongo {
         // The order in which optimizations are applied can have significant impact on the
         // efficiency of the final pipeline. Be Careful!
         Optimizations::Sharded::findSplitPoint(shardPipeline.get(), this);
+        Optimizations::Sharded::moveFinalUnwindFromShardsToMerger(shardPipeline.get(), this);
 
         return shardPipeline;
     }
@@ -379,6 +380,15 @@ namespace mongo {
 
                 break;
             }
+        }
+    }
+
+    void Pipeline::Optimizations::Sharded::moveFinalUnwindFromShardsToMerger(Pipeline* shardPipe,
+                                                                             Pipeline* mergePipe) {
+        while (!shardPipe->sources.empty()
+                && dynamic_cast<DocumentSourceUnwind*>(shardPipe->sources.back().get())) {
+            mergePipe->sources.push_front(shardPipe->sources.back());
+            shardPipe->sources.pop_back();
         }
     }
 

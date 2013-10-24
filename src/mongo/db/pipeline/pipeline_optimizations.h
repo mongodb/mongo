@@ -104,5 +104,12 @@ namespace mongo {
          * NOTE: looks for SplittableDocumentSources and uses that API
          */
         static void findSplitPoint(Pipeline* shardPipe, Pipeline* mergePipe);
+
+        /**
+         * If the final stage on shards is to unwind an array, move that stage to the merger. This
+         * cuts down on network traffic and allows us to take advantage of reduced copying in
+         * unwind.
+         */
+        static void moveFinalUnwindFromShardsToMerger(Pipeline* shardPipe, Pipeline* mergePipe);
     };
 } // namespace mongo
