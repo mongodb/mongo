@@ -212,7 +212,7 @@ namespace mongo {
 
         Collection* systemIndexes = db->getCollection( db->_indexesName );
         if ( !systemIndexes ) {
-            systemIndexes = db->createCollection( db->_indexesName, false, NULL );
+            systemIndexes = db->createCollection( db->_indexesName, false, NULL, false );
             verify( systemIndexes );
         }
 

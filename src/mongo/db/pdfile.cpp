@@ -194,7 +194,11 @@ namespace mongo {
     bool _userCreateNS(const char *ns, const BSONObj& options, string& err, bool *deferIdIndex) {
         LOG(1) << "create collection " << ns << ' ' << options << endl;
 
-        if ( nsdetails(ns) ) {
+        Database* db = cc().database();
+
+        Collection* collection = db->getCollection( ns );
+
+        if ( collection ) {
             err = "collection already exists";
             return false;
         }
@@ -227,9 +231,10 @@ namespace mongo {
         }
 
 
-        cc().database()->createCollection( ns, options["capped"].trueValue(), &options );
-
-        Collection* collection = cc().database()->getCollection( ns );
+        collection = db->createCollection( ns,
+                                           options["capped"].trueValue(),
+                                           &options,
+                                           false ); // we do it ourselves below
         verify( collection );
 
         // $nExtents just for debug/testing.
@@ -784,7 +789,7 @@ namespace mongo {
 
                     Collection* collection = database->getCollection( collectionToIndex );
                     if ( !collection ) {
-                        collection = database->createCollection( collectionToIndex, false, NULL );
+                        collection = database->createCollection( collectionToIndex, false, NULL, true );
                         verify( collection );
                         if ( !god )
                             ensureIdIndexForNewNs( collection );
@@ -801,7 +806,7 @@ namespace mongo {
 
         Collection* collection = database->getCollection( ns );
         if ( collection == NULL ) {
-            collection = database->createCollection( ns, false, NULL );
+            collection = database->createCollection( ns, false, NULL, false );
 
             int ies = Extent::initialSize(len);
             if( str::contains(ns, '$') &&

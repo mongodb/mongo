@@ -548,7 +548,8 @@ namespace mongo {
         log() << "have free list for " << _extentFreelistName << endl;
     }
 
-    Collection* Database::createCollection( const StringData& ns, bool capped, const BSONObj* options ) {
+    Collection* Database::createCollection( const StringData& ns, bool capped,
+                                            const BSONObj* options, bool allocateDefaultSpace ) {
         verify( _namespaceIndex.details( ns ) == NULL );
 
         if ( serverGlobalParams.configsvr &&
@@ -571,6 +572,11 @@ namespace mongo {
 
         Collection* collection = getCollection( ns );
         verify( collection );
+
+        if ( allocateDefaultSpace ) {
+            collection->increaseStorageSize( Extent::initialSize( 128 ), false );
+        }
+
         return collection;
     }
 
