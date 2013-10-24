@@ -150,12 +150,14 @@ namespace mongo {
                 vector<BSONObj> results;
                 BSONObjBuilder subobj (output.subobjStart("raw"));
                 BSONObjBuilder errors;
+                int commonErrCode = -1;
                 for ( list< shared_ptr<Future::CommandResult> >::iterator i=futures.begin(); i!=futures.end(); i++ ) {
                     shared_ptr<Future::CommandResult> res = *i;
                     if ( ! res->join() ) {
 
                         BSONObj result = res->result();
 
+                        // Handle "errmsg".
                         if( ! result["errmsg"].eoo() ){
                             errors.appendAs(res->result()["errmsg"], res->getServer());
                         }
@@ -164,6 +166,15 @@ namespace mongo {
                             // Can happen if message is empty, for some reason
                             errors.append( res->getServer(), str::stream()
                                 << "result without error message returned : " << result );
+                        }
+
+                        // Handle "code".
+                        int errCode = result["code"].numberInt();
+                        if ( commonErrCode == -1 ) {
+                            commonErrCode = errCode;
+                        }
+                        else if ( commonErrCode != errCode ) {
+                            commonErrCode = 0;
                         }
                     }
                     results.push_back( res->result() );
@@ -175,6 +186,13 @@ namespace mongo {
                 BSONObj errobj = errors.done();
                 if (! errobj.isEmpty()) {
                     errmsg = errobj.toString(false, true);
+
+                    // If every error has a code, and the code for all errors is the same, then add
+                    // a top-level field "code" with this value to the output object.
+                    if ( commonErrCode > 0 ) {
+                        output.append( "code", commonErrCode );
+                    }
+
                     return false;
                 }
 
