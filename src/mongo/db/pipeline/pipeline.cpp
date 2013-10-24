@@ -97,9 +97,9 @@ namespace mongo {
                       ((const StageDesc *)pR)->pName);
     }
 
-    intrusive_ptr<Pipeline> Pipeline::parseCommand(string &errmsg,
-                                                   BSONObj &cmdObj,
-                                                   const intrusive_ptr<ExpressionContext> &pCtx) {
+    intrusive_ptr<Pipeline> Pipeline::parseCommand(string& errmsg,
+                                                   const BSONObj& cmdObj,
+                                                   const intrusive_ptr<ExpressionContext>& pCtx) {
         intrusive_ptr<Pipeline> pPipeline(new Pipeline(pCtx));
         vector<BSONElement> pipeline;
 

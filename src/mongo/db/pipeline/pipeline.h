@@ -56,15 +56,16 @@ namespace mongo {
         public IntrusiveCounterUnsigned {
     public:
         /**
-          Create a pipeline from the command.
-
-          @param errmsg where to write errors, if there are any
-          @param cmdObj the command object sent from the client
-          @returns the pipeline, if created, otherwise a NULL reference
+         * Create a pipeline from the command.
+         *
+         * @param errmsg where to write errors, if there are any
+         * @param cmdObj the command object sent from the client
+         * @returns the pipeline, if created, otherwise a NULL reference
          */
         static intrusive_ptr<Pipeline> parseCommand(
-            string &errmsg, BSONObj &cmdObj,
-            const intrusive_ptr<ExpressionContext> &pCtx);
+            string& errmsg,
+            const BSONObj& cmdObj,
+            const intrusive_ptr<ExpressionContext>& pCtx);
 
         /// Helper to implement Command::addRequiredPrivileges
         static void addRequiredPrivileges(Command* commandTemplate,
