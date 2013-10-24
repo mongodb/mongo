@@ -110,6 +110,19 @@ __wt_lsm_merge_worker(void *vargs)
 	stallms = 0;
 
 	while (F_ISSET(lsm_tree, WT_LSM_TREE_WORKING)) {
+		/*
+		 * Help out with switching chunks in case the checkpoint worker
+		 * is busy.
+		 */
+		if (F_ISSET(lsm_tree, WT_LSM_TREE_NEED_SWITCH)) {
+			WT_ERR(__wt_writelock(session, lsm_tree->rwlock));
+			if (F_ISSET(lsm_tree, WT_LSM_TREE_NEED_SWITCH))
+				WT_WITH_SCHEMA_LOCK(session, ret =
+				    __wt_lsm_tree_switch(session, lsm_tree));
+			WT_TRET(__wt_rwunlock(session, lsm_tree->rwlock));
+			WT_ERR(ret);
+		}
+
 		progress = 0;
 
 		/* Clear any state from previous worker thread iterations. */
@@ -308,16 +321,16 @@ __wt_lsm_checkpoint_worker(void *arg)
 			 */
 			WT_ERR(__wt_session_get_btree(
 			    session, chunk->uri, NULL, NULL, 0));
-			if (__wt_spin_trylock(
-			    session, &S2C(session)->checkpoint_lock) == 0) {
-				ret = __wt_sync_file(
-				    session, WT_SYNC_WRITE_LEAVES);
-				__wt_spin_unlock(
-				   session, &S2C(session)->checkpoint_lock);
-			}
-
+			__wt_spin_lock(session, &S2C(session)->checkpoint_lock);
+			ret = __wt_bt_cache_op(
+			    session, NULL, WT_SYNC_WRITE_LEAVES);
+			__wt_spin_unlock(
+			   session, &S2C(session)->checkpoint_lock);
 			WT_TRET(__wt_session_release_btree(session));
 			WT_ERR(ret);
+
+			if (F_ISSET(lsm_tree, WT_LSM_TREE_NEED_SWITCH))
+				break;
 
 			WT_VERBOSE_ERR(session, lsm,
 			     "LSM worker checkpointing %u", i);
