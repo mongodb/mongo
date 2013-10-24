@@ -177,7 +177,7 @@ retry:
 	 * Sleep for a small amount of time to allow other threads a
 	 * chance to consolidate.
 	 */
-	__wt_sleep(0, 25);
+	__wt_yield();
 
 	/*
 	 * Swap out the slot we're going to use and put a free one in the

@@ -9,7 +9,7 @@
 
 /* Logging subsystem declarations. */
 #define	LOG_ALIGN		128
-#define	WT_LOG_SLOT_BUF_INIT_SIZE	8192
+#define	WT_LOG_SLOT_BUF_INIT_SIZE	64 * 1024
 
 struct __wt_lsn {
 	uint32_t	file;		/* Log file number */
