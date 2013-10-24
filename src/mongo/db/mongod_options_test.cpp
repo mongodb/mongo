@@ -1155,6 +1155,18 @@ namespace {
                 ASSERT_EQUALS(iterator->_sources, moe::SourceAll);
             }
 #endif
+#if defined(__linux__)
+            else if (iterator->_dottedName == "shutdown") {
+                ASSERT_EQUALS(iterator->_singleName, "shutdown");
+                ASSERT_EQUALS(iterator->_type, moe::Switch);
+                ASSERT_EQUALS(iterator->_description, "kill a running server (for init scripts)");
+                ASSERT_EQUALS(iterator->_isVisible, true);
+                ASSERT_TRUE(iterator->_default.isEmpty());
+                ASSERT_TRUE(iterator->_implicit.isEmpty());
+                ASSERT_EQUALS(iterator->_isComposing, false);
+                ASSERT_EQUALS(iterator->_sources, moe::SourceAll);
+            }
+#endif
             else {
                 ::mongo::StringBuilder sb;
                 sb << "Found extra option: " << iterator->_dottedName <<
