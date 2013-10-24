@@ -29,7 +29,10 @@
 #include "mongo/s/dbclient_multi_command.h"
 
 #include "mongo/db/dbmessage.h"
+#include "mongo/db/wire_version.h"
 #include "mongo/s/shard.h"
+#include "mongo/s/batch_downconvert.h"
+#include "mongo/s/dbclient_safe_writer.h"
 #include "mongo/util/net/message.h"
 
 namespace mongo {
@@ -51,6 +54,88 @@ namespace mongo {
         _pendingCommands.push_back( command );
     }
 
+    namespace {
+
+        //
+        // Stuff we need for batch downconversion
+        // TODO: Remove post-2.6
+        //
+
+        BatchedCommandRequest::BatchType getBatchWriteType( const BSONObj& cmdObj ) {
+            string cmdName = cmdObj.firstElement().fieldName();
+            if ( cmdName == "insert" ) return BatchedCommandRequest::BatchType_Insert;
+            if ( cmdName == "update" ) return BatchedCommandRequest::BatchType_Update;
+            if ( cmdName == "delete" ) return BatchedCommandRequest::BatchType_Delete;
+            return BatchedCommandRequest::BatchType_Unknown;
+        }
+
+        bool isBatchWriteCommand( const BSONObj& cmdObj ) {
+            return getBatchWriteType( cmdObj ) != BatchedCommandRequest::BatchType_Unknown;
+        }
+
+        bool hasBatchWriteFeature( DBClientBase* conn ) {
+            return conn->getMinWireVersion() <= BATCH_COMMANDS
+                   && conn->getMaxWireVersion() >= BATCH_COMMANDS;
+        }
+
+        /**
+         * Parses and re-BSON's a batch write command in order to send it as a set of safe writes.
+         */
+        void legacySafeWrite( DBClientBase* conn,
+                              const StringData& dbName,
+                              const BSONObj& cmdRequest,
+                              BSONObj* cmdResponse ) {
+
+            // Translate from BSON
+            BatchedCommandRequest request( getBatchWriteType( cmdRequest ) );
+
+            // This should *always* parse correctly
+            string errMsg;
+            bool parsed = !request.parseBSON( cmdRequest, &errMsg );
+            (void) parsed; // for non-debug compile
+            dassert( parsed && request.isValid( &errMsg ) );
+
+            // Collection name is sent without db to the dispatcher
+            request.setNS( dbName.toString() + "." + request.getNS() );
+
+            DBClientSafeWriter safeWriter;
+            BatchSafeWriter batchSafeWriter( &safeWriter );
+            BatchedCommandResponse response;
+            batchSafeWriter.safeWriteBatch( conn, request, &response );
+
+            // Back to BSON
+            dassert( response.isValid( &errMsg ) );
+            *cmdResponse = response.toBSON();
+        }
+    }
+
+    // THROWS
+    static void sayAsCmd( DBClientBase* conn, const StringData& dbName, const BSONObj& cmdObj ) {
+        Message toSend;
+
+        // see query.h for the protocol we are using here.
+        BufBuilder bufB;
+        bufB.appendNum( 0 ); // command/query options
+        bufB.appendStr( dbName.toString() + ".$cmd" ); // write command ns
+        bufB.appendNum( 0 ); // ntoskip (0 for command)
+        bufB.appendNum( 1 ); // ntoreturn (1 for command)
+        cmdObj.appendSelfToBufBuilder( bufB );
+        toSend.setData( dbQuery, bufB.buf(), bufB.len() );
+
+        // Send our command
+        conn->say( toSend );
+    }
+
+    // THROWS
+    static void recvAsCmd( DBClientBase* conn, Message* toRecv, BSONObj* result ) {
+
+        conn->recv( *toRecv );
+
+        // A query result is returned from commands
+        QueryResult* recvdQuery = reinterpret_cast<QueryResult*>( toRecv->singleData() );
+        *result = BSONObj( recvdQuery->data() );
+    }
+
     void DBClientMultiCommand::sendAll() {
 
         for ( deque<PendingCommand*>::iterator it = _pendingCommands.begin();
@@ -65,19 +150,15 @@ namespace mongo {
                     command->endpoint.type() == ConnectionString::CUSTOM );
                 command->conn = shardConnectionPool.get( command->endpoint, 0 /*timeout*/);
 
-                Message toSend;
-
-                // see query.h for the protocol we are using here.
-                BufBuilder bufB;
-                bufB.appendNum( 0 ); // command/query options
-                bufB.appendStr( command->dbName + ".$cmd" ); // write command ns
-                bufB.appendNum( 0 ); // ntoskip (0 for command)
-                bufB.appendNum( 1 ); // ntoreturn (1 for command)
-                command->cmdObj.appendSelfToBufBuilder( bufB );
-                toSend.setData( dbQuery, bufB.buf(), bufB.len() );
-
-                // Send our command
-                command->conn->say( toSend );
+                if ( hasBatchWriteFeature( command->conn )
+                     || !isBatchWriteCommand( command->cmdObj ) ) {
+                    // Do normal command dispatch
+                    sayAsCmd( command->conn, command->dbName, command->cmdObj );
+                }
+                else {
+                    // Sending a batch as safe writes necessarily blocks, so we can't do anything
+                    // here.  Instead we do the safe writes in recvAny(), which can block.
+                }
             }
             catch ( const DBException& ex ) {
                 command->status = ex.toStatus();
@@ -103,12 +184,20 @@ namespace mongo {
 
         try {
 
+            // Holds the data and BSONObj for the command result
             Message toRecv;
-            command->conn->recv( toRecv );
+            BSONObj result;
 
-            // RPC was sent as a command, so a query result is what we get back
-            QueryResult* recvdQuery = reinterpret_cast<QueryResult*>( toRecv.singleData() );
-            BSONObj result( recvdQuery->data() );
+            if ( hasBatchWriteFeature( command->conn )
+                 || !isBatchWriteCommand( command->cmdObj ) ) {
+                // Recv data from command sent earlier
+                recvAsCmd( command->conn, &toRecv, &result );
+            }
+            else {
+                // We can safely block in recvAny, so dispatch writes as safe writes for hosts
+                // that don't understand batch write commands.
+                legacySafeWrite( command->conn, command->dbName, command->cmdObj, &result );
+            }
 
             shardConnectionPool.release( command->endpoint.toString(), command->conn );
             command->conn = NULL;

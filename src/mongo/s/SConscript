@@ -247,22 +247,10 @@ env.CppUnitTest(
 )
 
 env.StaticLibrary(
-    target='write_op_impl',
-    source=[
-        'chunk_manager_targeter.cpp',
-        'dbclient_multi_command.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/bson',
-        'batched_write_ops',
-    ],
-)
-
-env.StaticLibrary(
     target='write_op_conversion',
     source=[
         'batch_upconvert.cpp',
-        # More to come
+        'batch_downconvert.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/bson',
@@ -280,8 +268,36 @@ env.CppUnitTest(
         'write_ops',
         'write_op_conversion',
         '$BUILD_DIR/mongo/db/common',
-        '$BUILD_DIR/mongo/server_options', # DbMessage needs server options, sigh
+        '$BUILD_DIR/mongo/server_options', # DbMessage needs server options
     ]
 )
+
+env.CppUnitTest(
+    target='batch_downconvert_test',
+    source=[
+        'batch_downconvert_test.cpp',
+    ],
+    LIBDEPS=[
+        'write_ops',
+        'write_op_conversion',
+        '$BUILD_DIR/mongo/db/common',
+        '$BUILD_DIR/mongo/server_options', # DbMessage needs server options
+    ]
+)
+
+env.StaticLibrary(
+    target='write_op_impl',
+    source=[
+        'chunk_manager_targeter.cpp',
+        'dbclient_multi_command.cpp',
+        'dbclient_safe_writer.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/bson',
+        'batched_write_ops',
+        'write_op_conversion',
+    ],
+)
+
 
 

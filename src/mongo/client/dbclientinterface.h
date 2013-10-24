@@ -1009,18 +1009,29 @@ namespace mongo {
         static AtomicInt64 ConnectionIdSequence;
         long long _connectionId; // unique connection id for this connection
         WriteConcern _writeConcern;
+        int _minWireVersion;
+        int _maxWireVersion;
     public:
         static const uint64_t INVALID_SOCK_CREATION_TIME;
 
         DBClientBase() {
             _writeConcern = W_NORMAL;
             _connectionId = ConnectionIdSequence.fetchAndAdd(1);
+            _minWireVersion = _maxWireVersion = 0;
         }
 
         long long getConnectionId() const { return _connectionId; }
 
         WriteConcern getWriteConcern() const { return _writeConcern; }
         void setWriteConcern( WriteConcern w ) { _writeConcern = w; }
+
+        void setWireVersions( int minWireVersion, int maxWireVersion ){
+            _minWireVersion = minWireVersion;
+            _maxWireVersion = maxWireVersion;
+        }
+
+        int getMinWireVersion() { return _minWireVersion; }
+        int getMaxWireVersion() { return _maxWireVersion; }
 
         /** send a query to the database.
          @param ns namespace to query, format is <dbname>.<collectname>[.<collectname>]*

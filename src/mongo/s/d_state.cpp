@@ -47,6 +47,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/db.h"
+#include "mongo/db/wire_version.h"
 #include "mongo/db/repl/is_master.h"
 #include "mongo/client/connpool.h"
 #include "mongo/s/chunk_version.h"
@@ -906,7 +907,13 @@ namespace mongo {
 
             // Handle initial shard connection
             if( cmdObj["version"].eoo() && cmdObj["init"].trueValue() ){
+
                 result.append( "initialized", true );
+
+                // Send back wire version to let mongos know what protocol we can speak
+                result.append( "minWireVersion", minWireVersion );
+                result.append( "maxWireVersion", maxWireVersion );
+
                 return true;
             }
 
