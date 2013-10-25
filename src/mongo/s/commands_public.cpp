@@ -39,6 +39,7 @@
 #include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege.h"
+#include "mongo/db/commands/copydb.h"
 #include "mongo/db/commands/find_and_modify.h"
 #include "mongo/db/commands/mr.h"
 #include "mongo/db/commands/rename_collection.h"
@@ -510,10 +511,12 @@ namespace mongo {
         class RenameCollectionCmd : public PublicGridCommand {
         public:
             RenameCollectionCmd() : PublicGridCommand( "renameCollection" ) {}
-            virtual void addRequiredPrivileges(const std::string& dbname,
-                                               const BSONObj& cmdObj,
-                                               std::vector<Privilege>* out) {
-                rename_collection::addPrivilegesRequiredForRenameCollection(cmdObj, out);
+            virtual Status checkAuthForCommand(ClientBasic* client,
+                                               const std::string& dbname,
+                                               const BSONObj& cmdObj) {
+                return rename_collection::checkAuthForRenameCollectionCommand(client,
+                                                                              dbname,
+                                                                              cmdObj);
             }
             bool run(const string& dbName, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
                 string fullnsFrom = cmdObj.firstElement().valuestrsafe();
@@ -543,16 +546,10 @@ namespace mongo {
             virtual bool adminOnly() const {
                 return true;
             }
-            virtual void addRequiredPrivileges(const std::string& dbname,
-                                               const BSONObj& cmdObj,
-                                               std::vector<Privilege>* out) {
-                // Note: privileges required are currently only granted to old-style users for
-                // backwards compatibility, since we can't properly handle auth checking for the
-                // read from the source DB.
-                ActionSet actions;
-                actions.addAction(ActionType::copyDBTarget);
-                out->push_back(Privilege(ResourcePattern::forDatabaseName(cmdObj["todb"].str()),
-                                         actions));
+            virtual Status checkAuthForCommand(ClientBasic* client,
+                                               const std::string& dbname,
+                                               const BSONObj& cmdObj) {
+                return copydb::checkAuthForCopydbCommand(client, dbname, cmdObj);
             }
             bool run(const string& dbName, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
                 string todb = cmdObj.getStringField("todb");

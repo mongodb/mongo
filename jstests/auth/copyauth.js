@@ -9,9 +9,12 @@ var baseName = "jstests_clone_copyauth";
 var source = startMongod( "--auth", "--port", ports[ 0 ], "--dbpath", "/data/db/" + baseName + "_source", "--nohttpinterface", "--bind_ip", "127.0.0.1", "--smallfiles" );
 var target = startMongod( "--port", ports[ 1 ], "--dbpath", "/data/db/" + baseName + "_target", "--nohttpinterface", "--bind_ip", "127.0.0.1", "--smallfiles" );
 
+source.getDB( "admin" ).addUser( "super", "super" );
+source.getDB( "admin" ).auth( "super", "super" );
 source.getDB( baseName )[ baseName ].save( {i:1} );
 source.getDB( baseName ).addUser( "foo", "bar" );
-source.getDB( "admin" ).addUser( "super", "super" );
+source.getDB( "admin" ).logout();
+
 assert.throws( function() { source.getDB( baseName )[ baseName ].findOne(); } );
 
 assert.commandWorked(target.getDB(baseName).copyDatabase(baseName,
@@ -61,6 +64,4 @@ assert.eq(1, target.getDB(baseName)[baseName].findOne().i);
 
 }
 
-if (0) { // SERVER-8213
-    runTest();
-}
+runTest();

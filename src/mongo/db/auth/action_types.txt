@@ -17,9 +17,6 @@
 "changeOwnCustomData",
 "clean",
 "cleanupOrphaned",
-"clone",
-"cloneCollectionLocalSource",
-"cloneCollectionTarget",
 "closeAllDatabases",
 "collMod",
 "collStats",
@@ -27,7 +24,6 @@
 "connPoolStats",
 "connPoolSync",
 "convertToCapped",
-"copyDBTarget",
 "cpuProfiler",
 "createCollection",
 "createDatabase",  # Not used for permissions checks, but to id the event in logs.

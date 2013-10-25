@@ -33,8 +33,12 @@
 #include "mongo/base/init.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/util/builder.h"
+#include "mongo/db/auth/action_set.h"
+#include "mongo/db/auth/resource_pattern.h"
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/cloner.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/copydb.h"
 #include "mongo/db/commands/rename_collection.h"
 #include "mongo/db/db.h"
 #include "mongo/db/dbhelpers.h"
@@ -318,7 +322,7 @@ namespace mongo {
         opts.fromDB = fromdb;
         opts.logForRepl = logForRepl;
         opts.slaveOk = slaveOk;
-        opts.useReplAuth = useReplAuth;
+        opts.useReplAuth = useReplAuth; // TODO(spencer): Remove this.  SERVER-11423
         opts.snapshot = snapshot;
         opts.mayYield = mayYield;
         opts.mayBeInterrupted = mayBeInterrupted;
@@ -549,14 +553,17 @@ namespace mongo {
             help << "clone this database from an instance of the db on another host\n";
             help << "{ clone : \"host13\" }";
         }
-        virtual void addRequiredPrivileges(const std::string& dbname,
-                                           const BSONObj& cmdObj,
-                                           std::vector<Privilege>* out) {
-            // Note: privileges required are currently only granted to old-style users for backwards
-            // compatibility, and to internal connections (used in movePrimary).
+        virtual Status checkAuthForCommand(ClientBasic* client,
+                                           const std::string& dbname,
+                                           const BSONObj& cmdObj) {
             ActionSet actions;
-            actions.addAction(ActionType::clone);
-            out->push_back(Privilege(ResourcePattern::forDatabaseName(dbname), actions));
+            actions.addAction(ActionType::insert);
+            actions.addAction(ActionType::createIndex);
+            if (!client->getAuthorizationSession()->isAuthorizedForActionsOnResource(
+                    ResourcePattern::forDatabaseName(dbname), actions)) {
+                return Status(ErrorCodes::Unauthorized, "Unauthorized");
+            }
+            return Status::OK();
         }
         CmdClone() : Command("clone") { }
         virtual bool run(const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
@@ -605,17 +612,20 @@ namespace mongo {
         virtual std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const {
             return parseNsFullyQualified(dbname, cmdObj);
         }
-
-        virtual void addRequiredPrivileges(const std::string& dbname,
-                                           const BSONObj& cmdObj,
-                                           std::vector<Privilege>* out) {
-            // Will fail if source instance has auth on.
-            NamespaceString ns(parseNs(dbname, cmdObj));
-            uassert(16709, "bad 'cloneCollection' value '" + ns.ns() + "'", ns.isValid());
+        virtual Status checkAuthForCommand(ClientBasic* client,
+                                           const std::string& dbname,
+                                           const BSONObj& cmdObj) {
+            std::string ns = parseNs(dbname, cmdObj);
 
             ActionSet actions;
-            actions.addAction(ActionType::cloneCollectionTarget);
-            out->push_back(Privilege(ResourcePattern::forExactNamespace(ns), actions));
+            actions.addAction(ActionType::insert);
+            actions.addAction(ActionType::createIndex); // SERVER-11418
+
+            if (!client->getAuthorizationSession()->isAuthorizedForActionsOnResource(
+                    ResourcePattern::forExactNamespace(NamespaceString(ns)), actions)) {
+                return Status(ErrorCodes::Unauthorized, "Unauthorized");
+            }
+            return Status::OK();
         }
         virtual void help( stringstream &help ) const {
             help << "{ cloneCollection: <collection>, from: <host> [,query: <query_filter>] [,copyIndexes:<bool>] }"
@@ -724,17 +734,10 @@ namespace mongo {
             return false;
         }
         virtual LockType locktype() const { return NONE; }
-        virtual void addRequiredPrivileges(const std::string& dbname,
-                                           const BSONObj& cmdObj,
-                                           std::vector<Privilege>* out) {
-            // Note: privileges required are currently only granted to old-style users for backwards
-            // compatibility, since we can't properly handle auth checking for the read from the
-            // source DB.
-            ActionSet actions;
-            // TODO: Should this become remove, insert, dropIndex,createIndex, etc., on "todb"?
-            actions.addAction(ActionType::copyDBTarget);
-            out->push_back(Privilege(ResourcePattern::forDatabaseName(cmdObj["todb"].str()),
-                                     actions));
+        virtual Status checkAuthForCommand(ClientBasic* client,
+                                           const std::string& dbname,
+                                           const BSONObj& cmdObj) {
+            return copydb::checkAuthForCopydbCommand(client, dbname, cmdObj);
         }
         virtual void help( stringstream &help ) const {
             help << "copy a database from another host to this host\n";

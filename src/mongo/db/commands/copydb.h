@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2012 10gen Inc.
+ *    Copyright (C) 2013 10gen Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -38,13 +38,13 @@ namespace mongo {
 
     class ClientBasic;
 
-namespace rename_collection {
+namespace copydb {
 
-    Status checkAuthForRenameCollectionCommand(ClientBasic* client,
-                                               const std::string& dbname,
-                                               const BSONObj& cmdObj);
+    Status checkAuthForCopydbCommand(ClientBasic* client,
+                                     const std::string& dbname,
+                                     const BSONObj& cmdObj);
 
-} // namespace rename_collection
+} // namespace copydb
 } // namespace mongo
 
 

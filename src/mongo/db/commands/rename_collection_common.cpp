@@ -33,35 +33,60 @@
 
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege.h"
+#include "mongo/db/client_basic.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
 
 namespace mongo {
 namespace rename_collection {
 
-    void addPrivilegesRequiredForRenameCollection(const BSONObj& cmdObj,
-                                                  std::vector<Privilege>* out) {
+    Status checkAuthForRenameCollectionCommand(ClientBasic* client,
+                                               const std::string& dbname,
+                                               const BSONObj& cmdObj) {
         NamespaceString sourceNS = NamespaceString(cmdObj.getStringField("renameCollection"));
         NamespaceString targetNS = NamespaceString(cmdObj.getStringField("to"));
-        uassert(17140, "Invalid source namespace " + sourceNS.ns(), sourceNS.isValid());
-        uassert(17141, "Invalid target namespace " + targetNS.ns(), targetNS.isValid());
-        ActionSet sourceActions;
-        ActionSet targetActions;
+        bool dropTarget = cmdObj["dropTarget"].trueValue();
 
-        if (sourceNS.db() == targetNS.db()) {
-            sourceActions.addAction(ActionType::renameCollectionSameDB);
-            targetActions.addAction(ActionType::renameCollectionSameDB);
-        } else {
-            sourceActions.addAction(ActionType::cloneCollectionLocalSource);
-            sourceActions.addAction(ActionType::dropCollection);
-            targetActions.addAction(ActionType::createCollection);
-            targetActions.addAction(ActionType::cloneCollectionTarget);
-            targetActions.addAction(ActionType::createIndex);
+        if (sourceNS.db() == targetNS.db() && !sourceNS.isSystem() && !targetNS.isSystem()) {
+            bool authed1 = client->getAuthorizationSession()->isAuthorizedForActionsOnResource(
+                    ResourcePattern::forDatabaseName(sourceNS.db()),
+                    ActionType::renameCollectionSameDB);
+
+            bool authed2 = true;
+            if (dropTarget) {
+                authed2 = client->getAuthorizationSession()->isAuthorizedForActionsOnResource(
+                        ResourcePattern::forExactNamespace(targetNS), ActionType::dropCollection);
+            }
+
+            if (authed1 && authed2) {
+                return Status::OK();
+            }
         }
 
-        out->push_back(Privilege(ResourcePattern::forExactNamespace(sourceNS), sourceActions));
-        out->push_back(Privilege(ResourcePattern::forExactNamespace(targetNS), targetActions));
+        // Check privileges on source collection
+        ActionSet actions;
+        actions.addAction(ActionType::find);
+        actions.addAction(ActionType::dropCollection);
+        if (!client->getAuthorizationSession()->isAuthorizedForActionsOnResource(
+                ResourcePattern::forExactNamespace(sourceNS), actions)) {
+            return Status(ErrorCodes::Unauthorized, "Unauthorized");
+        }
+
+        // Check privileges on dest collection
+        actions.removeAllActions();
+        actions.addAction(ActionType::insert);
+        actions.addAction(ActionType::createIndex);
+        if (dropTarget) {
+            actions.addAction(ActionType::dropCollection);
+        }
+        if (!client->getAuthorizationSession()->isAuthorizedForActionsOnResource(
+                ResourcePattern::forExactNamespace(targetNS), actions)) {
+            return Status(ErrorCodes::Unauthorized, "Unauthorized");
+        }
+
+        return Status::OK();
     }
 
 } // namespace rename_collection

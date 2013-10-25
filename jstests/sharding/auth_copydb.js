@@ -42,6 +42,4 @@ st.stop();
 
 }
 
-if (0) { // SERVER-8213
-    runTest();
-}
+runTest();

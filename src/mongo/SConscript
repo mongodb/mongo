@@ -328,6 +328,7 @@ env.StaticLibrary("coredb", [
         "db/commands.cpp",
         "db/commands/authentication_commands.cpp",
         "db/commands/connection_status.cpp",
+        "db/commands/copydb_common.cpp",
         "db/commands/fail_point_cmd.cpp",
         "db/commands/find_and_modify_common.cpp",
         "db/commands/hashcmd.cpp",

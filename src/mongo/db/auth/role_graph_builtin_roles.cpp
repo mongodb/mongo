@@ -93,7 +93,6 @@ namespace {
     MONGO_INITIALIZER(AuthorizationBuiltinRoles)(InitializerContext* context) {
         // Read role
         readRoleActions
-            << ActionType::cloneCollectionLocalSource
             << ActionType::collStats
             << ActionType::dbHash
             << ActionType::dbStats
@@ -103,7 +102,6 @@ namespace {
         // Read-write role
         readWriteRoleActions += readRoleActions;
         readWriteRoleActions
-            << ActionType::cloneCollectionTarget
             << ActionType::convertToCapped // db admin gets this also
             << ActionType::createCollection // db admin gets this also
             << ActionType::dropCollection
@@ -134,7 +132,6 @@ namespace {
         // DB admin role
         dbAdminRoleActions
             << ActionType::clean
-            << ActionType::cloneCollectionLocalSource
             << ActionType::collMod
             << ActionType::collStats // clusterMonitor gets this also
             << ActionType::compact
@@ -226,9 +223,6 @@ namespace {
         dbOwnerRoleActions += readWriteRoleActions;
         dbOwnerRoleActions += dbAdminRoleActions;
         dbOwnerRoleActions += userAdminRoleActions;
-        dbOwnerRoleActions
-            << ActionType::clone
-            << ActionType::copyDBTarget;
 
         return Status::OK();
     }
