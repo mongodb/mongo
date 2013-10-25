@@ -74,17 +74,7 @@ namespace mongo {
         return BSONObj::make( rec->accessed() );
     }
 
-    StatusWith<DiskLoc> Collection::insertDocument( const BSONObj& originalDoc, bool enforceQuota ) {
-        BSONObj docToInsert = originalDoc;
-        if ( originalDoc["_id"].eoo() ) {
-            BSONObjBuilder b;
-            b.appendOID( "_id", NULL, true );
-            BSONObjIterator i( originalDoc );
-            while ( i.more() )
-                b.append( i.next() );
-            docToInsert = b.obj();
-        }
-
+    StatusWith<DiskLoc> Collection::insertDocument( const BSONObj& docToInsert, bool enforceQuota ) {
         int lenWHdr = _details->getRecordAllocationSize( docToInsert.objsize() + Record::HeaderSize );
         fassert( 17208, lenWHdr >= ( docToInsert.objsize() + Record::HeaderSize ) );
 
