@@ -314,17 +314,24 @@ int
 __wt_evict_page(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_DECL_RET;
+	WT_PAGE_MODIFY *mod;
 	WT_TXN saved_txn, *txn;
 	int was_running;
 
 	/*
-	 * Fast path for pages that were never modified.
+	 * Fast path for never modified pages, or pages marked clean with no
+	 * data required by other running transactions.
 	 *
-	 * Note that we can't use !__wt_page_is_modified: a checkpoint may have
-	 * written the page (making it clean), even though it contains some
-	 * changes that a running transaction needs.
+	 * We can't use __wt_page_is_modified by itself: a checkpoint may have
+	 * written the page and marked it clean, even though it contains some
+	 * changes a running transaction needs.  If the page is marked clean,
+	 * do a further check that the maximum transaction written for the page
+	 * is visible to all running transactions.
 	 */
-	if (page->modify == NULL)
+	mod = page->modify;
+	if (mod == NULL ||
+	    (!__wt_page_is_modified(page) &&
+	    __wt_txn_visible_all(session, mod->disk_txn)))
 		return (__wt_rec_evict(session, page, 0));
 
 	/*
@@ -700,44 +707,55 @@ __evict_walk(WT_SESSION_IMPL *session, u_int *entriesp, int clean)
 	WT_CONNECTION_IMPL *conn;
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
-	u_int file_count, i, max_entries, retries;
+	u_int slot, max_entries, retries;
 
 	conn = S2C(session);
 	cache = S2C(session)->cache;
 	retries = 0;
 
 	/*
-	 * NOTE: we don't hold the schema lock, so we have to take care
-	 * that the handles we see are open and valid.
+	 * Set the starting slot in the queue and the maximum pages added
+	 * per walk.
 	 */
-	i = cache->evict_entries;
-	max_entries = i + WT_EVICT_WALK_INCR;
+	slot = cache->evict_entries;
+	max_entries = slot + WT_EVICT_WALK_INCR;
+
 	/*
 	 * Lock the dhandle list so sweeping cannot change the pointers out
 	 * from under us.
+	 *
+	 * NOTE: we don't hold the schema lock, so we have to take care
+	 * that the handles we see are open and valid.
 	 */
 	__wt_spin_lock(session, &conn->dhandle_lock);
-retry:	file_count = 0;
-	SLIST_FOREACH(dhandle, &conn->dhlh, l) {
+
+retry:	SLIST_FOREACH(dhandle, &conn->dhlh, l) {
+		/* Ignore non-file handles, or handles that aren't open. */
 		if (!WT_PREFIX_MATCH(dhandle->name, "file:") ||
 		    !F_ISSET(dhandle, WT_DHANDLE_OPEN))
 			continue;
-		if (file_count++ < cache->evict_file_next)
-			continue;
-		btree = dhandle->handle;
 
 		/*
-		 * Skip files that aren't open or don't have a root page.
-		 *
-		 * Also skip files marked as cache-resident, and files
-		 * potentially involved in a bulk load.  The real problem is
+		 * Each time we reenter this function, start at the next handle
+		 * on the list.  We use the address of the handle's name as the
+		 * handle's unique identifier, that should be unique, and is
+		 * unlikely to cause a false positive if freed and reallocated.
+		 */
+		if (cache->evict_file_next != NULL &&
+		    cache->evict_file_next != dhandle)
+			continue;
+		cache->evict_file_next = NULL;
+
+		/*
+		 * Skip files without a root page, marked as cache-resident and
+		 * files potentially involved in a bulk-load.  The problem is
 		 * eviction doesn't want to be walking the file as it converts
 		 * to a bulk-loaded object, and empty trees aren't worth trying
 		 * to evict, anyway.
 		 */
+		btree = dhandle->handle;
 		if (btree->root_page == NULL ||
-		    F_ISSET(btree, WT_BTREE_NO_EVICTION) ||
-		    btree->bulk_load_ok)
+		    F_ISSET(btree, WT_BTREE_NO_EVICTION) || btree->bulk_load_ok)
 			continue;
 
 		__wt_spin_lock(session, &cache->evict_walk_lock);
@@ -748,21 +766,26 @@ retry:	file_count = 0;
 		 */
 		if (!F_ISSET(btree, WT_BTREE_NO_EVICTION))
 			WT_WITH_BTREE(session, btree,
-			    ret = __evict_walk_file(session, &i, clean));
+			    ret = __evict_walk_file(session, &slot, clean));
 
 		__wt_spin_unlock(session, &cache->evict_walk_lock);
 
-		if (ret != 0 || i == max_entries)
+		if (ret != 0 || slot >= max_entries)
 			break;
 	}
-	cache->evict_file_next = (dhandle == NULL) ? 0 : file_count;
 
-	/* Walk the files a few times if we don't find enough pages. */
-	if (ret == 0 && i < cache->evict_slots && retries++ < 10)
+	/* Walk the list of files a few times if we don't find enough pages. */
+	if (ret == 0 && slot < max_entries && ++retries < 10)
 		goto retry;
+
+	/* Remember the file we should visit first, next loop. */
+	if (dhandle != NULL)
+		dhandle = SLIST_NEXT(dhandle, l);
+	cache->evict_file_next = dhandle;
+
 	__wt_spin_unlock(session, &conn->dhandle_lock);
 
-	*entriesp = i;
+	*entriesp = slot;
 	return (ret);
 }
 
