@@ -70,8 +70,8 @@ struct __wt_cache {
 	uint32_t evict_entries;		/* LRU entries in the queue */
 	volatile uint32_t evict_max;	/* LRU maximum eviction slot used */
 	uint32_t evict_slots;		/* LRU list eviction slots */
-	u_int    evict_file_next;	/* LRU: next file to search */
-	uint32_t force_entries;		/* Forced eviction page count */
+	WT_DATA_HANDLE	
+		*evict_file_next;	/* LRU next file to search */
 
 	/*
 	 * Sync/flush request information.
