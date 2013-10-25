@@ -108,14 +108,45 @@ namespace {
     }
 }  // namespace
 
+    void AuthzManagerExternalStateMongod::writeAuthSchemaVersionDocumentIfNeeded() {
+        Client::WriteContext ctx(AuthorizationManager::versionCollectionNamespace.ns());
+        BSONObj ignored;
+        if (Helpers::findOne(AuthorizationManager::versionCollectionNamespace.ns(),
+                             AuthorizationManager::versionDocumentQuery,
+                             ignored)) {
+            return;
+        }
+
+        const bool hasPrivDocs = Helpers::findOne(
+                AuthorizationManager::usersCollectionNamespace.ns(), BSONObj(), ignored);
+        const int version = hasPrivDocs ?
+            AuthorizationManager::schemaVersion24 :
+            AuthorizationManager::schemaVersion26Final;
+
+        DBDirectClient client;
+        BSONObjBuilder versionDocBuilder;
+        versionDocBuilder.appendElements(AuthorizationManager::versionDocumentQuery);
+        versionDocBuilder.append(AuthorizationManager::schemaVersionFieldName, version);
+        BSONObj versionDoc = versionDocBuilder.done();
+        client.insert(AuthorizationManager::versionCollectionNamespace.ns(), versionDoc);
+        std::string err = client.getLastError(
+                AuthorizationManager::versionCollectionNamespace.db().toString());
+        if (!err.empty()) {
+            warning() << "Failed to write auth schema version document " << versionDoc <<
+                " to " << AuthorizationManager::versionCollectionNamespace.ns() << ": " <<
+                err;
+        }
+    }
+
     Status AuthzManagerExternalStateMongod::getStoredAuthorizationVersion(int* outVersion) {
         {
             Client::ReadContext ctx(AuthorizationManager::versionCollectionNamespace.ns());
             BSONObj versionDoc;
             if (Helpers::findOne(AuthorizationManager::versionCollectionNamespace.ns(),
-                                 BSON("_id" << 1),
+                                 AuthorizationManager::versionDocumentQuery,
                                  versionDoc)) {
-                BSONElement versionElement = versionDoc["currentVersion"];
+                BSONElement versionElement = versionDoc[
+                        AuthorizationManager::schemaVersionFieldName];
                 if (versionElement.isNumber()) {
                     *outVersion = versionElement.numberInt();
                     return Status::OK();

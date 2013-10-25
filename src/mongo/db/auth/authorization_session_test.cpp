@@ -421,7 +421,6 @@ namespace {
 
 
     TEST_F(AuthorizationSessionTest, ImplicitAcquireFromSomeDatabasesWithV1Users) {
-        return;
         managerState->setAuthzVersion(AuthorizationManager::schemaVersion24);
 
         managerState->insert(NamespaceString("test.system.users"),

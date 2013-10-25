@@ -33,6 +33,7 @@
 #include "mongo/db/audit.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/authz_manager_external_state_d.h"
 #include "mongo/db/client.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/instance.h"
@@ -149,10 +150,10 @@ namespace {
 
         changeState(MemberState::RS_PRIMARY);
 
-        // This must be done after becoming primary but before releasing the write lock. This adds
-        // the dropCollection entries for every temp collection to the opLog since we want it to be
-        // replicated to secondaries.
+        // The following operations must occur after becoming primary but before accepting writes
+        // from clients.  Any actions taken from here will be replicated to seconaries.
         dropAllTempCollections();
+        AuthzManagerExternalStateMongod::writeAuthSchemaVersionDocumentIfNeeded();
     }
 
     void ReplSetImpl::changeState(MemberState s) { box.change(s, _self); }

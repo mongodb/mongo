@@ -40,6 +40,7 @@
 #include "mongo/db/auth/authz_manager_external_state_d.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_global.h"
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/client.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands/server_status.h"
@@ -639,6 +640,8 @@ namespace mongo {
     void _initAndListen(int listenPort ) {
 
         Client::initThread("initandlisten");
+        uassertStatusOK(getGlobalAuthorizationManager()->initialize());
+        cc().getAuthorizationSession()->grantInternalAuthorization();
 
         bool is32bit = sizeof(int*) == 4;
 
@@ -714,18 +717,19 @@ namespace mongo {
             globalScriptEngine->setGetCurrentOpIdCallback( jsGetCurrentOpIdCallback );
         }
 
-        // On replica set members we only clear temp collections on DBs other than "local" during
-        // promotion to primary. On pure slaves, they are only cleared when the oplog tells them to.
-        // The local DB is special because it is not replicated.  See SERVER-10927 for more details.
-        const bool shouldClearNonLocalTmpCollections = !(missingRepl
-                                                         || replSettings.usingReplSets()
-                                                         || replSettings.slave == SimpleSlave);
-        repairDatabasesAndCheckVersion(shouldClearNonLocalTmpCollections);
+        // On replica set members we only check the auth schema version document and clear temp
+        // collections on DBs other than "local" during promotion to primary. On pure slaves, these
+        // actions occur when the oplog tells them to.  The local DB is special because it is not
+        // replicated.
+        const bool canAcceptClientWrites = !(missingRepl
+                                             || replSettings.usingReplSets()
+                                             || replSettings.slave == SimpleSlave);
+        repairDatabasesAndCheckVersion(canAcceptClientWrites);
+        if (canAcceptClientWrites)
+            AuthzManagerExternalStateMongod::writeAuthSchemaVersionDocumentIfNeeded();
 
         if (mongodGlobalParams.upgrade)
             return;
-
-        uassertStatusOK(getGlobalAuthorizationManager()->initialize());
 
         /* this is for security on certain platforms (nonce generation) */
         srand((unsigned) (curTimeMicros() ^ startupSrandTimer.micros()));
