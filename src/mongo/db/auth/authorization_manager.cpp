@@ -93,9 +93,11 @@ namespace mongo {
     const std::string AuthorizationManager::schemaVersionServerParameter = "authSchemaVersion";
     const std::string AuthorizationManager::schemaVersionFieldName = "currentVersion";
 
+#ifndef _MSC_EXTENSIONS
     const int AuthorizationManager::schemaVersion24;
     const int AuthorizationManager::schemaVersion26Upgrade;
     const int AuthorizationManager::schemaVersion26Final;
+#endif
 
     bool AuthorizationManager::_doesSupportOldStylePrivileges = true;
 
