@@ -305,6 +305,93 @@ namespace PipelineTests {
                     string mergePipeJson() { return "[{$unwind: '$a'}]}"; }
                 };
             } // namespace moveFinalUnwindFromShardsToMerger
+
+
+            namespace limitFieldsSentFromShardsToMerger {
+                // These tests use $limit to split the pipelines between shards and merger as it is
+                // always a split point and neutral in terms of needed fields.
+
+                class NeedWholeDoc : public Base {
+                    string inputPipeJson() { return "[{$limit:1}]"; }
+                    string shardPipeJson() { return "[{$limit:1}]"; }
+                    string mergePipeJson() { return "[{$limit:1}]"; }
+                };
+
+                class JustNeedsId : public Base {
+                    string inputPipeJson() { return "[{$limit:1}, {$group: {_id: '$_id'}}]"; }
+                    string shardPipeJson() { return "[{$limit:1}, {$project: {_id:true}}]"; }
+                    string mergePipeJson() { return "[{$limit:1}, {$group: {_id: '$_id'}}]"; }
+                };
+
+                class JustNeedsNonId : public Base {
+                    string inputPipeJson() {
+                        return "[{$limit:1}, {$group: {_id: '$a.b'}}]";
+                    }
+                    string shardPipeJson() {
+                        return "[{$limit:1}, {$project: {_id: false, a: {b: true}}}]";
+                    }
+                    string mergePipeJson() {
+                        return "[{$limit:1}, {$group: {_id: '$a.b'}}]";
+                    }
+                };
+
+                class NothingNeeded : public Base {
+                    string inputPipeJson() {
+                        return "[{$limit:1}"
+                               ",{$group: {_id: {$const: null}, count: {$sum: {$const: 1}}}}"
+                               "]";
+                    }
+                    string shardPipeJson() {
+                        return "[{$limit:1}"
+                               ",{$project: {_id: true}}"
+                               "]";
+                    }
+                    string mergePipeJson() {
+                        return "[{$limit:1}"
+                               ",{$group: {_id: {$const: null}, count: {$sum: {$const: 1}}}}"
+                               "]";
+                    }
+                };
+
+                class JustNeedsMetadata : public Base {
+                    // Currently this optimization doesn't handle metadata and the shards assume it
+                    // needs to be propagated implicitly. Therefore the $project produced should be
+                    // the same as in NothingNeeded.
+                    string inputPipeJson() {
+                        return "[{$limit:1}, {$project: {_id: false, a: {$meta: 'textScore'}}}]";
+                    }
+                    string shardPipeJson() {
+                        return "[{$limit:1}, {$project: {_id: true}}]";
+                    }
+                    string mergePipeJson() {
+                        return "[{$limit:1}, {$project: {_id: false, a: {$meta: 'textScore'}}}]";
+                    }
+                };
+
+                class ShardAlreadyExhaustive : public Base {
+                    // No new project should be added. This test reflects current behavior where the
+                    // 'a' field is still sent because it is explicitly asked for, even though it
+                    // isn't actually needed. If this changes in the future, this test will need to
+                    // change.
+                    string inputPipeJson() {
+                        return "[{$project: {_id:true, a:true}}"
+                               ",{$limit:1}"
+                               ",{$group: {_id: '$_id'}}"
+                               "]";
+                    }
+                    string shardPipeJson() {
+                        return "[{$project: {_id:true, a:true}}"
+                               ",{$limit:1}"
+                               "]";
+                    }
+                    string mergePipeJson() {
+                        return "[{$limit:1}"
+                               ",{$group: {_id: '$_id'}}"
+                               "]";
+                    }
+                };
+
+            } // namespace limitFieldsSentFromShardsToMerger
         } // namespace Sharded
     } // namespace Optimizations
 
@@ -338,6 +425,12 @@ namespace PipelineTests {
             add<Optimizations::Sharded::moveFinalUnwindFromShardsToMerger::TwoUnwind>();
             add<Optimizations::Sharded::moveFinalUnwindFromShardsToMerger::UnwindNotFinal>();
             add<Optimizations::Sharded::moveFinalUnwindFromShardsToMerger::UnwindWithOther>();
+            add<Optimizations::Sharded::limitFieldsSentFromShardsToMerger::NeedWholeDoc>();
+            add<Optimizations::Sharded::limitFieldsSentFromShardsToMerger::JustNeedsId>();
+            add<Optimizations::Sharded::limitFieldsSentFromShardsToMerger::JustNeedsNonId>();
+            add<Optimizations::Sharded::limitFieldsSentFromShardsToMerger::NothingNeeded>();
+            add<Optimizations::Sharded::limitFieldsSentFromShardsToMerger::JustNeedsMetadata>();
+            add<Optimizations::Sharded::limitFieldsSentFromShardsToMerger::ShardAlreadyExhaustive>();
         }
     } myall;
     

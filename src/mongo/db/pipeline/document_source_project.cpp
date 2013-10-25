@@ -127,7 +127,7 @@ namespace mongo {
         pProject->_variables.reset(new Variables(idGenerator.getIdCount()));
 
         BSONObj projectObj = elem.Obj();
-        pProject->_raw = projectObj.getOwned(); // probably not necessary, but better to be safe
+        pProject->_raw = projectObj.getOwned();
 
 #if defined(_DEBUG)
         if (exprObj->isSimple()) {

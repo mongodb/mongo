@@ -359,6 +359,7 @@ namespace mongo {
         // efficiency of the final pipeline. Be Careful!
         Optimizations::Sharded::findSplitPoint(shardPipeline.get(), this);
         Optimizations::Sharded::moveFinalUnwindFromShardsToMerger(shardPipeline.get(), this);
+        Optimizations::Sharded::limitFieldsSentFromShardsToMerger(shardPipeline.get(), this);
 
         return shardPipeline;
     }
@@ -396,6 +397,42 @@ namespace mongo {
             mergePipe->sources.push_front(shardPipe->sources.back());
             shardPipe->sources.pop_back();
         }
+    }
+
+    void Pipeline::Optimizations::Sharded::limitFieldsSentFromShardsToMerger(Pipeline* shardPipe,
+                                                                             Pipeline* mergePipe) {
+        DepsTracker mergeDeps = mergePipe->getDependencies(shardPipe->getInitialQuery());
+        if (mergeDeps.needWholeDocument)
+            return; // the merge needs all fields, so nothing we can do.
+
+        // Empty project is "special" so if no fields are needed, we just ask for _id instead.
+        if (mergeDeps.fields.empty())
+            mergeDeps.fields.insert("_id");
+
+        // Remove metadata from dependencies since it automatically flows through projection and we
+        // don't want to project it in to the document.
+        mergeDeps.needTextScore = false;
+
+        // HEURISTIC: only apply optimization if none of the shard stages have an exhaustive list of
+        // field dependencies. While this may not be 100% ideal in all cases, it is simple and
+        // avoids the worst cases by ensuring that:
+        // 1) Optimization IS applied when the shards wouldn't have known their exhaustive list of
+        //    dependencies. This situation can happen when a $sort is before the first $project or
+        //    $group. Without the optimization, the shards would have to reify and transmit full
+        //    objects even though only a subset of fields are needed.
+        // 2) Optimization IS NOT applied immediately following a $project or $group since it would
+        //    add an unnecessary project (and therefore a deep-copy).
+        for (size_t i = 0; i < shardPipe->sources.size(); i++) {
+            DepsTracker dt; // ignored
+            if (shardPipe->sources[i]->getDependencies(&dt) & DocumentSource::EXHAUSTIVE_FIELDS)
+                return;
+        }
+
+        // if we get here, add the project.
+        shardPipe->sources.push_back(
+            DocumentSourceProject::createFromBson(
+                BSON("$project" << mergeDeps.toProjection()).firstElement(),
+                shardPipe->pCtx));
     }
 
     BSONObj Pipeline::getInitialQuery() const {
@@ -502,4 +539,43 @@ namespace mongo {
         return true;
     }
 
+    DepsTracker Pipeline::getDependencies(const BSONObj& initialQuery) const {
+        DepsTracker deps;
+        bool knowAllFields = false;
+        bool knowAllMeta = false;
+        for (size_t i=0; i < sources.size() && !(knowAllFields && knowAllMeta); i++) {
+            DepsTracker localDeps;
+            DocumentSource::GetDepsReturn status = sources[i]->getDependencies(&localDeps);
+
+            if (status == DocumentSource::NOT_SUPPORTED) {
+                // Assume this stage needs everything. We may still know something about our
+                // dependencies if an earlier stage returned either EXHAUSTIVE_FIELDS or
+                // EXHAUSTIVE_META.
+                break;
+            }
+
+            if (!knowAllFields) {
+                deps.fields.insert(localDeps.fields.begin(), localDeps.fields.end());
+                if (localDeps.needWholeDocument)
+                    deps.needWholeDocument = true;
+                knowAllFields = status & DocumentSource::EXHAUSTIVE_FIELDS;
+            }
+
+            if (!knowAllMeta) {
+                if (localDeps.needTextScore)
+                    deps.needTextScore = true;
+
+                knowAllMeta = status & DocumentSource::EXHAUSTIVE_META;
+            }
+        }
+
+        if (!knowAllFields)
+            deps.needWholeDocument = true; // don't know all fields we need
+
+        // If doing a text query, assume we need the score if we can't prove we don't.
+        if (!knowAllMeta && DocumentSourceMatch::isTextQuery(initialQuery))
+            deps.needTextScore = true;
+
+        return deps;
+    }
 } // namespace mongo

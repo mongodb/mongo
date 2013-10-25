@@ -112,5 +112,13 @@ namespace mongo {
          * unwind.
          */
         static void moveFinalUnwindFromShardsToMerger(Pipeline* shardPipe, Pipeline* mergePipe);
+
+        /**
+         * Adds a stage to the end of shardPipe explicitly requesting all fields that mergePipe
+         * needs. This is only done if it heuristically determines that it is needed. This
+         * optimization can reduce the amount of network traffic and can also enable the shards to
+         * convert less source BSON into Documents.
+         */
+        static void limitFieldsSentFromShardsToMerger(Pipeline* shardPipe, Pipeline* mergePipe);
     };
 } // namespace mongo

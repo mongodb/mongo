@@ -100,46 +100,8 @@ namespace {
             sources.pop_front();
         }
 
-
-
         // Find the set of fields in the source documents depended on by this pipeline.
-        DepsTracker deps; // should be considered const after the following block.
-        {
-            bool knowAllFields = false;
-            bool knowAllMeta = false;
-            for (size_t i=0; i < sources.size() && !(knowAllFields && knowAllMeta); i++) {
-                DepsTracker localDeps;
-                DocumentSource::GetDepsReturn status = sources[i]->getDependencies(&localDeps);
-
-                if (status == DocumentSource::NOT_SUPPORTED) {
-                    // Assume this stage needs everything. We may still know something about our
-                    // dependencies if an earlier stage returned either EXHAUSTIVE_FIELDS or
-                    // EXHAUSTIVE_META.
-                    break;
-                }
-
-                if (!knowAllFields) {
-                    deps.fields.insert(localDeps.fields.begin(), localDeps.fields.end());
-                    if (localDeps.needWholeDocument)
-                        deps.needWholeDocument = true;
-                    knowAllFields = status & DocumentSource::EXHAUSTIVE_FIELDS;
-                }
-
-                if (!knowAllMeta) {
-                    if (localDeps.needTextScore)
-                        deps.needTextScore = true;
-
-                    knowAllMeta = status & DocumentSource::EXHAUSTIVE_META;
-                }
-            }
-
-            if (!knowAllFields)
-                deps.needWholeDocument = true; // don't know all fields we need
-
-            // If doing a text query, assume we need the score if we can't prove we don't.
-            if (!knowAllMeta && DocumentSourceMatch::isTextQuery(queryObj))
-                deps.needTextScore = true;
-        }
+        const DepsTracker deps = pPipeline->getDependencies(queryObj);
 
         // Passing query an empty projection since it is faster to use ParsedDeps::extractFields().
         // This will need to change to support covering indexes (SERVER-12015). There is an
