@@ -378,14 +378,20 @@ namespace mongo {
 
                 int idxn = 0;
                 try  {
+                    IndexCatalog* indexCatalog = collection->getIndexCatalog();
+
                     result.append("nIndexes", nsd->getCompletedIndexCount());
                     BSONObjBuilder indexes; // not using subObjStart to be exception safe
                     NamespaceDetails::IndexIterator i = nsd->ii();
                     while( i.more() ) {
                         IndexDetails& id = i.next();
                         log() << "validating index " << idxn << ": " << id.indexNamespace() << endl;
-                        auto_ptr<IndexDescriptor> descriptor(CatalogHack::getDescriptor(nsd, idxn));
-                        auto_ptr<IndexAccessMethod> iam(CatalogHack::getIndex(descriptor.get()));
+
+                        IndexDescriptor* descriptor = indexCatalog->getDescriptor( idxn );
+                        verify( descriptor );
+                        IndexAccessMethod* iam = indexCatalog->getIndex( descriptor );
+                        verify( iam );
+
                         int64_t keys;
                         iam->validate(&keys);
                         indexes.appendNumber(id.indexNamespace(), static_cast<long long>(keys));
