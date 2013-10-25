@@ -449,7 +449,7 @@ namespace {
                 if (status.isOK()) {
                     if (user != updatedUser) {
                         LOG(1) << "Updated session cache for V1 user " << name;
-                        fassert(0, _authenticatedUsers.replaceAt(it, updatedUser) == user);
+                        fassert(17226, _authenticatedUsers.replaceAt(it, updatedUser) == user);
                     }
                     getAuthorizationManager().releaseUser(user);
                     user = updatedUser;

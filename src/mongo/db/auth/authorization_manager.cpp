@@ -175,7 +175,7 @@ namespace mongo {
          * Waits on the _authzManager->_fetchPhaseIsReady condition.
          */
         void wait() {
-            fassert(0, !_isThisGuardInFetchPhase);
+            fassert(17222, !_isThisGuardInFetchPhase);
             _authzManager->_fetchPhaseIsReady.wait(_lock);
         }
 
@@ -207,7 +207,7 @@ namespace mongo {
          * If this returns true, do not update the cached data with this
          */
         bool isSameCacheGeneration() const {
-            fassert(0, !_isThisGuardInFetchPhase);
+            fassert(17223, !_isThisGuardInFetchPhase);
             return _startGeneration == _authzManager->_cacheGeneration;
         }
 
@@ -633,8 +633,8 @@ namespace mongo {
         User* user = NULL;
         if (_userCache.end() != it) {
             user = it->second;
-            fassert(0, user->getSchemaVersion() == schemaVersion24);
-            fassert(0, user->isValid());
+            fassert(17224, user->getSchemaVersion() == schemaVersion24);
+            fassert(17225, user->isValid());
             if (user->hasProbedV1(dbname)) {
                 user->incrementRefCount();
                 *acquiredUser = user;
