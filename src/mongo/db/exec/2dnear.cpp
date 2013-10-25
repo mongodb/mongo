@@ -29,8 +29,8 @@
 #include "mongo/db/exec/2dnear.h"
 
 #include "mongo/db/exec/working_set_common.h"
-#include "mongo/db/index/catalog_hack.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/structure/collection.h"
 
 namespace mongo {
 
@@ -50,15 +50,23 @@ namespace mongo {
         ++_commonStats.works;
         if (!_initted) {
             _initted = true;
-            NamespaceDetails* nsd = nsdetails(_params.ns);
-            if (NULL == nsd) { return PlanStage::IS_EOF; }
-            int idxNo = nsd->findIndexByKeyPattern(_params.indexKeyPattern);
-            if (-1 == idxNo) { return PlanStage::IS_EOF; }
-            auto_ptr<IndexDescriptor> desc(CatalogHack::getDescriptor(nsd, idxNo));
-            auto_ptr<TwoDAccessMethod> am(static_cast<TwoDAccessMethod*>(
-                CatalogHack::getIndex(desc.get())));
+
+            Database* db = cc().database();
+            if ( !db )
+                return PlanStage::IS_EOF;
+            Collection* collection = db->getCollection( _params.ns );
+            if ( !collection )
+                return PlanStage::IS_EOF;
+
+            int idxNo = collection->details()->findIndexByKeyPattern(_params.indexKeyPattern);
+            if (-1 == idxNo)
+                return PlanStage::IS_EOF;
+
+            IndexDescriptor* desc = collection->getIndexCatalog()->getDescriptor(idxNo);
+            TwoDAccessMethod* am = static_cast<TwoDAccessMethod*>( collection->getIndexCatalog()->getIndex( desc ) );
+
             auto_ptr<twod_exec::GeoSearch> search;
-            search.reset(new twod_exec::GeoSearch(am.get(),
+            search.reset(new twod_exec::GeoSearch(am,
                                            _params.nearQuery.centroid.oldPoint,
                                            _params.numWanted, 
                                            _params.filter,

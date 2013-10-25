@@ -59,8 +59,8 @@ namespace mongo {
         TwoDParams _params;
         WorkingSet* _workingSet;
         bool _initted;
-        scoped_ptr<IndexDescriptor> _descriptor;
-        scoped_ptr<TwoDAccessMethod> _am;
+        IndexDescriptor* _descriptor;
+        TwoDAccessMethod* _am;
         CommonStats _commonStats;
     };
 }

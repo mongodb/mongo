@@ -29,13 +29,14 @@
 #include "mongo/db/exec/2d.h"
 
 #include "mongo/db/exec/working_set_common.h"
-#include "mongo/db/index/catalog_hack.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/structure/collection.h"
 
 namespace mongo {
 
     TwoD::TwoD(const TwoDParams& params, WorkingSet* ws)
-        : _params(params), _workingSet(ws), _initted(false) { }
+        : _params(params), _workingSet(ws), _initted(false),
+          _descriptor(NULL), _am(NULL) { }
 
     TwoD::~TwoD() { }
 
@@ -50,23 +51,33 @@ namespace mongo {
             _initted = true;
 
             // I hate this.
-            NamespaceDetails* nsd = nsdetails(_params.ns);
-            if (NULL == nsd) { return PlanStage::IS_EOF; }
-            int idxNo = nsd->findIndexByKeyPattern(_params.indexKeyPattern);
-            if (-1 == idxNo) { return PlanStage::IS_EOF; }
-            _descriptor.reset(CatalogHack::getDescriptor(nsd, idxNo));
-            _am.reset(static_cast<TwoDAccessMethod*>(CatalogHack::getIndex(_descriptor.get())));
+            Database* database = cc().database();
+            if ( !database )
+                return PlanStage::IS_EOF;
+
+            Collection* collection = database->getCollection( _params.ns );
+            if ( !collection )
+                return PlanStage::IS_EOF;
+
+            int idxNo = collection->details()->findIndexByKeyPattern(_params.indexKeyPattern);
+            if (-1 == idxNo)
+                return PlanStage::IS_EOF;
+
+            _descriptor = collection->getIndexCatalog()->getDescriptor( idxNo );
+            verify( _descriptor );
+            _am = static_cast<TwoDAccessMethod*>( collection->getIndexCatalog()->getIndex( _descriptor ) );
+            verify( _am );
             // I hate this.
 
             if (NULL != _params.gq.getGeometry()._cap.get()) {
-                _browse.reset(new twod_exec::GeoCircleBrowse(_params, _am.get()));
+                _browse.reset(new twod_exec::GeoCircleBrowse(_params, _am));
             }
             else if (NULL != _params.gq.getGeometry()._polygon.get()) {
-                _browse.reset(new twod_exec::GeoPolygonBrowse(_params, _am.get()));
+                _browse.reset(new twod_exec::GeoPolygonBrowse(_params, _am));
             }
             else {
                 verify(NULL != _params.gq.getGeometry()._box.get());
-                _browse.reset(new twod_exec::GeoBoxBrowse(_params, _am.get()));
+                _browse.reset(new twod_exec::GeoBoxBrowse(_params, _am));
             }
             return PlanStage::NEED_TIME;
         }
