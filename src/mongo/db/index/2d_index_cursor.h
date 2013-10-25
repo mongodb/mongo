@@ -42,13 +42,14 @@ namespace mongo {
 
     class TwoDAccessMethod;
     class GeoNearArguments;
+    class IndexDescriptor;
 
     namespace twod_internal {
         class GeoCursorBase;
 
         class TwoDGeoNearRunner {
         public:
-            static bool run2DGeoNear(NamespaceDetails* nsd, int idxNo, const BSONObj& cmdObj,
+            static bool run2DGeoNear(IndexDescriptor* descriptor, const BSONObj& cmdObj,
                                      const GeoNearArguments &parsedArgs, string& errmsg,
                                      BSONObjBuilder& result, unordered_map<string, double>* stats);
         };

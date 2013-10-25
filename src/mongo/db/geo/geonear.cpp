@@ -39,13 +39,14 @@
 #include "mongo/db/geo/s2common.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/index/2d_index_cursor.h"
-#include "mongo/db/index/catalog_hack.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/s2_near_cursor.h"
+#include "mongo/db/index/s2_access_method.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_details.h"
 #include "mongo/db/pdfile.h"
+#include "mongo/db/structure/collection.h"
 #include "mongo/platform/unordered_map.h"
 
 namespace mongo {
@@ -112,12 +113,20 @@ namespace mongo {
 
         bool run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             string ns = dbname + "." + cmdObj.firstElement().valuestr();
-            NamespaceDetails *d = nsdetails(ns);
 
-            if (NULL == d) {
+            Database* db = cc().database();
+            if ( !db ) {
                 errmsg = "can't find ns";
                 return false;
             }
+
+            Collection* collection = db->getCollection( ns );
+            if ( !collection ) {
+                errmsg = "can't find ns";
+                return false;
+            }
+
+            IndexCatalog* indexCatalog = collection->getIndexCatalog();
 
             GeoNearArguments commonArgs(cmdObj);
             if (commonArgs.numWanted < 0) {
@@ -127,7 +136,7 @@ namespace mongo {
 
             vector<int> idxs;
 
-            d->findIndexByType(IndexNames::GEO_2D, idxs);
+            collection->details()->findIndexByType(IndexNames::GEO_2D, idxs);
             if (idxs.size() > 1) {
                 errmsg = "more than one 2d index, not sure which to run geoNear on";
                 return false;
@@ -137,7 +146,8 @@ namespace mongo {
 
             if (1 == idxs.size()) {
                 result.append("ns", ns);
-                twod_internal::TwoDGeoNearRunner::run2DGeoNear(d, idxs[0], cmdObj, commonArgs,
+                twod_internal::TwoDGeoNearRunner::run2DGeoNear(indexCatalog->getDescriptor( idxs[0] ),
+                                                               cmdObj, commonArgs,
                                                                errmsg, result, &statsMap);
                 BSONObjBuilder stats(result.subobjStart("stats"));
                 for (unordered_map<string, double>::const_iterator it = statsMap.begin();
@@ -149,7 +159,7 @@ namespace mongo {
                 return true;
             }
 
-            d->findIndexByType(IndexNames::GEO_2DSPHERE, idxs);
+            collection->details()->findIndexByType(IndexNames::GEO_2DSPHERE, idxs);
             if (idxs.size() > 1) {
                 errmsg = "more than one 2dsphere index, not sure which to run geoNear on";
                 return false;
@@ -157,7 +167,8 @@ namespace mongo {
 
             if (1 == idxs.size()) {
                 result.append("ns", ns);
-                run2DSphereGeoNear(d, idxs[0], cmdObj, commonArgs, errmsg, result);
+                run2DSphereGeoNear(indexCatalog->getDescriptor(idxs[0]),
+                                   cmdObj, commonArgs, errmsg, result);
                 return true;
             }
 
@@ -167,13 +178,12 @@ namespace mongo {
 
     private:
 
-        static bool run2DSphereGeoNear(NamespaceDetails* nsDetails, int idxNo, BSONObj& cmdObj,
+        static bool run2DSphereGeoNear(IndexDescriptor* descriptor, BSONObj& cmdObj,
                                        const GeoNearArguments &parsedArgs, string& errmsg,
                                        BSONObjBuilder& result) {
-            auto_ptr<IndexDescriptor> descriptor(CatalogHack::getDescriptor(nsDetails, idxNo));
-            auto_ptr<S2AccessMethod> sam(new S2AccessMethod(descriptor.get()));
+            scoped_ptr<S2AccessMethod> sam(new S2AccessMethod(descriptor));
             const S2IndexingParams& params = sam->getParams();
-            auto_ptr<S2NearIndexCursor> nic(new S2NearIndexCursor(descriptor.get(), params));
+            scoped_ptr<S2NearIndexCursor> nic(new S2NearIndexCursor(descriptor, params));
 
             vector<string> geoFieldNames;
             BSONObjIterator i(descriptor->keyPattern());

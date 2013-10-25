@@ -38,7 +38,6 @@
 #include "mongo/db/btreecursor.h"
 #include "mongo/db/index/2d_access_method.h"
 #include "mongo/db/index/btree_interface.h"
-#include "mongo/db/index/catalog_hack.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/geo/core.h"
 #include "mongo/db/geo/geonear.h"
@@ -46,6 +45,7 @@
 #include "mongo/db/geo/shapes.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/db/queryutil.h"
+#include "mongo/db/structure/collection.h"
 
 namespace mongo {
 
@@ -1785,12 +1785,11 @@ namespace mongo {
         shared_ptr<GeoHashConverter> _converter;
     };
 
-    bool TwoDGeoNearRunner::run2DGeoNear(NamespaceDetails* nsd, int idxNo, const BSONObj& cmdObj,
+    bool TwoDGeoNearRunner::run2DGeoNear(IndexDescriptor* descriptor, const BSONObj& cmdObj,
                              const GeoNearArguments &parsedArgs, string& errmsg,
                              BSONObjBuilder& result, unordered_map<string, double>* stats) {
 
-        auto_ptr<IndexDescriptor> descriptor(CatalogHack::getDescriptor(nsd, idxNo));
-        auto_ptr<TwoDAccessMethod> sam(new TwoDAccessMethod(descriptor.get()));
+        auto_ptr<TwoDAccessMethod> sam(new TwoDAccessMethod(descriptor));
         const TwoDIndexingParams& params = sam->getParams();
 
         uassert(13046, "'near' param missing/invalid", !cmdObj["near"].eoo());
