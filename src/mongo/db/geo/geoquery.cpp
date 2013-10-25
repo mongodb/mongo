@@ -168,8 +168,7 @@ namespace mongo {
         while (withinIt.more()) {
             BSONElement elt = withinIt.next();
             if (equals(elt.fieldName(), "$uniqueDocs")) {
-                if (!elt.isBoolean()) { return false; }
-                _uniqueDocs = elt.boolean();
+                _uniqueDocs = elt.trueValue();
             }
             else if (elt.isABSONObj()) {
                 hasGeometry = geoContainer.parseFrom(elt.wrap());

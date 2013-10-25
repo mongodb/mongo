@@ -272,10 +272,11 @@ namespace {
                 BSONObj delSpec = BSON( "a" << 1 << "_id" << NE << 0 );
                 deleteObjects( ns(), delSpec, false );
 
-                QueryPattern queryPattern = FieldRangeSet( ns(), delSpec, true, true ).pattern();
-                CachedQueryPlan cachedQueryPlan = infoCache()->cachedQueryPlanForPattern( queryPattern );
-                ASSERT_EQUALS( BSON( "a" << 1 ), cachedQueryPlan.indexKey() );
-                ASSERT_EQUALS( 1, cachedQueryPlan.nScanned() );
+                // QUERY_MIGRATION no plan caching.
+                //QueryPattern queryPattern = FieldRangeSet( ns(), delSpec, true, true ).pattern();
+                //CachedQueryPlan cachedQueryPlan = infoCache()->cachedQueryPlanForPattern( queryPattern );
+                //ASSERT_EQUALS( BSON( "a" << 1 ), cachedQueryPlan.indexKey() );
+                //ASSERT_EQUALS( 1, cachedQueryPlan.nScanned() );
             }
         };
 
@@ -290,8 +291,11 @@ namespace {
                 theDataFileMgr.insertWithObjMod( ns(), two );
                 theDataFileMgr.insertWithObjMod( ns(), three );
                 deleteObjects( ns(), BSON( "_id" << GT << 0 << "a" << GT << 0 ), true );
-                for( boost::shared_ptr<Cursor> c = theDataFileMgr.findAll( ns() ); c->ok(); c->advance() )
-                    ASSERT( 3 != c->current().getIntField( "_id" ) );
+                size_t numDocs = 0;
+                for( boost::shared_ptr<Cursor> c = theDataFileMgr.findAll( ns() ); c->ok(); c->advance() ) {
+                    ++numDocs;
+                }
+                ASSERT_EQUALS(2U, numDocs);
             }
         };
 
@@ -306,8 +310,11 @@ namespace {
                 theDataFileMgr.insertWithObjMod( ns(), two );
                 theDataFileMgr.insertWithObjMod( ns(), three );
                 deleteObjects( ns(), BSON( "a" << GTE << 0 ), true );
-                for( boost::shared_ptr<Cursor> c = theDataFileMgr.findAll( ns() ); c->ok(); c->advance() )
-                    ASSERT( 2 != c->current().getIntField( "_id" ) );
+                size_t numDocs = 0;
+                for( boost::shared_ptr<Cursor> c = theDataFileMgr.findAll( ns() ); c->ok(); c->advance() ) {
+                    ++numDocs;
+                }
+                ASSERT_EQUALS(2U, numDocs);
             }
         };
 

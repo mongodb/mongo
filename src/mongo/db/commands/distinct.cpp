@@ -148,7 +148,9 @@ namespace mongo {
                 Status res = runner->getExplainPlan(&bareExplain);
                 if (res.isOK()) {
                     auto_ptr<TypeExplain> explain(bareExplain);
-                    cursorName = explain->getCursor();
+                    if (explain->isCursorSet()) {
+                        cursorName = explain->getCursor();
+                    }
                     n = explain->getN();
                     nscanned = explain->getNScanned();
                     nscannedObjects = explain->getNScannedObjects();
