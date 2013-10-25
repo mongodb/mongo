@@ -35,6 +35,7 @@
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/query/runner.h"
 #include "mongo/db/storage/extent.h"
+#include "mongo/db/structure/collection.h"
 
 namespace mongo {
 
@@ -61,57 +62,67 @@ namespace mongo {
 
         bool run(const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
             string ns = dbname + "." + cmdObj.firstElement().valuestrsafe();
-            NamespaceDetails * d = nsdetails( ns );
+
             if (!serverGlobalParams.quiet) {
                 MONGO_TLOG(0) << "CMD: validate " << ns << endl;
             }
 
-            if ( ! d ) {
+            Database* db = cc().database();
+            if ( !db ) {
+                errmsg = "ns nout found";
+                return false;
+            }
+
+            Collection* collection = db->getCollection( ns );
+            if ( !collection ) {
                 errmsg = "ns not found";
                 return false;
             }
 
             result.append( "ns", ns );
-            validateNS( ns.c_str() , d, cmdObj, result);
+            validateNS( ns , collection, cmdObj, result);
             return true;
         }
 
     private:
-        void validateNS(const char *ns,
-                        NamespaceDetails *d,
+        void validateNS(const string& ns,
+                        Collection* collection,
                         const BSONObj& cmdObj,
                         BSONObjBuilder& result) {
+
             const bool full = cmdObj["full"].trueValue();
             const bool scanData = full || cmdObj["scandata"].trueValue();
 
+            NamespaceDetails* nsd = collection->details();
+
             bool valid = true;
             BSONArrayBuilder errors; // explanation(s) for why valid = false
-            if ( d->isCapped() ){
-                result.append("capped", d->isCapped());
-                result.appendNumber("max", d->maxCappedDocs());
+            if ( nsd->isCapped() ){
+                result.append("capped", nsd->isCapped());
+                result.appendNumber("max", nsd->maxCappedDocs());
             }
 
-            if ( d->firstExtent().isNull() )
+            if ( nsd->firstExtent().isNull() )
                 result.append( "firstExtent", "null" );
             else
-                result.append( "firstExtent", str::stream() << d->firstExtent().toString()
-                               << " ns:" << d->firstExtent().ext()->nsDiagnostic.toString());
-            if ( d->lastExtent().isNull() )
+                result.append( "firstExtent", str::stream() << nsd->firstExtent().toString()
+                               << " ns:" << nsd->firstExtent().ext()->nsDiagnostic.toString());
+            if ( nsd->lastExtent().isNull() )
                 result.append( "lastExtent", "null" );
             else
-                result.append( "lastExtent", str::stream() <<  d->lastExtent().toString()
-                               << " ns:" <<  d->lastExtent().ext()->nsDiagnostic.toString());
+                result.append( "lastExtent", str::stream() <<  nsd->lastExtent().toString()
+                               << " ns:" <<  nsd->lastExtent().ext()->nsDiagnostic.toString());
 
             BSONArrayBuilder extentData;
             int extentCount = 0;
             try {
 
-                if ( !d->firstExtent().isNull() ) {
-                    d->firstExtent().ext()->assertOk();
-                    d->lastExtent().ext()->assertOk();
+                if ( !nsd->firstExtent().isNull() ) {
+                    nsd->firstExtent().ext()->assertOk();
+                    nsd->lastExtent().ext()->assertOk();
                 }
 
-                DiskLoc extentDiskLoc = d->firstExtent();
+                DiskLoc extentDiskLoc = nsd->firstExtent();
                 while (!extentDiskLoc.isNull()) {
                     Extent* thisExtent = extentDiskLoc.ext();
                     if (full) {
@@ -130,9 +141,9 @@ namespace mongo {
                         errors << sb.str();
                         valid = false;
                     }
-                    if (nextDiskLoc.isNull() && extentDiskLoc != d->lastExtent()) {
+                    if (nextDiskLoc.isNull() && extentDiskLoc != nsd->lastExtent()) {
                         StringBuilder sb;
-                        sb << "'lastExtent' pointer " << d->lastExtent().toString()
+                        sb << "'lastExtent' pointer " << nsd->lastExtent().toString()
                            << " does not point to last extent in list " << extentDiskLoc.toString();
                         errors << sb.str();
                         valid = false;
@@ -154,40 +165,40 @@ namespace mongo {
             if ( full )
                 result.appendArray( "extents" , extentData.arr() );
 
-            result.appendNumber("datasize", d->dataSize());
-            result.appendNumber("nrecords", d->numRecords());
-            result.appendNumber("lastExtentSize", d->lastExtentSize());
-            result.appendNumber("padding", d->paddingFactor());
+            result.appendNumber("datasize", nsd->dataSize());
+            result.appendNumber("nrecords", nsd->numRecords());
+            result.appendNumber("lastExtentSize", nsd->lastExtentSize());
+            result.appendNumber("padding", nsd->paddingFactor());
 
             try {
 
                 bool testingLastExtent = false;
                 try {
-                    if (d->firstExtent().isNull()) {
+                    if (nsd->firstExtent().isNull()) {
                         // this is ok
                     }
                     else {
-                        result.append("firstExtentDetails", d->firstExtent().ext()->dump());
-                        if (!d->firstExtent().ext()->xprev.isNull()) {
+                        result.append("firstExtentDetails", nsd->firstExtent().ext()->dump());
+                        if (!nsd->firstExtent().ext()->xprev.isNull()) {
                             StringBuilder sb;
-                            sb << "'xprev' pointer in 'firstExtent' " << d->firstExtent().toString()
-                               << " is " << d->firstExtent().ext()->xprev.toString()
+                            sb << "'xprev' pointer in 'firstExtent' " << nsd->firstExtent().toString()
+                               << " is " << nsd->firstExtent().ext()->xprev.toString()
                                << ", should be null";
                             errors << sb.str();
                             valid=false;
                         }
                     }
                     testingLastExtent = true;
-                    if (d->lastExtent().isNull()) {
+                    if (nsd->lastExtent().isNull()) {
                         // this is ok
                     }
                     else {
-                        if (d->firstExtent() != d->lastExtent()) {
-                            result.append("lastExtentDetails", d->lastExtent().ext()->dump());
-                            if (!d->lastExtent().ext()->xnext.isNull()) {
+                        if (nsd->firstExtent() != nsd->lastExtent()) {
+                            result.append("lastExtentDetails", nsd->lastExtent().ext()->dump());
+                            if (!nsd->lastExtent().ext()->xnext.isNull()) {
                                 StringBuilder sb;
-                                sb << "'xnext' pointer in 'lastExtent' " << d->lastExtent().toString()
-                                   << " is " << d->lastExtent().ext()->xnext.toString()
+                                sb << "'xnext' pointer in 'lastExtent' " << nsd->lastExtent().toString()
+                                   << " is " << nsd->lastExtent().ext()->xnext.toString()
                                    << ", should be null";
                                 errors << sb.str();
                                 valid = false;
@@ -224,7 +235,7 @@ namespace mongo {
 
                         if ( n < 1000000 )
                             recs.insert(cl);
-                        if ( d->isCapped() ) {
+                        if ( nsd->isCapped() ) {
                             if ( cl < cl_last )
                                 outOfOrder++;
                             cl_last = cl;
@@ -283,7 +294,7 @@ namespace mongo {
                         // TODO: more descriptive logging.
                         warning() << "Internal error while reading collection " << ns << endl;
                     }
-                    if ( d->isCapped() && !d->capLooped() ) {
+                    if ( nsd->isCapped() && !nsd->capLooped() ) {
                         result.append("cappedOutOfOrder", outOfOrder);
                         if ( outOfOrder > 1 ) {
                             valid = false;
@@ -308,7 +319,7 @@ namespace mongo {
 
                 BSONArrayBuilder deletedListArray;
                 for ( int i = 0; i < Buckets; i++ ) {
-                    deletedListArray << d->deletedListEntry(i).isNull();
+                    deletedListArray << nsd->deletedListEntry(i).isNull();
                 }
 
                 int ndel = 0;
@@ -316,7 +327,7 @@ namespace mongo {
                 BSONArrayBuilder delBucketSizes;
                 int incorrect = 0;
                 for ( int i = 0; i < Buckets; i++ ) {
-                    DiskLoc loc = d->deletedListEntry(i);
+                    DiskLoc loc = nsd->deletedListEntry(i);
                     try {
                         int k = 0;
                         while ( !loc.isNull() ) {
@@ -325,7 +336,7 @@ namespace mongo {
                             ndel++;
 
                             if ( loc.questionable() ) {
-                                if( d->isCapped() && !loc.isValid() && i == 1 ) {
+                                if( nsd->isCapped() && !loc.isValid() && i == 1 ) {
                                     /* the constructor for NamespaceDetails intentionally sets deletedList[1] to invalid
                                        see comments in namespace.h
                                     */
@@ -367,13 +378,13 @@ namespace mongo {
 
                 int idxn = 0;
                 try  {
-                    result.append("nIndexes", d->getCompletedIndexCount());
+                    result.append("nIndexes", nsd->getCompletedIndexCount());
                     BSONObjBuilder indexes; // not using subObjStart to be exception safe
-                    NamespaceDetails::IndexIterator i = d->ii();
+                    NamespaceDetails::IndexIterator i = nsd->ii();
                     while( i.more() ) {
                         IndexDetails& id = i.next();
                         log() << "validating index " << idxn << ": " << id.indexNamespace() << endl;
-                        auto_ptr<IndexDescriptor> descriptor(CatalogHack::getDescriptor(d, idxn));
+                        auto_ptr<IndexDescriptor> descriptor(CatalogHack::getDescriptor(nsd, idxn));
                         auto_ptr<IndexAccessMethod> iam(CatalogHack::getIndex(descriptor.get()));
                         int64_t keys;
                         iam->validate(&keys);
