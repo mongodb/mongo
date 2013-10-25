@@ -180,7 +180,12 @@ namespace mongo {
         // No entry in cache for the query.  We have to solve the query ourself.
 
         // Get the indices that we could possibly use.
-        NamespaceDetails* nsd = nsdetails(canonicalQuery->ns().c_str());
+        Database* db = cc().database();
+        verify( db );
+        Collection* collection = db->getCollection( canonicalQuery->ns() );
+        verify( collection );
+
+        NamespaceDetails* nsd = collection->details();
 
         // Tailable: If the query requests tailable the collection must be capped.
         if (canonicalQuery->getParsed().hasOption(QueryOption_CursorTailable)) {
@@ -202,7 +207,7 @@ namespace mongo {
         // If it's not NULL, we may have indices.
         vector<IndexEntry> indices;
         for (int i = 0; i < nsd->getCompletedIndexCount(); ++i) {
-            auto_ptr<IndexDescriptor> desc(CatalogHack::getDescriptor(nsd, i));
+            IndexDescriptor* desc = collection->getIndexCatalog()->getDescriptor( i );
             indices.push_back(IndexEntry(desc->keyPattern(), desc->isMultikey(), desc->isSparse(), desc->indexName()));
         }
 
