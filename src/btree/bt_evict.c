@@ -742,7 +742,7 @@ retry:	SLIST_FOREACH(dhandle, &conn->dhlh, l) {
 		 * unlikely to cause a false positive if freed and reallocated.
 		 */
 		if (cache->evict_file_next != NULL &&
-		    cache->evict_file_next != dhandle->name)
+		    cache->evict_file_next != dhandle)
 			continue;
 		cache->evict_file_next = NULL;
 
@@ -781,7 +781,7 @@ retry:	SLIST_FOREACH(dhandle, &conn->dhlh, l) {
 	/* Remember the file we should visit first, next loop. */
 	if (dhandle != NULL)
 		dhandle = SLIST_NEXT(dhandle, l);
-	cache->evict_file_next = dhandle == NULL ? NULL : dhandle->name;
+	cache->evict_file_next = dhandle;
 
 	__wt_spin_unlock(session, &conn->dhandle_lock);
 
