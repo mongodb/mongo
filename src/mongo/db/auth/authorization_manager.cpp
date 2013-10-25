@@ -88,10 +88,7 @@ namespace mongo {
     const NamespaceString AuthorizationManager::usersCollectionNamespace("admin.system.users");
     const NamespaceString AuthorizationManager::versionCollectionNamespace("admin.system.version");
 
-    const BSONObj AuthorizationManager::versionDocumentQuery = BSON("_id" << "authSchema");
-
     const std::string AuthorizationManager::schemaVersionServerParameter = "authSchemaVersion";
-    const std::string AuthorizationManager::schemaVersionFieldName = "currentVersion";
 
 #ifndef _MSC_EXTENSIONS
     const int AuthorizationManager::schemaVersion24;
@@ -231,7 +228,7 @@ namespace mongo {
     AuthorizationManager::AuthorizationManager(AuthzManagerExternalState* externalState) :
         _authEnabled(false),
         _externalState(externalState),
-        _version(schemaVersionInvalid),
+        _version(schemaVersion26Final),
         _cacheGeneration(0),
         _isFetchPhaseBusy(false) {
     }
@@ -882,6 +879,7 @@ namespace mongo {
 
         const NamespaceString newusersCollectionNamespace("admin._newusers");
         const NamespaceString backupUsersCollectionNamespace("admin.backup.users");
+        const BSONObj versionDocumentQuery = BSON("_id" << 1);
 
         /**
          * Fetches the admin.system.version document and extracts the currentVersion field's
@@ -891,7 +889,7 @@ namespace mongo {
             BSONObj versionDoc;
             Status status = externalState->findOne(
                     AuthorizationManager::versionCollectionNamespace,
-                    AuthorizationManager::versionDocumentQuery,
+                    versionDocumentQuery,
                     &versionDoc);
             if (!status.isOK() && ErrorCodes::NoMatchingDocument != status) {
                 return status;

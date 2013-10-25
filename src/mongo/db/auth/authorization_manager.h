@@ -88,20 +88,9 @@ namespace mongo {
         static const NamespaceString versionCollectionNamespace;
 
         /**
-         * Query to match the auth schema version document in the versionCollectionNamespace.
-         */
-        static const BSONObj versionDocumentQuery;
-
-        /**
          * Name of the server parameter used to report the auth schema version (via getParameter).
          */
         static const std::string schemaVersionServerParameter;
-
-        /**
-         * Name of the field in the auth schema version document containing the current schema
-         * version.
-         */
-        static const std::string schemaVersionFieldName;
 
         /**
          * Value used to represent that the schema version is not cached or invalid.

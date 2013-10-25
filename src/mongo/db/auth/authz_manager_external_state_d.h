@@ -47,8 +47,6 @@ namespace mongo {
         MONGO_DISALLOW_COPYING(AuthzManagerExternalStateMongod);
 
     public:
-        static void writeAuthSchemaVersionDocumentIfNeeded();
-
         AuthzManagerExternalStateMongod();
         virtual ~AuthzManagerExternalStateMongod();
 
