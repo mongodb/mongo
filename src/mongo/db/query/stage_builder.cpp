@@ -43,8 +43,9 @@
 #include "mongo/db/exec/sort.h"
 #include "mongo/db/exec/skip.h"
 #include "mongo/db/exec/text.h"
-#include "mongo/db/index/catalog_hack.h"
+#include "mongo/db/index/fts_access_method.h"
 #include "mongo/db/namespace_details.h"
+#include "mongo/db/structure/collection.h"
 
 namespace mongo {
 
@@ -67,19 +68,21 @@ namespace mongo {
             // don't involve any on-disk data, just descriptions thereof.
             // XXX XXX
             //
-            IndexScanParams params;
-            NamespaceDetails* nsd = nsdetails(ns.c_str());
-            if (NULL == nsd) {
+            Database* db = cc().database();
+            Collection* collection = db ? db->getCollection( ns ) : NULL;
+            if (NULL == collection) {
                 warning() << "Can't ixscan null ns " << ns << endl;
                 return NULL;
             }
+            NamespaceDetails* nsd = collection->details();
             int idxNo = nsd->findIndexByKeyPattern(ixn->indexKeyPattern);
             if (-1 == idxNo) {
                 warning() << "Can't find idx " << ixn->indexKeyPattern.toString()
                           << "in ns " << ns << endl;
                 return NULL;
             }
-            params.descriptor = CatalogHack::getDescriptor(nsd, idxNo);
+            IndexScanParams params;
+            params.descriptor = collection->getIndexCatalog()->getDescriptor( idxNo );
             params.bounds = ixn->bounds;
             params.direction = ixn->direction;
             params.limit = ixn->limit;
@@ -190,12 +193,13 @@ namespace mongo {
         else if (STAGE_TEXT == root->getType()) {
             const TextNode* node = static_cast<const TextNode*>(root);
 
-            NamespaceDetails* nsd = nsdetails(ns.c_str());
-            if (NULL == nsd) { return NULL; }
+            Database* db = cc().database();
+            Collection* collection = db ? db->getCollection( ns ) : NULL;
+            if (NULL == collection) { return NULL; }
             vector<int> idxMatches;
-            nsd->findIndexByType("text", idxMatches);
+            collection->details()->findIndexByType("text", idxMatches);
             if (1 != idxMatches.size()) { return NULL; }
-            IndexDescriptor* index = CatalogHack::getDescriptor(nsd, idxMatches[0]);
+            IndexDescriptor* index = collection->getIndexCatalog()->getDescriptor(idxMatches[0]);
             auto_ptr<FTSAccessMethod> fam(new FTSAccessMethod(index));
             TextStageParams params(fam->getSpec());
 
