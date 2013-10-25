@@ -42,6 +42,7 @@ no_scale_per_second_list = [
     'cache: tracked dirty pages in the cache',
     'cache: pages currently held in the cache',
     'files currently open',
+    'log: total log buffer size',
     'open cursor count',
     'block manager file allocation unit size',
     'checkpoint size',

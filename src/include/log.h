@@ -9,6 +9,7 @@
 
 /* Logging subsystem declarations. */
 #define	LOG_ALIGN		128
+#define	WT_LOG_SLOT_BUF_INIT_SIZE	64 * 1024
 
 struct __wt_lsn {
 	uint32_t	file;		/* Log file number */
@@ -52,45 +53,23 @@ struct __wt_lsn {
 #define	WT_LOG_SLOT_PENDING	2
 #define	WT_LOG_SLOT_READY	3
 typedef struct {
-	union {
-		struct {
-#undef	slot_state
-#define	slot_state		u.slot.state
-			int64_t	 state;		/* Slot state */
-#undef	slot_group_size
-#define	slot_group_size		u.slot.group_size
-			uint64_t group_size;	/* Group size */
-#undef	slot_error
-#define	slot_error		u.slot.error
-			int32_t	 error;		/* Error value */
-#undef	slot_index
-#define	slot_index		u.slot.index
+	int64_t	 slot_state;		/* Slot state */
+	uint64_t slot_group_size;	/* Group size */
+	int32_t	 slot_error;		/* Error value */
 #define	SLOT_INVALID_INDEX	0xffffffff
-			uint32_t index;		/* Active slot index */
-#undef	slot_start_offset
-#define	slot_start_offset	u.slot.start_offset
-			off_t	 start_offset;	/* Starting file offset */
-#undef	slot_release_lsn
-#define	slot_release_lsn	u.slot.release_lsn
-			WT_LSN	release_lsn;	/* Slot release LSN */
-#undef	slot_start_lsn
-#define	slot_start_lsn		u.slot.start_lsn
-			WT_LSN	start_lsn;	/* Slot starting LSN */
-#undef	slot_end_lsn
-#define	slot_end_lsn		u.slot.end_lsn
-			WT_LSN	end_lsn;	/* Slot ending LSN */
-#undef	slot_fh
-#define	slot_fh			u.slot.fh
-			WT_FH	*fh;		/* File handle for this group */
-#undef	slot_flags
-#define	slot_flags		u.slot.flags
-#define	SLOT_CLOSEFH	0x01			/* Close old fh on release */
-#define	SLOT_SYNC	0x02			/* Needs sync on release */
-			uint32_t flags;		/* Flags */
-		} slot;
-		uint8_t align[LOG_ALIGN];
-	} u;
-} WT_LOGSLOT;
+	uint32_t slot_index;		/* Active slot index */
+	off_t	 slot_start_offset;	/* Starting file offset */
+	WT_LSN	slot_release_lsn;	/* Slot release LSN */
+	WT_LSN	slot_start_lsn;	/* Slot starting LSN */
+	WT_LSN	slot_end_lsn;	/* Slot ending LSN */
+	WT_FH	*slot_fh;		/* File handle for this group */
+	WT_ITEM slot_buf;		/* Buffer for grouped writes */
+#define	SLOT_BUF_GROW	0x01			/* Grow buffer on release */
+#define	SLOT_BUFFERED	0x02			/* Buffer writes */
+#define	SLOT_CLOSEFH	0x04			/* Close old fh on release */
+#define	SLOT_SYNC	0x08			/* Needs sync on release */
+	uint32_t flags;		/* Flags */
+} WT_LOGSLOT WT_GCC_ATTRIBUTE((aligned(WT_CACHE_LINE_ALIGNMENT)));
 
 typedef struct {
 	WT_LOGSLOT	*slot;
@@ -127,14 +106,18 @@ typedef struct {
 	/*
 	 * Consolidation array information
 	 * SLOT_ACTIVE must be less than SLOT_POOL.
+	 * Our testing shows that the more consolidation we generate the
+	 * better the performance we see which equates to an active slot
+	 * slot count of one.
 	 */
-#define	SLOT_ACTIVE	4
+#define	SLOT_ACTIVE	1
 #define	SLOT_POOL	16
 	uint32_t	 pool_index;		/* Global pool index */
 	WT_LOGSLOT	*slot_array[SLOT_ACTIVE];	/* Active slots */
 	WT_LOGSLOT	 slot_pool[SLOT_POOL];	/* Pool of all slots */
 
-	uint32_t	 flags;			/* Currently unused */
+#define	WT_LOG_FORCE_CONSOLIDATE	0x01	/* Disable direct writes */
+	uint32_t	 flags;
 } WT_LOG;
 
 typedef struct {

@@ -99,6 +99,9 @@ connection_stats = [
 	##########################################
 	# Logging statistics
 	##########################################
+	Stat('log_buffer_grow',
+	    'log: number of times the log buffer size increased'),
+	Stat('log_buffer_size', 'log: total log buffer size', 'no_clear,no_scale'),
 	Stat('log_bytes_user', 'log: total user provided log bytes written'),
 	Stat('log_bytes_written', 'log: total log bytes written'),
 	Stat('log_max_filesize', 'log: maximum log file size', 'no_clear'),
@@ -114,8 +117,10 @@ connection_stats = [
 	Stat('log_slot_joins', 'log: total consolidated slot joins'),
 	Stat('log_slot_races', 'log: total consolidated slot join races'),
 	Stat('log_slot_toobig', 'log: record size exceeded maximum'),
+	Stat('log_slot_toosmall',
+	    'log: failed to find a slot large enough for record'),
 	Stat('log_slot_transitions',
-            'log: total consolidated slot join transitions'),
+	    'log: total consolidated slot join transitions'),
 
 	##########################################
 	# Reconciliation statistics

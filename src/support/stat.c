@@ -359,6 +359,9 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	stats->dh_sweep_evict.desc = "dhandle: sweeps conflicting with evict";
 	stats->dh_sweeps.desc = "dhandle: number of sweep attempts";
 	stats->file_open.desc = "files currently open";
+	stats->log_buffer_grow.desc =
+	    "log: number of times the log buffer size increased";
+	stats->log_buffer_size.desc = "log: total log buffer size";
 	stats->log_bytes_user.desc =
 	    "log: total user provided log bytes written";
 	stats->log_bytes_written.desc = "log: total log bytes written";
@@ -375,6 +378,8 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	stats->log_slot_joins.desc = "log: total consolidated slot joins";
 	stats->log_slot_races.desc = "log: total consolidated slot join races";
 	stats->log_slot_toobig.desc = "log: record size exceeded maximum";
+	stats->log_slot_toosmall.desc =
+	    "log: failed to find a slot large enough for record";
 	stats->log_slot_transitions.desc =
 	    "log: total consolidated slot join transitions";
 	stats->log_sync.desc = "log: total log sync operations";
@@ -447,6 +452,7 @@ __wt_stat_refresh_connection_stats(void *stats_arg)
 	stats->dh_session_handles.v = 0;
 	stats->dh_sweep_evict.v = 0;
 	stats->dh_sweeps.v = 0;
+	stats->log_buffer_grow.v = 0;
 	stats->log_bytes_user.v = 0;
 	stats->log_bytes_written.v = 0;
 	stats->log_reads.v = 0;
@@ -458,6 +464,7 @@ __wt_stat_refresh_connection_stats(void *stats_arg)
 	stats->log_slot_joins.v = 0;
 	stats->log_slot_races.v = 0;
 	stats->log_slot_toobig.v = 0;
+	stats->log_slot_toosmall.v = 0;
 	stats->log_slot_transitions.v = 0;
 	stats->log_sync.v = 0;
 	stats->log_writes.v = 0;
