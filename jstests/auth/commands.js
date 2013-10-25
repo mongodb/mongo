@@ -87,6 +87,8 @@ var roles = [
 var roles_write = {
     readWrite: 1,
     readWriteAnyDatabase: 1,
+    dbOwner: 1,
+    root: 1,
     __system: 1
 };
 var roles_readWrite = {
@@ -94,11 +96,14 @@ var roles_readWrite = {
     readAnyDatabase: 1,
     readWrite: 1,
     readWriteAnyDatabase: 1,
+    dbOwner: 1,
+    root: 1,
     __system: 1
 };
 var roles_readWriteAny = {
     readAnyDatabase: 1,
     readWriteAnyDatabase: 1,
+    root: 1,
     __system: 1
 };
 var roles_writeDbAdmin = {
@@ -106,11 +111,14 @@ var roles_writeDbAdmin = {
     readWriteAnyDatabase: 1,
     dbAdmin: 1,
     dbAdminAnyDatabase: 1,
+    dbOwner: 1,
+    root: 1,
     __system: 1 
 };
 var roles_writeDbAdminAny = {
     readWriteAnyDatabase: 1,
     dbAdminAnyDatabase: 1,
+    root: 1,
     __system: 1
 };
 var roles_readWriteDbAdmin = {
@@ -120,12 +128,33 @@ var roles_readWriteDbAdmin = {
     readWriteAnyDatabase: 1,
     dbAdmin: 1,
     dbAdminAnyDatabase: 1,
+    dbOwner: 1,
+    root: 1,
     __system: 1
 };
 var roles_readWriteDbAdminAny = {
     readAnyDatabase: 1,
     readWriteAnyDatabase: 1,
     dbAdminAnyDatabase: 1,
+    root: 1,
+    __system: 1
+};
+var roles_monitoring = {
+    clusterMonitor: 1,
+    clusterAdmin: 1,
+    root: 1,
+    __system: 1
+};
+var roles_hostManager = {
+    hostManager: 1,
+    clusterAdmin: 1,
+    root: 1,
+    __system: 1
+};
+var roles_clusterManager = {
+    clusterManager: 1,
+    clusterAdmin: 1,
+    root: 1,
     __system: 1
 };
 var roles_all = {
@@ -137,7 +166,12 @@ var roles_all = {
     userAdminAnyDatabase: 1,
     dbAdmin: 1,
     dbAdminAnyDatabase: 1,
+    dbOwner: 1,
+    clusterMonitor: 1,
+    hostManager: 1,
+    clusterManager: 1,
     clusterAdmin: 1,
+    root: 1,
     __system: 1
 }
 
@@ -149,7 +183,7 @@ var tests = [
         command: {addShard: "x"},
         skipStandalone: true,
         testcases: [
-            { runOnDb: adminDbName, rolesAllowed: {clusterAdmin: 1, __system: 1}, expectFail: true },
+            { runOnDb: adminDbName, rolesAllowed: roles_clusterManager, expectFail: true },
             { runOnDb: firstDbName, rolesAllowed: {} },
             { runOnDb: secondDbName, rolesAllowed: {} }
         ]
@@ -183,7 +217,7 @@ var tests = [
         command: {aggregate: "foo", pipeline: [ {$out: "foo_out"} ] },
         testcases: [
             { runOnDb: firstDbName, rolesAllowed: roles_write },
-            { runOnDb: secondDbName, rolesAllowed: {readWriteAnyDatabase: 1, __system: 1} }
+            { runOnDb: secondDbName, rolesAllowed: {readWriteAnyDatabase: 1, root: 1, __system: 1} }
         ]
     },
     {
@@ -225,7 +259,7 @@ var tests = [
         testcases: [
             {
                 runOnDb: secondDbName,
-                rolesAllowed: {readWriteAnyDatabase: 1, __system: 1},
+                rolesAllowed: {readWriteAnyDatabase: 1, root: 1, __system: 1},
                 expectFail: true
             }
         ]
@@ -241,7 +275,7 @@ var tests = [
         },
         testcases: [
             { runOnDb: firstDbName, rolesAllowed: roles_write },
-            { runOnDb: secondDbName, rolesAllowed: {readWriteAnyDatabase: 1, __system: 1} }
+            { runOnDb: secondDbName, rolesAllowed: {readWriteAnyDatabase: 1, root: 1, __system: 1} }
         ]
     },
     {
@@ -249,7 +283,7 @@ var tests = [
         command: {closeAllDatabases: "x"},
         skipSharded: true,
         testcases: [
-            { runOnDb: adminDbName, rolesAllowed: {clusterAdmin: 1, __system: 1} },
+            { runOnDb: adminDbName, rolesAllowed: roles_hostManager },
             { runOnDb: firstDbName, rolesAllowed: {} },
             { runOnDb: secondDbName, rolesAllowed: {} }
         ]
@@ -260,8 +294,8 @@ var tests = [
         setup: function (db) { db.foo.save( {} ); },
         teardown: function (db) { db.dropDatabase(); },
         testcases: [
-            { runOnDb: firstDbName, rolesAllowed: {dbAdmin: 1, dbAdminAnyDatabase: 1, __system: 1} },
-            { runOnDb: secondDbName, rolesAllowed: {dbAdminAnyDatabase: 1, __system: 1} }
+            { runOnDb: firstDbName, rolesAllowed: {dbAdmin: 1, dbAdminAnyDatabase: 1, root: 1, __system: 1} },
+            { runOnDb: secondDbName, rolesAllowed: {dbAdminAnyDatabase: 1, root: 1, __system: 1} }
         ]
     },
     {
@@ -270,9 +304,25 @@ var tests = [
         setup: function (db) { db.bar.save( {} ); },
         teardown: function (db) { db.dropDatabase(); },
         testcases: [
-            { runOnDb: firstDbName, rolesAllowed: roles_readWriteDbAdmin },
-            { runOnDb: secondDbName, rolesAllowed: roles_readWriteDbAdminAny }
-        ]
+            { runOnDb: firstDbName, rolesAllowed: {read: 1,
+                                                   readAnyDatabase: 1,
+                                                   readWrite: 1,
+                                                   readWriteAnyDatabase: 1,
+                                                   dbAdmin: 1,
+                                                   dbAdminAnyDatabase: 1,
+                                                   dbOwner: 1,
+                                                   monitor: 1,
+                                                   root: 1,
+                                                   __system: 1
+                                                  } },
+            { runOnDb: secondDbName, rolesAllowed: {readAnyDatabase: 1,
+                                                    readWriteAnyDatabase: 1,
+                                                    dbAdminAnyDatabase: 1,
+                                                    monitor: 1,
+                                                    root: 1,
+                                                    __system: 1
+                                                   } }
+            ]
     },
     {
         testname: "compact",
@@ -281,8 +331,8 @@ var tests = [
         setup: function (db) { db.foo.save( {} ); },
         teardown: function (db) { db.dropDatabase(); },
         testcases: [
-            { runOnDb: firstDbName, rolesAllowed: {dbAdmin: 1, dbAdminAnyDatabase: 1, __system: 1} },
-            { runOnDb: secondDbName, rolesAllowed: {dbAdminAnyDatabase: 1, __system: 1} }
+            { runOnDb: firstDbName, rolesAllowed: {dbAdmin: 1, dbAdminAnyDatabase: 1, root: 1, __system: 1} },
+            { runOnDb: secondDbName, rolesAllowed: {dbAdminAnyDatabase: 1, root: 1, __system: 1} }
         ]
     },
     {
@@ -297,16 +347,16 @@ var tests = [
         testname: "connPoolStats",
         command: {connPoolStats: 1},
         testcases: [
-            { runOnDb: firstDbName, rolesAllowed: {clusterAdmin: 1, __system: 1} },
-            { runOnDb: secondDbName, rolesAllowed: {clusterAdmin: 1, __system: 1} }
+            { runOnDb: firstDbName, rolesAllowed: roles_monitoring },
+            { runOnDb: secondDbName, rolesAllowed: roles_monitoring }
         ]
     },
     {
         testname: "connPoolSync",
         command: {connPoolSync: 1},
         testcases: [
-            { runOnDb: firstDbName, rolesAllowed: {clusterAdmin: 1, __system: 1} },
-            { runOnDb: secondDbName, rolesAllowed: {clusterAdmin: 1, __system: 1} }
+            { runOnDb: firstDbName, rolesAllowed: roles_hostManager },
+            { runOnDb: secondDbName, rolesAllowed: roles_hostManager }
         ]
     },
     /* SERVER-11098
@@ -341,8 +391,8 @@ var tests = [
         testname: "cursorInfo",
         command: {cursorInfo: 1},
         testcases: [
-            { runOnDb: firstDbName, rolesAllowed: {clusterAdmin: 1, __system: 1} },
-            { runOnDb: secondDbName, rolesAllowed: {clusterAdmin: 1, __system: 1} }
+            { runOnDb: firstDbName, rolesAllowed: roles_monitoring },
+            { runOnDb: secondDbName, rolesAllowed: roles_monitoring }
         ]
     },
     {
@@ -372,8 +422,24 @@ var tests = [
         testname: "dbStats",
         command: {dbStats: 1, scale: 1024},
         testcases: [
-            { runOnDb: firstDbName, rolesAllowed: roles_readWriteDbAdmin },
-            { runOnDb: secondDbName, rolesAllowed: roles_readWriteDbAdminAny }
+            { runOnDb: firstDbName, rolesAllowed: { read: 1,
+                                                    readAnyDatabase: 1,
+                                                    readWrite: 1,
+                                                    readWriteAnyDatabase: 1,
+                                                    dbAdmin: 1,
+                                                    dbAdminAnyDatabase: 1,
+                                                    dbOwner: 1,
+                                                    monitor: 1,
+                                                    root: 1,
+                                                    __system: 1
+                                                  } },
+            { runOnDb: secondDbName, rolesAllowed: { readAnyDatabase: 1,
+                                                     readWriteAnyDatabase: 1,
+                                                     dbAdminAnyDatabase: 1,
+                                                     monitor: 1,
+                                                     root: 1,
+                                                     __system: 1
+                                                   } }
         ]
     },
     {
@@ -394,7 +460,7 @@ var tests = [
         command: {diagLogging: 1},
         skipSharded: true,
         testcases: [
-            { runOnDb: adminDbName, rolesAllowed: {clusterAdmin: 1, __system: 1} },
+            { runOnDb: adminDbName, rolesAllowed: roles_hostManager },
             { runOnDb: firstDbName, rolesAllowed: {} },
             { runOnDb: secondDbName, rolesAllowed: {} }
         ]
@@ -422,8 +488,15 @@ var tests = [
         setup: function (db) { db.x.save({}); },
         teardown: function (db) { db.x.save({}); },
         testcases: [
-            { runOnDb: firstDbName, rolesAllowed: {clusterAdmin: 1, __system: 1} },
-            { runOnDb: secondDbName, rolesAllowed: {clusterAdmin: 1, __system: 1} }
+            { runOnDb: firstDbName, rolesAllowed: {dbAdmin: 1,
+                                                   dbAdminAnyDatabase: 1,
+                                                   clusterAdmin: 1,
+                                                   root: 1,
+                                                   __system: 1} },
+            { runOnDb: secondDbName, rolesAllowed: {dbAdminAnyDatabase:1,
+                                                    clusterAdmin: 1,
+                                                    root: 1,
+                                                    __system: 1} }
         ]
     },
     {
@@ -439,7 +512,7 @@ var tests = [
         command: {enableSharding: "x"},
         skipStandalone: true,
         testcases: [
-            { runOnDb: adminDbName, rolesAllowed: {clusterAdmin: 1, __system: 1}, expectFail: true },
+            { runOnDb: adminDbName, rolesAllowed: roles_clusterManager, expectFail: true },
             { runOnDb: firstDbName, rolesAllowed: {} },
             { runOnDb: secondDbName, rolesAllowed: {} }
         ]
@@ -486,7 +559,7 @@ var tests = [
         teardown: function (db) { db.x.drop(); },
         testcases: [
             { runOnDb: firstDbName, rolesAllowed: roles_write },
-            { runOnDb: secondDbName, rolesAllowed: {readWriteAnyDatabase: 1, __system: 1} }
+            { runOnDb: secondDbName, rolesAllowed: {readWriteAnyDatabase: 1, root: 1, __system: 1} }
         ]
     },
     {
@@ -494,7 +567,7 @@ var tests = [
         command: {flushRouterConfig: 1},
         skipStandalone: true,
         testcases: [
-            { runOnDb: adminDbName, rolesAllowed: {clusterAdmin: 1, __system: 1} },
+            { runOnDb: adminDbName, rolesAllowed: roles_hostManager },
             { runOnDb: firstDbName, rolesAllowed: {} },
             { runOnDb: secondDbName, rolesAllowed: {} }
         ]
@@ -503,7 +576,7 @@ var tests = [
         testname: "fsync",
         command: {fsync: 1},
         testcases: [
-            { runOnDb: adminDbName, rolesAllowed: {clusterAdmin: 1, __system: 1} },
+            { runOnDb: adminDbName, rolesAllowed: roles_hostManager },
             { runOnDb: firstDbName, rolesAllowed: {} },
             { runOnDb: secondDbName, rolesAllowed: {} }
         ]
@@ -541,7 +614,7 @@ var tests = [
         testname: "getCmdLineOpts",
         command: {getCmdLineOpts: 1},
         testcases: [
-            { runOnDb: adminDbName, rolesAllowed: {clusterAdmin: 1, __system: 1} },
+            { runOnDb: adminDbName, rolesAllowed: roles_monitoring },
             { runOnDb: firstDbName, rolesAllowed: {} },
             { runOnDb: secondDbName, rolesAllowed: {} }
         ]
@@ -558,7 +631,7 @@ var tests = [
         testname: "getLog",
         command: {getLog: "*"},
         testcases: [
-            { runOnDb: adminDbName, rolesAllowed: {clusterAdmin: 1, __system: 1} },
+            { runOnDb: adminDbName, rolesAllowed: roles_monitoring },
             { runOnDb: firstDbName, rolesAllowed: {} },
             { runOnDb: secondDbName, rolesAllowed: {} }
         ]
@@ -575,7 +648,7 @@ var tests = [
         testname: "getParameter",
         command: {getParameter: 1, quiet: 1},
         testcases: [
-            { runOnDb: adminDbName, rolesAllowed: {clusterAdmin: 1, __system: 1} },
+            { runOnDb: adminDbName, rolesAllowed: roles_monitoring },
             { runOnDb: firstDbName, rolesAllowed: {} },
             { runOnDb: secondDbName, rolesAllowed: {} }
         ]
@@ -602,7 +675,7 @@ var tests = [
         testname: "getShardMap",
         command: {getShardMap: "x"},
         testcases: [
-            { runOnDb: adminDbName, rolesAllowed: {clusterAdmin: 1, __system: 1} },
+            { runOnDb: adminDbName, rolesAllowed: roles_monitoring },
             { runOnDb: firstDbName, rolesAllowed: {} },
             { runOnDb: secondDbName, rolesAllowed: {} }
         ]
@@ -611,7 +684,7 @@ var tests = [
         testname: "getShardVersion",
         command: {getShardVersion: 1},
         testcases: [
-            { runOnDb: adminDbName, rolesAllowed: {clusterAdmin: 1, __system: 1}, expectFail: true },
+            { runOnDb: adminDbName, rolesAllowed: roles_monitoring, expectFail: true },
             { runOnDb: firstDbName, rolesAllowed: {} },
             { runOnDb: secondDbName, rolesAllowed: {} }
         ]
@@ -642,9 +715,9 @@ var tests = [
         testname: "hostInfo",
         command: {hostInfo: 1},
         testcases: [
-            { runOnDb: adminDbName, rolesAllowed: {clusterAdmin: 1, __system: 1}, },
-            { runOnDb: firstDbName, rolesAllowed: {clusterAdmin: 1, __system: 1} },
-            { runOnDb: secondDbName, rolesAllowed: {clusterAdmin: 1, __system: 1} }
+            { runOnDb: adminDbName, rolesAllowed: roles_monitoring, },
+            { runOnDb: firstDbName, rolesAllowed: roles_monitoring },
+            { runOnDb: secondDbName, rolesAllowed: roles_monitoring }
         ]
     },
     {
@@ -657,8 +730,8 @@ var tests = [
         },
         teardown: function (db) { db.x.drop(); },
         testcases: [
-            { runOnDb: firstDbName, rolesAllowed: {dbAdmin: 1, dbAdminAnyDatabase: 1, __system: 1} },
-            { runOnDb: secondDbName, rolesAllowed: {dbAdminAnyDatabase: 1, __system: 1} }
+            { runOnDb: firstDbName, rolesAllowed: {dbAdmin: 1, dbAdminAnyDatabase: 1, root: 1,  __system: 1} },
+            { runOnDb: secondDbName, rolesAllowed: {dbAdminAnyDatabase: 1, root: 1, __system: 1} }
         ]
     },
     {
@@ -686,9 +759,11 @@ var tests = [
             {
                 runOnDb: adminDbName,
                 rolesAllowed: {
-                    clusterAdmin: 1,
                     readAnyDatabase: 1,
                     readWriteAnyDatabase: 1,
+                    monitor: 1,
+                    clusterAdmin: 1,
+                    root: 1,
                     __system: 1
                 }
             },
@@ -701,7 +776,7 @@ var tests = [
         command: {listShards: 1},
         skipStandalone: true,
         testcases: [
-            { runOnDb: adminDbName, rolesAllowed: {clusterAdmin: 1, __system: 1} },
+            { runOnDb: adminDbName, rolesAllowed: roles_monitoring },
             { runOnDb: firstDbName, rolesAllowed: {} },
             { runOnDb: secondDbName, rolesAllowed: {} }
         ]
@@ -710,7 +785,7 @@ var tests = [
         testname: "logRotate",
         command: {logRotate: 1},
         testcases: [
-            { runOnDb: adminDbName, rolesAllowed: {clusterAdmin: 1, __system: 1}, },
+            { runOnDb: adminDbName, rolesAllowed: roles_hostManager, },
             { runOnDb: firstDbName, rolesAllowed: {} },
             { runOnDb: secondDbName, rolesAllowed: {} }
         ]
@@ -748,7 +823,7 @@ var tests = [
         teardown: function (db) { db.x.drop(); },
         testcases: [
             { runOnDb: firstDbName, rolesAllowed: roles_write },
-            { runOnDb: secondDbName, rolesAllowed: {readWriteAnyDatabase: 1, __system: 1} }
+            { runOnDb: secondDbName, rolesAllowed: {readWriteAnyDatabase: 1, root: 1, __system: 1} }
         ]
     },
     {
@@ -756,7 +831,7 @@ var tests = [
         command: {mergeChunks: "x", bounds: [{i : 0}, {i : 5}]},
         skipStandalone: true,
         testcases: [
-            { runOnDb: adminDbName, rolesAllowed: {clusterAdmin: 1, __system: 1}, expectFail: true },
+            { runOnDb: adminDbName, rolesAllowed: roles_clusterManager, expectFail: true },
             { runOnDb: firstDbName, rolesAllowed: {} },
             { runOnDb: secondDbName, rolesAllowed: {} }
         ]
@@ -765,7 +840,7 @@ var tests = [
         testname: "moveChunk",
         command: {moveChunk: "x"},
         testcases: [
-            { runOnDb: adminDbName, rolesAllowed: {clusterAdmin: 1, __system: 1}, expectFail: true },
+            { runOnDb: adminDbName, rolesAllowed: roles_clusterManager, expectFail: true },
             { runOnDb: firstDbName, rolesAllowed: {} },
             { runOnDb: secondDbName, rolesAllowed: {} }
         ]
@@ -775,7 +850,7 @@ var tests = [
         command: {movePrimary: "x"},
         skipStandalone: true,
         testcases: [
-            { runOnDb: adminDbName, rolesAllowed: {clusterAdmin: 1, __system: 1}, expectFail: true },
+            { runOnDb: adminDbName, rolesAllowed: roles_clusterManager, expectFail: true },
             { runOnDb: firstDbName, rolesAllowed: {} },
             { runOnDb: secondDbName, rolesAllowed: {} }
         ]
@@ -785,7 +860,7 @@ var tests = [
         command: {netstat: "x"},
         skipStandalone: true,
         testcases: [
-            { runOnDb: adminDbName, rolesAllowed: {clusterAdmin: 1, __system: 1}, expectFail: true },
+            { runOnDb: adminDbName, rolesAllowed: roles_monitoring, expectFail: true },
             { runOnDb: firstDbName, rolesAllowed: {} },
             { runOnDb: secondDbName, rolesAllowed: {} }
         ]
@@ -804,8 +879,11 @@ var tests = [
         command: {profile: 0},
         skipSharded: true,
         testcases: [
-            { runOnDb: firstDbName, rolesAllowed: {dbAdmin: 1, dbAdminAnyDatabase: 1, __system: 1} },
-            { runOnDb: secondDbName, rolesAllowed: {dbAdminAnyDatabase: 1, __system: 1} }
+            { runOnDb: firstDbName, rolesAllowed: {dbAdmin: 1,
+                                                   dbAdminAnyDatabase: 1,
+                                                   root: 1,
+                                                   __system: 1} },
+            { runOnDb: secondDbName, rolesAllowed: {dbAdminAnyDatabase: 1, root: 1, __system: 1} }
         ]
     },
     {
@@ -838,7 +916,7 @@ var tests = [
             db.getSisterDB(secondDbName).y.drop();
         },
         testcases: [
-            { runOnDb: adminDbName, rolesAllowed: {readWriteAnyDatabase: 1, __system: 1} },
+            { runOnDb: adminDbName, rolesAllowed: {readWriteAnyDatabase: 1, root: 1, __system: 1} },
             /* SERVER-11085
             { runOnDb: firstDbName, rolesAllowed: {} },
             { runOnDb: secondDbName, rolesAllowed: {} }
@@ -851,8 +929,8 @@ var tests = [
         setup: function (db) { db.x.save( {} ); },
         teardown: function (db) { db.x.drop(); },
         testcases: [
-            { runOnDb: firstDbName, rolesAllowed: {dbAdmin: 1, dbAdminAnyDatabase: 1, __system: 1} },
-            { runOnDb: secondDbName, rolesAllowed: {dbAdminAnyDatabase: 1, __system: 1} }
+            { runOnDb: firstDbName, rolesAllowed: {dbAdmin: 1, dbAdminAnyDatabase: 1, root: 1, __system: 1} },
+            { runOnDb: secondDbName, rolesAllowed: {dbAdminAnyDatabase: 1, root: 1, __system: 1} }
         ]
     },
     {
@@ -860,22 +938,33 @@ var tests = [
         command: {removeShard: "x"},
         skipStandalone: true,
         testcases: [
-            { runOnDb: adminDbName, rolesAllowed: {clusterAdmin: 1, __system: 1}, expectFail: true },
+            { runOnDb: adminDbName, rolesAllowed: roles_clusterManager, expectFail: true },
             { runOnDb: firstDbName, rolesAllowed: {} },
             { runOnDb: secondDbName, rolesAllowed: {} }
         ]
     },
-    /* SERVER-11027
     {
         testname: "repairDatabase",
         command: {repairDatabase: 1},
         testcases: [
-            { runOnDb: adminDbName, rolesAllowed: {clusterAdmin: 1} },
-            { runOnDb: firstDbName, rolesAllowed: {clusterAdmin: 1} },
-            { runOnDb: secondDbName, rolesAllowed: {clusterAdmin: 1} }
+            { runOnDb: firstDbName, rolesAllowed: {dbAdmin: 1,
+                                                   dbAdminAnyDatabase: 1,
+                                                   hostManager: 1,
+                                                   clusterAdmin: 1,
+                                                   root: 1,
+                                                   __system: 1} },
+            { runOnDb: secondDbName, rolesAllowed: {dbAdminAnyDatabase: 1,
+                                                    hostManager: 1,
+                                                    clusterAdmin: 1,
+                                                    root: 1,
+                                                    __system: 1} },
+            { runOnDb: adminDbName, rolesAllowed: {dbAdminAnyDatabase: 1,
+                                                   hostManager: 1,
+                                                   clusterAdmin: 1,
+                                                   root: 1,
+                                                   __system: 1} }
         ]
     },
-    */
     {
         testname: "replSetElect",
         command: {replSetElect: 1},
@@ -891,7 +980,7 @@ var tests = [
         command: {replSetFreeze: "x"},
         skipSharded: true,
         testcases: [
-            { runOnDb: adminDbName, rolesAllowed: {clusterAdmin: 1, __system: 1}, expectFail: true },
+            { runOnDb: adminDbName, rolesAllowed: roles_clusterManager, expectFail: true },
             { runOnDb: firstDbName, rolesAllowed: {} },
             { runOnDb: secondDbName, rolesAllowed: {} }
         ]
@@ -921,7 +1010,11 @@ var tests = [
         command: {replSetGetStatus: 1},
         skipSharded: true,
         testcases: [
-            { runOnDb: adminDbName, rolesAllowed: {clusterAdmin: 1, __system: 1}, expectFail: true },
+            { runOnDb: adminDbName, rolesAllowed: {clusterMonitor: 1,
+                                                   clusterManager: 1,
+                                                   clusterAdmin: 1,
+                                                   root: 1,
+                                                   __system: 1}, expectFail: true },
             { runOnDb: firstDbName, rolesAllowed: {} },
             { runOnDb: secondDbName, rolesAllowed: {} }
         ]
@@ -941,7 +1034,7 @@ var tests = [
         command: {replSetInitiate: "x"},
         skipSharded: true,
         testcases: [
-            { runOnDb: adminDbName, rolesAllowed: {clusterAdmin: 1, __system: 1}, expectFail: true },
+            { runOnDb: adminDbName, rolesAllowed: roles_clusterManager, expectFail: true },
             { runOnDb: firstDbName, rolesAllowed: {} },
             { runOnDb: secondDbName, rolesAllowed: {} }
         ]
@@ -951,7 +1044,7 @@ var tests = [
         command: {replSetMaintenance: "x"},
         skipSharded: true,
         testcases: [
-            { runOnDb: adminDbName, rolesAllowed: {clusterAdmin: 1, __system: 1}, expectFail: true },
+            { runOnDb: adminDbName, rolesAllowed: roles_clusterManager, expectFail: true },
             { runOnDb: firstDbName, rolesAllowed: {} },
             { runOnDb: secondDbName, rolesAllowed: {} }
         ]
@@ -961,7 +1054,7 @@ var tests = [
         command: {replSetReconfig: "x"},
         skipSharded: true,
         testcases: [
-            { runOnDb: adminDbName, rolesAllowed: {clusterAdmin: 1, __system: 1}, expectFail: true },
+            { runOnDb: adminDbName, rolesAllowed: roles_clusterManager, expectFail: true },
             { runOnDb: firstDbName, rolesAllowed: {} },
             { runOnDb: secondDbName, rolesAllowed: {} }
         ]
@@ -971,7 +1064,7 @@ var tests = [
         command: {replSetStepDown: "x"},
         skipSharded: true,
         testcases: [
-            { runOnDb: adminDbName, rolesAllowed: {clusterAdmin: 1, __system: 1}, expectFail: true },
+            { runOnDb: adminDbName, rolesAllowed: roles_clusterManager, expectFail: true },
             { runOnDb: firstDbName, rolesAllowed: {} },
             { runOnDb: secondDbName, rolesAllowed: {} }
         ]
@@ -981,7 +1074,7 @@ var tests = [
         command: {replSetSyncFrom: "x"},
         skipSharded: true,
         testcases: [
-            { runOnDb: adminDbName, rolesAllowed: {clusterAdmin: 1, __system: 1}, expectFail: true },
+            { runOnDb: adminDbName, rolesAllowed: roles_clusterManager, expectFail: true },
             { runOnDb: firstDbName, rolesAllowed: {} },
             { runOnDb: secondDbName, rolesAllowed: {} }
         ]
@@ -1000,7 +1093,11 @@ var tests = [
         command: {resync: 1},
         skipSharded: true,
         testcases: [
-            { runOnDb: adminDbName, rolesAllowed: {clusterAdmin: 1, __system: 1}, expectFail: true },
+            { runOnDb: adminDbName, rolesAllowed: { hostManager: 1,
+                                                    clusterManager: 1,
+                                                    clusterAdmin: 1,
+                                                    root: 1,
+                                                    __system: 1}, expectFail: true },
             { runOnDb: firstDbName, rolesAllowed: {} },
             { runOnDb: secondDbName, rolesAllowed: {} }
         ]
@@ -1009,16 +1106,16 @@ var tests = [
         testname: "serverStatus",
         command: {serverStatus: 1},
         testcases: [
-            { runOnDb: adminDbName, rolesAllowed: {clusterAdmin: 1, __system: 1} },
-            { runOnDb: firstDbName, rolesAllowed: {clusterAdmin: 1, __system: 1} },
-            { runOnDb: secondDbName, rolesAllowed: {clusterAdmin: 1, __system: 1} }
+            { runOnDb: adminDbName, rolesAllowed: roles_monitoring },
+            { runOnDb: firstDbName, rolesAllowed: roles_monitoring },
+            { runOnDb: secondDbName, rolesAllowed: roles_monitoring }
         ]
     },
     {
         testname: "setParameter",
         command: {setParameter: 1, quiet: 1},
         testcases: [
-            { runOnDb: adminDbName, rolesAllowed: {clusterAdmin: 1, __system: 1} },
+            { runOnDb: adminDbName, rolesAllowed: roles_hostManager },
             { runOnDb: firstDbName, rolesAllowed: {} },
             { runOnDb: secondDbName, rolesAllowed: {} }
         ]
@@ -1028,7 +1125,7 @@ var tests = [
         command: {setShardVersion: 1},
         skipSharded: true,
         testcases: [
-            { runOnDb: adminDbName, rolesAllowed: {clusterAdmin: 1, __system: 1}, expectFail: true },
+            { runOnDb: adminDbName, rolesAllowed: {__system: 1}, expectFail: true },
             { runOnDb: firstDbName, rolesAllowed: {} },
             { runOnDb: secondDbName, rolesAllowed: {} }
         ]
@@ -1038,7 +1135,7 @@ var tests = [
         command: {shardCollection: "x"},
         skipStandalone: true,
         testcases: [
-            { runOnDb: adminDbName, rolesAllowed: {clusterAdmin: 1, __system: 1}, expectFail: true },
+            { runOnDb: adminDbName, rolesAllowed: roles_clusterManager, expectFail: true },
             { runOnDb: firstDbName, rolesAllowed: {} },
             { runOnDb: secondDbName, rolesAllowed: {} }
         ]
@@ -1048,7 +1145,7 @@ var tests = [
         command: {shardingState: 1},
         skipSharded: true,
         testcases: [
-            { runOnDb: adminDbName, rolesAllowed: {clusterAdmin: 1, __system: 1} },
+            { runOnDb: adminDbName, rolesAllowed: roles_monitoring },
             { runOnDb: firstDbName, rolesAllowed: {} },
             { runOnDb: secondDbName, rolesAllowed: {} }
         ]
@@ -1066,7 +1163,7 @@ var tests = [
         command: {split: "x"},
         skipStandalone: true,
         testcases: [
-            { runOnDb: adminDbName, rolesAllowed: {clusterAdmin: 1, __system: 1}, expectFail: true },
+            { runOnDb: adminDbName, rolesAllowed: roles_clusterManager, expectFail: true },
             { runOnDb: firstDbName, rolesAllowed: {} },
             { runOnDb: secondDbName, rolesAllowed: {} }
         ]
@@ -1076,7 +1173,7 @@ var tests = [
         command: {splitChunk: "x"},
         skipSharded: true,
         testcases: [
-            { runOnDb: adminDbName, rolesAllowed: {clusterAdmin: 1, __system: 1}, expectFail: true },
+            { runOnDb: adminDbName, rolesAllowed: roles_clusterManager, expectFail: true },
             { runOnDb: firstDbName, rolesAllowed: {} },
             { runOnDb: secondDbName, rolesAllowed: {} }
         ]
@@ -1085,9 +1182,9 @@ var tests = [
         testname: "splitVector",
         command: {splitVector: "x"},
         testcases: [
-            { runOnDb: adminDbName, rolesAllowed: {clusterAdmin: 1, __system: 1}, expectFail: true },
-            { runOnDb: firstDbName, rolesAllowed: {clusterAdmin: 1, __system: 1}, expectFail: true },
-            { runOnDb: secondDbName, rolesAllowed: {clusterAdmin: 1, __system: 1}, expectFail: true }
+            { runOnDb: adminDbName, rolesAllowed: roles_clusterManager, expectFail: true },
+            { runOnDb: firstDbName, rolesAllowed: roles_clusterManager, expectFail: true },
+            { runOnDb: secondDbName, rolesAllowed: roles_clusterManager, expectFail: true }
         ]
     },
     {
@@ -1097,8 +1194,8 @@ var tests = [
         setup: function (db) { db.x.save( {} ); },
         teardown: function (db) { db.x.drop(); },
         testcases: [
-            { runOnDb: firstDbName, rolesAllowed: {dbAdmin: 1, dbAdminAnyDatabase: 1, __system: 1} },
-            { runOnDb: secondDbName, rolesAllowed: {dbAdminAnyDatabase: 1, __system: 1} }
+            { runOnDb: firstDbName, rolesAllowed: {dbAdmin: 1, dbAdminAnyDatabase: 1, root: 1, __system: 1} },
+            { runOnDb: secondDbName, rolesAllowed: {dbAdminAnyDatabase: 1, root:1, __system: 1} }
         ]
     },
     {
@@ -1113,7 +1210,7 @@ var tests = [
         testname: "top",
         command: {top: 1},
         testcases: [
-            { runOnDb: adminDbName, rolesAllowed: {clusterAdmin: 1, __system: 1} },
+            { runOnDb: adminDbName, rolesAllowed: roles_monitoring },
             { runOnDb: firstDbName, rolesAllowed: {} },
             { runOnDb: secondDbName, rolesAllowed: {} }
         ]
@@ -1125,9 +1222,9 @@ var tests = [
         setup: function (db) { db.x.save( {} ); },
         teardown: function (db) { db.x.drop(); },
         testcases: [
-            { runOnDb: adminDbName, rolesAllowed: {clusterAdmin: 1, __system: 1} },
-            { runOnDb: firstDbName, rolesAllowed: {clusterAdmin: 1, __system: 1} },
-            { runOnDb: secondDbName, rolesAllowed: {clusterAdmin: 1, __system: 1} }
+            { runOnDb: adminDbName, rolesAllowed: roles_hostManager },
+            { runOnDb: firstDbName, rolesAllowed: roles_hostManager },
+            { runOnDb: secondDbName, rolesAllowed: roles_hostManager }
         ]
     },
     {
@@ -1135,7 +1232,7 @@ var tests = [
         command: {unsetSharding: "x"},
         skipSharded: true,
         testcases: [
-            { runOnDb: adminDbName, rolesAllowed: {clusterAdmin: 1, __system: 1}, expectFail: true },
+            { runOnDb: adminDbName, rolesAllowed: {__system: 1}, expectFail: true },
             { runOnDb: firstDbName, rolesAllowed: {} },
             { runOnDb: secondDbName, rolesAllowed: {} }
         ]
@@ -1146,8 +1243,8 @@ var tests = [
         setup: function (db) { db.x.save( {} ); },
         teardown: function (db) { db.x.drop(); },
         testcases: [
-            { runOnDb: firstDbName, rolesAllowed: {dbAdmin: 1, dbAdminAnyDatabase: 1, __system: 1} },
-            { runOnDb: secondDbName, rolesAllowed: {dbAdminAnyDatabase: 1, __system: 1} }
+            { runOnDb: firstDbName, rolesAllowed: {dbAdmin: 1, dbAdminAnyDatabase: 1, root: 1, __system: 1} },
+            { runOnDb: secondDbName, rolesAllowed: {dbAdminAnyDatabase: 1, root: 1, __system: 1} }
         ]
     },
     {

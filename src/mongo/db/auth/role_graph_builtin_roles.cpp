@@ -44,6 +44,9 @@ namespace {
     const std::string BUILTIN_ROLE_ROOT = "root";
     const std::string BUILTIN_ROLE_INTERNAL = "__system";
     const std::string BUILTIN_ROLE_DB_OWNER = "dbOwner";
+    const std::string BUILTIN_ROLE_CLUSTER_MONITOR = "clusterMonitor";
+    const std::string BUILTIN_ROLE_HOST_MANAGEMENT = "hostManager";
+    const std::string BUILTIN_ROLE_CLUSTER_MANAGEMENT = "clusterManager";
 
     /// Actions that the "read" role may perform on a normal resources of a specific database, and
     /// that the "readAnyDatabase" role may perform on normal resources of any database.
@@ -61,14 +64,20 @@ namespace {
     // and that the "dbAdminAnyDatabase" role may perform on normal resources of any database.
     ActionSet dbAdminRoleActions;
 
-    /// Actions that the clusterAdmin role may perform on the cluster resource.
-    ActionSet clusterAdminRoleClusterActions;
-
-    /// Actions that the clusterAdmin role may perform on any database.
-    ActionSet clusterAdminRoleDatabaseActions;
-
     /// Actions that the "dbOwner" role may perform on normal resources of a specific database.
     ActionSet dbOwnerRoleActions;
+
+    /// Actions that the "monitor" role may perform on the cluster resource.
+    ActionSet clusterMonitorRoleClusterActions;
+
+    /// Actions that the "hostManager" role may perform on the cluster resource.
+    ActionSet hostManagerRoleClusterActions;
+
+    /// Actions that the "hostManager" role may perform on any database
+    ActionSet hostManagerRoleDatabaseActions;
+
+    /// Actions that the "dbOwner" role may perform on the cluster resoruce.
+    ActionSet clusterManagerRoleClusterActions;
 
     ActionSet& operator<<(ActionSet& target, ActionType source) {
         target.addAction(source);
@@ -115,6 +124,7 @@ namespace {
             << ActionType::dropUser
             << ActionType::dropRole
             << ActionType::grantRole
+            << ActionType::invalidateUserCache // hostManager gets this also
             << ActionType::revokeRole
             << ActionType::userAdmin
             << ActionType::viewUser
@@ -126,26 +136,28 @@ namespace {
             << ActionType::clean
             << ActionType::cloneCollectionLocalSource
             << ActionType::collMod
-            << ActionType::collStats
+            << ActionType::collStats // clusterMonitor gets this also
             << ActionType::compact
             << ActionType::convertToCapped // read_write gets this also
             << ActionType::createCollection // read_write gets this also
-            << ActionType::dbStats
+            << ActionType::dbStats // clusterMonitor gets this also
             << ActionType::dropCollection
+            << ActionType::dropDatabase // clusterAdmin gets this also TODO(spencer): should readWriteAnyDatabase?
             << ActionType::dropIndex
             << ActionType::createIndex
             << ActionType::indexStats
             << ActionType::profileEnable
             << ActionType::reIndex
             << ActionType::renameCollectionSameDB // read_write gets this also
+            << ActionType::repairDatabase
             << ActionType::storageDetails
             << ActionType::validate;
 
-        // Cluster admin role actions that target the cluster resource.
-        clusterAdminRoleClusterActions
-            << ActionType::applicationMessage
+        // clusterMonitor role actions that target the cluster resource
+        clusterMonitorRoleClusterActions
+            << ActionType::collStats // dbAdmin gets this also
             << ActionType::connPoolStats
-            << ActionType::connPoolSync
+            << ActionType::dbStats // dbAdmin gets this also
             << ActionType::getCmdLineOpts
             << ActionType::getLog
             << ActionType::getParameter
@@ -154,51 +166,61 @@ namespace {
             << ActionType::hostInfo
             << ActionType::listDatabases
             << ActionType::listShards
-            << ActionType::logRotate
             << ActionType::netstat
-            << ActionType::replSetFreeze
-            << ActionType::replSetGetStatus
+            << ActionType::replSetGetStatus // clusterManager gets this also
+            << ActionType::serverStatus
+            << ActionType::top
+            << ActionType::writeBacksQueued
+            << ActionType::cursorInfo
+            << ActionType::inprog
+            << ActionType::shardingState;
+
+        // hostManager role actions that target the cluster resource
+        hostManagerRoleClusterActions
+            << ActionType::applicationMessage // clusterManager gets this also
+            << ActionType::connPoolSync
+            << ActionType::closeAllDatabases
+            << ActionType::cpuProfiler
+            << ActionType::logRotate
+            << ActionType::setParameter
+            << ActionType::shutdown
+            << ActionType::touch
+            << ActionType::unlock
+            << ActionType::diagLogging
+            << ActionType::flushRouterConfig
+            << ActionType::fsync
+            << ActionType::invalidateUserCache // userAdmin gets this also
+            << ActionType::killop
+            << ActionType::resync; // clusterManager gets this also
+
+        // hostManager role actions that target the database resource
+        hostManagerRoleDatabaseActions
+            << ActionType::killCursors
+            << ActionType::repairDatabase;
+
+
+        // clusterManager role actions that target the cluster resource
+        clusterManagerRoleClusterActions
+            << ActionType::applicationMessage // hostManager gets this also
+            << ActionType::replSetGetStatus // clusterMonitor gets this also
+            << ActionType::replSetFreeze // TODO(spencer): combine the following 4 replset actions
             << ActionType::replSetMaintenance
             << ActionType::replSetStepDown
             << ActionType::replSetSyncFrom
-            << ActionType::setParameter
-            << ActionType::setShardVersion // TODO: should this be internal?
-            << ActionType::serverStatus
-            << ActionType::splitVector
-            << ActionType::shutdown
-            << ActionType::top
-            << ActionType::touch
-            << ActionType::unlock
-            << ActionType::unsetSharding
-            << ActionType::writeBacksQueued
-            << ActionType::addShard
-            << ActionType::cleanupOrphaned
-            << ActionType::closeAllDatabases
-            << ActionType::cpuProfiler
-            << ActionType::cursorInfo
-            << ActionType::diagLogging
-            << ActionType::enableSharding
-            << ActionType::flushRouterConfig
-            << ActionType::fsync
-            << ActionType::inprog
-            << ActionType::invalidateUserCache
-            << ActionType::killop
-            << ActionType::mergeChunks
-            << ActionType::moveChunk
-            << ActionType::movePrimary
-            << ActionType::removeShard
-            << ActionType::replSetInitiate
+            << ActionType::replSetInitiate // TODO(spencer): combine with replSetReconfig
             << ActionType::replSetReconfig
-            << ActionType::resync
+            << ActionType::resync // hostManager gets this also
+            << ActionType::splitVector
+            << ActionType::split // TODO(spencer): combine the following 3 sharding actions
+            << ActionType::splitChunk
+            << ActionType::mergeChunks
+            << ActionType::moveChunk // TODO(spencer): combine with movePrimary
+            << ActionType::movePrimary
+            << ActionType::addShard
+            << ActionType::removeShard
+            << ActionType::enableSharding // TODO(spencer): combine with shardCollection
             << ActionType::shardCollection
-            << ActionType::shardingState
-            << ActionType::split
-            << ActionType::splitChunk;
-
-        clusterAdminRoleDatabaseActions
-            << ActionType::dropDatabase
-            << ActionType::killCursors
-            << ActionType::repairDatabase;
+            << ActionType::cleanupOrphaned;
 
         // Database-owner role database actions.
         dbOwnerRoleActions += readWriteRoleActions;
@@ -206,9 +228,7 @@ namespace {
         dbOwnerRoleActions += userAdminRoleActions;
         dbOwnerRoleActions
             << ActionType::clone
-            << ActionType::copyDBTarget
-            << ActionType::dropDatabase
-            << ActionType::repairDatabase;
+            << ActionType::copyDBTarget;
 
         return Status::OK();
     }
@@ -352,19 +372,54 @@ namespace {
                           profileActions));
     }
 
-    void addClusterAdminPrivileges(PrivilegeVector* privileges) {
+    void addClusterMonitorPrivileges(PrivilegeVector* privileges) {
         Privilege::addPrivilegeToPrivilegeVector(
                 privileges,
-                Privilege(ResourcePattern::forClusterResource(), clusterAdminRoleClusterActions));
+                Privilege(ResourcePattern::forClusterResource(), clusterMonitorRoleClusterActions));
+        Privilege::addPrivilegeToPrivilegeVector(
+                privileges,
+                Privilege(ResourcePattern::forDatabaseName("config"), readRoleActions));
+    }
+
+    void addHostManagerPrivileges(PrivilegeVector* privileges) {
+        Privilege::addPrivilegeToPrivilegeVector(
+                privileges,
+                Privilege(ResourcePattern::forClusterResource(), hostManagerRoleClusterActions));
         Privilege::addPrivilegeToPrivilegeVector(
                 privileges,
                 Privilege(ResourcePattern::forAnyNormalResource(),
-                          clusterAdminRoleDatabaseActions));
+                          hostManagerRoleDatabaseActions));
+    }
+
+    void addClusterManagerPrivileges(PrivilegeVector* privileges) {
+        Privilege::addPrivilegeToPrivilegeVector(
+                privileges,
+                Privilege(ResourcePattern::forClusterResource(), clusterManagerRoleClusterActions));
+        Privilege::addPrivilegeToPrivilegeVector(
+                privileges,
+                Privilege(ResourcePattern::forDatabaseName("config"), readRoleActions));
+        ActionSet configSettingsActions;
+        configSettingsActions << ActionType::insert << ActionType::update << ActionType::remove;
+        Privilege::addPrivilegeToPrivilegeVector(
+                privileges,
+                Privilege(ResourcePattern::forExactNamespace(NamespaceString("config",
+                                                                             "settings")),
+                          configSettingsActions));
         Privilege::addPrivilegeToPrivilegeVector(
                 privileges,
                 Privilege(ResourcePattern::forExactNamespace(NamespaceString("local",
                                                                              "system.replset")),
                           readRoleActions));
+    }
+
+    void addClusterAdminPrivileges(PrivilegeVector* privileges) {
+        addClusterMonitorPrivileges(privileges);
+        addHostManagerPrivileges(privileges);
+        addClusterManagerPrivileges(privileges);
+        Privilege::addPrivilegeToPrivilegeVector(
+                privileges,
+                Privilege(ResourcePattern::forAnyNormalResource(),
+                          ActionType::dropDatabase));
     }
 
     void addRootRolePrivileges(PrivilegeVector* privileges) {
@@ -413,6 +468,15 @@ namespace {
         }
         else if (isAdminDB && roleName.getRole() == BUILTIN_ROLE_DB_ADMIN_ANY_DB) {
             addDbAdminAnyDbPrivileges(result);
+        }
+        else if (isAdminDB && roleName.getRole() == BUILTIN_ROLE_CLUSTER_MONITOR) {
+            addClusterMonitorPrivileges(result);
+        }
+        else if (isAdminDB && roleName.getRole() == BUILTIN_ROLE_HOST_MANAGEMENT) {
+            addHostManagerPrivileges(result);
+        }
+        else if (isAdminDB && roleName.getRole() == BUILTIN_ROLE_CLUSTER_MANAGEMENT) {
+            addClusterManagerPrivileges(result);
         }
         else if (isAdminDB && roleName.getRole() == BUILTIN_ROLE_CLUSTER_ADMIN) {
             addClusterAdminPrivileges(result);
@@ -463,6 +527,15 @@ namespace {
             return true;
         }
         else if (isAdminDB && role.getRole() == BUILTIN_ROLE_DB_ADMIN_ANY_DB) {
+            return true;
+        }
+        else if (isAdminDB && role.getRole() == BUILTIN_ROLE_CLUSTER_MONITOR) {
+            return true;
+        }
+        else if (isAdminDB && role.getRole() == BUILTIN_ROLE_HOST_MANAGEMENT) {
+            return true;
+        }
+        else if (isAdminDB && role.getRole() == BUILTIN_ROLE_CLUSTER_MANAGEMENT) {
             return true;
         }
         else if (isAdminDB && role.getRole() == BUILTIN_ROLE_CLUSTER_ADMIN) {
