@@ -74,6 +74,25 @@ namespace {
         ASSERT_OK(environment.validate());
     }
 
+    TEST(Environment, MutuallyExclusive) {
+        moe::Environment environment;
+        environment.addKeyConstraint(new moe::MutuallyExclusiveKeyConstraint(moe::Key("key"),
+                                                                             moe::Key("otherKey")));
+        ASSERT_OK(environment.set(moe::Key("key"), moe::Value(1)));
+        ASSERT_OK(environment.set(moe::Key("otherKey"), moe::Value(1)));
+        ASSERT_NOT_OK(environment.validate());
+    }
+
+    TEST(Environment, RequiresOther) {
+        moe::Environment environment;
+        environment.addKeyConstraint(new moe::RequiresOtherKeyConstraint(moe::Key("key"),
+                                                                         moe::Key("otherKey")));
+        ASSERT_OK(environment.set(moe::Key("key"), moe::Value(1)));
+        ASSERT_NOT_OK(environment.validate());
+        ASSERT_OK(environment.set(moe::Key("otherKey"), moe::Value(1)));
+        ASSERT_OK(environment.validate());
+    }
+
     TEST(Environment, DirectTypeAccess) {
         moe::Environment environment;
         ASSERT_OK(environment.set(moe::Key("number"), moe::Value(5)));

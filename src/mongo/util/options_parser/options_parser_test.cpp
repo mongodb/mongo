@@ -2957,7 +2957,6 @@ namespace {
         int port;
 
         moe::OptionSection testOpts;
-        testOpts.addOptionChaining("config", "config", moe::String, "Config file to parse");
         testOpts.addOptionChaining("port", "port", moe::Int, "Port")
                                   .validRange(1000, 65535);
 
@@ -3002,6 +3001,87 @@ namespace {
         ASSERT_OK(environment.get(moe::Key("port"), &value));
         ASSERT_OK(value.get(&port));
         ASSERT_EQUALS(port, 1000);
+    }
+
+    TEST(Constraints, MutuallyExclusiveConstraint) {
+        OptionsParserTester parser;
+        moe::Environment environment;
+        moe::Value value;
+        std::vector<std::string> argv;
+        std::map<std::string, std::string> env_map;
+
+        moe::OptionSection testOpts;
+        testOpts.addOptionChaining("option1", "option1", moe::Switch, "Option1")
+                                  .incompatibleWith("section.option2");
+        testOpts.addOptionChaining("section.option2", "option2", moe::Switch, "Option2");
+
+        environment = moe::Environment();
+        argv.clear();
+        argv.push_back("binaryname");
+        argv.push_back("--option1");
+        argv.push_back("--option2");
+
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        ASSERT_NOT_OK(environment.validate());;
+
+        environment = moe::Environment();
+        argv.clear();
+        argv.push_back("binaryname");
+        argv.push_back("--option1");
+
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        ASSERT_OK(environment.validate());;
+        ASSERT_OK(environment.get(moe::Key("option1"), &value));
+
+        environment = moe::Environment();
+        argv.clear();
+        argv.push_back("binaryname");
+        argv.push_back("--option2");
+
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        ASSERT_OK(environment.validate());;
+        ASSERT_OK(environment.get(moe::Key("section.option2"), &value));
+    }
+
+    TEST(Constraints, RequiresOtherConstraint) {
+        OptionsParserTester parser;
+        moe::Environment environment;
+        moe::Value value;
+        std::vector<std::string> argv;
+        std::map<std::string, std::string> env_map;
+
+        moe::OptionSection testOpts;
+        testOpts.addOptionChaining("option1", "option1", moe::Switch, "Option1")
+                                  .requires("section.option2");
+        testOpts.addOptionChaining("section.option2", "option2", moe::Switch, "Option2");
+
+        environment = moe::Environment();
+        argv.clear();
+        argv.push_back("binaryname");
+        argv.push_back("--option1");
+
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        ASSERT_NOT_OK(environment.validate());;
+
+        environment = moe::Environment();
+        argv.clear();
+        argv.push_back("binaryname");
+        argv.push_back("--option1");
+        argv.push_back("--option2");
+
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        ASSERT_OK(environment.validate());;
+        ASSERT_OK(environment.get(moe::Key("option1"), &value));
+        ASSERT_OK(environment.get(moe::Key("section.option2"), &value));
+
+        environment = moe::Environment();
+        argv.clear();
+        argv.push_back("binaryname");
+        argv.push_back("--option2");
+
+        ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
+        ASSERT_OK(environment.validate());;
+        ASSERT_OK(environment.get(moe::Key("section.option2"), &value));
     }
 
     TEST(YAMLConfigFile, Basic) {

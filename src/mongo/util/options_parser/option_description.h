@@ -164,6 +164,21 @@ namespace optionenvironment {
         OptionDescription& validRange(long min, long max);
 
         /**
+         * Specifies that this option is incompatible with another option.  The string provided must
+         * be the dottedName, which is the name used to access the option in the result Environment.
+         *
+         * TODO: Find a way to check that that option actually exists in our section somewhere.
+         */
+        OptionDescription& incompatibleWith(const std::string& otherDottedName);
+
+        /**
+         * Specifies that this option is requires another option to be specified.  The string
+         * provided must be the dottedName, which is the name used to access the option in the
+         * result Environment.
+         */
+        OptionDescription& requires(const std::string& otherDottedName);
+
+        /**
          * Adds a constraint for this option.  During parsing, this Constraint will be added to the
          * result Environment, ensuring that it will get checked when the environment is validated.
          * See the documentation on the Constraint and Environment classes for more details.

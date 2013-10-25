@@ -217,5 +217,13 @@ namespace optionenvironment {
         return addConstraint(new NumericKeyConstraint(_dottedName, min, max));
     }
 
+    OptionDescription& OptionDescription::incompatibleWith(const std::string& otherDottedName) {
+        return addConstraint(new MutuallyExclusiveKeyConstraint(_dottedName, otherDottedName));
+    }
+
+    OptionDescription& OptionDescription::requires(const std::string& otherDottedName) {
+        return addConstraint(new RequiresOtherKeyConstraint(_dottedName, otherDottedName));
+    }
+
 } // namespace optionenvironment
 } // namespace mongo
