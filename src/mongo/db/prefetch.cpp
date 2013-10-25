@@ -32,8 +32,9 @@
 
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/diskloc.h"
-#include "mongo/db/index/catalog_hack.h"
+#include "mongo/db/index/index_access_method.h"
 #include "mongo/db/storage/index_details.h"
+#include "mongo/db/structure/collection.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_details.h"
 #include "mongo/db/repl/rs.h"
@@ -72,12 +73,18 @@ namespace mongo {
             // prefetch ignores other ops
             return;
         }
-         
+
         BSONObj obj = op.getObjectField(opField);
         const char *ns = op.getStringField("ns");
-        NamespaceDetails *nsd = nsdetails(ns);
-        if (!nsd) return; // maybe not opened yet
-        
+
+        Database* db = cc().database();
+        if ( !db )
+            return;
+
+        Collection* collection = db->getCollection( ns );
+        if ( !collection )
+            return;
+
         LOG(4) << "index prefetch for op " << *opType << endl;
 
         DEV Lock::assertAtLeastReadLocked(ns);
@@ -97,7 +104,7 @@ namespace mongo {
         // a way to achieve that would be to prefetch the record first, and then afterwards do 
         // this part.
         //
-        prefetchIndexPages(nsd, obj);
+        prefetchIndexPages(collection, obj);
 
         // do not prefetch the data for inserts; it doesn't exist yet
         // 
@@ -108,12 +115,12 @@ namespace mongo {
         if ((*opType == 'u') &&
             // do not prefetch the data for capped collections because
             // they typically do not have an _id index for findById() to use.
-            !nsd->isCapped()) {
+            !collection->details()->isCapped()) {
             prefetchRecordPages(ns, obj);
         }
     }
 
-    void prefetchIndexPages(NamespaceDetails *nsd, const BSONObj& obj) {
+    void prefetchIndexPages(Collection* collection, const BSONObj& obj) {
         DiskLoc unusedDl; // unused
         BSONObjSet unusedKeys;
         ReplSetImpl::IndexPrefetchConfig prefetchConfig = theReplSet->getIndexPrefetchConfig();
@@ -129,11 +136,13 @@ namespace mongo {
             TimerHolder timer( &prefetchIndexStats);
             // on the update op case, the call to prefetchRecordPages will touch the _id index.
             // thus perhaps this option isn't very useful?
-            int indexNo = nsd->findIdIndex();
+            int indexNo = collection->details()->findIdIndex();
             if (indexNo == -1) return;
             try {
-                auto_ptr<IndexDescriptor> desc(CatalogHack::getDescriptor(nsd, indexNo));
-                auto_ptr<IndexAccessMethod> iam(CatalogHack::getIndex(desc.get()));
+                IndexDescriptor* desc = collection->getIndexCatalog()->getDescriptor(indexNo);
+                verify( desc );
+                IndexAccessMethod* iam = collection->getIndexCatalog()->getIndex( desc );
+                verify( iam );
                 iam->touch(obj);
             }
             catch (const DBException& e) {
@@ -145,13 +154,15 @@ namespace mongo {
         {
             // indexCount includes all indexes, including ones
             // in the process of being built
-            int indexCount = nsd->getTotalIndexCount();
+            int indexCount = collection->getIndexCatalog()->numIndexesTotal();
             for ( int indexNo = 0; indexNo < indexCount; indexNo++ ) {
                 TimerHolder timer( &prefetchIndexStats);
                 // This will page in all index pages for the given object.
                 try {
-                    auto_ptr<IndexDescriptor> desc(CatalogHack::getDescriptor(nsd, indexNo));
-                    auto_ptr<IndexAccessMethod> iam(CatalogHack::getIndex(desc.get()));
+                    IndexDescriptor* desc = collection->getIndexCatalog()->getDescriptor(indexNo);
+                    verify( desc );
+                    IndexAccessMethod* iam = collection->getIndexCatalog()->getIndex( desc );
+                    verify( iam );
                     iam->touch(obj);
                 }
                 catch (const DBException& e) {

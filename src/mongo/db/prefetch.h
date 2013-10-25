@@ -31,12 +31,12 @@
 #include "mongo/db/diskloc.h"
 
 namespace mongo {
-    class NamespaceDetails;
+    class Collection;
     // page in both index and data pages for an op from the oplog
     void prefetchPagesForReplicatedOp(const BSONObj& op);
 
     // page in pages needed for all index lookups on a given object
-    void prefetchIndexPages(NamespaceDetails *nsd, const BSONObj& obj);
+    void prefetchIndexPages(Collection *nsd, const BSONObj& obj);
 
     // page in the data pages for a record associated with an object
     void prefetchRecordPages(const char *ns, const BSONObj& obj);
