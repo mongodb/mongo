@@ -1083,7 +1083,10 @@ namespace mongo {
         }
 
         msgasserted( 8070 ,
-                     str::stream() << "couldn't find a chunk which should be impossible: " << point );
+                     str::stream() << "couldn't find a chunk intersecting: " << point
+                                   << " for ns: " << _ns
+                                   << " at version: " << _version.toString()
+                                   << ", number of chunks: " << _chunkMap.size() );
     }
 
     ChunkPtr ChunkManager::findChunkForDoc( const BSONObj& doc ) const {
