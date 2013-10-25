@@ -85,12 +85,13 @@ class backup_thread(threading.Thread):
                         self, sess, uris, "checkpoint=WiredTigerCheckpoint"):
                 print "Error: checkpoint tables differ."
             else:
-                print "Checkpoint tables match"
+                wttest.WiredTigerTestCase.printVerbose(
+                    3, "Checkpoint tables match")
 
             if not compare_tables(self, bkp_session, uris):
                 print "Error: backup tables differ."
             else:
-                print "Backup tables match"
+                wttest.WiredTigerTestCase.printVerbose(3, "Backup tables match")
             bkp_conn.close()
 
         sess.close()
