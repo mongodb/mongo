@@ -30,6 +30,7 @@
 
 #include "mongo/base/init.h"
 #include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/client.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/jsobj.h"
@@ -69,6 +70,12 @@ namespace {
     }
 
     void configureSystemUsersIndexes(const StringData& dbname) {
+        if (dbname != "admin") return;
+        if (getGlobalAuthorizationManager()->getAuthorizationVersion() !=
+            AuthorizationManager::schemaVersion26Final) {
+
+            return;
+        }
         std::string systemUsers = dbname.toString() + ".system.users";
         Client::WriteContext wctx(systemUsers);
 
@@ -122,7 +129,9 @@ namespace {
     }
 
     void createSystemIndexes(const NamespaceString& ns) {
-        if (ns.coll() == "system.users") {
+        if (ns == AuthorizationManager::usersCollectionNamespace &&
+            (getGlobalAuthorizationManager()->getAuthorizationVersion() ==
+             AuthorizationManager::schemaVersion26Final)) {
             try {
                 Helpers::ensureIndex(ns.ns().c_str(),
                                      v2SystemUsersKeyPattern,
@@ -136,7 +145,7 @@ namespace {
                 }
                 throw;
             }
-        } else if (ns.coll() == "system.roles") {
+        } else if (ns == AuthorizationManager::rolesCollectionNamespace) {
             try {
                 Helpers::ensureIndex(ns.ns().c_str(),
                                      v2SystemRolesKeyPattern,

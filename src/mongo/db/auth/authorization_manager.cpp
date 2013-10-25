@@ -89,6 +89,9 @@ namespace mongo {
     const NamespaceString AuthorizationManager::versionCollectionNamespace("admin.system.version");
 
     const std::string AuthorizationManager::schemaVersionServerParameter = "authSchemaVersion";
+    const int AuthorizationManager::schemaVersion24;
+    const int AuthorizationManager::schemaVersion26Upgrade;
+    const int AuthorizationManager::schemaVersion26Final;
 
     bool AuthorizationManager::_doesSupportOldStylePrivileges = true;
 
