@@ -31,13 +31,13 @@
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/privilege.h"
-#include "mongo/db/index/catalog_hack.h"
 #include "mongo/db/index/haystack_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/storage/index_details.h"
+#include "mongo/db/structure/collection.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/db/btreecursor.h"
@@ -76,14 +76,20 @@ namespace mongo {
                  string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             string ns = dbname + "." + cmdObj.firstElement().valuestr();
 
-            NamespaceDetails *nsd = nsdetails(ns);
-            if (NULL == nsd) {
+            Database* db = cc().database();
+            if ( !db ) {
+                errmsg = "can't find ns";
+                return false;
+            }
+
+            Collection* collection = db->getCollection( ns );
+            if ( !collection ) {
                 errmsg = "can't find ns";
                 return false;
             }
 
             vector<int> idxs;
-            nsd->findIndexByType(IndexNames::GEO_HAYSTACK, idxs);
+            collection->details()->findIndexByType(IndexNames::GEO_HAYSTACK, idxs);
             if (idxs.size() == 0) {
                 errmsg = "no geoSearch index";
                 return false;
@@ -106,8 +112,8 @@ namespace mongo {
                 limit = static_cast<unsigned>(cmdObj["limit"].numberInt());
 
             int idxNum = idxs[0];
-            auto_ptr<IndexDescriptor> desc(CatalogHack::getDescriptor(nsd, idxNum));
-            auto_ptr<HaystackAccessMethod> ham(new HaystackAccessMethod(desc.get()));
+            IndexDescriptor* desc = collection->getIndexCatalog()->getDescriptor(idxNum);
+            scoped_ptr<HaystackAccessMethod> ham(new HaystackAccessMethod(desc));
             ham->searchCommand(nearElt.Obj(), maxDistance.numberDouble(), search.Obj(),
                                &result, limit);
             return 1;
