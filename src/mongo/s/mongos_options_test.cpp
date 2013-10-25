@@ -264,7 +264,7 @@ namespace {
             else if (iterator->_dottedName == "clusterAuthMode") {
                 ASSERT_EQUALS(iterator->_singleName, "clusterAuthMode");
                 ASSERT_EQUALS(iterator->_type, moe::String);
-                ASSERT_EQUALS(iterator->_description, "Authentication mode used for cluster authentication. Alternatives are (keyfile|sendKeyfile|sendX509|x509)");
+                ASSERT_EQUALS(iterator->_description, "Authentication mode used for cluster authentication. Alternatives are (keyFile|sendKeyFile|sendX509|x509)");
                 ASSERT_EQUALS(iterator->_isVisible, true);
                 ASSERT_TRUE(iterator->_default.isEmpty());
                 ASSERT_TRUE(iterator->_implicit.isEmpty());
