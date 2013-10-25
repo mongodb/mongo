@@ -93,7 +93,6 @@ namespace mongo {
         }
 
         const T& getDefault() const {
-            dassert(_defaultSet);
             return _default;
         }
 
