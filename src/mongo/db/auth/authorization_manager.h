@@ -32,6 +32,7 @@
 #include <boost/scoped_ptr.hpp>
 #include <boost/thread/condition_variable.hpp>
 #include <boost/thread/mutex.hpp>
+#include <memory>
 #include <string>
 
 #include "mongo/base/disallow_copying.h"
@@ -128,12 +129,6 @@ namespace mongo {
          * Returns true if access control is enabled for this manager .
          */
         bool isAuthEnabled() const;
-
-        /**
-         * Sets the version number of the authorization system.  Returns an invalid status if the
-         * version number is not recognized.
-         */
-        Status setAuthorizationVersion(int version);
 
         /**
          * Returns the version number of the authorization system.
@@ -275,6 +270,16 @@ namespace mongo {
         void releaseUser(User* user);
 
         /**
+         * Returns a User object for a V1-style user with the given "userName" in "*acquiredUser",
+         * On success, "acquiredUser" will have any privileges that the named user has on
+         * database "dbname".
+         *
+         * Bumps the returned **acquiredUser's reference count on success.
+         */
+        Status acquireV1UserProbedForDb(
+                const UserName& userName, const StringData& dbname, User** acquiredUser);
+
+        /**
          * Marks the given user as invalid and removes it from the user cache.
          */
         void invalidateUserByName(const UserName& user);
@@ -358,14 +363,8 @@ namespace mongo {
         friend class AuthorizationManager::CacheGuard;
 
         /**
-         * Returns the current version number of the authorization system.  Should only be called
-         * when holding _userCacheMutex.
-         */
-        int _getVersion_inlock() const { return _version; }
-
-        /**
          * Invalidates all User objects in the cache and removes them from the cache.
-         * Should only be called when already holding _userCacheMutex.
+         * Should only be called when already holding _cacheMutex.
          */
         void _invalidateUserCache_inlock();
 
@@ -378,6 +377,18 @@ namespace mongo {
          */
         Status _initializeAllV1UserData();
 
+        /**
+         * Fetches user information from a v2-schema user document for the named user,
+         * and stores a pointer to a new user object into *acquiredUser on success.
+         */
+        Status _fetchUserV2(const UserName& userName, std::auto_ptr<User>* acquiredUser);
+
+        /**
+         * Fetches user information from a v1-schema user document for the named user, possibly
+         * examining system.users collections from userName.getDB() and admin.system.users in the
+         * process.  Stores a pointer to a new user object into *acquiredUser on success.
+         */
+        Status _fetchUserV1(const UserName& userName, std::auto_ptr<User>* acquiredUser);
 
         static bool _doesSupportOldStylePrivileges;
 
@@ -389,16 +400,17 @@ namespace mongo {
          */
         bool _authEnabled;
 
+        scoped_ptr<AuthzManagerExternalState> _externalState;
+
         /**
-         * Integer that represents what format version the privilege documents in the system are.
-         * The current version is 2.  When upgrading to v2.6 or later from v2.4 or prior, the
-         * version is 1.  After running the upgrade process to upgrade to the new privilege document
-         * format, the version will be 2.
-         * All reads/writes to _version must be done within _userCacheMutex.
+         * Cached value of the authorization schema version.
+         *
+         * May be set by acquireUser() and getAuthorizationVersion().  Invalidated by
+         * invalidateUserCache().
+         *
+         * Reads and writes guarded by CacheGuard.
          */
         int _version;
-
-        scoped_ptr<AuthzManagerExternalState> _externalState;
 
         /**
          * Caches User objects with information about user privileges, to avoid the need to
@@ -409,24 +421,24 @@ namespace mongo {
         unordered_map<UserName, User*> _userCache;
 
         /**
-         * Current generation of the user cache.  Bumped every time part of the cache gets
+         * Current generation of cached data.  Bumped every time part of the cache gets
          * invalidated.
          */
-        uint64_t _userCacheGeneration;
+        uint64_t _cacheGeneration;
 
         /**
          * True if there is an update to the _userCache in progress, and that update is currently in
-         * the "fetch phase", during which it does not hold the _userCacheMutex.
+         * the "fetch phase", during which it does not hold the _cacheMutex.
          *
          * Manipulated via CacheGuard.
          */
         bool _isFetchPhaseBusy;
 
         /**
-         * Protects _userCache, _userCacheGeneration, _version and _isFetchPhaseBusy.  Manipulated
+         * Protects _userCache, _cacheGeneration, _version and _isFetchPhaseBusy.  Manipulated
          * via CacheGuard.
          */
-        boost::mutex _userCacheMutex;
+        boost::mutex _cacheMutex;
 
         /**
          * Condition used to signal that it is OK for another CacheGuard to enter a fetch phase.

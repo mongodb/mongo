@@ -53,12 +53,6 @@ namespace mongo {
             _returnValue = returnValue;
         }
 
-        virtual Status _findUser(const std::string& usersNamespace,
-                                 const BSONObj& query,
-                                 BSONObj* result) const {
-            return Status(ErrorCodes::UserNotFound, "User not found");
-        }
-
         virtual void startRequest() {}
 
     private:

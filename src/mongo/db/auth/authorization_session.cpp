@@ -408,7 +408,7 @@ namespace {
                     // User does not exist anymore; remove it from _authenticatedUsers.
                     fassert(17068, _authenticatedUsers.removeAt(it) == user);
                     authMan.releaseUser(user);
-                    LOG(1) << "Removed deleted user " << name <<
+                    log() << "Removed deleted user " << name <<
                         " from session cache of user information.";
                     continue;  // No need to advance "it" in this case.
                 }
@@ -435,6 +435,31 @@ namespace {
         for (UserSet::iterator it = _authenticatedUsers.begin();
                 it != _authenticatedUsers.end(); ++it) {
             User* user = *it;
+
+            if (user->getSchemaVersion() == 1 &&
+                (target.isDatabasePattern() || target.isExactNamespacePattern()) &&
+                !user->hasProbedV1(target.databaseToMatch())) {
+
+                UserName name = user->getName();
+                User* updatedUser;
+                Status status = getAuthorizationManager().acquireV1UserProbedForDb(
+                        name,
+                        target.databaseToMatch(),
+                        &updatedUser);
+                if (status.isOK()) {
+                    if (user != updatedUser) {
+                        LOG(1) << "Updated session cache for V1 user " << name;
+                        fassert(0, _authenticatedUsers.replaceAt(it, updatedUser) == user);
+                    }
+                    getAuthorizationManager().releaseUser(user);
+                    user = updatedUser;
+                }
+                else {
+                    warning() << "Could not fetch updated user privilege information for V1-style "
+                        "user " << name << "; continuing to use old information.  Reason is "
+                              << status;
+                }
+            }
 
             for (int i = 0; i < resourceSearchListLength; ++i) {
                 ActionSet userActions = user->getActionsForResource(resourceSearchList[i]);

@@ -90,17 +90,15 @@ namespace mongo {
         virtual Status getRoleDescription(const RoleName& roleName, BSONObj* result) = 0;
 
         /**
-         * Gets the privilege information document for "userName".  authzVersion indicates what
-         * version of the privilege document format is being used, which is needed to know how to
-         * query for the user's privilege document.
-         *
+         * Gets the privilege document for "userName" stored in the system.users collection of
+         * database "dbname".  Useful only for schemaVersion24 user documents.  For newer schema
+         * versions, use getUserDescription().
          *
          * On success, returns Status::OK() and stores a shared-ownership copy of the document into
          * "result".
          */
-        Status getPrivilegeDocument(const UserName& userName,
-                                    int authzVersion,
-                                    BSONObj* result);
+        Status getPrivilegeDocumentV1(
+                const StringData& dbname, const UserName& userName, BSONObj* result);
 
         /**
          * Returns true if there exists at least one privilege document in the system.

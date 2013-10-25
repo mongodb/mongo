@@ -24,10 +24,11 @@
 #include "mongo/db/auth/user_name.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/sequence_util.h"
 
 namespace mongo {
 
-    User::User(const UserName& name) : _name(name), _refCount(0), _isValid(1) {}
+    User::User(const UserName& name) : _name(name), _schemaVersion(2), _refCount(0), _isValid(1) {}
     User::~User() {
         dassert(_refCount == 0);
     }
@@ -118,6 +119,21 @@ namespace mongo {
                 it != privileges.end(); ++it) {
             addPrivilege(*it);
         }
+    }
+
+    void User::setSchemaVersion1() {
+        _schemaVersion = 1;
+    }
+
+    void User::markProbedV1(const StringData& dbname) {
+        dassert(_schemaVersion == 1);
+        if (!hasProbedV1(dbname))
+            _probedDatabases.push_back(dbname.toString());
+    }
+
+    bool User::hasProbedV1(const StringData& dbname) const {
+        dassert(_schemaVersion == 1);
+        return sequenceContains(_probedDatabases, dbname);
     }
 
     void User::invalidate() {

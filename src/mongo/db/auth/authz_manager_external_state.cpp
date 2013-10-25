@@ -40,15 +40,13 @@ namespace mongo {
     AuthzManagerExternalState::AuthzManagerExternalState() {}
     AuthzManagerExternalState::~AuthzManagerExternalState() {}
 
-    Status AuthzManagerExternalState::getPrivilegeDocument(const UserName& userName,
-                                                           int authzVersion,
-                                                           BSONObj* result) {
+    Status AuthzManagerExternalState::getPrivilegeDocumentV1(const StringData& dbname,
+                                                             const UserName& userName,
+                                                             BSONObj* result) {
         if (userName == internalSecurity.user->getName()) {
             return Status(ErrorCodes::InternalError,
                           "Requested privilege document for the internal user");
         }
-
-        StringData dbname = userName.getDB();
 
         if (!NamespaceString::validDBName(dbname)) {
             return Status(ErrorCodes::BadValue,
@@ -58,23 +56,18 @@ namespace mongo {
         // Build the query needed to get the privilege document
         std::string usersNamespace;
         BSONObjBuilder queryBuilder;
-        if (authzVersion == 1) {
-            usersNamespace = mongoutils::str::stream() << dbname << ".system.users";
-            queryBuilder.append(AuthorizationManager::V1_USER_NAME_FIELD_NAME, userName.getUser());
+        usersNamespace = mongoutils::str::stream() << dbname << ".system.users";
+        queryBuilder.append(AuthorizationManager::V1_USER_NAME_FIELD_NAME, userName.getUser());
+        if (dbname == userName.getDB()) {
             queryBuilder.appendNull(AuthorizationManager::V1_USER_SOURCE_FIELD_NAME);
-        } else if (authzVersion == 2) {
-            usersNamespace = "admin.system.users";
-            queryBuilder.append(AuthorizationManager::USER_NAME_FIELD_NAME, userName.getUser());
-            queryBuilder.append(AuthorizationManager::USER_SOURCE_FIELD_NAME, userName.getDB());
-        } else {
-            return Status(ErrorCodes::UnsupportedFormat,
-                          mongoutils::str::stream() <<
-                                  "Unrecognized authorization format version: " << authzVersion);
+        }
+        else {
+            queryBuilder.append(AuthorizationManager::V1_USER_SOURCE_FIELD_NAME, userName.getDB());
         }
 
         // Query for the privilege document
         BSONObj userBSONObj;
-        Status found = _findUser(usersNamespace, queryBuilder.obj(), &userBSONObj);
+        Status found = _findUser(usersNamespace, queryBuilder.done(), &userBSONObj);
         if (!found.isOK()) {
             if (found.code() == ErrorCodes::UserNotFound) {
                 // Return more detailed status that includes user name.

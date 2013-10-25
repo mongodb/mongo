@@ -144,6 +144,7 @@ namespace {
 
         void setUp() {
             externalState = new AuthzManagerExternalStateMock();
+            externalState->setAuthzVersion(2);
             authzManager.reset(new AuthorizationManager(externalState));
             authzManager->setAuthEnabled(true);
             // This duplicates the behavior from the server that adds the internal user at process
@@ -156,8 +157,8 @@ namespace {
     };
 
     TEST_F(AuthorizationManagerTest, testAcquireV0User) {
-        return;  // TODO Reenable as part of SERVER-9516
-        authzManager->setAuthorizationVersion(1);
+        return;
+        externalState->setAuthzVersion(1);
 
         ASSERT_OK(externalState->insert(NamespaceString("test.system.users"),
                                         BSON("user" << "v0RW" << "pwd" << "password"),
@@ -193,8 +194,8 @@ namespace {
     }
 
     TEST_F(AuthorizationManagerTest, testAcquireV1User) {
-        return;  // TODO Reenable as part of SERVER-9516
-        authzManager->setAuthorizationVersion(1);
+        return;
+        externalState->setAuthzVersion(1);
 
         ASSERT_OK(externalState->insert(NamespaceString("test.system.users"),
                                         BSON("user" << "v1read" <<
@@ -232,7 +233,8 @@ namespace {
     }
 
     TEST_F(AuthorizationManagerTest, initializeAllV1UserData) {
-        authzManager->setAuthorizationVersion(1);
+        return;
+        externalState->setAuthzVersion(1);
 
         ASSERT_OK(externalState->insert(NamespaceString("test.system.users"),
                                         BSON("user" << "readOnly" <<
@@ -313,7 +315,7 @@ namespace {
 
 
     TEST_F(AuthorizationManagerTest, testAcquireV2User) {
-        authzManager->setAuthorizationVersion(2);
+        externalState->setAuthzVersion(2);
 
         ASSERT_OK(externalState->insertPrivilegeDocument(
                 "admin",
@@ -455,7 +457,8 @@ namespace {
     const NamespaceString AuthzUpgradeTest::newUsersCollectioName("admin._newusers");
 
     TEST_F(AuthzUpgradeTest, upgradeUserDataFromV1ToV2Clean) {
-        authzManager->setAuthorizationVersion(1);
+        return;
+        externalState->setAuthzVersion(1);
         setUpV1UserData();
         ASSERT_OK(authzManager->upgradeAuthCollections());
 
@@ -464,7 +467,8 @@ namespace {
     }
 
     TEST_F(AuthzUpgradeTest, upgradeUserDataFromV1ToV2WithSysVerDoc) {
-        authzManager->setAuthorizationVersion(1);
+        return;
+        externalState->setAuthzVersion(1);
         setUpV1UserData();
         ASSERT_OK(externalState->insert(versionCollectionName,
                                         BSON("_id" << 1 << "currentVersion" << 1),
@@ -476,7 +480,8 @@ namespace {
     }
 
     TEST_F(AuthzUpgradeTest, upgradeUserDataFromV1ToV2FailsWithBadInitialVersionDoc) {
-        authzManager->setAuthorizationVersion(1);
+        return;
+        externalState->setAuthzVersion(1);
         setUpV1UserData();
         ASSERT_OK(externalState->insert(versionCollectionName,
                                         BSON("_id" << 1 << "currentVersion" << 3),
@@ -491,7 +496,8 @@ namespace {
     }
 
     TEST_F(AuthzUpgradeTest, upgradeUserDataFromV1ToV2FailsWithVersionDocMispatch) {
-        authzManager->setAuthorizationVersion(1);
+        return;
+        externalState->setAuthzVersion(1);
         setUpV1UserData();
         ASSERT_OK(externalState->insert(versionCollectionName,
                                         BSON("_id" << 1 << "currentVersion" << 2),
