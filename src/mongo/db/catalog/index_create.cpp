@@ -261,7 +261,5 @@ namespace mongo {
         MONGO_TLOG(0) << "build index done.  scanned " << n << " total records. " << t.millis() / 1000.0 << " secs" << endl;
     }
 
-    extern BSONObj id_obj;  // { _id : 1 }
-
 }  // namespace mongo
 
