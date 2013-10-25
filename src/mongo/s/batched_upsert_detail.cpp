@@ -155,4 +155,4 @@ namespace mongo {
         return _upsertedID;
     }
 
- } // namespace mongo
+} // namespace mongo
