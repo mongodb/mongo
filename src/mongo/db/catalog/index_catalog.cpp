@@ -101,10 +101,6 @@ namespace mongo {
         string pluginName = IndexNames::findPluginName(keyPattern);
         bool known = IndexNames::isKnownName(pluginName);
 
-        if (NULL == cc().database()) {
-            return false;
-        }
-
         const DataFileHeader* dfh = _collection->_database->getFile(0)->getHeader();
 
         if (dfh->versionMinor == PDFILE_VERSION_MINOR_24_AND_NEWER) {
