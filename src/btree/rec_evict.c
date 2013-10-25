@@ -306,16 +306,13 @@ __rec_review(WT_SESSION_IMPL *session, WT_REF *ref, WT_PAGE *page,
 		WT_RET(__hazard_exclusive(session, ref, top));
 
 		/*
-		 * The top-level page was removed from the LRU eviction queue
-		 * when eviction started.  Child pages might still be on the
-		 * eviction queue, once the page is locked, remove it from the
-		 * queue.  We have to do this before freeing the page memory
-		 * or otherwise touching the reference because eviction paths
+		 * Now the page is locked, remove it from the LRU eviction
+		 * queue.  We have to do this before freeing the page memory or
+		 * otherwise touching the reference because eviction paths
 		 * assume a non-NULL reference on the queue is pointing at
 		 * valid memory.
 		 */
-		if (!top)
-			__wt_evict_list_clr_page(session, page);
+		__wt_evict_list_clr_page(session, page);
 	}
 
 	/*
