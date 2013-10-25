@@ -88,6 +88,7 @@ namespace mongo {
     const NamespaceString AuthorizationManager::usersCollectionNamespace("admin.system.users");
     const NamespaceString AuthorizationManager::versionCollectionNamespace("admin.system.version");
 
+    const std::string AuthorizationManager::schemaVersionServerParameter = "authSchemaVersion";
 
     bool AuthorizationManager::_doesSupportOldStylePrivileges = true;
 
@@ -221,7 +222,7 @@ namespace mongo {
     AuthorizationManager::AuthorizationManager(AuthzManagerExternalState* externalState) :
         _authEnabled(false),
         _externalState(externalState),
-        _version(2),
+        _version(schemaVersion26Final),
         _cacheGeneration(0),
         _isFetchPhaseBusy(false) {
     }
@@ -239,7 +240,7 @@ namespace mongo {
     int AuthorizationManager::getAuthorizationVersion() {
         CacheGuard guard(this, CacheGuard::fetchSynchronizationManual);
         int newVersion = _version;
-        if (0 == newVersion) {
+        if (schemaVersionInvalid == newVersion) {
             guard.beginFetchPhase();
             Status status = _externalState->getStoredAuthorizationVersion(&newVersion);
             guard.endFetchPhase();
@@ -495,7 +496,7 @@ namespace mongo {
 
         int authzVersion = _version;
         guard.beginFetchPhase();
-        if (authzVersion == 0) {
+        if (authzVersion == schemaVersionInvalid) {
             Status status = _externalState->getStoredAuthorizationVersion(&authzVersion);
             if (!status.isOK())
                 return status;
@@ -505,13 +506,14 @@ namespace mongo {
         default:
             return Status(ErrorCodes::BadValue, mongoutils::str::stream() <<
                           "Illegal value for authorization data schema version, " << authzVersion);
-        case 2: {
+        case schemaVersion26Final:
+        case schemaVersion26Upgrade: {
             Status status = _fetchUserV2(userName, &user);
             if (!status.isOK())
                 return status;
             break;
         }
-        case 1: {
+        case schemaVersion24: {
             Status status = _fetchUserV1(userName, &user);
             if (!status.isOK())
                 return status;
@@ -521,11 +523,10 @@ namespace mongo {
         guard.endFetchPhase();
 
         user->incrementRefCount();
-
         // NOTE: It is not safe to throw an exception from here to the end of the method.
         if (guard.isSameCacheGeneration()) {
             _userCache.insert(make_pair(userName, user.get()));
-            if (_version == 0)
+            if (_version == schemaVersionInvalid)
                 _version = authzVersion;
         }
         else {
@@ -625,7 +626,7 @@ namespace mongo {
         User* user = NULL;
         if (_userCache.end() != it) {
             user = it->second;
-            fassert(0, user->getSchemaVersion() == 1);
+            fassert(0, user->getSchemaVersion() == schemaVersion24);
             fassert(0, user->isValid());
             if (user->hasProbedV1(dbname)) {
                 user->incrementRefCount();
@@ -748,10 +749,10 @@ namespace mongo {
         // Make sure the internal user stays in the cache.
         _userCache.insert(make_pair(internalSecurity.user->getName(), internalSecurity.user));
 
-        // If the authorization manager was running with version-1 schema data, check to
+        // If the authorization manager was running with version 2.4 schema data, check to
         // see if the version has updated next time we go to add data to the cache.
-        if (1 == _version)
-            _version = 0;
+        if (schemaVersion24 == _version)
+            _version = schemaVersionInvalid;
     }
 
     Status AuthorizationManager::initialize() {
@@ -903,7 +904,7 @@ namespace mongo {
             return Status(ErrorCodes::LockBusy, "Could not lock auth data upgrade process lock.");
         }
         CacheGuard guard(this);
-        int durableVersion = 0;
+        int durableVersion = schemaVersionInvalid;
         Status status = readAuthzVersion(_externalState.get(), &durableVersion);
         if (!status.isOK())
             return status;

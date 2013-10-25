@@ -131,10 +131,10 @@ namespace {
             }
         }
         if (hasAnyPrivilegeDocuments()) {
-            *outVersion = 1;
+            *outVersion = AuthorizationManager::schemaVersion24;
         }
         else {
-            *outVersion = 2;
+            *outVersion = AuthorizationManager::schemaVersion26Final;
         }
         return Status::OK();
     }

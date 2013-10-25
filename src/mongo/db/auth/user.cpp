@@ -18,6 +18,7 @@
 
 #include <vector>
 
+#include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/auth/role_name.h"
@@ -28,7 +29,12 @@
 
 namespace mongo {
 
-    User::User(const UserName& name) : _name(name), _schemaVersion(2), _refCount(0), _isValid(1) {}
+    User::User(const UserName& name) :
+        _name(name),
+        _schemaVersion(AuthorizationManager::schemaVersion26Final),
+        _refCount(0),
+        _isValid(1) {}
+
     User::~User() {
         dassert(_refCount == 0);
     }
@@ -122,17 +128,17 @@ namespace mongo {
     }
 
     void User::setSchemaVersion1() {
-        _schemaVersion = 1;
+        _schemaVersion = AuthorizationManager::schemaVersion24;
     }
 
     void User::markProbedV1(const StringData& dbname) {
-        dassert(_schemaVersion == 1);
+        dassert(_schemaVersion == AuthorizationManager::schemaVersion24);
         if (!hasProbedV1(dbname))
             _probedDatabases.push_back(dbname.toString());
     }
 
     bool User::hasProbedV1(const StringData& dbname) const {
-        dassert(_schemaVersion == 1);
+        dassert(_schemaVersion == AuthorizationManager::schemaVersion24);
         return sequenceContains(_probedDatabases, dbname);
     }
 

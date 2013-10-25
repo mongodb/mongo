@@ -436,7 +436,7 @@ namespace {
                 it != _authenticatedUsers.end(); ++it) {
             User* user = *it;
 
-            if (user->getSchemaVersion() == 1 &&
+            if (user->getSchemaVersion() == AuthorizationManager::schemaVersion24 &&
                 (target.isDatabasePattern() || target.isExactNamespacePattern()) &&
                 !user->hasProbedV1(target.databaseToMatch())) {
 

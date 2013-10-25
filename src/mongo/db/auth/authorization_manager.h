@@ -87,11 +87,39 @@ namespace mongo {
         static const NamespaceString usersCollectionNamespace;
         static const NamespaceString versionCollectionNamespace;
 
+        /**
+         * Name of the server parameter used to report the auth schema version (via getParameter).
+         */
+        static const std::string schemaVersionServerParameter;
+
+        /**
+         * Value used to represent that the schema version is not cached or invalid.
+         */
+        static const int schemaVersionInvalid = 0;
+
+        /**
+         * Auth schema version for MongoDB v2.4 and prior.
+         */
+        static const int schemaVersion24 = 1;
+
+        /**
+         * Auth schema version for MongoDB v2.6 during the upgrade process.  Same as
+         * schemaVersion26Final, except that user documents are found in admin.new.users, and user
+         * management commands are disabled.
+         */
+        static const int schemaVersion26Upgrade = 2;
+
+        /**
+         * Auth schema version for MongoDB 2.6.  Users are stored in admin.system.users,
+         * roles in admin.system.roles.
+         */
+        static const int schemaVersion26Final = 3;
+
         // TODO: Make the following functions no longer static.
 
         /**
          * Sets whether or not we allow old style (pre v2.4) privilege documents for this whole
-         * server.
+         * server.  Only relevant prior to upgrade.
          */
         static void setSupportOldStylePrivilegeDocuments(bool enabled);
 

@@ -46,7 +46,15 @@ namespace {
         virtual void append(BSONObjBuilder& b, const std::string& name);
         virtual Status set(const BSONElement& newValueElement);
         virtual Status setFromString(const std::string& str);
-    } authzVersionParameter(ServerParameterSet::getGlobal(), "authzVersion");
+    };
+
+    MONGO_INITIALIZER_GENERAL(AuthzSchemaParameter,
+                              MONGO_NO_PREREQUISITES,
+                              ("BeginStartupOptionParsing"))(InitializerContext*) {
+        new AuthzVersionParameter(ServerParameterSet::getGlobal(),
+                                  AuthorizationManager::schemaVersionServerParameter);
+        return Status::OK();
+    }
 
     AuthzVersionParameter::AuthzVersionParameter(ServerParameterSet* sps, const std::string& name) :
         ServerParameter(sps, name, false, false) {}

@@ -204,16 +204,14 @@ namespace mongo {
         unordered_set<RoleName> _roles;
 
         // List of databases already probed for privilege information for this user.  Only
-        // meaningful for V1-schema users.
+        // meaningful for V2.4-schema users.
         std::vector<std::string> _probedDatabases;
 
         // Credential information.
         CredentialData _credentials;
 
-        // Schema version of user documents used to build this user.  Valid values are 1 (for V1 and
-        // V0 documents) and 2 (for V2 documents).  We need this information because the V1 and V0
-        // users need to do extra probing when checking for privileges.  See
-        // AuthorizationManager::updateV1UserForResource().  Defaults to 2.
+        // Schema version of user documents used to build this user.  Valid values are
+        // AuthorizationManager::schemaVersion24 and schemaVersion26Final.
         int _schemaVersion;
 
         // _refCount and _isInvalidated are modified exclusively by the AuthorizationManager

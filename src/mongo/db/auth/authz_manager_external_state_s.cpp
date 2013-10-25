@@ -79,7 +79,8 @@ namespace {
             BSONObj cmdResult;
             conn->get()->runCommand(
                     "admin",
-                    BSON("getParameter" << 1 << "authzVersion" << 1),
+                    BSON("getParameter" << 1 <<
+                         AuthorizationManager::schemaVersionServerParameter << 1),
                     cmdResult);
             if (!cmdResult["ok"].trueValue()) {
                 std::string errmsg = cmdResult["errmsg"].str();
@@ -96,7 +97,8 @@ namespace {
                 }
                 return Status(ErrorCodes::Error(code), errmsg);
             }
-            BSONElement versionElement = cmdResult["authzVersion"];
+            BSONElement versionElement =
+                cmdResult[AuthorizationManager::schemaVersionServerParameter];
             if (versionElement.eoo())
                 return Status(ErrorCodes::UnknownError, "getParameter misbehaved.");
             *outVersion = versionElement.numberInt();

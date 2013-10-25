@@ -63,7 +63,7 @@ namespace {
 
         void setUp() {
             managerState = new FailureCapableAuthzManagerExternalStateMock();
-            managerState->setAuthzVersion(2);
+            managerState->setAuthzVersion(AuthorizationManager::schemaVersion26Final);
             authzManager.reset(new AuthorizationManager(managerState));
             sessionState = new AuthzSessionExternalStateMock(authzManager.get());
             authzSession.reset(new AuthorizationSession(sessionState));
@@ -422,7 +422,7 @@ namespace {
 
     TEST_F(AuthorizationSessionTest, ImplicitAcquireFromSomeDatabasesWithV1Users) {
         return;
-        managerState->setAuthzVersion(1);
+        managerState->setAuthzVersion(AuthorizationManager::schemaVersion24);
 
         managerState->insert(NamespaceString("test.system.users"),
                                     BSON("user" << "andy" <<
