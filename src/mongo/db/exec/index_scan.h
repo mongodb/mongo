@@ -92,9 +92,9 @@ namespace mongo {
         WorkingSet* _workingSet;
 
         // Index access.
-        scoped_ptr<IndexAccessMethod> _iam;
+        IndexAccessMethod* _iam; // owned by Collection -> IndexCatalog
         scoped_ptr<IndexCursor> _indexCursor;
-        scoped_ptr<IndexDescriptor> _descriptor;
+        IndexDescriptor* _descriptor; // owned by Collection -> IndexCatalog
 
         // Have we hit the end of the index scan?
         bool _hitEnd;

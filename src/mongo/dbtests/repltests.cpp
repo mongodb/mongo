@@ -55,7 +55,7 @@ namespace ReplTests {
 
             Collection* c = _context.db()->getCollection( ns() );
             if ( ! c ) {
-                c = _context.db()->createCollection( ns(), false, NULL );
+                c = _context.db()->createCollection( ns(), false, NULL, true );
             }
             c->getIndexCatalog()->ensureHaveIdIndex();
         }

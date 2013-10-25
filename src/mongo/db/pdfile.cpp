@@ -570,8 +570,11 @@ namespace mongo {
         OwnedPointerVector<UpdateTicket> updateTickets;
         updateTickets.mutableVector().resize(collection->details()->getTotalIndexCount());
         for (int i = 0; i < collection->details()->getTotalIndexCount(); ++i) {
-            auto_ptr<IndexDescriptor> descriptor(CatalogHack::getDescriptor(collection->details(), i));
-            auto_ptr<IndexAccessMethod> iam(CatalogHack::getIndex(descriptor.get()));
+            IndexDescriptor* descriptor = collection->getIndexCatalog()->getDescriptor( i );
+            verify( descriptor );
+            IndexAccessMethod* iam = collection->getIndexCatalog()->getIndex( descriptor );
+            verify( iam );
+
             InsertDeleteOptions options;
             options.logIfError = false;
             options.dupsAllowed = !(KeyPattern::isIdKeyPattern(descriptor->keyPattern())
@@ -581,7 +584,7 @@ namespace mongo {
             Status ret = iam->validateUpdate(objOld, objNew, dl, options,
                                              updateTickets.mutableVector()[i]);
 
-            if (Status::OK() != ret) {
+            if ( !ret.isOK() ) {
                 uasserted(ASSERT_ID_DUPKEY, "Update validation failed: " + ret.toString());
             }
         }
@@ -610,8 +613,11 @@ namespace mongo {
         debug.keyUpdates = 0;
 
         for (int i = 0; i < collection->details()->getTotalIndexCount(); ++i) {
-            auto_ptr<IndexDescriptor> descriptor(CatalogHack::getDescriptor(collection->details(), i));
-            auto_ptr<IndexAccessMethod> iam(CatalogHack::getIndex(descriptor.get()));
+            IndexDescriptor* descriptor = collection->getIndexCatalog()->getDescriptor( i );
+            verify( descriptor );
+            IndexAccessMethod* iam = collection->getIndexCatalog()->getIndex( descriptor );
+            verify( iam );
+
             int64_t updatedKeys;
             Status ret = iam->update(*updateTickets.vector()[i], &updatedKeys);
             if (Status::OK() != ret) {

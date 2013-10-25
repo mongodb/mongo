@@ -23,6 +23,7 @@
 #include "mongo/db/instance.h"
 #include "mongo/db/json.h"
 #include "mongo/db/query/plan_executor.h"
+#include "mongo/db/structure/collection.h"
 #include "mongo/dbtests/dbtests.h"
 
 /**
@@ -45,9 +46,10 @@ namespace QueryStageMergeSortTests {
         }
 
         IndexDescriptor* getIndex(const BSONObj& obj) {
-            NamespaceDetails* nsd = nsdetails(ns());
+            Collection* collection = cc().database()->getCollection( ns() );
+            NamespaceDetails* nsd = collection->details();
             int idxNo = nsd->findIndexByKeyPattern(obj);
-            return CatalogHack::getDescriptor(nsd, idxNo);
+            return collection->getIndexCatalog()->getDescriptor( idxNo );
         }
 
         void insert(const BSONObj& obj) {

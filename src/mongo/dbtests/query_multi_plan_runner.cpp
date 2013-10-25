@@ -23,6 +23,7 @@
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/query/multi_plan_runner.h"
+#include "mongo/db/structure/collection.h"
 #include "mongo/dbtests/dbtests.h"
 
 namespace QueryMultiPlanRunner {
@@ -40,9 +41,10 @@ namespace QueryMultiPlanRunner {
         }
 
         IndexDescriptor* getIndex(const BSONObj& obj) {
-            NamespaceDetails* nsd = nsdetails(ns());
+            Collection* collection = cc().database()->getCollection( ns() );
+            NamespaceDetails* nsd = collection->details();
             int idxNo = nsd->findIndexByKeyPattern(obj);
-            return CatalogHack::getDescriptor(nsd, idxNo);
+            return collection->getIndexCatalog()->getDescriptor( idxNo );
         }
 
         void insert(const BSONObj& obj) {
