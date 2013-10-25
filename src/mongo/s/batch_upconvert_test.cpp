@@ -36,6 +36,16 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/net/message.h"
 
+
+#ifdef MONGO_SSL
+namespace mongo {
+        Status storeSSLServerOptions(const optionenvironment::Environment& params) {
+            return Status(ErrorCodes::InternalError,
+                          "This is a storeSSLServerOptions stub and should not be called");
+        }
+}
+#endif // ifdef MONGO_SSL
+
 namespace {
 
     using namespace mongo;
