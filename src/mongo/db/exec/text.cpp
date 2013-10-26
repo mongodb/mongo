@@ -40,7 +40,6 @@ namespace mongo {
           _filledOutResults(false), _curResult(0) { }
 
     TextStage::~TextStage() {
-        delete _params.index;
     }
 
     bool TextStage::isEOF() {

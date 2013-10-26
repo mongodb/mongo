@@ -58,7 +58,7 @@ namespace mongo {
         // Namespace.
         string ns;
 
-        // Text index descriptor.  TextStage owns this.
+        // Text index descriptor.  IndexCatalog owns this.
         IndexDescriptor* index;
 
         // Index spec.
