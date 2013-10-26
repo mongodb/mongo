@@ -1785,11 +1785,13 @@ namespace mongo {
         shared_ptr<GeoHashConverter> _converter;
     };
 
-    bool TwoDGeoNearRunner::run2DGeoNear(IndexDescriptor* descriptor, const BSONObj& cmdObj,
-                             const GeoNearArguments &parsedArgs, string& errmsg,
-                             BSONObjBuilder& result, unordered_map<string, double>* stats) {
+    bool TwoDGeoNearRunner::run2DGeoNear(IndexCatalog* catalog,
+                                         IndexDescriptor* descriptor, const BSONObj& cmdObj,
+                                         const GeoNearArguments &parsedArgs, string& errmsg,
+                                         BSONObjBuilder& result,
+                                         unordered_map<string, double>* stats) {
 
-        auto_ptr<TwoDAccessMethod> sam(new TwoDAccessMethod(descriptor));
+        TwoDAccessMethod* sam = static_cast<TwoDAccessMethod*>( catalog->getIndex( descriptor ) );
         const TwoDIndexingParams& params = sam->getParams();
 
         uassert(13046, "'near' param missing/invalid", !cmdObj["near"].eoo());
@@ -1810,7 +1812,7 @@ namespace mongo {
 
         GeoDistType type = parsedArgs.isSpherical ? GEO_SPHERE : GEO_PLANE;
 
-        GeoSearch gs(sam.get(), n, parsedArgs.numWanted, parsedArgs.query, maxDistance, type,
+        GeoSearch gs(sam, n, parsedArgs.numWanted, parsedArgs.query, maxDistance, type,
                      parsedArgs.uniqueDocs, true);
 
         if (cmdObj["start"].type() == String) {

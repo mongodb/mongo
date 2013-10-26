@@ -113,7 +113,8 @@ namespace mongo {
 
             int idxNum = idxs[0];
             IndexDescriptor* desc = collection->getIndexCatalog()->getDescriptor(idxNum);
-            scoped_ptr<HaystackAccessMethod> ham(new HaystackAccessMethod(desc));
+            HaystackAccessMethod* ham =
+                static_cast<HaystackAccessMethod*>( collection->getIndexCatalog()->getIndex(desc) );
             ham->searchCommand(nearElt.Obj(), maxDistance.numberDouble(), search.Obj(),
                                &result, limit);
             return 1;

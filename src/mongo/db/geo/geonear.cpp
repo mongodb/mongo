@@ -146,7 +146,8 @@ namespace mongo {
 
             if (1 == idxs.size()) {
                 result.append("ns", ns);
-                twod_internal::TwoDGeoNearRunner::run2DGeoNear(indexCatalog->getDescriptor( idxs[0] ),
+                twod_internal::TwoDGeoNearRunner::run2DGeoNear(indexCatalog,
+                                                               indexCatalog->getDescriptor( idxs[0] ),
                                                                cmdObj, commonArgs,
                                                                errmsg, result, &statsMap);
                 BSONObjBuilder stats(result.subobjStart("stats"));
@@ -167,7 +168,7 @@ namespace mongo {
 
             if (1 == idxs.size()) {
                 result.append("ns", ns);
-                run2DSphereGeoNear(indexCatalog->getDescriptor(idxs[0]),
+                run2DSphereGeoNear(indexCatalog,indexCatalog->getDescriptor(idxs[0]),
                                    cmdObj, commonArgs, errmsg, result);
                 return true;
             }
@@ -178,10 +179,10 @@ namespace mongo {
 
     private:
 
-        static bool run2DSphereGeoNear(IndexDescriptor* descriptor, BSONObj& cmdObj,
-                                       const GeoNearArguments &parsedArgs, string& errmsg,
-                                       BSONObjBuilder& result) {
-            scoped_ptr<S2AccessMethod> sam(new S2AccessMethod(descriptor));
+        static bool run2DSphereGeoNear(IndexCatalog* catalog, IndexDescriptor* descriptor,
+                                       BSONObj& cmdObj, const GeoNearArguments &parsedArgs,
+                                       string& errmsg, BSONObjBuilder& result) {
+            S2AccessMethod* sam = static_cast<S2AccessMethod*>( catalog->getIndex(descriptor) );
             const S2IndexingParams& params = sam->getParams();
             scoped_ptr<S2NearIndexCursor> nic(new S2NearIndexCursor(descriptor, params));
 

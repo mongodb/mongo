@@ -49,7 +49,8 @@ namespace mongo {
 
         class TwoDGeoNearRunner {
         public:
-            static bool run2DGeoNear(IndexDescriptor* descriptor, const BSONObj& cmdObj,
+            static bool run2DGeoNear(IndexCatalog* catalog,
+                                     IndexDescriptor* descriptor, const BSONObj& cmdObj,
                                      const GeoNearArguments &parsedArgs, string& errmsg,
                                      BSONObjBuilder& result, unordered_map<string, double>* stats);
         };
