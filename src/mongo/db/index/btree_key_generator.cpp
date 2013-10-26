@@ -249,7 +249,8 @@ namespace mongo {
                              arrObjElt.embeddedObject());
     }
 
-    void BtreeKeyGeneratorV1::getKeysImpl(vector<const char*> fieldNames, vector<BSONElement> fixed,                                          const BSONObj &obj, BSONObjSet *keys) const {
+    void BtreeKeyGeneratorV1::getKeysImpl(vector<const char*> fieldNames, vector<BSONElement> fixed,
+                                          const BSONObj &obj, BSONObjSet *keys) const {
         getKeysImplWithArray(fieldNames, fixed, obj, keys, 0, BSONObj());
     }
 
