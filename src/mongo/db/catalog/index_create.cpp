@@ -45,6 +45,7 @@
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/query/runner_yield_policy.h"
 #include "mongo/db/repl/is_master.h"
+#include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/structure/collection.h"
 #include "mongo/util/processinfo.h"
@@ -180,7 +181,10 @@ namespace mongo {
                 if (dropDups) {
                     bool runnerEOF = runner->isEOF();
                     runner->saveState();
-                    collection->deleteDocument( loc, false, true );
+                    BSONObj toDelete;
+                    collection->deleteDocument( loc, false, true, &toDelete );
+                    logOp( "d", ns.c_str(), toDelete );
+
                     if (!runner->restoreState()) {
                         // Runner got killed somehow.  This probably shouldn't happen.
                         if (runnerEOF) {
