@@ -56,7 +56,7 @@
 config.log
 settings.py
 log_config.py
-tags
+/tags
 TAGS
 failfile.smoke
 
