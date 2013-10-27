@@ -664,7 +664,6 @@ namespace mongo {
 
     bool CollectionMetadata::isValidKey( const BSONObj& key ) const {
         BSONObjIterator it( _keyPattern );
-        BSONObjBuilder maxKeyB;
         while ( it.more() ) {
             BSONElement next = it.next();
             if ( !key.hasField( next.fieldName() ) ) return false;
