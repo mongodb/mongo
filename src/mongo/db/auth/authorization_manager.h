@@ -89,9 +89,20 @@ namespace mongo {
         static const NamespaceString versionCollectionNamespace;
 
         /**
+         * Query to match the auth schema version document in the versionCollectionNamespace.
+         */
+        static const BSONObj versionDocumentQuery;
+
+        /**
          * Name of the server parameter used to report the auth schema version (via getParameter).
          */
         static const std::string schemaVersionServerParameter;
+
+        /**
+         * Name of the field in the auth schema version document containing the current schema
+         * version.
+         */
+        static const std::string schemaVersionFieldName;
 
         /**
          * Value used to represent that the schema version is not cached or invalid.
@@ -166,6 +177,14 @@ namespace mongo {
 
         // Returns true if there exists at least one privilege document in the system.
         bool hasAnyPrivilegeDocuments() const;
+
+        /**
+         * Updates the auth schema version document to reflect that the system is upgraded to
+         * schemaVersion26Final.
+         *
+         * Do not call if getAuthorizationVersion() reports a value other than schemaVersion26Final.
+         */
+        Status writeAuthSchemaVersionIfNeeded();
 
         /**
          * Creates the given user object in the given database.

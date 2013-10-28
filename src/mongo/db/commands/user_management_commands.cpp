@@ -241,7 +241,7 @@ namespace mongo {
                     "schema version " << AuthorizationManager::schemaVersion26Final <<
                     " but found " << foundSchemaVersion);
         }
-        return Status::OK();
+        return authzManager->writeAuthSchemaVersionIfNeeded();
     }
 
     static Status requireAuthSchemaVersion26UpgradeOrFinal(AuthorizationManager* authzManager) {

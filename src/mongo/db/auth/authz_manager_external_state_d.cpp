@@ -113,9 +113,10 @@ namespace {
             Client::ReadContext ctx(AuthorizationManager::versionCollectionNamespace.ns());
             BSONObj versionDoc;
             if (Helpers::findOne(AuthorizationManager::versionCollectionNamespace.ns(),
-                                 BSON("_id" << 1),
+                                 AuthorizationManager::versionDocumentQuery,
                                  versionDoc)) {
-                BSONElement versionElement = versionDoc["currentVersion"];
+                BSONElement versionElement = versionDoc[
+                        AuthorizationManager::schemaVersionFieldName];
                 if (versionElement.isNumber()) {
                     *outVersion = versionElement.numberInt();
                     return Status::OK();

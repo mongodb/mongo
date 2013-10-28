@@ -89,7 +89,10 @@ namespace mongo {
     const NamespaceString AuthorizationManager::usersCollectionNamespace("admin.system.users");
     const NamespaceString AuthorizationManager::versionCollectionNamespace("admin.system.version");
 
+    const BSONObj AuthorizationManager::versionDocumentQuery = BSON("_id" << "authSchema");
+
     const std::string AuthorizationManager::schemaVersionServerParameter = "authSchemaVersion";
+    const std::string AuthorizationManager::schemaVersionFieldName = "currentVersion";
 
 #ifndef _MSC_EXTENSIONS
     const int AuthorizationManager::schemaVersion24;
@@ -235,7 +238,7 @@ namespace mongo {
     AuthorizationManager::AuthorizationManager(AuthzManagerExternalState* externalState) :
         _authEnabled(false),
         _externalState(externalState),
-        _version(schemaVersion26Final),
+        _version(schemaVersionInvalid),
         _cacheGeneration(0),
         _isFetchPhaseBusy(false) {
     }
@@ -289,6 +292,20 @@ namespace mongo {
 
     bool AuthorizationManager::hasAnyPrivilegeDocuments() const {
         return _externalState->hasAnyPrivilegeDocuments();
+    }
+
+    Status AuthorizationManager::writeAuthSchemaVersionIfNeeded() {
+        Status status =  _externalState->updateOne(
+                AuthorizationManager::versionCollectionNamespace,
+                AuthorizationManager::versionDocumentQuery,
+                BSON("$set" << BSON(AuthorizationManager::schemaVersionFieldName <<
+                                    AuthorizationManager::schemaVersion26Final)),
+                true,  // upsert
+                BSONObj());  // write concern
+        if (status == ErrorCodes::NoMatchingDocument) {    // SERVER-11492
+            status = Status::OK();
+        }
+        return status;
     }
 
     Status AuthorizationManager::insertPrivilegeDocument(const std::string& dbname,
@@ -764,10 +781,8 @@ namespace mongo {
         // Make sure the internal user stays in the cache.
         _userCache.insert(make_pair(internalSecurity.user->getName(), internalSecurity.user));
 
-        // If the authorization manager was running with version 2.4 schema data, check to
-        // see if the version has updated next time we go to add data to the cache.
-        if (schemaVersion24 == _version)
-            _version = schemaVersionInvalid;
+        // Reread the schema version before acquiring the next user.
+        _version = schemaVersionInvalid;
     }
 
     Status AuthorizationManager::initialize() {
@@ -889,7 +904,6 @@ namespace mongo {
         const NamespaceString newusersCollectionNamespace(
                 AuthorizationManager::usersAltCollectionNamespace);
         const NamespaceString backupUsersCollectionNamespace("admin.backup.users");
-        const BSONObj versionDocumentQuery = BSON("_id" << 1);
 
         /**
          * Fetches the admin.system.version document and extracts the currentVersion field's
@@ -899,7 +913,7 @@ namespace mongo {
             BSONObj versionDoc;
             Status status = externalState->findOne(
                     AuthorizationManager::versionCollectionNamespace,
-                    versionDocumentQuery,
+                    AuthorizationManager::versionDocumentQuery,
                     &versionDoc);
             if (!status.isOK() && ErrorCodes::NoMatchingDocument != status) {
                 return status;

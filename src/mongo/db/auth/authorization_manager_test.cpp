@@ -157,7 +157,6 @@ namespace {
     };
 
     TEST_F(AuthorizationManagerTest, testAcquireV0User) {
-        return;
         externalState->setAuthzVersion(AuthorizationManager::schemaVersion24);
 
         ASSERT_OK(externalState->insert(NamespaceString("test.system.users"),
@@ -194,7 +193,6 @@ namespace {
     }
 
     TEST_F(AuthorizationManagerTest, testAcquireV1User) {
-        return;
         externalState->setAuthzVersion(AuthorizationManager::schemaVersion24);
 
         ASSERT_OK(externalState->insert(NamespaceString("test.system.users"),
