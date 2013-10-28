@@ -151,6 +151,9 @@ namespace mongo {
 
     private:
 
+        void _deleteCacheEntry( unsigned i );
+        void _fixDescriptorCacheNumbers();
+
         Status _upgradeDatabaseMinorVersionIfNeeded( const string& newPluginName );
 
         /**

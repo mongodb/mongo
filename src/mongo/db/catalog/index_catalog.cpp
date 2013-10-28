@@ -74,14 +74,11 @@ namespace mongo {
     }
 
     IndexCatalog::~IndexCatalog() {
+        _checkMagic();
         _magic = 123456;
 
-        for ( unsigned i = 0; i < _descriptorCache.size(); i++ ) {
-            delete _descriptorCache[i];
-        }
-
-        for ( unsigned i = 0; i < _accessMethodCache.size(); i++ ) {
-            delete _accessMethodCache[i];
+        for ( unsigned i = 0; i < _descriptorCache.capacity(); i++ ) {
+            _deleteCacheEntry(i);
         }
 
     }
@@ -352,6 +349,8 @@ namespace mongo {
         _catalog->_collection->infoCache()->addedIndex();
 
         IndexLegacy::postBuildHook( _nsd, _nsd->idx( idxNo ) );
+
+        _catalog->_fixDescriptorCacheNumbers();
     }
 
 
@@ -567,13 +566,7 @@ namespace mongo {
         string indexName = _details->idx( idxNo ).indexName();
 
         // delete my entries first so we don't have invalid pointers lying around
-        delete _descriptorCache[idxNo];
-        delete _accessMethodCache[idxNo];
-        delete _forcedBtreeAccessMethodCache[idxNo];
-
-        _descriptorCache[idxNo] = NULL;
-        _accessMethodCache[idxNo] = NULL;
-        _forcedBtreeAccessMethodCache[idxNo] = NULL;
+        _deleteCacheEntry(idxNo);
 
         // --------- START REAL WORK ----------
 
@@ -618,16 +611,40 @@ namespace mongo {
 
         // now that is really gone can fix arrays
 
-        unsigned idxNoUnsigned = static_cast<unsigned>( idxNo );
+        _checkMagic();
 
-        if ( idxNoUnsigned < _descriptorCache.size() )
-            _descriptorCache.erase( _descriptorCache.begin() + idxNo );
-        if ( idxNoUnsigned < _accessMethodCache.size() )
-            _accessMethodCache.erase( _accessMethodCache.begin() + idxNo );
-        if ( idxNoUnsigned < _forcedBtreeAccessMethodCache.size() )
-            _forcedBtreeAccessMethodCache.erase( _forcedBtreeAccessMethodCache.begin() + idxNo );
+        for ( unsigned i = static_cast<unsigned>(idxNo); i < _descriptorCache.capacity(); i++ ) {
+            _deleteCacheEntry(i);
+        }
+
+        _fixDescriptorCacheNumbers();
 
         return Status::OK();
+    }
+
+    void IndexCatalog::_deleteCacheEntry( unsigned i ) {
+        delete _descriptorCache[i];
+        _descriptorCache[i] = NULL;
+
+        delete _accessMethodCache[i];
+        _accessMethodCache[i] = NULL;
+
+        delete _forcedBtreeAccessMethodCache[i];
+        _forcedBtreeAccessMethodCache[i] = NULL;
+    }
+
+    void IndexCatalog::_fixDescriptorCacheNumbers() {
+
+        for ( unsigned i=0; i < _descriptorCache.capacity(); i++ ) {
+            if ( !_descriptorCache[i] )
+                continue;
+            fassert( 17230, static_cast<int>( i ) < numIndexesTotal() );
+            IndexDetails& id = _details->idx( i );
+            fassert( 17227, _descriptorCache[i]->_indexNumber == static_cast<int>( i ) );
+            fassert( 17228, id.info.obj() == _descriptorCache[i]->_infoObj );
+            fassert( 17229, &id == _descriptorCache[i]->_onDiskData );
+        }
+
     }
 
     int IndexCatalog::_removeFromSystemIndexes( const StringData& indexName ) {
@@ -694,6 +711,7 @@ namespace mongo {
 
     IndexDescriptor* IndexCatalog::getDescriptor( int idxNo ) {
         _checkMagic();
+        verify( idxNo < numIndexesTotal() );
 
         if ( _descriptorCache[idxNo] )
             return _descriptorCache[idxNo];
@@ -703,8 +721,8 @@ namespace mongo {
         if ( static_cast<unsigned>( idxNo ) >= _descriptorCache.size() )
             _descriptorCache.resize( idxNo + 1 );
 
-        _descriptorCache[idxNo] = new IndexDescriptor(_details, idxNo, id, id->info.obj());
-
+        _descriptorCache[idxNo] = new IndexDescriptor( _details, idxNo,
+                                                       id, id->info.obj().getOwned());
         return _descriptorCache[idxNo];
     }
 
