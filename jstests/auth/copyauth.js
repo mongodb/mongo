@@ -1,5 +1,7 @@
 // Test copyDatabase command with various combinations of authed/unauthed source and dest.
 var runTest = function() {
+TestData.authMechanism = "MONGODB-CR"; // SERVER-11428
+DB.prototype._defaultAuthenticationMechanism = "MONGODB-CR"; // SERVER-11428
 
 ports = allocatePorts( 2 );
 
