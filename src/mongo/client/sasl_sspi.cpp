@@ -207,41 +207,27 @@ namespace {
                                                 sasl_client_params_t* cparams,
                                                 const char *serverin,
                                                 unsigned serverinlen) {
-        SecPkgContext_Sizes sizes;
-        SECURITY_STATUS status = QueryContextAttributesW(&pcctx->ctx,
-                                                         SECPKG_ATTR_SIZES,
-                                                         &sizes);
-        if (status != SEC_E_OK) {
-            HandleLastError(cparams->utils, status, "QueryContextAttributes(sizes)");
-            return SASL_FAIL;
-        }
-        
-        unsigned bufferLength = sizes.cbMaxToken + sizes.cbMaxSignature + sizes.cbSecurityTrailer;
-        boost::scoped_array<char> message(new char[bufferLength]);
-        if (serverinlen > bufferLength) {
-            cparams->utils->seterror(cparams->utils->conn, 0, "SSPI: server message is too long");
-            return SASL_FAIL;
-        }
+        boost::scoped_array<char> message(new char[serverinlen]);
         memcpy(message.get(), serverin, serverinlen);
         
-        SecBuffer wrapBufs[4];
+        SecBuffer wrapBufs[2];
         SecBufferDesc wrapBufDesc;
         wrapBufDesc.cBuffers = 2;
         wrapBufDesc.pBuffers = wrapBufs;
         wrapBufDesc.ulVersion = SECBUFFER_VERSION;
 
-        wrapBufs[0].cbBuffer = 0;
-        wrapBufs[0].BufferType = SECBUFFER_DATA;
+        wrapBufs[0].cbBuffer = serverinlen;
+        wrapBufs[0].BufferType = SECBUFFER_STREAM;
         wrapBufs[0].pvBuffer = message.get();
 
-        wrapBufs[1].cbBuffer = serverinlen;
-        wrapBufs[1].BufferType = SECBUFFER_STREAM;
-        wrapBufs[1].pvBuffer = message.get();
+        wrapBufs[1].cbBuffer = 0;
+        wrapBufs[1].BufferType = SECBUFFER_DATA;
+        wrapBufs[1].pvBuffer = NULL;
 
-        status = DecryptMessage(&pcctx->ctx,
-                                &wrapBufDesc,
-                                0,
-                                NULL);
+        SECURITY_STATUS status = DecryptMessage(&pcctx->ctx,
+                                                &wrapBufDesc,
+                                                0,
+                                                NULL);
         if (status != SEC_E_OK) {
             HandleLastError(cparams->utils, status, "DecryptMessage");
             return SASL_FAIL;
@@ -249,14 +235,14 @@ namespace {
 
         // Validate the server's plaintext message.
         // Length (as per RFC 4752)
-        if (wrapBufs[0].cbBuffer < 4) {
+        if (wrapBufs[1].cbBuffer < 4) {
             cparams->utils->seterror(cparams->utils->conn, 0, "SSPI: server message is too short");
             return SASL_FAIL;
         }
         // First bit of first byte set, indicating that the client may elect to use no
         // security layer. As a client we are uninterested in any of the other features the
         // server offers and thus we ignore the other bits.
-        if (!(static_cast<char*>(wrapBufs[0].pvBuffer)[0] & 1)) {
+        if (!(static_cast<char*>(wrapBufs[1].pvBuffer)[0] & 1)) {
             cparams->utils->seterror(cparams->utils->conn, 0, 
                                      "SSPI: server does not support the required security layer");
             return SASL_BADAUTH;
