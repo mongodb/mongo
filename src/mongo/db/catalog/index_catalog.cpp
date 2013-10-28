@@ -328,17 +328,9 @@ namespace mongo {
 
             _nsd->swapIndex( _ns.c_str(), idxNo, toIdxNo );
 
-            IndexDescriptor* a = _catalog->_descriptorCache[idxNo];
-            IndexAccessMethod* b = _catalog->_accessMethodCache[idxNo];
-            BtreeBasedAccessMethod* c = _catalog->_forcedBtreeAccessMethodCache[idxNo];
-
-            _catalog->_descriptorCache[idxNo] = _catalog->_descriptorCache[toIdxNo];
-            _catalog->_accessMethodCache[idxNo] = _catalog->_accessMethodCache[toIdxNo];
-            _catalog->_forcedBtreeAccessMethodCache[idxNo] = _catalog->_forcedBtreeAccessMethodCache[toIdxNo];
-
-            _catalog->_descriptorCache[toIdxNo] = a;
-            _catalog->_accessMethodCache[toIdxNo] = b;
-            _catalog->_forcedBtreeAccessMethodCache[toIdxNo] = c;
+            // neither of these should be used in queries yet, so nothing should be caching these
+            _catalog->_deleteCacheEntry( idxNo );
+            _catalog->_deleteCacheEntry( toIdxNo );
 
             idxNo = _nsd->getCompletedIndexCount();
         }
