@@ -79,7 +79,12 @@ var roles = [
     {key: "userAdminAnyDatabase", role: "userAdminAnyDatabase", dbname: adminDbName},
     {key: "dbAdmin", role: "dbAdmin", dbname: firstDbName},
     {key: "dbAdminAnyDatabase", role: "dbAdminAnyDatabase", dbname: adminDbName},
+    {key: "dbOwner", role: "dbOwner", dbname: firstDbName},
+    {key: "clusterMonitor", role: "clusterMonitor", dbname: adminDbName},
+    {key: "hostManager", role: "hostManager", dbname: adminDbName},
+    {key: "clusterManager", role: "clusterManager", dbname: adminDbName},
     {key: "clusterAdmin", role: "clusterAdmin", dbname: adminDbName},
+    {key: "root", role: "root", dbname: adminDbName},
     {key: "__system", role: "__system", dbname: adminDbName}
 ];
 
@@ -103,6 +108,18 @@ var roles_readWrite = {
 var roles_readWriteAny = {
     readAnyDatabase: 1,
     readWriteAnyDatabase: 1,
+    root: 1,
+    __system: 1
+};
+var roles_dbAdmin = {
+    dbAdmin: 1,
+    dbAdminAnyDatabase: 1,
+    dbOwner: 1,
+    root: 1,
+    __system: 1
+};
+var roles_dbAdminAny = {
+    dbAdminAnyDatabase: 1,
     root: 1,
     __system: 1
 };
@@ -294,8 +311,8 @@ var tests = [
         setup: function (db) { db.foo.save( {} ); },
         teardown: function (db) { db.dropDatabase(); },
         testcases: [
-            { runOnDb: firstDbName, rolesAllowed: {dbAdmin: 1, dbAdminAnyDatabase: 1, root: 1, __system: 1} },
-            { runOnDb: secondDbName, rolesAllowed: {dbAdminAnyDatabase: 1, root: 1, __system: 1} }
+            { runOnDb: firstDbName, rolesAllowed: roles_dbAdmin },
+            { runOnDb: secondDbName, rolesAllowed: roles_dbAdminAny }
         ]
     },
     {
@@ -311,14 +328,16 @@ var tests = [
                                                    dbAdmin: 1,
                                                    dbAdminAnyDatabase: 1,
                                                    dbOwner: 1,
-                                                   monitor: 1,
+                                                   clusterMonitor: 1,
+                                                   clusterAdmin: 1,
                                                    root: 1,
                                                    __system: 1
                                                   } },
             { runOnDb: secondDbName, rolesAllowed: {readAnyDatabase: 1,
                                                     readWriteAnyDatabase: 1,
                                                     dbAdminAnyDatabase: 1,
-                                                    monitor: 1,
+                                                    clusterMonitor: 1,
+                                                    clusterAdmin: 1,
                                                     root: 1,
                                                     __system: 1
                                                    } }
@@ -331,8 +350,8 @@ var tests = [
         setup: function (db) { db.foo.save( {} ); },
         teardown: function (db) { db.dropDatabase(); },
         testcases: [
-            { runOnDb: firstDbName, rolesAllowed: {dbAdmin: 1, dbAdminAnyDatabase: 1, root: 1, __system: 1} },
-            { runOnDb: secondDbName, rolesAllowed: {dbAdminAnyDatabase: 1, root: 1, __system: 1} }
+            { runOnDb: firstDbName, rolesAllowed: roles_dbAdmin },
+            { runOnDb: secondDbName, rolesAllowed: roles_dbAdminAny }
         ]
     },
     {
@@ -429,14 +448,16 @@ var tests = [
                                                     dbAdmin: 1,
                                                     dbAdminAnyDatabase: 1,
                                                     dbOwner: 1,
-                                                    monitor: 1,
+                                                    clusterMonitor: 1,
+                                                    clusterAdmin: 1,
                                                     root: 1,
                                                     __system: 1
                                                   } },
             { runOnDb: secondDbName, rolesAllowed: { readAnyDatabase: 1,
                                                      readWriteAnyDatabase: 1,
                                                      dbAdminAnyDatabase: 1,
-                                                     monitor: 1,
+                                                     clusterMonitor: 1,
+                                                     clusterAdmin: 1,
                                                      root: 1,
                                                      __system: 1
                                                    } }
@@ -490,6 +511,7 @@ var tests = [
         testcases: [
             { runOnDb: firstDbName, rolesAllowed: {dbAdmin: 1,
                                                    dbAdminAnyDatabase: 1,
+                                                   dbOwner: 1,
                                                    clusterAdmin: 1,
                                                    root: 1,
                                                    __system: 1} },
@@ -730,8 +752,8 @@ var tests = [
         },
         teardown: function (db) { db.x.drop(); },
         testcases: [
-            { runOnDb: firstDbName, rolesAllowed: {dbAdmin: 1, dbAdminAnyDatabase: 1, root: 1,  __system: 1} },
-            { runOnDb: secondDbName, rolesAllowed: {dbAdminAnyDatabase: 1, root: 1, __system: 1} }
+            { runOnDb: firstDbName, rolesAllowed: roles_dbAdmin },
+            { runOnDb: secondDbName, rolesAllowed: roles_dbAdminAny }
         ]
     },
     {
@@ -761,7 +783,7 @@ var tests = [
                 rolesAllowed: {
                     readAnyDatabase: 1,
                     readWriteAnyDatabase: 1,
-                    monitor: 1,
+                    clusterMonitor: 1,
                     clusterAdmin: 1,
                     root: 1,
                     __system: 1
@@ -879,11 +901,8 @@ var tests = [
         command: {profile: 0},
         skipSharded: true,
         testcases: [
-            { runOnDb: firstDbName, rolesAllowed: {dbAdmin: 1,
-                                                   dbAdminAnyDatabase: 1,
-                                                   root: 1,
-                                                   __system: 1} },
-            { runOnDb: secondDbName, rolesAllowed: {dbAdminAnyDatabase: 1, root: 1, __system: 1} }
+            { runOnDb: firstDbName, rolesAllowed: roles_dbAdmin },
+            { runOnDb: secondDbName, rolesAllowed: roles_dbAdminAny }
         ]
     },
     {
@@ -929,8 +948,8 @@ var tests = [
         setup: function (db) { db.x.save( {} ); },
         teardown: function (db) { db.x.drop(); },
         testcases: [
-            { runOnDb: firstDbName, rolesAllowed: {dbAdmin: 1, dbAdminAnyDatabase: 1, root: 1, __system: 1} },
-            { runOnDb: secondDbName, rolesAllowed: {dbAdminAnyDatabase: 1, root: 1, __system: 1} }
+            { runOnDb: firstDbName, rolesAllowed: roles_dbAdmin },
+            { runOnDb: secondDbName, rolesAllowed: roles_dbAdminAny }
         ]
     },
     {
@@ -949,6 +968,7 @@ var tests = [
         testcases: [
             { runOnDb: firstDbName, rolesAllowed: {dbAdmin: 1,
                                                    dbAdminAnyDatabase: 1,
+                                                   dbOwner: 1,
                                                    hostManager: 1,
                                                    clusterAdmin: 1,
                                                    root: 1,
@@ -1194,8 +1214,8 @@ var tests = [
         setup: function (db) { db.x.save( {} ); },
         teardown: function (db) { db.x.drop(); },
         testcases: [
-            { runOnDb: firstDbName, rolesAllowed: {dbAdmin: 1, dbAdminAnyDatabase: 1, root: 1, __system: 1} },
-            { runOnDb: secondDbName, rolesAllowed: {dbAdminAnyDatabase: 1, root:1, __system: 1} }
+            { runOnDb: firstDbName, rolesAllowed: roles_dbAdmin },
+            { runOnDb: secondDbName, rolesAllowed: roles_dbAdminAny }
         ]
     },
     {
@@ -1243,8 +1263,8 @@ var tests = [
         setup: function (db) { db.x.save( {} ); },
         teardown: function (db) { db.x.drop(); },
         testcases: [
-            { runOnDb: firstDbName, rolesAllowed: {dbAdmin: 1, dbAdminAnyDatabase: 1, root: 1, __system: 1} },
-            { runOnDb: secondDbName, rolesAllowed: {dbAdminAnyDatabase: 1, root: 1, __system: 1} }
+            { runOnDb: firstDbName, rolesAllowed: roles_dbAdmin },
+            { runOnDb: secondDbName, rolesAllowed: roles_dbAdminAny }
         ]
     },
     {
@@ -1397,6 +1417,32 @@ function runTests(conn) {
     failures.forEach(function(i) { jsTest.log(i) });
     assert.eq(0, failures.length);
 }
+
+/*
+ * Makes sure that none of the test cases defined reference roles that aren't a part of the
+ * global "roles" array.
+ */
+function checkForNonExistentRoles() {
+    for (var i = 0; i < tests.length; i++) {
+        var test = tests[i];
+        for (var j = 0; j < test.testcases.length; j++) {
+            var testcase = test.testcases[j];
+            for (role in testcase.rolesAllowed) {
+                var roleExists = false;
+                for (var k = 0; k < roles.length; k++) {
+                    if (roles[k].role === role) {
+                        roleExists = true;
+                        break;
+                    }
+                }
+                assert(roleExists, "Role " + role + " found in test: " + test.testname +
+                       ", but doesn't exist in roles array");
+            }
+        }
+    }
+}
+
+checkForNonExistentRoles();
 
 var opts = {
     auth:"",
