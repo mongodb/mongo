@@ -147,6 +147,7 @@ namespace mongo {
                 WorkingSetMember* wsm = _ws->get(id);
                 IndexKeyDatum& keyDatum = wsm->keyData.back();
                 filterAndScore(keyDatum.keyData, wsm->loc);
+                _ws->free(id);
             }
             else if (PlanStage::IS_EOF == state) {
                 // Done with this scan.
@@ -166,6 +167,7 @@ namespace mongo {
                 return PlanStage::FAILURE;
             }
         }
+
         for (size_t i=0; i<scanners.size(); ++i) { delete scanners[i]; }
 
         // Filter for phrases and negative terms, score and truncate.
@@ -223,12 +225,11 @@ namespace mongo {
         }
         if (documentAggregateScore == 0 && _filter) {
             // We have not seen this document before and need to apply a filter.
-            MatchDetails d;
             Record* rec_p = loc.rec();
             BSONObj doc = BSONObj::make(rec_p);
 
             // TODO: Covered index matching logic here.
-            if (!_filter->matchesBSON(doc, &d)) {
+            if (!_filter->matchesBSON(doc)) {
                 documentAggregateScore = -1;
                 return;
             }

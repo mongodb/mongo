@@ -241,8 +241,10 @@ namespace mongo {
             // longer a valid target.  Fetch it, flag for review, and find another _targetLoc.
             ++_specificStats.flagged;
 
+            // TODO: Do we want to just delete the WSID?
             WorkingSetCommon::fetchAndInvalidateLoc(_ws->get(_targetId));
             _ws->flagForReview(_targetId);
+
             _targetId = WorkingSet::INVALID_ID;
             _targetNode = numeric_limits<size_t>::max();
             _targetLoc = DiskLoc();

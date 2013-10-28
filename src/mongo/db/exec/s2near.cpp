@@ -121,6 +121,12 @@ namespace mongo {
                 _invalidationMap.erase(it);
             }
 
+            // Drop flagged results.
+            if (_ws->isFlagged(*out)) {
+                _ws->free(*out);
+                return PlanStage::NEED_TIME;
+            }
+
             ++_commonStats.advanced;
             return PlanStage::ADVANCED;
         }
@@ -270,6 +276,7 @@ namespace mongo {
             WorkingSetMember* member = _ws->get(it->second);
             verify(member->hasLoc());
             WorkingSetCommon::fetchAndInvalidateLoc(member);
+            _ws->flagForReview(it->second);
             verify(!member->hasLoc());
             _invalidationMap.erase(it);
         }

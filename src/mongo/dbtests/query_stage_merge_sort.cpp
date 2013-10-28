@@ -483,13 +483,15 @@ namespace QueryStageMergeSortTests {
                 ++it;
             }
 
-            // Invalidate locs[11].  Should force a fetch.  Will still get it back.
+            // Invalidate locs[11].  Should force a fetch.  We don't get it back.
             ms->prepareToYield();
             ms->invalidate(*it);
             ms->recoverFromYield();
 
             // Make sure locs[11] was fetched for us.
             {
+            // TODO: If we have "return upon invalidation" ever triggerable, do the following test.
+            /*
                 WorkingSetID id;
                 PlanStage::StageState status;
                 do {
@@ -505,6 +507,7 @@ namespace QueryStageMergeSortTests {
                 ASSERT_EQUALS(1, elt.numberInt());
                 ASSERT(member->getFieldDotted("foo", &elt));
                 ASSERT_EQUALS(count, elt.numberInt());
+            */
 
                 ++it;
                 ++count;

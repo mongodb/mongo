@@ -152,11 +152,11 @@ namespace QueryStageAnd {
             ah->recoverFromYield();
 
             // And expect to find foo==15 it flagged for review.
-            const vector<WorkingSetID>& flagged = ws.getFlagged();
+            const unordered_set<WorkingSetID>& flagged = ws.getFlagged();
             ASSERT_EQUALS(size_t(1), flagged.size());
 
             // Expect to find the right value of foo in the flagged item.
-            WorkingSetMember* member = ws.get(flagged[0]);
+            WorkingSetMember* member = ws.get(*flagged.begin());
             ASSERT_TRUE(NULL != member);
             ASSERT_EQUALS(WorkingSetMember::OWNED_OBJ, member->state);
             BSONElement elt;
@@ -417,7 +417,7 @@ namespace QueryStageAnd {
 
             // Make sure the nuked obj is actually in the flagged data.
             ASSERT_EQUALS(ws.getFlagged().size(), size_t(1));
-            WorkingSetMember* member = ws.get(ws.getFlagged()[0]);
+            WorkingSetMember* member = ws.get(*ws.getFlagged().begin());
             ASSERT_EQUALS(WorkingSetMember::OWNED_OBJ, member->state);
             BSONElement elt;
             ASSERT_TRUE(member->getFieldDotted("foo", &elt));

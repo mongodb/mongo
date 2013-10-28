@@ -259,6 +259,8 @@ namespace mongo {
 
             // Add the WSID to the to-be-reviewed list in the WS.
             _ws->flagForReview(id);
+
+            // And don't return it.
             _dataMap.erase(it);
         }
     }

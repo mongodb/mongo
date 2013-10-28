@@ -59,16 +59,25 @@ namespace mongo {
         verify(_data.end() != it);
         delete it->second;
         _data.erase(it);
+
+        unordered_set<WorkingSetID>::iterator flagIt = _flagged.find(i);
+        if (_flagged.end() != flagIt) {
+            _flagged.erase(flagIt);
+        }
     }
 
     void WorkingSet::flagForReview(const WorkingSetID& i) {
         WorkingSetMember* member = get(i);
         verify(WorkingSetMember::OWNED_OBJ == member->state);
-        _flagged.push_back(i);
+        _flagged.insert(i);
     }
 
-    const vector<WorkingSetID>& WorkingSet::getFlagged() const {
+    const unordered_set<WorkingSetID>& WorkingSet::getFlagged() const {
         return _flagged;
+    }
+
+    bool WorkingSet::isFlagged(WorkingSetID id) const {
+        return _flagged.end() != _flagged.find(id);
     }
 
     WorkingSetMember::WorkingSetMember() : state(WorkingSetMember::INVALID) { }

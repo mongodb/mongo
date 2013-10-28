@@ -77,9 +77,14 @@ namespace mongo {
         void flagForReview(const WorkingSetID& i);
 
         /**
-         * Return a vector of all WSIDs passed to flagForReview.
+         * Return a set of all WSIDs passed to flagForReview.
          */
-        const vector<WorkingSetID>& getFlagged() const;
+        const unordered_set<WorkingSetID>& getFlagged() const;
+
+        /**
+         * Return true if the provided ID is flagged.
+         */
+        bool isFlagged(WorkingSetID id) const;
 
     private:
         typedef unordered_map<WorkingSetID, WorkingSetMember*> DataMap;
@@ -91,7 +96,7 @@ namespace mongo {
         WorkingSetID _nextId;
 
         // All WSIDs invalidated during evaluation of a predicate (AND).
-        vector<WorkingSetID> _flagged;
+        unordered_set<WorkingSetID> _flagged;
     };
 
     /**

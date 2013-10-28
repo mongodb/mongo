@@ -155,6 +155,13 @@ namespace mongo {
             _wsidByDiskLoc.erase(member->loc);
         }
 
+        // If it was flagged, we just drop it on the floor, assuming the caller wants a DiskLoc.  We
+        // could make this triggerable somehow.
+        if (_ws->isFlagged(*out)) {
+            _ws->free(*out);
+            return PlanStage::NEED_TIME;
+        }
+
         ++_commonStats.advanced;
         return PlanStage::ADVANCED;
     }
@@ -181,8 +188,15 @@ namespace mongo {
 
         // If we're holding on to data that's got the DiskLoc we're invalidating...
         if (_wsidByDiskLoc.end() != it) {
+            // Grab the WSM that we're nuking.
             WorkingSetMember* member = _ws->get(it->second);
+            verify(member->loc == dl);
+
+            // Fetch, invalidate, and flag.
             WorkingSetCommon::fetchAndInvalidateLoc(member);
+            _ws->flagForReview(it->second);
+
+            // Remove the DiskLoc from our set of active DLs.
             _wsidByDiskLoc.erase(it);
             ++_specificStats.forcedFetches;
         }

@@ -150,6 +150,13 @@ namespace mongo {
         // Return the min.
         *out = idToTest;
         ++_commonStats.advanced;
+
+        // But don't return it if it's flagged.
+        if (_ws->isFlagged(*out)) {
+            _ws->free(*out);
+            return PlanStage::NEED_TIME;
+        }
+
         return PlanStage::ADVANCED;
     }
 
@@ -174,13 +181,12 @@ namespace mongo {
         }
 
         // Go through our data and see if we're holding on to the invalidated loc.
-        for (list<StageWithValue>::iterator i = _mergingData.begin();
-             i != _mergingData.end(); ++i) {
-
-            WorkingSetMember* member = _ws->get(i->id);
+        for (list<StageWithValue>::iterator valueIt = _mergingData.begin(); valueIt != _mergingData.end(); valueIt++) {
+            WorkingSetMember* member = _ws->get(valueIt->id);
             if (member->hasLoc() && (dl == member->loc)) {
-                // We don't have to flag the member, just force a fetch.
+                // Force a fetch and flag.
                 WorkingSetCommon::fetchAndInvalidateLoc(member);
+                _ws->flagForReview(valueIt->id);
                 ++_specificStats.forcedFetches;
             }
         }

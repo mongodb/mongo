@@ -143,13 +143,14 @@ namespace mongo {
         // If we're holding on to an object that we're waiting for the runner to page in...
         if (WorkingSet::INVALID_ID != _idBeingPagedIn) {
             WorkingSetMember* member = _ws->get(_idBeingPagedIn);
+            // If we're paging something in it must have a DiskLoc.
             verify(member->hasLoc());
             // The DiskLoc is about to perish so we force a fetch of the data.
             if (member->loc == dl) {
-                // This is a fetch inside of a write lock (that somebody else holds) but the other
-                // holder is likely operating on this object so this shouldn't have to hit disk.
-                WorkingSetCommon::fetchAndInvalidateLoc(member);
-                ++_specificStats.forcedFetches;
+                // TODO: Do we ever want a third state, _idBeingPagedIn is a valid WSID but doesn't
+                // have a DiskLoc?
+                _ws->free(_idBeingPagedIn);
+                _idBeingPagedIn = WorkingSet::INVALID_ID;
             }
         }
     }
