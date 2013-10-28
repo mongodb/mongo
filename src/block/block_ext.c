@@ -288,7 +288,7 @@ __block_off_match(WT_EXTLIST *el, off_t off, off_t size)
  */
 int
 __wt_block_misplaced(WT_SESSION_IMPL *session,
-   WT_BLOCK *block, const char *tag, off_t offset, uint32_t size)
+   WT_BLOCK *block, const char *tag, off_t offset, uint32_t size, int live)
 {
 	const char *name;
 
@@ -304,7 +304,7 @@ __wt_block_misplaced(WT_SESSION_IMPL *session,
 	__wt_spin_lock(session, &block->live_lock);
 	if (__block_off_match(&block->live.avail, offset, size))
 		name = "available";
-	else if (__block_off_match(&block->live.discard, offset, size))
+	else if (live && __block_off_match(&block->live.discard, offset, size))
 		name = "discard";
 	__wt_spin_unlock(session, &block->live_lock);
 	if (name != NULL) {
@@ -572,7 +572,7 @@ __wt_block_free(WT_SESSION_IMPL *session,
 	    "free %" PRIdMAX "/%" PRIdMAX, (intmax_t)offset, (intmax_t)size);
 
 #ifdef HAVE_DIAGNOSTIC
-	WT_RET(__wt_block_misplaced(session, block, "free", offset, size));
+	WT_RET(__wt_block_misplaced(session, block, "free", offset, size, 1));
 #endif
 	__wt_spin_lock(session, &block->live_lock);
 	ret = __wt_block_off_free(session, block, offset, (off_t)size);

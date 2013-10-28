@@ -147,7 +147,8 @@ __wt_block_read_off(WT_SESSION_IMPL *session,
 	 */
 	if (!F_ISSET(session, WT_SESSION_SALVAGE_QUIET_ERR))
 		WT_RET(
-		    __wt_block_misplaced(session, block, "read", offset, size));
+		    __wt_block_misplaced(session, block, "read", offset, size,
+			session->dhandle->checkpoint == NULL));
 #endif
 
 	/*
