@@ -12,7 +12,7 @@ t.drop();
 
 // Insert a large number of documents, enough to ensure that an index build on these documents can
 // be interrupted before complete.
-for (i = 0; i < 1e5; ++i) {
+for (i = 0; i < 5e5; ++i) {
     t.save( { a:i } );
     if (i % 10000 == 0) {
         print("i: " + i);
