@@ -61,4 +61,4 @@ assert.eq(2, admin.system.users.count());
 userObj = admin.system.users.findOne({user:'spencer', db:'$external'});
 assert.eq('spencer', userObj['user']);
 assert.eq('$external', userObj['db']);
-assert(!userObj['credentials']);
+assert.eq(true, userObj['credentials']['external']);

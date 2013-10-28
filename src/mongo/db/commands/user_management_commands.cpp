@@ -336,6 +336,9 @@ namespace mongo {
                                   args.userName.getDB());
             if (args.hasHashedPassword) {
                 userObjBuilder.append("credentials", BSON("MONGODB-CR" << args.hashedPassword));
+            } else {
+                // Must be an external user
+                userObjBuilder.append("credentials", BSON("external" << true));
             }
             if (args.hasCustomData) {
                 userObjBuilder.append("customData", args.customData);
