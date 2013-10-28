@@ -271,7 +271,7 @@ namespace mongo {
                                                const BSONObj& cmdObj,
                                                std::vector<Privilege>* out) {
                 ActionSet actions;
-                actions.addAction(ActionType::profileEnable);
+                actions.addAction(ActionType::enableProfiler);
                 out->push_back(Privilege(ResourcePattern::forDatabaseName(dbname), actions));
             }
         } profileCmd;

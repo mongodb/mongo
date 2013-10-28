@@ -146,7 +146,7 @@ namespace {
             << ActionType::dropIndex
             << ActionType::createIndex
             << ActionType::indexStats
-            << ActionType::profileEnable
+            << ActionType::enableProfiler
             << ActionType::reIndex
             << ActionType::renameCollectionSameDB // read_write gets this also
             << ActionType::repairDatabase
