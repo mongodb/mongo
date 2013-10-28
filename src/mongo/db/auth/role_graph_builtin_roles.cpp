@@ -67,16 +67,19 @@ namespace {
     /// Actions that the "dbOwner" role may perform on normal resources of a specific database.
     ActionSet dbOwnerRoleActions;
 
-    /// Actions that the "monitor" role may perform on the cluster resource.
+    /// Actions that the "clusterMonitor" role may perform on the cluster resource.
     ActionSet clusterMonitorRoleClusterActions;
+
+    /// Actions that the "clusterMonitor" role may perform on any database.
+    ActionSet clusterMonitorRoleDatabaseActions;
 
     /// Actions that the "hostManager" role may perform on the cluster resource.
     ActionSet hostManagerRoleClusterActions;
 
-    /// Actions that the "hostManager" role may perform on any database
+    /// Actions that the "hostManager" role may perform on any database.
     ActionSet hostManagerRoleDatabaseActions;
 
-    /// Actions that the "dbOwner" role may perform on the cluster resoruce.
+    /// Actions that the "dbOwner" role may perform on the cluster resource.
     ActionSet clusterManagerRoleClusterActions;
 
     ActionSet& operator<<(ActionSet& target, ActionType source) {
@@ -152,9 +155,7 @@ namespace {
 
         // clusterMonitor role actions that target the cluster resource
         clusterMonitorRoleClusterActions
-            << ActionType::collStats // dbAdmin gets this also
             << ActionType::connPoolStats
-            << ActionType::dbStats // dbAdmin gets this also
             << ActionType::getCmdLineOpts
             << ActionType::getLog
             << ActionType::getParameter
@@ -171,6 +172,11 @@ namespace {
             << ActionType::cursorInfo
             << ActionType::inprog
             << ActionType::shardingState;
+
+        // clusterMonitor role actions that target a database (or collection) resource
+        clusterMonitorRoleDatabaseActions
+            << ActionType::collStats // dbAdmin gets this also
+            << ActionType::dbStats; // dbAdmin gets this also
 
         // hostManager role actions that target the cluster resource
         hostManagerRoleClusterActions
@@ -370,6 +376,10 @@ namespace {
         Privilege::addPrivilegeToPrivilegeVector(
                 privileges,
                 Privilege(ResourcePattern::forClusterResource(), clusterMonitorRoleClusterActions));
+        Privilege::addPrivilegeToPrivilegeVector(
+                privileges,
+                Privilege(ResourcePattern::forAnyNormalResource(),
+                          clusterMonitorRoleDatabaseActions));
         Privilege::addPrivilegeToPrivilegeVector(
                 privileges,
                 Privilege(ResourcePattern::forDatabaseName("config"), readRoleActions));
