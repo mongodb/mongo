@@ -63,7 +63,8 @@ extern int __wt_block_misplaced(WT_SESSION_IMPL *session,
     WT_BLOCK *block,
     const char *tag,
     off_t offset,
-    uint32_t size);
+    uint32_t size,
+    int live);
 extern int __wt_block_off_remove_overlap(WT_SESSION_IMPL *session,
     WT_BLOCK *block,
     WT_EXTLIST *el,

@@ -558,8 +558,7 @@ __wt_sync_file(WT_SESSION_IMPL *session, int syncop)
 		 * before any page is evicted.
 		 *
 		 * If any thread is already in the progress of evicting a page,
-		 * it will have switched the ref state to WT_REF_LOCKED while
-		 * holding evict_lock inside __evict_get_page, and the
+		 * it will have set the ref state to WT_REF_LOCKED, and the
 		 * checkpoint will notice and wait for eviction to complete
 		 * before proceeding.
 		 */

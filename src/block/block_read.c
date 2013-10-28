@@ -101,6 +101,14 @@ __wt_bm_read(WT_BM *bm, WT_SESSION_IMPL *session,
 		return (0);
 	}
 
+#ifdef HAVE_DIAGNOSTIC
+	/*
+	 * In diagnostic mode, verify the block we're about to read isn't on
+	 * the available list, or for live systems, the discard list.
+	 */
+	WT_RET(__wt_block_misplaced(
+	    session, block, "read", offset, size, bm->is_live));
+#endif
 	/* Read the block. */
 	WT_RET(__wt_block_read_off(session, block, buf, offset, size, cksum));
 
@@ -136,19 +144,6 @@ __wt_block_read_off(WT_SESSION_IMPL *session,
 	WT_VERBOSE_RET(session, read,
 	    "off %" PRIuMAX ", size %" PRIu32 ", cksum %" PRIu32,
 	    (uintmax_t)offset, size, cksum);
-
-#ifdef HAVE_DIAGNOSTIC
-	/*
-	 * In diagnostic mode, verify the block we're about to read isn't on
-	 * either the available or discard lists.
-	 *
-	 * Don't check during salvage, it's possible we're reading an already
-	 * freed overflow page.
-	 */
-	if (!F_ISSET(session, WT_SESSION_SALVAGE_QUIET_ERR))
-		WT_RET(
-		    __wt_block_misplaced(session, block, "read", offset, size));
-#endif
 
 	/*
 	 * Grow the buffer as necessary and read the block.  Buffers should be

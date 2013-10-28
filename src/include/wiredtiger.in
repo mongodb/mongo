@@ -1581,12 +1581,15 @@ struct __wt_event_handler {
 	 * non-zero, the error may cause the WiredTiger function posting the
 	 * event to fail, and may even cause operation or library failure.
 	 *
+	 * @param session the WiredTiger session handle in use when the error
+	 * was generated. The handle may have been created by the application
+	 * or automatically by WiredTiger.
 	 * @param error a WiredTiger, C99 or POSIX error code, which can
 	 * be converted to a string using ::wiredtiger_strerror
 	 * @param message an error string
 	 */
 	int (*handle_error)(WT_EVENT_HANDLER *handler,
-	    int error, const char *message);
+	    WT_SESSION *session, int error, const char *message);
 
 	/*!
 	 * Callback to handle informational messages; by default, informational
@@ -1596,9 +1599,13 @@ struct __wt_event_handler {
 	 * non-zero, the error may cause the WiredTiger function posting the
 	 * event to fail, and may even cause operation or library failure.
 	 *
+	 * @param session the WiredTiger session handle in use when the message
+	 * was generated. The handle may have been created by the application
+	 * or automatically by WiredTiger.
 	 * @param message an informational string
 	 */
-	int (*handle_message)(WT_EVENT_HANDLER *handler, const char *message);
+	int (*handle_message)(WT_EVENT_HANDLER *handler,
+	    WT_SESSION *session, const char *message);
 
 	/*!
 	 * Callback to handle progress messages; by default, no progress
@@ -1608,11 +1615,29 @@ struct __wt_event_handler {
 	 * non-zero, the error may cause the WiredTiger function posting the
 	 * event to fail, and may even cause operation or library failure.
 	 *
+	 * @param session the WiredTiger session handle in use when the
+	 * progress message was generated. The handle may have been created by
+	 * the application or automatically by WiredTiger.
 	 * @param operation a string representation of the operation
 	 * @param progress a counter
 	 */
 	int (*handle_progress)(WT_EVENT_HANDLER *handler,
-	    const char *operation, uint64_t progress);
+	    WT_SESSION *session, const char *operation, uint64_t progress);
+
+	/*!
+	 * Callback to handle automatic close of a WiredTiger handle.
+	 *
+	 * Close handler returns are not ignored: if the handler returns
+	 * non-zero, the error may cause the WiredTiger function posting the
+	 * event to fail, and may even cause operation or library failure.
+	 *
+	 * @param session The session handle that is being closed if the
+	 * cursor parameter is NULL.
+	 * @param cursor The cursor handle that is being closed, or NULL if
+	 * it is a session handle being closed.
+	 */
+	int (*handle_close)(WT_EVENT_HANDLER *handler,
+	    WT_SESSION *session, WT_CURSOR *cursor);
 };
 
 /*!

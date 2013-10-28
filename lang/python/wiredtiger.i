@@ -35,8 +35,9 @@ from packing import pack, unpack
 	$1 = &temp;
 }
 
-/* Event handlers are not supported in Python. */
-%typemap(in, numinputs=0) WT_EVENT_HANDLER * { $1 = NULL; }
+%typemap(in, numinputs=0) WT_EVENT_HANDLER * %{
+        $1 = &pyApiEventHandler;
+%}
 
 /* Set the return value to the returned connection, session, or cursor */
 %typemap(argout) WT_CONNECTION ** {
@@ -441,6 +442,87 @@ typedef int int_void;
 %rename(Connection) __wt_connection;
 
 %include "wiredtiger.h"
+
+/* Add event handler support. */
+%{
+
+static int
+writeToPythonStream(const char *streamname, const char *message)
+{
+	PyObject *sys, *se, *sys_stderr_write, *written, *arglist;
+	char *msg;
+	int ret;
+	size_t msglen;
+
+	sys = NULL;
+	se = NULL;
+	sys_stderr_write = NULL;
+	written = NULL;
+	arglist = NULL;
+	msglen = strlen(message);
+	msg = malloc(msglen + 2);
+	strcpy(msg, message);
+	strcpy(&msg[msglen], "\n");
+
+	/* Acquire python Global Interpreter Lock. Otherwise can segfault. */
+        SWIG_PYTHON_THREAD_BEGIN_BLOCK; 
+
+	ret = 1;
+	if ((sys = PyImport_ImportModule("sys")) == NULL)
+		goto err;
+	if ((se = PyObject_GetAttrString(sys, streamname)) == NULL)
+		goto err;
+	if ((sys_stderr_write = PyObject_GetAttrString(se, "write")) == NULL)
+		goto err;
+	if ((arglist = Py_BuildValue("(s)", msg)) == NULL)
+		goto err;
+
+	written = PyObject_CallObject(sys_stderr_write, arglist);
+	ret = 0;
+
+err:    /* Release python Global Interpreter Lock */
+        SWIG_PYTHON_THREAD_END_BLOCK;
+
+	if (arglist)
+		Py_XDECREF(arglist);
+	if (sys_stderr_write)
+		Py_XDECREF(sys_stderr_write);
+	if (se)
+		Py_XDECREF(se);
+	if (sys)
+		Py_XDECREF(sys);
+	if (written)
+		Py_XDECREF(written);
+	if (msg)
+		free(msg);
+	return (ret);
+}
+
+static int
+pythonErrorCallback(WT_EVENT_HANDLER *handler, WT_SESSION *session, int err,
+    const char *message)
+{
+	return writeToPythonStream("stderr", message);
+}
+
+static int
+pythonMessageCallback(WT_EVENT_HANDLER *handler, WT_SESSION *session,
+    const char *message)
+{
+	return writeToPythonStream("stdout", message);
+}
+
+static int
+pythonCloseCallback(WT_EVENT_HANDLER *handler, WT_SESSION *session,
+    WT_CURSOR *cursor)
+{
+	return 0;
+}
+
+WT_EVENT_HANDLER pyApiEventHandler = {
+	pythonErrorCallback, pythonMessageCallback, NULL, pythonCloseCallback
+};
+%}
 
 %pythoncode %{
 class stat:

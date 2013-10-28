@@ -134,8 +134,14 @@ __wt_block_checkpoint_load(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	}
 
 	if (0) {
-err:		WT_TRET(
-		    __wt_block_checkpoint_unload(session, block, checkpoint));
+err:		/*
+		 * Don't call checkpoint-unload: unload does real work including
+		 * file truncation.  If we fail early enough that the checkpoint
+		 * information isn't correct, bad things would happen.  The only
+		 * allocated memory was in the service of verify, clean that up.
+		 */
+		if (block->verify)
+			WT_ERR(__wt_verify_ckpt_unload(session, block));
 	}
 
 	/* Checkpoints don't need the original information, discard it. */
