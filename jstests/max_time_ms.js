@@ -180,11 +180,15 @@ assert.eq(0, t.getDB().runCommand({ping: 1, maxTimeMS: maxValue+1}).ok);
 assert.eq(0, t.getDB().runCommand({ping: 1, maxTimeMS: NumberInt(maxValue+1)}).ok);
 assert.eq(0, t.getDB().runCommand({ping: 1, maxTimeMS: NumberLong(maxValue+1)}).ok);
 
-// Verify invalid types are rejected.
+// Verify invalid values are rejected.
+assert.throws.automsg(function() { t.find().maxTimeMS(0.1).itcount(); });
+assert.throws.automsg(function() { t.find().maxTimeMS(-0.1).itcount(); });
 assert.throws.automsg(function() { t.find().maxTimeMS().itcount(); });
 assert.throws.automsg(function() { t.find().maxTimeMS("").itcount(); });
 assert.throws.automsg(function() { t.find().maxTimeMS(true).itcount(); });
 assert.throws.automsg(function() { t.find().maxTimeMS({}).itcount(); });
+assert.eq(0, t.getDB().runCommand({ping: 1, maxTimeMS: 0.1}).ok);
+assert.eq(0, t.getDB().runCommand({ping: 1, maxTimeMS: -0.1}).ok);
 assert.eq(0, t.getDB().runCommand({ping: 1, maxTimeMS: undefined}).ok);
 assert.eq(0, t.getDB().runCommand({ping: 1, maxTimeMS: ""}).ok);
 assert.eq(0, t.getDB().runCommand({ping: 1, maxTimeMS: true}).ok);

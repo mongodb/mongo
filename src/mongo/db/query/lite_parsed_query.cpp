@@ -16,6 +16,8 @@
 
 #include "mongo/db/query/lite_parsed_query.h"
 
+#include <cmath>
+
 #include "mongo/db/dbmessage.h"
 #include "mongo/util/assert_util.h"
 
@@ -57,6 +59,14 @@ namespace mongo {
                                    (StringBuilder()
                                        << maxTimeMSElt.fieldNameStringData()
                                        << " is out of range").str());
+        }
+        double maxTimeMSDouble = maxTimeMSElt.numberDouble();
+        if (maxTimeMSElt.type() == mongo::NumberDouble
+            && floor(maxTimeMSDouble) != maxTimeMSDouble) {
+            return StatusWith<int>(ErrorCodes::BadValue,
+                                   (StringBuilder()
+                                       << maxTimeMSElt.fieldNameStringData()
+                                       << " has non-integral value").str());
         }
         return StatusWith<int>(static_cast<int>(maxTimeMSLongLong));
     }
