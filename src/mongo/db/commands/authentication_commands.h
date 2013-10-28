@@ -38,7 +38,7 @@ namespace mongo {
 
     class CmdAuthenticate : public Command {
     public:
-        static void disableCommand();
+        static void disableAuthMechanism(std::string authMechanism);
 
         virtual bool logTheOp() {
             return false;

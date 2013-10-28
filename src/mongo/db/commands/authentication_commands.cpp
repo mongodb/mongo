@@ -54,11 +54,21 @@
 
 namespace mongo {
 
-    static bool _areNonceAuthenticateCommandsEnabled = true;
-    static const char _nonceAuthenticateCommandsDisabledMessage[] =
+    static bool _isCRAuthDisabled;
+    static bool _isX509AuthDisabled;
+    static const char _nonceAuthenticationDisabledMessage[] = 
         "Challenge-response authentication using getnonce and authenticate commands is disabled.";
-
-    void CmdAuthenticate::disableCommand() { _areNonceAuthenticateCommandsEnabled = false; }
+    static const char _x509AuthenticationDisabledMessage[] = 
+        "x.509 authentication is disabled.";
+    
+    void CmdAuthenticate::disableAuthMechanism(std::string authMechanism) {
+        if (authMechanism == "MONGODB-CR") {
+            _isCRAuthDisabled = true;
+        }
+        if (authMechanism == "MONGODB-X509") {
+            _isX509AuthDisabled = true;
+        }
+    }
 
     /* authentication
 
@@ -171,11 +181,11 @@ namespace mongo {
                           "Mechanism x509 is required for internal cluster authentication");
         }
 
-        if (!_areNonceAuthenticateCommandsEnabled) {
+        if (_isCRAuthDisabled) {
             // SERVER-8461, MONGODB-CR must be enabled for authenticating the internal user, so that
             // cluster members may communicate with each other.
             if (user != internalSecurity.user->getName()) {
-                return Status(ErrorCodes::BadValue, _nonceAuthenticateCommandsDisabledMessage);
+                return Status(ErrorCodes::BadValue, _nonceAuthenticationDisabledMessage);
             }
         }
 
@@ -285,6 +295,10 @@ namespace mongo {
             }
             // Handle normal client authentication, only applies to client-server connections
             else {
+                if (_isX509AuthDisabled) {
+                    return Status(ErrorCodes::BadValue,
+                                  _x509AuthenticationDisabledMessage);
+                }
                 Status status = authorizationSession->addAndAuthorizeUser(user);
                 if (!status.isOK()) {
                     return status;
