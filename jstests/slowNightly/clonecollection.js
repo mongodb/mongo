@@ -1,5 +1,6 @@
 // Test cloneCollection command
-
+// TODO(spencer): move this test out of slowNightly directory once there is a better place for tests
+// that start their own mongod's but aren't slow
 var baseName = "jstests_clonecollection";
 
 
