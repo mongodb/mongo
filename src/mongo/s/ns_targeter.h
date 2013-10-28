@@ -143,20 +143,16 @@ namespace mongo {
         }
 
         ShardEndpoint( const ShardEndpoint& other ) :
-            shardName( other.shardName ),
-            shardVersion( other.shardVersion ),
-            shardHost( other.shardHost ) {
+            shardName( other.shardName ), shardVersion( other.shardVersion ) {
         }
 
         ShardEndpoint( const string& shardName,
-                       const ChunkVersion& shardVersion,
-                       const ConnectionString& shardHost ) :
-            shardName( shardName ), shardVersion( shardVersion ), shardHost( shardHost ) {
+                       const ChunkVersion& shardVersion ) :
+            shardName( shardName ), shardVersion( shardVersion ) {
         }
 
         const std::string shardName;
         const ChunkVersion shardVersion;
-        const ConnectionString shardHost;
 
         //
         // For testing *only* - do not use as part of API
@@ -171,7 +167,6 @@ namespace mongo {
         void appendBSON( BSONObjBuilder* builder ) const {
             builder->append( "shardName", shardName );
             shardVersion.addToBSON( *builder, "shardVersion" );
-            builder->append( "shardHost", shardHost.toString() );
         }
     };
 

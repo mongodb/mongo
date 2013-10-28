@@ -47,7 +47,7 @@ namespace {
 
         NamespaceString nss( "foo.bar" );
 
-        ShardEndpoint endpoint( "shard", ChunkVersion::IGNORED(), ConnectionString() );
+        ShardEndpoint endpoint( "shard", ChunkVersion::IGNORED() );
 
         vector<MockRange*> mockRanges;
         mockRanges.push_back( new MockRange( endpoint,
@@ -116,7 +116,7 @@ namespace {
 
         NamespaceString nss( "foo.bar" );
 
-        ShardEndpoint endpoint( "shard", ChunkVersion::IGNORED(), ConnectionString() );
+        ShardEndpoint endpoint( "shard", ChunkVersion::IGNORED() );
 
         vector<MockRange*> mockRanges;
         mockRanges.push_back( new MockRange( endpoint,
@@ -176,7 +176,7 @@ namespace {
 
         NamespaceString nss( "foo.bar" );
 
-        ShardEndpoint endpoint( "shard", ChunkVersion::IGNORED(), ConnectionString() );
+        ShardEndpoint endpoint( "shard", ChunkVersion::IGNORED() );
 
         vector<MockRange*> mockRanges;
         mockRanges.push_back( new MockRange( endpoint,
@@ -241,8 +241,8 @@ namespace {
 
         NamespaceString nss( "foo.bar" );
 
-        ShardEndpoint endpointA( "shardA", ChunkVersion::IGNORED(), ConnectionString() );
-        ShardEndpoint endpointB( "shardB", ChunkVersion::IGNORED(), ConnectionString() );
+        ShardEndpoint endpointA( "shardA", ChunkVersion::IGNORED() );
+        ShardEndpoint endpointB( "shardB", ChunkVersion::IGNORED() );
 
         vector<MockRange*> mockRanges;
         mockRanges.push_back( new MockRange( endpointA,
@@ -316,8 +316,8 @@ namespace {
 
         NamespaceString nss( "foo.bar" );
 
-        ShardEndpoint endpointA( "shardA", ChunkVersion::IGNORED(), ConnectionString() );
-        ShardEndpoint endpointB( "shardB", ChunkVersion::IGNORED(), ConnectionString() );
+        ShardEndpoint endpointA( "shardA", ChunkVersion::IGNORED() );
+        ShardEndpoint endpointB( "shardB", ChunkVersion::IGNORED() );
 
         vector<MockRange*> mockRanges;
         mockRanges.push_back( new MockRange( endpointA,
@@ -382,8 +382,8 @@ namespace {
 
         NamespaceString nss( "foo.bar" );
 
-        ShardEndpoint endpointA( "shardA", ChunkVersion::IGNORED(), ConnectionString() );
-        ShardEndpoint endpointB( "shardB", ChunkVersion::IGNORED(), ConnectionString() );
+        ShardEndpoint endpointA( "shardA", ChunkVersion::IGNORED() );
+        ShardEndpoint endpointB( "shardB", ChunkVersion::IGNORED() );
 
         vector<MockRange*> mockRanges;
         mockRanges.push_back( new MockRange( endpointA,
@@ -457,7 +457,7 @@ namespace {
 
         NamespaceString nss( "foo.bar" );
 
-        ShardEndpoint endpoint( "shard", ChunkVersion::IGNORED(), ConnectionString() );
+        ShardEndpoint endpoint( "shard", ChunkVersion::IGNORED() );
 
         vector<MockRange*> mockRanges;
         mockRanges.push_back( new MockRange( endpoint,
@@ -515,7 +515,7 @@ namespace {
 
         NamespaceString nss( "foo.bar" );
 
-        ShardEndpoint endpoint( "shard", ChunkVersion::IGNORED(), ConnectionString() );
+        ShardEndpoint endpoint( "shard", ChunkVersion::IGNORED() );
 
         vector<MockRange*> mockRanges;
         mockRanges.push_back( new MockRange( endpoint,

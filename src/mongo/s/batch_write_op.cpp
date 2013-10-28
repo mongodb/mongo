@@ -62,11 +62,7 @@ namespace mongo {
 
         int shardEpochDiff =
             endpointA->shardVersion.epoch().compare( endpointB->shardVersion.epoch() );
-        if ( shardEpochDiff != 0 ) return shardEpochDiff;
-
-        int shardHostDiff =
-            endpointA->shardHost.toString().compare( endpointB->shardHost.toString() );
-        return shardHostDiff;
+        return shardEpochDiff;
     }
 
     namespace {

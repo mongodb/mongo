@@ -137,8 +137,7 @@ namespace mongo {
             }
             else {
                 ShardEndpoint broadcastEndpoint( endpoint->shardName,
-                                                 ChunkVersion::IGNORED(),
-                                                 endpoint->shardHost );
+                                                 ChunkVersion::IGNORED() );
                 targetedWrites->push_back( new TargetedWrite( broadcastEndpoint, ref ) );
             }
 

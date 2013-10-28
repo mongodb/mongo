@@ -31,7 +31,7 @@ namespace mongo {
     const BSONField<BSONObj> BatchedCommandResponse::singleUpserted("upserted");
     const BSONField<std::vector<BatchedUpsertDetail*> >
         BatchedCommandResponse::upsertDetails("upserted");
-    const BSONField<Date_t> BatchedCommandResponse::lastOp("lastOP");
+    const BSONField<Date_t> BatchedCommandResponse::lastOp("lastOp");
     const BSONField<std::vector<BatchedErrorDetail*> >
         BatchedCommandResponse::errDetails("errDetails");
 

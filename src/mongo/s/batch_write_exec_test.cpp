@@ -33,6 +33,7 @@
 #include "mongo/s/batched_command_response.h"
 #include "mongo/s/mock_multi_command.h"
 #include "mongo/s/mock_ns_targeter.h"
+#include "mongo/s/mock_shard_resolver.h"
 #include "mongo/unittest/unittest.h"
 
 namespace {
@@ -51,13 +52,15 @@ namespace {
 
         NamespaceString nss( "foo.bar" );
 
-        ShardEndpoint endpoint( "shard", ChunkVersion::IGNORED(), ConnectionString() );
+        ShardEndpoint endpoint( "shard", ChunkVersion::IGNORED() );
 
         vector<MockRange*> mockRanges;
         mockRanges.push_back( new MockRange( endpoint,
                                              nss,
                                              BSON( "x" << MINKEY ),
                                              BSON( "x" << MAXKEY ) ) );
+
+        MockShardResolver resolver;
 
         BatchedCommandRequest request( BatchedCommandRequest::BatchType_Insert );
         request.setNS( nss.ns() );
@@ -73,7 +76,7 @@ namespace {
 
         MockMultiCommand dispatcher;
 
-        BatchWriteExec exec( &targeter, &dispatcher );
+        BatchWriteExec exec( &targeter, &resolver, &dispatcher );
 
         BatchedCommandResponse response;
         exec.executeBatch( request, &response );
@@ -89,7 +92,7 @@ namespace {
 
         NamespaceString nss( "foo.bar" );
 
-        ShardEndpoint endpoint( "shard", ChunkVersion::IGNORED(), ConnectionString() );
+        ShardEndpoint endpoint( "shard", ChunkVersion::IGNORED() );
 
         vector<MockRange*> mockRanges;
         mockRanges.push_back( new MockRange( endpoint,
@@ -97,11 +100,15 @@ namespace {
                                              BSON( "x" << MINKEY ),
                                              BSON( "x" << MAXKEY ) ) );
 
+        MockShardResolver resolver;
+        ConnectionString shardHost;
+        resolver.chooseWriteHost( mockRanges.front()->endpoint.shardName, &shardHost );
+
         vector<MockEndpoint*> mockEndpoints;
         BatchedErrorDetail error;
         error.setErrCode( ErrorCodes::UnknownError );
         error.setErrMessage( "mock error" );
-        mockEndpoints.push_back( new MockEndpoint( endpoint.shardHost, error ) );
+        mockEndpoints.push_back( new MockEndpoint( shardHost, error ) );
 
         BatchedCommandRequest request( BatchedCommandRequest::BatchType_Insert );
         request.setNS( nss.ns() );
@@ -118,7 +125,7 @@ namespace {
         MockMultiCommand dispatcher;
         dispatcher.init( mockEndpoints );
 
-        BatchWriteExec exec( &targeter, &dispatcher );
+        BatchWriteExec exec( &targeter, &resolver, &dispatcher );
 
         BatchedCommandResponse response;
         exec.executeBatch( request, &response );
@@ -140,7 +147,7 @@ namespace {
 
         NamespaceString nss( "foo.bar" );
 
-        ShardEndpoint endpoint( "shard", ChunkVersion::IGNORED(), ConnectionString() );
+        ShardEndpoint endpoint( "shard", ChunkVersion::IGNORED() );
 
         vector<MockRange*> mockRanges;
         mockRanges.push_back( new MockRange( endpoint,
@@ -148,12 +155,16 @@ namespace {
                                              BSON( "x" << MINKEY ),
                                              BSON( "x" << MAXKEY ) ) );
 
+        MockShardResolver resolver;
+        ConnectionString shardHost;
+        resolver.chooseWriteHost( mockRanges.front()->endpoint.shardName, &shardHost );
+
         vector<MockEndpoint*> mockEndpoints;
         BatchedErrorDetail error;
         error.setErrCode( ErrorCodes::StaleShardVersion );
         error.setErrInfo( BSONObj() ); // Needed for correct handling
         error.setErrMessage( "mock stale error" );
-        mockEndpoints.push_back( new MockEndpoint( endpoint.shardHost, error ) );
+        mockEndpoints.push_back( new MockEndpoint( shardHost, error ) );
 
         BatchedCommandRequest request( BatchedCommandRequest::BatchType_Insert );
         request.setNS( nss.ns() );
@@ -170,7 +181,7 @@ namespace {
         MockMultiCommand dispatcher;
         dispatcher.init( mockEndpoints );
 
-        BatchWriteExec exec( &targeter, &dispatcher );
+        BatchWriteExec exec( &targeter, &resolver, &dispatcher );
 
         BatchedCommandResponse response;
         exec.executeBatch( request, &response );

@@ -119,6 +119,13 @@ namespace mongo {
 
         }
 
+        ShardPtr findIfExists( const string& shardName ) {
+            scoped_lock lk( _mutex );
+            ShardMap::iterator i = _lookup.find( shardName );
+            if ( i != _lookup.end() ) return i->second;
+            return ShardPtr();
+        }
+
         ShardPtr find( const string& ident ) {
             string mykey = ident;
 
@@ -295,6 +302,11 @@ namespace mongo {
         }
     } cmdGetShardMap;
 
+
+    Shard Shard::findIfExists( const string& shardName ) {
+        ShardPtr shard = staticShardInfo.findIfExists( shardName );
+        return shard ? *shard : Shard::EMPTY;
+    }
 
     void Shard::_setAddr( const string& addr ) {
         _addr = addr;

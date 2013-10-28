@@ -39,19 +39,18 @@ namespace mongo {
     namespace {
 
         struct ConnectionStringComp {
-            bool operator()( const ConnectionString* connStrA,
-                             const ConnectionString* connStrB ) const {
-                return connStrA->toString().compare( connStrB->toString() ) < 0;
+            bool operator()( const ConnectionString& connStrA,
+                             const ConnectionString& connStrB ) const {
+                return connStrA.toString().compare( connStrB.toString() ) < 0;
             }
         };
 
         //
-        // Map which allows associating ConnectionString endpoints with TargetedWriteBatches
-        // This is needed since the dispatcher only returns endpoints with responses.
+        // Map which allows associating ConnectionString hosts with TargetedWriteBatches
+        // This is needed since the dispatcher only returns hosts with responses.
         //
         // TODO: Unordered map?
-        typedef //
-        map<const ConnectionString*, TargetedWriteBatch*, ConnectionStringComp> EndpointBatchMap;
+        typedef map<ConnectionString, TargetedWriteBatch*, ConnectionStringComp> HostBatchMap;
     }
 
     static void buildErrorFrom( const Status& status, BatchedErrorDetail* error ) {
@@ -76,6 +75,7 @@ namespace mongo {
 
         int numTargetErrors = 0;
         int numStaleBatches = 0;
+        int numResolveFailures = 0;
 
         for ( int rounds = 0; !batchOp.isFinished(); rounds++ ) {
 
@@ -123,7 +123,6 @@ namespace mongo {
             // If we've had a targeting error or stale error, we've refreshed the metadata once and
             // can record target errors.
             bool recordTargetErrors = numTargetErrors > 0 || numStaleBatches > 0;
-
             Status targetStatus = batchOp.targetBatch( *_targeter,
                                                        recordTargetErrors,
                                                        &childBatches );
@@ -141,7 +140,7 @@ namespace mongo {
             while ( numSent != childBatches.size() ) {
 
                 // Collect batches out on the network, mapped by endpoint
-                EndpointBatchMap pendingBatches;
+                HostBatchMap pendingBatches;
 
                 //
                 // Send side
@@ -151,17 +150,42 @@ namespace mongo {
                 for ( vector<TargetedWriteBatch*>::iterator it = childBatches.begin();
                     it != childBatches.end(); ++it ) {
 
+                    //
+                    // Collect the info needed to dispatch our targeted batch
+                    //
+
                     TargetedWriteBatch* nextBatch = *it;
                     // If the batch is NULL, we sent it previously, so skip
                     if ( nextBatch == NULL ) continue;
-                    const ConnectionString& hostEndpoint = nextBatch->getEndpoint().shardHost;
 
-                    EndpointBatchMap::iterator pendingIt = pendingBatches.find( &hostEndpoint );
+                    // Figure out what host we need to dispatch our targeted batch
+                    ConnectionString shardHost;
+                    Status resolveStatus = _resolver->chooseWriteHost( nextBatch->getEndpoint()
+                                                                           .shardName,
+                                                                       &shardHost );
+                    if ( !resolveStatus.isOK() ) {
 
-                    // If we already have a batch for this endpoint, continue
+                        ++numResolveFailures;
+
+                        // Record a resolve failure
+                        // TODO: It may be necessary to refresh the cache if stale, or maybe just
+                        // cancel and retarget the batch
+                        BatchedErrorDetail error;
+                        buildErrorFrom( resolveStatus, &error );
+                        batchOp.noteBatchError( *nextBatch, error );
+
+                        // We're done with this batch
+                        *it = NULL;
+                        continue;
+                    }
+
+                    // If we already have a batch for this host, wait until the next time
+                    HostBatchMap::iterator pendingIt = pendingBatches.find( shardHost );
                     if ( pendingIt != pendingBatches.end() ) continue;
 
-                    // Otherwise send it out to the endpoint via a command to a database
+                    //
+                    // We now have all the info needed to dispatch the batch
+                    //
 
                     BatchedCommandRequest request( clientRequest.getBatchType() );
                     batchOp.buildBatchRequest( *nextBatch, &request );
@@ -171,7 +195,7 @@ namespace mongo {
                     NamespaceString nss( request.getNS() );
                     request.setNS( nss.coll() );
 
-                    _dispatcher->addCommand( hostEndpoint, nss.db(), request );
+                    _dispatcher->addCommand( shardHost, nss.db(), request );
 
                     // Indicate we're done by setting the batch to NULL
                     // We'll only get duplicate hostEndpoints if we have broadcast and non-broadcast
@@ -180,7 +204,7 @@ namespace mongo {
                     *it = NULL;
 
                     // Recv-side is responsible for cleaning up the nextBatch when used
-                    pendingBatches.insert( make_pair( &hostEndpoint, nextBatch ) );
+                    pendingBatches.insert( make_pair( shardHost, nextBatch ) );
                 }
 
                 // Send them all out
@@ -194,12 +218,13 @@ namespace mongo {
                 while ( _dispatcher->numPending() > 0 ) {
 
                     // Get the response
-                    ConnectionString endpoint;
+                    ConnectionString shardHost;
                     BatchedCommandResponse response;
-                    Status dispatchStatus = _dispatcher->recvAny( &endpoint, &response );
+                    Status dispatchStatus = _dispatcher->recvAny( &shardHost, &response );
 
                     // Get the TargetedWriteBatch to find where to put the response
-                    TargetedWriteBatch* batchRaw = pendingBatches.find( &endpoint )->second;
+                    dassert( pendingBatches.find( shardHost ) != pendingBatches.end() );
+                    TargetedWriteBatch* batchRaw = pendingBatches.find( shardHost )->second;
                     scoped_ptr<TargetedWriteBatch> batch( batchRaw );
 
                     if ( dispatchStatus.isOK() ) {

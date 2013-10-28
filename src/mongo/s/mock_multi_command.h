@@ -97,6 +97,7 @@ namespace mongo {
             BatchedCommandResponse* batchResponse = //
                 static_cast<BatchedCommandResponse*>( response );
 
+            *endpoint = _pending.front();
             MockEndpoint* mockEndpoint = releaseByHost( _pending.front() );
             _pending.pop_front();
 

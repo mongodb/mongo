@@ -35,6 +35,7 @@
 #include "mongo/s/batched_command_response.h"
 #include "mongo/s/ns_targeter.h"
 #include "mongo/s/multi_command_dispatch.h"
+#include "mongo/s/shard_resolver.h"
 
 namespace mongo {
 
@@ -57,8 +58,10 @@ namespace mongo {
     MONGO_DISALLOW_COPYING (BatchWriteExec);
     public:
 
-        BatchWriteExec( NSTargeter* targeter, MultiCommandDispatch* dispatcher ) :
-            _targeter( targeter ), _dispatcher( dispatcher ) {
+        BatchWriteExec( NSTargeter* targeter,
+                        ShardResolver* resolver,
+                        MultiCommandDispatch* dispatcher ) :
+            _targeter( targeter ), _resolver( resolver ), _dispatcher( dispatcher ) {
         }
 
         /**
@@ -78,6 +81,9 @@ namespace mongo {
 
         // Not owned here
         NSTargeter* _targeter;
+
+        // Not owned here
+        ShardResolver* _resolver;
 
         // Not owned here
         MultiCommandDispatch* _dispatcher;

@@ -93,15 +93,13 @@ namespace mongo {
             }
             ChunkPtr chunk = _manager->findChunkForDoc( doc );
             *endpoint = new ShardEndpoint( chunk->getShard().getName(),
-                                           _manager->getVersion( chunk->getShard() ),
-                                           chunk->getShard().getAddress() );
+                                           _manager->getVersion( chunk->getShard() ) );
 
             _stats->chunkSizeDelta[chunk->getMin()] += doc.objsize();
         }
         else {
             *endpoint = new ShardEndpoint( _primary->getName(),
-                                           ChunkVersion::UNSHARDED(),
-                                           _primary->getAddress() );
+                                           ChunkVersion::UNSHARDED() );
         }
 
         return Status::OK();
@@ -151,8 +149,7 @@ namespace mongo {
             endpoints->push_back( new ShardEndpoint( it->getName(),
                                                      _manager ?
                                                          _manager->getVersion( *it ) :
-                                                         ChunkVersion::UNSHARDED(),
-                                                     it->getAddress() ) );
+                                                         ChunkVersion::UNSHARDED() ) );
         }
 
         return Status::OK();

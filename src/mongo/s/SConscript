@@ -243,7 +243,9 @@ env.CppUnitTest(
         'base',
         'write_ops',
         '$BUILD_DIR/mongo/db/common',
-    ]
+        '$BUILD_DIR/mongo/clientandshell', # for ConnectionString::parse only
+    ],
+    NO_CRUTCH=True,
 )
 
 env.StaticLibrary(
@@ -291,6 +293,7 @@ env.StaticLibrary(
         'chunk_manager_targeter.cpp',
         'dbclient_multi_command.cpp',
         'dbclient_safe_writer.cpp',
+        'dbclient_shard_resolver.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/bson',

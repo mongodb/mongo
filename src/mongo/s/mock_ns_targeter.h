@@ -202,7 +202,6 @@ namespace mongo {
         ASSERT_EQUALS( endpointA.shardName, endpointB.shardName );
         ASSERT_EQUALS( endpointA.shardVersion.toLong(), endpointB.shardVersion.toLong() );
         ASSERT_EQUALS( endpointA.shardVersion.epoch(), endpointB.shardVersion.epoch() );
-        ASSERT_EQUALS( endpointA.shardHost.toString(), endpointB.shardHost.toString() );
     }
 
 } // namespace mongo

@@ -75,6 +75,8 @@ namespace mongo {
             return s;
         }
 
+        static Shard findIfExists( const string& shardName );
+
         /**
          * @param ident either name or address
          */
