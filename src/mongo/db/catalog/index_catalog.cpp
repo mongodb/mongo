@@ -709,6 +709,21 @@ namespace mongo {
         return _details->getCompletedIndexCount();
     }
 
+    IndexDescriptor* IndexCatalog::findIndexByName( const StringData& name ) {
+        int idxNo = _details->findIndexByName( name );
+        if ( idxNo < 0 )
+            return NULL;
+        return getDescriptor( idxNo );
+    }
+
+    IndexDescriptor* IndexCatalog::findIndexByKeyPattern( const BSONObj& key ) {
+        int idxNo = _details->findIndexByKeyPattern( key );
+        if ( idxNo < 0 )
+            return NULL;
+        return getDescriptor( idxNo );
+    }
+
+
     IndexDescriptor* IndexCatalog::getDescriptor( int idxNo ) {
         _checkMagic();
         verify( idxNo < numIndexesTotal() );

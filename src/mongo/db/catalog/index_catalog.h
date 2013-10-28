@@ -65,9 +65,21 @@ namespace mongo {
          * in which case everything from this tree has to go away
          */
 
+        /**
+         * @return null if cannot find
+         */
+        IndexDescriptor* findIndexByName( const StringData& name );
+
+        /**
+         * @return null if cannot find
+         */
+        IndexDescriptor* findIndexByKeyPattern( const BSONObj& key );
+
         // throws
+        // never returns NULL
         IndexDescriptor* getDescriptor( int idxNo );
 
+        // never returns NULL
         IndexAccessMethod* getIndex( IndexDescriptor* desc );
 
         BtreeBasedAccessMethod* getBtreeBasedIndex( IndexDescriptor* desc );

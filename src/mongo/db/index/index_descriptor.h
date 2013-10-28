@@ -62,7 +62,25 @@ namespace mongo {
         IndexDescriptor(NamespaceDetails* namespaceDetails, int indexNumber, OnDiskIndexData* data,
                         BSONObj infoObj)
             : _namespaceDetails(namespaceDetails), _indexNumber(indexNumber), _onDiskData(data),
-              _infoObj(infoObj), _numFields(infoObj.getObjectField("key").nFields()) { }
+              _infoObj(infoObj.getOwned()),
+              _numFields(infoObj.getObjectField("key").nFields()),
+              _keyPattern(infoObj.getObjectField("key").getOwned()),
+              _indexName(infoObj.getStringField("name")),
+              _parentNS(infoObj.getStringField("ns")),
+              _isIdIndex(IndexDetails::isIdIndexPattern( _keyPattern )),
+              _sparse(infoObj["sparse"].trueValue()),
+              _dropDups(infoObj["dropDups"].trueValue()),
+              _unique( _isIdIndex || infoObj["unique"].trueValue() )
+        {
+            _indexNamespace = _parentNS + ".$" + _indexNamespace;
+
+            _version = 0;
+            BSONElement e = _infoObj["v"];
+            if ( e.isNumber() ) {
+                _version = e.numberInt();
+            }
+
+        }
 
         // XXX this is terrible
         IndexDescriptor* clone() const {
@@ -78,7 +96,7 @@ namespace mongo {
          * Example: {geo: "2dsphere", nonGeo: 1}
          * Example: {foo: 1, bar: -1}
          */
-        BSONObj keyPattern() const { return _infoObj.getObjectField("key"); }
+        const BSONObj& keyPattern() const { return _keyPattern; }
 
         // How many fields do we index / are in the key pattern?
         int getNumFields() const { return _numFields; }
@@ -88,45 +106,34 @@ namespace mongo {
         //
 
         // Return the name of the index.
-        string indexName() const { return _infoObj.getStringField("name"); }
+        const string& indexName() const { return _indexName; }
 
         // Return the name of the indexed collection.
-        string parentNS() const { return _infoObj.getStringField("ns"); }
+        const string& parentNS() const { return _parentNS; }
 
         // Return the name of this index's storage area (database.table.$index)
-        string indexNamespace() const {
-            string s = parentNS();
-            verify(!s.empty());
-            s += ".$";
-            s += indexName();
-            return s;
-        }
+        const string& indexNamespace() const { return _indexNamespace; }
 
         //
         // Properties every index has
         //
 
         // Return what version of index this is.
-        int version() const {
-            BSONElement e = _infoObj["v"];
-            if (NumberInt == e.type()) {
-                return e.Int();
-            } else {
-                return 0;
-            }
-        }
+        int version() const { return _version; }
 
         // May each key only occur once?
-        bool unique() const { return _infoObj["unique"].trueValue(); }
+        bool unique() const { return _unique; }
 
         // Is dropDups set on this index?
-        bool dropDups() const { return _infoObj.getBoolField("dropDups"); }
+        bool dropDups() const { return _dropDups; }
 
         // Is this index sparse?
-        bool isSparse() const { return _infoObj["sparse"].trueValue(); }
+        bool isSparse() const { return _sparse; }
 
         // Is this index multikey?
         bool isMultikey() const { return _namespaceDetails->isMultikey(_indexNumber); }
+
+        bool isIdIndex() const { return _isIdIndex; }
 
         //
         // Properties that are Index-specific.
@@ -178,8 +185,18 @@ namespace mongo {
         // The BSONObj describing the index.  Accessed through the various members above.
         const BSONObj _infoObj;
 
-        // How many fields are indexed?
-        int64_t _numFields;
+        // --- cached data from _infoObj
+
+        int64_t _numFields; // How many fields are indexed?
+        BSONObj _keyPattern;
+        string _indexName;
+        string _parentNS;
+        string _indexNamespace;
+        bool _isIdIndex;
+        bool _sparse;
+        bool _dropDups;
+        bool _unique;
+        int _version;
 
         friend class IndexCatalog;
     };

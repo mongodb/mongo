@@ -96,11 +96,12 @@ namespace {
                 namedIndexesToDrop.push_back(idetails.indexName());
         }
 
+        IndexCatalog* indexCatalog = collection->getIndexCatalog();
         for (size_t i = 0; i < namedIndexesToDrop.size(); ++i) {
-            int idxNo = collection->details()->findIndexByName( namedIndexesToDrop[i] );
-            verify( idxNo >= 0 );
+            IndexDescriptor* desc = indexCatalog->findIndexByName( namedIndexesToDrop[i] );
+            verify( desc );
 
-            Status status = collection->getIndexCatalog()->dropIndex( idxNo );
+            Status status = indexCatalog->dropIndex( desc );
             if ( status.isOK() ) {
                 log() << "Dropped index " << namedIndexesToDrop[i] << " from " << systemUsers <<
                     " because it is incompatible with v2 form privilege documents." << endl;
