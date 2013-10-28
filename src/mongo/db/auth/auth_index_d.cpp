@@ -130,9 +130,7 @@ namespace {
     }
 
     void createSystemIndexes(const NamespaceString& ns) {
-        if (ns == AuthorizationManager::usersCollectionNamespace &&
-            (getGlobalAuthorizationManager()->getAuthorizationVersion() ==
-             AuthorizationManager::schemaVersion26Final)) {
+        if (ns == AuthorizationManager::usersCollectionNamespace) {
             try {
                 Helpers::ensureIndex(ns.ns().c_str(),
                                      v2SystemUsersKeyPattern,
