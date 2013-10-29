@@ -105,9 +105,13 @@ __wt_bm_read(WT_BM *bm, WT_SESSION_IMPL *session,
 	/*
 	 * In diagnostic mode, verify the block we're about to read isn't on
 	 * the available list, or for live systems, the discard list.
+	 *
+	 * Don't check during salvage, it's possible we're reading an already
+	 * freed overflow page.
 	 */
-	WT_RET(__wt_block_misplaced(
-	    session, block, "read", offset, size, bm->is_live));
+	if (!F_ISSET(session, WT_SESSION_SALVAGE_QUIET_ERR))
+		WT_RET(__wt_block_misplaced(
+		    session, block, "read", offset, size, bm->is_live));
 #endif
 	/* Read the block. */
 	WT_RET(__wt_block_read_off(session, block, buf, offset, size, cksum));
