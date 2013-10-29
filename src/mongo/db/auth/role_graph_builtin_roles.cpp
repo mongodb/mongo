@@ -47,6 +47,8 @@ namespace {
     const std::string BUILTIN_ROLE_CLUSTER_MONITOR = "clusterMonitor";
     const std::string BUILTIN_ROLE_HOST_MANAGEMENT = "hostManager";
     const std::string BUILTIN_ROLE_CLUSTER_MANAGEMENT = "clusterManager";
+    const std::string BUILTIN_ROLE_BACKUP = "backup";
+    const std::string BUILTIN_ROLE_RESTORE = "restore";
 
     /// Actions that the "read" role may perform on a normal resources of a specific database, and
     /// that the "readAnyDatabase" role may perform on normal resources of any database.
@@ -426,6 +428,91 @@ namespace {
                           ActionType::dropDatabase));
     }
 
+    void addBackupPrivileges(PrivilegeVector* privileges) {
+        Privilege::addPrivilegeToPrivilegeVector(
+                privileges,
+                Privilege(ResourcePattern::forAnyNormalResource(), ActionType::find));
+
+        Privilege::addPrivilegeToPrivilegeVector(
+                privileges,
+                Privilege(ResourcePattern::forClusterResource(), ActionType::listDatabases));
+
+        Privilege::addPrivilegeToPrivilegeVector(
+                privileges,
+                Privilege(ResourcePattern::forCollectionName("system.indexes"), ActionType::find));
+
+        Privilege::addPrivilegeToPrivilegeVector(
+                privileges,
+                Privilege(ResourcePattern::forCollectionName("system.namespaces"),
+                          ActionType::find));
+
+        Privilege::addPrivilegeToPrivilegeVector(
+                privileges,
+                Privilege(ResourcePattern::forCollectionName("system.js"), ActionType::find));
+
+        Privilege::addPrivilegeToPrivilegeVector(
+                privileges,
+                Privilege(ResourcePattern::forCollectionName("system.users"), ActionType::find));
+
+        Privilege::addPrivilegeToPrivilegeVector(
+                privileges,
+                Privilege(ResourcePattern::forExactNamespace(NamespaceString("admin.system.roles")),
+                          ActionType::find));
+
+        Privilege::addPrivilegeToPrivilegeVector(
+                privileges,
+                Privilege(
+                        ResourcePattern::forExactNamespace(NamespaceString("admin.system.version")),
+                        ActionType::find));
+
+        // For BRS
+        ActionSet backupCollectionActions;
+        backupCollectionActions << ActionType::insert << ActionType::update;
+        Privilege::addPrivilegeToPrivilegeVector(
+                privileges,
+                Privilege(ResourcePattern::forExactNamespace(NamespaceString("admin.mms.backup")),
+                          backupCollectionActions));
+    }
+
+    void addRestorePrivileges(PrivilegeVector* privileges) {
+        ActionSet actions;
+        actions << ActionType::insert
+                << ActionType::dropCollection
+                << ActionType::createIndex
+                << ActionType::createCollection
+                << ActionType::collMod;
+        Privilege::addPrivilegeToPrivilegeVector(
+                privileges,
+                Privilege(ResourcePattern::forAnyNormalResource(), actions));
+
+        Privilege::addPrivilegeToPrivilegeVector(
+                privileges,
+                Privilege(ResourcePattern::forCollectionName("system.js"), actions));
+
+        Privilege::addPrivilegeToPrivilegeVector(
+                privileges,
+                Privilege(ResourcePattern::forExactNamespace(NamespaceString("admin.system.roles")),
+                          actions));
+
+        Privilege::addPrivilegeToPrivilegeVector(
+                privileges,
+                Privilege(
+                        ResourcePattern::forExactNamespace(NamespaceString("admin.system.version")),
+                        actions));
+
+        // Need additional actions on system.users.
+        actions << ActionType::find << ActionType::update << ActionType::remove;
+        Privilege::addPrivilegeToPrivilegeVector(
+                privileges,
+                Privilege(ResourcePattern::forCollectionName("system.users"), actions));
+
+        // Need to be able to query system.namespaces to check existing collection options.
+        Privilege::addPrivilegeToPrivilegeVector(
+                privileges,
+                Privilege(ResourcePattern::forCollectionName("system.namespaces"),
+                          ActionType::find));
+    }
+
     void addRootRolePrivileges(PrivilegeVector* privileges) {
         addClusterAdminPrivileges(privileges);
         addUserAdminAnyDbPrivileges(privileges);
@@ -485,6 +572,12 @@ namespace {
         else if (isAdminDB && roleName.getRole() == BUILTIN_ROLE_CLUSTER_ADMIN) {
             addClusterAdminPrivileges(result);
         }
+        else if (isAdminDB && roleName.getRole() == BUILTIN_ROLE_BACKUP) {
+            addBackupPrivileges(result);
+        }
+        else if (isAdminDB && roleName.getRole() == BUILTIN_ROLE_RESTORE) {
+            addRestorePrivileges(result);
+        }
         else if (isAdminDB && roleName.getRole() == BUILTIN_ROLE_ROOT) {
             addRootRolePrivileges(result);
         }
@@ -543,6 +636,12 @@ namespace {
             return true;
         }
         else if (isAdminDB && role.getRole() == BUILTIN_ROLE_CLUSTER_ADMIN) {
+            return true;
+        }
+        else if (isAdminDB && role.getRole() == BUILTIN_ROLE_BACKUP) {
+            return true;
+        }
+        else if (isAdminDB && role.getRole() == BUILTIN_ROLE_RESTORE) {
             return true;
         }
         else if (isAdminDB && role.getRole() == BUILTIN_ROLE_ROOT) {
