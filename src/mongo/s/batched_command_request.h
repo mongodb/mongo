@@ -71,13 +71,20 @@ namespace mongo {
         virtual std::string toString() const;
 
         //
-        // individual field accessors
+        // Batch type accessors
         //
 
         BatchType getBatchType() const;
         BatchedInsertRequest* getInsertRequest() const;
         BatchedUpdateRequest* getUpdateRequest() const;
         BatchedDeleteRequest* getDeleteRequest() const;
+        // Index creation is also an insert, but a weird one.
+        bool isInsertIndexRequest() const;
+        std::string getTargetingNS() const;
+
+        //
+        // individual field accessors
+        //
 
         void setNS( const StringData& collName );
         void unsetNS();

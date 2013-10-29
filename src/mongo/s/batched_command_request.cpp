@@ -16,6 +16,8 @@
 
 #include "mongo/s/batched_command_request.h"
 
+#include "mongo/db/namespace_string.h"
+
 namespace mongo {
 
     BatchedCommandRequest::BatchedCommandRequest( BatchType batchType ) :
@@ -62,6 +64,22 @@ namespace mongo {
 
     BatchedDeleteRequest* BatchedCommandRequest::getDeleteRequest() const {
         return _deleteReq.get();
+    }
+
+    bool BatchedCommandRequest::isInsertIndexRequest() const {
+        if ( _batchType != BatchedCommandRequest::BatchType_Insert ) return false;
+        return NamespaceString( getNS() ).isSystemDotIndexes();
+    }
+
+    static void extractIndexNSS( const BSONObj& indexDesc, NamespaceString* indexNSS ) {
+        *indexNSS = NamespaceString( indexDesc["ns"].str() );
+    }
+
+    string BatchedCommandRequest::getTargetingNS() const {
+        if ( !isInsertIndexRequest() ) return getNS();
+        NamespaceString nss;
+        extractIndexNSS( getInsertRequest()->getDocumentsAt( 0 ), &nss );
+        return nss.toString();
     }
 
     void BatchedCommandRequest::cloneTo( BatchedCommandRequest* other ) const {

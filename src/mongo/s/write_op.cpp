@@ -78,6 +78,7 @@ namespace mongo {
 
         bool isUpdate = _itemRef.getOpType() == BatchedCommandRequest::BatchType_Update;
         bool isDelete = _itemRef.getOpType() == BatchedCommandRequest::BatchType_Delete;
+        bool isIndexInsert = _itemRef.getRequest()->isInsertIndexRequest();
 
         // In case of error, don't leak.
         OwnedPointerVector<ShardEndpoint> endpointsOwned;
@@ -109,17 +110,25 @@ namespace mongo {
             dassert( _itemRef.getOpType() == BatchedCommandRequest::BatchType_Insert );
 
             // Inserts targeted by doc itself
-
             ShardEndpoint* endpoint = NULL;
-            Status targetStatus = targeter.targetDoc( _itemRef.getDocument(), &endpoint );
+            Status targetStatus = Status::OK();
+
+            // TODO: Remove the index targeting stuff once there is a command for it
+            if ( !isIndexInsert ) {
+                targetStatus = targeter.targetDoc( _itemRef.getDocument(), &endpoint );
+            }
+            else {
+                // TODO: Retry index writes with stale version?
+                targetStatus = targeter.targetAll( &endpoints );
+            }
 
             if ( !targetStatus.isOK() ) {
                 dassert( NULL == endpoint );
                 return targetStatus;
             }
 
-            dassert( NULL != endpoint );
-            endpoints.push_back( endpoint );
+            // Store single endpoint result if we targeted a single endpoint
+            if ( endpoint ) endpoints.push_back( endpoint );
         }
 
         for ( vector<ShardEndpoint*>::iterator it = endpoints.begin(); it != endpoints.end();

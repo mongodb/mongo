@@ -58,6 +58,8 @@ namespace mongo {
 
         Status targetDelete( const BSONObj& query, std::vector<ShardEndpoint*>* endpoints ) const;
 
+        Status targetAll( std::vector<ShardEndpoint*>* endpoints ) const;
+
         void noteStaleResponse( const ShardEndpoint& endpoint, const BSONObj& staleInfo );
 
         void noteCouldNotTarget();

@@ -57,6 +57,7 @@ namespace {
         //
 
         BatchedCommandRequest request( BatchedCommandRequest::BatchType_Insert );
+        request.setNS( "foo.bar" );
         request.getInsertRequest()->addToDocuments( BSON( "x" << 1 ) );
 
         WriteOp writeOp( BatchItemRef( &request, 0 ) );
@@ -91,6 +92,7 @@ namespace {
                                              BSON( "x" << MAXKEY ) ) );
 
         BatchedCommandRequest request( BatchedCommandRequest::BatchType_Insert );
+        request.setNS( nss.ns() );
         request.getInsertRequest()->addToDocuments( BSON( "x" << 1 ) );
 
         // Do single-target write op
@@ -157,6 +159,7 @@ namespace {
                                              BSON( "x" << MAXKEY ) ) );
 
         BatchedCommandRequest request( BatchedCommandRequest::BatchType_Delete );
+        request.setNS( nss.ns() );
         BSONObj query = BSON( "x" << GTE << -1 << LT << 1 );
         request.getDeleteRequest()->addToDeletes( buildDeleteDoc( BSON( "q" << query ) ) );
 
@@ -201,6 +204,7 @@ namespace {
                                              BSON( "x" << MAXKEY ) ) );
 
         BatchedCommandRequest request( BatchedCommandRequest::BatchType_Insert );
+        request.setNS( nss.ns() );
         request.getInsertRequest()->addToDocuments( BSON( "x" << 1 ) );
 
         // Do single-target write op
@@ -250,6 +254,7 @@ namespace {
                                              BSON( "x" << MAXKEY ) ) );
 
         BatchedCommandRequest request( BatchedCommandRequest::BatchType_Insert );
+        request.setNS( nss.ns() );
         request.getInsertRequest()->addToDocuments( BSON( "x" << 1 ) );
 
         // Do single-target write op
@@ -295,6 +300,7 @@ namespace {
                                              BSON( "x" << MAXKEY ) ) );
 
         BatchedCommandRequest request( BatchedCommandRequest::BatchType_Insert );
+        request.setNS( nss.ns() );
         request.getInsertRequest()->addToDocuments( BSON( "x" << 1 ) );
 
         // Do single-target write op

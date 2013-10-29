@@ -155,6 +155,28 @@ namespace mongo {
         return Status::OK();
     }
 
+    Status ChunkManagerTargeter::targetAll( vector<ShardEndpoint*>* endpoints ) const {
+
+        if ( !_primary && !_manager ) return Status( ErrorCodes::NamespaceNotFound, "" );
+
+        set<Shard> shards;
+        if ( _manager ) {
+            _manager->getAllShards( shards );
+        }
+        else {
+            shards.insert( *_primary );
+        }
+
+        for ( set<Shard>::iterator it = shards.begin(); it != shards.end(); ++it ) {
+            endpoints->push_back( new ShardEndpoint( it->getName(),
+                                                     _manager ?
+                                                         _manager->getVersion( *it ) :
+                                                         ChunkVersion::UNSHARDED() ) );
+        }
+
+        return Status::OK();
+    }
+
     void ChunkManagerTargeter::noteStaleResponse( const ShardEndpoint& endpoint,
                                                   const BSONObj& staleInfo ) {
         dassert( !_needsTargetingRefresh );

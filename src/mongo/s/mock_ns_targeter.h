@@ -126,6 +126,12 @@ namespace mongo {
             return targetQuery( query, endpoints );
         }
 
+        Status targetAll( std::vector<ShardEndpoint*>* endpoints ) const {
+            // TODO: XXX
+            // No-op
+            return Status::OK();
+        }
+
         void noteCouldNotTarget() {
             // No-op
         }

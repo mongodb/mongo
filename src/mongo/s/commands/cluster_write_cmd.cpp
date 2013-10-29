@@ -225,6 +225,19 @@ namespace mongo {
             return true;
         }
 
+        // App-level validation of a create index insert
+        if ( request.isInsertIndexRequest() ) {
+            if ( request.sizeWriteOps() != 1 || request.isWriteConcernSet() ) {
+                // Invalid request to create index
+                response.setOk( false );
+                response.setErrCode( ErrorCodes::CannotCreateIndex );
+                response.setErrMessage( "invalid batch request for index creation" );
+                result.appendElements( response.toBSON() );
+
+                return false;
+            }
+        }
+
         //
         // Assemble the batch executor and run the batch
         //
@@ -234,12 +247,13 @@ namespace mongo {
         NamespaceString nss( dbName, request.getNS() );
         request.setNS( nss.ns() );
 
-        Status targetInitStatus = targeter.init( NamespaceString( request.getNS() ) );
+        Status targetInitStatus = targeter.init( NamespaceString( request.getTargetingNS() ) );
 
         if ( !targetInitStatus.isOK() ) {
 
-            warning() << "could not initialize targeter for write op in collection "
-                      << request.getNS() << endl;
+            warning() << "could not initialize targeter for"
+                      << ( request.isInsertIndexRequest() ? " index" : "" )
+                      << " write op in collection " << request.getTargetingNS() << endl;
 
             // Errors will be reported in response if we are unable to target
         }
