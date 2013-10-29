@@ -226,7 +226,7 @@ namespace {
 
     Status V2UserDocumentParser::checkValidUserDocument(const BSONObj& doc) const {
         BSONElement userElement = doc[AuthorizationManager::USER_NAME_FIELD_NAME];
-        BSONElement userSourceElement = doc[AuthorizationManager::USER_SOURCE_FIELD_NAME];
+        BSONElement userDBElement = doc[AuthorizationManager::USER_DB_FIELD_NAME];
         BSONElement credentialsElement = doc[CREDENTIALS_FIELD_NAME];
         BSONElement rolesElement = doc[ROLES_FIELD_NAME];
 
@@ -236,14 +236,14 @@ namespace {
         if (makeStringDataFromBSONElement(userElement).empty())
             return _badValue("User document needs 'user' field to be non-empty", 0);
 
-        // Validate the "userSource" element
-        if (userSourceElement.type() != String ||
-                makeStringDataFromBSONElement(userSourceElement).empty()) {
+        // Validate the "db" element
+        if (userDBElement.type() != String ||
+                makeStringDataFromBSONElement(userDBElement).empty()) {
             return _badValue("User document needs 'db' field to be a non-empty string", 0);
         }
-        StringData userSourceStr = makeStringDataFromBSONElement(userSourceElement);
-        if (!NamespaceString::validDBName(userSourceStr) && userSourceStr != "$external") {
-            return _badValue(mongoutils::str::stream() << "'" << userSourceStr <<
+        StringData userDBStr = makeStringDataFromBSONElement(userDBElement);
+        if (!NamespaceString::validDBName(userDBStr) && userDBStr != "$external") {
+            return _badValue(mongoutils::str::stream() << "'" << userDBStr <<
                                      "' is not a valid value for the db field.",
                              0);
         }
@@ -262,7 +262,7 @@ namespace {
             return _badValue("User document needs 'credentials' field to be a non-empty object",
                              0);
         }
-        if (userSourceStr == "$external") {
+        if (userDBStr == "$external") {
             BSONElement externalElement = credentialsObj[MONGODB_EXTERNAL_CREDENTIAL_FIELD_NAME];
             if (externalElement.eoo() || externalElement.type() != Bool ||
                     !externalElement.Bool()) {
@@ -298,14 +298,14 @@ namespace {
     Status V2UserDocumentParser::initializeUserCredentialsFromUserDocument(
             User* user, const BSONObj& privDoc) const {
         User::CredentialData credentials;
-        std::string userSource = privDoc[AuthorizationManager::USER_SOURCE_FIELD_NAME].String();
+        std::string userDB = privDoc[AuthorizationManager::USER_DB_FIELD_NAME].String();
         BSONElement credentialsElement = privDoc[CREDENTIALS_FIELD_NAME];
         if (!credentialsElement.eoo()) {
             if (credentialsElement.type() != Object) {
                 return Status(ErrorCodes::UnsupportedFormat,
                               "'credentials' field in user documents must be an object");
             }
-            if (userSource == "$external") {
+            if (userDB == "$external") {
                 BSONElement externalCredentialElement =
                         credentialsElement.Obj()[MONGODB_EXTERNAL_CREDENTIAL_FIELD_NAME];
                 if (!externalCredentialElement.eoo()) {

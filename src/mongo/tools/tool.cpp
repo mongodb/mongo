@@ -232,7 +232,7 @@ namespace mongo {
             return;
         }
 
-        _conn->auth(BSON(saslCommandUserSourceFieldName << getAuthenticationDatabase() <<
+        _conn->auth(BSON(saslCommandUserDBFieldName << getAuthenticationDatabase() <<
                          saslCommandUserFieldName << toolGlobalParams.username <<
                          saslCommandPasswordFieldName << toolGlobalParams.password  <<
                          saslCommandMechanismFieldName <<

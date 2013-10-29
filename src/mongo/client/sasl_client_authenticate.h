@@ -41,7 +41,7 @@ namespace mongo {
      *         all resources after successful authentication, which is the default.  Falsey values
      *         instruct the server to await separate privilege-acquisition commands.
      *     "user": The string name of the user to authenticate.
-     *     "userSource": The database target of the auth command, which identifies the location
+     *     "db": The database target of the auth command, which identifies the location
      *         of the credential information for the user.  May be "$external" if credential
      *         information is stored outside of the mongo cluster.
      *     "pwd": The password.
@@ -113,7 +113,7 @@ namespace mongo {
 
     /// Field containing the string identifier of the database containing credential information,
     /// or "$external" if the credential information is stored outside of the mongo cluster.
-    extern const char* const saslCommandUserSourceFieldName;
+    extern const char* const saslCommandUserDBFieldName;
 
     /// Field overriding the FQDN of the hostname hosting the mongodb srevice in
     /// saslClientAuthenticate().

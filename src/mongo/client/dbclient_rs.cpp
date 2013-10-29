@@ -1530,7 +1530,7 @@ namespace mongo {
             }
             catch (const UserException&) {
                 warning() << "cached auth failed for set: " << _setName <<
-                    " db: " << i->second[saslCommandUserSourceFieldName].str() <<
+                    " db: " << i->second[saslCommandUserDBFieldName].str() <<
                     " user: " << i->second[saslCommandUserFieldName].str() << endl;
             }
         }
@@ -1583,7 +1583,7 @@ namespace mongo {
         }
 
         // now that it does, we should save so that for a new node we can auth
-        _auths[params[saslCommandUserSourceFieldName].str()] = params.getOwned();
+        _auths[params[saslCommandUserDBFieldName].str()] = params.getOwned();
     }
 
     void DBClientReplicaSet::logout(const string &dbname, BSONObj& info) {

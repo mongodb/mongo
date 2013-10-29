@@ -143,7 +143,7 @@ namespace auth {
         return _parseNamesFromBSONArray(usersArray,
                                         dbname,
                                         AuthorizationManager::USER_NAME_FIELD_NAME,
-                                        AuthorizationManager::USER_SOURCE_FIELD_NAME,
+                                        AuthorizationManager::USER_DB_FIELD_NAME,
                                         parsedUserNames);
     }
 
@@ -371,7 +371,7 @@ namespace auth {
             status = _parseNameFromBSONElement(cmdObj["usersInfo"],
                                                dbname,
                                                AuthorizationManager::USER_NAME_FIELD_NAME,
-                                               AuthorizationManager::USER_SOURCE_FIELD_NAME,
+                                               AuthorizationManager::USER_DB_FIELD_NAME,
                                                &name);
             if (!status.isOK()) {
                 return status;

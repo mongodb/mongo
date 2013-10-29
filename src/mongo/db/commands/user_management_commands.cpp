@@ -358,7 +358,7 @@ namespace mongo {
                                           args.userName.getUser());
             userObjBuilder.append(AuthorizationManager::USER_NAME_FIELD_NAME,
                                   args.userName.getUser());
-            userObjBuilder.append(AuthorizationManager::USER_SOURCE_FIELD_NAME,
+            userObjBuilder.append(AuthorizationManager::USER_DB_FIELD_NAME,
                                   args.userName.getDB());
             if (args.hasHashedPassword) {
                 userObjBuilder.append("credentials", BSON("MONGODB-CR" << args.hashedPassword));
@@ -663,7 +663,7 @@ namespace mongo {
 
             status = authzManager->removePrivilegeDocuments(
                     BSON(AuthorizationManager::USER_NAME_FIELD_NAME << userName.getUser() <<
-                         AuthorizationManager::USER_SOURCE_FIELD_NAME << userName.getDB()),
+                         AuthorizationManager::USER_DB_FIELD_NAME << userName.getDB()),
                     writeConcern,
                     &numUpdated);
             // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
@@ -754,7 +754,7 @@ namespace mongo {
             audit::logDropAllUsersFromDatabase(ClientBasic::getCurrent(), dbname);
 
             status = authzManager->removePrivilegeDocuments(
-                    BSON(AuthorizationManager::USER_SOURCE_FIELD_NAME << dbname),
+                    BSON(AuthorizationManager::USER_DB_FIELD_NAME << dbname),
                     writeConcern,
                     &numRemoved);
             // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
@@ -1114,13 +1114,13 @@ namespace mongo {
                 // If you don't need privileges, you can just do a regular query on system.users
                 BSONObjBuilder queryBuilder;
                 if (args.allForDB) {
-                    queryBuilder.append(AuthorizationManager::USER_SOURCE_FIELD_NAME, dbname);
+                    queryBuilder.append(AuthorizationManager::USER_DB_FIELD_NAME, dbname);
                 } else {
                     BSONArrayBuilder usersMatchArray;
                     for (size_t i = 0; i < args.userNames.size(); ++i) {
                         usersMatchArray.append(BSON(AuthorizationManager::USER_NAME_FIELD_NAME <<
                                                     args.userNames[i].getUser() <<
-                                                    AuthorizationManager::USER_SOURCE_FIELD_NAME <<
+                                                    AuthorizationManager::USER_DB_FIELD_NAME <<
                                                     args.userNames[i].getDB()));
                     }
                     queryBuilder.append("$or", usersMatchArray.arr());

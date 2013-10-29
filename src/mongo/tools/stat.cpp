@@ -22,6 +22,7 @@
 
 #include "mongo/base/init.h"
 #include "mongo/client/dbclientcursor.h"
+#include "mongo/client/sasl_client_authenticate.h"
 #include "mongo/db/jsobjmanipulator.h"
 #include "mongo/db/json.h"
 #include "mongo/s/type_shard.h"
@@ -294,10 +295,11 @@ namespace mongo {
             state->thr.reset( new boost::thread( boost::bind( serverThread,
                                                               state,
                                                               (int)ceil(_statUtil.getSeconds()) ) ) );
-            state->authParams = BSON( "user" << toolGlobalParams.username <<
-                                      "pwd" << toolGlobalParams.password <<
-                                      "userSource" << getAuthenticationDatabase() <<
-                                      "mechanism" << toolGlobalParams.authenticationMechanism );
+            state->authParams = BSON(saslCommandUserFieldName << toolGlobalParams.username
+                                  << saslCommandPasswordFieldName << toolGlobalParams.password
+                                  << saslCommandUserDBFieldName << getAuthenticationDatabase()
+                                  << saslCommandMechanismFieldName
+                                  << toolGlobalParams.authenticationMechanism);
             return true;
         }
 

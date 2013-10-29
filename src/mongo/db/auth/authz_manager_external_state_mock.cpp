@@ -99,7 +99,7 @@ namespace {
         Status status = _findUser(
                 "admin.system.users",
                 BSON(AuthorizationManager::USER_NAME_FIELD_NAME << userName.getUser() <<
-                     AuthorizationManager::USER_SOURCE_FIELD_NAME << userName.getDB()),
+                     AuthorizationManager::USER_DB_FIELD_NAME << userName.getDB()),
                 &privDoc);
         if (!status.isOK())
             return status;

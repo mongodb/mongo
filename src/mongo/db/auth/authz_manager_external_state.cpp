@@ -102,7 +102,7 @@ namespace mongo {
         }
         if (status.code() == ErrorCodes::DuplicateKey) {
             std::string name = userObj[AuthorizationManager::USER_NAME_FIELD_NAME].String();
-            std::string source = userObj[AuthorizationManager::USER_SOURCE_FIELD_NAME].String();
+            std::string source = userObj[AuthorizationManager::USER_DB_FIELD_NAME].String();
             return Status(ErrorCodes::DuplicateKey,
                           mongoutils::str::stream() << "User \"" << name << "@" << source <<
                                   "\" already exists");
@@ -118,7 +118,7 @@ namespace mongo {
         Status status = updateOne(
                 NamespaceString("admin.system.users"),
                 BSON(AuthorizationManager::USER_NAME_FIELD_NAME << user.getUser() <<
-                     AuthorizationManager::USER_SOURCE_FIELD_NAME << user.getDB()),
+                     AuthorizationManager::USER_DB_FIELD_NAME << user.getDB()),
                 updateObj,
                 false,
                 writeConcern);

@@ -619,7 +619,7 @@ namespace mongo {
          *
          *     "mechanism": The string name of the sasl mechanism to use.  Mandatory.
          *     "user": The string name of the user to authenticate.  Mandatory.
-         *     "userSource": The database target of the auth command, which identifies the location
+         *     "db": The database target of the auth command, which identifies the location
          *         of the credential information for the user.  May be "$external" if
          *         credential information is stored outside of the mongo cluster.  Mandatory.
          *     "pwd": The password data.

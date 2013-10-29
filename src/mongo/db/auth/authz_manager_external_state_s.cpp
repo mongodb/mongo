@@ -120,7 +120,7 @@ namespace {
                     BSON("usersInfo" <<
                          BSON_ARRAY(BSON(AuthorizationManager::USER_NAME_FIELD_NAME <<
                                          userName.getUser() <<
-                                         AuthorizationManager::USER_SOURCE_FIELD_NAME <<
+                                         AuthorizationManager::USER_DB_FIELD_NAME <<
                                          userName.getDB())) <<
                          "showPrivileges" << true <<
                          "showCredentials" << true),

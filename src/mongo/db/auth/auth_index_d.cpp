@@ -55,13 +55,13 @@ namespace {
         v1SystemUsersKeyPattern = BSON(AuthorizationManager::V1_USER_NAME_FIELD_NAME << 1 <<
                                        AuthorizationManager::V1_USER_SOURCE_FIELD_NAME << 1);
         v2SystemUsersKeyPattern = BSON(AuthorizationManager::USER_NAME_FIELD_NAME << 1 <<
-                                       AuthorizationManager::USER_SOURCE_FIELD_NAME << 1);
+                                       AuthorizationManager::USER_DB_FIELD_NAME << 1);
         v2SystemRolesKeyPattern = BSON(AuthorizationManager::ROLE_NAME_FIELD_NAME << 1 <<
                                        AuthorizationManager::ROLE_SOURCE_FIELD_NAME << 1);
         v2SystemUsersIndexName = std::string(
                 str::stream() <<
                         AuthorizationManager::USER_NAME_FIELD_NAME << "_1_" <<
-                        AuthorizationManager::USER_SOURCE_FIELD_NAME << "_1");
+                        AuthorizationManager::USER_DB_FIELD_NAME << "_1");
         v2SystemRolesIndexName = std::string(
                 str::stream() <<
                         AuthorizationManager::ROLE_NAME_FIELD_NAME << "_1_" <<

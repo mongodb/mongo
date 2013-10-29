@@ -76,7 +76,7 @@ namespace mongo {
     }
 
     const std::string AuthorizationManager::USER_NAME_FIELD_NAME = "user";
-    const std::string AuthorizationManager::USER_SOURCE_FIELD_NAME = "db";
+    const std::string AuthorizationManager::USER_DB_FIELD_NAME = "db";
     const std::string AuthorizationManager::ROLE_NAME_FIELD_NAME = "role";
     const std::string AuthorizationManager::ROLE_SOURCE_FIELD_NAME = "db";
     const std::string AuthorizationManager::PASSWORD_FIELD_NAME = "pwd";
@@ -863,7 +863,7 @@ namespace mongo {
 
             const UserName& name = user.getName();
             builder.append(AuthorizationManager::USER_NAME_FIELD_NAME, name.getUser());
-            builder.append(AuthorizationManager::USER_SOURCE_FIELD_NAME, name.getDB());
+            builder.append(AuthorizationManager::USER_DB_FIELD_NAME, name.getDB());
 
             const User::CredentialData& credentials = user.getCredentials();
             if (!credentials.isExternal) {
@@ -878,7 +878,7 @@ namespace mongo {
                 const RoleName& role = roles.next();
                 BSONObjBuilder roleBuilder(rolesArray.subobjStart());
                 roleBuilder.append(AuthorizationManager::USER_NAME_FIELD_NAME, role.getRole());
-                roleBuilder.append(AuthorizationManager::USER_SOURCE_FIELD_NAME, role.getDB());
+                roleBuilder.append(AuthorizationManager::USER_DB_FIELD_NAME, role.getDB());
                 roleBuilder.doneFast();
             }
             rolesArray.doneFast();
@@ -971,7 +971,7 @@ namespace mongo {
             return status;
         status = _externalState->createIndex(
                 newusersCollectionNamespace,
-                BSON(USER_NAME_FIELD_NAME << 1 << USER_SOURCE_FIELD_NAME << 1),
+                BSON(USER_NAME_FIELD_NAME << 1 << USER_DB_FIELD_NAME << 1),
                 true, // unique
                 writeConcern
                 );

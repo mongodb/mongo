@@ -59,13 +59,13 @@ int main( int argc, const char **argv ) {
 
     errmsg.clear();
     conn->auth(BSON("user" << "eliot" <<
-                    "userSource" << "test" <<
+                    "db" << "test" <<
                     "pwd" << "bar" <<
                     "mechanism" << "MONGODB-CR"));
 
     try {
         conn->auth(BSON("user" << "eliot" <<
-                        "userSource" << "test" <<
+                        "db" << "test" <<
                         "pwd" << "bars" << // incorrect password
                         "mechanism" << "MONGODB-CR"));
         // Shouldn't get here.

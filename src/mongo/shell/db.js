@@ -1191,12 +1191,11 @@ DB.prototype._authOrThrow = function () {
     if (params.mechanism === undefined)
         params.mechanism = this._defaultAuthenticationMechanism;
 
-    if (params.userSource !== undefined) {
-        throw Error("Do not override userSource field on db.auth().  " +
-                    "Use getMongo().auth(), instead.");
+    if (params.db !== undefined) {
+        throw Error("Do not override db field on db.auth(). Use getMongo().auth(), instead.");
     }
 
-    params.userSource = this.getName();
+    params.db = this.getName();
     var good = this.getMongo().auth(params);
     if (good) {
         // auth enabled, and should try to use isMaster and replSetGetStatus to build prompt

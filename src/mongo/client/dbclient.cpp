@@ -38,6 +38,8 @@ namespace mongo {
 
     AtomicInt64 DBClientBase::ConnectionIdSequence;
 
+    const char* const saslCommandUserSourceFieldName = "userSource";
+
     void ConnectionString::_fillServers( string s ) {
         
         //
@@ -527,15 +529,27 @@ namespace mongo {
 
     void DBClientWithCommands::_auth(const BSONObj& params) {
         std::string mechanism;
+
         uassertStatusOK(bsonExtractStringField(params,
                                                saslCommandMechanismFieldName,
                                                &mechanism));
 
+        uassert(17232, "You cannot specify both 'db' and 'userSource'. Please use only 'db'.",
+                !(params.hasField(saslCommandUserDBFieldName)
+                  && params.hasField(saslCommandUserSourceFieldName)));
+
         if (mechanism == StringData("MONGODB-CR", StringData::LiteralTag())) {
-            std::string userSource;
-            uassertStatusOK(bsonExtractStringField(params,
-                                                   saslCommandUserSourceFieldName,
-                                                   &userSource));
+            std::string db;
+            if (params.hasField(saslCommandUserSourceFieldName)) {
+                uassertStatusOK(bsonExtractStringField(params,
+                                                       saslCommandUserSourceFieldName,
+                                                       &db));
+            }
+            else {
+                uassertStatusOK(bsonExtractStringField(params,
+                                                       saslCommandUserDBFieldName,
+                                                       &db));
+            }
             std::string user;
             uassertStatusOK(bsonExtractStringField(params,
                                                    saslCommandUserFieldName,
@@ -552,14 +566,21 @@ namespace mongo {
             BSONObj result;
             uassert(result["code"].Int(),
                     result.toString(),
-                    _authMongoCR(userSource, user, password, &result, digestPassword));
+                    _authMongoCR(db, user, password, &result, digestPassword));
         }
 #ifdef MONGO_SSL
         else if (mechanism == StringData("MONGODB-X509", StringData::LiteralTag())){
-            std::string userSource;
-            uassertStatusOK(bsonExtractStringField(params,
-                                                   saslCommandUserSourceFieldName,
-                                                   &userSource));
+            std::string db;
+            if (params.hasField(saslCommandUserSourceFieldName)) {
+                uassertStatusOK(bsonExtractStringField(params,
+                                                       saslCommandUserSourceFieldName,
+                                                       &db));
+            }
+            else {
+                uassertStatusOK(bsonExtractStringField(params,
+                                                       saslCommandUserDBFieldName,
+                                                       &db));
+            }
             std::string user;
             uassertStatusOK(bsonExtractStringField(params,
                                                    saslCommandUserFieldName,
@@ -579,7 +600,7 @@ namespace mongo {
             BSONObj result;
             uassert(result["code"].Int(),
                     result.toString(),
-                    _authX509(userSource, user, &result));
+                    _authX509(db, user, &result));
         }
 #endif
         else if (saslClientAuthenticate != NULL) {
@@ -602,7 +623,7 @@ namespace mongo {
                                     bool digestPassword) {
         try {
             _auth(BSON(saslCommandMechanismFieldName << "MONGODB-CR" <<
-                       saslCommandUserSourceFieldName << dbname <<
+                       saslCommandUserDBFieldName << dbname <<
                        saslCommandUserFieldName << username <<
                        saslCommandPasswordFieldName << password_text <<
                        saslCommandDigestPasswordFieldName << digestPassword));
@@ -819,7 +840,7 @@ namespace mongo {
             /* note we remember the auth info before we attempt to auth -- if the connection is broken, we will
                then have it for the next autoreconnect attempt.
             */
-            authCache[params[saslCommandUserSourceFieldName].str()] = params.getOwned();
+            authCache[params[saslCommandUserDBFieldName].str()] = params.getOwned();
         }
 
         DBClientBase::_auth(params);
@@ -944,7 +965,7 @@ namespace mongo {
                 if (ex.getCode() != ErrorCodes::AuthenticationFailed)
                     throw;
                 LOG(_logLevel) << "reconnect: auth failed " <<
-                    i->second[saslCommandUserSourceFieldName] <<
+                    i->second[saslCommandUserDBFieldName] <<
                     i->second[saslCommandUserFieldName] << ' ' <<
                     ex.what() << std::endl;
             }

@@ -145,7 +145,7 @@ namespace mongo {
             serverGlobalParams.clusterAuthMode == "sendKeyFile") {
             setInternalUserAuthParams(
                     BSON(saslCommandMechanismFieldName << "MONGODB-CR" <<
-                         saslCommandUserSourceFieldName <<
+                         saslCommandUserDBFieldName <<
                          internalSecurity.user->getName().getDB() <<
                          saslCommandUserFieldName << internalSecurity.user->getName().getUser() <<
                          saslCommandPasswordFieldName << credentials.password <<

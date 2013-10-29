@@ -170,7 +170,7 @@ namespace {
         std::string targetDatabase;
         try {
             Status status = bsonExtractStringFieldWithDefault(saslParameters,
-                                                              saslCommandUserSourceFieldName,
+                                                              saslCommandUserDBFieldName,
                                                               saslDefaultDBName,
                                                               &targetDatabase);
             if (!status.isOK())

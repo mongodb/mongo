@@ -64,7 +64,7 @@ namespace {
         for ( ; nameIter.more(); nameIter.next()) {
             BSONObjBuilder nextUser(allUsers.subobjStart());
             nextUser.append(AuthorizationManager::USER_NAME_FIELD_NAME, nameIter->getUser());
-            nextUser.append(AuthorizationManager::USER_SOURCE_FIELD_NAME, nameIter->getDB());
+            nextUser.append(AuthorizationManager::USER_DB_FIELD_NAME, nameIter->getDB());
             nextUser.doneFast();
 
             if (nameIter->getDB() == opdb) {

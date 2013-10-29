@@ -75,7 +75,7 @@ namespace mongo {
         ~AuthorizationManager();
 
         static const std::string USER_NAME_FIELD_NAME;
-        static const std::string USER_SOURCE_FIELD_NAME;
+        static const std::string USER_DB_FIELD_NAME;
         static const std::string ROLE_NAME_FIELD_NAME;
         static const std::string ROLE_SOURCE_FIELD_NAME;
         static const std::string PASSWORD_FIELD_NAME;

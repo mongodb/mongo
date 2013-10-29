@@ -337,7 +337,7 @@ namespace mongo {
         if (serverGlobalParams.clusterAuthMode == "x509" ||
             serverGlobalParams.clusterAuthMode == "sendX509") {
             setInternalUserAuthParams(BSON(saslCommandMechanismFieldName << "MONGODB-X509" <<
-                                           saslCommandUserSourceFieldName << "$external" <<
+                                           saslCommandUserDBFieldName << "$external" <<
                                            saslCommandUserFieldName << 
                                            getSSLManager()->getClientSubjectName()));
         }
