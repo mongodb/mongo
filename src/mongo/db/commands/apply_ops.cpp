@@ -37,6 +37,7 @@
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/dbhash.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/matcher.h"
 #include "mongo/db/repl/oplog.h"
@@ -108,14 +109,18 @@ namespace mongo {
             while ( i.more() ) {
                 BSONElement e = i.next();
                 const BSONObj& temp = e.Obj();
-                
-                Client::Context ctx(temp["ns"].String());
+
+                string ns = temp["ns"].String();
+
+                Client::Context ctx(ns);
                 bool failed = applyOperation_inlock(temp, false, alwaysUpsert);
                 ab.append(!failed);
                 if ( failed )
                     errors++;
 
                 num++;
+
+                logOpForDbHash( "u", ns.c_str(), BSONObj(), NULL, NULL, false );
             }
 
             result.append( "applied" , num );
