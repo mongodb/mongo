@@ -195,6 +195,13 @@ namespace mongo {
          */
         void endFetchPhase() {
             _lock.lock();
+            // We do not clear _authzManager->_isFetchPhaseBusy or notify waiters until
+            // ~CacheGuard(), for two reasons.  First, there's no value to notifying the waiters
+            // before you're ready to release the mutex, because they'll just go to sleep on the
+            // mutex.  Second, in order to meaningfully check the preconditions of
+            // isSameCacheGeneration(), we need a state that means "fetch phase was entered and now
+            // has been exited."  That state is _isThisGuardInFetchPhase == true and
+            // _lock.owns_lock() == true.
         }
 
         /**
@@ -204,7 +211,8 @@ namespace mongo {
          * If this returns true, do not update the cached data with this
          */
         bool isSameCacheGeneration() const {
-            fassert(17223, _isThisGuardInFetchPhase && _lock.owns_lock());
+            fassert(17223, _isThisGuardInFetchPhase);
+            fassert(17231, _lock.owns_lock());
             return _startGeneration == _authzManager->_cacheGeneration;
         }
 
