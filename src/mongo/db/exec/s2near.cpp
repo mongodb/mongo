@@ -166,18 +166,25 @@ namespace mongo {
 
         // Step 3: Actually create the ixscan.
         // TODO: Cache params.
+
+        Database* db = cc().database();
+        if ( !db ) {
+            _failed = true;
+            return;
+        }
+
+        Collection* collection = db->getCollection( _ns );
+        if ( !collection ) {
+            _failed = true;
+            return;
+        }
+
         IndexScanParams params;
-        NamespaceDetails* nsd = nsdetails(_ns.c_str());
-        if (NULL == nsd) {
+        params.descriptor = collection->getIndexCatalog()->findIndexByKeyPattern( _indexKeyPattern );
+        if ( !params.descriptor ) {
             _failed = true;
             return;
         }
-        int idxNo = nsd->findIndexByKeyPattern(_indexKeyPattern);
-        if (-1 == idxNo) {
-            _failed = true;
-            return;
-        }
-        params.descriptor = CatalogHack::getDescriptor(nsd, idxNo);
         params.bounds = _baseBounds;
         params.direction = 1;
         IndexScan* scan = new IndexScan(params, _ws, NULL);

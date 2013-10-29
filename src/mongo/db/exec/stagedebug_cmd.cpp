@@ -171,15 +171,17 @@ namespace mongo {
             string nodeName = firstElt.fieldName();
 
             if ("ixscan" == nodeName) {
-                NamespaceDetails* nsd = nsdetails(dbname + "." + nodeArgs["name"].String());
-                uassert(16913, "Can't find collection " + nodeArgs["name"].String(), nsd);
 
-                int idxNo = nsd->findIndexByKeyPattern(nodeArgs["keyPattern"].Obj());
-                uassert(16890, "Can't find index: " + nodeArgs["keyPattern"].Obj().toString(),
-                        idxNo != -1);
+                Database* db = cc().database();
+                Collection* collection = db->getCollection( dbname + "." + nodeArgs["name"].String() );
+                uassert(16913, "Can't find collection " + nodeArgs["name"].String(), collection);
+
+                IndexDescriptor* desc =
+                    collection->getIndexCatalog()->findIndexByKeyPattern(nodeArgs["keyPattern"].Obj());
+                uassert(16890, "Can't find index: " + nodeArgs["keyPattern"].Obj().toString(), desc );
 
                 IndexScanParams params;
-                params.descriptor = CatalogHack::getDescriptor(nsd, idxNo);
+                params.descriptor = desc;
                 params.bounds.isSimpleRange = true;
                 params.bounds.startKey = nodeArgs["startKey"].Obj();
                 params.bounds.endKey = nodeArgs["endKey"].Obj();
@@ -347,18 +349,19 @@ namespace mongo {
                 return mergeStage.release();
             }
             else if ("text" == nodeName) {
-                string collection = nodeArgs["name"].String();
+                string ns = nodeArgs["name"].String();
                 string search = nodeArgs["search"].String();
-                NamespaceDetails* ns = nsdetails(collection.c_str());
-                uassert(17193, "Can't find namespace " + collection, NULL != ns);
+                Database* db = cc().database();
+                Collection* collection = db->getCollection( ns );
+                uassert(17193, "Can't find namespace " + ns, collection);
                 vector<int> idxMatches;
-                ns->findIndexByType("text", idxMatches);
+                collection->details()->findIndexByType("text", idxMatches);
                 uassert(17194, "Expected exactly one text index", idxMatches.size() == 1);
 
-                IndexDescriptor* index = CatalogHack::getDescriptor(ns, idxMatches[0]);
+                IndexDescriptor* index = collection->getIndexCatalog()->getDescriptor(idxMatches[0]);
                 auto_ptr<FTSAccessMethod> fam(new FTSAccessMethod(index));
                 TextStageParams params(fam->getSpec());
-                params.ns = collection;
+                params.ns = ns;
                 params.index = index;
                 params.limit = 100;
 

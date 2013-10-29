@@ -83,14 +83,16 @@ namespace mongo {
             // priority queue for results
             Results results;
 
-            NamespaceDetails * d = nsdetails( ns.c_str() );
-            if ( !d ) {
+            Database* db = cc().database();
+            Collection* collection = db->getCollection( ns );
+
+            if ( !collection ) {
                 errmsg = "can't find ns";
                 return false;
             }
 
             vector<int> idxMatches;
-            d->findIndexByType( INDEX_NAME, idxMatches );
+            collection->details()->findIndexByType( INDEX_NAME, idxMatches );
             if ( idxMatches.size() == 0 ) {
                 errmsg = str::stream() << "no text index for: " << ns;
                 return false;
@@ -102,8 +104,8 @@ namespace mongo {
 
             BSONObj indexPrefix;
 
-            auto_ptr<IndexDescriptor> descriptor(CatalogHack::getDescriptor(d, idxMatches[0]));
-            auto_ptr<FTSAccessMethod> fam(new FTSAccessMethod(descriptor.get()));
+            IndexDescriptor* descriptor = collection->getIndexCatalog()->getDescriptor(idxMatches[0]);
+            auto_ptr<FTSAccessMethod> fam(new FTSAccessMethod(descriptor));
             if ( language == "" ) {
                 language = fam->getSpec().defaultLanguage();
             }
@@ -122,7 +124,7 @@ namespace mongo {
             result.append( "queryDebugString", query.debugString() );
             result.append( "language", language );
 
-            FTSSearch search(descriptor.get(), fam->getSpec(), indexPrefix, query, filter );
+            FTSSearch search(descriptor, fam->getSpec(), indexPrefix, query, filter );
             search.go( &results, limit );
 
             // grab underlying container inside priority queue
