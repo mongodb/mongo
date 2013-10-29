@@ -33,6 +33,7 @@
 #include "mongo/db/storage/index_details.h"  // For IndexDetails.
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_details.h"  // For NamespaceDetails.
+#include "mongo/db/structure/collection.h"
 
 namespace mongo {
 
@@ -59,9 +60,9 @@ namespace mongo {
          * OnDiskIndexData is a pointer to the memory mapped per-index data.
          * infoObj is a copy of the index-describing BSONObj contained in the OnDiskIndexData.
          */
-        IndexDescriptor(NamespaceDetails* namespaceDetails, int indexNumber, OnDiskIndexData* data,
+        IndexDescriptor(Collection* collection, int indexNumber, OnDiskIndexData* data,
                         BSONObj infoObj)
-            : _namespaceDetails(namespaceDetails), _indexNumber(indexNumber), _onDiskData(data),
+            : _collection(collection), _indexNumber(indexNumber), _onDiskData(data),
               _infoObj(infoObj.getOwned()),
               _numFields(infoObj.getObjectField("key").nFields()),
               _keyPattern(infoObj.getObjectField("key").getOwned()),
@@ -84,7 +85,7 @@ namespace mongo {
 
         // XXX this is terrible
         IndexDescriptor* clone() const {
-            return new IndexDescriptor(_namespaceDetails, _indexNumber, _onDiskData, _infoObj);
+            return new IndexDescriptor(_collection, _indexNumber, _onDiskData, _infoObj);
         }
 
         //
@@ -131,7 +132,7 @@ namespace mongo {
         bool isSparse() const { return _sparse; }
 
         // Is this index multikey?
-        bool isMultikey() const { return _namespaceDetails->isMultikey(_indexNumber); }
+        bool isMultikey() const { return _collection->details()->isMultikey(_indexNumber); }
 
         bool isIdIndex() const { return _isIdIndex; }
 
@@ -161,20 +162,26 @@ namespace mongo {
 
         // Set multikey attribute.  We never unset it.
         void setMultikey() {
-            _namespaceDetails->setIndexIsMultikey(parentNS().c_str(), _indexNumber);
+            _collection->details()->setIndexIsMultikey(parentNS().c_str(), _indexNumber);
         }
 
         // Is this index being created in the background?
         bool isBackgroundIndex() const {
-            return _indexNumber >= _namespaceDetails->getCompletedIndexCount();
+            return _indexNumber >= _collection->details()->getCompletedIndexCount();
         }
+
+        // this is the collection over which the index is over
+        Collection* getIndexedCollection() const { return _collection; }
+
+        // this is the owner of this IndexDescriptor
+        IndexCatalog* getIndexCatalog() const { return _collection->getIndexCatalog(); }
 
     private:
 
         int getIndexNumber() const { return _indexNumber; }
 
         // Related catalog information of the parent collection
-        NamespaceDetails* _namespaceDetails;
+        Collection* _collection;
 
         // What # index are we in the catalog represented by _namespaceDetails?  Needed for setting
         // and getting multikey.

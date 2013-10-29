@@ -58,12 +58,12 @@ namespace mongo {
         // If the query is using complex bounds, we must use a Btree access method, since that's the
         // only one that handles complex bounds.
         if (params.forceBtreeAccessMethod || !_params.bounds.isSimpleRange) {
-            _iam = CatalogHack::getBtreeIndex(_descriptor);
+            _iam = _descriptor->getIndexCatalog()->getBtreeIndex(_descriptor);
             amName = "";
         }
         else {
-            amName = CatalogHack::getAccessMethodName(_descriptor->keyPattern());
-            _iam = CatalogHack::getIndex(_descriptor);
+            amName = _descriptor->getIndexCatalog()->getAccessMethodName(_descriptor->keyPattern());
+            _iam = _descriptor->getIndexCatalog()->getIndex(_descriptor);
         }
 
         if (IndexNames::GEO_2D == amName || IndexNames::GEO_2DSPHERE == amName) {

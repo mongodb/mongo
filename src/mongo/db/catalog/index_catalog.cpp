@@ -728,10 +728,24 @@ namespace mongo {
         if ( static_cast<unsigned>( idxNo ) >= _descriptorCache.size() )
             _descriptorCache.resize( idxNo + 1 );
 
-        _descriptorCache[idxNo] = new IndexDescriptor( _details, idxNo,
+        _descriptorCache[idxNo] = new IndexDescriptor( _collection, idxNo,
                                                        id, id->info.obj().getOwned());
         return _descriptorCache[idxNo];
     }
+
+    IndexAccessMethod* IndexCatalog::getBtreeIndex( IndexDescriptor* desc ) {
+        _checkMagic();
+        int idxNo = desc->getIndexNumber();
+
+        if ( _forcedBtreeAccessMethodCache[idxNo] ) {
+            return _forcedBtreeAccessMethodCache[idxNo];
+        }
+
+        BtreeAccessMethod* newlyCreated = new BtreeAccessMethod( desc );
+        _forcedBtreeAccessMethodCache[idxNo] = newlyCreated;
+        return newlyCreated;
+    }
+
 
     IndexAccessMethod* IndexCatalog::getIndex( IndexDescriptor* desc ) {
         _checkMagic();

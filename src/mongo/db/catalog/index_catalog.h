@@ -43,6 +43,7 @@ namespace mongo {
     class IndexDescriptor;
     class IndexDetails;
     class IndexAccessMethod;
+    class BtreeAccessMethod;
     class BtreeBasedAccessMethod;
 
     /**
@@ -152,6 +153,9 @@ namespace mongo {
 
         int _removeFromSystemIndexes( const StringData& indexName );
 
+        string getAccessMethodName(const BSONObj& keyPattern) {
+            return _getAccessMethodName( keyPattern );
+        }
 
         // public static helpers
 
@@ -206,7 +210,7 @@ namespace mongo {
 
         std::vector<IndexDescriptor*> _descriptorCache;
         std::vector<IndexAccessMethod*> _accessMethodCache;
-        std::vector<BtreeBasedAccessMethod*> _forcedBtreeAccessMethodCache;
+        std::vector<BtreeAccessMethod*> _forcedBtreeAccessMethodCache;
 
         static const BSONObj _idObj; // { _id : 1 }
     };

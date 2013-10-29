@@ -106,7 +106,8 @@ namespace mongo {
 
         static IndexDescriptor* getDescriptor(NamespaceDetails* nsd, int idxNo) {
             IndexDetails& id = nsd->idx(idxNo);
-            return new IndexDescriptor(nsd, idxNo, &id, id.info.obj());
+            Collection* c = cc().database()->getCollection( id.parentNS() );
+            return new IndexDescriptor(c, idxNo, &id, id.info.obj());
         }
 
         static BtreeBasedAccessMethod* getBtreeBasedIndex(IndexDescriptor* desc) {
