@@ -24,39 +24,41 @@
 namespace mongo {
 
     Status addSSLServerOptions(moe::OptionSection* options) {
-        options->addOptionChaining("ssl.sslOnNormalPorts", "sslOnNormalPorts", moe::Switch,
-                "use ssl on configured ports");
+        options->addOptionChaining("net.ssl.sslOnNormalPorts", "sslOnNormalPorts", moe::Switch,
+                "use ssl on configured ports")
+                                  .setSources(moe::SourceAllLegacy);
 
-        options->addOptionChaining("ssl.mode", "sslMode", moe::String,
-                "set the SSL operation mode (disabled|allowSSL|preferSSL|requireSSL)");
+        options->addOptionChaining("net.ssl.mode", "sslMode", moe::String,
+                "set the SSL operation mode (noSSL|acceptSSL|sendAcceptSSL|sslOnly)");
 
-        options->addOptionChaining("ssl.PEMKeyFile", "sslPEMKeyFile", moe::String,
+        options->addOptionChaining("net.ssl.PEMKeyFile", "sslPEMKeyFile", moe::String,
                 "PEM file for ssl");
 
-        options->addOptionChaining("ssl.PEMKeyPassword", "sslPEMKeyPassword", moe::String,
+        options->addOptionChaining("net.ssl.PEMKeyPassword", "sslPEMKeyPassword", moe::String,
                 "PEM file password")
                                   .setImplicit(moe::Value(std::string("")));
 
-        options->addOptionChaining("ssl.clusterFile", "sslClusterFile", moe::String,
+        options->addOptionChaining("net.ssl.clusterFile", "sslClusterFile", moe::String,
                 "Key file for internal SSL authentication");
 
-        options->addOptionChaining("ssl.clusterPassword", "sslClusterPassword", moe::String,
+        options->addOptionChaining("net.ssl.clusterPassword", "sslClusterPassword", moe::String,
                 "Internal authentication key file password")
                                   .setImplicit(moe::Value(std::string("")));
 
-        options->addOptionChaining("ssl.CAFile", "sslCAFile", moe::String,
+        options->addOptionChaining("net.ssl.CAFile", "sslCAFile", moe::String,
                 "Certificate Authority file for SSL");
 
-        options->addOptionChaining("ssl.CRLFile", "sslCRLFile", moe::String,
+        options->addOptionChaining("net.ssl.CRLFile", "sslCRLFile", moe::String,
                 "Certificate Revocation List file for SSL");
 
-        options->addOptionChaining("ssl.weakCertificateValidation", "sslWeakCertificateValidation",
-                moe::Switch, "allow client to connect without presenting a certificate");
+        options->addOptionChaining("net.ssl.weakCertificateValidation",
+                "sslWeakCertificateValidation", moe::Switch, "allow client to connect without "
+                "presenting a certificate");
 
-        options->addOptionChaining("ssl.allowInvalidCertificates", "sslAllowInvalidCertificates",
+        options->addOptionChaining("net.ssl.allowInvalidCertificates", "sslAllowInvalidCertificates",
                     moe::Switch, "allow connections to servers with invalid certificates");
 
-        options->addOptionChaining("ssl.FIPSMode", "sslFIPSMode", moe::Switch,
+        options->addOptionChaining("net.ssl.FIPSMode", "sslFIPSMode", moe::Switch,
                 "activate FIPS 140-2 mode at startup");
 
         return Status::OK();
@@ -95,8 +97,8 @@ namespace mongo {
 
     Status storeSSLServerOptions(const moe::Environment& params) {
 
-        if (params.count("ssl.mode")) {
-            std::string sslModeParam = params["ssl.mode"].as<string>();
+        if (params.count("net.ssl.mode")) {
+            std::string sslModeParam = params["net.ssl.mode"].as<string>();
             if (sslModeParam == "disabled") {
                 sslGlobalParams.sslMode.store(SSLGlobalParams::SSLMode_disabled);
             }
@@ -110,51 +112,52 @@ namespace mongo {
                 sslGlobalParams.sslMode.store(SSLGlobalParams::SSLMode_requireSSL);
             }
             else {
-                return Status(ErrorCodes::BadValue, 
+                return Status(ErrorCodes::BadValue,
                               "unsupported value for sslMode " + sslModeParam );
             }
         }
 
-        if (params.count("ssl.PEMKeyFile")) {
+        if (params.count("net.ssl.PEMKeyFile")) {
             sslGlobalParams.sslPEMKeyFile = boost::filesystem::absolute(
-                                        params["ssl.PEMKeyFile"].as<string>()).generic_string();
+                                        params["net.ssl.PEMKeyFile"].as<string>()).generic_string();
         }
 
-        if (params.count("ssl.PEMKeyPassword")) {
-            sslGlobalParams.sslPEMKeyPassword = params["ssl.PEMKeyPassword"].as<string>();
+        if (params.count("net.ssl.PEMKeyPassword")) {
+            sslGlobalParams.sslPEMKeyPassword = params["net.ssl.PEMKeyPassword"].as<string>();
         }
 
-        if (params.count("ssl.clusterFile")) {
-            sslGlobalParams.sslClusterFile = boost::filesystem::absolute(
-                                         params["ssl.clusterFile"].as<string>()).generic_string();
+        if (params.count("net.ssl.clusterFile")) {
+            sslGlobalParams.sslClusterFile =
+                boost::filesystem::absolute(
+                        params["net.ssl.clusterFile"].as<string>()).generic_string();
         }
 
-        if (params.count("ssl.clusterPassword")) {
-            sslGlobalParams.sslClusterPassword = params["ssl.clusterPassword"].as<string>();
+        if (params.count("net.ssl.clusterPassword")) {
+            sslGlobalParams.sslClusterPassword = params["net.ssl.clusterPassword"].as<string>();
         }
 
-        if (params.count("ssl.CAFile")) {
+        if (params.count("net.ssl.CAFile")) {
             sslGlobalParams.sslCAFile = boost::filesystem::absolute(
-                                         params["ssl.CAFile"].as<std::string>()).generic_string();
+                                         params["net.ssl.CAFile"].as<std::string>()).generic_string();
         }
 
-        if (params.count("ssl.CRLFile")) {
+        if (params.count("net.ssl.CRLFile")) {
             sslGlobalParams.sslCRLFile = boost::filesystem::absolute(
-                                         params["ssl.CRLFile"].as<std::string>()).generic_string();
+                                         params["net.ssl.CRLFile"].as<std::string>()).generic_string();
         }
 
-        if (params.count("ssl.weakCertificateValidation")) {
+        if (params.count("net.ssl.weakCertificateValidation")) {
             sslGlobalParams.sslWeakCertificateValidation = true;
         }
-        if (params.count("ssl.allowInvalidCertificates")) {
+        if (params.count("net.ssl.allowInvalidCertificates")) {
             sslGlobalParams.sslAllowInvalidCertificates = true;
         }
-        if (params.count("ssl.FIPSMode")) {
+        if (params.count("net.ssl.FIPSMode")) {
             sslGlobalParams.sslFIPSMode = true;
         }
 
-        if (params.count("ssl.sslOnNormalPorts")) {
-            if (params.count("ssl.mode")) {
+        if (params.count("net.ssl.sslOnNormalPorts")) {
+            if (params.count("net.ssl.mode")) {
                     return Status(ErrorCodes::BadValue, 
                                   "can't have both sslMode and sslOnNormalPorts");
             }

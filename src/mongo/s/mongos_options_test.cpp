@@ -45,7 +45,19 @@ namespace {
                 ASSERT_TRUE(iterator->_default.isEmpty());
                 ASSERT_TRUE(iterator->_implicit.isEmpty());
                 ASSERT_EQUALS(iterator->_isComposing, false);
-                ASSERT_EQUALS(iterator->_sources, moe::SourceAll);
+                ASSERT_EQUALS(iterator->_sources, moe::SourceAllLegacy);
+                ASSERT_EQUALS(iterator->_positionalStart, -1);
+                ASSERT_EQUALS(iterator->_positionalEnd, -1);
+            }
+            else if (iterator->_dottedName == "sharding.autoSplit") {
+                ASSERT_EQUALS(iterator->_singleName, "");
+                ASSERT_EQUALS(iterator->_type, moe::Bool);
+                ASSERT_EQUALS(iterator->_description, "send split commands with writes");
+                ASSERT_EQUALS(iterator->_isVisible, true);
+                ASSERT_TRUE(iterator->_default.isEmpty());
+                ASSERT_TRUE(iterator->_implicit.isEmpty());
+                ASSERT_EQUALS(iterator->_isComposing, false);
+                ASSERT_EQUALS(iterator->_sources, moe::SourceYAMLConfig);
                 ASSERT_EQUALS(iterator->_positionalStart, -1);
                 ASSERT_EQUALS(iterator->_positionalEnd, -1);
             }
@@ -57,7 +69,7 @@ namespace {
                 ASSERT_TRUE(iterator->_default.isEmpty());
                 ASSERT_TRUE(iterator->_implicit.isEmpty());
                 ASSERT_EQUALS(iterator->_isComposing, false);
-                ASSERT_EQUALS(iterator->_sources, moe::SourceAll);
+                ASSERT_EQUALS(iterator->_sources, moe::SourceAllLegacy);
                 ASSERT_EQUALS(iterator->_positionalStart, -1);
                 ASSERT_EQUALS(iterator->_positionalEnd, -1);
             }
@@ -69,7 +81,7 @@ namespace {
                 ASSERT_TRUE(iterator->_default.isEmpty());
                 ASSERT_TRUE(iterator->_implicit.isEmpty());
                 ASSERT_EQUALS(iterator->_isComposing, false);
-                ASSERT_EQUALS(iterator->_sources, moe::SourceAll);
+                ASSERT_EQUALS(iterator->_sources, moe::SourceAllLegacy);
                 ASSERT_EQUALS(iterator->_positionalStart, -1);
                 ASSERT_EQUALS(iterator->_positionalEnd, -1);
             }
@@ -81,7 +93,7 @@ namespace {
                 ASSERT_TRUE(iterator->_default.isEmpty());
                 ASSERT_TRUE(iterator->_implicit.isEmpty());
                 ASSERT_EQUALS(iterator->_isComposing, false);
-                ASSERT_EQUALS(iterator->_sources, moe::SourceAll);
+                ASSERT_EQUALS(iterator->_sources, moe::SourceAllLegacy);
                 ASSERT_EQUALS(iterator->_positionalStart, -1);
                 ASSERT_EQUALS(iterator->_positionalEnd, -1);
             }
@@ -94,11 +106,23 @@ namespace {
                 moe::Value implicitVal(std::string("v"));
                 ASSERT_TRUE(iterator->_implicit.equal(implicitVal));
                 ASSERT_EQUALS(iterator->_isComposing, false);
-                ASSERT_EQUALS(iterator->_sources, moe::SourceAll);
+                ASSERT_EQUALS(iterator->_sources, moe::SourceAllLegacy);
                 ASSERT_EQUALS(iterator->_positionalStart, -1);
                 ASSERT_EQUALS(iterator->_positionalEnd, -1);
             }
-            else if (iterator->_dottedName == "quiet") {
+            else if (iterator->_dottedName == "systemLog.verbosity") {
+                ASSERT_EQUALS(iterator->_singleName, "");
+                ASSERT_EQUALS(iterator->_type, moe::Int);
+                ASSERT_EQUALS(iterator->_description, "set verbose level");
+                ASSERT_EQUALS(iterator->_isVisible, true);
+                ASSERT_TRUE(iterator->_default.isEmpty());
+                ASSERT_TRUE(iterator->_implicit.isEmpty());
+                ASSERT_EQUALS(iterator->_isComposing, false);
+                ASSERT_EQUALS(iterator->_sources, moe::SourceYAMLConfig);
+                ASSERT_EQUALS(iterator->_positionalStart, -1);
+                ASSERT_EQUALS(iterator->_positionalEnd, -1);
+            }
+            else if (iterator->_dottedName == "systemLog.quiet") {
                 ASSERT_EQUALS(iterator->_singleName, "quiet");
                 ASSERT_EQUALS(iterator->_type, moe::Switch);
                 ASSERT_EQUALS(iterator->_description, "quieter output");
@@ -110,7 +134,7 @@ namespace {
                 ASSERT_EQUALS(iterator->_positionalStart, -1);
                 ASSERT_EQUALS(iterator->_positionalEnd, -1);
             }
-            else if (iterator->_dottedName == "port") {
+            else if (iterator->_dottedName == "net.port") {
                 ASSERT_EQUALS(iterator->_singleName, "port");
                 ASSERT_EQUALS(iterator->_type, moe::Int);
                 ASSERT_EQUALS(iterator->_description, "specify port number - 27017 by default");
@@ -122,7 +146,7 @@ namespace {
                 ASSERT_EQUALS(iterator->_positionalStart, -1);
                 ASSERT_EQUALS(iterator->_positionalEnd, -1);
             }
-            else if (iterator->_dottedName == "bind_ip") {
+            else if (iterator->_dottedName == "net.bindIp") {
                 ASSERT_EQUALS(iterator->_singleName, "bind_ip");
                 ASSERT_EQUALS(iterator->_type, moe::String);
                 ASSERT_EQUALS(iterator->_description, "comma separated list of ip addresses to listen on - all local ips by default");
@@ -134,7 +158,7 @@ namespace {
                 ASSERT_EQUALS(iterator->_positionalStart, -1);
                 ASSERT_EQUALS(iterator->_positionalEnd, -1);
             }
-            else if (iterator->_dottedName == "maxConns") {
+            else if (iterator->_dottedName == "net.maxIncomingConnections") {
                 ASSERT_EQUALS(iterator->_singleName, "maxConns");
                 ASSERT_EQUALS(iterator->_type, moe::Int);
                 ASSERT_EQUALS(iterator->_description, "max number of simultaneous connections - 20000 by default");
@@ -154,11 +178,35 @@ namespace {
                 ASSERT_TRUE(iterator->_default.isEmpty());
                 ASSERT_TRUE(iterator->_implicit.isEmpty());
                 ASSERT_EQUALS(iterator->_isComposing, false);
-                ASSERT_EQUALS(iterator->_sources, moe::SourceAll);
+                ASSERT_EQUALS(iterator->_sources, moe::SourceAllLegacy);
                 ASSERT_EQUALS(iterator->_positionalStart, -1);
                 ASSERT_EQUALS(iterator->_positionalEnd, -1);
             }
-            else if (iterator->_dottedName == "syslogFacility") {
+            else if (iterator->_dottedName == "systemLog.path") {
+                ASSERT_EQUALS(iterator->_singleName, "");
+                ASSERT_EQUALS(iterator->_type, moe::String);
+                ASSERT_EQUALS(iterator->_description, "log file to send writes to if logging to a file - has to be a file, not directory");
+                ASSERT_EQUALS(iterator->_isVisible, false);
+                ASSERT_TRUE(iterator->_default.isEmpty());
+                ASSERT_TRUE(iterator->_implicit.isEmpty());
+                ASSERT_EQUALS(iterator->_isComposing, false);
+                ASSERT_EQUALS(iterator->_sources, moe::SourceYAMLConfig);
+                ASSERT_EQUALS(iterator->_positionalStart, -1);
+                ASSERT_EQUALS(iterator->_positionalEnd, -1);
+            }
+            else if (iterator->_dottedName == "systemLog.destination") {
+                ASSERT_EQUALS(iterator->_singleName, "");
+                ASSERT_EQUALS(iterator->_type, moe::String);
+                ASSERT_EQUALS(iterator->_description, "Destination of system log output.  (syslog/file)");
+                ASSERT_EQUALS(iterator->_isVisible, false);
+                ASSERT_TRUE(iterator->_default.isEmpty());
+                ASSERT_TRUE(iterator->_implicit.isEmpty());
+                ASSERT_EQUALS(iterator->_isComposing, false);
+                ASSERT_EQUALS(iterator->_sources, moe::SourceYAMLConfig);
+                ASSERT_EQUALS(iterator->_positionalStart, -1);
+                ASSERT_EQUALS(iterator->_positionalEnd, -1);
+            }
+            else if (iterator->_dottedName == "systemLog.syslogFacility") {
                 ASSERT_EQUALS(iterator->_singleName, "syslogFacility");
                 ASSERT_EQUALS(iterator->_type, moe::String);
                 ASSERT_EQUALS(iterator->_description, "syslog facility used for monogdb syslog message");
@@ -170,7 +218,7 @@ namespace {
                 ASSERT_EQUALS(iterator->_positionalStart, -1);
                 ASSERT_EQUALS(iterator->_positionalEnd, -1);
             }
-            else if (iterator->_dottedName == "logappend") {
+            else if (iterator->_dottedName == "systemLog.logAppend") {
                 ASSERT_EQUALS(iterator->_singleName, "logappend");
                 ASSERT_EQUALS(iterator->_type, moe::Switch);
                 ASSERT_EQUALS(iterator->_description, "append to logpath instead of over-writing");
@@ -182,8 +230,8 @@ namespace {
                 ASSERT_EQUALS(iterator->_positionalStart, -1);
                 ASSERT_EQUALS(iterator->_positionalEnd, -1);
             }
-            else if (iterator->_dottedName == "logTimestampFormat") {
-                ASSERT_EQUALS(iterator->_singleName, "logTimestampFormat");
+            else if (iterator->_dottedName == "systemLog.timeStampFormat") {
+                ASSERT_EQUALS(iterator->_singleName, "timeStampFormat");
                 ASSERT_EQUALS(iterator->_type, moe::String);
                 ASSERT_EQUALS(iterator->_description, "Desired format for timestamps in log messages. One of ctime, iso8601-utc or iso8601-local");
                 ASSERT_EQUALS(iterator->_isVisible, true);
@@ -194,7 +242,7 @@ namespace {
                 ASSERT_EQUALS(iterator->_positionalStart, -1);
                 ASSERT_EQUALS(iterator->_positionalEnd, -1);
             }
-            else if (iterator->_dottedName == "pidfilepath") {
+            else if (iterator->_dottedName == "processManagement.pidFilePath") {
                 ASSERT_EQUALS(iterator->_singleName, "pidfilepath");
                 ASSERT_EQUALS(iterator->_type, moe::String);
                 ASSERT_EQUALS(iterator->_description, "full path to pidfile (if not set, no pidfile is created)");
@@ -206,7 +254,7 @@ namespace {
                 ASSERT_EQUALS(iterator->_positionalStart, -1);
                 ASSERT_EQUALS(iterator->_positionalEnd, -1);
             }
-            else if (iterator->_dottedName == "keyFile") {
+            else if (iterator->_dottedName == "security.keyFile") {
                 ASSERT_EQUALS(iterator->_singleName, "keyFile");
                 ASSERT_EQUALS(iterator->_type, moe::String);
                 ASSERT_EQUALS(iterator->_description, "private key for cluster authentication");
@@ -238,11 +286,59 @@ namespace {
                 ASSERT_TRUE(iterator->_default.isEmpty());
                 ASSERT_TRUE(iterator->_implicit.isEmpty());
                 ASSERT_EQUALS(iterator->_isComposing, false);
-                ASSERT_EQUALS(iterator->_sources, moe::SourceAll);
+                ASSERT_EQUALS(iterator->_sources, moe::SourceAllLegacy);
                 ASSERT_EQUALS(iterator->_positionalStart, -1);
                 ASSERT_EQUALS(iterator->_positionalEnd, -1);
             }
-            else if (iterator->_dottedName == "clusterAuthMode") {
+            else if (iterator->_dottedName == "net.http.enabled") {
+                ASSERT_EQUALS(iterator->_singleName, "");
+                ASSERT_EQUALS(iterator->_type, moe::Bool);
+                ASSERT_EQUALS(iterator->_description, "enable http interface");
+                ASSERT_EQUALS(iterator->_isVisible, true);
+                ASSERT_TRUE(iterator->_default.isEmpty());
+                ASSERT_TRUE(iterator->_implicit.isEmpty());
+                ASSERT_EQUALS(iterator->_isComposing, false);
+                ASSERT_EQUALS(iterator->_sources, moe::SourceYAMLConfig);
+                ASSERT_EQUALS(iterator->_positionalStart, -1);
+                ASSERT_EQUALS(iterator->_positionalEnd, -1);
+            }
+            else if (iterator->_dottedName == "net.http.port") {
+                ASSERT_EQUALS(iterator->_singleName, "");
+                ASSERT_EQUALS(iterator->_type, moe::Switch);
+                ASSERT_EQUALS(iterator->_description, "port to listen on for http interface");
+                ASSERT_EQUALS(iterator->_isVisible, true);
+                ASSERT_TRUE(iterator->_default.isEmpty());
+                ASSERT_TRUE(iterator->_implicit.isEmpty());
+                ASSERT_EQUALS(iterator->_isComposing, false);
+                ASSERT_EQUALS(iterator->_sources, moe::SourceYAMLConfig);
+                ASSERT_EQUALS(iterator->_positionalStart, -1);
+                ASSERT_EQUALS(iterator->_positionalEnd, -1);
+            }
+            else if (iterator->_dottedName == "net.http.RESTInterfaceEnabled") {
+                ASSERT_EQUALS(iterator->_singleName, "");
+                ASSERT_EQUALS(iterator->_type, moe::Switch);
+                ASSERT_EQUALS(iterator->_description, "enable http interface");
+                ASSERT_EQUALS(iterator->_isVisible, true);
+                ASSERT_TRUE(iterator->_default.isEmpty());
+                ASSERT_TRUE(iterator->_implicit.isEmpty());
+                ASSERT_EQUALS(iterator->_isComposing, false);
+                ASSERT_EQUALS(iterator->_sources, moe::SourceYAMLConfig);
+                ASSERT_EQUALS(iterator->_positionalStart, -1);
+                ASSERT_EQUALS(iterator->_positionalEnd, -1);
+            }
+            else if (iterator->_dottedName == "net.http.JSONPEnabled") {
+                ASSERT_EQUALS(iterator->_singleName, "");
+                ASSERT_EQUALS(iterator->_type, moe::Switch);
+                ASSERT_EQUALS(iterator->_description, "enable http interface");
+                ASSERT_EQUALS(iterator->_isVisible, true);
+                ASSERT_TRUE(iterator->_default.isEmpty());
+                ASSERT_TRUE(iterator->_implicit.isEmpty());
+                ASSERT_EQUALS(iterator->_isComposing, false);
+                ASSERT_EQUALS(iterator->_sources, moe::SourceYAMLConfig);
+                ASSERT_EQUALS(iterator->_positionalStart, -1);
+                ASSERT_EQUALS(iterator->_positionalEnd, -1);
+            }
+            else if (iterator->_dottedName == "security.clusterAuthMode") {
                 ASSERT_EQUALS(iterator->_singleName, "clusterAuthMode");
                 ASSERT_EQUALS(iterator->_type, moe::String);
                 ASSERT_EQUALS(iterator->_description, "Authentication mode used for cluster authentication. Alternatives are (keyFile|sendKeyFile|sendX509|x509)");
@@ -262,11 +358,23 @@ namespace {
                 ASSERT_TRUE(iterator->_default.isEmpty());
                 ASSERT_TRUE(iterator->_implicit.isEmpty());
                 ASSERT_EQUALS(iterator->_isComposing, false);
-                ASSERT_EQUALS(iterator->_sources, moe::SourceAll);
+                ASSERT_EQUALS(iterator->_sources, moe::SourceAllLegacy);
                 ASSERT_EQUALS(iterator->_positionalStart, -1);
                 ASSERT_EQUALS(iterator->_positionalEnd, -1);
             }
-            else if (iterator->_dottedName == "unixSocketPrefix") {
+            else if (iterator->_dottedName == "net.unixDomainSocket.enabled") {
+                ASSERT_EQUALS(iterator->_singleName, "");
+                ASSERT_EQUALS(iterator->_type, moe::Bool);
+                ASSERT_EQUALS(iterator->_description, "disable listening on unix sockets");
+                ASSERT_EQUALS(iterator->_isVisible, true);
+                ASSERT_TRUE(iterator->_default.isEmpty());
+                ASSERT_TRUE(iterator->_implicit.isEmpty());
+                ASSERT_EQUALS(iterator->_isComposing, false);
+                ASSERT_EQUALS(iterator->_sources, moe::SourceYAMLConfig);
+                ASSERT_EQUALS(iterator->_positionalStart, -1);
+                ASSERT_EQUALS(iterator->_positionalEnd, -1);
+            }
+            else if (iterator->_dottedName == "net.unixDomainSocket.pathPrefix") {
                 ASSERT_EQUALS(iterator->_singleName, "unixSocketPrefix");
                 ASSERT_EQUALS(iterator->_type, moe::String);
                 ASSERT_EQUALS(iterator->_description, "alternative directory for UNIX domain sockets (defaults to /tmp)");
@@ -278,7 +386,7 @@ namespace {
                 ASSERT_EQUALS(iterator->_positionalStart, -1);
                 ASSERT_EQUALS(iterator->_positionalEnd, -1);
             }
-            else if (iterator->_dottedName == "fork") {
+            else if (iterator->_dottedName == "processManagement.fork") {
                 ASSERT_EQUALS(iterator->_singleName, "fork");
                 ASSERT_EQUALS(iterator->_type, moe::Switch);
                 ASSERT_EQUALS(iterator->_description, "fork server process");
@@ -290,7 +398,7 @@ namespace {
                 ASSERT_EQUALS(iterator->_positionalStart, -1);
                 ASSERT_EQUALS(iterator->_positionalEnd, -1);
             }
-            else if (iterator->_dottedName == "syslog") {
+            else if (iterator->_dottedName == "systemLog.syslog") {
                 ASSERT_EQUALS(iterator->_singleName, "syslog");
                 ASSERT_EQUALS(iterator->_type, moe::Switch);
                 ASSERT_EQUALS(iterator->_description, "log to system's syslog facility instead of file or stdout");
@@ -298,7 +406,7 @@ namespace {
                 ASSERT_TRUE(iterator->_default.isEmpty());
                 ASSERT_TRUE(iterator->_implicit.isEmpty());
                 ASSERT_EQUALS(iterator->_isComposing, false);
-                ASSERT_EQUALS(iterator->_sources, moe::SourceAll);
+                ASSERT_EQUALS(iterator->_sources, moe::SourceAllLegacy);
                 ASSERT_EQUALS(iterator->_positionalStart, -1);
                 ASSERT_EQUALS(iterator->_positionalEnd, -1);
             }
@@ -310,7 +418,7 @@ namespace {
                 ASSERT_TRUE(iterator->_default.isEmpty());
                 ASSERT_TRUE(iterator->_implicit.isEmpty());
                 ASSERT_EQUALS(iterator->_isComposing, false);
-                ASSERT_EQUALS(iterator->_sources, moe::SourceAll);
+                ASSERT_EQUALS(iterator->_sources, moe::SourceAllLegacy);
                 ASSERT_EQUALS(iterator->_positionalStart, -1);
                 ASSERT_EQUALS(iterator->_positionalEnd, -1);
             }
@@ -322,7 +430,7 @@ namespace {
                 ASSERT_TRUE(iterator->_default.isEmpty());
                 ASSERT_TRUE(iterator->_implicit.isEmpty());
                 ASSERT_EQUALS(iterator->_isComposing, false);
-                ASSERT_EQUALS(iterator->_sources, moe::SourceAll);
+                ASSERT_EQUALS(iterator->_sources, moe::SourceAllLegacy);
                 ASSERT_EQUALS(iterator->_positionalStart, -1);
                 ASSERT_EQUALS(iterator->_positionalEnd, -1);
             }
@@ -334,7 +442,7 @@ namespace {
                 ASSERT_TRUE(iterator->_default.isEmpty());
                 ASSERT_TRUE(iterator->_implicit.isEmpty());
                 ASSERT_EQUALS(iterator->_isComposing, false);
-                ASSERT_EQUALS(iterator->_sources, moe::SourceAll);
+                ASSERT_EQUALS(iterator->_sources, moe::SourceAllLegacy);
                 ASSERT_EQUALS(iterator->_positionalStart, -1);
                 ASSERT_EQUALS(iterator->_positionalEnd, -1);
             }
@@ -346,7 +454,7 @@ namespace {
                 ASSERT_TRUE(iterator->_default.isEmpty());
                 ASSERT_TRUE(iterator->_implicit.isEmpty());
                 ASSERT_EQUALS(iterator->_isComposing, false);
-                ASSERT_EQUALS(iterator->_sources, moe::SourceAll);
+                ASSERT_EQUALS(iterator->_sources, moe::SourceAllLegacy);
                 ASSERT_EQUALS(iterator->_positionalStart, -1);
                 ASSERT_EQUALS(iterator->_positionalEnd, -1);
             }
@@ -358,7 +466,7 @@ namespace {
                 ASSERT_TRUE(iterator->_default.isEmpty());
                 ASSERT_TRUE(iterator->_implicit.isEmpty());
                 ASSERT_EQUALS(iterator->_isComposing, false);
-                ASSERT_EQUALS(iterator->_sources, moe::SourceAll);
+                ASSERT_EQUALS(iterator->_sources, moe::SourceAllLegacy);
                 ASSERT_EQUALS(iterator->_positionalStart, -1);
                 ASSERT_EQUALS(iterator->_positionalEnd, -1);
             }
@@ -370,7 +478,7 @@ namespace {
                 ASSERT_TRUE(iterator->_default.isEmpty());
                 ASSERT_TRUE(iterator->_implicit.isEmpty());
                 ASSERT_EQUALS(iterator->_isComposing, false);
-                ASSERT_EQUALS(iterator->_sources, moe::SourceAll);
+                ASSERT_EQUALS(iterator->_sources, moe::SourceAllLegacy);
                 ASSERT_EQUALS(iterator->_positionalStart, -1);
                 ASSERT_EQUALS(iterator->_positionalEnd, -1);
             }
@@ -382,7 +490,7 @@ namespace {
                 ASSERT_TRUE(iterator->_default.isEmpty());
                 ASSERT_TRUE(iterator->_implicit.isEmpty());
                 ASSERT_EQUALS(iterator->_isComposing, false);
-                ASSERT_EQUALS(iterator->_sources, moe::SourceAll);
+                ASSERT_EQUALS(iterator->_sources, moe::SourceAllLegacy);
                 ASSERT_EQUALS(iterator->_positionalStart, -1);
                 ASSERT_EQUALS(iterator->_positionalEnd, -1);
             }
@@ -394,7 +502,7 @@ namespace {
                 ASSERT_TRUE(iterator->_default.isEmpty());
                 ASSERT_TRUE(iterator->_implicit.isEmpty());
                 ASSERT_EQUALS(iterator->_isComposing, false);
-                ASSERT_EQUALS(iterator->_sources, moe::SourceAll);
+                ASSERT_EQUALS(iterator->_sources, moe::SourceAllLegacy);
                 ASSERT_EQUALS(iterator->_positionalStart, -1);
                 ASSERT_EQUALS(iterator->_positionalEnd, -1);
             }
@@ -406,7 +514,7 @@ namespace {
                 ASSERT_TRUE(iterator->_default.isEmpty());
                 ASSERT_TRUE(iterator->_implicit.isEmpty());
                 ASSERT_EQUALS(iterator->_isComposing, false);
-                ASSERT_EQUALS(iterator->_sources, moe::SourceAll);
+                ASSERT_EQUALS(iterator->_sources, moe::SourceAllLegacy);
                 ASSERT_EQUALS(iterator->_positionalStart, -1);
                 ASSERT_EQUALS(iterator->_positionalEnd, -1);
             }
@@ -418,7 +526,7 @@ namespace {
                 ASSERT_TRUE(iterator->_default.isEmpty());
                 ASSERT_TRUE(iterator->_implicit.isEmpty());
                 ASSERT_EQUALS(iterator->_isComposing, false);
-                ASSERT_EQUALS(iterator->_sources, moe::SourceAll);
+                ASSERT_EQUALS(iterator->_sources, moe::SourceAllLegacy);
                 ASSERT_EQUALS(iterator->_positionalStart, -1);
                 ASSERT_EQUALS(iterator->_positionalEnd, -1);
             }
@@ -430,7 +538,7 @@ namespace {
                 ASSERT_TRUE(iterator->_default.isEmpty());
                 ASSERT_TRUE(iterator->_implicit.isEmpty());
                 ASSERT_EQUALS(iterator->_isComposing, false);
-                ASSERT_EQUALS(iterator->_sources, moe::SourceAll);
+                ASSERT_EQUALS(iterator->_sources, moe::SourceAllLegacy);
                 ASSERT_EQUALS(iterator->_positionalStart, -1);
                 ASSERT_EQUALS(iterator->_positionalEnd, -1);
             }
@@ -442,7 +550,7 @@ namespace {
                 ASSERT_TRUE(iterator->_default.isEmpty());
                 ASSERT_TRUE(iterator->_implicit.isEmpty());
                 ASSERT_EQUALS(iterator->_isComposing, false);
-                ASSERT_EQUALS(iterator->_sources, moe::SourceAll);
+                ASSERT_EQUALS(iterator->_sources, moe::SourceAllLegacy);
                 ASSERT_EQUALS(iterator->_positionalStart, -1);
                 ASSERT_EQUALS(iterator->_positionalEnd, -1);
             }
@@ -454,7 +562,7 @@ namespace {
                 ASSERT_TRUE(iterator->_default.isEmpty());
                 ASSERT_TRUE(iterator->_implicit.isEmpty());
                 ASSERT_EQUALS(iterator->_isComposing, false);
-                ASSERT_EQUALS(iterator->_sources, moe::SourceAll);
+                ASSERT_EQUALS(iterator->_sources, moe::SourceAllLegacy);
                 ASSERT_EQUALS(iterator->_positionalStart, -1);
                 ASSERT_EQUALS(iterator->_positionalEnd, -1);
             }
@@ -466,11 +574,23 @@ namespace {
                 ASSERT_TRUE(iterator->_default.isEmpty());
                 ASSERT_TRUE(iterator->_implicit.isEmpty());
                 ASSERT_EQUALS(iterator->_isComposing, false);
-                ASSERT_EQUALS(iterator->_sources, moe::SourceAll);
+                ASSERT_EQUALS(iterator->_sources, moe::SourceAllLegacy);
                 ASSERT_EQUALS(iterator->_positionalStart, -1);
                 ASSERT_EQUALS(iterator->_positionalEnd, -1);
             }
-            else if (iterator->_dottedName == "traceExceptions") {
+            else if (iterator->_dottedName == "net.wireObjectCheck") {
+                ASSERT_EQUALS(iterator->_singleName, "");
+                ASSERT_EQUALS(iterator->_type, moe::Bool);
+                ASSERT_EQUALS(iterator->_description, "inspect client data for validity on receipt (DEFAULT)");
+                ASSERT_EQUALS(iterator->_isVisible, false);
+                ASSERT_TRUE(iterator->_default.isEmpty());
+                ASSERT_TRUE(iterator->_implicit.isEmpty());
+                ASSERT_EQUALS(iterator->_isComposing, false);
+                ASSERT_EQUALS(iterator->_sources, moe::SourceYAMLConfig);
+                ASSERT_EQUALS(iterator->_positionalStart, -1);
+                ASSERT_EQUALS(iterator->_positionalEnd, -1);
+            }
+            else if (iterator->_dottedName == "systemLog.traceAllExceptions") {
                 ASSERT_EQUALS(iterator->_singleName, "traceExceptions");
                 ASSERT_EQUALS(iterator->_type, moe::Switch);
                 ASSERT_EQUALS(iterator->_description, "log stack traces for every exception");
@@ -490,7 +610,7 @@ namespace {
                 ASSERT_TRUE(iterator->_default.isEmpty());
                 ASSERT_TRUE(iterator->_implicit.isEmpty());
                 ASSERT_EQUALS(iterator->_isComposing, false);
-                ASSERT_EQUALS(iterator->_sources, moe::SourceAll);
+                ASSERT_EQUALS(iterator->_sources, moe::SourceAllLegacy);
                 ASSERT_EQUALS(iterator->_positionalStart, -1);
                 ASSERT_EQUALS(iterator->_positionalEnd, -1);
             }
@@ -502,11 +622,11 @@ namespace {
                 ASSERT_TRUE(iterator->_default.isEmpty());
                 ASSERT_TRUE(iterator->_implicit.isEmpty());
                 ASSERT_EQUALS(iterator->_isComposing, false);
-                ASSERT_EQUALS(iterator->_sources, moe::SourceAll);
+                ASSERT_EQUALS(iterator->_sources, moe::SourceAllLegacy);
                 ASSERT_EQUALS(iterator->_positionalStart, -1);
                 ASSERT_EQUALS(iterator->_positionalEnd, -1);
             }
-            else if (iterator->_dottedName == "configdb") {
+            else if (iterator->_dottedName == "sharding.configDB") {
                 ASSERT_EQUALS(iterator->_singleName, "configdb");
                 ASSERT_EQUALS(iterator->_type, moe::String);
                 ASSERT_EQUALS(iterator->_description, "1 or 3 comma separated config servers");
@@ -518,7 +638,7 @@ namespace {
                 ASSERT_EQUALS(iterator->_positionalStart, -1);
                 ASSERT_EQUALS(iterator->_positionalEnd, -1);
             }
-            else if (iterator->_dottedName == "localThreshold") {
+            else if (iterator->_dottedName == "replication.localPingThresholdMs") {
                 ASSERT_EQUALS(iterator->_singleName, "localThreshold");
                 ASSERT_EQUALS(iterator->_type, moe::Int);
                 ASSERT_EQUALS(iterator->_description, "ping time (in ms) for a node to be considered local (default 15ms)");
@@ -538,7 +658,7 @@ namespace {
                 ASSERT_TRUE(iterator->_default.isEmpty());
                 ASSERT_TRUE(iterator->_implicit.isEmpty());
                 ASSERT_EQUALS(iterator->_isComposing, false);
-                ASSERT_EQUALS(iterator->_sources, moe::SourceAll);
+                ASSERT_EQUALS(iterator->_sources, moe::SourceAllLegacy);
                 ASSERT_EQUALS(iterator->_positionalStart, -1);
                 ASSERT_EQUALS(iterator->_positionalEnd, -1);
             }
@@ -550,14 +670,14 @@ namespace {
                 ASSERT_TRUE(iterator->_default.isEmpty());
                 ASSERT_TRUE(iterator->_implicit.isEmpty());
                 ASSERT_EQUALS(iterator->_isComposing, false);
-                ASSERT_EQUALS(iterator->_sources, moe::SourceAll);
+                ASSERT_EQUALS(iterator->_sources, moe::SourceAllLegacy);
                 ASSERT_EQUALS(iterator->_positionalStart, -1);
                 ASSERT_EQUALS(iterator->_positionalEnd, -1);
             }
-            else if (iterator->_dottedName == "chunkSize") {
+            else if (iterator->_dottedName == "sharding.chunkSize") {
                 ASSERT_EQUALS(iterator->_singleName, "chunkSize");
                 ASSERT_EQUALS(iterator->_type, moe::Int);
-                ASSERT_EQUALS(iterator->_description, "maximum amount of data per chunk (in MB)");
+                ASSERT_EQUALS(iterator->_description, "maximum amount of data per chunk");
                 ASSERT_EQUALS(iterator->_isVisible, true);
                 ASSERT_TRUE(iterator->_default.isEmpty());
                 ASSERT_TRUE(iterator->_implicit.isEmpty());
@@ -566,7 +686,7 @@ namespace {
                 ASSERT_EQUALS(iterator->_positionalStart, -1);
                 ASSERT_EQUALS(iterator->_positionalEnd, -1);
             }
-            else if (iterator->_dottedName == "ipv6") {
+            else if (iterator->_dottedName == "net.ipv6") {
                 ASSERT_EQUALS(iterator->_singleName, "ipv6");
                 ASSERT_EQUALS(iterator->_type, moe::Switch);
                 ASSERT_EQUALS(iterator->_description, "enable IPv6 support (disabled by default)");
@@ -578,7 +698,7 @@ namespace {
                 ASSERT_EQUALS(iterator->_positionalStart, -1);
                 ASSERT_EQUALS(iterator->_positionalEnd, -1);
             }
-            else if (iterator->_dottedName == "jsonp") {
+            else if (iterator->_dottedName == "net.jsonp") {
                 ASSERT_EQUALS(iterator->_singleName, "jsonp");
                 ASSERT_EQUALS(iterator->_type, moe::Switch);
                 ASSERT_EQUALS(iterator->_description, "allow JSONP access via http (has security implications)");
@@ -586,7 +706,7 @@ namespace {
                 ASSERT_TRUE(iterator->_default.isEmpty());
                 ASSERT_TRUE(iterator->_implicit.isEmpty());
                 ASSERT_EQUALS(iterator->_isComposing, false);
-                ASSERT_EQUALS(iterator->_sources, moe::SourceAll);
+                ASSERT_EQUALS(iterator->_sources, moe::SourceAllLegacy);
                 ASSERT_EQUALS(iterator->_positionalStart, -1);
                 ASSERT_EQUALS(iterator->_positionalEnd, -1);
             }
@@ -598,12 +718,72 @@ namespace {
                 ASSERT_TRUE(iterator->_default.isEmpty());
                 ASSERT_TRUE(iterator->_implicit.isEmpty());
                 ASSERT_EQUALS(iterator->_isComposing, false);
+                ASSERT_EQUALS(iterator->_sources, moe::SourceAllLegacy);
+                ASSERT_EQUALS(iterator->_positionalStart, -1);
+                ASSERT_EQUALS(iterator->_positionalEnd, -1);
+            }
+            else if (iterator->_dottedName == "auditLog.log") {
+                ASSERT_EQUALS(iterator->_singleName, "auditLog");
+                ASSERT_EQUALS(iterator->_type, moe::String);
+                ASSERT_EQUALS(iterator->_description, "turn on auditing and specify output for log: textfile, bsonfile, syslog, console");
+                ASSERT_EQUALS(iterator->_isVisible, true);
+                ASSERT_TRUE(iterator->_default.isEmpty());
+                ASSERT_TRUE(iterator->_implicit.isEmpty());
+                ASSERT_EQUALS(iterator->_isComposing, false);
+                ASSERT_EQUALS(iterator->_sources, moe::SourceAllLegacy);
+                ASSERT_EQUALS(iterator->_positionalStart, -1);
+                ASSERT_EQUALS(iterator->_positionalEnd, -1);
+            }
+            else if (iterator->_dottedName == "auditLog.format") {
+                ASSERT_EQUALS(iterator->_singleName, "");
+                ASSERT_EQUALS(iterator->_type, moe::String);
+                ASSERT_EQUALS(iterator->_description, "Format of the audit log, if logging to a file.  (BSON/JSON)");
+                ASSERT_EQUALS(iterator->_isVisible, false);
+                ASSERT_TRUE(iterator->_default.isEmpty());
+                ASSERT_TRUE(iterator->_implicit.isEmpty());
+                ASSERT_EQUALS(iterator->_isComposing, false);
+                ASSERT_EQUALS(iterator->_sources, moe::SourceYAMLConfig);
+                ASSERT_EQUALS(iterator->_positionalStart, -1);
+                ASSERT_EQUALS(iterator->_positionalEnd, -1);
+            }
+            else if (iterator->_dottedName == "auditLog.destination") {
+                ASSERT_EQUALS(iterator->_singleName, "");
+                ASSERT_EQUALS(iterator->_type, moe::String);
+                ASSERT_EQUALS(iterator->_description, "Destination of audit log output.  (console/syslog/file)");
+                ASSERT_EQUALS(iterator->_isVisible, false);
+                ASSERT_TRUE(iterator->_default.isEmpty());
+                ASSERT_TRUE(iterator->_implicit.isEmpty());
+                ASSERT_EQUALS(iterator->_isComposing, false);
+                ASSERT_EQUALS(iterator->_sources, moe::SourceYAMLConfig);
+                ASSERT_EQUALS(iterator->_positionalStart, -1);
+                ASSERT_EQUALS(iterator->_positionalEnd, -1);
+            }
+            else if (iterator->_dottedName == "auditLog.path") {
+                ASSERT_EQUALS(iterator->_singleName, "auditPath");
+                ASSERT_EQUALS(iterator->_type, moe::String);
+                ASSERT_EQUALS(iterator->_description, "full filespec for audit log file");
+                ASSERT_EQUALS(iterator->_isVisible, true);
+                ASSERT_TRUE(iterator->_default.isEmpty());
+                ASSERT_TRUE(iterator->_implicit.isEmpty());
+                ASSERT_EQUALS(iterator->_isComposing, false);
+                ASSERT_EQUALS(iterator->_sources, moe::SourceAll);
+                ASSERT_EQUALS(iterator->_positionalStart, -1);
+                ASSERT_EQUALS(iterator->_positionalEnd, -1);
+            }
+            else if (iterator->_dottedName == "auditLog.filter") {
+                ASSERT_EQUALS(iterator->_singleName, "auditFilter");
+                ASSERT_EQUALS(iterator->_type, moe::String);
+                ASSERT_EQUALS(iterator->_description, "filter spec to screen audit records");
+                ASSERT_EQUALS(iterator->_isVisible, true);
+                ASSERT_TRUE(iterator->_default.isEmpty());
+                ASSERT_TRUE(iterator->_implicit.isEmpty());
+                ASSERT_EQUALS(iterator->_isComposing, false);
                 ASSERT_EQUALS(iterator->_sources, moe::SourceAll);
                 ASSERT_EQUALS(iterator->_positionalStart, -1);
                 ASSERT_EQUALS(iterator->_positionalEnd, -1);
             }
 #ifdef MONGO_SSL
-            else if (iterator->_dottedName == "ssl.sslOnNormalPorts") {
+            else if (iterator->_dottedName == "net.ssl.sslOnNormalPorts") {
                 ASSERT_EQUALS(iterator->_singleName, "sslOnNormalPorts");
                 ASSERT_EQUALS(iterator->_type, moe::Switch);
                 ASSERT_EQUALS(iterator->_description, "use ssl on configured ports");
@@ -611,14 +791,14 @@ namespace {
                 ASSERT_TRUE(iterator->_default.isEmpty());
                 ASSERT_TRUE(iterator->_implicit.isEmpty());
                 ASSERT_EQUALS(iterator->_isComposing, false);
-                ASSERT_EQUALS(iterator->_sources, moe::SourceAll);
+                ASSERT_EQUALS(iterator->_sources, moe::SourceAllLegacy);
                 ASSERT_EQUALS(iterator->_positionalStart, -1);
                 ASSERT_EQUALS(iterator->_positionalEnd, -1);
             }
-            else if (iterator->_dottedName == "ssl.mode") {
+            else if (iterator->_dottedName == "net.ssl.mode") {
                 ASSERT_EQUALS(iterator->_singleName, "sslMode");
                 ASSERT_EQUALS(iterator->_type, moe::String);
-                ASSERT_EQUALS(iterator->_description, "set the SSL operation mode (disabled|allowSSL|preferSSL|requireSSL)");
+                ASSERT_EQUALS(iterator->_description, "set the SSL operation mode (noSSL|acceptSSL|sendAcceptSSL|sslOnly)");
                 ASSERT_EQUALS(iterator->_isVisible, true);
                 ASSERT_TRUE(iterator->_default.isEmpty());
                 ASSERT_TRUE(iterator->_implicit.isEmpty());
@@ -627,7 +807,7 @@ namespace {
                 ASSERT_EQUALS(iterator->_positionalStart, -1);
                 ASSERT_EQUALS(iterator->_positionalEnd, -1);
             }
-            else if (iterator->_dottedName == "ssl.PEMKeyFile") {
+            else if (iterator->_dottedName == "net.ssl.PEMKeyFile") {
                 ASSERT_EQUALS(iterator->_singleName, "sslPEMKeyFile");
                 ASSERT_EQUALS(iterator->_type, moe::String);
                 ASSERT_EQUALS(iterator->_description, "PEM file for ssl");
@@ -639,7 +819,7 @@ namespace {
                 ASSERT_EQUALS(iterator->_positionalStart, -1);
                 ASSERT_EQUALS(iterator->_positionalEnd, -1);
             }
-            else if (iterator->_dottedName == "ssl.PEMKeyPassword") {
+            else if (iterator->_dottedName == "net.ssl.PEMKeyPassword") {
                 ASSERT_EQUALS(iterator->_singleName, "sslPEMKeyPassword");
                 ASSERT_EQUALS(iterator->_type, moe::String);
                 ASSERT_EQUALS(iterator->_description, "PEM file password");
@@ -652,7 +832,7 @@ namespace {
                 ASSERT_EQUALS(iterator->_positionalStart, -1);
                 ASSERT_EQUALS(iterator->_positionalEnd, -1);
             }
-            else if (iterator->_dottedName == "ssl.clusterFile") {
+            else if (iterator->_dottedName == "net.ssl.clusterFile") {
                 ASSERT_EQUALS(iterator->_singleName, "sslClusterFile");
                 ASSERT_EQUALS(iterator->_type, moe::String);
                 ASSERT_EQUALS(iterator->_description, "Key file for internal SSL authentication");
@@ -664,7 +844,7 @@ namespace {
                 ASSERT_EQUALS(iterator->_positionalStart, -1);
                 ASSERT_EQUALS(iterator->_positionalEnd, -1);
             }
-            else if (iterator->_dottedName == "ssl.clusterPassword") {
+            else if (iterator->_dottedName == "net.ssl.clusterPassword") {
                 ASSERT_EQUALS(iterator->_singleName, "sslClusterPassword");
                 ASSERT_EQUALS(iterator->_type, moe::String);
                 ASSERT_EQUALS(iterator->_description, "Internal authentication key file password");
@@ -677,7 +857,7 @@ namespace {
                 ASSERT_EQUALS(iterator->_positionalStart, -1);
                 ASSERT_EQUALS(iterator->_positionalEnd, -1);
             }
-            else if (iterator->_dottedName == "ssl.CAFile") {
+            else if (iterator->_dottedName == "net.ssl.CAFile") {
                 ASSERT_EQUALS(iterator->_singleName, "sslCAFile");
                 ASSERT_EQUALS(iterator->_type, moe::String);
                 ASSERT_EQUALS(iterator->_description, "Certificate Authority file for SSL");
@@ -689,7 +869,7 @@ namespace {
                 ASSERT_EQUALS(iterator->_positionalStart, -1);
                 ASSERT_EQUALS(iterator->_positionalEnd, -1);
             }
-            else if (iterator->_dottedName == "ssl.CRLFile") {
+            else if (iterator->_dottedName == "net.ssl.CRLFile") {
                 ASSERT_EQUALS(iterator->_singleName, "sslCRLFile");
                 ASSERT_EQUALS(iterator->_type, moe::String);
                 ASSERT_EQUALS(iterator->_description, "Certificate Revocation List file for SSL");
@@ -701,7 +881,7 @@ namespace {
                 ASSERT_EQUALS(iterator->_positionalStart, -1);
                 ASSERT_EQUALS(iterator->_positionalEnd, -1);
             }
-            else if (iterator->_dottedName == "ssl.weakCertificateValidation") {
+            else if (iterator->_dottedName == "net.ssl.weakCertificateValidation") {
                 ASSERT_EQUALS(iterator->_singleName, "sslWeakCertificateValidation");
                 ASSERT_EQUALS(iterator->_type, moe::Switch);
                 ASSERT_EQUALS(iterator->_description, "allow client to connect without presenting a certificate");
@@ -713,7 +893,7 @@ namespace {
                 ASSERT_EQUALS(iterator->_positionalStart, -1);
                 ASSERT_EQUALS(iterator->_positionalEnd, -1);
             }
-            else if (iterator->_dottedName == "ssl.allowInvalidCertificates") {
+            else if (iterator->_dottedName == "net.ssl.allowInvalidCertificates") {
                 ASSERT_EQUALS(iterator->_singleName, "sslAllowInvalidCertificates");
                 ASSERT_EQUALS(iterator->_type, moe::Switch);
                 ASSERT_EQUALS(iterator->_description, "allow connections to servers with invalid certificates");
@@ -725,7 +905,7 @@ namespace {
                 ASSERT_EQUALS(iterator->_positionalStart, -1);
                 ASSERT_EQUALS(iterator->_positionalEnd, -1);
             }
-            else if (iterator->_dottedName == "ssl.FIPSMode") {
+            else if (iterator->_dottedName == "net.ssl.FIPSMode") {
                 ASSERT_EQUALS(iterator->_singleName, "sslFIPSMode");
                 ASSERT_EQUALS(iterator->_type, moe::Switch);
                 ASSERT_EQUALS(iterator->_description, "activate FIPS 140-2 mode at startup");
@@ -747,7 +927,7 @@ namespace {
                 ASSERT_TRUE(iterator->_default.isEmpty());
                 ASSERT_TRUE(iterator->_implicit.isEmpty());
                 ASSERT_EQUALS(iterator->_isComposing, false);
-                ASSERT_EQUALS(iterator->_sources, moe::SourceAll);
+                ASSERT_EQUALS(iterator->_sources, moe::SourceAllLegacy);
                 ASSERT_EQUALS(iterator->_positionalStart, -1);
                 ASSERT_EQUALS(iterator->_positionalEnd, -1);
             }
@@ -759,7 +939,7 @@ namespace {
                 ASSERT_TRUE(iterator->_default.isEmpty());
                 ASSERT_TRUE(iterator->_implicit.isEmpty());
                 ASSERT_EQUALS(iterator->_isComposing, false);
-                ASSERT_EQUALS(iterator->_sources, moe::SourceAll);
+                ASSERT_EQUALS(iterator->_sources, moe::SourceAllLegacy);
                 ASSERT_EQUALS(iterator->_positionalStart, -1);
                 ASSERT_EQUALS(iterator->_positionalEnd, -1);
             }
@@ -771,11 +951,11 @@ namespace {
                 ASSERT_TRUE(iterator->_default.isEmpty());
                 ASSERT_TRUE(iterator->_implicit.isEmpty());
                 ASSERT_EQUALS(iterator->_isComposing, false);
-                ASSERT_EQUALS(iterator->_sources, moe::SourceAll);
+                ASSERT_EQUALS(iterator->_sources, moe::SourceAllLegacy);
                 ASSERT_EQUALS(iterator->_positionalStart, -1);
                 ASSERT_EQUALS(iterator->_positionalEnd, -1);
             }
-            else if (iterator->_dottedName == "serviceName") {
+            else if (iterator->_dottedName == "processManagement.windowsService.serviceName") {
                 ASSERT_EQUALS(iterator->_singleName, "serviceName");
                 ASSERT_EQUALS(iterator->_type, moe::String);
                 ASSERT_EQUALS(iterator->_description, "Windows service name");
@@ -787,7 +967,7 @@ namespace {
                 ASSERT_EQUALS(iterator->_positionalStart, -1);
                 ASSERT_EQUALS(iterator->_positionalEnd, -1);
             }
-            else if (iterator->_dottedName == "serviceDisplayName") {
+            else if (iterator->_dottedName == "processManagement.windowsService.displayName") {
                 ASSERT_EQUALS(iterator->_singleName, "serviceDisplayName");
                 ASSERT_EQUALS(iterator->_type, moe::String);
                 ASSERT_EQUALS(iterator->_description, "Windows service display name");
@@ -799,7 +979,7 @@ namespace {
                 ASSERT_EQUALS(iterator->_positionalStart, -1);
                 ASSERT_EQUALS(iterator->_positionalEnd, -1);
             }
-            else if (iterator->_dottedName == "serviceDescription") {
+            else if (iterator->_dottedName == "processManagement.windowsService.description") {
                 ASSERT_EQUALS(iterator->_singleName, "serviceDescription");
                 ASSERT_EQUALS(iterator->_type, moe::String);
                 ASSERT_EQUALS(iterator->_description, "Windows service description");
@@ -811,7 +991,7 @@ namespace {
                 ASSERT_EQUALS(iterator->_positionalStart, -1);
                 ASSERT_EQUALS(iterator->_positionalEnd, -1);
             }
-            else if (iterator->_dottedName == "serviceUser") {
+            else if (iterator->_dottedName == "processManagement.windowsService.serviceUser") {
                 ASSERT_EQUALS(iterator->_singleName, "serviceUser");
                 ASSERT_EQUALS(iterator->_type, moe::String);
                 ASSERT_EQUALS(iterator->_description, "account for service execution");
@@ -823,7 +1003,7 @@ namespace {
                 ASSERT_EQUALS(iterator->_positionalStart, -1);
                 ASSERT_EQUALS(iterator->_positionalEnd, -1);
             }
-            else if (iterator->_dottedName == "servicePassword") {
+            else if (iterator->_dottedName == "processManagement.windowsService.servicePassword") {
                 ASSERT_EQUALS(iterator->_singleName, "servicePassword");
                 ASSERT_EQUALS(iterator->_type, moe::String);
                 ASSERT_EQUALS(iterator->_description, "password used to authenticate serviceUser");
@@ -843,7 +1023,7 @@ namespace {
                 ASSERT_TRUE(iterator->_default.isEmpty());
                 ASSERT_TRUE(iterator->_implicit.isEmpty());
                 ASSERT_EQUALS(iterator->_isComposing, false);
-                ASSERT_EQUALS(iterator->_sources, moe::SourceAll);
+                ASSERT_EQUALS(iterator->_sources, moe::SourceAllLegacy);
                 ASSERT_EQUALS(iterator->_positionalStart, -1);
                 ASSERT_EQUALS(iterator->_positionalEnd, -1);
             }

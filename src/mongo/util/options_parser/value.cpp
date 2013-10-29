@@ -143,7 +143,7 @@ namespace optionenvironment {
     bool Value::isEmpty() const {
         return _type == None;
     }
-    bool Value::equal(Value& otherVal) const {
+    bool Value::equal(const Value& otherVal) const {
         if (_type != otherVal._type) {
             return false;
         }

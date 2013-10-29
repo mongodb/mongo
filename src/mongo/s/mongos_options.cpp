@@ -75,28 +75,32 @@ namespace mongo {
 
         moe::OptionSection sharding_options("Sharding options");
 
-        sharding_options.addOptionChaining("configdb", "configdb", moe::String,
+        sharding_options.addOptionChaining("sharding.configDB", "configdb", moe::String,
                 "1 or 3 comma separated config servers");
 
-        sharding_options.addOptionChaining("localThreshold", "localThreshold", moe::Int,
-                "ping time (in ms) for a node to be considered local (default 15ms)");
+        sharding_options.addOptionChaining("replication.localPingThresholdMs", "localThreshold",
+                moe::Int, "ping time (in ms) for a node to be considered local (default 15ms)");
 
-        sharding_options.addOptionChaining("test", "test", moe::Switch, "just run unit tests");
+        sharding_options.addOptionChaining("test", "test", moe::Switch, "just run unit tests")
+                                          .setSources(moe::SourceAllLegacy);
 
         sharding_options.addOptionChaining("upgrade", "upgrade", moe::Switch,
-                "upgrade meta data version");
+                "upgrade meta data version")
+                                          .setSources(moe::SourceAllLegacy);
 
-        sharding_options.addOptionChaining("chunkSize", "chunkSize", moe::Int,
-                "maximum amount of data per chunk (in MB)");
+        sharding_options.addOptionChaining("sharding.chunkSize", "chunkSize", moe::Int,
+                "maximum amount of data per chunk");
 
-        sharding_options.addOptionChaining("ipv6", "ipv6", moe::Switch,
+        sharding_options.addOptionChaining("net.ipv6", "ipv6", moe::Switch,
                 "enable IPv6 support (disabled by default)");
 
-        sharding_options.addOptionChaining("jsonp", "jsonp", moe::Switch,
-                "allow JSONP access via http (has security implications)");
+        sharding_options.addOptionChaining("net.jsonp", "jsonp", moe::Switch,
+                "allow JSONP access via http (has security implications)")
+                                         .setSources(moe::SourceAllLegacy);
 
         sharding_options.addOptionChaining("noscripting", "noscripting", moe::Switch,
-                "disable scripting engine");
+                "disable scripting engine")
+                                         .setSources(moe::SourceAllLegacy);
 
 
         options->addSection(general_options);
@@ -113,7 +117,12 @@ namespace mongo {
 
         options->addOptionChaining("noAutoSplit", "noAutoSplit", moe::Switch,
                 "do not send split commands with writes")
-                                  .hidden();
+                                  .hidden()
+                                  .setSources(moe::SourceAllLegacy);
+
+        options->addOptionChaining("sharding.autoSplit", "", moe::Bool,
+                "send split commands with writes")
+                                  .setSources(moe::SourceYAMLConfig);
 
 
         return Status::OK();
@@ -151,8 +160,8 @@ namespace mongo {
             return ret;
         }
 
-        if ( params.count( "chunkSize" ) ) {
-            int csize = params["chunkSize"].as<int>();
+        if ( params.count( "sharding.chunkSize" ) ) {
+            int csize = params["sharding.chunkSize"].as<int>();
 
             // validate chunksize before proceeding
             if ( csize == 0 ) {
@@ -164,28 +173,35 @@ namespace mongo {
             }
         }
 
-        if (params.count( "port" ) ) {
-            int port = params["port"].as<int>();
+        if (params.count( "net.port" ) ) {
+            int port = params["net.port"].as<int>();
             if ( port <= 0 || port > 65535 ) {
                 return Status(ErrorCodes::BadValue,
                               "error: port number must be between 1 and 65535");
             }
         }
 
-        if ( params.count( "localThreshold" ) ) {
-            serverGlobalParams.defaultLocalThresholdMillis = params["localThreshold"].as<int>();
+        if ( params.count( "replication.localPingThresholdMs" ) ) {
+            serverGlobalParams.defaultLocalThresholdMillis =
+                params["replication.localPingThresholdMs"].as<int>();
         }
 
-        if ( params.count( "ipv6" ) ) {
+        if ( params.count( "net.ipv6" ) ) {
             enableIPv6();
         }
 
-        if ( params.count( "jsonp" ) ) {
+        if ( params.count( "net.jsonp" ) ) {
             serverGlobalParams.jsonp = true;
         }
 
         if (params.count("noscripting")) {
             // This option currently has no effect for mongos
+        }
+
+        // Check "net.http.enabled" before "httpinterface" and "nohttpinterface", since this comes
+        // from a config file and those come from the command line
+        if (params.count("net.http.enabled")) {
+            serverGlobalParams.isHttpInterfaceEnabled = params["net.http.enabled"].as<bool>();
         }
 
         if (params.count("httpinterface")) {
@@ -196,16 +212,20 @@ namespace mongo {
             serverGlobalParams.isHttpInterfaceEnabled = true;
         }
 
-        if (params.count("noAutoSplit")) {
+        // --noAutoSplit is on the command line, while sharding.autoSplit is in the JSON config.
+        // Disable auto splitting if either one specifies that we should.
+        if (params.count("noAutoSplit") ||
+            (params.count("sharding.autoSplit") && !params["sharding.autoSplit"].as<bool>())) {
             warning() << "running with auto-splitting disabled" << endl;
             Chunk::ShouldAutoSplit = false;
         }
 
-        if ( ! params.count( "configdb" ) ) {
+        if ( ! params.count( "sharding.configDB" ) ) {
             return Status(ErrorCodes::BadValue, "error: no args for --configdb");
         }
 
-        splitStringDelim(params["configdb"].as<std::string>(), &mongosGlobalParams.configdbs, ',');
+        splitStringDelim(params["sharding.configDB"].as<std::string>(),
+                         &mongosGlobalParams.configdbs, ',');
         if (mongosGlobalParams.configdbs.size() != 1 && mongosGlobalParams.configdbs.size() != 3) {
             return Status(ErrorCodes::BadValue, "need either 1 or 3 configdbs");
         }

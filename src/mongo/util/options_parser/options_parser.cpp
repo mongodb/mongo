@@ -632,7 +632,7 @@ namespace optionenvironment {
         }
 
         try {
-            po::store(po::command_line_parser(argc, &argv_buffer[0]).
+            po::store(po::command_line_parser(argc, (argc > 0 ? &argv_buffer[0] : NULL)).
                       options(boostOptions).
                       positional(boostPositionalOptions).
                       style(style).

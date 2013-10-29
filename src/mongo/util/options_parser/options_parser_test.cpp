@@ -54,6 +54,44 @@ namespace {
         std::string _config;
     };
 
+    TEST(Registration, EmptySingleName) {
+        moe::OptionSection testOpts;
+        try {
+            testOpts.addOptionChaining("dup", "", moe::Switch, "dup");
+            testOpts.addOptionChaining("new", "", moe::Switch, "dup");
+        }
+        catch (::mongo::DBException &e) {
+            ::mongo::StringBuilder sb;
+            sb << "Was not able to register two options with empty single name: " << e.what();
+            FAIL(sb.str());
+        }
+
+        // This should fail now, because we didn't specify that these options were not valid in the
+        // INI config or on the command line
+        std::vector<std::string> argv;
+        std::map<std::string, std::string> env_map;
+        moe::OptionsParser parser;
+        moe::Environment environment;
+        ASSERT_NOT_OK(parser.run(testOpts, argv, env_map, &environment));
+
+        moe::OptionSection testOptsValid;
+        try {
+            testOptsValid.addOptionChaining("dup", "", moe::Switch, "dup")
+                                           .setSources(moe::SourceYAMLConfig);
+            testOptsValid.addOptionChaining("new", "", moe::Switch, "dup")
+                                           .setSources(moe::SourceYAMLConfig);
+        }
+        catch (::mongo::DBException &e) {
+            ::mongo::StringBuilder sb;
+            sb << "Was not able to register two options with empty single name" << e.what();
+            FAIL(sb.str());
+        }
+
+        // This should pass now, because we specified that these options were not valid in the INI
+        // config or on the command line
+        ASSERT_OK(parser.run(testOptsValid, argv, env_map, &environment));
+    }
+
     TEST(Registration, DuplicateSingleName) {
         moe::OptionSection testOpts;
         try {

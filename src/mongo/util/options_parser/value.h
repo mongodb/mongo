@@ -97,7 +97,7 @@ namespace optionenvironment {
          *
          *  Two empty values are equal
          */
-        bool equal(Value&) const;
+        bool equal(const Value&) const;
 
         /**
          *  Return the string representation of this Value.  This function is used only for
