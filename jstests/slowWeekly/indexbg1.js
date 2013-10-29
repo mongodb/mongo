@@ -27,7 +27,7 @@ waitParallel = function() {
     assert.soon( function() { return doneParallel(); }, "parallel did not finish in time", 300000, 1000 );
 }
 
-size = 500000;
+size = 5000000;
 while( 1 ) { // if indexing finishes before we can run checks, try indexing w/ more data
     print( "size: " + size );
     baseName = "jstests_indexbg1";
