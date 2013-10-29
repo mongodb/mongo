@@ -2,6 +2,7 @@
 // part of this test will not work correctly
 
 TestData.useX509 = false;
+TestData.authMechanism = "MONGODB-X509"; // SERVER-10353
 var SERVER_CERT = "jstests/libs/server.pem"
 var CA_CERT = "jstests/libs/ca.pem" 
 
