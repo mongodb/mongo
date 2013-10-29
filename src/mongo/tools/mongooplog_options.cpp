@@ -64,6 +64,9 @@ namespace mongo {
     }
 
     bool handlePreValidationMongoOplogOptions(const moe::Environment& params) {
+        if (!handlePreValidationGeneralToolOptions(params)) {
+            return false;
+        }
         if (params.count("help")) {
             printMongoOplogHelp(&std::cout);
             return false;

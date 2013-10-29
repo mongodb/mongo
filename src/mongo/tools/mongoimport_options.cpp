@@ -97,6 +97,9 @@ namespace mongo {
     }
 
     bool handlePreValidationMongoImportOptions(const moe::Environment& params) {
+        if (!handlePreValidationGeneralToolOptions(params)) {
+            return false;
+        }
         if (params.count("help")) {
             printMongoImportHelp(&std::cout);
             return false;
