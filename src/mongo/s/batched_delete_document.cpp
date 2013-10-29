@@ -23,7 +23,7 @@ namespace mongo {
 
     using mongoutils::str::stream;
         const BSONField<BSONObj> BatchedDeleteDocument::query("q");
-        const BSONField<int> BatchedDeleteDocument::limit("limit", 1);
+        const BSONField<int> BatchedDeleteDocument::limit("limit");
 
     BatchedDeleteDocument::BatchedDeleteDocument() {
         clear();
@@ -41,6 +41,11 @@ namespace mongo {
         // All the mandatory fields must be present.
         if (!_isQuerySet) {
             *errMsg = stream() << "missing " << query.name() << " field";
+            return false;
+        }
+
+        if (!_isLimitSet) {
+            *errMsg = stream() << "missing " << limit.name() << " field";
             return false;
         }
 

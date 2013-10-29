@@ -99,11 +99,11 @@ namespace mongo {
 
                 // In case updates turned out to be upserts, the callers may be interested
                 // in learning what _id was used for that document.
-                if (!upsertedID.isEmpty()) {
-                    if (numBatchOps == 1) {
+                if ( !upsertedID.isEmpty() ) {
+                    if ( numBatchOps == 1 ) {
                         response->setSingleUpserted(upsertedID);
                     }
-                    else {
+                    else if ( verbose ) {
                         std::auto_ptr<BatchedUpsertDetail> upsertDetail(new BatchedUpsertDetail);
                         upsertDetail->setIndex(i);
                         upsertDetail->setUpsertedID(upsertedID);
@@ -175,7 +175,7 @@ namespace mongo {
         BSONObjBuilder wcResultsB;
         if ( !waitForWriteConcern( writeConcern, !batchSuccess, &wcResultsB, &errMsg ) ) {
 
-            // TODO Revisit when user visiible family error codes are set
+            // TODO Revisit when user visible family error codes are set
             response->setErrCode( ErrorCodes::WriteConcernFailed );
             response->setErrMessage( errMsg );
 
@@ -479,7 +479,7 @@ namespace mongo {
 
         try {
             n = deleteObjects( ns, queryObj, // ns, query
-                               false, // justOne
+                               deleteOp.getLimit() == 1, // justOne
                                true, // logOp
                                false // god
                                );

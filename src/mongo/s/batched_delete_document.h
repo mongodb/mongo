@@ -81,7 +81,7 @@ namespace mongo {
         BSONObj _query;
         bool _isQuerySet;
 
-        // (O)  cap the number of documents to be deleted
+        // (M)  the maximum number of documents to be deleted
         int _limit;
         bool _isLimitSet;
     };
