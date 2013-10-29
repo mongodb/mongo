@@ -1637,6 +1637,7 @@ namespace mongo {
                                         _lastSlaveOkConn->getServerAddress() : "[not cached]" )
                                 << ")" << endl;
 
+            string lastNodeErrMsg;
             for (size_t retry = 0; retry < MAX_RETRY; retry++) {
                 try {
                     DBClientConnection* conn = selectNodeUsingTags(readPref);
@@ -1652,15 +1653,23 @@ namespace mongo {
                     return checkSlaveQueryResult(cursor);
                 }
                 catch (const DBException &dbExcep) {
-                    LOG(1) << "can't query replica set node " << _lastSlaveOkHost
-                           << ": " << causedBy(dbExcep) << endl;
+                    StringBuilder errMsgBuilder;
+                    errMsgBuilder << "can't query replica set node "
+                               << _lastSlaveOkHost.toString() << ": " << causedBy( dbExcep );
+                    lastNodeErrMsg = errMsgBuilder.str();
+
+                    LOG(1) << lastNodeErrMsg << endl;
                     invalidateLastSlaveOkCache();
                 }
             }
 
-            uasserted( 16370,
-                       str::stream() << "Failed to do query, no good nodes in "
-                               << _getMonitor()->getName() );
+            StringBuilder assertMsg;
+            assertMsg << "Failed to do query, no good nodes in " << _getMonitor()->getName();
+            if ( !lastNodeErrMsg.empty() ) {
+                assertMsg << ", last error: " << lastNodeErrMsg;
+            }
+
+            uasserted( 16370, assertMsg.str() );
         }
 
         LOG( 3 ) << "dbclient_rs query to primary node in " << _getMonitor()->getName() << endl;
@@ -1687,6 +1696,8 @@ namespace mongo {
                                         _lastSlaveOkConn->getServerAddress() : "[not cached]" )
                                 << ")" << endl;
 
+            string lastNodeErrMsg;
+
             for (size_t retry = 0; retry < MAX_RETRY; retry++) {
                 try {
                     DBClientConnection* conn = selectNodeUsingTags(readPref);
@@ -1698,14 +1709,23 @@ namespace mongo {
                     return conn->findOne(ns,query,fieldsToReturn,queryOptions);
                 }
                 catch ( const DBException &dbExcep ) {
-                    LOG(1) << "can't findone replica set node " << _lastSlaveOkHost << ": "
-                                      << causedBy( dbExcep ) << endl;
+                    StringBuilder errMsgBuilder;
+                    errMsgBuilder << "can't findone replica set node "
+                               << _lastSlaveOkHost.toString() << ": " << causedBy( dbExcep );
+                    lastNodeErrMsg = errMsgBuilder.str();
+
+                    LOG(1) << lastNodeErrMsg << endl;
                     invalidateLastSlaveOkCache();
                 }
             }
 
-            uasserted(16379, str::stream() << "Failed to call findOne, no good nodes in "
-                        << _getMonitor()->getName());
+            StringBuilder assertMsg;
+            assertMsg << "Failed to call findOne, no good nodes in " << _getMonitor()->getName();
+            if ( !lastNodeErrMsg.empty() ) {
+                assertMsg << ", last error: " << lastNodeErrMsg;
+            }
+
+            uasserted(16379, assertMsg.str());
         }
 
         LOG( 3 ) << "dbclient_rs findOne to primary node in " << _getMonitor()->getName()
@@ -1850,6 +1870,8 @@ namespace mongo {
                                             _lastSlaveOkConn->getServerAddress() : "[not cached]" )
                                     << ")" << endl;
 
+                string lastNodeErrMsg;
+
                 for (size_t retry = 0; retry < MAX_RETRY; retry++) {
                     _lazyState._retries = retry;
                     try {
@@ -1870,8 +1892,12 @@ namespace mongo {
                         _lazyState._lastClient = conn;
                     }
                     catch ( const DBException& DBExcep ) {
-                        LOG(1) << "can't callLazy replica set node " << _lastSlaveOkHost << ": "
-                                          << causedBy( DBExcep ) << endl;
+                        StringBuilder errMsgBuilder;
+                        errMsgBuilder << "can't callLazy replica set node "
+                                   << _lastSlaveOkHost.toString() << ": " << causedBy( DBExcep );
+                        lastNodeErrMsg = errMsgBuilder.str();
+
+                        LOG(1) << lastNodeErrMsg << endl;
                         invalidateLastSlaveOkCache();
                         continue;
                     }
@@ -1879,8 +1905,13 @@ namespace mongo {
                     return;
                 }
 
-                uasserted(16380, str::stream() << "Failed to call say, no good nodes in "
-                         << _getMonitor()->getName());
+                StringBuilder assertMsg;
+                assertMsg << "Failed to call say, no good nodes in " << _getMonitor()->getName();
+                if ( !lastNodeErrMsg.empty() ) {
+                    assertMsg << ", last error: " << lastNodeErrMsg;
+                }
+
+                uasserted(16380, assertMsg.str());
             }
         }
 
