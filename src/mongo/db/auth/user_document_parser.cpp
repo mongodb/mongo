@@ -50,6 +50,7 @@ namespace {
     const std::string ROLE_NAME_FIELD_NAME = "role";
     const std::string ROLE_SOURCE_FIELD_NAME = "db";
     const std::string MONGODB_CR_CREDENTIAL_FIELD_NAME = "MONGODB-CR";
+    const std::string MONGODB_EXTERNAL_CREDENTIAL_FIELD_NAME = "external";
 
     inline Status _badValue(const char* reason, int location) {
         return Status(ErrorCodes::BadValue, reason, location);
@@ -248,23 +249,34 @@ namespace {
         }
 
         // Validate the "credentials" element
-        if (credentialsElement.eoo() && userSourceStr != "$external") {
-            return _badValue("User document needs 'credentials' field unless 'db' is '$external'",
+        if (credentialsElement.eoo()) {
+            return _badValue("User document needs 'credentials' object",
                     0);
         }
-        if (!credentialsElement.eoo()) {
-            if (credentialsElement.type() != Object) {
-                return _badValue("User document needs 'credentials' field to be an object", 0);
-            }
+        if (credentialsElement.type() != Object) {
+            return _badValue("User document needs 'credentials' field to be an object", 0);
+        }
 
-            BSONObj credentialsObj = credentialsElement.Obj();
-            if (credentialsObj.isEmpty()) {
-                return _badValue("User document needs 'credentials' field to be a non-empty object",
-                                 0);
+        BSONObj credentialsObj = credentialsElement.Obj();
+        if (credentialsObj.isEmpty()) {
+            return _badValue("User document needs 'credentials' field to be a non-empty object",
+                             0);
+        }
+        if (userSourceStr == "$external") {
+            BSONElement externalElement = credentialsObj[MONGODB_EXTERNAL_CREDENTIAL_FIELD_NAME];
+            if (externalElement.eoo() || externalElement.type() != Bool ||
+                    !externalElement.Bool()) {
+                return _badValue("User documents for users defined on '$external' must have "
+                        "'credentials' field set to {external: true}", 0);
             }
+        } else {
             BSONElement MongoCRElement = credentialsObj[MONGODB_CR_CREDENTIAL_FIELD_NAME];
-            if (!MongoCRElement.eoo() && (MongoCRElement.type() != String ||
-                    makeStringDataFromBSONElement(MongoCRElement).empty())) {
+            if (MongoCRElement.eoo()) {
+                return _badValue("User document must provide MONGODB-CR credential to all "
+                        "non-external users", 0);
+            }
+            if (MongoCRElement.type() != String ||
+                    makeStringDataFromBSONElement(MongoCRElement).empty()) {
                 return _badValue("MONGODB-CR credential must to be a non-empty string, if present",
                                  0);
             }
@@ -293,29 +305,44 @@ namespace {
                 return Status(ErrorCodes::UnsupportedFormat,
                               "'credentials' field in user documents must be an object");
             }
-            BSONElement mongoCRCredentialElement =
-                    credentialsElement.Obj()[MONGODB_CR_CREDENTIAL_FIELD_NAME];
-            if (!mongoCRCredentialElement.eoo()) {
-                if (mongoCRCredentialElement.type() != String ||
-                        makeStringDataFromBSONElement(mongoCRCredentialElement).empty()) {
-                    return Status(ErrorCodes::UnsupportedFormat,
-                                  "MONGODB-CR credentials must be non-empty strings");
+            if (userSource == "$external") {
+                BSONElement externalCredentialElement =
+                        credentialsElement.Obj()[MONGODB_EXTERNAL_CREDENTIAL_FIELD_NAME];
+                if (!externalCredentialElement.eoo()) {
+                    if (externalCredentialElement.type() != Bool ||
+                            !externalCredentialElement.Bool()) {
+                        return Status(ErrorCodes::UnsupportedFormat,
+                                      "'external' field in credentials object must be set to true");
+                    } else {
+                        credentials.isExternal = true;
+                    }
                 } else {
-                    credentials.isExternal = false;
-                    credentials.password = mongoCRCredentialElement.String();
+                    return Status(ErrorCodes::UnsupportedFormat,
+                                  "User documents defined on '$external' must provide set "
+                                  "credentials to {external:true}");
                 }
             } else {
-                return Status(ErrorCodes::UnsupportedFormat,
-                              "User documents must provide credentials for MONGODB-CR"
-                              " authentication");
+                BSONElement mongoCRCredentialElement =
+                        credentialsElement.Obj()[MONGODB_CR_CREDENTIAL_FIELD_NAME];
+                if (!mongoCRCredentialElement.eoo()) {
+                    if (mongoCRCredentialElement.type() != String ||
+                            makeStringDataFromBSONElement(mongoCRCredentialElement).empty()) {
+                        return Status(ErrorCodes::UnsupportedFormat,
+                                      "MONGODB-CR credentials must be non-empty strings");
+                    } else {
+                        credentials.isExternal = false;
+                        credentials.password = mongoCRCredentialElement.String();
+                    }
+                } else {
+                    return Status(ErrorCodes::UnsupportedFormat,
+                                  "User documents must provide credentials for MONGODB-CR"
+                                  " authentication");
+                }
             }
-        }
-        else if (userSource == "$external") {
-            credentials.isExternal = true;
         } else {
                 return Status(ErrorCodes::UnsupportedFormat,
                               "Cannot extract credentials from user documents without a "
-                              "'credentials' field and with 'db' != \"$external\"");
+                              "'credentials' field");
         }
 
         user->setCredentials(credentials);
