@@ -2,7 +2,15 @@
 // part of this test will not work correctly
 
 TestData.useX509 = false;
-TestData.authMechanism = "MONGODB-X509"; // SERVER-10353
+
+// Check if this build supports the authenticationMechanisms startup parameter.
+var conn = MongoRunner.runMongod({ smallfiles: "", auth: "" });
+var cmdOut = conn.getDB('admin').runCommand({getParameter: 1, authenticationMechanisms: 1})
+if (cmdOut.ok) {
+    TestData.authMechanism = "MONGODB-X509"; // SERVER-10353
+}
+MongoRunner.stopMongod(conn);
+
 var SERVER_CERT = "jstests/libs/server.pem"
 var CA_CERT = "jstests/libs/ca.pem" 
 
