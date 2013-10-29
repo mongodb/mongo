@@ -27,7 +27,7 @@ waitParallel = function() {
     assert.soon( function() { return doneParallel(); }, "parallel did not finish in time", 300000, 1000 );
 }
 
-size = 5000000;
+size = 1000 * 1000;
 while( 1 ) { // if indexing finishes before we can run checks, try indexing w/ more data
     print( "size: " + size );
     baseName = "jstests_indexbg1";
@@ -60,21 +60,29 @@ while( 1 ) { // if indexing finishes before we can run checks, try indexing w/ m
         printjson(ex)
         assert.eq( "BasicCursor", ex.cursor, "used btree cursor" );
         assert( ex.nscanned < 1000 , "took too long to find 100: " + tojson( ex ) );
-        t.remove( {i:40} );
+
+
+        t.remove( {i:40}, true ); // table scan
         assert( !db.getLastError() );
-        t.update( {i:10}, {i:-10} );
+
+        t.update( {i:10}, {i:-10} ); // should scan 10
         assert( !db.getLastError() );
+
         id = t.find().hint( {$natural:-1} ).next()._id;
+
         t.update( {_id:id}, {i:-2} );
         assert( !db.getLastError() );
+
         t.save( {i:-50} );
         assert( !db.getLastError() );
+
         t.save( {i:size+2} );
         assert( !db.getLastError() );
 
         assert.eq( size + 1, t.count() );
         assert( !db.getLastError() );
 
+        print( "finished with checks" );
     } catch( e ) {
         // only a failure if we're still indexing
         // wait for parallel status to update to reflect indexing status
@@ -85,12 +93,14 @@ while( 1 ) { // if indexing finishes before we can run checks, try indexing w/ m
         }
         print("but that's OK")
     }
+
+    print( "going to check if index is done" );
     if ( !doneParallel() ) {
         break;
     }
     print( "indexing finished too soon, retrying..." );
     size *= 2;
-    assert( size < 20000000, "unable to run checks in parallel with index creation" );
+    assert( size < 200000000, "unable to run checks in parallel with index creation" );
 }
 
 print("our tests done, waiting for parallel to finish");
