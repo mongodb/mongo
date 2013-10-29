@@ -195,8 +195,6 @@ namespace mongo {
          */
         void endFetchPhase() {
             _lock.lock();
-            _isThisGuardInFetchPhase = false;
-            _authzManager->_isFetchPhaseBusy = false;
         }
 
         /**
@@ -206,7 +204,7 @@ namespace mongo {
          * If this returns true, do not update the cached data with this
          */
         bool isSameCacheGeneration() const {
-            fassert(17223, !_isThisGuardInFetchPhase);
+            fassert(17223, _isThisGuardInFetchPhase && _lock.owns_lock());
             return _startGeneration == _authzManager->_cacheGeneration;
         }
 
@@ -247,6 +245,8 @@ namespace mongo {
         CacheGuard guard(this, CacheGuard::fetchSynchronizationManual);
         int newVersion = _version;
         if (schemaVersionInvalid == newVersion) {
+            while (guard.otherUpdateInFetchPhase())
+                guard.wait();
             guard.beginFetchPhase();
             Status status = _externalState->getStoredAuthorizationVersion(&newVersion);
             guard.endFetchPhase();
