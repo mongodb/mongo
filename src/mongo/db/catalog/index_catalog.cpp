@@ -562,7 +562,7 @@ namespace mongo {
 
         // --------- START REAL WORK ----------
 
-        audit::logDropIndex( currentClient.get(), indexNamespace, _collection->ns().ns() );
+        audit::logDropIndex( currentClient.get(), indexName, _collection->ns().ns() );
 
         try {
             _details->clearSystemFlag( NamespaceDetails::Flag_HaveIdIndex );
