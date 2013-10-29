@@ -230,6 +230,7 @@ namespace mongo {
                 b.append( BSONObjBuilder::numStr( all.size() ) , o );
                 all.push_back( o );
             }
+            result.appendNumber( "nIndexesWas", collection->getIndexCatalog()->numIndexesTotal() );
 
             Status s = collection->getIndexCatalog()->dropAllIndexes( true );
             if ( !s.isOK() ) {
