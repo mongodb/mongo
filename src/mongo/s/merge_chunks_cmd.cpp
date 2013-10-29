@@ -149,6 +149,9 @@ namespace mongo {
                 return false;
             }
 
+            // This refreshes the chunk metadata if stale.
+            refreshChunkCache( NamespaceString( ns ) );
+
             ShardPtr mergeShard = guessMergeShard( NamespaceString( ns ), minKey );
 
             if ( !mergeShard ) {
@@ -171,9 +174,6 @@ namespace mongo {
             ScopedDbConnection conn( mergeShard->getAddress() );
             bool ok = conn->runCommand( "admin", remoteCmdObjB.obj(), remoteResult );
             conn.done();
-
-            // Always refresh our chunks afterwards
-            refreshChunkCache( NamespaceString( ns ) );
 
             result.appendElements( remoteResult );
             return ok;

@@ -916,7 +916,8 @@ namespace mongo {
                     return false;
                 }
 
-                ChunkManagerPtr info = config->getChunkManager( ns );
+                // This refreshes the chunk metadata if stale.
+                ChunkManagerPtr info = config->getChunkManager( ns, true );
                 ChunkPtr chunk;
 
                 if (!find.isEmpty()) {
@@ -969,7 +970,7 @@ namespace mongo {
                     result.append( "cause" , res );
                     return false;
                 }
-                config->getChunkManager( ns , true );
+
                 return true;
             }
         } splitCollectionCmd;
@@ -1036,7 +1037,8 @@ namespace mongo {
                     return false;
                 }
 
-                ChunkManagerPtr info = config->getChunkManager( ns );
+                // This refreshes the chunk metadata if stale.
+                ChunkManagerPtr info = config->getChunkManager( ns, true );
                 ChunkPtr c = find.isEmpty() ?
                                 info->findIntersectingChunk( bounds[0].Obj() ) :
                                 info->findChunkForDoc( find );
@@ -1074,9 +1076,6 @@ namespace mongo {
                     result.append( "cause" , res );
                     return false;
                 }
-                
-                // preemptively reload the config to get new version info
-                config->getChunkManager( ns , true );
 
                 result.append( "millis" , t.millis() );
                 return true;
