@@ -214,17 +214,18 @@ namespace {
                      "db" << "test" <<
                      "credentials" << BSON("MONGODB-CR" << "a"))));
 
-        // Don't need credentials field if userSource is $external
-        ASSERT_OK(v2parser.checkValidUserDocument(
-                BSON("user" << "spencer" <<
-                     "db" << "$external" <<
-                     "roles" << emptyArray)));
-
         // Empty roles arrays are OK
         ASSERT_OK(v2parser.checkValidUserDocument(
                 BSON("user" << "spencer" <<
                      "db" << "test" <<
                      "credentials" << BSON("MONGODB-CR" << "a") <<
+                     "roles" << emptyArray)));
+
+        // Need credentials of {external: true} if user's db is $external
+        ASSERT_OK(v2parser.checkValidUserDocument(
+                BSON("user" << "spencer" <<
+                     "db" << "$external" <<
+                     "credentials" << BSON("external" << true) <<
                      "roles" << emptyArray)));
 
         // Roles must be objects
@@ -285,7 +286,7 @@ namespace {
                      "db" << "test" <<
                      "pwd" << "")));
 
-        // Credentials must be provided (so long as userSource is not $external)
+        // Credentials must be provided
         ASSERT_NOT_OK(v2parser.initializeUserCredentialsFromUserDocument(
                 user.get(),
                 BSON("user" << "spencer" <<
@@ -314,11 +315,12 @@ namespace {
         ASSERT(user->getCredentials().password == "a");
         ASSERT(!user->getCredentials().isExternal);
 
-        // Leaving out 'credentials' field is OK so long as userSource is $external
+        // Credentials are {external:true if users's db is $external
         ASSERT_OK(v2parser.initializeUserCredentialsFromUserDocument(
                 user.get(),
                 BSON("user" << "spencer" <<
-                     "db" << "$external")));
+                     "db" << "$external" <<
+                     "credentials" << BSON("external" << true))));
         ASSERT(user->getCredentials().password.empty());
         ASSERT(user->getCredentials().isExternal);
 
