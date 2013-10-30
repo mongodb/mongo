@@ -867,6 +867,9 @@ namespace mongo {
                 userRoles.insert(roleName);
             }
 
+            audit::logGrantRolesToUser(ClientBasic::getCurrent(),
+                                       userName,
+                                       roles);
             BSONArray newRolesBSONArray = roleSetToBSONArray(userRoles);
             status = authzManager->updatePrivilegeDocument(
                     userName, BSON("$set" << BSON("roles" << newRolesBSONArray)), writeConcern);
@@ -979,6 +982,9 @@ namespace mongo {
                 userRoles.erase(roleName);
             }
 
+            audit::logRevokeRolesFromUser(ClientBasic::getCurrent(),
+                                          userName,
+                                          roles);
             BSONArray newRolesBSONArray = roleSetToBSONArray(userRoles);
             status = authzManager->updatePrivilegeDocument(
                     userName, BSON("$set" << BSON("roles" << newRolesBSONArray)), writeConcern);
