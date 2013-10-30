@@ -85,7 +85,10 @@ namespace mongo {
 
     const NamespaceString AuthorizationManager::adminCommandNamespace("admin.$cmd");
     const NamespaceString AuthorizationManager::rolesCollectionNamespace("admin.system.roles");
-    const NamespaceString AuthorizationManager::usersAltCollectionNamespace("admin.new.users");
+    const NamespaceString AuthorizationManager::usersAltCollectionNamespace(
+            "admin.system.new_users");
+    const NamespaceString AuthorizationManager::usersBackupCollectionNamespace(
+            "admin.system.backup_users");
     const NamespaceString AuthorizationManager::usersCollectionNamespace("admin.system.users");
     const NamespaceString AuthorizationManager::versionCollectionNamespace("admin.system.version");
 
@@ -462,11 +465,37 @@ namespace mongo {
         return Status::OK();
     }
 
+    static const RoleName userAdminAnyDatabase("userAdminAnyDatabase", "admin");
     static void _initializeUserPrivilegesFromRolesV1(User* user) {
         PrivilegeVector privileges;
-        RoleNameIterator roles = user->getRoles();
-        while(roles.more()) {
-            RoleGraph::addPrivilegesForBuiltinRole(roles.next(), &privileges);
+        for (RoleNameIterator roles = user->getRoles(); roles.more(); roles.next()) {
+            RoleGraph::addPrivilegesForBuiltinRole(roles.get(), &privileges);
+            if (roles.get() == userAdminAnyDatabase) {
+                // Giving schemaVersion24 users with userAdminAnyDatabase these privileges allows
+                // them to conduct a manual upgrade from schemaVersion24 to schemaVersion26Final.
+                ActionSet actions;
+                actions.addAction(ActionType::find);
+                actions.addAction(ActionType::insert);
+                actions.addAction(ActionType::update);
+                actions.addAction(ActionType::remove);
+                actions.addAction(ActionType::createIndex);
+                actions.addAction(ActionType::dropIndex);
+                Privilege::addPrivilegeToPrivilegeVector(
+                        &privileges,
+                        Privilege(ResourcePattern::forExactNamespace(
+                                          AuthorizationManager::versionCollectionNamespace),
+                                  actions));
+                Privilege::addPrivilegeToPrivilegeVector(
+                        &privileges,
+                        Privilege(ResourcePattern::forExactNamespace(
+                                          AuthorizationManager::usersAltCollectionNamespace),
+                                  actions));
+                Privilege::addPrivilegeToPrivilegeVector(
+                        &privileges,
+                        Privilege(ResourcePattern::forExactNamespace(
+                                          AuthorizationManager::usersBackupCollectionNamespace),
+                                  actions));
+            }
         }
         user->addPrivileges(privileges);
     }
