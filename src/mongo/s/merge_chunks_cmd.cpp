@@ -52,14 +52,19 @@ namespace mongo {
               << "usage: { mergeChunks : <ns>, bounds : [ <min key>, <max key> ] }";
         }
 
-        virtual Status checkAuthForCommand( ClientBasic* client,
-                                            const std::string& dbname,
-                                            const BSONObj& cmdObj ) {
+        virtual Status checkAuthForCommand(ClientBasic* client,
+                                           const std::string& dbname,
+                                           const BSONObj& cmdObj) {
             if (!client->getAuthorizationSession()->isAuthorizedForActionsOnResource(
-                        ResourcePattern::forClusterResource(), ActionType::mergeChunks)) {
-                return Status(ErrorCodes::Unauthorized, "Not authorized for mergeChunks.");
+                    ResourcePattern::forExactNamespace(NamespaceString(parseNs(dbname, cmdObj))),
+                    ActionType::mergeChunks)) {
+                return Status(ErrorCodes::Unauthorized, "Unauthorized");
             }
             return Status::OK();
+        }
+
+        virtual std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const {
+            return parseNsFullyQualified(dbname, cmdObj);
         }
 
         virtual bool adminOnly() const { return true; }
@@ -111,10 +116,7 @@ namespace mongo {
                   BSONObjBuilder& result,
                   bool ) {
 
-            string ns;
-            if ( !FieldParser::extract( cmdObj, nsField, &ns, &errmsg ) ) {
-                return false;
-            }
+            string ns = parseNs(dbname, cmdObj);
 
             if ( ns.size() == 0 ) {
                 errmsg = "no namespace specified";

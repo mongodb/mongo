@@ -113,8 +113,12 @@ namespace mongo {
                                              const StringData& collectionName )
         : _ns(dbName.size() + collectionName.size() + 1, '\0') {
 
-        dassert(dbName.find('.') == std::string::npos);
-        dassert(collectionName.empty() || collectionName[0] != '.');
+        uassert(17235,
+                "'.' is an invalid character in a database name",
+                dbName.find('.') == std::string::npos);
+        uassert(17246,
+                "Collection names cannot start with '.'",
+                collectionName.empty() || collectionName[0] != '.');
         std::string::iterator it = std::copy(dbName.begin(), dbName.end(), _ns.begin());
         *it = '.';
         ++it;

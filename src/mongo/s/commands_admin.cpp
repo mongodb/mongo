@@ -36,6 +36,7 @@
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/commands/shutdown.h"
 #include "mongo/db/dbmessage.h"
@@ -183,15 +184,21 @@ namespace mongo {
             virtual void help( stringstream& help ) const {
                 help << " example: { moveprimary : 'foo' , to : 'localhost:9999' }";
             }
-            virtual void addRequiredPrivileges(const std::string& dbname,
-                                               const BSONObj& cmdObj,
-                                               std::vector<Privilege>* out) {
-                ActionSet actions;
-                actions.addAction(ActionType::movePrimary);
-                out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
+            virtual Status checkAuthForCommand(ClientBasic* client,
+                                               const std::string& dbname,
+                                               const BSONObj& cmdObj) {
+                if (!client->getAuthorizationSession()->isAuthorizedForActionsOnResource(
+                        ResourcePattern::forDatabaseName(parseNs(dbname, cmdObj)),
+                        ActionType::movePrimary)) {
+                    return Status(ErrorCodes::Unauthorized, "Unauthorized");
+                }
+                return Status::OK();
+            }
+            virtual std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const {
+                return cmdObj.firstElement().valuestrsafe();
             }
             bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
-                string dbname = cmdObj.firstElement().valuestrsafe();
+                string dbname = parseNs("admin", cmdObj);
 
                 if ( dbname.size() == 0 ) {
                     errmsg = "no db";
@@ -372,15 +379,21 @@ namespace mongo {
                         << "Enable sharding for a db. (Use 'shardcollection' command afterwards.)\n"
                         << "  { enablesharding : \"<dbname>\" }\n";
             }
-            virtual void addRequiredPrivileges(const std::string& dbname,
-                                               const BSONObj& cmdObj,
-                                               std::vector<Privilege>* out) {
-                ActionSet actions;
-                actions.addAction(ActionType::enableSharding);
-                out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
+            virtual Status checkAuthForCommand(ClientBasic* client,
+                                               const std::string& dbname,
+                                               const BSONObj& cmdObj) {
+                if (!client->getAuthorizationSession()->isAuthorizedForActionsOnResource(
+                        ResourcePattern::forDatabaseName(parseNs(dbname, cmdObj)),
+                        ActionType::enableSharding)) {
+                    return Status(ErrorCodes::Unauthorized, "Unauthorized");
+                }
+                return Status::OK();
+            }
+            virtual std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const {
+                return cmdObj.firstElement().valuestrsafe();
             }
             bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
-                string dbname = cmdObj.firstElement().valuestrsafe();
+                string dbname = parseNs("admin", cmdObj);
                 if ( dbname.size() == 0 ) {
                     errmsg = "no db";
                     return false;
@@ -424,15 +437,22 @@ namespace mongo {
                         << "Shard a collection.  Requires key.  Optional unique. Sharding must already be enabled for the database.\n"
                         << "  { enablesharding : \"<dbname>\" }\n";
             }
-            virtual void addRequiredPrivileges(const std::string& dbname,
-                                               const BSONObj& cmdObj,
-                                               std::vector<Privilege>* out) {
-                ActionSet actions;
-                actions.addAction(ActionType::shardCollection);
-                out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
+            virtual Status checkAuthForCommand(ClientBasic* client,
+                                               const std::string& dbname,
+                                               const BSONObj& cmdObj) {
+                if (!client->getAuthorizationSession()->isAuthorizedForActionsOnResource(
+                        ResourcePattern::forExactNamespace(NamespaceString(parseNs(dbname,
+                                                                                   cmdObj))),
+                        ActionType::shardCollection)) {
+                    return Status(ErrorCodes::Unauthorized, "Unauthorized");
+                }
+                return Status::OK();
             }
-            bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
-                const string ns = cmdObj.firstElement().valuestrsafe();
+            virtual std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const {
+                return parseNsFullyQualified(dbname, cmdObj);
+            }
+            bool run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
+                const string ns = parseNs(dbname, cmdObj);
                 if ( ns.size() == 0 ) {
                     errmsg = "no ns";
                     return false;
@@ -793,15 +813,22 @@ namespace mongo {
             virtual void help( stringstream& help ) const {
                 help << " example: { getShardVersion : 'alleyinsider.foo'  } ";
             }
-            virtual void addRequiredPrivileges(const std::string& dbname,
-                                               const BSONObj& cmdObj,
-                                               std::vector<Privilege>* out) {
-                ActionSet actions;
-                actions.addAction(ActionType::getShardVersion);
-                out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
+            virtual Status checkAuthForCommand(ClientBasic* client,
+                                               const std::string& dbname,
+                                               const BSONObj& cmdObj) {
+                if (!client->getAuthorizationSession()->isAuthorizedForActionsOnResource(
+                        ResourcePattern::forExactNamespace(NamespaceString(parseNs(dbname,
+                                                                                   cmdObj))),
+                        ActionType::getShardVersion)) {
+                    return Status(ErrorCodes::Unauthorized, "Unauthorized");
+                }
+                return Status::OK();
             }
-            bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
-                string ns = cmdObj.firstElement().valuestrsafe();
+            virtual std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const {
+                return parseNsFullyQualified(dbname, cmdObj);
+            }
+            bool run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
+                string ns = parseNs(dbname, cmdObj);
                 if ( ns.size() == 0 ) {
                     errmsg = "need to specify fully namespace";
                     return false;
@@ -837,20 +864,27 @@ namespace mongo {
                         << " NOTE: this does not move the chunks, it merely creates a logical separation \n"
                         ;
             }
-            virtual void addRequiredPrivileges(const std::string& dbname,
-                                               const BSONObj& cmdObj,
-                                               std::vector<Privilege>* out) {
-                ActionSet actions;
-                actions.addAction(ActionType::split);
-                out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
+            virtual Status checkAuthForCommand(ClientBasic* client,
+                                               const std::string& dbname,
+                                               const BSONObj& cmdObj) {
+                if (!client->getAuthorizationSession()->isAuthorizedForActionsOnResource(
+                        ResourcePattern::forExactNamespace(NamespaceString(parseNs(dbname,
+                                                                                   cmdObj))),
+                        ActionType::split)) {
+                    return Status(ErrorCodes::Unauthorized, "Unauthorized");
+                }
+                return Status::OK();
             }
-            bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
+            virtual std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const {
+                return parseNsFullyQualified(dbname, cmdObj);
+            }
+            bool run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
                 if ( ! okForConfigChanges( errmsg ) )
                     return false;
 
                 ShardConnection::sync();
 
-                string ns = cmdObj.firstElement().valuestrsafe();
+                string ns = parseNs(dbname, cmdObj);
                 if ( ns.size() == 0 ) {
                     errmsg = "no ns";
                     return false;
@@ -988,21 +1022,28 @@ namespace mongo {
                      << "  { movechunk : 'test.foo' , bounds : [ { num : 0 } , { num : 10 } ] "
                      << " , to : 'shard001' }\n";
             }
-            virtual void addRequiredPrivileges(const std::string& dbname,
-                                               const BSONObj& cmdObj,
-                                               std::vector<Privilege>* out) {
-                ActionSet actions;
-                actions.addAction(ActionType::moveChunk);
-                out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
+            virtual Status checkAuthForCommand(ClientBasic* client,
+                                               const std::string& dbname,
+                                               const BSONObj& cmdObj) {
+                if (!client->getAuthorizationSession()->isAuthorizedForActionsOnResource(
+                        ResourcePattern::forExactNamespace(NamespaceString(parseNs(dbname,
+                                                                                   cmdObj))),
+                        ActionType::moveChunk)) {
+                    return Status(ErrorCodes::Unauthorized, "Unauthorized");
+                }
+                return Status::OK();
             }
-            bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
+            virtual std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const {
+                return parseNsFullyQualified(dbname, cmdObj);
+            }
+            bool run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
                 if ( ! okForConfigChanges( errmsg ) )
                     return false;
 
                 ShardConnection::sync();
 
                 Timer t;
-                string ns = cmdObj.firstElement().valuestrsafe();
+                string ns = parseNs(dbname, cmdObj);
                 if ( ns.size() == 0 ) {
                     errmsg = "no ns";
                     return false;
@@ -1663,13 +1704,10 @@ namespace mongo {
         virtual bool adminOnly() const { return true; }
         virtual LockType locktype() const { return NONE; }
         virtual void help( stringstream& help ) const { help << "Not supported through mongos"; }
-        virtual void addRequiredPrivileges(const std::string& dbname,
-                                           const BSONObj& cmdObj,
-                                           std::vector<Privilege>* out) {
-            // TODO: Should this require no auth since it's not supported in mongos anyway?
-            ActionSet actions;
-            actions.addAction(ActionType::replSetGetStatus);
-            out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
+        virtual Status checkAuthForCommand(ClientBasic* client,
+                                           const std::string& dbname,
+                                           const BSONObj& cmdObj) {
+            return Status::OK(); // Require no auth since this command isn't supported in mongos
         }
         bool run(const string& , BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool /*fromRepl*/) {
             if ( jsobj["forShell"].trueValue() ) {

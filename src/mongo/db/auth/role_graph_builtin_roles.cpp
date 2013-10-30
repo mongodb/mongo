@@ -81,8 +81,11 @@ namespace {
     /// Actions that the "hostManager" role may perform on any database.
     ActionSet hostManagerRoleDatabaseActions;
 
-    /// Actions that the "dbOwner" role may perform on the cluster resource.
+    /// Actions that the "clusterManager" role may perform on the cluster resource.
     ActionSet clusterManagerRoleClusterActions;
+
+    /// Actions that the "clusterManager" role may perform on any database
+    ActionSet clusterManagerRoleDatabaseActions;
 
     ActionSet& operator<<(ActionSet& target, ActionType source) {
         target.addAction(source);
@@ -162,7 +165,6 @@ namespace {
             << ActionType::getLog
             << ActionType::getParameter
             << ActionType::getShardMap
-            << ActionType::getShardVersion
             << ActionType::hostInfo
             << ActionType::listDatabases
             << ActionType::listShards
@@ -178,7 +180,8 @@ namespace {
         // clusterMonitor role actions that target a database (or collection) resource
         clusterMonitorRoleDatabaseActions
             << ActionType::collStats // dbAdmin gets this also
-            << ActionType::dbStats; // dbAdmin gets this also
+            << ActionType::dbStats // dbAdmin gets this also
+            << ActionType::getShardVersion;
 
         // hostManager role actions that target the cluster resource
         hostManagerRoleClusterActions
@@ -215,17 +218,20 @@ namespace {
             << ActionType::replSetInitiate // TODO(spencer): combine with replSetReconfig
             << ActionType::replSetReconfig
             << ActionType::resync // hostManager gets this also
-            << ActionType::splitVector
+            << ActionType::addShard
+            << ActionType::removeShard
+            << ActionType::cleanupOrphaned;
+
+        clusterManagerRoleDatabaseActions
             << ActionType::split // TODO(spencer): combine the following 3 sharding actions
             << ActionType::splitChunk
             << ActionType::mergeChunks
             << ActionType::moveChunk // TODO(spencer): combine with movePrimary
             << ActionType::movePrimary
-            << ActionType::addShard
-            << ActionType::removeShard
             << ActionType::enableSharding // TODO(spencer): combine with shardCollection
             << ActionType::shardCollection
-            << ActionType::cleanupOrphaned;
+            << ActionType::splitVector;
+
 
         // Database-owner role database actions.
         dbOwnerRoleActions += readWriteRoleActions;
@@ -423,6 +429,10 @@ namespace {
         Privilege::addPrivilegeToPrivilegeVector(
                 privileges,
                 Privilege(ResourcePattern::forClusterResource(), clusterManagerRoleClusterActions));
+        Privilege::addPrivilegeToPrivilegeVector(
+                privileges,
+                Privilege(ResourcePattern::forAnyNormalResource(),
+                          clusterManagerRoleDatabaseActions));
         Privilege::addPrivilegeToPrivilegeVector(
                 privileges,
                 Privilege(ResourcePattern::forDatabaseName("config"), readRoleActions));

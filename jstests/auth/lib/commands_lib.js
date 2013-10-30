@@ -894,7 +894,7 @@ var authCommandsLib = {
                     runOnDb: adminDbName,
                     rolesAllowed: roles_clusterManager,
                     requiredPrivileges: [
-                        { resource: {cluster: true}, actions: ["enableSharding"] }
+                        { resource: {db: "x", collection: ""}, actions: ["enableSharding"] }
                     ],
                     expectFail: true
                 },
@@ -1171,13 +1171,13 @@ var authCommandsLib = {
         },
         {
             testname: "getShardVersion",
-            command: {getShardVersion: 1},
+            command: {getShardVersion: "test.foo"},
             testcases: [
                 {
                     runOnDb: adminDbName,
                     rolesAllowed: roles_monitoring,
                     requiredPrivileges: [
-                        { resource: {cluster: true}, actions: ["getShardVersion"] }
+                        { resource: {db: "test", collection: 'foo'}, actions: ["getShardVersion"] }
                     ],
                     expectFail: true
                 },
@@ -1409,14 +1409,14 @@ var authCommandsLib = {
         },
         {
             testname: "mergeChunks",
-            command: {mergeChunks: "x", bounds: [{i : 0}, {i : 5}]},
+            command: {mergeChunks: "test.x", bounds: [{i : 0}, {i : 5}]},
             skipStandalone: true,
             testcases: [
                 {
                     runOnDb: adminDbName,
                     rolesAllowed: roles_clusterManager,
                     requiredPrivileges: [
-                        { resource: {cluster: true}, actions: ["mergeChunks"] }
+                        { resource: {db: "test", collection: "x"}, actions: ["mergeChunks"] }
                     ],
                     expectFail: true
                 },
@@ -1426,13 +1426,13 @@ var authCommandsLib = {
         },
         {
             testname: "moveChunk",
-            command: {moveChunk: "x"},
+            command: {moveChunk: "test.x"},
             testcases: [
                 {
                     runOnDb: adminDbName,
                     rolesAllowed: roles_clusterManager,
                     requiredPrivileges: [
-                        { resource: {cluster: true}, actions: ["moveChunk"] }
+                        { resource: {db: "test", collection: "x"}, actions: ["moveChunk"] }
                     ],
                     expectFail: true
                 },
@@ -1449,7 +1449,7 @@ var authCommandsLib = {
                     runOnDb: adminDbName,
                     rolesAllowed: roles_clusterManager,
                     requiredPrivileges: [
-                        { resource: {cluster: true}, actions: ["movePrimary"] }
+                        { resource: {db: "x", collection: ""}, actions: ["movePrimary"] }
                     ],
                     expectFail: true
                 },
@@ -1926,14 +1926,14 @@ var authCommandsLib = {
         },
         {
             testname: "shardCollection",
-            command: {shardCollection: "x"},
+            command: {shardCollection: "test.x"},
             skipStandalone: true,
             testcases: [
                 {
                     runOnDb: adminDbName,
                     rolesAllowed: roles_clusterManager,
                     requiredPrivileges: [
-                        { resource: {cluster: true}, actions: ["shardCollection"] }
+                        { resource: {db: "test", collection: "x"}, actions: ["shardCollection"] }
                     ],
                     expectFail: true
                 },
@@ -1967,14 +1967,14 @@ var authCommandsLib = {
         },
         {
             testname: "split",
-            command: {split: "x"},
+            command: {split: "test.x"},
             skipStandalone: true,
             testcases: [
                 {
                     runOnDb: adminDbName,
                     rolesAllowed: roles_clusterManager,
                     requiredPrivileges: [
-                        { resource: {cluster: true}, actions: ["split"] }
+                        { resource: {db: "test", collection: "x"}, actions: ["split"] }
                     ],
                     expectFail: true
                 },
@@ -1984,14 +1984,14 @@ var authCommandsLib = {
         },
         {
             testname: "splitChunk",
-            command: {splitChunk: "x"},
+            command: {splitChunk: "test.x"},
             skipSharded: true,
             testcases: [
                 {
                     runOnDb: adminDbName,
                     rolesAllowed: roles_clusterManager,
                     requiredPrivileges: [
-                        { resource: {cluster: true}, actions: ["splitChunk"] }
+                        { resource: {db: "test", collection: "x"}, actions: ["splitChunk"] }
                     ],
                     expectFail: true
                 },
@@ -2001,13 +2001,13 @@ var authCommandsLib = {
         },
         {
             testname: "splitVector",
-            command: {splitVector: "x"},
+            command: {splitVector: "test.x"},
             testcases: [
                 {
                     runOnDb: adminDbName,
                     rolesAllowed: roles_clusterManager,
                     requiredPrivileges: [
-                        { resource: {cluster: true}, actions: ["splitVector"] }
+                        { resource: {db: "test", collection: "x"}, actions: ["splitVector"] }
                     ],
                     expectFail: true
                 },
@@ -2015,7 +2015,7 @@ var authCommandsLib = {
                     runOnDb: firstDbName,
                     rolesAllowed: roles_clusterManager,
                     requiredPrivileges: [
-                        { resource: {cluster: true}, actions: ["splitVector"] }
+                        { resource: {db: "test", collection: "x"}, actions: ["splitVector"] }
                     ],
                     expectFail: true
                 },
@@ -2023,7 +2023,7 @@ var authCommandsLib = {
                     runOnDb: secondDbName,
                     rolesAllowed: roles_clusterManager,
                     requiredPrivileges: [
-                        { resource: {cluster: true}, actions: ["splitVector"] }
+                        { resource: {db: "test", collection: "x"}, actions: ["splitVector"] }
                     ],
                     expectFail: true
                 }

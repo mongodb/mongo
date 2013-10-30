@@ -41,6 +41,7 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/index_legacy.h"
@@ -223,14 +224,19 @@ namespace mongo {
                  "  'force' will produce one split point even if data is small; defaults to false\n"
                  "NOTE: This command may take a while to run";
         }
-        virtual void addRequiredPrivileges(const std::string& dbname,
-                                           const BSONObj& cmdObj,
-                                           std::vector<Privilege>* out) {
-            ActionSet actions;
-            actions.addAction(ActionType::splitVector);
-            out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
+        virtual Status checkAuthForCommand(ClientBasic* client,
+                                           const std::string& dbname,
+                                           const BSONObj& cmdObj) {
+            if (!client->getAuthorizationSession()->isAuthorizedForActionsOnResource(
+                    ResourcePattern::forExactNamespace(NamespaceString(parseNs(dbname, cmdObj))),
+                    ActionType::splitVector)) {
+                return Status(ErrorCodes::Unauthorized, "Unauthorized");
+            }
+            return Status::OK();
         }
-
+        virtual std::string parseNs(const string& dbname, const BSONObj& cmdObj) const {
+            return parseNsFullyQualified(dbname, cmdObj);
+        }
         bool run(const string& dbname, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
 
             //
@@ -238,7 +244,7 @@ namespace mongo {
             //     a good approximation of the size of the chunk -- without needing to access the actual data.
             //
 
-            const char* ns = jsobj.getStringField( "splitVector" );
+            const std::string ns = parseNs(dbname, jsobj);
             BSONObj keyPattern = jsobj.getObjectField( "keyPattern" );
 
             if ( keyPattern.isEmpty() ) {
@@ -511,12 +517,18 @@ namespace mongo {
         virtual bool slaveOk() const { return false; }
         virtual bool adminOnly() const { return true; }
         virtual LockType locktype() const { return NONE; }
-        virtual void addRequiredPrivileges(const std::string& dbname,
-                                           const BSONObj& cmdObj,
-                                           std::vector<Privilege>* out) {
-            ActionSet actions;
-            actions.addAction(ActionType::splitChunk);
-            out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
+        virtual Status checkAuthForCommand(ClientBasic* client,
+                                           const std::string& dbname,
+                                           const BSONObj& cmdObj) {
+            if (!client->getAuthorizationSession()->isAuthorizedForActionsOnResource(
+                    ResourcePattern::forExactNamespace(NamespaceString(parseNs(dbname, cmdObj))),
+                    ActionType::splitChunk)) {
+                return Status(ErrorCodes::Unauthorized, "Unauthorized");
+            }
+            return Status::OK();
+        }
+        virtual std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const {
+            return parseNsFullyQualified(dbname, cmdObj);
         }
         bool run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
 
@@ -524,7 +536,7 @@ namespace mongo {
             // 1. check whether parameters passed to splitChunk are sound
             //
 
-            const string ns = cmdObj.firstElement().str();
+            const string ns = parseNs(dbname, cmdObj);
             if ( ns.empty() ) {
                 errmsg  = "need to specify namespace in command";
                 return false;

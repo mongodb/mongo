@@ -226,6 +226,7 @@ namespace mongo {
         public:
             NotAllowedOnShardedCollectionCmd( const char * n ) : PublicGridCommand( n ) {}
 
+            // TODO(spencer): remove this in favor of using parseNs
             virtual string getFullNS( const string& dbName , const BSONObj& cmdObj ) = 0;
 
             virtual bool run(const string& dbName , BSONObj& cmdObj, int options, string& errmsg, BSONObjBuilder& result, bool) {
@@ -1012,23 +1013,30 @@ namespace mongo {
         public:
             SplitVectorCmd() : NotAllowedOnShardedCollectionCmd("splitVector") {}
             virtual bool passOptions() const { return true; }
-            virtual void addRequiredPrivileges(const std::string& dbname,
-                                               const BSONObj& cmdObj,
-                                               std::vector<Privilege>* out) {
-                ActionSet actions;
-                actions.addAction(ActionType::splitVector);
-                out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
+            virtual Status checkAuthForCommand(ClientBasic* client,
+                                               const std::string& dbname,
+                                               const BSONObj& cmdObj) {
+                if (!client->getAuthorizationSession()->isAuthorizedForActionsOnResource(
+                        ResourcePattern::forExactNamespace(NamespaceString(parseNs(dbname,
+                                                                                   cmdObj))),
+                        ActionType::splitVector)) {
+                    return Status(ErrorCodes::Unauthorized, "Unauthorized");
+                }
+                return Status::OK();
             }
             virtual bool run(const string& dbName , BSONObj& cmdObj, int options, string& errmsg, BSONObjBuilder& result, bool) {
-                string x = cmdObj.firstElement().valuestrsafe();
+                string x = parseNs(dbName, cmdObj);
                 if ( ! str::startsWith( x , dbName ) ) {
                     errmsg = str::stream() << "doing a splitVector across dbs isn't supported via mongos";
                     return false;
                 }
                 return NotAllowedOnShardedCollectionCmd::run( dbName , cmdObj , options , errmsg, result, false );
             }
+            virtual std::string parseNs(const string& dbname, const BSONObj& cmdObj) const {
+                return parseNsFullyQualified(dbname, cmdObj);
+            }
             virtual string getFullNS( const string& dbName , const BSONObj& cmdObj ) {
-                return cmdObj.firstElement().valuestrsafe();
+                return parseNs(dbName, cmdObj);
             }
 
         } splitVectorCmd;
