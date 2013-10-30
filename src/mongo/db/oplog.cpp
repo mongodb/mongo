@@ -979,13 +979,17 @@ namespace mongo {
                 BSONElement e = i.next();
                 const BSONObj& temp = e.Obj();
                 
-                Client::Context ctx(temp["ns"].String());
+                string ns = temp["ns"].String();
+                Client::Context ctx(ns);
+
                 bool failed = applyOperation_inlock(temp, false, alwaysUpsert);
                 ab.append(!failed);
                 if ( failed )
                     errors++;
 
                 num++;
+
+                logOpForDbHash( "u", ns.c_str(), BSONObj(), NULL );
             }
 
             result.append( "applied" , num );
