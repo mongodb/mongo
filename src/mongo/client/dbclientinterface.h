@@ -984,7 +984,7 @@ namespace mongo {
         bool _authMongoCR(const string &dbname,
                           const string &username,
                           const string &pwd,
-                          string& errmsg,
+                          BSONObj *info,
                           bool digestPassword);
 
         /**
@@ -993,8 +993,8 @@ namespace mongo {
          * Returns false on failure and set "errmsg".
          */
         bool _authX509(const string&dbname,
-                            const string &username,
-                            string& errmsg);
+                       const string &username,
+                       BSONObj *info);
 
     private:
         enum QueryOptions _cachedAvailableOptions;

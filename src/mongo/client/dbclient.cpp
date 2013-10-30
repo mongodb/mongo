@@ -549,10 +549,10 @@ namespace mongo {
                                                                saslCommandDigestPasswordFieldName,
                                                                true,
                                                                &digestPassword));
-            std::string errmsg;
-            uassert(ErrorCodes::AuthenticationFailed,
-                    errmsg,
-                    _authMongoCR(userSource, user, password, errmsg, digestPassword));
+            BSONObj result;
+            uassert(result["code"].Int(),
+                    result.toString(),
+                    _authMongoCR(userSource, user, password, &result, digestPassword));
         }
 #ifdef MONGO_SSL
         else if (mechanism == StringData("MONGODB-X509", StringData::LiteralTag())){
@@ -575,11 +575,11 @@ namespace mongo {
                     "\" does not match the provided client certificate user \"" +
                     getSSLManager()->getClientSubjectName() + "\"",
                     user ==  getSSLManager()->getClientSubjectName());
- 
-            std::string errmsg;
-            uassert(ErrorCodes::AuthenticationFailed,
-                    errmsg,
-                    _authX509(userSource, user, errmsg));
+
+            BSONObj result;
+            uassert(result["code"].Int(),
+                    result.toString(),
+                    _authX509(userSource, user, &result));
         }
 #endif
         else if (saslClientAuthenticate != NULL) {
@@ -618,21 +618,19 @@ namespace mongo {
     bool DBClientWithCommands::_authMongoCR(const string &dbname,
                                             const string &username,
                                             const string &password_text,
-                                            string& errmsg,
+                                            BSONObj *info,
                                             bool digestPassword) {
 
         string password = password_text;
         if( digestPassword )
             password = createPasswordDigest( username , password_text );
 
-        BSONObj info;
         string nonce;
-        if( !runCommand(dbname, getnoncecmdobj, info) ) {
-            errmsg = "getnonce failed: " + info.toString();
+        if( !runCommand(dbname, getnoncecmdobj, *info) ) {
             return false;
         }
         {
-            BSONElement e = info.getField("nonce");
+            BSONElement e = info->getField("nonce");
             verify( e.type() == String );
             nonce = e.valuestr();
         }
@@ -655,28 +653,25 @@ namespace mongo {
             authCmd = b.done();
         }
 
-        if( runCommand(dbname, authCmd, info) ) {
+        if( runCommand(dbname, authCmd, *info) ) {
             return true;
         }
 
-        errmsg = info.toString();
         return false;
     }
 
     bool DBClientWithCommands::_authX509(const string&dbname,
-                                              const string &username,
-                                              string& errmsg){
+                                         const string &username,
+                                         BSONObj *info){
         BSONObj authCmd;
         BSONObjBuilder cmdBuilder;
         cmdBuilder << "authenticate" << 1 << "mechanism" << "MONGODB-X509" << "user" << username;
         authCmd = cmdBuilder.done();
 
-        BSONObj info;
-        if( runCommand(dbname, authCmd, info) ) {
+        if( runCommand(dbname, authCmd, *info) ) {
             return true;
         }
 
-        errmsg = info.toString();
         return false;
     }
 
