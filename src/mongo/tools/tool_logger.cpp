@@ -26,6 +26,7 @@
 #include "mongo/logger/message_event.h"
 #include "mongo/logger/message_event_utf8_encoder.h"
 #include "mongo/tools/tool_options.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 namespace {
@@ -88,6 +89,8 @@ MONGO_INITIALIZER_GENERAL(ToolLogRedirection,
         logger::globalLogDomain()->attachAppender(MessageLogDomain::AppenderAutoPtr(
                     new ConsoleAppender<MessageEventEphemeral, ErrorConsole>(
                         new MessageEventDetailsEncoder)));
+
+        setRawOutDestination(stderr);
     }
 
     // Only put an appender on our informational messages if we did not use --quiet

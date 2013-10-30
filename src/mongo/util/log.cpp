@@ -110,16 +110,30 @@ namespace mongo {
         return s.str();
     }
 
+    namespace {
+        // NOTE: We can't directly set this variable to something like "stdout" because we need to
+        // make sure that it is initialized properly before static initialization.
+        FILE *rawOutDestination = NULL;
+    } // namespace
+
+    void setRawOutDestination(FILE *outDestination) {
+        rawOutDestination = outDestination;
+    }
+
     /*
      * NOTE(schwerin): Called from signal handlers; should not be taking locks or allocating
      * memory.
      */
     void rawOut(const StringData &s) {
+        FILE* dest = rawOutDestination;
+        if (!dest) {
+            dest = stdout;
+        }
         for (size_t i = 0; i < s.size(); ++i) {
 #ifdef _WIN32
-            putc(s[i], stdout);
+            putc(s[i], dest);
 #else
-            putc_unlocked(s[i], stdout);
+            putc_unlocked(s[i], dest);
 #endif
         }
     }
