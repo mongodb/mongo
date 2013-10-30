@@ -29,6 +29,8 @@
 
 #include "mongo/pch.h"
 
+#include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/client.h"
 #include "mongo/db/cloner.h"
 #include "mongo/db/ops/update.h"
@@ -586,6 +588,12 @@ namespace mongo {
         LOG(2) << "replSet rollback truncate oplog after " << h.commonPoint.toStringPretty() << rsLog;
         // todo: fatal error if this throws?
         oplogDetails->cappedTruncateAfter(rsoplog, h.commonPointOurDiskloc, false);
+
+        Status status = getGlobalAuthorizationManager()->initialize();
+        if (!status.isOK()) {
+            warning() << "Failed to reinitialize auth data after rollback: " << status;
+            warn = true;
+        }
 
         /* reset cached lastoptimewritten and h value */
         loadLastOpTimeWritten();
