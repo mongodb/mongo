@@ -340,9 +340,9 @@ namespace mongo {
 
         _catalog->_collection->infoCache()->addedIndex();
 
-        IndexLegacy::postBuildHook( _nsd, _nsd->idx( idxNo ) );
-
         _catalog->_fixDescriptorCacheNumbers();
+
+        IndexLegacy::postBuildHook( _catalog->_collection, _catalog->getDescriptor( idxNo ) );
     }
 
 

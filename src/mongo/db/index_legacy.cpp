@@ -80,12 +80,13 @@ namespace mongo {
     }
 
     // static
-    void IndexLegacy::postBuildHook(NamespaceDetails* tableToIndex, const IndexDetails& idx) {
+    void IndexLegacy::postBuildHook(Collection* collection, IndexDescriptor* desc) {
         // If it's an FTS index, we want to set the power of 2 flag.
-        string pluginName = CatalogHack::getAccessMethodName(idx.keyPattern());
+        string pluginName = collection->getIndexCatalog()->getAccessMethodName(desc->keyPattern());
         if (IndexNames::TEXT == pluginName || IndexNames::TEXT_INTERNAL == pluginName) {
-            if (tableToIndex->setUserFlag(NamespaceDetails::Flag_UsePowerOf2Sizes)) {
-                tableToIndex->syncUserFlags(idx.parentNS());
+            NamespaceDetails* nsd = collection->details();
+            if (nsd->setUserFlag(NamespaceDetails::Flag_UsePowerOf2Sizes)) {
+                nsd->syncUserFlags(collection->ns().ns());
             }
         }
     }
