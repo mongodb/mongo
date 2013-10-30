@@ -66,6 +66,8 @@ namespace mongo {
          * in which case everything from this tree has to go away
          */
 
+        IndexDescriptor* findIdIndex();
+
         /**
          * @return null if cannot find
          */
@@ -75,6 +77,14 @@ namespace mongo {
          * @return null if cannot find
          */
         IndexDescriptor* findIndexByKeyPattern( const BSONObj& key );
+
+        /* Returns the index entry for the first index whose prefix contains
+         * 'keyPattern'. If 'requireSingleKey' is true, skip indices that contain
+         * array attributes. Otherwise, returns NULL.
+         */
+        IndexDescriptor* findIndexByPrefix( const BSONObj &keyPattern,
+                                            bool requireSingleKey );
+
 
         // throws
         // never returns NULL

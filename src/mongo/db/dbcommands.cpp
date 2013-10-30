@@ -936,9 +936,9 @@ namespace mongo {
             bool estimate = jsobj["estimate"].trueValue();
 
             Client::Context ctx( ns );
-            NamespaceDetails *d = nsdetails(ns);
+            Collection* collection = ctx.db()->getCollection( ns );
 
-            if ( ! d || d->numRecords() == 0 ) {
+            if ( !collection || collection->numRecords() == 0 ) {
                 result.appendNumber( "size" , 0 );
                 result.appendNumber( "numObjects" , 0 );
                 result.append( "millis" , timer.millis() );
@@ -950,8 +950,8 @@ namespace mongo {
             auto_ptr<Runner> runner;
             if ( min.isEmpty() && max.isEmpty() ) {
                 if ( estimate ) {
-                    result.appendNumber( "size" , d->dataSize() );
-                    result.appendNumber( "numObjects" , d->numRecords() );
+                    result.appendNumber( "size" , collection->details()->dataSize() );
+                    result.appendNumber( "numObjects" , collection->numRecords() );
                     result.append( "millis" , timer.millis() );
                     return 1;
                 }
@@ -968,8 +968,9 @@ namespace mongo {
                     keyPattern = Helpers::inferKeyPattern( min );
                 }
 
-                const IndexDetails *idx = d->findIndexByPrefix( keyPattern ,
-                                                                true );  /* require single key */
+                IndexDescriptor *idx =
+                    collection->getIndexCatalog()->findIndexByPrefix( keyPattern, true );  /* require single key */
+
                 if ( idx == NULL ) {
                     errmsg = "couldn't find valid index containing key pattern";
                     return false;
@@ -979,10 +980,10 @@ namespace mongo {
                 min = Helpers::toKeyFormat( kp.extendRangeBound( min, false ) );
                 max = Helpers::toKeyFormat( kp.extendRangeBound( max, false ) );
 
-                runner.reset(InternalPlanner::indexScan(ns, d, d->idxNo(*idx), min, max, false));
+                runner.reset(InternalPlanner::indexScan(idx, min, max, false));
             }
 
-            long long avgObjSize = d->dataSize() / d->numRecords();
+            long long avgObjSize = collection->details()->dataSize() / collection->numRecords();
 
             long long maxSize = jsobj["maxSize"].numberLong();
             long long maxObjects = jsobj["maxObjects"].numberLong();

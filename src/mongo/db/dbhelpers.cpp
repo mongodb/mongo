@@ -331,12 +331,13 @@ namespace mongo {
             // Scoping for write lock.
             {
                 Client::WriteContext ctx(ns);
+                Collection* collection = ctx.ctx().db()->getCollection( ns );
+                if ( !collection ) break;
 
-                NamespaceDetails* nsd = nsdetails( ns );
-                if (NULL == nsd) { break; }
-                int ii = nsd->findIndexByKeyPattern( indexKeyPattern.toBSON() );
+                IndexDescriptor* desc =
+                    collection->getIndexCatalog()->findIndexByKeyPattern( indexKeyPattern.toBSON() );
 
-                auto_ptr<Runner> runner(InternalPlanner::indexScan(ns, nsd, ii, min, max,
+                auto_ptr<Runner> runner(InternalPlanner::indexScan(desc, min, max,
                                                                    maxInclusive,
                                                                    InternalPlanner::FORWARD,
                                                                    InternalPlanner::IXSCAN_FETCH));
@@ -433,12 +434,12 @@ namespace mongo {
         *numDocs = 0;
 
         Client::ReadContext ctx( ns );
-
-        NamespaceDetails* details = nsdetails( ns );
-        if ( !details ) return Status( ErrorCodes::NamespaceNotFound, ns );
+        Collection* collection = ctx.ctx().db()->getCollection( ns );
+        if ( !collection ) return Status( ErrorCodes::NamespaceNotFound, ns );
 
         // Require single key
-        const IndexDetails *idx = details->findIndexByPrefix( range.keyPattern, true );
+        IndexDescriptor *idx =
+            collection->getIndexCatalog()->findIndexByPrefix( range.keyPattern, true );
 
         if ( idx == NULL ) {
             return Status( ErrorCodes::IndexNotFound, range.keyPattern.toString() );
@@ -450,10 +451,10 @@ namespace mongo {
         // sizes will vary
         long long avgDocsWhenFull;
         long long avgDocSizeBytes;
-        const long long totalDocsInNS = details->numRecords();
+        const long long totalDocsInNS = collection->numRecords();
         if ( totalDocsInNS > 0 ) {
             // TODO: Figure out what's up here
-            avgDocSizeBytes = details->dataSize() / totalDocsInNS;
+            avgDocSizeBytes = collection->details()->dataSize() / totalDocsInNS;
             avgDocsWhenFull = maxChunkSizeBytes / avgDocSizeBytes;
             avgDocsWhenFull = std::min( kMaxDocsPerChunk + 1,
                                         130 * avgDocsWhenFull / 100 /* slack */);
@@ -474,7 +475,7 @@ namespace mongo {
         bool isLargeChunk = false;
         long long docCount = 0;
 
-        auto_ptr<Runner> runner(InternalPlanner::indexScan(ns, details, details->idxNo(*idx), min, max, false));
+        auto_ptr<Runner> runner(InternalPlanner::indexScan(idx, min, max, false));
         // we can afford to yield here because any change to the base data that we might miss  is
         // already being queued and will be migrated in the 'transferMods' stage
         runner->setYieldPolicy(Runner::YIELD_AUTO);

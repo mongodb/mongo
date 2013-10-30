@@ -701,6 +701,15 @@ namespace mongo {
         return _details->getCompletedIndexCount();
     }
 
+    IndexDescriptor* IndexCatalog::findIdIndex() {
+        for ( int i = 0; i < numIndexesReady(); i++ ) {
+            IndexDescriptor* desc = getDescriptor( i );
+            if ( desc->isIdIndex() )
+                return desc;
+        }
+        return NULL;
+    }
+
     IndexDescriptor* IndexCatalog::findIndexByName( const StringData& name ) {
         int idxNo = _details->findIndexByName( name );
         if ( idxNo < 0 )
@@ -715,6 +724,25 @@ namespace mongo {
         return getDescriptor( idxNo );
     }
 
+    IndexDescriptor* IndexCatalog::findIndexByPrefix( const BSONObj &keyPattern,
+                                                      bool requireSingleKey ) {
+        IndexDescriptor* best = NULL;
+
+        for ( int i = 0; i < numIndexesReady(); i++ ) {
+            IndexDescriptor* desc = getDescriptor( i );
+
+            if ( !keyPattern.isPrefixOf( desc->keyPattern() ) )
+                continue;
+
+            if( !_details->isMultikey( i ) )
+                return desc;
+
+            if ( !requireSingleKey )
+                best = desc;
+        }
+
+        return best;
+    }
 
     IndexDescriptor* IndexCatalog::getDescriptor( int idxNo ) {
         _checkMagic();

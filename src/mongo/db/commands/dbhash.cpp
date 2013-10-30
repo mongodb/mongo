@@ -80,34 +80,22 @@ namespace mongo {
         }
 
         *fromCache = false;
-        NamespaceDetails * nsd = nsdetails( fullCollectionName );
-        verify( nsd );
+        Collection* collection = cc().database()->getCollection( fullCollectionName );
+        if ( !collection )
+            return "";
 
-        // debug SERVER-761
-        NamespaceDetails::IndexIterator ii = nsd->ii();
-        while( ii.more() ) {
-            const IndexDetails &idx = ii.next();
-            if ( !idx.head.isValid() || !idx.info.isValid() ) {
-                log() << "invalid index for ns: " << fullCollectionName << " " << idx.head << " " << idx.info;
-                if ( idx.info.isValid() )
-                    log() << " " << idx.info.obj();
-                log() << endl;
-            }
-        }
+        IndexDescriptor* desc = collection->getIndexCatalog()->findIdIndex();
 
         auto_ptr<Runner> runner;
-        int idNum = nsd->findIdIndex();
-        if ( idNum >= 0 ) {
-            runner.reset(InternalPlanner::indexScan(fullCollectionName,
-                                                    nsd,
-                                                    idNum,
+        if ( desc ) {
+            runner.reset(InternalPlanner::indexScan(desc,
                                                     BSONObj(),
                                                     BSONObj(),
                                                     false,
                                                     InternalPlanner::FORWARD,
                                                     InternalPlanner::IXSCAN_FETCH));
         }
-        else if ( nsd->isCapped() ) {
+        else if ( collection->details()->isCapped() ) {
             runner.reset(InternalPlanner::collectionScan(fullCollectionName));
         }
         else {

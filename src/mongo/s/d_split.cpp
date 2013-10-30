@@ -123,10 +123,10 @@ namespace mongo {
                 errmsg = "ns not found";
                 return false;
             }
-            NamespaceDetails *d = collection->details();
 
-            const IndexDetails *idx = d->findIndexByPrefix( keyPattern ,
-                                                            true );  /* require single key */
+            IndexDescriptor *idx =
+                collection->getIndexCatalog()->findIndexByPrefix( keyPattern,
+                                                                  true );  /* require single key */
             if ( idx == NULL ) {
                 errmsg = "couldn't find valid index for shard key";
                 return false;
@@ -142,7 +142,7 @@ namespace mongo {
                 max = Helpers::toKeyFormat( kp.extendRangeBound( max, false ) );
             }
 
-            auto_ptr<Runner> runner(InternalPlanner::indexScan(ns, d, d->idxNo(*idx), min, max,
+            auto_ptr<Runner> runner(InternalPlanner::indexScan(idx, min, max,
                                                                false, InternalPlanner::FORWARD));
 
             runner->setYieldPolicy(Runner::YIELD_AUTO);
@@ -151,7 +151,7 @@ namespace mongo {
             // this index.
             // NOTE A local copy of 'missingField' is made because indices may be
             // invalidated during a db lock yield.
-            BSONObj missingFieldObj = IndexLegacy::getMissingField(collection,idx->info.obj());
+            BSONObj missingFieldObj = IndexLegacy::getMissingField(collection,idx->infoObj());
             BSONElement missingField = missingFieldObj.firstElement();
             
             // for now, the only check is that all shard keys are filled
@@ -271,14 +271,17 @@ namespace mongo {
             {
                 // Get the size estimate for this namespace
                 Client::ReadContext ctx( ns );
-                NamespaceDetails *d = nsdetails( ns );
-                if ( ! d ) {
+                Collection* collection = ctx.ctx().db()->getCollection( ns );
+                if ( !collection ) {
                     errmsg = "ns not found";
                     return false;
                 }
-                
-                const IndexDetails *idx = d->findIndexByPrefix( keyPattern ,
-                                                                true ); /* require single key */
+
+                NamespaceDetails* d = collection->details();
+
+                IndexDescriptor *idx =
+                    collection->getIndexCatalog()->findIndexByPrefix( keyPattern,
+                                                                      true ); /* require single key */
                 if ( idx == NULL ) {
                     errmsg = (string)"couldn't find index over splitting key " +
                              keyPattern.clientReadable().toString();
@@ -366,7 +369,7 @@ namespace mongo {
                 long long currCount = 0;
                 long long numChunks = 0;
                 
-                auto_ptr<Runner> runner(InternalPlanner::indexScan(ns, d, d->idxNo(*idx), min, max,
+                auto_ptr<Runner> runner(InternalPlanner::indexScan(idx, min, max,
                     false, InternalPlanner::FORWARD));
 
                 BSONObj currKey;
@@ -424,9 +427,9 @@ namespace mongo {
                     keyCount = currCount / 2;
                     currCount = 0;
                     log() << "splitVector doing another cycle because of force, keyCount now: " << keyCount << endl;
-                    
-                    runner.reset(InternalPlanner::indexScan(ns, d, d->idxNo(*idx), min, max,
-                        false, InternalPlanner::FORWARD));
+
+                    runner.reset(InternalPlanner::indexScan(idx, min, max,
+                                                            false, InternalPlanner::FORWARD));
 
                     runner->setYieldPolicy(Runner::YIELD_AUTO);
                     state = runner->getNext(&currKey, NULL);
@@ -830,10 +833,12 @@ namespace mongo {
                 for (int i=1; i >= 0 ; i--){ // high chunk more likely to have only one obj
 
                     Client::ReadContext ctx( ns );
-                    NamespaceDetails *d = nsdetails( ns );
+                    Collection* collection = ctx.ctx().db()->getCollection( ns );
+                    verify( collection );
 
-                    const IndexDetails *idx = d->findIndexByPrefix( keyPattern ,
-                                                                    true ); /* exclude multikeys */
+                    IndexDescriptor *idx =
+                        collection->getIndexCatalog()->findIndexByPrefix( keyPattern ,
+                                                                          true ); /* exclude multikeys */
                     if ( idx == NULL ) {
                         break;
                     }
@@ -843,8 +848,7 @@ namespace mongo {
                     BSONObj newmin = Helpers::toKeyFormat( kp.extendRangeBound( chunk.min, false) );
                     BSONObj newmax = Helpers::toKeyFormat( kp.extendRangeBound( chunk.max, false) );
 
-                    auto_ptr<Runner> runner(InternalPlanner::indexScan(ns, d, d->idxNo(*idx),
-                        newmin, newmax, false));
+                    auto_ptr<Runner> runner(InternalPlanner::indexScan(idx, newmin, newmax, false));
 
                     // check if exactly one document found
                     if (Runner::RUNNER_ADVANCED == runner->getNext(NULL, NULL)) {

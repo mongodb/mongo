@@ -389,14 +389,15 @@ namespace mongo {
          */
         bool storeCurrentLocs( long long maxChunkSize , string& errmsg , BSONObjBuilder& result ) {
             Client::ReadContext ctx( _ns );
-            NamespaceDetails *d = nsdetails( _ns );
-            if ( ! d ) {
+            Collection* collection = ctx.ctx().db()->getCollection( _ns );
+            if ( !collection ) {
                 errmsg = "ns not found, should be impossible";
                 return false;
             }
 
-            const IndexDetails *idx = d->findIndexByPrefix( _shardKeyPattern ,
-                                                            true );  /* require single key */
+            IndexDescriptor *idx =
+                collection->getIndexCatalog()->findIndexByPrefix( _shardKeyPattern ,
+                                                                  true );  /* require single key */
 
             if ( idx == NULL ) {
                 errmsg = (string)"can't find index in storeCurrentLocs" + causedBy( errmsg );
@@ -407,8 +408,7 @@ namespace mongo {
             BSONObj min = Helpers::toKeyFormat( kp.extendRangeBound( _min, false ) );
             BSONObj max = Helpers::toKeyFormat( kp.extendRangeBound( _max, false ) );
 
-            auto_ptr<Runner> runner(InternalPlanner::indexScan(_ns, d, d->idxNo(*idx),
-                                                               min, max, false));
+            auto_ptr<Runner> runner(InternalPlanner::indexScan(idx, min, max, false));
             // we can afford to yield here because any change to the base data that we might miss is
             // already being  queued and will be migrated in the 'transferMods' stage
             runner->setYieldPolicy(Runner::YIELD_AUTO);
@@ -418,9 +418,9 @@ namespace mongo {
             // there's a fair amount of slack before we determine a chunk is too large because object sizes will vary
             unsigned long long maxRecsWhenFull;
             long long avgRecSize;
-            const long long totalRecs = d->numRecords();
+            const long long totalRecs = collection->numRecords();
             if ( totalRecs > 0 ) {
-                avgRecSize = d->dataSize() / totalRecs;
+                avgRecSize = collection->details()->dataSize() / totalRecs;
                 maxRecsWhenFull = maxChunkSize / avgRecSize;
                 maxRecsWhenFull = std::min( (unsigned long long)(Chunk::MaxObjectPerChunk + 1) , 130 * maxRecsWhenFull / 100 /* slack */ );
             }
