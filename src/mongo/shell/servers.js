@@ -188,7 +188,11 @@ MongoRunner.toRealPath = function( path, pathOpts ){
     }
     
     // Relative path
-    if( ! path.startsWith( "/" ) ){
+    // Detect Unix and Windows absolute paths
+    // as well as Windows drive letters
+    // Also captures Windows UNC paths
+
+    if( ! path.match( /^(\/|\\|[A-Za-z]:)/ ) ){
         if( path != "" && ! path.endsWith( "/" ) )
             path += "/"
                 
