@@ -160,6 +160,11 @@ assert.eq(a3.toArray(), a3result);
 assert.eq(a4.toArray(), a4result);
 assert.eq(a5.toArray(), a5result);
 
+// Test redacts that are just a variable access (this can happen as a result of optimizations)
+assert.eq(t.aggregate({$redact: "$$PRUNE"}).toArray(), []);
+assert.eq(t.aggregate({$redact: "$$KEEP"}).toArray(), t.find().toArray());
+assert.eq(t.aggregate({$redact: "$$DESCEND"}).toArray(), t.find().toArray());
+
 // test $$KEEP
 t.drop();
 // entire document should be present at 2 and beyond
@@ -194,3 +199,4 @@ b23result = [{ _id: 1,
 assert.eq(b1.toArray(), b1result);
 assert.eq(b2.toArray(), b23result);
 assert.eq(b3.toArray(), b23result);
+
