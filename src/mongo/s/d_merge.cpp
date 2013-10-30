@@ -144,7 +144,7 @@ namespace mongo {
         // Get merged chunk information
         //
 
-        ChunkVersion mergeVersion = shardVersion;
+        ChunkVersion mergeVersion = metadata->getCollVersion();
         mergeVersion.incMinor();
 
         OwnedPointerVector<ChunkType> chunksToMerge;

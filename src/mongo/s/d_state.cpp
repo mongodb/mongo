@@ -424,7 +424,12 @@ namespace mongo {
         }
 
         ChunkVersion beforeShardVersion;
-        if ( beforeMetadata ) beforeShardVersion = beforeMetadata->getShardVersion();
+        ChunkVersion beforeCollVersion;
+        if ( beforeMetadata ) {
+            beforeShardVersion = beforeMetadata->getShardVersion();
+            beforeCollVersion = beforeMetadata->getCollVersion();
+        }
+
         *latestShardVersion = beforeShardVersion;
 
         // We can't reload without a shard name.  Must check here before loading, since shard name
@@ -461,7 +466,8 @@ namespace mongo {
                       string( " with requested shard version " ) + reqShardVersion.toString() : "" )
                  << ( fullReload ?
                       ", current shard version is " : " based on current shard version " )
-                 << beforeShardVersion << endl;
+                 << beforeShardVersion
+                 << ", current metadata version is " << beforeCollVersion << endl;
 
         string errMsg;
         ConnectionString configServerLoc = ConnectionString::parse( _configServer, errMsg );
@@ -490,7 +496,11 @@ namespace mongo {
         }
 
         ChunkVersion remoteShardVersion;
-        if ( remoteMetadata ) remoteShardVersion = remoteMetadata->getShardVersion();
+        ChunkVersion remoteCollVersion;
+        if ( remoteMetadata ) {
+            remoteShardVersion = remoteMetadata->getShardVersion();
+            remoteCollVersion = remoteMetadata->getCollVersion();
+        }
 
         //
         // Get ready to install loaded metadata if needed
@@ -498,6 +508,7 @@ namespace mongo {
 
         CollectionMetadataPtr afterMetadata;
         ChunkVersion afterShardVersion;
+        ChunkVersion afterCollVersion;
         ChunkVersion::VersionChoice choice;
 
         // If we choose to install the new metadata, this describes the kind of install
@@ -519,9 +530,12 @@ namespace mongo {
             CollectionMetadataMap::iterator it = _collMetadata.find( ns );
             if ( it != _collMetadata.end() ) afterMetadata = it->second;
 
-            if ( afterMetadata ) afterShardVersion = afterMetadata->getShardVersion();
-            *latestShardVersion = afterShardVersion;
+            if ( afterMetadata ) {
+                afterShardVersion = afterMetadata->getShardVersion();
+                afterCollVersion = afterMetadata->getCollVersion();
+            }
 
+            *latestShardVersion = afterShardVersion;
             //
             // Resolve newer pending chunks with the remote metadata, finish construction
             //
@@ -543,21 +557,23 @@ namespace mongo {
             // !epoch.isSet().
             //
 
-            choice = ChunkVersion::chooseNewestVersion( beforeShardVersion,
-                                                        afterShardVersion,
-                                                        remoteShardVersion );
+            choice = ChunkVersion::chooseNewestVersion( beforeCollVersion,
+                                                        afterCollVersion,
+                                                        remoteCollVersion );
 
             if ( choice == ChunkVersion::VersionChoice_Remote ) {
+                dassert(!remoteCollVersion.epoch().isSet() ||
+                        remoteShardVersion >= beforeShardVersion);
 
-                if ( !afterShardVersion.epoch().isSet() ) {
+                if ( !afterCollVersion.epoch().isSet() ) {
 
                     // First metadata load
                     installType = InstallType_New;
                     dassert( it == _collMetadata.end() );
                     _collMetadata.insert( make_pair( ns, remoteMetadata ) );
                 }
-                else if ( remoteShardVersion.epoch().isSet() &&
-                          remoteShardVersion.epoch() == afterShardVersion.epoch() ) {
+                else if ( remoteCollVersion.epoch().isSet() &&
+                          remoteCollVersion.epoch() == afterCollVersion.epoch() ) {
 
                     // Update to existing metadata
                     installType = InstallType_Update;
@@ -566,7 +582,7 @@ namespace mongo {
                     dassert( it != _collMetadata.end() );
                     it->second = remoteMetadata;
                 }
-                else if ( remoteShardVersion.epoch().isSet() ) {
+                else if ( remoteCollVersion.epoch().isSet() ) {
 
                     // New epoch detected, replacing metadata
                     installType = InstallType_Replace;
@@ -576,7 +592,7 @@ namespace mongo {
                     it->second = remoteMetadata;
                 }
                 else {
-                    dassert( !remoteShardVersion.epoch().isSet() );
+                    dassert( !remoteCollVersion.epoch().isSet() );
 
                     // Drop detected
                     installType = InstallType_Drop;
@@ -594,11 +610,11 @@ namespace mongo {
         //
 
         string versionMsg = str::stream()
-            << " (loaded version : " << remoteShardVersion.toString()
-            << ( beforeShardVersion.epoch() == afterShardVersion.epoch() ?
-                     string( ", stored version : " ) + afterShardVersion.toString() :
+            << " (loaded metadata version : " << remoteCollVersion.toString()
+            << ( beforeCollVersion.epoch() == afterCollVersion.epoch() ?
+                     string( ", stored version : " ) + afterCollVersion.toString() :
                      string( ", stored versions : " ) +
-                         beforeShardVersion.toString() + " / " + afterShardVersion.toString() )
+                         beforeCollVersion.toString() + " / " + afterCollVersion.toString() )
             << ", took " << refreshMillis << "ms)";
 
         if ( choice == ChunkVersion::VersionChoice_Unknown ) {
