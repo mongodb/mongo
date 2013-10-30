@@ -85,6 +85,7 @@ shell_executable = None
 continue_on_failure = None
 file_of_commands_mode = False
 start_mongod = True
+temp_path = None
 
 tests = []
 winners = []
@@ -531,8 +532,11 @@ def runTest(test, result):
 
         argv = argv + [ '--eval', evalString]
 
-    if argv[0].endswith( 'test' ) and no_preallocj :
-        argv = argv + [ '--nopreallocj' ]
+    if argv[0].endswith( 'test' ) or argv[0].endswith( 'test.exe' ):
+        if no_preallocj :
+            argv = argv + [ '--nopreallocj' ]
+        if temp_path:
+            argv = argv + [ '--tempPath', temp_path ]
 
 
     sys.stdout.write("      Command : %s\n" % ' '.join(argv))
@@ -850,6 +854,7 @@ def set_globals(options, tests):
     global use_ssl, use_x509
     global file_of_commands_mode
     global report_file, use_write_commands
+    global temp_path
     start_mongod = options.start_mongod
     if hasattr(options, 'use_ssl'):
         use_ssl = options.use_ssl
@@ -900,6 +905,7 @@ def set_globals(options, tests):
     file_of_commands_mode = options.File and options.mode == 'files'
     # generate json report
     report_file = options.report_file
+    temp_path = options.temp_path
 
     use_write_commands = options.use_write_commands
 
@@ -1052,6 +1058,8 @@ def main():
                       help='Adds --setParameter to mongod for each passed in item in the csv list - ex. "param1=1,param2=foo" ')
     parser.add_option('--set-parameters-mongos', dest='set_parameters_mongos', default="",
                       help='Adds --setParameter to mongos for each passed in item in the csv list - ex. "param1=1,param2=foo" ')
+    parser.add_option('--temp-path', dest='temp_path', default=None,
+                      help='If present, passed as --tempPath to unittests and dbtests')
     # Buildlogger invocation from command line
     parser.add_option('--buildlogger-builder', dest='buildlogger_builder', default=None,
                       action="store", help='Set the "builder name" for buildlogger')
