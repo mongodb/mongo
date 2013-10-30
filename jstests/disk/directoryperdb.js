@@ -35,12 +35,8 @@ assert( m.getDBs().totalSize > 0, "bad size calc" );
 // repair
 db.runCommand( {repairDatabase:1, backupOriginalFiles:true} );
 checkDir( dbpath );
-files = listFiles( dbpath );
-for( f in files ) {
-    if ( new RegExp( "^" + dbpath + "backup_" ).test( files[ f ].name ) ) {
-        backupDir = files[ f ].name + "/";
-    }
-}
+// data directory is always cleared by startMongodTest()
+var backupDir = dbpath + "/backup_repairDatabase_0/";
 checkDir( backupDir );
 assert.eq( 1, db[ baseName ].count() , "C" );
 

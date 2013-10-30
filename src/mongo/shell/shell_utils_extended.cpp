@@ -60,6 +60,7 @@ namespace mongo {
                 boost::filesystem::path p = *i;
                 BSONObjBuilder b;
                 b << "name" << p.generic_string();
+                b << "baseName" << p.filename().generic_string();
                 b.appendBool( "isDirectory", is_directory( p ) );
                 if ( ! boost::filesystem::is_directory( p ) ) {
                     try {
