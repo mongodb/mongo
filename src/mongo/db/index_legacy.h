@@ -65,7 +65,7 @@ namespace mongo {
          *
          * This is a significant leak of index functionality out of the index layer.
          */
-        static BSONObj getMissingField(const BSONObj& infoObj);
+        static BSONObj getMissingField(Collection* collection, const BSONObj& infoObj);
 
         /**
          * Perform any post-build steps for this index.

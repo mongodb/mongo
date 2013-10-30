@@ -118,11 +118,12 @@ namespace mongo {
             }
 
             Client::ReadContext ctx( ns );
-            NamespaceDetails *d = nsdetails( ns );
-            if ( ! d ) {
+            Collection* collection = ctx.ctx().db()->getCollection( ns );
+            if ( !collection ) {
                 errmsg = "ns not found";
                 return false;
             }
+            NamespaceDetails *d = collection->details();
 
             const IndexDetails *idx = d->findIndexByPrefix( keyPattern ,
                                                             true );  /* require single key */
@@ -150,7 +151,7 @@ namespace mongo {
             // this index.
             // NOTE A local copy of 'missingField' is made because indices may be
             // invalidated during a db lock yield.
-            BSONObj missingFieldObj = IndexLegacy::getMissingField(idx->info.obj());
+            BSONObj missingFieldObj = IndexLegacy::getMissingField(collection,idx->info.obj());
             BSONElement missingField = missingFieldObj.firstElement();
             
             // for now, the only check is that all shard keys are filled

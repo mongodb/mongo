@@ -58,8 +58,15 @@ namespace mongo {
     }
 
     // static
-    BSONObj IndexLegacy::getMissingField(const BSONObj& infoObj) {
-        if (IndexNames::HASHED == CatalogHack::getAccessMethodName(infoObj.getObjectField("key"))) {
+    BSONObj IndexLegacy::getMissingField(Collection* collection, const BSONObj& infoObj) {
+        BSONObj keyPattern = infoObj.getObjectField( "key" );
+        string accessMethodName;
+        if ( collection )
+            accessMethodName = collection->getIndexCatalog()->getAccessMethodName(keyPattern);
+        else
+            accessMethodName = IndexNames::findPluginName(keyPattern);
+
+        if (IndexNames::HASHED == accessMethodName ) {
             int hashVersion = infoObj["hashVersion"].numberInt();
             HashSeed seed = infoObj["seed"].numberInt();
 
