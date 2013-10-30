@@ -107,6 +107,33 @@ namespace mongo {
         return Status::OK();
     }
 
+    Status ChunkManagerTargeter::targetUpdate( const BSONObj& query,
+                                               const BSONObj& update,
+                                               vector<ShardEndpoint*>* endpoints ) const {
+        // Pre-2.6 implementation differentiates between $op and replacement style and
+        // will use the update object for routing as well as deciding which chunk will have
+        // their size stats incremented. Here, the query object is always used.
+        Status result = targetQuery( query, endpoints );
+
+        if ( result.isOK() ) {
+            if ( !_manager->hasShardKey( query )) {
+                return result;
+            }
+
+            // Note: this is only best effort accounting and is not accurate.
+            ChunkPtr chunk = _manager->findChunkForDoc( query );
+            _stats->chunkSizeDelta[chunk->getMin()] += (query.objsize() + update.objsize());
+        }
+
+        return result;
+    }
+
+    Status ChunkManagerTargeter::targetDelete( const BSONObj& query,
+                                               vector<ShardEndpoint*>* endpoints ) const {
+        return targetQuery( query, endpoints );
+    }
+
+
     Status ChunkManagerTargeter::targetQuery( const BSONObj& query,
                                               vector<ShardEndpoint*>* endpoints ) const {
 

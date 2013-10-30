@@ -83,19 +83,24 @@ namespace mongo {
         OwnedPointerVector<ShardEndpoint> endpointsOwned;
         vector<ShardEndpoint*>& endpoints = endpointsOwned.mutableVector();
 
-        if ( isUpdate || isDelete ) {
-
-            // Updates/deletes targeted by query
-
-            BSONObj queryDoc =
-                isUpdate ? _itemRef.getUpdate()->getQuery() : _itemRef.getDelete()->getQuery();
-
-            Status targetStatus = targeter.targetQuery( queryDoc, &endpoints );
+        if ( isUpdate ) {
+            Status targetStatus = targeter.targetUpdate( _itemRef.getUpdate()->getQuery(),
+                                                         _itemRef.getUpdate()->getUpdateExpr(),
+                                                         &endpoints );
 
             if ( targetStatus.isOK() ) {
-                targetStatus =
-                    isUpdate ?
-                        updateTargetsOk( *this, endpoints ) : deleteTargetsOk( *this, endpoints );
+                targetStatus = updateTargetsOk( *this, endpoints );
+            }
+
+            if ( !targetStatus.isOK() ) return targetStatus;
+        }
+        else if ( isDelete ) {
+
+            BSONObj queryDoc = _itemRef.getDelete()->getQuery();
+            Status targetStatus = targeter.targetDelete( queryDoc, &endpoints );
+
+            if ( targetStatus.isOK() ) {
+                targetStatus = deleteTargetsOk( *this, endpoints );
             }
 
             if ( !targetStatus.isOK() ) return targetStatus;

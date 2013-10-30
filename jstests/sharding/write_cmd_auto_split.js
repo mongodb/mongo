@@ -30,7 +30,7 @@ for (var x = 0; x < 1100; x++) {
 assert.gt(configDB.chunks.find().itcount(), 1);
 testDB.dropDatabase();
 
-// TODO: uncomment after ChunkManagerTargeter can received update docs.
+// TODO: uncomment after update commands in mongos is fully operational
 /*
 jsTest.log('Test single batch update should auto-split');
 
@@ -99,7 +99,7 @@ for (var x = 0; x < 1100; x += 400) {
 assert.gt(configDB.chunks.find().itcount(), 1);
 testDB.dropDatabase();
 
-// TODO: uncomment after ChunkManagerTargeter can received update docs.
+// TODO: uncomment after update commands in mongos is fully operational
 /*
 jsTest.log('Test batched update should auto-split');
 

@@ -112,27 +112,18 @@ namespace mongo {
          * Returns the first ShardEndpoint for the query from the mock ranges.  Only can handle
          * queries of the form { field : { $gte : <value>, $lt : <value> } }.
          */
-        Status targetQuery( const BSONObj& query, std::vector<ShardEndpoint*>* endpoints ) const {
+        Status targetUpdate( const BSONObj& query,
+                             const BSONObj& update,
+                             std::vector<ShardEndpoint*>* endpoints ) const {
+            return targetQuery( query, endpoints );
+        }
 
-            KeyRange queryRange = parseRange( query );
-
-            const std::vector<MockRange*>& ranges = getRanges();
-            for ( std::vector<MockRange*>::const_iterator it = ranges.begin(); it != ranges.end();
-                ++it ) {
-
-                const MockRange* range = *it;
-
-                if ( rangeOverlaps( queryRange.minKey,
-                                    queryRange.maxKey,
-                                    range->range.minKey,
-                                    range->range.maxKey ) ) {
-                    endpoints->push_back( new ShardEndpoint( range->endpoint ) );
-                }
-            }
-
-            if ( endpoints->empty() ) return Status( ErrorCodes::UnknownError,
-                                                     "no mock ranges found for query" );
-            return Status::OK();
+        /**
+         * Returns the first ShardEndpoint for the query from the mock ranges.  Only can handle
+         * queries of the form { field : { $gte : <value>, $lt : <value> } }.
+         */
+        Status targetDelete( const BSONObj& query, std::vector<ShardEndpoint*>* endpoints ) const {
+            return targetQuery( query, endpoints );
         }
 
         void noteCouldNotTarget() {
@@ -171,6 +162,33 @@ namespace mongo {
             maxKeyB.appendAs( queryRange[LT.l_], fieldName );
 
             return KeyRange( "", minKeyB.obj(), maxKeyB.obj(), BSON( fieldName << 1 ) );
+        }
+
+        /**
+         * Returns the first ShardEndpoint for the query from the mock ranges.  Only can handle
+         * queries of the form { field : { $gte : <value>, $lt : <value> } }.
+         */
+        Status targetQuery( const BSONObj& query, std::vector<ShardEndpoint*>* endpoints ) const {
+
+            KeyRange queryRange = parseRange( query );
+
+            const std::vector<MockRange*>& ranges = getRanges();
+            for ( std::vector<MockRange*>::const_iterator it = ranges.begin(); it != ranges.end();
+                ++it ) {
+
+                const MockRange* range = *it;
+
+                if ( rangeOverlaps( queryRange.minKey,
+                                    queryRange.maxKey,
+                                    range->range.minKey,
+                                    range->range.maxKey ) ) {
+                    endpoints->push_back( new ShardEndpoint( range->endpoint ) );
+                }
+            }
+
+            if ( endpoints->empty() ) return Status( ErrorCodes::UnknownError,
+                                                     "no mock ranges found for query" );
+            return Status::OK();
         }
 
         NamespaceString _nss;

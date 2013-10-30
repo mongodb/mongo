@@ -52,7 +52,11 @@ namespace mongo {
 
         Status targetDoc( const BSONObj& doc, ShardEndpoint** endpoint ) const;
 
-        Status targetQuery( const BSONObj& query, std::vector<ShardEndpoint*>* endpoints ) const;
+        Status targetUpdate( const BSONObj& query,
+                             const BSONObj& update,
+                             std::vector<ShardEndpoint*>* endpoints ) const;
+
+        Status targetDelete( const BSONObj& query, std::vector<ShardEndpoint*>* endpoints ) const;
 
         void noteStaleResponse( const ShardEndpoint& endpoint, const BSONObj& staleInfo );
 
@@ -89,6 +93,13 @@ namespace mongo {
          * Performs an actual refresh from the config server.
          */
         Status refreshNow( RefreshType refreshType );
+
+        /**
+         * Returns a vector of ShardEndpoints for a potentially multi-shard query.
+         *
+         * Returns !OK with message if query could not be targeted.
+         */
+        Status targetQuery( const BSONObj& query, std::vector<ShardEndpoint*>* endpoints ) const;
 
         NamespaceString _nss;
 

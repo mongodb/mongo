@@ -85,12 +85,21 @@ namespace mongo {
         virtual Status targetDoc( const BSONObj& doc, ShardEndpoint** endpoint ) const = 0;
 
         /**
-         * Returns a vector of ShardEndpoints for a potentially multi-shard query.
+         * Returns a vector of ShardEndpoints for a potentially multi-shard update.
          *
-         * Returns !OK with message if query could not be targeted.
+         * Returns OK and fills the endpoints; returns a status describing the error otherwise.
          */
-        virtual Status targetQuery( const BSONObj& query,
-                                    std::vector<ShardEndpoint*>* endpoints ) const = 0;
+        virtual Status targetUpdate( const BSONObj& query,
+                                     const BSONObj& update,
+                                     std::vector<ShardEndpoint*>* endpoints ) const = 0;
+
+        /**
+         * Returns a vector of ShardEndpoints for a potentially multi-shard delete.
+         *
+         * Returns OK and fills the endpoints; returns a status describing the error otherwise.
+         */
+        virtual Status targetDelete( const BSONObj& query,
+                                     std::vector<ShardEndpoint*>* endpoints ) const = 0;
 
         /**
          * Informs the targeter that a targeting failure occurred during one of the last targeting
