@@ -211,6 +211,7 @@ struct __wt_block {
 	 */
 	WT_SPINLOCK	live_lock;	/* Live checkpoint lock */
 	WT_BLOCK_CKPT	live;		/* Live checkpoint */
+	int		ckpt_inprogress;/* Live checkpoint in progress */
 
 	/*
 	 * Array of free WT_EXTLIST structures, if we're doing lots of I/O,

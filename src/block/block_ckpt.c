@@ -300,6 +300,57 @@ __ckpt_process(
 	locked = 0;
 
 	/*
+	 * Checkpoints are a two-step process: first, write a new checkpoint to
+	 * disk (including all the new extent lists for modified checkpoints
+	 * and the live system).  As part of this, create a list of file blocks
+	 * newly available for reallocation, based on checkpoints being deleted.
+	 * We then return the locations of the new checkpoint information to our
+	 * caller.  Our caller has to write that information into some kind of
+	 * stable storage, and once that's done, we can actually allocate from
+	 * that list of newly available file blocks.  (We can't allocate from
+	 * that list immediately because the allocation might happen before our
+	 * caller saves the new checkpoint information, and if we crashed before
+	 * the new checkpoint location was saved, we'd have overwritten blocks
+	 * still referenced by checkpoints in the system.)  In summary, there is
+	 * a second step: after our caller saves the checkpoint information, we
+	 * are called to add the newly available blocks into the live system's
+	 * available list.
+	 *
+	 * This function is the first step, the second step is in the resolve
+	 * function.
+	 *
+	 * If we're called to checkpoint the same file twice, without the second
+	 * resolution step, it's an error at an upper level and our choices are
+	 * all bad: either leak blocks or risk crashing with our caller not
+	 * having saved the checkpoint information to stable storage.  Leaked
+	 * blocks are a safer choice, but that means file verify will fail for
+	 * the rest of "forever", and the chance of us allocating a block and
+	 * then crashing such that it matters is reasonably low: don't leak the
+	 * blocks.
+	 */
+	if (block->ckpt_inprogress) {
+		__wt_errx(session,
+		    "%s: checkpointed twice without the checkpoint being "
+		    "resolved",
+		    block->name);
+
+		WT_RET(__wt_block_checkpoint_resolve(session, block));
+	}
+
+	/*
+	 * Extents newly available as a result of deleting previous checkpoints
+	 * are added to a list of extents.  The list should be empty, but as
+	 * described above, there is no "free the checkpoint information" call
+	 * into the block manager; if there was an error in an upper level that
+	 * resulted in some previous checkpoint never being resolved, the list
+	 * may not be empty.  We should have caught that with the "checkpoint
+	 * in progress" test, but it doesn't cost us anything to be cautious.
+	 */
+	__wt_block_extlist_free(session, &ci->ckpt_avail);
+	WT_RET(__wt_block_extlist_init(
+	    session, &ci->ckpt_avail, "live", "ckpt_avail"));
+
+	/*
 	 * We've allocated our last page, update the checkpoint size.  We need
 	 * to calculate the live system's checkpoint size before reading and
 	 * merging checkpoint allocation and discard information from the
@@ -309,21 +360,6 @@ __ckpt_process(
 	ckpt_size = ci->ckpt_size;
 	ckpt_size += ci->alloc.bytes;
 	ckpt_size -= ci->discard.bytes;
-
-	/*
-	 * Extents newly available as a result of deleting previous checkpoints
-	 * are added to a list of extents.  The list should be empty, but there
-	 * is no explicit "free the checkpoint information" call into the block
-	 * manager; if there was an error in an upper level resulting in some
-	 * previous checkpoint never being resolved, the list may not be empty.
-	 *
-	 * XXX
-	 * This isn't sufficient, actually: we're going to leak all the blocks
-	 * written as part of the last checkpoint because it was never resolved.
-	 */
-	__wt_block_extlist_free(session, &ci->ckpt_avail);
-	WT_RET(__wt_block_extlist_init(
-	    session, &ci->ckpt_avail, "live", "ckpt_avail"));
 
 	/*
 	 * To delete a checkpoint, we'll need checkpoint information for it and
@@ -538,6 +574,7 @@ live_update:
 		WT_ERR(WT_ERROR);
 	}
 #endif
+	block->ckpt_inprogress = 1;
 
 err:	if (locked)
 		__wt_spin_unlock(session, &block->live_lock);
@@ -665,22 +702,15 @@ __wt_block_checkpoint_resolve(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	ci = &block->live;
 
 	/*
-	 * Checkpoints are a two-step process: first, write a new checkpoint to
-	 * disk (including all the new extent lists for modified checkpoints
-	 * and the live system).  As part of this, create a list of file blocks
-	 * newly available for reallocation, based on checkpoints being deleted.
-	 * We then return the locations of the new checkpoint information to our
-	 * caller.  Our caller has to write that information into some kind of
-	 * stable storage, and once that's done, we can actually allocate from
-	 * that list of newly available file blocks.  (We can't allocate from
-	 * that list immediately because the allocation might happen before our
-	 * caller saves the new checkpoint information, and if we crashed before
-	 * the new checkpoint location was saved, we'd have overwritten blocks
-	 * still referenced by checkpoints in the system.)  In summary, there is
-	 * a second step: after our caller saves the checkpoint information, we
-	 * are called to add the newly available blocks into the live system's
-	 * available list.
+	 * Resolve the checkpoint after our caller has written the checkpoint
+	 * information to stable storage.
 	 */
+	if (!block->ckpt_inprogress)
+		WT_RET_MSG(session, WT_ERROR,
+		    "%s: checkpoint resolved, but no checkpoint in progress",
+		    block->name);
+	block->ckpt_inprogress = 0;
+
 	__wt_spin_lock(session, &block->live_lock);
 	ret = __wt_block_extlist_merge(
 	    session, block, &ci->ckpt_avail, &ci->avail);
