@@ -116,10 +116,8 @@ namespace mongo {
             }
         }
         bb.done();
-        if( nNotClosed )
+        if( nNotClosed ) {
             result.append("nNotClosed", nNotClosed);
-        else {
-            ClientCursor::assertNoCursors();
         }
 
         return true;
