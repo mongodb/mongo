@@ -98,7 +98,7 @@ main(int argc, char *argv[])
 		config = "create";
 	/* The "printlog" command requires logging. */
 	if (config == NULL && strcmp(command, "printlog") == 0)
-		config = "log=(enabled)";
+		config = "log=(enabled,archive=false)";
 
 	if ((ret = wiredtiger_open(home,
 	    verbose ? verbose_handler : NULL, config, &conn)) != 0)
