@@ -194,7 +194,7 @@ namespace {
         QuerySolution* indexedSolution;
         getPlanByType(STAGE_FETCH, &indexedSolution);
         FetchNode* fn = static_cast<FetchNode*>(indexedSolution->root.get());
-        IndexScanNode* ixNode = static_cast<IndexScanNode*>(fn->child.get());
+        IndexScanNode* ixNode = static_cast<IndexScanNode*>(fn->children[0]);
         boundsEqual(fromjson("{x: [ [5, 5, true, true] ] }"), ixNode->bounds);
     }
 
@@ -401,7 +401,7 @@ namespace {
         for (size_t i = 0; i < solns.size(); ++i) {
             cout << solns[i]->toString();
             ProjectionNode* pn = static_cast<ProjectionNode*>(solns[i]->root.get());
-            ASSERT(STAGE_COLLSCAN == pn->child->getType() || STAGE_IXSCAN == pn->child->getType());
+            ASSERT(STAGE_COLLSCAN == pn->children[0]->getType() || STAGE_IXSCAN == pn->children[0]->getType());
         }
     }
 
