@@ -68,7 +68,8 @@ namespace mongo {
 
     /** @return number of skipped (invalid) documents */
     unsigned compactExtent(const char *ns, NamespaceDetails *d, const DiskLoc diskloc, int n,
-                           int nidx, bool validate, double pf, int pb, bool useDefaultPadding) {
+                           int nidx, bool validate, double pf, int pb, bool useDefaultPadding,
+                           bool preservePadding) {
 
         log() << "compact begin extent #" << n << " for namespace " << ns << endl;
         unsigned oldObjSize = 0; // we'll report what the old padding was
@@ -119,8 +120,12 @@ namespace mongo {
 
                         unsigned lenWHdr = sz + Record::HeaderSize;
                         unsigned lenWPadding = lenWHdr;
+                        // if we are preserving the padding, the record should not change size
+                        if (preservePadding) {
+                            lenWPadding = recOld->lengthWithHeaders();
+                        }
                         // maintain UsePowerOf2Sizes if no padding values were passed in
-                        if (d->isUserFlagSet(NamespaceDetails::Flag_UsePowerOf2Sizes)
+                        else if (d->isUserFlagSet(NamespaceDetails::Flag_UsePowerOf2Sizes)
                                 && useDefaultPadding) {
                             lenWPadding = d->quantizePowerOf2AllocationSpace(lenWPadding);
                         }
@@ -192,7 +197,8 @@ namespace mongo {
     }
 
     bool _compact(const char *ns, NamespaceDetails *d, string& errmsg, bool validate,
-                  BSONObjBuilder& result, double pf, int pb, bool useDefaultPadding) {
+                  BSONObjBuilder& result, double pf, int pb, bool useDefaultPadding,
+                  bool preservePadding) {
         // this is a big job, so might as well make things tidy before we start just to be nice.
         getDur().commitIfNeeded();
 
@@ -266,7 +272,8 @@ namespace mongo {
         d->setStats( 0, 0 );
 
         for( list<DiskLoc>::iterator i = extents.begin(); i != extents.end(); i++ ) { 
-            skipped += compactExtent(ns, d, *i, n++, nidx, validate, pf, pb, useDefaultPadding);
+            skipped += compactExtent(ns, d, *i, n++, nidx, validate, pf, pb,
+                                     useDefaultPadding, preservePadding);
             pm.hit();
         }
 
@@ -367,17 +374,33 @@ namespace mongo {
                 }
             }
 
+
             double pf = 1.0;
             int pb = 0;
+            // preservePadding trumps all other compact methods
+            bool preservePadding = false;
             // useDefaultPadding is used to track whether or not a padding requirement was passed in
             // if it wasn't than UsePowerOf2Sizes will be maintained when compacting
             bool useDefaultPadding = true;
+            if (cmdObj.hasElement("preservePadding")) {
+                preservePadding = cmdObj["preservePadding"].trueValue();
+                useDefaultPadding = false;
+            }
+
             if( cmdObj.hasElement("paddingFactor") ) {
+                if (preservePadding == true) {
+                    errmsg = "preservePadding is incompatible with paddingFactor";
+                    return false;
+                }
                 useDefaultPadding = false;
                 pf = cmdObj["paddingFactor"].Number();
                 verify( pf >= 1.0 && pf <= 4.0 );
             }
             if( cmdObj.hasElement("paddingBytes") ) {
+                if (preservePadding == true) {
+                    errmsg = "preservePadding is incompatible with paddingBytes";
+                    return false;
+                }
                 useDefaultPadding = false;
                 pb = (int) cmdObj["paddingBytes"].Number();
                 verify( pb >= 0 && pb <= 1024 * 1024 );
@@ -405,7 +428,7 @@ namespace mongo {
                 } 
                 try { 
                     ok = _compact(ns.c_str(), d, errmsg, validate,
-                                  result, pf, pb, useDefaultPadding);
+                                  result, pf, pb, useDefaultPadding, preservePadding);
                 }
                 catch(...) { 
                     log() << "compact " << ns << " end (with error)" << endl;
