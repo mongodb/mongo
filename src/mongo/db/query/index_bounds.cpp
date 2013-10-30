@@ -288,6 +288,21 @@ namespace mongo {
         return false;
     }
 
+    bool IndexBoundsChecker::isValidKey(const BSONObj& key) {
+        BSONObjIterator it(key);
+        size_t curOil = 0;
+        while (it.more()) {
+            BSONElement elt = it.next();
+            size_t whichInterval;
+            Location loc = findIntervalForField(elt, _bounds->fields[curOil], _expectedDirection[curOil], &whichInterval);
+            if (WITHIN != loc) {
+                return false;
+            }
+            ++curOil;
+        }
+        return true;
+    }
+
     IndexBoundsChecker::KeyState IndexBoundsChecker::checkKey(const BSONObj& key,
                                                                 int* keyEltsToUse,
                                                                 bool* movePastKeyElts,

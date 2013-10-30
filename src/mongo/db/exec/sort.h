@@ -28,15 +28,20 @@
 
 #pragma once
 
+#include <boost/scoped_ptr.hpp>
 #include <vector>
 
 #include "mongo/db/diskloc.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher.h"
 #include "mongo/db/exec/plan_stage.h"
+#include "mongo/db/exec/working_set.h"
+#include "mongo/db/query/index_bounds.h"
 #include "mongo/platform/unordered_map.h"
 
 namespace mongo {
+
+    class BtreeKeyGenerator;
 
     // External params for the sort stage.  Declared below.
     class SortStageParams;
@@ -72,20 +77,49 @@ namespace mongo {
         // Our sort pattern.
         BSONObj _pattern;
 
-        // We read the child into this.
-        vector<WorkingSetID> _data;
-
-        // Have we sorted our data?
+        // Have we sorted our data? If so, we can access _resultIterator. If not,
+        // we're still populating _data.
         bool _sorted;
 
+        // Collection of working set members to sort with their respective sort key.
+        struct SortableDataItem {
+            WorkingSetID wsid;
+            BSONObj sortKey;
+        };
+        vector<SortableDataItem> _data;
+
         // Iterates through _data post-sort returning it.
-        vector<WorkingSetID>::iterator _resultIterator;
+        vector<SortableDataItem>::iterator _resultIterator;
 
         // We buffer a lot of data and we want to look it up by DiskLoc quickly upon invalidation.
         typedef unordered_map<DiskLoc, WorkingSetID, DiskLoc::Hasher> DataMap;
         DataMap _wsidByDiskLoc;
 
+        //
+        // Sort Apparatus
+        //
+
+        // A comparator for SortableDataItems.
+        struct WorkingSetComparator;
+        boost::scoped_ptr<WorkingSetComparator> _cmp;
+
+        // Bounds we should consider before sorting.
+        IndexBounds _bounds;
+
+        bool _hasBounds;
+
+        // Helper to extract sorting keys from documents containing dotted fields, arrays,
+        // or both.
+        boost::scoped_ptr<BtreeKeyGenerator> _keyGen;
+
+        // Helper to filter keys, thus enforcing _bounds over whatever keys generated with
+        // _keyGen.
+        boost::scoped_ptr<IndexBoundsChecker> _boundsChecker;
+
+        //
         // Stats
+        //
+
         CommonStats _commonStats;
         SortStats _specificStats;
 
@@ -96,10 +130,14 @@ namespace mongo {
     // Parameters that must be provided to a SortStage
     class SortStageParams {
     public:
-        //SortStageParams() : limit(0) { }
+        SortStageParams() : hasBounds(false) { }
 
         // How we're sorting.
         BSONObj pattern;
+
+        IndexBounds bounds;
+
+        bool hasBounds;
 
         // TODO: Implement this.
         // Must be >= 0.  Equal to 0 for no limit.

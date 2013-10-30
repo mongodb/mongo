@@ -159,7 +159,7 @@ namespace mongo {
         else if (leaf->stageType == STAGE_IXSCAN) {
             IndexScanStats* indexStats = static_cast<IndexScanStats*>(leaf->specific.get());
             dassert(indexStats);
-            string direction = indexStats > 0 ? "" : " reverse";
+            string direction = indexStats->direction > 0 ? "" : " reverse";
             res->setCursor(indexStats->indexType + " " + indexStats->indexName + direction);
             res->setNScanned(indexStats->keysExamined);
 

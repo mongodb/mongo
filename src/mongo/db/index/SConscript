@@ -1,0 +1,13 @@
+# -*- mode: python -*-
+
+Import("env")
+
+env.StaticLibrary(
+        target='key_generator',
+        source=[
+            'btree_key_generator.cpp',
+        ],
+        LIBDEPS=[
+            '$BUILD_DIR/mongo/bson',
+        ],
+)

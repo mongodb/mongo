@@ -76,6 +76,10 @@ namespace mongo {
         /** Returns true if an empty-constructed interval hasn't been init()-ialized yet */
         bool isEmpty() const;
 
+        bool isPoint() const {
+            return startInclusive && endInclusive && 0 == start.woCompare(end, false);
+        }
+
         /**
          * Swap start and end points of interval.
          */

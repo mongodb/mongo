@@ -30,51 +30,60 @@
 
 #include <algorithm>
 
-#include "mongo/db/exec/working_set.h"
 #include "mongo/db/exec/working_set_common.h"
+#include "mongo/db/index/btree_key_generator.h"
 
 namespace mongo {
 
     const size_t kMaxBytes = 32 * 1024 * 1024;
 
-    // Used in STL sort.
-    struct WorkingSetComparison {
-        WorkingSetComparison(WorkingSet* ws, BSONObj pattern) : _ws(ws), _pattern(pattern) { }
-
-        bool operator()(const WorkingSetID& lhs, const WorkingSetID& rhs) const {
-            WorkingSetMember* lhsMember = _ws->get(lhs);
-            WorkingSetMember* rhsMember = _ws->get(rhs);
-
-            BSONObjIterator it(_pattern);
-            while (it.more()) {
-                BSONElement patternElt = it.next();
-                string fn = patternElt.fieldName();
-
-                BSONElement lhsElt;
-                verify(lhsMember->getFieldDotted(fn, &lhsElt));
-
-                BSONElement rhsElt;
-                verify(rhsMember->getFieldDotted(fn, &rhsElt));
-
-                // false means don't compare field name.
-                int x = lhsElt.woCompare(rhsElt, false);
-                if (-1 == patternElt.number()) { x = -x; }
-                if (x != 0) { return x < 0; }
+    namespace {
+        void dumpKeys(const BSONObjSet& keys) {
+            for (BSONObjSet::const_iterator it = keys.begin(); it != keys.end(); ++it) {
+                std::cout << "key: " << it->toString() << std::endl;
             }
+        }
+    }  // namespace
 
-            // A comparator for use with sort is required to model a strict weak ordering, so
-            // to satisfy irreflexivity we must return 'false' for elements that we consider
-            // equivalent under the pattern.
-            return false;
+    struct SortStage::WorkingSetComparator {
+        explicit WorkingSetComparator(BSONObj p) : pattern(p) { }
+
+        bool operator()(const SortableDataItem& lhs, const SortableDataItem rhs) const {
+            return lhs.sortKey.woCompare(rhs.sortKey, pattern, false /* ignore field names */) < 0;
         }
 
-        WorkingSet* _ws;
-        BSONObj _pattern;
+        BSONObj pattern;
     };
 
     SortStage::SortStage(const SortStageParams& params, WorkingSet* ws, PlanStage* child)
-        : _ws(ws), _child(child), _pattern(params.pattern), _sorted(false),
-          _resultIterator(_data.end()), _memUsage(0) { }
+        : _ws(ws),
+          _child(child),
+          _pattern(params.pattern),
+          _sorted(false),
+          _resultIterator(_data.end()),
+          _bounds(params.bounds),
+          _hasBounds(params.hasBounds),
+          _memUsage(0) {
+
+        _cmp.reset(new WorkingSetComparator(_pattern));
+
+        // We'll need to treat arrays as if we were to create an index over them. that is,
+        // we may need to unnest the first level and consider each array element to decide
+        // the sort order.
+        std::vector<const char *> fieldNames;
+        std::vector<BSONElement> fixed;
+        BSONObjIterator it(_pattern);
+        while (it.more()) {
+            BSONElement patternElt = it.next();
+            fieldNames.push_back(patternElt.fieldName());
+            fixed.push_back(BSONElement());
+        }
+        _keyGen.reset(new BtreeKeyGeneratorV1(fieldNames, fixed, false /* not sparse */));
+
+        // See comment on the operator() call about sort semantics and why we need a
+        // to use a bounds checker here.
+        _boundsChecker.reset(new IndexBoundsChecker(&_bounds, _pattern, 1 /* == order */));
+    }
 
     SortStage::~SortStage() { }
 
@@ -99,9 +108,6 @@ namespace mongo {
             StageState code = _child->work(&id);
 
             if (PlanStage::ADVANCED == code) {
-                // We let the data stay in the WorkingSet and sort using the IDs.
-                _data.push_back(id);
-
                 // Add it into the map for quick invalidation if it has a valid DiskLoc.
                 // A DiskLoc may be invalidated at any time (during a yield).  We need to get into
                 // the WorkingSet as quickly as possible to handle it.
@@ -115,9 +121,57 @@ namespace mongo {
                     _memUsage += sizeof(DiskLoc);
                 }
 
-                if (member->hasObj()) {
-                    _memUsage += member->obj.objsize();
+                // We are not supposed (yet) to sort over anything other than objects.  In other
+                // words, the query planner wouldn't put a sort atop anything that wouldn't have a
+                // collection scan as a leaf.
+                verify(member->hasObj());
+                _memUsage += member->obj.objsize();
+
+                // We will sort '_data' in the same order an index over '_pattern' would
+                // have. This has very nuanced implications. Consider the sort pattern {a:1}
+                // and the document {a:[1,10]}. We have potentially two keys we could use to
+                // sort on. Here we extract these keys. In the next step we decide which one to
+                // use.
+                BSONObjCmp patternCmp(_pattern);
+                BSONObjSet keys(patternCmp);
+                // XXX keyGen will throw on a "parallel array"
+                _keyGen->getKeys(member->obj, &keys);
+                // dumpKeys(keys);
+
+                // To decide which key to use in sorting, we consider not only the sort pattern
+                // but also if a given key, matches the query. Assume a query {a: {$gte: 5}} and
+                // a document {a:1}. That document wouldn't match. In the same sense, the key '1'
+                // in an array {a: [1,10]} should not be considered as being part of the result
+                // set and thus that array should sort based on the '10' key. To find such key,
+                // we use the bounds for the query.
+                BSONObj sortKey;
+                for (BSONObjSet::const_iterator it = keys.begin(); it != keys.end(); ++it) {
+                    if (!_hasBounds) {
+                        sortKey = *it;
+                        break;
+                    }
+
+                    if (_boundsChecker->isValidKey(*it)) {
+                        sortKey = *it;
+                        break;
+                    }
                 }
+
+                if (sortKey.isEmpty()) {
+                    // We assume that if the document made it throught the sort stage, than it
+                    // matches the query and thus should contain at least on array item that
+                    // is within the query bounds.
+                    cout << "can't find bounds for obj " << member->obj.toString() << endl;
+                    cout << "bounds are " << _bounds.toString() << endl;
+                    verify(0);
+                }
+
+                // We let the data stay in the WorkingSet and sort using the selected portion
+                // of the object in that working set member.
+                SortableDataItem item;
+                item.wsid = id;
+                item.sortKey = sortKey;
+                _data.push_back(item);
 
                 ++_commonStats.needTime;
                 return PlanStage::NEED_TIME;
@@ -125,7 +179,7 @@ namespace mongo {
             else if (PlanStage::IS_EOF == code) {
                 // TODO: We don't need the lock for this.  We could ask for a yield and do this work
                 // unlocked.  Also, this is performing a lot of work for one call to work(...)
-                std::sort(_data.begin(), _data.end(), WorkingSetComparison(_ws, _pattern));
+                std::sort(_data.begin(), _data.end(), *_cmp);
                 _resultIterator = _data.begin();
                 _sorted = true;
                 ++_commonStats.needTime;
@@ -146,7 +200,8 @@ namespace mongo {
         // Returning results.
         verify(_resultIterator != _data.end());
         verify(_sorted);
-        *out = *_resultIterator++;
+        *out = _resultIterator->wsid;
+        _resultIterator++;
 
         // If we're returning something, take it out of our DL -> WSID map so that future
         // calls to invalidate don't cause us to take action for a DL we're done with.
@@ -183,7 +238,6 @@ namespace mongo {
         // _data contains indices into the WorkingSet, not actual data.  If a WorkingSetMember in
         // the WorkingSet needs to change state as a result of a DiskLoc invalidation, it will still
         // be at the same spot in the WorkingSet.  As such, we don't need to modify _data.
-
         DataMap::iterator it = _wsidByDiskLoc.find(dl);
 
         // If we're holding on to data that's got the DiskLoc we're invalidating...

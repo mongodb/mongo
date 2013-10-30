@@ -307,6 +307,8 @@ namespace mongo {
 
                 return new CollectionScan(params, workingSet, matcher);
             }
+            // sort is disabled for now.
+#if 0
             else if ("sort" == nodeName) {
                 uassert(16969, "Node argument must be provided to sort",
                         nodeArgs["node"].isABSONObj());
@@ -317,6 +319,7 @@ namespace mongo {
                 params.pattern = nodeArgs["pattern"].Obj();
                 return new SortStage(params, workingSet, subNode);
             }
+#endif
             else if ("mergeSort" == nodeName) {
                 uassert(16971, "Nodes argument must be provided to sort",
                         nodeArgs["nodes"].isABSONObj());

@@ -34,6 +34,7 @@
 #include <vector>
 
 // For QueryOption_foobar
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/geo/core.h"
 #include "mongo/db/matcher/expression_array.h"
@@ -230,7 +231,8 @@ namespace mongo {
     }
 
     // static
-    QuerySolution* QueryPlanner::makeCollectionScan(const CanonicalQuery& query, bool tailable) {
+    QuerySolution* QueryPlanner::makeCollectionScan(const CanonicalQuery& query, bool tailable,
+                                                    size_t options) {
         // Make the (only) node, a collection scan.
         CollectionScanNode* csn = new CollectionScanNode();
         csn->name = query.ns();
@@ -255,7 +257,7 @@ namespace mongo {
         }
 
         // QLOG() << "Outputting collscan " << soln->toString() << endl;
-        return analyzeDataAccess(query, csn);
+        return analyzeDataAccess(query, options, csn);
     }
 
     // static
@@ -387,32 +389,31 @@ namespace mongo {
         }
     }
 
-    /**
-     * Assumes each OIL in bounds is increasing.
-     * Reverses any OILs that are indexed according to '-1'.
-     */
-    void alignBounds(IndexBounds* bounds, const BSONObj& kp) {
+    // static
+    void QueryPlanner::alignBounds(IndexBounds* bounds, const BSONObj& kp, int scanDir) {
         BSONObjIterator it(kp);
         size_t oilIdx = 0;
         while (it.more()) {
             BSONElement elt = it.next();
             int direction = (elt.numberInt() >= 0) ? 1 : -1;
+            direction *= scanDir;
             if (-1 == direction) {
                 vector<Interval>& iv = bounds->fields[oilIdx].intervals;
                 // Step 1: reverse the list.
                 std::reverse(iv.begin(), iv.end());
                 // Step 2: reverse each interval.
                 for (size_t i = 0; i < iv.size(); ++i) {
-                    // QLOG() << "reversing " << iv[i].toString() << endl;
+                    QLOG() << "reversing " << iv[i].toString() << endl;
                     iv[i].reverse();
                 }
             }
             ++oilIdx;
         }
 
-        // XXX: some day we'll maybe go backward to pull a sort out
-        if (!bounds->isValidFor(kp, 1)) {
+        if (!bounds->isValidFor(kp, scanDir)) {
             QLOG() << "INVALID BOUNDS: " << bounds->toString() << endl;
+            QLOG() << "kp = " << kp.toString() << endl;
+            QLOG() << "scanDir = " << scanDir << endl;
             verify(0);
         }
     }
@@ -720,7 +721,7 @@ namespace mongo {
             // Takes ownership.
             fetch->filter.reset(autoRoot.release());
             // takes ownership
-            fetch->child.reset(andResult);
+            fetch->children.push_back(andResult);
             andResult = fetch;
         }
         else {
@@ -762,25 +763,35 @@ namespace mongo {
             orResult = ixscanNodes[0];
         }
         else {
-            // If each child is sorted by the same predicate, we can merge them and maintain
-            // sorted order.
-            bool haveSameSort;
-            if (ixscanNodes[0]->getSort().isEmpty()) {
-                haveSameSort = false;
-            }
-            else {
-                haveSameSort = true;
+            // XXX XXX XXX TODO: we shouldn't always merge sort, only if it gives us an order that
+            // we want.
+
+            // If there exists a sort order that is present in each child, we can merge them and
+            // maintain that sort order / those sort orders.
+            ixscanNodes[0]->computeProperties();
+            BSONObjSet sharedSortOrders = ixscanNodes[0]->getSort();
+
+            if (!sharedSortOrders.empty()) {
                 for (size_t i = 1; i < ixscanNodes.size(); ++i) {
-                    if (0 != ixscanNodes[0]->getSort().woCompare(ixscanNodes[i]->getSort())) {
-                        haveSameSort = false;
+                    ixscanNodes[i]->computeProperties();
+                    BSONObjSet isect;
+                    set_intersection(sharedSortOrders.begin(),
+                                     sharedSortOrders.end(),
+                                     ixscanNodes[i]->getSort().begin(),
+                                     ixscanNodes[i]->getSort().end(),
+                                     std::inserter(isect, isect.end()),
+                                     BSONObjCmp());
+                    sharedSortOrders = isect;
+                    if (sharedSortOrders.empty()) {
                         break;
                     }
                 }
             }
 
-            if (haveSameSort) {
+            if (!sharedSortOrders.empty()) {
                 MergeSortNode* msn = new MergeSortNode();
-                msn->sort = ixscanNodes[0]->getSort();
+                // XXX: which sort order do we choose?  Does it matter?  I don't think it does.
+                msn->sort = *sharedSortOrders.begin();
                 msn->children.swap(ixscanNodes);
                 orResult = msn;
             }
@@ -859,7 +870,7 @@ namespace mongo {
                 FetchNode* fetch = new FetchNode();
                 verify(NULL != autoRoot.get());
                 fetch->filter.reset(autoRoot.release());
-                fetch->child.reset(soln);
+                fetch->children.push_back(soln);
                 return fetch;
             }
             else if (Indexability::arrayUsesIndexOnChildren(root)) {
@@ -906,7 +917,7 @@ namespace mongo {
                 // Takes ownership of 'root'.
                 verify(NULL != autoRoot.get());
                 fetch->filter.reset(autoRoot.release());
-                fetch->child.reset(solution);
+                fetch->children.push_back(solution);
                 return fetch;
             }
         }
@@ -915,15 +926,105 @@ namespace mongo {
     }
 
     // static
+    void QueryPlanner::getBoundsForSort(const CanonicalQuery& query, SortNode* node) {
+        IndexEntry sortOrder(query.getParsed().getSort(), true, false, "doesnt_matter");
+        vector<IndexEntry> indices;
+        indices.push_back(sortOrder);
+
+        CanonicalQuery* rawQueryForSort;
+        verify(CanonicalQuery::canonicalize(query.ns(),
+                                            query.getQueryObj(),
+                                            &rawQueryForSort).isOK());
+        auto_ptr<CanonicalQuery> queryForSort(rawQueryForSort);
+
+        vector<QuerySolution*> solns;
+        //QLOG() << "Trying to get bounds for sort\n";
+        bool old = qlogOff();
+        plan(*queryForSort, indices, NO_TABLE_SCAN, &solns);
+        if (old) { qlogOn(); }
+        //QLOG() << "Exit planning for bounds for sort\n";
+        if (1 == solns.size()) {
+            IndexScanNode* ixScan = NULL;
+            QuerySolutionNode* rootNode = solns[0]->root.get();
+
+            if (rootNode->getType() == STAGE_FETCH) {
+                FetchNode* fetchNode = static_cast<FetchNode*>(rootNode);
+                verify(fetchNode->children[0]->getType() == STAGE_IXSCAN);
+                ixScan = static_cast<IndexScanNode*>(fetchNode->children[0]);
+            }
+            else if (rootNode->getType() == STAGE_IXSCAN) {
+                ixScan = static_cast<IndexScanNode*>(rootNode);
+            }
+            verify(ixScan);
+
+            node->bounds = ixScan->bounds;
+            node->hasBounds = true;
+        }
+    }
+
+    BSONObj reverseSortObj(const BSONObj& sortObj) {
+        BSONObjBuilder reverseBob;
+        BSONObjIterator it(sortObj);
+        while (it.more()) {
+            BSONElement elt = it.next();
+            reverseBob.append(elt.fieldName(), elt.numberInt() * -1);
+        }
+        return reverseBob.obj();
+    }
+
+    void QueryPlanner::reverseScans(QuerySolutionNode* node) {
+        StageType type = node->getType();
+
+        if (STAGE_IXSCAN == type) {
+            IndexScanNode* isn = static_cast<IndexScanNode*>(node);
+            QLOG() << " Bounds before reversing: " << isn->bounds.toString() << endl;
+            isn->direction *= -1;
+
+            for (size_t i = 0; i < isn->bounds.fields.size(); ++i) {
+                vector<Interval>& iv = isn->bounds.fields[i].intervals;
+                // Step 1: reverse the list.
+                std::reverse(iv.begin(), iv.end());
+                // Step 2: reverse each interval.
+                for (size_t j = 0; j < iv.size(); ++j) {
+                    iv[j].reverse();
+                }
+            }
+            if (!isn->bounds.isValidFor(isn->indexKeyPattern, isn->direction)) {
+                verify(0);
+            }
+            // TODO: we can just negate every value in the already computed properties.
+            isn->computeProperties();
+        }
+        else if (STAGE_SORT_MERGE == type) {
+            // reverse direction of comparison for merge
+            MergeSortNode* msn = static_cast<MergeSortNode*>(node);
+            msn->sort = reverseSortObj(msn->sort);
+        }
+        else {
+            verify(STAGE_SORT != type);
+            // This shouldn't be here...
+        }
+        for (size_t i = 0; i < node->children.size(); ++i) {
+            reverseScans(node->children[i]);
+        }
+
+    }
+
+    // static
     QuerySolution* QueryPlanner::analyzeDataAccess(const CanonicalQuery& query,
+                                                   size_t options,
                                                    QuerySolutionNode* solnRoot) {
         auto_ptr<QuerySolution> soln(new QuerySolution());
         soln->filterData = query.getQueryObj();
         verify(soln->filterData.isOwned());
         soln->ns = query.ns();
 
+        solnRoot->computeProperties();
+
         // solnRoot finds all our results.  Let's see what transformations we must perform to the
         // data.
+
+        bool blockingSort = false;
 
         // Sort the results, if there is a sort specified.
         if (!query.getParsed().getSort().isEmpty()) {
@@ -933,36 +1034,32 @@ namespace mongo {
             // outputted a collscan to satisfy the desired order.
             BSONElement natural = sortObj.getFieldDotted("$natural");
             if (natural.eoo()) {
+                BSONObjSet sorts = solnRoot->getSort();
                 // See if solnRoot gives us the sort.  If so, we're done.
-                if (0 == sortObj.woCompare(solnRoot->getSort())) {
-                    // Sort is already provided!
-                }
-                else {
-                    // If solnRoot isn't already sorted, let's see if it has the fields we're
-                    // sorting on.  If it's fetched, it has all the fields by definition.  If it's
-                    // not, we check sort field by sort field.
-                    if (!solnRoot->fetched()) {
-                        bool sortCovered = true;
-                        BSONObjIterator it(sortObj);
-                        while (it.more()) {
-                            if (!solnRoot->hasField(it.next().fieldName())) {
-                                sortCovered = false;
-                                break;
-                            }
-                        }
-
-                        if (!sortCovered) {
+                if (sorts.end() == sorts.find(sortObj)) {
+                    // Sort is not provided.  See if we provide the reverse of our sort pattern.
+                    // If so, we can reverse the scan direction(s).
+                    BSONObj reverseSort = reverseSortObj(sortObj);
+                    if (sorts.end() != sorts.find(reverseSort)) {
+                        reverseScans(solnRoot);
+                        QLOG() << "Reversing ixscan to provide sort.  Result: "
+                               << solnRoot->toString() << endl;
+                    }
+                    else {
+                        if (!solnRoot->fetched()) {
                             FetchNode* fetch = new FetchNode();
-                            fetch->child.reset(solnRoot);
+                            fetch->children.push_back(solnRoot);
                             solnRoot = fetch;
                         }
-                    }
 
-                    soln->hasSortStage = true;
-                    SortNode* sort = new SortNode();
-                    sort->pattern = sortObj;
-                    sort->child.reset(solnRoot);
-                    solnRoot = sort;
+                        soln->hasSortStage = true;
+                        SortNode* sort = new SortNode();
+                        sort->pattern = sortObj;
+                        getBoundsForSort(query, sort);
+                        sort->children.push_back(solnRoot);
+                        solnRoot = sort;
+                        blockingSort = true;
+                    }
                 }
             }
         }
@@ -976,7 +1073,7 @@ namespace mongo {
                 // If the projection requires the entire document, somebody must fetch.
                 if (!solnRoot->fetched()) {
                     FetchNode* fetch = new FetchNode();
-                    fetch->child.reset(solnRoot);
+                    fetch->children.push_back(solnRoot);
                     solnRoot = fetch;
                 }
             }
@@ -996,7 +1093,7 @@ namespace mongo {
                 // a fetch is required.
                 if (!covered) {
                     FetchNode* fetch = new FetchNode();
-                    fetch->child.reset(solnRoot);
+                    fetch->children.push_back(solnRoot);
                     solnRoot = fetch;
                 }
             }
@@ -1004,14 +1101,14 @@ namespace mongo {
             // We now know we have whatever data is required for the projection.
             ProjectionNode* projNode = new ProjectionNode();
             projNode->projection = query.getProj();
-            projNode->child.reset(solnRoot);
+            projNode->children.push_back(solnRoot);
             solnRoot = projNode;
         }
         else {
             // If there's no projection, we must fetch, as the user wants the entire doc.
             if (!solnRoot->fetched()) {
                 FetchNode* fetch = new FetchNode();
-                fetch->child.reset(solnRoot);
+                fetch->children.push_back(solnRoot);
                 solnRoot = fetch;
             }
         }
@@ -1019,14 +1116,16 @@ namespace mongo {
         if (0 != query.getParsed().getSkip()) {
             SkipNode* skip = new SkipNode();
             skip->skip = query.getParsed().getSkip();
-            skip->child.reset(solnRoot);
+            skip->children.push_back(solnRoot);
             solnRoot = skip;
         }
 
-        if (0 != query.getParsed().getNumToReturn() && !query.getParsed().wantMore()) {
+        if (0 != query.getParsed().getNumToReturn() &&
+            (blockingSort || !query.getParsed().wantMore())) {
+
             LimitNode* limit = new LimitNode();
             limit->limit = query.getParsed().getNumToReturn();
-            limit->child.reset(solnRoot);
+            limit->children.push_back(solnRoot);
             solnRoot = limit;
         }
 
@@ -1058,10 +1157,49 @@ namespace mongo {
         return false;
     }
 
+    QuerySolution* QueryPlanner::scanWholeIndex(const IndexEntry& index, size_t options, const CanonicalQuery& query) {
+        QuerySolutionNode* solnRoot = NULL;
+
+        // Build an ixscan over the id index, use it, and return it.
+        IndexScanNode* isn = new IndexScanNode();
+        isn->indexKeyPattern = index.keyPattern;
+        isn->indexIsMultiKey = index.multikey;
+        isn->bounds.fields.resize(index.keyPattern.nFields());
+
+        // TODO: can we use simple bounds with this compound idx?
+        BSONObjIterator it(isn->indexKeyPattern);
+        int field = 0;
+        while (it.more()) {
+            IndexBoundsBuilder::allValuesForField(it.next(), &isn->bounds.fields[field]);
+            ++field;
+        }
+        alignBounds(&isn->bounds, isn->indexKeyPattern);
+
+        MatchExpression* filter = query.root()->shallowClone();
+
+        // If it's find({}) remove the no-op root.
+        if (MatchExpression::AND == filter->matchType() && (0 == filter->numChildren())) {
+            delete filter;
+            solnRoot = isn;
+        }
+        else {
+            // TODO: We may not need to do the fetch if the predicates in root are covered.  But
+            // for now it's safe (though *maybe* slower).
+            FetchNode* fetch = new FetchNode();
+            fetch->filter.reset(filter);
+            fetch->children.push_back(isn);
+            solnRoot = fetch;
+        }
+
+        QuerySolution* soln = analyzeDataAccess(query, options, solnRoot);
+        verify(NULL != soln);
+        return soln;
+    }
+
     // static
     void QueryPlanner::plan(const CanonicalQuery& query, const vector<IndexEntry>& indices,
                             size_t options, vector<QuerySolution*>* out) {
-        QLOG() << "============================="
+        QLOG() << "=============================\n"
                << "Beginning planning.\n"
                << "query = " << query.toString()
                << "============================="
@@ -1081,7 +1219,7 @@ namespace mongo {
             if (!QueryPlannerCommon::hasNode(query.root(), MatchExpression::GEO_NEAR)
                 && canTableScan) {
 
-                out->push_back(makeCollectionScan(query, true));
+                out->push_back(makeCollectionScan(query, true, options));
             }
             return;
         }
@@ -1093,7 +1231,7 @@ namespace mongo {
             if (!natural.eoo()) {
                 QLOG() << "forcing a table scan due to hinted $natural\n";
                 if (canTableScan) {
-                    out->push_back(makeCollectionScan(query, false));
+                    out->push_back(makeCollectionScan(query, false, options));
                 }
                 return;
             }
@@ -1112,7 +1250,7 @@ namespace mongo {
             }
             QLOG() << "NOT/NOR in plan, just outtping a collscan\n";
             if (canTableScan) {
-                out->push_back(makeCollectionScan(query, false));
+                out->push_back(makeCollectionScan(query, false, options));
             }
             return;
         }
@@ -1253,11 +1391,7 @@ namespace mongo {
                 // only be first for gnNode.
                 tag->first.erase(tag->first.begin() + i);
 
-                QuerySolution* soln = new QuerySolution();
-                soln->root.reset(solnRoot);
-                soln->ns = query.ns();
-                soln->filterData = query.getQueryObj();
-                out->push_back(soln);
+                out->push_back(analyzeDataAccess(query, options, solnRoot));
             }
 
             // Continue planning w/non-2d indices tagged for this pred.
@@ -1294,7 +1428,7 @@ namespace mongo {
                 if (NULL == solnRoot) { continue; }
 
                 // This shouldn't ever fail.
-                QuerySolution* soln = analyzeDataAccess(query, solnRoot);
+                QuerySolution* soln = analyzeDataAccess(query, options, solnRoot);
                 verify(NULL != soln);
 
                 QLOG() << "Planner: adding solution:\n" << soln->toString() << endl;
@@ -1308,42 +1442,8 @@ namespace mongo {
         // scan the entire index to provide results and output that as our plan.  This is the
         // desired behavior when an index is hinted that is not relevant to the query.
         if (!hintIndex.isEmpty() && (0 == out->size())) {
-            QuerySolutionNode* solnRoot = NULL;
-
-            // Build an ixscan over the id index, use it, and return it.
-            IndexScanNode* isn = new IndexScanNode();
-            isn->indexKeyPattern = hintIndex;
-            isn->indexIsMultiKey = indices[hintIndexNumber].multikey;
-            isn->bounds.fields.resize(hintIndex.nFields());
-
-            // TODO: can we use simple bounds with this compound idx?
-            BSONObjIterator it(isn->indexKeyPattern);
-            int field = 0;
-            while (it.more()) {
-                IndexBoundsBuilder::allValuesForField(it.next(), &isn->bounds.fields[field]);
-                ++field;
-            }
-
-            MatchExpression* filter = query.root()->shallowClone();
-            // If it's find({}) remove the no-op root.
-            if (MatchExpression::AND == filter->matchType() && (0 == filter->numChildren())) {
-                delete filter;
-                solnRoot = isn;
-            }
-            else {
-                // TODO: We may not need to do the fetch if the predicates in root are covered.  But
-                // for now it's safe (though *maybe* slower).
-                FetchNode* fetch = new FetchNode();
-                fetch->filter.reset(filter);
-                fetch->child.reset(isn);
-                solnRoot = fetch;
-            }
-
-            QuerySolution* soln = analyzeDataAccess(query, solnRoot);
-            verify(NULL != soln);
-            out->push_back(soln);
-
-            QLOG() << "Planner: using hinted index as scan, soln = " << soln->toString() << endl;
+            QLOG() << "Planner: outputting soln that uses hinted index as scan." << endl;
+            out->push_back(scanWholeIndex(indices[hintIndexNumber], options, query));
             return;
         }
 
@@ -1367,30 +1467,10 @@ namespace mongo {
             if (!usingIndexToSort) {
                 for (size_t i = 0; i < indices.size(); ++i) {
                     const BSONObj& kp = indices[i].keyPattern;
-                    if (0 == kp.woCompare(query.getParsed().getSort())) {
-                        IndexScanNode* isn = new IndexScanNode();
-                        isn->indexKeyPattern = kp;
-                        isn->indexIsMultiKey = indices[i].multikey;
-                        isn->bounds.fields.resize(kp.nFields());
-
-                        // TODO: can we use simple bounds if compound?
-                        BSONObjIterator it(isn->indexKeyPattern);
-                        size_t field = 0;
-                        while (it.more()) {
-                            IndexBoundsBuilder::allValuesForField(it.next(),
-                                                                  &isn->bounds.fields[field]);
-                        }
-
-                        // TODO: We may not need to do the fetch if the predicates in root are
-                        // covered.  But for now it's safe (though *maybe* slower).
-                        FetchNode* fetch = new FetchNode();
-                        fetch->filter.reset(query.root()->shallowClone());
-                        fetch->child.reset(isn);
-
-                        QuerySolution* soln = analyzeDataAccess(query, fetch);
-                        verify(NULL != soln);
-                        out->push_back(soln);
-                        QLOG() << "Planner: using index to provide sort, soln = " << soln->toString() << endl;
+                    if (providesSort(query, kp)) {
+                        QLOG() << "Planner: outputting soln that uses index to provide sort."
+                               << endl;
+                        out->push_back(scanWholeIndex(indices[i], options, query));
                         break;
                     }
                 }
@@ -1403,10 +1483,28 @@ namespace mongo {
              && !QueryPlannerCommon::hasNode(query.root(), MatchExpression::TEXT)
              && ((options & QueryPlanner::INCLUDE_COLLSCAN) || (0 == out->size() && canTableScan)))
         {
-            QuerySolution* collscan = makeCollectionScan(query, false);
+            QuerySolution* collscan = makeCollectionScan(query, false, options);
             out->push_back(collscan);
-            QLOG() << "Planner: outputting a collscan\n";
+            QLOG() << "Planner: outputting a collscan:\n";
+            QLOG() << collscan->toString() << endl;
         }
+    }
+
+    // static
+    bool QueryPlanner::providesSort(const CanonicalQuery& query, const BSONObj& kp) {
+        BSONObjIterator sortIt(query.getParsed().getSort());
+        BSONObjIterator kpIt(kp);
+
+        while (sortIt.more() && kpIt.more()) {
+            // We want the field name to be the same as well (so we pass true).
+            // TODO: see if we can pull a reverse sort out...
+            if (0 != sortIt.next().woCompare(kpIt.next(), true)) {
+                return false;
+            }
+        }
+
+        // every elt in sort matched kp
+        return !sortIt.more();
     }
 
 }  // namespace mongo

@@ -34,4 +34,7 @@ namespace mongo {
 
     std::ostream& QLOG();
 
+    bool qlogOff();
+    bool qlogOn();
+
 }  // namespace mongo

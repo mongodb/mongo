@@ -120,7 +120,7 @@ namespace mongo {
         /**
          * Return a CollectionScanNode that scans as requested in 'query'.
          */
-        static QuerySolution* makeCollectionScan(const CanonicalQuery& query, bool tailable);
+        static QuerySolution* makeCollectionScan(const CanonicalQuery& query, bool tailable, size_t options);
 
         //
         // Indexed Data Access methods.
@@ -209,6 +209,15 @@ namespace mongo {
         static void finishLeafNode(QuerySolutionNode* node, const IndexEntry& index);
 
         //
+        // Helpers for creating a sort.
+        //
+
+        /**
+         * XXX
+         */
+        static void getBoundsForSort(const CanonicalQuery& query, SortNode* node);
+
+        //
         // Analysis of Data Access
         //
 
@@ -227,7 +236,28 @@ namespace mongo {
          * Caller owns the returned QuerySolution.
          */
         static QuerySolution* analyzeDataAccess(const CanonicalQuery& query,
+                                                size_t options,
                                                 QuerySolutionNode* solnRoot);
+
+        /**
+         * Return a plan that uses the provided index as a proxy for a collection scan.
+         */
+        static QuerySolution* scanWholeIndex(const IndexEntry& index, size_t options,
+                                             const CanonicalQuery& query);
+
+        /**
+         * XXX
+         */
+        static void reverseScans(QuerySolutionNode* root);
+
+        /**
+         * Assumes each OIL in bounds is increasing.
+         *
+         * Aligns OILs (and bounds) according to the kp direction * the scanDir.
+         */
+        static void alignBounds(IndexBounds* bounds, const BSONObj& kp, int scanDir = 1);
+
+        static bool providesSort(const CanonicalQuery& query, const BSONObj& kp);
     };
 
 }  // namespace mongo

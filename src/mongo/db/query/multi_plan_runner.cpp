@@ -42,8 +42,13 @@
 namespace mongo {
 
     MultiPlanRunner::MultiPlanRunner(CanonicalQuery* query)
-        : _killed(false), _failure(false), _failureCount(0), _policy(Runner::YIELD_MANUAL),
-          _query(query) { }
+        : _killed(false),
+          _failure(false),
+          _failureCount(0),
+          _policy(Runner::YIELD_MANUAL),
+          _query(query),
+          _backupSolution(NULL),
+          _backupPlan(NULL) { }
 
     MultiPlanRunner::~MultiPlanRunner() {
         for (size_t i = 0; i < _candidates.size(); ++i) {
@@ -51,6 +56,14 @@ namespace mongo {
             delete _candidates[i].root;
             // ws must die after the root.
             delete _candidates[i].ws;
+        }
+
+        if (NULL != _backupSolution) {
+            delete _backupSolution;
+        }
+
+        if (NULL != _backupPlan) {
+            delete _backupPlan;
         }
 
         for (vector<PlanStageStats*>::iterator it = _candidateStats.begin();
@@ -71,6 +84,9 @@ namespace mongo {
 
         if (NULL != _bestPlan) {
             _bestPlan->setYieldPolicy(policy);
+            if (NULL != _backupPlan) {
+                _backupPlan->setYieldPolicy(policy);
+            }
         } else {
             // Still running our candidates and doing our own yielding.
             if (Runner::YIELD_MANUAL == policy) {
@@ -87,6 +103,9 @@ namespace mongo {
 
         if (NULL != _bestPlan) {
             _bestPlan->saveState();
+            if (NULL != _backupPlan) {
+                _backupPlan->saveState();
+            }
         }
         else {
             allPlansSaveState();
@@ -98,6 +117,9 @@ namespace mongo {
 
         if (NULL != _bestPlan) {
             return _bestPlan->restoreState();
+            if (NULL != _backupPlan) {
+                _backupPlan->restoreState();
+            }
         }
         else {
             allPlansRestoreState();
@@ -110,22 +132,41 @@ namespace mongo {
 
         if (NULL != _bestPlan) {
             _bestPlan->invalidate(dl);
-            for (deque<WorkingSetID>::iterator it = _alreadyProduced.begin();
-                 it != _alreadyProduced.end(); ++it) {
+            for (list<WorkingSetID>::iterator it = _alreadyProduced.begin();
+                 it != _alreadyProduced.end();) {
                 WorkingSetMember* member = _bestPlan->getWorkingSet()->get(*it);
                 if (member->hasLoc() && member->loc == dl) {
+                    list<WorkingSetID>::iterator next = it;
+                    next++;
                     WorkingSetCommon::fetchAndInvalidateLoc(member);
+                    _bestPlan->getWorkingSet()->flagForReview(*it);
+                    _alreadyProduced.erase(it);
+                    it = next;
                 }
+                else {
+                    it++;
+                }
+            }
+            if (NULL != _backupPlan) {
+                _backupPlan->invalidate(dl);
             }
         }
         else {
             for (size_t i = 0; i < _candidates.size(); ++i) {
                 _candidates[i].root->invalidate(dl);
-                for (deque<WorkingSetID>::iterator it = _candidates[i].results.begin();
-                     it != _candidates[i].results.end(); ++it) {
+                for (list<WorkingSetID>::iterator it = _candidates[i].results.begin();
+                     it != _candidates[i].results.end();) {
                     WorkingSetMember* member = _candidates[i].ws->get(*it);
                     if (member->hasLoc() && member->loc == dl) {
+                        list<WorkingSetID>::iterator next = it;
+                        next++;
                         WorkingSetCommon::fetchAndInvalidateLoc(member);
+                        _candidates[i].ws->flagForReview(*it);
+                        _candidates[i].results.erase(it);
+                        it = next;
+                    }
+                    else {
+                        it++;
                     }
                 }
             }
@@ -199,7 +240,26 @@ namespace mongo {
             return Runner::RUNNER_ADVANCED;
         }
 
-        return _bestPlan->getNext(objOut, dlOut);
+        RunnerState state = _bestPlan->getNext(objOut, dlOut);
+
+        if (Runner::RUNNER_ERROR == state && (NULL != _backupSolution)) {
+            QLOG() << "Best plan errored out switching to backup\n";
+            _bestPlan.reset(_backupPlan);
+            _backupPlan = NULL;
+            _bestSolution.reset(_backupSolution);
+            _backupSolution = NULL;
+            return _bestPlan->getNext(objOut, dlOut);
+        }
+
+        if (NULL != _backupSolution && Runner::RUNNER_ADVANCED == state) {
+            QLOG() << "Best plan had a blocking sort, became unblocked, deleting backup plan\n";
+            delete _backupSolution;
+            delete _backupPlan;
+            _backupSolution = NULL;
+            _backupPlan = NULL;
+        }
+
+        return state;
     }
 
     bool MultiPlanRunner::pickBestPlan(size_t* out) {
@@ -224,6 +284,23 @@ namespace mongo {
 
         QLOG() << "Winning solution:\n" << _bestSolution->toString() << endl;
 
+        size_t backupChild = bestChild;
+        if (_bestSolution->hasSortStage && (0 == _alreadyProduced.size())) {
+            QLOG() << "Winner has blocked sort, looking for backup plan...\n";
+            for (size_t i = 0; i < _candidates.size(); ++i) {
+                // TODO: if we drastically change plan ranking, this will die.
+                verify(0 == _candidates[i].results.size());
+                if (!_candidates[i].solution->hasSortStage) {
+                    QLOG() << "Candidate " << i << " is backup child\n";
+                    backupChild = i;
+                    _backupSolution = _candidates[i].solution;
+                    _backupPlan = new PlanExecutor(_candidates[i].ws, _candidates[i].root);
+                    _backupPlan->setYieldPolicy(_policy);
+                    break;
+                }
+            }
+        }
+
         // TODO:
         // Store the choice we just made in the cache.
         // QueryPlanCache* cache = PlanCache::get(somenamespace);
@@ -233,6 +310,8 @@ namespace mongo {
         // Clear out the candidate plans, leaving only stats as we're all done w/them.
         for (size_t i = 0; i < _candidates.size(); ++i) {
             if (i == bestChild) { continue; }
+            if (i == backupChild) { continue; }
+
             delete _candidates[i].solution;
 
             // Remember the stats for the candidate plan because we always show it on an

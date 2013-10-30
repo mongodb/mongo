@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/geo/geoquery.h"
 #include "mongo/db/fts/fts_query.h"
@@ -48,15 +49,14 @@ namespace mongo {
         virtual ~QuerySolutionNode() { }
 
         /**
+         * Return a string representation of this node and any children.
+         */
+        string toString() const;
+
+        /**
          * What stage should this be transcribed to?  See stage_types.h.
          */
         virtual StageType getType() const = 0;
-
-        string toString() const {
-            stringstream ss;
-            appendToString(&ss, 0);
-            return ss.str();
-        }
 
         /**
          * Internal function called by toString()
@@ -64,6 +64,19 @@ namespace mongo {
          * TODO: Consider outputting into a BSONObj or builder thereof.
          */
         virtual void appendToString(stringstream* ss, int indent) const = 0;
+
+        //
+        // Computed properties
+        //
+
+        /**
+         * Must be called before any properties are examined.
+         */
+        virtual void computeProperties() {
+            for (size_t i = 0; i < children.size(); ++i) {
+                children[i]->computeProperties();
+            }
+        }
 
         /**
          * If true, one of these are true:
@@ -98,24 +111,31 @@ namespace mongo {
         virtual bool sortedByDiskLoc() const = 0;
 
         /**
-         * Return a BSONObj representing the sort order of the data stream from this node.  If the data
-         * is not sorted in any particular fashion, returns BSONObj().
-         *
-         * TODO: Is BSONObj really the best way to represent this?
+         * Return a BSONObjSet representing the possible sort orders of the data stream from this
+         * node.  If the data is not sorted in any particular fashion, returns an empty set.
          *
          * Usage:
          * 1. If our plan gives us a sort order, we don't have to add a sort stage.
          * 2. If all the children of an OR have the same sort order, we can maintain that
          *    sort order with a STAGE_SORT_MERGE instead of STAGE_OR.
          */
-        virtual BSONObj getSort() const = 0;
+        virtual const BSONObjSet& getSort() const = 0;
+
+        vector<QuerySolutionNode*> children;
+
+        scoped_ptr<MatchExpression> filter;
 
     protected:
-        static void addIndent(stringstream* ss, int level) {
-            for (int i = 0; i < level; ++i) {
-                *ss << "---";
-            }
-        }
+        /**
+         * Formatting helper used by toString().
+         */
+        static void addIndent(stringstream* ss, int level);
+
+        /**
+         * Every solution node has properties and this adds the debug info for the
+         * properties.
+         */
+        void addCommon(stringstream* ss, int indent) const;
 
     private:
         MONGO_DISALLOW_COPYING(QuerySolutionNode);
@@ -169,13 +189,14 @@ namespace mongo {
         bool fetched() const { return false; }
         bool hasField(const string& field) const { return false; }
         bool sortedByDiskLoc() const { return false; }
-        BSONObj getSort() const { return _indexKeyPattern; }
+        const BSONObjSet& getSort() const { return _sort; }
+
+        BSONObjSet _sort;
 
         uint32_t _numWanted;
         BSONObj  _indexKeyPattern;
         std::string _query;
         std::string _language;
-        scoped_ptr<MatchExpression> _filter;
     };
 
     struct CollectionScanNode : public QuerySolutionNode {
@@ -189,7 +210,9 @@ namespace mongo {
         bool fetched() const { return true; }
         bool hasField(const string& field) const { return true; }
         bool sortedByDiskLoc() const { return false; }
-        BSONObj getSort() const { return BSONObj(); }
+        const BSONObjSet& getSort() const { return _sort; }
+
+        BSONObjSet _sort;
 
         // Name of the namespace.
         string name;
@@ -198,8 +221,6 @@ namespace mongo {
         bool tailable;
 
         int direction;
-
-        scoped_ptr<MatchExpression> filter;
     };
 
     struct AndHashNode : public QuerySolutionNode {
@@ -213,10 +234,9 @@ namespace mongo {
         bool fetched() const;
         bool hasField(const string& field) const;
         bool sortedByDiskLoc() const { return false; }
-        BSONObj getSort() const { return BSONObj(); }
+        const BSONObjSet& getSort() const { return _sort; }
 
-        scoped_ptr<MatchExpression> filter;
-        vector<QuerySolutionNode*> children;
+        BSONObjSet _sort;
     };
 
     struct AndSortedNode : public QuerySolutionNode {
@@ -230,10 +250,9 @@ namespace mongo {
         bool fetched() const;
         bool hasField(const string& field) const;
         bool sortedByDiskLoc() const { return true; }
-        BSONObj getSort() const { return BSONObj(); }
+        const BSONObjSet& getSort() const { return _sort; }
 
-        scoped_ptr<MatchExpression> filter;
-        vector<QuerySolutionNode*> children;
+        BSONObjSet _sort;
     };
 
     struct OrNode : public QuerySolutionNode {
@@ -251,12 +270,11 @@ namespace mongo {
             // any order on the output.
             return false;
         }
-        BSONObj getSort() const { return BSONObj(); }
+        const BSONObjSet& getSort() const { return _sort; }
+
+        BSONObjSet _sort;
 
         bool dedup;
-        // XXX why is this here
-        scoped_ptr<MatchExpression> filter;
-        vector<QuerySolutionNode*> children;
     };
 
     struct MergeSortNode : public QuerySolutionNode {
@@ -270,13 +288,21 @@ namespace mongo {
         bool fetched() const;
         bool hasField(const string& field) const;
         bool sortedByDiskLoc() const { return false; }
-        BSONObj getSort() const { return sort; }
+
+        const BSONObjSet& getSort() const { return _sorts; }
+
+        virtual void computeProperties() {
+            for (size_t i = 0; i < children.size(); ++i) {
+                children[i]->computeProperties();
+            }
+            _sorts.clear();
+            _sorts.insert(sort);
+        }
+
+        BSONObjSet _sorts;
 
         BSONObj sort;
         bool dedup;
-        // XXX why is this here
-        scoped_ptr<MatchExpression> filter;
-        vector<QuerySolutionNode*> children;
     };
 
     struct FetchNode : public QuerySolutionNode {
@@ -289,16 +315,17 @@ namespace mongo {
 
         bool fetched() const { return true; }
         bool hasField(const string& field) const { return true; }
-        bool sortedByDiskLoc() const { return child->sortedByDiskLoc(); }
-        BSONObj getSort() const { return child->getSort(); }
+        bool sortedByDiskLoc() const { return children[0]->sortedByDiskLoc(); }
+        const BSONObjSet& getSort() const { return children[0]->getSort(); }
 
-        scoped_ptr<MatchExpression> filter;
-        scoped_ptr<QuerySolutionNode> child;
+        BSONObjSet _sorts;
     };
 
     struct IndexScanNode : public QuerySolutionNode {
         IndexScanNode();
         virtual ~IndexScanNode() { }
+
+        virtual void computeProperties();
 
         virtual StageType getType() const { return STAGE_IXSCAN; }
 
@@ -307,25 +334,12 @@ namespace mongo {
         bool fetched() const { return false; }
         bool hasField(const string& field) const;
         bool sortedByDiskLoc() const;
+        const BSONObjSet& getSort() const { return _sorts; }
 
-        // XXX: We need a better way of dealing with sorting and equalities on a prefix of the key
-        // pattern.  If we are using the index {a:1, b:1} to answer the predicate {a: 10}, it's
-        // sorted both by the index key pattern and by the pattern {b: 1}.  How do we expose this?
-        // Perhaps migrate to sortedBy(...) instead of getSort().  In this case, the ixscan can
-        // return true for both of those sort orders.
-        //
-
-        // This doesn't work for detecting that we can use a merge sort, though.  Perhaps we should
-        // just pick one sort order and miss out on the other case?  For the golden query we want
-        // our sort order to be {b: 1}.
-
-        BSONObj getSort() const { return indexKeyPattern; }
+        BSONObjSet _sorts;
 
         BSONObj indexKeyPattern;
-
         bool indexIsMultiKey;
-
-        scoped_ptr<MatchExpression> filter;
 
         // Only set for 2d.
         int limit;
@@ -364,39 +378,51 @@ namespace mongo {
             //
             // Perhaps this should be false to not imply that there *is* a DiskLoc?  Kind of a
             // corner case.
-            return child->sortedByDiskLoc();
+            return children[0]->sortedByDiskLoc();
         }
 
-        BSONObj getSort() const {
+        const BSONObjSet& getSort() const {
             // TODO: If we're applying a projection that maintains sort order, the prefix of the
             // sort order we project is the sort order.
-            return BSONObj();
+            return _sorts;
         }
+
+        BSONObjSet _sorts;
 
         // Points into the CanonicalQuery.
         ParsedProjection* projection;
-
-        scoped_ptr<QuerySolutionNode> child;
-
-        // TODO: Filter
     };
 
     struct SortNode : public QuerySolutionNode {
-        SortNode() { }
+        SortNode() : hasBounds(false) { }
         virtual ~SortNode() { }
 
         virtual StageType getType() const { return STAGE_SORT; }
 
         virtual void appendToString(stringstream* ss, int indent) const;
-        
-        bool fetched() const { return child->fetched(); }
-        bool hasField(const string& field) const { return child->hasField(field); }
+
+        bool fetched() const { return children[0]->fetched(); }
+        bool hasField(const string& field) const { return children[0]->hasField(field); }
         bool sortedByDiskLoc() const { return false; }
-        BSONObj getSort() const { return pattern; }
+
+        const BSONObjSet& getSort() const { return _sorts; }
+
+        virtual void computeProperties() {
+            for (size_t i = 0; i < children.size(); ++i) {
+                children[i]->computeProperties();
+            }
+            _sorts.clear();
+            _sorts.insert(pattern);
+        }
+
+        BSONObjSet _sorts;
 
         BSONObj pattern;
-        scoped_ptr<QuerySolutionNode> child;
-        // TODO: Filter
+
+        bool hasBounds;
+
+        // XXX
+        IndexBounds bounds;
     };
 
     struct LimitNode : public QuerySolutionNode {
@@ -407,13 +433,12 @@ namespace mongo {
 
         virtual void appendToString(stringstream* ss, int indent) const;
 
-        bool fetched() const { return child->fetched(); }
-        bool hasField(const string& field) const { return child->hasField(field); }
-        bool sortedByDiskLoc() const { return child->sortedByDiskLoc(); }
-        BSONObj getSort() const { return child->getSort(); }
+        bool fetched() const { return children[0]->fetched(); }
+        bool hasField(const string& field) const { return children[0]->hasField(field); }
+        bool sortedByDiskLoc() const { return children[0]->sortedByDiskLoc(); }
+        const BSONObjSet& getSort() const { return children[0]->getSort(); }
 
         int limit;
-        scoped_ptr<QuerySolutionNode> child;
     };
 
     struct SkipNode : public QuerySolutionNode {
@@ -423,13 +448,12 @@ namespace mongo {
         virtual StageType getType() const { return STAGE_SKIP; }
         virtual void appendToString(stringstream* ss, int indent) const;
 
-        bool fetched() const { return child->fetched(); }
-        bool hasField(const string& field) const { return child->hasField(field); }
-        bool sortedByDiskLoc() const { return child->sortedByDiskLoc(); }
-        BSONObj getSort() const { return child->getSort(); }
+        bool fetched() const { return children[0]->fetched(); }
+        bool hasField(const string& field) const { return children[0]->hasField(field); }
+        bool sortedByDiskLoc() const { return children[0]->sortedByDiskLoc(); }
+        const BSONObjSet& getSort() const { return children[0]->getSort(); }
 
         int skip;
-        scoped_ptr<QuerySolutionNode> child;
     };
 
     //
@@ -448,13 +472,11 @@ namespace mongo {
         bool fetched() const { return false; }
         bool hasField(const string& field) const;
         bool sortedByDiskLoc() const { return false; }
-        BSONObj getSort() const { return BSONObj(); }
+        const BSONObjSet& getSort() const { return _sorts; }
+        BSONObjSet _sorts;
 
         BSONObj indexKeyPattern;
         GeoQuery gq;
-
-        // TODO: Actually try to use this for covering
-        scoped_ptr<MatchExpression> filter;
     };
 
     // This is a standalone stage.
@@ -468,10 +490,10 @@ namespace mongo {
         bool fetched() const { return true; }
         bool hasField(const string& field) const { return true; }
         bool sortedByDiskLoc() const { return false; }
-        BSONObj getSort() const { return BSONObj(); }
+        const BSONObjSet& getSort() const { return _sorts; }
+        BSONObjSet _sorts;
 
         NearQuery nq;
-        scoped_ptr<MatchExpression> filter;
         int numWanted;
         BSONObj indexKeyPattern;
     };
@@ -487,14 +509,14 @@ namespace mongo {
         bool fetched() const { return true; }
         bool hasField(const string& field) const { return true; }
         bool sortedByDiskLoc() const { return false; }
-        BSONObj getSort() const { return BSONObj(); }
+        const BSONObjSet& getSort() const { return _sorts; }
+
+        BSONObjSet _sorts;
 
         NearQuery nq;
         IndexBounds baseBounds;
 
         BSONObj indexKeyPattern;
-        scoped_ptr<MatchExpression> filter;
     };
-
 
 }  // namespace mongo

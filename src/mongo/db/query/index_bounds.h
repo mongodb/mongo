@@ -122,6 +122,12 @@ namespace mongo {
         };
 
         /**
+         * Is 'key' a valid key?  Note that this differs from checkKey, which assumes that it
+         * receives keys in sorted order.
+         */
+        bool isValidKey(const BSONObj& key);
+
+        /**
          * This function checks if the key is within the bounds we're iterating over and updates any
          * internal state required to efficiently determine if the key is within our bounds.
          *

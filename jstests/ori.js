@@ -14,7 +14,8 @@ t.save( {a:10,b:2,c:4} );
 assert.eq( 2, t.count( {$or:[{a:{$gt:0,$lt:5},b:2},{a:10,c:4}]} ) );
 // Two $or clauses expected to be scanned.
 
-assert.eq( 2, t.find( {$or:[{a:{$gt:0,$lt:5},b:2},{a:10,c:4}]} ).explain().clauses.length );
+// QUERY_MIGRATION: we may merge sort these
+//assert.eq( 2, t.find( {$or:[{a:{$gt:0,$lt:5},b:2},{a:10,c:4}]} ).explain().clauses.length );
 assert.eq( 2, t.count( {$or:[{a:10,b:2},{a:{$gt:0,$lt:5},c:4}]} ) );
 
 t.drop();

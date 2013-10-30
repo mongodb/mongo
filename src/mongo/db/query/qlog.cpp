@@ -41,6 +41,18 @@ namespace mongo {
 
     static nullstream theNullStream;
 
+    bool qlogOff() {
+        bool old = verboseQueryLogging;
+        verboseQueryLogging = false;
+        return old;
+    }
+
+    bool qlogOn() {
+        bool old = verboseQueryLogging;
+        verboseQueryLogging = true;
+        return old;
+    }
+
     std::ostream& QLOG() {
         if (verboseQueryLogging) {
             return std::cout;

@@ -29,7 +29,7 @@
 #pragma once
 
 #include <boost/scoped_ptr.hpp>
-#include <deque>
+#include <list>
 #include <vector>
 
 #include "mongo/base/status.h"
@@ -133,7 +133,7 @@ namespace mongo {
         boost::scoped_ptr<PlanExecutor> _bestPlan;
 
         // ...and any results it produced while working toward winning.
-        std::deque<WorkingSetID> _alreadyProduced;
+        std::list<WorkingSetID> _alreadyProduced;
 
         // ...and the solution, for caching.
         boost::scoped_ptr<QuerySolution> _bestSolution;
@@ -149,6 +149,13 @@ namespace mongo {
 
         // The query that we're trying to figure out the best solution to.
         boost::scoped_ptr<CanonicalQuery> _query;
+
+        //
+        // Backup plan for sort
+        //
+
+        QuerySolution* _backupSolution;
+        PlanExecutor* _backupPlan;
     };
 
 }  // namespace mongo

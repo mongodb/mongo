@@ -28,7 +28,7 @@
 
 #pragma once
 
-#include <deque>
+#include <list>
 #include <vector>
 
 #include "mongo/db/exec/plan_stage.h"
@@ -72,7 +72,7 @@ namespace mongo {
         WorkingSet* ws;
 
         // Any results produced during the plan's execution prior to ranking are retained here.
-        std::deque<WorkingSetID> results;
+        std::list<WorkingSetID> results;
 
         bool failed;
     };

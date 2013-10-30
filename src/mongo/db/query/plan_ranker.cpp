@@ -52,8 +52,9 @@ namespace mongo {
         double maxScore = 0;
         size_t bestChild = numeric_limits<size_t>::max();
         for (size_t i = 0; i < statTrees.size(); ++i) {
+            QLOG() << "scoring plan " << i << ":\n" << candidates[i].solution->toString();
             double score = scoreTree(statTrees[i]);
-            QLOG() << "score of plan " << i << " is " << score << endl;
+            QLOG() << "score = " << score << endl;
             if (score > maxScore) {
                 maxScore = score;
                 bestChild = i;
@@ -95,6 +96,18 @@ namespace mongo {
         }
     }
 
+    bool hasSort(const PlanStageStats* stats) {
+        if (STAGE_SORT == stats->stageType) {
+            return true;
+        }
+        for (size_t i = 0; i < stats->children.size(); ++i) {
+            if (hasSort(stats->children[i])) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     // static 
     double PlanRanker::scoreTree(const PlanStageStats* stats) {
         // We start all scores at 1.  Our "no plan selected" score is 0 and we want all plans to
@@ -102,14 +115,24 @@ namespace mongo {
         double baseScore = 1;
 
         // How much did a plan produce?
+        // Range: [0, 1]
         double productivity = static_cast<double>(stats->common.advanced)
                             / static_cast<double>(stats->common.works);
 
+        // Does a plan have a sort?
+        // bool sort = hasSort(stats);
+
         // How selective do we think an index is?
         //double selectivity = computeSelectivity(stats);
-
-        return baseScore + productivity;
         //return baseScore + productivity + selectivity;
+
+        //double sortPenalty = sort ? 0.5 : 0;
+        //double score = baseScore + productivity - sortPenalty;
+        double score = baseScore + productivity;
+
+        QLOG() << "score (" << score << ") = baseScore (" << baseScore << ") + productivity(" << productivity << ")\n";
+
+        return score;
     }
 
 }  // namespace mongo

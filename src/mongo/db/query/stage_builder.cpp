@@ -90,33 +90,35 @@ namespace mongo {
         }
         else if (STAGE_FETCH == root->getType()) {
             const FetchNode* fn = static_cast<const FetchNode*>(root);
-            PlanStage* childStage = buildStages(ns, fn->child.get(), ws);
+            PlanStage* childStage = buildStages(ns, fn->children[0], ws);
             if (NULL == childStage) { return NULL; }
             return new FetchStage(ws, childStage, fn->filter.get());
         }
         else if (STAGE_SORT == root->getType()) {
             const SortNode* sn = static_cast<const SortNode*>(root);
-            PlanStage* childStage = buildStages(ns, sn->child.get(), ws);
+            PlanStage* childStage = buildStages(ns, sn->children[0], ws);
             if (NULL == childStage) { return NULL; }
             SortStageParams params;
             params.pattern = sn->pattern;
+            params.bounds = sn->bounds;
+            params.hasBounds = sn->hasBounds;
             return new SortStage(params, ws, childStage);
         }
         else if (STAGE_PROJECTION == root->getType()) {
             const ProjectionNode* pn = static_cast<const ProjectionNode*>(root);
-            PlanStage* childStage = buildStages(ns, pn->child.get(), ws);
+            PlanStage* childStage = buildStages(ns, pn->children[0], ws);
             if (NULL == childStage) { return NULL; }
             return new ProjectionStage(pn->projection, ws, childStage, NULL);
         }
         else if (STAGE_LIMIT == root->getType()) {
             const LimitNode* ln = static_cast<const LimitNode*>(root);
-            PlanStage* childStage = buildStages(ns, ln->child.get(), ws);
+            PlanStage* childStage = buildStages(ns, ln->children[0], ws);
             if (NULL == childStage) { return NULL; }
             return new LimitStage(ln->limit, ws, childStage);
         }
         else if (STAGE_SKIP == root->getType()) {
             const SkipNode* sn = static_cast<const SkipNode*>(root);
-            PlanStage* childStage = buildStages(ns, sn->child.get(), ws);
+            PlanStage* childStage = buildStages(ns, sn->children[0], ws);
             if (NULL == childStage) { return NULL; }
             return new SkipStage(sn->skip, ws, childStage);
         }
@@ -219,7 +221,7 @@ namespace mongo {
             if (!parseStatus.isOK()) { return NULL; }
             params.query = ftsq;
 
-            return new TextStage(params, ws, node->_filter.get());
+            return new TextStage(params, ws, node->filter.get());
         }
         else {
             stringstream ss;

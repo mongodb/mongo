@@ -30,6 +30,32 @@
 
 namespace mongo {
 
+    string QuerySolutionNode::toString() const {
+        stringstream ss;
+        appendToString(&ss, 0);
+        return ss.str();
+    }
+
+    // static
+    void QuerySolutionNode::addIndent(stringstream* ss, int level) {
+        for (int i = 0; i < level; ++i) {
+            *ss << "---";
+        }
+    }
+
+    void QuerySolutionNode::addCommon(stringstream* ss, int indent) const {
+        addIndent(ss, indent + 1);
+        *ss << "fetched = " << fetched() << endl;
+        addIndent(ss, indent + 1);
+        *ss << "sortedByDiskLoc = " << sortedByDiskLoc() << endl;
+        addIndent(ss, indent + 1);
+        *ss << "getSort = [";
+        for (BSONObjSet::const_iterator it = getSort().begin(); it != getSort().end(); it++) {
+            *ss << it->toString() << ", ";
+        }
+        *ss << "]" << endl;
+    }
+
     //
     // TextNode
     //
@@ -42,22 +68,17 @@ namespace mongo {
         addIndent(ss, indent + 1);
         *ss << "keyPattern = " << _indexKeyPattern.toString() << endl;
         addIndent(ss, indent + 1);
-        *ss << "fetched = " << fetched() << endl;
-        addIndent(ss, indent + 1);
-        *ss << "sortedByDiskLoc = " << sortedByDiskLoc() << endl;
-        addIndent(ss, indent + 1);
-        *ss << "getSort = " << getSort().toString() << endl;
-        addIndent(ss, indent + 1);
         *ss << "query = " << _query << endl;
         addIndent(ss, indent + 1);
         *ss << "language = " << _language << endl;
+        addCommon(ss, indent);
     }
 
     //
     // CollectionScanNode
     //
 
-    CollectionScanNode::CollectionScanNode() : tailable(false), direction(1), filter(NULL) { }
+    CollectionScanNode::CollectionScanNode() : tailable(false), direction(1) { }
 
     void CollectionScanNode::appendToString(stringstream* ss, int indent) const {
         addIndent(ss, indent);
@@ -68,19 +89,14 @@ namespace mongo {
             addIndent(ss, indent + 1);
             *ss << " filter = " << filter->toString();
         }
-        addIndent(ss, indent + 1);
-        *ss << "fetched = " << fetched() << endl;
-        addIndent(ss, indent + 1);
-        *ss << "sortedByDiskLoc = " << sortedByDiskLoc() << endl;
-        addIndent(ss, indent + 1);
-        *ss << "getSort = " << getSort().toString() << endl;
+        addCommon(ss, indent);
     }
 
     //
     // AndHashNode
     //
 
-    AndHashNode::AndHashNode() : filter(NULL) { }
+    AndHashNode::AndHashNode() { }
 
     AndHashNode::~AndHashNode() {
         for (size_t i = 0; i < children.size(); ++i) {
@@ -95,12 +111,7 @@ namespace mongo {
             addIndent(ss, indent + 1);
             *ss << " filter = " << filter->toString() << endl;
         }
-        addIndent(ss, indent + 1);
-        *ss << "fetched = " << fetched() << endl;
-        addIndent(ss, indent + 1);
-        *ss << "sortedByDiskLoc = " << sortedByDiskLoc() << endl;
-        addIndent(ss, indent + 1);
-        *ss << "getSort = " << getSort().toString() << endl;
+        addCommon(ss, indent);
         for (size_t i = 0; i < children.size(); ++i) {
             addIndent(ss, indent + 1);
             *ss << "Child " << i << ":\n";
@@ -134,7 +145,7 @@ namespace mongo {
     // AndSortedNode
     //
 
-    AndSortedNode::AndSortedNode() : filter(NULL) { }
+    AndSortedNode::AndSortedNode() { }
 
     AndSortedNode::~AndSortedNode() {
         for (size_t i = 0; i < children.size(); ++i) {
@@ -149,12 +160,7 @@ namespace mongo {
             addIndent(ss, indent + 1);
             *ss << " filter = " << filter->toString() << endl;
         }
-        addIndent(ss, indent + 1);
-        *ss << "fetched = " << fetched() << endl;
-        addIndent(ss, indent + 1);
-        *ss << "sortedByDiskLoc = " << sortedByDiskLoc() << endl;
-        addIndent(ss, indent + 1);
-        *ss << "getSort = " << getSort().toString() << endl;
+        addCommon(ss, indent);
         for (size_t i = 0; i < children.size(); ++i) {
             *ss << "Child " << i << ": ";
             children[i]->appendToString(ss, indent + 1);
@@ -187,7 +193,7 @@ namespace mongo {
     // OrNode
     //
 
-    OrNode::OrNode() : dedup(true), filter(NULL) { }
+    OrNode::OrNode() : dedup(true) { }
 
     OrNode::~OrNode() {
         for (size_t i = 0; i < children.size(); ++i) {
@@ -202,12 +208,7 @@ namespace mongo {
             addIndent(ss, indent + 1);
             *ss << " filter = " << filter->toString() << endl;
         }
-        addIndent(ss, indent + 1);
-        *ss << "fetched = " << fetched() << endl;
-        addIndent(ss, indent + 1);
-        *ss << "sortedByDiskLoc = " << sortedByDiskLoc() << endl;
-        addIndent(ss, indent + 1);
-        *ss << "getSort = " << getSort().toString() << endl;
+        addCommon(ss, indent);
         for (size_t i = 0; i < children.size(); ++i) {
             addIndent(ss, indent + 1);
             *ss << "Child " << i << ":\n";
@@ -246,7 +247,7 @@ namespace mongo {
     // MergeSortNode
     //
 
-    MergeSortNode::MergeSortNode() : dedup(true), filter(NULL) { }
+    MergeSortNode::MergeSortNode() : dedup(true) { }
 
     MergeSortNode::~MergeSortNode() {
         for (size_t i = 0; i < children.size(); ++i) {
@@ -261,12 +262,7 @@ namespace mongo {
             addIndent(ss, indent + 1);
             *ss << " filter = " << filter->toString() << endl;
         }
-        addIndent(ss, indent + 1);
-        *ss << "fetched = " << fetched() << endl;
-        addIndent(ss, indent + 1);
-        *ss << "sortedByDiskLoc = " << sortedByDiskLoc() << endl;
-        addIndent(ss, indent + 1);
-        *ss << "getSort = " << getSort().toString() << endl;
+        addCommon(ss, indent);
         for (size_t i = 0; i < children.size(); ++i) {
             addIndent(ss, indent + 1);
             *ss << "Child " << i << ":\n";
@@ -305,7 +301,7 @@ namespace mongo {
     // FetchNode
     //
 
-    FetchNode::FetchNode() : filter(NULL) { }
+    FetchNode::FetchNode() { }
 
     void FetchNode::appendToString(stringstream* ss, int indent) const {
         addIndent(ss, indent);
@@ -317,15 +313,10 @@ namespace mongo {
             filter->debugString(sb, indent + 2);
             *ss << sb.str();
         }
-        addIndent(ss, indent + 1);
-        *ss << "fetched = " << fetched() << endl;
-        addIndent(ss, indent + 1);
-        *ss << "sortedByDiskLoc = " << sortedByDiskLoc() << endl;
-        addIndent(ss, indent + 1);
-        *ss << "getSort = " << getSort().toString() << endl;
+        addCommon(ss, indent);
         addIndent(ss, indent + 1);
         *ss << "Child:" << endl;
-        child->appendToString(ss, indent + 2);
+        children[0]->appendToString(ss, indent + 2);
     }
 
     //
@@ -333,7 +324,7 @@ namespace mongo {
     //
 
     IndexScanNode::IndexScanNode()
-        : indexIsMultiKey(false), filter(NULL), limit(0), direction(1) { }
+        : indexIsMultiKey(false), limit(0), direction(1) { }
 
     void IndexScanNode::appendToString(stringstream* ss, int indent) const {
         addIndent(ss, indent);
@@ -350,10 +341,7 @@ namespace mongo {
         *ss << "bounds = " << bounds.toString() << endl;
         addIndent(ss, indent + 1);
         *ss << "fetched = " << fetched() << endl;
-        addIndent(ss, indent + 1);
-        *ss << "sortedByDiskLoc = " << sortedByDiskLoc() << endl;
-        addIndent(ss, indent + 1);
-        *ss << "getSort = " << getSort().toString() << endl;
+        addCommon(ss, indent);
     }
 
     bool IndexScanNode::hasField(const string& field) const {
@@ -395,6 +383,66 @@ namespace mongo {
         return true;
     }
 
+    void IndexScanNode::computeProperties() {
+        _sorts.clear();
+
+        BSONObj sortPattern;
+        {
+            BSONObjBuilder sortBob;
+            BSONObjIterator it(indexKeyPattern);
+            while (it.more()) {
+                BSONElement elt = it.next();
+                // Zero is returned if elt is not a number.  This happens when elt is hashed or
+                // 2dsphere, our two projection indices.  We want to drop those from the sort
+                // pattern.
+                int val = elt.numberInt() * direction;
+                if (0 != val) {
+                    sortBob.append(elt.fieldName(), val);
+                }
+            }
+            sortPattern = sortBob.obj();
+        }
+        _sorts.insert(sortPattern);
+
+        // We're sorted not only by sortPattern but also by all prefixes of it.
+        for (int i = 0; i < sortPattern.nFields(); ++i) {
+            // Make obj out of fields [0,i]
+            BSONObjIterator it(sortPattern);
+            BSONObjBuilder prefixBob;
+            for (int j = 0; j <= i; ++j) {
+                prefixBob.append(it.next());
+            }
+            _sorts.insert(prefixBob.obj());
+        }
+
+        // If we are using the index {a:1, b:1} to answer the predicate {a: 10}, it's sorted
+        // both by the index key pattern and by the pattern {b: 1}.
+
+        // See if there are any fields with equalities for bounds.  We can drop these
+        // from any sort orders created.
+        set<string> equalityFields;
+        if (!bounds.isSimpleRange) {
+            // Figure out how many fields are point intervals.
+            for (size_t i = 0; i < bounds.fields.size(); ++i) {
+                const OrderedIntervalList& oil = bounds.fields[i];
+                if (oil.intervals.size() != 1) {
+                    continue;
+                }
+                const Interval& ival = oil.intervals[0];
+                if (!ival.isPoint()) {
+                    continue;
+                }
+                equalityFields.insert(oil.name);
+            }
+        }
+
+        // TODO: Each field in equalityFields could be dropped from the sort order since it is
+        // a point interval.
+        // For each sort in _sorts:
+        //    For each drop in powerset(equalityFields):
+        //        Remove fields in 'drop' from 'sort' and add resulting sort to output.
+    }
+
     //
     // ProjectionNode
     //
@@ -405,15 +453,9 @@ namespace mongo {
         verify(NULL != projection);
         addIndent(ss, indent + 1);
         *ss << "proj = " << projection->toString() << endl;
-        addIndent(ss, indent + 1);
-        *ss << "fetched = " << fetched() << endl;
-        addIndent(ss, indent + 1);
-        *ss << "sortedByDiskLoc = " << sortedByDiskLoc() << endl;
-        addIndent(ss, indent + 1);
-        *ss << "getSort = " << getSort().toString() << endl;
-        addIndent(ss, indent + 1);
+        addCommon(ss, indent);
         *ss << "Child:" << endl;
-        child->appendToString(ss, indent + 2);
+        children[0]->appendToString(ss, indent + 2);
     }
 
     //
@@ -425,15 +467,9 @@ namespace mongo {
         *ss << "SORT\n";
         addIndent(ss, indent + 1);
         *ss << "pattern = " << pattern.toString() << endl;
-        addIndent(ss, indent + 1);
-        *ss << "fetched = " << fetched() << endl;
-        addIndent(ss, indent + 1);
-        *ss << "sortedByDiskLoc = " << sortedByDiskLoc() << endl;
-        addIndent(ss, indent + 1);
-        *ss << "getSort = " << getSort().toString() << endl;
-        addIndent(ss, indent + 1);
+        addCommon(ss, indent);
         *ss << "Child:" << endl;
-        child->appendToString(ss, indent + 2);
+        children[0]->appendToString(ss, indent + 2);
     }
 
     //
@@ -447,14 +483,9 @@ namespace mongo {
         addIndent(ss, indent + 1);
         *ss << "limit = " << limit << endl;
         addIndent(ss, indent + 1);
-        *ss << "fetched = " << fetched() << endl;
-        addIndent(ss, indent + 1);
-        *ss << "sortedByDiskLoc = " << sortedByDiskLoc() << endl;
-        addIndent(ss, indent + 1);
-        *ss << "getSort = " << getSort().toString() << endl;
-        addIndent(ss, indent + 1);
+        addCommon(ss, indent);
         *ss << "Child:" << endl;
-        child->appendToString(ss, indent + 2);
+        children[0]->appendToString(ss, indent + 2);
     }
 
     //
@@ -466,15 +497,9 @@ namespace mongo {
         *ss << "SKIP\n";
         addIndent(ss, indent + 1);
         *ss << "skip= " << skip << endl;
-        addIndent(ss, indent + 1);
-        *ss << "fetched = " << fetched() << endl;
-        addIndent(ss, indent + 1);
-        *ss << "sortedByDiskLoc = " << sortedByDiskLoc() << endl;
-        addIndent(ss, indent + 1);
-        *ss << "getSort = " << getSort().toString() << endl;
-        addIndent(ss, indent + 1);
+        addCommon(ss, indent);
         *ss << "Child:" << endl;
-        child->appendToString(ss, indent + 2);
+        children[0]->appendToString(ss, indent + 2);
     }
 
     //
@@ -486,13 +511,7 @@ namespace mongo {
         *ss << "GEO_NEAR_2D\n";
         addIndent(ss, indent + 1);
         *ss << "keyPattern = " << indexKeyPattern.toString() << endl;
-        addIndent(ss, indent + 1);
-        *ss << "fetched = " << fetched() << endl;
-        addIndent(ss, indent + 1);
-        *ss << "sortedByDiskLoc = " << sortedByDiskLoc() << endl;
-        addIndent(ss, indent + 1);
-        *ss << "getSort = " << getSort().toString() << endl;
-        addIndent(ss, indent + 1);
+        addCommon(ss, indent);
         *ss << "nearQuery = " << nq.toString() << endl;
         if (NULL != filter) {
             addIndent(ss, indent + 1);
@@ -509,13 +528,7 @@ namespace mongo {
         *ss << "GEO_NEAR_2DSPHERE\n";
         addIndent(ss, indent + 1);
         *ss << "keyPattern = " << indexKeyPattern.toString() << endl;
-        addIndent(ss, indent + 1);
-        *ss << "fetched = " << fetched() << endl;
-        addIndent(ss, indent + 1);
-        *ss << "sortedByDiskLoc = " << sortedByDiskLoc() << endl;
-        addIndent(ss, indent + 1);
-        *ss << "getSort = " << getSort().toString() << endl;
-        addIndent(ss, indent + 1);
+        addCommon(ss, indent);
         *ss << "baseBounds = " << baseBounds.toString() << endl;
         addIndent(ss, indent + 1);
         *ss << "nearQuery = " << nq.toString() << endl;
@@ -534,14 +547,7 @@ namespace mongo {
         *ss << "GEO_2D\n";
         addIndent(ss, indent + 1);
         *ss << "keyPattern = " << indexKeyPattern.toString() << endl;
-        addIndent(ss, indent + 1);
-        //*ss << "seek = " << seek.toString() << endl;
-        //addIndent(ss, indent + 1);
-        *ss << "fetched = " << fetched() << endl;
-        addIndent(ss, indent + 1);
-        *ss << "sortedByDiskLoc = " << sortedByDiskLoc() << endl;
-        addIndent(ss, indent + 1);
-        *ss << "getSort = " << getSort().toString() << endl;
+        addCommon(ss, indent);
     }
 
     bool Geo2DNode::hasField(const string& field) const {
