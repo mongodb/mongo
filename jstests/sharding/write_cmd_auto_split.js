@@ -61,7 +61,7 @@ assert.eq(1, configDB.chunks.find().itcount());
 
 for (var x = 0; x < 1100; x++) {
     var res = testDB.runCommand({ delete: 'delete',
-                                  deletes: [{ q: { x: x, v: doc1k }}],
+                                  deletes: [{ q: { x: x, v: doc1k }, limit : NumberInt(0) }],
                                   ordered: false,
                                   writeConcern: { w: 1 }});
 
@@ -144,7 +144,7 @@ for (var x = 0; x < 1100; x += 400) {
     }
 
     var res = testDB.runCommand({ delete: 'delete',
-                                  deletes: [{ q: { x: x, v: doc1k }}],
+                                  deletes: [{ q: { x: x, v: doc1k }, limit : NumberInt(0) }],
                                   ordered: false,
                                   writeConcern: { w: 1 }});
 
