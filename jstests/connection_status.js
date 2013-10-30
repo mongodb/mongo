@@ -14,7 +14,7 @@ function test(userName) {
 
     var matches = 0;
     for (var i=0; i < users.length; i++) {
-        if (users[i].userSource != dbName)
+        if (users[i].db != dbName)
             continue;
 
         assert.eq(users[i].user, userName);

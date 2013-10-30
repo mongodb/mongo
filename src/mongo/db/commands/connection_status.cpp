@@ -28,6 +28,7 @@
 
 #include <mongo/pch.h>
 
+#include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 
@@ -58,8 +59,10 @@ namespace mongo {
                 UserSet::NameIterator nameIter = authSession->getAuthenticatedUserNames();
                 for ( ; nameIter.more(); nameIter.next()) {
                     BSONObjBuilder userInfoBuilder(authenticatedUsers.subobjStart());
-                    userInfoBuilder.append("user", nameIter->getUser());
-                    userInfoBuilder.append("userSource", nameIter->getDB());
+                    userInfoBuilder.append(AuthorizationManager::USER_NAME_FIELD_NAME,
+                                           nameIter->getUser());
+                    userInfoBuilder.append(AuthorizationManager::USER_DB_FIELD_NAME,
+                                           nameIter->getDB());
                     userInfoBuilder.doneFast();
                 }
                 authenticatedUsers.doneFast();
