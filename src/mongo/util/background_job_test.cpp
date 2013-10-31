@@ -15,11 +15,14 @@
 
 #include "mongo/platform/basic.h"
 
+#include <boost/thread/thread.hpp>
+
 #include "mongo/db/server_options.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/background.h"
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/concurrency/synchronization.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 
@@ -37,6 +40,63 @@ namespace {
     using mongo::MsgAssertionException;
     using mongo::mutex;
     using mongo::Notification;
+
+    // a global variable that can be accessed independent of the IncTester object below
+    // IncTester keeps it up-to-date
+    int GLOBAL_val;
+
+    class IncTester : public mongo::BackgroundJob {
+    public:
+        explicit IncTester( long long millis , bool selfDelete = false )
+            : mongo::BackgroundJob(selfDelete), _val(0), _millis(millis) { GLOBAL_val = 0; }
+
+        void waitAndInc( long long millis ) {
+            if ( millis )
+                mongo::sleepmillis( millis );
+            ++_val;
+            ++GLOBAL_val;
+        }
+
+        int getVal() { return _val; }
+
+        /* --- BackgroundJob virtuals --- */
+
+        std::string name() const { return "IncTester"; }
+
+        void run() { waitAndInc( _millis ); }
+
+    private:
+        int _val;
+        long long _millis;
+    };
+
+    TEST(BackgroundJobBasic, NormalCase) {
+        IncTester tester( 0 /* inc without wait */ );
+        tester.go();
+        ASSERT( tester.wait() );
+        ASSERT_EQUALS( tester.getVal() , 1 );
+    }
+
+    TEST(BackgroundJobBasic, TimeOutCase) {
+        IncTester tester( 2000 /* wait 2 sec before inc-ing */ );
+        tester.go();
+        ASSERT( ! tester.wait( 100 /* ms */ ) ); // should time out
+        ASSERT_EQUALS( tester.getVal() , 0 );
+
+        // if we wait longer than the IncTester, we should see the increment
+        ASSERT( tester.wait( 4000 /* ms */ ) );  // should not time out
+        ASSERT_EQUALS( tester.getVal() , 1 );
+    }
+
+    TEST(BackgroundJobBasic, SelfDeletingCase) {
+        mongo::BackgroundJob* j = new IncTester( 0 /* inc without wait */ , true /* self delete */);
+        j->go();
+
+        // the background thread should have continued running and this test should pass the
+        // heap-checker as well
+        mongo::sleepmillis( 1000 );
+        ASSERT_EQUALS( GLOBAL_val, 1 );
+    }
 
     TEST(BackgroundJobLifeCycle, Go) {
 

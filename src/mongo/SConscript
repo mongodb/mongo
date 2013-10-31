@@ -225,7 +225,6 @@ commonFiles = [ "pch.cpp",
                 "db/lasterror.cpp",
                 "db/storage/namespace.cpp",
                 "shell/mongo.cpp",
-                "util/background.cpp",
                 "util/intrusive_counter.cpp",
                 "util/util.cpp",
                 "util/file_allocator.cpp",
@@ -319,6 +318,7 @@ env.StaticLibrary('mongocommon', commonFiles,
                            'stringutils',
                            'fail_point',
                            'spin_lock',
+                           'background_job',
                            'util/concurrency/thread_name',
                            '$BUILD_DIR/third_party/shim_pcrecpp',
                            '$BUILD_DIR/third_party/murmurhash3/murmurhash3',
@@ -327,13 +327,17 @@ env.StaticLibrary('mongocommon', commonFiles,
                            ] +
                            extraCommonLibdeps)
 
+env.StaticLibrary('background_job', ["util/background.cpp"],
+                  LIBDEPS=['spin_lock'])
+
 env.CppUnitTest(
     target="background_job_test",
     source=[
         "util/background_job_test.cpp",
     ],
     LIBDEPS=[
-        "mongocommon",
+        "background_job",
+        "mongocommon" # temporary crutch for linking
     ],
     NO_CRUTCH=True
 )

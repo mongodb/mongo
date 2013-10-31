@@ -165,6 +165,9 @@ namespace mongo {
         }
 
 #ifdef MONGO_SSL
+        // TODO(sverch): Allow people who use the BackgroundJob to also specify cleanup tasks.
+        // Currently the networking code depends on this class and this class depends on the
+        // networking code because of this ad hoc cleanup.
         SSLManagerInterface* manager = getSSLManager();
         if (manager)
             manager->cleanupThreadLocals();
