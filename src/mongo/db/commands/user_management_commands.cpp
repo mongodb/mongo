@@ -686,10 +686,10 @@ namespace mongo {
 
     } cmdDropUser;
 
-    class CmdDropUsersFromDatabase : public Command {
+    class CmdDropAllUsersFromDatabase : public Command {
     public:
 
-        CmdDropUsersFromDatabase() : Command("dropUsersFromDatabase") {}
+        CmdDropAllUsersFromDatabase() : Command("dropAllUsersFromDatabase") {}
 
         virtual bool logTheOp() {
             return false;
@@ -741,9 +741,9 @@ namespace mongo {
             }
 
             BSONObj writeConcern;
-            status = auth::parseAndValidateDropUsersFromDatabaseCommand(cmdObj,
-                                                                        dbname,
-                                                                        &writeConcern);
+            status = auth::parseAndValidateDropAllUsersFromDatabaseCommand(cmdObj,
+                                                                           dbname,
+                                                                           &writeConcern);
             if (!status.isOK()) {
                 addStatus(status, result);
                 return false;
@@ -768,7 +768,7 @@ namespace mongo {
             return true;
         }
 
-    } cmdDropUsersFromDatabase;
+    } cmdDropAllUsersFromDatabase;
 
     class CmdGrantRolesToUser: public Command {
     public:
@@ -2164,10 +2164,10 @@ namespace mongo {
 
     } cmdDropRole;
 
-    class CmdDropRolesFromDatabase: public Command {
+    class CmdDropAllRolesFromDatabase: public Command {
     public:
 
-        CmdDropRolesFromDatabase() : Command("dropRolesFromDatabase") {}
+        CmdDropAllRolesFromDatabase() : Command("dropAllRolesFromDatabase") {}
 
         virtual bool logTheOp() {
             return false;
@@ -2209,7 +2209,7 @@ namespace mongo {
                  BSONObjBuilder& result,
                  bool fromRepl) {
             BSONObj writeConcern;
-            Status status = auth::parseDropRolesFromDatabaseCommand(cmdObj,
+            Status status = auth::parseDropAllRolesFromDatabaseCommand(cmdObj,
                                                                     dbname,
                                                                     &writeConcern);
             if (!status.isOK()) {
@@ -2296,7 +2296,7 @@ namespace mongo {
             return true;
         }
 
-    } cmdDropRolesFromDatabase;
+    } cmdDropAllRolesFromDatabase;
 
     class CmdRolesInfo: public Command {
     public:

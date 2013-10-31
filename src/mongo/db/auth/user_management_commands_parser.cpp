@@ -324,14 +324,14 @@ namespace auth {
         return Status::OK();
     }
 
-    Status parseAndValidateDropUsersFromDatabaseCommand(const BSONObj& cmdObj,
-                                                        const std::string& dbname,
-                                                        BSONObj* parsedWriteConcern) {
+    Status parseAndValidateDropAllUsersFromDatabaseCommand(const BSONObj& cmdObj,
+                                                           const std::string& dbname,
+                                                           BSONObj* parsedWriteConcern) {
         unordered_set<std::string> validFieldNames;
-        validFieldNames.insert("dropUsersFromDatabase");
+        validFieldNames.insert("dropAllUsersFromDatabase");
         validFieldNames.insert("writeConcern");
 
-        Status status = _checkNoExtraFields(cmdObj, "dropUsersFromDatabase", validFieldNames);
+        Status status = _checkNoExtraFields(cmdObj, "dropAllUsersFromDatabase", validFieldNames);
         if (!status.isOK()) {
             return status;
         }
@@ -597,14 +597,14 @@ namespace auth {
         return Status::OK();
     }
 
-    Status parseDropRolesFromDatabaseCommand(const BSONObj& cmdObj,
-                                             const std::string& dbname,
-                                             BSONObj* parsedWriteConcern) {
+    Status parseDropAllRolesFromDatabaseCommand(const BSONObj& cmdObj,
+                                                const std::string& dbname,
+                                                BSONObj* parsedWriteConcern) {
         unordered_set<std::string> validFieldNames;
-        validFieldNames.insert("dropRolesFromDatabase");
+        validFieldNames.insert("dropAllRolesFromDatabase");
         validFieldNames.insert("writeConcern");
 
-        Status status = _checkNoExtraFields(cmdObj, "dropRolesFromDatabase", validFieldNames);
+        Status status = _checkNoExtraFields(cmdObj, "dropAllRolesFromDatabase", validFieldNames);
         if (!status.isOK()) {
             return status;
         }

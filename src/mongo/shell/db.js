@@ -1157,7 +1157,7 @@ DB.prototype._removeUserV1 = function(username, writeConcern) {
 }
 
 DB.prototype.dropAllUsers = function(writeConcern) {
-    var res = this.runCommand({dropUsersFromDatabase:1,
+    var res = this.runCommand({dropAllUsersFromDatabase:1,
                                writeConcern: writeConcern ? writeConcern : _defaultWriteConcern});
 
     if (!res.ok) {
@@ -1303,7 +1303,7 @@ DB.prototype.dropRole = function(name, writeConcern) {
 };
 
 DB.prototype.dropAllRoles = function(writeConcern) {
-    var res = this.runCommand({dropRolesFromDatabase:1,
+    var res = this.runCommand({dropAllRolesFromDatabase:1,
                                writeConcern: writeConcern ? writeConcern : _defaultWriteConcern});
 
     if (!res.ok) {
