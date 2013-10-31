@@ -9,7 +9,7 @@ db = t.db.getSiblingDB("admin")
 db.addUser({user: 'user',pwd: 'password', roles: jsTest.basicUserRoles});
 
 assert.eq(1, db.system.users.count(), "setup")
-assert.eq(2, db.system.indexes.count(), "setup2")
+assert.eq(2, db.system.indexes.count({ns: "admin.system.users"}), "setup2")
 
 t.runTool( "dump" , "--out" , t.ext );
 
