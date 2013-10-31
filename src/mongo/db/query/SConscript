@@ -8,7 +8,6 @@ env.StaticLibrary(
         "canonical_query.cpp",
         "index_bounds_builder.cpp",
         "index_tag.cpp",
-        "lite_parsed_query.cpp",
         "plan_enumerator.cpp",
         "projection_parser.cpp",
         "qlog.cpp",
@@ -17,6 +16,7 @@ env.StaticLibrary(
     ],
     LIBDEPS=[
         "index_bounds",
+        "lite_parsed_query",
         "$BUILD_DIR/mongo/bson",
         "$BUILD_DIR/mongo/mongohasher",
         "$BUILD_DIR/mongo/expressions",
@@ -51,6 +51,16 @@ env.StaticLibrary(
     source=[
         "index_bounds.cpp",
         "interval.cpp",
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/bson",
+    ],
+)
+
+env.StaticLibrary(
+    target="lite_parsed_query",
+    source=[
+        "lite_parsed_query.cpp"
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/bson",
