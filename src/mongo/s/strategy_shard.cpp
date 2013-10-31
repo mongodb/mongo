@@ -38,8 +38,10 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/max_time.h"
 #include "mongo/db/storage/index_details.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/query/lite_parsed_query.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/s/client_info.h"
 #include "mongo/s/chunk.h"
@@ -65,6 +67,8 @@ namespace mongo {
             // Commands are handled in strategy_single.cpp
             verify( !NamespaceString( r.getns() ).isCommand() );
 
+            Timer queryTimer;
+
             QueryMessage q( r.d() );
 
             NamespaceString ns(q.ns);
@@ -80,6 +84,12 @@ namespace mongo {
                 throw UserException( 8010 , "something is wrong, shouldn't see a command here" );
 
             QuerySpec qSpec( (string)q.ns, q.query, q.fields, q.ntoskip, q.ntoreturn, q.queryOptions );
+
+            // Parse "$maxTimeMS".
+            StatusWith<int> maxTimeMS = LiteParsedQuery::parseMaxTimeMSQuery( q.query );
+            uassert( 17233,
+                     maxTimeMS.getStatus().reason(),
+                     maxTimeMS.isOK() );
 
             if ( _isSystemIndexes( q.ns ) && q.query["ns"].type() == String && r.getConfig()->isSharded( q.query["ns"].String() ) ) {
                 // if you are querying on system.indexes, we need to make sure we go to a shard that actually has chunks
@@ -105,16 +115,13 @@ namespace mongo {
 
             // TODO:  Move out to Request itself, not strategy based
             try {
-                long long start_millis = 0;
-                if ( qSpec.isExplain() ) start_millis = curTimeMillis64();
                 cursor->init();
 
                 if ( qSpec.isExplain() ) {
-                    // fetch elapsed time for the query
-                    long long elapsed_millis = curTimeMillis64() - start_millis;
                     BSONObjBuilder explain_builder;
                     cursor->explain( explain_builder );
-                    explain_builder.appendNumber( "millis", elapsed_millis );
+                    explain_builder.appendNumber( "millis",
+                                                  static_cast<long long>(queryTimer.millis()) );
                     BSONObj b = explain_builder.obj();
 
                     replyToQuery( 0 , r.p() , r.m() , b );
@@ -137,7 +144,16 @@ namespace mongo {
 
                 if ( hasMore ) {
                     LOG(5) << "storing cursor : " << cc->getId() << endl;
-                    cursorCache.store( cc );
+
+                    int cursorLeftoverMillis = maxTimeMS.getValue() - queryTimer.millis();
+                    if ( maxTimeMS.getValue() == 0 ) { // 0 represents "no limit".
+                        cursorLeftoverMillis = kMaxTimeCursorNoTimeLimit;
+                    }
+                    else if ( cursorLeftoverMillis <= 0 ) {
+                        cursorLeftoverMillis = kMaxTimeCursorTimeLimitExpired;
+                    }
+
+                    cursorCache.store( cc, cursorLeftoverMillis );
                 }
 
                 replyToQuery( 0, r.p(), r.m(), buffer.buf(), buffer.len(), docCount,
@@ -194,6 +210,8 @@ namespace mongo {
 
         virtual void getMore( Request& r ) {
 
+            Timer getMoreTimer;
+
             const char *ns = r.getns();
 
             // TODO:  Handle stale config exceptions here from coll being dropped or sharded during op
@@ -208,6 +226,7 @@ namespace mongo {
             long long id = r.d().pullInt64();
             string host = cursorCache.getRef( id );
             ShardedClientCursorPtr cursor = cursorCache.get( id );
+            int cursorMaxTimeMS = cursorCache.getMaxTimeMS( id );
 
             // Cursor ids should not overlap between sharded and unsharded cursors
             massert( 17012, str::stream() << "duplicate sharded and unsharded cursor id "
@@ -247,6 +266,11 @@ namespace mongo {
             }
             else if ( cursor ) {
 
+                if ( cursorMaxTimeMS == kMaxTimeCursorTimeLimitExpired ) {
+                    cursorCache.remove( id );
+                    uasserted( ErrorCodes::ExceededTimeLimit, "operation exceeded time limit" );
+                }
+
                 // TODO: Try to match logic of mongod, where on subsequent getMore() we pull lots more data?
                 BufBuilder buffer( ShardedClientCursor::INIT_REPLY_BUFFER_SIZE );
                 int docCount = 0;
@@ -256,6 +280,15 @@ namespace mongo {
                 if ( hasMore ) {
                     // still more data
                     cursor->accessed();
+
+                    if ( cursorMaxTimeMS != kMaxTimeCursorNoTimeLimit ) {
+                        // Update remaining amount of time in cursor cache.
+                        int cursorLeftoverMillis = cursorMaxTimeMS - getMoreTimer.millis();
+                        if ( cursorLeftoverMillis <= 0 ) {
+                            cursorLeftoverMillis = kMaxTimeCursorTimeLimitExpired;
+                        }
+                        cursorCache.updateMaxTimeMS( id, cursorLeftoverMillis );
+                    }
                 }
                 else {
                     // we've exhausted the cursor

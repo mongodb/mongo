@@ -44,6 +44,7 @@
 #include "mongo/client/connpool.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/max_time.h"
 #include "mongo/util/concurrency/task.h"
 #include "mongo/util/net/listen.h"
 
@@ -204,17 +205,42 @@ namespace mongo {
         return i->second;
     }
 
-    void CursorCache::store( ShardedClientCursorPtr cursor ) {
-        LOG(_myLogLevel) << "CursorCache::store cursor " << " id: " << cursor->getId() << endl;
+    int CursorCache::getMaxTimeMS( long long id ) const {
+        verify( id );
+        scoped_lock lk( _mutex );
+        MapShardedInt::const_iterator i = _cursorsMaxTimeMS.find( id );
+        return ( i != _cursorsMaxTimeMS.end() ) ? i->second : 0;
+    }
+
+    void CursorCache::store( ShardedClientCursorPtr cursor, int maxTimeMS ) {
+        LOG(_myLogLevel) << "CursorCache::store cursor " << " id: " << cursor->getId()
+            << (maxTimeMS != kMaxTimeCursorNoTimeLimit ? str::stream() << "maxTimeMS: " << maxTimeMS
+                                                      : string(""))
+            << endl;
         verify( cursor->getId() );
+        verify( maxTimeMS == kMaxTimeCursorTimeLimitExpired
+                || maxTimeMS == kMaxTimeCursorNoTimeLimit
+                || maxTimeMS > 0 );
         scoped_lock lk( _mutex );
         _cursors[cursor->getId()] = cursor;
+        _cursorsMaxTimeMS[cursor->getId()] = maxTimeMS;
         _shardedTotal++;
     }
+
+    void CursorCache::updateMaxTimeMS( long long id, int maxTimeMS ) {
+        verify( id );
+        verify( maxTimeMS == kMaxTimeCursorTimeLimitExpired
+                || maxTimeMS == kMaxTimeCursorNoTimeLimit
+                || maxTimeMS > 0 );
+        scoped_lock lk( _mutex );
+        _cursorsMaxTimeMS[id] = maxTimeMS;
+    }
+
     void CursorCache::remove( long long id ) {
         verify( id );
         scoped_lock lk( _mutex );
         _cursors.erase( id );
+        _cursorsMaxTimeMS.erase( id );
     }
     
     void CursorCache::removeRef( long long id ) {
@@ -323,6 +349,7 @@ namespace mongo {
                             isAuthorized ? ErrorCodes::OK : ErrorCodes::Unauthorized);
                     if (isAuthorized) {
                         _cursors.erase( i );
+                        _cursorsMaxTimeMS.erase( i->second->getId() );
                     }
                     continue;
                 }
@@ -377,6 +404,7 @@ namespace mongo {
             }
             log() << "killing old cursor " << i->second->getId() << " idle for: " << idleFor << "ms" << endl; // TODO: make LOG(1)
             _cursors.erase( i );
+            _cursorsMaxTimeMS.erase( i->second->getId() );
             i = _cursors.begin(); // possible 2nd entry will get skipped, will get on next pass
             if ( i == _cursors.end() )
                 break;

@@ -646,6 +646,7 @@ env.Library( "mongoscore",
              mongosLibraryFiles,
              LIBDEPS=['db/auth/authmongos',
                       'db/fts/ftsmongos',
+                      'db/query/lite_parsed_query',
                       's/write_ops',
                       's/write_op_impl'] )
 

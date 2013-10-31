@@ -107,13 +107,16 @@ namespace mongo {
         static long long TIMEOUT;
 
         typedef map<long long,ShardedClientCursorPtr> MapSharded;
+        typedef map<long long,int> MapShardedInt;
         typedef map<long long,string> MapNormal;
 
         CursorCache();
         ~CursorCache();
 
         ShardedClientCursorPtr get( long long id ) const;
-        void store( ShardedClientCursorPtr cursor );
+        int getMaxTimeMS( long long id ) const;
+        void store( ShardedClientCursorPtr cursor, int maxTimeMS );
+        void updateMaxTimeMS( long long id, int maxTimeMS );
         void remove( long long id );
 
         void storeRef(const std::string& server, long long id, const std::string& ns);
@@ -137,9 +140,20 @@ namespace mongo {
 
         PseudoRandom _random;
 
+        // Maps sharded cursor ID to ShardedClientCursorPtr.
         MapSharded _cursors;
-        MapNormal _refs; // Maps cursor ID to shard name
-        MapNormal _refsNS; // Maps cursor ID to namespace
+
+        // Maps sharded cursor ID to remaining max time.  Value can be any of:
+        // - the constant "kMaxTimeCursorNoTimeLimit", or
+        // - the constant "kMaxTimeCursorTimeLimitExpired", or
+        // - a positive integer representing milliseconds of remaining time
+        MapShardedInt _cursorsMaxTimeMS;
+
+        // Maps passthrough cursor ID to shard name.
+        MapNormal _refs;
+
+        // Maps passthrough cursor ID to namespace.
+        MapNormal _refsNS;
         
         long long _shardedTotal;
 
