@@ -139,8 +139,8 @@ namespace audit {
     void logDropRole(ClientBasic* client,
                      const RoleName& role) MONGO_AUDIT_STUB
 
-    void logDropAllRolesForDatabase(ClientBasic* client,
-                                    const StringData& dbname) MONGO_AUDIT_STUB
+    void logDropAllRolesFromDatabase(ClientBasic* client,
+                                     const StringData& dbname) MONGO_AUDIT_STUB
 
     void logGrantRolesToRole(ClientBasic* client,
                              const RoleName& role,

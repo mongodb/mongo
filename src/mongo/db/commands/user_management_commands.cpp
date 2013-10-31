@@ -2276,6 +2276,7 @@ namespace mongo {
                 return false;
             }
 
+            audit::logDropAllRolesFromDatabase(ClientBasic::getCurrent(), dbname);
             // Finally, remove the actual role documents
             status = authzManager->removeRoleDocuments(
                     BSON(AuthorizationManager::ROLE_SOURCE_FIELD_NAME << dbname),

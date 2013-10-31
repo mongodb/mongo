@@ -225,8 +225,8 @@ namespace audit {
     /**
      * Logs the result of a dropAllRolesForDatabase command.
      */
-    void logDropAllRolesForDatabase(ClientBasic* client,
-                                    const StringData& dbname);
+    void logDropAllRolesFromDatabase(ClientBasic* client,
+                                     const StringData& dbname);
 
     /**
      * Logs the result of a grantRolesToRole command.
