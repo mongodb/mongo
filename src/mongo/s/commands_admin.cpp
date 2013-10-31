@@ -41,6 +41,7 @@
 #include "mongo/db/field_parser.h"
 #include "mongo/db/hasher.h"
 #include "mongo/db/index_names.h"
+#include "mongo/db/query/lite_parsed_query.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/s/chunk.h"
@@ -736,7 +737,7 @@ namespace mongo {
 
                         BSONObj moveResult;
                         if (!chunk->moveAndCommit(to, Chunk::MaxChunkSize,
-                                false, true, moveResult)) {
+                                false, true, 0, moveResult)) {
                             warning().stream()
                                       << "Couldn't move chunk " << chunk << " to shard "  << to
                                       << " while sharding collection " << ns << ". Reason: "
@@ -1055,11 +1056,19 @@ namespace mongo {
 
                 MONGO_TLOG(0) << "CMD: movechunk: " << cmdObj << endl;
 
+                StatusWith<int> maxTimeMS = LiteParsedQuery::parseMaxTimeMSCommand(cmdObj);
+
+                if (!maxTimeMS.isOK()) {
+                    errmsg = maxTimeMS.getStatus().reason();
+                    return false;
+                }
+
                 BSONObj res;
                 if (!c->moveAndCommit(to,
                                       maxChunkSizeBytes,
                                       cmdObj["_secondaryThrottle"].trueValue(),
                                       cmdObj["_waitForDelete"].trueValue(),
+                                      maxTimeMS.getValue(),
                                       res)) {
                     errmsg = "move failed";
                     result.append( "cause" , res );

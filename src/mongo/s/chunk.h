@@ -166,6 +166,7 @@ namespace mongo {
          * @param chunSize maximum number of bytes beyond which the migrate should no go trhough
          * @param secondaryThrottle whether during migrate all writes should block for repl
          * @param waitForDelete whether chunk move should wait for cleanup or return immediately
+         * @param maxTimeMS max time for the migrate request
          * @param res the object containing details about the migrate execution
          * @return true if move was successful
          */
@@ -173,6 +174,7 @@ namespace mongo {
                            long long chunkSize,
                            bool secondaryThrottle,
                            bool waitForDelete,
+                           int maxTimeMS,
                            BSONObj& res) const;
 
         /**

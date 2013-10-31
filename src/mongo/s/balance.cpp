@@ -95,6 +95,7 @@ namespace mongo {
                                      Chunk::MaxChunkSize,
                                      secondaryThrottle,
                                      waitForDelete,
+                                     0, /* maxTimeMS */
                                      res)) {
                     movedCount++;
                     continue;

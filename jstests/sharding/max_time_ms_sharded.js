@@ -106,4 +106,29 @@ assert.doesNotThrow(function() { cursor.itcount(); },
                     [],
                     "did not expect getmore ops to hit the time limit");
 
+configureMaxTimeNeverTimeOut("off");
+
+//
+// Test that mongos correctly forwards max time to shards for sharded commands.  Uses
+// maxTimeAlwaysTimeOut to ensure mongod throws if it receives a max time.
+//
+
+// Positive test for "moveChunk".
+configureMaxTimeAlwaysTimeOut("alwaysOn");
+assert.commandFailed(admin.runCommand({moveChunk: coll.getFullName(),
+                                       find: {_id: 0},
+                                       to: "shard0000",
+                                       maxTimeMS: 1000*60*60*24}),
+                     "expected moveChunk to fail in mongod due to maxTimeAlwaysTimeOut fail point");
+
+// Negative test for "moveChunk".
+configureMaxTimeAlwaysTimeOut("off");
+assert.commandWorked(admin.runCommand({moveChunk: coll.getFullName(),
+                                       find: {_id: 0},
+                                       to: "shard0000",
+                                       maxTimeMS: 1000*60*60*24}),
+                     "expected moveChunk to not hit time limit in mongod");
+
+// TODO Test additional commmands.
+
 st.stop();

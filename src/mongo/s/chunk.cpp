@@ -34,6 +34,7 @@
 
 #include "mongo/client/connpool.h"
 #include "mongo/client/dbclientcursor.h"
+#include "mongo/db/query/lite_parsed_query.h"
 #include "mongo/db/queryutil.h"
 #include "mongo/platform/random.h"
 #include "mongo/s/chunk_diff.h"
@@ -317,6 +318,7 @@ namespace mongo {
                               long long chunkSize /* bytes */,
                               bool secondaryThrottle,
                               bool waitForDelete,
+                              int maxTimeMS,
                               BSONObj& res) const
     {
         uassert( 10167 ,  "can't move shard to its current location!" , getShard() != to );
@@ -341,7 +343,8 @@ namespace mongo {
                                                   "shardId" << genID() <<
                                                   "configdb" << configServer.modelServer() <<
                                                   "secondaryThrottle" << secondaryThrottle <<
-                                                  "waitForDelete" << waitForDelete
+                                                  "waitForDelete" << waitForDelete <<
+                                                  LiteParsedQuery::cmdOptionMaxTimeMS << maxTimeMS
                                                    ) ,
                                             res);
         fromconn.done();
@@ -443,6 +446,7 @@ namespace mongo {
                                                 MaxChunkSize , 
                                                 false , /* secondaryThrottle - small chunk, no need */
                                                 false, /* waitForDelete - small chunk, no need */
+                                                0, /* maxTimeMS - don't time out */
                                                 res ) );
                 
                 // update our config
