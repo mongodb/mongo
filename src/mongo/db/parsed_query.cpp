@@ -182,7 +182,7 @@ namespace mongo {
                     _showDiskLoc = e.trueValue();
                 }
                 else if ( strcmp( "maxTimeMS" , name ) == 0 ) {
-                    StatusWith<int> maxTimeMS = LiteParsedQuery::parseMaxTimeMS(e);
+                    StatusWith<int> maxTimeMS = LiteParsedQuery::parseMaxTimeMSQuery( top );
                     uassert(17131,
                             maxTimeMS.getStatus().reason(),
                             maxTimeMS.isOK());

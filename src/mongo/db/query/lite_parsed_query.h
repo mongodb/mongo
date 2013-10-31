@@ -50,11 +50,22 @@ namespace mongo {
                            LiteParsedQuery** out);
 
         /**
-         * Helper function to parse a "maxTimeMS" BSONElement.  Returns the contained value, or an
-         * error on parsing fail.  When passed an EOO-type element, returns 0 (special value for
-         * "allow to run indefinitely").
+         * Helper functions to parse maxTimeMS from a command object.  Returns the contained value,
+         * or an error on parsing fail.  When passed an EOO-type element, returns 0 (special value
+         * for "allow to run indefinitely").
          */
-        static StatusWith<int> parseMaxTimeMS(const BSONElement& maxTimeMSElt);
+        static StatusWith<int> parseMaxTimeMSCommand(const BSONObj& cmdObj);
+
+        /**
+         * Same as parseMaxTimeMSCommand, but for a query object.
+         */
+        static StatusWith<int> parseMaxTimeMSQuery(const BSONObj& queryObj);
+
+        // Name of the maxTimeMS command option.
+        static const string cmdOptionMaxTimeMS;
+
+        // Name of the maxTimeMS query option.
+        static const string queryOptionMaxTimeMS;
 
         const string& ns() const { return _ns; }
         bool isLocalDB() const { return _ns.compare(0, 6, "local.") == 0; }
@@ -88,6 +99,8 @@ namespace mongo {
                     const BSONObj& queryObj, const BSONObj& proj, bool fromQueryMessage);
 
         Status initFullQuery(const BSONObj& top);
+
+        static StatusWith<int> parseMaxTimeMS(const BSONElement& maxTimeMSElt);
 
         string _ns;
         int _ntoskip;

@@ -23,6 +23,9 @@
 
 namespace mongo {
 
+    const string LiteParsedQuery::cmdOptionMaxTimeMS("maxTimeMS");
+    const string LiteParsedQuery::queryOptionMaxTimeMS("$maxTimeMS");
+
     // static
     Status LiteParsedQuery::make(const QueryMessage& qm, LiteParsedQuery** out) {
         auto_ptr<LiteParsedQuery> pq(new LiteParsedQuery());
@@ -43,6 +46,16 @@ namespace mongo {
         Status status = pq->init(ns, ntoskip, ntoreturn, queryOptions, query, proj, false);
         if (status.isOK()) { *out = pq.release(); }
         return status;
+    }
+
+    // static
+    StatusWith<int> LiteParsedQuery::parseMaxTimeMSCommand(const BSONObj& cmdObj) {
+        return parseMaxTimeMS(cmdObj[cmdOptionMaxTimeMS]);
+    }
+
+    // static
+    StatusWith<int> LiteParsedQuery::parseMaxTimeMSQuery(const BSONObj& queryObj) {
+        return parseMaxTimeMS(queryObj[queryOptionMaxTimeMS]);
     }
 
     // static

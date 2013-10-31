@@ -1780,7 +1780,7 @@ namespace mongo {
         }
 
         // Handle command option maxTimeMS.
-        StatusWith<int> maxTimeMS = LiteParsedQuery::parseMaxTimeMS(cmdObj["maxTimeMS"]);
+        StatusWith<int> maxTimeMS = LiteParsedQuery::parseMaxTimeMSCommand(cmdObj);
         if (!maxTimeMS.isOK()) {
             appendCommandStatus(result, false, maxTimeMS.getStatus().reason());
             return;
