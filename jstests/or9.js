@@ -12,11 +12,15 @@ function check( a, b, q ) {
     clauses = b;
     query = q;
     assert.eq.automsg( "count", "t.count( query )" );
+    // QUERY_MIGRATION: we don't merge the sub-and into the or so our # of clauses isn't
+    // always the same.
+    /*
     if ( clauses == 1 ) {
         assert.eq.automsg( "undefined", "t.find( query ).explain().clauses" );
     } else {
         assert.eq.automsg( "clauses", "t.find( query ).explain().clauses.length" );
     }
+    */
 }
 
 check( 1, 1, { $or: [ { a: { $gte:1,$lte:3 } }, { a: 2 } ] } );

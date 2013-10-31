@@ -106,11 +106,7 @@ namespace mongo {
             ixtype = elt.String();
         }
 
-        // we know elt.fieldname() == node->path()
-
-        // XXX: Our predicate may be normal and it may be over a geo index (compounding).  Detect
-        // this at some point.
-
+        // We know elt.fieldname() == node->path().
         MatchExpression::MatchType exprtype = node->matchType();
 
         // TODO: use indexnames
@@ -332,59 +328,60 @@ namespace mongo {
     void QueryPlanner::mergeWithLeafNode(MatchExpression* expr, const IndexEntry& index,
                                          size_t pos, bool* exactOut, QuerySolutionNode* node,
                                          MatchExpression::MatchType mergeType) {
-        const StageType type = node->getType();
 
-        if (STAGE_GEO_2D == type || STAGE_GEO_NEAR_2D == type) {
-            warning() << "About to screw up 2d geo compound";
-            // This keeps the pred as a matcher but the limit argument to 2d indices applies
-            // post-match so this is wrong.
+        const StageType type = node->getType();
+        verify(STAGE_GEO_NEAR_2D != type);
+
+        if (STAGE_GEO_2D == type) {
+            // XXX: 'expr' is possibly indexed by 'node'.  Right now we don't take advantage
+            // of covering for 2d indices.
             *exactOut = false;
+            return;
+        }
+
+        IndexBounds* boundsToFillOut = NULL;
+
+        if (STAGE_GEO_NEAR_2DSPHERE == type) {
+            GeoNear2DSphereNode* gn = static_cast<GeoNear2DSphereNode*>(node);
+            boundsToFillOut = &gn->baseBounds;
         }
         else {
-            IndexBounds* boundsToFillOut = NULL;
+            verify(type == STAGE_IXSCAN);
+            IndexScanNode* scan = static_cast<IndexScanNode*>(node);
+            boundsToFillOut = &scan->bounds;
+        }
 
-            if (STAGE_GEO_NEAR_2DSPHERE == type) {
-                GeoNear2DSphereNode* gn = static_cast<GeoNear2DSphereNode*>(node);
-                boundsToFillOut = &gn->baseBounds;
+        // Get the ixtag->pos-th element of the index key pattern.
+        // TODO: cache this instead/with ixtag->pos?
+        BSONObjIterator it(index.keyPattern);
+        BSONElement keyElt = it.next();
+        for (size_t i = 0; i < pos; ++i) {
+            verify(it.more());
+            keyElt = it.next();
+        }
+        verify(!keyElt.eoo());
+        *exactOut = false;
+
+        //QLOG() << "current bounds are " << currentScan->bounds.toString() << endl;
+        //QLOG() << "node merging in " << child->toString() << endl;
+        //QLOG() << "merging with field " << keyElt.toString(true, true) << endl;
+        //QLOG() << "taking advantage of compound index "
+        //<< indices[currentIndexNumber].keyPattern.toString() << endl;
+
+        verify(boundsToFillOut->fields.size() > pos);
+
+        OrderedIntervalList* oil = &boundsToFillOut->fields[pos];
+
+        if (boundsToFillOut->fields[pos].name.empty()) {
+            IndexBoundsBuilder::translate(expr, keyElt, oil, exactOut);
+        }
+        else {
+            if (MatchExpression::AND == mergeType) {
+                IndexBoundsBuilder::translateAndIntersect(expr, keyElt, oil, exactOut);
             }
             else {
-                verify(type == STAGE_IXSCAN);
-                IndexScanNode* scan = static_cast<IndexScanNode*>(node);
-                boundsToFillOut = &scan->bounds;
-            }
-
-            // Get the ixtag->pos-th element of the index key pattern.
-            // TODO: cache this instead/with ixtag->pos?
-            BSONObjIterator it(index.keyPattern);
-            BSONElement keyElt = it.next();
-            for (size_t i = 0; i < pos; ++i) {
-                verify(it.more());
-                keyElt = it.next();
-            }
-            verify(!keyElt.eoo());
-            *exactOut = false;
-
-            //QLOG() << "current bounds are " << currentScan->bounds.toString() << endl;
-            //QLOG() << "node merging in " << child->toString() << endl;
-            //QLOG() << "merging with field " << keyElt.toString(true, true) << endl;
-            //QLOG() << "taking advantage of compound index "
-                 //<< indices[currentIndexNumber].keyPattern.toString() << endl;
-
-            verify(boundsToFillOut->fields.size() > pos);
-
-            OrderedIntervalList* oil = &boundsToFillOut->fields[pos];
-
-            if (boundsToFillOut->fields[pos].name.empty()) {
-                IndexBoundsBuilder::translate(expr, keyElt, oil, exactOut);
-            }
-            else {
-                if (MatchExpression::AND == mergeType) {
-                    IndexBoundsBuilder::translateAndIntersect(expr, keyElt, oil, exactOut);
-                }
-                else {
-                    verify(MatchExpression::OR == mergeType);
-                    IndexBoundsBuilder::translateAndUnion(expr, keyElt, oil, exactOut);
-                }
+                verify(MatchExpression::OR == mergeType);
+                IndexBoundsBuilder::translateAndUnion(expr, keyElt, oil, exactOut);
             }
         }
     }
@@ -421,77 +418,77 @@ namespace mongo {
     // static
     void QueryPlanner::finishLeafNode(QuerySolutionNode* node, const IndexEntry& index) {
         const StageType type = node->getType();
+        verify(STAGE_GEO_NEAR_2D != type);
 
-        if (STAGE_GEO_2D == type || STAGE_GEO_NEAR_2D == type || STAGE_TEXT == type) {
-            // XXX: do we do anything here?
+        if (STAGE_GEO_2D == type || STAGE_TEXT == type) {
             return;
         }
-        else {
-            IndexBounds* bounds = NULL;
 
-            if (STAGE_GEO_NEAR_2DSPHERE == type) {
-                GeoNear2DSphereNode* gnode = static_cast<GeoNear2DSphereNode*>(node);
-                bounds = &gnode->baseBounds;
-            }
-            else {
-                verify(type == STAGE_IXSCAN);
-                IndexScanNode* scan = static_cast<IndexScanNode*>(node);
-                bounds = &scan->bounds;
-            }
+        IndexBounds* bounds = NULL;
 
-            // XXX: this currently fills out minkey/maxkey bounds for near queries, fix that.  just
-            // set the field name of the near query field when starting a near scan.
-
-            // Find the first field in the scan's bounds that was not filled out.
-            // TODO: could cache this.
-            size_t firstEmptyField = 0;
-            for (firstEmptyField = 0; firstEmptyField < bounds->fields.size(); ++firstEmptyField) {
-                if ("" == bounds->fields[firstEmptyField].name) {
-                    verify(bounds->fields[firstEmptyField].intervals.empty());
-                    break;
-                }
-            }
-
-            // All fields are filled out with bounds, nothing to do.
-            if (firstEmptyField == bounds->fields.size()) {
-                alignBounds(bounds, index.keyPattern);
-                return;
-            }
-
-            // Skip ahead to the firstEmptyField-th element, where we begin filling in bounds.
-            BSONObjIterator it(index.keyPattern);
-            for (size_t i = 0; i < firstEmptyField; ++i) {
-                verify(it.more());
-                it.next();
-            }
-
-            // For each field in the key...
-            while (it.more()) {
-                BSONElement kpElt = it.next();
-                // There may be filled-in fields to the right of the firstEmptyField.
-                // Example:
-                // The index {loc:"2dsphere", x:1}
-                // With a predicate over x and a near search over loc.
-                if ("" == bounds->fields[firstEmptyField].name) {
-                    verify(bounds->fields[firstEmptyField].intervals.empty());
-                    // ...build the "all values" interval.
-                    IndexBoundsBuilder::allValuesForField(kpElt,
-                                                          &bounds->fields[firstEmptyField]);
-                }
-                ++firstEmptyField;
-            }
-
-            // Make sure that the length of the key is the length of the bounds we started.
-            verify(firstEmptyField == bounds->fields.size());
-
-            // We create bounds assuming a forward direction but can easily reverse bounds to align
-            // according to our desired direction.
-            alignBounds(bounds, index.keyPattern);
+        if (STAGE_GEO_NEAR_2DSPHERE == type) {
+            GeoNear2DSphereNode* gnode = static_cast<GeoNear2DSphereNode*>(node);
+            bounds = &gnode->baseBounds;
         }
+        else {
+            verify(type == STAGE_IXSCAN);
+            IndexScanNode* scan = static_cast<IndexScanNode*>(node);
+            bounds = &scan->bounds;
+        }
+
+        // XXX: this currently fills out minkey/maxkey bounds for near queries, fix that.  just
+        // set the field name of the near query field when starting a near scan.
+
+        // Find the first field in the scan's bounds that was not filled out.
+        // TODO: could cache this.
+        size_t firstEmptyField = 0;
+        for (firstEmptyField = 0; firstEmptyField < bounds->fields.size(); ++firstEmptyField) {
+            if ("" == bounds->fields[firstEmptyField].name) {
+                verify(bounds->fields[firstEmptyField].intervals.empty());
+                break;
+            }
+        }
+
+        // All fields are filled out with bounds, nothing to do.
+        if (firstEmptyField == bounds->fields.size()) {
+            alignBounds(bounds, index.keyPattern);
+            return;
+        }
+
+        // Skip ahead to the firstEmptyField-th element, where we begin filling in bounds.
+        BSONObjIterator it(index.keyPattern);
+        for (size_t i = 0; i < firstEmptyField; ++i) {
+            verify(it.more());
+            it.next();
+        }
+
+        // For each field in the key...
+        while (it.more()) {
+            BSONElement kpElt = it.next();
+            // There may be filled-in fields to the right of the firstEmptyField.
+            // Example:
+            // The index {loc:"2dsphere", x:1}
+            // With a predicate over x and a near search over loc.
+            if ("" == bounds->fields[firstEmptyField].name) {
+                verify(bounds->fields[firstEmptyField].intervals.empty());
+                // ...build the "all values" interval.
+                IndexBoundsBuilder::allValuesForField(kpElt,
+                                                      &bounds->fields[firstEmptyField]);
+            }
+            ++firstEmptyField;
+        }
+
+        // Make sure that the length of the key is the length of the bounds we started.
+        verify(firstEmptyField == bounds->fields.size());
+
+        // We create bounds assuming a forward direction but can easily reverse bounds to align
+        // according to our desired direction.
+        alignBounds(bounds, index.keyPattern);
     }
 
     // static
-    bool QueryPlanner::processIndexScans(MatchExpression* root,
+    bool QueryPlanner::processIndexScans(const CanonicalQuery& query,
+                                         MatchExpression* root,
                                          bool inArrayOperator,
                                          const vector<IndexEntry>& indices,
                                          vector<QuerySolutionNode*>* out) {
@@ -536,7 +533,8 @@ namespace mongo {
 
                 // If inArrayOperator: takes ownership of child, which is OK, since we detached
                 // child from root.
-                QuerySolutionNode* childSolution = buildIndexedDataAccess(child,
+                QuerySolutionNode* childSolution = buildIndexedDataAccess(query,
+                                                                          child,
                                                                           inArrayOperator,
                                                                           indices);
                 if (NULL == childSolution) { return false; }
@@ -658,7 +656,8 @@ namespace mongo {
     }
 
     // static
-    QuerySolutionNode* QueryPlanner::buildIndexedAnd(MatchExpression* root,
+    QuerySolutionNode* QueryPlanner::buildIndexedAnd(const CanonicalQuery& query,
+                                                     MatchExpression* root,
                                                      bool inArrayOperator,
                                                      const vector<IndexEntry>& indices) {
         auto_ptr<MatchExpression> autoRoot;
@@ -667,7 +666,7 @@ namespace mongo {
         }
 
         vector<QuerySolutionNode*> ixscanNodes;
-        if (!processIndexScans(root, inArrayOperator, indices, &ixscanNodes)) {
+        if (!processIndexScans(query, root, inArrayOperator, indices, &ixscanNodes)) {
             return NULL;
         }
 
@@ -732,7 +731,8 @@ namespace mongo {
     }
 
     // static
-    QuerySolutionNode* QueryPlanner::buildIndexedOr(MatchExpression* root,
+    QuerySolutionNode* QueryPlanner::buildIndexedOr(const CanonicalQuery& query,
+                                                    MatchExpression* root,
                                                     bool inArrayOperator,
                                                     const vector<IndexEntry>& indices) {
         auto_ptr<MatchExpression> autoRoot;
@@ -741,7 +741,7 @@ namespace mongo {
         }
 
         vector<QuerySolutionNode*> ixscanNodes;
-        if (!processIndexScans(root, inArrayOperator, indices, &ixscanNodes)) {
+        if (!processIndexScans(query, root, inArrayOperator, indices, &ixscanNodes)) {
             return NULL;
         }
 
@@ -763,35 +763,40 @@ namespace mongo {
             orResult = ixscanNodes[0];
         }
         else {
-            // XXX XXX XXX TODO: we shouldn't always merge sort, only if it gives us an order that
-            // we want.
+            bool shouldMergeSort = false;
 
-            // If there exists a sort order that is present in each child, we can merge them and
-            // maintain that sort order / those sort orders.
-            ixscanNodes[0]->computeProperties();
-            BSONObjSet sharedSortOrders = ixscanNodes[0]->getSort();
+            if (!query.getParsed().getSort().isEmpty()) {
+                const BSONObj& desiredSort = query.getParsed().getSort();
 
-            if (!sharedSortOrders.empty()) {
-                for (size_t i = 1; i < ixscanNodes.size(); ++i) {
-                    ixscanNodes[i]->computeProperties();
-                    BSONObjSet isect;
-                    set_intersection(sharedSortOrders.begin(),
-                                     sharedSortOrders.end(),
-                                     ixscanNodes[i]->getSort().begin(),
-                                     ixscanNodes[i]->getSort().end(),
-                                     std::inserter(isect, isect.end()),
-                                     BSONObjCmp());
-                    sharedSortOrders = isect;
-                    if (sharedSortOrders.empty()) {
-                        break;
+                // If there exists a sort order that is present in each child, we can merge them and
+                // maintain that sort order / those sort orders.
+                ixscanNodes[0]->computeProperties();
+                BSONObjSet sharedSortOrders = ixscanNodes[0]->getSort();
+
+                if (!sharedSortOrders.empty()) {
+                    for (size_t i = 1; i < ixscanNodes.size(); ++i) {
+                        ixscanNodes[i]->computeProperties();
+                        BSONObjSet isect;
+                        set_intersection(sharedSortOrders.begin(),
+                                sharedSortOrders.end(),
+                                ixscanNodes[i]->getSort().begin(),
+                                ixscanNodes[i]->getSort().end(),
+                                std::inserter(isect, isect.end()),
+                                BSONObjCmp());
+                        sharedSortOrders = isect;
+                        if (sharedSortOrders.empty()) {
+                            break;
+                        }
                     }
                 }
+
+                // XXX: consider reversing?
+                shouldMergeSort = (sharedSortOrders.end() != sharedSortOrders.find(desiredSort));
             }
 
-            if (!sharedSortOrders.empty()) {
+            if (shouldMergeSort) {
                 MergeSortNode* msn = new MergeSortNode();
-                // XXX: which sort order do we choose?  Does it matter?  I don't think it does.
-                msn->sort = *sharedSortOrders.begin();
+                msn->sort = query.getParsed().getSort();
                 msn->children.swap(ixscanNodes);
                 orResult = msn;
             }
@@ -810,17 +815,18 @@ namespace mongo {
     }
 
     // static
-    QuerySolutionNode* QueryPlanner::buildIndexedDataAccess(MatchExpression* root,
+    QuerySolutionNode* QueryPlanner::buildIndexedDataAccess(const CanonicalQuery& query,
+                                                            MatchExpression* root,
                                                             bool inArrayOperator,
                                                             const vector<IndexEntry>& indices) {
         if (root->isLogical()) {
             if (MatchExpression::AND == root->matchType()) {
                 // Takes ownership of root.
-                return buildIndexedAnd(root, inArrayOperator, indices);
+                return buildIndexedAnd(query, root, inArrayOperator, indices);
             }
             else if (MatchExpression::OR == root->matchType()) {
                 // Takes ownership of root.
-                return buildIndexedOr(root, inArrayOperator, indices);
+                return buildIndexedOr(query, root, inArrayOperator, indices);
             }
             else {
                 // Can't do anything with negated logical nodes index-wise.
@@ -881,7 +887,9 @@ namespace mongo {
                     auto_ptr<AndHashNode> ahn(new AndHashNode());
 
                     for (size_t i = 0; i < root->numChildren(); ++i) {
-                        QuerySolutionNode* node = buildIndexedDataAccess(root->getChild(i), true,
+                        QuerySolutionNode* node = buildIndexedDataAccess(query,
+                                                                         root->getChild(i),
+                                                                         true,
                                                                          indices);
                         if (NULL != node) {
                             ahn->children.push_back(node);
@@ -906,7 +914,7 @@ namespace mongo {
                     verify(MatchExpression::ELEM_MATCH_OBJECT);
                     // The child is an AND.
                     verify(1 == root->numChildren());
-                    solution = buildIndexedDataAccess(root->getChild(0), true, indices);
+                    solution = buildIndexedDataAccess(query, root->getChild(0), true, indices);
                     if (NULL == solution) { return NULL; }
                 }
 
@@ -943,13 +951,18 @@ namespace mongo {
         plan(*queryForSort, indices, NO_TABLE_SCAN, &solns);
         if (old) { qlogOn(); }
         //QLOG() << "Exit planning for bounds for sort\n";
+
+        // TODO: are there ever >1 solns?
         if (1 == solns.size()) {
             IndexScanNode* ixScan = NULL;
             QuerySolutionNode* rootNode = solns[0]->root.get();
 
             if (rootNode->getType() == STAGE_FETCH) {
                 FetchNode* fetchNode = static_cast<FetchNode*>(rootNode);
-                verify(fetchNode->children[0]->getType() == STAGE_IXSCAN);
+                if (fetchNode->children[0]->getType() != STAGE_IXSCAN) {
+                    // No bounds.
+                    return;
+                }
                 ixScan = static_cast<IndexScanNode*>(fetchNode->children[0]);
             }
             else if (rootNode->getType() == STAGE_IXSCAN) {
@@ -1004,6 +1017,7 @@ namespace mongo {
             verify(STAGE_SORT != type);
             // This shouldn't be here...
         }
+
         for (size_t i = 0; i < node->children.size(); ++i) {
             reverseScans(node->children[i]);
         }
@@ -1423,7 +1437,9 @@ namespace mongo {
                      << endl;
 
                 // This can fail if enumeration makes a mistake.
-                QuerySolutionNode* solnRoot = buildIndexedDataAccess(rawTree, false,
+                QuerySolutionNode* solnRoot = buildIndexedDataAccess(query,
+                                                                     rawTree,
+                                                                     false,
                                                                      relevantIndices);
                 if (NULL == solnRoot) { continue; }
 

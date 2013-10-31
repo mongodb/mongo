@@ -33,6 +33,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/expression_parser.h"
+#include "mongo/db/query/qlog.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/unittest/unittest.h"
@@ -649,6 +650,50 @@ namespace {
 
         // 2 indexed solns and one non-indexed
         ASSERT_EQUALS(getNumSolutions(), 3U);
+    }
+
+    //
+    // Sort orders
+    //
+
+    // SERVER-1205.
+    TEST_F(IndexAssignmentTest, MergeSort) {
+        addIndex(BSON("a" << 1 << "c" << 1));
+        addIndex(BSON("b" << 1 << "c" << 1));
+        runDetailedQuery(fromjson("{$or: [{a:1}, {b:1}]}"), fromjson("{c:1}"), BSONObj());
+        dumpSolutions();
+    }
+
+    // SERVER-1205 as well.
+    TEST_F(IndexAssignmentTest, NoMergeSortIfNoSortWanted) {
+        addIndex(BSON("a" << 1 << "c" << 1));
+        addIndex(BSON("b" << 1 << "c" << 1));
+        runDetailedQuery(fromjson("{$or: [{a:1}, {b:1}]}"), BSONObj(), BSONObj());
+        dumpSolutions();
+    }
+
+    // SERVER-10801
+    TEST_F(IndexAssignmentTest, SortOnGeoQuery) {
+        addIndex(BSON("timestamp" << -1 << "position" << "2dsphere"));
+        BSONObj query = fromjson("{position: {$geoWithin: {$geometry: {type: \"Polygon\", coordinates: [[[1, 1], [1, 90], [180, 90], [180, 1], [1, 1]]]}}}}");
+        BSONObj sort = fromjson("{timestamp: -1}");
+        runDetailedQuery(query, sort, BSONObj());
+        dumpSolutions();
+    }
+
+    // SERVER-9257
+    TEST_F(IndexAssignmentTest, CompoundGeoNoGeoPredicate) {
+        addIndex(BSON("creationDate" << 1 << "foo.bar" << "2dsphere"));
+        runDetailedQuery(fromjson("{creationDate: { $gt: 7}}"),
+                         fromjson("{creationDate: 1}"), BSONObj());
+        dumpSolutions();
+    }
+
+    // Basic "keep sort in mind with an OR"
+    TEST_F(IndexAssignmentTest, MergeSortEvenIfSameIndex) {
+        addIndex(BSON("a" << 1 << "b" << 1));
+        runDetailedQuery(fromjson("{$or: [{a:1}, {a:7}]}"), fromjson("{b:1}"), BSONObj());
+        dumpSolutions();
     }
 
     // STOPPED HERE - need to hook up machinery for multiple indexed predicates

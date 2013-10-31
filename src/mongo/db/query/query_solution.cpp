@@ -404,15 +404,18 @@ namespace mongo {
         }
         _sorts.insert(sortPattern);
 
-        // We're sorted not only by sortPattern but also by all prefixes of it.
-        for (int i = 0; i < sortPattern.nFields(); ++i) {
-            // Make obj out of fields [0,i]
-            BSONObjIterator it(sortPattern);
-            BSONObjBuilder prefixBob;
-            for (int j = 0; j <= i; ++j) {
-                prefixBob.append(it.next());
+        const int nFields = sortPattern.nFields();
+        if (nFields > 1) {
+            // We're sorted not only by sortPattern but also by all prefixes of it.
+            for (int i = 0; i < nFields; ++i) {
+                // Make obj out of fields [0,i]
+                BSONObjIterator it(sortPattern);
+                BSONObjBuilder prefixBob;
+                for (int j = 0; j <= i; ++j) {
+                    prefixBob.append(it.next());
+                }
+                _sorts.insert(prefixBob.obj());
             }
-            _sorts.insert(prefixBob.obj());
         }
 
         // If we are using the index {a:1, b:1} to answer the predicate {a: 10}, it's sorted
@@ -436,11 +439,39 @@ namespace mongo {
             }
         }
 
+        if (equalityFields.empty()) {
+            return;
+        }
+
         // TODO: Each field in equalityFields could be dropped from the sort order since it is
-        // a point interval.
+        // a point interval.  The full set of sort orders is as follows:
         // For each sort in _sorts:
         //    For each drop in powerset(equalityFields):
         //        Remove fields in 'drop' from 'sort' and add resulting sort to output.
+
+        // Since this involves a powerset, we only remove point intervals that the prior sort
+        // planning code removed, namely the contiguous prefix of the key pattern.
+        BSONObjIterator it(sortPattern);
+        BSONObjBuilder prefixBob;
+        while (it.more()) {
+            BSONElement elt = it.next();
+            // XXX string slowness.  fix when bounds are stringdata not string.
+            if (equalityFields.end() == equalityFields.find(string(elt.fieldName()))) {
+                prefixBob.append(elt);
+                // This field isn't a point interval, can't drop.
+                break;
+            }
+        }
+
+        while (it.more()) {
+            prefixBob.append(it.next());
+        }
+
+        // If we have an index {a:1} and an equality on 'a' don't append an empty sort order.
+        BSONObj filterPointsObj = prefixBob.obj();
+        if (!filterPointsObj.isEmpty()) {
+            _sorts.insert(filterPointsObj);
+        }
     }
 
     //

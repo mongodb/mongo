@@ -141,21 +141,24 @@ namespace mongo {
         /**
          * If 'inArrayOperator' is false, takes ownership of 'root'.
          */
-        static QuerySolutionNode* buildIndexedDataAccess(MatchExpression* root,
+        static QuerySolutionNode* buildIndexedDataAccess(const CanonicalQuery& query,
+                                                         MatchExpression* root,
                                                          bool inArrayOperator,
                                                          const vector<IndexEntry>& indices);
 
         /**
          * Takes ownership of 'root'.
          */
-        static QuerySolutionNode* buildIndexedAnd(MatchExpression* root,
+        static QuerySolutionNode* buildIndexedAnd(const CanonicalQuery& query,
+                                                  MatchExpression* root,
                                                   bool inArrayOperator,
                                                   const vector<IndexEntry>& indices);
 
         /**
          * Takes ownership of 'root'.
          */
-        static QuerySolutionNode* buildIndexedOr(MatchExpression* root,
+        static QuerySolutionNode* buildIndexedOr(const CanonicalQuery& query,
+                                                 MatchExpression* root,
                                                  bool inArrayOperator,
                                                  const vector<IndexEntry>& indices);
 
@@ -172,7 +175,8 @@ namespace mongo {
          *
          * Does not take ownership of 'root' but may remove children from it.
          */
-        static bool processIndexScans(MatchExpression* root,
+        static bool processIndexScans(const CanonicalQuery& query,
+                                      MatchExpression* root,
                                       bool inArrayOperator,
                                       const vector<IndexEntry>& indices,
                                       vector<QuerySolutionNode*>* out);
@@ -187,7 +191,8 @@ namespace mongo {
          * If the node is an index scan, the bounds for 'expr' are computed and placed into the
          * first field's OIL position.  The rest of the OILs are allocated but uninitialized.
          *
-         * If the node is a geo node, XXX.
+         * If the node is a geo node, grab the geo data from 'expr' and stuff it into the
+         * geo solution node of the appropriate type.
          */
         static QuerySolutionNode* makeLeafNode(const IndexEntry& index,
                                                MatchExpression* expr,
@@ -201,21 +206,12 @@ namespace mongo {
                                       MatchExpression::MatchType mergeType);
 
         /**
-         * If index scan, fill in any bounds that are missing in 'node' with the "all values for
-         * this field" interval.
+         * If index scan (regular or expression index), fill in any bounds that are missing in
+         * 'node' with the "all values for this field" interval.
          *
-         * If geo, XXX.
+         * If geo, do nothing.
          */
         static void finishLeafNode(QuerySolutionNode* node, const IndexEntry& index);
-
-        //
-        // Helpers for creating a sort.
-        //
-
-        /**
-         * XXX
-         */
-        static void getBoundsForSort(const CanonicalQuery& query, SortNode* node);
 
         //
         // Analysis of Data Access
@@ -246,7 +242,7 @@ namespace mongo {
                                              const CanonicalQuery& query);
 
         /**
-         * XXX
+         * Traverse the tree rooted at 'root' reversing ixscans and other sorts.
          */
         static void reverseScans(QuerySolutionNode* root);
 
@@ -257,7 +253,16 @@ namespace mongo {
          */
         static void alignBounds(IndexBounds* bounds, const BSONObj& kp, int scanDir = 1);
 
+        /**
+         * Does the index with key pattern 'kp' provide the sort that 'query' wants?
+         */
         static bool providesSort(const CanonicalQuery& query, const BSONObj& kp);
+
+        /**
+         * Get the bounds for the sort in 'query' used by the sort stage.  Output the bounds
+         * in 'node'.
+         */
+        static void getBoundsForSort(const CanonicalQuery& query, SortNode* node);
     };
 
 }  // namespace mongo

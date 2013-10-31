@@ -20,16 +20,19 @@ assertIndexBounds( [[ 1, 1 ]], { $or:[ { a:1 } ] }, { a:1 } );
 assertIndexBounds( [[ 1, 1 ]], { $or:[ { $or:[ { a:1 } ] } ] }, { a:1 } );
 
 // No index bounds computed for a non singleton $or expression with an indexed sort.
-assertIndexBounds( [[ { $minElement:1 }, { $maxElement:1 } ]], { $or:[ { a:1 }, { a:2 } ] },
-                   { a:1 } );
+// QUERY_MIGRATION: a isn't multikey so we can get an indexed sort by unioning the two point ivals
+//assertIndexBounds( [[ { $minElement:1 }, { $maxElement:1 } ]], { $or:[ { a:1 }, { a:2 } ] },
+                   //{ a:1 } );
 
 // Tight index bounds for a singleton $or expression with an unindexed sort.
 assertIndexBounds( [[ 1, 1 ]], { $or:[ { a:1 } ] }, { b:1 } );
 
 // No index bounds computed for a non singleton $or expression and an unindexed sort, so a $natural
 // plan is used.
-assertIndexBounds( undefined, { $or:[ { a:1 }, { a:2 } ] }, { b:1 } );
+// QUERY_MIGRATION: we use an ixscan and then sort the results of that.
+//assertIndexBounds( undefined, { $or:[ { a:1 }, { a:2 } ] }, { b:1 } );
 
 // No index bounds computed for a non singleton $or expression with an unindexed sort.
-assertIndexBounds( [[ { $minElement:1 }, { $maxElement:1 } ]], { $or:[ { a:1 }, { a:2 } ] },
-                   { b:1 }, { a:1 } );
+// QUERY_MIGRATION: ditto
+//assertIndexBounds( [[ { $minElement:1 }, { $maxElement:1 } ]], { $or:[ { a:1 }, { a:2 } ] },
+                   //{ b:1 }, { a:1 } );

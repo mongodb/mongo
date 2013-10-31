@@ -6,12 +6,13 @@ t.ensureIndex( {b:1} );
 
 assert.eq.automsg( "'BasicCursor'", "t.find( {$or:[{a:2},{b:3},{}]} ).explain().cursor" );
 assert.eq.automsg( "'BasicCursor'", "t.find( {$or:[{a:2},{b:3},{c:4}]} ).explain().cursor" );
+// QUERY_MIGRATION: we OR the ixscans then sort...
 // printjson( t.find( {$or:[{a:2},{b:3}]} ).sort( {c:1} ).explain() );
-assert.eq.automsg( "'BasicCursor'", "t.find( {$or:[{a:2},{b:3}]} ).sort( {c:1} ).explain().cursor" );
+// assert.eq.automsg( "'BasicCursor'", "t.find( {$or:[{a:2},{b:3}]} ).sort( {c:1} ).explain().cursor" );
 e = t.find( {$or:[{a:2},{b:3}]} ).sort( {a:1} ).explain();
-assert.eq.automsg( "'BtreeCursor a_1'", "e.cursor" );
-assert.eq.automsg( "1", "e.indexBounds.a[ 0 ][ 0 ].$minElement" );
-assert.eq.automsg( "1", "e.indexBounds.a[ 0 ][ 1 ].$maxElement" );
+//assert.eq.automsg( "'BtreeCursor a_1'", "e.cursor" );
+//assert.eq.automsg( "1", "e.indexBounds.a[ 0 ][ 0 ].$minElement" );
+//assert.eq.automsg( "1", "e.indexBounds.a[ 0 ][ 1 ].$maxElement" );
 
 t.ensureIndex( {c:1} );
 

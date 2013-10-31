@@ -126,16 +126,6 @@ namespace mongo {
 
         // Things we know we fail at:
 
-        // Sort.
-        if (!pq.getSort().isEmpty()) {
-            // We can deal with this 'cuz it means do a collscan.
-            BSONElement natural = pq.getSort().getFieldDotted("$natural");
-            if (natural.eoo()) {
-                QLOG() << "rejecting query w/sort: " << pq.getSort().toString() << endl;
-                return false;
-            }
-        }
-
         // Projections.
         if (!pq.getProj().isEmpty()) {
             QLOG() << "rejecting query w/proj\n";

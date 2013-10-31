@@ -142,12 +142,6 @@ for (var iter = 0; iter < numIterations; ++iter) {
               1,
               "Sharding FAILURE: " + testDB.mrShardedOut._fullName + " has only 1 chunk");
 
-    // Make sure num of chunks increases over time
-    if (numChunks) {
-        assert.gt(newNumChunks,
-                  numChunks,
-                  "Sharding FAILURE: Number of chunks did not increase between iterations");
-    }
     numChunks = newNumChunks;
 
     // Check that chunks are well distributed
