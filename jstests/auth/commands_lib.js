@@ -1299,6 +1299,8 @@ var authCommandsLib = {
                     rolesAllowed: {
                         readAnyDatabase: 1,
                         readWriteAnyDatabase: 1,
+                        dbAdminAnyDatabase: 1,
+                        userAdminAnyDatabase: 1,
                         clusterMonitor: 1,
                         clusterAdmin: 1,
                         root: 1,

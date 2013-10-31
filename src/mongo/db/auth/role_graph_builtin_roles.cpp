@@ -341,8 +341,7 @@ namespace {
                 Privilege(ResourcePattern::forAnyNormalResource(), userAdminRoleActions));
         Privilege::addPrivilegeToPrivilegeVector(
                 privileges,
-                Privilege(ResourcePattern::forCollectionName("system.roles"),
-                          readRoleActions));
+                Privilege(ResourcePattern::forClusterResource(), ActionType::listDatabases));
         Privilege::addPrivilegeToPrivilegeVector(
                 privileges,
                 Privilege(ResourcePattern::forCollectionName("system.users"),
@@ -350,11 +349,34 @@ namespace {
         Privilege::addPrivilegeToPrivilegeVector(
                 privileges,
                 Privilege(ResourcePattern::forExactNamespace(
-                                  NamespaceString("admin.system.version")),
+                                  AuthorizationManager::usersCollectionNamespace),
+                          readRoleActions));
+        Privilege::addPrivilegeToPrivilegeVector(
+                privileges,
+                Privilege(ResourcePattern::forExactNamespace(
+                                  AuthorizationManager::rolesCollectionNamespace),
+                          readRoleActions));
+        Privilege::addPrivilegeToPrivilegeVector(
+                privileges,
+                Privilege(ResourcePattern::forExactNamespace(
+                                  AuthorizationManager::versionCollectionNamespace),
+                          readRoleActions));
+        Privilege::addPrivilegeToPrivilegeVector(
+                privileges,
+                Privilege(ResourcePattern::forExactNamespace(
+                                  AuthorizationManager::usersAltCollectionNamespace),
+                          readRoleActions));
+        Privilege::addPrivilegeToPrivilegeVector(
+                privileges,
+                Privilege(ResourcePattern::forExactNamespace(
+                                  AuthorizationManager::usersBackupCollectionNamespace),
                           readRoleActions));
     }
 
     void addDbAdminAnyDbPrivileges(PrivilegeVector* privileges) {
+        Privilege::addPrivilegeToPrivilegeVector(
+                privileges,
+                Privilege(ResourcePattern::forClusterResource(), ActionType::listDatabases));
         Privilege::addPrivilegeToPrivilegeVector(
                 privileges,
                 Privilege(ResourcePattern::forAnyNormalResource(), dbAdminRoleActions));
@@ -456,14 +478,27 @@ namespace {
 
         Privilege::addPrivilegeToPrivilegeVector(
                 privileges,
-                Privilege(ResourcePattern::forExactNamespace(NamespaceString("admin.system.roles")),
+                Privilege(ResourcePattern::forExactNamespace(
+                                  AuthorizationManager::usersAltCollectionNamespace),
                           ActionType::find));
 
         Privilege::addPrivilegeToPrivilegeVector(
                 privileges,
-                Privilege(
-                        ResourcePattern::forExactNamespace(NamespaceString("admin.system.version")),
-                        ActionType::find));
+                Privilege(ResourcePattern::forExactNamespace(
+                                  AuthorizationManager::usersBackupCollectionNamespace),
+                          ActionType::find));
+
+        Privilege::addPrivilegeToPrivilegeVector(
+                privileges,
+                Privilege(ResourcePattern::forExactNamespace(
+                                  AuthorizationManager::rolesCollectionNamespace),
+                          ActionType::find));
+
+        Privilege::addPrivilegeToPrivilegeVector(
+                privileges,
+                Privilege(ResourcePattern::forExactNamespace(
+                                  AuthorizationManager::versionCollectionNamespace),
+                          ActionType::find));
 
         // For BRS
         ActionSet backupCollectionActions;
@@ -491,13 +526,27 @@ namespace {
 
         Privilege::addPrivilegeToPrivilegeVector(
                 privileges,
-                Privilege(ResourcePattern::forExactNamespace(NamespaceString("admin.system.roles")),
+                Privilege(ResourcePattern::forExactNamespace(
+                                  AuthorizationManager::usersAltCollectionNamespace),
+                          actions));
+
+        Privilege::addPrivilegeToPrivilegeVector(
+                privileges,
+                Privilege(ResourcePattern::forExactNamespace(
+                                  AuthorizationManager::usersBackupCollectionNamespace),
+                          actions));
+
+        Privilege::addPrivilegeToPrivilegeVector(
+                privileges,
+                Privilege(ResourcePattern::forExactNamespace(
+                                  AuthorizationManager::rolesCollectionNamespace),
                           actions));
 
         Privilege::addPrivilegeToPrivilegeVector(
                 privileges,
                 Privilege(
-                        ResourcePattern::forExactNamespace(NamespaceString("admin.system.version")),
+                        ResourcePattern::forExactNamespace(
+                                AuthorizationManager::versionCollectionNamespace),
                         actions));
 
         // Need additional actions on system.users.
