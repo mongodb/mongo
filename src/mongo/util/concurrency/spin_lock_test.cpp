@@ -1,7 +1,5 @@
-// spin_lock_test.cpp : spin_lock.{h, cpp} unit test
-
 /**
- *    Copyright (C) 2010 10gen Inc.
+ *    Copyright (C) 2013 10gen Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -14,19 +12,30 @@
  *
  *    You should have received a copy of the GNU Affero General Public License
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the GNU Affero General Public License in all respects
+ *    for all of the code used other than as permitted herein. If you modify
+ *    file(s) with this exception, you may extend this exception to your
+ *    version of the file(s), but you are not obligated to do so. If you do not
+ *    wish to do so, delete this exception statement from your version. If you
+ *    delete this exception statement from all source files in the program,
+ *    then also delete it in the license file.
  */
-
-#include "mongo/pch.h"
 
 #include <boost/thread/thread.hpp>
 
-#include "mongo/dbtests/dbtests.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/concurrency/spin_lock.h"
 #include "mongo/util/timer.h"
 
 namespace {
 
     using mongo::SpinLock;
+    using mongo::Timer;
 
     class LockTester {
     public:
@@ -68,49 +77,36 @@ namespace {
         LockTester& operator=( LockTester& );
     };
 
-    class ConcurrentIncs {
-    public:
-        void run() {
 
-            SpinLock spin;
-            int counter = 0;
+    TEST(Concurrency, ConcurrentIncs) {
+        SpinLock spin;
+        int counter = 0;
 
-            const int threads = 64;
-            const int incs = 50000;
-            LockTester* testers[threads];
-            
-            Timer timer;
+        const int threads = 64;
+        const int incs = 50000;
+        LockTester* testers[threads];
 
-            for ( int i = 0; i < threads; i++ ) {
-                testers[i] = new LockTester( &spin, &counter );
-            }
-            for ( int i = 0; i < threads; i++ ) {
-                testers[i]->start( incs );
-            }
-            for ( int i = 0; i < threads; i++ ) {
-                testers[i]->join();
-                ASSERT_EQUALS( testers[i]->requests(), incs );
-                delete testers[i];
-            }
-      
-            int ms = timer.millis();
-            mongo::unittest::log() << "spinlock ConcurrentIncs time: " << ms << endl;
-            
-            ASSERT_EQUALS( counter, threads*incs );
+        Timer timer;
+
+        for ( int i = 0; i < threads; i++ ) {
+            testers[i] = new LockTester( &spin, &counter );
+        }
+        for ( int i = 0; i < threads; i++ ) {
+            testers[i]->start( incs );
+        }
+        for ( int i = 0; i < threads; i++ ) {
+            testers[i]->join();
+            ASSERT_EQUALS( testers[i]->requests(), incs );
+            delete testers[i];
+        }
+
+        int ms = timer.millis();
+        mongo::unittest::log() << "spinlock ConcurrentIncs time: " << ms << std::endl;
+
+        ASSERT_EQUALS( counter, threads*incs );
 #if defined(__linux__)
-            ASSERT( SpinLock::isfast() );
+        ASSERT( SpinLock::isfast() );
 #endif
+    }
 
-        }
-    };
-
-    class SpinLockSuite : public Suite {
-    public:
-        SpinLockSuite() : Suite( "spinlock" ) {}
-
-        void setupTests() {
-            add< ConcurrentIncs >();
-        }
-    } spinLockSuite;
-
-}  // anonymous namespace
+} // namespace
