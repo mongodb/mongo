@@ -15,18 +15,12 @@
 
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/server_options_helpers.h"
 #include "mongo/logger/logger.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/options_parser/environment.h"
 #include "mongo/util/options_parser/option_section.h"
 #include "mongo/util/options_parser/options_parser.h"
-
-// These are stubs that we need now since we include mongocommon
-namespace mongo {
-    bool inShutdown() {
-        return false;
-    }
-}
 
 namespace {
 

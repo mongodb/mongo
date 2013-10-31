@@ -110,7 +110,6 @@ env.StaticLibrary('metadata', ['collection_metadata.cpp',
 env.CppUnitTest('chunk_diff_test',
                 'chunk_diff_test.cpp',
                 LIBDEPS=['metadata',
-                         '$BUILD_DIR/mongo/clientandshell', # CmdLine crutch
                          '$BUILD_DIR/mongo/db/common'],
                 NO_CRUTCH=True)
 
@@ -118,7 +117,6 @@ env.CppUnitTest('collection_metadata_test',
                 'collection_metadata_test.cpp',
                 LIBDEPS=['metadata',
                          '$BUILD_DIR/mongo/mocklib',
-                         '$BUILD_DIR/mongo/clientandshell', # CmdLine crutch
                          '$BUILD_DIR/mongo/db/common'],
                 NO_CRUTCH=True)
 
@@ -126,9 +124,8 @@ env.CppUnitTest('metadata_loader_test',
                 'metadata_loader_test.cpp',
                 LIBDEPS=['metadata',
                          '$BUILD_DIR/mongo/mocklib',
-                         '$BUILD_DIR/mongo/clientandshell', # CmdLine crutch
                          '$BUILD_DIR/mongo/db/common'],
-                NO_CRUTCH=True);
+                NO_CRUTCH=True)
 
 #
 # Write Operations

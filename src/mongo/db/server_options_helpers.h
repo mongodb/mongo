@@ -1,5 +1,5 @@
-/**
- *    Copyright (C) 2013 MongoDB Inc.
+/*
+ *    Copyright (C) 2013 10gen Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -26,17 +26,34 @@
  *    it in the license file.
  */
 
-#include "mongo/s/batch_downconvert.h"
+#pragma once
 
-#include "mongo/unittest/unittest.h"
+#include "mongo/base/status.h"
+#include "mongo/util/options_parser/environment.h"
+#include "mongo/util/options_parser/option_section.h"
 
-namespace {
+namespace mongo {
 
-    using namespace mongo;
+    namespace optionenvironment {
+        class OptionSection;
+        class Environment;
+    } // namespace optionenvironment
 
-    TEST(WriteBatchDownconvert, Basic) {
-        BatchSafeWriter( NULL );
-        ASSERT( true );
-    }
+    namespace moe = mongo::optionenvironment;
 
-}
+    Status addGeneralServerOptions(moe::OptionSection* options);
+
+    Status addWindowsServerOptions(moe::OptionSection* options);
+
+    Status addSSLServerOptions(moe::OptionSection* options);
+
+    Status storeServerOptions(const moe::Environment& params,
+                              const std::vector<std::string>& args);
+
+    void printCommandLineOpts();
+
+    // This function should eventually go away, but needs to be here now because we have a lot of
+    // code that is shared between mongod and mongos that must know at runtime which binary it is in
+    bool isMongos();
+
+} // namespace mongo

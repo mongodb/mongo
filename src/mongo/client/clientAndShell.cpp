@@ -26,8 +26,6 @@
 
 namespace mongo {
 
-    ServerGlobalParams serverGlobalParams;
-
     const char * curNs = "in client mode";
 
     bool dbexitCalled = false;

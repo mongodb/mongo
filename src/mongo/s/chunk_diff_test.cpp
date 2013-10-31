@@ -33,6 +33,15 @@
 #include "mongo/s/chunk_diff.h"
 #include "mongo/unittest/unittest.h"
 
+namespace mongo {
+
+    // Temporary crutches to allow us to link against libraries that need this symbol
+    bool inShutdown() {
+        return false;
+    }
+
+} // namespace mongo
+
 namespace {
 
     using mongo::BSONObj;

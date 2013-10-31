@@ -33,6 +33,7 @@
 #include "mongo/db/log_process_details.h"
 
 #include "mongo/db/server_options.h"
+#include "mongo/db/server_options_helpers.h"
 #include "mongo/util/net/sock.h"
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/processinfo.h"

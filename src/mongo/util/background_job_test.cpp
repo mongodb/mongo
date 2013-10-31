@@ -24,16 +24,6 @@
 #include "mongo/util/concurrency/synchronization.h"
 #include "mongo/util/time_support.h"
 
-namespace mongo {
-
-    ServerGlobalParams serverGlobalParams;
-
-    bool inShutdown() {
-        return false;
-    }
-
-} // namespace mongo
-
 namespace {
 
     using mongo::BackgroundJob;

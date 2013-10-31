@@ -22,6 +22,7 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/server_options_helpers.h"
 #include "mongo/s/chunk.h"
 #include "mongo/s/version_mongos.h"
 #include "mongo/util/net/ssl_options.h"

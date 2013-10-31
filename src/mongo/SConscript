@@ -202,8 +202,9 @@ env.CppUnitTest('descriptive_stats_test',
                 LIBDEPS=['foundation', 'bson']);
 
 env.CppUnitTest('sock_test', ['util/net/sock_test.cpp'],
-                LIBDEPS=['mongocommon'],
-                NO_CRUTCH=True)
+                LIBDEPS=['network',
+                         'synchronization',
+                ])
 
 env.CppUnitTest('curop_test',
                 ['db/curop_test.cpp'],
@@ -219,6 +220,22 @@ env.StaticLibrary('auth_helpers', ['client/auth_helpers.cpp'], LIBDEPS=['md5'])
 env.StaticLibrary('spin_lock', ["util/concurrency/spin_lock.cpp"])
 env.CppUnitTest('spin_lock_test', ['util/concurrency/spin_lock_test.cpp'],
                 LIBDEPS=['spin_lock', '$BUILD_DIR/third_party/shim_boost'])
+
+env.StaticLibrary('network', [
+                  "util/net/sock.cpp",
+                  "util/net/socket_poll.cpp",
+                  "util/net/ssl_manager.cpp",
+                  "util/net/ssl_options.cpp",
+                  "util/net/httpclient.cpp",
+                  "util/net/message.cpp",
+                  "util/net/message_port.cpp",
+                  "util/net/listen.cpp" ],
+                  LIBDEPS=['$BUILD_DIR/mongo/util/options_parser/options_parser',
+                           'background_job',
+                           'fail_point',
+                           'foundation',
+                           'server_options_core',
+                  ])
 
 commonFiles = [ "pch.cpp",
                 "buildinfo.cpp",
@@ -238,14 +255,6 @@ commonFiles = [ "pch.cpp",
                 "util/histogram.cpp",
                 "util/text_startuptest.cpp",
                 "util/stack_introspect.cpp",
-                "util/net/sock.cpp",
-                "util/net/socket_poll.cpp",
-                "util/net/ssl_manager.cpp",
-                "util/net/ssl_options.cpp",
-                "util/net/httpclient.cpp",
-                "util/net/message.cpp",
-                "util/net/message_port.cpp",
-                "util/net/listen.cpp",
                 "util/startup_test.cpp",
                 "util/version.cpp",
                 "client/connpool.cpp",
@@ -319,6 +328,7 @@ env.StaticLibrary('mongocommon', commonFiles,
                            'fail_point',
                            'spin_lock',
                            'background_job',
+                           'network',
                            'util/concurrency/thread_name',
                            '$BUILD_DIR/third_party/shim_pcrecpp',
                            '$BUILD_DIR/third_party/murmurhash3/murmurhash3',
@@ -337,9 +347,9 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         "background_job",
-        "mongocommon" # temporary crutch for linking
-    ],
-    NO_CRUTCH=True
+        "network", # Temporary crutch since the ssl cleanup is hard coded in background.cpp
+        "synchronization",
+    ]
 )
 
 env.StaticLibrary("coredb", [
@@ -610,16 +620,27 @@ serverOnlyFiles = [ "db/curop.cpp",
                     "db/pipeline/document_source_cursor.cpp",
                     "db/driverHelpers.cpp" ]
 
-env.Library("server_options", ["db/server_options.cpp"],
+# This library exists because some libraries, such as our networking library, need access to server
+# options, but not to the helpers to set them from the command line.  libserver_options_core.a just
+# has the structure for storing the server options, while libserver_options.a has the code to set
+# them via the command line.
+env.Library("server_options_core", ["db/server_options.cpp"],
+            LIBDEPS=['bson'])
+
+env.Library("server_options", [
+                    "db/server_options_helpers.cpp"
+                    ],
             LIBDEPS=['bson',
-                    'server_parameters',
-                    '$BUILD_DIR/mongo/util/options_parser/options_parser',
-                    '$BUILD_DIR/mongo/util/cmdline_utils/cmdline_utils',
+                     'network', # temporary crutch that should go away once the networking
+                                # library has separate options
+                     'server_options_core',
+                     'server_parameters',
+                     '$BUILD_DIR/mongo/util/cmdline_utils/cmdline_utils',
+                     '$BUILD_DIR/mongo/util/options_parser/options_parser',
                     ])
 
 env.CppUnitTest('server_options_test', 'db/server_options_test.cpp',
-                LIBDEPS=['server_options', 'mongocommon',],
-                NO_CRUTCH=True)
+                LIBDEPS=['server_options'])
 
 env.CppUnitTest('diskloc_test', 'db/diskloc_test.cpp', LIBDEPS=[])
 

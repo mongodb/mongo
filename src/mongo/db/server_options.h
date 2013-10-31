@@ -28,20 +28,11 @@
 
 #pragma once
 
-#include "mongo/base/status.h"
+#include "mongo/db/jsobj.h"
 #include "mongo/platform/process_id.h"
 #include "mongo/util/net/listen.h" // For DEFAULT_MAX_CONN
-#include "mongo/util/options_parser/environment.h"
-#include "mongo/util/options_parser/option_section.h"
 
 namespace mongo {
-
-    namespace optionenvironment {
-        class OptionSection;
-        class Environment;
-    } // namespace optionenvironment
-
-    namespace moe = mongo::optionenvironment;
 
     struct ServerGlobalParams {
 
@@ -126,19 +117,4 @@ namespace mongo {
     };
 
     extern ServerGlobalParams serverGlobalParams;
-
-    Status addGeneralServerOptions(moe::OptionSection* options);
-
-    Status addWindowsServerOptions(moe::OptionSection* options);
-
-    Status addSSLServerOptions(moe::OptionSection* options);
-
-    Status storeServerOptions(const moe::Environment& params,
-                              const std::vector<std::string>& args);
-
-    void printCommandLineOpts();
-
-    // This function should eventually go away, but needs to be here now because we have a lot of
-    // code that is shared between mongod and mongos that must know at runtime which binary it is in
-    bool isMongos();
 }

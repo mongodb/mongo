@@ -43,16 +43,6 @@
 #include "mongo/util/concurrency/synchronization.h"
 #include "mongo/util/fail_point_service.h"
 
-namespace mongo {
-
-    ServerGlobalParams serverGlobalParams;
-
-    bool inShutdown() {
-        return false;
-    }
-
-} // namespace mongo
-
 namespace {
 
     using namespace mongo;
