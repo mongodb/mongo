@@ -84,6 +84,7 @@ namespace {
     class BasicRS: public mongo::unittest::Test {
     protected:
         void setUp() {
+            ReplicaSetMonitor::cleanup();
             _replSet.reset(new MockReplicaSet("test", 2));
             ConnectionString::setConnectionHook(
                     mongo::MockConnRegistry::get()->getConnStrHook());
@@ -163,6 +164,7 @@ namespace {
     class AllNodesDown: public mongo::unittest::Test {
     protected:
         void setUp() {
+            ReplicaSetMonitor::cleanup();
             _replSet.reset(new MockReplicaSet("test", 2));
             ConnectionString::setConnectionHook(
                     mongo::MockConnRegistry::get()->getConnStrHook());
@@ -241,6 +243,7 @@ namespace {
     class PrimaryDown: public mongo::unittest::Test {
     protected:
         void setUp() {
+            ReplicaSetMonitor::cleanup();
             _replSet.reset(new MockReplicaSet("test", 2));
             ConnectionString::setConnectionHook(
                     mongo::MockConnRegistry::get()->getConnStrHook());
@@ -328,6 +331,7 @@ namespace {
     class SecondaryDown: public mongo::unittest::Test {
     protected:
         void setUp() {
+            ReplicaSetMonitor::cleanup();
             _replSet.reset(new MockReplicaSet("test", 2));
             ConnectionString::setConnectionHook(
                     mongo::MockConnRegistry::get()->getConnStrHook());
@@ -419,6 +423,7 @@ namespace {
     class TaggedFiveMemberRS: public mongo::unittest::Test {
     protected:
         void setUp() {
+            ReplicaSetMonitor::cleanup();
             _replSet.reset(new MockReplicaSet("test", 5));
             _originalConnectionHook = ConnectionString::getConnectionHook();
             ConnectionString::setConnectionHook(

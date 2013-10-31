@@ -38,6 +38,13 @@ int printIfAge(DBClientConnection& c, int age) {
 }
 
 int run() {
+
+    Status status = client::initialize();
+    if ( !status.isOK() ) {
+        std::cout << "failed to initialize the client driver: " << status.toString() << endl;
+        return EXIT_FAILURE;
+    }
+
     DBClientConnection c;
     c.connect("localhost"); //"192.168.58.1");
     cout << "connected ok" << endl;

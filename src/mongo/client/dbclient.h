@@ -34,6 +34,7 @@
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/client/gridfs.h"
+#include "mongo/client/init.h"
 #include "mongo/client/sasl_client_authenticate.h"
 #include "mongo/client/syncclusterconnection.h"
 #include "mongo/util/net/ssl_options.h"

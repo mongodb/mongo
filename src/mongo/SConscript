@@ -323,6 +323,17 @@ env.StaticLibrary('mongocommon', commonFiles,
                            ] +
                            extraCommonLibdeps)
 
+env.CppUnitTest(
+    target="background_job_test",
+    source=[
+        "util/background_job_test.cpp",
+    ],
+    LIBDEPS=[
+        "mongocommon",
+    ],
+    NO_CRUTCH=True
+)
+
 env.StaticLibrary("coredb", [
         "client/parallel.cpp",
         "db/audit.cpp",

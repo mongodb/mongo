@@ -35,6 +35,7 @@
 #include <boost/thread/condition.hpp>
 #include <boost/function.hpp>
 
+#include "mongo/util/concurrency/mutex.h"
 #include "task.h"
 
 namespace mongo {

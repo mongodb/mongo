@@ -34,6 +34,12 @@ int main( int argc, const char **argv ) {
         port = argv[ 2 ];
     }
 
+    Status status = client::initialize();
+    if (!status.isOK()) {
+        std::cout << "failed to initialize the client driver: " << status.toString() << endl;
+        return EXIT_FAILURE;
+    }
+
     std::string errmsg;
     ConnectionString cs = ConnectionString::parse(string("127.0.0.1:") + port, errmsg);
     if (!cs.isValid()) {

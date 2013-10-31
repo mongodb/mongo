@@ -17,10 +17,11 @@
 
 #pragma once
 
+#include <boost/scoped_ptr.hpp>
 #include <string>
 #include <vector>
 
-#include "concurrency/spin_lock.h"
+#include "mongo/base/status.h"
 
 namespace mongo {
 
@@ -28,19 +29,16 @@ namespace mongo {
      *  Background thread dispatching.
      *  subclass and define run()
      *
-     *  It is ok to call go(), that is, run the job, more than once -- if the
-     *  previous invocation has finished. Thus one pattern of use is to embed
-     *  a backgroundjob in your object and reuse it (or same thing with
-     *  inheritance).  Each go() call spawns a new thread.
+     *  It is not possible to run the job more than once. An attempt to call 'go' while the
+     *  task is running will fail. Calling 'go' after the task has finished are ignored and
+     *  will not start the job again.
      *
-     *  Thread safety:
-     *    note when job destructs, the thread is not terminated if still running.
-     *    generally if the thread could still be running, allocate the job dynamically
-     *    and set deleteSelf to true.
+     *  Thread safety: Note that when the job destructs, the thread is not terminated if still
+     *  running. Generally, if the thread could still be running, allocate the job dynamically
+     *  and set deleteSelf to true.
      *
-     *    go() and wait() are not thread safe
-     *    run() will be executed on the background thread
-     *    BackgroundJob object must exist for as long the background thread is running
+     *  The overridden run() method will be executed on the background thread, so the
+     *  BackgroundJob object must exist for as long the background thread is running.
      */
 
     class BackgroundJob : boost::noncopyable {
@@ -74,7 +72,7 @@ namespace mongo {
             Done
         };
 
-        virtual ~BackgroundJob() { }
+        virtual ~BackgroundJob();
 
         /**
          * starts job.
@@ -83,7 +81,17 @@ namespace mongo {
          * @note the BackgroundJob object must live for as long the thread is still running, ie
          * until getState() returns Done.
          */
-        BackgroundJob& go();
+        void go();
+
+
+        /**
+         * If the job has not yet started, transitions the job to the 'done' state immediately,
+         * such that subsequent calls to 'go' are ignored, and notifies any waiters waiting in
+         * 'wait'. If the job has already been started, this method returns a not-ok status: it
+         * does not cancel running jobs. For this reason, you must still call 'wait' on a
+         * BackgroundJob even after calling 'cancel'.
+         */
+        Status cancel();
 
         /**
          * wait for completion.
@@ -96,18 +104,21 @@ namespace mongo {
          */
         bool wait( unsigned msTimeOut = 0 );
 
-        // accessors
+        // accessors. Note that while the access to the internal state is synchronized within
+        // these methods, there is no guarantee that the BackgroundJob is still in the
+        // indicated state after returning.
         State getState() const;
         bool running() const;
 
     private:
+        const bool _selfDelete;
+
         struct JobStatus;
-        boost::shared_ptr<JobStatus> _status;  // shared between 'this' and body() thread
+        const boost::scoped_ptr<JobStatus> _status;
 
-        void jobBody( boost::shared_ptr<JobStatus> status );
-
+        void jobBody();
     };
-    
+
     /**
      * these run "roughly" every minute
      * instantiate statically
@@ -125,31 +136,25 @@ namespace mongo {
         virtual void taskDoWork() = 0;
         virtual std::string taskName() const = 0;
 
-        class Runner : public BackgroundJob {
-        public:
-            virtual ~Runner(){}
+        /**
+         *  Starts the BackgroundJob that runs PeriodicTasks. You may call this multiple times,
+         *  from multiple threads, and the BackgroundJob will be started only once. Please note
+         *  that since this method starts threads, it is not appropriate to call it from within
+         *  a mongo initializer. Calling this method after calling 'stopRunningPeriodicTasks'
+         *  does not re-start the background job.
+         */
+        static void startRunningPeriodicTasks();
 
-            virtual std::string name() const { return "PeriodicTask::Runner"; }
-            
-            virtual void run();
-            
-            void add( PeriodicTask* task );
-            void remove( PeriodicTask* task );
-
-        private:
-            
-            SpinLock _lock;
-            
-            // these are NOT owned by Runner
-            // Runner will not delete these
-            // this never gets smaller
-            // only fields replaced with nulls
-            std::vector< PeriodicTask* > _tasks;
-
-        };
-
-        static Runner* theRunner;
-
+        /**
+         *  Waits 'gracePeriodMillis' for the BackgroundJob responsible for PeriodicTask
+         *  execution to finish any running tasks, then destroys it. If the BackgroundJob was
+         *  never started, returns Status::OK right away. If the BackgroundJob does not
+         *  terminate within the grace period, returns an invalid status. It is safe to call
+         *  this method repeatedly from one thread if the grace period is overshot. It is not
+         *  safe to call this method from multiple threads, or in a way that races with
+         *  'startRunningPeriodicTasks'.
+         */
+        static Status stopRunningPeriodicTasks( int gracePeriodMillis );
     };
 
 

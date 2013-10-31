@@ -42,6 +42,7 @@
 #include "mongo/s/stale_exception.h"
 #include "mongo/s/version_manager.h"
 #include "mongo/server.h"
+#include "mongo/util/concurrency/spin_lock.h"
 #include "mongo/util/stacktrace.h"
 
 namespace mongo {

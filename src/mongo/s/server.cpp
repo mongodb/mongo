@@ -252,7 +252,7 @@ namespace mongo {
         UserCacheInvalidator cacheInvalidatorThread(getGlobalAuthorizationManager());
         cacheInvalidatorThread.go();
 
-        PeriodicTask::theRunner->go();
+        PeriodicTask::startRunningPeriodicTasks();
 
         ShardedMessageHandler handler;
         MessageServer * server = createServer( opts , &handler );

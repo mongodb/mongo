@@ -82,10 +82,6 @@ namespace mongo {
         virtual string name() const { return "ReplicaSetMonitorWatcher"; }
 
         void safeGo() {
-            // check outside of lock for speed
-            if ( _started )
-                return;
-
             scoped_lock lk( _monitorMutex );
             if ( _started )
                 return;
@@ -144,9 +140,6 @@ namespace mongo {
 
                 _stopRequestedCV.timed_wait(sl.boost(), boost::posix_time::seconds(10));
             }
-
-            scoped_lock sl( _monitorMutex );
-            _started = false;
         }
 
         // protects _started, _stopRequested
@@ -155,7 +148,6 @@ namespace mongo {
 
         boost::condition _stopRequestedCV;
         bool _stopRequested;
-
     } replicaSetMonitorWatcher;
 
     static StaticObserver staticObserver;
@@ -1312,16 +1304,13 @@ namespace mongo {
     }
 
     void ReplicaSetMonitor::cleanup() {
-        {
-            scoped_lock lock(_setsLock);
-            _sets.clear();
-            _seedServers.clear();
-
-            replicaSetMonitorWatcher.stop();
-        }
-
-        // Join thread outside of _setsLock to avoid deadlock.
+        // Call cancel first, in case the RSMW was never started.
+        replicaSetMonitorWatcher.cancel();
+        replicaSetMonitorWatcher.stop();
         replicaSetMonitorWatcher.wait();
+        scoped_lock lock(_setsLock);
+        _sets.clear();
+        _seedServers.clear();
     }
 
     bool ReplicaSetMonitor::Node::matchesTag(const BSONObj& tag) const {

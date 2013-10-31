@@ -79,6 +79,12 @@ int main( int argc , const char ** argv ) {
             
     }
 
+    Status status = client::initialize();
+    if ( !status.isOK() ) {
+        std::cout << "failed to initialize the client driver: " << status.toString() << endl;
+        return EXIT_FAILURE;
+    }
+
     string errmsg;
     ConnectionString cs = ConnectionString::parse( "foo/127.0.0.1" , errmsg );
     if ( ! cs.isValid() ) {

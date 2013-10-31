@@ -31,6 +31,13 @@ using namespace mongo;
 using namespace bson;
 
 int main() {
+
+    Status status = client::initialize();
+    if ( !status.isOK() ) {
+        std::cout << "failed to initialize the client driver: " << status.toString() << endl;
+        return EXIT_FAILURE;
+    }
+
     try {
         cout << "connecting to localhost..." << endl;
         DBClientConnection c;

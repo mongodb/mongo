@@ -222,15 +222,9 @@ namespace mongo {
         static void setConfigChangeHook( ConfigChangeHook hook );
 
         /**
-         * Stops all monitoring on replica sets and clears all cached information as well.
-         * Note that this does not prevent new monitors from being created afterwards or even
-         * while this is being executed. As a consequence, NEVER call this if you have other
-         * threads that has a DBClientReplicaSet instance or will create one before this
-         * fully terminates as it will cause a deadlock. This is intended for performing cleanups
-         * in unit tests.
-         *
-         * Warning: Make sure that the monitor thread is running, otherwise this can hang
-         * indefinitely.
+         * Permanently stops all monitoring on replica sets and clears all cached information
+         * as well. As a consequence, NEVER call this if you have other threads that have a
+         * DBClientReplicaSet instance.
          */
         static void cleanup();
 
