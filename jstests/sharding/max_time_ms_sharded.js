@@ -51,6 +51,7 @@ assert.commandWorked(admin.runCommand({moveChunk: coll.getFullName(),
 for (i=-50; i<50; i++) {
     coll.insert({_id: i});
 }
+assert.eq(null, coll.getDB().getLastError());
 assert.eq(50, shards[0].getCollection(coll.getFullName()).count());
 assert.eq(50, shards[1].getCollection(coll.getFullName()).count());
 
