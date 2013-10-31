@@ -49,6 +49,7 @@
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/query/lite_parsed_query.h"
 #include "mongo/db/queryutil.h"
 #include "mongo/s/client_info.h"
 #include "mongo/s/chunk.h"
@@ -670,6 +671,10 @@ namespace mongo {
 
                 if (cmdObj.hasField("$queryOptions")) {
                     countCmdBuilder.append(cmdObj["$queryOptions"]);
+                }
+
+                if (cmdObj.hasField(LiteParsedQuery::cmdOptionMaxTimeMS)) {
+                    countCmdBuilder.append(cmdObj[LiteParsedQuery::cmdOptionMaxTimeMS]);
                 }
 
                 vector<Strategy::CommandResult> countResult;
@@ -1346,7 +1351,8 @@ namespace mongo {
                             fn == "sort" ||
                             fn == "scope" ||
                             fn == "verbose" ||
-                            fn == "$queryOptions") {
+                            fn == "$queryOptions" ||
+                            fn == LiteParsedQuery::cmdOptionMaxTimeMS) {
                         b.append( e );
                     }
                     else if ( fn == "out" ||
@@ -1570,6 +1576,10 @@ namespace mongo {
                 }
                 BSONObj aggCounts = aggCountsB.done();
                 finalCmd.append( "counts" , aggCounts );
+
+                if (cmdObj.hasField(LiteParsedQuery::cmdOptionMaxTimeMS)) {
+                    finalCmd.append(cmdObj[LiteParsedQuery::cmdOptionMaxTimeMS]);
+                }
 
                 Timer t2;
                 long long reduceCount = 0;
@@ -1895,6 +1905,11 @@ namespace mongo {
 
             commandBuilder.setField("cursor", Value(DOC("batchSize" << 0)));
 
+            if (cmdObj.hasField(LiteParsedQuery::cmdOptionMaxTimeMS)) {
+                commandBuilder.setField(LiteParsedQuery::cmdOptionMaxTimeMS,
+                                        Value(cmdObj[LiteParsedQuery::cmdOptionMaxTimeMS]));
+            }
+
             BSONObj shardedCommand = commandBuilder.freeze().toBson();
             BSONObj shardQuery = pShardPipeline->getInitialQuery();
 
@@ -1933,6 +1948,10 @@ namespace mongo {
                 mergeCmd["cursor"] = Value(cmdObj["cursor"]);
             if (cmdObj.hasField("$queryOptions"))
                 mergeCmd["$queryOptions"] = Value(cmdObj["$queryOptions"]);
+            if (cmdObj.hasField(LiteParsedQuery::cmdOptionMaxTimeMS)) {
+                mergeCmd[LiteParsedQuery::cmdOptionMaxTimeMS]
+                    = Value(cmdObj[LiteParsedQuery::cmdOptionMaxTimeMS]);
+            }
 
             string outputNsOrEmpty;
             if (DocumentSourceOut* out = dynamic_cast<DocumentSourceOut*>(pPipeline->output())) {

@@ -113,6 +113,16 @@ configureMaxTimeNeverTimeOut("off");
 // maxTimeAlwaysTimeOut to ensure mongod throws if it receives a max time.
 //
 
+// Positive test for "validate".
+configureMaxTimeAlwaysTimeOut("alwaysOn");
+assert.commandFailed(coll.runCommand("validate", {maxTimeMS: 60*1000}),
+                     "expected validate to fail in mongod due to maxTimeAlwaysTimeOut fail point");
+
+// Negative test for "validate".
+configureMaxTimeAlwaysTimeOut("off");
+assert.commandWorked(coll.runCommand("validate", {maxTimeMS: 60*1000}),
+                     "expected validate to not hit time limit in mongod");
+
 // Positive test for "moveChunk".
 configureMaxTimeAlwaysTimeOut("alwaysOn");
 assert.commandFailed(admin.runCommand({moveChunk: coll.getFullName(),
