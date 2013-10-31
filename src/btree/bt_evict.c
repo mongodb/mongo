@@ -318,20 +318,32 @@ __wt_evict_page(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_TXN saved_txn, *txn;
 	int was_running;
 
+	txn = &session->txn;
+
 	/*
 	 * Fast path for never modified pages, or pages marked clean with no
-	 * data required by other running transactions.
+	 * data required by other running transactions.  This fast path is only
+	 * for leaf pages: attempting to evict an internal page will cause the
+	 * whole subtree to be flushed with the current transaction context,
+	 * and there could be a newer change in a child page.
 	 *
 	 * We can't use __wt_page_is_modified by itself: a checkpoint may have
 	 * written the page and marked it clean, even though it contains some
 	 * changes a running transaction needs.  If the page is marked clean,
 	 * do a further check that the maximum transaction written for the page
 	 * is visible to all running transactions.
+	 *
+	 * If the page was ever modified, also make sure that there is a
+	 * sufficiently up-to-date transaction context, otherwise we need to
+	 * set one up anyway.
 	 */
 	mod = page->modify;
-	if (mod == NULL ||
+	if (page->type != WT_PAGE_ROW_INT && page->type != WT_PAGE_COL_INT &&
+	    (mod == NULL ||
 	    (!__wt_page_is_modified(page) &&
-	    __wt_txn_visible_all(session, mod->disk_txn)))
+	    __wt_txn_visible_all(session, mod->disk_txn) &&
+	    txn->isolation != TXN_ISO_READ_UNCOMMITTED &&
+	    !__wt_txn_visible_all(session, txn->snap_min))))
 		return (__wt_rec_evict(session, page, 0));
 
 	/*
@@ -344,7 +356,6 @@ __wt_evict_page(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * the snapshot.  If a transaction is in progress in the evicting
 	 * session, we save and restore its state.
 	 */
-	txn = &session->txn;
 	saved_txn = *txn;
 	was_running = (F_ISSET(txn, TXN_RUNNING) != 0);
 
