@@ -1035,17 +1035,6 @@ __evict_get_page(
 		++cache->evict_current;
 
 		/*
-		 * In case something goes wrong, don't pick the same set of
-		 * pages every time.
-		 *
-		 * We used to bump the page's read_gen only if eviction failed,
-		 * but that isn't safe: at that point, eviction has already
-		 * unlocked the page and some other thread may have evicted it
-		 * by the time we look at it.
-		 */
-		evict->page->read_gen = __wt_cache_read_gen_set(session);
-
-		/*
 		 * Lock the page while holding the eviction mutex to prevent
 		 * multiple attempts to evict it.  For pages that are already
 		 * being evicted, this operation will fail and we will move on.
@@ -1096,6 +1085,17 @@ __wt_evict_lru_page(WT_SESSION_IMPL *session, int is_app)
 
 	WT_RET(__evict_get_page(session, is_app, &btree, &page));
 	WT_ASSERT(session, page->ref->state == WT_REF_LOCKED);
+
+	/*
+	 * In case something goes wrong, don't pick the same set of pages every
+	 * time.
+	 *
+	 * We used to bump the page's read generation only if eviction failed,
+	 * but that isn't safe: at that point, eviction has already unlocked
+	 * the page and some other thread may have evicted it by the time we
+	 * look at it.
+	 */
+	page->read_gen = __wt_cache_read_gen_set(session);
 
 	WT_WITH_BTREE(session, btree,
 	    ret = __wt_evict_page(session, page));
