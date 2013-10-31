@@ -67,33 +67,12 @@ namespace QueryStageSortTests {
             set<DiskLoc>::iterator it = locs.begin();
 
             for (int i = 0; i < numObj(); ++i, ++it) {
-                int which = i % 3;
-
-                if (0 == which) {
-                    // Insert some unowned obj data.
-                    WorkingSetMember member;
-                    member.state = WorkingSetMember::LOC_AND_UNOWNED_OBJ;
-                    member.loc = *it;
-                    member.obj = member.loc.obj();
-                    ASSERT(!member.obj.isOwned());
-                    ms->pushBack(member);
-                }
-                else if (1 == which) {
-                    // Insert some key data.
-                    WorkingSetMember member;
-                    member.state = WorkingSetMember::LOC_AND_IDX;
-                    member.loc = *it;
-                    member.keyData.push_back(IndexKeyDatum(BSON("foo" << 1), BSON("" << i)));
-                    ms->pushBack(member);
-                }
-                else {
-                    // Insert some owned obj data.
-                    WorkingSetMember member;
-                    member.state = WorkingSetMember::OWNED_OBJ;
-                    member.obj = it->obj().getOwned();
-                    ASSERT(member.obj.isOwned());
-                    ms->pushBack(member);
-                }
+                // Insert some owned obj data.
+                WorkingSetMember member;
+                member.state = WorkingSetMember::OWNED_OBJ;
+                member.obj = it->obj().getOwned();
+                ASSERT(member.obj.isOwned());
+                ms->pushBack(member);
             }
         }
 
@@ -258,7 +237,7 @@ namespace QueryStageSortTests {
 
             // We've invalidated everything, but only 2/3 of our data had a DiskLoc to be
             // invalidated.  We get the rest as-is.
-            ASSERT_EQUALS(count, numObj() / 3);
+            ASSERT_EQUALS(count, numObj());
         }
     };
 
