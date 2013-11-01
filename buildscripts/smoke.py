@@ -46,6 +46,7 @@ import socket
 import stat
 from subprocess import (Popen,
                         PIPE,
+                        STDOUT,
                         call)
 import sys
 import time
@@ -537,14 +538,22 @@ def runTest(test, result):
     os.environ['MONGO_TEST_FILENAME'] = mongo_test_filename
     t1 = time.time()
 
-    proc = Popen(buildlogger(argv), cwd=test_path, stdout=PIPE)
+    proc = Popen(buildlogger(argv), cwd=test_path, stdout=PIPE, stderr=STDOUT, bufsize=0)
     first_line = proc.stdout.readline() # Get suppressed output URL
     m = re.search(r"\s*\(output suppressed; see (?P<url>.*)\)" + os.linesep, first_line)
     if m:
         result["url"] = m.group("url")
     sys.stdout.write(first_line)
-    for line in proc.stdout: # print until subprocess's stdout closed
+    sys.stdout.flush()
+    while True:
+        # print until subprocess's stdout closed.
+        # Not using "for line in file" since that has unwanted buffering.
+        line = proc.stdout.readline()
+        if not line:
+            break;
+
         sys.stdout.write(line)
+        sys.stdout.flush()
 
     proc.wait() # wait if stdout is closed before subprocess exits.
     r = proc.returncode

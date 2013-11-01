@@ -152,6 +152,7 @@ namespace mongo {
             else
                 buf << "sh" << pid << "| " << line;
             printf( "%s\n", buf.str().c_str() ); // cout << buf.str() << endl;
+            fflush(stdout); // not implicit if stdout isn't directly outputting to a console.
             _buffer << buf.str() << endl;
         }
 

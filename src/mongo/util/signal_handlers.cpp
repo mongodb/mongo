@@ -116,7 +116,7 @@ namespace mongo {
     }
 
     void printStackAndExit( int signalNum ) {
-        const int fd = 0;
+        const int fd = 1; // same as STDOUT_FILENO which doesn't exist on windows
 
         formattedWrite( fd , "Received signal %d\n" , signalNum );
         formattedWrite( fd , "Backtrace: " );
