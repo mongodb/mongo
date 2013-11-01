@@ -1845,7 +1845,7 @@ namespace mongo {
 
             audit::logGrantRolesToRole(ClientBasic::getCurrent(),
                                        roleName,
-                                       directRoles);
+                                       rolesToAdd);
 
             status = authzManager->updateRoleDocument(
                     roleName,
@@ -1972,7 +1972,7 @@ namespace mongo {
 
             audit::logRevokeRolesFromRole(ClientBasic::getCurrent(),
                                           roleName,
-                                          roles);
+                                          rolesToRemove);
 
             status = authzManager->updateRoleDocument(
                     roleName,
