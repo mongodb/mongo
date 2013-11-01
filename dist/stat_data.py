@@ -32,9 +32,9 @@ connection_stats = [
 	##########################################
 	Stat('cond_wait', 'pthread mutex condition wait calls'),
 	Stat('file_open', 'files currently open', 'no_clear,no_scale'),
-	Stat('memory_allocation', 'total heap memory allocations'),
-	Stat('memory_free', 'total heap memory frees'),
-	Stat('memory_grow', 'total heap memory re-allocations'),
+	Stat('memory_allocation', 'memory allocations'),
+	Stat('memory_free', 'memory frees'),
+	Stat('memory_grow', 'memory re-allocations'),
 	Stat('read_io', 'total read I/Os'),
 	Stat('rwlock_read', 'pthread mutex shared lock read-lock calls'),
 	Stat('rwlock_write', 'pthread mutex shared lock write-lock calls'),
@@ -99,23 +99,22 @@ connection_stats = [
 	##########################################
 	# Logging statistics
 	##########################################
-	Stat('log_bytes_user', 'log: total user provided log bytes written'),
-	Stat('log_bytes_written', 'log: total log bytes written'),
+	Stat('log_bytes_user', 'log: user provided log bytes written'),
+	Stat('log_bytes_written', 'log: log bytes written'),
 	Stat('log_max_filesize', 'log: maximum log file size', 'no_clear'),
-	Stat('log_reads', 'log: total log read operations'),
-	Stat('log_scan_records', 'log: total records processed by log scan'),
+	Stat('log_reads', 'log: log read operations'),
+	Stat('log_scan_records', 'log: records processed by log scan'),
 	Stat('log_scan_rereads', 'log: log scan records requiring two reads'),
-	Stat('log_scans', 'log: total log scan operations'),
-	Stat('log_sync', 'log: total log sync operations'),
-	Stat('log_writes', 'log: total log write operations'),
+	Stat('log_scans', 'log: log scan operations'),
+	Stat('log_sync', 'log: log sync operations'),
+	Stat('log_writes', 'log: log write operations'),
 
-	Stat('log_slot_consolidated', 'log: total logging bytes consolidated'),
-	Stat('log_slot_closes', 'log: total consolidated slot closures'),
-	Stat('log_slot_joins', 'log: total consolidated slot joins'),
-	Stat('log_slot_races', 'log: total consolidated slot join races'),
+	Stat('log_slot_consolidated', 'log: logging bytes consolidated'),
+	Stat('log_slot_closes', 'log: consolidated slot closures'),
+	Stat('log_slot_joins', 'log: consolidated slot joins'),
+	Stat('log_slot_races', 'log: consolidated slot join races'),
 	Stat('log_slot_toobig', 'log: record size exceeded maximum'),
-	Stat('log_slot_transitions',
-            'log: total consolidated slot join transitions'),
+	Stat('log_slot_transitions', 'log: consolidated slot join transitions'),
 
 	##########################################
 	# Reconciliation statistics
