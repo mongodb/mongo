@@ -177,7 +177,12 @@ struct __wt_connection_impl {
 
 	WT_CONNECTION_STATS stats;	/* Connection statistics */
 #if SPINLOCK_TYPE == SPINLOCK_PTHREAD_MUTEX_LOGGING
-	WT_CONNECTION_STATS_SPINLOCK spinlock_stats[WT_STATS_SPINLOCK_MAX];
+	/* List of spinlocks: sized 1x the number of spinlocks. */
+	WT_SPINLOCK *spinlock_list[25];
+
+	/* Blocking matrix: sized 2x the number of spinlocks. */
+	WT_CONNECTION_STATS_SPINLOCK spinlock_stats[50];
+	/*
 #endif
 
 	WT_SESSION_IMPL *stat_session;	/* Statistics log session */

@@ -15,59 +15,107 @@
  */
 void
 __wt_spin_lock_register(WT_SESSION_IMPL *session,
-    const char *file, int line, const char *name, int *idp)
+    WT_SPINLOCK *t, const char *file, int line, int *idp)
 {
+	WT_CONNECTION_IMPL *conn;
 	WT_CONNECTION_STATS_SPINLOCK *p;
-	int i;
+	u_int i;
 	const char *s;
 
+	*idp = WT_SPINLOCK_REGISTER_FAILED;
+
+	conn = S2C(session);
+
+	/* If this spinlock isn't yet on our spinlock list, add it. */
+	for (i = 0; i < WT_ELEMENTS(conn->spinlock_list); ++i) {
+		if (conn->spinlock_list[i] == t)
+			break;
+		if (conn->spinlock_list[i] == NULL &&
+		    WT_ATOMIC_CAS(conn->spinlock_list[i], NULL, t))
+			break;
+	}
+	if (i == WT_ELEMENTS(conn->spinlock_list)) {
+		__wt_err(session, ENOMEM,
+		    "spin-lock reference list allocation failed, too many "
+		    "spinlocks");
+		return;
+	}
+
 	/*
-	 * Walk the connection's array of spinlock statistics, looking for an
-	 * empty slot.
+	 * Walk the connection's spinlock blocking matrix, looking for an empty
+	 * slot.
 	 */
 	if ((s = strrchr(file, '/')) == NULL)
 		s = file;
 	else
 		++s;
-	for (i = 0,
-	    p = S2C(session)->spinlock_stats;
-	    i < WT_STATS_SPINLOCK_MAX; ++i, ++p)
+	for (i = 0; i < WT_ELEMENTS(conn->spinlock_stats); ++i) {
+		p = &conn->spinlock_stats[i];
 		if (p->file == NULL && WT_ATOMIC_CAS(p->file, NULL, s)) {
 			p->line = line;
-			p->name = name;
-			*idp = i;
-			return;
+			p->name = t->name;
+			*idp = (int)i;
+			break;
 		}
+	}
 
-	__wt_err(session, ENOMEM,
-	    "spin-lock registration failed, too many spinlocks");
-	*idp = WT_SPINLOCK_REGISTER_FAILED;
+	if (i == WT_ELEMENTS(conn->spinlock_stats))
+		__wt_err(session, ENOMEM,
+		    "spin-lock blocking matrix allocation failed, too many "
+		    "spinlocks");
 }
+
+/*
+ * Ignore rare acquisition of a spinlock, don't create graphs we don't care
+ * about.  (Since the minimum statistics logging interval is a second, we're
+ * potentially ignoring 10 spin acquisitions per second).
+ */
+#define	WT_SPIN_IGNORE	10
 
 /*
  * __wt_statlog_spinlock_dump --
  *	Log the spin-lock statistics.
  */
 int
-__wt_statlog_dump_spinlock(WT_CONNECTION_IMPL *conn, const char *name)
+__wt_statlog_dump_spinlock(WT_CONNECTION_IMPL *conn, const char *tag)
 {
+	WT_SPINLOCK *spin;
 	WT_CONNECTION_STATS_SPINLOCK *p, *t;
 	u_int i, j;
 
-	for (i = 0,
-	    p = conn->spinlock_stats; i < WT_STATS_SPINLOCK_MAX; ++i, ++p) {
+	/* Dump the reference list. */
+	for (i = 0; i < WT_ELEMENTS(conn->spinlock_list); ++i) {
+		spin = conn->spinlock_list[i];
+		if (spin == NULL)
+			continue;
+
+		WT_RET_TEST((fprintf(conn->stat_fp,
+		    "%s %" PRIu64 " %s spinlock %s: acquisitions\n",
+		    conn->stat_stamp,
+		    spin->counter <= WT_SPIN_IGNORE ? 0 : spin->counter,
+		    tag, spin->name) < 0),
+		    __wt_errno());
+		if (conn->stat_clear)
+			spin->counter = 0;
+	}
+
+	/* Dump the blocking matrix. */
+	for (i = 0; i < WT_ELEMENTS(conn->spinlock_stats); ++i) {
+		p = &conn->spinlock_stats[i];
 		if (p->file == NULL)
 			break;
 
-		for (j = 0; j < WT_STATS_SPINLOCK_MAX; ++j) {
+		for (j = 0; j < WT_ELEMENTS(conn->spinlock_stats); ++j) {
 			t = &conn->spinlock_stats[j];
 			if (t->file == NULL)
 				continue;
 
 			WT_RET_TEST((fprintf(conn->stat_fp,
 			    "%s %d %s spinlock %s: %s(%d) blocked by %s(%d)\n",
-			    conn->stat_stamp, p->blocked[j], name, p->name,
-			    p->file, p->line,
+			    conn->stat_stamp,
+			    p->blocked[j] <= WT_SPIN_IGNORE ? 0 : p->blocked[j],
+			    tag,
+			    p->name, p->file, p->line,
 			    t->file, t->line) < 0), __wt_errno());
 
 			    if (conn->stat_clear)
@@ -76,5 +124,4 @@ __wt_statlog_dump_spinlock(WT_CONNECTION_IMPL *conn, const char *name)
 	}
 	return (0);
 }
-
 #endif /* SPINLOCK_PTHREAD_MUTEX_LOGGING */

@@ -1275,12 +1275,12 @@ extern int __wt_huffman_decode(WT_SESSION_IMPL *session,
     uint32_t from_len,
     WT_ITEM *to_buf);
 extern void __wt_spin_lock_register(WT_SESSION_IMPL *session,
+    WT_SPINLOCK *t,
     const char *file,
     int line,
-    const char *name,
     int *idp);
 extern int __wt_statlog_dump_spinlock(WT_CONNECTION_IMPL *conn,
-    const char *name);
+    const char *tag);
 extern uint32_t __wt_nlpo2_round(uint32_t v);
 extern uint32_t __wt_nlpo2(uint32_t v);
 extern uint32_t __wt_log2_int(uint32_t n);
