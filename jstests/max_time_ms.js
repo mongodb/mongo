@@ -287,3 +287,17 @@ assert.doesNotThrow(function() { cursor.next(); cursor.next(); cursor.next(); },
                     [],
                     "expected batch 2 (getmore) to trigger maxTimeNeverTimeOut fail point");
 assert.eq(1, t.getDB().adminCommand({configureFailPoint: "maxTimeNeverTimeOut", mode: "off"}).ok);
+
+//
+// Test that maxTimeMS is accepted by commands that have an option whitelist.
+//
+
+// "aggregate" command.
+res = t.runCommand("aggregate", {pipeline: [], maxTimeMS: 60*1000});
+assert(res.ok == 1,
+       "expected aggregate with maxtime to succeed, ok=" + res.ok + ", code=" + res.code);
+
+// "collMod" command.
+res = t.runCommand("collMod", {usePowerOf2Sizes: true, maxTimeMS: 60*1000});
+assert(res.ok == 1,
+       "expected collmod with maxtime to succeed, ok=" + res.ok + ", code=" + res.code);

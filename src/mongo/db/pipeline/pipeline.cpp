@@ -114,6 +114,11 @@ namespace mongo {
                 continue;
             }
 
+            // maxTimeMS is also for the command processor.
+            if (LiteParsedQuery::cmdOptionMaxTimeMS.compare(pFieldName) == 0) {
+                continue;
+            }
+
             // ignore cursor options since they are handled externally.
             if (str::equals(pFieldName, "cursor")) {
                 continue;

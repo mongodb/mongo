@@ -1162,6 +1162,9 @@ namespace mongo {
                 if ( str::equals( "collMod", e.fieldName() ) ) {
                     // no-op
                 }
+                else if ( LiteParsedQuery::cmdOptionMaxTimeMS == e.fieldNameStringData() ) {
+                    // no-op
+                }
                 else if ( str::equals( "usePowerOf2Sizes", e.fieldName() ) ) {
                     bool oldPowerOf2 = nsd->isUserFlagSet(NamespaceDetails::Flag_UsePowerOf2Sizes);
                     bool newPowerOf2 = e.trueValue();
