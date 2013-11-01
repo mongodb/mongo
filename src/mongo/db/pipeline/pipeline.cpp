@@ -115,7 +115,7 @@ namespace mongo {
             }
 
             // maxTimeMS is also for the command processor.
-            if (LiteParsedQuery::cmdOptionMaxTimeMS.compare(pFieldName) == 0) {
+            if (pFieldName == LiteParsedQuery::cmdOptionMaxTimeMS) {
                 continue;
             }
 
