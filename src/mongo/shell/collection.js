@@ -197,11 +197,42 @@ DBCollection.prototype.insert = function( obj , options, _allow_dot ){
             obj[key] = tmp[key];
         }
     }
-    var startTime = (typeof(_verboseShell) === 'undefined' ||
-                     !_verboseShell) ? 0 : new Date().getTime();
-    this._mongo.insert( this._fullName , obj, options );
+
     this._lastID = obj._id;
-    this._printExtraInfo("Inserted", startTime);
+
+    if (this._mongo.useWriteCommands) {
+        var documents = obj;
+        if (!Array.isArray(obj)) {
+            documents = [obj];
+        }
+
+        var cmdObj = { insert: this.getName(),
+                       documents: documents,
+                       // bit 0 flag is continueOnError
+                       ordered: ((options & 1) == 1)};
+
+        // Bypass runCommand to ignore slaveOk and read pref settings
+        var cmdColl = this._db.getCollection('$cmd');
+        var cursor = new DBQuery(this._mongo,
+                                 this._db,
+                                 cmdColl,
+                                 cmdColl.getFullName(),
+                                 cmdObj,
+                                 {}, /* projection */
+                                 -1, /* limit */
+                                 0, /* skip */
+                                 0, /* batchSize */
+                                 0 /* option flags */);
+
+        return (cursor.hasNext()? cursor.next(): null);
+    }
+    else {
+        var startTime = (typeof(_verboseShell) === 'undefined' ||
+                         !_verboseShell) ? 0 : new Date().getTime();
+
+        this._mongo.insert( this._fullName , obj, options );
+        this._printExtraInfo("Inserted", startTime);
+    }
 }
 
 DBCollection.prototype.remove = function( t , justOne ){
@@ -210,10 +241,39 @@ DBCollection.prototype.remove = function( t , justOne ){
             throw "can't have _id set to undefined in a remove expression"
         }
     }
-    var startTime = (typeof(_verboseShell) === 'undefined' ||
-                     !_verboseShell) ? 0 : new Date().getTime();
-    this._mongo.remove( this._fullName , this._massageObject( t ) , justOne ? true : false );
-    this._printExtraInfo("Removed", startTime);
+
+    if (this._mongo.useWriteCommands) {
+        var limit = NumberInt(0);
+        if (typeof(justOne) != 'undefined' && justOne != null && justOne) {
+            limit = NumberInt(1);
+        }
+
+        var query = (typeof(t) == 'undefined')? {} : this._massageObject(t);
+        var cmdObj = { delete: this.getName(),
+                       deletes: [{ q: query,
+                                   limit: limit }]};
+
+        // Bypass runCommand to ignore slaveOk and read pref settings
+        var cmdColl = this._db.getCollection('$cmd');
+        var cursor = new DBQuery(this._mongo,
+                                 this._db,
+                                 cmdColl,
+                                 cmdColl.getFullName(),
+                                 cmdObj,
+                                 {}, /* projection */
+                                 -1, /* limit */
+                                 0, /* skip */
+                                 0, /* batchSize */
+                                 0 /* option flags */);
+
+        return (cursor.hasNext()? cursor.next(): null);
+    }
+    else {
+        var startTime = (typeof(_verboseShell) === 'undefined' ||
+                         !_verboseShell) ? 0 : new Date().getTime();
+        this._mongo.remove(this._fullName, this._massageObject(t), justOne ? true : false );
+        this._printExtraInfo("Removed", startTime);
+    }
 }
 
 DBCollection.prototype.update = function( query , obj , upsert , multi ){
@@ -240,10 +300,35 @@ DBCollection.prototype.update = function( query , obj , upsert , multi ){
         upsert = opts.upsert;
     }
 
-    var startTime = (typeof(_verboseShell) === 'undefined' ||
-                     !_verboseShell) ? 0 : new Date().getTime();
-    this._mongo.update( this._fullName , query , obj , upsert ? true : false , multi ? true : false );
-    this._printExtraInfo("Updated", startTime);
+    if (this._mongo.useWriteCommands) {
+        var cmdObj = { update: this.getName(),
+                       updates: [{ q: query,
+                                   u: obj,
+                                   upsert: (upsert? true : false),
+                                   multi: (multi? true : false) }]};
+
+        // Bypass runCommand to ignore slaveOk and read pref settings
+        var cmdColl = this._db.getCollection('$cmd');
+        var cursor = new DBQuery(this._mongo,
+                                 this._db,
+                                 cmdColl,
+                                 cmdColl.getFullName(),
+                                 cmdObj,
+                                 {}, /* projection */
+                                 -1, /* limit */
+                                 0, /* skip */
+                                 0, /* batchSize */
+                                 0 /* option flags */);
+
+        return (cursor.hasNext()? cursor.next(): null);
+    }
+    else {
+        var startTime = (typeof(_verboseShell) === 'undefined' ||
+                         !_verboseShell) ? 0 : new Date().getTime();
+        this._mongo.update(this._fullName, query, obj,
+                           upsert ? true : false, multi ? true : false );
+        this._printExtraInfo("Updated", startTime);
+    }
 }
 
 DBCollection.prototype.save = function( obj ){

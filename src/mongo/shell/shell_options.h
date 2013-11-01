@@ -49,8 +49,9 @@ namespace mongo {
         std::string script;
 
         bool autoKillOp;
+        bool useWriteCommandsDefault;
 
-        ShellGlobalParams() : autoKillOp(false) { }
+        ShellGlobalParams() : autoKillOp(false), useWriteCommandsDefault(true) { }
     };
 
     extern ShellGlobalParams shellGlobalParams;

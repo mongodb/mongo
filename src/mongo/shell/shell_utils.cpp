@@ -22,6 +22,7 @@
 #include "mongo/client/dbclient_rs.h"
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/scripting/engine.h"
+#include "mongo/shell/shell_options.h"
 #include "mongo/shell/shell_utils_extended.h"
 #include "mongo/shell/shell_utils_launcher.h"
 #include "mongo/util/processinfo.h"
@@ -148,6 +149,9 @@ namespace mongo {
             return result.obj();
         }
 
+        BSONObj useWriteCommandsDefault(const BSONObj& a, void* data) {
+            return BSON("" << shellGlobalParams.useWriteCommandsDefault);
+        }
 
         BSONObj interpreterVersion(const BSONObj& a, void* data) {
             uassert( 16453, "interpreterVersion accepts no arguments", a.nFields() == 0 );
@@ -172,6 +176,8 @@ namespace mongo {
         }
 
         void initScope( Scope &scope ) {
+            // Need to define this method before JSFiles::mongo is executed.
+            scope.injectNative("_useWriteCommandsDefault", useWriteCommandsDefault);
             scope.externalSetup();
             mongo::shell_utils::installShellUtils( scope );
             scope.execSetup(JSFiles::servers);

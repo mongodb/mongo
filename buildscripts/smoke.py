@@ -452,6 +452,8 @@ def runTest(test, result):
             path = argv[1]
     elif ext == ".js":
         argv = [shell_executable, "--port", mongod_port, '--authenticationMechanism', authMechanism]
+        if not use_write_commands:
+            argv += ["--useLegacyWriteOps"]
         if not usedb:
             argv += ["--nodb"]
         if small_oplog or small_oplog_rs:
@@ -845,7 +847,7 @@ def set_globals(options, tests):
     global no_journal, set_parameters, no_preallocj, auth, authMechanism, keyFile, smoke_db_prefix, test_path, start_mongod
     global use_ssl, use_x509
     global file_of_commands_mode
-    global report_file
+    global report_file, use_write_commands
     start_mongod = options.start_mongod
     if hasattr(options, 'use_ssl'):
         use_ssl = options.use_ssl
@@ -895,6 +897,8 @@ def set_globals(options, tests):
     file_of_commands_mode = options.File and options.mode == 'files'
     # generate json report
     report_file = options.report_file
+
+    use_write_commands = options.use_write_commands
 
 def file_version():
     return md5(open(__file__, 'r').read()).hexdigest()
@@ -976,7 +980,10 @@ def add_to_failfile(tests, options):
 
 
 def main():
-    global mongod_executable, mongod_port, shell_executable, continue_on_failure, small_oplog, no_journal, set_parameters, no_preallocj, auth, keyFile, smoke_db_prefix, test_path
+    global mongod_executable, mongod_port, shell_executable, continue_on_failure, small_oplog
+    global no_journal, set_parameters, no_preallocj, auth, keyFile, smoke_db_prefix, test_path
+    global use_write_commands
+
     parser = OptionParser(usage="usage: smoke.py [OPTIONS] ARGS*")
     parser.add_option('--mode', dest='mode', default='suite',
                       help='If "files", ARGS are filenames; if "suite", ARGS are sets of tests (%default)')
@@ -1052,7 +1059,9 @@ def main():
     parser.add_option('--report-file', dest='report_file', default=None,
                       action='store',
                       help='Path to generate detailed json report containing all test details')
-
+    parser.add_option('--use-write-commands', dest='use_write_commands', default=False,
+                      action='store_true',
+                      help='Sets the shell to use write commands by default')
 
     global tests
     (options, tests) = parser.parse_args()

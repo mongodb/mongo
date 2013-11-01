@@ -99,6 +99,10 @@ namespace mongo {
         options->addOptionChaining("autokillop", "autokillop", moe::Switch, "autokillop")
                                   .hidden();
 
+        options->addOptionChaining("useLegacyWriteOps",
+                                   "useLegacyWriteOps",
+                                   moe::Switch,
+                                   "use legacy write ops instead of write commands").hidden();
 
         return Status::OK();
     }
@@ -197,6 +201,9 @@ namespace mongo {
         }
         if (params.count("autokillop")) {
             shellGlobalParams.autoKillOp = true;
+        }
+        if (params.count("useLegacyWriteOps")) {
+            shellGlobalParams.useWriteCommandsDefault = false;
         }
 
         /* This is a bit confusing, here are the rules:
