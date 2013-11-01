@@ -1123,13 +1123,8 @@ main(int argc, char *argv[])
 		goto err;
 	}
 
-	/* Sanity check run time and reporting interval. */
-	if (cfg.run_time == 0) {
-		fprintf(stderr, "run-time not configured.\n");
-		ret = EINVAL;
-		goto err;
-	}
-	if (cfg.report_interval > cfg.run_time) {
+	/* Sanity check reporting interval. */
+	if (cfg.run_time > 0 && cfg.report_interval > cfg.run_time) {
 		fprintf(stderr, "report-interval larger than the run-time.n");
 		ret = EINVAL;
 		goto err;
