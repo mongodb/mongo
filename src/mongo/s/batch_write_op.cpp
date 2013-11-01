@@ -328,13 +328,15 @@ namespace mongo {
             stats->numInserted += response.getN();
         }
         else if ( batchType == BatchedCommandRequest::BatchType_Update ) {
-            stats->numUpdated += response.getN();
+            int numUpserted = 0;
             if( response.isUpsertDetailsSet() ) {
-                stats->numUpserted += response.sizeUpsertDetails();
+                numUpserted = response.sizeUpsertDetails();
             }
             else if( response.isSingleUpsertedSet() ) {
-                ++stats->numUpserted;
+                numUpserted = 1;
             }
+            stats->numUpdated += ( response.getN() - numUpserted );
+            stats->numUpserted += numUpserted;
         }
         else {
             dassert( batchType == BatchedCommandRequest::BatchType_Delete );
@@ -619,7 +621,8 @@ namespace mongo {
         }
 
         // Stats
-        int nValue = _stats->numInserted + _stats->numUpdated + _stats->numDeleted;
+        int nValue = _stats->numInserted + _stats->numUpserted + _stats->numUpdated
+                     + _stats->numDeleted;
         batchResp->setN( nValue );
 
         batchResp->setOk( !batchResp->isErrCodeSet() );

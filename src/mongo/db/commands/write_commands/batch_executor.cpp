@@ -175,7 +175,8 @@ namespace mongo {
         // Set the main body of the response. We assume that, if there was an error, the error
         // code would already be set.
         response->setOk( !response->isErrCodeSet() );
-        response->setN( stats.numUpdated + stats.numInserted + stats.numDeleted );
+        response->setN( stats.numInserted + stats.numUpserted + stats.numUpdated
+                        + stats.numDeleted );
         dassert( response->isValid( NULL ) );
     }
 
