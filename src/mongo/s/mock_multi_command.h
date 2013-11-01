@@ -103,9 +103,11 @@ namespace mongo {
 
             if ( NULL == mockEndpoint ) {
                 batchResponse->setOk( true );
+                batchResponse->setN( 0 ); // TODO: Make this accurate
             }
             else {
                 batchResponse->setOk( false );
+                batchResponse->setN( 0 );
                 batchResponse->setErrCode( mockEndpoint->error.getErrCode() );
                 if ( mockEndpoint->error.isErrInfoSet() ) batchResponse->setErrInfo( mockEndpoint
                     ->error.getErrInfo() );
@@ -113,6 +115,8 @@ namespace mongo {
                 delete mockEndpoint;
             }
 
+            string errMsg;
+            ASSERT( batchResponse->isValid( &errMsg ) );
             return Status::OK();
         }
 

@@ -32,6 +32,14 @@
 
 namespace mongo {
 
+    BatchWriteStats::BatchWriteStats() :
+        numInserted( 0 ), numUpserted( 0 ), numUpdated( 0 ), numDeleted( 0 ) {
+    }
+
+    BatchWriteOp::BatchWriteOp() :
+        _clientRequest( NULL ), _writeOps( NULL ), _stats( new BatchWriteStats ) {
+    }
+
     void BatchWriteOp::initClientRequest( const BatchedCommandRequest* clientRequest ) {
         dassert( clientRequest->isValid( NULL ) );
 
@@ -288,10 +296,6 @@ namespace mongo {
         return errCode == ErrorCodes::WriteConcernFailed;
     }
 
-    static bool isItemErrorsOnlyCode( int errCode ) {
-        return errCode == ErrorCodes::MultipleErrorsOccurred;
-    }
-
     // Given *either* a batch error or an array of per-item errors, copies errors we're interested
     // in into a TrackedErrorMap
     static void trackErrors( const ShardEndpoint& endpoint,
@@ -313,6 +317,28 @@ namespace mongo {
                     trackedErrors->addError( new ShardError( endpoint, *error ) );
                 }
             }
+        }
+    }
+
+    static void incBatchStats( BatchedCommandRequest::BatchType batchType,
+                               const BatchedCommandResponse& response,
+                               BatchWriteStats* stats ) {
+
+        if ( batchType == BatchedCommandRequest::BatchType_Insert) {
+            stats->numInserted += response.getN();
+        }
+        else if ( batchType == BatchedCommandRequest::BatchType_Update ) {
+            stats->numUpdated += response.getN();
+            if( response.isUpsertDetailsSet() ) {
+                stats->numUpserted += response.sizeUpsertDetails();
+            }
+            else if( response.isSingleUpsertedSet() ) {
+                ++stats->numUpserted;
+            }
+        }
+        else {
+            dassert( batchType == BatchedCommandRequest::BatchType_Delete );
+            stats->numDeleted += response.getN();
         }
     }
 
@@ -407,6 +433,41 @@ namespace mongo {
             trackErrors( targetedBatch.getEndpoint(), batchError.get(), itemErrors, trackedErrors );
         }
 
+        // Track upserted ids if we need to
+        if ( response.isSingleUpsertedSet() ) {
+
+            // Work backward from the child batch item index to the batch item index
+            int batchIndex = targetedBatch.getWrites()[0]->writeOpRef.first;
+
+            BatchedUpsertDetail* upsertedId = new BatchedUpsertDetail;
+            upsertedId->setIndex( batchIndex );
+            upsertedId->setUpsertedID( response.getSingleUpserted() );
+            _upsertedIds.mutableVector().push_back( upsertedId );
+        }
+        else if ( response.isUpsertDetailsSet() ) {
+
+            const vector<BatchedUpsertDetail*>& upsertedIds = response.getUpsertDetails();
+            for ( vector<BatchedUpsertDetail*>::const_iterator it = upsertedIds.begin();
+                it != upsertedIds.end(); ++it ) {
+
+                // The child upserted details don't have the correct index for the full batch
+                const BatchedUpsertDetail* childUpsertedId = *it;
+
+                // Work backward from the child batch item index to the batch item index
+                int childBatchIndex = childUpsertedId->getIndex();
+                int batchIndex = targetedBatch.getWrites()[childBatchIndex]->writeOpRef.first;
+
+                // Push the upserted id with the correct index into the batch upserted ids
+                BatchedUpsertDetail* upsertedId = new BatchedUpsertDetail;
+                upsertedId->setIndex( batchIndex );
+                upsertedId->setUpsertedID( childUpsertedId->getUpsertedID() );
+                _upsertedIds.mutableVector().push_back( upsertedId );
+            }
+        }
+
+        // Increment stats for this batch
+        incBatchStats( _clientRequest->getBatchType(), response, _stats.get() );
+
         // Stop tracking targeted batch
         _targeted.erase( &targetedBatch );
     }
@@ -415,7 +476,9 @@ namespace mongo {
                                        const BatchedErrorDetail& error ) {
         BatchedCommandResponse response;
         response.setOk( false );
+        response.setN( 0 );
         cloneBatchErrorFrom( error, &response );
+        dassert( response.isValid( NULL ) );
         noteBatchResponse( targetedBatch, response, NULL );
     }
 
@@ -533,7 +596,7 @@ namespace mongo {
         // Build the per-item errors, if needed
         //
 
-        if ( !errOps.empty() ) {
+        if ( !errOps.empty() && _clientRequest->isVerboseWC() ) {
             for ( vector<WriteOp*>::iterator it = errOps.begin(); it != errOps.end(); ++it ) {
                 WriteOp& writeOp = **it;
                 BatchedErrorDetail* error = new BatchedErrorDetail();
@@ -542,7 +605,25 @@ namespace mongo {
             }
         }
 
+        //
+        // Append the upserted ids, if required
+        //
+
+        if ( _upsertedIds.size() != 0 ) {
+            if ( _clientRequest->sizeWriteOps() == 1u ) {
+                batchResp->setSingleUpserted( _upsertedIds.vector().front()->getUpsertedID() );
+            }
+            else if( _clientRequest->isVerboseWC() ) {
+                batchResp->setUpsertDetails( _upsertedIds.vector() );
+            }
+        }
+
+        // Stats
+        int nValue = _stats->numInserted + _stats->numUpdated + _stats->numDeleted;
+        batchResp->setN( nValue );
+
         batchResp->setOk( !batchResp->isErrCodeSet() );
+        dassert( batchResp->isValid( NULL ) );
     }
 
     BatchWriteOp::~BatchWriteOp() {

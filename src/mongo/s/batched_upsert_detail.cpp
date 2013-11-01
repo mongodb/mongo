@@ -89,7 +89,7 @@ namespace mongo {
         if (fieldState == FieldParser::FIELD_INVALID) return false;
         _isIndexSet = fieldState == FieldParser::FIELD_SET;
 
-        fieldState = FieldParser::extract(source, upsertedID, &_upsertedID, errMsg);
+        fieldState = FieldParser::extractID(source, upsertedID, &_upsertedID, errMsg);
         if (fieldState == FieldParser::FIELD_INVALID) return false;
         _isUpsertedIDSet = fieldState == FieldParser::FIELD_SET;
 
@@ -138,7 +138,7 @@ namespace mongo {
     }
 
     void BatchedUpsertDetail::setUpsertedID(const BSONObj& upsertedID) {
-        _upsertedID = upsertedID.getOwned();
+        _upsertedID = upsertedID.firstElement().wrap( "" ).getOwned();
         _isUpsertedIDSet = true;
     }
 

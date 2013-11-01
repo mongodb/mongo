@@ -48,26 +48,6 @@
 
 namespace mongo {
 
-    namespace {
-
-        // We're assuming here that writeConcern was parsed and is valid or is not
-        // present. This is just a quick check of whether is is {w:0} or not.
-        bool verboseResponse( const BatchedCommandRequest& request ) {
-            if ( !request.isWriteConcernSet() ) {
-                return true;
-            }
-
-            BSONObj writeConcern = request.getWriteConcern();
-            BSONElement wElem = writeConcern["w"];
-            if ( !wElem.isNumber() || wElem.Number() != 0 ) {
-                return true;
-            }
-
-            return false;
-        }
-
-    }
-
     WriteBatchExecutor::WriteBatchExecutor( const BSONObj& wc,
                                             Client* client,
                                             OpCounters* opCounters,
@@ -89,7 +69,7 @@ namespace mongo {
         // Apply each batch item, stopping on an error if we were asked to apply the batch
         // sequentially.
         size_t numBatchOps = request.sizeWriteOps();
-        bool verbose = verboseResponse( request );
+        bool verbose = request.isVerboseWC();
         for ( size_t i = 0; i < numBatchOps; i++ ) {
 
             if ( applyWriteItem( BatchItemRef( &request, i ),
@@ -196,6 +176,7 @@ namespace mongo {
         // code would already be set.
         response->setOk( !response->isErrCodeSet() );
         response->setN( stats.numUpdated + stats.numInserted + stats.numDeleted );
+        dassert( response->isValid( NULL ) );
     }
 
     namespace {

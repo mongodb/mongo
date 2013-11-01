@@ -283,4 +283,28 @@ namespace mongo {
         return FIELD_INVALID;
     }
 
+    FieldParser::FieldState FieldParser::extractID( BSONObj doc,
+                                                    const BSONField<BSONObj>& field,
+                                                    BSONObj* out,
+                                                    string* errMsg ) {
+        BSONElement elem = doc[field.name()];
+        if (elem.eoo()) {
+            if (field.hasDefault()) {
+                *out = field.getDefault().firstElement().wrap( "" );
+                return FIELD_DEFAULT;
+            }
+            else {
+                return FIELD_NONE;
+            }
+        }
+
+        if ( elem.type() != Array ) {
+            *out = elem.wrap( "" ).getOwned();
+            return FIELD_SET;
+        }
+
+        _genFieldErrMsg(doc, field, "id", errMsg);
+        return FIELD_INVALID;
+    }
+
 } // namespace mongo

@@ -55,6 +55,12 @@ namespace mongo {
             return false;
         }
 
+        // All the mandatory fields must be present.
+        if (!_isNSet) {
+            *errMsg = stream() << "missing " << n.name() << " field";
+            return false;
+        }
+
         // upserted and singleUpserted cannot live together
         if (_isSingleUpsertedSet && _upsertDetails.get()) {
             *errMsg = stream() << "duplicated " << singleUpserted.name() << " field";
@@ -148,14 +154,18 @@ namespace mongo {
             _n = tempN;
         }
 
-        fieldState = FieldParser::extract(source, singleUpserted, &_singleUpserted, errMsg);
-        if (fieldState == FieldParser::FIELD_INVALID) return false;
+        // singleUpserted and upsertDetails have the same field name, but are distinguished
+        // by type.  First try parsing singleUpserted, if that doesn't work, try upsertDetails
+        fieldState = FieldParser::extractID(source, singleUpserted, &_singleUpserted, errMsg);
         _isSingleUpsertedSet = fieldState == FieldParser::FIELD_SET;
 
-        std::vector<BatchedUpsertDetail*>* tempUpsertDetails = NULL;
-        fieldState = FieldParser::extract(source, upsertDetails, &tempUpsertDetails, errMsg);
-        if (fieldState == FieldParser::FIELD_INVALID) return false;
-        if (fieldState == FieldParser::FIELD_SET) _upsertDetails.reset(tempUpsertDetails);
+        // Try upsertDetails if singleUpserted didn't work
+        if (fieldState == FieldParser::FIELD_INVALID) {
+            std::vector<BatchedUpsertDetail*>* tempUpsertDetails = NULL;
+            fieldState = FieldParser::extract( source, upsertDetails, &tempUpsertDetails, errMsg );
+            if ( fieldState == FieldParser::FIELD_INVALID ) return false;
+            if ( fieldState == FieldParser::FIELD_SET ) _upsertDetails.reset( tempUpsertDetails );
+        }
 
         fieldState = FieldParser::extract(source, lastOp, &_lastOp, errMsg);
         if (fieldState == FieldParser::FIELD_INVALID) return false;
@@ -345,7 +355,7 @@ namespace mongo {
     }
 
     void BatchedCommandResponse::setSingleUpserted(const BSONObj& singleUpserted) {
-        _singleUpserted = singleUpserted.getOwned();
+        _singleUpserted = singleUpserted.firstElement().wrap( "" ).getOwned();
         _isSingleUpsertedSet = true;
     }
 

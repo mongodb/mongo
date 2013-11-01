@@ -122,6 +122,15 @@ namespace mongo {
                                   string* errMsg = NULL);
 
         /**
+         * Extracts a document id from a particular field name, which may be of any type but Array.
+         * Wraps the extracted id value in a BSONObj with one element and empty field name.
+         */
+        static FieldState extractID( BSONObj doc,
+                                     const BSONField<BSONObj>& field,
+                                     BSONObj* out,
+                                     string* errMsg = NULL );
+
+        /**
          * Extracts a mandatory BSONSerializable structure 'field' from the object 'doc'. Write
          * the extracted contents to '*out' if successful or fills '*errMsg', if exising,
          * otherwise.  This variant relies on T having a parseBSON, which all

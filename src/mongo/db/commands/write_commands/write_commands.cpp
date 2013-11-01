@@ -89,10 +89,14 @@ namespace mongo {
         BatchedCommandResponse response;
 
         if ( !request.parseBSON( cmdObj, &errMsg ) || !request.isValid( &errMsg ) ) {
+
             // Batch parse failure
             response.setOk( false );
+            response.setN( 0 );
             response.setErrCode( 99999 );
             response.setErrMessage( errMsg );
+
+            dassert( response.isValid( &errMsg ) );
             result.appendElements( response.toBSON() );
 
             // TODO

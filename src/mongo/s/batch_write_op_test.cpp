@@ -82,6 +82,8 @@ namespace {
 
         BatchedCommandResponse response;
         response.setOk( true );
+        response.setN( 0 );
+        ASSERT( response.isValid( NULL ) );
 
         batchOp.noteBatchResponse( *targeted.front(), response, NULL );
         ASSERT( batchOp.isFinished() );
@@ -103,9 +105,11 @@ namespace {
 
     void setBatchError( const BatchedErrorDetail& error, BatchedCommandResponse* response ) {
         response->setOk( false );
+        response->setN( 0 );
         response->setErrCode( error.getErrCode() );
         response->setErrInfo( error.getErrInfo() );
         response->setErrMessage( error.getErrMessage() );
+        ASSERT( response->isValid( NULL ) );
     }
 
     TEST(WriteOpTests, TargetSingleError) {
@@ -213,6 +217,8 @@ namespace {
 
         BatchedCommandResponse response;
         response.setOk( true );
+        response.setN( 0 );
+        ASSERT( response.isValid( NULL ) );
 
         batchOp.noteBatchResponse( *targeted.front(), response, NULL );
         ASSERT( batchOp.isFinished() );
@@ -286,6 +292,8 @@ namespace {
 
         BatchedCommandResponse response;
         response.setOk( true );
+        response.setN( 0 );
+        ASSERT( response.isValid( NULL ) );
 
         batchOp.noteBatchResponse( *targeted.front(), response, NULL );
         ASSERT( !batchOp.isFinished() );
@@ -363,6 +371,8 @@ namespace {
 
         BatchedCommandResponse response;
         response.setOk( true );
+        response.setN( 0 );
+        ASSERT( response.isValid( NULL ) );
 
         batchOp.noteBatchResponse( *targeted.front(), response, NULL );
         ASSERT( !batchOp.isFinished() );
@@ -430,6 +440,8 @@ namespace {
         // First shard write ok
         BatchedCommandResponse response;
         response.setOk( true );
+        response.setN( 0 );
+        ASSERT( response.isValid( NULL ) );
 
         batchOp.noteBatchResponse( *targeted.front(), response, NULL );
         ASSERT( !batchOp.isFinished() );
@@ -570,6 +582,8 @@ namespace {
 
         BatchedCommandResponse nextResponse;
         nextResponse.setOk( true );
+        nextResponse.setN( 0 );
+        ASSERT( nextResponse.isValid( NULL ) );
 
         batchOp.noteBatchResponse( *nextTargeted.front(), nextResponse, NULL );
         ASSERT( batchOp.isFinished() );

@@ -46,6 +46,7 @@ namespace mongo {
     class TargetedWriteBatch;
     struct ShardError;
     class TrackedErrors;
+    class BatchWriteStats;
 
     /**
      * The BatchWriteOp class manages the lifecycle of a batched write received by mongos.  Each
@@ -77,9 +78,7 @@ namespace mongo {
     MONGO_DISALLOW_COPYING(BatchWriteOp);
     public:
 
-        BatchWriteOp() :
-            _clientRequest( NULL ), _writeOps( NULL ) {
-        }
+        BatchWriteOp();
 
         ~BatchWriteOp();
 
@@ -157,6 +156,23 @@ namespace mongo {
 
         // Write concern responses from all write batches so far
         OwnedPointerVector<ShardError> _wcErrors;
+
+        // Upserted ids for the whole write batch
+        OwnedPointerVector<BatchedUpsertDetail> _upsertedIds;
+
+        // Stats for the entire batch op
+        scoped_ptr<BatchWriteStats> _stats;
+    };
+
+    struct BatchWriteStats {
+
+        BatchWriteStats();
+
+        int numInserted;
+        int numUpserted;
+        int numUpdated;
+        int numDeleted;
+
     };
 
     /**

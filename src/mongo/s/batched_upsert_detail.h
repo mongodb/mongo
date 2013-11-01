@@ -50,7 +50,7 @@ namespace mongo {
         //
 
         static const BSONField<int> index;
-        static const BSONField<BSONObj> upsertedID;
+        static const BSONField<BSONObj> upsertedID; // ID type
 
         //
         // construction / destruction

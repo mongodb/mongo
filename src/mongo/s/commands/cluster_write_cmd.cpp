@@ -213,8 +213,11 @@ namespace mongo {
         if ( !request.parseBSON( cmdObj, &errMsg ) || !request.isValid( &errMsg ) ) {
             // Batch parse failure
             response.setOk( false );
+            response.setN( 0 );
             response.setErrCode( ErrorCodes::FailedToParse );
             response.setErrMessage( errMsg );
+
+            dassert( response.isValid( &errMsg ) );
             result.appendElements( response.toBSON() );
 
             // TODO
@@ -230,8 +233,11 @@ namespace mongo {
             if ( request.sizeWriteOps() != 1 || request.isWriteConcernSet() ) {
                 // Invalid request to create index
                 response.setOk( false );
+                response.setN( 0 );
                 response.setErrCode( ErrorCodes::CannotCreateIndex );
                 response.setErrMessage( "invalid batch request for index creation" );
+
+                dassert( response.isValid( &errMsg ) );
                 result.appendElements( response.toBSON() );
 
                 return false;

@@ -45,7 +45,7 @@ namespace mongo {
         static const BSONField<BSONObj> errInfo;
         static const BSONField<string> errMessage;
         static const BSONField<long long> n;
-        static const BSONField<BSONObj> singleUpserted;
+        static const BSONField<BSONObj> singleUpserted; // ID type
         static const BSONField<std::vector<BatchedUpsertDetail*> > upsertDetails;
         static const BSONField<Date_t> lastOp;
         static const BSONField<std::vector<BatchedErrorDetail*> > errDetails;
@@ -144,11 +144,11 @@ namespace mongo {
         string _errMessage;
         bool _isErrMessageSet;
 
-        // (O)  number of documents affected
+        // (M)  number of documents affected
         long long _n;
         bool _isNSet;
 
-        // (0)  "promoted" _upserted, if the corresponding request contained only one batch item
+        // (O)  "promoted" _upserted, if the corresponding request contained only one batch item
         //      Should only be present if _upserted is not.
         BSONObj _singleUpserted;
         bool _isSingleUpsertedSet;

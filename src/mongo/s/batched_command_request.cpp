@@ -82,6 +82,20 @@ namespace mongo {
         return nss.toString();
     }
 
+    bool BatchedCommandRequest::isVerboseWC() const {
+        if ( !isWriteConcernSet() ) {
+            return true;
+        }
+
+        BSONObj writeConcern = getWriteConcern();
+        BSONElement wElem = writeConcern["w"];
+        if ( !wElem.isNumber() || wElem.Number() != 0 ) {
+            return true;
+        }
+
+        return false;
+    }
+
     void BatchedCommandRequest::cloneTo( BatchedCommandRequest* other ) const {
         other->_insertReq.reset();
         other->_updateReq.reset();

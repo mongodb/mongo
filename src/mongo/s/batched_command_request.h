@@ -86,6 +86,8 @@ namespace mongo {
         // individual field accessors
         //
 
+        bool isVerboseWC() const;
+
         void setNS( const StringData& collName );
         void unsetNS();
         bool isNSSet() const;
