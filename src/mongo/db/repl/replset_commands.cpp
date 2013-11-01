@@ -179,7 +179,7 @@ namespace mongo {
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {
             ActionSet actions;
-            actions.addAction(ActionType::replSetReconfig);
+            actions.addAction(ActionType::replSetConfigure);
             out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
         }
         CmdReplSetReconfig() : ReplSetCommand("replSetReconfig"), mutex("rsreconfig") { }
@@ -274,7 +274,7 @@ namespace mongo {
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {
             ActionSet actions;
-            actions.addAction(ActionType::replSetFreeze);
+            actions.addAction(ActionType::replSetStateChange);
             out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
         }
         CmdReplSetFreeze() : ReplSetCommand("replSetFreeze") { }
@@ -304,7 +304,7 @@ namespace mongo {
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {
             ActionSet actions;
-            actions.addAction(ActionType::replSetStepDown);
+            actions.addAction(ActionType::replSetStateChange);
             out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
         }
         CmdReplSetStepDown() : ReplSetCommand("replSetStepDown") { }
@@ -359,7 +359,7 @@ namespace mongo {
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {
             ActionSet actions;
-            actions.addAction(ActionType::replSetMaintenance);
+            actions.addAction(ActionType::replSetStateChange);
             out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
         }
         CmdReplSetMaintenance() : ReplSetCommand("replSetMaintenance") { }
@@ -391,7 +391,7 @@ namespace mongo {
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {
             ActionSet actions;
-            actions.addAction(ActionType::replSetSyncFrom);
+            actions.addAction(ActionType::replSetStateChange);
             out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
         }
         CmdReplSetSyncFrom() : ReplSetCommand("replSetSyncFrom") { }

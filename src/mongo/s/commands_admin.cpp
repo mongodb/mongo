@@ -189,7 +189,7 @@ namespace mongo {
                                                const BSONObj& cmdObj) {
                 if (!client->getAuthorizationSession()->isAuthorizedForActionsOnResource(
                         ResourcePattern::forDatabaseName(parseNs(dbname, cmdObj)),
-                        ActionType::movePrimary)) {
+                        ActionType::moveChunk)) {
                     return Status(ErrorCodes::Unauthorized, "Unauthorized");
                 }
                 return Status::OK();
@@ -443,7 +443,7 @@ namespace mongo {
                 if (!client->getAuthorizationSession()->isAuthorizedForActionsOnResource(
                         ResourcePattern::forExactNamespace(NamespaceString(parseNs(dbname,
                                                                                    cmdObj))),
-                        ActionType::shardCollection)) {
+                        ActionType::enableSharding)) {
                     return Status(ErrorCodes::Unauthorized, "Unauthorized");
                 }
                 return Status::OK();
@@ -870,7 +870,7 @@ namespace mongo {
                 if (!client->getAuthorizationSession()->isAuthorizedForActionsOnResource(
                         ResourcePattern::forExactNamespace(NamespaceString(parseNs(dbname,
                                                                                    cmdObj))),
-                        ActionType::split)) {
+                        ActionType::splitChunk)) {
                     return Status(ErrorCodes::Unauthorized, "Unauthorized");
                 }
                 return Status::OK();

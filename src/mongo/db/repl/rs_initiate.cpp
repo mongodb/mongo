@@ -173,7 +173,7 @@ namespace mongo {
                                            const BSONObj& cmdObj,
                                            std::vector<Privilege>* out) {
             ActionSet actions;
-            actions.addAction(ActionType::replSetInitiate);
+            actions.addAction(ActionType::replSetConfigure);
             out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
         }
         virtual bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {

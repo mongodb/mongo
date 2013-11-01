@@ -1412,7 +1412,7 @@ var authCommandsLib = {
                     runOnDb: adminDbName,
                     rolesAllowed: roles_clusterManager,
                     requiredPrivileges: [
-                        { resource: {db: "test", collection: "x"}, actions: ["mergeChunks"] }
+                        { resource: {db: "test", collection: "x"}, actions: ["splitChunk"] }
                     ],
                     expectFail: true
                 },
@@ -1445,7 +1445,7 @@ var authCommandsLib = {
                     runOnDb: adminDbName,
                     rolesAllowed: roles_clusterManager,
                     requiredPrivileges: [
-                        { resource: {db: "x", collection: ""}, actions: ["movePrimary"] }
+                        { resource: {db: "x", collection: ""}, actions: ["moveChunk"] }
                     ],
                     expectFail: true
                 },
@@ -1658,7 +1658,7 @@ var authCommandsLib = {
                     runOnDb: adminDbName,
                     rolesAllowed: roles_clusterManager,
                     requiredPrivileges: [
-                        { resource: {cluster: true}, actions: ["replSetFreeze"] }
+                        { resource: {cluster: true}, actions: ["replSetStateChange"] }
                     ],
                     expectFail: true
                 },
@@ -1749,7 +1749,7 @@ var authCommandsLib = {
                     runOnDb: adminDbName,
                     rolesAllowed: roles_clusterManager,
                     requiredPrivileges: [
-                        { resource: {cluster: true}, actions: ["replSetInitiate"] }
+                        { resource: {cluster: true}, actions: ["replSetConfigure"] }
                     ],
                     expectFail: true
                 },
@@ -1766,7 +1766,7 @@ var authCommandsLib = {
                     runOnDb: adminDbName,
                     rolesAllowed: roles_clusterManager,
                     requiredPrivileges: [
-                        { resource: {cluster: true}, actions: ["replSetMaintenance"] }
+                        { resource: {cluster: true}, actions: ["replSetStateChange"] }
                     ],
                     expectFail: true
                 },
@@ -1783,7 +1783,7 @@ var authCommandsLib = {
                     runOnDb: adminDbName,
                     rolesAllowed: roles_clusterManager,
                     requiredPrivileges: [
-                        { resource: {cluster: true}, actions: ["replSetReconfig"] }
+                        { resource: {cluster: true}, actions: ["replSetConfigure"] }
                     ],
                     expectFail: true
                 },
@@ -1800,7 +1800,7 @@ var authCommandsLib = {
                     runOnDb: adminDbName,
                     rolesAllowed: roles_clusterManager,
                     requiredPrivileges: [
-                        { resource: {cluster: true}, actions: ["replSetStepDown"] }
+                        { resource: {cluster: true}, actions: ["replSetStateChange"] }
                     ],
                     expectFail: true
                 },
@@ -1817,7 +1817,7 @@ var authCommandsLib = {
                     runOnDb: adminDbName,
                     rolesAllowed: roles_clusterManager,
                     requiredPrivileges: [
-                        { resource: {cluster: true}, actions: ["replSetSyncFrom"] }
+                        { resource: {cluster: true}, actions: ["replSetStateChange"] }
                     ],
                     expectFail: true
                 },
@@ -1925,7 +1925,7 @@ var authCommandsLib = {
                     runOnDb: adminDbName,
                     rolesAllowed: roles_clusterManager,
                     requiredPrivileges: [
-                        { resource: {db: "test", collection: "x"}, actions: ["shardCollection"] }
+                        { resource: {db: "test", collection: "x"}, actions: ["enableSharding"] }
                     ],
                     expectFail: true
                 },
@@ -1966,7 +1966,7 @@ var authCommandsLib = {
                     runOnDb: adminDbName,
                     rolesAllowed: roles_clusterManager,
                     requiredPrivileges: [
-                        { resource: {db: "test", collection: "x"}, actions: ["split"] }
+                        { resource: {db: "test", collection: "x"}, actions: ["splitChunk"] }
                     ],
                     expectFail: true
                 },

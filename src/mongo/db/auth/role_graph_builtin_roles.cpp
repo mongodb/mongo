@@ -132,7 +132,6 @@ namespace {
             << ActionType::grantRole
             << ActionType::invalidateUserCache // hostManager gets this also
             << ActionType::revokeRole
-            << ActionType::userAdmin
             << ActionType::viewUser
             << ActionType::viewRole;
 
@@ -210,28 +209,19 @@ namespace {
         // clusterManager role actions that target the cluster resource
         clusterManagerRoleClusterActions
             << ActionType::applicationMessage // hostManager gets this also
+            << ActionType::replSetConfigure
             << ActionType::replSetGetStatus // clusterMonitor gets this also
-            << ActionType::replSetFreeze // TODO(spencer): combine the following 4 replset actions
-            << ActionType::replSetMaintenance
-            << ActionType::replSetStepDown
-            << ActionType::replSetSyncFrom
-            << ActionType::replSetInitiate // TODO(spencer): combine with replSetReconfig
-            << ActionType::replSetReconfig
+            << ActionType::replSetStateChange
             << ActionType::resync // hostManager gets this also
             << ActionType::addShard
             << ActionType::removeShard
             << ActionType::cleanupOrphaned;
 
         clusterManagerRoleDatabaseActions
-            << ActionType::split // TODO(spencer): combine the following 3 sharding actions
             << ActionType::splitChunk
-            << ActionType::mergeChunks
-            << ActionType::moveChunk // TODO(spencer): combine with movePrimary
-            << ActionType::movePrimary
-            << ActionType::enableSharding // TODO(spencer): combine with shardCollection
-            << ActionType::shardCollection
+            << ActionType::moveChunk
+            << ActionType::enableSharding
             << ActionType::splitVector;
-
 
         // Database-owner role database actions.
         dbOwnerRoleActions += readWriteRoleActions;

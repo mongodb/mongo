@@ -57,7 +57,7 @@ namespace mongo {
                                            const BSONObj& cmdObj) {
             if (!client->getAuthorizationSession()->isAuthorizedForActionsOnResource(
                     ResourcePattern::forExactNamespace(NamespaceString(parseNs(dbname, cmdObj))),
-                    ActionType::mergeChunks)) {
+                    ActionType::splitChunk)) {
                 return Status(ErrorCodes::Unauthorized, "Unauthorized");
             }
             return Status::OK();
