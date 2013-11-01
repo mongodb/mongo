@@ -1352,6 +1352,7 @@ namespace mongo {
             ActionSet targetActions;
             targetActions.addAction(ActionType::insert);
             targetActions.addAction(ActionType::createIndex);
+            targetActions.addAction(ActionType::convertToCapped);
             std::string collection = cmdObj.getStringField("toCollection");
             uassert(16708, "bad 'toCollection' value", !collection.empty());
 
