@@ -393,12 +393,26 @@ namespace mongo {
         class CreateCmd : public PublicGridCommand {
         public:
             CreateCmd() : PublicGridCommand( "create" ) {}
-            virtual void addRequiredPrivileges(const std::string& dbname,
-                                               const BSONObj& cmdObj,
-                                               std::vector<Privilege>* out) {
-                ActionSet actions;
-                actions.addAction(ActionType::createCollection);
-                out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
+            virtual Status checkAuthForCommand(ClientBasic* client,
+                                               const std::string& dbname,
+                                               const BSONObj& cmdObj) {
+                AuthorizationSession* authzSession = client->getAuthorizationSession();
+                if (cmdObj["capped"].trueValue()) {
+                    if (!authzSession->isAuthorizedForActionsOnResource(
+                            parseResourcePattern(dbname, cmdObj), ActionType::convertToCapped)) {
+                        return Status(ErrorCodes::Unauthorized, "unauthorized");
+                    }
+                }
+
+                // ActionType::createCollection or ActionType::insert are both acceptable
+                if (authzSession->isAuthorizedForActionsOnResource(
+                        parseResourcePattern(dbname, cmdObj), ActionType::createCollection) ||
+                    authzSession->isAuthorizedForActionsOnResource(
+                        parseResourcePattern(dbname, cmdObj), ActionType::insert)) {
+                    return Status::OK();
+                }
+
+                return Status(ErrorCodes::Unauthorized, "unauthorized");
             }
             bool run(const string& dbName,
                      BSONObj& cmdObj,

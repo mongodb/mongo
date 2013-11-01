@@ -625,12 +625,26 @@ namespace mongo {
             help << "create a collection explicitly\n"
                 "{ create: <ns>[, capped: <bool>, size: <collSizeInBytes>, max: <nDocs>] }";
         }
-        virtual void addRequiredPrivileges(const std::string& dbname,
-                                           const BSONObj& cmdObj,
-                                           std::vector<Privilege>* out) {
-            ActionSet actions;
-            actions.addAction(ActionType::createCollection);
-            out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
+        virtual Status checkAuthForCommand(ClientBasic* client,
+                                           const std::string& dbname,
+                                           const BSONObj& cmdObj) {
+            AuthorizationSession* authzSession = client->getAuthorizationSession();
+            if (cmdObj["capped"].trueValue()) {
+                if (!authzSession->isAuthorizedForActionsOnResource(
+                        parseResourcePattern(dbname, cmdObj), ActionType::convertToCapped)) {
+                    return Status(ErrorCodes::Unauthorized, "unauthorized");
+                }
+            }
+
+            // ActionType::createCollection or ActionType::insert are both acceptable
+            if (authzSession->isAuthorizedForActionsOnResource(
+                    parseResourcePattern(dbname, cmdObj), ActionType::createCollection) ||
+                authzSession->isAuthorizedForActionsOnResource(
+                    parseResourcePattern(dbname, cmdObj), ActionType::insert)) {
+                return Status::OK();
+            }
+
+            return Status(ErrorCodes::Unauthorized, "unauthorized");
         }
         virtual bool run(const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
             uassert(15888, "must pass name of collection to create", cmdObj.firstElement().valuestrsafe()[0] != '\0');
