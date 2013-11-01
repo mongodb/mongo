@@ -211,16 +211,21 @@ static inline void
 __wt_txn_read_first(WT_SESSION_IMPL *session)
 {
 	WT_TXN *txn;
-	WT_TXN_GLOBAL *txn_global;
-	WT_TXN_STATE *txn_state;
 
 	txn = &session->txn;
+
+#ifdef HAVE_DIAGNOSTIC
+	{
+	WT_TXN_GLOBAL *txn_global;
+	WT_TXN_STATE *txn_state;
 	txn_global = &S2C(session)->txn_global;
 	txn_state = &txn_global->states[session->id];
 
 	WT_ASSERT(session, F_ISSET(txn, TXN_RUNNING) ||
 	    (txn_state->id == WT_TXN_NONE &&
 	    txn_state->snap_min == WT_TXN_NONE));
+	}
+#endif
 
 	if (txn->isolation == TXN_ISO_READ_COMMITTED ||
 	    (!F_ISSET(txn, TXN_RUNNING) &&

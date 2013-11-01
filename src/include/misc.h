@@ -71,6 +71,12 @@
  */
 #define	WT_UNUSED(var)	(void)(var)
 
+/*
+ * Quiet compiler warning for unused result.
+ */
+#define	WT_UNUSED_RET(var)						\
+	({ __typeof__(var) __ret = var; (void)sizeof __ret; })
+
 /* Add GCC-specific attributes to types and function declarations. */
 #ifdef __GNUC__
 #define	WT_GCC_ATTRIBUTE(x)	__attribute__(x)

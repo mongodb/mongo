@@ -43,6 +43,11 @@
 #define	FNAME_STAT	"__stats"		/* File name for statistics */
 
 #define	UNUSED(v)	(void)(v)		/* Quiet unused var warnings */
+/*
+ * Quiet compiler warning for unused result.
+ */
+#define	UNUSED_RET(var)						\
+	({ __typeof__(var) __ret = var; (void)sizeof __ret; })
 
 extern WT_CONNECTION *conn;			/* WiredTiger connection */
 
