@@ -56,7 +56,7 @@ NAME=mongod
 # http://dochub.mongodb.org/core/configurationoptions
 CONF=/etc/mongod.conf
 PIDFILE=/var/run/$NAME.pid
-ENABLE_MONGODB=yes
+ENABLE_MONGOD=yes
 
 # Include mongodb defaults if available
 if [ -f /etc/default/$NAME ] ; then
