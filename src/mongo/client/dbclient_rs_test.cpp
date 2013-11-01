@@ -33,24 +33,6 @@
 #include <string>
 #include <vector>
 
-namespace mongo {
-    // Symbols defined to build the binary correctly.
-
-    bool inShutdown() {
-        return false;
-    }
-
-    DBClientBase *createDirectClient() { return NULL; }
-
-    void dbexit(ExitCode rc, const char *why){
-        ::_exit(rc);
-    }
-
-    bool haveLocalShardingInfo(const string& ns) {
-        return false;
-    }
-}
-
 namespace {
     using boost::scoped_ptr;
     using std::auto_ptr;

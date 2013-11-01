@@ -42,15 +42,6 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/net/hostandport.h"
 
-namespace mongo {
-
-    // Temporary crutches to allow us to link against libraries that need this symbol
-    bool inShutdown() {
-        return false;
-    }
-
-} // namespace mongo
-
 namespace {
 
     using boost::scoped_ptr;

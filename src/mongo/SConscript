@@ -237,6 +237,19 @@ env.StaticLibrary('network', [
                            'server_options_core',
                   ])
 
+env.StaticLibrary('clientdriver', [
+                  "client/connpool.cpp",
+                  "client/dbclient.cpp",
+                  "client/dbclient_rs.cpp",
+                  "client/dbclientcursor.cpp",
+                  'client/sasl_client_authenticate.cpp',
+                  "client/syncclusterconnection.cpp",
+                  "db/dbmessage.cpp"
+                  ],
+                  LIBDEPS=['auth_helpers',
+                           'network',
+                  ])
+
 commonFiles = [ "pch.cpp",
                 "buildinfo.cpp",
                 "db/lasterror.cpp",
@@ -257,13 +270,6 @@ commonFiles = [ "pch.cpp",
                 "util/stack_introspect.cpp",
                 "util/startup_test.cpp",
                 "util/version.cpp",
-                "client/connpool.cpp",
-                "client/dbclient.cpp",
-                "client/dbclient_rs.cpp",
-                "client/dbclientcursor.cpp",
-                'client/sasl_client_authenticate.cpp',
-                "client/syncclusterconnection.cpp",
-                "db/dbmessage.cpp"
                 ]
 
 extraCommonLibdeps = []
@@ -318,17 +324,18 @@ env.StaticLibrary("fail_point",
 env.StaticLibrary('mongocommon', commonFiles,
                   LIBDEPS=['auth_helpers',
                            'bson',
+                           'background_job',
+                           'clientdriver',
+                           'fail_point',
                            'foundation',
-                           'mongohasher',
                            'md5',
+                           'mongohasher',
+                           'network',
                            'processinfo',
-                           'synchronization',
+                           'spin_lock',
                            'stacktrace',
                            'stringutils',
-                           'fail_point',
-                           'spin_lock',
-                           'background_job',
-                           'network',
+                           'synchronization',
                            'util/concurrency/thread_name',
                            '$BUILD_DIR/third_party/shim_pcrecpp',
                            '$BUILD_DIR/third_party/murmurhash3/murmurhash3',
@@ -421,6 +428,7 @@ env.StaticLibrary("coredb", [
                            '$BUILD_DIR/third_party/shim_snappy',
                            'server_options',
                            '$BUILD_DIR/mongo/util/cmdline_utils/cmdline_utils',
+                           'clientdriver',
                            ])
 
 coreServerFiles = [ "db/client_basic.cpp",
@@ -700,15 +708,7 @@ env.CppUnitTest( "balancer_policy_test" , [ "s/balancer_policy_tests.cpp" ] ,
                 NO_CRUTCH=True)
 
 env.CppUnitTest("dbclient_rs_test", [ "client/dbclient_rs_test.cpp" ],
-                 LIBDEPS=[
-                    "coredb",
-                    "coreserver",
-                    "coreshard",
-                    "mocklib",
-                    "mongocommon",
-                    "message_server_port",
-                    "mongoscore"],
-                 NO_CRUTCH=True)
+                 LIBDEPS=['clientdriver', 'mocklib'])
 
 env.CppUnitTest("scoped_db_conn_test", [ "client/scoped_db_conn_test.cpp" ],
                  LIBDEPS=[
@@ -988,7 +988,7 @@ env.StaticLibrary('mocklib', [
         'dbtests/mock/mock_remote_db_server.cpp',
         'dbtests/mock/mock_replica_set.cpp'
     ],
-    LIBDEPS=['mongocommon'])
+    LIBDEPS=['clientdriver'])
 
 test = testEnv.Install(
     '#/',
