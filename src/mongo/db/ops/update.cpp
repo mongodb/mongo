@@ -43,6 +43,9 @@
 #include "mongo/db/ops/update_driver.h"
 #include "mongo/db/pagefault.h"
 #include "mongo/db/pdfile.h"
+#include "mongo/db/query/new_find.h"
+#include "mongo/db/query/query_planner_common.h"
+#include "mongo/db/query/runner_yield_policy.h"
 #include "mongo/db/query_optimizer.h"
 #include "mongo/db/query_runner.h"
 #include "mongo/db/queryutil.h"
@@ -131,29 +134,27 @@ namespace mongo {
         if ( collection )
             driver->refreshIndexKeys( collection->infoCache()->indexKeys() );
 
-        shared_ptr<Cursor> cursor = getOptimizedCursor(
-            nsString.ns(), request.getQuery(), BSONObj(), request.getQueryPlanSelectionPolicy() );
+        CanonicalQuery* cq;
+        // We pass -limit because a positive limit means 'batch size' but negative limit is a
+        // hard limit.
+        if (!CanonicalQuery::canonicalize(nsString, request.getQuery(), &cq).isOK()) {
+            uasserted(17242, "could not canonicalize query " + request.getQuery().toString());
+        }
+
+        Runner* rawRunner;
+        if (!getRunner(cq, &rawRunner).isOK()) {
+            uasserted(17243, "could not get runner " + request.getQuery().toString());
+        }
+
+        auto_ptr<Runner> runner(rawRunner);
+        RunnerYieldPolicy yieldPolicy;
 
         // If the update was marked with '$isolated' (a.k.a '$atomic'), we are not allowed to
         // yield while evaluating the update loop below.
-        //
-        // TODO: Old code checks this repeatedly within the update loop. Is that necessary? It seems
-        // that once atomic should be always atomic.
-        const bool isolated =
-            cursor->ok() &&
-            cursor->matcher() &&
-            cursor->matcher()->docMatcher().atomic();
-
-        // The 'cursor' the optimizer gave us may contain query plans that generate duplicate
-        // diskloc's. We set up here the mechanims that will prevent us from processing those
-        // twice if we see them. We also set up a 'ClientCursor' so that we can support
-        // yielding.
-        //
-        // TODO: Is it valid to call this on a non-ok cursor?
-        const bool dedupHere = cursor->autoDedup();
+        const bool isolated = QueryPlannerCommon::hasNode(cq->root(), MatchExpression::ATOMIC);
 
         //
-        // We'll start assuming we have one or more documents for this update. (Othwerwise,
+        // We'll start assuming we have one or more documents for this update. (Otherwise,
         // we'll fallback to upserting.)
         //
 
@@ -161,12 +162,8 @@ namespace mongo {
         // when in strict update mode.
         driver->setContext( ModifierInterface::ExecInfo::UPDATE_CONTEXT );
 
-        // Let's fetch each of them and pipe them through the update expression, making sure to
-        // keep track of the necessary stats. Recall that we'll be pulling documents out of
-        // cursors and some of them do not deduplicate the entries they generate. We have
-        // deduping logic in here, too -- for now.
-        unordered_set<DiskLoc, DiskLoc::Hasher> seenLocs;
         int numMatched = 0;
+        unordered_set<DiskLoc, DiskLoc::Hasher> updatedLocs;
 
         // Reset these counters on each call. We might re-enter this function to retry this
         // update if we throw a page fault exception below, and we rely on these counters
@@ -175,142 +172,46 @@ namespace mongo {
         opDebug->nscanned = 0;
         opDebug->nupdateNoops = 0;
 
-        Client& client = cc();
-
         mutablebson::Document doc;
         mutablebson::DamageVector damages;
 
-        // If we are going to be yielding, we will need a ClientCursor scoped to this loop. We
-        // only loop as long as the underlying cursor is OK.
-        for ( auto_ptr<ClientCursor> clientCursor; cursor->ok(); ) {
-
-            // If we haven't constructed a ClientCursor, and if the client allows us to throw
-            // page faults, and if we are referring to a location that is likely not in
-            // physical memory, then throw a PageFaultException. The entire operation will be
-            // restarted.
-            if ( clientCursor.get() == NULL &&
-                 client.allowedToThrowPageFaultException() &&
-                 !cursor->currLoc().isNull() &&
-                 !cursor->currLoc().rec()->likelyInPhysicalMemory() ) {
-
-                // We should never throw a PFE if we have already updated items. The numMatched
-                // variable includes no-ops, which do not prevent us from raising a PFE, so if
-                // numMatched is non-zero, we are still OK to throw as long all matched items
-                // resulted in a no-op.
-                dassert((numMatched == 0) || (numMatched == opDebug->nupdateNoops));
-
-                throw PageFaultException( cursor->currLoc().rec() );
-            }
-
+        BSONObj oldObj;
+        DiskLoc loc;
+        Runner::RunnerState state;
+        while (Runner::RUNNER_ADVANCED == (state = runner->getNext(&oldObj, &loc))) {
             if ( !isolated && opDebug->nscanned != 0 ) {
+                if (yieldPolicy.shouldYield()) {
+                    if (!yieldPolicy.yieldAndCheckIfOK(runner.get())) {
+                        break;
+                    }
 
-                // We are permitted to yield. To do so we need a ClientCursor, so create one
-                // now if we have not yet done so.
-                if ( !clientCursor.get() )
-                    clientCursor.reset(
-                        new ClientCursor( QueryOption_NoCursorTimeout, cursor, nsString.ns() ) );
-
-                // Ask the client cursor to yield. We get two bits of state back: whether or not
-                // we yielded, and whether or not we correctly recovered from yielding.
-                bool yielded = false;
-                const bool recovered = clientCursor->yieldSometimes(
-                    ClientCursor::WillNeed, &yielded );
-
-                if ( !recovered ) {
-                    // If we failed to recover from the yield, then the ClientCursor is already
-                    // gone. Release it so we don't destroy it a second time.
-                    clientCursor.release();
-                    break;
-                }
-
-                if ( !cursor->ok() ) {
-                    // If the cursor died while we were yielded, just get out of the update loop.
-                    break;
-                }
-
-                if ( yielded ) {
                     // We yielded and recovered OK, and our cursor is still good. Details about
                     // our namespace may have changed while we were yielded, so we re-acquire
                     // them here. If we can't do so, escape the update loop. Otherwise, refresh
                     // the driver so that it knows about what is currently indexed.
-                    Collection* collection = cc().database()->getCollection( nsString.ns() );
-                    if ( !collection )
+
+                    collection = cc().database()->getCollection( nsString.ns() );
+                    if (NULL == collection) {
                         break;
+                    }
 
                     // TODO: This copies the index keys, but it may not need to do so.
                     driver->refreshIndexKeys( collection->infoCache()->indexKeys() );
                 }
-
             }
 
-            // Let's fetch the next candidate object for this update.
-            Record* record = cursor->_current();
-            DiskLoc loc = cursor->currLoc();
-            const BSONObj oldObj = loc.obj();
+            // We fill this with the new locs of updates so we don't double-update anything.
+            if (updatedLocs.count(loc)) {
+                continue;
+            }
+
+            Record* record = loc.rec();
 
             // We count how many documents we scanned even though we may skip those that are
             // deemed duplicated. The final 'numUpdated' and 'nscanned' numbers may differ for
             // that reason.
+            // XXX: pull this out of the plan.
             opDebug->nscanned++;
-
-            // Skips this document if it:
-            // a) doesn't match the query portion of the update
-            // b) was deemed duplicate by the underlying cursor machinery
-            //
-            // Now, if we are going to update the document,
-            // c) we don't want to do so while the cursor is at it, as that may invalidate
-            // the cursor. So, we advance to next document, before issuing the update.
-            MatchDetails matchDetails;
-            matchDetails.requestElemMatchKey();
-            if ( !cursor->currentMatches( &matchDetails ) ) {
-                // a)
-                cursor->advance();
-                continue;
-            }
-            else if ( cursor->getsetdup( loc ) && dedupHere ) {
-                // b)
-                cursor->advance();
-                continue;
-            }
-            else if (!driver->isDocReplacement() && request.isMulti()) {
-                // c)
-                cursor->advance();
-                if ( dedupHere ) {
-                    if ( seenLocs.count( loc ) ) {
-                        continue;
-                    }
-                }
-
-                // There are certain kind of cursors that hold multiple pointers to data
-                // underneath. $or cursors is one example. In a $or cursor, it may be the case
-                // that when we did the last advance(), we finished consuming documents from
-                // one of $or child and started consuming the next one. In that case, it is
-                // possible that the last document of the previous child is the same as the
-                // first document of the next (see SERVER-5198 and jstests/orp.js).
-                //
-                // So we advance the cursor here until we see a new diskloc.
-                //
-                // Note that we won't be yielding, and we may not do so for a while if we find
-                // a particularly duplicated sequence of loc's. That is highly unlikely,
-                // though.  (See SERVER-5725, if curious, but "stage" based $or will make that
-                // ticket moot).
-                while( cursor->ok() && loc == cursor->currLoc() ) {
-                    cursor->advance();
-                }
-            }
-
-            // For some (unfortunate) historical reasons, not all cursors would be valid after
-            // a write simply because we advanced them to a document not affected by the write.
-            // To protect in those cases, not only we engaged in the advance() logic above, but
-            // we also tell the cursor we're about to write a document that we've just seen.
-            // prepareToTouchEarlierIterate() requires calling later
-            // recoverFromTouchingEarlierIterate(), so we make a note here to do so.
-            bool touchPreviousDoc = request.isMulti() && cursor->ok();
-            if ( touchPreviousDoc ) {
-                if ( clientCursor.get() )
-                    clientCursor->setDoingDeletes( true );
-                cursor->prepareToTouchEarlierIterate();
-            }
 
             // Found a matching document
             numMatched++;
@@ -323,6 +224,11 @@ namespace mongo {
             BSONObj logObj;
 
             // If there was a matched field, obtain it.
+            // XXX: do we always want to do this additional match?
+            MatchDetails matchDetails;
+            matchDetails.requestElemMatchKey();
+            verify(cq->root()->matchesBSON(oldObj, &matchDetails));
+
             string matchedField;
             if (matchDetails.hasElemMatchKey())
                 matchedField = matchDetails.elemMatchKey();
@@ -350,6 +256,8 @@ namespace mongo {
             // If something changed in the document, verify that no shard keys were altered.
             if ((!inPlace || !damages.empty()) && driver->modsAffectShardKeys())
                 uassertStatusOK( driver->checkShardKeysUnaltered (oldObj, doc ) );
+
+            runner->saveState();
 
             if ( inPlace && !driver->modsAffectIndices() ) {
                 // If a set of modifiers were all no-ops, we are still 'in place', but there is
@@ -385,13 +293,13 @@ namespace mongo {
                                                              *opDebug);
 
                 // If we've moved this object to a new location, make sure we don't apply
-                // that update again if our traversal picks the objecta again.
+                // that update again if our traversal picks the object again.
                 //
                 // We also take note that the diskloc if the updates are affecting indices.
                 // Chances are that we're traversing one of them and they may be multi key and
                 // therefore duplicate disklocs.
                 if ( newLoc != loc || driver->modsAffectIndices()  ) {
-                    seenLocs.insert( newLoc );
+                    updatedLocs.insert( newLoc );
                 }
 
                 objectWasChanged = true;
@@ -414,14 +322,11 @@ namespace mongo {
                 break;
             }
 
-            // If we used the cursor mechanism that prepares an earlier seen document for a
-            // write we need to tell such mechanisms that the write is over.
-            if ( touchPreviousDoc ) {
-                cursor->recoverFromTouchingEarlierIterate();
-            }
-
             getDur().commitIfNeeded();
 
+            if (!runner->restoreState()) {
+                break;
+            }
         }
 
         // TODO: Can this be simplified?

@@ -1220,7 +1220,8 @@ namespace mongo {
                             size_t options, vector<QuerySolution*>* out) {
         QLOG() << "=============================\n"
                << "Beginning planning.\n"
-               << "query = " << query.toString()
+               << "query = " << query.toString() << endl
+               << "opts = " << options << endl
                << "============================="
                << endl;
 

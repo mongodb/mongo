@@ -47,6 +47,7 @@
 #include "mongo/db/query_optimizer.h"
 #include "mongo/db/query_runner.h"
 #include "mongo/db/query/internal_plans.h"
+#include "mongo/db/query/new_find.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/write_concern.h"
 #include "mongo/db/storage_options.h"
@@ -93,18 +94,19 @@ namespace mongo {
        set your db SavedContext first
     */
     DiskLoc Helpers::findOne(const StringData& ns, const BSONObj &query, bool requireIndex) {
-        shared_ptr<Cursor> c =
-            getOptimizedCursor( ns,
-                                query,
-                                BSONObj(),
-                                requireIndex ?
-                                    QueryPlanSelectionPolicy::indexOnly() :
-                                    QueryPlanSelectionPolicy::any() );
-        while( c->ok() ) {
-            if ( c->currentMatches() && !c->getsetdup( c->currLoc() ) ) {
-                return c->currLoc();
-            }
-            c->advance();
+        CanonicalQuery* cq;
+        uassert(17244, "Could not canonicalize " + query.toString(),
+                CanonicalQuery::canonicalize(ns.toString(), query, &cq).isOK());
+
+        Runner* rawRunner;
+        uassert(17245, "Could not get runner for query " + query.toString(),
+                getRunner(cq, &rawRunner).isOK());
+
+        auto_ptr<Runner> runner(rawRunner);
+        Runner::RunnerState state;
+        DiskLoc loc;
+        if (Runner::RUNNER_ADVANCED == (state = runner->getNext(NULL, &loc))) {
+            return loc;
         }
         return DiskLoc();
     }
@@ -147,19 +149,24 @@ namespace mongo {
     }
 
     vector<BSONObj> Helpers::findAll( const string& ns , const BSONObj& query ) {
-        Lock::assertAtLeastReadLocked( ns );
+        Lock::assertAtLeastReadLocked(ns);
+        Client::Context ctx(ns);
+
+        CanonicalQuery* cq;
+        uassert(17236, "Could not canonicalize " + query.toString(),
+                CanonicalQuery::canonicalize(ns, query, &cq).isOK());
+
+        Runner* rawRunner;
+        uassert(17237, "Could not get runner for query " + query.toString(),
+                getRunner(cq, &rawRunner).isOK());
 
         vector<BSONObj> all;
 
-        Client::Context tx( ns );
-        
-        shared_ptr<Cursor> c = getOptimizedCursor( ns.c_str(), query );
-
-        while( c->ok() ) {
-            if ( c->currentMatches() && !c->getsetdup( c->currLoc() ) ) {
-                all.push_back( c->current() );
-            }
-            c->advance();
+        auto_ptr<Runner> runner(rawRunner);
+        Runner::RunnerState state;
+        BSONObj obj;
+        while (Runner::RUNNER_ADVANCED == (state = runner->getNext(&obj, NULL))) {
+            all.push_back(obj);
         }
 
         return all;

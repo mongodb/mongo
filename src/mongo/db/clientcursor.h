@@ -63,6 +63,8 @@ namespace mongo {
 
         ClientCursor(Runner* runner, int qopts = 0, const BSONObj query = BSONObj());
 
+        ClientCursor(const string& ns);
+
         ~ClientCursor();
 
         /**
@@ -399,9 +401,10 @@ namespace mongo {
     public:
         ClientCursorPin( long long cursorid );
         ~ClientCursorPin();
+        // This just releases the pin, does not delete the underlying.
         void release();
         // Call this to delete the underlying ClientCursor.
-        void free();
+        void deleteUnderlying();
         ClientCursor *c() const;
     private:
         CursorId _cursorid;

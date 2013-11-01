@@ -147,7 +147,7 @@ namespace mongo {
      * For a given query, get a runner.  The runner could be a SingleSolutionRunner, a
      * CachedQueryRunner, or a MultiPlanRunner, depending on the cache/query solver/etc.
      */
-    Status getRunner(CanonicalQuery* rawCanonicalQuery, Runner** out) {
+    Status getRunner(CanonicalQuery* rawCanonicalQuery, Runner** out, size_t plannerOptions) {
         verify(rawCanonicalQuery);
         auto_ptr<CanonicalQuery> canonicalQuery(rawCanonicalQuery);
 
@@ -173,6 +173,13 @@ namespace mongo {
         Database* db = cc().database();
         verify( db );
         Collection* collection = db->getCollection( canonicalQuery->ns() );
+
+        // This can happen as we're called by internal clients as well.
+        if (NULL == collection) {
+            const string& ns = canonicalQuery->ns();
+            *out = new EOFRunner(canonicalQuery.release(), ns);
+            return Status::OK();
+        }
         verify( collection );
 
         NamespaceDetails* nsd = collection->details();
@@ -202,7 +209,7 @@ namespace mongo {
         }
 
         vector<QuerySolution*> solutions;
-        size_t options = QueryPlanner::DEFAULT;
+        size_t options = plannerOptions;
         if (storageGlobalParams.noTableScan) {
             const string& ns = canonicalQuery->ns();
             // There are certain cases where we ignore this restriction:
@@ -213,7 +220,7 @@ namespace mongo {
                 options |= QueryPlanner::NO_TABLE_SCAN;
             }
         }
-        else {
+        if (!(options & QueryPlanner::NO_TABLE_SCAN)) {
             options |= QueryPlanner::INCLUDE_COLLSCAN;
         }
         QueryPlanner::plan(*canonicalQuery, indices, options, &solutions);
@@ -390,7 +397,7 @@ namespace mongo {
             }
 
             if (!saveClientCursor) {
-                ccPin.free();
+                ccPin.deleteUnderlying();
                 // cc is now invalid, as is the runner
                 cursorid = 0;
                 cc = NULL;

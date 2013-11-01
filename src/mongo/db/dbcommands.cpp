@@ -62,11 +62,14 @@
 #include "mongo/db/lasterror.h"
 #include "mongo/db/ops/count.h"
 #include "mongo/db/pdfile.h"
+#include "mongo/db/query/new_find.h"
 #include "mongo/db/query/internal_plans.h"
+#include "mongo/db/query/query_planner.h"
 #include "mongo/db/query_optimizer.h"
 #include "mongo/db/repl/is_master.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/write_concern.h"
+#include "mongo/s/d_logic.h"
 #include "mongo/s/d_writeback.h"
 #include "mongo/s/stale_exception.h"  // for SendStaleConfigException
 #include "mongo/scripting/engine.h"
@@ -829,24 +832,24 @@ namespace mongo {
             BSONObj query = BSON( "files_id" << jsobj["filemd5"] << "n" << GTE << n );
             BSONObj sort = BSON( "files_id" << 1 << "n" << 1 );
 
-            shared_ptr<Cursor> cursor = getBestGuessCursor(ns.c_str(), query, sort);
-            if ( ! cursor ) {
-                errmsg = "need an index on { files_id : 1 , n : 1 }";
-                return false;
+            CanonicalQuery* cq;
+            if (!CanonicalQuery::canonicalize(ns, query, sort, BSONObj(), &cq).isOK()) {
+                uasserted(17240, "Can't canonicalize query " + query.toString());
+                return 0;
             }
-            auto_ptr<ClientCursor> cc (new ClientCursor(QueryOption_NoCursorTimeout, cursor, ns.c_str()));
 
-            while ( cursor->ok() ) {
-                if ( ! cursor->matcher()->matchesCurrent( cursor.get() ) ) {
-                    log() << "**** NOT MATCHING ****" << endl;
-                    PRINT(cursor->current());
-                    cursor->advance();
-                    continue;
-                }
+            Runner* rawRunner;
+            if (!getRunner(cq, &rawRunner, QueryPlanner::NO_TABLE_SCAN).isOK()) {
+                uasserted(17241, "Can't get runner for query " + query.toString());
+                return 0;
+            }
 
-                BSONObj obj = cursor->current();
-                cursor->advance();
+            auto_ptr<Runner> runner(rawRunner);
+            const ChunkVersion shardVersionAtStart = shardingState.getVersion(ns);
 
+            BSONObj obj;
+            Runner::RunnerState state;
+            while (Runner::RUNNER_ADVANCED == (state = runner->getNext(&obj, NULL))) {
                 BSONElement ne = obj["n"];
                 verify(ne.isNumber());
                 int myn = ne.numberInt();
@@ -864,35 +867,27 @@ namespace mongo {
                 int len;
                 const char * data = owned["data"].binDataClean( len );
 
-                ClientCursorYieldLock yield (cc.get());
-                try {
-                    md5_append( &st , (const md5_byte_t*)(data) , len );
-                    n++;
-                }
-                catch (...) {
-                    if ( ! yield.stillOk() ) // relocks
-                        cc.release();
-                    throw;
-                }
+                // Save state, yield, run the MD5, and reacquire lock.
+                runner->saveState();
+                auto_ptr<dbtempreleasecond> yield(new dbtempreleasecond());
+                md5_append( &st , (const md5_byte_t*)(data) , len );
+                n++;
+                yield.reset();
 
-                try { // SERVER-5752 may make this try unnecessary
-                    if ( ! yield.stillOk() ) { // relocks and checks shard version
-                        cc.release();
-                        if (!partialOk)
-                            uasserted(13281, "File deleted during filemd5 command");
+                // Have the lock again.  See if we were killed.
+                if (!runner->restoreState()) {
+                    if (!partialOk) {
+                        uasserted(13281, "File deleted during filemd5 command");
                     }
                 }
-                catch(SendStaleConfigException& e){
+
+                if (!shardingState.getVersion(ns).isWriteCompatibleWith(shardVersionAtStart)) {
                     // return partial results.
                     // Mongos will get the error at the start of the next call if it doesn't update first.
                     log() << "Config changed during filemd5 - command will resume " << endl;
-
-                    // useful for debugging but off by default to avoid looking like a scary error.
-                    LOG(1) << "filemd5 stale config exception: " << e.what() << endl;
                     break;
                 }
             }
-
 
             if (partialOk)
                 result.appendBinData("md5state", sizeof(st), BinDataGeneral, &st);

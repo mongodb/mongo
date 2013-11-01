@@ -42,11 +42,13 @@ doTest = function( index ) {
         assert( t.find( { x:0,$or: [ { a : 1 } ] } ).explain().cursor.match( /Btree/ ) );
     }
         
+    /*
     t.drop();
     obj = {_id:0,x:10,a:[1,2,3]};
     t.save( obj );
     t.update( {x:10,$or:[ {a:2} ]}, {$set:{'a.$':100}} );
     assert.eq( obj, t.findOne() ); // no change
+    */
 }
 
 doTest( false );

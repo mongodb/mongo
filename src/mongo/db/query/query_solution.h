@@ -125,6 +125,7 @@ namespace mongo {
          */
         virtual const BSONObjSet& getSort() const = 0;
 
+        // These are owned here.
         vector<QuerySolutionNode*> children;
 
         scoped_ptr<MatchExpression> filter;

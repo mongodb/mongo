@@ -48,7 +48,7 @@ namespace mongo {
      * If the query cannot be executed, returns a Status indicating why.  Deletes
      * rawCanonicalQuery.
      */
-    Status getRunner(CanonicalQuery* rawCanonicalQuery, Runner** out);
+    Status getRunner(CanonicalQuery* rawCanonicalQuery, Runner** out, size_t plannerOptions = 0);
 
     /**
      * A switch to choose between old Cursor-based code and new Runner-based code.

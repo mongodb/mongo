@@ -42,7 +42,10 @@
 #include "mongo/db/kill_current_op.h"
 #include "mongo/db/matcher.h"
 #include "mongo/db/query_optimizer.h"
+#include "mongo/db/query/new_find.h"
+#include "mongo/db/query/query_planner.h"
 #include "mongo/db/repl/is_master.h"
+#include "mongo/db/range_preserver.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/s/collection_metadata.h"
@@ -882,39 +885,42 @@ namespace mongo {
                                         "M/R: (3/3) Final Reduce Progress",
                                         _db.count(_config.incLong, BSONObj(), QueryOption_SlaveOk)));
 
-            shared_ptr<Cursor> temp = getBestGuessCursor(_config.incLong.c_str(),
-                                                         BSONObj(),
-                                                         sortKey);
-            ClientCursorHolder cursor(new ClientCursor(QueryOption_NoCursorTimeout,
-                                                         temp,
-                                                         _config.incLong.c_str()));
-            // iterate over all sorted objects
-            while ( cursor->ok() ) {
-                BSONObj o = cursor->current().getOwned();
-                cursor->advance();
+            CanonicalQuery* cq;
+            verify(CanonicalQuery::canonicalize(_config.incLong, BSONObj(), sortKey, BSONObj(), &cq).isOK());
 
+            Runner* rawRunner;
+            verify(getRunner(cq, &rawRunner, QueryPlanner::NO_TABLE_SCAN).isOK());
+
+            auto_ptr<Runner> runner(rawRunner);
+            auto_ptr<DeregisterEvenIfUnderlyingCodeThrows> safety;
+            ClientCursor::registerRunner(runner.get());
+            runner->setYieldPolicy(Runner::YIELD_AUTO);
+            safety.reset(new DeregisterEvenIfUnderlyingCodeThrows(runner.get()));
+
+            // iterate over all sorted objects
+            BSONObj o;
+            Runner::RunnerState state;
+            while (Runner::RUNNER_ADVANCED == (state = runner->getNext(&o, NULL))) {
                 pm.hit();
 
                 if ( o.woSortOrder( prev , sortKey ) == 0 ) {
                     // object is same as previous, add to array
                     all.push_back( o );
                     if ( pm->hits() % 100 == 0 ) {
-                        if ( ! cursor->yield() ) {
-                            break;
-                        }
                         killCurrentOp.checkForInterrupt();
                     }
                     continue;
                 }
 
-                ClientCursorYieldLock yield (cursor.get());
+                runner->saveState();
+                auto_ptr<dbtempreleasecond> yield(new dbtempreleasecond());
 
                 try {
                     // reduce a finalize array
                     finalReduce( all );
                 }
                 catch (...) {
-                    yield.relock();
+                    yield.reset();
                     throw;
                 }
 
@@ -922,7 +928,8 @@ namespace mongo {
                 prev = o;
                 all.push_back( o );
 
-                if ( ! yield.stillOk() ) {
+                yield.reset();
+                if (!runner->restoreState()) {
                     break;
                 }
 
@@ -1140,27 +1147,19 @@ namespace mongo {
 
                 uassert( 16149 , "cannot run map reduce without the js engine", globalScriptEngine );
 
-                ClientCursorHolder holdCursor;
                 CollectionMetadataPtr collMetadata;
 
+                // Prevent sharding state from changing during the MR.
+                auto_ptr<RangePreserver> rangePreserver;
                 {
+                    Client::ReadContext ctx(config.ns);
+                    rangePreserver.reset(new RangePreserver(config.ns));
+
                     // Get metadata before we check our version, to make sure it doesn't increment
-                    // in the meantime
-                    if ( shardingState.needCollectionMetadata( config.ns ) ) {
+                    // in the meantime.  Need to do this in the same lock scope as the block.
+                    if (shardingState.needCollectionMetadata(config.ns)) {
                         collMetadata = shardingState.getCollectionMetadata( config.ns );
                     }
-
-                    // Check our version immediately, to avoid migrations happening in the meantime while we do prep
-                    Client::ReadContext ctx( config.ns );
-
-                    // Get a very basic cursor, prevents deletion of migrated data while we m/r
-                    shared_ptr<Cursor> temp = getOptimizedCursor( config.ns.c_str(),
-                                                                  BSONObj(),
-                                                                  BSONObj() );
-                    uassert( 15876, str::stream() << "could not create cursor over " << config.ns << " to hold data while prepping m/r", temp.get() );
-                    holdCursor.reset( new ClientCursor( QueryOption_NoCursorTimeout , temp , config.ns.c_str() ) );
-                    uassert( 15877, str::stream() << "could not create m/r holding client cursor over " << config.ns, holdCursor );
-
                 }
 
                 bool shouldHaveData = false;
@@ -1218,39 +1217,29 @@ namespace mongo {
                         // open cursor
                         Client::Context ctx(config.ns, storageGlobalParams.dbpath, false);
 
-                        // obtain full cursor on data to apply mr to
-                        shared_ptr<Cursor> temp = getOptimizedCursor( config.ns.c_str(),
-                                                                      config.filter,
-                                                                      config.sort );
-                        uassert( 16052, str::stream() << "could not create cursor over " << config.ns << " for query : " << config.filter << " sort : " << config.sort, temp.get() );
-                        ClientCursorHolder cursor(new ClientCursor(QueryOption_NoCursorTimeout,
-                                                                     temp,
-                                                                     config.ns.c_str()));
-                        uassert( 16053, str::stream() << "could not create client cursor over " << config.ns << " for query : " << config.filter << " sort : " << config.sort, cursor.get() );
+                        CanonicalQuery* cq;
+                        if (!CanonicalQuery::canonicalize(config.ns, config.filter, config.sort, BSONObj(), &cq).isOK()) {
+                            uasserted(17238, "Can't canonicalize query " + config.filter.toString());
+                            return 0;
+                        }
+
+                        Runner* rawRunner;
+                        if (!getRunner(cq, &rawRunner).isOK()) {
+                            uasserted(17239, "Can't get runner for query " + config.filter.toString());
+                            return 0;
+                        }
+
+                        auto_ptr<Runner> runner(rawRunner);
+                        auto_ptr<DeregisterEvenIfUnderlyingCodeThrows> safety;
+                        ClientCursor::registerRunner(runner.get());
+                        runner->setYieldPolicy(Runner::YIELD_AUTO);
+                        safety.reset(new DeregisterEvenIfUnderlyingCodeThrows(runner.get()));
 
                         Timer mt;
                         // go through each doc
-                        while ( cursor->ok() ) {
-                            if ( ! cursor->yieldSometimes( ClientCursor::WillNeed ) ) {
-                                cursor.release();
-                                break;
-                            }
-
-                            if ( ! cursor->currentMatches() ) {
-                                cursor->advance();
-                                continue;
-                            }
-
-                            // make sure we dont process duplicates in case data gets moved around during map
-                            // TODO This won't actually help when data gets moved, it's to handle multikeys.
-                            if ( cursor->currentIsDup() ) {
-                                cursor->advance();
-                                continue;
-                            }
-
-                            BSONObj o = cursor->current();
-                            cursor->advance();
-
+                        BSONObj o;
+                        Runner::RunnerState state;
+                        while (Runner::RUNNER_ADVANCED == (state = runner->getNext(&o, NULL))) {
                             // check to see if this is a new object we don't own yet
                             // because of a chunk migration
                             if ( collMetadata ) {
@@ -1267,17 +1256,6 @@ namespace mongo {
 
                             num++;
                             if ( num % 100 == 0 ) {
-                                // try to yield lock regularly
-                                ClientCursorYieldLock yield (cursor.get());
-                                Timer t;
-                                // check if map needs to be dumped to disk
-                                state.checkSize();
-                                inReduce += t.micros();
-
-                                if ( ! yield.stillOk() ) {
-                                    break;
-                                }
-
                                 killCurrentOp.checkForInterrupt();
                             }
                             pm.hit();

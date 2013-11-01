@@ -86,6 +86,14 @@ namespace mongo {
         init();
     }
 
+    ClientCursor::ClientCursor(const string& ns)
+        : _ns(ns),
+          _queryOptions(QueryOption_NoCursorTimeout),
+          _yieldSometimesTracker(128, 10) {
+
+        init();
+    }
+
     void ClientCursor::init() {
         _db = cc().database();
         verify( _db );
@@ -171,12 +179,22 @@ namespace mongo {
             }
         }
 
+        // Look at all cached ClientCursor(s).  The CC may have a Runner, a Cursor, or nothing (see
+        // sharding_block.h).
         CCById::const_iterator it = clientCursorsById.begin();
         while (it != clientCursorsById.end()) {
             ClientCursor* cc = it->second;
 
             // We're only interested in cursors over one db.
             if (cc->_db != db) {
+                ++it;
+                continue;
+            }
+
+            // Note that a valid ClientCursor state is "no cursor no runner."  This is because
+            // the set of active cursor IDs in ClientCursor is used as representation of query
+            // state.  See sharding_block.h.  TODO(greg,hk): Move this out.
+            if (NULL == cc->c() && NULL == cc->_runner.get()) {
                 ++it;
                 continue;
             }
@@ -276,7 +294,7 @@ namespace mongo {
             cc->_runner->invalidate(dl);
         }
 
-        // Begin cursor-only
+        // Begin cursor-only.  Only cursors that are in ccByLoc are processed here.
         CCByLoc& bl = db->ccByLoc();
         CCByLoc::iterator j = bl.lower_bound(ByLocKey::min(dl));
         CCByLoc::iterator stop = bl.upper_bound(ByLocKey::max(dl));
@@ -869,7 +887,7 @@ namespace mongo {
         }
     }
 
-    void ClientCursorPin::free() {
+    void ClientCursorPin::deleteUnderlying() {
         if (_cursorid == INVALID_CURSOR_ID) {
             return;
         }
