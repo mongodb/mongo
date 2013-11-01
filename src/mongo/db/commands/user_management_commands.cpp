@@ -1556,7 +1556,7 @@ namespace mongo {
 
             audit::logGrantPrivilegesToRole(ClientBasic::getCurrent(),
                                             roleName,
-                                            privileges);
+                                            privilegesToAdd);
 
             status = authzManager->updateRoleDocument(
                     roleName,
@@ -1708,7 +1708,7 @@ namespace mongo {
 
             audit::logRevokePrivilegesFromRole(ClientBasic::getCurrent(),
                                                roleName,
-                                               privileges);
+                                               privilegesToRemove);
 
             BSONObjBuilder updateBSONBuilder;
             updateObj.writeTo(&updateBSONBuilder);
