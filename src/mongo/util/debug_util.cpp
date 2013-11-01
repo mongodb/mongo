@@ -17,6 +17,8 @@
 
 #include "mongo/pch.h"
 
+#include "mongo/db/server_options.h"
+
 #ifndef _WIN32
 #include <signal.h>
 #endif
