@@ -159,14 +159,13 @@ namespace auth {
 
     Status parseRolePossessionManipulationCommands(const BSONObj& cmdObj,
                                                    const StringData& cmdName,
-                                                   const StringData& rolesFieldName,
                                                    const std::string& dbname,
                                                    std::string* parsedName,
                                                    vector<RoleName>* parsedRoleNames,
                                                    BSONObj* parsedWriteConcern) {
         unordered_set<std::string> validFieldNames;
         validFieldNames.insert(cmdName.toString());
-        validFieldNames.insert(rolesFieldName.toString());
+        validFieldNames.insert("roles");
         validFieldNames.insert("writeConcern");
 
         Status status = _checkNoExtraFields(cmdObj, cmdName, validFieldNames);
@@ -185,7 +184,7 @@ namespace auth {
         }
 
         BSONElement rolesElement;
-        status = bsonExtractTypedField(cmdObj, rolesFieldName, Array, &rolesElement);
+        status = bsonExtractTypedField(cmdObj, "roles", Array, &rolesElement);
         if (!status.isOK()) {
             return status;
         }
@@ -199,8 +198,8 @@ namespace auth {
 
         if (!parsedRoleNames->size()) {
             return Status(ErrorCodes::BadValue,
-                          mongoutils::str::stream() << cmdName << " command requires a non-empty \""
-                                  << rolesFieldName << "\" array");
+                          mongoutils::str::stream() << cmdName << " command requires a non-empty "
+                                  "\"roles\" array");
         }
         return Status::OK();
     }

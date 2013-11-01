@@ -800,7 +800,6 @@ namespace mongo {
             BSONObj unusedWriteConcern;
             Status status = auth::parseRolePossessionManipulationCommands(cmdObj,
                                                                           "grantRolesToUser",
-                                                                          "roles",
                                                                           dbname,
                                                                           &unusedUserNameString,
                                                                           &roles,
@@ -837,7 +836,6 @@ namespace mongo {
             BSONObj writeConcern;
             status = auth::parseRolePossessionManipulationCommands(cmdObj,
                                                                    "grantRolesToUser",
-                                                                   "roles",
                                                                    dbname,
                                                                    &userNameString,
                                                                    &roles,
@@ -915,7 +913,6 @@ namespace mongo {
             BSONObj unusedWriteConcern;
             Status status = auth::parseRolePossessionManipulationCommands(cmdObj,
                                                                           "revokeRolesFromUser",
-                                                                          "roles",
                                                                           dbname,
                                                                           &unusedUserNameString,
                                                                           &roles,
@@ -952,7 +949,6 @@ namespace mongo {
             BSONObj writeConcern;
             status = auth::parseRolePossessionManipulationCommands(cmdObj,
                                                                    "revokeRolesFromUser",
-                                                                   "roles",
                                                                    dbname,
                                                                    &userNameString,
                                                                    &roles,
@@ -1756,7 +1752,6 @@ namespace mongo {
             BSONObj unusedWriteConcern;
             Status status = auth::parseRolePossessionManipulationCommands(cmdObj,
                                                                           "grantRolesToRole",
-                                                                          "grantedRoles",
                                                                           dbname,
                                                                           &unusedUserNameString,
                                                                           &roles,
@@ -1780,7 +1775,6 @@ namespace mongo {
             Status status = auth::parseRolePossessionManipulationCommands(
                     cmdObj,
                     "grantRolesToRole",
-                    "grantedRoles",
                     dbname,
                     &roleNameString,
                     &rolesToAdd,
@@ -1890,7 +1884,6 @@ namespace mongo {
             BSONObj unusedWriteConcern;
             Status status = auth::parseRolePossessionManipulationCommands(cmdObj,
                                                                           "revokeRolesFromRole",
-                                                                          "revokedRoles",
                                                                           dbname,
                                                                           &unusedUserNameString,
                                                                           &roles,
@@ -1927,7 +1920,6 @@ namespace mongo {
             BSONObj writeConcern;
             status = auth::parseRolePossessionManipulationCommands(cmdObj,
                                                                    "revokeRolesFromRole",
-                                                                   "revokedRoles",
                                                                    dbname,
                                                                    &roleNameString,
                                                                    &rolesToRemove,

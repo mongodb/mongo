@@ -74,7 +74,6 @@ namespace auth {
      */
     Status parseRolePossessionManipulationCommands(const BSONObj& cmdObj,
                                                    const StringData& cmdName,
-                                                   const StringData& rolesFieldName,
                                                    const std::string& dbname,
                                                    std::string* parsedName,
                                                    vector<RoleName>* parsedRoleNames,

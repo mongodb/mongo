@@ -1315,7 +1315,7 @@ DB.prototype.dropAllRoles = function(writeConcern) {
 
 DB.prototype.grantRolesToRole = function(rolename, roles, writeConcern) {
     var cmdObj = {grantRolesToRole: rolename,
-                  grantedRoles: roles,
+                  roles: roles,
                   writeConcern: writeConcern ? writeConcern : _defaultWriteConcern};
     var res = this.runCommand(cmdObj);
     if (!res.ok) {
@@ -1325,7 +1325,7 @@ DB.prototype.grantRolesToRole = function(rolename, roles, writeConcern) {
 
 DB.prototype.revokeRolesFromRole = function(rolename, roles, writeConcern) {
     var cmdObj = {revokeRolesFromRole: rolename,
-                  revokedRoles: roles,
+                  roles: roles,
                   writeConcern: writeConcern ? writeConcern : _defaultWriteConcern};
     var res = this.runCommand(cmdObj);
     if (!res.ok) {
